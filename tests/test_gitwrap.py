@@ -146,6 +146,20 @@ class RejectTest(GitWrapperTest):
     def test_unknown_subcommand_is_rejected_by_default(self):
         self.assertRejected("frobnicate")
 
+    def test_rm_passes_but_forcing_it_does_not(self):
+        # git rm は索引や HEAD と食い違うファイルを既定で拒む。-f はその線を
+        # 越えてコミットしていない変更ごと消すので、こちらでも同じ場所で止める。
+        for args in (
+            ("rm",),
+            ("rm", "-f", "tracked.txt"),
+            ("rm", "--force", "tracked.txt"),
+            ("rm", "-rf", "."),
+            ("rm", "."),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "tracked.txt")))
+
     def test_the_alternative_it_names_is_not_a_denied_form(self):
         # 生の git は PreToolUse で止まる。案内が `git stash push -u` と書くと、
         # 案内された先でもう 1 度拒否される。代わりの手段が拒否される案内は、
@@ -177,6 +191,13 @@ class RejectTest(GitWrapperTest):
 
 
 class PassTest(GitWrapperTest):
+    def test_rm_removes_a_tracked_file(self):
+        # rules.yml が rm -rf の代わりに名指しで勧める経路。勧めた先が
+        # 通らないと、案内は行き止まりになる。
+        result = self.run_wrapper("rm", "tracked.txt")
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "tracked.txt")))
+
     def test_commit_goes_through(self):
         self.assertEqual(0, self.run_wrapper("add", "untracked.txt").returncode)
         result = self.run_wrapper("commit", "-m", "足した")
