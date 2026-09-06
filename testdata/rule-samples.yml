@@ -100,6 +100,15 @@ deny:
   - tool: Bash
     subject: "cp /tmp/x /repo/.claude/settings.local.json"
     why: 行き先に来た設定ファイル
+  - tool: Write
+    subject: "/repo/.claude/scripts/ccnavi-git.sh"
+    why: git の入口。書き換えれば git のルールがまとめて外れる
+  - tool: Bash
+    subject: "sed -i s/push/x/ /repo/.claude/scripts/ccnavi-git.sh"
+    why: 通さないはずのサブコマンドを通す形に変えられる
+  - tool: Bash
+    subject: "cd /repo/.claude/worktrees/x && echo x > ../../scripts/ccnavi-git.sh"
+    why: .claude を通らない綴り。Bash の対象は解かれないので名前で捕まえる
 
 ask:
   - tool: Bash
@@ -185,6 +194,15 @@ allow:
   - tool: Read
     subject: "/repo/.claude/settings.json"
     why: Read は止めない。止めると何が効いているか分からなくなる
+  - tool: Bash
+    subject: "cat /repo/.claude/scripts/ccnavi-git.sh"
+    why: ラッパの中身を読むのは普通
+  - tool: Bash
+    subject: "sh /repo/.claude/scripts/ccnavi-git.sh diff --stat"
+    why: これが git の打ち方そのもの。ここを止めたら何もできない
+  - tool: Bash
+    subject: "cp /repo/.claude/scripts/ccnavi-git.sh /tmp/backup.sh"
+    why: 控えを取っているだけ
   - tool: Bash
     subject: "uv run python -m ccnavi --rules /repo/.claude/ccnavi/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ここを止めると点検ができない
