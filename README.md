@@ -4,6 +4,116 @@ Claude Code のツール呼び出しを hook で止め、止めた理由と代�
 
 要求は [requirements.md](requirements.md)、設計は [ccnavi.md](ccnavi.md) にある。
 
+## 導入
+
+止める設定を先に書き切ることはできない。何が打たれるかは走らせてみないと分からず、
+書いたルールが何に当たるかも当ててみないと分からない。だから `dry-run` で立てて、
+記録を読みながらルールを寄せる。`enable` に切り替えるのは記録が落ち着いてから。
+
+### 1. dry-run で立てる
+
+実行ファイルを組み立て、`PreToolUse` と `PostToolUse` の両方に登録する（「設定」の節）。
+`CCNAVI_MODE` は `dry-run` にする。
+
+```json
+"env": {
+  "CCNAVI_MODE": "dry-run",
+  "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
+  "CCNAVI_LOG": ".claude/ccnavi/log.jsonl"
+}
+```
+
+ルールファイルには、取り返しの付かない操作とガード自身の設定だけを `deny` に書いて
+始める。`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、`.claude/` の下。
+組み込みの既定（「ルールファイルが読めないとき」の節）がちょうどその範囲なので、
+写して直すのが早い。
+
+`allow` は空のままでよい。既定は許可ではなく確認なので、`enable` ならここで普通の
+作業がすべて確認に落ちる。`dry-run` は呼び出しに手を出さないから、空のまま走らせても
+作業は止まらず、どこに穴が開いているかだけが記録に溜まる。
+
+立てたら、判定を始める前に設定そのものを見る。
+
+```sh
+ccnavi --lint
+```
+
+`dry-run` の間は `warn` が 1 件出続ける（「モードが `dry-run` なので呼び出しに手を
+出さない」）。終了コードは 0 のままで、切り替えが済んでいない合図としてそこに残る。
+
+`env` の変更はセッションを開き直すまで効かない。
+
+### 2. 普段どおり開発する
+
+ccnavi は判定して、呼び出しには手を出さず「`enable` なら何をしていたか」を返す。
+その文面はそのままエージェントが読むので、代わりに取る手段が書けているかもここで
+分かる。「止めた」としか言っていないルールは、`enable` にしたとたんに手を止める。
+
+### 3. 記録を読む
+
+通した回も含めて 1 行 1 件で残っている（「記録」の節）。読む順は 4 つ。
+
+```sh
+# 判定の内訳
+jq -r '.decision' .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn
+
+# 止めた回。誤検知はここに出る
+jq -r 'select(.decision=="deny")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
+  .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn
+
+# どこにも当たらなかった回。enable ではこれが全部、人への確認になる
+jq -r 'select(.code=="IMPL_UNDECLARED")|(.subject|gsub("[ \t\n]+";" "))' \
+  .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn | head -30
+
+# 通した回を、当たったルール別に。広すぎる allow はここに出る
+jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
+  .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn | head -30
+```
+
+`subject` を 1 行に均してから数える。複数行のコマンドをそのまま流すと、
+`uniq -c` が 1 件を行数ぶんに割ってしまう。
+
+`decision` が `skip` の行は判定が届かなかった回で、`reason` に理由が入る。
+`paths` が付いた行は実行後の監視が拾った変更で、引数に現れない書き込みがそこにある。
+
+### 4. ルールを直す
+
+記録から出てくる直しは 3 種類ある。
+
+| 記録に出るもの | 直す先 |
+|---|---|
+| 止めるつもりのなかったものが `deny` に出ている | ルールの綴りを絞る。語の切れ目が要るなら `regex` へ |
+| 同じ呼び出しが `IMPL_UNDECLARED` で並ぶ | `allow` に足す。1 行足すたびに人が見なくなる範囲が広がる |
+| `allow` で通っているが止めたいものがある | `deny` か `ask` に足す。強い区画が先に当たる |
+
+直したら、そのつど 3 つを回す。
+
+```sh
+ccnavi --lint                              # 防御を無効化しうる記述が無いか
+ccnavi --test Bash "cd /repo && git push"  # 1 件が何に当たるか
+uv run python testdata/check_rules.py      # 見本をまとめて
+```
+
+ルールを 1 件足したら見本も 1 行足す（「見本で確かめる」の節）。止めたいものだけでなく、
+**止めたくないものを必ず一緒に置く**。片側だけの見本では、ルールを広げすぎたことに
+気づけない。`/rules-check` スキルがこの流れをまとめて回す。
+
+### 5. enable へ切り替える
+
+目安は記録の側にある。
+
+- 普段の作業で `IMPL_UNDECLARED` がほとんど出ない。ここが残ったまま切り替えると、
+  穴が塞がるまで同じ問いが繰り返される
+- `deny` に出ているものが、全部「意図して止めたもの」になっている
+- `--lint` の `error` が 0 件
+
+`CCNAVI_MODE` を `enable` にして、セッションを開き直す。記録は同じファイルに続き、
+`deny` と `ask` の `enforced` が `false` から `true` に変わる。1 つのファイルで
+「何を止めるはずだったか」と「何を実際に止めたか」を同じ物差しで数えられる。
+
+`disable` は `.claude/settings.json` に書いても効かない（「動作モード」の節）。
+一時的に外すなら、セッションを起動する側の環境から渡す。
+
 ## 開発
 
 Python 3.12 以降。実行時の依存は PyYAML 1 本だけ。
