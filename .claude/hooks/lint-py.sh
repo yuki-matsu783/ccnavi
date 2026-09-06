@@ -45,12 +45,9 @@ else
 $lint"
 fi
 
-if tests=$($UV python -m unittest discover -s tests -t . 2>&1); then
-	:
-else
-	add "unittest:
-$tests"
-fi
+# テストはここでは走らせない。Stop の test-py.sh に移した。編集ごとに全件を
+# 走らせると、複数ファイルにまたがる変更では途中の状態が必ず落ちるので、
+# 意味のない失敗の山を毎回読むことになり、本当の失敗がその中に紛れる。
 
 # 実行ファイルはここでは作り直さない。PyInstaller は 11 秒かかるので、
 # 編集 1 回ごとに走らせると 1 ファイル直すたびに 20 秒近く待つことになる。
