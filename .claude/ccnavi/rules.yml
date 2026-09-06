@@ -68,7 +68,7 @@ deny:
 ask:
   - id: commit
     match: Bash
-    regex: '^git\s+commit\b'
+    regex: '\bgit\s+commit\b'
     message: >-
       コミットは 1 回ごとに人が見ます。何を含めたか、メッセージが変更と合っているかを
       確かめてください。
@@ -109,14 +109,24 @@ allow:
     match: Write|Edit|MultiEdit
     pattern: ".claude/worktrees/*"
 
+  # コマンドの regex は行頭に錨を打たない。判定に渡るのは実行される部分を
+  # 繋いだ 1 本の文字列で、`cd /repo && git status` のように前に別の語が来る。
+  # `^` を打つと、繋がった 2 本目以降がどれも当たらず、普通の作業が丸ごと
+  # 暗黙的 ask に落ちる。代わりに `\b` で語の切れ目を要求して、`controls` の
+  # 中の `ls` のような当たり方を防ぐ。
+  #
+  # 錨を外したぶん網は粗い。`git status && 知らないもの` は、allow に当たった
+  # 側の語だけで全体が通る。deny は文字列全体に当たり続けるので危ないものは
+  # 止まるが、確認の網から漏れる形は残る。ここを詰めるなら、判定を繋いだ
+  # 文字列ではなくコマンド 1 本ずつに当てる作りが要る。
   - id: git-read-only
     match: Bash
-    regex: '^git\s+(status|log|diff|show|branch|remote|worktree|add|stash|merge|restore|rev-parse)\b'
+    regex: '\bgit\s+(status|log|diff|show|branch|remote|worktree|add|stash|merge|restore|rev-parse)\b'
 
   - id: checks
     match: Bash
-    regex: '^uv\s+run\b'
+    regex: '\buv\s+run\b'
 
   - id: shell-inspection
     match: Bash
-    regex: '^(ls|cat|sed|head|tail|find|grep|echo|mkdir|cp|mv|pwd|wc|sort|uniq|diff)\b'
+    regex: '\b(ls|cat|sed|head|tail|find|grep|echo|mkdir|cp|mv|pwd|wc|sort|uniq|diff)\b'
