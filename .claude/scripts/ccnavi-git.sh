@@ -62,7 +62,8 @@ sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
   変える    add  commit (--no-verify は不可)  restore <パス>
             checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
-            stash (list show push pop apply)  merge --ff-only / --abort / --quit
+            stash (list show push pop apply)
+            merge (-X ours / -s ours / --no-verify は不可)
   通信      fetch  pull  (--force / --prune は不可)
 
 通さないもの (代わりの手段):
@@ -226,11 +227,35 @@ restore)
 	;;
 
 merge)
-	if has --abort ${1+"$@"} || has --quit ${1+"$@"} || has --ff-only ${1+"$@"}; then
-		:
-	else
-		reject "merge は --ff-only だけ通します。worktree のブランチが main の直上なら早送りで入ります。入らないなら衝突の解消が要るので、状態を報告して判断を仰いでください。中断は git merge --abort です。"
-	fi
+	# 早送り以外も通す。CLAUDE.md の worktree 手順は、main が先に進んだ状態から
+	# ブランチへ main を取り込む形を必ず通る。そこを --ff-only に絞ると、
+	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
+	# 解こうとする手をラッパが止めてしまっては、止めた先に進む道が無くなる。
+	#
+	# 止めるのは、衝突を人が見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
+	# もう一方の変更を黙って落とす。並行して動いている他セッションの書きかけが
+	# そこに入っていることがあり、落ちたことは差分にも記録にも残らない。
+	prev=""
+	for arg in ${1+"$@"}; do
+		case "$prev" in
+		-X | -s | --strategy | --strategy-option)
+			case "$arg" in
+			ours | theirs)
+				reject "$prev $arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+				;;
+			esac
+			;;
+		esac
+		case "$arg" in
+		-Xours | -Xtheirs | --strategy-option=ours | --strategy-option=theirs | -sours | --strategy=ours)
+			reject "$arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+			;;
+		--no-verify)
+			reject "$arg はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+			;;
+		esac
+		prev="$arg"
+	done
 	;;
 
 commit)
