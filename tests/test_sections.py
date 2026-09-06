@@ -25,8 +25,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def rule(name: str, match: str, pattern: str, message: str = "文面") -> dict:
-    return {"id": name, "match": match, "pattern": pattern, "message": message}
+def rule(name: str, match: str, glob: str, message: str = "文面") -> dict:
+    return {"id": name, "match": match, "glob": glob, "message": message}
 
 
 def write(path: str, text: str) -> str:
@@ -49,7 +49,7 @@ class SectionsTest(unittest.TestCase):
         読み手がそのまま受け取る。区画の強さを見たいテストで、YAML の綴りの
         話に付き合わずに済む。
         """
-        body = {"version": 2, **sections}
+        body = {"version": 3, **sections}
         return write(os.path.join(self.root, "rules.yml"), json.dumps(body))
 
     def judge(self, rules_path: str, tool: str, subject: str) -> dict:
@@ -98,7 +98,7 @@ class SectionsTest(unittest.TestCase):
     def test_どのルールも言及しなければ確認になる(self):
         # 既定が許可ではなく確認であること。allow を書き切るまで、
         # 言及されていない呼び出しは人が見る側に落ちる。
-        path = self.rules(deny=[rule("push", "Bash", "git push *")])
+        path = self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         out = self.judge(path, "Bash", "ls -la")
 
@@ -107,7 +107,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_暗黙的_ask_は危険の表明ではないと言う(self):
         # 設計 §13.2。危険だと書くと、受け取った側は存在しない危険を探しに行く。
-        path = self.rules(deny=[rule("push", "Bash", "git push *")])
+        path = self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         reason = self.judge(path, "Bash", "ls -la")["permissionDecisionReason"]
 
@@ -117,15 +117,15 @@ class SectionsTest(unittest.TestCase):
 
     def test_allow_に当たれば通る(self):
         path = self.rules(
-            deny=[rule("push", "Bash", "git push *")],
-            allow=[rule("ls", "Bash", "ls *", message="")],
+            deny=[rule("push", "Bash", "*git push*")],
+            allow=[rule("ls", "Bash", "*ls *", message="")],
         )
 
         self.assertNotIn("permissionDecision", self.judge(path, "Bash", "ls -la"))
 
     def test_明示的_ask_は暗黙的と区別して返る(self):
         path = self.rules(
-            ask=[rule("migrations", "Write", "migrations/*", message="人が中身を見ます")],
+            ask=[rule("migrations", "Write", "*/migrations/*", message="人が中身を見ます")],
             allow=[rule("anything", "Write", "*", message="")],
         )
 
@@ -138,7 +138,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_deny_が明示的_ask_より強い(self):
         path = self.rules(
-            deny=[rule("secrets", "Write", "secrets/*", message="止めます")],
+            deny=[rule("secrets", "Write", "*/secrets/*", message="止めます")],
             ask=[rule("everything", "Write", "*", message="聞きます")],
         )
 
@@ -150,7 +150,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_明示的_ask_が_allow_より強い(self):
         path = self.rules(
-            ask=[rule("migrations", "Write", "migrations/*", message="聞きます")],
+            ask=[rule("migrations", "Write", "*/migrations/*", message="聞きます")],
             allow=[rule("anything", "Write", "*", message="")],
         )
 
@@ -162,8 +162,8 @@ class SectionsTest(unittest.TestCase):
         # 弱い側の文面まで返すと、拒否された呼び出しに「確認すれば通る」と
         # 読める文が並ぶ。次の一手が 2 つに割れる。
         path = self.rules(
-            deny=[rule("a", "Bash", "git push *", message="拒否の文面")],
-            ask=[rule("b", "Bash", "git *", message="確認の文面")],
+            deny=[rule("a", "Bash", "*git push*", message="拒否の文面")],
+            ask=[rule("b", "Bash", "*git *", message="確認の文面")],
             allow=[rule("c", "Bash", "*", message="")],
         )
 
@@ -176,7 +176,7 @@ class SectionsTest(unittest.TestCase):
         # どれか 1 つを選ぶと、選ばれなかったルールの言い分は誰にも届かない。
         path = self.rules(
             deny=[
-                rule("a", "Bash", "git push *", message="1 つ目"),
+                rule("a", "Bash", "*git push*", message="1 つ目"),
                 rule("b", "Bash", "* origin *", message="2 つ目"),
             ]
         )
@@ -190,7 +190,7 @@ class SectionsTest(unittest.TestCase):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
         # 設計 §13.1 の IMPL_PARSE_UNCERTAIN は ask 系に置かれている。
         path = self.rules(
-            deny=[rule("push", "Bash", "git push *")],
+            deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],
         )
 
@@ -201,7 +201,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_実行される部分が無いコマンドは何も返さない(self):
         # コメントだけの行。何も走らないものについて人に聞く意味は無い。
-        path = self.rules(deny=[rule("push", "Bash", "git push *")])
+        path = self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         self.assertEqual(self.judge(path, "Bash", "# git push origin main"), {})
 

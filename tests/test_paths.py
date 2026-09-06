@@ -63,14 +63,14 @@ class RuleReachTest(unittest.TestCase):
     def test_迂回した綴りでも保護領域のルールに当たる(self):
         import re
 
-        from ccnavi.pattern import translate
+        from ccnavi.globmatch import translate
 
-        pattern = re.compile(translate("secrets/"))
+        pattern = re.compile(translate("*/secrets/*"))
         with tempfile.TemporaryDirectory() as base:
             base = os.path.realpath(base)
             sneaky = full_path("docs/../secrets/key.pem", base)
             self.assertIsNotNone(
-                pattern.search(sneaky), f"迂回した綴りがルールをすり抜けた: {sneaky}"
+                pattern.match(sneaky), f"迂回した綴りがルールをすり抜けた: {sneaky}"
             )
 
 

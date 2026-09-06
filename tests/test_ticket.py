@@ -26,13 +26,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GUARD_RULE = {
     "id": "guard-config",
     "match": "Write|Edit|MultiEdit",
-    "pattern": ".claude/ccnavi/*",
+    "glob": "*/.claude/ccnavi/*",
     "message": "ガード自身の設定です。利用者に依頼してください。",
 }
 
 # allow は置かない。チケットの範囲が「ここは聞かない」を作る側であることを
 # 見たいので、ルールの側が先に許してしまうとその境目が見えなくなる。
-RULES = {"version": 2, "deny": [GUARD_RULE]}
+RULES = {"version": 3, "deny": [GUARD_RULE]}
 
 
 def ticket_text(name: str, *areas: str, title: str = "作業", why: str = "理由") -> str:

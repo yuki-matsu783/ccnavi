@@ -1,0 +1,112 @@
+# ルールが何を止めて何を通すかの見本。`/rules-check` スキルがこれを回す。
+#
+# ルールを 1 件足したり直したりしたら、ここにも 1 行足す。足さないと、
+# あとから読んだ人に「そのルールが何のために在るのか」を伝える手立てが
+# ルールの文面しか無くなる。文面は止められた側に向けた言葉で、
+# 何に当たるかは書いていない。
+#
+# 区画の名前が期待する判定になる。deny なら止まるはず、allow なら通るはず、
+# ask なら人に確認が出るはず。実際の判定と食い違ったものをスキルが報告する。
+#
+# subject は Bash ならコマンド、それ以外ならパス。パスは絶対で書く。
+# 判定は行き着く先まで解いてから当てるので、相対で書くと走らせた場所で
+# 答えが変わる。
+
+deny:
+  - tool: Bash
+    subject: "git push origin main"
+    why: エージェントからは push しない
+  - tool: Bash
+    subject: "cd /repo && git push"
+    why: コマンド列の途中でも当たる
+  - tool: Bash
+    subject: "/usr/bin/git push"
+    why: パス付きでも当たる
+  - tool: Bash
+    subject: "echo $(git push origin main)"
+    why: コマンド置換の中も実行される
+  - tool: Bash
+    subject: "git reset --hard HEAD~1"
+    why: 作業中の変更が消える
+  - tool: Bash
+    subject: "git branch -D feature"
+    why: 未マージのブランチが消える
+  - tool: Bash
+    subject: "rm -rf /tmp/x"
+    why: 再帰的な強制削除は戻せない
+  - tool: Bash
+    subject: "cat <<'EOF' > notes.md"
+    why: ヒアドキュメントは検査を通らない経路になる
+  - tool: Bash
+    subject: "cat /repo/.env"
+    why: 認証情報。settings.json はシェル経由を止められない
+  - tool: Bash
+    subject: "cat /repo/certs/server.pem"
+    why: 同上
+  - tool: Bash
+    subject: "cat /home/u/.aws/credentials"
+    why: 同上
+  - tool: Bash
+    subject: "cat /repo/secrets/token.txt"
+    why: 同上
+  - tool: Write
+    subject: "/repo/.claude/ccnavi/rules.yml"
+    why: ガード自身の設定
+  - tool: Write
+    subject: "/repo/.claude/hooks/lint-py.sh"
+    why: ガードを起動する hook 本体
+  - tool: Edit
+    subject: "/repo/docs/../.claude/ccnavi/rules.yml"
+    why: 迂回した綴りでも行き着く先で当たる
+
+ask:
+  - tool: Bash
+    subject: "git commit -m 'x'"
+    why: コミットは 1 回ごとに人が見る
+  - tool: Write
+    subject: "/repo/pyproject.toml"
+    why: 実行時の依存が変わる
+  - tool: Write
+    subject: "/repo/.current-ticket.md"
+    why: 作業範囲の提案。承認は別の経路
+  - tool: Bash
+    subject: "curl https://example.com"
+    why: どのルールも言及していない。暗黙的 ask
+  - tool: Bash
+    subject: "docker run --rm alpine"
+    why: 同上
+  - tool: Bash
+    subject: "bash -c 'ls'"
+    why: 読み切れないコマンド。allow は当てない
+
+allow:
+  - tool: Bash
+    subject: "cd /repo && git status --porcelain"
+    why: 普通に打つ
+  - tool: Bash
+    subject: "git worktree add .claude/worktrees/x -b x"
+    why: このプロジェクトの作業手順
+  - tool: Bash
+    subject: "uv run python -m unittest discover -s tests -t ."
+    why: 検査コマンド
+  - tool: Bash
+    subject: "grep -n TODO ccnavi/cli.py"
+    why: 読むだけ
+  - tool: Bash
+    subject: 'grep -n "git push" README.md'
+    why: 引用された語は実行位置ではない
+  - tool: Bash
+    subject: "# git push origin main"
+    why: コメントだけの行は何も走らない
+  - tool: Read
+    subject: "/repo/README.md"
+    why: 読み取りは通す
+  - tool: Write
+    subject: "/repo/ccnavi/cli.py"
+    why: このプロジェクトのソース
+  - tool: Write
+    subject: "/repo/tests/test_glob.py"
+    why: 同上
+  - tool: Write
+    subject: "/repo/README.md"
+    why: 同上

@@ -20,7 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOUND = {
     "id": "git-push",
     "match": "Bash",
-    "pattern": "git push *",
+    "glob": "*git push*",
     "message": "git push is not run by the agent. Ask the user to push.",
 }
 
@@ -38,7 +38,7 @@ def write(directory: str, name: str, text: str) -> str:
 ALLOWED = {"id": "anything", "match": "Read", "regex": "."}
 
 
-def rules_file(directory: str, *rules, version: int = 2, allow: bool = True) -> str:
+def rules_file(directory: str, *rules, version: int = 3, allow: bool = True) -> str:
     """ルールファイルを 1 本置く。並べたルールは deny の区画に入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
@@ -132,10 +132,10 @@ class LintTest(unittest.TestCase):
                 self.root,
                 dict(SOUND, id="文面無し", message=""),
                 dict(SOUND, id="match無し", match=""),
-                dict(SOUND, id="当てるもの無し", pattern="", regex=""),
+                dict(SOUND, id="当てるもの無し", glob="", regex=""),
                 dict(SOUND, id="二重指定", regex="git push"),
-                dict(SOUND, id="組み立て不能", pattern="", regex="git push ("),
-                dict(SOUND, id="先読み", pattern="", regex="git (?=push)"),
+                dict(SOUND, id="組み立て不能", glob="", regex="git push ("),
+                dict(SOUND, id="先読み", glob="", regex="git (?=push)"),
             ),
         )
 
@@ -177,7 +177,7 @@ class LintTest(unittest.TestCase):
                 self.root,
                 dict(SOUND, id=""),
                 dict(SOUND, id="重複"),
-                dict(SOUND, id="重複", pattern="rm -rf *"),
+                dict(SOUND, id="重複", glob="*rm -rf *"),
                 dict(SOUND, id="当たらないツール", match="Task|Bash"),
             ),
         )
@@ -225,7 +225,7 @@ class LintTest(unittest.TestCase):
         # 別の読み方をすると、検証は通ったのに実運用で落ちる。同じ壊れたルールに
         # ついて、検証が名指しするものと、判定が走るときに苦情を言うものが
         # 一致することで確かめる。
-        path = rules_file(self.root, SOUND, dict(SOUND, id="組み立て不能", pattern="", regex="("))
+        path = rules_file(self.root, SOUND, dict(SOUND, id="組み立て不能", glob="", regex="("))
 
         checked = lint(self.root, path)
         payload = json.dumps(

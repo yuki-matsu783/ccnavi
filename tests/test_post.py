@@ -19,18 +19,18 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 RULES = {
-    "version": 2,
+    "version": 3,
     "deny": [
         {
             "id": "protected",
             "match": "Write|Edit|MultiEdit",
-            "pattern": "protected/",
+            "glob": "*/protected/*",
             "message": "protected/ is declared write-deny. Ask the user before changing it.",
         },
         {
             "id": "push",
             "match": "Bash",
-            "pattern": "git push *",
+            "glob": "*git push*",
             "message": "git push is not run by the agent.",
         },
     ],
