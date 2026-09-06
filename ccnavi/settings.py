@@ -25,6 +25,10 @@ from dataclasses import dataclass
 MODE_ENV = "CCNAVI_MODE"
 RULES_ENV = "CCNAVI_RULES"
 LOG_ENV = "CCNAVI_LOG"
+# 実行後の監視が使う 2 つ。STATE_ENV はセッションごとの控えの置き場、
+# RESTORE_ENV は検知した変更を ccnavi 自身が戻すかどうか。
+STATE_ENV = "CCNAVI_STATE"
+RESTORE_ENV = "CCNAVI_RESTORE"
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -37,6 +41,9 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 既定の置き場。プロジェクト根からの相対。
 DEFAULT_LOG = os.path.join(".claude", "ccnavi", "log.jsonl")
 DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.json")
+# 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
+# 配る対象ではないし、消えても次の起動で取り直せる。
+DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
 
 
 @dataclass
@@ -58,6 +65,11 @@ class Settings:
 
     log: str = ""
     rules: str = ""
+    state: str = ""
+    # restore は実行後の監視が検知した変更を ccnavi 自身が戻すかどうか。
+    # 既定は戻さない。戻す側はファイルを動かすので、設定の欠落が
+    # 誰も頼んでいないファイル操作にならないようにする。
+    restore: str = ""
 
 
 def load(root: str) -> tuple[Settings, list[str]]:
@@ -73,6 +85,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         mode_from_environment=from_env,
         log=os.path.join(root, DEFAULT_LOG),
         rules=os.path.join(root, DEFAULT_RULES),
+        state=os.path.join(root, DEFAULT_STATE),
+        restore=os.environ.get(RESTORE_ENV, ""),
     )
 
     rules_env = os.environ.get(RULES_ENV, "")
@@ -80,6 +94,10 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.rules = _resolve(root, rules_env)
     if LOG_ENV in os.environ:
         settings.log = _log_or_none(root, os.environ[LOG_ENV])
+    if STATE_ENV in os.environ:
+        # 空文字は「控えを持たない」。診断のための実行が、走っている
+        # セッションの控えを書き替えずに済むようにする。
+        settings.state = _log_or_none(root, os.environ[STATE_ENV])
 
     if not own_source_tree(root):
         return settings, []
@@ -100,6 +118,10 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.rules = _resolve(root, conf["rules"])
     if isinstance(conf.get("log"), str):
         settings.log = _log_or_none(root, conf["log"])
+    if isinstance(conf.get("state"), str):
+        settings.state = _log_or_none(root, conf["state"])
+    if isinstance(conf.get("restore"), str):
+        settings.restore = conf["restore"]
 
     return settings, problems
 

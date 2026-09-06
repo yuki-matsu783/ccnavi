@@ -27,6 +27,9 @@ REASON_EVENT_NOT_CHECKED = "event-not-checked"
 REASON_NO_SUBJECT = "no-subject"
 REASON_PAYLOAD_UNUSABLE = "payload-unusable"
 REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
+# 実行後の監視だけが出す 2 つは post.py が持っている。判定に至らなかった
+# 理由という点では同じだが、あちらは作業ツリーを読めたかどうかの話なので、
+# 名前もそちらに置いてある。
 # ルールが読めないことは、ここには無い。判定に至らなかった理由ではなく、
 # 組み込みの既定で判定を続けたうえで fallback に残す事実になっている。
 # 拒否側へ倒すと、壊れたファイルを直す呼び出しまで止まって回復できなくなる。
@@ -67,6 +70,10 @@ class Record:
     # これが無いと、設置を誤った状態が「どのファイルのことか分からない理由」に見える。
     detail: str = ""
     rules: list[str] = field(default_factory=list)
+    # paths は実行後の監視が保護領域の中に見つけた変更。件数ではなく綴りで
+    # 残すのは、同じ場所が繰り返し汚れているのか毎回違う場所なのかで、
+    # 直す先が変わるため。前者は出力先の設定 1 つ、後者は経路そのもの。
+    paths: list[str] = field(default_factory=list)
     session: str = ""
 
 
@@ -135,6 +142,8 @@ class Log:
                 out[key] = value
         if record.rules:
             out["rules"] = record.rules
+        if record.paths:
+            out["paths"] = record.paths
         if record.session:
             out["session"] = record.session
 

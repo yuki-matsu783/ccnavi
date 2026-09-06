@@ -43,7 +43,7 @@ import json
 import os
 from typing import TextIO
 
-from . import hookio, rules, settings
+from . import gitstate, hookio, post, rules, settings
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
@@ -53,7 +53,14 @@ from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 PROJECT_SETTINGS = os.path.join(".claude", "settings.json")
 
 
-def report(stdout: TextIO, root: str, conf: settings.Settings, notes: list[str], flag: str) -> int:
+def report(
+    stdout: TextIO,
+    root: str,
+    conf: settings.Settings,
+    notes: list[str],
+    flag: str,
+    restore_flag: str = "",
+) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
     書き先は標準出力にしてある。この経路は hook の payload を読まないので、
@@ -69,10 +76,21 @@ def report(stdout: TextIO, root: str, conf: settings.Settings, notes: list[str],
     complaints = io.StringIO()
     mode = resolve_mode(complaints, flag, conf)
 
+    # 自動復元も同じ理由で同じ関数に任せる。受け皿を分けるのは、苦情の出所を
+    # 取り違えないため。どちらの設定について言われたのかが混ざると、
+    # 直しに行く先が決まらない。
+    said = io.StringIO()
+    restore = post.resolve_restore(said, restore_flag, conf.restore)
+
     problems = check(root, conf, notes, mode, complaints.getvalue())
+    problems += [
+        Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
+        for line in said.getvalue().splitlines()
+    ]
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
+    stdout.write(f"  自動復元: {restore}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
@@ -118,8 +136,82 @@ def check(
         problems.append(Problem(SEVERITY_WARN, "(mode)", "warn なので判定しても呼び出しを止めない"))
 
     problems.extend(_project_settings(root))
+    problems.extend(_after(root))
     problems.extend(_rules(conf.rules))
     return problems
+
+
+def _after(root: str) -> list[Problem]:
+    """実行後の監視が実際に動く形になっているかを見る。
+
+    どちらも error にしない。実行前の判定は動いているので、防御が消えている
+    わけではない。それでも言う。宣言した保護領域が、引数に現れない書き込みに
+    対しては 1 つも守られていない状態は、外から見ると守られている状態と
+    区別が付かない。
+
+    見に行き方は判定と同じ。別の見方をすると、検証は通ったのに実運用では
+    何も見えない、という一番まずい形になる。
+    """
+    registered = _registered(root)
+    if registered is None:
+        # 設定ファイルが無い、あるいは読めない。どこに登録されているかを
+        # 言えないので、登録についても、その監視が見る先についても黙る。
+        # 読めないこと自体は _project_settings が言う。
+        return []
+
+    if not registered:
+        # 登録されていないなら、見る先の話はしない。走らない監視に対して
+        # 「見えない」と言っても、直す先が 2 つあるように読めるだけになる。
+        return [
+            Problem(
+                SEVERITY_WARN,
+                "(project)",
+                f"{PROJECT_SETTINGS} の PostToolUse に ccnavi が登録されていない。"
+                "実行後の監視は走らないので、ビルドの副作用やスクリプトが内部で開いた"
+                "ファイルによる保護領域の変更は誰も見ていない",
+            )
+        ]
+
+    problems: list[Problem] = []
+    top = gitstate.top_level(root)
+    _, unreadable = gitstate.read(top)
+    if unreadable:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(project)",
+                f"作業ツリーを読めない（{unreadable}）ので実行後の監視は何も検知しない。"
+                "実行前の判定はこれまでどおり動く",
+            )
+        )
+    return problems
+
+
+def _registered(root: str) -> bool | None:
+    """PostToolUse に ccnavi が登録されているか。設定ファイルが無ければ None。
+
+    コマンド文字列に名前が含まれるかどうかで見る。実行ファイルの置き場も
+    呼び出し方もプロジェクトごとに違うので、綴りを決め打ちにはできない。
+
+    無いときに「登録されていない」と言い切らないのは、hook をここ以外
+    （利用者ごとの設定）に書くことができ、そちらはこの検証から見えないため。
+    見えないものを「無い」と報告すると、正しい設定に苦情を出すことになる。
+    """
+    try:
+        with open(os.path.join(root, PROJECT_SETTINGS), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        # 読めないことは _project_settings が言う。ここで二重には言わない。
+        return None
+
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    entries = hooks.get(hookio.POST_TOOL_USE) if isinstance(hooks, dict) else None
+    for entry in entries if isinstance(entries, list) else []:
+        for hook in entry.get("hooks", []) if isinstance(entry, dict) else []:
+            command = hook.get("command") if isinstance(hook, dict) else None
+            if isinstance(command, str) and "ccnavi" in command:
+                return True
+    return False
 
 
 def _project_settings(root: str) -> list[Problem]:

@@ -227,6 +227,41 @@ class LintTest(unittest.TestCase):
         self.assertIn("組み立て不能", checked.stdout)
         self.assertIn("組み立て不能", decided.stderr, "判定と検証が別のことを言っている")
 
+    def test_実行後の監視が登録されていなければwarnになる(self):
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, "実行前の判定は動くのでガードは消えていない")
+        self.assertEqual(counts(result.stdout), (0, 1))
+        self.assertIn("PostToolUse", result.stdout)
+
+    def test_git_の作業ツリーでなければ監視が何も見ないとwarnになる(self):
+        # 登録はされているのに見る先が無い状態。実行後の監視は git の差分で
+        # 見るので、リポジトリでない場所では 1 件も検知しない。
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(counts(result.stdout), (0, 1))
+        self.assertIn("作業ツリーを読めない", result.stdout)
+
+    def test_設定ファイルが無ければ登録については何も言わない(self):
+        # hook は利用者ごとの設定にも書ける。そちらはここから見えないので、
+        # 見えないものを「無い」と報告すると正しい設定に苦情を出すことになる。
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(counts(result.stdout), (0, 0), result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

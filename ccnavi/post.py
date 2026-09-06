@@ -1,0 +1,379 @@
+"""ツール実行後の監視。走ったあとの作業ツリーを見て、保護領域が変わっていないかを問う。
+
+## 実行前の判定と何が違うか
+
+見ている対象が違う。実行前はツール呼び出しの引数を見て「これは何をするか」を
+言い当てる。ここは作業ツリーを見て「何が起きたか」を読む。前者を厳しくしても
+後者は要る。引数に現れない書き込み――ビルドの出力先、スクリプトが内部で開く
+ファイル、読めなかったシェル構文――は、言い当てる限りどこまでも抜けるから。
+
+止められないことも違う。このイベントにはツール呼び出しを取り消す手段が無く、
+返せるのは文だけになる。だから文が「何が変わったか」だけで終わってはいけない。
+戻す手順を対象ごとに書く（REQ-PST-03）。手順の無い通知は、受け取った側に
+戻し方を発明させることになり、そこで対象が増えたり減ったりする。
+
+## 保護領域をどこから知るか
+
+ルールファイルから知る。`match` に書き込み系のツールを含むルールは、
+「この場所はエージェントに書かせない」とプロジェクトが宣言したものなので、
+そのままここでの保護領域になる。宣言を 2 か所に分けて書かせない。分ければ
+必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
+
+当てる先は git が返したパスを解いた絶対パス。実行前の判定がファイルのパスを
+解いてから当てるのと同じ理由で、綴りを変えただけで外せてはいけない。
+
+## 前から在った変更を原因にしない
+
+作業ツリーは、セッションが始まる前から汚れていることがある。他のセッションの
+書きかけ、人が直している最中のもの。それを「直前の実行が壊した」として
+差し戻すと、エージェントは他人の作業を戻しにいく。だから初回に見えたものは
+その場で控えを取り、以降は新しく現れたものだけを原因付きで報告する。
+控えの側も 1 度は伝えるが、文面を分けて、戻すなと明示する。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+from typing import TextIO
+
+from . import audit, gitstate, hookio, rules
+
+# 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
+# そのルールは「この場所に書かせない」を言っている。
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+
+# 作業ツリーを変えようがないツール。ここを飛ばすぶん git を起こす回数が減る。
+# 飛ばしてよいのは「このツールが走った直後に確かめなくても、次に走る
+# 書き込みうるツールの直後に同じ変更が見える」から。見落としではなく遅れ。
+#
+# 名前を並べる側は狭く保つ。MCP のツールは名前を自由に付けられるので、
+# 知らない名前は「書けるかもしれない」側に置く。
+READ_ONLY_TOOLS = ("Read", "Grep", "Glob", "WebFetch", "WebSearch")
+
+# 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
+# 設計 §18.6 が監査に残す事象名がそのまま POST_VIOLATION。
+CODE_VIOLATION = "POST_VIOLATION"
+# 前から在った変更には別のコードを立てる。同じコードで送ると、受け取った側に
+# 「直前の実行が壊したもの」と「元から汚れていたもの」を見分ける手が無くなる。
+CODE_PREEXISTING = "POST_PREEXISTING"
+
+# 自動復元の設定。既定は off。
+RESTORE_OFF = "off"
+RESTORE_AUTO = "auto"
+
+# 判定に至らなかった理由のうち、この面だけが出すもの。
+REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
+REASON_WORKTREE_UNREADABLE = "worktree-unreadable"
+
+# 1 回の報告に載せる件数の上限。ビルドが生成物を数百件置くことがあり、
+# 全部を並べると本文が流れて 1 件も読まれない。
+REPORT_LIMIT = 12
+
+# 控えに残す件数の上限。セッションが長引いても記録が膨らまないように。
+SEEN_LIMIT = 500
+
+# 対象の綴りを載せるときの長さの上限。
+SUBJECT_LIMIT = 200
+
+# 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
+# 区切り文字が混じった値でファイルを別の場所へ書かせない。
+_UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def check(
+    stderr: TextIO,
+    mode_blocks: bool,
+    restore: str,
+    state_dir: str,
+    mine: tuple[str, ...],
+    rule_set: rules.RuleSet,
+    source: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    root: str,
+) -> str:
+    """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
+
+    mode_blocks は、このモードが呼び出しを止める側かどうか。止めない側
+    （warn）では復元も行わない。何も変えないことが目的のモードが、
+    自分の判断でファイルを動かしては意味がない。
+
+    mine は ccnavi 自身が書く場所。記録と控えがそれで、どちらも保護領域の
+    中に置かれることがある。実際このリポジトリのルールは `.claude/ccnavi/*`
+    を守っていて、記録も控えもそこにある。自分の書き込みを自分の違反として
+    報告しはじめると、監視は 1 回目から嘘しか言わなくなる。
+    """
+    if payload.tool_name in READ_ONLY_TOOLS:
+        record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
+        return ""
+
+    top = gitstate.top_level(root)
+    changes, unreadable = gitstate.read(top)
+    if unreadable:
+        # 見えないことを黙らない。記録に残せば、監視が動いていなかった期間を
+        # 後から数えられる。数えられないと、違反が無かったのか見ていなかった
+        # のかが同じ見た目になる。
+        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
+        record.detail = unreadable
+        stderr.write(f"ccnavi: 作業ツリーを読めないので実行後の監視は動かない: {unreadable}\n")
+        return ""
+
+    seen, first_time = _load_seen(stderr, state_dir, payload.session_id)
+
+    found = _violations(changes, rule_set, mine)
+    if not found:
+        # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
+        # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
+        # 汚れが全部「前から在ったもの」に化けて、誰も差し戻されなくなる。
+        if first_time:
+            _save_seen(stderr, state_dir, payload.session_id, set())
+        record.decision, record.enforced = audit.ALLOW, True
+        return ""
+
+    fresh = [(c, r) for c, r in found if c.key() not in seen]
+    known = [(c, r) for c, r in found if c.key() in seen]
+    # 初めて見たセッションでは、今そこに在るものは直前の実行の結果ではない。
+    # 控えを取るだけにして、原因を付けずに 1 度だけ伝える。
+    carried, fresh = (fresh, []) if first_time else ([], fresh)
+
+    restored: dict[str, str] = {}
+    if fresh and restore == RESTORE_AUTO and mode_blocks:
+        restored = _restore(stderr, top, state_dir, [c for c, _ in fresh])
+
+    _save_seen(
+        stderr,
+        state_dir,
+        payload.session_id,
+        seen
+        # 戻せたものは控えに入れない。同じ場所がもう一度汚れたら、それは
+        # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
+        | {c.key() for c, _ in fresh if c.path not in restored}
+        | {c.key() for c, _ in carried},
+    )
+
+    record.paths = [f"{c.kind} {c.path}" for c, _ in fresh]
+    record.rules = sorted({rule.id or "(id 無し)" for _, group in fresh for rule in group})
+    # 既にある detail を先頭に残す。ルールを読めなかったときのファイル名が
+    # そこに入っていて、上書きすると「どのファイルが読めなかったか」が消える。
+    notes = [record.detail] if record.detail else []
+    if carried:
+        notes.append(f"preexisting {len(carried)}")
+    if known:
+        notes.append(f"known {len(known)}")
+    if restored:
+        notes.append(f"restored {len(restored)}")
+    record.detail = "; ".join(notes)
+
+    if fresh:
+        record.decision, record.enforced = audit.DENY, mode_blocks
+    else:
+        # この呼び出しは何も汚していない。控えの報告は状態の通知であって、
+        # 直前の実行についての判定ではない。
+        record.decision, record.enforced = audit.ALLOW, True
+
+    blocks = [_violation(c, group, source, payload, restored.get(c.path)) for c, group in fresh]
+    blocks += [_preexisting(c, group, source) for c, group in carried[:REPORT_LIMIT]]
+    if not blocks:
+        return ""
+
+    shown, dropped = blocks[:REPORT_LIMIT], len(blocks) - REPORT_LIMIT
+    if dropped > 0:
+        shown.append(
+            f"[ccnavi] {dropped} more changed paths in protected areas are not listed here. "
+            "Run 'git status' to see the rest before you undo anything."
+        )
+    return "\n\n".join(shown)
+
+
+def resolve_restore(stderr: TextIO, flag: str, declared: str) -> str:
+    """自動復元の設定を解決する。
+
+    読めない値は off に落とす。モードの解決が読めない値を block へ倒すのと
+    向きが逆なのは、倒れた先でやることが逆だから。あちらは何もしないほうへ
+    倒れるが、こちらの auto はファイルを動かす。書き損じた 1 語が、
+    誰も頼んでいないファイル操作に化けてはいけない。
+    """
+    value = (flag or declared).lower()
+    if value in (RESTORE_OFF, ""):
+        return RESTORE_OFF
+    if value == RESTORE_AUTO:
+        return RESTORE_AUTO
+    stderr.write(
+        f"ccnavi: {value!r} is not a restore setting; using {RESTORE_OFF}. "
+        f"Valid values are {RESTORE_OFF} and {RESTORE_AUTO}\n"
+    )
+    return RESTORE_OFF
+
+
+def _violations(
+    changes: list[gitstate.Change], rule_set: rules.RuleSet, mine: tuple[str, ...]
+) -> list[tuple[gitstate.Change, list[rules.Rule]]]:
+    """変更のうち、保護領域を宣言したルールに当たるものを返す。
+
+    ccnavi 自身が書く場所は先に落とす。落とさないと、記録を 1 行足すたびに
+    自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
+    """
+    own = tuple(os.path.realpath(p) for p in mine if p)
+    found = []
+    for change in changes:
+        if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
+            continue
+        group = [rule for rule in rule_set.rules if _guards_writes(rule, change.full)]
+        if group:
+            found.append((change, group))
+    return found
+
+
+def _guards_writes(rule: rules.Rule, path: str) -> bool:
+    """このルールがこのパスへの書き込みを禁じているか。
+
+    ルールの当て方は実行前の判定と同じ rule.matches に任せる。ここで別に
+    書くと、同じルールが実行前と実行後で違う場所に当たることになり、
+    どちらが正しいのかを誰も言えなくなる。
+    """
+    return any(rule.matches(tool, path) for tool in WRITE_TOOLS)
+
+
+def _violation(
+    change: gitstate.Change,
+    group: list[rules.Rule],
+    source: str,
+    payload: hookio.Input,
+    moved: str | None,
+) -> str:
+    """1 件を、それだけで読んで成立する差し戻しの文に組む。
+
+    実行前の拒否と同じ作りにしてある。何に当たったか・どの設定が言っているか・
+    直前に何が走ったか・どう戻すか。1 件だけが切り出されて見えても、
+    受け取った側がそこから次の一手に行けること。
+    """
+    lines = [
+        f"[ccnavi] {CODE_VIOLATION} (source: {_source(source, group)})",
+        f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+        f"after: {_call(payload)}",
+    ]
+    if moved is None:
+        lines.append(f"undo: {gitstate.undo(change)}")
+    elif moved:
+        lines.append(f"restored: ccnavi moved this file to {moved}. It was not deleted.")
+    else:
+        lines.append("restored: ccnavi put this path back to its committed content.")
+    lines.append(_messages(group))
+    return "\n".join(line for line in lines if line)
+
+
+def _preexisting(change: gitstate.Change, group: list[rules.Rule], source: str) -> str:
+    """セッションが始まる前から在った変更に添える文。
+
+    戻すなと書く。ここを書き落とすと、受け取った側は違反と同じ形の通知を読んで
+    同じ手順を踏み、他のセッションや人の書きかけを消しにいく。
+    """
+    return "\n".join(
+        [
+            f"[ccnavi] {CODE_PREEXISTING} (source: {_source(source, group)})",
+            f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+            "note: this was already in the working tree when ccnavi started watching this "
+            "session, so the call that just ran did not cause it. Do not undo it and do not "
+            "build on it: say what you found and let the user decide whose change it is.",
+            _messages(group),
+        ]
+    )
+
+
+def _source(source: str, group: list[rules.Rule]) -> str:
+    """どの設定がこの場所を守ると言っているかを名指しする。
+
+    ファイル名だけでは、見に行った人が当たったルールに辿り着けない。
+    """
+    named = [rule.id for rule in group if rule.id]
+    return f"{source}#{','.join(named)}" if named else source
+
+
+def _messages(group: list[rules.Rule]) -> str:
+    """当たったルールの文面。同じパスに複数当たったら全部載せる。
+
+    どれか 1 つを選ぶと、選ばれなかったルールの言い分は誰にも届かない。
+    """
+    seen, out = set(), []
+    for rule in group:
+        if rule.message not in seen:
+            seen.add(rule.message)
+            out.append(rule.message)
+    return "\n".join(out)
+
+
+def _call(payload: hookio.Input) -> str:
+    """直前に走った呼び出しを 1 行で。"""
+    subject = payload.tool_input.get("command") or payload.tool_input.get("file_path") or ""
+    if not isinstance(subject, str) or not subject:
+        return payload.tool_name or "(unknown tool)"
+    shown = " ".join(subject.split())
+    if len(shown) > SUBJECT_LIMIT:
+        shown = shown[:SUBJECT_LIMIT] + "…"
+    return f"{payload.tool_name}({shown})"
+
+
+def _restore(
+    stderr: TextIO, top: str, state_dir: str, changes: list[gitstate.Change]
+) -> dict[str, str]:
+    """戻せたものを {パス: 退避先（戻しただけなら空文字）} で返す。
+
+    戻せなかったものは黙って落とす。復元は報告の代わりではないので、
+    戻せなかった 1 件は手順付きの報告として残ればよい。
+    """
+    aside = os.path.join(state_dir, "aside", time.strftime("%Y%m%d-%H%M%S"))
+    done: dict[str, str] = {}
+    for change in changes:
+        failed = gitstate.restore(top, change, aside)
+        if failed:
+            stderr.write(f"ccnavi: {change.path} を戻せない: {failed}\n")
+            continue
+        done[change.path] = aside if change.kind == gitstate.KIND_NEW else ""
+    return done
+
+
+def _seen_path(state_dir: str, session: str) -> str:
+    name = _UNSAFE.sub("_", session)[:64] or "unknown"
+    return os.path.join(state_dir, f"{name}.json")
+
+
+def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
+    """すでに報告した変更と、このセッションで初めて見るかどうかを返す。
+
+    読めなければ「初めて」として扱う。控えを失ったときに、前から在った変更を
+    直前の実行のせいにするより、もう一度控えを取り直すほうが害が小さい。
+    """
+    if not state_dir:
+        return set(), True
+    try:
+        with open(_seen_path(state_dir, session), encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return set(), True
+    except (OSError, ValueError) as exc:
+        stderr.write(f"ccnavi: 実行後の監視の控えを読めない: {exc}\n")
+        return set(), True
+    seen = data.get("seen") if isinstance(data, dict) else None
+    if not isinstance(seen, list):
+        return set(), True
+    return {s for s in seen if isinstance(s, str)}, False
+
+
+def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> None:
+    """控えを書く。書けなかったことは報告して捨てる。
+
+    ここでの失敗は監視を止めない。控えが無ければ同じ変更をもう一度報告する
+    ことになり、うるさいが、見落とすよりはよい。
+    """
+    if not state_dir:
+        return
+    path = _seen_path(state_dir, session)
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"seen": sorted(seen)[:SEEN_LIMIT]}, f, ensure_ascii=False)
+    except OSError as exc:
+        stderr.write(f"ccnavi: 実行後の監視の控えを書けない: {exc}\n")
