@@ -11,7 +11,7 @@ import os
 import time
 from typing import TextIO
 
-from . import audit, builtin, hookio, lint, rules, settings, shellread
+from . import audit, builtin, hookio, lint, post, rules, settings, shellread
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定へ着地することが、遅い判定が黙った許可に化けるのを防ぐ。
@@ -45,6 +45,8 @@ MODE_BLOCK = "block"  # 判定して呼び出しを止める
 # 「理由コードを含むこと」までなので、版を上げずに済む側を採る。
 CODE_COMMAND = "DENY_COMMAND_PATTERN"  # Bash の実行される部分に当たった
 CODE_PATH = "DENY_PATH"  # ファイルのパスに当たった
+# 実行後の監視が出すコードは post.py にある。あちらは判定ではなく、
+# すでに起きたことの報告なので、同じ表に混ぜていない。
 # 読み切れないコマンドを生の文字列に当てたときの根拠は、宣言された禁止に
 # 当たったことではなく、対象を確定できなかったこと。付録 B でそれを言うのは
 # IMPL_PARSE_UNCERTAIN で、あれは ask 系に置かれている。今のビルドに ask は
@@ -62,7 +64,8 @@ USAGE = """ccnavi guards agent tool calls and guides the agent to a safer altern
 It is a hook command, not something to run by hand: it reads one hook payload
 as JSON on stdin and writes its response to stdout.
 
-Register it on the tool-call events of your agent, then exercise it with
+Register it on PreToolUse to judge calls before they run, and on PostToolUse to
+watch the working tree for protected files that changed anyway. Exercise it with
 
     echo '{"hook_event_name":"PreToolUse","tool_name":"Bash",
            "tool_input":{"command":"git push"}}' | ccnavi
@@ -82,7 +85,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--root", default=None)
     parser.add_argument("--mode", default="")
     parser.add_argument("--rules", default="")
-    parser.add_argument("--log", default="")
+    parser.add_argument("--log", default=None)
+    parser.add_argument("--state", default=None)
+    parser.add_argument("--restore", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     try:
@@ -98,21 +103,26 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     # フラグは何よりも強い。診断のための実行が、プロジェクト全体で共有している
     # ファイルに触らずに別の場所を指せるように。
-    if args.log:
+    # 空文字も受ける。「記録しない」「控えを持たない」を言えないと、診断の
+    # ための 1 回が、走っているセッションの記録と控えに必ず混ざる。
+    if args.log is not None:
         conf.log = args.log
     if args.rules:
         conf.rules = args.rules
+    if args.state is not None:
+        conf.state = args.state
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
     # 報告でしかないものが、検証にとっては結論そのものになる。
     if args.lint:
-        return lint.report(stdout, root, conf, problems, args.mode)
+        return lint.report(stdout, root, conf, problems, args.mode, args.restore)
 
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
     mode = resolve_mode(stderr, args.mode, conf)
+    conf.restore = post.resolve_restore(stderr, args.restore, conf.restore)
     log = audit.Log(conf.log)
     deadline = time.monotonic() + DEADLINE_SECONDS
 
@@ -143,7 +153,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         session=payload.session_id,
     )
 
-    code = decide(stdout, stderr, mode, conf.rules, payload, record, deadline)
+    code = decide(stdout, stderr, mode, conf, root, payload, record, deadline)
     _record(stderr, log, record)
     return code
 
@@ -152,44 +162,47 @@ def decide(
     stdout: TextIO,
     stderr: TextIO,
     mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    deadline: float,
+) -> int:
+    """イベントごとの処理に振り分ける。
+
+    振り分けだけをここに置く。イベントが増えるたびに 1 本の関数が伸びると、
+    どのイベントで何が起きるのかを読むのに全部を読むことになる。
+    """
+    if mode == MODE_OFF:
+        record.decision, record.reason = audit.SKIP, audit.REASON_MODE_OFF
+        return EXIT_OK
+    if payload.event == hookio.PRE_TOOL_USE:
+        return decide_before(stdout, stderr, mode, conf.rules, payload, record, deadline)
+    if payload.event == hookio.POST_TOOL_USE:
+        return decide_after(stdout, stderr, mode, conf, root, payload, record)
+    # 判定を持たないイベントは誤りではない。想定していない登録が
+    # 作業を止めてはいけない。
+    record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
+    return EXIT_OK
+
+
+def decide_before(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
     rules_path: str,
     payload: hookio.Input,
     record: audit.Record,
     deadline: float,
 ) -> int:
-    """判定に達し、何が起きたかを record に書き込む。
+    """実行前の判定に達し、何が起きたかを record に書き込む。
     記録と応答が必ず同じ結論から作られるようにするため。"""
-    if mode == MODE_OFF:
-        record.decision, record.reason = audit.SKIP, audit.REASON_MODE_OFF
-        return EXIT_OK
-    if payload.event != hookio.PRE_TOOL_USE:
-        # 判定を持たないイベントは誤りではない。想定していない登録が
-        # 作業を止めてはいけない。
-        record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
-        return EXIT_OK
     if not record.subject:
         record.decision, record.reason = audit.SKIP, audit.REASON_NO_SUBJECT
         return EXIT_OK
 
-    try:
-        rule_set, problems = rules.load(rules_path)
-    except (OSError, ValueError) as exc:
-        # 「設定が読めない」は「判断できない」ではなく「設定が壊れている」。
-        # 拒否側へ倒すと、壊れたファイルを直すための呼び出しまで止まって
-        # 回復できなくなる。既定モードが block なので、ファイルを置く前に
-        # hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
-        stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
-        rule_set, problems = builtin.load()
-        record.fallback = builtin.FALLBACK
-        record.detail = rules_path
-    for problem in problems:
-        stderr.write(f"ccnavi: {problem}\n")
-
+    rule_set, source = load_rules(stderr, rules_path, record)
     subject = screen(payload.tool_name, record.subject, record)
-    # 出所は、いま当てているルールがどこから来たか。既定に落ちているなら
-    # 読めなかったファイルではない。そのファイルを名乗ると、見に行った人が
-    # 当たったルールを見つけられない。
-    source = builtin.SOURCE if record.fallback else rules_path
 
     reasons: list[str] = []
     for rule in rule_set.rules:
@@ -233,6 +246,85 @@ def decide(
     record.decision, record.enforced = audit.DENY, True
     hookio.write_verdict(stdout, hookio.DENY, reason)
     return EXIT_OK
+
+
+def decide_after(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """実行後の監視を 1 回動かし、言うことがあれば返す。
+
+    期限を渡していない。実行前の期限は、遅い判定が黙った許可に化けるのを
+    防ぐためのもので、止められるイベントでしか意味を持たない。ここは
+    何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
+    自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
+    """
+    rule_set, source = load_rules(stderr, conf.rules, record)
+    # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
+    # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
+    # 読まれなくなる。記録には fallback が残る。
+    text = post.check(
+        stderr,
+        mode_blocks=mode == MODE_BLOCK,
+        restore=conf.restore,
+        state_dir=conf.state,
+        mine=(conf.state, conf.log),
+        rule_set=rule_set,
+        source=source,
+        payload=payload,
+        record=record,
+        root=root,
+    )
+    if not text:
+        return EXIT_OK
+
+    # 差し戻すのは、直前の実行が汚したと言える分があるときだけ。セッションが
+    # 始まる前から在った変更は言うが差し戻さない。差し戻しは「あなたが直せ」で、
+    # 誰が書いたか分からないものにそれを言うと、他人の書きかけを消しにいく。
+    pushback = record.decision == audit.DENY
+
+    if pushback and mode == MODE_BLOCK:
+        # このイベントで差し戻す経路は exit 2 と標準エラーだけ。ツールは
+        # すでに走っているので取り消せず、渡せるのは「次に何をするか」になる。
+        stderr.write(text + "\n")
+        return EXIT_BLOCK
+
+    if pushback:
+        # warn は差し戻さない。呼び出しを止めないことがこのモードの約束で、
+        # 差し戻しは止めはしないが次の一手を変えさせる。変えさせないまま
+        # 数えるためのモードなので、届け先を報告の側にする。
+        text = "[ccnavi warn] block mode would have sent this back as a correction:\n" + text
+    hookio.write_context(stdout, hookio.POST_TOOL_USE, text)
+    return EXIT_OK
+
+
+def load_rules(stderr: TextIO, rules_path: str, record: audit.Record) -> tuple[rules.RuleSet, str]:
+    """ルール集合と、それがどこから来たかを返す。
+
+    読めなければ組み込みの既定に落ちる。「設定が読めない」は「判断できない」
+    ではなく「設定が壊れている」。拒否側へ倒すと、壊れたファイルを直すための
+    呼び出しまで止まって回復できなくなる。既定モードが block なので、
+    ファイルを置く前に hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
+
+    出所は、いま当てているルールがどこから来たか。既定に落ちているなら
+    読めなかったファイルではない。そのファイルを名乗ると、見に行った人が
+    当たったルールを見つけられない。
+    """
+    try:
+        rule_set, problems = rules.load(rules_path)
+    except (OSError, ValueError) as exc:
+        stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
+        rule_set, problems = builtin.load()
+        record.fallback = builtin.FALLBACK
+        record.detail = rules_path
+    for problem in problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    return rule_set, builtin.SOURCE if record.fallback else rules_path
 
 
 def fail_closed(mode: str) -> int:
