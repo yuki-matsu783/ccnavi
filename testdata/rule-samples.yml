@@ -32,6 +32,15 @@ deny:
     subject: "git branch -D feature"
     why: 未マージのブランチが消える
   - tool: Bash
+    subject: "git status"
+    why: 生の git はサブコマンドによらず止め、ラッパへ寄せる
+  - tool: Bash
+    subject: "/usr/bin/git.exe diff"
+    why: パス付きでも拡張子付きでも、コマンドの位置に立つ git は当たる
+  - tool: Bash
+    subject: "git -c diff.external=touch diff"
+    why: 読むだけに見えて任意コマンドを実行する形
+  - tool: Bash
     subject: "rm -rf /tmp/x"
     why: 再帰的な強制削除は戻せない
   - tool: Bash
@@ -82,8 +91,8 @@ deny:
 
 ask:
   - tool: Bash
-    subject: "git commit -m 'x'"
-    why: コミットは 1 回ごとに人が見る
+    subject: "sh .claude/scripts/ccnavi-git.sh commit -m 'x'"
+    why: コミットは 1 回ごとに人が見る。通る道はラッパだけなので錨もそちらに打つ
   - tool: Write
     subject: "/repo/pyproject.toml"
     why: 実行時の依存が変わる
@@ -102,11 +111,17 @@ ask:
 
 allow:
   - tool: Bash
-    subject: "cd /repo && git status --porcelain"
-    why: 普通に打つ
+    subject: "sh .claude/scripts/ccnavi-git.sh status --porcelain"
+    why: git の入口。サブコマンドの選別はラッパの中で行う
   - tool: Bash
-    subject: "git worktree add .claude/worktrees/x -b x"
-    why: このプロジェクトの作業手順
+    subject: "cd /repo && sh .claude/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
+    why: このプロジェクトの作業手順。コマンド列の途中でも通る
+  - tool: Bash
+    subject: "cd /repo/.claude/worktrees/git-wrapper && ls"
+    why: パスの中の git は当たらない。当たると worktree の出入りが丸ごと止まる
+  - tool: Bash
+    subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
+    why: ラッパが残した記録を読む手。ここを止めると抑えた出力に辿り着けない
   - tool: Bash
     subject: "uv run python -m unittest discover -s tests -t ."
     why: 検査コマンド
