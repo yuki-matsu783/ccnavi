@@ -88,6 +88,18 @@ deny:
   - tool: Bash
     subject: "echo x | tee /repo/.claude/ccnavi/rules.yml"
     why: リダイレクトを使わない書き込み
+  - tool: Write
+    subject: "/repo/.claude/settings.json"
+    why: hook の登録そのもの。ルールを触らずにガードを外せる
+  - tool: Edit
+    subject: "/repo/.claude/settings.local.json"
+    why: permissions を足せるので同じ強さを持つ
+  - tool: Bash
+    subject: "echo {} > /repo/.claude/settings.json"
+    why: 設定もシェルから届く
+  - tool: Bash
+    subject: "cp /tmp/x /repo/.claude/settings.local.json"
+    why: 行き先に来た設定ファイル
 
 ask:
   - tool: Bash
@@ -164,6 +176,15 @@ allow:
   - tool: Bash
     subject: "cp /repo/.claude/ccnavi/rules.yml /tmp/backup.yml"
     why: 写しを取っているだけ。cp は行き先の側だけを見る
+  - tool: Bash
+    subject: "cat /repo/.claude/settings.json"
+    why: 設定も読むのは普通
+  - tool: Bash
+    subject: "diff /repo/.claude/settings.json /repo/.claude/settings.local.json"
+    why: 2 つ並べて見比べるだけ
+  - tool: Read
+    subject: "/repo/.claude/settings.json"
+    why: Read は止めない。止めると何が効いているか分からなくなる
   - tool: Bash
     subject: "uv run python -m ccnavi --rules /repo/.claude/ccnavi/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ここを止めると点検ができない
