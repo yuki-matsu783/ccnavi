@@ -30,6 +30,10 @@ GUARD_RULE = {
     "message": "ガード自身の設定です。利用者に依頼してください。",
 }
 
+# allow は置かない。チケットの範囲が「ここは聞かない」を作る側であることを
+# 見たいので、ルールの側が先に許してしまうとその境目が見えなくなる。
+RULES = {"version": 2, "deny": [GUARD_RULE]}
+
 
 def ticket_text(name: str, *areas: str, title: str = "作業", why: str = "理由") -> str:
     """frontmatter を組む。設計 §9.1 の綴りをそのまま使う。"""
@@ -72,10 +76,7 @@ class TicketTest(unittest.TestCase):
         self.root = self.dir.name
         self.addCleanup(self.dir.cleanup)
 
-        self.rules = write(
-            os.path.join(self.root, "rules.json"),
-            json.dumps({"version": 1, "rules": [GUARD_RULE]}),
-        )
+        self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
         self.ticket = os.path.join(self.root, ".current-ticket.md")
         self.ledger = os.path.join(self.root, "approvals.jsonl")
 

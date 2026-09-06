@@ -14,7 +14,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES = os.path.join(ROOT, "testdata", "rules.json")
+RULES = os.path.join(ROOT, "testdata", "rules.yml")
 
 
 def run(mode="block", payload="", log=""):

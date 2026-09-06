@@ -1,0 +1,47 @@
+# 受入テストが使うルール。判定の骨格を試すためのもので、実運用の設定ではない。
+#
+# allow を置いてあるのは、暗黙的 ask が既定になっているため。置かないと、
+# どのルールにも当たらない呼び出しがすべて確認になり、「止めるべきものを
+# 止めたか」を見たいテストが「確認が出たか」の話になってしまう。
+version: 2
+
+deny:
+  - id: git-push
+    match: Bash
+    pattern: "git push *"
+    message: >-
+      git push is not run by the agent. Leave the branch as it is and ask the
+      user to push.
+
+  - id: sed-in-place
+    match: Bash
+    pattern: "sed *"
+    message: >-
+      sed is not available here. Use perl for the same edit, e.g.
+      perl -pi -e 's/old/new/g' file.
+
+  - id: dotenv
+    match: Bash|Read|Write|Edit
+    pattern: ".env"
+    message: >-
+      Files named .env hold credentials and are off limits. Ask the user for the
+      value you need.
+
+  - id: heredoc
+    match: Bash
+    regex: "<<"
+    message: >-
+      Heredocs are not used here. Write file contents with the Write or Edit
+      tool, and for input a program reads, write the script to a file first and
+      pass that file.
+
+ask:
+  - id: migrations
+    match: Write|Edit|MultiEdit
+    pattern: "migrations/*"
+    message: Migrations are read by a person before they run. Say what this one changes.
+
+allow:
+  - id: anything-else
+    match: Bash|Read|Write|Edit|MultiEdit|NotebookEdit
+    regex: "."

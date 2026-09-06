@@ -19,8 +19,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 RULES = {
-    "version": 1,
-    "rules": [
+    "version": 2,
+    "deny": [
         {
             "id": "protected",
             "match": "Write|Edit|MultiEdit",
@@ -33,6 +33,15 @@ RULES = {
             "pattern": "git push *",
             "message": "git push is not run by the agent.",
         },
+    ],
+    # 実行後の監視を見るテストなので、実行前の判定で確認を出させない。
+    # 出すと、監視が何を言ったかを見たいテストが ask の話になる。
+    "allow": [
+        {
+            "id": "anything-else",
+            "match": "Bash|Read|Write|Edit|MultiEdit|NotebookEdit",
+            "regex": ".",
+        }
     ],
 }
 
@@ -70,7 +79,7 @@ class PostToolUseTest(unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        self.rules = os.path.join(self.repo, "rules.json")
+        self.rules = os.path.join(self.repo, "rules.yml")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
@@ -164,7 +173,7 @@ class PostToolUseTest(unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("protected/keep.txt", result.stderr)
         # どの設定が言っているか。名指ししないと直しに行く先が決まらない。
-        self.assertIn("rules.json#protected", result.stderr)
+        self.assertIn("rules.yml#protected", result.stderr)
         # 原因となった直前の実行（REQ-PST-02）。
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順（REQ-PST-03）。
@@ -322,8 +331,8 @@ class PostToolUseTest(unittest.TestCase):
         outside = tempfile.mkdtemp(prefix="ccnavi-plain-")
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
         self.repo = outside
-        write(os.path.join(outside, "rules.json"), json.dumps(RULES))
-        self.rules = os.path.join(outside, "rules.json")
+        write(os.path.join(outside, "rules.yml"), json.dumps(RULES))
+        self.rules = os.path.join(outside, "rules.yml")
         self.state = os.path.join(outside, "state")
         self.log = os.path.join(outside, "log.jsonl")
 

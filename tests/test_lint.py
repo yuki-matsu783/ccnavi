@@ -33,10 +33,22 @@ def write(directory: str, name: str, text: str) -> str:
     return path
 
 
-def rules_file(directory: str, *rules, version: int = 1) -> str:
-    return write(
-        directory, "rules.json", json.dumps({"version": version, "rules": list(rules)}, indent=2)
-    )
+# 検証を通すのに要る最小の allow。無いと「allow が空」の warn が毎回 1 件増え、
+# 数を見ているテストが、そのテストの主題と関係の無い 1 件を数えることになる。
+ALLOWED = {"id": "anything", "match": "Read", "regex": "."}
+
+
+def rules_file(directory: str, *rules, version: int = 2, allow: bool = True) -> str:
+    """ルールファイルを 1 本置く。並べたルールは deny の区画に入る。
+
+    書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
+    読み手がそのまま受け取る。区画の形だけを見たいテストで、YAML の綴りの
+    話に付き合わずに済む。
+    """
+    body: dict = {"version": version, "deny": list(rules)}
+    if allow:
+        body["allow"] = [ALLOWED]
+    return write(directory, "rules.yml", json.dumps(body, indent=2))
 
 
 def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
@@ -86,12 +98,12 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout), (0, 0))
         # どのファイルを見た結果なのかを名乗らない報告は、別の設定についての
         # 報告と見分けが付かない。
-        self.assertIn("rules.json", result.stdout)
+        self.assertIn("rules.yml", result.stdout)
 
     def test_読めないルールはerrorで非ゼロで終わる(self):
         # block モードではこれが全ツール呼び出しの拒否になり、直すための
         # 呼び出しまで止まる。検証がいちばん先に見つけなければならない形。
-        path = write(self.root, "rules.json", '{"version": 1, "rules": [')
+        path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
 
         result = lint(self.root, path)
 
@@ -100,13 +112,13 @@ class LintTest(unittest.TestCase):
         self.assertIn("ルールを読めない", result.stdout)
 
     def test_無いルールファイルもerrorになる(self):
-        result = lint(self.root, os.path.join(self.root, "どこにも無い.json"))
+        result = lint(self.root, os.path.join(self.root, "どこにも無い.yml"))
 
         self.assertEqual(result.returncode, 1)
         self.assertEqual(counts(result.stdout)[0], 1)
 
     def test_版が違うルールはerrorになる(self):
-        result = lint(self.root, rules_file(self.root, SOUND, version=2))
+        result = lint(self.root, rules_file(self.root, SOUND, version=99))
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("版", result.stdout)
@@ -136,15 +148,25 @@ class LintTest(unittest.TestCase):
             "組み立て不能",
             "先読み",
         ):
-            self.assertIn(f"error: {name}:", result.stdout, f"{name} を咎めていない")
+            # 名前には区画が付く。同じ id が別の区画に居ることがあるので、
+            # どちらの話なのかを名前が言えないと直しに行く先が決まらない。
+            self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
 
-    def test_ルールが1件も無いのはerrorになる(self):
+    def test_denyが1件も無いのはerrorになる(self):
         # 何も止めないガードは、入っていないガードと同じでありながら、
         # 入っているように見える。いちばん見つけにくい壊れ方なので error。
         result = lint(self.root, rules_file(self.root))
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("1 件も無い", result.stdout)
+        self.assertIn("`deny` が空", result.stdout)
+
+    def test_allowが1件も無いのはwarnになる(self):
+        # 判定は動いている。ただし、どのルールも言及しない呼び出しが
+        # すべて暗黙的 ask になるので、確認が出続ける状態と区別が付かない。
+        result = lint(self.root, rules_file(self.root, SOUND, allow=False))
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("`allow` が空", result.stdout)
 
     def test_判定は動くが効かない記述はwarnで0のまま(self):
         # ここが error と warn を分ける意味そのもの。ガードは動いているので
