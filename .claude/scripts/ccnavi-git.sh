@@ -1,0 +1,386 @@
+#!/bin/sh
+# ccnavi-git — 安全な git だけを通し、出力を抑えて結果だけ返すラッパ。
+#
+# 生の `git` は PreToolUse で拒否し、拒否の文面からここへ誘導する。狙いは 2 つ。
+#
+#   1. 出力がコンテキストに丸ごと載るのを止める。`git log -p` や `git diff` は
+#      入力次第で数千行になる。全量は logs/ に残し、標準出力へは要約と先頭数十行
+#      だけを返す。足りなければログを名指しで読ませる
+#   2. オプションの穴を入口 1 本で塞ぐ。`permissions.allow` の `Bash(git diff:*)`
+#      は前方一致でしかないので、後ろに何を足されても通る。サブコマンドごとに
+#      使ってよい形を書けるのは、入口を 1 本にしたここだけ
+#
+# 白名簿に無いものは既定で拒否する。拒否の文面には必ず「代わりに何をするか」を
+# 書く。理由だけ返すとエージェントは言い換えて再試行する。
+#
+# これは事故と浪費を減らすためのもので、敵対的な回避への防御ではない。
+# `sh -c` や `python -c` に埋めれば hook の文字列一致は外れる。そこまで塞ぐなら
+# permissions.deny か sandbox が要る。
+#
+# 使い方:  sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
+# 終了コード: 0 成功 / 1 git が失敗 / 2 引数か環境の誤り (拒否を含む)
+
+set -eu
+
+# 標準出力に返す本文の上限。超えたぶんはログにだけ残る。
+MAX_LINES="${CCNAVI_GIT_MAX_LINES:-40}"
+
+# 失敗したときに返す末尾の行数。原因はたいてい最後に出る。
+FAIL_LINES="${CCNAVI_GIT_FAIL_LINES:-30}"
+
+# 残す記録の本数。放っておくと増え続けるので世代で切る。
+KEEP_LOGS="${CCNAVI_GIT_KEEP_LOGS:-50}"
+
+# 対話に落ちる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
+# 資格情報プロンプトは /dev/tty を直接開くので stdin だけでは止まらない。
+GIT_TERMINAL_PROMPT=0
+GIT_PAGER=cat
+PAGER=cat
+GIT_EDITOR=true
+export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
+
+# 環境変数から設定を差し込む道を閉じる。`-c diff.external=<コマンド>` を引数で
+# 弾いても、GIT_CONFIG_COUNT/KEY/VALUE と GIT_EXTERNAL_DIFF で同じことができる。
+# 引数だけ見て環境を見ないと、塞いだつもりの穴が横に開いたままになる。
+# GIT_CONFIG_KEY_n / VALUE_n は GIT_CONFIG_COUNT が門になっているので、
+# 番号を数えて消す必要はない。門を閉じれば全部読まれない。
+unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || :
+
+reject() {
+	printf 'ccnavi-git: %s\n' "$1" >&2
+	exit 2
+}
+
+usage() {
+	cat <<'USAGE'
+sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
+
+通すもの:
+  読む      status log show diff blame shortlog describe rev-parse rev-list
+            ls-files ls-tree merge-base diff-tree cat-file grep
+  一覧      branch (-d は可 / -D -M -f -u は不可)  tag (一覧のみ)
+            remote (-v / show / get-url のみ)  worktree (list add prune remove)
+  変える    add  commit (--no-verify は不可)  restore <パス>
+            checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
+            stash (list show push pop apply)  merge --ff-only / --abort / --quit
+  通信      fetch  pull  (--force / --prune は不可)
+
+通さないもの (代わりの手段):
+  push          利用者に依頼する。ブランチはそのまま残す
+  reset clean   git stash push -u で退避する。消さない
+  rebase cherry-pick revert am apply bisect  履歴を書き換えない
+  config clone submodule  利用者に依頼する
+  -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
+                読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
+                化けるので、値を見ずに一律で拒否する
+
+出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
+環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
+USAGE
+}
+
+[ "$#" -eq 0 ] && {
+	usage
+	exit 2
+}
+
+case "$1" in
+-h | --help | help)
+	usage
+	exit 0
+	;;
+esac
+
+# サブコマンドより前のグローバルオプションは 1 つも受け取らない。
+#
+# `-c diff.external=<コマンド>` は分類上ただの `git diff` のまま任意コマンドを
+# 実行する。危ない設定名 (diff.external / core.pager / core.sshCommand ...) を
+# 列挙して弾く手は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
+# 形で落とす。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
+case "$1" in
+-*) reject "サブコマンドより前のオプション ($1) は受け取りません。素の形 (git <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
+esac
+
+sub="$1"
+shift
+
+# 全引数を走査して、どのサブコマンドでも許さない形を落とす。前方一致で拾えば
+# 等号形 (--output=out.diff) も一緒に落ちるので、getopt 相当の解析は要らない。
+for arg in ${1+"$@"}; do
+	case "$arg" in
+	-c | --config-env | --config-env=*)
+		reject "設定の一時上書き ($arg) は受け取りません。素の形で書き直してください。"
+		;;
+	--output | --output=* | --upload-pack* | --receive-pack* | --exec-path* | --exec=* | --ext-diff | --textconv)
+		reject "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパが logs/ に全量を残すのでそちらを読んでください。"
+		;;
+	--git-dir | --git-dir=* | --work-tree | --work-tree=* | --namespace | --namespace=* | -C)
+		reject "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+		;;
+	esac
+done
+
+# サブコマンドごとの白名簿。ここに無いものは既定で拒否。
+#
+# 「読み取り専用」に分類したサブコマンドでも、オプション次第で状態が変わる。
+# branch -D / worktree remove --force / tag -d が実例。だから分類だけでは足りず、
+# 閉じる向き (通っていたものを止める) の判定をサブコマンドの中に足してある。
+has() {
+	needle="$1"
+	shift
+	for a in ${1+"$@"}; do
+		[ "$a" = "$needle" ] && return 0
+	done
+	return 1
+}
+
+case "$sub" in
+status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list | ls-files | ls-tree | merge-base | diff-tree | cat-file | grep | whatchanged | show-ref)
+	: # 読むだけ。上のグローバル判定で穴は塞いである
+	;;
+
+branch)
+	# 短いオプションは束ねられる (-rd は -r -d と同じ) ので、1 文字ずつ見る。
+	# 見るのはダッシュ 1 個で始まる語だけ。長いオプションまで 1 文字で見ると、
+	# `--contains=feature/dev` のような値の中の f と d に当たって誤検知する。
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		--force | --delete=* | --move | --move=* | --set-upstream-to | --set-upstream-to=* | --edit-description)
+			reject "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 (git branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
+			;;
+		--*) ;;
+		-*)
+			case "$arg" in
+			*D*)
+				reject "$arg は未マージのブランチを消します。安全側の削除 (git branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
+				;;
+			*f* | *m* | *u*)
+				reject "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
+				;;
+			esac
+			;;
+		esac
+	done
+	;;
+
+tag)
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		-l | --list | --contains | --contains=* | --points-at | --points-at=* | --merged | --no-merged | --sort=* | --format=* | -n | -n[0-9]*) ;;
+		-*) reject "tag は一覧だけ通します ($arg は不可)。タグを作る・消すのは利用者に依頼してください。" ;;
+		esac
+	done
+	;;
+
+remote)
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		-v | --verbose | show | get-url) ;;
+		-*) reject "remote は一覧だけ通します ($arg は不可)。" ;;
+		add | set-url | set-head | set-branches | remove | rm | rename | prune | update)
+			reject "remote $arg は取得先・送信先を書き換えます。利用者に依頼してください。"
+			;;
+		esac
+	done
+	;;
+
+worktree)
+	action="${1:-list}"
+	case "$action" in
+	list | add | prune) ;;
+	remove)
+		if has --force ${1+"$@"} || has -f ${1+"$@"}; then
+			reject "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してから素の git worktree remove を使ってください。"
+		fi
+		;;
+	*) reject "worktree $action は通しません。使えるのは list / add / prune / remove です。" ;;
+	esac
+	;;
+
+stash)
+	action="${1:-push}"
+	case "$action" in
+	list | show | push | save | pop | apply | -*) ;;
+	drop | clear)
+		reject "stash $action は退避した変更を捨てます。中身を git stash show -p で確かめ、要らないと判断した理由を利用者に伝えてください。"
+		;;
+	*) reject "stash $action は通しません。使えるのは list / show / push / pop / apply です。" ;;
+	esac
+	;;
+
+add)
+	: # 索引を変えるだけ。作業ツリーは壊れない
+	;;
+
+restore)
+	# 作業中の変更を捨てる側。rules.yml が reset --hard の代わりに名指しで勧める
+	# 経路でもあるので、対象を 1 つずつ名指しさせる形だけ通す。
+	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください (git restore <パス>)。"
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		. | :/ | "*" | ":/*" | "./")
+			reject "restore にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。戻したいファイルを 1 つずつ名指ししてください。"
+			;;
+		esac
+	done
+	;;
+
+merge)
+	if has --abort ${1+"$@"} || has --quit ${1+"$@"} || has --ff-only ${1+"$@"}; then
+		:
+	else
+		reject "merge は --ff-only だけ通します。worktree のブランチが main の直上なら早送りで入ります。入らないなら衝突の解消が要るので、状態を報告して判断を仰いでください。中断は git merge --abort です。"
+	fi
+	;;
+
+commit)
+	# 通す。中身の点検は /commit スキルと ask ルールの側でやる。
+	# ここで見るのは、点検そのものを飛ばす形だけ。
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		--no-verify)
+			reject "$arg はコミット前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+			;;
+		--*) ;;
+		-*)
+			case "$arg" in
+			*n*)
+				reject "$arg には -n (--no-verify) が含まれます。コミット前の検査は飛ばさず、落ちた理由を直してください。"
+				;;
+			esac
+			;;
+		esac
+	done
+	;;
+
+checkout | switch)
+	# ブランチを移る形は通す。作業ツリーの中身を捨てる形だけ止める。
+	# `git checkout -- .` は、書きかけを何も言わずに消す。取り返せない。
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		--force | --discard-changes | --ours | --theirs)
+			reject "$arg は作業中の変更を捨てます。退避は git stash push -u です。"
+			;;
+		--)
+			reject "$sub にパスを渡す形は、そのファイルの書きかけを消します。戻したいファイルがあるなら git restore <パス> を名指しで使ってください。"
+			;;
+		. | :/)
+			reject "$sub にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。git restore <パス> を名指しで使ってください。"
+			;;
+		--*) ;;
+		-*)
+			case "$arg" in
+			*f*)
+				reject "$arg には -f (--force) が含まれます。作業中の変更を捨てるので通しません。退避は git stash push -u です。"
+				;;
+			esac
+			;;
+		esac
+	done
+	;;
+
+fetch | pull)
+	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗に倒れる。
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		-f | --force | --prune | --unshallow)
+			reject "$arg は手元の参照を書き換えます。素の git $sub で足ります。"
+			;;
+		esac
+	done
+	;;
+
+push)
+	reject "push はエージェントからは実行しません。ブランチをそのまま残し、利用者に push を依頼してください。"
+	;;
+reset | clean)
+	reject "$sub は作業中の変更を消します。退避は git stash push -u、戻すのは git restore <パス> です。"
+	;;
+rebase | cherry-pick | revert | am | apply | bisect | filter-branch | replace | update-ref | symbolic-ref | reflog | gc | notes)
+	reject "$sub は履歴か参照を書き換えます。通しません。必要な理由を利用者に伝えてください。"
+	;;
+config)
+	reject "config は設定を読み書きします。値には資格情報が混ざるので通しません。必要な値は利用者に尋ねてください。"
+	;;
+clone | submodule | lfs)
+	reject "$sub は外から中身を持ち込みます。通しません。利用者に依頼してください。"
+	;;
+*)
+	reject "$sub は白名簿にありません。使える形は sh .claude/scripts/ccnavi-git.sh --help で確認してください。"
+	;;
+esac
+
+# 外部 diff ドライバは設定にも書けるので、読む系では毎回無効にして呼ぶ。
+case "$sub" in
+diff | show | log | whatchanged) set -- --no-ext-diff ${1+"$@"} ;;
+esac
+
+root=$(git rev-parse --show-toplevel 2>/dev/null || :)
+[ -z "$root" ] && reject "git リポジトリの中で実行してください。"
+
+logdir="$root/logs"
+mkdir -p "$logdir"
+logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
+
+# 全量を必ず残す。成功でも書く。捨てると「あのとき何が出ていたか」を後から
+# 確かめられない。logs/ は .gitignore に入っていて、コミット対象にならない。
+{
+	printf '# %s  cwd=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$(pwd)"
+	printf '$ git %s' "$sub"
+	for arg in ${1+"$@"}; do printf ' %s' "$arg"; done
+	printf '\n--- 出力 ---\n'
+} >"$logfile"
+
+status=0
+git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
+
+# 記録の相対パス。エージェントがそのまま sed -n で開ける形で返す。
+case "$logfile" in
+"$root"/*) logrel="${logfile#"$root"/}" ;;
+*) logrel="$logfile" ;;
+esac
+
+# 本文は目印の次の行から。目印と同じ行が出力に含まれても、awk は最初の 1 件で
+# 立ち上がるので取り違えない。
+body() { awk 'f; /^--- 出力 ---$/ { f = 1 }' "$logfile"; }
+
+lines=$(body | awk 'END { print NR + 0 }')
+
+# 要約は「次の判断に効く数値」だけにする。本文をもう 1 度読ませないためのもので、
+# 本文の代わりではない。
+summary=$(body | awk -v cmd="$sub" '
+	/^diff --git /			{ files++ }
+	/^\+/ && !/^\+\+\+/		{ plus++ }
+	/^-/ && !/^---/			{ minus++ }
+	/^commit [0-9a-f]/		{ commits++ }
+	/^[ MADRCU?!][ MADRCU?!] /	{ entries++ }
+	/^\t/				{ entries++ }
+					{ n++ }
+	END {
+		if ((cmd == "diff" || cmd == "show") && files > 0)
+			printf "%d ファイル +%d -%d", files, plus, minus
+		else if ((cmd == "log" || cmd == "shortlog") && commits > 0)
+			printf "%d コミット", commits
+		else if (cmd == "status")
+			printf "変更 %d 件", entries + 0
+		else
+			printf "%d 行", n + 0
+	}')
+
+if [ "$status" -eq 0 ]; then
+	printf 'ok  git %s  %s  log=%s\n' "$sub" "$summary" "$logrel"
+	body | head -n "$MAX_LINES"
+	if [ "$lines" -gt "$MAX_LINES" ]; then
+		printf '... 残り %d 行は %s にある\n' "$((lines - MAX_LINES))" "$logrel"
+	fi
+else
+	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
+	body | tail -n "$FAIL_LINES"
+fi
+
+# 世代で切る。新しい順に並べ、上限より後ろを消す。
+ls -1t "$logdir"/git-*.log 2>/dev/null | awk -v keep="$KEEP_LOGS" 'NR > keep' |
+	while IFS= read -r old; do rm -f "$old"; done
+
+[ "$status" -eq 0 ] || exit 1
+exit 0
