@@ -146,6 +146,29 @@ class RejectTest(GitWrapperTest):
     def test_unknown_subcommand_is_rejected_by_default(self):
         self.assertRejected("frobnicate")
 
+    def test_the_alternative_it_names_is_not_a_denied_form(self):
+        # 生の git は PreToolUse で止まる。案内が `git stash push -u` と書くと、
+        # 案内された先でもう 1 度拒否される。代わりの手段が拒否される案内は、
+        # 案内が無いのとほとんど同じ。名乗るならラッパの形で名乗る。
+        for args in (
+            ("reset", "--hard"),
+            ("clean", "-fd"),
+            ("checkout", "-f", "main"),
+            ("checkout", "--", "tracked.txt"),
+            ("stash", "drop"),
+            ("branch", "-D", "other"),
+            ("restore",),
+            ("pull", "--force"),
+        ):
+            with self.subTest(args=args):
+                result = self.assertRejected(*args)
+                stderr = result.stderr
+                self.assertIn("ccnavi-git.sh", stderr, f"代わりの形を名乗っていない: {stderr}")
+                for form in ("git stash", "git restore", "git branch", "git worktree"):
+                    self.assertNotIn(
+                        form, stderr.replace("ccnavi-git.sh", ""), f"生の git を勧めた: {stderr}"
+                    )
+
     def test_long_option_values_do_not_trip_the_short_option_scan(self):
         # `--contains=feature/dev` の f と d を -f -d と読み違えないこと。
         # 短いオプションの束 (-rd) を 1 文字ずつ見る判定の巻き添え。
