@@ -68,7 +68,7 @@
   "env": {
     "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
     "CCNAVI_MODE": "warn",
-    "CCNAVI_RULES": ".claude/ccnavi/rules.json",
+    "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl"
   },
   "autoMemoryEnabled": false,

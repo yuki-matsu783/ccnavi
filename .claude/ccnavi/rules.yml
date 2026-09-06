@@ -1,0 +1,122 @@
+# このファイルは ccnavi 自身のリポジトリのルール。ccnavi を自分自身に仕掛けてある。
+#
+# 区画は強い順に deny / ask / allow。どこにも当たらない呼び出しは暗黙的 ask になり、
+# 人に確認が出る。だから allow は「このプロジェクトで普通にやること」を並べる場所で、
+# 権限を配る場所ではない。ここに書き足すたびに、人が見なくなる範囲が広がる。
+#
+# pattern と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する。
+# `<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグになる。
+version: 2
+
+deny:
+  - id: guard-config
+    match: Write|Edit|MultiEdit
+    pattern: ".claude/ccnavi/*"
+    message: >-
+      ガード自身のルールです。エージェントの判断で書き換えず、変更が要る理由を伝えて
+      利用者に依頼してください。
+
+  - id: guard-hooks
+    match: Write|Edit|MultiEdit
+    pattern: ".claude/hooks/*"
+    message: >-
+      ガードを起動する hook 本体です。エージェントの判断で書き換えず、変更が要る理由を
+      伝えて利用者に依頼してください。
+
+  - id: git-push
+    match: Bash
+    pattern: "git push *"
+    message: >-
+      git push はエージェントからは実行しません。ブランチをそのまま残し、利用者に
+      push を依頼してください。
+
+  - id: git-reset-hard
+    match: Bash
+    pattern: "git reset --hard *"
+    message: >-
+      作業中の変更が消えます。'git stash' で退避するか、戻したいファイルを名指しして
+      'git restore' を使ってください。
+
+  - id: git-branch-force-delete
+    match: Bash
+    pattern: "git branch -D *"
+    message: >-
+      未マージのブランチが消えます。'git branch -d' で安全側の削除を試し、それでも
+      消したいなら利用者に依頼してください。
+
+  - id: credentials
+    match: Bash|Read|Write|Edit|MultiEdit
+    regex: '\.env|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc'
+    message: 認証情報を含む場所です。中身を読まず、必要な値を利用者に尋ねてください。
+
+  - id: recursive-delete
+    match: Bash
+    pattern: "rm -rf *"
+    message: >-
+      再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
+      'git rm' を使ってください。
+
+  - id: heredoc
+    match: Bash
+    regex: "<<"
+    message: >-
+      ヒアドキュメントは使いません。ファイルの中身は Write / Edit ツールで書いてください。
+      プログラムに読ませる入力も、まず Write でスクリプトをファイルに置いて、そのファイルを
+      渡してください。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
+      編集後に走る検査も、どちらも通りません。
+
+ask:
+  - id: commit
+    match: Bash
+    regex: '^git\s+commit\b'
+    message: >-
+      コミットは 1 回ごとに人が見ます。何を含めたか、メッセージが変更と合っているかを
+      確かめてください。
+
+  - id: dependencies
+    match: Write|Edit|MultiEdit
+    regex: 'pyproject\.toml|uv\.lock'
+    message: >-
+      実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
+      1 本になります。何を足すのか、外せない理由は何かを言ってください。
+
+  - id: current-ticket
+    match: Write|Edit|MultiEdit
+    pattern: ".current-ticket.md"
+    message: >-
+      作業範囲の提案です。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
+      人が読んで 'ccnavi --approve' を通すまでは提案のままです。
+
+allow:
+  # このリポジトリで普通にやること。ここに無いものは人に確認が出る。
+  #
+  # Grep と Glob は書かない。判定が対象を取り出せるツールでないと、ルールは
+  # 当たりようがない（cli.subject_of）。対象を取り出せないツールは判定に
+  # 届かないまま通るので、allow に書いても死んだ行が 1 つ増えるだけになる。
+  - id: read-anything
+    match: Read
+    regex: "."
+
+  - id: source
+    match: Write|Edit|MultiEdit
+    regex: '(^|[\\/])(ccnavi|tests|testdata)[\\/]'
+
+  - id: project-files
+    match: Write|Edit|MultiEdit
+    regex: '(^|[\\/])(README|HANDOVER|CLAUDE|requirements|ccnavi)\.md$|(^|[\\/])(build|main)\.py$'
+
+  - id: worktrees
+    match: Write|Edit|MultiEdit
+    pattern: ".claude/worktrees/*"
+
+  - id: git-read-only
+    match: Bash
+    regex: '^git\s+(status|log|diff|show|branch|remote|worktree|add|stash|merge|restore|rev-parse)\b'
+
+  - id: checks
+    match: Bash
+    regex: '^uv\s+run\b'
+
+  - id: shell-inspection
+    match: Bash
+    regex: '^(ls|cat|sed|head|tail|find|grep|echo|mkdir|cp|mv|pwd|wc|sort|uniq|diff)\b'
