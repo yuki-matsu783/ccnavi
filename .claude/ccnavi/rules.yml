@@ -64,6 +64,25 @@ deny:
       Write / Edit で拒否される場所です。綴りを変えても同じ場所なので、変更が要る
       理由を伝えて利用者に依頼してください。読むだけなら cat や grep はそのまま通ります。
 
+  # 生の git はまとめて止め、入口を .claude/scripts/ccnavi-git.sh の 1 本に寄せる。
+  # 止める理由は 2 つで、どちらも許可ルールの粒度では書けない。
+  #
+  #   1. 出力がそのままコンテキストに載る。`git log -p` はこのリポジトリで 2 万行
+  #   2. `Bash(git diff:*)` は前方一致でしかなく、後ろに何を足されても通る。
+  #      `-c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを実行する
+  #
+  # glob ではなく regex なのは、`*git*` だと誘導先の `ccnavi-git.sh` にも当たって
+  # 出口ごと塞がるため。`git` がコマンドの位置に立つ形だけを拾う。
+  # `/usr/bin/git push` は拾い、`ccnavi-git.sh` は前がダッシュなので外れる。
+  - id: raw-git
+    match: Bash
+    regex: '(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s'
+    message: >-
+      生の git は実行しません。'sh .claude/scripts/ccnavi-git.sh <サブコマンド> ...'
+      を使ってください。通る形は同じスクリプトの --help に出ます。返るのは要約と
+      先頭 40 行だけで、全量は logs/ に残ります。push はラッパも通さないので、
+      ブランチをそのまま残して利用者に依頼してください。
+
   - id: git-push
     match: Bash
     glob: "*git push*"
@@ -115,9 +134,11 @@ deny:
       編集後に走る検査も、どちらも通りません。
 
 ask:
+  # 生の git を止めたので、コミットが通る道はラッパだけになった。
+  # 錨を `git commit` に打ったままだと、この確認はどこにも当たらなくなる。
   - id: commit
     match: Bash
-    regex: '\bgit\s+commit\b'
+    regex: 'ccnavi-git\.sh\s+commit\b'
     message: >-
       コミットは 1 回ごとに人が見ます。何を含めたか、メッセージが変更と合っているかを
       確かめてください。
@@ -168,9 +189,12 @@ allow:
   # 側の語だけで全体が通る。deny は文字列全体に当たり続けるので危ないものは
   # 止まるが、確認の網から漏れる形は残る。ここを詰めるなら、判定を繋いだ
   # 文字列ではなくコマンド 1 本ずつに当てる作りが要る。
-  - id: git-read-only
+  # git の入口。サブコマンドの選別はラッパの中で行うので、ここでは区別しない。
+  # ここに書けるのは前方一致か文字列一致だけで、`--force` のような一語で結果が
+  # 変わる引数はそもそも書き分けられない。書き分けられる場所へ寄せた結果がこれ。
+  - id: ccnavi-git
     match: Bash
-    regex: '\bgit\s+(status|log|diff|show|branch|remote|worktree|add|stash|merge|restore|rev-parse)\b'
+    glob: "*ccnavi-git.sh*"
 
   - id: checks
     match: Bash
