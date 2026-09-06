@@ -1,0 +1,249 @@
+"""設定とルールの検証。判定を行わずに、防御を無効化しうる記述だけを報告する。
+
+判定の経路は、苦情を言うために設定を読むわけではない。判定のついでに気づいたことを
+標準エラーへ落としているだけなので、判定が走らない場面――ルールを書き換えた直後、
+CI、入れたばかりのプロジェクト――で不備を見つける手段が無い。ここがその経路になる。
+
+急ぐ理由は事故の側にある。ルールファイルが読めないと、block モードでは
+すべてのツール呼び出しが拒否側に倒れる。そのファイルを直すための呼び出しも
+止まるので、壊れてから気づいたのでは直せない。だから壊れる前に言う側が要る。
+
+深刻度の分け方は 1 つの原則で決めてある。
+
+* error はガードが働かない、あるいは働きすぎて全部を止める記述。放っておくと
+  防御が消えるか、セッションが死ぬ。CI が落とす対象はここだけでよい
+* warn は判定そのものは動くが、書いた人が意図した防御が効いていない記述。
+  直さなくても今日は何も壊れないが、守っているつもりの穴が開いている
+
+## 設計からの読み替え
+
+ccnavi.md 付録 D.2「診断コマンド」の `--lint` と D.4「設定lintの検証項目」は、
+config.yaml という 1 枚の設定ファイルに、ツールの許可・保護対象ディレクトリ・
+禁止コマンドがまとめて書かれている前提で書かれている。現在の形はそうではない。
+設定は `.claude/settings.json` の env が運ぶ環境変数、防御の中身はルールファイルで、
+パスの列挙という考え方そのものが無い。そこで D.4 の 9 項目を次のように読み替えた。
+
+| D.4 の項目 | 現在の形での読み替え | 深刻度 |
+|---|---|---|
+| 3 正規表現がコンパイル可能か | regex / pattern を組み立てられるか | error |
+| 6 tools セクションが存在するか | ルールが 1 件でも組み上がるか | error |
+| 1,2,4 禁止値・`..`・絶対パス | 該当する列挙が無い。代わりに版番号と必須欄 | error |
+| 5 max_* が既定より緩くないか | 呼び出しを止めないモードと読めない値 | warn |
+| 8 重複していないか | id の欠落と重複 | warn |
+| 7,9 保護対象・immutable の漏れ | どのツールにも当たらない match | warn |
+
+読み替えても変わらないのは、CI で走らせて error だけを落とす対象にするという
+D.4 の使い方のほうで、終了コードはそれに合わせてある。
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import os
+from typing import TextIO
+
+from . import hookio, rules, settings
+from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+
+# Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
+# env は Claude Code がプロセスに渡し、ccnavi はそれを環境変数として受け取る。
+# 検証だけがこのファイルを直接見る。作業ツリーの中にあってエージェントが書き換えられる
+# ファイルに、防御を無効化する値が書かれていないかを問えるのはここだけだから。
+PROJECT_SETTINGS = os.path.join(".claude", "settings.json")
+
+
+def report(stdout: TextIO, root: str, conf: settings.Settings, notes: list[str], flag: str) -> int:
+    """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
+
+    書き先は標準出力にしてある。この経路は hook の payload を読まないので、
+    判定を運ぶための標準出力が空いている。CI がそのまま拾える側に出す。
+    """
+    # 判定の側にある定数と関数を使う。lint は cli から呼ばれるので、
+    # モジュールの頭で import すると循環する。
+    from .cli import EXIT_ERROR, EXIT_OK, resolve_mode
+
+    # モードの解決は判定と同じ関数に任せる。ここで別に書くと、検証は通ったのに
+    # 実運用では違うモードになる、という一番まずい形になる。苦情を標準エラーへ
+    # 書く作りなので、受け皿を渡して拾い、こちらで深刻度を付け直す。
+    complaints = io.StringIO()
+    mode = resolve_mode(complaints, flag, conf)
+
+    problems = check(root, conf, notes, mode, complaints.getvalue())
+
+    stdout.write("ccnavi: 設定を検証する\n")
+    stdout.write(f"  ルール: {conf.rules}\n")
+    # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
+    # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
+    # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
+    stdout.write(f"  モード: {mode}（この起動の環境から解決したもの）\n")
+
+    for problem in problems:
+        stdout.write(f"{problem}\n")
+
+    errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
+    warns = len(problems) - errors
+    stdout.write(f"error {errors} 件、warn {warns} 件\n")
+    return EXIT_ERROR if errors else EXIT_OK
+
+
+def check(
+    root: str, conf: settings.Settings, notes: list[str], mode: str, complaints: str
+) -> list[Problem]:
+    """防御を無効化しうる記述を数え上げる。
+
+    notes は設定の解決が出した苦情、complaints はモードの解決が出した苦情。
+    どちらも深刻度を持たない文字列で届くので、ここで付ける。
+    """
+    from .cli import MODE_OFF, MODE_WARN
+
+    problems: list[Problem] = []
+
+    # 上書き設定を読み飛ばしても、値は既定に落ちてガードは弱まらない。
+    # ただし人が設定したつもりの値がどこにも効いていない状態にはなる。
+    for note in notes:
+        problems.append(Problem(SEVERITY_WARN, "(settings)", note))
+
+    for line in complaints.splitlines():
+        # 判定の側は "ccnavi: " を付けて標準エラーへ書く。ここでは深刻度が
+        # 頭に付くので、その前置きは落とす。
+        problems.append(Problem(SEVERITY_WARN, "(mode)", line.removeprefix("ccnavi: ")))
+
+    if mode == MODE_OFF:
+        problems.append(Problem(SEVERITY_WARN, "(mode)", "off なので何も判定しない"))
+    elif mode == MODE_WARN:
+        # warn は導入の途中では正しい状態なので error にはしない。それでも
+        # 言う。ルールが揃っているのに 1 件も止まらない状態は、外から見ると
+        # ガードが効いている状態と区別が付かない。
+        problems.append(Problem(SEVERITY_WARN, "(mode)", "warn なので判定しても呼び出しを止めない"))
+
+    problems.extend(_project_settings(root))
+    problems.extend(_rules(conf.rules))
+    return problems
+
+
+def _project_settings(root: str) -> list[Problem]:
+    """`.claude/settings.json` の env に、防御を無効化する値が無いかを見る。
+
+    このファイルは作業ツリーの中にあり、エージェントが書き換えられ、書いた値は
+    次のセッションから効く。ccnavi は環境変数しか読まないので、ここに書かれた
+    off が「人がセッションを起動するときに渡した off」と同じ顔をして届く。
+    判定の側にはその 2 つを見分ける手段が無いから、書かれていることを
+    見つけられる場所はここしかない。
+    """
+    from .cli import MODE_BLOCK, MODE_OFF, MODE_WARN
+
+    path = os.path.join(root, PROJECT_SETTINGS)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        # 無いのは異常ではない。ccnavi は環境変数だけでも動く。
+        return []
+    except (OSError, ValueError) as exc:
+        return [Problem(SEVERITY_WARN, "(project)", f"{PROJECT_SETTINGS} を読めない: {exc}")]
+
+    env = data.get("env") if isinstance(data, dict) else None
+    if not isinstance(env, dict):
+        return []
+
+    problems: list[Problem] = []
+    declared = env.get(settings.MODE_ENV)
+    if isinstance(declared, str) and declared:
+        normalized = declared.lower()
+        if normalized == MODE_OFF:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    "(project)",
+                    f"{PROJECT_SETTINGS} の env が {settings.MODE_ENV}=off を宣言している。"
+                    "監視される側が書けるファイルから監視を止めている。"
+                    "止めるならセッションを起動する側の環境から渡す",
+                )
+            )
+        elif normalized not in (MODE_WARN, MODE_BLOCK):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(project)",
+                    f"{PROJECT_SETTINGS} の env の {settings.MODE_ENV}={declared!r} は"
+                    f"モードとして読めない。{MODE_BLOCK} に落ちる",
+                )
+            )
+    return problems
+
+
+def _rules(path: str) -> list[Problem]:
+    """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
+
+    rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
+    落ちるという、検証があるぶんかえって危ない形になる。
+    """
+    try:
+        rule_set, problems = rules.load(path)
+    except (OSError, ValueError) as exc:
+        # block モードではこれがそのまま全ツール呼び出しの拒否になり、
+        # このファイルを直すための呼び出しも止まる。いちばん重い error。
+        return [Problem(SEVERITY_ERROR, "(rules)", f"ルールを読めない: {exc}")]
+
+    problems = list(problems)
+
+    if not rule_set.rules:
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                "(rules)",
+                "組み立てられたルールが 1 件も無い。何も止めないガードは、"
+                "入っていないガードと同じでありながら、入っているように見える",
+            )
+        )
+
+    seen: set[str] = set()
+    for rule in rule_set.rules:
+        # id を欠いたルールは名指しできないので、当たった中身で呼ぶ。
+        name = rule.id or f"(id 無し: {rule.match} {rule.pattern or rule.regex})"
+        if not rule.id:
+            problems.append(
+                Problem(SEVERITY_WARN, name, "id が無い。記録も報告もこのルールを名指しできない")
+            )
+        elif rule.id in seen:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN, name, "id が重複している。記録からどちらが当たったか辿れない"
+                )
+            )
+        seen.add(rule.id)
+
+        for tool in _inert(rule.match):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない"
+                )
+            )
+
+    return problems
+
+
+def _inert(match: str) -> list[str]:
+    """match に並んだツール名のうち、判定が対象を取り出せないものを返す。
+
+    ルールを当てる文字列を選ぶのは cli.subject_of で、そこが知らないツール名では
+    対象が空になり、rule.matches は必ず False を返す。つまりそのルールは
+    書いてあるのに何も止めない。守っているつもりの穴なので warn で言う。
+
+    ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を写すと、
+    判定側が扱うツールを増やしたときにこちらが黙って古くなり、正しいルールを
+    誤って咎めるようになる。
+    """
+    from .cli import subject_of
+
+    inert: list[str] = []
+    for want in match.split("|"):
+        tool = want.strip()
+        if not tool:
+            continue
+        # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
+        probe = hookio.Input(tool_name=tool, tool_input={"command": "x", "file_path": "x"})
+        if not subject_of(probe):
+            inert.append(tool)
+    return inert

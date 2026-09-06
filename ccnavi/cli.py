@@ -11,7 +11,7 @@ import os
 import time
 from typing import TextIO
 
-from . import audit, hookio, rules, settings, shellread
+from . import audit, hookio, lint, rules, settings, shellread
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定へ着地することが、遅い判定が黙った許可に化けるのを防ぐ。
@@ -41,6 +41,13 @@ Register it on the tool-call events of your agent, then exercise it with
 
     echo '{"hook_event_name":"PreToolUse","tool_name":"Bash",
            "tool_input":{"command":"git push"}}' | ccnavi
+
+To check the rules file and the settings without making a decision, run
+
+    ccnavi --lint
+
+It reads no payload, reports anything that could disable the guard as an error
+or a warning, and exits non-zero when it reports an error.
 """
 
 
@@ -51,6 +58,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--mode", default="")
     parser.add_argument("--rules", default="")
     parser.add_argument("--log", default="")
+    parser.add_argument("--lint", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     try:
         args = parser.parse_args(argv)
@@ -62,8 +70,6 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
-    for problem in problems:
-        stderr.write(f"ccnavi: {problem}\n")
 
     # フラグは何よりも強い。診断のための実行が、プロジェクト全体で共有している
     # ファイルに触らずに別の場所を指せるように。
@@ -71,6 +77,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.log = args.log
     if args.rules:
         conf.rules = args.rules
+
+    # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
+    # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
+    # 報告でしかないものが、検証にとっては結論そのものになる。
+    if args.lint:
+        return lint.report(stdout, root, conf, problems, args.mode)
+
+    for problem in problems:
+        stderr.write(f"ccnavi: {problem}\n")
 
     mode = resolve_mode(stderr, args.mode, conf)
     log = audit.Log(conf.log)
