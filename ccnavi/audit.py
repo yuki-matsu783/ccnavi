@@ -22,7 +22,7 @@ DENY = "deny"
 SKIP = "skip"
 
 # 判定に至らなかった理由。
-REASON_MODE_OFF = "mode-off"
+REASON_MODE_DISABLED = "mode-disabled"
 REASON_EVENT_NOT_CHECKED = "event-not-checked"
 REASON_NO_SUBJECT = "no-subject"
 # コマンドは在るが、実行される部分が無い。コメントだけの行がこれにあたる。

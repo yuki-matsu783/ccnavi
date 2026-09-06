@@ -101,7 +101,7 @@ _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 def check(
     stderr: TextIO,
-    mode_blocks: bool,
+    enforcing: bool,
     restore: str,
     state_dir: str,
     mine: tuple[str, ...],
@@ -114,9 +114,9 @@ def check(
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
-    mode_blocks は、このモードが呼び出しを止める側かどうか。止めない側
-    （warn）では復元も行わない。何も変えないことが目的のモードが、
-    自分の判断でファイルを動かしては意味がない。
+    enforcing は、このモードが判定を実際に適用する側かどうか。適用しない側
+    （dry-run）では復元も行わない。呼び出しにも作業ツリーにも手を出さないことが
+    そのモードの約束なので、自分の判断でファイルを動かしては意味がない。
 
     mine は ccnavi 自身が書く場所。記録と控えがそれで、どちらも保護領域の
     中に置かれることがある。実際このリポジトリのルールは `.claude/ccnavi/*`
@@ -157,7 +157,7 @@ def check(
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
-    if fresh and restore == RESTORE_AUTO and mode_blocks:
+    if fresh and restore == RESTORE_AUTO and enforcing:
         restored = _restore(stderr, top, state_dir, [f.change for f in fresh])
 
     _save_seen(
@@ -185,7 +185,7 @@ def check(
     record.detail = "; ".join(notes)
 
     if fresh:
-        record.decision, record.enforced = audit.DENY, mode_blocks
+        record.decision, record.enforced = audit.DENY, enforcing
     else:
         # この呼び出しは何も汚していない。控えの報告は状態の通知であって、
         # 直前の実行についての判定ではない。

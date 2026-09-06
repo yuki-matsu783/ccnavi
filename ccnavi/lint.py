@@ -113,7 +113,7 @@ def check(
     notes は設定の解決が出した苦情、complaints はモードの解決が出した苦情。
     どちらも深刻度を持たない文字列で届くので、ここで付ける。
     """
-    from .cli import MODE_OFF, MODE_WARN
+    from .cli import MODE_DISABLE, MODE_DRY_RUN
 
     problems: list[Problem] = []
 
@@ -127,13 +127,17 @@ def check(
         # 頭に付くので、その前置きは落とす。
         problems.append(Problem(SEVERITY_WARN, "(mode)", line.removeprefix("ccnavi: ")))
 
-    if mode == MODE_OFF:
-        problems.append(Problem(SEVERITY_WARN, "(mode)", "off なので何も判定しない"))
-    elif mode == MODE_WARN:
+    if mode == MODE_DISABLE:
+        problems.append(Problem(SEVERITY_WARN, "(mode)", f"{MODE_DISABLE} なので何も判定しない"))
+    elif mode == MODE_DRY_RUN:
         # warn は導入の途中では正しい状態なので error にはしない。それでも
         # 言う。ルールが揃っているのに 1 件も止まらない状態は、外から見ると
         # ガードが効いている状態と区別が付かない。
-        problems.append(Problem(SEVERITY_WARN, "(mode)", "warn なので判定しても呼び出しを止めない"))
+        problems.append(
+            Problem(
+                SEVERITY_WARN, "(mode)", f"{MODE_DRY_RUN} なので判定しても呼び出しに手を出さない"
+            )
+        )
 
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
@@ -287,7 +291,7 @@ def _project_settings(root: str) -> list[Problem]:
     判定の側にはその 2 つを見分ける手段が無いから、書かれていることを
     見つけられる場所はここしかない。
     """
-    from .cli import MODE_BLOCK, MODE_OFF, MODE_WARN
+    from .cli import MODE_DISABLE, MODE_DRY_RUN, MODE_ENABLE
 
     path = os.path.join(root, PROJECT_SETTINGS)
     try:
@@ -307,23 +311,24 @@ def _project_settings(root: str) -> list[Problem]:
     declared = env.get(settings.MODE_ENV)
     if isinstance(declared, str) and declared:
         normalized = declared.lower()
-        if normalized == MODE_OFF:
+        if normalized == MODE_DISABLE:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     "(project)",
-                    f"{PROJECT_SETTINGS} の env が {settings.MODE_ENV}=off を宣言している。"
+                    f"{PROJECT_SETTINGS} の env が {settings.MODE_ENV}={MODE_DISABLE} を"
+                    "宣言している。"
                     "監視される側が書けるファイルから監視を止めている。"
                     "止めるならセッションを起動する側の環境から渡す",
                 )
             )
-        elif normalized not in (MODE_WARN, MODE_BLOCK):
+        elif normalized not in (MODE_DRY_RUN, MODE_ENABLE):
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
                     f"{PROJECT_SETTINGS} の env の {settings.MODE_ENV}={declared!r} は"
-                    f"モードとして読めない。{MODE_BLOCK} に落ちる",
+                    f"モードとして読めない。{MODE_ENABLE} に落ちる",
                 )
             )
     return problems

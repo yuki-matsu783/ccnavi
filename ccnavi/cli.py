@@ -24,14 +24,15 @@ EXIT_ERROR = 1  # 使い方の誤り、または読めない設定
 EXIT_BLOCK = 2  # 判定を書けなかったので拒否側に倒す
 
 # モードは判定をどう扱うかを決めるだけで、どう判定するかは決めない。
-# 判定を続ける 2 つのモードは同じ経路を通るので、warn が報告するものが
-# block なら止めていたものと一致する。
+# 判定を続ける 2 つのモードは同じ経路を通るので、dry-run が報告するものが
+# enable なら実際に起きたことと一致する。
 #
-# 名前はツール呼び出しがどうなるかを言っていて、lint の深刻度と同じように
-# 弱いほうから強いほうへ並ぶ。
-MODE_OFF = "off"  # 判定しない
-MODE_WARN = "warn"  # 判定して報告するが、呼び出しは通す
-MODE_BLOCK = "block"  # 判定して呼び出しを止める
+# 名前はガードそのものの状態を言う。判定に deny と ask の 2 つがある以上、
+# 名前が「止める」だけを言うと、確認で済む回に嘘をつくことになる。
+# 弱いほうから強いほうへ並ぶのは lint の深刻度と同じ。
+MODE_DISABLE = "disable"  # 判定しない
+MODE_DRY_RUN = "dry-run"  # 判定して報告するが、呼び出しには手を出さない
+MODE_ENABLE = "enable"  # 判定を呼び出しに適用する
 
 # 返す理由に載せる理由コード。ccnavi.md 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -224,8 +225,8 @@ def decide(
     振り分けだけをここに置く。イベントが増えるたびに 1 本の関数が伸びると、
     どのイベントで何が起きるのかを読むのに全部を読むことになる。
     """
-    if mode == MODE_OFF:
-        record.decision, record.reason = audit.SKIP, audit.REASON_MODE_OFF
+    if mode == MODE_DISABLE:
+        record.decision, record.reason = audit.SKIP, audit.REASON_MODE_DISABLED
         return EXIT_OK
     if payload.event == hookio.PRE_TOOL_USE:
         return decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
@@ -342,13 +343,13 @@ def decide_before(
     reason = "\n\n".join(notices + reasons)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK
 
-    if mode == MODE_WARN:
+    if mode == MODE_DRY_RUN:
         record.decision, record.enforced = decision, False
         would = "stopped" if verdict == rules.DENY else "asked the user about"
         hookio.write_context(
             stdout,
             hookio.PRE_TOOL_USE,
-            f"[ccnavi warn] block mode would have {would} this call:\n" + reason,
+            f"[ccnavi dry-run] {MODE_ENABLE} would have {would} this call:\n" + reason,
         )
         return EXIT_OK
 
@@ -395,7 +396,7 @@ def decide_after(
 
     text = post.check(
         stderr,
-        mode_blocks=mode == MODE_BLOCK,
+        enforcing=mode == MODE_ENABLE,
         restore=conf.restore,
         state_dir=conf.state,
         mine=(conf.state, conf.log),
@@ -414,7 +415,7 @@ def decide_after(
     # 誰が書いたか分からないものにそれを言うと、他人の書きかけを消しにいく。
     pushback = record.decision == audit.DENY
 
-    if pushback and mode == MODE_BLOCK:
+    if pushback and mode == MODE_ENABLE:
         # このイベントで差し戻す経路は exit 2 と標準エラーだけ。ツールは
         # すでに走っているので取り消せず、渡せるのは「次に何をするか」になる。
         stderr.write(text + "\n")
@@ -424,7 +425,7 @@ def decide_after(
         # warn は差し戻さない。呼び出しを止めないことがこのモードの約束で、
         # 差し戻しは止めはしないが次の一手を変えさせる。変えさせないまま
         # 数えるためのモードなので、届け先を報告の側にする。
-        text = "[ccnavi warn] block mode would have sent this back as a correction:\n" + text
+        text = f"[ccnavi dry-run] {MODE_ENABLE} would have sent this back as a correction:\n" + text
     hookio.write_context(stdout, hookio.POST_TOOL_USE, text)
     return EXIT_OK
 
@@ -456,11 +457,11 @@ def load_rules(stderr: TextIO, rules_path: str, record: audit.Record) -> tuple[r
 def fail_closed(mode: str) -> int:
     """「判定に達せなかった」ときの終了コード。
 
-    block は呼び出しを止める。達せなかった判定が許可に化けてはならないから。
-    warn は通す。何も変えないことが目的のモードが、自分の失敗で作業を
-    止めるようでは意味がない。
+    enable は呼び出しを止める。達せなかった判定が許可に化けてはならないから。
+    dry-run は通す。呼び出しに手を出さないことがそのモードの約束なので、
+    自分の失敗で作業を止めるようでは意味がない。
     """
-    return EXIT_OK if mode == MODE_WARN else EXIT_BLOCK
+    return EXIT_OK if mode == MODE_DRY_RUN else EXIT_BLOCK
 
 
 def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
@@ -742,14 +743,14 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
     """設定された値をモードにする。
 
     設定ファイルが決められるのは warn と block だけで、その編集は次のツール
-    呼び出しから効く。off を言えるのは環境だけ。設定ファイルは作業ツリーの中に
-    あってエージェントが書けるので、そこに書かれた off を効かせると、
+    呼び出しから効く。disable を言えるのは環境だけ。設定ファイルは作業ツリーの中に
+    あってエージェントが書けるので、そこに書かれた disable を効かせると、
     見張られている側が見張りを止められてしまう。
 
     フラグは両方より強い。テストが、たまたま走った環境に依存せずモードを
     固定できるように。
 
-    どこにも値が無ければ block。設定の欠落が、ガードの欠落にならないように。
+    どこにも値が無ければ enable。設定の欠落が、ガードの欠落にならないように。
     """
     source, value = settings.MODE_ENV, conf.mode
     if flag_value:
@@ -757,37 +758,37 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
 
     normalized = value.lower()
 
-    if normalized == MODE_WARN:
-        return MODE_WARN
+    if normalized == MODE_DRY_RUN:
+        return MODE_DRY_RUN
 
-    if normalized == MODE_OFF:
-        # off の経路は 1 本だけ。セッションを起動した人の環境から来て、
+    if normalized == MODE_DISABLE:
+        # disable の経路は 1 本だけ。セッションを起動した人の環境から来て、
         # かつ作業ツリーの中の何もそれを求めていないとき。設定ファイルもフラグも
         # エージェントが書ける場所から来るし、そこでの編集は次のツール呼び出しから
         # 効くので、どちらの off を認めても、見張られている側が見張りを
         # 止められることになる。
         from_file = conf.mode_declared_in_file.lower()
         from_env = conf.mode_from_environment.lower()
-        if not flag_value and from_env == MODE_OFF and from_file != MODE_OFF:
-            return MODE_OFF
+        if not flag_value and from_env == MODE_DISABLE and from_file != MODE_DISABLE:
+            return MODE_DISABLE
         stderr.write(
-            f"ccnavi: {source}=off is ignored because it comes from inside the "
-            f"project; start the session with {settings.MODE_ENV}=off in the "
-            "environment instead\n"
+            f"ccnavi: {source}={MODE_DISABLE} is ignored because it comes from inside "
+            f"the project; start the session with {settings.MODE_ENV}={MODE_DISABLE} "
+            "in the environment instead\n"
         )
-        return MODE_BLOCK
+        return MODE_ENABLE
 
-    if normalized in ("", MODE_BLOCK):
-        return MODE_BLOCK
+    if normalized in ("", MODE_ENABLE):
+        return MODE_ENABLE
 
     # 解釈できない値も最も強いモードに着地するが、それを言うことに意味がある。
     # 名前を変えた設定や打ち間違いが、黙っていると意図した選択に見えてしまい、
     # 誰にも見えない理由でガードが締まることになる。
     stderr.write(
-        f"ccnavi: {source}={value!r} is not a mode; using {MODE_BLOCK}. "
-        f"Valid modes are {MODE_OFF}, {MODE_WARN} and {MODE_BLOCK}\n"
+        f"ccnavi: {source}={value!r} is not a mode; using {MODE_ENABLE}. "
+        f"Valid modes are {MODE_DISABLE}, {MODE_DRY_RUN} and {MODE_ENABLE}\n"
     )
-    return MODE_BLOCK
+    return MODE_ENABLE
 
 
 def default_root() -> str:
