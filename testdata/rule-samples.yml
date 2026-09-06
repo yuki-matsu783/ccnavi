@@ -113,7 +113,7 @@ ask:
     why: 作業範囲の提案。承認は別の経路
   - tool: Bash
     subject: "curl https://example.com"
-    why: どのルールも言及していない。暗黙的 ask
+    why: どのルールも言及していない。--test は人が居るモードを前提に判定するので確認になる
   - tool: Bash
     subject: "docker run --rm alpine"
     why: 同上

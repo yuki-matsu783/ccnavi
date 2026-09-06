@@ -1,14 +1,14 @@
-"""3 つの区画と暗黙的 ask の受入テスト。道具を外から叩いて応答だけを見る。
+"""3 つの区画と権限モードへの委譲の受入テスト。道具を外から叩いて応答だけを見る。
 
 見るのは 4 つ。
 
-1. 強さの順が deny > 明示的 ask > allow > 暗黙的 ask であること
+1. 強さの順が deny > ルールが置いた確認 > allow > 権限モードへの委譲であること
 2. どのルールも言及しない呼び出しが確認になること
-3. 明示的 ask と暗黙的 ask が区別して返ること
+3. ルールが置いた確認と権限モードへの委譲が区別して返ること
 4. ルールがチケットより強いこと
 
-3 つ目が要る理由は設計 §13.2 にある。暗黙的 ask は設定の穴に起因するので、
-穴が塞がるまで同じ問いが繰り返される。明示的 ask は人が意図して置いた
+3 つ目が要る理由は設計 §13.2 にある。権限モードへの委譲は設定の穴に起因するので、
+穴が塞がるまで同じ問いが繰り返される。ルールが置いた確認は人が意図して置いた
 確認ポイントで、繰り返されること自体に価値がある。混ぜると前者の数に
 後者が埋もれる。
 """
@@ -103,9 +103,9 @@ class SectionsTest(unittest.TestCase):
         out = self.judge(path, "Bash", "ls -la")
 
         self.assertEqual(out.get("permissionDecision"), "ask")
-        self.assertIn("IMPL_UNDECLARED", out["permissionDecisionReason"])
+        self.assertIn("UNDECLARED", out["permissionDecisionReason"])
 
-    def test_暗黙的_ask_は危険の表明ではないと言う(self):
+    def test_未言及の文は危険の表明ではないと言う(self):
         # 設計 §13.2。危険だと書くと、受け取った側は存在しない危険を探しに行く。
         path = self.rules(deny=[rule("push", "Bash", "*git push*")])
 
@@ -123,7 +123,7 @@ class SectionsTest(unittest.TestCase):
 
         self.assertNotIn("permissionDecision", self.judge(path, "Bash", "ls -la"))
 
-    def test_明示的_ask_は暗黙的と区別して返る(self):
+    def test_ルールが置いた確認は未言及と区別して返る(self):
         path = self.rules(
             ask=[rule("migrations", "Write", "*/migrations/*", message="人が中身を見ます")],
             allow=[rule("anything", "Write", "*", message="")],
@@ -132,7 +132,7 @@ class SectionsTest(unittest.TestCase):
         out = self.judge(path, "Write", os.path.join(self.root, "migrations", "0001.sql"))
 
         self.assertEqual(out.get("permissionDecision"), "ask")
-        self.assertIn("EXPL_ASK", out["permissionDecisionReason"])
+        self.assertIn("RULE_ASK", out["permissionDecisionReason"])
         # 人が置いた文面が届くこと。届かないと、何を見て判断するのか分からない。
         self.assertIn("人が中身を見ます", out["permissionDecisionReason"])
 
@@ -188,7 +188,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_読み切れないコマンドは拒否ではなく確認になる(self):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
-        # 設計 §13.1 の IMPL_PARSE_UNCERTAIN は ask 系に置かれている。
+        # 設計 §13.1 の PARSE_UNCERTAIN は ask 系に置かれている。
         path = self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],
@@ -197,7 +197,7 @@ class SectionsTest(unittest.TestCase):
         out = self.judge(path, "Bash", "cat <<'EOF'\nhello\n")
 
         self.assertEqual(out.get("permissionDecision"), "ask")
-        self.assertIn("IMPL_PARSE_UNCERTAIN", out["permissionDecisionReason"])
+        self.assertIn("PARSE_UNCERTAIN", out["permissionDecisionReason"])
 
     def test_実行される部分が無いコマンドは何も返さない(self):
         # コメントだけの行。何も走らないものについて人に聞く意味は無い。

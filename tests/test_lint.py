@@ -162,7 +162,7 @@ class LintTest(unittest.TestCase):
 
     def test_allowが1件も無いのはwarnになる(self):
         # 判定は動いている。ただし、どのルールも言及しない呼び出しが
-        # すべて暗黙的 ask になるので、確認が出続ける状態と区別が付かない。
+        # すべて Claude Code の権限モードに従うので、確認が出続ける状態と区別が付かない。
         result = lint(self.root, rules_file(self.root, SOUND, allow=False))
 
         self.assertEqual(result.returncode, 0)

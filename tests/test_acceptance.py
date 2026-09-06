@@ -188,7 +188,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(len(got), 2)
         for i, part in enumerate(got):
             with self.subTest(reason=i):
-                self.assertIn("IMPL_PARSE_UNCERTAIN", part)
+                self.assertIn("PARSE_UNCERTAIN", part)
                 self.assertIn("raw text", part, "読めたときと同じ文面になっている")
 
     def test_理由は他の判定の結果に言及しない(self):

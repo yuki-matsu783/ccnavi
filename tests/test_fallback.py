@@ -73,7 +73,7 @@ class FallbackTest(unittest.TestCase):
         # 止まって回復できなくなる。既定モードが block なので、ルールを置く前に
         # hook を登録しただけでセッションが死ぬ。
         #
-        # 既定にはプロジェクトの allow が無いので、無害な呼び出しも暗黙的 ask に
+        # 既定にはプロジェクトの allow が無いので、無害な呼び出しも権限モードへの委譲に
         # なる。人が答えれば進むので、道は塞がっていない。塞がるのは deny だけ。
         for rules_path in (self.broken, self.missing):
             with self.subTest(rules=os.path.basename(rules_path)):
@@ -112,7 +112,7 @@ class FallbackTest(unittest.TestCase):
         # REQ-PRE-06 が「読み取りと設定自身の修復を妨げない」と書いている意味。
         # ここを止めると直す道が 1 本も残らない。
         #
-        # Write / Edit は暗黙的 ask になる。妨げてはいないが、ガードが落ちている
+        # Write / Edit は Claude Code の権限モードに従う。妨げてはいないが、ガードが落ちている
         # あいだにガードの設定を書き換える操作なので、人が 1 度見る側に置く。
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
@@ -148,9 +148,9 @@ class FallbackTest(unittest.TestCase):
         self.assertEqual(records[0].get("fallback"), "builtin-rules")
         self.assertEqual(records[0].get("detail"), self.broken)
         # 判定には達しているので skip ではない。既定にプロジェクトの allow が
-        # 無いので、どのルールも言及しない呼び出しは暗黙的 ask になる。
+        # 無いので、どのルールも言及しない呼び出しは Claude Code の権限モードに従う。
         self.assertEqual(records[0]["decision"], "ask")
-        self.assertEqual(records[0].get("code"), "IMPL_UNDECLARED")
+        self.assertEqual(records[0].get("code"), "UNDECLARED")
 
 
 if __name__ == "__main__":
