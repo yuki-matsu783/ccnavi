@@ -32,6 +32,11 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 差し戻すと、同じ場所を往復して人の手が入る機会が来ない。上限に達したら止まらせて
 判断を人へ返す。
 
+どちらの hook も、編集したファイルからいちばん近い `pyproject.toml` を上に辿って
+ツリーを決める。git の worktree の中を直せば worktree が検査される。テストは
+そのターンで触ったツリーだけを走らせるので、触っていないツリーの書きかけで
+差し戻されることもない。
+
 実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
 動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。
 

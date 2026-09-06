@@ -37,11 +37,16 @@
 - 退避が要るときは `git stash push -u` を使う。消す前にスクラッチパッドへコピーも取る。
   stash は衝突しても消えないので、戻せる形が残る
 
-#### 検査は worktree の中で自分で走らせる
+#### 検査は編集したツリーで走る
 
-`.claude/hooks/lint-py.sh` は `CLAUDE_PROJECT_DIR` へ `cd` してから検査する。
-つまり worktree の Python ファイルを編集しても、検査されるのは main であって worktree ではない。
-worktree では編集のたびに自分で通す。
+hook は編集したファイルから、いちばん近い `pyproject.toml` を上に辿ってツリーを決める。
+worktree の中を直せば worktree が検査される。手で走らせ直す必要はない。
+
+- `PostToolUse` の `lint-py.sh` が、そのファイルのツリーで整形と検査をかける
+- `Stop` の `test-py.sh` が、ターンの終わりに、そのターンで触ったツリーのテストを走らせる。
+  触っていないツリーは巻き添えにしない。他セッションの書きかけでこちらが差し戻されないように
+
+手で確かめたいときは同じことをこう書く。
 
 ```sh
 cd .claude/worktrees/<名前>
@@ -49,7 +54,7 @@ uv run --with ruff ruff format --check . && uv run --with ruff ruff check . \
   && uv run python -m unittest discover -s tests -t .
 ```
 
-実行ファイルは lint hook では作り直さない。PyInstaller が 11 秒かかるので外してある。
+実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので外してある。
 動かして確かめるときに `uv run --with pyinstaller python build.py` を手で回す。
 
 #### main へ戻す

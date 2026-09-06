@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop: ターンの終わりに 1 回だけテストを走らせ、落ちていたら差し戻す。
+# Stop: ターンの終わりに、このターンで触ったツリーのテストを走らせる。
 #
 # 編集ごとの PostToolUse に置くと、1 ファイル直すたびに全件が走る。複数ファイルに
 # またがる変更では途中の状態が必ず落ちるので、意味のない失敗の山を毎回読むことに
@@ -24,18 +24,20 @@ session=$(printf '%s' "$payload" |
 	sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 [ -z "$session" ] && session=unknown
 
-counter=".claude/ccnavi/stop-retries/$session"
+state=".claude/ccnavi/session"
+counter="$state/$session.retries"
+trees="$state/$session.trees"
 
-# 見捨てられた数を掃除する。
+# 見捨てられたセッションの跡を掃除する。
 #
-# この数が意味を持つのは 1 回の停止の連鎖の中だけで、長くても数分。ふつうは
+# ここの状態が意味を持つのは 1 回の停止の連鎖の中だけで、長くても数分。ふつうは
 # テストが通るか、次の連鎖が始まるか、上限に達するかで消える。消えないのは
 # 連鎖の途中でセッションが終わったときで、その session_id は二度と現れないから
-# 誰も消さない。1 セッションにつき 1 個ずつ溜まっていく。
+# 誰も消さない。1 セッションにつき溜まっていく。
 #
-# 掃除の窓を 1 時間にしてあるのは、連鎖の長さより十分に長く、放置の長さより
-# 十分に短いから。走っている連鎖のファイルは書くたびに新しくなるので巻き添えにならない。
-find .claude/ccnavi/stop-retries -type f -mmin +60 -delete 2>/dev/null
+# 窓を 1 時間にしてあるのは、連鎖の長さより十分に長く、放置の長さより十分に
+# 短いから。走っている連鎖のファイルは書くたびに新しくなるので巻き添えにならない。
+find "$state" -type f -mmin +60 -delete 2>/dev/null
 
 # stop_hook_active が false なら、この hook が差し戻した結果ではなく、
 # モデルが自分の判断で止まろうとしている。そこが数え始めの位置。
@@ -44,10 +46,35 @@ case "$payload" in
 *) rm -f "$counter" ;;
 esac
 
+# このターンで触ったツリーだけを見る。worktree で作業していても
+# CLAUDE_PROJECT_DIR は元のディレクトリを指したままなので、そこだけをテストすると
+# 直したツリーが検査されないまま通ってしまう。逆に、在るツリーを全部テストすると、
+# 触ってもいない他セッションの書きかけでこちらが差し戻される。
+# どこを触ったかは PostToolUse の lint-py.sh が書き残している。
+if [ -s "$trees" ]; then
+	targets=$(sort -u "$trees")
+else
+	# Python を 1 つも触っていないターン。ルールファイルや testdata の変更でも
+	# 壊れるので、既定のツリーで 1 回は走らせる。
+	targets=$(pwd)
+fi
+
 # --failfast で最初の 1 件で止める。全件の失敗を並べても、直す順番は結局
 # 1 件ずつなので、読む量だけが増える。
-if tests=$(uv run --python 3.12 python -m unittest discover -s tests -t . --failfast 2>&1); then
-	rm -f "$counter"
+failed=""
+output=""
+for target in $targets; do
+	[ -d "$target" ] || continue
+	if out=$(cd "$target" && uv run --python 3.12 python -m unittest discover -s tests -t . --failfast 2>&1); then
+		continue
+	fi
+	failed=$target
+	output=$out
+	break
+done
+
+if [ -z "$failed" ]; then
+	rm -f "$counter" "$trees"
 	exit 0
 fi
 
@@ -59,17 +86,18 @@ esac
 tried=$((tried + 1))
 
 if [ "$tried" -gt "$MAX" ]; then
-	rm -f "$counter"
+	rm -f "$counter" "$trees"
 	# ここは exit 0 なのでモデルには届かない。届けると差し戻しと同じことになる。
 	# 上限の意味は「機械の往復をやめて人に返す」なので、宛先は人でよい。
-	printf 'ccnavi: テストが落ちたまま %s 回差し戻したので、これ以上は止めません。\n' "$MAX" >&2
-	printf '%s\n' "$(printf '%s' "$tests" | tail -20)" >&2
+	printf 'ccnavi: %s のテストが落ちたまま %s 回差し戻したので、これ以上は止めません。\n' \
+		"$failed" "$MAX" >&2
+	printf '%s\n' "$(printf '%s' "$output" | tail -20)" >&2
 	exit 0
 fi
 
-mkdir -p "$(dirname "$counter")"
+mkdir -p "$state"
 printf '%s' "$tried" >"$counter"
-printf 'unittest（最初に落ちた 1 件 / %s 回目、あと %s 回で打ち切り）:\n%s\n' \
-	"$tried" "$((MAX - tried))" "$(printf '%s' "$tests" | tail -40)" >&2
+printf 'unittest（%s / 最初に落ちた 1 件 / %s 回目、あと %s 回で打ち切り）:\n%s\n' \
+	"$failed" "$tried" "$((MAX - tried))" "$(printf '%s' "$output" | tail -40)" >&2
 printf '落ちたテストを直してから終わってください。\n' >&2
 exit 2
