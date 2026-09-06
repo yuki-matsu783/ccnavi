@@ -11,7 +11,7 @@ import os
 import time
 from typing import TextIO
 
-from . import audit, hookio, rules, settings, shellread
+from . import audit, builtin, hookio, rules, settings, shellread
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
 # それより先に自前の判定へ着地することが、遅い判定が黙った許可に化けるのを防ぐ。
@@ -134,11 +134,14 @@ def decide(
     try:
         rule_set, problems = rules.load(rules_path)
     except (OSError, ValueError) as exc:
+        # 「設定が読めない」は「判断できない」ではなく「設定が壊れている」。
+        # 拒否側へ倒すと、壊れたファイルを直すための呼び出しまで止まって
+        # 回復できなくなる。既定モードが block なので、ファイルを置く前に
+        # hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
         stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
-        record.decision = audit.SKIP
-        record.reason = audit.REASON_RULES_UNREADABLE
+        rule_set, problems = builtin.load()
+        record.fallback = builtin.FALLBACK
         record.detail = rules_path
-        return fail_closed(mode)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
@@ -156,6 +159,12 @@ def decide(
 
     if not reasons:
         record.decision, record.enforced = audit.ALLOW, True
+        if record.fallback:
+            # 通した回にも言う。既定に落ちたことを黙っていると、ガードが今
+            # 何を見ていないのかを誰も知らないまま作業が進む。呼び出しごとに
+            # 出るのでうるさいが、うるさいのが正しい。壊れた設定は短命であるべきで、
+            # 黙って居座られるより気づかれたほうがよい。
+            hookio.write_context(stdout, hookio.PRE_TOOL_USE, fallen_back(rules_path))
         return EXIT_OK
 
     # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
@@ -163,6 +172,10 @@ def decide(
     reason = "\n".join(reasons)
     if record.degraded:
         reason = unreadable(record.degraded) + "\n" + reason
+    if record.fallback:
+        # 既定に落ちた話が先。どのルールに当たったかより、いま当てている
+        # ルールの出どころが違うことのほうが、読み手には大きい。
+        reason = fallen_back(rules_path) + "\n" + reason
 
     if mode == MODE_WARN:
         record.decision, record.enforced = audit.DENY, False
@@ -247,6 +260,27 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
         record.degraded = reading.reason
         return subject
     return reading.text
+
+
+def fallen_back(rules_path: str) -> str:
+    """ルールファイルを読めずに組み込みの既定へ落ちたことを伝える文。
+
+    通した回にも返す。ここを黙ると、ガードが立っているように見えて実際には
+    プロジェクトのルールを 1 件も見ていない、という状態が続く。それは
+    ガードが止まっていることより悪い。止まっていれば誰かが気づくから。
+
+    直し方に Write / Edit を名指しするのは、既定の側がシェルからこの場所への
+    書き込みを止めているため。止めた先に道が無いと、拒否は行き止まりになる。
+    """
+    return (
+        "[ccnavi] the rule file at "
+        + rules_path
+        + " could not be read, so ccnavi is judging with its built-in defaults. "
+        "The project's own rules are not in force right now. Repair that file with "
+        "the Write or Edit tool; while the defaults are in force the shell cannot "
+        "write to it, so that the path that breaks it and the path that fixes it "
+        "are not the same one."
+    )
 
 
 def unreadable(reason: str) -> str:

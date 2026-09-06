@@ -26,8 +26,10 @@ REASON_MODE_OFF = "mode-off"
 REASON_EVENT_NOT_CHECKED = "event-not-checked"
 REASON_NO_SUBJECT = "no-subject"
 REASON_PAYLOAD_UNUSABLE = "payload-unusable"
-REASON_RULES_UNREADABLE = "rules-unreadable"
 REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
+# ルールが読めないことは、ここには無い。判定に至らなかった理由ではなく、
+# 組み込みの既定で判定を続けたうえで fallback に残す事実になっている。
+# 拒否側へ倒すと、壊れたファイルを直す呼び出しまで止まって回復できなくなる。
 
 # 記録に残すコマンドやパスの上限。ヒアドキュメントはファイル 1 本を運べるので、
 # 1 回の呼び出しが記録を膨らませられないようにする。
@@ -57,6 +59,10 @@ class Record:
     # 別に数えられないと、ガードの出力のどれだけが読み切れないまま出たものかを
     # あとから言えなくなる。
     degraded: str = ""
+    # fallback は、ルールファイルを読めずに組み込みの既定で判定したことを示す。
+    # そのとき効いているのはプロジェクトのルールではないので、記録を数えるときに
+    # 混ぜられない。ガードが落ちたまま何回動いたかも、これでしか分からない。
+    fallback: str = ""
     # detail は reason だけでは言えないことを運ぶ。読めなかったファイルのパスなど。
     # これが無いと、設置を誤った状態が「どのファイルのことか分からない理由」に見える。
     detail: str = ""
@@ -122,6 +128,7 @@ class Log:
         for key, value in (
             ("reason", record.reason),
             ("degraded", record.degraded),
+            ("fallback", record.fallback),
             ("detail", record.detail),
         ):
             if value:

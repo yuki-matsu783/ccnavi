@@ -91,7 +91,17 @@ def load(path: str) -> tuple[RuleSet, list[Problem]]:
         data = json.load(f)
     if not isinstance(data, dict):
         raise ValueError(f"{path} のルールがオブジェクトではない")
+    return parse(data)
 
+
+def parse(data: dict) -> tuple[RuleSet, list[Problem]]:
+    """読み込み済みのルールを組み立てる。
+
+    ファイルを開く部分と分けてあるのは、組み込みの既定ルールが同じ経路を通るため。
+    別の道で組み立てると、ファイルから読んだときと既定に落ちたときで
+    ルールの意味が食い違いうる。食い違えば、ガードが落ちている最中に
+    さらに読み違えることになる。
+    """
     raw_rules = data.get("rules")
     rule_set = RuleSet(version=data.get("version") or 0)
     problems: list[Problem] = []
