@@ -1,0 +1,26 @@
+# 権限モードの受入テストが使うルール。実運用の設定ではない。
+#
+# testdata/rules.yml と違って allow に総取りを置いていない。置くと、どの
+# 呼び出しも allow に当たってしまい、「ルールがどこも言及しない呼び出し」を
+# 1 件も作れなくなる。ここで試したいのはまさにその呼び出しの行き先なので、
+# 網を張らないこと自体がこのファイルの目的になる。
+version: 3
+
+deny:
+  - id: git-push
+    match: Bash
+    glob: "*git push*"
+    message: >-
+      git push is not run by the agent. Leave the branch as it is and ask the
+      user to push.
+
+ask:
+  - id: commit
+    match: Bash
+    regex: '\bgit\s+commit\b'
+    message: Commits are read by a person one at a time.
+
+allow:
+  - id: listing
+    match: Bash
+    regex: '\bls\b'
