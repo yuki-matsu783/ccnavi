@@ -44,7 +44,7 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 
 # 既定の置き場。プロジェクト根からの相対。
 DEFAULT_LOG = os.path.join(".claude", "ccnavi", "log.jsonl")
-DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.json")
+DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")

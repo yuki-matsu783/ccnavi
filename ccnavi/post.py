@@ -14,10 +14,15 @@
 
 ## 保護領域をどこから知るか
 
-ルールファイルから知る。`match` に書き込み系のツールを含むルールは、
-「この場所はエージェントに書かせない」とプロジェクトが宣言したものなので、
-そのままここでの保護領域になる。宣言を 2 か所に分けて書かせない。分ければ
-必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
+ルールファイルから知る。`deny` と `ask` の区画にあって、`match` に書き込み系の
+ツールを含むルールは、「この場所はエージェントに好きに書かせない」と
+プロジェクトが宣言したものなので、そのままここでの保護領域になる。宣言を
+2 か所に分けて書かせない。分ければ必ず食い違い、食い違った側は誰にも
+気づかれないまま緩む。
+
+`ask` も保護領域に数えるのは、そこが「人が 1 度見るべき場所」だから。
+実行前の判定は引数を見て確認を出すが、シェルやビルドが書いたぶんは
+引数に現れないので、誰にも確認が出ないまま通っている。あとから言う先がここしかない。
 
 当てる先は git が返したパスを解いた絶対パス。実行前の判定がファイルのパスを
 解いてから当てるのと同じ理由で、綴りを変えただけで外せてはいけない。
@@ -302,12 +307,38 @@ def _findings(
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
             continue
-        group = [rule for rule in rule_set.rules if _guards_writes(rule, change.full)]
+        group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
             found.append(Finding(change, group, source, CODE_VIOLATION))
-        elif scope is not None and scope.outside(change.full):
+        elif (
+            scope is not None and not _allowed(rule_set, change.full) and scope.outside(change.full)
+        ):
             found.append(Finding(change, [scope.rule()], scope.ledger, CODE_TICKET_SCOPE))
     return found
+
+
+def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
+    """保護領域を宣言していると読むルール。`deny` と `ask` の両方。
+
+    `ask` を入れるのは、そこが「人が 1 度見るべき場所」だとプロジェクトが
+    言っている場所だから。シェルやビルドが書いたぶんは誰にも確認が出ないまま
+    通っているので、あとから言う先がここしかない。
+
+    `allow` は入れない。通してよいと宣言された場所なので、変わっていることは
+    報告することではない。ただし `deny` や `ask` と同じ場所に当たる `allow` が
+    あっても、強いほうが勝つ。当てる順は実行前の判定と同じ。
+    """
+    return rule_set.deny + rule_set.ask
+
+
+def _allowed(rule_set: rules.RuleSet, path: str) -> bool:
+    """この場所への書き込みが `allow` で宣言されているか。
+
+    宣言されていればチケットの範囲の外でも咎めない。実行前の判定でルールが
+    チケットより強いのと同じ順で、実行後もルールを先に見る。片方だけ順番が
+    違うと、実行前に通った書き込みが実行後に差し戻されることになる。
+    """
+    return any(_guards_writes(rule, path) for rule in rule_set.allow)
 
 
 def _guards_writes(rule: rules.Rule, path: str) -> bool:

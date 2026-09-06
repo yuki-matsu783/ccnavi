@@ -352,9 +352,10 @@ def _guarded_by(path: str, rule_set: rules.RuleSet, root: str) -> str:
     """
     full = os.path.join(root, path.replace("/", os.sep))
     probe = os.path.join(full, "probe")
+    # 見るのは deny と ask だけ。allow が守っている場所というものは無い。
     hits = [
         rule.id or "(id 無し)"
-        for rule in rule_set.rules
+        for rule in rule_set.deny + rule_set.ask
         if any(rule.matches(tool, probe) for tool in ("Write", "Edit", "MultiEdit"))
     ]
     return ", ".join(sorted(set(hits)))

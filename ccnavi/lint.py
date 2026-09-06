@@ -344,20 +344,32 @@ def _rules(path: str) -> list[Problem]:
 
     problems = list(problems)
 
-    if not rule_set.rules:
+    if not rule_set.deny:
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 "(rules)",
-                "組み立てられたルールが 1 件も無い。何も止めないガードは、"
-                "入っていないガードと同じでありながら、入っているように見える",
+                "`deny` が空。何も止めないガードは、入っていないガードと"
+                "同じでありながら、入っているように見える",
+            )
+        )
+
+    if not rule_set.allow:
+        # allow が 1 件も無いと、どの呼び出しも暗黙的 ask に落ちる。判定は
+        # 動いているので error ではないが、確認が出続ける状態は、外から見ると
+        # ガードが壊れている状態と区別が付かない。
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(rules)",
+                "`allow` が空。どのルールも言及しない呼び出しはすべて暗黙的 ask になる",
             )
         )
 
     seen: set[str] = set()
-    for rule in rule_set.rules:
+    for rule in rule_set.all():
         # id を欠いたルールは名指しできないので、当たった中身で呼ぶ。
-        name = rule.id or f"(id 無し: {rule.match} {rule.pattern or rule.regex})"
+        name = rule.id or f"(id 無し: {rule.decision} {rule.match} {rule.pattern or rule.regex})"
         if not rule.id:
             problems.append(
                 Problem(SEVERITY_WARN, name, "id が無い。記録も報告もこのルールを名指しできない")

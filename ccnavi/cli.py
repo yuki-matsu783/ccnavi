@@ -46,13 +46,21 @@ MODE_BLOCK = "block"  # 判定して呼び出しを止める
 # 「理由コードを含むこと」までなので、版を上げずに済む側を採る。
 CODE_COMMAND = "DENY_COMMAND_PATTERN"  # Bash の実行される部分に当たった
 CODE_PATH = "DENY_PATH"  # ファイルのパスに当たった
+# 明示的 ask。設定に ask と書いてある場所に当たった。設計 §13.1 の 🟠E で、
+# 「ここは毎回人間が見るべき」という意図的な確認ポイント。
+CODE_EXPLICIT_ASK = "EXPL_ASK"
+# 暗黙的 ask。どの区画も言及していない。設計 §13.1 の 🟠I で、危険の表明ではなく
+# 「判断材料が足りないので安全側に倒した」だけ。設計 §13.3 はパスについて
+# IMPL_PATH_UNDEF と呼ぶが、こちらはコマンドにも同じ根拠で着地するので、
+# 対象の種類で名前を割らずに 1 つにしてある。
+CODE_UNDECLARED = "IMPL_UNDECLARED"
 # 実行後の監視が出すコードは post.py にある。あちらは判定ではなく、
 # すでに起きたことの報告なので、同じ表に混ぜていない。
-# 読み切れないコマンドを生の文字列に当てたときの根拠は、宣言された禁止に
-# 当たったことではなく、対象を確定できなかったこと。付録 B でそれを言うのは
-# IMPL_PARSE_UNCERTAIN で、あれは ask 系に置かれている。今のビルドに ask は
-# 無いので同じ根拠が deny に着地するが、着地先は permissionDecision が別に
-# 言うので、根拠の名前のほうは体系のまま借りる。
+# 読み切れないコマンドの根拠は、宣言された禁止に当たったことではなく、
+# 対象を確定できなかったこと。付録 B でそれを言うのが IMPL_PARSE_UNCERTAIN で、
+# あれは ask 系に置かれている。どの区画も言及しなかったときは、そのまま
+# 暗黙的 ask に着地する。生の文字列が deny に当たったときだけは拒否になり、
+# そのときも「読めないまま当てた」ことを文面が断る。
 CODE_UNCERTAIN = "IMPL_PARSE_UNCERTAIN"
 # 承認されたチケットの作業範囲の外に書こうとした。ルールに当たったのではなく、
 # 宣言された範囲に入っていないことが根拠なので、コードを分けている。
@@ -248,24 +256,49 @@ def decide_before(
     rule_set, source = load_rules(stderr, conf.rules, record)
     subject = screen(payload.tool_name, record.subject, record)
 
-    reasons: list[str] = []
-    for rule in rule_set.rules:
-        if time.monotonic() > deadline:
-            stderr.write("ccnavi: 判定を終える前に期限に達した\n")
-            record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
-            return fail_closed(mode)
-        if rule.matches(payload.tool_name, subject):
-            reasons.append(reason_for(rule, payload.tool_name, subject, source, record.degraded))
-            record.rules.append(rule.id)
+    if not subject:
+        # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
+        # これにあたる。ルールを当てる先が無いので、どの区画にも当たらず
+        # 暗黙的 ask に落ちるが、何も走らないものについて人に聞く意味は無い。
+        record.decision, record.reason = audit.SKIP, audit.REASON_NOTHING_TO_RUN
+        return EXIT_OK
 
-    # チケットの範囲はルールの後に当てる。ルールのほうが強く、範囲の中でも
-    # ルールが守る場所には書けない。順番を逆にすると、範囲外で止まった呼び出しが
-    # 「範囲を広げれば通る」に見え、本当は広げても通らないことが伝わらない。
+    # 強い区画から順に見て、最初に当たったところで止める。deny に当たった
+    # 呼び出しについて ask の区画を調べる意味は無いし、調べれば「拒否だが
+    # 確認もしろ」という読めない結論に届く道ができる。
+    verdict, group = "", []
+    for name in rules.SECTIONS:
+        if name == rules.ALLOW and record.degraded:
+            # 読み切れなかったコマンドに allow は当てない。当てる先は
+            # 実行される部分ではなく生の文字列なので、そこで許可を出すのは
+            # 「読めなかった文字列にそう書いてあった」を根拠に通すことになる。
+            # deny と ask は当てたままにする。生の文字列に当たりすぎるぶんは
+            # 厳しい側へ外れるだけで、そのことは文面が断る。
+            break
+        for rule in rule_set.section(name):
+            if time.monotonic() > deadline:
+                stderr.write("ccnavi: 判定を終える前に期限に達した\n")
+                record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
+                return fail_closed(mode)
+            if rule.matches(payload.tool_name, subject):
+                group.append(rule)
+        if group:
+            verdict = name
+            break
+
+    record.rules = [rule.id or f"({verdict})" for rule in group]
+
+    # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
+    # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
+    # 人が書いた宣言よりエージェントが書いた宣言のほうが強くなる。
     approved, notice = ticket_scope(conf)
-    outside = out_of_scope(conf, root, approved, payload.tool_name, record.subject)
-    if outside:
-        reasons.append(outside)
-        record.rules.append(TICKET_RULE)
+    ticket_reason = ""
+    if not verdict:
+        verdict, ticket_reason = ticket_verdict(
+            conf, root, approved, payload.tool_name, record.subject
+        )
+        if ticket_reason:
+            record.rules = [TICKET_RULE]
 
     # 通知は件ごとではなく先頭に 1 回。件ごとの断りはその件の中で閉じるが、
     # 通知は応答全体に掛かる事情で、繰り返すと理由の本体が下へ流れて読まれなくなる。
@@ -273,7 +306,7 @@ def decide_before(
         text for text in (fallen_back(conf.rules) if record.fallback else "", notice) if text
     ]
 
-    if not reasons:
+    if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
         if notices:
             # 通した回にも言う。ガードが今なにを見ていないのかを黙っていると、
@@ -283,22 +316,44 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
         return EXIT_OK
 
-    # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
-    # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
+    if verdict == rules.DENY and group:
+        # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
+        # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
+        reasons = [
+            reason_for(rule, payload.tool_name, subject, source, record.degraded) for rule in group
+        ]
+        record.code = code_for(payload.tool_name, record.degraded)
+    elif verdict == rules.DENY:
+        # チケットの範囲の外。ルールが 1 件も当たっていないので group は空。
+        reasons = [ticket_reason]
+        record.code = CODE_TICKET_SCOPE
+    elif verdict == rules.ASK:
+        reasons = [
+            reason_for(rule, payload.tool_name, subject, source, record.degraded) for rule in group
+        ]
+        record.code = CODE_EXPLICIT_ASK
+    else:
+        # どの区画も言及しなかった。暗黙的 ask。
+        reasons = [undeclared(payload.tool_name, subject, conf.rules, record.degraded)]
+        record.code = CODE_UNCERTAIN if record.degraded else CODE_UNDECLARED
+        verdict = rules.ASK
+
     # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(notices + reasons)
+    decision = audit.DENY if verdict == rules.DENY else audit.ASK
 
     if mode == MODE_WARN:
-        record.decision, record.enforced = audit.DENY, False
+        record.decision, record.enforced = decision, False
+        would = "stopped" if verdict == rules.DENY else "asked the user about"
         hookio.write_context(
             stdout,
             hookio.PRE_TOOL_USE,
-            "[ccnavi warn] block mode would have stopped this call:\n" + reason,
+            f"[ccnavi warn] block mode would have {would} this call:\n" + reason,
         )
         return EXIT_OK
 
-    record.decision, record.enforced = audit.DENY, True
-    hookio.write_verdict(stdout, hookio.DENY, reason)
+    record.decision, record.enforced = decision, True
+    hookio.write_verdict(stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason)
     return EXIT_OK
 
 
@@ -541,28 +596,36 @@ def ticket_scope(conf: settings.Settings) -> tuple[approval.Approval | None, str
     return approved, ""
 
 
-def out_of_scope(
+def ticket_verdict(
     conf: settings.Settings,
     root: str,
     approved: approval.Approval | None,
     tool: str,
     full: str,
-) -> str:
-    """承認された範囲の外への書き込みなら、その理由を返す。中なら空文字。
+) -> tuple[str, str]:
+    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文。
 
-    チケットのファイルだけは範囲の外でも通す。通さないと、承認された範囲の
-    外にあるチケットを書き直せなくなり、いちど承認した範囲から永久に出られない。
-    次のチケットを提案する道は開けておく。提案が効くのは承認されてからなので、
-    ここを開けても範囲は広がらない。
+    範囲の中は allow。ルールが何も言っていない場所で、チケットだけが
+    「ここで作業する」と宣言しているので、そこは聞かずに通す。これが無いと、
+    宣言した作業範囲の中でも暗黙的 ask が出続けることになり、
+    範囲を宣言する意味が「止まる場所が増えるだけ」になる。
+
+    範囲の外は deny。チケットが境界を明示している以上、外に出たことは
+    「誰も言及していない」ではなく「宣言に反した」になる。
+
+    チケットのファイル自身については何も言わない。承認された範囲の外に
+    あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が
+    無くなる。allow にもしないのは、範囲外への書き込みであることに変わりは
+    ないから。暗黙的 ask に落ちるので、人が 1 度見ることになる。
     """
     if approved is None or tool not in SCOPE_TOOLS or not full:
-        return ""
+        return "", ""
     if conf.ticket and os.path.normpath(full) == os.path.realpath(conf.ticket):
-        return ""
+        return "", ""
     if ticket_mod.inside(root, approved.write, full):
-        return ""
+        return rules.ALLOW, ""
     scope = ", ".join(f"{p}/" for p in approved.write) or "(空)"
-    return "\n".join(
+    return rules.DENY, "\n".join(
         [
             f"[ccnavi] {CODE_TICKET_SCOPE} (source: {conf.ledger})",
             f"subject: {full}",
@@ -573,6 +636,50 @@ def out_of_scope(
             "ask the user to run 'ccnavi --approve'. Editing the ticket alone changes nothing.",
         ]
     )
+
+
+def code_for(tool: str, degraded: str) -> str:
+    """拒否の根拠コード。対象がコマンドかパスかで割れる。"""
+    if degraded:
+        return CODE_UNCERTAIN
+    return CODE_COMMAND if tool == "Bash" else CODE_PATH
+
+
+def undeclared(tool: str, subject: str, rules_path: str, degraded: str) -> str:
+    """どの区画も言及しなかった呼び出しに返す、暗黙的 ask の文。
+
+    危険だとは言わない。言えないから聞いている。設計 §13.2 のとおり、
+    暗黙的 ask は設定の穴に起因するので、危険の表明として書くと、
+    受け取った側は存在しない危険を探すことになる。
+
+    直し方を書くのは、この ask が繰り返されるのが穴の側の問題だから。
+    同じ問いが何度も出るなら、答えるべきなのは呼び出しごとの是非ではなく
+    「この場所を allow に書くかどうか」になる。
+    """
+    shown = " ".join(subject.split())
+    if len(shown) > SUBJECT_LIMIT:
+        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(subject) - SUBJECT_LIMIT})"
+
+    lines = [
+        f"[ccnavi] {CODE_UNCERTAIN if degraded else CODE_UNDECLARED} (source: {rules_path})",
+        f"subject: {shown}",
+    ]
+    if degraded:
+        lines.append(unreadable(degraded))
+        lines.append(
+            "ccnavi is asking rather than deciding because it could not tell what this call "
+            "would actually do. Say what the command is for, or rewrite it in a form that can "
+            "be read: no heredoc, no string handed to something that runs it."
+        )
+    else:
+        lines.append(
+            f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
+            "so ccnavi has nothing to go on and is asking the user. This is not a warning about "
+            "the call itself. If this is ordinary work for this project, say so and ask the user "
+            f"to add it to the allow section of {rules_path}; that is what stops the same "
+            "question from coming back."
+        )
+    return "\n".join(lines)
 
 
 def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degraded: str) -> str:
@@ -595,7 +702,10 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # どこまでが対象でどこからが言い分なのかが読めなくなる。
     shown = " ".join(shown.split())
 
-    code = CODE_UNCERTAIN if degraded else (CODE_COMMAND if tool == "Bash" else CODE_PATH)
+    # コードはルールが置かれていた区画から決まる。拒否と確認で同じコードを
+    # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
+    # 推し量ることになる。
+    code = CODE_EXPLICIT_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所は「どのファイルのどのルール」まで。ファイル名だけでは、同じ名前の
     # ルールファイルが複数ある構成で直しに行く先が決まらない。
     source = f"{rules_path}#{rule.id}" if rule.id else rules_path

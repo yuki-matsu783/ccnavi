@@ -24,6 +24,16 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 限る。ここを開けると、`echo x > .claude/ccnavi/rules.json` でルールを壊し、
 壊れた結果として緩んだ既定に落ちる、という順路ができてしまう。
 壊す側と直す側で経路を分けることで、その順路を閉じる。
+
+## 既定に落ちると、ほとんどが確認になる
+
+どのルールも言及しない呼び出しは暗黙的 ask になる（cli.py）。既定には
+プロジェクトの `allow` が入っていないので、既定に落ちているあいだは
+書き込みもシェルも 1 件ずつ人に確認が出る。これは事故ではなく、そのほうがよい。
+ガードが落ちているあいだ状態を変える操作は、人が見ているべきものになる。
+
+`Read` だけは通す。作業ツリーを変えようがないうえ、いちばん数が多い。
+ここまで確認を出すと、本当に見てほしい 1 件がその中に埋もれる。
 """
 
 from __future__ import annotations
@@ -33,7 +43,7 @@ from . import rules
 # ファイルから読むルールと同じ形。同じ `rules.parse` を通す。
 RULES: dict = {
     "version": rules.VERSION,
-    "rules": [
+    "deny": [
         {
             "id": "builtin-guard-config-via-bash",
             "match": "Bash",
@@ -82,6 +92,16 @@ RULES: dict = {
                 "This is a place credentials live. Do not read it; ask the user "
                 "for the value you need."
             ),
+        },
+    ],
+    "allow": [
+        {
+            # 作業ツリーを変えようがない読み取り。既定に落ちている最中でも、
+            # ここまで確認を出すと、本当に見てほしい 1 件がその中に埋もれる。
+            # Grep と Glob は書かない。判定が対象を取り出せないので当たらない。
+            "id": "builtin-read-anything",
+            "match": "Read",
+            "regex": r".",
         },
     ],
 }

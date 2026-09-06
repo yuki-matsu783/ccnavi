@@ -25,6 +25,9 @@ SKIP = "skip"
 REASON_MODE_OFF = "mode-off"
 REASON_EVENT_NOT_CHECKED = "event-not-checked"
 REASON_NO_SUBJECT = "no-subject"
+# コマンドは在るが、実行される部分が無い。コメントだけの行がこれにあたる。
+# 何も走らないものについて確認を出すと、確認の数だけが増えて中身が減る。
+REASON_NOTHING_TO_RUN = "nothing-to-run"
 REASON_PAYLOAD_UNUSABLE = "payload-unusable"
 REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
 # 実行後の監視だけが出す 2 つは post.py が持っている。判定に至らなかった
@@ -55,6 +58,13 @@ class Record:
     # 「何を実際に止めたか」の両方に答えられるのはこのため。実際に止めた分だけを
     # 数えると、warn で先に走らせる意味がまるごと隠れる。
     enforced: bool = False
+
+    # code は判定の根拠の種別。ccnavi.md 付録 B の体系から借りた名前で、
+    # cli.py と post.py が返す文の先頭に載せるものと同じ。記録に残すのは、
+    # 止めた回のうちどれだけが「宣言された禁止に当たった」もので、どれだけが
+    # 「どのルールも言及していない」ものかを、あとから数えられるようにするため。
+    # 後者が多いなら直すのはルールの側で、拒否を 1 件足すことではない。
+    code: str = ""
 
     reason: str = ""
     # degraded は、判定は下したがコマンドを読み切れなかったときに、
@@ -133,6 +143,7 @@ class Log:
         out["enforced"] = record.enforced
 
         for key, value in (
+            ("code", record.code),
             ("reason", record.reason),
             ("degraded", record.degraded),
             ("fallback", record.fallback),
