@@ -34,6 +34,23 @@ MODE_DISABLE = "disable"  # 判定しない
 MODE_DRY_RUN = "dry-run"  # 判定して報告するが、呼び出しには手を出さない
 MODE_ENABLE = "enable"  # 判定を呼び出しに適用する
 
+# Claude Code 側の権限モード。ルールがどこも言及しなかった呼び出しの結末が、
+# ここで変わる。ccnavi 自身のモード（上の 3 つ）とは別のもので、あちらは
+# 「下した判定を適用するか」、こちらは「そもそも誰が判断するか」を決める。
+#
+# ルールが言及していない呼び出しについて、ccnavi は判定を持たない。持っていない
+# 判定を ask として返すと、判断できるモードでも必ず人に止まり、auto モードが
+# 実質効かなくなる。だから返さず、Claude Code の権限モードに従う。
+# ルールに書いていないものは、ルールに書いていないものとして渡す。
+PERMISSION_JUDGED = ("auto",)
+# 人にも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
+# 通る」に化けるので、許可としない（REQ-PRE-08）。
+PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
+
+# 判定を権限モードへ渡したことを表す内部の値。区画名（rules.ALLOW など）と
+# 同じ変数に入るので、ルールファイルには現れない綴りにしてある。
+HANDOVER = "(handover)"
+
 # 返す理由に載せる理由コード。ccnavi.md 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
 #
@@ -47,22 +64,22 @@ MODE_ENABLE = "enable"  # 判定を呼び出しに適用する
 # 「理由コードを含むこと」までなので、版を上げずに済む側を採る。
 CODE_COMMAND = "DENY_COMMAND_PATTERN"  # Bash の実行される部分に当たった
 CODE_PATH = "DENY_PATH"  # ファイルのパスに当たった
-# 明示的 ask。設定に ask と書いてある場所に当たった。設計 §13.1 の 🟠E で、
-# 「ここは毎回人間が見るべき」という意図的な確認ポイント。
-CODE_EXPLICIT_ASK = "EXPL_ASK"
-# 暗黙的 ask。どの区画も言及していない。設計 §13.1 の 🟠I で、危険の表明ではなく
-# 「判断材料が足りないので安全側に倒した」だけ。設計 §13.3 はパスについて
-# IMPL_PATH_UNDEF と呼ぶが、こちらはコマンドにも同じ根拠で着地するので、
-# 対象の種類で名前を割らずに 1 つにしてある。
-CODE_UNDECLARED = "IMPL_UNDECLARED"
+# ルールが ask と書いてある場所に当たった。「ここは毎回人間が見るべき」という
+# 意図的な確認ポイントで、繰り返し出ること自体に値打ちがある。
+CODE_RULE_ASK = "RULE_ASK"
+# ルールがどこも言及していない。危険の表明ではない。ccnavi はこの呼び出しに
+# ついて何も言えず、扱いを Claude Code の権限モードに委ねたことを言うだけ。
+# 委ねた先が判断できないモードなら許可としないので、同じコードが渡した回と
+# 断った回の両方に付く。どちらだったかは記録の decision 側が持つ。
+CODE_UNDECLARED = "UNDECLARED"
 # 実行後の監視が出すコードは post.py にある。あちらは判定ではなく、
 # すでに起きたことの報告なので、同じ表に混ぜていない。
 # 読み切れないコマンドの根拠は、宣言された禁止に当たったことではなく、
-# 対象を確定できなかったこと。付録 B でそれを言うのが IMPL_PARSE_UNCERTAIN で、
-# あれは ask 系に置かれている。どの区画も言及しなかったときは、そのまま
-# 暗黙的 ask に着地する。生の文字列が deny に当たったときだけは拒否になり、
+# 対象を確定できなかったこと。こちらは権限モードに委ねない。読めなかった
+# という事実は判定の結果に現れず、委ねた先には伝わらないので、言えるのが
+# ここしかない。生の文字列が deny に当たったときだけは拒否になり、
 # そのときも「読めないまま当てた」ことを文面が断る。
-CODE_UNCERTAIN = "IMPL_PARSE_UNCERTAIN"
+CODE_UNCERTAIN = "PARSE_UNCERTAIN"
 # 承認されたチケットの作業範囲の外に書こうとした。ルールに当たったのではなく、
 # 宣言された範囲に入っていないことが根拠なので、コードを分けている。
 # 受け取った側の次の一手が違う。ルールなら別の手段を探すことになるが、
@@ -209,6 +226,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     record = audit.Record(
         mode=mode,
+        permission_mode=payload.permission_mode,
         event=payload.event,
         tool=payload.tool_name,
         subject=subject_of(payload),
@@ -270,7 +288,8 @@ def decide_before(
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
         # これにあたる。ルールを当てる先が無いので、どの区画にも当たらず
-        # 暗黙的 ask に落ちるが、何も走らないものについて人に聞く意味は無い。
+        # 権限モードへ渡る先になるが、何も走らないものについて誰かの判断を
+        # 求める意味は無い。
         record.decision, record.reason = audit.SKIP, audit.REASON_NOTHING_TO_RUN
         return EXIT_OK
 
@@ -342,12 +361,30 @@ def decide_before(
         reasons = [
             reason_for(rule, payload.tool_name, subject, source, record.degraded) for rule in group
         ]
-        record.code = CODE_EXPLICIT_ASK
+        record.code = CODE_RULE_ASK
     else:
-        # どの区画も言及しなかった。暗黙的 ask。
-        reasons = [undeclared(payload.tool_name, subject, conf.rules, record.degraded)]
+        # どの区画も言及しなかった。ccnavi はこの呼び出しの判定を持たない。
+        # 結末は Claude Code の権限モードが決める。
         record.code = CODE_UNCERTAIN if record.degraded else CODE_UNDECLARED
-        verdict = rules.ASK
+        verdict = undeclared_verdict(payload.permission_mode, record.degraded)
+        reasons = [
+            undeclared(
+                payload.tool_name, subject, conf.rules, record.degraded, verdict == rules.DENY
+            )
+        ]
+
+    if verdict == HANDOVER:
+        # 判定は渡した。ここで残せるのは記録だけで、それがこの分担の要点になる。
+        # ルールが言及していない場所は log の handover を数えれば分かり、その数は
+        # 人に聞いた回とも、classifier が通した回とも混ざらない。
+        #
+        # 文面は返さない。呼び出しごとに「ルールが言及していない」と言うと、
+        # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
+        # 穴の在処は記録から読む。
+        record.decision, record.enforced = audit.HANDOVER, False
+        if notices:
+            hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
+        return EXIT_OK
 
     # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(notices + reasons)
@@ -618,8 +655,8 @@ def ticket_verdict(
 
     範囲の中は allow。ルールが何も言っていない場所で、チケットだけが
     「ここで作業する」と宣言しているので、そこは聞かずに通す。これが無いと、
-    宣言した作業範囲の中でも暗黙的 ask が出続けることになり、
-    範囲を宣言する意味が「止まる場所が増えるだけ」になる。
+    宣言した作業範囲の中まで権限モード任せに落ちることになり、
+    範囲を宣言する意味が「ccnavi が何も言わない場所が増えるだけ」になる。
 
     範囲の外は deny。チケットが境界を明示している以上、外に出たことは
     「誰も言及していない」ではなく「宣言に反した」になる。
@@ -627,7 +664,8 @@ def ticket_verdict(
     チケットのファイル自身については何も言わない。承認された範囲の外に
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が
     無くなる。allow にもしないのは、範囲外への書き込みであることに変わりは
-    ないから。暗黙的 ask に落ちるので、人が 1 度見ることになる。
+    ないから。ルールが言及していない扱いになるので、そこから先は
+    Claude Code の権限モードが決める。
     """
     if approved is None or tool not in SCOPE_TOOLS or not full:
         return "", ""
@@ -656,16 +694,39 @@ def code_for(tool: str, degraded: str) -> str:
     return CODE_COMMAND if tool == "Bash" else CODE_PATH
 
 
-def undeclared(tool: str, subject: str, rules_path: str, degraded: str) -> str:
-    """どの区画も言及しなかった呼び出しに返す、暗黙的 ask の文。
+def undeclared_verdict(permission_mode: str, degraded: str) -> str:
+    """どの区画も言及しなかった呼び出しを、権限モードごとにどう扱うか。
 
-    危険だとは言わない。言えないから聞いている。設計 §13.2 のとおり、
-    暗黙的 ask は設定の穴に起因するので、危険の表明として書くと、
-    受け取った側は存在しない危険を探すことになる。
+    渡すのは「ルールが言及していない」ときだけ。読み切れなかったコマンド
+    （degraded）は渡さない。ccnavi が読めなかったという事実は判定の結果に
+    現れないので、渡すと「判断材料が足りない」ことが誰にも伝わらないまま
+    モードの既定に落ちる。読めなかったことを言えるのはここだけ。
 
-    直し方を書くのは、この ask が繰り返されるのが穴の側の問題だから。
-    同じ問いが何度も出るなら、答えるべきなのは呼び出しごとの是非ではなく
+    知らないモードは ask に倒す。名前が 1 つ増えたときに、それが素通りではなく
+    確認になるように。設定漏れがガードの消失にならない側へ既定を置く。
+    """
+    if permission_mode in PERMISSION_NO_JUDGE:
+        return rules.DENY
+    if not degraded and permission_mode in PERMISSION_JUDGED:
+        return HANDOVER
+    return rules.ASK
+
+
+def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused: bool) -> str:
+    """どの区画も言及しなかった呼び出しに返す文。
+
+    危険だとは言わない。言えないから権限モードに委ねている。根拠は設定の穴で
+    あって呼び出しの中身ではないので、危険の表明として書くと、受け取った側は
+    存在しない危険を探すことになる。
+
+    直し方を書くのは、これが繰り返されるのが穴の側の問題だから。同じ場所で
+    何度も止まるなら、答えるべきなのは呼び出しごとの是非ではなく
     「この場所を allow に書くかどうか」になる。
+
+    refused は、確認できる者が居ないモードで許可としなかったことを示す。
+    そのときは同じ根拠でも受け取った側の次の一手が違う。人に聞けるなら
+    「言えば通るかもしれない」だが、聞けないなら「言っても通らない」ので、
+    先に設定を直すか、人が居るセッションでやり直すしかない。
     """
     shown = " ".join(subject.split())
     if len(shown) > SUBJECT_LIMIT:
@@ -682,13 +743,22 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str) -> str:
             "would actually do. Say what the command is for, or rewrite it in a form that can "
             "be read: no heredoc, no string handed to something that runs it."
         )
+    elif refused:
+        lines.append(
+            f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
+            "and this session has no one to ask: its permission mode answers on its own or not "
+            "at all. An undeclared call is not allowed here. Either do the work with something "
+            f"the allow section of {rules_path} already covers, or tell the user what needs to "
+            "be added there and let them decide."
+        )
     else:
         lines.append(
             f"No rule in {rules_path} mentions this {'command' if tool == 'Bash' else 'path'}, "
-            "so ccnavi has nothing to go on and is asking the user. This is not a warning about "
-            "the call itself. If this is ordinary work for this project, say so and ask the user "
-            f"to add it to the allow section of {rules_path}; that is what stops the same "
-            "question from coming back."
+            "so ccnavi has no verdict of its own and leaves the call to Claude Code's permission "
+            "mode, which in this session asks the user. This is not a warning about the call "
+            "itself. If this is ordinary work for this project, say so and ask the user to add "
+            f"it to the allow section of {rules_path}; that is what stops the same question from "
+            "coming back."
         )
     return "\n".join(lines)
 
@@ -716,7 +786,7 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # コードはルールが置かれていた区画から決まる。拒否と確認で同じコードを
     # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
     # 推し量ることになる。
-    code = CODE_EXPLICIT_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
+    code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所は「どのファイルのどのルール」まで。ファイル名だけでは、同じ名前の
     # ルールファイルが複数ある構成で直しに行く先が決まらない。
     source = f"{rules_path}#{rule.id}" if rule.id else rules_path

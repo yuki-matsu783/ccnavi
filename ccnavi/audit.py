@@ -20,6 +20,12 @@ DENY = "deny"
 # SKIP は判定に至らなかったことを示す。SKIP には必ず reason が付くので、
 # 「判定しなかった」と「判定して何も無かった」を見分けられる。
 SKIP = "skip"
+# HANDOVER は、判定を Claude Code の権限モードへ渡したことを示す。
+# ASK と分けてあるのは、渡した回と人に聞いた回を別に数えるため。混ぜると
+# 「ルールが言及していない呼び出し」の総量は見えても、そのうち誰かが実際に
+# 判断した回がどれだけかを言えなくなる。ルールを足すべきかどうかは前者で決まり、
+# ガードが効いていたかどうかは後者で決まるので、同じ欄には置けない。
+HANDOVER = "handover"
 
 # 判定に至らなかった理由。
 REASON_MODE_DISABLED = "mode-disabled"
@@ -47,6 +53,11 @@ class Record:
     """記録の 1 行。"""
 
     mode: str = ""
+    # permission_mode は、呼び出しが来たときの Claude Code の権限モード。
+    # ルールが言及しない呼び出しの結末がこれで変わる（cli.undeclared_verdict）
+    # ので、残さないと
+    # 同じ subject に別の結末が並ぶ理由を、記録だけでは説明できなくなる。
+    permission_mode: str = ""
     event: str = ""
     tool: str = ""
     subject: str = ""
@@ -132,6 +143,7 @@ class Log:
         }
         # 空の欄は落とす。1 行を目で追うのに、意味の無い欄は邪魔にしかならない。
         for key, value in (
+            ("permission_mode", record.permission_mode),
             ("event", record.event),
             ("tool", record.tool),
             ("subject", subject),

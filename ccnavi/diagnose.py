@@ -180,7 +180,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             stdout.write(f"  {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n")
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
-    stdout.write("  暗黙的 ask。人に確認が出る\n")
+    stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
+    stdout.write("    auto                          classifier が判断する\n")
+    stdout.write("    default / acceptEdits / plan  人に確認が出る\n")
+    stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
     stdout.write("\n■ チケットの作業範囲\n")
     if not conf.ledger:

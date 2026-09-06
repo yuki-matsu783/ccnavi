@@ -360,14 +360,15 @@ def _rules(path: str) -> list[Problem]:
         )
 
     if not rule_set.allow:
-        # allow が 1 件も無いと、どの呼び出しも暗黙的 ask に落ちる。判定は
-        # 動いているので error ではないが、確認が出続ける状態は、外から見ると
-        # ガードが壊れている状態と区別が付かない。
+        # allow が 1 件も無いと、どの呼び出しも ccnavi の判定を受けずに
+        # 権限モードへ渡る。判定は動いているので error ではないが、外から見ると
+        # ガードが何も言わない状態と区別が付かない。
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(rules)",
-                "`allow` が空。どのルールも言及しない呼び出しはすべて暗黙的 ask になる",
+                "`allow` が空。どのルールも言及しない呼び出しは、"
+                "すべて Claude Code の権限モードに従うことになる",
             )
         )
 
