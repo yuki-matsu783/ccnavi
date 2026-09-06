@@ -47,6 +47,32 @@ class ReadTest(unittest.TestCase):
             with self.subTest(src=src):
                 self.assertNotIn("git push", self.readable(src))
 
+    def test_リダイレクトは演算子として残る(self):
+        # 書き込み先を見るルールが立つ土台。空白の有無で形が変わらないこと。
+        cases = {
+            "echo x > f": "echo x > f",
+            "echo x>f": "echo x > f",
+            "cat a>>b": "cat a >> b",
+            "cmd 2>&1": "cmd 2 >& 1",
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(show(self.readable(src)), show(want))
+
+    def test_語の中の演算子は演算子として読まれない(self):
+        # ルールの regex を grep で引く作業が、いちばんリダイレクトの形に触れる。
+        # 引用の中の ">" は文字であって、書き込み先を連れてこない。
+        cases = [
+            ("""grep -n "regex: '(>" rules.yml""", "> rules.yml"),
+            ('grep -n "x>y" notes.md', "x>y"),
+            # ヒアドキュメントについて書く作業も同じ。区切り記号と同じ綴りが
+            # 引用の中に出るが、そこで本文が始まるわけではない。
+            ('grep -n "<<EOF" README.md', "<<"),
+        ]
+        for src, absent in cases:
+            with self.subTest(src=src):
+                self.assertNotIn(absent, self.readable(src))
+
     def test_ヒアドキュメントの本文は実行位置ではない(self):
         src = "cat <<'EOF' > notes.md\ngit push origin main\nEOF\necho done"
         text = self.readable(src)
