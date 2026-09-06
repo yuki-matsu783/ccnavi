@@ -198,6 +198,12 @@ allow:
     subject: "cat /repo/.claude/scripts/ccnavi-git.sh"
     why: ラッパの中身を読むのは普通
   - tool: Bash
+    subject: "grep -n \"regex: '(>\" /repo/.claude/ccnavi/rules.yml"
+    why: 引用の中の > は文字。ルールの regex を引いているだけ
+  - tool: Bash
+    subject: 'grep -n "<<EOF" /repo/README.md'
+    why: ヒアドキュメントについて書く作業。そこで本文は始まらない
+  - tool: Bash
     subject: "sh /repo/.claude/scripts/ccnavi-git.sh diff --stat"
     why: これが git の打ち方そのもの。ここを止めたら何もできない
   - tool: Bash
