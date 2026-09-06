@@ -137,6 +137,32 @@ class FallbackTest(unittest.TestCase):
         # 止めた先に道が無いと、拒否は行き止まりになる。
         self.assertIn("Write", out["permissionDecisionReason"])
 
+    def test_既定でもシェルからの書き込みは綴りを変えても止まる(self):
+        for command in [
+            "echo x >> .claude/hooks/lint-py.sh",
+            "sed -i s/deny/allow/ .claude/ccnavi/rules.yml",
+            "cp /tmp/x .claude/scripts/ccnavi-git.sh",
+            "echo {} > .claude/settings.json",
+            "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
+        ]:
+            with self.subTest(command=command):
+                out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
+                self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
+
+    def test_既定はマージの解決を妨げない(self):
+        # 衝突マーカーの入ったルールファイルは YAML として読めないので、
+        # 衝突を解いている最中は必ず既定に落ちている。そこで解決の手が止まると、
+        # ガードが落ちた状態から出られない。どれもファイルに新しい文面を書かない。
+        for command in [
+            "sh .claude/scripts/ccnavi-git.sh restore --ours -- .claude/ccnavi/rules.yml",
+            "sh .claude/scripts/ccnavi-git.sh add -- .claude/ccnavi/rules.yml",
+            "cat .claude/ccnavi/rules.yml",
+            "grep -n conflict .claude/ccnavi/rules.yml",
+        ]:
+            with self.subTest(command=command):
+                out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
+                self.assertNotEqual(out.get("permissionDecision"), "deny", f"止めた: {command!r}")
+
     def test_既定に落ちたことは記録に残る(self):
         # ガードが落ちたまま何回動いたかは、これでしか数えられない。
         log = os.path.join(self.directory.name, "log.jsonl")
