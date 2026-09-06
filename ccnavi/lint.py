@@ -138,6 +138,70 @@ def check(
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules))
+    problems.extend(_ticket(conf))
+    return problems
+
+
+def _ticket(conf: settings.Settings) -> list[Problem]:
+    """チケットと承認台帳が噛み合っているかを見る。
+
+    判定に効くのは台帳の側だけなので、ここで問うのは「効いている範囲は何か」と
+    「作業ツリーのチケットがそれと一致しているか」の 2 つ。一致していない状態は
+    壊れてはいないが、書いた人は書いたとおりに効いていると思っている。
+    検証はその思い違いを名指しする場所になる。
+    """
+    from . import approval
+    from . import ticket as ticket_mod
+
+    problems: list[Problem] = []
+    if not conf.ledger:
+        problems.append(
+            Problem(SEVERITY_WARN, "(ticket)", "承認台帳の置き場が空。チケットの範囲は効かない")
+        )
+        return problems
+
+    approved, unreadable = approval.current(conf.ledger)
+    if unreadable:
+        problems.append(Problem(SEVERITY_ERROR, "(ticket)", unreadable))
+        return problems
+
+    proposed, complaints = ticket_mod.load(conf.ticket)
+    # チケットの不備は error のまま上げる。検証は人が読む場所なので、
+    # 承認しようとして初めて気づくより、ここで気づけるほうがよい。
+    problems.extend(complaints)
+
+    if approved is None and proposed is None:
+        # チケットも承認も無い状態は不備ではない。チケットによる制御は任意で、
+        # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
+        # 他の報告ごと読まれなくなる。
+        return problems
+
+    if approved is None:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{proposed.ticket} は未承認。'ccnavi --approve' を通すまで範囲は効かない",
+            )
+        )
+    elif proposed is None:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"読めるチケットが無いが、{approved.ticket} の承認済みの範囲は効いている: "
+                f"{', '.join(approved.write)}",
+            )
+        )
+    elif proposed.digest() != approved.digest:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{conf.ticket} は承認された内容と違う。効いているのは {approved.ticket} の "
+                f"承認済みの範囲: {', '.join(approved.write)}",
+            )
+        )
     return problems
 
 
