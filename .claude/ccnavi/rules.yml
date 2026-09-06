@@ -4,42 +4,47 @@
 # 人に確認が出る。だから allow は「このプロジェクトで普通にやること」を並べる場所で、
 # 権限を配る場所ではない。ここに書き足すたびに、人が見なくなる範囲が広がる。
 #
-# pattern と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する。
+# glob と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する。
 # `<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグになる。
-version: 2
+#
+# glob は fnmatch と同じ意味で、文字列全体に当たる。部分一致が欲しければ
+# 前後に `*` を自分で書く。語の切れ目は入らないので、右側だけなら
+# `*sed *` のように空白を書いて守る。左側の切れ目は glob では書けない。
+# `*git push*` は `legit push` にも当たる。そこが要るルールは regex を使う。
+version: 3
 
 deny:
   - id: guard-config
     match: Write|Edit|MultiEdit
-    pattern: ".claude/ccnavi/*"
+    glob: "*/.claude/ccnavi/*"
     message: >-
       ガード自身のルールです。エージェントの判断で書き換えず、変更が要る理由を伝えて
       利用者に依頼してください。
 
   - id: guard-hooks
     match: Write|Edit|MultiEdit
-    pattern: ".claude/hooks/*"
+    glob: "*/.claude/hooks/*"
     message: >-
       ガードを起動する hook 本体です。エージェントの判断で書き換えず、変更が要る理由を
       伝えて利用者に依頼してください。
 
   - id: git-push
     match: Bash
-    pattern: "git push *"
+    glob: "*git push*"
     message: >-
       git push はエージェントからは実行しません。ブランチをそのまま残し、利用者に
       push を依頼してください。
 
   - id: git-reset-hard
     match: Bash
-    pattern: "git reset --hard *"
+    glob: "*git reset --hard*"
     message: >-
       作業中の変更が消えます。'git stash' で退避するか、戻したいファイルを名指しして
       'git restore' を使ってください。
 
   - id: git-branch-force-delete
     match: Bash
-    pattern: "git branch -D *"
+    glob: "*git branch -D*"
     message: >-
       未マージのブランチが消えます。'git branch -d' で安全側の削除を試し、それでも
       消したいなら利用者に依頼してください。
@@ -59,7 +64,7 @@ deny:
 
   - id: recursive-delete
     match: Bash
-    pattern: "rm -rf *"
+    glob: "*rm -rf *"
     message: >-
       再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
       'git rm' を使ってください。
@@ -90,7 +95,7 @@ ask:
 
   - id: current-ticket
     match: Write|Edit|MultiEdit
-    pattern: ".current-ticket.md"
+    glob: "*/.current-ticket.md"
     message: >-
       作業範囲の提案です。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
       人が読んで 'ccnavi --approve' を通すまでは提案のままです。
@@ -115,7 +120,7 @@ allow:
 
   - id: worktrees
     match: Write|Edit|MultiEdit
-    pattern: ".claude/worktrees/*"
+    glob: "*/.claude/worktrees/*"
 
   # コマンドの regex は行頭に錨を打たない。判定に渡るのは実行される部分を
   # 繋いだ 1 本の文字列で、`cd /repo && git status` のように前に別の語が来る。
