@@ -648,6 +648,58 @@ error 2 件、warn 2 件
 `.claude/settings.json` の `env` は Claude Code がセッションのプロセスに渡すもので、
 端末から叩いた検証には入っていない。だから報告はモードがどこから来たかを名乗る。
 
+## 生の git は止めてラッパへ寄せる
+
+`.claude/scripts/ccnavi-git.sh` は、安全な git だけを通し、出力を抑えて結果だけを返す。
+生の `git` はルールで拒否し、拒否の文面からここへ誘導する。
+
+```sh
+sh .claude/scripts/ccnavi-git.sh status
+sh .claude/scripts/ccnavi-git.sh log -p
+sh .claude/scripts/ccnavi-git.sh --help    # 通す形と通さない形の一覧
+```
+
+狙いは 2 つある。
+
+- **出力がコンテキストに丸ごと載るのを止める。** `git log -p` はこのリポジトリで
+  2 万行を超える。全量は `logs/` に残し、標準出力へは要約 1 行と先頭 40 行だけを返す。
+  足りなければログのパスを名指しで返してあるので、必要な部分だけ読める
+- **オプションの穴を入口 1 本で塞ぐ。** `permissions.allow` の `Bash(git diff:*)` は
+  前方一致でしかなく、後ろに何を足されても通る。サブコマンドごとに使ってよい形を
+  書けるのは、入口を 1 本にしたここだけになる
+
+```
+$ sh .claude/scripts/ccnavi-git.sh log -p
+ok  git log  56 コミット  log=logs/git-20260907-061907-23235.log
+commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
+...
+... 残り 20893 行は logs/git-20260907-061907-23235.log にある
+```
+
+終了コードは提供コマンドの約束に揃える。0 が成功、1 は git が失敗、2 は引数か環境の誤りで、
+拒否もここに入る。失敗したときは末尾 30 行を返す。原因はたいてい最後に出る。
+
+### 何を通し、何を止めるか
+
+白名簿に無いものは既定で拒否する。分類だけでは足りないので、閉じる向き
+（通っていたものを止める向き）の判定をサブコマンドの中に足してある。
+`git branch -D`、`git worktree remove --force`、`git tag -d`、`git checkout -- <パス>` は、
+どれも「読む」「移る」ように見えて取り返しがつかない。
+
+サブコマンドより前のオプションは 1 つも受け取らない。`git -c diff.external=<コマンド> diff` は
+分類上ただの `diff` のまま任意コマンドを実行する。危ない設定名を列挙して弾く手は網羅できず、
+漏れた名前が読み取り専用のまま通るので、値を見ずに形で落とす。同じ穴が環境変数側にもあるので、
+`GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す。
+
+これは事故と浪費を減らすためのもので、敵対的な回避への防御ではない。
+`sh -c` や `python -c` に埋めれば hook の文字列一致は外れる。そこまで塞ぐなら
+`permissions.deny` か sandbox が要る。
+
+記録は `logs/git-<日時>-<pid>.log` に成功でも失敗でも全量を書く。捨てると
+「あのとき何が出ていたか」を後から確かめられない。`logs/` は `.gitignore` に
+入っていて、絶対パスとコマンド全文が入るのでコミットしない。放っておくと
+増え続けるので、新しい順に 50 本だけ残して古いものを消す。
+
 ## 構成
 
 | 場所 | 中身 |
@@ -668,6 +720,7 @@ error 2 件、warn 2 件
 | `ccnavi/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
 | `ccnavi/cli.py` | 引数と入力を 1 つの判定に繋ぐ |
 | `build.py` | 配布物の組み立て |
+| `.claude/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `testdata/rules.yml` | テスト用のルール |
 | `testdata/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
