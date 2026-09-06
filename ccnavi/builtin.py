@@ -25,6 +25,21 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 壊れた結果として緩んだ既定に落ちる、という順路ができてしまう。
 壊す側と直す側で経路を分けることで、その順路を閉じる。
 
+止めるのは書き込む綴りだけで、場所の名前が出たかどうかでは止めない。
+プロジェクトのルールの `guard-shell-write` と同じ形を、同じ場所に当てている。
+以前はどちらでも当てていたが、それだと `git add <パス>` も
+`git restore --ours -- <パス>` も止まった。どちらもファイルの中身を書かないのに。
+
+これが問題になるのはマージの衝突を解くとき。衝突マーカーの入ったルールファイルは
+YAML として読めないので既定に落ちる。そこで解決の手が止まると、ガードが落ちた
+状態から出られなくなる。名前が出たら止める形は、いちばんガードを直したいときに
+いちばん強く効いていた。
+
+シェルから入れられるのは、既にコミットされている内容だけになる。新しい文面は
+Write / Edit を通る。壊す側と直す側を分ける狙いはそこで保たれている。
+書き込む綴りをここで数え落としても、既定はプロジェクトの `allow` を持たないので、
+当たらなかった呼び出しは権限モードに渡り、人が居るモードなら 1 件ずつ確認が出る。
+
 ## 既定に落ちると、ほとんどを権限モードに委ねる
 
 どのルールも言及しない呼び出しについて、ccnavi は判定を持たず、Claude Code の
@@ -51,14 +66,25 @@ RULES: dict = {
         {
             "id": "builtin-guard-config-via-bash",
             "match": "Bash",
-            # 前に区切り文字を求めない。リダイレクト先は "> .claude/ccnavi/x" の
-            # ように語の先頭に来るので、求めると素通りする。実際に踏んだ。
-            "regex": r"\.claude[\\/](ccnavi|hooks)[\\/]",
+            # プロジェクトの rules.yml の guard-shell-write と同じ形。既定が
+            # 弱いほうへずれると、ルールファイルを壊すことがそのまま緩めることに
+            # なる。書き写しなので、片方を直したらもう片方も直すこと。
+            "regex": (
+                r"(>[>|&]* ?[^ \x00]*"
+                r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
+                r"|(^|\x00)sed\b[^\x00]*-i[^\x00]*)"
+                r"(\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)"
+                r"|ccnavi-git\.sh)"
+                r"|(^|\x00)(cp|ln|install)\b[^\x00]*"
+                r"(\.claude[\\/](ccnavi|hooks|scripts|settings)|ccnavi-git\.sh)[^ \x00]*($|\x00)"
+            ),
             "message": (
                 "ccnavi is running on its built-in defaults because its rule file "
-                "could not be read, and the shell is not the way to repair it. "
-                "Edit the file with the Write or Edit tool instead, so the repair "
-                "goes through a path that is checked and recorded."
+                "could not be read, and the shell is not the way to write it. "
+                "Put new content there with the Write or Edit tool, so the repair "
+                "goes through a path that is checked and recorded. Resolving a merge "
+                "conflict is not blocked: 'git add' and 'git restore --ours' put back "
+                "a version that is already committed instead of writing new content."
             ),
         },
         {
