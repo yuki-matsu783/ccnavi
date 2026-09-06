@@ -39,10 +39,21 @@ deny:
       hook の登録と permissions が入っている設定です。エージェントの判断で書き換えず、
       変更が要る理由を伝えて利用者に依頼してください。
 
-  # 上の 3 つは Write / Edit という名指しのツールにしか掛からない。同じ場所へ
+  # ccnavi-git.sh が居る場所。生の git を deny にして入口をこの 1 本に寄せた以上、
+  # ここを書き換えれば git のルールはまとめて外れる。通す/通さないを決めている
+  # ものがルールファイルの外にもある、ということなので、同じ強さで守る。
+  # 1 本だけでなく置き場ごと名指しするのは、2 本目が同じ立場で増えるから。
+  - id: guard-scripts
+    match: Write|Edit|MultiEdit
+    glob: "*/.claude/scripts/*"
+    message: >-
+      ガードが通す道を決めているスクリプトです。エージェントの判断で書き換えず、
+      変更が要る理由を伝えて利用者に依頼してください。
+
+  # 上の 4 つは Write / Edit という名指しのツールにしか掛からない。同じ場所へ
   # シェルから届く道が開いたままで、`echo x > .claude/ccnavi/rules.yml` は
   # allow:shell-inspection に当たって素通りしていた。拒否したはずのファイルが
-  # リダイレクト 1 つで書き換わるなら、上の 3 つは掛かっていないのと同じ。
+  # リダイレクト 1 つで書き換わるなら、上の 4 つは掛かっていないのと同じ。
   #
   # 場所を名指しするだけにはしない。ここは読むほうが普通の場所で、
   # `cat .claude/ccnavi/rules.yml` も `tail .claude/ccnavi/log.jsonl` も
@@ -68,12 +79,18 @@ deny:
   # `cp .claude/ccnavi/rules.yml /tmp/backup.yml` は写しを取っているだけで、
   # ここを止めると、変更を利用者に頼む前に控えを置く手も止まる。
   #
+  # 場所は 2 通りで書く。`.claude/` から始まる綴りと、`ccnavi-git.sh` という
+  # 名前そのもの。Bash の対象は行き着く先まで解かれない生の文字列なので、
+  # worktree の中から `../../scripts/ccnavi-git.sh` と書けば前者は外れる。
+  # 名前で捕まえられるのはラッパだけ（rules.yml のような一般的な名前は
+  # 他人の空似が多すぎる）ので、そこだけ二重にしてある。
+  #
   # 読み切れないコマンド（`bash -c`、閉じない引用符）は生の文字列に当たる。
   # 綴りはどれも文字列としてもそのまま残るので、そこでも当たる。
   # インタプリタに 1 行渡す形（`python -c` に書いた open）はここでは止まらない。
   - id: guard-shell-write
     match: Bash
-    regex: '(>[>|&]* ?[^ \x00]*|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*|(^|\x00)sed\b[^\x00]*-i[^\x00]*)\.claude[\\/]((ccnavi|hooks)[\\/]|settings[\w.-]*\.json)|(^|\x00)(cp|ln|install)\b[^\x00]*\.claude[\\/](ccnavi|hooks|settings)[^ \x00]*($|\x00)'
+    regex: '(>[>|&]* ?[^ \x00]*|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*|(^|\x00)sed\b[^\x00]*-i[^\x00]*)(\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)|ccnavi-git\.sh)|(^|\x00)(cp|ln|install)\b[^\x00]*(\.claude[\\/](ccnavi|hooks|scripts|settings)|ccnavi-git\.sh)[^ \x00]*($|\x00)'
     message: >-
       ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。
       Write / Edit で拒否される場所です。綴りを変えても同じ場所なので、変更が要る
