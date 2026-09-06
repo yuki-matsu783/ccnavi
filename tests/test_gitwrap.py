@@ -135,7 +135,10 @@ class RejectTest(GitWrapperTest):
             ("stash", "drop"),
             ("stash", "clear"),
             ("restore", "."),
-            ("merge", "other"),
+            ("merge", "-X", "ours", "other"),
+            ("merge", "-Xtheirs", "other"),
+            ("merge", "-s", "ours", "other"),
+            ("merge", "--no-verify", "other"),
         ):
             with self.subTest(args=args):
                 self.assertRejected(*args)
@@ -156,6 +159,25 @@ class PassTest(GitWrapperTest):
         result = self.run_wrapper("commit", "-m", "足した")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertTrue(result.stdout.startswith("ok  git commit"), result.stdout)
+
+    def test_a_merge_that_is_not_a_fast_forward_goes_through(self):
+        # worktree の手順は、main が先に進んだ状態から取り込む形を必ず通る。
+        # ここを止めると、枝分かれしたブランチが永久に統合されない。
+        self.assertEqual(0, self.run_wrapper("checkout", "-b", "topic").returncode)
+        with open(os.path.join(self.dir, "topic.txt"), "w", encoding="utf-8") as f:
+            f.write("topic\n")
+        self.run_wrapper("add", "topic.txt")
+        self.run_wrapper("commit", "-m", "topic")
+        self.run_wrapper("checkout", "-")
+        with open(os.path.join(self.dir, "main.txt"), "w", encoding="utf-8") as f:
+            f.write("main\n")
+        self.run_wrapper("add", "main.txt")
+        self.run_wrapper("commit", "-m", "main")
+
+        result = self.run_wrapper("merge", "topic", "--no-edit")
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "topic.txt")))
 
     def test_checkout_moves_between_branches(self):
         result = self.run_wrapper("checkout", "-b", "topic")
