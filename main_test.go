@@ -79,6 +79,33 @@ func run(t *testing.T, payload string, env ...string) result {
 	return result{stdout.String(), stderr.String(), cmd.ProcessState.ExitCode()}
 }
 
+// runMode pins the mode through the flag rather than the environment.
+//
+// This repository runs ccnavi on itself, so the session running these tests
+// already carries a mode, and the local override file may carry another. A test
+// that read either would report on the machine it ran on instead of on the
+// code. The flag beats both.
+func runMode(t *testing.T, mode, payload string) result {
+	t.Helper()
+
+	cmd := exec.Command(binary,
+		"--rules", filepath.Join("testdata", "rules.json"),
+		"--mode", mode)
+	cmd.Stdin = strings.NewReader(payload)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		var exit *exec.ExitError
+		if !errorsAs(err, &exit) {
+			t.Fatalf("run %s: %v", binary, err)
+		}
+	}
+	return result{stdout.String(), stderr.String(), cmd.ProcessState.ExitCode()}
+}
+
 func errorsAs(err error, target **exec.ExitError) bool {
 	e, ok := err.(*exec.ExitError)
 	if ok {
@@ -177,7 +204,7 @@ func TestDirectRunFailsInsteadOfSucceedingSilently(t *testing.T) {
 }
 
 func TestWarnModeReportsWithoutBlocking(t *testing.T) {
-	got := run(t, preToolUse("Bash", "command", "git push origin main"), "CCNAVI_MODE=warn")
+	got := runMode(t, "warn", preToolUse("Bash", "command", "git push origin main"))
 
 	v := decode(t, got)
 	if v.HookSpecificOutput.PermissionDecision != "" {

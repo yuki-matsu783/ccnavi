@@ -53,6 +53,7 @@ func Run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []
 	fs := flag.NewFlagSet("ccnavi", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	root := fs.String("root", defaultRoot(), "project root, the directory that holds .claude")
+	modeFlag := fs.String("mode", "", "override the configured mode: warn or block")
 	rulesPath := fs.String("rules", "", "override the rule file named in the settings")
 	logPath := fs.String("log", "", "override the record destination named in the settings")
 	fs.Usage = func() { usage(stderr, fs) }
@@ -61,10 +62,7 @@ func Run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []
 		return exitError
 	}
 
-	conf, problems, err := settings.Load(*root, filepath.Join(*root, ".claude", "settings.json"))
-	if err != nil {
-		fmt.Fprintf(stderr, "ccnavi: %v\n", err)
-	}
+	conf, problems := settings.Load(*root)
 	for _, p := range problems {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", p)
 	}
@@ -77,7 +75,7 @@ func Run(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args []
 		conf.Rules = *rulesPath
 	}
 
-	mode := resolveMode(stderr, conf)
+	mode := resolveMode(stderr, *modeFlag, conf)
 	log := audit.Open(conf.Log)
 
 	in, err := hookio.Decode(stdin)
@@ -211,39 +209,53 @@ func subjectOf(in *hookio.Input) string {
 
 // resolveMode turns the configured value into a mode.
 //
-// Off is refused when it was written into the project's settings file. That
-// file sits in the working tree, the agent can edit it, and the change takes
-// effect on the very next tool call, so honouring it would let the agent switch
-// off the thing watching it. Off is reachable only from the environment of
-// whoever started the session, which nothing inside the session can reach.
+// The settings files decide between warn and block, and an edit to them takes
+// effect on the next tool call. Only the environment can say off. Those files
+// sit in the working tree, the agent can edit them, and the change lands on the
+// very next tool call, so an off written there would let the agent switch off
+// the thing watching it.
 //
-// An absent value means block, so a missing setting is never a missing guard.
-func resolveMode(stderr io.Writer, conf *settings.Settings) Mode {
-	switch Mode(strings.ToLower(conf.Mode)) {
+// A flag beats both, so a test can pin the mode without depending on the
+// environment it happens to run in.
+//
+// An absent value everywhere means block, so a missing setting is never a
+// missing guard.
+func resolveMode(stderr io.Writer, flagValue string, conf *settings.Settings) Mode {
+	source, value := settings.ModeEnv, conf.Mode
+	if flagValue != "" {
+		source, value = "--mode", flagValue
+	}
+
+	switch Mode(strings.ToLower(value)) {
 	case ModeWarn:
 		return ModeWarn
+
 	case ModeOff:
-		// Only an off written into the file itself is refused. When the file
-		// asks for something else and off arrived anyway, it came from outside
-		// the working tree, which is exactly where it is allowed to come from.
-		if Mode(strings.ToLower(conf.ModeDeclaredInFile)) == ModeOff {
-			fmt.Fprintf(stderr,
-				"ccnavi: %s=off is ignored because it is written in the project's settings file; "+
-					"start the session with it in the environment instead\n", settings.ModeEnv)
-			return ModeBlock
+		// Off has one route: the environment of whoever started the session,
+		// and only when nothing inside the working tree asked for it. Both the
+		// settings files and the flag come from places the agent can edit, and
+		// an edit there lands on the very next tool call, so honouring off from
+		// either would let the agent switch off the thing watching it.
+		fromFile := Mode(strings.ToLower(conf.ModeDeclaredInFile))
+		fromEnv := Mode(strings.ToLower(conf.ModeFromEnvironment))
+		if flagValue == "" && fromEnv == ModeOff && fromFile != ModeOff {
+			return ModeOff
 		}
-		return ModeOff
-	case "":
+		fmt.Fprintf(stderr,
+			"ccnavi: %s=off is ignored because it comes from inside the project; "+
+				"start the session with %s=off in the environment instead\n", source, settings.ModeEnv)
 		return ModeBlock
-	case ModeBlock:
+
+	case "", ModeBlock:
 		return ModeBlock
+
 	default:
 		// An unreadable value still lands on the strongest mode, but saying so
 		// matters: a renamed or mistyped setting would otherwise look like a
 		// deliberate choice, and the guard would tighten for reasons nobody
 		// could see.
 		fmt.Fprintf(stderr, "ccnavi: %s=%q is not a mode; using %s. Valid modes are %s, %s and %s\n",
-			settings.ModeEnv, conf.Mode, ModeBlock, ModeOff, ModeWarn, ModeBlock)
+			source, value, ModeBlock, ModeOff, ModeWarn, ModeBlock)
 		return ModeBlock
 	}
 }
