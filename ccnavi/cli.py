@@ -32,6 +32,31 @@ MODE_OFF = "off"  # 判定しない
 MODE_WARN = "warn"  # 判定して報告するが、呼び出しは通す
 MODE_BLOCK = "block"  # 判定して呼び出しを止める
 
+# 返す理由に載せる理由コード。ccnavi.md 付録 B の体系から、今のビルドが実際に
+# 下せる判定に対応するものだけを借りている。
+#
+# 付録 B のコードは「どの検査がその根拠を作ったか」の名前であって、ルール 1 件を
+# 指す名前ではない。今のビルドが持つ検査は 1 つ（外から注入したルール集合を
+# 正規化済みの対象に当てる）で、当てる先がコマンドかパスかで 2 つに割れる。
+# だからコードはその割れ方に対応させ、どのルールだったかは出所が名指しする。
+# ルール 1 件ごとにコードを持たせれば付録 B の粒度（ヒアドキュメントなら
+# DENY_REDIRECT、DB 破壊なら DENY_DB_DESTRUCTIVE）に届くが、それはルール
+# ファイルに欄を 1 つ足すことなので書式の版が上がる。この要件が求めるのは
+# 「理由コードを含むこと」までなので、版を上げずに済む側を採る。
+CODE_COMMAND = "DENY_COMMAND_PATTERN"  # Bash の実行される部分に当たった
+CODE_PATH = "DENY_PATH"  # ファイルのパスに当たった
+# 読み切れないコマンドを生の文字列に当てたときの根拠は、宣言された禁止に
+# 当たったことではなく、対象を確定できなかったこと。付録 B でそれを言うのは
+# IMPL_PARSE_UNCERTAIN で、あれは ask 系に置かれている。今のビルドに ask は
+# 無いので同じ根拠が deny に着地するが、着地先は permissionDecision が別に
+# 言うので、根拠の名前のほうは体系のまま借りる。
+CODE_UNCERTAIN = "IMPL_PARSE_UNCERTAIN"
+
+# 理由に載せる対象の長さの上限。対象はエージェントが今書いたものなので、
+# ここでは同じものを指せれば足りる。ヒアドキュメントは 1 ファイル分を運べるので、
+# 全文を載せると理由の本体が下へ流れて読まれなくなる。
+SUBJECT_LIMIT = 200
+
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
 
 It is a hook command, not something to run by hand: it reads one hook payload
@@ -151,7 +176,9 @@ def decide(
             record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
             return fail_closed(mode)
         if rule.matches(payload.tool_name, subject):
-            reasons.append(rule.message)
+            reasons.append(
+                reason_for(rule, payload.tool_name, subject, rules_path, record.degraded)
+            )
             record.rules.append(rule.id)
 
     if not reasons:
@@ -160,9 +187,8 @@ def decide(
 
     # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
     # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
-    reason = "\n".join(reasons)
-    if record.degraded:
-        reason = unreadable(record.degraded) + "\n" + reason
+    # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
+    reason = "\n\n".join(reasons)
 
     if mode == MODE_WARN:
         record.decision, record.enforced = audit.DENY, False
@@ -249,8 +275,40 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     return reading.text
 
 
+def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degraded: str) -> str:
+    """当たったルール 1 件を、それだけで読んで成立する理由に組む。
+
+    載せるのは 3 つ。何に当たったか（対象）、どういう筋の根拠か（理由コード）、
+    それを言っているのはどの設定か（出所）。どれが欠けても、受け取った側は
+    自分の呼び出しのどこが引っかかったのかを自分では辿れず、
+    文面を信じるか無視するかの二択になる。
+
+    件ごとに閉じた形にするのは、1 回の応答に複数の理由が入り、そのうちどれが
+    利用者の目に入るかが決まらないため。「上に書いた事情が下の全部に掛かる」形は、
+    1 件だけが切り出されて見えた瞬間に意味を失う。読めなかったという断りが
+    件ごとに繰り返されるのはその代金で、繰り返しのほうが誤読より安い。
+    """
+    shown = subject
+    if len(shown) > SUBJECT_LIMIT:
+        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(subject) - SUBJECT_LIMIT})"
+    # 改行を含む対象は 1 行に畳む。理由の骨格が対象の中身で割られると、
+    # どこまでが対象でどこからが言い分なのかが読めなくなる。
+    shown = " ".join(shown.split())
+
+    code = CODE_UNCERTAIN if degraded else (CODE_COMMAND if tool == "Bash" else CODE_PATH)
+    # 出所は「どのファイルのどのルール」まで。ファイル名だけでは、同じ名前の
+    # ルールファイルが複数ある構成で直しに行く先が決まらない。
+    source = f"{rules_path}#{rule.id}" if rule.id else rules_path
+
+    lines = [f"[ccnavi] {code} (source: {source})", f"subject: {shown}"]
+    if degraded:
+        lines.append(unreadable(degraded))
+    lines.append(rule.message)
+    return "\n".join(lines)
+
+
 def unreadable(reason: str) -> str:
-    """コマンドを読めないまま出す拒否の書き出し。
+    """コマンドを読めないまま出した 1 件に添える断り。
 
     2 つの違う失敗に同じ文を使わせないために要る。「禁止されたコマンドを実行した」と
     「読めない文字列のどこかにその語がある」では次にやることが違うし、
@@ -263,10 +321,10 @@ def unreadable(reason: str) -> str:
         ),
     }.get(reason, "this command could not be read")
     return (
-        "[ccnavi] " + what + ", so the rules below were matched against the raw text instead of "
-        "against what runs. If these words are only being written down and not "
-        "run, nothing was deliberately forbidden: move the text into a file, or "
-        "split the command up, and try again. The rules that matched the text:"
+        "note: " + what + ", so this rule was matched against the raw text of the "
+        "command instead of against what runs. If these words are only being "
+        "written down and not run, nothing was deliberately forbidden: move the "
+        "text into a file, or split the command up, and try again."
     )
 
 
