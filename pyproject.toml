@@ -3,9 +3,11 @@ name = "ccnavi"
 version = "0.1.0"
 description = "Claude Code のツール呼び出しを止め、代わりに取る手段を返す hook"
 requires-python = ">=3.12"
-# third-party の実行時依存は持たない。守る側の道具なので、
-# ガード自身が点検できない供給網を増やさない。
-dependencies = []
+# 実行時の依存は PyYAML 1 本だけ。チケットの frontmatter が YAML で、
+# 自前の読み手を書くと書式の解釈違いがそのままガードの穴になる。
+# 読むのは safe_load に限る（ticket.py）。任意の Python の型を組み立てる
+# load は、エージェントが書けるファイルに向けては使わない。
+dependencies = ["pyyaml>=6.0"]
 
 [dependency-groups]
 # 開発時だけの道具。配布物には入らない。
