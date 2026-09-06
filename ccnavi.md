@@ -29,6 +29,7 @@
 > | Python のスクリプトとして hook に登録する | 言語は Python のままだが、登録するのは PyInstaller で組んだ実行ファイル。使う側にランタイムの導入を求めない。実行時の third-party 依存は持たず、判定中に外部プロセスを起こさない |
 > | 設定は `.claude/hooks/config.yaml` に置く | `.claude/settings.json` の `env` ブロックで環境変数として渡す。Claude Code の設定スキーマが独自キーを拒むため |
 > | 判定は deny / ask / allow の 3 値 | それに加えて、判定しない・警告・ブロックの 3 つの動作モードを持つ |
+| ask を明示的／暗黙的に二分類する（§13） | 「暗黙的 ask」という考え方をやめた。どのルールも言及しない呼び出しについて ccnavi は判定を持たず、Claude Code の権限モードに従う。`auto` は classifier に渡し、人が居るモードは確認に出し、`dontAsk` と `bypassPermissions` は通さない。渡した回は記録の `decision: handover` に残る。理由コードも `IMPL_UNDECLARED` / `EXPL_ASK` から `UNDECLARED` / `RULE_ASK` に改めた |
 > | ― | ルールは実行ファイルの外から注入し、正規表現を知らなくても書ける記法を持つ |
 > | ― | 判定した呼び出しは、通したものも判定しなかったものも 1 件 1 行で記録する |
 >
