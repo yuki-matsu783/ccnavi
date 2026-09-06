@@ -128,6 +128,78 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(result.stdout, "")
 
 
+def reasons(case, result):
+    """1 回の応答に入った理由を、件ごとに切り分けて返す。
+
+    件と件は空行で割れている。受け取った側が 1 件だけを切り出して読めることが
+    要求そのものなので、テストもまず切り分けてから 1 件ずつ見る。
+    """
+    text = verdict(case, result)["permissionDecisionReason"]
+    return [part for part in text.split("\n\n") if part.strip()]
+
+
+class ReasonTest(unittest.TestCase):
+    """理由が、対象・理由コード・出所を持ち、単独で読んで成立すること。"""
+
+    def test_理由は対象と理由コードと出所を名指しする(self):
+        # 文面だけでは、受け取った側は自分の呼び出しのどこが引っかかったのかを
+        # 辿れない。信じるか無視するかしか残らず、直しにも行けない。
+        got = reasons(self, run(payload=pre_tool_use("Bash", "command", "git push origin main")))
+
+        self.assertEqual(len(got), 1)
+        self.assertIn("git push origin main", got[0], "何に当たったのかが無い")
+        self.assertIn("DENY_COMMAND_PATTERN", got[0], "理由コードが無い")
+        self.assertIn(f"{RULES}#git-push", got[0], "どの設定が言っているのかが無い")
+
+    def test_ファイルの理由は行き着く先を対象として名指しする(self):
+        # 当てたのは来たままの綴りではなく解いた先なので、対象もそちらを言う。
+        # 来たままの綴りを見せると、当たった理由と対象がずれて読めなくなる。
+        got = reasons(self, run(payload=pre_tool_use("Read", "file_path", "docs/../.env")))
+
+        self.assertEqual(len(got), 1)
+        self.assertIn(os.path.join(ROOT, ".env"), got[0])
+        self.assertIn("DENY_PATH", got[0])
+        self.assertIn(f"{RULES}#dotenv", got[0])
+
+    def test_複数返った理由は一件ずつ単独で読んで成立する(self):
+        # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれが利用者の目に
+        # 入るかは決まらない。上の 1 行を下の全部が参照する形は、1 件だけが
+        # 切り出されて見えた瞬間に意味を失う。
+        got = reasons(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))
+
+        self.assertEqual(len(got), 2, "2 つのルールに当たったはず")
+        for i, part in enumerate(got):
+            with self.subTest(reason=i):
+                self.assertIn("sed -i s/a/b/ .env", part, "対象を他の件に預けている")
+                self.assertIn("[ccnavi] DENY_", part, "理由コードを他の件に預けている")
+                self.assertIn(f"{RULES}#", part, "出所を他の件に預けている")
+
+    def test_読めなかった判定は件ごとにそう名乗る(self):
+        # 読めなかったという断りは、1 回だけ先頭に置くと、その下の 1 件だけを
+        # 読んだ人には届かない。届かなかった人は、書いた覚えのないコマンドを
+        # 実行したと告げられたことになる。
+        got = reasons(
+            self,
+            run(payload=pre_tool_use("Bash", "command", 'bash -c "git push and read .env"')),
+        )
+
+        self.assertEqual(len(got), 2)
+        for i, part in enumerate(got):
+            with self.subTest(reason=i):
+                self.assertIn("IMPL_PARSE_UNCERTAIN", part)
+                self.assertIn("raw text", part, "読めたときと同じ文面になっている")
+
+    def test_理由は他の判定の結果に言及しない(self):
+        # 「上の」「下の」で他の件を指した瞬間、1 件だけ読んだ人には
+        # 指した先が無い文になる。
+        text = verdict(self, run(payload=pre_tool_use("Bash", "command", "sed -i s/a/b/ .env")))[
+            "permissionDecisionReason"
+        ]
+
+        for pointer in ("the rules below", "the rules above", "listed below"):
+            self.assertNotIn(pointer, text)
+
+
 class ReadingTest(unittest.TestCase):
     def test_コマンドについて書くことは実行ではない(self):
         # ルールはコマンドについて書かれたものであって文字列についてではない。

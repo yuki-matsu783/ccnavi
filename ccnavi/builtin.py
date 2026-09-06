@@ -90,6 +90,11 @@ RULES: dict = {
 # ガードが落ちたまま何回動いたかが後から分かる。
 FALLBACK = "builtin-rules"
 
+# 返す理由に載せる出所。既定に落ちているとき、当てているルールは読めなかった
+# ファイルの中には無い。そのファイルの名前を出所として名乗ると、見に行った人が
+# 当たったルールを見つけられず、文面と設定が食い違っているように見える。
+SOURCE = "(ccnavi built-in defaults)"
+
 
 def load() -> tuple[rules.RuleSet, list[rules.Problem]]:
     """組み込みの既定ルールを組み立てる。
