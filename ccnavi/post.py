@@ -37,9 +37,11 @@ import json
 import os
 import re
 import time
+from dataclasses import dataclass, field
 from typing import TextIO
 
 from . import audit, gitstate, hookio, rules
+from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。
@@ -59,6 +61,15 @@ CODE_VIOLATION = "POST_VIOLATION"
 # 前から在った変更には別のコードを立てる。同じコードで送ると、受け取った側に
 # 「直前の実行が壊したもの」と「元から汚れていたもの」を見分ける手が無くなる。
 CODE_PREEXISTING = "POST_PREEXISTING"
+# 承認されたチケットの作業範囲の外が変わった。実行前の判定が同じことを
+# DENY_TICKET_SCOPE で止めるが、そちらは Write / Edit の引数しか見ない。
+# シェルが書いたもの、ビルドの出力、スクリプトが内部で開いたファイルは、
+# 引数に現れないのでここでしか捕まらない。
+CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
+
+# 範囲外の変更を咎めているのは、ルールファイルの中のルールではなく承認台帳。
+# 出所にこの名前を添えて、ルールファイルを探しても見つからないことを示す。
+TICKET_SCOPE_RULE = "(ticket-scope)"
 
 # 自動復元の設定。既定は off。
 RESTORE_OFF = "off"
@@ -91,6 +102,7 @@ def check(
     mine: tuple[str, ...],
     rule_set: rules.RuleSet,
     source: str,
+    scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
     root: str,
@@ -123,7 +135,7 @@ def check(
 
     seen, first_time = _load_seen(stderr, state_dir, payload.session_id)
 
-    found = _violations(changes, rule_set, mine)
+    found = _findings(changes, rule_set, mine, source, scope)
     if not found:
         # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
         # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
@@ -133,15 +145,15 @@ def check(
         record.decision, record.enforced = audit.ALLOW, True
         return ""
 
-    fresh = [(c, r) for c, r in found if c.key() not in seen]
-    known = [(c, r) for c, r in found if c.key() in seen]
+    fresh = [f for f in found if f.change.key() not in seen]
+    known = [f for f in found if f.change.key() in seen]
     # 初めて見たセッションでは、今そこに在るものは直前の実行の結果ではない。
     # 控えを取るだけにして、原因を付けずに 1 度だけ伝える。
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
     if fresh and restore == RESTORE_AUTO and mode_blocks:
-        restored = _restore(stderr, top, state_dir, [c for c, _ in fresh])
+        restored = _restore(stderr, top, state_dir, [f.change for f in fresh])
 
     _save_seen(
         stderr,
@@ -150,12 +162,12 @@ def check(
         seen
         # 戻せたものは控えに入れない。同じ場所がもう一度汚れたら、それは
         # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
-        | {c.key() for c, _ in fresh if c.path not in restored}
-        | {c.key() for c, _ in carried},
+        | {f.change.key() for f in fresh if f.change.path not in restored}
+        | {f.change.key() for f in carried},
     )
 
-    record.paths = [f"{c.kind} {c.path}" for c, _ in fresh]
-    record.rules = sorted({rule.id or "(id 無し)" for _, group in fresh for rule in group})
+    record.paths = [f"{f.change.kind} {f.change.path}" for f in fresh]
+    record.rules = sorted({rule.id or "(id 無し)" for f in fresh for rule in f.group})
     # 既にある detail を先頭に残す。ルールを読めなかったときのファイル名が
     # そこに入っていて、上書きすると「どのファイルが読めなかったか」が消える。
     notes = [record.detail] if record.detail else []
@@ -174,8 +186,8 @@ def check(
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
-    blocks = [_violation(c, group, source, payload, restored.get(c.path)) for c, group in fresh]
-    blocks += [_preexisting(c, group, source) for c, group in carried[:REPORT_LIMIT]]
+    blocks = [_violation(f, payload, restored.get(f.change.path)) for f in fresh]
+    blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
         return ""
 
@@ -208,13 +220,82 @@ def resolve_restore(stderr: TextIO, flag: str, declared: str) -> str:
     return RESTORE_OFF
 
 
-def _violations(
-    changes: list[gitstate.Change], rule_set: rules.RuleSet, mine: tuple[str, ...]
-) -> list[tuple[gitstate.Change, list[rules.Rule]]]:
-    """変更のうち、保護領域を宣言したルールに当たるものを返す。
+@dataclass
+class ScopeGuard:
+    """承認された作業範囲を、実行後の側から当てるための持ち物。
+
+    実行前の判定と同じ範囲・同じ当て方を使う。別に書くと、同じ書き込みが
+    実行前は通って実行後に咎められる（あるいはその逆）ことになり、
+    どちらが本当の範囲なのかを誰も言えなくなる。
+    """
+
+    root: str
+    ledger: str
+    ticket: str
+    name: str
+    write: list[str] = field(default_factory=list)
+
+    def outside(self, full: str) -> bool:
+        """この変更が範囲の外かどうか。
+
+        チケットのファイル自身は外でも咎めない。次のチケットを提案する道を
+        塞ぐと、いちど承認した範囲から永久に出られなくなる。提案が効くのは
+        承認されてからなので、ここを開けても範囲は広がらない。
+        """
+        if self.ticket and os.path.normpath(full) == os.path.realpath(self.ticket):
+            return False
+        return not ticket_mod.inside(self.root, self.write, full)
+
+    def rule(self) -> rules.Rule:
+        """範囲外を咎める文面を、ルール 1 件の形に組む。
+
+        既存の報告はルールの文面を載せる作りになっている。同じ形に合わせると、
+        範囲外の 1 件も、ルールに当たった 1 件と同じ骨格で報告できる。
+        判定には使わないので、当てる式は持たせない。
+        """
+        area = ", ".join(f"{p}/" for p in self.write) or "(empty)"
+        return rules.Rule(
+            id=TICKET_SCOPE_RULE,
+            message=(
+                f"This path is outside the work area that ticket {self.name} declares ({area}). "
+                "Send the output inside that area, or, if the task genuinely needs this path, "
+                "add it to the ticket and ask the user to run 'ccnavi --approve'. "
+                "Editing the ticket on its own does not widen the area."
+            ),
+        )
+
+
+@dataclass
+class Finding:
+    """報告する 1 件。何が変わったかと、それを咎めているのが誰かの組。
+
+    咎める側が 2 通りある。ルールファイルが守ると宣言した場所と、承認された
+    チケットが作業範囲の外だと言う場所。どちらから来たかを持ち回らないと、
+    報告の出所がすべてルールファイルを名乗ることになり、見に行った人が
+    そこに無いルールを探すことになる。
+    """
+
+    change: gitstate.Change
+    group: list[rules.Rule]
+    source: str
+    code: str
+
+
+def _findings(
+    changes: list[gitstate.Change],
+    rule_set: rules.RuleSet,
+    mine: tuple[str, ...],
+    source: str,
+    scope: ScopeGuard | None,
+) -> list[Finding]:
+    """変更のうち、報告すべきものを返す。
 
     ccnavi 自身が書く場所は先に落とす。落とさないと、記録を 1 行足すたびに
     自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
+
+    ルールに当たった変更は、範囲の外でもルールの側で報告する。ルールのほうが
+    強く、範囲を広げても通らないから。ここで範囲の側の文面を返すと、
+    「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
     found = []
@@ -223,7 +304,9 @@ def _violations(
             continue
         group = [rule for rule in rule_set.rules if _guards_writes(rule, change.full)]
         if group:
-            found.append((change, group))
+            found.append(Finding(change, group, source, CODE_VIOLATION))
+        elif scope is not None and scope.outside(change.full):
+            found.append(Finding(change, [scope.rule()], scope.ledger, CODE_TICKET_SCOPE))
     return found
 
 
@@ -237,21 +320,16 @@ def _guards_writes(rule: rules.Rule, path: str) -> bool:
     return any(rule.matches(tool, path) for tool in WRITE_TOOLS)
 
 
-def _violation(
-    change: gitstate.Change,
-    group: list[rules.Rule],
-    source: str,
-    payload: hookio.Input,
-    moved: str | None,
-) -> str:
+def _violation(finding: Finding, payload: hookio.Input, moved: str | None) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
     実行前の拒否と同じ作りにしてある。何に当たったか・どの設定が言っているか・
     直前に何が走ったか・どう戻すか。1 件だけが切り出されて見えても、
     受け取った側がそこから次の一手に行けること。
     """
+    change, group = finding.change, finding.group
     lines = [
-        f"[ccnavi] {CODE_VIOLATION} (source: {_source(source, group)})",
+        f"[ccnavi] {finding.code} (source: {_source(finding.source, group)})",
         f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
         f"after: {_call(payload)}",
     ]
@@ -265,15 +343,16 @@ def _violation(
     return "\n".join(line for line in lines if line)
 
 
-def _preexisting(change: gitstate.Change, group: list[rules.Rule], source: str) -> str:
+def _preexisting(finding: Finding) -> str:
     """セッションが始まる前から在った変更に添える文。
 
     戻すなと書く。ここを書き落とすと、受け取った側は違反と同じ形の通知を読んで
     同じ手順を踏み、他のセッションや人の書きかけを消しにいく。
     """
+    change, group = finding.change, finding.group
     return "\n".join(
         [
-            f"[ccnavi] {CODE_PREEXISTING} (source: {_source(source, group)})",
+            f"[ccnavi] {CODE_PREEXISTING} (source: {_source(finding.source, group)})",
             f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
             "note: this was already in the working tree when ccnavi started watching this "
             "session, so the call that just ran did not cause it. Do not undo it and do not "
