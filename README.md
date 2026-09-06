@@ -6,7 +6,7 @@ Claude Code のツール呼び出しを hook で止め、止めた理由と代�
 
 ## 開発
 
-Python 3.12 以降。実行時の third-party 依存は持たない。標準ライブラリだけで動く。
+Python 3.12 以降。実行時の依存は PyYAML 1 本だけ。
 組み立てと検査の道具（PyInstaller、ruff）は開発時にしか要らない。
 
 ```sh
@@ -20,7 +20,7 @@ uv run --with pyinstaller python build.py          # 実行ファイルの組み
 
 ```sh
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}' \
-  | uv run python -m ccnavi --rules testdata/rules.yml --mode block
+  | uv run python -m ccnavi --rules testdata/rules.yml --mode enable
 ```
 
 編集のたびに `.claude/hooks/lint-py.sh` が走り、整形と検査をかける。
@@ -73,7 +73,7 @@ hook には実行ファイルだけを登録すればよい。
     ]
   },
   "env": {
-    "CCNAVI_MODE": "warn",
+    "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl"
   }
@@ -86,7 +86,7 @@ hook には実行ファイルだけを登録すればよい。
 
 | 変数 | 意味 |
 |---|---|
-| `CCNAVI_MODE` | `block`（既定）、`warn`、`off` |
+| `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
 | `CCNAVI_RULES` | ルールファイル。相対パスはプロジェクト根から |
 | `CCNAVI_LOG` | 記録先。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
@@ -279,14 +279,22 @@ docs/../.env
 
 | 値 | 挙動 |
 |---|---|
-| `block` | 判定し、`deny` なら止め、`ask` なら人に確認を出す。指定が無いときはこれ |
-| `warn` | 同じ判定を行い、止めも聞きもせず「block なら止めていた／聞いていた」と伝える |
-| `off` | 判定しない |
+| `enable` | 判定し、`deny` なら止め、`ask` なら人に確認を出す。指定が無いときはこれ |
+| `dry-run` | 同じ判定を行い、呼び出しには手を出さず「`enable` なら何をしていたか」を伝える |
+| `disable` | 判定しない |
 
-`off` だけは `.claude/settings.json` に書いても効かない。名指しで無視して理由を出す。
-その設定ファイルは作業ツリーの中にあってエージェントが書き換えられ、変更は次の
-ツール呼び出しから効く。監視される側が監視を止められる経路を残さないための扱い。
-`off` にするときはセッションを起動する側の環境から渡す。
+名前はガードそのものの状態を言う。判定に `deny` と `ask` の 2 つがある以上、
+モードの名前が「止める」だけを言うと、確認で済む回に嘘をつくことになる。
+
+`disable` だけは `.claude/settings.json` に書いても効かない。名指しで無視して
+理由を出す。その設定ファイルは作業ツリーの中にあってエージェントが書き換えられ、
+変更は次のツール呼び出しから効く。監視される側が監視を止められる経路を残さない
+ための扱い。`disable` にするときはセッションを起動する側の環境から渡す。
+
+読めない値は報告して `enable` に落ちる。旧い名前（`block` `warn` `off`）は
+受け付けないので、そのまま残っている設定は `enable` として動きはじめる。
+緩む側ではないが、`dry-run` のつもりだった設定が止めはじめるので、
+名前を変えるときは設定の側も一緒に直す。
 
 ## ツール実行後の監視
 
@@ -307,8 +315,8 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 ガード自身のルールです。エージェントの判断で書き換えず、変更が要る理由を伝えて利用者に依頼してください。
 ```
 
-このイベントにツール呼び出しを取り消す手段は無い。`block` では exit 2 と標準エラーで
-差し戻し、`warn` では止めない側の経路（`additionalContext`）で報告だけする。
+このイベントにツール呼び出しを取り消す手段は無い。`enable` では exit 2 と標準エラーで
+差し戻し、`dry-run` では手を出さない側の経路（`additionalContext`）で報告だけする。
 戻す手順は対象ごとに 1 つ。数えられる手順でないと、受け取った側が自分で
 組み立て直すことになり、そこで対象が増えたり減ったりする。
 
@@ -333,7 +341,7 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 ### 自動復元
 
 `CCNAVI_RESTORE=auto` のとき、ccnavi 自身が戻す。既定は `off`。
-`warn` モードでは `auto` でも戻さない。呼び出しを何も変えないことが
+`dry-run` では `auto` でも戻さない。呼び出しにも作業ツリーにも手を出さないことが
 そのモードの約束で、ファイルを動かすのはそれに反する。
 
 現れたファイルは消さずに `.claude/ccnavi/state/aside/<日時>/` へ退避し、
@@ -472,7 +480,7 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
 
 「設定が読めない」は「判断できない」ではなく「設定が壊れている」で、
 拒否側へ倒すと壊れた設定を直す操作まで止まって回復できなくなる。
-既定モードが `block` なので、ルールファイルを置く前に hook を登録しただけで
+既定モードが `enable` なので、ルールファイルを置く前に hook を登録しただけで
 セッションが死ぬことになる。
 
 既定に入っているのは、取り返しの付かない操作だけ。`rm -rf`、`git push`、
@@ -492,13 +500,13 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
 判定した呼び出しは、通したものも含めて 1 行 1 件で追記される。
 
 ```
-{"ts":"...","mode":"warn","event":"PreToolUse","tool":"Bash",
+{"ts":"...","mode":"dry-run","event":"PreToolUse","tool":"Bash",
  "subject":"git push origin main","decision":"deny","enforced":false,
  "rules":["git-push"],"session":"...","ms":0.9}
 ```
 
 `decision` は下した判定で `allow` `ask` `deny` `skip` のどれか。`enforced` は
-実際に適用したか。`warn` は `enforced:false` になるので、1 つのファイルで
+実際に適用したか。`dry-run` は `enforced:false` になるので、1 つのファイルで
 「何を止めるはずだったか」と「何を実際に止めたか」の両方が数えられる。
 
 `code` は判定の根拠の種別で、返した文の先頭に載るものと同じ。
@@ -509,7 +517,7 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
 拒否を 1 件足すことではない。
 
 判定しなかった回は `decision` が `skip` になり、`reason` が付く。
-`mode-off`、`event-not-checked`、`no-subject`、`nothing-to-run`、
+`mode-disabled`、`event-not-checked`、`no-subject`、`nothing-to-run`、
 `payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、
 `worktree-unreadable` の 8 つ。
 通した回も残すのは、記録が無いことを「ccnavi が動かなかった」と読めるようにするため。
@@ -554,7 +562,7 @@ error 2 件、warn 2 件
 ```
 
 `error` はガードが働かない、あるいは働きすぎて全部を止める記述で、1 件でもあれば
-終了コードは 1 になる。`warn` は判定そのものは動くが、書いた人が意図した防御が
+終了コードは 1 になる。warn は判定そのものは動くが、書いた人が意図した防御が
 効いていない記述で、終了コードは 0 のまま。CI が落とす対象は `error` だけでよい。
 
 | 深刻度 | 拾うもの |
@@ -564,7 +572,7 @@ error 2 件、warn 2 件
 | error | 組み立てられない正規表現、読み込み時に弾いている先読み・後読み・後方参照 |
 | error | 組み立てられたルールが 1 件も無い |
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=off` を宣言している |
-| warn | モードが `off` / `warn`、あるいはモードとして読めない値 |
+| warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 上書き設定ファイルが読めない |
 | warn | `id` の無いルール、`id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
