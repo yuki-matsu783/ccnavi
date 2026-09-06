@@ -108,27 +108,27 @@ hook には実行ファイルだけを登録すればよい。
 誰にも何も返らないので、書いても届く先が無い）。
 
 ```yaml
-version: 2
+version: 3
 
 deny:
   - id: git-push
     match: Bash
-    pattern: "git push *"
+    glob: "*git push*"
     message: git push はエージェントからは実行しません。利用者に依頼してください。
 
 ask:
   - id: migrations
     match: Write|Edit
-    pattern: "migrations/*"
+    glob: "*/migrations/*"
     message: 移行ファイルは実行前に人が中身を見ます。何が変わるかを言ってください。
 
 allow:
   - id: source
     match: Write|Edit|MultiEdit
-    regex: '(^|[\\/])src[\\/]'
+    glob: "*/src/*"
 ```
 
-`pattern` と `regex` は必ず引用符で囲む。囲まないと YAML が先に解釈する。
+`glob` と `regex` は必ず引用符で囲む。囲まないと YAML が先に解釈する。
 `<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグになる。
 
 ### 強さ
@@ -161,26 +161,25 @@ allow:
 `NotebookEdit` だけ。`Grep` や `Glob` のように対象を取り出せないツールは
 判定に届かないまま通るので、`allow` に書いても死んだ行が 1 つ増えるだけになる。
 
-`pattern` の書き方は 3 つだけ。
+`glob` の意味は標準ライブラリの `fnmatch` そのまま。`*` が任意の文字列、
+`?` が 1 文字、`[abc]` が文字クラス。
 
-| 書き方 | 意味 |
-|---|---|
-| `*` | 任意の文字列。空でもよい |
-| `?` | 任意の 1 文字 |
-| 空白 | 任意の空白の並び。`git push` は `git   push` にも当たる |
+**文字列全体に当たる。** 部分一致が欲しければ前後に `*` を自分で書く。
+`git push` は素の `git push` にしか当たらず、`cd /repo && git push` には当たらない。
+`*git push*` と書けば当たる。自動で前後に `*` を足さないのは、足すと
+「書いたものがそのまま当たる」が崩れて、見えない層が 1 枚できるため。
 
-残りはそのままの文字として扱う。部分一致なので `git push` は
-`/usr/bin/git push origin main` にも当たる。単語の切れ目は自動で見るので、
-`sed *` は `sed` に当たり `sedate` には当たらない。`/` はどちらの区切り文字にも
-当たるため、`secrets/` は Windows のパスでも効く。
+**語の切れ目は入らない。** `*sed*` は `sedate` にも当たる。右側だけなら空白を
+書いて `*sed *` とすれば守れる。左側は glob では書けない。`*git push*` は
+`legit push` にも当たり、`* git push*` と書くと今度は行頭の `git push` が外れる。
+左の切れ目が要るルールは `regex` を使う。
 
-単語の切れ目を見るのはワイルドカードに接していないところだけ。`*` と `?` は
-任意の文字を表すので、その隣で切れ目を求めると当たり方が狭くなりすぎる。
-`foo*bar` は `foobar` にも `fooXbar` にも `foo-bar` にも当たり、
-`id_*sa` は `id_rsa` に当たる。
+**区切り文字だけは正規化する。** `/` と書けば `\` にも当たる。ルールを 1 回書いて
+Windows でも Linux でも同じ意味にするための、`fnmatch` の外で足している唯一の処理。
+`*/secrets/*` は `C:\repo\secrets\key` にも当たる。
 
-`|` による択一のように上の 3 つで書けないものは、`pattern` の代わりに
-`regex` に正規表現を書く。両方書いたルールは受け付けない。
+書けないものは `glob` の代わりに `regex` に正規表現を書く。両方書いたルールは
+受け付けない。
 先読み・後読み・後方参照は受け付けない。書ける範囲を狭く保つと、ルールが
 エンジンをまたいでも同じ意味になる。加えてこの 2 つは、組み合わせ爆発を起こす
 書き方の入口でもある。判定の途中で固まった hook は期限に達して素通りになる。
@@ -544,6 +543,59 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
 `detail` に読めなかったファイルのパスが入る。ガードが落ちたまま何回動いたかは、
 これでしか数えられない。
 
+## ルールが何に当たるかを確かめる
+
+ルールは書いた瞬間から、当たるつもりのものに当たっているかが分からない。
+`glob` は正規表現に翻訳され、Bash のコマンドは実行される部分まで絞られてから
+当たる。ずれても気づく手立てが無いと、足したつもりで何も止めていない 1 行になる。
+
+```sh
+ccnavi --test Bash "cd /repo && git push"
+```
+
+```
+verdict: deny (DENY_COMMAND_PATTERN)
+tool: Bash
+subject: cd /repo && git push
+rules:
+  deny:git-push  glob '*git push*'
+    -> (?s:(?>.*?git\ push).*)\Z
+response:
+  [ccnavi] DENY_COMMAND_PATTERN (source: .claude/ccnavi/rules.yml#git-push)
+  ...
+```
+
+出るのは、判定と根拠コード、当たったルールとその区画、`glob` が翻訳された
+正規表現、そして返る文面そのもの。パスを渡したときは行き着く先も出るので、
+当たらなかった理由が綴りなのかどうかを自分で辿れる。
+
+判定は実運用と同じ関数を通る（REQ-DIA-03）。ここで判定を作り直すと、
+試験で通ったものが実運用で落ちる、という一番まずい形になる。
+モードは常に `enable` で動く。走っているセッションが `dry-run` でも、
+試験が答えるのは「`enable` なら何が起きるか」。
+
+いま効いている宣言を数え上げるには `--explain`。区画ごとのルール一覧と、
+承認されたチケットの作業範囲が出る。判定は行わない（REQ-DIA-01）。
+
+### 見本で確かめる
+
+止めたいものが止まり、止めたくないものが通ることは、1 件ずつ試すより
+見本をまとめて回すほうが早い。
+
+```sh
+uv run python testdata/check_rules.py
+```
+
+`testdata/rule-samples.yml` の見本をすべて `--test` に掛け、期待と食い違った
+ものを名指しする。見本は `deny` `ask` `allow` の区画に置き、区画の名前が
+期待する判定になる。ルールを 1 件足したら見本も 1 行足す。
+
+止めたいものだけでなく、**止めたくないものを必ず一緒に置く**。片側だけの見本は、
+ルールを広げすぎたことに気づけない。
+
+`/rules-check` スキルがこの流れをまとめて回し、食い違いの原因を調べ、
+怪しい当たり方を利用者に確認する。
+
 ## 設定の検証
 
 `--lint` は判定を行わず、防御を無効化しうる記述だけを報告する。payload を読まないので
@@ -561,7 +613,7 @@ ccnavi: 設定を検証する
   モード: warn（この起動の環境から解決したもの）
 warn: (mode): warn なので判定しても呼び出しを止めない
 error: no-message: 文面が無い。ルールは代わりに何をすべきかを言わなければならない
-error: both: pattern と regex の両方がある。どちらで判定するのか決められない
+error: both: glob と regex の両方がある。どちらで判定するのか決められない
 warn: (id 無し: Task|Bash curl *): match の Task には当てる対象が無い。何も止まらない
 error 2 件、warn 2 件
 ```
@@ -573,7 +625,7 @@ error 2 件、warn 2 件
 | 深刻度 | 拾うもの |
 |---|---|
 | error | ルールファイルが読めない、JSON として壊れている、版番号が違う |
-| error | 文面・`match`・`pattern` を欠いたルール、`pattern` と `regex` の両方があるルール |
+| error | 文面・`match`・`glob` を欠いたルール、`glob` と `regex` の両方があるルール |
 | error | 組み立てられない正規表現、読み込み時に弾いている先読み・後読み・後方参照 |
 | error | 組み立てられたルールが 1 件も無い |
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=off` を宣言している |
@@ -604,7 +656,7 @@ error 2 件、warn 2 件
 | `ccnavi/hookio.py` | stdin の payload の解釈と、stdout に返す応答の組み立て |
 | `ccnavi/rules.py` | ルールファイルの読み込みと検証 |
 | `ccnavi/builtin.py` | ルールファイルを読めないときの組み込み既定 |
-| `ccnavi/pattern.py` | やさしい記法から正規表現への翻訳 |
+| `ccnavi/globmatch.py` | glob から正規表現への翻訳 |
 | `ccnavi/shellread.py` | コマンド文字列のうち実際に実行される部分の切り出し |
 | `ccnavi/settings.py` | 環境と設定ファイルからの設定解決 |
 | `ccnavi/gitstate.py` | 作業ツリーで実際に何が変わったかを git から読む |
@@ -613,10 +665,13 @@ error 2 件、warn 2 件
 | `ccnavi/approval.py` | 承認台帳、リスクスコア、承認の画面 |
 | `ccnavi/audit.py` | 1 行 1 件の追記記録 |
 | `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |
+| `ccnavi/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
 | `ccnavi/cli.py` | 引数と入力を 1 つの判定に繋ぐ |
 | `build.py` | 配布物の組み立て |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `testdata/rules.yml` | テスト用のルール |
+| `testdata/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
+| `testdata/check_rules.py` | 見本をぜんぶ判定に掛ける |
 
 ## 配布物の条件
 
