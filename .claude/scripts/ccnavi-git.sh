@@ -46,6 +46,12 @@ export GIT_TERMINAL_PROMPT GIT_PAGER PAGER GIT_EDITOR
 # 番号を数えて消す必要はない。門を閉じれば全部読まれない。
 unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJECT_DIRECTORIES 2>/dev/null || :
 
+# 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
+# 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
+# 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
+# $0 は呼ばれたときの綴りそのままなので、worktree の中から相対で呼ばれても合う。
+SELF="sh $0"
+
 reject() {
 	printf 'ccnavi-git: %s\n' "$1" >&2
 	exit 2
@@ -100,7 +106,7 @@ esac
 # 列挙して弾く手は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
 # 形で落とす。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
 case "$1" in
--*) reject "サブコマンドより前のオプション ($1) は受け取りません。素の形 (git <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
+-*) reject "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
 esac
 
 sub="$1"
@@ -148,13 +154,13 @@ branch)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		--force | --delete=* | --move | --move=* | --set-upstream-to | --set-upstream-to=* | --edit-description)
-			reject "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 (git branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
+			reject "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*D*)
-				reject "$arg は未マージのブランチを消します。安全側の削除 (git branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
+				reject "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
 				;;
 			*f* | *m* | *u*)
 				reject "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
@@ -192,7 +198,7 @@ worktree)
 	list | add | prune) ;;
 	remove)
 		if has --force ${1+"$@"} || has -f ${1+"$@"}; then
-			reject "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してから素の git worktree remove を使ってください。"
+			reject "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してからオプション無しの $SELF worktree remove を使ってください。"
 		fi
 		;;
 	*) reject "worktree $action は通しません。使えるのは list / add / prune / remove です。" ;;
@@ -204,7 +210,7 @@ stash)
 	case "$action" in
 	list | show | push | save | pop | apply | -*) ;;
 	drop | clear)
-		reject "stash $action は退避した変更を捨てます。中身を git stash show -p で確かめ、要らないと判断した理由を利用者に伝えてください。"
+		reject "stash $action は退避した変更を捨てます。中身を $SELF stash show -p で確かめ、要らないと判断した理由を利用者に伝えてください。"
 		;;
 	*) reject "stash $action は通しません。使えるのは list / show / push / pop / apply です。" ;;
 	esac
@@ -223,7 +229,7 @@ restore)
 	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定に落ちているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
-	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください (git restore <パス>)。"
+	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		. | :/ | "*" | ":/*" | "./")
@@ -291,19 +297,19 @@ checkout | switch)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		--force | --discard-changes | --ours | --theirs)
-			reject "$arg は作業中の変更を捨てます。退避は git stash push -u です。"
+			reject "$arg は作業中の変更を捨てます。退避は $SELF stash push -u です。"
 			;;
 		--)
-			reject "$sub にパスを渡す形は、そのファイルの書きかけを消します。戻したいファイルがあるなら git restore <パス> を名指しで使ってください。"
+			reject "$sub にパスを渡す形は、そのファイルの書きかけを消します。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
 			;;
 		. | :/)
-			reject "$sub にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。git restore <パス> を名指しで使ってください。"
+			reject "$sub にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。$SELF restore <パス> を名指しで使ってください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*f*)
-				reject "$arg には -f (--force) が含まれます。作業中の変更を捨てるので通しません。退避は git stash push -u です。"
+				reject "$arg には -f (--force) が含まれます。作業中の変更を捨てるので通しません。退避は $SELF stash push -u です。"
 				;;
 			esac
 			;;
@@ -316,7 +322,7 @@ fetch | pull)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-f | --force | --prune | --unshallow)
-			reject "$arg は手元の参照を書き換えます。素の git $sub で足ります。"
+			reject "$arg は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
 			;;
 		esac
 	done
@@ -326,7 +332,7 @@ push)
 	reject "push はエージェントからは実行しません。ブランチをそのまま残し、利用者に push を依頼してください。"
 	;;
 reset | clean)
-	reject "$sub は作業中の変更を消します。退避は git stash push -u、戻すのは git restore <パス> です。"
+	reject "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
 	;;
 rebase | cherry-pick | revert | am | apply | bisect | filter-branch | replace | update-ref | symbolic-ref | reflog | gc | notes)
 	reject "$sub は履歴か参照を書き換えます。通しません。必要な理由を利用者に伝えてください。"

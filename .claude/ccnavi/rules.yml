@@ -126,15 +126,16 @@ deny:
     match: Bash
     glob: "*git reset --hard*"
     message: >-
-      作業中の変更が消えます。'git stash' で退避するか、戻したいファイルを名指しして
-      'git restore' を使ってください。
+      作業中の変更が消えます。'ccnavi-git.sh stash push -u' で退避するか、戻したい
+      ファイルを名指しして 'ccnavi-git.sh restore <パス>' を使ってください。生の git は
+      止まるので、代わりの形もラッパで書いてあります。
 
   - id: git-branch-force-delete
     match: Bash
     glob: "*git branch -D*"
     message: >-
-      未マージのブランチが消えます。'git branch -d' で安全側の削除を試し、それでも
-      消したいなら利用者に依頼してください。
+      未マージのブランチが消えます。'ccnavi-git.sh branch -d <名前>' で安全側の削除を
+      試し、それでも消したいなら利用者に依頼してください。
 
   # settings.json の permissions.deny と同じ場所を並べてある。あちらは
   # Read と Write という名指しのツールにしか掛からないので、同じ場所へ
@@ -153,8 +154,8 @@ deny:
     match: Bash
     glob: "*rm -rf *"
     message: >-
-      再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
-      'git rm' を使ってください。
+      再帰的な強制削除です。消す対象を 1 つずつ名指ししてください。git の管理下から
+      外す形は、ラッパが rm を通していないので利用者に依頼してください。
 
   - id: heredoc
     match: Bash
