@@ -65,6 +65,7 @@
     ]
   },
   "env": {
+    "PYTHONUTF8": "1",
     "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
     "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
