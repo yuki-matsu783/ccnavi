@@ -1,0 +1,20 @@
+[project]
+name = "ccnavi"
+version = "0.1.0"
+description = "Claude Code のツール呼び出しを止め、代わりに取る手段を返す hook"
+requires-python = ">=3.12"
+# third-party の実行時依存は持たない。守る側の道具なので、
+# ガード自身が点検できない供給網を増やさない。
+dependencies = []
+
+[dependency-groups]
+# 開発時だけの道具。配布物には入らない。
+dev = ["pyinstaller>=6.10", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+# PyInstaller の作業場所と出力。生成物なので読ませない。
+exclude = ["build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]

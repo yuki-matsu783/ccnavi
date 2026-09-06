@@ -1,15 +1,25 @@
-# Reference material, not part of the build.
+# 参照専用の資料。配布物には入らない。
 knowledge
 
-# Build output. The hook that rebuilds swaps through .new and .old because
-# Windows will not overwrite a running executable.
-/ccnavi
-/ccnavi.exe
-/ccnavi.new.exe
-/ccnavi.old.exe
+# 組み立ての出力。dist は hook が指す実行ファイルの置き場、
+# build は PyInstaller の作業場所。
 /dist/
+/build/
 
-# Decision records written at runtime. They hold absolute paths and full
-# command lines, so they never get committed.
+# Python の中間物。
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+
+# 実行時に書かれる記録。絶対パスとコマンド全文が入るのでコミットしない。
 /logs/
 *.jsonl
+
+# 並行セッションのワークツリー。プロジェクト根の中に置かれるので、
+# セッションの道具と権限が届く代わりに git の邪魔になる。
+/.claude/worktrees/
+
+# ccnavi が自分のソースツリーでだけ読む上書き設定。
+# 1 人がモードを変えて試すためのものなので、他人に届いてはいけない。
+/ccnavi.settings.local.json

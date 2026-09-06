@@ -18,6 +18,12 @@
       "match": "Bash|Read|Write|Edit",
       "pattern": ".env",
       "message": "Files named .env hold credentials and are off limits. Ask the user for the value you need."
+    },
+    {
+      "id": "heredoc",
+      "match": "Bash",
+      "regex": "<<",
+      "message": "Heredocs are not used here. Write file contents with the Write or Edit tool, and for input a program reads, write the script to a file first and pass that file."
     }
   ]
 }
