@@ -25,14 +25,30 @@ from __future__ import annotations
 import shlex
 from dataclasses import dataclass
 
-# SEP は、シェルなら一致がまたげない場所に置く印。コマンドとコマンドの間と、
-# 引用が 2 語を 1 語につないだ場所。ルールはコマンドと引数の間に空白を求めるが
+# SEP は、シェルなら一致がまたげない場所に置く印。置く先は 3 つある。
+# コマンドとコマンドの間、引用が 2 語を 1 語につないだ場所、そして
+# 語の中に入った演算子の文字の両側。ルールはコマンドと引数の間に空白を求めるが
 # これは空白ではないので、grep 'git push' が push として読まれなくなる。
 # 一方で rm -rf /x は 1 つのコマンドとして読まれ続ける。
+#
+# 3 つめが要るのは、`>` や `<<` が、演算子として書かれたのか引数の中にあるのかで
+# 意味がまるで違うから。`grep -n "regex: '(>" rules.yml` の `>` は文字であって
+# リダイレクトではない。区別はトークンの側に既に在って（演算子は独立した
+# トークンとして返る）、繋ぎ直すところで消えていた。文字は消さずに両側へ
+# 印を置くので、記録に残る文面は書かれたとおりのままになる。
 #
 # 実際のコマンドラインはこの文字を運べないので、入力の側がこれを騙ることはできない。
 # read() が入力から取り除いて、その前提を保つ。
 SEP = "\x00"
+
+# シェルが演算子として読む文字。shlex の punctuation_chars と同じ並び。
+# 演算子はこの文字だけでできたトークンとして返ってくるので、語の中に
+# 同じ文字が現れたときと見分けられる。
+#
+# 引用符だけで書かれた 1 語（`echo ">"`）は演算子と区別が付かない。shlex は
+# 引用されていたかどうかを返さないので、ここでは演算子として扱う。今までと
+# 同じ読みなので、この変更で新しく緩む場所ではない。
+_PUNCTUATION = "();<>|&"
 
 # 読み切れなかった理由。何が読みを止めたかまで名指しする。
 # 「読めなかった」だけでは、読み手が直す先を持てない。
@@ -275,9 +291,34 @@ def _render(commands: list[list[str]]) -> str:
     トークンの中に空白があるなら、それは引用が置いた空白。引用されていない空白は
     shlex が最初に割った場所だから。そこを置き換えることが、grep 'git push' を
     「コマンドとその引数」として読ませないことにあたる。
+
+    同じことを演算子の文字にもする。語の中の `>` は書かれた文字であって、
+    リダイレクトではない。ここで両側に印を置かないと、`grep -n "x>" f` が
+    `x > f` と同じ形になり、書き込み先を見るルールが読み手に当たる。
     """
     return SEP.join(" ".join(_join(token) for token in command) for command in commands if command)
 
 
 def _join(token: str) -> str:
-    return "".join(SEP if c.isspace() else c for c in token)
+    """1 つのトークンを、ルールを当てる形に直す。
+
+    演算子のトークンはそのまま。それ以外は語なので、中の空白を印に置き換え、
+    中の演算子の文字を印で挟む。
+    """
+    if _is_operator(token):
+        return token
+    out = []
+    for c in token:
+        if c.isspace():
+            out.append(SEP)
+        elif c in _PUNCTUATION:
+            out.append(SEP + c + SEP)
+        else:
+            out.append(c)
+    return "".join(out)
+
+
+def _is_operator(token: str) -> bool:
+    """演算子のトークンかどうか。punctuation_chars が返す塊は
+    この文字だけでできている。"""
+    return bool(token) and all(c in _PUNCTUATION for c in token)
