@@ -60,7 +60,7 @@ RULES: dict = {
         {
             "id": "builtin-recursive-delete",
             "match": "Bash",
-            "pattern": "rm -rf *",
+            "glob": "*rm -rf *",
             "message": (
                 "A recursive forced delete cannot be undone. Name what to remove "
                 "one at a time, or use 'git rm' when the files are tracked."
@@ -69,7 +69,7 @@ RULES: dict = {
         {
             "id": "builtin-git-push",
             "match": "Bash",
-            "pattern": "git push *",
+            "glob": "*git push*",
             "message": (
                 "git push is not run by the agent. Leave the branch as it is and "
                 "ask the user to push."
@@ -78,7 +78,7 @@ RULES: dict = {
         {
             "id": "builtin-git-reset-hard",
             "match": "Bash",
-            "pattern": "git reset --hard *",
+            "glob": "*git reset --hard*",
             "message": (
                 "Work in progress would be lost. Use 'git stash' to set it aside, "
                 "or name the files and use 'git restore'."
@@ -101,7 +101,7 @@ RULES: dict = {
             # Grep と Glob は書かない。判定が対象を取り出せないので当たらない。
             "id": "builtin-read-anything",
             "match": "Read",
-            "regex": r".",
+            "glob": "*",
         },
     ],
 }

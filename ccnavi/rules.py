@@ -9,21 +9,21 @@
 ルールファイルは `deny` `ask` `allow` の 3 つに分かれる。どれも同じ形の
 ルールを並べるだけで、置かれた区画がその判定になる。
 
-    version: 2
+    version: 3
     deny:
       - id: guard-config
         match: Write|Edit|MultiEdit
-        pattern: .claude/ccnavi/*
+        glob: "*/.claude/ccnavi/*"
         message: ガード自身の設定です。利用者に依頼してください。
     ask:
       - id: migrations
         match: Write|Edit
-        pattern: migrations/*
+        glob: "*/migrations/*"
         message: 移行ファイルは実行前に人が中身を見ます。
     allow:
       - id: source
         match: Read|Write|Edit|MultiEdit
-        pattern: ccnavi/*
+        glob: "*/ccnavi/*"
 
 文面は `deny` と `ask` では必須。止めるなら代わりの手段を、聞くなら何を見て
 判断すればよいかを、ルール自身が言わなければならない。`allow` では要らない。
@@ -50,7 +50,7 @@ import yaml
 
 # このビルドが読めるルールファイルの書式の版。
 # 2 で区画が 3 つに分かれ、ファイルの形式も JSON から YAML になった。
-VERSION = 2
+VERSION = 3
 
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
 SEVERITY_ERROR = "error"
@@ -98,11 +98,13 @@ class Rule:
     id: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
-    # pattern は日常の言い方。"git push *"、"*.pem"、"secrets/" など。
-    # 記法の全体は pattern.translate を参照。
-    pattern: str = ""
+    # glob は fnmatch と同じ意味の glob。文字列全体に当たるので、部分一致が
+    # 欲しければ前後に "*" を自分で書く。"*git push*"、"*.pem"、"*/secrets/*" など。
+    # 詳しくは globmatch.translate を参照。
+    glob: str = ""
     # regex は本当に正規表現が要るときの逃げ道。これに手を伸ばしたルールこそ
-    # いちばん厳しく見直す対象なので、pattern の別の綴りではなく別の欄にしてある。
+    # いちばん厳しく見直す対象なので、glob の別の綴りではなく別の欄にしてある。
+    # glob では書けない「語の左側の切れ目」が要るときも、こちらを使う。
     regex: str = ""
     # message は、なぜ止めたかと、代わりに何をすればよいかを言う。
     message: str = ""
@@ -188,8 +190,10 @@ def parse(data: dict) -> tuple[RuleSet, list[Problem]]:
                 SEVERITY_ERROR,
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
-                f"版 1 は 1 本の `rules` の並びだったが、版 2 は "
-                f"`{'` `'.join(SECTIONS)}` の 3 区画に分かれている",
+                f"版 1 は 1 本の `rules` の並び、版 2 は "
+                f"`{'` `'.join(SECTIONS)}` の 3 区画で欄の名前が `pattern`。"
+                "版 3 は欄の名前が `glob` で、意味も fnmatch の glob になった。"
+                "文字列全体に当たるので、部分一致が要るなら前後に `*` を書く",
             )
         )
 
@@ -211,7 +215,7 @@ def parse(data: dict) -> tuple[RuleSet, list[Problem]]:
 
 
 def _build(raw: object, section: str, index: int) -> tuple[Rule, None] | tuple[None, Problem]:
-    from .pattern import translate
+    from .globmatch import translate
 
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
@@ -220,7 +224,7 @@ def _build(raw: object, section: str, index: int) -> tuple[Rule, None] | tuple[N
     rule = Rule(
         id=str(raw.get("id") or ""),
         match=str(raw.get("match") or ""),
-        pattern=str(raw.get("pattern") or ""),
+        glob=str(raw.get("glob") or ""),
         regex=str(raw.get("regex") or ""),
         message=str(raw.get("message") or ""),
         decision=section,
@@ -233,14 +237,14 @@ def _build(raw: object, section: str, index: int) -> tuple[Rule, None] | tuple[N
         )
     if not rule.match:
         return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにも当たらない")
-    if not rule.pattern and not rule.regex:
-        return None, Problem(SEVERITY_ERROR, name, "pattern も regex も無い")
-    if rule.pattern and rule.regex:
+    if not rule.glob and not rule.regex:
+        return None, Problem(SEVERITY_ERROR, name, "glob も regex も無い")
+    if rule.glob and rule.regex:
         return None, Problem(
-            SEVERITY_ERROR, name, "pattern と regex の両方がある。どちらで判定するのか決められない"
+            SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
         )
 
-    expression = rule.regex or translate(rule.pattern)
+    expression = rule.regex or translate(rule.glob)
 
     if rule.regex:
         unsupported = _unsupported(rule.regex)
