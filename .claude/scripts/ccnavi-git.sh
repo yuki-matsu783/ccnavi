@@ -66,7 +66,7 @@ sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             ls-files ls-tree merge-base diff-tree cat-file grep
   一覧      branch (-d は可 / -D -M -f -u は不可)  tag (一覧のみ)
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
-  変える    add  commit (--no-verify は不可)
+  変える    add  commit (--no-verify は不可)  rm <パス> (-f は不可)
             restore <パス>  (衝突の解決は restore --ours / --theirs -- <パス>)
             checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
             stash (list show push pop apply)
@@ -218,6 +218,35 @@ stash)
 
 add)
 	: # 索引を変えるだけ。作業ツリーは壊れない
+	;;
+
+rm)
+	# 消す側だが、消えるのは git が中身を持っているファイルだけ。git rm は
+	# 索引や HEAD と食い違うファイルを既定で拒む。`rm -rf` の代わりとして
+	# rules.yml が名指しで勧める経路なので、勧めた先が通らない形にはしない。
+	#
+	# 通さないのは -f。それを付けると、コミットしていない変更ごと消える。
+	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
+	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
+	[ "$#" -eq 0 ] && reject "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		. | :/ | "*" | ":/*" | "./")
+			reject "rm にツリー全体 ($arg) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
+			;;
+		--force)
+			reject "$arg はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてから利用者に伝えてください。"
+			;;
+		--*) ;;
+		-*)
+			case "$arg" in
+			*f*)
+				reject "$arg には -f (--force) が含まれます。コミットしていない変更ごと消すので通しません。付けずに実行してください。"
+				;;
+			esac
+			;;
+		esac
+	done
 	;;
 
 restore)
