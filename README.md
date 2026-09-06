@@ -20,7 +20,7 @@ uv run --with pyinstaller python build.py          # 実行ファイルの組み
 
 ```sh
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}' \
-  | uv run python -m ccnavi --rules testdata/rules.json --mode block
+  | uv run python -m ccnavi --rules testdata/rules.yml --mode block
 ```
 
 編集のたびに `.claude/hooks/lint-py.sh` が走り、整形と検査をかける。
@@ -74,7 +74,7 @@ hook には実行ファイルだけを登録すればよい。
   },
   "env": {
     "CCNAVI_MODE": "warn",
-    "CCNAVI_RULES": ".claude/ccnavi/rules.json",
+    "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl"
   }
 }
@@ -102,17 +102,64 @@ hook には実行ファイルだけを登録すればよい。
 
 ## ルール
 
+ルールファイルは YAML で、`deny` `ask` `allow` の 3 つの区画に分かれる。
 1 件のルールは、当てるツール・探すもの・見つけたときに返す文面を 1 組で持つ。
-文面を欠いたルールは受け付けない。
+文面は `deny` と `ask` では必須。`allow` では要らない（通した呼び出しには
+誰にも何も返らないので、書いても届く先が無い）。
 
-```json
-{
-  "id": "git-push",
-  "match": "Bash",
-  "pattern": "git push *",
-  "message": "git push はエージェントからは実行しません。利用者に依頼してください。"
-}
+```yaml
+version: 2
+
+deny:
+  - id: git-push
+    match: Bash
+    pattern: "git push *"
+    message: git push はエージェントからは実行しません。利用者に依頼してください。
+
+ask:
+  - id: migrations
+    match: Write|Edit
+    pattern: "migrations/*"
+    message: 移行ファイルは実行前に人が中身を見ます。何が変わるかを言ってください。
+
+allow:
+  - id: source
+    match: Write|Edit|MultiEdit
+    regex: '(^|[\\/])src[\\/]'
 ```
+
+`pattern` と `regex` は必ず引用符で囲む。囲まないと YAML が先に解釈する。
+`<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグになる。
+
+### 強さ
+
+強い順に `deny` `ask` `allow`、そのどれにも当たらなければ暗黙的 ask。
+
+| 当たった区画 | 呼び出しはどうなるか |
+|---|---|
+| `deny` | 止まる |
+| `ask` | 人に確認が出る。明示的 ask（`EXPL_ASK`） |
+| `allow` | 通る |
+| どこにも当たらない | 人に確認が出る。暗黙的 ask（`IMPL_UNDECLARED`） |
+
+1 件でも `deny` に当たれば拒否で、弱い区画は見に行かない。同じ区画に複数
+当たったら全部の文面を返す。どれか 1 つを選ぶと、選ばれなかったルールの
+言い分は誰にも届かない。
+
+**既定は許可ではなく確認。** `allow` を書き切るまで、言及されていない
+呼び出しはすべて人に確認が出る。だから `allow` は「このプロジェクトで普通に
+やること」を並べる場所で、権限を配る場所ではない。1 行足すたびに、
+人が見なくなる範囲が広がる。
+
+暗黙的 ask と明示的 ask を分けるのは設計 §13.2 の理由による。暗黙的 ask は
+設定の穴に起因するので、穴が塞がるまで同じ問いが繰り返される。明示的 ask は
+人が意図して置いた確認ポイントで、繰り返されること自体に価値がある。
+混ぜると前者の数に後者が埋もれる。文面もそれに合わせて分けてあり、
+暗黙的 ask は「危険だから聞いている」とは書かない。言えないから聞いている。
+
+判定が対象を取り出せるのは `Bash` `Read` `Write` `Edit` `MultiEdit`
+`NotebookEdit` だけ。`Grep` や `Glob` のように対象を取り出せないツールは
+判定に届かないまま通るので、`allow` に書いても死んだ行が 1 つ増えるだけになる。
 
 `pattern` の書き方は 3 つだけ。
 
@@ -162,6 +209,16 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 静的に読めないコマンドは、生の文字列との一致に縮退する。これは以前の挙動なので、
 これまで捕まえていたものが抜けることはない。縮退した拒否は文面が変わり、
 「禁止された操作を行った」ではなく「読めなかったので文字列に当てた」と伝える。
+
+縮退した呼び出しに `allow` は当てない。当てる先が実行される部分ではなく生の
+文字列なので、そこで許可を出すのは「読めなかった文字列にそう書いてあった」を
+根拠に通すことになる。`deny` と `ask` は当てたままにする。生の文字列に
+当たりすぎるぶんは厳しい側へ外れるだけで、そのことは文面が断る。
+結果として、読み切れないコマンドはどこにも当たらなければ暗黙的 ask になり、
+コード `IMPL_PARSE_UNCERTAIN` で人に確認が出る。
+
+コメントだけの行のように、実行される部分が何も残らないコマンドは判定に入らない。
+何も走らないものについて人に聞く意味が無いため。記録には `nothing-to-run` が残る。
 
 | 縮退する条件 | 例 |
 |---|---|
@@ -222,8 +279,8 @@ docs/../.env
 
 | 値 | 挙動 |
 |---|---|
-| `block` | 判定し、該当すれば止める（ブロック）。指定が無いときはこれ |
-| `warn` | 同じ判定を行い、止めずに「block なら止めていた」と伝える（警告） |
+| `block` | 判定し、`deny` なら止め、`ask` なら人に確認を出す。指定が無いときはこれ |
+| `warn` | 同じ判定を行い、止めも聞きもせず「block なら止めていた／聞いていた」と伝える |
 | `off` | 判定しない |
 
 `off` だけは `.claude/settings.json` に書いても効かない。名指しで無視して理由を出す。
@@ -243,7 +300,7 @@ docs/../.env
 宣言を 2 か所に分けると必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
 
 ```
-[ccnavi] POST_VIOLATION (source: .claude/ccnavi/rules.json#guard-config)
+[ccnavi] POST_VIOLATION (source: .claude/ccnavi/rules.yml#guard-config)
 path: .claude/ccnavi/probe.json (?? / new)
 after: Bash(npm run build)
 undo: git clean -f -- ".claude/ccnavi/probe.json"
@@ -382,9 +439,23 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
 シェルが書いたもの、ビルドの出力、スクリプトが内部で開いたファイルは、
 実行後の監視が作業ツリーの実物を見て `POST_TICKET_SCOPE` で差し戻す。
 
-ルールのほうが強い。範囲の中でもルールが守る場所には書けないし、範囲の外で
-ルールにも当たる書き込みは、ルールの側の文面で報告する。範囲を広げても
-通らないものを「範囲を広げれば済む」と読ませないため。
+ルールのほうが強い。チケットを見るのは、ルールの 3 区画が何も言わなかったときだけ。
+範囲の中でもルールが守る場所には書けないし、範囲の外でもルールが `allow` と
+言っていれば通る。順番を逆にすると、人が書いた宣言よりエージェントが書いた
+宣言のほうが強くなる。
+
+範囲の中は通る。ルールが何も言っていない場所で、チケットだけが「ここで作業する」と
+宣言しているので、そこは聞かずに通す。これが無いと、宣言した作業範囲の中でも
+暗黙的 ask が出続けることになり、範囲を宣言する意味が「止まる場所が増えるだけ」になる。
+
+| ルールの 3 区画 | チケット | 結果 |
+|---|---|---|
+| `deny` に当たる | ― | 止まる |
+| `ask` に当たる | ― | 明示的 ask |
+| `allow` に当たる | ― | 通る |
+| 何も言わない | 範囲の中 | 通る |
+| 何も言わない | 範囲の外 | 止まる（`DENY_TICKET_SCOPE`） |
+| 何も言わない | 承認が無い | 暗黙的 ask |
 
 チケットのファイル自身は範囲の外でも書ける。塞ぐと、いちど承認した範囲から
 出る道が無くなる。提案が効くのは承認されてからなので、ここを開けても範囲は広がらない。
@@ -426,13 +497,21 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
  "rules":["git-push"],"session":"...","ms":0.9}
 ```
 
-`decision` は下した判定、`enforced` は実際に適用したか。`warn` は
-`deny` かつ `enforced:false` になるので、1 つのファイルで「何を止めるはずだったか」と
-「何を実際に止めたか」の両方が数えられる。
+`decision` は下した判定で `allow` `ask` `deny` `skip` のどれか。`enforced` は
+実際に適用したか。`warn` は `enforced:false` になるので、1 つのファイルで
+「何を止めるはずだったか」と「何を実際に止めたか」の両方が数えられる。
+
+`code` は判定の根拠の種別で、返した文の先頭に載るものと同じ。
+`DENY_COMMAND_PATTERN`、`DENY_PATH`、`DENY_TICKET_SCOPE`、`EXPL_ASK`、
+`IMPL_UNDECLARED`、`IMPL_PARSE_UNCERTAIN`。止めた回のうちどれだけが
+「宣言された禁止に当たった」もので、どれだけが「どのルールも言及していない」
+ものかが、これで数えられる。後者が多いなら、直すのはルールの側であって、
+拒否を 1 件足すことではない。
 
 判定しなかった回は `decision` が `skip` になり、`reason` が付く。
-`mode-off`、`event-not-checked`、`no-subject`、`payload-unusable`、
-`deadline-exceeded`、`tool-cannot-write`、`worktree-unreadable` の 7 つ。
+`mode-off`、`event-not-checked`、`no-subject`、`nothing-to-run`、
+`payload-unusable`、`deadline-exceeded`、`tool-cannot-write`、
+`worktree-unreadable` の 8 つ。
 通した回も残すのは、記録が無いことを「ccnavi が動かなかった」と読めるようにするため。
 後ろの 2 つは実行後の監視が見に行かなかった回で、`worktree-unreadable` の
 `detail` には見に行けなかった理由が入る。これが残らないと、違反が無かったのか
@@ -464,7 +543,7 @@ ccnavi --lint --rules .claude/ccnavi/next.json # 入れ替える前のファイ�
 
 ```
 ccnavi: 設定を検証する
-  ルール: /repo/.claude/ccnavi/rules.json
+  ルール: /repo/.claude/ccnavi/rules.yml
   自動復元: off
   モード: warn（この起動の環境から解決したもの）
 warn: (mode): warn なので判定しても呼び出しを止めない
@@ -524,7 +603,7 @@ error 2 件、warn 2 件
 | `ccnavi/cli.py` | 引数と入力を 1 つの判定に繋ぐ |
 | `build.py` | 配布物の組み立て |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
-| `testdata/rules.json` | テスト用のルール |
+| `testdata/rules.yml` | テスト用のルール |
 
 ## 配布物の条件
 
