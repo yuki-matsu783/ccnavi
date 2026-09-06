@@ -26,6 +26,17 @@ session=$(printf '%s' "$payload" |
 
 counter=".claude/ccnavi/stop-retries/$session"
 
+# 見捨てられた数を掃除する。
+#
+# この数が意味を持つのは 1 回の停止の連鎖の中だけで、長くても数分。ふつうは
+# テストが通るか、次の連鎖が始まるか、上限に達するかで消える。消えないのは
+# 連鎖の途中でセッションが終わったときで、その session_id は二度と現れないから
+# 誰も消さない。1 セッションにつき 1 個ずつ溜まっていく。
+#
+# 掃除の窓を 1 時間にしてあるのは、連鎖の長さより十分に長く、放置の長さより
+# 十分に短いから。走っている連鎖のファイルは書くたびに新しくなるので巻き添えにならない。
+find .claude/ccnavi/stop-retries -type f -mmin +60 -delete 2>/dev/null
+
 # stop_hook_active が false なら、この hook が差し戻した結果ではなく、
 # モデルが自分の判断で止まろうとしている。そこが数え始めの位置。
 case "$payload" in
