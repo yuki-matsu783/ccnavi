@@ -61,8 +61,8 @@ jq -r '.decision' .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn
 jq -r 'select(.decision=="deny")|[((.rules//[])|join(",")),(.subject|gsub("[ \t\n]+";" "))]|join("\t")' \
   .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn
 
-# どこにも当たらなかった回。enable ではこれが全部、人への確認になる
-jq -r 'select(.code=="IMPL_UNDECLARED")|(.subject|gsub("[ \t\n]+";" "))' \
+# どこにも当たらなかった回。enable ではこれが全部、権限モードに渡る
+jq -r 'select(.code=="UNDECLARED")|(.subject|gsub("[ \t\n]+";" "))' \
   .claude/ccnavi/log.jsonl | sort | uniq -c | sort -rn | head -30
 
 # 通した回を、当たったルール別に。広すぎる allow はここに出る
@@ -83,7 +83,7 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 | 記録に出るもの | 直す先 |
 |---|---|
 | 止めるつもりのなかったものが `deny` に出ている | ルールの綴りを絞る。語の切れ目が要るなら `regex` へ |
-| 同じ呼び出しが `IMPL_UNDECLARED` で並ぶ | `allow` に足す。1 行足すたびに人が見なくなる範囲が広がる |
+| 同じ呼び出しが `UNDECLARED` で並ぶ | `allow` に足す。1 行足すたびに人が見なくなる範囲が広がる |
 | `allow` で通っているが止めたいものがある | `deny` か `ask` に足す。強い区画が先に当たる |
 
 直したら、そのつど 3 つを回す。
@@ -102,8 +102,9 @@ uv run python testdata/check_rules.py      # 見本をまとめて
 
 目安は記録の側にある。
 
-- 普段の作業で `IMPL_UNDECLARED` がほとんど出ない。ここが残ったまま切り替えると、
-  穴が塞がるまで同じ問いが繰り返される
+- 普段の作業で `UNDECLARED` がほとんど出ない。ここが残ったまま切り替えると、
+  普段の作業の大半が ccnavi の判定を受けずに権限モードへ渡ることになる。
+  人が居るモードなら、穴が塞がるまで同じ問いが繰り返される
 - `deny` に出ているものが、全部「意図して止めたもの」になっている
 - `--lint` の `error` が 0 件
 
