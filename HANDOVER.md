@@ -216,21 +216,30 @@ ccnavi は settings.json の `env` を自分で読み、そこに `off` と書�
 - **複合コマンドは 1 つの区間が読めなければ全体が縮退する。** `a && bash -c "..."`
   は `a` の側も生の文字列で判定される。縮退の向きが安全側なのでそのままにしてある
 - **lint hook は編集 1 回ごとに走る。** 複数ファイルにまたがる変更は途中の状態で
-  必ず差し戻される。順番に直せば通るので、途中の差し戻しは無視してよい。
-  ただし Python では組み立てが 11 秒かかるので、編集 1 回あたり 20 秒近くになる。
-  うるさければ `.claude/settings.json` の hooks から build の行を外す
+  必ず差し戻される。順番に直せば通るので、途中の差し戻しは無視してよい
+- **テストを編集ごとの hook に置かない。** 一度そうしていたが、途中の状態の失敗が
+  毎回 40 行以上返ってきて、本当の失敗がその中に紛れた。Stop へ移してある
 
 ## セッション中に自分自身へ仕掛けたもの
 
-`.claude/settings.json` に 2 つの hook が入っている。
+`.claude/settings.json` に 3 つの hook が入っている。
 
 - `PreToolUse` に `dist/ccnavi/ccnavi`。warn モードなので止めない。通知だけ返す
 - `PostToolUse` の `Write|Edit|MultiEdit` に `.claude/hooks/lint-py.sh`。
-  Python ファイルの編集時だけ動き、整形・検査・テストをかけ、
-  最後に `dist/ccnavi/` を作り直す。登録されている実行ファイルが常に今のソースになる
+  Python ファイルの編集時だけ動き、整形と検査をかける
+- `Stop` に `.claude/hooks/test-py.sh`。ターンの終わりに 1 回だけテストを走らせる
 
-lint が通らないと exit 2 で差し戻される。実際に何度も差し戻された。
+どちらも通らないと exit 2 で差し戻される。実際に何度も差し戻された。
 うるさければ `.claude/settings.json` の hooks から外す。
+
+Stop の差し戻しには上限がある。3 回で打ち切って止まらせる。直せない失敗を無限に
+差し戻すと、同じ場所を往復して人の手が入る機会が来ない。回数はセッションごとに
+`.claude/ccnavi/stop-retries/` に置いて数える。payload の `stop_hook_active` は
+真偽値でしかなく「何回目か」を持たないため。テストが通れば数えた跡は消える。
+
+実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
+編集 1 回あたり 20 秒近くになっていた。動かして確かめるときに手で
+`uv run --with pyinstaller python build.py` を回す。
 
 `dist/`、`build/`、`.claude/ccnavi/log.jsonl` は git 管理外。
 記録には絶対パスとコマンド全文が入るのでコミットしない。

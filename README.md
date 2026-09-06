@@ -23,8 +23,17 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
   | uv run python -m ccnavi --rules testdata/rules.json --mode block
 ```
 
-編集のたびに `.claude/hooks/lint-py.sh` が走り、整形・検査・テストをかけて
-`dist/ccnavi/` を作り直す。登録されている実行ファイルが常に今のソースになる。
+編集のたびに `.claude/hooks/lint-py.sh` が走り、整形と検査をかける。
+テストはそこでは走らせない。1 ファイル直すたびに全件を走らせると、複数ファイルに
+またがる変更では途中の状態が必ず落ちて、意味のない失敗の山を毎回読むことになる。
+
+代わりに `Stop` の `.claude/hooks/test-py.sh` が、ターンの終わりに 1 回だけ走る。
+落ちていたら止まらせずに差し戻すが、差し戻しは 3 回まで。直せない失敗を無限に
+差し戻すと、同じ場所を往復して人の手が入る機会が来ない。上限に達したら止まらせて
+判断を人へ返す。
+
+実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
+動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。
 
 ### 配布物
 
