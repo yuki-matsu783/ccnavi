@@ -58,6 +58,27 @@ deny:
   - tool: Edit
     subject: "/repo/docs/../.claude/ccnavi/rules.yml"
     why: 迂回した綴りでも行き着く先で当たる
+  - tool: Bash
+    subject: "echo x > /repo/.claude/ccnavi/rules.yml"
+    why: Write で拒否した場所。リダイレクトで同じところに届く
+  - tool: Bash
+    subject: "cd /repo && printf x >> .claude/hooks/lint-py.sh"
+    why: 相対の綴りでも、追記でも同じ場所
+  - tool: Bash
+    subject: "sed -i s/deny/allow/ /repo/.claude/ccnavi/rules.yml"
+    why: その場で書き換える形
+  - tool: Bash
+    subject: "cp /tmp/x /repo/.claude/hooks/lint-py.sh"
+    why: 別の場所から上書きする形。行き先に名前が来ている
+  - tool: Bash
+    subject: "mv /repo/.claude/ccnavi/rules.yml /tmp/old.yml"
+    why: 移した元が消える。ルールが読めなくなる
+  - tool: Bash
+    subject: "rm /repo/.claude/ccnavi/log.jsonl"
+    why: 記録を消すのも書き換えのうち
+  - tool: Bash
+    subject: "echo x | tee /repo/.claude/ccnavi/rules.yml"
+    why: リダイレクトを使わない書き込み
 
 ask:
   - tool: Bash
@@ -110,3 +131,24 @@ allow:
   - tool: Write
     subject: "/repo/README.md"
     why: 同上
+  - tool: Bash
+    subject: "cat /repo/.claude/ccnavi/rules.yml"
+    why: ガードの設定は読むほうが普通。名前が出ただけでは止めない
+  - tool: Bash
+    subject: "sed -n 1,20p /repo/.claude/ccnavi/rules.yml"
+    why: sed でも -i が無ければ読むだけ
+  - tool: Bash
+    subject: "grep -n cp /repo/.claude/hooks/lint-py.sh"
+    why: 書き込むコマンドの名前を探しているだけ。コマンドの先頭に無い
+  - tool: Bash
+    subject: 'grep -n "rm -rf" /repo/.claude/ccnavi/rules.yml'
+    why: ルールの文面を引いているだけ
+  - tool: Bash
+    subject: "cat /repo/.claude/ccnavi/rules.yml > /tmp/x"
+    why: リダイレクトはあるが行き先が別の場所
+  - tool: Bash
+    subject: "cp /repo/.claude/ccnavi/rules.yml /tmp/backup.yml"
+    why: 写しを取っているだけ。cp は行き先の側だけを見る
+  - tool: Bash
+    subject: "uv run python -m ccnavi --rules /repo/.claude/ccnavi/rules.yml --test Bash ls"
+    why: ルールを確かめる手そのもの。ここを止めると点検ができない
