@@ -29,6 +29,10 @@ LOG_ENV = "CCNAVI_LOG"
 # RESTORE_ENV は検知した変更を ccnavi 自身が戻すかどうか。
 STATE_ENV = "CCNAVI_STATE"
 RESTORE_ENV = "CCNAVI_RESTORE"
+# チケットによる範囲の制御が使う 2 つ。TICKET_ENV は人に見せる提案の置き場、
+# LEDGER_ENV は承認台帳。判定が読むのは台帳だけで、提案のほうは承認の画面しか読まない。
+TICKET_ENV = "CCNAVI_TICKET"
+LEDGER_ENV = "CCNAVI_LEDGER"
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -44,6 +48,12 @@ DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.json")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
+# チケットはプロジェクト根に置く。人が編集し、人が承認するものなので、
+# ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
+DEFAULT_TICKET = ".current-ticket.md"
+# 台帳は設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
+# シェル経由の書き込みを止めている。台帳のために別の保護を足さずに済む。
+DEFAULT_LEDGER = os.path.join(".claude", "ccnavi", "approvals.jsonl")
 
 
 @dataclass
@@ -71,6 +81,12 @@ class Settings:
     # 誰も頼んでいないファイル操作にならないようにする。
     restore: str = ""
 
+    # ticket は人に見せる提案の置き場、ledger は承認台帳。
+    # 判定が読むのは ledger だけ。ticket を読むのは承認の画面と --lint で、
+    # どちらも人が起こす経路になっている。
+    ticket: str = ""
+    ledger: str = ""
+
 
 def load(root: str) -> tuple[Settings, list[str]]:
     """root にあるプロジェクトの設定を解決する。
@@ -87,6 +103,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         rules=os.path.join(root, DEFAULT_RULES),
         state=os.path.join(root, DEFAULT_STATE),
         restore=os.environ.get(RESTORE_ENV, ""),
+        ticket=os.path.join(root, DEFAULT_TICKET),
+        ledger=os.path.join(root, DEFAULT_LEDGER),
     )
 
     rules_env = os.environ.get(RULES_ENV, "")
@@ -98,6 +116,14 @@ def load(root: str) -> tuple[Settings, list[str]]:
         # 空文字は「控えを持たない」。診断のための実行が、走っている
         # セッションの控えを書き替えずに済むようにする。
         settings.state = _log_or_none(root, os.environ[STATE_ENV])
+    ticket_env = os.environ.get(TICKET_ENV, "")
+    if ticket_env:
+        settings.ticket = _resolve(root, ticket_env)
+    if LEDGER_ENV in os.environ:
+        # 空文字は「台帳を持たない」＝チケットによる制御を使わない。
+        # 承認済みの範囲が無ければ範囲の制限は掛からないので、これは
+        # チケットを置いていないのと同じ状態になる。
+        settings.ledger = _log_or_none(root, os.environ[LEDGER_ENV])
 
     if not own_source_tree(root):
         return settings, []
@@ -122,6 +148,10 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.state = _log_or_none(root, conf["state"])
     if isinstance(conf.get("restore"), str):
         settings.restore = conf["restore"]
+    if isinstance(conf.get("ticket"), str) and conf["ticket"]:
+        settings.ticket = _resolve(root, conf["ticket"])
+    if isinstance(conf.get("ledger"), str):
+        settings.ledger = _log_or_none(root, conf["ledger"])
 
     return settings, problems
 
