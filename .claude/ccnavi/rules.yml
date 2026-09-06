@@ -44,9 +44,17 @@ deny:
       未マージのブランチが消えます。'git branch -d' で安全側の削除を試し、それでも
       消したいなら利用者に依頼してください。
 
+  # settings.json の permissions.deny と同じ場所を並べてある。あちらは
+  # Read と Write という名指しのツールにしか掛からないので、同じ場所へ
+  # シェルから届く道が開いたままになる。`cat certs/server.pem` を止められるのは
+  # こちらだけで、match に Bash を入れられることがこのルールの値打ちになる。
+  #
+  # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。素の `\.key\b` は
+  # `jq '.key' data.json` に当たった。誤検知の多い拒否は、そのうち文面ごと
+  # 読まれなくなる。絞ったぶん、`.key` という名前のファイルそのものは外れる。
   - id: credentials
     match: Bash|Read|Write|Edit|MultiEdit
-    regex: '\.env|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc'
+    regex: '\.env|\.dev\.vars|[\w\-\\/]\.pem\b|[\w\-\\/]\.key\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\.aws[\\/]|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc|\.pypirc'
     message: 認証情報を含む場所です。中身を読まず、必要な値を利用者に尋ねてください。
 
   - id: recursive-delete
