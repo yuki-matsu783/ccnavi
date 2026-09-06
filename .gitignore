@@ -1,0 +1,15 @@
+# Reference material, not part of the build.
+knowledge
+
+# Build output. The hook that rebuilds swaps through .new and .old because
+# Windows will not overwrite a running executable.
+/ccnavi
+/ccnavi.exe
+/ccnavi.new.exe
+/ccnavi.old.exe
+/dist/
+
+# Decision records written at runtime. They hold absolute paths and full
+# command lines, so they never get committed.
+/logs/
+*.jsonl
