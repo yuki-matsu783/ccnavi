@@ -71,7 +71,7 @@ class SectionsTest(unittest.TestCase):
                 "--root",
                 self.root,
                 "--mode",
-                "block",
+                "enable",
                 "--rules",
                 rules_path,
                 "--log",

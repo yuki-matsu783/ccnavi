@@ -91,7 +91,7 @@ class TicketTest(unittest.TestCase):
         return ccnavi(
             self.root,
             "--mode",
-            "block",
+            "enable",
             "--rules",
             self.rules,
             "--log",
@@ -265,7 +265,7 @@ class TicketTest(unittest.TestCase):
             "--rules",
             self.rules,
             "--mode",
-            "block",
+            "enable",
             "--ticket",
             self.ticket,
             "--ledger",

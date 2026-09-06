@@ -32,7 +32,7 @@ def run(rules_path, payload, log=""):
             "--log",
             log,
             "--mode",
-            "block",
+            "enable",
         ],
         input=payload,
         capture_output=True,

@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RULES = os.path.join(ROOT, "testdata", "rules.yml")
 
 
-def run(mode="block", payload="", log=""):
+def run(mode="enable", payload="", log=""):
     """道具を 1 回動かし、呼び手から見えるものだけを返す。
 
     モードは環境ではなくフラグで固定する。このリポジトリは ccnavi を自分自身に
@@ -103,17 +103,19 @@ class VerdictTest(unittest.TestCase):
         )
         self.assertIn("hook", result.stderr, "使い方を説明していない")
 
-    def test_warnは止めずに報告する(self):
-        result = run(mode="warn", payload=pre_tool_use("Bash", "command", "git push origin main"))
+    def test_dry_runは手を出さずに報告する(self):
+        result = run(
+            mode="dry-run", payload=pre_tool_use("Bash", "command", "git push origin main")
+        )
 
         out = verdict(self, result)
-        self.assertNotIn("permissionDecision", out, "warn は報告するだけで呼び出しを止めない")
+        self.assertNotIn("permissionDecision", out, "dry-run は報告するだけで手を出さない")
         self.assertIn("git push", out["additionalContext"])
 
-    def test_offは何も判定しない(self):
-        # off は起動した人の環境からしか効かない。フラグからは効かない。
+    def test_disableは何も判定しない(self):
+        # disable は起動した人の環境からしか効かない。フラグからは効かない。
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        environment["CCNAVI_MODE"] = "off"
+        environment["CCNAVI_MODE"] = "disable"
         result = subprocess.run(
             [sys.executable, "-m", "ccnavi", "--rules", RULES, "--log", ""],
             input=pre_tool_use("Bash", "command", "git push origin main"),
@@ -351,7 +353,7 @@ class RecordTest(unittest.TestCase):
 
     def test_通した呼び出しも含めてすべて記録される(self):
         got = self.logged(
-            "block",
+            "enable",
             pre_tool_use("Bash", "command", "git push origin main"),
             pre_tool_use("Bash", "command", "go build ./..."),
             pre_tool_use("Task", "prompt", "something"),
@@ -369,8 +371,8 @@ class RecordTest(unittest.TestCase):
             self.assertEqual(got[i]["decision"], decision, f"{i + 1} 行目")
             self.assertEqual(got[i].get("reason"), reason, f"{i + 1} 行目")
 
-    def test_warnは適用しなかった判定を記録する(self):
-        got = self.logged("warn", pre_tool_use("Bash", "command", "git push origin main"))
+    def test_dry_runは適用しなかった判定を記録する(self):
+        got = self.logged("dry-run", pre_tool_use("Bash", "command", "git push origin main"))
 
         self.assertEqual(len(got), 1)
         # warn で走らせる理由そのものが「何を止めるはずだったか」を数えることなので、
@@ -381,7 +383,7 @@ class RecordTest(unittest.TestCase):
 
     def test_読めたものと読めなかったものを分けて記録する(self):
         got = self.logged(
-            "block",
+            "enable",
             pre_tool_use("Bash", "command", "git push origin main"),
             pre_tool_use("Bash", "command", 'bash -c "git push origin main"'),
         )

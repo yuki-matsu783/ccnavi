@@ -84,7 +84,7 @@ class PostToolUseTest(unittest.TestCase):
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
 
-    def run_hook(self, mode="block", restore="off", session="s1", tool="Bash", **tool_input):
+    def run_hook(self, mode="enable", restore="off", session="s1", tool="Bash", **tool_input):
         payload = json.dumps(
             {
                 "hook_event_name": "PostToolUse",
@@ -99,10 +99,10 @@ class PostToolUseTest(unittest.TestCase):
         # 機械のことを報告してしまう。
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         args = ["--mode", mode]
-        if mode == "off":
-            # off だけはフラグから言えない。作業ツリーの中から来た off は
+        if mode == "disable":
+            # disable だけはフラグから言えない。作業ツリーの中から来た disable は
             # 名指しで無視される仕様なので、環境から渡す。
-            environment["CCNAVI_MODE"] = "off"
+            environment["CCNAVI_MODE"] = "disable"
             args = []
         return subprocess.run(
             [
@@ -251,11 +251,11 @@ class PostToolUseTest(unittest.TestCase):
 
     # モード
 
-    def test_warn_は差し戻さず報告だけする(self):
-        self.run_hook(mode="warn", command="ls")
+    def test_dry_run_は差し戻さず報告だけする(self):
+        self.run_hook(mode="dry-run", command="ls")
         self.dirty()
 
-        result = self.run_hook(mode="warn", command="python build.py")
+        result = self.run_hook(mode="dry-run", command="python build.py")
 
         self.assertEqual(result.returncode, 0, "呼び出しを止めないのが warn の約束")
         text = self.context(result)
@@ -263,23 +263,23 @@ class PostToolUseTest(unittest.TestCase):
         self.assertIn("protected/keep.txt", text)
         self.assertFalse(self.records()[-1]["enforced"])
 
-    def test_warn_は自動復元も行わない(self):
-        self.run_hook(mode="warn", command="ls")
+    def test_dry_run_は自動復元も行わない(self):
+        self.run_hook(mode="dry-run", command="ls")
         self.dirty()
 
-        self.run_hook(mode="warn", restore="auto", command="python build.py")
+        self.run_hook(mode="dry-run", restore="auto", command="python build.py")
 
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "changed by a build\n")
 
-    def test_off_は何も見ない(self):
+    def test_disable_は何も見ない(self):
         self.dirty()
 
-        result = self.run_hook(mode="off", command="python build.py")
+        result = self.run_hook(mode="disable", command="python build.py")
 
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stderr, "")
-        self.assertEqual(self.records()[-1]["reason"], "mode-off")
+        self.assertEqual(self.records()[-1]["reason"], "mode-disabled")
 
     # 自動復元
 

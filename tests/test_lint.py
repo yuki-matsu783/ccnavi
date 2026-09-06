@@ -70,7 +70,7 @@ def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def lint(root: str, rules_path: str, mode: str = "block") -> subprocess.CompletedProcess:
+def lint(root: str, rules_path: str, mode: str = "enable") -> subprocess.CompletedProcess:
     return ccnavi(root, "--lint", "--rules", rules_path, "--mode", mode)
 
 
@@ -193,7 +193,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("Task", result.stdout)
 
     def test_止めないモードはwarnとして報告される(self):
-        result = lint(self.root, rules_file(self.root, SOUND), mode="warn")
+        result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")
 
         self.assertEqual(result.returncode, 0)
         self.assertEqual(counts(result.stdout), (0, 1))
@@ -212,14 +212,14 @@ class LintTest(unittest.TestCase):
         write(
             self.root,
             os.path.join(".claude", "settings.json"),
-            json.dumps({"env": {"CCNAVI_MODE": "off"}}),
+            json.dumps({"env": {"CCNAVI_MODE": "disable"}}),
         )
 
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("settings.json", result.stdout)
-        self.assertIn("off", result.stdout)
+        self.assertIn("disable", result.stdout)
 
     def test_検証は判定と同じ読み込みを使う(self):
         # 別の読み方をすると、検証は通ったのに実運用で落ちる。同じ壊れたルールに
@@ -237,7 +237,7 @@ class LintTest(unittest.TestCase):
         )
         decided = subprocess.run(
             [sys.executable, "-m", "ccnavi", "--root", self.root, "--rules", path]
-            + ["--mode", "block", "--log", ""],
+            + ["--mode", "enable", "--log", ""],
             input=payload,
             capture_output=True,
             text=True,
