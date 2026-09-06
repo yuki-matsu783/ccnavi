@@ -11,7 +11,7 @@ import os
 import time
 from typing import TextIO
 
-from . import approval, audit, builtin, hookio, lint, post, rules, settings, shellread
+from . import approval, audit, builtin, diagnose, hookio, lint, post, rules, settings, shellread
 from . import ticket as ticket_mod
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
@@ -124,6 +124,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--restore", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
+    parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
+    parser.add_argument("--explain", action="store_true")
     parser.add_argument("--ticket", default="")
     parser.add_argument("--ledger", default=None)
     parser.add_argument("-h", "--help", action="store_true")
@@ -158,6 +160,14 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 報告でしかないものが、検証にとっては結論そのものになる。
     if args.lint:
         return lint.report(stdout, root, conf, problems, args.mode, args.restore)
+
+    # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
+    # 人が端末から叩いて「このルールは何に当たるのか」を確かめるための場所で、
+    # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
+    if args.test is not None:
+        return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
+    if args.explain:
+        return diagnose.explain(stdout, stderr, conf, root)
 
     # 承認の経路。人が端末から叩くもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
