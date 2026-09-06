@@ -60,7 +60,8 @@ sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             ls-files ls-tree merge-base diff-tree cat-file grep
   一覧      branch (-d は可 / -D -M -f -u は不可)  tag (一覧のみ)
             remote (-v / show / get-url のみ)  worktree (list add prune remove)
-  変える    add  commit (--no-verify は不可)  restore <パス>
+  変える    add  commit (--no-verify は不可)
+            restore <パス>  (衝突の解決は restore --ours / --theirs -- <パス>)
             checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
@@ -216,6 +217,12 @@ add)
 restore)
 	# 作業中の変更を捨てる側。rules.yml が reset --hard の代わりに名指しで勧める
 	# 経路でもあるので、対象を 1 つずつ名指しさせる形だけ通す。
+	#
+	# --ours / --theirs もここを通る。衝突したパスにしか効かない（普段は
+	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
+	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
+	# 入っていると YAML として読めず、判定は組み込みの既定に落ちているが、
+	# 既定もこの形は止めない（ccnavi/builtin.py）。
 	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください (git restore <パス>)。"
 	for arg in ${1+"$@"}; do
 		case "$arg" in
