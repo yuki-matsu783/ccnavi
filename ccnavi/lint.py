@@ -287,7 +287,10 @@ def _registered(root: str) -> bool | None:
     for entry in entries if isinstance(entries, list) else []:
         for hook in entry.get("hooks", []) if isinstance(entry, dict) else []:
             command = hook.get("command") if isinstance(hook, dict) else None
-            if isinstance(command, str) and "ccnavi" in command:
+            # 大文字小文字を無視する。実行ファイルの位置を環境変数から取る形
+            # （`${CCNAVI_BIN_PATH}`）が普通にあり、そこでは名前が大文字で書かれる。
+            # 区別すると、正しく登録されている設定に「登録されていない」と言う。
+            if isinstance(command, str) and "ccnavi" in command.lower():
                 return True
     return False
 

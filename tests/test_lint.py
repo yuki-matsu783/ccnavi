@@ -262,6 +262,27 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout), (0, 1))
         self.assertIn("PostToolUse", result.stdout)
 
+    def test_実行ファイルを環境変数で指した登録も見つける(self):
+        # 実行ファイルの位置を env から取る形。そこでは名前が大文字で書かれる。
+        # 大文字小文字を区別すると、正しい設定に「登録されていない」と言う。
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps(
+                {
+                    "hooks": {
+                        "PostToolUse": [
+                            {"hooks": [{"command": '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'}]}
+                        ]
+                    }
+                }
+            ),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotIn("登録されていない", result.stdout)
+
     def test_git_の作業ツリーでなければ監視が何も見ないとwarnになる(self):
         # 登録はされているのに見る先が無い状態。実行後の監視は git の差分で
         # 見るので、リポジトリでない場所では 1 件も検知しない。
