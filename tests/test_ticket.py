@@ -407,10 +407,14 @@ class TicketTest(unittest.TestCase):
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
 
-    # ---- レビュー（代役のホストで）
+    # ---- レビュー（sh の代わりに、テストがリモートの写しを渡す）
 
     def remote(self, merge=("i0001-01", "i0001-02")):
-        """origin と、合流して push した親ブランチ。代役の MR の置き場を返す。"""
+        """origin と、合流して push した親ブランチ。リモートの写し（JSON）の置き場を返す。
+
+        sh がリモートから取ってくる形そのもの。テストはネットワークに出ないので、
+        sh の代わりにこのファイルを --result で渡す。
+        """
         bare = os.path.join(self.root, "origin.git")
         git(self.root, "init", "--quiet", "--bare", bare)
         git(self.root, "remote", "add", "origin", bare)
@@ -420,23 +424,38 @@ class TicketTest(unittest.TestCase):
         fixture = os.path.join(self.root, "fixture.json")
         write(
             fixture,
-            json.dumps({"mr": {"number": 7, "url": "https://example/mr/7", "branch": "i0001"}}),
+            json.dumps({"host": "fixture", "mr": {"number": 7, "url": "https://example/mr/7"}}),
         )
         return fixture
 
     def request(self, fixture, phase="1"):
+        """sh の request と同じ 3 段。prepare → 投稿（写しに書く）→ requested。"""
         body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
+        prepared = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", phase, "--body-file", body, "review", "prepare"
+        )
+        if prepared.returncode != 0:
+            return prepared
+        with open(prepared.stdout.strip(), encoding="utf-8") as f:
+            text = f.read()
+        data = read_json(fixture)
+        posted = data.setdefault("comments", [])
+        url = f"{data['mr']['url']}#note-{len(posted) + 1}"
+        posted.append({"body": text, "url": url, "created_at": "2026-01-01T00:00:00Z"})
+        write(fixture, json.dumps(data))
+        result = write(
+            os.path.join(self.root, "posted.json"),
+            json.dumps(
+                {
+                    "host": "fixture",
+                    "mr": data["mr"],
+                    "url": url,
+                    "created_at": "2026-01-01T00:00:00Z",
+                }
+            ),
+        )
         return self.ccnavi(
-            "--cwd",
-            self.parent_tree,
-            "--phase",
-            phase,
-            "--body-file",
-            body,
-            "review",
-            "request",
-            "--review-fixture",
-            fixture,
+            "--cwd", self.parent_tree, "--phase", phase, "review", "requested", "--result", result
         )
 
     def test_request_needs_merged_children_and_check_opens_the_gate(self):
@@ -489,7 +508,7 @@ class TicketTest(unittest.TestCase):
             "1",
             "review",
             "check",
-            "--review-fixture",
+            "--result",
             fixture,
         )
         self.assertNotEqual(check.returncode, 0)
@@ -506,7 +525,7 @@ class TicketTest(unittest.TestCase):
             "1",
             "review",
             "check",
-            "--review-fixture",
+            "--result",
             fixture,
         )
         self.assertEqual(check.returncode, 0, check.stderr)
@@ -528,7 +547,7 @@ class TicketTest(unittest.TestCase):
             "--reviewed",
             "1",
             "--accept-unresolved",
-            "--review-fixture",
+            "--result",
             fixture,
             stdin="y\n",
         )
@@ -543,7 +562,7 @@ class TicketTest(unittest.TestCase):
             "--reviewed",
             "1",
             "--accept-unresolved",
-            "--review-fixture",
+            "--result",
             fixture,
             stdin="y\n",
         )
@@ -705,7 +724,7 @@ class TicketTest(unittest.TestCase):
             "1",
             "review",
             "check",
-            "--review-fixture",
+            "--result",
             fixture,
         )
         self.assertNotEqual(check.returncode, 0)
@@ -742,16 +761,21 @@ class TicketTest(unittest.TestCase):
             "1",
             "review",
             "check",
-            "--review-fixture",
+            "--result",
             fixture,
         )
         self.assertEqual(check.returncode, 0, check.stderr)
 
-    def test_fixture_cannot_come_from_the_environment(self):
+    def test_exe_never_reaches_the_remote_and_needs_a_matching_result(self):
+        """写しが無ければ動かず、依頼したのと違うマージリクエストの写しでは開かない。"""
         self.family()
         self.close_phase()
         fixture = self.remote()
-        result = self.ccnavi(
+        bare = self.ccnavi("--cwd", self.parent_tree, "--phase", "1", "review", "check")
+        self.assertNotEqual(bare.returncode, 0)
+        self.assertIn("--result", bare.stderr)
+        # 投稿の url が無い結果では印を置かない。
+        prepared = self.ccnavi(
             "--cwd",
             self.parent_tree,
             "--phase",
@@ -759,11 +783,46 @@ class TicketTest(unittest.TestCase):
             "--body-file",
             write(os.path.join(self.root, "body.md"), "x\n"),
             "review",
-            "request",
-            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+            "prepare",
         )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn("comments", read_json(fixture))
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        self.assertTrue(os.path.exists(prepared.stdout.strip()))
+        unposted = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "requested", "--result", fixture
+        )
+        self.assertNotEqual(unposted.returncode, 0)
+        self.assertIn("url", unposted.stderr)
+        self.assertEqual(self.request(fixture).returncode, 0)
+        other = write(
+            os.path.join(self.root, "other.json"),
+            json.dumps({"host": "fixture", "mr": {"number": 8, "url": "https://example/mr/8"}}),
+        )
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", other
+        )
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("違う", check.stderr)
+
+    def test_review_script_refuses_an_unreadable_origin(self):
+        """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
+        self.family()
+        self.remote()
+        script = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
+        os.makedirs(os.path.dirname(script), exist_ok=True)
+        shutil.copy(os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh"), script)
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment["CCNAVI_BIN_PATH"] = sys.executable
+        done = subprocess.run(
+            ["sh", script, "fetch"],
+            cwd=self.parent_tree,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+        )
+        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
+        self.assertIn("origin の綴りを読めない", done.stderr)
 
     # ---- 10. 差し戻しを無視した終了
 
