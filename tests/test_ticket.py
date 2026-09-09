@@ -1,20 +1,24 @@
-"""チケットによる作業範囲の制御の受入テスト。道具を外から叩いて応答だけを見る。
+"""並行するチケット（REQ-TKT）の受入テスト。道具を外から叩いて応答だけを見る。
 
-見るのは 4 つ。
+本物の git リポジトリと作業ツリーを一時ディレクトリに作る。親 1 本と子 2 本を
+フェーズ 1 つで通す（requirements.md の受け入れ条件 9）。
 
-1. 承認された範囲の外への書き込みが止まること
-2. 承認していないチケットは 1 ミリも効かないこと。効かないことを毎回言うこと
-3. 承認したあとにチケットを書き換えても範囲が広がらないこと
-4. 承認の画面が、書けるようになる領域・前回との差分・リスクを出すこと
+見るのは 6 つ。
 
-3 つ目がこの機能の要になっている。チケットはエージェントが書けるファイルなので、
-そこを判定が直接読んでいたら、止められたエージェントが自分で範囲を伸ばせる。
+1. 判定の鍵がファイルの行き先であること。親の cwd から子のツリーへ絶対パスで
+   書いても、子のチケットで判定される
+2. 子は親の部分集合で、超えた子は承認されないこと
+3. 状態の置き場への直接の作成と、サブエージェントからの状態の移動が止まること
+4. フェーズが終わるとゲートが閉じ、レビューが済むと開くこと
+5. 変更要求のレビューは人の端末からも通せないこと
+6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,256 +26,577 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 不備の無いルール 1 件。チケットの範囲とは別に、ルールが効き続けることを見る。
-GUARD_RULE = {
-    "id": "guard-config",
-    "match": "Write|Edit|MultiEdit",
-    "glob": "*/.claude/ccnavi/*",
-    "message": "ガード自身の設定です。利用者に依頼してください。",
+RULES = {
+    "version": 3,
+    "deny": [
+        {
+            "id": "guard-approved",
+            "match": "Write|Edit|MultiEdit|NotebookEdit",
+            "glob": "*/.claude/ccnavi/*",
+            "message": "ガードの設定と写しです。利用者に依頼してください。",
+        }
+    ],
 }
 
-# allow は置かない。チケットの範囲が「ここは聞かない」を作る側であることを
-# 見たいので、ルールの側が先に許してしまうとその境目が見えなくなる。
-RULES = {"version": 3, "deny": [GUARD_RULE]}
+
+def git(cwd, *args):
+    done = subprocess.run(
+        ["git", "-c", "user.email=t@example.com", "-c", "user.name=t", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if done.returncode != 0:
+        raise AssertionError(f"git {args}: {done.stderr}")
+    return done.stdout
 
 
-def ticket_text(name: str, *areas: str, title: str = "作業", why: str = "理由") -> str:
-    """frontmatter を組む。設計 §9.1 の綴りをそのまま使う。"""
-    body = ["---", f"ticket: {name}", f"title: {title}", "rationale: |", f"  {why}"]
-    if areas:
-        body += ["target_directories:", "  write:"]
-        body += [f'    "{area}": allow' for area in areas]
-    body += ["---", "", "## 作業内容", "本文は判定に影響しない。"]
-    return "\n".join(body) + "\n"
+def read_json(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
-def write(path: str, text: str) -> str:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     return path
 
 
-def ccnavi(root: str, *args: str, stdin: str = "") -> subprocess.CompletedProcess:
-    """道具を 1 回動かす。
-
-    環境変数を落とすのは、このリポジトリが ccnavi を自分自身に仕掛けているため。
-    落とさないと、テストがコードではなく走った機械のことを報告する。
-    """
-    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-    return subprocess.run(
-        [sys.executable, "-m", "ccnavi", "--root", root, *args],
-        input=stdin,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        cwd=ROOT,
-        env=environment,
-    )
+def ticket_text(
+    name,
+    *,
+    parent="",
+    phase=None,
+    allow=(),
+    ask=(),
+    review=True,
+    predecessors=(),
+    title="作業",
+):
+    lines = ["---", "version: 1", f"ticket: {name}"]
+    if parent:
+        lines += [f"parent: {parent}", f"phase: {phase}"]
+    if predecessors:
+        lines.append("predecessors: [" + ", ".join(predecessors) + "]")
+    lines += [
+        "human_review:",
+        f"  required: {'true' if review else 'false'}",
+        "  reason: テスト",
+        f"title: {title}",
+        "rationale: |",
+        "  理由",
+    ]
+    for section, globs in (("allow", allow), ("ask", ask)):
+        if globs:
+            lines.append(f"{section}:")
+            for g in globs:
+                lines += ["  - match: Write|Edit|MultiEdit", f'    glob: "{g}"']
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
+    return "\n".join(lines) + "\n"
 
 
 class TicketTest(unittest.TestCase):
     def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.root = self.dir.name
-        self.addCleanup(self.dir.cleanup)
+        self.root = tempfile.mkdtemp(prefix="ccnavi-ticket-")
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        os.makedirs(os.path.join(self.root, ".claude"))
+        git(self.root, "init", "--quiet", "-b", "main")
+        write(os.path.join(self.root, "src", "keep.py"), "print(1)\n")
+        write(os.path.join(self.root, ".gitignore"), ".claude/\nwip/tmp/\n")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "--quiet", "-m", "init")
 
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
-        self.ticket = os.path.join(self.root, ".current-ticket.md")
-        self.ledger = os.path.join(self.root, "approvals.jsonl")
+        self.approved = os.path.join(self.root, ".claude", "ccnavi", "tickets")
+        self.state = os.path.join(self.root, "state")
+        self.parent_tree = self.worktree("i0001", "main")
 
-    def judge(self, path: str, tool: str = "Write") -> subprocess.CompletedProcess:
-        """1 件のツール呼び出しを判定させる。"""
-        payload = {
-            "hook_event_name": "PreToolUse",
-            "tool_name": tool,
-            "cwd": self.root,
-            "tool_input": {"file_path": path},
-        }
-        return ccnavi(
-            self.root,
-            "--mode",
-            "enable",
-            "--rules",
-            self.rules,
-            "--log",
-            "",
-            "--state",
-            "",
-            "--ticket",
-            self.ticket,
-            "--ledger",
-            self.ledger,
-            stdin=json.dumps(payload),
-        )
+    # ---- 道具
 
-    def approve(self, answer: str) -> subprocess.CompletedProcess:
-        return ccnavi(
-            self.root,
-            "--approve",
-            "--rules",
-            self.rules,
-            "--ticket",
-            self.ticket,
-            "--ledger",
-            self.ledger,
-            stdin=answer + "\n",
-        )
+    def worktree(self, name, base):
+        path = os.path.join(self.root, ".claude", "worktrees", name)
+        git(self.root, "worktree", "add", "--quiet", path, "-b", name, base)
+        return path
 
-    def test_no_ticket_leaves_everything_open(self):
-        """チケットも台帳も無ければ、ルールに当たらない書き込みは通る。
-
-        チケットによる制御は任意で、置かないプロジェクトの挙動を変えない。
-        """
-        result = self.judge(os.path.join(self.root, "anywhere", "x.py"))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("DENY_TICKET_SCOPE", result.stdout)
-
-    def test_unapproved_ticket_does_not_narrow_anything(self):
-        """未承認のチケットは範囲を絞らない。絞っていないことを毎回言う。
-
-        ここを「絞る」にすると、承認していない範囲でエージェントが止まり、
-        誰も承認していない宣言が権限として効いてしまう。
-        """
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        result = self.judge(os.path.join(self.root, "outside", "x.py"))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("DENY_TICKET_SCOPE", result.stdout)
-        self.assertIn("has not been approved", result.stdout)
-
-    def test_approved_scope_stops_the_outside(self):
-        """承認された範囲の外への書き込みは止まり、中は通る。"""
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        self.assertEqual(self.approve("y").returncode, 0)
-
-        outside = self.judge(os.path.join(self.root, "docs", "x.md"))
-        self.assertEqual(outside.returncode, 0, outside.stderr)
-        self.assertIn("DENY_TICKET_SCOPE", outside.stdout)
-        self.assertIn("PROJ-1", outside.stdout)
-        # 止めるだけでは足りない。次に何をすればよいかを言う。
-        self.assertIn("--approve", outside.stdout)
-
-        inside = self.judge(os.path.join(self.root, "src", "deep", "x.py"))
-        self.assertEqual(inside.returncode, 0, inside.stderr)
-        self.assertNotIn("DENY_TICKET_SCOPE", inside.stdout)
-
-    def test_editing_the_ticket_does_not_widen_the_scope(self):
-        """承認後にチケットへ範囲を書き足しても、効く範囲は変わらない。
-
-        この機能の要。台帳が権威で、作業ツリーのチケットは提案でしかない。
-        """
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        self.assertEqual(self.approve("y").returncode, 0)
-
-        # エージェントが自分で範囲を伸ばした形。
-        write(self.ticket, ticket_text("PROJ-1", "src", "docs"))
-        result = self.judge(os.path.join(self.root, "docs", "x.md"))
-        self.assertIn("DENY_TICKET_SCOPE", result.stdout)
-        # 書き換えたことに気づける文が要る。黙って効かないのがいちばん悪い。
-        self.assertIn("no longer matches what was approved", result.stdout)
-
-    def test_the_ticket_file_itself_stays_writable(self):
-        """チケットのファイルは範囲の外でも書ける。
-
-        塞ぐと、いちど承認した範囲から出る道が無くなる。
-        """
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        self.assertEqual(self.approve("y").returncode, 0)
-        result = self.judge(self.ticket)
-        self.assertNotIn("DENY_TICKET_SCOPE", result.stdout)
-
-    def test_rules_still_win_inside_the_scope(self):
-        """範囲の中でも、ルールが守る場所には書けない。
-
-        `.claude` は高影響領域なので、承認には識別子の入力が要る。
-        """
-        write(self.ticket, ticket_text("PROJ-1", ".claude"))
-        self.assertEqual(self.approve("PROJ-1").returncode, 0)
-        result = self.judge(os.path.join(self.root, ".claude", "ccnavi", "rules.json"))
-        self.assertIn("guard-config", result.stdout)
-
-    def test_approval_screen_leads_with_the_writable_area(self):
-        """承認の画面が、書けるようになる領域・差分・リスクを出す。"""
-        write(self.ticket, ticket_text("PROJ-1", "src", why="設定コンポーネントの分割"))
-        result = self.approve("y")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        head = result.stdout.index("書き込みが許される領域")
-        self.assertLess(head, result.stdout.index("リスクスコア"))
-        self.assertIn("src", result.stdout)
-        self.assertIn("設定コンポーネントの分割", result.stdout)
-        self.assertIn("前回の承認が無い", result.stdout)
-
-    def test_second_approval_shows_the_difference(self):
-        """2 本目の承認は、前回からの差分を出す。"""
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        self.approve("y")
-        write(self.ticket, ticket_text("PROJ-2", "docs"))
-        result = self.approve("y")
-        self.assertIn("前回: PROJ-1", result.stdout)
-        self.assertIn("+ docs/", result.stdout)
-        self.assertIn("- src/", result.stdout)
-
-    def test_high_risk_needs_the_identifier_typed(self):
-        """リスクが高いチケットは、y ひとつでは承認できない。"""
-        # .claude は高影響領域。この 1 件で HIGH に届く。
-        write(self.ticket, ticket_text("PROJ-9", ".claude"))
-        refused = self.approve("y")
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("チケット識別子を入力", refused.stdout)
-        self.assertFalse(os.path.exists(self.ledger))
-
-        accepted = self.approve("PROJ-9")
-        self.assertEqual(accepted.returncode, 0, accepted.stderr)
-        self.assertTrue(os.path.exists(self.ledger))
-
-    def test_refusing_writes_nothing(self):
-        """承認しなければ台帳は増えない。"""
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        result = self.approve("n")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(os.path.exists(self.ledger))
-
-    def test_scope_paths_cannot_escape(self):
-        """`..` を含む範囲は受け付けない。"""
-        write(self.ticket, ticket_text("PROJ-1", "../elsewhere"))
-        result = self.approve("y")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("`..`", result.stderr)
-
-    def test_ask_is_not_read_as_allow(self):
-        """このビルドに ask は無いので、ask の範囲を allow に読み替えない。"""
-        text = "\n".join(
+    def ccnavi(self, *args, stdin="", env=None):
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        environment.update(env or {})
+        return subprocess.run(
             [
-                "---",
-                "ticket: PROJ-1",
-                "title: 作業",
-                "target_directories:",
-                "  write:",
-                '    "src": ask',
-                "---",
-            ]
+                sys.executable,
+                "-m",
+                "ccnavi",
+                "--root",
+                self.root,
+                "--rules",
+                self.rules,
+                "--approved",
+                self.approved,
+                "--state",
+                self.state,
+                "--log",
+                "",
+                "--guard-core-files",
+                "disable",
+                "--restore-if-deny",
+                "disable",
+                *args,
+            ],
+            input=stdin,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            cwd=ROOT,
+            env=environment,
         )
-        write(self.ticket, text)
-        result = self.approve("y")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("allow の範囲が 1 件も無い", result.stderr)
 
-    def test_lint_names_an_unapproved_ticket(self):
-        """検証が、未承認のチケットを名指しする。"""
-        write(self.ticket, ticket_text("PROJ-1", "src"))
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            self.rules,
-            "--mode",
-            "enable",
-            "--ticket",
-            self.ticket,
-            "--ledger",
-            self.ledger,
+    def hook(self, event, tool, cwd, mode="enable", agent_id="", **tool_input):
+        payload = {
+            "hook_event_name": event,
+            "tool_name": tool,
+            "cwd": cwd,
+            "session_id": "s1",
+            "tool_input": tool_input,
+        }
+        if agent_id:
+            payload["agent_id"] = agent_id
+        return self.ccnavi("--mode", mode, stdin=json.dumps(payload))
+
+    def reason(self, result):
+        if not result.stdout.strip():
+            return ""
+        out = json.loads(result.stdout).get("hookSpecificOutput", {})
+        return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
+
+    def propose(self, name, **kw):
+        return write(
+            os.path.join(self.parent_tree, "wip", "tickets", "todo", name + ".md"),
+            ticket_text(name, **kw),
         )
-        self.assertIn("PROJ-1 は未承認", result.stdout)
+
+    def approve(self, answer="y"):
+        return self.ccnavi("--approve", stdin=answer + "\n")
+
+    def family(self, review=(True, False)):
+        """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子の作業ツリーを作って着手する。"""
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",), review=review[0])
+        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",), review=review[1])
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for child in ("i0001-01", "i0001-02"):
+            self.worktree(child, "i0001")
+            started = self.ccnavi("ticket", "start", child)
+            self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        # 状態の移動は親がコミットする。参考にした運用と同じ。
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "start")
+
+    # ---- 1. 判定の鍵は行き先
+
+    def test_writes_are_judged_by_where_they_land(self):
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+
+        inside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(child, "src", "a", "x.py"),
+        )
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside), self.reason(inside))
+        self.assertEqual(inside.returncode, 0, inside.stderr)
+
+        # 親の cwd から、子のツリーの範囲外へ。子のチケットで止まる。
+        outside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(child, "src", "b", "x.py"),
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+        self.assertIn("i0001-01", self.reason(outside))
+
+        # 親のツリーは親の範囲で判定される。
+        parent_ok = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(self.parent_tree, "src", "z.py")
+        )
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(parent_ok))
+        parent_out = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(self.parent_tree, "docs", "z.md")
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(parent_out))
+
+        # main はチケットを持たない。ルールだけで判定される。
+        main = self.hook(
+            "PreToolUse", "Write", self.root, file_path=os.path.join(self.root, "docs", "z.md")
+        )
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(main))
+
+    def test_no_worktree_means_no_ticket(self):
+        """作業ツリーが無い子は効かない。"""
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.assertEqual(self.approve().returncode, 0)
+        result = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("作業ツリー", result.stderr)
+
+    # ---- 2. 子は親の部分集合
+
+    def test_child_beyond_parent_is_not_approved(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("超えている", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+
+    def test_grandchild_is_refused(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-01-01", parent="i0001-01", phase=1, allow=("src/a/*",))
+        result = self.approve()
+        self.assertIn("2 段", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01-01.md")))
+
+    def test_editing_the_proposal_does_not_widen_the_scope(self):
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        # 承認後に提案を書き足しても、効いているのは写し。
+        write(
+            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001-01.md"),
+            ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
+        )
+        result = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
+
+    def test_parent_and_child_strictest_wins(self):
+        self.propose("i0001", allow=("src/a/*",), ask=("src/b/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*"))
+        self.assertEqual(self.approve().returncode, 0)
+        child = self.worktree("i0001-01", "i0001")
+        result = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
+        )
+        out = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(out["permissionDecision"], "ask")
+        self.assertIn("TICKET_ASK", out["permissionDecisionReason"])
+
+    # ---- 3. 状態の置き場
+
+    def test_state_directories_cannot_be_written_directly(self):
+        self.family()
+        target = os.path.join(self.parent_tree, "wip", "tickets", "done", "i0001-01.md")
+        result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
+        self.assertIn("builtin-ticket-state", self.reason(result))
+        moved = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="mv wip/tickets/doing/i0001-01.md wip/tickets/done/",
+        )
+        self.assertIn("builtin-ticket-state", self.reason(moved))
+        # todo/ への作成は自由。
+        todo = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md")
+        free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
+        self.assertNotIn("builtin-ticket-state", self.reason(free))
+
+    def test_subagent_cannot_move_state(self):
+        self.family()
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            agent_id="sub-1",
+            command="sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+        )
+        self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
+        parent = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+        )
+        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
+
+    def test_done_closes_the_copy_without_approval(self):
+        self.family()
+        result = self.ccnavi("ticket", "done", "i0001-01")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.parent_tree, "wip", "tickets", "done", "i0001-01.md"))
+        )
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0001-01.md")))
+        # 閉じた子のツリーへの書き込みは、チケット無しの扱いになる。
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        after = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
+        )
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(after))
+
+    def test_start_records_the_base_point(self):
+        self.family()
+        with open(os.path.join(self.approved, "i0001-01.md"), encoding="utf-8") as f:
+            copy = f.read()
+        head = git(os.path.join(self.root, ".claude", "worktrees", "i0001-01"), "rev-parse", "HEAD")
+        self.assertIn(head.strip(), copy)
+        self.assertIn("started_at:", copy)
+
+    # ---- 4. フェーズとゲート
+
+    def close_phase(self):
+        for child in ("i0001-01", "i0001-02"):
+            done = self.ccnavi("ticket", "done", child)
+            self.assertEqual(done.returncode, 0, done.stderr)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "done")
+
+    def test_phase_end_announces_and_gate_closes(self):
+        self.family()
+        self.close_phase()
+        said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("フェーズ 1 が終わりました", self.reason(said))
+        self.assertIn("request", self.reason(said))
+
+        spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        exempt = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="sh .claude/scripts/ccnavi-git.sh status",
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt))
+        # 次のフェーズの計画は通る。
+        plan = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md"),
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(plan))
+        # main からの起動にはゲートが無い。
+        elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
+
+    def test_phase_without_review_skips_the_gate(self):
+        self.family(review=(False, False))
+        self.close_phase()
+        said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("省略", self.reason(said))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.skipped")))
+        spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+
+    # ---- レビュー（代役のホストで）
+
+    def remote(self, merge=("i0001-01", "i0001-02")):
+        """origin と、合流して push した親ブランチ。代役の MR の置き場を返す。"""
+        bare = os.path.join(self.root, "origin.git")
+        git(self.root, "init", "--quiet", "--bare", bare)
+        git(self.root, "remote", "add", "origin", bare)
+        for child in merge:
+            git(self.parent_tree, "merge", "--quiet", "--no-edit", child)
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        fixture = os.path.join(self.root, "fixture.json")
+        write(
+            fixture,
+            json.dumps({"mr": {"number": 7, "url": "https://example/mr/7", "branch": "i0001"}}),
+        )
+        return fixture
+
+    def request(self, fixture, phase="1"):
+        body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
+        return self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            phase,
+            "--body-file",
+            body,
+            "review",
+            "request",
+            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+        )
+
+    def test_request_needs_merged_children_and_check_opens_the_gate(self):
+        self.family()
+        # 子のツリーに成果を積んでから閉じる。合流していない子を見分けるため。
+        for child in ("i0001-01", "i0001-02"):
+            tree = os.path.join(self.root, ".claude", "worktrees", child)
+            write(os.path.join(tree, "src", child[-1], "work.py"), "x\n")
+            git(tree, "add", "-A")
+            git(tree, "commit", "--quiet", "-m", "work")
+        self.close_phase()
+        # 子を 1 本だけ合流した形で、前提の未充足を見る。
+        fixture = self.remote(merge=("i0001-01",))
+        refused = self.request(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-02", refused.stderr)
+        self.assertIn("取り込まれていない", refused.stderr)
+        git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-02")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+        ok = self.request(fixture)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.requested"))
+        )
+        with open(fixture, encoding="utf-8") as f:
+            posted = json.load(f)["comments"]
+        self.assertIn("見てほしい点", posted[0]["body"])
+
+        again = self.request(fixture)
+        self.assertIn("依頼済み", again.stderr)
+
+        # 未解決のスレッドがある間は開かない。
+        data = read_json(fixture)
+        data["threads"] = [
+            {
+                "id": "t1",
+                "resolved": False,
+                "url": "u1",
+                "path": "src/a/x.py",
+                "line": 3,
+                "body": "ここ",
+            }
+        ]
+        write(fixture, json.dumps(data))
+        check = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "check",
+            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+        )
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("未解決", check.stderr)
+        spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+
+        data["threads"][0]["resolved"] = True
+        write(fixture, json.dumps(data))
+        check = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "check",
+            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+        spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+
+    def test_human_accepts_unresolved_but_not_changes_requested(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "ここ"}]
+        data["reviews"] = [{"state": "CHANGES_REQUESTED", "url": "r1"}]
+        write(fixture, json.dumps(data))
+        refused = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            stdin="y\n",
+            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("変更要求", refused.stderr)
+
+        data["reviews"] = []
+        write(fixture, json.dumps(data))
+        accepted = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            stdin="y\n",
+            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertIn("u1", accepted.stdout)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        )
+
+    def test_new_child_in_ended_phase_clears_the_marks(self):
+        self.family()
+        self.close_phase()
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
+        self.propose("i0001-03", parent="i0001", phase=1, allow=("src/a/*",))
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("印", result.stdout)
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending"))
+        )
+
+    # ---- 6. 基準点より後の範囲外
+
+    def test_subagent_stop_bounces_out_of_scope_once(self):
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        write(os.path.join(child, "src", "b", "stray.py"), "x\n")
+        git(child, "add", "-A")
+        git(child, "commit", "--quiet", "-m", "stray")
+        first = self.hook("SubagentStop", "", child, agent_id="sub-1")
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        self.assertIn("POST_TICKET_SCOPE", first.stderr)
+        self.assertIn("src/b/stray.py", first.stderr)
+        second = self.hook("SubagentStop", "", child, agent_id="sub-1")
+        self.assertEqual(second.returncode, 0)
+        self.assertIn("POST_TICKET_SCOPE", self.reason(second))
+        # 親の cwd からは、開いている子の全部を見る。
+        from_parent = self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-2")
+        self.assertEqual(from_parent.returncode, 2)
+
+    def test_subagent_start_lists_open_children(self):
+        self.family()
+        result = self.hook("SubagentStart", "", self.parent_tree, agent_id="sub-1")
+        text = self.reason(result)
+        self.assertIn("i0001-01", text)
+        self.assertIn("src/a/*", text)
+
+    # ---- 診断
+
+    def test_lint_names_the_gaps(self):
+        self.family()
+        self.worktree("stray", "main")
+        result = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_LEDGER": "x"})
+        self.assertIn("stray にチケットが無い", result.stdout)
+        self.assertIn("CCNAVI_LEDGER はもう効かない", result.stdout)
+
+    def test_explain_lists_copies_and_phases(self):
+        self.family()
+        result = self.ccnavi("--explain")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("i0001-01", result.stdout)
+        self.assertIn("フェーズ 1", result.stdout)
 
 
 if __name__ == "__main__":

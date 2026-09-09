@@ -78,7 +78,7 @@ class SectionsTest(unittest.TestCase):
                 "",
                 "--state",
                 "",
-                "--ledger",
+                "--approved",
                 "",
             ],
             input=payload,
