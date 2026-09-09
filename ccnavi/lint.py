@@ -42,6 +42,7 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 from typing import TextIO
 
 from . import gitstate, hookio, rules, selfguard, settings
@@ -62,6 +63,7 @@ def report(
     flag: str,
     restore_if_deny_flag: str = "",
     guard_core_files_flag: str = "",
+    guard_cli: str = "",
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
@@ -97,11 +99,22 @@ def report(
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
         for line in said.getvalue().splitlines()
     ]
+    if conf.approved and guard_cli == selfguard.DISABLE:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{settings.GUARD_CLI_ENV}=disable。エージェントが ccnavi の実行ファイルを"
+                "直接打って承認・レビュー済みの受け入れ・状態の移動を行える",
+            )
+        )
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
     stdout.write(f"  中核ファイルを守る: {guard_core_files}\n")
+    if conf.approved:
+        stdout.write(f"  人の判断の経路を守る: {guard_cli or selfguard.ENABLE}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
@@ -219,6 +232,10 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     proposals, complaints = ticket_mod.scan(root, conf.tickets)
     problems.extend(complaints)
 
+    # 提案と写しを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
+    pool = dict(index)
+    for t in proposals:
+        pool.setdefault(t.ticket, t)
     seen: dict[str, list[str]] = {}
     for t in proposals:
         seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{t.state}")
@@ -231,6 +248,10 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                     "'ccnavi --approve' を通すまで範囲は効かない",
                 )
             )
+        if t.state not in ticket_mod.CLOSED:
+            # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
+            for p in approval.validate(t, pool):
+                problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.state == ticket_mod.DOING:
             waiting = [p for p in t.predecessors if p not in done]
             if waiting:
@@ -278,16 +299,9 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                     f"{tree.worktree_path(root, t.ticket)} が無い。作るまで効かない",
                 )
             )
-    if any(not t.is_child for t in copies) and not (
-        os.environ.get("GITHUB_TOKEN") or os.environ.get("GITLAB_TOKEN")
-    ):
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                "GITHUB_TOKEN も GITLAB_TOKEN も無い。レビューの依頼と確認は動かない",
-            )
-        )
+    if any(not t.is_child for t in copies):
+        problems.extend(_review_token(root))
+    problems.extend(_ticket_hooks(root))
     for stray in _stray_claude_dirs(root, names):
         problems.append(
             Problem(
@@ -297,6 +311,77 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 "cd 1 回で別の根に見える",
             )
         )
+    return problems
+
+
+def _review_token(root: str) -> list[Problem]:
+    """リモートのホストに合うトークンがあるか。合わないトークンは無いのと同じ。"""
+    from . import review
+
+    try:
+        done = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+        )
+        url = done.stdout.strip() if done.returncode == 0 else ""
+    except (OSError, subprocess.TimeoutExpired):
+        url = ""
+    if not url:
+        return [Problem(SEVERITY_WARN, "(ticket)", "origin が無い。レビューの依頼と確認は動かない")]
+    token = review.token_for(url)
+    if token is None:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"origin ({url}) が GitHub でも GitLab でもない。レビューの依頼と確認は動かない",
+            )
+        ]
+    name, present = token
+    if not present:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"origin ({url}) に要る {name} が無い。レビューの依頼と確認は動かない",
+            )
+        ]
+    return []
+
+
+TICKET_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
+
+
+def _ticket_hooks(root: str) -> list[Problem]:
+    """親子の運用に要る hook の登録とスクリプトが揃っているか。"""
+    problems = []
+    for event, what in (
+        (hookio.SUBAGENT_START, "サブエージェントに開いている子の一覧を渡せない"),
+        (hookio.SUBAGENT_STOP, "範囲外の変更を残したサブエージェントを差し戻せない"),
+    ):
+        if _registered(root, event) is False:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(project)",
+                    f"{PROJECT_SETTINGS} の {event} に ccnavi が登録されていない。{what}",
+                )
+            )
+    for name in TICKET_SCRIPTS:
+        path = os.path.join(root, ".claude", "scripts", name)
+        if not os.path.isfile(path):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(project)",
+                    f".claude/scripts/{name} が無い。ゲートの中で通る形が無くなる",
+                )
+            )
     return problems
 
 
@@ -380,8 +465,8 @@ def _after(root: str) -> list[Problem]:
     return problems
 
 
-def _registered(root: str) -> bool | None:
-    """PostToolUse に ccnavi が登録されているか。設定ファイルが無ければ None。
+def _registered(root: str, event: str = hookio.POST_TOOL_USE) -> bool | None:
+    """そのイベントに ccnavi が登録されているか。設定ファイルが無ければ None。
 
     コマンド文字列に名前が含まれるかどうかで見る。実行ファイルの置き場も
     呼び出し方もプロジェクトごとに違うので、綴りを決め打ちにはできない。
@@ -398,7 +483,7 @@ def _registered(root: str) -> bool | None:
         return None
 
     hooks = data.get("hooks") if isinstance(data, dict) else None
-    entries = hooks.get(hookio.POST_TOOL_USE) if isinstance(hooks, dict) else None
+    entries = hooks.get(event) if isinstance(hooks, dict) else None
     for entry in entries if isinstance(entries, list) else []:
         for hook in entry.get("hooks", []) if isinstance(entry, dict) else []:
             command = hook.get("command") if isinstance(hook, dict) else None

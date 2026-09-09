@@ -7,6 +7,7 @@ run は終了コードを返す。自分で終了しないので、道具ぜん�
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import time
 from collections.abc import Callable
@@ -173,6 +174,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--state", default=None)
     parser.add_argument("--restore-if-deny", default="")
     parser.add_argument("--guard-core-files", default="")
+    parser.add_argument("--guard-cli", default="")
+    # レビューのホストの代役（JSON）。テストと人の手だけ。環境変数では指せない。
+    parser.add_argument("--review-fixture", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
@@ -213,6 +217,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.tickets = args.tickets.replace("\\", "/").strip("/")
     if args.approved is not None:
         conf.approved = args.approved
+    if args.review_fixture:
+        conf.review_fixture = args.review_fixture
+    conf.guard_cli = selfguard.resolve(
+        stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
+    )
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
@@ -226,6 +235,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             args.mode,
             args.restore_if_deny,
             args.guard_core_files,
+            conf.guard_cli,
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
@@ -243,12 +253,16 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not conf.approved:
             stderr.write("ccnavi: 写しの置き場が空。--approved で指す先が要る\n")
             return EXIT_ERROR
+        if not _from_terminal(stdin, conf, stderr, "--approve"):
+            return EXIT_ERROR
         rule_set, _ = load_rules(stderr, conf.rules, audit.Record())
         approved = approval.approve(stdin, stdout, stderr, conf, rule_set, root)
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
     if args.command or args.reviewed is not None:
+        if args.reviewed is not None and not _from_terminal(stdin, conf, stderr, "--reviewed"):
+            return EXIT_ERROR
         return operate(stdin, stdout, stderr, conf, root, args)
 
     for problem in problems:
@@ -336,6 +350,28 @@ def decide(
     # 作業を止めてはいけない。
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
     return EXIT_OK
+
+
+def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
+    """人の判断の経路が、端末の前の人から打たれているか。
+
+    `--approve` と `--reviewed` は人の合意そのもの。エージェントが Bash から打てば
+    その合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
+    hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
+    CCNAVI_GUARD_CLI=disable で切れる（テストと、端末を持たない配管のため）。
+    """
+    if conf.guard_cli == selfguard.DISABLE:
+        return True
+    try:
+        if stdin.isatty():
+            return True
+    except (AttributeError, ValueError):
+        pass
+    stderr.write(
+        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない"
+        f"（{settings.GUARD_CLI_ENV}=disable で切れる）\n"
+    )
+    return False
 
 
 def operate(
@@ -591,6 +627,10 @@ def decide_before(
     # 誰がやっても止める。写しを使っているときだけ足す。
     if conf.approved:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
+        # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
+        if conf.guard_cli != selfguard.DISABLE:
+            rule_set.deny.append(phase.cli_guard_rule(conf.bin))
 
     subject = screen(payload.tool_name, record.subject, record)
 
@@ -613,8 +653,8 @@ def decide_before(
     if (
         conf.approved
         and payload.agent_id
-        and payload.tool_name == "Bash"
-        and phase.SUBAGENT_FORBIDDEN.search(subject)
+        and payload.tool_name in phase.SHELL_TOOLS
+        and phase.forbidden(subject)
     ):
         record.code, record.rules = phase.CODE_SUBAGENT, [TICKET_RULE]
         return refuse(stdout, mode, record, rules.DENY, notices + [subagent_forbidden(subject)])
@@ -624,7 +664,7 @@ def decide_before(
     if conf.approved and payload.tool_name in phase.GATED_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         closed = phase.gate(root, conf, parent.ticket) if parent is not None else None
-        exempt = payload.tool_name == "Bash" and phase.EXEMPT.search(subject) is not None
+        exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if closed is not None and not exempt:
             record.code, record.rules = phase.CODE_GATE, [TICKET_RULE]
             reason = phase.gate_reason(closed, payload.tool_name)
@@ -681,6 +721,8 @@ def decide_before(
             reason_for(rule, payload.tool_name, subject, source, record.degraded) for rule in group
         ]
         record.code = code_for(payload.tool_name, record.degraded)
+        if any(rule.id == phase.CLI_RULE_ID for rule in group):
+            record.code = phase.CODE_CLI
     elif verdict == rules.DENY:
         # チケットの範囲の外。ルールが 1 件も当たっていないので group は空。
         reasons = [ticket_reason]
@@ -814,8 +856,8 @@ def decide_at_subagent_stop(
     index = approval.by_id(copies)
     t = tree.tree_of(root, payload.cwd or os.getcwd())
     targets: list[ticket_mod.Ticket] = []
-    if t is not None and not t.is_main and t.name in index:
-        bound = index[t.name]
+    bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
+    if bound is not None:
         targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     findings = []
     for child in targets:
@@ -848,6 +890,22 @@ def decide_at_subagent_stop(
     record.enforced = False
     hookio.write_context(stdout, hookio.SUBAGENT_STOP, text)
     return EXIT_OK
+
+
+def _ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
+    """終わったサブエージェントが差し戻しを受けていたなら、その旨。印は消す。"""
+    if payload.tool_name != AGENT_TOOL:
+        return ""
+    agent_id = str(payload.tool_response.get("agentId") or "")
+    if not agent_id or not _bounced(state_dir, agent_id):
+        return ""
+    with contextlib.suppress(OSError):
+        os.remove(_bounce_path(state_dir, agent_id))
+    return (
+        f"[ccnavi] {post.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
+        "差し戻されたまま終わっています。合流する前に、その子の作業ツリーの範囲外の"
+        "変更を確かめてください。"
+    )
 
 
 def _bounce_path(state_dir: str, agent_id: str) -> str:
@@ -925,6 +983,11 @@ def decide_after(
         said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
         if said:
             text = f"{text}\n\n{said}" if text else said
+        # サブエージェントが差し戻しを無視して終わったなら、親にそれを言う。
+        # 差し戻しは 1 回きりなので、2 度目の終了は黙って通っている。
+        bounced = _ignored_bounce(conf.state, payload)
+        if bounced:
+            text = f"{text}\n\n{bounced}" if text else bounced
     if not text:
         return EXIT_OK
 
@@ -993,9 +1056,12 @@ def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
 
 def subject_of(payload: hookio.Input) -> str:
     """このツールでルールを当てる欄を選ぶ。"""
-    if payload.tool_name == "Bash":
+    if payload.tool_name in phase.SHELL_TOOLS:
         return payload.field_value("command")
-    if payload.tool_name in ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit"):
+    if payload.tool_name == "NotebookEdit":
+        path = payload.field_value("notebook_path") or payload.field_value("file_path")
+        return full_path(path, payload.cwd)
+    if payload.tool_name in ("Read", "Write", "Edit", "MultiEdit"):
         return full_path(payload.field_value("file_path"), payload.cwd)
     if payload.tool_name == AGENT_TOOL:
         # 起動には対象の文字列が無い。ゲートが止める対象なので、見出しを subject に
@@ -1238,6 +1304,9 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # 出所は「どのファイルのどのルール」まで。ファイル名だけでは、同じ名前の
     # ルールファイルが複数ある構成で直しに行く先が決まらない。
     source = f"{rules_path}#{rule.id}" if rule.id else rules_path
+    if rule.id == phase.CLI_RULE_ID:
+        # 組み込み。ルールファイルには無いので、そこを探させない。
+        code, source = phase.CODE_CLI, f"builtin#{rule.id} ({settings.GUARD_CLI_ENV})"
 
     lines = [f"[ccnavi] {code} (source: {source})", f"subject: {shown}"]
     if degraded:

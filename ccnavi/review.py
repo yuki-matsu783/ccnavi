@@ -47,13 +47,13 @@ MARKER_NOTE = "<!-- ccnavi:note -->"
 MARKER_ACCEPT = "<!-- ccnavi:accept -->"
 MARKER_PREFIX = "<!-- ccnavi:"
 
-# テストと外部委任のための代役。JSON ファイルを指す。
-FIXTURE_ENV = "CCNAVI_REVIEW_FIXTURE"
-
 GITHUB_TOKEN = "GITHUB_TOKEN"
 GITLAB_TOKEN = "GITLAB_TOKEN"
 
 TIMEOUT_SECONDS = 15.0
+
+# 一覧を読むページ数の上限。100 件 × これ。超えたら読み切れないとして拒む側に倒す。
+PAGE_LIMIT = 20
 
 # 出力に出す前に伏せる形。トークンらしい語。
 _SECRET = re.compile(r"(ghp_|gho_|github_pat_|glpat-)[A-Za-z0-9_-]+|Bearer\s+\S+")
@@ -75,6 +75,25 @@ class Review:
     state: str = ""
     url: str = ""
     submitted_at: str = ""
+    # author はレビュアーの識別。同じ人の最新のレビューだけを数えるために要る。
+    # GitHub は過去の全レビューを返すので、後で approve しても古い変更要求が残る。
+    author: str = ""
+
+
+# 変更要求の状態。GitHub の CHANGES_REQUESTED と、GitLab の requested_changes をここに寄せる。
+CHANGES_REQUESTED = "CHANGES_REQUESTED"
+DISMISSED = "DISMISSED"
+
+
+def effective(reviews: list[Review]) -> list[Review]:
+    """レビュアーごとに最新の 1 件。取り下げられたものは無い扱い。"""
+    latest: dict[str, Review] = {}
+    for r in reviews:
+        key = r.author or r.url or id(r)
+        current = latest.get(key)
+        if current is None or _epoch(r.submitted_at) >= _epoch(current.submitted_at):
+            latest[key] = r
+    return [r for r in latest.values() if r.state.upper() != DISMISSED]
 
 
 @dataclass
@@ -98,7 +117,8 @@ class Host:
     def reviews(self, mr: MergeRequest) -> list[Review]:
         raise NotImplementedError
 
-    def comment(self, mr: MergeRequest, body: str) -> str:
+    def comment(self, mr: MergeRequest, body: str) -> tuple[str, str]:
+        """投稿して、その URL と投稿された時刻を返す。時刻はホストの時計。"""
         raise NotImplementedError
 
 
@@ -141,19 +161,23 @@ class Fixture(Host):
     def reviews(self, mr: MergeRequest) -> list[Review]:
         return [
             Review(
-                str(r.get("state") or ""), str(r.get("url") or ""), str(r.get("submitted_at") or "")
+                str(r.get("state") or ""),
+                str(r.get("url") or ""),
+                str(r.get("submitted_at") or ""),
+                str(r.get("author") or ""),
             )
             for r in self.data.get("reviews", [])
             if isinstance(r, dict)
         ]
 
-    def comment(self, mr: MergeRequest, body: str) -> str:
+    def comment(self, mr: MergeRequest, body: str) -> tuple[str, str]:
         posted = self.data.setdefault("comments", [])
         url = f"{mr.url}#note-{len(posted) + 1}"
-        posted.append({"body": body, "url": url, "created_at": approval.now()})
+        at = str(self.data.get("clock") or approval.now())
+        posted.append({"body": body, "url": url, "created_at": at})
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=1)
-        return url
+        return url, at
 
 
 @dataclass
@@ -173,56 +197,76 @@ class GitHub(Host):
         return MergeRequest(int(pr["number"]), str(pr.get("html_url") or ""), self.name)
 
     def threads(self, mr: MergeRequest) -> list[Thread]:
-        query = {
-            "query": (
-                "query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){"
-                "pullRequest(number:$n){reviewThreads(first:100){nodes{id isResolved "
-                "comments(first:1){nodes{url path line body createdAt}}}}}}}"
-            ),
-            "variables": {"o": self.owner, "r": self.repo, "n": mr.number},
-        }
-        data = self._post("/graphql", query)
-        nodes = []
-        try:
-            nodes = data["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]
-        except (KeyError, TypeError):
-            return []
-        threads = []
-        for node in nodes:
-            first = (node.get("comments") or {}).get("nodes") or [{}]
-            c = first[0] if first else {}
-            threads.append(
-                Thread(
-                    id=str(node.get("id") or ""),
-                    resolved=bool(node.get("isResolved")),
-                    url=str(c.get("url") or ""),
-                    path=str(c.get("path") or ""),
-                    line=int(c.get("line") or 0),
-                    body=str(c.get("body") or ""),
-                    created_at=str(c.get("createdAt") or ""),
+        threads: list[Thread] = []
+        cursor: str | None = None
+        for _ in range(PAGE_LIMIT):
+            query = {
+                "query": (
+                    "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){"
+                    "pullRequest(number:$n){reviewThreads(first:100,after:$c){"
+                    "pageInfo{hasNextPage endCursor} nodes{id isResolved "
+                    "comments(first:1){nodes{url path line body createdAt}}}}}}}"
+                ),
+                "variables": {"o": self.owner, "r": self.repo, "n": mr.number, "c": cursor},
+            }
+            data = self._post("/graphql", query)
+            try:
+                page = data["data"]["repository"]["pullRequest"]["reviewThreads"]
+            except (KeyError, TypeError) as exc:
+                raise RuntimeError("reviewThreads を読めない") from exc
+            for node in page.get("nodes") or []:
+                first = (node.get("comments") or {}).get("nodes") or [{}]
+                c = first[0] if first else {}
+                threads.append(
+                    Thread(
+                        id=str(node.get("id") or ""),
+                        resolved=bool(node.get("isResolved")),
+                        url=str(c.get("url") or ""),
+                        path=str(c.get("path") or ""),
+                        line=int(c.get("line") or 0),
+                        body=str(c.get("body") or ""),
+                        created_at=str(c.get("createdAt") or ""),
+                    )
                 )
-            )
-        return threads
+            info = page.get("pageInfo") or {}
+            if not info.get("hasNextPage"):
+                return threads
+            cursor = info.get("endCursor")
+        raise RuntimeError("reviewThreads が多すぎて読み切れない")
 
     def reviews(self, mr: MergeRequest) -> list[Review]:
-        data = self._get(f"/repos/{self.owner}/{self.repo}/pulls/{mr.number}/reviews?per_page=100")
-        if not isinstance(data, list):
-            return []
-        return [
-            Review(
-                str(r.get("state") or ""),
-                str(r.get("html_url") or ""),
-                str(r.get("submitted_at") or ""),
+        found: list[Review] = []
+        for r in self._pages(f"/repos/{self.owner}/{self.repo}/pulls/{mr.number}/reviews"):
+            user = r.get("user") or {}
+            found.append(
+                Review(
+                    str(r.get("state") or ""),
+                    str(r.get("html_url") or ""),
+                    str(r.get("submitted_at") or ""),
+                    str(user.get("id") or user.get("login") or ""),
+                )
             )
-            for r in data
-            if isinstance(r, dict)
-        ]
+        return found
 
-    def comment(self, mr: MergeRequest, body: str) -> str:
+    def comment(self, mr: MergeRequest, body: str) -> tuple[str, str]:
         data = self._post(
             f"/repos/{self.owner}/{self.repo}/issues/{mr.number}/comments", {"body": body}
         )
-        return str(data.get("html_url") or "") if isinstance(data, dict) else ""
+        if not isinstance(data, dict):
+            return "", ""
+        return str(data.get("html_url") or ""), str(data.get("created_at") or "")
+
+    def _pages(self, path: str) -> list[dict]:
+        """REST の一覧を最後のページまで読む。読み切れなければ拒む側に倒す。"""
+        items: list[dict] = []
+        for page in range(1, PAGE_LIMIT + 1):
+            data = self._get(f"{path}?per_page=100&page={page}")
+            if not isinstance(data, list):
+                raise RuntimeError(f"{path} を読めない")
+            items.extend(d for d in data if isinstance(d, dict))
+            if len(data) < 100:
+                return items
+        raise RuntimeError(f"{path} が多すぎて読み切れない")
 
     def _get(self, path: str):
         return _http("GET", self.api + path, self._headers(), None)
@@ -250,11 +294,8 @@ class GitLab(Host):
         return MergeRequest(int(mr["iid"]), str(mr.get("web_url") or ""), self.name)
 
     def threads(self, mr: MergeRequest) -> list[Thread]:
-        data = self._get(f"/merge_requests/{mr.number}/discussions?per_page=100")
-        if not isinstance(data, list):
-            return []
         threads = []
-        for d in data:
+        for d in self._pages(f"/merge_requests/{mr.number}/discussions"):
             notes = d.get("notes") or []
             if not notes or not notes[0].get("resolvable"):
                 continue
@@ -274,12 +315,37 @@ class GitLab(Host):
         return threads
 
     def reviews(self, mr: MergeRequest) -> list[Review]:
-        # GitLab に「変更要求」の状態は無い。
-        return []
+        # GitLab の変更要求はレビュアーの状態（reviewers の requested_changes）。
+        found = []
+        for r in self._pages(f"/merge_requests/{mr.number}/reviewers"):
+            user = r.get("user") or {}
+            state = str(r.get("state") or "")
+            found.append(
+                Review(
+                    CHANGES_REQUESTED if state == "requested_changes" else state.upper(),
+                    f"{mr.url}",
+                    str(r.get("updated_at") or r.get("created_at") or ""),
+                    str(user.get("id") or user.get("username") or ""),
+                )
+            )
+        return found
 
-    def comment(self, mr: MergeRequest, body: str) -> str:
+    def comment(self, mr: MergeRequest, body: str) -> tuple[str, str]:
         data = self._post(f"/merge_requests/{mr.number}/notes", {"body": body})
-        return f"{mr.url}#note_{data.get('id')}" if isinstance(data, dict) else ""
+        if not isinstance(data, dict):
+            return "", ""
+        return f"{mr.url}#note_{data.get('id')}", str(data.get("created_at") or "")
+
+    def _pages(self, path: str) -> list[dict]:
+        items: list[dict] = []
+        for page in range(1, PAGE_LIMIT + 1):
+            data = self._get(f"{path}?per_page=100&page={page}")
+            if not isinstance(data, list):
+                raise RuntimeError(f"{path} を読めない")
+            items.extend(d for d in data if isinstance(d, dict))
+            if len(data) < 100:
+                return items
+        raise RuntimeError(f"{path} が多すぎて読み切れない")
 
     def _get(self, path: str):
         return _http("GET", self._url(path), self._headers(), None)
@@ -294,9 +360,13 @@ class GitLab(Host):
         return {"PRIVATE-TOKEN": self.token}
 
 
-def host_for(stderr: TextIO, tree_root: str) -> Host | None:
-    """この作業ツリーのリモートに合う相手。分からなければ None。"""
-    fixture = os.environ.get(FIXTURE_ENV, "")
+def host_for(stderr: TextIO, tree_root: str, fixture: str = "") -> Host | None:
+    """この作業ツリーのリモートに合う相手。分からなければ None。
+
+    代役はフラグ（`--review-fixture`）でしか指せない。環境変数で指せると、親が
+    Bash の環境変数に付けて `check` を打ち、偽のホストでゲートを開けられる。
+    スクリプトはこのフラグを渡さないので、代役が効くのはテストと人の手だけ。
+    """
     if fixture:
         return Fixture(fixture)
     rc, url = _git(tree_root, ["remote", "get-url", "origin"])
@@ -306,8 +376,20 @@ def host_for(stderr: TextIO, tree_root: str) -> Host | None:
     return host_from_url(stderr, url.strip())
 
 
+_REMOTE = re.compile(r"^(?:https?://|git@|ssh://git@)([^/:]+)[/:]+(.+?)(?:\.git)?/?$")
+
+
+def token_for(url: str) -> tuple[str, bool] | None:
+    """このリモートに要るトークンの名前と、それが環境にあるか。読めない綴りなら None。"""
+    m = _REMOTE.match(url)
+    if m is None:
+        return None
+    name = GITHUB_TOKEN if m.group(1) == "github.com" else GITLAB_TOKEN
+    return name, bool(os.environ.get(name, ""))
+
+
 def host_from_url(stderr: TextIO, url: str) -> Host | None:
-    m = re.match(r"^(?:https?://|git@|ssh://git@)([^/:]+)[/:]+(.+?)(?:\.git)?/?$", url)
+    m = _REMOTE.match(url)
     if m is None:
         stderr.write(f"ccnavi: リモートの綴りを読めない: {url}\n")
         return None
@@ -350,16 +432,18 @@ def request(
     for child in ph.tickets:
         if ph.states.get(child.ticket) != ticket_mod.DONE:
             continue
-        child_tree = tree.worktree_path(root, child.ticket)
-        if not os.path.isdir(child_tree):
-            continue
-        rc, sha = _git(child_tree, ["rev-parse", "HEAD"])
-        if rc != 0:
+        # 子のブランチは識別子と同じ名前。作業ツリーではなくブランチを引くので、
+        # 作業ツリーを消しても検査から外れない。引けなければ前提の未充足。
+        rc, sha = _git(tree_root, ["rev-parse", "--verify", f"{child.ticket}^{{commit}}"])
+        if rc != 0 or not sha.strip():
+            unmet.append(f"子 {child.ticket} のブランチを確かめられない（消えている）")
             continue
         rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", sha.strip(), "HEAD"])
         if rc != 0:
             unmet.append(f"子 {child.ticket} のブランチが親に取り込まれていない")
-    rc, status = _git(tree_root, ["status", "--porcelain"])
+    # 未追跡は数えない。依頼文そのものを作業ツリーに置く形が普通にあり、それが
+    # 前提を落とすと依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
+    rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
     if rc != 0 or status.strip():
         unmet.append("親の作業ツリーに未コミットの変更がある")
     branch = _branch(tree_root)
@@ -369,17 +453,15 @@ def request(
         rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"])
         if rc != 0 or ahead.strip():
             unmet.append("親ブランチの HEAD が push されていない")
-    try:
-        with open(body_file, encoding="utf-8") as f:
-            body = f.read()
-    except OSError as exc:
-        unmet.append(f"依頼文を読めない ({exc})")
+    body = _read_body(_resolve(cwd, body_file))
+    if body is None:
+        unmet.append(f"依頼文を読めない ({body_file})")
         body = ""
     if not body.strip():
         unmet.append("依頼文が空")
     if approval.MARK_REQUESTED in ph.marks:
         unmet.append(f"フェーズ {phase_no} は依頼済み")
-    host = host_for(stderr, tree_root)
+    host = host_for(stderr, tree_root, conf.review_fixture)
     mr = host.find(branch) if host is not None and branch else None
     if mr is None:
         unmet.append("親ブランチに対応するマージリクエストが無い")
@@ -392,16 +474,24 @@ def request(
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} -->\n"
     try:
-        url = host.comment(mr, marker + body)
+        url, posted_at = host.comment(mr, marker + body)
     except RuntimeError as exc:
         stderr.write(f"ccnavi: 投稿できない: {_redact(str(exc))}\n")
         return 1
+    # since はホストの時計。手元の時計と比べると、依頼直後の指摘が「依頼より前」に
+    # 落ちて黙って除かれる。
     failed = approval.write_mark(
         conf.approved,
         parent.ticket,
         phase_no,
         approval.MARK_REQUESTED,
-        {"head": head.strip(), "mr": mr.number, "url": url, "host": host.name},
+        {
+            "head": head.strip(),
+            "mr": mr.number,
+            "url": url,
+            "host": host.name,
+            "since": posted_at,
+        },
     )
     if failed:
         stderr.write(f"ccnavi: 印を置けない: {failed}\n")
@@ -426,24 +516,29 @@ def check(
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    host = host_for(stderr, tree_root)
+    moved = _moved_since_request(tree_root, requested)
+    if moved:
+        stderr.write(f"ccnavi: {moved}。人が見たものと今の HEAD が違う。request をやり直すこと\n")
+        return 1
+    host = host_for(stderr, tree_root, conf.review_fixture)
     branch = _branch(tree_root)
     mr = host.find(branch) if host is not None else None
     if mr is None:
         stderr.write("ccnavi: マージリクエストを引けない\n")
         return 1
-    since = _epoch(str(requested.get("at") or ""))
+    if requested.get("host") and host.name != requested.get("host"):
+        stderr.write(
+            f"ccnavi: 依頼したホスト（{requested.get('host')}）と今のホスト（{host.name}）が違う\n"
+        )
+        return 1
+    since = _since(requested)
     try:
         threads = host.threads(mr)
-        reviews = host.reviews(mr)
+        reviews = effective(host.reviews(mr))
     except RuntimeError as exc:
         stderr.write(f"ccnavi: リモートを読めない: {_redact(str(exc))}\n")
         return 1
-    changes = [
-        r
-        for r in reviews
-        if r.state.upper() == "CHANGES_REQUESTED" and _after(r.submitted_at, since)
-    ]
+    changes = [r for r in reviews if r.state.upper() == CHANGES_REQUESTED]
     if changes:
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。--accept-unresolved でも通せない。"
@@ -488,22 +583,20 @@ def note(
     if parent is None:
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    try:
-        with open(body_file, encoding="utf-8") as f:
-            body = f.read()
-    except OSError as exc:
-        stderr.write(f"ccnavi: 本文を読めない ({exc})\n")
+    body = _read_body(_resolve(cwd, body_file))
+    if body is None:
+        stderr.write(f"ccnavi: 本文を読めない ({body_file})\n")
         return 1
     if not body.strip():
         stderr.write("ccnavi: 本文が空\n")
         return 1
-    host = host_for(stderr, tree_root)
+    host = host_for(stderr, tree_root, conf.review_fixture)
     mr = host.find(_branch(tree_root)) if host is not None else None
     if mr is None:
         stderr.write("ccnavi: マージリクエストを引けない\n")
         return 1
     try:
-        url = host.comment(mr, MARKER_NOTE + "\n" + body)
+        url, _ = host.comment(mr, MARKER_NOTE + "\n" + body)
     except RuntimeError as exc:
         stderr.write(f"ccnavi: 投稿できない: {_redact(str(exc))}\n")
         return 1
@@ -540,17 +633,23 @@ def reviewed(
         )
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    host = host_for(stderr, tree_root)
+    moved = _moved_since_request(tree_root, requested)
+    if moved:
+        stderr.write(f"ccnavi: {moved}。request をやり直すこと\n")
+        return 1
+    host = host_for(stderr, tree_root, conf.review_fixture)
     mr = host.find(_branch(tree_root)) if host is not None else None
     if mr is None:
         stderr.write("ccnavi: マージリクエストを引けない\n")
         return 1
-    since = _epoch(str(requested.get("at") or ""))
-    threads = host.threads(mr)
-    reviews = host.reviews(mr)
-    if any(
-        r.state.upper() == "CHANGES_REQUESTED" and _after(r.submitted_at, since) for r in reviews
-    ):
+    since = _since(requested)
+    try:
+        threads = host.threads(mr)
+        reviews = effective(host.reviews(mr))
+    except RuntimeError as exc:
+        stderr.write(f"ccnavi: リモートを読めない: {_redact(str(exc))}\n")
+        return 1
+    if any(r.state.upper() == CHANGES_REQUESTED for r in reviews):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
             "レビュアーの approve / dismiss を待つこと\n"
@@ -619,6 +718,46 @@ def _phase(
 def _branch(tree_root: str) -> str:
     rc, out = _git(tree_root, ["rev-parse", "--abbrev-ref", "HEAD"])
     return out.strip() if rc == 0 else ""
+
+
+def _moved_since_request(tree_root: str, requested: dict) -> str:
+    """依頼の後に親の HEAD が動いたか。動いていれば、その説明。
+
+    人が見たのは依頼時の HEAD。その後に積んだコミットは誰も見ていないので、
+    それを「レビュー済み」に含めない。
+    """
+    rc, head = _git(tree_root, ["rev-parse", "HEAD"])
+    head = head.strip()
+    if rc != 0:
+        return "親の HEAD を読めない"
+    recorded = str(requested.get("head") or "")
+    if recorded and head != recorded:
+        return f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
+    branch = _branch(tree_root)
+    rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"]) if branch else (1, "")
+    if rc != 0 or ahead.strip():
+        return "親ブランチの HEAD が push されていない"
+    return ""
+
+
+def _since(requested: dict) -> float:
+    """依頼の時点。ホストの時計で記録した時刻を優先し、無ければ手元の時計。"""
+    return _epoch(str(requested.get("since") or requested.get("at") or ""))
+
+
+def _resolve(cwd: str, path: str) -> str:
+    """相対パスは、スクリプトを打った場所（--cwd）からの相対。"""
+    if not path or os.path.isabs(path):
+        return path
+    return os.path.join(cwd or os.getcwd(), path)
+
+
+def _read_body(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
 
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:

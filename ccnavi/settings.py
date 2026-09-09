@@ -37,6 +37,10 @@ STATE_ENV = "CCNAVI_STATE"
 # 分けた理由は selfguard.py の冒頭にある。片方だけを切れることが要る。
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
+# GUARD_CLI_ENV は、人の判断の経路を守るか。enable（既定）なら、シェルから ccnavi の
+# 実行ファイルに `--approve` `--reviewed` `ticket` `review` を付けた呼び出しを止め、
+# `--approve` と `--reviewed` は標準入力が端末でなければ拒む。テストは disable にする。
+GUARD_CLI_ENV = "CCNAVI_GUARD_CLI"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
@@ -109,6 +113,12 @@ class Settings:
     # 対象は組み込みで固定なので、広がりようがない。
     restore_if_deny: str = ""
     guard_core_files: str = ""
+    # guard_cli は人の判断の経路（承認・レビュー済みの受け入れ・状態の移動）を
+    # エージェントの手から守るか。enable / disable。
+    guard_cli: str = ""
+    # review_fixture はテストと外部委任のための、リモートの代役（JSON）。
+    # 環境変数では指せない。指せると、親が check にそれを付けてゲートを開けられる。
+    review_fixture: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
     # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
@@ -140,6 +150,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         state=os.path.join(root, DEFAULT_STATE),
         restore_if_deny=os.environ.get(RESTORE_IF_DENY_ENV, ""),
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
+        guard_cli=os.environ.get(GUARD_CLI_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved=os.path.join(root, DEFAULT_APPROVED),
         retired=[name for name in RETIRED_ENVS if name in os.environ],
@@ -193,6 +204,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.restore_if_deny = conf["restore_if_deny"]
     if isinstance(conf.get("guard_core_files"), str):
         settings.guard_core_files = conf["guard_core_files"]
+    if isinstance(conf.get("guard_cli"), str):
+        settings.guard_cli = conf["guard_cli"]
     if isinstance(conf.get("tickets"), str) and conf["tickets"]:
         settings.tickets = _relative(conf["tickets"])
     if isinstance(conf.get("approved"), str):

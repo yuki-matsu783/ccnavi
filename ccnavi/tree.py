@@ -127,6 +127,34 @@ def worktree_path(root: str, name: str) -> str:
     return os.path.join(root, WORKTREES_DIR, name)
 
 
+def exact_name(root: str, name: str) -> bool:
+    """この名前の作業ツリーが、綴りの大文字小文字までそのままで在るか。
+
+    大文字小文字を区別しない機械では `I0001-02` というディレクトリが `i0001-02` として
+    開けてしまう。名前が識別子だと言う以上、綴りまで同じであることを求める。
+    """
+    try:
+        return name in os.listdir(os.path.join(root, WORKTREES_DIR))
+    except OSError:
+        return False
+
+
+# 大文字小文字を区別しない機械かどうか。写しの索引を引くときに、作業ツリーの
+# 名前の綴りが違っても同じ識別子として結び付けるのは、この機械だけ。
+CASE_INSENSITIVE = os.path.normcase("A") == "a"
+
+
+def lookup(index: dict, name: str):
+    """作業ツリーの名前で写しを引く。区別しない機械では綴りの違いを許す。"""
+    found = index.get(name)
+    if found is not None or not CASE_INSENSITIVE:
+        return found
+    for key, value in index.items():
+        if key.lower() == name.lower():
+            return value
+    return None
+
+
 def _canonical(path: str) -> str:
     """同じ場所が同じ綴りになる形。大文字小文字は区別しない機械のために normcase。"""
     try:

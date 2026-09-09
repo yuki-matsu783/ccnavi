@@ -62,6 +62,8 @@ class Input:
     # 許さない操作を見分けるときと、差し戻しの回数を数えるときだけ。
     agent_id: str = ""
     agent_type: str = ""
+    # tool_response は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
+    tool_response: dict[str, Any] = field(default_factory=dict)
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -87,7 +89,9 @@ def decode(stream: TextIO) -> Input:
         raise Unusable("payload に hook_event_name が無い")
 
     tool_input = data.get("tool_input")
+    tool_response = data.get("tool_response")
     return Input(
+        tool_response=tool_response if isinstance(tool_response, dict) else {},
         event=event,
         tool_name=data.get("tool_name") or "",
         tool_input=tool_input if isinstance(tool_input, dict) else {},

@@ -412,6 +412,18 @@ def scan(root: str, tickets_rel: str) -> tuple[list[Ticket], list[Problem]]:
                 names = sorted(os.listdir(directory))
             except OSError:
                 continue
+            # 大文字小文字を区別しない機械では `DONE/` が `done/` として開ける。
+            # 置き場が状態なので、綴りまで同じディレクトリだけを読む。
+            if os.path.basename(os.path.realpath(directory)) != state:
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        state,
+                        f"{os.path.relpath(directory, root)} の綴りが状態の名前 `{state}` と"
+                        "違うので読まない",
+                    )
+                )
+                continue
             for name in names:
                 if not name.endswith(".md"):
                     continue
@@ -492,21 +504,58 @@ def guard_rules(tickets_rel: str) -> list[rules.Rule]:
         message=message,
         decision=rules.DENY,
     )
-    write_rule.compiled = re.compile(place)
+    # 大文字小文字を区別しない機械では `DONE/` も同じ場所。区別する機械で余分に
+    # 当たっても、状態の名前を大文字で書く正当な用事は無い。
+    write_rule.compiled = re.compile(place, re.IGNORECASE)
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
-    # 書き込む動詞の式が引数までを覆う。
+    # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無い綴り
+    # （`mv x wip/tickets/done`）でも当てる。
     parts = [re.escape(p) for p in tickets_rel.split("/") if p]
-    loose = r"[\\/]".join(parts) + rf"[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
-    shell = rf"{selfguard._WRITE_VERBS}{loose}|{selfguard._COPY_VERBS}{loose}"
+    states = "|".join(GUARDED_STATES)
+    loose = r"[\\/]".join(parts) + rf"[\\/]({states})([\\/]|\s|$)"
+    # 写す動詞は行き先が最後の引数。置き場から外へ写す読み向きの cp は止めない。
+    last = r"[\\/]".join(parts) + rf"[\\/]({states})([\\/][^ \x00]*)?($|\x00)"
+    shell = rf"{selfguard._WRITE_VERBS}{loose}|{selfguard._COPY_VERBS}{last}"
     shell_rule = rules.Rule(
         id=STATE_RULE_ID + "-shell",
-        match="Bash",
+        match="Bash|PowerShell",
         regex=shell,
         message=message,
         decision=rules.DENY,
     )
-    shell_rule.compiled = re.compile(shell)
+    shell_rule.compiled = re.compile(shell, re.IGNORECASE)
     return [write_rule, shell_rule]
+
+
+def set_fields(text: str, fields: dict[str, str]) -> str:
+    """提案の frontmatter の、スクリプトが書く欄だけを行単位で書き換える。
+
+    読み直して書き出す（render）と、人が書いたコメントや `|` のブロックが
+    消えて、親のブランチの diff が汚れる。提案は人も読むものなので、
+    触るのは欄の行だけにする。無い欄は閉じの `---` の前に足す。
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FENCE:
+        return text
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == FENCE), None)
+    if end is None:
+        return text
+    pending = {k: v for k, v in fields.items() if k in SCRIPT_FIELDS}
+    for i in range(1, end):
+        key = lines[i].split(":", 1)[0].strip()
+        if key in pending and not lines[i].startswith((" ", "\t")):
+            lines[i] = f"{key}: {_yaml_scalar(pending.pop(key))}"
+    for key, value in pending.items():
+        lines.insert(end, f"{key}: {_yaml_scalar(value)}")
+        end += 1
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def _yaml_scalar(value: str) -> str:
+    """欄の値を、YAML が文字列として読み戻せる綴りにする。"""
+    return (
+        yaml.safe_dump(value, allow_unicode=True, default_style='"').strip().removesuffix("\n...")
+    )
 
 
 STATE_RULE_ID = "builtin-ticket-state"

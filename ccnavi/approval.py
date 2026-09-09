@@ -279,7 +279,7 @@ def approve(
     batch: list[tuple[ticket_mod.Ticket, int, list[str], list[rules.Problem]]] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
-        complaints = _validate(t, pool)
+        complaints = validate(t, pool)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -293,11 +293,12 @@ def approve(
     if not batch:
         return 1
 
-    stdout.write(screen(batch, known) + "\n\n")
+    stdout.write(screen(batch, pool) + "\n\n")
     total = max(points for _, points, _, _ in batch)
-    parents = [t.ticket for t, _, _, _ in batch if not t.is_child]
     if total >= HIGH_RISK:
-        key = parents[0] if parents else batch[0][0].ticket
+        # 鍵は最も重い親の識別子。識別子順の先頭にすると、軽い親の識別子を
+        # 打つだけで重い親まで束ごと通る。
+        key = max(batch, key=lambda item: item[1])[0].ticket
         stdout.write(
             f"⚠ リスクスコア {total} ({level(total)})。ワンキーでは承認できない。\n"
             f"  承認するなら識別子を入力: [{key}] "
@@ -336,7 +337,7 @@ def approve(
 
 def screen(
     batch: list[tuple[ticket_mod.Ticket, int, list[str], list[rules.Problem]]],
-    known: dict[str, ticket_mod.Ticket],
+    pool: dict[str, ticket_mod.Ticket],
 ) -> str:
     """承認を求める画面を組む。
 
@@ -352,7 +353,8 @@ def screen(
             + (f"（親 {t.parent}、フェーズ {t.phase}）" if t.is_child else "（親）"),
         ]
         if t.is_child:
-            parent = known.get(t.parent)
+            # 親は同じ束の中に居ることが普通。写しだけを引くと「写しが無い」になる。
+            parent = pool.get(t.parent)
             lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
             head = "親 " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
@@ -389,7 +391,7 @@ def screen(
     return "\n".join(lines)
 
 
-def _validate(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> list[rules.Problem]:
+def validate(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> list[rules.Problem]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。"""
     problems: list[rules.Problem] = []
     if not t.is_child:

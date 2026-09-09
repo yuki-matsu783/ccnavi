@@ -33,14 +33,77 @@ from typing import TextIO
 from . import approval, rules, settings, tree
 from . import ticket as ticket_mod
 
-# ゲートの中でも通す Bash。状態を動かす・レビューを頼む・合流して片付ける、の 3 本。
-EXEMPT = re.compile(r"ccnavi-(ticket|review|git)\.sh")
+# ゲートの中でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
+# コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
+# 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
+_EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
 
-# サブエージェントに許さない操作。状態を動かすスクリプトとレビューのスクリプト。
-SUBAGENT_FORBIDDEN = re.compile(r"ccnavi-(ticket|review)\.sh")
+# サブエージェントに許さない操作。状態を動かす形とレビューの形を、コマンドの位置で。
+# 読むだけの `cat` や `--help` は止めない。
+_FORBIDDEN_COMMAND = re.compile(
+    r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review)\.sh\s+"
+    r"(start|done|cancel|request|check|note)\b"
+)
+
+# シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
+SHELL_TOOLS = ("Bash", "PowerShell")
 
 # ゲートが止めるツール。
-GATED_TOOLS = ("Agent", "Bash")
+GATED_TOOLS = ("Agent", *SHELL_TOOLS)
+
+# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
+# 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
+# 経由せずに打てば止める。CCNAVI_GUARD_CLI で切れる。
+_CLI_FORMS = (
+    r"(--approve\b|--reviewed\b|\b(ticket|review)\s+(start|done|cancel|request|check|note)\b)"
+)
+CODE_CLI = "DENY_CCNAVI_CLI"
+CLI_RULE_ID = "builtin-guard-cli"
+
+
+def commands(subject: str) -> list[str]:
+    """shellread が切ったコマンドの並び。読めなかった生の文字列なら 1 本。"""
+    return [c.strip() for c in subject.split("\x00") if c.strip()]
+
+
+def exempt(subject: str, degraded: str) -> bool:
+    """ゲートの中でも通してよいか。読み切れなかったコマンドは通さない。"""
+    if degraded:
+        return False
+    parts = commands(subject)
+    return bool(parts) and all(_EXEMPT_COMMAND.match(c) for c in parts)
+
+
+def forbidden(subject: str) -> bool:
+    """サブエージェントに許さない形を含むか。"""
+    return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject))
+
+
+def cli_guard_rule(bin_path: str) -> rules.Rule:
+    """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。"""
+    from . import selfguard
+
+    names = [r"ccnavi(\.exe)?"]
+    clause = selfguard.binary_clause(bin_path)
+    if clause:
+        names.append(clause)
+    launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
+    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
+    rule = rules.Rule(
+        id=CLI_RULE_ID,
+        match="|".join(SHELL_TOOLS),
+        regex=expression,
+        message=(
+            "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
+            "直接打つものではありません。状態の移動とレビューは "
+            "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
+            "使い、承認と未解決の受け入れは利用者が端末で行います。"
+        ),
+        decision=rules.DENY,
+    )
+    rule.compiled = re.compile(expression)
+    return rule
+
 
 # 返す文の理由コード。
 CODE_GATE = "DENY_PHASE_GATE"
@@ -112,8 +175,18 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
     open_copies, _ = approval.copies(conf.approved)
     closed_copies, _ = approval.copies(conf.approved, closed=True)
     by_number: dict[int, Phase] = {}
-    for t in approval.children_of(open_copies + closed_copies, parent_id):
+    # 閉じた写しは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
+    # 場所にあるので、消す・同じ識別子を todo/ に書く、でフェーズを開き直せては
+    # いけない。閉じたことの権威は写しの側。
+    for t in approval.children_of(closed_copies, parent_id):
         if t.phase is None:
+            continue
+        phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))
+        phase.tickets.append(t)
+        phase.states[t.ticket] = ticket_mod.CANCELLED if t.cancelled_at else ticket_mod.DONE
+    closed_ids = {t.ticket for t in closed_copies}
+    for t in approval.children_of(open_copies, parent_id):
+        if t.phase is None or t.ticket in closed_ids:
             continue
         phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))
         phase.tickets.append(t)
@@ -138,7 +211,7 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     if t is None or t.is_main:
         return None
     open_copies, _ = approval.copies(conf.approved)
-    found = approval.by_id(open_copies).get(t.name)
+    found = tree.lookup(approval.by_id(open_copies), t.name)
     if found is None or found.is_child:
         return None
     return found
@@ -216,18 +289,22 @@ def scope_findings(
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
         return [], "作業ツリーが無い"
+    # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用して 8 進に
+    # 逃がすので、そのまま当てると範囲の中の日本語のファイルが必ず範囲外になる。
     paths: set[str] = set()
     if child.base_sha:
-        rc, out = _git(worktree, ["diff", "--name-only", f"{child.base_sha}..HEAD"])
+        rc, out = _git(worktree, ["diff", "--name-only", "-z", f"{child.base_sha}..HEAD"])
         if rc != 0:
             return [], "基準点からの差分を読めない"
-        paths.update(line.strip() for line in out.splitlines() if line.strip())
-    rc, out = _git(worktree, ["status", "--porcelain", "--untracked-files=all", "--no-renames"])
+        paths.update(p for p in out.split("\0") if p)
+    rc, out = _git(
+        worktree, ["status", "--porcelain", "-z", "--untracked-files=all", "--no-renames"]
+    )
     if rc != 0:
         return [], "作業ツリーの状態を読めない"
-    for line in out.splitlines():
-        if len(line) > 3:
-            paths.add(line[3:].strip())
+    for entry in out.split("\0"):
+        if len(entry) > 3 and entry[2] == " ":
+            paths.add(entry[3:])
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
@@ -265,7 +342,7 @@ def _script_fields(proposal: ticket_mod.Ticket) -> dict[str, str]:
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:
     try:
         done = subprocess.run(
-            ["git", *args],
+            ["git", "-c", "core.quotePath=false", *args],
             cwd=cwd,
             capture_output=True,
             text=True,

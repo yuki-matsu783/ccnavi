@@ -302,7 +302,7 @@ class ScopeGuard:
         t = tree.tree_of(self.root, full)
         if t is None or t.is_main:
             return None
-        ticket = self.copies.get(t.name)
+        ticket = tree.lookup(self.copies, t.name)
         if ticket is None or ticket.is_own_file(full):
             return None
         rel = tree.relative(t, full)

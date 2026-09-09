@@ -32,9 +32,9 @@ def start(
         stderr.write(f"ccnavi: {ticket_id} は未着手ではない（いまは {found.state}/）\n")
         return 1
     worktree = tree.worktree_path(root, ticket_id)
-    if not tree.is_worktree_of(root, worktree):
+    if not tree.is_worktree_of(root, worktree) or not tree.exact_name(root, ticket_id):
         stderr.write(
-            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無い。"
+            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無い（綴りは大文字小文字まで同じで）。"
             "先に 'sh .claude/scripts/ccnavi-git.sh worktree add .claude/worktrees/"
             f"{ticket_id} -b {ticket_id}' で作ること\n"
         )
@@ -63,6 +63,8 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
     if found.state != ticket_mod.DOING:
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
         return 1
+    if _parent_still_busy(stderr, root, conf, found):
+        return 1
     fields = {"completed_at": approval.now()}
     return _move(
         stdout, stderr, conf, found, ticket_mod.DONE, fields, f"完了 {fields['completed_at']}"
@@ -81,6 +83,8 @@ def cancel(
         return 1
     if found.state not in (ticket_mod.TODO, ticket_mod.DOING):
         stderr.write(f"ccnavi: {ticket_id} は未着手でも作業中でもない（いまは {found.state}/）\n")
+        return 1
+    if _parent_still_busy(stderr, root, conf, found):
         return 1
     fields = {"cancelled_at": approval.now(), "cancel_reason": reason.strip()}
     return _move(
@@ -108,6 +112,36 @@ def _find(
     return hits[0]
 
 
+def _parent_still_busy(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """親を閉じてよいか。開いている子や閉じたゲートがある間は閉じさせない。
+
+    親の写しが閉じるとゲートの鍵（cwd から引く親）が消え、レビュー要の
+    フェーズが終わっていても誰も止めなくなる。
+    """
+    from . import phase
+
+    if found.is_child:
+        return False
+    copies, _ = approval.copies(conf.approved)
+    open_children = [t.ticket for t in copies if t.parent == found.ticket]
+    if open_children:
+        stderr.write(
+            f"ccnavi: {found.ticket} には開いている子がある（{', '.join(open_children)}）。"
+            "子を先に閉じること\n"
+        )
+        return True
+    closed = phase.gate(root, conf, found.ticket)
+    if closed is not None:
+        stderr.write(
+            f"ccnavi: {found.ticket} のフェーズ {closed.number} はレビュー待ち"
+            "（ゲートが閉じている）。レビューを済ませてから閉じること\n"
+        )
+        return True
+    return False
+
+
 def _move(
     stdout: TextIO,
     stderr: TextIO,
@@ -120,12 +154,27 @@ def _move(
     base = os.path.dirname(os.path.dirname(found.path))
     target = os.path.join(base, state, found.ticket + ".md")
     try:
+        with open(found.path, encoding="utf-8") as f:
+            original = f.read()
         os.makedirs(os.path.dirname(target), exist_ok=True)
+        # 提案は人も読む。読み直して書き出さず、欄の行だけを書き換える。
         with open(target, "w", encoding="utf-8") as f:
-            f.write(ticket_mod.render(found, fields))
-        os.remove(found.path)
+            f.write(ticket_mod.set_fields(original, fields))
     except OSError as exc:
         stderr.write(f"ccnavi: {found.ticket} を {state}/ へ動かせない ({exc})\n")
+        return 1
+    try:
+        os.remove(found.path)
+    except OSError as exc:
+        # 両方に残すと、以後どの操作も「複数の場所にある」で止まる。書いた側を消して戻す。
+        try:
+            os.remove(target)
+            stderr.write(f"ccnavi: {found.path} を消せない ({exc})。元の置き場のままにした\n")
+        except OSError:
+            stderr.write(
+                f"ccnavi: {found.ticket} が {found.state}/ と {state}/ の両方に残った ({exc})。"
+                f"人が {found.state}/ の側を消すこと\n"
+            )
         return 1
     # 写しがあれば、欄をすぐ写す。次の hook でも写るが、ここで写しておくと
     # スクリプトの直後に走る検査が古い基準点を見ない。
