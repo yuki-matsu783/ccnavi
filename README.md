@@ -172,28 +172,59 @@ hook には実行ファイルだけを登録すればよい。
 ```json
 {
   "hooks": {
+    "SessionStart": [
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+      ]}
+    ],
+    "UserPromptSubmit": [
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+      ]}
+    ],
     "PreToolUse": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/dist/ccnavi/ccnavi\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
       ]}
     ],
     "PostToolUse": [
       { "matcher": "", "hooks": [
-        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/dist/ccnavi/ccnavi\"", "timeout": 10 }
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+      ]}
+    ],
+    "Stop": [
+      { "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
       ]}
     ]
   },
   "env": {
     "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
-    "CCNAVI_LOG": ".claude/ccnavi/log.jsonl"
+    "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
+    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi.exe"
   }
 }
 ```
 
-同じ実行ファイルを両方のイベントに登録する。payload が自分でイベント名を名乗るので、
-判定と監視のどちらを走らせるかは ccnavi が選ぶ。`matcher` は絞らない。
-絞ると、そこに書かなかったツールで hook 自体が起動しなくなる。
+同じ実行ファイルを 5 つのイベントに登録する。payload が自分でイベント名を名乗るので、
+どれを走らせるかは ccnavi が選ぶ。`matcher` は絞らない。絞ると、そこに書かなかった
+ツールで hook 自体が起動しなくなる。
+
+| イベント | ここで何をするか | 登録しないと |
+|---|---|---|
+| `SessionStart` | 実行ファイルの控えを取る | 実行ファイルが差し替えられても戻せない |
+| `UserPromptSubmit` | 保護領域の状態を控え、ターンの基準にする | ターンの終わりの報告が出ない |
+| `PreToolUse` | 呼び出しを判定し、設定ファイルを控える | 判定そのものが働かない |
+| `PostToolUse` | 作業ツリーを見て、変わっていれば戻す | 引数に現れない書き込みを取りこぼす |
+| `Stop` | このターンで変わった保護領域を利用者へ報告する | 変更が人の目に触れない |
+
+`command` を `${CCNAVI_BIN_PATH}` で書いているのは、守る対象と起動する実体を
+1 か所に寄せるため。直書きすると、`CCNAVI_BIN_PATH` が指すファイルと実際に走る
+ファイルが黙って食い違いうる。`args` を書かない形（shell form）では command が
+shell に渡るので、環境変数はそこで展開される。代わりに、`env` からこの 1 行が
+消えると hook が起動しなくなる。パスを 1 か所にする利点と、その 1 行に全部が
+懸かる欠点の取り引きになる。
 
 | 変数 | 意味 |
 |---|---|
@@ -202,7 +233,7 @@ hook には実行ファイルだけを登録すればよい。
 | `CCNAVI_LOG` | 記録先。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか |
-| `CCNAVI_RESTORE_SETTING_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi 自身の設定ファイルを、実行前に控えて実行後に戻すか |
+| `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い |
 | `CCNAVI_TICKET` | チケットの置き場。既定は `.current-ticket.md` |
 | `CCNAVI_LEDGER` | 承認台帳。既定は `.claude/ccnavi/approvals.jsonl`。空文字にするとチケットによる範囲の制御を使わない |
@@ -492,6 +523,25 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 繰り返さないためのもので、消えても次の起動で取り直せる。同じ場所でも
 「中身が変わった」の次に「消えた」が来れば、別の出来事としてもう一度言う。
 
+### ターンの終わりに人へ報告する
+
+呼び出しごとの報告はモデルへ届く。次の一手を変えさせるための経路で、そこは足りて
+いる。足りていないのは、ターンが終わったあとに人が「結局どこが変わったのか」を
+1 度で見る場所のほう。`Stop` に登録すると、そのターンで変わった保護領域を
+`systemMessage` で返す。戻す手順も 1 件ずつ添える。
+
+比べる相手は `UserPromptSubmit` で控えた状態になる。控えが無いと、利用者自身の
+書きかけも、他のセッションが置いたものも、前のターンで片付けなかったものも、
+すべてこのターンの成果として並ぶ。同じものを何度も見せられた人は、次から読まなく
+なる。だから `UserPromptSubmit` を登録していないときは、`Stop` は何も言わない。
+見えていない期間を、見えたことにしない。記録には `no-turn-baseline` が残る。
+
+ここでは戻さない。報告するのは、実行後の監視が戻さなかった、あるいは戻す設定に
+なっていなかった変更なので、どうするかは人が決める。`CCNAVI_MODE` も見ない。
+見えたことを言うだけで呼び出しにも作業ツリーにも手を出さないため、どのモードが
+約束しているものも破らない。むしろ `dry-run` は「まだ何も適用していないが何が
+起きているか」を見るためのモードなので、ここが黙ると見る手立てが減る。
+
 ### 自動復元
 
 `CCNAVI_RESTORE_IF_DENY=enable`（既定）のとき、ccnavi 自身が戻す。
@@ -508,7 +558,7 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 片方に決めることになる。取り返しの付かない操作を止めるための道具が、
 自分だけは取り返しの付かない操作をするのはおかしい。
 
-### 設定ファイルそのものを守る
+### 中核ファイルを守る
 
 上の自動復元は、保護領域をルールファイルの `deny` と `ask` から導く。だから
 ルールファイル自身をそこで守ることはできない。書き換えられた瞬間に「何を守るか」
@@ -516,7 +566,7 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 保護領域は 0 件になり、監視は何も検知しない。
 
 そこでこの 3 つだけは、ルールファイルの外に、組み込みで持つ。
-`CCNAVI_RESTORE_SETTING_FILES` が切り替える。
+`CCNAVI_GUARD_CORE_FILES` が切り替える。
 
 | 対象 | 何が懸かっているか | 控えを取る時点 |
 |---|---|---|
@@ -865,7 +915,7 @@ error 2 件、warn 2 件
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
 | warn | `PostToolUse` に ccnavi が登録されていない（実行後の監視が走らない） |
 | warn | 登録はされているが git の作業ツリーではない（監視が何も検知しない） |
-| warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_RESTORE_SETTING_FILES` の値 |
+| warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
 
 登録の検査は `.claude/settings.json` しか見ない。そのファイルが無いときは
 登録について何も言わない。hook は利用者ごとの設定にも書けて、そちらはここから
