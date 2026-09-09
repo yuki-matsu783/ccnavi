@@ -443,36 +443,53 @@ def at_start(
     root: str,
     found: list[Target],
 ) -> list[Outcome]:
-    """セッションが始まったとき。大きい対象をここで 1 度だけ控える。
+    """セッションが始まったとき。対象をすべて控える。
 
-    実行ファイルがこれにあたる。ツール呼び出しのたびに数十 MB を写すわけには
-    いかないので、写すのはセッションに 1 度。そのあいだに作り直されたものは
-    控えと食い違うが、作り直しは人が起こす作業なので、食い違いは報告に出て
-    人の目に触れる。黙って新しいほうを控え直すと、差し替えと作り直しが
+    大きい対象を控えるのはここだけ。実行ファイルがこれにあたり、ツール呼び出しの
+    たびに数十 MB を写すわけにはいかないので、写すのはセッションに 1 度。そのあいだに
+    作り直されたものは控えと食い違うが、作り直しは人が起こす作業なので、食い違いは
+    報告に出て人の目に触れる。黙って新しいほうを控え直すと、差し替えと作り直しが
     同じ見た目になる。
+
+    小さいほうも一緒に控える。実行前の控えが始まるのは最初のツール呼び出しからで、
+    それより前に設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+    セッションの開始そのものが、いちばん早く取れる断面になる。
+
+    控えるだけで、戻さない。`dry-run` でも控えるのは、控えることが誰の書きかけも
+    消さない側の操作だから。ここを `enable` に限ると、切り替えた最初のセッションが
+    戻す先を持たないまま走る。設定を変えた瞬間から効いてほしい。何を戻すかは
+    実行前と実行後が `setting` を見て決める。
     """
     if setting == DISABLE or not state_dir:
         return []
 
     outcomes = []
     for target in found:
-        if not target.heavy:
-            continue
-        if not os.path.exists(target.path):
-            outcomes.append(
-                Outcome(
-                    target,
-                    ACTION_MISSING,
-                    "実行ファイルが見つからない。CCNAVI_BIN_PATH の綴りを確かめること",
+        if target.heavy:
+            if not os.path.exists(target.path):
+                outcomes.append(
+                    Outcome(
+                        target,
+                        ACTION_MISSING,
+                        "実行ファイルが見つからない。CCNAVI_BIN_PATH の綴りを確かめること",
+                    )
                 )
-            )
+                continue
+            failed = _copy(target.path, _backup_path(state_dir, session, target))
+            if failed:
+                outcomes.append(Outcome(target, ACTION_FAILED, f"控えを取れない: {failed}"))
             continue
-        if setting != ENABLE:
-            outcomes.append(Outcome(target, ACTION_WOULD, "控えを取るはずだった"))
+
+        content = _read(target.path)
+        if content is None:
+            # 最初から無い。`settings.local.json` を置いていない形がこれで、
+            # 事件ではない。無いことの印は実行前の側が残す。開始の時点では
+            # まだ「消された」と「置いていない」を見分ける手がかりが無い。
             continue
-        failed = _copy(target.path, _backup_path(state_dir, session, target))
+        _clear_absent(state_dir, session, target)
+        failed = _write_backup(state_dir, session, target, content)
         if failed:
-            outcomes.append(Outcome(target, ACTION_FAILED, f"控えを取れない: {failed}"))
+            outcomes.append(Outcome(target, ACTION_FAILED, f"控えを書けない: {failed}"))
     return outcomes
 
 
