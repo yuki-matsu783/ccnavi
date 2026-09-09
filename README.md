@@ -239,6 +239,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い |
 | `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーの根からの相対。既定は `wip/tickets` |
 | `CCNAVI_APPROVED` | 承認済みの写しの置き場。main の根からの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
+| `CCNAVI_GUARD_CLI` | `enable`（既定）、`disable`。人の判断の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_CCNAVI_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `CCNAVI_TICKET` と `CCNAVI_LEDGER` はもう効かない。指定してあれば `--lint` が言う。
@@ -800,8 +801,16 @@ ccnavi --reviewed 2 --accept-unresolved --cwd .claude/worktrees/i0050
 解くのはレビュアーの approve / dismiss だけ。
 
 GitHub と GitLab は origin の URL で見分け、`GITHUB_TOKEN` / `GITLAB_TOKEN` で認証する。
-`gh` や `glab` は使わない。テストと外部委任のために、`CCNAVI_REVIEW_FIXTURE` で JSON の
-代役を指せる。
+`gh` や `glab` は使わない。テストと外部委任のために、`--review-fixture <JSON>` で代役を指せる。
+環境変数では指せない。指せると、エージェントが Bash の環境に付けて `check` を打ち、偽のホストで
+ゲートを開けられる。
+
+`check` は依頼したときの HEAD と今の HEAD が同じで、push 済みであることも求める。人が見たのは
+依頼時のものなので、その後に積んだコミットを「レビュー済み」に含めない。変更要求は
+レビュアーごとに最新のレビューだけを数える。取り下げ（dismissed）は無い扱い。
+
+これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_CLI`）。
+状態の移動とレビューはスクリプト 2 本を通し、承認と未解決の受け入れは利用者が端末で打つ。
 
 `note` はチャットで受けた承認や判断を MR の通常コメントに写す。作業ツリーの記録はマージで消えるので、
 経緯を残す場所は MR しか無い。
