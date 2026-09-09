@@ -55,7 +55,10 @@ case "$common" in
 esac
 
 # 実行ファイル。設定に書かれた綴りを優先し、無ければ既定の置き場、それも無ければソース。
-bin="$root/${CCNAVI_BIN_PATH:-dist/ccnavi/ccnavi}"
+case "${CCNAVI_BIN_PATH:-}" in
+/* | [A-Za-z]:*) bin="$CCNAVI_BIN_PATH" ;;
+*) bin="$root/${CCNAVI_BIN_PATH:-dist/ccnavi/ccnavi}" ;;
+esac
 if [ -x "$bin" ]; then
 	exec "$bin" --root "$root" ticket "$@"
 elif [ -x "$bin.exe" ]; then
