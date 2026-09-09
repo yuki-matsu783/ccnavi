@@ -156,11 +156,20 @@ The parent agent moves tickets between states and asks for reviews through the
 scripts in .claude/scripts/, which call
 
     ccnavi ticket start|done|cancel <id> [--reason <why>]
-    ccnavi review request|check|note --cwd <dir> [--phase N] [--body-file <path>]
+    ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
+    ccnavi review requested --cwd <dir> --phase N --result <json>
+    ccnavi review check     --cwd <dir> --phase N --result <json>
+
+ccnavi never reaches the remote itself. The script fetches the merge request,
+its threads and reviews, and hands them over as --result <json>.
 
 A human accepts unresolved review threads with
 
-    ccnavi --reviewed N --accept-unresolved --cwd <parent worktree>
+    sh .claude/scripts/ccnavi-review.sh accept N
+
+which fetches the threads and runs
+
+    ccnavi --reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
 """
 
 
@@ -175,8 +184,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--restore-if-deny", default="")
     parser.add_argument("--guard-core-files", default="")
     parser.add_argument("--guard-cli", default="")
-    # レビューのホストの代役（JSON）。テストと人の手だけ。環境変数では指せない。
-    parser.add_argument("--review-fixture", default="")
+    # リモートの写し（JSON）。.claude/scripts/ccnavi-review.sh が取ってきて渡す。
+    parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
@@ -217,8 +226,6 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.tickets = args.tickets.replace("\\", "/").strip("/")
     if args.approved is not None:
         conf.approved = args.approved
-    if args.review_fixture:
-        conf.review_fixture = args.review_fixture
     conf.guard_cli = selfguard.resolve(
         stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
     )
@@ -384,8 +391,9 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|done|cancel <識別子>` と `review request|check|note`、それに
+    `ticket start|done|cancel <識別子>` と `review prepare|requested|check`、それに
     人が打つ `--reviewed`。どれも payload を読まず、判定も記録もしない。
+    リモートの写しは `--result <json>` で受け取る。exe はネットワークに出ない。
     """
     if not conf.approved:
         stderr.write("ccnavi: 写しの置き場が空。チケットによる制御を使っていない\n")
@@ -393,7 +401,15 @@ def operate(
     cwd = args.cwd or os.getcwd()
     if args.reviewed is not None:
         code = review.reviewed(
-            stdin, stdout, stderr, root, conf, cwd, args.reviewed, args.accept_unresolved
+            stdin,
+            stdout,
+            stderr,
+            root,
+            conf,
+            cwd,
+            args.reviewed,
+            args.accept_unresolved,
+            args.result,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
 
@@ -409,21 +425,18 @@ def operate(
             code = ops.done(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
-    elif kind == "review" and verb == "request":
+    elif kind == "review" and verb == "prepare":
         if args.phase is None or not args.body_file:
-            stderr.write("ccnavi: review request には --phase <N> と --body-file <path> が要る\n")
+            stderr.write("ccnavi: review prepare には --phase <N> と --body-file <path> が要る\n")
         else:
-            code = review.request(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
-    elif kind == "review" and verb == "check":
-        if args.phase is None:
-            stderr.write("ccnavi: review check には --phase <N> が要る\n")
+            code = review.prepare(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
+    elif kind == "review" and verb in ("requested", "check"):
+        if args.phase is None or not args.result:
+            stderr.write(f"ccnavi: review {verb} には --phase <N> と --result <json> が要る\n")
+        elif verb == "requested":
+            code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
-            code = review.check(stdout, stderr, root, conf, cwd, args.phase)
-    elif kind == "review" and verb == "note":
-        if not args.body_file:
-            stderr.write("ccnavi: review note には --body-file <path> が要る\n")
-        else:
-            code = review.note(stdout, stderr, root, conf, cwd, args.body_file)
+            code = review.check(stdout, stderr, root, conf, cwd, args.phase, args.result)
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR

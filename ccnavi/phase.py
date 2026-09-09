@@ -42,7 +42,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # 読むだけの `cat` や `--help` は止めない。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review)\.sh\s+"
-    r"(start|done|cancel|request|check|note)\b"
+    r"(start|done|cancel|request|check|note|accept)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -55,7 +55,8 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_CLI で切れる。
 _CLI_FORMS = (
-    r"(--approve\b|--reviewed\b|\b(ticket|review)\s+(start|done|cancel|request|check|note)\b)"
+    r"(--approve\b|--reviewed\b"
+    r"|\b(ticket|review)\s+(start|done|cancel|prepare|requested|check)\b)"
 )
 CODE_CLI = "DENY_CCNAVI_CLI"
 CLI_RULE_ID = "builtin-guard-cli"

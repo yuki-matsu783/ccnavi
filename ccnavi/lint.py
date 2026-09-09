@@ -315,7 +315,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
 
 
 def _review_token(root: str) -> list[Problem]:
-    """リモートのホストに合うトークンがあるか。合わないトークンは無いのと同じ。"""
+    """sh がリモートを読み書きできる形か。gh / glab か、curl とホストに合うトークン。"""
     from . import review
 
     try:
@@ -333,24 +333,9 @@ def _review_token(root: str) -> list[Problem]:
         url = ""
     if not url:
         return [Problem(SEVERITY_WARN, "(ticket)", "origin が無い。レビューの依頼と確認は動かない")]
-    token = review.token_for(url)
-    if token is None:
-        return [
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"origin ({url}) が GitHub でも GitLab でもない。レビューの依頼と確認は動かない",
-            )
-        ]
-    name, present = token
-    if not present:
-        return [
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"origin ({url}) に要る {name} が無い。レビューの依頼と確認は動かない",
-            )
-        ]
+    problem = review.transport_problem(url)
+    if problem:
+        return [Problem(SEVERITY_WARN, "(ticket)", f"{problem}。レビューの依頼と確認は動かない")]
     return []
 
 

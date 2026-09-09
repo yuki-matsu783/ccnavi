@@ -116,9 +116,6 @@ class Settings:
     # guard_cli は人の判断の経路（承認・レビュー済みの受け入れ・状態の移動）を
     # エージェントの手から守るか。enable / disable。
     guard_cli: str = ""
-    # review_fixture はテストと外部委任のための、リモートの代役（JSON）。
-    # 環境変数では指せない。指せると、親が check にそれを付けてゲートを開けられる。
-    review_fixture: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
     # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
