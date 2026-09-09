@@ -78,16 +78,34 @@ class SelfGuardTest(unittest.TestCase):
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
 
-    def run_hook(self, event, mode="enable", setting="enable", session="s1", **tool_input):
+    def binary(self, text="MZ fake executable\n"):
+        """実行ファイルの代わりを置く。`.gitignore` の中に在る想定なので、
+        コミットしない。git から戻せない対象がこれにあたる。"""
+        path = os.path.join(self.repo, "dist", "ccnavi", "ccnavi.exe")
+        write(path, text)
+        return path
+
+    def run_hook(
+        self,
+        event,
+        mode="enable",
+        setting="enable",
+        session="s1",
+        tool="Bash",
+        bin="",
+        **tool_input,
+    ):
         payload = json.dumps(
             {
                 "hook_event_name": event,
-                "tool_name": "Bash",
+                "tool_name": tool,
                 "tool_input": tool_input or {"command": "ls"},
                 "session_id": session,
             }
         )
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        if bin:
+            environment["CCNAVI_BIN_PATH"] = bin
         return subprocess.run(
             [
                 sys.executable,
@@ -236,6 +254,63 @@ class SelfGuardTest(unittest.TestCase):
         )
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    # 実行ファイル
+
+    def test_実行ファイルはシェルからの書き込みで止まる(self):
+        path = self.binary()
+
+        result = self.run_hook(
+            "PreToolUse", bin=path, command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe"
+        )
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_実行ファイルは名指しのツールからも止まる(self):
+        path = self.binary()
+
+        result = self.run_hook("PreToolUse", bin=path, tool="Write", file_path=path)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_指していなければ実行ファイルの綴りは当たらない(self):
+        # CCNAVI_BIN_PATH が空なら、そこは守る対象ではない。綴りを推測して
+        # 守ると、そこに在る別のファイルを実体として扱うことになる。
+        self.binary()
+
+        result = self.run_hook("PreToolUse", command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe")
+
+        self.assertNotIn("deny", result.stdout)
+
+    def test_セッション開始で控えを取り実行後に戻す(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        write(path, "MZ replaced\n")
+
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ fake executable\n")
+        self.assertIn("ccnavi.exe", result.stdout)
+
+    def test_セッション開始を通らなければ実行ファイルは黙って通る(self):
+        # 控えが無い状態。セッション開始のイベントに登録していないか、
+        # 実行ファイルを指していない設定がこれで、事件ではない。
+        path = self.binary()
+        write(path, "MZ replaced\n")
+
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ replaced\n")
+        self.assertEqual(result.stdout, "")
+
+    def test_実行ファイルが見つからなければセッション開始で言う(self):
+        missing = os.path.join(self.repo, "dist", "ccnavi", "ccnavi.exe")
+
+        result = self.run_hook("SessionStart", bin=missing)
+
+        self.assertIn("CCNAVI_BIN_PATH", result.stdout)
 
     # 設定で切る
 

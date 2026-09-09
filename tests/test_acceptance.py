@@ -358,13 +358,18 @@ class RecordTest(unittest.TestCase):
             pre_tool_use("Bash", "command", "go build ./..."),
             pre_tool_use("Task", "prompt", "something"),
             json.dumps({"hook_event_name": "SessionStart"}),
+            json.dumps({"hook_event_name": "Stop"}),
         )
 
-        self.assertEqual(len(got), 4, "記録の無い呼び出しは、動かなかったガードと区別が付かない")
+        self.assertEqual(len(got), 5, "記録の無い呼び出しは、動かなかったガードと区別が付かない")
         want = [
             ("deny", None),
             ("allow", None),
             ("skip", "no-subject"),
+            # セッション開始は判定を持つイベントになった。大きい対象の控えを
+            # ここで 1 度だけ取る。
+            ("allow", None),
+            # 判定を持たないイベントは、誤りではなく素通り（REQ-HKS-03）。
             ("skip", "event-not-checked"),
         ]
         for i, (decision, reason) in enumerate(want):
