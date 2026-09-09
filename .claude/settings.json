@@ -1,4 +1,18 @@
 {
+  "env": {
+    "PYTHONUTF8": "1",
+    "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
+    "CCNAVI_GUARD_CORE_FILES": "dry-run",
+    "CCNAVI_MODE": "dry-run",
+    "CCNAVI_RESTORE_IF_DENY": "dry-run",
+    "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
+    "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
+    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "deny": [
       "Read(**/.env*)",
@@ -16,16 +30,6 @@
       "Write(**/secrets/**)",
       "Write(**/.ssh/**)"
     ]
-  },
-  "env": {
-    "PYTHONUTF8": "1",
-    "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
-    "CCNAVI_GUARD_CORE_FILES": "dry-run",
-    "CCNAVI_MODE": "dry-run",
-    "CCNAVI_RESTORE_IF_DENY": "dry-run",
-    "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
-    "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
-    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi"
   },
   "hooks": {
     "SessionStart": [
@@ -108,9 +112,8 @@
       }
     ]
   },
-  "autoMemoryEnabled": false,
-  "attribution": {
-    "commit": "",
-    "pr": ""
-  }
+  "enabledPlugins": {
+    "mattpocock-skills@claude-plugins-official": true
+  },
+  "autoMemoryEnabled": false
 }
