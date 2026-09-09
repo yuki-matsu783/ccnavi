@@ -38,6 +38,7 @@ D.4 の使い方のほうで、終了コードはそれに合わせてある。
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -152,71 +153,185 @@ def check(
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules))
-    problems.extend(_ticket(conf))
+    problems.extend(_ticket(conf, root))
     return problems
 
 
-def _ticket(conf: settings.Settings) -> list[Problem]:
-    """チケットと承認台帳が噛み合っているかを見る。
+def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
+    """チケットと写しと作業ツリーが噛み合っているかを見る（REQ-TKT-25）。
 
-    判定に効くのは台帳の側だけなので、ここで問うのは「効いている範囲は何か」と
-    「作業ツリーのチケットがそれと一致しているか」の 2 つ。一致していない状態は
-    壊れてはいないが、書いた人は書いたとおりに効いていると思っている。
+    判定に効くのは写しの側だけなので、ここで問うのは「効いている範囲は何か」と
+    「作業ツリーと提案がそれと一致しているか」。一致していない状態は壊れては
+    いないが、書いた人は書いたとおりに効いていると思っている。
     検証はその思い違いを名指しする場所になる。
     """
-    from . import approval
+    from . import approval, tree
     from . import ticket as ticket_mod
 
     problems: list[Problem] = []
-    if not conf.ledger:
+    for name in conf.retired:
         problems.append(
-            Problem(SEVERITY_WARN, "(ticket)", "承認台帳の置き場が空。チケットの範囲は効かない")
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{name} はもう効かない。提案は {settings.TICKETS_ENV}、写しは "
+                f"{settings.APPROVED_ENV} で指す",
+            )
+        )
+    if not conf.approved:
+        problems.append(
+            Problem(SEVERITY_WARN, "(ticket)", "写しの置き場が空。チケットの範囲は効かない")
         )
         return problems
-
-    approved, unreadable = approval.current(conf.ledger)
-    if unreadable:
-        problems.append(Problem(SEVERITY_ERROR, "(ticket)", unreadable))
-        return problems
-
-    proposed, complaints = ticket_mod.load(conf.ticket)
-    # チケットの不備は error のまま上げる。検証は人が読む場所なので、
-    # 承認しようとして初めて気づくより、ここで気づけるほうがよい。
-    problems.extend(complaints)
-
-    if approved is None and proposed is None:
-        # チケットも承認も無い状態は不備ではない。チケットによる制御は任意で、
+    root = root or os.path.dirname(os.path.dirname(os.path.dirname(conf.approved)))
+    if not os.path.isdir(conf.approved) and not tree_has_tickets(root, conf.tickets):
+        # 写しも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
         # 他の報告ごと読まれなくなる。
         return problems
 
-    if approved is None:
+    # 写しの置き場が守られているか。ルールが Write を止めていなければ、
+    # エージェントが写しを書けて、承認の意味が無い。
+    try:
+        rule_set, _ = rules.load(conf.rules)
+    except (OSError, ValueError):
+        rule_set = None
+    probe = os.path.join(conf.approved, "probe.md")
+    if rule_set is not None and not any(
+        rule.matches("Write", probe) for rule in rule_set.deny + rule_set.ask
+    ):
         problems.append(
             Problem(
-                SEVERITY_WARN,
+                SEVERITY_ERROR,
                 "(ticket)",
-                f"{proposed.ticket} は未承認。'ccnavi --approve' を通すまで範囲は効かない",
+                f"写しの置き場 {conf.approved} への Write をルールが止めていない。"
+                "エージェントが写しを書けるので、承認の意味が無い",
             )
         )
-    elif proposed is None:
+
+    copies, notes = approval.copies(conf.approved)
+    for note in notes:
+        problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
+    closed, _ = approval.copies(conf.approved, closed=True)
+    index = approval.by_id(copies)
+    done = {t.ticket for t in closed}
+
+    proposals, complaints = ticket_mod.scan(root, conf.tickets)
+    problems.extend(complaints)
+
+    seen: dict[str, list[str]] = {}
+    for t in proposals:
+        seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{t.state}")
+        if t.ticket not in index and t.ticket not in done and t.state != ticket_mod.CANCELLED:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket} は未承認（{t.tree or '(main)'} の {t.state}/）。"
+                    "'ccnavi --approve' を通すまで範囲は効かない",
+                )
+            )
+        if t.state == ticket_mod.DOING:
+            waiting = [p for p in t.predecessors if p not in done]
+            if waiting:
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        "(ticket)",
+                        f"{t.ticket} は先行 {', '.join(waiting)} が閉じていないのに doing/ にある",
+                    )
+                )
+    for ticket_id, places in seen.items():
+        if len(places) > 1:
+            where = ", ".join(places)
+            problems.append(
+                Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
+            )
+
+    worktrees = tree.worktrees(root)
+    for t in worktrees:
+        if t.name not in index:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"作業ツリー {t.name} にチケットが無い。そこへの書き込みはルールだけで判定する",
+                )
+            )
+        stray = os.path.join(t.root, os.path.relpath(conf.approved, root))
+        if os.path.isdir(stray) and os.listdir(stray):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"作業ツリー {t.name} の側に写しの置き場がある。読むのは main の側だけ",
+                )
+            )
+    names = {t.name for t in worktrees}
+    for t in copies:
+        if t.ticket not in names:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket} は承認済みだが作業ツリー "
+                    f"{tree.worktree_path(root, t.ticket)} が無い。作るまで効かない",
+                )
+            )
+    if any(not t.is_child for t in copies) and not (
+        os.environ.get("GITHUB_TOKEN") or os.environ.get("GITLAB_TOKEN")
+    ):
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"読めるチケットが無いが、{approved.ticket} の承認済みの範囲は効いている: "
-                f"{', '.join(approved.write)}",
+                "GITHUB_TOKEN も GITLAB_TOKEN も無い。レビューの依頼と確認は動かない",
             )
         )
-    elif proposed.digest() != approved.digest:
+    for stray in _stray_claude_dirs(root, names):
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{conf.ticket} は承認された内容と違う。効いているのは {approved.ticket} の "
-                f"承認済みの範囲: {', '.join(approved.write)}",
+                f"{stray} は作業ツリーでも main でもないのに .claude/ を持つ。"
+                "cd 1 回で別の根に見える",
             )
         )
     return problems
+
+
+def tree_has_tickets(root: str, tickets_rel: str) -> bool:
+    """main か作業ツリーのどこかに提案の置き場があるか。"""
+    from . import tree
+
+    for t in [tree.main_tree(root), *tree.worktrees(root)]:
+        if os.path.isdir(os.path.join(t.root, tickets_rel.replace("/", os.sep))):
+            return True
+    return False
+
+
+def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
+    """リポジトリの中で `.claude/` を持つ、作業ツリーでも main でもないディレクトリ。
+
+    浅くしか見ない。2 段まで。深く歩くと大きなリポジトリで検証が待たされる。
+    """
+    found = []
+    skip = {".git", ".claude", "node_modules", ".venv", "dist", "build"}
+    try:
+        first = sorted(os.listdir(root))
+    except OSError:
+        return found
+    for name in first:
+        top = os.path.join(root, name)
+        if name in skip or not os.path.isdir(top):
+            continue
+        candidates = [top]
+        with contextlib.suppress(OSError):
+            candidates += [os.path.join(top, n) for n in sorted(os.listdir(top))]
+        for candidate in candidates:
+            if os.path.isdir(os.path.join(candidate, ".claude")):
+                found.append(os.path.relpath(candidate, root))
+    return found
 
 
 def _after(root: str) -> list[Problem]:

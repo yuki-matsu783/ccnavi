@@ -19,6 +19,10 @@ POST_TOOL_USE = "PostToolUse"
 SESSION_START = "SessionStart"
 USER_PROMPT_SUBMIT = "UserPromptSubmit"
 STOP = "Stop"
+# サブエージェントの開始と終了。開始は止められないイベントで、返せるのは文だけ。
+# 終了は Stop と同じで、exit 2 が「続けさせる」を意味する。
+SUBAGENT_START = "SubagentStart"
+SUBAGENT_STOP = "SubagentStop"
 
 # 1 回の呼び出しに対する判定。緩い順に並べてある。
 ALLOW = "allow"
@@ -53,6 +57,11 @@ class Input:
     cwd: str = ""
     permission_mode: str = ""
     tool_use_id: str = ""
+    # agent_id はサブエージェントの中で走った呼び出しにだけ付く。判定の鍵には
+    # 使わない（判定の鍵はファイルの行き先）。使うのは、サブエージェントに
+    # 許さない操作を見分けるときと、差し戻しの回数を数えるときだけ。
+    agent_id: str = ""
+    agent_type: str = ""
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -86,6 +95,8 @@ def decode(stream: TextIO) -> Input:
         cwd=data.get("cwd") or "",
         permission_mode=data.get("permission_mode") or "",
         tool_use_id=data.get("tool_use_id") or "",
+        agent_id=str(data.get("agent_id") or ""),
+        agent_type=str(data.get("agent_type") or ""),
     )
 
 

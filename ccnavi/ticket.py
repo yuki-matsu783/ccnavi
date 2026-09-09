@@ -6,118 +6,196 @@
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の首輪を伸ばせる。
 止められた側が止め方を書き換えられる仕組みは、止めていない。
 
-判定が使うのは承認台帳に載った範囲だけにしてある（approval.py）。作業ツリーの
-チケットは、人に見せて承認を求めるための提案で、承認されるまで判定には
-1 ミリも効かない。承認されたあとにファイルを書き換えても、効いているのは
-台帳の側なので範囲は広がらない。広がらないかわりに食い違いが起きるので、
-食い違いは毎回報告する。
+判定が使うのは承認済みの写し（approval.py）だけ。作業ツリーの提案は、人に見せて
+承認を求めるためのもので、承認されるまで判定には 1 ミリも効かない。承認されたあとに
+提案を書き換えても、効いているのは写しの側なので範囲は広がらない。
 
 ## 絞ることしかできない
 
 チケットが宣言できるのは「ここだけ書く」であって「ここも書ける」ではない。
-今のビルドの判定は deny の一覧で、チケットが無ければ全部通る。チケットは
-そこへ「宣言した範囲の外は止める」を足すだけなので、チケットをどう書いても
-チケットが無いときより緩くはならない。この向きが保たれている限り、
-エージェントが書いたファイルを判定に使っても危険は増えない。
+ルールが何も言わなかった場所に、チケットは「宣言した範囲の外は止める」を足すだけ。
+子は親の部分集合で、親子は厳しい側が勝つ。どう書いてもチケットが無いときより
+緩くはならない。
 
 ## 書式
 
-`.current-ticket.md` の先頭の frontmatter。設計 §9.1 のとおり YAML。
+`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §24.3。
+区画は rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
+パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
     ---
-    ticket: PROJ-1234
-    title: ユーザー設定画面のリファクタリング
+    version: 1
+    ticket: i0050-03
+    parent: i0050
+    phase: 2
+    predecessors: [i0050-01]
+    human_review: {required: true, reason: 設定の読み込み経路を変えるため}
+    title: 設定画面の分割
     rationale: |
-      設定コンポーネントの分割。
-    target_directories:
-      write:
-        "src/components/Settings": allow
+      Settings 配下のコンポーネント分割。
+    allow:
+      - match: Write|Edit|MultiEdit
+        glob: "src/components/Settings/*"
+    ask:
+      - match: Write|Edit|MultiEdit
+        glob: "src/components/*"
+    started_at: ""
+    completed_at: ""
+    base_sha: ""
     ---
 
-    ## 作業内容
-    ...(本文は判定に影響しない)
-
-読むのは `ticket` `title` `rationale` と `target_directories.write` だけ。
-設計にある他の欄（`tools`、`deny_commands`、`target_directories.read`）は
-このビルドの判定が使わない。使わない欄を黙って受け取ると、書いた人は
-効いていると思い、効いていないことに誰も気づかない。だから読み飛ばさずに
-「これは効かない」と名指しで報告する。
+状態は frontmatter ではなく置き場（`todo` `doing` `done` `cancelled`）が表す。
+`ls` で見え、コミットに残り、閉じたつもりが起きない。
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import os
+import re
 from dataclasses import dataclass, field
 
 import yaml
 
+from . import globmatch, rules, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
 FENCE = "---"
 
+# このビルドが読めるチケット書式の版。
+VERSION = 1
+
+# 状態。置き場の名前そのもの。
+TODO = "todo"
+DOING = "doing"
+DONE = "done"
+CANCELLED = "cancelled"
+STATES = (TODO, DOING, DONE, CANCELLED)
+# 閉じた状態。写しが closed/ へ動く。
+CLOSED = (DONE, CANCELLED)
+# 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
+GUARDED_STATES = (DOING, DONE, CANCELLED)
+
+# 範囲の項として効くツール。これ以外を match に書いた項は効かない。
+WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+
 # 範囲の件数の上限。設計 §9.4 の max_ticket_rules。大量に並べて人のレビューを
-# 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。上限を超えたら
-# チケットごと拒否する。1 件ずつ落とすと、落ちた 1 件がどれなのかを
-# 承認する人が追えない。
+# 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
-# 範囲のパスに書けない綴り。設計 §9.4 の検証 4 番。
-# `..` は範囲の外へ出る綴り、絶対パスと `~` はプロジェクトの外を指す綴り、
-# `$` は展開されるまで行き先が決まらない綴り。`*` は前置として読めない綴りで、
-# 範囲は前置で書くことになっている。
-_FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"), ("*", "`*`"))
+# 範囲のパスに書けない綴り。`..` は範囲の外へ出る綴り、絶対パスと `~` は
+# プロジェクトの外を指す綴り、`$` は展開されるまで行き先が決まらない綴り。
+_FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 
-# このビルドの判定が使わない欄。読めても効かないので名指しで報告する。
-_UNUSED = (
-    ("tools", "ツール権限"),
-    ("deny_commands", "追加の禁止コマンド"),
-)
+# 識別子。親は自由な 1 語、子は `<親>-<2 桁連番>`。
+_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
+
+# スクリプトだけが書く欄。人もエージェントも書かない。hook はこの 3 つ（と
+# 取り消しの 2 つ）だけを提案から写しへ写す。
+SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
+
+# 写しにだけある欄。承認の記録。
+APPROVAL_KEY = "ccnavi_approved"
+
+# glob のワイルドカード。これより前が字義どおりの前置。
+_WILDCARDS = "*?["
+
+# 範囲の判定。空文字は「言及していない」。
+OUTSIDE = ""
+
+
+@dataclass
+class Entry:
+    """範囲の 1 項。区画と、当てる式。"""
+
+    decision: str
+    glob: str = ""
+    regex: str = ""
+    compiled: re.Pattern | None = None
+
+    def matches(self, rel: str) -> bool:
+        if self.compiled is None:
+            return False
+        if self.glob and not any(c in self.glob for c in _WILDCARDS):
+            # ワイルドカードの無い綴りは前置。`src` が範囲なら `src` という
+            # 名前のファイルも `src/` の下も中。そこだけ外に落ちるのは驚きでしかない。
+            return rel == self.glob or rel.startswith(self.glob + "/")
+        return self.compiled.match(rel) is not None
+
+    def prefix(self) -> str:
+        """字義どおりの前置。部分集合の検査に使う。"""
+        if self.regex:
+            return ""
+        cut = len(self.glob)
+        for c in _WILDCARDS:
+            i = self.glob.find(c)
+            if i >= 0:
+                cut = min(cut, i)
+        return self.glob[:cut]
 
 
 @dataclass
 class Ticket:
-    """チケット 1 本ぶん。人に見せて承認を求めるための姿。"""
+    """チケット 1 本ぶん。提案としても写しとしても同じ形。"""
 
     ticket: str = ""
+    parent: str = ""
+    phase: int | None = None
+    predecessors: list[str] = field(default_factory=list)
+    review_required: bool = True
+    review_reason: str = ""
     title: str = ""
     rationale: str = ""
-    # write はプロジェクト根からの相対の前置。ここだけが判定に効く。
-    write: list[str] = field(default_factory=list)
+    entries: list[Entry] = field(default_factory=list)
+    # スクリプトが書く欄。
+    started_at: str = ""
+    completed_at: str = ""
+    base_sha: str = ""
+    cancelled_at: str = ""
+    cancel_reason: str = ""
+    # 読んだままの frontmatter。写しを作るときに使う。
+    raw: dict = field(default_factory=dict)
+    body: str = ""
+    # 見つけた場所。提案なら状態と作業ツリー、写しなら承認の記録から。
+    state: str = ""
+    tree: str = ""
+    tree_root: str = ""
+    path: str = ""
+    # 写しにだけある。
+    approved_at: str = ""
+    source_tree: str = ""
+    source_path: str = ""
+    risk: int = 0
 
-    def digest(self) -> str:
-        """承認の同一性を決める指紋。
+    @property
+    def is_child(self) -> bool:
+        return bool(self.parent)
 
-        frontmatter の生の文字列ではなく、解釈した中身から取る。人が承認画面で
-        見たものと、指紋が覆う範囲を一致させるため。生の文字列から取ると、
-        コメントを 1 つ足しただけで再承認を求めることになり、承認が
-        「また出た、押しておこう」に化ける。逆に範囲だけから取ると、
-        rationale を書き換えて別の作業に見せかけても指紋が変わらない。
-        人が読んで判断した欄は、すべて覆う。
+    def paths(self, decision: str) -> list[str]:
+        return [e.glob or e.regex for e in self.entries if e.decision == decision]
+
+    def decide(self, rel: str) -> str:
+        """このチケットが、作業ツリーの根からの相対パスをどう扱うか。
+
+        強い区画から見る。どこにも当たらなければ OUTSIDE で、それは範囲外。
+        書いていない場所は範囲外、が子のファイルだけ読んで範囲が分かる条件。
         """
-        canonical = json.dumps(
-            {
-                "ticket": self.ticket,
-                "title": self.title,
-                "rationale": self.rationale,
-                "write": sorted(self.write),
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        for name in rules.SECTIONS:
+            if any(e.decision == name and e.matches(rel) for e in self.entries):
+                return name
+        return OUTSIDE
+
+    def is_own_file(self, full: str) -> bool:
+        """この綴りがチケット自身の提案ファイルかどうか。"""
+        for candidate in (self.path, self.source_path):
+            if candidate and _same(candidate, full):
+                return True
+        return False
 
 
 def load(path: str) -> tuple[Ticket | None, list[Problem]]:
-    """チケットを読んで組み立てる。
-
-    ファイルが無いことは不備ではない。チケットによる制御は任意で、
-    置かなければ範囲の制限が掛からないだけ。置いていないプロジェクトに
-    苦情を返すと、苦情のほうが常態になって読まれなくなる。
-    """
+    """チケットを読んで組み立てる。無いことは不備ではない。"""
     try:
         with open(path, encoding="utf-8") as f:
             text = f.read()
@@ -125,62 +203,139 @@ def load(path: str) -> tuple[Ticket | None, list[Problem]]:
         return None, []
     except OSError as exc:
         return None, [Problem(SEVERITY_ERROR, path, f"チケットを読めない ({exc})")]
-    return parse(text)
+    ticket, problems = parse(text)
+    if ticket is not None:
+        ticket.path = os.path.realpath(path)
+    return ticket, problems
 
 
 def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     """読み込み済みの文面からチケットを組み立てる。
 
     ファイルを開く部分と分けてあるのは、テストと承認の画面が同じ道を通るため。
-    別の道で組み立てると、承認したものと判定が使うものが食い違いうる。
     """
-    front, problems = _frontmatter(text)
+    front, body, problems = _frontmatter(text)
     if front is None:
         return None, problems
 
     ticket = Ticket(
-        ticket=_text(front.get("ticket")),
+        ticket=_text(front.get("ticket")).strip(),
+        parent=_text(front.get("parent")).strip(),
         title=_text(front.get("title")),
         rationale=_text(front.get("rationale")),
+        raw=front,
+        body=body,
     )
     if not ticket.ticket:
         problems.append(Problem(SEVERITY_ERROR, "ticket", "チケット識別子が無い"))
         return None, problems
-
     name = ticket.ticket
-    for key, label in _UNUSED:
+
+    version = front.get("version")
+    if version != VERSION:
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"チケット書式の版 {version!r} は扱えない（このビルドが読むのは {VERSION}）。"
+                "区画は rules.yml と同じ deny / ask / allow で、`target_directories` は読まない",
+            )
+        )
+        return None, problems
+
+    if not _ID.match(name):
+        problems.append(Problem(SEVERITY_ERROR, name, "識別子に使えない文字がある"))
+        return None, problems
+
+    if ticket.parent:
+        matched = _CHILD.match(name)
+        if matched is None or matched.group("parent") != ticket.parent:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"子の識別子は `{ticket.parent}-<2 桁連番>` の形で書く。親の識別子が名前空間",
+                )
+            )
+            return None, problems
+        phase = front.get("phase")
+        if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
+            problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
+            return None, problems
+        ticket.phase = phase
+    else:
+        for key in ("phase", "predecessors"):
+            if key in front:
+                problems.append(
+                    Problem(SEVERITY_WARN, name, f"`{key}` は子だけの欄。親では読まない")
+                )
+
+    raw_preds = front.get("predecessors")
+    if isinstance(raw_preds, list):
+        ticket.predecessors = [_text(p).strip() for p in raw_preds if _text(p).strip()]
+    elif raw_preds is not None:
+        problems.append(Problem(SEVERITY_ERROR, name, "`predecessors` は並びで書く"))
+        return None, problems
+
+    review = front.get("human_review")
+    if isinstance(review, dict):
+        required = review.get("required", True)
+        if not isinstance(required, bool):
+            problems.append(
+                Problem(SEVERITY_ERROR, name, "`human_review.required` は true か false")
+            )
+            return None, problems
+        ticket.review_required = required
+        ticket.review_reason = _text(review.get("reason"))
+    elif isinstance(review, bool):
+        ticket.review_required = review
+    elif review is not None:
+        problems.append(
+            Problem(SEVERITY_ERROR, name, "`human_review` は {required:, reason:} で書く")
+        )
+        return None, problems
+    if not ticket.review_required and not ticket.review_reason:
+        problems.append(
+            Problem(
+                SEVERITY_WARN, name, "人間レビューを省くなら `human_review.reason` に理由を書く"
+            )
+        )
+
+    for key in ("tools", "deny_commands", "target_directories"):
         if key in front:
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"`{key}`（{label}）はこのビルドの判定が使わない。書いても効かない",
+                    f"`{key}` はこの版の判定が使わない。書いても効かない。"
+                    "範囲は deny / ask / allow の区画に `match: Write|Edit|MultiEdit` で書く",
                 )
             )
 
-    scope, scope_problems = _write_scope(front, name)
-    problems.extend(scope_problems)
-    ticket.write = scope
+    for key in SCRIPT_FIELDS:
+        setattr(ticket, key, _text(front.get(key)).strip())
 
-    if not ticket.write:
-        # 範囲が 1 件も無いチケットは、承認しても何も止めない。止めないことを
-        # 止めているつもりで居られるのがいちばん悪いので、error にする。
+    entries, scope_problems = _entries(front, name)
+    problems.extend(scope_problems)
+    ticket.entries = entries
+
+    if not any(e.decision in (rules.ALLOW, rules.ASK) for e in entries):
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 name,
-                "`target_directories.write` に allow の範囲が 1 件も無い。"
-                "このチケットは承認しても何も止めない",
+                "allow にも ask にも、効く範囲の項が 1 件も無い。このチケットは承認しても"
+                "何も書けない",
             )
         )
         return None, problems
 
-    if len(ticket.write) > MAX_SCOPE_ENTRIES:
+    if len(entries) > MAX_SCOPE_ENTRIES:
         problems.append(
             Problem(
                 SEVERITY_ERROR,
                 name,
-                f"範囲が {len(ticket.write)} 件ある（上限 {MAX_SCOPE_ENTRIES} 件）。"
+                f"範囲が {len(entries)} 件ある（上限 {MAX_SCOPE_ENTRIES} 件）。"
                 "作業を分けるか、範囲をまとめること",
             )
         )
@@ -189,125 +344,265 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     return ticket, problems
 
 
-def _frontmatter(text: str) -> tuple[dict | None, list[Problem]]:
-    """先頭の frontmatter を切り出して読む。
+def render(ticket: Ticket, extra: dict | None = None) -> str:
+    """チケットを文面に戻す。写しを作るときと、スクリプトが欄を書くときに使う。
 
-    `---` で始まらないファイルはチケットではない。本文だけの覚え書きを
-    チケットとして読み違えるより、読まなかったと言うほうがよい。
+    読んだ frontmatter をそのまま出す。並びが変わっても意味は変わらない。
     """
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != FENCE:
-        return None, [Problem(SEVERITY_ERROR, "(file)", f"先頭が `{FENCE}` で始まっていない")]
-
-    for i in range(1, len(lines)):
-        if lines[i].strip() == FENCE:
-            body = "\n".join(lines[1:i])
-            break
-    else:
-        return None, [Problem(SEVERITY_ERROR, "(file)", f"frontmatter が `{FENCE}` で閉じていない")]
-
-    try:
-        # safe_load に限る。任意の Python の型を組み立てる load は、
-        # エージェントが書けるファイルに向けては使えない。
-        front = yaml.safe_load(body)
-    except yaml.YAMLError as exc:
-        return None, [
-            Problem(SEVERITY_ERROR, "(file)", f"frontmatter を YAML として読めない ({exc})")
-        ]
-
-    if front is None:
-        return None, [Problem(SEVERITY_ERROR, "(file)", "frontmatter が空")]
-    if not isinstance(front, dict):
-        return None, [Problem(SEVERITY_ERROR, "(file)", "frontmatter がキーと値の並びではない")]
-    return front, []
+    front = dict(ticket.raw)
+    if extra:
+        front.update(extra)
+    dumped = yaml.safe_dump(front, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    return f"{FENCE}\n{dumped}{FENCE}\n{ticket.body}"
 
 
-def _write_scope(front: dict, name: str) -> tuple[list[str], list[Problem]]:
-    """`target_directories.write` から、判定に使う前置の一覧を取り出す。
+def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
+    """子が親の部分集合でない項を名指しする。
 
-    `allow` だけを範囲に数える。設計は `ask` も書けることになっているが、
-    このビルドに ask は無い。無い判定を黙って allow に読み替えると、
-    確認を求めたつもりの範囲が無確認で書ける範囲になる。数えないほうへ倒すと
-    その範囲は「範囲外」として止まるので、倒れる先が厳しい側になる。
+    glob 同士の包含は一般には決められないので、子の項の字義どおりの前置を
+    親に当てる。前置が親の allow か ask に入っていれば中、入っていなければ外。
+    `src/components/*` の前置は `src/components/`、`*` の前置は空文字で、
+    空文字を中と言える親は `*` を持つ親だけになる。
     """
-    problems: list[Problem] = []
-    directories = front.get("target_directories")
-    if directories is None:
-        return [], problems
-    if not isinstance(directories, dict):
-        return [], [Problem(SEVERITY_ERROR, name, "`target_directories` がキーと値の並びではない")]
-
-    if "read" in directories:
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                name,
-                "`target_directories.read` はこのビルドの判定が使わない。読み取りは制限しない",
-            )
-        )
-
-    raw = directories.get("write")
-    if raw is None:
-        return [], problems
-    if not isinstance(raw, dict):
-        return [], [
-            *problems,
-            Problem(SEVERITY_ERROR, name, "`target_directories.write` がキーと値の並びではない"),
-        ]
-
-    scope: list[str] = []
-    for key, value in raw.items():
-        path = _text(key).strip()
-        decision = _text(value).strip().lower()
-        if not path:
-            problems.append(Problem(SEVERITY_ERROR, name, "範囲のパスが空"))
+    problems = []
+    for entry in child.entries:
+        if entry.decision == rules.DENY:
             continue
-        if decision != "allow":
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    name,
-                    f"`{path}: {decision or '(空)'}` は allow ではないので範囲に数えない。"
-                    "このビルドに ask は無いため、この場所は範囲外として止まる",
-                )
-            )
-            continue
-        bad = _forbidden(path)
-        if bad:
-            problems.append(Problem(SEVERITY_ERROR, name, f"範囲のパス `{path}` に{bad}は書けない"))
-            continue
-        if os.path.isabs(path) or (len(path) > 1 and path[1] == ":"):
+        if entry.regex:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
-                    name,
-                    f"範囲のパス `{path}` が絶対パス。範囲はプロジェクト根からの相対で書く",
+                    child.ticket,
+                    f"子の範囲に regex `{entry.regex}` は書けない。親の部分集合であることを"
+                    "確かめられない",
                 )
             )
             continue
-        scope.append(path.replace("\\", "/").strip("/"))
+        # ワイルドカードがあれば、前置に 1 文字足した綴りを親に当てる。`src/b/*` なら
+        # `src/b/x`。無ければ綴りそのもの。前置の末尾の `/` を落として当てると、
+        # 親の `src/b/*` が `src/b` に当たらず、正当な子を「超えている」と読む。
+        probe = entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
+        verdict = parent.decide(probe)
+        if verdict not in (rules.ALLOW, rules.ASK):
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    child.ticket,
+                    f"`{entry.glob}` は親 {parent.ticket} の範囲を超えている",
+                )
+            )
+    return problems
 
-    return scope, problems
+
+def combine(child: str, parent: str) -> str:
+    """親子の判定を、厳しい側が勝つ形で合わせる。"""
+    order = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, OUTSIDE: 4}
+    return child if order[child] >= order[parent] else parent
 
 
-def inside(root: str, scope: list[str], full: str) -> bool:
-    """行き着く先が範囲の中かどうか。
+def scan(root: str, tickets_rel: str) -> tuple[list[Ticket], list[Problem]]:
+    """main と全作業ツリーの提案を集める。状態と置き場を添える。"""
+    found: list[Ticket] = []
+    problems: list[Problem] = []
+    for t in [tree.main_tree(root), *tree.worktrees(root)]:
+        base = os.path.join(t.root, tickets_rel.replace("/", os.sep))
+        for state in STATES:
+            directory = os.path.join(base, state)
+            try:
+                names = sorted(os.listdir(directory))
+            except OSError:
+                continue
+            for name in names:
+                if not name.endswith(".md"):
+                    continue
+                path = os.path.join(directory, name)
+                ticket, complaints = load(path)
+                for p in complaints:
+                    p.rule = f"{p.rule} ({os.path.relpath(path, root)})"
+                problems.extend(complaints)
+                if ticket is None:
+                    continue
+                if ticket.ticket != name[:-3]:
+                    problems.append(
+                        Problem(
+                            SEVERITY_ERROR,
+                            ticket.ticket,
+                            f"ファイル名 {name} と識別子 {ticket.ticket} が一致しない",
+                        )
+                    )
+                    continue
+                ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
+                found.append(ticket)
+    return _dedupe(found), problems
 
-    当てる先は解いた絶対パス。実行前の判定がファイルのパスを解いてから
-    ルールに当てるのと同じ理由で、`src/../etc` のような綴りで範囲の外へ
-    出られてはいけない。範囲の側も同じ解き方をしてから比べる。
 
-    範囲そのものを指すパスも中とみなす。`src` が範囲なら `src` という名前の
-    ファイルを作ることも作業のうちで、そこだけ外に落ちるのは驚きでしかない。
+def _dedupe(found: list[Ticket]) -> list[Ticket]:
+    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。
+
+    子の作業ツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
+    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに無い
+    ときは全部残し、検証が「複数の場所にある」と言う。
     """
-    if not full:
-        return False
-    target = os.path.normpath(full)
-    for entry in scope:
-        base = os.path.realpath(os.path.join(root, entry.replace("/", os.sep)))
-        if target == base or target.startswith(base + os.sep):
-            return True
-    return False
+    by_id: dict[str, list[Ticket]] = {}
+    for t in found:
+        by_id.setdefault(t.ticket, []).append(t)
+    kept: list[Ticket] = []
+    for hits in by_id.values():
+        home = hits[0].parent or hits[0].ticket
+        at_home = [t for t in hits if t.tree == home]
+        kept.extend(at_home if at_home else hits)
+    return kept
+
+
+def locate(root: str, tickets_rel: str, tree_root: str, ticket_id: str) -> tuple[str, str]:
+    """この作業ツリーで、この識別子の提案がどの状態にあるか。無ければ空文字 2 つ。"""
+    base = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
+    for state in STATES:
+        path = os.path.join(base, state, ticket_id + ".md")
+        if os.path.isfile(path):
+            return state, path
+    return "", ""
+
+
+def state_dir_regex(tickets_rel: str) -> str:
+    """直接の作成・移動を止める置き場に当たる式。パス用。"""
+    parts = [re.escape(p) for p in tickets_rel.split("/") if p]
+    joined = r"[\\/]".join(parts)
+    return rf"(^|[\\/]){joined}[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
+
+
+def guard_rules(tickets_rel: str) -> list[rules.Rule]:
+    """状態の置き場を守るルール。組み込みで、ルールファイルには書かない。
+
+    通るのは状態を動かすスクリプトだけ。そのスクリプトの呼び出し文字列には
+    置き場の綴りが現れないので、ここに当たらない。
+    """
+    from . import selfguard
+
+    place = state_dir_regex(tickets_rel)
+    message = (
+        "チケットの状態は置き場（doing/ done/ cancelled/）で表し、動かすのは "
+        "'sh .claude/scripts/ccnavi-ticket.sh start|done|cancel <識別子>' だけです。"
+        "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
+    )
+    write_rule = rules.Rule(
+        id=STATE_RULE_ID,
+        match="|".join(WRITE_TOOLS),
+        regex=place,
+        message=message,
+        decision=rules.DENY,
+    )
+    write_rule.compiled = re.compile(place)
+    # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
+    # 書き込む動詞の式が引数までを覆う。
+    parts = [re.escape(p) for p in tickets_rel.split("/") if p]
+    loose = r"[\\/]".join(parts) + rf"[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
+    shell = rf"{selfguard._WRITE_VERBS}{loose}|{selfguard._COPY_VERBS}{loose}"
+    shell_rule = rules.Rule(
+        id=STATE_RULE_ID + "-shell",
+        match="Bash",
+        regex=shell,
+        message=message,
+        decision=rules.DENY,
+    )
+    shell_rule.compiled = re.compile(shell)
+    return [write_rule, shell_rule]
+
+
+STATE_RULE_ID = "builtin-ticket-state"
+
+
+def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
+    problems: list[Problem] = []
+    entries: list[Entry] = []
+    for section in rules.SECTIONS:
+        raw_section = front.get(section)
+        if raw_section is None:
+            continue
+        if not isinstance(raw_section, list):
+            problems.append(Problem(SEVERITY_ERROR, name, f"`{section}` が並びではない"))
+            continue
+        for i, raw in enumerate(raw_section):
+            where = f"{section}[{i}]"
+            if not isinstance(raw, dict):
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} がキーと値の並びではない"))
+                continue
+            match = _text(raw.get("match"))
+            tools = [w.strip() for w in match.split("|") if w.strip()]
+            if not any(t in WRITE_TOOLS for t in tools):
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        name,
+                        f"{where} の match `{match}` は書き込みのツールを含まない。"
+                        "この版の判定はパスの範囲しか見ないので効かない",
+                    )
+                )
+                continue
+            glob = _text(raw.get("glob")).strip()
+            regex = _text(raw.get("regex")).strip()
+            if not glob and not regex:
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} に glob も regex も無い"))
+                continue
+            if glob and regex:
+                problems.append(
+                    Problem(SEVERITY_ERROR, name, f"{where} に glob と regex の両方がある")
+                )
+                continue
+            bad = _forbidden(glob or regex)
+            if bad:
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} の範囲に{bad}は書けない"))
+                continue
+            if glob and (os.path.isabs(glob) or (len(glob) > 1 and glob[1] == ":")):
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        name,
+                        f"{where} の範囲 `{glob}` が絶対パス。作業ツリーの根からの相対で書く",
+                    )
+                )
+                continue
+            glob = glob.replace("\\", "/").strip("/")
+            expression = regex or ("^" + globmatch.translate(glob))
+            try:
+                compiled = re.compile(expression)
+            except re.error as exc:
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} を式にできない: {exc}"))
+                continue
+            entries.append(Entry(decision=section, glob=glob, regex=regex, compiled=compiled))
+    return entries, problems
+
+
+def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FENCE:
+        return None, "", [Problem(SEVERITY_ERROR, "(file)", f"先頭が `{FENCE}` で始まっていない")]
+    for i in range(1, len(lines)):
+        if lines[i].strip() == FENCE:
+            head = "\n".join(lines[1:i])
+            body = "\n".join(lines[i + 1 :])
+            break
+    else:
+        return (
+            None,
+            "",
+            [Problem(SEVERITY_ERROR, "(file)", f"frontmatter が `{FENCE}` で閉じていない")],
+        )
+    try:
+        # safe_load に限る。任意の Python の型を組み立てる load は、
+        # エージェントが書けるファイルに向けては使えない。
+        front = yaml.safe_load(head)
+    except yaml.YAMLError as exc:
+        return (
+            None,
+            "",
+            [Problem(SEVERITY_ERROR, "(file)", f"frontmatter を YAML として読めない ({exc})")],
+        )
+    if front is None:
+        return None, "", [Problem(SEVERITY_ERROR, "(file)", "frontmatter が空")]
+    if not isinstance(front, dict):
+        return None, "", [Problem(SEVERITY_ERROR, "(file)", "frontmatter がキーと値の並びではない")]
+    return front, body + ("\n" if body and not body.endswith("\n") else ""), []
 
 
 def _forbidden(path: str) -> str:
@@ -318,11 +613,14 @@ def _forbidden(path: str) -> str:
 
 
 def _text(value: object) -> str:
-    """YAML から来た値を文字列にする。
-
-    数字だけのチケット識別子は YAML が int にして返す。str() で受けないと、
-    `ticket: 1234` と書いたチケットが「識別子が無い」で落ちる。
-    """
-    if value is None or isinstance(value, (dict, list)):
+    """YAML から来た値を文字列にする。数字だけの識別子は int で返ってくる。"""
+    if value is None or isinstance(value, (dict, list, bool)):
         return ""
     return str(value)
+
+
+def _same(a: str, b: str) -> bool:
+    try:
+        return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+    except OSError:
+        return False

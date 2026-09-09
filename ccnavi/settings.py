@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # ccnavi が読む環境変数。
 MODE_ENV = "CCNAVI_MODE"
@@ -45,10 +45,14 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # BIN_SUFFIXES は、書かれた綴りに無いときだけ継ぎ足して探す拡張子。
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
-# チケットによる範囲の制御が使う 2 つ。TICKET_ENV は人に見せる提案の置き場、
-# LEDGER_ENV は承認台帳。判定が読むのは台帳だけで、提案のほうは承認の画面しか読まない。
-TICKET_ENV = "CCNAVI_TICKET"
-LEDGER_ENV = "CCNAVI_LEDGER"
+# チケットによる範囲の制御が使う 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
+# 根からの相対。APPROVED_ENV は承認済みの写しの置き場で、main の根からの相対。
+# 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
+TICKETS_ENV = "CCNAVI_TICKETS"
+APPROVED_ENV = "CCNAVI_APPROVED"
+# 以前の形（チケット 1 本と台帳 jsonl）の環境変数。もう効かない。指定されていたら
+# --lint が言う。黙って無視すると、書いた人は効いていると思い続ける。
+RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER")
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -64,12 +68,13 @@ DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
-# チケットはプロジェクト根に置く。人が編集し、人が承認するものなので、
+# 提案は各作業ツリーの `wip/tickets/` に置く。人が読み、人が承認するものなので、
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
-DEFAULT_TICKET = ".current-ticket.md"
-# 台帳は設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
-# シェル経由の書き込みを止めている。台帳のために別の保護を足さずに済む。
-DEFAULT_LEDGER = os.path.join(".claude", "ccnavi", "approvals.jsonl")
+# 区切りは "/" で持つ。作業ツリーの根に継ぎ足すときに os の区切りへ直す。
+DEFAULT_TICKETS = "wip/tickets"
+# 写しは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
+# シェル経由の書き込みを止めている。写しのために別の保護を足さずに済む。
+DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
 
 
 @dataclass
@@ -110,11 +115,13 @@ class Settings:
     # 「ccnavi の実体」として扱うことになるため。
     bin: str = ""
 
-    # ticket は人に見せる提案の置き場、ledger は承認台帳。
-    # 判定が読むのは ledger だけ。ticket を読むのは承認の画面と --lint で、
-    # どちらも人が起こす経路になっている。
-    ticket: str = ""
-    ledger: str = ""
+    # tickets は提案の置き場（各作業ツリーの根からの相対、"/" 区切り）、
+    # approved は承認済みの写しの置き場（絶対）。判定が読むのは approved だけ。
+    # approved が空なら、チケットによる制御を使わない。
+    tickets: str = ""
+    approved: str = ""
+    # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
+    retired: list[str] = field(default_factory=list)
 
 
 def load(root: str) -> tuple[Settings, list[str]]:
@@ -133,8 +140,9 @@ def load(root: str) -> tuple[Settings, list[str]]:
         state=os.path.join(root, DEFAULT_STATE),
         restore_if_deny=os.environ.get(RESTORE_IF_DENY_ENV, ""),
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
-        ticket=os.path.join(root, DEFAULT_TICKET),
-        ledger=os.path.join(root, DEFAULT_LEDGER),
+        tickets=DEFAULT_TICKETS,
+        approved=os.path.join(root, DEFAULT_APPROVED),
+        retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
 
     rules_env = os.environ.get(RULES_ENV, "")
@@ -149,14 +157,14 @@ def load(root: str) -> tuple[Settings, list[str]]:
         # 空文字は「控えを持たない」。診断のための実行が、走っている
         # セッションの控えを書き替えずに済むようにする。
         settings.state = _log_or_none(root, os.environ[STATE_ENV])
-    ticket_env = os.environ.get(TICKET_ENV, "")
-    if ticket_env:
-        settings.ticket = _resolve(root, ticket_env)
-    if LEDGER_ENV in os.environ:
-        # 空文字は「台帳を持たない」＝チケットによる制御を使わない。
+    tickets_env = os.environ.get(TICKETS_ENV, "")
+    if tickets_env:
+        settings.tickets = _relative(tickets_env)
+    if APPROVED_ENV in os.environ:
+        # 空文字は「写しを持たない」＝チケットによる制御を使わない。
         # 承認済みの範囲が無ければ範囲の制限は掛からないので、これは
         # チケットを置いていないのと同じ状態になる。
-        settings.ledger = _log_or_none(root, os.environ[LEDGER_ENV])
+        settings.approved = _log_or_none(root, os.environ[APPROVED_ENV])
 
     if not own_source_tree(root):
         return settings, []
@@ -185,12 +193,22 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.restore_if_deny = conf["restore_if_deny"]
     if isinstance(conf.get("guard_core_files"), str):
         settings.guard_core_files = conf["guard_core_files"]
-    if isinstance(conf.get("ticket"), str) and conf["ticket"]:
-        settings.ticket = _resolve(root, conf["ticket"])
-    if isinstance(conf.get("ledger"), str):
-        settings.ledger = _log_or_none(root, conf["ledger"])
+    if isinstance(conf.get("tickets"), str) and conf["tickets"]:
+        settings.tickets = _relative(conf["tickets"])
+    if isinstance(conf.get("approved"), str):
+        settings.approved = _log_or_none(root, conf["approved"])
 
     return settings, problems
+
+
+def _relative(path: str) -> str:
+    """提案の置き場の綴りを、作業ツリーの根からの相対に揃える。
+
+    絶対パスは受けない。作業ツリーごとに違う根に継ぎ足すものなので、
+    絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
+    分からなくなる。絶対で来たら先頭の区切りだけ落として相対として読む。
+    """
+    return path.replace("\\", "/").strip("/")
 
 
 def own_source_tree(root: str) -> bool:

@@ -1,77 +1,69 @@
-"""承認台帳。人がチケットに合意したことの記録で、判定はここだけを読む。
+"""承認済みの写し。人がチケットに合意したことの記録で、判定はここだけを読む。
 
-## なぜ台帳が権威なのか
+## なぜ写しが権威なのか
 
-チケットのファイルはエージェントが書ける。判定がファイルを直接読むと、
-範囲の外で止められたエージェントが範囲を書き足して通れる。台帳を挟むと、
-書き足したチケットは指紋が変わり、台帳のどの行とも一致しなくなる。
-一致しなければ未承認で、未承認のチケットは判定に効かない。
+チケットの提案はエージェントが書ける。判定が提案を直接読むと、範囲の外で
+止められたエージェントが範囲を書き足して通れる。承認のときに写しを取り、判定は
+写しだけを読む。書き足した提案は写しに届かない。
 
-効かないということは、範囲の制限が外れて元の状態に戻るということ。ここを
-「全部拒否」に倒さないのは、倒した先でチケットを直す手も止まるから。
-ルールファイルが読めないときに組み込みの既定へ落ちる（REQ-PRE-06）のと
-同じ形で、倒れた先に回復の道を残す。そのかわり、未承認のあいだは呼び出しの
-たびに言う。黙って外れた制限は、掛かっているつもりで居られるぶん、
-最初から無いより悪い。
+以前は台帳（jsonl の最後の行）だったが、同時に効くチケットが複数になって
+最後の 1 行では表せなくなった。チケット 1 本に写し 1 つ。有効な承認の集合は
+ディレクトリの中身そのもので、指紋の照合は要らない。
 
-## 追記しかしない
+## 写しを守るのはルールの側
 
-1 行 1 承認で追記する。上書きすると、いつ何を承認したかの履歴が消え、
-前回からの差分（REQ-APV-02）を出す元も無くなる。現在有効なのは
-最後の行 1 つで、それより前の行は差分と監査のために残る。
-
-## 台帳を守るのはルールの側
-
-台帳は `.claude/ccnavi/` に置く。そこはこのリポジトリのルールが
+写しは `.claude/ccnavi/tickets/` に置く。そこはこのリポジトリのルールが
 Write / Edit を止め、組み込みの既定がシェル経由の書き込みを止めている場所で、
-チケットのために別の保護を足す必要がない。設計 §17.5 は
-`.claude/approved-tickets.jsonl` に置いているが、置き場を分けると
-守り方も 2 通りになり、片方が緩んでも気づかれない。
+写しのために別の保護を足す必要がない。置き場を `.claude/` の外に向けたら、
+守られていないことを --lint が言う。
 
-設計 §17.6 が書いているとおり、これは任意のシェル実行ができる相手には
-効かない。台帳は hook と同じ権限で書かれるので、そこまで届いた相手は
-台帳も書ける。防げるのは、エージェントがツールを使って範囲を広げることと、
-承認前のチケットで作業が始まる事故と、チケットの切り替え忘れ。
+## 閉じる向きだけは承認が要らない
+
+提案が `done/` か `cancelled/` に動いたら、hook が写しを `closed/` へ動かす。
+範囲が消える向きなので、エージェントが動かしても危険は増えない。逆に写しを
+戻す（再開）のは人の手でやる。
+
+## フェーズの印
+
+`phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みの印を置く。
+ゲート（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import time
-from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import rules
+from . import rules, settings
 from . import ticket as ticket_mod
+
+# 写しの下の置き場。
+CLOSED_DIR = "closed"
+PHASES_DIR = "phases"
+
+# フェーズの印の種類。
+MARK_REQUESTED = "requested"
+MARK_REVIEWED = "reviewed"
+MARK_SKIPPED = "skipped"
+# pending は「終わったと 1 度伝えた」の印。同じ文を呼び出しごとに繰り返さないため。
+MARK_PENDING = "pending"
+MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
 
 # リスクの段階。設計 §17.3 の表。
 LEVELS = ((70, "CRITICAL"), (40, "HIGH"), (20, "MEDIUM"), (0, "LOW"))
-
-# 二段階承認に入る境目。設計 §17.4 の high_risk_threshold。
-#
-# 40 ちょうどの扱いは設計の中で揺れている（§17.3 の転記注記）。段階の表は
-# 40 を HIGH に含め、HIGH の挙動は二段階承認と書く。§17.4 の本文は「超える場合」。
-# 2 つが一致する側、つまり 40 を含める側を採った。境目で緩いほうを選ぶ理由が
-# 無いのと、40 で HIGH と表示しながらワンキーで通せるほうが読み手を裏切る。
 HIGH_RISK = 40
 
 # 高影響領域。ここへの書き込みは、実行環境・CI・エージェント定義に波及する。
-# 設計 §17.3 の +35 の行。
 HIGH_IMPACT = (".claude", ".github", ".git", "ci", "Dockerfile", ".gitlab-ci.yml")
 
-# 加点。設計 §17.3 のうち、このビルドに対応する概念があるものだけを写した。
-# 写していない行（expected_roots 外、Layer 0-B 不変 deny、ask の allow 化、
-# tools と approval_cache の緩和、sandbox 外）は、その概念自体がまだ無い。
-# 概念の無い加点を 0 点として黙って落とすと、点が低いことが安全の証拠に見える。
-# 承認画面はスコアと一緒に「何を見ていないか」を出す。
 POINTS_NEW_SCOPE = 5
 POINTS_HIGH_IMPACT = 35
 POINTS_PROJECT_ROOT = 30
 POINTS_GUARDED = 25
-POINTS_DOUBLED = 15
 
-# スコアが見ていないもの。承認画面に出す。
 UNSCORED = (
     "expected_roots（想定委譲範囲）との照合",
     "sandbox_root の外かどうか",
@@ -79,280 +71,365 @@ UNSCORED = (
 )
 
 
-@dataclass
-class Approval:
-    """台帳の 1 行。承認したときのチケットの姿をそのまま留める。"""
-
-    ticket: str = ""
-    title: str = ""
-    digest: str = ""
-    write: list[str] = field(default_factory=list)
-    risk: int = 0
-    approved_at: str = ""
-
-    def to_json(self) -> str:
-        return json.dumps(
-            {
-                "approved_at": self.approved_at,
-                "ticket": self.ticket,
-                "title": self.title,
-                "digest": self.digest,
-                "write": self.write,
-                "risk": self.risk,
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
+def copy_path(approved_dir: str, ticket_id: str) -> str:
+    return os.path.join(approved_dir, ticket_id + ".md")
 
 
-def current(path: str) -> tuple[Approval | None, str]:
-    """今効いている承認と、読めなかった理由を返す。
+def closed_path(approved_dir: str, ticket_id: str) -> str:
+    return os.path.join(approved_dir, CLOSED_DIR, ticket_id + ".md")
 
-    有効なのは最後の行 1 つ。前の行は差分と監査のために残っているだけで、
-    2 本のチケットを同時に承認済みにはしない。同時に効く範囲が 2 つあると、
-    片方を承認したつもりの人が、もう片方の範囲まで開けたことになる。
-    """
+
+def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Ticket], list[str]]:
+    """写しの一覧。closed なら閉じた写し。2 つめは読めなかったものの説明。"""
+    directory = os.path.join(approved_dir, CLOSED_DIR) if closed else approved_dir
     try:
-        with open(path, encoding="utf-8") as f:
-            lines = [line for line in f.read().splitlines() if line.strip()]
+        names = sorted(os.listdir(directory))
     except FileNotFoundError:
-        return None, ""
+        return [], []
     except OSError as exc:
-        return None, f"承認台帳を読めない ({exc})"
+        return [], [f"写しの置き場を読めない ({exc})"]
+    found, notes = [], []
+    for name in names:
+        if not name.endswith(".md"):
+            continue
+        path = os.path.join(directory, name)
+        ticket = load_copy(path)
+        if ticket is None:
+            notes.append(f"写し {path} を読めない")
+            continue
+        if ticket.ticket != name[:-3]:
+            notes.append(f"写し {path} の識別子 {ticket.ticket} がファイル名と違う")
+            continue
+        found.append(ticket)
+    return found, notes
 
-    if not lines:
-        return None, ""
-    try:
-        raw = json.loads(lines[-1])
-    except ValueError as exc:
-        return None, f"承認台帳の最後の行を JSON として読めない ({exc})"
-    if not isinstance(raw, dict):
-        return None, "承認台帳の最後の行がオブジェクトではない"
 
-    write = raw.get("write")
-    return (
-        Approval(
-            ticket=str(raw.get("ticket") or ""),
-            title=str(raw.get("title") or ""),
-            digest=str(raw.get("digest") or ""),
-            write=[str(p) for p in write] if isinstance(write, list) else [],
-            risk=raw.get("risk") if isinstance(raw.get("risk"), int) else 0,
-            approved_at=str(raw.get("approved_at") or ""),
-        ),
-        "",
+def load_copy(path: str) -> ticket_mod.Ticket | None:
+    ticket, problems = ticket_mod.load(path)
+    if ticket is None:
+        return None
+    meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
+    if not isinstance(meta, dict):
+        return None
+    ticket.approved_at = str(meta.get("approved_at") or "")
+    ticket.source_tree = str(meta.get("source_tree") or "")
+    ticket.source_path = str(meta.get("source_path") or "")
+    ticket.risk = meta.get("risk") if isinstance(meta.get("risk"), int) else 0
+    ticket.tree = ticket.source_tree
+    return ticket
+
+
+def write_copy(
+    approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, risk: int, approved_at: str
+) -> str:
+    """承認した提案を写す。書けなかった理由を返す。書けたら空文字。"""
+    meta = {
+        "approved_at": approved_at,
+        "source_tree": source_tree,
+        "source_path": ticket.path,
+        "risk": risk,
+    }
+    return _write(
+        copy_path(approved_dir, ticket.ticket),
+        ticket_mod.render(ticket, {ticket_mod.APPROVAL_KEY: meta}),
     )
 
 
-def append(path: str, approval: Approval) -> str:
-    """台帳に 1 行足す。書けなかった理由を返す。書けたら空文字。"""
+def update_copy(approved_dir: str, ticket: ticket_mod.Ticket, fields: dict) -> str:
+    """写しの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
+    allowed = {k: v for k, v in fields.items() if k in ticket_mod.SCRIPT_FIELDS}
+    return _write(copy_path(approved_dir, ticket.ticket), ticket_mod.render(ticket, allowed))
+
+
+def close_copy(approved_dir: str, ticket_id: str) -> str:
+    """写しを closed/ へ動かす。"""
+    source = copy_path(approved_dir, ticket_id)
+    target = closed_path(approved_dir, ticket_id)
     try:
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(approval.to_json() + "\n")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.move(source, target)
     except OSError as exc:
-        return f"承認台帳に書けない ({exc})"
+        return f"写しを閉じられない ({exc})"
     return ""
 
 
-def score(
-    proposed: ticket_mod.Ticket, previous: Approval | None, rule_set: rules.RuleSet, root: str
-) -> tuple[int, list[str]]:
-    """リスクを数え、加点した理由を人の読める形で返す。
+def by_id(tickets: list[ticket_mod.Ticket]) -> dict[str, ticket_mod.Ticket]:
+    return {t.ticket: t for t in tickets}
 
-    数だけを出しても承認の判断には使えない。40 という数字は「何が 40 なのか」が
-    分からなければ押す指を止められないので、点と一緒にその内訳を返す。
+
+def children_of(tickets: list[ticket_mod.Ticket], parent_id: str) -> list[ticket_mod.Ticket]:
+    return [t for t in tickets if t.parent == parent_id]
+
+
+def mark_path(approved_dir: str, parent: str, phase: int, kind: str) -> str:
+    return os.path.join(approved_dir, PHASES_DIR, parent, f"{phase}.{kind}")
+
+
+def read_mark(approved_dir: str, parent: str, phase: int, kind: str) -> dict | None:
+    try:
+        with open(mark_path(approved_dir, parent, phase, kind), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else {}
+
+
+def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict) -> str:
+    payload = dict(data)
+    payload.setdefault("at", now())
+    return _write(
+        mark_path(approved_dir, parent, phase, kind), json.dumps(payload, ensure_ascii=False)
+    )
+
+
+def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
+    """このフェーズの印を全部消す。消せた種類を返す。"""
+    cleared = []
+    for kind in MARKS:
+        path = mark_path(approved_dir, parent, phase, kind)
+        try:
+            os.remove(path)
+            cleared.append(kind)
+        except OSError:
+            continue
+    return cleared
+
+
+def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
+    found = {}
+    for kind in MARKS:
+        data = read_mark(approved_dir, parent, phase, kind)
+        if data is not None:
+            found[kind] = data
+    return found
+
+
+def now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def score(
+    proposed: ticket_mod.Ticket, rule_set: rules.RuleSet, tree_root: str
+) -> tuple[int, list[str]]:
+    """親のリスクを数え、加点した理由を人の読める形で返す。
+
+    子は数えない。親の部分集合なので、新たに書けるようになる領域は無い。
     """
-    known = set(previous.write) if previous else set()
     points = 0
     why: list[str] = []
-
-    for path in sorted(proposed.write):
-        if path not in known:
-            points += POINTS_NEW_SCOPE
-            why.append(f"+{POINTS_NEW_SCOPE} 新しい書き込み範囲 `{path}`")
-        if not path or path == ".":
+    for path in sorted(proposed.paths(rules.ALLOW) + proposed.paths(rules.ASK)):
+        points += POINTS_NEW_SCOPE
+        why.append(f"+{POINTS_NEW_SCOPE} 書き込み範囲 `{path}`")
+        if path in ("", ".", "*", "**"):
             points += POINTS_PROJECT_ROOT
-            why.append(f"+{POINTS_PROJECT_ROOT} `{path or '(空)'}` はプロジェクト全体を開ける")
+            why.append(f"+{POINTS_PROJECT_ROOT} `{path}` は作業ツリー全体を開ける")
             continue
         head = path.split("/")[0]
         if head in HIGH_IMPACT or path.endswith(".tf"):
             points += POINTS_HIGH_IMPACT
             why.append(f"+{POINTS_HIGH_IMPACT} `{path}` は実行環境・CI・エージェント定義に波及する")
-        guarded = _guarded_by(path, rule_set, root)
+        guarded = _guarded_by(path, rule_set, tree_root)
         if guarded:
             points += POINTS_GUARDED
             why.append(f"+{POINTS_GUARDED} `{path}` はルール {guarded} が守っている場所を含む")
-
-    if previous and known and len(proposed.write) >= len(known) * 2:
-        points += POINTS_DOUBLED
-        why.append(
-            f"+{POINTS_DOUBLED} 前回承認（{previous.ticket}）から範囲が "
-            f"{len(known)} 件 → {len(proposed.write)} 件に広がっている"
-        )
-
     return points, why
 
 
 def level(points: int) -> str:
-    """スコアの段階名。"""
     for threshold, name in LEVELS:
         if points >= threshold:
             return name
     return LEVELS[-1][1]
 
 
-def screen(
-    proposed: ticket_mod.Ticket,
-    previous: Approval | None,
-    points: int,
-    why: list[str],
-    problems: list[rules.Problem],
-) -> str:
-    """承認を求める画面を組む。
-
-    設計 §17.1 のとおり、frontmatter の全文は見せない。人に見せるのは
-    「何が新たに書けるようになるか」「前回との差分」「リスク」の 3 つ。
-    全文を目視させる形にすると、長いものほど読まれなくなり、長く書けば
-    通せるという逆の誘因ができる。
-
-    新たに書けるようになる領域を最初に置くのは設計 §17.2 の指定。これが
-    被害の上限を決める情報なので、読み手が最初に当たる位置に置く。
-    """
-    known = set(previous.write) if previous else set()
-    now = set(proposed.write)
-
-    lines = [
-        f"Ticket 承認リクエスト: {proposed.ticket}: {proposed.title}",
-        "",
-        "■ このチケットで書き込みが許される領域（これ以外はすべて止まる）",
-    ]
-    lines += [f"    {'+ ' if p not in known else '  '}{p}/" for p in sorted(now)] or ["    (無し)"]
-
-    if proposed.rationale.strip():
-        lines += ["", "■ 理由（エージェントの記述）"]
-        lines += [f"    {line}" for line in proposed.rationale.strip().splitlines()]
-
-    lines += ["", "■ 前回承認からの差分"]
-    if previous is None:
-        lines.append("    前回の承認が無い。これが最初の承認になる")
-    else:
-        added = sorted(now - known)
-        removed = sorted(known - now)
-        lines.append(f"    前回: {previous.ticket} ({previous.approved_at})")
-        lines += [f"    + {p}/  新規" for p in added]
-        lines += [f"    - {p}/  削除" for p in removed]
-        if not added and not removed:
-            lines.append("    範囲の変化なし")
-
-    lines += ["", f"■ リスクスコア: {points} ({level(points)})"]
-    lines += [f"    {line}" for line in why] or ["    加点なし"]
-
-    lines += ["", "■ このスコアが見ていないもの"]
-    lines += [f"    {item}" for item in UNSCORED]
-
-    complaints = [p for p in problems if p.severity == rules.SEVERITY_WARN]
-    if complaints:
-        lines += ["", "■ チケットの記述のうち、判定に効かないもの"]
-        lines += [f"    {p.detail}" for p in complaints]
-
-    return "\n".join(lines)
-
-
 def approve(
     stdin: TextIO,
     stdout: TextIO,
     stderr: TextIO,
-    ticket_path: str,
-    ledger_path: str,
+    conf: settings.Settings,
     rule_set: rules.RuleSet,
     root: str,
 ) -> int:
-    """チケットを人に見せ、承認されたら台帳に追記する。
+    """未承認の提案を束で人に見せ、承認されたら写しを置く。
 
-    エージェントではなく人が端末から叩く経路。チケットを書き直す道
-    （設計 §17.2 の「編集して承認」「再生成」）は用意しない。チケットを
-    書くのはエージェントの仕事で、承認する場所で書き替えられると、
-    承認した人が承認したものの作者になる。承認と作成は分けたままにする。
+    エージェントではなく人が端末から叩く経路。提案を書き直す道は用意しない。
+    チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
+    承認した人が承認したものの作者になる。
+
+    束は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
+    子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
     """
-    proposed, problems = ticket_mod.load(ticket_path)
-    errors = [p for p in problems if p.severity == rules.SEVERITY_ERROR]
-    if proposed is None:
-        stderr.write(f"ccnavi: {ticket_path} からチケットを読めない\n")
-        for problem in errors or problems:
-            stderr.write(f"  {problem}\n")
-        if not problems:
-            stderr.write("  ファイルが無い\n")
+    proposals, problems = ticket_mod.scan(root, conf.tickets)
+    for problem in problems:
+        stderr.write(f"ccnavi: {problem}\n")
+
+    approved, notes = copies(conf.approved)
+    for note in notes:
+        stderr.write(f"ccnavi: {note}\n")
+    closed, _ = copies(conf.approved, closed=True)
+    known = by_id(approved + closed)
+
+    # 承認待ち。写しが無いもの。閉じたものは対象外で、再開は人が写しを戻す。
+    pending = [t for t in proposals if t.ticket not in known and t.state != ticket_mod.CANCELLED]
+    if not pending:
+        stdout.write("承認待ちのチケットは無い。\n")
+        return 0
+
+    pool = by_id(approved + pending)
+    batch: list[tuple[ticket_mod.Ticket, int, list[str], list[rules.Problem]]] = []
+    rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
+    for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
+        complaints = _validate(t, pool)
+        if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
+            rejected.append((t, complaints))
+            continue
+        points, why = (0, []) if t.is_child else score(t, rule_set, t.tree_root)
+        batch.append((t, points, why, complaints))
+
+    for t, complaints in rejected:
+        stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
+        for p in complaints:
+            stderr.write(f"  {p}\n")
+    if not batch:
         return 1
 
-    previous, unreadable = current(ledger_path)
-    if unreadable:
-        # 台帳が読めないまま追記すると、前回からの差分が「前回が無い」に化ける。
-        # 差分が出ない承認は、段階的に範囲を広げる手口をそのまま通す。
-        stderr.write(f"ccnavi: {unreadable}\n")
-        return 1
-
-    points, why = score(proposed, previous, rule_set, root)
-    stdout.write(screen(proposed, previous, points, why, problems) + "\n\n")
-
-    if points >= HIGH_RISK:
+    stdout.write(screen(batch, known) + "\n\n")
+    total = max(points for _, points, _, _ in batch)
+    parents = [t.ticket for t, _, _, _ in batch if not t.is_child]
+    if total >= HIGH_RISK:
+        key = parents[0] if parents else batch[0][0].ticket
         stdout.write(
-            f"⚠ リスクスコア {points} ({level(points)})。ワンキーでは承認できない。\n"
-            "  上の「書き込みが許される領域」は、却下される要求ではなく実際に許可される範囲。\n"
-            f"  承認するならチケット識別子を入力: [{proposed.ticket}] "
+            f"⚠ リスクスコア {total} ({level(total)})。ワンキーでは承認できない。\n"
+            f"  承認するなら識別子を入力: [{key}] "
         )
         stdout.flush()
-        answer = _read(stdin).strip()
-        if answer != proposed.ticket:
+        if _read(stdin).strip() != key:
             stderr.write("ccnavi: 識別子が一致しないので承認しなかった\n")
             return 1
     else:
-        stdout.write("承認する場合は y、やめる場合はそれ以外: ")
+        stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
         stdout.flush()
         if _read(stdin).strip().lower() not in ("y", "yes"):
             stderr.write("ccnavi: 承認しなかった\n")
             return 1
 
-    approval = Approval(
-        ticket=proposed.ticket,
-        title=proposed.title,
-        digest=proposed.digest(),
-        write=sorted(proposed.write),
-        risk=points,
-        approved_at=time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-    )
-    failed = append(ledger_path, approval)
-    if failed:
-        stderr.write(f"ccnavi: {failed}\n")
-        return 1
+    stamp = now()
+    for t, points, _, _ in batch:
+        failed = write_copy(conf.approved, t, t.tree, points, stamp)
+        if failed:
+            stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
+            return 1
+        # 終わったフェーズに子を足したら、そのフェーズの印は消す。印は
+        # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
+        if t.is_child and t.phase is not None:
+            cleared = clear_marks(conf.approved, t.parent, t.phase)
+            if cleared:
+                stdout.write(
+                    f"  {t.parent} のフェーズ {t.phase} の印（{', '.join(cleared)}）を消した。"
+                    "全部閉じたらレビューをもう一度頼むことになる\n"
+                )
 
-    stdout.write(f"\n承認した。{ledger_path} に記録した。\n")
+    stdout.write(f"\n承認した。{conf.approved} に写しを置いた。\n")
     stdout.write("この範囲は次のツール呼び出しから効く。\n")
     return 0
 
 
-def _read(stdin: TextIO) -> str:
-    """1 行読む。端末が繋がっていなければ空文字。
+def screen(
+    batch: list[tuple[ticket_mod.Ticket, int, list[str], list[rules.Problem]]],
+    known: dict[str, ticket_mod.Ticket],
+) -> str:
+    """承認を求める画面を組む。
 
-    非対話で叩かれたときに、読めない入力を承認として扱わない。承認は
-    人が居ることが前提の操作で、居ないなら承認しないほうへ倒す。
+    frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
+    「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」。
+    新たに書けるようになる領域を最初に置く（REQ-APV-01）。
     """
+    lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
+    for t, points, why, complaints in batch:
+        lines += [
+            "",
+            f"== {t.ticket}: {t.title}"
+            + (f"（親 {t.parent}、フェーズ {t.phase}）" if t.is_child else "（親）"),
+        ]
+        if t.is_child:
+            parent = known.get(t.parent)
+            lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
+            head = "親 " + (
+                ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
+                if parent
+                else "(写しが無い)"
+            )
+            lines.append(f"    {head}")
+        else:
+            lines.append("■ このチケットで書き込みが許される領域（これ以外はすべて止まる）")
+        for name in rules.SECTIONS:
+            paths = t.paths(name)
+            if paths:
+                lines.append(f"    {name}: " + ", ".join(paths))
+        if t.is_child:
+            state = "要" if t.review_required else "不要"
+            lines.append(
+                f"■ 人間レビュー: {state}" + (f"（{t.review_reason}）" if t.review_reason else "")
+            )
+            if t.predecessors:
+                lines.append(f"■ 先行: {', '.join(t.predecessors)}")
+        if t.rationale.strip():
+            lines.append("■ 理由（エージェントの記述）")
+            lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
+        lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
+        if not t.is_child:
+            lines.append(f"■ リスクスコア: {points} ({level(points)})")
+            lines += [f"    {line}" for line in why] or ["    加点なし"]
+        warnings = [p for p in complaints if p.severity == rules.SEVERITY_WARN]
+        if warnings:
+            lines.append("■ 記述のうち、判定に効かないもの")
+            lines += [f"    {p.detail}" for p in warnings]
+    lines += ["", "■ このスコアが見ていないもの"]
+    lines += [f"    {item}" for item in UNSCORED]
+    return "\n".join(lines)
+
+
+def _validate(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> list[rules.Problem]:
+    """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。"""
+    problems: list[rules.Problem] = []
+    if not t.is_child:
+        return problems
+    parent = pool.get(t.parent)
+    if parent is None:
+        problems.append(
+            rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} が承認されていない")
+        )
+        return problems
+    if parent.is_child:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
+            )
+        )
+        return problems
+    problems.extend(ticket_mod.subset_problems(t, parent))
+    return problems
+
+
+def _read(stdin: TextIO) -> str:
     try:
         return stdin.readline()
     except (OSError, ValueError):
         return ""
 
 
-def _guarded_by(path: str, rule_set: rules.RuleSet, root: str) -> str:
-    """この範囲が、既存のルールの守る場所を含んでいたら、そのルール名を返す。
+def _write(path: str, text: str) -> str:
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+    except OSError as exc:
+        return f"書けない ({exc})"
+    return ""
 
-    範囲が守られた場所に掛かっていること自体は禁止ではない。ルールのほうが
-    強いので、範囲に入れても個々の書き込みはルールが止める。ただし
-    「守られた場所を作業範囲だと言っているチケット」は、通常の作業では
-    出てこないので、承認する人の目に留める。
-    """
-    full = os.path.join(root, path.replace("/", os.sep))
-    probe = os.path.join(full, "probe")
-    # 見るのは deny と ask だけ。allow が守っている場所というものは無い。
+
+def _guarded_by(path: str, rule_set: rules.RuleSet, root: str) -> str:
+    probe = os.path.join(root, path.replace("/", os.sep).rstrip("*"), "probe")
     hits = [
         rule.id or "(id 無し)"
         for rule in rule_set.deny + rule_set.ask

@@ -45,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, gitstate, hookio, rules, selfguard, settings
+from . import audit, gitstate, hookio, rules, selfguard, settings, tree
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -285,43 +285,44 @@ class ScopeGuard:
 
     実行前の判定と同じ範囲・同じ当て方を使う。別に書くと、同じ書き込みが
     実行前は通って実行後に咎められる（あるいはその逆）ことになり、
-    どちらが本当の範囲なのかを誰も言えなくなる。
+    どちらが本当の範囲なのかを誰も言えなくなる。鍵はファイルの行き先で、
+    その行き先の作業ツリーに結び付いた写しの範囲を当てる。
     """
 
     root: str
-    ledger: str
-    ticket: str
-    name: str
-    write: list[str] = field(default_factory=list)
+    approved: str
+    copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
 
-    def outside(self, full: str) -> bool:
-        """この変更が範囲の外かどうか。
+    def finding(self, full: str) -> tuple[rules.Rule, str] | None:
+        """この変更が範囲の外なら、咎める文面と出所を返す。中なら None。
 
-        チケットのファイル自身は外でも咎めない。次のチケットを提案する道を
-        塞ぐと、いちど承認した範囲から永久に出られなくなる。提案が効くのは
-        承認されてからなので、ここを開けても範囲は広がらない。
+        チケット自身の提案ファイルは外でも咎めない。次のチケットを提案する道を
+        塞ぐと、いちど承認した範囲から永久に出られなくなる。
         """
-        if self.ticket and os.path.normpath(full) == os.path.realpath(self.ticket):
-            return False
-        return not ticket_mod.inside(self.root, self.write, full)
-
-    def rule(self) -> rules.Rule:
-        """範囲外を咎める文面を、ルール 1 件の形に組む。
-
-        既存の報告はルールの文面を載せる作りになっている。同じ形に合わせると、
-        範囲外の 1 件も、ルールに当たった 1 件と同じ骨格で報告できる。
-        判定には使わないので、当てる式は持たせない。
-        """
-        area = ", ".join(f"{p}/" for p in self.write) or "(empty)"
-        return rules.Rule(
+        t = tree.tree_of(self.root, full)
+        if t is None or t.is_main:
+            return None
+        ticket = self.copies.get(t.name)
+        if ticket is None or ticket.is_own_file(full):
+            return None
+        rel = tree.relative(t, full)
+        verdict = ticket.decide(rel)
+        parent = self.copies.get(ticket.parent) if ticket.is_child else None
+        if parent is not None:
+            verdict = ticket_mod.combine(verdict, parent.decide(rel))
+        if verdict in (rules.ALLOW, rules.ASK):
+            return None
+        area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(empty)"
+        rule = rules.Rule(
             id=TICKET_SCOPE_RULE,
             message=(
-                f"This path is outside the work area that ticket {self.name} declares ({area}). "
-                "Send the output inside that area, or, if the task genuinely needs this path, "
-                "add it to the ticket and ask the user to run 'ccnavi --approve'. "
-                "Editing the ticket on its own does not widen the area."
+                f"This path is outside the work area that ticket {ticket.ticket} declares "
+                f"({area}) for worktree {t.name}. Send the output inside that area, or, if the "
+                "task genuinely needs this path, tell the parent so it can propose a ticket that "
+                "covers it and ask the user to run 'ccnavi --approve'."
             ),
         )
+        return rule, os.path.join(self.approved, ticket.ticket + ".md")
 
 
 @dataclass
@@ -364,10 +365,13 @@ def _findings(
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
             found.append(Finding(change, group, source, CODE_VIOLATION))
-        elif (
-            scope is not None and not _allowed(rule_set, change.full) and scope.outside(change.full)
-        ):
-            found.append(Finding(change, [scope.rule()], scope.ledger, CODE_TICKET_SCOPE))
+            continue
+        if scope is None or _allowed(rule_set, change.full):
+            continue
+        hit = scope.finding(change.full)
+        if hit is not None:
+            rule, where = hit
+            found.append(Finding(change, [rule], where, CODE_TICKET_SCOPE))
     return found
 
 

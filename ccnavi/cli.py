@@ -19,11 +19,15 @@ from . import (
     diagnose,
     hookio,
     lint,
+    ops,
+    phase,
     post,
+    review,
     rules,
     selfguard,
     settings,
     shellread,
+    tree,
 )
 from . import ticket as ticket_mod
 
@@ -98,6 +102,8 @@ CODE_UNCERTAIN = "PARSE_UNCERTAIN"
 # 受け取った側の次の一手が違う。ルールなら別の手段を探すことになるが、
 # こちらは範囲の中で済ませるか、チケットを書き直して承認を求めることになる。
 CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
+# チケットが `ask` と書いた場所。ルールの `ask` と同じく、人が 1 度見る場所。
+CODE_TICKET_ASK = "TICKET_ASK"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
@@ -108,6 +114,10 @@ TICKET_RULE = "(ticket-scope)"
 # 当てると当たったり当たらなかったりする判定になる。シェル経由の書き込みは
 # 実行後の監視が作業ツリーの実物を見て捕まえる。
 SCOPE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+
+# サブエージェントの起動ツール。ゲートが止める対象で、対象の文字列を持たないので
+# 見出しだけを subject にする。
+AGENT_TOOL = "Agent"
 
 # 理由に載せる対象の長さの上限。対象はエージェントが今書いたものなので、
 # ここでは同じものを指せれば足りる。ヒアドキュメントは 1 ファイル分を運べるので、
@@ -132,14 +142,24 @@ To check the rules file and the settings without making a decision, run
 It reads no payload, reports anything that could disable the guard as an error
 or a warning, and exits non-zero when it reports an error.
 
-To review the current ticket and approve the work area it declares, run
+To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
 
-It shows what the ticket makes writable, how that differs from the last approved
-ticket, and a risk score, then appends the approval to the ledger. Only the
-ledger is consulted when judging calls, so editing the ticket never widens the
-area on its own.
+It scans wip/tickets/ in every worktree, shows what each ticket makes writable
+and whether it needs a human review, then keeps an approved copy under
+.claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
+editing a ticket never widens the area on its own.
+
+The parent agent moves tickets between states and asks for reviews through the
+scripts in .claude/scripts/, which call
+
+    ccnavi ticket start|done|cancel <id> [--reason <why>]
+    ccnavi review request|check|note --cwd <dir> [--phase N] [--body-file <path>]
+
+A human accepts unresolved review threads with
+
+    ccnavi --reviewed N --accept-unresolved --cwd <parent worktree>
 """
 
 
@@ -157,8 +177,16 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     parser.add_argument("--explain", action="store_true")
-    parser.add_argument("--ticket", default="")
-    parser.add_argument("--ledger", default=None)
+    parser.add_argument("--tickets", default="")
+    parser.add_argument("--approved", default=None)
+    # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
+    parser.add_argument("command", nargs="*")
+    parser.add_argument("--cwd", default="")
+    parser.add_argument("--phase", type=int, default=None)
+    parser.add_argument("--body-file", default="")
+    parser.add_argument("--reason", default="")
+    parser.add_argument("--reviewed", type=int, default=None)
+    parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     try:
         args = parser.parse_args(argv)
@@ -181,10 +209,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.rules = args.rules
     if args.state is not None:
         conf.state = args.state
-    if args.ticket:
-        conf.ticket = args.ticket
-    if args.ledger is not None:
-        conf.ledger = args.ledger
+    if args.tickets:
+        conf.tickets = args.tickets.replace("\\", "/").strip("/")
+    if args.approved is not None:
+        conf.approved = args.approved
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
@@ -212,12 +240,16 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
     # 判断ではなく、これから効く範囲についての合意になる。
     if args.approve:
-        if not conf.ledger:
-            stderr.write("ccnavi: 承認台帳の置き場が空。--ledger で指す先が要る\n")
+        if not conf.approved:
+            stderr.write("ccnavi: 写しの置き場が空。--approved で指す先が要る\n")
             return EXIT_ERROR
         rule_set, _ = load_rules(stderr, conf.rules, audit.Record())
-        approved = approval.approve(stdin, stdout, stderr, conf.ticket, conf.ledger, rule_set, root)
+        approved = approval.approve(stdin, stdout, stderr, conf, rule_set, root)
         return EXIT_OK if approved == 0 else EXIT_ERROR
+
+    # チケットの状態とレビューの操作。payload を読まない。
+    if args.command or args.reviewed is not None:
+        return operate(stdin, stdout, stderr, conf, root, args)
 
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -296,10 +328,69 @@ def decide(
         return decide_at_prompt(stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, conf, root, payload, record)
+    if payload.event == hookio.SUBAGENT_START:
+        return decide_at_subagent_start(stdout, conf, root, record)
+    if payload.event == hookio.SUBAGENT_STOP:
+        return decide_at_subagent_stop(stdout, stderr, mode, conf, root, payload, record)
     # 判定を持たないイベントは誤りではない。想定していない登録が
     # 作業を止めてはいけない。
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
     return EXIT_OK
+
+
+def operate(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    args: argparse.Namespace,
+) -> int:
+    """チケットの状態とレビューの操作を振り分ける。
+
+    `ticket start|done|cancel <識別子>` と `review request|check|note`、それに
+    人が打つ `--reviewed`。どれも payload を読まず、判定も記録もしない。
+    """
+    if not conf.approved:
+        stderr.write("ccnavi: 写しの置き場が空。チケットによる制御を使っていない\n")
+        return EXIT_ERROR
+    cwd = args.cwd or os.getcwd()
+    if args.reviewed is not None:
+        code = review.reviewed(
+            stdin, stdout, stderr, root, conf, cwd, args.reviewed, args.accept_unresolved
+        )
+        return EXIT_OK if code == 0 else EXIT_ERROR
+
+    words = list(args.command)
+    kind = words[0] if words else ""
+    verb = words[1] if len(words) > 1 else ""
+    target = words[2] if len(words) > 2 else ""
+    code = 1
+    if kind == "ticket" and verb in ("start", "done", "cancel") and target:
+        if verb == "start":
+            code = ops.start(stdout, stderr, root, conf, target)
+        elif verb == "done":
+            code = ops.done(stdout, stderr, root, conf, target)
+        else:
+            code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
+    elif kind == "review" and verb == "request":
+        if args.phase is None or not args.body_file:
+            stderr.write("ccnavi: review request には --phase <N> と --body-file <path> が要る\n")
+        else:
+            code = review.request(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
+    elif kind == "review" and verb == "check":
+        if args.phase is None:
+            stderr.write("ccnavi: review check には --phase <N> が要る\n")
+        else:
+            code = review.check(stdout, stderr, root, conf, cwd, args.phase)
+    elif kind == "review" and verb == "note":
+        if not args.body_file:
+            stderr.write("ccnavi: review note には --body-file <path> が要る\n")
+        else:
+            code = review.note(stdout, stderr, root, conf, cwd, args.body_file)
+    else:
+        stderr.write(USAGE)
+    return EXIT_OK if code == 0 else EXIT_ERROR
 
 
 def watch_context(
@@ -312,19 +403,15 @@ def watch_context(
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
     rule_set, source = load_rules(stderr, conf.rules, record)
-    approved, _ = ticket_scope(conf)
-    scope = (
-        post.ScopeGuard(
-            root=root,
-            ledger=conf.ledger,
-            ticket=conf.ticket,
-            name=approved.ticket,
-            write=approved.write,
-        )
-        if approved is not None
-        else None
-    )
-    return rule_set, source, scope
+    return rule_set, source, scope_guard(conf, root)
+
+
+def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
+    """承認済みの写しを、実行後の側から当てる持ち物。写しを使っていなければ None。"""
+    if not conf.approved:
+        return None
+    copies, _ = approval.copies(conf.approved)
+    return post.ScopeGuard(root=root, approved=conf.approved, copies=approval.by_id(copies))
 
 
 def decide_at_prompt(
@@ -500,6 +587,10 @@ def decide_before(
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
     if not record.fallback and effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE:
         selfguard.add_rules(rule_set, conf.bin)
+    # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
+    # 誰がやっても止める。写しを使っているときだけ足す。
+    if conf.approved:
+        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
 
     subject = screen(payload.tool_name, record.subject, record)
 
@@ -512,6 +603,32 @@ def decide_before(
         if guard:
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
+
+    fallback = fallen_back(conf.rules) if record.fallback else ""
+    notices = [text for text in (guard, fallback) if text]
+
+    # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
+    # 閉じるのは親だけ（REQ-TKT-10）。ルールより先に見る。ルールが allow と
+    # 書いていても、この 2 本はサブエージェントの手には渡さない。
+    if (
+        conf.approved
+        and payload.agent_id
+        and payload.tool_name == "Bash"
+        and phase.SUBAGENT_FORBIDDEN.search(subject)
+    ):
+        record.code, record.rules = phase.CODE_SUBAGENT, [TICKET_RULE]
+        return refuse(stdout, mode, record, rules.DENY, notices + [subagent_forbidden(subject)])
+
+    # ゲート。人間レビュー要のフェーズが終わっていて印が無い間、サブエージェントの
+    # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
+    if conf.approved and payload.tool_name in phase.GATED_TOOLS:
+        parent = phase.parent_for_cwd(root, conf, payload.cwd)
+        closed = phase.gate(root, conf, parent.ticket) if parent is not None else None
+        exempt = payload.tool_name == "Bash" and phase.EXEMPT.search(subject) is not None
+        if closed is not None and not exempt:
+            record.code, record.rules = phase.CODE_GATE, [TICKET_RULE]
+            reason = phase.gate_reason(closed, payload.tool_name)
+            return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 強い区画から順に見て、最初に当たったところで止める。deny に当たった
     # 呼び出しについて ask の区画を調べる意味は無いし、調べれば「拒否だが
@@ -541,19 +658,11 @@ def decide_before(
     # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
     # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
     # 人が書いた宣言よりエージェントが書いた宣言のほうが強くなる。
-    approved, notice = ticket_scope(conf)
     ticket_reason = ""
     if not verdict:
-        verdict, ticket_reason = ticket_verdict(
-            conf, root, approved, payload.tool_name, record.subject
-        )
+        verdict, ticket_reason = ticket_verdict(conf, root, payload.tool_name, record.subject)
         if ticket_reason:
             record.rules = [TICKET_RULE]
-
-    # 通知は件ごとではなく先頭に 1 回。件ごとの断りはその件の中で閉じるが、
-    # 通知は応答全体に掛かる事情で、繰り返すと理由の本体が下へ流れて読まれなくなる。
-    fallback = fallen_back(conf.rules) if record.fallback else ""
-    notices = [text for text in (guard, fallback, notice) if text]
 
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
@@ -576,11 +685,15 @@ def decide_before(
         # チケットの範囲の外。ルールが 1 件も当たっていないので group は空。
         reasons = [ticket_reason]
         record.code = CODE_TICKET_SCOPE
-    elif verdict == rules.ASK:
+    elif verdict == rules.ASK and group:
         reasons = [
             reason_for(rule, payload.tool_name, subject, source, record.degraded) for rule in group
         ]
         record.code = CODE_RULE_ASK
+    elif verdict == rules.ASK:
+        # チケットが ask と書いた場所。人が 1 度見る場所として宣言されている。
+        reasons = [ticket_reason]
+        record.code = CODE_TICKET_ASK
     else:
         # どの区画も言及しなかった。ccnavi はこの呼び出しの判定を持たない。
         # 結末は Claude Code の権限モードが決める。
@@ -605,8 +718,13 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
         return EXIT_OK
 
+    return refuse(stdout, mode, record, verdict, notices + reasons)
+
+
+def refuse(stdout: TextIO, mode: str, record: audit.Record, verdict: str, parts: list[str]) -> int:
+    """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。"""
     # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
-    reason = "\n\n".join(notices + reasons)
+    reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK
 
     if mode == MODE_DRY_RUN:
@@ -622,6 +740,134 @@ def decide_before(
     record.decision, record.enforced = decision, True
     hookio.write_verdict(stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason)
     return EXIT_OK
+
+
+def subagent_forbidden(subject: str) -> str:
+    shown = " ".join(subject.split())[:SUBJECT_LIMIT]
+    return "\n".join(
+        [
+            f"[ccnavi] {phase.CODE_SUBAGENT}",
+            f"subject: {shown}",
+            "チケットの状態を動かす操作とレビューの依頼・確認は、親（メインエージェント）だけが"
+            "行います。サブエージェントは自分のチケットの範囲で作業を終えたら、"
+            "結果を報告して終わってください。閉じるのは親の仕事です。",
+        ]
+    )
+
+
+def decide_at_subagent_start(
+    stdout: TextIO, conf: settings.Settings, root: str, record: audit.Record
+) -> int:
+    """サブエージェントが始まったとき。承認済みで開いている子の一覧を渡す。
+
+    止められないイベントなので判定はしない。判定はファイルの行き先で決まるので、
+    ここで渡す文は案内でしかない。親のプロンプトに書き忘れがあっても、
+    サブエージェントが自分のツリーと範囲を知れるようにする。
+    """
+    record.decision, record.enforced = audit.ALLOW, True
+    if not conf.approved:
+        return EXIT_OK
+    copies, _ = approval.copies(conf.approved)
+    closed, _ = approval.copies(conf.approved, closed=True)
+    done = {t.ticket for t in closed}
+    children = [t for t in copies if t.is_child]
+    if not children:
+        return EXIT_OK
+    lines = [
+        "[ccnavi] 承認済みで開いている子チケット。"
+        "書き込みは行き先の作業ツリーのチケットで判定される。"
+    ]
+    for t in sorted(children, key=lambda x: x.ticket):
+        where = tree.worktree_path(root, t.ticket)
+        state = "作業ツリーあり" if os.path.isdir(where) else "作業ツリー無し（効かない）"
+        waiting = [p for p in t.predecessors if p not in done]
+        lines.append(
+            f"  {t.ticket}（親 {t.parent}、フェーズ {t.phase}）: {where} [{state}]"
+            + (f" 先行が未完了: {', '.join(waiting)}" if waiting else "")
+        )
+        for name in rules.SECTIONS:
+            paths = t.paths(name)
+            if paths:
+                lines.append(f"    {name}: " + ", ".join(paths))
+    hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines))
+    return EXIT_OK
+
+
+def decide_at_subagent_stop(
+    stdout: TextIO,
+    stderr: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """サブエージェントが終わろうとしたとき。範囲外の変更が残っていれば 1 回だけ差し戻す。
+
+    見るのは、cwd が子の作業ツリーならその子、親の作業ツリーならその親の開いている
+    子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
+    """
+    record.decision, record.enforced = audit.ALLOW, True
+    if not conf.approved:
+        return EXIT_OK
+    copies, _ = approval.copies(conf.approved)
+    index = approval.by_id(copies)
+    t = tree.tree_of(root, payload.cwd or os.getcwd())
+    targets: list[ticket_mod.Ticket] = []
+    if t is not None and not t.is_main and t.name in index:
+        bound = index[t.name]
+        targets = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
+    findings = []
+    for child in targets:
+        outside, unreadable = phase.scope_findings(root, conf, child, index.get(child.parent))
+        if unreadable:
+            stderr.write(f"ccnavi: {child.ticket} の作業ツリーを読めない: {unreadable}\n")
+            continue
+        for rel in outside:
+            findings.append((child, rel))
+    if not findings:
+        return EXIT_OK
+
+    record.decision, record.paths = audit.DENY, [f"{c.ticket}:{rel}" for c, rel in findings]
+    record.rules, record.code = [TICKET_RULE], post.CODE_TICKET_SCOPE
+    lines = [
+        f"[ccnavi] {post.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
+        f"{len(findings)} 件）。範囲の中へ戻すか、要るなら親に伝えて次のチケットにしてください。"
+    ]
+    for child, rel in findings[: post.REPORT_LIMIT]:
+        area = ", ".join(child.paths(rules.ALLOW) + child.paths(rules.ASK)) or "(空)"
+        lines.append(f"  {child.ticket}: {rel}  範囲は {area}")
+    text = "\n".join(lines)
+
+    already = _bounced(conf.state, payload.agent_id)
+    if mode == MODE_ENABLE and not already:
+        _remember_bounce(stderr, conf.state, payload.agent_id)
+        record.enforced = True
+        stderr.write(text + "\n")
+        return EXIT_BLOCK
+    record.enforced = False
+    hookio.write_context(stdout, hookio.SUBAGENT_STOP, text)
+    return EXIT_OK
+
+
+def _bounce_path(state_dir: str, agent_id: str) -> str:
+    safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in agent_id)[:64] or "unknown"
+    return os.path.join(state_dir, f"subagent-{safe}.bounced")
+
+
+def _bounced(state_dir: str, agent_id: str) -> bool:
+    return bool(state_dir) and os.path.exists(_bounce_path(state_dir, agent_id))
+
+
+def _remember_bounce(stderr: TextIO, state_dir: str, agent_id: str) -> None:
+    if not state_dir:
+        return
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        with open(_bounce_path(state_dir, agent_id), "w", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%dT%H:%M:%S%z"))
+    except OSError as exc:
+        stderr.write(f"ccnavi: 差し戻しの回数を書けない: {exc}\n")
 
 
 def decide_after(
@@ -650,21 +896,11 @@ def decide_after(
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 範囲は実行前の判定と同じ経路で解く。断りの文はここでは出さない。
-    # 実行前が呼び出しごとに同じことを言っているので、同じターンで 2 度届く。
-    # 届く数が増えると、どちらも読まれなくなる。
-    approved, _ = ticket_scope(conf)
-    scope = (
-        post.ScopeGuard(
-            root=root,
-            ledger=conf.ledger,
-            ticket=conf.ticket,
-            name=approved.ticket,
-            write=approved.write,
-        )
-        if approved is not None
-        else None
-    )
+    # 提案の状態を写しへ写す。閉じた子の写しはここで closed/ へ動く。
+    # 範囲は実行前の判定と同じ経路で解く。
+    if conf.approved:
+        phase.sync(stderr, root, conf)
+    scope = scope_guard(conf, root)
 
     text = post.check(
         stderr,
@@ -683,6 +919,12 @@ def decide_after(
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
+    # フェーズが終わったばかりなら、ここで 1 度だけ言う。ゲートは次の呼び出しから。
+    if conf.approved:
+        parent = phase.parent_for_cwd(root, conf, payload.cwd)
+        said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
+        if said:
+            text = f"{text}\n\n{said}" if text else said
     if not text:
         return EXIT_OK
 
@@ -755,6 +997,10 @@ def subject_of(payload: hookio.Input) -> str:
         return payload.field_value("command")
     if payload.tool_name in ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit"):
         return full_path(payload.field_value("file_path"), payload.cwd)
+    if payload.tool_name == AGENT_TOOL:
+        # 起動には対象の文字列が無い。ゲートが止める対象なので、見出しを subject に
+        # して判定に入れる。
+        return payload.field_value("description") or payload.field_value("prompt") or "(agent)"
     return ""
 
 
@@ -822,96 +1068,69 @@ def fallen_back(rules_path: str) -> str:
     )
 
 
-def ticket_scope(conf: settings.Settings) -> tuple[approval.Approval | None, str]:
-    """いま効いている作業範囲と、呼び出しごとに言うべき断りを返す。
-
-    判定に使うのは台帳に載った範囲だけ。作業ツリーのチケットは、承認を求める
-    ための提案でしかなく、書き換えても効いている範囲は変わらない。変わらない
-    かわりに食い違いが起きるので、食い違いはここで見つけて毎回言う。
-
-    台帳が読めないときと未承認のときは、範囲の制限を掛けない。掛けようにも
-    「どこが範囲か」を知らないし、全部拒否へ倒すと、チケットを直す手も
-    台帳を直す手も同時に止まる。倒れた先に回復の道を残すのは、ルールを
-    読めないときに組み込みの既定へ落ちるのと同じ判断（REQ-PRE-06）。
-    """
-    if not conf.ledger:
-        return None, ""
-
-    approved, unreadable = approval.current(conf.ledger)
-    if unreadable:
-        return None, (
-            f"[ccnavi] {unreadable} ({conf.ledger}). "
-            "No ticket scope is in force right now. Ask the user to repair or remove that file."
-        )
-
-    proposed, _ = ticket_mod.load(conf.ticket) if conf.ticket else (None, [])
-
-    if approved is None:
-        if proposed is None:
-            return None, ""
-        return None, (
-            f"[ccnavi] the ticket {proposed.ticket} at {conf.ticket} has not been approved, "
-            "so no ticket scope is in force. Ask the user to run 'ccnavi --approve'. "
-            "Until they do, nothing is limiting which files you may write."
-        )
-
-    if proposed is None:
-        return approved, (
-            f"[ccnavi] no readable ticket at {conf.ticket}, but the approved scope of "
-            f"{approved.ticket} is still in force: {', '.join(approved.write)}. "
-            "Ask the user if you believe this ticket is finished."
-        )
-
-    if proposed.digest() != approved.digest:
-        return approved, (
-            f"[ccnavi] the ticket at {conf.ticket} no longer matches what was approved "
-            f"({approved.ticket}, approved {approved.approved_at}). Judgement still uses the "
-            f"approved scope: {', '.join(approved.write)}. Editing the ticket does not widen it; "
-            "ask the user to run 'ccnavi --approve' to approve the new one."
-        )
-
-    return approved, ""
-
-
 def ticket_verdict(
     conf: settings.Settings,
     root: str,
-    approved: approval.Approval | None,
     tool: str,
     full: str,
 ) -> tuple[str, str]:
     """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文。
 
+    鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
+    同じ識別子の写しで判定する。main の直下ならチケットは無く、ルールだけで判定する。
+    呼び出し元の cwd も agent_id も使わない（REQ-TKT-01）。
+
     範囲の中は allow。ルールが何も言っていない場所で、チケットだけが
-    「ここで作業する」と宣言しているので、そこは聞かずに通す。これが無いと、
-    宣言した作業範囲の中まで権限モード任せに落ちることになり、
-    範囲を宣言する意味が「ccnavi が何も言わない場所が増えるだけ」になる。
+    「ここで作業する」と宣言しているので、そこは聞かずに通す。範囲の外は deny。
+    チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
+    子は親と合わせて厳しい側が勝つ。
 
-    範囲の外は deny。チケットが境界を明示している以上、外に出たことは
-    「誰も言及していない」ではなく「宣言に反した」になる。
-
-    チケットのファイル自身については何も言わない。承認された範囲の外に
-    あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が
-    無くなる。allow にもしないのは、範囲外への書き込みであることに変わりは
-    ないから。ルールが言及していない扱いになるので、そこから先は
-    Claude Code の権限モードが決める。
+    チケット自身の提案ファイルについては何も言わない。承認された範囲の外に
+    あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
-    if approved is None or tool not in SCOPE_TOOLS or not full:
+    if not conf.approved or tool not in SCOPE_TOOLS or not full:
         return "", ""
-    if conf.ticket and os.path.normpath(full) == os.path.realpath(conf.ticket):
+    t = tree.tree_of(root, full)
+    if t is None or t.is_main:
         return "", ""
-    if ticket_mod.inside(root, approved.write, full):
+    copies, _ = approval.copies(conf.approved)
+    index = approval.by_id(copies)
+    ticket = index.get(t.name)
+    if ticket is None or ticket.is_own_file(full):
+        return "", ""
+    rel = tree.relative(t, full)
+    verdict = ticket.decide(rel)
+    parent = index.get(ticket.parent) if ticket.is_child else None
+    if parent is not None:
+        verdict = ticket_mod.combine(verdict, parent.decide(rel))
+    if verdict == rules.ALLOW:
         return rules.ALLOW, ""
-    scope = ", ".join(f"{p}/" for p in approved.write) or "(空)"
+
+    area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
+    source = approval.copy_path(conf.approved, t.name)
+    head = [
+        f"subject: {full}",
+        f"ticket: {ticket.ticket} ({ticket.title}), approved {ticket.approved_at}, "
+        f"worktree {t.name}",
+        f"scope: {area}",
+    ]
+    if verdict == rules.ASK:
+        return rules.ASK, "\n".join(
+            [
+                f"[ccnavi] {CODE_TICKET_ASK} (source: {source})",
+                *head,
+                "This path is one the ticket marks `ask`: the user looks at each write here. "
+                "Say what you are changing and why.",
+            ]
+        )
     return rules.DENY, "\n".join(
         [
-            f"[ccnavi] {CODE_TICKET_SCOPE} (source: {conf.ledger})",
-            f"subject: {full}",
-            f"ticket: {approved.ticket} ({approved.title}), approved {approved.approved_at}",
-            f"scope: {scope}",
-            "This path is outside the work area the current ticket declares. Do the work inside "
-            "that area, or, if the task genuinely needs this path, edit the ticket to add it and "
-            "ask the user to run 'ccnavi --approve'. Editing the ticket alone changes nothing.",
+            f"[ccnavi] {CODE_TICKET_SCOPE} (source: {source})",
+            *head,
+            "This path is outside the work area the ticket for this worktree declares. Do the "
+            "work inside that area, or, if the task genuinely needs this path, tell the parent "
+            "so it can propose a ticket that covers it and ask the user to run 'ccnavi --approve'. "
+            "Editing a proposal alone changes nothing.",
         ]
     )
 

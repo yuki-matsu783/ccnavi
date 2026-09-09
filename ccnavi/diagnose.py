@@ -30,7 +30,7 @@ from . import audit, hookio, rules, settings
 
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
 # 試したい人には「当たらない」ではなく「そもそも見ていない」と言う。
-KNOWN_TOOLS = ("Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit")
+KNOWN_TOOLS = ("Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Agent")
 
 
 def test(
@@ -57,7 +57,7 @@ def test(
         )
         return 0
 
-    field = "command" if tool == "Bash" else "file_path"
+    field = {"Bash": "command", "Agent": "description"}.get(tool, "file_path")
     payload = hookio.Input(
         event=hookio.PRE_TOOL_USE,
         tool_name=tool,
@@ -165,8 +165,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     それはまだ無いので、ここで言えるのは「どのルールがどの区画にあるか」と
     「チケットの範囲が効いているか」まで。言えないことは言わない。
     """
-    from . import approval
-    from . import ticket as ticket_mod
+    from . import approval, phase, tree
     from .cli import load_rules
 
     rule_set, source = load_rules(stderr, conf.rules, audit.Record())
@@ -185,21 +184,36 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("    default / acceptEdits / plan  人に確認が出る\n")
     stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
-    stdout.write("\n■ チケットの作業範囲\n")
-    if not conf.ledger:
-        stdout.write("  承認台帳の置き場が空。範囲の制限は掛かっていない\n")
+    stdout.write("\n■ チケットの作業範囲（承認済みの写し）\n")
+    if not conf.approved:
+        stdout.write("  写しの置き場が空。範囲の制限は掛かっていない\n")
         return 0
-    approved, unreadable = approval.current(conf.ledger)
-    if unreadable:
-        stdout.write(f"  {unreadable}\n")
-        return 0
-    if approved is None:
+    copies, notes = approval.copies(conf.approved)
+    for note in notes:
+        stdout.write(f"  {note}\n")
+    if not copies:
         stdout.write("  承認されたチケットが無い。範囲の制限は掛かっていない\n")
         return 0
-    stdout.write(f"  {approved.ticket}（{approved.title}、承認 {approved.approved_at}）\n")
-    for path in approved.write:
-        stdout.write(f"    {path}/\n")
-    proposed, _ = ticket_mod.load(conf.ticket) if conf.ticket else (None, [])
-    if proposed is not None and proposed.digest() != approved.digest:
-        stdout.write(f"  ※ {conf.ticket} は承認された内容と違う。効いているのは上の範囲\n")
+    closed, _ = approval.copies(conf.approved, closed=True)
+    done = {t.ticket for t in closed}
+    for t in sorted(copies, key=lambda x: (x.parent or x.ticket, x.ticket)):
+        where = tree.worktree_path(root, t.ticket)
+        bound = "作業ツリーあり" if tree.is_worktree_of(root, where) else "作業ツリー無し"
+        head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{bound}）"
+        if t.is_child:
+            waiting = [p for p in t.predecessors if p not in done]
+            review = "要" if t.review_required else "不要"
+            head += f" 親 {t.parent} フェーズ {t.phase} レビュー{review}"
+            if waiting:
+                head += f" 先行が閉じていない: {', '.join(waiting)}"
+        stdout.write(f"  {head}\n")
+        for name in rules.SECTIONS:
+            for path in t.paths(name):
+                stdout.write(f"    {name:<5} {path}\n")
+    for parent in [t for t in copies if not t.is_child]:
+        for ph in phase.phases_of(root, conf, parent.ticket):
+            marks = ", ".join(sorted(ph.marks)) or "印なし"
+            state = "終了" if ph.ended else "進行中"
+            gate = "ゲート閉" if ph.gate_closed else "ゲート開"
+            stdout.write(f"  {parent.ticket} フェーズ {ph.number}: {state} / {marks} / {gate}\n")
     return 0
