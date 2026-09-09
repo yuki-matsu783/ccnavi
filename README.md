@@ -800,10 +800,26 @@ ccnavi --reviewed 2 --accept-unresolved --cwd .claude/worktrees/i0050
 変更要求（changes requested）のレビューが立っている間は、この道でも通らない。
 解くのはレビュアーの approve / dismiss だけ。
 
-GitHub と GitLab は origin の URL で見分け、`GITHUB_TOKEN` / `GITLAB_TOKEN` で認証する。
-`gh` や `glab` は使わない。テストと外部委任のために、`--review-fixture <JSON>` で代役を指せる。
-環境変数では指せない。指せると、エージェントが Bash の環境に付けて `check` を打ち、偽のホストで
-ゲートを開けられる。
+**リモートを読み書きするのは sh で、ccnavi の実行ファイルはネットワークに出ない。** 実行ファイルが
+見るのは作業ツリーの中（フェーズ・ブランチ・未コミット・push・印）だけで、マージリクエストの中身は
+`.claude/scripts/ccnavi-review.sh` が取ってきて JSON で渡す（`--result <path>`）。この JSON の形が
+sh と実行ファイルの契約で、テストも同じ経路を通る。
+
+| sh の動き | 実行ファイルの段 |
+|---|---|
+| `request` | `review prepare`（前提を確かめ、マーカー付きの本文を控えの置き場に書き出す）→ sh が投稿 → `review requested`（印を置く） |
+| `check` | sh がスレッドとレビューを取ってくる → `review check`（判定して印を置く） |
+| `accept N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せて印を置く）→ 受け入れた一覧を sh がコメントに写す |
+| `note` | sh が投稿する。実行ファイルは関わらない |
+| `fetch` | 取ってきた写しを標準出力へ。デバッグ用 |
+
+リモートへの道具は、`gh` / `glab` があればそれ（認証はツールに任せる）、無ければ `curl` と
+`GITHUB_TOKEN` / `GITLAB_TOKEN`。どちらも無ければ止まり、MCP などでリモートを読む形を提案する。
+結果の組み立てに `jq` が要る。道具は起動時に絶対パスへ解いて固定するので、PATH の細工では
+差し替えられない。GitHub と GitLab は origin の URL で見分ける。
+
+`--result` を実行ファイルに直接渡せるのは人の手だけ（`CCNAVI_GUARD_CLI`）。`requested` と `check` は
+依頼の印にあるホストとマージリクエストの番号が写しと一致しなければ拒む。
 
 `check` は依頼したときの HEAD と今の HEAD が同じで、push 済みであることも求める。人が見たのは
 依頼時のものなので、その後に積んだコミットを「レビュー済み」に含めない。変更要求は
@@ -1079,7 +1095,7 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 | `ccnavi/tree.py` | 作業ツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
 | `ccnavi/approval.py` | 承認済みの写し、フェーズの印、リスクスコア、承認の画面 |
 | `ccnavi/phase.py` | フェーズの終わりとゲート。提案から写しへの同期 |
-| `ccnavi/review.py` | レビューの依頼と確認。GitHub / GitLab の読み書きと、テスト用の代役 |
+| `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
 | `ccnavi/ops.py` | チケットの状態を動かす `ticket start / done / cancel` |
 | `ccnavi/audit.py` | 1 行 1 件の追記記録 |
 | `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |
