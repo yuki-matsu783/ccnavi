@@ -50,6 +50,9 @@ deny:
     subject: "cat /repo/.env"
     why: 認証情報。settings.json はシェル経由を止められない
   - tool: Bash
+    subject: "cat /repo/.env.production"
+    why: 環境名が付いた形も同じ場所
+  - tool: Bash
     subject: "cat /repo/certs/server.pem"
     why: 同上
   - tool: Bash
@@ -117,6 +120,14 @@ ask:
   - tool: Write
     subject: "/repo/pyproject.toml"
     why: 実行時の依存が変わる
+  - tool: Bash
+    subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_BIN_PATH' .claude/settings.json"
+    why: >-
+      jq のフィールド参照 `.env` は認証情報のファイル名ではない。以前はここで
+      credentials に当たり、設定を読むだけの操作が「中身を読むな」と止められていた。
+      いまはどのルールにも当たらず、権限モードへ渡って確認になる。allow に
+      jq を足せば通るが、それは網を広げる別の判断なので、ここでは当たり方を
+      そのまま記録する
   - tool: Write
     subject: "/repo/.current-ticket.md"
     why: 作業範囲の提案。承認は別の経路

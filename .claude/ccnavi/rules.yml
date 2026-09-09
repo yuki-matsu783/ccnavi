@@ -147,7 +147,17 @@ deny:
   # 読まれなくなる。絞ったぶん、`.key` という名前のファイルそのものは外れる。
   - id: credentials
     match: Bash|Read|Write|Edit|MultiEdit
-    regex: '\.env|\.dev\.vars|[\w\-\\/]\.pem\b|[\w\-\\/]\.key\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\.aws[\\/]|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc|\.pypirc'
+    # ドットで始まる名前には、前に区切りを求める。求めないと、名前が語の
+    # 途中に現れただけで当たる。実際に踏んだのは `jq -r '.env.CCNAVI_BIN_PATH'`
+    # で、設定ファイルの env ブロックを読むだけの操作が認証情報として止まった。
+    #
+    # 区切りに空白とパス区切りは入れるが、shellread がコマンドの切れ目と
+    # 引用の中の空白に置く印（\x00）は入れない。ここが 2 つを分ける。
+    # ファイルの引数は語として現れるので前が空白になり、引用の中に書かれた
+    # 式は前が印になる。`cat .env` は当たり、`jq '.a, .env.b'` は当たらない。
+    #
+    # 後ろは語の切れ目。`.env.local` は当たり、`.envrc` は当たらない。
+    regex: '(^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b'
     message: 認証情報を含む場所です。中身を読まず、必要な値を利用者に尋ねてください。
 
   - id: recursive-delete
