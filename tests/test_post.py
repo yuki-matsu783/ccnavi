@@ -84,10 +84,18 @@ class PostToolUseTest(unittest.TestCase):
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
 
-    def run_hook(self, mode="enable", restore="disable", session="s1", tool="Bash", **tool_input):
+    def run_hook(
+        self,
+        mode="enable",
+        restore="disable",
+        session="s1",
+        tool="Bash",
+        event="PostToolUse",
+        **tool_input,
+    ):
         payload = json.dumps(
             {
-                "hook_event_name": "PostToolUse",
+                "hook_event_name": event,
                 "tool_name": tool,
                 "tool_input": tool_input,
                 "session_id": session,
@@ -122,7 +130,7 @@ class PostToolUseTest(unittest.TestCase):
                 # ここで見るのはルール由来の保護だけ。ccnavi 自身の設定ファイルを
                 # 守る側は対象も経路も別なので、混ぜると失敗したときにどちらの
                 # 話なのかが分からなくなる。あちらは test_selfguard が見る。
-                "--restore-setting-files",
+                "--guard-core-files",
                 "disable",
                 *args,
             ],
@@ -324,6 +332,69 @@ class PostToolUseTest(unittest.TestCase):
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "committed\n")
         self.assertIn("is not a setting", result.stderr)
+
+    # ターンの終わり
+
+    def test_ターンの終わりに保護領域の変更を人へ報告する(self):
+        self.run_hook(event="UserPromptSubmit")
+        self.dirty()
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.returncode, 0, "報告のためにターンを続けさせない")
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertIn("protected", message, "どのルールが言っているか")
+        self.assertIn("git restore", message, "戻す手順")
+
+    def test_ターンの終わりも変わっていなければ何も言わない(self):
+        self.run_hook(event="UserPromptSubmit")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
+    def test_ターンが始まる前から在った変更は報告しない(self):
+        # 利用者の書きかけ、他のセッションが置いたもの、前のターンで片付け
+        # なかったもの。全部このターンの成果として並べると、次から読まれなくなる。
+        self.dirty()
+        self.run_hook(event="UserPromptSubmit")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "", "基準に入っているものは、このターンの出来事ではない")
+
+    def test_ターンの始まりを見ていなければ何も言わない(self):
+        # 登録されていない、あるいは基準を読めなかった。見えていない期間を
+        # 見えたことにしない。
+        self.dirty()
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "")
+        self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
+
+    def test_ターンの終わりの報告は一度伝えた変更も含む(self):
+        # 呼び出しごとの報告は控えを見て繰り返さないが、人はまだ 1 度も
+        # 見ていないことがある。宛先が違うので、控えを共有しない。
+        self.run_hook(event="UserPromptSubmit")
+        self.run_hook(command="ls")
+        self.dirty()
+        self.run_hook(command="python build.py")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertIn("protected/keep.txt", json.loads(result.stdout)["systemMessage"])
+
+    def test_dry_run_でもターンの終わりには報告する(self):
+        # 見えたことを言うだけで、呼び出しにも作業ツリーにも手を出さない。
+        self.run_hook(mode="dry-run", event="UserPromptSubmit")
+        self.dirty()
+
+        result = self.run_hook(mode="dry-run", event="Stop")
+
+        self.assertIn("protected/keep.txt", json.loads(result.stdout)["systemMessage"])
 
     # 見えないとき
 

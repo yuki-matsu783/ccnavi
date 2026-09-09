@@ -358,7 +358,7 @@ class RecordTest(unittest.TestCase):
             pre_tool_use("Bash", "command", "go build ./..."),
             pre_tool_use("Task", "prompt", "something"),
             json.dumps({"hook_event_name": "SessionStart"}),
-            json.dumps({"hook_event_name": "Stop"}),
+            json.dumps({"hook_event_name": "PreCompact"}),
         )
 
         self.assertEqual(len(got), 5, "記録の無い呼び出しは、動かなかったガードと区別が付かない")
