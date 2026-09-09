@@ -79,6 +79,9 @@ TICKET_SCOPE_RULE = "(ticket-scope)"
 # 判定に至らなかった理由のうち、この面だけが出すもの。
 REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
 REASON_WORKTREE_UNREADABLE = "worktree-unreadable"
+# ターンの始まりを見ていないので、このターンで起きたことを切り出せない。
+# 記録に残す。ターンの終わりの報告が黙っていた期間を、後から数えられるように。
+REASON_NO_TURN_BASELINE = "no-turn-baseline"
 
 # 1 回の報告に載せる件数の上限。ビルドが生成物を数百件置くことがあり、
 # 全部を並べると本文が流れて 1 件も読まれない。
@@ -153,7 +156,7 @@ def check(
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
-    # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.restore_setting）ので、
+    # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.effective_setting）ので、
     # ここで enforcing を見る必要はない。掛ける場所を 1 か所に寄せてあるのは、
     # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
     if fresh and restore == selfguard.ENABLE:
@@ -202,6 +205,70 @@ def check(
             "Run 'git status' to see the rest before you undo anything."
         )
     return "\n\n".join(shown)
+
+
+def at_stop(
+    stderr: TextIO,
+    state_dir: str,
+    mine: tuple[str, ...],
+    rule_set: rules.RuleSet,
+    source: str,
+    scope: ScopeGuard | None,
+    payload: hookio.Input,
+    record: audit.Record,
+    root: str,
+) -> str:
+    """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
+
+    呼び出しごとの報告とは宛先も目的も違う。あちらはモデルが読んで次の一手を
+    変えるためのもので、こちらは人が「このターンで何が変わったか」を 1 度で
+    見るためのものになる。
+
+    セッションの控え（`seen`）は見ない。あれは「モデルへ 1 度伝えた」を
+    覚えているもので、人はまだ 1 度も見ていないことがある。代わりに見るのは
+    ターンの始まりに取った基準で、そこに無いものだけが、このターンで起きたこと。
+
+    戻しもしない。ここで報告するのは、実行後の監視が戻さなかった、あるいは
+    戻す設定になっていなかった変更で、どうするかは人が決める。
+    """
+    baseline, known_baseline = _load_turn(stderr, state_dir, payload.session_id)
+    if not known_baseline:
+        # ターンの始まりを見ていない。ここで今そこに在るものを全部並べると、
+        # 利用者の書きかけも他のセッションが置いたものも、このターンの成果として
+        # 報告することになる。見えていない期間を、見えたことにしない。
+        record.decision, record.reason = audit.SKIP, REASON_NO_TURN_BASELINE
+        return ""
+
+    top = gitstate.top_level(root)
+    changes, unreadable = gitstate.read(top)
+    if unreadable:
+        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
+        record.detail = unreadable
+        return ""
+
+    found = [
+        f
+        for f in _findings(changes, rule_set, mine, source, scope)
+        if f.change.key() not in baseline
+    ]
+    if not found:
+        record.decision, record.enforced = audit.ALLOW, True
+        return ""
+
+    record.decision, record.enforced = audit.DENY, True
+    record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
+    record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
+
+    lines = [f"[ccnavi] 守ると宣言した場所が、このターンで {len(found)} 件変わりました。"]
+    for finding in found[:REPORT_LIMIT]:
+        rule = finding.group[0]
+        lines.append(
+            f"  {finding.change.path}（{finding.change.kind}）"
+            f" ルール {rule.id or '(id 無し)'} / 戻すなら {gitstate.undo(finding.change)}"
+        )
+    if len(found) > REPORT_LIMIT:
+        lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
+    return "\n".join(lines)
 
 
 @dataclass
@@ -427,6 +494,87 @@ def _restore(
 def _seen_path(state_dir: str, session: str) -> str:
     name = _UNSAFE.sub("_", session)[:64] or "unknown"
     return os.path.join(state_dir, f"{name}.json")
+
+
+def _turn_path(state_dir: str, session: str) -> str:
+    """ターンの基準を置く場所。セッションの控えとは別に持つ。
+
+    2 つは寿命が違う。セッションの控えは「モデルへ 1 度伝えた」を覚えていて
+    セッションが終わるまで残るが、こちらはターンごとに取り直す。同じファイルに
+    まとめると、ターンの区切りでセッションの控えまで消えることになる。
+    """
+    name = _UNSAFE.sub("_", session)[:64] or "unknown"
+    return os.path.join(state_dir, f"{name}.turn.json")
+
+
+def at_prompt(
+    stderr: TextIO,
+    state_dir: str,
+    mine: tuple[str, ...],
+    rule_set: rules.RuleSet,
+    source: str,
+    scope: ScopeGuard | None,
+    payload: hookio.Input,
+    record: audit.Record,
+    root: str,
+) -> None:
+    """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
+
+    これが無いと、ターンの終わりの報告が「今そこにある変更」しか言えない。
+    利用者自身の書きかけも、他のセッションが置いたものも、前のターンで
+    片付けなかったものも、全部このターンの成果として並ぶ。何度も同じものを
+    見せられた人は、次から読まなくなる。
+
+    基準を取るのはターンが始まる瞬間で、そこが「エージェントがまだ何もして
+    いない時点」になる。以降に現れたものだけが、このターンで起きたこと。
+    """
+    top = gitstate.top_level(root)
+    changes, unreadable = gitstate.read(top)
+    if unreadable:
+        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
+        record.detail = unreadable
+        return
+
+    found = _findings(changes, rule_set, mine, source, scope)
+    _save_turn(stderr, state_dir, payload.session_id, {f.change.key() for f in found})
+    record.decision, record.enforced = audit.ALLOW, True
+    if found:
+        record.detail = f"turn baseline {len(found)}"
+
+
+def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
+    """このターンの基準を返す。2 つめの値は、基準を持っているかどうか。
+
+    持っていないなら、ターンの始まりを見ていない。登録されていないか、
+    そのイベントで読めなかったか。そこで「全部このターンの成果」として
+    報告すると、前から在ったものまで並ぶので、そのときは何も言わない。
+    見えていない期間を、見えたことにしない。
+    """
+    if not state_dir:
+        return set(), False
+    try:
+        with open(_turn_path(state_dir, session), encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return set(), False
+    except (OSError, ValueError) as exc:
+        stderr.write(f"ccnavi: ターンの基準を読めない: {exc}\n")
+        return set(), False
+    base = data.get("baseline") if isinstance(data, dict) else None
+    if not isinstance(base, list):
+        return set(), False
+    return {s for s in base if isinstance(s, str)}, True
+
+
+def _save_turn(stderr: TextIO, state_dir: str, session: str, baseline: set[str]) -> None:
+    if not state_dir:
+        return
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        with open(_turn_path(state_dir, session), "w", encoding="utf-8") as f:
+            json.dump({"baseline": sorted(baseline)[:SEEN_LIMIT]}, f, ensure_ascii=False)
+    except OSError as exc:
+        stderr.write(f"ccnavi: ターンの基準を書けない: {exc}\n")
 
 
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:

@@ -152,7 +152,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--log", default=None)
     parser.add_argument("--state", default=None)
     parser.add_argument("--restore-if-deny", default="")
-    parser.add_argument("--restore-setting-files", default="")
+    parser.add_argument("--guard-core-files", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
@@ -197,7 +197,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             problems,
             args.mode,
             args.restore_if_deny,
-            args.restore_setting_files,
+            args.guard_core_files,
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
@@ -226,11 +226,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     conf.restore_if_deny = selfguard.resolve(
         stderr, args.restore_if_deny, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
     )
-    conf.restore_setting_files = selfguard.resolve(
+    conf.guard_core_files = selfguard.resolve(
         stderr,
-        args.restore_setting_files,
-        conf.restore_setting_files,
-        settings.RESTORE_SETTING_FILES_ENV,
+        args.guard_core_files,
+        conf.guard_core_files,
+        settings.GUARD_CORE_FILES_ENV,
     )
     log = audit.Log(conf.log)
     deadline = time.monotonic() + DEADLINE_SECONDS
@@ -292,9 +292,105 @@ def decide(
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SESSION_START:
         return decide_at_start(stdout, mode, conf, root, payload, record)
+    if payload.event == hookio.USER_PROMPT_SUBMIT:
+        return decide_at_prompt(stderr, conf, root, payload, record)
+    if payload.event == hookio.STOP:
+        return decide_at_stop(stdout, stderr, conf, root, payload, record)
     # 判定を持たないイベントは誤りではない。想定していない登録が
     # 作業を止めてはいけない。
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
+    return EXIT_OK
+
+
+def watch_context(
+    stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
+) -> tuple[rules.RuleSet, str, post.ScopeGuard | None]:
+    """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
+
+    保護領域も範囲も、実行前の判定と同じ経路で解く。別に書くと、実行前に
+    通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
+    どちらが本当の宣言なのかを誰も言えなくなる。
+    """
+    rule_set, source = load_rules(stderr, conf.rules, record)
+    approved, _ = ticket_scope(conf)
+    scope = (
+        post.ScopeGuard(
+            root=root,
+            ledger=conf.ledger,
+            ticket=conf.ticket,
+            name=approved.ticket,
+            write=approved.write,
+        )
+        if approved is not None
+        else None
+    )
+    return rule_set, source, scope
+
+
+def decide_at_prompt(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """利用者が何か言ったとき。ターンの基準をここで取る。
+
+    何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
+    まだ何も起きていない時点で 1 段積むことになる。ここでやるのは、
+    ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
+    """
+    rule_set, source, scope = watch_context(stderr, conf, root, record)
+    post.at_prompt(
+        stderr,
+        conf.state,
+        (conf.state, conf.log),
+        rule_set,
+        source,
+        scope,
+        payload,
+        record,
+        root,
+    )
+    return EXIT_OK
+
+
+def decide_at_stop(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """ターンが終わったとき。宣言した保護領域の今の状態を人へ報告する。
+
+    宛先が人なので `systemMessage` で返す。呼び出しごとの報告はモデルへ届く
+    経路に載せてあり、そこは既に足りている。足りていないのは、ターンが終わった
+    あとに人が「結局どこが変わったのか」を 1 度で見る場所のほう。
+
+    exit 2 は使わない。このイベントでの exit 2 はターンを続けさせる意味になり、
+    報告のために作業を終わらせない形になる。何も止めずに、言うだけにする。
+
+    モードを見ない。dry-run でも disable でも報告する。ここは呼び出しにも
+    作業ツリーにも手を出さず、見えたことを言うだけなので、モードが約束している
+    ものを何ひとつ破らない。むしろ dry-run は「まだ何も適用していないが何が
+    起きているか」を見るためのモードなので、ここが黙ると見る手立てが減る。
+    """
+    rule_set, source, scope = watch_context(stderr, conf, root, record)
+    text = post.at_stop(
+        stderr,
+        conf.state,
+        (conf.state, conf.log),
+        rule_set,
+        source,
+        scope,
+        payload,
+        record,
+        root,
+    )
+    if text:
+        hookio.write_system_message(stdout, text)
     return EXIT_OK
 
 
@@ -314,7 +410,7 @@ def decide_at_start(
     判定は返さない。何も起きていない時点なので、言うことがあるとすれば
     控えを取れなかったことだけになる。
     """
-    setting = restore_setting(mode, conf.restore_setting_files)
+    setting = effective_setting(mode, conf.guard_core_files)
     outcomes = selfguard.at_start(
         setting,
         conf.state,
@@ -330,7 +426,7 @@ def decide_at_start(
     return EXIT_OK
 
 
-def restore_setting(mode: str, declared: str) -> str:
+def effective_setting(mode: str, declared: str) -> str:
     """CCNAVI_MODE を掛けたあとの、実際に効く設定。
 
     判定を適用しないモードでは、戻す側もファイルに触らない。dry-run は
@@ -358,7 +454,7 @@ def guard_setting_files(
     対象の決め方も設定の解き方も 1 か所にまとまり、片方だけが別の対象を
     見ている、という食い違いが起きない。
     """
-    setting = restore_setting(mode, conf.restore_setting_files)
+    setting = effective_setting(mode, conf.guard_core_files)
     outcomes = step(
         stderr,
         setting,
@@ -402,10 +498,7 @@ def decide_before(
     # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
     # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
-    if (
-        not record.fallback
-        and restore_setting(mode, conf.restore_setting_files) != selfguard.DISABLE
-    ):
+    if not record.fallback and effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE:
         selfguard.add_rules(rule_set, conf.bin)
 
     subject = screen(payload.tool_name, record.subject, record)
@@ -576,7 +669,7 @@ def decide_after(
     text = post.check(
         stderr,
         enforcing=mode == MODE_ENABLE,
-        restore=restore_setting(mode, conf.restore_if_deny),
+        restore=effective_setting(mode, conf.restore_if_deny),
         state_dir=conf.state,
         mine=(conf.state, conf.log),
         rule_set=rule_set,

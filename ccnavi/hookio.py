@@ -17,6 +17,8 @@ from typing import Any, TextIO
 PRE_TOOL_USE = "PreToolUse"
 POST_TOOL_USE = "PostToolUse"
 SESSION_START = "SessionStart"
+USER_PROMPT_SUBMIT = "UserPromptSubmit"
+STOP = "Stop"
 
 # 1 回の呼び出しに対する判定。緩い順に並べてある。
 ALLOW = "allow"
@@ -109,6 +111,21 @@ def write_context(stream: TextIO, event: str, text: str) -> None:
     PostToolUse と SessionStart にはこの経路しかない。素の標準出力は捨てられる。
     """
     _write(stream, {"hookEventName": event, "additionalContext": text})
+
+
+def write_system_message(stream: TextIO, text: str) -> None:
+    """人に見せる文を書き出す。
+
+    `additionalContext` との違いは宛先。あちらはモデルが読み、これは
+    トランスクリプトに出て人が読む。ターンの終わりに「宣言した保護領域が
+    こう変わっている」と言う相手は、次の一手を打つエージェントではなく、
+    それを見ている人になる。エージェントには実行後の監視が呼び出しごとに
+    返しているので、同じことを 2 度モデルへ送らない。
+
+    このキーは hookSpecificOutput の中ではなく、応答の一番外に置く。
+    """
+    stream.write(json.dumps({"systemMessage": text}, ensure_ascii=False))
+    stream.write("\n")
 
 
 def _write(stream: TextIO, payload: dict[str, Any]) -> None:
