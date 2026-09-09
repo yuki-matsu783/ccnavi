@@ -31,12 +31,12 @@ STATE_ENV = "CCNAVI_STATE"
 #
 # RESTORE_IF_DENY_ENV は、ルールが `deny` と宣言した場所を戻す。対象は
 # ルールファイル次第で動くので、プロジェクトが書いたぶんだけ広がる。
-# RESTORE_SETTING_FILES_ENV は、ccnavi 自身を成り立たせている設定ファイルを
+# GUARD_CORE_FILES_ENV は、ccnavi 自身を成り立たせている設定ファイルを
 # 戻す。対象は組み込みで固定されていて、ルールファイルには書かない。
 #
 # 分けた理由は selfguard.py の冒頭にある。片方だけを切れることが要る。
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
-RESTORE_SETTING_FILES_ENV = "CCNAVI_RESTORE_SETTING_FILES"
+GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
@@ -97,10 +97,10 @@ class Settings:
     # 戻さない既定は「宣言したのに守られない」を既定にすることでもあるので、
     # 既定は enable にしてある。切りたいプロジェクトは明示して切る。
     #
-    # restore_setting_files は、ccnavi 自身の設定ファイルを控えから戻すかどうか。
+    # guard_core_files は、ccnavi 自身の設定ファイルを控えから戻すかどうか。
     # 対象は組み込みで固定なので、広がりようがない。
     restore_if_deny: str = ""
-    restore_setting_files: str = ""
+    guard_core_files: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
     # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
@@ -129,7 +129,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         rules=os.path.join(root, DEFAULT_RULES),
         state=os.path.join(root, DEFAULT_STATE),
         restore_if_deny=os.environ.get(RESTORE_IF_DENY_ENV, ""),
-        restore_setting_files=os.environ.get(RESTORE_SETTING_FILES_ENV, ""),
+        guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
         ticket=os.path.join(root, DEFAULT_TICKET),
         ledger=os.path.join(root, DEFAULT_LEDGER),
     )
@@ -180,8 +180,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.bin = _resolve(root, conf["bin"])
     if isinstance(conf.get("restore_if_deny"), str):
         settings.restore_if_deny = conf["restore_if_deny"]
-    if isinstance(conf.get("restore_setting_files"), str):
-        settings.restore_setting_files = conf["restore_setting_files"]
+    if isinstance(conf.get("guard_core_files"), str):
+        settings.guard_core_files = conf["guard_core_files"]
     if isinstance(conf.get("ticket"), str) and conf["ticket"]:
         settings.ticket = _resolve(root, conf["ticket"])
     if isinstance(conf.get("ledger"), str):

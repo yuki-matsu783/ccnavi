@@ -121,7 +121,7 @@ class SelfGuardTest(unittest.TestCase):
                 self.log,
                 "--mode",
                 mode,
-                "--restore-setting-files",
+                "--guard-core-files",
                 setting,
                 # ルール由来の保護は切っておく。両方が同じファイルについて
                 # 別々に口を出すと、どちらが戻したのかがテストから見えない。
