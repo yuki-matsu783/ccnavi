@@ -84,7 +84,7 @@ class PostToolUseTest(unittest.TestCase):
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
 
-    def run_hook(self, mode="enable", restore="off", session="s1", tool="Bash", **tool_input):
+    def run_hook(self, mode="enable", restore="disable", session="s1", tool="Bash", **tool_input):
         payload = json.dumps(
             {
                 "hook_event_name": "PostToolUse",
@@ -117,8 +117,13 @@ class PostToolUseTest(unittest.TestCase):
                 self.state,
                 "--log",
                 self.log,
-                "--restore",
+                "--restore-if-deny",
                 restore,
+                # ここで見るのはルール由来の保護だけ。ccnavi 自身の設定ファイルを
+                # 守る側は対象も経路も別なので、混ぜると失敗したときにどちらの
+                # 話なのかが分からなくなる。あちらは test_selfguard が見る。
+                "--restore-setting-files",
+                "disable",
                 *args,
             ],
             input=payload,
@@ -244,7 +249,7 @@ class PostToolUseTest(unittest.TestCase):
     def test_前から在った変更は自動復元でも触らない(self):
         self.dirty()
 
-        self.run_hook(command="ls", restore="auto")
+        self.run_hook(command="ls", restore="enable")
 
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "changed by a build\n", "他人の書きかけを戻してはいけない")
@@ -267,7 +272,7 @@ class PostToolUseTest(unittest.TestCase):
         self.run_hook(mode="dry-run", command="ls")
         self.dirty()
 
-        self.run_hook(mode="dry-run", restore="auto", command="python build.py")
+        self.run_hook(mode="dry-run", restore="enable", command="python build.py")
 
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "changed by a build\n")
@@ -287,7 +292,7 @@ class PostToolUseTest(unittest.TestCase):
         self.run_hook(command="ls")
         self.dirty()
 
-        result = self.run_hook(restore="auto", command="python build.py")
+        result = self.run_hook(restore="enable", command="python build.py")
 
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
             self.assertEqual(f.read(), "committed\n")
@@ -297,7 +302,7 @@ class PostToolUseTest(unittest.TestCase):
         self.run_hook(command="ls")
         write(os.path.join(self.repo, "protected", "generated.env"), "SECRET=1\n")
 
-        result = self.run_hook(restore="auto", command="npm run build")
+        result = self.run_hook(restore="enable", command="npm run build")
 
         self.assertFalse(os.path.exists(os.path.join(self.repo, "protected", "generated.env")))
         self.assertIn("moved this file to", result.stderr)
@@ -306,15 +311,19 @@ class PostToolUseTest(unittest.TestCase):
         found = [f for _, _, files in os.walk(aside) for f in files]
         self.assertEqual(found, ["generated.env"])
 
-    def test_読めない自動復元の値は戻さない側に落ちる(self):
+    def test_読めない自動復元の値は守る側に落ちる(self):
+        # 倒れる先を off から enable に変えてある。書き損じた 1 語で守りが
+        # 消えるより、書き損じた 1 語で守りが残るほうがよい、という向き。
+        # 戻す先はコミット済みの内容なので、失われるのは「宣言した保護領域を
+        # 汚した未コミットの変更」だけになる。
         self.run_hook(command="ls")
         self.dirty()
 
         result = self.run_hook(restore="yes", command="python build.py")
 
         with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "changed by a build\n", "書き損じがファイル操作に化けない")
-        self.assertIn("is not a restore setting", result.stderr)
+            self.assertEqual(f.read(), "committed\n")
+        self.assertIn("is not a setting", result.stderr)
 
     # 見えないとき
 
