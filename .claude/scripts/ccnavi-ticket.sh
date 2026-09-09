@@ -50,7 +50,7 @@ common=$(git rev-parse --git-common-dir 2>/dev/null || :)
 }
 case "$common" in
 */.git) root="${common%/.git}" ;;
-.git) root="$(pwd)" ;;
+.git) root="$(pwd -W 2>/dev/null || pwd)" ;;
 *) root="$common" ;;
 esac
 
