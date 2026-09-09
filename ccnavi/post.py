@@ -45,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, gitstate, hookio, rules
+from . import audit, gitstate, hookio, rules, selfguard
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -75,10 +75,6 @@ CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 # 範囲外の変更を咎めているのは、ルールファイルの中のルールではなく承認台帳。
 # 出所にこの名前を添えて、ルールファイルを探しても見つからないことを示す。
 TICKET_SCOPE_RULE = "(ticket-scope)"
-
-# 自動復元の設定。既定は off。
-RESTORE_OFF = "off"
-RESTORE_AUTO = "auto"
 
 # 判定に至らなかった理由のうち、この面だけが出すもの。
 REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
@@ -157,7 +153,10 @@ def check(
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
-    if fresh and restore == RESTORE_AUTO and enforcing:
+    # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.restore_setting）ので、
+    # ここで enforcing を見る必要はない。掛ける場所を 1 か所に寄せてあるのは、
+    # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
+    if fresh and restore == selfguard.ENABLE:
         restored = _restore(stderr, top, state_dir, [f.change for f in fresh])
 
     _save_seen(
@@ -203,26 +202,6 @@ def check(
             "Run 'git status' to see the rest before you undo anything."
         )
     return "\n\n".join(shown)
-
-
-def resolve_restore(stderr: TextIO, flag: str, declared: str) -> str:
-    """自動復元の設定を解決する。
-
-    読めない値は off に落とす。モードの解決が読めない値を block へ倒すのと
-    向きが逆なのは、倒れた先でやることが逆だから。あちらは何もしないほうへ
-    倒れるが、こちらの auto はファイルを動かす。書き損じた 1 語が、
-    誰も頼んでいないファイル操作に化けてはいけない。
-    """
-    value = (flag or declared).lower()
-    if value in (RESTORE_OFF, ""):
-        return RESTORE_OFF
-    if value == RESTORE_AUTO:
-        return RESTORE_AUTO
-    stderr.write(
-        f"ccnavi: {value!r} is not a restore setting; using {RESTORE_OFF}. "
-        f"Valid values are {RESTORE_OFF} and {RESTORE_AUTO}\n"
-    )
-    return RESTORE_OFF
 
 
 @dataclass

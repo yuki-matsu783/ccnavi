@@ -25,10 +25,18 @@ from dataclasses import dataclass
 MODE_ENV = "CCNAVI_MODE"
 RULES_ENV = "CCNAVI_RULES"
 LOG_ENV = "CCNAVI_LOG"
-# 実行後の監視が使う 2 つ。STATE_ENV はセッションごとの控えの置き場、
-# RESTORE_ENV は検知した変更を ccnavi 自身が戻すかどうか。
+# STATE_ENV はセッションごとの控えの置き場。
 STATE_ENV = "CCNAVI_STATE"
-RESTORE_ENV = "CCNAVI_RESTORE"
+# 戻す働きは 2 つあり、守る対象の決まり方が違うので環境変数も分けてある。
+#
+# RESTORE_IF_DENY_ENV は、ルールが `deny` と宣言した場所を戻す。対象は
+# ルールファイル次第で動くので、プロジェクトが書いたぶんだけ広がる。
+# RESTORE_SETTING_FILES_ENV は、ccnavi 自身を成り立たせている設定ファイルを
+# 戻す。対象は組み込みで固定されていて、ルールファイルには書かない。
+#
+# 分けた理由は selfguard.py の冒頭にある。片方だけを切れることが要る。
+RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
+RESTORE_SETTING_FILES_ENV = "CCNAVI_RESTORE_SETTING_FILES"
 # チケットによる範囲の制御が使う 2 つ。TICKET_ENV は人に見せる提案の置き場、
 # LEDGER_ENV は承認台帳。判定が読むのは台帳だけで、提案のほうは承認の画面しか読まない。
 TICKET_ENV = "CCNAVI_TICKET"
@@ -76,10 +84,18 @@ class Settings:
     log: str = ""
     rules: str = ""
     state: str = ""
-    # restore は実行後の監視が検知した変更を ccnavi 自身が戻すかどうか。
-    # 既定は戻さない。戻す側はファイルを動かすので、設定の欠落が
-    # 誰も頼んでいないファイル操作にならないようにする。
-    restore: str = ""
+    # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
+    #
+    # restore_if_deny は、ルールが `deny` と宣言した場所が副作用で変わったときに
+    # git から戻すかどうか。対象がルールファイル次第で動くので、書き損じが
+    # そのまま「頼んでいないファイル操作」になりうる。その懸念は残るが、
+    # 戻さない既定は「宣言したのに守られない」を既定にすることでもあるので、
+    # 既定は enable にしてある。切りたいプロジェクトは明示して切る。
+    #
+    # restore_setting_files は、ccnavi 自身の設定ファイルを控えから戻すかどうか。
+    # 対象は組み込みで固定なので、広がりようがない。
+    restore_if_deny: str = ""
+    restore_setting_files: str = ""
 
     # ticket は人に見せる提案の置き場、ledger は承認台帳。
     # 判定が読むのは ledger だけ。ticket を読むのは承認の画面と --lint で、
@@ -102,7 +118,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         log=os.path.join(root, DEFAULT_LOG),
         rules=os.path.join(root, DEFAULT_RULES),
         state=os.path.join(root, DEFAULT_STATE),
-        restore=os.environ.get(RESTORE_ENV, ""),
+        restore_if_deny=os.environ.get(RESTORE_IF_DENY_ENV, ""),
+        restore_setting_files=os.environ.get(RESTORE_SETTING_FILES_ENV, ""),
         ticket=os.path.join(root, DEFAULT_TICKET),
         ledger=os.path.join(root, DEFAULT_LEDGER),
     )
@@ -146,8 +163,10 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.log = _log_or_none(root, conf["log"])
     if isinstance(conf.get("state"), str):
         settings.state = _log_or_none(root, conf["state"])
-    if isinstance(conf.get("restore"), str):
-        settings.restore = conf["restore"]
+    if isinstance(conf.get("restore_if_deny"), str):
+        settings.restore_if_deny = conf["restore_if_deny"]
+    if isinstance(conf.get("restore_setting_files"), str):
+        settings.restore_setting_files = conf["restore_setting_files"]
     if isinstance(conf.get("ticket"), str) and conf["ticket"]:
         settings.ticket = _resolve(root, conf["ticket"])
     if isinstance(conf.get("ledger"), str):

@@ -95,6 +95,10 @@ class Record:
     # 残すのは、同じ場所が繰り返し汚れているのか毎回違う場所なのかで、
     # 直す先が変わるため。前者は出力先の設定 1 つ、後者は経路そのもの。
     paths: list[str] = field(default_factory=list)
+    # guarded は、ccnavi 自身の設定ファイルについてこの 1 回で何をしたか。
+    # ルールに当たった結果ではないので rules とも paths とも混ぜない。
+    # 「戻した」が何回あったかは、ここを数えないと分からない。
+    guarded: list[str] = field(default_factory=list)
     session: str = ""
 
 
@@ -167,6 +171,8 @@ class Log:
             out["rules"] = record.rules
         if record.paths:
             out["paths"] = record.paths
+        if record.guarded:
+            out["guarded"] = record.guarded
         if record.session:
             out["session"] = record.session
 

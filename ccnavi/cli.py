@@ -9,9 +9,22 @@ from __future__ import annotations
 import argparse
 import os
 import time
+from collections.abc import Callable
 from typing import TextIO
 
-from . import approval, audit, builtin, diagnose, hookio, lint, post, rules, settings, shellread
+from . import (
+    approval,
+    audit,
+    builtin,
+    diagnose,
+    hookio,
+    lint,
+    post,
+    rules,
+    selfguard,
+    settings,
+    shellread,
+)
 from . import ticket as ticket_mod
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
@@ -138,7 +151,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--rules", default="")
     parser.add_argument("--log", default=None)
     parser.add_argument("--state", default=None)
-    parser.add_argument("--restore", default="")
+    parser.add_argument("--restore-if-deny", default="")
+    parser.add_argument("--restore-setting-files", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
@@ -176,7 +190,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
     # 報告でしかないものが、検証にとっては結論そのものになる。
     if args.lint:
-        return lint.report(stdout, root, conf, problems, args.mode, args.restore)
+        return lint.report(
+            stdout,
+            root,
+            conf,
+            problems,
+            args.mode,
+            args.restore_if_deny,
+            args.restore_setting_files,
+        )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
     # 人が端末から叩いて「このルールは何に当たるのか」を確かめるための場所で、
@@ -201,7 +223,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         stderr.write(f"ccnavi: {problem}\n")
 
     mode = resolve_mode(stderr, args.mode, conf)
-    conf.restore = post.resolve_restore(stderr, args.restore, conf.restore)
+    conf.restore_if_deny = selfguard.resolve(
+        stderr, args.restore_if_deny, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
+    )
+    conf.restore_setting_files = selfguard.resolve(
+        stderr,
+        args.restore_setting_files,
+        conf.restore_setting_files,
+        settings.RESTORE_SETTING_FILES_ENV,
+    )
     log = audit.Log(conf.log)
     deadline = time.monotonic() + DEADLINE_SECONDS
 
@@ -266,6 +296,49 @@ def decide(
     return EXIT_OK
 
 
+def restore_setting(mode: str, declared: str) -> str:
+    """CCNAVI_MODE を掛けたあとの、実際に効く設定。
+
+    判定を適用しないモードでは、戻す側もファイルに触らない。dry-run は
+    「呼び出しにも作業ツリーにも手を出さない」ことがモードの約束で、
+    守る側だけがその約束の外に出ると、試している最中に誰も頼んでいない
+    ファイル操作が起きる。試すことが怖くなれば、誰も試さなくなる。
+    """
+    if declared == selfguard.DISABLE:
+        return selfguard.DISABLE
+    return declared if mode == MODE_ENABLE else selfguard.DRY_RUN
+
+
+def guard_setting_files(
+    stderr: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    step: Callable[..., list[selfguard.Outcome]],
+) -> str:
+    """ccnavi 自身の設定ファイルを控えと突き合わせる 1 回。返す文を作る。
+
+    実行前と実行後で違うのは呼ぶ関数だけなので、そこを引数で受け取る。
+    対象の決め方も設定の解き方も 1 か所にまとまり、片方だけが別の対象を
+    見ている、という食い違いが起きない。
+    """
+    setting = restore_setting(mode, conf.restore_setting_files)
+    outcomes = step(
+        stderr,
+        setting,
+        conf.state,
+        payload.session_id,
+        root,
+        selfguard.targets(root, conf.rules),
+    )
+    if not outcomes:
+        return ""
+    record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
+    return selfguard.report(outcomes)
+
+
 def decide_before(
     stdout: TextIO,
     stderr: TextIO,
@@ -278,11 +351,29 @@ def decide_before(
 ) -> int:
     """実行前の判定に達し、何が起きたかを record に書き込む。
     記録と応答が必ず同じ結論から作られるようにするため。"""
+    # 控えを取るのは判定より先。ここで取る断面が、この呼び出しが何かを壊した
+    # ときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
+    # 弾けなかったものだけが作業ツリーに届くので、届いた側から見れば
+    # 「直前」は判定の前だから。
+    guard = guard_setting_files(stderr, mode, conf, root, payload, record, selfguard.before)
+
     if not record.subject:
         record.decision, record.reason = audit.SKIP, audit.REASON_NO_SUBJECT
+        if guard:
+            hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
     rule_set, source = load_rules(stderr, conf.rules, record)
+    # 設定ファイルを守る側が有効なら、そこへシェルから書き込む形を止める
+    # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
+    # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
+    # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
+    if (
+        not record.fallback
+        and restore_setting(mode, conf.restore_setting_files) != selfguard.DISABLE
+    ):
+        selfguard.add_shell_rule(rule_set)
+
     subject = screen(payload.tool_name, record.subject, record)
 
     if not subject:
@@ -291,6 +382,8 @@ def decide_before(
         # 権限モードへ渡る先になるが、何も走らないものについて誰かの判断を
         # 求める意味は無い。
         record.decision, record.reason = audit.SKIP, audit.REASON_NOTHING_TO_RUN
+        if guard:
+            hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
     # 強い区画から順に見て、最初に当たったところで止める。deny に当たった
@@ -332,9 +425,8 @@ def decide_before(
 
     # 通知は件ごとではなく先頭に 1 回。件ごとの断りはその件の中で閉じるが、
     # 通知は応答全体に掛かる事情で、繰り返すと理由の本体が下へ流れて読まれなくなる。
-    notices = [
-        text for text in (fallen_back(conf.rules) if record.fallback else "", notice) if text
-    ]
+    fallback = fallen_back(conf.rules) if record.fallback else ""
+    notices = [text for text in (guard, fallback, notice) if text]
 
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
@@ -421,6 +513,12 @@ def decide_after(
     何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
     """
+    # 設定ファイルを先に戻す。ルールを読むより前でなければならない。あとから
+    # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
+    # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
+    # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
+    guard = guard_setting_files(stderr, mode, conf, root, payload, record, selfguard.after)
+
     rule_set, source = load_rules(stderr, conf.rules, record)
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
@@ -444,7 +542,7 @@ def decide_after(
     text = post.check(
         stderr,
         enforcing=mode == MODE_ENABLE,
-        restore=conf.restore,
+        restore=restore_setting(mode, conf.restore_if_deny),
         state_dir=conf.state,
         mine=(conf.state, conf.log),
         rule_set=rule_set,
@@ -454,6 +552,10 @@ def decide_after(
         record=record,
         root=root,
     )
+    # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
+    # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
+    if guard:
+        text = f"{guard}\n\n{text}" if text else guard
     if not text:
         return EXIT_OK
 

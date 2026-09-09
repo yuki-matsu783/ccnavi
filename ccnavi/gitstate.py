@@ -226,6 +226,19 @@ def restore(top: str, change: Change, aside: str, timeout: float = TIMEOUT_SECON
     return ""
 
 
+def restore_committed(top: str, path: str, timeout: float = TIMEOUT_SECONDS) -> str:
+    """名指しした 1 つのパスを、コミット済みの内容へ戻す。
+    戻せたら空文字、駄目なら理由を返す。
+
+    Change を経由しない口を分けてあるのは、呼ぶ側の出発点が違うから。
+    上の restore は「git が変更として返したもの」を戻すが、こちらは
+    「控えが無いので git に頼るしかないもの」を戻す。後者には Change が無い。
+    git が追っていないパスなら失敗して戻り、呼び手はそれを報告に載せる。
+    黙って成功したことにはしない。控えも git も無い場所は、戻せない場所なので。
+    """
+    return _git(top, ["restore", "--staged", "--worktree", "--", path], timeout)
+
+
 def _git(top: str, args: list[str], timeout: float) -> str:
     try:
         done = subprocess.run(

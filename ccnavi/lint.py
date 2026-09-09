@@ -43,7 +43,7 @@ import json
 import os
 from typing import TextIO
 
-from . import gitstate, hookio, post, rules, settings
+from . import gitstate, hookio, rules, selfguard, settings
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
@@ -59,7 +59,8 @@ def report(
     conf: settings.Settings,
     notes: list[str],
     flag: str,
-    restore_flag: str = "",
+    restore_if_deny_flag: str = "",
+    restore_setting_files_flag: str = "",
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
@@ -80,7 +81,15 @@ def report(
     # 取り違えないため。どちらの設定について言われたのかが混ざると、
     # 直しに行く先が決まらない。
     said = io.StringIO()
-    restore = post.resolve_restore(said, restore_flag, conf.restore)
+    restore_if_deny = selfguard.resolve(
+        said, restore_if_deny_flag, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
+    )
+    restore_setting_files = selfguard.resolve(
+        said,
+        restore_setting_files_flag,
+        conf.restore_setting_files,
+        settings.RESTORE_SETTING_FILES_ENV,
+    )
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
     problems += [
@@ -90,7 +99,8 @@ def report(
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
-    stdout.write(f"  自動復元: {restore}\n")
+    stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
+    stdout.write(f"  設定ファイルを戻す: {restore_setting_files}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。

@@ -57,7 +57,7 @@ Write / Edit を通る。壊す側と直す側を分ける狙いはそこで保�
 
 from __future__ import annotations
 
-from . import rules
+from . import rules, selfguard
 
 # ファイルから読むルールと同じ形。同じ `rules.parse` を通す。
 RULES: dict = {
@@ -66,18 +66,11 @@ RULES: dict = {
         {
             "id": "builtin-guard-config-via-bash",
             "match": "Bash",
-            # プロジェクトの rules.yml の guard-shell-write と同じ形。既定が
-            # 弱いほうへずれると、ルールファイルを壊すことがそのまま緩めることに
-            # なる。書き写しなので、片方を直したらもう片方も直すこと。
-            "regex": (
-                r"(>[>|&]* ?[^ \x00]*"
-                r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
-                r"|(^|\x00)sed\b[^\x00]*-i[^\x00]*)"
-                r"(\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)"
-                r"|ccnavi-git\.sh)"
-                r"|(^|\x00)(cp|ln|install)\b[^\x00]*"
-                r"(\.claude[\\/](ccnavi|hooks|scripts|settings)|ccnavi-git\.sh)[^ \x00]*($|\x00)"
-            ),
+            # 当てる形は selfguard と同じものを使う。以前はここに書き写しがあり、
+            # 「片方を直したらもう片方も」という注意書きが付いていた。既定が弱い
+            # ほうへずれると、ルールファイルを壊すことがそのまま緩めることになる。
+            # 注意書きで守るのをやめて、1 か所から取る。
+            "regex": selfguard.SHELL_WRITE_REGEX,
             "message": (
                 "ccnavi is running on its built-in defaults because its rule file "
                 "could not be read, and the shell is not the way to write it. "
