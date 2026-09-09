@@ -58,6 +58,7 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -112,31 +113,75 @@ _SETTINGS_FILES = (
 #
 # 元と行き先がある cp / ln / install は組が違うので後ろに分けてある。見るのは
 # 行き先の側だけで、行き先は最後の引数なので、コマンドの終わりに来た形に絞る。
-SHELL_WRITE_REGEX = (
+_WRITE_VERBS = (
     r"(>[>|&]* ?[^ \x00]*"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
     r"|(^|\x00)sed\b[^\x00]*-i[^\x00]*)"
-    r"(\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)"
-    r"|ccnavi-git\.sh)"
-    r"|(^|\x00)(cp|ln|install)\b[^\x00]*"
-    r"(\.claude[\\/](ccnavi|hooks|scripts|settings)|ccnavi-git\.sh)[^ \x00]*($|\x00)"
 )
+_COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
+
+_PLACES = (r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)", r"ccnavi-git\.sh")
+_COPY_PLACES = (r"\.claude[\\/](ccnavi|hooks|scripts|settings)", r"ccnavi-git\.sh")
+
+
+def shell_write_regex(bin_path: str = "") -> str:
+    """設定ファイルへシェルから書き込む形。実行ファイルの綴りは設定で動くので、
+    ここで組み立てる。
+
+    実行ファイルを場所の一覧に足すのは、そこが判定器の実体だから。差し替えられると
+    ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
+    `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
+    """
+    places = [*_PLACES]
+    copy_places = [*_COPY_PLACES]
+    clause = binary_clause(bin_path)
+    if clause:
+        places.append(clause)
+        copy_places.append(clause)
+    where = "(" + "|".join(places) + ")"
+    copy_where = "(" + "|".join(copy_places) + ")"
+    return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
+
+
+def binary_clause(bin_path: str) -> str:
+    """実行ファイルの綴りを、当てる形に直す。
+
+    末尾の 2 要素だけを使う。絶対で書かれても相対で書かれても同じ形に当たり、
+    ファイル名だけに絞ると、同じ名前の無関係なファイルまで拾う。
+    区切りはどちらの綴りにも当てる。ルールは 1 回書いてどの機械でも同じ意味で
+    なければならない、という globmatch と同じ約束をここでも守る。
+    """
+    if not bin_path:
+        return ""
+    parts = [p for p in re.split(r"[\\/]", bin_path) if p and p not in (".", "..")]
+    if not parts:
+        return ""
+    return r"[\\/]".join(re.escape(p) for p in parts[-2:])
+
+
+SHELL_WRITE_REGEX = shell_write_regex()
 
 # 足すルールの id。プロジェクトが同じ名前で書いていれば、そちらを優先して
 # 足さない。組み込みが黙って上書きすると、ルールファイルを読んだ人が
 # 「ここに書いてあるとおりに効いている」と読めなくなる。
 SHELL_RULE_ID = "builtin-guard-setting-files"
 
-SHELL_RULE: dict = {
-    "id": SHELL_RULE_ID,
-    "match": "Bash",
-    "regex": SHELL_WRITE_REGEX,
-    "message": (
-        "ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。"
-        "Write / Edit で拒否される場所です。綴りを変えても同じ場所なので、変更が要る"
-        "理由を伝えて利用者に依頼してください。読むだけなら cat や grep はそのまま通ります。"
-    ),
-}
+SHELL_MESSAGE = (
+    "ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。"
+    "Write / Edit でも拒否される場所です。綴りを変えても同じ場所なので、変更が要る"
+    "理由を伝えて利用者に依頼してください。読むだけなら cat や grep はそのまま通ります。"
+)
+
+# 実行ファイルを名指しのツールから守るルールの id。Bash 側とは別に持つ。
+# 当てる先が違う（あちらはコマンド文字列、こちらはパス）ので、1 件にまとめると
+# どちらの読みで当たったのかが報告から消える。
+BINARY_RULE_ID = "builtin-guard-binary"
+
+BINARY_MESSAGE = (
+    "ccnavi 自身の実行ファイルです。ここが差し替わると、ルールを 1 行も変えずに"
+    "判定そのものを入れ替えられます。作り直しが要るなら、何をなぜ変えたいのかを"
+    "伝えて利用者に依頼してください。"
+)
 
 
 @dataclass
@@ -151,6 +196,11 @@ class Target:
     path: str = ""
     # label は報告に出す綴り。root からの相対で、人が探せる形。
     label: str = ""
+    # heavy は、中身を毎回読むには大きすぎる対象。実行ファイルがこれで、
+    # PyInstaller が作るものは数十 MB になる。呼び出しのたびに読むと、
+    # 判定に張った期限に効く。控えはセッション開始で 1 度だけ取り、
+    # 突き合わせは大きさと更新時刻で行う。
+    heavy: bool = False
 
 
 @dataclass
@@ -182,19 +232,48 @@ def resolve(stderr: TextIO, flag: str, declared: str, name: str) -> str:
     return ENABLE
 
 
-def add_shell_rule(rule_set: rules.RuleSet) -> None:
-    """設定ファイルへのシェル経由の書き込みを止めるルールを、判定に足す。
+def add_rules(rule_set: rules.RuleSet, bin_path: str = "") -> None:
+    """ガード自身を守るルールを、判定に足す。
 
     ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
+
+    2 本ある。シェルから書き込む形と、名指しのツールで実行ファイルを書く形。
+    設定ファイルを名指しのツールから守るぶんはプロジェクトのルールに任せる。
+    そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルは
+    置き場が設定で動くので、ルールファイルに綴りを固定できない。
 
     同じ id が既にあるなら足さない。プロジェクトが自分で書いているなら、
     書いたとおりに効いているほうがよい。組み込みが黙って重ねると、当たった
     ルールを名指しされた人が、ルールファイルを見ても見つけられなくなる。
     """
-    if any(rule.id == SHELL_RULE_ID for rule in rule_set.deny):
+    _insert(
+        rule_set,
+        {
+            "id": SHELL_RULE_ID,
+            "match": "Bash",
+            "regex": shell_write_regex(bin_path),
+            "message": SHELL_MESSAGE,
+        },
+    )
+    clause = binary_clause(bin_path)
+    if clause:
+        _insert(
+            rule_set,
+            {
+                "id": BINARY_RULE_ID,
+                "match": "Write|Edit|MultiEdit|NotebookEdit",
+                # 当てる先は解決済みの絶対パスなので、末尾で閉じる。
+                "regex": clause + "$",
+                "message": BINARY_MESSAGE,
+            },
+        )
+
+
+def _insert(rule_set: rules.RuleSet, raw: dict) -> None:
+    if any(rule.id == raw["id"] for rule in rule_set.deny):
         return
-    built, problems = rules.parse({"version": rules.VERSION, "deny": [SHELL_RULE]})
+    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]})
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
         # しない。止まると、直すための呼び出しごと止まる。
@@ -202,11 +281,11 @@ def add_shell_rule(rule_set: rules.RuleSet) -> None:
     rule_set.deny.insert(0, built.deny[0])
 
 
-def targets(root: str, rules_path: str) -> list[Target]:
+def targets(root: str, rules_path: str, bin_path: str = "") -> list[Target]:
     """守る対象を組み立てる。
 
-    ルールファイルは設定で動くので、解決済みの綴りを受け取る。空なら
-    ルールファイルを持たない設定なので、対象からも外れる。
+    ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
+    空なら、その設定を持たないということなので、対象からも外れる。
     """
     found = [
         Target(key=key, path=os.path.realpath(os.path.join(root, rel)), label=rel)
@@ -215,6 +294,9 @@ def targets(root: str, rules_path: str) -> list[Target]:
     if rules_path:
         full = os.path.realpath(rules_path)
         found.append(Target(key="rules", path=full, label=_relative(root, full)))
+    if bin_path:
+        full = os.path.realpath(bin_path)
+        found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))
     return found
 
 
@@ -248,6 +330,11 @@ def before(
 
     outcomes = []
     for target in found:
+        if target.heavy:
+            # 大きい対象はセッション開始で 1 度だけ控える。呼び出しのたびに
+            # 数十 MB を写すと、判定を待たせるために置いた仕組みが、判定より
+            # 重くなる。
+            continue
         content = _read(target.path)
         if content is not None:
             _clear_absent(state_dir, session, target)
@@ -297,6 +384,12 @@ def after(
 
     outcomes = []
     for target in found:
+        if target.heavy:
+            heavy = _check_heavy(setting, state_dir, session, target)
+            if heavy is not None:
+                outcomes.append(heavy)
+            continue
+
         saved = _read_backup(state_dir, session, target)
         now = _read(target.path)
 
@@ -338,7 +431,97 @@ def after(
             outcomes.append(
                 Outcome(target, ACTION_RESTORED, "このツール呼び出しの直前の内容に戻した")
             )
+    # 何も起きていない回は落とす。ACTION_KEPT はここまでの経路で「調べたが
+    # 変わっていなかった」を運ぶための値で、報告に出す用件ではない。
+    return [o for o in outcomes if o.action != ACTION_KEPT]
+
+
+def at_start(
+    setting: str,
+    state_dir: str,
+    session: str,
+    root: str,
+    found: list[Target],
+) -> list[Outcome]:
+    """セッションが始まったとき。大きい対象をここで 1 度だけ控える。
+
+    実行ファイルがこれにあたる。ツール呼び出しのたびに数十 MB を写すわけには
+    いかないので、写すのはセッションに 1 度。そのあいだに作り直されたものは
+    控えと食い違うが、作り直しは人が起こす作業なので、食い違いは報告に出て
+    人の目に触れる。黙って新しいほうを控え直すと、差し替えと作り直しが
+    同じ見た目になる。
+    """
+    if setting == DISABLE or not state_dir:
+        return []
+
+    outcomes = []
+    for target in found:
+        if not target.heavy:
+            continue
+        if not os.path.exists(target.path):
+            outcomes.append(
+                Outcome(
+                    target,
+                    ACTION_MISSING,
+                    "実行ファイルが見つからない。CCNAVI_BIN_PATH の綴りを確かめること",
+                )
+            )
+            continue
+        if setting != ENABLE:
+            outcomes.append(Outcome(target, ACTION_WOULD, "控えを取るはずだった"))
+            continue
+        failed = _copy(target.path, _backup_path(state_dir, session, target))
+        if failed:
+            outcomes.append(Outcome(target, ACTION_FAILED, f"控えを取れない: {failed}"))
     return outcomes
+
+
+def _check_heavy(setting: str, state_dir: str, session: str, target: Target) -> Outcome | None:
+    """大きい対象を、大きさと更新時刻で突き合わせる。
+
+    中身は読まない。控えは更新時刻ごと写してあるので、差し替えられれば
+    どちらかが必ず動く。同じ大きさで同じ時刻に作った別物までは見分けられないが、
+    そこを見分けるには毎回全部を読むことになり、実行前の判定に張った期限を
+    設定ファイル 1 つのために使い切ることになる。
+
+    控えが無いときは黙る。セッション開始のイベントに登録していない、あるいは
+    実行ファイルを指していない設定がこれで、事件ではない。登録の漏れは
+    `--lint` が言う。
+    """
+    backup = _backup_path(state_dir, session, target)
+    if not os.path.exists(backup):
+        return None
+    if _same_shape(backup, target.path):
+        return None
+    if setting != ENABLE:
+        return Outcome(target, ACTION_WOULD, "控えから戻すはずだった（今回は触っていない）")
+    failed = _copy(backup, target.path)
+    if failed:
+        return Outcome(target, ACTION_FAILED, f"戻せない: {failed}")
+    return Outcome(target, ACTION_RESTORED, "セッション開始の時点の実行ファイルに戻した")
+
+
+def _same_shape(a: str, b: str) -> bool:
+    """大きさと更新時刻が同じかどうか。
+
+    秒未満を落として比べる。控えは更新時刻ごと写すが、写した先の
+    ファイルシステムがそこまでの精度を持たないことがある。
+    """
+    try:
+        left, right = os.stat(a), os.stat(b)
+    except OSError:
+        return False
+    return left.st_size == right.st_size and int(left.st_mtime) == int(right.st_mtime)
+
+
+def _copy(source: str, target: str) -> str:
+    """更新時刻ごと写す。写せたら空文字、駄目なら理由を返す。"""
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy2(source, target)
+    except OSError as exc:
+        return f"{exc}"
+    return ""
 
 
 def report(outcomes: list[Outcome]) -> str:

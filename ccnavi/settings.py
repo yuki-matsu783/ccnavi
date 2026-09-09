@@ -37,6 +37,11 @@ STATE_ENV = "CCNAVI_STATE"
 # 分けた理由は selfguard.py の冒頭にある。片方だけを切れることが要る。
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
 RESTORE_SETTING_FILES_ENV = "CCNAVI_RESTORE_SETTING_FILES"
+# BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
+# ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
+# プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
+# 守ることになる。hook の登録に書いた綴りをそのまま渡してもらう。
+BIN_ENV = "CCNAVI_BIN_PATH"
 # チケットによる範囲の制御が使う 2 つ。TICKET_ENV は人に見せる提案の置き場、
 # LEDGER_ENV は承認台帳。判定が読むのは台帳だけで、提案のほうは承認の画面しか読まない。
 TICKET_ENV = "CCNAVI_TICKET"
@@ -97,6 +102,11 @@ class Settings:
     restore_if_deny: str = ""
     restore_setting_files: str = ""
 
+    # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
+    # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
+    # 「ccnavi の実体」として扱うことになるため。
+    bin: str = ""
+
     # ticket は人に見せる提案の置き場、ledger は承認台帳。
     # 判定が読むのは ledger だけ。ticket を読むのは承認の画面と --lint で、
     # どちらも人が起こす経路になっている。
@@ -127,6 +137,9 @@ def load(root: str) -> tuple[Settings, list[str]]:
     rules_env = os.environ.get(RULES_ENV, "")
     if rules_env:
         settings.rules = _resolve(root, rules_env)
+    bin_env = os.environ.get(BIN_ENV, "")
+    if bin_env:
+        settings.bin = _resolve(root, bin_env)
     if LOG_ENV in os.environ:
         settings.log = _log_or_none(root, os.environ[LOG_ENV])
     if STATE_ENV in os.environ:
@@ -163,6 +176,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.log = _log_or_none(root, conf["log"])
     if isinstance(conf.get("state"), str):
         settings.state = _log_or_none(root, conf["state"])
+    if isinstance(conf.get("bin"), str) and conf["bin"]:
+        settings.bin = _resolve(root, conf["bin"])
     if isinstance(conf.get("restore_if_deny"), str):
         settings.restore_if_deny = conf["restore_if_deny"]
     if isinstance(conf.get("restore_setting_files"), str):

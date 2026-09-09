@@ -290,9 +290,43 @@ def decide(
         return decide_before(stdout, stderr, mode, conf, root, payload, record, deadline)
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
+    if payload.event == hookio.SESSION_START:
+        return decide_at_start(stdout, mode, conf, root, payload, record)
     # 判定を持たないイベントは誤りではない。想定していない登録が
     # 作業を止めてはいけない。
     record.decision, record.reason = audit.SKIP, audit.REASON_EVENT_NOT_CHECKED
+    return EXIT_OK
+
+
+def decide_at_start(
+    stdout: TextIO,
+    mode: str,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> int:
+    """セッションが始まったとき。大きい対象の控えをここで 1 度だけ取る。
+
+    ここで取るのは実行ファイルで、ツール呼び出しのたびに写すには大きすぎる。
+    このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
+
+    判定は返さない。何も起きていない時点なので、言うことがあるとすれば
+    控えを取れなかったことだけになる。
+    """
+    setting = restore_setting(mode, conf.restore_setting_files)
+    outcomes = selfguard.at_start(
+        setting,
+        conf.state,
+        payload.session_id,
+        root,
+        selfguard.targets(root, conf.rules, conf.bin),
+    )
+    record.decision, record.enforced = audit.ALLOW, True
+    if not outcomes:
+        return EXIT_OK
+    record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
+    hookio.write_context(stdout, hookio.SESSION_START, selfguard.report(outcomes))
     return EXIT_OK
 
 
@@ -331,7 +365,7 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules),
+        selfguard.targets(root, conf.rules, conf.bin),
     )
     if not outcomes:
         return ""
@@ -372,7 +406,7 @@ def decide_before(
         not record.fallback
         and restore_setting(mode, conf.restore_setting_files) != selfguard.DISABLE
     ):
-        selfguard.add_shell_rule(rule_set)
+        selfguard.add_rules(rule_set, conf.bin)
 
     subject = screen(payload.tool_name, record.subject, record)
 
