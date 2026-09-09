@@ -17,14 +17,48 @@
       "Write(**/.ssh/**)"
     ]
   },
+  "env": {
+    "PYTHONUTF8": "1",
+    "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
+    "CCNAVI_GUARD_CORE_FILES": "dry-run",
+    "CCNAVI_MODE": "dry-run",
+    "CCNAVI_RESTORE_IF_DENY": "dry-run",
+    "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
+    "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
+    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi"
+  },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/dist/ccnavi/ccnavi\"",
+            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -36,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR}/dist/ccnavi/ccnavi\"",
+            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
           }
         ]
@@ -54,6 +88,16 @@
     ],
     "Stop": [
       {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",
@@ -63,13 +107,6 @@
         ]
       }
     ]
-  },
-  "env": {
-    "PYTHONUTF8": "1",
-    "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
-    "CCNAVI_MODE": "dry-run",
-    "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
-    "CCNAVI_LOG": ".claude/ccnavi/log.jsonl"
   },
   "autoMemoryEnabled": false,
   "attribution": {
