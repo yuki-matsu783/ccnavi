@@ -29,6 +29,16 @@ deny:
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
       エージェントの判断で書き換えず、変更が要る理由を伝えて利用者に依頼してください。
 
+  # 承認済みのチケットの写しとフェーズの印。判定はここだけを読むので、ここを
+  # 書けると承認の意味が無い。シェル経由は組み込みの既定が止めている。
+  - id: guard-approved-tickets
+    match: Write|Edit|MultiEdit|NotebookEdit
+    glob: "*/.claude/ccnavi/tickets/*"
+    message: >-
+      承認済みのチケットの写しです。承認は利用者が 'ccnavi --approve' で行い、
+      閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
+      範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
+
   # 生の git はまとめて止め、入口を .claude/scripts/ccnavi-git.sh の 1 本に寄せる。
   # 止める理由は 2 つで、どちらも許可ルールの粒度では書けない。
   #
