@@ -42,6 +42,9 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
 # 守ることになる。hook の登録に書いた綴りをそのまま渡してもらう。
 BIN_ENV = "CCNAVI_BIN_PATH"
+# BIN_SUFFIXES は、書かれた綴りに無いときだけ継ぎ足して探す拡張子。
+# PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
+BIN_SUFFIXES = (".exe",)
 # チケットによる範囲の制御が使う 2 つ。TICKET_ENV は人に見せる提案の置き場、
 # LEDGER_ENV は承認台帳。判定が読むのは台帳だけで、提案のほうは承認の画面しか読まない。
 TICKET_ENV = "CCNAVI_TICKET"
@@ -139,7 +142,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.rules = _resolve(root, rules_env)
     bin_env = os.environ.get(BIN_ENV, "")
     if bin_env:
-        settings.bin = _resolve(root, bin_env)
+        settings.bin = _resolve_bin(root, bin_env)
     if LOG_ENV in os.environ:
         settings.log = _log_or_none(root, os.environ[LOG_ENV])
     if STATE_ENV in os.environ:
@@ -177,7 +180,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     if isinstance(conf.get("state"), str):
         settings.state = _log_or_none(root, conf["state"])
     if isinstance(conf.get("bin"), str) and conf["bin"]:
-        settings.bin = _resolve(root, conf["bin"])
+        settings.bin = _resolve_bin(root, conf["bin"])
     if isinstance(conf.get("restore_if_deny"), str):
         settings.restore_if_deny = conf["restore_if_deny"]
     if isinstance(conf.get("guard_core_files"), str):
@@ -240,3 +243,30 @@ def _log_or_none(root: str, path: str) -> str:
 
 def _resolve(root: str, path: str) -> str:
     return path if os.path.isabs(path) else os.path.join(root, path)
+
+
+def _resolve_bin(root: str, path: str) -> str:
+    """実行ファイルの綴りを、この環境に在る形へ寄せる。
+
+    書かれたとおりに在れば、それを使う。`.exe` まで書いてある設定が Windows で
+    そのまま通るのはこの経路になる。無いときだけ、付くかもしれない拡張子を
+    継ぎ足して探す。hook の登録に書いた `dist/ccnavi/ccnavi` の 1 行が、
+    Windows では `ccnavi.exe` に、Linux ではそのまま当たる。PyInstaller が
+    Windows でだけ `.exe` を付けるので、3 つの環境で同じ 1 行を使うと、
+    設定の綴りとファイルの綴りがここでずれる。
+
+    プラットフォームで分けない。WSL から Windows 側の置き場を指す形があり、
+    そこでも守れるほうがよい。継ぎ足した綴りは在るものだけを採るので、
+    推測で別のファイルを実体として扱うことにはならない。
+
+    どちらも無ければ書かれたまま返す。ここで空に落とすと、綴りを間違えた設定が
+    「実行ファイルを守らない設定」と見分けられなくなる。無いことは selfguard が
+    missing と言い、綴りを確かめるよう促す。
+    """
+    full = _resolve(root, path)
+    if os.path.exists(full):
+        return full
+    for suffix in BIN_SUFFIXES:
+        if not full.endswith(suffix) and os.path.exists(full + suffix):
+            return full + suffix
+    return full
