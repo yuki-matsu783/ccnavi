@@ -144,6 +144,10 @@ class TicketTest(unittest.TestCase):
                 "disable",
                 "--restore-if-deny",
                 "disable",
+                # 人の判断の経路の端末要求は切る。テストは端末を持たない。
+                # 経路そのものの検査は、個別に enable を渡す。
+                "--guard-cli",
+                "disable",
                 *args,
             ],
             input=stdin,
@@ -154,7 +158,7 @@ class TicketTest(unittest.TestCase):
             env=environment,
         )
 
-    def hook(self, event, tool, cwd, mode="enable", agent_id="", **tool_input):
+    def hook(self, event, tool, cwd, mode="enable", agent_id="", guard_cli="", **tool_input):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -164,7 +168,8 @@ class TicketTest(unittest.TestCase):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        return self.ccnavi("--mode", mode, stdin=json.dumps(payload))
+        extra = ["--guard-cli", guard_cli] if guard_cli else []
+        return self.ccnavi("--mode", mode, *extra, stdin=json.dumps(payload))
 
     def reason(self, result):
         if not result.stdout.strip():
@@ -430,7 +435,8 @@ class TicketTest(unittest.TestCase):
             body,
             "review",
             "request",
-            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+            "--review-fixture",
+            fixture,
         )
 
     def test_request_needs_merged_children_and_check_opens_the_gate(self):
@@ -483,7 +489,8 @@ class TicketTest(unittest.TestCase):
             "1",
             "review",
             "check",
-            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+            "--review-fixture",
+            fixture,
         )
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("未解決", check.stderr)
@@ -499,7 +506,8 @@ class TicketTest(unittest.TestCase):
             "1",
             "review",
             "check",
-            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+            "--review-fixture",
+            fixture,
         )
         self.assertEqual(check.returncode, 0, check.stderr)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
@@ -520,8 +528,9 @@ class TicketTest(unittest.TestCase):
             "--reviewed",
             "1",
             "--accept-unresolved",
+            "--review-fixture",
+            fixture,
             stdin="y\n",
-            env={"CCNAVI_REVIEW_FIXTURE": fixture},
         )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("変更要求", refused.stderr)
@@ -534,8 +543,9 @@ class TicketTest(unittest.TestCase):
             "--reviewed",
             "1",
             "--accept-unresolved",
+            "--review-fixture",
+            fixture,
             stdin="y\n",
-            env={"CCNAVI_REVIEW_FIXTURE": fixture},
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
         self.assertIn("u1", accepted.stdout)
@@ -582,14 +592,219 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01", text)
         self.assertIn("src/a/*", text)
 
+    # ---- 7. 人の判断の経路
+
+    def test_cli_paths_are_denied_from_the_shell_unless_disabled(self):
+        self.family()
+        for command in (
+            "ccnavi --approve",
+            "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
+            "uv run python -m ccnavi ticket start i0001-01",
+            "ls && ./ccnavi review check --phase 1",
+        ):
+            result = self.hook(
+                "PreToolUse", "Bash", self.parent_tree, command=command, guard_cli="enable"
+            )
+            self.assertIn("DENY_CCNAVI_CLI", self.reason(result), command)
+        # 読むだけの形と、スクリプト経由は通る。
+        for command in (
+            "ccnavi --explain",
+            "ccnavi --lint",
+            "sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+        ):
+            result = self.hook(
+                "PreToolUse", "Bash", self.parent_tree, command=command, guard_cli="enable"
+            )
+            self.assertNotIn("DENY_CCNAVI_CLI", self.reason(result), command)
+        # PowerShell も同じ。
+        result = self.hook(
+            "PreToolUse",
+            "PowerShell",
+            self.parent_tree,
+            command="& ccnavi.exe --approve",
+            guard_cli="enable",
+        )
+        self.assertIn("DENY_CCNAVI_CLI", self.reason(result))
+        # 切ると通る。
+        result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
+        self.assertNotIn("DENY_CCNAVI_CLI", self.reason(result))
+
+    def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        refused = self.ccnavi("--approve", "--guard-cli", "enable", stdin="y\n")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("端末", refused.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
+        refused = self.ccnavi(
+            "--cwd", self.parent_tree, "--reviewed", "1", "--guard-cli", "enable", stdin="y\n"
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("端末", refused.stderr)
+        self.assertEqual(self.approve().returncode, 0)
+
+    def test_subagent_cannot_move_state_from_powershell_either(self):
+        self.family()
+        result = self.hook(
+            "PreToolUse",
+            "PowerShell",
+            self.parent_tree,
+            agent_id="sub-1",
+            command="sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+        )
+        self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
+
+    # ---- 8. 親を閉じる順
+
+    def test_parent_cannot_close_while_children_are_open(self):
+        self.family()
+        refused = self.ccnavi("ticket", "start", "i0001")
+        # 親のツリーは作ってあるので start は通る。
+        self.assertEqual(refused.returncode, 0, refused.stderr)
+        refused = self.ccnavi("ticket", "done", "i0001")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("開いている子", refused.stderr)
+        refused = self.ccnavi("ticket", "cancel", "i0001", "--reason", "やめる")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("開いている子", refused.stderr)
+        # 子を閉じてもゲートが閉じている間は閉じない。
+        self.close_phase()
+        refused = self.ccnavi("ticket", "done", "i0001")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("ゲート", refused.stderr)
+
+    def test_moving_state_keeps_the_proposal_text(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        path = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001.md")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        write(path, text.replace("---\n", "---\n# 人の覚え書き\n", 1))
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        moved = os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md")
+        with open(moved, encoding="utf-8") as f:
+            after = f.read()
+        self.assertIn("# 人の覚え書き", after)
+        self.assertIn("started_at:", after)
+        self.assertIn("base_sha:", after)
+
+    # ---- 9. レビューの前提
+
+    def test_check_refuses_when_head_moved_after_request(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "later")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        check = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "check",
+            "--review-fixture",
+            fixture,
+        )
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("HEAD が動いている", check.stderr)
+
+    def test_request_refuses_when_a_child_branch_is_gone(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        git(self.root, "worktree", "remove", "--force", ".claude/worktrees/i0001-01")
+        git(self.root, "branch", "-D", "i0001-01")
+        refused = self.request(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01", refused.stderr)
+        self.assertIn("消えている", refused.stderr)
+
+    def test_only_the_latest_review_per_author_counts(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        data["reviews"] = [
+            {"state": "CHANGES_REQUESTED", "author": "a", "submitted_at": "2026-01-01T00:00:00Z"},
+            {"state": "APPROVED", "author": "a", "submitted_at": "2026-01-02T00:00:00Z"},
+            {"state": "CHANGES_REQUESTED", "author": "b", "submitted_at": "2026-01-01T00:00:00Z"},
+            {"state": "DISMISSED", "author": "b", "submitted_at": "2026-01-03T00:00:00Z"},
+        ]
+        write(fixture, json.dumps(data))
+        check = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "check",
+            "--review-fixture",
+            fixture,
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+
+    def test_fixture_cannot_come_from_the_environment(self):
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        result = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "--body-file",
+            write(os.path.join(self.root, "body.md"), "x\n"),
+            "review",
+            "request",
+            env={"CCNAVI_REVIEW_FIXTURE": fixture},
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("comments", read_json(fixture))
+
+    # ---- 10. 差し戻しを無視した終了
+
+    def test_parent_hears_about_an_ignored_bounce(self):
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        write(os.path.join(child, "src", "b", "stray.py"), "x\n")
+        git(child, "add", "-A")
+        git(child, "commit", "--quiet", "-m", "stray")
+        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-9").returncode, 2)
+        payload = {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "子"},
+            "tool_response": {"agentId": "sub-9"},
+        }
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertIn("差し戻されたまま", self.reason(result))
+
     # ---- 診断
 
     def test_lint_names_the_gaps(self):
         self.family()
         self.worktree("stray", "main")
+        # PostToolUse だけ登録した設定。SubagentStop が無いことを名指しさせる。
+        write(
+            os.path.join(self.root, ".claude", "settings.json"),
+            json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
+        )
         result = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_LEDGER": "x"})
         self.assertIn("stray にチケットが無い", result.stdout)
         self.assertIn("CCNAVI_LEDGER はもう効かない", result.stdout)
+        self.assertIn("CCNAVI_GUARD_CLI=disable", result.stdout)
+        self.assertIn("SubagentStop", result.stdout)
+        self.assertIn("origin が無い", result.stdout)
+        # 超えている子を、承認の前に名指しする。
+        self.propose("i0001-03", parent="i0001", phase=2, allow=("docs/*",))
+        result = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn("超えている", result.stdout)
 
     def test_explain_lists_copies_and_phases(self):
         self.family()
