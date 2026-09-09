@@ -232,7 +232,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_RULES` | ルールファイル。相対パスはプロジェクト根から |
 | `CCNAVI_LOG` | 記録先。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
-| `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか |
+| `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い |
 | `CCNAVI_TICKET` | チケットの置き場。既定は `.current-ticket.md` |
@@ -545,9 +545,15 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 ### 自動復元
 
 `CCNAVI_RESTORE_IF_DENY=enable`（既定）のとき、ccnavi 自身が戻す。
-`dry-run` では戻さない。呼び出しにも作業ツリーにも手を出さないことが
-そのモードの約束で、ファイルを動かすのはそれに反する。`CCNAVI_MODE=dry-run` の
-ときも同じで、こちらが `enable` でも触らない。
+`dry-run` では戻さず、報告に `would-restore` の行を足して、本番なら何をしていたかを
+言う。判定は本番のまま戻しだけを試せる形で、対象がルールファイル次第で動く面なので、
+宣言を書いた直後にここを通しておくと、何が戻るのかを戻される前に確かめられる。
+`disable` では戻さず、その行も出さない。
+
+`CCNAVI_MODE=dry-run` のときは、こちらが `enable` でも触らず `dry-run` として振る舞う。
+呼び出しにも作業ツリーにも手を出さないことがそのモードの約束で、ファイルを動かすのは
+それに反する。組み合わせの表は
+[requirements.md §2.2](requirements.md#22-共通の動作--req-cmn) にある。
 
 戻す先はコミット済みの内容になる。宣言した保護領域を汚した未コミットの変更は、
 戻すと失われる。そこを守りたいなら `disable` にするか、保護領域の宣言を狭める。
@@ -807,7 +813,9 @@ frontmatter の全文は見せない。長いものほど読まれなくなり�
 残すのは、同じ場所が繰り返し汚れているのか毎回違う場所なのかで直す先が
 変わるため。前者は出力先の設定 1 つ、後者は経路そのもの。
 `detail` には、前から在った変更の件数（`preexisting`）、すでに伝えた変更の件数
-（`known`）、自動復元で戻した件数（`restored`）が入る。
+（`known`）、自動復元で戻した件数（`restored`）が入る。予行のときは代わりに
+戻していたはずの件数（`would-restore`）が入るので、記録を数えるだけで、本番に
+切り替えたときに何件が戻るのかが分かる。
 
 コマンドを読み切れずに生の文字列で判定した回は、判定を下したうえで `degraded` が付く。
 `command-taken-as-code` と `unterminated-quote` の 2 つ。
