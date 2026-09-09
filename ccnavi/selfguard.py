@@ -42,6 +42,22 @@
 黙ると、戻した先が直前の断面なのかコミット済みの内容なのかを、受け取った側が
 見分けられない。人の書きかけが消えているかもしれない、という違いになる。
 
+## 控えを溜めない
+
+控えはセッションごとに分かれる。何もしないと、走らせたセッションの数だけ
+残りつづける。小さい設定ファイルは上書きなので増えないが、実行ファイルは
+1 セッションにつき丸ごと 1 本で、そこが効いてくる。
+
+2 つで抑える。
+
+  1. 実体はセッションの側に置かない。中身のハッシュで名前を付けた 1 本を
+     `store/` に置き、セッションは参照だけ持つ。同じビルドで何セッション
+     走っても実体は 1 本のまま。
+  2. 古い控えはセッション開始で落とす。生きているセッションは呼び出しの
+     たびに控えを書き直すので、更新時刻が新しいものは巻き添えにならない。
+     件数の上限ではなく日付で切るのはここが理由で、長く黙っているだけの
+     生きたセッションを、数が増えたという理由で消したくない。
+
 ## 実行後だけでは足りない
 
 hook の登録は設定ファイルの file watcher が拾っていて、書き換えは同じセッションの
@@ -56,9 +72,11 @@ hook の登録は設定ファイルの file watcher が拾っていて、書き�
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import os
 import re
 import shutil
+import time
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -74,6 +92,24 @@ SETTINGS = (ENABLE, DRY_RUN, DISABLE)
 # 「このセッションの直前の断面」でしかないから。別のセッションが取った断面で
 # 戻すと、こちらが一度も見ていない内容へ書き換えることになる。
 BACKUP_DIR = "selfguard"
+
+# 大きい対象の実体の置き場。セッションの下ではなく控えの直下に置き、中身の
+# ハッシュで名前を付ける。断面が「このセッションのもの」であることは参照の側が
+# 担うので、実体まで分ける必要がない。同じ中身を何本も持たない。
+STORE_DIR = "store"
+
+# セッションの側に置く参照の綴り。実体のハッシュと、控えた時点の大きさと
+# 更新時刻が入る。
+REF_SUFFIX = ".ref"
+
+# 控えを残す日数。これより長く触られていないセッションの控えは落とす。
+# 控えが役に立つのはそれを取ったセッションの中だけなので、短くてよい。
+# 中断して翌日に開き直した形までは拾える幅にしてある。
+KEEP_DAYS = 3
+
+# 実体を写すときの一時名。写している途中で落ちたものを、次のセッションが
+# 中身の揃った控えとして拾わないように、名前を分けてから置き換える。
+_PART_SUFFIX = ".part"
 
 # 何が起きたかの名前。報告と記録に出る。
 ACTION_KEPT = "kept"  # 変わっていない
@@ -459,9 +495,15 @@ def at_start(
     消さない側の操作だから。ここを `enable` に限ると、切り替えた最初のセッションが
     戻す先を持たないまま走る。設定を変えた瞬間から効いてほしい。何を戻すかは
     実行前と実行後が `setting` を見て決める。
+
+    古い控えを落とすのもここ。セッションに 1 度しか来ない場所が他に無く、
+    ツール呼び出しのたびに置き場を数えると、判定を待たせるために置いた仕組みが
+    判定より重くなる。
     """
     if setting == DISABLE or not state_dir:
         return []
+
+    sweep(state_dir, session)
 
     outcomes = []
     for target in found:
@@ -475,7 +517,7 @@ def at_start(
                     )
                 )
                 continue
-            failed = _copy(target.path, _backup_path(state_dir, session, target))
+            failed = _save_heavy(state_dir, session, target)
             if failed:
                 outcomes.append(Outcome(target, ACTION_FAILED, f"控えを取れない: {failed}"))
             continue
@@ -493,42 +535,240 @@ def at_start(
     return outcomes
 
 
+def sweep(state_dir: str, session: str, keep_days: int = KEEP_DAYS) -> None:
+    """古い控えを落とす。
+
+    セッション開始で 1 度だけ呼ぶ。控えが役に立つのはそれを取ったセッションの
+    中だけなので、しばらく触られていないものは持っていても戻す先にならない。
+
+    生きているセッションを巻き添えにしないために、見るのは更新時刻にする。
+    実行前の控えは呼び出しのたびに書き直されるので、動いているセッションの
+    置き場は必ず新しい。件数の上限で切ると、長く人の返事を待っているだけの
+    セッションが、他が増えたという理由で控えを失う。
+
+    自分の置き場は日付を見ずに残す。始まったばかりで中身が無い、あるいは
+    時計がずれている環境で、自分の控えを自分で消してしまわないため。
+
+    掃除に失敗してもセッションは始める。控えが消せないことは、控えが取れない
+    ことより軽い。ここで止めると、ディスクの都合で守りが働かなくなる。
+    """
+    if not state_dir:
+        return
+    root = os.path.join(state_dir, BACKUP_DIR)
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return
+
+    cutoff = time.time() - keep_days * 86400
+    mine = _safe(session)
+    kept = []
+    for name in names:
+        path = os.path.join(root, name)
+        if name in (mine, STORE_DIR) or not os.path.isdir(path):
+            kept.append(name)
+            continue
+        if _touched(path) >= cutoff:
+            kept.append(name)
+            continue
+        shutil.rmtree(path, ignore_errors=True)
+    _sweep_store(root, kept, cutoff)
+
+
+def _touched(path: str) -> float:
+    """置き場がいちばん最後に触られた時刻。
+
+    ディレクトリの更新時刻だけでは足りない。中身を書き換えても、名前が
+    増えなければ親は動かないファイルシステムがある。
+    """
+    newest = 0.0
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return newest
+    for entry in (path, *(os.path.join(path, name) for name in names)):
+        try:
+            newest = max(newest, os.stat(entry).st_mtime)
+        except OSError:
+            continue
+    return newest
+
+
+def _sweep_store(root: str, kept: list[str], cutoff: float) -> None:
+    """どのセッションからも参照されなくなった実体を落とす。
+
+    2 つの条件が揃ったものだけを消す。残ったセッションの参照に出てこないことと、
+    最後に使われてから日が経っていること。参照だけを見ると、セッション開始が
+    まだ来ていない置き場の実体を消しうる。時刻だけを見ると、何日も続いている
+    セッションが、自分が戻す先を失う。
+    """
+    store = os.path.join(root, STORE_DIR)
+    try:
+        entries = os.listdir(store)
+    except OSError:
+        return
+
+    alive = set()
+    for name in kept:
+        directory = os.path.join(root, name)
+        try:
+            files = os.listdir(directory)
+        except OSError:
+            continue
+        for found in files:
+            if not found.endswith(REF_SUFFIX):
+                continue
+            ref = _parse_ref(_read(os.path.join(directory, found)))
+            if ref:
+                alive.add(ref[0])
+
+    for name in entries:
+        if name in alive:
+            continue
+        path = os.path.join(store, name)
+        try:
+            if os.stat(path).st_mtime >= cutoff:
+                continue
+        except OSError:
+            continue
+        with contextlib.suppress(OSError):
+            os.remove(path)
+
+
+def _save_heavy(state_dir: str, session: str, target: Target) -> str:
+    """大きい対象を控える。写せたら空文字、駄目なら理由を返す。
+
+    実体は中身のハッシュで名前を付けて `store/` に 1 本だけ置き、セッションの
+    側には参照を置く。同じビルドのまま何セッション走っても、写しは 1 本で済む。
+
+    参照には、控えた時点の大きさと更新時刻も書く。突き合わせはこの数字と
+    現物を比べる形になるので、実体の側の時刻をあとから触っても判定は動かない。
+    """
+    try:
+        shape = os.stat(target.path)
+    except OSError as exc:
+        return f"{exc}"
+    digest = _digest(target.path)
+    if not digest:
+        return f"読めない: {target.path}"
+
+    entry = _store_path(state_dir, digest)
+    if not os.path.exists(entry):
+        failed = _place(target.path, entry)
+        if failed:
+            return failed
+    # 最後に使った時刻にする。掃除はこれを見て、使われなくなった実体を落とす。
+    with contextlib.suppress(OSError):
+        os.utime(entry, None)
+
+    ref = f"{digest} {shape.st_size} {int(shape.st_mtime)}\n".encode()
+    failed = _write(_ref_path(state_dir, session, target), ref)
+    if failed:
+        return failed
+    # セッションごとに実体を持っていたころの控え。参照に置き換わったので要らない。
+    with contextlib.suppress(OSError):
+        os.remove(_backup_path(state_dir, session, target))
+    return ""
+
+
 def _check_heavy(setting: str, state_dir: str, session: str, target: Target) -> Outcome | None:
     """大きい対象を、大きさと更新時刻で突き合わせる。
 
-    中身は読まない。控えは更新時刻ごと写してあるので、差し替えられれば
-    どちらかが必ず動く。同じ大きさで同じ時刻に作った別物までは見分けられないが、
-    そこを見分けるには毎回全部を読むことになり、実行前の判定に張った期限を
-    設定ファイル 1 つのために使い切ることになる。
+    中身は読まない。控えた時点の大きさと更新時刻を参照に書いてあるので、
+    差し替えられればどちらかが必ず動く。同じ大きさで同じ時刻に作った別物までは
+    見分けられないが、そこを見分けるには毎回全部を読むことになり、実行前の
+    判定に張った期限を設定ファイル 1 つのために使い切ることになる。
 
     控えが無いときは黙る。セッション開始のイベントに登録していない、あるいは
     実行ファイルを指していない設定がこれで、事件ではない。登録の漏れは
     `--lint` が言う。
     """
-    backup = _backup_path(state_dir, session, target)
-    if not os.path.exists(backup):
+    ref = _parse_ref(_read(_ref_path(state_dir, session, target)))
+    if ref is None:
         return None
-    if _same_shape(backup, target.path):
+    digest, size, mtime = ref
+    if _same_shape(target.path, size, mtime):
         return None
     if setting != ENABLE:
         return Outcome(target, ACTION_WOULD, "控えから戻すはずだった（今回は触っていない）")
-    failed = _copy(backup, target.path)
+
+    entry = _store_path(state_dir, digest)
+    if not os.path.exists(entry):
+        return Outcome(
+            target,
+            ACTION_FAILED,
+            "控えの実体が見つからないので戻せない。ccnavi を作り直して、セッションを開き直すこと",
+        )
+    failed = _place(entry, target.path)
     if failed:
         return Outcome(target, ACTION_FAILED, f"戻せない: {failed}")
+    # 控えた時点の時刻に戻す。実体は写しなので、写した時刻をそのまま置くと
+    # 次の突き合わせが毎回ずれたまま鳴りつづける。
+    with contextlib.suppress(OSError):
+        os.utime(target.path, (mtime, mtime))
     return Outcome(target, ACTION_RESTORED, "セッション開始の時点の実行ファイルに戻した")
 
 
-def _same_shape(a: str, b: str) -> bool:
-    """大きさと更新時刻が同じかどうか。
+def _same_shape(path: str, size: int, mtime: int) -> bool:
+    """控えた時点の大きさと更新時刻に、現物が一致するか。
 
     秒未満を落として比べる。控えは更新時刻ごと写すが、写した先の
     ファイルシステムがそこまでの精度を持たないことがある。
     """
     try:
-        left, right = os.stat(a), os.stat(b)
+        found = os.stat(path)
     except OSError:
         return False
-    return left.st_size == right.st_size and int(left.st_mtime) == int(right.st_mtime)
+    return found.st_size == size and int(found.st_mtime) == mtime
+
+
+def _digest(path: str) -> str:
+    """中身のハッシュ。読めなければ空文字。
+
+    まるごと読むが、これを呼ぶのはセッション開始の 1 度だけ。ツール呼び出しの
+    たびの突き合わせは、参照に書いた大きさと更新時刻だけで済ませる。
+    """
+    found = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            while chunk := f.read(1024 * 1024):
+                found.update(chunk)
+    except OSError:
+        return ""
+    return found.hexdigest()
+
+
+def _parse_ref(raw: bytes | None) -> tuple[str, int, int] | None:
+    """参照を読み解く。読めない形は「控えが無い」として扱う。"""
+    if not raw:
+        return None
+    parts = raw.decode("utf-8", "replace").split()
+    if len(parts) != 3:
+        return None
+    try:
+        return parts[0], int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+
+
+def _place(source: str, destination: str) -> str:
+    """別の名前へ写してから置き換える。写せたら空文字、駄目なら理由を返す。
+
+    途中で落ちた写しを、中身の揃った控えとして次のセッションに拾わせないため。
+    """
+    part = destination + _PART_SUFFIX
+    failed = _copy(source, part)
+    if failed:
+        with contextlib.suppress(OSError):
+            os.remove(part)
+        return failed
+    try:
+        os.replace(part, destination)
+    except OSError as exc:
+        with contextlib.suppress(OSError):
+            os.remove(part)
+        return f"{exc}"
+    return ""
 
 
 def _copy(source: str, target: str) -> str:
@@ -638,9 +878,27 @@ def _clear_absent(state_dir: str, session: str, target: Target) -> None:
         os.remove(_absent_path(state_dir, session, target))
 
 
+def _safe(session: str) -> str:
+    """セッション識別子から作る、置き場の名前。
+
+    そのまま名前になるので、区切り文字が混じった値でファイルを別の場所へ
+    書かせない。
+    """
+    return _UNSAFE.sub("_", session or "no-session")
+
+
 def _backup_path(state_dir: str, session: str, target: Target) -> str:
-    safe = _UNSAFE.sub("_", session or "no-session")
-    return os.path.join(state_dir, BACKUP_DIR, safe, target.key)
+    return os.path.join(state_dir, BACKUP_DIR, _safe(session), target.key)
+
+
+def _ref_path(state_dir: str, session: str, target: Target) -> str:
+    """大きい対象の参照の置き場。実体は持たず、どれを指しているかだけを持つ。"""
+    return _backup_path(state_dir, session, target) + REF_SUFFIX
+
+
+def _store_path(state_dir: str, digest: str) -> str:
+    """実体の置き場。セッションをまたいで共有するので、下には畳まない。"""
+    return os.path.join(state_dir, BACKUP_DIR, STORE_DIR, digest)
 
 
 def _read_backup(state_dir: str, session: str, target: Target) -> bytes | None:
