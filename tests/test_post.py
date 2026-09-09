@@ -319,6 +319,52 @@ class PostToolUseTest(unittest.TestCase):
         found = [f for _, _, files in os.walk(aside) for f in files]
         self.assertEqual(found, ["generated.env"])
 
+    def test_自動復元の予行は戻さずに戻すはずだったと言う(self):
+        # 判定は本番で、戻しだけ予行。何が戻るのかを、戻される前に見せる面。
+        self.run_hook(command="ls")
+        self.dirty()
+
+        result = self.run_hook(restore="dry-run", command="python build.py")
+
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n", "予行はファイルに触らない")
+        self.assertIn("would-restore:", result.stderr)
+        self.assertIn("put it back to its committed content", result.stderr)
+        # 誰も戻していないので、戻す手順は落とさない。
+        self.assertIn('git restore --staged --worktree -- "protected/keep.txt"', result.stderr)
+        self.assertIn("would-restore 1", self.records()[-1]["detail"])
+
+    def test_自動復元の予行は現れたファイルにも触らない(self):
+        self.run_hook(command="ls")
+        write(os.path.join(self.repo, "protected", "generated.env"), "SECRET=1\n")
+
+        result = self.run_hook(restore="dry-run", command="npm run build")
+
+        self.assertTrue(os.path.exists(os.path.join(self.repo, "protected", "generated.env")))
+        self.assertIn("would have moved this file aside", result.stderr)
+
+    def test_自動復元を切ったときは予行の文を出さない(self):
+        # 切った形と予行の形が同じ見た目になると、3 つの値が 2 つに戻る。
+        self.run_hook(command="ls")
+        self.dirty()
+
+        result = self.run_hook(restore="disable", command="python build.py")
+
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertNotIn("would-restore", result.stderr)
+        self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
+
+    def test_モードが予行なら戻しの宣言によらず予行として言う(self):
+        # CCNAVI_MODE=dry-run は戻しの側も予行に落とす（cli.effective_setting）。
+        self.run_hook(mode="dry-run", command="ls")
+        self.dirty()
+
+        result = self.run_hook(mode="dry-run", restore="enable", command="python build.py")
+
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n")
+        self.assertIn("would-restore:", self.context(result))
+
     def test_読めない自動復元の値は守る側に落ちる(self):
         # 倒れる先を off から enable に変えてある。書き損じた 1 語で守りが
         # 消えるより、書き損じた 1 語で守りが残るほうがよい、という向き。

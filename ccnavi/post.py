@@ -45,7 +45,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, gitstate, hookio, rules, selfguard
+from . import audit, gitstate, hookio, rules, selfguard, settings
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -161,6 +161,12 @@ def check(
     # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
     if fresh and restore == selfguard.ENABLE:
         restored = _restore(stderr, top, state_dir, [f.change for f in fresh])
+    # dry-run では戻さない代わりに、戻していたはずだと言う。selfguard の
+    # would-restore と同じ扱いにしてある。黙って何もしないと、報告を読んだ側には
+    # 戻しを切った形と見分けが付かない。予行として置いた設定が「戻しは要らない」
+    # という結論に読み替えられるし、対象がルールファイル次第で動くこの面では、
+    # 何が戻るのかを本番の前に見せることがそのまま安全の余裕になる。
+    would_restore = bool(fresh) and restore == selfguard.DRY_RUN
 
     _save_seen(
         stderr,
@@ -184,6 +190,8 @@ def check(
         notes.append(f"known {len(known)}")
     if restored:
         notes.append(f"restored {len(restored)}")
+    elif would_restore:
+        notes.append(f"{selfguard.ACTION_WOULD} {len(fresh)}")
     record.detail = "; ".join(notes)
 
     if fresh:
@@ -193,7 +201,7 @@ def check(
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
-    blocks = [_violation(f, payload, restored.get(f.change.path)) for f in fresh]
+    blocks = [_violation(f, payload, restored.get(f.change.path), would_restore) for f in fresh]
     blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
         return ""
@@ -397,12 +405,18 @@ def _guards_writes(rule: rules.Rule, path: str) -> bool:
     return any(rule.matches(tool, path) for tool in WRITE_TOOLS)
 
 
-def _violation(finding: Finding, payload: hookio.Input, moved: str | None) -> str:
+def _violation(
+    finding: Finding, payload: hookio.Input, moved: str | None, would_restore: bool = False
+) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
     実行前の拒否と同じ作りにしてある。何に当たったか・どの設定が言っているか・
     直前に何が走ったか・どう戻すか。1 件だけが切り出されて見えても、
     受け取った側がそこから次の一手に行けること。
+
+    would_restore は、戻しが予行のとき。戻す手順はそのまま載せる。今回は
+    誰も戻していないので、手順を落とすと戻す手立てが 1 つも書かれていない
+    報告になる。そのうえで、本番なら ccnavi が戻していたことを添える。
     """
     change, group = finding.change, finding.group
     lines = [
@@ -412,6 +426,16 @@ def _violation(finding: Finding, payload: hookio.Input, moved: str | None) -> st
     ]
     if moved is None:
         lines.append(f"undo: {gitstate.undo(change)}")
+        if would_restore:
+            lines.append(
+                f"{selfguard.ACTION_WOULD}: ccnavi did not touch this path. With "
+                f"{settings.RESTORE_IF_DENY_ENV}=enable it would have "
+                + (
+                    "moved this file aside."
+                    if change.kind == gitstate.KIND_NEW
+                    else "put it back to its committed content."
+                )
+            )
     elif moved:
         lines.append(f"restored: ccnavi moved this file to {moved}. It was not deleted.")
     else:
