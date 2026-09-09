@@ -312,6 +312,52 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertIn("CCNAVI_BIN_PATH", result.stdout)
 
+    def test_拡張子を書かない綴りでも実行ファイルに当たる(self):
+        # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
+        # だけ `.exe` を付けるので、設定に書いた綴りと在るファイルの綴りがずれる。
+        # 書いた側を直させるのではなく、在るほうを選ぶ。
+        path = self.binary()
+        spelled = os.path.join(self.repo, "dist", "ccnavi", "ccnavi")
+
+        self.run_hook("SessionStart", bin=spelled)
+        write(path, "MZ replaced\n")
+        self.run_hook("PostToolUse", bin=spelled)
+
+        self.assertEqual(read(path), "MZ fake executable\n")
+
+    def test_拡張子なしの実行ファイルはそのまま当たる(self):
+        # Linux の置き場がこれ。継ぎ足して探すのは書いた綴りが無いときだけで、
+        # 在るならそれを使う。Windows で `.exe` まで書いた設定も、同じ理由で
+        # 継ぎ足しに回らず、書いたとおりに当たる。
+        path = os.path.join(self.repo, "dist", "ccnavi", "ccnavi")
+        write(path, "ELF fake executable\n")
+
+        self.run_hook("SessionStart", bin=path)
+        write(path, "ELF replaced\n")
+        self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "ELF fake executable\n")
+
+    # セッション開始の控え
+
+    def test_dry_run_でもセッション開始で控えを取る(self):
+        # 控えることは誰の書きかけも消さない。ここを enable に限ると、
+        # 切り替えた最初のセッションが戻す先を持たないまま走る。
+        path = self.binary()
+
+        self.run_hook("SessionStart", bin=path, mode="dry-run")
+
+        saved = os.path.join(self.state, "selfguard", "s1", "bin")
+        self.assertEqual(read(saved), "MZ fake executable\n")
+
+    def test_セッション開始では設定ファイルも控える(self):
+        # 実行前の控えが始まるのは最初のツール呼び出しから。それより前に
+        # 設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+        self.run_hook("SessionStart")
+
+        saved = os.path.join(self.state, "selfguard", "s1", "rules")
+        self.assertEqual(read(saved), read(self.rules))
+
     # 設定で切る
 
     def test_disable_は控えも取らず戻しもしない(self):
