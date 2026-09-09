@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -135,6 +136,28 @@ class SelfGuardTest(unittest.TestCase):
             cwd=ROOT,
             env=environment,
         )
+
+    def store(self):
+        """実体の置き場に在るものの中身。セッションをまたいで共有する側。"""
+        found = os.path.join(self.state, "selfguard", "store")
+        if not os.path.isdir(found):
+            return []
+        return sorted(read(os.path.join(found, name)) for name in os.listdir(found))
+
+    def sessions(self):
+        """控えを持っているセッションの名前。"""
+        found = os.path.join(self.state, "selfguard")
+        return sorted(
+            name for name in os.listdir(found) if os.path.isdir(os.path.join(found, name))
+        )
+
+    def backdate(self, *paths, days=10):
+        """置き場ごと更新時刻を古くする。掃除の日付をまたがせるため。"""
+        old = time.time() - days * 86400
+        for path in paths:
+            for name in os.listdir(path):
+                os.utime(os.path.join(path, name), (old, old))
+            os.utime(path, (old, old))
 
     def records(self):
         with open(self.log, encoding="utf-8") as f:
@@ -347,8 +370,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.run_hook("SessionStart", bin=path, mode="dry-run")
 
-        saved = os.path.join(self.state, "selfguard", "s1", "bin")
-        self.assertEqual(read(saved), "MZ fake executable\n")
+        self.assertEqual(self.store(), ["MZ fake executable\n"])
 
     def test_セッション開始では設定ファイルも控える(self):
         # 実行前の控えが始まるのは最初のツール呼び出しから。それより前に
@@ -357,6 +379,65 @@ class SelfGuardTest(unittest.TestCase):
 
         saved = os.path.join(self.state, "selfguard", "s1", "rules")
         self.assertEqual(read(saved), read(self.rules))
+
+    # 控えを溜めない
+
+    def test_実行ファイルの控えはセッションをまたいで_1_本(self):
+        # 同じビルドのまま何セッション走っても、写しは 1 本で済むこと。
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path, session="s1")
+        self.run_hook("SessionStart", bin=path, session="s2")
+
+        self.assertEqual(self.store(), ["MZ fake executable\n"])
+        self.assertFalse(os.path.exists(os.path.join(self.state, "selfguard", "s1", "bin")))
+
+    def test_古い控えはセッション開始で落ちる(self):
+        self.run_hook("SessionStart", session="old")
+        self.backdate(os.path.join(self.state, "selfguard", "old"))
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertEqual(self.sessions(), ["s1"])
+
+    def test_動いているセッションの控えは巻き添えにしない(self):
+        # 実行前の控えは呼び出しのたびに書き直される。日付で切るのは
+        # そこに乗るため。並行しているセッションの戻す先を消さない。
+        self.run_hook("PreToolUse", session="other")
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertIn("other", self.sessions())
+
+    def test_自分の控えは日付を見ずに残る(self):
+        # 時計がずれている環境で、自分が戻す先を自分で消さないこと。
+        self.run_hook("SessionStart", session="s1")
+        self.backdate(os.path.join(self.state, "selfguard", "s1"))
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertIn("s1", self.sessions())
+
+    def test_参照されなくなった実体も落ちる(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path, session="old")
+        self.backdate(
+            os.path.join(self.state, "selfguard", "old"),
+            os.path.join(self.state, "selfguard", "store"),
+        )
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertEqual(self.store(), [])
+
+    def test_使われている実体は古くても残る(self):
+        # 何日も続いているセッションが、自分が戻す先を失わないこと。
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path, session="s1")
+        self.backdate(os.path.join(self.state, "selfguard", "store"))
+
+        self.run_hook("SessionStart", session="s2")
+
+        self.assertEqual(self.store(), ["MZ fake executable\n"])
 
     # 設定で切る
 
