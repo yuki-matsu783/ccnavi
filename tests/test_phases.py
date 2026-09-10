@@ -105,7 +105,9 @@ def child_text(name, parent, phase, allow, review=True):
     return "\n".join(lines) + "\n"
 
 
-class PhaseTest(unittest.TestCase):
+class PhaseHarness(unittest.TestCase):
+    """親と子を動かす道具。テストは持たない（他のテストが継いで使う）。"""
+
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-phase-")
         self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
@@ -270,6 +272,8 @@ class PhaseTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
 
+
+class PhaseTest(PhaseHarness):
     # ---- 1. 種類の定義
 
     def test_phase_types_must_be_unique_and_well_formed(self):
