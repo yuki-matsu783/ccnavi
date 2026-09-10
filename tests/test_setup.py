@@ -82,6 +82,25 @@ class SetupTest(unittest.TestCase):
         with open(self.settings_path(), encoding="utf-8") as f:
             return json.load(f)
 
+    def vscode_path(self):
+        return os.path.join(self.dir, ".vscode", "settings.json")
+
+    def write_vscode(self, data):
+        os.makedirs(os.path.dirname(self.vscode_path()), exist_ok=True)
+        with open(self.vscode_path(), "w", encoding="utf-8") as f:
+            if isinstance(data, str):
+                f.write(data)
+            else:
+                json.dump(data, f)
+
+    def read_vscode(self):
+        with open(self.vscode_path(), encoding="utf-8") as f:
+            return json.load(f)
+
+    def read_vscode_text(self):
+        with open(self.vscode_path(), encoding="utf-8") as f:
+            return f.read()
+
     def commands_of(self, data, event):
         out = []
         for entry in data.get("hooks", {}).get(event, []):
@@ -543,6 +562,80 @@ class WritesWithoutLeavingTraces(SetupTest):
             landed = json.load(f)
         self.assertEqual(landed["env"]["CCNAVI_MODE"], "enable")
         self.assertEqual(landed["env"]["KEEP"], "yes")
+
+
+class WritesTheVscodeSettings(SetupTest):
+    """VS Code へ渡す設定。README「worktreeをVSCODEで見えるようにする」と対になる。
+
+    ccnavi は作業を .claude/worktrees/ の中でさせる。この 1 行が無いと、
+    エディタからは main の作業ツリーしか見えないまま作業が進む。
+    """
+
+    def test_creates_the_file_when_it_is_not_there(self):
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.read_vscode(), {"git.detectWorktrees": True})
+
+    def test_keeps_settings_that_have_nothing_to_do_with_ccnavi(self):
+        """VS Code の他の設定は残す。写しも 1 つ取る。"""
+        self.write_vscode({"editor.tabSize": 2})
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        landed = self.read_vscode()
+        self.assertEqual(landed["editor.tabSize"], 2)
+        self.assertIs(landed["git.detectWorktrees"], True)
+        self.assertTrue(os.path.exists(self.vscode_path() + ".bak"))
+
+    def test_running_twice_changes_nothing(self):
+        self.run_setup()
+        before = self.read_vscode_text()
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.read_vscode_text(), before)
+        self.assertFalse(os.path.exists(self.vscode_path() + ".bak"))
+
+    def test_keeps_a_value_the_person_wrote(self):
+        """`false` と書いた人の判断を消さない。並べて見せるだけ。"""
+        self.write_vscode({"git.detectWorktrees": False})
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIs(self.read_vscode()["git.detectWorktrees"], False)
+        self.assertIn("git.detectWorktrees", result.stdout)
+
+        check = self.run_setup("--check")
+        self.assertEqual(check.returncode, 1, check.stdout)
+
+    def test_does_not_touch_a_file_it_cannot_read(self):
+        """VS Code の設定ファイルはコメントを書ける（JSONC）。jq は読めない。
+
+        ここで死ぬと、ccnavi と関係のない書き方のせいで .claude/settings.json
+        まで書けなくなる。触らずに人へ渡して、残りは進める。
+        """
+        jsonc = '{\n  // worktree は見せない\n  "git.detectWorktrees": false\n}\n'
+        self.write_vscode(jsonc)
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.read_vscode_text(), jsonc)
+        self.assertIn(".vscode/settings.json", result.stdout)
+        self.assertIn("--no-vscode", result.stdout)
+        # 肝心の登録は済んでいる。
+        self.assertIn("CCNAVI_BIN_PATH", self.read_settings()["env"])
+
+    def test_no_vscode_leaves_it_alone(self):
+        result = self.run_setup("--no-vscode")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(os.path.exists(self.vscode_path()))
+
+        check = self.run_setup("--check", "--no-vscode")
+        self.assertEqual(check.returncode, 0, check.stdout)
+
+    def test_check_is_not_settled_when_the_line_is_missing(self):
+        self.run_setup("--no-vscode")
+        check = self.run_setup("--check")
+        self.assertEqual(check.returncode, 1, check.stdout)
+        self.assertIn("git.detectWorktrees", check.stdout)
+        self.assertFalse(os.path.exists(self.vscode_path()), "--check は書かない")
 
 
 if __name__ == "__main__":
