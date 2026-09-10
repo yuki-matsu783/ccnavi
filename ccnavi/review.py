@@ -23,10 +23,15 @@
 変更要求（changes requested）のレビューが立っている間は印を置かない。
 「このままではマージしない」の意思表示を、別の人が端末から上書きする形は残さない。
 
-## 時刻はエポック秒で比べる
+## 未解決の指摘は、付いた時刻で絞らない
 
-ホストは UTC の `Z`、手元はオフセット付き。文字列のまま比べると依頼直後の指摘が
-「依頼より前」に落ちる。参考にした運用が実測で踏んだ穴。
+数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えていた版は、
+指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで前回の
+指摘が数から消えた。人が解決も受け入れもしていないのに通る形で、実物の GitLab で
+流れを通したときに出た。除くのは機構自身の投稿と、人が受け入れたものだけ。
+
+レビューの状態（変更要求）はレビュアーごとの最新だけを見る。こちらは時刻で
+比べるので、ホストの `Z` と手元のオフセットをエポック秒に直してから並べる。
 """
 
 from __future__ import annotations
@@ -309,7 +314,6 @@ def check(
     result = _matching(stderr, result_path, requested_mark)
     if result is None:
         return 1
-    since = _since(requested_mark)
     changes = [r for r in effective(result.reviews) if r.state.upper() == CHANGES_REQUESTED]
     if changes:
         stderr.write(
@@ -319,7 +323,9 @@ def check(
         for r in changes:
             stderr.write(f"  - {r.url}\n")
         return 1
-    unresolved = _unresolved(result.threads, since)
+    unresolved = _unresolved(
+        result.threads, approval.accepted_threads(conf.approved, parent.ticket)
+    )
     if unresolved:
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
         for t in unresolved:
@@ -390,7 +396,9 @@ def reviewed(
             "レビュアーの approve / dismiss を待つこと\n"
         )
         return 1
-    unresolved = _unresolved(result.threads, _since(requested_mark))
+    unresolved = _unresolved(
+        result.threads, approval.accepted_threads(conf.approved, parent.ticket)
+    )
     stdout.write(
         f"フェーズ {phase_no}（親 {parent.ticket}）の未解決スレッド: {len(unresolved)} 件\n"
     )
@@ -434,7 +442,12 @@ def reviewed(
 
 # ---- リモートに要る道具の有無。exe は使わないが、--lint が言う。
 
-_REMOTE = re.compile(r"^(?:https?://|git@|ssh://git@)([^/:]+)[/:]+(.+?)(?:\.git)?/?$")
+# ホストにはポートが付く（`localhost:8929`）。落とすと、手元や社内に立てた
+# GitLab を GitHub と見分ける手掛かりまで狂う。ssh の `git@host:group/proj` の
+# `:` はパスの区切りなので、数字だけのときにポートと見なす。
+_REMOTE = re.compile(
+    r"^(?:https?://|git@|ssh://git@)(?P<host>[^/:]+(?::\d+)?)[/:]+(?P<path>.+?)(?:\.git)?/?$"
+)
 
 
 def remote_kind(url: str) -> str:
@@ -442,7 +455,8 @@ def remote_kind(url: str) -> str:
     m = _REMOTE.match(url)
     if m is None:
         return ""
-    return "github" if m.group(1) == "github.com" else "gitlab"
+    host = m.group("host").split(":")[0]
+    return "github" if host == "github.com" else "gitlab"
 
 
 def transport_problem(url: str) -> str:
@@ -554,11 +568,23 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
     return result
 
 
-def _unresolved(threads: list[Thread], since: float) -> list[Thread]:
+def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
+    """まだ解決されていない指摘。
+
+    付いた時刻では絞らない。依頼より後のものだけを数えていた版は、
+    指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで
+    前回の指摘が数から消えた。人が解決も受け入れもしていないのに通る形になる。
+
+    数えないのは 2 つだけ。機構自身が置いた投稿と、人が「未解決のまま進める」と
+    受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。
+    """
     return [
         t
         for t in threads
-        if not t.resolved and not t.body.startswith(MARKER_PREFIX) and _after(t.created_at, since)
+        if not t.resolved
+        and not t.body.startswith(MARKER_PREFIX)
+        and t.url not in accepted
+        and t.id not in accepted
     ]
 
 
@@ -585,11 +611,6 @@ def _moved_since_request(tree_root: str, requested_mark: dict) -> str:
     if rc != 0 or ahead.strip():
         return "親ブランチの HEAD が push されていない"
     return ""
-
-
-def _since(requested_mark: dict) -> float:
-    """依頼の時点。ホストの時計で記録した時刻を優先し、無ければ手元の時計。"""
-    return _epoch(str(requested_mark.get("since") or requested_mark.get("at") or ""))
 
 
 def _resolve(cwd: str, path: str) -> str:
@@ -630,12 +651,6 @@ def _epoch(text: str) -> float:
         return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
     except ValueError:
         return 0.0
-
-
-def _after(text: str, since: float) -> bool:
-    """依頼より後か。読めない時刻は「後」に倒す。落とすより余分に見せるほうが安い。"""
-    stamp = _epoch(text)
-    return since == 0.0 or stamp == 0.0 or stamp >= since
 
 
 def _first_line(body: str) -> str:

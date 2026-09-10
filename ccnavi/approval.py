@@ -188,6 +188,31 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
     return cleared
 
 
+def accepted_threads(approved_dir: str, parent: str) -> set[str]:
+    """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。
+
+    レビュー済みの印に残っている分を全フェーズ集める。受け入れたスレッドを
+    数え続けると、その親のレビューが二度と通らなくなる。
+    """
+    found: set[str] = set()
+    directory = os.path.join(approved_dir, PHASES_DIR, parent)
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return found
+    for name in names:
+        if not name.endswith("." + MARK_REVIEWED):
+            continue
+        try:
+            with open(os.path.join(directory, name), encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            found.update(str(x) for x in data.get("accepted") or [] if str(x))
+    return found
+
+
 def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
     found = {}
     for kind in MARKS:
