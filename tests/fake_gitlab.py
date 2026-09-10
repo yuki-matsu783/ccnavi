@@ -220,6 +220,8 @@ class Handler(BaseHTTPRequestHandler):
             data = self.body()
             if "title" in data:
                 mr["title"] = data["title"]
+            if "squash" in data:
+                mr["squash"] = bool(data["squash"])
             return 200, self.mr_view(mr)
 
         if name == "discussions" and method == "GET":

@@ -612,17 +612,33 @@ class PhaseTest(unittest.TestCase):
             parent_text("i0001", ["design"], feedback=[]),
         )
         self.assertEqual(self.approve().returncode, 0)
-        # 閉じられる状態になった。ready が通り、印と note の下書きができる。
+        # 閉じられる状態になったが、wip/ が追跡されたままなら外せない。
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("`wip/` に追跡されているファイル", refused.stderr)
+        self.assertIn("rm -r wip", refused.stderr)
+        # 親を閉じる。案内は「片付けて push して ready」。
+        closed = self.ccnavi("ticket", "done", "i0001")
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.assertIn("rm -r wip", closed.stdout)
+        self.assertIn("squash", closed.stdout)
+        self.commit_parent("状態の移動")
+        git(self.parent_tree, "rm", "-r", "-q", "wip")
+        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
+        # push していなければまだ外せない。
+        refused = self.ready(fixture)
+        self.assertIn("push されていない", refused.stderr)
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        # 片付いて push 済み。ready が通り、印と note の下書きができる。
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         with open(passed.stdout.strip(), encoding="utf-8") as f:
-            self.assertIn("ccnavi:ready", f.read())
+            note = f.read()
+        self.assertIn("ccnavi:ready", note)
+        self.assertIn("squash", note)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "ready.json"))
         self.assertEqual(mark["mr"], 7)
-        # 親を閉じると「Draft は外してある」と言う。閉じたあとにもう 1 度打てる。
-        closed = self.ccnavi("ticket", "done", "i0001")
-        self.assertEqual(closed.returncode, 0, closed.stderr)
-        self.assertIn("Draft は外してある", closed.stdout)
+        # 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し）。
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)
 
@@ -687,8 +703,16 @@ class PhaseTest(unittest.TestCase):
         self.assertIn("利用者が締めた", explained.stdout)
         closed = self.ccnavi("ticket", "done", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
-        # ready も通る（sh が Draft を外し損ねたときの打ち直し）。
-        self.assertEqual(self.ready(fixture).returncode, 0)
+        # Draft はまだ外れていない。片付けて push してから ready で外す。
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "ready.json"))
+        )
+        self.commit_parent("状態の移動")
+        git(self.parent_tree, "rm", "-r", "-q", "wip")
+        git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        passed = self.ready(fixture)
+        self.assertEqual(passed.returncode, 0, passed.stderr)
 
     def test_wrapup_is_a_human_path(self):
         """wrapup は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""
