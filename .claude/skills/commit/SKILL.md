@@ -2,10 +2,10 @@
 name: commit
 description: >-
   Create one or more atomic git commits in this repository with a Conventional Commits prefix and a
-  one-line Japanese description, after running the Go checks and filtering out credentials and build
-  junk. Use whenever a commit is made here, both when the user types /commit and whenever the agent
-  commits on its own after finishing a change. Not for writing or fixing the content itself, and not
-  for push, branch, or PR operations.
+  one-line Japanese description, after running the Python checks and filtering out credentials and
+  build junk. Use whenever a commit is made here, both when the user types /commit and whenever the
+  agent commits on its own after finishing a change. Not for writing or fixing the content itself,
+  and not for push, branch, or PR operations.
 ---
 
 # commit
@@ -40,35 +40,34 @@ description: >-
 
 ### 2. 検査を通す
 
-Go のファイルが変わっているなら、すべて通してからコミットする。error が残っている状態でコミットしない。
+Python のファイルが変わっているなら、すべて通してからコミットする。error が残っている状態でコミットしない。
 
 ```sh
-gofmt -l .              # 出力が空であること
-go vet ./...
-golangci-lint run
-go test -count=1 ./...
+uv run --with ruff ruff format --check .
+uv run --with ruff ruff check .
+uv run python -m unittest discover -s tests -t .
 ```
 
-`-count=1` は必須。受入テストが実行ファイルを外から叩くだけで内部パッケージを import しないため、
-付けないとキャッシュが内部の変更に気づかず古い結果を返す。
+worktree で作業しているときは、そのツリーの中でこれを実行する (`cd .claude/worktrees/<名前>` してから)。
+`pyproject.toml` はツリーごとに持つので、混ぜて実行しない。
 
-`golangci-lint` が PATH に無い環境では、その 1 つを飛ばして残りを実行し、飛ばした旨をチャットに書く。
-
-`.claude/hooks/lint-go.sh` が PostToolUse に登録されていれば編集のたびに同じ検査が走るが、
-hook が無効な環境でも落ちないよう、コミット前に明示的に実行してよい。
+`.claude/hooks/lint-py.sh` (PostToolUse) と `.claude/hooks/test-py.sh` (Stop) が登録されていれば
+編集のたびとターンの終わりに同じ検査が走るが、hook が無効な環境でも落ちないよう、
+コミット前に明示的に実行してよい。実行ファイル (PyInstaller) はここでは作り直さない。
+ビルドが必要なときは `uv run --with pyinstaller python build.py` を手で回す。
 
 ### 3. prefix と論理的まとまりを決める
 
 | prefix | このリポジトリでの対象 |
 |---|---|
-| `feat` | `main.go` / `internal/` への機能追加 |
-| `fix` | `main.go` / `internal/` / hook スクリプトのバグ修正 |
+| `feat` | `main.py` / `ccnavi/` への機能追加 |
+| `fix` | `main.py` / `ccnavi/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
-| `test` | `main_test.go` / `*_test.go` / `testdata/` |
+| `test` | `tests/*.py` / `testdata/` |
 | `docs` | `README.md` / `requirements.md` / `ccnavi.md` / `HANDOVER.md` |
 | `ai-asset` | `.claude/` 配下 (settings.json / hooks / skills / ccnavi のルール) と `CLAUDE.md`。エージェント向けの指示は docs ではなくこちら |
-| `chore` | `.gitignore` / `.golangci.yml` / 雑務 |
-| `build` | `go.mod` / `go.sum` |
+| `chore` | `.gitignore` / 雑務 |
+| `build` | `pyproject.toml` / `uv.lock` |
 | `ci` | CI 設定 |
 | `perf` | 性能改善 |
 | `style` | 意味に影響しない整形 |
@@ -90,8 +89,9 @@ prefix が変わるか、扱っている主題が別なら別コミットに分�
 `.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` (Git Bash のクラッシュダンプ) / `.claude/settings.local.json`
 
 **このリポジトリ固有の生成物**
-`ccnavi` / `ccnavi.exe` / `ccnavi.new.exe` / `ccnavi.old.exe` (ビルド成果物。lint hook が差し替えのために `.new` と `.old` を作る) /
-`*.jsonl` (ccnavi の判定記録。絶対パスとコマンド全文が入る) / `knowledge/` (参照専用の外部資料) / `dist/`
+`dist/` (ビルド成果物。実行ファイルの置き場) / `build/` (PyInstaller の作業場所) /
+`__pycache__/` / `*.pyc` / `.venv/` / `.ruff_cache/` (Python の中間物) /
+`*.jsonl` / `logs/` (ccnavi の判定記録。絶対パスとコマンド全文が入る) / `knowledge/` (参照専用の外部資料)
 
 多くは `.gitignore` にも入っているが、**この一覧が最後の砦**。`.gitignore` に無い新種の副産物を見つけたら、この一覧と `.gitignore` の両方に足す。
 
@@ -112,9 +112,9 @@ git commit -m "<prefix>: <日本語の説明>"
 
 ```
 コミット1: feat: PreToolUse のルール照合と判定の記録を追加
-  - main.go
-  - internal/cli/cli.go
-  - internal/rules/rules.go
+  - main.py
+  - ccnavi/cli.py
+  - ccnavi/rules.py
 コミット2: docs: モードの呼び名を判定しない・警告・ブロックに統一
   - requirements.md
   - README.md
