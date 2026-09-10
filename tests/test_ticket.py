@@ -75,8 +75,11 @@ def ticket_text(
     review=True,
     predecessors=(),
     title="作業",
+    issue=None,
 ):
     lines = ["---", "version: 1", f"ticket: {name}"]
+    if issue is not None:
+        lines.append(f"issue: {issue}")
     if parent:
         lines += [f"parent: {parent}", f"phase: {phase}"]
     if predecessors:
@@ -464,7 +467,10 @@ class TicketTest(unittest.TestCase):
         )
         if prepared.returncode != 0:
             return prepared
-        with open(prepared.stdout.strip(), encoding="utf-8") as f:
+        # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。
+        body_path, draft_path = prepared.stdout.splitlines()[:2]
+        self.assertTrue(os.path.exists(draft_path), draft_path)
+        with open(body_path, encoding="utf-8") as f:
             text = f.read()
         data = read_json(fixture)
         posted = data.setdefault("comments", [])
@@ -819,6 +825,76 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
         self.assertEqual(self.check(fixture).returncode, 0)
 
+    def test_the_acceptance_survives_a_later_check(self):
+        """人が受け入れたスレッドは、あとから走った check で消えないこと。
+
+        受け入れをフェーズの印に書いていた版では、次に通った check が同じ印を
+        `accepted: []` で上書きし、記録が飛んだ。人がもう一度同じスレッドを
+        受け入れることになる。控えは印と別の場所に置く。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "承知で進める"}]
+        write(fixture, json.dumps(data))
+        accepted = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--result",
+            fixture,
+            stdin="y\n",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        kept = os.path.join(self.approved, "phases", "i0001", "accepted.json")
+        self.assertIn("u1", read_json(kept)["threads"])
+
+        # check が通ると印は書き換わるが、控えは残る。
+        self.assertEqual(self.check(fixture).returncode, 0)
+        self.assertIn("u1", read_json(kept)["threads"])
+
+        # 依頼をやり直しても、受け入れた分は数えない。
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.requested"))
+        self.assertEqual(self.request(fixture).returncode, 0)
+        self.assertEqual(self.check(fixture).returncode, 0)
+
+    def test_prepare_writes_a_merge_request_draft(self):
+        """マージリクエストが無ければ sh が作れるように、下書きを書き出すこと。"""
+        self.propose("i0001", allow=("src/*", "wip/*"), title="挨拶の言語を切り替える", issue=12)
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
+        self.assertEqual(self.approve().returncode, 0)
+        self.worktree("i0001-01", "i0001")
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01").returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "done", "i0001-01").returncode, 0)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "done")
+        self.remote(merge=("i0001-01",))
+
+        prepared = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "--body-file",
+            write(os.path.join(self.root, "body.md"), "見てほしい点\n"),
+            "review",
+            "prepare",
+        )
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        draft = prepared.stdout.splitlines()[1]
+        with open(draft, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        self.assertEqual(lines[0], "Draft: 挨拶の言語を切り替える")
+        self.assertEqual(lines[1], "")
+        self.assertIn("Closes #12", lines)
+        self.assertIn("i0001", "\n".join(lines))
+
     def check(self, fixture, phase="1"):
         return self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "review", "check", "--result", fixture
@@ -869,7 +945,8 @@ class TicketTest(unittest.TestCase):
             "prepare",
         )
         self.assertEqual(prepared.returncode, 0, prepared.stderr)
-        self.assertTrue(os.path.exists(prepared.stdout.strip()))
+        for line in prepared.stdout.splitlines()[:2]:
+            self.assertTrue(os.path.exists(line), line)
         unposted = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", "1", "review", "requested", "--result", fixture
         )

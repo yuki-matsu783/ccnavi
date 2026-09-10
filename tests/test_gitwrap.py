@@ -82,9 +82,27 @@ class GitWrapperTest(unittest.TestCase):
 
 
 class RejectTest(GitWrapperTest):
-    def test_push_is_rejected_and_names_the_user(self):
+    def test_push_to_an_integration_branch_is_rejected(self):
+        """統合先へ直接は送らない。統合は利用者がマージリクエストで行う。"""
         result = self.assertRejected("push", "origin", "main")
-        self.assertIn("利用者", result.stderr)
+        self.assertIn("統合", result.stderr)
+
+    def test_push_forms_that_cannot_be_undone_are_rejected(self):
+        git(self.dir, "checkout", "--quiet", "-b", "i0001")
+        for args in (
+            ("push", "--force"),
+            ("push", "-f", "origin"),
+            ("push", "--force-with-lease"),
+            ("push", "--delete", "origin", "i0001"),
+            ("push", "--all"),
+            ("push", "--mirror"),
+            ("push", "--tags"),
+            ("push", "--no-verify"),
+            ("push", "origin", "HEAD:main"),
+            ("push", "origin", "other"),
+        ):
+            with self.subTest(args=args):
+                self.assertRejected(*args)
 
     def test_global_config_option_is_rejected_without_reading_its_value(self):
         # `git -c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを
@@ -222,6 +240,35 @@ class PassTest(GitWrapperTest):
 
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.dir, "topic.txt")))
+
+    def test_push_sends_the_current_branch(self):
+        """作業用のブランチは、そのままの名前で送れる。
+
+        レビューはマージリクエストの実物に結ぶので、そこまではエージェントが運べる。
+        統合（マージ）は利用者の側に残してある。
+        """
+        bare = os.path.join(self.dir, "..", "gitwrap-origin.git")
+        bare = os.path.abspath(bare)
+        self.addCleanup(shutil.rmtree, bare, ignore_errors=True)
+        git(self.dir, "init", "-q", "--bare", bare)
+        git(self.dir, "remote", "add", "origin", bare)
+        git(self.dir, "checkout", "--quiet", "-b", "i0001")
+
+        result = self.run_wrapper("push", "-u", "origin", "i0001")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        landed = subprocess.run(
+            ["git", "--git-dir", bare, "rev-parse", "i0001"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, landed.returncode, landed.stderr)
+        here = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.dir,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(here.stdout.strip(), landed.stdout.strip())
 
     def test_checkout_moves_between_branches(self):
         result = self.run_wrapper("checkout", "-b", "topic")
