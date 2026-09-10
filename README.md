@@ -170,8 +170,18 @@ Claude Code の設定スキーマは独自のキーを受け付けないので�
 hook には実行ファイルだけを登録すればよい。
 
 下の形は `sh scripts/ccnavi-setup.sh <プロジェクトルート>` が書く。何度打っても同じ形に
-落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに不足だけを
-見たいときは `--check`、既定を持つつまみも並べたいときは `--all` を付ける。
+落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
+ところだけを見たいときは `--check`、既定を持つつまみも並べたいときは `--all` を付ける。
+
+既にある値は置き換えない。値が違えば、変えずに並べて見せる。置き換えるのは
+`--mode` か `--bin` を名指しして `--force` を付けたときだけで、名指ししていない値は
+そのままにする。`--all` を足しに来た打ち直しが、その場で指定していない
+`CCNAVI_MODE` を既定へ落とさないため。
+
+hook は、そのイベントに ccnavi が登録されていなければ足す。別の綴りで登録されて
+いるように見えるイベントは、足さずに名前を挙げる。どちらが正しいかをスクリプトが
+決められないうえ、黙って足すと判定が 2 回走り、黙って飛ばすとそのイベントが
+落ちたままになる。
 
 ```json
 {
@@ -206,7 +216,7 @@ hook には実行ファイルだけを登録すればよい。
     "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
-    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi.exe"
+    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi"
   }
 }
 ```
@@ -240,7 +250,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
-| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い |
+| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーの根からの相対。既定は `wip/tickets` |
 | `CCNAVI_APPROVED` | 承認済みの写しの置き場。main の根からの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
 | `CCNAVI_PHASES` | フェーズの種類の定義。main の根からの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
