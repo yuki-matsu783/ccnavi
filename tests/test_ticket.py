@@ -284,6 +284,26 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("作業ツリー", result.stderr)
 
+    @unittest.skipUnless(os.path.normcase("A") == "a", "大文字小文字を区別する機械")
+    def test_worktree_name_case_does_not_drop_the_ticket(self):
+        """区別しない機械で綴り違いに切った作業ツリーでも、判定は写しで行う。
+
+        案内（SubagentStart）は綴りの違いを吸収するのに判定だけ厳密だと、
+        「効いている」と言われながら権限モード任せに落ちる（敵対的レビューで実測）。
+        """
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.assertEqual(self.approve().returncode, 0)
+        child = self.worktree("I0001-01", "i0001")
+        outside = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+        inside = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "a", "x.py")
+        )
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
     # ---- 2. 子は親の部分集合
 
     def test_child_beyond_parent_is_not_approved(self):
