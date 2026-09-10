@@ -244,6 +244,34 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(main))
 
+    def test_scope_with_uppercase_still_matches(self):
+        """大文字を含む範囲が当たること。
+
+        作業ツリーの根からの相対パスを normcase した綴りから作っていたので、
+        大文字小文字を区別しない機械では `README.md` が `readme.md` になり、
+        `README.md` と書いた範囲に永久に当たらなかった。`Dockerfile` や
+        `src/Components/*` も同じ。実物の GitLab で流れを通したときに出た。
+        """
+        self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "ticket")
+        self.assertEqual(self.approve().returncode, 0)
+        for name in ("README.md", "docs/Design/plan.md", "docs/design/plan.md"):
+            hit = self.hook(
+                "PreToolUse",
+                "Write",
+                self.parent_tree,
+                file_path=os.path.join(self.parent_tree, *name.split("/")),
+            )
+            self.assertNotIn("DENY_TICKET_SCOPE", self.reason(hit), name)
+        outside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "NOTES.md"),
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
     def test_no_worktree_means_no_ticket(self):
         """作業ツリーが無い子は効かない。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -741,6 +769,61 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01", refused.stderr)
         self.assertIn("消えている", refused.stderr)
 
+    def test_unresolved_threads_survive_a_new_request(self):
+        """指摘が残ったまま依頼をやり直しても、数から消えないこと。
+
+        依頼より後のスレッドだけを数えていた版では、子をもう 1 本足して承認してもらい、
+        依頼をやり直すだけで前回の指摘が数から消え、check が通った。人が解決も
+        受け入れもしていないのに通る形で、実物の GitLab で流れを通したときに出た。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        # 依頼より前に付いた指摘。時刻で絞る版では数から落ちていた。
+        data["threads"] = [
+            {
+                "id": "t1",
+                "resolved": False,
+                "url": "u1",
+                "body": "直して",
+                "created_at": "2020-01-01T00:00:00Z",
+            }
+        ]
+        write(fixture, json.dumps(data))
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+
+        first = self.check(fixture)
+        self.assertNotEqual(first.returncode, 0)
+        self.assertIn("未解決", first.stderr)
+
+        # 印を消して依頼をやり直す（新しい子が承認された形）。指摘は残ったまま。
+        os.remove(mark)
+        self.assertEqual(self.request(fixture).returncode, 0)
+        again = self.check(fixture)
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("未解決", again.stderr)
+
+        # 人が受け入れれば通り、受け入れた分は次から数えない。
+        accepted = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--result",
+            fixture,
+            stdin="y\n",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.assertEqual(self.check(fixture).returncode, 0)
+
+    def check(self, fixture, phase="1"):
+        return self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", phase, "review", "check", "--result", fixture
+        )
+
     def test_only_the_latest_review_per_author_counts(self):
         self.family()
         self.close_phase()
@@ -802,6 +885,71 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("違う", check.stderr)
+
+    def test_review_script_keeps_the_port_and_scheme_of_origin(self):
+        """origin の綴りから、ホスト・ポート・scheme を落とさずに API の綴りを組むこと。
+
+        以前は host を `[^/:]+` で切っていたのでポートが落ち、落ちたポートが
+        プロジェクトのパスの先頭に混ざり（`8929/demo/greeter`）、しかも scheme が
+        https に決め打ちだった。手元や社内に平文で立てた GitLab
+        （`http://localhost:8929`）はこれで全滅する。
+        """
+        script = self.script()
+        cases = [
+            (
+                "http://localhost:8929/demo/greeter.git",
+                "gitlab",
+                "http",
+                "localhost:8929",
+                "demo/greeter",
+            ),
+            (
+                "https://gitlab.example.com:8443/g/p.git",
+                "gitlab",
+                "https",
+                "gitlab.example.com:8443",
+                "g/p",
+            ),
+            ("git@gitlab.example.com:g/p.git", "gitlab", "https", "gitlab.example.com", "g/p"),
+            ("https://github.com/o/r.git", "github", "https", "github.com", "o/r"),
+        ]
+        git(self.parent_tree, "remote", "add", "origin", "https://example.invalid/x/y.git")
+        for url, kind, scheme, host, path in cases:
+            git(self.parent_tree, "remote", "set-url", "origin", url)
+            read = self.run_script(script, "origin")
+            self.assertEqual(read.returncode, 0, read.stdout + read.stderr)
+            got = dict(line.split("=", 1) for line in read.stdout.splitlines() if "=" in line)
+            self.assertEqual(got.get("kind"), kind, url)
+            self.assertEqual(got.get("scheme"), scheme, url)
+            self.assertEqual(got.get("host"), host, url)
+            self.assertEqual(got.get("path"), path, url)
+            expected = "https://api.github.com" if kind == "github" else f"{scheme}://{host}/api/v4"
+            self.assertEqual(got.get("api_base"), expected, url)
+
+    def script(self):
+        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。"""
+        where = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
+        os.makedirs(os.path.dirname(where), exist_ok=True)
+        shutil.copy(os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh"), where)
+        return where
+
+    def run_script(self, script, *args, env=None):
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        # curl 経路を選ばせる。gh / glab が入っていても、このホストには認証が無い。
+        environment["GITLAB_TOKEN"] = "t"
+        environment["GITHUB_TOKEN"] = "t"
+        environment["CCNAVI_BIN_PATH"] = sys.executable
+        environment.update(env or {})
+        return subprocess.run(
+            ["sh", script, *args],
+            cwd=self.parent_tree,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+        )
 
     def test_review_script_refuses_an_unreadable_origin(self):
         """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
