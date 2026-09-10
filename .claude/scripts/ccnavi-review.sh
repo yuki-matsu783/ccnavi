@@ -35,6 +35,7 @@ sh .claude/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
   accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
   fetch                                        リモートから取ってきた写し（JSON）を標準出力へ
+  origin                                       origin をどう読んだか（ホスト・scheme・API の綴り）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が要る。
 USAGE
@@ -52,7 +53,7 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | check | note | accept | fetch) ;;
+request | check | note | accept | fetch | origin) ;;
 -h | --help | help)
 	usage
 	exit 0
@@ -94,41 +95,81 @@ fi
 
 origin=$(git remote get-url origin 2>/dev/null || :)
 [ -z "$origin" ] && fail "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
-host=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)([^/:]+).*#\2#')
-path=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)[^/:]+[/:]+##; s#\.git$##; s#/$##')
-[ "$host" = "$origin" ] && fail "origin の綴りを読めない ($origin)。"
-if [ "$host" = "github.com" ]; then
+# scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
+# GitLab（`http://localhost:8929` のような形）に当たらない。ssh の綴りには
+# scheme が無いので、そこだけ https にする。
+# host には**ポートを残す**。落とすと `:8929` のような立て方が全滅し、しかも
+# 落ちたポートがプロジェクトのパスの先頭に混ざる（`8929/demo/greeter`）。
+case "$origin" in
+http://*) scheme=http ;;
+*) scheme=https ;;
+esac
+rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
+[ "$rest" = "$origin" ] && fail "origin の綴りを読めない ($origin)。"
+host="${rest%%/*}"
+# ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
+# そうでなければパスの先頭なので落とす。
+case "$host" in
+*:*)
+	case "${host##*:}" in
+	'' | *[!0-9]*) host="${host%%:*}" ;;
+	esac
+	;;
+esac
+[ -n "$host" ] || fail "origin からホストを読めない ($origin)。"
+tail="${rest#"$host"}"
+while :; do
+	case "$tail" in
+	[/:]*) tail="${tail#?}" ;;
+	*) break ;;
+	esac
+done
+path="${tail%.git}"
+path="${path%/}"
+[ -n "$path" ] || fail "origin からプロジェクトのパスを読めない ($origin)。"
+case "$host" in
+github.com | github.com:*)
 	kind=github
 	token_name=GITHUB_TOKEN
 	api_base="https://api.github.com"
-else
+	;;
+*)
 	kind=gitlab
 	token_name=GITLAB_TOKEN
-	api_base="https://$host/api/v4"
-fi
+	api_base="$scheme://$host/api/v4"
+	;;
+esac
 branch=$(git rev-parse --abbrev-ref HEAD)
 
 # ---- 道具。絶対パスに解いて固定する。
 
 JQ=$(command -v jq 2>/dev/null || :)
 [ -z "$JQ" ] && fail "jq が無い。結果の JSON を組み立てられない。" 2
+# gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
+# 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
+# 1 度だけ疎通を試して、通らなければ curl とトークンへ落ちる。
 transport=""
 if [ "$kind" = github ]; then
 	CLI=$(command -v gh 2>/dev/null || :)
-	[ -n "$CLI" ] && transport=gh
+	if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "repos/$path" >/dev/null 2>&1; then
+		transport=gh
+	fi
 else
 	CLI=$(command -v glab 2>/dev/null || :)
-	[ -n "$CLI" ] && transport=glab
+	if [ -n "$CLI" ] && "$CLI" api --hostname "$host" "projects/$(printf '%s' "$path" | "$JQ" -Rr '@uri')" >/dev/null 2>&1; then
+		transport=glab
+	fi
 fi
 if [ -z "$transport" ]; then
 	CURL=$(command -v curl 2>/dev/null || :)
 	eval "token=\${$token_name:-}"
+	if [ "$kind" = github ]; then cli_name=gh; else cli_name=glab; fi
 	if [ -n "$CURL" ] && [ -n "$token" ]; then
 		transport=curl
 	elif [ -n "$CURL" ]; then
-		fail "$([ "$kind" = github ] && echo gh || echo glab) が無く、curl に付ける $token_name も無い。$token_name を置くか、gh / glab を入れてください。" 2
+		fail "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
 	else
-		fail "$([ "$kind" = github ] && echo gh || echo glab) も curl も無い。どちらかを入れるか、MCP などでリモートを読める道具を用意して、その結果を JSON にしてから 'ccnavi review check --result <json>' を人が打つ形にしてください。" 2
+		fail "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review check --result <json>' を人が打つ形にしてください。" 2
 	fi
 fi
 
@@ -140,9 +181,9 @@ api() {
 	case "$transport" in
 	gh | glab)
 		if [ -n "$body" ]; then
-			printf '%s' "$body" | "$CLI" api --method "$method" --input - "$rel"
+			printf '%s' "$body" | "$CLI" api --hostname "$host" --method "$method" --input - "$rel"
 		else
-			"$CLI" api --method "$method" "$rel"
+			"$CLI" api --hostname "$host" --method "$method" "$rel"
 		fi
 		;;
 	curl)
@@ -277,6 +318,11 @@ result="$state/review-result-$$.json"
 trap 'rm -f "$result"' EXIT
 
 case "$sub" in
+origin)
+	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見る出口。
+	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
+		"$origin" "$kind" "$scheme" "$host" "$path" "$api_base" "$branch" "$transport"
+	;;
 fetch)
 	fetch_all
 	printf '\n'
