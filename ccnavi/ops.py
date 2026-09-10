@@ -31,6 +31,15 @@ def start(
     if found.state != ticket_mod.TODO:
         stderr.write(f"ccnavi: {ticket_id} は未着手ではない（いまは {found.state}/）\n")
         return 1
+    # 承認の無いチケットは着手させない。写しが無ければ範囲は効かず、フェーズにも
+    # 数えられないので、着手した子が「無いもの」として進んでしまう。
+    open_copies, _ = approval.copies(conf.approved)
+    if found.ticket not in approval.by_id(open_copies):
+        stderr.write(
+            f"ccnavi: {ticket_id} は承認されていない（写しが無い）。"
+            "先に利用者が 'ccnavi --approve' を通すこと\n"
+        )
+        return 1
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(root, worktree) or not tree.exact_name(root, ticket_id):
         stderr.write(
@@ -64,6 +73,8 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
         return 1
     if _parent_still_busy(stderr, root, conf, found):
+        return 1
+    if _deliverables_missing(stderr, root, conf, found):
         return 1
     fields = {"completed_at": approval.now()}
     return _move(
@@ -135,11 +146,92 @@ def _parent_still_busy(
     closed = phase.gate(root, conf, found.ticket)
     if closed is not None:
         stderr.write(
-            f"ccnavi: {found.ticket} のフェーズ {closed.number} はレビュー待ち"
+            f"ccnavi: {found.ticket} のフェーズ {closed.label} はレビュー待ち"
             "（ゲートが閉じている）。レビューを済ませてから閉じること\n"
         )
         return True
+    copy = approval.by_id(copies).get(found.ticket)
+    if copy is not None and copy.has_plan:
+        if copy.feedback is None:
+            stderr.write(
+                f"ccnavi: {found.ticket} はフィードバック計画がまだ。対応が無くても "
+                "`feedback: []` を改版で出して承認を受けてから閉じること\n"
+            )
+            return True
+        unfinished = [p.label for p in phase.phases_of(root, conf, found.ticket) if not p.ended]
+        if unfinished:
+            stderr.write(
+                f"ccnavi: {found.ticket} には終わっていないフェーズがある"
+                f"（{', '.join(unfinished)}）。全部閉じてから\n"
+            )
+            return True
     return False
+
+
+def _deliverables_missing(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §24.15.6）。
+
+    在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
+    「調査したことにする」は塞げる。
+    """
+    from . import phase
+
+    if not found.is_child or found.phase is None:
+        return False
+    copies, _ = approval.copies(conf.approved)
+    parent = approval.by_id(copies).get(found.parent)
+    if parent is None or not parent.has_plan:
+        return False
+    item = parent.item_at(found.phase)
+    types = phase.load_types(conf) or {}
+    pt = types.get(item.type) if item is not None else None
+    if pt is None or not pt.deliverables:
+        return False
+    # 同じフェーズに、まだ開いている別の子があれば、成果物はその子が出すかもしれない。
+    for ph in phase.phases_of(root, conf, found.parent):
+        if ph.number != found.phase:
+            continue
+        others = [
+            t.ticket
+            for t in ph.tickets
+            if t.ticket != found.ticket
+            and ph.states.get(t.ticket) in (ticket_mod.TODO, ticket_mod.DOING)
+        ]
+        if others:
+            return False
+    worktree = tree.worktree_path(root, found.parent)
+    child_tree = tree.worktree_path(root, found.ticket)
+    missing = [
+        g for g in pt.deliverables if not _tracked(worktree, g) and not _tracked(child_tree, g)
+    ]
+    if not missing:
+        return False
+    stderr.write(
+        f"ccnavi: フェーズ {found.phase}（{pt.title}）の成果物が無い: {', '.join(missing)}。"
+        "親か子の作業ツリーに置いて追跡（git add）してから閉じること\n"
+    )
+    return True
+
+
+def _tracked(worktree: str, glob: str) -> bool:
+    """この glob に当たる追跡済みのファイルが 1 つでもあるか。"""
+    if not os.path.isdir(worktree):
+        return False
+    try:
+        done_ = subprocess.run(
+            ["git", "ls-files", "--", glob],
+            cwd=worktree,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return done_.returncode == 0 and bool(done_.stdout.strip())
 
 
 def _move(

@@ -192,6 +192,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--tickets", default="")
     parser.add_argument("--approved", default=None)
+    parser.add_argument("--phases", default=None)
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", default="")
@@ -226,6 +227,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.tickets = args.tickets.replace("\\", "/").strip("/")
     if args.approved is not None:
         conf.approved = args.approved
+    if args.phases is not None:
+        conf.phases = args.phases
     conf.guard_cli = selfguard.resolve(
         stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
     )
@@ -437,6 +440,13 @@ def operate(
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
             code = review.check(stdout, stderr, root, conf, cwd, args.phase, args.result)
+    elif kind == "review" and verb == "handoff":
+        if not args.body_file or not args.result:
+            stderr.write(
+                "ccnavi: review handoff には --body-file <path> と --result <json> が要る\n"
+            )
+        else:
+            code = review.handoff(stdout, stderr, root, conf, cwd, args.body_file, args.result)
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR
@@ -832,13 +842,25 @@ def decide_at_subagent_start(
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先の作業ツリーのチケットで判定される。"
     ]
+    parents = approval.by_id(copies)
+    types = phase.load_types(conf) or {}
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
         state = "作業ツリーあり" if os.path.isdir(where) else "作業ツリー無し（効かない）"
         waiting = [p for p in t.predecessors if p not in done]
+        label = str(t.phase)
+        hint = ""
+        parent = parents.get(t.parent)
+        item = parent.item_at(t.phase) if parent is not None and t.phase is not None else None
+        pt = types.get(item.type) if item is not None else None
+        if pt is not None:
+            label = f"{t.phase}: {pt.title}"
+            if pt.agent:
+                hint = f" 種類の案内: エージェント {pt.agent}"
         lines.append(
-            f"  {t.ticket}（親 {t.parent}、フェーズ {t.phase}）: {where} [{state}]"
+            f"  {t.ticket}（親 {t.parent}、フェーズ {label}）: {where} [{state}]"
             + (f" 先行が未完了: {', '.join(waiting)}" if waiting else "")
+            + hint
         )
         for name in rules.SECTIONS:
             paths = t.paths(name)

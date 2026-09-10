@@ -166,8 +166,28 @@ def check(
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules))
+    problems.extend(_phases(conf))
     problems.extend(_ticket(conf, root))
     return problems
+
+
+def _phases(conf: settings.Settings) -> list[Problem]:
+    """フェーズの種類の定義が読めるか。無いのは不備ではない（番号だけの挙動）。"""
+    from . import phasetypes
+
+    if not conf.phases:
+        return []
+    _, notes = phasetypes.load(conf.phases)
+    return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
+
+
+def _phase_types(conf: settings.Settings):
+    from . import phasetypes
+
+    if not conf.phases:
+        return None
+    types, _ = phasetypes.load(conf.phases)
+    return types
 
 
 def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
@@ -232,6 +252,17 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     proposals, complaints = ticket_mod.scan(root, conf.tickets)
     problems.extend(complaints)
 
+    types = _phase_types(conf)
+    for t in copies:
+        if not t.is_child and t.has_plan and types is None:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    "(phases)",
+                    f"{t.ticket} は計画を持つのにフェーズの種類の定義（{conf.phases}）が読めない",
+                )
+            )
+
     # 提案と写しを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
@@ -250,7 +281,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             )
         if t.state not in ticket_mod.CLOSED:
             # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-            for p in approval.validate(t, pool):
+            for p in approval.validate(t, pool, types):
                 problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.state == ticket_mod.DOING:
             waiting = [p for p in t.predecessors if p not in done]

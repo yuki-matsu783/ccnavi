@@ -54,6 +54,8 @@ BIN_SUFFIXES = (".exe",)
 # 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
+# PHASES_ENV はフェーズの種類の定義。main の根からの相対。無ければ番号だけの挙動。
+PHASES_ENV = "CCNAVI_PHASES"
 # 以前の形（チケット 1 本と台帳 jsonl）の環境変数。もう効かない。指定されていたら
 # --lint が言う。黙って無視すると、書いた人は効いていると思い続ける。
 RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER")
@@ -79,6 +81,8 @@ DEFAULT_TICKETS = "wip/tickets"
 # 写しは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
 # シェル経由の書き込みを止めている。写しのために別の保護を足さずに済む。
 DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
+# フェーズの種類は人が持つ設定なので、写しと同じ保護の内側に置く。
+DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
 
 
 @dataclass
@@ -127,6 +131,8 @@ class Settings:
     # approved が空なら、チケットによる制御を使わない。
     tickets: str = ""
     approved: str = ""
+    # phases はフェーズの種類の定義（絶対）。無ければフェーズは番号だけ。
+    phases: str = ""
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
     retired: list[str] = field(default_factory=list)
 
@@ -150,8 +156,12 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_cli=os.environ.get(GUARD_CLI_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved=os.path.join(root, DEFAULT_APPROVED),
+        phases=os.path.join(root, DEFAULT_PHASES),
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
+    phases_env = os.environ.get(PHASES_ENV, "")
+    if phases_env:
+        settings.phases = _resolve(root, phases_env)
 
     rules_env = os.environ.get(RULES_ENV, "")
     if rules_env:
@@ -207,6 +217,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.tickets = _relative(conf["tickets"])
     if isinstance(conf.get("approved"), str):
         settings.approved = _log_or_none(root, conf["approved"])
+    if isinstance(conf.get("phases"), str) and conf["phases"]:
+        settings.phases = _resolve(root, conf["phases"])
 
     return settings, problems
 

@@ -211,9 +211,24 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             for path in t.paths(name):
                 stdout.write(f"    {name:<5} {path}\n")
     for parent in [t for t in copies if not t.is_child]:
+        where = phase.stage(root, conf, parent)
+        if where:
+            stdout.write(f"  {parent.ticket} の段階: {where}\n")
         for ph in phase.phases_of(root, conf, parent.ticket):
             marks = ", ".join(sorted(ph.marks)) or "印なし"
-            state = "終了" if ph.ended else "進行中"
+            if not ph.tickets:
+                state = "未計画（子がまだ無い）"
+            elif ph.ended:
+                state = "終了"
+            else:
+                state = "進行中"
             gate = "ゲート閉" if ph.gate_closed else "ゲート開"
-            stdout.write(f"  {parent.ticket} フェーズ {ph.number}: {state} / {marks} / {gate}\n")
+            review = ""
+            if ph.deferred:
+                review = f" / レビューは {ph.review_at} と一緒に"
+            elif ph.covers:
+                review = f" / {', '.join(str(c) for c in ph.covers)} の分も見る"
+            stdout.write(
+                f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {gate}{review}\n"
+            )
     return 0

@@ -65,6 +65,8 @@ REQUEST_FILE = "review-request-{parent}-{phase}.md"
 ACCEPT_FILE = "review-accept-{parent}-{phase}.md"
 # まだマージリクエストが無いときに、sh がこれで作る。
 MR_FILE = "review-mr-{parent}.md"
+# 残った指摘を別の issue に切り出すときの下書き。sh がこれで issue を作る。
+HANDOFF_FILE = "review-handoff-{parent}.md"
 
 
 @dataclass
@@ -204,12 +206,20 @@ def prepare(
         unmet.append("依頼文が空")
     if approval.MARK_REQUESTED in ph.marks:
         unmet.append(f"フェーズ {phase_no} は依頼済み")
+    if ph.deferred:
+        unmet.append(
+            f"フェーズ {ph.label} のレビューは {ph.review_at} 番目と一緒に見る計画。"
+            f"--phase {ph.review_at} で依頼する"
+        )
     if unmet:
         stderr.write(f"ccnavi: 依頼の前提が {len(unmet)} 件満たされていない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
     marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} -->\n"
+    # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
+    # 人が読み落とさないように。
+    body = _covered_header(root, conf, parent, ph) + body
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     try:
@@ -363,10 +373,23 @@ def check(
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
         for t in unresolved:
             stderr.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
-        stderr.write(
-            "解決してもらって再実行するか、利用者が端末で "
-            f"'sh .claude/scripts/ccnavi-review.sh accept {phase_no}' を打つ\n"
-        )
+        if _is_last_feedback_review(parent, phase_no):
+            # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
+            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §24.15.7）。
+            stderr.write(
+                "フィードバック対応の最後のレビューです。道は 2 つ。\n"
+                f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
+                "  - 'sh .claude/scripts/ccnavi-review.sh handoff --body-file <題と本文>' で"
+                "別の issue に切り出し、利用者が端末で "
+                f"'sh .claude/scripts/ccnavi-review.sh accept {phase_no}' を打って"
+                "残りを受け入れる\n"
+                "新しいフィードバック作業フェーズは足せません。\n"
+            )
+        else:
+            stderr.write(
+                "解決してもらって再実行するか、同じフェーズに子を足してやり直すか、利用者が端末で "
+                f"'sh .claude/scripts/ccnavi-review.sh accept {phase_no}' を打つ\n"
+            )
         return 1
     assert result.mr is not None
     failed = approval.write_mark(
@@ -477,6 +500,97 @@ def reviewed(
         f"OK: フェーズ {phase_no} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
     )
     return 0
+
+
+def handoff(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    body_file: str,
+    result_path: str,
+) -> int:
+    """残った指摘を別の issue に切り出す下書きを書き出す（設計 §24.15.7）。
+
+    作るのは sh。ここは、切り出してよい段階か（フィードバック計画が承認済み）を確かめ、
+    親が書いた題と本文に、写しの中の未解決スレッドの URL を添えて、控えの置き場に置く。
+    標準出力はその綴り。1 行目が題、空行のあとが本文。
+    """
+    parent = _parent(stderr, root, conf, cwd)
+    if parent is None:
+        return 1
+    if not parent.has_plan or parent.feedback is None:
+        stderr.write(
+            "ccnavi: 切り出せるのはフィードバック計画が承認されたあと。"
+            "それまでは同じフェーズに子を足して応える\n"
+        )
+        return 1
+    if not conf.state:
+        stderr.write("ccnavi: 控えの置き場が空。下書きを置く場所が無い\n")
+        return 1
+    body = _read_body(_resolve(cwd, body_file))
+    if body is None or not body.strip():
+        stderr.write(f"ccnavi: 題と本文を読めない ({body_file})。1 行目が題\n")
+        return 1
+    result = _result(stderr, result_path)
+    if result is None or result.mr is None:
+        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+        return 1
+    accepted = approval.accepted_threads(conf.approved, parent.ticket)
+    remaining = _unresolved(result.threads, accepted)
+    lines = body.rstrip("\n").splitlines()
+    title = lines[0].strip() if lines else ""
+    rest = "\n".join(lines[1:]).strip()
+    if not title:
+        stderr.write("ccnavi: 1 行目が題。空にしない\n")
+        return 1
+    text = [title, "", rest, ""] if rest else [title, ""]
+    text += [
+        f"元のマージリクエスト: {result.mr.url}（チケット `{parent.ticket}`）",
+        "",
+        "## 引き継ぐ指摘",
+        "",
+    ]
+    if remaining:
+        text += [f"- {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in remaining]
+    else:
+        text.append("（未解決のスレッドは残っていない）")
+    text.append("")
+    path = os.path.join(conf.state, HANDOFF_FILE.format(parent=parent.ticket))
+    try:
+        os.makedirs(conf.state, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(text))
+    except OSError as exc:
+        stderr.write(f"ccnavi: 下書きを書き出せない ({exc})\n")
+        return 1
+    stdout.write(path + "\n")
+    return 0
+
+
+def _covered_header(
+    root: str, conf: settings.Settings, parent: ticket_mod.Ticket, ph: phase.Phase
+) -> str:
+    """依頼文の先頭に置く「このレビューが含むフェーズ」。計画が無ければ空。"""
+    if not parent.has_plan:
+        return ""
+    numbers = [*ph.covers, ph.number]
+    labels = []
+    for p in phase.phases_of(root, conf, parent.ticket):
+        if p.number in numbers:
+            labels.append(p.label)
+    if len(labels) <= 1 and not ph.covers:
+        return f"このレビューが含むフェーズ: {ph.label}\n\n"
+    return "このレビューが含むフェーズ: " + "、".join(labels) + "\n\n"
+
+
+def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
+    """フィードバック作業フェーズの最後のレビューか。"""
+    if not parent.has_plan or not parent.feedback:
+        return False
+    last = len(parent.plan) + len(parent.feedback)
+    return parent.review_at(last) == phase_no
 
 
 # ---- リモートに要る道具の有無。exe は使わないが、--lint が言う。

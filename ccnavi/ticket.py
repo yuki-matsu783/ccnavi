@@ -102,6 +102,46 @@ APPROVAL_KEY = "ccnavi_approved"
 _WILDCARDS = "*?["
 
 
+def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem]]:
+    """計画の並びを読む。種類が在るかはここでは見ない（種類を読むのは承認の側）。"""
+    problems: list[Problem] = []
+    if not isinstance(raw, list):
+        problems.append(Problem(SEVERITY_ERROR, name, f"`{key}` は並びで書く"))
+        return None, problems
+    items: list[PlanItem] = []
+    for i, entry in enumerate(raw):
+        where = f"{key}[{i}]"
+        if isinstance(entry, str) and entry.strip():
+            items.append(PlanItem(type=entry.strip()))
+            continue
+        if isinstance(entry, dict):
+            kind = _text(entry.get("type")).strip()
+            review = _text(entry.get("review")).strip()
+            if not kind:
+                problems.append(Problem(SEVERITY_ERROR, name, f"{where} に `type` が無い"))
+                return None, problems
+            if review and review not in PLAN_REVIEWS:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        name,
+                        f"{where} の `review` は {' か '.join(PLAN_REVIEWS)}。"
+                        "弱める向き（none）は書けない",
+                    )
+                )
+                return None, problems
+            items.append(PlanItem(type=kind, review=review))
+            continue
+        problems.append(Problem(SEVERITY_ERROR, name, f"{where} は種類の名前か {{type, review}}"))
+        return None, problems
+    if items and items[-1].deferred:
+        problems.append(
+            Problem(SEVERITY_ERROR, name, f"`{key}` の最後の項は延期できない。誰も見ないまま終わる")
+        )
+        return None, problems
+    return items, problems
+
+
 def _issue_number(raw) -> int | None:
     """課題の番号。`12` でも `"#12"` でも読む。読めなければ None。"""
     if isinstance(raw, bool):
@@ -157,6 +197,33 @@ class Entry:
         return self.glob[:cut]
 
 
+# 計画の項が書けるレビューの指定。`mr` は種類が none でも要る（強める）、`defer` は
+# 次にレビューがあるフェーズと一緒に見る（延期）。弱める向き（none）は書けない。
+PLAN_REVIEW_MR = "mr"
+PLAN_REVIEW_DEFER = "defer"
+PLAN_REVIEWS = (PLAN_REVIEW_MR, PLAN_REVIEW_DEFER)
+
+
+@dataclass
+class PlanItem:
+    """親の計画の 1 項。フェーズの種類の名前と、レビューの指定。"""
+
+    type: str
+    review: str = ""
+
+    @property
+    def deferred(self) -> bool:
+        return self.review == PLAN_REVIEW_DEFER
+
+    def as_raw(self):
+        return {"type": self.type, "review": self.review} if self.review else self.type
+
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, PlanItem) and self.type == other.type and self.review == other.review
+        )
+
+
 @dataclass
 class Ticket:
     """チケット 1 本ぶん。提案としても写しとしても同じ形。"""
@@ -168,6 +235,11 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
+    # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
+    # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
+    # 「見たうえで対応なし」。設計 §24.15.2。
+    plan: list[PlanItem] = field(default_factory=list)
+    feedback: list[PlanItem] | None = None
     review_required: bool = True
     review_reason: str = ""
     title: str = ""
@@ -196,6 +268,42 @@ class Ticket:
     @property
     def is_child(self) -> bool:
         return bool(self.parent)
+
+    @property
+    def has_plan(self) -> bool:
+        return bool(self.plan)
+
+    def numbered(self) -> list[tuple[int, PlanItem]]:
+        """計画の項に番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
+        items = list(self.plan) + list(self.feedback or [])
+        return [(i + 1, item) for i, item in enumerate(items)]
+
+    def item_at(self, number: int) -> PlanItem | None:
+        for n, item in self.numbered():
+            if n == number:
+                return item
+        return None
+
+    def review_at(self, number: int) -> int | None:
+        """この番号のフェーズのレビューが行われる番号。延期なら次にレビューがある番号。
+
+        延期の連鎖の先が無ければ None（計画が壊れている）。
+        """
+        items = self.numbered()
+        for n, item in items:
+            if n >= number and not item.deferred:
+                return n
+        return None
+
+    def covered_by(self, number: int) -> list[int]:
+        """この番号のレビューが含む、それより前の延期したフェーズの番号。"""
+        found = []
+        for n, item in self.numbered():
+            if n >= number:
+                break
+            if item.deferred and self.review_at(n) == number:
+                found.append(n)
+        return found
 
     def paths(self, decision: str) -> list[str]:
         return [e.glob or e.regex for e in self.entries if e.decision == decision]
@@ -301,6 +409,22 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     elif raw_preds is not None:
         problems.append(Problem(SEVERITY_ERROR, name, "`predecessors` は並びで書く"))
         return None, problems
+
+    for key in ("plan", "feedback"):
+        raw_plan = front.get(key)
+        if raw_plan is None:
+            continue
+        if ticket.is_child:
+            problems.append(Problem(SEVERITY_WARN, name, f"`{key}` は親だけの欄。子では読まない"))
+            continue
+        items, bad = _plan(name, key, raw_plan)
+        problems.extend(bad)
+        if items is None:
+            return None, problems
+        if key == "plan":
+            ticket.plan = items
+        else:
+            ticket.feedback = items
 
     raw_issue = front.get("issue")
     if raw_issue is not None:

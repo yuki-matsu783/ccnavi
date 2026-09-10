@@ -28,6 +28,7 @@ import json
 import os
 import shutil
 import time
+from dataclasses import dataclass, field
 from typing import TextIO
 
 from . import rules, settings
@@ -277,6 +278,33 @@ def level(points: int) -> str:
     return LEVELS[-1][1]
 
 
+@dataclass
+class Candidate:
+    """承認の束の 1 件。新規の提案か、親の改版か。"""
+
+    ticket: ticket_mod.Ticket
+    points: int = 0
+    why: list[str] = field(default_factory=list)
+    complaints: list[rules.Problem] = field(default_factory=list)
+    # 改版なら、いま効いている写し。
+    current: ticket_mod.Ticket | None = None
+    # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def is_revision(self) -> bool:
+        return self.current is not None
+
+    @property
+    def plans_feedback(self) -> bool:
+        return (
+            self.is_revision
+            and self.current is not None
+            and self.current.feedback is None
+            and self.ticket.feedback is not None
+        )
+
+
 def approve(
     stdin: TextIO,
     stdout: TextIO,
@@ -293,7 +321,12 @@ def approve(
 
     束は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
+
+    親の改版（計画の変更）も同じ束に載る。写しは動かないのが原則で、改版はその
+    唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
     """
+    from . import phase
+
     proposals, problems = ticket_mod.scan(root, conf.tickets)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -303,23 +336,55 @@ def approve(
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = copies(conf.approved, closed=True)
     known = by_id(approved + closed)
+    open_index = by_id(approved)
+    types = phase.load_types(conf)
 
     # 承認待ち。写しが無いもの。閉じたものは対象外で、再開は人が写しを戻す。
     pending = [t for t in proposals if t.ticket not in known and t.state != ticket_mod.CANCELLED]
-    if not pending:
+    # 改版の候補。開いている親の写しがあり、提案の計画が写しと違うもの。
+    revisions = [
+        t
+        for t in proposals
+        if t.ticket in open_index
+        and not t.is_child
+        and t.has_plan
+        and _plan_differs(t, open_index[t.ticket])
+    ]
+    if not pending and not revisions:
         stdout.write("承認待ちのチケットは無い。\n")
-        return 0
+        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
+        # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
+        return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
 
     pool = by_id(approved + pending)
-    batch: list[tuple[ticket_mod.Ticket, int, list[str], list[rules.Problem]]] = []
+    batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
+
+    for t in sorted(revisions, key=lambda x: x.ticket):
+        current = open_index[t.ticket]
+        complaints = revision_problems(root, conf, t, current, types)
+        if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
+            rejected.append((t, complaints))
+            continue
+        cand = Candidate(ticket=t, complaints=complaints, current=current)
+        if cand.plans_feedback:
+            cand.notes = feedback_notes(root, conf, t)
+        batch.append(cand)
+        # 通った改版だけ、同じ束の子から見える親にする。落ちた改版の計画で子を
+        # 通すと、承認されない番号の子が写しになる。
+        pool[t.ticket] = t
+
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
-        complaints = validate(t, pool)
+        complaints = validate(t, pool, types)
+        if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
+            parent = pool.get(t.parent)
+            if parent is not None:
+                complaints += phase.order_problems(root, conf, t, parent, types)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
         points, why = (0, []) if t.is_child else score(t, rule_set, t.tree_root)
-        batch.append((t, points, why, complaints))
+        batch.append(Candidate(ticket=t, points=points, why=why, complaints=complaints))
 
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
@@ -328,12 +393,12 @@ def approve(
     if not batch:
         return 1
 
-    stdout.write(screen(batch, pool) + "\n\n")
-    total = max(points for _, points, _, _ in batch)
+    stdout.write(screen(batch, pool, types) + "\n\n")
+    total = max(c.points for c in batch)
     if total >= HIGH_RISK:
         # 鍵は最も重い親の識別子。識別子順の先頭にすると、軽い親の識別子を
         # 打つだけで重い親まで束ごと通る。
-        key = max(batch, key=lambda item: item[1])[0].ticket
+        key = max(batch, key=lambda c: c.points).ticket.ticket
         stdout.write(
             f"⚠ リスクスコア {total} ({level(total)})。ワンキーでは承認できない。\n"
             f"  承認するなら識別子を入力: [{key}] "
@@ -350,8 +415,27 @@ def approve(
             return 1
 
     stamp = now()
-    for t, points, _, _ in batch:
-        failed = write_copy(conf.approved, t, t.tree, points, stamp)
+    for cand in batch:
+        t = cand.ticket
+        if cand.is_revision and cand.current is not None:
+            failed = revise_copy(conf.approved, cand.current, t, stamp, cand.plans_feedback)
+            if failed:
+                stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
+                return 1
+            what = "フィードバック計画" if cand.plans_feedback else "全体計画"
+            stdout.write(f"  {t.ticket} の{what}を改版した\n")
+            if cand.plans_feedback:
+                # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
+                failed = phase.settle_last_review(conf, t, stamp)
+                if failed:
+                    stderr.write(f"ccnavi: {t.ticket}: 印を置けない: {failed}\n")
+                    return 1
+                stdout.write(
+                    "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
+                    "フィードバック作業フェーズの check が数える\n"
+                )
+            continue
+        failed = write_copy(conf.approved, t, t.tree, cand.points, stamp)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return 1
@@ -371,21 +455,34 @@ def approve(
 
 
 def screen(
-    batch: list[tuple[ticket_mod.Ticket, int, list[str], list[rules.Problem]]],
+    batch: list[Candidate],
     pool: dict[str, ticket_mod.Ticket],
+    types: dict | None = None,
 ) -> str:
     """承認を求める画面を組む。
 
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
-    「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」。
+    「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
     """
     lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
-    for t, points, why, complaints in batch:
+    for cand in batch:
+        t = cand.ticket
+        if cand.is_revision and cand.current is not None:
+            lines += ["", f"== {t.ticket}: {t.title}（親の改版）"]
+            lines += _plan_diff_lines(cand.current, t, types)
+            for note in cand.notes:
+                lines.append(f"    {note}")
+            lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
+            continue
         lines += [
             "",
             f"== {t.ticket}: {t.title}"
-            + (f"（親 {t.parent}、フェーズ {t.phase}）" if t.is_child else "（親）"),
+            + (
+                f"（親 {t.parent}、フェーズ {_phase_label(t, pool, types)}）"
+                if t.is_child
+                else "（親）"
+            ),
         ]
         if t.is_child:
             # 親は同じ束の中に居ることが普通。写しだけを引くと「写しが無い」になる。
@@ -397,6 +494,9 @@ def screen(
                 else "(写しが無い)"
             )
             lines.append(f"    {head}")
+            bound = _type_of(t, pool, types)
+            if bound is not None and not bound.inherits_scope:
+                lines.append(f"    種類 {bound.title}: " + ", ".join(bound.scope_globs))
         else:
             lines.append("■ このチケットで書き込みが許される領域（これ以外はすべて止まる）")
         for name in rules.SECTIONS:
@@ -410,14 +510,20 @@ def screen(
             )
             if t.predecessors:
                 lines.append(f"■ 先行: {', '.join(t.predecessors)}")
+        elif t.has_plan:
+            lines.append("■ 全体計画（この並びに合意する）")
+            lines += _plan_lines(t.plan, 1, types)
+            if t.feedback is not None:
+                lines.append("■ フィードバック計画")
+                lines += _plan_lines(t.feedback, len(t.plan) + 1, types) or ["    （対応なし）"]
         if t.rationale.strip():
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
         lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
         if not t.is_child:
-            lines.append(f"■ リスクスコア: {points} ({level(points)})")
-            lines += [f"    {line}" for line in why] or ["    加点なし"]
-        warnings = [p for p in complaints if p.severity == rules.SEVERITY_WARN]
+            lines.append(f"■ リスクスコア: {cand.points} ({level(cand.points)})")
+            lines += [f"    {line}" for line in cand.why] or ["    加点なし"]
+        warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
             lines.append("■ 記述のうち、判定に効かないもの")
             lines += [f"    {p.detail}" for p in warnings]
@@ -426,11 +532,257 @@ def screen(
     return "\n".join(lines)
 
 
-def validate(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> list[rules.Problem]:
+def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None) -> list[str]:
+    lines = []
+    for i, item in enumerate(items):
+        n = start + i
+        pt = (types or {}).get(item.type)
+        title = pt.title if pt is not None else item.type
+        review = ""
+        if item.deferred:
+            review = "レビューは次と一緒に"
+        elif item.review == ticket_mod.PLAN_REVIEW_MR:
+            review = "レビュー要（計画で強めた）"
+        elif pt is not None:
+            review = "レビュー要" if pt.review == "mr" else "レビュー不要"
+        lines.append(f"    {n}. {title}（{item.type}）" + (f"  {review}" if review else ""))
+    return lines
+
+
+def _plan_diff_lines(
+    current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None
+) -> list[str]:
+    lines = []
+    if current.plan != revised.plan:
+        lines.append("■ 全体計画の変更")
+        lines.append("    いま:")
+        lines += ["    " + x for x in _plan_lines(current.plan, 1, types)]
+        lines.append("    改版:")
+        lines += ["    " + x for x in _plan_lines(revised.plan, 1, types)]
+    if current.feedback != revised.feedback:
+        lines.append("■ フィードバック計画")
+        start = len(revised.plan) + 1
+        lines += _plan_lines(revised.feedback or [], start, types) or [
+            "    （対応なし。見たうえで対応しないという記録になる）"
+        ]
+    return lines
+
+
+def _phase_label(t: ticket_mod.Ticket, pool: dict, types: dict | None) -> str:
+    pt = _type_of(t, pool, types)
+    return f"{t.phase}: {pt.title}" if pt is not None else str(t.phase)
+
+
+def _type_of(t: ticket_mod.Ticket, pool: dict, types: dict | None):
+    parent = pool.get(t.parent) if t.is_child else None
+    if parent is None or not parent.has_plan or t.phase is None or not types:
+        return None
+    item = parent.item_at(t.phase)
+    return types.get(item.type) if item is not None else None
+
+
+def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
+    return proposal.plan != current.plan or proposal.feedback != current.feedback
+
+
+def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
+    """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
+    accepted = accepted_threads(conf.approved, parent.ticket)
+    notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
+    if not parent.feedback:
+        notes.append("対応なし。見たうえで対応しない、という記録になる")
+        if accepted:
+            notes.append("受け入れた分は別 issue に切り出したか（ccnavi-review.sh handoff）")
+    return notes
+
+
+def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
+    """親の計画が種類の定義と噛み合っているか（設計 §24.15.2）。"""
+    from . import phasetypes
+
+    problems: list[rules.Problem] = []
+    if not t.has_plan:
+        return problems
+    if types is None:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                "`plan` があるのにフェーズの種類の定義（phases.yml）が読めない",
+            )
+        )
+        return problems
+    for key, items, kind in (
+        ("plan", t.plan, phasetypes.KIND_WORK),
+        ("feedback", t.feedback or [], phasetypes.KIND_FEEDBACK),
+    ):
+        seen_types = {item.type for item in items}
+        for i, item in enumerate(items):
+            pt = types.get(item.type)
+            if pt is None:
+                problems.append(
+                    rules.Problem(
+                        rules.SEVERITY_ERROR, t.ticket, f"`{key}[{i}]` の種類 `{item.type}` は無い"
+                    )
+                )
+                continue
+            if pt.kind != kind:
+                where = "全体計画" if key == "plan" else "フィードバック計画"
+                problems.append(
+                    rules.Problem(
+                        rules.SEVERITY_ERROR,
+                        t.ticket,
+                        f"`{key}[{i}]` の `{item.type}` は kind `{pt.kind}`。{where}には置けない",
+                    )
+                )
+            if item.deferred and pt.review == phasetypes.REVIEW_NONE:
+                problems.append(
+                    rules.Problem(
+                        rules.SEVERITY_ERROR,
+                        t.ticket,
+                        f"`{key}[{i}]` の `{item.type}` はレビュー不要の種類。延期するものが無い",
+                    )
+                )
+            for need in pt.requires:
+                if need not in seen_types:
+                    problems.append(
+                        rules.Problem(
+                            rules.SEVERITY_ERROR,
+                            t.ticket,
+                            f"`{item.type}` を置くなら `{need}` も {key} に要る（requires）",
+                        )
+                    )
+        # 延期の先は、レビューがある項でなければならない。
+        for i, item in enumerate(items):
+            if not item.deferred:
+                continue
+            target = next((x for x in items[i + 1 :] if not x.deferred), None)
+            if target is None:
+                continue
+            tpt = types.get(target.type)
+            if tpt is not None and tpt.review == phasetypes.REVIEW_NONE and target.review != "mr":
+                problems.append(
+                    rules.Problem(
+                        rules.SEVERITY_ERROR,
+                        t.ticket,
+                        f"`{key}[{i}]` を延期した先の `{target.type}` にレビューが無い",
+                    )
+                )
+    return problems
+
+
+def revision_problems(
+    root: str,
+    conf: settings.Settings,
+    revised: ticket_mod.Ticket,
+    current: ticket_mod.Ticket,
+    types: dict | None,
+) -> list[rules.Problem]:
+    """親の改版を受けてよいか（設計 §24.15.5）。"""
+    from . import phase
+
+    problems = plan_problems(revised, types)
+    if any(p.severity == rules.SEVERITY_ERROR for p in problems):
+        return problems
+    # 変えられるのは計画だけ。
+    if _scope_signature(revised) != _scope_signature(current):
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                revised.ticket,
+                "改版で変えられるのは plan と feedback だけ。範囲が写しと違う",
+            )
+        )
+    if revised.title != current.title or revised.issue != current.issue:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                revised.ticket,
+                "改版で変えられるのは plan と feedback だけ。題か課題番号が写しと違う",
+            )
+        )
+    # 全体計画: 子がある番号までは同じ並びでなければならない。
+    if revised.plan != current.plan:
+        frozen = _last_phase_with_children(conf, current.ticket)
+        if frozen > len(revised.plan) or revised.plan[:frozen] != current.plan[:frozen]:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    revised.ticket,
+                    f"全体計画の {frozen} 番目までは子が承認されているので変えられない。"
+                    "番号がずれると子の phase が指す先が変わる",
+                )
+            )
+    # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
+    if revised.feedback != current.feedback:
+        if current.feedback is not None:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    revised.ticket,
+                    "フィードバック計画は 1 回だけ。承認済みのフィードバック作業フェーズに"
+                    "子を足して"
+                    "やり直すか、残りは別 issue に切り出す（ccnavi-review.sh handoff）",
+                )
+            )
+        elif not phase.plan_finished(root, conf, current):
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    revised.ticket,
+                    "フィードバック計画は、全体計画のフェーズが全部閉じてレビューが済んでから出す。"
+                    "作業が終わるまで対応は計画できない",
+                )
+            )
+    return problems
+
+
+def revise_copy(
+    approved_dir: str,
+    current: ticket_mod.Ticket,
+    revised: ticket_mod.Ticket,
+    stamp: str,
+    feedback_planned: bool,
+) -> str:
+    """写しの計画を差し替える。範囲と承認の記録はそのまま。"""
+    front = dict(current.raw)
+    front["plan"] = [item.as_raw() for item in revised.plan]
+    if revised.feedback is not None:
+        front["feedback"] = [item.as_raw() for item in revised.feedback]
+    meta = dict(front.get(ticket_mod.APPROVAL_KEY) or {})
+    meta["revised_at"] = stamp
+    if feedback_planned:
+        meta["feedback_at"] = stamp
+    front[ticket_mod.APPROVAL_KEY] = meta
+    current.raw = front
+    return _write(copy_path(approved_dir, current.ticket), ticket_mod.render(current))
+
+
+def _scope_signature(t: ticket_mod.Ticket) -> tuple:
+    return tuple((e.decision, e.glob, e.regex) for e in t.entries)
+
+
+def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
+    """この親で、子が承認された（開いていても閉じていても）いちばん後ろの番号。"""
+    open_copies, _ = copies(conf.approved)
+    closed_copies, _ = copies(conf.approved, closed=True)
+    numbers = [
+        t.phase
+        for t in open_copies + closed_copies
+        if t.parent == parent_id and t.phase is not None
+    ]
+    return max(numbers) if numbers else 0
+
+
+def validate(
+    t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], types: dict | None = None
+) -> list[rules.Problem]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。"""
+    from . import phasetypes
+
     problems: list[rules.Problem] = []
     if not t.is_child:
-        return problems
+        return plan_problems(t, types)
     parent = pool.get(t.parent)
     if parent is None:
         problems.append(
@@ -445,6 +797,29 @@ def validate(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> list[r
         )
         return problems
     problems.extend(ticket_mod.subset_problems(t, parent))
+    if parent.has_plan and t.phase is not None:
+        item = parent.item_at(t.phase)
+        if item is None:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"{t.phase} 番目のフェーズは親 {parent.ticket} の計画に無い"
+                    f"（計画は {len(parent.numbered())} 番目まで）",
+                )
+            )
+            return problems
+        pt = (types or {}).get(item.type)
+        if pt is None:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"{t.phase} 番目の種類 `{item.type}` の定義が読めない",
+                )
+            )
+            return problems
+        problems.extend(phasetypes.scope_problems(t, pt))
     return problems
 
 
