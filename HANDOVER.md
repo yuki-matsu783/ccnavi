@@ -415,6 +415,17 @@ push 前の `request` が前提で止まる → 親の push（ラッパ経由）
 | 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
 | 未解決の一覧で、位置の無い討論が ` :0 ` と出る | 直していない。読めるので後回し |
 
+**main の作業ツリーでの編集をルールで止めた（2026-09-11）。** 「編集は worktree で」は CLAUDE.md の
+指示だけで、hook は main の Write / Edit を通していた（allow の `source` と `project-files`）。
+ルールに `{root}`（判定の根の実パスに読み込み時に置き換わる合言葉）を足し、deny の `main-tree` で
+「根の下で、かつ `.claude/worktrees/` の外」を止める。ルールの契約が先読みを禁じているので、
+根の直下の 1 段目で場合分けする形（`.` で始まらない名前 / `.c` 以外で始まる隠し名 / `.cl` 以外 /
+`.claude/` の下の `w` で始まらない名前）。worktree の中でも `.claude/settings*.json` は
+`worktree-settings` で止める。hook・スクリプト・写しは既存の deny が場所を問わず当たる。
+`source` と `project-files` は deny の陰で死ぬので消した。作業ツリーの中は `worktrees` の allow が
+まとめて通す。`tests/test_root_placeholder.py` と `testdata/rule-samples.yml` に固定してある。
+このセッション自身が main で編集していたのは、hook が dry-run だったから。enable に戻せば止まる。
+
 **この 1 周で溶かした時間の内訳**（同じ道を戻らないために）。Docker Desktop を起動したら
 利用者の GitLab が `restart=unless-stopped` で勝手に上がり、2GB の VM に収まらず engine ごと落ちた。
 `docker exec` も `docker ps` も 500 を返すようになり、トークンを取る手立てが無くなった。
