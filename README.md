@@ -239,6 +239,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い |
 | `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーの根からの相対。既定は `wip/tickets` |
 | `CCNAVI_APPROVED` | 承認済みの写しの置き場。main の根からの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
+| `CCNAVI_PHASES` | フェーズの種類の定義。main の根からの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
 | `CCNAVI_GUARD_CLI` | `enable`（既定）、`disable`。人の判断の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_CCNAVI_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -776,6 +777,76 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 起動）と Bash を止める（`DENY_PHASE_GATE`）。通すのは `ccnavi-ticket.sh` `ccnavi-review.sh`
 `ccnavi-git.sh` の 3 本だけ。Write / Edit は通すので、次のフェーズの計画はレビュー前に進められる。
 
+### フェーズの種類と計画
+
+番号だけのフェーズは「2 番目の束」以上のことを言わない。`.claude/ccnavi/phases.yml` に
+**フェーズの種類**を定義し、親が `plan:` にその並びを書くと、フェーズに意味が付く。
+種類は人が持つ設定で、エージェントは書き換えない。ファイルが無ければ番号だけの挙動のまま。
+
+```yaml
+# .claude/ccnavi/phases.yml
+version: 1
+phases:
+  research:
+    kind: work            # work は全体計画に、feedback はフィードバック計画にだけ置ける
+    title: 調査           # id と title はどちらも一意
+    review: none          # none | mr。既定であって上限ではない
+    scope: ["wip/research/*"]          # 子の範囲の上限。inherit なら親の範囲
+    deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの
+    when: 既存の振る舞いが分からないとき          # 案内。判定には使わない
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope: ["src/*", "tests/*"]
+    requires: [acceptance]             # 計画に置くなら一緒に要る
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope: ["tests/*"]
+    overlap: [implement]               # 並行してよい（対称）
+  implement-feedback:
+    kind: feedback
+    title: 実装フィードバック対応
+    review: mr                         # feedback は mr 固定
+    scope: inherit
+```
+
+```yaml
+# 親チケット
+ticket: i0001
+issue: 1
+plan:                                  # 全体計画。--approve が通ることが合意
+  - research
+  - {type: design, review: defer}      # レビューを次と一緒に見る（延期。省略ではない）
+  - acceptance
+  - implement
+feedback:                              # フィードバック計画。レビューのあと改版で足す。空でも出す
+  - implement-feedback
+```
+
+子は今までどおり `phase: N`。N 番目が何の種類かは親の計画が言う。番号は全体計画が 1 から、
+フィードバック計画がその続き。
+
+**合意は全部 `--approve` を通る。** 全体計画は親の承認。各フェーズの計画は、その番号の子を
+提案して承認を受けること（別の文書は求めない）。フィードバック計画は `feedback:` を足した
+親の改版の承認で、全体計画の最後のレビューが済んでから 1 回だけ。指摘が無くても `feedback: []`
+で出す。それが「見たうえで対応なし」の証跡になる。
+
+**順序は承認で止まる。** N 番目の子は、N-1 番目までが全部閉じてレビュー（延期でなければ）が
+済むまで承認されない。`overlap` に挙げた組だけ例外。フェーズには必ず子が 1 本以上あり、
+親は計画・合流・依頼だけをして、作業はしない。
+
+**改版**は「写しは動かない」の唯一の例外で、変えられるのは `plan` と `feedback` だけ。
+`plan` は子がまだ承認されていない番号の項に限る。`feedback` の承認後は新しいフィードバック
+作業フェーズを足せない。承認済みのフィードバック作業フェーズの中で差し戻しを受けて子を
+足すのは何度でもできる。それでも残る指摘は `ccnavi-review.sh handoff` で別の issue に切り出す。
+
+`--explain` と `SubagentStart` はフェーズを「3（実装とテスト）」のように番号と種類で示し、
+親の段階（全体計画待ち・作業中・レビュー待ち・フィードバック計画待ち・フィードバック対応中・
+閉じられる）を名指しする。
+
 ### レビューの依頼と確認
 
 ```sh
@@ -817,6 +888,7 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 | `check` | sh がスレッドとレビューを取ってくる → `review check`（判定して印を置く） |
 | `accept N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せて印を置く）→ 受け入れた一覧を sh がコメントに写す |
 | `note` | sh が投稿する。実行ファイルは関わらない |
+| `handoff --body-file <題と本文>` | 残った指摘を別の issue に切り出す。`review handoff`（段階を確かめ、残ったスレッドの URL を添えた下書きを書く）→ sh が issue を作り、MR に引き継ぎの note を残す |
 | `fetch` | 取ってきた写しを標準出力へ。デバッグ用 |
 | `origin` | origin をどう読んだか（ホスト・scheme・API の綴り・使う道具）。当たらないときの出口 |
 
