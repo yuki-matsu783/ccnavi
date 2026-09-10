@@ -360,6 +360,14 @@ jq -r 'select(.decision == "handover") | .subject' .claude/ccnavi/log.jsonl | so
 Windows でも Linux でも同じ意味にするための、`fnmatch` の外で足している唯一の処理。
 `*/secrets/*` は `C:\repo\secrets\key` にも当たる。
 
+**`{root}` は判定の根に置き換わる。** hook なら `CLAUDE_PROJECT_DIR`、端末なら `--root` の
+実パス。「このプロジェクトの下」を絶対パスの直書きなしに書くためのもので、Windows と WSL と
+Linux で綴りが割れない。glob なら `{root}/wip/*`、regex なら `^{root}[\\/]` のように書く。
+区切りは `/` と `\` のどちらにも当たり、大文字小文字を区別しない機械では綴りの違いも許す。
+`--explain` と `--test` は書いた綴りのまま `{root}` を出す。このリポジトリのルールでは、
+main の作業ツリーでの Write / Edit を止める `main-tree` がこれを使っている（作業は
+`.claude/worktrees/` の中だけで行い、ff-only で main に戻す）。
+
 書けないものは `glob` の代わりに `regex` に正規表現を書く。両方書いたルールは
 受け付けない。
 先読み・後読み・後方参照は受け付けない。書ける範囲を狭く保つと、ルールが

@@ -39,10 +39,18 @@ Claude Code の権限モードに従う（判定は cli.py）。
 強い側を先に見るのは、緩める側のルールを 1 行足しただけで守りが消える形を
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` の穴を開ける道具ではない。
+
+## 根の合言葉
+
+`{root}` は判定の根（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
+読み込み時に置き換わる。「このプロジェクトの下」を絶対パスの直書きなしに書くための
+もので、Windows と WSL と Linux で綴りが割れない。glob なら `{root}/wip/*`、regex なら
+`^{root}[\\/]` のように書く。根が渡らない読み方をしたルールは error で名指しする。
 """
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -77,6 +85,29 @@ _UNSUPPORTED = (
     (r"(?<!", "否定後読み"),
 )
 _BACKREFERENCE = re.compile(r"\\[1-9]")
+
+# 判定の根を指す合言葉。glob と regex の中で使え、読み込み時に根の実パスに置き換わる。
+ROOT_PLACEHOLDER = "{root}"
+
+
+def root_pattern(root: str) -> str:
+    """根の実パスを、regex に埋めて安全な形にする。
+
+    区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
+    解いた綴り（cli.full_path）で、Windows では `\\` になるが、ルールを書く人は
+    `/` で考える。大文字小文字を区別しない機械では、綴りの違いも許す
+    （`c:` と `C:` は同じ場所）。
+    """
+    real = os.path.realpath(root).rstrip("\\/")
+    body = "".join("[\\\\/]" if ch in "\\/" else re.escape(ch) for ch in real)
+    if os.path.normcase("A") == "a":
+        return f"(?i:{body})"
+    return body
+
+
+def root_glob(root: str) -> str:
+    """根の実パスを、glob に埋める形にする。区切りは `/` に寄せ、翻訳の側が両方に当てる。"""
+    return os.path.realpath(root).replace("\\", "/").rstrip("/")
 
 
 @dataclass
@@ -148,8 +179,8 @@ class RuleSet:
             yield from self.section(name)
 
 
-def load(path: str) -> tuple[RuleSet, list[Problem]]:
-    """ルールファイルを読んで組み立てる。
+def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
+    """ルールファイルを読んで組み立てる。root は `{root}` の置き換え先。
 
     解釈できないルールは、黙って飛ばさずに落として名指しで報告する。
     黙って消えたルールは、誰も気づかないガードの穴になるから。
@@ -171,10 +202,10 @@ def load(path: str) -> tuple[RuleSet, list[Problem]]:
             raise ValueError(f"{path} を YAML として読めない: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"{path} のルールがキーと値の並びではない")
-    return parse(data)
+    return parse(data, root)
 
 
-def parse(data: dict) -> tuple[RuleSet, list[Problem]]:
+def parse(data: dict, root: str = "") -> tuple[RuleSet, list[Problem]]:
     """読み込み済みのルールを組み立てる。
 
     ファイルを開く部分と分けてあるのは、組み込みの既定ルールが同じ経路を通るため。
@@ -206,7 +237,7 @@ def parse(data: dict) -> tuple[RuleSet, list[Problem]]:
             problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` が並びではない"))
             continue
         for i, raw in enumerate(raw_section):
-            rule, problem = _build(raw, name, i)
+            rule, problem = _build(raw, name, i, root)
             if problem is not None:
                 problems.append(problem)
                 continue
@@ -215,7 +246,9 @@ def parse(data: dict) -> tuple[RuleSet, list[Problem]]:
     return rule_set, problems
 
 
-def _build(raw: object, section: str, index: int) -> tuple[Rule, None] | tuple[None, Problem]:
+def _build(
+    raw: object, section: str, index: int, root: str = ""
+) -> tuple[Rule, None] | tuple[None, Problem]:
     from .globmatch import translate
 
     where = f"{section}[{index}]"
@@ -245,12 +278,21 @@ def _build(raw: object, section: str, index: int) -> tuple[Rule, None] | tuple[N
             SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
         )
 
-    expression = rule.regex or translate(rule.glob)
-
+    # `{root}` は根の実パスに置き換える。書いた綴り（rule.glob / rule.regex）は
+    # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた綴りを出す。
+    uses_root = ROOT_PLACEHOLDER in rule.regex or ROOT_PLACEHOLDER in rule.glob
+    if uses_root and not root:
+        return None, Problem(SEVERITY_ERROR, name, f"`{ROOT_PLACEHOLDER}` を使うには判定の根が要る")
     if rule.regex:
         unsupported = _unsupported(rule.regex)
         if unsupported:
             return None, Problem(SEVERITY_ERROR, name, f"{unsupported}は使えない")
+        expression = (
+            rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
+        )
+    else:
+        glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
+        expression = translate(glob)
 
     try:
         rule.compiled = re.compile(expression)

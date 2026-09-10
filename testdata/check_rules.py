@@ -40,7 +40,12 @@ def judge(rules_path: str, tool: str, subject: str) -> tuple[str, str]:
             ROOT,
             "--rules",
             rules_path,
-            "--ledger",
+            # 見るのはルールだけ。写しと控えは外し、記録も残さない。
+            "--approved",
+            "",
+            "--state",
+            "",
+            "--log",
             "",
             "--test",
             tool,

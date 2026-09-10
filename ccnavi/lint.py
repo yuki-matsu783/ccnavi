@@ -165,7 +165,7 @@ def check(
 
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
-    problems.extend(_rules(conf.rules))
+    problems.extend(_rules(conf.rules, root))
     problems.extend(_phases(conf))
     problems.extend(_risk(conf))
     problems.extend(_ticket(conf, root))
@@ -237,7 +237,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     # 写しの置き場が守られているか。ルールが Write を止めていなければ、
     # エージェントが写しを書けて、承認の意味が無い。
     try:
-        rule_set, _ = rules.load(conf.rules)
+        rule_set, _ = rules.load(conf.rules, root)
     except (OSError, ValueError):
         rule_set = None
     probe = os.path.join(conf.approved, "probe.md")
@@ -574,14 +574,14 @@ def _project_settings(root: str) -> list[Problem]:
     return problems
 
 
-def _rules(path: str) -> list[Problem]:
+def _rules(path: str, root: str = "") -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
     落ちるという、検証があるぶんかえって危ない形になる。
     """
     try:
-        rule_set, problems = rules.load(path)
+        rule_set, problems = rules.load(path, root)
     except (OSError, ValueError) as exc:
         # block モードではこれがそのまま全ツール呼び出しの拒否になり、
         # このファイルを直すための呼び出しも止まる。いちばん重い error。

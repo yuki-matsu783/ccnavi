@@ -15,6 +15,8 @@
 ### ソースコード編集方法
 
 - 他セッションでも並行して作業が進められるよう、worktreeを使って作業すること
+- main の作業ツリーでの Write / Edit はルール（`main-tree`）が止める。編集は必ず worktree の中で
+  行う。worktree の中でも `.claude/settings.json`・hook・スクリプト・写しは触らない
 
 #### worktree の作り方
 

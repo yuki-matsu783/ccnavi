@@ -13,6 +13,21 @@
 # 答えが変わる。
 
 deny:
+  - tool: Write
+    subject: "/repo/README.md"
+    why: main の作業ツリーでは編集しない。作業は worktree の中で
+  - tool: Edit
+    subject: "/repo/ccnavi/cli.py"
+    why: 同上。ソースも main では触らない
+  - tool: Write
+    subject: "/repo/.gitignore"
+    why: 隠しファイルも同じ
+  - tool: Write
+    subject: "/repo/.claude/skills/commit/SKILL.md"
+    why: .claude/ の下も worktrees/ 以外は main では触らない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/.claude/settings.json"
+    why: worktree の中でも hook の登録は触らない
   - tool: Bash
     subject: "git push origin main"
     why: エージェントからは push しない
@@ -115,11 +130,11 @@ deny:
 
 ask:
   - tool: Bash
-    subject: "sh .claude/scripts/ccnavi-git.sh commit -m 'x'"
-    why: コミットは 1 回ごとに人が見る。通る道はラッパだけなので錨もそちらに打つ
+    subject: "sh .claude/scripts/ccnavi-git.sh push -u origin i0001"
+    why: push は 1 回ごとに人が見る。通る道はラッパだけなので錨もそちらに打つ
   - tool: Write
-    subject: "/repo/pyproject.toml"
-    why: 実行時の依存が変わる
+    subject: "/repo/.claude/worktrees/x/pyproject.toml"
+    why: 実行時の依存が変わる。main の側は deny なので作業ツリーで見る
   - tool: Bash
     subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_BIN_PATH' .claude/settings.json"
     why: >-
@@ -129,8 +144,8 @@ ask:
       jq を足せば通るが、それは網を広げる別の判断なので、ここでは当たり方を
       そのまま記録する
   - tool: Write
-    subject: "/repo/.current-ticket.md"
-    why: 作業範囲の提案。承認は別の経路
+    subject: "/repo/.claude/worktrees/x/.current-ticket.md"
+    why: 作業範囲の提案。承認は別の経路。main の側は deny なので作業ツリーで見る
   - tool: Bash
     subject: "curl https://example.com"
     why: どのルールも言及していない。--test は人が居るモードを前提に判定するので確認になる
@@ -170,14 +185,17 @@ allow:
     subject: "/repo/README.md"
     why: 読み取りは通す
   - tool: Write
-    subject: "/repo/ccnavi/cli.py"
-    why: このプロジェクトのソース
+    subject: "/repo/.claude/worktrees/x/ccnavi/cli.py"
+    why: 作業ツリーの中のソース。main の側は deny
   - tool: Write
-    subject: "/repo/tests/test_glob.py"
+    subject: "/repo/.claude/worktrees/x/tests/test_glob.py"
     why: 同上
   - tool: Write
-    subject: "/repo/README.md"
-    why: 同上
+    subject: "/repo/.claude/worktrees/x/README.md"
+    why: 同上。文書も作業ツリーで直して main に戻す
+  - tool: Edit
+    subject: "/repo/.claude/worktrees/x/.claude/ccnavi/rules.yml"
+    why: ルールも作業ツリーで直す。効くのは main の側なので、戻すまで変わらない
   - tool: Bash
     subject: "cat /repo/.claude/ccnavi/rules.yml"
     why: ガードの設定は読むほうが普通。名前が出ただけでは止めない
