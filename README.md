@@ -241,6 +241,8 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_APPROVED` | 承認済みの写しの置き場。main の根からの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
 | `CCNAVI_PHASES` | フェーズの種類の定義。main の根からの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
 | `CCNAVI_RISK` | 実績で測るリスクの配点。main の根からの相対。既定は `.claude/ccnavi/risk.yml`。無ければ組み込みの配点 |
+| `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §25）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、この機能が入る前と同じに動く |
+| `CCNAVI_PROJECT_RULES` | プロジェクトごとのルールファイル。各プロジェクトルート（`.git` のある場所）からの相対。既定は `config/rules.yml`。パスを持つツールは行き先のプロジェクトのルールで判定し、Bash はワークスペースと全プロジェクトのルールの和で判定する |
 | `CCNAVI_GUARD_CLI` | `enable`（既定）、`disable`。人の判断の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_CCNAVI_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -706,6 +708,7 @@ frontmatter は rules.yml と同じ区画（`deny` / `ask` / `allow`）。効く
 version: 1
 ticket: i0050-03
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
+project: lib             # 親だけ。projects/ の名前。子は承認で親から継ぐ。省けばワークスペース自身の作業
 parent: i0050            # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つの束
 predecessors: [i0050-01] # 先に閉じているべき子。案内にだけ使う
