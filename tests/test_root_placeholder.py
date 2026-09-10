@@ -1,7 +1,8 @@
-"""ルールの `{root}` が判定の根に置き換わることの受入テスト。道具を外から叩いて応答だけを見る。
+"""ルールの `{root}` がワークスペースルートに置き換わることの受入テスト。
+道具を外から叩いて応答だけを見る。
 
-「根の下で、かつ .claude/worktrees/ の外」を止めるルールが、main の側では止め、
-作業ツリーの中では止めず、プロジェクトの外には何も言わないこと。
+「ワークスペースルートの下で、かつ .claude/worktrees/ の外」を止めるルールが、main の側では止め、
+作業ツリーの中では止めず、ワークスペースの外には何も言わないこと。
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ class RootPlaceholderTest(unittest.TestCase):
                             "id": "wip",
                             "match": "Write",
                             "glob": "{root}/wip/*",
-                            "message": "glob でも根を指せる",
+                            "message": "glob でもワークスペースルートを指せる",
                         },
                     ],
                     "allow": [
