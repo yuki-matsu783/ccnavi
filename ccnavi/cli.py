@@ -156,6 +156,7 @@ The parent agent moves tickets between states and asks for reviews through the
 scripts in .claude/scripts/, which call
 
     ccnavi ticket start|done|cancel <id> [--reason <why>]
+    ccnavi ticket judge <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review check     --cwd <dir> --phase N --result <json>
@@ -202,6 +203,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--tickets", default="")
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
+    parser.add_argument("--risk", default=None)
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", default="")
@@ -238,6 +240,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.approved = args.approved
     if args.phases is not None:
         conf.phases = args.phases
+    if args.risk is not None:
+        conf.risk = args.risk
     conf.guard_cli = selfguard.resolve(
         stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
     )
@@ -437,6 +441,12 @@ def operate(
             code = ops.done(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
+    elif kind == "ticket" and verb == "judge":
+        # ticket judge <子> <項目> yes|no --reason <根拠>
+        if len(words) < 5:
+            stderr.write("ccnavi: ticket judge には <子> <項目> yes|no と --reason <根拠> が要る\n")
+        else:
+            code = ops.judge(stdout, stderr, root, conf, words[2], words[3], words[4], args.reason)
     elif kind == "review" and verb == "prepare":
         if args.phase is None or not args.body_file:
             stderr.write("ccnavi: review prepare には --phase <N> と --body-file <path> が要る\n")

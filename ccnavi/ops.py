@@ -76,10 +76,17 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         return 1
     if _deliverables_missing(stderr, root, conf, found):
         return 1
+    # 子は、閉じる前に実績のリスクを数える（risk.py）。定性項目の判定が揃わなければ閉じない。
+    scored = _score_child(stdout, stderr, root, conf, found)
+    if scored is None:
+        return 1
     fields = {"completed_at": approval.now()}
     code = _move(
         stdout, stderr, conf, found, ticket_mod.DONE, fields, f"完了 {fields['completed_at']}"
     )
+    if code == 0 and scored:
+        for line in scored:
+            stdout.write(line + "\n")
     if code == 0 and not found.is_child:
         # 親を閉じた。マージに進んでよいの合図（Draft を外す）は、まだなら親が出す。
         # マージそのものは人。
@@ -117,6 +124,143 @@ def cancel(
     return _move(
         stdout, stderr, conf, found, ticket_mod.CANCELLED, fields, f"取り消し: {reason.strip()}"
     )
+
+
+def judge(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    ticket_id: str,
+    factor_id: str,
+    answer: str,
+    reason: str,
+) -> int:
+    """定性のリスク項目の判定を記録する。判断したのはサブエージェント、記録するのは親。
+
+    判定は子の HEAD に結ぶ。HEAD が動いたら判定は古く、閉じるときに取り直しになる。
+    """
+    from . import risk
+
+    answer = answer.strip().lower()
+    if answer not in ("yes", "no"):
+        stderr.write("ccnavi: 判定は yes か no\n")
+        return 1
+    if not reason.strip():
+        stderr.write("ccnavi: judge には --reason <根拠> が要る\n")
+        return 1
+    found = _find(stderr, root, conf, ticket_id)
+    if found is None:
+        return 1
+    if not found.is_child:
+        stderr.write(f"ccnavi: {ticket_id} は子ではない。判定は子の差分に付ける\n")
+        return 1
+    definition = risk.load_definition(conf)
+    factor = definition.factor(factor_id)
+    if factor is None or factor.kind != risk.KIND_JUDGE:
+        names = ", ".join(f.id for f in definition.judges) or "(無い)"
+        stderr.write(
+            f"ccnavi: {factor_id} は定性の項目ではない（{definition.source}）。あるのは: {names}\n"
+        )
+        return 1
+    worktree = tree.worktree_path(root, ticket_id)
+    head = _head(worktree)
+    if not head:
+        stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
+        return 1
+    record = (
+        approval.read_child_record(
+            conf.approved, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE
+        )
+        or {}
+    )
+    record[factor_id] = {
+        "hit": answer == "yes",
+        "reason": reason.strip(),
+        "head": head,
+        "at": approval.now(),
+    }
+    failed = approval.write_child_record(
+        conf.approved, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE, record
+    )
+    if failed:
+        stderr.write(f"ccnavi: 判定を記録できない: {failed}\n")
+        return 1
+    stdout.write(
+        f"OK: {ticket_id} の {factor_id} を {answer} と記録した"
+        f"（{'+' + str(factor.points) if answer == 'yes' else '加点なし'}、HEAD {head[:12]}）\n"
+    )
+    return 0
+
+
+def _score_child(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> list[str] | None:
+    """子の実績のリスクを数えて記録する。閉じられなければ None。
+
+    返すのは、閉じたあとに出す行（点と内訳）。親は数えない。
+    """
+    from . import risk
+
+    if not found.is_child:
+        return []
+    worktree = tree.worktree_path(root, found.ticket)
+    definition = risk.load_definition(conf)
+    if definition.fallback:
+        stderr.write(f"ccnavi: {definition.fallback}\n")
+    diff, why = risk.measure(worktree, found.base_sha)
+    if diff is None:
+        stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
+        return None
+    judgements = (
+        approval.read_child_record(
+            conf.approved, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE
+        )
+        or {}
+    )
+    env = {
+        "CCNAVI_BASE_SHA": diff.base,
+        "CCNAVI_HEAD": diff.head,
+        "CCNAVI_TICKET": found.ticket,
+        "CCNAVI_PARENT": found.parent,
+    }
+    score = risk.evaluate(definition, diff, root, worktree, env, judgements)
+    if score.pending:
+        prompt = risk.judge_prompt(found.ticket, found.parent, diff, score.pending, worktree)
+        where = ""
+        if conf.state:
+            path = os.path.join(conf.state, f"risk-judge-{found.ticket}.md")
+            try:
+                os.makedirs(conf.state, exist_ok=True)
+                with open(path, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(prompt)
+                where = path
+            except OSError as exc:
+                stderr.write(f"ccnavi: 問いを書き出せない ({exc})\n")
+        names = ", ".join(f.id for f in score.pending)
+        stderr.write(
+            f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
+            "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
+            f"'sh .claude/scripts/ccnavi-ticket.sh judge {found.ticket} <項目> yes|no "
+            "--reason <根拠>' で記録してから閉じ直すこと\n"
+        )
+        if where:
+            stderr.write(f"  問い: {where}\n")
+        return None
+    record = score.as_dict()
+    record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
+    record["summary"] = diff.summary()
+    failed = approval.write_child_record(
+        conf.approved, found.parent, found.ticket, approval.CHILD_RECORD_RISK, record
+    )
+    if failed:
+        stderr.write(f"ccnavi: リスクを記録できない: {failed}\n")
+        return None
+    lines = score.lines()
+    lines[0] += f"（{diff.summary()}、配点 {definition.source}）"
+    if score.level in risk.ESCALATE_FROM:
+        lines.append("  実績のリスクが高いので、宣言に関わらずこのフェーズは人間レビューが要る")
+    return lines
 
 
 def _find(

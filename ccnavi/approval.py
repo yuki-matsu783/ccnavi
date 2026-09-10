@@ -46,24 +46,6 @@ MARK_SKIPPED = "skipped"
 MARK_PENDING = "pending"
 MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
 
-# リスクの段階。設計 §17.3 の表。
-LEVELS = ((70, "CRITICAL"), (40, "HIGH"), (20, "MEDIUM"), (0, "LOW"))
-HIGH_RISK = 40
-
-# 高影響領域。ここへの書き込みは、実行環境・CI・エージェント定義に波及する。
-HIGH_IMPACT = (".claude", ".github", ".git", "ci", "Dockerfile", ".gitlab-ci.yml")
-
-POINTS_NEW_SCOPE = 5
-POINTS_HIGH_IMPACT = 35
-POINTS_PROJECT_ROOT = 30
-POINTS_GUARDED = 25
-
-UNSCORED = (
-    "expected_roots（想定委譲範囲）との照合",
-    "sandbox_root の外かどうか",
-    "ツール権限と確認の記憶の緩和",
-)
-
 
 def copy_path(approved_dir: str, ticket_id: str) -> str:
     return os.path.join(approved_dir, ticket_id + ".md")
@@ -108,20 +90,18 @@ def load_copy(path: str) -> ticket_mod.Ticket | None:
     ticket.approved_at = str(meta.get("approved_at") or "")
     ticket.source_tree = str(meta.get("source_tree") or "")
     ticket.source_path = str(meta.get("source_path") or "")
-    ticket.risk = meta.get("risk") if isinstance(meta.get("risk"), int) else 0
     ticket.tree = ticket.source_tree
     return ticket
 
 
 def write_copy(
-    approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, risk: int, approved_at: str
+    approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approved_at: str
 ) -> str:
     """承認した提案を写す。書けなかった理由を返す。書けたら空文字。"""
     meta = {
         "approved_at": approved_at,
         "source_tree": source_tree,
         "source_path": ticket.path,
-        "risk": risk,
     }
     return _write(
         copy_path(approved_dir, ticket.ticket),
@@ -218,6 +198,33 @@ def write_parent_mark(approved_dir: str, parent: str, name: str, data: dict) -> 
     )
 
 
+# 子ごとの記録。実績のリスク（閉じるときに数えた点）と、定性項目の判定。
+#   phases/<親>/<子>.risk.json   {points, level, hits, unmeasured, head, at}
+#   phases/<親>/<子>.judge.json  {<項目>: {hit, reason, head, at}}
+CHILD_RECORD_RISK = "risk"
+CHILD_RECORD_JUDGE = "judge"
+
+
+def child_record_path(approved_dir: str, parent: str, child: str, kind: str) -> str:
+    return os.path.join(approved_dir, PHASES_DIR, parent, f"{child}.{kind}.json")
+
+
+def read_child_record(approved_dir: str, parent: str, child: str, kind: str) -> dict | None:
+    try:
+        with open(child_record_path(approved_dir, parent, child, kind), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else {}
+
+
+def write_child_record(approved_dir: str, parent: str, child: str, kind: str, data: dict) -> str:
+    return _write(
+        child_record_path(approved_dir, parent, child, kind),
+        json.dumps(data, ensure_ascii=False, indent=1),
+    )
+
+
 # 人が受け入れたスレッドの控え。フェーズの印とは別の場所に、親ごとに 1 つ置く。
 ACCEPTED_FILE = "accepted.json"
 
@@ -273,47 +280,15 @@ def now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
-def score(
-    proposed: ticket_mod.Ticket, rule_set: rules.RuleSet, tree_root: str
-) -> tuple[int, list[str]]:
-    """親のリスクを数え、加点した理由を人の読める形で返す。
-
-    子は数えない。親の部分集合なので、新たに書けるようになる領域は無い。
-    """
-    points = 0
-    why: list[str] = []
-    for path in sorted(proposed.paths(rules.ALLOW) + proposed.paths(rules.ASK)):
-        points += POINTS_NEW_SCOPE
-        why.append(f"+{POINTS_NEW_SCOPE} 書き込み範囲 `{path}`")
-        if path in ("", ".", "*", "**"):
-            points += POINTS_PROJECT_ROOT
-            why.append(f"+{POINTS_PROJECT_ROOT} `{path}` は作業ツリー全体を開ける")
-            continue
-        head = path.split("/")[0]
-        if head in HIGH_IMPACT or path.endswith(".tf"):
-            points += POINTS_HIGH_IMPACT
-            why.append(f"+{POINTS_HIGH_IMPACT} `{path}` は実行環境・CI・エージェント定義に波及する")
-        guarded = _guarded_by(path, rule_set, tree_root)
-        if guarded:
-            points += POINTS_GUARDED
-            why.append(f"+{POINTS_GUARDED} `{path}` はルール {guarded} が守っている場所を含む")
-    return points, why
-
-
-def level(points: int) -> str:
-    for threshold, name in LEVELS:
-        if points >= threshold:
-            return name
-    return LEVELS[-1][1]
-
-
 @dataclass
 class Candidate:
-    """承認の束の 1 件。新規の提案か、親の改版か。"""
+    """承認の束の 1 件。新規の提案か、親の改版か。
+
+    リスクの点はここに無い。宣言の広さで数える点はやめた。点は子を閉じるときに
+    実績（差分）で数える（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
+    """
 
     ticket: ticket_mod.Ticket
-    points: int = 0
-    why: list[str] = field(default_factory=list)
     complaints: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている写し。
     current: ticket_mod.Ticket | None = None
@@ -412,8 +387,7 @@ def approve(
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        points, why = (0, []) if t.is_child else score(t, rule_set, t.tree_root)
-        batch.append(Candidate(ticket=t, points=points, why=why, complaints=complaints))
+        batch.append(Candidate(ticket=t, complaints=complaints))
 
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
@@ -423,25 +397,11 @@ def approve(
         return 1
 
     stdout.write(screen(batch, pool, types) + "\n\n")
-    total = max(c.points for c in batch)
-    if total >= HIGH_RISK:
-        # 鍵は最も重い親の識別子。識別子順の先頭にすると、軽い親の識別子を
-        # 打つだけで重い親まで束ごと通る。
-        key = max(batch, key=lambda c: c.points).ticket.ticket
-        stdout.write(
-            f"⚠ リスクスコア {total} ({level(total)})。ワンキーでは承認できない。\n"
-            f"  承認するなら識別子を入力: [{key}] "
-        )
-        stdout.flush()
-        if _read(stdin).strip() != key:
-            stderr.write("ccnavi: 識別子が一致しないので承認しなかった\n")
-            return 1
-    else:
-        stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
-        stdout.flush()
-        if _read(stdin).strip().lower() not in ("y", "yes"):
-            stderr.write("ccnavi: 承認しなかった\n")
-            return 1
+    stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
+    stdout.flush()
+    if _read(stdin).strip().lower() not in ("y", "yes"):
+        stderr.write("ccnavi: 承認しなかった\n")
+        return 1
 
     stamp = now()
     for cand in batch:
@@ -464,7 +424,7 @@ def approve(
                     "フィードバック作業フェーズの check が数える\n"
                 )
             continue
-        failed = write_copy(conf.approved, t, t.tree, cand.points, stamp)
+        failed = write_copy(conf.approved, t, t.tree, stamp)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return 1
@@ -549,15 +509,10 @@ def screen(
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
         lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
-        if not t.is_child:
-            lines.append(f"■ リスクスコア: {cand.points} ({level(cand.points)})")
-            lines += [f"    {line}" for line in cand.why] or ["    加点なし"]
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
             lines.append("■ 記述のうち、判定に効かないもの")
             lines += [f"    {p.detail}" for p in warnings]
-    lines += ["", "■ このスコアが見ていないもの"]
-    lines += [f"    {item}" for item in UNSCORED]
     return "\n".join(lines)
 
 
@@ -867,13 +822,3 @@ def _write(path: str, text: str) -> str:
     except OSError as exc:
         return f"書けない ({exc})"
     return ""
-
-
-def _guarded_by(path: str, rule_set: rules.RuleSet, root: str) -> str:
-    probe = os.path.join(root, path.replace("/", os.sep).rstrip("*"), "probe")
-    hits = [
-        rule.id or "(id 無し)"
-        for rule in rule_set.deny + rule_set.ask
-        if any(rule.matches(tool, probe) for tool in ("Write", "Edit", "MultiEdit"))
-    ]
-    return ", ".join(sorted(set(hits)))

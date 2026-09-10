@@ -235,6 +235,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 review = f" / レビューは {ph.review_at} と一緒に"
             elif ph.covers:
                 review = f" / {', '.join(str(c) for c in ph.covers)} の分も見る"
+            if ph.risk_line:
+                review += f" / {ph.risk_line}"
+                if ph.risk_escalates:
+                    review += "（実績でレビュー要）"
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {gate}{review}\n"
             )

@@ -263,7 +263,6 @@ class Ticket:
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
-    risk: int = 0
 
     @property
     def is_child(self) -> bool:

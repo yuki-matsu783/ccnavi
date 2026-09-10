@@ -56,6 +56,8 @@ TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
 # PHASES_ENV はフェーズの種類の定義。main の根からの相対。無ければ番号だけの挙動。
 PHASES_ENV = "CCNAVI_PHASES"
+# RISK_ENV は実績で測るリスクの配点。main の根からの相対。無ければ組み込みの配点。
+RISK_ENV = "CCNAVI_RISK"
 # 以前の形（チケット 1 本と台帳 jsonl）の環境変数。もう効かない。指定されていたら
 # --lint が言う。黙って無視すると、書いた人は効いていると思い続ける。
 RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER")
@@ -83,6 +85,8 @@ DEFAULT_TICKETS = "wip/tickets"
 DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
 # フェーズの種類は人が持つ設定なので、写しと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
+# リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
+DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
 
 
 @dataclass
@@ -133,6 +137,8 @@ class Settings:
     approved: str = ""
     # phases はフェーズの種類の定義（絶対）。無ければフェーズは番号だけ。
     phases: str = ""
+    # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
+    risk: str = ""
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
     retired: list[str] = field(default_factory=list)
 
@@ -157,11 +163,15 @@ def load(root: str) -> tuple[Settings, list[str]]:
         tickets=DEFAULT_TICKETS,
         approved=os.path.join(root, DEFAULT_APPROVED),
         phases=os.path.join(root, DEFAULT_PHASES),
+        risk=os.path.join(root, DEFAULT_RISK),
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
     phases_env = os.environ.get(PHASES_ENV, "")
     if phases_env:
         settings.phases = _resolve(root, phases_env)
+    risk_env = os.environ.get(RISK_ENV, "")
+    if risk_env:
+        settings.risk = _resolve(root, risk_env)
 
     rules_env = os.environ.get(RULES_ENV, "")
     if rules_env:
@@ -219,6 +229,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.approved = _log_or_none(root, conf["approved"])
     if isinstance(conf.get("phases"), str) and conf["phases"]:
         settings.phases = _resolve(root, conf["phases"])
+    if isinstance(conf.get("risk"), str) and conf["risk"]:
+        settings.risk = _resolve(root, conf["risk"])
 
     return settings, problems
 

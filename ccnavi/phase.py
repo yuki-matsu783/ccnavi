@@ -45,7 +45,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # サブエージェントが親のツリーへ cd して打てばラッパは通すので、素性で止める層をここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|done|cancel|request|check|note|accept|handoff|ready|wrapup|push)\b"
+    r"(start|done|cancel|judge|request|check|note|accept|handoff|ready|wrapup|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -59,7 +59,8 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 経由せずに打てば止める。CCNAVI_GUARD_CLI で切れる。
 _CLI_FORMS = (
     r"(--approve\b|--reviewed\b"
-    r"|\b(ticket|review)\s+(start|done|cancel|prepare|requested|check|handoff|ready|wrapup)\b)"
+    r"|\b(ticket|review)\s+"
+    r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
 )
 CODE_CLI = "DENY_CCNAVI_CLI"
 CLI_RULE_ID = "builtin-guard-cli"
@@ -134,6 +135,35 @@ class Phase:
     item: ticket_mod.PlanItem | None = None
     type: phasetypes.PhaseType | None = None
     owner: ticket_mod.Ticket | None = None
+    # 子ごとの実績のリスク（閉じるときに数えた記録）。子の識別子 → 記録。
+    risks: dict[str, dict] = field(default_factory=dict)
+
+    @property
+    def risk(self) -> dict | None:
+        """このフェーズの実績のリスク。子の最大値。無ければ None。"""
+        best: dict | None = None
+        for record in self.risks.values():
+            if best is None or int(record.get("points") or 0) > int(best.get("points") or 0):
+                best = record
+        return best
+
+    @property
+    def risk_escalates(self) -> bool:
+        """実績のリスクが、宣言に関わらずレビューを要る扱いにする段階か。"""
+        from . import risk as risk_mod
+
+        record = self.risk
+        return record is not None and str(record.get("level") or "") in risk_mod.ESCALATE_FROM
+
+    @property
+    def risk_line(self) -> str:
+        """人向けの 1 行。`リスク: 58 (HIGH) — 行数が多い（…）、…`。無ければ空。"""
+        record = self.risk
+        if record is None:
+            return ""
+        hits = [str(h.get("detail") or "") for h in record.get("hits") or [] if isinstance(h, dict)]
+        text = f"リスク: {record.get('points', 0)} ({record.get('level', '')})"
+        return text + (" — " + "、".join(hits) if hits else "")
 
     @property
     def planned(self) -> bool:
@@ -189,6 +219,9 @@ class Phase:
         from_children = any(
             t.review_required for t in self.tickets if self.states.get(t.ticket) == ticket_mod.DONE
         )
+        # 実績のリスクは、宣言を厳しい側にだけ上書きする（risk.py）。
+        if self.risk_escalates:
+            return True
         if not self.planned:
             return from_children
         by_type = self.type is not None and self.type.review == phasetypes.REVIEW_MR
@@ -269,6 +302,12 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         phase.states[t.ticket] = state
     for phase in by_number.values():
         phase.marks = approval.marks(conf.approved, parent_id, phase.number)
+        for t in phase.tickets:
+            record = approval.read_child_record(
+                conf.approved, parent_id, t.ticket, approval.CHILD_RECORD_RISK
+            )
+            if record:
+                phase.risks[t.ticket] = record
     return [by_number[n] for n in sorted(by_number)]
 
 
@@ -298,6 +337,8 @@ def gate_reason(phase: Phase, tool: str) -> str:
     marks = "依頼済み" if approval.MARK_REQUESTED in phase.marks else "未依頼"
     n = phase.number
     why = "人間レビューが要る子を含みます" if not phase.planned else "レビューが要るフェーズです"
+    if phase.risk_escalates:
+        why = f"実績のリスクが高い（{phase.risk_line}）ので、宣言に関わらずレビューが要ります"
     return "\n".join(
         [
             f"[ccnavi] {CODE_GATE} (parent: {phase.parent}, phase: {n}, {marks})",
@@ -344,6 +385,11 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 else ""
             )
             who = f"人間レビュー要の子: {', '.join(required)}。" if required else ""
+            if phase.risk_escalates:
+                who += "実績のリスクが高いので、宣言に関わらずレビューが要ります"
+                who += f"（{phase.risk_line}）。"
+            elif phase.risk_line:
+                who += f"{phase.risk_line}。"
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
                 f"子の成果を親ブランチへ合流して push し、"
@@ -362,8 +408,9 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+            risk_note = f"{phase.risk_line}。" if phase.risk_line else ""
             texts.append(
-                f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
+                f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"
                 "レビューは不要なので、省略して次へ進めます。省略した事実は記録に残しました。"
                 + _next_hint(parent, phases, n)
             )

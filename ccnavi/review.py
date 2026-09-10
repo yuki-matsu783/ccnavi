@@ -901,17 +901,30 @@ def _write_text(path: str, text: str) -> str:
 def _covered_header(
     root: str, conf: settings.Settings, parent: ticket_mod.Ticket, ph: phase.Phase
 ) -> str:
-    """依頼文の先頭に置く「このレビューが含むフェーズ」。計画が無ければ空。"""
-    if not parent.has_plan:
-        return ""
+    """依頼文の先頭に置く「このレビューが含むフェーズ」と「このレビューのリスク」。
+
+    リスクの行は、レビュアーが「なぜこのフェーズにレビューが要ることになったか」を
+    依頼文で読めるように、実績の点と加点した理由を機械が書く（risk.py）。
+    """
     numbers = [*ph.covers, ph.number]
     labels = []
+    risks = []
     for p in phase.phases_of(root, conf, parent.ticket):
         if p.number in numbers:
             labels.append(p.label)
-    if len(labels) <= 1 and not ph.covers:
-        return f"このレビューが含むフェーズ: {ph.label}\n\n"
-    return "このレビューが含むフェーズ: " + "、".join(labels) + "\n\n"
+            if p.risk_line:
+                risks.append(f"{p.label}: {p.risk_line}" if len(numbers) > 1 else p.risk_line)
+    head = ""
+    if parent.has_plan:
+        if len(labels) <= 1 and not ph.covers:
+            head = f"このレビューが含むフェーズ: {ph.label}\n"
+        else:
+            head = "このレビューが含むフェーズ: " + "、".join(labels) + "\n"
+    if risks:
+        head += "このレビューのリスク: " + " / ".join(risks) + "\n"
+        if ph.risk_escalates:
+            head += "（実績のリスクが高いので、宣言に関わらずレビューが要る扱い）\n"
+    return head + "\n" if head else ""
 
 
 def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:

@@ -167,8 +167,19 @@ def check(
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules))
     problems.extend(_phases(conf))
+    problems.extend(_risk(conf))
     problems.extend(_ticket(conf, root))
     return problems
+
+
+def _risk(conf: settings.Settings) -> list[Problem]:
+    """リスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。"""
+    from . import risk
+
+    if not conf.risk:
+        return []
+    _, notes = risk.load(conf.risk)
+    return [Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}") for p in notes]
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
