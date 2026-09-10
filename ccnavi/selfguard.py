@@ -19,7 +19,7 @@
 懸かっているものに限る。それ以外は `deny` に書いて、ルール由来の保護
 （`CCNAVI_RESTORE_IF_DENY`）に任せる。切りたいプロジェクトが切れる側に置く。
 
-## 作業ツリーの中の写しも同じ 3 つ
+## 作業ツリーの中の写しも同じ扱い
 
 この 3 つは追跡されているので、`.claude/worktrees/<名前>/` の中にも複製が入る。
 写しは今この瞬間には誰にも読まれない。hook の登録を読むのはセッションを起こした
@@ -33,8 +33,11 @@
 git の変更一覧にも出てこない。止める側も気づく側も無いまま、時間差で効く道になる。
 
 守る場所は増えるが、守る対象の種類は増えていない。上の 3 つが、それぞれの
-作業ツリーにもう 1 つずつ在るというだけ。実行ファイルだけは写しを持たない。
-置き場が `.gitignore` の中にあり、統合で main へ入る道が無い。
+作業ツリーにもう 1 つずつ在るというだけ。プロジェクトごとのルールファイルも
+同じで、root の下に在れば同じ道を持つ。
+
+実行ファイルだけは写しを持たない。置き場が `.gitignore` の中にあり、統合で
+main へ入る道が無い。
 
 ## なぜ控えを実行前に取るか
 
@@ -404,14 +407,16 @@ def targets(
     if bin_path:
         full = os.path.realpath(bin_path)
         found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))
-    found.extend(_worktree_copies(root, rules_path))
+    found.extend(_worktree_copies(root, rules_path, project_rules))
     return found
 
 
-def _worktree_copies(root: str, rules_path: str) -> list[Target]:
+def _worktree_copies(
+    root: str, rules_path: str, project_rules: list[tuple[str, str]] = ()
+) -> list[Target]:
     """作業ツリーの中にある、同じ設定ファイルの写し。
 
-    なぜ守るかは冒頭の「作業ツリーの中の写しも同じ 3 つ」に書いた。ここでは
+    なぜ守るかは冒頭の「作業ツリーの中の写しも同じ扱い」に書いた。ここでは
     対象の組み立て方だけ。
 
     作業ツリーの一覧は `tree.worktrees` から取る。`.claude/worktrees/` の下に
@@ -419,15 +424,22 @@ def _worktree_copies(root: str, rules_path: str) -> list[Target]:
     両向きに揃ったものだけを数える。参照実装の写しのような、ただの
     ディレクトリを守りに行かないため。git は起こさないので、呼び出しごとに
     通っても外部プロセスは増えない。
+
+    ルールファイルの置き場は設定で動く。root の外を指しているなら、作業ツリーの
+    中に対応する写しは無いので、そこは対象から落ちる。プロジェクトごとの
+    ルールファイルも同じ扱いで、root の下に在るぶんだけ写しを守る。
     """
+    places = [*_SETTINGS_FILES]
     inside = _inside(root, rules_path)
+    if inside:
+        places.append(("rules", inside))
+    for name, path in project_rules:
+        rel = _inside(root, path)
+        if rel:
+            places.append((f"rules:{name}", rel))
+
     copies = []
     for work in tree.worktrees(root):
-        places = [*_SETTINGS_FILES]
-        if inside:
-            # ルールファイルの置き場は設定で動く。root の外を指しているなら、
-            # 作業ツリーの中に対応する写しは無い。
-            places.append(("rules", inside))
         for key, rel in places:
             full = os.path.realpath(os.path.join(work.root, rel))
             copies.append(
