@@ -19,6 +19,23 @@
 懸かっているものに限る。それ以外は `deny` に書いて、ルール由来の保護
 （`CCNAVI_RESTORE_IF_DENY`）に任せる。切りたいプロジェクトが切れる側に置く。
 
+## 作業ツリーの中の写しも同じ 3 つ
+
+この 3 つは追跡されているので、`.claude/worktrees/<名前>/` の中にも複製が入る。
+写しは今この瞬間には誰にも読まれない。hook の登録を読むのはセッションを起こした
+プロジェクトルートの側で、判定の根も `CLAUDE_PROJECT_DIR` に留まるから、作業ツリーの
+中の `settings.json` を書き換えても、その場では何も変わらない。
+
+それでも守るのは、写しが main へ入る道を持っているから。作業ツリーで書き換えて
+ブランチを統合すれば、そのまま main の hook の登録とルールになる。実行前の `deny` は
+「今の 1 回」を止めるが、統合は別の日の別のセッションが行うので、そこには届かない。
+しかも main の側と違って、作業ツリーは `.gitignore` の中にあり、実行後の監視が読む
+git の変更一覧にも出てこない。止める側も気づく側も無いまま、時間差で効く道になる。
+
+守る場所は増えるが、守る対象の種類は増えていない。上の 3 つが、それぞれの
+作業ツリーにもう 1 つずつ在るというだけ。実行ファイルだけは写しを持たない。
+置き場が `.gitignore` の中にあり、統合で main へ入る道が無い。
+
 ## なぜ控えを実行前に取るか
 
 実行後に git へ聞く形だと、戻す先が「コミット済みの内容」になる。利用者が
@@ -80,7 +97,7 @@ import time
 from dataclasses import dataclass
 from typing import TextIO
 
-from . import gitstate, rules
+from . import gitstate, rules, tree
 
 # 設定の値。mode と同じ語彙にしてある。覚えるものを増やさないため。
 ENABLE = "enable"
@@ -237,6 +254,11 @@ class Target:
     # 判定に張った期限に効く。控えはセッション開始で 1 度だけ取り、
     # 突き合わせは大きさと更新時刻で行う。
     heavy: bool = False
+    # top は、この対象を git から戻すときに渡す作業ツリーの根。作業ツリーの
+    # 中の写しだけが持つ。空なら root の側から戻す。main の git に
+    # `.claude/worktrees/...` を聞いても、そこは `.gitignore` の中なので
+    # 何も持っていない。写しを持っているのは、その作業ツリー自身の git。
+    top: str = ""
 
 
 @dataclass
@@ -333,7 +355,70 @@ def targets(root: str, rules_path: str, bin_path: str = "") -> list[Target]:
     if bin_path:
         full = os.path.realpath(bin_path)
         found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))
+    found.extend(_worktree_copies(root, rules_path))
     return found
+
+
+def _worktree_copies(root: str, rules_path: str) -> list[Target]:
+    """作業ツリーの中にある、同じ設定ファイルの写し。
+
+    なぜ守るかは冒頭の「作業ツリーの中の写しも同じ 3 つ」に書いた。ここでは
+    対象の組み立て方だけ。
+
+    作業ツリーの一覧は `tree.worktrees` から取る。`.claude/worktrees/` の下に
+    在るだけでは作業ツリーと呼ばず、`.git` ファイルと main の登録の相互参照が
+    両向きに揃ったものだけを数える。参照実装の写しのような、ただの
+    ディレクトリを守りに行かないため。git は起こさないので、呼び出しごとに
+    通っても外部プロセスは増えない。
+    """
+    inside = _inside(root, rules_path)
+    copies = []
+    for work in tree.worktrees(root):
+        places = [*_SETTINGS_FILES]
+        if inside:
+            # ルールファイルの置き場は設定で動く。root の外を指しているなら、
+            # 作業ツリーの中に対応する写しは無い。
+            places.append(("rules", inside))
+        for key, rel in places:
+            full = os.path.realpath(os.path.join(work.root, rel))
+            copies.append(
+                Target(
+                    key=_copy_key(key, work.name),
+                    path=full,
+                    label=_relative(root, full),
+                    top=work.root,
+                )
+            )
+    return copies
+
+
+def _copy_key(key: str, name: str) -> str:
+    """写しの控えの名前。
+
+    key はそのままファイル名になるので、作業ツリーの名前を素で混ぜると、
+    区切り文字の入った名前で控えが別の場所へ書かれる。潰した綴りだけにすると、
+    今度は `a/b` と `a_b` が同じ名前に落ちて、別の作業ツリーの控えを互いに
+    書き戻すことになる。中身が入れ替わるので、取り違えは実害になる。
+    潰した綴りに元の名前の digest を添えて、読めることと衝突しないことの
+    両方を取る。
+    """
+    digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
+    return f"{key}.{_UNSAFE.sub('_', name)[:40]}-{digest}"
+
+
+def _inside(root: str, path: str) -> str:
+    """root の下に在るなら root からの相対、外に在るなら空文字。"""
+    if not path:
+        return ""
+    rel = _relative(os.path.realpath(root), os.path.realpath(path))
+    if os.path.isabs(rel) or rel == os.pardir or rel.startswith(os.pardir + os.sep):
+        return ""
+    return rel
+
+
+def _top(root: str, target: Target) -> str:
+    """この対象を git から戻すときに渡す、作業ツリーの根。"""
+    return target.top or gitstate.top_level(root)
 
 
 def before(
@@ -792,6 +877,14 @@ def report(outcomes: list[Outcome]) -> str:
     ]
     for outcome in outcomes:
         lines.append(f"  {outcome.target.label}: {outcome.action} — {outcome.detail}")
+    if any(outcome.target.top for outcome in outcomes):
+        # 作業ツリーの中の写しが混じっている。今この瞬間の判定は変わらないので、
+        # 「何も起きていないのに戻された」と読まれる。時間差で効く道であることを
+        # 言わないと、次に同じ手が繰り返される。
+        lines.append(
+            "作業ツリーの中の写しは、その場では誰も読みませんが、統合すれば main の "
+            "hook の登録とルールになります。"
+        )
     lines.append(
         "変更が要るなら、何をなぜ変えたいのかを利用者に伝えて依頼してください。"
         "自分で書き換えると、次の呼び出しで同じように戻ります。"
@@ -812,7 +905,7 @@ def _recover_missing(setting: str, root: str, target: Target, saved: bytes | Non
         if failed:
             return Outcome(target, ACTION_FAILED, f"消えた対象を戻せない: {failed}")
         return Outcome(target, ACTION_RESTORED, "消えていたので、直前の内容に戻した")
-    top = gitstate.top_level(root)
+    top = _top(root, target)
     failed = gitstate.restore_committed(top, _relative(top, target.path).replace(os.sep, "/"))
     if failed:
         return Outcome(target, ACTION_MISSING, f"対象が無く、git からも戻せない: {failed}")
@@ -826,7 +919,7 @@ def _fall_back_to_git(setting: str, root: str, target: Target, now: bytes | None
     誰も触っていない、という回がここに来るので、そこで毎回 git restore を
     打つと、何も起きていない呼び出しがファイルに触ることになる。
     """
-    top = gitstate.top_level(root)
+    top = _top(root, target)
     changes, unreadable = gitstate.read(top)
     if unreadable:
         if now is None:
