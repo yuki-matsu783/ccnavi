@@ -101,6 +101,12 @@ APPROVAL_KEY = "ccnavi_approved"
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
 
+
+def _fold(path: str) -> str:
+    """比べるための綴り。大文字小文字を区別しない機械でだけ揃える。"""
+    return path.lower() if tree.CASE_INSENSITIVE else path
+
+
 # 範囲の判定。空文字は「言及していない」。
 OUTSIDE = ""
 
@@ -120,7 +126,10 @@ class Entry:
         if self.glob and not any(c in self.glob for c in _WILDCARDS):
             # ワイルドカードの無い綴りは前置。`src` が範囲なら `src` という
             # 名前のファイルも `src/` の下も中。そこだけ外に落ちるのは驚きでしかない。
-            return rel == self.glob or rel.startswith(self.glob + "/")
+            # 大文字小文字を区別しない機械では、綴りの違いは同じ場所を指すので
+            # 揃えてから比べる。区別する機械では別の場所なので、そのまま比べる。
+            here, there = _fold(rel), _fold(self.glob)
+            return here == there or here.startswith(there + "/")
         return self.compiled.match(rel) is not None
 
     def prefix(self) -> str:
@@ -613,8 +622,13 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
                 continue
             glob = glob.replace("\\", "/").strip("/")
             expression = regex or ("^" + globmatch.translate(glob))
+            # 大文字小文字を区別しない機械では、`src/Components/*` と
+            # `src/components/*` が同じ場所を指す。当てる側だけ区別すると、
+            # 宣言した範囲に自分のファイルが入らない、が起きる。regex は
+            # 書いた人が意図を持てるので、そこだけ区別したままにする。
+            flags = re.IGNORECASE if (tree.CASE_INSENSITIVE and not regex) else 0
             try:
-                compiled = re.compile(expression)
+                compiled = re.compile(expression, flags)
             except re.error as exc:
                 problems.append(Problem(SEVERITY_ERROR, name, f"{where} を式にできない: {exc}"))
                 continue

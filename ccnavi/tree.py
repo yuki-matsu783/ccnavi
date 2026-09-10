@@ -115,11 +115,18 @@ def tree_of(root: str, full: str) -> Tree | None:
 
 
 def relative(tree: Tree, full: str) -> str:
-    """作業ツリーの根からの相対。区切りは "/"。根そのものなら空文字。"""
+    """作業ツリーの根からの相対。区切りは "/"。根そのものなら空文字。
+
+    綴りの大文字小文字は元のまま返す。normcase を掛けた綴りから作ると、
+    区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と
+    書いた範囲に `readme.md` を当てることになって、永久に当たらない。
+    `os.path.relpath` は比較にだけ normcase を使い、返す綴りは元のままなので、
+    根（normcase 済み）と突き合わせても大文字小文字は保たれる。
+    """
     target = _canonical(full)
     if target == tree.root:
         return ""
-    return os.path.relpath(target, tree.root).replace(os.sep, "/")
+    return os.path.relpath(_resolved(full), tree.root).replace(os.sep, "/")
 
 
 def worktree_path(root: str, name: str) -> str:
@@ -155,10 +162,15 @@ def lookup(index: dict, name: str):
     return None
 
 
-def _canonical(path: str) -> str:
-    """同じ場所が同じ綴りになる形。大文字小文字は区別しない機械のために normcase。"""
+def _resolved(path: str) -> str:
+    """行き着く先。綴りの大文字小文字は元のまま。"""
     try:
         resolved = os.path.realpath(path)
     except OSError:
         resolved = os.path.abspath(path)
-    return os.path.normcase(os.path.normpath(resolved))
+    return os.path.normpath(resolved)
+
+
+def _canonical(path: str) -> str:
+    """同じ場所が同じ綴りになる形。大文字小文字は区別しない機械のために normcase。"""
+    return os.path.normcase(_resolved(path))
