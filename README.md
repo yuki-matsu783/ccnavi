@@ -169,6 +169,10 @@ Linux なら `dist/ccnavi/ccnavi`。単一ファイルの onefile は使わな�
 Claude Code の設定スキーマは独自のキーを受け付けないので、ここが唯一開いている場所になる。
 hook には実行ファイルだけを登録すればよい。
 
+下の形は `sh scripts/ccnavi-setup.sh <プロジェクト根>` が書く。何度打っても同じ形に
+落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに不足だけを
+見たいときは `--check`、既定を持つつまみも並べたいときは `--all` を付ける。
+
 ```json
 {
   "hooks": {
