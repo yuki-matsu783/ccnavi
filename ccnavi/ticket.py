@@ -312,7 +312,7 @@ class Ticket:
         return [e.glob or e.regex for e in self.entries if e.decision == decision]
 
     def decide(self, rel: str) -> str:
-        """このチケットが、作業ツリーの根からの相対パスをどう扱うか。
+        """このチケットが、作業ツリーのルートからの相対パスをどう扱うか。
 
         強い区画から見る。どこにも当たらなければ OUTSIDE で、それは範囲外。
         書いていない場所は範囲外、が子のファイルだけ読んで範囲が分かる条件。
@@ -804,7 +804,7 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
                     Problem(
                         SEVERITY_ERROR,
                         name,
-                        f"{where} の範囲 `{glob}` が絶対パス。作業ツリーの根からの相対で書く",
+                        f"{where} の範囲 `{glob}` が絶対パス。作業ツリーのルートからの相対で書く",
                     )
                 )
                 continue

@@ -363,7 +363,7 @@ class SelfGuardTest(unittest.TestCase):
         )
 
     def test_root_の外を指すルールファイルには写しが無い(self):
-        # 置き場がプロジェクトルートの外にあるなら、作業ツリーの中に対応する
+        # 置き場がワークスペースルートの外にあるなら、作業ツリーの中に対応する
         # 写しは無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
         self.worktree()
         outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")

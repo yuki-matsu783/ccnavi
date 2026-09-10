@@ -76,7 +76,7 @@ class PhaseType:
         return self.scope is None
 
     def decide(self, rel: str) -> str:
-        """この種類の範囲が、作業ツリーの根からの相対パスをどう扱うか。inherit なら常に中。"""
+        """この種類の範囲が、作業ツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
         if self.scope is None:
             return rules.ALLOW
         for entry in self.scope:

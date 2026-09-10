@@ -29,7 +29,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# 作業ツリーの置き場。CLAUDE.md の運用と対になる。プロジェクトルートの中に置くのは、
+# 作業ツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
 # セッションの道具と権限がそこまで届くようにするため。
 WORKTREES_DIR = os.path.join(".claude", "worktrees")
 
@@ -59,7 +59,7 @@ class Tree:
 
     @property
     def is_main(self) -> bool:
-        """チケットを持たないツリーか。ワークスペースルート とプロジェクトルート がこれ。"""
+        """チケットを持たないツリーか。ワークスペースルートと git プロジェクトルートがこれ。"""
         return self.kind != KIND_WORKTREE
 
 
@@ -126,7 +126,7 @@ def all_trees(root: str, projects_dir: str = "") -> list[Tree]:
 
 
 def project_root(projects_dir: str, project: str) -> str:
-    """この名前のプロジェクトルート。在るかどうかは見ない。空の名前はワークスペース（空文字）。"""
+    """この名前の git プロジェクトルート。無くても返す。空の名前はワークスペース（空文字）。"""
     return os.path.join(projects_dir, project) if project and projects_dir else ""
 
 
@@ -177,7 +177,7 @@ def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
 
 
 def relative(tree: Tree, full: str) -> str:
-    """作業ツリーの根からの相対。区切りは "/"。根そのものなら空文字。
+    """作業ツリーのルートからの相対。区切りは "/"。ルートそのものなら空文字。
 
     綴りの大文字小文字は元のまま返す。normcase を掛けた綴りから作ると、
     区別しない機械（Windows）では全部が小文字になり、チケットが `README.md` と

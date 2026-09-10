@@ -50,17 +50,17 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
 # チケットによる範囲の制御が使う 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
-# 根からの相対。APPROVED_ENV は承認済みの写しの置き場で、main の根からの相対。
+# 根からの相対。APPROVED_ENV は承認済みの写しの置き場で、ワークスペースルートからの相対。
 # 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
-# PHASES_ENV はフェーズの種類の定義。main の根からの相対。無ければ番号だけの挙動。
+# PHASES_ENV はフェーズの種類の定義。ワークスペースルートからの相対。無ければ番号だけの挙動。
 PHASES_ENV = "CCNAVI_PHASES"
-# RISK_ENV は実績で測るリスクの配点。main の根からの相対。無ければ組み込みの配点。
+# RISK_ENV は実績で測るリスクの配点。ワークスペースルートからの相対。無ければ組み込みの配点。
 RISK_ENV = "CCNAVI_RISK"
 # PROJECTS_ENV はプロジェクトの置き場（設計 §25）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
-# PROJECT_RULES_ENV はプロジェクトごとのルールファイル。各プロジェクトルートからの相対。
+# PROJECT_RULES_ENV はプロジェクトごとのルールファイル。各 git プロジェクトルートからの相対。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
 # 以前の形（チケット 1 本と台帳 jsonl）の環境変数。もう効かない。指定されていたら
@@ -75,7 +75,7 @@ OWN_PROJECT = "ccnavi"
 # 直しても影響が及ぶのは道具を試している本人だけになる。
 LOCAL_FILE = "ccnavi.settings.local.json"
 
-# 既定の置き場。プロジェクトルートからの相対。
+# 既定の置き場。ワークスペースルートからの相対。
 DEFAULT_LOG = os.path.join(".claude", "ccnavi", "log.jsonl")
 DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
@@ -83,7 +83,7 @@ DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
 # 提案は各作業ツリーの `wip/tickets/` に置く。人が読み、人が承認するものなので、
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
-# 区切りは "/" で持つ。作業ツリーの根に継ぎ足すときに os の区切りへ直す。
+# 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/tickets"
 # 写しは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
 # シェル経由の書き込みを止めている。写しのために別の保護を足さずに済む。
@@ -143,7 +143,7 @@ class Settings:
     # 「ccnavi の実体」として扱うことになるため。
     bin: str = ""
 
-    # tickets は提案の置き場（各作業ツリーの根からの相対、"/" 区切り）、
+    # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みの写しの置き場（絶対）。判定が読むのは approved だけ。
     # approved が空なら、チケットによる制御を使わない。
     tickets: str = ""
@@ -154,7 +154,7 @@ class Settings:
     risk: str = ""
     # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、この設定が
     # 入る前と同じに動く。project_rules は各プロジェクトのルールファイル
-    # （プロジェクトルートからの相対、"/" 区切り）。
+    # （git プロジェクトルートからの相対、"/" 区切り）。
     projects: str = ""
     project_rules: str = ""
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
@@ -271,7 +271,7 @@ def project_rules_path(conf: Settings, project_root: str) -> str:
 
 
 def _relative(path: str) -> str:
-    """提案の置き場の綴りを、作業ツリーの根からの相対に揃える。
+    """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
 
     絶対パスは受けない。作業ツリーごとに違う根に継ぎ足すものなので、
     絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが

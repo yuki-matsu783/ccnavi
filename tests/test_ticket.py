@@ -250,7 +250,7 @@ class TicketTest(unittest.TestCase):
     def test_scope_with_uppercase_still_matches(self):
         """大文字を含む範囲が当たること。
 
-        作業ツリーの根からの相対パスを normcase した綴りから作っていたので、
+        作業ツリーのルートからの相対パスを normcase した綴りから作っていたので、
         大文字小文字を区別しない機械では `README.md` が `readme.md` になり、
         `README.md` と書いた範囲に永久に当たらなかった。`Dockerfile` や
         `src/Components/*` も同じ。実物の GitLab で流れを通したときに出た。

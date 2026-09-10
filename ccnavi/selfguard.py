@@ -23,7 +23,7 @@
 
 この 3 つは追跡されているので、`.claude/worktrees/<名前>/` の中にも複製が入る。
 写しは今この瞬間には誰にも読まれない。hook の登録を読むのはセッションを起こした
-プロジェクトルートの側で、判定の根も `CLAUDE_PROJECT_DIR` に留まるから、作業ツリーの
+ワークスペースルートの側で、判定のルートも `CLAUDE_PROJECT_DIR` に留まるから、作業ツリーの
 中の `settings.json` を書き換えても、その場では何も変わらない。
 
 それでも守るのは、写しが main へ入る道を持っているから。作業ツリーで書き換えて
@@ -205,7 +205,7 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
 def project_rules_clause(projects_dir: str, project_rules: str) -> str:
     """プロジェクトのルールファイルの綴りを、当てる形に直す（設計 §25.6）。
 
-    置き場の名前と、プロジェクトルートからの相対を、間に任意の 1 語（プロジェクトの
+    置き場の名前と、 git プロジェクトルートからの相対を、間に任意の 1 語（プロジェクトの
     名前）を挟んで繋ぐ。`projects/<名前>/config/rules.yml` の形。区切りはどちらの
     綴りにも当てる。
     """
@@ -284,7 +284,7 @@ class Target:
     # 判定に張った期限に効く。控えはセッション開始で 1 度だけ取り、
     # 突き合わせは大きさと更新時刻で行う。
     heavy: bool = False
-    # top は、この対象を git から戻すときに渡す作業ツリーの根。作業ツリーの
+    # top は、この対象を git から戻すときに渡す作業ツリーのルート。作業ツリーの
     # 中の写しだけが持つ。空なら root の側から戻す。main の git に
     # `.claude/worktrees/...` を聞いても、そこは `.gitignore` の中なので
     # 何も持っていない。写しを持っているのは、その作業ツリー自身の git。
@@ -478,7 +478,7 @@ def _inside(root: str, path: str) -> str:
 
 
 def _top(root: str, target: Target) -> str:
-    """この対象を git から戻すときに渡す、作業ツリーの根。"""
+    """この対象を git から戻すときに渡す、作業ツリーのルート。"""
     return target.top or gitstate.top_level(root)
 
 

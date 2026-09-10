@@ -75,7 +75,7 @@ KIND_SCRIPT = "script"
 KIND_JUDGE = "judge"
 KINDS = (KIND_LINES, KIND_FILES, KIND_DELETED, KIND_GLOB, KIND_SCRIPT, KIND_JUDGE)
 
-# スクリプトを置いてよい場所（main の根からの相対の先頭）。guard の内側。
+# スクリプトを置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
 SCRIPT_HOMES = (".claude/ccnavi/", ".claude/scripts/")
 SCRIPT_TIMEOUT_SECONDS = 30.0
 
@@ -288,7 +288,7 @@ def _factors(raw: list, where: str) -> tuple[list[Factor], list[Problem]]:
                         ident,
                         "`script` は "
                         + " か ".join(f"`{h}`" for h in SCRIPT_HOMES)
-                        + " の下に、main の根からの相対で置く（エージェントが書けない場所）",
+                        + " の下に、ワークスペースルートからの相対で置く（守られた場所）",
                     )
                 )
                 continue

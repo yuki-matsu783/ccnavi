@@ -251,7 +251,7 @@ class DoesNotWeakenTheGuard(SetupTest):
     def test_refuses_an_empty_bin_path(self):
         """空の実行ファイルは、7 つの hook すべてを壊す。
 
-        書かれるのはプロジェクトルートのディレクトリを起動しようとする 1 行に
+        書かれるのはワークスペースルートのディレクトリを起動しようとする 1 行に
         なり、しかも「まだ無いもの」にも挙がらない（ディレクトリは在るので）。
         """
         result = self.run_setup("--bin", "")
