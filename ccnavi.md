@@ -2349,7 +2349,7 @@ SubagentStart で `additionalContext` が届くかは公式文書の読み方が
 | 子の識別子が `<親>-<2 桁連番>` の形でない、同じ親の下で連番が重なる | error |
 | `predecessors` が閉じていないのに `doing/` にある子 | warn |
 | `doing/` に同じ識別子が 2 枚、または同じ識別子が 2 つの置き場にある | error |
-| リポジトリの中に `.claude/` を持つ別のディレクトリがある（作業ツリーでも main でもない） | warn（`cd` 1 回で別の根に見える） |
+| リポジトリの中に `.claude/` を持つ別のディレクトリがある（作業ツリーでも main でもない） | warn（`cd` 1 回で別のワークスペースルートに見える） |
 | `CCNAVI_TICKET` / `CCNAVI_LEDGER` の指定 | warn（もう効かない） |
 | リモートに対応するトークンが無い | warn |
 
