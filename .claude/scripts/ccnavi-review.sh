@@ -112,6 +112,13 @@ http://*) scheme=http ;;
 esac
 rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
 [ "$rest" = "$origin" ] && fail "origin の綴りを読めない ($origin)。"
+# `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
+# 落とさないと host にトークンが混ざり、API の綴りにも `origin` の出力にも漏れる（実測）。
+# 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
+authority="${rest%%/*}"
+case "$authority" in
+*@*) rest="${authority##*@}${rest#"$authority"}" ;;
+esac
 host="${rest%%/*}"
 # ssh の `git@host:group/proj` は `:` の後ろがパス。数字だけならポート、
 # そうでなければパスの先頭なので落とす。
@@ -423,8 +430,10 @@ trap 'rm -f "$result"' EXIT
 case "$sub" in
 origin)
 	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見る出口。
+	# URL に埋まった資格情報は伏せる。ここの出力はエージェントの文脈と記録に残る。
+	shown=$(printf '%s' "$origin" | sed -E 's#^([a-z]+://)[^/@]+@#\1<伏せた>@#')
 	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
-		"$origin" "$kind" "$scheme" "$host" "$path" "$api_base" "$branch" "$transport"
+		"$shown" "$kind" "$scheme" "$host" "$path" "$api_base" "$branch" "$transport"
 	;;
 fetch)
 	fetch_all
