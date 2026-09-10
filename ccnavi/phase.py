@@ -38,11 +38,14 @@ from . import ticket as ticket_mod
 # 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
 
-# サブエージェントに許さない操作。状態を動かす形とレビューの形を、コマンドの位置で。
-# 読むだけの `cat` や `--help` は止めない。
+# サブエージェントに許さない操作。状態を動かす形・レビューの形・リモートへ送る形を、
+# コマンドの位置で。読むだけの `cat` や `--help` は止めない。
+# push を含めるのは、リモートに置く枝は親ブランチ 1 本で、それを送るのが親の仕事だから。
+# git ラッパも子チケットのツリーからの push を拒むが、そちらは cwd のツリーで見る。
+# サブエージェントが親のツリーへ cd して打てばラッパは通すので、素性で止める層をここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
-    r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review)\.sh\s+"
-    r"(start|done|cancel|request|check|note|accept|handoff)\b"
+    r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
+    r"(start|done|cancel|request|check|note|accept|handoff|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
