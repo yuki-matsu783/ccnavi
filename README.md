@@ -169,7 +169,7 @@ Linux なら `dist/ccnavi/ccnavi`。単一ファイルの onefile は使わな�
 Claude Code の設定スキーマは独自のキーを受け付けないので、ここが唯一開いている場所になる。
 hook には実行ファイルだけを登録すればよい。
 
-下の形は `sh scripts/ccnavi-setup.sh <プロジェクトルート>` が書く。何度打っても同じ形に
+下の形は `sh scripts/ccnavi-setup.sh <ワークスペースルート>` が書く。何度打っても同じ形に
 落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
 ところだけを見たいときは `--check`、既定を持つつまみも並べたいときは `--all` を付ける。
 
@@ -245,18 +245,18 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | 変数 | 意味 |
 |---|---|
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
-| `CCNAVI_RULES` | ルールファイル。相対パスはプロジェクトルートから |
+| `CCNAVI_RULES` | ルールファイル。相対パスはワークスペースルートから |
 | `CCNAVI_LOG` | 記録先。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
-| `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーの根からの相対。既定は `wip/tickets` |
-| `CCNAVI_APPROVED` | 承認済みの写しの置き場。main の根からの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
-| `CCNAVI_PHASES` | フェーズの種類の定義。main の根からの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
-| `CCNAVI_RISK` | 実績で測るリスクの配点。main の根からの相対。既定は `.claude/ccnavi/risk.yml`。無ければ組み込みの配点 |
+| `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーのルートからの相対。既定は `wip/tickets` |
+| `CCNAVI_APPROVED` | 承認済みの写しの置き場。ワークスペースルートからの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
+| `CCNAVI_PHASES` | フェーズの種類の定義。ワークスペースルートからの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
+| `CCNAVI_RISK` | 実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.claude/ccnavi/risk.yml`。無ければ組み込みの配点 |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §25）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、この機能が入る前と同じに動く |
-| `CCNAVI_PROJECT_RULES` | プロジェクトごとのルールファイル。各プロジェクトルート（`.git` のある場所）からの相対。既定は `config/rules.yml`。パスを持つツールは行き先のプロジェクトのルールで判定し、Bash はワークスペースと全プロジェクトのルールの和で判定する |
+| `CCNAVI_PROJECT_RULES` | プロジェクトごとのルールファイル。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `config/rules.yml`。パスを持つツールは行き先のプロジェクトのルールで判定し、Bash はワークスペースと全プロジェクトのルールの和で判定する |
 | `CCNAVI_GUARD_CLI` | `enable`（既定）、`disable`。人の判断の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_CCNAVI_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -265,7 +265,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
 `env` には相対パスを書く。値の変更はセッションを開き直すまで効かない。
 
-プロジェクトルートは `CLAUDE_PROJECT_DIR`、無ければ作業ディレクトリから親へ辿って
+ワークスペースルートは `CLAUDE_PROJECT_DIR`、無ければ作業ディレクトリから親へ辿って
 `.claude` を探して決める。どの階層から起動しても同じ設定に行き着く。
 
 ## ルール
@@ -673,7 +673,7 @@ git はフォールバックで、控えが無いときだけ使う。実行前�
 |---|---|
 | `.gitignore` に入っているファイル | `git status` に出ない。ccnavi 自身の記録と控えがここに入るので、自分の書き込みを自分の違反として報告することもない |
 | git の作業ツリーの外 | 同上。監視はリポジトリの中だけを見る |
-| 別の作業ツリー（`git worktree`） | 呼び出しごとの監視が見るのはセッションのプロジェクトルートにあるリポジトリ。`.claude/worktrees/` は無視設定にも入っている。子チケットの作業ツリーだけは、サブエージェントの終了時に基準点からの差分を見る（「チケットによる作業範囲」） |
+| 別の作業ツリー（`git worktree`） | 呼び出しごとの監視が見るのはセッションのワークスペースルートにあるリポジトリ。`.claude/worktrees/` は無視設定にも入っている。子チケットの作業ツリーだけは、サブエージェントの終了時に基準点からの差分を見る（「チケットによる作業範囲」） |
 | 失敗したツール呼び出しの副作用 | `PostToolUse` は成功した呼び出しの後にしか走らない |
 | `Read` `Grep` `Glob` `WebFetch` `WebSearch` の直後 | 作業ツリーを変えようがないので見に行かない。次に走る書き込みうるツールの直後に同じ変更が見える。見落としではなく遅れ |
 
