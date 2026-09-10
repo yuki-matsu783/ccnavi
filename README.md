@@ -261,10 +261,10 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 version: 3
 
 deny:
-  - id: git-push
+  - id: force-push
     match: Bash
-    glob: "*git push*"
-    message: git push はエージェントからは実行しません。利用者に依頼してください。
+    glob: "*git push*--force*"
+    message: リモートの履歴を書き換えます。送り直したい理由を利用者に伝えてください。
 
 ask:
   - id: migrations
@@ -694,6 +694,7 @@ frontmatter は rules.yml と同じ区画（`deny` / `ask` / `allow`）。効く
 ---
 version: 1
 ticket: i0050-03
+issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
 parent: i0050            # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つの束
 predecessors: [i0050-01] # 先に閉じているべき子。案内にだけ使う
@@ -785,13 +786,18 @@ sh .claude/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 
 `request` は前提を全部確かめてから依頼コメントを投稿し、依頼の時点を印に残す。前提は、
 フェーズが終わっている・そのフェーズの子ブランチが親に取り込まれている・未コミット無し・
-push 済み・親ブランチに対応する MR / PR がある・未依頼、の 6 つ。1 つでも欠けたら全件を
-列挙して何もしない。
+push 済み・未依頼、の 5 つ。1 つでも欠けたら全件を列挙して何もしない。
 
-`check` は依頼の後だけを見る。依頼より後の未解決スレッドが無く、変更要求のレビューも無ければ
+**マージリクエストが無ければ作る。** 人はレビューをそこで行うので、入れ物が無いことで
+止めない。題・本文・`Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue`
+から写し、下書き（Draft）で作る。題から Draft を外してマージするのは人の手に残る。
+
+`check` は今そこに残っている未解決スレッドを数える。無く、変更要求のレビューも無ければ
 レビュー済みの印を置き、ゲートが開く。未解決が残るなら一覧を返す。
 
-未解決を残したまま進める判断は人が端末で打つ。
+未解決を残したまま進める判断は人が端末で打つ。受け入れたスレッドは
+`phases/<親>/accepted.json` に控える。印とは別の場所に置くのは、印が上書きも一括の消去も
+されるため。人が 1 度言った「これは承知で進める」は、取り消されるまで残す。
 
 ```sh
 ccnavi --reviewed 2 --accept-unresolved --cwd .claude/worktrees/i0050
@@ -1071,6 +1077,13 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 （通っていたものを止める向き）の判定をサブコマンドの中に足してある。
 `git branch -D`、`git worktree remove --force`、`git tag -d`、`git checkout -- <パス>` は、
 どれも「読む」「移る」ように見えて取り返しがつかない。
+
+`push` は通す。ただし**居るブランチを、そのままの名前で送る形だけ**。`--force` と
+`--force-with-lease` はリモートの履歴を書き換えるので通さない。`--delete` も、
+`--all` `--mirror` `--tags` のようにブランチをまとめて動かすものも、`HEAD:main` のように
+別の綴りへ送る refspec も通さない。`main` `master` `develop` `release*` へ直接は送れない。
+レビューはマージリクエストの実物に結ぶので、そこまではエージェントが運べたほうがよい。
+統合を決めるのは人なので、マージは人の側に残す。
 
 サブコマンドより前のオプションは 1 つも受け取らない。`git -c diff.external=<コマンド> diff` は
 分類上ただの `diff` のまま任意コマンドを実行する。危ない設定名を列挙して弾く手は網羅できず、
