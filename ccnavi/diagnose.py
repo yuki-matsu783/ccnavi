@@ -214,6 +214,13 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = phase.stage(root, conf, parent)
         if where:
             stdout.write(f"  {parent.ticket} の段階: {where}\n")
+        wrapped = approval.read_parent_mark(
+            conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP
+        )
+        if wrapped:
+            stdout.write(f"  {parent.ticket} は利用者が締めた: {wrapped.get('reason', '')}\n")
+        if approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_READY):
+            stdout.write(f"  {parent.ticket} は Draft を外した。マージは利用者が行う\n")
         for ph in phase.phases_of(root, conf, parent.ticket):
             marks = ", ".join(sorted(ph.marks)) or "印なし"
             if not ph.tickets:

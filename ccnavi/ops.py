@@ -77,9 +77,20 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
     if _deliverables_missing(stderr, root, conf, found):
         return 1
     fields = {"completed_at": approval.now()}
-    return _move(
+    code = _move(
         stdout, stderr, conf, found, ticket_mod.DONE, fields, f"完了 {fields['completed_at']}"
     )
+    if code == 0 and not found.is_child:
+        # 親を閉じた。マージに進んでよいの合図（Draft を外す）は、まだなら親が出す。
+        # マージそのものは人。
+        if approval.read_parent_mark(conf.approved, found.ticket, approval.PARENT_MARK_READY):
+            stdout.write("Draft は外してある。マージは利用者が行う\n")
+        else:
+            stdout.write(
+                "次は 'sh .claude/scripts/ccnavi-review.sh ready' で Draft を外す"
+                "（マージに進んでよいの合図）。マージは利用者が行う\n"
+            )
+    return code
 
 
 def cancel(
@@ -131,41 +142,53 @@ def _parent_still_busy(
     親の写しが閉じるとゲートの鍵（cwd から引く親）が消え、レビュー要の
     フェーズが終わっていても誰も止めなくなる。
     """
-    from . import phase
-
     if found.is_child:
         return False
+    problems = close_problems(root, conf, found.ticket)
+    for p in problems:
+        stderr.write(f"ccnavi: {p}\n")
+    return bool(problems)
+
+
+def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[str]:
+    """親を閉じられない理由の一覧。空なら閉じてよい。
+
+    `review ready`（Draft を外す）も同じ条件を見る。閉じてよい状態と、マージに
+    進んでよい状態は同じもの。人が wrapup で締めていれば、開いている子以外は問わない。
+    人が締めたあとに残っているものは、締めたときに別の issue へ写してある。
+    """
+    from . import phase
+
     copies, _ = approval.copies(conf.approved)
-    open_children = [t.ticket for t in copies if t.parent == found.ticket]
+    open_children = [t.ticket for t in copies if t.parent == parent_id]
     if open_children:
-        stderr.write(
-            f"ccnavi: {found.ticket} には開いている子がある（{', '.join(open_children)}）。"
-            "子を先に閉じること\n"
-        )
-        return True
-    closed = phase.gate(root, conf, found.ticket)
+        return [
+            f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
+        ]
+    if approval.read_parent_mark(conf.approved, parent_id, approval.PARENT_MARK_WRAPUP):
+        return []
+    problems: list[str] = []
+    closed = phase.gate(root, conf, parent_id)
     if closed is not None:
-        stderr.write(
-            f"ccnavi: {found.ticket} のフェーズ {closed.label} はレビュー待ち"
-            "（ゲートが閉じている）。レビューを済ませてから閉じること\n"
+        problems.append(
+            f"{parent_id} のフェーズ {closed.label} はレビュー待ち（ゲートが閉じている）。"
+            "レビューを済ませてから"
         )
-        return True
-    copy = approval.by_id(copies).get(found.ticket)
+    closed_copies, _ = approval.copies(conf.approved, closed=True)
+    copy = approval.by_id(copies + closed_copies).get(parent_id)
     if copy is not None and copy.has_plan:
         if copy.feedback is None:
-            stderr.write(
-                f"ccnavi: {found.ticket} はフィードバック計画がまだ。対応が無くても "
-                "`feedback: []` を改版で出して承認を受けてから閉じること\n"
+            problems.append(
+                f"{parent_id} はフィードバック計画がまだ。対応が無くても "
+                "`feedback: []` を改版で出して承認を受けてから"
             )
-            return True
-        unfinished = [p.label for p in phase.phases_of(root, conf, found.ticket) if not p.ended]
+        unfinished = [p.label for p in phase.phases_of(root, conf, parent_id) if not p.ended]
         if unfinished:
-            stderr.write(
-                f"ccnavi: {found.ticket} には終わっていないフェーズがある"
-                f"（{', '.join(unfinished)}）。全部閉じてから\n"
+            problems.append(
+                f"{parent_id} には終わっていないフェーズがある（{', '.join(unfinished)}）。"
+                "全部閉じてから"
             )
-            return True
-    return False
+    return problems
 
 
 def _deliverables_missing(

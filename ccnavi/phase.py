@@ -45,7 +45,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # サブエージェントが親のツリーへ cd して打てばラッパは通すので、素性で止める層をここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|done|cancel|request|check|note|accept|handoff|push)\b"
+    r"(start|done|cancel|request|check|note|accept|handoff|ready|wrapup|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -59,7 +59,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 経由せずに打てば止める。CCNAVI_GUARD_CLI で切れる。
 _CLI_FORMS = (
     r"(--approve\b|--reviewed\b"
-    r"|\b(ticket|review)\s+(start|done|cancel|prepare|requested|check|handoff)\b)"
+    r"|\b(ticket|review)\s+(start|done|cancel|prepare|requested|check|handoff|ready|wrapup)\b)"
 )
 CODE_CLI = "DENY_CCNAVI_CLI"
 CLI_RULE_ID = "builtin-guard-cli"
@@ -502,6 +502,9 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     closed = gate(root, conf, parent.ticket)
     if closed is not None:
         return f"レビュー待ち（{closed.label}）"
+    if approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP):
+        # 人が締めた。残りは別の issue に写してあるので、閉じられる。
+        return "閉じられる（利用者が締めた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
     for phase in phases:
         if not phase.ended:

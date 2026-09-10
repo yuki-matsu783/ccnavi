@@ -159,6 +159,8 @@ scripts in .claude/scripts/, which call
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review check     --cwd <dir> --phase N --result <json>
+    ccnavi review handoff   --cwd <dir> --body-file <path> --result <json>
+    ccnavi review ready     --cwd <dir> --result <json>
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
@@ -170,6 +172,13 @@ A human accepts unresolved review threads with
 which fetches the threads and runs
 
     ccnavi --reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
+
+A human closes a parent early ("good enough for now") with
+
+    sh .claude/scripts/ccnavi-review.sh wrapup --reason <why>
+
+which runs `ccnavi review wrapup --reason <why> --result <json>` and then
+un-drafts the merge request and files the leftovers as a new issue.
 """
 
 
@@ -447,6 +456,17 @@ def operate(
             )
         else:
             code = review.handoff(stdout, stderr, root, conf, cwd, args.body_file, args.result)
+    elif kind == "review" and verb == "ready":
+        if not args.result:
+            stderr.write("ccnavi: review ready には --result <json> が要る\n")
+        else:
+            code = review.ready(stdout, stderr, root, conf, cwd, args.result)
+    elif kind == "review" and verb == "wrapup":
+        # 人の判断。--approve / --reviewed と同じく端末を求める。
+        if not args.result:
+            stderr.write("ccnavi: review wrapup には --reason <理由> と --result <json> が要る\n")
+        elif _from_terminal(stdin, conf, stderr, "review wrapup"):
+            code = review.wrapup(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR

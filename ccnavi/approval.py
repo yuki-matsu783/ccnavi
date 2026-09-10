@@ -189,6 +189,35 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
     return cleared
 
 
+# 親ごとの印。フェーズの番号に付かないもの。
+#   ready.json   Draft を外した（外してよいと確かめた）。マージに進んでよいの合図
+#   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
+PARENT_MARK_READY = "ready"
+PARENT_MARK_WRAPUP = "wrapup"
+
+
+def parent_mark_path(approved_dir: str, parent: str, name: str) -> str:
+    return os.path.join(approved_dir, PHASES_DIR, parent, f"{name}.json")
+
+
+def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
+    try:
+        with open(parent_mark_path(approved_dir, parent, name), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else {}
+
+
+def write_parent_mark(approved_dir: str, parent: str, name: str, data: dict) -> str:
+    payload = dict(data)
+    payload.setdefault("at", now())
+    return _write(
+        parent_mark_path(approved_dir, parent, name),
+        json.dumps(payload, ensure_ascii=False, indent=1),
+    )
+
+
 # 人が受け入れたスレッドの控え。フェーズの印とは別の場所に、親ごとに 1 つ置く。
 ACCEPTED_FILE = "accepted.json"
 
