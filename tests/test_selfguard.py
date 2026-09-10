@@ -20,6 +20,8 @@ import tempfile
 import time
 import unittest
 
+from ccnavi import selfguard
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 RULES = {
@@ -344,6 +346,38 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
         self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
+
+    def test_プロジェクトのルールファイルの写しも対象になる(self):
+        # 置き場に並ぶプロジェクトのルールファイルも、root の下に在れば
+        # 作業ツリーに写しが入り、統合で main へ届く道は同じ。
+        self.worktree()
+        project = os.path.join(self.repo, "projects", "lib", "config", "rules.yml")
+        write(project, json.dumps(RULES))
+
+        found = selfguard.targets(self.repo, self.rules, "", [("lib", project)])
+
+        copies = {t.label for t in found if t.top}
+        self.assertIn(
+            os.path.join(".claude", "worktrees", "w1", "projects", "lib", "config", "rules.yml"),
+            copies,
+        )
+
+    def test_root_の外を指すルールファイルには写しが無い(self):
+        # 置き場がプロジェクトルートの外にあるなら、作業ツリーの中に対応する
+        # 写しは無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
+        self.worktree()
+        outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
+
+        found = selfguard.targets(self.repo, outside, "")
+
+        self.assertEqual([t.label for t in found if t.top], self.settings_copies())
+
+    def settings_copies(self):
+        """作業ツリー w1 の中の、設定ファイル 2 つの綴り。"""
+        return [
+            os.path.join(".claude", "worktrees", "w1", ".claude", "settings.json"),
+            os.path.join(".claude", "worktrees", "w1", ".claude", "settings.local.json"),
+        ]
 
     # 戻す前に止める
 
