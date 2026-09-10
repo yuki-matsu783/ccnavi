@@ -366,6 +366,44 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
 
+    def test_subagent_cannot_push(self):
+        """リモートに置く枝は親ブランチ 1 本で、送るのは親の仕事。
+
+        ラッパは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
+        cd して打てばラッパは通す。素性で止める層を hook に持つ。
+        """
+        self.family()
+        for command in (
+            "sh .claude/scripts/ccnavi-git.sh push -u origin i0001-01",
+            "cd ../i0001 && sh .claude/scripts/ccnavi-git.sh push origin i0001",
+        ):
+            with self.subTest(command=command):
+                result = self.hook(
+                    "PreToolUse",
+                    "Bash",
+                    self.parent_tree,
+                    agent_id="sub-1",
+                    command=command,
+                )
+                self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
+                self.assertIn("push", self.reason(result))
+        parent = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="sh .claude/scripts/ccnavi-git.sh push -u origin i0001",
+        )
+        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
+        # 読むだけの形は、サブエージェントでも通る。
+        reading = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            agent_id="sub-1",
+            command="sh .claude/scripts/ccnavi-git.sh status",
+        )
+        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(reading))
+
     def test_done_closes_the_copy_without_approval(self):
         self.family()
         result = self.ccnavi("ticket", "done", "i0001-01")

@@ -270,6 +270,56 @@ class PassTest(GitWrapperTest):
         )
         self.assertEqual(here.stdout.strip(), landed.stdout.strip())
 
+    def test_push_from_a_child_ticket_worktree_is_rejected(self):
+        """子チケットの作業ツリーからは送れない。親が合流してから親のツリーで送る。
+
+        見分けるのは承認済みの写しに `parent:` があるかだけ。写しの無いツリーと
+        親の写しを持つツリーは通す。
+        """
+        bare = os.path.abspath(os.path.join(self.dir, "..", "gitwrap-child-origin.git"))
+        self.addCleanup(shutil.rmtree, bare, ignore_errors=True)
+        git(self.dir, "init", "-q", "--bare", bare)
+        git(self.dir, "remote", "add", "origin", bare)
+        copies = os.path.join(self.dir, ".claude", "ccnavi", "tickets")
+        os.makedirs(copies)
+        with open(os.path.join(copies, "i0001.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001\n---\n")
+        with open(os.path.join(copies, "i0001-01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+        trees = {}
+        for name in ("i0001", "i0001-01", "free"):
+            path = os.path.join(self.dir, ".claude", "worktrees", name)
+            git(self.dir, "worktree", "add", "-q", path, "-b", name)
+            trees[name] = path
+
+        def push_from(name):
+            environment = dict(os.environ)
+            return subprocess.run(
+                [SHELL, SCRIPT, "push", "-u", "origin", name],
+                cwd=trees[name],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=environment,
+            )
+
+        child = push_from("i0001-01")
+        self.assertEqual(2, child.returncode, child.stdout + child.stderr)
+        self.assertIn("子チケット", child.stderr)
+        self.assertIn("i0001", child.stderr)
+        self.assertEqual([], logs_of(self.dir), "拒否したのに git が走って記録が残っている")
+        for name in ("i0001", "free"):
+            with self.subTest(tree=name):
+                result = push_from(name)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                landed = subprocess.run(
+                    ["git", "--git-dir", bare, "rev-parse", "--verify", name],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(0, landed.returncode, landed.stderr)
+
     def test_checkout_moves_between_branches(self):
         result = self.run_wrapper("checkout", "-b", "topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
