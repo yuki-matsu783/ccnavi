@@ -565,7 +565,166 @@ class PhaseTest(unittest.TestCase):
         self.assertIn("u/7#t1", text)
         self.assertIn("i0001", text)
 
-    # ---- 7. 計画の無い親は今までどおり
+    # ---- 7. Draft を外す（ready）と、人が締める（wrapup）
+
+    def ready(self, fixture):
+        return self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
+
+    def wrapup(self, fixture, reason="ここまでで十分", answer="y"):
+        return self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "review",
+            "wrapup",
+            "--reason",
+            reason,
+            "--result",
+            fixture,
+            stdin=answer + "\n",
+        )
+
+    def test_ready_needs_the_parent_to_be_closable(self):
+        """Draft を外せるのは、親を閉じられる状態と同じ。閉じたあとでも打てる。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        fixture = self.remote()
+        # 子が開いている間は外せない。
+        refused = self.ready(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("Draft を外せない", refused.stderr)
+        self.assertIn("wrapup", refused.stderr)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        requested = self.request(fixture, 1)
+        self.assertEqual(requested.returncode, 0, requested.stderr)
+        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        # フィードバック計画が無い間も外せない。
+        refused = self.ready(fixture)
+        self.assertIn("フィードバック計画", refused.stderr)
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        write(
+            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            parent_text("i0001", ["design"], feedback=[]),
+        )
+        self.assertEqual(self.approve().returncode, 0)
+        # 閉じられる状態になった。ready が通り、印と note の下書きができる。
+        passed = self.ready(fixture)
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        with open(passed.stdout.strip(), encoding="utf-8") as f:
+            self.assertIn("ccnavi:ready", f.read())
+        mark = read_json(os.path.join(self.approved, "phases", "i0001", "ready.json"))
+        self.assertEqual(mark["mr"], 7)
+        # 親を閉じると「Draft は外してある」と言う。閉じたあとにもう 1 度打てる。
+        closed = self.ccnavi("ticket", "done", "i0001")
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.assertIn("Draft は外してある", closed.stdout)
+        again = self.ready(fixture)
+        self.assertEqual(again.returncode, 0, again.stderr)
+
+    def test_wrapup_closes_early_and_files_the_rest(self):
+        """人が「キリの良いところ」と締める。残りは取り消し・省略・受け入れになり、issue に写る。"""
+        self.family(plan=["research", "design", "acceptance", "implement"])
+        self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/research/summary.md", "s\n")])
+        # 作業中の子がいる間は締められない。
+        fixture = self.remote()
+        refused = self.wrapup(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("作業中の子", refused.stderr)
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        # 2 番目の子を提案して承認するが、着手はしない（todo/ に残る）。
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent("propose 02")
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
+        write(fixture, json.dumps(data))
+        # n なら何も変わらない。
+        declined = self.wrapup(fixture, answer="n")
+        self.assertNotEqual(declined.returncode, 0)
+        self.assertIn("i0001-02", declined.stdout)
+        self.assertIn("実装とテスト", declined.stdout)
+        self.assertIn("フィードバック計画", declined.stdout)
+        self.assertIn("u/7#t0", declined.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        # y で締める。
+        done = self.wrapup(fixture, reason="今期はここまで")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("締めた", done.stdout)
+        self.assertTrue(
+            os.path.exists(
+                os.path.join(self.parent_tree, "wip", "tickets", "cancelled", "i0001-02.md")
+            )
+        )
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        mark = read_json(os.path.join(self.approved, "phases", "i0001", "wrapup.json"))
+        self.assertEqual(mark["reason"], "今期はここまで")
+        self.assertEqual(mark["cancelled"], ["i0001-02"])
+        self.assertEqual(sorted(mark["skipped"]), [2, 3, 4])
+        self.assertEqual(mark["accepted"], ["u/7#t0"])
+        with open(os.path.join(self.state, "review-wrapup-issue-i0001.md"), encoding="utf-8") as f:
+            issue = f.read()
+        self.assertTrue(issue.startswith("親 の残り\n\n"))
+        self.assertIn("i0001-02", issue)
+        self.assertIn("実装とテスト", issue)
+        self.assertIn("u/7#t0", issue)
+        self.assertIn("今期はここまで", issue)
+        # 締めたので、フィードバック計画が無くても親を閉じられる。
+        explained = self.ccnavi("--explain")
+        self.assertIn("利用者が締めた", explained.stdout)
+        closed = self.ccnavi("ticket", "done", "i0001")
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        # ready も通る（sh が Draft を外し損ねたときの打ち直し）。
+        self.assertEqual(self.ready(fixture).returncode, 0)
+
+    def test_wrapup_is_a_human_path(self):
+        """wrapup は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""
+        self.family(plan=["design"])
+        fixture = self.remote()
+        result = self.ccnavi(
+            "--guard-cli",
+            "enable",
+            "--cwd",
+            self.parent_tree,
+            "review",
+            "wrapup",
+            "--reason",
+            "r",
+            "--result",
+            fixture,
+            stdin="y\n",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("端末", result.stderr)
+        for command in (
+            "sh .claude/scripts/ccnavi-review.sh wrapup --reason x",
+            "sh .claude/scripts/ccnavi-review.sh ready",
+        ):
+            payload = {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "cwd": self.parent_tree,
+                "session_id": "s1",
+                "agent_id": "sub-1",
+                "tool_input": {"command": command},
+            }
+            denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+            self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(denied), command)
+
+    # ---- 8. 計画の無い親は今までどおり
 
     def test_parent_without_plan_keeps_the_old_behaviour(self):
         from tests.test_ticket import ticket_text

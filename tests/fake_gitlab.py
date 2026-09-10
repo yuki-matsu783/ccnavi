@@ -214,6 +214,14 @@ class Handler(BaseHTTPRequestHandler):
         if name == "mr" and method == "GET":
             return 200, self.mr_view(mr_of(state, iid) or {})
 
+        if name == "mr" and method == "PUT":
+            # 題の書き換え（Draft を外す）だけを受ける。
+            mr = mr_of(state, iid)
+            data = self.body()
+            if "title" in data:
+                mr["title"] = data["title"]
+            return 200, self.mr_view(mr)
+
         if name == "discussions" and method == "GET":
             return 200, page(mr_of(state, iid)["discussions"], query)
 
