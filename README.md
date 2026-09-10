@@ -240,6 +240,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーの根からの相対。既定は `wip/tickets` |
 | `CCNAVI_APPROVED` | 承認済みの写しの置き場。main の根からの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
 | `CCNAVI_PHASES` | フェーズの種類の定義。main の根からの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
+| `CCNAVI_RISK` | 実績で測るリスクの配点。main の根からの相対。既定は `.claude/ccnavi/risk.yml`。無ければ組み込みの配点 |
 | `CCNAVI_GUARD_CLI` | `enable`（既定）、`disable`。人の判断の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_CCNAVI_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -734,8 +735,10 @@ ccnavi --approve
 
 main と全作業ツリーの `wip/tickets/` を走査し、未承認のものを束で見せる。親が 1 本、
 その下の子が複数、という形が普通。画面に出るのは、親が新たに書けるようにする領域、
-子が親からどれだけ絞ったか、子ごとの人間レビュー要否、リスクスコア。承認すると
+子が親からどれだけ絞ったか、子ごとの人間レビュー要否、計画。承認すると
 チケットごとに写しを置く。承認後に提案を書き足しても効く範囲は変わらない。
+宣言の広さで数えるリスクの点は持たない。宣言の広さは親が `human_review.reason` で言い、
+リスクは子を閉じるときに実績で測る（「実績のリスク」）。
 
 終わったフェーズに子を足して承認すると、そのフェーズの印（依頼・レビュー済み・省略）は消える。
 
@@ -935,6 +938,42 @@ origin の綴りはホストのポートと scheme をそのまま使う。`http
 残りを新しい issue に写す。黙って消えるものは作らない。`phases/<親>/wrapup.json` が
 その証跡で、これがあれば親はフィードバック計画が無くても閉じられる。Draft を外すのはここではなく、
 親が閉じて片付けて push したあとの `ready`。外す道を 1 本にしておくと、外れた MR は必ず片付いている。
+
+### 実績のリスク
+
+計画のときに「軽い」と思った作業が、やってみたら大きな変更になることがある。宣言（種類の
+`review: none` や子の `required: false`）だけを信じると、それがレビューを通らずに進む。
+だからリスクは宣言ではなく実績で測る。子を `ticket done` で閉じるとき、その子の作業ツリーで
+`base_sha..HEAD` の差分を数えて点を付け、`phases/<親>/<子>.risk.json` に残す。フェーズの点は
+子の最大値。**HIGH 以上なら、宣言に関わらずそのフェーズは人間レビューが要る扱いになり、
+ゲートが閉じる。** 実績が小さくても宣言のレビュー要を下げることはしない。
+
+配点は `.claude/ccnavi/risk.yml`（guard の内側。エージェントは書けない）。無ければ組み込み。
+
+```yaml
+version: 1
+levels: {medium: 20, high: 40, critical: 70}     # 段階の名前は固定、閾値だけ動かす
+factors:
+  - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
+  - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
+  - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
+  - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
+  - {id: complexity, points: 30, script: .claude/ccnavi/risk/complexity.sh, message: 複雑度}
+  - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
+```
+
+項目は 3 系統。
+
+| 系統 | 書き方 | 誰が測るか |
+|---|---|---|
+| 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
+| 定量（スクリプト） | `script: <.claude/ccnavi/ か .claude/scripts/ の下>` | ccnavi が `sh` で走らせる。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は**重い側に倒し**、その項目の点を加える |
+| 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`done` が問いと差分の要約を `state/risk-judge-<子>.md` に書くので、親がそれをサブエージェントに渡し、報告を `sh .claude/scripts/ccnavi-ticket.sh judge <子> <項目> yes\|no --reason <根拠>` で記録する。判定は子の HEAD に結ぶので、HEAD が動けば取り直し |
+
+閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
+（「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に、点と加点した理由が出る。
+レビュアーは「なぜこのフェーズにレビューが要ることになったか」を依頼文で読める。
+壊れた `risk.yml` は組み込みに落ち、`--lint` と閉じたときの出力がそう言う。
 
 ### サブエージェントに渡すもの
 
@@ -1210,10 +1249,11 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `ccnavi/post.py` | 実行後の監視。保護領域の変更の検知、差し戻しの文、復元 |
 | `ccnavi/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
 | `ccnavi/tree.py` | 作業ツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
-| `ccnavi/approval.py` | 承認済みの写し、フェーズの印、リスクスコア、承認の画面 |
+| `ccnavi/approval.py` | 承認済みの写し、フェーズの印、子ごとの記録、承認の画面 |
+| `ccnavi/risk.py` | 実績で測るリスク。`risk.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `ccnavi/phase.py` | フェーズの終わりとゲート。提案から写しへの同期 |
 | `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
-| `ccnavi/ops.py` | チケットの状態を動かす `ticket start / done / cancel` |
+| `ccnavi/ops.py` | チケットの状態を動かす `ticket start / done / cancel / judge`。閉じるときに実績のリスクを数える |
 | `ccnavi/audit.py` | 1 行 1 件の追記記録 |
 | `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |
 | `ccnavi/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
