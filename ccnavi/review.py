@@ -597,6 +597,7 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
+    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
         for p in problems:
@@ -615,7 +616,10 @@ def ready(
         return 1
     wrapped = approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP)
     text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
-    text.append("マージするかどうかは利用者が決める。")
+    text.append(
+        f"`{wip_root(conf)}/` は片付けてある。マージするかどうかは利用者が決める。"
+        "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
+    )
     if wrapped:
         text.append(f"（利用者が締めた: {wrapped.get('reason', '')}）")
     path = os.path.join(conf.state, READY_FILE.format(parent=parent.ticket))
@@ -652,7 +656,11 @@ def wrapup(
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
     未着手の子を取り消し、フェーズに省略とレビュー済みの印を置き、未解決を受け入れ、
     親の印 `wrapup.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
-    issue を作り、Draft を外す。黙って消えるものは作らない。
+    issue を作る。黙って消えるものは作らない。
+
+    Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
+    途中の作業の置き場を消して push する。それが済んだことを `ready` が確かめて外す。
+    外す道を 1 本にしておくと、外れた MR は必ず「片付いて push 済み」になる。
 
     作業中の子がいる間は打てない。締めるのは、手が止まっているときだけ。
     """
@@ -708,7 +716,7 @@ def wrapup(
         parent.has_plan and parent.feedback is None
     ):
         stdout.write("  （何も残っていない。ready で足りる）\n")
-    stdout.write("残りは別の issue に写し、Draft を外す。締めてよいなら y、やめるならそれ以外: ")
+    stdout.write("残りは別の issue に写す。締めてよいなら y、やめるならそれ以外: ")
     stdout.flush()
     if approval._read(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
@@ -770,17 +778,6 @@ def wrapup(
     if failed:
         stderr.write(f"ccnavi: 印を置けない: {failed}\n")
         return 1
-    # sh がこの直後に Draft を外すので、ready の印もここで置く。親を閉じたときの案内が
-    # 「もう外してある」と言えるように。
-    failed = approval.write_parent_mark(
-        conf.approved,
-        parent.ticket,
-        approval.PARENT_MARK_READY,
-        {"by": "wrapup", "at": stamp, "mr": result.mr.number, "url": result.mr.url},
-    )
-    if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
-        return 1
     # 残りを写す issue の下書き。1 行目が題、空行のあとが本文。
     issue = [f"{parent.title} の残り", ""]
     issue += [
@@ -814,7 +811,8 @@ def wrapup(
         f"利用者が締めた（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
         f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
-        "残りは別の issue に写す。Draft を外す。マージは利用者が行う。",
+        "残りは別の issue に写す。親が片付けて ready を打てば Draft が外れる。"
+        "マージは利用者が行う。",
         "",
     ]
     note_path = os.path.join(conf.state, WRAPUP_NOTE_FILE.format(parent=parent.ticket))
@@ -825,9 +823,52 @@ def wrapup(
     # 下書きの綴りは標準出力に出さない。ここは人の端末に向いていて、sh は
     # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
-        f"OK: {parent.ticket} を締めた。あとは親に 'ticket done {parent.ticket}' を打たせる\n"
+        f"OK: {parent.ticket} を締めた。あとは親に、状態の移動をコミットし、"
+        f"'ticket done {parent.ticket}' で閉じ、`{wip_root(conf)}/` を消して push し、"
+        "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
+
+
+def wip_root(conf: settings.Settings) -> str:
+    """途中の作業を置く場所。提案の置き場（`wip/tickets`）のいちばん上の階層。
+
+    マージのときにはここを丸ごと消す。途中の記録（チケットの置き場、調査や設計の文書）は
+    既定のブランチに残さない。残す場所はマージリクエストと issue。
+    """
+    rel = (conf.tickets or settings.DEFAULT_TICKETS).replace("\\", "/").strip("/")
+    return rel.split("/")[0] if rel else "wip"
+
+
+def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
+    """マージに進む前に作業ツリーの側で満たしていること。
+
+    途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
+    人がマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
+    """
+    problems: list[str] = []
+    if not os.path.isdir(tree_root):
+        return [f"親の作業ツリーが無い ({tree_root})"]
+    wip = wip_root(conf)
+    rc, tracked = _git(tree_root, ["ls-files", "--", wip])
+    if rc == 0 and tracked.strip():
+        n = len(tracked.strip().splitlines())
+        problems.append(
+            f"`{wip}/` に追跡されているファイルが {n} 件ある。"
+            "途中の作業は既定のブランチに残さない。"
+            f"'sh .claude/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
+        )
+    rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
+    if rc != 0 or status.strip():
+        problems.append("親の作業ツリーに未コミットの変更がある")
+    branch = _branch(tree_root)
+    if not branch:
+        problems.append("親ブランチの名前を読めない")
+    else:
+        rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"])
+        if rc != 0 or ahead.strip():
+            problems.append("親ブランチの HEAD が push されていない")
+    return problems
 
 
 def _parent_any(

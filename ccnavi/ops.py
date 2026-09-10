@@ -86,9 +86,14 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         if approval.read_parent_mark(conf.approved, found.ticket, approval.PARENT_MARK_READY):
             stdout.write("Draft は外してある。マージは利用者が行う\n")
         else:
+            from .review import wip_root
+
             stdout.write(
-                "次は 'sh .claude/scripts/ccnavi-review.sh ready' で Draft を外す"
-                "（マージに進んでよいの合図）。マージは利用者が行う\n"
+                f"次は、この移動をコミットし、`{wip_root(conf)}/` を消して"
+                f"（'sh .claude/scripts/ccnavi-git.sh rm -r {wip_root(conf)}'）コミットし、"
+                "push してから 'sh .claude/scripts/ccnavi-review.sh ready' で Draft を外す"
+                "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
+                "マージは利用者が squash で行う\n"
             )
     return code
 
