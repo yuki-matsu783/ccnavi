@@ -73,7 +73,8 @@ sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             merge (-X ours / -s ours / --no-verify は不可)
   通信      fetch  pull  (--force / --prune は不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
-                   main master develop release へ直接は送れない)
+                   main master develop release へ直接は送れない。
+                   子チケットの作業ツリーからは送れない。親が合流してから親のツリーで送る)
 
 通さないもの (代わりの手段):
   reset clean   git stash push -u で退避する。消さない
@@ -369,6 +370,35 @@ push)
 	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
 		reject "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので通しません。"
+	fi
+	# 子チケットの作業ツリーからは送らない。レビューはマージリクエストの実物に結び、
+	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
+	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
+	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
+	# 見分けるのは承認済みの写し（main の `.claude/ccnavi/tickets/<名前>.md`）に
+	# `parent:` があるかだけ。写しの無いツリー（チケットを使わないブランチ）は通す。
+	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
+	push_common=$(git rev-parse --git-common-dir 2>/dev/null || :)
+	case "$push_common" in
+	*/.git) push_root="${push_common%/.git}" ;;
+	*) push_root="" ;;
+	esac
+	if [ -n "$push_root" ]; then
+		case "$push_top" in
+		"$push_root"/.claude/worktrees/*)
+			push_name="${push_top#"$push_root"/.claude/worktrees/}"
+			push_name="${push_name%%/*}"
+			case "${CCNAVI_APPROVED:-}" in
+			/* | [A-Za-z]:*) push_copies="$CCNAVI_APPROVED" ;;
+			*) push_copies="$push_root/${CCNAVI_APPROVED:-.claude/ccnavi/tickets}" ;;
+			esac
+			push_copy="$push_copies/$push_name.md"
+			if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
+				push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
+				reject "$push_name は子チケットの作業ツリーです。子のブランチはリモートへ送りません。親（$push_parent）が子の成果を合流してから、親の作業ツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
+			fi
+			;;
+		esac
 	fi
 	case "$push_branch" in
 	main | master | develop | release | release/*)
