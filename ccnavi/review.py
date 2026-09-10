@@ -940,8 +940,10 @@ def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
 # ホストにはポートが付く（`localhost:8929`）。落とすと、手元や社内に立てた
 # GitLab を GitHub と見分ける手掛かりまで狂う。ssh の `git@host:group/proj` の
 # `:` はパスの区切りなので、数字だけのときにポートと見なす。
+# `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh も同じく落とす。
 _REMOTE = re.compile(
-    r"^(?:https?://|git@|ssh://git@)(?P<host>[^/:]+(?::\d+)?)[/:]+(?P<path>.+?)(?:\.git)?/?$"
+    r"^(?:https?://(?:[^/@]+@)?|git@|ssh://git@)"
+    r"(?P<host>[^/:@]+(?::\d+)?)[/:]+(?P<path>.+?)(?:\.git)?/?$"
 )
 
 
