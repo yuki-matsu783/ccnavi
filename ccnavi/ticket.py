@@ -102,6 +102,19 @@ APPROVAL_KEY = "ccnavi_approved"
 _WILDCARDS = "*?["
 
 
+def _issue_number(raw) -> int | None:
+    """課題の番号。`12` でも `"#12"` でも読む。読めなければ None。"""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw > 0 else None
+    text = str(raw).strip().lstrip("#").strip()
+    if not text.isdigit():
+        return None
+    number = int(text)
+    return number if number > 0 else None
+
+
 def _fold(path: str) -> str:
     """比べるための綴り。大文字小文字を区別しない機械でだけ揃える。"""
     return path.lower() if tree.CASE_INSENSITIVE else path
@@ -152,6 +165,9 @@ class Ticket:
     parent: str = ""
     phase: int | None = None
     predecessors: list[str] = field(default_factory=list)
+    # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
+    # `Closes #<番号>` へ写す。無くても動く。
+    issue: int | None = None
     review_required: bool = True
     review_reason: str = ""
     title: str = ""
@@ -285,6 +301,19 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     elif raw_preds is not None:
         problems.append(Problem(SEVERITY_ERROR, name, "`predecessors` は並びで書く"))
         return None, problems
+
+    raw_issue = front.get("issue")
+    if raw_issue is not None:
+        number = _issue_number(raw_issue)
+        if number is None:
+            problems.append(
+                Problem(SEVERITY_ERROR, name, "`issue` は課題の番号（正の整数）で書く。`#12` も可")
+            )
+            return None, problems
+        if ticket.is_child:
+            problems.append(Problem(SEVERITY_WARN, name, "`issue` は親だけの欄。子では読まない"))
+        else:
+            ticket.issue = number
 
     review = front.get("human_review")
     if isinstance(review, dict):

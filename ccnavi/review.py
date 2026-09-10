@@ -63,6 +63,8 @@ TIMEOUT_SECONDS = 15.0
 # 控えの置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
 ACCEPT_FILE = "review-accept-{parent}-{phase}.md"
+# まだマージリクエストが無いときに、sh がこれで作る。
+MR_FILE = "review-mr-{parent}.md"
 
 
 @dataclass
@@ -209,15 +211,46 @@ def prepare(
         return 1
     marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} -->\n"
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
+    draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     try:
         os.makedirs(conf.state, exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(marker + body)
+        with open(draft, "w", encoding="utf-8", newline="\n") as f:
+            f.write(mr_draft(parent))
     except OSError as exc:
         stderr.write(f"ccnavi: 本文を書き出せない ({exc})\n")
         return 1
-    stdout.write(path + "\n")
+    # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
+    stdout.write(path + "\n" + draft + "\n")
     return 0
+
+
+def mr_draft(parent: ticket_mod.Ticket) -> str:
+    """マージリクエストの下書き。1 行目が題、空行のあとが本文。
+
+    まだ無ければ sh がこれで作る。人がレビューのときに見るのはこの入れ物なので、
+    親チケットが持っている材料（題・理由・本文・元の課題）をそのまま写す。
+    下書き（Draft）で作るのは、統合を決めるのが人だから。題から Draft を外して
+    マージするところまでが人の手に残る。
+    """
+    title = parent.title.strip() or parent.ticket
+    lines = [f"Draft: {title}", ""]
+    if parent.issue:
+        lines += [f"Closes #{parent.issue}", ""]
+    lines += [f"チケット `{parent.ticket}`。作業ツリーは `.claude/worktrees/{parent.ticket}`。", ""]
+    if parent.rationale.strip():
+        lines += ["## なぜやるか", "", parent.rationale.strip(), ""]
+    if parent.body.strip():
+        lines += [parent.body.strip(), ""]
+    lines += [
+        "---",
+        "",
+        "フェーズが終わるたびに ccnavi がレビューの依頼をこの MR に投稿する。",
+        "未解決のスレッドが残っている間、次のフェーズへは進めない。",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def requested(
@@ -411,6 +444,12 @@ def reviewed(
         return 1
     accepted = [t.url or t.id for t in unresolved]
     assert result.mr is not None
+    # 印より先に控えへ。印は上書きも一括の消去もされるので、人が 1 度言った
+    # 「これは承知で進める」はそちらに置かない。
+    failed = approval.remember_accepted(conf.approved, parent.ticket, accepted)
+    if failed:
+        stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
+        return 1
     failed = approval.write_mark(
         conf.approved,
         parent.ticket,

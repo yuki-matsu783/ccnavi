@@ -188,29 +188,46 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
     return cleared
 
 
-def accepted_threads(approved_dir: str, parent: str) -> set[str]:
-    """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。
+# 人が受け入れたスレッドの控え。フェーズの印とは別の場所に、親ごとに 1 つ置く。
+ACCEPTED_FILE = "accepted.json"
 
-    レビュー済みの印に残っている分を全フェーズ集める。受け入れたスレッドを
-    数え続けると、その親のレビューが二度と通らなくなる。
-    """
-    found: set[str] = set()
-    directory = os.path.join(approved_dir, PHASES_DIR, parent)
+
+def accepted_path(approved_dir: str, parent: str) -> str:
+    return os.path.join(approved_dir, PHASES_DIR, parent, ACCEPTED_FILE)
+
+
+def accepted_threads(approved_dir: str, parent: str) -> set[str]:
+    """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。"""
     try:
-        names = os.listdir(directory)
-    except OSError:
-        return found
-    for name in names:
-        if not name.endswith("." + MARK_REVIEWED):
-            continue
-        try:
-            with open(os.path.join(directory, name), encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            continue
-        if isinstance(data, dict):
-            found.update(str(x) for x in data.get("accepted") or [] if str(x))
-    return found
+        with open(accepted_path(approved_dir, parent), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    return {str(x) for x in data.get("threads") or [] if str(x)}
+
+
+def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str:
+    """受け入れたスレッドを控えに足す。失敗したら、その説明を返す。
+
+    フェーズの印とは別の場所に置く。印は 2 つの理由で消える。同じ番号の印は
+    `check` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
+    丸ごと消す。どちらでも受け入れの記録が飛び、人がもう一度同じスレッドを
+    受け入れることになる。人が 1 度言った「これは承知で進める」は、
+    取り消されるまで残す。
+    """
+    if not threads:
+        return ""
+    path = accepted_path(approved_dir, parent)
+    keep = sorted(accepted_threads(approved_dir, parent) | {str(t) for t in threads if str(t)})
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"threads": keep, "at": now()}, f, ensure_ascii=False, indent=1)
+    except OSError as exc:
+        return f"{path} ({exc})"
+    return ""
 
 
 def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
