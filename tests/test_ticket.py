@@ -25,6 +25,9 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 大文字小文字を区別しない機械かどうか（ccnavi/tree.py の CASE_INSENSITIVE と同じ判じ方）。
+# 範囲の照合は、この機械でだけ綴りの違いを許す（ticket.py の _in_scope）。
+CASE_INSENSITIVE = os.path.normcase("A") == "a"
 
 RULES = {
     "version": 3,
@@ -248,7 +251,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(main))
 
     def test_scope_with_uppercase_still_matches(self):
-        """大文字を含む範囲が当たること。
+        """大文字を含む範囲が、書いた綴りのまま当たること。
 
         作業ツリーのルートからの相対パスを normcase した綴りから作っていたので、
         大文字小文字を区別しない機械では `README.md` が `readme.md` になり、
@@ -259,7 +262,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "ticket")
         self.assertEqual(self.approve().returncode, 0)
-        for name in ("README.md", "docs/Design/plan.md", "docs/design/plan.md"):
+        for name in ("README.md", "docs/Design/plan.md"):
             hit = self.hook(
                 "PreToolUse",
                 "Write",
@@ -274,6 +277,29 @@ class TicketTest(unittest.TestCase):
             file_path=os.path.join(self.parent_tree, "NOTES.md"),
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    def test_scope_follows_the_machine_on_case(self):
+        """綴りの大文字小文字を許すかどうかは、走っている機械で決まる。
+
+        `docs/Design/*` と書いた範囲に `docs/design/plan.md` が当たるのは、
+        大文字小文字を区別しない機械（Windows、既定の macOS）だけ。Linux では
+        別の場所なので当たらない。ここを片方に決め打つと、3 つの実行環境の
+        どれかでテストが必ず落ちる（`_in_scope` の re.IGNORECASE と同じ分かれ方）。
+        """
+        self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "ticket")
+        self.assertEqual(self.approve().returncode, 0)
+        hit = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "docs", "design", "plan.md"),
+        )
+        if CASE_INSENSITIVE:
+            self.assertNotIn("DENY_TICKET_SCOPE", self.reason(hit))
+        else:
+            self.assertIn("DENY_TICKET_SCOPE", self.reason(hit))
 
     def test_no_worktree_means_no_ticket(self):
         """作業ツリーが無い子は効かない。"""
