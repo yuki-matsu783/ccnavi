@@ -681,7 +681,25 @@ class TicketTest(unittest.TestCase):
         result = self.hook("SubagentStart", "", self.parent_tree, agent_id="sub-1")
         text = self.reason(result)
         self.assertIn("i0001-01", text)
+        self.assertIn("i0001-02", text)
         self.assertIn("src/a/*", text)
+
+    def test_subagent_start_says_nothing_outside_the_family(self):
+        """渡すのは cwd の作業ツリーに関わる子だけ。
+
+        別のセッションが main や無関係な作業ツリーで調査を委譲したとき、無関係な子の
+        範囲を案内すると、調査役が自分の居場所を迷う。
+        """
+        self.family()
+        for cwd in (self.root, self.worktree("research-abc", "main")):
+            result = self.hook("SubagentStart", "", cwd, agent_id="sub-r")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(self.reason(result), "", cwd)
+        # 子の作業ツリーからは、その子だけ。
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        text = self.reason(self.hook("SubagentStart", "", child, agent_id="sub-1"))
+        self.assertIn("i0001-01", text)
+        self.assertNotIn("i0001-02", text)
 
     # ---- 7. 人の判断の経路
 
