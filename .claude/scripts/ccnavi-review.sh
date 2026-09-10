@@ -11,8 +11,11 @@
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・印）
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。
 #
-#   request: `ccnavi review prepare` が前提を確かめて本文を書き出す → ここが投稿する
+#   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
+#            下書きを書き出す → ここが（無ければ）MR を下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` が印を置く
+#            人はレビューを MR で行うので、入れ物が無いことで止めない。題から Draft を
+#            外してマージするのは人の手に残す。
 #   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定して印を置く
 #   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せて印を置く
 #            → 受け入れた一覧をここがコメントに写す
@@ -30,7 +33,7 @@ usage() {
 	cat <<'USAGE'
 sh .claude/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <N>] [--body-file <path>]
 
-  request  --phase <N> --body-file <依頼文>   前提を確かめて依頼を投稿し、依頼の印を置く
+  request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿して印を置く
   check    --phase <N>                         依頼より後の未解決スレッドが無ければ印を置く
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
   accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
@@ -235,6 +238,34 @@ find_mr() {
 	fi
 }
 
+# ---- マージリクエストを作る。下書きの 1 行目が題、3 行目からが本文。
+
+default_branch() {
+	# 統合先。clone が置いた origin/HEAD を見る。無ければ main。
+	head=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || :)
+	head="${head#origin/}"
+	[ -n "$head" ] && printf '%s' "$head" || printf 'main'
+}
+
+create_mr() {
+	draft="$1"
+	target=$(default_branch)
+	if [ "$kind" = github ]; then
+		payload=$("$JQ" -n --arg h "$branch" --arg b "$target" --rawfile all "$draft" \
+			'($all | split("\n")) as $l |
+			 {head: $h, base: $b, title: ($l[0]), body: ($l[2:] | join("\n")), draft: true}')
+		api POST "repos/$path/pulls" "$payload" |
+			"$JQ" '{number: .number, url: .html_url}'
+	else
+		payload=$("$JQ" -n --arg s "$branch" --arg b "$target" --rawfile all "$draft" \
+			'($all | split("\n")) as $l |
+			 {source_branch: $s, target_branch: $b, title: ($l[0]),
+			  description: ($l[2:] | join("\n"))}')
+		api POST "projects/$(encoded_path)/merge_requests" "$payload" |
+			"$JQ" '{number: .iid, url: .web_url}'
+	fi
+}
+
 # ---- スレッド。GitHub は GraphQL でしか解決状態を読めない。GitLab は discussions。
 
 threads() {
@@ -332,10 +363,19 @@ check)
 	ccnavi review check "$@" --result "$result"
 	;;
 request)
-	# 段 1: 前提。exe が本文を書き出す。
-	file=$(ccnavi review prepare "$@") || exit $?
+	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
+	prepared=$(ccnavi review prepare "$@") || exit $?
+	file=$(printf '%s\n' "$prepared" | sed -n 1p)
+	draft=$(printf '%s\n' "$prepared" | sed -n 2p)
+	# 段 1.5: 入れ物が無ければ作る。人はレビューをここで行うので、
+	# 「見る場所が無い」で止めない。統合するのは人なので下書きで作る。
 	mr=$(find_mr)
-	[ -z "$mr" ] && fail "親ブランチ $branch に対応するマージリクエストが $host に無い。先に MR を作ること。"
+	if [ -z "$mr" ]; then
+		[ -n "$draft" ] && [ -f "$draft" ] || fail "マージリクエストの下書きを読めない ($draft)。"
+		mr=$(create_mr "$draft")
+		[ -z "$mr" ] && fail "マージリクエストを作れなかった。"
+		printf 'マージリクエストを作った: %s\n' "$(printf '%s' "$mr" | "$JQ" -r '.url')"
+	fi
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	# 段 2: 投稿。

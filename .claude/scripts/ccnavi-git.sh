@@ -72,9 +72,10 @@ sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
   通信      fetch  pull  (--force / --prune は不可)
+            push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
+                   main master develop release へ直接は送れない)
 
 通さないもの (代わりの手段):
-  push          利用者に依頼する。ブランチはそのまま残す
   reset clean   git stash push -u で退避する。消さない
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
   config clone submodule  利用者に依頼する
@@ -358,7 +359,53 @@ fetch | pull)
 	;;
 
 push)
-	reject "push はエージェントからは実行しません。ブランチをそのまま残し、利用者に push を依頼してください。"
+	# 自分が居るブランチを、同じ名前でそのまま送る形だけを通す。レビューは
+	# マージリクエストの実物に結ぶので、そこまではエージェントが自分で運べたほうがよい。
+	#
+	# 通さないのは「戻せなくなる形」と「人の判断を飛び越す形」の 2 つ。
+	# 履歴を書き換える force、消す delete、まとめて送る all/mirror/tags、
+	# 別の綴りへ送る refspec（`HEAD:main` が書ける）、そして統合先そのものへの直接の push。
+	# 統合は人がマージリクエストで行う。
+	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
+	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
+		reject "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので通しません。"
+	fi
+	case "$push_branch" in
+	main | master | develop | release | release/*)
+		reject "$push_branch は統合先です。統合は利用者がマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
+		;;
+	esac
+	push_seen_remote=""
+	for arg in ${1+"$@"}; do
+		case "$arg" in
+		-u | --set-upstream | --porcelain | --quiet | -q | --verbose | -v) ;;
+		--no-verify)
+			reject "$arg は送る前の検査を飛ばします。検査が落ちるなら原因を直してください。"
+			;;
+		--force-with-lease | --force-with-lease=* | --force-if-includes | -f | --force)
+			reject "$arg はリモートの履歴を書き換えます。送り直したい理由を利用者に伝えてください。"
+			;;
+		-d | --delete)
+			reject "$arg はリモートのブランチを消します。利用者に依頼してください。"
+			;;
+		--all | --mirror | --tags | --follow-tags | --prune | --atomic)
+			reject "$arg は今のブランチ以外も動かします。通すのは、居るブランチをそのまま送る形だけです。"
+			;;
+		-*)
+			reject "push で $arg は通しません。通すのは 'push [-u] [<リモート>] [$push_branch]' の形だけです。"
+			;;
+		*:*)
+			reject "$arg は送り先を直に書く形（refspec や URL）です。設定済みのリモート名だけを使い、居るブランチをそのままの名前で送ってください。"
+			;;
+		*)
+			if [ -z "$push_seen_remote" ]; then
+				push_seen_remote="$arg"
+			elif [ "$arg" != "$push_branch" ] && [ "$arg" != "HEAD" ]; then
+				reject "$arg は今居るブランチ（$push_branch）ではありません。他のブランチは、そこへ移ってから送ってください。"
+			fi
+			;;
+		esac
+	done
 	;;
 reset | clean)
 	reject "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
