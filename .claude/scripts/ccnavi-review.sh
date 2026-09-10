@@ -178,6 +178,10 @@ if [ -z "$transport" ]; then
 fi
 
 # api <METHOD> <path> [<JSON body>] — レスポンスの JSON を標準出力へ。path は api_base からの相対。
+#
+# 失敗したら標準出力には何も出さず、ホストが返した本文ごと標準エラーへ出して 1 を返す。
+# gh と glab は 4xx でも本文を標準出力へ書くので、そのまま流すと `{"message":"Not Found"}` が
+# jq に渡り、`{number: null}` の形で「マージリクエストができた」ことになる（実測）。
 api() {
 	method="$1"
 	rel="$2"
@@ -185,9 +189,15 @@ api() {
 	case "$transport" in
 	gh | glab)
 		if [ -n "$body" ]; then
-			printf '%s' "$body" | "$CLI" api --hostname "$host" --method "$method" --input - "$rel"
+			out=$(printf '%s' "$body" | "$CLI" api --hostname "$host" --method "$method" --input - "$rel" 2>&1) || {
+				api_failed "$method" "$rel" "$out"
+				return 1
+			}
 		else
-			"$CLI" api --hostname "$host" --method "$method" "$rel"
+			out=$("$CLI" api --hostname "$host" --method "$method" "$rel" 2>&1) || {
+				api_failed "$method" "$rel" "$out"
+				return 1
+			}
 		fi
 		;;
 	curl)
@@ -197,12 +207,23 @@ api() {
 			auth="PRIVATE-TOKEN: $token"
 		fi
 		if [ -n "$body" ]; then
-			printf '%s' "$body" | "$CURL" -fsS -X "$method" -H "$auth" -H 'Content-Type: application/json' --data-binary @- "$api_base/$rel"
+			out=$(printf '%s' "$body" | "$CURL" -fsS -X "$method" -H "$auth" -H 'Content-Type: application/json' --data-binary @- "$api_base/$rel" 2>&1) || {
+				api_failed "$method" "$rel" "$out"
+				return 1
+			}
 		else
-			"$CURL" -fsS -X "$method" -H "$auth" "$api_base/$rel"
+			out=$("$CURL" -fsS -X "$method" -H "$auth" "$api_base/$rel" 2>&1) || {
+				api_failed "$method" "$rel" "$out"
+				return 1
+			}
 		fi
 		;;
 	esac
+	printf '%s' "$out"
+}
+
+api_failed() {
+	printf 'ccnavi-review: %s への %s %s が失敗した:\n%s\n' "$host" "$1" "$2" "$3" >&2
 }
 
 # pages <path> — 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
@@ -388,7 +409,7 @@ request)
 	mr=$(find_mr)
 	if [ -z "$mr" ]; then
 		[ -n "$draft" ] && [ -f "$draft" ] || fail "マージリクエストの下書きを読めない ($draft)。"
-		mr=$(create_mr "$draft")
+		mr=$(create_mr "$draft") || fail "マージリクエストを作れなかった。ホストの返事は上に出ている。"
 		[ -z "$mr" ] && fail "マージリクエストを作れなかった。"
 		printf 'マージリクエストを作った: %s\n' "$(printf '%s' "$mr" | "$JQ" -r '.url')"
 	fi
