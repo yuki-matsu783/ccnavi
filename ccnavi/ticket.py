@@ -235,6 +235,10 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
+    # project は作業のプロジェクト（`projects/` の名前、設計 §25.5）。親だけが書き、子は親から
+    # 継ぐ。空ならワークスペース自身の作業。人が承認で確定し、判定は行き先の作業ツリーの
+    # 切り元と突き合わせる。
+    project: str = ""
     # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
     # 「見たうえで対応なし」。設計 §24.15.2。
@@ -402,6 +406,10 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
                     Problem(SEVERITY_WARN, name, f"`{key}` は子だけの欄。親では読まない")
                 )
 
+    # 子の `project` は承認が親から継いで写しに書く。提案の子に書いてあれば、
+    # 親と同じでなければならない。それを見るのも承認（approval.project_problems）。
+    ticket.project = _text(front.get("project")).strip()
+
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):
         ticket.predecessors = [_text(p).strip() for p in raw_preds if _text(p).strip()]
@@ -561,12 +569,34 @@ def combine(child: str, parent: str) -> str:
     return child if order[child] >= order[parent] else parent
 
 
-def scan(root: str, tickets_rel: str) -> tuple[list[Ticket], list[Problem]]:
-    """main と全作業ツリーの提案を集める。状態と置き場を添える。"""
+def tickets_rel_for(tickets_rel: str, project: str) -> str:
+    """このプロジェクトの提案の置き場。ワークスペースルートからの相対（設計 §25.5）。
+
+    `wip/tickets` なら `wip/<project>/tickets`。プロジェクトの名前は最初の区切りの
+    あとに挟む。プロジェクトのリポジトリの中には書かない。そこは public で、提案は
+    ワークスペースの運用の痕跡だから（REQ-MLT-14）。空の名前ならそのまま。
+    """
+    if not project:
+        return tickets_rel
+    parts = [p for p in tickets_rel.split("/") if p]
+    if len(parts) < 2:
+        return "/".join([project, *parts])
+    return "/".join([parts[0], project, *parts[1:]])
+
+
+def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
+    """main と全作業ツリーの提案を集める。状態と置き場を添える。
+
+    プロジェクト向けの提案はワークスペースルートの `wip/<project>/tickets/` にある。
+    作業ツリーの側には無い（プロジェクトのブランチには wip/ が無い）。
+    """
     found: list[Ticket] = []
     problems: list[Problem] = []
-    for t in [tree.main_tree(root), *tree.worktrees(root)]:
-        base = os.path.join(t.root, tickets_rel.replace("/", os.sep))
+    ws = tree.main_tree(root)
+    places = [(t, tickets_rel) for t in [ws, *tree.worktrees(root, projects_dir)]]
+    places += [(ws, tickets_rel_for(tickets_rel, p.name)) for p in tree.projects(projects_dir)]
+    for t, rel in places:
+        base = os.path.join(t.root, rel.replace("/", os.sep))
         for state in STATES:
             directory = os.path.join(base, state)
             try:
@@ -637,11 +667,18 @@ def locate(root: str, tickets_rel: str, tree_root: str, ticket_id: str) -> tuple
     return "", ""
 
 
+def _place(tickets_rel: str) -> str:
+    """置き場の綴りに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/tickets`）にも当たる。"""
+    parts = [re.escape(p) for p in tickets_rel.split("/") if p]
+    optional = r"(?:[^\\/\s\x00]+[\\/])?"
+    if len(parts) < 2:
+        return optional + r"[\\/]".join(parts)
+    return parts[0] + r"[\\/]" + optional + r"[\\/]".join(parts[1:])
+
+
 def state_dir_regex(tickets_rel: str) -> str:
     """直接の作成・移動を止める置き場に当たる式。パス用。"""
-    parts = [re.escape(p) for p in tickets_rel.split("/") if p]
-    joined = r"[\\/]".join(parts)
-    return rf"(^|[\\/]){joined}[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
+    return rf"(^|[\\/]){_place(tickets_rel)}[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
 
 
 def guard_rules(tickets_rel: str) -> list[rules.Rule]:
@@ -671,11 +708,10 @@ def guard_rules(tickets_rel: str) -> list[rules.Rule]:
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無い綴り
     # （`mv x wip/tickets/done`）でも当てる。
-    parts = [re.escape(p) for p in tickets_rel.split("/") if p]
     states = "|".join(GUARDED_STATES)
-    loose = r"[\\/]".join(parts) + rf"[\\/]({states})([\\/]|\s|$)"
+    loose = _place(tickets_rel) + rf"[\\/]({states})([\\/]|\s|$)"
     # 写す動詞は行き先が最後の引数。置き場から外へ写す読み向きの cp は止めない。
-    last = r"[\\/]".join(parts) + rf"[\\/]({states})([\\/][^ \x00]*)?($|\x00)"
+    last = _place(tickets_rel) + rf"[\\/]({states})([\\/][^ \x00]*)?($|\x00)"
     shell = rf"{selfguard._WRITE_VERBS}{loose}|{selfguard._COPY_VERBS}{last}"
     shell_rule = rules.Rule(
         id=STATE_RULE_ID + "-shell",

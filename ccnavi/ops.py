@@ -40,12 +40,18 @@ def start(
             "先に利用者が 'ccnavi --approve' を通すこと\n"
         )
         return 1
+    # 作業ツリーは写しの `project` が指すリポジトリから切られていること（REQ-MLT-13）。
+    # 切り元が違えば、判定はそのツリーの切り元で行われ、チケットと噛み合わない。
+    copy = approval.by_id(open_copies)[found.ticket]
+    owner = tree.project_root(conf.projects, copy.project) or root
     worktree = tree.worktree_path(root, ticket_id)
-    if not tree.is_worktree_of(root, worktree) or not tree.exact_name(root, ticket_id):
+    if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
+        where = f"projects/{copy.project} の中で " if copy.project else ""
         stderr.write(
-            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無い（綴りは大文字小文字まで同じで）。"
-            "先に 'sh .claude/scripts/ccnavi-git.sh worktree add .claude/worktrees/"
-            f"{ticket_id} -b {ticket_id}' で作ること\n"
+            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、切り元が写しの project"
+            f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
+            f'先に {where}\'sh .claude/scripts/ccnavi-git.sh worktree add "{worktree}" '
+            f"-b {ticket_id}' で作ること\n"
         )
         return 1
     sha = _head(worktree)
@@ -266,7 +272,7 @@ def _score_child(
 def _find(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> ticket_mod.Ticket | None:
-    proposals, problems = ticket_mod.scan(root, conf.tickets)
+    proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     hits = [t for t in proposals if t.ticket == ticket_id]
     if not hits:
         stderr.write(

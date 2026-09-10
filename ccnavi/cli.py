@@ -204,6 +204,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
+    # プロジェクトの置き場と、プロジェクトごとのルールファイル（設計 §25）。
+    parser.add_argument("--projects", default=None)
+    parser.add_argument("--project-rules", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", default="")
@@ -242,6 +245,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.phases = args.phases
     if args.risk is not None:
         conf.risk = args.risk
+    if args.projects is not None:
+        conf.projects = args.projects
+    if args.project_rules:
+        conf.project_rules = args.project_rules.replace("\\", "/").strip("/")
     conf.guard_cli = selfguard.resolve(
         stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
     )
@@ -484,15 +491,56 @@ def operate(
 
 def watch_context(
     stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
-) -> tuple[rules.RuleSet, str, post.ScopeGuard | None]:
+) -> tuple[list[post.Watched], post.ScopeGuard | None]:
     """ターンの区切りで作業ツリーを見る 2 つが、共通して使う持ち物。
 
     保護領域も範囲も、実行前の判定と同じ経路で解く。別に書くと、実行前に
     通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
-    rule_set, source = load_rules(stderr, conf.rules, record, root)
-    return rule_set, source, scope_guard(conf, root)
+    return watched_for(stderr, conf, root, record), scope_guard(conf, root)
+
+
+def watched_for(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    record: audit.Record,
+    payload: hookio.Input | None = None,
+) -> list[post.Watched]:
+    """実行後に見るツリーと、それぞれに当てるルール（設計 §25.7）。
+
+    payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
+    この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
+    ルールの引き方は実行前の判定と同じ。プロジェクトとその作業ツリーには
+    そのプロジェクトのルール、ワークスペースのツリーにはワークスペースのルール。
+    """
+    ws = tree.main_tree(root)
+    if payload is None:
+        trees = tree.all_trees(root, conf.projects)
+    else:
+        trees = [ws]
+        where = record.subject if payload.tool_name in PATH_TOOLS else payload.cwd
+        t = tree.tree_of(root, where, conf.projects) if where else None
+        if t is not None and t.root != ws.root:
+            trees.append(t)
+    loaded: dict[str, tuple[rules.RuleSet, str]] = {}
+    out = []
+    for t in trees:
+        if t.project not in loaded:
+            if t.project:
+                home = tree.project_root(conf.projects, t.project)
+                rule_set, source = load_rules(
+                    stderr, settings.project_rules_path(conf, home), record, root
+                )
+                if source != builtin.SOURCE:
+                    prefix_ids(rule_set, t.project)
+            else:
+                rule_set, source = load_rules(stderr, conf.rules, record, root)
+            loaded[t.project] = (rule_set, source)
+        rule_set, source = loaded[t.project]
+        out.append(post.Watched(t, rule_set, source))
+    return out
 
 
 def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
@@ -500,7 +548,9 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
     if not conf.approved:
         return None
     copies, _ = approval.copies(conf.approved)
-    return post.ScopeGuard(root=root, approved=conf.approved, copies=approval.by_id(copies))
+    return post.ScopeGuard(
+        root=root, approved=conf.approved, copies=approval.by_id(copies), projects=conf.projects
+    )
 
 
 def decide_at_prompt(
@@ -516,18 +566,8 @@ def decide_at_prompt(
     まだ何も起きていない時点で 1 段積むことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
     """
-    rule_set, source, scope = watch_context(stderr, conf, root, record)
-    post.at_prompt(
-        stderr,
-        conf.state,
-        (conf.state, conf.log),
-        rule_set,
-        source,
-        scope,
-        payload,
-        record,
-        root,
-    )
+    watched, scope = watch_context(stderr, conf, root, record)
+    post.at_prompt(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
     return EXIT_OK
 
 
@@ -553,18 +593,8 @@ def decide_at_stop(
     ものを何ひとつ破らない。むしろ dry-run は「まだ何も適用していないが何が
     起きているか」を見るためのモードなので、ここが黙ると見る手立てが減る。
     """
-    rule_set, source, scope = watch_context(stderr, conf, root, record)
-    text = post.at_stop(
-        stderr,
-        conf.state,
-        (conf.state, conf.log),
-        rule_set,
-        source,
-        scope,
-        payload,
-        record,
-        root,
-    )
+    watched, scope = watch_context(stderr, conf, root, record)
+    text = post.at_stop(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
     if text:
         hookio.write_system_message(stdout, text)
     return EXIT_OK
@@ -592,7 +622,7 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin),
+        selfguard.targets(root, conf.rules, conf.bin, project_rules_files(conf)),
     )
     record.decision, record.enforced = audit.ALLOW, True
     if not outcomes:
@@ -637,7 +667,7 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin),
+        selfguard.targets(root, conf.rules, conf.bin, project_rules_files(conf)),
     )
     if not outcomes:
         return ""
@@ -669,13 +699,20 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    rule_set, source = load_rules(stderr, conf.rules, record, root)
+    rule_set, source, target = rules_for(stderr, conf, root, payload, record)
+    if target is None and payload.cwd:
+        # Bash には行き先が無い。記録には cwd のツリーを添える。判定には使わない。
+        target = tree.tree_of(root, payload.cwd, conf.projects)
+    if target is not None:
+        record.tree, record.project = target.name, target.project
     # 設定ファイルを守る側が有効なら、そこへシェルから書き込む形を止める
     # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
     # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
     if not record.fallback and effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE:
-        selfguard.add_rules(rule_set, conf.bin)
+        selfguard.add_rules(
+            rule_set, conf.bin, selfguard.project_rules_clause(conf.projects, conf.project_rules)
+        )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。写しを使っているときだけ足す。
     if conf.approved:
@@ -697,7 +734,7 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    fallback = fallen_back(conf.rules) if record.fallback else ""
+    fallback = fallen_back(record.detail or conf.rules) if record.fallback else ""
     notices = [text for text in (guard, fallback) if text]
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
@@ -722,6 +759,14 @@ def decide_before(
             record.code, record.rules = phase.CODE_GATE, [TICKET_RULE]
             reason = phase.gate_reason(closed, payload.tool_name)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
+
+    # 作業ツリーの切り元と写しの `project:` の食い違いは、ルールより先に見る。
+    # 範囲の宣言ではなく配線の誤りなので、ルールが allow と言っていても通さない。
+    if conf.approved and target is not None and payload.tool_name in SCOPE_TOOLS:
+        mismatch = project_mismatch(conf, root, target, record.subject)
+        if mismatch:
+            record.code, record.rules = CODE_TICKET_PROJECT, [TICKET_RULE]
+            return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
 
     # 強い区画から順に見て、最初に当たったところで止める。deny に当たった
     # 呼び出しについて ask の区画を調べる意味は無いし、調べれば「拒否だが
@@ -874,7 +919,7 @@ def decide_at_subagent_start(
         return EXIT_OK
     copies, _ = approval.copies(conf.approved)
     index = approval.by_id(copies)
-    t = tree.tree_of(root, payload.cwd or os.getcwd())
+    t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is None:
         return EXIT_OK
@@ -934,7 +979,7 @@ def decide_at_subagent_stop(
         return EXIT_OK
     copies, _ = approval.copies(conf.approved)
     index = approval.by_id(copies)
-    t = tree.tree_of(root, payload.cwd or os.getcwd())
+    t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     targets: list[ticket_mod.Ticket] = []
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is not None:
@@ -1030,7 +1075,9 @@ def decide_after(
     # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
     guard = guard_setting_files(stderr, mode, conf, root, payload, record, selfguard.after)
 
-    rule_set, source = load_rules(stderr, conf.rules, record, root)
+    watched = watched_for(stderr, conf, root, record, payload)
+    if len(watched) > 1:
+        record.tree, record.project = watched[-1].tree.name, watched[-1].tree.project
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
@@ -1046,12 +1093,10 @@ def decide_after(
         restore=effective_setting(mode, conf.restore_if_deny),
         state_dir=conf.state,
         mine=(conf.state, conf.log),
-        rule_set=rule_set,
-        source=source,
+        watched=watched,
         scope=scope,
         payload=payload,
         record=record,
-        root=root,
     )
     # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
@@ -1115,6 +1160,86 @@ def load_rules(
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
     return rule_set, builtin.SOURCE if record.fallback else rules_path
+
+
+# 行き先で判定するツール。subject に解決済みのパスが入っている。
+PATH_TOOLS = ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit")
+
+
+def rules_for(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> tuple[rules.RuleSet, str, tree.Tree | None]:
+    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 §25.4）。
+
+    パスを持つツールは行き先で 1 本に決まる。行き先のツリーがプロジェクトのものなら、
+    そのプロジェクトルートにあるルールファイル。ワークスペースのツリーなら
+    ワークスペースのルール。プロジェクトを数えていないワークスペースでは、いつも
+    ワークスペースのルールになる。
+
+    Bash はワークスペースと全プロジェクトのルールの和。呼び出しがどのプロジェクトの
+    ものかは当てない。当てる仕掛け（cwd、cd の追跡、引数の語の走査）は「どのルール
+    ファイルを引くか」にしか効かず、副作用は結局実行後の監視が拾う。和なら deny と
+    ask は増える側に倒れ、緩むのは allow の共有だけになる（REQ-MLT-05）。読めない
+    プロジェクトは和から外し、外したことを記録に残す（REQ-MLT-06）。
+    """
+    if payload.tool_name in PATH_TOOLS:
+        target = tree.tree_of(root, record.subject, conf.projects)
+        if target is not None and target.project:
+            where = tree.project_root(conf.projects, target.project)
+            rule_set, source = load_rules(
+                stderr, settings.project_rules_path(conf, where), record, root
+            )
+            if not record.fallback:
+                prefix_ids(rule_set, target.project)
+            return rule_set, source, target
+        rule_set, source = load_rules(stderr, conf.rules, record, root)
+        return rule_set, source, target
+
+    rule_set, source = load_rules(stderr, conf.rules, record, root)
+    if payload.tool_name not in phase.SHELL_TOOLS:
+        return rule_set, source, None
+    skipped = []
+    for p in tree.projects(conf.projects):
+        path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.project))
+        try:
+            extra, problems = rules.load(path, root)
+        except (OSError, ValueError) as exc:
+            stderr.write(f"ccnavi: プロジェクト {p.project} のルールを読めない: {exc}\n")
+            skipped.append(p.project)
+            continue
+        for problem in problems:
+            stderr.write(f"ccnavi: {problem}\n")
+        prefix_ids(extra, p.project)
+        for name in rules.SECTIONS:
+            rule_set.section(name).extend(extra.section(name))
+    if skipped:
+        note = "unreadable project rules: " + ",".join(skipped)
+        record.detail = f"{record.detail}; {note}" if record.detail else note
+    return rule_set, source, None
+
+
+def project_rules_files(conf: settings.Settings) -> list[tuple[str, str]]:
+    """置き場にあるプロジェクトと、そのルールファイル。selfguard の守る対象に渡す。"""
+    return [
+        (p.name, settings.project_rules_path(conf, tree.project_root(conf.projects, p.name)))
+        for p in tree.projects(conf.projects)
+    ]
+
+
+def prefix_ids(rule_set: rules.RuleSet, project: str) -> None:
+    """プロジェクトのルールの id にプロジェクトの名前を添える。`lib:source` の形（REQ-MLT-07）。
+
+    プロジェクトどうしで同じ id があっても衝突せず、記録を読んだ人がどのファイルを
+    見に行けばよいかが id だけで分かる。ワークスペースのルールは裸の id のまま。
+    """
+    for name in rules.SECTIONS:
+        for rule in rule_set.section(name):
+            if rule.id:
+                rule.id = f"{project}:{rule.id}"
 
 
 def fail_closed(mode: str) -> int:
@@ -1216,6 +1341,43 @@ def fallen_back(rules_path: str) -> str:
     )
 
 
+# 作業ツリーの切り元と、チケットが承認されたプロジェクトが食い違っている。
+CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
+
+
+def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:
+    """作業ツリーの切り元と、そこに結び付く写しの `project:` が違えば、その理由の文。
+
+    範囲の宣言ではなく配線の誤りなので、ルールより先に見る（REQ-MLT-12）。ルールが
+    allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
+    行き先のツリーが誰のものかは、そのツリーの `.git` が指す先で決まっている。
+    """
+    if t.is_main:
+        return ""
+    copies, _ = approval.copies(conf.approved)
+    index = approval.by_id(copies)
+    ticket = index.get(t.name)
+    if ticket is None:
+        return ""
+    parent = index.get(ticket.parent) if ticket.is_child else None
+    owner = parent.project if parent is not None else ticket.project
+    if owner == t.project:
+        return ""
+    source = approval.copy_path(conf.approved, t.name)
+    return "\n".join(
+        [
+            f"[ccnavi] {CODE_TICKET_PROJECT} (source: {source})",
+            f"subject: {full}",
+            f"ticket: {ticket.ticket} ({ticket.title}) was approved for project "
+            f"'{owner or '(workspace)'}', but worktree {t.name} was cut from "
+            f"'{t.project or '(workspace)'}'",
+            "Do not write here. The worktree must be created from the repository the ticket "
+            "names (projects/<project>), or the ticket must be proposed again for this "
+            "repository and approved by the user.",
+        ]
+    )
+
+
 def ticket_verdict(
     conf: settings.Settings,
     root: str,
@@ -1238,7 +1400,7 @@ def ticket_verdict(
     """
     if not conf.approved or tool not in SCOPE_TOOLS or not full:
         return "", ""
-    t = tree.tree_of(root, full)
+    t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
         return "", ""
     copies, _ = approval.copies(conf.approved)

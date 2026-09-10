@@ -321,7 +321,7 @@ def gate(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
 
 def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
     """cwd が親の作業ツリーの中なら、その親の写し。"""
-    t = tree.tree_of(root, cwd or os.getcwd())
+    t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
     open_copies, _ = approval.copies(conf.approved)
@@ -604,16 +604,17 @@ def scope_findings(
 
 def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tuple[str, str]:
     """写しの元になった提案が、いまどの状態にあるか。"""
-    tree_root = _tree_root(root, copy.source_tree)
+    tree_root = _tree_root(root, copy.source_tree, conf.projects)
     if not tree_root:
         return "", ""
-    return ticket_mod.locate(root, conf.tickets, tree_root, copy.ticket)
+    rel = ticket_mod.tickets_rel_for(conf.tickets, copy.project)
+    return ticket_mod.locate(root, rel, tree_root, copy.ticket)
 
 
-def _tree_root(root: str, name: str) -> str:
+def _tree_root(root: str, name: str, projects_dir: str = "") -> str:
     if name == tree.MAIN:
         return tree.main_tree(root).root
-    for t in tree.worktrees(root):
+    for t in tree.worktrees(root, projects_dir):
         if t.name == name:
             return t.root
     return ""

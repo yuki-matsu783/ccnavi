@@ -878,7 +878,7 @@ def _parent_any(
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
         return parent
-    t = tree.tree_of(root, cwd or os.getcwd())
+    t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
         closed, _ = approval.copies(conf.approved, closed=True)
         found = tree.lookup(approval.by_id(closed), t.name)

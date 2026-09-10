@@ -160,23 +160,42 @@ _PLACES = (r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)", 
 _COPY_PLACES = (r"\.claude[\\/](ccnavi|hooks|scripts|settings)", r"ccnavi-git\.sh")
 
 
-def shell_write_regex(bin_path: str = "") -> str:
+def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルの綴りは設定で動くので、
     ここで組み立てる。
 
     実行ファイルを場所の一覧に足すのは、そこが判定器の実体だから。差し替えられると
     ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
     `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
+
+    extra_clause はプロジェクトのルールファイルの綴り（project_rules_clause）。
+    行き先の判定に使うので、書けるとエージェントが自分のルールを緩められる。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
-    clause = binary_clause(bin_path)
-    if clause:
-        places.append(clause)
-        copy_places.append(clause)
+    for clause in (binary_clause(bin_path), extra_clause):
+        if clause:
+            places.append(clause)
+            copy_places.append(clause)
     where = "(" + "|".join(places) + ")"
     copy_where = "(" + "|".join(copy_places) + ")"
     return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
+
+
+def project_rules_clause(projects_dir: str, project_rules: str) -> str:
+    """プロジェクトのルールファイルの綴りを、当てる形に直す（設計 §25.6）。
+
+    置き場の名前と、プロジェクトルートからの相対を、間に任意の 1 語（プロジェクトの
+    名前）を挟んで繋ぐ。`projects/<名前>/config/rules.yml` の形。区切りはどちらの
+    綴りにも当てる。
+    """
+    if not projects_dir or not project_rules:
+        return ""
+    base = os.path.basename(os.path.normpath(projects_dir))
+    parts = [re.escape(p) for p in project_rules.split("/") if p]
+    if not base or not parts:
+        return ""
+    return re.escape(base) + r"[\\/][^\\/ \x00]+[\\/]" + r"[\\/]".join(parts)
 
 
 def binary_clause(bin_path: str) -> str:
@@ -217,6 +236,14 @@ BINARY_MESSAGE = (
     "ccnavi 自身の実行ファイルです。ここが差し替わると、ルールを 1 行も変えずに"
     "判定そのものを入れ替えられます。作り直しが要るなら、何をなぜ変えたいのかを"
     "伝えて利用者に依頼してください。"
+)
+
+PROJECT_RULES_RULE_ID = "builtin-guard-project-rules"
+
+PROJECT_RULES_MESSAGE = (
+    "プロジェクトのルールファイルです。このプロジェクトへの書き込みはここで判定される"
+    "ので、エージェントが書き換えると自分のルールを緩められます。変更が要るなら、"
+    "何をなぜ変えたいのかを伝えて利用者に依頼してください。"
 )
 
 
@@ -268,16 +295,19 @@ def resolve(stderr: TextIO, flag: str, declared: str, name: str) -> str:
     return ENABLE
 
 
-def add_rules(rule_set: rules.RuleSet, bin_path: str = "") -> None:
+def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str = "") -> None:
     """ガード自身を守るルールを、判定に足す。
 
     ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
 
-    2 本ある。シェルから書き込む形と、名指しのツールで実行ファイルを書く形。
-    設定ファイルを名指しのツールから守るぶんはプロジェクトのルールに任せる。
-    そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルは
-    置き場が設定で動くので、ルールファイルに綴りを固定できない。
+    3 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
+    名指しのツールでプロジェクトのルールファイルを書く形。ワークスペースの設定
+    ファイルを名指しのツールから守るぶんはワークスペースのルールに任せる。
+    そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルと
+    プロジェクトのルールは置き場が設定で動くので、ルールファイルに綴りを固定できない。
+    プロジェクトのルールは行き先の判定に使うので、そのプロジェクトのルール自身に
+    任せると、書けた瞬間に緩められる（REQ-MLT-08）。
 
     同じ id が既にあるなら足さない。プロジェクトが自分で書いているなら、
     書いたとおりに効いているほうがよい。組み込みが黙って重ねると、当たった
@@ -288,7 +318,7 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "") -> None:
         {
             "id": SHELL_RULE_ID,
             "match": "Bash",
-            "regex": shell_write_regex(bin_path),
+            "regex": shell_write_regex(bin_path, project_clause),
             "message": SHELL_MESSAGE,
         },
     )
@@ -304,6 +334,16 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "") -> None:
                 "message": BINARY_MESSAGE,
             },
         )
+    if project_clause:
+        _insert(
+            rule_set,
+            {
+                "id": PROJECT_RULES_RULE_ID,
+                "match": "Write|Edit|MultiEdit|NotebookEdit",
+                "regex": project_clause + "$",
+                "message": PROJECT_RULES_MESSAGE,
+            },
+        )
 
 
 def _insert(rule_set: rules.RuleSet, raw: dict) -> None:
@@ -317,11 +357,17 @@ def _insert(rule_set: rules.RuleSet, raw: dict) -> None:
     rule_set.deny.insert(0, built.deny[0])
 
 
-def targets(root: str, rules_path: str, bin_path: str = "") -> list[Target]:
+def targets(
+    root: str,
+    rules_path: str,
+    bin_path: str = "",
+    project_rules: list[tuple[str, str]] = (),
+) -> list[Target]:
     """守る対象を組み立てる。
 
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
+    project_rules は (プロジェクトの名前, そのルールファイル) の並び（REQ-MLT-08）。
     """
     found = [
         Target(key=key, path=os.path.realpath(os.path.join(root, rel)), label=rel)
@@ -330,6 +376,9 @@ def targets(root: str, rules_path: str, bin_path: str = "") -> list[Target]:
     if rules_path:
         full = os.path.realpath(rules_path)
         found.append(Target(key="rules", path=full, label=_relative(root, full)))
+    for name, path in project_rules:
+        full = os.path.realpath(path)
+        found.append(Target(key=f"rules:{name}", path=full, label=_relative(root, full)))
     if bin_path:
         full = os.path.realpath(bin_path)
         found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))

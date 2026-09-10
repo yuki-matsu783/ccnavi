@@ -104,12 +104,10 @@ def check(
     restore: str,
     state_dir: str,
     mine: tuple[str, ...],
-    rule_set: rules.RuleSet,
-    source: str,
+    watched: list[Watched],
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
-    root: str,
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -121,25 +119,25 @@ def check(
     中に置かれることがある。実際このリポジトリのルールは `.claude/ccnavi/*`
     を守っていて、記録も控えもそこにある。自分の書き込みを自分の違反として
     報告しはじめると、監視は 1 回目から嘘しか言わなくなる。
+
+    watched は見るツリー。ワークスペースルートと、この呼び出しが触ったツリー
+    （設計 §25.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
         return ""
 
-    top = gitstate.top_level(root)
-    changes, unreadable = gitstate.read(top)
-    if unreadable:
-        # 見えないことを黙らない。記録に残せば、監視が動いていなかった期間を
-        # 後から数えられる。数えられないと、違反が無かったのか見ていなかった
-        # のかが同じ見た目になる。
-        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
-        record.detail = unreadable
-        stderr.write(f"ccnavi: 作業ツリーを読めないので実行後の監視は動かない: {unreadable}\n")
+    read = _read_all(stderr, watched, record)
+    if not read:
         return ""
 
     seen, first_time = _load_seen(stderr, state_dir, payload.session_id)
 
-    found = _findings(changes, rule_set, mine, source, scope)
+    found = [
+        f
+        for w, _, changes in read
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
+    ]
     if not found:
         # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
         # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
@@ -149,8 +147,8 @@ def check(
         record.decision, record.enforced = audit.ALLOW, True
         return ""
 
-    fresh = [f for f in found if f.change.key() not in seen]
-    known = [f for f in found if f.change.key() in seen]
+    fresh = [f for f in found if f.key() not in seen]
+    known = [f for f in found if f.key() in seen]
     # 初めて見たセッションでは、今そこに在るものは直前の実行の結果ではない。
     # 控えを取るだけにして、原因を付けずに 1 度だけ伝える。
     carried, fresh = (fresh, []) if first_time else ([], fresh)
@@ -159,8 +157,15 @@ def check(
     # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.effective_setting）ので、
     # ここで enforcing を見る必要はない。掛ける場所を 1 か所に寄せてあるのは、
     # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
+    # 戻すのはそのツリーの git で。鍵はツリー付きにして、別のツリーの同じ相対パスと
+    # 混ざらないようにする。
     if fresh and restore == selfguard.ENABLE:
-        restored = _restore(stderr, top, state_dir, [f.change for f in fresh])
+        for w, top, _ in read:
+            here = [f for f in fresh if f.tree_name == w.tree.name]
+            if not here:
+                continue
+            done = _restore(stderr, top, state_dir, [f.change for f in here])
+            restored.update({f.key(): done[f.change.path] for f in here if f.change.path in done})
     # dry-run では戻さない代わりに、戻していたはずだと言う。selfguard の
     # would-restore と同じ扱いにしてある。黙って何もしないと、報告を読んだ側には
     # 戻しを切った形と見分けが付かない。予行として置いた設定が「戻しは要らない」
@@ -175,8 +180,8 @@ def check(
         seen
         # 戻せたものは控えに入れない。同じ場所がもう一度汚れたら、それは
         # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
-        | {f.change.key() for f in fresh if f.change.path not in restored}
-        | {f.change.key() for f in carried},
+        | {f.key() for f in fresh if f.key() not in restored}
+        | {f.key() for f in carried},
     )
 
     record.paths = [f"{f.change.kind} {f.change.path}" for f in fresh]
@@ -201,7 +206,7 @@ def check(
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
-    blocks = [_violation(f, payload, restored.get(f.change.path), would_restore) for f in fresh]
+    blocks = [_violation(f, payload, restored.get(f.key()), would_restore) for f in fresh]
     blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
         return ""
@@ -219,12 +224,10 @@ def at_stop(
     stderr: TextIO,
     state_dir: str,
     mine: tuple[str, ...],
-    rule_set: rules.RuleSet,
-    source: str,
+    watched: list[Watched],
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
-    root: str,
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -247,17 +250,15 @@ def at_stop(
         record.decision, record.reason = audit.SKIP, REASON_NO_TURN_BASELINE
         return ""
 
-    top = gitstate.top_level(root)
-    changes, unreadable = gitstate.read(top)
-    if unreadable:
-        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
-        record.detail = unreadable
+    read = _read_all(stderr, watched, record)
+    if not read:
         return ""
 
     found = [
         f
-        for f in _findings(changes, rule_set, mine, source, scope)
-        if f.change.key() not in baseline
+        for w, _, changes in read
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
+        if f.key() not in baseline
     ]
     if not found:
         record.decision, record.enforced = audit.ALLOW, True
@@ -270,8 +271,9 @@ def at_stop(
     lines = [f"[ccnavi] 守ると宣言した場所が、このターンで {len(found)} 件変わりました。"]
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
+        where = f"{finding.tree_name}: " if finding.tree_name else ""
         lines.append(
-            f"  {finding.change.path}（{finding.change.kind}）"
+            f"  {where}{finding.change.path}（{finding.change.kind}）"
             f" ルール {rule.id or '(id 無し)'} / 戻すなら {gitstate.undo(finding.change)}"
         )
     if len(found) > REPORT_LIMIT:
@@ -292,6 +294,8 @@ class ScopeGuard:
     root: str
     approved: str
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
+    # プロジェクトの置き場。作業ツリーの切り元をプロジェクトまで広げる（設計 §25.3）。
+    projects: str = ""
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、咎める文面と出所を返す。中なら None。
@@ -299,7 +303,7 @@ class ScopeGuard:
         チケット自身の提案ファイルは外でも咎めない。次のチケットを提案する道を
         塞ぐと、いちど承認した範囲から永久に出られなくなる。
         """
-        t = tree.tree_of(self.root, full)
+        t = tree.tree_of(self.root, full, self.projects)
         if t is None or t.is_main:
             return None
         ticket = tree.lookup(self.copies, t.name)
@@ -339,6 +343,53 @@ class Finding:
     group: list[rules.Rule]
     source: str
     code: str
+    # どのツリーで見つけたか。ワークスペースルートなら空。控えの鍵と報告に使う。
+    tree_name: str = ""
+    tree_root: str = ""
+
+    def key(self) -> str:
+        """控えの鍵。ツリーが違えば同じ相対パスでも別の変更。"""
+        return f"{self.tree_name}|{self.change.key()}" if self.tree_name else self.change.key()
+
+
+@dataclass
+class Watched:
+    """実行後に見るツリー 1 つと、そこに当てるルール（設計 §25.7）。
+
+    ワークスペースのツリーにはワークスペースのルール、プロジェクトとその作業ツリーには
+    そのプロジェクトのルール。実行前の判定と同じ引き方でなければ、実行前に通った
+    書き込みが実行後に咎められる。
+    """
+
+    tree: tree.Tree
+    rule_set: rules.RuleSet
+    source: str
+
+
+def _read_all(
+    stderr: TextIO, watched: list[Watched], record: audit.Record
+) -> list[tuple[Watched, str, list[gitstate.Change]]]:
+    """見るツリーを順に git に聞く。読めないツリーは記録して飛ばす。
+
+    1 つも読めなければ判定に至らなかったことにする。見えないことを黙らない。
+    記録に残せば、監視が動いていなかった期間を後から数えられる。数えられないと、
+    違反が無かったのか見ていなかったのかが同じ見た目になる。
+    """
+    out, failed = [], []
+    for w in watched:
+        top = gitstate.top_level(w.tree.root)
+        changes, unreadable = gitstate.read(top)
+        if unreadable:
+            failed.append(f"{w.tree.name}: {unreadable}" if w.tree.name else unreadable)
+            continue
+        out.append((w, top, changes))
+    if failed:
+        note = "; ".join(failed)
+        stderr.write(f"ccnavi: 作業ツリーを読めないので実行後の監視は動かない: {note}\n")
+        record.detail = f"{record.detail}; {note}" if record.detail else note
+    if not out:
+        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
+    return out
 
 
 def _findings(
@@ -347,6 +398,7 @@ def _findings(
     mine: tuple[str, ...],
     source: str,
     scope: ScopeGuard | None,
+    where: tree.Tree | None = None,
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
@@ -358,20 +410,22 @@ def _findings(
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
+    name = where.name if where is not None else ""
+    top = where.root if where is not None else ""
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
-            found.append(Finding(change, group, source, CODE_VIOLATION))
+            found.append(Finding(change, group, source, CODE_VIOLATION, name, top))
             continue
         if scope is None or _allowed(rule_set, change.full):
             continue
         hit = scope.finding(change.full)
         if hit is not None:
-            rule, where = hit
-            found.append(Finding(change, [rule], where, CODE_TICKET_SCOPE))
+            rule, place = hit
+            found.append(Finding(change, [rule], place, CODE_TICKET_SCOPE, name, top))
     return found
 
 
@@ -426,6 +480,7 @@ def _violation(
     lines = [
         f"[ccnavi] {finding.code} (source: {_source(finding.source, group)})",
         f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+        f"tree: {finding.tree_name} ({finding.tree_root})" if finding.tree_name else "",
         f"after: {_call(payload)}",
     ]
     if moved is None:
@@ -539,12 +594,10 @@ def at_prompt(
     stderr: TextIO,
     state_dir: str,
     mine: tuple[str, ...],
-    rule_set: rules.RuleSet,
-    source: str,
+    watched: list[Watched],
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
-    root: str,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
 
@@ -556,15 +609,16 @@ def at_prompt(
     基準を取るのはターンが始まる瞬間で、そこが「エージェントがまだ何もして
     いない時点」になる。以降に現れたものだけが、このターンで起きたこと。
     """
-    top = gitstate.top_level(root)
-    changes, unreadable = gitstate.read(top)
-    if unreadable:
-        record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
-        record.detail = unreadable
+    read = _read_all(stderr, watched, record)
+    if not read:
         return
 
-    found = _findings(changes, rule_set, mine, source, scope)
-    _save_turn(stderr, state_dir, payload.session_id, {f.change.key() for f in found})
+    found = [
+        f
+        for w, _, changes in read
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
+    ]
+    _save_turn(stderr, state_dir, payload.session_id, {f.key() for f in found})
     record.decision, record.enforced = audit.ALLOW, True
     if found:
         record.detail = f"turn baseline {len(found)}"

@@ -331,7 +331,7 @@ def approve(
     """
     from . import phase
 
-    proposals, problems = ticket_mod.scan(root, conf.tickets)
+    proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
@@ -380,6 +380,7 @@ def approve(
 
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
         complaints = validate(t, pool, types)
+        complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
@@ -756,6 +757,46 @@ def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
         if t.parent == parent_id and t.phase is not None
     ]
     return max(numbers) if numbers else 0
+
+
+def project_problems(
+    t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
+) -> list[rules.Problem]:
+    """`project:` が置き場に在るプロジェクトを指しているか（REQ-MLT-11）。
+
+    子は親から継ぐ。提案に書いていなければここで埋め、写しに書かれる。書いてあって
+    親と違えば承認しない。決めるのは人で、承認の画面に出た値が写しに残る。
+    """
+    from . import tree
+
+    if t.is_child:
+        parent = pool.get(t.parent)
+        if parent is None:
+            return []
+        if not t.project:
+            t.project = parent.project
+            if parent.project:
+                t.raw["project"] = parent.project
+        elif t.project != parent.project:
+            return [
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"`project: {t.project}` が親 {parent.ticket} の "
+                    f"{parent.project or '(ワークスペース)'} と違う。子は親から継ぐ",
+                )
+            ]
+        return []
+    known = {p.name for p in tree.projects(conf.projects)}
+    if t.project and t.project not in known:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"`project: {t.project}` は置き場 {conf.projects or '(無し)'} に無い",
+            )
+        ]
+    return []
 
 
 def validate(
