@@ -366,7 +366,7 @@ def decide(
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
-        return decide_at_subagent_start(stdout, conf, root, record)
+        return decide_at_subagent_start(stdout, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
         return decide_at_subagent_stop(stdout, stderr, mode, conf, root, payload, record)
     # 判定を持たないイベントは誤りではない。想定していない登録が
@@ -852,23 +852,37 @@ def subagent_forbidden(subject: str) -> str:
 
 
 def decide_at_subagent_start(
-    stdout: TextIO, conf: settings.Settings, root: str, record: audit.Record
+    stdout: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
 ) -> int:
-    """サブエージェントが始まったとき。承認済みで開いている子の一覧を渡す。
+    """サブエージェントが始まったとき。cwd の作業ツリーに関わる、開いている子の一覧を渡す。
 
     止められないイベントなので判定はしない。判定はファイルの行き先で決まるので、
     ここで渡す文は案内でしかない。親のプロンプトに書き忘れがあっても、
     サブエージェントが自分のツリーと範囲を知れるようにする。
+
+    渡すのは cwd で決める。親の作業ツリーならその親の開いている子、子の作業ツリーなら
+    その子自身。main と、チケットの無い作業ツリーからの起動には何も渡さない。
+    全部の子を渡していた版は、別のセッションが main で調査を委譲したときにも無関係な
+    子の範囲を案内し、調査役が自分の居場所を迷う形になった（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.approved:
         return EXIT_OK
     copies, _ = approval.copies(conf.approved)
-    closed, _ = approval.copies(conf.approved, closed=True)
-    done = {t.ticket for t in closed}
-    children = [t for t in copies if t.is_child]
+    index = approval.by_id(copies)
+    t = tree.tree_of(root, payload.cwd or os.getcwd())
+    bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
+    if bound is None:
+        return EXIT_OK
+    children = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     if not children:
         return EXIT_OK
+    closed, _ = approval.copies(conf.approved, closed=True)
+    done = {t.ticket for t in closed}
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先の作業ツリーのチケットで判定される。"
