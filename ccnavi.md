@@ -2624,11 +2624,15 @@ N 番目のフェーズの子は、N-1 番目までの全部が閉じ、レビ�
 `handoff` は親が書いた題と本文に残ったスレッドの URL を添えて issue を作り、元の MR に引き継ぎの note を残す。
 作るのは提案で、閉じるのは人。
 
-**Draft を外すのは親（`ready`）。** 条件は親を閉じられる条件と同じ（`ops.close_problems`）。閉じてよい状態と
-マージに進んでよい状態は同じものなので、判定を 2 つ持たない。exe が条件を確かめて `phases/<親>/ready.json` と
-note の下書きを置き、sh が Draft を外す（GitHub は GraphQL の `markPullRequestReadyForReview`、GitLab は題の
-`Draft:` を落とす）。親を閉じる前でも後でも打てる（閉じた写しも引く）。同じ親に 2 度打っても通る。sh が外し損ねた
-ときに打ち直せるように。マージは人。ccnavi はマージされたかを見ない。
+**Draft を外すのは親（`ready`）。** 条件は親を閉じられる条件（`ops.close_problems`）に、マージに進む前の
+作業ツリーの条件（`review._merge_problems`）を足したもの。後者は、途中の作業の置き場（`wip_root`。提案の置き場
+`wip/tickets` のいちばん上の階層 `wip/`）が追跡から消えていること、未コミットが無いこと、push 済みであること。
+途中のコミットもチケットの置き場も既定のブランチには残さない。人は squash で取り込む（GitLab では MR に
+`squash: true` を立てる。GitHub は MR ごとに持てないので note に書き、マージのときに人が選ぶ）。経緯は MR と
+issue に残る。exe が条件を確かめて `phases/<親>/ready.json` と note の下書きを置き、sh が Draft を外す
+（GitHub は GraphQL の `markPullRequestReadyForReview` と題の `Draft:` 落とし、GitLab は題の `Draft:` を落として
+`squash` を立てる）。親を閉じたあとに打つ（閉じた写しも引く。`done` は提案の置き場を読むので、片付ける前に閉じる）。
+同じ親に 2 度打っても通る。sh が外し損ねたときに打ち直せるように。マージは人。ccnavi はマージされたかを見ない。
 
 **まだ残っているが締める（`wrapup`）。** 人が端末で打つ人の判断。「未着手の子が残っているが、キリの良いところ
 までやった」を、途中の検査を 1 つずつ人が飛ばす形ではなく、1 手の証跡で表す。作業中の子がいる間は打てない
@@ -2643,8 +2647,10 @@ note の下書きを置き、sh が Draft を外す（GitHub は GraphQL の `ma
 | 未計画のフィードバック | 問わない（`wrapup.json` があれば `close_problems` は開いている子しか見ない） |
 
 そのうえで `phases/<親>/wrapup.json`（理由・時刻・取り消した子・省略した番号・受け入れた指摘）を置き、残りを写す
-issue の下書きと MR への note を書く。sh が issue を作り（`--no-issue` で省く）、Draft を外し、note を投稿する。
-親は `ticket done` で閉じる。取り消しも省略も受け入れも、それぞれの層に普段と同じ形で残るので、後から読む人は
+issue の下書きと MR への note を書く。sh が issue を作り（`--no-issue` で省く）、note を投稿する。
+親は状態の移動をコミットし、`ticket done` で閉じ、`wip/` を消して push し、`ready` で Draft を外す。
+Draft を外す道を `ready` の 1 本にしておくと、外れた MR は必ず「片付いて push 済み」になる。
+取り消しも省略も受け入れも、それぞれの層に普段と同じ形で残るので、後から読む人は
 「人がここで締めた」と、その時に何が残っていたかを、いつもの場所で読める。
 
 #### 24.15.8 段階の名前
