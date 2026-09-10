@@ -38,6 +38,8 @@ sh .claude/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
   accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
   handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
+  ready                                        親を閉じられる状態なら Draft を外す（マージに進んでよいの合図。マージは人）
+  wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写し、Draft を外す
   fetch                                        リモートから取ってきた写し（JSON）を標準出力へ
   origin                                       origin をどう読んだか（ホスト・scheme・API の綴り）
 
@@ -57,13 +59,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | check | note | accept | handoff | fetch | origin) ;;
+request | check | note | accept | handoff | ready | wrapup | fetch | origin) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail "$sub は通しません。使えるのは request / check / note / accept / handoff / fetch / origin です。" 2
+	fail "$sub は通しません。使えるのは request / check / note / accept / handoff / ready / wrapup / fetch / origin です。" 2
 	;;
 esac
 
@@ -353,6 +355,37 @@ comment() {
 	fi
 }
 
+# ---- Draft を外す。GitHub は GraphQL でしか外せない。GitLab は題の "Draft: " を落とす。
+
+undraft() {
+	mr_number="$1"
+	if [ "$kind" = github ]; then
+		pr=$(api GET "repos/$path/pulls/$mr_number")
+		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
+		[ -n "$node" ] || fail "マージリクエスト #$mr_number の node_id を読めない。"
+		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は旗で持つので、旗を下ろすときに題からも落とす。
+		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
+		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
+		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
+			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null
+		fi
+		query=$("$JQ" -n --arg id "$node" '{
+			query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{number isDraft}}}",
+			variables: {id: $id}}')
+		api POST graphql "$query" | "$JQ" -r '.data.markPullRequestReadyForReview.pullRequest.isDraft'
+	else
+		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
+		[ -n "$title" ] || fail "マージリクエスト !$mr_number の題を読めない。"
+		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
+		if [ "$stripped" = "$title" ]; then
+			printf 'false\n'
+			return 0
+		fi
+		payload=$("$JQ" -n --arg t "$stripped" '{title: $t}')
+		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" | "$JQ" -r '.draft // .work_in_progress // false'
+	fi
+}
+
 # ---- issue を作る。下書きの 1 行目が題、3 行目からが本文。{number, url} を返す。
 
 create_issue() {
@@ -489,5 +522,62 @@ handoff)
 	comment "$number" "$url" "$noted" >/dev/null
 	rm -f "$noted"
 	printf 'OK: #%s に引き継いだ（%s）。残りは利用者が accept で受け入れて閉じる\n' "$issue_no" "$issue_url"
+	;;
+ready)
+	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめて印と note の下書きを置き、
+	# ここが外して note を投稿する。マージは人。
+	fetch_all >"$result"
+	noted=$(ccnavi review ready --result "$result") || exit $?
+	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
+	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
+	still=$(undraft "$number")
+	[ "$still" = "false" ] || fail "Draft を外せなかった（$url）。ホストの返事は上に出ている。"
+	if [ -n "$noted" ] && [ -f "$noted" ]; then
+		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
+	fi
+	printf 'OK: Draft を外した（%s）。マージは利用者が行う\n' "$url"
+	;;
+wrapup)
+	# 人が端末で打つ。exe が残りを見せて y/N を取り、印を置いて下書きを書く。
+	# ここが残りを issue に写し、Draft を外し、note を投稿する。
+	reason=""
+	make_issue=1
+	while [ "$#" -gt 0 ]; do
+		case "$1" in
+		--reason)
+			reason="${2:-}"
+			shift 2
+			;;
+		--no-issue)
+			make_issue=0
+			shift
+			;;
+		*) shift ;;
+		esac
+	done
+	[ -n "$reason" ] || fail "wrapup には --reason <理由> が要る。" 2
+	fetch_all >"$result"
+	# exe は人に残りを見せて y/N を取るので、標準出力は端末のまま。下書きは控えの
+	# 置き場の決まった名前で拾う（親の識別子 = ブランチ名）。
+	ccnavi review wrapup --reason "$reason" --result "$result" || exit $?
+	issue_draft="$state/review-wrapup-issue-$branch.md"
+	noted="$state/review-wrapup-note-$branch.md"
+	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
+	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
+	if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
+		issue=$(create_issue "$issue_draft")
+		[ -z "$issue" ] && fail "残りを写す issue を作れなかった。下書きは $issue_draft にある。"
+		issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
+		issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
+		printf '残りを #%s に写した（%s）\n' "$issue_no" "$issue_url"
+		printf '残りは #%s へ: %s\n' "$issue_no" "$issue_url" >>"$noted"
+		rm -f "$issue_draft"
+	fi
+	still=$(undraft "$number")
+	[ "$still" = "false" ] || fail "Draft を外せなかった（$url）。ホストの返事は上に出ている。"
+	if [ -f "$noted" ]; then
+		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
+	fi
+	printf 'OK: Draft を外した（%s）。あとは親に ticket done を打たせる。マージは利用者が行う\n' "$url"
 	;;
 esac
