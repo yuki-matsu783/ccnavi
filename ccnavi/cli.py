@@ -1633,7 +1633,7 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
 
 
 def default_root() -> str:
-    """プロジェクト根、つまり .claude を持つディレクトリを見つける。
+    """プロジェクトルート、つまり .claude を持つディレクトリを見つける。
 
     ここでは作業ディレクトリそのものに頼ってはいけない。hook は自分が走る
     ディレクトリを選べないから。代わりに上へ辿るので、プロジェクトの中の

@@ -71,6 +71,19 @@ class GitWrapperTest(unittest.TestCase):
             env=environment,
         )
 
+    def make_bare(self):
+        """送り先の空のリポジトリを、その回だけの場所に作る。
+
+        名前を決め打ちにして Temp の直下へ置くと、別のセッションが同じテストを
+        走らせたときに同じ場所を指す。片方の後始末がもう片方の送り先を消して、
+        コードと関係のない失敗になる。
+        """
+        parent = tempfile.mkdtemp(prefix="ccnavi-gitwrap-origin-")
+        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
+        bare = os.path.join(parent, "origin.git")
+        git(self.dir, "init", "-q", "--bare", bare)
+        return bare
+
     def assertRejected(self, *args):
         """拒否は終了コード 2 で、git を 1 度も動かさない。"""
         result = self.run_wrapper(*args)
@@ -247,10 +260,7 @@ class PassTest(GitWrapperTest):
         レビューはマージリクエストの実物に結ぶので、そこまではエージェントが運べる。
         統合（マージ）は利用者の側に残してある。
         """
-        bare = os.path.join(self.dir, "..", "gitwrap-origin.git")
-        bare = os.path.abspath(bare)
-        self.addCleanup(shutil.rmtree, bare, ignore_errors=True)
-        git(self.dir, "init", "-q", "--bare", bare)
+        bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
         git(self.dir, "checkout", "--quiet", "-b", "i0001")
 
@@ -276,9 +286,7 @@ class PassTest(GitWrapperTest):
         見分けるのは承認済みの写しに `parent:` があるかだけ。写しの無いツリーと
         親の写しを持つツリーは通す。
         """
-        bare = os.path.abspath(os.path.join(self.dir, "..", "gitwrap-child-origin.git"))
-        self.addCleanup(shutil.rmtree, bare, ignore_errors=True)
-        git(self.dir, "init", "-q", "--bare", bare)
+        bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
         copies = os.path.join(self.dir, ".claude", "ccnavi", "tickets")
         os.makedirs(copies)

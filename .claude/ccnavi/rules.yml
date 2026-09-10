@@ -18,8 +18,8 @@ deny:
     match: Write|Edit|MultiEdit
     glob: "*/.claude/hooks/*"
     message: >-
-      hook 本体です。エージェントの判断で書き換えず、変更が要る理由を
-      伝えて利用者に依頼してください。
+      hook 本体です。エージェントの判断で書き換えず、理由を
+      伝えてユーザに変更を依頼ください。
 
   # ラッパースクリプト の場所
   - id: guard-scripts
@@ -27,7 +27,26 @@ deny:
     glob: "*/.claude/scripts/*"
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
-      エージェントの判断で書き換えず、変更が要る理由を伝えて利用者に依頼してください。
+      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
+
+  # main の作業ツリーでは編集しない
+  # `.claude/worktrees/` だけがこの網から外れ、allow の worktrees に落ちる。
+  # `{root}` は判定の根（hook なら CLAUDE_PROJECT_DIR）の実パスに置き換わる。
+  - id: main-tree
+    match: Write|Edit|MultiEdit|NotebookEdit
+    regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'
+    message: >-
+      main の作業ツリーでは編集しません。'sh .claude/scripts/ccnavi-git.sh worktree add
+      .claude/worktrees/<名前> -b <名前>' で作業ツリーを切り、その中で編集して、
+      ff-only で main に戻してください。
+
+  # worktree の中でも hook の登録は触らない。main の側と同じ扱い。
+  - id: worktree-settings
+    match: Write|Edit|MultiEdit|NotebookEdit
+    glob: "*/.claude/worktrees/*/.claude/settings*.json"
+    message: >-
+      作業ツリーの settings.json は hook の登録そのものです。main の側と同じく、
+      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
 
   # 承認済みのチケットの写しとフェーズの印。判定はここだけを読むので、ここを
   # 書けると承認の意味が無い。シェル経由は組み込みの既定が止めている。
@@ -38,29 +57,6 @@ deny:
       承認済みのチケットの写しです。承認は利用者が 'ccnavi --approve' で行い、
       閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
       範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
-
-  # main の作業ツリーでは編集しない（CLAUDE.md「ソースコード編集方法」）。作業は
-  # .claude/worktrees/ に切った worktree の中で行い、ff-only で main に戻す。
-  # ここは「根の下で、かつ .claude/worktrees/ の外」を止める。ルールの契約が先読みを
-  # 禁じているので、根の直下の 1 段目で場合分けする: `.` で始まらない名前、`.c` 以外で
-  # 始まる隠し名、`.cl` 以外で始まる隠し名、`.claude/` の下の `w` で始まらない名前。
-  # `.claude/worktrees/` だけがこの網から外れ、allow の worktrees に落ちる。
-  # `{root}` は判定の根（hook なら CLAUDE_PROJECT_DIR）の実パスに置き換わる。
-  - id: main-tree
-    match: Write|Edit|MultiEdit|NotebookEdit
-    regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'
-    message: >-
-      main の作業ツリーでは編集しません。'sh .claude/scripts/ccnavi-git.sh worktree add
-      .claude/worktrees/<名前> -b <名前>' で作業ツリーを切り、その中で編集して、
-      ff-only で main に戻してください（CLAUDE.md「ソースコード編集方法」）。
-
-  # worktree の中でも hook の登録は触らない。main の側と同じ扱い。
-  - id: worktree-settings
-    match: Write|Edit|MultiEdit|NotebookEdit
-    glob: "*/.claude/worktrees/*/.claude/settings*.json"
-    message: >-
-      作業ツリーの settings.json は hook の登録そのものです。main の側と同じく、
-      エージェントの判断で書き換えず、変更が要る理由を伝えて利用者に依頼してください。
 
   # 生の git はまとめて止め、入口を .claude/scripts/ccnavi-git.sh の 1 本に寄せる。
   # 止める理由は 2 つで、どちらも許可ルールの粒度では書けない。
@@ -94,7 +90,7 @@ deny:
     glob: "*git branch -D*"
     message: >-
       未マージのブランチが消えます。'ccnavi-git.sh branch -d <名前>' で安全側の削除を
-      試し、それでも消したいなら利用者に依頼してください。
+      試し、それでも消したいならユーザに変更を依頼ください。
 
   # settings.json の permissions.deny と同じ場所を並べてある。あちらは
   # Read と Write という名指しのツールにしか掛からないので、同じ場所へ

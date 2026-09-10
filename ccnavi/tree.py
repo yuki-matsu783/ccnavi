@@ -29,7 +29,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# 作業ツリーの置き場。CLAUDE.md の運用と対になる。プロジェクト根の中に置くのは、
+# 作業ツリーの置き場。CLAUDE.md の運用と対になる。プロジェクトルートの中に置くのは、
 # セッションの道具と権限がそこまで届くようにするため。
 WORKTREES_DIR = os.path.join(".claude", "worktrees")
 
