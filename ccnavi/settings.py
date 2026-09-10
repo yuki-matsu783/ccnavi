@@ -50,7 +50,7 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
 # チケットによる範囲の制御が使う 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
-# 根からの相対。APPROVED_ENV は承認済みの写しの置き場で、ワークスペースルートからの相対。
+# ルートからの相対。APPROVED_ENV は承認済みの写しの置き場で、ワークスペースルートからの相対。
 # 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
@@ -273,7 +273,7 @@ def project_rules_path(conf: Settings, project_root: str) -> str:
 def _relative(path: str) -> str:
     """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
 
-    絶対パスは受けない。作業ツリーごとに違う根に継ぎ足すものなので、
+    絶対パスは受けない。作業ツリーごとに違うルートに継ぎ足すものなので、
     絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
     分からなくなる。絶対で来たら先頭の区切りだけ落として相対として読む。
     """
