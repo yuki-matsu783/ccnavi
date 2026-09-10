@@ -878,7 +878,7 @@ def _parent_any(
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
         return parent
-    t = tree.tree_of(root, cwd or os.getcwd())
+    t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
         closed, _ = approval.copies(conf.approved, closed=True)
         found = tree.lookup(approval.by_id(closed), t.name)
@@ -940,10 +940,13 @@ def _is_last_feedback_review(parent: ticket_mod.Ticket, phase_no: int) -> bool:
 # ホストにはポートが付く（`localhost:8929`）。落とすと、手元や社内に立てた
 # GitLab を GitHub と見分ける手掛かりまで狂う。ssh の `git@host:group/proj` の
 # `:` はパスの区切りなので、数字だけのときにポートと見なす。
-# `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh も同じく落とす。
+# `https://oauth2:token@host/` のユーザ情報は読み飛ばす。sh と同じく、authority の
+# 最後の `@` までをユーザ情報と見る（git がそう切る。トークンに `@` が入る形がある）。
+# IPv6 は `[::1]` の形。sh が読めない綴り（`ssh://user@host/`、大文字の scheme）は
+# ここでも読めない扱いにして、--lint と sh の言うことを揃える。
 _REMOTE = re.compile(
-    r"^(?:https?://(?:[^/@]+@)?|git@|ssh://git@)"
-    r"(?P<host>[^/:@]+(?::\d+)?)[/:]+(?P<path>.+?)(?:\.git)?/?$"
+    r"^(?:https?://|ssh://git@|git@)(?:[^/]*@)?"
+    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::\d+)?[/:]+(?P<path>.+?)(?:\.git)?/?$"
 )
 
 
@@ -952,7 +955,7 @@ def remote_kind(url: str) -> str:
     m = _REMOTE.match(url)
     if m is None:
         return ""
-    host = m.group("host").split(":")[0]
+    host = m.group("host")
     return "github" if host == "github.com" else "gitlab"
 
 

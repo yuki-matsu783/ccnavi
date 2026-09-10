@@ -100,6 +100,11 @@ class Record:
     # 「戻した」が何回あったかは、ここを数えないと分からない。
     guarded: list[str] = field(default_factory=list)
     session: str = ""
+    # tree と project は、この呼び出しがどのツリーのものと判定されたか（設計 §25.9）。
+    # パスを持つツールは行き先、Bash は cwd のツリー。project はプロジェクトの名前で、
+    # ワークスペースなら空。dry-run でまず分布を見て、和で増えた確認を数えるための欄。
+    tree: str = ""
+    project: str = ""
 
 
 class Log:
@@ -164,6 +169,8 @@ class Log:
             ("degraded", record.degraded),
             ("fallback", record.fallback),
             ("detail", record.detail),
+            ("tree", record.tree),
+            ("project", record.project),
         ):
             if value:
                 out[key] = value

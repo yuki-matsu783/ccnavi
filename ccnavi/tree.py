@@ -36,25 +36,59 @@ WORKTREES_DIR = os.path.join(".claude", "worktrees")
 # main の名前。空文字。チケットは持たない。
 MAIN = ""
 
+# ツリーの種類（設計 §25.3）。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
+# リポジトリ）、作業ツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
+KIND_MAIN = "main"
+KIND_PROJECT = "project"
+KIND_WORKTREE = "worktree"
+
 
 @dataclass
 class Tree:
-    """作業ツリー 1 つ。name が空なら main。"""
+    """ツリー 1 つ。name が空ならワークスペースルート。
+
+    project は、このツリーがどのプロジェクトのものか。ワークスペースなら空、
+    プロジェクトならその名前、作業ツリーなら切り元のプロジェクトの名前
+    （ワークスペースから切った作業ツリーなら空）。
+    """
 
     name: str
     root: str
+    project: str = ""
+    kind: str = KIND_MAIN
 
     @property
     def is_main(self) -> bool:
-        return self.name == MAIN
+        """チケットを持たないツリーか。ワークスペースルート とプロジェクトルート がこれ。"""
+        return self.kind != KIND_WORKTREE
 
 
 def main_tree(root: str) -> Tree:
     return Tree(MAIN, _canonical(root))
 
 
-def worktrees(root: str) -> list[Tree]:
-    """main の下にある、本物の作業ツリーの一覧。
+def projects(projects_dir: str) -> list[Tree]:
+    """プロジェクトの一覧。置き場の直下で `.git` を持つディレクトリだけ。深さ 1。
+
+    置き場を空にしたプロジェクトはプロジェクトを持たない。`.git` はディレクトリでも
+    ファイルでもよい（プロジェクトが submodule として置かれた形も、自分の git を持つ）。
+    """
+    if not projects_dir:
+        return []
+    try:
+        names = sorted(os.listdir(projects_dir))
+    except OSError:
+        return []
+    found = []
+    for name in names:
+        candidate = os.path.join(projects_dir, name)
+        if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, ".git")):
+            found.append(Tree(name, _canonical(candidate), project=name, kind=KIND_PROJECT))
+    return found
+
+
+def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
+    """main の下にある、本物の作業ツリーの一覧。切り元はワークスペースでもプロジェクトでもよい。
 
     読むのはファイルシステムだけで、git は起こさない。実行前の判定の中で
     呼ばれるので、外部プロセスを起こす場所にはできない。
@@ -64,12 +98,36 @@ def worktrees(root: str) -> list[Tree]:
         names = sorted(os.listdir(base))
     except OSError:
         return []
+    owners = [main_tree(root), *projects(projects_dir)]
     found = []
     for name in names:
         candidate = os.path.join(base, name)
-        if os.path.isdir(candidate) and is_worktree_of(root, candidate):
-            found.append(Tree(name, _canonical(candidate)))
+        if not os.path.isdir(candidate):
+            continue
+        owner = owner_of(candidate, owners)
+        if owner is not None:
+            found.append(
+                Tree(name, _canonical(candidate), project=owner.project, kind=KIND_WORKTREE)
+            )
     return found
+
+
+def owner_of(candidate: str, owners: list[Tree]) -> Tree | None:
+    """この作業ツリーの切り元。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
+    for owner in owners:
+        if is_worktree_of(owner.root, candidate):
+            return owner
+    return None
+
+
+def all_trees(root: str, projects_dir: str = "") -> list[Tree]:
+    """ワークスペースルート、プロジェクト、作業ツリーの順。"""
+    return [main_tree(root), *projects(projects_dir), *worktrees(root, projects_dir)]
+
+
+def project_root(projects_dir: str, project: str) -> str:
+    """この名前のプロジェクトルート。在るかどうかは見ない。空の名前はワークスペース（空文字）。"""
+    return os.path.join(projects_dir, project) if project and projects_dir else ""
 
 
 def is_worktree_of(root: str, candidate: str) -> bool:
@@ -101,13 +159,17 @@ def is_worktree_of(root: str, candidate: str) -> bool:
     return _canonical(back) == _canonical(gitfile)
 
 
-def tree_of(root: str, full: str) -> Tree | None:
-    """このパスが属する作業ツリー。プロジェクトの外なら None。"""
+def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
+    """このパスが属するツリー。ワークスペースルートの外なら None。
+
+    候補はワークスペースルート、プロジェクト、作業ツリーの全部で、最長一致を採る。上限は
+    ワークスペースルートで、外に行き先があれば判定を持たない。
+    """
     if not full:
         return None
     target = _canonical(full)
     best: Tree | None = None
-    for tree in [main_tree(root), *worktrees(root)]:
+    for tree in all_trees(root, projects_dir):
         inside = target == tree.root or target.startswith(tree.root + os.sep)
         if inside and (best is None or len(tree.root) > len(best.root)):
             best = tree

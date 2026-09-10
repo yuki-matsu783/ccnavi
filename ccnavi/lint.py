@@ -169,6 +169,7 @@ def check(
     problems.extend(_phases(conf))
     problems.extend(_risk(conf))
     problems.extend(_ticket(conf, root))
+    problems.extend(_projects(conf, root))
     return problems
 
 
@@ -260,7 +261,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     index = approval.by_id(copies)
     done = {t.ticket for t in closed}
 
-    proposals, complaints = ticket_mod.scan(root, conf.tickets)
+    proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
     problems.extend(complaints)
 
     types = _phase_types(conf)
@@ -311,7 +312,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
             )
 
-    worktrees = tree.worktrees(root)
+    worktrees = tree.worktrees(root, conf.projects)
     for t in worktrees:
         if t.name not in index:
             problems.append(
@@ -330,6 +331,20 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                     f"作業ツリー {t.name} の側に写しの置き場がある。読むのは main の側だけ",
                 )
             )
+        bound = index.get(t.name)
+        if bound is not None:
+            parent = index.get(bound.parent) if bound.is_child else None
+            owner = parent.project if parent is not None else bound.project
+            if owner != t.project:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        "(ticket)",
+                        f"作業ツリー {t.name} の切り元（{t.project or 'ワークスペース'}）が写しの "
+                        f"project（{owner or 'ワークスペース'}）と違う。そこへの書き込みは止まる。"
+                        "写しが指すリポジトリから切り直す",
+                    )
+                )
     names = {t.name for t in worktrees}
     for t in copies:
         if t.ticket not in names:
@@ -354,6 +369,75 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             )
         )
     return problems
+
+
+def _projects(conf: settings.Settings, root: str) -> list[Problem]:
+    """プロジェクトの置き場が噛み合っているか（REQ-MLT-16）。
+
+    置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
+    各プロジェクトのルールが読めること、プロジェクトが `.claude/` を持たないことを見る。
+    どれも error にしない。判定は動いていて、読めないプロジェクトは組み込みの既定に落ちる。
+    """
+    from . import tree
+
+    problems: list[Problem] = []
+    found = tree.projects(conf.projects)
+    if not found:
+        return problems
+    rel = os.path.relpath(conf.projects, root).replace(os.sep, "/")
+    if _ignored(root, rel) is False:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(projects)",
+                f"{rel}/ がワークスペースの git で無視されていない。プロジェクトは自分の git を"
+                "持つので、ワークスペースの `.gitignore` に入れる",
+            )
+        )
+    for p in found:
+        where = f"(projects/{p.name})"
+        path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.name))
+        if not os.path.isfile(path):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    where,
+                    f"ルール {conf.project_rules} が無い。このプロジェクトへの書き込みは組み込みの"
+                    "既定で判定し、Bash の合成からは外れる",
+                )
+            )
+        else:
+            for c in _rules(path, root):
+                problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
+        if os.path.isdir(os.path.join(p.root, ".claude")):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    where,
+                    ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに"
+                    f"見える。プロジェクトの設定は {conf.project_rules} に置く",
+                )
+            )
+    return problems
+
+
+def _ignored(root: str, rel: str) -> bool | None:
+    """このパスをワークスペースの git が無視しているか。git が無ければ None。"""
+    import subprocess
+
+    try:
+        done = subprocess.run(
+            ["git", "check-ignore", "-q", rel],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            timeout=gitstate.TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if done.returncode == 0:
+        return True
+    return False if done.returncode == 1 else None
 
 
 def _review_token(root: str) -> list[Problem]:

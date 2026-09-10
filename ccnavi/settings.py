@@ -58,6 +58,11 @@ APPROVED_ENV = "CCNAVI_APPROVED"
 PHASES_ENV = "CCNAVI_PHASES"
 # RISK_ENV は実績で測るリスクの配点。main の根からの相対。無ければ組み込みの配点。
 RISK_ENV = "CCNAVI_RISK"
+# PROJECTS_ENV はプロジェクトの置き場（設計 §25）。ワークスペースルートからの相対。直下で `.git` を
+# 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
+# PROJECT_RULES_ENV はプロジェクトごとのルールファイル。各プロジェクトルートからの相対。
+PROJECTS_ENV = "CCNAVI_PROJECTS"
+PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
 # 以前の形（チケット 1 本と台帳 jsonl）の環境変数。もう効かない。指定されていたら
 # --lint が言う。黙って無視すると、書いた人は効いていると思い続ける。
 RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER")
@@ -87,6 +92,14 @@ DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
 DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
 DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
+# プロジェクトの置き場。ワークスペースの直下に固定するのは、列挙が速いことと、
+# 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
+# （プロジェクトは自分の git を持つ）。
+DEFAULT_PROJECTS = "projects"
+# プロジェクトのルールはプロジェクトの git で育てる。`.claude/` の下には置かない。
+# プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、`--lint` が
+# 迷い子として拾う。
+DEFAULT_PROJECT_RULES = "config/rules.yml"
 
 
 @dataclass
@@ -139,6 +152,11 @@ class Settings:
     phases: str = ""
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
+    # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、この設定が
+    # 入る前と同じに動く。project_rules は各プロジェクトのルールファイル
+    # （プロジェクトルートからの相対、"/" 区切り）。
+    projects: str = ""
+    project_rules: str = ""
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
     retired: list[str] = field(default_factory=list)
 
@@ -164,8 +182,16 @@ def load(root: str) -> tuple[Settings, list[str]]:
         approved=os.path.join(root, DEFAULT_APPROVED),
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
+        projects=os.path.join(root, DEFAULT_PROJECTS),
+        project_rules=DEFAULT_PROJECT_RULES,
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
+    if PROJECTS_ENV in os.environ:
+        # 空文字は「プロジェクトを数えない」。
+        settings.projects = _log_or_none(root, os.environ[PROJECTS_ENV])
+    project_rules_env = os.environ.get(PROJECT_RULES_ENV, "")
+    if project_rules_env:
+        settings.project_rules = _relative(project_rules_env)
     phases_env = os.environ.get(PHASES_ENV, "")
     if phases_env:
         settings.phases = _resolve(root, phases_env)
@@ -231,8 +257,17 @@ def load(root: str) -> tuple[Settings, list[str]]:
         settings.phases = _resolve(root, conf["phases"])
     if isinstance(conf.get("risk"), str) and conf["risk"]:
         settings.risk = _resolve(root, conf["risk"])
+    if isinstance(conf.get("projects"), str):
+        settings.projects = _log_or_none(root, conf["projects"])
+    if isinstance(conf.get("project_rules"), str) and conf["project_rules"]:
+        settings.project_rules = _relative(conf["project_rules"])
 
     return settings, problems
+
+
+def project_rules_path(conf: Settings, project_root: str) -> str:
+    """このプロジェクトのルールファイルの絶対パス。"""
+    return os.path.join(project_root, conf.project_rules.replace("/", os.sep))
 
 
 def _relative(path: str) -> str:

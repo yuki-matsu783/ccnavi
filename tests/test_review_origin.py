@@ -33,6 +33,15 @@ class RemoteKindTest(unittest.TestCase):
             "http://oauth2:glpat-secret@localhost:8929/root/p.git": "gitlab",
             "ssh://git@gitlab.example.com:2222/g/p.git": "gitlab",
             "git@gitlab.example.com:g/p.git": "gitlab",
+            # ユーザ情報に `@` が入る。git は最後の `@` で切るので、こちらもそう読む。
+            "https://user:p@ss@github.com/o/r.git": "github",
+            "https://oauth2:glpat-A@B@localhost:8929/root/p.git": "gitlab",
+            # パスに `@` があっても authority の外なので混ざらない。
+            "git@github.com:o/r@x.git": "github",
+            "https://[::1]:9/g/p.git": "gitlab",
+            # sh が読めない綴りは、こちらも読めない扱い。
+            "ssh://user@host.example.com/g/p.git": "",
+            "HTTPS://github.com/o/r.git": "",
             "not a url": "",
         }
         for url, kind in cases.items():

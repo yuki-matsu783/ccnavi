@@ -178,6 +178,24 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             written = rule.glob or rule.regex
             stdout.write(f"  {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n")
 
+    projects = tree.projects(conf.projects)
+    if projects:
+        stdout.write(f"\n■ プロジェクト（{len(projects)} 件、置き場 {conf.projects}）\n")
+        stdout.write(
+            "  パスを持つツールは行き先のプロジェクトのルールで判定し、Bash は"
+            "ワークスペースと全プロジェクトのルールの和で判定する（設計 §25.4）\n"
+        )
+        for p in projects:
+            path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.name))
+            try:
+                extra, _ = rules.load(path, root)
+            except (OSError, ValueError) as exc:
+                stdout.write(f"  {p.name:<28} 読めない: {exc}\n")
+                stdout.write("    書き込みは組み込みの既定で判定し、Bash の和からは外れる\n")
+                continue
+            counts = " ".join(f"{name} {len(extra.section(name))}" for name in rules.SECTIONS)
+            stdout.write(f"  {p.name:<28} {path}  {counts}\n")
+
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
     stdout.write("    auto                          classifier が判断する\n")
