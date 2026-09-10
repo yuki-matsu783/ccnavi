@@ -37,6 +37,7 @@ sh .claude/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <
   check    --phase <N>                         依頼より後の未解決スレッドが無ければ印を置く
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
   accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
+  handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
   fetch                                        リモートから取ってきた写し（JSON）を標準出力へ
   origin                                       origin をどう読んだか（ホスト・scheme・API の綴り）
 
@@ -56,13 +57,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | check | note | accept | fetch | origin) ;;
+request | check | note | accept | handoff | fetch | origin) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail "$sub は通しません。使えるのは request / check / note / accept / fetch です。" 2
+	fail "$sub は通しません。使えるのは request / check / note / accept / handoff / fetch / origin です。" 2
 	;;
 esac
 
@@ -331,6 +332,21 @@ comment() {
 	fi
 }
 
+# ---- issue を作る。下書きの 1 行目が題、3 行目からが本文。{number, url} を返す。
+
+create_issue() {
+	draft="$1"
+	if [ "$kind" = github ]; then
+		payload=$("$JQ" -n --rawfile all "$draft" \
+			'($all | split("\n")) as $l | {title: ($l[0]), body: ($l[2:] | join("\n"))}')
+		api POST "repos/$path/issues" "$payload" | "$JQ" '{number: .number, url: .html_url}'
+	else
+		payload=$("$JQ" -n --rawfile all "$draft" \
+			'($all | split("\n")) as $l | {title: ($l[0]), description: ($l[2:] | join("\n"))}')
+		api POST "projects/$(encoded_path)/issues" "$payload" | "$JQ" '{number: .iid, url: .web_url}'
+	fi
+}
+
 # ---- 写し。exe に渡す JSON。
 
 fetch_all() {
@@ -422,5 +438,35 @@ accept)
 		url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 		comment "$number" "$url" "$f" >/dev/null && rm -f "$f"
 	done
+	;;
+handoff)
+	# 残った指摘を別の issue に切り出す。exe が段階を確かめて下書きを書き、ここが作る。
+	body=""
+	while [ "$#" -gt 0 ]; do
+		case "$1" in
+		--body-file)
+			body="${2:-}"
+			shift 2
+			;;
+		*) shift ;;
+		esac
+	done
+	[ -n "$body" ] && [ -f "$body" ] || fail "handoff には --body-file <題と本文>（1 行目が題）が要る。" 2
+	fetch_all >"$result"
+	draft=$(ccnavi review handoff --body-file "$body" --result "$result") || exit $?
+	issue=$(create_issue "$draft")
+	[ -z "$issue" ] && fail "issue を作れなかった。"
+	issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
+	issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
+	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
+	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
+	noted="$state/review-handoff-note-$$.md"
+	{
+		printf '<!-- ccnavi:handoff -->\n'
+		printf '残った指摘を #%s へ引き継ぐ: %s\n' "$issue_no" "$issue_url"
+	} >"$noted"
+	comment "$number" "$url" "$noted" >/dev/null
+	rm -f "$noted"
+	printf 'OK: #%s に引き継いだ（%s）。残りは利用者が accept で受け入れて閉じる\n' "$issue_no" "$issue_url"
 	;;
 esac

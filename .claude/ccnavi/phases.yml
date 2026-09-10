@@ -1,0 +1,59 @@
+# フェーズの種類（設計 §24.15）。人が持つ設定で、エージェントは書き換えない。
+#
+# 親チケットの `plan:` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
+# `ccnavi --approve` が通ることが合意になる。レビューを受けたあとは `feedback:` に
+# `kind: feedback` の種類を並べて改版を出す（対応が無くても `[]` で出す）。
+#
+# `id`（キー）と `title` はどちらも一意。重なれば --lint が error で止める。
+# このファイルが無ければ、フェーズは番号だけの挙動に戻る。
+version: 1
+
+phases:
+  research:
+    kind: work
+    title: 調査
+    review: none
+    scope: ["wip/research/*"]
+    deliverables: ["wip/research/summary.md"]
+    when: 既存の振る舞いや依存が分からないとき。分かっているなら飛ばす
+
+  design:
+    kind: work
+    title: 設計
+    review: mr
+    scope: ["wip/design/*", "docs/*"]
+    deliverables: ["wip/design/*.md"]
+    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
+
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    scope: ["tests/*"]
+    overlap: [implement]
+    when: 振る舞いが変わるとき。実装と並行してよい
+
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml"]
+    requires: [acceptance]
+
+  docs:
+    kind: work
+    title: 文書
+    review: mr
+    scope: ["README.md", "ccnavi.md", "requirements.md", "HANDOVER.md", "docs/*"]
+
+  design-feedback:
+    kind: feedback
+    title: 設計フィードバック対応
+    review: mr
+    scope: ["wip/design/*", "docs/*"]
+
+  implement-feedback:
+    kind: feedback
+    title: 実装フィードバック対応
+    review: mr
+    scope: inherit
