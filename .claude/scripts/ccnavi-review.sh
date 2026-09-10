@@ -38,8 +38,8 @@ sh .claude/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
   accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
   handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
-  ready                                        親を閉じられる状態なら Draft を外す（マージに進んでよいの合図。マージは人）
-  wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写し、Draft を外す
+  ready                                        閉じられて wip を片付け push 済みなら Draft を外す（マージに進んでよいの合図。マージは人が squash で）
+  wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                        リモートから取ってきた写し（JSON）を標準出力へ
   origin                                       origin をどう読んだか（ホスト・scheme・API の綴り）
 
@@ -381,7 +381,9 @@ undraft() {
 			printf 'false\n'
 			return 0
 		fi
-		payload=$("$JQ" -n --arg t "$stripped" '{title: $t}')
+		# squash も立てる。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
+		# （マージのときに人が選ぶ）ので、note に書くだけ。
+		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
 		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" | "$JQ" -r '.draft // .work_in_progress // false'
 	fi
 }
@@ -539,7 +541,8 @@ ready)
 	;;
 wrapup)
 	# 人が端末で打つ。exe が残りを見せて y/N を取り、印を置いて下書きを書く。
-	# ここが残りを issue に写し、Draft を外し、note を投稿する。
+	# ここが残りを issue に写し、note を投稿する。Draft を外すのは、親が片付けて
+	# push したあとの ready（外す道は 1 本）。
 	reason=""
 	make_issue=1
 	while [ "$#" -gt 0 ]; do
@@ -573,11 +576,9 @@ wrapup)
 		printf '残りは #%s へ: %s\n' "$issue_no" "$issue_url" >>"$noted"
 		rm -f "$issue_draft"
 	fi
-	still=$(undraft "$number")
-	[ "$still" = "false" ] || fail "Draft を外せなかった（$url）。ホストの返事は上に出ている。"
 	if [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
-	printf 'OK: Draft を外した（%s）。あとは親に ticket done を打たせる。マージは利用者が行う\n' "$url"
+	printf 'OK: 締めた（%s）。あとは親に、閉じて片付けて push し、ready を打たせる。マージは利用者が行う\n' "$url"
 	;;
 esac
