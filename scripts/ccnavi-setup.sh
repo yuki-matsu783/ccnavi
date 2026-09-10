@@ -7,18 +7,17 @@
 #   --mode <enable|dry-run>  CCNAVI_MODE。既定は dry-run
 #   --bin <相対パス>         CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
 #   --all                    既定値を持つ env も明示して書く
-#   --force                  既にある env の値を、このスクリプトの値で置き換える
-#   --check                  書かずに、足りないものだけを並べる
+#   --force                  明示した --mode / --bin で、既にある値を置き換える
+#   --check                  書かずに、揃っていないところだけを並べる
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
-# env は触らない（--force を付けたときだけ置き換える）。ccnavi と関係のない
-# hook や設定はそのまま残す。
+# env は触らない。ccnavi と関係のない hook や設定はそのまま残す。
 #
 # `disable` は受け付けない。監視される側が書けるファイルから監視を止める形に
 # なるので、ccnavi 自身がそれを error として報告する（README「設定lint」）。
 # 止めるならセッションを起動する側の環境から渡す。
 #
-# 終了コード: 0 成功 / 1 --check で不足あり / 2 引数か環境の誤り
+# 終了コード: 0 成功 / 1 --check で揃っていない / 2 引数か環境の誤り
 
 set -eu
 
@@ -31,8 +30,16 @@ HOOK_TIMEOUT=10
 # 落ちる。何が落ちるかは README「設定」の表にある。
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart SubagentStop"
 
-mode="dry-run"
-bin="dist/ccnavi/ccnavi"
+DEFAULT_MODE="dry-run"
+DEFAULT_BIN="dist/ccnavi/ccnavi"
+
+mode="$DEFAULT_MODE"
+bin="$DEFAULT_BIN"
+# 明示されたかどうかを分けて持つ。--force が置き換えてよいのは、人がこの実行で
+# 名指しした値だけ。既定で埋めただけの値まで置き換えると、`--all` を足しに来た
+# 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run へ落とす。
+mode_given=no
+bin_given=no
 all=no
 force=no
 check=no
@@ -42,12 +49,12 @@ usage() {
 	cat <<'USAGE'
 sh scripts/ccnavi-setup.sh [<プロジェクトルート>] [オプション]
 
-  <プロジェクトルート>          既定は現在の作業ディレクトリ
+  <プロジェクトルート>      既定は現在の作業ディレクトリ
   --mode <enable|dry-run>   CCNAVI_MODE。既定は dry-run
   --bin <相対パス>          CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
   --all                     既定値を持つ env も明示して書く
-  --force                   既にある env の値を置き換える
-  --check                   書かずに、足りないものだけを並べる
+  --force                   明示した --mode / --bin で、既にある値を置き換える
+  --check                   書かずに、揃っていないところだけを並べる
 USAGE
 }
 
@@ -61,11 +68,13 @@ while [ "$#" -gt 0 ]; do
 	--mode)
 		[ "$#" -ge 2 ] || die "--mode に値がありません。"
 		mode="$2"
+		mode_given=yes
 		shift 2
 		;;
 	--bin)
 		[ "$#" -ge 2 ] || die "--bin に値がありません。"
 		bin="$2"
+		bin_given=yes
 		shift 2
 		;;
 	--all)
@@ -84,11 +93,21 @@ while [ "$#" -gt 0 ]; do
 		usage
 		exit 0
 		;;
+	--)
+		# ここから先は値として読む。`-` で始まる名前のディレクトリを対象にできる。
+		shift
+		[ "$#" -eq 1 ] || die "-- のうしろはプロジェクトルート 1 つだけです。"
+		target="$1"
+		shift
+		;;
 	-*)
 		die "$1 は知らないオプションです。使える形は --help に出ます。"
 		;;
 	*)
-		[ -z "$target" ] || die "プロジェクトルートは 1 つだけ受け取ります。"
+		# 空文字を「まだ受け取っていない」と読むと 2 つ受け取れてしまうので、
+		# 受け取ったかどうかは別の印で持つ。
+		[ "$target" = "" ] || die "プロジェクトルートは 1 つだけ受け取ります。"
+		[ "$1" != "" ] || die "プロジェクトルートが空です。"
 		target="$1"
 		shift
 		;;
@@ -105,9 +124,23 @@ disable)
 	;;
 esac
 
+# 実行ファイルの綴りは、hook が何を起動するかと、ccnavi が何を守るかの両方を
+# 決める 1 行（selfguard.py 冒頭）。ここが差し替えられると、ルールを 1 行も
+# 変えずに判定そのものを入れ替えられるので、`disable` と同じ重さで検査する。
+[ "$bin" != "" ] || die "--bin が空です。空のまま書くと hook がプロジェクトルートのディレクトリを起動しようとします。"
+if [ "$(printf '%s' "$bin" | wc -l)" -ne 0 ]; then
+	die "--bin に改行を含められません。"
+fi
 case "$bin" in
-/* | ?:*)
+/* | ?:* | //* | '\\'*)
 	die "--bin はプロジェクトルートからの相対で書いてください。env の値は \${CLAUDE_PROJECT_DIR} を展開しないので、絶対パスは 3 つの環境で綴りが変わります。"
+	;;
+esac
+# 区切りを "/" に寄せてから `..` を探す。相対で書かせる目的はプロジェクトの中に
+# 閉じ込めることなので、外へ出る綴りは絶対パスと同じ理由で通さない。
+case "/$(printf '%s' "$bin" | tr '\\' '/')/" in
+*/../*)
+	die "--bin に .. を含められません。プロジェクトルートの外にある実行ファイルは、ここからは指せません。"
 	;;
 esac
 
@@ -119,6 +152,13 @@ command -v jq >/dev/null 2>&1 || die "jq が要ります。"
 # 人が設定ファイルを開くときにそのまま使える綴りになる。
 root=$(cd "$target" && { pwd -W 2>/dev/null || pwd; })
 settings="$root/$SETTINGS_REL"
+claude_dir=$(dirname "$settings")
+
+# 書けない形を、jq を回す前に見つける。あとで mkdir が失敗すると、終了コードが
+# 1（--check の「揃っていない」）と衝突したうえ、生のエラーだけが出る。
+if [ -e "$claude_dir" ] && [ ! -d "$claude_dir" ]; then
+	die "$claude_dir がディレクトリではありません。"
+fi
 
 # 読む側を 1 か所にする。ファイルが無いときは空のオブジェクトとして扱う。
 # ccnavi を入れる前のプロジェクトには settings.json が無いのが普通で、
@@ -126,129 +166,195 @@ settings="$root/$SETTINGS_REL"
 if [ -e "$settings" ]; then
 	[ -f "$settings" ] || die "$settings がファイルではありません。"
 	current=$(cat "$settings")
-	printf '%s' "$current" | jq -e . >/dev/null 2>&1 ||
+	# `jq -e` は使わない。`null` や `false` は JSON として正しいのに -e が
+	# 偽を返すので、「読めません」という嘘の理由で死ぬことになる。
+	printf '%s' "$current" | jq . >/dev/null 2>&1 ||
 		die "$SETTINGS_REL が JSON として読めません。直してから打ち直してください。"
 else
 	current="{}"
 fi
 
+# 形の検査。ここを通さずに進むと、想定と違う型に当たった jq が生のエラーを吐いて
+# 終了コード 5 で落ちる。5 はこのスクリプトが宣言していない値で、呼んだ側は
+# 引数の誤りとも環境の不足とも区別が付かない。
+#
+# 見るのは ccnavi が触る場所だけ。プロジェクトが置いている他のキーの形は問わない。
+shape=$(printf '%s' "$current" | jq -r '
+	if type != "object" then "全体が JSON のオブジェクトではありません"
+	elif (.env // {} | type) != "object" then ".env がオブジェクトではありません"
+	elif (.hooks // {} | type) != "object" then ".hooks がオブジェクトではありません"
+	elif (.hooks // {} | to_entries | any(.value | type != "array")) then
+		".hooks の中に、配列でないイベントがあります"
+	elif ([.hooks // {} | to_entries[] | .value[]] | any(type != "object")) then
+		".hooks のイベントの中に、オブジェクトでない要素があります"
+	elif ([.hooks // {} | to_entries[] | .value[] | .hooks // []] | any(type != "array")) then
+		".hooks のエントリの中に、配列でない hooks があります"
+	elif ([.hooks // {} | to_entries[] | .value[] | (.hooks // [])[]] | any(type != "object")) then
+		".hooks の中に、オブジェクトでない hook があります"
+	elif ([.hooks // {} | to_entries[] | .value[] | (.hooks // [])[] | .command // ""] | any(type != "string")) then
+		".hooks の中に、文字列でない command があります"
+	else "" end
+')
+[ -z "$shape" ] || die "$SETTINGS_REL の形を扱えません: $shape。直してから打ち直してください。"
+
 # 必ず書く env。既定を持たない CCNAVI_BIN_PATH と、既定と同じでも書いておきたい
 # 2 つのパス。設定ファイルだけを見て、どこを読み書きするかが分かる形にする。
-required_env() {
-	cat <<ENV
-CCNAVI_MODE=$mode
-CCNAVI_RULES=.claude/ccnavi/rules.yml
-CCNAVI_LOG=.claude/ccnavi/log.jsonl
-CCNAVI_BIN_PATH=$bin
-ENV
-}
-
+#
+# 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
+# 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を --bin 経由で
+# 書き込めてしまう。
+env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" '{
+	CCNAVI_MODE: $mode,
+	CCNAVI_RULES: ".claude/ccnavi/rules.yml",
+	CCNAVI_LOG: ".claude/ccnavi/log.jsonl",
+	CCNAVI_BIN_PATH: $bin
+}')
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
 # 書く利点は、あとで値を変えたくなった人が、つまみの一覧を README ではなく
 # 設定ファイルの中で見つけられること。
-optional_env() {
-	cat <<'ENV'
-CCNAVI_STATE=.claude/ccnavi/state
-CCNAVI_TICKETS=wip/tickets
-CCNAVI_APPROVED=.claude/ccnavi/tickets
-CCNAVI_PHASES=.claude/ccnavi/phases.yml
-CCNAVI_RISK=.claude/ccnavi/risk.yml
-CCNAVI_RESTORE_IF_DENY=enable
-CCNAVI_GUARD_CORE_FILES=enable
-CCNAVI_GUARD_CLI=enable
-ENV
-}
+if [ "$all" = yes ]; then
+	env_json=$(printf '%s' "$env_json" | jq '. + {
+		CCNAVI_STATE: ".claude/ccnavi/state",
+		CCNAVI_TICKETS: "wip/tickets",
+		CCNAVI_APPROVED: ".claude/ccnavi/tickets",
+		CCNAVI_PHASES: ".claude/ccnavi/phases.yml",
+		CCNAVI_RISK: ".claude/ccnavi/risk.yml",
+		CCNAVI_RESTORE_IF_DENY: "enable",
+		CCNAVI_GUARD_CORE_FILES: "enable",
+		CCNAVI_GUARD_CLI: "enable"
+	}')
+fi
 
-collect_env() {
-	required_env
-	if [ "$all" = yes ]; then
-		optional_env
-	fi
-}
-
-# 値に "=" が入りうるので、最初の 1 つだけで割る。
-env_json=$(collect_env | jq -R -s '
-	split("\n") | map(select(length > 0)) | map(
-		(index("=")) as $i | {(.[0:$i]): .[$i + 1:]}
-	) | add
-')
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 登録の見方は ccnavi の設定lint と揃えてある（lint.py の _registered）。
-# command の綴りはプロジェクトごとに違うので、名前が入っているかどうかで見る。
-# 大文字小文字を無視するのは、${CCNAVI_BIN_PATH} で書く形が普通にあるため。
-REGISTERED='def registered($ev):
-	[ (.hooks[$ev] // [])[] | (.hooks // [])[] | (.command // "") | ascii_downcase | test("ccnavi") ] | any;'
+# --force が置き換えてよいキー。人がこの実行で名指しした 2 つだけ。
+forced=""
+if [ "$force" = yes ]; then
+	if [ "$mode_given" = yes ]; then
+		forced="$forced CCNAVI_MODE"
+	fi
+	if [ "$bin_given" = yes ]; then
+		forced="$forced CCNAVI_BIN_PATH"
+	fi
+fi
+forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
+
+# 登録の見方。ccnavi の設定lint（lint.py の _registered）は command に "ccnavi" が
+# 含まれるかどうかだけで見るが、それだけだと無関係な hook のパスに名前が入って
+# いるプロジェクトで、そのイベントが「登録済み」に見えたまま永久に登録されない。
+#
+# そこで 3 つに分ける。同じ綴りで在る（exact）、ccnavi らしき別の綴りが在る
+# （other）、無い（none）。足すのは none だけ。other は足さずに人へ見せる。
+# 綴りはプロジェクトごとに違うので、どちらが正しいかをここで決められない。
+# 黙って足すと判定が 2 回走り、黙って飛ばすとそのイベントが落ちたままになる。
+REGISTERED='def commands($ev): [ (.hooks[$ev] // [])[] | (.hooks // [])[] | .command // "" ];
+	def exact($ev; $cmd): [ commands($ev)[] | select(. == $cmd) ] | length > 0;
+	def looks($ev): [ commands($ev)[] | ascii_downcase
+		| select(test("(^|[^a-z0-9])ccnavi([^a-z0-9]|$)")) ] | length > 0;'
 
 missing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" '
 	(.env // {}) as $cur | $env | keys_unsorted[] | select($cur[.] == null)
 ')
-differing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" '
+# 値が違う env を 2 つに分ける。名指しされた分は置き換え、それ以外は残す。
+# 残すほうも黙らない。既に書かれている CCNAVI_MODE=disable のように、
+# 揃っているように見えて防御が消えている形が、ここにしか現れない。
+replacing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjson forced "$forced_json" '
 	(.env // {}) as $cur | $env | to_entries[]
 	| select($cur[.key] != null and $cur[.key] != .value)
+	| select(.key as $k | $forced | index($k) != null)
 	| "\(.key): \($cur[.key]) -> \(.value)"
 ')
-# 根を $root に取り置いてから回す。イベント名を `.` に置いたまま registered を
-# 呼ぶと、関数の中の `.hooks` が文字列を引くことになる。
-missing_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" "
+differing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjson forced "$forced_json" '
+	(.env // {}) as $cur | $env | to_entries[]
+	| select($cur[.key] != null and $cur[.key] != .value)
+	| select(.key as $k | $forced | index($k) == null)
+	| "\(.key): \($cur[.key])（このスクリプトが書くのは \(.value)）"
+')
+# 根を $root に取り置いてから回す。イベント名を `.` に置いたまま関数を呼ぶと、
+# 関数の中の `.hooks` が文字列を引くことになる。
+missing_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --arg cmd "$HOOK_COMMAND" "
 	$REGISTERED
-	. as \$root | \$events[] as \$ev | select(\$root | registered(\$ev) | not) | \$ev
+	. as \$root | \$events[] as \$ev
+	| select((\$root | exact(\$ev; \$cmd)) | not)
+	| select((\$root | looks(\$ev)) | not) | \$ev
+")
+other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --arg cmd "$HOOK_COMMAND" "
+	$REGISTERED
+	. as \$root | \$events[] as \$ev
+	| select((\$root | exact(\$ev; \$cmd)) | not)
+	| select(\$root | looks(\$ev)) | \$ev
 ")
 
+# 書き込みの前と後で、同じ一覧を違う言葉で見せる。前は「足りない」、後は
+# 「足した」。同じ文面のままだと、書けたのか書けなかったのかが読み取れない。
 report() {
 	if [ -n "$missing_env" ]; then
-		printf '足りない env:\n'
+		printf '%s env:\n' "$1"
 		printf '%s\n' "$missing_env" | sed 's/^/  /'
 	fi
 	if [ -n "$missing_hooks" ]; then
-		printf 'ccnavi が登録されていない hook:\n'
+		printf '%s hook:\n' "$2"
 		printf '%s\n' "$missing_hooks" | sed 's/^/  /'
 	fi
+	if [ -n "$replacing_env" ]; then
+		printf '%s env:\n' "$3"
+		printf '%s\n' "$replacing_env" | sed 's/^/  /'
+	fi
 	if [ -n "$differing_env" ]; then
-		if [ "$force" = yes ]; then
-			printf '置き換える env:\n'
-		else
-			printf '値が違う env（--force を付けない限りそのまま）:\n'
-		fi
+		printf '値が違う env（このスクリプトは変えません。変えるなら --mode / --bin を名指しして --force）:\n'
 		printf '%s\n' "$differing_env" | sed 's/^/  /'
+	fi
+	if [ -n "$other_hooks" ]; then
+		printf 'ccnavi らしき別の綴りが登録されている hook（二重に走らせないため足していません。綴りを確かめてください）:\n'
+		printf '%s\n' "$other_hooks" | sed 's/^/  /'
 	fi
 }
 
+report_missing() {
+	report '足りない' 'ccnavi が登録されていない' '置き換える'
+}
+
+# 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
+# ここを不足の 2 つだけで決めると、CCNAVI_MODE=disable が書かれた設定に
+# --check を打って「揃っています」と言うことになる。
+settled=yes
+if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] ||
+	[ -n "$replacing_env" ] || [ -n "$differing_env" ] || [ -n "$other_hooks" ]; then
+	settled=no
+fi
+
 if [ "$check" = yes ]; then
 	printf '%s\n' "$settings"
-	report
-	if [ -z "$missing_env" ] && [ -z "$missing_hooks" ]; then
+	report_missing
+	if [ "$settled" = yes ]; then
 		printf 'env と hook は揃っています。\n'
 		exit 0
 	fi
 	exit 1
 fi
 
-if [ -z "$missing_env" ] && [ -z "$missing_hooks" ] &&
-	{ [ "$force" = no ] || [ -z "$differing_env" ]; }; then
-	printf '%s\n変えるところがありません。\n' "$settings"
+# 書くものがあるか。値が違うだけで名指しされていないもの、別の綴りの登録は、
+# このスクリプトが触らないので書き込みには数えない。ただし黙って終わらせない。
+if [ -z "$missing_env" ] && [ -z "$missing_hooks" ] && [ -z "$replacing_env" ]; then
+	printf '%s\n書き足すものはありません。\n' "$settings"
+	report_missing
 	exit 0
 fi
 
-if [ "$force" = yes ]; then
-	force_json=true
-else
-	force_json=false
-fi
-
-# 既存を残す向きでマージする。env は既にある値を勝たせ（--force のときだけ逆）、
-# hook は ccnavi が登録されていないイベントにだけ足す。ccnavi と関係のない
+# 既存を残す向きでマージする。env は既にある値を勝たせ、名指しされたキーだけを
+# 後勝ちで置き換える。hook は登録が無いイベントにだけ足す。ccnavi と関係のない
 # hook の隣に並ぶ形になるので、他の道具の設定を消さない。
 updated=$(printf '%s' "$current" | jq --argjson env "$env_json" \
 	--argjson events "$events_json" \
+	--argjson forced "$forced_json" \
 	--arg cmd "$HOOK_COMMAND" \
-	--argjson timeout "$HOOK_TIMEOUT" \
-	--argjson force "$force_json" "
+	--argjson timeout "$HOOK_TIMEOUT" "
 	$REGISTERED
-	.env = (if \$force then ((.env // {}) + \$env) else (\$env + (.env // {})) end)
+	(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
+	| .env = (\$env + (.env // {}) + \$overrides)
 	| reduce \$events[] as \$ev (
 		.;
-		if registered(\$ev) then .
+		if (exact(\$ev; \$cmd)) or (looks(\$ev)) then .
 		else .hooks[\$ev] = ((.hooks[\$ev] // []) + [{
 			matcher: \"\",
 			hooks: [{type: \"command\", command: \$cmd, timeout: \$timeout}]
@@ -257,25 +363,52 @@ updated=$(printf '%s' "$current" | jq --argjson env "$env_json" \
 	)
 ")
 
-mkdir -p "$(dirname "$settings")"
-# 書く前に写しを取る。書き損じたときに戻せる形が残っていないと、hook の登録を
-# 失った状態から手で組み直すことになる。
-if [ -f "$settings" ]; then
+mkdir -p "$claude_dir"
+# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
+# 打ち直した数だけ写しが新しくなり、戻れるのは 1 手前まで――そこには既に
+# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
+backed_up=no
+if [ -f "$settings" ] && [ ! -e "$settings.bak" ]; then
 	cp "$settings" "$settings.bak"
 	backed_up=yes
-else
-	backed_up=no
 fi
-# 同じディレクトリに書いてから動かす。別のファイルシステムをまたぐと mv が
-# コピーに落ちて、途中で切れた設定ファイルが残りうる。
-tmp="$settings.tmp.$$"
-printf '%s\n' "$updated" >"$tmp"
-mv "$tmp" "$settings"
+
+# リンクを切らずに書く。`mv` はディレクトリエントリを差し替えるので、設定を
+# 1 か所で持って各プロジェクトから張っている置き方だと、リンクが普通のファイルに
+# なって実体には何も届かない。リンクのときだけ中身を書き、それ以外は同じ
+# ディレクトリに書いてから動かす（途中で切れた設定ファイルを残さないため）。
+linked=no
+if [ -L "$settings" ]; then
+	linked=yes
+elif [ -e "$settings" ]; then
+	count=$(ls -ld "$settings" 2>/dev/null | awk '{print $2}')
+	case "$count" in
+	'' | *[!0-9]*) count=1 ;;
+	esac
+	if [ "$count" -gt 1 ]; then
+		linked=yes
+	fi
+fi
+
+if [ "$linked" = yes ]; then
+	printf '%s\n' "$updated" >"$settings"
+else
+	tmp="$settings.tmp.$$"
+	# 途中で落ちたときに書きかけを残さない。設定ファイルの隣に見慣れない
+	# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
+	trap 'rm -f "$tmp"' EXIT INT TERM
+	printf '%s\n' "$updated" >"$tmp"
+	mv "$tmp" "$settings"
+	trap - EXIT INT TERM
+fi
 
 printf '%s\n' "$settings"
-report
+report '足した' 'ccnavi を登録した' '置き換えた'
 if [ "$backed_up" = yes ]; then
-	printf '前の内容は %s.bak にあります。\n' "$SETTINGS_REL"
+	printf '書き換える前の内容は %s.bak にあります（写しは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
+fi
+if [ "$linked" = yes ]; then
+	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$SETTINGS_REL"
 fi
 
 # 登録しただけでは動かない。ここから先は人が置くものなので、無いものを挙げる。
@@ -286,7 +419,7 @@ note_missing() {
 	missing_parts="$missing_parts  $1
 "
 }
-if [ ! -e "$root/$bin" ] && [ ! -e "$root/$bin.exe" ]; then
+if [ ! -f "$root/$bin" ] && [ ! -f "$root/$bin.exe" ]; then
 	note_missing "$bin（ccnavi の実行ファイル。build.py で組み立てる）"
 fi
 if [ ! -f "$root/.claude/ccnavi/rules.yml" ]; then
