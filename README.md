@@ -172,6 +172,7 @@ hook には実行ファイルだけを登録すればよい。
 下の形は `sh scripts/ccnavi-setup.sh <ワークスペースルート>` が書く。何度打っても同じ形に
 落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
 ところだけを見たいときは `--check`、既定を持つつまみも並べたいときは `--all` を付ける。
+同じ 1 回で `.vscode/settings.json` も見る（次の節）。触ってほしくないときは `--no-vscode`。
 
 既にある値は置き換えない。値が違えば、変えずに並べて見せる。置き換えるのは
 `--mode` か `--bin` を名指しして `--force` を付けたときだけで、名指ししていない値は
@@ -392,10 +393,21 @@ main の作業ツリーでの Write / Edit を止める `main-tree` がこれを
 
 ## worktreeをVSCODEで見えるようにする
 
-vscodeの設定に下記を追加する
-```
+ccnavi は作業を `.claude/worktrees/` の中でさせる。VS Code の設定に下の 1 行が無いと、
+エディタからは main の作業ツリーしか見えないまま作業が進む。
+
+```json
 "git.detectWorktrees": true
 ```
+
+`sh scripts/ccnavi-setup.sh <ワークスペースルート>` が、`.claude/settings.json` と同じ 1 回で
+`.vscode/settings.json` にもこれを書く。無ければ作り、あれば足りないキーだけを足す。
+VS Code の他の設定は残るし、`false` と書いてあれば変えずに並べて見せる。
+
+`.vscode/settings.json` にコメントや末尾のカンマがあると（VS Code はこれを許すが `jq` は
+読めない）、そのファイルは触らずに、何を足せばよいかだけを出す。ここで死ぬと、ccnavi と
+関係のない書き方のせいで `.claude/settings.json` まで書けなくなる。自分で書きたいときや
+VS Code を使わないときは `--no-vscode` を付ける。
 
 ## Bash のコマンドは実行される部分だけを見る
 
