@@ -1243,7 +1243,10 @@ def ticket_verdict(
         return "", ""
     copies, _ = approval.copies(conf.approved)
     index = approval.by_id(copies)
-    ticket = index.get(t.name)
+    # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
+    # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切った作業ツリーは案内では
+    # 「効いている」と言われながら判定では権限モード任せに落ちる（敵対的レビューで実測）。
+    ticket = tree.lookup(index, t.name)
     if ticket is None or ticket.is_own_file(full):
         return "", ""
     rel = tree.relative(t, full)

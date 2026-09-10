@@ -377,16 +377,15 @@ def main() -> int:
     origin = f"{GITLAB}/root/{project_path}.git"
     git(ROOT, "remote", "add", "origin", origin)
     # 認証は git の設定側に置く。空文字で system / global の helper（GCM）を外し、
-    # トークンをファイルから返す helper を足す。ラッパは GIT_CONFIG_COUNT を落とすので
-    # 環境変数では差し替えられない。
-    token_file = write(os.path.join(OUT, "token.txt"), ROOT_TOKEN + "\n").replace("\\", "/")
+    # 環境変数 GITLAB_TOKEN を返す helper を足す。ラッパが落とすのは GIT_CONFIG_COUNT だけで、
+    # 環境変数は helper の sh に届く。トークンをファイルに書かない（置き去りになる）。
     git(ROOT, "config", "--add", "credential.helper", "")
     git(
         ROOT,
         "config",
         "--add",
         "credential.helper",
-        f"!f() {{ echo username=oauth2; echo password=$(cat '{token_file}'); }}; f",
+        '!f() { echo username=oauth2; echo "password=$GITLAB_TOKEN"; }; f',
     )
     pushed = run(["git", "push", "--quiet", "-u", "origin", "main"], ROOT)
     record(
