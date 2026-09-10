@@ -101,13 +101,13 @@ def test(
     if record.fallback:
         stdout.write(f"fallback: {record.fallback}（組み込みの既定で判定した）\n")
 
-    _rules_hit(stdout, stderr, conf, record)
+    _rules_hit(stdout, stderr, conf, root, record)
     _response(stdout, captured.getvalue())
     return 0
 
 
 def _rules_hit(
-    stdout: TextIO, stderr: TextIO, conf: settings.Settings, record: audit.Record
+    stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
 ) -> None:
     """当たったルールを、区画と翻訳後の式まで見せる。
 
@@ -121,7 +121,7 @@ def _rules_hit(
         stdout.write("rules: (どのルールにも当たらなかった)\n")
         return
 
-    rule_set, _ = load_rules(stderr, conf.rules, audit.Record())
+    rule_set, _ = load_rules(stderr, conf.rules, audit.Record(), root)
     by_id = {rule.id: rule for rule in rule_set.all() if rule.id}
 
     stdout.write("rules:\n")
@@ -168,7 +168,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     from . import approval, phase, tree
     from .cli import load_rules
 
-    rule_set, source = load_rules(stderr, conf.rules, audit.Record())
+    rule_set, source = load_rules(stderr, conf.rules, audit.Record(), root)
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
 
     for name in rules.SECTIONS:

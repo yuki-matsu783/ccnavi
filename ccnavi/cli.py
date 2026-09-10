@@ -278,7 +278,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
-        rule_set, _ = load_rules(stderr, conf.rules, audit.Record())
+        rule_set, _ = load_rules(stderr, conf.rules, audit.Record(), root)
         approved = approval.approve(stdin, stdout, stderr, conf, rule_set, root)
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
@@ -491,7 +491,7 @@ def watch_context(
     通った書き込みがターンの終わりに咎められる（あるいはその逆）ことになり、
     どちらが本当の宣言なのかを誰も言えなくなる。
     """
-    rule_set, source = load_rules(stderr, conf.rules, record)
+    rule_set, source = load_rules(stderr, conf.rules, record, root)
     return rule_set, source, scope_guard(conf, root)
 
 
@@ -669,7 +669,7 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    rule_set, source = load_rules(stderr, conf.rules, record)
+    rule_set, source = load_rules(stderr, conf.rules, record, root)
     # 設定ファイルを守る側が有効なら、そこへシェルから書き込む形を止める
     # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
     # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
@@ -1030,7 +1030,7 @@ def decide_after(
     # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
     guard = guard_setting_files(stderr, mode, conf, root, payload, record, selfguard.after)
 
-    rule_set, source = load_rules(stderr, conf.rules, record)
+    rule_set, source = load_rules(stderr, conf.rules, record, root)
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
@@ -1091,7 +1091,9 @@ def decide_after(
     return EXIT_OK
 
 
-def load_rules(stderr: TextIO, rules_path: str, record: audit.Record) -> tuple[rules.RuleSet, str]:
+def load_rules(
+    stderr: TextIO, rules_path: str, record: audit.Record, root: str = ""
+) -> tuple[rules.RuleSet, str]:
     """ルール集合と、それがどこから来たかを返す。
 
     読めなければ組み込みの既定に落ちる。「設定が読めない」は「判断できない」
@@ -1104,7 +1106,7 @@ def load_rules(stderr: TextIO, rules_path: str, record: audit.Record) -> tuple[r
     当たったルールを見つけられない。
     """
     try:
-        rule_set, problems = rules.load(rules_path)
+        rule_set, problems = rules.load(rules_path, root)
     except (OSError, ValueError) as exc:
         stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
         rule_set, problems = builtin.load()
