@@ -80,8 +80,9 @@ uv run --with pyinstaller python build.py
   次に要るものになった。ルールが `ask` と書いた確認は記憶の対象外（設計 §13.1）
 - 期限（REQ-CMN-06）はループの中で見ているだけで、実測していない
 - モードは `disable`（判定しない）/ `dry-run`（判定して報告するだけ）/ `enable`（判定を適用する）。指定が無いときは `enable`。未知の値は報告して `enable` に倒す
-- 並行するチケット（REQ-TKT）のうち、GitHub / GitLab の実物に対する `request` と `check` は
-  実測していない。sh の代わりにテストが写し（`--result`）を渡す形でだけ通してある
+- 並行するチケット（REQ-TKT）のうち、GitHub の実物に対する `request` と `check` は
+  実測していない。GitLab は実物（CE 18.5）で 1 周した（「実物の GitLab で 1 周した」）。
+  自動テストは sh の代わりに写し（`--result`）を渡す形で通す
 
 ## 次にやること
 
@@ -92,8 +93,9 @@ uv run --with pyinstaller python build.py
   サブエージェント内の最初の PreToolUse で渡す形に変える（§24.9）
 - `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`。判定は行き先で
   決まるので止め方は変わらないが、ゲートは cwd で親を引くので、そこが割れる
-- GitHub / GitLab の実物に `request` / `check` を当てる。GitLab の discussions の
-  `resolvable` / `resolved` の読みは文書どおりに書いただけ
+- GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
+  書いただけ。GitLab は済んだ（`tests/probe_gitlab.py` で繰り返せる）。GitLab の変更要求
+  （`request_changes`）だけは CE に無い機能で、EE でしか当てられない
 - `.claude/scripts/` への Write は `guard-scripts` が止める。今回の 2 本はこの
   リポジトリで作ったので入っているが、他のプロジェクトへ配るときは人が置く
 先に §24.12 の 4 つを実測してから書く。とくに SubagentStart の `additionalContext` と
@@ -389,14 +391,29 @@ issue → MR → チケット → 計画 → 作業 → レビュー → 差戻 
 `gh` / `glab` が入っていても未認証のホストでは curl とトークンへ落ちること。親を閉じるのは子が全部
 閉じてゲートが開いてから、であること。
 
-**まだ実物で確かめていない。** 代役サーバは私が書いた的なので、GitLab が本当にその形の JSON を
-返すかは分からない。`discussions` の `resolvable` / `resolved`、`reviewers` の `state`、
-GitHub の GraphQL `reviewThreads` は文書どおりに書いただけ。Docker の VM に 4GB 割り当てられる
-機械で 1 周すれば済む。
-
 代役サーバは `tests/fake_gitlab.py` に置いた。自動テストからは呼んでいない（人が手で 1 周させる道具）。
-使い方はそのファイルの先頭に書いてある。次に実物で 1 周するときは、この的と同じ順で叩いて、
-返ってくる JSON の形を突き合わせるのがいちばん早い。
+使い方はそのファイルの先頭に書いてある。
+
+**実物の GitLab で 1 周した（2026-09-10、GitLab CE 18.5.4、Docker Desktop の VM を 4GB にして）。**
+`tests/probe_gitlab.py` が、一時リポジトリと使い捨てのプロジェクトを作り、sh 3 本と exe を本物に
+当てる。人間役（レビュアー）は別ユーザのトークンで API を直に叩く。通ったのは、
+push 前の `request` が前提で止まる → 親の push（ラッパ経由）→ `request` が Draft の MR を作り
+（題 `Draft:`、本文に `Closes #課題`）依頼の note を投稿して印を置く → 2 度目は依頼済みで止まる →
+レビュアーの討論で `check` が止まりゲートは閉じたまま → 解決と approve で `check` が通りゲートが開く →
+`note` → もう 1 本の討論を `accept` で受け入れ、受け入れの note が MR に写り、以後 `check` で数えない →
+親を閉じて `wip/` を消して push し `ready` で Draft が外れ `squash` が立つ → 別の親を `wrapup` で締めて
+残りが issue になり、未着手の子が `cancelled/` へ動く。返ってきた JSON は sh の読み方と合っていた
+（`discussions` の `notes[0].resolvable` と `resolved`、`reviewers` の `{user, state, created_at}`、
+位置の無い討論は `path` 空・`line` 0）。
+
+| 分かったこと | どうしたか |
+|---|---|
+| 変更要求（`POST .../request_changes`）は CE の `lib/api` に無い。EE 限定 | 当てられない。sh の `requested_changes` の読みは EE の文書どおりのまま。CE では `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
+| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh はユーザ情報を落とし、出力で伏せる。exe の `remote_kind` も読み飛ばす。`tests/test_review_origin.py` |
+| ラッパ経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら GCM に保存しておく |
+| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tests/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
+| 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
+| 未解決の一覧で、位置の無い討論が ` :0 ` と出る | 直していない。読めるので後回し |
 
 **この 1 周で溶かした時間の内訳**（同じ道を戻らないために）。Docker Desktop を起動したら
 利用者の GitLab が `restart=unless-stopped` で勝手に上がり、2GB の VM に収まらず engine ごと落ちた。

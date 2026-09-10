@@ -915,7 +915,13 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 数から消える。
 
 origin の綴りはホストのポートと scheme をそのまま使う。`http://localhost:8929/g/p.git` なら
-`http://localhost:8929/api/v4` を叩く。どう読んだかは `sh .claude/scripts/ccnavi-review.sh origin` で出る。
+`http://localhost:8929/api/v4` を叩く。URL に埋めた資格情報（`https://oauth2:<token>@host/...`）は
+読み飛ばし、出力では伏せる。どう読んだかは `sh .claude/scripts/ccnavi-review.sh origin` で出る。
+
+push の認証は git の設定側に置く（Git Credential Manager に保存しておく、か `credential.helper`）。
+git ラッパは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落とし、`GIT_TERMINAL_PROMPT=0` で
+入力待ちを即失敗に倒すので、環境変数で helper を差し替える形も、認証画面で入れる形も通らない。
+GitLab CE 18.5 の実物で 1 周した記録は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tests/probe_gitlab.py`。
 
 これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_CLI`）。
 状態の移動とレビューはスクリプト 2 本を通し、承認と未解決の受け入れは利用者が端末で打つ。
