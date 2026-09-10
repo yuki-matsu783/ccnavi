@@ -286,8 +286,12 @@ class PassTest(GitWrapperTest):
             f.write("---\nversion: 1\nticket: i0001\n---\n")
         with open(os.path.join(copies, "i0001-01.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+        # 閉じた子。写しは closed/ に動いているが、ツリーはまだ子のもの。
+        os.makedirs(os.path.join(copies, "closed"))
+        with open(os.path.join(copies, "closed", "i0001-02.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-02\nparent: i0001\nphase: 1\n---\n")
         trees = {}
-        for name in ("i0001", "i0001-01", "free"):
+        for name in ("i0001", "i0001-01", "i0001-02", "free"):
             path = os.path.join(self.dir, ".claude", "worktrees", name)
             git(self.dir, "worktree", "add", "-q", path, "-b", name)
             trees[name] = path
@@ -304,10 +308,12 @@ class PassTest(GitWrapperTest):
                 env=environment,
             )
 
-        child = push_from("i0001-01")
-        self.assertEqual(2, child.returncode, child.stdout + child.stderr)
-        self.assertIn("子チケット", child.stderr)
-        self.assertIn("i0001", child.stderr)
+        for name in ("i0001-01", "i0001-02"):
+            with self.subTest(tree=name):
+                child = push_from(name)
+                self.assertEqual(2, child.returncode, child.stdout + child.stderr)
+                self.assertIn("子チケット", child.stderr)
+                self.assertIn("i0001", child.stderr)
         self.assertEqual([], logs_of(self.dir), "拒否したのに git が走って記録が残っている")
         for name in ("i0001", "free"):
             with self.subTest(tree=name):

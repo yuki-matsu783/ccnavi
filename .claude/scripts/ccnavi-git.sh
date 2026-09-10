@@ -392,11 +392,14 @@ push)
 			/* | [A-Za-z]:*) push_copies="$CCNAVI_APPROVED" ;;
 			*) push_copies="$push_root/${CCNAVI_APPROVED:-.claude/ccnavi/tickets}" ;;
 			esac
-			push_copy="$push_copies/$push_name.md"
-			if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
-				push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
-				reject "$push_name は子チケットの作業ツリーです。子のブランチはリモートへ送りません。親（$push_parent）が子の成果を合流してから、親の作業ツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
-			fi
+			# 閉じた写し（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
+			# そのツリーは子のもので、送ってよくなるわけではない。
+			for push_copy in "$push_copies/$push_name.md" "$push_copies/closed/$push_name.md"; do
+				if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
+					push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
+					reject "$push_name は子チケットの作業ツリーです。子のブランチはリモートへ送りません。親（$push_parent）が子の成果を合流してから、親の作業ツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
+				fi
+			done
 			;;
 		esac
 	fi
