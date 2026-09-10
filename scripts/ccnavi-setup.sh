@@ -2,7 +2,7 @@
 # ccnavi-setup — 対象プロジェクトの .claude/settings.json に、ccnavi が想定する
 # env と hook を登録する。ccnavi を新しいプロジェクトへ入れるときに人が 1 回打つ。
 #
-#   sh scripts/ccnavi-setup.sh [<プロジェクト根>] [オプション]
+#   sh scripts/ccnavi-setup.sh [<プロジェクトルート>] [オプション]
 #
 #   --mode <enable|dry-run>  CCNAVI_MODE。既定は dry-run
 #   --bin <相対パス>         CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
@@ -40,9 +40,9 @@ target=""
 
 usage() {
 	cat <<'USAGE'
-sh scripts/ccnavi-setup.sh [<プロジェクト根>] [オプション]
+sh scripts/ccnavi-setup.sh [<プロジェクトルート>] [オプション]
 
-  <プロジェクト根>          既定は現在の作業ディレクトリ
+  <プロジェクトルート>          既定は現在の作業ディレクトリ
   --mode <enable|dry-run>   CCNAVI_MODE。既定は dry-run
   --bin <相対パス>          CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
   --all                     既定値を持つ env も明示して書く
@@ -88,7 +88,7 @@ while [ "$#" -gt 0 ]; do
 		die "$1 は知らないオプションです。使える形は --help に出ます。"
 		;;
 	*)
-		[ -z "$target" ] || die "プロジェクト根は 1 つだけ受け取ります。"
+		[ -z "$target" ] || die "プロジェクトルートは 1 つだけ受け取ります。"
 		target="$1"
 		shift
 		;;
@@ -107,7 +107,7 @@ esac
 
 case "$bin" in
 /* | ?:*)
-	die "--bin はプロジェクト根からの相対で書いてください。env の値は \${CLAUDE_PROJECT_DIR} を展開しないので、絶対パスは 3 つの環境で綴りが変わります。"
+	die "--bin はプロジェクトルートからの相対で書いてください。env の値は \${CLAUDE_PROJECT_DIR} を展開しないので、絶対パスは 3 つの環境で綴りが変わります。"
 	;;
 esac
 

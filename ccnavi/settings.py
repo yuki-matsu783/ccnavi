@@ -70,7 +70,7 @@ OWN_PROJECT = "ccnavi"
 # 直しても影響が及ぶのは道具を試している本人だけになる。
 LOCAL_FILE = "ccnavi.settings.local.json"
 
-# 既定の置き場。プロジェクト根からの相対。
+# 既定の置き場。プロジェクトルートからの相対。
 DEFAULT_LOG = os.path.join(".claude", "ccnavi", "log.jsonl")
 DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
