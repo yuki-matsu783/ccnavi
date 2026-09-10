@@ -86,6 +86,21 @@ class SelfGuardTest(unittest.TestCase):
         write(path, text)
         return path
 
+    def worktree(self, name="w1"):
+        """本物の作業ツリーを `.claude/worktrees/<名前>` に作る。
+
+        git に作らせる。守る側は `.git` ファイルと main の登録の相互参照が
+        両向きに揃ったものだけを作業ツリーと呼ぶので、手でディレクトリを
+        置いただけでは対象にならない。
+        """
+        path = os.path.join(self.repo, ".claude", "worktrees", name)
+        git(self.repo, "worktree", "add", "--quiet", "-b", name, path)
+        return path
+
+    def copy_in(self, work, *parts):
+        """作業ツリーの中の写しの綴り。"""
+        return os.path.join(work, ".claude", *parts)
+
     def run_hook(
         self,
         event,
@@ -253,6 +268,82 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertTrue(os.path.exists(local), "人が置くこともあるファイルを消さない")
         self.assertIn("settings.local.json", result.stdout)
+
+    # 作業ツリーの中の写し
+
+    def test_作業ツリーの中の設定ファイルも戻る(self):
+        # その場では誰も読まないファイルだが、統合すれば main の hook の
+        # 登録になる。止める側も気づく側も無い道なので、ここで戻す。
+        work = self.worktree()
+        copy = self.copy_in(work, "settings.json")
+        self.run_hook("PreToolUse")
+        write(copy, "{}\n")
+
+        result = self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), SETTINGS)
+        self.assertIn("restored", result.stdout)
+        self.assertIn("統合すれば", result.stdout)
+
+    def test_作業ツリーの中のルールファイルも戻る(self):
+        work = self.worktree()
+        copy = self.copy_in(work, "ccnavi", "rules.yml")
+        self.run_hook("PreToolUse")
+        write(copy, json.dumps({"version": 3, "deny": []}))
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), RULES)
+
+    def test_作業ツリーでないディレクトリは守らない(self):
+        # `.claude/worktrees/` の下に在るだけのディレクトリ。参考実装の写しを
+        # 置いた形がこれで、守りに行くと人のファイルを勝手に戻すことになる。
+        fake = os.path.join(self.repo, ".claude", "worktrees", "not-a-tree")
+        copy = self.copy_in(fake, "settings.json")
+        write(copy, "{}\n")
+        self.run_hook("PreToolUse")
+        write(copy, '{"changed": true}\n')
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), {"changed": True})
+
+    def test_消された写しは実行前に戻る(self):
+        work = self.worktree()
+        copy = self.copy_in(work, "settings.json")
+        self.run_hook("PreToolUse")
+        os.remove(copy)
+
+        self.run_hook("PreToolUse")
+
+        self.assertEqual(json.loads(read(copy)), SETTINGS)
+
+    def test_控えが無ければ作業ツリーの側の_git_から戻る(self):
+        # 控えを取る前に書き換えられた回。main の git は
+        # `.claude/worktrees/` を無視しているので、写しのコミット済みの内容を
+        # 持っているのは、その作業ツリー自身の git のほうになる。
+        work = self.worktree()
+        copy = self.copy_in(work, "settings.json")
+        write(copy, "{}\n")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), SETTINGS)
+
+    def test_写しの控えは作業ツリーごとに分かれる(self):
+        # 取り違えると、片方の作業ツリーの内容がもう片方に書き戻される。
+        one = self.copy_in(self.worktree("w1"), "settings.json")
+        two = self.copy_in(self.worktree("w2"), "settings.json")
+        write(one, json.dumps({"env": {"A": "1"}}))
+        write(two, json.dumps({"env": {"B": "2"}}))
+        self.run_hook("PreToolUse")
+        write(one, "{}\n")
+        write(two, "{}\n")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
+        self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
 
     # 戻す前に止める
 
