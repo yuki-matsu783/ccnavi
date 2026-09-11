@@ -234,7 +234,7 @@ const STYLE = `  * { box-sizing: border-box; }
     background: var(--vscode-editorWidget-background);
   }
   .rule.hit { outline: 2px solid var(--vscode-focusBorder); }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
+  .rule-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 6px; }
   .rule-row label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
   .rule-row .grow { flex: 1 1 240px; }
   .rule-row .grow input { flex: 1; min-width: 120px; }
@@ -242,6 +242,13 @@ const STYLE = `  * { box-sizing: border-box; }
   .rule-row input.f-match { width: 220px; }
   .rule-row .buttons { margin-left: auto; display: flex; gap: 4px; }
   .rule textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; margin-bottom: 4px; }
+  /* 欄名は欄の上に小さく常に出す。placeholder は説明で、入れると消えてよい。 */
+  .field { display: flex; flex-direction: column; gap: 1px; }
+  .field > .cap { font-size: .78em; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); }
+  .field > input, .field > textarea { width: 100%; box-sizing: border-box; margin: 0; }
+  .rule-row .field.w-id { width: 170px; }
+  .rule-row .field.w-match { width: 230px; }
+  .rule .field.block { margin-bottom: 6px; }
   .rule .stale { margin: 0 0 6px; font-size: .9em; color: var(--vscode-editorError-foreground); overflow-wrap: anywhere; }
   .rule .stale code { margin: 0 6px; }
   .rule .pattern { font-family: var(--vscode-editor-font-family); }
@@ -314,20 +321,28 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     input.addEventListener("input", () => { rule[name] = input.value; markDirty(); });
     return input;
   }
+  function area(rule, name, className, placeholder) {
+    const textarea = h("textarea", { class: className, placeholder: placeholder });
+    textarea.value = rule[name];
+    textarea.addEventListener("input", () => { rule[name] = textarea.value; markDirty(); });
+    return textarea;
+  }
+  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
+  function captioned(name, control, className) {
+    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  }
   function renderRule(section, rule) {
     const key = keyOf(rule);
     const sectionSelect = h("select", { class: "f-section" }, SECTIONS.map((s) => option(s, s, s === section)));
     sectionSelect.addEventListener("change", () => moveTo(key, sectionSelect.value));
     const kindSelect = h("select", { class: "f-kind" }, [option("glob", "glob", rule.kind === "glob"), option("regex", "regex", rule.kind === "regex")]);
-    kindSelect.addEventListener("change", () => { rule.kind = kindSelect.value; markDirty(); });
+    kindSelect.addEventListener("change", () => { rule.kind = kindSelect.value; markDirty(); renderAll(); });
     const pattern = field(rule, "pattern", "f-pattern pattern", rule.kind === "glob" ? "*git push*" : "\\\\bgit push\\\\b");
     // message は deny だけの欄。ask と allow には欄を出さない。文面が残っていれば
     // （lint が止めるので）そう言って、消すボタンだけ出す。
     let message;
     if (section === "deny") {
-      message = h("textarea", { class: "f-message", placeholder: "message: なぜ止めるかと、代わりに何をすればよいか（止められたモデルに届く）" });
-      message.value = rule.message;
-      message.addEventListener("input", () => { rule.message = message.value; markDirty(); });
+      message = captioned("message", area(rule, "message", "f-message", "なぜ止めるかと、代わりに何をすればよいか（止められたモデルに届く）"), "block");
     } else if (rule.message !== "") {
       const drop = h("button", { type: "button", class: "action small", text: "message を消す" });
       drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
@@ -337,14 +352,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         drop,
       ]);
     }
-    const context = h("textarea", { class: "f-context", placeholder: "additionalContext: 当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）" });
-    context.value = rule.additionalContext;
-    context.addEventListener("input", () => { rule.additionalContext = context.value; markDirty(); });
-    const once = h("textarea", { class: "f-once", placeholder: "additionalContextOnce: セッション（サブエージェントはその起動ごと）で最初に当たったときだけ渡す文。開始（compact の後も）で忘れる。上と両方あれば初回は並べて、2 回目からは上だけ" });
-    once.value = rule.additionalContextOnce;
-    once.addEventListener("input", () => { rule.additionalContextOnce = once.value; markDirty(); });
-    const contextFile = field(rule, "additionalContextFile", "f-context-file", "additionalContextFile: 文に続けて本文を渡すファイル（ルートからの相対。作業ツリーにあればそちら。先頭 4000 文字まで）");
-    const onceFile = field(rule, "additionalContextOnceFile", "f-once-file", "additionalContextOnceFile: 最初に当たったときだけ本文を渡すファイル（同上）");
+    const context = captioned("additionalContext", area(rule, "additionalContext", "f-context", "当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）"), "block");
+    const once = captioned("additionalContextOnce", area(rule, "additionalContextOnce", "f-once", "セッション（サブエージェントはその起動ごと）で最初に当たったときだけ渡す文。開始（compact の後も）で忘れる。上と両方あれば初回は並べて、2 回目からは上だけ"), "block");
+    const contextFile = captioned("additionalContextFile", field(rule, "additionalContextFile", "f-context-file", "文に続けて本文を渡すファイル（ルートからの相対。作業ツリーにあればそちら。先頭 4000 文字まで）"), "block");
+    const onceFile = captioned("additionalContextOnceFile", field(rule, "additionalContextOnceFile", "f-once-file", "最初に当たったときだけ本文を渡すファイル（同上）"), "block");
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
@@ -353,20 +364,20 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     del.addEventListener("click", () => remove(key));
     return h("li", { class: "rule", "data-key": key, "data-id": rule.id }, [
       h("div", { class: "rule-row" }, [
-        h("label", { text: "id" }, [field(rule, "id", "f-id", "git-push")]),
-        h("label", { text: "match" }, [field(rule, "match", "f-match", "Bash / Write|Edit")]),
-        h("label", { text: "区画" }, [sectionSelect]),
+        captioned("id", field(rule, "id", "f-id", "git-push"), "w-id"),
+        captioned("match", field(rule, "match", "f-match", "Bash / Write|Edit"), "w-match"),
+        captioned("区画", sectionSelect),
         h("span", { class: "buttons" }, [up, down, del]),
       ]),
       h("div", { class: "rule-row" }, [
-        h("label", {}, [kindSelect]),
-        h("span", { class: "grow" }, [pattern]),
+        captioned("形", kindSelect),
+        captioned(rule.kind, pattern, "grow"),
       ]),
       message,
       context,
-      h("div", { class: "rule-row" }, [h("span", { class: "grow" }, [contextFile])]),
+      contextFile,
       once,
-      h("div", { class: "rule-row" }, [h("span", { class: "grow" }, [onceFile])]),
+      onceFile,
     ]);
   }
   function renderAll() {

@@ -2,7 +2,7 @@
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
   "description": "ccnavi のチケット（提案・写し・印・作業ツリー）をカンバンで表示し、人の承認をターミナルへ送る。ルールと hook を画面で眺め、ルールを直し、判定を試す",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "local",
   "private": true,
   "license": "MIT",
