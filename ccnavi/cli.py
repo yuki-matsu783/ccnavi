@@ -18,6 +18,7 @@ from . import (
     approval,
     audit,
     builtin,
+    ctxfile,
     diagnose,
     hookio,
     lint,
@@ -834,7 +835,7 @@ def decide_before(
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
-    context = _context_for(stderr, conf.state, payload, group)
+    context = _context_for(stderr, conf.state, payload, group, _context_bases(conf, root, target))
 
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
@@ -1109,7 +1110,11 @@ ONCE_KEEP_DAYS = 3
 
 
 def _context_for(
-    stderr: TextIO, state_dir: str, payload: hookio.Input, group: list[rules.Rule]
+    stderr: TextIO,
+    state_dir: str,
+    payload: hookio.Input,
+    group: list[rules.Rule],
+    bases: list[str] | None = None,
 ) -> str:
     """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
 
@@ -1118,15 +1123,23 @@ def _context_for(
     文脈はセッションと、サブエージェントならその 1 回の起動（agent_id）で分ける。
     サブエージェントは親の文脈を持たないので、親で渡した文は子にも 1 度渡す。
 
+    `additionalContextFile` / `additionalContextOnceFile` は、文に続けてファイルの本文を
+    渡す。探す先は `bases` の順（行き先の作業ツリー、プロジェクト、ルート）で、最初に
+    在ったものを読む。無ければ文だけ。once の記憶は文とファイルで分けず、ルール 1 件で
+    1 度と数える。
+
     控えを置く場所が無いとき（`--state ""`）は once の文も毎回渡す。覚えられないなら
     黙るのではなく言うほうに倒す。届かない文は書いていないのと同じになるから。
     """
     parts: list[str] = []
     remembered: set[str] | None = None
     for rule in group:
-        if rule.additional_context:
-            parts.append(rule.additional_context)
-        if not rule.additional_context_once:
+        every = _with_file(
+            stderr, bases or [], rule.additional_context, rule.additional_context_file
+        )
+        if every:
+            parts.append(every)
+        if not rule.additional_context_once and not rule.additional_context_once_file:
             continue
         if state_dir:
             if remembered is None:
@@ -1135,10 +1148,36 @@ def _context_for(
             if key in remembered:
                 continue
             remembered.add(key)
-        parts.append(rule.additional_context_once)
+        once = _with_file(
+            stderr, bases or [], rule.additional_context_once, rule.additional_context_once_file
+        )
+        if once:
+            parts.append(once)
     if remembered is not None:
         _save_once(stderr, state_dir, payload, remembered)
     return "\n\n".join(parts)
+
+
+def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str) -> str:
+    """文とファイルの本文を空行で並べる。どちらか無ければ在るほうだけ。"""
+    body = ctxfile.load(stderr, bases, rel) if rel else ""
+    return "\n\n".join(p for p in (text, body) if p)
+
+
+def _context_bases(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[str]:
+    """ルールが指すファイルを探すルートの並び。近いほうから。
+
+    行き先（Bash なら cwd）が作業ツリーの中なら、まずその作業ツリー。そこに無ければ
+    切り元のプロジェクト、最後にワークスペースルート。作業ツリーで直している最中の
+    案内文がそのまま効くように、作業ツリーを先に見る。
+    """
+    bases: list[str] = []
+    if target is not None and not target.is_main:
+        bases.append(target.root)
+    if target is not None and target.project:
+        bases.append(tree.project_root(conf.projects, target.project))
+    bases.append(root)
+    return bases
 
 
 def _once_path(state_dir: str, session: str, agent_id: str) -> str:

@@ -254,6 +254,102 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertIn("verdict: allow", allowed.stdout)
         self.assertIn(NOTE, allowed.stdout)
 
+    def test_file_body_follows_the_text_and_is_cut_at_the_limit(self):
+        from ccnavi import ctxfile
+
+        write(os.path.join(self.root, "docs", "guide.md"), "# 決まり\n\nテストは tests/ に置く。\n")
+        write(os.path.join(self.root, "docs", "long.md"), "あ" * (ctxfile.MAX_CHARS + 50))
+        path = self.rules(
+            deny=[rule("push", "Bash", glob="*git push*")],
+            allow=[
+                rule(
+                    "src",
+                    "Write",
+                    "",
+                    glob="*/src/*",
+                    additionalContext=NOTE,
+                    additionalContextFile="docs/guide.md",
+                ),
+                rule("doc", "Write", "", glob="*/docs/*", additionalContextFile="docs/long.md"),
+                rule("none", "Write", "", glob="*/etc/*", additionalContextFile="docs/none.md"),
+            ],
+        )
+        got = self.judge(path, "Write", os.path.join(self.root, "src", "a.py"))
+        self.assertEqual(
+            got.get("additionalContext"), f"{NOTE}\n\n# 決まり\n\nテストは tests/ に置く。"
+        )
+        cut = self.judge(path, "Write", os.path.join(self.root, "docs", "x.md"))[
+            "additionalContext"
+        ]
+        self.assertTrue(cut.startswith("あ" * ctxfile.MAX_CHARS + "\n\n(ccnavi: docs/long.md は"))
+        self.assertNotIn("あ" * (ctxfile.MAX_CHARS + 1), cut)
+        self.assertIn("続きはこのファイルを読む", cut)
+        # 無いファイルは何も足さない。
+        self.assertEqual(self.judge(path, "Write", os.path.join(self.root, "etc", "a")), {})
+        # 試験にも本文が出る。
+        shown = self.run_ccnavi(path, "--test", "Write", os.path.join(self.root, "src", "a.py"))
+        self.assertIn("テストは tests/ に置く。", shown.stdout)
+
+    def test_file_in_the_worktree_wins_over_the_root(self):
+        write(os.path.join(self.root, "docs", "guide.md"), "ルートの案内")
+        wt = os.path.join(self.root, ".claude", "worktrees", "feat")
+        write(os.path.join(wt, "docs", "guide.md"), "作業ツリーの案内")
+        # 本物の作業ツリーと見なされるには、.git ファイルと登録簿の相互参照が要る。
+        gitdir = os.path.join(self.root, ".git", "worktrees", "feat")
+        write(os.path.join(wt, ".git"), f"gitdir: {gitdir}\n")
+        write(os.path.join(gitdir, "gitdir"), os.path.join(wt, ".git") + "\n")
+        path = self.rules(
+            deny=[rule("push", "Bash", glob="*git push*")],
+            allow=[rule("src", "Write", "", glob="*/src/*", additionalContextFile="docs/guide.md")],
+        )
+        inside = self.judge(path, "Write", os.path.join(wt, "src", "a.py"))
+        self.assertEqual(inside.get("additionalContext"), "作業ツリーの案内")
+        outside = self.judge(path, "Write", os.path.join(self.root, "src", "a.py"))
+        self.assertEqual(outside.get("additionalContext"), "ルートの案内")
+
+    def test_once_file_is_delivered_once_and_lint_checks_the_path(self):
+        from ccnavi import ctxfile
+
+        state = os.path.join(self.root, "state")
+        write(os.path.join(self.root, "docs", "once.md"), "最初に 1 度だけ")
+        write(os.path.join(self.root, "docs", "long.md"), "い" * (ctxfile.MAX_CHARS + 1))
+        path = self.rules(
+            deny=[rule("push", "Bash", glob="*git push*")],
+            allow=[
+                rule("src", "Write", "", glob="*/src/*", additionalContextOnceFile="docs/once.md"),
+                rule("gone", "Write", "", glob="*/a/*", additionalContextFile="docs/gone.md"),
+                rule("long", "Write", "", glob="*/b/*", additionalContextFile="docs/long.md"),
+                rule("up", "Write", "", glob="*/c/*", additionalContextFile="../secret.md"),
+                rule("abs", "Write", "", glob="*/d/*", additionalContextOnceFile="/etc/passwd"),
+            ],
+        )
+        target = os.path.join(self.root, "src", "a.py")
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Write",
+                "session_id": "s1",
+                "cwd": self.root,
+                "tool_input": {"file_path": target},
+            }
+        )
+        first = self.run_ccnavi(path, "--mode", "enable", "--state", state, payload=payload)
+        self.assertIn("最初に 1 度だけ", first.stdout)
+        second = self.run_ccnavi(path, "--mode", "enable", "--state", state, payload=payload)
+        self.assertEqual(second.stdout.strip(), "")
+
+        lint = self.run_ccnavi(path, "--lint")
+        self.assertIn("warn: gone: additionalContextFile の docs/gone.md が無い", lint.stdout)
+        self.assertIn(
+            f"warn: long: additionalContextFile の docs/long.md は {ctxfile.MAX_CHARS} 文字",
+            lint.stdout,
+        )
+        self.assertIn("error: up: additionalContextFile の ../secret.md: `..`", lint.stdout)
+        self.assertIn("error: abs: additionalContextOnceFile の /etc/passwd: 絶対パス", lint.stdout)
+        self.assertNotIn("src:", lint.stdout)
+        # 外を指す欄は実行時も読まない。
+        self.assertEqual(self.judge(path, "Write", os.path.join(self.root, "c", "a")), {})
+
 
 if __name__ == "__main__":
     unittest.main()

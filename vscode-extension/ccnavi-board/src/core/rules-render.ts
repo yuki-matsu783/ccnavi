@@ -343,6 +343,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const once = h("textarea", { class: "f-once", placeholder: "additionalContextOnce: セッション（サブエージェントはその起動ごと）で最初に当たったときだけ渡す文。開始（compact の後も）で忘れる。上と両方あれば初回は並べて、2 回目からは上だけ" });
     once.value = rule.additionalContextOnce;
     once.addEventListener("input", () => { rule.additionalContextOnce = once.value; markDirty(); });
+    const contextFile = field(rule, "additionalContextFile", "f-context-file", "additionalContextFile: 文に続けて本文を渡すファイル（ルートからの相対。作業ツリーにあればそちら。先頭 4000 文字まで）");
+    const onceFile = field(rule, "additionalContextOnceFile", "f-once-file", "additionalContextOnceFile: 最初に当たったときだけ本文を渡すファイル（同上）");
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
@@ -362,7 +364,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       ]),
       message,
       context,
+      h("div", { class: "rule-row" }, [h("span", { class: "grow" }, [contextFile])]),
       once,
+      h("div", { class: "rule-row" }, [h("span", { class: "grow" }, [onceFile])]),
     ]);
   }
   function renderAll() {
@@ -417,7 +421,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add(section) {
-    sections[section] = sections[section].concat([{ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "" }]);
+    sections[section] = sections[section].concat([{ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "" }]);
     markDirty();
     renderAll();
     const items = document.querySelectorAll("[data-list=" + section + "] .rule");

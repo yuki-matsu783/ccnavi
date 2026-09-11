@@ -45,7 +45,7 @@ import os
 import subprocess
 from typing import TextIO
 
-from . import gitstate, hookio, rules, selfguard, settings
+from . import ctxfile, gitstate, hookio, rules, selfguard, settings
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
@@ -407,7 +407,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 )
             )
         else:
-            for c in _rules(path, root):
+            for c in _rules(path, root, home=p.root):
                 problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
         if os.path.isdir(os.path.join(p.root, ".claude")):
             problems.append(
@@ -658,12 +658,17 @@ def _project_settings(root: str) -> list[Problem]:
     return problems
 
 
-def _rules(path: str, root: str = "") -> list[Problem]:
+def _rules(path: str, root: str = "", home: str = "") -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
     落ちるという、検証があるぶんかえって危ない形になる。
+
+    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。プロジェクトの
+    ルールならそのプロジェクトのルート。省けばワークスペースルート、それも無ければ
+    ルールファイルの隣。
     """
+    home = home or root or os.path.dirname(os.path.abspath(path))
     try:
         rule_set, problems = rules.load(path, root)
     except (OSError, ValueError) as exc:
@@ -737,8 +742,41 @@ def _rules(path: str, root: str = "") -> list[Problem]:
                 )
             )
 
+        # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
+        # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。
+        for key, rel in (
+            ("additionalContextFile", rule.additional_context_file),
+            ("additionalContextOnceFile", rule.additional_context_once_file),
+        ):
+            if not rel:
+                continue
+            why = ctxfile.bad_path(rel)
+            if why:
+                problems.append(Problem(SEVERITY_ERROR, name, f"{key} の {rel}: {why}"))
+                continue
+            full = ctxfile.locate([home], rel)
+            if not full:
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        name,
+                        f"{key} の {rel} が無い。作業ツリーにもルートにも無ければ何も足さない",
+                    )
+                )
+            elif ctxfile.over_limit(full):
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        name,
+                        f"{key} の {rel} は {ctxfile.MAX_CHARS} 文字を超える。"
+                        "先頭だけが届き、切ったことを末尾に添える",
+                    )
+                )
+
         # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
-        if rule.additional_context and rule.decision == rules.ALLOW:
+        if (
+            rule.additional_context or rule.additional_context_file
+        ) and rule.decision == rules.ALLOW:
             why = _broad(rule)
             if why:
                 problems.append(

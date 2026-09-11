@@ -26,6 +26,10 @@ export interface RuleForm {
   readonly additionalContext: string;
   /** 1 つの文脈で最初に当たったときだけ渡す文（`additionalContextOnce`）。無ければ空 */
   readonly additionalContextOnce: string;
+  /** 文に続けて本文を渡すファイル（`additionalContextFile`）。ルートからの相対パス。無ければ空 */
+  readonly additionalContextFile: string;
+  /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
+  readonly additionalContextOnceFile: string;
 }
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
@@ -95,6 +99,8 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     message: scalarText(map, "message"),
     additionalContext: scalarText(map, "additionalContext"),
     additionalContextOnce: scalarText(map, "additionalContextOnce"),
+    additionalContextFile: scalarText(map, "additionalContextFile"),
+    additionalContextOnceFile: scalarText(map, "additionalContextOnceFile"),
   };
 }
 
@@ -260,6 +266,13 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   if (form.additionalContextOnce !== "" || node.has("additionalContextOnce")) {
     setText(doc, node, "additionalContextOnce", form.additionalContextOnce, Scalar.BLOCK_FOLDED);
   }
+  // ファイルのパスは 1 行の値。文の欄の直後に置く（文が無ければ末尾）。
+  if (form.additionalContextFile !== "" || node.has("additionalContextFile")) {
+    setText(doc, node, "additionalContextFile", form.additionalContextFile, Scalar.PLAIN, "additionalContext");
+  }
+  if (form.additionalContextOnceFile !== "" || node.has("additionalContextOnceFile")) {
+    setText(doc, node, "additionalContextOnceFile", form.additionalContextOnceFile, Scalar.PLAIN, "additionalContextOnce");
+  }
 }
 
 function setText(
@@ -346,5 +359,7 @@ function asForm(raw: unknown): RuleForm | undefined {
     message: text(r.message),
     additionalContext: text(r.additionalContext),
     additionalContextOnce: text(r.additionalContextOnce),
+    additionalContextFile: text(r.additionalContextFile),
+    additionalContextOnceFile: text(r.additionalContextOnceFile),
   };
 }

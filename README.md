@@ -340,6 +340,35 @@ allow:
       テストは tests/ に同じ名前で置く。CHANGELOG は締めるときにまとめて書く。
 ```
 
+### ファイルの本文を渡す
+
+`additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に続けて）
+ファイルの本文を渡す。長い案内を rules.yml に抱えず、既にある md をそのまま指せる。
+それぞれ `additionalContext` と `additionalContextOnce` の後ろに、空行で割って並ぶ。
+once の記憶は文とファイルで分けず、ルール 1 件で 1 度と数える。
+
+```yaml
+allow:
+  - id: tests
+    match: Write|Edit|MultiEdit
+    glob: "*/tests/*"
+    additionalContextOnce: テストの決まりは次のとおり。
+    additionalContextOnceFile: docs/testing.md
+```
+
+- パスはワークスペースルートからの相対で書く。絶対パスと `..` で上に出るパスは
+  `--lint` が error にし、実行時も読まない。ルールから任意のファイルをモデルに流し込める
+  形にはしない
+- 行き先（Bash なら cwd）が作業ツリーの中なら、まず作業ツリーの同じパスを見る。
+  無ければ切り元のプロジェクト、最後にワークスペースルート。作業ツリーで直している最中の
+  案内文がそのまま効く
+- ファイルが無ければ何も足さない。`--lint` はそのことを warn で言う
+- 読むのは先頭 4000 文字まで（固定）。超えたら先頭だけを載せ、末尾に「先頭だけを載せた。
+  続きはこのファイルを読むこと」と添える。黙って切ると、モデルは途中で終わる文を全部だと
+  思って読む。`--lint` は上限を超えるファイルにも warn を出す
+- `--test` と「判定を試す」には、読んだ本文がそのまま（切った状態で）出る。モデルに届く
+  ものと同じ
+
 **広い `allow` には書かない。** 当たった回ごとに同じ文がコンテキストに積まれるので、
 `ls` のたびに届く文は 2 回目から読まれなくなる。`--lint` は、何にでも当たる `allow`
 （`glob: "*"` など）と選択肢が 3 つ以上ある `regex`（`(ls|cat|sed)`）に書いた
@@ -1295,7 +1324,9 @@ error 2 件、warn 2 件
 | warn | 上書き設定ファイルが読めない |
 | warn | `id` の無いルール、`id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
-| warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext` を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので咎めない） |
+| warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext`（か `additionalContextFile`）を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので咎めない） |
+| error | `additionalContextFile` / `additionalContextOnceFile` が絶対パスか `..` で上に出るパス（実行時も読まない） |
+| warn | `additionalContextFile` / `additionalContextOnceFile` が指すファイルが無い（作るまで何も足さない）、または先頭 4000 文字を超える（先頭だけが届き、切ったことを添える） |
 | warn | `PostToolUse` に ccnavi が登録されていない（実行後の監視が走らない） |
 | warn | 登録はされているが git の作業ツリーではない（監視が何も検知しない） |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |

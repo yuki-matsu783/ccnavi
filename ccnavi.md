@@ -2400,6 +2400,16 @@ SubagentStart で `additionalContext` が届くかは公式文書の読み方が
   `additionalContext` も文面も届かない。allow の文面はどこにも出ない。この結果から、
   `message` は deny だけの欄にして、ask と allow に書いた文面は lint が error にする。
   書いた人が「モデルに届く」と誤解して書く欄を残さないため
+- `/compact` の後に SessionStart が来て、`additionalContextOnce` の記憶が捨てられるか。
+  **実測済み（2026-09、Claude Code 2.1.235、同じ対話セッション）**: compact の直後に
+  `source: compact` の SessionStart が同じ session_id で届き、`once-<セッション>-main.json` は
+  空になった。その後の最初のヒットで once の文がもう一度モデルに届いた。compact 前の
+  ヒットでは毎回の文だけが届いていた。つまり「文脈が新しくなるたびに 1 度」は
+  compact にも効く
+- ルールが指すファイル（`additionalContextFile` / `additionalContextOnceFile`、REQ-PRE-12）は
+  実行ファイルがワークスペースの中から読む。P11 の境界の内側。探す先は行き先の作業ツリー、
+  切り元のプロジェクト、ワークスペースルートの順で、上限（4000 文字）で切ったときは
+  そのことを本文に添える。lint は外を指すパスを error、無いファイルと上限超えを warn にする
 
 ### 24.13 参考にした運用との対応
 

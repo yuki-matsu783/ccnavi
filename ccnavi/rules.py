@@ -155,6 +155,12 @@ class Rule:
     # 忘れる。毎回読ませる必要が無い長い説明のために。additionalContext と両方あれば、
     # 初回は両方を並べ、2 回目からは additionalContext だけを渡す。
     additional_context_once: str = ""
+    # additionalContextFile / additionalContextOnceFile は、文の代わりに（または文に
+    # 続けて）本文を渡すファイル。ルートからの相対パスで、行き先の作業ツリーにあれば
+    # そちらを、無ければルートのものを読む。無ければ何も足さない。長さは
+    # ctxfile.MAX_CHARS で切り、切ったことを本文の末尾に添える。
+    additional_context_file: str = ""
+    additional_context_once_file: str = ""
     # decision はこのルールが置かれていた区画。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
@@ -278,6 +284,8 @@ def _build(
         message=str(raw.get("message") or ""),
         additional_context=str(raw.get("additionalContext") or ""),
         additional_context_once=str(raw.get("additionalContextOnce") or ""),
+        additional_context_file=str(raw.get("additionalContextFile") or ""),
+        additional_context_once_file=str(raw.get("additionalContextOnceFile") or ""),
         decision=section,
     )
     name = f"{section}:{rule.id}" if rule.id else where

@@ -99,6 +99,8 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
     message: "消さない。退避する。",
     additionalContext: "",
     additionalContextOnce: "",
+    additionalContextFile: "",
+    additionalContextOnceFile: "",
   };
   const out = doc.apply({ deny: [s.deny[0], fresh], ask: s.ask, allow: [] });
   assert.match(out, /- id: no-rm\n    match: Bash\n    glob: '\*rm -rf\*'\n    message: >-\n      消さない。退避する。/);
@@ -169,4 +171,40 @@ allow:
   const once = doc.apply({ deny: [{ ...s.deny[0], additionalContextOnce: "最初に 1 度だけ" }], ask: [], allow: s.allow });
   assert.match(once, /親が送れる\n    additionalContextOnce: >-\n      最初に 1 度だけ\n/);
   assert.equal(readRules(once).model.sections.deny[0].additionalContextOnce, "最初に 1 度だけ");
+});
+test("CB-T54 additionalContextFile は 1 行の値で、対応する文の直後に置く", () => {
+  const text = `version: 3
+deny:
+  - id: git-push
+    match: Bash
+    glob: "*git push*"
+    message: push は人が行う
+    additionalContext: ラッパを通す
+    additionalContextFile: docs/push.md
+allow:
+  - id: src
+    match: Write
+    glob: "*/src/*"
+    additionalContextOnce: 決まり
+`;
+  const doc = readRules(text);
+  const s = doc.model.sections;
+  assert.equal(s.deny[0].additionalContextFile, "docs/push.md");
+  assert.equal(s.deny[0].additionalContextOnceFile, "");
+  assert.equal(s.allow[0].additionalContextFile, "");
+  assert.equal(doc.apply(s), text);
+  // once のファイルは once の文の直後。文が無ければ末尾。空のままなら足さない
+  const out = doc.apply({
+    deny: [{ ...s.deny[0], additionalContextOnceFile: "docs/once.md" }],
+    ask: [],
+    allow: [{ ...s.allow[0], additionalContextOnceFile: "docs/testing.md" }],
+  });
+  assert.match(out, /additionalContextFile: docs\/push.md\n    additionalContextOnceFile: docs\/once.md\n/);
+  assert.match(out, /additionalContextOnce: 決まり\n    additionalContextOnceFile: docs\/testing.md\n/);
+  const again = readRules(out).model.sections;
+  assert.equal(again.deny[0].additionalContextOnceFile, "docs/once.md");
+  assert.equal(again.allow[0].additionalContextOnceFile, "docs/testing.md");
+  // 空にすれば欄は残るが値は空
+  const cleared = doc.apply({ deny: [{ ...s.deny[0], additionalContextFile: "" }], ask: [], allow: s.allow });
+  assert.equal(readRules(cleared).model.sections.deny[0].additionalContextFile, "");
 });
