@@ -71,8 +71,11 @@ ASK = "ask"
 ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
-# 文面が要る区画。allow は通すだけなので、書いても届く先が無い。
-_NEEDS_MESSAGE = (DENY, ASK)
+# 文面が要る区画。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
+# 通すだけで届く先が無い（どちらも実測済み、設計 §24.12）。モデルに渡す文は
+# additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
+# ここで落とすとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
+_NEEDS_MESSAGE = (DENY,)
 
 # Python の正規表現エンジンは後方参照と先読みを扱えるが、ルールファイルの契約は
 # それを使わないことになっている。書ける範囲を狭いままにしておくと、ルールが

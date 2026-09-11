@@ -719,6 +719,24 @@ def _rules(path: str, root: str = "") -> list[Problem]:
                 )
             )
 
+        if rule.message and rule.decision != rules.DENY:
+            # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
+            # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
+            # ルールは効いているので判定は変わらない。直すまで CI が落ちるだけ。
+            where = (
+                "人の確認ダイアログにしか出ない"
+                if rule.decision == rules.ASK
+                else "どこにも届かない"
+            )
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    name,
+                    f"{rule.decision} に message がある。{where}ので、モデルに渡す文は "
+                    "additionalContext に書き、message は消す",
+                )
+            )
+
         # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
         if rule.additional_context and rule.decision == rules.ALLOW:
             why = _broad(rule)
