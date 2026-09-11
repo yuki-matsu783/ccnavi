@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import json
 import os
 import time
 from collections.abc import Callable
@@ -650,6 +651,9 @@ def decide_at_start(
         root,
         selfguard.targets(root, conf.rules, conf.bin, project_rules_files(conf)),
     )
+    # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
+    # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
+    _forget_once(conf.state, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     if not outcomes:
         return EXIT_OK
@@ -828,14 +832,21 @@ def decide_before(
         if ticket_reason:
             record.rules = [TICKET_RULE]
 
+    # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
+    # 別の経路（additionalContext）で届く。
+    context = _context_for(stderr, conf.state, payload, group)
+
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
-        if notices:
+        if notices or context:
             # 通した回にも言う。ガードが今なにを見ていないのかを黙っていると、
             # 誰も知らないまま作業が進む。呼び出しごとに出るのでうるさいが、
             # うるさいのが正しい。壊れた設定と未承認のチケットはどちらも
             # 短命であるべきで、黙って居座られるより気づかれたほうがよい。
-            hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
+            # ルールの additionalContext も同じ経路で、通す代わりに一言添える。
+            hookio.write_context(
+                stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([context] if context else []))
+            )
         return EXIT_OK
 
     if verdict == rules.DENY and group:
@@ -884,11 +895,23 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
         return EXIT_OK
 
-    return refuse(stdout, mode, record, verdict, notices + reasons)
+    return refuse(stdout, mode, record, verdict, notices + reasons, context)
 
 
-def refuse(stdout: TextIO, mode: str, record: audit.Record, verdict: str, parts: list[str]) -> int:
-    """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。"""
+def refuse(
+    stdout: TextIO,
+    mode: str,
+    record: audit.Record,
+    verdict: str,
+    parts: list[str],
+    context: str = "",
+) -> int:
+    """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
+
+    context はルールの `additionalContext`。判定と一緒にモデルへ渡す文で、
+    dry-run では判定の代わりの文に続けて出す。止めない回でも文だけは届く形にして、
+    enable に切り替えたときに初めて読まれる文を残さない。
+    """
     # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
     decision = audit.DENY if verdict == rules.DENY else audit.ASK
@@ -896,15 +919,16 @@ def refuse(stdout: TextIO, mode: str, record: audit.Record, verdict: str, parts:
     if mode == MODE_DRY_RUN:
         record.decision, record.enforced = decision, False
         would = "stopped" if verdict == rules.DENY else "asked the user about"
-        hookio.write_context(
-            stdout,
-            hookio.PRE_TOOL_USE,
-            f"[ccnavi dry-run] {MODE_ENABLE} would have {would} this call:\n" + reason,
-        )
+        text = f"[ccnavi dry-run] {MODE_ENABLE} would have {would} this call:\n" + reason
+        if context:
+            text += "\n\n" + context
+        hookio.write_context(stdout, hookio.PRE_TOOL_USE, text)
         return EXIT_OK
 
     record.decision, record.enforced = decision, True
-    hookio.write_verdict(stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason)
+    hookio.write_verdict(
+        stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason, context
+    )
     return EXIT_OK
 
 
@@ -1077,6 +1101,95 @@ def _remember_bounce(stderr: TextIO, state_dir: str, agent_id: str) -> None:
             f.write(time.strftime("%Y-%m-%dT%H:%M:%S%z"))
     except OSError as exc:
         stderr.write(f"ccnavi: 差し戻しの回数を書けない: {exc}\n")
+
+
+# 「1 度だけ渡す文」の記憶を残す日数。セッションの開始で消えるのが本筋で、
+# これは開始が来ないまま終わったセッションの分を掃くための上限。
+ONCE_KEEP_DAYS = 3
+
+
+def _context_for(
+    stderr: TextIO, state_dir: str, payload: hookio.Input, group: list[rules.Rule]
+) -> str:
+    """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
+
+    `additionalContext` は当たるたびに渡す。`additionalContextOnce` は、この文脈で
+    初めて当たったときだけ渡す。両方あれば初回は並べて、2 回目からは前者だけ。
+    文脈はセッションと、サブエージェントならその 1 回の起動（agent_id）で分ける。
+    サブエージェントは親の文脈を持たないので、親で渡した文は子にも 1 度渡す。
+
+    控えを置く場所が無いとき（`--state ""`）は once の文も毎回渡す。覚えられないなら
+    黙るのではなく言うほうに倒す。届かない文は書いていないのと同じになるから。
+    """
+    parts: list[str] = []
+    remembered: set[str] | None = None
+    for rule in group:
+        if rule.additional_context:
+            parts.append(rule.additional_context)
+        if not rule.additional_context_once:
+            continue
+        if state_dir:
+            if remembered is None:
+                remembered = _load_once(stderr, state_dir, payload)
+            key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
+            if key in remembered:
+                continue
+            remembered.add(key)
+        parts.append(rule.additional_context_once)
+    if remembered is not None:
+        _save_once(stderr, state_dir, payload, remembered)
+    return "\n\n".join(parts)
+
+
+def _once_path(state_dir: str, session: str, agent_id: str) -> str:
+    def safe(text: str) -> str:
+        return "".join(c if c.isalnum() or c in "._-" else "_" for c in text)[:64]
+
+    return os.path.join(
+        state_dir, f"once-{safe(session) or 'unknown'}-{safe(agent_id) or 'main'}.json"
+    )
+
+
+def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str]:
+    path = _once_path(state_dir, payload.session_id, payload.agent_id)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return set()
+    except (OSError, ValueError) as exc:
+        stderr.write(f"ccnavi: 1 度だけ渡す文の控えを読めない: {exc}\n")
+        return set()
+    given = data.get("given") if isinstance(data, dict) else None
+    return {s for s in given if isinstance(s, str)} if isinstance(given, list) else set()
+
+
+def _save_once(stderr: TextIO, state_dir: str, payload: hookio.Input, given: set[str]) -> None:
+    path = _once_path(state_dir, payload.session_id, payload.agent_id)
+    try:
+        os.makedirs(state_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"given": sorted(given)}, f, ensure_ascii=False)
+    except OSError as exc:
+        stderr.write(f"ccnavi: 1 度だけ渡す文の控えを書けない: {exc}\n")
+
+
+def _forget_once(state_dir: str, session: str) -> None:
+    """このセッションの「1 度だけ渡す文」の記憶を全部捨てる。古いセッションの分も掃く。"""
+    if not state_dir or not os.path.isdir(state_dir):
+        return
+    mine = os.path.basename(_once_path(state_dir, session, "")).rsplit("-", 1)[0] + "-"
+    cutoff = time.time() - ONCE_KEEP_DAYS * 86400
+    for name in os.listdir(state_dir):
+        if not name.startswith("once-") or not name.endswith(".json"):
+            continue
+        path = os.path.join(state_dir, name)
+        try:
+            if name.startswith(mine) or os.path.getmtime(path) < cutoff:
+                os.remove(path)
+        except OSError:
+            # 消せなくても次の開始でまた試す。ここで止めるほどのものではない。
+            continue
 
 
 def decide_after(

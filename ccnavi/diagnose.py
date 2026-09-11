@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import io
 import json
 import time
@@ -55,6 +56,11 @@ def judge(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject
     判定が対象を取り出せないもので、他の鍵は空のまま。
     """
     from .cli import DEADLINE_SECONDS, MODE_ENABLE, decide_before, subject_of
+
+    # 試験は控えを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
+    # 1 回で届かなくなる。控えを外すと selfguard の写しも取らないが、試験は
+    # 実行しないのでそもそも戻すものが無い。
+    conf = dataclasses.replace(conf, state="")
 
     out: dict = {
         "known": tool in KNOWN_TOOLS,
@@ -248,7 +254,10 @@ def _response_text(written: str) -> str:
         out = json.loads(written)["hookSpecificOutput"]
     except (ValueError, KeyError):
         return written.strip()
-    return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
+    # 理由と additionalContext は別の鍵で、deny と ask では両方が届く。
+    # 両方あるときは届く順に並べる。
+    parts = [out.get("permissionDecisionReason") or "", out.get("additionalContext") or ""]
+    return "\n\n".join(p for p in parts if p)
 
 
 def load_samples(path: str, root: str) -> list[dict]:

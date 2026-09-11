@@ -143,6 +143,15 @@ class Rule:
     regex: str = ""
     # message は、なぜ止めたかと、代わりに何をすればよいかを言う。
     message: str = ""
+    # additionalContext は、当たったときにモデルへ渡す文。message と違って
+    # 止められた側ではなく進む側に向けた言葉で、allow でも ask でも deny でも
+    # 応答の `additionalContext` に載る。通すが踏まえてほしいことを書く。
+    additional_context: str = ""
+    # additionalContextOnce は、1 つの文脈（セッション、サブエージェントならその 1 回の
+    # 起動）で最初に当たったときだけ渡す文。セッションの開始（起動・再開・compact の後）で
+    # 忘れる。毎回読ませる必要が無い長い説明のために。additionalContext と両方あれば、
+    # 初回は両方を並べ、2 回目からは additionalContext だけを渡す。
+    additional_context_once: str = ""
     # decision はこのルールが置かれていた区画。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
@@ -264,6 +273,8 @@ def _build(
         glob=str(raw.get("glob") or ""),
         regex=str(raw.get("regex") or ""),
         message=str(raw.get("message") or ""),
+        additional_context=str(raw.get("additionalContext") or ""),
+        additional_context_once=str(raw.get("additionalContextOnce") or ""),
         decision=section,
     )
     name = f"{section}:{rule.id}" if rule.id else where

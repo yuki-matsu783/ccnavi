@@ -719,7 +719,58 @@ def _rules(path: str, root: str = "") -> list[Problem]:
                 )
             )
 
+        # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
+        if rule.additional_context and rule.decision == rules.ALLOW:
+            why = _broad(rule)
+            if why:
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        name,
+                        f"広い allow に additionalContext がある（{why}）。"
+                        "当たるたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
+                    )
+                )
+
     return problems
+
+
+def _broad(rule: rules.Rule) -> str:
+    """allow のルールが広いと言える理由。無ければ空。
+
+    additionalContext は当たった回ごとにモデルへ渡るので、広い allow に書くと
+    ls のたびに同じ文が積まれる。「広い」の判定は 2 つで、どちらも書き方から
+    機械的に言えるものに限る。当たる頻度は記録を見ないと分からないので、
+    ここでは扱わない。
+
+    1. 何にでも当たる。翻訳後の式が、当てる語を含まない文字列にも当たる
+    2. 選択肢が 3 つ以上。`(ls|cat|sed)` のような並びは、それだけ多くの
+       コマンドに同じ文を添えることになる
+    """
+    if rule.compiled is not None and rule.compiled.search("x"):
+        return "何にでも当たる"
+    if _alternatives(rule.regex) >= 3:
+        return "選択肢が 3 つ以上"
+    return ""
+
+
+def _alternatives(regex: str) -> int:
+    """正規表現の選択肢の数。文字クラスの中と、エスケープされた `|` は数えない。"""
+    if not regex:
+        return 0
+    count, in_class, escaped = 1, False, False
+    for ch in regex:
+        if escaped:
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif in_class:
+            in_class = ch != "]"
+        elif ch == "[":
+            in_class = True
+        elif ch == "|":
+            count += 1
+    return count
 
 
 def _inert(match: str) -> list[str]:

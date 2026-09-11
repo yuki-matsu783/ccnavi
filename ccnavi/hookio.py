@@ -104,20 +104,24 @@ def decode(stream: TextIO) -> Input:
     )
 
 
-def write_verdict(stream: TextIO, decision: str, reason: str) -> None:
+def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "") -> None:
     """PreToolUse の判定を書き出す。
 
     理由には「なぜ止めたか」と「代わりに何をすればよいか」が入る。
     通すときは理由が要らないので何も書かない。
+
+    context はルールの `additionalContext`。判定と一緒に `additionalContext` として
+    載せる。deny でも ask でも、理由と一緒にモデルへ届くことは実測で確かめた
+    （2026-09、Claude Code 2.1）。空なら鍵ごと出さない。
     """
-    _write(
-        stream,
-        {
-            "hookEventName": PRE_TOOL_USE,
-            "permissionDecision": decision,
-            "permissionDecisionReason": reason,
-        },
-    )
+    payload: dict[str, Any] = {
+        "hookEventName": PRE_TOOL_USE,
+        "permissionDecision": decision,
+        "permissionDecisionReason": reason,
+    }
+    if context:
+        payload["additionalContext"] = context
+    _write(stream, payload)
 
 
 def write_context(stream: TextIO, event: str, text: str) -> None:
