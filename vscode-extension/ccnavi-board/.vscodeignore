@@ -1,0 +1,10 @@
+.gitignore
+.vscodeignore
+node_modules/**
+out/test/**
+pnpm-lock.yaml
+scripts/**
+src/**
+test/**
+tsconfig.json
+**/*.map
