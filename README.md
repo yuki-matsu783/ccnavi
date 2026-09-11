@@ -273,7 +273,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 ルールファイルは YAML で、`deny` `ask` `allow` の 3 つの区画に分かれる。
 1 件のルールは、当てるツール・探すもの・見つけたときに返す文面を 1 組で持つ。
 文面は `deny` と `ask` では必須。`allow` では要らない（通した呼び出しには
-誰にも何も返らないので、書いても届く先が無い）。
+判定の理由が返らないので、書いても届く先が無い）。
 
 ```yaml
 version: 3
@@ -294,10 +294,52 @@ allow:
   - id: source
     match: Write|Edit|MultiEdit
     glob: "*/src/*"
+    additionalContext: src の下は自由に直してよい。ただし公開 API の綴りを変えたら docs/api.md も直すこと。
 ```
 
 `glob` と `regex` は必ず引用符で囲む。囲まないと YAML が先に解釈する。
 `<<` はマージキー、`*` はエイリアス、`&` はアンカー、`!` はタグになる。
+
+### 通す・聞く・止めるのどれでも、一言添える
+
+`additionalContext` は、そのルールに当たったときにモデルへ渡す文。`message` が
+止められた側に向けた言葉（なぜ止めたか、代わりに何をするか）なのに対し、こちらは
+進む側に向けた言葉で、「通すが、これを踏まえて進めろ」を書く。どの区画にも書ける。
+
+| 区画 | どう届くか |
+|---|---|
+| `allow` | 応答の `additionalContext` として届く。判定の理由は無いので、これだけが届く |
+| `ask` / `deny` | `permissionDecisionReason`（`message`）と一緒に `additionalContext` として届く。両方が届くことは Claude Code 2.1 で実測した |
+| `dry-run` のとき | 止める代わりに返す文に続けて届く。`enable` に切り替えて初めて読まれる文を残さない |
+
+同じ区画に複数当たれば、全部の文を空行で割って並べる。`--test` と `--test --json` の
+`response` には理由と一緒に出るので、書いた文が何と一緒に届くかはそこで見える。
+
+`additionalContextOnce` は、1 つの文脈で最初に当たったときだけ届く文。文脈はセッション 1 本で、
+サブエージェントはその 1 回の起動ごとに別に数える（親で渡した文は子にも 1 度届く）。
+セッションの開始（起動・再開・compact の後）で忘れるので、モデルの文脈が新しくなるたびに
+改めて 1 度届く。長い説明を毎回読ませずに済ませるためのもので、記憶は
+`.claude/ccnavi/state/once-<セッション>-<エージェント>.json` に置く。控えの置き場が無い
+（`--state ""`）なら毎回届く。覚えられないなら黙るのではなく言う側に倒す。
+
+`additionalContext` と両方書けば、初回は 2 つを空行で並べて届け、2 回目からは
+`additionalContext` だけが届く。毎回添える一言と、最初に 1 度だけ読ませる説明を分けて書ける。
+
+```yaml
+allow:
+  - id: source
+    match: Write|Edit|MultiEdit
+    glob: "*/src/*"
+    additionalContext: src の下を直したら docs/api.md も見直すこと。
+    additionalContextOnce: >-
+      src の下は自由に直してよい。公開 API の綴りを変えたら docs/api.md も直し、
+      テストは tests/ に同じ名前で置く。CHANGELOG は締めるときにまとめて書く。
+```
+
+**広い `allow` には書かない。** 当たった回ごとに同じ文がコンテキストに積まれるので、
+`ls` のたびに届く文は 2 回目から読まれなくなる。`--lint` は、何にでも当たる `allow`
+（`glob: "*"` など）と選択肢が 3 つ以上ある `regex`（`(ls|cat|sed)`）に書いた
+`additionalContext` を warn にする。狭いルールに分けて、そのルールにだけ書く。
 
 ### 強さ
 
@@ -1248,6 +1290,7 @@ error 2 件、warn 2 件
 | warn | 上書き設定ファイルが読めない |
 | warn | `id` の無いルール、`id` が重複するルール |
 | warn | 判定が対象を取り出せないツールを `match` に書いたルール |
+| warn | 何にでも当たる、または選択肢が 3 つ以上ある `allow` に `additionalContext` を書いたルール（当たるたびに同じ文が積まれる。`additionalContextOnce` は文脈ごとに 1 度なので咎めない） |
 | warn | `PostToolUse` に ccnavi が登録されていない（実行後の監視が走らない） |
 | warn | 登録はされているが git の作業ツリーではない（監視が何も検知しない） |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |

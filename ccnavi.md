@@ -2388,6 +2388,11 @@ SubagentStart で `additionalContext` が届くかは公式文書の読み方が
 - 保護済みスクリプトが `.claude/ccnavi/tickets/` へ書く道が、組み込みの既定のシェル書き込み検知に当たらないか
 - Windows で `.claude/worktrees/<名前>` の `.git` ファイルの `gitdir:` が絶対パスで書かれるか、区切りが何か
 - Windows の jq 1.6 に `strptime` が無い（参考の実測）。時刻の変換を jq に頼らず Python 側で行う
+- PreToolUse で `permissionDecision` と `additionalContext` を 1 つの応答に入れたとき、両方が
+  モデルに届くか。**実測済み（2026-09、Claude Code 2.1.235）**: deny / ask / allow のどれでも
+  `additionalContext` はモデルに届き、deny と ask では `permissionDecisionReason` と一緒に届く。
+  隔離したプロジェクトに目印入りの文を返す hook を置き、`claude -p` で受け取った目印を
+  報告させて確かめた。ルールの `additionalContext`（REQ-PRE-11）はこの結果に乗っている
 
 ### 24.13 参考にした運用との対応
 
