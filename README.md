@@ -271,9 +271,12 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 ## ルール
 
 ルールファイルは YAML で、`deny` `ask` `allow` の 3 つの区画に分かれる。
-1 件のルールは、当てるツール・探すもの・見つけたときに返す文面を 1 組で持つ。
-文面は `deny` と `ask` では必須。`allow` では要らない（通した呼び出しには
-判定の理由が返らないので、書いても届く先が無い）。
+1 件のルールは、当てるツール・探すもの・見つけたときに返す文を 1 組で持つ。
+`message` は `deny` だけに書く（必須）。止められたモデルに「なぜ止めたか、代わりに何を
+するか」を伝える文で、`permissionDecisionReason` として届く。`ask` と `allow` に書くと
+`--lint` が error にする。`ask` の文面は人の確認ダイアログにしか出ず、`allow` の文面は
+どこにも出ない（どちらも実測済み）。書いた人は「モデルに届く」と思って書くので、
+届かない欄を残さない。モデルに伝えたいことは区画によらず `additionalContext` に書く。
 
 ```yaml
 version: 3
@@ -288,7 +291,7 @@ ask:
   - id: migrations
     match: Write|Edit
     glob: "*/migrations/*"
-    message: 移行ファイルは実行前に人が中身を見ます。何が変わるかを言ってください。
+    additionalContext: 移行ファイルは実行前に人が中身を見る。何が変わるかを先に言うこと。
 
 allow:
   - id: source
@@ -306,10 +309,11 @@ allow:
 止められた側に向けた言葉（なぜ止めたか、代わりに何をするか）なのに対し、こちらは
 進む側に向けた言葉で、「通すが、これを踏まえて進めろ」を書く。どの区画にも書ける。
 
-| 区画 | どう届くか |
+| 区画 | どう届くか（Claude Code 2.1 で実測） |
 |---|---|
 | `allow` | 応答の `additionalContext` として届く。判定の理由は無いので、これだけが届く |
-| `ask` / `deny` | `permissionDecisionReason`（`message`）と一緒に `additionalContext` として届く。両方が届くことは Claude Code 2.1 で実測した |
+| `ask` | 人が Yes を押したときだけ `additionalContext` が届く。No なら拒否の定型文だけが届いてターンが終わり、文は届かない。ダイアログには `[ccnavi] RULE_ASK (source: …)` と subject が出る |
+| `deny` | `permissionDecisionReason`（`message`）と一緒に `additionalContext` として届く |
 | `dry-run` のとき | 止める代わりに返す文に続けて届く。`enable` に切り替えて初めて読まれる文を残さない |
 
 同じ区画に複数当たれば、全部の文を空行で割って並べる。`--test` と `--test --json` の
@@ -1282,7 +1286,8 @@ error 2 件、warn 2 件
 | 深刻度 | 拾うもの |
 |---|---|
 | error | ルールファイルが読めない、JSON として壊れている、版番号が違う |
-| error | 文面・`match`・`glob` を欠いたルール、`glob` と `regex` の両方があるルール |
+| error | 文面（`deny` だけ）・`match`・`glob` を欠いたルール、`glob` と `regex` の両方があるルール |
+| error | `ask` か `allow` に `message` を書いたルール（`ask` の文面は人の確認ダイアログにしか出ず、`allow` の文面はどこにも出ない。ルールは効いたまま） |
 | error | 組み立てられない正規表現、読み込み時に弾いている先読み・後読み・後方参照 |
 | error | 組み立てられたルールが 1 件も無い |
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=off` を宣言している |

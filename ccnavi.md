@@ -2393,6 +2393,13 @@ SubagentStart で `additionalContext` が届くかは公式文書の読み方が
   `additionalContext` はモデルに届き、deny と ask では `permissionDecisionReason` と一緒に届く。
   隔離したプロジェクトに目印入りの文を返す hook を置き、`claude -p` で受け取った目印を
   報告させて確かめた。ルールの `additionalContext`（REQ-PRE-11）はこの結果に乗っている
+- ask で `permissionDecisionReason` が誰に見えるか。**実測済み（2026-09、Claude Code 2.1.235、
+  ccnavi 自身のリポジトリで対話セッションを使い、モデルの側から届いたものを報告した）**:
+  文面は人の確認ダイアログに出るが、Yes を押した後もモデルには届かない。`additionalContext` は
+  Yes のときだけ届く。No のときは拒否の定型文だけがモデルに届いてターンが終わり、
+  `additionalContext` も文面も届かない。allow の文面はどこにも出ない。この結果から、
+  `message` は deny だけの欄にして、ask と allow に書いた文面は lint が error にする。
+  書いた人が「モデルに届く」と誤解して書く欄を残さないため
 
 ### 24.13 参考にした運用との対応
 
