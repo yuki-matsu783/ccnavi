@@ -135,21 +135,21 @@ ask:
   - id: commit
     match: Bash
     regex: 'ccnavi-git\.sh\s+push\b'
-    message: >-
+    additionalContextOnce: >-
       pushは 1 回ごとに人が見ます。何を含めたか、メッセージが変更と合っているかを
       確かめてください。
 
   - id: dependencies
     match: Write|Edit|MultiEdit
     regex: 'pyproject\.toml|uv\.lock'
-    message: >-
+    additionalContextOnce: >-
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
       1 本になります。何を足すのか、外せない理由は何かを言ってください。
 
   - id: current-ticket
     match: Write|Edit|MultiEdit
     glob: "*/.current-ticket.md"
-    message: >-
+    additionalContextOnce: >-
       作業範囲の提案です。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
       人が読んで 'ccnavi --approve' を通すまでは提案のままです。
 
