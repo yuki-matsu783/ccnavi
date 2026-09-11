@@ -478,7 +478,7 @@ def _violation(
     """
     change, group = finding.change, finding.group
     lines = [
-        f"[ccnavi] {finding.code} (source: {_source(finding.source, group)})",
+        f"[ccnavi] {finding.code} ({_source(finding.source, group)})",
         f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
         f"tree: {finding.tree_name} ({finding.tree_root})" if finding.tree_name else "",
         f"after: {_call(payload)}",
@@ -512,7 +512,7 @@ def _preexisting(finding: Finding) -> str:
     change, group = finding.change, finding.group
     return "\n".join(
         [
-            f"[ccnavi] {CODE_PREEXISTING} (source: {_source(finding.source, group)})",
+            f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
             f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
             "note: this was already in the working tree when ccnavi started watching this "
             "session, so the call that just ran did not cause it. Do not undo it and do not "
@@ -525,10 +525,12 @@ def _preexisting(finding: Finding) -> str:
 def _source(source: str, group: list[rules.Rule]) -> str:
     """どの設定がこの場所を守ると言っているかを名指しする。
 
-    ファイル名だけでは、見に行った人が当たったルールに辿り着けない。
+    実行前の理由（cli.reason_for）と同じで、名乗るのはルールの id。プロジェクトの
+    ルールの id にはプロジェクトの名前が付くので、id だけで直しに行く先が決まる。
+    id を持たないルールだけ、代わりにファイルを名乗る。
     """
     named = [rule.id for rule in group if rule.id]
-    return f"{source}#{','.join(named)}" if named else source
+    return f"rule: {','.join(named)}" if named else f"rules: {source}"
 
 
 def _messages(group: list[rules.Rule]) -> str:

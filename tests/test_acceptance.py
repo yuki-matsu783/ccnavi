@@ -151,7 +151,8 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(len(got), 1)
         self.assertIn("git push origin main", got[0], "何に当たったのかが無い")
         self.assertIn("DENY_COMMAND_PATTERN", got[0], "理由コードが無い")
-        self.assertIn(f"{RULES}#git-push", got[0], "どの設定が言っているのかが無い")
+        self.assertIn("rule: git-push", got[0], "どのルールが言っているのかが無い")
+        self.assertNotIn(RULES, got[0], "ルールファイルの綴りは要らない（id で辿れる）")
 
     def test_ファイルの理由は行き着く先を対象として名指しする(self):
         # 当てたのは来たままの綴りではなく解いた先なので、対象もそちらを言う。
@@ -161,7 +162,7 @@ class ReasonTest(unittest.TestCase):
         self.assertEqual(len(got), 1)
         self.assertIn(os.path.join(ROOT, ".env"), got[0])
         self.assertIn("DENY_PATH", got[0])
-        self.assertIn(f"{RULES}#dotenv", got[0])
+        self.assertIn("rule: dotenv", got[0])
 
     def test_複数返った理由は一件ずつ単独で読んで成立する(self):
         # 同じ出来事に複数の判定が同時に当たるとき、そのうちどれが利用者の目に
@@ -174,7 +175,7 @@ class ReasonTest(unittest.TestCase):
             with self.subTest(reason=i):
                 self.assertIn("sed -i s/a/b/ .env", part, "対象を他の件に預けている")
                 self.assertIn("[ccnavi] DENY_", part, "理由コードを他の件に預けている")
-                self.assertIn(f"{RULES}#", part, "出所を他の件に預けている")
+                self.assertIn("(rule: ", part, "出所を他の件に預けている")
 
     def test_読めなかった判定は件ごとにそう名乗る(self):
         # 読めなかったという断りは、1 回だけ先頭に置くと、その下の 1 件だけを

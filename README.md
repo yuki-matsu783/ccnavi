@@ -312,7 +312,7 @@ allow:
 | 区画 | どう届くか（Claude Code 2.1 で実測） |
 |---|---|
 | `allow` | 応答の `additionalContext` として届く。判定の理由は無いので、これだけが届く |
-| `ask` | 人が Yes を押したときだけ `additionalContext` が届く。No なら拒否の定型文だけが届いてターンが終わり、文は届かない。ダイアログには `[ccnavi] RULE_ASK (source: …)` と subject が出る |
+| `ask` | 人が Yes を押したときだけ `additionalContext` が届く。No なら拒否の定型文だけが届いてターンが終わり、文は届かない。ダイアログには `[ccnavi] RULE_ASK (rule: …)` と subject が出る |
 | `deny` | `permissionDecisionReason`（`message`）と一緒に `additionalContext` として届く |
 | `dry-run` のとき | 止める代わりに返す文に続けて届く。`enable` に切り替えて初めて読まれる文を残さない |
 
@@ -618,7 +618,7 @@ docs/../.env
 宣言を 2 か所に分けると必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
 
 ```
-[ccnavi] POST_VIOLATION (source: .claude/ccnavi/rules.yml#guard-config)
+[ccnavi] POST_VIOLATION (rule: guard-config)
 path: .claude/ccnavi/probe.json (?? / new)
 after: Bash(npm run build)
 undo: git clean -f -- ".claude/ccnavi/probe.json"
@@ -1203,7 +1203,7 @@ rules:
   deny:git-push  glob '*git push*'
     -> (?s:(?>.*?git\ push).*)\Z
 response:
-  [ccnavi] DENY_COMMAND_PATTERN (source: .claude/ccnavi/rules.yml#git-push)
+  [ccnavi] DENY_COMMAND_PATTERN (rule: git-push)
   ...
 ```
 
