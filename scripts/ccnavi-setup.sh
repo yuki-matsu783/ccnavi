@@ -6,12 +6,24 @@
 #
 #   --mode <enable|dry-run>  CCNAVI_MODE。既定は dry-run
 #   --bin <相対パス>         CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
+#   --deploy <ccnavi の根>   実行ファイル・ルール・ゲートの sh を配り元から写す
 #   --all                    既定値を持つ env も明示して書く
-#   --force                  明示した --mode / --bin で、既にある値を置き換える
+#   --force                  明示した --mode / --bin で、既にある値を置き換える。
+#                            --deploy と一緒なら、配り先に既にあるものも入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
 # env は触らない。ccnavi と関係のない hook や設定はそのまま残す。
+#
+# `--deploy` は、ccnavi を組み立てたところ（ccnavi のリポジトリ）から対象プロジェクト
+# へ写しを取る。設定を書くだけでは動かないのに、実行ファイルを置く手立てがどこにも
+# 無かった。`dist/` は .gitignore に入っているので git では渡らず、CCNAVI_BIN_PATH は
+# 相対でしか書けないので、よそで組んだ実行ファイルを指すこともできない。対象
+# プロジェクトの中に実体を置く経路がここに要る。
+#
+# 配り先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
+# ルールファイルもゲートの sh も、入れた先で直されている前提のもの。黙って上書き
+# すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配り元の形へ戻す。
 #
 # `disable` は受け付けない。監視される側が書けるファイルから監視を止める形に
 # なるので、ccnavi 自身がそれを error として報告する（README「設定lint」）。
@@ -33,6 +45,14 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart 
 DEFAULT_MODE="dry-run"
 DEFAULT_BIN="dist/ccnavi/ccnavi"
 
+# --deploy が写すもの。配り元での置き場は build.py の出力（dist/ccnavi）と、
+# ccnavi のリポジトリの .claude/ の形に決め打ちで対応する。配り先の綴りは
+# --bin に従うので、実行ファイルだけは行き先が動く。
+DEPLOY_BIN_DIR="dist/ccnavi"
+DEPLOY_RULES=".claude/ccnavi/rules.yml"
+DEPLOY_SCRIPT_DIR=".claude/scripts"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh"
+
 mode="$DEFAULT_MODE"
 bin="$DEFAULT_BIN"
 # 明示されたかどうかを分けて持つ。--force が置き換えてよいのは、人がこの実行で
@@ -44,6 +64,7 @@ all=no
 force=no
 check=no
 target=""
+deploy=""
 
 usage() {
 	cat <<'USAGE'
@@ -52,8 +73,10 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   <ワークスペースルート>      既定は現在の作業ディレクトリ
   --mode <enable|dry-run>   CCNAVI_MODE。既定は dry-run
   --bin <相対パス>          CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
+  --deploy <ccnavi の根>    実行ファイル・ルール・ゲートの sh を配り元から写す
   --all                     既定値を持つ env も明示して書く
-  --force                   明示した --mode / --bin で、既にある値を置き換える
+  --force                   明示した --mode / --bin で、既にある値を置き換える。
+                            --deploy と一緒なら、配り先に既にあるものも入れ替える
   --check                   書かずに、揃っていないところだけを並べる
 USAGE
 }
@@ -75,6 +98,12 @@ while [ "$#" -gt 0 ]; do
 		[ "$#" -ge 2 ] || die "--bin に値がありません。"
 		bin="$2"
 		bin_given=yes
+		shift 2
+		;;
+	--deploy)
+		[ "$#" -ge 2 ] || die "--deploy に値がありません。"
+		[ "$2" != "" ] || die "--deploy が空です。"
+		deploy="$2"
 		shift 2
 		;;
 	--all)
@@ -153,6 +182,23 @@ command -v jq >/dev/null 2>&1 || die "jq が要ります。"
 root=$(cd "$target" && { pwd -W 2>/dev/null || pwd; })
 settings="$root/$SETTINGS_REL"
 claude_dir=$(dirname "$settings")
+
+# 配り元。対象の根を決めたあとで見る。同じ綴りの取り方で絶対化してから
+# 突き合わせないと、配り元と配り先が同じかどうかを判定できない。
+source_root=""
+if [ -n "$deploy" ]; then
+	[ -d "$deploy" ] || die "$deploy というディレクトリがありません。"
+	source_root=$(cd "$deploy" && { pwd -W 2>/dev/null || pwd; })
+	if [ "$source_root" = "$root" ]; then
+		die "--deploy の配り元と配り先が同じです。自分自身へは配れません。"
+	fi
+	# 組み立てていない配り元で黙って進まない。ここを報告だけにすると、
+	# 「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、
+	# 打った人は配れたものとして先へ進む。--deploy を付けた以上、実行ファイルが
+	# 無いことは環境の誤りとして 2 で断る。
+	[ -d "$source_root/$DEPLOY_BIN_DIR" ] ||
+		die "$source_root/$DEPLOY_BIN_DIR がありません。配り元で 'uv run --with pyinstaller python build.py' を回してから打ち直してください。"
+fi
 
 # 書けない形を、jq を回す前に見つける。あとで mkdir が失敗すると、終了コードが
 # 1（--check の「揃っていない」）と衝突したうえ、生のエラーだけが出る。
@@ -285,6 +331,118 @@ other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --a
 	| select(\$root | looks(\$ev)) | \$ev
 ")
 
+# 写すものを決める。配り先に既にあるものは触らない。入れ替えるのは --force の
+# ときだけで、そのときも配り元に在るものだけを動かす。
+#
+# 「配り元に無い」を黙って飛ばさない。ルールファイルやゲートの sh が欠けた
+# 配り元から配ると、判定するものだけが入って何を止めるかが入らない。その形は
+# 最後の「まだ無いもの」にしか出ず、配った側の落ち度に見えない。
+deploy_new=""
+deploy_replacing=""
+deploy_kept=""
+deploy_absent=""
+bin_dir_rel=""
+bin_verdict=""
+rules_verdict=""
+scripts_todo=""
+
+# 配り元に在るか、配り先に在るか、--force か。この 3 つだけで決まる。
+verdict() {
+	# $1 配り元の絶対パス / $2 配り先に既にあるか（yes/no）
+	if [ ! -e "$1" ]; then
+		printf 'absent'
+	elif [ "$2" = no ]; then
+		printf 'copy'
+	elif [ "$force" = yes ]; then
+		printf 'replace'
+	else
+		printf 'keep'
+	fi
+}
+
+note_deploy() {
+	# $1 verdict / $2 配り先の綴り / $3 配り元の綴り
+	case "$1" in
+	copy)
+		deploy_new="$deploy_new$2
+"
+		;;
+	replace)
+		deploy_replacing="$deploy_replacing$2
+"
+		;;
+	keep)
+		deploy_kept="$deploy_kept$2
+"
+		;;
+	absent)
+		deploy_absent="$deploy_absent$2（配り元の $3 にありません）
+"
+		;;
+	esac
+}
+
+if [ -n "$deploy" ]; then
+	# 実行ファイルの行き先は --bin が決める。CCNAVI_BIN_PATH に書く綴りと、
+	# 実体を置く場所を 1 つの値から出す。ここが割れると、設定は書けているのに
+	# hook がどこにも無いものを起動する形になる。
+	bin_dir_rel=$(dirname "$bin")
+	# 在るかどうかは 2 つの綴りで見る。PyInstaller が Windows でだけ .exe を
+	# 付けるので、同じ設定が環境によって違うファイル名に当たる。
+	if [ -f "$root/$bin" ] || [ -f "$root/$bin.exe" ]; then
+		bin_there=yes
+	else
+		bin_there=no
+	fi
+	bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$bin_there")
+	note_deploy "$bin_verdict" "$bin_dir_rel" "$DEPLOY_BIN_DIR"
+
+	if [ -e "$root/$DEPLOY_RULES" ]; then
+		rules_there=yes
+	else
+		rules_there=no
+	fi
+	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
+	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
+
+	for name in $DEPLOY_SCRIPTS; do
+		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
+			script_there=yes
+		else
+			script_there=no
+		fi
+		script_verdict=$(verdict "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$script_there")
+		note_deploy "$script_verdict" "$DEPLOY_SCRIPT_DIR/$name" "$DEPLOY_SCRIPT_DIR/$name"
+		case "$script_verdict" in
+		copy | replace)
+			scripts_todo="$scripts_todo $name"
+			;;
+		esac
+	done
+fi
+
+copy_tree() {
+	# 中身を 1 つずつ写す。ディレクトリごと入れ替えないのは、配り先が既にある
+	# 別のフォルダ（--bin の綴りによってはワークスペースルートそのもの）でも、
+	# 配り元が持つ名前のものにしか手が届かないようにするため。
+	mkdir -p "$2"
+	for entry in "$1"/*; do
+		# 配り元が空なら glob がそのまま残る。在るものだけを写す。
+		[ -e "$entry" ] || continue
+		name=$(basename "$entry")
+		# 古い組み立ての残りを持ち越さない。PyInstaller の同梱物は名前で
+		# 引かれるので、前の版の .so が残ると新しい実行ファイルがそれを掴む。
+		# 名前は配り元に在る entry から取るので、空のパスを消すことはない。
+		rm -rf "$2/$name"
+		cp -R "$entry" "$2/$name"
+	done
+}
+
+copy_file() {
+	mkdir -p "$(dirname "$2")"
+	cp "$1" "$2"
+}
+
 # 書き込みの前と後で、同じ一覧を違う言葉で見せる。前は「足りない」、後は
 # 「足した」。同じ文面のままだと、書けたのか書けなかったのかが読み取れない。
 report() {
@@ -314,6 +472,30 @@ report_missing() {
 	report '足りない' 'ccnavi が登録されていない' '置き換える'
 }
 
+# 写しの報告。env と同じく、写す前と後で言葉を変える。
+report_deploy() {
+	if [ -n "$deploy_new" ]; then
+		printf '%s:\n' "$1"
+		printf '%s' "$deploy_new" | sed 's/^/  /'
+	fi
+	if [ -n "$deploy_replacing" ]; then
+		printf '%s:\n' "$2"
+		printf '%s' "$deploy_replacing" | sed 's/^/  /'
+	fi
+	if [ -n "$deploy_kept" ]; then
+		printf '配り先に既にあるので写していないもの（入れ替えるなら --force）:\n'
+		printf '%s' "$deploy_kept" | sed 's/^/  /'
+	fi
+	if [ -n "$deploy_absent" ]; then
+		printf '配り元に無くて写せないもの:\n'
+		printf '%s' "$deploy_absent" | sed 's/^/  /'
+	fi
+}
+
+report_deploy_plan() {
+	report_deploy '写す' '入れ替える'
+}
+
 # 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
 # ここを不足の 2 つだけで決めると、CCNAVI_MODE=disable が書かれた設定に
 # --check を打って「揃っています」と言うことになる。
@@ -322,10 +504,16 @@ if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] ||
 	[ -n "$replacing_env" ] || [ -n "$differing_env" ] || [ -n "$other_hooks" ]; then
 	settled=no
 fi
+# 写しも「揃っていない」に数える。配り元に無いものも数える。実行ファイルが
+# 欠けたまま「揃っています」と言うと、--check を門にしている手順がそこを通す。
+if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ]; then
+	settled=no
+fi
 
 if [ "$check" = yes ]; then
 	printf '%s\n' "$settings"
 	report_missing
+	report_deploy_plan
 	if [ "$settled" = yes ]; then
 		printf 'env と hook は揃っています。\n'
 		exit 0
@@ -333,76 +521,90 @@ if [ "$check" = yes ]; then
 	exit 1
 fi
 
-# 書くものがあるか。値が違うだけで名指しされていないもの、別の綴りの登録は、
-# このスクリプトが触らないので書き込みには数えない。ただし黙って終わらせない。
-if [ -z "$missing_env" ] && [ -z "$missing_hooks" ] && [ -z "$replacing_env" ]; then
-	printf '%s\n書き足すものはありません。\n' "$settings"
-	report_missing
-	exit 0
+# 手を動かすものがあるか。値が違うだけで名指しされていないもの、別の綴りの
+# 登録は、このスクリプトが触らないので数えない。ただし黙って終わらせない。
+settings_work=no
+if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$replacing_env" ]; then
+	settings_work=yes
 fi
-
-# 既存を残す向きでマージする。env は既にある値を勝たせ、名指しされたキーだけを
-# 後勝ちで置き換える。hook は登録が無いイベントにだけ足す。ccnavi と関係のない
-# hook の隣に並ぶ形になるので、他の道具の設定を消さない。
-updated=$(printf '%s' "$current" | jq --argjson env "$env_json" \
-	--argjson events "$events_json" \
-	--argjson forced "$forced_json" \
-	--arg cmd "$HOOK_COMMAND" \
-	--argjson timeout "$HOOK_TIMEOUT" "
-	$REGISTERED
-	(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
-	| .env = (\$env + (.env // {}) + \$overrides)
-	| reduce \$events[] as \$ev (
-		.;
-		if (exact(\$ev; \$cmd)) or (looks(\$ev)) then .
-		else .hooks[\$ev] = ((.hooks[\$ev] // []) + [{
-			matcher: \"\",
-			hooks: [{type: \"command\", command: \$cmd, timeout: \$timeout}]
-		}])
-		end
-	)
-")
-
-mkdir -p "$claude_dir"
-# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
-# 打ち直した数だけ写しが新しくなり、戻れるのは 1 手前まで――そこには既に
-# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
-backed_up=no
-if [ -f "$settings" ] && [ ! -e "$settings.bak" ]; then
-	cp "$settings" "$settings.bak"
-	backed_up=yes
-fi
-
-# リンクを切らずに書く。`mv` はディレクトリエントリを差し替えるので、設定を
-# 1 か所で持って各プロジェクトから張っている置き方だと、リンクが普通のファイルに
-# なって実体には何も届かない。リンクのときだけ中身を書き、それ以外は同じ
-# ディレクトリに書いてから動かす（途中で切れた設定ファイルを残さないため）。
-linked=no
-if [ -L "$settings" ]; then
-	linked=yes
-elif [ -e "$settings" ]; then
-	count=$(ls -ld "$settings" 2>/dev/null | awk '{print $2}')
-	case "$count" in
-	'' | *[!0-9]*) count=1 ;;
-	esac
-	if [ "$count" -gt 1 ]; then
-		linked=yes
-	fi
-fi
-
-if [ "$linked" = yes ]; then
-	printf '%s\n' "$updated" >"$settings"
-else
-	tmp="$settings.tmp.$$"
-	# 途中で落ちたときに書きかけを残さない。設定ファイルの隣に見慣れない
-	# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
-	trap 'rm -f "$tmp"' EXIT INT TERM
-	printf '%s\n' "$updated" >"$tmp"
-	mv "$tmp" "$settings"
-	trap - EXIT INT TERM
+deploy_work=no
+if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ]; then
+	deploy_work=yes
 fi
 
 printf '%s\n' "$settings"
+
+if [ "$settings_work" = no ] && [ "$deploy_work" = no ]; then
+	printf '書き足すものはありません。\n'
+	report_missing
+	report_deploy_plan
+	exit 0
+fi
+
+backed_up=no
+linked=no
+
+if [ "$settings_work" = yes ]; then
+	# 既存を残す向きでマージする。env は既にある値を勝たせ、名指しされたキーだけを
+	# 後勝ちで置き換える。hook は登録が無いイベントにだけ足す。ccnavi と関係のない
+	# hook の隣に並ぶ形になるので、他の道具の設定を消さない。
+	updated=$(printf '%s' "$current" | jq --argjson env "$env_json" \
+		--argjson events "$events_json" \
+		--argjson forced "$forced_json" \
+		--arg cmd "$HOOK_COMMAND" \
+		--argjson timeout "$HOOK_TIMEOUT" "
+		$REGISTERED
+		(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
+		| .env = (\$env + (.env // {}) + \$overrides)
+		| reduce \$events[] as \$ev (
+			.;
+			if (exact(\$ev; \$cmd)) or (looks(\$ev)) then .
+			else .hooks[\$ev] = ((.hooks[\$ev] // []) + [{
+				matcher: \"\",
+				hooks: [{type: \"command\", command: \$cmd, timeout: \$timeout}]
+			}])
+			end
+		)
+	")
+
+	mkdir -p "$claude_dir"
+	# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
+	# 打ち直した数だけ写しが新しくなり、戻れるのは 1 手前まで――そこには既に
+	# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
+	if [ -f "$settings" ] && [ ! -e "$settings.bak" ]; then
+		cp "$settings" "$settings.bak"
+		backed_up=yes
+	fi
+
+	# リンクを切らずに書く。`mv` はディレクトリエントリを差し替えるので、設定を
+	# 1 か所で持って各プロジェクトから張っている置き方だと、リンクが普通のファイルに
+	# なって実体には何も届かない。リンクのときだけ中身を書き、それ以外は同じ
+	# ディレクトリに書いてから動かす（途中で切れた設定ファイルを残さないため）。
+	if [ -L "$settings" ]; then
+		linked=yes
+	elif [ -e "$settings" ]; then
+		count=$(ls -ld "$settings" 2>/dev/null | awk '{print $2}')
+		case "$count" in
+		'' | *[!0-9]*) count=1 ;;
+		esac
+		if [ "$count" -gt 1 ]; then
+			linked=yes
+		fi
+	fi
+
+	if [ "$linked" = yes ]; then
+		printf '%s\n' "$updated" >"$settings"
+	else
+		tmp="$settings.tmp.$$"
+		# 途中で落ちたときに書きかけを残さない。設定ファイルの隣に見慣れない
+		# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
+		trap 'rm -f "$tmp"' EXIT INT TERM
+		printf '%s\n' "$updated" >"$tmp"
+		mv "$tmp" "$settings"
+		trap - EXIT INT TERM
+	fi
+fi
+
 report '足した' 'ccnavi を登録した' '置き換えた'
 if [ "$backed_up" = yes ]; then
 	printf '書き換える前の内容は %s.bak にあります（写しは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
@@ -411,9 +613,42 @@ if [ "$linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$SETTINGS_REL"
 fi
 
-# 登録しただけでは動かない。ここから先は人が置くものなので、無いものを挙げる。
-# 挙げるだけで、取りに行ったり作ったりはしない。実行ファイルは PyInstaller が
-# Windows でだけ .exe を付けるので、両方の綴りで探す（settings.py の _resolve_bin）。
+# 写す。順は実行ファイル → ルール → ゲートの sh。途中で落ちたときに、判定する
+# ものだけが在って何を止めるかが無い、という形にしないため。
+if [ "$deploy_work" = yes ]; then
+	case "$bin_verdict" in
+	copy | replace)
+		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$bin_dir_rel"
+		# 実行の許しを付け直す。cp は元のモードを umask で削って写すので、
+		# 配り元の側の置き方によってはここが落ちる。落ちていると hook は
+		# 「実行ファイルが無い」ではなく「起動できない」で黙って死ぬ。
+		for spelling in "$root/$bin" "$root/$bin.exe"; do
+			if [ -f "$spelling" ]; then
+				chmod +x "$spelling" 2>/dev/null || true
+			fi
+		done
+		;;
+	esac
+	case "$rules_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_RULES" "$root/$DEPLOY_RULES"
+		;;
+	esac
+	for name in $scripts_todo; do
+		copy_file "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$root/$DEPLOY_SCRIPT_DIR/$name"
+	done
+fi
+
+if [ -n "$deploy" ]; then
+	report_deploy '写した' '入れ替えた'
+fi
+
+# 登録しただけでは動かない。写し終えたあとの姿をそのまま見て、まだ無いものを
+# 挙げる。--deploy を付けていれば普通はここで何も出ない。出たときは、配り元に
+# 無かったか、配り先に別のものが既にあって写していないか、どちらか。
+#
+# ここでは取りに行ったり作ったりはしない。実行ファイルは PyInstaller が Windows
+# でだけ .exe を付けるので、両方の綴りで探す（settings.py の _resolve_bin）。
 missing_parts=""
 note_missing() {
 	missing_parts="$missing_parts  $1
@@ -432,6 +667,9 @@ for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh; do
 done
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
+	if [ -z "$deploy" ]; then
+		printf 'ccnavi を組み立てたところから写すなら --deploy <ccnavi の根> を付けてください。\n'
+	fi
 fi
 
 printf 'env の値はセッションを開き直すまで効きません。\n'
