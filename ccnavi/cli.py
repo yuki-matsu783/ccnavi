@@ -151,6 +151,15 @@ in a machine-readable form (the VS Code board extension reads this), run
 It reads no payload and never reaches the remote. The shape is documented
 in README.md ("ボードの JSON").
 
+To try one call against the rules without running it, or to run every sample
+in a file against them, run
+
+    ccnavi --test Bash "git push" [--json]
+    ccnavi --test-samples testdata/rule-samples.yml [--json]
+
+Both go through the same decision as the hook. --json prints the shape
+documented in README.md ("試験の JSON"); the VS Code extension reads it.
+
 To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
@@ -207,6 +216,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
+    # 見本をぜんぶ判定に掛ける。testdata/check_rules.py と VS Code 拡張が呼ぶ。
+    parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tickets", default="")
@@ -281,7 +292,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 人が端末から叩いて「このルールは何に当たるのか」を確かめるための場所で、
     # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
     if args.test is not None:
+        if args.json:
+            return diagnose.test_json(stdout, stderr, conf, root, args.test[0], args.test[1])
         return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
+    if args.test_samples:
+        return diagnose.test_samples(stdout, stderr, conf, root, args.test_samples, args.json)
     if args.explain and args.json:
         return diagnose.explain_json(stdout, stderr, conf, root)
     if args.explain:

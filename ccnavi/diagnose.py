@@ -36,29 +36,41 @@ BOARD_VERSION = 1
 KNOWN_TOOLS = ("Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Agent")
 
 
-def test(
-    stdout: TextIO,
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    tool: str,
-    subject: str,
-) -> int:
-    """1 件を判定して、結果とすべての理由を書く。終了コードは常に 0。
+# `--test --json` と `--test-samples --json` の形の版。読み手は VS Code 拡張の
+# ルール設定画面。形を変えたら上げる。
+TEST_VERSION = 1
 
-    判定の内容を終了コードで表さない。deny を非ゼロにすると、試験を回す側が
-    「拒否された」と「試験そのものが失敗した」を見分けられなくなる。
-    結果は 1 行目の `verdict:` で読む。
+# 見本のパスに書く合言葉。走らせた場所に読み替える。見本を絶対パスで
+# 書かせておかないと、判定が解いた先が走らせた場所によって変わる。
+SAMPLE_PLACEHOLDER = "/repo"
+
+
+def judge(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject: str) -> dict:
+    """1 件を判定して、結果とすべての理由を 1 つの辞書にする。
+
+    文字で出す `test` と JSON で出す `test_json` の両方がここを読む。読み手ごとに
+    判定を呼び直すと、端末で見た答えと画面で見た答えが別物になりうる。
+
+    鍵は README「試験の JSON」に書いてある。`known` が偽なら、そのツールは
+    判定が対象を取り出せないもので、他の鍵は空のまま。
     """
     from .cli import DEADLINE_SECONDS, MODE_ENABLE, decide_before, subject_of
 
-    if tool not in KNOWN_TOOLS:
-        stdout.write(f"verdict: (判定に入らない)\ntool: {tool}\n")
-        stdout.write(
-            f"note: {tool} は判定が対象を取り出せないツール。ルールを書いても当たらず、"
-            "呼び出しはそのまま通る\n"
-        )
-        return 0
+    out: dict = {
+        "known": tool in KNOWN_TOOLS,
+        "tool": tool,
+        "subject": subject,
+        "resolved": "",
+        "verdict": "",
+        "code": "",
+        "reason": "",
+        "degraded": "",
+        "fallback": "",
+        "rules": [],
+        "response": "",
+    }
+    if not out["known"]:
+        return out
 
     field = {"Bash": "command", "Agent": "description"}.get(tool, "file_path")
     payload = hookio.Input(
@@ -89,75 +101,278 @@ def test(
         time.monotonic() + DEADLINE_SECONDS,
     )
 
-    verdict = record.decision or audit.ALLOW
-    stdout.write(f"verdict: {verdict}{f' ({record.code})' if record.code else ''}\n")
+    out["verdict"] = record.decision or audit.ALLOW
+    out["code"] = record.code or ""
+    # ファイルのパスは行き着く先まで解いてから当てる。解いた先を見せないと、
+    # 当たらなかった理由が「綴りが違う」なのかどうかを人が言えない。
+    out["resolved"] = record.subject if record.subject and record.subject != subject else ""
+    out["reason"] = record.reason or ""
+    out["degraded"] = record.degraded or ""
+    out["fallback"] = record.fallback or ""
+    out["rules"] = _rules_hit(stderr, conf, root, record)
+    out["response"] = _response_text(captured.getvalue())
+    return out
+
+
+def test(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    tool: str,
+    subject: str,
+) -> int:
+    """1 件を判定して、結果とすべての理由を書く。終了コードは常に 0。
+
+    判定の内容を終了コードで表さない。deny を非ゼロにすると、試験を回す側が
+    「拒否された」と「試験そのものが失敗した」を見分けられなくなる。
+    結果は 1 行目の `verdict:` で読む。
+    """
+    out = judge(stderr, conf, root, tool, subject)
+    if not out["known"]:
+        stdout.write(f"verdict: (判定に入らない)\ntool: {tool}\n")
+        stdout.write(
+            f"note: {tool} は判定が対象を取り出せないツール。ルールを書いても当たらず、"
+            "呼び出しはそのまま通る\n"
+        )
+        return 0
+
+    code = out["code"]
+    stdout.write(f"verdict: {out['verdict']}{f' ({code})' if code else ''}\n")
     stdout.write(f"tool: {tool}\n")
     stdout.write(f"subject: {subject}\n")
-    if record.subject and record.subject != subject:
-        # ファイルのパスは行き着く先まで解いてから当てる。解いた先を見せないと、
-        # 当たらなかった理由が「綴りが違う」なのかどうかを人が言えない。
-        stdout.write(f"resolved: {record.subject}\n")
-    if record.reason:
-        stdout.write(f"reason: {record.reason}\n")
-    if record.degraded:
-        stdout.write(f"degraded: {record.degraded}（生の文字列に当てた）\n")
-    if record.fallback:
-        stdout.write(f"fallback: {record.fallback}（組み込みの既定で判定した）\n")
+    if out["resolved"]:
+        stdout.write(f"resolved: {out['resolved']}\n")
+    if out["reason"]:
+        stdout.write(f"reason: {out['reason']}\n")
+    if out["degraded"]:
+        stdout.write(f"degraded: {out['degraded']}（生の文字列に当てた）\n")
+    if out["fallback"]:
+        stdout.write(f"fallback: {out['fallback']}（組み込みの既定で判定した）\n")
 
-    _rules_hit(stdout, stderr, conf, root, record)
-    _response(stdout, captured.getvalue())
+    if not out["rules"]:
+        stdout.write("rules: (どのルールにも当たらなかった)\n")
+    else:
+        stdout.write("rules:\n")
+        for hit in out["rules"]:
+            if hit["source"] == "outside":
+                # チケットの範囲のように、ルールファイルの中に無い根拠。
+                stdout.write(f"  {hit['id']}（ルールファイルの外から来た根拠）\n")
+                continue
+            stdout.write(f"  {hit['section']}:{hit['id']}  {hit['kind']} {hit['written']!r}\n")
+            stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
+
+    if not out["response"]:
+        stdout.write("response: (何も返さない)\n")
+    else:
+        stdout.write("response:\n")
+        for line in out["response"].splitlines():
+            stdout.write(f"  {line}\n")
+    return 0
+
+
+def test_json(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    tool: str,
+    subject: str,
+) -> int:
+    """`--test` と同じ判定を JSON で出す。読み手は VS Code 拡張のルール設定画面。"""
+    body = {"version": TEST_VERSION, "root": root, "rules_path": conf.rules}
+    body.update(judge(stderr, conf, root, tool, subject))
+    stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
+    stdout.write("\n")
     return 0
 
 
 def _rules_hit(
-    stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
-) -> None:
-    """当たったルールを、区画と翻訳後の式まで見せる。
+    stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
+) -> list[dict]:
+    """当たったルールを、区画と翻訳後の式まで返す。
 
     翻訳後の式を出すのがこの試験の要。`glob` は正規表現に化けるので、
     書いたものと当たるものの間に見えない層が 1 枚ある。その層を開けないと、
     当たらなかった理由を人が自分で辿れない。
+
+    `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
+    ルールファイルの外から来た根拠）。
     """
     from .cli import load_rules
 
     if not record.rules:
-        stdout.write("rules: (どのルールにも当たらなかった)\n")
-        return
+        return []
 
     rule_set, _ = load_rules(stderr, conf.rules, audit.Record(), root)
     by_id = {rule.id: rule for rule in rule_set.all() if rule.id}
 
-    stdout.write("rules:\n")
+    hits = []
     for name in record.rules:
         rule = by_id.get(name)
         if rule is None:
-            # チケットの範囲のように、ルールファイルの中に無い根拠。
-            stdout.write(f"  {name}（ルールファイルの外から来た根拠）\n")
+            hits.append(
+                {
+                    "id": name,
+                    "source": "outside",
+                    "section": "",
+                    "kind": "",
+                    "written": "",
+                    "pattern": "",
+                }
+            )
             continue
-        written = f"glob {rule.glob!r}" if rule.glob else f"regex {rule.regex!r}"
-        stdout.write(f"  {rule.decision}:{name}  {written}\n")
-        stdout.write(f"    -> {rule.compiled.pattern if rule.compiled else '(組み立て失敗)'}\n")
+        hits.append(
+            {
+                "id": name,
+                "source": "file",
+                "section": rule.decision,
+                "kind": "glob" if rule.glob else "regex",
+                "written": rule.glob or rule.regex,
+                "pattern": rule.compiled.pattern if rule.compiled else "",
+            }
+        )
+    return hits
 
 
-def _response(stdout: TextIO, written: str) -> None:
-    """判定が返した文面をそのまま見せる。
+def _response_text(written: str) -> str:
+    """判定が返した文面をそのまま取り出す。
 
     止めるだけでは足りない、というのがこの道具の目的なので、試験でも
     「何が返るか」まで見せる。文面の無い拒否は、受け取った側に
     次の一手が無い。
     """
     if not written.strip():
-        stdout.write("response: (何も返さない)\n")
-        return
+        return ""
     try:
         out = json.loads(written)["hookSpecificOutput"]
     except (ValueError, KeyError):
-        stdout.write(f"response: {written.strip()}\n")
-        return
-    text = out.get("permissionDecisionReason") or out.get("additionalContext") or ""
-    stdout.write("response:\n")
-    for line in text.splitlines():
-        stdout.write(f"  {line}\n")
+        return written.strip()
+    return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
+
+
+def load_samples(path: str, root: str) -> list[dict]:
+    """見本を読んで、区画の順に平らな並びにする。
+
+    区画の名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
+    `subject` の合言葉 `/repo` は走らせた場所に読み替える。
+    """
+    import yaml
+
+    with open(path, encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    if not isinstance(raw, dict):
+        raise ValueError(f"見本の形が違う。最上位は区画の対応表のはず: {path}")
+    samples = []
+    for want in rules.SECTIONS:
+        for case in raw.get(want) or []:
+            if not isinstance(case, dict):
+                raise ValueError(f"見本の形が違う。区画 {want} の 1 件が対応表ではない: {path}")
+            written = str(case.get("subject") or "")
+            samples.append(
+                {
+                    "expected": want,
+                    "tool": str(case.get("tool") or ""),
+                    "subject": written,
+                    "resolved_subject": written.replace(SAMPLE_PLACEHOLDER, root),
+                    "why": str(case.get("why") or ""),
+                }
+            )
+    return samples
+
+
+def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -> dict:
+    """見本をぜんぶ判定に掛けて、期待と突き合わせた結果を 1 つの辞書にする。
+
+    判定は `judge` を通す。ここで判定を作り直さないのが肝で、別の道で確かめると、
+    見本が通ったのに実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
+
+    `ok` は期待どおりか。`skipped` は allow の見本が判定に入らずに通ったもので、
+    呼び出しは通るので期待は満たしているが、通した理由が「allow に当たった」では
+    ない。ルールを書いても当たらない場所なので、食い違いとは別に数えて必ず見せる。
+    """
+    results = []
+    for sample in load_samples(path, root):
+        out = judge(stderr, conf, root, sample["tool"], sample["resolved_subject"])
+        want = sample["expected"]
+        got = out["verdict"] if out["known"] else audit.SKIP
+        skipped = want == rules.ALLOW and got == audit.SKIP
+        results.append(
+            {
+                **sample,
+                "known": out["known"],
+                "verdict": got,
+                "code": out["code"],
+                "reason": out["reason"],
+                "rules": out["rules"],
+                "ok": got == want or skipped,
+                "skipped": skipped,
+            }
+        )
+    counts = {
+        want: {
+            "ok": sum(1 for r in results if r["expected"] == want and r["ok"]),
+            "total": sum(1 for r in results if r["expected"] == want),
+        }
+        for want in rules.SECTIONS
+    }
+    return {
+        "version": TEST_VERSION,
+        "root": root,
+        "rules_path": conf.rules,
+        "samples_path": path,
+        "counts": counts,
+        "mismatches": sum(1 for r in results if not r["ok"]),
+        "skipped": sum(1 for r in results if r["skipped"]),
+        "samples": results,
+    }
+
+
+def test_samples(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    path: str,
+    as_json: bool,
+) -> int:
+    """`--test-samples`。見本をぜんぶ回して、食い違いを並べる。
+
+    文字で出すときの終了コードは、食い違いが 1 件でもあれば 1。`/rules-check`
+    スキルと `testdata/check_rules.py` がそれを見る。JSON で出すときは常に 0 で、
+    食い違いの数は本文の `mismatches` にある。読み手が「食い違った」と
+    「試験そのものが失敗した」を終了コードで見分けられるように。
+    """
+    try:
+        body = run_samples(stderr, conf, root, path)
+    except (OSError, ValueError) as exc:
+        stderr.write(f"ccnavi: 見本を読めない: {exc}\n")
+        return 1
+
+    if as_json:
+        stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
+        stdout.write("\n")
+        return 0
+
+    for r in body["samples"]:
+        if r["ok"]:
+            continue
+        stdout.write(f"食い違い: {r['expected']} のはずが {r['verdict']}\n")
+        stdout.write(f"  {r['tool']}  {r['subject']}\n")
+        stdout.write(f"  なぜ deny/ask/allow に置いたか: {r['why']}\n")
+        hit = ", ".join(f"{h['section']}:{h['id']}" for h in r["rules"] if h["source"] == "file")
+        if hit:
+            stdout.write(f"  当たったルール: {hit}\n")
+        stdout.write("\n")
+    for r in body["samples"]:
+        if not r["skipped"]:
+            continue
+        stdout.write(f"判定に入らずに通った（allow ではない）: {r['tool']}  {r['subject']}\n")
+        stdout.write(f"  {r['why']}\n\n")
+    for want, c in body["counts"].items():
+        stdout.write(f"{want}: {c['ok']}/{c['total']}\n")
+    stdout.write(f"食い違い {body['mismatches']} 件、判定に入らなかったもの {body['skipped']} 件\n")
+    return 1 if body["mismatches"] else 0
 
 
 def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
