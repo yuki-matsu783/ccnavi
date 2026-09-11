@@ -37,7 +37,7 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 
 | タブ | 何ができるか |
 |---|---|
-| ルール | `rules.yml` を区画（deny / ask / allow）ごとに一覧し、id・match・glob か regex・message・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）を直す。足す・消す・上下に動かす・区画を移す。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
+| ルール | `rules.yml` を区画（deny / ask / allow）ごとに一覧し、id・match・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）を直す。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す・消す・上下に動かす・区画を移す。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
 | 判定を試す | ツール名と subject を入れて `--test --json` に掛ける。判定・根拠コード・当たったルール（翻訳後の正規表現まで）・返る文面と、そのツールで走る hook を出す。「見本を一括で流す」は `--test-samples --json` で見本をすべて回し、期待と食い違ったものを赤く出す。どちらも**編集中の内容**で試す（保存は要らない） |
 | hook | `.claude/settings.json` と `.claude/settings.local.json` の hooks を読むだけの一覧。書き換えない。利用者ごとの設定（`~/.claude/settings.json`）は載らない |
 
@@ -109,7 +109,7 @@ pnpm run package   # scripts/package.sh: install → compile → test → vsce p
 入れるには次を打つ。Marketplace には出さない。
 
 ```sh
-code --install-extension dist/ccnavi-board-0.2.0.vsix
+code --install-extension dist/ccnavi-board-0.2.1.vsix
 ```
 
 `node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
