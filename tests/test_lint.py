@@ -152,6 +152,31 @@ class LintTest(unittest.TestCase):
             # どちらの話なのかを名前が言えないと直しに行く先が決まらない。
             self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
 
+    def test_askとallowのmessageはerrorになりルールは効いたまま(self):
+        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない（実測）。
+        # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
+        # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
+        body = {
+            "version": 3,
+            "deny": [SOUND],
+            "ask": [
+                {"id": "mig", "match": "Write", "glob": "*/migrations/*", "message": "人が見る"},
+                {"id": "quiet", "match": "Write", "glob": "*/quiet/*"},
+            ],
+            "allow": [dict(ALLOWED, message="通す")],
+        }
+        path = write(self.root, "rules.yml", json.dumps(body))
+        result = lint(self.root, path)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("error: mig: ask に message がある", result.stdout)
+        self.assertIn("error: anything: allow に message がある", result.stdout)
+        self.assertNotIn("quiet", result.stdout, "文面の無い ask は咎めない")
+        # 咎めたルールも読み込まれている（--explain に載る）。
+        shown = ccnavi(self.root, "--explain", "--rules", path, "--mode", "enable").stdout
+        self.assertIn("mig", shown)
+        self.assertIn("quiet", shown)
+
     def test_denyが1件も無いのはerrorになる(self):
         # 何も止めないガードは、入っていないガードと同じでありながら、
         # 入っているように見える。いちばん見つけにくい壊れ方なので error。
