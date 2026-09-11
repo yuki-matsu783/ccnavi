@@ -28,6 +28,9 @@ from typing import TextIO
 
 from . import audit, hookio, rules, settings
 
+# `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
+BOARD_VERSION = 1
+
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
 # 試したい人には「当たらない」ではなく「そもそも見ていない」と言う。
 KNOWN_TOOLS = ("Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Agent")
@@ -261,3 +264,191 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {gate}{review}\n"
             )
     return 0
+
+
+def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
+    """`--explain` が言うことのうち、チケットに関わる部分を機械可読で出す。
+
+    読み手は VS Code のボード拡張。拡張は提案・写し・印を自分で解釈せず、ここが
+    出した形をそのまま並べる。「ゲートが閉じているか」「承認待ちは何か」の答えを
+    2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
+    ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 §4 P11）。
+    """
+    stdout.write(json.dumps(board(conf, root), ensure_ascii=True, indent=1))
+    stdout.write("\n")
+    return 0
+
+
+def board(conf: settings.Settings, root: str) -> dict:
+    """ボードの中身。形は設計 §24.10 と README「ボードの JSON」に書いてある。"""
+    from . import approval, phase, tree
+    from . import ticket as ticket_mod
+
+    problems: list[str] = []
+    trees = tree.all_trees(root, conf.projects)
+    payload: dict = {
+        "version": BOARD_VERSION,
+        "root": root,
+        "generated_at": approval.now(),
+        "settings": {
+            "tickets": conf.tickets,
+            "approved": conf.approved,
+            "projects": conf.projects,
+        },
+        "trees": [
+            {"name": t.name, "root": t.root, "project": t.project, "kind": t.kind} for t in trees
+        ],
+        "projects": [t.name for t in trees if t.kind == tree.KIND_PROJECT],
+        "problems": problems,
+        "pending_approval": [],
+        "tickets": [],
+        "parents": [],
+    }
+    if not conf.approved:
+        problems.append("写しの置き場が空。チケットによる制御を使っていない")
+        return payload
+
+    everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
+    problems.extend(str(p) for p in scan_problems)
+    proposals = ticket_mod.dedupe(everything)
+    open_copies, notes = approval.copies(conf.approved)
+    problems.extend(notes)
+    closed_copies, notes = approval.copies(conf.approved, closed=True)
+    problems.extend(notes)
+
+    pending, revisions = approval.waiting(proposals, open_copies, closed_copies)
+    payload["pending_approval"] = sorted(
+        {t.ticket for t in pending} | {t.ticket for t in revisions}
+    )
+
+    worktrees = {t.name: t for t in trees if t.kind == tree.KIND_WORKTREE}
+    proposal_index = approval.by_id(proposals)
+    open_index = approval.by_id(open_copies)
+    closed_index = approval.by_id(closed_copies)
+    # 同じ識別子が写っている場所の全部。権威の側は proposal に、残りは seen_in に出す。
+    seen: dict[str, list[dict]] = {}
+    for t in everything:
+        seen.setdefault(t.ticket, []).append({"tree": t.tree, "state": t.state, "path": t.path})
+
+    ids = sorted(set(proposal_index) | set(open_index) | set(closed_index))
+    for ticket_id in ids:
+        proposal = proposal_index.get(ticket_id)
+        copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
+        source = proposal or copy
+        assert source is not None
+        if ticket_id in open_index:
+            status = "open"
+        elif ticket_id in closed_index:
+            status = "closed"
+        else:
+            status = "none"
+        found = worktrees.get(ticket_id) or tree.lookup(worktrees, ticket_id)
+        record: dict = {
+            "ticket": ticket_id,
+            "parent": source.parent,
+            "phase": source.phase,
+            "title": source.title,
+            "project": source.project,
+            "issue": source.issue,
+            "predecessors": list(source.predecessors),
+            "human_review": {
+                "required": source.review_required,
+                "reason": source.review_reason,
+            },
+            "proposal": (
+                {
+                    "state": proposal.state,
+                    "tree": proposal.tree,
+                    "tree_root": proposal.tree_root,
+                    "path": proposal.path,
+                }
+                if proposal is not None
+                else None
+            ),
+            "copy": (
+                {
+                    "status": status,
+                    "approved_at": copy.approved_at,
+                    "source_tree": copy.source_tree,
+                    "path": copy.path,
+                }
+                if copy is not None
+                else {"status": status}
+            ),
+            "worktree": (
+                {"exists": True, "path": found.root, "project": found.project}
+                if found is not None
+                else {"exists": False, "path": tree.worktree_path(root, ticket_id)}
+            ),
+            "started_at": source.started_at,
+            "completed_at": source.completed_at,
+            "base_sha": source.base_sha,
+            "cancelled_at": source.cancelled_at,
+            "cancel_reason": source.cancel_reason,
+            "seen_in": seen.get(ticket_id, []),
+            "risk": None,
+            "judge": None,
+        }
+        if source.parent:
+            record["risk"] = approval.read_child_record(
+                conf.approved, source.parent, ticket_id, approval.CHILD_RECORD_RISK
+            )
+            record["judge"] = approval.read_child_record(
+                conf.approved, source.parent, ticket_id, approval.CHILD_RECORD_JUDGE
+            )
+        payload["tickets"].append(record)
+
+    # 親ごとの段階とフェーズ。写しのある親だけ。承認前の親はフェーズを持たない。
+    for parent in sorted(open_copies + closed_copies, key=lambda x: x.ticket):
+        if parent.is_child:
+            continue
+        phases = []
+        for ph in phase.phases_of(root, conf, parent.ticket):
+            if not ph.tickets:
+                state = "planned"
+            elif ph.ended:
+                state = "ended"
+            else:
+                state = "active"
+            phases.append(
+                {
+                    "number": ph.number,
+                    "type": ph.item.type if ph.item is not None else "",
+                    "title": ph.title,
+                    "label": ph.label,
+                    "state": state,
+                    "tickets": [t.ticket for t in ph.tickets],
+                    "states": dict(ph.states),
+                    "marks": ph.marks,
+                    "review_required": ph.review_required,
+                    "gate_closed": ph.gate_closed,
+                    "deferred": ph.deferred,
+                    "review_at": ph.review_at,
+                    "covers": list(ph.covers),
+                    "risk": ph.risk,
+                    "risk_escalates": ph.risk_escalates,
+                    "risk_line": ph.risk_line,
+                }
+            )
+        payload["parents"].append(
+            {
+                "ticket": parent.ticket,
+                "closed": parent.ticket in closed_index,
+                "stage": phase.stage(root, conf, parent),
+                "plan": [item.as_raw() for item in parent.plan],
+                "feedback": (
+                    [item.as_raw() for item in parent.feedback]
+                    if parent.feedback is not None
+                    else None
+                ),
+                "wrapup": approval.read_parent_mark(
+                    conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP
+                ),
+                "ready": approval.read_parent_mark(
+                    conf.approved, parent.ticket, approval.PARENT_MARK_READY
+                ),
+                "accepted_threads": sorted(approval.accepted_threads(conf.approved, parent.ticket)),
+                "phases": phases,
+            }
+        )
+    return payload

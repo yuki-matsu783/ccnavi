@@ -589,6 +589,19 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
 
     プロジェクト向けの提案はワークスペースルートの `wip/<project>/tickets/` にある。
     作業ツリーの側には無い（プロジェクトのブランチには wip/ が無い）。
+    同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
+    """
+    found, problems = scan_all(root, tickets_rel, projects_dir)
+    return dedupe(found), problems
+
+
+def scan_all(
+    root: str, tickets_rel: str, projects_dir: str = ""
+) -> tuple[list[Ticket], list[Problem]]:
+    """main と全作業ツリーの提案を、重複を畳まずに集める。
+
+    ボード（`--explain --json`）が「どのツリーに写っているか」を見せるために使う。
+    判定と承認は `scan` の畳んだ側を読む。
     """
     found: list[Ticket] = []
     problems: list[Problem] = []
@@ -636,10 +649,10 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
                     continue
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
                 found.append(ticket)
-    return _dedupe(found), problems
+    return found, problems
 
 
-def _dedupe(found: list[Ticket]) -> list[Ticket]:
+def dedupe(found: list[Ticket]) -> list[Ticket]:
     """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。
 
     子の作業ツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
