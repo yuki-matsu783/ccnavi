@@ -97,6 +97,8 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
     kind: "glob",
     pattern: "*rm -rf*",
     message: "消さない。退避する。",
+    additionalContext: "",
+    additionalContextOnce: "",
   };
   const out = doc.apply({ deny: [s.deny[0], fresh], ask: s.ask, allow: [] });
   assert.match(out, /- id: no-rm\n    match: Bash\n    glob: '\*rm -rf\*'\n    message: >-\n      消さない。退避する。/);
@@ -126,4 +128,45 @@ test("CB-T47 画面から来た並びは形を確かめてから受け取る", (
   assert.equal(asSections({ deny: [], ask: [] }), undefined);
   assert.equal(asSections({ deny: [{ kind: "nope" }], ask: [], allow: [] }), undefined);
   assert.equal(asSections({ deny: [{ origin: { section: "x", index: 0 }, kind: "glob" }], ask: [], allow: [] }), undefined);
+});
+
+test("CB-T53 additionalContext を読み、書き、変えていなければ折り返しを残す", () => {
+  const text = `version: 3
+deny:
+  - id: git-push
+    match: Bash
+    glob: "*git push*"
+    message: push は人が行う
+    additionalContext: >-
+      ラッパを通せば
+      親が送れる
+allow:
+  - id: src
+    match: Write
+    glob: "*/src/*"
+`;
+  const doc = readRules(text);
+  const s = doc.model.sections;
+  assert.equal(s.deny[0].additionalContext, "ラッパを通せば 親が送れる");
+  assert.equal(s.allow[0].additionalContext, "");
+  // 何も変えなければそのまま
+  assert.equal(doc.apply(s), text);
+  // 無かった欄を足す。空のままなら足さない
+  const out = doc.apply({
+    deny: s.deny,
+    ask: [],
+    allow: [{ ...s.allow[0], additionalContext: "src は自由に直してよい" }],
+  });
+  assert.match(out, /additionalContext: >-\n      ラッパを通せば\n      親が送れる/);
+  assert.match(out, /glob: "\*\/src\/\*"\n    additionalContext: >-\n      src は自由に直してよい/);
+  const again = readRules(out).model.sections;
+  assert.equal(again.allow[0].additionalContext, "src は自由に直してよい");
+  // 空にすれば欄は残るが値は空
+  const cleared = doc.apply({ deny: [{ ...s.deny[0], additionalContext: "" }], ask: [], allow: s.allow });
+  assert.equal(readRules(cleared).model.sections.deny[0].additionalContext, "");
+  // once の文も同じ扱い。書けば折り返しで足し、読み直せば同じ
+  assert.equal(s.deny[0].additionalContextOnce, "");
+  const once = doc.apply({ deny: [{ ...s.deny[0], additionalContextOnce: "最初に 1 度だけ" }], ask: [], allow: s.allow });
+  assert.match(once, /親が送れる\n    additionalContextOnce: >-\n      最初に 1 度だけ\n/);
+  assert.equal(readRules(once).model.sections.deny[0].additionalContextOnce, "最初に 1 度だけ");
 });

@@ -22,7 +22,14 @@ export interface RuleForm {
   readonly kind: PatternKind;
   readonly pattern: string;
   readonly message: string;
+  /** 当たったときにモデルへ渡す文（`additionalContext`）。無ければ空 */
+  readonly additionalContext: string;
+  /** 1 つの文脈で最初に当たったときだけ渡す文（`additionalContextOnce`）。無ければ空 */
+  readonly additionalContextOnce: string;
 }
+
+/** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
+const BLOCK_KEYS = ["message", "additionalContext", "additionalContextOnce"] as const;
 
 export interface RulesModel {
   readonly version: number | null;
@@ -86,6 +93,8 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     kind,
     pattern: kind === "glob" ? glob : regex,
     message: scalarText(map, "message"),
+    additionalContext: scalarText(map, "additionalContext"),
+    additionalContextOnce: scalarText(map, "additionalContextOnce"),
   };
 }
 
@@ -97,9 +106,10 @@ function scalarText(map: YAMLMap, key: string): string {
   return typeof value === "string" ? value : String(value);
 }
 
-/** 変えていないブロック（`>-` / `|-`）の message を、元の折り返しのまま戻すための控え */
+/** 変えていないブロック（`>-` / `|-`）の文を、元の折り返しのまま戻すための控え */
 interface BlockKeep {
   readonly node: YAMLMap;
+  readonly key: (typeof BLOCK_KEYS)[number];
   readonly value: unknown;
   readonly raw: string;
 }
@@ -119,10 +129,7 @@ function applyTo(
       adoptLeadingComment(seq, originals[section][0]);
     }
     for (const node of originals[section]) {
-      const keep = blockKeep(node, text);
-      if (keep !== undefined) {
-        keeps.push(keep);
-      }
+      keeps.push(...blockKeeps(node, text));
     }
   }
 
@@ -172,29 +179,33 @@ function newRuleNode(doc: Document): YAMLMap {
 
 /**
  * 書き出しはブロックの文を折り返し直す。人が書いた折り返しと違う形になるので、
- * 値を変えていない message は元の文字列をそのまま埋め戻す。書き出した文書を読み直して
- * 同じ位置の範囲を求め、後ろから差し替える。
+ * 値を変えていない文（message / additionalContext）は元の文字列をそのまま埋め戻す。
+ * 書き出した文書を読み直して同じ位置の範囲を求め、後ろから差し替える。
  */
-function blockKeep(node: YAMLMap, text: string): BlockKeep | undefined {
-  const scalar = node.get("message", true);
-  if (!(scalar instanceof Scalar) || scalar.range === undefined || scalar.range === null) {
-    return undefined;
+function blockKeeps(node: YAMLMap, text: string): BlockKeep[] {
+  const keeps: BlockKeep[] = [];
+  for (const key of BLOCK_KEYS) {
+    const scalar = node.get(key, true);
+    if (!(scalar instanceof Scalar) || scalar.range === undefined || scalar.range === null) {
+      continue;
+    }
+    if (scalar.type !== Scalar.BLOCK_FOLDED && scalar.type !== Scalar.BLOCK_LITERAL) {
+      continue;
+    }
+    keeps.push({ node, key, value: scalar.value, raw: text.slice(scalar.range[0], scalar.range[1]) });
   }
-  if (scalar.type !== Scalar.BLOCK_FOLDED && scalar.type !== Scalar.BLOCK_LITERAL) {
-    return undefined;
-  }
-  return { node, value: scalar.value, raw: text.slice(scalar.range[0], scalar.range[1]) };
+  return keeps;
 }
 
 function restoreBlocks(output: string, placed: readonly YAMLMap[], keeps: readonly BlockKeep[]): string {
-  const wanted = new Map<YAMLMap, BlockKeep>();
+  const wanted: BlockKeep[] = [];
   for (const keep of keeps) {
-    const scalar = keep.node.get("message", true);
+    const scalar = keep.node.get(keep.key, true);
     if (scalar instanceof Scalar && scalar.value === keep.value) {
-      wanted.set(keep.node, keep);
+      wanted.push(keep);
     }
   }
-  if (wanted.size === 0) {
+  if (wanted.length === 0) {
     return output;
   }
   const again = parseDocument(output);
@@ -209,14 +220,17 @@ function restoreBlocks(output: string, placed: readonly YAMLMap[], keeps: readon
     return output;
   }
   const edits: { start: number; end: number; raw: string }[] = [];
-  placed.forEach((node, i) => {
-    const keep = wanted.get(node);
-    const scalar = written[i].get("message", true);
-    if (keep === undefined || !(scalar instanceof Scalar) || !scalar.range) {
-      return;
+  for (const keep of wanted) {
+    const i = placed.indexOf(keep.node);
+    if (i < 0) {
+      continue;
+    }
+    const scalar = written[i].get(keep.key, true);
+    if (!(scalar instanceof Scalar) || !scalar.range) {
+      continue;
     }
     edits.push({ start: scalar.range[0], end: scalar.range[1], raw: keep.raw });
-  });
+  }
   let result = output;
   for (const edit of edits.sort((a, b) => b.start - a.start)) {
     result = result.slice(0, edit.start) + edit.raw + result.slice(edit.end);
@@ -238,6 +252,13 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   // 言う対象が増えるだけなので、書いてあるか元から在るときだけ書く。
   if (form.message !== "" || node.has("message")) {
     setText(doc, node, "message", form.message, Scalar.BLOCK_FOLDED);
+  }
+  // additionalContext も同じ。書いてあるか元から在るときだけ。
+  if (form.additionalContext !== "" || node.has("additionalContext")) {
+    setText(doc, node, "additionalContext", form.additionalContext, Scalar.BLOCK_FOLDED);
+  }
+  if (form.additionalContextOnce !== "" || node.has("additionalContextOnce")) {
+    setText(doc, node, "additionalContextOnce", form.additionalContextOnce, Scalar.BLOCK_FOLDED);
   }
 }
 
@@ -323,5 +344,7 @@ function asForm(raw: unknown): RuleForm | undefined {
     kind: r.kind,
     pattern: text(r.pattern),
     message: text(r.message),
+    additionalContext: text(r.additionalContext),
+    additionalContextOnce: text(r.additionalContextOnce),
   };
 }

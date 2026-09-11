@@ -241,7 +241,7 @@ const STYLE = `  * { box-sizing: border-box; }
   .rule-row input.f-id { width: 160px; }
   .rule-row input.f-match { width: 220px; }
   .rule-row .buttons { margin-left: auto; display: flex; gap: 4px; }
-  .rule textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }
+  .rule textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; margin-bottom: 4px; }
   .rule .pattern { font-family: var(--vscode-editor-font-family); }
   .judge-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
   .judge-form label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
@@ -322,6 +322,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const message = h("textarea", { class: "f-message", placeholder: "なぜ止めるかと、代わりに何をすればよいか（allow は空でよい）" });
     message.value = rule.message;
     message.addEventListener("input", () => { rule.message = message.value; markDirty(); });
+    const context = h("textarea", { class: "f-context", placeholder: "additionalContext: 当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）" });
+    context.value = rule.additionalContext;
+    context.addEventListener("input", () => { rule.additionalContext = context.value; markDirty(); });
+    const once = h("textarea", { class: "f-once", placeholder: "additionalContextOnce: セッション（サブエージェントはその起動ごと）で最初に当たったときだけ渡す文。開始（compact の後も）で忘れる。上と両方あれば初回は並べて、2 回目からは上だけ" });
+    once.value = rule.additionalContextOnce;
+    once.addEventListener("input", () => { rule.additionalContextOnce = once.value; markDirty(); });
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
@@ -340,6 +346,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         h("span", { class: "grow" }, [pattern]),
       ]),
       message,
+      context,
+      once,
     ]);
   }
   function renderAll() {
@@ -394,7 +402,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add(section) {
-    sections[section] = sections[section].concat([{ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "" }]);
+    sections[section] = sections[section].concat([{ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "" }]);
     markDirty();
     renderAll();
     const items = document.querySelectorAll("[data-list=" + section + "] .rule");
