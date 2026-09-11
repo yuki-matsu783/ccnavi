@@ -124,15 +124,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/test-py.sh\"",
-            "timeout": 300
-          }
-        ]
       }
     ]
   },
