@@ -39,8 +39,8 @@ error が 1 件でもあれば、そこで止めて報告する。壊れた設�
 uv run python testdata/check_rules.py
 ```
 
-`testdata/rule-samples.yml` の見本をすべて `ccnavi --test` に掛ける。
-区画の名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず、
+`testdata/rule-samples.yml` の見本をすべて判定に掛ける（中身は `ccnavi --test-samples` で、
+`--test` と同じ判定を通る）。区画の名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず、
 `ask` なら人に確認が出るはず。
 
 出力は 3 つに分かれる。
