@@ -319,9 +319,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const kindSelect = h("select", { class: "f-kind" }, [option("glob", "glob", rule.kind === "glob"), option("regex", "regex", rule.kind === "regex")]);
     kindSelect.addEventListener("change", () => { rule.kind = kindSelect.value; markDirty(); });
     const pattern = field(rule, "pattern", "f-pattern pattern", rule.kind === "glob" ? "*git push*" : "\\\\bgit push\\\\b");
-    const message = h("textarea", { class: "f-message", placeholder: "なぜ止めるかと、代わりに何をすればよいか（allow は空でよい）" });
+    const message = h("textarea", { class: "f-message", placeholder: "message: なぜ止めるかと、代わりに何をすればよいか（deny だけ。ask と allow に書くと lint が止める）" });
     message.value = rule.message;
     message.addEventListener("input", () => { rule.message = message.value; markDirty(); });
+    // message は deny の欄。ask と allow では、消すべき文面が残っているときだけ見せる。
+    if (section !== "deny" && rule.message === "") { message.classList.add("hidden"); }
     const context = h("textarea", { class: "f-context", placeholder: "additionalContext: 当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）" });
     context.value = rule.additionalContext;
     context.addEventListener("input", () => { rule.additionalContext = context.value; markDirty(); });
