@@ -13,16 +13,16 @@ interface Entry {
 
 const ENTRIES: readonly Entry[] = [
   {
-    label: "チケット画面",
-    description: "提案・写し・印・作業ツリーをカンバンで",
-    command: "ccnaviBoard.open",
-    icon: "checklist",
-  },
-  {
-    label: "ルール設定画面",
+    label: "ルール管理",
     description: "ルールを直し、判定を試し、hook を眺める",
     command: "ccnaviBoard.openRules",
     icon: "shield",
+  },
+  {
+    label: "チケット管理",
+    description: "提案・写し・印・作業ツリーをカンバンで",
+    command: "ccnaviBoard.open",
+    icon: "checklist",
   },
 ];
 

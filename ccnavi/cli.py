@@ -1726,14 +1726,16 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
     # 推し量ることになる。
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
-    # 出所は「どのファイルのどのルール」まで。ファイル名だけでは、同じ名前の
-    # ルールファイルが複数ある構成で直しに行く先が決まらない。
-    source = f"{rules_path}#{rule.id}" if rule.id else rules_path
+    # 出所はルールの id で名乗る。プロジェクトのルールの id には `lib:git-push` の形で
+    # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
+    # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い綴りが
+    # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを名乗る。
+    source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
     if rule.id == phase.CLI_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
-        code, source = phase.CODE_CLI, f"builtin#{rule.id} ({settings.GUARD_CLI_ENV})"
+        code, source = phase.CODE_CLI, f"builtin rule: {rule.id} ({settings.GUARD_CLI_ENV})"
 
-    lines = [f"[ccnavi] {code} (source: {source})", f"subject: {shown}"]
+    lines = [f"[ccnavi] {code} ({source})", f"subject: {shown}"]
     if degraded:
         lines.append(unreadable(degraded))
     lines.append(rule.message)

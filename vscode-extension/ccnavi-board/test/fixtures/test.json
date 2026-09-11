@@ -21,5 +21,5 @@
    "pattern": "(?s:(?>.*?git\\ push).*)\\Z"
   }
  ],
- "response": "[ccnavi] DENY_COMMAND_PATTERN (source: /ws\\rules.yml#git-push)\nsubject: cd /repo\u0000git push\npush は人が行う。ラッパに依頼する。"
+ "response": "[ccnavi] DENY_COMMAND_PATTERN (rule: git-push)\nsubject: cd /repo\u0000git push\npush は人が行う。ラッパに依頼する。"
 }

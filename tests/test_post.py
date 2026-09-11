@@ -186,7 +186,7 @@ class PostToolUseTest(unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertIn("protected/keep.txt", result.stderr)
         # どの設定が言っているか。名指ししないと直しに行く先が決まらない。
-        self.assertIn("rules.yml#protected", result.stderr)
+        self.assertIn("rule: protected", result.stderr)
         # 原因となった直前の実行（REQ-PST-02）。
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順（REQ-PST-03）。
