@@ -73,6 +73,11 @@ uv run --with ruff ruff format --check . && uv run --with ruff ruff check . \
   スクラッチパッドへコピー、`git stash push -u`、`git merge --ff-only`、`git stash pop` の順で進め、
   両方の変更が生きていることをビルドとテストで確かめる
 - 統合したら `git worktree remove <パス>` と `git branch -d <名前>` で片付ける
+- worktree の中で `vscode-extension/ccnavi-board` を組み立てた（`pnpm install` を回した）なら、
+  remove の**前に**そこで `pnpm run clean` を走らせて `node_modules/` と `out/` を消す。
+  残したまま remove すると git の削除が途中で止まり、抜け殻が残る。抜け殻を `rm -rf` で
+  消さない（ルール `recursive-delete` が止める）。残ったら `mv` で `.claude/worktrees/` の外へ
+  出して `git worktree prune` する
 
 ## 提案と判断
 
