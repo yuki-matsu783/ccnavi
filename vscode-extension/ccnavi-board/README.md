@@ -37,7 +37,7 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 
 | タブ | 何ができるか |
 |---|---|
-| ルール | `rules.yml` を区画（deny / ask / allow）ごとに一覧し、id・match・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス）を直す。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す・消す・上下に動かす・区画を移す。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
+| ルール | `rules.yml` を区画（deny / ask / allow）ごとに一覧し、id・match・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。各欄の上に欄名が小さく出る。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す・消す・上下に動かす・区画を移す。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
 | 判定を試す | ツール名と subject を入れて `--test --json` に掛ける。判定・根拠コード・当たったルール（翻訳後の正規表現まで）・返る文面と、そのツールで走る hook を出す。「見本を一括で流す」は `--test-samples --json` で見本をすべて回し、期待と食い違ったものを赤く出す。どちらも**編集中の内容**で試す（保存は要らない） |
 | hook | `.claude/settings.json` と `.claude/settings.local.json` の hooks を読むだけの一覧。書き換えない。利用者ごとの設定（`~/.claude/settings.json`）は載らない |
 
@@ -109,7 +109,7 @@ pnpm run package   # scripts/package.sh: install → compile → test → vsce p
 入れるには次を打つ。Marketplace には出さない。
 
 ```sh
-code --install-extension dist/ccnavi-board-0.2.3.vsix
+code --install-extension dist/ccnavi-board-0.2.4.vsix
 ```
 
 `node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
@@ -163,6 +163,7 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 | 20 | 外で変わった | 画面を開いたまま `rules.yml` をエディタで変える | 上部に「外で変わった」。この状態で「保存」を押しても上書きしない |
 | 21 | コメントが残る | ルールの message を 1 つ変えて保存し、`git diff` を見る | 変えた行だけが差分。先頭やルール間のコメントは残っている |
 | 22 | 未保存の再読込 | 何か変えてから「再読込」 | 「捨てて読み直す？」の確認。「読み直す」で編集が消える |
+| 23 | ファイルを選ぶ | additionalContextFile の「選ぶ…」でワークスペース内の md を選ぶ。もう一度押して外のファイルを選ぶ | 欄にルート相対のパス（`/` 区切り）が入り、保存ボタンが押せるようになる。外のファイルは「ワークスペースの外は指せない」の通知で欄が変わらない |
 
 ## 構成
 

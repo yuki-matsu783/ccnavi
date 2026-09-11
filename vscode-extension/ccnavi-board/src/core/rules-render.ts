@@ -249,6 +249,9 @@ const STYLE = `  * { box-sizing: border-box; }
   .rule-row .field.w-id { width: 170px; }
   .rule-row .field.w-match { width: 230px; }
   .rule .field.block { margin-bottom: 6px; }
+  .with-button { display: flex; gap: 6px; align-items: center; }
+  .with-button > input { flex: 1; min-width: 120px; }
+  .with-button > button { margin-left: 0; white-space: nowrap; }
   .rule .stale { margin: 0 0 6px; font-size: .9em; color: var(--vscode-editorError-foreground); overflow-wrap: anywhere; }
   .rule .stale code { margin: 0 6px; }
   .rule .pattern { font-family: var(--vscode-editor-font-family); }
@@ -331,6 +334,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function captioned(name, control, className) {
     return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
   }
+  // ファイルを指す欄。手で書くほかに、VS Code のダイアログで選べる。選んだ結果は
+  // 拡張側がルート相対にして "picked" で返す。
+  function fileField(rule, key, name, className, placeholder) {
+    const input = field(rule, name, className, placeholder);
+    const pick = h("button", { type: "button", class: "action small", text: "選ぶ…", title: "ファイルを選ぶ" });
+    pick.addEventListener("click", () => vscode.postMessage({ type: "pickFile", key: key, field: name }));
+    return captioned(name, h("div", { class: "with-button" }, [input, pick]), "block");
+  }
   function renderRule(section, rule) {
     const key = keyOf(rule);
     const sectionSelect = h("select", { class: "f-section" }, SECTIONS.map((s) => option(s, s, s === section)));
@@ -354,8 +365,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     }
     const context = captioned("additionalContext", area(rule, "additionalContext", "f-context", "当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）"), "block");
     const once = captioned("additionalContextOnce", area(rule, "additionalContextOnce", "f-once", "セッション（サブエージェントはその起動ごと）で最初に当たったときだけ渡す文。開始（compact の後も）で忘れる。上と両方あれば初回は並べて、2 回目からは上だけ"), "block");
-    const contextFile = captioned("additionalContextFile", field(rule, "additionalContextFile", "f-context-file", "文に続けて本文を渡すファイル（ルートからの相対。作業ツリーにあればそちら。先頭 4000 文字まで）"), "block");
-    const onceFile = captioned("additionalContextOnceFile", field(rule, "additionalContextOnceFile", "f-once-file", "最初に当たったときだけ本文を渡すファイル（同上）"), "block");
+    const contextFile = fileField(rule, key, "additionalContextFile", "f-context-file", "文に続けて本文を渡すファイル（ルートからの相対。作業ツリーにあればそちら。先頭 4000 文字まで）");
+    const onceFile = fileField(rule, key, "additionalContextOnceFile", "f-once-file", "最初に当たったときだけ本文を渡すファイル（同上）");
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
@@ -571,6 +582,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "failed") { setBusy(false, ""); status(m.message, true); }
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
+    else if (m.type === "picked") {
+      const found = ruleByKey(m.key);
+      if (!found) { return; }
+      found.rule[m.field] = m.path;
+      markDirty();
+      const input = document.querySelector('.rule[data-key="' + m.key + '"] .' + (m.field === "additionalContextFile" ? "f-context-file" : "f-once-file"));
+      if (input) { input.value = m.path; }
+    }
   });
   const saved = vscode.getState();
   renderAll();

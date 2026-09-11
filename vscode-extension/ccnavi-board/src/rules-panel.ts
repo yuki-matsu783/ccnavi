@@ -33,7 +33,11 @@ type Message =
   | { readonly type: "openFile"; readonly which: "rules" | "samples" }
   | { readonly type: "save"; readonly sections: Sections }
   | { readonly type: "judge"; readonly sections: Sections; readonly tool: string; readonly subject: string }
-  | { readonly type: "samples"; readonly sections: Sections };
+  | { readonly type: "samples"; readonly sections: Sections }
+  | { readonly type: "pickFile"; readonly key: string; readonly field: FileField };
+
+/** ファイル選択ダイアログで埋める欄 */
+type FileField = "additionalContextFile" | "additionalContextOnceFile";
 
 interface Loaded {
   readonly text: string;
@@ -325,6 +329,34 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       );
       return;
     }
+    case "pickFile": {
+      // 選んだファイルはワークスペースルートからの相対で欄に入れる。外を選んだら入れない。
+      // 実行ファイルが読むのはルートの中だけで、lint も外を指すパスを error にする。
+      const picked = await vscode.window.showOpenDialog({
+        defaultUri: current.folder.uri,
+        canSelectFiles: true,
+        canSelectFolders: false,
+        canSelectMany: false,
+        openLabel: "この本文を渡す",
+        title: `${message.field}: モデルへ渡すファイル`,
+      });
+      const chosen = picked?.[0];
+      if (chosen === undefined) {
+        return;
+      }
+      const rel = path.relative(root, chosen.fsPath);
+      if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
+        void vscode.window.showWarningMessage(`ワークスペースの外は指せない: ${chosen.fsPath}`);
+        return;
+      }
+      void current.panel.webview.postMessage({
+        type: "picked",
+        key: message.key,
+        field: message.field,
+        path: rel.split(path.sep).join("/"),
+      });
+      return;
+    }
     case "judge": {
       let tmp: string;
       try {
@@ -444,10 +476,15 @@ function asMessage(message: unknown): Message | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; dirty?: unknown; which?: unknown; sections?: unknown; tool?: unknown; subject?: unknown };
+  const m = message as { type?: unknown; dirty?: unknown; which?: unknown; sections?: unknown; tool?: unknown; subject?: unknown; key?: unknown; field?: unknown };
   switch (m.type) {
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
+    case "pickFile":
+      if (typeof m.key !== "string" || (m.field !== "additionalContextFile" && m.field !== "additionalContextOnceFile")) {
+        return undefined;
+      }
+      return { type: "pickFile", key: m.key, field: m.field };
     case "openFile":
       return m.which === "rules" || m.which === "samples" ? { type: "openFile", which: m.which } : undefined;
     case "save": {
