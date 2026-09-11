@@ -242,6 +242,8 @@ const STYLE = `  * { box-sizing: border-box; }
   .rule-row input.f-match { width: 220px; }
   .rule-row .buttons { margin-left: auto; display: flex; gap: 4px; }
   .rule textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; margin-bottom: 4px; }
+  .rule .stale { margin: 0 0 6px; font-size: .9em; color: var(--vscode-editorError-foreground); overflow-wrap: anywhere; }
+  .rule .stale code { margin: 0 6px; }
   .rule .pattern { font-family: var(--vscode-editor-font-family); }
   .judge-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
   .judge-form label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
@@ -319,11 +321,22 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const kindSelect = h("select", { class: "f-kind" }, [option("glob", "glob", rule.kind === "glob"), option("regex", "regex", rule.kind === "regex")]);
     kindSelect.addEventListener("change", () => { rule.kind = kindSelect.value; markDirty(); });
     const pattern = field(rule, "pattern", "f-pattern pattern", rule.kind === "glob" ? "*git push*" : "\\\\bgit push\\\\b");
-    const message = h("textarea", { class: "f-message", placeholder: "message: なぜ止めるかと、代わりに何をすればよいか（deny だけ。ask と allow に書くと lint が止める）" });
-    message.value = rule.message;
-    message.addEventListener("input", () => { rule.message = message.value; markDirty(); });
-    // message は deny の欄。ask と allow では、消すべき文面が残っているときだけ見せる。
-    if (section !== "deny" && rule.message === "") { message.classList.add("hidden"); }
+    // message は deny だけの欄。ask と allow には欄を出さない。文面が残っていれば
+    // （lint が止めるので）そう言って、消すボタンだけ出す。
+    let message;
+    if (section === "deny") {
+      message = h("textarea", { class: "f-message", placeholder: "message: なぜ止めるかと、代わりに何をすればよいか（止められたモデルに届く）" });
+      message.value = rule.message;
+      message.addEventListener("input", () => { rule.message = message.value; markDirty(); });
+    } else if (rule.message !== "") {
+      const drop = h("button", { type: "button", class: "action small", text: "message を消す" });
+      drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
+      message = h("p", { class: "stale" }, [
+        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint が止める。モデルに渡す文は additionalContext に移す: "),
+        h("code", { text: rule.message }),
+        drop,
+      ]);
+    }
     const context = h("textarea", { class: "f-context", placeholder: "additionalContext: 当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）" });
     context.value = rule.additionalContext;
     context.addEventListener("input", () => { rule.additionalContext = context.value; markDirty(); });
