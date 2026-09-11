@@ -1,5 +1,3 @@
-# このファイルは ccnavi 自身のリポジトリのルール。ccnavi を自分自身に仕掛けてある。
-#
 # 区画は強い順に deny / ask / allow。どこにも当たらない呼び出しについて ccnavi は
 # 判定を持たず、Claude Code の権限モードに従う。
 #
@@ -30,8 +28,8 @@ deny:
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
 
   # main の作業ツリーでは編集しない
-  # `.claude/worktrees/` だけがこの網から外れ、allow の worktrees に落ちる。
-  # `{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR）の実パスに置き換わる。
+  # `.claude/worktrees/` だけが編集可能。
+  # `{root}` はワークスペースルートの実パスに置き換わる。
   - id: main-tree
     match: Write|Edit|MultiEdit|NotebookEdit
     regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'
@@ -40,26 +38,8 @@ deny:
       .claude/worktrees/<名前> -b <名前>' で作業ツリーを切り、その中で編集して、
       ff-only で main に戻してください。
 
-  # worktree の中でも hook の登録は触らない。main の側と同じ扱い。
-  - id: worktree-settings
-    match: Write|Edit|MultiEdit|NotebookEdit
-    glob: "*/.claude/worktrees/*/.claude/settings*.json"
-    message: >-
-      作業ツリーの settings.json は hook の登録そのものです。main の側と同じく、
-      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
-
-  # 承認済みのチケットの写しとフェーズの印。判定はここだけを読むので、ここを
-  # 書けると承認の意味が無い。シェル経由は組み込みの既定が止めている。
-  - id: guard-approved-tickets
-    match: Write|Edit|MultiEdit|NotebookEdit
-    glob: "*/.claude/ccnavi/tickets/*"
-    message: >-
-      承認済みのチケットの写しです。承認は利用者が 'ccnavi --approve' で行い、
-      閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
-      範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
-
   # 生の git はまとめて止め、入口を .claude/scripts/ccnavi-git.sh の 1 本に寄せる。
-  # 止める理由は 2 つで、どちらも許可ルールの粒度では書けない。
+  # 止める理由は 2 つ。
   #
   #   1. 出力がそのままコンテキストに載る。`git log -p` はこのリポジトリで 2 万行
   #   2. `Bash(git diff:*)` は前方一致でしかなく、後ろに何を足されても通る。
@@ -67,7 +47,6 @@ deny:
   #
   # glob ではなく regex なのは、`*git*` だと誘導先の `ccnavi-git.sh` にも当たって
   # 出口ごと塞がるため。`git` がコマンドの位置に立つ形だけを拾う。
-  # `/usr/bin/git push` は拾い、`ccnavi-git.sh` は前がダッシュなので外れる。
   - id: raw-git
     match: Bash
     regex: '(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s'
@@ -77,6 +56,7 @@ deny:
       先頭 40 行だけで、全量は logs/ に残ります。push はラッパを通せば親が実行できます
       （居るブランチをそのままの名前で送る形だけ。統合先へは送れません）。
 
+  # git reset --hard は止める。作業中の変更が消える。
   - id: git-reset-hard
     match: Bash
     glob: "*git reset --hard*"
@@ -85,6 +65,7 @@ deny:
       ファイルを名指しして 'ccnavi-git.sh restore <パス>' を使ってください。生の git は
       止まるので、代わりの形もラッパで書いてあります。
 
+  # git branch -D は未マージのブランチが消えるのでユーザに作業依頼。
   - id: git-branch-force-delete
     match: Bash
     glob: "*git branch -D*"
@@ -92,28 +73,14 @@ deny:
       未マージのブランチが消えます。'ccnavi-git.sh branch -d <名前>' で安全側の削除を
       試し、それでも消したいならユーザに変更を依頼ください。
 
-  # settings.json の permissions.deny と同じ場所を並べてある。あちらは
-  # Read と Write という名指しのツールにしか掛からないので、同じ場所へ
-  # シェルから届く道が開いたままになる。`cat certs/server.pem` を止められるのは
-  # こちらだけで、match に Bash を入れられることがこのルールの値打ちになる。
-  #
-  # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。素の `\.key\b` は
-  # `jq '.key' data.json` に当たった。誤検知の多い拒否は、そのうち文面ごと
-  # 読まれなくなる。絞ったぶん、`.key` という名前のファイルそのものは外れる。
+  # settings.json の permissions.deny と同じ場所を並べてある。
+  # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
   - id: credentials
     match: Bash|Read|Write|Edit|MultiEdit|NotebookEdit
-    # ドットで始まる名前も同じように絞ってある。前に区切りを求めないと、
-    # 名前が語の途中に現れただけで当たる。実際に踏んだのは
-    # `jq -r '.env.CCNAVI_BIN_PATH'` で、設定を読むだけの操作が止まった。
-    #
-    # 区切りに空白とパス区切りは入れるが、shellread が引用の中の空白と
-    # コマンドの切れ目に置く印（\x00）は入れない。ここが 2 つを分ける。
-    # ファイルの引数は前が空白になり、引用の中に書かれた式は前が印になる。
-    # `cat .env` は当たり、`jq '.a, .env.b'` は当たらない。
-    # 後ろは語の切れ目で、`.env.local` は当たり、`.envrc` は当たらない。
     regex: '(^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b'
     message: 認証情報を含む場所です。中身を読まず、必要な値を利用者に尋ねてください。
 
+  # 再帰的な強制削除は止める。
   - id: recursive-delete
     match: Bash
     glob: "*rm -rf *"
@@ -121,6 +88,7 @@ deny:
       再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
       'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
 
+  # ヒアドキュメントによるファイルの書き込みは止める。Write / Edit ツールで書くのが正しい。
   - id: heredoc
     match: Bash
     regex: "<<"
@@ -130,15 +98,17 @@ deny:
       渡してください。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
-ask:
-  # 生の git を止めたので、pushが通る道はラッパだけになった。
-  - id: commit
-    match: Bash
-    regex: 'ccnavi-git\.sh\s+push\b'
-    additionalContextOnce: >-
-      pushは 1 回ごとに人が見ます。何を含めたか、メッセージが変更と合っているかを
-      確かめてください。
+  # 承認済みのチケットの写し。判定はここだけを読むので、ここを書けると承認の意味が無い。
+  - id: guard-approved-tickets
+    match: Write|Edit|MultiEdit|NotebookEdit
+    glob: "*/.claude/ccnavi/tickets/*"
+    message: >-
+      承認済みのチケットの写しです。承認は利用者が 'ccnavi --approve' で行い、
+      閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
+      範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
 
+ask:
+  # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。
   - id: dependencies
     match: Write|Edit|MultiEdit
     regex: 'pyproject\.toml|uv\.lock'
@@ -146,6 +116,7 @@ ask:
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
       1 本になります。何を足すのか、外せない理由は何かを言ってください。
 
+  # 作業範囲の提案。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
   - id: current-ticket
     match: Write|Edit|MultiEdit
     glob: "*/.current-ticket.md"
@@ -154,42 +125,15 @@ ask:
       人が読んで 'ccnavi --approve' を通すまでは提案のままです。
 
 allow:
-  # このリポジトリで普通にやること。ここに無いものは人に確認が出る。
-  #
-  # Grep と Glob は書かない。判定が対象を取り出せるツールでないと、ルールは
-  # 当たりようがない（cli.subject_of）。対象を取り出せないツールは判定に
-  # 届かないまま通るので、allow に書いても死んだ行が 1 つ増えるだけになる。
-  - id: read-anything
-    match: Read
-    regex: "."
-
   # 書き込みを許すのは作業ツリーの中だけ。main の側は deny の main-tree が止める。
   # 作業ツリーの中でも hook・スクリプト・写し・settings.json は deny が先に当たる。
   - id: worktrees
     match: Write|Edit|MultiEdit
     glob: "*/.claude/worktrees/*"
 
-  # コマンドの regex は行頭に錨を打たない。判定に渡るのは実行される部分を
-  # 繋いだ 1 本の文字列で、`cd /repo && git status` のように前に別の語が来る。
-  # `^` を打つと、繋がった 2 本目以降がどれも当たらず、普通の作業が丸ごと
-  # 権限モード任せに落ちる。代わりに `\b` で語の切れ目を要求して、`controls` の
-  # 中の `ls` のような当たり方を防ぐ。
-  #
-  # 錨を外したぶん網は粗い。`git status && 知らないもの` は、allow に当たった
-  # 側の語だけで全体が通る。deny は文字列全体に当たり続けるので危ないものは
-  # 止まるが、確認の網から漏れる形は残る。ここを詰めるなら、判定を繋いだ
-  # 文字列ではなくコマンド 1 本ずつに当てる作りが要る。
   # git の入口。サブコマンドの選別はラッパの中で行うので、ここでは区別しない。
   # ここに書けるのは前方一致か文字列一致だけで、`--force` のような一語で結果が
   # 変わる引数はそもそも書き分けられない。書き分けられる場所へ寄せた結果がこれ。
   - id: ccnavi-git
     match: Bash
     glob: "*ccnavi-git.sh*"
-
-  - id: checks
-    match: Bash
-    regex: '\buv\s+run\b'
-
-  - id: shell-inspection
-    match: Bash
-    regex: '\b(ls|cat|sed|head|tail|find|grep|echo|mkdir|cp|mv|pwd|wc|sort|uniq|diff)\b'
