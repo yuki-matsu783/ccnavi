@@ -1,0 +1,47 @@
+{
+  "name": "ccnavi-board",
+  "displayName": "ccnavi ボード",
+  "description": "ccnavi のチケット（提案・写し・印・作業ツリー）をカンバンで表示し、人の承認をターミナルへ送る",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "license": "MIT",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Visualization"],
+  "main": "./out/src/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "ccnaviBoard.open", "title": "ccnavi ボード: ボードを開く" },
+      { "command": "ccnaviBoard.refresh", "title": "ccnavi ボード: ボードを更新" },
+      { "command": "ccnaviBoard.approve", "title": "ccnavi ボード: 承認待ちを承認する（--approve）" }
+    ],
+    "configuration": {
+      "title": "ccnavi ボード",
+      "properties": {
+        "ccnaviBoard.binPath": {
+          "type": "string",
+          "default": "",
+          "description": "ccnavi の実行ファイル。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、それも無ければ uv run python -m ccnavi の順に探す。ワークスペースルートからの相対でも絶対でもよい。"
+        },
+        "ccnaviBoard.bashPath": {
+          "type": "string",
+          "default": "",
+          "description": "承認コマンドを送るターミナルのシェル（Windows だけ使う）。空なら Git Bash（C:\\Program Files\\Git\\bin\\bash.exe）、無ければ PATH の bash。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "test": "tsc -p . && node --test out/test/*.test.js",
+    "package": "sh scripts/package.sh",
+    "clean": "node scripts/clean.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.9.0"
+  }
+}

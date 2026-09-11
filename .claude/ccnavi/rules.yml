@@ -31,7 +31,7 @@ deny:
 
   # main の作業ツリーでは編集しない
   # `.claude/worktrees/` だけがこの網から外れ、allow の worktrees に落ちる。
-  # `{root}` は判定の根（hook なら CLAUDE_PROJECT_DIR）の実パスに置き換わる。
+  # `{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR）の実パスに置き換わる。
   - id: main-tree
     match: Write|Edit|MultiEdit|NotebookEdit
     regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'

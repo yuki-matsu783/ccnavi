@@ -365,7 +365,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 SEVERITY_WARN,
                 "(ticket)",
                 f"{stray} は作業ツリーでも main でもないのに .claude/ を持つ。"
-                "cd 1 回で別の根に見える",
+                "cd 1 回で別のワークスペースルートに見える",
             )
         )
     return problems

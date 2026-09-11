@@ -86,6 +86,12 @@ uv run --with pyinstaller python build.py
 
 ## 次にやること
 
+**`test-py.sh` が、作業ツリーの抜け殻で落ちる（人が直す。hook はエージェントが触らない）。**
+`git worktree remove` が `.venv` の 1 ファイルを消せずに抜け殻を残すことがある（下の
+「作業ツリーが消せない」）。抜け殻はディレクトリとしては在るので `[ -d "$target" ]` を通り、
+`uv run … unittest discover` が `Start directory is not importable: 'tests'` で落ちて、
+関係のない差し戻しがモデルへ届く。`[ -d "$target/tests" ] || continue` に直せば済む。
+
 **`ccnavi-review.sh` に、敵対的レビューで見つかった漏れが 2 つ残っている（人が直す）。**
 スクリプトはエージェントが触らない決まりなので、直し方だけ書く。
 (1) `origin` を読めなかったときの `fail` が URL をそのまま stderr に出す（114 行付近と、
@@ -443,9 +449,9 @@ push 前の `request` が前提で止まる → 親の push（ラッパ経由）
 
 **main の作業ツリーでの編集をルールで止めた（2026-09-11）。** 「編集は worktree で」は CLAUDE.md の
 指示だけで、hook は main の Write / Edit を通していた（allow の `source` と `project-files`）。
-ルールに `{root}`（判定の根の実パスに読み込み時に置き換わる合言葉）を足し、deny の `main-tree` で
-「根の下で、かつ `.claude/worktrees/` の外」を止める。ルールの契約が先読みを禁じているので、
-根の直下の 1 段目で場合分けする形（`.` で始まらない名前 / `.c` 以外で始まる隠し名 / `.cl` 以外 /
+ルールに `{root}`（ワークスペースルートの実パスに読み込み時に置き換わる合言葉）を足し、deny の `main-tree` で
+「ワークスペースルートの下で、かつ `.claude/worktrees/` の外」を止める。ルールの契約が先読みを禁じているので、
+ワークスペースルートの直下の 1 段目で場合分けする形（`.` で始まらない名前 / `.c` 以外で始まる隠し名 / `.cl` 以外 /
 `.claude/` の下の `w` で始まらない名前）。worktree の中でも `.claude/settings*.json` は
 `worktree-settings` で止める。hook・スクリプト・写しは既存の deny が場所を問わず当たる。
 `source` と `project-files` は deny の陰で死ぬので消した。作業ツリーの中は `worktrees` の allow が
@@ -635,6 +641,27 @@ ccnavi は settings.json の `env` を自分で読み、そこに `disable` と�
 ## 実測で分かった落とし穴
 
 次のセッションで同じところを踏まないように。
+
+- **作業ツリーが消せない（Windows）。`git worktree remove` が `Permission denied` で落ち、
+  `.venv` の 1 ファイルだけの抜け殻が残る。** 原因は uv のハードリンクと Windows の
+  削除規則の組み合わせで、消そうとしている作業ツリーで**何も走っていなくても**起きる。
+  2026-09-11 に隔離した場所で再現させて確かめた（`fsutil hardlink list` と、掴む側 /
+  消す側を分けた実験）。
+  1. uv は wheel の中身をキャッシュから venv へハードリンクで置く。実体は 1 つで、
+     `_yaml.cp312-win_amd64.pyd` は main・全作業ツリー・uv のキャッシュで同じファイル
+     （このプロジェクトで C 拡張を持つ依存は PyYAML だけなので、当たるのはこの 1 本）
+  2. Windows は、実体が DLL として読み込まれている間、**どの名前も**消させない。
+     rename は通る。Linux は mmap 中でも unlink できるので、ここは Windows だけの話
+  3. 並行するセッションはターンの終わりに `test-py.sh` で 9 分ほどテストを走らせ、
+     そこで PyYAML を読み込む。作業ツリーが数本あると、ほぼ常に誰かが掴んでいる
+  4. 掴まれている間に別の作業ツリーを消そうとすると、その 1 ファイルだけが残る
+  対処は入れた（`pyproject.toml` の `[tool.uv] link-mode = "copy"`。複製にすれば実体が
+  分かれる）。ただし**既にある `.venv` はハードリンクのまま**なので、効くのは次に作る
+  ぶんから。いま在るものを切り替えるなら、テストが走っていないときに各作業ツリーの
+  `.venv` を消して作り直す。
+  それでも「自分のテストが走っている間に自分の作業ツリーを消せない」は残る。落ちたら、
+  掴みが離れるのを待つか、抜け殻を `mv` で `.claude/worktrees/` の外へ出して
+  `git worktree prune` する（rename は通るので、これは必ず成功する）。
 
 - **`${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。**
   中括弧のままの文字列が渡る。`env` には相対パスを書く

@@ -40,12 +40,12 @@ Claude Code の権限モードに従う（判定は cli.py）。
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` の穴を開ける道具ではない。
 
-## 根の合言葉
+## ワークスペースルートの合言葉
 
-`{root}` は判定の根（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
-読み込み時に置き換わる。「このプロジェクトの下」を絶対パスの直書きなしに書くための
+`{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
+読み込み時に置き換わる。「ワークスペースの下」を絶対パスの直書きなしに書くための
 もので、Windows と WSL と Linux で綴りが割れない。glob なら `{root}/wip/*`、regex なら
-`^{root}[\\/]` のように書く。根が渡らない読み方をしたルールは error で名指しする。
+`^{root}[\\/]` のように書く。ワークスペースルートが渡らない読み方をしたルールは error で名指しする。
 """
 
 from __future__ import annotations
@@ -86,12 +86,12 @@ _UNSUPPORTED = (
 )
 _BACKREFERENCE = re.compile(r"\\[1-9]")
 
-# 判定の根を指す合言葉。glob と regex の中で使え、読み込み時に根の実パスに置き換わる。
+# ワークスペースルートを指す合言葉。glob と regex の中で使え、読み込み時にその実パスに置き換わる。
 ROOT_PLACEHOLDER = "{root}"
 
 
 def root_pattern(root: str) -> str:
-    """根の実パスを、regex に埋めて安全な形にする。
+    """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
     解いた綴り（cli.full_path）で、Windows では `\\` になるが、ルールを書く人は
@@ -106,7 +106,10 @@ def root_pattern(root: str) -> str:
 
 
 def root_glob(root: str) -> str:
-    """根の実パスを、glob に埋める形にする。区切りは `/` に寄せ、翻訳の側が両方に当てる。"""
+    """ワークスペースルートの実パスを、glob に埋める形にする。
+
+    区切りは `/` に寄せ、翻訳の側が両方に当てる。
+    """
     return os.path.realpath(root).replace("\\", "/").rstrip("/")
 
 
@@ -278,11 +281,13 @@ def _build(
             SEVERITY_ERROR, name, "glob と regex の両方がある。どちらで判定するのか決められない"
         )
 
-    # `{root}` は根の実パスに置き換える。書いた綴り（rule.glob / rule.regex）は
+    # `{root}` はワークスペースルートの実パスに置き換える。書いた綴り（rule.glob / rule.regex）は
     # そのまま残し、置き換えるのは翻訳後の式だけ。報告と --explain は書いた綴りを出す。
     uses_root = ROOT_PLACEHOLDER in rule.regex or ROOT_PLACEHOLDER in rule.glob
     if uses_root and not root:
-        return None, Problem(SEVERITY_ERROR, name, f"`{ROOT_PLACEHOLDER}` を使うには判定の根が要る")
+        return None, Problem(
+            SEVERITY_ERROR, name, f"`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る"
+        )
     if rule.regex:
         unsupported = _unsupported(rule.regex)
         if unsupported:

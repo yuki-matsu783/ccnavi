@@ -339,21 +339,10 @@ def approve(
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = copies(conf.approved, closed=True)
-    known = by_id(approved + closed)
     open_index = by_id(approved)
     types = phase.load_types(conf)
 
-    # 承認待ち。写しが無いもの。閉じたものは対象外で、再開は人が写しを戻す。
-    pending = [t for t in proposals if t.ticket not in known and t.state != ticket_mod.CANCELLED]
-    # 改版の候補。開いている親の写しがあり、提案の計画が写しと違うもの。
-    revisions = [
-        t
-        for t in proposals
-        if t.ticket in open_index
-        and not t.is_child
-        and t.has_plan
-        and _plan_differs(t, open_index[t.ticket])
-    ]
+    pending, revisions = waiting(proposals, approved, closed)
     if not pending and not revisions:
         stdout.write("承認待ちのチケットは無い。\n")
         # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
@@ -564,6 +553,31 @@ def _type_of(t: ticket_mod.Ticket, pool: dict, types: dict | None):
         return None
     item = parent.item_at(t.phase)
     return types.get(item.type) if item is not None else None
+
+
+def waiting(
+    proposals: list[ticket_mod.Ticket],
+    approved: list[ticket_mod.Ticket],
+    closed: list[ticket_mod.Ticket],
+) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
+    """いま `--approve` の束に載るもの。新規の承認待ちと、親の改版。
+
+    承認待ちは写しが無いもの。閉じたものは対象外で、再開は人が写しを戻す。
+    改版は、開いている親の写しがあり、提案の計画が写しと違うもの。
+    `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
+    """
+    known = by_id(approved + closed)
+    open_index = by_id(approved)
+    pending = [t for t in proposals if t.ticket not in known and t.state != ticket_mod.CANCELLED]
+    revisions = [
+        t
+        for t in proposals
+        if t.ticket in open_index
+        and not t.is_child
+        and t.has_plan
+        and _plan_differs(t, open_index[t.ticket])
+    ]
+    return pending, revisions
 
 
 def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:

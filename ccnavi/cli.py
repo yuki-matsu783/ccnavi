@@ -143,6 +143,14 @@ To check the rules file and the settings without making a decision, run
 It reads no payload, reports anything that could disable the guard as an error
 or a warning, and exits non-zero when it reports an error.
 
+To list the tickets, their approved copies, the phase marks and the gates
+in a machine-readable form (the VS Code board extension reads this), run
+
+    ccnavi --explain --json
+
+It reads no payload and never reaches the remote. The shape is documented
+in README.md ("ボードの JSON").
+
 To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
@@ -200,6 +208,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     parser.add_argument("--explain", action="store_true")
+    parser.add_argument("--json", action="store_true")
     parser.add_argument("--tickets", default="")
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
@@ -273,6 +282,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
     if args.test is not None:
         return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
+    if args.explain and args.json:
+        return diagnose.explain_json(stdout, stderr, conf, root)
     if args.explain:
         return diagnose.explain(stdout, stderr, conf, root)
 
@@ -1639,9 +1650,9 @@ def default_root() -> str:
     """ワークスペースルート、つまり .claude を持つディレクトリを見つける。
 
     ここでは作業ディレクトリそのものに頼ってはいけない。hook は自分が走る
-    ディレクトリを選べないから。代わりに上へ辿るので、プロジェクトの中の
-    どこから起動しても同じ根に行き着くし、思わぬ場所で起動された hook でも
-    プロジェクトの設定を読める。
+    ディレクトリを選べないから。代わりに上へ辿るので、ワークスペースの中の
+    どこから起動しても同じワークスペースルートに行き着くし、思わぬ場所で起動された
+    hook でもワークスペースの設定を読める。
     """
     # Claude Code はこれを渡してくるが、あることに依存してはいけない。
     from_env = os.environ.get("CLAUDE_PROJECT_DIR", "")
@@ -1652,8 +1663,8 @@ def default_root() -> str:
 
 
 def _find_project_root() -> str:
-    """作業ディレクトリからファイルシステムの根まで上って .claude を探す。
-    バージョン管理が自分の根を見つけるのと同じやり方。"""
+    """作業ディレクトリからファイルシステムのルートまで上って .claude を探す。
+    バージョン管理が自分のルートを見つけるのと同じやり方。"""
     try:
         directory = os.getcwd()
     except OSError:

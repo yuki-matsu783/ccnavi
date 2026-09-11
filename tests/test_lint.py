@@ -87,7 +87,7 @@ class LintTest(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        # 空のディレクトリを根に使う。設定ファイルの有無まで自分で決められないと、
+        # 空のディレクトリをワークスペースルートに使う。設定ファイルの有無まで自分で決められないと、
         # テストが走った機械にあるファイルを報告することになる。
         self.root = directory.name
 
