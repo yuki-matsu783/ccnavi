@@ -397,6 +397,11 @@ vscodeの設定に下記を追加する
 "git.detectWorktrees": true
 ```
 
+チケットがどの作業ツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
+（`vscode-extension/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
+並べるだけで、人の承認（`--approve` / `accept` / `wrapup`）はボタンから統合ターミナルへ
+コマンドを送る。組み立て方と使い方はそこの README、出力の形は下の「ボードの JSON」。
+
 ## Bash のコマンドは実行される部分だけを見る
 
 `Bash` のルールは、コマンド文字列そのものではなく、シェルが実際に実行する部分に
@@ -1209,6 +1214,55 @@ error 2 件、warn 2 件
 見るのは検証を起動した環境であって、セッションが受け取る環境ではない。
 `.claude/settings.json` の `env` は Claude Code がセッションのプロセスに渡すもので、
 端末から叩いた検証には入っていない。だから報告はモードがどこから来たかを名乗る。
+
+## ボードの JSON
+
+```sh
+ccnavi --explain --json
+```
+
+`--explain` が言うことのうち、チケットに関わる部分を JSON で出す。読み手は VS Code の
+拡張「ccnavi ボード」で、拡張はこれを並べるだけで提案や印を自分では読まない。
+ゲートの開閉や承認待ちの答えを 2 か所で出さないため。ネットワークには出ない。
+
+最上位は 1 つのオブジェクト。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに
+版の違いを伝える。実例は `vscode-extension/ccnavi-board/test/fixtures/board.json` にあり、
+`tests/test_board.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けて
+そのテストを走らせ、例を書き直す）。
+
+| 鍵 | 何 |
+|---|---|
+| `version` | 形の版。整数 |
+| `root` / `generated_at` | ワークスペースルートと、出した時刻 |
+| `settings` | `tickets`（提案の置き場、相対）/ `approved`（写しの置き場）/ `projects`（プロジェクトの置き場） |
+| `trees[]` | ワークスペースルート・プロジェクト・作業ツリー。`{name, root, project, kind}`。`kind` は `main` / `project` / `worktree` |
+| `projects[]` | プロジェクトの名前 |
+| `problems[]` | 読めなかった提案や写しの説明。あっても他は出す |
+| `pending_approval[]` | `--approve` の束に載る識別子（写しの無い提案と、親の改版） |
+| `tickets[]` | 識別子ごとに 1 件。提案と写しのどちらか一方しか無くても出す |
+| `parents[]` | 写しのある親ごとの段階とフェーズ。承認前の親はフェーズを持たないのでここに無い |
+
+`tickets[]` の 1 件。
+
+| 鍵 | 何 |
+|---|---|
+| `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ写し）の frontmatter から |
+| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー）で見つけた提案。無ければ `null` |
+| `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open` / `closed` |
+| `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物の作業ツリーか（§24.4 の相互参照） |
+| `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
+| `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子の作業ツリーは親のブランチから切るので、親の提案が写っているのが普通 |
+| `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
+
+`parents[]` の 1 件。
+
+| 鍵 | 何 |
+|---|---|
+| `ticket` / `closed` / `stage` | 識別子、閉じた写しか、いまの段階（§24.15.8 の文） |
+| `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
+| `wrapup` / `ready` | 親の印 `wrapup.json` / `ready.json` の中身。無ければ `null` |
+| `accepted_threads[]` | 人が受け入れた未解決スレッド |
+| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` は印の種類 → 中身。`gate_closed` は判定が使うのと同じ値 |
 
 ## 生の git は止めてラッパへ寄せる
 
