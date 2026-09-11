@@ -1,0 +1,25 @@
+{
+ "version": 1,
+ "root": "/ws",
+ "rules_path": "/ws\\rules.yml",
+ "known": true,
+ "tool": "Bash",
+ "subject": "cd /repo && git push",
+ "resolved": "",
+ "verdict": "deny",
+ "code": "DENY_COMMAND_PATTERN",
+ "reason": "",
+ "degraded": "",
+ "fallback": "",
+ "rules": [
+  {
+   "id": "git-push",
+   "source": "file",
+   "section": "deny",
+   "kind": "glob",
+   "written": "*git push*",
+   "pattern": "(?s:(?>.*?git\\ push).*)\\Z"
+  }
+ ],
+ "response": "[ccnavi] DENY_COMMAND_PATTERN (source: /ws\\rules.yml#git-push)\nsubject: cd /repo\u0000git push\npush は人が行う。ラッパに依頼する。"
+}

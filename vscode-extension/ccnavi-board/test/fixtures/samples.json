@@ -1,0 +1,130 @@
+{
+ "version": 1,
+ "root": "/ws",
+ "rules_path": "/ws\\rules.yml",
+ "samples_path": "/ws\\samples.yml",
+ "counts": {
+  "deny": {
+   "ok": 1,
+   "total": 1
+  },
+  "ask": {
+   "ok": 1,
+   "total": 1
+  },
+  "allow": {
+   "ok": 2,
+   "total": 3
+  }
+ },
+ "mismatches": 1,
+ "skipped": 1,
+ "samples": [
+  {
+   "expected": "deny",
+   "tool": "Bash",
+   "subject": "cd /repo && git push",
+   "resolved_subject": "cd /ws && git push",
+   "why": "push は人が行う",
+   "known": true,
+   "verdict": "deny",
+   "code": "DENY_COMMAND_PATTERN",
+   "reason": "",
+   "rules": [
+    {
+     "id": "git-push",
+     "source": "file",
+     "section": "deny",
+     "kind": "glob",
+     "written": "*git push*",
+     "pattern": "(?s:(?>.*?git\\ push).*)\\Z"
+    }
+   ],
+   "ok": true,
+   "skipped": false
+  },
+  {
+   "expected": "ask",
+   "tool": "Read",
+   "subject": "/repo/secrets/token",
+   "resolved_subject": "/ws/secrets/token",
+   "why": "秘密の置き場",
+   "known": true,
+   "verdict": "ask",
+   "code": "RULE_ASK",
+   "reason": "",
+   "rules": [
+    {
+     "id": "secrets",
+     "source": "file",
+     "section": "ask",
+     "kind": "glob",
+     "written": "*/secrets/*",
+     "pattern": "(?s:(?>.*?[\\\\/]secrets[\\\\/]).*)\\Z"
+    }
+   ],
+   "ok": true,
+   "skipped": false
+  },
+  {
+   "expected": "allow",
+   "tool": "Bash",
+   "subject": "ls -la",
+   "resolved_subject": "ls -la",
+   "why": "見るだけ",
+   "known": true,
+   "verdict": "allow",
+   "code": "",
+   "reason": "",
+   "rules": [
+    {
+     "id": "inspection",
+     "source": "file",
+     "section": "allow",
+     "kind": "regex",
+     "written": "^(ls|cat)\\b",
+     "pattern": "^(ls|cat)\\b"
+    }
+   ],
+   "ok": true,
+   "skipped": false
+  },
+  {
+   "expected": "allow",
+   "tool": "Bash",
+   "subject": "git push --force",
+   "resolved_subject": "git push --force",
+   "why": "食い違いの見本。deny に当たるので allow の期待とずれる",
+   "known": true,
+   "verdict": "deny",
+   "code": "DENY_COMMAND_PATTERN",
+   "reason": "",
+   "rules": [
+    {
+     "id": "git-push",
+     "source": "file",
+     "section": "deny",
+     "kind": "glob",
+     "written": "*git push*",
+     "pattern": "(?s:(?>.*?git\\ push).*)\\Z"
+    }
+   ],
+   "ok": false,
+   "skipped": false
+  },
+  {
+   "expected": "allow",
+   "tool": "Bash",
+   "subject": "# comment only",
+   "resolved_subject": "# comment only",
+   "why": "何も走らないので判定に入らない",
+   "known": true,
+   "verdict": "skip",
+   "code": "",
+   "reason": "nothing-to-run",
+   "rules": [],
+   "ok": true,
+   "skipped": true
+  }
+ ]
+}
