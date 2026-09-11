@@ -14,7 +14,7 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 `--test --json` / `--test-samples --json` を通り、拡張は glob も regex も自分で当てない。
 
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
-「チケット画面」と「ルール設定画面」の 2 つの入口が並ぶ。
+「ルール管理」と「チケット管理」の 2 つの入口が並ぶ。
 
 - 出力の形: ccnavi の README「ボードの JSON」「試験の JSON」
 - 設計: ccnavi.md §24.10、要求 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06
@@ -28,8 +28,8 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 | `ccnavi ボード: 承認待ちを承認する（--approve）` | ボードを開かずに `--approve` をターミナルへ送る |
 | `ccnavi ボード: ルール設定画面を開く` | ルール設定画面を開く。既に開いていれば前面に出す |
 
-サイドパネル（左端の ccnavi アイコン）の「チケット画面」「ルール設定画面」は、それぞれ
-`ボードを開く` と `ルール設定画面を開く` と同じ。
+サイドパネル（左端の ccnavi アイコン）の「ルール管理」「チケット管理」は、それぞれ
+`ルール設定画面を開く` と `ボードを開く` と同じ。
 
 ### ルール設定画面
 
@@ -37,7 +37,7 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 
 | タブ | 何ができるか |
 |---|---|
-| ルール | `rules.yml` を区画（deny / ask / allow）ごとに一覧し、id・match・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。各欄の上に欄名が小さく出る。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す・消す・上下に動かす・区画を移す。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
+| ルール | `rules.yml` を区画（deny / ask / allow）ごとに一覧し、id・match（判定が対象を取り出せるツールのチェックボックス。ファイルに書いてある知らない名前も札として並ぶ）・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。各欄の上に欄名が小さく出る。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す・消す・上下に動かす・区画を移す。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
 | 判定を試す | ツール名と subject を入れて `--test --json` に掛ける。判定・根拠コード・当たったルール（翻訳後の正規表現まで）・返る文面と、そのツールで走る hook を出す。「見本を一括で流す」は `--test-samples --json` で見本をすべて回し、期待と食い違ったものを赤く出す。どちらも**編集中の内容**で試す（保存は要らない） |
 | hook | `.claude/settings.json` と `.claude/settings.local.json` の hooks を読むだけの一覧。書き換えない。利用者ごとの設定（`~/.claude/settings.json`）は載らない |
 
@@ -109,7 +109,7 @@ pnpm run package   # scripts/package.sh: install → compile → test → vsce p
 入れるには次を打つ。Marketplace には出さない。
 
 ```sh
-code --install-extension dist/ccnavi-board-0.2.4.vsix
+code --install-extension dist/ccnavi-board-0.2.5.vsix
 ```
 
 `node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
@@ -154,8 +154,8 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 | 11 | 未表示で更新 | ボードを閉じた状態で `ボードを更新` | 「ccnavi ボードが開かれていない」の通知 |
 | 12 | 読めない写し | ボードを開いたまま `.claude/ccnavi/tickets/<id>.md` の frontmatter を壊す | 上部の問題の一覧にその写しが出て、他のカードはそのまま |
 | 13 | プロジェクト | `projects/<repo>` を持つワークスペースで開く | `project` バッジと絞り込みが出る |
-| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「チケット画面」「ルール設定画面」の 2 つ |
-| 15 | ルール設定画面が開く | サイドパネルの「ルール設定画面」 | deny / ask / allow の 3 区画にルールが並ぶ。上部に dry-run の注意 |
+| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「ルール管理」「チケット管理」の順で 2 つ |
+| 15 | ルール設定画面が開く | サイドパネルの「ルール管理」 | deny / ask / allow の 3 区画にルールが並ぶ。上部に dry-run の注意 |
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
 | 17 | 見本の一括 | 「見本を一括で流す」 | 区画ごとの件数と食い違い 0 件。glob を壊してから流すと食い違いの行が赤くなる |
 | 18 | lint で止まる | message を空にした deny のルールを作って「保存」 | 下部に `--lint` の error が出て保存されない |
@@ -164,6 +164,7 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 | 21 | コメントが残る | ルールの message を 1 つ変えて保存し、`git diff` を見る | 変えた行だけが差分。先頭やルール間のコメントは残っている |
 | 22 | 未保存の再読込 | 何か変えてから「再読込」 | 「捨てて読み直す？」の確認。「読み直す」で編集が消える |
 | 23 | ファイルを選ぶ | additionalContextFile の「選ぶ…」でワークスペース内の md を選ぶ。もう一度押して外のファイルを選ぶ | 欄にルート相対のパス（`/` 区切り）が入り、保存ボタンが押せるようになる。外のファイルは「ワークスペースの外は指せない」の通知で欄が変わらない |
+| 24 | match を選ぶ | あるルールの match で `Write` にチェックを入れ、`Bash` を外して保存し、`rules.yml` を見る | `match: Write` になっている。ファイルに書いてあった知らないツール名も札として並び、触らなければチェックが付いたまま残る |
 
 ## 構成
 
