@@ -1,6 +1,7 @@
 .gitignore
 .vscodeignore
 node_modules/**
+out/src/**
 out/test/**
 pnpm-lock.yaml
 scripts/**
