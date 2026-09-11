@@ -35,7 +35,8 @@
   "scripts": {
     "compile": "tsc -p .",
     "test": "tsc -p . && node --test out/test/*.test.js",
-    "package": "sh scripts/package.sh"
+    "package": "sh scripts/package.sh",
+    "clean": "node scripts/clean.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
