@@ -402,6 +402,12 @@ vscodeの設定に下記を追加する
 並べるだけで、人の承認（`--approve` / `accept` / `wrapup`）はボタンから統合ターミナルへ
 コマンドを送る。組み立て方と使い方はそこの README、出力の形は下の「ボードの JSON」。
 
+同じ拡張の「ルール設定画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
+判定は `ccnavi --test --json` と `--test-samples --json` を通る（形は「試験の JSON」）。
+hook の一覧は `.claude/settings.json` を読むだけで書き換えない。作業中のチケット
+（提案が `doing`）がある間は保存できない。hook はツール呼び出しのたびにルールを読み直すので、
+セッションの途中で判定が変わるのを避けるため。
+
 ## Bash のコマンドは実行される部分だけを見る
 
 `Bash` のルールは、コマンド文字列そのものではなく、シェルが実際に実行する部分に
@@ -1149,18 +1155,60 @@ Claude Code の権限モードは、人が確認できるセッションを前�
 見本をまとめて回すほうが早い。
 
 ```sh
-uv run python testdata/check_rules.py
+ccnavi --test-samples testdata/rule-samples.yml
+uv run python testdata/check_rules.py     # 同じことを、写しと記録を外して回す
 ```
 
-`testdata/rule-samples.yml` の見本をすべて `--test` に掛け、期待と食い違った
+`testdata/rule-samples.yml` の見本をすべて判定に掛け、期待と食い違った
 ものを名指しする。見本は `deny` `ask` `allow` の区画に置き、区画の名前が
-期待する判定になる。ルールを 1 件足したら見本も 1 行足す。
+期待する判定になる。ルールを 1 件足したら見本も 1 行足す。食い違いが 1 件でも
+あれば終了コードは 1。`subject` の `/repo` は走らせたワークスペースルートに読み替わる。
 
 止めたいものだけでなく、**止めたくないものを必ず一緒に置く**。片側だけの見本は、
 ルールを広げすぎたことに気づけない。
 
 `/rules-check` スキルがこの流れをまとめて回し、食い違いの原因を調べ、
 怪しい当たり方を利用者に確認する。
+
+### 試験の JSON
+
+```sh
+ccnavi --test Bash "cd /repo && git push" --json
+ccnavi --test-samples testdata/rule-samples.yml --json
+```
+
+`--test` と `--test-samples` が言うことを JSON で出す。読み手は VS Code の拡張の
+ルール設定画面で、拡張はこれを並べるだけで判定を自分では行わない。判定は文字で出す
+ときと同じ関数を通る（REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、
+食い違いの数は本文の `mismatches` で読む。「食い違った」と「試験そのものが失敗した」を
+終了コードで見分けられるように。
+
+実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json` にあり、
+`tests/test_test_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を
+付けてそのテストを走らせ、例を書き直す）。
+
+`--test --json` の最上位。
+
+| 鍵 | 何 |
+|---|---|
+| `version` | 形の版。整数。いま 1 |
+| `root` / `rules_path` | ワークスペースルートと、当てたルールファイル |
+| `known` | 判定が対象を取り出せるツールか。偽なら以下は空のまま（ルールを書いても当たらない） |
+| `tool` / `subject` | 試した入力そのまま |
+| `resolved` | パスを行き着く先まで解いた結果。入力と同じなら空 |
+| `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`）と根拠コード |
+| `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てた印、組み込みの既定で判定した印。無ければ空 |
+| `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob` か `regex`、`written` は書いたまま、`pattern` は翻訳後の正規表現 |
+| `response` | エージェントに返る文面そのもの。無ければ空 |
+
+`--test-samples --json` の最上位。
+
+| 鍵 | 何 |
+|---|---|
+| `version` / `root` / `rules_path` / `samples_path` | 上と同じ。加えて見本の場所 |
+| `counts` | 区画ごとの `{ok, total}` |
+| `mismatches` / `skipped` | 食い違いの数と、allow の見本が判定に入らずに通った数 |
+| `samples[]` | 見本 1 件ごと。`{expected, tool, subject, resolved_subject, why, known, verdict, code, reason, rules, ok, skipped}`。`expected` は置いた区画、`resolved_subject` は `/repo` を読み替えた後、`ok` は期待どおりか、`skipped` は判定に入らずに通ったか |
 
 ## 設定の検証
 
