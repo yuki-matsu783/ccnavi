@@ -121,9 +121,11 @@ def write_verdict(stream: TextIO, decision: str, reason: str) -> None:
 
 
 def write_context(stream: TextIO, event: str, text: str) -> None:
-    """止められないイベントで、モデルに届く文を書き出す。
+    """判定を返さないとき、モデルに届く文を書き出す。
 
-    PostToolUse と SessionStart にはこの経路しかない。素の標準出力は捨てられる。
+    PostToolUse と SessionStart は判定自体ができないのでこの経路しかない。
+    PreToolUse でも、ccnavi がこの呼び出しの判定を持たない（handover）ときや
+    dry-run で知らせるだけのときはこちらを使う。素の標準出力は捨てられる。
     """
     _write(stream, {"hookEventName": event, "additionalContext": text})
 
