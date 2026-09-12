@@ -101,11 +101,9 @@ from dataclasses import dataclass
 from typing import TextIO
 
 from . import fsio, gitstate, rules, tree
+from .modes import DISABLE, DRY_RUN, ENABLE
 
-# 設定の値。mode と同じ語彙にしてある。覚えるものを増やさないため。
-ENABLE = "enable"
-DRY_RUN = "dry-run"
-DISABLE = "disable"
+# 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
 SETTINGS = (ENABLE, DRY_RUN, DISABLE)
 
 # 控えの置き場。state の下に畳む。セッションごとに分けるのは、控えが

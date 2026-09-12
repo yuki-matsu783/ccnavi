@@ -10,7 +10,7 @@
 
 ## 判定と同じ道を通る
 
-ここは判定を作り直さない。payload を組み立てて `cli.decide_before` を
+ここは判定を作り直さない。payload を組み立てて `judge.decide_before` を
 そのまま呼び、返った応答と記録を読んで人に見せる。別の道で判定すると、
 試験で通ったものが実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
 
@@ -27,7 +27,7 @@ import json
 import time
 from typing import TextIO
 
-from . import audit, hookio, rules, settings
+from . import audit, hookio, judge, modes, ruleload, rules, settings
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
 BOARD_VERSION = 1
@@ -46,7 +46,7 @@ TEST_VERSION = 1
 SAMPLE_PLACEHOLDER = "/repo"
 
 
-def judge(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject: str) -> dict:
+def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject: str) -> dict:
     """1 件を判定して、結果とすべての理由を 1 つの辞書にする。
 
     文字で出す `test` と JSON で出す `test_json` の両方がここを読む。読み手ごとに
@@ -55,8 +55,6 @@ def judge(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject
     鍵は README「試験の JSON」に書いてある。`known` が偽なら、そのツールは
     判定が対象を取り出せないもので、他の鍵は空のまま。
     """
-    from .cli import DEADLINE_SECONDS, MODE_ENABLE, decide_before, subject_of
-
     # 試験は控えを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
     # 1 回で届かなくなる。控えを外すと selfguard の写しも取らないが、試験は
     # 実行しないのでそもそも戻すものが無い。
@@ -86,25 +84,25 @@ def judge(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subject
         cwd=root,
     )
     record = audit.Record(
-        mode=MODE_ENABLE,
+        mode=modes.ENABLE,
         event=payload.event,
         tool=tool,
-        subject=subject_of(payload),
+        subject=judge.subject_of(payload),
     )
 
     # 応答は捨てずに拾う。判定が返す文面そのものを見せたいので、
     # ここで文を組み直さない。組み直すと、試験で読んだ文と
     # エージェントに届く文が別物になる。
     captured = io.StringIO()
-    decide_before(
+    judge.decide_before(
         captured,
         stderr,
-        MODE_ENABLE,
+        modes.ENABLE,
         conf,
         root,
         payload,
         record,
-        time.monotonic() + DEADLINE_SECONDS,
+        time.monotonic() + judge.DEADLINE_SECONDS,
     )
 
     out["verdict"] = record.decision or audit.ALLOW
@@ -134,7 +132,7 @@ def test(
     「拒否された」と「試験そのものが失敗した」を見分けられなくなる。
     結果は 1 行目の `verdict:` で読む。
     """
-    out = judge(stderr, conf, root, tool, subject)
+    out = try_one(stderr, conf, root, tool, subject)
     if not out["known"]:
         stdout.write(f"verdict: (判定に入らない)\ntool: {tool}\n")
         stdout.write(
@@ -187,7 +185,7 @@ def test_json(
 ) -> int:
     """`--test` と同じ判定を JSON で出す。読み手は VS Code 拡張のルール設定画面。"""
     body = {"version": TEST_VERSION, "root": root, "rules_path": conf.rules}
-    body.update(judge(stderr, conf, root, tool, subject))
+    body.update(try_one(stderr, conf, root, tool, subject))
     stdout.write(json.dumps(body, ensure_ascii=True, indent=1))
     stdout.write("\n")
     return 0
@@ -205,12 +203,10 @@ def _rules_hit(
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
     ルールファイルの外から来た根拠）。
     """
-    from .cli import load_rules
-
     if not record.rules:
         return []
 
-    rule_set, _ = load_rules(stderr, conf.rules, audit.Record(), root)
+    rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
     by_id = {rule.id: rule for rule in rule_set.all() if rule.id}
 
     hits = []
@@ -302,7 +298,7 @@ def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -
     """
     results = []
     for sample in load_samples(path, root):
-        out = judge(stderr, conf, root, sample["tool"], sample["resolved_subject"])
+        out = try_one(stderr, conf, root, sample["tool"], sample["resolved_subject"])
         want = sample["expected"]
         got = out["verdict"] if out["known"] else audit.SKIP
         skipped = want == rules.ALLOW and got == audit.SKIP
@@ -393,9 +389,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     「チケットの範囲が効いているか」まで。言えないことは言わない。
     """
     from . import approval, phase, tree
-    from .cli import load_rules
 
-    rule_set, source = load_rules(stderr, conf.rules, audit.Record(), root)
+    rule_set, source = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
 
     for name in rules.SECTIONS:

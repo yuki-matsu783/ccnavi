@@ -44,7 +44,8 @@ import json
 import os
 from typing import TextIO
 
-from . import ctxfile, gitcmd, gitstate, hookio, rules, selfguard, settings
+from . import ctxfile, gitcmd, gitstate, hookio, judge, modes, rules, selfguard, settings
+from .modes import EXIT_ERROR, EXIT_OK
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
@@ -69,15 +70,11 @@ def report(
     書き先は標準出力にしてある。この経路は hook の payload を読まないので、
     判定を運ぶための標準出力が空いている。CI がそのまま拾える側に出す。
     """
-    # 判定の側にある定数と関数を使う。lint は cli から呼ばれるので、
-    # モジュールの頭で import すると循環する。
-    from .cli import EXIT_ERROR, EXIT_OK, resolve_mode
-
     # モードの解決は判定と同じ関数に任せる。ここで別に書くと、検証は通ったのに
     # 実運用では違うモードになる、という一番まずい形になる。苦情を標準エラーへ
     # 書く作りなので、受け皿を渡して拾い、こちらで深刻度を付け直す。
     complaints = io.StringIO()
-    mode = resolve_mode(complaints, flag, conf)
+    mode = modes.resolve_mode(complaints, flag, conf)
 
     # 自動復元も同じ理由で同じ関数に任せる。受け皿を分けるのは、苦情の出所を
     # 取り違えないため。どちらの設定について言われたのかが混ざると、
@@ -136,8 +133,6 @@ def check(
     notes は設定の解決が出した苦情、complaints はモードの解決が出した苦情。
     どちらも深刻度を持たない文字列で届くので、ここで付ける。
     """
-    from .cli import MODE_DISABLE, MODE_DRY_RUN
-
     problems: list[Problem] = []
 
     # 上書き設定を読み飛ばしても、値は既定に落ちてガードは弱まらない。
@@ -150,15 +145,15 @@ def check(
         # 頭に付くので、その前置きは落とす。
         problems.append(Problem(SEVERITY_WARN, "(mode)", line.removeprefix("ccnavi: ")))
 
-    if mode == MODE_DISABLE:
-        problems.append(Problem(SEVERITY_WARN, "(mode)", f"{MODE_DISABLE} なので何も判定しない"))
-    elif mode == MODE_DRY_RUN:
+    if mode == modes.DISABLE:
+        problems.append(Problem(SEVERITY_WARN, "(mode)", f"{modes.DISABLE} なので何も判定しない"))
+    elif mode == modes.DRY_RUN:
         # warn は導入の途中では正しい状態なので error にはしない。それでも
         # 言う。ルールが揃っているのに 1 件も止まらない状態は、外から見ると
         # ガードが効いている状態と区別が付かない。
         problems.append(
             Problem(
-                SEVERITY_WARN, "(mode)", f"{MODE_DRY_RUN} なので判定しても呼び出しに手を出さない"
+                SEVERITY_WARN, "(mode)", f"{modes.DRY_RUN} なので判定しても呼び出しに手を出さない"
             )
         )
 
@@ -594,8 +589,6 @@ def _project_settings(root: str) -> list[Problem]:
     判定の側にはその 2 つを見分ける手段が無いから、書かれていることを
     見つけられる場所はここしかない。
     """
-    from .cli import MODE_DISABLE, MODE_DRY_RUN, MODE_ENABLE
-
     path = os.path.join(root, PROJECT_SETTINGS)
     try:
         with open(path, encoding="utf-8") as f:
@@ -614,24 +607,24 @@ def _project_settings(root: str) -> list[Problem]:
     declared = env.get(settings.MODE_ENV)
     if isinstance(declared, str) and declared:
         normalized = declared.lower()
-        if normalized == MODE_DISABLE:
+        if normalized == modes.DISABLE:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     "(project)",
-                    f"{PROJECT_SETTINGS} の env が {settings.MODE_ENV}={MODE_DISABLE} を"
+                    f"{PROJECT_SETTINGS} の env が {settings.MODE_ENV}={modes.DISABLE} を"
                     "宣言している。"
                     "監視される側が書けるファイルから監視を止めている。"
                     "止めるならセッションを起動する側の環境から渡す",
                 )
             )
-        elif normalized not in (MODE_DRY_RUN, MODE_ENABLE):
+        elif normalized not in (modes.DRY_RUN, modes.ENABLE):
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
                     f"{PROJECT_SETTINGS} の env の {settings.MODE_ENV}={declared!r} は"
-                    f"モードとして読めない。{MODE_ENABLE} に落ちる",
+                    f"モードとして読めない。{modes.ENABLE} に落ちる",
                 )
             )
     return problems
@@ -811,7 +804,7 @@ def _alternatives(regex: str) -> int:
 def _inert(match: str) -> list[str]:
     """match に並んだツール名のうち、判定が対象を取り出せないものを返す。
 
-    ルールを当てる文字列を選ぶのは cli.subject_of で、そこが知らないツール名では
+    ルールを当てる文字列を選ぶのは judge.subject_of で、そこが知らないツール名では
     対象が空になり、rule.matches は必ず False を返す。つまりそのルールは
     書いてあるのに何も止めない。守っているつもりの穴なので warn で言う。
 
@@ -819,8 +812,6 @@ def _inert(match: str) -> list[str]:
     判定側が扱うツールを増やしたときにこちらが黙って古くなり、正しいルールを
     誤って咎めるようになる。
     """
-    from .cli import subject_of
-
     inert: list[str] = []
     for want in match.split("|"):
         tool = want.strip()
@@ -828,6 +819,6 @@ def _inert(match: str) -> list[str]:
             continue
         # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
         probe = hookio.Input(tool_name=tool, tool_input={"command": "x", "file_path": "x"})
-        if not subject_of(probe):
+        if not judge.subject_of(probe):
             inert.append(tool)
     return inert
