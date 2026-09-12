@@ -27,6 +27,14 @@ test("CB-T12b 列ごとに畳むボタンを出す", () => {
   assert.equal((html.match(/class="fold"/g) ?? []).length, 4);
 });
 
+test("CB-T12c 絞り込み後の件数は見えているカードで数え、畳んだ列は固定幅に縛られない", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  // 絞り込みのたびに列の .count を .hidden でないカードの数で書き直す
+  assert.ok(html.includes('column.querySelectorAll(".card:not(.hidden)").length'));
+  // ドラッグで付けたインラインの width より畳んだ状態を優先する
+  assert.ok(/\.column\.folded \{[^}]*width: auto !important/.test(html));
+});
+
 test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   assert.ok(html.includes("承認済"));

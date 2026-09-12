@@ -319,7 +319,8 @@ ${BUTTON_STYLE}
   .column.folded .fold-mark {
     border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
   }
-  .column.folded { flex: 0 0 auto; min-width: 0; width: auto; }
+  /* ドラッグで固定した px 幅（インラインの style）より畳んだ状態を優先する。広げたときは固定幅に戻る */
+  .column.folded { flex: 0 0 auto; min-width: 0; width: auto !important; }
   .column.folded h2 { margin: 0; white-space: nowrap; }
   .column.folded .cards, .column.folded .empty, .column.folded .resizer { display: none; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
@@ -473,6 +474,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const ownFamily = card.getAttribute("data-family") || "";
       const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent);
       card.classList.toggle("hidden", hidden);
+    }
+    // 列の件数は絞り込み後に見えているカードの数にする。
+    for (const column of document.querySelectorAll(".column")) {
+      const count = column.querySelector(".count");
+      if (count) { count.textContent = String(column.querySelectorAll(".card:not(.hidden)").length); }
     }
     state.project = project;
     state.parent = parent;
