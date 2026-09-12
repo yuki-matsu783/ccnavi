@@ -1,11 +1,11 @@
 /**
- * プロジェクト管理画面の判断。ccnavi が数えるプロジェクト（`projects/` の直下で `.git` を持つもの、
+ * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/` の直下で `.git` を持つもの、
  * 設計 §25.2）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
  *
  * ここは vscode にも子プロセスにも触れない。ファイルの有無や git の答えは呼び手が渡す。
- * 判定は実行ファイルのもの（`--explain --json` の trees、`--lint --json` の苦情）を並べるだけで、
- * 拡張が「何がプロジェクトか」を出し直さない。拡張が自分で決めるのは、入力の形の検査と、
- * ccnavi が数えない `.git` の探し方だけ。
+ * 何がプロジェクトかは実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）に
+ * 従い、拡張が決め直すことはしない。拡張が自分で決めるのは、入力の形の検査と、
+ * プロジェクトになっていない `.git` の探し方だけ。
  */
 import { shellQuote, toPosixPath } from "./commands.js";
 import { problemsOfProject, problemsOfProjectsDir, type LintJson, type LintProblem } from "./lintmodel.js";
@@ -131,7 +131,7 @@ export function pullCommand(projectRoot: string): string {
   return `cd ${shellQuote(toPosixPath(projectRoot))} && git pull`;
 }
 
-// ---- ccnavi が数えない .git
+// ---- プロジェクトになっていない .git
 
 export interface DirEntry {
   readonly name: string;
@@ -147,25 +147,25 @@ export interface Stray {
 /** 歩かないディレクトリ。作業ツリーは trees に既にあり、依存の置き場は深くて遅い */
 export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", ".venv", ".claude"]);
 
-/** 置き場の中は 1 段深く歩き、2 段目に置かれた clone を「深すぎる」として拾う */
+/** 置き場の中は 1 段深く歩き、2 段目に置かれた clone を「置き場の 2 段目以下」として拾う */
 const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 
-export const REASON_OUTSIDE = "置き場の外。ccnavi はプロジェクトと数えない（projects/ の直下だけ数える）";
-export const REASON_TOO_DEEP = "置き場が深すぎる。ccnavi は projects/ の直下だけ数える";
+export const REASON_OUTSIDE = "置き場の外にある。プロジェクトになるのは projects/ の直下に置いたものだけ";
+export const REASON_TOO_DEEP = "置き場の 2 段目以下にある。プロジェクトになるのは projects/ の直下に置いたものだけ";
 
 export interface StrayInput {
-  /** 置き場のルートからの相対（"/" 区切り）。空なら置き場を数えていない */
+  /** 置き場のルートからの相対（"/" 区切り）。空なら置き場が無効 */
   readonly projectsRel: string;
   /** ルートからの相対（空はルート自身）を受けて、そこにあるものを返す。読めなければ空 */
   readonly list: (rel: string) => readonly DirEntry[];
-  /** trees にあるルート相対パス。ここは数えているので拾わない */
+  /** trees にあるルート相対パス。既にプロジェクトか作業ツリーなので拾わない */
   readonly knownRels: ReadonlySet<string>;
 }
 
 /**
- * ワークスペース直下を深さ 2 まで歩き、`.git` を持つのに ccnavi が数えないディレクトリを拾う。
- * 見つけたところで降りるのをやめる。表示のみで、操作は付けない。
+ * ワークスペース直下を深さ 2 まで歩き、`.git` を持つのにプロジェクトになっていないディレクトリを拾う。
+ * 見つけたところで降りるのをやめる。表示だけで、操作は付けない。
  */
 export function findStrayGitDirs(input: StrayInput): Stray[] {
   const found: Stray[] = [];
@@ -195,7 +195,7 @@ export function findStrayGitDirs(input: StrayInput): Stray[] {
   return found.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-// ---- clone 後の整合
+// ---- clone 後の設定
 
 /** `.gitignore` の本文に置き場が書かれているか。`/projects/`、`projects/`、`/projects`、`projects` のどれか */
 export function gitignoreHasProjects(text: string | undefined, projectsRel: string): boolean {
@@ -255,7 +255,7 @@ export interface ProjectsPage {
   readonly root: string;
   readonly generatedAt: string;
   readonly ticketsEnabled: boolean;
-  /** 置き場（絶対）。空なら置き場を数えていない設定 */
+  /** 置き場（絶対）。空なら置き場が無効（CCNAVI_PROJECTS が空） */
   readonly projectsDir: string;
   readonly projectsRel: string;
   readonly projectsDirExists: boolean;

@@ -68,7 +68,7 @@ test("CB-T63 clone / fetch / pull はターミナル向けの 1 行になる", (
   assert.equal(pullCommand("/ws/projects/lib"), "cd '/ws/projects/lib' && git pull");
 });
 
-test("CB-T64 ccnavi が数えない .git を深さ 2 まで探し、置き場の中は 1 段深く見る", () => {
+test("CB-T64 プロジェクトになっていない .git を深さ 2 まで探し、置き場の中は 1 段深く見る", () => {
   const tree: Record<string, readonly DirEntry[]> = {
     "": [
       dir("projects"), dir("参考"), dir("tools"), dir("node_modules"), dir(".claude"), dir("src"), file("README.md"),

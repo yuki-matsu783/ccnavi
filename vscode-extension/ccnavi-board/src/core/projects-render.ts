@@ -30,7 +30,7 @@ ${STYLE}
 <header class="toolbar">
   <div class="summary">
     <span>プロジェクト ${page.rows.length} 件</span>
-    <span class="path" title="${escapeHtml(page.projectsDir)}">置き場 ${escapeHtml(page.projectsRel === "" ? "（数えていない）" : `${page.projectsRel}/`)}</span>
+    <span class="path" title="${escapeHtml(page.projectsDir)}">置き場 ${escapeHtml(page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`)}</span>
   </div>
   <div class="controls">
     <button type="button" class="action" data-action="open-rules" data-name="" title="ワークスペースのルール（.claude/ccnavi/rules.yml）を直す">ルール管理</button>
@@ -66,10 +66,10 @@ ${SCRIPT}
 function renderBanners(page: ProjectsPage): string {
   const banners: string[] = [];
   if (page.lintError !== "") {
-    banners.push(`<div class="banner warn">--lint --json を読めなかったので、プロジェクトごとの検証は出ない: ${escapeHtml(page.lintError)}</div>`);
+    banners.push(`<div class="banner warn"><code>--lint --json</code> の結果を読めなかったので、プロジェクトごとの検証結果は出せない: ${escapeHtml(page.lintError)}</div>`);
   }
   if (page.projectsRel === "") {
-    banners.push(`<div class="banner warn">置き場を数えない設定（CCNAVI_PROJECTS が空）。clone しても ccnavi はプロジェクトと見ない</div>`);
+    banners.push(`<div class="banner warn">置き場が無効（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われない</div>`);
     return `${banners.join("\n")}\n`;
   }
   if (!page.projectsDirExists) {
@@ -79,7 +79,7 @@ function renderBanners(page: ProjectsPage): string {
   }
   if (!page.ignored) {
     banners.push(
-      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> が無い。プロジェクトは自分の git を持つので、ワークスペースの git からは無視する。<button type="button" class="action" data-action="fix-ignore">.gitignore に足す</button></div>`,
+      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> が無い。プロジェクトは自分の git を持つので、ワークスペースの git では無視する。<button type="button" class="action" data-action="fix-ignore">.gitignore に足す</button></div>`,
     );
   }
   for (const p of page.dirProblems) {
@@ -146,8 +146,8 @@ function renderStrays(strays: readonly Stray[]): string {
     .map((s) => `    <li><span class="mono">${escapeHtml(s.path)}</span> <span class="dim">${escapeHtml(s.reason)}</span></li>`)
     .join("\n");
   return `<section class="strays">
-  <h2>ccnavi が数えない .git <span class="count">${strays.length}</span></h2>
-  <p class="hint">ワークスペース直下を深さ 2 まで歩いて見つけたもの（node_modules、.venv、.claude は歩かない）。数えさせるには <code>projects/</code> の直下へ移す。ここからは操作しない。</p>
+  <h2>プロジェクトになっていない .git <span class="count">${strays.length}</span></h2>
+  <p class="hint">ワークスペース直下を深さ 2 まで歩いて見つけたもの（node_modules、.venv、.claude の中は歩かない）。プロジェクトにするには <code>projects/</code> の直下へ移す。ここからは操作できない。</p>
   <ul class="stray-list">
 ${items}
   </ul>
