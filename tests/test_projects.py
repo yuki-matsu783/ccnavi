@@ -121,6 +121,26 @@ def ticket_text(name, *, project="", allow=()):
     return "\n".join(lines) + "\n"
 
 
+def child_text(name, parent, *, project="", allow=()):
+    lines = ["---", "version: 1", f"ticket: {name}", f"parent: {parent}", "phase: 1"]
+    if project:
+        lines.append(f"project: {project}")
+    lines += [
+        "human_review:",
+        "  required: false",
+        "  reason: テスト",
+        f"title: 子 {name}",
+        "rationale: |",
+        "  理由",
+    ]
+    if allow:
+        lines.append("allow:")
+        for g in allow:
+            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
+    return "\n".join(lines) + "\n"
+
+
 class ProjectsTest(unittest.TestCase):
     def setUp(self):
         self.ws = tempfile.mkdtemp(prefix="ccnavi-projects-")
@@ -303,12 +323,14 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
 
     def test_worktree_cut_from_the_wrong_project_is_refused_by_the_ticket(self):
+        # プロジェクトの提案はワークスペースの wip/<名前>/tickets/ に置く（設計 §25.5）。
+        # 置き場がプロジェクトを決めるので、frontmatter の project は書かなくてよい。
         write(
-            os.path.join(self.ws, "wip", "tickets", "todo", "i0007.md"),
-            ticket_text("i0007", project="lib", allow=("src/*",)),
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.ws, "wip", "tickets", "todo", "i0008.md"),
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0008.md"),
             ticket_text("i0008", project="lib", allow=("src/*",)),
         )
         approved = self.ccnavi("--approve", stdin="y\n")
@@ -328,6 +350,110 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("DENY", self.reason(allowed))
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    # ---- 4b. プロジェクトを決めるのは提案を置いた場所（設計 §25.5）
+
+    def test_the_place_decides_the_project_for_parent_and_child_alike(self):
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007-01.md"),
+            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+        )
+        # 承認の前から、親も子も同じプロジェクトとしてボードに出る
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        found = {t["ticket"]: t["project"] for t in board["tickets"]}
+        self.assertEqual(found, {"i0007": "lib", "i0007-01": "lib"})
+        self.assertEqual(board["pending_approval"], ["i0007", "i0007-01"])
+
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        # 承認の画面は、書き込みが向かうリポジトリを人に見せる（REQ-MLT-11）
+        self.assertIn("■ プロジェクト: lib", approved.stdout)
+        # 継ぐ段は無いが、写しには残る（親の写しを引けないとき judge が子の写しを見る）
+        for name in ("i0007", "i0007-01"):
+            with open(os.path.join(self.approved, name + ".md"), encoding="utf-8") as f:
+                self.assertIn("project: lib", f.read())
+
+    def test_a_declaration_that_disagrees_with_the_place_is_not_approved(self):
+        write(
+            os.path.join(self.ws, "wip", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", project="lib", allow=("src/*",)),
+        )
+        result = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("置き場（ワークスペース）と違う", result.stderr)
+        self.assertIn("wip/lib/tickets/ に置く", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007.md")))
+
+    def test_a_child_placed_apart_from_its_parent_is_not_approved(self):
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        write(
+            os.path.join(self.ws, "wip", "app", "tickets", "todo", "i0007-01.md"),
+            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+        )
+        result = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("子は親と同じ置き場に置く", result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0007.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007-01.md")))
+
+    def test_a_proposal_inside_a_project_worktree_is_read_but_named(self):
+        # プロジェクトのリポジトリの中に提案は置かない（REQ-MLT-14）。読むのはやめないが言う。
+        # 置き場は作業ツリーの切り元で決まり、写しは記録した道から引くので閉じられる。
+        tree = self.worktree(self.lib, "i0010")
+        write(
+            os.path.join(tree, "wip", "tickets", "todo", "i0010.md"),
+            ticket_text("i0010", allow=("src/*",)),
+        )
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertIn("作業ツリー i0010（lib から切った）の中に提案がある", approved.stderr)
+        self.assertIn("■ プロジェクト: lib", approved.stdout)
+
+        os.makedirs(os.path.join(tree, "wip", "tickets", "done"))
+        os.replace(
+            os.path.join(tree, "wip", "tickets", "todo", "i0010.md"),
+            os.path.join(tree, "wip", "tickets", "done", "i0010.md"),
+        )
+        after = self.hook("Bash", self.ws, event="PostToolUse", command="true")
+        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0010.md")))
+
+    def test_lint_names_a_ticket_place_that_is_not_scanned(self):
+        write(
+            os.path.join(self.ws, "wip", "gone", "tickets", "todo", "i0009.md"),
+            ticket_text("i0009", allow=("src/*",)),
+        )
+        result = self.ccnavi("--lint")
+        out = result.stdout + result.stderr
+        self.assertIn("wip/gone/tickets", out)
+        self.assertIn("走査されていない", out)
+        # 置き場が走査されないので、提案はどこにも出ない
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        self.assertEqual(board["tickets"], [])
+
+    def test_the_copys_proposal_is_found_through_the_recorded_path(self):
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        # 提案を done/ へ動かすと、写しが閉じる。置き場を project から組み直すのではなく
+        # 承認のときに記録した道から引くので、どの置き場でも見つかる
+        os.makedirs(os.path.join(self.ws, "wip", "lib", "tickets", "done"))
+        os.replace(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            os.path.join(self.ws, "wip", "lib", "tickets", "done", "i0007.md"),
+        )
+        after = self.hook("Bash", self.ws, event="PostToolUse", command="true")
+        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0007.md")))
 
     # ---- 5. 実行後の監視はツリーごと
 

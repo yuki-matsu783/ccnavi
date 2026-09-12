@@ -238,6 +238,7 @@ def check(
     problems.extend(_risk(conf))
     problems.extend(_ticket(conf, root))
     problems.extend(_projects(conf, root))
+    problems.extend(_ticket_places(conf, root))
     return problems
 
 
@@ -518,6 +519,44 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"見える。プロジェクトの設定は {conf.project_rules} に置く",
                 )
             )
+    return problems
+
+
+def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
+    """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
+
+    プロジェクト向けの提案はワークスペースの `wip/<名前>/tickets/` に置き、名前は
+    `projects/` にあるプロジェクトのものでなければ走査されない（設計 §25.5）。走査
+    されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
+    いちばん困るので名指しする。error にはしない。判定は動いている。
+    """
+    parts = [p for p in conf.tickets.split("/") if p]
+    if len(parts) < 2:
+        # 名前を挟む位置が置き場の綴りから決められない。言えないことは言わない。
+        return []
+    head, tail = parts[0], parts[1:]
+    known = {p.name for p in tree.projects(conf.projects)}
+    where = os.path.relpath(conf.projects, root).replace(os.sep, "/") if conf.projects else "(無し)"
+    problems: list[Problem] = []
+    try:
+        names = sorted(os.listdir(os.path.join(root, head)))
+    except OSError:
+        return []
+    for name in names:
+        if name == tail[0] or name in known:
+            continue
+        place = os.path.join(root, head, name, *tail)
+        if not os.path.isdir(place):
+            continue
+        rel = "/".join([head, name, *tail])
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(projects)",
+                f"{rel}/ の提案は走査されていない。{name} が {where} のプロジェクトとして"
+                "数えられていない（`.git` がまだ無いか、名前が違う）",
+            )
+        )
     return problems
 
 
