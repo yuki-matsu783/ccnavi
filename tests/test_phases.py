@@ -347,6 +347,21 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("計画に無い", refused.stderr)
 
+    def test_phase_scope_ignores_letter_case_on_every_machine(self):
+        """種類の範囲の上限は、子チケットの範囲と同じく大文字小文字を区別しない。
+
+        機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
+        承認を拒まれ、Windows では通る。範囲は人が宣言する意図なので、綴りの
+        意味で読む（子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える）。
+        """
+        self.family(plan=["research", "design"])
+        # 種類は `wip/research/*`。子は綴りだけ違う `WIP/Research/*` を宣言する。
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["WIP/Research/*"]))
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertNotIn("超えている", result.stderr)
+
     # ---- 3. 順序は承認で止まる
 
     def test_next_phase_waits_for_the_previous_one(self):
