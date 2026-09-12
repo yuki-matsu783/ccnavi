@@ -84,13 +84,20 @@ def forbidden(subject: str) -> bool:
 
 
 def ticket_approval_rule(bin_path: str) -> rules.Rule:
-    """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。"""
+    """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
+
+    承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
+    呼び出しと写しの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
+    端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
+    「なぜ通らないのか」が当たったルールの id で分かる。
+    """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
     if clause:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
-    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
+    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-approve\.sh\b"
+    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
@@ -99,7 +106,8 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
             "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
-            "使い、承認と未解決の受け入れは利用者が端末で行います。"
+            "使い、承認（'sh .claude/scripts/ccnavi-approve.sh'）と未解決の受け入れは"
+            "利用者が端末で行います。"
         ),
         decision=rules.DENY,
     )

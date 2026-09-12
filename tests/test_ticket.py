@@ -767,6 +767,8 @@ class TicketTest(unittest.TestCase):
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
             "ls && ./ccnavi review check --phase 1",
+            # 承認のスクリプトも人の経路。中身は --approve と写しの push。
+            "sh .claude/scripts/ccnavi-approve.sh",
         ):
             result = self.hook(
                 "PreToolUse",
