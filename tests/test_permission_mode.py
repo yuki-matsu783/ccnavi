@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RULES = os.path.join(ROOT, "testdata", "rules-undeclared.yml")
@@ -35,12 +35,9 @@ def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable"):
 
     with tempfile.TemporaryDirectory(prefix="ccnavi-mode-") as directory:
         log = os.path.join(directory, "log.jsonl")
-        result = subprocess.run(
-            [sys.executable, "-m", "ccnavi", "--rules", RULES, "--mode", mode, "--log", log],
+        result = run_ccnavi(
+            ["--rules", RULES, "--mode", mode, "--log", log],
             input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

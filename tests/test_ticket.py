@@ -24,6 +24,8 @@ import sys
 import tempfile
 import unittest
 
+from tests.inproc import run_ccnavi
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 RULES = {
@@ -128,11 +130,8 @@ class TicketTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.root,
                 "--rules",
@@ -154,9 +153,6 @@ class TicketTest(unittest.TestCase):
                 *args,
             ],
             input=stdin,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

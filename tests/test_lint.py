@@ -10,9 +10,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -59,12 +60,9 @@ def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-    return subprocess.run(
-        [sys.executable, "-m", "ccnavi", "--root", root, *args],
+    return run_ccnavi(
+        ["--root", root, *args],
         input="",
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
         cwd=ROOT,
         env=environment,
     )
@@ -260,13 +258,9 @@ class LintTest(unittest.TestCase):
                 "tool_input": {"command": "git status"},
             }
         )
-        decided = subprocess.run(
-            [sys.executable, "-m", "ccnavi", "--root", self.root, "--rules", path]
-            + ["--mode", "enable", "--log", ""],
+        decided = run_ccnavi(
+            ["--root", self.root, "--rules", path] + ["--mode", "enable", "--log", ""],
             input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
         )

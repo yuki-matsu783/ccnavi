@@ -1,17 +1,18 @@
 """受入テスト。すべて外から道具を動かす。
 
 標準入力に payload を 1 件渡し、読み返すのは標準出力・標準エラー・終了コードだけ。
-内部の関数を呼ばないので、中身が動いてもテストは真であり続ける。
+入口（`python -m ccnavi` と同じ引数と標準入力）より内側の関数を呼ばないので、
+中身が動いてもテストは真であり続ける。起動の仕方は tests/inproc.py を見る。
 """
 
 from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RULES = os.path.join(ROOT, "testdata", "rules.yml")
@@ -26,18 +27,10 @@ def run(mode="enable", payload="", log=""):
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
 
-    args = [sys.executable, "-m", "ccnavi", "--rules", RULES, "--mode", mode]
+    args = ["--rules", RULES, "--mode", mode]
     args += ["--log", log] if log else ["--log", ""]
 
-    return subprocess.run(
-        args,
-        input=payload,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        cwd=ROOT,
-        env=environment,
-    )
+    return run_ccnavi(args, input=payload, cwd=ROOT, env=environment)
 
 
 def pre_tool_use(tool, field, value):
@@ -116,12 +109,9 @@ class VerdictTest(unittest.TestCase):
         # disable は起動した人の環境からしか効かない。フラグからは効かない。
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_MODE"] = "disable"
-        result = subprocess.run(
-            [sys.executable, "-m", "ccnavi", "--rules", RULES, "--log", ""],
+        result = run_ccnavi(
+            ["--rules", RULES, "--log", ""],
             input=pre_tool_use("Bash", "command", "git push origin main"),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )
