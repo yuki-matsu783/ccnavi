@@ -39,6 +39,8 @@ plan:
 - acceptance
 - implement
 - docs
+feedback:
+- design-feedback
 allow:
 - match: Write|Edit
   glob: wip/design/*
