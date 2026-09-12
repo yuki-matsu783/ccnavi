@@ -1473,12 +1473,23 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `ccnavi/approval.py` | 承認済みの写し、フェーズの印、子ごとの記録、承認の画面 |
 | `ccnavi/risk.py` | 実績で測るリスク。`risk.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `ccnavi/phase.py` | フェーズの終わりとゲート。提案から写しへの同期 |
+| `ccnavi/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
 | `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
 | `ccnavi/ops.py` | チケットの状態を動かす `ticket start / done / cancel / judge`。閉じるときに実績のリスクを数える |
 | `ccnavi/audit.py` | 1 行 1 件の追記記録 |
 | `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |
 | `ccnavi/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |
-| `ccnavi/cli.py` | 引数と入力を 1 つの判定に繋ぐ |
+| `ccnavi/cli.py` | 引数の解釈と振り分け。`ticket` / `review` の副命令を ops / review へ渡す |
+| `ccnavi/events.py` | hook のイベントごとの手順。1 回の起動で何が起きるかはここを上から読む |
+| `ccnavi/judge.py` | 実行前の判定。通す・聞く・止めるを決める |
+| `ccnavi/reasons.py` | 判定に添える文面と理由コード |
+| `ccnavi/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
+| `ccnavi/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
+| `ccnavi/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の控え |
+| `ccnavi/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルの控えと復元 |
+| `ccnavi/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
+| `ccnavi/gitcmd.py` | git を 1 回起こす |
+| `ccnavi/fsio.py` | ファイルの読み書きの型。控え・印・写し・下書きが全部これを通る |
 | `build.py` | 配布物の組み立て |
 | `.claude/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
 | `.claude/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |

@@ -40,12 +40,23 @@ ccnavi/tree.py              作業ツリーの特定。判定の鍵はファイ�
 ccnavi/approval.py          承認済みの写し・フェーズの印・子ごとの記録・承認の画面
 ccnavi/risk.py              実績で測るリスク。risk.yml・差分の計測・スクリプト・定性項目
 ccnavi/phase.py             フェーズの終わりとゲート。提案から写しへの同期
+ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
 ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。network に出ない
 ccnavi/ops.py               チケットの状態を動かす ticket start / done / cancel
 ccnavi/audit.py             1 行 1 件の追記記録
 ccnavi/lint.py              設定とルールの検証
 ccnavi/diagnose.py          判定を実行せずに試す --test と --explain
-ccnavi/cli.py               上記をイベントごとの処理に繋ぐ
+ccnavi/cli.py               引数の解釈と振り分け。ticket / review の副命令を ops / review へ
+ccnavi/events.py            hook のイベントごとの手順
+ccnavi/judge.py             実行前の判定
+ccnavi/reasons.py           判定に添える文面と理由コード
+ccnavi/ruleload.py          この呼び出しに当てるルール集合の決定
+ccnavi/subagent.py          SubagentStart / SubagentStop
+ccnavi/ctxfile.py           additionalContext の組み立てと once の控え
+ccnavi/selfguard.py         ccnavi 自身の設定ファイルと実行ファイルの控えと復元
+ccnavi/modes.py             enable / dry-run / disable と終了コード
+ccnavi/gitcmd.py            git を 1 回起こす
+ccnavi/fsio.py              ファイルの読み書きの型
 build.py                    PyInstaller の onedir で配布物を組み立てる
 tests/                      受入テスト。実行ファイルを外から叩く
 ```
