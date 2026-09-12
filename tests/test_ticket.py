@@ -755,6 +755,9 @@ class TicketTest(unittest.TestCase):
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
             "ls && ./ccnavi review check --phase 1",
+            # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
+            "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
+            "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -769,6 +772,9 @@ class TicketTest(unittest.TestCase):
             "ccnavi --explain",
             "ccnavi --lint",
             "sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
+            "uv run python -m ccnavi --approve --preview --json",
+            "echo --approve --preview",
         ):
             result = self.hook(
                 "PreToolUse",
