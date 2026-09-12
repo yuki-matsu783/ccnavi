@@ -27,10 +27,6 @@ import unittest
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# 大文字小文字を区別しない機械かどうか（ccnavi/tree.py の CASE_INSENSITIVE と同じ判じ方）。
-# 範囲の照合は、この機械でだけ綴りの違いを許す（ticket.py の _in_scope）。
-CASE_INSENSITIVE = os.path.normcase("A") == "a"
-
 RULES = {
     "version": 3,
     "deny": [
@@ -276,13 +272,13 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
-    def test_scope_follows_the_machine_on_case(self):
-        """綴りの大文字小文字を許すかどうかは、走っている機械で決まる。
+    def test_scope_ignores_case_on_every_machine(self):
+        """綴りの大文字小文字は、どの機械でも区別しない。
 
-        `docs/Design/*` と書いた範囲に `docs/design/plan.md` が当たるのは、
-        大文字小文字を区別しない機械（Windows、既定の macOS）だけ。Linux では
-        別の場所なので当たらない。ここを片方に決め打つと、3 つの実行環境の
-        どれかでテストが必ず落ちる（`_in_scope` の re.IGNORECASE と同じ分かれ方）。
+        `docs/Design/*` と書いた範囲に `docs/design/plan.md` が当たる。機械に
+        任せると、同じチケットと同じ綴りで、止まる場所が Windows と Linux で
+        食い違う。範囲は人が宣言する意図なので、機械の都合ではなく綴りの意味で
+        読む（`_fold` と `_entries` の re.IGNORECASE）。
         """
         self.propose("i0001", allow=("src/*", "README.md", "docs/Design/*"))
         git(self.parent_tree, "add", "-A")
@@ -294,10 +290,15 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             file_path=os.path.join(self.parent_tree, "docs", "design", "plan.md"),
         )
-        if CASE_INSENSITIVE:
-            self.assertNotIn("DENY_TICKET_SCOPE", self.reason(hit))
-        else:
-            self.assertIn("DENY_TICKET_SCOPE", self.reason(hit))
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(hit))
+        # 揃えるのは綴りの大小だけ。別の場所は別の場所のまま止める。
+        outside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "docs", "designs", "plan.md"),
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_no_worktree_means_no_ticket(self):
         """作業ツリーが無い子は効かない。"""
