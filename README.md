@@ -959,7 +959,7 @@ frontmatter は rules.yml と同じタイプ（`deny` / `ask` / `allow`）。効
 version: 1
 ticket: i0050-03
 issue: 50                # 親だけ。マージリクエストの Closes に写す。省ける
-project: lib             # 親だけ。projects/ の名前。子は承認で親から継ぐ。省けばワークスペース自身の作業
+project: lib             # 置き場と同じ名前。省ける（提案を置いた場所が決める）
 parent: i0050            # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つの束
 predecessors: [i0050-01] # 先に閉じているべき子。案内にだけ使う
