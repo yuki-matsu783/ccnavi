@@ -156,8 +156,8 @@ def _issue_number(raw) -> int | None:
 
 
 def _fold(path: str) -> str:
-    """比べるための綴り。大文字小文字を区別しない機械でだけ揃える。"""
-    return path.lower() if tree.CASE_INSENSITIVE else path
+    """比べるための綴り。範囲の照合はどの機械でも大文字小文字を区別しない。"""
+    return path.lower()
 
 
 # 範囲の判定。空文字は「言及していない」。
@@ -179,8 +179,9 @@ class Entry:
         if self.glob and not any(c in self.glob for c in _WILDCARDS):
             # ワイルドカードの無い綴りは前置。`src` が範囲なら `src` という
             # 名前のファイルも `src/` の下も中。そこだけ外に落ちるのは驚きでしかない。
-            # 大文字小文字を区別しない機械では、綴りの違いは同じ場所を指すので
-            # 揃えてから比べる。区別する機械では別の場所なので、そのまま比べる。
+            # 大文字小文字は揃えてから比べる。機械によって区別の有無が変わると、
+            # 同じチケットと同じ綴りで止まる場所が Windows と Linux で食い違う。
+            # 範囲は人が宣言する意図なので、機械の都合ではなく綴りの意味で読む。
             here, there = _fold(rel), _fold(self.glob)
             return here == there or here.startswith(there + "/")
         return self.compiled.match(rel) is not None
@@ -846,11 +847,11 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
                 continue
             glob = glob.replace("\\", "/").strip("/")
             expression = regex or ("^" + globmatch.translate(glob))
-            # 大文字小文字を区別しない機械では、`src/Components/*` と
-            # `src/components/*` が同じ場所を指す。当てる側だけ区別すると、
-            # 宣言した範囲に自分のファイルが入らない、が起きる。regex は
-            # 書いた人が意図を持てるので、そこだけ区別したままにする。
-            flags = re.IGNORECASE if (tree.CASE_INSENSITIVE and not regex) else 0
+            # `src/Components/*` と `src/components/*` は同じ範囲として扱う。
+            # 当てる側だけ区別すると、宣言した範囲に自分のファイルが入らない、が
+            # 起きる。機械ごとに変えないのは、同じチケットがどの環境でも同じ場所で
+            # 止まるため。regex は書いた人が意図を持てるので、そこだけ区別を残す。
+            flags = 0 if regex else re.IGNORECASE
             try:
                 compiled = re.compile(expression, flags)
             except re.error as exc:
