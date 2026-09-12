@@ -1184,7 +1184,7 @@ origin の綴りはホストのポートと scheme をそのまま使う。`http
 push の認証は git の設定側に置く（Git Credential Manager に保存しておく、か `credential.helper`）。
 git ラッパは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落とし、`GIT_TERMINAL_PROMPT=0` で
 入力待ちを即失敗に倒すので、環境変数で helper を差し替える形も、認証画面で入れる形も通らない。
-GitLab CE 18.5 の実物で 1 周した記録は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tests/probe_gitlab.py`。
+GitLab CE 18.5 の実物で 1 周した記録は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tools/gitlab/probe_gitlab.py`。
 
 これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_TICKET_APPROVAL`）。
 状態の移動とレビューはスクリプト 2 本を通し、承認と未解決の受け入れは利用者が端末で打つ。
@@ -1675,6 +1675,7 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `.claude/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
 | `.claude/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
+| `tools/gitlab/` | 実物または代役の GitLab に sh と exe を当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
 | `testdata/rules.yml` | テスト用のルール |
 | `testdata/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `testdata/check_rules.py` | 見本をぜんぶ判定に掛ける |

@@ -1,7 +1,7 @@
 # 実物の GitLab（Docker）で ccnavi を試すための personal access token を、ブラウザを開かずに作る。
 # root（エージェント役、GITLAB_TOKEN）と ccnavi-reviewer（人間役）の 2 人分。
 #
-#   docker exec -i gitlab gitlab-rails runner - < tests/make_gitlab_tokens.rb
+#   docker exec -i gitlab gitlab-rails runner - < tools/gitlab/make_gitlab_tokens.rb
 #
 # 出力は KEY=VALUE の 4 行。probe_gitlab.py はこれを環境変数で受ける。
 # GitLab 18 は組織（organization）と、よくある語を含まないパスワードを求める。
