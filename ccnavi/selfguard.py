@@ -203,18 +203,38 @@ _WRITE_VERBS = (
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
 #
+# 名前がそこで終わる形。空白とコマンドの切れ目（`\x00`）を語の終わりとして数える。
+# `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
+# `mv .ccnavi .ccnavi.bak` も、傘ごと消す・退かす形なので、下のファイルを 1 本ずつ
+# 書き換えるのと同じだけ守りが消える（敵対的レビュー A-3）。
+_TERM = r"(?:[ \x00]|$)"
+# 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
+# 当たり、`.ccnavixyz` のような別名には当たらない。
+_END = r"(?:[\\/ \x00]|$)"
+# 元と行き先がある cp / ln / install のための終わり。空白とコマンドの切れ目を
+# 数えない。あちらは行き先（最後の引数）だけを見る形で、後ろに `[^ \x00]*($|\x00)`
+# が続く。空白を数えると `cp .ccnavi /tmp/x` のように傘から外へ写すだけの読みが
+# 止まり、`\x00` を数えるとその切れ目を先に食ってしまって後ろの当てが外れる。
+_COPY_TERM = r"$"
+_COPY_END = r"(?:[\\/]|$)"
+
 # `.ccnavi/` は層の傘（設計 §25.2）。その下には各層の設定 3 本と、配点が呼ぶ
 # スクリプトが入る。どちらも判定の中身そのものなので、傘ごと止める。既定の綴りを
 # ここに書いておくのは、傘の名前を動かしていないワークスペースが、設定の受け渡しに
 # 依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
+#
+# `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
+# だから傘と違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
+# `.claude/` に続く綴り全部が入り、作業ツリーの片付けまで止まる。
 _PLACES = (
-    r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)",
-    r"\.ccnavi[\\/]",
+    r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
+    r"\.ccnavi" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
-    r"\.claude[\\/](ccnavi|hooks|scripts|settings)",
-    r"\.ccnavi[\\/]",
+    r"\.claude(?:[\\/](ccnavi|hooks|scripts|settings)|" + _COPY_TERM + r")",
+    # 行き先が傘そのもの（`cp /tmp/x .ccnavi`）でも止める。
+    r"\.ccnavi" + _COPY_END,
     r"ccnavi-git\.sh",
 )
 
@@ -237,9 +257,21 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
         if clause:
             places.append(clause)
             copy_places.append(clause)
-    where = "(" + "|".join(places) + ")"
-    copy_where = "(" + "|".join(copy_places) + ")"
+    where = _folded("(" + "|".join(places) + ")")
+    copy_where = _folded("(" + "|".join(copy_places) + ")")
     return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
+
+
+def _folded(clause: str) -> str:
+    """場所の綴りを、その機械がパスを見るのと同じ見方にする。
+
+    大文字小文字を区別しない機械では `.Ccnavi/scripts/count.sh` は
+    `.ccnavi/scripts/count.sh` そのもので、消せば本物が消える。区別する側に
+    立つと、綴りを 1 文字変えるだけで傘の中が書けた（敵対的レビュー A-2 / A-6）。
+    畳むのは場所の綴りだけ。コマンドの名前（`rm` / `cp`）は畳まない。そこを決める
+    のは機械のファイルシステムではなくシェルで、`RM` が通る保証は無い。
+    """
+    return f"(?i:{clause})" if tree.CASE_INSENSITIVE else clause
 
 
 def project_home_clause(project_home: str) -> str:
@@ -247,12 +279,18 @@ def project_home_clause(project_home: str) -> str:
 
     傘の下は丸ごと守る。層の設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
     既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
-    ある場合の綴り。区切りはどちらの綴りにも当てる。
+    ある場合の綴り。区切りはどちらの綴りにも当て、名前がそこで終わる形（傘ごと
+    消す・退かす）にも当てる。
+
+    返す 1 本は書き込む側と写す側の両方に足される。写す側だけは既定の名前が
+    `_COPY_END`（空白を数えない）で閉じているので、動かしてある傘のほうが
+    `cp <傘> <外>` まで止める、というぶんだけ広い。広い側が deny なので倒れる向きは
+    安全だが、綴りを揃えるなら足し方を 2 つに分けることになる。
     """
     parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
     if not parts:
         return ""
-    return r"[\\/]".join(parts) + r"[\\/]"
+    return r"[\\/]".join(parts) + _END
 
 
 def project_home_glob(project_home: str) -> str:

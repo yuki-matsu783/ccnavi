@@ -37,6 +37,17 @@ LAYER_COMMON = "common"
 LAYER_SELF = "self"
 
 
+def is_self_name(name: str) -> bool:
+    """その名前が、ワークスペース自身の層として予約してある `self` か（設計 §25.4）。
+
+    綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
+    `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
+    取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも同じに
+    畳む。`--lint` が error で名指しする（lint._projects）。
+    """
+    return (name or "").casefold() == LAYER_SELF
+
+
 @dataclass
 class Layer:
     """共通層より後ろの層 1 つ。"""
@@ -84,8 +95,8 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
     """共通層より後ろの層を、足す順に並べる。自身の層が先、プロジェクトは名前順。
 
     `projects/self/` は数えない。`self:id` と区別が付かないので、名前を 1 つ
-    予約するほうが、接頭辞の綴りを別にするより安い（設計 §25.4）。`--lint` が
-    error で言う。
+    予約するほうが、接頭辞の綴りを別にするより安い（設計 §25.4）。`projects/Self/`
+    のような綴り違いも同じに扱う（is_self_name）。`--lint` が error で言う。
     """
     found = [
         Layer(
@@ -95,7 +106,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
         )
     ]
     for p in tree.projects(conf.projects):
-        if p.name == LAYER_SELF:
+        if is_self_name(p.name):
             continue
         home = tree.project_root(conf.projects, p.name)
         found.append(
@@ -324,4 +335,4 @@ def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
     mark_source(rule_set, layer)
     for rule in rule_set.all():
         if rule.id:
-            rule.id = f"{layer}:{rule.id}"
+            rule.id = f"{layer}{rules.ID_SEPARATOR}{rule.id}"

@@ -562,7 +562,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
     """
     problems: list[Problem] = []
     names = [ruleload.LAYER_SELF]
-    names += [p.name for p in tree.projects(conf.projects) if p.name != ruleload.LAYER_SELF]
+    names += [p.name for p in tree.projects(conf.projects) if not ruleload.is_self_name(p.name)]
     for name in names:
         where = layer_where(name)
         project = "" if name == ruleload.LAYER_SELF else name
@@ -628,8 +628,8 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     """プロジェクトの置き場が噛み合っているか（REQ-MLT-16）。
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
-    `self` という名前を使っていないこと、プロジェクトが `.claude/` を持たないこと、
-    旧の置き場のルールが残っていないことを見る。層の中身は `_layers` が見る。
+    `self` という名前（綴り違いも含む）を使っていないこと、プロジェクトが `.claude/` を
+    持たないこと、旧の置き場のルールが残っていないことを見る。層の中身は `_layers` が見る。
     """
     problems: list[Problem] = []
     found = tree.projects(conf.projects)
@@ -647,14 +647,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
         )
     for p in found:
         where = f"(projects/{p.name})"
-        if p.name == ruleload.LAYER_SELF:
+        if ruleload.is_self_name(p.name):
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     where,
                     f"`{ruleload.LAYER_SELF}` はワークスペース自身の層の名前として予約してある。"
                     f"このプロジェクトは数えていない（id の `{ruleload.LAYER_SELF}:` と"
-                    "区別が付かない）。別の名前に変える",
+                    "区別が付かない。綴りの大文字小文字は問わない）。別の名前に変える",
                 )
             )
         old = os.path.join(p.root, settings.OLD_PROJECT_RULES.replace("/", os.sep))

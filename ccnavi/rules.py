@@ -40,6 +40,14 @@ Claude Code の権限モードに従う（判定は cli.py）。
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` の穴を開ける道具ではない。
 
+## 綴りの大文字小文字
+
+`glob` で書いたルールは、その機械がパスを見るのと同じ見方で当てる。大文字小文字を
+区別しない機械では `*/.ccnavi/*` が `.Ccnavi/config/rules.yml` にも当たる。同じ場所を
+指しているのに守りが外れる形を残さないため（risk.py と phasetypes.py の範囲も同じ）。
+`regex` で書いたルールは区別する。書いた人が `(?i:...)` を自分で書けるので、
+意図を持てる側に任せる。
+
 ## ワークスペースルートの合言葉
 
 `{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
@@ -57,6 +65,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
+from . import tree
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。
@@ -98,6 +107,11 @@ _BACKREFERENCE = re.compile(r"\\[1-9]")
 
 # ワークスペースルートを指す合言葉。glob と regex の中で使え、読み込み時にその実パスに置き換わる。
 ROOT_PLACEHOLDER = "{root}"
+
+# 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
+# 書かれたままの id にこれが入っていると、層を添えた形と見分けが付かない。
+# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §25.4）。
+ID_SEPARATOR = ":"
 
 
 def root_pattern(root: str) -> str:
@@ -326,6 +340,14 @@ def _build(
     )
     name = f"{section}:{rule.id}" if rule.id else where
 
+    if ID_SEPARATOR in written_id:
+        return None, Problem(
+            SEVERITY_ERROR,
+            name,
+            f"id に `{ID_SEPARATOR}` は書けない。層の名前を添えた形"
+            f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
+            "見分けが付かず、記録を読んだ人がどのファイルを直すのか決められない",
+        )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(
             SEVERITY_ERROR, name, "文面が無い。ルールは代わりに何をすべきかを言わなければならない"
@@ -353,12 +375,19 @@ def _build(
         expression = (
             rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
         )
+        # `regex` で書いた範囲だけは綴りの区別を残す。書いた人が `(?i:...)` を
+        # 自分で書けるので、意図を持てる側に任せる（ticket.py の範囲と同じ理屈）。
+        flags = 0
     else:
         glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
         expression = translate(glob)
+        # glob は、その機械がパスを見るのと同じ見方で当てる。区別しない機械で
+        # `*/.ccnavi/*` と書いたルールが `.Ccnavi/` を素通りさせると、同じ場所を
+        # 指しているのに守りが外れる（phasetypes._globs / risk._factors と同じ形）。
+        flags = re.IGNORECASE if tree.CASE_INSENSITIVE else 0
 
     try:
-        rule.compiled = re.compile(expression)
+        rule.compiled = re.compile(expression, flags)
     except re.error as exc:
         return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
 

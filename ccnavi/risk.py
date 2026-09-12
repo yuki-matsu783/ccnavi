@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 import yaml
 
 from . import gitcmd, globmatch, settings, tree
-from .rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
+from .rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 VERSION = 1
 
@@ -288,6 +288,19 @@ def _factors(
             problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}]` が辞書ではない"))
             continue
         ident = str(item.get("id") or "").strip()
+        if ID_SEPARATOR in ident:
+            # 層の名前を添えた形（`lib:schema`）と見分けが付かない。共通層に書けば
+            # lib の配点に見え、記録を読んだ人がどのファイルを直すのか決められない。
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    where,
+                    f"`factors[{i}].id` に `{ID_SEPARATOR}` は書けない。"
+                    f"層の名前を添えた形（`self{ID_SEPARATOR}id` / "
+                    f"`<プロジェクト名>{ID_SEPARATOR}id`）と見分けが付かない",
+                )
+            )
+            continue
         if not _ID.match(ident):
             problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}].id` が無いか形が違う"))
             continue

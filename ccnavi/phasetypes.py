@@ -156,6 +156,19 @@ def parse(
     titles: dict[str, str] = {}
     for key, body in raw.items():
         ident = str(key).strip()
+        if rules.ID_SEPARATOR in ident:
+            # 層の名前を添えた形（`lib:build`）と見分けが付かない。共通層に書けば
+            # lib の定義に見え、記録を読んだ人がどのファイルを直すのか決められない。
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"識別子に `{rules.ID_SEPARATOR}` は書けない。"
+                    f"層の名前を添えた形（`self{rules.ID_SEPARATOR}id` / "
+                    f"`<プロジェクト名>{rules.ID_SEPARATOR}id`）と見分けが付かない",
+                )
+            )
+            continue
         if not _ID.match(ident):
             problems.append(Problem(SEVERITY_ERROR, ident, "識別子に使えない文字がある"))
             continue
