@@ -27,13 +27,13 @@ deny:
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
 
-  # main の作業ツリーでは編集しない。`.claude/worktrees/` だけが編集可能。
+  # チェックアウトしたブランチでは編集しない。`.claude/worktrees/` だけが編集可能。
   # `{root}` はワークスペースルートの実パスに置き換わる。
   - id: main-tree
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'
     message: >-
-      main の作業ツリーでは編集しません。'sh .claude/scripts/ccnavi-git.sh worktree add
+      チェックアウトしたブランチ直下では編集しません。'sh .claude/scripts/ccnavi-git.sh worktree add
       .claude/worktrees/<名前> -b <名前>' で作業ツリーを切り、その中で編集して、
       ff-only で main に戻してください。
 
