@@ -37,7 +37,8 @@ BOARD_VERSION = 1
 
 # 対象を取り出せるツール。ここに無いツールは判定に届かないまま通るので、
 # 試したい人には「当たらない」ではなく「そもそも見ていない」と言う。
-KNOWN_TOOLS = ("Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Agent")
+# 一覧は judge の表そのもの。VS Code 拡張の KNOWN_TOOLS はこれと同じ並び。
+KNOWN_TOOLS = tuple(judge.SUBJECT_FIELDS)
 
 
 # `--test --json` と `--test-samples --json` の形の版。読み手は VS Code 拡張の
@@ -79,7 +80,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     if not out["known"]:
         return out
 
-    field = {"Bash": "command", "Agent": "description"}.get(tool, "file_path")
+    field = judge.SUBJECT_FIELDS[tool]
     payload = hookio.Input(
         event=hookio.PRE_TOOL_USE,
         tool_name=tool,

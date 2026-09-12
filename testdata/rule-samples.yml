@@ -8,7 +8,9 @@
 # タイプの名前が期待する判定になる。deny なら止まるはず、allow なら通るはず、
 # ask なら人に確認が出るはず。実際の判定と食い違ったものをスキルが報告する。
 #
-# subject は Bash ならコマンド、それ以外ならパス。パスは絶対で書く。
+# subject は Bash / PowerShell / Monitor ならコマンド、Read / Write / Edit /
+# MultiEdit / NotebookEdit ならパス、Skill ならスキル名、Agent なら見出し、
+# WebFetch なら URL。パスは絶対で書く。
 # 判定は行き着く先まで解いてから当てるので、相対で書くと走らせた場所で
 # 答えが変わる。
 
