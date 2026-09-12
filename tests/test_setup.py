@@ -39,6 +39,8 @@ REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_RULES", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
 GUARD_ENV = ("CCNAVI_RESTORE_IF_DENY", "CCNAVI_GUARD_CORE_FILES")
 # チケットの承認の経路。enable か disable しか取らないので、モードには合わせない。
 TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
+# チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
+TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものがずれる。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
@@ -218,6 +220,31 @@ class WritesTheExpectedShape(SetupTest):
     def test_the_ticket_approval_gate_is_enable_under_an_enable_mode(self):
         self.run_setup("--mode", "enable")
         self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
+
+    def test_ticket_control_is_written_as_enable_by_default(self):
+        """チケット制御は既定の enable でも常に書く。切るつまみを設定ファイルの中で
+        見つけられるように。"""
+        self.run_setup()
+        self.assertEqual(self.read_settings()["env"][TICKET_CONTROL_ENV], "enable")
+
+    def test_ticket_control_can_be_disabled_at_setup(self):
+        """全体ルールだけで足りるプロジェクトは、導入のときに disable を選ぶ。"""
+        self.run_setup("--ticket-control", "disable")
+        self.assertEqual(self.read_settings()["env"][TICKET_CONTROL_ENV], "disable")
+
+    def test_refuses_a_ticket_control_it_does_not_know(self):
+        for value in ("off", "dry-run", "Enable"):
+            with self.subTest(value=value):
+                result = self.run_setup("--ticket-control", value)
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse(os.path.exists(self.settings_path()))
+
+    def test_force_replaces_ticket_control_only_when_named(self):
+        self.write_settings({"env": {TICKET_CONTROL_ENV: "disable"}})
+        self.run_setup("--force", "--mode", "enable")
+        self.assertEqual(self.read_settings()["env"][TICKET_CONTROL_ENV], "disable")
+        self.run_setup("--force", "--ticket-control", "enable")
+        self.assertEqual(self.read_settings()["env"][TICKET_CONTROL_ENV], "enable")
 
     def test_does_not_write_retired_env(self):
         """もう効かない環境変数を書かない。書けば --lint が苦情を言う。"""

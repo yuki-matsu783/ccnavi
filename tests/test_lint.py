@@ -151,6 +151,58 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(counts(result.stdout)[0], 0)
 
+    def test_チケット制御に読めない値を書いたらerrorになる(self):
+        # 切ったつもりの綴り違いは enable として動く。守りは消えないが、
+        # 書いた人は切れていると思い続けるので、直すまで error で名指しする。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--ticket-control",
+            "off",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CCNAVI_TICKET_CONTROL=off", result.stdout)
+        self.assertIn("enable として動いている", result.stdout)
+
+    def test_チケット制御をdisableにするとwarnで0のまま(self):
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--ticket-control",
+            "disable",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("チケット制御: disable", result.stdout)
+        self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 0)
+
+    def test_写しの置き場を空文字にしてももう切れずwarnで今の書き方を言う(self):
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--approved",
+            "",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("チケット制御: enable", result.stdout)
+        self.assertIn("CCNAVI_APPROVED が空文字", result.stdout)
+        self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
+
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))
 

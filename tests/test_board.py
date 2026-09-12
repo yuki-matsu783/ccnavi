@@ -6,7 +6,7 @@ VS Code のボード拡張が読む形を、判定と同じ関数で組んでい
 1. 提案・写し・印・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
 2. 承認待ち（写しの無い提案）が `pending_approval` に出る
 3. 親のフェーズとゲートが `parents` に出る
-4. 写しの置き場が無ければ、空のボードと理由を返す
+4. チケット制御が disable なら、空のボードと理由を返す
 
 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/board.json）と
 同じ形であることも見る。形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを
@@ -106,11 +106,20 @@ class BoardTest(PhaseHarness):
         self.assertEqual(phases[2]["states"], {"i0001-02": "doing"})
         self.assertTrue(phases[2]["review_required"])
 
-    def test_without_copies_the_board_is_empty_and_says_why(self):
-        board = self.board("--approved", "")
+    def test_with_ticket_control_disabled_the_board_is_empty_and_says_why(self):
+        board = self.board("--ticket-control", "disable")
         self.assertEqual(board["tickets"], [])
         self.assertEqual(board["parents"], [])
-        self.assertTrue(any("写しの置き場" in p for p in board["problems"]))
+        self.assertEqual(board["settings"]["ticket_control"], "disable")
+        self.assertTrue(any("CCNAVI_TICKET_CONTROL" in p for p in board["problems"]))
+
+    def test_settings_say_ticket_control_is_enabled_by_default(self):
+        board = self.board()
+        self.assertEqual(board["settings"]["ticket_control"], "enable")
+        # 写しの置き場を空文字で指しても、もう切れない。既定の置き場で有効のまま。
+        board = self.board("--approved", "")
+        self.assertEqual(board["settings"]["ticket_control"], "enable")
+        self.assertTrue(board["settings"]["approved"].endswith("tickets"))
 
     def test_shape_matches_the_extension_fixture(self):
         self.scene()
