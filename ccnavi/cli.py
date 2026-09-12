@@ -120,7 +120,7 @@ OVERRIDES = (
     ("log", True),
     ("rules", False),
     ("state", True),
-    ("approved", True),
+    ("approved", False),
     ("phases", True),
     ("risk", True),
     ("projects", True),
@@ -139,6 +139,10 @@ def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
         value = getattr(args, name)
         if value is not None and (accepts_empty or value):
             setattr(conf, name, value)
+    # 写しの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
+    # 今は --ticket-control の仕事。置き場は既定のままにして、--lint が言う。
+    if args.approved == "":
+        conf.approved_blank = True
     for name in RELATIVE_OVERRIDES:
         value = getattr(args, name)
         if value:
@@ -156,6 +160,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--restore-if-deny", default="")
     parser.add_argument("--guard-core-files", default="")
     parser.add_argument("--guard-ticket-approval", default="")
+    # チケット制御を使うか。enable / disable。VS Code 拡張が試し打ちで disable を渡す。
+    parser.add_argument("--ticket-control", default="")
     # リモートの写し（JSON）。.claude/scripts/ccnavi-review.sh が取ってきて渡す。
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
@@ -205,6 +211,17 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         settings.GUARD_TICKET_APPROVAL_ENV,
         selfguard.GATE_SETTINGS,
     )
+    # チケット制御も 2 値。読めない値は enable（使う側）に倒す。切ったつもりで
+    # 綴りを誤った設定は、判定では効いたままになり、--lint が error で名指しする。
+    if args.ticket_control:
+        conf.ticket_control_declared = args.ticket_control
+    conf.ticket_control = selfguard.resolve(
+        stderr,
+        args.ticket_control,
+        conf.ticket_control,
+        settings.TICKET_CONTROL_ENV,
+        selfguard.GATE_SETTINGS,
+    )
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
@@ -239,8 +256,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
     # 判断ではなく、これから効く範囲についての合意になる。
     if args.approve:
-        if not conf.approved:
-            stderr.write("ccnavi: 写しの置き場が空。--approved で指す先が要る\n")
+        if not conf.tickets_enabled:
+            stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
@@ -339,8 +356,8 @@ def operate(
     人が打つ `--reviewed`。どれも payload を読まず、判定も記録もしない。
     リモートの写しは `--result <json>` で受け取る。exe はネットワークに出ない。
     """
-    if not conf.approved:
-        stderr.write("ccnavi: 写しの置き場が空。チケットによる制御を使っていない\n")
+    if not conf.tickets_enabled:
+        stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
         return EXIT_ERROR
     cwd = args.cwd or os.getcwd()
     if args.reviewed is not None:

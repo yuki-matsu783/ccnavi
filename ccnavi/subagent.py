@@ -47,7 +47,7 @@ def at_start(
     子の範囲を案内し、調査役が自分の居場所を迷う形になった（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
-    if not conf.approved:
+    if not conf.tickets_enabled:
         return EXIT_OK
     copies, _ = approval.copies(conf.approved)
     index = approval.by_id(copies)
@@ -107,7 +107,7 @@ def at_stop(
     子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
     """
     record.decision, record.enforced = audit.ALLOW, True
-    if not conf.approved:
+    if not conf.tickets_enabled:
         return EXIT_OK
     copies, _ = approval.copies(conf.approved)
     index = approval.by_id(copies)

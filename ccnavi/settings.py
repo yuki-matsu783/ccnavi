@@ -53,7 +53,14 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # BIN_SUFFIXES は、書かれた綴りに無いときだけ継ぎ足して探す拡張子。
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
-# チケットによる範囲の制御が使う 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
+# TICKET_CONTROL_ENV は、チケット制御を使うか。enable（既定）/ disable の 2 値。
+# チケット制御は、提案を承認して写しを作り、その範囲・フェーズのゲート・
+# サブエージェントの制限を判定に掛ける働き全体。全体ルールは全プロジェクトが使うが、
+# チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
+# 以前は APPROVED_ENV を空文字にすることがこの宣言を兼ねていた。置き場のパスが
+# 空であることと機能を切ることは別の話なので、名前を分けた。
+TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
+# チケット制御が使う置き場 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
 # ルートからの相対。APPROVED_ENV は承認済みの写しの置き場で、ワークスペースルートからの相対。
 # 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
@@ -158,11 +165,20 @@ class Settings:
     # 「ccnavi の実体」として扱うことになるため。
     bin: str = ""
 
+    # ticket_control はチケット制御を使うか。enable / disable の 2 つだけを取る。
+    # 解決は cli が selfguard.resolve で行い、読めない値は enable に倒す。
+    # ticket_control_declared は解決する前に人が書いた綴りで、--lint がそれを名指しする。
+    ticket_control: str = ""
+    ticket_control_declared: str = ""
+
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
     # approved は承認済みの写しの置き場（絶対）。判定が読むのは approved だけ。
-    # approved が空なら、チケットによる制御を使わない。
+    # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
+    # approved_blank は、置き場を空文字で指定されたこと。以前はそれが「使わない」の
+    # 宣言だったので、--lint が今の書き方を案内する。
     tickets: str = ""
     approved: str = ""
+    approved_blank: bool = False
     # phases はフェーズの種類の定義（絶対）。無ければフェーズは番号だけ。
     phases: str = ""
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
@@ -174,6 +190,22 @@ class Settings:
     project_rules: str = ""
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
     retired: list[str] = field(default_factory=list)
+
+    @property
+    def tickets_enabled(self) -> bool:
+        """チケット制御が効いているか。
+
+        判定・監視・診断はこれで分岐する。approved の真偽で分岐しない。
+        解決前（空）は enable と同じに読む。読めない値は解決で enable に倒れるので、
+        ここで disable と読めるのは disable と書かれたときだけになる。
+        """
+        return self.ticket_control != TICKET_CONTROL_DISABLE
+
+
+# ticket_control の値。modes / selfguard と同じ綴りだが、settings は両方より下に
+# あるので、ここに持つ。
+TICKET_CONTROL_ENABLE = "enable"
+TICKET_CONTROL_DISABLE = "disable"
 
 
 def load(root: str) -> tuple[Settings, list[str]]:
@@ -194,7 +226,10 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
         guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
+        ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
+        ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
+        approved_blank=APPROVED_ENV in os.environ and os.environ[APPROVED_ENV] == "",
         approved=os.path.join(root, DEFAULT_APPROVED),
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
@@ -203,9 +238,9 @@ def load(root: str) -> tuple[Settings, list[str]]:
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
     # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
-    # 空文字を受ける欄は、「記録しない」「控えを持たない」「写しを持たない」
-    # 「プロジェクトを数えない」を言えるようにしてある。写しが無ければ範囲の制限は
-    # 掛からず、チケットを置いていないのと同じ状態になる。
+    # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
+    # 言えるようにしてある。写しの置き場は空文字を受けない。チケット制御を切るのは
+    # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
         ("project_rules", PROJECT_RULES_ENV, _relative, False),
@@ -216,7 +251,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ("log", LOG_ENV, _log_or_none, True),
         ("state", STATE_ENV, _log_or_none, True),
         ("tickets", TICKETS_ENV, _relative, False),
-        ("approved", APPROVED_ENV, _log_or_none, True),
+        ("approved", APPROVED_ENV, _resolve, False),
     )
     for name, env, read, accepts_empty in overrides:
         if env in os.environ and (accepts_empty or os.environ[env]):
@@ -237,13 +272,16 @@ def load(root: str) -> tuple[Settings, list[str]]:
     if isinstance(conf.get("mode"), str):
         settings.mode_declared_in_file = conf["mode"]
         settings.mode = conf["mode"]
-    for name in ("restore_if_deny", "guard_core_files", "guard_ticket_approval"):
+    for name in ("restore_if_deny", "guard_core_files", "guard_ticket_approval", "ticket_control"):
         if isinstance(conf.get(name), str):
             setattr(settings, name, conf[name])
     # 書かれた綴りをそのまま控える。上書き設定ファイルは ccnavi 自身を開発している
     # ときだけ読むものだが、そこに dry-run と書いた人にも --lint から同じことを言う。
-    if isinstance(conf.get("guard_ticket_approval"), str):
-        settings.guard_ticket_approval_declared = conf["guard_ticket_approval"]
+    for name in ("guard_ticket_approval", "ticket_control"):
+        if isinstance(conf.get(name), str):
+            setattr(settings, f"{name}_declared", conf[name])
+    if conf.get("approved") == "":
+        settings.approved_blank = True
     for name, _, read, accepts_empty in overrides:
         value = conf.get(name)
         if isinstance(value, str) and (accepts_empty or value):

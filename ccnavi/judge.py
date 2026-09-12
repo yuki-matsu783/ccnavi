@@ -134,8 +134,8 @@ def decide_before(
             rule_set, conf.bin, selfguard.project_rules_clause(conf.projects, conf.project_rules)
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
-    # 誰がやっても止める。写しを使っているときだけ足す。
-    if conf.approved:
+    # 誰がやっても止める。チケット制御が効いているときだけ足す。
+    if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
@@ -161,7 +161,7 @@ def decide_before(
     # 閉じるのは親だけ（REQ-TKT-10）。ルールより先に見る。ルールが allow と
     # 書いていても、この 2 本はサブエージェントの手には渡さない。
     if (
-        conf.approved
+        conf.tickets_enabled
         and payload.agent_id
         and payload.tool_name in phase.SHELL_TOOLS
         and phase.forbidden(subject)
@@ -173,7 +173,7 @@ def decide_before(
 
     # ゲート。人間レビュー要のフェーズが終わっていて印が無い間、サブエージェントの
     # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
-    if conf.approved and payload.tool_name in phase.GATED_TOOLS:
+    if conf.tickets_enabled and payload.tool_name in phase.GATED_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         closed = phase.gate(root, conf, parent.ticket) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
@@ -184,7 +184,7 @@ def decide_before(
 
     # 作業ツリーの切り元と写しの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく配線の誤りなので、ルールが allow と言っていても通さない。
-    if conf.approved and target is not None and payload.tool_name in SCOPE_TOOLS:
+    if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject)
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
@@ -440,7 +440,7 @@ def ticket_verdict(
     チケット自身の提案ファイルについては何も言わない。承認された範囲の外に
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
-    if not conf.approved or tool not in SCOPE_TOOLS or not full:
+    if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
         return "", ""
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:

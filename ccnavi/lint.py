@@ -127,7 +127,20 @@ def report(
                 f"今は {selfguard.ENABLE} として動いている",
             )
         )
-    if conf.approved and guard_ticket_approval == selfguard.DISABLE:
+    # チケット制御も同じ 2 値。切ったつもりの綴り違いは enable として動いているので、
+    # 書いた人が「切れている」と思い続けないよう error にする。
+    declared = (conf.ticket_control_declared or "").strip().lower()
+    if declared and declared not in selfguard.GATE_SETTINGS:
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                "(ticket)",
+                f"{settings.TICKET_CONTROL_ENV}={declared}。"
+                f"{' か '.join(selfguard.GATE_SETTINGS)} しか取らない。"
+                f"今は {selfguard.ENABLE} として動いている",
+            )
+        )
+    if conf.tickets_enabled and guard_ticket_approval == selfguard.DISABLE:
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -142,7 +155,8 @@ def report(
     stdout.write(f"  ルール: {conf.rules}\n")
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
     stdout.write(f"  中核ファイルを守る: {guard_core_files}\n")
-    if conf.approved:
+    stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
+    if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
@@ -246,9 +260,25 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 f"{name} はもう効かない。{replacements.get(name, default)}",
             )
         )
-    if not conf.approved:
+    if conf.approved_blank:
+        # 以前は空文字が「チケット制御を使わない」の宣言だった。今は置き場のパスで
+        # しかなく、空は既定の置き場に戻る。切りたかった人には今の書き方を言う。
         problems.append(
-            Problem(SEVERITY_WARN, "(ticket)", "写しの置き場が空。チケットの範囲は効かない")
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{settings.APPROVED_ENV} が空文字。空で切ることはもうできず、"
+                f"既定の置き場で動いている。切るなら {settings.TICKET_CONTROL_ENV}=disable",
+            )
+        )
+    if not conf.tickets_enabled:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・ゲート・"
+                "サブエージェントの制限は効かない",
+            )
         )
         return problems
     root = root or os.path.dirname(os.path.dirname(os.path.dirname(conf.approved)))

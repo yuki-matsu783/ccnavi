@@ -8,7 +8,10 @@
 
 from __future__ import annotations
 
+import os
+
 from . import phase, rules, settings, shellread
+from .modes import DRY_RUN
 
 # 返す理由に載せる理由コード。ccnavi.md 付録 B の体系から、今のビルドが実際に
 # 下せる判定に対応するものだけを借りている。
@@ -221,3 +224,44 @@ def subagent_forbidden(subject: str) -> str:
             "合流と push と閉じるのは親の仕事です。",
         ]
     )
+
+
+def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
+    """セッションの頭で渡す、直接作業とチケット作業の使い分け。
+
+    チケット制御が効いているワークスペースで、モデルが「この作業にチケットは要るか」を
+    自分で決められるようにする。判定はこの線引きを担保しない。チケットの無い作業ツリーと
+    main 直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
+
+    phases.yml と risk.yml は解決後のパスで示す。無ければその括弧を省く。人が既定と
+    違う場所に置いていれば、そちらの綴りが出る。
+    """
+    phases = _relative_or_omit(conf.phases, root)
+    risk = _relative_or_omit(conf.risk, root)
+    lines = [
+        "[ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。",
+        "- 直接作業: 調査や小さな修正（触るファイルが少ない、振る舞いが変わらない、",
+        "  人のレビューが要らない）は、チケットを起こさずそのまま進める。判定は全体ルールだけ。",
+        "- チケット作業: 大きな修正（設計に触れる、複数の段階になる、人のレビューが要る）は、",
+        f"  {conf.tickets}/ に提案を書いて承認を受け、フェーズ{phases}と",
+        f"  リスクの配点{risk}に従って issue と MR を作りながら進める。",
+        "  操作は sh .claude/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。",
+        "どちらで進めるか迷ったら、利用者に聞く。",
+    ]
+    if mode == DRY_RUN:
+        lines.append(f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny判定でも止めずに言うだけ）")
+    return "\n".join(lines)
+
+
+def _relative_or_omit(path: str, root: str) -> str:
+    """案内に載せる設定ファイルの綴り。ワークスペースルートからの相対で括弧に入れる。
+    無ければ空文字で、呼び手が括弧ごと省ける。"""
+    if not path or not os.path.exists(path):
+        return ""
+    shown = path
+    if os.path.isabs(path):
+        try:
+            shown = os.path.relpath(path, root)
+        except ValueError:
+            shown = path
+    return f"（{shown.replace(os.sep, '/')}）"

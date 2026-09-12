@@ -20,6 +20,7 @@ from . import (
     modes,
     phase,
     post,
+    reasons,
     ruleload,
     rules,
     selfguard,
@@ -123,8 +124,8 @@ def watched_for(
 
 
 def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
-    """承認済みの写しを、実行後の側から当てる持ち物。写しを使っていなければ None。"""
-    if not conf.approved:
+    """承認済みの写しを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
+    if not conf.tickets_enabled:
         return None
     copies, _ = approval.copies(conf.approved)
     return post.ScopeGuard(
@@ -192,8 +193,12 @@ def decide_at_start(
     ここで取るのは実行ファイルで、ツール呼び出しのたびに写すには大きすぎる。
     このイベントは 1 セッションに 1 回しか来ないので、重い仕事を置く先になる。
 
-    判定は返さない。何も起きていない時点なので、言うことがあるとすれば
-    控えを取れなかったことだけになる。
+    判定は返さない。何も起きていない時点なので、言うことは 2 つだけ。控えを
+    取れなかったこと（あれば）と、チケット制御が効いているときの作業の進め方。
+    後者は起動・再開・compact・clear のどの回にも出す。文脈が新しくなるたびに
+    改めて届かないと、compact のあとのモデルは進め方を知らないまま続ける。
+    サブエージェントには出さない（SubagentStart は別の手順で、チケットを起こす
+    立場にない）。
     """
     setting = modes.effective_setting(mode, conf.guard_core_files)
     outcomes = selfguard.at_start(
@@ -207,10 +212,14 @@ def decide_at_start(
     # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
     ctxfile.forget(conf.state, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
-    if not outcomes:
-        return EXIT_OK
-    record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
-    hookio.write_context(stdout, hookio.SESSION_START, selfguard.report(outcomes))
+    texts = []
+    if outcomes:
+        record.guarded = [f"{o.target.key}:{o.action}" for o in outcomes]
+        texts.append(selfguard.report(outcomes))
+    if conf.tickets_enabled:
+        texts.append(reasons.ways_of_working(conf, root, mode))
+    if texts:
+        hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK
 
 
@@ -244,7 +253,7 @@ def decide_after(
     # 読まれなくなる。記録には fallback が残る。
     # 提案の状態を写しへ写す。閉じた子の写しはここで closed/ へ動く。
     # 範囲は実行前の判定と同じ経路で解く。
-    if conf.approved:
+    if conf.tickets_enabled:
         phase.sync(stderr, root, conf)
     scope = scope_guard(conf, root)
 
@@ -264,7 +273,7 @@ def decide_after(
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。ゲートは次の呼び出しから。
-    if conf.approved:
+    if conf.tickets_enabled:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
         if said:

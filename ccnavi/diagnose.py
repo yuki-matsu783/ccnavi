@@ -424,8 +424,9 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
     stdout.write("\n■ チケットの作業範囲（承認済みの写し）\n")
-    if not conf.approved:
-        stdout.write("  写しの置き場が空。範囲の制限は掛かっていない\n")
+    stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
+    if not conf.tickets_enabled:
+        stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")
         return 0
     copies, notes = approval.copies(conf.approved)
     for note in notes:
@@ -506,6 +507,7 @@ def board(conf: settings.Settings, root: str) -> dict:
         "root": root,
         "generated_at": approval.now(),
         "settings": {
+            "ticket_control": conf.ticket_control or settings.TICKET_CONTROL_ENABLE,
             "tickets": conf.tickets,
             "approved": conf.approved,
             "projects": conf.projects,
@@ -519,8 +521,8 @@ def board(conf: settings.Settings, root: str) -> dict:
         "tickets": [],
         "parents": [],
     }
-    if not conf.approved:
-        problems.append("写しの置き場が空。チケットによる制御を使っていない")
+    if not conf.tickets_enabled:
+        problems.append(f"{settings.TICKET_CONTROL_ENV}=disable。チケット制御を使っていない")
         return payload
 
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
