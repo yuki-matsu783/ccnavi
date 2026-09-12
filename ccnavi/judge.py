@@ -526,7 +526,8 @@ def ticket_verdict(
             *head,
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
-            "so it can propose a ticket that covers it and ask the user to run 'ccnavi --approve'. "
+            "so it can propose a ticket that covers it and ask the user to approve it (from the "
+            "ccnavi board in VS Code, or 'ccnavi --approve' in a terminal). "
             "Editing a proposal alone changes nothing.",
         ]
     )
