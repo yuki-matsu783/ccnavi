@@ -114,9 +114,10 @@ class TicketTest(unittest.TestCase):
         git(self.root, "commit", "--quiet", "-m", "init")
 
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
-        self.approved = os.path.join(self.root, ".claude", "ccnavi", "tickets")
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
+        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
 
@@ -136,7 +137,7 @@ class TicketTest(unittest.TestCase):
                 "--rules",
                 self.rules,
                 "--approved",
-                self.approved,
+                ".ccnavi/tickets",
                 "--state",
                 self.state,
                 "--log",
@@ -179,12 +180,21 @@ class TicketTest(unittest.TestCase):
 
     def propose(self, name, **kw):
         return write(
-            os.path.join(self.parent_tree, "wip", "tickets", "todo", name + ".md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", name + ".md"),
             ticket_text(name, **kw),
         )
 
     def approve(self, answer="y"):
-        return self.ccnavi("--approve", stdin=answer + "\n")
+        """承認して、写しを親のブランチに乗せる。
+
+        写しは親のツリーに置かれ、コミットして初めて子の作業ツリーへ渡る。
+        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
+        """
+        result = self.ccnavi("--approve", stdin=answer + "\n")
+        if os.path.isdir(self.approved):
+            git(self.parent_tree, "add", "-A")
+            git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
+        return result
 
     def family(self, review=(True, False)):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子の作業ツリーを作って着手する。"""
@@ -354,7 +364,7 @@ class TicketTest(unittest.TestCase):
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
         # 承認後に提案を書き足しても、効いているのは写し。
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001-01.md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001-01.md"),
             ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
         )
         result = self.hook(
@@ -378,18 +388,18 @@ class TicketTest(unittest.TestCase):
 
     def test_state_directories_cannot_be_written_directly(self):
         self.family()
-        target = os.path.join(self.parent_tree, "wip", "tickets", "done", "i0001-01.md")
+        target = os.path.join(self.parent_tree, ".ccnavi", "proposals", "done", "i0001-01.md")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
         self.assertIn("builtin-ticket-state", self.reason(result))
         moved = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="mv wip/tickets/doing/i0001-01.md wip/tickets/done/",
+            command="mv .ccnavi/proposals/doing/i0001-01.md .ccnavi/proposals/done/",
         )
         self.assertIn("builtin-ticket-state", self.reason(moved))
         # todo/ への作成は自由。
-        todo = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md")
+        todo = os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001-03.md")
         free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
         self.assertNotIn("builtin-ticket-state", self.reason(free))
 
@@ -454,7 +464,9 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("ticket", "done", "i0001-01")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(
-            os.path.exists(os.path.join(self.parent_tree, "wip", "tickets", "done", "i0001-01.md"))
+            os.path.exists(
+                os.path.join(self.parent_tree, ".ccnavi", "proposals", "done", "i0001-01.md")
+            )
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0001-01.md")))
@@ -505,7 +517,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Write",
             self.parent_tree,
-            file_path=os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md"),
+            file_path=os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001-03.md"),
         )
         self.assertNotIn("DENY_PHASE_GATE", self.reason(plan))
         # main からの起動にはゲートが無い。
@@ -842,13 +854,13 @@ class TicketTest(unittest.TestCase):
 
     def test_moving_state_keeps_the_proposal_text(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        path = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001.md")
+        path = os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()
         write(path, text.replace("---\n", "---\n# 人の覚え書き\n", 1))
         self.assertEqual(self.approve().returncode, 0)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-        moved = os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md")
+        moved = os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md")
         with open(moved, encoding="utf-8") as f:
             after = f.read()
         self.assertIn("# 人の覚え書き", after)

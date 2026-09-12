@@ -304,11 +304,11 @@ class ProjectsTest(unittest.TestCase):
 
     def test_worktree_cut_from_the_wrong_project_is_refused_by_the_ticket(self):
         write(
-            os.path.join(self.ws, "wip", "tickets", "todo", "i0007.md"),
+            os.path.join(self.ws, ".ccnavi", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", project="lib", allow=("src/*",)),
         )
         write(
-            os.path.join(self.ws, "wip", "tickets", "todo", "i0008.md"),
+            os.path.join(self.ws, ".ccnavi", "proposals", "todo", "i0008.md"),
             ticket_text("i0008", project="lib", allow=("src/*",)),
         )
         approved = self.ccnavi("--approve", stdin="y\n")

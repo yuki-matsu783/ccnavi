@@ -257,7 +257,7 @@ class WritesTheExpectedShape(SetupTest):
         """--all は、既定と同じ値のつまみも設定ファイルに並べる。"""
         self.run_setup("--all")
         env = self.read_settings()["env"]
-        self.assertEqual(env["CCNAVI_TICKETS"], "wip/tickets")
+        self.assertEqual(env["CCNAVI_TICKETS"], ".ccnavi/proposals")
         self.assertEqual(env["CCNAVI_PHASES"], ".claude/ccnavi/phases.yml")
 
     def test_says_what_is_still_missing(self):

@@ -118,9 +118,10 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "commit", "--quiet", "-m", "init")
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
         self.phases = write(os.path.join(self.root, "phases.yml"), PHASES)
-        self.approved = os.path.join(self.root, ".claude", "ccnavi", "tickets")
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
+        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
 
@@ -139,7 +140,7 @@ class PhaseHarness(unittest.TestCase):
                 "--rules",
                 self.rules,
                 "--approved",
-                self.approved,
+                ".ccnavi/tickets",
                 "--phases",
                 phases or self.phases,
                 "--state",
@@ -176,10 +177,21 @@ class PhaseHarness(unittest.TestCase):
         return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
 
     def propose(self, name, text):
-        return write(os.path.join(self.parent_tree, "wip", "tickets", "todo", name + ".md"), text)
+        return write(
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", name + ".md"), text
+        )
 
     def approve(self):
-        return self.ccnavi("--approve", stdin="y\n")
+        """承認して、写しを親のブランチに乗せる。
+
+        写しは親のツリーに置かれるので、コミットするまで作業ツリーは汚れたまま。
+        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
+        """
+        result = self.ccnavi("--approve", stdin="y\n")
+        if os.path.isdir(self.approved):
+            git(self.parent_tree, "add", "-A")
+            git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
+        return result
 
     def commit_parent(self, message="tickets"):
         git(self.parent_tree, "add", "-A")
@@ -341,7 +353,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("超えている", refused.stderr)
         self.assertIn("調査", refused.stderr)
         # 計画に無い番号。
-        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md"))
+        os.remove(os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001-01.md"))
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ["wip/research/*"]))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
@@ -470,9 +482,9 @@ class PhaseTest(PhaseHarness):
         # 空のフィードバック計画を改版で出す。証跡が残る。
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         # 提案は doing/ にあるので、そこを書き換える。
-        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001.md"))
+        os.remove(os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001.md"))
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=[]),
         )
         approved = self.approve()
@@ -484,7 +496,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("feedback_at", text)
         # 2 度目は拒む。
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=["implement-feedback"]),
         )
         again = self.approve()
@@ -492,7 +504,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("1 回だけ", again.stderr)
         # 閉じられる。
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=[]),
         )
         self.assertEqual(self.close_child("i0001").returncode, 0)
@@ -519,7 +531,7 @@ class PhaseTest(PhaseHarness):
         # ゲートが開く。指摘は消えず、フィードバック作業フェーズの check が数える。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=["implement-feedback"]),
         )
         planned = self.approve()
@@ -605,7 +617,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("フィードバック計画", refused.stderr)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=[]),
         )
         self.assertEqual(self.approve().returncode, 0)
@@ -679,7 +691,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("締めた", done.stdout)
         self.assertTrue(
             os.path.exists(
-                os.path.join(self.parent_tree, "wip", "tickets", "cancelled", "i0001-02.md")
+                os.path.join(self.parent_tree, ".ccnavi", "proposals", "cancelled", "i0001-02.md")
             )
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
