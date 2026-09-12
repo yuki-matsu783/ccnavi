@@ -233,8 +233,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
-    # プロジェクトのルールの差し替えは診断の経路でだけ効く。hook からの判定に
-    # 差し替えの口を持つと、ルールを保存せずに緩める道になるので、そこでは捨てる。
+    # プロジェクトのルールの差し替えは診断の経路でだけ効く。hook からの判定にも
+    # 差し替えの手段を残すと、ルールを保存せずに緩める道になるので、そこでは無視する。
     diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
     if args.project_rules_file:
         if not diagnosing:
@@ -244,7 +244,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         else:
             name, sep, path = args.project_rules_file.partition("=")
             if not sep or not name or not path:
-                stderr.write("ccnavi: --project-rules-file は <名前>=<パス> の形\n")
+                stderr.write("ccnavi: --project-rules-file は <名前>=<パス> の形で書く\n")
                 return EXIT_ERROR
             conf.project_rules_files[name] = os.path.abspath(path)
 
