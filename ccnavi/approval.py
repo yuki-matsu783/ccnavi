@@ -27,11 +27,10 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import rules, settings
+from . import fsio, rules, settings
 from . import ticket as ticket_mod
 
 # 写しの下の置き場。
@@ -140,12 +139,7 @@ def mark_path(approved_dir: str, parent: str, phase: int, kind: str) -> str:
 
 
 def read_mark(approved_dir: str, parent: str, phase: int, kind: str) -> dict | None:
-    try:
-        with open(mark_path(approved_dir, parent, phase, kind), encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else {}
+    return fsio.read_dict(mark_path(approved_dir, parent, phase, kind))
 
 
 def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict) -> str:
@@ -181,12 +175,7 @@ def parent_mark_path(approved_dir: str, parent: str, name: str) -> str:
 
 
 def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
-    try:
-        with open(parent_mark_path(approved_dir, parent, name), encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else {}
+    return fsio.read_dict(parent_mark_path(approved_dir, parent, name))
 
 
 def write_parent_mark(approved_dir: str, parent: str, name: str, data: dict) -> str:
@@ -210,12 +199,7 @@ def child_record_path(approved_dir: str, parent: str, child: str, kind: str) -> 
 
 
 def read_child_record(approved_dir: str, parent: str, child: str, kind: str) -> dict | None:
-    try:
-        with open(child_record_path(approved_dir, parent, child, kind), encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else {}
+    return fsio.read_dict(child_record_path(approved_dir, parent, child, kind))
 
 
 def write_child_record(approved_dir: str, parent: str, child: str, kind: str, data: dict) -> str:
@@ -235,12 +219,8 @@ def accepted_path(approved_dir: str, parent: str) -> str:
 
 def accepted_threads(approved_dir: str, parent: str) -> set[str]:
     """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。"""
-    try:
-        with open(accepted_path(approved_dir, parent), encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        return set()
-    if not isinstance(data, dict):
+    data = fsio.read_dict(accepted_path(approved_dir, parent))
+    if not data:
         return set()
     return {str(x) for x in data.get("threads") or [] if str(x)}
 
@@ -258,13 +238,8 @@ def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str
         return ""
     path = accepted_path(approved_dir, parent)
     keep = sorted(accepted_threads(approved_dir, parent) | {str(t) for t in threads if str(t)})
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({"threads": keep, "at": now()}, f, ensure_ascii=False, indent=1)
-    except OSError as exc:
-        return f"{path} ({exc})"
-    return ""
+    failed = fsio.write_json(path, {"threads": keep, "at": now()}, indent=1)
+    return f"{path} ({failed})" if failed else ""
 
 
 def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
@@ -277,7 +252,7 @@ def marks(approved_dir: str, parent: str, phase: int) -> dict[str, dict]:
 
 
 def now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    return fsio.stamp()
 
 
 @dataclass
@@ -870,10 +845,5 @@ def _read(stdin: TextIO) -> str:
 
 
 def _write(path: str, text: str) -> str:
-    try:
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(text)
-    except OSError as exc:
-        return f"書けない ({exc})"
-    return ""
+    failed = fsio.write_text(path, text)
+    return f"書けない ({failed})" if failed else ""

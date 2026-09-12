@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import globmatch, settings, tree
+from . import gitcmd, globmatch, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 VERSION = 1
@@ -78,6 +78,8 @@ KINDS = (KIND_LINES, KIND_FILES, KIND_DELETED, KIND_GLOB, KIND_SCRIPT, KIND_JUDG
 # スクリプトを置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
 SCRIPT_HOMES = (".claude/ccnavi/", ".claude/scripts/")
 SCRIPT_TIMEOUT_SECONDS = 30.0
+# 差分を数える git に与える時間。閉じるときにしか走らないので、判定より長くてよい。
+GIT_TIMEOUT_SECONDS = 10.0
 
 BUILTIN = "(builtin)"
 
@@ -567,16 +569,4 @@ def _int(text: str) -> int:
 
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:
-    try:
-        done = subprocess.run(
-            ["git", "-c", "core.quotePath=false", *args],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=10.0,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return 1, ""
-    return done.returncode, done.stdout
+    return gitcmd.output(cwd, args, GIT_TIMEOUT_SECONDS, raw_paths=True)

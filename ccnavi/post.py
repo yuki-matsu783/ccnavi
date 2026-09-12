@@ -38,14 +38,12 @@
 
 from __future__ import annotations
 
-import json
 import os
-import re
 import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, gitstate, hookio, rules, selfguard, settings, tree
+from . import audit, fsio, gitstate, hookio, rules, selfguard, settings, tree
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -95,7 +93,6 @@ SUBJECT_LIMIT = 200
 
 # 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
 # 区切り文字が混じった値でファイルを別の場所へ書かせない。
-_UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def check(
@@ -577,7 +574,7 @@ def _restore(
 
 
 def _seen_path(state_dir: str, session: str) -> str:
-    name = _UNSAFE.sub("_", session)[:64] or "unknown"
+    name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.json")
 
 
@@ -588,7 +585,7 @@ def _turn_path(state_dir: str, session: str) -> str:
     セッションが終わるまで残るが、こちらはターンごとに取り直す。同じファイルに
     まとめると、ターンの区切りでセッションの控えまで消えることになる。
     """
-    name = _UNSAFE.sub("_", session)[:64] or "unknown"
+    name = fsio.safe_name(session) or "unknown"
     return os.path.join(state_dir, f"{name}.turn.json")
 
 
@@ -636,13 +633,10 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     """
     if not state_dir:
         return set(), False
-    try:
-        with open(_turn_path(state_dir, session), encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return set(), False
-    except (OSError, ValueError) as exc:
-        stderr.write(f"ccnavi: ターンの基準を読めない: {exc}\n")
+    data, failed = fsio.read_json(_turn_path(state_dir, session))
+    if failed is not None:
+        if not isinstance(failed, FileNotFoundError):
+            stderr.write(f"ccnavi: ターンの基準を読めない: {failed}\n")
         return set(), False
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
@@ -653,12 +647,11 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
 def _save_turn(stderr: TextIO, state_dir: str, session: str, baseline: set[str]) -> None:
     if not state_dir:
         return
-    try:
-        os.makedirs(state_dir, exist_ok=True)
-        with open(_turn_path(state_dir, session), "w", encoding="utf-8") as f:
-            json.dump({"baseline": sorted(baseline)[:SEEN_LIMIT]}, f, ensure_ascii=False)
-    except OSError as exc:
-        stderr.write(f"ccnavi: ターンの基準を書けない: {exc}\n")
+    failed = fsio.write_json(
+        _turn_path(state_dir, session), {"baseline": sorted(baseline)[:SEEN_LIMIT]}
+    )
+    if failed:
+        stderr.write(f"ccnavi: ターンの基準を書けない: {failed}\n")
 
 
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
@@ -669,13 +662,10 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     """
     if not state_dir:
         return set(), True
-    try:
-        with open(_seen_path(state_dir, session), encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return set(), True
-    except (OSError, ValueError) as exc:
-        stderr.write(f"ccnavi: 実行後の監視の控えを読めない: {exc}\n")
+    data, failed = fsio.read_json(_seen_path(state_dir, session))
+    if failed is not None:
+        if not isinstance(failed, FileNotFoundError):
+            stderr.write(f"ccnavi: 実行後の監視の控えを読めない: {failed}\n")
         return set(), True
     seen = data.get("seen") if isinstance(data, dict) else None
     if not isinstance(seen, list):
@@ -691,10 +681,6 @@ def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> 
     """
     if not state_dir:
         return
-    path = _seen_path(state_dir, session)
-    try:
-        os.makedirs(state_dir, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({"seen": sorted(seen)[:SEEN_LIMIT]}, f, ensure_ascii=False)
-    except OSError as exc:
-        stderr.write(f"ccnavi: 実行後の監視の控えを書けない: {exc}\n")
+    failed = fsio.write_json(_seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]})
+    if failed:
+        stderr.write(f"ccnavi: 実行後の監視の控えを書けない: {failed}\n")

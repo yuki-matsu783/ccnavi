@@ -34,8 +34,9 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 from dataclasses import dataclass
+
+from . import gitcmd
 
 # 変更の種類。元に戻す手順がこの 3 つで割れるので、この 3 つにしてある。
 KIND_NEW = "new"  # 無かったものが現れた
@@ -106,43 +107,34 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
     if not top:
         return [], REASON_NO_WORKTREE
 
-    try:
-        done = subprocess.run(
-            [
-                "git",
-                "status",
-                "--porcelain",
-                # -z は綴りをそのまま NUL 区切りで返す。既定の出力は空白や
-                # 非 ASCII を含むパスを引用符で包んで自前の escape を掛けるので、
-                # 読み戻す側がその escape を解く羽目になる。解き損ねたパスは
-                # 保護領域のルールを外す。
-                "-z",
-                # 無視されていない未追跡ファイルは 1 件ずつ挙げる。既定では
-                # ディレクトリ 1 つにまとめられ、その下の何が現れたかが消える。
-                "--untracked-files=all",
-                # 改名を追わせない。追わせると 1 件が 2 つのパスを持つ形になり、
-                # 読み戻しが増える。追わなければ「消えた」と「現れた」の
-                # 2 件になり、元に戻す手順はどちらにしても 2 つ要る。
-                "--no-renames",
-            ],
-            cwd=top,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-        )
-    except FileNotFoundError:
+    done = gitcmd.run(
+        top,
+        [
+            "status",
+            "--porcelain",
+            # -z は綴りをそのまま NUL 区切りで返す。既定の出力は空白や
+            # 非 ASCII を含むパスを引用符で包んで自前の escape を掛けるので、
+            # 読み戻す側がその escape を解く羽目になる。解き損ねたパスは
+            # 保護領域のルールを外す。
+            "-z",
+            # 無視されていない未追跡ファイルは 1 件ずつ挙げる。既定では
+            # ディレクトリ 1 つにまとめられ、その下の何が現れたかが消える。
+            "--untracked-files=all",
+            # 改名を追わせない。追わせると 1 件が 2 つのパスを持つ形になり、
+            # 読み戻しが増える。追わなければ「消えた」と「現れた」の
+            # 2 件になり、元に戻す手順はどちらにしても 2 つ要る。
+            "--no-renames",
+        ],
+        timeout,
+    )
+    if done.missing:
         return [], REASON_NO_GIT
-    except subprocess.TimeoutExpired:
+    if done.timed_out:
         return [], REASON_TIMEOUT
-    except OSError:
+    if done.failure or done.code != 0:
         return [], REASON_FAILED
 
-    if done.returncode != 0:
-        return [], REASON_FAILED
-
-    return [c for c in (_parse(top, entry) for entry in done.stdout.split("\0")) if c], ""
+    return [c for c in (_parse(top, entry) for entry in done.out.split("\0")) if c], ""
 
 
 def _parse(top: str, entry: str) -> Change | None:
@@ -240,18 +232,9 @@ def restore_committed(top: str, path: str, timeout: float = TIMEOUT_SECONDS) -> 
 
 
 def _git(top: str, args: list[str], timeout: float) -> str:
-    try:
-        done = subprocess.run(
-            ["git", *args],
-            cwd=top,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return f"{exc}"
-    if done.returncode != 0:
-        return " ".join(done.stderr.split()) or f"git {args[0]} が失敗した"
+    done = gitcmd.run(top, args, timeout)
+    if done.failure:
+        return done.failure
+    if done.code != 0:
+        return " ".join(done.err.split()) or f"git {args[0]} が失敗した"
     return ""

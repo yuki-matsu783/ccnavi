@@ -36,17 +36,14 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
 import os
 import re
 import shutil
-import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, phase, settings, tree
+from . import approval, fsio, gitcmd, phase, settings, tree
 from . import ticket as ticket_mod
 
 # 投稿に付ける印。機構自身の投稿を、確認のときに除くため。
@@ -137,13 +134,11 @@ class Result:
 
     @classmethod
     def load(cls, path: str) -> Result:
-        try:
-            with open(path, encoding="utf-8") as f:
-                data = json.load(f)
-        except OSError as exc:
-            return cls(error=f"結果を読めない ({exc})")
-        except ValueError as exc:
-            return cls(error=f"結果が JSON として読めない ({exc})")
+        data, failed = fsio.read_json(path)
+        if isinstance(failed, OSError):
+            return cls(error=f"結果を読めない ({failed})")
+        if failed is not None:
+            return cls(error=f"結果が JSON として読めない ({failed})")
         if not isinstance(data, dict):
             return cls(error="結果の最上位が辞書ではない")
         if data.get("error"):
@@ -229,14 +224,11 @@ def prepare(
     body = _covered_header(root, conf, parent, ph) + body
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
-    try:
-        os.makedirs(conf.state, exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(marker + body)
-        with open(draft, "w", encoding="utf-8", newline="\n") as f:
-            f.write(mr_draft(parent))
-    except OSError as exc:
-        stderr.write(f"ccnavi: 本文を書き出せない ({exc})\n")
+    failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
+        draft, mr_draft(parent), newline="\n"
+    )
+    if failed:
+        stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
     # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
     stdout.write(path + "\n" + draft + "\n")
@@ -325,10 +317,9 @@ def requested(
         stderr.write(f"ccnavi: 印を置けない: {failed}\n")
         return 1
     if conf.state:
-        with contextlib.suppress(OSError):
-            os.remove(
-                os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
-            )
+        fsio.remove(
+            os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
+        )
     stdout.write(
         f"OK: レビューを依頼した（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
     )
@@ -492,17 +483,15 @@ def reviewed(
         return 1
     if accepted and conf.state:
         path = os.path.join(conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no))
-        try:
-            os.makedirs(conf.state, exist_ok=True)
-            with open(path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(
-                    MARKER_ACCEPT
-                    + "\n未解決のまま次のフェーズへ進める:\n"
-                    + "\n".join(f"- {a}" for a in accepted)
-                    + "\n"
-                )
-        except OSError as exc:
-            stderr.write(f"ccnavi: 受け入れの記録を書き出せない ({exc})\n")
+        note = (
+            MARKER_ACCEPT
+            + "\n未解決のまま次のフェーズへ進める:\n"
+            + "\n".join(f"- {a}" for a in accepted)
+            + "\n"
+        )
+        failed = fsio.write_text(path, note, newline="\n")
+        if failed:
+            stderr.write(f"ccnavi: 受け入れの記録を書き出せない ({failed})\n")
     stdout.write(
         f"OK: フェーズ {phase_no} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
     )
@@ -565,12 +554,9 @@ def handoff(
         text.append("（未解決のスレッドは残っていない）")
     text.append("")
     path = os.path.join(conf.state, HANDOFF_FILE.format(parent=parent.ticket))
-    try:
-        os.makedirs(conf.state, exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write("\n".join(text))
-    except OSError as exc:
-        stderr.write(f"ccnavi: 下書きを書き出せない ({exc})\n")
+    failed = fsio.write_text(path, "\n".join(text), newline="\n")
+    if failed:
+        stderr.write(f"ccnavi: 下書きを書き出せない ({failed})\n")
         return 1
     stdout.write(path + "\n")
     return 0
@@ -889,13 +875,8 @@ def _parent_any(
 
 
 def _write_text(path: str, text: str) -> str:
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
-    except OSError as exc:
-        return f"下書きを書き出せない ({path}: {exc})"
-    return ""
+    failed = fsio.write_text(path, text, newline="\n")
+    return f"下書きを書き出せない ({path}: {failed})" if failed else ""
 
 
 def _covered_header(
@@ -1121,27 +1102,11 @@ def _resolve(cwd: str, path: str) -> str:
 
 
 def _read_body(path: str) -> str | None:
-    try:
-        with open(path, encoding="utf-8") as f:
-            return f.read()
-    except OSError:
-        return None
+    return fsio.read_text(path)
 
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:
-    try:
-        done = subprocess.run(
-            ["git", *args],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return 1, ""
-    return done.returncode, done.stdout
+    return gitcmd.output(cwd, args, TIMEOUT_SECONDS)
 
 
 def _epoch(text: str) -> float:

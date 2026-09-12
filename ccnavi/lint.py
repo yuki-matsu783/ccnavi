@@ -42,10 +42,9 @@ import contextlib
 import io
 import json
 import os
-import subprocess
 from typing import TextIO
 
-from . import ctxfile, gitstate, hookio, rules, selfguard, settings
+from . import ctxfile, gitcmd, gitstate, hookio, rules, selfguard, settings
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
@@ -423,40 +422,20 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 
 def _ignored(root: str, rel: str) -> bool | None:
     """このパスをワークスペースの git が無視しているか。git が無ければ None。"""
-    import subprocess
-
-    try:
-        done = subprocess.run(
-            ["git", "check-ignore", "-q", rel],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            timeout=gitstate.TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+    done = gitcmd.run(root, ["check-ignore", "-q", rel], gitstate.TIMEOUT_SECONDS)
+    if done.failure:
         return None
-    if done.returncode == 0:
+    if done.code == 0:
         return True
-    return False if done.returncode == 1 else None
+    return False if done.code == 1 else None
 
 
 def _review_token(root: str) -> list[Problem]:
     """sh がリモートを読み書きできる形か。gh / glab か、curl とホストに合うトークン。"""
     from . import review
 
-    try:
-        done = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=5,
-        )
-        url = done.stdout.strip() if done.returncode == 0 else ""
-    except (OSError, subprocess.TimeoutExpired):
-        url = ""
+    rc, out = gitcmd.output(root, ["remote", "get-url", "origin"], 5)
+    url = out.strip() if rc == 0 else ""
     if not url:
         return [Problem(SEVERITY_WARN, "(ticket)", "origin が無い。レビューの依頼と確認は動かない")]
     problem = review.transport_problem(url)

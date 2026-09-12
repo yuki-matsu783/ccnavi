@@ -26,11 +26,10 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, phasetypes, rules, settings, tree
+from . import approval, gitcmd, phasetypes, rules, settings, tree
 from . import ticket as ticket_mod
 
 # ゲートの中でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -625,16 +624,4 @@ def _script_fields(proposal: ticket_mod.Ticket) -> dict[str, str]:
 
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:
-    try:
-        done = subprocess.run(
-            ["git", "-c", "core.quotePath=false", *args],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return 1, ""
-    return done.returncode, done.stdout
+    return gitcmd.output(cwd, args, TIMEOUT_SECONDS, raw_paths=True)

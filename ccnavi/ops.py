@@ -12,10 +12,9 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
 from typing import TextIO
 
-from . import approval, settings, tree
+from . import approval, fsio, gitcmd, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -236,13 +235,11 @@ def _score_child(
         where = ""
         if conf.state:
             path = os.path.join(conf.state, f"risk-judge-{found.ticket}.md")
-            try:
-                os.makedirs(conf.state, exist_ok=True)
-                with open(path, "w", encoding="utf-8", newline="\n") as f:
-                    f.write(prompt)
+            failed = fsio.write_text(path, prompt, newline="\n")
+            if failed:
+                stderr.write(f"ccnavi: 問いを書き出せない ({failed})\n")
+            else:
                 where = path
-            except OSError as exc:
-                stderr.write(f"ccnavi: 問いを書き出せない ({exc})\n")
         names = ", ".join(f.id for f in score.pending)
         stderr.write(
             f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
@@ -397,19 +394,8 @@ def _tracked(worktree: str, glob: str) -> bool:
     """この glob に当たる追跡済みのファイルが 1 つでもあるか。"""
     if not os.path.isdir(worktree):
         return False
-    try:
-        done_ = subprocess.run(
-            ["git", "ls-files", "--", glob],
-            cwd=worktree,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return done_.returncode == 0 and bool(done_.stdout.strip())
+    rc, out = gitcmd.output(worktree, ["ls-files", "--", glob], TIMEOUT_SECONDS)
+    return rc == 0 and bool(out.strip())
 
 
 def _move(
@@ -461,19 +447,8 @@ def _move(
 
 
 def _head(worktree: str) -> str:
-    try:
-        done_ = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=worktree,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=TIMEOUT_SECONDS,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    return done_.stdout.strip() if done_.returncode == 0 else ""
+    rc, out = gitcmd.output(worktree, ["rev-parse", "HEAD"], TIMEOUT_SECONDS)
+    return out.strip() if rc == 0 else ""
 
 
 def worktree_exists(root: str, ticket_id: str) -> bool:

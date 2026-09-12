@@ -100,7 +100,7 @@ import time
 from dataclasses import dataclass
 from typing import TextIO
 
-from . import gitstate, rules, tree
+from . import fsio, gitstate, rules, tree
 
 # 設定の値。mode と同じ語彙にしてある。覚えるものを増やさないため。
 ENABLE = "enable"
@@ -142,7 +142,6 @@ ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
 
 # 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
 # 区切り文字が混じった値でファイルを別の場所へ書かせない。
-_UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 # 守る対象。root からの相対で書く。rules は設定で動くので、ここには無い。
 _SETTINGS_FILES = (
@@ -464,7 +463,7 @@ def _copy_key(key: str, name: str) -> str:
     両方を取る。
     """
     digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
-    return f"{key}.{_UNSAFE.sub('_', name)[:40]}-{digest}"
+    return f"{key}.{fsio.safe_name(name, 40)}-{digest}"
 
 
 def _inside(root: str, path: str) -> str:
@@ -1038,7 +1037,7 @@ def _safe(session: str) -> str:
     そのまま名前になるので、区切り文字が混じった値でファイルを別の場所へ
     書かせない。
     """
-    return _UNSAFE.sub("_", session or "no-session")
+    return fsio.safe_name(session or "no-session", limit=None)
 
 
 def _backup_path(state_dir: str, session: str, target: Target) -> str:
@@ -1064,27 +1063,13 @@ def _write_backup(state_dir: str, session: str, target: Target, content: bytes) 
 
 
 def _read(path: str) -> bytes | None:
-    """中身をそのまま読む。読めなければ None。
-
-    バイト列で扱う。改行を変換すると、控えから戻したファイルが元と 1 バイト
-    違うものになる。Windows と Linux で同じ控えを取るために、ここは解釈しない。
-    """
-    try:
-        with open(path, "rb") as f:
-            return f.read()
-    except OSError:
-        return None
+    """中身をそのまま読む。読めなければ None。バイト列で扱う理由は fsio.read_bytes を見よ。"""
+    return fsio.read_bytes(path)
 
 
 def _write(path: str, content: bytes) -> str:
     """中身をそのまま書く。書けたら空文字、駄目なら理由を返す。"""
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "wb") as f:
-            f.write(content)
-    except OSError as exc:
-        return f"{exc}"
-    return ""
+    return fsio.write_bytes(path, content)
 
 
 def _relative(base: str, path: str) -> str:

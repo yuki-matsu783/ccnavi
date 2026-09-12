@@ -7,8 +7,6 @@ run は終了コードを返す。自分で終了しないので、道具ぜん�
 from __future__ import annotations
 
 import argparse
-import contextlib
-import json
 import os
 import time
 from collections.abc import Callable
@@ -20,6 +18,7 @@ from . import (
     builtin,
     ctxfile,
     diagnose,
+    fsio,
     hookio,
     lint,
     ops,
@@ -1075,8 +1074,7 @@ def _ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
     agent_id = str(payload.tool_response.get("agentId") or "")
     if not agent_id or not _bounced(state_dir, agent_id):
         return ""
-    with contextlib.suppress(OSError):
-        os.remove(_bounce_path(state_dir, agent_id))
+    fsio.remove(_bounce_path(state_dir, agent_id))
     return (
         f"[ccnavi] {post.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
         "差し戻されたまま終わっています。合流する前に、その子の作業ツリーの範囲外の"
@@ -1085,7 +1083,7 @@ def _ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
 
 
 def _bounce_path(state_dir: str, agent_id: str) -> str:
-    safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in agent_id)[:64] or "unknown"
+    safe = fsio.safe_name(agent_id) or "unknown"
     return os.path.join(state_dir, f"subagent-{safe}.bounced")
 
 
@@ -1096,12 +1094,9 @@ def _bounced(state_dir: str, agent_id: str) -> bool:
 def _remember_bounce(stderr: TextIO, state_dir: str, agent_id: str) -> None:
     if not state_dir:
         return
-    try:
-        os.makedirs(state_dir, exist_ok=True)
-        with open(_bounce_path(state_dir, agent_id), "w", encoding="utf-8") as f:
-            f.write(time.strftime("%Y-%m-%dT%H:%M:%S%z"))
-    except OSError as exc:
-        stderr.write(f"ccnavi: 差し戻しの回数を書けない: {exc}\n")
+    failed = fsio.write_text(_bounce_path(state_dir, agent_id), fsio.stamp())
+    if failed:
+        stderr.write(f"ccnavi: 差し戻しの回数を書けない: {failed}\n")
 
 
 # 「1 度だけ渡す文」の記憶を残す日数。セッションの開始で消えるのが本筋で、
@@ -1181,23 +1176,17 @@ def _context_bases(conf: settings.Settings, root: str, target: tree.Tree | None)
 
 
 def _once_path(state_dir: str, session: str, agent_id: str) -> str:
-    def safe(text: str) -> str:
-        return "".join(c if c.isalnum() or c in "._-" else "_" for c in text)[:64]
-
-    return os.path.join(
-        state_dir, f"once-{safe(session) or 'unknown'}-{safe(agent_id) or 'main'}.json"
-    )
+    session_part = fsio.safe_name(session) or "unknown"
+    agent_part = fsio.safe_name(agent_id) or "main"
+    return os.path.join(state_dir, f"once-{session_part}-{agent_part}.json")
 
 
 def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str]:
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        return set()
-    except (OSError, ValueError) as exc:
-        stderr.write(f"ccnavi: 1 度だけ渡す文の控えを読めない: {exc}\n")
+    data, failed = fsio.read_json(path)
+    if failed is not None:
+        if not isinstance(failed, FileNotFoundError):
+            stderr.write(f"ccnavi: 1 度だけ渡す文の控えを読めない: {failed}\n")
         return set()
     given = data.get("given") if isinstance(data, dict) else None
     return {s for s in given if isinstance(s, str)} if isinstance(given, list) else set()
@@ -1205,12 +1194,9 @@ def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str
 
 def _save_once(stderr: TextIO, state_dir: str, payload: hookio.Input, given: set[str]) -> None:
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
-    try:
-        os.makedirs(state_dir, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump({"given": sorted(given)}, f, ensure_ascii=False)
-    except OSError as exc:
-        stderr.write(f"ccnavi: 1 度だけ渡す文の控えを書けない: {exc}\n")
+    failed = fsio.write_json(path, {"given": sorted(given)})
+    if failed:
+        stderr.write(f"ccnavi: 1 度だけ渡す文の控えを書けない: {failed}\n")
 
 
 def _forget_once(state_dir: str, session: str) -> None:
