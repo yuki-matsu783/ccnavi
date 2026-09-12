@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import { approveFromPalette, openBoard, refreshBoard } from "./board-panel.js";
+import { openBoard, refreshBoard } from "./board-panel.js";
 import { openProjects } from "./projects-panel.js";
 import { openRules } from "./rules-panel.js";
 import { registerSidebar } from "./sidebar.js";
@@ -16,7 +16,7 @@ export function activate(context: vscode.ExtensionContext): void {
       void openBoard(typeof project === "string" ? project : undefined),
     ),
     vscode.commands.registerCommand("ccnaviBoard.refresh", refreshBoard),
-    vscode.commands.registerCommand("ccnaviBoard.approve", approveFromPalette),
+    // 承認はボードのボタンだけ。パレットからは打てない（承認内容を見ずに押せる入口を作らない）。
     vscode.commands.registerCommand("ccnaviBoard.openRules", (project?: unknown) =>
       void openRules(typeof project === "string" && project !== "" ? { kind: "project", name: project } : { kind: "workspace" }),
     ),

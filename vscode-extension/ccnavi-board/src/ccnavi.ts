@@ -2,9 +2,11 @@
  * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
- * 走らせるのは 5 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * 走らせるのは 7 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
- * 機械可読で。プロジェクト管理画面が読む）。判定と検証はルールファイルを差し替えられる。
+ * 機械可読で。プロジェクト管理画面が読む）、`--approve --preview --json`（承認の束を見る）、
+ * `--approve --yes … --json`（見せた束を承認する。人がオーバーレイで押したときだけ）。
+ * 判定と検証はルールファイルを差し替えられる。
  * ワークスペースのルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 編集中の内容を一時ファイルに置いて試すため。写しと控えは外し、記録も残さない
  * （試し打ちで記録を汚さない）。
@@ -13,7 +15,14 @@ import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { Launcher } from "./core/commands.js";
+import {
+  parseApprovePreview,
+  parseApproveResult,
+  type ApproveMismatch,
+  type ApprovePreview,
+  type ApproveResult,
+} from "./core/approvemodel.js";
+import { approveArgs, previewArgs, type Launcher } from "./core/commands.js";
 import { parseLintJson, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
@@ -148,6 +157,55 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
     return { ok: false, launcher, error: parsed.error };
   }
   return { ok: true, launcher, board: parsed.board };
+}
+
+export type ApproveOutcome =
+  | { readonly ok: true; readonly value: ApproveResult }
+  | { readonly ok: false; readonly mismatch: ApproveMismatch }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * 承認の束を見る（`--approve --preview --json`）。写しは置かれない。
+ * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
+ */
+export async function runApprovePreview(root: string, setting: string): Promise<RunResult<ApprovePreview>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, previewArgs());
+  if (ran.code !== 0) {
+    return { ok: false, error: `ccnavi --approve --preview --json が失敗した: ${firstLine(ran.stderr)}` };
+  }
+  const parsed = parseApprovePreview(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/**
+ * 見せた束をそのまま承認する（`--approve --yes <識別子,…> --json`）。
+ * 実行ファイルは見せた束と今の束が同じことを求め、違えば `mismatch` を返して何も置かない。
+ */
+export async function runApproveYes(
+  root: string,
+  setting: string,
+  tickets: readonly string[],
+): Promise<ApproveOutcome> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, approveArgs(tickets));
+  const parsed = parseApproveResult(ran.stdout);
+  if (parsed.ok) {
+    return ran.code === 0
+      ? parsed
+      : { ok: false, error: `ccnavi --approve --yes が失敗した: ${firstLine(ran.stderr)}` };
+  }
+  if ("mismatch" in parsed) {
+    return parsed;
+  }
+  const said = firstLine(ran.stderr) || firstLine(ran.stdout);
+  return { ok: false, error: said === "" ? `ccnavi --approve --yes の出力を読み取れない（${parsed.error}）` : said };
 }
 
 /** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */

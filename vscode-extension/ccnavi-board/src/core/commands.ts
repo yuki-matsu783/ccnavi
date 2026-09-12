@@ -1,9 +1,11 @@
 /**
- * 人の承認をターミナルへ送るときのコマンド行。bash（Windows なら Git Bash）で動く形。
+ * 人の判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
  *
- * 拡張は承認を自分で実行しない。`--approve` と `accept` と `wrapup` は端末（tty）から
- * 打つものと ccnavi が決めていて（人の合意をエージェントが出せないための壁）、
- * 拡張の子プロセスもその壁の外に置く。ここで組んだ 1 行をターミナルに送り、y/N は人が押す。
+ * `accept` と `wrapup` は端末（tty）から打つものと ccnavi が決めていて、拡張はここで組んだ
+ * 1 行をターミナルに送り、y/N は人が押す。承認だけは違う。ボードのオーバーレイで人が押した
+ * 承認を、拡張が子プロセスで `--approve --yes <識別子,…>` として打つ。端末の壁は無く、
+ * 代わりに「見せた束と今の束が同じ」ことを実行ファイルが求める。エージェントが Bash で
+ * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。
  */
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
@@ -29,9 +31,14 @@ function ccnaviInvocation(launcher: Launcher, root: string): string {
   return `uv run python -m ccnavi --root ${rootArg}`;
 }
 
-/** `ccnavi --approve`。束（いま承認待ちのもの全部）を見せて y/N を取る */
-export function approveCommand(launcher: Launcher, root: string): string {
-  return `cd ${shellQuote(toPosixPath(root))} && ${ccnaviInvocation(launcher, root)} --approve`;
+/** `--approve --preview --json`。束を見るだけで写しは置かない（子プロセスの引数） */
+export function previewArgs(): readonly string[] {
+  return ["--approve", "--preview", "--json"];
+}
+
+/** `--approve --yes <識別子,…> --json`。見せた束をそのまま承認する（子プロセスの引数） */
+export function approveArgs(tickets: readonly string[]): readonly string[] {
+  return ["--approve", "--yes", tickets.join(","), "--json"];
 }
 
 /**

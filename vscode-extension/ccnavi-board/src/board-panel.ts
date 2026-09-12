@@ -5,10 +5,10 @@
 import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 
-import { loadBoard } from "./ccnavi.js";
+import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
-import { acceptCommand, approveCommand, wrapupCommand, type Launcher } from "./core/commands.js";
-import { escapeHtml, renderBoard } from "./core/render.js";
+import { acceptCommand, wrapupCommand, type Launcher } from "./core/commands.js";
+import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
@@ -32,6 +32,8 @@ type Message =
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }
   | { readonly type: "approve" }
+  | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
+  | { readonly type: "approveCancel" }
   | { readonly type: "accept"; readonly parent: string; readonly phase: number }
   | { readonly type: "wrapup"; readonly parent: string };
 
@@ -48,6 +50,8 @@ interface PanelState {
   wasVisible: boolean;
   /** 次に描いたときに選ぶ絞り込み。1 度使ったら消す（以後は Webview の state が覚える） */
   filter?: string;
+  /** 承認のオーバーレイ。あれば描くたびにボードの上に被せる。監視の更新で消えない */
+  approval?: ApprovalOverlay;
 }
 
 let state: PanelState | undefined;
@@ -117,19 +121,6 @@ export function refreshBoard(): void {
     return;
   }
   void update();
-}
-
-/** `ccnaviBoard.approve` の本体。ボードが開いていなくても打てる */
-export function approveFromPalette(): void {
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていない");
-    return;
-  }
-  if (!ticketsEnabled()) {
-    return;
-  }
-  sendApprove(folder.uri.fsPath, state?.launcher);
 }
 
 /**
@@ -237,6 +228,7 @@ function show(current: PanelState, board: Board): void {
   current.board = board;
   current.panel.webview.html = renderBoard(board, {
     nonce: crypto.randomBytes(16).toString("base64"),
+    approval: current.approval,
   });
   if (current.filter !== undefined) {
     // HTML の差し替えの後に届く。Webview の中のスクリプトが select を合わせる。
@@ -263,7 +255,16 @@ async function handleMessage(message: Message | undefined): Promise<void> {
       openTicket(current, message.filePath);
       return;
     case "approve":
-      sendApprove(root, current.launcher);
+      await openApproval(current);
+      return;
+    case "approveConfirm":
+      await confirmApproval(current, message.tickets);
+      return;
+    case "approveCancel":
+      if (current.approval?.kind !== "approving") {
+        current.approval = undefined;
+        redraw(current);
+      }
       return;
     case "accept": {
       const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
@@ -304,12 +305,89 @@ async function handleMessage(message: Message | undefined): Promise<void> {
   }
 }
 
-function sendApprove(root: string, launcher: Launcher | undefined): void {
-  if (launcher === undefined) {
-    vscode.window.showErrorMessage("ccnavi の実行ファイルが見つからないので --approve を送れない");
+/** いまの状態でボードを描き直す（オーバーレイの出し入れ） */
+function redraw(current: PanelState): void {
+  if (current.board !== undefined) {
+    show(current, current.board);
+  }
+}
+
+/**
+ * 「承認」。束を読んでオーバーレイに出す。写しはまだ置かれない。
+ * 読んでいる間も「読んでいる…」のオーバーレイを出し、二重に開かない。
+ */
+async function openApproval(current: PanelState): Promise<void> {
+  if (current.approval !== undefined && current.approval.kind !== "error") {
     return;
   }
-  runInTerminal(root, approveCommand(launcher, root));
+  current.approval = { kind: "loading" };
+  redraw(current);
+  const result = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+  if (state !== current || current.approval?.kind !== "loading") {
+    return;
+  }
+  current.approval = result.ok ? { kind: "preview", preview: result.value } : { kind: "error", error: result.error };
+  redraw(current);
+}
+
+/**
+ * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが束の一致を
+ * 確かめ、違えば何も置かずに `mismatch` を返すので、束を読み直して出し直す。
+ * 承認できたら、Claude Code に渡す文を通知の 2 ボタン（コピー / 新しいセッションで開く）で渡す。
+ * 押すまで何もしない。ボードの読み直しは写しの監視が起こす。
+ */
+async function confirmApproval(current: PanelState, tickets: readonly string[]): Promise<void> {
+  if (current.approval?.kind !== "preview" || tickets.length === 0) {
+    return;
+  }
+  const preview = current.approval.preview;
+  current.approval = { kind: "approving", preview };
+  redraw(current);
+  const outcome = await runApproveYes(current.folder.uri.fsPath, binSetting(), tickets);
+  if (state !== current) {
+    return;
+  }
+  if (outcome.ok) {
+    current.approval = undefined;
+    redraw(current);
+    void offerPrompt(outcome.value.approved.length, outcome.value.prompt);
+    return;
+  }
+  if ("mismatch" in outcome) {
+    const again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+    if (state !== current) {
+      return;
+    }
+    current.approval = again.ok
+      ? { kind: "preview", preview: again.value, notice: "見せた束と今の束が違った（提案が増えたか減った）。見直してから承認する" }
+      : { kind: "error", error: again.error };
+    redraw(current);
+    return;
+  }
+  current.approval = { kind: "error", error: outcome.error };
+  redraw(current);
+}
+
+const COPY_PROMPT = "コピー";
+const OPEN_PROMPT = "新しいセッションで開く";
+
+/**
+ * 承認の文を Claude Code に渡す。走っているセッションに送る公開の API は無いので、
+ * クリップボードに入れて進行中のセッションに貼るか、`vscode://anthropic.claude-code/open?prompt=…`
+ * で新しいセッションに文を埋める（送信は人が Enter）。
+ */
+async function offerPrompt(count: number, prompt: string): Promise<void> {
+  const chosen = await vscode.window.showInformationMessage(
+    `${count} 件を承認した。Claude Code に伝える文を用意した`,
+    COPY_PROMPT,
+    OPEN_PROMPT,
+  );
+  if (chosen === COPY_PROMPT) {
+    await vscode.env.clipboard.writeText(prompt);
+    vscode.window.setStatusBarMessage("承認の文をクリップボードに入れた。Claude Code に貼って送る", 5000);
+  } else if (chosen === OPEN_PROMPT) {
+    await vscode.env.openExternal(vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(prompt)}`));
+  }
 }
 
 function openTicket(current: PanelState, filePath: string): void {
@@ -329,11 +407,16 @@ function asMessage(message: unknown): Message | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; filePath?: unknown; parent?: unknown; phase?: unknown };
+  const m = message as { type?: unknown; filePath?: unknown; parent?: unknown; phase?: unknown; tickets?: unknown };
   switch (m.type) {
     case "refresh":
     case "approve":
+    case "approveCancel":
       return { type: m.type };
+    case "approveConfirm":
+      return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string")
+        ? { type: "approveConfirm", tickets: m.tickets as string[] }
+        : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
     case "accept":

@@ -1,8 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as commands from "../src/core/commands.js";
 import {
   acceptCommand,
-  approveCommand,
+  approveArgs,
+  previewArgs,
   shellQuote,
   toPosixPath,
   wrapupCommand,
@@ -14,15 +16,11 @@ test("CB-T17 単引用符で囲み、中の単引用符を割る", () => {
   assert.equal(toPosixPath("C:\\Users\\x\\ws"), "C:/Users/x/ws");
 });
 
-test("CB-T18 --approve は実行ファイルかソースで、ワークスペースルートで打つ", () => {
-  assert.equal(
-    approveCommand({ kind: "exe", path: "C:\\ws\\dist\\ccnavi\\ccnavi.exe" }, "C:\\ws"),
-    "cd 'C:/ws' && 'C:/ws/dist/ccnavi/ccnavi.exe' --root 'C:/ws' --approve",
-  );
-  assert.equal(
-    approveCommand({ kind: "uv", root: "/ws" }, "/ws"),
-    "cd '/ws' && uv run python -m ccnavi --root '/ws' --approve",
-  );
+test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、yes は見せた識別子をそのまま返す", () => {
+  assert.deepEqual(previewArgs(), ["--approve", "--preview", "--json"]);
+  assert.deepEqual(approveArgs(["i0001", "i0001-01"]), ["--approve", "--yes", "i0001,i0001-01", "--json"]);
+  // ターミナルに `--approve` を送る経路は消した。y/N を端末で押す形には戻さない。
+  assert.equal((commands as Record<string, unknown>).approveCommand, undefined);
 });
 
 test("CB-T19 accept と wrapup は親の作業ツリーで sh を打つ", () => {
