@@ -9,7 +9,9 @@
  * 書式の検証も `--lint --risk <一時ファイル>` に聞く。画面の欄は文字のまま持ち、整数で
  * なければそのまま書いて lint に言わせる。
  */
-import { isMap, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
+import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
+
+import { yaml11Ambiguous } from "./yaml11.js";
 
 /** 当て方。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
@@ -105,6 +107,9 @@ export function readRisk(text: string): RiskDocument {
   for (const e of doc.errors) {
     problems.push(`YAML として読めない: ${e.message}`);
   }
+  if (doc.contents !== null && !isMap(doc.contents)) {
+    problems.push("最上位が対応表ではない。実行ファイルは組み込みの配点に落ちる。保存すると中身を捨てて対応表から始める");
+  }
   const version = doc.get("version");
   if (version === undefined || version === null) {
     problems.push(`version が無い。保存すると version: ${RISK_VERSION} を先頭に足す`);
@@ -132,7 +137,7 @@ export function readRisk(text: string): RiskDocument {
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factors の ${index + 1} 件目が対応表ではない。画面に出さない`);
+          problems.push(`factors の ${index + 1} 件目が対応表ではない。画面に出さず、保存するとこの項目は消える（実行ファイルも読めない）`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));
@@ -213,11 +218,21 @@ function applyTo(doc: Document, edited: RiskForm): string {
   }
 
   // factors。元のノードを先に全部拾っておき、編集した並びへ移す。
+  // `origin` は読み込んだときの生の位置なので、対応表でない項目の分も位置を空けて持つ
+  // （詰めると、その後ろの項目が 1 つずれた元ノードに書き込まれる）。
   const existing = top.get("factors", true);
-  const originals: YAMLMap[] = isSeq(existing) ? existing.items.filter(isMap) : [];
-  if (isSeq(existing)) {
-    adoptLeadingComment(existing, originals[0]);
+  const originals: (YAMLMap | undefined)[] = isSeq(existing) ? existing.items.map((n) => (isMap(n) ? n : undefined)) : [];
+  const seen = new Set<number>();
+  for (const form of edited.factors) {
+    if (form.origin !== null && seen.has(form.origin)) {
+      // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出る。
+      throw new Error(`${form.origin + 1} 件目の項目が 2 回送られた。再読込してから編集し直す`);
+    }
+    if (form.origin !== null) {
+      seen.add(form.origin);
+    }
   }
+  const adopted = isSeq(existing) ? adoptLeadingComment(existing, originals[0]) : undefined;
   const nodes = edited.factors.map((form) => {
     const original = form.origin === null ? undefined : originals[form.origin];
     const node = original ?? (doc.createNode({}) as YAMLMap);
@@ -225,6 +240,11 @@ function applyTo(doc: Document, edited: RiskForm): string {
     return node;
   });
   if (isSeq(existing)) {
+    // 先頭の項目を消したときは、付け替えたコメントを並びの見出しとして戻す。
+    if (adopted !== undefined && !nodes.includes(adopted) && !existing.commentBefore) {
+      existing.commentBefore = adopted.commentBefore ?? null;
+    }
+    keepSpacing(existing.items, nodes);
     // 並びの前後のコメントは並びのノードに付いているので、並びは残して中身だけ替える。
     existing.items = nodes;
     existing.flow = nodes.length === 0;
@@ -239,15 +259,30 @@ function applyTo(doc: Document, edited: RiskForm): string {
 /**
  * 並びの先頭の項目の前にあるコメントは、読み込みでは並びのほうに付く。
  * そのままだと先頭の項目を移したときにコメントが置き去りになるので、項目に付け直す。
+ * 付け直した項目を返す（呼び手は、その項目が消えたときにコメントを並びへ戻す）。
  */
-function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): void {
+function adoptLeadingComment(seq: YAMLSeq, first: YAMLMap | undefined): YAMLMap | undefined {
   if (first === undefined || !seq.commentBefore) {
-    return;
+    return undefined;
   }
   if (!first.commentBefore) {
     first.commentBefore = seq.commentBefore;
     seq.commentBefore = null;
+    return first;
   }
+  return undefined;
+}
+
+/**
+ * 項目の前の空行は、項目ではなく「並びの何番目か」に付いていたものとして揃える。
+ * 先頭に来た項目が空行を連れてくると `factors:` の直後に空白だけの行が出るため。
+ */
+function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): void {
+  const slots = before.map((n) => isNode(n) && n.spaceBefore === true);
+  const last = slots.length > 0 ? slots[slots.length - 1] : false;
+  after.forEach((node, i) => {
+    node.spaceBefore = i < slots.length ? slots[i] : last;
+  });
 }
 
 /** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す */
@@ -268,8 +303,8 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   } else {
     setValue(doc, node, form.kind, form.value, Scalar.PLAIN, "points");
   }
-  // max は glob の上限。空なら欄ごと消す（青天井）。
-  if (form.max === "") {
+  // max は glob の上限。glob 以外の当て方では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
+  if (form.max === "" || form.kind !== "glob") {
     if (node.has("max")) {
       node.delete("max");
     }
@@ -303,13 +338,17 @@ function setValue(
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符）は元のまま。値が変わっても書き方まで変えない。
+    // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
     if (current.value !== value) {
       current.value = value;
+      if (current.type === Scalar.PLAIN && typeof value === "string" && yaml11Ambiguous(value)) {
+        current.type = Scalar.QUOTE_DOUBLE;
+      }
     }
     return;
   }
   const scalar = doc.createNode(value) as Scalar;
-  scalar.type = style;
+  scalar.type = style === Scalar.PLAIN && typeof value === "string" && yaml11Ambiguous(value) ? Scalar.QUOTE_DOUBLE : style;
   insertAfter(doc, node, key, scalar, after);
 }
 

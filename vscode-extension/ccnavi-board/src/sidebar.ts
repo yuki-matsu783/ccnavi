@@ -1,5 +1,5 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。入口は 4 つで、どれも Webview パネルを開く。
+ * アクティビティバーの ccnavi から開くサイドパネル。入口は 5 つで、どれも Webview パネルを開く。
  * 「チケット管理」はチケット制御（CCNAVI_TICKET_CONTROL）が disable のプロジェクトでは出さない。
  * 全体ルールだけを使うプロジェクトに、開いても空のボードしか出ない入口を見せないため。
  * VS Code の API に触れるので単体テストの対象外。
@@ -37,6 +37,13 @@ const ENTRIES: readonly Entry[] = [
     description: "実績で測るリスクの配点（閾値と項目）の編集と保存",
     command: "ccnaviBoard.openRisk",
     icon: "pulse",
+    needsTickets: false,
+  },
+  {
+    label: "フェーズ管理",
+    description: "フェーズの種類（計画に並べる型、範囲の上限、レビューの既定）の編集と保存",
+    command: "ccnaviBoard.openPhases",
+    icon: "milestone",
     needsTickets: false,
   },
   {
