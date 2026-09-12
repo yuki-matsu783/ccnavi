@@ -6,10 +6,12 @@
 #
 #   --mode <enable|dry-run>  CCNAVI_MODE。既定は dry-run
 #   --bin <相対パス>         CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
+#   --ticket-control <enable|disable>
+#                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配り元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              写しを取らず、settings.json だけを書く
 #   --all                    既定値を持つ env も明示して書く
-#   --force                  明示した --mode / --bin で、既にある値を置き換える。
+#   --force                  明示した --mode / --bin / --ticket-control で、既にある値を置き換える。
 #                            写しでは、配り先に既にあるものも入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
 #   --no-vscode              .vscode/settings.json には触らない
@@ -84,6 +86,11 @@ bin="$DEFAULT_BIN"
 # 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run へ落とす。
 mode_given=no
 bin_given=no
+# チケット制御。プロジェクトが「全体ルールだけ」か「チケットまで」かを、導入の
+# ときに決めてもらう場所。既定は enable で、書かなくても同じに動くが、常に書く。
+# 切りたい人が README ではなく設定ファイルの中でつまみを見つけられるように。
+ticket_control="enable"
+ticket_control_given=no
 all=no
 force=no
 check=no
@@ -105,10 +112,13 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   <ワークスペースルート>      既定は現在の作業ディレクトリ
   --mode <enable|dry-run>   CCNAVI_MODE。既定は dry-run
   --bin <相対パス>          CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
+  --ticket-control <enable|disable>
+                            CCNAVI_TICKET_CONTROL。チケット制御（提案・承認・フェーズ）を
+                            使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
   --deploy <ccnavi の根>    配り元。既定はこのスクリプトが入っている ccnavi の根
   --no-deploy               写しを取らず、settings.json だけを書く
   --all                     既定値を持つ env も明示して書く
-  --force                   明示した --mode / --bin で、既にある値を置き換える。
+  --force                   明示した --mode / --bin / --ticket-control で、既にある値を置き換える。
                             写しでは、配り先に既にあるものも入れ替える
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
@@ -135,6 +145,12 @@ while [ "$#" -gt 0 ]; do
 		[ "$#" -ge 2 ] || die "--bin に値がありません。"
 		bin="$2"
 		bin_given=yes
+		shift 2
+		;;
+	--ticket-control)
+		[ "$#" -ge 2 ] || die "--ticket-control に値がありません。"
+		ticket_control="$2"
+		ticket_control_given=yes
 		shift 2
 		;;
 	--deploy)
@@ -196,6 +212,15 @@ disable)
 	;;
 *)
 	die "--mode に使えるのは enable か dry-run です。"
+	;;
+esac
+
+# チケット制御は enable か disable の 2 値。ccnavi 側は読めない値を enable に倒し、
+# --lint が error にするが、書く前に止めるほうが安い。
+case "$ticket_control" in
+enable | disable) ;;
+*)
+	die "--ticket-control に使えるのは enable か disable です。"
 	;;
 esac
 
@@ -342,14 +367,15 @@ shape=$(printf '%s' "$current" | jq -r '
 # 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
 # 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を --bin 経由で
 # 書き込めてしまう。
-env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" '{
+env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
 	CCNAVI_RULES: ".claude/ccnavi/rules.yml",
 	CCNAVI_LOG: ".claude/ccnavi/log.jsonl",
 	CCNAVI_BIN_PATH: $bin,
 	CCNAVI_RESTORE_IF_DENY: $mode,
 	CCNAVI_GUARD_CORE_FILES: $mode,
-	CCNAVI_GUARD_TICKET_APPROVAL: "enable"
+	CCNAVI_GUARD_TICKET_APPROVAL: "enable",
+	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
 # 書く利点は、あとで値を変えたくなった人が、つまみの一覧を README ではなく
@@ -366,7 +392,7 @@ fi
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# --force が置き換えてよいキー。人がこの実行で名指しした 2 つだけ。
+# --force が置き換えてよいキー。人がこの実行で名指しした 3 つだけ。
 forced=""
 if [ "$force" = yes ]; then
 	if [ "$mode_given" = yes ]; then
@@ -374,6 +400,9 @@ if [ "$force" = yes ]; then
 	fi
 	if [ "$bin_given" = yes ]; then
 		forced="$forced CCNAVI_BIN_PATH"
+	fi
+	if [ "$ticket_control_given" = yes ]; then
+		forced="$forced CCNAVI_TICKET_CONTROL"
 	fi
 fi
 forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
@@ -637,7 +666,7 @@ report() {
 		printf '%s\n' "$replacing_env" | sed 's/^/  /'
 	fi
 	if [ -n "$differing_env" ]; then
-		printf '値が違う env（このスクリプトは変えません。変えるなら --mode / --bin を名指しして --force）:\n'
+		printf '値が違う env（このスクリプトは変えません。変えるなら --mode / --bin / --ticket-control を名指しして --force）:\n'
 		printf '%s\n' "$differing_env" | sed 's/^/  /'
 	fi
 	if [ -n "$other_hooks" ]; then
