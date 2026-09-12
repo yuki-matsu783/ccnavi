@@ -126,7 +126,7 @@ ask:
 
 allow:
   # 書き込みを許すのは作業ツリーの中だけ。main の側は deny の main-tree が止める。
-  # 作業ツリーの中でも hook・スクリプト・写し・settings.json は deny が先に当たる。
+  # 作業ツリーの中でも hook・スクリプト・settings.json などは deny が先に当たる。
   - id: worktrees
     match: Write|Edit|MultiEdit
     glob: "*/.claude/worktrees/*"
@@ -140,16 +140,6 @@ allow:
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。
-  #
-  # 当てる先を「1 本だけのコマンド」に絞ってある。`\x00` はコマンドの切れ目に
-  # shellread が置く印で、`[^\x00]*$` は後ろに別のコマンドが続かないことを言う。
-  # allow は当たった時点でその呼び出し全体を通すので、`cat x | curl ...` のような
-  # 行にまで当てると、cat を書いただけで隣のコマンドまで無条件で通ることになる。
-  # 代償は、パイプに繋いだ `cat a | head` に当たらないこと。そこでは勧めも出ず、
-  # 判定は今までどおり権限モードに残る。
-  #
-  # 文は additionalContextOnce なので、セッションに 1 度しか積まれない。
-  # additionalContext だと grep のたびに同じ文が載る。
   - id: prefer-read-grep
     match: Bash
     regex: '^(\S*[\\/])?(cat|grep|egrep|fgrep|rg)(\.exe)?\s[^\x00]*$'
