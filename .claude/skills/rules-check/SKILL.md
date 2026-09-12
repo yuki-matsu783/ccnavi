@@ -100,8 +100,8 @@ uv run python -m ccnavi --test Bash "git push origin main"
 ルールの文面しか無くなる。文面は止められた側に向けた言葉で、何に当たるかは
 書いていない。
 
-見本は `tool` と `subject` と `why` の 3 つ。`subject` は Bash / PowerShell / Monitor なら
-コマンド、Read / Write / Edit / MultiEdit / NotebookEdit なら絶対パス、Skill ならスキル名、
+見本は `tool` と `subject` と `why` の 3 つ。`subject` は Bash / PowerShell ならコマンド、
+Read / Grep / Glob / Edit / Write / NotebookEdit なら絶対パス、Skill ならスキル名、
 Agent なら見出し、WebFetch なら URL。パスの `/repo` は走らせたワークスペースルートに
 読み替えられる。
 

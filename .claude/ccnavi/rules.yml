@@ -13,7 +13,7 @@ version: 3
 deny:
   # フックスクリプト の場所
   - id: guard-hooks
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/.claude/hooks/*"
     message: >-
       hook 本体です。エージェントの判断で書き換えず、理由を
@@ -21,7 +21,7 @@ deny:
 
   # ラッパースクリプト の場所
   - id: guard-scripts
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/.claude/scripts/*"
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
@@ -30,7 +30,7 @@ deny:
   # main の作業ツリーでは編集しない。`.claude/worktrees/` だけが編集可能。
   # `{root}` はワークスペースルートの実パスに置き換わる。
   - id: main-tree
-    match: Write|Edit|MultiEdit|NotebookEdit
+    match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'
     message: >-
       main の作業ツリーでは編集しません。'sh .claude/scripts/ccnavi-git.sh worktree add
@@ -73,7 +73,7 @@ deny:
   # settings.json の permissions.deny と同じ場所を並べてある。
   # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
   - id: credentials
-    match: Bash|Read|Write|Edit|MultiEdit|NotebookEdit
+    match: Bash|Read|Write|Edit|NotebookEdit
     regex: '(^|[ \\/])\.(env|dev\.vars|netrc|npmrc|pypirc)\b|(^|[ \\/])\.(aws|ssh)[\\/]|[\w\-\\/]\.(pem|key)\b|[\\/]secrets[\\/]|[\\/]credentials([\\/]|\.json\b)|\b(id_rsa|id_ed25519)\b'
     message: 認証情報を含む場所です。中身を読まず、必要な値を利用者に尋ねてください。
 
@@ -105,7 +105,7 @@ deny:
 
   # 承認済みのチケットの写し。判定はここだけを読むので、ここを書けると承認の意味が無い。
   - id: guard-approved-tickets
-    match: Write|Edit|MultiEdit|NotebookEdit
+    match: Write|Edit|NotebookEdit
     glob: "*/.claude/ccnavi/tickets/*"
     message: >-
       承認済みのチケットの写しです。承認は利用者が 'ccnavi --approve' で行い、
@@ -115,7 +115,7 @@ deny:
 ask:
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。
   - id: dependencies
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     regex: 'pyproject\.toml|uv\.lock'
     additionalContextOnce: >-
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
@@ -123,7 +123,7 @@ ask:
 
   # 作業範囲の提案。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
   - id: current-ticket
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/.current-ticket.md"
     additionalContextOnce: >-
       作業範囲の提案です。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
@@ -147,7 +147,7 @@ allow:
   # 書き込みを許すのは作業ツリーの中だけ。main の側は deny の main-tree が止める。
   # 作業ツリーの中でも hook・スクリプト・settings.json などは deny が先に当たる。
   - id: worktrees
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/.claude/worktrees/*"
 
   # git の入口。サブコマンドの選別はラッパの中で行うので、ここでは区別しない。
