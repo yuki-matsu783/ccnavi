@@ -76,7 +76,8 @@ exit は、束が組めた（空でも）なら 0。チケット制御が disabl
 ```json
 {"version": 1, "approved": ["approve-popup", "approve-popup-01"],
  "copies": ["C:/…/.claude/ccnavi/tickets/approve-popup.md", "…"],
- "cleared_marks": [], "prompt": "…"}
+ "lines": ["承認した。… に写しを置いた。", "この範囲は次のツール呼び出しから効く。"],
+ "prompt": "…"}
 ```
 
 ```json
@@ -91,23 +92,43 @@ exit は、束が組めた（空でも）なら 0。チケット制御が disabl
 
 ### 2.3 組み込み deny の変更
 
-`phase._CLI_FORMS` の `--approve\b` を「`--preview` を伴わない `--approve`」にする。規則は Python の
-`re` で直接組むので先読みが使える（rules.yml の regex の制約はここには掛からない）。
+`phase._CLI_FORMS` に `--yes\b` の枝を足し、`--approve\b` には「`--preview` を伴わない」の
+先読みを付ける。規則は Python の `re` で直接組むので先読みが使える（rules.yml の regex の
+制約はここには掛からない）。
 
 ```python
-r"(--approve\b(?![^\x00]*--preview\b)|--reviewed\b|…)"
+_NOT_PREVIEW = r"(?![^\x00;&|\r\n]*--preview\b)"
+rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|…)"
 ```
 
-`[^\x00]*` は同じコマンドの中だけを見る（shellread の区切りをまたがない）。見本は
-`.claude/ccnavi/rule-samples.yml` ではなく `tests/test_phase.py`（組み込みなので）に置く。
+**免除は許さない側から書く。** 最初の案は `--approve\b(?![^\x00]*--preview\b)` の 1 本で、
+「`--preview` があれば免除」を `--approve` と `--yes` の両方に掛けていた。これには 2 つ穴があり、
+敵対的レビュー（読み取り専用サブエージェント）が見つけた。
 
-| 見本（Bash の subject） | 期待 |
+| 穴 | どうなるか |
 |---|---|
-| `uv run python -m ccnavi --approve --yes a,b --json` | deny |
-| `dist/ccnavi/ccnavi --approve` | deny（今までどおり） |
-| `uv run python -m ccnavi --approve --preview --json` | 当たらない |
-| `ccnavi --approve --preview; ccnavi --approve --yes a` | deny（2 本目に当たる） |
-| `echo --approve --preview` | 当たらない（ccnavi の起動ではない） |
+| 同じコマンドに両方書く | `ccnavi --approve --preview --yes a` が当たらない。承認そのものが免除される |
+| PowerShell | `judge.screen` は Bash 以外を shellread に通さず生の文字列に当てる。`\x00` が無いので、`ccnavi --approve --yes a; ccnavi --approve --preview` の後ろの `--preview` が前の `--yes` を免除する |
+
+直し方は 2 つ。承認そのもの（`--yes`）を独立した枝にして免除の対象から外すこと。免除の範囲を
+コマンド 1 本に区切ること（`\x00` に加えて `;` `&` `|` 改行を区切りと見る）。許す側から条件を
+書き足すと、条件が増えるたびに免除が広がる。止める側を先に固定して、そこから外れるものだけを
+免除する。
+
+見本は `.claude/ccnavi/rule-samples.yml` ではなく `tests/test_ticket.py`（組み込みなので）に置く。
+
+| 見本 | ツール | 期待 |
+|---|---|---|
+| `uv run python -m ccnavi --approve --yes a,b --json` | Bash | deny |
+| `dist/ccnavi/ccnavi --approve` | Bash | deny（今までどおり） |
+| `ccnavi --approve --preview --yes a --json` | Bash | deny（同じコマンドでも免除しない） |
+| `ccnavi --approve --yes a --preview` | Bash | deny |
+| `ccnavi --approve --preview; ccnavi --approve --yes a` | Bash | deny（2 本目に当たる） |
+| `ccnavi --approve --yes a,b --json; ccnavi --approve --preview` | PowerShell | deny |
+| `ccnavi --approve; echo --preview` | PowerShell | deny |
+| `uv run python -m ccnavi --approve --preview --json` | Bash / PowerShell | 当たらない |
+| `echo --approve --preview` | Bash | 当たらない（ccnavi の起動ではない） |
+| `apt-get install --yes git` | Bash | 当たらない（ccnavi の起動ではない） |
 
 `rules.yml` の `guard-approved-tickets` の文面と `judge.py:519` の「ask the user to run 'ccnavi --approve'」は、
 「利用者がボードで承認する」に直す（文書フェーズと一緒でよい）。
@@ -115,17 +136,32 @@ r"(--approve\b(?![^\x00]*--preview\b)|--reviewed\b|…)"
 ### 2.4 hook が「新しい承認」を 1 度だけ伝える
 
 **控え。** `<state>/approved-<session>-<agent>.json`。`once-*.json` と同じ命名（`fsio.safe_name`、
-agent は `main`）。中身は `{"known": ["approve-popup", "approve-popup-01"]}`。`known` は
-「このセッションが知っている写し」の識別子で、開と閉の両方を含む。
+agent は `main`）。中身は `{"known": {"approve-popup": "<印>", …}}` で、印は写しの `approved_at` と
+`revised_at` を並べたもの。開いた写しと閉じた写しの両方を持つ。
 
-**起点（決定 10）。** 控えが無い hook で、いまの写し（`approval.copies` の開 + 閉）を `known` に
-書き、何も伝えない。これが「セッションの最初の hook 時点」。SessionStart は `ctxfile.forget` で
-`once-*` を捨てるが、`approved-*` は捨てない（compact のあとに再度伝える文ではない。承認は
-1 度知れば足りる）。掃除は `forget` の古いファイルの間引きと同じ 30 日で一緒に消す。
+**識別子だけでは足りない。** 親の改版（`revise_copy`、設計 §24.15.5）は写しを書き換えるだけで
+識別子を増やさない。識別子の集合を比べる形では、計画が変わったという新しい合意を検知できない。
+印まで見る。印を持たない古い控え（この形になる前のもの）は、識別子を伝えたものとして扱い、
+改版とは見なさない。
 
-**伝える。** `UserPromptSubmit` と `PreToolUse` で、いまの開の写し − `known` を「新しい承認」と
-して文にし、`known` に足して書き戻す。サブエージェント（`agent_id` あり）は控えを別に持つので、
+**起点（決定 10）。** 控えが無い hook で、いまの写しを `known` に書き、何も伝えない。これが
+「セッションの最初の hook 時点」。SessionStart は `ctxfile.forget` で `once-*` を捨てるが、
+`approved-*` は捨てない（compact のあとに再度伝える文ではない。承認は 1 度知れば足りる）。
+掃除は `forget` の古いファイルの間引きと同じ 30 日で一緒に消す。
+
+**伝える。** `UserPromptSubmit` と `PreToolUse` で、印の変わった写しと新しい写しを「新しい承認」と
+して文にし、控えに書き戻す。サブエージェント（`agent_id` あり）は控えを別に持つので、
 起動後に初めて見た写しが起点になり、何も伝えない（サブエージェントはチケットを起こす立場にない）。
+
+**閉じた写しも見る。** 承認の直後・次の hook の前に子が閉じることがある（承認してすぐ着手して
+`done` にした形）。開いた写しだけを見ると、その承認は控えに吸われて誰にも伝わらない。
+
+**壊れた控えは「無い」と同じに扱わない。** 読めるのに壊れているとき、起点として書き直すと、
+まだ伝えていない承認ごと黙って消える。何も知らないことにして、その回に全部を伝える。
+伝えすぎる側へ倒す。
+
+**競合は受け入れる。** 読み・判定・書きを直列化していないので、同じセッションの hook が同時に
+走ると同じ承認を 2 度伝えることがある。取るべきでないのは逆で、競合のために黙る形にはしない。
 
 **どこで。**
 
@@ -176,7 +212,7 @@ sh .claude/scripts/ccnavi-ticket.sh start <識別子> で着手する。
 | 何 | どこ |
 |---|---|
 | コマンド `ccnaviBoard.approve` | `package.json`（commands、menus）、`extension.ts`、`board-panel.ts` の `approveFromPalette` |
-| ターミナルに `--approve` を送る経路 | `core/commands.ts` の `approveCommand`、`board-panel.ts` の `sendApprove`。`terminal.ts` は accept / wrapup / clone が使うので残す |
+| ターミナルに `--approve` を送る経路 | `core/commands.ts` の `approveCommand`、`board-panel.ts` の `sendApprove`。`terminal.ts` は accept / clone / fetch / pull が使うので残す（見出しも直す） |
 | README の該当行 | コマンド一覧、「人の承認はボタンから統合ターミナルへ」の段、手動確認 #4 |
 
 ### 3.2 子プロセス（`ccnavi.ts`）
@@ -197,9 +233,11 @@ runApproveYes(root, setting, tickets: readonly string[]): Promise<ApproveOutcome
 ### 3.3 形の読み取り（`core/approvemodel.ts`）
 
 `model.ts` と同じ流儀で `parseApprovePreview(text)` / `parseApproveResult(text)` を置き、
-`APPROVE_VERSION = 1` と違えば読まない。フィクスチャは `test/fixtures/approve-preview.json` と
-`approve-yes.json`。Python 側 `tests/test_approve_json.py` が `CCNAVI_APPROVE_FIXTURE=1` で書き出し、
-同じ例で形を確かめる（`test_board.py` と同じ仕組み）。
+`APPROVE_VERSION = 1` と違えば読まない。フィクスチャは `test/fixtures/` の
+`approve-preview.json` / `approve-yes.json` / `approve-mismatch.json` の 3 つ。食い違いの形も拡張が
+読むので写す。Python 側 `tests/test_approve_json.py` が `CCNAVI_BOARD_FIXTURE=1` で書き出し、
+同じ例で形を確かめる（`test_board.py` と同じ仕組み）。照合は鍵の名前だけでなく値まで見る。
+時刻の欄は固定の綴りで書き、形が変わらない限り差分が出ないようにする。
 
 ### 3.4 オーバーレイ（決定 3、11）
 
@@ -258,7 +296,7 @@ type ApprovalOverlay =
 | `core/commands.ts` | `approveCommand` を消し、`approveArgs(tickets)`（引数の並び）を足す |
 | `core/approvemodel.ts` | 新規 |
 | `core/render.ts` | `renderApproval` と、スクリプトに confirm / cancel / Esc |
-| `test/approvemodel.test.ts`、`render.test.ts`、`commands.test.ts` | CB-T69 以降 |
+| `test/approvemodel.test.ts`、`render.test.ts`、`commands.test.ts` | CB-T104 以降（main が CB-T103 まで使っていた） |
 | `README.md` | §3.1 と、オーバーレイと通知の説明、手動確認 #4 の書き換え |
 
 ## 4. 文書に触る場所（フェーズ 4）
@@ -266,10 +304,11 @@ type ApprovalOverlay =
 | 文書 | 何 |
 |---|---|
 | `README.md`（実行ファイル） | 「効くのは承認したものだけ」の段に preview / yes。「ボードの JSON」の隣に「承認の JSON」（§2.1、§2.2 の表）。hook が承認を伝えること |
-| `ccnavi.md` §17 | 端末の壁の位置づけ。`--yes` は壁を持たず、組み込み deny がエージェントの経路を塞ぐ。dry-run では止まらない（受け入れた） |
-| `ccnavi.md` §24.10 | 「拡張の子プロセスを壁の外に置く」を「承認は拡張の子プロセスが打つ。accept / wrapup は端末のまま」に |
-| `requirements.md` | REQ-APV の該当（承認画面の内容は変えない。経路が増える） |
-| `vscode-extension/ccnavi-board/README.md` | §3.1、§3.4、§3.5 |
+| `ccnavi.md` §17 | 端末の壁の位置づけ。`--yes` は壁を持たず、組み込み deny がエージェントの経路を塞ぐ。dry-run では止まらない（受け入れた）。§17.7 と §17.8 として書いた |
+| `ccnavi.md` §24.10 | 「拡張の子プロセスを壁の外に置く」を「承認は拡張の子プロセスが打つ。accept は端末のまま」に |
+| `requirements.md` | REQ-APV-06（人が押したことの証拠）、REQ-APV-07（承認を 1 度伝える）、REQ-DIA-10（preview の形） |
+| `vscode-extension/ccnavi-board/README.md` | §3.1、§3.4、§3.5（フェーズ 3 で直した） |
+| `ccnavi/judge.py` | 範囲外の書き込みを止めたときの英文（「利用者に `--approve` を打つよう頼め」を、ボードでの承認に） |
 | `HANDOVER.md` | 経緯 |
 
 ## 5. 受入テスト（フェーズ 2 の入力）
@@ -286,12 +325,18 @@ Python（`tests/`）。
 | A6 | 素の `--approve` を tty でない stdin で | 今までどおり止まる |
 | A7 | Bash `… ccnavi --approve --yes a --json` を PreToolUse で | deny、rule `builtin-guard-ticket-approval` |
 | A8 | Bash `… ccnavi --approve --preview --json` を PreToolUse で | その規則に当たらない |
+| A7b | 同じコマンドに `--preview` と `--yes` を並べる | deny（免除しない） |
+| A7c | PowerShell で、後続のコマンドに `--preview` を書く | deny（免除がコマンドをまたがない） |
+| A8b | ccnavi の起動でない `--yes`（`apt-get install --yes git`） | その規則に当たらない |
 | A9 | 承認の後の UserPromptSubmit | `additionalContext` に `prompt` と同じ文。もう 1 度 UserPromptSubmit しても出ない |
 | A10 | 承認の後の PreToolUse（allow になる呼び出し） | `additionalContext` に同じ文が 1 度だけ |
 | A11 | セッションの最初の hook の前に置いた写し | 伝えない |
 | A12 | 別の `session_id` | それぞれ 1 度ずつ伝える |
 | A13 | `--state ""` | 伝えない、控えも作らない |
-| A14 | フィクスチャ | `approve-preview.json` / `approve-yes.json` と形が一致 |
+| A14 | フィクスチャ | `approve-preview.json` / `approve-yes.json` / `approve-mismatch.json` と鍵も値も一致 |
+| A15 | 親の改版を承認した後の UserPromptSubmit | 改版として 1 度だけ伝える |
+| A16 | 承認の直後・次の hook の前に閉じた写し | 1 度だけ伝える |
+| A17 | 控えを壊してから hook | まだ伝えていない承認を伝える（黙って起点化しない） |
 
 拡張（`test/`、`core` だけ）。
 
