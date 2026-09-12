@@ -7,7 +7,8 @@
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
-    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi"
+    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi",
+    "CCNAVI_TICKET_CONTROL": "enable"
   },
   "attribution": {
     "commit": "",
