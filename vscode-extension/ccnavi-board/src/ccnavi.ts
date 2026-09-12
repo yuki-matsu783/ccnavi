@@ -52,6 +52,13 @@ export interface LintResult {
 /** ボードの JSON はチケットが増えても数百 KB。余裕を持って 32 MB まで受ける */
 const MAX_OUTPUT = 32 * 1024 * 1024;
 
+/**
+ * 承認の 2 本に付ける期限（ミリ秒）。承認している間オーバーレイは閉じられないので、
+ * 実行ファイルが返らないとパネルが「承認している…」から戻らなくなる。
+ * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て 60 秒。
+ */
+const APPROVE_TIMEOUT_MS = 60_000;
+
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つからない（dist/ccnavi/ccnavi、.claude/settings.json の CCNAVI_BIN_PATH、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
 
@@ -130,7 +137,12 @@ interface Ran {
   readonly stderr: string;
 }
 
-function run(launcher: Launcher, root: string, args: readonly string[]): Promise<Ran> {
+function run(
+  launcher: Launcher,
+  root: string,
+  args: readonly string[],
+  timeout?: number,
+): Promise<Ran> {
   const common = ["--root", root, ...args];
   const [file, argv] =
     launcher.kind === "exe"
@@ -144,6 +156,7 @@ function run(launcher: Launcher, root: string, args: readonly string[]): Promise
         cwd: root,
         maxBuffer: MAX_OUTPUT,
         windowsHide: true,
+        ...(timeout === undefined ? {} : { timeout }),
         // 標準出力は ASCII に落としてあるが、標準エラーの日本語が化けないように。
         env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
       },
@@ -194,7 +207,7 @@ export async function runApprovePreview(root: string, setting: string): Promise<
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, previewArgs());
+  const ran = await run(launcher, root, previewArgs(), APPROVE_TIMEOUT_MS);
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi --approve --preview --json が失敗した: ${firstLine(ran.stderr)}` };
   }
@@ -215,7 +228,7 @@ export async function runApproveYes(
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, approveArgs(tickets));
+  const ran = await run(launcher, root, approveArgs(tickets), APPROVE_TIMEOUT_MS);
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0
