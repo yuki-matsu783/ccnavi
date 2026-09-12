@@ -501,19 +501,66 @@ def _news_path(state_dir: str, session: str, agent_id: str) -> str:
     return os.path.join(state_dir, f"approved-{session_part}-{agent_part}.json")
 
 
-def _known(path: str) -> set[str] | None:
-    """控えにある識別子。控えが無ければ None。"""
+def _known(path: str) -> dict[str, str] | None:
+    """控えにある「識別子 → 印」。控えが無ければ None。
+
+    読めるのに壊れているときは空の辞書を返す。「無い」と同じに扱うと、まだ伝えて
+    いない承認ごと現状を起点にして黙ることになる。何も知らないことにして、
+    伝える側へ倒す。
+    """
     data, failed = fsio.read_json(path)
     if failed is not None:
-        return None
+        return None if isinstance(failed, FileNotFoundError) else {}
     known = data.get("known") if isinstance(data, dict) else None
-    return {s for s in known if isinstance(s, str)} if isinstance(known, list) else set()
+    if isinstance(known, dict):
+        return {k: str(v) for k, v in known.items() if isinstance(k, str)}
+    if isinstance(known, list):
+        # 印を持たなかった頃の控え。識別子は伝えたものとして扱い、印は空にする。
+        # 空の印は「伝えたが、いつの写しかは分からない」の意味で、_fresh が改版と
+        # 見なさない（写しは必ず approved_at を持つので、空は古い控えにしか無い）。
+        return {s: "" for s in known if isinstance(s, str)}
+    return {}
 
 
-def _write_known(stderr: TextIO, path: str, known: set[str]) -> None:
-    failed = fsio.write_json(path, {"known": sorted(known)})
+def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
+    failed = fsio.write_json(path, {"known": dict(sorted(known.items()))})
     if failed:
         stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
+
+
+def _mark(t: ticket_mod.Ticket) -> str:
+    """写し 1 枚の印。承認した時刻と、改版した時刻。
+
+    改版（`revise_copy`）は写しを書き換えるだけで識別子を増やさないので、識別子だけを
+    比べても新しい合意だと分からない。印まで見る。
+    """
+    meta = t.raw.get(ticket_mod.APPROVAL_KEY)
+    meta = meta if isinstance(meta, dict) else {}
+    return f"{meta.get('approved_at') or ''}/{meta.get('revised_at') or ''}"
+
+
+def _copy_marks(conf: settings.Settings) -> dict[str, ticket_mod.Ticket]:
+    """いまある写し。開いたものと閉じたもの。
+
+    閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
+    見ると、その承認は誰にも伝わらないまま控えに吸われる。
+    """
+    found: dict[str, ticket_mod.Ticket] = {}
+    for closed in (False, True):
+        got, _ = copies(conf.approved, closed=closed)
+        for t in got:
+            found[t.ticket] = t
+    return found
+
+
+def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
+    """まだ伝えていない写し。印が変わったもの（改版）も含む。"""
+    out = []
+    for ident, t in sorted(current.items()):
+        recorded = known.get(ident)
+        if recorded is None or (recorded != "" and recorded != _mark(t)):
+            out.append(t)
+    return out
 
 
 def baseline(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -> None:
@@ -526,39 +573,37 @@ def baseline(stderr: TextIO, conf: settings.Settings, session: str, agent_id: st
         return
     path = _news_path(conf.state, session, agent_id)
     if _known(path) is None:
-        _write_known(stderr, path, _copy_ids(conf))
+        _write_known(stderr, path, {i: _mark(t) for i, t in _copy_marks(conf).items()})
 
 
 def news(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -> str:
     """このセッションがまだ知らない写しがあれば、その承認を伝える文。1 度だけ。
 
     最初の hook で控えが無ければ、いまの写しを起点として書き、何も伝えない。
-    それより後に置かれた写しだけが「新しい承認」になる。控えを置けない
-    （`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側に倒す。
+    それより後に置かれた写しと、印の変わった写し（親の改版）が「新しい承認」になる。
+    控えを置けない（`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側に倒す。
     サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
+
+    読み・判定・書きは直列化していない。同じセッションの hook が同時に走ると、同じ承認を
+    2 度伝えることがある。伝えすぎる側なので受け入れる。取るべきでないのは逆で、
+    競合のために黙る形にはしない。
     """
     if not conf.state or not conf.tickets_enabled:
         return ""
     path = _news_path(conf.state, session, agent_id)
     known = _known(path)
-    current = _copy_ids(conf)
+    current = _copy_marks(conf)
+    marks = {i: _mark(t) for i, t in current.items()}
     if known is None:
-        _write_known(stderr, path, current)
+        _write_known(stderr, path, marks)
         return ""
-    fresh, _ = copies(conf.approved)
-    new = sorted((t for t in fresh if t.ticket not in known), key=lambda t: t.ticket)
-    if not (current - known):
+    fresh = _fresh(known, current)
+    if not fresh:
         return ""
-    _write_known(stderr, path, known | current)
-    if not new:
-        return ""
-    return _approved_text(new, set())
-
-
-def _copy_ids(conf: settings.Settings) -> set[str]:
-    opened, _ = copies(conf.approved)
-    closed, _ = copies(conf.approved, closed=True)
-    return {t.ticket for t in opened + closed}
+    # 消えた写しの分も残す。写しが 1 回読めなかっただけで「知らない」に戻すと、
+    # 次の回に同じ承認をもう一度伝えることになる。
+    _write_known(stderr, path, {**known, **marks})
+    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known})
 
 
 def _candidates(

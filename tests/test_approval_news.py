@@ -134,6 +134,53 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertEqual(self.before(session="s1", agent_id="sub-1"), "")
         self.assertEqual(self.before(session="s1", agent_id="sub-1"), "")
 
+    # ---- 4b. 伝え漏れ（敵対的レビューが見つけた 3 つ）
+
+    def test_a_revision_of_the_parent_is_told_once(self):
+        """親の改版は写しを書き換えるだけで識別子が増えない。印まで見て伝える。"""
+        self.parent_only()
+        self.prompt()  # 起点
+        self.approve_yes(["i0001"])
+        self.assertIn("i0001", self.prompt())
+        self.assertEqual(self.prompt(), "")
+        # 全体計画を差し替えて再承認する。識別子は同じまま。
+        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
+        self.commit_parent()
+        told = self.approve_yes(["i0001"])
+        self.assertIn("改版", told)
+        heard = self.prompt()
+        self.assertIn("i0001", heard)
+        self.assertIn("改版", heard)
+        self.assertEqual(self.prompt(), "")
+
+    def test_a_copy_closed_before_the_next_hook_is_still_told(self):
+        """承認の直後に子が閉じても、その承認は 1 度伝える。"""
+        from ccnavi import approval
+
+        self.parent_only()
+        self.approve_yes(["i0001"])
+        self.prompt()
+        self.next_child()
+        self.approve_yes(["i0001-01"])
+        # 次の hook より前に閉じる（子を done にしたときと同じ形）。
+        self.assertEqual(approval.close_copy(self.approved, "i0001-01"), "")
+        heard = self.prompt()
+        self.assertIn("i0001-01", heard)
+        self.assertEqual(self.prompt(), "")
+
+    def test_a_broken_memo_tells_instead_of_going_quiet(self):
+        """控えが壊れていたら、伝えていない承認ごと起点化せず、伝える側へ倒す。"""
+        self.parent_only()
+        self.prompt()
+        self.next_child()
+        self.approve_yes(["i0001", "i0001-01"])
+        memo = glob.glob(os.path.join(self.state, "approved-s1-*.json"))[0]
+        with open(memo, "w", encoding="utf-8") as f:
+            f.write("{ これは JSON ではない")
+        heard = self.prompt()
+        self.assertIn("i0001-01", heard)
+        self.assertEqual(self.prompt(), "")
+
     # ---- 5. 控えを置けないときは黙る
 
     def test_without_a_state_dir_nothing_is_told_and_nothing_is_written(self):
