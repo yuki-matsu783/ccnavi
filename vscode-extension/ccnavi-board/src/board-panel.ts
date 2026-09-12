@@ -288,13 +288,27 @@ function openTicket(current: PanelState, filePath: string): void {
   if (current.board === undefined || !isKnownPath(current.board, filePath)) {
     return;
   }
-  void vscode.workspace.openTextDocument(filePath).then(
-    (document) => vscode.window.showTextDocument(document),
-    () => {
-      vscode.window.showInformationMessage(`チケットのファイルを開けなかった: ${filePath}`);
-      void update();
-    },
-  );
+  void showTicketPreview(filePath).catch(() => {
+    vscode.window.showInformationMessage(`チケットのファイルを開けなかった: ${filePath}`);
+    void update();
+  });
+}
+
+/**
+ * チケットは Markdown なので、素のテキストではなくプレビューで見せる。
+ * 無いファイルでもプレビューのコマンドは失敗を返さず空の画面を出すだけなので、先に在るかを確かめ、
+ * 無ければ呼び手に失敗を返す（通知して、ボードを読み直す）。
+ * プレビューのコマンドが無い環境（組み込みの Markdown 拡張が無効）では、これまでどおりエディタで開く。
+ */
+async function showTicketPreview(filePath: string): Promise<void> {
+  const uri = vscode.Uri.file(filePath);
+  await vscode.workspace.fs.stat(uri);
+  try {
+    await vscode.commands.executeCommand("markdown.showPreview", uri);
+  } catch {
+    const document = await vscode.workspace.openTextDocument(uri);
+    await vscode.window.showTextDocument(document);
+  }
 }
 
 function asMessage(message: unknown): Message | undefined {
