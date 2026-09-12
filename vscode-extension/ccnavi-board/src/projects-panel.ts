@@ -75,7 +75,7 @@ function binSetting(): string {
 export async function openProjects(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、プロジェクト管理を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、プロジェクト管理を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -86,7 +86,7 @@ export async function openProjects(): Promise<void> {
 
   const first = await gather(folder.uri.fsPath);
   if (!first.ok) {
-    vscode.window.showErrorMessage(`プロジェクト管理を表示できない: ${first.error}`);
+    vscode.window.showErrorMessage(`プロジェクト管理を表示できません: ${first.error}`);
     return;
   }
 
@@ -287,7 +287,7 @@ function show(current: PanelState, page: ProjectsPage): void {
 }
 
 function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi プロジェクト管理</title></head><body><p>プロジェクトの一覧を読み直せなかった。直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi プロジェクト管理</title></head><body><p>プロジェクトの一覧を読み込めませんでした。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直してください。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
 function fail(current: PanelState, message: string): void {
@@ -330,7 +330,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     case "openBoard":
       if (ticketControl() !== "enable") {
-        fail(current, "このワークスペースはチケット制御を使っていない（CCNAVI_TICKET_CONTROL=disable）");
+        fail(current, "このワークスペースではチケット制御が無効です（CCNAVI_TICKET_CONTROL=disable）");
         return;
       }
       await openBoard(message.name);
@@ -339,11 +339,11 @@ async function handleMessage(current: PanelState, message: Message | undefined):
     case "pull": {
       const row = page.rows.find((r) => r.name === message.name);
       if (row === undefined) {
-        fail(current, `プロジェクト ${message.name} が一覧に無い。更新してから押し直す`);
+        fail(current, `プロジェクト ${message.name} が一覧にありません。更新してから押し直してください`);
         return;
       }
       runInTerminal(root, message.type === "fetch" ? fetchCommand(row.root) : pullCommand(row.root));
-      info(current, `${message.name} で git ${message.type} をターミナルへ送った`);
+      info(current, `${message.name} で git ${message.type} をターミナルで実行しました`);
       return;
     }
   }
@@ -352,7 +352,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
 function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName: string): void {
   const root = current.folder.uri.fsPath;
   if (page.projectsDir === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、clone 先が決まらない");
+    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）のため、clone 先を決められません");
     return;
   }
   const remote = checkRemote(rawUrl);
@@ -367,40 +367,40 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   }
   const twin = duplicateOf(page.rows, remote.remote.key);
   if (twin !== undefined) {
-    fail(current, `同じリポジトリを ${twin.name} として既に clone している（origin ${twin.origin}）`);
+    fail(current, `同じリポジトリを ${twin.name} として既に clone しています（origin ${twin.origin}）`);
     return;
   }
   const target = path.join(page.projectsDir, name.name);
   if (fs.existsSync(target) && listDir(target).length > 0) {
-    fail(current, `${page.projectsRel}/${name.name} が既にあって空ではない`);
+    fail(current, `${page.projectsRel}/${name.name} が既に存在し、空ではありません`);
     return;
   }
   runInTerminal(root, cloneCommand(root, page.projectsDir, remote.remote.url, name.name));
   info(
     current,
-    `git clone を「ccnavi」ターミナルへ送った（${page.projectsRel}/${name.name}）。認証の対話はターミナルで。終わると一覧が更新される`,
+    `git clone を「ccnavi」ターミナルで実行しました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。完了すると一覧が更新されます`,
     "cloned",
   );
 }
 
 function createDir(current: PanelState, page: ProjectsPage): void {
   if (page.projectsDir === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、作る場所が無い");
+    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）のため、作成先がありません");
     return;
   }
   try {
     fs.mkdirSync(page.projectsDir, { recursive: true });
   } catch (error) {
-    fail(current, `${page.projectsRel}/ を作れない: ${(error as Error).message}`);
+    fail(current, `${page.projectsRel}/ を作成できません: ${(error as Error).message}`);
     return;
   }
-  info(current, `${page.projectsRel}/ を作った`);
+  info(current, `${page.projectsRel}/ を作成しました`);
   void update();
 }
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、足す行が無い");
+    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）のため、追加する行がありません");
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
@@ -408,10 +408,10 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
   try {
     fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
   } catch (error) {
-    fail(current, `.gitignore に書けない: ${(error as Error).message}`);
+    fail(current, `.gitignore に書き込めません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignore に /${page.projectsRel}/ を足した。コミットは人が行う`);
+  info(current, `.gitignore に /${page.projectsRel}/ を追加しました。コミットは手動で行ってください`);
   void update();
 }
 
@@ -419,29 +419,29 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
   const root = current.folder.uri.fsPath;
   const row = page.rows.find((r) => r.name === name);
   if (row === undefined) {
-    fail(current, `プロジェクト ${name} が一覧に無い。更新してから押し直す`);
+    fail(current, `プロジェクト ${name} が一覧にありません。更新してから押し直してください`);
     return;
   }
   const target = path.join(root, ...row.rulesRel.split("/"));
   if (fs.existsSync(target)) {
-    fail(current, `${row.rulesRel} は既にある。上書きしない`);
+    fail(current, `${row.rulesRel} は既に存在するため、上書きしません`);
     return;
   }
   const settingsText = readText(path.join(root, ".claude", "settings.json"));
   const sourceRel = (settingsText !== undefined && envFromSettingsJson(settingsText, "CCNAVI_RULES")) || DEFAULT_RULES;
   const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {
-    fail(current, `ワークスペースのルール ${sourceRel} を読めない`);
+    fail(current, `ワークスペースのルール ${sourceRel} を読み込めません`);
     return;
   }
   try {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, rewriteRulesForProject(source, sourceRel, name, new Date().toISOString().slice(0, 10)), { encoding: "utf8", flag: "wx" });
   } catch (error) {
-    fail(current, `${row.rulesRel} に書けない: ${(error as Error).message}`);
+    fail(current, `${row.rulesRel} に書き込めません: ${(error as Error).message}`);
     return;
   }
-  info(current, `${row.rulesRel} にワークスペースのルールを写した。中身を見直してからプロジェクトの git にコミットする`);
+  info(current, `${row.rulesRel} にワークスペースのルールをコピーしました。内容を確認してからプロジェクトの git にコミットしてください`);
   void update();
 }
 

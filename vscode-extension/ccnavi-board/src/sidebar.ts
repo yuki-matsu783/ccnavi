@@ -20,21 +20,21 @@ interface Entry {
 const ENTRIES: readonly Entry[] = [
   {
     label: "プロジェクト管理",
-    description: "projects/ の一覧、clone、ルールとチケットへの導線",
+    description: "projects/ の一覧、clone・fetch・pull の実行",
     command: "ccnaviBoard.openProjects",
     icon: "repo",
     needsTickets: false,
   },
   {
     label: "ルール管理",
-    description: "ルールを直し、判定を試し、hook を眺める",
+    description: "ルールの編集と保存、判定の試行、hook の確認",
     command: "ccnaviBoard.openRules",
     icon: "shield",
     needsTickets: false,
   },
   {
     label: "チケット管理",
-    description: "提案・写し・印・作業ツリーをカンバンで",
+    description: "チケットをカンバンで見て、承認とレビューを進める",
     command: "ccnaviBoard.open",
     icon: "checklist",
     needsTickets: true,
