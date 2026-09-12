@@ -733,7 +733,7 @@ ccnavi は settings.json の `env` を自分で読み、そこに `disable` と�
 - `PostToolUse` に同じ `dist/ccnavi/ccnavi`。こちらは実行後の監視で、
   保護領域（`.claude/ccnavi/` と `.claude/hooks/`）が変わっていないかを見る。
   warn なので差し戻さず報告だけ返す。`matcher` は絞らない。絞ると Bash が抜ける
-- `PostToolUse` の `Write|Edit|MultiEdit` に `.claude/hooks/lint-py.sh`。
+- `PostToolUse` の `Write|Edit` に `.claude/hooks/lint-py.sh`。
   Python ファイルの編集時だけ動き、整形と検査をかける
 - `Stop` に `.claude/hooks/test-py.sh`。ターンの終わりに 1 回だけテストを走らせる
 

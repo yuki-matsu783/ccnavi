@@ -1,5 +1,5 @@
 #!/bin/sh
-# PostToolUse (Write|Edit|MultiEdit): 編集したファイルのツリーを整形・検査する。
+# PostToolUse (Write|Edit): 編集したファイルのツリーを整形・検査する。
 #
 # 編集したファイルが Python のソースのときだけ走る。報告は exit 2 で返す。
 # このイベントでモデルに届く経路はそれだけなので、指摘がコミット時ではなく
