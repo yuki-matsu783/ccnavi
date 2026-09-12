@@ -112,6 +112,27 @@ deny:
       閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
       範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
 
+  # ccnavi の設定（ルール・フェーズの種類・リスクの配点）。人が持つ設定で、エージェントが
+  # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリーの写しも
+  # 止める。写しは統合でそのまま main の設定になる道を持つので、main の側だけ止めても
+  # 時間差で効く。
+  - id: guard-ccnavi-config
+    match: Write|Edit|NotebookEdit
+    glob: "*/.claude/ccnavi/*.yml"
+    message: >-
+      ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
+      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
+      （/ccnavi-config）。
+
+  # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、作業ツリーの写しは
+  # 統合で main へ入る道を持つので、写しも名前で止める。
+  - id: guard-settings
+    match: Write|Edit|NotebookEdit
+    regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
+    message: >-
+      hook の登録そのものです。作業ツリーの写しも統合で main の設定になります。
+      エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼ください。
+
 ask:
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。
   - id: dependencies

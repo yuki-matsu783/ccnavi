@@ -58,10 +58,10 @@ ccnavi --test-samples testdata/rule-samples.yml --log "" --state "" --approved "
 **守られているかも見本で見る。** rules.yml と phases.yml と risk.yml、承認済みの写しの
 置き場、settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート
 直下と、**実在する作業ツリーの名前**での写しの両方。作業ツリーの写しは、ブランチを
-統合すればそのまま main の設定になる道を持つ。出るのはルールの判定だけで、組み込みの
-守り（settings.json と rules.yml を実行後に戻す働き）は `--test` には出ない。allow に
-見えたものは「ルールでは止めていない」ということなので、そのまま報告する。戻す働きに
-頼れるのは settings.json と rules.yml だけで、phases.yml と risk.yml にはそれも無い。
+統合すればそのまま main の設定になる道を持つ。このリポジトリでは `guard-ccnavi-config` と
+`guard-settings` が両方を止める。出るのはルールの判定だけで、組み込みの守り
+（settings.json と rules.yml を実行後に戻す働き）は `--test` には出ない。allow に見えた
+ものは「ルールでは止めていない」ということなので、そのまま報告する。
 
 ## 3. phases: 計画と噛み合うか
 
