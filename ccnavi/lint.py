@@ -70,6 +70,10 @@ from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 # ファイルに、防御を無効化する値が書かれていないかを問えるのはここだけだから。
 PROJECT_SETTINGS = os.path.join(".claude", "settings.json")
 
+# `--lint --json` の形の版。欄を足すだけなら上げない。欄の意味や名前を変えたら上げ、
+# 読む側（VS Code 拡張）は違う版を「読めない」として扱う。
+LINT_VERSION = 1
+
 
 def report(
     stdout: TextIO,
@@ -80,8 +84,13 @@ def report(
     restore_if_deny_flag: str = "",
     guard_core_files_flag: str = "",
     guard_ticket_approval: str = "",
+    as_json: bool = False,
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
+
+    as_json なら README「lint の JSON」の形で 1 つの JSON を書く。VS Code 拡張が
+    プロジェクトごとの warn を拾うための口で、文面の版は人向けに変えてよいが、
+    こちらの形は契約になる。
 
     書き先は標準出力にしてある。この経路は hook の payload を読まないので、
     判定を運ぶための標準出力が空いている。CI がそのまま拾える側に出す。
@@ -151,6 +160,26 @@ def report(
             )
         )
 
+    errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
+    warns = len(problems) - errors
+    if as_json:
+        payload = {
+            "version": LINT_VERSION,
+            "root": root,
+            "rules": conf.rules,
+            "mode": mode,
+            "ticket_control": conf.ticket_control or selfguard.ENABLE,
+            "projects": [t.name for t in tree.projects(conf.projects)],
+            "problems": [
+                {"severity": p.severity, "where": p.rule, "detail": p.detail} for p in problems
+            ],
+            "errors": errors,
+            "warns": warns,
+        }
+        stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
+        stdout.write("\n")
+        return EXIT_ERROR if errors else EXIT_OK
+
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
@@ -166,8 +195,6 @@ def report(
     for problem in problems:
         stdout.write(f"{problem}\n")
 
-    errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
-    warns = len(problems) - errors
     stdout.write(f"error {errors} 件、warn {warns} 件\n")
     return EXIT_ERROR if errors else EXIT_OK
 

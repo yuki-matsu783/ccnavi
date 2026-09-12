@@ -394,6 +394,80 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
 
+    # ---- 8. --project-rules-file は診断でだけ 1 つのプロジェクトのルールを差し替える
+
+    def test_project_rules_file_swaps_one_projects_rules_for_diagnostics_only(self):
+        # VS Code 拡張が、編集中の lib のルールを保存せずに試す形。lib の deny に
+        # `*/docs/*` を足した一時ファイルを渡すと、lib への書き込みはそれで判定される。
+        edited = dict(LIB_RULES)
+        edited["deny"] = LIB_RULES["deny"] + [
+            {
+                "id": "docs",
+                "match": "Write|Edit|MultiEdit",
+                "glob": "*/docs/*",
+                "message": "docs are generated.",
+            }
+        ]
+        tmp = write(os.path.join(self.ws, "tmp", "lib-rules.yml"), json.dumps(edited))
+        target = os.path.join(self.lib, "docs", "a.md")
+
+        tried = self.ccnavi(
+            "--test", "Write", target, "--json", "--project-rules-file", f"lib={tmp}"
+        )
+        self.assertEqual(tried.returncode, 0, tried.stderr)
+        body = json.loads(tried.stdout)
+        self.assertEqual(body["verdict"], "deny", tried.stdout)
+        hit = body["rules"][0]
+        self.assertEqual(hit["id"], "lib:docs")
+        # 当たったルールはプロジェクトの名前付きで引け、翻訳後の式まで見える。
+        self.assertEqual(hit["source"], "file")
+        self.assertEqual(hit["written"], "*/docs/*")
+
+        # app は差し替えていないので、app への同じ書き込みは前のまま通る。
+        other = self.ccnavi(
+            "--test",
+            "Write",
+            os.path.join(self.app, "docs", "a.md"),
+            "--json",
+            "--project-rules-file",
+            f"lib={tmp}",
+        )
+        self.assertNotEqual(json.loads(other.stdout)["verdict"], "deny", other.stdout)
+
+        # --lint --json も差し替えた側を読む。壊れた一時ファイルは lib の error として出る。
+        broken = write(os.path.join(self.ws, "tmp", "broken.yml"), "version: 3\ndeny: [\n")
+        linted = self.ccnavi("--lint", "--json", "--project-rules-file", f"lib={broken}")
+        report = json.loads(linted.stdout)
+        self.assertEqual(report["projects"], ["app", "lib"])
+        wheres = [p["where"] for p in report["problems"] if p["severity"] == "error"]
+        self.assertTrue(any(w.startswith("(projects/lib)") for w in wheres), linted.stdout)
+        self.assertFalse(any(w.startswith("(projects/app)") for w in wheres), linted.stdout)
+
+        # hook からの判定は差し替えを見ない。保存していないルールが判定に効く道を持たない。
+        ignored = self.ccnavi(
+            "--mode",
+            "enable",
+            "--project-rules-file",
+            f"lib={tmp}",
+            stdin=json.dumps(
+                {
+                    "hook_event_name": "PreToolUse",
+                    "tool_name": "Write",
+                    "cwd": self.ws,
+                    "session_id": "s1",
+                    "tool_input": {"file_path": target},
+                }
+            ),
+        )
+        self.assertEqual(ignored.returncode, 0, ignored.stderr)
+        self.assertNotEqual(self.decision(ignored), "deny", ignored.stdout)
+        self.assertIn("診断", ignored.stderr)
+
+        # 形が違えば止まる。
+        malformed = self.ccnavi("--lint", "--json", "--project-rules-file", "lib")
+        self.assertEqual(malformed.returncode, 1)
+        self.assertIn("<名前>=<パス>", malformed.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

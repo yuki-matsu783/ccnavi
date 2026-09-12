@@ -51,10 +51,17 @@ watch the working tree for protected files that changed anyway. Exercise it with
 
 To check the rules file and the settings without making a decision, run
 
-    ccnavi --lint
+    ccnavi --lint [--json]
 
 It reads no payload, reports anything that could disable the guard as an error
-or a warning, and exits non-zero when it reports an error.
+or a warning, and exits non-zero when it reports an error. --json prints the
+shape documented in README.md ("lint の JSON"); the VS Code extension reads it.
+
+To try or lint one project's rules before saving them, hand the edited file in
+by the project's name (this flag is for --test, --test-samples, --lint and
+--explain only; a hook invocation ignores it):
+
+    ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
 
 To list the tickets, their approved copies, the phase marks and the gates
 in a machine-readable form (the VS Code board extension reads this), run
@@ -178,6 +185,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # プロジェクトの置き場と、プロジェクトごとのルールファイル（設計 §25）。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-rules", default="")
+    # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
+    # VS Code 拡張が編集中のプロジェクトのルールを保存せずに試すために渡す。
+    parser.add_argument("--project-rules-file", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", default="")
@@ -223,6 +233,21 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
+    # プロジェクトのルールの差し替えは診断の経路でだけ効く。hook からの判定に
+    # 差し替えの口を持つと、ルールを保存せずに緩める道になるので、そこでは捨てる。
+    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    if args.project_rules_file:
+        if not diagnosing:
+            stderr.write(
+                "ccnavi: --project-rules-file は診断（--test / --lint / --explain）でだけ効く\n"
+            )
+        else:
+            name, sep, path = args.project_rules_file.partition("=")
+            if not sep or not name or not path:
+                stderr.write("ccnavi: --project-rules-file は <名前>=<パス> の形\n")
+                return EXIT_ERROR
+            conf.project_rules_files[name] = os.path.abspath(path)
+
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
     # 報告でしかないものが、検証にとっては結論そのものになる。
@@ -236,6 +261,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             args.restore_if_deny,
             args.guard_core_files,
             conf.guard_ticket_approval,
+            as_json=args.json,
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。

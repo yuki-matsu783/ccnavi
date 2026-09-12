@@ -412,6 +412,28 @@ class LintTest(unittest.TestCase):
 
         self.assertEqual(counts(result.stdout), (0, 0), result.stdout)
 
+    def test_json_は同じ苦情を機械可読な形で返し終了コードも同じ(self):
+        # VS Code 拡張が読む形（README「lint の JSON」）。文面の版と同じ判定を
+        # 同じ深刻度で運ぶ。error があれば終了コードも同じく非ゼロ。
+        path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
+
+        result = ccnavi(self.root, "--lint", "--json", "--rules", path, "--mode", "dry-run")
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["version"], 1)
+        self.assertEqual(body["rules"], path)
+        self.assertEqual(body["mode"], "dry-run")
+        self.assertEqual(body["projects"], [])
+        self.assertEqual(body["errors"], 1)
+        self.assertGreaterEqual(body["warns"], 1)
+        self.assertEqual(body["errors"] + body["warns"], len(body["problems"]))
+        severities = {p["severity"] for p in body["problems"]}
+        self.assertEqual(severities, {"error", "warn"})
+        errors = [p for p in body["problems"] if p["severity"] == "error"]
+        self.assertIn("ルールを読めない", errors[0]["detail"])
+        self.assertEqual(set(body["problems"][0]), {"severity", "where", "detail"})
+
 
 if __name__ == "__main__":
     unittest.main()

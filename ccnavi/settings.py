@@ -188,6 +188,11 @@ class Settings:
     # （git プロジェクトルートからの相対、"/" 区切り）。
     projects: str = ""
     project_rules: str = ""
+    # project_rules_files は、名前で指したプロジェクトのルールファイルの差し替え
+    # （名前 → 絶対パス）。`--project-rules-file <名前>=<パス>` が入れる。診断（--test /
+    # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
+    # VS Code 拡張が、編集中のプロジェクトのルールを保存せずに試すための口。
+    project_rules_files: dict[str, str] = field(default_factory=dict)
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
     retired: list[str] = field(default_factory=list)
 
@@ -291,7 +296,19 @@ def load(root: str) -> tuple[Settings, list[str]]:
 
 
 def project_rules_path(conf: Settings, project_root: str) -> str:
-    """このプロジェクトのルールファイルの絶対パス。"""
+    """このプロジェクトのルールファイルの絶対パス。判定と診断が読む先。
+
+    `--project-rules-file` で名前が差し替えられていれば、そのパス。守る対象
+    （selfguard）は差し替えを見ない `project_rules_real_path` を使う。
+    """
+    override = conf.project_rules_files.get(os.path.basename(project_root))
+    if override:
+        return override
+    return project_rules_real_path(conf, project_root)
+
+
+def project_rules_real_path(conf: Settings, project_root: str) -> str:
+    """このプロジェクトのルールファイルが本来ある場所。差し替えを見ない。"""
     return os.path.join(project_root, conf.project_rules.replace("/", os.sep))
 
 

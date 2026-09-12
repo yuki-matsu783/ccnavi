@@ -204,13 +204,22 @@ def _rules_hit(
     当たらなかった理由を人が自分で辿れない。
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
-    ルールファイルの外から来た根拠）。
+    ルールファイルの外から来た根拠）。プロジェクトのルールは `lib:source` の形の id で
+    当たるので（REQ-MLT-07）、同じ綴りで引けるように名前を添えて並べる。
     """
     if not record.rules:
         return []
 
     rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
     by_id = {rule.id: rule for rule in rule_set.all() if rule.id}
+    for p in tree.projects(conf.projects):
+        path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.name))
+        try:
+            extra, _ = rules.load(path, root)
+        except (OSError, ValueError):
+            continue
+        ruleload.prefix_ids(extra, p.name)
+        by_id.update({rule.id: rule for rule in extra.all() if rule.id})
 
     hits = []
     for name in record.rules:

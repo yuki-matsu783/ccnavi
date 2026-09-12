@@ -100,7 +100,7 @@ def rules_for(
 def project_rules_files(conf: settings.Settings) -> list[tuple[str, str]]:
     """置き場にあるプロジェクトと、そのルールファイル。selfguard の守る対象に渡す。"""
     return [
-        (p.name, settings.project_rules_path(conf, tree.project_root(conf.projects, p.name)))
+        (p.name, settings.project_rules_real_path(conf, tree.project_root(conf.projects, p.name)))
         for p in tree.projects(conf.projects)
     ]
 
