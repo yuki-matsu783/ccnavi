@@ -27,9 +27,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: wip/design/*
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: "2026-09-12T23:47:28+0900"
+completed_at: "2026-09-12T23:52:21+0900"
+base_sha: "15b17ab5f93b0198962edec09a650c9434688f97"
 ---
 
 # 設計文書を実装に合わせる
