@@ -24,6 +24,8 @@ import sys
 import tempfile
 import unittest
 
+from tests.inproc import run_ccnavi
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 大文字小文字を区別しない機械かどうか（ccnavi/tree.py の CASE_INSENSITIVE と同じ判じ方）。
 # 範囲の照合は、この機械でだけ綴りの違いを許す（ticket.py の _in_scope）。
@@ -131,11 +133,8 @@ class TicketTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.root,
                 "--rules",
@@ -157,9 +156,6 @@ class TicketTest(unittest.TestCase):
                 *args,
             ],
             input=stdin,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

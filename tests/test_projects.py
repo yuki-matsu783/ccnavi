@@ -21,9 +21,10 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -160,11 +161,8 @@ class ProjectsTest(unittest.TestCase):
     def ccnavi(self, *args, stdin="", projects=None):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.ws,
                 "--rules",
@@ -186,9 +184,6 @@ class ProjectsTest(unittest.TestCase):
                 *args,
             ],
             input=stdin,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

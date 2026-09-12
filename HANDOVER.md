@@ -58,7 +58,8 @@ ccnavi/modes.py             enable / dry-run / disable と終了コード
 ccnavi/gitcmd.py            git を 1 回起こす
 ccnavi/fsio.py              ファイルの読み書きの型
 build.py                    PyInstaller の onedir で配布物を組み立てる
-tests/                      受入テスト。実行ファイルを外から叩く
+tests/                      受入テスト。入口（cli.run）に引数と標準入力を渡し、応答だけを見る
+tests/inproc.py             その起動をプロセスを起こさずに行う。起動の検査は test_entry.py だけ
 ```
 
 実行時の third-party 依存は PyYAML 1 本。チケットの frontmatter が YAML なので、
@@ -663,7 +664,7 @@ ccnavi は settings.json の `env` を自分で読み、そこに `disable` と�
      （このプロジェクトで C 拡張を持つ依存は PyYAML だけなので、当たるのはこの 1 本）
   2. Windows は、実体が DLL として読み込まれている間、**どの名前も**消させない。
      rename は通る。Linux は mmap 中でも unlink できるので、ここは Windows だけの話
-  3. 並行するセッションはターンの終わりに `test-py.sh` で 9 分ほどテストを走らせ、
+  3. 並行するセッションはターンの終わりに `test-py.sh` で数分テストを走らせ、
      そこで PyYAML を読み込む。作業ツリーが数本あると、ほぼ常に誰かが掴んでいる
   4. 掴まれている間に別の作業ツリーを消そうとすると、その 1 ファイルだけが残る
   対処は入れた（`pyproject.toml` の `[tool.uv] link-mode = "copy"`。複製にすれば実体が

@@ -16,9 +16,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -50,11 +51,8 @@ class AdditionalContextTest(unittest.TestCase):
         self, rules_path: str, *args: str, payload: str = ""
     ) -> subprocess.CompletedProcess:
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.root,
                 "--rules",
@@ -68,9 +66,6 @@ class AdditionalContextTest(unittest.TestCase):
                 *args,
             ],
             input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

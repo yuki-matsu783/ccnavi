@@ -17,10 +17,10 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -63,11 +63,8 @@ class SectionsTest(unittest.TestCase):
             }
         )
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        done = subprocess.run(
+        done = run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.root,
                 "--mode",
@@ -82,9 +79,6 @@ class SectionsTest(unittest.TestCase):
                 "",
             ],
             input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

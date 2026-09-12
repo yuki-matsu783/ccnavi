@@ -17,11 +17,10 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
-import sys
 import tempfile
 import unittest
 
+from tests.inproc import run_ccnavi
 from tests.test_ticket import ROOT, RULES, git, read_json, write
 
 PHASES = """
@@ -133,11 +132,8 @@ class PhaseHarness(unittest.TestCase):
     def ccnavi(self, *args, stdin="", phases=None):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.root,
                 "--rules",
@@ -159,9 +155,6 @@ class PhaseHarness(unittest.TestCase):
                 *args,
             ],
             input=stdin,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

@@ -12,9 +12,10 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -112,11 +113,8 @@ class PostToolUseTest(unittest.TestCase):
             # 名指しで無視される仕様なので、環境から渡す。
             environment["CCNAVI_MODE"] = "disable"
             args = []
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.repo,
                 "--rules",
@@ -135,9 +133,6 @@ class PostToolUseTest(unittest.TestCase):
                 *args,
             ],
             input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

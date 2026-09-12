@@ -15,12 +15,12 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
 from ccnavi import selfguard
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -124,11 +124,8 @@ class SelfGuardTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
-        return subprocess.run(
+        return run_ccnavi(
             [
-                sys.executable,
-                "-m",
-                "ccnavi",
                 "--root",
                 self.repo,
                 "--rules",
@@ -147,9 +144,6 @@ class SelfGuardTest(unittest.TestCase):
                 "disable",
             ],
             input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
             cwd=ROOT,
             env=environment,
         )

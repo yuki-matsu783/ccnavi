@@ -18,9 +18,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
+
+from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures")
@@ -81,11 +82,8 @@ def write(directory: str, name: str, text: str) -> str:
 def ccnavi(root: str, rules_path: str, *args: str) -> subprocess.CompletedProcess:
     """見るのはルールだけ。写しと控えは外し、記録も残さない。"""
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-    return subprocess.run(
+    return run_ccnavi(
         [
-            sys.executable,
-            "-m",
-            "ccnavi",
             "--root",
             root,
             "--rules",
@@ -99,9 +97,6 @@ def ccnavi(root: str, rules_path: str, *args: str) -> subprocess.CompletedProces
             *args,
         ],
         input="",
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
         cwd=ROOT,
         env=environment,
     )
