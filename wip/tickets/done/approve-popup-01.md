@@ -15,9 +15,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: wip/design/*
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: "2026-09-12T19:00:18+0900"
+completed_at: "2026-09-12T19:06:24+0900"
+base_sha: "a8e25a29bc1475a9d178b995a2b54eb34fbdf702"
 ---
 
 # 承認ポップアップの設計
