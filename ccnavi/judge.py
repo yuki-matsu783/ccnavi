@@ -47,7 +47,7 @@ PERMISSION_JUDGED = ("auto",)
 # 通る」に化けるので、許可としない（REQ-PRE-08）。
 PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 
-# 判定を権限モードへ渡したことを表す内部の値。区画名（rules.ALLOW など）と
+# 判定を権限モードへ渡したことを表す内部の値。タイプ名（rules.ALLOW など）と
 # 同じ変数に入るので、ルールファイルには現れない綴りにしてある。
 HANDOVER = "(handover)"
 
@@ -146,7 +146,7 @@ def decide_before(
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
-        # これにあたる。ルールを当てる先が無いので、どの区画にも当たらず
+        # これにあたる。ルールを当てる先が無いので、どのタイプにも当たらず
         # 権限モードへ渡る先になるが、何も走らないものについて誰かの判断を
         # 求める意味は無い。
         record.decision, record.reason = audit.SKIP, audit.REASON_NOTHING_TO_RUN
@@ -190,8 +190,8 @@ def decide_before(
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
 
-    # 強い区画から順に見て、最初に当たったところで止める。deny に当たった
-    # 呼び出しについて ask の区画を調べる意味は無いし、調べれば「拒否だが
+    # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
+    # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
     # 確認もしろ」という読めない結論に届く道ができる。
     verdict, group = "", []
     for name in rules.SECTIONS:
@@ -268,7 +268,7 @@ def decide_before(
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
     else:
-        # どの区画も言及しなかった。ccnavi はこの呼び出しの判定を持たない。
+        # どのタイプも言及しなかった。ccnavi はこの呼び出しの判定を持たない。
         # 結末は Claude Code の権限モードが決める。
         record.code = reasons.CODE_UNCERTAIN if record.degraded else reasons.CODE_UNDECLARED
         verdict = undeclared_verdict(payload.permission_mode, record.degraded)
@@ -491,7 +491,7 @@ def ticket_verdict(
 
 
 def undeclared_verdict(permission_mode: str, degraded: str) -> str:
-    """どの区画も言及しなかった呼び出しを、権限モードごとにどう扱うか。
+    """どのタイプも言及しなかった呼び出しを、権限モードごとにどう扱うか。
 
     渡すのは「ルールが言及していない」ときだけ。読み切れなかったコマンド
     （degraded）は渡さない。ccnavi が読めなかったという事実は判定の結果に

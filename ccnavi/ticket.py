@@ -20,7 +20,7 @@
 ## 書式
 
 `wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §24.3。
-区画は rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
+タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
     ---
@@ -166,7 +166,7 @@ OUTSIDE = ""
 
 @dataclass
 class Entry:
-    """範囲の 1 項。区画と、当てる式。"""
+    """範囲の 1 項。タイプと、当てる式。"""
 
     decision: str
     glob: str = ""
@@ -315,7 +315,7 @@ class Ticket:
     def decide(self, rel: str) -> str:
         """このチケットが、作業ツリーのルートからの相対パスをどう扱うか。
 
-        強い区画から見る。どこにも当たらなければ OUTSIDE で、それは範囲外。
+        強いタイプから見る。どこにも当たらなければ OUTSIDE で、それは範囲外。
         書いていない場所は範囲外、が子のファイルだけ読んで範囲が分かる条件。
         """
         for name in rules.SECTIONS:
@@ -386,7 +386,7 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
                 SEVERITY_ERROR,
                 name,
                 f"チケット書式の版 {version!r} は扱えない（このビルドが読むのは {VERSION}）。"
-                "区画は rules.yml と同じ deny / ask / allow で、`target_directories` は読まない",
+                "タイプは rules.yml と同じ deny / ask / allow で、`target_directories` は読まない",
             )
         )
         return True
@@ -504,7 +504,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
                     SEVERITY_WARN,
                     name,
                     f"`{key}` はこの版の判定が使わない。書いても効かない。"
-                    "範囲は deny / ask / allow の区画に `match: Write|Edit|MultiEdit` で書く",
+                    "範囲は deny / ask / allow のタイプに `match: Write|Edit|MultiEdit` で書く",
                 )
             )
 

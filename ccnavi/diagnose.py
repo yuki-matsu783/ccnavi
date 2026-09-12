@@ -197,7 +197,7 @@ def test_json(
 def _rules_hit(
     stderr: TextIO, conf: settings.Settings, root: str, record: audit.Record
 ) -> list[dict]:
-    """当たったルールを、区画と翻訳後の式まで返す。
+    """当たったルールを、タイプと翻訳後の式まで返す。
 
     翻訳後の式を出すのがこの試験の要。`glob` は正規表現に化けるので、
     書いたものと当たるものの間に見えない層が 1 枚ある。その層を開けないと、
@@ -269,20 +269,20 @@ def _response_text(written: str) -> str:
 
 
 def load_samples(path: str, root: str) -> list[dict]:
-    """見本を読んで、区画の順に平らな並びにする。
+    """見本を読んで、タイプの順に平らな並びにする。
 
-    区画の名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
+    タイプの名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
     """
     with open(path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     if not isinstance(raw, dict):
-        raise ValueError(f"見本の形が違う。最上位は区画の対応表のはず: {path}")
+        raise ValueError(f"見本の形が違う。最上位はタイプの対応表のはず: {path}")
     samples = []
     for want in rules.SECTIONS:
         for case in raw.get(want) or []:
             if not isinstance(case, dict):
-                raise ValueError(f"見本の形が違う。区画 {want} の 1 件が対応表ではない: {path}")
+                raise ValueError(f"見本の形が違う。タイプ {want} の 1 件が対応表ではない: {path}")
             written = str(case.get("subject") or "")
             samples.append(
                 {
@@ -395,7 +395,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     どこが守られているかではなく、何がどう宣言されているかを見せる。
     実効権限をパスごとに数え上げるには、宣言済み領域という概念が要る。
-    それはまだ無いので、ここで言えるのは「どのルールがどの区画にあるか」と
+    それはまだ無いので、ここで言えるのは「どのルールがどのタイプにあるか」と
     「チケットの範囲が効いているか」まで。言えないことは言わない。
     """
     rule_set, source = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)

@@ -4,10 +4,10 @@
 ルールは自分の文面を持つ。これが「代わりの手段」を忘れさせない仕組みで、
 ルールを 1 件足すことが、代わりに何をすべきかを書くことを強制する。
 
-## 3 つの区画
+## 3 つのタイプ
 
 ルールファイルは `deny` `ask` `allow` の 3 つに分かれる。どれも同じ形の
-ルールを並べるだけで、置かれた区画がその判定になる。
+ルールを並べるだけで、置かれたタイプがその判定になる。
 
     version: 3
     deny:
@@ -31,7 +31,7 @@
 
 ## 強さ
 
-同じ呼び出しに複数の区画が当たることがある。強い順に `deny` `ask` `allow`。
+同じ呼び出しに複数のタイプが当たることがある。強い順に `deny` `ask` `allow`。
 1 件でも `deny` に当たれば拒否で、`ask` があれば確認、どちらも無く `allow` に
 当たれば許可になる。どこにも当たらなければ、ccnavi は判定を持たず、
 Claude Code の権限モードに従う（判定は cli.py）。
@@ -60,20 +60,20 @@ import yaml
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。
-# 2 で区画が 3 つに分かれ、ファイルの形式も JSON から YAML になった。
+# 2 でタイプが 3 つに分かれ、ファイルの形式も JSON から YAML になった。
 VERSION = 3
 
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 
-# 区画の名前。強い順。cli.py の判定もこの順に見る。
+# タイプの名前。強い順。cli.py の判定もこの順に見る。
 DENY = "deny"
 ASK = "ask"
 ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
-# 文面が要る区画。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
+# 文面が要るタイプ。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
 # 通すだけで届く先が無い（どちらも実測済み、設計 §24.12）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
 # ここで落とすとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
@@ -163,7 +163,7 @@ class Rule:
     # ctxfile.MAX_CHARS で切り、切ったことを本文の末尾に添える。
     additional_context_file: str = ""
     additional_context_once_file: str = ""
-    # decision はこのルールが置かれていた区画。当たったルールを 1 件だけ
+    # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
 
@@ -181,11 +181,11 @@ class Rule:
 
 @dataclass
 class RuleSet:
-    """ルールファイル 1 本ぶん。区画ごとに分けて持つ。
+    """ルールファイル 1 本ぶん。タイプごとに分けて持つ。
 
     1 本の並びにして各ルールが自分の判定を名乗る形にもできるが、分けておくと
-    「強い順に見る」が並びの順そのものになる。判定の側が区画を選び違える形を
-    残さないほうが、あとから区画を足したときに事故が起きにくい。
+    「強い順に見る」が並びの順そのものになる。判定の側がタイプを選び違える形を
+    残さないほうが、あとからタイプを足したときに事故が起きにくい。
     """
 
     version: int = 0
@@ -197,7 +197,7 @@ class RuleSet:
         return {DENY: self.deny, ASK: self.ask, ALLOW: self.allow}[name]
 
     def all(self) -> Iterator[Rule]:
-        """全区画を強い順に。検証と、区画をまたいだ数え上げのために。"""
+        """全タイプを強い順に。検証と、タイプをまたいだ数え上げのために。"""
         for name in SECTIONS:
             yield from self.section(name)
 
@@ -246,7 +246,7 @@ def parse(data: dict, root: str = "") -> tuple[RuleSet, list[Problem]]:
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
                 f"版 1 は 1 本の `rules` の並び、版 2 は "
-                f"`{'` `'.join(SECTIONS)}` の 3 区画で欄の名前が `pattern`。"
+                f"`{'` `'.join(SECTIONS)}` の 3 タイプで欄の名前が `pattern`。"
                 "版 3 は欄の名前が `glob` で、意味も fnmatch の glob になった。"
                 "文字列全体に当たるので、部分一致が要るなら前後に `*` を書く",
             )

@@ -98,7 +98,7 @@ def fallen_back(rules_path: str) -> str:
 
 
 def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused: bool) -> str:
-    """どの区画も言及しなかった呼び出しに返す文。
+    """どのタイプも言及しなかった呼び出しに返す文。
 
     危険だとは言わない。言えないから権限モードに委ねている。根拠は設定の穴で
     あって呼び出しの中身ではないので、危険の表明として書くと、受け取った側は
@@ -168,7 +168,7 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # どこまでが対象でどこからが言い分なのかが読めなくなる。
     shown = " ".join(shown.split())
 
-    # コードはルールが置かれていた区画から決まる。拒否と確認で同じコードを
+    # コードはルールが置かれていたタイプから決まる。拒否と確認で同じコードを
     # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
     # 推し量ることになる。
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
