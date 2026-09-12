@@ -2,6 +2,11 @@
 
 run は終了コードを返す。自分で終了しないので、道具ぜんぶを別プロセス無しで
 テストから動かせる。
+
+ここに置くのは引数の解釈と振り分けだけ。hook のイベントごとの手順は events、
+実行前の判定は judge、判定に添える文面は reasons、モードと終了コードは modes に
+ある。チケットとレビューの操作（`ticket ...` / `review ...`）は operate が
+ops / review へ渡す。
 """
 
 from __future__ import annotations
@@ -16,6 +21,7 @@ from . import (
     audit,
     diagnose,
     events,
+    fsio,
     hookio,
     judge,
     lint,
@@ -107,6 +113,38 @@ un-drafts the merge request and files the leftovers as a new issue.
 """
 
 
+# フラグで上書きする設定の欄と、空文字を「指定した」と読むかどうか。
+# 空文字を受ける欄は、既定が None のフラグで運ぶ。「記録しない」「控えを持たない」を
+# 言えないと、診断のための 1 回が、走っているセッションの記録と控えに必ず混ざる。
+OVERRIDES = (
+    ("log", True),
+    ("rules", False),
+    ("state", True),
+    ("approved", True),
+    ("phases", True),
+    ("risk", True),
+    ("projects", True),
+)
+# 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
+RELATIVE_OVERRIDES = ("tickets", "project_rules")
+
+
+def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
+    """フラグを設定に重ねる。フラグは何よりも強い。
+
+    診断のための実行が、プロジェクト全体で共有しているファイルに触らずに
+    別の場所を指せるように。
+    """
+    for name, accepts_empty in OVERRIDES:
+        value = getattr(args, name)
+        if value is not None and (accepts_empty or value):
+            setattr(conf, name, value)
+    for name in RELATIVE_OVERRIDES:
+        value = getattr(args, name)
+        if value:
+            setattr(conf, name, fsio.slashed(value).strip("/"))
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
@@ -154,28 +192,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
 
-    # フラグは何よりも強い。診断のための実行が、プロジェクト全体で共有している
-    # ファイルに触らずに別の場所を指せるように。
-    # 空文字も受ける。「記録しない」「控えを持たない」を言えないと、診断の
-    # ための 1 回が、走っているセッションの記録と控えに必ず混ざる。
-    if args.log is not None:
-        conf.log = args.log
-    if args.rules:
-        conf.rules = args.rules
-    if args.state is not None:
-        conf.state = args.state
-    if args.tickets:
-        conf.tickets = args.tickets.replace("\\", "/").strip("/")
-    if args.approved is not None:
-        conf.approved = args.approved
-    if args.phases is not None:
-        conf.phases = args.phases
-    if args.risk is not None:
-        conf.risk = args.risk
-    if args.projects is not None:
-        conf.projects = args.projects
-    if args.project_rules:
-        conf.project_rules = args.project_rules.replace("\\", "/").strip("/")
+    _override(conf, args)
     conf.guard_cli = selfguard.resolve(
         stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
     )

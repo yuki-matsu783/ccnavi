@@ -1,4 +1,9 @@
-"""ルールが指すファイルを additionalContext に載せる（REQ-PRE-12）。
+"""当たったルールがモデルへ渡す文（additionalContext）を組む（REQ-PRE-12）。
+
+文（`additionalContext`）と、ファイルの本文（`additionalContextFile`）と、
+1 度だけ渡す文（`additionalContextOnce` / `additionalContextOnceFile`）の 3 つを
+ここで並べる。once の控えも持つ。文脈はセッションと、サブエージェントなら
+その 1 回の起動で分ける。
 
 `additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に
 続けて）ファイルの本文をモデルへ渡す。長い案内を rules.yml に抱えず、既にある md を
