@@ -100,20 +100,112 @@ uv run --with pyinstaller python build.py
 
 ## 次にやること
 
-**`test-py.sh` が、作業ツリーの抜け殻で落ちる（人が直す。hook はエージェントが触らない）。**
-`git worktree remove` が `.venv` の 1 ファイルを消せずに抜け殻を残すことがある（下の
-「作業ツリーが消せない」）。抜け殻はディレクトリとしては在るので `[ -d "$target" ]` を通り、
-`uv run … unittest discover` が `Start directory is not importable: 'tests'` で落ちて、
-関係のない差し戻しがモデルへ届く。`[ -d "$target/tests" ] || continue` に直せば済む。
+### まず: 写す版の sh が `wip/design/scripts/` にある（人が写す）
 
-**`ccnavi-review.sh` に、敵対的レビューで見つかった漏れが 2 つ残っている（人が直す）。**
-スクリプトはエージェントが触らない決まりなので、直し方だけ書く。
-(1) `origin` を読めなかったときの `fail` が URL をそのまま stderr に出す（114 行付近と、
-その後の 2 か所）。`ssh://oauth2:<token>@host:2222/g/p.git` のように読めない綴りだと
-トークンが漏れる。伏せた綴りを origin を読む前に 1 度作り、`fail` にはそれだけ渡す。
-(2) `origin` サブコマンドの伏せ字が最初の `@` まで（`s#^([a-z]+://)[^/@]+@#`）で、解析は
-最後の `@` まで。`glpat-A@B` のように `@` を含む資格情報だと後半が出る。`[^/]*@` に直し、
-scheme の `[a-z]+` は大文字も含める。exe 側の `remote_kind` は同じ規則に直してある。
+チケット `sh-ws-root` の成果物。**まだ配布先に入っていない。** 手順は
+`wip/design/scripts/COPY.md`。`ccnavi-common.sh` を最初に写すこと。3 本が起動時に
+`.` で読むので、本体だけ先に写すと sh が全部動かなくなる。
+
+写す理由は、これらが `deny` の対象でエージェントが書けないため（`judge.py:246-247`
+「チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い」）。
+ガードは緩めていない。
+
+確かめ方。
+
+```
+CCNAVI_E2E=1 CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.test_e2e_sh  # 写す前（20 件緑）
+CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh                                    # 写した後（20 件緑になること）
+```
+
+`tests/test_e2e_sh.py` は重い（実 git・実行ファイル 18MB の写し）ので `CCNAVI_E2E` が
+無ければ skip する。**モード B（`projects/` を使う形）に触ったら回すこと。**
+
+写す版で直したもの。
+
+- **保護済み sh 3 本が、自分の根を git に聞いていた**（`--show-toplevel` /
+  `--git-common-dir`）。モード A では git のトップとワークスペースルートが一致するので
+  露見しなかったが、モード B では一致しない。結果、`ccnavi-ticket.sh` と
+  `ccnavi-review.sh` がプロジェクトの中で動かず、後者はプロジェクトに `.claude/` を
+  作って失敗し、子チケットの push ガードが黙って効かなくなり、記録が
+  `projects/<名前>/logs/` に出ていた
+- 根の探し方を `ccnavi-common.sh`（新設）に切り出した。`cwd` から上へ歩いて
+  `.claude/scripts/` を持つディレクトリを探す。**`.claude/worktrees/` の下は候補から
+  外す。** `.claude/scripts/` は git が運ぶのでどの作業ツリーにも写しがあるが、
+  承認済みの写しと `state/` は追跡外で運ばれない。根は運ばれないほうに合わせる
+- `worktree add` の行き先を検査するようにした。ワークスペースの `.claude/worktrees/` の
+  外なら止め、`cwd` に合わせた正しい綴りを文面に出す。知らないオプションも止める
+- `origin` の伏せ字を `ccnavi_mask_url` に集約し、生の URL を文面に入れる綴りを
+  1 つも残していない（上の (1)(2) はこれで塞がった）
+- `test-py.sh` の存在チェックを `[ -d "$target/tests" ]` にした
+- `rules.yml` の拒否の文面 3 か所を `{root}/.claude/scripts/...` にした
+- `ccnavi-setup.sh` の配布と点検の一覧に `ccnavi-common.sh` を足した
+
+### 未了: 要求表と設計書への反映
+
+`ccnavi.md` §25 と `requirements.md` の REQ-MLT 表に、上の振る舞いを**書いていない**。
+進行中の `config-union` が §25 を構造ごと改版するため、先に足すと解き直しになる。
+**実装が入っているのに要求表に無い期間ができている。** `config-union` が統合先に
+入ったら足すこと。
+
+`wip/design/sh-ws-root.md` の 2 節も、根の決め方を「最初に当たったもの」と書いたまま。
+実装は「`.claude/worktrees/` の下を外して最初に当たったもの」。上の説明が正。
+
+### 未了: Python 側の 6 件（`config-union` の後）
+
+2026-09-12 の監査で見つけたもの。`config-union` が同じ場所を作り直すので、それが
+統合先に入ってから出す。
+
+1. **識別子の接頭辞が消える。** `Record` を全ツリーで使い回すため、壊れたルールを持つ
+   プロジェクトが 1 つあると、それ以降のツリーが「組み込み」扱いになり `zzz:own` が
+   `own` になる（`ruleload.py:37`、`events.py:116`）。REQ-MLT-07 が壊れている
+2. **プロジェクト名に空白が入ると自己防衛が抜ける。** `selfguard.py:222` の
+   `[^\\/ \x00]+` が空白を除いているため、`projects/has space/config/rules.yml` への
+   Write もシェル書き込みも止まらない。同じ欠陥が `ticket.py:712` の `wip/<名前>/` にも
+   ある。**エージェントが自分のルールを緩められる穴**
+3. **プロジェクトから切った作業ツリーの控えが作られない。** `selfguard.py:452` が
+   `tree.worktrees(root)` を `projects_dir` 無しで呼ぶため空を返す
+4. **`--lint` の早期 return。** `lint.py:484-486` が、`projects/` があってもリポジトリが
+   無ければ返るので、`.gitignore` の確認が行われない。clone する前が一番確かめたい時点
+5. **孤児の作業ツリー。** 切り元のプロジェクトを消すと、相互参照が切れて列挙から静かに
+   外れ、その中のパスがワークスペースルートとして判定される（`tree.py:133-159`）。
+   ワークスペース向けの `allow` が孤児の中で効く。判定は変えず、`--lint` と `--explain` が
+   名指しする方針で決まっている
+6. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い
+   `.claude/scripts/` の綴りがある」を warn で言うようにする
+
+### 伝えること: `config-union` に残る見込みの穴
+
+上の 2 は `config-union` の範囲と重なるが、**あちらの計画には入っていない。**
+置き場を `projects/<名前>/.ccnavi/config/` に移しても、名前の区画の正規表現は同じなので
+穴がそのまま移植される。再現は次のとおり。
+
+```
+projects/has space/ を作り、config/rules.yml（移行後は .ccnavi/config/rules.yml）への
+Write が deny にならないことを見る
+```
+
+### ccnavi 自身の設計の穴（2026-09-12 の作業で踏んだもの）
+
+どれも回避して進めたが、次に同じことをする人も同じ場所で止まる。
+
+1. **保護済みファイルを直すチケットが行き止まりに入る。** 直す対象（`.claude/scripts/`、
+   `.claude/hooks/`、`rules.yml`）は `deny` なのでエージェントは書けない。完成品を
+   `wip/design/scripts/` に置いて人が写す形にしたが、`implement` の種類の `scope` に
+   `wip/design/*` が無く、承認が拒まれる。親の `allow` は改版で変えられない
+   （変えられるのは `plan` と `feedback` だけ）。しかも着手後は親の提案が `doing/` に
+   あり、`builtin-ticket-state` が編集を止めるので `plan` の改版もできない。
+   今回は `phases.yml` に `staging`（写す版の作成、`scope: [wip/design/*, tests/*]`）を
+   足して回避した。**`phases.yml` は人が持つ設定なので、エージェントは足せない。**
+   同じ形の作業が来たら、この種類を使うこと
+2. **`.claude/` の中で、git が運ぶものと運ばないものが混ざっている。** `scripts/` と
+   `hooks/` は追跡されるので作業ツリーに写しがある。`ccnavi/tickets/`（承認済みの写し）と
+   `ccnavi/state/` は `.gitignore` に入るので運ばれない。この非対称のせいで、
+   「道具のある場所」を印にして根を決めると作業ツリーが自分を根と見なし、チケットが
+   見つからなくなる。sh 側は `.claude/worktrees/` を候補から外して解いた
+3. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。**
+   コマンドの文字列に `.claude/scripts` が含まれるだけで当たるので、一時ディレクトリに
+   検証用のワークスペースを作る `cp` も止まる。受入テストは Python の中で写すので
+   通るが、手で確かめるときに踏む
 
 **複数のリポジトリ（REQ-MLT、設計 §25）は入った。** private のワークスペースリポジトリを
 Claude Code が開き、その下の `projects/<名前>/` に clone したプロジェクトを横断する形。
