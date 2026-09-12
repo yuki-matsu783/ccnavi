@@ -355,7 +355,7 @@ def test_samples(
     """`--test-samples`。見本をぜんぶ回して、食い違いを並べる。
 
     文字で出すときの終了コードは、食い違いが 1 件でもあれば 1。`/ccnavi-config`
-    スキルと `testdata/check_rules.py` がそれを見る。JSON で出すときは常に 0 で、
+    スキルと `tools/check_rules.py` がそれを見る。JSON で出すときは常に 0 で、
     食い違いの数は本文の `mismatches` にある。読み手が「食い違った」と
     「試験そのものが失敗した」を終了コードで見分けられるように。
     """

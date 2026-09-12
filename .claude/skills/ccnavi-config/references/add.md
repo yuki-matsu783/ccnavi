@@ -78,7 +78,7 @@ allow:
 **広い `allow` には書かない。** `ls` のたびに同じ文が積まれ、2 回目から読まれなくなる。
 lint は何にでも当たる allow と選択肢が 3 つ以上ある regex を warn にする。
 
-**見本を一緒に足す。** ルールを 1 件足したら `testdata/rule-samples.yml` に、当たってほしい
+**見本を一緒に足す。** ルールを 1 件足したら `.claude/ccnavi/rule-samples.yml` に、当たってほしい
 見本と**当たってほしくない見本を両方**足す。片側だけでは広げすぎに気づけない。見本は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
 ワークスペースルートに読み替わる。見本の下書きも scratchpad に置き、`--test-samples` で
@@ -181,7 +181,7 @@ factors:
 検証: --lint error 0 / warn N（内容）、見本 deny a/b ask c/d allow e/f 食い違い 0
 差分:
   <本物との diff>
-見本の追加: testdata/rule-samples.yml に <n> 件（下書き: <パス>）
+見本の追加: .claude/ccnavi/rule-samples.yml に <n> 件（下書き: <パス>）
 ```
 
 置いたあとに `/ccnavi-config` の確かめる側をもう一度回す。下書きで通った検証は、置き場所が

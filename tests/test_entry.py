@@ -15,7 +15,7 @@ import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES = os.path.join(ROOT, "testdata", "rules.yml")
+RULES = os.path.join(ROOT, "tests", "fixtures", "rules.yml")
 
 
 def spawn(*args, payload=""):

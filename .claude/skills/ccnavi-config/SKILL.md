@@ -63,4 +63,4 @@ ccnavi --explain --log "" --state ""
 
 **`--test` に禁止語を書かない。** `ccnavi --test Bash "git push"` は、その Bash 自体が
 `raw-git` に当たる。単発で試したいものも見本ファイルを scratchpad に書いて
-`--test-samples` で回す。見本の形は `testdata/rule-samples.yml` の先頭のコメントにある。
+`--test-samples` で回す。見本の形は `.claude/ccnavi/rule-samples.yml` の先頭のコメントにある。

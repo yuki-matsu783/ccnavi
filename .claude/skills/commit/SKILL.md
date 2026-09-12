@@ -63,7 +63,7 @@ worktree で作業しているときは、そのツリーの中でこれを実�
 | `feat` | `main.py` / `ccnavi/` への機能追加 |
 | `fix` | `main.py` / `ccnavi/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
-| `test` | `tests/*.py` / `testdata/` |
+| `test` | `tests/*.py` / `tests/fixtures/` |
 | `docs` | `README.md` / `requirements.md` / `ccnavi.md` / `HANDOVER.md` |
 | `ai-asset` | `.claude/` 配下 (settings.json / hooks / skills / ccnavi のルール) と `CLAUDE.md`。エージェント向けの指示は docs ではなくこちら |
 | `chore` | `.gitignore` / 雑務 |

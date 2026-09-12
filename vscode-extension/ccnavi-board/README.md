@@ -129,7 +129,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 |---|---|
 | `ccnaviBoard.binPath` | 実行ファイルの場所。空なら上の順で探す。相対ならワークスペースルートから |
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |
-| `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `testdata/rule-samples.yml`。相対ならワークスペースルートから |
+| `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `.claude/ccnavi/rule-samples.yml`。相対ならワークスペースルートから |
 
 ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.claude/ccnavi/rules.yml`。
 プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。プロジェクトのルールは

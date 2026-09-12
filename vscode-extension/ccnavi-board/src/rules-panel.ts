@@ -28,7 +28,7 @@ const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
 const DEFAULT_PROJECTS = "projects";
 const DEFAULT_PROJECT_RULES = "config/rules.yml";
-const DEFAULT_SAMPLES = "testdata/rule-samples.yml";
+const DEFAULT_SAMPLES = ".claude/ccnavi/rule-samples.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 

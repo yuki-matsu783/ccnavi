@@ -75,7 +75,7 @@ To try one call against the rules without running it, or to run every sample
 in a file against them, run
 
     ccnavi --test Bash "git push" [--json]
-    ccnavi --test-samples testdata/rule-samples.yml [--json]
+    ccnavi --test-samples .claude/ccnavi/rule-samples.yml [--json]
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
@@ -174,7 +174,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
-    # 見本をぜんぶ判定に掛ける。testdata/check_rules.py と VS Code 拡張が呼ぶ。
+    # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
     parser.add_argument("--json", action="store_true")

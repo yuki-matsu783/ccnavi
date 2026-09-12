@@ -91,7 +91,7 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 ```sh
 ccnavi --lint                              # 防御を無効化しうる記述が無いか
 ccnavi --test Bash "cd /repo && git push"  # 1 件が何に当たるか
-uv run python testdata/check_rules.py      # 見本をまとめて
+uv run python tools/check_rules.py      # 見本をまとめて
 ```
 
 ルールを 1 件足したら見本も 1 行足す（「見本で確かめる」の節）。止めたいものだけでなく、
@@ -131,7 +131,7 @@ uv run --with pyinstaller python build.py          # 実行ファイルの組み
 
 ```sh
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}' \
-  | uv run python -m ccnavi --rules testdata/rules.yml --mode enable
+  | uv run python -m ccnavi --rules tests/fixtures/rules.yml --mode enable
 ```
 
 編集のたびに `.claude/hooks/lint-py.sh` が走り、整形と検査をかける。
@@ -1375,11 +1375,11 @@ Claude Code の権限モードは、人が確認できるセッションを前�
 見本をまとめて回すほうが早い。
 
 ```sh
-ccnavi --test-samples testdata/rule-samples.yml
-uv run python testdata/check_rules.py     # 同じことを、写しと記録を外して回す
+ccnavi --test-samples .claude/ccnavi/rule-samples.yml
+uv run python tools/check_rules.py     # 同じことを、写しと記録を外して回す
 ```
 
-`testdata/rule-samples.yml` の見本をすべて判定に掛け、期待と食い違った
+`.claude/ccnavi/rule-samples.yml` の見本をすべて判定に掛け、期待と食い違った
 ものを名指しする。見本は `deny` `ask` `allow` のタイプに置き、タイプの名前が
 期待する判定になる。ルールを 1 件足したら見本も 1 行足す。食い違いが 1 件でも
 あれば終了コードは 1。`subject` の `/repo` は走らせたワークスペースルートに読み替わる。
@@ -1394,7 +1394,7 @@ uv run python testdata/check_rules.py     # 同じことを、写しと記録を
 
 ```sh
 ccnavi --test Bash "cd /repo && git push" --json
-ccnavi --test-samples testdata/rule-samples.yml --json
+ccnavi --test-samples .claude/ccnavi/rule-samples.yml --json
 ```
 
 `--test` と `--test-samples` が言うことを JSON で出す。読み手は VS Code の拡張の
@@ -1676,9 +1676,9 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `.claude/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と exe を当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
-| `testdata/rules.yml` | テスト用のルール |
-| `testdata/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
-| `testdata/check_rules.py` | 見本をぜんぶ判定に掛ける |
+| `tests/fixtures/rules.yml` | テスト用のルール |
+| `.claude/ccnavi/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
+| `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
 
 ## 配布物の条件
 
