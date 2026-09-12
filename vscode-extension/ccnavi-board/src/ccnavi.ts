@@ -224,6 +224,11 @@ export async function runLint(
  * 差し替えは無し。プロジェクト管理画面が、置き場とプロジェクトごとの warn を拾うために呼ぶ。
  * error があると終了コードが 1 になるが、それは JSON の中身で分かるので失敗にしない。
  */
+/** 出力の最初の空でない行。画面の 1 行に収める用途で、全量は要らない */
+function firstLine(text: string): string {
+  return text.split(/\r?\n/).map((l) => l.trim()).find((l) => l !== "") ?? "";
+}
+
 export async function runLintJson(root: string, setting: string): Promise<RunResult<LintJson>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
@@ -231,8 +236,14 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
   }
   const ran = await run(launcher, root, ["--lint", "--json"]);
   if (ran.code < 0 || ran.code > 1) {
-    return { ok: false, error: `ccnavi --lint --json が失敗した: ${ran.stderr}` };
+    return { ok: false, error: `ccnavi --lint --json が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseLintJson(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+  if (parsed.ok) {
+    return { ok: true, value: parsed.value };
+  }
+  // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
+  // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
+  const said = firstLine(ran.stdout) || firstLine(ran.stderr);
+  return { ok: false, error: said === "" ? `ccnavi --lint --json の出力を読み取れません（${parsed.error}）` : `ccnavi --lint --json の出力: ${said}` };
 }

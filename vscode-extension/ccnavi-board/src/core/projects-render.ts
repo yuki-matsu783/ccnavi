@@ -30,31 +30,31 @@ ${STYLE}
 <header class="toolbar">
   <div class="summary">
     <span>プロジェクト ${page.rows.length} 件</span>
-    <span class="path" title="${escapeHtml(page.projectsDir)}">置き場 ${escapeHtml(page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`)}</span>
+    <span class="path" title="${escapeHtml(page.projectsDir)}">置き場: ${escapeHtml(page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`)}</span>
   </div>
   <div class="controls">
-    <button type="button" class="action" data-action="open-rules" data-name="" title="ワークスペースのルール（.claude/ccnavi/rules.yml）を直す">ルール管理</button>
+    <button type="button" class="action" data-action="open-rules" data-name="" title="ワークスペースのルール（.claude/ccnavi/rules.yml）を編集します">ルール管理</button>
 ${page.ticketsEnabled ? '    <button type="button" class="action" data-action="open-board" data-name="*">チケット管理</button>\n' : ""}    <button type="button" class="action" data-action="refresh">更新</button>
   </div>
 </header>
 ${renderBanners(page)}<section class="clone">
-  <h2>git プロジェクトを clone する</h2>
+  <h2>リポジトリを clone する</h2>
   <div class="clone-form">
     <label class="grow">URL <input id="url" type="text" placeholder="https://gitlab.example.com/group/repo.git" spellcheck="false"></label>
-    <label>名前 <input id="name" type="text" placeholder="URL の末尾" spellcheck="false"></label>
-    <button type="button" class="action primary" data-action="clone" title="git clone を「ccnavi」ターミナルへ送る。認証の対話はそこで">clone</button>
+    <label>名前 <input id="name" type="text" placeholder="URL から自動で入ります" spellcheck="false"></label>
+    <button type="button" class="action primary" data-action="clone" title="git clone を「ccnavi」ターミナルで実行します。認証が必要ならターミナルで入力してください">clone</button>
   </div>
   <p id="status" class="status hidden"></p>
 </section>
 <section class="list">
   <h2>ワークスペース内のプロジェクト <span class="count">${page.rows.length}</span></h2>
-${page.rows.length === 0 ? '  <p class="empty">まだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderList(page)}
+${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだありません。上の欄から clone するか、既存のリポジトリを置き場の直下へ移動してください</p>' : renderList(page)}
 </section>
 ${renderStrays(page.strays)}<section class="workspace">
-  <h2>ワークスペース自身</h2>
-  <p class="hint"><span class="mono">${escapeHtml(page.root)}</span> / 作業ツリー ${page.workspaceWorktrees.length} 件${page.workspaceWorktrees.length > 0 ? `（${escapeHtml(page.workspaceWorktrees.join(", "))}）` : ""}</p>
+  <h2>ワークスペース本体</h2>
+  <p class="hint"><span class="mono">${escapeHtml(page.root)}</span>（作業ツリー ${page.workspaceWorktrees.length} 件${page.workspaceWorktrees.length > 0 ? `: ${escapeHtml(page.workspaceWorktrees.join(", "))}` : ""}）</p>
 </section>
-<footer class="foot">取得 ${escapeHtml(page.generatedAt)} / ${escapeHtml(page.root)}</footer>
+<footer class="foot">最終更新 ${escapeHtml(page.generatedAt)}（${escapeHtml(page.root)}）</footer>
 <script nonce="${nonce}">
 ${SCRIPT}
 </script>
@@ -66,20 +66,20 @@ ${SCRIPT}
 function renderBanners(page: ProjectsPage): string {
   const banners: string[] = [];
   if (page.lintError !== "") {
-    banners.push(`<div class="banner warn"><code>--lint --json</code> の結果を読めなかったので、プロジェクトごとの検証結果は出せない: ${escapeHtml(page.lintError)}</div>`);
+    banners.push(`<div class="banner warn">検証結果を取得できなかったため、プロジェクトごとの検証結果は表示できません。${escapeHtml(page.lintError)}</div>`);
   }
   if (page.projectsRel === "") {
-    banners.push(`<div class="banner warn">置き場が無効（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われない</div>`);
+    banners.push(`<div class="banner warn">置き場が無効です（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われません</div>`);
     return `${banners.join("\n")}\n`;
   }
   if (!page.projectsDirExists) {
     banners.push(
-      `<div class="banner"><code>${escapeHtml(page.projectsRel)}/</code> がまだ無い。<button type="button" class="action" data-action="create-dir">作る</button> clone すれば git が作るので、無くても clone はできる</div>`,
+      `<div class="banner"><code>${escapeHtml(page.projectsRel)}/</code> がまだありません。<button type="button" class="action" data-action="create-dir">作成</button> clone すると git が作るので、無いままでも clone はできます</div>`,
     );
   }
   if (!page.ignored) {
     banners.push(
-      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> が無い。プロジェクトは自分の git を持つので、ワークスペースの git では無視する。<button type="button" class="action" data-action="fix-ignore">.gitignore に足す</button></div>`,
+      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> がありません。各プロジェクトは自分の git リポジトリを持つため、ワークスペースの git からは除外する必要があります。<button type="button" class="action" data-action="fix-ignore">.gitignore に追加</button></div>`,
     );
   }
   for (const p of page.dirProblems) {
@@ -100,19 +100,19 @@ function renderList(page: ProjectsPage): string {
 function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   const rules = row.rulesExists
     ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
-    : `<span class="warn-text">無い</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="ワークスペースの rules.yml を写す。文面の sh の綴りを {root} 付きに置き換える">ワークスペースから写す</button>`;
-  const worktrees = row.worktrees.length === 0 ? '<span class="dim">無し</span>' : `${row.worktrees.length} 件 <span class="small dim">${escapeHtml(row.worktrees.join(", "))}</span>`;
+    : `<span class="warn-text">なし</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="ワークスペースの rules.yml をこのプロジェクトにコピーします。文面の sh のパスは {root} 付きに置き換えます">ワークスペースからコピー</button>`;
+  const worktrees = row.worktrees.length === 0 ? '<span class="dim">なし</span>' : `${row.worktrees.length} 件 <span class="small dim">${escapeHtml(row.worktrees.join(", "))}</span>`;
   const tickets = ticketsEnabled
     ? `\n          <div class="field"><dt>チケット</dt><dd>${row.tickets} 件${row.doing > 0 ? `<span class="dim">、作業中 ${row.doing} 件</span>` : ""}</dd></div>`
     : "";
   const problems = [
-    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える" }] : []),
+    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ があります。Claude Code はそこのスキルを読み込み、cd すると別のワークスペースルートに見えます" }] : []),
     ...row.problems,
   ];
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
-  const origin = row.origin === "" ? '<span class="dim">読めない</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;
+  const origin = row.origin === "" ? '<span class="dim">不明</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;
   const board = ticketsEnabled
-    ? `\n          <button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="チケット管理をこのプロジェクトで絞って開く">チケット管理</button>`
+    ? `\n          <button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="このプロジェクトに絞ってチケット管理を開きます">チケット管理</button>`
     : "";
   const flags = [
     row.doing > 0 ? `<span class="badge doing">作業中 ${row.doing}</span>` : "",
@@ -131,9 +131,9 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
           <div class="field wide"><dt>検証</dt><dd>${lint}</dd></div>
       </dl>
       <div class="ops">
-          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの config/rules.yml を直し、判定を試す">ルール管理</button>${board}
-          <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルへ送る">fetch</button>
-          <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルへ送る。衝突すれば git が止める">pull</button>
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの config/rules.yml を編集し、判定を試します">ルール管理</button>${board}
+          <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルで実行します">fetch</button>
+          <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルで実行します。衝突があれば git が止めます">pull</button>
       </div>
     </li>`;
 }
@@ -153,8 +153,8 @@ function renderStrays(strays: readonly Stray[]): string {
     .map((s) => `    <li><span class="mono">${escapeHtml(s.path)}</span> <span class="dim">${escapeHtml(s.reason)}</span></li>`)
     .join("\n");
   return `<section class="strays">
-  <h2>プロジェクトになっていない .git <span class="count">${strays.length}</span></h2>
-  <p class="hint">ワークスペース直下を深さ 2 まで歩いて見つけたもの（node_modules、.venv、.claude の中は歩かない）。プロジェクトにするには <code>projects/</code> の直下へ移す。ここからは操作できない。</p>
+  <h2>プロジェクトとして認識されない git リポジトリ <span class="count">${strays.length}</span></h2>
+  <p class="hint">ワークスペース直下から 2 階層までを探して見つかったものです（node_modules、.venv、.claude の中は探しません）。プロジェクトとして扱うには <code>projects/</code> の直下へ移動してください。この画面からは操作できません。</p>
   <ul class="stray-list">
 ${items}
   </ul>
