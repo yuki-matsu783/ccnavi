@@ -20,7 +20,7 @@ dev = ["pyinstaller>=6.10", "ruff>=0.6"]
 # uv は wheel の中身をキャッシュから venv へハードリンクで置く（Windows / Linux の既定）。
 # 実体は 1 つで、`.venv/.../yaml/_yaml.cp312-win_amd64.pyd` は main と全作業ツリーで
 # 同じファイルを指す。Windows は、実体が DLL として読み込まれている間、**どの名前も**
-# 消させない（rename は通る）。並行するセッションはターンの終わりに 9 分ほどテストを
+# 消させない（rename は通る）。並行するセッションはターンの終わりに数分テストを
 # 走らせ、そこで PyYAML を読み込むので、別の作業ツリーのテストが走っている間は
 # `git worktree remove` が `Permission denied` で落ち、`.venv` だけの抜け殻が残る。
 # 抜け殻は次の `test-py.sh` を「tests を読めない」で落とすので、実害が続く。
