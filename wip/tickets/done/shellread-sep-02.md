@@ -19,9 +19,9 @@ human_review:
 allow:
   - match: Write|Edit
     glob: "tests/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-12T18:50:13+0900"
+completed_at: "2026-09-12T19:00:33+0900"
+base_sha: "628853846afa4d48e4c0cde963c65d9cc5530605"
 ---
 
 # 受入テスト: shellread の印を分ける
