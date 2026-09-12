@@ -25,9 +25,9 @@ allow:
   glob: requirements.md
 - match: Write|Edit
   glob: HANDOVER.md
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: "2026-09-12T22:32:50+0900"
+completed_at: "2026-09-12T22:42:03+0900"
+base_sha: "59b5eae89fc6826dda8721ed0ab069600af52d24"
 ---
 
 # 承認ポップアップの文書
