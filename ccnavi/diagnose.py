@@ -60,7 +60,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     判定が対象を取り出せないもので、他の鍵は空のまま。
     """
     # 試験は控えを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
-    # 1 回で届かなくなる。控えを外すと selfguard の写しも取らないが、試験は
+    # 1 回で届かなくなる。置き場を外すと selfguard も控えを取らないが、試験は
     # 実行しないのでそもそも戻すものが無い。
     conf = dataclasses.replace(conf, state="")
 

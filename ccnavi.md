@@ -208,7 +208,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身、`rules.yml`、`.claude/scripts/ccnavi-{ticket,review,git}.sh`。配り先に既にあるものは触らず、`--force` のときだけ入れ替える |
-| 配り先の `.gitignore` | 実行ファイルと同梱物の 3 行（配り先が git のリポジトリで、写しを行うときだけ） |
+| 配り先の `.gitignore` | 実行ファイルと同梱物の 3 行（配り先が git のリポジトリで、配るときだけ） |
 
 `--mode disable` は断る（設定ファイルに書いても効かないので、§4.3）。`--check` は書かずに
 揃っていないところだけを並べ、揃っていなければ終了コード 1。名指しした `--deploy` が
@@ -535,7 +535,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 各プロジェクトの `config/rules.yml` | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル | 判定器の実体 | セッション開始 |
 
-ワークスペースルートの中にあるこれらの作業ツリーの写しも対象に入る。`phases.yml` と `risk.yml`、
+ワークスペースルートの中にある作業ツリー側の設定も対象に入る。`phases.yml` と `risk.yml`、
 hook スクリプト、保護済みスクリプトはここに無く、ルールの `deny` で止めている。
 
 ### 8.2 止める側

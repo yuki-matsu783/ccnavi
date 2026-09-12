@@ -95,7 +95,7 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.claude/ccnavi/rules.yml"
     why: >-
-      作業ツリーの写しも止める（guard-ccnavi-config）。統合すればそのまま main の
+      作業ツリー側の設定も止める（guard-ccnavi-config）。統合すればそのまま main の
       ルールになる。直したい形は下書きを検証して利用者に渡す
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/ccnavi/phases.yml"

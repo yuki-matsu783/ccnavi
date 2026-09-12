@@ -57,7 +57,7 @@ ccnavi --test-samples .claude/ccnavi/rule-samples.yml --log "" --state "" --appr
 
 **守られているかも見本で見る。** rules.yml と phases.yml と risk.yml、承認済みチケットの
 置き場、settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート
-直下と、**実在する作業ツリーの名前**での写しの両方。作業ツリーの写しは、ブランチを
+直下と、**実在する作業ツリーの名前**での設定の両方。作業ツリー側の設定は、ブランチを
 統合すればそのまま main の設定になる道を持つ。このリポジトリでは `guard-ccnavi-config` と
 `guard-settings` が両方を止める。出るのはルールの判定だけで、組み込みの守り
 （settings.json と rules.yml を実行後に戻す働き）は `--test` には出ない。allow に見えた
