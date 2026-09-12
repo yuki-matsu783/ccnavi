@@ -263,10 +263,7 @@ def approved(tickets, revisions: set[str]) -> str:
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
     revisions は親の改版だった識別子。
     """
-    lines = [
-        "[ccnavi] チケットが承認され、承認済みチケットが置かれた。"
-        "この範囲は次のツール呼び出しから効く。"
-    ]
+    lines = ["[ccnavi] 承認済みチケットが置かれた。この範囲は次のツール呼び出しから効く。"]
     for t in tickets:
         if t.ticket in revisions:
             where = "親の改版。計画が新しくなった"
