@@ -55,7 +55,7 @@ HANDOVER = "(handover)"
 # Bash は入れていない。コマンド文字列に現れるパスは追えないので、ここで
 # 当てると当たったり当たらなかったりする判定になる。シェル経由の書き込みは
 # 実行後の監視が作業ツリーの実物を見て捕まえる。
-SCOPE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # サブエージェントの起動ツール。ゲートが止める対象で、対象の文字列を持たないので
 # 見出しだけを subject にする。
@@ -63,19 +63,19 @@ AGENT_TOOL = "Agent"
 
 # ツールごとに、ルールを当てる欄。ここに無いツールは対象を持たず、判定に届かない
 # まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を
-# 除いたものに揃えてある。Grep / Glob / LSP はパスが省略されることが多く、
-# WebSearch は指定子を持たないので載せない。並びは画面の候補の順になる。
+# 除いたものに揃えてある。WebSearch は指定子を持たないので載せない。並びは画面の
+# 候補の順になる。
 #
 # 対象を差し込む側（試験の diagnose と lint の probe）はこの表を読む。欄の名前を
 # subject_of の中にだけ持つと、ツールを足したときにそちらが黙って古くなる。
 SUBJECT_FIELDS: dict[str, str] = {
     "Bash": "command",
     "PowerShell": "command",
-    "Monitor": "command",
     "Read": "file_path",
-    "Write": "file_path",
+    "Grep": "path",
+    "Glob": "path",
     "Edit": "file_path",
-    "MultiEdit": "file_path",
+    "Write": "file_path",
     "NotebookEdit": "notebook_path",
     "Skill": "skill",
     AGENT_TOOL: "description",
@@ -83,11 +83,11 @@ SUBJECT_FIELDS: dict[str, str] = {
 }
 
 # 行き着く先まで解いてから当てるツール（パスを対象にするもの）。
-PATH_TOOLS = ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit")
+PATH_TOOLS = ("Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit")
 
-# POSIX のシェルとして読んでから当てるツール。Monitor は bash のコマンドを走らせる。
-# PowerShell は文法が違うので読まず、生の文字列に当てる。
-POSIX_SHELL_TOOLS = ("Bash", "Monitor")
+# 探す場所を省略できるツール。省略は「いま居る場所」の意味なので、cwd を対象にする。
+# 空のままにすると、場所を書かない呼び出しがどのルールにも当たらずに通る。
+SEARCH_TOOLS = ("Grep", "Glob")
 
 
 def guard_setting_files(
@@ -369,6 +369,8 @@ def subject_of(payload: hookio.Input) -> str:
     value = payload.field_value(field)
     if tool == "NotebookEdit":
         value = value or payload.field_value("file_path")
+    if tool in SEARCH_TOOLS:
+        value = value or "."
     if tool in PATH_TOOLS:
         return full_path(value, payload.cwd)
     return value
@@ -408,7 +410,7 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     今まで捕まえていたものが抜けることはない。変わるのは、返す拒否が
     どちらの拒否なのかを名乗らなければならない点。
     """
-    if tool not in POSIX_SHELL_TOOLS:
+    if tool != "Bash":
         return subject
     reading = shellread.read(subject)
     if reading.degraded:

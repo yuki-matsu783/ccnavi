@@ -109,7 +109,7 @@ RULES: dict = {
         },
         {
             "id": "builtin-credentials",
-            "match": "Bash|Read|Write|Edit|MultiEdit",
+            "match": "Bash|Read|Write|Edit",
             "regex": r"\.env|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc",
             "message": (
                 "This is a place credentials live. Do not read it; ask the user "

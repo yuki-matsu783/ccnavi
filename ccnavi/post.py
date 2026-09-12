@@ -48,7 +48,7 @@ from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
 # そのルールは「この場所に書かせない」を言っている。
-WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 作業ツリーを変えようがないツール。ここを飛ばすぶん git を起こす回数が減る。
 # 飛ばしてよいのは「このツールが走った直後に確かめなくても、次に走る

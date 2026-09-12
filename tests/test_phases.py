@@ -79,7 +79,7 @@ def parent_text(name, plan, feedback=None, allow=("src/*", "wip/*", "tests/*"), 
     lines += ["human_review:", "  required: true", "  reason: t", "title: 親", "rationale: r"]
     lines.append("allow:")
     for g in allow:
-        lines += ["  - match: Write|Edit|MultiEdit", f'    glob: "{g}"']
+        lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
     return "\n".join(lines) + "\n"
 
@@ -99,7 +99,7 @@ def child_text(name, parent, phase, allow, review=True):
         "allow:",
     ]
     for g in allow:
-        lines += ["  - match: Write|Edit|MultiEdit", f'    glob: "{g}"']
+        lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
     return "\n".join(lines) + "\n"
 

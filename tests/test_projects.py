@@ -39,13 +39,13 @@ WS_RULES = {
         },
         {
             "id": "guard-approved",
-            "match": "Write|Edit|MultiEdit|NotebookEdit",
+            "match": "Write|Edit|NotebookEdit",
             "glob": "*/.claude/ccnavi/*",
             "message": "guard settings. ask the user.",
         },
     ],
     "allow": [
-        {"id": "ws-src", "match": "Write|Edit|MultiEdit", "glob": "*/src/*"},
+        {"id": "ws-src", "match": "Write|Edit", "glob": "*/src/*"},
         {"id": "ws-read", "match": "Read", "regex": "."},
     ],
 }
@@ -55,13 +55,13 @@ APP_RULES = {
     "deny": [
         {
             "id": "schema",
-            "match": "Write|Edit|MultiEdit",
+            "match": "Write|Edit",
             "glob": "*/schema/*",
             "message": "schema is not edited by hand. write a migration.",
         }
     ],
     "allow": [
-        {"id": "source", "match": "Write|Edit|MultiEdit", "glob": "*/src/*"},
+        {"id": "source", "match": "Write|Edit", "glob": "*/src/*"},
         {"id": "npm", "match": "Bash", "regex": r"\bnpm test\b"},
     ],
 }
@@ -76,7 +76,7 @@ LIB_RULES = {
             "message": "psql is not run by the agent.",
         }
     ],
-    "allow": [{"id": "source", "match": "Write|Edit|MultiEdit", "glob": "*/src/*"}],
+    "allow": [{"id": "source", "match": "Write|Edit", "glob": "*/src/*"}],
 }
 
 
@@ -116,7 +116,7 @@ def ticket_text(name, *, project="", allow=()):
     if allow:
         lines.append("allow:")
         for g in allow:
-            lines += ["  - match: Write|Edit|MultiEdit", f'    glob: "{g}"']
+            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
     return "\n".join(lines) + "\n"
 
@@ -403,7 +403,7 @@ class ProjectsTest(unittest.TestCase):
         edited["deny"] = LIB_RULES["deny"] + [
             {
                 "id": "docs",
-                "match": "Write|Edit|MultiEdit",
+                "match": "Write|Edit",
                 "glob": "*/docs/*",
                 "message": "docs are generated.",
             }

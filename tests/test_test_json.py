@@ -167,8 +167,9 @@ class TestJsonTest(unittest.TestCase):
     def test_tools_named_like_permission_rules_are_judged(self):
         """Claude Code の権限ルールの名前（括弧の中を除いたもの）で試せる。
 
-        PowerShell と Monitor はコマンド、Skill はスキル名、WebFetch は URL が対象。
-        欄の名前を取り違えると known でも対象が空になり、ルールに当たらないまま通る。
+        PowerShell はコマンド、Grep / Glob は探す場所のパス、Skill はスキル名、
+        WebFetch は URL が対象。欄の名前を取り違えると known でも対象が空になり、
+        ルールに当たらないまま通る。
         """
         rules_path = write(
             self.tmp.name,
@@ -184,10 +185,10 @@ class TestJsonTest(unittest.TestCase):
                             "message": "消さない",
                         },
                         {
-                            "id": "mon",
-                            "match": "Monitor",
-                            "glob": "*rm -rf*",
-                            "message": "消さない",
+                            "id": "search",
+                            "match": "Grep|Glob",
+                            "glob": "*/secrets/*",
+                            "message": "秘密の置き場は探さない",
                         },
                         {
                             "id": "skill",
@@ -208,7 +209,8 @@ class TestJsonTest(unittest.TestCase):
         )
         cases = [
             ("PowerShell", "Remove-Item -Recurse x", "ps"),
-            ("Monitor", "rm -rf build", "mon"),
+            ("Grep", "/repo/secrets/keys", "search"),
+            ("Glob", "/repo/secrets/tokens", "search"),
             ("Skill", "deploy prod", "skill"),
             ("WebFetch", "https://example.com/a", "fetch"),
         ]

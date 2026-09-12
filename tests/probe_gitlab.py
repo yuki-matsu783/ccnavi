@@ -81,7 +81,7 @@ RULES = {
     "deny": [
         {
             "id": "guard-approved",
-            "match": "Write|Edit|MultiEdit|NotebookEdit",
+            "match": "Write|Edit|NotebookEdit",
             "glob": "*/.claude/ccnavi/*",
             "message": "ガードの設定と写しです。利用者に依頼してください。",
         }
@@ -255,7 +255,7 @@ def ticket_text(name, *, parent="", phase=None, allow=(), review=True, title="�
     if allow:
         lines.append("allow:")
         for g in allow:
-            lines += ["  - match: Write|Edit|MultiEdit", f'    glob: "{g}"']
+            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += [
         'started_at: ""',
         'completed_at: ""',

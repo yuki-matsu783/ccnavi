@@ -363,7 +363,7 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
             rule_set,
             {
                 "id": BINARY_RULE_ID,
-                "match": "Write|Edit|MultiEdit|NotebookEdit",
+                "match": "Write|Edit|NotebookEdit",
                 # 当てる先は解決済みの絶対パスなので、末尾で閉じる。
                 "regex": clause + "$",
                 "message": BINARY_MESSAGE,
@@ -374,7 +374,7 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
             rule_set,
             {
                 "id": PROJECT_RULES_RULE_ID,
-                "match": "Write|Edit|MultiEdit|NotebookEdit",
+                "match": "Write|Edit|NotebookEdit",
                 "regex": project_clause + "$",
                 "message": PROJECT_RULES_MESSAGE,
             },

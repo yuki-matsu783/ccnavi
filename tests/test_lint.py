@@ -305,24 +305,28 @@ class LintTest(unittest.TestCase):
 
     def test_権限ルールの名前で書いたmatchは咎めない(self):
         # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
-        # 判定が対象を取り出せる。PowerShell / Monitor はコマンド、Skill はスキル名、
-        # WebFetch は URL。lint の probe がその欄を渡し損ねると、正しいルールを咎める。
+        # 判定が対象を取り出せる。PowerShell はコマンド、Grep / Glob は探す場所、
+        # Skill はスキル名、WebFetch は URL。lint の probe がその欄を渡し損ねると、
+        # 正しいルールを咎める。
         result = lint(
             self.root,
             rules_file(
                 self.root,
-                dict(SOUND, id="ps", match="PowerShell|Monitor"),
+                dict(SOUND, id="ps", match="PowerShell"),
+                dict(SOUND, id="search", match="Grep|Glob", glob="*/secrets/*"),
                 dict(SOUND, id="skill", match="Skill", glob="deploy*"),
                 dict(SOUND, id="fetch", match="WebFetch", glob="*://example.com/*"),
-                dict(SOUND, id="search", match="WebSearch", glob="*"),
+                dict(SOUND, id="gone", match="WebSearch|MultiEdit", glob="*"),
             ),
         )
         self.assertEqual(result.returncode, 0)
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        # WebSearch は指定子を持たず対象を取り出せないので、これだけ咎める。
-        self.assertEqual(warns, 1, result.stdout)
+        # WebSearch は指定子を持たず、MultiEdit は今の Claude Code に無い。
+        # どちらも対象を取り出せないので、この 2 つだけを名前ごとに咎める。
+        self.assertEqual(warns, 2, result.stdout)
         self.assertIn("WebSearch", result.stdout)
+        self.assertIn("MultiEdit", result.stdout)
 
     def test_止めないモードはwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")

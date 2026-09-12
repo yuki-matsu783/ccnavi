@@ -38,7 +38,7 @@ def load_rules(
 
 
 # 行き先で判定するツール。subject に解決済みのパスが入っている。
-PATH_TOOLS = ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit")
+PATH_TOOLS = ("Read", "Write", "Edit", "NotebookEdit")
 
 
 def rules_for(

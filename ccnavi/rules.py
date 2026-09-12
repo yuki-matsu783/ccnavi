@@ -12,7 +12,7 @@
     version: 3
     deny:
       - id: guard-config
-        match: Write|Edit|MultiEdit
+        match: Write|Edit
         glob: "*/.claude/ccnavi/*"
         message: ガード自身の設定です。利用者に依頼してください。
     ask:
@@ -22,7 +22,7 @@
         message: 移行ファイルは実行前に人が中身を見ます。
     allow:
       - id: source
-        match: Read|Write|Edit|MultiEdit
+        match: Read|Write|Edit
         glob: "*/ccnavi/*"
 
 文面は `deny` と `ask` では必須。止めるなら代わりの手段を、聞くなら何を見て

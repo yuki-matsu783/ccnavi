@@ -37,11 +37,11 @@ deny:
 
 ask:
   - id: migrations
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/migrations/*"
     message: Migrations are read by a person before they run. Say what this one changes.
 
 allow:
   - id: anything-else
-    match: Bash|Read|Write|Edit|MultiEdit|NotebookEdit
+    match: Bash|Read|Write|Edit|NotebookEdit
     glob: "*"

@@ -24,7 +24,7 @@ RULES = {
     "deny": [
         {
             "id": "protected",
-            "match": "Write|Edit|MultiEdit",
+            "match": "Write|Edit",
             "glob": "*/protected/*",
             "message": "protected/ is declared write-deny. Ask the user before changing it.",
         },
@@ -40,7 +40,7 @@ RULES = {
     "allow": [
         {
             "id": "anything-else",
-            "match": "Bash|Read|Write|Edit|MultiEdit|NotebookEdit",
+            "match": "Bash|Read|Write|Edit|NotebookEdit",
             "regex": ".",
         }
     ],

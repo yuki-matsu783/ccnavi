@@ -32,7 +32,7 @@ RULES = {
     "deny": [
         {
             "id": "guard-approved",
-            "match": "Write|Edit|MultiEdit|NotebookEdit",
+            "match": "Write|Edit|NotebookEdit",
             "glob": "*/.claude/ccnavi/*",
             "message": "ガードの設定と写しです。利用者に依頼してください。",
         }
@@ -97,7 +97,7 @@ def ticket_text(
         if globs:
             lines.append(f"{section}:")
             for g in globs:
-                lines += ["  - match: Write|Edit|MultiEdit", f'    glob: "{g}"']
+                lines += ["  - match: Write|Edit", f'    glob: "{g}"']
     lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
     return "\n".join(lines) + "\n"
 

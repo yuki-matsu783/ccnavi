@@ -34,10 +34,10 @@
     rationale: |
       Settings 配下のコンポーネント分割。
     allow:
-      - match: Write|Edit|MultiEdit
+      - match: Write|Edit
         glob: "src/components/Settings/*"
     ask:
-      - match: Write|Edit|MultiEdit
+      - match: Write|Edit
         glob: "src/components/*"
     started_at: ""
     completed_at: ""
@@ -77,7 +77,7 @@ CLOSED = (DONE, CANCELLED)
 GUARDED_STATES = (DOING, DONE, CANCELLED)
 
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
-WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
+WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 範囲の件数の上限。設計 §9.4 の max_ticket_rules。大量に並べて人のレビューを
 # 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
@@ -504,7 +504,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
                     SEVERITY_WARN,
                     name,
                     f"`{key}` はこの版の判定が使わない。書いても効かない。"
-                    "範囲は deny / ask / allow のタイプに `match: Write|Edit|MultiEdit` で書く",
+                    "範囲は deny / ask / allow のタイプに `match: Write|Edit` で書く",
                 )
             )
 

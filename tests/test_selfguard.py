@@ -34,7 +34,7 @@ RULES = {
             "message": "git push is not run by the agent.",
         }
     ],
-    "allow": [{"id": "anything-else", "match": "Bash|Read|Write|Edit|MultiEdit", "regex": "."}],
+    "allow": [{"id": "anything-else", "match": "Bash|Read|Write|Edit", "regex": "."}],
 }
 
 SETTINGS = {"hooks": {"PreToolUse": [], "PostToolUse": []}, "env": {"CCNAVI_MODE": "enable"}}
