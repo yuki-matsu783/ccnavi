@@ -271,6 +271,11 @@ allow:
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.vscode/settings.json"
     why: guard-settings が止めるのは .claude/ の下の settings だけ。エディタの設定は作業ツリーで直せる
+  - tool: Edit
+    subject: "/repo/.claude/worktrees/x/.claude/ccnavi/rule-samples.yml"
+    why: >-
+      同じ置き場でも見本は止めない（guard-ccnavi-config は rules / phases / risk の 3 本だけ）。
+      ルールを足したら見本も足すのはエージェントの仕事
   - tool: Write
     subject: "/repo/.claude/worktrees/x/wip/tickets/todo/i0001.md"
     why: 提案は作業ツリーで書く。効くのは承認済みの写しの側

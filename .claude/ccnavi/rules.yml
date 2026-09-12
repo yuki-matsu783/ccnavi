@@ -115,10 +115,11 @@ deny:
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）。人が持つ設定で、エージェントが
   # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリーの写しも
   # 止める。写しは統合でそのまま main の設定になる道を持つので、main の側だけ止めても
-  # 時間差で効く。
+  # 時間差で効く。同じ置き場の見本（rule-samples.yml）は止めない。ルールを足したら
+  # 見本も足すのはエージェントの仕事。
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
-    glob: "*/.claude/ccnavi/*.yml"
+    regex: '[\\/]\.claude[\\/]ccnavi[\\/](rules|phases|risk)\.yml$'
     message: >-
       ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
