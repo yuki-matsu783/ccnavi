@@ -56,11 +56,18 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# `--approve --preview` は束を見るだけ（写しを置かない）なので除く。同じコマンドの
-# 中（`\x00` をまたがない）に `--preview` があれば当てない。承認そのものは `--yes` で、
-# それは `--approve` の形として当たる。ここは Python の re で組むので先読みが使える。
+# `--approve --preview` は束を見るだけ（写しを置かない）ので除く。ただし除外は
+# `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
+# 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
+# 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
+#
+# 免除の範囲はコマンド 1 本まで。Bash なら shellread が `\x00` で切るが、PowerShell は
+# 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
+# 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
+# 前のコマンドの `--approve` を免除する。
+_NOT_PREVIEW = r"(?![^\x00;&|\r\n]*--preview\b)"
 _CLI_FORMS = (
-    r"(--approve\b(?![^\x00]*--preview\b)|--reviewed\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
     r"|\b(ticket|review)\s+"
     r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
 )

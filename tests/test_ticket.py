@@ -758,6 +758,9 @@ class TicketTest(unittest.TestCase):
             # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
             "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
             "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
+            # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
+            "ccnavi --approve --preview --yes i0001 --json",
+            "ccnavi --approve --yes i0001 --preview",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -784,15 +787,39 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # PowerShell も同じ。
+        # PowerShell も同じ。PowerShell は shellread で読めないので生の文字列に当たる。
+        # 免除の範囲がコマンドをまたぐと、後ろに --preview を書くだけで前の承認が通る。
+        for command in (
+            "& ccnavi.exe --approve",
+            "ccnavi --approve --yes i0001,i0001-01 --json; ccnavi --approve --preview",
+            "ccnavi --approve; echo --preview",
+            "ccnavi --approve --yes i0001 | findstr --preview",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "PowerShell",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
         result = self.hook(
             "PreToolUse",
             "PowerShell",
             self.parent_tree,
-            command="& ccnavi.exe --approve",
+            command="ccnavi --approve --preview --json",
             guard_ticket_approval="enable",
         )
-        self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        # ccnavi の起動でない --yes は当てない。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="apt-get install --yes git",
+            guard_ticket_approval="enable",
+        )
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
         # 切ると通る。
         result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
