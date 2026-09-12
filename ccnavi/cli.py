@@ -160,7 +160,7 @@ def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
         value = getattr(args, name)
         if value is not None and (accepts_empty or value):
             setattr(conf, name, value)
-    # 写しの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
+    # 承認済みチケットの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
     # 今は --ticket-control の仕事。置き場は既定のままにして、--lint が言う。
     if args.approved == "":
         conf.approved_blank = True
@@ -187,7 +187,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
-    # 承認の束を見るだけ（写しを置かない）。VS Code の拡張がオーバーレイに出すために打つ。
+    # 承認の束を見るだけ（承認済みチケットを置かない）。
+    # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
     # 見せた束の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
@@ -306,7 +307,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
-        # 見るだけの経路。写しを置かないので端末の壁は要らない。後ろに並べた語は
+        # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
         # `--approve` と同じで、束に載せる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
             code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))

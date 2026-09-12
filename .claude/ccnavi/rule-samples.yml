@@ -278,7 +278,7 @@ allow:
       ルールを足したら見本も足すのはエージェントの仕事
   - tool: Write
     subject: "/repo/.claude/worktrees/x/wip/tickets/todo/i0001.md"
-    why: 提案は作業ツリーで書く。効くのは承認済みの写しの側
+    why: 提案は作業ツリーで書く。効くのは承認済みチケットの側
   - tool: Bash
     subject: "cat /repo/.claude/ccnavi/rules.yml"
     why: ガードの設定は読むほうが普通。名前が出ただけでは止めない

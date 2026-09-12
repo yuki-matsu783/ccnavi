@@ -375,8 +375,8 @@ push)
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
-	# 見分けるのは承認済みの写し（main の `.claude/ccnavi/tickets/<名前>.md`）に
-	# `parent:` があるかだけ。写しの無いツリー（チケットを使わないブランチ）は通す。
+	# 見分けるのは承認済みチケット（main の `.claude/ccnavi/tickets/<名前>.md`）に
+	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	push_common=$(git rev-parse --git-common-dir 2>/dev/null || :)
 	case "$push_common" in
@@ -392,7 +392,7 @@ push)
 			/* | [A-Za-z]:*) push_copies="$CCNAVI_APPROVED" ;;
 			*) push_copies="$push_root/${CCNAVI_APPROVED:-.claude/ccnavi/tickets}" ;;
 			esac
-			# 閉じた写し（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
+			# 閉じた承認済みチケット（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
 			# そのツリーは子のもので、送ってよくなるわけではない。
 			for push_copy in "$push_copies/$push_name.md" "$push_copies/closed/$push_name.md"; do
 				if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then

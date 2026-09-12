@@ -21,7 +21,7 @@ worktree の中でも `.claude/settings*.json` は `guard-settings` で止める
 `w` で始まらない名前）になった。`{root}` は「ワークスペースの下」を絶対パスの直書きなしに
 書くためのもので、Windows と WSL と Linux で綴りが割れない。
 
-hook・スクリプト・写しは既存の deny が場所を問わず当たる。
+hook・スクリプト・承認済みチケットは既存の deny が場所を問わず当たる。
 
 ## 採らなかった案
 

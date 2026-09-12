@@ -10,7 +10,7 @@
  * ワークスペースのルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases` で差し替えられる
  * （リスク管理画面・フェーズ管理画面）。
- * 編集中の内容を一時ファイルに置いて試すため。写しと控えは外し、記録も残さない
+ * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと控えは外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
 import { execFile } from "node:child_process";
@@ -199,7 +199,7 @@ export type ApproveOutcome =
   | { readonly ok: false; readonly error: string };
 
 /**
- * 承認の束を見る（`--approve --preview --json`）。写しは置かれない。
+ * 承認の束を見る（`--approve --preview --json`）。承認済みチケットは置かれない。
  * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(

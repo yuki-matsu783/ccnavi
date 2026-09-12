@@ -372,7 +372,8 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         # 承認の画面は、書き込みが向かうリポジトリを人に見せる（REQ-MLT-11）
         self.assertIn("■ プロジェクト: lib", approved.stdout)
-        # 継ぐ段は無いが、写しには残る（親の写しを引けないとき judge が子の写しを見る）
+        # 継ぐ段は無いが、承認済みチケットには残る
+        # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
         for name in ("i0007", "i0007-01"):
             with open(os.path.join(self.approved, name + ".md"), encoding="utf-8") as f:
                 self.assertIn("project: lib", f.read())
@@ -405,7 +406,7 @@ class ProjectsTest(unittest.TestCase):
 
     def test_a_proposal_inside_a_project_worktree_is_read_but_named(self):
         # プロジェクトのリポジトリの中に提案は置かない（REQ-MLT-14）。読むのはやめないが言う。
-        # 置き場は作業ツリーの切り元で決まり、写しは記録した道から引くので閉じられる。
+        # 置き場は作業ツリーの切り元で決まり、承認済みチケットは記録した道から引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
         write(
             os.path.join(tree, "wip", "tickets", "todo", "i0010.md"),
@@ -444,7 +445,7 @@ class ProjectsTest(unittest.TestCase):
             ticket_text("i0007", allow=("src/*",)),
         )
         self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
-        # 提案を done/ へ動かすと、写しが閉じる。置き場を project から組み直すのではなく
+        # 提案を done/ へ動かすと、承認済みチケットが閉じる。置き場を project から組み直すのではなく
         # 承認のときに記録した道から引くので、どの置き場でも見つかる
         os.makedirs(os.path.join(self.ws, "wip", "lib", "tickets", "done"))
         os.replace(

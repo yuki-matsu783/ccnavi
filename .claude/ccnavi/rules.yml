@@ -103,12 +103,12 @@ deny:
       渡してください。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
-  # 承認済みのチケットの写し。判定はここだけを読むので、ここを書けると承認の意味が無い。
+  # 承認済みチケット。判定はここだけを読むので、ここを書けると承認の意味が無い。
   - id: guard-approved-tickets
     match: Write|Edit|NotebookEdit
     glob: "*/.claude/ccnavi/tickets/*"
     message: >-
-      承認済みのチケットの写しです。承認は利用者が VS Code のボード（端末なら
+      承認済みチケットです。承認は利用者が VS Code のボード（端末なら
       'ccnavi --approve'）で行い、
       閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
       範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。

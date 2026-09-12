@@ -115,7 +115,7 @@ function renderApprovalBody(preview: ApprovePreview, approving: boolean, notice:
   const problems =
     preview.problems.length === 0
       ? ""
-      : `<h3>読めない提案・写し</h3>\n<ul class="approval-problems">\n${preview.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n")}\n</ul>\n`;
+      : `<h3>読めない提案・承認済みチケット</h3>\n<ul class="approval-problems">\n${preview.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n")}\n</ul>\n`;
   const confirm =
     count === 0
       ? ""

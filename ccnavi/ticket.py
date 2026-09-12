@@ -6,9 +6,9 @@
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の首輪を伸ばせる。
 止められた側が止め方を書き換えられる仕組みは、止めていない。
 
-判定が使うのは承認済みの写し（approval.py）だけ。作業ツリーの提案は、人に見せて
+判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、人に見せて
 承認を求めるためのもので、承認されるまで判定には 1 ミリも効かない。承認されたあとに
-提案を書き換えても、効いているのは写しの側なので範囲は広がらない。
+提案を書き換えても、効いているのは承認済みチケットの側なので範囲は広がらない。
 
 ## 絞ることしかできない
 
@@ -71,7 +71,7 @@ DOING = "doing"
 DONE = "done"
 CANCELLED = "cancelled"
 STATES = (TODO, DOING, DONE, CANCELLED)
-# 閉じた状態。写しが closed/ へ動く。
+# 閉じた状態。承認済みチケットが closed/ へ動く。
 CLOSED = (DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (DOING, DONE, CANCELLED)
@@ -92,10 +92,10 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
 
 # スクリプトだけが書く欄。人もエージェントも書かない。hook はこの 3 つ（と
-# 取り消しの 2 つ）だけを提案から写しへ写す。
+# 取り消しの 2 つ）だけを提案から承認済みチケットへ写す。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
-# 写しにだけある欄。承認の記録。
+# 承認済みチケットにだけある欄。承認の記録。
 APPROVAL_KEY = "ccnavi_approved"
 
 # glob のワイルドカード。これより前が字義どおりの前置。
@@ -227,7 +227,7 @@ class PlanItem:
 
 @dataclass
 class Ticket:
-    """チケット 1 本ぶん。提案としても写しとしても同じ形。"""
+    """チケット 1 本ぶん。提案としても承認済みチケットとしても同じ形。"""
 
     ticket: str = ""
     parent: str = ""
@@ -261,15 +261,15 @@ class Ticket:
     base_sha: str = ""
     cancelled_at: str = ""
     cancel_reason: str = ""
-    # 読んだままの frontmatter。写しを作るときに使う。
+    # 読んだままの frontmatter。承認済みチケットを作るときに使う。
     raw: dict = field(default_factory=dict)
     body: str = ""
-    # 見つけた場所。提案なら状態と作業ツリー、写しなら承認の記録から。
+    # 見つけた場所。提案なら状態と作業ツリー、承認済みチケットなら承認の記録から。
     state: str = ""
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 写しにだけある。
+    # 承認済みチケットにだけある。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
@@ -546,7 +546,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
 
 
 def render(ticket: Ticket, extra: dict | None = None) -> str:
-    """チケットを文面に戻す。写しを作るときと、スクリプトが欄を書くときに使う。
+    """チケットを文面に戻す。承認済みチケットを作るときと、スクリプトが欄を書くときに使う。
 
     読んだ frontmatter をそのまま出す。並びが変わっても意味は変わらない。
     """
@@ -720,7 +720,8 @@ def scan_all(
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
                 ticket.project = place_project
                 if place_project and not ticket.declared_project:
-                    # 写しにも残す。judge は親の写しを引けないとき（親が閉じた）子の写しの
+                    # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
+                    # （親が閉じた）子の承認済みチケットの
                     # `project` を見る。ここで入れないとその落ち先が空になる。
                     ticket.raw["project"] = place_project
                 found.append(ticket)

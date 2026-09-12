@@ -48,7 +48,7 @@ start | done | cancel | judge) ;;
 	;;
 esac
 
-# main の根。作業ツリーの中から呼ばれても、写しと設定は main の側にある。
+# main の根。作業ツリーの中から呼ばれても、承認済みチケットと設定は main の側にある。
 common=$(git rev-parse --git-common-dir 2>/dev/null || :)
 [ -z "$common" ] && {
 	printf 'ccnavi-ticket: git リポジトリの中で実行してください。\n' >&2

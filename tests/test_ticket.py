@@ -34,7 +34,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.claude/ccnavi/*",
-            "message": "ガードの設定と写しです。利用者に依頼してください。",
+            "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
         }
     ],
 }
@@ -311,7 +311,7 @@ class TicketTest(unittest.TestCase):
 
     @unittest.skipUnless(os.path.normcase("A") == "a", "大文字小文字を区別する機械")
     def test_worktree_name_case_does_not_drop_the_ticket(self):
-        """区別しない機械で綴り違いに切った作業ツリーでも、判定は写しで行う。
+        """区別しない機械で綴り違いに切った作業ツリーでも、判定は承認済みチケットで行う。
 
         案内（SubagentStart）は綴りの違いを吸収するのに判定だけ厳密だと、
         「効いている」と言われながら権限モード任せに落ちる（敵対的レビューで実測）。
@@ -392,7 +392,7 @@ class TicketTest(unittest.TestCase):
     def test_editing_the_proposal_does_not_widen_the_scope(self):
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
-        # 承認後に提案を書き足しても、効いているのは写し。
+        # 承認後に提案を書き足しても、効いているのは承認済みチケット。
         write(
             os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001-01.md"),
             ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
@@ -583,7 +583,7 @@ class TicketTest(unittest.TestCase):
         return fixture
 
     def request(self, fixture, phase="1"):
-        """sh の request と同じ 3 段。prepare → 投稿（写しに書く）→ requested。"""
+        """sh の request と同じ 3 段。prepare → 投稿（承認済みチケットに書く）→ requested。"""
         body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
         prepared = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "--body-file", body, "review", "prepare"
@@ -1114,7 +1114,7 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(check.returncode, 0, check.stderr)
 
     def test_exe_never_reaches_the_remote_and_needs_a_matching_result(self):
-        """写しが無ければ動かず、依頼したのと違うマージリクエストの写しでは開かない。"""
+        """承認済みチケットが無ければ動かず、依頼したのと違うマージリクエストの承認済みチケットでは開かない。"""
         self.family()
         self.close_phase()
         fixture = self.remote()

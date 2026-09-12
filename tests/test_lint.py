@@ -186,7 +186,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 0)
 
-    def test_写しの置き場を空文字にしてももう切れずwarnで今の書き方を言う(self):
+    def test_承認済みチケットの置き場を空文字にしてももう切れずwarnで今の書き方を言う(self):
         result = ccnavi(
             self.root,
             "--lint",

@@ -124,7 +124,7 @@ def watched_for(
 
 
 def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
-    """承認済みの写しを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
+    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.copies(conf.approved)
@@ -147,7 +147,7 @@ def decide_at_prompt(
     まだ何も起きていない時点で 1 段積むことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
 
-    例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた写し）。
+    例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）。
     それは 1 度だけ伝える。伝えないと、人が「承認した」とチャットで打つまで
     モデルは後工程に入れない。
     """
@@ -220,8 +220,8 @@ def decide_at_start(
     # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
     # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
     ctxfile.forget(conf.state, payload.session_id)
-    # 承認の控えは捨てない。控えが無ければ、いまの写しを「知っているもの」として
-    # 書く。それより後に置かれた写しだけが、次の hook で「新しい承認」になる。
+    # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
+    # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     approval.baseline(stderr, conf, payload.session_id, payload.agent_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
@@ -263,7 +263,7 @@ def decide_after(
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 提案の状態を写しへ写す。閉じた子の写しはここで closed/ へ動く。
+    # 提案の状態を承認済みチケットへ写す。閉じた子の承認済みチケットはここで closed/ へ動く。
     # 範囲は実行前の判定と同じ経路で解く。
     if conf.tickets_enabled:
         phase.sync(stderr, root, conf)
