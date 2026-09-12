@@ -147,11 +147,14 @@ pnpm run package   # scripts/package.sh: install → compile → test → vsce p
 ```
 
 `pnpm run package` は `dist/ccnavi-board-<version>.vsix`（リポジトリの `dist/`、gitignore 済み）に出す。
+`<version>` は `package.json` の `version`。出来上がったパスは package の最後にも表示される。
 入れるには次を打つ。Marketplace には出さない。
 
 ```sh
-code --install-extension dist/ccnavi-board-0.3.2.vsix
+code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force は入れ替えのとき
 ```
+
+入れたあと、開いているウィンドウは再読み込み（`Developer: Reload Window`）で新しい版になる。
 
 `node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
 
