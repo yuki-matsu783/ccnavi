@@ -23,9 +23,9 @@ allow:
     glob: "ccnavi/*"
   - match: Write|Edit
     glob: "tests/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-13T05:48:26+0900"
+completed_at: "2026-09-13T06:26:12+0900"
+base_sha: "b77eb77b0f657bd33b9940b2d9b8fb20d18e2b8b"
 ---
 
 # 層の名前とプロジェクト名の衝突を塞ぐ
