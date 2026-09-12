@@ -1,4 +1,4 @@
-# 区画は強い順に deny / ask / allow。どこにも当たらない呼び出しについて ccnavi は
+# タイプは強い順に deny / ask / allow。どこにも当たらない呼び出しについて ccnavi は
 # 判定を持たず、Claude Code の権限モードに従う。
 #
 # glob と regex は必ず引用符で囲む。囲まないと YAML が先に解釈する。
