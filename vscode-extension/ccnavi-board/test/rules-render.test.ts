@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseHooks } from "../src/core/hooks.js";
 import { readRules } from "../src/core/rules-doc.js";
-import { renderRulesPage, type RulesPage } from "../src/core/rules-render.js";
+import { KNOWN_TOOLS, renderRulesPage, type RulesPage } from "../src/core/rules-render.js";
 
 const RULES = `version: 3
 deny:
@@ -74,6 +74,18 @@ test("CB-T69 タイプごとに畳む印を出す", () => {
   for (const section of ["deny", "ask", "allow"]) {
     assert.match(html, new RegExp(`data-action="fold-section" data-section="${section}"`));
   }
+});
+
+test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名前（括弧の中を除いたもの）で並ぶ", () => {
+  // 判定が対象を取り出せるツールだけ。Grep / Glob / WebSearch は取り出せないので載せない。
+  assert.deepEqual([...KNOWN_TOOLS], [
+    "Bash", "PowerShell", "Monitor", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Skill", "Agent", "WebFetch",
+  ]);
+  const html = renderRulesPage(page(), { nonce: "n" });
+  for (const tool of ["PowerShell", "Monitor", "Skill", "WebFetch"]) {
+    assert.match(html, new RegExp(`<option value="${tool}">${tool}</option>`));
+  }
+  assert.doesNotMatch(html, /<option value="WebSearch">/);
 });
 
 // 画面の中のスクリプトは文字列なので、tsc は見ない。壊れても画面が黙って動かなくなるだけ。

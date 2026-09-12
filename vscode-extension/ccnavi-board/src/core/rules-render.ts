@@ -13,8 +13,23 @@ import type { Lock } from "./lock.js";
 import { BUTTON_STYLE, escapeHtml } from "./render.js";
 import type { RulesModel } from "./rules-doc.js";
 
-/** 判定が対象を取り出せるツール。ccnavi の diagnose.KNOWN_TOOLS と同じ並び */
-export const KNOWN_TOOLS = ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Agent"] as const;
+/**
+ * 判定が対象を取り出せるツール。ccnavi の judge.SUBJECT_FIELDS（diagnose.KNOWN_TOOLS）と同じ並び。
+ * 名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を除いたもの。
+ */
+export const KNOWN_TOOLS = [
+  "Bash",
+  "PowerShell",
+  "Monitor",
+  "Read",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+  "Skill",
+  "Agent",
+  "WebFetch",
+] as const;
 
 export interface RulesPage {
   readonly root: string;
@@ -80,7 +95,7 @@ ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
   <p class="hint">判定は実行ファイルの <code>--test</code> を通る。編集中の内容で試すので、保存していなくてもよい。走っているセッションが dry-run でも、ここは enable の答えを返す。</p>
   <div class="judge-form">
     <label>ツール <select id="tool">${KNOWN_TOOLS.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></label>
-    <label class="grow">subject <input id="subject" type="text" placeholder="Bash ならコマンド、それ以外なら絶対パス" spellcheck="false"></label>
+    <label class="grow">subject <input id="subject" type="text" placeholder="Bash / PowerShell / Monitor ならコマンド、Read / Write / Edit なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
     <button type="button" class="action primary" data-action="judge">判定</button>
   </div>
   <div id="judge-result" class="result hidden"></div>
