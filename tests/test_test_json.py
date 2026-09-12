@@ -5,7 +5,7 @@ VS Code 拡張のルール設定画面が読む形を、`--test` と同じ判定
 
 1. `--test --json` が判定・根拠・当たったルール・返る文面を 1 つの JSON で出す
 2. 判定が対象を取り出せないツールは `known` が偽で出る
-3. `--test-samples` が見本を区画の期待と突き合わせ、食い違いを数える。
+3. `--test-samples` が見本をタイプの期待と突き合わせ、食い違いを数える。
    文字で出すときは食い違いがあれば終了コード 1、JSON では常に 0
 4. 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/test.json と
    samples.json）と同じ形である

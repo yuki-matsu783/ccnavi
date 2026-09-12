@@ -40,10 +40,10 @@ ALLOWED = {"id": "anything", "match": "Read", "regex": "."}
 
 
 def rules_file(directory: str, *rules, version: int = 3, allow: bool = True) -> str:
-    """ルールファイルを 1 本置く。並べたルールは deny の区画に入る。
+    """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-    読み手がそのまま受け取る。区画の形だけを見たいテストで、YAML の綴りの
+    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の綴りの
     話に付き合わずに済む。
     """
     body: dict = {"version": version, "deny": list(rules)}
@@ -234,7 +234,7 @@ class LintTest(unittest.TestCase):
             "組み立て不能",
             "先読み",
         ):
-            # 名前には区画が付く。同じ id が別の区画に居ることがあるので、
+            # 名前にはタイプが付く。同じ id が別のタイプに居ることがあるので、
             # どちらの話なのかを名前が言えないと直しに行く先が決まらない。
             self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
 

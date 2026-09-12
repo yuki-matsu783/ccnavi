@@ -1,4 +1,4 @@
-"""3 つの区画と権限モードへの委譲の受入テスト。道具を外から叩いて応答だけを見る。
+"""3 つのタイプと権限モードへの委譲の受入テスト。道具を外から叩いて応答だけを見る。
 
 見るのは 4 つ。
 
@@ -43,10 +43,10 @@ class SectionsTest(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
 
     def rules(self, **sections) -> str:
-        """区画を渡してルールファイルを 1 本置く。
+        """タイプを渡してルールファイルを 1 本置く。
 
         書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
-        読み手がそのまま受け取る。区画の強さを見たいテストで、YAML の綴りの
+        読み手がそのまま受け取る。タイプの強さを見たいテストで、YAML の綴りの
         話に付き合わずに済む。
         """
         body = {"version": 3, **sections}
@@ -152,7 +152,7 @@ class SectionsTest(unittest.TestCase):
 
         self.assertEqual(out.get("permissionDecision"), "ask")
 
-    def test_区画をまたいで当たっても強いほうだけを返す(self):
+    def test_タイプをまたいで当たっても強いほうだけを返す(self):
         # 弱い側の文面まで返すと、拒否された呼び出しに「確認すれば通る」と
         # 読める文が並ぶ。次の一手が 2 つに割れる。
         path = self.rules(
@@ -166,7 +166,7 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("拒否の文面", reason)
         self.assertNotIn("確認の文面", reason)
 
-    def test_同じ区画で複数当たれば全部返す(self):
+    def test_同じタイプで複数当たれば全部返す(self):
         # どれか 1 つを選ぶと、選ばれなかったルールの言い分は誰にも届かない。
         path = self.rules(
             deny=[
