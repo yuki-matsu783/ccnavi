@@ -9,7 +9,9 @@ import { loadBoard } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
 import { acceptCommand, approveCommand, wrapupCommand, type Launcher } from "./core/commands.js";
 import { escapeHtml, renderBoard } from "./core/render.js";
+import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
+import { ticketControl } from "./ticket-control.js";
 
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
@@ -59,6 +61,9 @@ export async function openBoard(): Promise<void> {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、ccnavi ボードを表示できない");
     return;
   }
+  if (!ticketsEnabled()) {
+    return;
+  }
   if (state !== undefined) {
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
@@ -71,6 +76,11 @@ export async function openBoard(): Promise<void> {
   if (!first.ok) {
     vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${first.error}`);
     return;
+  }
+  // 設定ファイルの読みと実行ファイルの答えが食い違えば言う。判定は実行ファイルの側で動いている。
+  const mismatch = ticketControlMismatch(ticketControl(), first.board.settings.ticket_control);
+  if (mismatch) {
+    vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
   }
 
   const panel = vscode.window.createWebviewPanel("ccnaviBoard", "ccnavi ボード", vscode.ViewColumn.One, {
@@ -109,7 +119,24 @@ export function approveFromPalette(): void {
     vscode.window.showInformationMessage("ワークスペースが開かれていない");
     return;
   }
+  if (!ticketsEnabled()) {
+    return;
+  }
   sendApprove(folder.uri.fsPath, state?.launcher);
+}
+
+/**
+ * チケット制御が disable なら、その旨を伝えて偽を返す。コマンドパレットは `when` で隠れるが、
+ * キーバインドや他の拡張からの呼び出しはそこを通らない。
+ */
+function ticketsEnabled(): boolean {
+  if (ticketControl() === "enable") {
+    return true;
+  }
+  vscode.window.showInformationMessage(
+    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）。ルール管理だけが使える`,
+  );
+  return false;
 }
 
 function registerPanelHandlers(current: PanelState): void {

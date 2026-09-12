@@ -3,6 +3,7 @@
  "root": "<root>",
  "generated_at": "2026-09-11T08:56:45+0900",
  "settings": {
+  "ticket_control": "enable",
   "tickets": "wip/tickets",
   "approved": "<root>/.claude/ccnavi/tickets",
   "projects": "<root>/projects"

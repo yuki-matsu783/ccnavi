@@ -103,6 +103,8 @@ export interface BoardJson {
   readonly root: string;
   readonly generated_at: string;
   readonly settings: {
+    /** チケット制御を使うか。実行ファイルが解決した値（enable / disable）。古い実行ファイルは空 */
+    readonly ticket_control: string;
     readonly tickets: string;
     readonly approved: string;
     readonly projects: string;
@@ -148,6 +150,7 @@ export function parseBoardJson(text: string): ParseResult {
       root: str(raw.root),
       generated_at: str(raw.generated_at),
       settings: {
+        ticket_control: str(settings.ticket_control),
         tickets: str(settings.tickets),
         approved: str(settings.approved),
         projects: str(settings.projects),

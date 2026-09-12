@@ -14,7 +14,11 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 `--test --json` / `--test-samples --json` を通り、拡張は glob も regex も自分で当てない。
 
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
-「ルール管理」と「チケット管理」の 2 つの入口が並ぶ。
+「ルール管理」と「チケット管理」の 2 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
+チケット制御を使っているときだけ。`.claude/settings.json`（`settings.local.json` が勝つ）の
+`env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口もコマンドパレットの「ボードを開く」「ボードを更新」
+「承認する」も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
+ボードを開いたとき、実行ファイルの答え（`--explain --json` の `settings.ticket_control`）と食い違えば通知で言う。
 
 - 出力の形: ccnavi の README「ボードの JSON」「試験の JSON」
 - 設計: ccnavi.md §24.10、要求 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06
@@ -155,6 +159,7 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 | 12 | 読めない写し | ボードを開いたまま `.claude/ccnavi/tickets/<id>.md` の frontmatter を壊す | 上部の問題の一覧にその写しが出て、他のカードはそのまま |
 | 13 | プロジェクト | `projects/<repo>` を持つワークスペースで開く | `project` バッジと絞り込みが出る |
 | 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「ルール管理」「チケット管理」の順で 2 つ |
+| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「ルール管理」だけになり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。行を消すと戻る |
 | 15 | ルール設定画面が開く | サイドパネルの「ルール管理」 | deny / ask / allow の 3 区画にルールが並ぶ。上部に dry-run の注意 |
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
 | 17 | 見本の一括 | 「見本を一括で流す」 | 区画ごとの件数と食い違い 0 件。glob を壊してから流すと食い違いの行が赤くなる |
@@ -171,7 +176,8 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 ```
 src/
   extension.ts        コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 2 つの入口（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 2 つの入口。チケット制御が disable なら 1 つ（vscode に依存する）
+  ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
   rules-panel.ts      ルール設定画面の Webview パネル。判定・検証・保存の受け付け（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
@@ -187,12 +193,13 @@ src/
     lock.ts           保存できるか（doing のチケットの有無）
     commands.ts       ターミナルに送るコマンド行
     locate.ts         実行ファイルの探索順
+    ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
 media/
   icon.svg            アクティビティバーのアイコン
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T52
+  *.test.ts           core の単体テスト CB-T01〜CB-T59
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て

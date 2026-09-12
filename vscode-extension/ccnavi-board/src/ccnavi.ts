@@ -41,8 +41,8 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つからない（dist/ccnavi/ccnavi、.claude/settings.json の CCNAVI_BIN_PATH、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
 
-/** 見るのはルールだけ。写しと控えは外し、記録も残さない */
-const RULES_ONLY = ["--approved", "", "--state", "", "--log", ""] as const;
+/** 見るのはルールだけ。チケット制御と控えは外し、記録も残さない */
+const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
 
 export function findLauncher(root: string, setting: string): Launcher | undefined {
   return locate({
@@ -61,14 +61,21 @@ export function findLauncher(root: string, setting: string): Launcher | undefine
   });
 }
 
+/** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。Claude Code の env の重なりと同じ */
 function readSettingsEnvBin(root: string): string | undefined {
-  try {
-    return binFromSettingsJson(
-      fs.readFileSync(path.join(root, ".claude", "settings.json"), "utf8"),
-    );
-  } catch {
-    return undefined;
+  for (const name of ["settings.local.json", "settings.json"]) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(root, ".claude", name), "utf8");
+    } catch {
+      continue;
+    }
+    const found = binFromSettingsJson(text);
+    if (found !== undefined) {
+      return found;
+    }
   }
+  return undefined;
 }
 
 interface Ran {
