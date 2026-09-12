@@ -16,16 +16,22 @@ export interface Lock {
   readonly doing: readonly string[];
 }
 
-export function lockFromBoard(board: BoardJson): Lock {
+/**
+ * ワークスペースのルールは、どのツリーの doing でも保存を止める（Bash の和に効くため）。
+ * プロジェクトのルール（`project` を渡す）は、そのプロジェクトの doing だけを見る。
+ */
+export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const doing = board.tickets
     .filter((t) => t.proposal !== null && t.proposal.state === "doing")
+    .filter((t) => project === undefined || t.project === project)
     .map((t) => t.ticket);
   if (doing.length === 0) {
     return { locked: false, reason: "", doing };
   }
+  const where = project === undefined ? "" : `プロジェクト ${project} に`;
   return {
     locked: true,
-    reason: `作業中のチケットがある（${doing.join(", ")}）。終わるか取り消すまで保存できない`,
+    reason: `${where}作業中のチケットがある（${doing.join(", ")}）。終わるか取り消すまで保存できない`,
     doing,
   };
 }

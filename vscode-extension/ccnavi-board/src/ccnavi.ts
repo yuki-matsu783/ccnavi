@@ -2,16 +2,19 @@
  * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
- * 走らせるのは 4 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
- * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）。判定と検証は
- * ルールファイルを `--rules` で差し替えられる。編集中の内容を一時ファイルに置いて
- * 試すため。写しと控えは外し、記録も残さない（試し打ちで記録を汚さない）。
+ * 走らせるのは 5 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
+ * 機械可読で。プロジェクト管理画面が読む）。判定と検証はルールファイルを差し替えられる。
+ * ワークスペースのルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
+ * 編集中の内容を一時ファイルに置いて試すため。写しと控えは外し、記録も残さない
+ * （試し打ちで記録を汚さない）。
  */
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { Launcher } from "./core/commands.js";
+import { parseLintJson, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import {
@@ -43,6 +46,19 @@ const NOT_FOUND =
 
 /** 見るのはルールだけ。チケット制御と控えは外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
+
+/**
+ * 判定と検証に掛けるルールファイルの差し替え。ワークスペースのルールは `--rules` で、
+ * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
+ * どちらも診断でだけ効き、hook からの判定には届かない。
+ */
+export type RulesOverride =
+  | { readonly kind: "workspace"; readonly path: string }
+  | { readonly kind: "project"; readonly name: string; readonly path: string };
+
+function overrideArgs(rules: RulesOverride): string[] {
+  return rules.kind === "workspace" ? ["--rules", rules.path] : ["--project-rules-file", `${rules.name}=${rules.path}`];
+}
 
 export function findLauncher(root: string, setting: string): Launcher | undefined {
   return locate({
@@ -134,11 +150,11 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   return { ok: true, launcher, board: parsed.board };
 }
 
-/** 1 件を判定する。`rulesPath` は当てるルールファイル（編集中の内容を置いた一時ファイルでもよい） */
+/** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */
 export async function runTest(
   root: string,
   setting: string,
-  rulesPath: string,
+  rules: RulesOverride,
   tool: string,
   subject: string,
 ): Promise<RunResult<TestJson>> {
@@ -147,8 +163,7 @@ export async function runTest(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, [
-    "--rules",
-    rulesPath,
+    ...overrideArgs(rules),
     ...RULES_ONLY,
     "--test",
     tool,
@@ -166,7 +181,7 @@ export async function runTest(
 export async function runSamples(
   root: string,
   setting: string,
-  rulesPath: string,
+  rules: RulesOverride,
   samplesPath: string,
 ): Promise<RunResult<SamplesJson>> {
   const launcher = findLauncher(root, setting);
@@ -174,8 +189,7 @@ export async function runSamples(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, [
-    "--rules",
-    rulesPath,
+    ...overrideArgs(rules),
     ...RULES_ONLY,
     "--test-samples",
     samplesPath,
@@ -192,15 +206,33 @@ export async function runSamples(
 export async function runLint(
   root: string,
   setting: string,
-  rulesPath: string,
+  rules: RulesOverride,
 ): Promise<RunResult<LintResult>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--rules", rulesPath, "--lint"]);
+  const ran = await run(launcher, root, [...overrideArgs(rules), "--lint"]);
   if (ran.code < 0 || ran.code > 1) {
     return { ok: false, error: `ccnavi --lint が失敗した: ${ran.stderr}` };
   }
   return { ok: true, value: { ok: ran.code === 0, report: ran.stdout.trim() } };
+}
+
+/**
+ * 実運用の設定をそのまま検証し、苦情を JSON で受ける（README「lint の JSON」）。
+ * 差し替えは無し。プロジェクト管理画面が、置き場とプロジェクトごとの warn を拾うために呼ぶ。
+ * error があると終了コードが 1 になるが、それは JSON の中身で分かるので失敗にしない。
+ */
+export async function runLintJson(root: string, setting: string): Promise<RunResult<LintJson>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, ["--lint", "--json"]);
+  if (ran.code < 0 || ran.code > 1) {
+    return { ok: false, error: `ccnavi --lint --json が失敗した: ${ran.stderr}` };
+  }
+  const parsed = parseLintJson(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }

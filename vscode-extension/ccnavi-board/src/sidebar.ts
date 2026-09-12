@@ -1,5 +1,5 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。入口は 2 つで、どちらも Webview パネルを開く。
+ * アクティビティバーの ccnavi から開くサイドパネル。入口は 3 つで、どれも Webview パネルを開く。
  * 「チケット管理」はチケット制御（CCNAVI_TICKET_CONTROL）が disable のプロジェクトでは出さない。
  * 全体ルールだけを使うプロジェクトに、開いても空のボードしか出ない入口を見せないため。
  * VS Code の API に触れるので単体テストの対象外。
@@ -18,6 +18,13 @@ interface Entry {
 }
 
 const ENTRIES: readonly Entry[] = [
+  {
+    label: "プロジェクト管理",
+    description: "projects/ の一覧、clone、ルールとチケットへの導線",
+    command: "ccnaviBoard.openProjects",
+    icon: "repo",
+    needsTickets: false,
+  },
   {
     label: "ルール管理",
     description: "ルールを直し、判定を試し、hook を眺める",

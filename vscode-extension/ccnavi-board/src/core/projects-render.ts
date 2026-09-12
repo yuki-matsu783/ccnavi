@@ -1,0 +1,267 @@
+/**
+ * プロジェクト管理画面を外部資源に依存しない 1 枚の HTML に組み立てる。
+ * 色は VS Code のテーマ変数だけを使う。文字列は全部実体参照にする。
+ *
+ * 画面が持つ状態は clone の入力欄だけで、一覧は読み直すたびに HTML ごと差し替える。
+ * 入力欄の途中は Webview の state に控え、差し替え後に戻す。
+ */
+import type { LintProblem } from "./lintmodel.js";
+import type { ProjectRow, ProjectsPage, Stray } from "./projects.js";
+import { escapeHtml } from "./render.js";
+
+export interface RenderOptions {
+  readonly nonce: string;
+}
+
+export function renderProjectsPage(page: ProjectsPage, options: RenderOptions): string {
+  const { nonce } = options;
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ccnavi プロジェクト管理</title>
+<style nonce="${nonce}">
+${STYLE}
+</style>
+</head>
+<body>
+<header class="toolbar">
+  <div class="summary">
+    <span>プロジェクト ${page.rows.length} 件</span>
+    <span class="path" title="${escapeHtml(page.projectsDir)}">置き場 ${escapeHtml(page.projectsRel === "" ? "（数えていない）" : `${page.projectsRel}/`)}</span>
+  </div>
+  <div class="controls">
+    <button type="button" class="action" data-action="open-rules" data-name="">ワークスペースのルール管理</button>
+${page.ticketsEnabled ? '    <button type="button" class="action" data-action="open-board" data-name="*">チケット管理</button>\n' : ""}    <button type="button" class="action" data-action="refresh">更新</button>
+  </div>
+</header>
+${renderBanners(page)}<section class="clone">
+  <h2>clone して置き場に足す</h2>
+  <p class="hint">受け付けるのは <code>https://host/path</code>、<code>ssh://host/path</code>、<code>git@host:path</code>。資格情報入りの URL は通さない。コマンドは「ccnavi」ターミナルに送られ、認証の対話はそこで行う。</p>
+  <div class="clone-form">
+    <label class="grow">URL <input id="url" type="text" placeholder="https://gitlab.example.com/group/repo.git" spellcheck="false"></label>
+    <label>名前 <input id="name" type="text" placeholder="URL の末尾" spellcheck="false"></label>
+    <button type="button" class="action primary" data-action="clone">clone をターミナルへ送る</button>
+  </div>
+  <p id="status" class="status hidden"></p>
+</section>
+<section class="list">
+  <h2>ccnavi が数えるプロジェクト <span class="count">${page.rows.length}</span></h2>
+${page.rows.length === 0 ? '  <p class="empty">まだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderTable(page)}
+</section>
+${renderStrays(page.strays)}<section class="workspace">
+  <h2>ワークスペース自身</h2>
+  <p class="hint"><span class="mono">${escapeHtml(page.root)}</span> / 作業ツリー ${page.workspaceWorktrees.length} 件${page.workspaceWorktrees.length > 0 ? `（${escapeHtml(page.workspaceWorktrees.join(", "))}）` : ""}</p>
+</section>
+<footer class="foot">取得 ${escapeHtml(page.generatedAt)} / ${escapeHtml(page.root)}</footer>
+<script nonce="${nonce}">
+${SCRIPT}
+</script>
+</body>
+</html>
+`;
+}
+
+function renderBanners(page: ProjectsPage): string {
+  const banners: string[] = [];
+  if (page.lintError !== "") {
+    banners.push(`<div class="banner warn">--lint --json を読めなかったので、プロジェクトごとの検証は出ない: ${escapeHtml(page.lintError)}</div>`);
+  }
+  if (page.projectsRel === "") {
+    banners.push(`<div class="banner warn">置き場を数えない設定（CCNAVI_PROJECTS が空）。clone しても ccnavi はプロジェクトと見ない</div>`);
+    return `${banners.join("\n")}\n`;
+  }
+  if (!page.projectsDirExists) {
+    banners.push(
+      `<div class="banner"><code>${escapeHtml(page.projectsRel)}/</code> がまだ無い。<button type="button" class="action" data-action="create-dir">作る</button> clone すれば git が作るので、無くても clone はできる</div>`,
+    );
+  }
+  if (!page.ignored) {
+    banners.push(
+      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> が無い。プロジェクトは自分の git を持つので、ワークスペースの git からは無視する。<button type="button" class="action" data-action="fix-ignore">.gitignore に足す</button></div>`,
+    );
+  }
+  for (const p of page.dirProblems) {
+    banners.push(`<div class="banner ${p.severity}">${escapeHtml(p.severity)}: ${escapeHtml(p.detail)}</div>`);
+  }
+  return banners.length === 0 ? "" : `${banners.join("\n")}\n`;
+}
+
+function renderTable(page: ProjectsPage): string {
+  const rows = page.rows.map((r) => renderRow(r, page.ticketsEnabled)).join("\n");
+  return `  <table>
+    <thead><tr><th>名前</th><th>origin</th><th>ルール</th><th>作業ツリー</th>${page.ticketsEnabled ? "<th>チケット</th>" : ""}<th>検証</th><th>操作</th></tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>`;
+}
+
+function renderRow(row: ProjectRow, ticketsEnabled: boolean): string {
+  const rules = row.rulesExists
+    ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
+    : `<span class="warn-text">無い</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="ワークスペースの rules.yml を写す。文面の sh の綴りを {root} 付きに置き換える">ワークスペースから写す</button>`;
+  const worktrees = row.worktrees.length === 0 ? '<span class="dim">0</span>' : `${row.worktrees.length} <span class="small dim">${escapeHtml(row.worktrees.join(", "))}</span>`;
+  const tickets = ticketsEnabled
+    ? `<td>${row.tickets}${row.doing > 0 ? ` <span class="badge doing">作業中 ${row.doing}</span>` : ""}</td>`
+    : "";
+  const problems = [
+    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える" }] : []),
+    ...row.problems,
+  ];
+  const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
+  const origin = row.origin === "" ? '<span class="dim">読めない</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;
+  const board = ticketsEnabled
+    ? `<button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="チケット管理をこのプロジェクトで絞って開く">チケット管理</button>`
+    : "";
+  return `      <tr data-name="${escapeHtml(row.name)}">
+        <td class="name"><span class="mono">${escapeHtml(row.name)}</span><br><span class="small dim">${escapeHtml(row.rel)}</span></td>
+        <td>${origin}</td>
+        <td>${rules}</td>
+        <td>${worktrees}</td>
+        ${tickets}
+        <td>${lint}</td>
+        <td class="ops">
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの config/rules.yml を直し、判定を試す">ルール管理</button>
+          ${board}
+          <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルへ送る">fetch</button>
+          <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルへ送る。衝突すれば git が止める">pull</button>
+        </td>
+      </tr>`;
+}
+
+function renderProblems(problems: readonly LintProblem[]): string {
+  const items = problems
+    .map((p) => `<li class="${p.severity}">${escapeHtml(p.severity)}: ${escapeHtml(p.detail)}</li>`)
+    .join("");
+  return `<ul class="lint">${items}</ul>`;
+}
+
+function renderStrays(strays: readonly Stray[]): string {
+  if (strays.length === 0) {
+    return "";
+  }
+  const items = strays
+    .map((s) => `    <li><span class="mono">${escapeHtml(s.path)}</span> <span class="dim">${escapeHtml(s.reason)}</span></li>`)
+    .join("\n");
+  return `<section class="strays">
+  <h2>ccnavi が数えない .git <span class="count">${strays.length}</span></h2>
+  <p class="hint">ワークスペース直下を深さ 2 まで歩いて見つけたもの（node_modules、.venv、.claude は歩かない）。数えさせるには <code>projects/</code> の直下へ移す。ここからは操作しない。</p>
+  <ul class="stray-list">
+${items}
+  </ul>
+</section>
+`;
+}
+
+const STYLE = `  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+  }
+  h2 { margin: 0 0 8px; font-size: 1em; }
+  section { margin-bottom: 18px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 12px; }
+  .summary { display: flex; gap: 16px; font-weight: 600; }
+  .summary .path { font-weight: 400; color: var(--vscode-descriptionForeground); }
+  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
+  .hint { margin: 0 0 8px; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  .empty { margin: 0; color: var(--vscode-descriptionForeground); }
+  .mono { font-family: var(--vscode-editor-font-family); }
+  .small { font-size: .85em; }
+  .dim { color: var(--vscode-descriptionForeground); }
+  .ok { color: var(--vscode-charts-green); }
+  .warn-text { color: var(--vscode-editorWarning-foreground); }
+  code { font-family: var(--vscode-editor-font-family); }
+  button.action {
+    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
+    border: none; border-radius: 2px; padding: 3px 10px; cursor: pointer; font: inherit;
+  }
+  button.action:hover { background: var(--vscode-button-secondaryHoverBackground); }
+  button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
+  button.action.small { padding: 0 6px; font-size: .9em; }
+  button.action:disabled { opacity: .5; cursor: default; }
+  input[type=text] {
+    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 3px 6px; font: inherit; width: 100%;
+  }
+  .banner {
+    margin: 0 0 8px; padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--vscode-panel-border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
+  .banner.error { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
+  .clone-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+  .clone-form label { display: flex; flex-direction: column; gap: 2px; font-size: .9em; color: var(--vscode-descriptionForeground); }
+  .clone-form label.grow { flex: 1 1 320px; }
+  .clone-form label:not(.grow) { flex: 0 1 200px; }
+  .status { margin: 8px 0 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
+  .status.failed { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
+  .hidden { display: none; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--vscode-panel-border); }
+  th { color: var(--vscode-descriptionForeground); font-weight: 600; font-size: .9em; }
+  td.ops { white-space: nowrap; }
+  td.ops button { margin: 0 4px 4px 0; }
+  .badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); }
+  .badge.doing { color: var(--vscode-charts-yellow); border-color: var(--vscode-charts-yellow); }
+  .lint { list-style: none; margin: 0; padding: 0; font-size: .88em; }
+  .lint li { overflow-wrap: anywhere; }
+  .lint li.warn { color: var(--vscode-editorWarning-foreground); }
+  .lint li.error { color: var(--vscode-editorError-foreground); }
+  .stray-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }`;
+
+const SCRIPT = `  const vscode = acquireVsCodeApi();
+  const url = document.getElementById("url");
+  const name = document.getElementById("name");
+  const status = document.getElementById("status");
+  let nameTouched = false;
+  const saved = vscode.getState();
+  if (saved && typeof saved.url === "string") { url.value = saved.url; }
+  if (saved && typeof saved.name === "string") { name.value = saved.name; nameTouched = saved.nameTouched === true; }
+  function remember() { vscode.setState({ url: url.value, name: name.value, nameTouched: nameTouched }); }
+  function guessName(text) {
+    const trimmed = text.trim().replace(/\\/+$/, "").replace(/\\.git$/i, "");
+    const tail = trimmed.split(/[\\/:]/).pop() || "";
+    return tail;
+  }
+  url.addEventListener("input", () => {
+    if (!nameTouched) { name.value = guessName(url.value); }
+    remember();
+  });
+  name.addEventListener("input", () => { nameTouched = name.value !== ""; remember(); });
+  function show(kind, message) {
+    status.textContent = message;
+    status.classList.remove("hidden", "failed");
+    if (kind === "failed") { status.classList.add("failed"); }
+  }
+  for (const button of document.querySelectorAll("button[data-action]")) {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const action = button.getAttribute("data-action");
+      const target = button.getAttribute("data-name") || "";
+      if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
+      else if (action === "clone") { vscode.postMessage({ type: "clone", url: url.value, name: name.value }); }
+      else if (action === "create-dir") { vscode.postMessage({ type: "createDir" }); }
+      else if (action === "fix-ignore") { vscode.postMessage({ type: "fixIgnore" }); }
+      else if (action === "create-rules") { vscode.postMessage({ type: "createRules", name: target }); }
+      else if (action === "open-rules") { vscode.postMessage({ type: "openRules", name: target }); }
+      else if (action === "open-board") { vscode.postMessage({ type: "openBoard", name: target }); }
+      else if (action === "fetch") { vscode.postMessage({ type: "fetch", name: target }); }
+      else if (action === "pull") { vscode.postMessage({ type: "pull", name: target }); }
+    });
+  }
+  window.addEventListener("message", (event) => {
+    const data = event.data || {};
+    if (data.type === "failed") { show("failed", String(data.message || "")); }
+    else if (data.type === "info") { show("info", String(data.message || "")); }
+    else if (data.type === "cloned") { url.value = ""; name.value = ""; nameTouched = false; remember(); show("info", String(data.message || "")); }
+  });`;

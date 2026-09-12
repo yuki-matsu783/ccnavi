@@ -2,8 +2,12 @@
  * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書いて `--rules` で渡す。
- * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていない
+ * 対象はワークスペースのルール（`.claude/ccnavi/rules.yml`）か、プロジェクト 1 つのルール
+ * （`projects/<名前>/config/rules.yml`、設計 §25.4）。対象ごとに 1 パネルで、並べて開ける。
+ *
+ * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、ワークスペースなら `--rules`、
+ * プロジェクトなら `--project-rules-file <名前>=<パス>` で渡す。保存は、検証（`--lint`）を通り、
+ * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う。
  */
 import * as crypto from "node:crypto";
@@ -13,7 +17,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { WATCH_PATTERNS } from "./board-panel.js";
-import { loadBoard, runLint, runSamples, runTest } from "./ccnavi.js";
+import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { escapeHtml } from "./core/render.js";
@@ -22,9 +26,14 @@ import { renderRulesPage } from "./core/rules-render.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
+const DEFAULT_PROJECTS = "projects";
+const DEFAULT_PROJECT_RULES = "config/rules.yml";
 const DEFAULT_SAMPLES = "testdata/rule-samples.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
+
+/** 画面が直すルールファイル。ワークスペースのものか、プロジェクト 1 つのもの */
+export type RulesTarget = { readonly kind: "workspace" } | { readonly kind: "project"; readonly name: string };
 
 type Sections = Readonly<Record<Section, readonly RuleForm[]>>;
 
@@ -44,6 +53,7 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
+  /** ワークスペースルートからの相対で見せる綴り。プロジェクトなら `projects/<名前>/config/rules.yml` */
   readonly rulesRel: string;
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
@@ -53,6 +63,7 @@ interface Loaded {
 }
 
 interface PanelState {
+  readonly target: RulesTarget;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
@@ -64,7 +75,16 @@ interface PanelState {
   wroteAt: number;
 }
 
-let state: PanelState | undefined;
+/** 対象ごとのパネル。鍵はワークスペースが空、プロジェクトはその名前 */
+const panels = new Map<string, PanelState>();
+
+function keyOf(target: RulesTarget): string {
+  return target.kind === "workspace" ? "" : target.name;
+}
+
+function projectOf(target: RulesTarget): string | undefined {
+  return target.kind === "workspace" ? undefined : target.name;
+}
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
@@ -74,28 +94,31 @@ function samplesSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("samplesPath", DEFAULT_SAMPLES);
 }
 
-/** `ccnaviBoard.openRules` の本体 */
-export async function openRules(): Promise<void> {
+/** `ccnaviBoard.openRules` の本体。引数なしはワークスペースのルール */
+export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できない");
     return;
   }
-  if (state !== undefined) {
-    state.panel.reveal(state.panel.viewColumn);
+  const key = keyOf(target);
+  const existing = panels.get(key);
+  if (existing !== undefined) {
+    existing.panel.reveal(existing.panel.viewColumn);
     return;
   }
 
   const root = folder.uri.fsPath;
   let loaded: Loaded;
   try {
-    loaded = readPage(root);
+    loaded = readPage(root, target);
   } catch (error) {
     vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${(error as Error).message}`);
     return;
   }
 
-  const panel = vscode.window.createWebviewPanel("ccnaviRules", "ccnavi ルール設定", vscode.ViewColumn.One, {
+  const title = target.kind === "workspace" ? "ccnavi ルール設定" : `ccnavi ルール設定: ${target.name}`;
+  const panel = vscode.window.createWebviewPanel("ccnaviRules", title, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
@@ -103,6 +126,7 @@ export async function openRules(): Promise<void> {
     retainContextWhenHidden: true,
   });
   const current: PanelState = {
+    target,
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-rules-")),
@@ -111,17 +135,29 @@ export async function openRules(): Promise<void> {
     lock: lockFromError("まだ確かめていない"),
     wroteAt: 0,
   };
-  state = current;
+  panels.set(key, current);
   registerPanelHandlers(current);
   show(current);
   void refreshLock(current);
 }
 
-function readPage(root: string): Loaded {
+function readPage(root: string, target: RulesTarget): Loaded {
   const settingsText = readText(path.join(root, ".claude", "settings.json"));
   const localText = readText(path.join(root, ".claude", "settings.local.json"));
-  const rulesRel = (settingsText !== undefined && envFromSettingsJson(settingsText, "CCNAVI_RULES")) || DEFAULT_RULES;
-  const rulesPath = resolveIn(root, rulesRel);
+  const env = (name: string) => (settingsText !== undefined && envFromSettingsJson(settingsText, name)) || "";
+  let rulesPath: string;
+  let rulesRel: string;
+  if (target.kind === "workspace") {
+    rulesRel = env("CCNAVI_RULES") || DEFAULT_RULES;
+    rulesPath = resolveIn(root, rulesRel);
+  } else {
+    // プロジェクトのルールは git プロジェクトルートからの相対（既定 config/rules.yml）。
+    // 作業ツリーの中の版は読まない（設計 §25.4）。置き場は CCNAVI_PROJECTS、既定 projects/。
+    const projectsDir = resolveIn(root, env("CCNAVI_PROJECTS") || DEFAULT_PROJECTS);
+    const projectRules = env("CCNAVI_PROJECT_RULES") || DEFAULT_PROJECT_RULES;
+    rulesPath = path.join(projectsDir, target.name, ...projectRules.split("/"));
+    rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
+  }
   let text: string;
   let mtimeMs: number;
   try {
@@ -143,7 +179,7 @@ function readPage(root: string): Loaded {
     rulesRel,
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
-    mode: settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_MODE"),
+    mode: env("CCNAVI_MODE"),
     samplesPath: resolveIn(root, samplesRel),
     samplesRel,
   };
@@ -163,6 +199,7 @@ function resolveIn(root: string, filePath: string): string {
 
 function registerPanelHandlers(current: PanelState): void {
   const { panel, folder } = current;
+  const key = keyOf(current.target);
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asMessage(message));
@@ -183,8 +220,8 @@ function registerPanelHandlers(current: PanelState): void {
     } catch {
       // 一時ファイルの片付けに失敗しても画面の仕事には関係ない
     }
-    if (state === current) {
-      state = undefined;
+    if (panels.get(key) === current) {
+      panels.delete(key);
     }
   });
 
@@ -213,6 +250,10 @@ function toGlob(rel: string): string {
   return rel.replace(/\\/g, "/");
 }
 
+function alive(current: PanelState): boolean {
+  return panels.get(keyOf(current.target)) === current;
+}
+
 function scheduleChanged(current: PanelState): void {
   if (Date.now() - current.wroteAt < OWN_WRITE_GRACE_MS) {
     return;
@@ -222,7 +263,7 @@ function scheduleChanged(current: PanelState): void {
   }
   current.timer = setTimeout(() => {
     current.timer = undefined;
-    if (state === current) {
+    if (alive(current)) {
       void current.panel.webview.postMessage({ type: "changed" });
     }
   }, DEBOUNCE_MS);
@@ -234,17 +275,20 @@ function scheduleLock(current: PanelState): void {
   }
   current.lockTimer = setTimeout(() => {
     current.lockTimer = undefined;
-    if (state === current) {
+    if (alive(current)) {
       void refreshLock(current);
     }
   }, DEBOUNCE_MS);
 }
 
-/** 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側 */
+/**
+ * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
+ * ワークスペースのルールはどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
+ */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
-  const lock = result.ok ? lockFromBoard(result.board) : lockFromError(result.error);
-  if (state === current) {
+  const lock = result.ok ? lockFromBoard(result.board, projectOf(current.target)) : lockFromError(result.error);
+  if (alive(current)) {
     current.lock = lock;
     void current.panel.webview.postMessage({ type: "lock", lock });
   }
@@ -273,7 +317,7 @@ function show(current: PanelState): void {
 
 function reload(current: PanelState): void {
   try {
-    current.loaded = readPage(current.folder.uri.fsPath);
+    current.loaded = readPage(current.folder.uri.fsPath, current.target);
   } catch (error) {
     current.panel.webview.html = renderError((error as Error).message);
     return;
@@ -290,19 +334,23 @@ function fail(current: PanelState, message: string): void {
   void current.panel.webview.postMessage({ type: "failed", message });
 }
 
-/** 編集中の内容を一時ファイルに書き、そのパスを返す */
-function stage(current: PanelState, sections: Sections): string {
+/** 編集中の内容を一時ファイルに書き、実行ファイルへ渡す差し替えを返す */
+function stage(current: PanelState, sections: Sections): RulesOverride {
   const loaded = current.loaded;
   if (loaded === undefined) {
     throw new Error("ルールが読み込まれていない");
   }
   const tmp = path.join(current.tmpDir, "rules.yml");
   fs.writeFileSync(tmp, loaded.doc.apply(sections), "utf8");
-  return tmp;
+  return overrideFor(current.target, tmp);
+}
+
+function overrideFor(target: RulesTarget, tmp: string): RulesOverride {
+  return target.kind === "workspace" ? { kind: "workspace", path: tmp } : { kind: "project", name: target.name, path: tmp };
 }
 
 async function handleMessage(current: PanelState, message: Message | undefined): Promise<void> {
-  if (message === undefined || state !== current || current.loaded === undefined) {
+  if (message === undefined || !alive(current) || current.loaded === undefined) {
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -358,15 +406,15 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     }
     case "judge": {
-      let tmp: string;
+      let rules: RulesOverride;
       try {
-        tmp = stage(current, message.sections);
+        rules = stage(current, message.sections);
       } catch (error) {
         fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
         return;
       }
-      const result = await runTest(root, binSetting(), tmp, message.tool, message.subject);
-      if (state !== current) {
+      const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
+      if (!alive(current)) {
         return;
       }
       if (!result.ok) {
@@ -381,15 +429,15 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     }
     case "samples": {
-      let tmp: string;
+      let rules: RulesOverride;
       try {
-        tmp = stage(current, message.sections);
+        rules = stage(current, message.sections);
       } catch (error) {
         fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
         return;
       }
-      const result = await runSamples(root, binSetting(), tmp, current.loaded.samplesPath);
-      if (state !== current) {
+      const result = await runSamples(root, binSetting(), rules, current.loaded.samplesPath);
+      if (!alive(current)) {
         return;
       }
       if (!result.ok) {
@@ -424,8 +472,8 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
 
   // 1. 検証。error が 1 件でもあれば保存しない。
-  const lint = await runLint(root, binSetting(), tmp);
-  if (state !== current) {
+  const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
+  if (!alive(current)) {
     return;
   }
   if (!lint.ok) {
@@ -439,7 +487,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
 
   // 2. 作業中のチケットが無いこと。押した時点で取り直す。
   const lock = await refreshLock(current);
-  if (state !== current) {
+  if (!alive(current)) {
     return;
   }
   if (lock.locked) {

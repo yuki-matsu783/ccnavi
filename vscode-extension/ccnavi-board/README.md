@@ -13,8 +13,12 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 「この操作はどう判定されるか」を試し、hook の一覧を眺める。判定は実行ファイルの
 `--test --json` / `--test-samples --json` を通り、拡張は glob も regex も自分で当てない。
 
+同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 §25）を
+一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の整合（`.gitignore`、`config/rules.yml`）を
+ボタンで整える。各行からそのプロジェクトのルール設定画面とチケット管理（ボードの絞り込み）へ飛べる。
+
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
-「ルール管理」と「チケット管理」の 2 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
+「プロジェクト管理」「ルール管理」「チケット管理」の 3 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
 チケット制御を使っているときだけ。`.claude/settings.json`（`settings.local.json` が勝つ）の
 `env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口もコマンドパレットの「ボードを開く」「ボードを更新」
 「承認する」も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
@@ -30,12 +34,39 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 | `ccnavi ボード: ボードを開く` | ボードを開く。既に開いていれば増やさず前面に出す |
 | `ccnavi ボード: ボードを更新` | `ccnavi --explain --json` を走らせ直して内容を差し替える |
 | `ccnavi ボード: 承認待ちを承認する（--approve）` | ボードを開かずに `--approve` をターミナルへ送る |
-| `ccnavi ボード: ルール設定画面を開く` | ルール設定画面を開く。既に開いていれば前面に出す |
+| `ccnavi ボード: ルール設定画面を開く` | ワークスペースのルール設定画面を開く。既に開いていれば前面に出す |
+| `ccnavi ボード: プロジェクト管理を開く` | プロジェクト管理画面を開く。既に開いていれば前面に出して読み直す |
 
-サイドパネル（左端の ccnavi アイコン）の「ルール管理」「チケット管理」は、それぞれ
-`ルール設定画面を開く` と `ボードを開く` と同じ。
+サイドパネル（左端の ccnavi アイコン）の「プロジェクト管理」「ルール管理」「チケット管理」は、それぞれ
+`プロジェクト管理を開く`、`ルール設定画面を開く`、`ボードを開く` と同じ。
+
+### プロジェクト管理画面
+
+| 何 | どう出るか、何が起きるか |
+|---|---|
+| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を並べる。名前・パス・origin（`git remote get-url origin` をローカルで読む）・`config/rules.yml` の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
+| clone | URL と名前を入れて「clone をターミナルへ送る」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
+| clone を止める条件 | URL が https / ssh / `git@host:path` の 3 形でない、資格情報（`user:token@`）入り、名前が英数字と `. _ -` 以外（先頭は英数字）、既存のツリー名と衝突（大文字小文字違いも）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` 抜きの `host/path` で比べる）、clone 先が既にあって空でない |
+| 置き場が無い | 上部に出る。「作る」で `projects/` を作る。clone すれば git が作るので無くても clone はできる |
+| `.gitignore` に無い | 上部に出る。「.gitignore に足す」で `/projects/` の行を足す。コミットは人 |
+| ルールが無い | 行に「ワークスペースから写す」。`.claude/ccnavi/rules.yml`（`CCNAVI_RULES`）を `projects/<名前>/config/rules.yml` に写す。先頭に出どころのコメント、文面の `sh .claude/scripts/` は `sh {root}/.claude/scripts/` に置き換える。既にあれば上書きしない。コミットは人 |
+| `.claude/` を持つ | 行に warn で出す。消さない |
+| ルール管理 | そのプロジェクトのルール設定画面を開く（下の節）。ルールが無い行では押せない |
+| チケット管理 | ボードを開き、絞り込みをそのプロジェクトにする。チケット制御が disable なら出ない |
+| fetch / pull | `git fetch` / `git pull` を `projects/<名前>` でターミナルへ送る。未コミットの検査はしない。衝突すれば git が止める |
+| ccnavi が数えない `.git` | ワークスペース直下を深さ 2 まで歩き（`node_modules` `.venv` `.claude` `.git` は歩かない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。置き場の外か、置き場の 2 段下か。表示のみ |
+| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin は読み直しのたびに取る |
+
+持たないもの。プロジェクトを外す操作（作業ツリーと写しが残ったまま消せる事故の出口になる。エクスプローラで消せる）、
+clone のオプション欄（ブランチ、`--depth`、submodule。要るならターミナルで打つ）、ブランチと未コミットの表示（VS Code の Git 表示で見る）。
 
 ### ルール設定画面
+
+対象はワークスペースのルール（`.claude/ccnavi/rules.yml`）か、プロジェクト 1 つのルール
+（`projects/<名前>/config/rules.yml`）。プロジェクト版はプロジェクト管理画面の「ルール管理」から開き、
+対象ごとに 1 パネルで並べて開ける。編集中の内容は、ワークスペースなら `--rules`、プロジェクトなら
+`--project-rules-file <名前>=<パス>` で実行ファイルに渡す。保存を止める条件は、ワークスペース版は
+どのツリーの `doing` でも、プロジェクト版はそのプロジェクトの `doing` だけ。
 
 タブは 3 つ。
 
@@ -85,7 +116,8 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 |---|---|
 | VS Code | 1.90 以上 |
 | ccnavi の実行ファイル | `dist/ccnavi/ccnavi[.exe]`。無ければ `.claude/settings.json` の `CCNAVI_BIN_PATH`、それも無ければソースを `uv run python -m ccnavi` で走らせる |
-| bash | 承認コマンドを送るターミナル。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
+| bash | 承認コマンドと clone / fetch / pull を送るターミナル。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
+| git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone / fetch / pull を打つ |
 | Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
 
 設定（`settings.json`）。
@@ -97,6 +129,8 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 | `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `testdata/rule-samples.yml`。相対ならワークスペースルートから |
 
 ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.claude/ccnavi/rules.yml`。
+プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。プロジェクトのルールは
+`env.CCNAVI_PROJECT_RULES`、無ければ `config/rules.yml`（git プロジェクトルートからの相対）。
 
 ## 組み立てとインストール
 
@@ -113,7 +147,7 @@ pnpm run package   # scripts/package.sh: install → compile → test → vsce p
 入れるには次を打つ。Marketplace には出さない。
 
 ```sh
-code --install-extension dist/ccnavi-board-0.2.6.vsix
+code --install-extension dist/ccnavi-board-0.3.0.vsix
 ```
 
 `node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
@@ -138,8 +172,8 @@ code --install-extension dist/ccnavi-board-0.2.6.vsix
 
 ## 手動確認の手順
 
-`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `sidebar.ts` / `terminal.ts` / `ccnavi.ts` は
-VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
+`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `projects-panel.ts` / `sidebar.ts` / `terminal.ts` /
+`ccnavi.ts` / `git.ts` は VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
 `tests/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を
 実際のリポジトリで踏む。
 
@@ -158,8 +192,8 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 | 11 | 未表示で更新 | ボードを閉じた状態で `ボードを更新` | 「ccnavi ボードが開かれていない」の通知 |
 | 12 | 読めない写し | ボードを開いたまま `.claude/ccnavi/tickets/<id>.md` の frontmatter を壊す | 上部の問題の一覧にその写しが出て、他のカードはそのまま |
 | 13 | プロジェクト | `projects/<repo>` を持つワークスペースで開く | `project` バッジと絞り込みが出る |
-| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「ルール管理」「チケット管理」の順で 2 つ |
-| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「ルール管理」だけになり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。行を消すと戻る |
+| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「プロジェクト管理」「ルール管理」「チケット管理」の順で 3 つ |
+| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
 | 15 | ルール設定画面が開く | サイドパネルの「ルール管理」 | deny / ask / allow の 3 区画にルールが並ぶ。上部に dry-run の注意 |
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
 | 17 | 見本の一括 | 「見本を一括で流す」 | 区画ごとの件数と食い違い 0 件。glob を壊してから流すと食い違いの行が赤くなる |
@@ -170,27 +204,41 @@ VS Code の API か子プロセスに触れるので単体テストの対象外�
 | 22 | 未保存の再読込 | 何か変えてから「再読込」 | 「捨てて読み直す？」の確認。「読み直す」で編集が消える |
 | 23 | ファイルを選ぶ | additionalContextFile の「選ぶ…」でワークスペース内の md を選ぶ。もう一度押して外のファイルを選ぶ | 欄にルート相対のパス（`/` 区切り）が入り、保存ボタンが押せるようになる。外のファイルは「ワークスペースの外は指せない」の通知で欄が変わらない |
 | 24 | match を選ぶ | match の欄を押して札を出し、`Write` にチェック、`Bash` を外す。次に欄へ直接ツール名を縦棒でつないで打つ。最後に欄の外を押す | 札で選ぶと欄の文字が変わり、手で打つと札のチェックがそれを追う。外を押すか Esc で札が閉じる |
+| 25 | プロジェクト管理が開く | サイドパネルの「プロジェクト管理」 | `projects/` の各プロジェクトが表に並び、origin・ルールの有無・作業ツリー・チケット数・検証が出る。`projects/` が `.gitignore` に無ければ上部に警告とボタン |
+| 26 | clone | URL に `git@host:group/repo.git` を入れる（名前が `repo` に埋まる）。「clone をターミナルへ送る」 | 「ccnavi」ターミナルで `git clone -- ... projects/repo` が走る。終わると表に `repo` の行が増え、ルール「無い」と lint の warn が出る |
+| 27 | clone を止める | `https://user:token@host/g/p.git` を入れて送る。次に既存と同じ origin の URL を送る。次に既存の名前を大文字にして送る | それぞれ「資格情報」「既に clone している」「既にある」の赤い文が出て、ターミナルには何も送られない |
+| 28 | 整合のボタン | 「.gitignore に足す」→ 行の「ワークスペースから写す」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告と行の warn が消える |
+| 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」 | タブの題が「ccnavi ルール設定: <名前>」。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。ワークスペース版のパネルも同時に開いたままにできる |
+| 30 | プロジェクトのロック | そのプロジェクトの子チケットを `start` してから「保存」。次に別のプロジェクトの子だけを `start` にして「保存」 | 前者は「プロジェクト <名前> に作業中のチケットがある」で止まる。後者は保存できる |
+| 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |
+| 32 | fetch / pull | 行の「fetch」「pull」 | ターミナルで `cd projects/<名前> && git fetch` / `git pull` が走る |
+| 33 | 数えない .git | `参考/` のような `.git` 付きのディレクトリをワークスペース直下に置く。`projects/group/deep` に clone する | 「ccnavi が数えない .git」に「置き場の外」「置き場が深すぎる」で出る。操作ボタンは無い |
 
 ## 構成
 
 ```
 src/
   extension.ts        コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 2 つの入口。チケット制御が disable なら 1 つ（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 3 つの入口。チケット制御が disable なら 2 つ（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
-  rules-panel.ts      ルール設定画面の Webview パネル。判定・検証・保存の受け付け（vscode に依存する）
+  rules-panel.ts      ルール設定画面の Webview パネル（ワークスペース / プロジェクトの対象ごとに 1 つ）。判定・検証・保存の受け付け（vscode に依存する）
+  projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
-  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint の実行（Node の子プロセス）
+  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint / --lint --json の実行（Node の子プロセス）
+  git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
     testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
+    lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情の抜き出し
     board.ts          列とカードへの組み立て、操作の有無
     render.ts         ボードの HTML（外部資源なし、テーマ変数だけ）
     rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
+    projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、数えない .git の探索、.gitignore と雛形の加工
+    projects-render.ts プロジェクト管理画面の HTML と、その中で動くスクリプト
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
-    lock.ts           保存できるか（doing のチケットの有無）
+    lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）
     commands.ts       ターミナルに送るコマンド行
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
@@ -199,7 +247,7 @@ media/
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T59
+  *.test.ts           core の単体テスト CB-T01〜CB-T68
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て

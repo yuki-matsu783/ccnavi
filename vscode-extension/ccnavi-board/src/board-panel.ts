@@ -46,6 +46,8 @@ interface PanelState {
   loading: boolean;
   again: boolean;
   wasVisible: boolean;
+  /** 次に描いたときに選ぶ絞り込み。1 度使ったら消す（以後は Webview の state が覚える） */
+  filter?: string;
 }
 
 let state: PanelState | undefined;
@@ -54,8 +56,11 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.open` の本体 */
-export async function openBoard(): Promise<void> {
+/**
+ * `ccnaviBoard.open` の本体。`project` を渡すと、開いたボードの絞り込みをそのプロジェクトにする
+ * （`""` はワークスペース自身、`"*"` は全部）。プロジェクト管理画面からの導線。
+ */
+export async function openBoard(project?: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、ccnavi ボードを表示できない");
@@ -67,6 +72,7 @@ export async function openBoard(): Promise<void> {
   if (state !== undefined) {
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
+    state.filter = project;
     void update();
     return;
   }
@@ -97,6 +103,7 @@ export async function openBoard(): Promise<void> {
     again: false,
     wasVisible: panel.visible,
     launcher: first.launcher,
+    filter: project,
   };
   state = current;
   registerPanelHandlers(current);
@@ -231,6 +238,11 @@ function show(current: PanelState, board: Board): void {
   current.panel.webview.html = renderBoard(board, {
     nonce: crypto.randomBytes(16).toString("base64"),
   });
+  if (current.filter !== undefined) {
+    // HTML の差し替えの後に届く。Webview の中のスクリプトが select を合わせる。
+    void current.panel.webview.postMessage({ type: "filter", project: current.filter });
+    current.filter = undefined;
+  }
 }
 
 function renderError(error: string): string {

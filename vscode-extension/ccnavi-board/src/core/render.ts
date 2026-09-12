@@ -337,11 +337,18 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     }
     vscode.setState({ project: value });
   }
+  function selectProject(value) {
+    if (!filter) { return; }
+    if ([...filter.options].some((o) => o.value === value)) { filter.value = value; applyFilter(); }
+  }
   if (filter) {
     const saved = vscode.getState();
-    if (saved && typeof saved.project === "string") {
-      if ([...filter.options].some((o) => o.value === saved.project)) { filter.value = saved.project; }
-    }
+    if (saved && typeof saved.project === "string") { selectProject(saved.project); }
     filter.addEventListener("change", applyFilter);
     applyFilter();
-  }`;
+  }
+  // プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき。
+  window.addEventListener("message", (event) => {
+    const data = event.data || {};
+    if (data.type === "filter" && typeof data.project === "string") { selectProject(data.project); }
+  });`;
