@@ -308,8 +308,8 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             )
         )
         return problems
-    root = root or os.path.dirname(os.path.dirname(os.path.dirname(conf.approved)))
-    if not os.path.isdir(conf.approved) and not tree_has_tickets(root, conf.tickets):
+    root = root or os.getcwd()
+    if not _any_copies(conf, root) and not tree_has_tickets(root, conf.tickets):
         # 写しも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
         # 他の報告ごと読まれなくなる。
@@ -317,10 +317,10 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
 
     problems.extend(_approved_guarded(conf, root))
 
-    copies, notes = approval.copies(conf.approved)
+    copies, notes = approval.scan(conf, root)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
-    closed, _ = approval.copies(conf.approved, closed=True)
+    closed, _ = approval.scan(conf, root, closed=True)
     index = approval.by_id(copies)
     done = {t.ticket for t in closed}
 
@@ -358,24 +358,29 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     return problems
 
 
+def _any_copies(conf: settings.Settings, root: str) -> bool:
+    """どこかのツリーに写しの置き場があるか。"""
+    return any(
+        os.path.isdir(settings.approved_dir(conf, t.root)) for t in approval.trees(conf, root)
+    )
+
+
 def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     """写しの置き場が守られているか。
 
-    ルールが Write を止めていなければ、エージェントが写しを書けて、承認の意味が無い。
+    守るのは組み込み（`builtin-guard-approved-tickets`）で、ルールファイルには
+    書かせない。書かせると消せることになる。組み立てられるかだけをここで見る。
+    綴りから当てる形を作れなければ、その 1 本は足されず、エージェントが写しを
+    書けて承認の意味が無くなる。
     """
-    try:
-        rule_set, _ = rules.load(conf.rules, root)
-    except (OSError, ValueError):
-        return []
-    probe = os.path.join(conf.approved, "probe.md")
-    if any(rule.matches("Write", probe) for rule in rule_set.deny + rule_set.ask):
+    if selfguard.approved_clause(conf.approved):
         return []
     return [
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"写しの置き場 {conf.approved} への Write をルールが止めていない。"
-            "エージェントが写しを書けるので、承認の意味が無い",
+            f"写しの置き場の綴り（{settings.APPROVED_ENV}={conf.approved}）から"
+            "守るルールを組み立てられない。エージェントが写しを書けるので、承認の意味が無い",
         )
     ]
 
@@ -434,15 +439,6 @@ def _worktree_problems(
                     SEVERITY_WARN,
                     "(ticket)",
                     f"作業ツリー {t.name} にチケットが無い。そこへの書き込みはルールだけで判定する",
-                )
-            )
-        stray = os.path.join(t.root, os.path.relpath(conf.approved, root))
-        if os.path.isdir(stray) and os.listdir(stray):
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    "(ticket)",
-                    f"作業ツリー {t.name} の側に写しの置き場がある。読むのは main の側だけ",
                 )
             )
         bound = index.get(t.name)

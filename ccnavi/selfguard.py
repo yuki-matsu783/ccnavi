@@ -184,7 +184,7 @@ _PLACES = (r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)", 
 _COPY_PLACES = (r"\.claude[\\/](ccnavi|hooks|scripts|settings)", r"ccnavi-git\.sh")
 
 
-def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
+def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルの綴りは設定で動くので、
     ここで組み立てる。
 
@@ -192,12 +192,13 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
     ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
     `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
 
-    extra_clause はプロジェクトのルールファイルの綴り（project_rules_clause）。
-    行き先の判定に使うので、書けるとエージェントが自分のルールを緩められる。
+    extra_clauses はプロジェクトのルールファイル（project_rules_clause）と承認済みの
+    写しの置き場（approved_clause）の綴り。どちらも行き先の判定に使うので、書けると
+    エージェントが自分のルールや自分の範囲を緩められる。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
-    for clause in (binary_clause(bin_path), extra_clause):
+    for clause in (binary_clause(bin_path), *extra_clauses):
         if clause:
             places.append(clause)
             copy_places.append(clause)
@@ -220,6 +221,19 @@ def project_rules_clause(projects_dir: str, project_rules: str) -> str:
     if not base or not parts:
         return ""
     return re.escape(base) + r"[\\/][^\\/ \x00]+[\\/]" + r"[\\/]".join(parts)
+
+
+def approved_clause(approved_rel: str) -> str:
+    """承認済みの写しの置き場の綴りを、当てる形に直す。
+
+    写しはプロジェクトの git に入り、どのツリーにも同じ相対で現れる。置き場は設定で
+    動くのでルールファイルに綴りを固定できず、ここで組み立てる。ここが書けると、
+    エージェントが自分の範囲を自分で広げられる（承認の意味が無くなる）。
+    """
+    parts = [re.escape(p) for p in (approved_rel or "").split("/") if p]
+    if not parts:
+        return ""
+    return r"[\\/]".join(parts) + r"[\\/]"
 
 
 def binary_clause(bin_path: str) -> str:
@@ -268,6 +282,15 @@ PROJECT_RULES_MESSAGE = (
     "プロジェクトのルールファイルです。このプロジェクトへの書き込みはここで判定される"
     "ので、エージェントが書き換えると自分のルールを緩められます。変更が要るなら、"
     "何をなぜ変えたいのかを伝えて利用者に依頼してください。"
+)
+
+APPROVED_RULE_ID = "builtin-guard-approved-tickets"
+
+APPROVED_MESSAGE = (
+    "承認済みのチケットの写しです。判定はここだけを読むので、ここが書けると承認の意味が"
+    "ありません。承認は利用者が 'ccnavi --approve' で行い、閉じるのは "
+    "'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。範囲を変えたいなら、"
+    "提案の todo/ に新しい提案を書いて承認を依頼してください。"
 )
 
 
@@ -330,14 +353,20 @@ def resolve(
     return ENABLE
 
 
-def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str = "") -> None:
+def add_rules(
+    rule_set: rules.RuleSet,
+    bin_path: str = "",
+    project_clause: str = "",
+    approved: str = "",
+) -> None:
     """ガード自身を守るルールを、判定に足す。
 
     ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
 
-    3 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
-    名指しのツールでプロジェクトのルールファイルを書く形。ワークスペースの設定
+    4 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
+    名指しのツールでプロジェクトのルールファイルを書く形、名指しのツールで
+    承認済みの写しを書く形。ワークスペースの設定
     ファイルを名指しのツールから守るぶんはワークスペースのルールに任せる。
     そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルと
     プロジェクトのルールは置き場が設定で動くので、ルールファイルに綴りを固定できない。
@@ -353,7 +382,7 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
         {
             "id": SHELL_RULE_ID,
             "match": "Bash",
-            "regex": shell_write_regex(bin_path, project_clause),
+            "regex": shell_write_regex(bin_path, project_clause, approved),
             "message": SHELL_MESSAGE,
         },
     )
@@ -379,6 +408,28 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
                 "message": PROJECT_RULES_MESSAGE,
             },
         )
+    add_approved_rule(rule_set, approved)
+
+
+def add_approved_rule(rule_set: rules.RuleSet, approved: str) -> None:
+    """承認済みの写しを名指しのツールから守る 1 本。
+
+    足す先が 2 つある（ガード自身を守る面と、チケット制御の面）ので、関数に分けて
+    どちらからも呼ぶ。`_insert` は同じ id を二度足さない。チケット制御が効いていれば、
+    ガード自身を守る面が切られていてもこの 1 本は残る。
+    """
+    if not approved:
+        return
+    _insert(
+        rule_set,
+        {
+            "id": APPROVED_RULE_ID,
+            "match": "Write|Edit|NotebookEdit",
+            # 末尾で閉じない。置き場の下の何を書く形も止める（closed/ と phases/ を含む）。
+            "regex": approved,
+            "message": APPROVED_MESSAGE,
+        },
+    )
 
 
 def _insert(rule_set: rules.RuleSet, raw: dict) -> None:

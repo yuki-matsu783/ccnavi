@@ -595,27 +595,12 @@ def combine(child: str, parent: str) -> str:
     return child if order[child] >= order[parent] else parent
 
 
-def tickets_rel_for(tickets_rel: str, project: str) -> str:
-    """このプロジェクトの提案の置き場。ワークスペースルートからの相対（設計 §25.5）。
-
-    `wip/tickets` なら `wip/<project>/tickets`。プロジェクトの名前は最初の区切りの
-    あとに挟む。プロジェクトのリポジトリの中には書かない。そこは public で、提案は
-    ワークスペースの運用の痕跡だから（REQ-MLT-14）。空の名前ならそのまま。
-    """
-    if not project:
-        return tickets_rel
-    parts = [p for p in tickets_rel.split("/") if p]
-    if len(parts) < 2:
-        return "/".join([project, *parts])
-    return "/".join([parts[0], project, *parts[1:]])
-
-
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
     """main と全作業ツリーの提案を集める。状態と置き場を添える。
 
-    プロジェクト向けの提案はワークスペースルートの `wip/<project>/tickets/` にある。
-    作業ツリーの側には無い（プロジェクトのブランチには wip/ が無い）。
-    同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
+    提案はどのツリーでも同じ相対の置き場にある。プロジェクト向けの提案は
+    そのプロジェクトの git が持つ。同じ識別子が複数のツリーにあれば、
+    権威のあるツリーの側だけを残す。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
     return dedupe(found), problems
@@ -632,8 +617,8 @@ def scan_all(
     found: list[Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    places = [(t, tickets_rel) for t in [ws, *tree.worktrees(root, projects_dir)]]
-    places += [(ws, tickets_rel_for(tickets_rel, p.name)) for p in tree.projects(projects_dir)]
+    trees = [ws, *tree.projects(projects_dir), *tree.worktrees(root, projects_dir)]
+    places = [(t, tickets_rel) for t in trees]
     for t, rel in places:
         base = os.path.join(t.root, rel.replace("/", os.sep))
         for state in STATES:

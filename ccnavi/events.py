@@ -127,10 +127,8 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
     """承認済みの写しを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
     if not conf.tickets_enabled:
         return None
-    copies, _ = approval.copies(conf.approved)
-    return post.ScopeGuard(
-        root=root, approved=conf.approved, copies=approval.by_id(copies), projects=conf.projects
-    )
+    copies, _ = approval.scan(conf, root)
+    return post.ScopeGuard(root=root, copies=approval.by_id(copies), projects=conf.projects)
 
 
 def decide_at_prompt(

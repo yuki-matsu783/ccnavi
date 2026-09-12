@@ -238,17 +238,18 @@ def load_types(conf: settings.Settings) -> dict[str, phasetypes.PhaseType] | Non
 
 def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.Ticket]:
     """提案の状態を写しへ写し、閉じたものを閉じる。開いている写しを返す。"""
-    open_copies, notes = approval.copies(conf.approved)
+    open_copies, notes = approval.scan(conf, root)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     remaining = []
     for copy in open_copies:
         state, path = _proposal(root, conf, copy)
         if state in ticket_mod.CLOSED:
+            where = approval.dir_of(conf, copy)
             proposal, _ = ticket_mod.load(path)
             if proposal is not None:
-                approval.update_copy(conf.approved, copy, _script_fields(proposal))
-            failed = approval.close_copy(conf.approved, copy.ticket)
+                approval.update_copy(where, copy, _script_fields(proposal))
+            failed = approval.close_copy(where, copy.ticket)
             if failed:
                 stderr.write(f"ccnavi: {copy.ticket}: {failed}\n")
                 remaining.append(copy)
@@ -258,7 +259,7 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
             if proposal is not None:
                 fields = _script_fields(proposal)
                 if any(getattr(copy, k) != v for k, v in fields.items()):
-                    approval.update_copy(conf.approved, copy, fields)
+                    approval.update_copy(approval.dir_of(conf, copy), copy, fields)
                     for k, v in fields.items():
                         setattr(copy, k, v)
         remaining.append(copy)
@@ -270,8 +271,8 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
     """
-    open_copies, _ = approval.copies(conf.approved)
-    closed_copies, _ = approval.copies(conf.approved, closed=True)
+    open_copies, _ = approval.scan(conf, root)
+    closed_copies, _ = approval.scan(conf, root, closed=True)
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is not None and owner.has_plan:
@@ -295,11 +296,14 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         phase.tickets.append(t)
         state, _ = _proposal(root, conf, t)
         phase.states[t.ticket] = state
+    # 印と記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
+    # 印を子の側に書くと、同じフェーズの印が複数のツリーに散る。
+    where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
-        phase.marks = approval.marks(conf.approved, parent_id, phase.number)
+        phase.marks = approval.marks(where, parent_id, phase.number)
         for t in phase.tickets:
             record = approval.read_child_record(
-                conf.approved, parent_id, t.ticket, approval.CHILD_RECORD_RISK
+                where, parent_id, t.ticket, approval.CHILD_RECORD_RISK
             )
             if record:
                 phase.risks[t.ticket] = record
@@ -319,7 +323,7 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
-    open_copies, _ = approval.copies(conf.approved)
+    open_copies, _ = approval.copies(settings.approved_dir(conf, t.root))
     found = tree.lookup(approval.by_id(open_copies), t.name)
     if found is None or found.is_child:
         return None
@@ -352,6 +356,7 @@ def gate_reason(phase: Phase, tool: str) -> str:
 def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。"""
     texts = []
+    where = approval.home_dir(conf, root, parent.ticket, "")
     phases = phases_of(root, conf, parent.ticket)
     for phase in phases:
         if not phase.ended or phase.marks:
@@ -360,7 +365,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
         if phase.deferred:
             at = phase.review_at
             failed = approval.write_mark(
-                conf.approved, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
+                where, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
@@ -370,7 +375,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 + _next_hint(parent, phases, n)
             )
         elif phase.review_required:
-            failed = approval.write_mark(conf.approved, parent.ticket, n, approval.MARK_PENDING, {})
+            failed = approval.write_mark(where, parent.ticket, n, approval.MARK_PENDING, {})
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
@@ -395,7 +400,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
         else:
             failed = approval.write_mark(
-                conf.approved,
+                where,
                 parent.ticket,
                 n,
                 approval.MARK_SKIPPED,
@@ -515,7 +520,7 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_mod.Ticket)
     return False
 
 
-def settle_last_review(conf: settings.Settings, parent: ticket_mod.Ticket, stamp: str) -> str:
+def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str) -> str:
     """フィードバック計画の承認で、全体計画の最後のレビューを済んだ扱いにする。
 
     人がレビューの結果を見たうえで対応を計画したので、その計画の承認がレビューの
@@ -525,10 +530,10 @@ def settle_last_review(conf: settings.Settings, parent: ticket_mod.Ticket, stamp
     if not parent.has_plan:
         return ""
     last = len(parent.plan)
-    if approval.read_mark(conf.approved, parent.ticket, last, approval.MARK_REVIEWED) is not None:
+    if approval.read_mark(approved_dir, parent.ticket, last, approval.MARK_REVIEWED) is not None:
         return ""
     return approval.write_mark(
-        conf.approved,
+        approved_dir,
         parent.ticket,
         last,
         approval.MARK_REVIEWED,
@@ -544,7 +549,9 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     closed = gate(root, conf, parent.ticket)
     if closed is not None:
         return f"レビュー待ち（{closed.label}）"
-    if approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP):
+    if approval.read_parent_mark(
+        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
+    ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
         return "閉じられる（利用者が締めた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
@@ -587,7 +594,9 @@ def scope_findings(
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
-        if rel.startswith(conf.tickets + "/"):
+        # チケットの置き場（提案も写しも印も）は範囲の外でも咎めない。次の提案を書く道と、
+        # 承認がブランチに乗る道を塞がないため。
+        if any(rel.startswith(p + "/") for p in (conf.tickets, conf.approved) if p):
             continue
         verdict = child.decide(rel)
         if parent is not None:
@@ -602,14 +611,13 @@ def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tu
     tree_root = _tree_root(root, copy.source_tree, conf.projects)
     if not tree_root:
         return "", ""
-    rel = ticket_mod.tickets_rel_for(conf.tickets, copy.project)
-    return ticket_mod.locate(root, rel, tree_root, copy.ticket)
+    return ticket_mod.locate(root, conf.tickets, tree_root, copy.ticket)
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:
     if name == tree.MAIN:
         return tree.main_tree(root).root
-    for t in tree.worktrees(root, projects_dir):
+    for t in [*tree.projects(projects_dir), *tree.worktrees(root, projects_dir)]:
         if t.name == name:
             return t.root
     return ""

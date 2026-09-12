@@ -159,12 +159,18 @@ def decide_before(
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
         selfguard.add_rules(
-            rule_set, conf.bin, selfguard.project_rules_clause(conf.projects, conf.project_rules)
+            rule_set,
+            conf.bin,
+            selfguard.project_rules_clause(conf.projects, conf.project_rules),
+            selfguard.approved_clause(conf.approved),
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        # 承認済みの写しは、チケット制御が効いている間はいつでも守る。ここが書けると
+        # 範囲を自分で広げられるので、ガード自身を守る面の設定には従わせない。
+        selfguard.add_approved_rule(rule_set, selfguard.approved_clause(conf.approved))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
@@ -428,7 +434,10 @@ def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str
     """
     if t.is_main:
         return ""
-    copies, _ = approval.copies(conf.approved)
+    # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
+    # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
+    # チケットの範囲がいつまでも効く。
+    copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     ticket = index.get(t.name)
     if ticket is None:
@@ -437,7 +446,7 @@ def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str
     owner = parent.project if parent is not None else ticket.project
     if owner == t.project:
         return ""
-    source = approval.copy_path(conf.approved, t.name)
+    source = ticket.path
     return "\n".join(
         [
             f"[ccnavi] {reasons.CODE_TICKET_PROJECT} (source: {source})",
@@ -477,7 +486,7 @@ def ticket_verdict(
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
         return "", ""
-    copies, _ = approval.copies(conf.approved)
+    copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切った作業ツリーは案内では
@@ -494,7 +503,7 @@ def ticket_verdict(
         return rules.ALLOW, ""
 
     area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
-    source = approval.copy_path(conf.approved, t.name)
+    source = ticket.path
     head = [
         f"subject: {full}",
         f"ticket: {ticket.ticket} ({ticket.title}), approved {ticket.approved_at}, "

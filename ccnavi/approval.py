@@ -89,8 +89,98 @@ def load_copy(path: str) -> ticket_mod.Ticket | None:
     ticket.approved_at = str(meta.get("approved_at") or "")
     ticket.source_tree = str(meta.get("source_tree") or "")
     ticket.source_path = str(meta.get("source_path") or "")
+    # tree は「どのツリーで見つけたか」。scan が入れる。source_tree（どのツリーの提案を
+    # 写したか）とは別物で、子の作業ツリーに checkout された写しでは食い違う。
     ticket.tree = ticket.source_tree
     return ticket
+
+
+def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
+    """写しを持ちうるツリー全部。ワークスペース、プロジェクト、作業ツリー。"""
+    return [
+        tree.main_tree(root),
+        *tree.projects(conf.projects),
+        *tree.worktrees(root, conf.projects),
+    ]
+
+
+def scan_all(
+    conf: settings.Settings, root: str, closed: bool = False
+) -> tuple[list[ticket_mod.Ticket], list[str]]:
+    """全ツリーの写しを、重複を畳まずに集める。
+
+    写しは親チケットのブランチに乗るので、そこから切った子の作業ツリーにも
+    同じものが checkout されている。畳まない側は、ボードが「どこに写っているか」を
+    見せるために使う。
+    """
+    found: list[ticket_mod.Ticket] = []
+    notes: list[str] = []
+    for t in trees(conf, root):
+        got, complaints = copies(settings.approved_dir(conf, t.root), closed)
+        for c in got:
+            c.tree, c.tree_root = t.name, t.root
+        found.extend(got)
+        notes.extend(complaints)
+    return found, notes
+
+
+def scan(
+    conf: settings.Settings, root: str, closed: bool = False
+) -> tuple[list[ticket_mod.Ticket], list[str]]:
+    """判定と承認が読む写し。権威のあるツリーの側だけを残す。
+
+    権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに
+    無ければ落とす。子の作業ツリーに checkout されている写しは、切った時点の
+    写ししか持たない。親のツリーで閉じたあとも子の側には開いた写しが残るので、
+    「権威の側に無ければ全部残す」に倒すと、閉じたチケットが開いたものとして
+    復活する。
+    """
+    found, notes = scan_all(conf, root, closed)
+    other, _ = scan_all(conf, root, not closed)
+    # 権威のツリーがこの識別子を持っているか（開いていても閉じていても）。持っていれば
+    # そこだけを読む。持っていなければ、見つかった側を全部残す。親の作業ツリーがまだ
+    # 無いうちに承認した写し（ワークスペースの側に置かれる）を落とさないため。
+    at_home = {t.ticket for t in found + other if t.tree == (t.parent or t.ticket)}
+    by_id: dict[str, list[ticket_mod.Ticket]] = {}
+    for t in found:
+        by_id.setdefault(t.ticket, []).append(t)
+    kept: list[ticket_mod.Ticket] = []
+    for ticket_id, hits in by_id.items():
+        home = hits[0].parent or hits[0].ticket
+        kept.extend(hits if ticket_id not in at_home else [t for t in hits if t.tree == home])
+    return kept, notes
+
+
+def dir_of(conf: settings.Settings, ticket: ticket_mod.Ticket) -> str:
+    """この写しが見つかったツリーの置き場。書き戻す先。"""
+    return settings.approved_dir(conf, ticket.tree_root)
+
+
+def home_dir(
+    conf: settings.Settings, root: str, ticket_id: str, parent: str, fallback_root: str = ""
+) -> str:
+    """この識別子の写しを置くツリーの置き場。
+
+    書く先も読む先も 1 つに決めるためのもの。子の作業ツリーにも写しは checkout
+    されるが、そこへ書くと同じ識別子の写しが 2 通りになる。
+
+    親のツリーが無いときは、fallback_root（提案があったツリー）、既に写しを持って
+    いるツリー、ワークスペースルートの順に落とす。親の作業ツリーを作る前に承認する
+    道を塞がないため。
+    """
+    home = parent or ticket_id
+    for t in trees(conf, root):
+        if t.name == home:
+            return settings.approved_dir(conf, t.root)
+    if fallback_root:
+        return settings.approved_dir(conf, fallback_root)
+    for t in trees(conf, root):
+        where = settings.approved_dir(conf, t.root)
+        if os.path.exists(copy_path(where, ticket_id)) or os.path.exists(
+            closed_path(where, ticket_id)
+        ):
+            return where
+    return settings.approved_dir(conf, tree.main_tree(root).root)
 
 
 def write_copy(
@@ -310,10 +400,10 @@ def approve(
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
 
-    approved, notes = copies(conf.approved)
+    approved, notes = scan(conf, root)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
-    closed, _ = copies(conf.approved, closed=True)
+    closed, _ = scan(conf, root, closed=True)
     types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
@@ -337,7 +427,7 @@ def approve(
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
         return 1
-    return _apply(stdout, stderr, conf, batch, now())
+    return _apply(stdout, stderr, root, conf, batch, now())
 
 
 def _candidates(
@@ -385,7 +475,12 @@ def _candidates(
 
 
 def _apply(
-    stdout: TextIO, stderr: TextIO, conf: settings.Settings, batch: list[Candidate], stamp: str
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    batch: list[Candidate],
+    stamp: str,
 ) -> int:
     """承認された束を写しに落とす。改版は写しを書き換え、新規は写しを置く。"""
     from . import phase
@@ -393,7 +488,8 @@ def _apply(
     for cand in batch:
         t = cand.ticket
         if cand.is_revision and cand.current is not None:
-            failed = revise_copy(conf.approved, cand.current, t, stamp, cand.plans_feedback)
+            where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
+            failed = revise_copy(where, cand.current, t, stamp, cand.plans_feedback)
             if failed:
                 stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
                 return 1
@@ -401,7 +497,7 @@ def _apply(
             stdout.write(f"  {t.ticket} の{what}を改版した\n")
             if cand.plans_feedback:
                 # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
-                failed = phase.settle_last_review(conf, t, stamp)
+                failed = phase.settle_last_review(home_dir(conf, root, t.ticket, ""), t, stamp)
                 if failed:
                     stderr.write(f"ccnavi: {t.ticket}: 印を置けない: {failed}\n")
                     return 1
@@ -410,21 +506,22 @@ def _apply(
                     "フィードバック作業フェーズの check が数える\n"
                 )
             continue
-        failed = write_copy(conf.approved, t, t.tree, stamp)
+        where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
+        failed = write_copy(where, t, t.tree, stamp)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return 1
         # 終わったフェーズに子を足したら、そのフェーズの印は消す。印は
         # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
         if t.is_child and t.phase is not None:
-            cleared = clear_marks(conf.approved, t.parent, t.phase)
+            cleared = clear_marks(home_dir(conf, root, t.parent, ""), t.parent, t.phase)
             if cleared:
                 stdout.write(
                     f"  {t.parent} のフェーズ {t.phase} の印（{', '.join(cleared)}）を消した。"
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
 
-    stdout.write(f"\n承認した。{conf.approved} に写しを置いた。\n")
+    stdout.write(f"\n承認した。親のツリーの {conf.approved} に写しを置いた。\n")
     stdout.write("この範囲は次のツール呼び出しから効く。\n")
     return 0
 
@@ -582,7 +679,7 @@ def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bo
 
 def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> list[str]:
     """フィードバック計画の承認に添える証跡。何を見たうえでの合意かを残す。"""
-    accepted = accepted_threads(conf.approved, parent.ticket)
+    accepted = accepted_threads(home_dir(conf, root, parent.ticket, ""), parent.ticket)
     notes = [f"受け入れ済みの未解決スレッド: {len(accepted)} 件"]
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
@@ -696,7 +793,7 @@ def revision_problems(
         )
     # 全体計画: 子がある番号までは同じ並びでなければならない。
     if revised.plan != current.plan:
-        frozen = _last_phase_with_children(conf, current.ticket)
+        frozen = _last_phase_with_children(conf, root, current.ticket)
         if frozen > len(revised.plan) or revised.plan[:frozen] != current.plan[:frozen]:
             problems.append(
                 rules.Problem(
@@ -755,10 +852,10 @@ def _scope_signature(t: ticket_mod.Ticket) -> tuple:
     return tuple((e.decision, e.glob, e.regex) for e in t.entries)
 
 
-def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
+def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str) -> int:
     """この親で、子が承認された（開いていても閉じていても）いちばん後ろの番号。"""
-    open_copies, _ = copies(conf.approved)
-    closed_copies, _ = copies(conf.approved, closed=True)
+    open_copies, _ = scan(conf, root)
+    closed_copies, _ = scan(conf, root, closed=True)
     numbers = [
         t.phase
         for t in open_copies + closed_copies

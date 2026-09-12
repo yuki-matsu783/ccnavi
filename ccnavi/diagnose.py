@@ -438,13 +438,13 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     if not conf.tickets_enabled:
         stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")
         return 0
-    copies, notes = approval.copies(conf.approved)
+    copies, notes = approval.scan(conf, root)
     for note in notes:
         stdout.write(f"  {note}\n")
     if not copies:
         stdout.write("  承認されたチケットが無い。範囲の制限は掛かっていない\n")
         return 0
-    closed, _ = approval.copies(conf.approved, closed=True)
+    closed, _ = approval.scan(conf, root, closed=True)
     done = {t.ticket for t in closed}
     for t in sorted(copies, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
@@ -464,12 +464,11 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         where = phase.stage(root, conf, parent)
         if where:
             stdout.write(f"  {parent.ticket} の段階: {where}\n")
-        wrapped = approval.read_parent_mark(
-            conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP
-        )
+        where = approval.home_dir(conf, root, parent.ticket, "")
+        wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP)
         if wrapped:
             stdout.write(f"  {parent.ticket} は利用者が締めた: {wrapped.get('reason', '')}\n")
-        if approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_READY):
+        if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
             stdout.write(f"  {parent.ticket} は Draft を外した。マージは利用者が行う\n")
         for ph in phase.phases_of(root, conf, parent.ticket):
             marks = ", ".join(sorted(ph.marks)) or "印なし"
@@ -538,9 +537,9 @@ def board(conf: settings.Settings, root: str) -> dict:
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(str(p) for p in scan_problems)
     proposals = ticket_mod.dedupe(everything)
-    open_copies, notes = approval.copies(conf.approved)
+    open_copies, notes = approval.scan(conf, root)
     problems.extend(notes)
-    closed_copies, notes = approval.copies(conf.approved, closed=True)
+    closed_copies, notes = approval.scan(conf, root, closed=True)
     problems.extend(notes)
 
     pending, revisions = approval.waiting(proposals, open_copies, closed_copies)
@@ -647,11 +646,12 @@ def _ticket_record(
         "judge": None,
     }
     if source.parent:
+        where = approval.home_dir(conf, root, ticket_id, source.parent)
         record["risk"] = approval.read_child_record(
-            conf.approved, source.parent, ticket_id, approval.CHILD_RECORD_RISK
+            where, source.parent, ticket_id, approval.CHILD_RECORD_RISK
         )
         record["judge"] = approval.read_child_record(
-            conf.approved, source.parent, ticket_id, approval.CHILD_RECORD_JUDGE
+            where, source.parent, ticket_id, approval.CHILD_RECORD_JUDGE
         )
     return record
 
@@ -688,6 +688,7 @@ def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
     """親 1 件。段階、計画、親の印、フェーズの並び。"""
+    where = approval.home_dir(conf, root, parent.ticket, "")
     return {
         "ticket": parent.ticket,
         "closed": parent.ticket in closed_index,
@@ -696,12 +697,8 @@ def _parent_record(
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None
         ),
-        "wrapup": approval.read_parent_mark(
-            conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP
-        ),
-        "ready": approval.read_parent_mark(
-            conf.approved, parent.ticket, approval.PARENT_MARK_READY
-        ),
-        "accepted_threads": sorted(approval.accepted_threads(conf.approved, parent.ticket)),
+        "wrapup": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP),
+        "ready": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY),
+        "accepted_threads": sorted(approval.accepted_threads(where, parent.ticket)),
         "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket)],
     }

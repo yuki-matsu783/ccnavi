@@ -60,8 +60,8 @@ BIN_SUFFIXES = (".exe",)
 # 以前は APPROVED_ENV を空文字にすることがこの宣言を兼ねていた。置き場のパスが
 # 空であることと機能を切ることは別の話なので、名前を分けた。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# チケット制御が使う置き場 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
-# ルートからの相対。APPROVED_ENV は承認済みの写しの置き場で、ワークスペースルートからの相対。
+# チケット制御が使う置き場 2 つ。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みの
+# 写しの置き場。どちらも各ツリーのルートからの相対で、そのツリーの git が追跡する。
 # 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
@@ -97,13 +97,13 @@ DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
-# 提案は各作業ツリーの `wip/tickets/` に置く。人が読み、人が承認するものなので、
-# ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
-# 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
-DEFAULT_TICKETS = "wip/tickets"
-# 写しは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
-# シェル経由の書き込みを止めている。写しのために別の保護を足さずに済む。
-DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
+# 提案も写しも、そのツリーの `.ccnavi/` に置く。プロジェクトの git で運ぶためで、
+# 承認した人の機械にだけ在る形だと、A が承認して B の機械で作業する流れが成り立たない
+# （設計 §24.5）。プロジェクトに `.claude/` は置けない（Claude Code がそこのスキルを
+# 読み、`--lint` が迷い子として拾う）ので `.ccnavi/` を使う。守りは組み込みが持つ。
+# 区切りは "/" で持つ。ツリーのルートに継ぎ足すときに os の区切りへ直す。
+DEFAULT_TICKETS = ".ccnavi/proposals"
+DEFAULT_APPROVED = ".ccnavi/tickets"
 # フェーズの種類は人が持つ設定なので、写しと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
@@ -171,8 +171,9 @@ class Settings:
     ticket_control: str = ""
     ticket_control_declared: str = ""
 
-    # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
-    # approved は承認済みの写しの置き場（絶対）。判定が読むのは approved だけ。
+    # tickets は提案の置き場、approved は承認済みの写しの置き場。どちらも各ツリーの
+    # ルートからの相対（"/" 区切り）。絶対で 1 か所を指さないのは、どちらもそのツリーの
+    # git に乗って運ばれるから（設計 §24.5）。判定が読むのは approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     # approved_blank は、置き場を空文字で指定されたこと。以前はそれが「使わない」の
     # 宣言だったので、--lint が今の書き方を案内する。
@@ -235,7 +236,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved_blank=APPROVED_ENV in os.environ and os.environ[APPROVED_ENV] == "",
-        approved=os.path.join(root, DEFAULT_APPROVED),
+        approved=DEFAULT_APPROVED,
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
         projects=os.path.join(root, DEFAULT_PROJECTS),
@@ -256,7 +257,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ("log", LOG_ENV, _log_or_none, True),
         ("state", STATE_ENV, _log_or_none, True),
         ("tickets", TICKETS_ENV, _relative, False),
-        ("approved", APPROVED_ENV, _resolve, False),
+        ("approved", APPROVED_ENV, _relative, False),
     )
     for name, env, read, accepts_empty in overrides:
         if env in os.environ and (accepts_empty or os.environ[env]):
@@ -295,6 +296,20 @@ def load(root: str) -> tuple[Settings, list[str]]:
     return settings, problems
 
 
+def approved_dir(conf: Settings, tree_root: str) -> str:
+    """このツリーの写しの置き場（絶対）。"""
+    return _under(tree_root, conf.approved or DEFAULT_APPROVED)
+
+
+def tickets_dir(conf: Settings, tree_root: str) -> str:
+    """このツリーの提案の置き場（絶対）。状態の置き場はこの下。"""
+    return _under(tree_root, conf.tickets or DEFAULT_TICKETS)
+
+
+def _under(tree_root: str, rel: str) -> str:
+    return os.path.join(tree_root, rel.replace("/", os.sep))
+
+
 def project_rules_path(conf: Settings, project_root: str) -> str:
     """このプロジェクトのルールファイルの絶対パス。判定と診断が読む先。
 
@@ -313,10 +328,10 @@ def project_rules_real_path(conf: Settings, project_root: str) -> str:
 
 
 def _relative(root: str, path: str) -> str:
-    """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
+    """置き場の綴りを、ツリーのルートからの相対に揃える。
 
-    絶対パスは受けない。作業ツリーごとに違うルートに継ぎ足すものなので、
-    絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
+    絶対パスは受けない。ツリーごとに違うルートに継ぎ足すものなので、
+    絶対で書かれた 1 か所を全ツリーが指すと、どのツリーのものなのかが
     分からなくなる。絶対で来たら先頭の区切りだけ落として相対として読む。
     root は使わない。他の読み方と並べて表に置けるように、引数の形だけ揃えてある。
     """

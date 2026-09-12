@@ -383,8 +383,8 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" --arg ticket_control "$tick
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {
 		CCNAVI_STATE: ".claude/ccnavi/state",
-		CCNAVI_TICKETS: "wip/tickets",
-		CCNAVI_APPROVED: ".claude/ccnavi/tickets",
+		CCNAVI_TICKETS: ".ccnavi/proposals",
+		CCNAVI_APPROVED: ".ccnavi/tickets",
 		CCNAVI_PHASES: ".claude/ccnavi/phases.yml",
 		CCNAVI_RISK: ".claude/ccnavi/risk.yml"
 	}')

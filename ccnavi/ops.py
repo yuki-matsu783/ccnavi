@@ -32,7 +32,7 @@ def start(
         return 1
     # 承認の無いチケットは着手させない。写しが無ければ範囲は効かず、フェーズにも
     # 数えられないので、着手した子が「無いもの」として進んでしまう。
-    open_copies, _ = approval.copies(conf.approved)
+    open_copies, _ = approval.scan(conf, root)
     if found.ticket not in approval.by_id(open_copies):
         stderr.write(
             f"ccnavi: {ticket_id} は承認されていない（写しが無い）。"
@@ -61,6 +61,7 @@ def start(
     return _move(
         stdout,
         stderr,
+        root,
         conf,
         found,
         ticket_mod.DOING,
@@ -87,7 +88,7 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         return 1
     fields = {"completed_at": approval.now()}
     code = _move(
-        stdout, stderr, conf, found, ticket_mod.DONE, fields, f"完了 {fields['completed_at']}"
+        stdout, stderr, root, conf, found, ticket_mod.DONE, fields, f"完了 {fields['completed_at']}"
     )
     if code == 0 and scored:
         for line in scored:
@@ -95,7 +96,11 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
     if code == 0 and not found.is_child:
         # 親を閉じた。マージに進んでよいの合図（Draft を外す）は、まだなら親が出す。
         # マージそのものは人。
-        if approval.read_parent_mark(conf.approved, found.ticket, approval.PARENT_MARK_READY):
+        if approval.read_parent_mark(
+            approval.home_dir(conf, root, found.ticket, ""),
+            found.ticket,
+            approval.PARENT_MARK_READY,
+        ):
             stdout.write("Draft は外してある。マージは利用者が行う\n")
         else:
             from .review import wip_root
@@ -127,7 +132,14 @@ def cancel(
         return 1
     fields = {"cancelled_at": approval.now(), "cancel_reason": reason.strip()}
     return _move(
-        stdout, stderr, conf, found, ticket_mod.CANCELLED, fields, f"取り消し: {reason.strip()}"
+        stdout,
+        stderr,
+        root,
+        conf,
+        found,
+        ticket_mod.CANCELLED,
+        fields,
+        f"取り消し: {reason.strip()}",
     )
 
 
@@ -171,10 +183,9 @@ def judge(
     if not head:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
+    where = approval.home_dir(conf, root, ticket_id, found.parent)
     record = (
-        approval.read_child_record(
-            conf.approved, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE
-        )
+        approval.read_child_record(where, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE)
         or {}
     )
     record[factor_id] = {
@@ -184,7 +195,7 @@ def judge(
         "at": approval.now(),
     }
     failed = approval.write_child_record(
-        conf.approved, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE, record
+        where, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE, record
     )
     if failed:
         stderr.write(f"ccnavi: 判定を記録できない: {failed}\n")
@@ -213,10 +224,9 @@ def _score_child(
     if diff is None:
         stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
         return None
+    where = approval.home_dir(conf, root, found.ticket, found.parent)
     judgements = (
-        approval.read_child_record(
-            conf.approved, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE
-        )
+        approval.read_child_record(where, found.parent, found.ticket, approval.CHILD_RECORD_JUDGE)
         or {}
     )
     env = {
@@ -250,7 +260,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
     record["summary"] = diff.summary()
     failed = approval.write_child_record(
-        conf.approved, found.parent, found.ticket, approval.CHILD_RECORD_RISK, record
+        where, found.parent, found.ticket, approval.CHILD_RECORD_RISK, record
     )
     if failed:
         stderr.write(f"ccnavi: リスクを記録できない: {failed}\n")
@@ -305,13 +315,15 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     進んでよい状態は同じもの。人が wrapup で締めていれば、開いている子以外は問わない。
     人が締めたあとに残っているものは、締めたときに別の issue へ写してある。
     """
-    copies, _ = approval.copies(conf.approved)
+    copies, _ = approval.scan(conf, root)
     open_children = [t.ticket for t in copies if t.parent == parent_id]
     if open_children:
         return [
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
         ]
-    if approval.read_parent_mark(conf.approved, parent_id, approval.PARENT_MARK_WRAPUP):
+    if approval.read_parent_mark(
+        approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_WRAPUP
+    ):
         return []
     problems: list[str] = []
     closed = phase.gate(root, conf, parent_id)
@@ -320,7 +332,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
             f"{parent_id} のフェーズ {closed.label} はレビュー待ち（ゲートが閉じている）。"
             "レビューを済ませてから"
         )
-    closed_copies, _ = approval.copies(conf.approved, closed=True)
+    closed_copies, _ = approval.scan(conf, root, closed=True)
     copy = approval.by_id(copies + closed_copies).get(parent_id)
     if copy is not None and copy.has_plan:
         if copy.feedback is None:
@@ -347,7 +359,7 @@ def _deliverables_missing(
     """
     if not found.is_child or found.phase is None:
         return False
-    copies, _ = approval.copies(conf.approved)
+    copies, _ = approval.scan(conf, root)
     parent = approval.by_id(copies).get(found.parent)
     if parent is None or not parent.has_plan:
         return False
@@ -393,6 +405,7 @@ def _tracked(worktree: str, glob: str) -> bool:
 def _move(
     stdout: TextIO,
     stderr: TextIO,
+    root: str,
     conf: settings.Settings,
     found: ticket_mod.Ticket,
     state: str,
@@ -426,14 +439,15 @@ def _move(
         return 1
     # 写しがあれば、欄をすぐ写す。次の hook でも写るが、ここで写しておくと
     # スクリプトの直後に走る検査が古い基準点を見ない。
-    copies, _ = approval.copies(conf.approved)
+    copies, _ = approval.scan(conf, root)
     copy = approval.by_id(copies).get(found.ticket)
     if copy is not None:
+        where = approval.dir_of(conf, copy)
         if state in ticket_mod.CLOSED:
-            approval.update_copy(conf.approved, copy, fields)
-            approval.close_copy(conf.approved, found.ticket)
+            approval.update_copy(where, copy, fields)
+            approval.close_copy(where, found.ticket)
         else:
-            approval.update_copy(conf.approved, copy, fields)
+            approval.update_copy(where, copy, fields)
     stdout.write(f"OK: {found.ticket} を {state}/ へ動かした（{said}）\n")
     return 0
 
