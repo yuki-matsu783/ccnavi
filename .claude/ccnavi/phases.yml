@@ -37,7 +37,7 @@ phases:
     kind: work
     title: 実装とテスト
     review: mr
-    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".claude/ccnavi/phases.yml"]
+    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".claude/ccnavi/phases.yml", "vscode-extension/*"]
     requires: [acceptance]
 
   docs:
