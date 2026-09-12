@@ -89,6 +89,15 @@ and whether it needs a human review, then keeps an approved copy under
 .claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
 editing a ticket never widens the area on its own.
 
+The VS Code board extension approves from an overlay instead of the terminal:
+
+    ccnavi --approve --preview --json          (show the batch; places nothing)
+    ccnavi --approve --yes <id,id,...> --json  (approve exactly the batch shown)
+
+--yes needs no terminal; it refuses when the batch changed since it was shown.
+The next UserPromptSubmit / PreToolUse tells the model once about the new
+copies (the same text the extension hands to Claude Code).
+
 The parent agent moves tickets between states and asks for reviews through the
 scripts in .claude/scripts/, which call
 
@@ -173,6 +182,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
+    # 承認の束を見るだけ（写しを置かない）。VS Code の拡張がオーバーレイに出すために打つ。
+    parser.add_argument("--preview", action="store_true")
+    # 見せた束の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
+    parser.add_argument("--yes", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
@@ -285,6 +298,19 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
+        if args.preview and args.yes:
+            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            return EXIT_ERROR
+        # 見るだけの経路。写しを置かないので端末の壁は要らない。
+        if args.preview:
+            code = approval.preview(stdout, stderr, conf, root, args.json)
+            return EXIT_OK if code == 0 else EXIT_ERROR
+        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた束と今の束が
+        # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
+        # deny（phase.ticket_approval_rule）が止める。
+        if args.yes:
+            code = approval.approve_yes(stdout, stderr, conf, root, args.yes.split(","), args.json)
+            return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
         rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)

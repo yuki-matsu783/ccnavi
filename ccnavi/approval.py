@@ -24,6 +24,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
@@ -304,6 +305,63 @@ def approve(
     親の改版（計画の変更）も同じ束に載る。写しは動かないのが原則で、改版はその
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
     """
+    gathered = gather(stderr, conf, root)
+    if gathered.nothing_pending:
+        stdout.write("承認待ちのチケットは無い。\n")
+        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
+        # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
+        return 1 if gathered.broken else 0
+    if not gathered.batch:
+        return 1
+
+    stdout.write(gathered.text + "\n\n")
+    stdout.write(f"この {len(gathered.batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
+    stdout.flush()
+    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
+        stderr.write("ccnavi: 承認しなかった\n")
+        return 1
+    return _apply(stdout, stderr, conf, gathered.batch, now())
+
+
+# 承認の JSON の版。`--approve --preview --json` と `--approve --yes … --json` が名乗る。
+# VS Code のボード拡張が読み、知らない番号なら読まずに版の違いを言う。
+APPROVE_VERSION = 1
+
+
+@dataclass
+class Gathered:
+    """いま `--approve` が見せる束と、その周りのもの。見せる・承認するの両方がここから出る。
+
+    束を組む関数を 1 つにしてあるのは、拡張が見せたものと実行ファイルが承認する
+    ものを同じ答えにするため。`--explain --json` の `pending_approval` も同じ
+    `waiting` を通る。
+    """
+
+    batch: list[Candidate]
+    rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]]
+    problems: list[str]
+    pool: dict
+    types: dict | None
+    nothing_pending: bool
+    broken: bool
+
+    @property
+    def text(self) -> str:
+        if self.nothing_pending:
+            return "承認待ちのチケットは無い。"
+        return screen(self.batch, self.pool, self.types)
+
+    @property
+    def identifiers(self) -> list[str]:
+        return sorted(c.ticket.ticket for c in self.batch)
+
+
+def gather(stderr: TextIO, conf: settings.Settings, root: str) -> Gathered:
+    """束を組む。提案を走査し、写しと突き合わせ、載せるものと落とすものに分ける。
+
+    読めない提案や写し、落とした提案の理由は標準エラーにも出す。端末の人は
+    そこで読み、拡張は JSON の `problems` / `rejected` で読む。
+    """
     from . import phase
 
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
@@ -317,27 +375,190 @@ def approve(
     types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
+    broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
+    texts = [str(p) for p in problems] + list(notes)
     if not pending and not revisions:
-        stdout.write("承認待ちのチケットは無い。\n")
-        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
-        # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
-        return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
+        return Gathered([], [], texts, {}, types, True, broken)
 
     batch, rejected, pool = _candidates(root, conf, pending, revisions, approved, types)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
-    if not batch:
+    return Gathered(batch, rejected, texts, pool, types, False, broken)
+
+
+def preview(
+    stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str, as_json: bool
+) -> int:
+    """`--approve --preview`。束を見せるだけで、写しは置かない。端末の壁は要らない。
+
+    JSON の形は README「承認の JSON」。束が空でも 0 で返す。拡張は `batch` が空なら
+    「承認待ちは無い」と出す。
+    """
+    gathered = gather(stderr, conf, root)
+    if not as_json:
+        stdout.write(gathered.text + "\n")
+        return 0
+    body = {
+        "version": APPROVE_VERSION,
+        "root": root,
+        "generated_at": now(),
+        "batch": [_batch_entry(c) for c in gathered.batch],
+        "text": gathered.text,
+        "rejected": [
+            {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
+            for t, complaints in gathered.rejected
+        ],
+        "problems": gathered.problems,
+    }
+    stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+    return 0
+
+
+def _batch_entry(cand: Candidate) -> dict:
+    t = cand.ticket
+    return {
+        "ticket": t.ticket,
+        "title": t.title,
+        "parent": t.parent or None,
+        "phase": t.phase if t.is_child else None,
+        "revision": cand.is_revision,
+        "tree": t.tree or "",
+        "path": t.path,
+    }
+
+
+def approve_yes(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    expected: list[str],
+    as_json: bool,
+) -> int:
+    """`--approve --yes <識別子,…>`。拡張のオーバーレイで人が押した承認。
+
+    端末の壁は通らない。代わりに、見せた束と今の束が同じであることを求める。
+    拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
+    ものを承認する道を塞ぐため。
+    """
+    wanted = sorted({s.strip() for s in expected if s.strip()})
+    gathered = gather(stderr, conf, root)
+    current = gathered.identifiers
+    if wanted != current:
+        if as_json:
+            body = {
+                "version": APPROVE_VERSION,
+                "mismatch": {"expected": wanted, "current": current},
+            }
+            stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+        stderr.write(
+            "ccnavi: 見せた束と今の束が違う（見せた: "
+            f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
+            "見直してから承認する\n"
+        )
+        return 1
+    if not gathered.batch:
+        stderr.write("ccnavi: 承認するものが無い\n")
         return 1
 
-    stdout.write(screen(batch, pool, types) + "\n\n")
-    stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
-    stdout.flush()
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 承認しなかった\n")
-        return 1
-    return _apply(stdout, stderr, conf, batch, now())
+    lines = io.StringIO()
+    code = _apply(lines, stderr, conf, gathered.batch, now())
+    if code != 0:
+        return code
+    tickets = [c.ticket for c in gathered.batch]
+    revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
+    prompt = _approved_text(tickets, revisions)
+    if not as_json:
+        stdout.write(lines.getvalue())
+        return 0
+    body = {
+        "version": APPROVE_VERSION,
+        "approved": [t.ticket for t in tickets],
+        "copies": [copy_path(conf.approved, t.ticket) for t in tickets],
+        "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
+        "prompt": prompt,
+    }
+    stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+    return 0
+
+
+def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str]) -> str:
+    from . import reasons
+
+    return reasons.approved(tickets, revisions)
+
+
+# ---- 承認の事実を hook がモデルへ伝える
+
+
+def _news_path(state_dir: str, session: str, agent_id: str) -> str:
+    """このセッション（サブエージェントならその起動）が知っている写しの控え。
+    `once-<session>-<agent>.json`（ctxfile）と同じ並びに置く。"""
+    session_part = fsio.safe_name(session) or "unknown"
+    agent_part = fsio.safe_name(agent_id) or "main"
+    return os.path.join(state_dir, f"approved-{session_part}-{agent_part}.json")
+
+
+def _known(path: str) -> set[str] | None:
+    """控えにある識別子。控えが無ければ None。"""
+    data, failed = fsio.read_json(path)
+    if failed is not None:
+        return None
+    known = data.get("known") if isinstance(data, dict) else None
+    return {s for s in known if isinstance(s, str)} if isinstance(known, list) else set()
+
+
+def _write_known(stderr: TextIO, path: str, known: set[str]) -> None:
+    failed = fsio.write_json(path, {"known": sorted(known)})
+    if failed:
+        stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
+
+
+def baseline(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -> None:
+    """控えが無ければ、いまの写しを「知っているもの」として書く。文は出さない。
+
+    SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、控えがあれば
+    触らない。compact の前に置かれた承認は、compact のあとにも 1 度は伝える。
+    """
+    if not conf.state or not conf.tickets_enabled:
+        return
+    path = _news_path(conf.state, session, agent_id)
+    if _known(path) is None:
+        _write_known(stderr, path, _copy_ids(conf))
+
+
+def news(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -> str:
+    """このセッションがまだ知らない写しがあれば、その承認を伝える文。1 度だけ。
+
+    最初の hook で控えが無ければ、いまの写しを起点として書き、何も伝えない。
+    それより後に置かれた写しだけが「新しい承認」になる。控えを置けない
+    （`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側に倒す。
+    サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
+    """
+    if not conf.state or not conf.tickets_enabled:
+        return ""
+    path = _news_path(conf.state, session, agent_id)
+    known = _known(path)
+    current = _copy_ids(conf)
+    if known is None:
+        _write_known(stderr, path, current)
+        return ""
+    fresh, _ = copies(conf.approved)
+    new = sorted((t for t in fresh if t.ticket not in known), key=lambda t: t.ticket)
+    if not (current - known):
+        return ""
+    _write_known(stderr, path, known | current)
+    if not new:
+        return ""
+    return _approved_text(new, set())
+
+
+def _copy_ids(conf: settings.Settings) -> set[str]:
+    opened, _ = copies(conf.approved)
+    closed, _ = copies(conf.approved, closed=True)
+    return {t.ticket for t in opened + closed}
 
 
 def _candidates(

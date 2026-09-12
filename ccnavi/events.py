@@ -54,9 +54,9 @@ def decide(
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SESSION_START:
-        return decide_at_start(stdout, mode, conf, root, payload, record)
+        return decide_at_start(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.USER_PROMPT_SUBMIT:
-        return decide_at_prompt(stderr, conf, root, payload, record)
+        return decide_at_prompt(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
@@ -134,6 +134,7 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
 
 
 def decide_at_prompt(
+    stdout: TextIO,
     stderr: TextIO,
     conf: settings.Settings,
     root: str,
@@ -142,12 +143,19 @@ def decide_at_prompt(
 ) -> int:
     """利用者が何か言ったとき。ターンの基準をここで取る。
 
-    何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
+    原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で 1 段積むことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
+
+    例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた写し）。
+    それは 1 度だけ伝える。伝えないと、人が「承認した」とチャットで打つまで
+    モデルは後工程に入れない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     post.at_prompt(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
+    told = approval.news(stderr, conf, payload.session_id, payload.agent_id)
+    if told:
+        hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
 
 
@@ -182,6 +190,7 @@ def decide_at_stop(
 
 def decide_at_start(
     stdout: TextIO,
+    stderr: TextIO,
     mode: str,
     conf: settings.Settings,
     root: str,
@@ -211,6 +220,9 @@ def decide_at_start(
     # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
     # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
     ctxfile.forget(conf.state, payload.session_id)
+    # 承認の控えは捨てない。控えが無ければ、いまの写しを「知っているもの」として
+    # 書く。それより後に置かれた写しだけが、次の hook で「新しい承認」になる。
+    approval.baseline(stderr, conf, payload.session_id, payload.agent_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:

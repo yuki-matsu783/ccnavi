@@ -56,8 +56,11 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
+# `--approve --preview` は束を見るだけ（写しを置かない）なので除く。同じコマンドの
+# 中（`\x00` をまたがない）に `--preview` があれば当てない。承認そのものは `--yes` で、
+# それは `--approve` の形として当たる。ここは Python の re で組むので先読みが使える。
 _CLI_FORMS = (
-    r"(--approve\b|--reviewed\b"
+    r"(--approve\b(?![^\x00]*--preview\b)|--reviewed\b"
     r"|\b(ticket|review)\s+"
     r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
 )
@@ -99,7 +102,8 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
             "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
-            "使い、承認と未解決の受け入れは利用者が端末で行います。"
+            "使い、承認は利用者が VS Code のボードで、未解決の受け入れは利用者が端末で行います。"
+            "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )

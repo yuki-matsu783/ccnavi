@@ -257,6 +257,12 @@ def decide_before(
     context = ctxfile.for_rules(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
+    # このセッションがまだ知らない承認（人がボードで承認して置かれた写し）は、
+    # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
+    # 同じ経路（additionalContext）に合流させる。
+    told = approval.news(stderr, conf, payload.session_id, payload.agent_id)
+    if told:
+        context = "\n\n".join(p for p in (told, context) if p)
 
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
@@ -315,8 +321,12 @@ def decide_before(
         # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
         # 穴の在処は記録から読む。
         record.decision, record.enforced = audit.HANDOVER, False
-        if notices:
-            hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
+        # 新しい承認だけは、渡す回にも言う。言わないと、その承認を伝える機会が
+        # 権限モードに渡す呼び出しの分だけ遅れる。
+        if notices or told:
+            hookio.write_context(
+                stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([told] if told else []))
+            )
         return EXIT_OK
 
     return refuse(stdout, mode, record, verdict, notices + texts, context)
