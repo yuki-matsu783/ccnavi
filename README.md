@@ -525,9 +525,9 @@ jq -r 'select(.decision == "handover") | .subject' .claude/ccnavi/log.jsonl | so
 | `WebFetch` | URL |
 
 `WebSearch` のように対象を取り出せないツールは判定に届かないまま通るので、
-`allow` に書いても死んだ行が 1 つ増えるだけになる。`MultiEdit` は今の Claude Code に
-無いので受け付けない（`--lint` が咎める）。`match` は名前をそのまま突き合わせるので、
-`Bash` のルールが `PowerShell` に及ぶことはない。及ぼしたければ `Bash|PowerShell` と並べる。
+`allow` に書いても死んだ行が 1 つ増えるだけになる（`--lint` が咎める）。`match` は
+名前をそのまま突き合わせるので、`Bash` のルールが `PowerShell` に及ぶことはない。
+及ぼしたければ `Bash|PowerShell` と並べる。
 
 `glob` の意味は標準ライブラリの `fnmatch` そのまま。`*` が任意の文字列、
 `?` が 1 文字、`[abc]` が文字クラス。

@@ -965,7 +965,7 @@ deny[] が空でない        → deny
 | ツール種別 | 対象ツール | 参照するツリー | access |
 |---|---|---|---|
 | 参照系 | Read, Glob, Grep | target_directories.read | read |
-| 編集系 | Write, Edit, MultiEdit | target_directories.write | write |
+| 編集系 | Write, Edit | target_directories.write | write |
 | Bash実行対象 | bash x.sh, python x.py 等 | target_directories.exec → 未定義時はreadにフォールバック | exec |
 
 処理手順
@@ -3053,7 +3053,6 @@ tools:
   Grep:      allow
   Edit:      allow
   Write:     allow
-  MultiEdit: allow
   Bash:      allow
   Task:      ask
   WebSearch: ask
@@ -3178,7 +3177,7 @@ config_hash : a1b2c3d4e5f6
 session : 対話 / cache=implicit scope=prefix ttl=60m
 
 ■ ツール
-allow : Read Glob Grep Edit Write MultiEdit Bash
+allow : Read Glob Grep Edit Write Bash
 ask   : Task WebSearch
 deny  : (settings.json) WebFetch
 
