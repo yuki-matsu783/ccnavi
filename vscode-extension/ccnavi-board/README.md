@@ -45,7 +45,7 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 | 何 | どう出るか、何が起きるか |
 |---|---|
 | 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を並べる。名前・パス・origin（`git remote get-url origin` をローカルで読む）・`config/rules.yml` の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
-| clone | URL と名前を入れて「clone をターミナルへ送る」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
+| clone | URL と名前を入れて「clone」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
 | clone を止める条件 | URL が https / ssh / `git@host:path` の 3 形でない、資格情報（`user:token@`）入り、名前が英数字と `. _ -` 以外（先頭は英数字）、既存のツリー名と衝突（大文字小文字違いも）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` 抜きの `host/path` で比べる）、clone 先が既にあって空でない |
 | 置き場が無い | 上部に出る。「作る」で `projects/` を作る。clone すれば git が作るので無くても clone はできる |
 | `.gitignore` に無い | 上部に出る。「.gitignore に足す」で `/projects/` の行を足す。コミットは人 |
@@ -147,7 +147,7 @@ pnpm run package   # scripts/package.sh: install → compile → test → vsce p
 入れるには次を打つ。Marketplace には出さない。
 
 ```sh
-code --install-extension dist/ccnavi-board-0.3.0.vsix
+code --install-extension dist/ccnavi-board-0.3.1.vsix
 ```
 
 `node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
@@ -205,7 +205,7 @@ code --install-extension dist/ccnavi-board-0.3.0.vsix
 | 23 | ファイルを選ぶ | additionalContextFile の「選ぶ…」でワークスペース内の md を選ぶ。もう一度押して外のファイルを選ぶ | 欄にルート相対のパス（`/` 区切り）が入り、保存ボタンが押せるようになる。外のファイルは「ワークスペースの外は指せない」の通知で欄が変わらない |
 | 24 | match を選ぶ | match の欄を押して札を出し、`Write` にチェック、`Bash` を外す。次に欄へ直接ツール名を縦棒でつないで打つ。最後に欄の外を押す | 札で選ぶと欄の文字が変わり、手で打つと札のチェックがそれを追う。外を押すか Esc で札が閉じる |
 | 25 | プロジェクト管理が開く | サイドパネルの「プロジェクト管理」 | `projects/` の各プロジェクトが表に並び、origin・ルールの有無・作業ツリー・チケット数・検証が出る。`projects/` が `.gitignore` に無ければ上部に警告とボタン |
-| 26 | clone | URL に `git@host:group/repo.git` を入れる（名前が `repo` に埋まる）。「clone をターミナルへ送る」 | 「ccnavi」ターミナルで `git clone -- ... projects/repo` が走る。終わると表に `repo` の行が増え、ルール「無い」と lint の warn が出る |
+| 26 | clone | URL に `git@host:group/repo.git` を入れる（名前が `repo` に埋まる）。「clone」 | 「ccnavi」ターミナルで `git clone -- ... projects/repo` が走る。終わると表に `repo` の行が増え、ルール「無い」と lint の warn が出る |
 | 27 | clone を止める | `https://user:token@host/g/p.git` を入れて送る。次に既存と同じ origin の URL を送る。次に既存の名前を大文字にして送る | それぞれ「資格情報」「既に clone している」「既にある」の赤い文が出て、ターミナルには何も送られない |
 | 28 | 整合のボタン | 「.gitignore に足す」→ 行の「ワークスペースから写す」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告と行の warn が消える |
 | 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」 | タブの題が「ccnavi ルール設定: <名前>」。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。ワークスペース版のパネルも同時に開いたままにできる |

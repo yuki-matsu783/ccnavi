@@ -33,22 +33,21 @@ ${STYLE}
     <span class="path" title="${escapeHtml(page.projectsDir)}">置き場 ${escapeHtml(page.projectsRel === "" ? "（数えていない）" : `${page.projectsRel}/`)}</span>
   </div>
   <div class="controls">
-    <button type="button" class="action" data-action="open-rules" data-name="">ワークスペースのルール管理</button>
+    <button type="button" class="action" data-action="open-rules" data-name="" title="ワークスペースのルール（.claude/ccnavi/rules.yml）を直す">ルール管理</button>
 ${page.ticketsEnabled ? '    <button type="button" class="action" data-action="open-board" data-name="*">チケット管理</button>\n' : ""}    <button type="button" class="action" data-action="refresh">更新</button>
   </div>
 </header>
 ${renderBanners(page)}<section class="clone">
-  <h2>clone して置き場に足す</h2>
-  <p class="hint">受け付けるのは <code>https://host/path</code>、<code>ssh://host/path</code>、<code>git@host:path</code>。資格情報入りの URL は通さない。コマンドは「ccnavi」ターミナルに送られ、認証の対話はそこで行う。</p>
+  <h2>git プロジェクトを clone する</h2>
   <div class="clone-form">
     <label class="grow">URL <input id="url" type="text" placeholder="https://gitlab.example.com/group/repo.git" spellcheck="false"></label>
     <label>名前 <input id="name" type="text" placeholder="URL の末尾" spellcheck="false"></label>
-    <button type="button" class="action primary" data-action="clone">clone をターミナルへ送る</button>
+    <button type="button" class="action primary" data-action="clone" title="git clone を「ccnavi」ターミナルへ送る。認証の対話はそこで">clone</button>
   </div>
   <p id="status" class="status hidden"></p>
 </section>
 <section class="list">
-  <h2>ccnavi が数えるプロジェクト <span class="count">${page.rows.length}</span></h2>
+  <h2>ワークスペース内のプロジェクト <span class="count">${page.rows.length}</span></h2>
 ${page.rows.length === 0 ? '  <p class="empty">まだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderTable(page)}
 </section>
 ${renderStrays(page.strays)}<section class="workspace">
