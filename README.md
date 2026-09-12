@@ -1425,6 +1425,7 @@ ccnavi --test-samples testdata/rule-samples.yml --json
 ```sh
 ccnavi --lint                                  # 実運用と同じ設定を見る
 ccnavi --lint --rules .claude/ccnavi/next.json # 入れ替える前のファイルを見る
+ccnavi --lint --json                           # 同じ苦情を JSON で（「lint の JSON」）
 ```
 
 ```
@@ -1473,6 +1474,39 @@ error 2 件、warn 2 件
 見るのは検証を起動した環境であって、セッションが受け取る環境ではない。
 `.claude/settings.json` の `env` は Claude Code がセッションのプロセスに渡すもので、
 端末から叩いた検証には入っていない。だから報告はモードがどこから来たかを名乗る。
+
+## lint の JSON
+
+```sh
+ccnavi --lint --json
+```
+
+`--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にして出す。終了コードも同じ
+（error があれば 1）。読み手は VS Code の拡張で、プロジェクト管理画面が
+プロジェクトごとの warn（`projects/` が無視されていない、`config/rules.yml` が無い、
+`.claude/` を持つ）を拾って並べる。文面の版は人向けに変えてよいが、こちらの形は契約。
+
+| 鍵 | 何 |
+|---|---|
+| `version` | 形の版。整数（いま 1）。欄を足すだけなら上げない |
+| `root` / `rules` / `mode` / `ticket_control` | 何を見た結果か。文面の版が頭に名乗るものと同じ |
+| `projects[]` | 数えたプロジェクトの名前 |
+| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn`。`where` は文面の版で `error: ` の後ろに出る場所（`(projects/lib) rule-id` など。ファイル全体なら空） |
+| `errors` / `warns` | 件数 |
+
+### 1 つのプロジェクトのルールを保存せずに試す
+
+```sh
+ccnavi --test Write projects/lib/src/a.py --json --project-rules-file lib=/tmp/edited.yml
+ccnavi --lint --json --project-rules-file lib=/tmp/edited.yml
+```
+
+`--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルとして
+`<パス>` を読む。`--rules` がワークスペースのルールを差し替えるのと同じことを、
+プロジェクト 1 つに対して行う。VS Code の拡張が、編集中の `config/rules.yml` を保存する前に
+判定と検証に掛けるための口で、`--test` / `--test-samples` / `--lint` / `--explain` でだけ効く。
+hook からの判定に渡しても捨てる（標準エラーに言う）。保存していないルールが判定に効く
+道を、実行時には持たない。守る対象（selfguard）も差し替えを見ず、本来の場所を守る。
 
 ## ボードの JSON
 

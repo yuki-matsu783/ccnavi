@@ -33,6 +33,10 @@ __pycache__/
 # 他人に配るものではない。作業ツリーの側に同じ場所があっても読まない。
 /.claude/ccnavi/tickets/
 
+# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 §25.2）。
+# 入っていないと --lint が warn で言う。
+/projects/
+
 # ccnavi が自分のソースツリーでだけ読む上書き設定。
 # 1 人がモードを変えて試すためのものなので、他人に届いてはいけない。
 /ccnavi.settings.local.json

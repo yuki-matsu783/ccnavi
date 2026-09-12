@@ -131,6 +131,14 @@ selfguard の中核に入る。`projects/` が無ければ前と同じに動く�
   プロジェクトのルールの `message` は `{root}/.claude/scripts/...` で書く。このリポジトリの rules.yml も同じ
 - §25.10 の残り。プロジェクトの数に対する `ms`、Windows でプロジェクトから切った作業ツリーの `gitdir:` の綴り
 
+**VS Code 拡張にプロジェクト管理画面が入った（2026-09-12、拡張 0.3.0、設計 §24.10 の末尾）。** `projects/` の
+一覧、URL からの `git clone` の送信（ターミナルへ。拡張は clone を自分では走らせない）、`.gitignore` と
+`config/rules.yml` の雛形をボタンで整える、各行からプロジェクトのルール設定画面とボードの絞り込みへの導線、
+`fetch` / `pull`。実行ファイルには 2 つの旗を足した。`--lint --json`（README「lint の JSON」、REQ-DIA-08）と、
+診断だけで効く `--project-rules-file <名前>=<パス>`（REQ-DIA-09。hook からの判定では捨てる。selfguard は
+本来の場所を守る）。`tests/test_lint.py` と `tests/test_projects.py` の末尾のテストが通す。拡張の
+手動確認は README の表 25〜33。まだ拡張開発ホストでは通していないので、次に入る人が 25〜33 を 1 度踏む。
+
 **並行するチケット（REQ-TKT、設計 §24）は入った。** `tests/test_ticket.py` が親 1 本と子 2 本を
 フェーズ 1 つで通す。残っているのは実測が要るもの。
 
