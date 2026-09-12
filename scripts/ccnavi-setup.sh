@@ -5,21 +5,31 @@
 #   sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 #
 #   --mode <enable|dry-run>  CCNAVI_MODE。既定は dry-run
-#   --bin <相対パス>         CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
-#   --deploy <ccnavi の根>   実行ファイル・ルール・ゲートの sh を配り元から写す
+#   --bin <相対パス>         CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
+#   --deploy <ccnavi の根>   配り元。既定はこのスクリプトが入っている ccnavi の根
+#   --no-deploy              写しを取らず、settings.json だけを書く
 #   --all                    既定値を持つ env も明示して書く
 #   --force                  明示した --mode / --bin で、既にある値を置き換える。
-#                            --deploy と一緒なら、配り先に既にあるものも入れ替える
+#                            写しでは、配り先に既にあるものも入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
 # env は触らない。ccnavi と関係のない hook や設定はそのまま残す。
 #
-# `--deploy` は、ccnavi を組み立てたところ（ccnavi のリポジトリ）から対象プロジェクト
-# へ写しを取る。設定を書くだけでは動かないのに、実行ファイルを置く手立てがどこにも
+# 写しは、ccnavi を組み立てたところ（ccnavi のリポジトリ）から対象プロジェクトへ
+# 取る。設定を書くだけでは動かないのに、実行ファイルを置く手立てがどこにも
 # 無かった。`dist/` は .gitignore に入っているので git では渡らず、CCNAVI_BIN_PATH は
 # 相対でしか書けないので、よそで組んだ実行ファイルを指すこともできない。対象
 # プロジェクトの中に実体を置く経路がここに要る。
+#
+# 配り元は既定でこのスクリプト自身の置き場から取る。設定だけ書かれて実行ファイルが
+# 無い形は、hook が 7 つ登録されているのに何も起動しない、という一番分かりにくい
+# 壊れ方になる。既定で写しまで取れば、打った人が `--deploy` を知っているかどうかで
+# そこが分かれない。よそから配りたいときだけ `--deploy` で配り元を名指しする。
+#
+# 既定の配り元が使えないとき（組み立てていない、配り先が ccnavi 自身）は、写しを
+# 諦めて理由を 1 行出し、settings.json は書く。名指しされた `--deploy` が使えない
+# ときだけ 2 で断る。人が名指ししたものが無いのは、環境の誤りとして扱う。
 #
 # 配り先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルもゲートの sh も、入れた先で直されている前提のもの。黙って上書き
@@ -43,11 +53,15 @@ HOOK_TIMEOUT=10
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart SubagentStop"
 
 DEFAULT_MODE="dry-run"
-DEFAULT_BIN="dist/ccnavi/ccnavi"
+# 配り先での既定の置き場。配り元の dist/ は組み立ての出力で、.gitignore に
+# 入っている場所。配られた側にとっては、そこは「自分が組み立てた物の置き場」
+# ではなく、ccnavi が入っている場所。.claude/ の下に置けば、rules.yml や
+# ゲートの sh と同じ並びに収まる。
+DEFAULT_BIN=".claude/ccnavi/ccnavi"
 
-# --deploy が写すもの。配り元での置き場は build.py の出力（dist/ccnavi）と、
-# ccnavi のリポジトリの .claude/ の形に決め打ちで対応する。配り先の綴りは
-# --bin に従うので、実行ファイルだけは行き先が動く。
+# 写すもの。配り元での置き場は build.py の出力（dist/ccnavi）と、ccnavi の
+# リポジトリの .claude/ の形に決め打ちで対応する。配り先の綴りは --bin に
+# 従うので、実行ファイルだけは行き先が動く。
 DEPLOY_BIN_DIR="dist/ccnavi"
 DEPLOY_RULES=".claude/ccnavi/rules.yml"
 DEPLOY_SCRIPT_DIR=".claude/scripts"
@@ -64,7 +78,14 @@ all=no
 force=no
 check=no
 target=""
+# 配り元。名指しされたかどうかを分けて持つ。既定で埋めただけの配り元が使えない
+# のは「組み立てていない」で済むが、人が名指ししたものが使えないのは誤り。
+# 同じ変数で持つと、その 2 つを最後まで区別できない。
 deploy=""
+deploy_given=no
+deploy_off=no
+# 既定の配り元が使えなかった理由。空でなければ 1 行出す。
+deploy_skipped=""
 
 usage() {
 	cat <<'USAGE'
@@ -72,12 +93,16 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 
   <ワークスペースルート>      既定は現在の作業ディレクトリ
   --mode <enable|dry-run>   CCNAVI_MODE。既定は dry-run
-  --bin <相対パス>          CCNAVI_BIN_PATH。既定は dist/ccnavi/ccnavi
-  --deploy <ccnavi の根>    実行ファイル・ルール・ゲートの sh を配り元から写す
+  --bin <相対パス>          CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
+  --deploy <ccnavi の根>    配り元。既定はこのスクリプトが入っている ccnavi の根
+  --no-deploy               写しを取らず、settings.json だけを書く
   --all                     既定値を持つ env も明示して書く
   --force                   明示した --mode / --bin で、既にある値を置き換える。
-                            --deploy と一緒なら、配り先に既にあるものも入れ替える
+                            写しでは、配り先に既にあるものも入れ替える
   --check                   書かずに、揃っていないところだけを並べる
+
+実行ファイル・ルール・ゲートの sh は、既定で ccnavi の根から写す。写した
+実行ファイルと _internal は、配り先の .gitignore に足す。
 USAGE
 }
 
@@ -104,7 +129,12 @@ while [ "$#" -gt 0 ]; do
 		[ "$#" -ge 2 ] || die "--deploy に値がありません。"
 		[ "$2" != "" ] || die "--deploy が空です。"
 		deploy="$2"
+		deploy_given=yes
 		shift 2
+		;;
+	--no-deploy)
+		deploy_off=yes
+		shift
 		;;
 	--all)
 		all=yes
@@ -185,19 +215,51 @@ claude_dir=$(dirname "$settings")
 
 # 配り元。対象の根を決めたあとで見る。同じ綴りの取り方で絶対化してから
 # 突き合わせないと、配り元と配り先が同じかどうかを判定できない。
+#
+# 名指しが無ければ、このスクリプトの置き場の 1 つ上を配り元にする。scripts/ の
+# 下に居るという 1 点だけに寄りかかる。作業ツリーから打てばその作業ツリーの
+# dist/ が配り元になり、写しと、そこに居る自分の変更が食い違わない。
 source_root=""
+if [ "$deploy_off" = yes ]; then
+	if [ "$deploy_given" = yes ]; then
+		die "--deploy と --no-deploy は一緒に使えません。どちらを通すかを、ここで決められません。"
+	fi
+	deploy=""
+else
+	if [ "$deploy_given" = no ]; then
+		deploy=$(dirname "$0")/..
+	fi
+	if [ ! -d "$deploy" ]; then
+		[ "$deploy_given" = no ] ||
+			die "$deploy というディレクトリがありません。"
+		deploy_skipped="配り元が見つからないので写していません（--deploy <ccnavi の根> で名指しできます）。"
+		deploy=""
+	fi
+fi
 if [ -n "$deploy" ]; then
-	[ -d "$deploy" ] || die "$deploy というディレクトリがありません。"
 	source_root=$(cd "$deploy" && { pwd -W 2>/dev/null || pwd; })
 	if [ "$source_root" = "$root" ]; then
-		die "--deploy の配り元と配り先が同じです。自分自身へは配れません。"
+		# 既定の配り元では普通に起きる。ccnavi のリポジトリ自身に打つと、
+		# 配り元と配り先が同じ場所になる。そこは写す先ではないので、
+		# 設定だけ書いて写しは諦める。名指しなら、打った人の思い違い。
+		[ "$deploy_given" = no ] ||
+			die "--deploy の配り元と配り先が同じです。自分自身へは配れません。"
+		deploy_skipped="配り元と配り先が同じなので写していません。"
+		deploy=""
+		source_root=""
 	fi
-	# 組み立てていない配り元で黙って進まない。ここを報告だけにすると、
-	# 「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、
-	# 打った人は配れたものとして先へ進む。--deploy を付けた以上、実行ファイルが
-	# 無いことは環境の誤りとして 2 で断る。
-	[ -d "$source_root/$DEPLOY_BIN_DIR" ] ||
+fi
+# 組み立てていない配り元で黙って進まない。ここを報告だけにすると、
+# 「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、
+# 打った人は配れたものとして先へ進む。--deploy を名指しした以上、実行ファイルが
+# 無いことは環境の誤りとして 2 で断る。既定の配り元なら、組み立てていないだけ
+# なので、諦めた理由を出して settings.json は書く。
+if [ -n "$deploy" ] && [ ! -d "$source_root/$DEPLOY_BIN_DIR" ]; then
+	[ "$deploy_given" = no ] ||
 		die "$source_root/$DEPLOY_BIN_DIR がありません。配り元で 'uv run --with pyinstaller python build.py' を回してから打ち直してください。"
+	deploy_skipped="$source_root/$DEPLOY_BIN_DIR が無いので写していません（配り元で 'uv run --with pyinstaller python build.py' を回すと作られます）。"
+	deploy=""
+	source_root=""
 fi
 
 # 書けない形を、jq を回す前に見つける。あとで mkdir が失敗すると、終了コードが
@@ -243,8 +305,18 @@ shape=$(printf '%s' "$current" | jq -r '
 ')
 [ -z "$shape" ] || die "$SETTINGS_REL の形を扱えません: $shape。直してから打ち直してください。"
 
-# 必ず書く env。既定を持たない CCNAVI_BIN_PATH と、既定と同じでも書いておきたい
-# 2 つのパス。設定ファイルだけを見て、どこを読み書きするかが分かる形にする。
+# 必ず書く env。既定を持たない CCNAVI_BIN_PATH、既定と同じでも書いておきたい
+# 2 つのパス、そして 3 つの守りのつまみ。設定ファイルだけを見て、どこを読み書き
+# するかと、どこまで止まるかが分かる形にする。
+#
+# つまみの値は CCNAVI_MODE に合わせる。3 つは設定が無ければ enable で動くので、
+# 書かないまま dry-run で導入すると、判定は止めないのに戻す働きだけが本気で
+# 動く。入れた先が様子を見ている間に、いきなり手元のファイルが戻ることになる。
+# 導入直後は全部が同じ強さで並ぶほうが、何が起きるかを読める。
+#
+# 代償は、書いた瞬間から enable が既定ではなくなること。dry-run で入れたまま
+# 忘れると、この 3 つも dry-run のまま残る。--mode enable で打ち直すか、
+# 設定ファイルの 4 行を書き換えるまで、守りは弱いまま。
 #
 # 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
 # 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を --bin 経由で
@@ -253,7 +325,10 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" '{
 	CCNAVI_MODE: $mode,
 	CCNAVI_RULES: ".claude/ccnavi/rules.yml",
 	CCNAVI_LOG: ".claude/ccnavi/log.jsonl",
-	CCNAVI_BIN_PATH: $bin
+	CCNAVI_BIN_PATH: $bin,
+	CCNAVI_RESTORE_IF_DENY: $mode,
+	CCNAVI_GUARD_CORE_FILES: $mode,
+	CCNAVI_GUARD_CLI: $mode
 }')
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
 # 書く利点は、あとで値を変えたくなった人が、つまみの一覧を README ではなく
@@ -264,10 +339,7 @@ if [ "$all" = yes ]; then
 		CCNAVI_TICKETS: "wip/tickets",
 		CCNAVI_APPROVED: ".claude/ccnavi/tickets",
 		CCNAVI_PHASES: ".claude/ccnavi/phases.yml",
-		CCNAVI_RISK: ".claude/ccnavi/risk.yml",
-		CCNAVI_RESTORE_IF_DENY: "enable",
-		CCNAVI_GUARD_CORE_FILES: "enable",
-		CCNAVI_GUARD_CLI: "enable"
+		CCNAVI_RISK: ".claude/ccnavi/risk.yml"
 	}')
 fi
 
@@ -421,6 +493,50 @@ if [ -n "$deploy" ]; then
 	done
 fi
 
+# 写した実行ファイルを git に入れない。配り先は git で持ち回るのが普通なので、
+# .gitignore に無いと、次のコミットで実行ファイルと _internal がまるごと履歴に
+# 入る。入ってしまうと、消すには履歴を書き換えるしかない。
+#
+# 置き場ごと無視はしない。--bin の綴りによっては、実行ファイルの置き場が
+# rules.yml と同じディレクトリ（.claude/ccnavi）になる。そこを丸ごと無視すると、
+# そのプロジェクトが何を止めるかまで git から消える。
+#
+# 綴りは 3 つ。実行ファイルの 2 つの名前（PyInstaller が Windows でだけ .exe を
+# 付ける）と、同梱物の _internal。同じリポジトリを 3 つの環境で開くので、
+# 打った機械に在るほうだけでなく両方を書く。
+IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
+ignore_todo=""
+ignore_kept=""
+if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
+	# `dirname` は `ccnavi` のような直下の綴りに `.` を返す。そのまま並べると
+	# `/./ccnavi` になり、git は読めても人には別の場所に見える。
+	ignore_dir=$(printf '%s' "$bin_dir_rel" | tr '\\' '/')
+	case "$ignore_dir" in
+	. | "") ignore_prefix="/" ;;
+	*) ignore_prefix="/$ignore_dir/" ;;
+	esac
+	ignore_name=$(basename "$bin")
+	# `--bin` に .exe まで書かれていたら、足すのはその 1 つだけ。
+	case "$ignore_name" in
+	*.exe) ignore_names="$ignore_name" ;;
+	*) ignore_names="$ignore_name $ignore_name.exe" ;;
+	esac
+
+	note_ignore() {
+		if [ -f "$root/.gitignore" ] && grep -qxF "$1" "$root/.gitignore"; then
+			ignore_kept="$ignore_kept$1
+"
+		else
+			ignore_todo="$ignore_todo$1
+"
+		fi
+	}
+	for ignore_name in $ignore_names; do
+		note_ignore "$ignore_prefix$ignore_name"
+	done
+	note_ignore "${ignore_prefix}_internal/"
+fi
+
 copy_tree() {
 	# 中身を 1 つずつ写す。ディレクトリごと入れ替えないのは、配り先が既にある
 	# 別のフォルダ（--bin の綴りによってはワークスペースルートそのもの）でも、
@@ -490,10 +606,17 @@ report_deploy() {
 		printf '配り元に無くて写せないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
 	fi
+	if [ -n "$ignore_todo" ]; then
+		printf '%s:\n' "$3"
+		printf '%s' "$ignore_todo" | sed 's/^/  /'
+	fi
+	if [ -n "$deploy_skipped" ]; then
+		printf '%s\n' "$deploy_skipped"
+	fi
 }
 
 report_deploy_plan() {
-	report_deploy '写す' '入れ替える'
+	report_deploy '写す' '入れ替える' '.gitignore に足す'
 }
 
 # 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
@@ -506,7 +629,10 @@ if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] ||
 fi
 # 写しも「揃っていない」に数える。配り元に無いものも数える。実行ファイルが
 # 欠けたまま「揃っています」と言うと、--check を門にしている手順がそこを通す。
-if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ]; then
+# .gitignore の不足も数える。足りないまま通すと、次のコミットで実行ファイルが
+# 履歴に入る。
+if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ] ||
+	[ -n "$ignore_todo" ]; then
 	settled=no
 fi
 
@@ -528,7 +654,7 @@ if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$replacing_env" ]; 
 	settings_work=yes
 fi
 deploy_work=no
-if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ]; then
+if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$ignore_todo" ]; then
 	deploy_work=yes
 fi
 
@@ -637,15 +763,33 @@ if [ "$deploy_work" = yes ]; then
 	for name in $scripts_todo; do
 		copy_file "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$root/$DEPLOY_SCRIPT_DIR/$name"
 	done
+	# .gitignore は足すだけ。既にある行は書かないし、ccnavi と関係のない行にも
+	# 触らない。見出しは、この 3 行が何なのかを、あとで開いた人に伝えるためだけの
+	# もの。既に同じ見出しがあれば重ねない。
+	if [ -n "$ignore_todo" ]; then
+		{
+			if [ -s "$root/.gitignore" ]; then
+				# 末尾に改行が無いファイルへ足すと、最後の行と繋がって別の
+				# 綴りになる。無視のつもりの行が、誰も意図しない 1 行に化ける。
+				if [ -n "$(tail -c 1 "$root/.gitignore")" ]; then
+					printf '\n'
+				fi
+				# もとから在る行と、ここで足す塊を、空行 1 つで分ける。
+				printf '\n'
+			fi
+			if ! { [ -f "$root/.gitignore" ] && grep -qxF "$IGNORE_HEADER" "$root/.gitignore"; }; then
+				printf '%s\n' "$IGNORE_HEADER"
+			fi
+			printf '%s' "$ignore_todo"
+		} >>"$root/.gitignore"
+	fi
 fi
 
-if [ -n "$deploy" ]; then
-	report_deploy '写した' '入れ替えた'
-fi
+report_deploy '写した' '入れ替えた' '.gitignore に足した'
 
 # 登録しただけでは動かない。写し終えたあとの姿をそのまま見て、まだ無いものを
-# 挙げる。--deploy を付けていれば普通はここで何も出ない。出たときは、配り元に
-# 無かったか、配り先に別のものが既にあって写していないか、どちらか。
+# 挙げる。写しが通っていれば普通はここで何も出ない。出たときは、写しを切ったか、
+# 配り元に無かったか、配り先に別のものが既にあって写していないか、のどれか。
 #
 # ここでは取りに行ったり作ったりはしない。実行ファイルは PyInstaller が Windows
 # でだけ .exe を付けるので、両方の綴りで探す（settings.py の _resolve_bin）。
@@ -667,8 +811,12 @@ for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh; do
 done
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
-	if [ -z "$deploy" ]; then
-		printf 'ccnavi を組み立てたところから写すなら --deploy <ccnavi の根> を付けてください。\n'
+	# 諦めた理由は report_deploy が既に出している。ここで足すのは、人が自分で
+	# 写しを切ったときだけ。理由を二重に出すと、どちらが今の話か分からなくなる。
+	if [ "$deploy_off" = yes ]; then
+		# 書式の側に置かない。`--` で始まる文字列は、printf がオプションとして
+		# 読んで落ちる。
+		printf '%s\n' "--no-deploy を外すと、ccnavi の根から写します。"
 	fi
 fi
 
