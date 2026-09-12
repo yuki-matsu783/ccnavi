@@ -291,6 +291,7 @@ def approve(
     conf: settings.Settings,
     rule_set: rules.RuleSet,
     root: str,
+    only: list[str] | None = None,
 ) -> int:
     """未承認の提案を束で人に見せ、承認されたら写しを置く。
 
@@ -303,6 +304,13 @@ def approve(
 
     親の改版（計画の変更）も同じ束に載る。写しは動かないのが原則で、改版はその
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
+
+    `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
+    ボードが絞り込みで見えている分だけを渡す。絞りは束を狭めるだけで、絞らない束で
+    落ちるものを通してはいけない。だから、承認待ちに無い識別子が混じっていたら
+    何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の
+    改版が承認待ちなのに束から外した子も何も承認しない（外すと旧計画で検証される）。
+    絞った束に載らない親を持つ子は「親が承認されていない」で落ちる。
     """
     from . import phase
 
@@ -317,6 +325,31 @@ def approve(
     types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
+    if only:
+        # 識別子の検査は「承認待ちが無い」より先。承認待ちが空でも、指定したものが
+        # 無いのは失敗で、終了コードが他の承認待ちの有無で変わらないように。
+        wanted = [i for i in dict.fromkeys(only) if i]
+        known = {t.ticket for t in pending + revisions}
+        unknown = [i for i in wanted if i not in known]
+        if not wanted or unknown:
+            stderr.write(f"ccnavi: 承認待ちに無い: {', '.join(unknown) or '(空の識別子)'}\n")
+            stderr.write("ccnavi: 何も承認しない。ボードを更新して承認待ちを確かめる\n")
+            return 1
+        # 親の改版を外して子だけ通すと、子は写し（旧計画）で検証される。絞らない束なら
+        # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
+        skipped = {t.ticket for t in revisions if t.ticket not in wanted}
+        blocked = [t for t in pending if t.ticket in wanted and t.is_child and t.parent in skipped]
+        if blocked:
+            for t in blocked:
+                stderr.write(f"ccnavi: {t.ticket}: 親 {t.parent} の改版が承認待ちなのに束に無い\n")
+            stderr.write("ccnavi: 何も承認しない。親も並べる\n")
+            return 1
+        waiting_count = len(pending) + len(revisions)
+        pending = [t for t in pending if t.ticket in wanted]
+        revisions = [t for t in revisions if t.ticket in wanted]
+        stdout.write(
+            f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを束にする。\n\n"
+        )
     if not pending and not revisions:
         stdout.write("承認待ちのチケットは無い。\n")
         # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
@@ -352,7 +385,11 @@ def _candidates(
     from . import phase
 
     open_index = by_id(approved)
-    pool = by_id(approved + pending)
+    # 親子を引く池は、写しと、この束で通ったものだけ。落ちた親を池に残すと、承認されない
+    # 親の範囲で子が検証され、親の承認という門を通らずに子の写しができる。
+    # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
+    # 親の通過が決まっている。
+    pool = by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
 
@@ -381,6 +418,7 @@ def _candidates(
             rejected.append((t, complaints))
             continue
         batch.append(Candidate(ticket=t, complaints=complaints))
+        pool[t.ticket] = t
     return batch, rejected, pool
 
 
@@ -429,6 +467,18 @@ def _apply(
     return 0
 
 
+def _origin_line(t: ticket_mod.Ticket) -> str:
+    """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
+
+    プロジェクトは提案を置いた場所が決める。人はここで、書き込みが向かうリポジトリを
+    見て承認する。
+    """
+    return (
+        f"■ プロジェクト: {t.project or '(ワークスペース)'}"
+        f"  作業ツリー: {t.tree or '(main)'}  提案: {t.path}"
+    )
+
+
 def screen(
     batch: list[Candidate],
     pool: dict[str, ticket_mod.Ticket],
@@ -448,7 +498,7 @@ def screen(
             lines += _plan_diff_lines(cand.current, t, types)
             for note in cand.notes:
                 lines.append(f"    {note}")
-            lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
+            lines.append(_origin_line(t))
             continue
         lines += [
             "",
@@ -494,7 +544,7 @@ def screen(
         if t.rationale.strip():
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
-        lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
+        lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
             lines.append("■ 記述のうち、判定に効かないもの")
@@ -770,29 +820,35 @@ def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
 def project_problems(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
 ) -> list[rules.Problem]:
-    """`project:` が置き場に在るプロジェクトを指しているか（REQ-MLT-11）。
+    """`project` が置き場と噛み合っているか（REQ-MLT-11）。
 
-    子は親から継ぐ。提案に書いていなければここで埋め、写しに書かれる。書いてあって
-    親と違えば承認しない。決めるのは人で、承認の画面に出た値が写しに残る。
+    プロジェクトを決めるのは提案を置いた場所（設計 §25.5）。frontmatter の `project:` は
+    宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
+    無い。承認の画面が置き場から引いた値を出し、それが写しに残る。
     """
+    if t.declared_project and t.declared_project != t.project:
+        where = ticket_mod.tickets_rel_for(conf.tickets, t.declared_project)
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"`project: {t.declared_project}` が置き場"
+                f"（{t.project or 'ワークスペース'}）と違う。"
+                f"{t.declared_project} の提案はワークスペースの {where}/ に置く",
+            )
+        ]
     if t.is_child:
         parent = pool.get(t.parent)
-        if parent is None:
+        if parent is None or t.project == parent.project:
             return []
-        if not t.project:
-            t.project = parent.project
-            if parent.project:
-                t.raw["project"] = parent.project
-        elif t.project != parent.project:
-            return [
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"`project: {t.project}` が親 {parent.ticket} の "
-                    f"{parent.project or '(ワークスペース)'} と違う。子は親から継ぐ",
-                )
-            ]
-        return []
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"置き場（{t.project or 'ワークスペース'}）が親 {parent.ticket} の"
+                f"{parent.project or 'ワークスペース'}と違う。子は親と同じ置き場に置く",
+            )
+        ]
     known = {p.name for p in tree.projects(conf.projects)}
     if t.project and t.project not in known:
         return [
