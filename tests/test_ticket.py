@@ -341,6 +341,46 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
 
+    # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
+
+    def test_approve_only_the_listed_tickets(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0002", allow=("docs/*",))
+        result = self.ccnavi("--approve", "i0001", "i0001-01", stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
+        self.assertNotIn("i0002", result.stdout.split("Ticket 承認リクエスト")[1])
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0002.md")))
+        # 残した分は次の --approve の束に載る
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0002.md")))
+
+    def test_listed_child_without_its_pending_parent_is_refused(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        result = self.ccnavi("--approve", "i0001-01", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("親 i0001 が承認されていない", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
+
+    def test_listed_id_with_nothing_pending_is_refused_too(self):
+        # 承認待ちが空でも、識別子を並べたなら「無い」は失敗。
+        # 終了コードが他の承認待ちの有無で変わらない
+        result = self.ccnavi("--approve", "i0001", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("承認待ちに無い: i0001", result.stderr)
+
+    def test_listed_id_that_is_not_pending_approves_nothing(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        result = self.ccnavi("--approve", "i0001", "i0009", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("承認待ちに無い: i0009", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
+
     def test_grandchild_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
@@ -755,6 +795,12 @@ class TicketTest(unittest.TestCase):
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
             "ls && ./ccnavi review check --phase 1",
+            # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
+            "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
+            "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
+            # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
+            "ccnavi --approve --preview --yes i0001 --json",
+            "ccnavi --approve --yes i0001 --preview",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -769,6 +815,9 @@ class TicketTest(unittest.TestCase):
             "ccnavi --explain",
             "ccnavi --lint",
             "sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
+            "uv run python -m ccnavi --approve --preview --json",
+            "echo --approve --preview",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -778,15 +827,39 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # PowerShell も同じ。
+        # PowerShell も同じ。PowerShell は shellread で読めないので生の文字列に当たる。
+        # 免除の範囲がコマンドをまたぐと、後ろに --preview を書くだけで前の承認が通る。
+        for command in (
+            "& ccnavi.exe --approve",
+            "ccnavi --approve --yes i0001,i0001-01 --json; ccnavi --approve --preview",
+            "ccnavi --approve; echo --preview",
+            "ccnavi --approve --yes i0001 | findstr --preview",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "PowerShell",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
         result = self.hook(
             "PreToolUse",
             "PowerShell",
             self.parent_tree,
-            command="& ccnavi.exe --approve",
+            command="ccnavi --approve --preview --json",
             guard_ticket_approval="enable",
         )
-        self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        # ccnavi の起動でない --yes は当てない。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="apt-get install --yes git",
+            guard_ticket_approval="enable",
+        )
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
         # 切ると通る。
         result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))

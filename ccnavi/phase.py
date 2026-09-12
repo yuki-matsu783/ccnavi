@@ -56,8 +56,18 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
+# `--approve --preview` は束を見るだけ（写しを置かない）ので除く。ただし除外は
+# `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
+# 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
+# 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
+#
+# 免除の範囲はコマンド 1 本まで。Bash なら shellread が `\x00` で切るが、PowerShell は
+# 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
+# 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
+# 前のコマンドの `--approve` を免除する。
+_NOT_PREVIEW = r"(?![^\x00;&|\r\n]*--preview\b)"
 _CLI_FORMS = (
-    r"(--approve\b|--reviewed\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
     r"|\b(ticket|review)\s+"
     r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
 )
@@ -99,7 +109,8 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
             "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
-            "使い、承認と未解決の受け入れは利用者が端末で行います。"
+            "使い、承認は利用者が VS Code のボードで、未解決の受け入れは利用者が端末で行います。"
+            "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -602,8 +613,27 @@ def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tu
     tree_root = _tree_root(root, copy.source_tree, conf.projects)
     if not tree_root:
         return "", ""
-    rel = ticket_mod.tickets_rel_for(conf.tickets, copy.project)
-    return ticket_mod.locate(root, rel, tree_root, copy.ticket)
+    return ticket_mod.locate(root, _tickets_rel_of(conf, copy, tree_root), tree_root, copy.ticket)
+
+
+def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root: str) -> str:
+    """写しの元になった提案の置き場（そのツリーのルートからの相対）。
+
+    承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。`project` から組み直すと、
+    同じ名前を生む置き場が 2 つある（ワークスペースの `wip/<名前>/tickets/` と、その
+    プロジェクトから切った作業ツリーの `wip/tickets/`）ので、片方を必ず外す。
+    記録の無い古い写しだけ、名前から組む。
+    """
+    if copy.source_path:
+        base = os.path.dirname(os.path.dirname(copy.source_path))
+        try:
+            rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
+        except ValueError:  # 別のドライブ（Windows）
+            rel = ""
+        if rel and rel != "." and not rel.startswith("../"):
+            return rel
+    return ticket_mod.tickets_rel_for(conf.tickets, copy.project)
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:
