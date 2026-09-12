@@ -382,7 +382,7 @@ Claude Code本体が評価する権限設定。Hookより外側で強制され�
   },
   "hooks": {
     "PreToolUse":  [{ "matcher": "*", "hooks": [{ "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre_tool_use.py" }] }],
-    "PostToolUse": [{ "matcher": "Bash|Write|Edit|MultiEdit", "hooks": [{ "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_use.py" }] }]
+    "PostToolUse": [{ "matcher": "Bash|Write|Edit", "hooks": [{ "type": "command", "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post_tool_use.py" }] }]
   }
 }
 ```
@@ -2144,10 +2144,10 @@ title: 設定画面の分割
 rationale: |
   Settings 配下のコンポーネント分割。
 allow:
-  - match: Write|Edit|MultiEdit
+  - match: Write|Edit
     glob: "src/components/Settings/*"
 ask:
-  - match: Write|Edit|MultiEdit
+  - match: Write|Edit
     glob: "src/components/*"
 started_at: ""           # 以下 3 つはスクリプトが書く。人もエージェントも書かない
 completed_at: ""
@@ -2799,7 +2799,7 @@ private のリポジトリに置く。直したいプロジェクトは別々の
 
 ### 25.4 ルール
 
-**書き込み系（Write / Edit / MultiEdit / NotebookEdit）は行き先で 1 本に決まる。** 行き先のツリーの `repo` がプロジェクトなら、
+**書き込み系（Write / Edit / NotebookEdit）は行き先で 1 本に決まる。** 行き先のツリーの `repo` がプロジェクトなら、
 その git プロジェクトルートにある `config/rules.yml`。ワークスペースのツリーならワークスペースのルール。ルールは今までどおり解いた先の絶対パスに
 当てるので、書き方は変わらない。プロジェクトのルールに `*/schema/*` と書けば、 git プロジェクトルートでも、そこから切った作業ツリーでも当たる。
 

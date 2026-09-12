@@ -377,7 +377,7 @@ ask:
 
 allow:
   - id: source
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/src/*"
     additionalContext: src の下は自由に直してよい。ただし公開 API の綴りを変えたら docs/api.md も直すこと。
 ```
@@ -414,7 +414,7 @@ allow:
 ```yaml
 allow:
   - id: source
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/src/*"
     additionalContext: src の下を直したら docs/api.md も見直すこと。
     additionalContextOnce: >-
@@ -432,7 +432,7 @@ once の記憶は文とファイルで分けず、ルール 1 件で 1 度と数
 ```yaml
 allow:
   - id: tests
-    match: Write|Edit|MultiEdit
+    match: Write|Edit
     glob: "*/tests/*"
     additionalContextOnce: テストの決まりは次のとおり。
     additionalContextOnceFile: docs/testing.md
@@ -517,16 +517,17 @@ jq -r 'select(.decision == "handover") | .subject' .claude/ccnavi/log.jsonl | so
 
 | `match` に書く名前 | 当てる対象 |
 |---|---|
-| `Bash` `PowerShell` `Monitor` | コマンド（`Bash` と `Monitor` はシェルとして読んでから当てる） |
-| `Read` `Write` `Edit` `MultiEdit` `NotebookEdit` | ファイルのパス（行き着く先まで解いてから当てる） |
+| `Bash` `PowerShell` | コマンド（`Bash` はシェルとして読んでから当てる） |
+| `Read` `Edit` `Write` `NotebookEdit` | ファイルのパス（行き着く先まで解いてから当てる） |
+| `Grep` `Glob` | 探す場所のパス（`path`。省略されていれば呼び出し側の cwd） |
 | `Skill` | スキル名 |
 | `Agent` | 起動の見出し（`description`、無ければ `prompt`） |
 | `WebFetch` | URL |
 
-`Grep` や `Glob` のように対象を取り出せないツールは判定に届かないまま通るので、
-`allow` に書いても死んだ行が 1 つ増えるだけになる。`match` は名前をそのまま
-突き合わせるので、`Bash` のルールが `Monitor` に及ぶことはない。及ぼしたければ
-`Bash|Monitor` と並べる。
+`WebSearch` のように対象を取り出せないツールは判定に届かないまま通るので、
+`allow` に書いても死んだ行が 1 つ増えるだけになる。`MultiEdit` は今の Claude Code に
+無いので受け付けない（`--lint` が咎める）。`match` は名前をそのまま突き合わせるので、
+`Bash` のルールが `PowerShell` に及ぶことはない。及ぼしたければ `Bash|PowerShell` と並べる。
 
 `glob` の意味は標準ライブラリの `fnmatch` そのまま。`*` が任意の文字列、
 `?` が 1 文字、`[abc]` が文字クラス。
@@ -675,7 +676,7 @@ uv run python scratch.py    # 通る。scratch.py は Write で置く
 
 ## ファイルのパスは行き着く先で見る
 
-`Read` `Write` `Edit` `MultiEdit` `NotebookEdit` のルールは、payload に来た
+`Read` `Write` `Edit` `NotebookEdit` のルールは、payload に来た
 `file_path` そのものではなく、絶対パスに直し `..` を畳みシンボリックリンクを解いた
 結果に当てる。守る対象は名前ではなく場所なので、同じ場所を指す別の綴りで
 ルールを外せてはいけない。
@@ -718,7 +719,7 @@ docs/../.env
 ファイルを開く、読み切れないシェル構文で書く。実行後の監視はこれを、
 走ったあとの作業ツリーを `git status` で読んで拾う。
 
-保護領域は別に宣言しない。`match` に `Write` `Edit` `MultiEdit` `NotebookEdit` の
+保護領域は別に宣言しない。`match` に `Write` `Edit` `NotebookEdit` の
 どれかを含むルールが、そのまま「この場所に書かせない」の宣言になる。
 宣言を 2 か所に分けると必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
 
@@ -965,10 +966,10 @@ title: 設定画面の分割
 rationale: |
   Settings 配下のコンポーネント分割。
 allow:
-  - match: Write|Edit|MultiEdit
+  - match: Write|Edit
     glob: "src/components/Settings/*"
 ask:
-  - match: Write|Edit|MultiEdit
+  - match: Write|Edit
     glob: "src/components/*"
 started_at: ""           # 以下はスクリプトが書く
 completed_at: ""
