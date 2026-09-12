@@ -161,3 +161,55 @@ test("CB-T79 画面から来た内容は形を確かめてから受け取る", (
   assert.equal(asRiskForm({ levels: {}, factors: [{ origin: -1, kind: "glob" }] }), undefined);
   assert.equal(asRiskForm({ levels: {}, factors: [{ origin: "0", kind: "glob" }] }), undefined);
 });
+
+test("CB-T97 対応表でない項目が前にあっても、後ろの項目は自分の元ノードに書き戻す", () => {
+  const text = "version: 1\nfactors:\n  - ごみ\n  # a の理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n";
+  const doc = readRisk(text);
+  assert.deepEqual(doc.model.form.factors.map((f) => [f.origin, f.id]), [[1, "a"], [2, "b"]]);
+  assert.match(doc.model.problems[0], /保存するとこの項目は消える/);
+  // 何も変えずに保存: 読めない項目だけが消え、a と b はそれぞれのコメントごと残る
+  const out = doc.apply(doc.model.form);
+  assert.equal(out, "version: 1\nfactors:\n  # a の理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n");
+});
+
+test("CB-T98 先頭の項目を消しても並びの見出しのコメントは残り、先頭に来た項目は空行を連れてこない", () => {
+  const text = "version: 1\nfactors:\n  # 見出し\n  - id: a\n    points: 1\n    lines_over: 1\n\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n";
+  const doc = readRisk(text);
+  const [a, b] = doc.model.form.factors;
+  assert.equal(doc.apply({ levels: doc.model.form.levels, factors: [b] }), "version: 1\nfactors:\n  # 見出し\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n");
+  // 入れ替えると、見出しは a に付いて動き、空行は 2 番目の位置に残る
+  assert.equal(doc.apply({ levels: doc.model.form.levels, factors: [b, a] }), "version: 1\nfactors:\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n\n  # 見出し\n  - id: a\n    points: 1\n    lines_over: 1\n");
+});
+
+test("CB-T99 同じ元ノードを 2 回送れば書き戻さない。glob 以外の max は消す。最上位が対応表でなければ苦情", () => {
+  const doc = readRisk(TEXT);
+  const f = doc.model.form;
+  assert.throws(() => doc.apply({ levels: f.levels, factors: [f.factors[0], { ...f.factors[0], id: "x" }] }), /2 回送られた/);
+  const withMax = readRisk("version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n    max: 3\n");
+  assert.equal(withMax.apply(withMax.model.form), "version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n");
+  assert.match(readRisk("hello\n").model.problems[0], /最上位が対応表ではない/);
+  assert.match(readRisk("- a\n").model.problems[0], /最上位が対応表ではない/);
+});
+
+test("CB-T100 PyYAML が別の型に読む語は引用符で囲み、それ以外は裸のまま", () => {
+  const doc = readRisk(TEXT);
+  const f = doc.model.form;
+  const out = doc.apply({
+    levels: f.levels,
+    factors: [
+      { ...f.factors[0], message: "yes" },
+      { ...f.factors[2], value: "1:30" },
+      { origin: null, id: "no", points: "1_000", kind: "script", value: "0755", max: "", message: "普通の文" },
+    ],
+  });
+  assert.match(out, /    message: "yes"\n/);
+  assert.match(out, /    judge: "1:30"\n/);
+  assert.match(out, /  - id: "no"\n    points: "1_000"\n    script: "0755"\n    message: 普通の文\n/);
+  // 読み直せば文字のまま
+  const again = readRisk(out).model.form;
+  assert.deepEqual(again.factors.map((x) => [x.id, x.points, x.value, x.message]), [
+    ["big-diff", "25", "300", "yes"],
+    ["untested", "30", "1:30", ""],
+    ["no", "1_000", "0755", "普通の文"],
+  ]);
+});
