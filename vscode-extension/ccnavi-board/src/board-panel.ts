@@ -7,7 +7,7 @@ import * as vscode from "vscode";
 
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
-import { acceptCommand, wrapupCommand, type Launcher } from "./core/commands.js";
+import { acceptCommand, type Launcher } from "./core/commands.js";
 import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
@@ -34,8 +34,7 @@ type Message =
   | { readonly type: "approve" }
   | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
   | { readonly type: "approveCancel" }
-  | { readonly type: "accept"; readonly parent: string; readonly phase: number }
-  | { readonly type: "wrapup"; readonly parent: string };
+  | { readonly type: "accept"; readonly parent: string; readonly phase: number };
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -141,7 +140,7 @@ function registerPanelHandlers(current: PanelState): void {
   const { panel, folder } = current;
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
-    void handleMessage(asMessage(message));
+    handleMessage(asMessage(message));
   });
 
   panel.onDidChangeViewState(() => {
@@ -241,7 +240,7 @@ function renderError(error: string): string {
   return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ボード</title></head><body><p>ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
-async function handleMessage(message: Message | undefined): Promise<void> {
+function handleMessage(message: Message | undefined): void {
   const current = state;
   if (message === undefined || current === undefined) {
     return;
@@ -255,10 +254,11 @@ async function handleMessage(message: Message | undefined): Promise<void> {
       openTicket(current, message.filePath);
       return;
     case "approve":
-      await openApproval(current);
+      // 待たない。読み込み中もオーバーレイを出しておき、終わったら描き直す。
+      void openApproval(current);
       return;
     case "approveConfirm":
-      await confirmApproval(current, message.tickets);
+      void confirmApproval(current, message.tickets);
       return;
     case "approveCancel":
       if (current.approval?.kind !== "approving") {
@@ -273,33 +273,6 @@ async function handleMessage(message: Message | undefined): Promise<void> {
         return;
       }
       runInTerminal(root, acceptCommand(tree, message.phase));
-      return;
-    }
-    case "wrapup": {
-      const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
-      if (tree === undefined) {
-        vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーが無いので wrapup を送れない`);
-        return;
-      }
-      const reason = await vscode.window.showInputBox({
-        title: `${message.parent} を締める`,
-        prompt: "締める理由（--reason）。残りは別の issue に起こす",
-        validateInput: (value) => (value.trim() === "" ? "理由は空にできない" : undefined),
-      });
-      if (reason === undefined || reason.trim() === "") {
-        return;
-      }
-      const choice = await vscode.window.showQuickPick(
-        [
-          { label: "残りを issue に起こす", makeIssue: true },
-          { label: "起こさない（--no-issue）", makeIssue: false },
-        ],
-        { title: `${message.parent} を締める`, placeHolder: "残った指摘の扱い" },
-      );
-      if (choice === undefined) {
-        return;
-      }
-      runInTerminal(root, wrapupCommand(tree, reason.trim(), choice.makeIssue));
       return;
     }
   }
@@ -394,13 +367,28 @@ function openTicket(current: PanelState, filePath: string): void {
   if (current.board === undefined || !isKnownPath(current.board, filePath)) {
     return;
   }
-  void vscode.workspace.openTextDocument(filePath).then(
-    (document) => vscode.window.showTextDocument(document),
-    () => {
-      vscode.window.showInformationMessage(`チケットのファイルを開けなかった: ${filePath}`);
-      void update();
-    },
-  );
+  void showTicketPreview(filePath).catch(() => {
+    vscode.window.showInformationMessage(`チケットのファイルを開けなかった: ${filePath}`);
+    void update();
+  });
+}
+
+/**
+ * チケットは Markdown なので、素のテキストではなくプレビューで見せる。
+ * プレビューは組み込みの Markdown 拡張のもので、無いファイルを渡しても失敗を返さない前提で書いている
+ * （ここからは確かめられないので、README の手動確認で見る）。だから先に在るかを確かめ、無ければ
+ * 呼び手に失敗を返す（通知して、ボードを読み直す）。確かめてから描くまでに消えた場合は拾えない。
+ * プレビューのコマンドが無い環境（組み込みの Markdown 拡張が無効）では、これまでどおりエディタで開く。
+ */
+async function showTicketPreview(filePath: string): Promise<void> {
+  const uri = vscode.Uri.file(filePath);
+  await vscode.workspace.fs.stat(uri);
+  try {
+    await vscode.commands.executeCommand("markdown.showPreview", uri);
+  } catch {
+    const document = await vscode.workspace.openTextDocument(uri);
+    await vscode.window.showTextDocument(document);
+  }
 }
 
 function asMessage(message: unknown): Message | undefined {
@@ -423,8 +411,6 @@ function asMessage(message: unknown): Message | undefined {
       return typeof m.parent === "string" && typeof m.phase === "number" && Number.isInteger(m.phase)
         ? { type: "accept", parent: m.parent, phase: m.phase }
         : undefined;
-    case "wrapup":
-      return typeof m.parent === "string" ? { type: "wrapup", parent: m.parent } : undefined;
     default:
       return undefined;
   }

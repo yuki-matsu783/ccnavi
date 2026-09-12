@@ -8,6 +8,8 @@
  * `--approve --yes … --json`（見せた束を承認する。人がオーバーレイで押したときだけ）。
  * 判定と検証はルールファイルを差し替えられる。
  * ワークスペースのルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
+ * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases` で差し替えられる
+ * （リスク管理画面・フェーズ管理画面）。
  * 編集中の内容を一時ファイルに置いて試すため。写しと控えは外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
@@ -65,8 +67,27 @@ export type RulesOverride =
   | { readonly kind: "workspace"; readonly path: string }
   | { readonly kind: "project"; readonly name: string; readonly path: string };
 
-function overrideArgs(rules: RulesOverride): string[] {
-  return rules.kind === "workspace" ? ["--rules", rules.path] : ["--project-rules-file", `${rules.name}=${rules.path}`];
+/**
+ * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、リスクの配点を `--risk` で、
+ * フェーズの種類を `--phases` で差し替えられる。判定（`--test`）には配点も種類も関係ないので、
+ * そちらは RulesOverride だけを受ける。
+ */
+export type LintOverride =
+  | RulesOverride
+  | { readonly kind: "risk"; readonly path: string }
+  | { readonly kind: "phases"; readonly path: string };
+
+function overrideArgs(override: LintOverride): string[] {
+  switch (override.kind) {
+    case "workspace":
+      return ["--rules", override.path];
+    case "project":
+      return ["--project-rules-file", `${override.name}=${override.path}`];
+    case "risk":
+      return ["--risk", override.path];
+    case "phases":
+      return ["--phases", override.path];
+  }
 }
 
 export function findLauncher(root: string, setting: string): Launcher | undefined {
@@ -264,13 +285,13 @@ export async function runSamples(
 export async function runLint(
   root: string,
   setting: string,
-  rules: RulesOverride,
+  override: LintOverride,
 ): Promise<RunResult<LintResult>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, [...overrideArgs(rules), "--lint"]);
+  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"]);
   if (ran.code < 0 || ran.code > 1) {
     return { ok: false, error: `ccnavi --lint が失敗した: ${ran.stderr}` };
   }

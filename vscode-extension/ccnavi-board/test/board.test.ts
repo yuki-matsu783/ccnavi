@@ -31,13 +31,16 @@ test("CB-T06 カードに写し・作業ツリー・印・承認待ちが載る"
   assert.equal(parent.worktreeExists, true);
   assert.match(parent.stage, /作業中/);
   assert.equal(parent.phases.length, 2);
-  assert.deepEqual(parent.actions, [{ kind: "wrapup", parent: "i0001" }]);
+  // 締める（wrapup）は拡張からは出さない。端末で打つ
+  assert.deepEqual(parent.actions, []);
+  assert.equal(parent.family, "i0001");
 
   const done = cards.get("i0001-01")!;
   assert.equal(done.copyStatus, "closed");
   assert.equal(done.column, "done");
   assert.equal(done.parent, "i0001");
   assert.equal(done.phase, 1);
+  assert.equal(done.family, "i0001");
 
   const waiting = cards.get("i0001-03")!;
   assert.equal(waiting.copyStatus, "none");
@@ -77,7 +80,7 @@ test("CB-T08 親の無い子は不備", () => {
   assert.match(cards.get("i0002-01")!.issues[0], /親 i0002 が見つからない/);
 });
 
-test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締めた親に wrapup は出ない", () => {
+test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締めた親にはバッジだけ", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -107,6 +110,26 @@ test("CB-T10 表示しているパスだけを開く", () => {
   assert.equal(isKnownPath(board, card.seenIn[1].path), true);
   assert.equal(isKnownPath(board, "/etc/passwd"), false);
   assert.equal(isKnownPath(board, ""), false);
+});
+
+test("CB-T11b 親の絞り込みの候補は親だけを識別子順に並べる", () => {
+  const base = fixture();
+  const other: TicketJson = {
+    ...base.tickets[0],
+    ticket: "i0000",
+    title: "先に起きた親",
+    proposal: base.tickets[0].proposal === null ? null : { ...base.tickets[0].proposal, state: "doing" },
+  };
+  const child: TicketJson = { ...base.tickets[1], ticket: "i0000-01", parent: "i0000" };
+  const board = buildBoard({ ...base, tickets: [...base.tickets, other, child] });
+  assert.deepEqual(
+    board.parents,
+    [
+      { id: "i0000", title: "先に起きた親" },
+      { id: "i0001", title: base.tickets[0].title },
+    ],
+  );
+  assert.equal(cardsOf(board).get("i0000-01")!.family, "i0000");
 });
 
 test("CB-T11 親の作業ツリーを引ける", () => {

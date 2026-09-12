@@ -49,9 +49,3 @@ export function approveArgs(tickets: readonly string[]): readonly string[] {
 export function acceptCommand(parentTree: string, phase: number): string {
   return `cd ${shellQuote(toPosixPath(parentTree))} && sh .claude/scripts/ccnavi-review.sh accept ${phase}`;
 }
-
-/** `ccnavi-review.sh wrapup --reason <理由> [--no-issue]`。親を早期に締める */
-export function wrapupCommand(parentTree: string, reason: string, makeIssue: boolean): string {
-  const tail = makeIssue ? "" : " --no-issue";
-  return `cd ${shellQuote(toPosixPath(parentTree))} && sh .claude/scripts/ccnavi-review.sh wrapup --reason ${shellQuote(reason)}${tail}`;
-}

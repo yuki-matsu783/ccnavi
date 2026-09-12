@@ -9,7 +9,7 @@ function fixtureText(name: string): string {
   return fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", name), "utf8");
 }
 
-test("CB-T70 承認の preview を読む（束・本文・対象外・読めない提案）", () => {
+test("CB-T104 承認の preview を読む（束・本文・対象外・読めない提案）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {
@@ -31,7 +31,7 @@ test("CB-T70 承認の preview を読む（束・本文・対象外・読めな�
   assert.deepEqual(preview.problems, []);
 });
 
-test("CB-T71 承認の答えを読む（承認した / 束が違った）", () => {
+test("CB-T105 承認の答えを読む（承認した / 束が違った）", () => {
   const done = parseApproveResult(fixtureText("approve-yes.json"));
   assert.ok(done.ok);
   if (done.ok) {
@@ -50,7 +50,7 @@ test("CB-T71 承認の答えを読む（承認した / 束が違った）", () =
   }
 });
 
-test("CB-T72 版が違う・JSON でない答えは読まない", () => {
+test("CB-T106 版が違う・JSON でない答えは読まない", () => {
   const other = parseApprovePreview(JSON.stringify({ version: APPROVE_VERSION + 1, batch: [] }));
   assert.ok(!other.ok);
   assert.ok(!other.ok && other.error.includes("版が違う"));

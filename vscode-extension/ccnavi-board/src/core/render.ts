@@ -4,7 +4,7 @@
  * ように全部の文字列を実体参照にする。
  */
 import type { ApprovePreview } from "./approvemodel.js";
-import type { Action, Board, BoardColumn, Card, PhaseChip } from "./board.js";
+import type { Action, Board, BoardColumn, Card, ParentOption, PhaseChip } from "./board.js";
 
 /**
  * 承認のオーバーレイの状態。拡張側（board-panel）が持ち、描くたびに渡す。Webview の中に
@@ -54,7 +54,7 @@ ${STYLE}
     <span class="pending${approveCount > 0 ? " warn" : ""}">承認待ち ${approveCount} 件</span>
   </div>
   <div class="controls">
-${renderFilter(board.projects)}    <button type="button" class="action" data-action="refresh">更新</button>
+${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button type="button" class="action" data-action="refresh">更新</button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
@@ -146,6 +146,26 @@ ${options}
 `;
 }
 
+/** 親の絞り込み。並行して進めている親が複数あるとき、1 つの家族（親とその子）だけを見る */
+function renderParentFilter(parents: readonly ParentOption[]): string {
+  if (parents.length === 0) {
+    return "";
+  }
+  const options = parents
+    .map((p) => {
+      const label = p.title === "" ? p.id : `${p.id} ${p.title}`;
+      return `      <option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+    })
+    .join("\n");
+  return `    <label class="filter">親
+      <select id="parent-filter">
+      <option value="*">すべて</option>
+${options}
+      </select>
+    </label>
+`;
+}
+
 function renderProblems(problems: readonly string[]): string {
   if (problems.length === 0) {
     return "";
@@ -165,6 +185,7 @@ function renderColumn(column: BoardColumn): string {
       <span class="count">${column.count}</span>
     </h2>
 ${body}
+    <div class="resizer" data-resize="${escapeHtml(column.state)}" title="ドラッグで幅を変える／ダブルクリックで戻す"></div>
   </section>`;
 }
 
@@ -184,7 +205,7 @@ function renderCard(card: Card): string {
   const issues = renderIssues(card.issues);
   const actions = renderActions(card.actions, card.id);
   const stage = card.stage ? `\n        <div class="stage">${escapeHtml(card.stage)}</div>` : "";
-  return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" tabindex="0">
+  return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" data-family="${escapeHtml(card.family)}" tabindex="0">
         <div class="card-head"><span class="num">${escapeHtml(card.id)}</span><span class="title">${escapeHtml(card.title)}</span></div>${stage}
         <div class="badges">
 ${badges}
@@ -280,8 +301,6 @@ function renderActionButton(action: Action, id: string): string {
       return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。${escapeHtml(id)} だけを承認することはできない">承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
-    case "wrapup":
-      return `<button type="button" class="action" data-action="wrapup" data-parent="${escapeHtml(action.parent)}" title="ここで締める（ccnavi-review.sh wrapup）">締める</button>`;
   }
 }
 
@@ -296,7 +315,7 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * 3 つの画面（ボード・ルール設定・プロジェクト管理）で同じ見た目のボタン。
+ * 5 つの画面（ボード・ルール設定・リスク管理・フェーズ管理・プロジェクト管理）で同じ見た目のボタン。
  * 縁と薄い影で「押せる」と分かるようにし、押した瞬間に 1px 沈む。primary は VS Code の主ボタンの色。
  */
 export const BUTTON_STYLE = `  button.action {
@@ -340,12 +359,22 @@ ${BUTTON_STYLE}
   }
   .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
   /* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールに逃がす。
-     畳んだ列は縦書きの見出しだけの細い帯になる */
+     右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
+     畳んだ列は見出し 1 行ぶんの幅に縮む。縦書きにはしない */
   .board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; }
   .column {
+    position: relative;
     flex: 1 1 0; min-width: 220px;
     border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px;
   }
+  .column.sized { flex: 0 0 auto; }
+  .resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: 1; }
+  .resizer::after {
+    content: ""; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 2px;
+    border-radius: 1px; background: var(--vscode-focusBorder); opacity: 0;
+  }
+  .resizer:hover::after, .column.resizing .resizer::after { opacity: 1; }
+  body.resizing, body.resizing * { cursor: col-resize; user-select: none; }
   .column h2 { margin: 0 0 8px; font-size: 1em; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .column .count { color: var(--vscode-descriptionForeground); }
   button.fold {
@@ -362,11 +391,9 @@ ${BUTTON_STYLE}
   .column.folded .fold-mark {
     border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
   }
-  .column.folded { flex: 0 0 auto; min-width: 0; width: 36px; padding: 8px 4px; }
-  .column.folded h2 { margin: 0; flex-direction: column; justify-content: flex-start; }
-  .column.folded button.fold { flex-direction: column; }
-  .column.folded .label { writing-mode: vertical-rl; }
-  .column.folded .cards, .column.folded .empty { display: none; }
+  .column.folded { flex: 0 0 auto; min-width: 0; width: auto; }
+  .column.folded h2 { margin: 0; white-space: nowrap; }
+  .column.folded .cards, .column.folded .empty, .column.folded .resizer { display: none; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .card {
@@ -467,7 +494,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "accept") {
         vscode.postMessage({ type: "accept", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) });
       }
-      else if (action === "wrapup") { vscode.postMessage({ type: "wrapup", parent: button.getAttribute("data-parent") }); }
     });
   }
   // 承認のオーバーレイ。Esc でやめる。承認している最中は閉じない。開いたら「やめる」に焦点を置く。
@@ -481,13 +507,16 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       }
     });
   }
-  // 絞り込みと畳んだ列は、更新で HTML が作り直されても残るように webview の状態に置く。
+  // 絞り込み（プロジェクト・親）・畳んだ列・列の幅は、更新で HTML が作り直されても残るように webview の状態に置く。
   const saved = vscode.getState() || {};
+  const savedWidths = saved.widths && typeof saved.widths === "object" ? saved.widths : {};
   const state = {
     project: typeof saved.project === "string" ? saved.project : "*",
+    parent: typeof saved.parent === "string" ? saved.parent : "*",
     folded: Array.isArray(saved.folded) ? saved.folded.filter((f) => typeof f === "string") : [],
+    widths: Object.fromEntries(Object.entries(savedWidths).filter(([, w]) => typeof w === "number" && w > 0)),
   };
-  function save() { vscode.setState({ project: state.project, folded: state.folded }); }
+  function save() { vscode.setState({ project: state.project, parent: state.parent, folded: state.folded, widths: state.widths }); }
 
   function setFolded(column, folded) {
     column.classList.toggle("folded", folded);
@@ -506,25 +535,76 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     });
   }
 
+  // 列の幅。取っ手をドラッグした列だけ px で固定し、ダブルクリックで元の伸び縮みに戻す。
+  const MIN_WIDTH = 220;
+  function setWidth(column, width) {
+    column.classList.toggle("sized", width !== undefined);
+    column.style.width = width === undefined ? "" : width + "px";
+  }
+  for (const handle of document.querySelectorAll(".resizer")) {
+    const column = handle.closest(".column");
+    const key = handle.getAttribute("data-resize") || "";
+    setWidth(column, state.widths[key]);
+    handle.addEventListener("dblclick", () => {
+      delete state.widths[key];
+      setWidth(column, undefined);
+      save();
+    });
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) { return; }
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = column.getBoundingClientRect().width;
+      column.classList.add("resizing");
+      document.body.classList.add("resizing");
+      handle.setPointerCapture(event.pointerId);
+      const move = (e) => {
+        const width = Math.max(MIN_WIDTH, Math.round(startWidth + e.clientX - startX));
+        setWidth(column, width);
+        state.widths[key] = width;
+      };
+      const finish = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        column.classList.remove("resizing");
+        document.body.classList.remove("resizing");
+        save();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
+    });
+  }
+
+  // 絞り込みはプロジェクトと親の両方を満たすカードだけを出す。覚えていた値が候補に無ければ
+  //（その親が消えた等）「すべて」のまま。
   const filter = document.getElementById("project-filter");
+  const parentFilter = document.getElementById("parent-filter");
   function applyFilter() {
-    const value = filter ? filter.value : "*";
+    const project = filter ? filter.value : "*";
+    const parent = parentFilter ? parentFilter.value : "*";
     for (const card of document.querySelectorAll(".card")) {
-      const own = card.getAttribute("data-project") || "";
-      card.classList.toggle("hidden", value !== "*" && own !== value);
+      const ownProject = card.getAttribute("data-project") || "";
+      const ownFamily = card.getAttribute("data-family") || "";
+      const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent);
+      card.classList.toggle("hidden", hidden);
     }
-    state.project = value;
+    state.project = project;
+    state.parent = parent;
     save();
   }
-  function selectProject(value) {
-    if (!filter) { return; }
-    if ([...filter.options].some((o) => o.value === value)) { filter.value = value; applyFilter(); }
+  function select(element, value) {
+    if (!element) { return; }
+    if ([...element.options].some((o) => o.value === value)) { element.value = value; applyFilter(); }
   }
-  if (filter) {
-    selectProject(state.project);
-    filter.addEventListener("change", applyFilter);
-    applyFilter();
+  function selectProject(value) { select(filter, value); }
+  for (const element of [filter, parentFilter]) {
+    if (element) { element.addEventListener("change", applyFilter); }
   }
+  selectProject(state.project);
+  select(parentFilter, state.parent);
+  applyFilter();
   // プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき。
   window.addEventListener("message", (event) => {
     const data = event.data || {};

@@ -18,7 +18,7 @@ function approvePreview(): ApprovePreview {
   return parsed.value;
 }
 
-test("CB-T73 承認のオーバーレイに束・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
+test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
   const preview = approvePreview();
   const html = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview } });
   assert.ok(html.includes('class="approval-backdrop" data-approval="preview"'));
@@ -38,7 +38,7 @@ test("CB-T73 承認のオーバーレイに束・本文・対象外を出し、�
   assert.ok(escaped.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
 });
 
-test("CB-T74 束が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
+test("CB-T108 束が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
   const preview = approvePreview();
   const empty = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
@@ -59,7 +59,7 @@ test("CB-T74 束が空なら承認ボタンを出さず、承認中はボタン�
   assert.ok(failed.includes('class="approval-note error">実行ファイルが無い'));
 });
 
-test("CB-T75 オーバーレイを渡さなければ出ない", () => {
+test("CB-T109 オーバーレイを渡さなければ出ない", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   // スタイルとスクリプトには名前が残るので、要素そのものが無いことを見る。
   assert.ok(!html.includes('class="approval-backdrop"'));
@@ -97,8 +97,19 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   assert.ok(html.includes("2 か所にコピーあり"));
   assert.ok(html.includes("親 i0001 / フェーズ 2"));
   assert.ok(html.includes('class="phases"'));
-  assert.ok(html.includes('data-action="wrapup" data-parent="i0001"'));
+  // 締める（wrapup）のボタンは出さない
+  assert.ok(!html.includes('data-action="wrapup"'));
+  assert.ok(!html.includes("締める"));
   assert.ok(html.includes("base "));
+});
+
+test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  assert.ok(html.includes('id="parent-filter"'));
+  assert.ok(/<option value="i0001">i0001 [^<]+<\/option>/.test(html));
+  assert.equal((html.match(/data-family="i0001"/g) ?? []).length, 4);
+  const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
+  assert.ok(!renderBoard(buildBoard(empty), OPTIONS).includes('id="parent-filter"'));
 });
 
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
