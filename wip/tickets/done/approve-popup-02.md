@@ -18,9 +18,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: tests/*
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: "2026-09-12T19:18:47+0900"
+completed_at: "2026-09-12T19:25:11+0900"
+base_sha: "0e57d1b72f9bd89510fff3c61e2602e28d504d92"
 ---
 
 # 承認ポップアップの受入テスト
