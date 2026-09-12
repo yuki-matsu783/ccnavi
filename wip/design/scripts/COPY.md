@@ -43,12 +43,28 @@ cp "$src/ccnavi-setup.sh"  scripts/ccnavi-setup.sh
 
 ## 写したあとに確かめる
 
+**作業ツリーの中から回します。** `tests/test_e2e_sh.py` はこのチケットのブランチにしか
+無いので、ワークスペースルート（`main`）からは import できません。
+
 ```sh
+cd <ワークスペースルート>/.claude/worktrees/sh-ws-root
 CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 ```
 
-20 件すべて緑になること。写す前は `CCNAVI_SH_DIR=wip/design/scripts` を付けて
-同じものを回しており、そちらでは既に 20 件緑、付けない（＝今の配布版）と 16 件赤です。
+走り出しに、測った場所が出ます。
+
+```
+  sh = <ワークスペースルート>/.claude/scripts
+  exe = <ワークスペースルート>/dist/ccnavi
+```
+
+`sh =` が**ワークスペースルート側**を指していることを確かめてください。作業ツリーの
+`.claude/scripts` を指していたら、写す前の版を測っています（`.claude/scripts/` は git が
+運ぶので作業ツリーにも古い写しがあります）。テストは `.claude/worktrees/` の下を
+候補から外して上へ歩くので、既定ではワークスペース側を向きます。
+
+20 件すべて緑になること。写す前は `CCNAVI_SH_DIR=wip/design/scripts` を付けて回しており、
+そちらでは既に 20 件緑でした。
 
 既存の in-process テストも回してください。
 

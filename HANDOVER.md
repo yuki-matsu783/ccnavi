@@ -110,12 +110,20 @@ uv run --with pyinstaller python build.py
 「チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い」）。
 ガードは緩めていない。
 
-確かめ方。
+確かめ方。**このチケットのブランチを checkout した作業ツリーの中で回す。**
+`tests/test_e2e_sh.py` はまだ `main` に入っていないので、ワークスペースルートからは
+import できない。
 
 ```
+cd .claude/worktrees/sh-ws-root
 CCNAVI_E2E=1 CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.test_e2e_sh  # 写す前（20 件緑）
-CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh                                    # 写した後（20 件緑になること）
+CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh                                    # 写した後（20 件緑）
 ```
+
+走り出しに、測った `sh` と `exe` の場所が出る。`sh =` が**ワークスペースルート側**を
+指していることを確かめること。作業ツリーの `.claude/scripts` を指していたら、写す前の
+版を測っている。テストは実装（`ccnavi_workspace`）と同じ規則で `.claude/worktrees/` の
+下を候補から外して上へ歩くので、既定ではワークスペース側を向く。
 
 `tests/test_e2e_sh.py` は重い（実 git・実行ファイル 18MB の写し）ので `CCNAVI_E2E` が
 無ければ skip する。**モード B（`projects/` を使う形）に触ったら回すこと。**

@@ -41,32 +41,50 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHELL = shutil.which("sh") or shutil.which("bash")
 E2E = os.environ.get("CCNAVI_E2E", "")
 
-# 写す sh の出どころ。既定はワークスペースに配られている版。
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", os.path.join(".claude", "scripts")))
-HOOK_DIR = os.path.join(ROOT, ".claude", "hooks")
 
+def walk_up_for(relative, skip_worktrees=True):
+    """`ROOT` から上へ歩いて、`relative` を持つディレクトリの中身を返す。
 
-def find_dist():
-    """組み立てた実行ファイルの置き場を探す。
+    実装（`ccnavi_workspace`）と同じ規則にしてある。**`.claude/worktrees/` の下は
+    候補にしない。**
 
-    作業ツリーには `dist/` が無い（追跡外なので checkout されない）。実物は
-    ワークスペースルートにあるので、そこまで上へ歩く。`CCNAVI_DIST` があれば
-    それを使う。
+    これを外すと、作業ツリーから回したときに作業ツリー自身を掴む。`.claude/scripts/`
+    は git が運ぶのでどの作業ツリーにも写しがあるが、実際に効くのはワークスペース側の
+    1 本だけ。写したあとに作業ツリーから回すと、写す前の版を測って赤になる（実際に
+    起きた）。`dist/` は追跡外なので作業ツリーには無く、こちらは上へ歩くだけでよい。
+
+    見つからなければ `ROOT` 直下の綴りを返す。呼ぶ側の skip 判定がそれを見る。
     """
-    named = os.environ.get("CCNAVI_DIST", "")
-    if named:
-        return os.path.abspath(named)
     here = ROOT
     while True:
-        candidate = os.path.join(here, "dist", "ccnavi")
-        if os.path.isdir(candidate):
+        candidate = os.path.join(here, relative)
+        inside_worktree = skip_worktrees and os.path.join(".claude", "worktrees") in here
+        if os.path.isdir(candidate) and not inside_worktree:
             return candidate
         parent = os.path.dirname(here)
         if parent == here:
-            return os.path.join(ROOT, "dist", "ccnavi")
+            return os.path.join(ROOT, relative)
         here = parent
 
 
+def find_scripts():
+    """測る sh の出どころ。既定はワークスペースに配られている版。"""
+    named = os.environ.get("CCNAVI_SH_DIR", "")
+    if named:
+        return os.path.join(ROOT, named)
+    return walk_up_for(os.path.join(".claude", "scripts"))
+
+
+def find_dist():
+    """組み立てた実行ファイルの置き場。作業ツリーには無いので上へ歩く。"""
+    named = os.environ.get("CCNAVI_DIST", "")
+    if named:
+        return os.path.abspath(named)
+    return walk_up_for(os.path.join("dist", "ccnavi"), skip_worktrees=False)
+
+
+SH_DIR = find_scripts()
+HOOK_DIR = walk_up_for(os.path.join(".claude", "hooks"))
 DIST = find_dist()
 
 
@@ -145,6 +163,10 @@ class WorkspaceTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # どこを測ったかを出す。緑と赤が「写したかどうか」と食い違ったとき、
+        # 最初に見る情報がこれ。出していなかったせいで、写し済みなのに赤になった
+        # 原因（作業ツリーの古い写しを見ていた）を突き止めるのに 1 往復かかった。
+        print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
         cls.tmp = tempfile.mkdtemp(prefix="ccnavi-e2e-")
         cls.ws = os.path.join(cls.tmp, "ws")
         cls.build_workspace(cls.ws, projects=("p1", "p2"))
