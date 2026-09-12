@@ -42,9 +42,9 @@ allow:
   glob: tests/*
 - match: Write|Edit
   glob: vscode-extension/*
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: "2026-09-12T22:02:20+0900"
+completed_at: "2026-09-12T22:29:47+0900"
+base_sha: "9d389fdb05dbaa32522770bafa0e0be589adfdab"
 ---
 
 # 敵対的レビューの指摘を直す
