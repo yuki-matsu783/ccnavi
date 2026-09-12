@@ -52,6 +52,9 @@ fail() {
 	exit "${2:-1}"
 }
 
+# 共通部分。ワークスペースルートの探し方と、URL の伏せ字はここにある。
+. "$(dirname "$0")/ccnavi-common.sh"
+
 [ "$#" -ge 1 ] || {
 	usage
 	exit 2
@@ -69,15 +72,13 @@ request | check | note | accept | handoff | ready | wrapup | fetch | origin) ;;
 	;;
 esac
 
-# ---- 場所。main の根と、いまの作業ツリー。Windows の Git Bash では pwd -W で綴りを直す。
-
-common=$(git rev-parse --git-common-dir 2>/dev/null || :)
-[ -z "$common" ] && fail "git リポジトリの中で実行してください。" 2
-case "$common" in
-*/.git) root="${common%/.git}" ;;
-.git) root="$(pwd -W 2>/dev/null || pwd)" ;;
-*) root="$common" ;;
-esac
+# ---- 場所。ワークスペースルートと、いまの作業ツリー。Windows の Git Bash では pwd -W で綴りを直す。
+#
+# 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
+# プロジェクトを答え、写し・印・状態の置き場がプロジェクト側にずれる。
+# 道具の置き場は上へ歩いて探す（設計 §25.8）。
+root=$(ccnavi_workspace) ||
+	fail "ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 here="$(pwd -W 2>/dev/null || pwd)"
 state="$root/${CCNAVI_STATE:-.claude/ccnavi/state}"
 
@@ -101,6 +102,11 @@ fi
 
 origin=$(git remote get-url origin 2>/dev/null || :)
 [ -z "$origin" ] && fail "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
+# 伏せた綴りを、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
+# 生の $origin を文面に入れる綴りを 1 つも残さないことで、次に fail を足す人が
+# 素通りできないようにする。URL に資格情報を埋める使い方は普通にあり、
+# 出力はエージェントの文脈にも記録にも残る。
+origin_shown=$(ccnavi_mask_url "$origin")
 # scheme は origin から取る。https に決め打ちすると、社内や手元で平文で立てた
 # GitLab（`http://localhost:8929` のような形）に当たらない。ssh の綴りには
 # scheme が無いので、そこだけ https にする。
@@ -111,7 +117,7 @@ http://*) scheme=http ;;
 *) scheme=https ;;
 esac
 rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
-[ "$rest" = "$origin" ] && fail "origin の綴りを読めない ($origin)。"
+[ "$rest" = "$origin" ] && fail "origin の綴りを読めない ($origin_shown)。"
 # `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
 # 落とさないと host にトークンが混ざり、API の綴りにも `origin` の出力にも漏れる（実測）。
 # 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
@@ -129,7 +135,7 @@ case "$host" in
 	esac
 	;;
 esac
-[ -n "$host" ] || fail "origin からホストを読めない ($origin)。"
+[ -n "$host" ] || fail "origin からホストを読めない ($origin_shown)。"
 tail="${rest#"$host"}"
 while :; do
 	case "$tail" in
@@ -139,7 +145,7 @@ while :; do
 done
 path="${tail%.git}"
 path="${path%/}"
-[ -n "$path" ] || fail "origin からプロジェクトのパスを読めない ($origin)。"
+[ -n "$path" ] || fail "origin からプロジェクトのパスを読めない ($origin_shown)。"
 case "$host" in
 github.com | github.com:*)
 	kind=github
@@ -433,7 +439,7 @@ origin)
 	# URL に埋まった資格情報は伏せる。ここの出力はエージェントの文脈と記録に残る。
 	shown=$(printf '%s' "$origin" | sed -E 's#^([a-z]+://)[^/@]+@#\1<伏せた>@#')
 	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
-		"$shown" "$kind" "$scheme" "$host" "$path" "$api_base" "$branch" "$transport"
+		"$origin_shown" "$kind" "$scheme" "$host" "$path" "$api_base" "$branch" "$transport"
 	;;
 fetch)
 	fetch_all
