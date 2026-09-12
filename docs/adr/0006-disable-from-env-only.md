@@ -10,9 +10,14 @@
 
 ## 決定
 
-ccnavi は `.claude/settings.json` の `env` を自分でも読み、そこに `CCNAVI_MODE=disable` と
-書かれていたら無視して理由を出す。ファイルが別の値を書いているのに環境が `disable` を渡した
-場合は、その `disable` はファイル由来ではないので通す。`--lint` は `env` の `disable` を error にする。
+停止の指定は、ccnavi を起動した側の環境からしか効かせない。設定ファイルが求めた `disable` は
+無視して理由を出す。
+
+ただし実行ファイルが見分けられるのは `ccnavi.settings.local.json`（ccnavi 自身のソースツリーでだけ
+読む上書き設定）が求めた `disable` までで、`.claude/settings.json` の `env` に書かれた `disable` は
+Claude Code がプロセス環境として渡すので、判定の経路では「人が起動時に渡した `disable`」と
+区別が付かない。そこを見つけられるのは `--lint`（error で名指しする）と導入スクリプト
+（`--mode disable` を断る）だけで、hook からの判定では止められない。
 
 ## 理由
 
@@ -21,9 +26,14 @@ ccnavi は `.claude/settings.json` の `env` を自分でも読み、そこに `
 
 ## 得たもの・失ったもの
 
-- 得たもの: エージェントが設定ファイルを書いてガードを止める道が閉じる
-- 失ったもの: 「このプロジェクトでは使わない」を settings.json では書けない。
-  導入スクリプトも `--mode disable` を断る
+- 得たもの: 「このプロジェクトでは使わない」を settings.json に書いて止める道が、`--lint` と
+  導入スクリプトの 2 か所で見える
+- 失ったもの: REQ-CMN-04 は半分しか満たせていない。エージェントが `.claude/settings.json` の
+  `env` に `disable` を書けば、次のセッションから判定は止まる。塞ぐには実行ファイルが
+  `.claude/settings.json` を読む必要があり、それは判定の間に読むものを増やす向きなので、
+  入れるかどうかは別に決める（HANDOVER.md の「未実装」）
+- `ccnavi.settings.local.json` は開発の便宜で、境界ではない。`mode` の `disable` だけは塞ぐが、
+  戻す働きやチケット制御はここから緩められる。だから ccnavi 自身のソースツリーでしか読まない
 
 ## 採らなかった案
 

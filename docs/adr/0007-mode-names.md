@@ -16,8 +16,9 @@
 報告したうえで `enable` に倒す。
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）も同じ 3 値を取る。
-`CCNAVI_GUARD_TICKET_APPROVAL` だけは `enable` / `disable` の 2 値で、`dry-run` を取らない。
-承認は通れば済んでしまい、済んだものは報告では戻らないので、「止めずに報告する」段が持てない。
+2 値（`enable` / `disable`）なのは `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL` の 2 本。
+前者は承認が通れば済んでしまい、済んだものは報告では戻らないので「止めずに報告する」段が持てない。
+後者は機能を使うかの二択で、予行に意味が無い。
 
 ## 理由
 
