@@ -2109,6 +2109,14 @@ IAM と DB 権限の設計が最も重要である。本システムがすべて
 `CCNAVI_APPROVED`（写し、既定 `.claude/ccnavi/tickets`、ワークスペースルートからの相対）。4 つの状態と `closed/` `phases/` は
 それぞれの下に固定。`CCNAVI_TICKET` と `CCNAVI_LEDGER` は廃止し、`--lint` が「もう効かない」と言う。
 
+チケット制御そのものを使うかは `CCNAVI_TICKET_CONTROL`（`enable` / `disable`、既定 `enable`）で宣言する。
+以前は `CCNAVI_APPROVED` を空文字にすることがこの宣言を兼ねていたが、置き場のパスが空であることと
+機能を切ることは別の話なので分けた。空の `CCNAVI_APPROVED` はもう効かず、`--lint` が今の書き方を言う。
+`disable` のとき、判定・監視・診断はチケットを一切見ず、`--approve` と `ticket` / `review` の副命令は
+エラーで止まり、VS Code 拡張は「チケット管理」の入口を出さない。有効なときは `SessionStart` で
+直接作業（チケット無し、全体ルールだけ）とチケット作業の使い分けをモデルに渡す（README「使うかどうかは
+プロジェクトが決める」）。
+
 写しを `.claude/` の外に向けると、そこはルールが Write / Edit を止めておらず、組み込みの既定がシェル書き込みを
 止めてもいない。`--lint` が「写しの置き場が守られていない」を error で出す。
 

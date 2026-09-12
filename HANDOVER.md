@@ -13,7 +13,8 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 | 文書 | 中身 |
 |---|---|
-| [requirements.md](requirements.md) | 外から観測できる要求だけ。93 件、11 面。実装の理屈は書かない |
+| [CONTEXT.md](CONTEXT.md) | 用語集。全体ルール・チケット制御・直接作業・チケット作業・提案・写し・印。実装のことは書かない |
+| [requirements.md](requirements.md) | 外から観測できる要求だけ。135 件、13 面。実装の理屈は書かない |
 | [ccnavi.md](ccnavi.md) | 到達点の設計。仕様側。冒頭に「現在の実装との食い違い」の注記がある |
 | [README.md](README.md) | 設定、ルールの書き方、モード、記録の読み方 |
 
