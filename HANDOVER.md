@@ -98,6 +98,15 @@ uv run --with pyinstaller python build.py
 - 並行するチケット（REQ-TKT）のうち、GitHub の実物に対する `request` と `check` は
   実測していない。GitLab は実物（CE 18.5）で 1 周した（下の「落とし穴」）。
   自動テストは sh の代わりに写し（`--result`）を渡す形で通す
+- REQ-CMN-04 の半分。`.claude/settings.json` の `env` に書いた `CCNAVI_MODE=disable` は、判定の
+  経路では「人が起動時に渡した `disable`」と区別が付かないので止められない。見つけられるのは
+  `--lint`（error）と導入スクリプト（`--mode disable` を断る）だけ。塞ぐなら実行ファイルが
+  `.claude/settings.json` を読む必要があり、それは「判定の間に外部の状態を増やす」向きなので
+  入れるかどうかは相談（設計 §4.3、ADR-0006）
+- REQ-MLT-14 の後半。git ラッパの記録が `logs/<プロジェクト>/` ではなく `logs/` に平坦に出る
+  （下の「次にやること」）
+- REQ-TKT-35 の後半。`SubagentStart` は親の局面（作業中・レビュー待ちなど）を名指ししない。
+  フェーズの番号と種類までは渡す。名指しするのは `--explain` とボードだけ
 
 ## 次にやること
 
@@ -107,14 +116,14 @@ uv run --with pyinstaller python build.py
 `uv run … unittest discover` が `Start directory is not importable: 'tests'` で落ちて、
 関係のない差し戻しがモデルへ届く。`[ -d "$target/tests" ] || continue` に直せば済む。
 
-**`ccnavi-review.sh` に、敵対的レビューで見つかった漏れが 2 つ残っている（人が直す）。**
+**`ccnavi-review.sh` に、敵対的レビューで見つかった漏れが 3 つ残っている（人が直す）。**
 スクリプトはエージェントが触らない決まりなので、直し方だけ書く。
 (1) `origin` を読めなかったときの `fail` が URL をそのまま stderr に出す（114 行付近と、
 その後の 2 か所）。`ssh://oauth2:<token>@host:2222/g/p.git` のように読めない綴りだと
 トークンが漏れる。伏せた綴りを origin を読む前に 1 度作り、`fail` にはそれだけ渡す。
 (2) `origin` サブコマンドの伏せ字が最初の `@` まで（`s#^([a-z]+://)[^/@]+@#`）で、解析は
 最後の `@` まで。`glpat-A@B` のように `@` を含む資格情報だと後半が出る。`[^/]*@` に直し、
-scheme の `[a-z]+` は大文字も含める。exe 側の `remote_kind` は同じ規則に直してある。
+scheme の `[a-z]+` は大文字も含める。実行ファイル側の `remote_kind` は同じ規則に直してある。
 (3) usage の `check` の説明が「依頼より後の未解決スレッドが無ければ」のままで、いまの挙動
 （時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `handoff` `ready`
 `wrapup` `origin` が無い。
@@ -129,6 +138,23 @@ scheme の `[a-z]+` は大文字も含める。exe 側の `remote_kind` は同�
 - `projects/` をワークスペースの `.gitignore` に入れたとき、Claude Code がプロジェクトの中の
   CLAUDE.md を読むか。読まれるならワークスペースの CLAUDE.md と矛盾しないように書く
 - `cwd` がプロジェクトの中にあるとき、hook の `${CLAUDE_PROJECT_DIR}` がワークスペースルートのままか
+
+**フェーズの種類の `scope` だけ、大文字小文字の扱いが機械依存になっている。** チケットの範囲は
+常に区別しないのに（`ticket.py`）、種類の範囲の上限は走らせる機械に従う（`phasetypes.py`）。同じ提案が
+Linux と Windows で「種類の上限を超えている」の判定が割れる。範囲は人が宣言する意図なので、
+チケット側に揃えるのが筋。判定が緩む向きにも厳しい向きにも動きうるので、直す前に相談する。
+
+**`.claude/ccnavi/rules.yml` に、もう当たらないルールが 1 件残っている（人が直す）。** `ask` の
+`current-ticket` が `*/.current-ticket.md` に当てているが、提案の置き場は `wip/tickets/<状態>/` に
+変わっていて（ADR-0023）、この綴りのファイルはもう作られない。文面も「承認台帳の側」という
+廃止した言い方をしている。消すか、`*/wip/tickets/*` に当てて文面を写しの話に直す。設定 3 本は
+エージェントが触らない決まりなので、`/ccnavi-config` で下書きを作って渡す。
+
+**コードのコメントに残る旧設計書の節番号（約 30 か所）。** ADR-0037 の対応表で引けるが、旧 §9 と
+新 §9、旧 §11 と新 §11、旧 §4 と新 §3 は同じ綴りで別の中身を指すので、読み手が体系を当てることに
+なる。とくに `vscode-extension/ccnavi-board/src/core/projects.ts` は、他プロジェクトの `.gitignore` に
+「（設計 §25.2）」と**書き込む**ので、次に clone した人の手元に古い参照が入る。`ccnavi/modes.py` の
+`resolve_mode` の docstring も旧モード名（`warn` と `block`）のまま。まとめて 1 本のチケットで直す。
 
 **VS Code 拡張のプロジェクト管理画面（0.3.0）とリスク管理画面（0.4.0）は、まだ拡張開発ホストで
 通していない。** 拡張の README の手動確認の表 25〜38 を 1 度踏む。
@@ -183,7 +209,9 @@ scheme の `[a-z]+` は大文字も含める。exe 側の `remote_kind` は同�
 
 ## 実測で分かった落とし穴
 
-次のセッションで同じところを踏まないように。
+次のセッションで同じところを踏まないように。Claude Code の振る舞いについて測った前提は
+設計書の付録 C が一覧で持っている。ここはそれに、踏んだときに何が起きたかと逃げ方を足したもの。
+測り直したときは両方を直す。
 
 - **作業ツリーが消せない（Windows）。`git worktree remove` が `Permission denied` で落ち、
   `.venv` の 1 ファイルだけの抜け殻が残る。** 原因は uv のハードリンクと Windows の
@@ -214,7 +242,7 @@ scheme の `[a-z]+` は大文字も含める。exe 側の `remote_kind` は同�
 - **ツールのプロセスに `CLAUDE_PROJECT_DIR` は入っていない。** hook の環境にだけ来る。
   だからワークスペースルートは上方向の探索でも見つけられるようにしてある
 - **`.claude/settings.json` はスキーマ検証があり、未知のトップレベルキーを拒否する**
-- **Windows は実行中の exe を上書きできない。** 名前の変更はできるので、
+- **Windows は実行中の実行ファイルを上書きできない。** 名前の変更はできるので、
   `build.py` は組み上がったものを別の場所に作り、古いほうを `.old` に退避してから
   入れ替える。失敗しても数回やり直す
 - **テストが session の環境を継承する。** 自分自身に仕掛けているので
@@ -254,7 +282,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 | 分かったこと | どうしたか |
 |---|---|
 | 変更要求（`POST .../request_changes`）は CE の `lib/api` に無い。EE 限定 | 当てられない。sh の `requested_changes` の読みは EE の文書どおりのまま。CE では `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
-| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh はユーザ情報を落とし、出力で伏せる。exe の `remote_kind` も読み飛ばす。`tests/test_review_origin.py` |
+| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh は利用者の情報を落とし、出力で伏せる。実行ファイルの `remote_kind` も読み飛ばす。`tests/test_review_origin.py` |
 | ラッパ経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら Git Credential Manager に保存しておく |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tools/gitlab/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
