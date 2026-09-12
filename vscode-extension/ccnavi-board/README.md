@@ -17,12 +17,16 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 「この操作はどう判定されるか」を試し、hook の一覧を眺める。判定は実行ファイルの
 `--test --json` / `--test-samples --json` を通り、拡張は glob も regex も自分で当てない。
 
+同じ拡張に「リスク管理画面」がある。実績で測るリスクの配点（`risk.yml`）の閾値と項目を画面で直し、
+保存する前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は配点を書く場所と、書いた配点が
+読めるかを確かめる入口だけを持つ。
+
 同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 §25）を
 一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の設定（`.gitignore`、`config/rules.yml`）を
 ボタンで整える。各行からそのプロジェクトのルール設定画面とチケット管理（ボードの絞り込み）へ飛べる。
 
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
-「プロジェクト管理」「ルール管理」「チケット管理」の 3 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
+「プロジェクト管理」「ルール管理」「リスク管理」「チケット管理」の 4 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
 チケット制御を使っているときだけ。`.claude/settings.json`（`settings.local.json` が勝つ）の
 `env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口もコマンドパレットの「ボードを開く」「ボードを更新」
 「承認する」も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
@@ -40,9 +44,10 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 | `ccnavi ボード: 承認待ちを承認する（--approve）` | ボードを開かずに `--approve` をターミナルへ送る |
 | `ccnavi ボード: ルール設定画面を開く` | ワークスペースのルール設定画面を開く。既に開いていれば前面に出す |
 | `ccnavi ボード: プロジェクト管理を開く` | プロジェクト管理画面を開く。既に開いていれば前面に出して読み直す |
+| `ccnavi ボード: リスク管理画面を開く` | リスク管理画面を開く。既に開いていれば前面に出す |
 
-サイドパネル（左端の ccnavi アイコン）の「プロジェクト管理」「ルール管理」「チケット管理」は、それぞれ
-`プロジェクト管理を開く`、`ルール設定画面を開く`、`ボードを開く` と同じ。
+サイドパネル（左端の ccnavi アイコン）の「プロジェクト管理」「ルール管理」「リスク管理」「チケット管理」は、
+それぞれ `プロジェクト管理を開く`、`ルール設定画面を開く`、`リスク管理画面を開く`、`ボードを開く` と同じ。
 
 ### プロジェクト管理画面
 
@@ -93,6 +98,29 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
   引用符や折り返しの書き方は元のまま。新しく足すルールは glob / regex を単引用符で囲む
 - **記録を汚さない。** 試し打ちは `--log "" --state "" --approved ""` で走らせ、`log.jsonl` に残さない
 - 上部に `CCNAVI_MODE` が `enable` でないときの注意が出る。試す判定は enable のときの答え
+
+### リスク管理画面
+
+対象はワークスペースの配点（`.claude/ccnavi/risk.yml`、`env.CCNAVI_RISK`）の 1 本。プロジェクトごとの配点は
+無い（設計 §25）。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。
+
+| 何 | どう出るか、何が起きるか |
+|---|---|
+| 段階の閾値 | `levels` の medium / high / critical。空ならその段階は組み込みの値（20 / 40 / 70）で、保存しても欄を書かない |
+| 項目 | `factors` を 1 件 1 枚で並べる。id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
+| 保存 | 一時ファイルへ書いて `--lint --risk` を通し、error があれば保存しない。整数でない points や逆順の閾値はここで止まる |
+| ファイルが無い | 組み込みの配点を読み取り専用で見せ、「組み込みの配点でファイルを作る」で同じ値のファイルを書き出す。値が同じなので数え方は変わらない。既にあれば上書きしない |
+| チケット制御が disable | 上部に「配点は何にも効かない」と出る。編集と保存はできる |
+| 監視 | 配点のファイル、`.claude/settings.json`、`.claude/settings.local.json`、チケットの置き場。外で変われば「外で変わった」、チケットが動けば保存の可否を取り直す |
+
+守っていること。
+
+- **点は実行ファイルが出す。** 画面は配点を書くだけで、差分を数えて何点になるかは出さない。試算が要るなら
+  子を閉じたときの出力と `phases/<親>/<子>.risk.json` を見る
+- **作業中のチケットがある間は保存できない。** 配点は子を閉じるときに読まれるので、どのツリーの `doing` でも止める
+- **外で変わったら上書きしない。** ルール設定画面と同じ。読み込んだときの更新時刻と保存時のそれが違えば止める
+- **コメントを残す。** `risk.yml` のコメントは、変えていない場所ではそのまま。項目を並べ替えれば、その項目の前の
+  コメントも一緒に動く。新しく足す glob は二重引用符で囲む。`version` が無いファイルは保存で先頭に `version: 1` を足す
 
 ボードの中で。
 
@@ -179,8 +207,8 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 ## 手動確認の手順
 
-`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `projects-panel.ts` / `sidebar.ts` / `terminal.ts` /
-`ccnavi.ts` / `git.ts` は VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
+`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `projects-panel.ts` / `sidebar.ts` /
+`terminal.ts` / `ccnavi.ts` / `git.ts` は VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
 `tests/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を
 実際のリポジトリで踏む。
 
@@ -199,8 +227,8 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 11 | 未表示で更新 | ボードを閉じた状態で `ボードを更新` | 「ccnavi ボードが開かれていない」の通知 |
 | 12 | 読めない写し | ボードを開いたまま `.claude/ccnavi/tickets/<id>.md` の frontmatter を壊す | 上部の問題の一覧にその写しが出て、他のカードはそのまま |
 | 13 | プロジェクト | `projects/<repo>` を持つワークスペースで開く | `project` バッジと絞り込みが出る |
-| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「プロジェクト管理」「ルール管理」「チケット管理」の順で 3 つ |
-| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
+| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「プロジェクト管理」「ルール管理」「リスク管理」「チケット管理」の順で 4 つ |
+| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」「リスク管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
 | 15 | ルール設定画面が開く | サイドパネルの「ルール管理」 | deny / ask / allow の 3 タイプにルールが並ぶ。上部に dry-run の注意 |
 | 15b | 畳む | タイプの見出しの印、ルールの印を押す | タイプは中のルールごと隠れ、ルールは要約 1 行になる。もう一度押すと戻る。畳んだまま並べ替えても畳んだまま |
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
@@ -221,16 +249,22 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |
 | 32 | fetch / pull | 行の「fetch」「pull」 | ターミナルで `cd projects/<名前> && git fetch` / `git pull` が走る |
 | 33 | プロジェクトとして認識されない git リポジトリ | `参考/` のような `.git` 付きのディレクトリをワークスペース直下に置く。`projects/group/deep` に clone する | 「プロジェクトとして認識されない git リポジトリ」の枠に、前者は「projects/ の外にあります」、後者は「projects/ の 2 階層目より深くにあります」の理由付きで出る。操作ボタンは無い |
+| 34 | リスク管理画面が開く | サイドパネルの「リスク管理」 | 閾値 3 欄と項目 4 件（このリポジトリの `risk.yml`）。上部の path が `.claude/ccnavi/risk.yml` |
+| 35 | lint で止まる | high を critical より大きくして「保存」 | 下部に `--lint` の error（`levels` は medium <= high <= critical の順）が出て保存されない |
+| 36 | コメントが残る | 項目を 1 つ上へ動かし、points を変えて保存し、`git diff` を見る | 動かした項目と変えた行だけが差分。先頭の説明と末尾の例のコメントは残っている |
+| 37 | 無ければ作る | `risk.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「組み込みの配点でファイルを作る」。欄は押せない。押すとファイルが出来て、帯が消えて編集できる |
+| 38 | 作業中はロック | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
 
 ## 構成
 
 ```
 src/
   extension.ts        コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 3 つの入口。チケット制御が disable なら 2 つ（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 4 つの入口。チケット制御が disable なら 3 つ（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
   rules-panel.ts      ルール設定画面の Webview パネル（ワークスペース / プロジェクトの対象ごとに 1 つ）。判定・検証・保存の受け付け（vscode に依存する）
+  risk-panel.ts       リスク管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint / --lint --json の実行（Node の子プロセス）
@@ -243,6 +277,8 @@ src/
     render.ts         ボードの HTML（外部資源なし、テーマ変数だけ）
     rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
+    risk-render.ts    リスク管理画面の HTML と、その中で動くスクリプト
+    risk-doc.ts       risk.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、プロジェクトになっていない .git の探索、.gitignore と雛形の加工
     projects-render.ts プロジェクト管理画面の HTML と、その中で動くスクリプト
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
@@ -255,7 +291,7 @@ media/
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T68
+  *.test.ts           core の単体テスト CB-T01〜CB-T85
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て
