@@ -51,9 +51,8 @@ deny:
     regex: '(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s'
     message: >-
       生の git は実行しません。'sh .claude/scripts/ccnavi-git.sh <サブコマンド> ...'
-      を使ってください。通る形は同じスクリプトの --help に出ます。返るのは要約と
-      先頭 40 行だけで、全量は logs/ に残ります。push はラッパを通せば親が実行できます
-      （居るブランチをそのままの名前で送る形だけ。統合先へは送れません）。
+      を使ってください。通る形は同じスクリプトの --help 参照。返るのは要約と
+      先頭 40 行だけで、全量は logs/ に残ります。
 
   # git reset --hard は止める。作業中の変更が消える。
   - id: git-reset-hard
@@ -61,8 +60,7 @@ deny:
     glob: "*git reset --hard*"
     message: >-
       作業中の変更が消えます。'ccnavi-git.sh stash push -u' で退避するか、戻したい
-      ファイルを名指しして 'ccnavi-git.sh restore <パス>' を使ってください。生の git は
-      止まるので、代わりの形もラッパで書いてあります。
+      ファイルを名指しして 'ccnavi-git.sh restore <パス>' を使ってください。
 
   # git branch -D は未マージのブランチが消えるのでユーザに作業依頼。
   - id: git-branch-force-delete
