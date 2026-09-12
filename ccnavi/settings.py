@@ -186,39 +186,25 @@ def load(root: str) -> tuple[Settings, list[str]]:
         project_rules=DEFAULT_PROJECT_RULES,
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
-    if PROJECTS_ENV in os.environ:
-        # 空文字は「プロジェクトを数えない」。
-        settings.projects = _log_or_none(root, os.environ[PROJECTS_ENV])
-    project_rules_env = os.environ.get(PROJECT_RULES_ENV, "")
-    if project_rules_env:
-        settings.project_rules = _relative(project_rules_env)
-    phases_env = os.environ.get(PHASES_ENV, "")
-    if phases_env:
-        settings.phases = _resolve(root, phases_env)
-    risk_env = os.environ.get(RISK_ENV, "")
-    if risk_env:
-        settings.risk = _resolve(root, risk_env)
-
-    rules_env = os.environ.get(RULES_ENV, "")
-    if rules_env:
-        settings.rules = _resolve(root, rules_env)
-    bin_env = os.environ.get(BIN_ENV, "")
-    if bin_env:
-        settings.bin = _resolve_bin(root, bin_env)
-    if LOG_ENV in os.environ:
-        settings.log = _log_or_none(root, os.environ[LOG_ENV])
-    if STATE_ENV in os.environ:
-        # 空文字は「控えを持たない」。診断のための実行が、走っている
-        # セッションの控えを書き替えずに済むようにする。
-        settings.state = _log_or_none(root, os.environ[STATE_ENV])
-    tickets_env = os.environ.get(TICKETS_ENV, "")
-    if tickets_env:
-        settings.tickets = _relative(tickets_env)
-    if APPROVED_ENV in os.environ:
-        # 空文字は「写しを持たない」＝チケットによる制御を使わない。
-        # 承認済みの範囲が無ければ範囲の制限は掛からないので、これは
-        # チケットを置いていないのと同じ状態になる。
-        settings.approved = _log_or_none(root, os.environ[APPROVED_ENV])
+    # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
+    # 空文字を受ける欄は、「記録しない」「控えを持たない」「写しを持たない」
+    # 「プロジェクトを数えない」を言えるようにしてある。写しが無ければ範囲の制限は
+    # 掛からず、チケットを置いていないのと同じ状態になる。
+    overrides = (
+        ("projects", PROJECTS_ENV, _log_or_none, True),
+        ("project_rules", PROJECT_RULES_ENV, _relative, False),
+        ("phases", PHASES_ENV, _resolve, False),
+        ("risk", RISK_ENV, _resolve, False),
+        ("rules", RULES_ENV, _resolve, False),
+        ("bin", BIN_ENV, _resolve_bin, False),
+        ("log", LOG_ENV, _log_or_none, True),
+        ("state", STATE_ENV, _log_or_none, True),
+        ("tickets", TICKETS_ENV, _relative, False),
+        ("approved", APPROVED_ENV, _log_or_none, True),
+    )
+    for name, env, read, accepts_empty in overrides:
+        if env in os.environ and (accepts_empty or os.environ[env]):
+            setattr(settings, name, read(root, os.environ[env]))
 
     if not own_source_tree(root):
         return settings, []
@@ -235,32 +221,13 @@ def load(root: str) -> tuple[Settings, list[str]]:
     if isinstance(conf.get("mode"), str):
         settings.mode_declared_in_file = conf["mode"]
         settings.mode = conf["mode"]
-    if isinstance(conf.get("rules"), str) and conf["rules"]:
-        settings.rules = _resolve(root, conf["rules"])
-    if isinstance(conf.get("log"), str):
-        settings.log = _log_or_none(root, conf["log"])
-    if isinstance(conf.get("state"), str):
-        settings.state = _log_or_none(root, conf["state"])
-    if isinstance(conf.get("bin"), str) and conf["bin"]:
-        settings.bin = _resolve_bin(root, conf["bin"])
-    if isinstance(conf.get("restore_if_deny"), str):
-        settings.restore_if_deny = conf["restore_if_deny"]
-    if isinstance(conf.get("guard_core_files"), str):
-        settings.guard_core_files = conf["guard_core_files"]
-    if isinstance(conf.get("guard_cli"), str):
-        settings.guard_cli = conf["guard_cli"]
-    if isinstance(conf.get("tickets"), str) and conf["tickets"]:
-        settings.tickets = _relative(conf["tickets"])
-    if isinstance(conf.get("approved"), str):
-        settings.approved = _log_or_none(root, conf["approved"])
-    if isinstance(conf.get("phases"), str) and conf["phases"]:
-        settings.phases = _resolve(root, conf["phases"])
-    if isinstance(conf.get("risk"), str) and conf["risk"]:
-        settings.risk = _resolve(root, conf["risk"])
-    if isinstance(conf.get("projects"), str):
-        settings.projects = _log_or_none(root, conf["projects"])
-    if isinstance(conf.get("project_rules"), str) and conf["project_rules"]:
-        settings.project_rules = _relative(conf["project_rules"])
+    for name in ("restore_if_deny", "guard_core_files", "guard_cli"):
+        if isinstance(conf.get(name), str):
+            setattr(settings, name, conf[name])
+    for name, _, read, accepts_empty in overrides:
+        value = conf.get(name)
+        if isinstance(value, str) and (accepts_empty or value):
+            setattr(settings, name, read(root, value))
 
     return settings, problems
 
@@ -270,12 +237,13 @@ def project_rules_path(conf: Settings, project_root: str) -> str:
     return os.path.join(project_root, conf.project_rules.replace("/", os.sep))
 
 
-def _relative(path: str) -> str:
+def _relative(root: str, path: str) -> str:
     """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
 
     絶対パスは受けない。作業ツリーごとに違うルートに継ぎ足すものなので、
     絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
     分からなくなる。絶対で来たら先頭の区切りだけ落として相対として読む。
+    root は使わない。他の読み方と並べて表に置けるように、引数の形だけ揃えてある。
     """
     return path.replace("\\", "/").strip("/")
 

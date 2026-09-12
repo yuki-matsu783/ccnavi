@@ -314,7 +314,6 @@ def approve(
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = copies(conf.approved, closed=True)
-    open_index = by_id(approved)
     types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
@@ -324,6 +323,35 @@ def approve(
         # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
         return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
 
+    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved, types)
+    for t, complaints in rejected:
+        stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
+        for p in complaints:
+            stderr.write(f"  {p}\n")
+    if not batch:
+        return 1
+
+    stdout.write(screen(batch, pool, types) + "\n\n")
+    stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
+    stdout.flush()
+    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
+        stderr.write("ccnavi: 承認しなかった\n")
+        return 1
+    return _apply(stdout, stderr, conf, batch, now())
+
+
+def _candidates(
+    root: str,
+    conf: settings.Settings,
+    pending: list[ticket_mod.Ticket],
+    revisions: list[ticket_mod.Ticket],
+    approved: list[ticket_mod.Ticket],
+    types: dict | None,
+) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
+    """束に載せるものと、落とすものに分ける。3 つめは親子を引くための池。"""
+    from . import phase
+
+    open_index = by_id(approved)
     pool = by_id(approved + pending)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
@@ -353,22 +381,15 @@ def approve(
             rejected.append((t, complaints))
             continue
         batch.append(Candidate(ticket=t, complaints=complaints))
+    return batch, rejected, pool
 
-    for t, complaints in rejected:
-        stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
-        for p in complaints:
-            stderr.write(f"  {p}\n")
-    if not batch:
-        return 1
 
-    stdout.write(screen(batch, pool, types) + "\n\n")
-    stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
-    stdout.flush()
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
-        stderr.write("ccnavi: 承認しなかった\n")
-        return 1
+def _apply(
+    stdout: TextIO, stderr: TextIO, conf: settings.Settings, batch: list[Candidate], stamp: str
+) -> int:
+    """承認された束を写しに落とす。改版は写しを書き換え、新規は写しを置く。"""
+    from . import phase
 
-    stamp = now()
     for cand in batch:
         t = cand.ticket
         if cand.is_revision and cand.current is not None:
