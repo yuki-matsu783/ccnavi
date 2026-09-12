@@ -3,8 +3,8 @@
  * VS Code の API と子プロセスに触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
  * 一覧は実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）を並べる。
- * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で）、ルールファイルと `.claude/` の有無、
- * `.gitignore` の本文、ccnavi が数えない `.git` の探索だけ。
+ * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ルールファイルと `.claude/` の有無、
+ * `.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  *
  * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこで人が行い、完了は `projects/<名前>/.git`
  * の出現を監視して拾う。書くのは、人がボタンを押したときの `.gitignore`、置き場のディレクトリ、
@@ -352,7 +352,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
 function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName: string): void {
   const root = current.folder.uri.fsPath;
   if (page.projectsDir === "") {
-    fail(current, "置き場を数えない設定（CCNAVI_PROJECTS が空）なので、clone 先が決まらない");
+    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、clone 先が決まらない");
     return;
   }
   const remote = checkRemote(rawUrl);
@@ -385,7 +385,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
 
 function createDir(current: PanelState, page: ProjectsPage): void {
   if (page.projectsDir === "") {
-    fail(current, "置き場を数えない設定なので作る場所が無い");
+    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、作る場所が無い");
     return;
   }
   try {
@@ -400,7 +400,7 @@ function createDir(current: PanelState, page: ProjectsPage): void {
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
-    fail(current, "置き場を数えない設定なので足す行が無い");
+    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、足す行が無い");
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
