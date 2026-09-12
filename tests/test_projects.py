@@ -179,7 +179,7 @@ class ProjectsTest(unittest.TestCase):
                 "disable",
                 "--restore-if-deny",
                 "disable",
-                "--guard-cli",
+                "--guard-ticket-approval",
                 "disable",
                 *args,
             ],

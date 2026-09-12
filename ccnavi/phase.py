@@ -55,14 +55,14 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
-# 経由せずに打てば止める。CCNAVI_GUARD_CLI で切れる。
+# 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
 _CLI_FORMS = (
     r"(--approve\b|--reviewed\b"
     r"|\b(ticket|review)\s+"
     r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
 )
-CODE_CLI = "DENY_CCNAVI_CLI"
-CLI_RULE_ID = "builtin-guard-cli"
+CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
+TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
 
 
 def commands(subject: str) -> list[str]:
@@ -83,7 +83,7 @@ def forbidden(subject: str) -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject))
 
 
-def cli_guard_rule(bin_path: str) -> rules.Rule:
+def ticket_approval_rule(bin_path: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。"""
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
@@ -92,7 +92,7 @@ def cli_guard_rule(bin_path: str) -> rules.Rule:
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
     rule = rules.Rule(
-        id=CLI_RULE_ID,
+        id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
         regex=expression,
         message=(

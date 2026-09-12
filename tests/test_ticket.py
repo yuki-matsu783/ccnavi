@@ -151,7 +151,7 @@ class TicketTest(unittest.TestCase):
                 "disable",
                 # 人の判断の経路の端末要求は切る。テストは端末を持たない。
                 # 経路そのものの検査は、個別に enable を渡す。
-                "--guard-cli",
+                "--guard-ticket-approval",
                 "disable",
                 *args,
             ],
@@ -160,7 +160,9 @@ class TicketTest(unittest.TestCase):
             env=environment,
         )
 
-    def hook(self, event, tool, cwd, mode="enable", agent_id="", guard_cli="", **tool_input):
+    def hook(
+        self, event, tool, cwd, mode="enable", agent_id="", guard_ticket_approval="", **tool_input
+    ):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -170,7 +172,7 @@ class TicketTest(unittest.TestCase):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        extra = ["--guard-cli", guard_cli] if guard_cli else []
+        extra = ["--guard-ticket-approval", guard_ticket_approval] if guard_ticket_approval else []
         return self.ccnavi("--mode", mode, *extra, stdin=json.dumps(payload))
 
     def reason(self, result):
@@ -754,9 +756,13 @@ class TicketTest(unittest.TestCase):
             "ls && ./ccnavi review check --phase 1",
         ):
             result = self.hook(
-                "PreToolUse", "Bash", self.parent_tree, command=command, guard_cli="enable"
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
             )
-            self.assertIn("DENY_CCNAVI_CLI", self.reason(result), command)
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
         # 読むだけの形と、スクリプト経由は通る。
         for command in (
             "ccnavi --explain",
@@ -764,30 +770,40 @@ class TicketTest(unittest.TestCase):
             "sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
         ):
             result = self.hook(
-                "PreToolUse", "Bash", self.parent_tree, command=command, guard_cli="enable"
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
             )
-            self.assertNotIn("DENY_CCNAVI_CLI", self.reason(result), command)
+            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
         # PowerShell も同じ。
         result = self.hook(
             "PreToolUse",
             "PowerShell",
             self.parent_tree,
             command="& ccnavi.exe --approve",
-            guard_cli="enable",
+            guard_ticket_approval="enable",
         )
-        self.assertIn("DENY_CCNAVI_CLI", self.reason(result))
+        self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
         # 切ると通る。
         result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
-        self.assertNotIn("DENY_CCNAVI_CLI", self.reason(result))
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
     def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        refused = self.ccnavi("--approve", "--guard-cli", "enable", stdin="y\n")
+        refused = self.ccnavi("--approve", "--guard-ticket-approval", "enable", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("端末", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
         refused = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "1", "--guard-cli", "enable", stdin="y\n"
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--guard-ticket-approval",
+            "enable",
+            stdin="y\n",
         )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("端末", refused.stderr)
@@ -1180,7 +1196,7 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_LEDGER": "x"})
         self.assertIn("stray にチケットが無い", result.stdout)
         self.assertIn("CCNAVI_LEDGER はもう効かない", result.stdout)
-        self.assertIn("CCNAVI_GUARD_CLI=disable", result.stdout)
+        self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=disable", result.stdout)
         self.assertIn("SubagentStop", result.stdout)
         self.assertIn("origin が無い", result.stdout)
         # 超えている子を、承認の前に名指しする。

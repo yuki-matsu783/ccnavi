@@ -33,10 +33,12 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_RULES", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
-# 守りの 3 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV /
-# GUARD_CLI_ENV）。書かなければ enable で動くので、dry-run で導入したときに
-# ここだけ本気で動くと、様子を見ている人の手元でファイルが勝手に戻る。
-GUARD_ENV = ("CCNAVI_RESTORE_IF_DENY", "CCNAVI_GUARD_CORE_FILES", "CCNAVI_GUARD_CLI")
+# 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
+# 書かなければ enable で動くので、dry-run で導入したときにここだけ本気で動くと、
+# 様子を見ている人の手元でファイルが勝手に戻る。
+GUARD_ENV = ("CCNAVI_RESTORE_IF_DENY", "CCNAVI_GUARD_CORE_FILES")
+# チケットの承認の経路。enable か disable しか取らないので、モードには合わせない。
+TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものがずれる。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
@@ -185,9 +187,9 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".claude/ccnavi/ccnavi")
 
     def test_writes_the_guards_at_the_same_strength_as_the_mode(self):
-        """守りの 3 つは CCNAVI_MODE と同じ値で並ぶ。
+        """戻す働きの 2 つは CCNAVI_MODE と同じ値で並ぶ。
 
-        書かなければ 3 つとも enable で動く。dry-run で導入したつもりの
+        書かなければ 2 つとも enable で動く。dry-run で導入したつもりの
         プロジェクトで、判定は止めないのに戻す働きだけが本気で動く形になり、
         様子を見ている人の手元でファイルが勝手に戻る。
         """
@@ -197,11 +199,25 @@ class WritesTheExpectedShape(SetupTest):
             self.assertEqual(env[name], "dry-run", name)
 
     def test_the_guards_follow_an_enable_mode_too(self):
-        """`--mode enable` なら 3 つとも enable。片方だけが残らない。"""
+        """`--mode enable` なら 2 つとも enable。片方だけが残らない。"""
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         for name in GUARD_ENV:
             self.assertEqual(env[name], "enable", name)
+
+    def test_the_ticket_approval_gate_does_not_follow_a_dry_run_mode(self):
+        """承認の門は dry-run で導入しても enable で書く。
+
+        この門は enable か disable しか取らない。dry-run と書くと、ccnavi の
+        `--lint` が error にするし、書いた人は止まらないつもりでいるのに
+        実際は止まる。導入スクリプトがその食い違いを作らない。
+        """
+        self.run_setup()
+        self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
+
+    def test_the_ticket_approval_gate_is_enable_under_an_enable_mode(self):
+        self.run_setup("--mode", "enable")
+        self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
 
     def test_does_not_write_retired_env(self):
         """もう効かない環境変数を書かない。書けば --lint が苦情を言う。"""

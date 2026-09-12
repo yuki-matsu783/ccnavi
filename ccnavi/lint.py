@@ -79,7 +79,7 @@ def report(
     flag: str,
     restore_if_deny_flag: str = "",
     guard_core_files_flag: str = "",
-    guard_cli: str = "",
+    guard_ticket_approval: str = "",
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
@@ -111,13 +111,30 @@ def report(
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
         for line in said.getvalue().splitlines()
     ]
-    if conf.approved and guard_cli == selfguard.DISABLE:
+    # この門に dry-run は無い。書いた人は「止めずに報告する」つもりでいるのに、
+    # 実際は enable と同じに止める。設定ファイルを読んだだけでは、その食い違いが
+    # どこにも現れない。warn ではなく error にするのは、直すまで意味が変わらない
+    # ――つまり、直さないと設定ファイルが嘘をつき続ける――ため。
+    declared = (conf.guard_ticket_approval_declared or "").strip().lower()
+    if declared and declared not in selfguard.GATE_SETTINGS:
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                "(ticket)",
+                f"{settings.GUARD_TICKET_APPROVAL_ENV}={declared}。この門は "
+                f"{' か '.join(selfguard.GATE_SETTINGS)} しか取らない"
+                "（承認は通れば済んでしまうので、止めずに報告する段が無い）。"
+                f"今は {selfguard.ENABLE} として動いている",
+            )
+        )
+    if conf.approved and guard_ticket_approval == selfguard.DISABLE:
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{settings.GUARD_CLI_ENV}=disable。エージェントが ccnavi の実行ファイルを"
-                "直接打って承認・レビュー済みの受け入れ・状態の移動を行える",
+                f"{settings.GUARD_TICKET_APPROVAL_ENV}=disable。"
+                "エージェントが ccnavi の実行ファイルを直接打って、"
+                "承認・レビュー済みの受け入れ・状態の移動を行える",
             )
         )
 
@@ -126,7 +143,7 @@ def report(
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
     stdout.write(f"  中核ファイルを守る: {guard_core_files}\n")
     if conf.approved:
-        stdout.write(f"  人の判断の経路を守る: {guard_cli or selfguard.ENABLE}\n")
+        stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
@@ -215,13 +232,18 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     検証はその思い違いを名指しする場所になる。
     """
     problems: list[Problem] = []
+    # 退役した名前ごとに、代わりに何を書くのかを言う。まとめて 1 つの文面にすると、
+    # 置き場の話しかしない案内が、置き場とは関係ない名前にも付く。
+    replacements = {
+        "CCNAVI_GUARD_CLI": f"{settings.GUARD_TICKET_APPROVAL_ENV} に改名した",
+    }
+    default = f"提案は {settings.TICKETS_ENV}、写しは {settings.APPROVED_ENV} で指す"
     for name in conf.retired:
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{name} はもう効かない。提案は {settings.TICKETS_ENV}、写しは "
-                f"{settings.APPROVED_ENV} で指す",
+                f"{name} はもう効かない。{replacements.get(name, default)}",
             )
         )
     if not conf.approved:

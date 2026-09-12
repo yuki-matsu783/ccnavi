@@ -115,6 +115,42 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(counts(result.stdout)[0], 1)
 
+    def test_承認の門にdry_runと書いたらerrorになる(self):
+        # この門は enable か disable しか取らない。dry-run と書いた人は止まらない
+        # つもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
+        # だけでは、その食い違いがどこにも現れない。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--guard-ticket-approval",
+            "dry-run",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("error:", result.stdout)
+        self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=dry-run", result.stdout)
+        # 倒れた先も言う。言わないと、止まっているのか通っているのかが分からない。
+        self.assertIn("enable として動いている", result.stdout)
+
+    def test_承認の門にenableと書いてもerrorにならない(self):
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--guard-ticket-approval",
+            "enable",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 0)
+
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))
 

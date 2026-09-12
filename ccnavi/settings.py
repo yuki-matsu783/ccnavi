@@ -37,10 +37,14 @@ STATE_ENV = "CCNAVI_STATE"
 # 分けた理由は selfguard.py の冒頭にある。片方だけを切れることが要る。
 RESTORE_IF_DENY_ENV = "CCNAVI_RESTORE_IF_DENY"
 GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
-# GUARD_CLI_ENV は、人の判断の経路を守るか。enable（既定）なら、シェルから ccnavi の
-# 実行ファイルに `--approve` `--reviewed` `ticket` `review` を付けた呼び出しを止め、
-# `--approve` と `--reviewed` は標準入力が端末でなければ拒む。テストは disable にする。
-GUARD_CLI_ENV = "CCNAVI_GUARD_CLI"
+# GUARD_TICKET_APPROVAL_ENV は、チケットの承認の経路を守るか。enable（既定）なら、
+# シェルから ccnavi の実行ファイルに `--approve` `--reviewed` `ticket` `review` を付けた
+# 呼び出しを止め、`--approve` と `--reviewed` は標準入力が端末でなければ拒む。
+# テストは disable にする。
+#
+# 守る対象で名乗る。以前は CCNAVI_GUARD_CLI といって、守る手段（CLI から打つ形）の
+# ほうを名前にしていた。切りたい人が何を切ることになるのかが、名前から読めなかった。
+GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
@@ -63,9 +67,14 @@ RISK_ENV = "CCNAVI_RISK"
 # PROJECT_RULES_ENV はプロジェクトごとのルールファイル。各 git プロジェクトルートからの相対。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
-# 以前の形（チケット 1 本と台帳 jsonl）の環境変数。もう効かない。指定されていたら
-# --lint が言う。黙って無視すると、書いた人は効いていると思い続ける。
-RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER")
+# もう効かない環境変数。指定されていたら --lint が言う。黙って無視すると、書いた人は
+# 効いていると思い続ける。
+#
+# 前の 2 つは以前の形（チケット 1 本と台帳 jsonl）のもの。CCNAVI_GUARD_CLI は
+# CCNAVI_GUARD_TICKET_APPROVAL に改名した。旧名で disable と書いてあった設定は、
+# 読まれなくなった時点で既定の enable に戻る――守りが消える向きには倒れない――が、
+# 切ったつもりの人には止まる理由が分からないので、名前を挙げて知らせる。
+RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_GUARD_CLI")
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -134,9 +143,15 @@ class Settings:
     # 対象は組み込みで固定なので、広がりようがない。
     restore_if_deny: str = ""
     guard_core_files: str = ""
-    # guard_cli は人の判断の経路（承認・レビュー済みの受け入れ・状態の移動）を
-    # エージェントの手から守るか。enable / disable。
-    guard_cli: str = ""
+    # guard_ticket_approval はチケットの承認の経路（承認・レビュー済みの受け入れ・
+    # 状態の移動）をエージェントの手から守るか。enable / disable の 2 つだけを取る。
+    #
+    # guard_ticket_approval_declared は、解決する前に人が書いた綴り。判定はこれを
+    # 読まない。読むのは --lint で、dry-run のように「書けるつもりで書かれたが
+    # この門には無い値」を名指しするために要る。解決した値だけを持っていると、
+    # 書いた人の思い違いが enable に倒れた時点で消える。
+    guard_ticket_approval: str = ""
+    guard_ticket_approval_declared: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
     # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
@@ -177,7 +192,8 @@ def load(root: str) -> tuple[Settings, list[str]]:
         state=os.path.join(root, DEFAULT_STATE),
         restore_if_deny=os.environ.get(RESTORE_IF_DENY_ENV, ""),
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
-        guard_cli=os.environ.get(GUARD_CLI_ENV, ""),
+        guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
+        guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved=os.path.join(root, DEFAULT_APPROVED),
         phases=os.path.join(root, DEFAULT_PHASES),
@@ -221,9 +237,13 @@ def load(root: str) -> tuple[Settings, list[str]]:
     if isinstance(conf.get("mode"), str):
         settings.mode_declared_in_file = conf["mode"]
         settings.mode = conf["mode"]
-    for name in ("restore_if_deny", "guard_core_files", "guard_cli"):
+    for name in ("restore_if_deny", "guard_core_files", "guard_ticket_approval"):
         if isinstance(conf.get(name), str):
             setattr(settings, name, conf[name])
+    # 書かれた綴りをそのまま控える。上書き設定ファイルは ccnavi 自身を開発している
+    # ときだけ読むものだが、そこに dry-run と書いた人にも --lint から同じことを言う。
+    if isinstance(conf.get("guard_ticket_approval"), str):
+        settings.guard_ticket_approval_declared = conf["guard_ticket_approval"]
     for name, _, read, accepts_empty in overrides:
         value = conf.get(name)
         if isinstance(value, str) and (accepts_empty or value):

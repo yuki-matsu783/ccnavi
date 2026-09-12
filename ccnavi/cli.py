@@ -155,7 +155,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--state", default=None)
     parser.add_argument("--restore-if-deny", default="")
     parser.add_argument("--guard-core-files", default="")
-    parser.add_argument("--guard-cli", default="")
+    parser.add_argument("--guard-ticket-approval", default="")
     # リモートの写し（JSON）。.claude/scripts/ccnavi-review.sh が取ってきて渡す。
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
@@ -193,8 +193,17 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     conf, problems = settings.load(root)
 
     _override(conf, args)
-    conf.guard_cli = selfguard.resolve(
-        stderr, args.guard_cli, conf.guard_cli, settings.GUARD_CLI_ENV
+    # フラグは設定ファイルより強い。書かれた綴りのほうも、そこに合わせて差し替える。
+    if args.guard_ticket_approval:
+        conf.guard_ticket_approval_declared = args.guard_ticket_approval
+    # この門は dry-run を取らない（selfguard.GATE_SETTINGS）。取れない語で書かれて
+    # いたら、読めない値と同じ扱いで enable へ倒す。--lint はそれを error にする。
+    conf.guard_ticket_approval = selfguard.resolve(
+        stderr,
+        args.guard_ticket_approval,
+        conf.guard_ticket_approval,
+        settings.GUARD_TICKET_APPROVAL_ENV,
+        selfguard.GATE_SETTINGS,
     )
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
@@ -209,7 +218,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             args.mode,
             args.restore_if_deny,
             args.guard_core_files,
-            conf.guard_cli,
+            conf.guard_ticket_approval,
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
@@ -300,9 +309,9 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     `--approve` と `--reviewed` は人の合意そのもの。エージェントが Bash から打てば
     その合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
-    CCNAVI_GUARD_CLI=disable で切れる（テストと、端末を持たない配管のため）。
+    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない配管のため）。
     """
-    if conf.guard_cli == selfguard.DISABLE:
+    if conf.guard_ticket_approval == selfguard.DISABLE:
         return True
     try:
         if stdin.isatty():
@@ -311,7 +320,7 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
         pass
     stderr.write(
         f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない"
-        f"（{settings.GUARD_CLI_ENV}=disable で切れる）\n"
+        f"（{settings.GUARD_TICKET_APPROVAL_ENV}=disable で切れる）\n"
     )
     return False
 

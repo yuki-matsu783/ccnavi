@@ -111,7 +111,7 @@ def env_for() -> dict[str, str]:
         {
             "GITLAB_TOKEN": ROOT_TOKEN,
             "CCNAVI_BIN_PATH": EXE,
-            "CCNAVI_GUARD_CLI": "disable",
+            "CCNAVI_GUARD_TICKET_APPROVAL": "disable",
             "CCNAVI_MODE": "enable",
             "CCNAVI_GUARD_CORE_FILES": "disable",
             "CCNAVI_RESTORE_IF_DENY": "disable",

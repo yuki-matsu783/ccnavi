@@ -150,7 +150,7 @@ class PhaseHarness(unittest.TestCase):
                 "disable",
                 "--restore-if-deny",
                 "disable",
-                "--guard-cli",
+                "--guard-ticket-approval",
                 "disable",
                 *args,
             ],
@@ -716,7 +716,7 @@ class PhaseTest(PhaseHarness):
         self.family(plan=["design"])
         fixture = self.remote()
         result = self.ccnavi(
-            "--guard-cli",
+            "--guard-ticket-approval",
             "enable",
             "--cwd",
             self.parent_tree,

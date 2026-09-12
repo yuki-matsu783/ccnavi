@@ -174,9 +174,12 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # 決まる。パスまで載せると、判定を試したときの一時ファイルのような読む値の無い綴りが
     # そのまま毎回モデルに届く。id を持たないルールだけ、代わりにファイルを名乗る。
     source = f"rule: {rule.id}" if rule.id else f"rules: {rules_path}"
-    if rule.id == phase.CLI_RULE_ID:
+    if rule.id == phase.TICKET_APPROVAL_RULE_ID:
         # 組み込み。ルールファイルには無いので、そこを探させない。
-        code, source = phase.CODE_CLI, f"builtin rule: {rule.id} ({settings.GUARD_CLI_ENV})"
+        code, source = (
+            phase.CODE_TICKET_APPROVAL,
+            f"builtin rule: {rule.id} ({settings.GUARD_TICKET_APPROVAL_ENV})",
+        )
 
     lines = [f"[ccnavi] {code} ({source})", f"subject: {shown}"]
     if degraded:

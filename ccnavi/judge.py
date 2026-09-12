@@ -139,8 +139,8 @@ def decide_before(
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
-        if conf.guard_cli != selfguard.DISABLE:
-            rule_set.deny.append(phase.cli_guard_rule(conf.bin))
+        if conf.guard_ticket_approval != selfguard.DISABLE:
+            rule_set.deny.append(phase.ticket_approval_rule(conf.bin))
 
     subject = screen(payload.tool_name, record.subject, record)
 
@@ -251,8 +251,8 @@ def decide_before(
             for rule in group
         ]
         record.code = reasons.code_for(payload.tool_name, record.degraded)
-        if any(rule.id == phase.CLI_RULE_ID for rule in group):
-            record.code = phase.CODE_CLI
+        if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
+            record.code = phase.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
         # チケットの範囲の外。ルールが 1 件も当たっていないので group は空。
         texts = [ticket_reason]

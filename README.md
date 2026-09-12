@@ -179,12 +179,17 @@ hook には実行ファイルだけを登録すればよい。
 そのままにする。`--all` を足しに来た打ち直しが、その場で指定していない
 `CCNAVI_MODE` を既定へ落とさないため。
 
-守りの 3 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_CLI`）は
-`CCNAVI_MODE` と同じ値で書く。この 3 つは設定が無ければ `enable` で動くので、書かないまま
-`dry-run` で導入すると、判定は止めないのに戻す働きだけが本気で動く。様子を見ている間に
-手元のファイルが戻ることになるので、導入直後は同じ強さで並べる。代償として、`dry-run` で
-入れたまま忘れるとこの 3 つも `dry-run` のまま残る。`--mode enable` で打ち直すか、
-設定ファイルの 4 行を書き換えるまで、守りは弱いまま。
+戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と
+同じ値で書く。この 2 つは設定が無ければ `enable` で動くので、書かないまま `dry-run` で
+導入すると、判定は止めないのに戻す働きだけが本気で動く。様子を見ている間に手元のファイルが
+戻ることになるので、導入直後は同じ強さで並べる。代償として、`dry-run` で入れたまま忘れると
+この 2 つも `dry-run` のまま残る。`--mode enable` で打ち直すか、設定ファイルの 3 行を
+書き換えるまで、守りは弱いまま。
+
+`CCNAVI_GUARD_TICKET_APPROVAL` はモードに合わせず、いつも `enable` で書く。この門は
+`enable` か `disable` しか取らない。承認は通れば済んでしまい、済んだものは報告では戻らない
+ので、「止めずに報告する」段を持てない。`dry-run` と書かれていたら `--lint` が error にする
+（今は `enable` として動いている、と添えて）。
 
 hook は、そのイベントに ccnavi が登録されていなければ足す。別の綴りで登録されて
 いるように見えるイベントは、足さずに名前を挙げる。どちらが正しいかをスクリプトが
@@ -227,7 +232,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
     "CCNAVI_BIN_PATH": ".claude/ccnavi/ccnavi",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
-    "CCNAVI_GUARD_CLI": "dry-run"
+    "CCNAVI_GUARD_TICKET_APPROVAL": "enable"
   }
 }
 ```
@@ -268,10 +273,13 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_RISK` | 実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.claude/ccnavi/risk.yml`。無ければ組み込みの配点 |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §25）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、この機能が入る前と同じに動く |
 | `CCNAVI_PROJECT_RULES` | プロジェクトごとのルールファイル。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `config/rules.yml`。パスを持つツールは行き先のプロジェクトのルールで判定し、Bash はワークスペースと全プロジェクトのルールの和で判定する |
-| `CCNAVI_GUARD_CLI` | `enable`（既定）、`disable`。人の判断の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_CCNAVI_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか（旧 `CCNAVI_GUARD_CLI`。旧名はもう効かず、書いてあれば `--lint` が言う）。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
-`CCNAVI_TICKET` と `CCNAVI_LEDGER` はもう効かない。指定してあれば `--lint` が言う。
+`CCNAVI_TICKET` と `CCNAVI_LEDGER` と `CCNAVI_GUARD_CLI` はもう効かない。指定してあれば
+`--lint` が言う。`CCNAVI_GUARD_CLI` は `CCNAVI_GUARD_TICKET_APPROVAL` に改名した。守る手段
+（CLI から打つ形）ではなく、守る対象（チケットの承認の経路）で名乗る。旧名で `disable` と
+書いてあった設定は、読まれなくなった時点で既定の `enable` に戻る。
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
 `env` には相対パスを書く。値の変更はセッションを開き直すまで効かない。
@@ -1109,7 +1117,7 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 結果の組み立てに `jq` が要る。道具は起動時に絶対パスへ解いて固定するので、PATH の細工では
 差し替えられない。GitHub と GitLab は origin の URL で見分ける。
 
-`--result` を実行ファイルに直接渡せるのは人の手だけ（`CCNAVI_GUARD_CLI`）。`requested` と `check` は
+`--result` を実行ファイルに直接渡せるのは人の手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。`requested` と `check` は
 依頼の印にあるホストとマージリクエストの番号が写しと一致しなければ拒む。
 
 `check` は依頼したときの HEAD と今の HEAD が同じで、push 済みであることも求める。人が見たのは
@@ -1129,7 +1137,7 @@ git ラッパは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落と�
 入力待ちを即失敗に倒すので、環境変数で helper を差し替える形も、認証画面で入れる形も通らない。
 GitLab CE 18.5 の実物で 1 周した記録は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tests/probe_gitlab.py`。
 
-これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_CLI`）。
+これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_TICKET_APPROVAL`）。
 状態の移動とレビューはスクリプト 2 本を通し、承認と未解決の受け入れは利用者が端末で打つ。
 
 `note` はチャットで受けた承認や判断を MR の通常コメントに写す。作業ツリーの記録はマージで消えるので、

@@ -105,6 +105,13 @@ from .modes import DISABLE, DRY_RUN, ENABLE
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
 SETTINGS = (ENABLE, DRY_RUN, DISABLE)
+# 戻す働きを持たない門の値。dry-run が無い。
+#
+# 「止めずに報告する」は、止めたあとに何が起きたかを見せられる働き――deny の場所を
+# 戻す、中核ファイルを控えから戻す――があって初めて意味を持つ。チケットの承認の経路は
+# その形を持たない。通せば承認が済んでしまい、済んだものは報告では戻らない。
+# 半分開けた状態を作れないので、書ける値を 2 つに絞る。
+GATE_SETTINGS = (ENABLE, DISABLE)
 
 # 控えの置き場。state の下に畳む。セッションごとに分けるのは、控えが
 # 「このセッションの直前の断面」でしかないから。別のセッションが取った断面で
@@ -297,22 +304,28 @@ class Outcome:
     detail: str = ""
 
 
-def resolve(stderr: TextIO, flag: str, declared: str, name: str) -> str:
+def resolve(
+    stderr: TextIO, flag: str, declared: str, name: str, allowed: tuple[str, ...] = SETTINGS
+) -> str:
     """設定の値を解決する。読めない値は enable に倒す。
 
     mode の解決が読めない値を enable へ倒すのと同じ向き。倒れた先が
     「守る」側になる。書き損じた 1 語で守りが消えるより、書き損じた 1 語で
     守りが残るほうがよい。戻す動きはファイルに触るが、触る先は組み込みで
     固定された 3 つだけで、しかも戻す先はこちらが取った直前の断面になる。
+
+    `allowed` を絞ると、そこに無い語も「読めない値」として扱う。dry-run を
+    持たない門（GATE_SETTINGS）に dry-run と書かれた設定が、止めているのに
+    止めていないように読める形で残らないようにする。
     """
     value = (flag or declared or "").strip().lower()
     if not value:
         return ENABLE
-    if value in SETTINGS:
+    if value in allowed:
         return value
     stderr.write(
         f"ccnavi: {name}={value!r} is not a setting; using {ENABLE}. "
-        f"Valid values are {', '.join(SETTINGS)}\n"
+        f"Valid values are {', '.join(allowed)}\n"
     )
     return ENABLE
 
