@@ -1192,10 +1192,18 @@ class TicketTest(unittest.TestCase):
             self.assertEqual(got.get("api_base"), expected, url)
 
     def script(self):
-        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。"""
+        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。
+
+        ccnavi-common.sh も一緒に置く。sh は起動して最初に隣の共通部を読むので、
+        片方だけだと判定の前に「読めない」で落ちる。
+        """
         where = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
         os.makedirs(os.path.dirname(where), exist_ok=True)
-        shutil.copy(os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh"), where)
+        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+            shutil.copy(
+                os.path.join(ROOT, ".claude", "scripts", name),
+                os.path.join(os.path.dirname(where), name),
+            )
         return where
 
     def run_script(self, script, *args, env=None):
@@ -1220,9 +1228,7 @@ class TicketTest(unittest.TestCase):
         """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
         self.family()
         self.remote()
-        script = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
-        os.makedirs(os.path.dirname(script), exist_ok=True)
-        shutil.copy(os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh"), script)
+        script = self.script()
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_BIN_PATH"] = sys.executable
         done = subprocess.run(

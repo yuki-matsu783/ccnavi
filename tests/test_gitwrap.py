@@ -26,7 +26,13 @@ def git(cwd, *args):
 
 
 def make_repo(cwd):
-    """コミットが 1 件あり、追跡外のファイルが 1 件ある使い捨てのリポジトリ。"""
+    """コミットが 1 件あり、追跡外のファイルが 1 件ある使い捨てのリポジトリ。
+
+    ワークスペースルートにもする。ラッパは `.claude/scripts/` を持つディレクトリを
+    cwd から上へ探して根を決める（`ccnavi_workspace`）ので、それが無いと
+    「ワークスペースの外」として断られ、判定まで届かない。
+    """
+    os.makedirs(os.path.join(cwd, ".claude", "scripts"), exist_ok=True)
     git(cwd, "init", "-q")
     git(cwd, "config", "user.email", "t@example.invalid")
     git(cwd, "config", "user.name", "t")
