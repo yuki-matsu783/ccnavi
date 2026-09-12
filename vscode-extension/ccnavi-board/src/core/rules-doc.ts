@@ -62,12 +62,12 @@ export function readRules(text: string): RulesDocument {
       continue;
     }
     if (!isSeq(seq)) {
-      problems.push(`区画 ${section} が並びではない。この区画は画面に出さない`);
+      problems.push(`タイプ ${section} が並びではない。このタイプは画面に出さない`);
       continue;
     }
     seq.items.forEach((item, index) => {
       if (!isMap(item)) {
-        problems.push(`区画 ${section} の ${index + 1} 件目が対応表ではない。画面に出さない`);
+        problems.push(`タイプ ${section} の ${index + 1} 件目が対応表ではない。画面に出さない`);
         return;
       }
       sections[section].push(formOf(section, index, item));

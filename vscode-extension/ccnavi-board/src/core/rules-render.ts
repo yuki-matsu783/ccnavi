@@ -73,7 +73,7 @@ ${renderProblems(page.model.problems)}<nav class="tabs" role="tablist">
   <button type="button" class="tab" data-tab="hooks" role="tab">hook</button>
 </nav>
 <section id="tab-rules" class="pane active">
-  <p class="hint">区画は強い順に deny / ask / allow。glob は文字列全体に当たる（部分一致は前後に <code>*</code>）。保存の前に <code>--lint</code> を通し、通らなければ保存しない。</p>
+  <p class="hint">判定は強い順に deny &gt; ask &gt; allow</p>
 ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
 </section>
 <section id="tab-judge" class="pane">
@@ -110,7 +110,7 @@ function renderModeBanner(mode: string): string {
     return "";
   }
   const shown = mode === "" ? "未設定" : mode;
-  return `<div class="banner warn">いまの <code>CCNAVI_MODE</code> は <strong>${escapeHtml(shown)}</strong>。実運用では判定しても呼び出しを止めない。ここで試す判定は enable のときの答え。</div>\n`;
+  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。deny, ask 判定に HIT しても tool_use は停止しない</div>\n`;
 }
 
 function renderProblems(problems: readonly string[]): string {
@@ -129,7 +129,7 @@ const SECTION_LABELS = {
 
 function renderSectionShell(section: "deny" | "ask" | "allow"): string {
   return `  <section class="rule-section" data-section="${section}">
-    <h2><span class="section-name ${section}">${section}</span> <span class="section-label">${SECTION_LABELS[section]}</span> <span class="count" data-count="${section}">0</span>
+    <h2><button type="button" class="twist" data-action="fold-section" data-section="${section}" aria-expanded="true" title="このタイプを畳む／開く">▾</button> <span class="section-name ${section}">${section}</span> <span class="section-label">${SECTION_LABELS[section]}</span> <span class="count" data-count="${section}">0</span>
       <button type="button" class="action small" data-action="add" data-section="${section}">＋ ルールを足す</button></h2>
     <ul class="rules" data-list="${section}"></ul>
   </section>`;
@@ -227,6 +227,21 @@ ${BUTTON_STYLE}
     background: var(--vscode-editorWidget-background);
   }
   .rule.hit { outline: 2px solid var(--vscode-focusBorder); }
+  /* 畳む印。タイプ（区画）と 1 件ずつのルールの両方に付く。 */
+  .twist {
+    background: none; border: none; color: var(--vscode-descriptionForeground);
+    font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
+  }
+  .rule-section.folded .rules { display: none; }
+  .rule-head { display: flex; gap: 8px; align-items: center; }
+  .rule-head .buttons { margin-left: auto; display: flex; gap: 4px; }
+  /* 開いているときは欄がそのまま出るので、要約は畳んだときだけ出す。 */
+  .rule-sum { display: none; }
+  .rule.folded .rule-sum { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; cursor: pointer; overflow-wrap: anywhere; }
+  .rule.folded .rule-body { display: none; }
+  .rule-sum .sum-id { font-weight: 600; }
+  .rule-sum .sum-match, .rule-sum .sum-empty { color: var(--vscode-descriptionForeground); }
+  .rule-sum code { font-family: var(--vscode-editor-font-family); }
   .rule-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 6px; }
   .rule-row label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
   .rule-row .grow { flex: 1 1 240px; }
@@ -296,6 +311,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   let busy = false;
   let seq = 0;
   const keys = new Map();
+  // 畳んであるルールの鍵。鍵はルールごとなので、並べ替えても移しても畳んだままになる。
+  const folded = new Set();
 
   function h(tag, attrs, children) {
     const el = document.createElement(tag);
@@ -412,33 +429,80 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         drop,
       ]);
     }
-    const context = captioned("additionalContext", area(rule, "additionalContext", "f-context", "当たったときにモデルへ渡す文。通すが踏まえてほしいこと（無くてよい。広い allow には書かない）"), "block");
-    const once = captioned("additionalContextOnce", area(rule, "additionalContextOnce", "f-once", "セッション（サブエージェントはその起動ごと）で最初に当たったときだけ渡す文。開始（compact の後も）で忘れる。上と両方あれば初回は並べて、2 回目からは上だけ"), "block");
-    const contextFile = fileField(rule, key, "additionalContextFile", "f-context-file", "文に続けて本文を渡すファイル（ルートからの相対。作業ツリーにあればそちら。先頭 4000 文字まで）");
-    const onceFile = fileField(rule, key, "additionalContextOnceFile", "f-once-file", "最初に当たったときだけ本文を渡すファイル（同上）");
+    const context = captioned("additionalContext", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト"), "block");
+    const once = captioned("additionalContextOnce", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト"), "block");
+    const contextFile = fileField(rule, key, "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）");
+    const onceFile = fileField(rule, key, "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）");
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
     down.addEventListener("click", () => shift(key, 1));
     const del = h("button", { type: "button", class: "action small", text: "削除" });
     del.addEventListener("click", () => remove(key));
-    return h("li", { class: "rule", "data-key": key, "data-id": rule.id }, [
-      h("div", { class: "rule-row" }, [
-        captioned("id", field(rule, "id", "f-id", "git-push"), "w-id"),
-        matchField(rule),
-        captioned("区画", sectionSelect),
-        h("span", { class: "buttons" }, [up, down, del]),
+    // 畳んだときは要約だけを出す。要約は欄を打つたびに書き直す（入力は上へ伝わる）。
+    const twist = h("button", { type: "button", class: "twist", title: "このルールを畳む／開く" });
+    const sum = h("span", { class: "rule-sum" });
+    const li = h("li", { class: "rule", "data-key": key, "data-id": rule.id }, [
+      h("div", { class: "rule-head" }, [twist, sum, h("span", { class: "buttons" }, [up, down, del])]),
+      h("div", { class: "rule-body" }, [
+        h("div", { class: "rule-row" }, [
+          captioned("id", field(rule, "id", "f-id", "git-push"), "w-id"),
+          matchField(rule),
+          captioned("タイプ", sectionSelect),
+        ]),
+        h("div", { class: "rule-row" }, [
+          captioned("形", kindSelect),
+          captioned(rule.kind, pattern, "grow"),
+        ]),
+        message,
+        context,
+        contextFile,
+        once,
+        onceFile,
       ]),
-      h("div", { class: "rule-row" }, [
-        captioned("形", kindSelect),
-        captioned(rule.kind, pattern, "grow"),
-      ]),
-      message,
-      context,
-      contextFile,
-      once,
-      onceFile,
     ]);
+    function fillSummary() {
+      sum.textContent = "";
+      sum.appendChild(h("span", { class: "sum-id", text: rule.id === "" ? "（id 無し）" : rule.id }));
+      sum.appendChild(h("span", { class: "sum-match", text: rule.match === "" ? "（全ツール）" : rule.match }));
+      sum.appendChild(rule.pattern === ""
+        ? h("span", { class: "sum-empty", text: "（" + rule.kind + " 空）" })
+        : h("code", { text: rule.kind + " " + rule.pattern }));
+    }
+    function setFolded(on) {
+      if (on) { folded.add(key); } else { folded.delete(key); }
+      li.classList.toggle("folded", on);
+      twist.textContent = on ? "▸" : "▾";
+      twist.setAttribute("aria-expanded", on ? "false" : "true");
+      if (on) { fillSummary(); }
+    }
+    twist.addEventListener("click", () => setFolded(!li.classList.contains("folded")));
+    sum.addEventListener("click", () => setFolded(false));
+    li.addEventListener("input", () => { if (li.classList.contains("folded")) { fillSummary(); } });
+    fillSummary();
+    setFolded(folded.has(key));
+    return li;
+  }
+  // タイプごとの畳み。画面の見え方だけで、ルールの中身と並びには触らない。
+  function foldSection(section, on) {
+    const el = document.querySelector(".rule-section[data-section=" + section + "]");
+    if (!el) { return; }
+    const next = on === undefined ? !el.classList.contains("folded") : on;
+    el.classList.toggle("folded", next);
+    const twist = el.querySelector("h2 > .twist");
+    twist.textContent = next ? "▸" : "▾";
+    twist.setAttribute("aria-expanded", next ? "false" : "true");
+  }
+  // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
+  function unfoldRule(el) {
+    folded.delete(el.getAttribute("data-key"));
+    const section = el.closest(".rule-section");
+    if (section) { foldSection(section.getAttribute("data-section"), false); }
+    if (!el.classList.contains("folded")) { return; }
+    el.classList.remove("folded");
+    const twist = el.querySelector(".rule-head > .twist");
+    twist.textContent = "▾";
+    twist.setAttribute("aria-expanded", "true");
   }
   function renderAll() {
     for (const section of SECTIONS) {
@@ -495,6 +559,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     sections[section] = sections[section].concat([{ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "" }]);
     markDirty();
     renderAll();
+    foldSection(section, false);
     const items = document.querySelectorAll("[data-list=" + section + "] .rule");
     const last = items[items.length - 1];
     if (last) { last.querySelector("input.f-id").focus(); }
@@ -532,7 +597,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("td", {}, [r.pattern ? h("code", { text: r.pattern }) : null]),
     ])));
     return h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "区画" }), h("th", { text: "id" }), h("th", { text: "書いたもの" }), h("th", { text: "翻訳後" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "書いたもの" }), h("th", { text: "翻訳後" })])]),
       body,
     ]);
   }
@@ -561,7 +626,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       box.appendChild(hitsTable(result.rules));
       for (const r of result.rules) {
         for (const el of document.querySelectorAll(".rule[data-id]")) {
-          if (el.getAttribute("data-id") === r.id) { el.classList.add("hit"); }
+          if (el.getAttribute("data-id") === r.id) { el.classList.add("hit"); unfoldRule(el); }
         }
       }
       box.appendChild(h("h3", { text: "返る文面" }));
@@ -605,6 +670,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!button) { return; }
     const action = button.getAttribute("data-action");
     if (action === "add") { add(button.getAttribute("data-section")); }
+    else if (action === "fold-section") { foldSection(button.getAttribute("data-section")); }
     else if (action === "save") { setBusy(true, "検証して保存している…"); vscode.postMessage({ type: "save", sections: sections }); }
     else if (action === "reload") { vscode.postMessage({ type: "reload", dirty: dirty }); }
     else if (action === "judge") {

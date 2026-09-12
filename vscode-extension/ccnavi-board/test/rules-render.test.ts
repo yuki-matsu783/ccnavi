@@ -47,7 +47,7 @@ test("CB-T49 埋め込むルールは JSON で、文面の < は実体にして 
 });
 
 test("CB-T50 dry-run のときは enable でないことを言い、enable なら言わない", () => {
-  assert.match(renderRulesPage(page(), { nonce: "n" }), /CCNAVI_MODE<\/code> は <strong>dry-run<\/strong>/);
+  assert.match(renderRulesPage(page(), { nonce: "n" }), /CCNAVI_MODE<\/code>: <strong>dry-run<\/strong>/);
   assert.match(renderRulesPage(page({ mode: "" }), { nonce: "n" }), /<strong>未設定<\/strong>/);
   assert.doesNotMatch(renderRulesPage(page({ mode: "enable" }), { nonce: "n" }), /CCNAVI_MODE/);
 });
@@ -67,4 +67,18 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", () => {
 test("CB-T52 settings.json が無ければ hook の表にそう書く", () => {
   const html = renderRulesPage(page({ hooks: [], hookFiles: { settings: false, settingsLocal: false } }), { nonce: "n" });
   assert.match(html, /settings\.json が無い/);
+});
+
+test("CB-T69 タイプごとに畳む印を出す", () => {
+  const html = renderRulesPage(page(), { nonce: "n" });
+  for (const section of ["deny", "ask", "allow"]) {
+    assert.match(html, new RegExp(`data-action="fold-section" data-section="${section}"`));
+  }
+});
+
+// 画面の中のスクリプトは文字列なので、tsc は見ない。壊れても画面が黙って動かなくなるだけ。
+test("CB-T70 画面に埋める script は構文として通る", () => {
+  const html = renderRulesPage(page(), { nonce: "n" });
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  assert.doesNotThrow(() => new Function(body));
 });
