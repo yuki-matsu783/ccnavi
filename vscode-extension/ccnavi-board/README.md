@@ -22,7 +22,7 @@ ccnavi は `--approve` / `accept` を端末から打つものと決めていて�
 保存する前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は配点を書く場所と、書いた配点が
 読めるかを確かめる入口だけを持つ。
 
-同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 §25）を
+同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 §11）を
 一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の設定（`.gitignore`、`config/rules.yml`）を
 ボタンで整える。各行からそのプロジェクトのルール設定画面とチケット管理（ボードの絞り込み）へ飛べる。
 
@@ -34,7 +34,7 @@ ccnavi は `--approve` / `accept` を端末から打つものと決めていて�
 ボードを開いたとき、実行ファイルの答え（`--explain --json` の `settings.ticket_control`）と食い違えば通知で言う。
 
 - 出力の形: ccnavi の README「ボードの JSON」「試験の JSON」
-- 設計: ccnavi.md §24.10、要求 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06
+- 設計: ccnavi.md §10、要求 REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06
 
 ## できること
 
@@ -103,7 +103,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 ### リスク管理画面
 
 対象はワークスペースの配点（`.claude/ccnavi/risk.yml`、`env.CCNAVI_RISK`）の 1 本。プロジェクトごとの配点は
-無い（設計 §25）。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。
+無い（設計 §11）。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。
 
 | 何 | どう出るか、何が起きるか |
 |---|---|
@@ -148,7 +148,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | もの | 版 |
 |---|---|
 | VS Code | 1.90 以上 |
-| ccnavi の実行ファイル | `dist/ccnavi/ccnavi[.exe]`。無ければ `.claude/settings.json` の `CCNAVI_BIN_PATH`、それも無ければソースを `uv run python -m ccnavi` で走らせる |
+| ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が勝つ）の `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi[.exe]` → ソースがあれば `uv run python -m ccnavi` |
 | bash | 承認コマンドと clone / fetch / pull を送るターミナル。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone / fetch / pull を打つ |
 | Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
@@ -165,7 +165,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。プロジェクトのルールは
 `env.CCNAVI_PROJECT_RULES`、無ければ `config/rules.yml`（git プロジェクトルートからの相対）。
 
-## 組み立てとインストール
+## 組み立てと導入
 
 `vscode-extension/ccnavi-board/` で。
 
@@ -198,7 +198,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 これを走らせる。pnpm の `node_modules/.pnpm/` は深くて symlink も含み、git の削除が途中で止まって
 抜け殻が残ることがある。
 
-## デバッグ実行（拡張ホストで動かす）
+## 拡張開発ホストで動かす
 
 1. `pnpm install && pnpm run compile`
 2. VS Code で `vscode-extension/ccnavi-board/` を開く
@@ -235,7 +235,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
 | 17 | 見本の一括 | 「見本を一括で流す」 | タイプごとの件数と食い違い 0 件。glob を壊してから流すと食い違いの行が赤くなる |
 | 18 | lint で止まる | message を空にした deny のルールを作って「保存」 | 下部に `--lint` の error が出て保存されない |
-| 19 | 作業中はロック | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
+| 19 | 作業中は保存できない | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
 | 20 | 外で変わった | 画面を開いたまま `rules.yml` をエディタで変える | 上部に「外で変わった」。この状態で「保存」を押しても上書きしない |
 | 21 | コメントが残る | ルールの message を 1 つ変えて保存し、`git diff` を見る | 変えた行だけが差分。先頭やルール間のコメントは残っている |
 | 22 | 未保存の再読込 | 何か変えてから「再読込」 | 「捨てて読み直す？」の確認。「読み直す」で編集が消える |
@@ -246,7 +246,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 27 | clone を止める | `https://user:token@host/g/p.git` を入れて送る。次に既存と同じ origin の URL を送る。次に既存の名前を大文字にして送る | それぞれ「資格情報」「既に clone している」「既にある」の赤い文が出て、ターミナルには何も送られない |
 | 28 | clone 後の設定 | 「.gitignore に追加」→ 行の「ワークスペースからコピー」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告と行の warn が消える |
 | 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」 | タブの題が「ccnavi ルール設定: <名前>」。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。ワークスペース版のパネルも同時に開いたままにできる |
-| 30 | プロジェクトのロック | そのプロジェクトの子チケットを `start` してから「保存」。次に別のプロジェクトの子だけを `start` にして「保存」 | 前者は「プロジェクト <名前> に作業中のチケットがある」で止まる。後者は保存できる |
+| 30 | プロジェクトごとに保存を止める | そのプロジェクトの子チケットを `start` してから「保存」。次に別のプロジェクトの子だけを `start` にして「保存」 | 前者は「プロジェクト <名前> に作業中のチケットがある」で止まる。後者は保存できる |
 | 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |
 | 32 | fetch / pull | 行の「fetch」「pull」 | ターミナルで `cd projects/<名前> && git fetch` / `git pull` が走る |
 | 33 | プロジェクトとして認識されない git リポジトリ | `参考/` のような `.git` 付きのディレクトリをワークスペース直下に置く。`projects/group/deep` に clone する | 「プロジェクトとして認識されない git リポジトリ」の枠に、前者は「projects/ の外にあります」、後者は「projects/ の 2 階層目より深くにあります」の理由付きで出る。操作ボタンは無い |
@@ -254,7 +254,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 35 | lint で止まる | high を critical より大きくして「保存」 | 下部に `--lint` の error（`levels` は medium <= high <= critical の順）が出て保存されない |
 | 36 | コメントが残る | 項目を 1 つ上へ動かし、points を変えて保存し、`git diff` を見る | 動かした項目と変えた行だけが差分。先頭の説明と末尾の例のコメントは残っている |
 | 37 | 無ければ作る | `risk.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「組み込みの配点でファイルを作る」。欄は押せない。押すとファイルが出来て、帯が消えて編集できる |
-| 38 | 作業中はロック | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
+| 38 | 作業中は保存できない | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
 
 ## 構成
 

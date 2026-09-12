@@ -2,7 +2,8 @@
 
 Claude Code のツール呼び出しを hook で止め、止めた理由と代わりに取る手段を返す。
 
-要求は [requirements.md](requirements.md)、設計は [ccnavi.md](ccnavi.md) にある。
+要求は [requirements.md](requirements.md)、設計は [ccnavi.md](ccnavi.md)、判断の理由と経緯は
+[docs/adr/](docs/adr/README.md) にある。
 
 ## 導入
 
@@ -134,19 +135,20 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
   | uv run python -m ccnavi --rules tests/fixtures/rules.yml --mode enable
 ```
 
-編集のたびに `.claude/hooks/lint-py.sh` が走り、整形と検査をかける。
-テストはそこでは走らせない。1 ファイル直すたびに全件を走らせると、複数ファイルに
-またがる変更では途中の状態が必ず落ちて、意味のない失敗の山を毎回読むことになる。
+Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`PostToolUse` の
+`Write|Edit|NotebookEdit`）が走り、整形と検査をかける。テストはそこでは走らせない。
+1 ファイル直すたびに全件を走らせると、複数ファイルにまたがる変更では途中の状態が必ず落ちる
+（ADR-0036）。
 
-代わりに `Stop` の `.claude/hooks/test-py.sh` が、ターンの終わりに 1 回だけ走る。
-落ちていたら止まらせずに差し戻すが、差し戻しは 3 回まで。直せない失敗を無限に
-差し戻すと、同じ場所を往復して人の手が入る機会が来ない。上限に達したら止まらせて
-判断を人へ返す。
+テストは `.claude/hooks/test-py.sh` で、`Stop` に登録してターンの終わりに 1 回だけ回す。
+落ちていたら止まらせずに差し戻すが、差し戻しは 3 回まで。上限に達したら止まらせて判断を
+人へ返す。このリポジトリの `.claude/settings.json` が `Stop` に登録しているのは ccnavi の
+実行ファイルだけなので、テストを回すなら `Stop` に足す（利用者ごとの `settings.local.json` でよい）。
 
-どちらの hook も、編集したファイルからいちばん近い `pyproject.toml` を上に辿って
-ツリーを決める。git の worktree の中を直せば worktree が検査される。テストは
-そのターンで触ったツリーだけを走らせるので、触っていないツリーの書きかけで
-差し戻されることもない。
+`lint-py.sh` は、編集したファイルからいちばん近い `pyproject.toml` を上に辿ってツリーを決め、
+そのターンで触ったツリーを `.claude/ccnavi/session/<セッション>.trees` に書き残す。
+`test-py.sh` はそれを読んで、触ったツリーだけをテストする。git の worktree の中を直せば
+worktree が検査され、触っていないツリーの書きかけで差し戻されることもない。
 
 実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
 動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。
@@ -272,15 +274,13 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・写しの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PHASES` | フェーズの種類の定義。ワークスペースルートからの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
 | `CCNAVI_RISK` | 実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.claude/ccnavi/risk.yml`。無ければ組み込みの配点 |
-| `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §25）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、この機能が入る前と同じに動く |
+| `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、この機能が入る前と同じに動く |
 | `CCNAVI_PROJECT_RULES` | プロジェクトごとのルールファイル。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `config/rules.yml`。パスを持つツールは行き先のプロジェクトのルールで判定し、Bash はワークスペースと全プロジェクトのルールの和で判定する |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか（旧 `CCNAVI_GUARD_CLI`。旧名はもう効かず、書いてあれば `--lint` が言う）。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `CCNAVI_TICKET` と `CCNAVI_LEDGER` と `CCNAVI_GUARD_CLI` はもう効かない。指定してあれば
-`--lint` が言う。`CCNAVI_GUARD_CLI` は `CCNAVI_GUARD_TICKET_APPROVAL` に改名した。守る手段
-（CLI から打つ形）ではなく、守る対象（チケットの承認の経路）で名乗る。旧名で `disable` と
-書いてあった設定は、読まれなくなった時点で既定の `enable` に戻る。
+`--lint` が言う（ADR-0023、ADR-0029）。
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
 `env` には相対パスを書く。値の変更はセッションを開き直すまで効かない。
@@ -487,9 +487,8 @@ ccnavi は判定を返さず、**Claude Code の権限モードに従う**。ル
 | `default` / `acceptEdits` / `plan` / 不明 | 人に確認が出る | `ask` |
 | `dontAsk` / `bypassPermissions` | 通さない | `deny` |
 
-ここを ccnavi が ask に格上げして返していた時期がある。そうすると、判断できる
-モードでも必ず人に止まり、auto モードが実質効かなくなる。持っていない判定を
-返さないことのほうが、ガードとして正しい。
+持っていない判定を ask として返すと、判断できるモードでも必ず人に止まり、auto モードが
+実質効かなくなる。持っていない判定を返さないことのほうが、ガードとして正しい（ADR-0009）。
 
 **渡した回も記録には残る。** `decision` が `handover` の行がそれで、人に聞いた
 回の `ask` とは混ざらない。ルールを足すべきかどうかは前者の数で決まり、ガードが
@@ -580,12 +579,13 @@ VS Code を使わないときは `--no-vscode` を付ける。
 
 チケットがどの作業ツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
 （`vscode-extension/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
-並べるだけで、人の承認（`--approve` / `accept` / `wrapup`）はボタンから統合ターミナルへ
-コマンドを送る。組み立て方と使い方はそこの README、出力の形は下の「ボードの JSON」。
+並べるだけで、人の承認（`--approve` / `accept`）はボタンから統合ターミナルへコマンドを送る。
+`wrapup` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、出力の形は
+下の「ボードの JSON」。
 
 同じ拡張の「ルール設定画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
 判定は `ccnavi --test --json` と `--test-samples --json` を通る（形は「試験の JSON」）。
-hook の一覧は `.claude/settings.json` を読むだけで書き換えない。作業中のチケット
+hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだけで書き換えない。作業中のチケット
 （提案が `doing`）がある間は保存できない。hook はツール呼び出しのたびにルールを読み直すので、
 セッションの途中で判定が変わるのを避けるため。
 
@@ -625,8 +625,7 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 
 ### 読み切れないとき
 
-静的に読めないコマンドは、生の文字列との一致に縮退する。これは以前の挙動なので、
-これまで捕まえていたものが抜けることはない。縮退した拒否は文面が変わり、
+静的に読めないコマンドは、生の文字列との一致に縮退する。縮退した拒否は文面が変わり、
 「禁止された操作を行った」ではなく「読めなかったので文字列に当てた」と伝える。
 
 縮退した呼び出しに `allow` は当てない。当てる先が実行される部分ではなく生の
@@ -674,7 +673,7 @@ uv run python scratch.py    # 通る。scratch.py は Write で置く
 
 `grep -n "<<" README.md` は止まる。引用された `<<` と素の `<<` を `shlex` が
 区別しないため。これは**許容する誤検知**として設計に記載してある
-（[ccnavi.md](ccnavi.md) §12.3 ①、§23.1 L-7）。止まる側に倒れること、
+（[ccnavi.md](ccnavi.md) §6.3、§12.2）。止まる側に倒れること、
 文面が「読めなかったので文字列に当てた」と名乗って本来の禁止と混ざらないこと、
 対象をファイルへ逃がせば回避できることの 3 つが揃っているため。
 
@@ -711,10 +710,7 @@ docs/../.env
 変更は次のツール呼び出しから効く。監視される側が監視を止められる経路を残さない
 ための扱い。`disable` にするときはセッションを起動する側の環境から渡す。
 
-読めない値は報告して `enable` に落ちる。旧い名前（`block` `warn` `off`）は
-受け付けないので、そのまま残っている設定は `enable` として動きはじめる。
-緩む側ではないが、`dry-run` のつもりだった設定が止めはじめるので、
-名前を変えるときは設定の側も一緒に直す。
+読めない値は報告して `enable` に落ちる。緩む側には倒れない（ADR-0007）。
 
 ## ツール実行後の監視
 
@@ -794,10 +790,8 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 戻すと失われる。そこを守りたいなら `disable` にするか、保護領域の宣言を狭める。
 
 現れたファイルは消さずに `.claude/ccnavi/state/aside/<日時>/` へ退避し、
-退避先を報告に載せる。設計は削除と書いているが、消すと「保護領域を汚した実行」と
-「出力先を間違えただけで中身は要るもの」を、戻す側が見分けられないまま
-片方に決めることになる。取り返しの付かない操作を止めるための道具が、
-自分だけは取り返しの付かない操作をするのはおかしい。
+退避先を報告に載せる。消すと「保護領域を汚した実行」と「出力先を間違えただけで中身は
+要るもの」を、戻す側が見分けられないまま片方に決めることになる（ADR-0019）。
 
 ### 中核ファイルを守る
 
@@ -830,7 +824,7 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 実行後に突き合わせて、変わっていれば控えから戻す。戻す先が「このツール呼び出しの
 直前」になるので、コミットしていない編集は残る。git から戻す形だとそこが消える。
 
-git はフォールバックで、控えが無いときだけ使う。実行前に対象が消えていて控えも
+git は控えが無いときの代わりで、そのときだけ使う。実行前に対象が消えていて控えも
 無い場合と、控えの置き場ごと消された場合の 2 つ。落ちたことは報告に書く。
 戻した先が直前の断面なのかコミット済みの内容なのかで、人の書きかけが残っているか
 どうかが変わるので、そこを黙らない。
@@ -888,7 +882,7 @@ git はフォールバックで、控えが無いときだけ使う。実行前�
 
 チケットは複数が同時に効く。親（メインエージェント）が作業を子チケットに分け、
 子は別々の作業ツリー（git worktree）でサブエージェントが実行する。
-設計は [ccnavi.md](ccnavi.md) の §24、要求は [requirements.md](requirements.md) の REQ-TKT。
+設計は [ccnavi.md](ccnavi.md) の §9、要求は [requirements.md](requirements.md) の REQ-TKT。
 
 ### 使うかどうかはプロジェクトが決める
 
@@ -946,7 +940,7 @@ phases.yml と risk.yml は在るときだけ、解決後の綴りで載る。�
 
 状態を持つ場所は、この置き場のほかに承認済みの写し（無し / 開 / 閉）とフェーズの印
 （`pending` `skipped` `requested` `reviewed`）の 2 つがあり、動かす者と条件が層ごとに違う。
-3 層の遷移と、再開のように人の手でしか動かない向きは [ccnavi.md](ccnavi.md) の §24.14 にまとめてある。
+3 層の遷移と、再開のように人の手でしか動かない向きは [ccnavi.md](ccnavi.md) の §9.6 にまとめてある。
 再開するときは提案を `done/` から出し、写しを `closed/` から戻す。写しだけ戻しても次の hook がまた閉じる。
 
 ### 書式
@@ -1127,8 +1121,9 @@ sh .claude/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 ```
 
 `request` は前提を全部確かめてから依頼コメントを投稿し、依頼の時点を印に残す。前提は、
-フェーズが終わっている・そのフェーズの子ブランチが親に取り込まれている・未コミット無し・
-push 済み・未依頼、の 5 つ。1 つでも欠けたら全件を列挙して何もしない。
+フェーズが終わっている・そのフェーズのレビューが延期されていない・そのフェーズの子ブランチが
+親に取り込まれている・未コミット無し（未追跡は数えない）・push 済み・未依頼、の 6 つ。
+1 つでも欠けたら全件を列挙して何もしない。
 
 **マージリクエストが無ければ作る。** 人はレビューをそこで行うので、入れ物が無いことで
 止めない。題・本文・`Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue`
@@ -1188,7 +1183,7 @@ origin の綴りはホストのポートと scheme をそのまま使う。`http
 push の認証は git の設定側に置く（Git Credential Manager に保存しておく、か `credential.helper`）。
 git ラッパは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落とし、`GIT_TERMINAL_PROMPT=0` で
 入力待ちを即失敗に倒すので、環境変数で helper を差し替える形も、認証画面で入れる形も通らない。
-GitLab CE 18.5 の実物で 1 周した記録は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tools/gitlab/probe_gitlab.py`。
+GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tools/gitlab/probe_gitlab.py`。
 
 これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_TICKET_APPROVAL`）。
 状態の移動とレビューはスクリプト 2 本を通し、承認と未解決の受け入れは利用者が端末で打つ。
@@ -1258,8 +1253,7 @@ factors:
 ### 参考にした運用
 
 `参考/issue-mr-ticket-workflow` の運用層（`ticket.sh` / `worktree.sh` / `boundary.sh`）から
-抜いて改めた。何を採り何を採らなかったかは [HANDOVER.md](HANDOVER.md) の「判断の経緯」と
-[ccnavi.md](ccnavi.md) の §24.13。
+抜いて改めた。何を採り何を採らなかったかは [ADR-0025](docs/adr/0025-reference-workflow.md)。
 
 ## ルールファイルが読めないとき
 
@@ -1560,7 +1554,7 @@ ccnavi --explain --json
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ写し）の frontmatter から |
 | `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー）で見つけた提案。無ければ `null` |
 | `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open` / `closed` |
-| `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物の作業ツリーか（§24.4 の相互参照） |
+| `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物の作業ツリーか（設計 §9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子の作業ツリーは親のブランチから切るので、親の提案が写っているのが普通 |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
@@ -1569,7 +1563,7 @@ ccnavi --explain --json
 
 | 鍵 | 何 |
 |---|---|
-| `ticket` / `closed` / `stage` | 識別子、閉じた写しか、いまの段階（§24.15.8 の文） |
+| `ticket` / `closed` / `stage` | 識別子、閉じた写しか、いまの段階（設計 §9.7 の文） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `wrapup` / `ready` | 親の印 `wrapup.json` / `ready.json` の中身。無ければ `null` |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
@@ -1608,7 +1602,7 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 
 ### 何を通し、何を止めるか
 
-ホワイトリストに無いものは既定で拒否する。分類だけでは足りないので、閉じる向き
+通す形の一覧に無いものは既定で拒否する。分類だけでは足りないので、閉じる向き
 （通っていたものを止める向き）の判定をサブコマンドの中に足してある。
 `git branch -D`、`git worktree remove --force`、`git tag -d`、`git checkout -- <パス>` は、
 どれも「読む」「移る」ように見えて取り返しがつかない。
@@ -1675,14 +1669,19 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `ccnavi/gitcmd.py` | git を 1 回起こす |
 | `ccnavi/fsio.py` | ファイルの読み書きの型。控え・印・写し・下書きが全部これを通る |
 | `build.py` | 配布物の組み立て |
+| `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
+| `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
+| `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
 | `.claude/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
 | `.claude/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
 | `.claude/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と exe を当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
-| `tests/fixtures/rules.yml` | テスト用のルール |
+| `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
 | `.claude/ccnavi/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
+| `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール設定・リスク管理・プロジェクト管理の画面 |
+| `docs/adr/` | 設計判断の記録。なぜそう決めたか、以前はどうだったか |
 
 ## 配布物の条件
 
@@ -1694,7 +1693,8 @@ push はラッパが拒み、サブエージェントからの push は hook が
   読めなければ何も言わないだけで穴も開かない。作業ツリーの今の状態を自前で
   持つには保護領域を毎回歩いて指紋を取り続けることになり、それは git が
   すでに持っている情報になる
-- ネットワークへは出ない。呼ぶのはローカルの git だけ
+- ネットワークへは出ない。起こす外部プロセスはローカルの git と、子を閉じるときに
+  リスクの配点の `script` 項目を走らせる `sh` だけ
 - 作業ディレクトリに依らず同じ入力に同じ判定を返す
 - 実行時の third-party 依存は PyYAML 1 本。チケットの frontmatter が YAML で、
   自前の読み手を書くと書式の解釈違いがそのままガードの穴になる。読むのは
