@@ -367,6 +367,13 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
 
+    def test_listed_id_with_nothing_pending_is_refused_too(self):
+        # 承認待ちが空でも、識別子を並べたなら「無い」は失敗。
+        # 終了コードが他の承認待ちの有無で変わらない
+        result = self.ccnavi("--approve", "i0001", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("承認待ちに無い: i0001", result.stderr)
+
     def test_listed_id_that_is_not_pending_approves_nothing(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
         result = self.ccnavi("--approve", "i0001", "i0009", stdin="y\n")

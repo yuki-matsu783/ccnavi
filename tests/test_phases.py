@@ -266,6 +266,40 @@ class PhaseHarness(unittest.TestCase):
         return result
 
 
+class ApproveOnlyTest(PhaseHarness):
+    """`--approve <識別子>...` で束を絞っても、絞らない束で落ちるものは通らない。"""
+
+    def test_child_cannot_be_approved_without_the_parents_pending_revision(self):
+        self.family(plan=("acceptance", "implement"))
+        # 親を改版してフェーズ 1 を設計にする。子はまだ旧計画（受入テスト作成）の範囲で出す
+        self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
+        self.commit_parent()
+        # 絞らない束では、改版後の計画で検証されて落ちる（n で何も適用しない）
+        whole = self.ccnavi("--approve", stdin="n\n")
+        self.assertIn("超えている", whole.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        # 改版を外して子だけ並べても、旧計画で通してはいけない
+        only = self.ccnavi("--approve", "i0001-02", stdin="y\n")
+        self.assertEqual(only.returncode, 1, only.stdout + only.stderr)
+        self.assertIn("改版", only.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+
+    def test_child_of_a_rejected_parent_is_not_approved(self):
+        # 親が落ちたら（置き場に無いプロジェクト）、その子も親が承認されていないので落ちる。
+        # 子自身は正しいので、落ちた親を池に残すと子だけ写しになる
+        parent = parent_text("i0001", ["design"]).replace("plan:", "project: nope\nplan:", 1)
+        self.propose("i0001", parent)
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/design/*",)))
+        self.commit_parent()
+        result = self.approve()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("i0001 は承認の対象にしない", result.stderr)
+        self.assertIn("親 i0001 が承認されていない", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+
+
 class PhaseTest(PhaseHarness):
     # ---- 1. 種類の定義
 
