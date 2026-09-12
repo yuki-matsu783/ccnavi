@@ -180,8 +180,21 @@ _WRITE_VERBS = (
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
-_PLACES = (r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)", r"ccnavi-git\.sh")
-_COPY_PLACES = (r"\.claude[\\/](ccnavi|hooks|scripts|settings)", r"ccnavi-git\.sh")
+#
+# `.ccnavi/` は層の傘（設計 §25.2）。その下には各層の設定 3 本と、配点が呼ぶ
+# スクリプトが入る。どちらも判定の中身そのものなので、傘ごと止める。既定の綴りを
+# ここに書いておくのは、傘の名前を動かしていないワークスペースが、設定の受け渡しに
+# 依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
+_PLACES = (
+    r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)",
+    r"\.ccnavi[\\/]",
+    r"ccnavi-git\.sh",
+)
+_COPY_PLACES = (
+    r"\.claude[\\/](ccnavi|hooks|scripts|settings)",
+    r"\.ccnavi[\\/]",
+    r"ccnavi-git\.sh",
+)
 
 
 def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
@@ -192,7 +205,8 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
     ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
     `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
 
-    extra_clause はプロジェクトのルールファイルの綴り（project_rules_clause）。
+    extra_clause は層の傘の綴り（project_home_clause）。既定の名前は _PLACES に
+    書いてあるので、ここで足すのは傘を動かしてある場合の綴りになる。層の設定は
     行き先の判定に使うので、書けるとエージェントが自分のルールを緩められる。
     """
     places = [*_PLACES]
@@ -206,20 +220,28 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
     return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
 
 
-def project_rules_clause(projects_dir: str, project_rules: str) -> str:
-    """プロジェクトのルールファイルの綴りを、当てる形に直す（設計 §25.6）。
+def project_home_clause(project_home: str) -> str:
+    """層の傘の綴りを、シェルの書き込みに当てる形に直す（設計 §25.6）。
 
-    置き場の名前と、 git プロジェクトルートからの相対を、間に任意の 1 語（プロジェクトの
-    名前）を挟んで繋ぐ。`projects/<名前>/config/rules.yml` の形。区切りはどちらの
-    綴りにも当てる。
+    傘の下は丸ごと守る。層の設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
+    既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
+    ある場合の綴り。区切りはどちらの綴りにも当てる。
     """
-    if not projects_dir or not project_rules:
+    parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
+    if not parts:
         return ""
-    base = os.path.basename(os.path.normpath(projects_dir))
-    parts = [re.escape(p) for p in project_rules.split("/") if p]
-    if not base or not parts:
-        return ""
-    return re.escape(base) + r"[\\/][^\\/ \x00]+[\\/]" + r"[\\/]".join(parts)
+    return r"[\\/]".join(parts) + r"[\\/]"
+
+
+def project_home_glob(project_home: str) -> str:
+    """層の傘の下を、名指しのツールで止める glob。`*/.ccnavi/*` の形。"""
+    home = _home_name(project_home)
+    return f"*/{home}/*" if home else ""
+
+
+def _home_name(project_home: str) -> str:
+    """傘の名前。前後の区切りは落とし、区切りを含む綴りはそのまま 1 つの節にする。"""
+    return (project_home or "").replace("\\", "/").strip("/")
 
 
 def binary_clause(bin_path: str) -> str:
@@ -262,12 +284,13 @@ BINARY_MESSAGE = (
     "伝えて利用者に依頼してください。"
 )
 
-PROJECT_RULES_RULE_ID = "builtin-guard-project-rules"
+PROJECT_HOME_RULE_ID = "builtin-guard-project-home"
 
-PROJECT_RULES_MESSAGE = (
-    "プロジェクトのルールファイルです。このプロジェクトへの書き込みはここで判定される"
-    "ので、エージェントが書き換えると自分のルールを緩められます。変更が要るなら、"
-    "何をなぜ変えたいのかを伝えて利用者に依頼してください。"
+PROJECT_HOME_MESSAGE = (
+    "層の設定の置き場です。ここに入っているルール・フェーズの種類・リスクの配点が"
+    "このツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩め"
+    "られます。変更が要るなら、何をなぜ変えたいのかを伝えて利用者に依頼してください。"
+    "読むだけなら止まりません。"
 )
 
 
@@ -330,19 +353,19 @@ def resolve(
     return ENABLE
 
 
-def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str = "") -> None:
+def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_home: str = "") -> None:
     """ガード自身を守るルールを、判定に足す。
 
     ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
 
     3 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
-    名指しのツールでプロジェクトのルールファイルを書く形。ワークスペースの設定
+    名指しのツールで層の傘（`.ccnavi/`）の下を書く形。ワークスペースの設定
     ファイルを名指しのツールから守るぶんはワークスペースのルールに任せる。
     そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルと
-    プロジェクトのルールは置き場が設定で動くので、ルールファイルに綴りを固定できない。
-    プロジェクトのルールは行き先の判定に使うので、そのプロジェクトのルール自身に
-    任せると、書けた瞬間に緩められる（REQ-MLT-08）。
+    層の傘は置き場が設定で動くので、ルールファイルに綴りを固定できない。
+    層の設定は行き先の判定に使うので、その層のルール自身に任せると、書けた瞬間に
+    緩められる（REQ-MLT-08）。
 
     同じ id が既にあるなら足さない。プロジェクトが自分で書いているなら、
     書いたとおりに効いているほうがよい。組み込みが黙って重ねると、当たった
@@ -353,7 +376,7 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
         {
             "id": SHELL_RULE_ID,
             "match": "Bash",
-            "regex": shell_write_regex(bin_path, project_clause),
+            "regex": shell_write_regex(bin_path, project_home_clause(project_home)),
             "message": SHELL_MESSAGE,
         },
     )
@@ -369,14 +392,18 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
                 "message": BINARY_MESSAGE,
             },
         )
-    if project_clause:
+    home_glob = project_home_glob(project_home)
+    if home_glob:
         _insert(
             rule_set,
             {
-                "id": PROJECT_RULES_RULE_ID,
+                "id": PROJECT_HOME_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
-                "regex": project_clause + "$",
-                "message": PROJECT_RULES_MESSAGE,
+                # 傘の下は丸ごと。層の設定 3 本だけを名指しすると、配点が呼ぶ
+                # スクリプトが外れる。当てる先は解決済みの絶対パスなので、
+                # どの層の傘（ワークスペース、プロジェクト、作業ツリー）にも同じ 1 本が当たる。
+                "glob": home_glob,
+                "message": PROJECT_HOME_MESSAGE,
             },
         )
 
@@ -403,6 +430,11 @@ def targets(
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
     project_rules は (プロジェクトの名前, そのルールファイル) の並び（REQ-MLT-08）。
+
+    渡ってくるのは今のところプロジェクトの層の rules だけ（ruleload.layer_files）。
+    自身の層と phases / risk、プロジェクトから切った作業ツリーの写しを足すのは
+    設計 §25.6 の回で、そこで引数を層ごとの 3 本（層, kind, パス）に広げる。
+    控えの key と写しの並べ方が一緒に変わるので、置き場の変更とは別の回にしてある。
     """
     found = [
         Target(key=key, path=os.path.realpath(os.path.join(root, rel)), label=rel)

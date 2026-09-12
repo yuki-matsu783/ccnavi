@@ -92,8 +92,8 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前の判定と同じ。プロジェクトとその作業ツリーには
-    そのプロジェクトのルール、ワークスペースのツリーにはワークスペースのルール。
+    ルールの引き方は実行前の判定と同じで、共通層にそのツリーの層を足した和。
+    別に書くと、実行前に通った書き込みがターンの終わりに咎められる。
     """
     ws = tree.main_tree(root)
     if payload is None:
@@ -108,15 +108,11 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            if t.project:
-                home = tree.project_root(conf.projects, t.project)
-                rule_set, source = ruleload.load_rules(
-                    stderr, settings.project_rules_path(conf, home), record, root
+            rule_set, source = ruleload.load_rules(stderr, conf.rules, record, root)
+            if source != builtin.SOURCE:
+                ruleload.add_layers(
+                    stderr, rule_set, ruleload.layer_for(conf, root, t), root, record
                 )
-                if source != builtin.SOURCE:
-                    ruleload.prefix_ids(rule_set, t.project)
-            else:
-                rule_set, source = ruleload.load_rules(stderr, conf.rules, record, root)
             loaded[t.project] = (rule_set, source)
         rule_set, source = loaded[t.project]
         out.append(post.Watched(t, rule_set, source))
@@ -206,7 +202,7 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin, ruleload.project_rules_files(conf)),
+        selfguard.targets(root, conf.rules, conf.bin, ruleload.layer_files(conf)),
     )
     # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
     # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。

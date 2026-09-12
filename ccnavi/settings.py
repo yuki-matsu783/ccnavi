@@ -71,9 +71,12 @@ PHASES_ENV = "CCNAVI_PHASES"
 RISK_ENV = "CCNAVI_RISK"
 # PROJECTS_ENV はプロジェクトの置き場（設計 §25）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
-# PROJECT_RULES_ENV はプロジェクトごとのルールファイル。各 git プロジェクトルートからの相対。
+# PROJECT_HOME_ENV は層の傘（設計 §25.2）。各 git プロジェクトルートからの相対で、
+# その下の `config/{rules,phases,risk}.yml` が層の 3 本になる。自身の層
+# （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
+# 動かせるのは傘の名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
-PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
+PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # もう効かない環境変数。指定されていたら --lint が言う。黙って無視すると、書いた人は
 # 効いていると思い続ける。
 #
@@ -81,7 +84,18 @@ PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
 # CCNAVI_GUARD_TICKET_APPROVAL に改名した。旧名で disable と書いてあった設定は、
 # 読まれなくなった時点で既定の enable に戻る――守りが消える向きには倒れない――が、
 # 切ったつもりの人には止まる理由が分からないので、名前を挙げて知らせる。
-RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_GUARD_CLI")
+RETIRED_ENVS = (
+    "CCNAVI_TICKET",
+    "CCNAVI_LEDGER",
+    "CCNAVI_GUARD_CLI",
+    # 層の置き場が 3 本まとめて `CCNAVI_PROJECT_HOME` の下に移った（設計 §25.2）。
+    # 旧の綴り（`config/rules.yml`）はもう読まない。
+    "CCNAVI_PROJECT_RULES",
+)
+
+# 旧のプロジェクトのルールの置き場。読まないが、まだそこに置いてあるワークスペースに
+# --lint が「あるが読まない」と言うために覚えておく（設計 §25.12）。
+OLD_PROJECT_RULES = "config/rules.yml"
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -112,10 +126,19 @@ DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
 DEFAULT_PROJECTS = "projects"
-# プロジェクトのルールはプロジェクトの git で育てる。`.claude/` の下には置かない。
-# プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、`--lint` が
-# 迷い子として拾う。
-DEFAULT_PROJECT_RULES = "config/rules.yml"
+# 層の傘。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
+# 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
+# `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
+# スクリプトを 1 つの傘にまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
+# 済ませるため（設計 §25.2）。
+DEFAULT_PROJECT_HOME = ".ccnavi"
+# 傘の下の固定の綴り。層はこの形でしか置けない。
+LAYER_CONFIG_DIR = "config"
+# 層が持てる設定。3 本は独立に無くてよい。
+KIND_RULES = "rules"
+KIND_PHASES = "phases"
+KIND_RISK = "risk"
+LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
 
 
 @dataclass
@@ -184,10 +207,10 @@ class Settings:
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
     # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、この設定が
-    # 入る前と同じに動く。project_rules は各プロジェクトのルールファイル
-    # （git プロジェクトルートからの相対、"/" 区切り）。
+    # 入る前と同じに動く。project_home は層の傘（git プロジェクトルートからの相対、
+    # "/" 区切り）。自身の層とプロジェクトの層の両方に効く。
     projects: str = ""
-    project_rules: str = ""
+    project_home: str = ""
     # project_rules_files は、名前で指したプロジェクトのルールファイルの差し替え
     # （名前 → 絶対パス）。`--project-rules-file <名前>=<パス>` が入れる。診断（--test /
     # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
@@ -239,7 +262,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
         projects=os.path.join(root, DEFAULT_PROJECTS),
-        project_rules=DEFAULT_PROJECT_RULES,
+        project_home=DEFAULT_PROJECT_HOME,
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
     # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
@@ -248,7 +271,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
-        ("project_rules", PROJECT_RULES_ENV, _relative, False),
+        ("project_home", PROJECT_HOME_ENV, _relative, False),
         ("phases", PHASES_ENV, _resolve, False),
         ("risk", RISK_ENV, _resolve, False),
         ("rules", RULES_ENV, _resolve, False),
@@ -295,21 +318,33 @@ def load(root: str) -> tuple[Settings, list[str]]:
     return settings, problems
 
 
-def project_rules_path(conf: Settings, project_root: str) -> str:
-    """このプロジェクトのルールファイルの絶対パス。判定と診断が読む先。
+def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> str:
+    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 §25.2）。
 
-    `--project-rules-file` で名前が差し替えられていれば、そのパス。守る対象
-    （selfguard）は差し替えを見ない `project_rules_real_path` を使う。
+    `home_root` はその層の git プロジェクトルート。自身の層ならワークスペースルート、
+    プロジェクトの層ならその git プロジェクトルートを渡す。3 種とも同じ形なので、
+    rules だけの経路を別に持たない。
+
+    `--project-rules-file` で名前が差し替えられていれば、rules に限ってそのパス。
+    差し替えは診断のためのもので、phases と risk には効かない。守る対象（selfguard）は
+    差し替えを見ない `layer_real_path` を使う。
     """
-    override = conf.project_rules_files.get(os.path.basename(project_root))
-    if override:
-        return override
-    return project_rules_real_path(conf, project_root)
+    if kind == KIND_RULES:
+        override = conf.project_rules_files.get(layer or _layer_name(home_root))
+        if override:
+            return override
+    return layer_real_path(conf, home_root, kind)
 
 
-def project_rules_real_path(conf: Settings, project_root: str) -> str:
-    """このプロジェクトのルールファイルが本来ある場所。差し替えを見ない。"""
-    return os.path.join(project_root, conf.project_rules.replace("/", os.sep))
+def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
+    """層の設定ファイルが本来ある場所。差し替えを見ない。"""
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    return os.path.join(home_root, home, LAYER_CONFIG_DIR, f"{kind}.yml")
+
+
+def _layer_name(home_root: str) -> str:
+    """差し替えを引くときの名前。プロジェクトの層は置き場の下のディレクトリ名。"""
+    return os.path.basename(os.path.normpath(home_root)) if home_root else ""
 
 
 def _relative(root: str, path: str) -> str:
