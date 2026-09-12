@@ -303,6 +303,27 @@ class LintTest(unittest.TestCase):
         self.assertIn("id が重複", result.stdout)
         self.assertIn("Task", result.stdout)
 
+    def test_権限ルールの名前で書いたmatchは咎めない(self):
+        # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
+        # 判定が対象を取り出せる。PowerShell / Monitor はコマンド、Skill はスキル名、
+        # WebFetch は URL。lint の probe がその欄を渡し損ねると、正しいルールを咎める。
+        result = lint(
+            self.root,
+            rules_file(
+                self.root,
+                dict(SOUND, id="ps", match="PowerShell|Monitor"),
+                dict(SOUND, id="skill", match="Skill", glob="deploy*"),
+                dict(SOUND, id="fetch", match="WebFetch", glob="*://example.com/*"),
+                dict(SOUND, id="search", match="WebSearch", glob="*"),
+            ),
+        )
+        self.assertEqual(result.returncode, 0)
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        # WebSearch は指定子を持たず対象を取り出せないので、これだけ咎める。
+        self.assertEqual(warns, 1, result.stdout)
+        self.assertIn("WebSearch", result.stdout)
+
     def test_止めないモードはwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")
 

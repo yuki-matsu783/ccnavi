@@ -61,6 +61,34 @@ SCOPE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 # 見出しだけを subject にする。
 AGENT_TOOL = "Agent"
 
+# ツールごとに、ルールを当てる欄。ここに無いツールは対象を持たず、判定に届かない
+# まま通る。名前は Claude Code の権限ルール `ToolName(指定子)` から括弧の中を
+# 除いたものに揃えてある。Grep / Glob / LSP はパスが省略されることが多く、
+# WebSearch は指定子を持たないので載せない。並びは画面の候補の順になる。
+#
+# 対象を差し込む側（試験の diagnose と lint の probe）はこの表を読む。欄の名前を
+# subject_of の中にだけ持つと、ツールを足したときにそちらが黙って古くなる。
+SUBJECT_FIELDS: dict[str, str] = {
+    "Bash": "command",
+    "PowerShell": "command",
+    "Monitor": "command",
+    "Read": "file_path",
+    "Write": "file_path",
+    "Edit": "file_path",
+    "MultiEdit": "file_path",
+    "NotebookEdit": "notebook_path",
+    "Skill": "skill",
+    AGENT_TOOL: "description",
+    "WebFetch": "url",
+}
+
+# 行き着く先まで解いてから当てるツール（パスを対象にするもの）。
+PATH_TOOLS = ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit")
+
+# POSIX のシェルとして読んでから当てるツール。Monitor は bash のコマンドを走らせる。
+# PowerShell は文法が違うので読まず、生の文字列に当てる。
+POSIX_SHELL_TOOLS = ("Bash", "Monitor")
+
 
 def guard_setting_files(
     stderr: TextIO,
@@ -329,19 +357,21 @@ def refuse(
 
 
 def subject_of(payload: hookio.Input) -> str:
-    """このツールでルールを当てる欄を選ぶ。"""
-    if payload.tool_name in phase.SHELL_TOOLS:
-        return payload.field_value("command")
-    if payload.tool_name == "NotebookEdit":
-        path = payload.field_value("notebook_path") or payload.field_value("file_path")
-        return full_path(path, payload.cwd)
-    if payload.tool_name in ("Read", "Write", "Edit", "MultiEdit"):
-        return full_path(payload.field_value("file_path"), payload.cwd)
-    if payload.tool_name == AGENT_TOOL:
+    """このツールでルールを当てる欄を選ぶ。欄は SUBJECT_FIELDS が持つ。"""
+    tool = payload.tool_name
+    field = SUBJECT_FIELDS.get(tool)
+    if field is None:
+        return ""
+    if tool == AGENT_TOOL:
         # 起動には対象の文字列が無い。ゲートが止める対象なので、見出しを subject に
         # して判定に入れる。
-        return payload.field_value("description") or payload.field_value("prompt") or "(agent)"
-    return ""
+        return payload.field_value(field) or payload.field_value("prompt") or "(agent)"
+    value = payload.field_value(field)
+    if tool == "NotebookEdit":
+        value = value or payload.field_value("file_path")
+    if tool in PATH_TOOLS:
+        return full_path(value, payload.cwd)
+    return value
 
 
 def full_path(path: str, cwd: str) -> str:
@@ -378,7 +408,7 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     今まで捕まえていたものが抜けることはない。変わるのは、返す拒否が
     どちらの拒否なのかを名乗らなければならない点。
     """
-    if tool != "Bash":
+    if tool not in POSIX_SHELL_TOOLS:
         return subject
     reading = shellread.read(subject)
     if reading.degraded:

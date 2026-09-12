@@ -157,12 +157,69 @@ class TestJsonTest(unittest.TestCase):
         self._check_fixture("test.json", body)
 
     def test_unknown_tool_is_not_judged(self):
-        done = ccnavi(self.root, self.rules_path, "--test", "WebFetch", "https://x", "--json")
+        done = ccnavi(self.root, self.rules_path, "--test", "WebSearch", "ccnavi", "--json")
         self.assertEqual(done.returncode, 0, done.stderr)
         body = json.loads(done.stdout)
         self.assertFalse(body["known"])
         self.assertEqual(body["verdict"], "")
         self.assertEqual(body["rules"], [])
+
+    def test_tools_named_like_permission_rules_are_judged(self):
+        """Claude Code の権限ルールの名前（括弧の中を除いたもの）で試せる。
+
+        PowerShell と Monitor はコマンド、Skill はスキル名、WebFetch は URL が対象。
+        欄の名前を取り違えると known でも対象が空になり、ルールに当たらないまま通る。
+        """
+        rules_path = write(
+            self.tmp.name,
+            "named.yml",
+            json.dumps(
+                {
+                    "version": 3,
+                    "deny": [
+                        {
+                            "id": "ps",
+                            "match": "PowerShell",
+                            "glob": "*Remove-Item*",
+                            "message": "消さない",
+                        },
+                        {
+                            "id": "mon",
+                            "match": "Monitor",
+                            "glob": "*rm -rf*",
+                            "message": "消さない",
+                        },
+                        {
+                            "id": "skill",
+                            "match": "Skill",
+                            "glob": "deploy*",
+                            "message": "配布は人が行う",
+                        },
+                        {
+                            "id": "fetch",
+                            "match": "WebFetch",
+                            "glob": "*://example.com/*",
+                            "message": "外",
+                        },
+                    ],
+                    "allow": [{"id": "rest", "match": "Bash", "glob": "*"}],
+                }
+            ),
+        )
+        cases = [
+            ("PowerShell", "Remove-Item -Recurse x", "ps"),
+            ("Monitor", "rm -rf build", "mon"),
+            ("Skill", "deploy prod", "skill"),
+            ("WebFetch", "https://example.com/a", "fetch"),
+        ]
+        for tool, subject, rule_id in cases:
+            with self.subTest(tool=tool):
+                done = ccnavi(self.root, rules_path, "--test", tool, subject, "--json")
+                self.assertEqual(done.returncode, 0, done.stderr)
+                body = json.loads(done.stdout)
+                self.assertTrue(body["known"])
+                self.assertEqual(body["verdict"], "deny")
+                self.assertEqual([hit["id"] for hit in body["rules"]], [rule_id])
 
     def test_samples_count_mismatches_and_skips(self):
         done = ccnavi(self.root, self.rules_path, "--test-samples", self.samples_path, "--json")

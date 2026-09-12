@@ -912,15 +912,16 @@ def _inert(match: str) -> list[str]:
 
     ツール名の一覧を持たずに subject_of を実際に呼んで確かめている。一覧を写すと、
     判定側が扱うツールを増やしたときにこちらが黙って古くなり、正しいルールを
-    誤って咎めるようになる。
+    誤って咎めるようになる。差し込む欄の名前だけは judge の表から借りる。
     """
+    # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
+    probe_input = {field: "x" for field in judge.SUBJECT_FIELDS.values()}
     inert: list[str] = []
     for want in match.split("|"):
         tool = want.strip()
         if not tool:
             continue
-        # 対象を持つツールなら何かしら返る値を入れておく。返るかどうかだけを見る。
-        probe = hookio.Input(tool_name=tool, tool_input={"command": "x", "file_path": "x"})
+        probe = hookio.Input(tool_name=tool, tool_input=probe_input)
         if not judge.subject_of(probe):
             inert.append(tool)
     return inert
