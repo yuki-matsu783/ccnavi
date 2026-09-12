@@ -2372,8 +2372,9 @@ SubagentStart で `additionalContext` が届くかは公式文書の読み方が
 - **外には出ない（P11）。** 見るのはワークスペースの中のファイルだけ。レビューのスレッドの現状は
   載せない。それは sh が取ってくるもので、ボードが欲しければ印（`requested` / `reviewed`）で足りる
 
-人の判断（`--approve`、`accept`、`wrapup`）は拡張からも端末を通す。ボタンは統合ターミナルに
+人の判断（`--approve`、`accept`）は拡張からも端末を通す。ボタンは統合ターミナルに
 コマンドを送るだけで、y/N は人が押す。端末を求める壁（§17）の外側に拡張の子プロセスを置かない。
+`wrapup` はボードにボタンを置かず、端末で打つ。
 
 同じ拡張のルール設定画面は `--test --json` と `--test-samples --json`（README「試験の JSON」）を
 読む。守るものは同じで、判定は `diagnose.judge` が `cli.decide_before` を呼んだ答えをそのまま載せ、
