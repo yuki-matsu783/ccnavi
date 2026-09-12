@@ -57,6 +57,15 @@ reject() {
 	exit 2
 }
 
+# 共通部分。ワークスペースルートの探し方と、プロジェクト名の導出はここにある。
+. "$(dirname "$0")/ccnavi-common.sh"
+
+# ワークスペースルート。道具と記録の置き場。git のトップとは別物で、
+# モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
+# 上へ歩いて `.claude/scripts/` を探す（設計 §25.8）。
+WS=$(ccnavi_workspace) ||
+	reject "ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
+
 usage() {
 	cat <<'USAGE'
 sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
@@ -197,7 +206,87 @@ remote)
 worktree)
 	action="${1:-list}"
 	case "$action" in
-	list | add | prune) ;;
+	add)
+		# 行き先を確かめる。git は cwd 基準で解くので、プロジェクトの中で
+		# `.claude/worktrees/x` と打つと projects/<名前>/.claude/worktrees/x が
+		# できる。プロジェクトに .claude/ ができて --lint が error になり、
+		# tree_of の探す場所からも外れる（設計 4.1）。
+		#
+		# 書き換えずに止める。打った綴りと起きたことがずれると、記録を読んだ
+		# 人が追えなくなる。
+		# 行き先は「オプションでない最初の語」。値を取るオプションは値ごと飛ばす。
+		# 知らないオプションは通さない。通すと行き先を取り違え、検査そのものが
+		# 意味を失う（2026-09-12 の決定）。
+		wt_dest=""
+		wt_skip=0
+		wt_first=1
+		for wt_word in ${1+"$@"}; do
+			if [ "$wt_first" -eq 1 ]; then
+				wt_first=0 # 先頭の `add` 自身
+				continue
+			fi
+			if [ "$wt_skip" -eq 1 ]; then
+				wt_skip=0 # 直前のオプションの値
+				continue
+			fi
+			case "$wt_word" in
+			-b | -B | --reason)
+				wt_skip=1
+				;;
+			--detach | -d | --force | -f | --checkout | --no-checkout | --lock | \
+				--guess-remote | --no-guess-remote | --track | --no-track | --quiet | -q) ;;
+			-*)
+				reject "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中に作業ツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
+				;;
+			*)
+				if [ -z "$wt_dest" ]; then
+					wt_dest="$wt_word"
+				fi
+				;;
+			esac
+		done
+		[ -n "$wt_dest" ] || reject "worktree add に行き先がありません。"
+		wt_abs=$(ccnavi_abs "$wt_dest") ||
+			reject "worktree add の行き先 ($wt_dest) を絶対パスに直せません。親のディレクトリが在るか確かめてください。"
+		wt_ok=no
+		case "$wt_abs" in
+		"$WS"/.claude/worktrees/*)
+			wt_rest="${wt_abs#"$WS"/.claude/worktrees/}"
+			case "$wt_rest" in
+			*/*) ;; # 2 段以上は置かない
+			'') ;;
+			*) wt_ok=yes ;;
+			esac
+			;;
+		esac
+		if [ "$wt_ok" = no ]; then
+			# 案内は cwd に合わせた綴りで出す。絶対パスだけを出すと、受け取った側が
+			# そのまま打てはするが、次に別の場所から打つときに応用が効かない。
+			wt_name=$(basename "$wt_dest")
+			wt_here=$(ccnavi_abs .)
+			wt_spell="$WS/.claude/worktrees/$wt_name"
+			case "$wt_here" in
+			"$WS")
+				wt_spell=".claude/worktrees/$wt_name"
+				;;
+			"$WS"/*)
+				# ワークスペースまで何段上がるかを数えて `../` を並べる。
+				wt_rel="${wt_here#"$WS"/}"
+				wt_up=""
+				while [ -n "$wt_rel" ]; do
+					wt_up="../$wt_up"
+					case "$wt_rel" in
+					*/*) wt_rel="${wt_rel#*/}" ;;
+					*) wt_rel="" ;;
+					esac
+				done
+				wt_spell="$wt_up.claude/worktrees/$wt_name"
+				;;
+			esac
+			reject "作業ツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §25.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+		fi
+		;;
+	list | prune) ;;
 	remove)
 		if has --force ${1+"$@"} || has -f ${1+"$@"}; then
 			reject "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してからオプション無しの $SELF worktree remove を使ってください。"
@@ -377,12 +466,13 @@ push)
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
 	# 見分けるのは承認済みチケット（main の `.claude/ccnavi/tickets/<名前>.md`）に
 	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
+	# 作業ツリーはワークスペースの .claude/worktrees/ の下にある。切り元が
+	# プロジェクトでも置き場はワークスペース（設計 §25.2）なので、git の
+	# --git-common-dir から導くと、モード B では切り元のプロジェクトを指して
+	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
+	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	push_common=$(git rev-parse --git-common-dir 2>/dev/null || :)
-	case "$push_common" in
-	*/.git) push_root="${push_common%/.git}" ;;
-	*) push_root="" ;;
-	esac
+	push_root="$WS"
 	if [ -n "$push_root" ]; then
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
@@ -465,7 +555,15 @@ esac
 root=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -z "$root" ] && reject "git リポジトリの中で実行してください。"
 
-logdir="$root/logs"
+# 記録はワークスペースの下に寄せる（REQ-MLT-14、設計 4.1）。git のトップに書くと、
+# モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
+# /logs/ はワークスペースルート起点なので効かず、public のリポジトリに運用の痕跡が入る。
+logproject=$(ccnavi_project "$(pwd)" "$WS")
+if [ -n "$logproject" ]; then
+	logdir="$WS/logs/$logproject"
+else
+	logdir="$WS/logs"
+fi
 mkdir -p "$logdir"
 logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 
@@ -481,11 +579,20 @@ logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
 status=0
 git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
 
-# 記録の相対パス。エージェントがそのまま sed -n で開ける形で返す。
+# 記録の綴り。エージェントがそのまま sed -n で開ける形で返す。
+#
+# 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
+# あるので、git のトップからの相対を返すと届かない。ワークスペースの中に居るときは
+# 短い相対、そうでなければ絶対を返す（設計 4.1）。
 case "$logfile" in
-"$root"/*) logrel="${logfile#"$root"/}" ;;
+"$WS"/*) logrel="${logfile#"$WS"/}" ;;
 *) logrel="$logfile" ;;
 esac
+# cwd から相対で開けないなら、絶対の綴りをそのまま返す。2 つ並べない。
+# 並べると、受け取った側がどちらを開くか迷い、綴りの切り出しも要る。
+if [ ! -f "$logrel" ]; then
+	logrel="$logfile"
+fi
 
 # 本文は目印の次の行から。目印と同じ行が出力に含まれても、awk は最初の 1 件で
 # 立ち上がるので取り違えない。

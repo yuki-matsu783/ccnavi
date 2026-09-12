@@ -64,7 +64,11 @@ fi
 failed=""
 output=""
 for target in $targets; do
-	[ -d "$target" ] || continue
+	# tests/ を持たないツリーは飛ばす。ツリーの有無だけを見ると、`unittest
+	# discover -s tests` が "Start directory is not importable" で落ち、ターンが
+	# 止まる。モード B では projects/ のプロジェクトが Python とは限らないので、
+	# プロジェクトを 1 つ置いた時点で起きる（設計 4.4）。
+	[ -d "$target/tests" ] || continue
 	if out=$(cd "$target" && uv run --python 3.12 python -m unittest discover -s tests -t . --failfast 2>&1); then
 		continue
 	fi

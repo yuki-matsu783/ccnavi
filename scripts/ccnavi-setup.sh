@@ -77,7 +77,9 @@ DEFAULT_BIN=".claude/ccnavi/ccnavi"
 DEPLOY_BIN_DIR="dist/ccnavi"
 DEPLOY_RULES=".claude/ccnavi/rules.yml"
 DEPLOY_SCRIPT_DIR=".claude/scripts"
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh"
+# ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
+# 起動時に落ちる。
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh"
 
 mode="$DEFAULT_MODE"
 bin="$DEFAULT_BIN"
@@ -944,7 +946,7 @@ fi
 if [ ! -f "$root/.claude/ccnavi/rules.yml" ]; then
 	note_missing ".claude/ccnavi/rules.yml（何を止めるか。無いと組み込みの既定だけで判定する）"
 fi
-for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh; do
+for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh; do
 	if [ ! -f "$root/.claude/scripts/$name" ]; then
 		note_missing ".claude/scripts/$name（ゲートの中で通る形）"
 	fi

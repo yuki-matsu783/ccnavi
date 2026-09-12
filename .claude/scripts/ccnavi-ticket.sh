@@ -20,6 +20,9 @@
 
 set -eu
 
+# 共通部分。ワークスペースルートの探し方はここにある（設計 §25.8）。
+. "$(dirname "$0")/ccnavi-common.sh"
+
 usage() {
 	cat <<'USAGE'
 sh .claude/scripts/ccnavi-ticket.sh <start|done|cancel> <識別子> [--reason <理由>]
@@ -48,17 +51,15 @@ start | done | cancel | judge) ;;
 	;;
 esac
 
-# main の根。作業ツリーの中から呼ばれても、承認済みチケットと設定は main の側にある。
-common=$(git rev-parse --git-common-dir 2>/dev/null || :)
-[ -z "$common" ] && {
-	printf 'ccnavi-ticket: git リポジトリの中で実行してください。\n' >&2
+# ワークスペースルート。承認済みチケットと設定と実行ファイルはここにある。
+#
+# git には聞かない。モード B（projects/ の下に別リポジトリを clone する形）では、
+# cwd がプロジェクトの中にあると git はプロジェクトを答える。それは git として
+# 正しい答えで、ここで欲しいもの（道具の置き場）とは違う（設計 §25.8）。
+root=$(ccnavi_workspace) || {
+	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
-case "$common" in
-*/.git) root="${common%/.git}" ;;
-.git) root="$(pwd -W 2>/dev/null || pwd)" ;;
-*) root="$common" ;;
-esac
 
 # 実行ファイル。設定に書かれた綴りを優先し、無ければ既定の置き場、それも無ければソース。
 case "${CCNAVI_BIN_PATH:-}" in
