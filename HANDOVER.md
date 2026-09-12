@@ -145,6 +145,13 @@ selfguard の中核に入る。`projects/` が無ければ前と同じに動く�
 何も足していない（`--risk` は前からある）。ファイルが無ければ組み込みと同じ値で作る。core は `risk-doc.ts` と
 `risk-render.ts`（テスト CB-T72〜T85）。拡張の手動確認は README の表 34〜38。まだ拡張開発ホストでは通していない。
 
+**VS Code 拡張にフェーズ管理画面が入った（2026-09-12、拡張 0.5.0）。** サイドパネルの「フェーズ管理」から
+`phases.yml` の種類（id・title・kind・review・scope・deliverables・overlap・requires・agent・when）を画面で直し、
+`--lint --phases <一時ファイル>` を通してから保存する。実行ファイルには何も足していない（`--phases` は前からある。
+`--lint` が承認待ちの計画をその種類で照合するので、計画が指す種類を消す保存はそこで止まる）。ファイルが無ければ
+README の例を雛形として作る（組み込みの既定は無い）。core は `phases-doc.ts` と `phases-render.ts`
+（テスト CB-T86〜T95）。拡張の手動確認は README の表 39〜44。まだ拡張開発ホストでは通していない。
+
 **並行するチケット（REQ-TKT、設計 §24）は入った。** `tests/test_ticket.py` が親 1 本と子 2 本を
 フェーズ 1 つで通す。残っているのは実測が要るもの。
 
