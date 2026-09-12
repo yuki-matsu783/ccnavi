@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import globmatch, rules, tree
+from . import globmatch, rules
 from . import ticket as ticket_mod
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
@@ -236,9 +236,12 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
             )
             continue
         glob = glob.replace("\\", "/").strip("/")
-        flags = re.IGNORECASE if tree.CASE_INSENSITIVE else 0
+        # 子チケットの範囲と同じく、大文字小文字は区別しない（`ticket.entries`）。
+        # 機械ごとに変えると、同じ提案が Linux では「種類の上限を超えている」で
+        # 承認を拒まれ、Windows では通る。範囲は人が宣言する意図なので、機械の
+        # 都合ではなく綴りの意味で読む。子 ⊆ 種類 ⊆ 親 の 3 つを 1 つの規則で揃える。
         try:
-            compiled = re.compile("^" + globmatch.translate(glob), flags)
+            compiled = re.compile("^" + globmatch.translate(glob), re.IGNORECASE)
         except re.error as exc:
             problems.append(Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` を式にできない: {exc}"))
             continue
