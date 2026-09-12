@@ -58,7 +58,8 @@ ccnavi/modes.py             enable / dry-run / disable と終了コード
 ccnavi/gitcmd.py            git を 1 回起こす
 ccnavi/fsio.py              ファイルの読み書きの型
 build.py                    PyInstaller の onedir で配布物を組み立てる
-tests/                      受入テスト。実行ファイルを外から叩く
+tests/                      受入テスト。入口（cli.run）に引数と標準入力を渡し、応答だけを見る
+tests/inproc.py             その起動をプロセスを起こさずに行う。起動の検査は test_entry.py だけ
 ```
 
 実行時の third-party 依存は PyYAML 1 本。チケットの frontmatter が YAML なので、
