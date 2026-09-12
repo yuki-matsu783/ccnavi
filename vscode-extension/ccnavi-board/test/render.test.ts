@@ -1,10 +1,71 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
 import { buildBoard } from "../src/core/board.js";
 import { escapeHtml, renderBoard } from "../src/core/render.js";
 import { fixture } from "./fixture.js";
 
 const OPTIONS = { nonce: "TEST-NONCE-123" };
+
+function approvePreview(): ApprovePreview {
+  const text = fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
+  const parsed = parseApprovePreview(text);
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+  return parsed.value;
+}
+
+test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
+  const preview = approvePreview();
+  const html = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview } });
+  assert.ok(html.includes('class="approval-backdrop" data-approval="preview"'));
+  assert.ok(html.includes("Ticket 承認リクエスト: 2 件"));
+  assert.ok(html.includes('data-action="approve-confirm" data-tickets="i0001,i0001-01"'));
+  assert.ok(html.includes("この 2 件を承認する"));
+  assert.ok(html.includes('data-action="approve-cancel"'));
+  assert.ok(html.includes('<pre class="approval-text">Ticket 承認リクエスト'));
+  assert.ok(html.includes("承認の対象にしない"));
+  assert.ok(html.includes("i0001-02"));
+  assert.ok(html.includes("超えている"));
+  assert.ok(!html.includes("読めない提案・写し"));
+  // 本文は実体参照にする。
+  const spiked = { ...preview, text: "<script>alert(1)</script>" };
+  const escaped = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview: spiked } });
+  assert.ok(!escaped.includes("<script>alert(1)</script>"));
+  assert.ok(escaped.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
+});
+
+test("CB-T108 束が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
+  const preview = approvePreview();
+  const empty = renderBoard(buildBoard(fixture()), {
+    ...OPTIONS,
+    approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
+  });
+  assert.ok(empty.includes("承認待ちのチケットは無い"));
+  assert.ok(!empty.includes('data-action="approve-confirm"'));
+  const approving = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "approving", preview } });
+  assert.ok(approving.includes('data-approval="approving"'));
+  assert.ok(approving.includes("承認している…"));
+  assert.ok(/data-action="approve-confirm"[^>]*disabled/.test(approving));
+  const noticed = renderBoard(buildBoard(fixture()), {
+    ...OPTIONS,
+    approval: { kind: "preview", preview, notice: "見せた束と今の束が違った" },
+  });
+  assert.ok(noticed.includes('class="approval-note warn">見せた束と今の束が違った'));
+  const failed = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "error", error: "実行ファイルが無い" } });
+  assert.ok(failed.includes('class="approval-note error">実行ファイルが無い'));
+});
+
+test("CB-T109 オーバーレイを渡さなければ出ない", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  // スタイルとスクリプトには名前が残るので、要素そのものが無いことを見る。
+  assert.ok(!html.includes('class="approval-backdrop"'));
+  assert.ok(!html.includes('data-action="approve-confirm"'));
+  assert.ok(html.includes('data-action="approve"'));
+});
 
 test("CB-T12 4 列と件数と承認ボタンを出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);

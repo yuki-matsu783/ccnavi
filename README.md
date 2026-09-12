@@ -584,9 +584,10 @@ VS Code を使わないときは `--no-vscode` を付ける。
 
 チケットがどの作業ツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
 （`vscode-extension/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
-並べるだけで、人の承認（`--approve` / `accept`）はボタンから統合ターミナルへコマンドを送る。
-`wrapup` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、出力の形は
-下の「ボードの JSON」。
+並べるだけ。承認はボードのオーバーレイで束を見せ、人が押したら `--approve --yes` を子プロセスで
+打つ（形は下の「承認の JSON」）。`accept` はボタンから統合ターミナルへコマンドを送り、y/N は人が
+ターミナルで押す。`wrapup` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
+出力の形は下の「ボードの JSON」。
 
 同じ拡張の「ルール設定画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
 判定は `ccnavi --test --json` と `--test-samples --json` を通る（形は「試験の JSON」）。
@@ -1024,6 +1025,20 @@ ccnavi --approve i0002 i0002-01   # 並べた識別子だけを束にする
 
 終わったフェーズに子を足して承認すると、そのフェーズの印 4 種（`pending` `requested`
 `reviewed` `skipped`）は全部消える。
+
+承認する場所は 2 つある。端末で `--approve` を打つと束を見せて y/N を取る。VS Code の
+拡張（ボード）は、束を `--approve --preview --json` で読んでオーバーレイに出し、人が押したら
+`--approve --yes <識別子,…> --json` を子プロセスで打つ。形は「承認の JSON」にある。
+`--yes` は端末を求めない代わりに、見せた束と今の束が同じであることを求め、違えば何も置かない。
+ボードが絞り込んでいるときは、その絞りを `--preview` と `--yes` の両方に同じように渡す。
+エージェントが Bash や PowerShell で `--yes` を打つ道は、組み込みの deny
+（`builtin-guard-ticket-approval`）が塞ぐ。束を見るだけの `--preview` は通す。
+
+承認されたことは、次の `UserPromptSubmit` か `PreToolUse` で 1 度だけモデルに届く
+（`additionalContext`）。セッションごとに、最初の hook より後に置かれた写しと、印
+（`approved_at` と `revised_at`）が変わった写しが「新しい承認」になる。人が「承認した」と
+打たなくても、モデルは後工程に入れる。拡張は同じ文を通知の 2 ボタン（コピー、
+新しいセッションで開く）から渡せる。
 
 ### 判定の鍵はファイルの行き先
 
@@ -1653,6 +1668,51 @@ ccnavi --explain --json
 | `wrapup` / `ready` | 親の印 `wrapup.json` / `ready.json` の中身。無ければ `null` |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` は印の種類 → 中身。`gate_closed` は判定が使うのと同じ値 |
+
+## 承認の JSON
+
+```sh
+ccnavi --approve --preview --json [<絞り>...]           # 束を見る（写しは置かない）
+ccnavi --approve --yes <識別子,…> --json [<絞り>...]    # 見せた束をそのまま承認する
+```
+
+VS Code の拡張が、承認をターミナルではなくボードのオーバーレイで行うための 2 本。束を組むのは
+`--approve` と同じ関数で、`--explain --json` の `pending_approval` と答えが割れない。実例は
+`vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` ほかにあり、`tests/test_approve_json.py`
+が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
+`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
+
+`--preview` の答え。
+
+| 鍵 | 何 |
+|---|---|
+| `version` | 形の版。整数。`--yes` と同じ番号 |
+| `root` / `generated_at` | ワークスペースルートと、出した時刻 |
+| `batch[]` | 承認する束。`{ticket, title, parent, phase, revision, tree, path}`。`parent` と `phase` は子だけ（親は `null`）。`revision` は親の改版。空なら承認待ちが無い |
+| `text` | 承認画面の本文そのまま。拡張はこれを等幅で並べ、項目には分けない |
+| `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}` |
+| `problems[]` | 読めない提案や写しの説明 |
+
+`--yes` の答え。値は `--preview` の `batch[].ticket` をカンマで並べたもの。
+
+| 鍵 | 何 |
+|---|---|
+| `version` | 同上 |
+| `approved[]` / `copies[]` | 承認した識別子と、置いた写しのパス |
+| `lines[]` | 端末なら標準出力に出ていた行（印を消したことなど） |
+| `prompt` | Claude Code に渡す文。hook が次の `UserPromptSubmit` / `PreToolUse` で渡す文と同じ |
+| `mismatch` | 束が変わっていたとき。`{expected[], current[]}`。このとき写しは置かれず、終了コードは 1 |
+
+`--yes` は端末を求めない（`--preview` も同じ）。代わりに、見せた束と今の束が同じであることを
+求める。人が見ていないものを承認する道を塞ぐため。エージェントが Bash や PowerShell で
+`--yes` を打つ道は、組み込みの deny（`builtin-guard-ticket-approval`）が塞ぐ。`--preview` は
+束を見るだけなので通す。`--json` を付けなければ、どちらも人向けの文面を出す。
+
+後ろに並べる `<絞り>` は `ccnavi --approve <識別子>...` と同じで、束を狭める（ボードが絞り込みで
+見えている承認待ちを渡す）。`--yes` の値とは役割が違う。`--yes` は「人がオーバーレイで見た識別子」で、
+`<絞り>` は「そのとき掛けていた絞り」。比べるのは「その絞りで今できる束」と「見た識別子」で、
+1 つの引数にまとめると検査が自分自身と比べる形になり、常に一致してしまう。絞り込みが無ければ
+`<絞り>` は空で、承認待ち全部と比べる。
 
 ## 生の git は止めてラッパへ寄せる
 

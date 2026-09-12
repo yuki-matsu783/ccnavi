@@ -77,6 +77,7 @@
 | [0030](0030-three-human-touches.md) | push とマージリクエストの作成を親に渡し、人の手を 3 回にする |
 | [0031](0031-unresolved-not-by-time.md) | 未解決の指摘は時刻で絞らず、いま残っている全部を数える |
 | [0039](0039-approve-narrowing.md) | 承認の束は識別子で狭められる（狭めるだけ） |
+| [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える |
 
 ### 複数のリポジトリと VS Code 拡張
 

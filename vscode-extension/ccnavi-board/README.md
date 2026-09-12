@@ -9,9 +9,18 @@ ccnavi のチケットが、どの作業ツリーでどこまで進んでいる�
 ドラッグすると幅を固定でき、ダブルクリックで元の伸び縮みに戻る。幅を固定した列も畳めば見出し
 1 行ぶんに縮み、広げると固定した幅に戻る。畳んだ列・列の幅・絞り込みは更新しても残る。
 
-人の承認はボタンから統合ターミナルへコマンドを送る。拡張は承認を自分では実行しない。
-ccnavi は `--approve` / `accept` を端末から打つものと決めていて（エージェントが
-人の合意を出せないための壁）、拡張の子プロセスもその壁の外に置く。y/N は人がターミナルで押す。
+人の承認はボードのオーバーレイで行う。「承認」を押すと拡張が `ccnavi --approve --preview --json` を
+子プロセスで打ち、束（いま承認待ちのもの全部）の本文・対象外の提案・読めない提案をボードの上に出す。
+「この N 件を承認する」で `ccnavi --approve --yes <識別子,…> --json` を打ち、実行ファイルが「見せた束と
+今の束が同じ」ことを確かめてから写しを置く。違えば何も置かず、束を読み直して出し直す。端末の壁
+（stdin が tty）はこの経路に無く、エージェントが Bash で同じ形を打つ道は実行ファイルの組み込みの
+deny が止める。承認できたら通知に「コピー」「新しいセッションで開く」の 2 ボタンが出て、Claude Code に
+渡す文（承認された識別子と後工程の進め方）をクリップボードに入れるか、
+`vscode://anthropic.claude-code/open?prompt=…` で新しいセッションに埋める。送信は人が Enter で行う。
+同じ文は hook が次の UserPromptSubmit / PreToolUse でモデルに 1 度渡すので、進行中のセッションに
+何か打てば後工程に入れる。
+
+`accept` は今までどおり統合ターミナルへコマンドを送り、y/N は人がターミナルで押す。
 親を早期に締める `wrapup` はボードに出さない。端末で `ccnavi-review.sh wrapup` を打つ。
 
 同じ拡張に「ルール設定画面」がある。ルールファイル（`rules.yml`）を画面で直し、保存する前に
@@ -35,7 +44,7 @@ ccnavi は `--approve` / `accept` を端末から打つものと決めていて�
 「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の 5 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
 チケット制御を使っているときだけ。`.claude/settings.json`（`settings.local.json` が勝つ）の
 `env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口もコマンドパレットの「ボードを開く」「ボードを更新」
-「承認する」も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
+も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
 ボードを開いたとき、実行ファイルの答え（`--explain --json` の `settings.ticket_control`）と食い違えば通知で言う。
 
 - 出力の形: ccnavi の README「ボードの JSON」「試験の JSON」
@@ -47,7 +56,6 @@ ccnavi は `--approve` / `accept` を端末から打つものと決めていて�
 |---|---|
 | `ccnavi ボード: ボードを開く` | ボードを開く。既に開いていれば増やさず前面に出す |
 | `ccnavi ボード: ボードを更新` | `ccnavi --explain --json` を走らせ直して内容を差し替える |
-| `ccnavi ボード: 承認待ちを承認する（--approve）` | ボードを開かずに `--approve` をターミナルへ送る。絞り込みは効かず、承認待ち全部の束になる |
 | `ccnavi ボード: ルール設定画面を開く` | ワークスペースのルール設定画面を開く。既に開いていれば前面に出す |
 | `ccnavi ボード: プロジェクト管理を開く` | プロジェクト管理画面を開く。既に開いていれば前面に出して読み直す |
 | `ccnavi ボード: リスク管理画面を開く` | リスク管理画面を開く。既に開いていれば前面に出す |
@@ -171,7 +179,11 @@ YAML として読めないファイルは画面から直せない（エディタ
 | 操作 | 何が起きるか |
 |---|---|
 | カードをクリック / Enter | そのチケットの提案（無ければ写し）を Markdown プレビューで開く。組み込みの Markdown 拡張が無効ならエディタで開く |
-| 上部の「承認待ち N 件を承認」、未承認カードの「承認」 | ターミナルに `ccnavi --approve` を送る。束を見せて y/N を取る。絞り込み中は、見えている承認待ちの識別子を並べて送り（`--approve i0002 i0002-01`）、その分だけの束になる。N もその数。絞り込みが無ければ承認待ち全部の束。親や親の改版を束から外した子は実行ファイルが落とし、何も承認しない |
+| 上部の「承認待ち N 件を承認」、未承認カードの「承認」 | `--approve --preview --json` を打ち、承認のオーバーレイを出す。束の識別子の表、承認画面の本文、承認の対象にしない提案とその理由、読めない提案が並ぶ。絞り込み中は、見えている承認待ちの識別子を並べて渡し（`--approve --preview --json i0002 i0002-01`）、その分だけの束になる。絞り込みが無ければ承認待ち全部。親や親の改版を束から外した子は実行ファイルが落とし、何も承認しない |
+| オーバーレイの「この N 件を承認する」 | 見せた識別子をそのまま `--approve --yes <識別子,…> --json` に渡す。束が変わっていれば何も置かれず、読み直して「見せた束と今の束が違った」と出る。承認できたら通知に「コピー」「新しいセッションで開く」 |
+| オーバーレイの「やめる」/ Esc | 何もせず閉じる。承認している最中は閉じない |
+| 通知の「コピー」 | Claude Code に渡す文（`--yes` の `prompt`）をクリップボードに入れる。進行中のセッションに貼って送る |
+| 通知の「新しいセッションで開く」 | `vscode://anthropic.claude-code/open?prompt=…` を開く。Claude Code の新しいタブに文が埋まる。送信は人が Enter |
 | フェーズ行の「受け入れ」 | 依頼済みでゲートが閉じたままのフェーズに出る。親の作業ツリーに `cd` して `sh .claude/scripts/ccnavi-review.sh accept <N>` を送る |
 | プロジェクトの絞り込み | `projects/` があるときだけ出る。選択は Webview の状態として覚える |
 | 親の絞り込み | 親チケットが 1 つでもあれば出る。選んだ親とその子だけを出す。プロジェクトの絞り込みと重ねて効く。選択は Webview の状態として覚える |
@@ -180,7 +192,8 @@ YAML として読めないファイルは画面から直せない（エディタ
 
 - 提案（`wip/**/tickets/`、全作業ツリーの同じ場所）・写しと印（`.claude/ccnavi/tickets/`）・
   作業ツリーの登録（`.git/worktrees/`、`projects/*/.git/worktrees/`）を監視し、変化から 120 ミリ秒
-  静まったら自動で読み直す。承認コマンドの終了は追わず、写しや印が変わったことで読み直す
+  静まったら自動で読み直す。承認の後も、写しが置かれたことで読み直す。オーバーレイの状態は
+  拡張側が持つので、読み直しで HTML が作り直されても消えない
 - 対象はワークスペースの最初のフォルダだけ。`projects/` 配下のプロジェクト向けチケットも
   同じボードに出る（`project` バッジ）
 - レビューのスレッドの現状は取りに行かない。ボードが見せるのは印まで
@@ -193,7 +206,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 |---|---|
 | VS Code | 1.90 以上 |
 | ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が勝つ）の `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi[.exe]` → ソースがあれば `uv run python -m ccnavi` |
-| bash | 承認コマンドと clone / fetch / pull を送るターミナル。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
+| bash | accept と clone / fetch / pull を送るターミナル。承認は通らない（子プロセスで打つ）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone / fetch / pull を打つ |
 | Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
 
@@ -264,7 +277,9 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 2b | ファイルが無い | 提案のファイルを消した直後（ボードが読み直す前）にそのカードをクリック | 「チケットのファイルを開けなかった」の通知が出て、カードが消える |
 | 2c | プレビューが無い | 拡張の一覧で組み込みの「Markdown Language Features」を無効にしてからカードをクリック | 提案の Markdown がエディタ（素のテキスト）で開く |
 | 3 | 自動更新 | ボードを開いたまま、別のターミナルで `sh .claude/scripts/ccnavi-ticket.sh start <子>` | コマンドを打たなくてもカードが作業中へ動く |
-| 4 | 承認 | 未承認の提案を置き、「承認待ち 1 件を承認」を押す | 「ccnavi」ターミナルが開いて `--approve` が走り、束が出て y/N を聞く。y を押すとカードが承認済になる |
+| 4 | 承認 | 未承認の提案を置き、「承認待ち 1 件を承認」を押す | ボードの上にオーバーレイが出て、識別子の表と承認画面の本文が並ぶ。「この 1 件を承認する」でオーバーレイが閉じ、カードが承認済になり、通知に「コピー」「新しいセッションで開く」が出る。「コピー」でクリップボードに承認の文が入る。「新しいセッションで開く」で Claude Code の新しいタブに文が埋まる |
+| 4b | 束が変わった | オーバーレイを出したまま、別のターミナルで `wip/tickets/todo/` に提案をもう 1 枚置き、「この 1 件を承認する」 | 写しは置かれず、オーバーレイが「見せた束と今の束が違った」の注意付きで 2 件に読み直される |
+| 4c | やめる | オーバーレイで「やめる」か Esc | 何も置かれず閉じる |
 | 5 | 受け入れ | レビュー依頼済みでゲートが閉じたフェーズの「受け入れ」を押す | ターミナルで親の作業ツリーに `cd` してから `accept <N>` が走る |
 | 6 | 親の絞り込み | 親が 2 つ以上あるボードで、上部の「親」で 1 つを選ぶ | その親と子だけが残り、列の件数もその数になる。上部の「残り／全／不備／承認待ち」は変わらない。「更新」しても選択が残る |
 | 6b | 絞って承認 | 承認待ちが 2 つの親にまたがるボードで、片方の親で絞って「承認待ち N 件を承認」を押す | N はその親の分だけ。ターミナルの `--approve` に識別子が並び、束もその分だけ。y の後、もう片方の親の承認待ちは残る |
@@ -278,7 +293,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 12 | 読めない写し | ボードを開いたまま `.claude/ccnavi/tickets/<id>.md` の frontmatter を壊す | 上部の問題の一覧にその写しが出て、他のカードはそのまま |
 | 13 | プロジェクト | `projects/<repo>` を持つワークスペースで開く | `project` バッジと絞り込みが出る |
 | 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の順で 5 つ |
-| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
+| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
 | 15 | ルール設定画面が開く | サイドパネルの「ルール管理」 | deny / ask / allow の 3 タイプにルールが並ぶ。上部に dry-run の注意 |
 | 15b | 畳む | タイプの見出しの印、ルールの印を押す | タイプは中のルールごと隠れ、ルールは要約 1 行になる。もう一度押すと戻る。畳んだまま並べ替えても畳んだまま |
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
@@ -325,14 +340,15 @@ src/
   phases-panel.ts     フェーズ管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
-  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases の差し替え）/ --lint --json の実行（Node の子プロセス）
+  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases の差し替え）/ --lint --json / --approve --preview --json / --approve --yes … --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
+    approvemodel.ts   承認の JSON の形（--approve --preview --json / --approve --yes … --json）と読み取り
     testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情の抜き出し
     board.ts          列とカードへの組み立て、操作の有無
-    render.ts         ボードの HTML（外部資源なし、テーマ変数だけ）
+    render.ts         ボードの HTML（外部資源なし、テーマ変数だけ）と、承認のオーバーレイ
     rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
     risk-render.ts    リスク管理画面の HTML と、その中で動くスクリプト
@@ -344,7 +360,7 @@ src/
     projects-render.ts プロジェクト管理画面の HTML と、その中で動くスクリプト
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）
-    commands.ts       ターミナルに送るコマンド行
+    commands.ts       ターミナルに送るコマンド行（accept / wrapup）と、承認を子プロセスで打つ引数の並び
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
 media/
@@ -352,7 +368,8 @@ media/
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T103
+  fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/test_approve_json.py が書き出す
+  *.test.ts           core の単体テスト CB-T01〜CB-T109
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て
