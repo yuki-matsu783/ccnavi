@@ -12,9 +12,14 @@
 #   --force                  明示した --mode / --bin で、既にある値を置き換える。
 #                            写しでは、配り先に既にあるものも入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
+#   --no-vscode              .vscode/settings.json には触らない
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
 # env は触らない。ccnavi と関係のない hook や設定はそのまま残す。
+#
+# .claude/settings.json と一緒に .vscode/settings.json も見る。ccnavi は作業を
+# .claude/worktrees/ の中でさせるので、VS Code にそれを見せる 1 行が無いと、
+# エディタからは main の作業ツリーしか見えないまま作業が進む。
 #
 # 写しは、ccnavi を組み立てたところ（ccnavi のリポジトリ）から対象プロジェクトへ
 # 取る。設定を書くだけでは動かないのに、実行ファイルを置く手立てがどこにも
@@ -44,6 +49,11 @@
 set -eu
 
 SETTINGS_REL=".claude/settings.json"
+# VS Code へ渡す設定。値ではなくキーの有無で見て、足りないものだけを足す。
+# `git.detectWorktrees` は、.claude/worktrees/ の中の作業ツリーをソース管理の
+# ビューに出す（README「worktreeをVSCODEで見えるようにする」）。
+VSCODE_REL=".vscode/settings.json"
+VSCODE_KEYS='{"git.detectWorktrees": true}'
 # hook はこの 1 行だけを登録する。どのイベントを走らせるかは、payload が名乗る
 # イベント名を見て ccnavi 自身が選ぶ。
 HOOK_COMMAND='"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
@@ -77,6 +87,7 @@ bin_given=no
 all=no
 force=no
 check=no
+vscode=yes
 target=""
 # 配り元。名指しされたかどうかを分けて持つ。既定で埋めただけの配り元が使えない
 # のは「組み立てていない」で済むが、人が名指ししたものが使えないのは誤り。
@@ -100,6 +111,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --force                   明示した --mode / --bin で、既にある値を置き換える。
                             写しでは、配り先に既にあるものも入れ替える
   --check                   書かずに、揃っていないところだけを並べる
+  --no-vscode               .vscode/settings.json には触らない
 
 実行ファイル・ルール・ゲートの sh は、既定で ccnavi の根から写す。写した
 実行ファイルと _internal は、配り先の .gitignore に足す。
@@ -146,6 +158,10 @@ while [ "$#" -gt 0 ]; do
 		;;
 	--check)
 		check=yes
+		shift
+		;;
+	--no-vscode)
+		vscode=no
 		shift
 		;;
 	-h | --help | help)
@@ -559,6 +575,47 @@ copy_file() {
 	cp "$1" "$2"
 }
 
+# .vscode/settings.json。ここは ccnavi の判定には関わらない。人がエディタから
+# worktree を見られるかどうかだけを決める。
+#
+# 読めない形（VS Code の設定ファイルはコメントや末尾のカンマを書ける）に当たっても
+# die しない。ccnavi と関係のない書き方のせいで、肝心の .claude/settings.json まで
+# 書けなくなる。触らずに人へ渡して、残りは進める。
+vscode_settings="$root/$VSCODE_REL"
+vscode_current="{}"
+missing_vscode=""
+differing_vscode=""
+vscode_blocked=""
+
+if [ "$vscode" = yes ]; then
+	vscode_dir=$(dirname "$vscode_settings")
+	if [ -e "$vscode_dir" ] && [ ! -d "$vscode_dir" ]; then
+		vscode_blocked="$vscode_dir がディレクトリではありません。"
+	elif [ -e "$vscode_settings" ] && [ ! -f "$vscode_settings" ]; then
+		vscode_blocked="$VSCODE_REL がファイルではありません。"
+	elif [ -f "$vscode_settings" ]; then
+		vscode_current=$(cat "$vscode_settings")
+		if ! printf '%s' "$vscode_current" | jq . >/dev/null 2>&1; then
+			vscode_blocked="JSON として読めません（コメントや末尾のカンマがあると読めません）。"
+		elif [ "$(printf '%s' "$vscode_current" | jq -r 'type')" != object ]; then
+			vscode_blocked="全体が JSON のオブジェクトではありません。"
+		fi
+	fi
+fi
+
+if [ "$vscode" = yes ] && [ -z "$vscode_blocked" ]; then
+	missing_vscode=$(printf '%s' "$vscode_current" | jq -r --argjson want "$VSCODE_KEYS" '
+		. as $cur | $want | keys_unsorted[] | select($cur[.] == null)
+	')
+	# 値が違うものは変えない。`false` と書いてある設定を true に戻すのは、
+	# このスクリプトの仕事ではなく、そう書いた人の判断を消すことになる。
+	differing_vscode=$(printf '%s' "$vscode_current" | jq -r --argjson want "$VSCODE_KEYS" '
+		. as $cur | $want | to_entries[]
+		| select($cur[.key] != null and $cur[.key] != .value)
+		| "\(.key): \($cur[.key])（このスクリプトが書くのは \(.value)）"
+	')
+fi
+
 # 書き込みの前と後で、同じ一覧を違う言葉で見せる。前は「足りない」、後は
 # 「足した」。同じ文面のままだと、書けたのか書けなかったのかが読み取れない。
 report() {
@@ -581,6 +638,18 @@ report() {
 	if [ -n "$other_hooks" ]; then
 		printf 'ccnavi らしき別の綴りが登録されている hook（二重に走らせないため足していません。綴りを確かめてください）:\n'
 		printf '%s\n' "$other_hooks" | sed 's/^/  /'
+	fi
+	if [ -n "$missing_vscode" ]; then
+		printf '%s %s:\n' "$1" "$VSCODE_REL"
+		printf '%s\n' "$missing_vscode" | sed 's/^/  /'
+	fi
+	if [ -n "$differing_vscode" ]; then
+		printf '値が違う %s（このスクリプトは変えません）:\n' "$VSCODE_REL"
+		printf '%s\n' "$differing_vscode" | sed 's/^/  /'
+	fi
+	if [ -n "$vscode_blocked" ]; then
+		printf '%s は触っていません: %s\n' "$VSCODE_REL" "$vscode_blocked"
+		printf '  %s を自分で足すか、要らないなら --no-vscode を付けてください。\n' "$VSCODE_KEYS"
 	fi
 }
 
@@ -624,7 +693,8 @@ report_deploy_plan() {
 # --check を打って「揃っています」と言うことになる。
 settled=yes
 if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] ||
-	[ -n "$replacing_env" ] || [ -n "$differing_env" ] || [ -n "$other_hooks" ]; then
+	[ -n "$replacing_env" ] || [ -n "$differing_env" ] || [ -n "$other_hooks" ] ||
+	[ -n "$missing_vscode" ] || [ -n "$differing_vscode" ] || [ -n "$vscode_blocked" ]; then
 	settled=no
 fi
 # 写しも「揃っていない」に数える。配り元に無いものも数える。実行ファイルが
@@ -641,7 +711,11 @@ if [ "$check" = yes ]; then
 	report_missing
 	report_deploy_plan
 	if [ "$settled" = yes ]; then
-		printf 'env と hook は揃っています。\n'
+		if [ "$vscode" = yes ]; then
+			printf 'env と hook と %s は揃っています。\n' "$VSCODE_REL"
+		else
+			printf 'env と hook は揃っています。\n'
+		fi
 		exit 0
 	fi
 	exit 1
@@ -653,6 +727,10 @@ settings_work=no
 if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$replacing_env" ]; then
 	settings_work=yes
 fi
+vscode_work=no
+if [ -n "$missing_vscode" ]; then
+	vscode_work=yes
+fi
 deploy_work=no
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$ignore_todo" ]; then
 	deploy_work=yes
@@ -660,16 +738,61 @@ fi
 
 printf '%s\n' "$settings"
 
-if [ "$settings_work" = no ] && [ "$deploy_work" = no ]; then
+if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no ]; then
 	printf '書き足すものはありません。\n'
 	report_missing
 	report_deploy_plan
 	exit 0
 fi
 
-backed_up=no
-linked=no
+# 設定ファイルへの書き込みを 1 か所にする。写しは最初の 1 回だけ、リンクは
+# 切らない、という約束を 2 か所に書き写すと、片方だけ直したときにどちらが
+# 壊れるかが打つたびに変わる。
+#
+# 結果は backed_up と linked に置く。呼んだ側が、その綴りで報告する。
+write_json() {
+	# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
+	# 打ち直した数だけ写しが新しくなり、戻れるのは 1 手前まで――そこには既に
+	# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
+	mkdir -p "$(dirname "$1")"
+	backed_up=no
+	if [ -f "$1" ] && [ ! -e "$1.bak" ]; then
+		cp "$1" "$1.bak"
+		backed_up=yes
+	fi
 
+	# リンクを切らずに書く。`mv` はディレクトリエントリを差し替えるので、設定を
+	# 1 か所で持って各プロジェクトから張っている置き方だと、リンクが普通のファイルに
+	# なって実体には何も届かない。リンクのときだけ中身を書き、それ以外は同じ
+	# ディレクトリに書いてから動かす（途中で切れた設定ファイルを残さないため）。
+	linked=no
+	if [ -L "$1" ]; then
+		linked=yes
+	elif [ -e "$1" ]; then
+		count=$(ls -ld "$1" 2>/dev/null | awk '{print $2}')
+		case "$count" in
+		'' | *[!0-9]*) count=1 ;;
+		esac
+		if [ "$count" -gt 1 ]; then
+			linked=yes
+		fi
+	fi
+
+	if [ "$linked" = yes ]; then
+		printf '%s\n' "$2" >"$1"
+	else
+		tmp="$1.tmp.$$"
+		# 途中で落ちたときに書きかけを残さない。設定ファイルの隣に見慣れない
+		# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
+		trap 'rm -f "$tmp"' EXIT INT TERM
+		printf '%s\n' "$2" >"$tmp"
+		mv "$tmp" "$1"
+		trap - EXIT INT TERM
+	fi
+}
+
+settings_backed_up=no
+settings_linked=no
 if [ "$settings_work" = yes ]; then
 	# 既存を残す向きでマージする。env は既にある値を勝たせ、名指しされたキーだけを
 	# 後勝ちで置き換える。hook は登録が無いイベントにだけ足す。ccnavi と関係のない
@@ -692,51 +815,34 @@ if [ "$settings_work" = yes ]; then
 			end
 		)
 	")
+	write_json "$settings" "$updated"
+	settings_backed_up=$backed_up
+	settings_linked=$linked
+fi
 
-	mkdir -p "$claude_dir"
-	# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
-	# 打ち直した数だけ写しが新しくなり、戻れるのは 1 手前まで――そこには既に
-	# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
-	if [ -f "$settings" ] && [ ! -e "$settings.bak" ]; then
-		cp "$settings" "$settings.bak"
-		backed_up=yes
-	fi
-
-	# リンクを切らずに書く。`mv` はディレクトリエントリを差し替えるので、設定を
-	# 1 か所で持って各プロジェクトから張っている置き方だと、リンクが普通のファイルに
-	# なって実体には何も届かない。リンクのときだけ中身を書き、それ以外は同じ
-	# ディレクトリに書いてから動かす（途中で切れた設定ファイルを残さないため）。
-	if [ -L "$settings" ]; then
-		linked=yes
-	elif [ -e "$settings" ]; then
-		count=$(ls -ld "$settings" 2>/dev/null | awk '{print $2}')
-		case "$count" in
-		'' | *[!0-9]*) count=1 ;;
-		esac
-		if [ "$count" -gt 1 ]; then
-			linked=yes
-		fi
-	fi
-
-	if [ "$linked" = yes ]; then
-		printf '%s\n' "$updated" >"$settings"
-	else
-		tmp="$settings.tmp.$$"
-		# 途中で落ちたときに書きかけを残さない。設定ファイルの隣に見慣れない
-		# ファイルがあると、それが設定なのか残骸なのかを人が判断できない。
-		trap 'rm -f "$tmp"' EXIT INT TERM
-		printf '%s\n' "$updated" >"$tmp"
-		mv "$tmp" "$settings"
-		trap - EXIT INT TERM
-	fi
+# .vscode も同じ向きでマージする。既にあるキーは勝たせ、足りないものだけを足す。
+# ccnavi と関係のない VS Code の設定はそのまま残る。
+vscode_backed_up=no
+vscode_linked=no
+if [ "$vscode_work" = yes ]; then
+	vscode_updated=$(printf '%s' "$vscode_current" | jq --argjson want "$VSCODE_KEYS" '$want + .')
+	write_json "$vscode_settings" "$vscode_updated"
+	vscode_backed_up=$backed_up
+	vscode_linked=$linked
 fi
 
 report '足した' 'ccnavi を登録した' '置き換えた'
-if [ "$backed_up" = yes ]; then
+if [ "$settings_backed_up" = yes ]; then
 	printf '書き換える前の内容は %s.bak にあります（写しは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
 fi
-if [ "$linked" = yes ]; then
+if [ "$settings_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$SETTINGS_REL"
+fi
+if [ "$vscode_backed_up" = yes ]; then
+	printf '書き換える前の内容は %s.bak にあります（写しは最初の 1 回だけ取ります）。\n' "$VSCODE_REL"
+fi
+if [ "$vscode_linked" = yes ]; then
+	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
 fi
 
 # 写す。順は実行ファイル → ルール → ゲートの sh。途中で落ちたときに、判定する
