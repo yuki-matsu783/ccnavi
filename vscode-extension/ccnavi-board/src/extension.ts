@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import { approveFromPalette, openBoard, refreshBoard } from "./board-panel.js";
+import { openPhases } from "./phases-panel.js";
 import { openProjects } from "./projects-panel.js";
 import { openRisk } from "./risk-panel.js";
 import { openRules } from "./rules-panel.js";
@@ -23,6 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("ccnaviBoard.openProjects", () => void openProjects()),
     vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void openRisk()),
+    vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void openPhases()),
   );
 }
 

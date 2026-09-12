@@ -1,14 +1,15 @@
 /**
- * リスク管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
+ * フェーズ管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象はワークスペースの配点（`.claude/ccnavi/risk.yml`、`CCNAVI_RISK`）の 1 本だけ。配点は
- * プロジェクトごとには持たない（設計 §25）。パネルは 1 つ。
+ * 対象はワークスペースのフェーズの種類（`.claude/ccnavi/phases.yml`、`CCNAVI_PHASES`）の 1 本だけ。
+ * 種類はプロジェクトごとには持たない（設計 §25）。パネルは 1 つ。
  *
- * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --risk <パス>` で渡す。
- * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（どのツリーでも。配点は子を閉じる
- * ときに読まれるので、走っている最中に変えない）、ファイルが外で変わっていないときだけ行う。
- * ファイルが無いときは組み込みの配点を見せ、「作る」で同じ値のファイルを書き出してから直す。
+ * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --phases <パス>` で渡す。
+ * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（どのツリーでも。種類は承認・着手・
+ * 閉じるときに読まれるので、走っている最中に変えない）、ファイルが外で変わっていないときだけ行う。
+ * ファイルが無いときは空の画面を見せ、「作る」で雛形を書き出してから直す。組み込みの既定は無い
+ * （実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -20,13 +21,13 @@ import { WATCH_PATTERNS } from "./board-panel.js";
 import { loadBoard, runLint } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
+import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
+import { renderPhasesPage } from "./core/phases-render.js";
 import { escapeHtml } from "./core/render.js";
-import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument, type RiskForm } from "./core/risk-doc.js";
-import { renderRiskPage } from "./core/risk-render.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_RISK = ".claude/ccnavi/risk.yml";
+const DEFAULT_PHASES = ".claude/ccnavi/phases.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
@@ -34,18 +35,18 @@ type Message =
   | { readonly type: "reload"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "create" }
-  | { readonly type: "save"; readonly form: RiskForm };
+  | { readonly type: "save"; readonly form: PhasesForm };
 
 interface Loaded {
-  /** ファイルの本文。無ければ組み込みの配点の本文 */
+  /** ファイルの本文。無ければ空 */
   readonly text: string;
   readonly exists: boolean;
   /** 無いときは 0 */
   readonly mtimeMs: number;
-  readonly doc: RiskDocument;
-  readonly riskPath: string;
+  readonly doc: PhasesDocument;
+  readonly phasesPath: string;
   /** ワークスペースルートからの相対で見せる綴り */
-  readonly riskRel: string;
+  readonly phasesRel: string;
 }
 
 interface PanelState {
@@ -69,11 +70,11 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openRisk` の本体 */
-export async function openRisk(): Promise<void> {
+/** `ccnaviBoard.openPhases` の本体 */
+export async function openPhases(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、リスク管理画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フェーズ管理画面を表示できない");
     return;
   }
   if (state !== undefined) {
@@ -86,11 +87,11 @@ export async function openRisk(): Promise<void> {
   try {
     loaded = readPage(root);
   } catch (error) {
-    vscode.window.showErrorMessage(`リスク管理画面を表示できない: ${(error as Error).message}`);
+    vscode.window.showErrorMessage(`フェーズ管理画面を表示できない: ${(error as Error).message}`);
     return;
   }
 
-  const panel = vscode.window.createWebviewPanel("ccnaviRisk", "ccnavi リスク管理", vscode.ViewColumn.One, {
+  const panel = vscode.window.createWebviewPanel("ccnaviPhases", "ccnavi フェーズ管理", vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
@@ -100,7 +101,7 @@ export async function openRisk(): Promise<void> {
   const current: PanelState = {
     panel,
     folder,
-    tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-risk-")),
+    tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-phases-")),
     fileWatchers: [],
     watchers: [],
     loaded,
@@ -114,37 +115,40 @@ export async function openRisk(): Promise<void> {
 }
 
 /** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。実行ファイルが読む env の重なりと同じ */
-function riskRelOf(root: string): string {
+function phasesRelOf(root: string): string {
   for (const name of ["settings.local.json", "settings.json"]) {
     const settingsText = readText(path.join(root, ".claude", name));
-    const found = settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_RISK");
+    const found = settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_PHASES");
     if (found !== "") {
       return found;
     }
   }
-  return DEFAULT_RISK;
+  return DEFAULT_PHASES;
 }
 
 function readPage(root: string): Loaded {
-  const riskRel = riskRelOf(root);
-  const riskPath = resolveIn(root, riskRel);
+  const phasesRel = phasesRelOf(root);
+  const phasesPath = resolveIn(root, phasesRel);
   let text: string;
   let mtimeMs: number;
   let exists: boolean;
   try {
-    text = fs.readFileSync(riskPath, "utf8");
-    mtimeMs = fs.statSync(riskPath).mtimeMs;
+    text = fs.readFileSync(phasesPath, "utf8");
+    mtimeMs = fs.statSync(phasesPath).mtimeMs;
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`配点のファイルを読めない（${riskRel}）: ${(error as Error).message}`);
+      throw new Error(`フェーズの種類のファイルを読めない（${phasesRel}）: ${(error as Error).message}`);
     }
-    // 無いのは不備ではない（組み込みの配点）。画面は組み込みを見せ、「作る」だけができる。
-    text = BUILTIN_RISK_TEXT;
+    // 無いのは不備ではない（番号だけのフェーズ）。画面は空を見せ、「作る」だけができる。
+    text = "";
     mtimeMs = 0;
     exists = false;
   }
-  return { text, exists, mtimeMs, doc: readRisk(text), riskPath, riskRel };
+  // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
+  const parsed = readPhases(text);
+  const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
+  return { text, exists, mtimeMs, doc, phasesPath, phasesRel };
 }
 
 function readText(filePath: string): string | undefined {
@@ -200,7 +204,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * 配点のファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * 種類のファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
  * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
  * ならないので、そのディレクトリを起点にする。
  */
@@ -209,9 +213,9 @@ function watchFiles(current: PanelState): void {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  const riskRel = current.loaded?.riskRel ?? DEFAULT_RISK;
+  const phasesRel = current.loaded?.phasesRel ?? DEFAULT_PHASES;
   const patterns: vscode.RelativePattern[] = [
-    patternFor(current.folder, riskRel),
+    patternFor(current.folder, phasesRel),
     new vscode.RelativePattern(current.folder, ".claude/settings.json"),
     new vscode.RelativePattern(current.folder, ".claude/settings.local.json"),
   ];
@@ -269,7 +273,7 @@ function scheduleLock(current: PanelState): void {
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 配点はワークスペースに 1 本で、どのツリーの子を閉じるときにも読まれるので、どのツリーの doing でも止める。
+ * 種類はワークスペースに 1 本で、どのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
@@ -286,10 +290,10 @@ function show(current: PanelState): void {
   if (loaded === undefined) {
     return;
   }
-  current.panel.webview.html = renderRiskPage(
+  current.panel.webview.html = renderPhasesPage(
     {
       root: current.folder.uri.fsPath,
-      riskPath: loaded.riskRel,
+      phasesPath: loaded.phasesRel,
       exists: loaded.exists,
       ticketControl: ticketControl(),
       model: loaded.doc.model,
@@ -312,7 +316,7 @@ function reload(current: PanelState): void {
 }
 
 function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi リスク管理</title></head><body><p>リスク管理画面を読み直せなかった。直してから「ccnavi ボード: リスク管理画面を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi フェーズ管理</title></head><body><p>フェーズ管理画面を読み直せなかった。直してから「ccnavi ボード: フェーズ管理画面を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
 function fail(current: PanelState, message: string): void {
@@ -339,7 +343,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     }
     case "openFile": {
-      const target = current.loaded.riskPath;
+      const target = current.loaded.phasesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
         () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
@@ -357,37 +361,39 @@ async function handleMessage(current: PanelState, message: Message | undefined):
   }
 }
 
-/** 組み込みと同じ値のファイルを書き出す。既にあれば上書きしない（値は同じなので数え方は変わらない） */
+/** 雛形を書き出す。既にあれば上書きしない */
 function create(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
   }
-  if (fs.existsSync(loaded.riskPath)) {
-    fail(current, `${loaded.riskRel} は既に存在するため、上書きしない。再読込する`);
+  if (fs.existsSync(loaded.phasesPath)) {
+    fail(current, `${loaded.phasesRel} は既に存在するため、上書きしない。再読込する`);
     return;
   }
   try {
-    fs.mkdirSync(path.dirname(loaded.riskPath), { recursive: true });
+    fs.mkdirSync(path.dirname(loaded.phasesPath), { recursive: true });
     current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.riskPath, BUILTIN_RISK_TEXT, { encoding: "utf8", flag: "wx" });
+    fs.writeFileSync(loaded.phasesPath, TEMPLATE_PHASES_TEXT, { encoding: "utf8", flag: "wx" });
   } catch (error) {
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
-    fail(current, `${loaded.riskRel} に書けない: ${(error as Error).message}`);
+    fail(current, `${loaded.phasesRel} に書けない: ${(error as Error).message}`);
     return;
   }
   reload(current);
-  vscode.window.showInformationMessage(`${loaded.riskRel} を組み込みの配点で作った。コミットは人が行う`);
+  vscode.window.showInformationMessage(
+    `${loaded.phasesRel} を雛形で作った。scope の綴りをこのプロジェクトの置き場に直す。コミットは人が行う`,
+  );
 }
 
-async function save(current: PanelState, form: RiskForm): Promise<void> {
+async function save(current: PanelState, form: PhasesForm): Promise<void> {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
   }
   if (!loaded.exists) {
-    fail(current, `${loaded.riskRel} が無い。先に「組み込みの配点でファイルを作る」を押す`);
+    fail(current, `${loaded.phasesRel} が無い。先に「雛形でファイルを作る」を押す`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -395,15 +401,15 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   let text: string;
   try {
     text = loaded.doc.apply(form);
-    tmp = path.join(current.tmpDir, "risk.yml");
+    tmp = path.join(current.tmpDir, "phases.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
     fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
     return;
   }
 
-  // 1. 検証。error が 1 件でもあれば保存しない。
-  const lint = await runLint(root, binSetting(), { kind: "risk", path: tmp });
+  // 1. 検証。error が 1 件でもあれば保存しない。承認済みの計画がこの種類で読めるかもここで分かる。
+  const lint = await runLint(root, binSetting(), { kind: "phases", path: tmp });
   if (!alive(current)) {
     return;
   }
@@ -413,7 +419,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.riskRel)}`);
+    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }
 
@@ -430,27 +436,27 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   // 3. 読み込んでから外で変わっていないこと。
   let mtimeMs: number;
   try {
-    mtimeMs = fs.statSync(loaded.riskPath).mtimeMs;
+    mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
   } catch (error) {
-    fail(current, `配点のファイルを確かめられない: ${(error as Error).message}`);
+    fail(current, `フェーズの種類のファイルを確かめられない: ${(error as Error).message}`);
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "配点のファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+    fail(current, "フェーズの種類のファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
     return;
   }
 
   try {
     current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.riskPath, text, "utf8");
+    fs.writeFileSync(loaded.phasesPath, text, "utf8");
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `配点のファイルに書けない: ${(error as Error).message}`);
+    fail(current, `フェーズの種類のファイルに書けない: ${(error as Error).message}`);
     return;
   }
   reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.riskRel} に保存した（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存した（${tail}）`);
 }
 
 function asMessage(message: unknown): Message | undefined {
@@ -465,7 +471,7 @@ function asMessage(message: unknown): Message | undefined {
     case "create":
       return { type: m.type };
     case "save": {
-      const form = asRiskForm(m.form);
+      const form = asPhasesForm(m.form);
       return form === undefined ? undefined : { type: "save", form };
     }
     default:
