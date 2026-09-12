@@ -1481,17 +1481,18 @@ error 2 件、warn 2 件
 ccnavi --lint --json
 ```
 
-`--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にして出す。終了コードも同じ
+`--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にまとめて出す。終了コードも同じ
 （error があれば 1）。読み手は VS Code の拡張で、プロジェクト管理画面が
 プロジェクトごとの warn（`projects/` が無視されていない、`config/rules.yml` が無い、
-`.claude/` を持つ）を拾って並べる。文面の版は人向けに変えてよいが、こちらの形は契約。
+`.claude/` を持つ）を拾って並べる。人向けの文面は書き換えてよいが、この JSON の形は
+拡張との契約なので、変えるときは版を上げる。
 
 | 鍵 | 何 |
 |---|---|
 | `version` | 形の版。整数（いま 1）。欄を足すだけなら上げない |
-| `root` / `rules` / `mode` / `ticket_control` | 何を見た結果か。文面の版が頭に名乗るものと同じ |
-| `projects[]` | 数えたプロジェクトの名前 |
-| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn`。`where` は文面の版で `error: ` の後ろに出る場所（`(projects/lib) rule-id` など。ファイル全体なら空） |
+| `root` / `rules` / `mode` / `ticket_control` | 何を見て検証したか。人向けの文面が先頭に出すものと同じ |
+| `projects[]` | 検証の対象になったプロジェクトの名前 |
+| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id` など。ファイル全体への苦情なら空） |
 | `errors` / `warns` | 件数 |
 
 ### 1 つのプロジェクトのルールを保存せずに試す
@@ -1501,12 +1502,12 @@ ccnavi --test Write projects/lib/src/a.py --json --project-rules-file lib=/tmp/e
 ccnavi --lint --json --project-rules-file lib=/tmp/edited.yml
 ```
 
-`--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルとして
+`--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに
 `<パス>` を読む。`--rules` がワークスペースのルールを差し替えるのと同じことを、
 プロジェクト 1 つに対して行う。VS Code の拡張が、編集中の `config/rules.yml` を保存する前に
-判定と検証に掛けるための口で、`--test` / `--test-samples` / `--lint` / `--explain` でだけ効く。
-hook からの判定に渡しても捨てる（標準エラーに言う）。保存していないルールが判定に効く
-道を、実行時には持たない。守る対象（selfguard）も差し替えを見ず、本来の場所を守る。
+判定と検証に掛けるための旗で、`--test` / `--test-samples` / `--lint` / `--explain` でだけ効く。
+hook からの判定に渡しても無視する（標準エラーにその旨を出す）。保存していないルールが
+実運用の判定に効く道を作らないため。守る対象（selfguard）も差し替えを見ず、本来の場所を守る。
 
 ## ボードの JSON
 
