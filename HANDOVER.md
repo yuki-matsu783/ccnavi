@@ -98,11 +98,6 @@ uv run --with pyinstaller python build.py
 - 並行するチケット（REQ-TKT）のうち、GitHub の実物に対する `request` と `check` は
   実測していない。GitLab は実物（CE 18.5）で 1 周した（下の「落とし穴」）。
   自動テストは sh の代わりに写し（`--result`）を渡す形で通す
-- REQ-CMN-04 の半分。`.claude/settings.json` の `env` に書いた `CCNAVI_MODE=disable` は、判定の
-  経路では「人が起動時に渡した `disable`」と区別が付かないので止められない。見つけられるのは
-  `--lint`（error）と導入スクリプト（`--mode disable` を断る）だけ。塞ぐなら実行ファイルが
-  `.claude/settings.json` を読む必要があり、それは「判定の間に外部の状態を増やす」向きなので
-  入れるかどうかは相談（設計 §4.3、ADR-0006）
 - REQ-MLT-14 の後半。git ラッパの記録が `logs/<プロジェクト>/` ではなく `logs/` に平坦に出る
   （下の「次にやること」）
 - REQ-TKT-35 の後半。`SubagentStart` は親の局面（作業中・レビュー待ちなど）を名指ししない。
@@ -138,11 +133,6 @@ scheme の `[a-z]+` は大文字も含める。実行ファイル側の `remote_
 - `projects/` をワークスペースの `.gitignore` に入れたとき、Claude Code がプロジェクトの中の
   CLAUDE.md を読むか。読まれるならワークスペースの CLAUDE.md と矛盾しないように書く
 - `cwd` がプロジェクトの中にあるとき、hook の `${CLAUDE_PROJECT_DIR}` がワークスペースルートのままか
-
-**フェーズの種類の `scope` だけ、大文字小文字の扱いが機械依存になっている。** チケットの範囲は
-常に区別しないのに（`ticket.py`）、種類の範囲の上限は走らせる機械に従う（`phasetypes.py`）。同じ提案が
-Linux と Windows で「種類の上限を超えている」の判定が割れる。範囲は人が宣言する意図なので、
-チケット側に揃えるのが筋。判定が緩む向きにも厳しい向きにも動きうるので、直す前に相談する。
 
 **`.claude/ccnavi/rules.yml` に、もう当たらないルールが 1 件残っている（人が直す）。** `ask` の
 `current-ticket` が `*/.current-ticket.md` に当てているが、提案の置き場は `wip/tickets/<状態>/` に
