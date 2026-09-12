@@ -170,7 +170,11 @@ class WorkspaceTest(unittest.TestCase):
         hooks = os.path.join(ws, ".claude", "hooks")
         os.makedirs(hooks, exist_ok=True)
         for name in ("test-py.sh",):
-            src = os.path.join(HOOK_DIR, name)
+            # 写す版があればそちらを優先する。CCNAVI_SH_DIR で写す前の版を
+            # 指しているとき、hook だけ古い版を測ってしまうのを防ぐ。
+            src = os.path.join(SH_DIR, name)
+            if not os.path.isfile(src):
+                src = os.path.join(HOOK_DIR, name)
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(hooks, name))
         shutil.copytree(DIST, os.path.join(ws, "dist", "ccnavi"))
@@ -266,12 +270,16 @@ class LogPlacementTest(WorkspaceTest):
         opened = False
         for piece in shown.replace("\n", " ").split():
             candidate = piece.strip("()")
+            # ラッパは `log=<綴り>` の形で返す。接頭辞を落としてから開く。
+            if "=" in candidate:
+                candidate = candidate.split("=", 1)[1]
             if not candidate.endswith(".log"):
                 continue
-            for base in (p1, self.ws):
-                if os.path.isfile(os.path.join(base, candidate)) or os.path.isfile(candidate):
-                    opened = True
-        self.assertTrue(opened, f"返された綴りがどこからも開けない: {shown!r}")
+            # cwd（プロジェクトの中）から開けるか、絶対で開けるかを見る。
+            # ワークスペースからしか開けない綴りは、モード B では届かない。
+            if os.path.isfile(os.path.join(p1, candidate)) or os.path.isfile(candidate):
+                opened = True
+        self.assertTrue(opened, f"返された綴りが cwd から開けない: {shown!r}")
 
 
 class BinaryDiscoveryTest(WorkspaceTest):
