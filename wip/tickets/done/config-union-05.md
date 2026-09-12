@@ -27,9 +27,9 @@ allow:
     glob: "scripts/*"
   - match: Write|Edit
     glob: ".ccnavi/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-13T01:15:09+0900"
+completed_at: "2026-09-13T01:55:43+0900"
+base_sha: "0b1efa4879bfeb887a50d5b35544818f054d66b5"
 ---
 
 # 実装 3/3 — 自己保護の対象、導入スクリプト、移行

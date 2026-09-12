@@ -27,9 +27,9 @@ allow:
   # tests/test_board.py が割れる。`CCNAVI_BOARD_FIXTURE=1` で作り直す先がここ。
   - match: Write|Edit
     glob: "vscode-extension/ccnavi-board/test/fixtures/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-12T22:58:31+0900"
+completed_at: "2026-09-13T00:09:33+0900"
+base_sha: "12e79be43e92c837df45146b75f46e86ec306227"
 ---
 
 # 実装 1/3 — 層の置き場と rules の和

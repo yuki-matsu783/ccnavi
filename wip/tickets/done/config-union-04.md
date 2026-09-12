@@ -22,9 +22,9 @@ allow:
     glob: "ccnavi/*"
   - match: Write|Edit
     glob: "tests/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-13T00:10:08+0900"
+completed_at: "2026-09-13T01:14:55+0900"
+base_sha: "7cbee21ad98288ab77f5819709e9de4b588001cb"
 ---
 
 # 実装 2/3 — phases と risk の合成
