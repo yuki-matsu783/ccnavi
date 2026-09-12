@@ -170,13 +170,6 @@ class ApproveJsonTest(PhaseHarness):
         self.commit_parent()
         preview = self.preview()
         self._check_fixture("approve-preview.json", preview)
-        self.assertEqual(
-            sorted(self._fixture("approve-preview.json")["batch"][0]), sorted(preview["batch"][0])
-        )
-        self.assertEqual(
-            sorted(self._fixture("approve-preview.json")["rejected"][0]),
-            sorted(preview["rejected"][0]),
-        )
 
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -193,13 +186,30 @@ class ApproveJsonTest(PhaseHarness):
         with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:
             return json.load(f)
 
+    # 走らせるたびに変わる欄。フィクスチャと比べるときは外す。
+    VOLATILE = ("generated_at",)
+
     def _check_fixture(self, name, body):
+        """拡張のフィクスチャと突き合わせる。鍵だけでなく値まで見る。
+
+        鍵の集合だけを比べると、識別子や本文が入れ替わっても気づけない。
+        機械に依らない形（`_portable`）に直したうえで、時刻の欄だけ外して比べる。
+        """
+        portable = _portable(body, self.root)
         if os.environ.get("CCNAVI_BOARD_FIXTURE"):
+            # 時刻は固定の綴りで書く。走らせるたびに変わる欄をそのまま置くと、
+            # 形が同じでもフィクスチャに差分が出る。
+            stable = {k: ("<time>" if k in self.VOLATILE else v) for k, v in portable.items()}
             write(
                 os.path.join(FIXTURES, name),
-                json.dumps(_portable(body, self.root), ensure_ascii=False, indent=1) + "\n",
+                json.dumps(stable, ensure_ascii=False, indent=1) + "\n",
             )
-        self.assertEqual(sorted(self._fixture(name)), sorted(body))
+        fixture = self._fixture(name)
+        self.assertEqual(sorted(fixture), sorted(portable))
+        for key in sorted(portable):
+            if key in self.VOLATILE:
+                continue
+            self.assertEqual(fixture[key], portable[key], key)
 
 
 if __name__ == "__main__":
