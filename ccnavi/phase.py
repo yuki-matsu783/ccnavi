@@ -602,8 +602,27 @@ def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tu
     tree_root = _tree_root(root, copy.source_tree, conf.projects)
     if not tree_root:
         return "", ""
-    rel = ticket_mod.tickets_rel_for(conf.tickets, copy.project)
-    return ticket_mod.locate(root, rel, tree_root, copy.ticket)
+    return ticket_mod.locate(root, _tickets_rel_of(conf, copy, tree_root), tree_root, copy.ticket)
+
+
+def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root: str) -> str:
+    """写しの元になった提案の置き場（そのツリーのルートからの相対）。
+
+    承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。`project` から組み直すと、
+    同じ名前を生む置き場が 2 つある（ワークスペースの `wip/<名前>/tickets/` と、その
+    プロジェクトから切った作業ツリーの `wip/tickets/`）ので、片方を必ず外す。
+    記録の無い古い写しだけ、名前から組む。
+    """
+    if copy.source_path:
+        base = os.path.dirname(os.path.dirname(copy.source_path))
+        try:
+            rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
+        except ValueError:  # 別のドライブ（Windows）
+            rel = ""
+        if rel and rel != "." and not rel.startswith("../"):
+            return rel
+    return ticket_mod.tickets_rel_for(conf.tickets, copy.project)
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:

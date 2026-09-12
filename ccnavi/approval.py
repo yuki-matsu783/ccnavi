@@ -467,6 +467,18 @@ def _apply(
     return 0
 
 
+def _origin_line(t: ticket_mod.Ticket) -> str:
+    """どのプロジェクトの、どのツリーの、どの提案か（REQ-MLT-11）。
+
+    プロジェクトは提案を置いた場所が決める。人はここで、書き込みが向かうリポジトリを
+    見て承認する。
+    """
+    return (
+        f"■ プロジェクト: {t.project or '(ワークスペース)'}"
+        f"  作業ツリー: {t.tree or '(main)'}  提案: {t.path}"
+    )
+
+
 def screen(
     batch: list[Candidate],
     pool: dict[str, ticket_mod.Ticket],
@@ -486,7 +498,7 @@ def screen(
             lines += _plan_diff_lines(cand.current, t, types)
             for note in cand.notes:
                 lines.append(f"    {note}")
-            lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
+            lines.append(_origin_line(t))
             continue
         lines += [
             "",
@@ -532,7 +544,7 @@ def screen(
         if t.rationale.strip():
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
-        lines.append(f"■ 作業ツリー: {t.tree or '(main)'}  提案: {t.path}")
+        lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
             lines.append("■ 記述のうち、判定に効かないもの")
@@ -808,29 +820,35 @@ def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
 def project_problems(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
 ) -> list[rules.Problem]:
-    """`project:` が置き場に在るプロジェクトを指しているか（REQ-MLT-11）。
+    """`project` が置き場と噛み合っているか（REQ-MLT-11）。
 
-    子は親から継ぐ。提案に書いていなければここで埋め、写しに書かれる。書いてあって
-    親と違えば承認しない。決めるのは人で、承認の画面に出た値が写しに残る。
+    プロジェクトを決めるのは提案を置いた場所（設計 §25.5）。frontmatter の `project:` は
+    宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
+    無い。承認の画面が置き場から引いた値を出し、それが写しに残る。
     """
+    if t.declared_project and t.declared_project != t.project:
+        where = ticket_mod.tickets_rel_for(conf.tickets, t.declared_project)
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"`project: {t.declared_project}` が置き場"
+                f"（{t.project or 'ワークスペース'}）と違う。"
+                f"{t.declared_project} の提案はワークスペースの {where}/ に置く",
+            )
+        ]
     if t.is_child:
         parent = pool.get(t.parent)
-        if parent is None:
+        if parent is None or t.project == parent.project:
             return []
-        if not t.project:
-            t.project = parent.project
-            if parent.project:
-                t.raw["project"] = parent.project
-        elif t.project != parent.project:
-            return [
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"`project: {t.project}` が親 {parent.ticket} の "
-                    f"{parent.project or '(ワークスペース)'} と違う。子は親から継ぐ",
-                )
-            ]
-        return []
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"置き場（{t.project or 'ワークスペース'}）が親 {parent.ticket} の"
+                f"{parent.project or 'ワークスペース'}と違う。子は親と同じ置き場に置く",
+            )
+        ]
     known = {p.name for p in tree.projects(conf.projects)}
     if t.project and t.project not in known:
         return [
