@@ -287,7 +287,7 @@ class ApproveOnlyTest(PhaseHarness):
 
     def test_child_of_a_rejected_parent_is_not_approved(self):
         # 親が落ちたら（置き場に無いプロジェクト）、その子も親が承認されていないので落ちる。
-        # 子自身は正しいので、落ちた親を池に残すと子だけ写しになる
+        # 子自身は正しいので、落ちた親を池に残すと子だけ承認済みチケットになる
         parent = parent_text("i0001", ["design"]).replace("plan:", "project: nope\nplan:", 1)
         self.propose("i0001", parent)
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/design/*",)))

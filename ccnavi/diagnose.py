@@ -60,7 +60,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     判定が対象を取り出せないもので、他の鍵は空のまま。
     """
     # 試験は控えを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
-    # 1 回で届かなくなる。控えを外すと selfguard の写しも取らないが、試験は
+    # 1 回で届かなくなる。置き場を外すと selfguard も控えを取らないが、試験は
     # 実行しないのでそもそも戻すものが無い。
     conf = dataclasses.replace(conf, state="")
 
@@ -433,7 +433,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("    default / acceptEdits / plan  人に確認が出る\n")
     stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
-    stdout.write("\n■ チケットの作業範囲（承認済みの写し）\n")
+    stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
     if not conf.tickets_enabled:
         stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")
@@ -498,7 +498,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
     """`--explain` が言うことのうち、チケットに関わる部分を機械可読で出す。
 
-    読み手は VS Code のボード拡張。拡張は提案・写し・印を自分で解釈せず、ここが
+    読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・印を自分で解釈せず、ここが
     出した形をそのまま並べる。「ゲートが閉じているか」「承認待ちは何か」の答えを
     2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
     ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 §4 P11）。
@@ -571,7 +571,7 @@ def board(conf: settings.Settings, root: str) -> dict:
             )
         )
 
-    # 親ごとの段階とフェーズ。写しのある親だけ。承認前の親はフェーズを持たない。
+    # 親ごとの段階とフェーズ。承認済みチケットのある親だけ。承認前の親はフェーズを持たない。
     for parent in sorted(open_copies + closed_copies, key=lambda x: x.ticket):
         if parent.is_child:
             continue
@@ -589,7 +589,7 @@ def _ticket_record(
     worktrees: dict,
     seen_in: list[dict],
 ) -> dict:
-    """チケット 1 件。提案と写しと作業ツリーの今を 1 つにまとめる。"""
+    """チケット 1 件。提案と承認済みチケットと作業ツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
     source = proposal or copy
     assert source is not None

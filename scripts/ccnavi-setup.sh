@@ -8,11 +8,11 @@
 #   --bin <相対パス>         CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
 #   --ticket-control <enable|disable>
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
-#   --deploy <ccnavi の根>   配り元。既定はこのスクリプトが入っている ccnavi の根
-#   --no-deploy              写しを取らず、settings.json だけを書く
+#   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
+#   --no-deploy              配布物を置かず、settings.json だけを書く
 #   --all                    既定値を持つ env も明示して書く
 #   --force                  明示した --mode / --bin / --ticket-control で、既にある値を置き換える。
-#                            写しでは、配り先に既にあるものも入れ替える
+#                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
 #   --no-vscode              .vscode/settings.json には触らない
 #
@@ -23,24 +23,24 @@
 # .claude/worktrees/ の中でさせるので、VS Code にそれを見せる 1 行が無いと、
 # エディタからは main の作業ツリーしか見えないまま作業が進む。
 #
-# 写しは、ccnavi を組み立てたところ（ccnavi のリポジトリ）から対象プロジェクトへ
+# 配布物は、ccnavi を組み立てたところ（ccnavi のリポジトリ）から対象プロジェクトへ
 # 取る。設定を書くだけでは動かないのに、実行ファイルを置く手立てがどこにも
 # 無かった。`dist/` は .gitignore に入っているので git では渡らず、CCNAVI_BIN_PATH は
 # 相対でしか書けないので、よそで組んだ実行ファイルを指すこともできない。対象
 # プロジェクトの中に実体を置く経路がここに要る。
 #
-# 配り元は既定でこのスクリプト自身の置き場から取る。設定だけ書かれて実行ファイルが
+# 配布元は既定でこのスクリプト自身の置き場から取る。設定だけ書かれて実行ファイルが
 # 無い形は、hook が 7 つ登録されているのに何も起動しない、という一番分かりにくい
-# 壊れ方になる。既定で写しまで取れば、打った人が `--deploy` を知っているかどうかで
-# そこが分かれない。よそから配りたいときだけ `--deploy` で配り元を名指しする。
+# 壊れ方になる。既定で配布物まで置けば、打った人が `--deploy` を知っているかどうかで
+# そこが分かれない。よそから配りたいときだけ `--deploy` で配布元を名指しする。
 #
-# 既定の配り元が使えないとき（組み立てていない、配り先が ccnavi 自身）は、写しを
+# 既定の配布元が使えないとき（組み立てていない、配布先が ccnavi 自身）は、配るのを
 # 諦めて理由を 1 行出し、settings.json は書く。名指しされた `--deploy` が使えない
 # ときだけ 2 で断る。人が名指ししたものが無いのは、環境の誤りとして扱う。
 #
-# 配り先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
+# 配布先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルもゲートの sh も、入れた先で直されている前提のもの。黙って上書き
-# すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配り元の形へ戻す。
+# すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配布元の形へ戻す。
 #
 # `disable` は受け付けない。監視される側が書けるファイルから監視を止める形に
 # なるので、ccnavi 自身がそれを error として報告する（README「設定lint」）。
@@ -65,14 +65,14 @@ HOOK_TIMEOUT=10
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart SubagentStop"
 
 DEFAULT_MODE="dry-run"
-# 配り先での既定の置き場。配り元の dist/ は組み立ての出力で、.gitignore に
+# 配布先での既定の置き場。配布元の dist/ は組み立ての出力で、.gitignore に
 # 入っている場所。配られた側にとっては、そこは「自分が組み立てた物の置き場」
 # ではなく、ccnavi が入っている場所。.claude/ の下に置けば、rules.yml や
 # ゲートの sh と同じ並びに収まる。
 DEFAULT_BIN=".claude/ccnavi/ccnavi"
 
-# 写すもの。配り元での置き場は build.py の出力（dist/ccnavi）と、ccnavi の
-# リポジトリの .claude/ の形に決め打ちで対応する。配り先の綴りは --bin に
+# 配るもの。配布元での置き場は build.py の出力（dist/ccnavi）と、ccnavi の
+# リポジトリの .claude/ の形に決め打ちで対応する。配布先の綴りは --bin に
 # 従うので、実行ファイルだけは行き先が動く。
 DEPLOY_BIN_DIR="dist/ccnavi"
 DEPLOY_RULES=".claude/ccnavi/rules.yml"
@@ -98,13 +98,13 @@ force=no
 check=no
 vscode=yes
 target=""
-# 配り元。名指しされたかどうかを分けて持つ。既定で埋めただけの配り元が使えない
+# 配布元。名指しされたかどうかを分けて持つ。既定で埋めただけの配布元が使えない
 # のは「組み立てていない」で済むが、人が名指ししたものが使えないのは誤り。
 # 同じ変数で持つと、その 2 つを最後まで区別できない。
 deploy=""
 deploy_given=no
 deploy_off=no
-# 既定の配り元が使えなかった理由。空でなければ 1 行出す。
+# 既定の配布元が使えなかった理由。空でなければ 1 行出す。
 deploy_skipped=""
 
 usage() {
@@ -117,16 +117,16 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --ticket-control <enable|disable>
                             CCNAVI_TICKET_CONTROL。チケット制御（提案・承認・フェーズ）を
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
-  --deploy <ccnavi の根>    配り元。既定はこのスクリプトが入っている ccnavi の根
-  --no-deploy               写しを取らず、settings.json だけを書く
+  --deploy <ccnavi の根>    配布元。既定はこのスクリプトが入っている ccnavi の根
+  --no-deploy               配布物を置かず、settings.json だけを書く
   --all                     既定値を持つ env も明示して書く
   --force                   明示した --mode / --bin / --ticket-control で、既にある値を置き換える。
-                            写しでは、配り先に既にあるものも入れ替える
+                            配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
 
-実行ファイル・ルール・ゲートの sh は、既定で ccnavi の根から写す。写した
-実行ファイルと _internal は、配り先の .gitignore に足す。
+実行ファイル・ルール・ゲートの sh は、既定で ccnavi の根から配る。配った
+実行ファイルと _internal は、配布先の .gitignore に足す。
 USAGE
 }
 
@@ -256,12 +256,12 @@ root=$(cd "$target" && { pwd -W 2>/dev/null || pwd; })
 settings="$root/$SETTINGS_REL"
 claude_dir=$(dirname "$settings")
 
-# 配り元。対象の根を決めたあとで見る。同じ綴りの取り方で絶対化してから
-# 突き合わせないと、配り元と配り先が同じかどうかを判定できない。
+# 配布元。対象の根を決めたあとで見る。同じ綴りの取り方で絶対化してから
+# 突き合わせないと、配布元と配布先が同じかどうかを判定できない。
 #
-# 名指しが無ければ、このスクリプトの置き場の 1 つ上を配り元にする。scripts/ の
+# 名指しが無ければ、このスクリプトの置き場の 1 つ上を配布元にする。scripts/ の
 # 下に居るという 1 点だけに寄りかかる。作業ツリーから打てばその作業ツリーの
-# dist/ が配り元になり、写しと、そこに居る自分の変更が食い違わない。
+# dist/ が配布元になり、配布物と、そこに居る自分の変更が食い違わない。
 source_root=""
 if [ "$deploy_off" = yes ]; then
 	if [ "$deploy_given" = yes ]; then
@@ -275,32 +275,32 @@ else
 	if [ ! -d "$deploy" ]; then
 		[ "$deploy_given" = no ] ||
 			die "$deploy というディレクトリがありません。"
-		deploy_skipped="配り元が見つからないので写していません（--deploy <ccnavi の根> で名指しできます）。"
+		deploy_skipped="配布元が見つからないので配っていません（--deploy <ccnavi の根> で名指しできます）。"
 		deploy=""
 	fi
 fi
 if [ -n "$deploy" ]; then
 	source_root=$(cd "$deploy" && { pwd -W 2>/dev/null || pwd; })
 	if [ "$source_root" = "$root" ]; then
-		# 既定の配り元では普通に起きる。ccnavi のリポジトリ自身に打つと、
-		# 配り元と配り先が同じ場所になる。そこは写す先ではないので、
-		# 設定だけ書いて写しは諦める。名指しなら、打った人の思い違い。
+		# 既定の配布元では普通に起きる。ccnavi のリポジトリ自身に打つと、
+		# 配布元と配布先が同じ場所になる。そこは配る先ではないので、
+		# 設定だけ書いて配るのは諦める。名指しなら、打った人の思い違い。
 		[ "$deploy_given" = no ] ||
-			die "--deploy の配り元と配り先が同じです。自分自身へは配れません。"
-		deploy_skipped="配り元と配り先が同じなので写していません。"
+			die "--deploy の配布元と配布先が同じです。自分自身へは配れません。"
+		deploy_skipped="配布元と配布先が同じなので配っていません。"
 		deploy=""
 		source_root=""
 	fi
 fi
-# 組み立てていない配り元で黙って進まない。ここを報告だけにすると、
+# 組み立てていない配布元で黙って進まない。ここを報告だけにすると、
 # 「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、
 # 打った人は配れたものとして先へ進む。--deploy を名指しした以上、実行ファイルが
-# 無いことは環境の誤りとして 2 で断る。既定の配り元なら、組み立てていないだけ
+# 無いことは環境の誤りとして 2 で断る。既定の配布元なら、組み立てていないだけ
 # なので、諦めた理由を出して settings.json は書く。
 if [ -n "$deploy" ] && [ ! -d "$source_root/$DEPLOY_BIN_DIR" ]; then
 	[ "$deploy_given" = no ] ||
-		die "$source_root/$DEPLOY_BIN_DIR がありません。配り元で 'uv run --with pyinstaller python build.py' を回してから打ち直してください。"
-	deploy_skipped="$source_root/$DEPLOY_BIN_DIR が無いので写していません（配り元で 'uv run --with pyinstaller python build.py' を回すと作られます）。"
+		die "$source_root/$DEPLOY_BIN_DIR がありません。配布元で 'uv run --with pyinstaller python build.py' を回してから打ち直してください。"
+	deploy_skipped="$source_root/$DEPLOY_BIN_DIR が無いので配っていません（配布元で 'uv run --with pyinstaller python build.py' を回すと作られます）。"
 	deploy=""
 	source_root=""
 fi
@@ -455,11 +455,11 @@ other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --a
 	| select(\$root | looks(\$ev)) | \$ev
 ")
 
-# 写すものを決める。配り先に既にあるものは触らない。入れ替えるのは --force の
-# ときだけで、そのときも配り元に在るものだけを動かす。
+# 配るものを決める。配布先に既にあるものは触らない。入れ替えるのは --force の
+# ときだけで、そのときも配布元に在るものだけを動かす。
 #
-# 「配り元に無い」を黙って飛ばさない。ルールファイルやゲートの sh が欠けた
-# 配り元から配ると、判定するものだけが入って何を止めるかが入らない。その形は
+# 「配布元に無い」を黙って飛ばさない。ルールファイルやゲートの sh が欠けた
+# 配布元から配ると、判定するものだけが入って何を止めるかが入らない。その形は
 # 最後の「まだ無いもの」にしか出ず、配った側の落ち度に見えない。
 deploy_new=""
 deploy_replacing=""
@@ -470,9 +470,9 @@ bin_verdict=""
 rules_verdict=""
 scripts_todo=""
 
-# 配り元に在るか、配り先に在るか、--force か。この 3 つだけで決まる。
+# 配布元に在るか、配布先に在るか、--force か。この 3 つだけで決まる。
 verdict() {
-	# $1 配り元の絶対パス / $2 配り先に既にあるか（yes/no）
+	# $1 配布元の絶対パス / $2 配布先に既にあるか（yes/no）
 	if [ ! -e "$1" ]; then
 		printf 'absent'
 	elif [ "$2" = no ]; then
@@ -485,7 +485,7 @@ verdict() {
 }
 
 note_deploy() {
-	# $1 verdict / $2 配り先の綴り / $3 配り元の綴り
+	# $1 verdict / $2 配布先の綴り / $3 配布元の綴り
 	case "$1" in
 	copy)
 		deploy_new="$deploy_new$2
@@ -500,7 +500,7 @@ note_deploy() {
 "
 		;;
 	absent)
-		deploy_absent="$deploy_absent$2（配り元の $3 にありません）
+		deploy_absent="$deploy_absent$2（配布元の $3 にありません）
 "
 		;;
 	esac
@@ -545,7 +545,7 @@ if [ -n "$deploy" ]; then
 	done
 fi
 
-# 写した実行ファイルを git に入れない。配り先は git で持ち回るのが普通なので、
+# 配った実行ファイルを git に入れない。配布先は git で持ち回るのが普通なので、
 # .gitignore に無いと、次のコミットで実行ファイルと _internal がまるごと履歴に
 # 入る。入ってしまうと、消すには履歴を書き換えるしかない。
 #
@@ -590,17 +590,17 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 fi
 
 copy_tree() {
-	# 中身を 1 つずつ写す。ディレクトリごと入れ替えないのは、配り先が既にある
+	# 中身を 1 つずつ配る。ディレクトリごと入れ替えないのは、配布先が既にある
 	# 別のフォルダ（--bin の綴りによってはワークスペースルートそのもの）でも、
-	# 配り元が持つ名前のものにしか手が届かないようにするため。
+	# 配布元が持つ名前のものにしか手が届かないようにするため。
 	mkdir -p "$2"
 	for entry in "$1"/*; do
-		# 配り元が空なら glob がそのまま残る。在るものだけを写す。
+		# 配布元が空なら glob がそのまま残る。在るものだけを配る。
 		[ -e "$entry" ] || continue
 		name=$(basename "$entry")
 		# 古い組み立ての残りを持ち越さない。PyInstaller の同梱物は名前で
 		# 引かれるので、前の版の .so が残ると新しい実行ファイルがそれを掴む。
-		# 名前は配り元に在る entry から取るので、空のパスを消すことはない。
+		# 名前は配布元に在る entry から取るので、空のパスを消すことはない。
 		rm -rf "$2/$name"
 		cp -R "$entry" "$2/$name"
 	done
@@ -693,7 +693,7 @@ report_missing() {
 	report '足りない' 'ccnavi が登録されていない' '置き換える'
 }
 
-# 写しの報告。env と同じく、写す前と後で言葉を変える。
+# 配布物の報告。env と同じく、配る前と後で言葉を変える。
 report_deploy() {
 	if [ -n "$deploy_new" ]; then
 		printf '%s:\n' "$1"
@@ -704,11 +704,11 @@ report_deploy() {
 		printf '%s' "$deploy_replacing" | sed 's/^/  /'
 	fi
 	if [ -n "$deploy_kept" ]; then
-		printf '配り先に既にあるので写していないもの（入れ替えるなら --force）:\n'
+		printf '配布先に既にあるので配っていないもの（入れ替えるなら --force）:\n'
 		printf '%s' "$deploy_kept" | sed 's/^/  /'
 	fi
 	if [ -n "$deploy_absent" ]; then
-		printf '配り元に無くて写せないもの:\n'
+		printf '配布元に無くて配れないもの:\n'
 		printf '%s' "$deploy_absent" | sed 's/^/  /'
 	fi
 	if [ -n "$ignore_todo" ]; then
@@ -721,7 +721,7 @@ report_deploy() {
 }
 
 report_deploy_plan() {
-	report_deploy '写す' '入れ替える' '.gitignore に足す'
+	report_deploy '配る' '入れ替える' '.gitignore に足す'
 }
 
 # 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
@@ -733,7 +733,7 @@ if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] ||
 	[ -n "$missing_vscode" ] || [ -n "$differing_vscode" ] || [ -n "$vscode_blocked" ]; then
 	settled=no
 fi
-# 写しも「揃っていない」に数える。配り元に無いものも数える。実行ファイルが
+# 配布物も「揃っていない」に数える。配布元に無いものも数える。実行ファイルが
 # 欠けたまま「揃っています」と言うと、--check を門にしている手順がそこを通す。
 # .gitignore の不足も数える。足りないまま通すと、次のコミットで実行ファイルが
 # 履歴に入る。
@@ -781,14 +781,14 @@ if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no
 	exit 0
 fi
 
-# 設定ファイルへの書き込みを 1 か所にする。写しは最初の 1 回だけ、リンクは
+# 設定ファイルへの書き込みを 1 か所にする。控えは最初の 1 回だけ、リンクは
 # 切らない、という約束を 2 か所に書き写すと、片方だけ直したときにどちらが
 # 壊れるかが打つたびに変わる。
 #
 # 結果は backed_up と linked に置く。呼んだ側が、その綴りで報告する。
 write_json() {
 	# 導入前の姿を 1 つだけ残す。2 回目以降は上書きしない。毎回取り直すと、
-	# 打ち直した数だけ写しが新しくなり、戻れるのは 1 手前まで――そこには既に
+	# 打ち直した数だけ控えが新しくなり、戻れるのは 1 手前まで――そこには既に
 	# ccnavi が入っている――になって、入れる前の設定へ戻す手立てが消える。
 	mkdir -p "$(dirname "$1")"
 	backed_up=no
@@ -869,26 +869,26 @@ fi
 
 report '足した' 'ccnavi を登録した' '置き換えた'
 if [ "$settings_backed_up" = yes ]; then
-	printf '書き換える前の内容は %s.bak にあります（写しは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
+	printf '書き換える前の内容は %s.bak にあります（控えは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
 fi
 if [ "$settings_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$SETTINGS_REL"
 fi
 if [ "$vscode_backed_up" = yes ]; then
-	printf '書き換える前の内容は %s.bak にあります（写しは最初の 1 回だけ取ります）。\n' "$VSCODE_REL"
+	printf '書き換える前の内容は %s.bak にあります（控えは最初の 1 回だけ取ります）。\n' "$VSCODE_REL"
 fi
 if [ "$vscode_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
 fi
 
-# 写す。順は実行ファイル → ルール → ゲートの sh。途中で落ちたときに、判定する
+# 配る。順は実行ファイル → ルール → ゲートの sh。途中で落ちたときに、判定する
 # ものだけが在って何を止めるかが無い、という形にしないため。
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
 	copy | replace)
 		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$bin_dir_rel"
 		# 実行の許しを付け直す。cp は元のモードを umask で削って写すので、
-		# 配り元の側の置き方によってはここが落ちる。落ちていると hook は
+		# 配布元の側の置き方によってはここが落ちる。落ちていると hook は
 		# 「実行ファイルが無い」ではなく「起動できない」で黙って死ぬ。
 		for spelling in "$root/$bin" "$root/$bin.exe"; do
 			if [ -f "$spelling" ]; then
@@ -927,11 +927,11 @@ if [ "$deploy_work" = yes ]; then
 	fi
 fi
 
-report_deploy '写した' '入れ替えた' '.gitignore に足した'
+report_deploy '配った' '入れ替えた' '.gitignore に足した'
 
-# 登録しただけでは動かない。写し終えたあとの姿をそのまま見て、まだ無いものを
-# 挙げる。写しが通っていれば普通はここで何も出ない。出たときは、写しを切ったか、
-# 配り元に無かったか、配り先に別のものが既にあって写していないか、のどれか。
+# 登録しただけでは動かない。配り終えたあとの姿をそのまま見て、まだ無いものを
+# 挙げる。配布が通っていれば普通はここで何も出ない。出たときは、配るのを切ったか、
+# 配布元に無かったか、配布先に別のものが既にあって配っていないか、のどれか。
 #
 # ここでは取りに行ったり作ったりはしない。実行ファイルは PyInstaller が Windows
 # でだけ .exe を付けるので、両方の綴りで探す（settings.py の _resolve_bin）。
@@ -954,11 +954,11 @@ done
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
 	# 諦めた理由は report_deploy が既に出している。ここで足すのは、人が自分で
-	# 写しを切ったときだけ。理由を二重に出すと、どちらが今の話か分からなくなる。
+	# 配るのを切ったときだけ。理由を二重に出すと、どちらが今の話か分からなくなる。
 	if [ "$deploy_off" = yes ]; then
 		# 書式の側に置かない。`--` で始まる文字列は、printf がオプションとして
 		# 読んで落ちる。
-		printf '%s\n' "--no-deploy を外すと、ccnavi の根から写します。"
+		printf '%s\n' "--no-deploy を外すと、ccnavi の根から配ります。"
 	fi
 fi
 

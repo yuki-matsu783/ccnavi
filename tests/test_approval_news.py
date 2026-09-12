@@ -1,11 +1,12 @@
 """承認の事実を hook がモデルへ 1 度だけ伝えることの受入テスト。
 
 設計 wip/design/approve-popup.md §2.4。人がボードで承認したあと、モデルは次の
-UserPromptSubmit か PreToolUse で「写しが置かれた。後工程を進める」を読む。見るのは 5 つ。
+UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。後工程を進める」を読む。
+見るのは 5 つ。
 
 1. 承認の後の UserPromptSubmit で `additionalContext` に文が載り、もう 1 度は載らない
 2. PreToolUse（allow になる呼び出し）でも同じ文が 1 度だけ載る
-3. セッションの最初の hook の時点で既にあった写しは伝えない（起点）
+3. セッションの最初の hook の時点で既にあった承認済みチケットは伝えない（起点）
 4. 別のセッションにはそれぞれ 1 度ずつ伝える。サブエージェントには伝えない
 5. 控えを置けない（`--state ""`）ときは伝えず、控えも作らない
 
@@ -95,13 +96,13 @@ class ApprovalNewsTest(PhaseHarness):
         # 一方で聞いたなら、もう一方でも言わない。
         self.assertEqual(self.prompt(), "")
 
-    # ---- 3. 起点より前の写しは伝えない
+    # ---- 3. 起点より前の承認済みチケットは伝えない
 
     def test_copies_that_existed_at_the_first_hook_are_not_news(self):
         self.parent_only()
         self.next_child()
         self.approve_yes(["i0001", "i0001-01"])
-        # このセッションの最初の hook。既にある写しは知っているものとして控える。
+        # このセッションの最初の hook。既にある承認済みチケットは知っているものとして控える。
         self.assertEqual(self.prompt(), "")
         self.assertEqual(self.before(), "")
 
@@ -130,14 +131,14 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertIn("i0001-01", self.prompt(session="s2"))
         self.assertEqual(self.prompt(session="s1"), "")
         self.assertEqual(self.prompt(session="s2"), "")
-        # 承認より後に起動したサブエージェントは、起動時点の写しを起点にする。
+        # 承認より後に起動したサブエージェントは、起動時点の承認済みチケットを起点にする。
         self.assertEqual(self.before(session="s1", agent_id="sub-1"), "")
         self.assertEqual(self.before(session="s1", agent_id="sub-1"), "")
 
     # ---- 4b. 伝え漏れ（敵対的レビューが見つけた 3 つ）
 
     def test_a_revision_of_the_parent_is_told_once(self):
-        """親の改版は写しを書き換えるだけで識別子が増えない。印まで見て伝える。"""
+        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。印まで見て伝える。"""
         self.parent_only()
         self.prompt()  # 起点
         self.approve_yes(["i0001"])

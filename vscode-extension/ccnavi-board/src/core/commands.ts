@@ -32,7 +32,7 @@ function ccnaviInvocation(launcher: Launcher, root: string): string {
 }
 
 /**
- * `--approve --preview --json [<識別子>...]`。束を見るだけで写しは置かない（子プロセスの引数）。
+ * `--approve --preview --json [<識別子>...]`。束を見るだけで承認済みチケットは置かない（子プロセスの引数）。
  * 識別子を並べればその分だけの束、空なら承認待ち全部。ボードは絞り込みで見えている分を渡す。
  */
 export function previewArgs(tickets: readonly string[] = []): readonly string[] {

@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は提案の置き場（todo / doing / done / cancelled）。写し・印・ゲート・作業ツリーは
+ * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・印・ゲート・作業ツリーは
  * カードのバッジで出す。ゲートの開閉や承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
@@ -58,7 +58,7 @@ export interface Card {
   readonly proposalTree: string;
   /** 絞り込みの単位。親なら自分、子なら親の識別子 */
   readonly family: string;
-  /** カードを選んだときに開くファイル。提案があれば提案、無ければ写し */
+  /** カードを選んだときに開くファイル。提案があれば提案、無ければ承認済みチケット */
   readonly openPath: string;
   readonly copyStatus: CopyStatus;
   readonly approvedAt: string;
@@ -217,8 +217,8 @@ function toCard(
 }
 
 /**
- * 列は提案の置き場。提案が無い（写しだけがある）ときは写しから推す。
- * 閉じた写しは done、取り消しの時刻があれば cancelled。開いている写しなのに提案が無いのは
+ * 列は提案の置き場。提案が無い（承認済みチケットだけがある）ときは承認済みチケットから推す。
+ * 閉じた承認済みチケットは done、取り消しの時刻があれば cancelled。開いている承認済みチケットなのに提案が無いのは
  * 食い違いなので、todo に置いたうえで不備として言う。
  */
 function columnOf(t: TicketJson, issues: string[]): ProposalState {
@@ -228,7 +228,7 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   if (t.copy.status === "closed") {
     return t.cancelled_at !== "" ? "cancelled" : "done";
   }
-  issues.push("提案が見つからない（写しだけがある）");
+  issues.push("提案が見つからない（承認済みチケットだけがある）");
   return "todo";
 }
 

@@ -100,7 +100,7 @@ class SelfGuardTest(unittest.TestCase):
         return path
 
     def copy_in(self, work, *parts):
-        """作業ツリーの中の写しの綴り。"""
+        """作業ツリー側の設定の綴り。"""
         return os.path.join(work, ".claude", *parts)
 
     def run_hook(
@@ -265,7 +265,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertTrue(os.path.exists(local), "人が置くこともあるファイルを消さない")
         self.assertIn("settings.local.json", result.stdout)
 
-    # 作業ツリーの中の写し
+    # 作業ツリー側の設定
 
     def test_作業ツリーの中の設定ファイルも戻る(self):
         # その場では誰も読まないファイルだが、統合すれば main の hook の
@@ -304,7 +304,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(copy)), {"changed": True})
 
-    def test_消された写しは実行前に戻る(self):
+    def test_消された作業ツリー側の設定は実行前に戻る(self):
         work = self.worktree()
         copy = self.copy_in(work, "settings.json")
         self.run_hook("PreToolUse")
@@ -316,7 +316,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_控えが無ければ作業ツリーの側の_git_から戻る(self):
         # 控えを取る前に書き換えられた回。main の git は
-        # `.claude/worktrees/` を無視しているので、写しのコミット済みの内容を
+        # `.claude/worktrees/` を無視しているので、作業ツリー側の設定のコミット済みの内容を
         # 持っているのは、その作業ツリー自身の git のほうになる。
         work = self.worktree()
         copy = self.copy_in(work, "settings.json")
@@ -326,7 +326,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(copy)), SETTINGS)
 
-    def test_写しの控えは作業ツリーごとに分かれる(self):
+    def test_作業ツリー側の設定の控えは作業ツリーごとに分かれる(self):
         # 取り違えると、片方の作業ツリーの内容がもう片方に書き戻される。
         one = self.copy_in(self.worktree("w1"), "settings.json")
         two = self.copy_in(self.worktree("w2"), "settings.json")
@@ -341,9 +341,9 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
         self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
 
-    def test_プロジェクトのルールファイルの写しも対象になる(self):
+    def test_プロジェクトのルールファイルも作業ツリー側が対象になる(self):
         # 置き場に並ぶプロジェクトのルールファイルも、root の下に在れば
-        # 作業ツリーに写しが入り、統合で main へ届く道は同じ。
+        # 作業ツリー側にも入り、統合で main へ届く道は同じ。
         self.worktree()
         project = os.path.join(self.repo, "projects", "lib", "config", "rules.yml")
         write(project, json.dumps(RULES))
@@ -356,9 +356,9 @@ class SelfGuardTest(unittest.TestCase):
             copies,
         )
 
-    def test_root_の外を指すルールファイルには写しが無い(self):
+    def test_root_の外を指すルールファイルには作業ツリー側が無い(self):
         # 置き場がワークスペースルートの外にあるなら、作業ツリーの中に対応する
-        # 写しは無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
+        # 作業ツリー側には無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
         self.worktree()
         outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
 

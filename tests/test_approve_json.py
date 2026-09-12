@@ -3,10 +3,11 @@
 VS Code のボード拡張がオーバーレイで承認するための経路。設計 wip/design/approve-popup.md §2。
 見るのは 6 つ。
 
-1. `--preview` は束の本文と識別子、対象外の提案、読めない提案を JSON で返し、写しを置かない
+1. `--preview` は束の本文と識別子、対象外の提案、読めない提案を JSON で返す。
+   承認済みチケットは置かない
 2. 承認待ちが無くても `--preview` は `batch: []` で exit 0
-3. `--yes` に束と同じ識別子を渡すと写しが置かれ、`prompt`（Claude Code に渡す文）が返る
-4. `--yes` の識別子が束と違えば写しを置かず、`mismatch` で exit 1
+3. `--yes` に束と同じ識別子を渡すと承認済みチケットが置かれ、`prompt`（Claude Code に渡す文）が返る
+4. `--yes` の識別子が束と違えば承認済みチケットを置かず、`mismatch` で exit 1
 5. `--yes` は端末の壁を通らない。素の `--approve` は今までどおり壁で止まる
 6. 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
@@ -72,7 +73,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-02"])
         self.assertTrue(any("超えている" in p for p in body["rejected"][0]["problems"]))
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
-        # 見ただけ。写しは置かれていない。
+        # 見ただけ。承認済みチケットは置かれていない。
         self.assertFalse(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01"))
 

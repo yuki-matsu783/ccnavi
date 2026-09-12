@@ -30,7 +30,7 @@ test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、
   assert.ok(html.includes("承認の対象にしない"));
   assert.ok(html.includes("i0001-02"));
   assert.ok(html.includes("超えている"));
-  assert.ok(!html.includes("読めない提案・写し"));
+  assert.ok(!html.includes("読めない提案・承認済みチケット"));
   // 本文は実体参照にする。
   const spiked = { ...preview, text: "<script>alert(1)</script>" };
   const escaped = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview: spiked } });
@@ -141,10 +141,10 @@ test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
 });
 
 test("CB-T15 問題とプロジェクトの絞り込みを出す", () => {
-  const json = { ...fixture(), problems: ["写し x を読めない"], projects: ["lib", "app"] };
+  const json = { ...fixture(), problems: ["承認済みチケット x を読めない"], projects: ["lib", "app"] };
   const html = renderBoard(buildBoard(json), OPTIONS);
   assert.ok(html.includes('class="problems"'));
-  assert.ok(html.includes("写し x を読めない"));
+  assert.ok(html.includes("承認済みチケット x を読めない"));
   assert.ok(html.includes('id="project-filter"'));
   assert.ok(html.includes('<option value="lib">lib</option>'));
   const without = renderBoard(buildBoard(fixture()), OPTIONS);

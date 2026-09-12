@@ -35,7 +35,7 @@ export interface ApprovePreview {
   readonly text: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
-  /** 読めない提案や写しの説明 */
+  /** 読めない提案や承認済みチケットの説明 */
   readonly problems: readonly string[];
 }
 
