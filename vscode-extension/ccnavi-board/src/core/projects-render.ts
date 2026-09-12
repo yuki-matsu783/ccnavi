@@ -7,7 +7,7 @@
  */
 import type { LintProblem } from "./lintmodel.js";
 import type { ProjectRow, ProjectsPage, Stray } from "./projects.js";
-import { escapeHtml } from "./render.js";
+import { BUTTON_STYLE, escapeHtml } from "./render.js";
 
 export interface RenderOptions {
   readonly nonce: string;
@@ -48,7 +48,7 @@ ${renderBanners(page)}<section class="clone">
 </section>
 <section class="list">
   <h2>ワークスペース内のプロジェクト <span class="count">${page.rows.length}</span></h2>
-${page.rows.length === 0 ? '  <p class="empty">まだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderTable(page)}
+${page.rows.length === 0 ? '  <p class="empty">まだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderList(page)}
 </section>
 ${renderStrays(page.strays)}<section class="workspace">
   <h2>ワークスペース自身</h2>
@@ -88,23 +88,22 @@ function renderBanners(page: ProjectsPage): string {
   return banners.length === 0 ? "" : `${banners.join("\n")}\n`;
 }
 
-function renderTable(page: ProjectsPage): string {
-  const rows = page.rows.map((r) => renderRow(r, page.ticketsEnabled)).join("\n");
-  return `  <table>
-    <thead><tr><th>名前</th><th>origin</th><th>ルール</th><th>作業ツリー</th>${page.ticketsEnabled ? "<th>チケット</th>" : ""}<th>検証</th><th>操作</th></tr></thead>
-    <tbody>
-${rows}
-    </tbody>
-  </table>`;
+/**
+ * 一覧は表ではなく 1 プロジェクト 1 枚のカード。表だと列が 7 本になり、幅が足りないと検証や
+ * チケットの列が 1 文字ずつ縦に潰れる。カードの中の項目は幅に合わせて 1〜3 段に組み替わる。
+ */
+function renderList(page: ProjectsPage): string {
+  const items = page.rows.map((r) => renderProject(r, page.ticketsEnabled)).join("\n");
+  return `  <ul class="projects">\n${items}\n  </ul>`;
 }
 
-function renderRow(row: ProjectRow, ticketsEnabled: boolean): string {
+function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   const rules = row.rulesExists
     ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
     : `<span class="warn-text">無い</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="ワークスペースの rules.yml を写す。文面の sh の綴りを {root} 付きに置き換える">ワークスペースから写す</button>`;
-  const worktrees = row.worktrees.length === 0 ? '<span class="dim">0</span>' : `${row.worktrees.length} <span class="small dim">${escapeHtml(row.worktrees.join(", "))}</span>`;
+  const worktrees = row.worktrees.length === 0 ? '<span class="dim">無し</span>' : `${row.worktrees.length} 件 <span class="small dim">${escapeHtml(row.worktrees.join(", "))}</span>`;
   const tickets = ticketsEnabled
-    ? `<td>${row.tickets}${row.doing > 0 ? ` <span class="badge doing">作業中 ${row.doing}</span>` : ""}</td>`
+    ? `\n          <div class="field"><dt>チケット</dt><dd>${row.tickets} 件${row.doing > 0 ? `<span class="dim">、作業中 ${row.doing} 件</span>` : ""}</dd></div>`
     : "";
   const problems = [
     ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える" }] : []),
@@ -113,22 +112,30 @@ function renderRow(row: ProjectRow, ticketsEnabled: boolean): string {
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
   const origin = row.origin === "" ? '<span class="dim">読めない</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;
   const board = ticketsEnabled
-    ? `<button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="チケット管理をこのプロジェクトで絞って開く">チケット管理</button>`
+    ? `\n          <button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="チケット管理をこのプロジェクトで絞って開く">チケット管理</button>`
     : "";
-  return `      <tr data-name="${escapeHtml(row.name)}">
-        <td class="name"><span class="mono">${escapeHtml(row.name)}</span><br><span class="small dim">${escapeHtml(row.rel)}</span></td>
-        <td>${origin}</td>
-        <td>${rules}</td>
-        <td>${worktrees}</td>
-        ${tickets}
-        <td>${lint}</td>
-        <td class="ops">
-          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの config/rules.yml を直し、判定を試す">ルール管理</button>
-          ${board}
+  const flags = [
+    row.doing > 0 ? `<span class="badge doing">作業中 ${row.doing}</span>` : "",
+    problems.some((p) => p.severity === "error") ? '<span class="badge error">error</span>' : "",
+    problems.some((p) => p.severity === "warn") ? '<span class="badge warn">warn</span>' : "",
+  ].filter((f) => f !== "");
+  return `    <li class="project${problems.length > 0 ? " has-problem" : ""}" data-name="${escapeHtml(row.name)}">
+      <div class="project-head">
+        <span class="name mono">${escapeHtml(row.name)}</span>
+        <span class="rel small dim">${escapeHtml(row.rel)}</span>${flags.length > 0 ? `\n        <span class="flags">${flags.join(" ")}</span>` : ""}
+      </div>
+      <dl class="fields">
+          <div class="field"><dt>origin</dt><dd>${origin}</dd></div>
+          <div class="field"><dt>ルール</dt><dd>${rules}</dd></div>
+          <div class="field"><dt>作業ツリー</dt><dd>${worktrees}</dd></div>${tickets}
+          <div class="field wide"><dt>検証</dt><dd>${lint}</dd></div>
+      </dl>
+      <div class="ops">
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの config/rules.yml を直し、判定を試す">ルール管理</button>${board}
           <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルへ送る">fetch</button>
           <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルへ送る。衝突すれば git が止める">pull</button>
-        </td>
-      </tr>`;
+      </div>
+    </li>`;
 }
 
 function renderProblems(problems: readonly LintProblem[]): string {
@@ -166,9 +173,9 @@ const STYLE = `  * { box-sizing: border-box; }
   h2 { margin: 0 0 8px; font-size: 1em; }
   section { margin-bottom: 18px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 12px; }
-  .summary { display: flex; gap: 16px; font-weight: 600; }
-  .summary .path { font-weight: 400; color: var(--vscode-descriptionForeground); }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .summary { display: flex; flex-wrap: wrap; gap: 4px 16px; font-weight: 600; }
+  .summary .path { font-weight: 400; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
   .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
   .hint { margin: 0 0 8px; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); }
@@ -178,19 +185,13 @@ const STYLE = `  * { box-sizing: border-box; }
   .ok { color: var(--vscode-charts-green); }
   .warn-text { color: var(--vscode-editorWarning-foreground); }
   code { font-family: var(--vscode-editor-font-family); }
-  button.action {
-    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
-    border: none; border-radius: 2px; padding: 3px 10px; cursor: pointer; font: inherit;
-  }
-  button.action:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-  button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
-  button.action.small { padding: 0 6px; font-size: .9em; }
-  button.action:disabled { opacity: .5; cursor: default; }
+${BUTTON_STYLE}
   input[type=text] {
     background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; padding: 3px 6px; font: inherit; width: 100%;
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 3px;
+    min-height: 24px; padding: 2px 6px; font: inherit; width: 100%;
   }
+  input[type=text]:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
   .banner {
     margin: 0 0 8px; padding: 6px 10px; border-radius: 4px;
     border: 1px solid var(--vscode-panel-border); display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
@@ -204,13 +205,28 @@ const STYLE = `  * { box-sizing: border-box; }
   .status { margin: 8px 0 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
   .status.failed { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
   .hidden { display: none; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--vscode-panel-border); }
-  th { color: var(--vscode-descriptionForeground); font-weight: 600; font-size: .9em; }
-  td.ops { white-space: nowrap; }
-  td.ops button { margin: 0 4px 4px 0; }
-  .badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); }
+  .projects { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .project {
+    border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px;
+    background: var(--vscode-editorWidget-background);
+  }
+  .project.has-problem { border-left: 3px solid var(--vscode-editorWarning-foreground); }
+  .project-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; }
+  .project-head .name { font-weight: 600; font-size: 1.05em; overflow-wrap: anywhere; }
+  .project-head .rel { overflow-wrap: anywhere; }
+  .project-head .flags { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+  /* 項目は 1 つ 240px を目安に、幅に合わせて段数が変わる。検証は長くなるので常に 1 段まるごと使う */
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 16px; margin: 0; }
+  .field { min-width: 0; }
+  .field.wide { grid-column: 1 / -1; }
+  .field dt { font-size: .85em; color: var(--vscode-descriptionForeground); }
+  .field dd { margin: 0; overflow-wrap: anywhere; }
+  .field dd button.action { vertical-align: middle; }
+  .ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
+  .badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
   .badge.doing { color: var(--vscode-charts-yellow); border-color: var(--vscode-charts-yellow); }
+  .badge.warn { color: var(--vscode-editorWarning-foreground); border-color: var(--vscode-editorWarning-foreground); }
+  .badge.error { color: var(--vscode-editorError-foreground); border-color: var(--vscode-editorError-foreground); }
   .lint { list-style: none; margin: 0; padding: 0; font-size: .88em; }
   .lint li { overflow-wrap: anywhere; }
   .lint li.warn { color: var(--vscode-editorWarning-foreground); }

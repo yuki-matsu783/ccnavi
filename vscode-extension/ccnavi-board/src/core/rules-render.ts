@@ -10,7 +10,7 @@
  */
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
-import { escapeHtml } from "./render.js";
+import { BUTTON_STYLE, escapeHtml } from "./render.js";
 import type { RulesModel } from "./rules-doc.js";
 
 /** 判定が対象を取り出せるツール。ccnavi の diagnose.KNOWN_TOOLS と同じ並び */
@@ -205,15 +205,8 @@ const STYLE = `  * { box-sizing: border-box; }
   .pane.active { display: block; }
   .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .empty { color: var(--vscode-descriptionForeground); }
-  button.action {
-    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
-    border: none; border-radius: 2px; padding: 3px 10px; cursor: pointer; font: inherit;
-  }
-  button.action:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-  button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
-  button.action:disabled { opacity: .5; cursor: default; }
-  button.action.small { padding: 1px 8px; font-size: .9em; margin-left: auto; }
+${BUTTON_STYLE}
+  button.action.small { margin-left: auto; }
   input[type=text], textarea, select {
     background: var(--vscode-input-background); color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
