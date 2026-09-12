@@ -488,7 +488,15 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
 
 
 def definition_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の risk.yml。空の `project` はワークスペース自身の層。"""
+    """そのプロジェクトの層の risk.yml。空の `project` はワークスペース自身の層。
+
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
+    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    名札と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
+    配点を書ける側が層を選べると、自分のリスクを自分で下げる道になる。
+    """
+    if settings.is_reserved_layer_name(project):
+        return ""
     home = tree.project_root(conf.projects, project) if project else root
     if not home:
         return ""

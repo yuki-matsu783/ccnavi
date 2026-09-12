@@ -229,7 +229,14 @@ class Phase:
 
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。"""
+    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
+
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
+    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
+    """
+    if settings.is_reserved_layer_name(project):
+        return ""
     home = tree.project_root(conf.projects, project) if project else root
     if not home:
         return ""

@@ -488,7 +488,7 @@ def targets(
     root: str,
     rules_path: str,
     bin_path: str = "",
-    layers: list[tuple[str, str, str]] = (),
+    layers: list[settings.LayerFile] = (),
     projects_dir: str = "",
 ) -> list[Target]:
     """守る対象を組み立てる（設計 §25.6）。
@@ -496,9 +496,10 @@ def targets(
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
 
-    layers は (層の名前, kind, そのファイル) の並び（`ruleload.layer_files`）。
-    kind は rules / phases / risk。共通層は phases と risk の 2 本で来る。rules は
-    `rules_path` が運んでいて、両方から並べると同じファイルを 2 度守ることになる。
+    layers は `settings.LayerFile`（層の種別, 名札, kind, そのファイル）の並び
+    （`ruleload.layer_files`）。kind は rules / phases / risk。共通層は phases と
+    risk の 2 本で来る。rules は `rules_path` が運んでいて、両方から並べると同じ
+    ファイルを 2 度守ることになる。
 
     控えの key は層ごとに分ける。共通層は kind そのまま（`rules` / `phases` /
     `risk`）、それ以外は `rules:self` / `phases:lib` の形。key はそのまま控えの
@@ -520,7 +521,7 @@ def _places(
     root: str,
     projects_dir: str,
     rules_path: str,
-    layers: list[tuple[str, str, str]],
+    layers: list[settings.LayerFile],
 ) -> list[tuple[str, str, str]]:
     """守る対象の (控えの key, 追跡している git プロジェクトルート, 絶対パス)。
 
@@ -534,10 +535,16 @@ def _places(
     found = [(key, root, os.path.join(root, rel)) for key, rel in _SETTINGS_FILES]
     if rules_path:
         found.append(("rules", root, rules_path))
-    for layer, kind, path in layers:
+    for origin, layer, kind, path in layers:
         if not path:
             continue
-        found.append((_layer_key(layer, kind), _layer_home(root, projects_dir, layer), path))
+        found.append(
+            (
+                _layer_key(origin, layer, kind),
+                _layer_home(root, projects_dir, origin, layer),
+                path,
+            )
+        )
 
     seen = set()
     places = []
@@ -549,19 +556,38 @@ def _places(
     return places
 
 
-def _layer_key(layer: str, kind: str) -> str:
-    """控えの key。共通層は kind そのまま、それ以外は `<kind>:<層>`。"""
-    return kind if layer == settings.LAYER_COMMON else f"{kind}:{layer}"
+def _layer_key(origin: str, layer: str, kind: str) -> str:
+    """控えの key。共通層は kind そのまま、それ以外は `<kind>:<層>`。
+
+    決めるのは層の種別（`settings.ORIGIN_*`）で、名札の綴りではない。名札で
+    比べると、`projects/common/` の 3 本が共通層と同じ key（`rules` / `phases` /
+    `risk`）になり、`_places` の重複の排除でその層の 3 本が控えと復元の対象から
+    丸ごと落ちる。プロジェクトが名前を 1 つ選ぶだけで守りが外れることになる。
+
+    予約名のプロジェクトは置き場を添える（`rules:projects/self`）。`projects/self/`
+    の 3 本を素の `rules:self` にすると、こんどはワークスペース自身の層と
+    ぶつかって、先に積んだほうだけが残る。名札に予約してある綴りは、名札の側に
+    譲って、プロジェクトの側が名乗り直す。
+    """
+    if origin == settings.ORIGIN_COMMON:
+        return kind
+    if origin == settings.ORIGIN_PROJECT and settings.is_reserved_layer_name(layer):
+        return f"{kind}:{settings.PROJECT_KEY_HOME}{layer}"
+    return f"{kind}:{layer}"
 
 
-def _layer_home(root: str, projects_dir: str, layer: str) -> str:
+def _layer_home(root: str, projects_dir: str, origin: str, layer: str) -> str:
     """その層の設定を追跡している git プロジェクトルート。
 
     共通層と自身の層はワークスペースルート、プロジェクトの層はそのプロジェクト。
+    ここも名札では決めない。`projects/common/` の設定はそのプロジェクトの git が
+    追跡しているので、名札で共通層と同じに扱うと、ワークスペースの git に戻し方を
+    聞きに行くことになる。
+
     名前を引けないものはワークスペースルートに寄せる。そこに写しが無ければ
     対象から落ちるだけで、別の場所を守りに行くことにはならない。
     """
-    if layer in (settings.LAYER_COMMON, settings.LAYER_SELF):
+    if origin != settings.ORIGIN_PROJECT:
         return root
     return tree.project_root(projects_dir, layer) or root
 

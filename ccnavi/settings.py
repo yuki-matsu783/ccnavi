@@ -20,6 +20,7 @@ import json
 import os
 import tomllib
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 # ccnavi が読む環境変数。
 MODE_ENV = "CCNAVI_MODE"
@@ -144,6 +145,52 @@ LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
 LAYER_SELF = "self"
+# 層の名札に予約してある綴り。プロジェクトはこの名前を名乗れない。
+RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
+# 予約名のプロジェクトの控えの key に添える前置き。名札の側（`rules:self`）と
+# プロジェクトの側を分ける（_layer_key）。
+PROJECT_KEY_HOME = "projects/"
+
+# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 §25.4）。
+#
+# 名札の綴りでは種別を決められない。`projects/common/` は `common` を名乗るが
+# 共通層ではないし、`projects/self/` は `self` を名乗るがワークスペース自身の層
+# ではない。`layer == LAYER_COMMON` のような文字列比較で種別を決めると、
+# プロジェクトが名前を 1 つ選ぶだけで、共通層と同じ扱いに滑り込める。
+ORIGIN_COMMON = "common-layer"
+ORIGIN_SELF = "self-layer"
+ORIGIN_PROJECT = "project-layer"
+
+
+class LayerFile(NamedTuple):
+    """層 1 つの設定ファイル。守る対象（selfguard）へ渡す形（`ruleload.layer_files`）。
+
+    `origin` は層の種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
+    プロジェクトの名前）、`kind` は rules / phases / risk、`path` はその綴り。
+    種別を添えるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
+    """
+
+    origin: str
+    layer: str
+    kind: str
+    path: str
+
+
+def is_reserved_layer_name(name: str) -> bool:
+    """その名前が層の名札に予約してあるか（`common` / `self`、設計 §25.4）。
+
+    予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
+    lint（名指しする）、approval（`project:` を承認しない）、phase / risk
+    （層の phases / risk を足さない）が同じ答えを引く。片側にしか予約が
+    掛かっていないと、数えない層の名前で別の層の判定を引ける。
+
+    綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
+    `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
+    取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも
+    同じに畳む。`--lint` が error で名指しする（lint._projects）。
+    """
+    folded = (name or "").casefold()
+    return any(folded == reserved.casefold() for reserved in RESERVED_LAYER_NAMES)
 
 
 def layer_script_home(conf: Settings) -> str:

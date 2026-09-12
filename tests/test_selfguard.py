@@ -19,7 +19,7 @@ import tempfile
 import time
 import unittest
 
-from ccnavi import selfguard
+from ccnavi import selfguard, settings
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -352,7 +352,7 @@ class SelfGuardTest(unittest.TestCase):
         project = os.path.join(home, ".ccnavi", "config", "rules.yml")
         write(project, json.dumps(RULES))
 
-        layers = [("lib", "rules", project)]
+        layers = [settings.LayerFile(settings.ORIGIN_PROJECT, "lib", "rules", project)]
         found = selfguard.targets(self.repo, self.rules, "", layers, projects)
 
         own = [t for t in found if t.key == "rules:lib"]

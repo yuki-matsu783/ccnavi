@@ -33,19 +33,11 @@ from . import audit, builtin, hookio, phase, rules, settings, tree
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 
 # 層の名前。共通層と自身の層は固定で、プロジェクトの層はその名前を名乗る。
-LAYER_COMMON = "common"
-LAYER_SELF = "self"
-
-
-def is_self_name(name: str) -> bool:
-    """その名前が、ワークスペース自身の層として予約してある `self` か（設計 §25.4）。
-
-    綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
-    `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
-    取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも同じに
-    畳む。`--lint` が error で名指しする（lint._projects）。
-    """
-    return (name or "").casefold() == LAYER_SELF
+# 実体は settings が持つ（phase / risk も同じ綴りを要るが、そこは ruleload を
+# import できない）。ここは読み手のための別名。予約の判断は settings に寄せてある
+# （`settings.is_reserved_layer_name`）。
+LAYER_COMMON = settings.LAYER_COMMON
+LAYER_SELF = settings.LAYER_SELF
 
 
 @dataclass
@@ -94,9 +86,15 @@ PATH_TOOLS = ("Read", "Write", "Edit", "NotebookEdit")
 def layers(conf: settings.Settings, root: str) -> list[Layer]:
     """共通層より後ろの層を、足す順に並べる。自身の層が先、プロジェクトは名前順。
 
-    `projects/self/` は数えない。`self:id` と区別が付かないので、名前を 1 つ
-    予約するほうが、接頭辞の綴りを別にするより安い（設計 §25.4）。`projects/Self/`
-    のような綴り違いも同じに扱う（is_self_name）。`--lint` が error で言う。
+    予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
+    `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
+    接頭辞の綴りを別にするより安い（設計 §25.4）。綴り違い（`projects/Self/`）も
+    同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
+
+    数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
+    層を引く側（layer_for）も同じ予約を見て「層無し」を返すので、共通層だけで
+    判定する。片側にしか予約が掛かっていないと、数えない名前で別の層の判定を
+    引けてしまう。
     """
     found = [
         Layer(
@@ -106,7 +104,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
         )
     ]
     for p in tree.projects(conf.projects):
-        if is_self_name(p.name):
+        if settings.is_reserved_layer_name(p.name):
             continue
         home = tree.project_root(conf.projects, p.name)
         found.append(
@@ -121,8 +119,18 @@ def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> l
     ワークスペースのツリー（ワークスペースルートと、そこから切った作業ツリー）なら
     自身の層。プロジェクトのツリーならその層。ワークスペースルートの外に行き先が
     あるなら、どの層でもないので何も足さない。
+
+    行き先が予約名のプロジェクト（`projects/self/` / `projects/common/`）なら層無し。
+    ここを名前引きに任せてはいけない。`target.project` が `"self"` のとき、名前は
+    ワークスペース自身の層の名札と一致するので、**そのプロジェクトへの Write / Edit が
+    プロジェクト自身の deny を一度も読まずに、ワークスペースの層のルールで判定される**。
+    ワークスペースの層に広い `allow` があればそれで通る。層無しなら共通層だけで
+    判定するので、緩む側には倒れない。`--lint` が error で名指しし、人が名前を変える
+    までのあいだも、この 1 行が判定のすり替えを止める。
     """
     if target is None:
+        return []
+    if settings.is_reserved_layer_name(target.project):
         return []
     name = target.project or LAYER_SELF
     return [layer for layer in layers(conf, root) if layer.name == name]
@@ -298,8 +306,8 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     return views
 
 
-def layer_files(conf: settings.Settings, root: str) -> list[tuple[str, str, str]]:
-    """守る対象（selfguard）に渡す、層ごとの設定ファイル（層の名前, kind, 綴り）。
+def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
+    """守る対象（selfguard）に渡す、層ごとの設定ファイル（種別, 名札, kind, 綴り）。
 
     共通層は phases と risk の 2 本だけ返す。共通層の rules は `selfguard.targets` が
     `rules_path` で受け取っているので、ここから重ねると同じファイルが 2 度並ぶ。
@@ -307,16 +315,33 @@ def layer_files(conf: settings.Settings, root: str) -> list[tuple[str, str, str]
     自身の層とプロジェクトの層は 3 本とも返す。差し替え（`--project-rules-file`）は
     見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
 
+    種別（`settings.ORIGIN_*`）を添える。受け取る側は控えの key と、戻す先の git を
+    ここから決める。名札の綴りでは決められない。`projects/common/` は `common` を
+    名乗るので、名札で比べると共通層と同じ key になり、重複の排除でその層の 3 本が
+    控えと復元の対象から丸ごと落ちる。
+
+    予約名のプロジェクトも並べる。判定の層としては数えない（layers）が、ファイルは
+    守る。`--lint` が名前を変えるよう言っているあいだも、そこに置いてある 3 本は
+    ccnavi の設定ファイルで、書き換えられたら戻すほうが筋が通る。判定に効かない
+    ものを守るだけなので、緩む側には倒れない。
+
     在るかどうかは見ない。無いファイルは selfguard が対象から外す（REQ-SLF-03）ので、
     ここで存在を確かめると、同じ判断が 2 か所に分かれる。
     """
     found = [
-        (LAYER_COMMON, settings.KIND_PHASES, conf.phases),
-        (LAYER_COMMON, settings.KIND_RISK, conf.risk),
+        settings.LayerFile(settings.ORIGIN_COMMON, LAYER_COMMON, settings.KIND_PHASES, conf.phases),
+        settings.LayerFile(settings.ORIGIN_COMMON, LAYER_COMMON, settings.KIND_RISK, conf.risk),
     ]
-    for layer in layers(conf, root):
+    homes = [(settings.ORIGIN_SELF, LAYER_SELF, root)]
+    homes += [
+        (settings.ORIGIN_PROJECT, p.name, tree.project_root(conf.projects, p.name))
+        for p in tree.projects(conf.projects)
+    ]
+    for origin, name, home in homes:
         for kind in settings.LAYER_KINDS:
-            found.append((layer.name, kind, settings.layer_real_path(conf, layer.home, kind)))
+            found.append(
+                settings.LayerFile(origin, name, kind, settings.layer_real_path(conf, home, kind))
+            )
     return found
 
 

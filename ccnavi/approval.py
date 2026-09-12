@@ -804,6 +804,23 @@ def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
     return max(numbers) if numbers else 0
 
 
+def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
+    """`project:` が層の名札に予約してある綴りなら error（設計 §25.4）。"""
+    if not t.project or not settings.is_reserved_layer_name(t.project):
+        return []
+    reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"`project: {t.project}` は層の名札に予約してある綴り（{reserved}）。"
+            "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
+            "ワークスペース自身を指すなら `project:` を書かない。プロジェクトを指すなら、"
+            "そのプロジェクトの名前を変えてから書く",
+        )
+    ]
+
+
 def project_problems(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
 ) -> list[rules.Problem]:
@@ -811,7 +828,14 @@ def project_problems(
 
     子は親から継ぐ。提案に書いていなければここで埋め、写しに書かれる。書いてあって
     親と違えば承認しない。決めるのは人で、承認の画面に出た値が写しに残る。
+
+    予約名（`common` / `self`）は指せない。置き場にその名前のディレクトリが在っても
+    層としては数えないので（`ruleload.layers`）、指せると「層が決まらないチケット」を
+    承認することになる。継いだ値も同じに見る。
     """
+    reserved = _reserved_project(t)
+    if reserved:
+        return reserved
     if t.is_child:
         parent = pool.get(t.parent)
         if parent is None:
@@ -829,8 +853,12 @@ def project_problems(
                     f"{parent.project or '(ワークスペース)'} と違う。子は親から継ぐ",
                 )
             ]
-        return []
-    known = {p.name for p in tree.projects(conf.projects)}
+        return _reserved_project(t)
+    # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それは層では
+    # ないので、指せてはいけない。素の一覧で見ると通ってしまう。
+    known = {
+        p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)
+    }
     if t.project and t.project not in known:
         return [
             rules.Problem(
