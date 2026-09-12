@@ -207,12 +207,12 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_RULES` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身、`rules.yml`、`.claude/scripts/ccnavi-{ticket,review,git}.sh`。配り先に既にあるものは触らず、`--force` のときだけ入れ替える |
-| 配り先の `.gitignore` | 実行ファイルと同梱物の 3 行（配り先が git のリポジトリで、配るときだけ） |
+| 配るもの | `dist/ccnavi/` の中身、`rules.yml`、`.claude/scripts/ccnavi-{ticket,review,git}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える |
+| 配布先の `.gitignore` | 実行ファイルと同梱物の 3 行（配布先が git のリポジトリで、配るときだけ） |
 
 `--mode disable` は断る（設定ファイルに書いても効かないので、§4.3）。`--check` は書かずに
 揃っていないところだけを並べ、揃っていなければ終了コード 1。名指しした `--deploy` が
-組み立てられていなければ終了コード 2 で断るが、既定の配り元が使えないだけなら理由を 1 行出して
+組み立てられていなければ終了コード 2 で断るが、既定の配布元が使えないだけなら理由を 1 行出して
 設定は書く。仕様は `tests/test_setup.py` が固定している。
 
 ### 4.7 記録
