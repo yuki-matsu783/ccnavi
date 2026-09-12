@@ -223,6 +223,26 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/**
+ * 3 つの画面（ボード・ルール設定・プロジェクト管理）で同じ見た目のボタン。
+ * 縁と薄い影で「押せる」と分かるようにし、押した瞬間に 1px 沈む。primary は VS Code の主ボタンの色。
+ */
+export const BUTTON_STYLE = `  button.action {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    min-height: 24px; padding: 2px 12px; line-height: 1.3; white-space: nowrap;
+    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border, rgba(128, 128, 128, .4)); border-radius: 3px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .25);
+    cursor: pointer; font: inherit;
+  }
+  button.action:hover { background: var(--vscode-button-secondaryHoverBackground); border-color: var(--vscode-focusBorder); }
+  button.action:active { transform: translateY(1px); box-shadow: none; }
+  button.action:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+  button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
+  button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
+  button.action.small { min-height: 20px; padding: 0 8px; font-size: .9em; }
+  button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }`;
+
 const STYLE = `  * { box-sizing: border-box; }
   body {
     margin: 0; padding: 12px;
@@ -240,14 +260,7 @@ const STYLE = `  * { box-sizing: border-box; }
     background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground);
     border: 1px solid var(--vscode-dropdown-border); border-radius: 2px; padding: 2px 4px;
   }
-  button.action {
-    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
-    border: none; border-radius: 2px; padding: 3px 10px; cursor: pointer; font: inherit;
-  }
-  button.action:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-  button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
-  button.action:disabled { opacity: .5; cursor: default; }
+${BUTTON_STYLE}
   .problems {
     margin: 0 0 12px; padding: 8px 8px 8px 24px;
     border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
@@ -317,7 +330,7 @@ const STYLE = `  * { box-sizing: border-box; }
   .phase { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase.gate-closed { color: var(--vscode-editorError-foreground); }
-  .phase button.action { margin-left: 6px; padding: 0 6px; font-size: .95em; }
+  .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
   .issues {
     list-style: none; margin: 6px 0 0; padding: 0;
     font-size: .82em; color: var(--vscode-editorWarning-foreground);

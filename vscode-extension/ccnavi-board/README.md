@@ -47,7 +47,7 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 
 | 何 | どう出るか、何が起きるか |
 |---|---|
-| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を並べる。名前・パス・origin（`git remote get-url origin` をローカルで読む）・`config/rules.yml` の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
+| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・`config/rules.yml` の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
 | clone | URL と名前を入れて「clone」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
 | clone を止める条件 | URL が https / ssh / `git@host:path` のどの形でもない、資格情報（`user:token@`）が入っている、名前が英数字と `. _ -` 以外を含む（先頭は英数字）、既存のツリー名と衝突する（大文字小文字だけ違う名前も）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` を落とした `host/path` で比べる）、clone 先が既にあって空でない |
 | 置き場が無い | 上部に警告が出る。「作る」で `projects/` を作る。clone すれば git が作るので、無くても clone はできる |
