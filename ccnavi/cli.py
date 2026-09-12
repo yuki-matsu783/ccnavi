@@ -83,16 +83,21 @@ documented in README.md ("試験の JSON"); the VS Code extension reads it.
 To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
+    ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board;
+                                            ids go last, after every flag)
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
 .claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
-editing a ticket never widens the area on its own.
+editing a ticket never widens the area on its own. Ids only narrow the batch:
+an id that is not pending, or a child listed without its pending parent or
+its parent's pending revision, approves nothing.
 
 The VS Code board extension approves from an overlay instead of the terminal:
 
-    ccnavi --approve --preview --json          (show the batch; places nothing)
-    ccnavi --approve --yes <id,id,...> --json  (approve exactly the batch shown)
+    ccnavi --approve --preview --json [<id>...]  (show the batch; places nothing)
+    ccnavi --approve --yes <id,id,...> --json [<id>...]  (approve exactly what was shown;
+                                                 the trailing ids are the same filter)
 
 --yes needs no terminal; it refuses when the batch changed since it was shown.
 The next UserPromptSubmit / PreToolUse tells the model once about the new
@@ -301,20 +306,27 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
-        # 見るだけの経路。写しを置かないので端末の壁は要らない。
+        # 見るだけの経路。写しを置かないので端末の壁は要らない。後ろに並べた語は
+        # `--approve` と同じで、束に載せる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
-            code = approval.preview(stdout, stderr, conf, root, args.json)
+            code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
         # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた束と今の束が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
-            code = approval.approve_yes(stdout, stderr, conf, root, args.yes.split(","), args.json)
+            # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
+            code = approval.approve_yes(
+                stdout, stderr, conf, root, args.yes.split(","), args.json, list(args.command)
+            )
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
         rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
-        approved = approval.approve(stdin, stdout, stderr, conf, rule_set, root)
+        # `--approve` の後ろに並べた語は、束に載せる識別子。無ければ承認待ち全部。
+        approved = approval.approve(
+            stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
+        )
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。

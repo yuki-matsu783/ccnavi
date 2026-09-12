@@ -22,7 +22,7 @@
    "path": "<root>/.claude/worktrees/i0001/wip/tickets/todo/i0001-01.md"
   }
  ],
- "text": "Ticket 承認リクエスト: 2 件\n\n== i0001: 親（親）\n■ このチケットで書き込みが許される領域（これ以外はすべて止まる）\n    allow: src/*, wip/*, tests/*\n■ 全体計画（この並びに合意する）\n    1. 調査（research）  レビュー不要\n    2. 設計（design）  レビュー要\n■ 理由（エージェントの記述）\n    r\n■ 作業ツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/tickets/todo/i0001.md\n\n== i0001-01: 子 i0001-01（親 i0001、フェーズ 1: 調査）\n■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）\n    親 src/*, wip/*, tests/*\n    種類 調査: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要（t）\n■ 理由（エージェントの記述）\n    r\n■ 作業ツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/tickets/todo/i0001-01.md",
+ "text": "Ticket 承認リクエスト: 2 件\n\n== i0001: 親（親）\n■ このチケットで書き込みが許される領域（これ以外はすべて止まる）\n    allow: src/*, wip/*, tests/*\n■ 全体計画（この並びに合意する）\n    1. 調査（research）  レビュー不要\n    2. 設計（design）  レビュー要\n■ 理由（エージェントの記述）\n    r\n■ プロジェクト: (ワークスペース)  作業ツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/tickets/todo/i0001.md\n\n== i0001-01: 子 i0001-01（親 i0001、フェーズ 1: 調査）\n■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）\n    親 src/*, wip/*, tests/*\n    種類 調査: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要（t）\n■ 理由（エージェントの記述）\n    r\n■ プロジェクト: (ワークスペース)  作業ツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/tickets/todo/i0001-01.md",
  "rejected": [
   {
    "ticket": "i0001-02",

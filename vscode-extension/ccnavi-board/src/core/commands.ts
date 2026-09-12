@@ -31,14 +31,25 @@ function ccnaviInvocation(launcher: Launcher, root: string): string {
   return `uv run python -m ccnavi --root ${rootArg}`;
 }
 
-/** `--approve --preview --json`。束を見るだけで写しは置かない（子プロセスの引数） */
-export function previewArgs(): readonly string[] {
-  return ["--approve", "--preview", "--json"];
+/**
+ * `--approve --preview --json [<識別子>...]`。束を見るだけで写しは置かない（子プロセスの引数）。
+ * 識別子を並べればその分だけの束、空なら承認待ち全部。ボードは絞り込みで見えている分を渡す。
+ */
+export function previewArgs(tickets: readonly string[] = []): readonly string[] {
+  return ["--approve", "--preview", "--json", ...tickets];
 }
 
-/** `--approve --yes <識別子,…> --json`。見せた束をそのまま承認する（子プロセスの引数） */
-export function approveArgs(tickets: readonly string[]): readonly string[] {
-  return ["--approve", "--yes", tickets.join(","), "--json"];
+/**
+ * `--approve --yes <識別子,…> --json [<絞り>...]`。見せた束をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`only` はそのとき preview に渡した絞り。
+ * 絞りを渡さないと、実行ファイルは「絞らない束」と見せた識別子を比べるので、
+ * 絞り込み中の承認がいつも食い違いになる。
+ */
+export function approveArgs(
+  tickets: readonly string[],
+  only: readonly string[] = [],
+): readonly string[] {
+  return ["--approve", "--yes", tickets.join(","), "--json", ...only];
 }
 
 /**

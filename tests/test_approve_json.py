@@ -35,6 +35,7 @@ class ApproveJsonTest(PhaseHarness):
         return json.loads(result.stdout)
 
     def yes(self, tickets, *extra):
+        """`--approve --yes <識別子,…> --json [<絞り>...]`。extra は絞りかフラグ。"""
         return self.ccnavi("--approve", "--yes", ",".join(tickets), "--json", *extra)
 
     def copy_exists(self, name):
@@ -122,6 +123,29 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01"])
         self.assertFalse(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01"))
+
+    def test_a_filtered_overlay_approves_only_what_it_showed(self):
+        """絞り込み中の承認。preview と yes に同じ絞りを渡し、見せた分だけを承認する。"""
+        self.pending_parent_and_child()
+        # 親だけに絞って見せる。
+        body = self.preview("i0001")
+        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001"])
+        # 同じ絞りを添えて承認する。子は承認されない。
+        result = self.yes(["i0001"], "i0001")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.copy_exists("i0001"))
+        self.assertFalse(self.copy_exists("i0001-01"))
+        # 絞りを添えずに同じことを頼めば、絞らない束と比べて食い違いになる。
+        self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01")
+
+    def test_yes_without_the_filter_compares_against_the_whole_batch(self):
+        """絞りを添えない `--yes` は、絞らない束と比べる。部分だけを黙って通さない。"""
+        self.pending_parent_and_child()
+        result = self.yes(["i0001"])
+        self.assertEqual(result.returncode, 1)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["mismatch"]["current"], ["i0001", "i0001-01"])
+        self.assertFalse(self.copy_exists("i0001"))
 
     def test_yes_refuses_unknown_identifiers(self):
         self.pending_parent_and_child()

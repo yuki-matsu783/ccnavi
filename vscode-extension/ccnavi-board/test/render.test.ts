@@ -88,6 +88,26 @@ test("CB-T12b 列ごとに畳むボタンを出す", () => {
   assert.equal((html.match(/class="fold"/g) ?? []).length, 4);
 });
 
+test("CB-T12c 絞り込み後の件数は見えているカードで数え、畳んだ列は固定幅に縛られない", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  // 絞り込みのたびに列の見出しの .count を .hidden でないカードの数で書き直す
+  assert.ok(html.includes('column.querySelector(":scope > h2 > .count")'), "列の見出しの件数を拾う");
+  assert.ok(html.includes('column.querySelectorAll(".card:not(.hidden)").length'), "見えているカードで数える");
+  // ドラッグで付けたインラインの width より畳んだ状態を優先する
+  assert.ok(/\.column\.folded \{[^}]*width: auto !important/.test(html), "畳んだ列は固定幅より優先");
+});
+
+test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、その識別子を --approve に渡す。上部の集計は絞らない", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  // 上部の集計は描いたときの全体の数のままで、script は触らない
+  assert.ok(html.includes("承認待ち 1 件</span>"), "集計は全体の数");
+  // ボタンの数と disabled は見えている承認待ちで決め、押すとその識別子を送る
+  assert.ok(html.includes(`document.querySelector('.controls button[data-action="approve"]')`), "上部のボタンだけを書き換える");
+  assert.ok(html.includes('document.querySelectorAll(".card.pending:not(.hidden)").length'), "見えている承認待ちで数える");
+  // 識別子と「絞り込み中か」を別々に送る。空の並びを「全部」に読ませない
+  assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
+});
+
 test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   assert.ok(html.includes("承認済"));

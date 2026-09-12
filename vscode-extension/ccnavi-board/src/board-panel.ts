@@ -31,7 +31,7 @@ export const WATCH_PATTERNS = [
 type Message =
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }
-  | { readonly type: "approve" }
+  | { readonly type: "approve"; readonly tickets: readonly string[]; readonly filtered: boolean }
   | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
   | { readonly type: "approveCancel" }
   | { readonly type: "accept"; readonly parent: string; readonly phase: number };
@@ -51,6 +51,8 @@ interface PanelState {
   filter?: string;
   /** 承認のオーバーレイ。あれば描くたびにボードの上に被せる。監視の更新で消えない */
   approval?: ApprovalOverlay;
+  /** そのオーバーレイが見せている束の絞り（ボードの絞り込みで見えている識別子）。空なら全部 */
+  approvalOnly?: readonly string[];
 }
 
 let state: PanelState | undefined;
@@ -253,10 +255,26 @@ function handleMessage(message: Message | undefined): void {
     case "open":
       openTicket(current, message.filePath);
       return;
-    case "approve":
+    case "approve": {
+      // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを束にする。
+      let only: readonly string[] = [];
+      if (message.filtered) {
+        if (message.tickets.length === 0) {
+          vscode.window.showWarningMessage("絞り込みで見えている承認待ちが無い");
+          return;
+        }
+        const tickets = pendingOf(current, message.tickets);
+        if (tickets === undefined) {
+          vscode.window.showWarningMessage("ボードが古く、承認待ちが変わっている。更新してから承認する");
+          void update();
+          return;
+        }
+        only = tickets;
+      }
       // 待たない。読み込み中もオーバーレイを出しておき、終わったら描き直す。
-      void openApproval(current);
+      void openApproval(current, only);
       return;
+    }
     case "approveConfirm":
       void confirmApproval(current, message.tickets);
       return;
@@ -289,13 +307,16 @@ function redraw(current: PanelState): void {
  * 「承認」。束を読んでオーバーレイに出す。写しはまだ置かれない。
  * 読んでいる間も「読んでいる…」のオーバーレイを出し、二重に開かない。
  */
-async function openApproval(current: PanelState): Promise<void> {
+async function openApproval(current: PanelState, only: readonly string[] = []): Promise<void> {
   if (current.approval !== undefined && current.approval.kind !== "error") {
     return;
   }
   current.approval = { kind: "loading" };
+  // 読み直し（束が変わったとき）も同じ絞りを通す。絞りを忘れると、絞り込んで見せた
+  // つもりのオーバーレイが承認待ち全部に化ける。
+  current.approvalOnly = only;
   redraw(current);
-  const result = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+  const result = await runApprovePreview(current.folder.uri.fsPath, binSetting(), only);
   if (state !== current || current.approval?.kind !== "loading") {
     return;
   }
@@ -316,7 +337,13 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   const preview = current.approval.preview;
   current.approval = { kind: "approving", preview };
   redraw(current);
-  const outcome = await runApproveYes(current.folder.uri.fsPath, binSetting(), tickets);
+  // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らない束と比べて食い違いにする。
+  const outcome = await runApproveYes(
+    current.folder.uri.fsPath,
+    binSetting(),
+    tickets,
+    current.approvalOnly ?? [],
+  );
   if (state !== current) {
     return;
   }
@@ -327,6 +354,8 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
     return;
   }
   if ("mismatch" in outcome) {
+    // 絞りは外す。束が変わったのだから、いま何が承認待ちなのかを全部見せる。
+    current.approvalOnly = [];
     const again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
     if (state !== current) {
       return;
@@ -363,6 +392,16 @@ async function offerPrompt(count: number, prompt: string): Promise<void> {
   }
 }
 
+/**
+ * ボードが絞り込みで見えている承認待ちとして送ってきた識別子。1 つでもいまのボードで
+ * 承認待ちでなければ undefined（ボードが古い）。落として送ると、見せた 2 件のつもりが
+ * 1 件になるので、削らずに止める。
+ */
+function pendingOf(current: PanelState, tickets: readonly string[]): readonly string[] | undefined {
+  const pending = new Set(current.board?.pendingApproval ?? []);
+  return tickets.every((id) => pending.has(id)) ? tickets : undefined;
+}
+
 function openTicket(current: PanelState, filePath: string): void {
   if (current.board === undefined || !isKnownPath(current.board, filePath)) {
     return;
@@ -395,12 +434,25 @@ function asMessage(message: unknown): Message | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; filePath?: unknown; parent?: unknown; phase?: unknown; tickets?: unknown };
+  const m = message as {
+    type?: unknown;
+    filePath?: unknown;
+    parent?: unknown;
+    phase?: unknown;
+    tickets?: unknown;
+    filtered?: unknown;
+  };
   switch (m.type) {
     case "refresh":
-    case "approve":
     case "approveCancel":
       return { type: m.type };
+    case "approve":
+      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きに倒れる。
+      return Array.isArray(m.tickets) &&
+        m.tickets.every((t) => typeof t === "string") &&
+        typeof m.filtered === "boolean"
+        ? { type: "approve", tickets: m.tickets, filtered: m.filtered }
+        : undefined;
     case "approveConfirm":
       return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string")
         ? { type: "approveConfirm", tickets: m.tickets as string[] }

@@ -202,12 +202,16 @@ export type ApproveOutcome =
  * 承認の束を見る（`--approve --preview --json`）。写しは置かれない。
  * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
-export async function runApprovePreview(root: string, setting: string): Promise<RunResult<ApprovePreview>> {
+export async function runApprovePreview(
+  root: string,
+  setting: string,
+  only: readonly string[] = [],
+): Promise<RunResult<ApprovePreview>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, previewArgs(), APPROVE_TIMEOUT_MS);
+  const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi --approve --preview --json が失敗した: ${firstLine(ran.stderr)}` };
   }
@@ -223,12 +227,13 @@ export async function runApproveYes(
   root: string,
   setting: string,
   tickets: readonly string[],
+  only: readonly string[] = [],
 ): Promise<ApproveOutcome> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, approveArgs(tickets), APPROVE_TIMEOUT_MS);
+  const ran = await run(launcher, root, approveArgs(tickets, only), APPROVE_TIMEOUT_MS);
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0

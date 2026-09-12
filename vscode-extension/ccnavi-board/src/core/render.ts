@@ -298,7 +298,7 @@ function renderActions(actions: readonly Action[], id: string): string {
 function renderActionButton(action: Action, id: string): string {
   switch (action.kind) {
     case "approve":
-      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。${escapeHtml(id)} だけを承認することはできない">承認</button>`;
+      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。絞り込み中は、見えている承認待ちだけの束になる">承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
   }
@@ -391,7 +391,8 @@ ${BUTTON_STYLE}
   .column.folded .fold-mark {
     border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
   }
-  .column.folded { flex: 0 0 auto; min-width: 0; width: auto; }
+  /* ドラッグで固定した px 幅（インラインの style）より畳んだ状態を優先する。広げたときは固定幅に戻る */
+  .column.folded { flex: 0 0 auto; min-width: 0; width: auto !important; }
   .column.folded h2 { margin: 0; white-space: nowrap; }
   .column.folded .cards, .column.folded .empty, .column.folded .resizer { display: none; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
@@ -467,6 +468,12 @@ ${BUTTON_STYLE}
   .approval-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }`;
 
 const SCRIPT = `  const vscode = acquireVsCodeApi();
+  // 絞り込みで見えている承認待ちの識別子と、絞り込み中かどうか。「絞り込み無し」は空の並びでは
+  // なく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認に化ける。
+  function filtering() { return document.body.classList.contains("filtering"); }
+  function visiblePending() {
+    return [...document.querySelectorAll(".card.pending:not(.hidden)")].map((card) => card.getAttribute("data-id") || "");
+  }
   function open(card) {
     const filePath = card.getAttribute("data-path");
     if (filePath) { vscode.postMessage({ type: "open", filePath: filePath }); }
@@ -485,7 +492,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       event.stopPropagation();
       const action = button.getAttribute("data-action");
       if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
-      else if (action === "approve") { vscode.postMessage({ type: "approve" }); }
+      else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() }); }
       else if (action === "approve-confirm") {
         const tickets = (button.getAttribute("data-tickets") || "").split(",").filter((t) => t !== "");
         vscode.postMessage({ type: "approveConfirm", tickets: tickets });
@@ -589,6 +596,20 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const ownFamily = card.getAttribute("data-family") || "";
       const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent);
       card.classList.toggle("hidden", hidden);
+    }
+    document.body.classList.toggle("filtering", project !== "*" || parent !== "*");
+    // 列の件数は絞り込み後に見えているカードの数にする。上部の集計（残り・全・不備・承認待ち）は
+    // 絞り込みに関係なくボード全体の数のまま。
+    for (const column of document.querySelectorAll(".column")) {
+      const count = column.querySelector(":scope > h2 > .count");
+      if (count) { count.textContent = String(column.querySelectorAll(".card:not(.hidden)").length); }
+    }
+    // 「承認待ち N 件を承認」だけは、押したときに束になるもの（見えている承認待ち）の数にする。
+    const approve = document.querySelector('.controls button[data-action="approve"]');
+    if (approve) {
+      const n = document.querySelectorAll(".card.pending:not(.hidden)").length;
+      approve.textContent = "承認待ち " + n + " 件を承認";
+      approve.disabled = n === 0;
     }
     state.project = project;
     state.parent = parent;
