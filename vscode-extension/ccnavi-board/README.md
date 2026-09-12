@@ -22,12 +22,17 @@ ccnavi は `--approve` / `accept` を端末から打つものと決めていて�
 保存する前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は配点を書く場所と、書いた配点が
 読めるかを確かめる入口だけを持つ。
 
+同じ拡張に「フェーズ管理画面」がある。フェーズの種類（`phases.yml`）を画面で直し、保存する前に
+`--lint --phases` を通す。種類は親チケットの計画に並べる型で、子の範囲の上限とレビューの既定を持つ。
+子の範囲が上限に収まるか、レビューが要るかを判定するのは実行ファイルで、拡張は種類を書く場所と、書いた種類が
+読めるかを確かめる入口だけを持つ。
+
 同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 §25）を
 一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の設定（`.gitignore`、`config/rules.yml`）を
 ボタンで整える。各行からそのプロジェクトのルール設定画面とチケット管理（ボードの絞り込み）へ飛べる。
 
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
-「プロジェクト管理」「ルール管理」「リスク管理」「チケット管理」の 4 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
+「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の 5 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
 チケット制御を使っているときだけ。`.claude/settings.json`（`settings.local.json` が勝つ）の
 `env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口もコマンドパレットの「ボードを開く」「ボードを更新」
 「承認する」も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
@@ -46,9 +51,10 @@ ccnavi は `--approve` / `accept` を端末から打つものと決めていて�
 | `ccnavi ボード: ルール設定画面を開く` | ワークスペースのルール設定画面を開く。既に開いていれば前面に出す |
 | `ccnavi ボード: プロジェクト管理を開く` | プロジェクト管理画面を開く。既に開いていれば前面に出して読み直す |
 | `ccnavi ボード: リスク管理画面を開く` | リスク管理画面を開く。既に開いていれば前面に出す |
+| `ccnavi ボード: フェーズ管理画面を開く` | フェーズ管理画面を開く。既に開いていれば前面に出す |
 
-サイドパネル（左端の ccnavi アイコン）の「プロジェクト管理」「ルール管理」「リスク管理」「チケット管理」は、
-それぞれ `プロジェクト管理を開く`、`ルール設定画面を開く`、`リスク管理画面を開く`、`ボードを開く` と同じ。
+サイドパネル（左端の ccnavi アイコン）の「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」は、
+それぞれ `プロジェクト管理を開く`、`ルール設定画面を開く`、`リスク管理画面を開く`、`フェーズ管理画面を開く`、`ボードを開く` と同じ。
 
 ### プロジェクト管理画面
 
@@ -122,6 +128,29 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 - **外で変わったら上書きしない。** ルール設定画面と同じ。読み込んだときの更新時刻と保存時のそれが違えば止める
 - **コメントを残す。** `risk.yml` のコメントは、変えていない場所ではそのまま。項目を並べ替えれば、その項目の前の
   コメントも一緒に動く。新しく足す glob は二重引用符で囲む。`version` が無いファイルは保存で先頭に `version: 1` を足す
+
+### フェーズ管理画面
+
+対象はワークスペースのフェーズの種類（`.claude/ccnavi/phases.yml`、`env.CCNAVI_PHASES`）の 1 本。プロジェクトごとの
+種類は無い（設計 §25）。編集中の内容は一時ファイルに書いて `--lint --phases <パス>` で実行ファイルに渡す。
+
+| 何 | どう出るか、何が起きるか |
+|---|---|
+| 種類 | `phases` を 1 件 1 枚で並べる。id（対応表のキー）・title・kind（work / feedback）・review（none / mr）・scope（inherit か glob の並び）・deliverables・overlap・requires・agent・when。並びの欄は `,` 区切りの 1 欄。足す・消す・上下に動かす・改名する。feedback の種類は左端に色が付く |
+| 保存 | 一時ファイルへ書いて `--lint --phases` を通し、error があれば保存しない。識別子に使えない id、title の重なり、feedback で `review: none`、overlap / requires が指す先の無い種類、承認待ちの親の計画（提案）が指す種類を消したとき、はここで止まる（承認済みの写しの計画は照合しない。定義が読めなくなるときだけ止まる）。同じ id が 2 つあるときは画面が先に止める（実行ファイルは後ろの定義で黙って上書きするため） |
+| ファイルが無い | 空の画面と「雛形でファイルを作る」。雛形は README「フェーズの種類と計画」の例で、`scope` の綴りは作ったあとにこのプロジェクトの置き場へ直す。組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。既にあれば上書きしない |
+| チケット制御が disable | 上部に「種類は何にも効かない」と出る。編集と保存はできる |
+| 監視 | 種類のファイル、`.claude/settings.json`、`.claude/settings.local.json`、チケットの置き場。外で変われば「外で変わった」、チケットが動けば保存の可否を取り直す |
+
+守っていること。
+
+- **判定は実行ファイルが出す。** 画面は種類を書くだけで、子の範囲が上限に収まるか、レビューが要るかは出さない。
+  それは承認（`--approve`）と着手・閉じるときに実行ファイルが言う
+- **作業中のチケットがある間は保存できない。** 種類は承認・着手・閉じるときに読まれるので、どのツリーの `doing` でも止める
+- **外で変わったら上書きしない。** ルール設定画面と同じ。読み込んだときの更新時刻と保存時のそれが違えば止める
+- **コメントを残す。** `phases.yml` のコメントは、変えていない場所ではそのまま。種類を並べ替えたり改名したりすれば、その種類の前の
+  コメントも一緒に動く。変えていない欄は引用符も含めて触らない。新しく足す glob は二重引用符で囲み、overlap / requires の id は裸で書く。
+  `kind` と `review` を書いていない種類は既定（work / mr）で出し、変えなければ足さない。`version` が無いファイルは保存で先頭に `version: 1` を足す
 
 ボードの中で。
 
@@ -208,7 +237,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 ## 手動確認の手順
 
-`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `projects-panel.ts` / `sidebar.ts` /
+`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `projects-panel.ts` / `sidebar.ts` /
 `terminal.ts` / `ccnavi.ts` / `git.ts` は VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
 `tests/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を
 実際のリポジトリで踏む。
@@ -228,8 +257,8 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 11 | 未表示で更新 | ボードを閉じた状態で `ボードを更新` | 「ccnavi ボードが開かれていない」の通知 |
 | 12 | 読めない写し | ボードを開いたまま `.claude/ccnavi/tickets/<id>.md` の frontmatter を壊す | 上部の問題の一覧にその写しが出て、他のカードはそのまま |
 | 13 | プロジェクト | `projects/<repo>` を持つワークスペースで開く | `project` バッジと絞り込みが出る |
-| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「プロジェクト管理」「ルール管理」「リスク管理」「チケット管理」の順で 4 つ |
-| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」「リスク管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
+| 14 | 左端のアイコン | 拡張を入れる | アクティビティバーに ccnavi のアイコン。押すと「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の順で 5 つ |
+| 14b | チケット制御を切る | `.claude/settings.json` の env に `"CCNAVI_TICKET_CONTROL": "disable"` を書く | サイドパネルが「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」になり、コマンドパレットから「ボードを開く」「ボードを更新」「承認する」が消える。プロジェクト管理の各行から「チケット管理」が消える。行を消すと戻る |
 | 15 | ルール設定画面が開く | サイドパネルの「ルール管理」 | deny / ask / allow の 3 タイプにルールが並ぶ。上部に dry-run の注意 |
 | 15b | 畳む | タイプの見出しの印、ルールの印を押す | タイプは中のルールごと隠れ、ルールは要約 1 行になる。もう一度押すと戻る。畳んだまま並べ替えても畳んだまま |
 | 16 | 編集中の内容で判定 | あるルールの glob を変え、保存せずに「判定を試す」で当たる subject を入れて「判定」 | 変えた後の glob で判定される。当たったルールがルール一覧で枠付きになる。「このツールで走る hook」に PreToolUse / PostToolUse の該当行と Stop などが並ぶ |
@@ -255,20 +284,27 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 36 | コメントが残る | 項目を 1 つ上へ動かし、points を変えて保存し、`git diff` を見る | 動かした項目と変えた行だけが差分。先頭の説明と末尾の例のコメントは残っている |
 | 37 | 無ければ作る | `risk.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「組み込みの配点でファイルを作る」。欄は押せない。押すとファイルが出来て、帯が消えて編集できる |
 | 38 | 作業中はロック | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
+| 39 | フェーズ管理画面が開く | サイドパネルの「フェーズ管理」 | 種類 7 件（このリポジトリの `phases.yml`）。`implement-feedback` の scope が inherit で、feedback の 2 件に左端の色。上部の path が `.claude/ccnavi/phases.yml` |
+| 40 | lint で止まる | `implement-feedback` の review を none にして「保存」。次に戻して `implement` の requires に `nothing` を書いて「保存」 | どちらも下部に `--lint` の error（`review: mr` でなければならない / `nothing` という種類は無い）が出て保存されない |
+| 41 | id の重なり | `design` の id を `research` に変える | id の欄が赤くなり、下部に「id が重なっている」。保存ボタンが押せない。戻すと消える |
+| 42 | コメントが残る | `acceptance` を 1 つ上へ動かし、`docs` の scope に `wip/docs/*` を足して保存し、`git diff` を見る | 動かした種類とその前のコメント、変えた `scope` の行だけが差分。先頭の説明は残っている。`overlap: [implement]` のような裸の並びはそのまま |
+| 43 | 無ければ作る | `phases.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「雛形でファイルを作る」。欄は無く、追加も押せない。押すとファイルが出来て、帯が消えて種類 5 件が編集できる |
+| 44 | 作業中はロック | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
 
 ## 構成
 
 ```
 src/
   extension.ts        コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 4 つの入口。チケット制御が disable なら 3 つ（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネルの 5 つの入口。チケット制御が disable なら 4 つ（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
   rules-panel.ts      ルール設定画面の Webview パネル（ワークスペース / プロジェクトの対象ごとに 1 つ）。判定・検証・保存の受け付け（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
+  phases-panel.ts     フェーズ管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
-  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint / --lint --json の実行（Node の子プロセス）
+  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases の差し替え）/ --lint --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
@@ -280,6 +316,8 @@ src/
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
     risk-render.ts    リスク管理画面の HTML と、その中で動くスクリプト
     risk-doc.ts       risk.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
+    phases-render.ts  フェーズ管理画面の HTML と、その中で動くスクリプト
+    phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）と、無いときに書く雛形の本文
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、プロジェクトになっていない .git の探索、.gitignore と雛形の加工
     projects-render.ts プロジェクト管理画面の HTML と、その中で動くスクリプト
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
@@ -292,7 +330,7 @@ media/
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T85
+  *.test.ts           core の単体テスト CB-T01〜CB-T95
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て
