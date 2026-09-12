@@ -93,6 +93,7 @@ function renderColumn(column: BoardColumn): string {
       <span class="count">${column.count}</span>
     </h2>
 ${body}
+    <div class="resizer" data-resize="${escapeHtml(column.state)}" title="ドラッグで幅を変える／ダブルクリックで戻す"></div>
   </section>`;
 }
 
@@ -268,12 +269,22 @@ ${BUTTON_STYLE}
   }
   .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
   /* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールに逃がす。
-     畳んだ列は縦書きの見出しだけの細い帯になる */
+     右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
+     畳んだ列は見出し 1 行ぶんの幅に縮む。縦書きにはしない */
   .board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; }
   .column {
+    position: relative;
     flex: 1 1 0; min-width: 220px;
     border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px;
   }
+  .column.sized { flex: 0 0 auto; }
+  .resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: 1; }
+  .resizer::after {
+    content: ""; position: absolute; top: 8px; bottom: 8px; left: 5px; width: 2px;
+    border-radius: 1px; background: var(--vscode-focusBorder); opacity: 0;
+  }
+  .resizer:hover::after, .column.resizing .resizer::after { opacity: 1; }
+  body.resizing, body.resizing * { cursor: col-resize; user-select: none; }
   .column h2 { margin: 0 0 8px; font-size: 1em; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .column .count { color: var(--vscode-descriptionForeground); }
   button.fold {
@@ -290,11 +301,9 @@ ${BUTTON_STYLE}
   .column.folded .fold-mark {
     border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
   }
-  .column.folded { flex: 0 0 auto; min-width: 0; width: 36px; padding: 8px 4px; }
-  .column.folded h2 { margin: 0; flex-direction: column; justify-content: flex-start; }
-  .column.folded button.fold { flex-direction: column; }
-  .column.folded .label { writing-mode: vertical-rl; }
-  .column.folded .cards, .column.folded .empty { display: none; }
+  .column.folded { flex: 0 0 auto; min-width: 0; width: auto; }
+  .column.folded h2 { margin: 0; white-space: nowrap; }
+  .column.folded .cards, .column.folded .empty, .column.folded .resizer { display: none; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .card {
@@ -365,13 +374,15 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "wrapup") { vscode.postMessage({ type: "wrapup", parent: button.getAttribute("data-parent") }); }
     });
   }
-  // 絞り込みと畳んだ列は、更新で HTML が作り直されても残るように webview の状態に置く。
+  // 絞り込み・畳んだ列・列の幅は、更新で HTML が作り直されても残るように webview の状態に置く。
   const saved = vscode.getState() || {};
+  const savedWidths = saved.widths && typeof saved.widths === "object" ? saved.widths : {};
   const state = {
     project: typeof saved.project === "string" ? saved.project : "*",
     folded: Array.isArray(saved.folded) ? saved.folded.filter((f) => typeof f === "string") : [],
+    widths: Object.fromEntries(Object.entries(savedWidths).filter(([, w]) => typeof w === "number" && w > 0)),
   };
-  function save() { vscode.setState({ project: state.project, folded: state.folded }); }
+  function save() { vscode.setState({ project: state.project, folded: state.folded, widths: state.widths }); }
 
   function setFolded(column, folded) {
     column.classList.toggle("folded", folded);
@@ -387,6 +398,48 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       setFolded(column, folded);
       state.folded = folded ? state.folded.concat([key]) : state.folded.filter((f) => f !== key);
       save();
+    });
+  }
+
+  // 列の幅。取っ手をドラッグした列だけ px で固定し、ダブルクリックで元の伸び縮みに戻す。
+  const MIN_WIDTH = 220;
+  function setWidth(column, width) {
+    column.classList.toggle("sized", width !== undefined);
+    column.style.width = width === undefined ? "" : width + "px";
+  }
+  for (const handle of document.querySelectorAll(".resizer")) {
+    const column = handle.closest(".column");
+    const key = handle.getAttribute("data-resize") || "";
+    setWidth(column, state.widths[key]);
+    handle.addEventListener("dblclick", () => {
+      delete state.widths[key];
+      setWidth(column, undefined);
+      save();
+    });
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) { return; }
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = column.getBoundingClientRect().width;
+      column.classList.add("resizing");
+      document.body.classList.add("resizing");
+      handle.setPointerCapture(event.pointerId);
+      const move = (e) => {
+        const width = Math.max(MIN_WIDTH, Math.round(startWidth + e.clientX - startX));
+        setWidth(column, width);
+        state.widths[key] = width;
+      };
+      const finish = () => {
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", finish);
+        handle.removeEventListener("pointercancel", finish);
+        column.classList.remove("resizing");
+        document.body.classList.remove("resizing");
+        save();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", finish);
+      handle.addEventListener("pointercancel", finish);
     });
   }
 
