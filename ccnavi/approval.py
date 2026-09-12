@@ -306,10 +306,11 @@ def approve(
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
 
     `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
-    ボードが絞り込みで見えている分だけを渡す。承認待ちに無い識別子が混じっていたら
-    何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。絞った
-    束に載らない親を持つ子は「親が承認されていない」で落ちる。親の分だけ承認する
-    のは絞らなくてもできることなので、絞りで新たに通るものは無い。
+    ボードが絞り込みで見えている分だけを渡す。絞りは束を狭めるだけで、絞らない束で
+    落ちるものを通してはいけない。だから、承認待ちに無い識別子が混じっていたら
+    何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の
+    改版が承認待ちなのに束から外した子も何も承認しない（外すと旧計画で検証される）。
+    絞った束に載らない親を持つ子は「親が承認されていない」で落ちる。
     """
     from . import phase
 
@@ -324,26 +325,36 @@ def approve(
     types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
-    if not pending and not revisions:
-        stdout.write("承認待ちのチケットは無い。\n")
-        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
-        # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
-        return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
-
-    waiting_count = len(pending) + len(revisions)
     if only:
-        wanted = list(dict.fromkeys(only))
+        # 識別子の検査は「承認待ちが無い」より先。承認待ちが空でも、指定したものが
+        # 無いのは失敗で、終了コードが他の承認待ちの有無で変わらないように。
+        wanted = [i for i in dict.fromkeys(only) if i]
         known = {t.ticket for t in pending + revisions}
         unknown = [i for i in wanted if i not in known]
-        if unknown:
-            stderr.write(f"ccnavi: 承認待ちに無い: {', '.join(unknown)}\n")
+        if not wanted or unknown:
+            stderr.write(f"ccnavi: 承認待ちに無い: {', '.join(unknown) or '(空の識別子)'}\n")
             stderr.write("ccnavi: 何も承認しない。ボードを更新して承認待ちを確かめる\n")
             return 1
+        # 親の改版を外して子だけ通すと、子は写し（旧計画）で検証される。絞らない束なら
+        # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
+        skipped = {t.ticket for t in revisions if t.ticket not in wanted}
+        blocked = [t for t in pending if t.ticket in wanted and t.is_child and t.parent in skipped]
+        if blocked:
+            for t in blocked:
+                stderr.write(f"ccnavi: {t.ticket}: 親 {t.parent} の改版が承認待ちなのに束に無い\n")
+            stderr.write("ccnavi: 何も承認しない。親も並べる\n")
+            return 1
+        waiting_count = len(pending) + len(revisions)
         pending = [t for t in pending if t.ticket in wanted]
         revisions = [t for t in revisions if t.ticket in wanted]
         stdout.write(
             f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを束にする。\n\n"
         )
+    if not pending and not revisions:
+        stdout.write("承認待ちのチケットは無い。\n")
+        # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
+        # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
+        return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
 
     batch, rejected, pool = _candidates(root, conf, pending, revisions, approved, types)
     for t, complaints in rejected:
@@ -374,7 +385,11 @@ def _candidates(
     from . import phase
 
     open_index = by_id(approved)
-    pool = by_id(approved + pending)
+    # 親子を引く池は、写しと、この束で通ったものだけ。落ちた親を池に残すと、承認されない
+    # 親の範囲で子が検証され、親の承認という門を通らずに子の写しができる。
+    # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
+    # 親の通過が決まっている。
+    pool = by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
 
@@ -403,6 +418,7 @@ def _candidates(
             rejected.append((t, complaints))
             continue
         batch.append(Candidate(ticket=t, complaints=complaints))
+        pool[t.ticket] = t
     return batch, rejected, pool
 
 

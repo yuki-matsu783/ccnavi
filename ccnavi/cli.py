@@ -83,14 +83,15 @@ documented in README.md ("試験の JSON"); the VS Code extension reads it.
 To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
-    ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board)
+    ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board;
+                                            ids go last, after every flag)
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
 .claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
-editing a ticket never widens the area on its own. With ids, a child whose
-pending parent is not listed is refused, and an id that is not pending
-approves nothing.
+editing a ticket never widens the area on its own. Ids only narrow the batch:
+an id that is not pending, or a child listed without its pending parent or
+its parent's pending revision, approves nothing.
 
 The parent agent moves tickets between states and asks for reviews through the
 scripts in .claude/scripts/, which call
