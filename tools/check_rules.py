@@ -2,7 +2,7 @@
 
 `/rules-check` スキルが呼ぶ。人が直接叩いてもよい。
 
-    uv run python testdata/check_rules.py [ルールファイル]
+    uv run python tools/check_rules.py [ルールファイル]
 
 中身は `ccnavi --test-samples` の薄い皮。見本の読み方も突き合わせも実行ファイルの
 側にあり、ここは引数を足して呼ぶだけ。VS Code 拡張のルール設定画面も同じ口を
@@ -19,7 +19,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAMPLES = os.path.join(ROOT, "testdata", "rule-samples.yml")
+SAMPLES = os.path.join(ROOT, ".claude", "ccnavi", "rule-samples.yml")
 
 
 def main() -> int:

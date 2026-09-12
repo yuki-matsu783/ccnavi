@@ -54,7 +54,7 @@ esac
 if [ -s "$trees" ]; then
 	targets=$(sort -u "$trees")
 else
-	# Python を 1 つも触っていないターン。ルールファイルや testdata の変更でも
+	# Python を 1 つも触っていないターン。ルールファイルやテストの固定データの変更でも
 	# 壊れるので、既定のツリーで 1 回は走らせる。
 	targets=$(pwd)
 fi

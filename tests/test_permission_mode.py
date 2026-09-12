@@ -15,7 +15,7 @@ import unittest
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES = os.path.join(ROOT, "testdata", "rules-undeclared.yml")
+RULES = os.path.join(ROOT, "tests", "fixtures", "rules-undeclared.yml")
 
 # どのルールも言及しない呼び出し。allow にも deny にも ask にも当たらない。
 UNDECLARED_COMMAND = "docker run --rm alpine"

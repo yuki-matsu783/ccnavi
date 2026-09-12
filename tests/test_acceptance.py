@@ -15,7 +15,7 @@ import unittest
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES = os.path.join(ROOT, "testdata", "rules.yml")
+RULES = os.path.join(ROOT, "tests", "fixtures", "rules.yml")
 
 
 def run(mode="enable", payload="", log=""):

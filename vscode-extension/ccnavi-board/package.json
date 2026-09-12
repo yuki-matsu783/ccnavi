@@ -50,7 +50,7 @@
         },
         "ccnaviBoard.samplesPath": {
           "type": "string",
-          "default": "testdata/rule-samples.yml",
+          "default": ".claude/ccnavi/rule-samples.yml",
           "description": "ルール設定画面が一括で判定するサンプル（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でもよい。"
         }
       }

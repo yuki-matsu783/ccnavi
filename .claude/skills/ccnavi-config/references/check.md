@@ -31,8 +31,8 @@ lint しても、本物と組み合わせたときの答えになる。それで
 ## 2. rules: 見本を回す
 
 ```sh
-uv run python testdata/check_rules.py            # このリポジトリ。写しと記録を外して回す
-ccnavi --test-samples testdata/rule-samples.yml --log "" --state "" --approved ""
+uv run python tools/check_rules.py            # このリポジトリ。写しと記録を外して回す
+ccnavi --test-samples .claude/ccnavi/rule-samples.yml --log "" --state "" --approved ""
 ```
 
 出力は 3 つに分かれる。

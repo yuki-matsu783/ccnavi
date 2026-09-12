@@ -36,10 +36,10 @@ error が 1 件でもあれば、そこで止めて報告する。壊れた設�
 ### 2. 見本を回す
 
 ```sh
-uv run python testdata/check_rules.py
+uv run python tools/check_rules.py
 ```
 
-`testdata/rule-samples.yml` の見本をすべて判定に掛ける（中身は `ccnavi --test-samples` で、
+`.claude/ccnavi/rule-samples.yml` の見本をすべて判定に掛ける（中身は `ccnavi --test-samples` で、
 `--test` と同じ判定を通る）。タイプの名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず、
 `ask` なら人に確認が出るはず。
 
@@ -95,7 +95,7 @@ uv run python -m ccnavi --test Bash "git push origin main"
 
 ## 見本を足す
 
-ルールを 1 件足したり直したりしたら、`testdata/rule-samples.yml` にも足す。
+ルールを 1 件足したり直したりしたら、`.claude/ccnavi/rule-samples.yml` にも足す。
 足さないと、あとから読んだ人に「そのルールが何のために在るのか」を伝える手立てが
 ルールの文面しか無くなる。文面は止められた側に向けた言葉で、何に当たるかは
 書いていない。

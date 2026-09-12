@@ -256,7 +256,7 @@ knowledge の同じ文書がグローバルオプションの飛ばし方を書�
 実運用の判定が同じものになる。ここを作り直すと、試験が通ったのに実運用で落ちる、
 という一番まずい形になる。
 
-見本は `testdata/rule-samples.yml`、回すのは `testdata/check_rules.py`。
+見本は `.claude/ccnavi/rule-samples.yml`、回すのは `tools/check_rules.py`。
 `/rules-check` スキルがその流れをまとめ、食い違いの原因を調べて、
 怪しい当たり方を利用者に確認する。ルールを 1 件足したら見本も 1 行足す。
 止めたいものだけでなく止めたくないものを一緒に置くこと。片側だけの見本は、
@@ -477,7 +477,7 @@ push 前の `request` が前提で止まる → 親の push（ラッパ経由）
 `.claude/` の下の `w` で始まらない名前）。worktree の中でも `.claude/settings*.json` は
 `worktree-settings` で止める。hook・スクリプト・写しは既存の deny が場所を問わず当たる。
 `source` と `project-files` は deny の陰で死ぬので消した。作業ツリーの中は `worktrees` の allow が
-まとめて通す。`tests/test_root_placeholder.py` と `testdata/rule-samples.yml` に固定してある。
+まとめて通す。`tests/test_root_placeholder.py` と `.claude/ccnavi/rule-samples.yml` に固定してある。
 このセッション自身が main で編集していたのは、hook が dry-run だったから。enable に戻せば止まる。
 
 **この 1 周で溶かした時間の内訳**（同じ道を戻らないために）。Docker Desktop を起動したら

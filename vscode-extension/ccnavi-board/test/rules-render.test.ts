@@ -24,7 +24,7 @@ function page(overrides: Partial<RulesPage> = {}): RulesPage {
       "settings",
     ),
     hookFiles: { settings: true, settingsLocal: false },
-    samplesPath: "testdata/rule-samples.yml",
+    samplesPath: ".claude/ccnavi/rule-samples.yml",
     lock: { locked: false, reason: "", doing: [] },
     ...overrides,
   };
