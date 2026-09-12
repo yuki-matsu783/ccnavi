@@ -24,9 +24,9 @@ allow:
   glob: tests/*
 - match: Write|Edit
   glob: vscode-extension/*
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: "2026-09-12T19:29:34+0900"
+completed_at: "2026-09-12T20:06:41+0900"
+base_sha: "baf05184fe9e35329f13f7a4fb0c71946d996d11"
 ---
 
 # 承認ポップアップの実装
