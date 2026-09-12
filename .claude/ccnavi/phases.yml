@@ -37,14 +37,14 @@ phases:
     kind: work
     title: 実装とテスト
     review: mr
-    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml"]
+    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".claude/ccnavi/phases.yml"]
     requires: [acceptance]
 
   docs:
     kind: work
     title: 文書
     review: mr
-    scope: ["README.md", "ccnavi.md", "requirements.md", "HANDOVER.md", "docs/*"]
+    scope: ["README.md", "ccnavi.md", "requirements.md", "HANDOVER.md", "docs/*", "CONTEXT.md", "CLAUDE.md"]
 
   design-feedback:
     kind: feedback
