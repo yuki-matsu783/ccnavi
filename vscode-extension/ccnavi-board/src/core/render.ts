@@ -226,7 +226,7 @@ function renderActions(actions: readonly Action[], id: string): string {
 function renderActionButton(action: Action, id: string): string {
   switch (action.kind) {
     case "approve":
-      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。${escapeHtml(id)} だけを承認することはできない。親で絞れば、その親の承認待ちだけの束になる">承認</button>`;
+      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。絞り込み中は、見えている承認待ちだけの束になる">承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
   }
@@ -368,10 +368,10 @@ ${BUTTON_STYLE}
   .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }`;
 
 const SCRIPT = `  const vscode = acquireVsCodeApi();
-  // 絞り込みで見えている承認待ちの識別子。絞り込みが無ければ空で、承認待ち全部を束にする。
+  // 絞り込みで見えている承認待ちの識別子と、絞り込み中かどうか。「絞り込み無し」は空の並びでは
+  // なく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認に化ける。
   function filtering() { return document.body.classList.contains("filtering"); }
   function visiblePending() {
-    if (!filtering()) { return []; }
     return [...document.querySelectorAll(".card.pending:not(.hidden)")].map((card) => card.getAttribute("data-id") || "");
   }
   function open(card) {
@@ -392,7 +392,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       event.stopPropagation();
       const action = button.getAttribute("data-action");
       if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
-      else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending() }); }
+      else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() }); }
       else if (action === "accept") {
         vscode.postMessage({ type: "accept", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) });
       }

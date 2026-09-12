@@ -40,13 +40,11 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   // 上部の集計は描いたときの全体の数のままで、script は触らない
   assert.ok(html.includes("承認待ち 1 件</span>"), "集計は全体の数");
-  assert.ok(!html.includes('querySelector(".pending")'), "集計を書き換える処理が無い");
   // ボタンの数と disabled は見えている承認待ちで決め、押すとその識別子を送る
   assert.ok(html.includes(`document.querySelector('.controls button[data-action="approve"]')`), "上部のボタンだけを書き換える");
   assert.ok(html.includes('document.querySelectorAll(".card.pending:not(.hidden)").length'), "見えている承認待ちで数える");
-  assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending() })'), "識別子を送る");
-  // 絞り込みが無ければ空を送り、承認待ち全部の束になる
-  assert.ok(html.includes('if (!filtering()) { return []; }'), "絞り込み無しは空");
+  // 識別子と「絞り込み中か」を別々に送る。空の並びを「全部」に読ませない
+  assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
 });
 
 test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {

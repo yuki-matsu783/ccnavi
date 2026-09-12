@@ -31,7 +31,7 @@ export const WATCH_PATTERNS = [
 type Message =
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }
-  | { readonly type: "approve"; readonly tickets: readonly string[] }
+  | { readonly type: "approve"; readonly tickets: readonly string[]; readonly filtered: boolean }
   | { readonly type: "accept"; readonly parent: string; readonly phase: number };
 
 interface PanelState {
@@ -262,6 +262,14 @@ function handleMessage(message: Message | undefined): void {
       openTicket(current, message.filePath);
       return;
     case "approve": {
+      if (!message.filtered) {
+        sendApprove(root, current.launcher);
+        return;
+      }
+      if (message.tickets.length === 0) {
+        vscode.window.showWarningMessage("絞り込みで見えている承認待ちが無い");
+        return;
+      }
       const tickets = pendingOf(current, message.tickets);
       if (tickets === undefined) {
         vscode.window.showWarningMessage("ボードが古く、承認待ちが変わっている。更新してから承認する");
@@ -284,9 +292,9 @@ function handleMessage(message: Message | undefined): void {
 }
 
 /**
- * ボードが絞り込みで見えている承認待ちとして送ってきた識別子。空は「絞り込み無し」で、
- * 承認待ち全部を束にする。1 つでもいまのボードで承認待ちでなければ undefined（ボードが古い）。
- * 落として送ると、見せた 2 件のつもりが 1 件や全部になるので、削らずに止める。
+ * ボードが絞り込みで見えている承認待ちとして送ってきた識別子。1 つでもいまのボードで
+ * 承認待ちでなければ undefined（ボードが古い）。落として送ると、見せた 2 件のつもりが
+ * 1 件になるので、削らずに止める。
  */
 function pendingOf(current: PanelState, tickets: readonly string[]): readonly string[] | undefined {
   const pending = new Set(current.board?.pendingApproval ?? []);
@@ -318,14 +326,24 @@ function asMessage(message: unknown): Message | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; filePath?: unknown; parent?: unknown; phase?: unknown; tickets?: unknown };
+  const m = message as {
+    type?: unknown;
+    filePath?: unknown;
+    parent?: unknown;
+    phase?: unknown;
+    tickets?: unknown;
+    filtered?: unknown;
+  };
   switch (m.type) {
     case "refresh":
       return { type: m.type };
     case "approve":
-      return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string")
-        ? { type: "approve", tickets: m.tickets }
-        : { type: "approve", tickets: [] };
+      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きに倒れる。
+      return Array.isArray(m.tickets) &&
+        m.tickets.every((t) => typeof t === "string") &&
+        typeof m.filtered === "boolean"
+        ? { type: "approve", tickets: m.tickets, filtered: m.filtered }
+        : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
     case "accept":
