@@ -287,23 +287,26 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     return views
 
 
-def layer_files(conf: settings.Settings) -> list[tuple[str, str]]:
-    """守る対象に渡す、各層のルールファイル（名前, 綴り）。
+def layer_files(conf: settings.Settings, root: str) -> list[tuple[str, str, str]]:
+    """守る対象（selfguard）に渡す、層ごとの設定ファイル（層の名前, kind, 綴り）。
 
-    今はプロジェクトの層の rules だけ。自身の層と phases / risk を足すのは
-    selfguard の対象を広げる回（設計 §25.6）の仕事で、控えと復元の対象が増えると
-    作業ツリーの写しの一覧も一緒に変わる。ここで先に増やすと、その回が動かす
-    範囲が 2 つに割れる。
+    共通層は phases と risk の 2 本だけ返す。共通層の rules は `selfguard.targets` が
+    `rules_path` で受け取っているので、ここから重ねると同じファイルが 2 度並ぶ。
+
+    自身の層とプロジェクトの層は 3 本とも返す。差し替え（`--project-rules-file`）は
+    見ない。あれは診断のためのもので、守る対象は本来の置き場のほうになる。
+
+    在るかどうかは見ない。無いファイルは selfguard が対象から外す（REQ-SLF-03）ので、
+    ここで存在を確かめると、同じ判断が 2 か所に分かれる。
     """
-    return [
-        (
-            p.name,
-            settings.layer_real_path(
-                conf, tree.project_root(conf.projects, p.name), settings.KIND_RULES
-            ),
-        )
-        for p in tree.projects(conf.projects)
+    found = [
+        (LAYER_COMMON, settings.KIND_PHASES, conf.phases),
+        (LAYER_COMMON, settings.KIND_RISK, conf.risk),
     ]
+    for layer in layers(conf, root):
+        for kind in settings.LAYER_KINDS:
+            found.append((layer.name, kind, settings.layer_real_path(conf, layer.home, kind)))
+    return found
 
 
 def mark_source(rule_set: rules.RuleSet, layer: str) -> None:

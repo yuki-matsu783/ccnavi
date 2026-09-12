@@ -248,6 +248,7 @@ def check(
     # そこが書く標準エラーにも出るので、受け皿へ逃がして二重に言わない。
     problems.extend(_layers(io.StringIO(), conf, root))
     problems.extend(_layer_configs(conf, root))
+    problems.extend(_worktree_layers(conf, root))
     return problems
 
 
@@ -572,6 +573,49 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
         for p in [*notes, *risk.script_problems(definition, name)]:
             problems.append(Problem(p.severity, f"{where} (risk) {p.rule}".rstrip(), p.detail))
     return problems
+
+
+def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
+    """作業ツリーの層の傘に、切り元の git プロジェクトルートに無いファイルがあるか（設計 §25.6）。
+
+    判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
+    作業ツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
+    効かないものを書いた人は、書いたとおりに効いていると思ったまま進む。統合の前に
+    気づけるように、ここで名前を挙げる。
+
+    足したファイルを咎めているのではない。設定を育てる場所は作業ツリーでよく、
+    そこから統合する道も普通の道。言うのは「今はまだ効いていない」という 1 点だけ。
+
+    中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
+    差分が拾う。ここが拾うのは、切り元に無くて差分にも出ない新しい綴りのほう。
+    """
+    problems: list[Problem] = []
+    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    for work in tree.worktrees(root, conf.projects):
+        origin = tree.project_root(conf.projects, work.project) if work.project else root
+        for rel in _files_under(os.path.join(work.root, home)):
+            if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
+                continue
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
+                    f"{conf.project_home}/{rel} は作業ツリーにしかない。判定が読むのは"
+                    "切り元の git プロジェクトルートの版なので、このファイルは統合されるまで"
+                    "効かない",
+                )
+            )
+    return problems
+
+
+def _files_under(base: str) -> list[str]:
+    """base の下のファイルを、base からの相対（"/" 区切り）で並べる。順は綴り順。"""
+    found = []
+    for parent, _, names in os.walk(base):
+        for name in sorted(names):
+            rel = os.path.relpath(os.path.join(parent, name), base)
+            found.append(rel.replace(os.sep, "/"))
+    return sorted(found)
 
 
 def _layer_home(conf: settings.Settings, root: str, name: str) -> str:

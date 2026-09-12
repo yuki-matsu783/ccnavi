@@ -76,6 +76,12 @@ DEFAULT_BIN=".claude/ccnavi/ccnavi"
 # 従うので、実行ファイルだけは行き先が動く。
 DEPLOY_BIN_DIR="dist/ccnavi"
 DEPLOY_RULES=".claude/ccnavi/rules.yml"
+# 設定 3 本のひな形。rules と risk は汎用なので共通層（.claude/ccnavi/）へ、
+# phases はワークスペースのレイアウト（scope の綴り）に付くので自身の層
+# （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
+# projects/ の下のプロジェクトにも効いてしまう（設計 §25.12）。
+DEPLOY_RISK=".claude/ccnavi/risk.yml"
+DEPLOY_PHASES=".ccnavi/config/phases.yml"
 DEPLOY_SCRIPT_DIR=".claude/scripts"
 DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh"
 
@@ -123,7 +129,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
 
-実行ファイル・ルール・ゲートの sh は、既定で ccnavi の根から写す。写した
+実行ファイル・設定 3 本（.claude/ccnavi/rules.yml、.claude/ccnavi/risk.yml、
+.ccnavi/config/phases.yml）・ゲートの sh は、既定で ccnavi の根から写す。写した
 実行ファイルと _internal は、配り先の .gitignore に足す。
 USAGE
 }
@@ -386,7 +393,8 @@ if [ "$all" = yes ]; then
 		CCNAVI_TICKETS: "wip/tickets",
 		CCNAVI_APPROVED: ".claude/ccnavi/tickets",
 		CCNAVI_PHASES: ".claude/ccnavi/phases.yml",
-		CCNAVI_RISK: ".claude/ccnavi/risk.yml"
+		CCNAVI_RISK: ".claude/ccnavi/risk.yml",
+		CCNAVI_PROJECT_HOME: ".ccnavi"
 	}')
 fi
 
@@ -466,6 +474,8 @@ deploy_absent=""
 bin_dir_rel=""
 bin_verdict=""
 rules_verdict=""
+risk_verdict=""
+phases_verdict=""
 scripts_todo=""
 
 # 配り元に在るか、配り先に在るか、--force か。この 3 つだけで決まる。
@@ -526,6 +536,22 @@ if [ -n "$deploy" ]; then
 	fi
 	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
 	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
+
+	if [ -e "$root/$DEPLOY_RISK" ]; then
+		risk_there=yes
+	else
+		risk_there=no
+	fi
+	risk_verdict=$(verdict "$source_root/$DEPLOY_RISK" "$risk_there")
+	note_deploy "$risk_verdict" "$DEPLOY_RISK" "$DEPLOY_RISK"
+
+	if [ -e "$root/$DEPLOY_PHASES" ]; then
+		phases_there=yes
+	else
+		phases_there=no
+	fi
+	phases_verdict=$(verdict "$source_root/$DEPLOY_PHASES" "$phases_there")
+	note_deploy "$phases_verdict" "$DEPLOY_PHASES" "$DEPLOY_PHASES"
 
 	for name in $DEPLOY_SCRIPTS; do
 		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
@@ -879,8 +905,9 @@ if [ "$vscode_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
 fi
 
-# 写す。順は実行ファイル → ルール → ゲートの sh。途中で落ちたときに、判定する
-# ものだけが在って何を止めるかが無い、という形にしないため。
+# 写す。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズの種類）→
+# ゲートの sh。途中で落ちたときに、判定するものだけが在って何を止めるかが無い、
+# という形にしないため。
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
 	copy | replace)
@@ -898,6 +925,16 @@ if [ "$deploy_work" = yes ]; then
 	case "$rules_verdict" in
 	copy | replace)
 		copy_file "$source_root/$DEPLOY_RULES" "$root/$DEPLOY_RULES"
+		;;
+	esac
+	case "$risk_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_RISK" "$root/$DEPLOY_RISK"
+		;;
+	esac
+	case "$phases_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_PHASES" "$root/$DEPLOY_PHASES"
 		;;
 	esac
 	for name in $scripts_todo; do
@@ -941,8 +978,14 @@ note_missing() {
 if [ ! -f "$root/$bin" ] && [ ! -f "$root/$bin.exe" ]; then
 	note_missing "$bin（ccnavi の実行ファイル。build.py で組み立てる）"
 fi
-if [ ! -f "$root/.claude/ccnavi/rules.yml" ]; then
-	note_missing ".claude/ccnavi/rules.yml（何を止めるか。無いと組み込みの既定だけで判定する）"
+if [ ! -f "$root/$DEPLOY_RULES" ]; then
+	note_missing "$DEPLOY_RULES（何を止めるか。無いと組み込みの既定だけで判定する）"
+fi
+if [ ! -f "$root/$DEPLOY_RISK" ]; then
+	note_missing "$DEPLOY_RISK（リスクの配点。無いと組み込みの配点で測る）"
+fi
+if [ ! -f "$root/$DEPLOY_PHASES" ]; then
+	note_missing "$DEPLOY_PHASES（フェーズの種類。無いと番号だけの挙動になる）"
 fi
 for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh; do
 	if [ ! -f "$root/.claude/scripts/$name" ]; then

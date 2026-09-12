@@ -113,7 +113,9 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin, ruleload.layer_files(conf)),
+        selfguard.targets(
+            root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+        ),
     )
     if not outcomes:
         return ""

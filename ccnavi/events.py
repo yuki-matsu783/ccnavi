@@ -202,7 +202,9 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin, ruleload.layer_files(conf)),
+        selfguard.targets(
+            root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+        ),
     )
     # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
     # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
