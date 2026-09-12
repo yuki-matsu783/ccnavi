@@ -316,17 +316,17 @@ class LintTest(unittest.TestCase):
                 dict(SOUND, id="search", match="Grep|Glob", glob="*/secrets/*"),
                 dict(SOUND, id="skill", match="Skill", glob="deploy*"),
                 dict(SOUND, id="fetch", match="WebFetch", glob="*://example.com/*"),
-                dict(SOUND, id="gone", match="WebSearch|MultiEdit", glob="*"),
+                dict(SOUND, id="gone", match="WebSearch|Task", glob="*"),
             ),
         )
         self.assertEqual(result.returncode, 0)
         errors, warns = counts(result.stdout)
         self.assertEqual(errors, 0)
-        # WebSearch は指定子を持たず、MultiEdit は今の Claude Code に無い。
+        # WebSearch は指定子を持たず、Task は今の Claude Code に無い。
         # どちらも対象を取り出せないので、この 2 つだけを名前ごとに咎める。
         self.assertEqual(warns, 2, result.stdout)
         self.assertIn("WebSearch", result.stdout)
-        self.assertIn("MultiEdit", result.stdout)
+        self.assertIn("Task", result.stdout)
 
     def test_止めないモードはwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")

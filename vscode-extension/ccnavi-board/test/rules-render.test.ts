@@ -77,7 +77,7 @@ test("CB-T69 タイプごとに畳む印を出す", () => {
 });
 
 test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名前（括弧の中を除いたもの）で並ぶ", () => {
-  // 判定が対象を取り出せるツールだけ。WebSearch は取り出せず、MultiEdit は今の Claude Code に無い。
+  // 判定が対象を取り出せるツールだけ。WebSearch は取り出せないので載せない。
   assert.deepEqual([...KNOWN_TOOLS], [
     "Bash", "PowerShell", "Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "Skill", "Agent", "WebFetch",
   ]);
@@ -86,7 +86,6 @@ test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名�
     assert.match(html, new RegExp(`<option value="${tool}">${tool}</option>`));
   }
   assert.doesNotMatch(html, /<option value="WebSearch">/);
-  assert.doesNotMatch(html, /<option value="MultiEdit">/);
 });
 
 // 画面の中のスクリプトは文字列なので、tsc は見ない。壊れても画面が黙って動かなくなるだけ。
