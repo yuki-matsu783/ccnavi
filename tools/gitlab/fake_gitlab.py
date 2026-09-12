@@ -14,7 +14,7 @@ sh の HTTP 経路（curl / gh / glab、jq での組み立て、ページング�
 
 ## 使い方
 
-    python tests/fake_gitlab.py <state.json> <port>
+    python tools/gitlab/fake_gitlab.py <state.json> <port>
 
 状態は JSON ファイル 1 つ。最初は次の形で置く。
 

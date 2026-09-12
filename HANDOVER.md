@@ -61,6 +61,7 @@ ccnavi/fsio.py              ファイルの読み書きの型
 build.py                    PyInstaller の onedir で配布物を組み立てる
 tests/                      受入テスト。入口（cli.run）に引数と標準入力を渡し、応答だけを見る
 tests/inproc.py             その起動をプロセスを起こさずに行う。起動の検査は test_entry.py だけ
+tools/gitlab/               実物または代役の GitLab で 1 周する道具。人が手で回す。自動テストは呼ばない
 ```
 
 実行時の third-party 依存は PyYAML 1 本。チケットの frontmatter が YAML なので、
@@ -147,7 +148,7 @@ selfguard の中核に入る。`projects/` が無ければ前と同じに動く�
 - `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`。判定は行き先で
   決まるので止め方は変わらないが、ゲートは cwd で親を引くので、そこが割れる
 - GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
-  書いただけ。GitLab は済んだ（`tests/probe_gitlab.py` で繰り返せる）。GitLab の変更要求
+  書いただけ。GitLab は済んだ（`tools/gitlab/probe_gitlab.py` で繰り返せる）。GitLab の変更要求
   （`request_changes`）だけは CE に無い機能で、EE でしか当てられない
 - `.claude/scripts/` への Write は `guard-scripts` が止める。今回の 2 本はこの
   リポジトリで作ったので入っているが、他のプロジェクトへ配るときは人が置く
@@ -444,11 +445,11 @@ issue → MR → チケット → 計画 → 作業 → レビュー → 差戻 
 `gh` / `glab` が入っていても未認証のホストでは curl とトークンへ落ちること。親を閉じるのは子が全部
 閉じてゲートが開いてから、であること。
 
-代役サーバは `tests/fake_gitlab.py` に置いた。自動テストからは呼んでいない（人が手で 1 周させる道具）。
+代役サーバは `tools/gitlab/fake_gitlab.py` に置いた。自動テストからは呼んでいない（人が手で 1 周させる道具）。
 使い方はそのファイルの先頭に書いてある。
 
 **実物の GitLab で 1 周した（2026-09-10、GitLab CE 18.5.4、Docker Desktop の VM を 4GB にして）。**
-`tests/probe_gitlab.py` が、一時リポジトリと使い捨てのプロジェクトを作り、sh 3 本と exe を本物に
+`tools/gitlab/probe_gitlab.py` が、一時リポジトリと使い捨てのプロジェクトを作り、sh 3 本と exe を本物に
 当てる。人間役（レビュアー）は別ユーザのトークンで API を直に叩く。通ったのは、
 push 前の `request` が前提で止まる → 親の push（ラッパ経由）→ `request` が Draft の MR を作り
 （題 `Draft:`、本文に `Closes #課題`）依頼の note を投稿して印を置く → 2 度目は依頼済みで止まる →
@@ -464,7 +465,7 @@ push 前の `request` が前提で止まる → 親の push（ラッパ経由）
 | 変更要求（`POST .../request_changes`）は CE の `lib/api` に無い。EE 限定 | 当てられない。sh の `requested_changes` の読みは EE の文書どおりのまま。CE では `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
 | URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh はユーザ情報を落とし、出力で伏せる。exe の `remote_kind` も読み飛ばす。`tests/test_review_origin.py` |
 | ラッパ経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら GCM に保存しておく |
-| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tests/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
+| トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tools/gitlab/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
 | 未解決の一覧で、位置の無い討論が ` :0 ` と出る | 直していない。読めるので後回し |
 
