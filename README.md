@@ -512,9 +512,21 @@ jq -r 'select(.decision == "handover") | .subject' .claude/ccnavi/log.jsonl | so
 にやること」を並べる場所で、権限を配る場所ではない。1 行足すたびに、ccnavi が
 何も言わない範囲が広がる。
 
-判定が対象を取り出せるのは `Bash` `Read` `Write` `Edit` `MultiEdit`
-`NotebookEdit` だけ。`Grep` や `Glob` のように対象を取り出せないツールは
-判定に届かないまま通るので、`allow` に書いても死んだ行が 1 つ増えるだけになる。
+判定が対象を取り出せるのは次のツールだけ。名前は Claude Code の権限ルール
+`ToolName(指定子)` から括弧の中を除いたものに揃えてある。
+
+| `match` に書く名前 | 当てる対象 |
+|---|---|
+| `Bash` `PowerShell` `Monitor` | コマンド（`Bash` と `Monitor` はシェルとして読んでから当てる） |
+| `Read` `Write` `Edit` `MultiEdit` `NotebookEdit` | ファイルのパス（行き着く先まで解いてから当てる） |
+| `Skill` | スキル名 |
+| `Agent` | 起動の見出し（`description`、無ければ `prompt`） |
+| `WebFetch` | URL |
+
+`Grep` や `Glob` のように対象を取り出せないツールは判定に届かないまま通るので、
+`allow` に書いても死んだ行が 1 つ増えるだけになる。`match` は名前をそのまま
+突き合わせるので、`Bash` のルールが `Monitor` に及ぶことはない。及ぼしたければ
+`Bash|Monitor` と並べる。
 
 `glob` の意味は標準ライブラリの `fnmatch` そのまま。`*` が任意の文字列、
 `?` が 1 文字、`[abc]` が文字クラス。
