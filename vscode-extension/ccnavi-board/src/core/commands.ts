@@ -29,9 +29,13 @@ function ccnaviInvocation(launcher: Launcher, root: string): string {
   return `uv run python -m ccnavi --root ${rootArg}`;
 }
 
-/** `ccnavi --approve`。束（いま承認待ちのもの全部）を見せて y/N を取る */
-export function approveCommand(launcher: Launcher, root: string): string {
-  return `cd ${shellQuote(toPosixPath(root))} && ${ccnaviInvocation(launcher, root)} --approve`;
+/**
+ * `ccnavi --approve [<識別子>...]`。束を見せて y/N を取る。識別子を並べればその分だけの束、
+ * 空なら承認待ち全部。ボードは絞り込みで見えている承認待ちだけを並べる。
+ */
+export function approveCommand(launcher: Launcher, root: string, tickets: readonly string[] = []): string {
+  const ids = tickets.map((id) => ` ${shellQuote(id)}`).join("");
+  return `cd ${shellQuote(toPosixPath(root))} && ${ccnaviInvocation(launcher, root)} --approve${ids}`;
 }
 
 /**
