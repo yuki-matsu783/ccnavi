@@ -19,7 +19,7 @@ import tempfile
 import time
 import unittest
 
-from ccnavi import selfguard
+from ccnavi import selfguard, shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -396,6 +396,40 @@ class SelfGuardTest(unittest.TestCase):
         )
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    # 引用に空白を含む形（wip/design/shellread-sep.md §3）。shellread が語の中の
+    # 切れ目をコマンドの区切りと別の印で渡すようになると、`[^\x00]*` が引用の
+    # 空白をまたいで行き先まで届く。止める側はそれで穴が塞がり、リダイレクトの
+    # 行き先の式は語の中の印を食わないように直す。
+
+    def rules_in_shell(self):
+        """シェルに書く綴りのルールファイル。引用の外に置くので区切りは `/`。"""
+        return self.rules.replace("\\", "/")
+
+    @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
+    def test_引用の中に書いたリダイレクトの行き先は書き込みではない(self):
+        # `> 場所` が引用の中にある。grep の引数であって、書き込み先を連れてこない。
+        # 語の中の印がリダイレクトの行き先として読まれると、ここが止まる。
+        result = self.run_hook("PreToolUse", command=f'grep -n "> {self.rules_in_shell()}" f')
+
+        self.assertNotIn("deny", result.stdout)
+        self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
+    def test_引用に空白を含む書き換えも止まる(self):
+        # 動詞と行き先の間に引用の空白があっても、同じコマンドの中なら届く。
+        # 引用の空白がコマンドの区切りと同じ印だった間は、ここが穴だった。
+        rules = self.rules_in_shell()
+        for command in [
+            f'sed -i "s/a b/c/" {rules}',
+            f'tee "a b" {rules}',
+            f'cp "a b" {rules}',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
 
     # 実行ファイル
 

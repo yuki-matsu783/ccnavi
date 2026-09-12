@@ -24,6 +24,8 @@ import sys
 import tempfile
 import unittest
 
+from ccnavi import phase as phase_mod
+from ccnavi import shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -511,6 +513,35 @@ class TicketTest(unittest.TestCase):
         # main からの起動にはゲートが無い。
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
         self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
+
+    @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
+    def test_gate_exempts_wrapper_with_quoted_spaces(self):
+        """ゲートが閉じている間、引用に空白を含むラッパ呼び出しも免除されること。
+
+        免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ印で
+        渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に
+        当たらず、レビューの依頼そのものが止まっていた（wip/design/shellread-sep.md §3）。
+        """
+        self.family()
+        self.close_phase()
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+
+        exempt = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command='sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"',
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+
+        # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形に当たる。
+        reading = shellread.read('sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"')
+        self.assertEqual(len(phase_mod.commands(reading.text)), 1, reading.text)
+        self.assertTrue(phase_mod.exempt(reading.text, reading.reason))
+        # 連結の片方が違えば止める側は変わらない。
+        joined = shellread.read('ls; sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"')
+        self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
 
     def test_phase_without_review_skips_the_gate(self):
         self.family(review=(False, False))
