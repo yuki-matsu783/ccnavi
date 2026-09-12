@@ -31,8 +31,7 @@ export const COLUMNS: readonly ColumnDef[] = [
 /** 人が押せる操作。ターミナルへ送るコマンドの種類 */
 export type Action =
   | { readonly kind: "approve" }
-  | { readonly kind: "accept"; readonly parent: string; readonly phase: number }
-  | { readonly kind: "wrapup"; readonly parent: string };
+  | { readonly kind: "accept"; readonly parent: string; readonly phase: number };
 
 export interface PhaseChip {
   readonly parent: string;
@@ -57,6 +56,8 @@ export interface Card {
   readonly column: ProposalState;
   readonly proposalState: ProposalState | null;
   readonly proposalTree: string;
+  /** 絞り込みの単位。親なら自分、子なら親の識別子 */
+  readonly family: string;
   /** カードを選んだときに開くファイル。提案があれば提案、無ければ写し */
   readonly openPath: string;
   readonly copyStatus: CopyStatus;
@@ -91,9 +92,17 @@ export interface BoardColumn extends ColumnDef {
   readonly count: number;
 }
 
+/** 親の絞り込みの候補。識別子と題名 */
+export interface ParentOption {
+  readonly id: string;
+  readonly title: string;
+}
+
 export interface Board {
   readonly columns: readonly BoardColumn[];
   readonly projects: readonly string[];
+  /** 親の絞り込みの候補。識別子順 */
+  readonly parents: readonly ParentOption[];
   readonly problems: readonly string[];
   readonly pendingApproval: readonly string[];
   readonly totalCount: number;
@@ -119,6 +128,7 @@ export function buildBoard(json: BoardJson): Board {
   return {
     columns,
     projects: json.projects,
+    parents: cards.filter((card) => card.isParent).map((card) => ({ id: card.id, title: card.title })),
     problems: json.problems,
     pendingApproval: json.pending_approval,
     totalCount: cards.length,
@@ -168,9 +178,6 @@ function toCard(
     actions.push({ kind: "approve" });
   }
   const wrapped = ownParent?.wrapup !== null && ownParent?.wrapup !== undefined;
-  if (isParent && ownParent && !ownParent.closed && !wrapped && t.copy.status === "open") {
-    actions.push({ kind: "wrapup", parent: t.ticket });
-  }
 
   return {
     id: t.ticket,
@@ -182,6 +189,7 @@ function toCard(
     column,
     proposalState: t.proposal?.state ?? null,
     proposalTree: t.proposal?.tree ?? "",
+    family: isParent ? t.ticket : t.parent,
     openPath: t.proposal?.path || t.copy.path || "",
     copyStatus: t.copy.status,
     approvedAt: t.copy.approved_at ?? "",

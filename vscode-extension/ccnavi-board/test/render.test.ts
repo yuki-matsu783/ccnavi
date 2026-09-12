@@ -36,8 +36,19 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   assert.ok(html.includes("2 か所にコピーあり"));
   assert.ok(html.includes("親 i0001 / フェーズ 2"));
   assert.ok(html.includes('class="phases"'));
-  assert.ok(html.includes('data-action="wrapup" data-parent="i0001"'));
+  // 締める（wrapup）のボタンは出さない
+  assert.ok(!html.includes('data-action="wrapup"'));
+  assert.ok(!html.includes("締める"));
   assert.ok(html.includes("base "));
+});
+
+test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  assert.ok(html.includes('id="parent-filter"'));
+  assert.ok(/<option value="i0001">i0001 [^<]+<\/option>/.test(html));
+  assert.equal((html.match(/data-family="i0001"/g) ?? []).length, 4);
+  const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
+  assert.ok(!renderBoard(buildBoard(empty), OPTIONS).includes('id="parent-filter"'));
 });
 
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {

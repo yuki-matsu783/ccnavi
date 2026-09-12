@@ -7,7 +7,7 @@ import * as vscode from "vscode";
 
 import { loadBoard } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
-import { acceptCommand, approveCommand, wrapupCommand, type Launcher } from "./core/commands.js";
+import { acceptCommand, approveCommand, type Launcher } from "./core/commands.js";
 import { escapeHtml, renderBoard } from "./core/render.js";
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
@@ -32,8 +32,7 @@ type Message =
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }
   | { readonly type: "approve" }
-  | { readonly type: "accept"; readonly parent: string; readonly phase: number }
-  | { readonly type: "wrapup"; readonly parent: string };
+  | { readonly type: "accept"; readonly parent: string; readonly phase: number };
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -150,7 +149,7 @@ function registerPanelHandlers(current: PanelState): void {
   const { panel, folder } = current;
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
-    void handleMessage(asMessage(message));
+    handleMessage(asMessage(message));
   });
 
   panel.onDidChangeViewState(() => {
@@ -249,7 +248,7 @@ function renderError(error: string): string {
   return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ボード</title></head><body><p>ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
-async function handleMessage(message: Message | undefined): Promise<void> {
+function handleMessage(message: Message | undefined): void {
   const current = state;
   if (message === undefined || current === undefined) {
     return;
@@ -272,33 +271,6 @@ async function handleMessage(message: Message | undefined): Promise<void> {
         return;
       }
       runInTerminal(root, acceptCommand(tree, message.phase));
-      return;
-    }
-    case "wrapup": {
-      const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
-      if (tree === undefined) {
-        vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーが無いので wrapup を送れない`);
-        return;
-      }
-      const reason = await vscode.window.showInputBox({
-        title: `${message.parent} を締める`,
-        prompt: "締める理由（--reason）。残りは別の issue に起こす",
-        validateInput: (value) => (value.trim() === "" ? "理由は空にできない" : undefined),
-      });
-      if (reason === undefined || reason.trim() === "") {
-        return;
-      }
-      const choice = await vscode.window.showQuickPick(
-        [
-          { label: "残りを issue に起こす", makeIssue: true },
-          { label: "起こさない（--no-issue）", makeIssue: false },
-        ],
-        { title: `${message.parent} を締める`, placeHolder: "残った指摘の扱い" },
-      );
-      if (choice === undefined) {
-        return;
-      }
-      runInTerminal(root, wrapupCommand(tree, reason.trim(), choice.makeIssue));
       return;
     }
   }
@@ -340,8 +312,6 @@ function asMessage(message: unknown): Message | undefined {
       return typeof m.parent === "string" && typeof m.phase === "number" && Number.isInteger(m.phase)
         ? { type: "accept", parent: m.parent, phase: m.phase }
         : undefined;
-    case "wrapup":
-      return typeof m.parent === "string" ? { type: "wrapup", parent: m.parent } : undefined;
     default:
       return undefined;
   }

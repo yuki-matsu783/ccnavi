@@ -3,7 +3,7 @@
  * 色は VS Code のテーマ変数だけを使う。チケットの本文に何が書かれていても、表示を壊さない
  * ように全部の文字列を実体参照にする。
  */
-import type { Action, Board, BoardColumn, Card, PhaseChip } from "./board.js";
+import type { Action, Board, BoardColumn, Card, ParentOption, PhaseChip } from "./board.js";
 
 export interface RenderOptions {
   readonly nonce: string;
@@ -41,7 +41,7 @@ ${STYLE}
     <span class="pending${approveCount > 0 ? " warn" : ""}">承認待ち ${approveCount} 件</span>
   </div>
   <div class="controls">
-${renderFilter(board.projects)}    <button type="button" class="action" data-action="refresh">更新</button>
+${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button type="button" class="action" data-action="refresh">更新</button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
@@ -68,6 +68,26 @@ function renderFilter(projects: readonly string[]): string {
       <select id="project-filter">
       <option value="*">すべて</option>
       <option value="">ワークスペース本体</option>
+${options}
+      </select>
+    </label>
+`;
+}
+
+/** 親の絞り込み。並行して進めている親が複数あるとき、1 つの家族（親とその子）だけを見る */
+function renderParentFilter(parents: readonly ParentOption[]): string {
+  if (parents.length === 0) {
+    return "";
+  }
+  const options = parents
+    .map((p) => {
+      const label = p.title === "" ? p.id : `${p.id} ${p.title}`;
+      return `      <option value="${escapeHtml(p.id)}">${escapeHtml(label)}</option>`;
+    })
+    .join("\n");
+  return `    <label class="filter">親
+      <select id="parent-filter">
+      <option value="*">すべて</option>
 ${options}
       </select>
     </label>
@@ -113,7 +133,7 @@ function renderCard(card: Card): string {
   const issues = renderIssues(card.issues);
   const actions = renderActions(card.actions, card.id);
   const stage = card.stage ? `\n        <div class="stage">${escapeHtml(card.stage)}</div>` : "";
-  return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" tabindex="0">
+  return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" data-family="${escapeHtml(card.family)}" tabindex="0">
         <div class="card-head"><span class="num">${escapeHtml(card.id)}</span><span class="title">${escapeHtml(card.title)}</span></div>${stage}
         <div class="badges">
 ${badges}
@@ -209,8 +229,6 @@ function renderActionButton(action: Action, id: string): string {
       return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。${escapeHtml(id)} だけを承認することはできない">承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
-    case "wrapup":
-      return `<button type="button" class="action" data-action="wrapup" data-parent="${escapeHtml(action.parent)}" title="ここで締める（ccnavi-review.sh wrapup）">締める</button>`;
   }
 }
 
@@ -371,18 +389,18 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "accept") {
         vscode.postMessage({ type: "accept", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) });
       }
-      else if (action === "wrapup") { vscode.postMessage({ type: "wrapup", parent: button.getAttribute("data-parent") }); }
     });
   }
-  // 絞り込み・畳んだ列・列の幅は、更新で HTML が作り直されても残るように webview の状態に置く。
+  // 絞り込み（プロジェクト・親）・畳んだ列・列の幅は、更新で HTML が作り直されても残るように webview の状態に置く。
   const saved = vscode.getState() || {};
   const savedWidths = saved.widths && typeof saved.widths === "object" ? saved.widths : {};
   const state = {
     project: typeof saved.project === "string" ? saved.project : "*",
+    parent: typeof saved.parent === "string" ? saved.parent : "*",
     folded: Array.isArray(saved.folded) ? saved.folded.filter((f) => typeof f === "string") : [],
     widths: Object.fromEntries(Object.entries(savedWidths).filter(([, w]) => typeof w === "number" && w > 0)),
   };
-  function save() { vscode.setState({ project: state.project, folded: state.folded, widths: state.widths }); }
+  function save() { vscode.setState({ project: state.project, parent: state.parent, folded: state.folded, widths: state.widths }); }
 
   function setFolded(column, folded) {
     column.classList.toggle("folded", folded);
@@ -443,25 +461,34 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     });
   }
 
+  // 絞り込みはプロジェクトと親の両方を満たすカードだけを出す。覚えていた値が候補に無ければ
+  //（その親が消えた等）「すべて」のまま。
   const filter = document.getElementById("project-filter");
+  const parentFilter = document.getElementById("parent-filter");
   function applyFilter() {
-    const value = filter ? filter.value : "*";
+    const project = filter ? filter.value : "*";
+    const parent = parentFilter ? parentFilter.value : "*";
     for (const card of document.querySelectorAll(".card")) {
-      const own = card.getAttribute("data-project") || "";
-      card.classList.toggle("hidden", value !== "*" && own !== value);
+      const ownProject = card.getAttribute("data-project") || "";
+      const ownFamily = card.getAttribute("data-family") || "";
+      const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent);
+      card.classList.toggle("hidden", hidden);
     }
-    state.project = value;
+    state.project = project;
+    state.parent = parent;
     save();
   }
-  function selectProject(value) {
-    if (!filter) { return; }
-    if ([...filter.options].some((o) => o.value === value)) { filter.value = value; applyFilter(); }
+  function select(element, value) {
+    if (!element) { return; }
+    if ([...element.options].some((o) => o.value === value)) { element.value = value; applyFilter(); }
   }
-  if (filter) {
-    selectProject(state.project);
-    filter.addEventListener("change", applyFilter);
-    applyFilter();
+  function selectProject(value) { select(filter, value); }
+  for (const element of [filter, parentFilter]) {
+    if (element) { element.addEventListener("change", applyFilter); }
   }
+  selectProject(state.project);
+  select(parentFilter, state.parent);
+  applyFilter();
   // プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき。
   window.addEventListener("message", (event) => {
     const data = event.data || {};

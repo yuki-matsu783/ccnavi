@@ -1,7 +1,7 @@
 /**
  * 人の承認をターミナルへ送るときのコマンド行。bash（Windows なら Git Bash）で動く形。
  *
- * 拡張は承認を自分で実行しない。`--approve` と `accept` と `wrapup` は端末（tty）から
+ * 拡張は承認を自分で実行しない。`--approve` と `accept` は端末（tty）から
  * 打つものと ccnavi が決めていて（人の合意をエージェントが出せないための壁）、
  * 拡張の子プロセスもその壁の外に置く。ここで組んだ 1 行をターミナルに送り、y/N は人が押す。
  */
@@ -41,10 +41,4 @@ export function approveCommand(launcher: Launcher, root: string): string {
  */
 export function acceptCommand(parentTree: string, phase: number): string {
   return `cd ${shellQuote(toPosixPath(parentTree))} && sh .claude/scripts/ccnavi-review.sh accept ${phase}`;
-}
-
-/** `ccnavi-review.sh wrapup --reason <理由> [--no-issue]`。親を早期に締める */
-export function wrapupCommand(parentTree: string, reason: string, makeIssue: boolean): string {
-  const tail = makeIssue ? "" : " --no-issue";
-  return `cd ${shellQuote(toPosixPath(parentTree))} && sh .claude/scripts/ccnavi-review.sh wrapup --reason ${shellQuote(reason)}${tail}`;
 }
