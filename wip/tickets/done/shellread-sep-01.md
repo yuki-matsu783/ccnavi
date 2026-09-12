@@ -16,9 +16,9 @@ human_review:
 allow:
   - match: Write|Edit
     glob: "wip/design/*"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-12T18:20:41+0900"
+completed_at: "2026-09-12T18:31:20+0900"
+base_sha: "40dc99bd0a74274d356bc3b09b07e4ce5ef9e9c0"
 ---
 
 # 設計: shellread の印を分ける
