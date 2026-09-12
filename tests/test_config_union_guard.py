@@ -62,6 +62,11 @@ class GuardHarness(ConfigUnionHarness):
         result = self.run_hook("PostToolUse")
         return before, read(path), result
 
+    def said(self, result, note=""):
+        """落ちたときに何が起きたかを添える。標準エラーを見ないと理由が出ない。"""
+        head = f"{note}\n" if note else ""
+        return f"{head}stdout: {result.stdout}\nstderr: {result.stderr}"
+
 
 class RestoreTest(GuardHarness):
     """控えと復元（§25.6、REQ-MLT-08 の変更）。"""
@@ -72,9 +77,9 @@ class RestoreTest(GuardHarness):
             with self.subTest(kind=kind):
                 path = layer_path(self.lib, kind)
                 before, after, result = self.break_and_restore(path)
-                self.assertEqual(after, before, kind)
-                self.assertIn("restored", result.stdout)
-                self.assertIn(f"{kind}.yml", result.stdout)
+                self.assertEqual(after, before, self.said(result, kind))
+                self.assertIn("restored", result.stdout, self.said(result, kind))
+                self.assertIn(f"{kind}.yml", result.stdout, self.said(result, kind))
 
     def test_own_layer_files_are_restored(self):
         """§25.6: 自身の層 `<ワークスペースルート>/.ccnavi/config/` の 3 本も対象。"""
@@ -83,16 +88,17 @@ class RestoreTest(GuardHarness):
             with self.subTest(kind=kind):
                 path = layer_path(self.ws, kind)
                 before, after, result = self.break_and_restore(path)
-                self.assertEqual(after, before, kind)
-                self.assertIn("restored", result.stdout)
+                self.assertEqual(after, before, self.said(result, kind))
+                self.assertIn("restored", result.stdout, self.said(result, kind))
 
     def test_common_phases_and_risk_are_restored(self):
         """§25.6: 共通層の phases.yml / risk.yml を足す（既存の穴の修正）。"""
         for path in (self.phases, self.risk):
-            with self.subTest(path=os.path.basename(path)):
+            name = os.path.basename(path)
+            with self.subTest(path=name):
                 before, after, result = self.break_and_restore(path)
-                self.assertEqual(after, before)
-                self.assertIn("restored", result.stdout)
+                self.assertEqual(after, before, self.said(result, name))
+                self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_copies_in_a_worktree_cut_from_a_project_are_restored(self):
         """§25.6: 切り元のプロジェクトから切った作業ツリーの中の写しも対象。"""
@@ -101,16 +107,33 @@ class RestoreTest(GuardHarness):
         self.assertTrue(os.path.exists(copy), "lib の .ccnavi/ は追跡されているので写しがある")
 
         before, after, result = self.break_and_restore(copy)
-        self.assertEqual(after, before)
-        self.assertIn("restored", result.stdout)
-        self.assertIn("統合すれば", result.stdout)
+        self.assertEqual(after, before, self.said(result))
+        self.assertIn("restored", result.stdout, self.said(result))
+        self.assertIn("統合すれば", result.stdout, self.said(result))
 
     def test_copies_in_a_worktree_cut_from_the_workspace_are_restored(self):
         """§25.6: ワークスペースから切った作業ツリーの中の自身の層の写しも対象。"""
         tree = self.worktree(self.ws, "w2")
         copy = layer_path(tree, "phases")
-        before, after, _ = self.break_and_restore(copy, broken="version: 1\nphases: {}\n")
-        self.assertEqual(after, before)
+        before, after, result = self.break_and_restore(copy, broken="version: 1\nphases: {}\n")
+        self.assertEqual(after, before, self.said(result))
+
+    def test_copies_of_the_common_layer_in_a_worktree_are_restored(self):
+        """§25.6: ワークスペースから切った作業ツリーの中の共通層の写しも対象（既存の穴）。
+
+        共通層の 3 本はワークスペースの git が追跡しているので、作業ツリーにも写しが入る。
+        今はそこがルールの allow `worktrees` に当たって書けてしまい、戻りもしない。
+        """
+        tree = self.worktree(self.ws, "w3")
+        for name in ("rules.yml", "phases.yml", "risk.yml"):
+            with self.subTest(name=name):
+                copy = os.path.join(tree, ".claude", "ccnavi", name)
+                self.assertTrue(os.path.exists(copy), "共通層は追跡されているので写しがある")
+                broken = "version: 3\ndeny: []\n" if name == "rules.yml" else "version: 1\n"
+                before, after, result = self.break_and_restore(copy, broken=broken)
+                self.assertEqual(after, before, self.said(result, name))
+                self.assertIn("restored", result.stdout, self.said(result, name))
+                self.assertIn("統合すれば", result.stdout, self.said(result, name))
 
     def test_deleted_layer_file_comes_back_from_the_project_git(self):
         """§25.6 / REQ-SLF: 控えが無ければ、その層の git（プロジェクト自身）から戻る。"""
@@ -118,16 +141,16 @@ class RestoreTest(GuardHarness):
         expected = read(path)
         os.remove(path)
 
-        self.run_hook("PreToolUse")
+        result = self.run_hook("PreToolUse")
 
-        self.assertTrue(os.path.exists(path))
-        self.assertEqual(read(path), expected)
+        self.assertTrue(os.path.exists(path), self.said(result))
+        self.assertEqual(read(path), expected, self.said(result))
 
     def test_missing_layer_files_are_not_reported(self):
         """§25.6 / REQ-SLF-03: 無いものは対象から外れる。app の層が無いことは言わない。"""
         result = self.run_hook("PreToolUse")
-        self.assertNotIn("app", result.stdout)
-        self.assertEqual(result.stderr, "")
+        self.assertNotIn("app", result.stdout, self.said(result))
+        self.assertEqual(result.stderr, "", self.said(result))
 
     def test_record_names_the_layer_that_was_restored(self):
         """§25.6: 記録の `guarded` に、層の名前付きの鍵で何をしたかが残る。"""

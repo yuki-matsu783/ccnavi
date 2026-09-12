@@ -9,6 +9,34 @@ selfguard の対象の拡張、`--explain` の書き直しで**変える必要�
 `tests/test_config_union_guard.py` が固定している。ここに挙げるのは、今の置き場や今の出力の
 綴りに依存していて、実装が入ると赤になる（か、意味がずれる）既存の 1 件ずつ。
 
+## 0. config-union-02 の報告の訂正（config-union-06 で足した）
+
+02 の報告に「緑 6 件は今どおりの挙動を確かめている」と書いたが、正しくない。6 件のうち 4 件は
+**確かめたい機能がまだ無いから**緑になっていて、実装が入るまで何も守っていない。
+
+| 件 | なぜ今は緑か |
+|---|---|
+| `test_bash_union_drops_identical_duplicates_too` | プロジェクトの層を新しい置き場（`.ccnavi/config/`）から読んでいないので、写した定義がそもそも和に入らない。1 本にまとまったのではなく、はじめから 1 本 |
+| `test_own_layer_does_not_reach_projects` | 自身の層（`<ワークスペースルート>/.ccnavi/config/`）をまだ読んでいない。届かないのではなく、読んでいない |
+| `test_disable_does_not_add_the_deny` | `builtin-guard-project-home` がまだ無いので `assertNotIn` が常に真 |
+| `test_reading_project_home_is_allowed` | 同上。止める側がまだ無いので、読みが通るのは当たり前 |
+
+正味の「現状維持の確認」は次の 3 件だけ。ここが赤くなったら、それは今動いているものを
+壊したという意味になる。
+
+- `test_broken_common_layer_falls_back_to_builtin_as_before`（§25.2 / REQ-PRE-06）
+- `test_workspace_without_projects_or_own_layer_is_unchanged`（§25.12 / REQ-MLT-15）
+- `test_a_workspace_worktree_is_watched_with_the_common_layer`（§25.7。06 で足した）
+
+### fixture の `.gitignore` を実物に合わせた（06）
+
+`tests/test_config_union.py` の雛形は `/.claude/` を丸ごと無視していて、共通層の 3 本が
+追跡されず、ワークスペースから切った作業ツリーに写しが入らなかった。設計 §25.6 が名指しした
+穴（作業ツリーの中の `.claude/ccnavi/phases.yml` が書けて復元されない）を一度も踏めない形
+だったので、実物と同じ 4 つ（`/projects/`、`/.claude/worktrees/`、`/.claude/ccnavi/state/`、
+`/.claude/ccnavi/tickets/`）だけを無視するように直した。この変更はこの 3 ファイルの中で閉じる
+（`tests/test_projects.py` などは自前の雛形を持つ）。
+
 ## 1. 置き場が `config/rules.yml` から `.ccnavi/config/rules.yml` に変わる
 
 | ファイル | テスト | 何が変わるか |

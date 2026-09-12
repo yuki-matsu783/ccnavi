@@ -11,6 +11,10 @@
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空）。
 
+`.gitignore` は実物に合わせて 4 つだけ無視する（`projects/`、作業ツリー、状態、承認済みの
+写し）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切った作業ツリーに写しが
+入り、設計 §25.6 が名指しした穴（写しが書けて戻らない）を再現できる。
+
 実装はまだ無い。このテストは実装フェーズが緑にする。ここでは import 時に落ちない
 ことと、振る舞いを 1 つずつ固定していることだけを守る。phases / risk の合成は
 test_config_union_phases_risk.py、selfguard と導入スクリプトは test_config_union_guard.py。
@@ -18,6 +22,7 @@ test_config_union_phases_risk.py、selfguard と導入スクリプトは test_co
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import shutil
@@ -148,6 +153,57 @@ factors:
   - {id: schema, points: 30, glob: "schema/**", message: スキーマに触った}
 """
 
+# app の層。fixture では置かない（無い層 = 空）。2 つ目の非空の層を要るテストだけが置く。
+APP_RULES = {
+    "version": 3,
+    "deny": [
+        {
+            "id": "kube",
+            "match": "Bash",
+            "glob": "*kubectl*",
+            "message": "kubectl is not run by the agent.",
+        },
+        {
+            "id": "deploy",
+            "match": "Bash",
+            "glob": "*deploy.sh*",
+            "message": "deploy.sh is run by a human.",
+        },
+    ],
+}
+
+# lib 側の、app の `deploy` と同じ呼び出しに当たる deny。並びが名前順かを見る。
+LIB_DEPLOY = {
+    "id": "deploy-any",
+    "match": "Bash",
+    "glob": "*deploy*",
+    "message": "deploy is run by a human.",
+}
+
+# 共通層の `ask`。プロジェクトの層の `allow` で緩められないことを見る（§25.4 代償）。
+ASK_VENDOR = {
+    "id": "ask-vendor",
+    "match": "Write|Edit",
+    "glob": "*/vendor/*",
+    "message": "vendor は人に確かめてから触る。",
+}
+
+# NotebookEdit を実際の `tool_name` として通すためのルール。欄は notebook_path。
+NOTEBOOK_RULE = {
+    "id": "notebook",
+    "match": "NotebookEdit",
+    "glob": "*/notebooks/*",
+    "message": "ノートは人が回す。",
+}
+
+# `{root}` を含む定義。共通層と層の両方に同じものを置いて、置換後の全欄一致を見る（§25.8）。
+ROOT_RULE = {
+    "id": "root-secret",
+    "match": "Write|Edit",
+    "glob": "{root}/*/secret.txt",
+    "message": "secret.txt は置かない。",
+}
+
 # YAML として壊れている。閉じていない並び。
 BROKEN = "version: 3\ndeny: [\n"
 
@@ -232,54 +288,90 @@ def ticket_text(
     return "\n".join(lines) + "\n"
 
 
+# どの git プロジェクトルートにも置く、判定の的になるファイル。
+KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
+
+# ワークスペースの git が無視するもの。実物の .gitignore と同じ 4 つだけ。
+# `/.claude/` を丸ごと無視すると共通層の 3 本が追跡されず、作業ツリーに写しが入らない。
+# 写しが入らないと、設計 §25.6 が名指しした穴（作業ツリーの中の共通層の写しが書けて
+# 戻らない）を一度も踏めない。
+GITIGNORE = "/projects/\n/.claude/worktrees/\n/.claude/ccnavi/state/\n/.claude/ccnavi/tickets/\n"
+
+# 雛形のワークスペース。1 度だけ組んで、以後は写しを配る。
+#
+# 組み直す形だと 1 件あたり git が 9 回（ワークスペースと 2 つのプロジェクトの
+# init / add / commit）起き、この 3 ファイルの全件で 500 回を超えていた。写しなら
+# git は雛形の 9 回だけで済む。テストごとに別のディレクトリを配るのは変わらないので、
+# テストどうしが状態を共有することもない（`setUpClass` に寄せる形との違いはここ）。
+_TEMPLATE = ""
+
+
+def build_project(root, *, rules=None, phases=None, risk=None, home=HOME):
+    """git 初期化したプロジェクトを 1 つ置く。層は渡したぶんだけ。"""
+    os.makedirs(root)
+    git(root, "init", "--quiet", "-b", "main")
+    for rel in KEEP:
+        write(os.path.join(root, *rel.split("/")), "keep\n")
+    write_layer(root, rules=rules, phases=phases, risk=risk, home=home)
+    git(root, "add", "-A")
+    git(root, "commit", "--quiet", "-m", "init")
+    return root
+
+
+def build_template():
+    """雛形を組んで、その場所を返す。片付けはプロセスの終わりに 1 度。"""
+    ws = tempfile.mkdtemp(prefix="ccnavi-union-template-")
+    atexit.register(shutil.rmtree, ws, ignore_errors=True)
+    os.makedirs(os.path.join(ws, ".claude"))
+    git(ws, "init", "--quiet", "-b", "main")
+    write(os.path.join(ws, ".gitignore"), GITIGNORE)
+    for rel in KEEP:
+        write(os.path.join(ws, *rel.split("/")), "keep\n")
+    write_layer(ws, rules=OWN_RULES, phases=OWN_PHASES)
+    common = os.path.join(ws, ".claude", "ccnavi")
+    write(os.path.join(common, "rules.yml"), json.dumps(COMMON_RULES))
+    write(os.path.join(common, "phases.yml"), COMMON_PHASES)
+    write(os.path.join(common, "risk.yml"), COMMON_RISK)
+    git(ws, "add", "-A")
+    git(ws, "commit", "--quiet", "-m", "init")
+
+    projects = os.path.join(ws, "projects")
+    build_project(os.path.join(projects, "lib"), rules=LIB_RULES, phases=LIB_PHASES, risk=LIB_RISK)
+    build_project(os.path.join(projects, "app"))
+    return ws
+
+
 class ConfigUnionHarness(unittest.TestCase):
-    """ワークスペースと 2 つのプロジェクトを組む道具。テストは持たない。"""
+    """ワークスペースと 2 つのプロジェクトを配る道具。テストは持たない。"""
 
     def setUp(self):
-        self.ws = tempfile.mkdtemp(prefix="ccnavi-union-")
-        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
-        self.build_workspace()
-
-    # ---- 組み立て
-
-    def build_workspace(self):
-        """git 初期化したワークスペースに、共通層と自身の層と projects/ を置く。
-
-        `.claude/` と `projects/` はワークスペースの git で無視する。自身の層 `.ccnavi/` は
-        追跡する（作業ツリーに写しが入る形）。
-        """
-        os.makedirs(os.path.join(self.ws, ".claude"))
-        git(self.ws, "init", "--quiet", "-b", "main")
-        write(os.path.join(self.ws, ".gitignore"), "/projects/\n/.claude/\n")
-        for rel in ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md"):
-            write(os.path.join(self.ws, *rel.split("/")), "keep\n")
-        write_layer(self.ws, rules=OWN_RULES, phases=OWN_PHASES)
-        git(self.ws, "add", "-A")
-        git(self.ws, "commit", "--quiet", "-m", "init")
+        global _TEMPLATE
+        if not _TEMPLATE:
+            _TEMPLATE = build_template()
+        base = tempfile.mkdtemp(prefix="ccnavi-union-")
+        self.addCleanup(shutil.rmtree, base, ignore_errors=True)
+        self.ws = os.path.join(base, "ws")
+        shutil.copytree(_TEMPLATE, self.ws)
 
         common = os.path.join(self.ws, ".claude", "ccnavi")
-        self.rules = write(os.path.join(common, "rules.yml"), json.dumps(COMMON_RULES))
-        self.phases = write(os.path.join(common, "phases.yml"), COMMON_PHASES)
-        self.risk = write(os.path.join(common, "risk.yml"), COMMON_RISK)
+        self.rules = os.path.join(common, "rules.yml")
+        self.phases = os.path.join(common, "phases.yml")
+        self.risk = os.path.join(common, "risk.yml")
         self.approved = os.path.join(common, "tickets")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "log.jsonl")
 
         self.projects = os.path.join(self.ws, "projects")
-        self.lib = self.project("lib", rules=LIB_RULES, phases=LIB_PHASES, risk=LIB_RISK)
-        self.app = self.project("app")
+        self.lib = os.path.join(self.projects, "lib")
+        self.app = os.path.join(self.projects, "app")
+
+    # ---- 組み立て
 
     def project(self, name, *, rules=None, phases=None, risk=None, home=HOME):
-        """`projects/<名前>/` に git 初期化したプロジェクトを置く。層は渡したぶんだけ。"""
-        root = os.path.join(self.projects, name)
-        os.makedirs(root)
-        git(root, "init", "--quiet", "-b", "main")
-        for rel in ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md"):
-            write(os.path.join(root, *rel.split("/")), "keep\n")
-        write_layer(root, rules=rules, phases=phases, risk=risk, home=home)
-        git(root, "add", "-A")
-        git(root, "commit", "--quiet", "-m", "init")
-        return root
+        """`projects/<名前>/` に git 初期化したプロジェクトを足す。"""
+        return build_project(
+            os.path.join(self.projects, name), rules=rules, phases=phases, risk=risk, home=home
+        )
 
     def worktree(self, owner, name):
         """`.claude/worktrees/<名前>` に、owner（ワークスペースかプロジェクト）から切る。"""
@@ -351,10 +443,21 @@ class ConfigUnionHarness(unittest.TestCase):
         except ValueError as exc:
             self.fail(f"--lint --json が JSON を返さない: {exc}\n{result.stdout}\n{result.stderr}")
 
-    def problems(self, severity, *args, **options):
+    def problems(self, severity, *args, where="", **options):
+        """その深刻度の Problem。`where` を渡すと、その出どころで先に絞る。
+
+        `detail` の部分一致だけで見ると、`self` や `lib` のようなありふれた語が
+        別の苦情の文面に紛れていても通ってしまう。どの層の話かは `where` が持つ。
+        """
         return [
-            p for p in self.lint_json(*args, **options)["problems"] if p["severity"] == severity
+            p
+            for p in self.lint_json(*args, **options)["problems"]
+            if p["severity"] == severity and (not where or p["where"].startswith(where))
         ]
+
+    def project_where(self, name):
+        """`--lint` の Problem の出どころのうち、そのプロジェクトのもの（`(projects/lib)`）。"""
+        return f"(projects/{name})"
 
     # ---- 読み取り
 
@@ -368,6 +471,11 @@ class ConfigUnionHarness(unittest.TestCase):
             return ""
         out = json.loads(result.stdout).get("hookSpecificOutput", {})
         return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
+
+    def system_message(self, result):
+        if not result.stdout.strip():
+            return ""
+        return json.loads(result.stdout).get("systemMessage", "")
 
     def last_record(self):
         with open(self.log, encoding="utf-8") as f:
@@ -445,8 +553,9 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assert_not_denied(allowed)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow")
-        # 共通層の ws-src が先に当たる（共通層 → 層の順）。どちらでも allow。
-        self.assertIn(record["rules"][0], ("ws-src", "lib:source"))
+        # §25.4「順は 共通層 → 自身の層 → プロジェクトの層」。先に当たるのは共通層の ws-src。
+        # ここを「どちらでも良い」にすると、逆順に並べた実装でも通ってしまう。
+        self.assertEqual(record["rules"][0], "ws-src", record)
 
         allowed = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "docs", "a.md"))
         self.assertEqual(self.last_record()["decision"], "allow")
@@ -454,6 +563,89 @@ class WriteUnionTest(ConfigUnionHarness):
         # lib の docs/ に self:docs は効かない。どのルールも言及しない。
         self.hook("Write", self.ws, file_path=os.path.join(self.lib, "docs", "a.md"))
         self.assertNotIn("self:docs", self.last_record().get("rules", []))
+
+    def test_notebook_edit_goes_through_the_same_union(self):
+        """§25.4: NotebookEdit も書き込み系。共通層 + 行き先の層の和で、欄は notebook_path。"""
+        deny = [*LIB_RULES["deny"], NOTEBOOK_RULE]
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
+
+        denied = self.hook(
+            "NotebookEdit",
+            self.ws,
+            notebook_path=os.path.join(self.lib, "notebooks", "a.ipynb"),
+        )
+        self.assert_denied(denied, "lib:notebook")
+        record = self.last_record()
+        self.assertEqual(record["rules"], ["lib:notebook"])
+        self.assertEqual(record.get("source"), "lib")
+
+        # 共通層の guard-approved も NotebookEdit を持つ。プロジェクトのツリーでも効く。
+        common = self.hook(
+            "NotebookEdit",
+            self.ws,
+            notebook_path=os.path.join(self.lib, ".claude", "ccnavi", "a.ipynb"),
+        )
+        self.assert_denied(common, "guard-approved")
+
+    def test_a_project_allow_does_not_loosen_the_common_ask(self):
+        """§25.4 代償: 共通層の `ask` を、プロジェクトの層の `allow` では緩められない。"""
+        write(self.rules, json.dumps(dict(COMMON_RULES, ask=[ASK_VENDOR])))
+        allow = [
+            *LIB_RULES["allow"],
+            {"id": "open-vendor", "match": "Write|Edit", "glob": "*/vendor/*"},
+        ]
+        write_layer(self.lib, rules=dict(LIB_RULES, allow=allow))
+
+        result = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "vendor", "x.py"))
+        self.assertEqual(self.decision(result), "ask", result.stdout + result.stderr)
+        self.assertIn("ask-vendor", self.reason(result))
+        record = self.last_record()
+        self.assertEqual(record["rules"][0], "ask-vendor", record)
+        self.assertEqual(record.get("source"), "common")
+        # ワークスペースのツリーでも同じ。lib の allow はそこには足さない。
+        here = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "vendor", "x.py"))
+        self.assertEqual(self.decision(here), "ask", here.stdout + here.stderr)
+
+
+class RootPlaceholderUnionTest(ConfigUnionHarness):
+    """`{root}` の置換先はどの層でもワークスペースルート（§25.8）。"""
+
+    def test_root_in_a_project_layer_is_the_workspace_root(self):
+        """§25.8: プロジェクトの層の `{root}` も、そのプロジェクトではなくワークスペースルート。"""
+        deny = [
+            *LIB_RULES["deny"],
+            {
+                "id": "root-vendor",
+                "match": "Write|Edit",
+                "glob": "{root}/projects/lib/vendor/*",
+                "message": "vendor はワークスペースルートから数えた綴りで止める。",
+            },
+        ]
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
+
+        denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "vendor", "x.py"))
+        self.assert_denied(denied, "lib:root-vendor")
+        # `{root}` が lib の git プロジェクトルートに置き換わるなら、こちらが当たるはず。
+        self.assert_not_denied(
+            self.hook(
+                "Write",
+                self.ws,
+                file_path=os.path.join(self.lib, "projects", "lib", "vendor", "x.py"),
+            )
+        )
+
+    def test_a_copied_root_rule_is_dropped_as_a_duplicate(self):
+        """§25.8: 重複の判定は置き換えた後の欄で比べる。`{root}` ごと写した定義は捨てる。"""
+        write(self.rules, json.dumps(dict(COMMON_RULES, deny=[*COMMON_RULES["deny"], ROOT_RULE])))
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=[ROOT_RULE, *LIB_RULES["deny"]]))
+
+        denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "secret.txt"))
+        self.assert_denied(denied, "root-secret")
+        self.assertEqual(self.last_record()["rules"], ["root-secret"])
+        self.assertEqual(self.last_record().get("source"), "common")
+
+        infos = self.problems("info", where=self.project_where("lib"))
+        self.assertTrue(any("root-secret" in p["detail"] for p in infos), infos)
 
 
 class BashUnionTest(ConfigUnionHarness):
@@ -480,6 +672,25 @@ class BashUnionTest(ConfigUnionHarness):
         self.hook("Bash", self.app, command="psql")
         self.assertEqual(self.last_record().get("source"), "lib")
 
+    def test_two_non_empty_project_layers_take_part_in_name_order(self):
+        """§25.4: 非空のプロジェクトの層が 2 つでも両方が和に入り、並びは名前順。"""
+        write_layer(self.app, rules=APP_RULES)
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], LIB_DEPLOY]))
+
+        for cwd in (self.ws, self.lib, self.app):
+            with self.subTest(cwd=os.path.basename(cwd)):
+                self.assert_denied(self.hook("Bash", cwd, command="kubectl get pods"), "app:kube")
+                self.assert_denied(
+                    self.hook("Bash", cwd, command="psql -c 'select 1'"), "lib:raw-psql"
+                )
+
+        # 1 本の呼び出しに app と lib の両方が当たる。先に載るのは名前順で前の app。
+        both = self.hook("Bash", self.ws, command="sh deploy.sh --now")
+        self.assert_denied(both, "app:deploy", "lib:deploy-any")
+        record = self.last_record()
+        self.assertEqual(record["rules"], ["app:deploy", "lib:deploy-any"], record)
+        self.assertEqual(record.get("source"), "app")
+
 
 class DuplicateTest(ConfigUnionHarness):
     """同 `id` の扱い（§25.4「重複は後ろを捨てる」「同 id で中身が違うとき」）。"""
@@ -494,9 +705,11 @@ class DuplicateTest(ConfigUnionHarness):
         self.assert_denied(denied, "credentials")
         self.assertEqual(self.last_record()["rules"], ["credentials"])
 
-        infos = self.problems("info")
+        where = self.project_where("lib")
+        infos = self.problems("info", where=where)
         self.assertTrue(any("credentials" in p["detail"] for p in infos), infos)
-        self.assertFalse(any("credentials" in p["detail"] for p in self.problems("warn")))
+        warns = self.problems("warn", where=where)
+        self.assertFalse(any("credentials" in p["detail"] for p in warns), warns)
 
     def test_same_id_with_different_content_keeps_both(self):
         """§25.4: 同 id で中身が違う rules は両方効く。記録に両方が並び、--lint は warn。"""
@@ -511,7 +724,7 @@ class DuplicateTest(ConfigUnionHarness):
         self.assert_denied(denied, "credentials", "lib:credentials")
         self.assertEqual(sorted(self.last_record()["rules"]), ["credentials", "lib:credentials"])
 
-        warns = self.problems("warn")
+        warns = self.problems("warn", where=self.project_where("lib"))
         self.assertTrue(any("credentials" in p["detail"] for p in warns), warns)
 
     def test_bash_union_drops_identical_duplicates_too(self):
@@ -588,6 +801,68 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assertNotIn("lib:schema", self.reason(passed))
 
 
+class PostMonitoringUnionTest(ConfigUnionHarness):
+    """実行後の監視も「共通層 + そのツリーの層」の和（§25.7）。
+
+    行き先の層 1 本のままの実装では、共通層の deny の場所が保護領域に数えられない。
+    プロジェクトのツリー（共通層）と、ワークスペースの作業ツリー（自身の層）の両方で見る。
+    """
+
+    def start_turn(self, cwd):
+        """ターンを起こし、そのツリーの控えを取らせる。初回の実行後は控えるだけ。"""
+        started = self.hook("", self.ws, event="UserPromptSubmit")
+        self.assertEqual(started.returncode, 0, started.stderr)
+        first = self.hook("Bash", cwd, event="PostToolUse", command="python gen.py")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+
+    def test_a_project_tree_is_watched_with_the_common_layer_too(self):
+        """§25.7: プロジェクトのツリーでも、共通層の deny の場所が保護領域に入る。"""
+        self.start_turn(self.lib)
+        write(os.path.join(self.lib, ".env"), "SECRET=1\n")
+
+        after = self.hook("Bash", self.lib, event="PostToolUse", command="python gen.py")
+        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
+        self.assertIn("POST_VIOLATION", after.stderr)
+        self.assertIn("credentials", after.stderr)
+        self.assertIn(".env", after.stderr)
+        self.assertEqual(self.last_record()["rules"], ["credentials"])
+
+    def test_a_project_tree_is_watched_with_its_own_layer_as_well(self):
+        """§25.7: 和なので、そのプロジェクトの層の deny も同じターンで並ぶ。"""
+        self.start_turn(self.lib)
+        write(os.path.join(self.lib, "schema", "keep.sql"), "-- dirty\n")
+        write(os.path.join(self.lib, ".env"), "SECRET=1\n")
+
+        after = self.hook("Bash", self.lib, event="PostToolUse", command="python gen.py")
+        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
+        self.assertIn("lib:schema", after.stderr)
+        self.assertIn("credentials", after.stderr)
+        self.assertIn("tree: lib", after.stderr)
+
+    def test_a_workspace_worktree_is_watched_with_the_own_layer(self):
+        """§25.7: ワークスペースから切った作業ツリーには、共通層 + 自身の層。"""
+        tree = self.worktree(self.ws, "w1")
+        self.start_turn(tree)
+        write(os.path.join(tree, "generated", "keep.py"), "dirty\n")
+
+        after = self.hook("Bash", tree, event="PostToolUse", command="python gen.py")
+        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
+        self.assertIn("POST_VIOLATION", after.stderr)
+        self.assertIn("self:generated", after.stderr)
+        self.assertIn("generated/keep.py", after.stderr)
+        self.assertEqual(self.last_record()["tree"], "w1")
+
+    def test_a_workspace_worktree_is_watched_with_the_common_layer(self):
+        """§25.7: 同じ作業ツリーで、共通層の deny の場所も見る。"""
+        tree = self.worktree(self.ws, "w2")
+        self.start_turn(tree)
+        write(os.path.join(tree, ".env"), "SECRET=1\n")
+
+        after = self.hook("Bash", tree, event="PostToolUse", command="python gen.py")
+        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
+        self.assertIn("credentials", after.stderr)
+
+
 class WiringTest(ConfigUnionHarness):
     """置き場と環境変数（§25.2、§25.9、§25.12）。"""
 
@@ -600,7 +875,7 @@ class WiringTest(ConfigUnionHarness):
         self.project("self", rules=deny)
 
         self.assert_not_denied(self.hook("Bash", self.ws, command="mysqldump db"))
-        errors = self.problems("error")
+        errors = self.problems("error", where=self.project_where("self"))
         self.assertTrue(any("self" in p["detail"] for p in errors), errors)
 
     def test_project_home_env_moves_the_umbrella(self):
@@ -643,7 +918,7 @@ class WiringTest(ConfigUnionHarness):
         self.assert_not_denied(
             self.hook("Write", self.ws, file_path=os.path.join(self.app, "vendor", "x.py"))
         )
-        warns = self.problems("warn")
+        warns = self.problems("warn", where=self.project_where("app"))
         self.assertTrue(any("config/rules.yml" in p["detail"] for p in warns), warns)
 
     def test_workspace_without_projects_or_own_layer_is_unchanged(self):
