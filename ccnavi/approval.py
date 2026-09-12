@@ -291,6 +291,7 @@ def approve(
     conf: settings.Settings,
     rule_set: rules.RuleSet,
     root: str,
+    only: list[str] | None = None,
 ) -> int:
     """未承認の提案を束で人に見せ、承認されたら写しを置く。
 
@@ -303,6 +304,12 @@ def approve(
 
     親の改版（計画の変更）も同じ束に載る。写しは動かないのが原則で、改版はその
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
+
+    `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
+    ボードが絞り込みで見えている分だけを渡す。承認待ちに無い識別子が混じっていたら
+    何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。絞った
+    束に載らない親を持つ子は「親が承認されていない」で落ちる。親の分だけ承認する
+    のは絞らなくてもできることなので、絞りで新たに通るものは無い。
     """
     from . import phase
 
@@ -322,6 +329,21 @@ def approve(
         # 読めない提案があったなら、その旨は標準エラーに出ている。承認するものが
         # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
         return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
+
+    waiting_count = len(pending) + len(revisions)
+    if only:
+        wanted = list(dict.fromkeys(only))
+        known = {t.ticket for t in pending + revisions}
+        unknown = [i for i in wanted if i not in known]
+        if unknown:
+            stderr.write(f"ccnavi: 承認待ちに無い: {', '.join(unknown)}\n")
+            stderr.write("ccnavi: 何も承認しない。ボードを更新して承認待ちを確かめる\n")
+            return 1
+        pending = [t for t in pending if t.ticket in wanted]
+        revisions = [t for t in revisions if t.ticket in wanted]
+        stdout.write(
+            f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを束にする。\n\n"
+        )
 
     batch, rejected, pool = _candidates(root, conf, pending, revisions, approved, types)
     for t, complaints in rejected:

@@ -83,11 +83,14 @@ documented in README.md ("試験の JSON"); the VS Code extension reads it.
 To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
+    ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board)
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
 .claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
-editing a ticket never widens the area on its own.
+editing a ticket never widens the area on its own. With ids, a child whose
+pending parent is not listed is refused, and an id that is not pending
+approves nothing.
 
 The parent agent moves tickets between states and asks for reviews through the
 scripts in .claude/scripts/, which call
@@ -288,7 +291,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
         rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
-        approved = approval.approve(stdin, stdout, stderr, conf, rule_set, root)
+        # `--approve` の後ろに並べた語は、束に載せる識別子。無ければ承認待ち全部。
+        approved = approval.approve(
+            stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
+        )
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
