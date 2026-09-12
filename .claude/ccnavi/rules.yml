@@ -89,19 +89,11 @@ deny:
       'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
 
   # find は探すだけのつもりで書かれるが、-delete と -fprintf は消す・書く。
-  # allow の prefer-glob が単純な find を通すので、通してはいけない形を先に外す。
-  # 区画の順で deny が先に当たるから、allow の regex を複雑にしなくて済む。
-  # regex に否定先読みが書けない（rules._UNSUPPORTED）ので、この分け方になる。
-  #
-  # 当てるのは同じコマンドの中に並んだ形だけ。`\x00` はコマンドの切れ目に
-  # shellread が置く印で、引用された文字列（`grep -n "find -delete" x`）の
-  # 中には入らないので、書いただけの綴りには当たらない。
   - id: find-writes
     match: Bash
     regex: '(^|\x00)(\S*[\\/])?find(\.exe)?\s[^\x00]*\s-(delete|fprintf|fls|fprint)\b'
     message: >-
-      探すついでに消す・書く形の find です。消すなら対象を 1 つずつ名指しするか、
-      git の管理下なら 'ccnavi-git.sh rm <パス>' を使ってください。探すだけなら
+      探すついでに消す・書く形の find です。探すだけなら
       Glob ツール、または -delete を外した find にしてください。
 
   # ヒアドキュメントによるファイルの書き込みは止める。Write / Edit ツールで書くのが正しい。
