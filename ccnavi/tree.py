@@ -208,13 +208,13 @@ def exact_name(root: str, name: str) -> bool:
         return False
 
 
-# 大文字小文字を区別しない機械かどうか。写しの索引を引くときに、作業ツリーの
+# 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、作業ツリーの
 # 名前の綴りが違っても同じ識別子として結び付けるのは、この機械だけ。
 CASE_INSENSITIVE = os.path.normcase("A") == "a"
 
 
 def lookup(index: dict, name: str):
-    """作業ツリーの名前で写しを引く。区別しない機械では綴りの違いを許す。"""
+    """作業ツリーの名前で承認済みチケットを引く。区別しない機械では綴りの違いを許す。"""
     found = index.get(name)
     if found is not None or not CASE_INSENSITIVE:
         return found

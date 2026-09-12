@@ -1,19 +1,19 @@
-"""承認済みの写し。人がチケットに合意したことの記録で、判定はここだけを読む。
+"""承認済みチケット。人がチケットに合意したことの記録で、判定はここだけを読む。
 
-## なぜ写しが権威なのか
+## なぜ承認済みチケットが権威なのか
 
 チケットの提案はエージェントが書ける。判定が提案を直接読むと、範囲の外で
-止められたエージェントが範囲を書き足して通れる。承認のときに写しを取り、判定は
-写しだけを読む。書き足した提案は写しに届かない。
+止められたエージェントが範囲を書き足して通れる。承認のときに承認済みチケットを置き、判定は
+承認済みチケットだけを読む。書き足した提案は承認済みチケットに届かない。
 
-## 写しを守るのはルールの側
+## 承認済みチケットを守るのはルールの側
 
-写しは `.claude/ccnavi/tickets/` に置く。
+承認済みチケットは `.claude/ccnavi/tickets/` に置く。
 
 ## 閉じる向きだけは承認が要らない
 
-提案が `done/` か `cancelled/` に動いたら、hook が写しを `closed/` へ動かす。
-範囲が消える向きなので、エージェントが動かしても危険は増えない。逆に写しを
+提案が `done/` か `cancelled/` に動いたら、hook が承認済みチケットを `closed/` へ動かす。
+範囲が消える向きなので、エージェントが動かしても危険は増えない。逆に承認済みチケットを
 戻す（再開）のは人の手でやる。
 
 ## フェーズの印
@@ -34,7 +34,7 @@ from typing import TextIO
 from . import fsio, phasetypes, rules, settings, tree
 from . import ticket as ticket_mod
 
-# 写しの下の置き場。
+# 承認済みチケットの下の置き場。
 CLOSED_DIR = "closed"
 PHASES_DIR = "phases"
 
@@ -56,14 +56,14 @@ def closed_path(approved_dir: str, ticket_id: str) -> str:
 
 
 def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Ticket], list[str]]:
-    """写しの一覧。closed なら閉じた写し。2 つめは読めなかったものの説明。"""
+    """承認済みチケットの一覧。closed なら閉じたもの。2 つめは読めなかったものの説明。"""
     directory = os.path.join(approved_dir, CLOSED_DIR) if closed else approved_dir
     try:
         names = sorted(os.listdir(directory))
     except FileNotFoundError:
         return [], []
     except OSError as exc:
-        return [], [f"写しの置き場を読めない ({exc})"]
+        return [], [f"承認済みチケットの置き場を読めない ({exc})"]
     found, notes = [], []
     for name in names:
         if not name.endswith(".md"):
@@ -71,10 +71,10 @@ def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Tic
         path = os.path.join(directory, name)
         ticket = load_copy(path)
         if ticket is None:
-            notes.append(f"写し {path} を読めない")
+            notes.append(f"承認済みチケット {path} を読めない")
             continue
         if ticket.ticket != name[:-3]:
-            notes.append(f"写し {path} の識別子 {ticket.ticket} がファイル名と違う")
+            notes.append(f"承認済みチケット {path} の識別子 {ticket.ticket} がファイル名と違う")
             continue
         found.append(ticket)
     return found, notes
@@ -110,20 +110,20 @@ def write_copy(
 
 
 def update_copy(approved_dir: str, ticket: ticket_mod.Ticket, fields: dict) -> str:
-    """写しの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
+    """承認済みチケットの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
     allowed = {k: v for k, v in fields.items() if k in ticket_mod.SCRIPT_FIELDS}
     return _write(copy_path(approved_dir, ticket.ticket), ticket_mod.render(ticket, allowed))
 
 
 def close_copy(approved_dir: str, ticket_id: str) -> str:
-    """写しを closed/ へ動かす。"""
+    """承認済みチケットを closed/ へ動かす。"""
     source = copy_path(approved_dir, ticket_id)
     target = closed_path(approved_dir, ticket_id)
     try:
         os.makedirs(os.path.dirname(target), exist_ok=True)
         shutil.move(source, target)
     except OSError as exc:
-        return f"写しを閉じられない ({exc})"
+        return f"承認済みチケットを閉じられない ({exc})"
     return ""
 
 
@@ -266,7 +266,7 @@ class Candidate:
 
     ticket: ticket_mod.Ticket
     complaints: list[rules.Problem] = field(default_factory=list)
-    # 改版なら、いま効いている写し。
+    # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
@@ -294,7 +294,7 @@ def approve(
     root: str,
     only: list[str] | None = None,
 ) -> int:
-    """未承認の提案を束で人に見せ、承認されたら写しを置く。
+    """未承認の提案を束で人に見せ、承認されたら承認済みチケットを置く。
 
     エージェントではなく人が端末から叩く経路。提案を書き直す道は用意しない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
@@ -303,7 +303,7 @@ def approve(
     束は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
 
-    親の改版（計画の変更）も同じ束に載る。写しは動かないのが原則で、改版はその
+    親の改版（計画の変更）も同じ束に載る。承認済みチケットは動かないのが原則で、改版はその
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
 
     `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
@@ -375,9 +375,9 @@ class Gathered:
 def gather(
     stderr: TextIO, conf: settings.Settings, root: str, only: list[str] | None = None
 ) -> Gathered:
-    """束を組む。提案を走査し、写しと突き合わせ、載せるものと落とすものに分ける。
+    """束を組む。提案を走査し、承認済みチケットと突き合わせ、載せるものと落とすものに分ける。
 
-    読めない提案や写し、落とした提案の理由は標準エラーにも出す。端末の人は
+    読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末の人は
     そこで読み、拡張は JSON の `problems` / `rejected` で読む。
 
     `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`、拡張のオーバーレイ）。
@@ -418,7 +418,7 @@ def gather(
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
             return Gathered([], [], texts, {}, types, False, broken, "\n".join(lines))
-        # 親の改版を外して子だけ通すと、子は写し（旧計画）で検証される。絞らない束なら
+        # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らない束なら
         # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
         skipped = {t.ticket for t in revisions if t.ticket not in wanted}
         blocked = [t for t in pending if t.ticket in wanted and t.is_child and t.parent in skipped]
@@ -452,7 +452,7 @@ def preview(
     as_json: bool,
     only: list[str] | None = None,
 ) -> int:
-    """`--approve --preview`。束を見せるだけで、写しは置かない。端末の壁は要らない。
+    """`--approve --preview`。束を見せるだけで、承認済みチケットは置かない。端末の壁は要らない。
 
     JSON の形は README「承認の JSON」。束が空でも 0 で返す。拡張は `batch` が空なら
     「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--approve` と
@@ -569,7 +569,7 @@ def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str]) -> str
 
 
 def _news_path(state_dir: str, session: str, agent_id: str) -> str:
-    """このセッション（サブエージェントならその起動）が知っている写しの控え。
+    """このセッション（サブエージェントならその起動）が知っている承認済みチケットの控え。
     `once-<session>-<agent>.json`（ctxfile）と同じ並びに置く。"""
     session_part = fsio.safe_name(session) or "unknown"
     agent_part = fsio.safe_name(agent_id) or "main"
@@ -591,8 +591,8 @@ def _known(path: str) -> dict[str, str] | None:
         return {k: str(v) for k, v in known.items() if isinstance(k, str)}
     if isinstance(known, list):
         # 印を持たなかった頃の控え。識別子は伝えたものとして扱い、印は空にする。
-        # 空の印は「伝えたが、いつの写しかは分からない」の意味で、_fresh が改版と
-        # 見なさない（写しは必ず approved_at を持つので、空は古い控えにしか無い）。
+        # 空の印は「伝えたが、いつの承認済みチケットかは分からない」の意味で、_fresh が改版と
+        # 見なさない（承認済みチケットは必ず approved_at を持つので、空は古い控えにしか無い）。
         return {s: "" for s in known if isinstance(s, str)}
     return {}
 
@@ -604,9 +604,9 @@ def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
 
 
 def _mark(t: ticket_mod.Ticket) -> str:
-    """写し 1 枚の印。承認した時刻と、改版した時刻。
+    """承認済みチケット 1 枚の印。承認した時刻と、改版した時刻。
 
-    改版（`revise_copy`）は写しを書き換えるだけで識別子を増やさないので、識別子だけを
+    改版（`revise_copy`）は承認済みチケットを書き換えるだけで識別子を増やさないので、識別子だけを
     比べても新しい合意だと分からない。印まで見る。
     """
     meta = t.raw.get(ticket_mod.APPROVAL_KEY)
@@ -615,7 +615,7 @@ def _mark(t: ticket_mod.Ticket) -> str:
 
 
 def _copy_marks(conf: settings.Settings) -> dict[str, ticket_mod.Ticket]:
-    """いまある写し。開いたものと閉じたもの。
+    """いまある承認済みチケット。開いたものと閉じたもの。
 
     閉じたものも見る。承認の直後・次の hook の前に子が閉じることがあり、開いたものだけを
     見ると、その承認は誰にも伝わらないまま控えに吸われる。
@@ -629,7 +629,7 @@ def _copy_marks(conf: settings.Settings) -> dict[str, ticket_mod.Ticket]:
 
 
 def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """まだ伝えていない写し。印が変わったもの（改版）も含む。"""
+    """まだ伝えていない承認済みチケット。印が変わったもの（改版）も含む。"""
     out = []
     for ident, t in sorted(current.items()):
         recorded = known.get(ident)
@@ -639,7 +639,7 @@ def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list
 
 
 def baseline(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -> None:
-    """控えが無ければ、いまの写しを「知っているもの」として書く。文は出さない。
+    """控えが無ければ、いまの承認済みチケットを「知っているもの」として書く。文は出さない。
 
     SessionStart から呼ぶ。起動・再開・compact のどれでも来るが、控えがあれば
     触らない。compact の前に置かれた承認は、compact のあとにも 1 度は伝える。
@@ -652,10 +652,10 @@ def baseline(stderr: TextIO, conf: settings.Settings, session: str, agent_id: st
 
 
 def news(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -> str:
-    """このセッションがまだ知らない写しがあれば、その承認を伝える文。1 度だけ。
+    """このセッションがまだ知らない承認済みチケットがあれば、その承認を伝える文。1 度だけ。
 
-    最初の hook で控えが無ければ、いまの写しを起点として書き、何も伝えない。
-    それより後に置かれた写しと、印の変わった写し（親の改版）が「新しい承認」になる。
+    最初の hook で控えが無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
+    それより後に置かれた承認済みチケットと、印の変わった承認済みチケット（親の改版）が「新しい承認」になる。
     控えを置けない（`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側に倒す。
     サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
 
@@ -675,7 +675,7 @@ def news(stderr: TextIO, conf: settings.Settings, session: str, agent_id: str) -
     fresh = _fresh(known, current)
     if not fresh:
         return ""
-    # 消えた写しの分も残す。写しが 1 回読めなかっただけで「知らない」に戻すと、
+    # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
     # 次の回に同じ承認をもう一度伝えることになる。
     _write_known(stderr, path, {**known, **marks})
     return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known})
@@ -693,8 +693,8 @@ def _candidates(
     from . import phase
 
     open_index = by_id(approved)
-    # 親子を引く池は、写しと、この束で通ったものだけ。落ちた親を池に残すと、承認されない
-    # 親の範囲で子が検証され、親の承認という門を通らずに子の写しができる。
+    # 親子を引く池は、承認済みチケットと、この束で通ったものだけ。落ちた親を池に残すと、承認されない
+    # 親の範囲で子が検証され、親の承認という門を通らずに子の承認済みチケットができる。
     # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
     pool = by_id(approved)
@@ -712,7 +712,7 @@ def _candidates(
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
         # 通った改版だけ、同じ束の子から見える親にする。落ちた改版の計画で子を
-        # 通すと、承認されない番号の子が写しになる。
+        # 通すと、承認されない番号の子が承認済みチケットになる。
         pool[t.ticket] = t
 
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
@@ -733,7 +733,7 @@ def _candidates(
 def _apply(
     stdout: TextIO, stderr: TextIO, conf: settings.Settings, batch: list[Candidate], stamp: str
 ) -> int:
-    """承認された束を写しに落とす。改版は写しを書き換え、新規は写しを置く。"""
+    """承認された束を承認済みチケットに落とす。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
     from . import phase
 
     for cand in batch:
@@ -770,7 +770,7 @@ def _apply(
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
 
-    stdout.write(f"\n承認した。{conf.approved} に写しを置いた。\n")
+    stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
     stdout.write("この範囲は次のツール呼び出しから効く。\n")
     return 0
 
@@ -818,13 +818,14 @@ def screen(
             ),
         ]
         if t.is_child:
-            # 親は同じ束の中に居ることが普通。写しだけを引くと「写しが無い」になる。
+            # 親は同じ束の中に居ることが普通。承認済みチケットだけを引くと
+            # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
             lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
             head = "親 " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
-                else "(写しが無い)"
+                else "(承認済みチケットが無い)"
             )
             lines.append(f"    {head}")
             bound = _type_of(t, pool, types)
@@ -916,8 +917,8 @@ def waiting(
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
     """いま `--approve` の束に載るもの。新規の承認待ちと、親の改版。
 
-    承認待ちは写しが無いもの。閉じたものは対象外で、再開は人が写しを戻す。
-    改版は、開いている親の写しがあり、提案の計画が写しと違うもの。
+    承認待ちは承認済みチケットが無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
+    改版は、開いている親の承認済みチケットがあり、提案の計画が承認済みチケットと違うもの。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     """
     known = by_id(approved + closed)
@@ -1041,7 +1042,7 @@ def revision_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。範囲が写しと違う",
+                "改版で変えられるのは plan と feedback だけ。範囲が承認済みチケットと違う",
             )
         )
     if revised.title != current.title or revised.issue != current.issue:
@@ -1049,7 +1050,7 @@ def revision_problems(
             rules.Problem(
                 rules.SEVERITY_ERROR,
                 revised.ticket,
-                "改版で変えられるのは plan と feedback だけ。題か課題番号が写しと違う",
+                "改版で変えられるのは plan と feedback だけ。題か課題番号が承認済みチケットと違う",
             )
         )
     # 全体計画: 子がある番号までは同じ並びでなければならない。
@@ -1095,7 +1096,7 @@ def revise_copy(
     stamp: str,
     feedback_planned: bool,
 ) -> str:
-    """写しの計画を差し替える。範囲と承認の記録はそのまま。"""
+    """承認済みチケットの計画を差し替える。範囲と承認の記録はそのまま。"""
     front = dict(current.raw)
     front["plan"] = [item.as_raw() for item in revised.plan]
     if revised.feedback is not None:
@@ -1132,7 +1133,7 @@ def project_problems(
 
     プロジェクトを決めるのは提案を置いた場所（設計 §25.5）。frontmatter の `project:` は
     宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
-    無い。承認の画面が置き場から引いた値を出し、それが写しに残る。
+    無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
     """
     if t.declared_project and t.declared_project != t.project:
         where = ticket_mod.tickets_rel_for(conf.tickets, t.declared_project)

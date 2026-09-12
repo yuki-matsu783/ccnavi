@@ -17,7 +17,7 @@ import { ticketControl } from "./ticket-control.js";
 const DEBOUNCE_MS = 120;
 
 /**
- * 監視する場所。提案（main と全作業ツリー、プロジェクト向けの置き場も）、写しと印、
+ * 監視する場所。提案（main と全作業ツリー、プロジェクト向けの置き場も）、承認済みチケットと印、
  * 作業ツリーの登録。glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [
@@ -304,7 +304,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * 「承認」。束を読んでオーバーレイに出す。写しはまだ置かれない。
+ * 「承認」。束を読んでオーバーレイに出す。承認済みチケットはまだ置かれない。
  * 読んでいる間も「読んでいる…」のオーバーレイを出し、二重に開かない。
  */
 async function openApproval(current: PanelState, only: readonly string[] = []): Promise<void> {
@@ -328,7 +328,7 @@ async function openApproval(current: PanelState, only: readonly string[] = []): 
  * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが束の一致を
  * 確かめ、違えば何も置かずに `mismatch` を返すので、束を読み直して出し直す。
  * 承認できたら、Claude Code に渡す文を通知の 2 ボタン（コピー / 新しいセッションで開く）で渡す。
- * 押すまで何もしない。ボードの読み直しは写しの監視が起こす。
+ * 押すまで何もしない。ボードの読み直しは承認済みチケットの監視が起こす。
  */
 async function confirmApproval(current: PanelState, tickets: readonly string[]): Promise<void> {
   if (current.approval?.kind !== "preview" || tickets.length === 0) {

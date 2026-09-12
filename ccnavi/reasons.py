@@ -260,10 +260,10 @@ def approved(tickets, revisions: set[str]) -> str:
     UserPromptSubmit / PreToolUse で渡す `additionalContext` の両方がここから出る。
     2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
 
-    tickets は承認された写し（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
+    tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
     revisions は親の改版だった識別子。
     """
-    lines = ["[ccnavi] チケットが承認され、写しが置かれた。この範囲は次のツール呼び出しから効く。"]
+    lines = ["[ccnavi] 承認済みチケットが置かれた。この範囲は次のツール呼び出しから効く。"]
     for t in tickets:
         if t.ticket in revisions:
             where = "親の改版。計画が新しくなった"

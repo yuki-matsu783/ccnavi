@@ -15,11 +15,11 @@
 どの親の作業ツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
 サブエージェントの書き込みは行き先で止まるので、致命傷にならない。
 
-## 提案から写しへ写すもの
+## 提案から承認済みチケットへ写すもの
 
-スクリプトが書く欄（着手・完了の時刻と基準点）だけを、提案から写しへ写す。
+スクリプトが書く欄（着手・完了の時刻と基準点）だけを、提案から承認済みチケットへ写す。
 範囲に触らない欄なので、写しても承認の意味は変わらない。提案が `done/` か
-`cancelled/` に動いていたら、写しを `closed/` へ動かす。
+`cancelled/` に動いていたら、承認済みチケットを `closed/` へ動かす。
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# `--approve --preview` は束を見るだけ（写しを置かない）ので除く。ただし除外は
+# `--approve --preview` は束を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
 # `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
 # 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
@@ -139,7 +139,7 @@ class Phase:
     tickets: list[ticket_mod.Ticket] = field(default_factory=list)
     states: dict[str, str] = field(default_factory=dict)
     marks: dict[str, dict] = field(default_factory=dict)
-    # 計画があるときだけ。item は計画の項、type は種類、owner は親の写し。
+    # 計画があるときだけ。item は計画の項、type は種類、owner は親の承認済みチケット。
     item: ticket_mod.PlanItem | None = None
     type: phasetypes.PhaseType | None = None
     owner: ticket_mod.Ticket | None = None
@@ -248,7 +248,7 @@ def load_types(conf: settings.Settings) -> dict[str, phasetypes.PhaseType] | Non
 
 
 def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.Ticket]:
-    """提案の状態を写しへ写し、閉じたものを閉じる。開いている写しを返す。"""
+    """提案の状態を承認済みチケットへ写し、閉じたものを閉じる。開いている承認済みチケットを返す。"""
     open_copies, notes = approval.copies(conf.approved)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
@@ -277,7 +277,7 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
 
 
 def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]:
-    """この親のフェーズを番号順に。開いている写しと閉じた写しの両方から組む。
+    """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
     """
@@ -289,9 +289,9 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         types = load_types(conf) or {}
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
-    # 閉じた写しは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
+    # 閉じた承認済みチケットは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
     # 場所にあるので、消す・同じ識別子を todo/ に書く、でフェーズを開き直せては
-    # いけない。閉じたことの権威は写しの側。
+    # いけない。閉じたことの権威は承認済みチケットの側。
     for t in approval.children_of(closed_copies, parent_id):
         if t.phase is None:
             continue
@@ -326,7 +326,7 @@ def gate(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
 
 
 def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
-    """cwd が親の作業ツリーの中なら、その親の写し。"""
+    """cwd が親の作業ツリーの中なら、その親の承認済みチケット。"""
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
@@ -609,7 +609,7 @@ def scope_findings(
 
 
 def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tuple[str, str]:
-    """写しの元になった提案が、いまどの状態にあるか。"""
+    """承認済みチケットの元になった提案が、いまどの状態にあるか。"""
     tree_root = _tree_root(root, copy.source_tree, conf.projects)
     if not tree_root:
         return "", ""
@@ -617,13 +617,13 @@ def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tu
 
 
 def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root: str) -> str:
-    """写しの元になった提案の置き場（そのツリーのルートからの相対）。
+    """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
 
     承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
     下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。`project` から組み直すと、
     同じ名前を生む置き場が 2 つある（ワークスペースの `wip/<名前>/tickets/` と、その
     プロジェクトから切った作業ツリーの `wip/tickets/`）ので、片方を必ず外す。
-    記録の無い古い写しだけ、名前から組む。
+    記録の無い古い承認済みチケットだけ、名前から組む。
     """
     if copy.source_path:
         base = os.path.dirname(os.path.dirname(copy.source_path))

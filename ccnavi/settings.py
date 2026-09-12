@@ -54,15 +54,15 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
 # TICKET_CONTROL_ENV は、チケット制御を使うか。enable（既定）/ disable の 2 値。
-# チケット制御は、提案を承認して写しを作り、その範囲・フェーズのゲート・
+# チケット制御は、提案を承認して承認済みチケットを作り、その範囲・フェーズのゲート・
 # サブエージェントの制限を判定に掛ける働き全体。全体ルールは全プロジェクトが使うが、
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
 # 以前は APPROVED_ENV を空文字にすることがこの宣言を兼ねていた。置き場のパスが
 # 空であることと機能を切ることは別の話なので、名前を分けた。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # チケット制御が使う置き場 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
-# ルートからの相対。APPROVED_ENV は承認済みの写しの置き場で、ワークスペースルートからの相対。
-# 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
+# ルートからの相対。APPROVED_ENV は承認済みチケットの置き場で、ワークスペースルートからの相対。
+# 判定が読むのは承認済みチケットだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
 # PHASES_ENV はフェーズの種類の定義。ワークスペースルートからの相対。無ければ番号だけの挙動。
@@ -101,10 +101,10 @@ DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/tickets"
-# 写しは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
-# シェル経由の書き込みを止めている。写しのために別の保護を足さずに済む。
+# 承認済みチケットは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
+# シェル経由の書き込みを止めている。承認済みチケットのために別の保護を足さずに済む。
 DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
-# フェーズの種類は人が持つ設定なので、写しと同じ保護の内側に置く。
+# フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
 DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
@@ -172,7 +172,7 @@ class Settings:
     ticket_control_declared: str = ""
 
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
-    # approved は承認済みの写しの置き場（絶対）。判定が読むのは approved だけ。
+    # approved は承認済みチケットの置き場（絶対）。判定が読むのは approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     # approved_blank は、置き場を空文字で指定されたこと。以前はそれが「使わない」の
     # 宣言だったので、--lint が今の書き方を案内する。
@@ -244,7 +244,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     )
     # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
     # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
-    # 言えるようにしてある。写しの置き場は空文字を受けない。チケット制御を切るのは
+    # 言えるようにしてある。承認済みチケットの置き場は空文字を受けない。チケット制御を切るのは
     # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
