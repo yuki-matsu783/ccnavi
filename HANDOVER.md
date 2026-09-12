@@ -100,30 +100,35 @@ uv run --with pyinstaller python build.py
 
 ## 次にやること
 
-### まず: 写す版の sh が `wip/design/scripts/` にある（人が写す）
+### 入った: sh がモード B で動くようになった（`sh-ws-root`）
 
-チケット `sh-ws-root` の成果物。**まだ配布先に入っていない。** 手順は
-`wip/design/scripts/COPY.md`。`ccnavi-common.sh` を最初に写すこと。3 本が起動時に
+**配布先に入っている。** 写す作業は済んだ。`.claude/scripts/`（`ccnavi-common.sh` を
+新設）、`.claude/hooks/test-py.sh`、`.claude/ccnavi/rules.yml`、`scripts/ccnavi-setup.sh`。
+
+**次に同じ形の作業をする人へ。** これらは `deny` の対象でエージェントが書けない
+（`judge.py:246-247`「チケットはルールが何も言わなかったときだけ見る。ルールのほうが
+強い」）。ガードは緩めない。完成品を `wip/design/scripts/` に全文で置き、人が写し、
+人がコミットする形で通した。手順書（`COPY.md`）も同じ場所に置いた。フェーズの種類は
+`staging`（写す版の作成）を使う。写す順は `ccnavi-common.sh` が先。3 本が起動時に
 `.` で読むので、本体だけ先に写すと sh が全部動かなくなる。
 
-写す理由は、これらが `deny` の対象でエージェントが書けないため（`judge.py:246-247`
-「チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い」）。
-ガードは緩めていない。
+この一式は `wip/` ごとマージ前に消してある（`ready` が「途中の作業を既定のブランチに
+残さない」を求めるため）。中身は git の履歴に残っている。
 
-確かめ方。**このチケットのブランチを checkout した作業ツリーの中で回す。**
-`tests/test_e2e_sh.py` はまだ `main` に入っていないので、ワークスペースルートからは
-import できない。
+確かめ方。
 
 ```
-cd .claude/worktrees/sh-ws-root
-CCNAVI_E2E=1 CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.test_e2e_sh  # 写す前（20 件緑）
-CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh                                    # 写した後（20 件緑）
+CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 ```
 
-走り出しに、測った `sh` と `exe` の場所が出る。`sh =` が**ワークスペースルート側**を
-指していることを確かめること。作業ツリーの `.claude/scripts` を指していたら、写す前の
-版を測っている。テストは実装（`ccnavi_workspace`）と同じ規則で `.claude/worktrees/` の
-下を候補から外して上へ歩くので、既定ではワークスペース側を向く。
+走り出しに、測った `sh` と `exe` の場所が出る。**`sh =` がワークスペースルート側を
+指していることを確かめること。** 作業ツリーの `.claude/scripts` を指していたら、
+そのツリーに checkout された写しを測っている。`.claude/scripts/` は git が運ぶので
+どの作業ツリーにも写しがあるが、実際に効くのはワークスペース側の 1 本だけ。
+テストは実装（`ccnavi_workspace`）と同じ規則で `.claude/worktrees/` の下を候補から
+外して上へ歩くので、既定ではワークスペース側を向く。
+
+写す前の版を測りたいときは `CCNAVI_SH_DIR=<場所>` で出どころを差し替える。
 
 `tests/test_e2e_sh.py` は重い（実 git・実行ファイル 18MB の写し）ので `CCNAVI_E2E` が
 無ければ skip する。**モード B（`projects/` を使う形）に触ったら回すこと。**
