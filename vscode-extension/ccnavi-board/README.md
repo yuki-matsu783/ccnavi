@@ -50,14 +50,14 @@ ccnavi は `--approve` / `accept` / `wrapup` を端末から打つものと決�
 | 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・`config/rules.yml` の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
 | clone | URL と名前を入れて「clone」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
 | clone を止める条件 | URL が https / ssh / `git@host:path` のどの形でもない、資格情報（`user:token@`）が入っている、名前が英数字と `. _ -` 以外を含む（先頭は英数字）、既存のツリー名と衝突する（大文字小文字だけ違う名前も）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` を落とした `host/path` で比べる）、clone 先が既にあって空でない |
-| 置き場が無い | 上部に警告が出る。「作る」で `projects/` を作る。clone すれば git が作るので、無くても clone はできる |
-| `.gitignore` に無い | 上部に警告が出る。「.gitignore に足す」で `/projects/` の行を足す。コミットは人が行う |
-| ルールが無い | 行に「ワークスペースから写す」のボタンが出る。`.claude/ccnavi/rules.yml`（`CCNAVI_RULES`）を `projects/<名前>/config/rules.yml` に写す。先頭に出どころのコメントを足し、文面の `sh .claude/scripts/` は `sh {root}/.claude/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う |
+| 置き場が無い | 上部に警告が出る。「作成」で `projects/` を作る。clone すれば git が作るので、無くても clone はできる |
+| `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
+| ルールが無い | 行に「ワークスペースからコピー」のボタンが出る。`.claude/ccnavi/rules.yml`（`CCNAVI_RULES`）を `projects/<名前>/config/rules.yml` に写す。先頭に出どころのコメントを足し、文面の `sh .claude/scripts/` は `sh {root}/.claude/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
 | ルール管理 | そのプロジェクトのルール設定画面を開く（下の節）。ルールが無い行では押せない |
 | チケット管理 | ボードを開き、絞り込みをそのプロジェクトにする。チケット制御が disable なら出ない |
 | fetch / pull | `git fetch` / `git pull` を `projects/<名前>` でターミナルへ送る。未コミットの有無は見ない。衝突すれば git が止める |
-| プロジェクトになっていない `.git` | ワークスペース直下を深さ 2 まで歩き（`node_modules` `.venv` `.claude` `.git` の中は歩かない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。置き場の外にあるか、置き場の 2 段目以下にあるか。表示だけで操作は無い |
+| プロジェクトとして認識されない git リポジトリ | ワークスペース直下を深さ 2 まで歩き（`node_modules` `.venv` `.claude` `.git` の中は歩かない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。置き場の外にあるか、置き場の 2 段目以下にあるか。表示だけで操作は無い |
 | 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
 
 入れていないもの。プロジェクトを外す操作（作業ツリーと写しが残ったままディレクトリだけ消してしまう事故につながる。消したいならエクスプローラで消す）、
@@ -214,12 +214,12 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 25 | プロジェクト管理が開く | サイドパネルの「プロジェクト管理」 | `projects/` の各プロジェクトが表に並び、origin・ルールの有無・作業ツリー・チケット数・検証が出る。`projects/` が `.gitignore` に無ければ上部に警告とボタン |
 | 26 | clone | URL に `git@host:group/repo.git` を入れる（名前が `repo` に埋まる）。「clone」 | 「ccnavi」ターミナルで `git clone -- ... projects/repo` が走る。終わると表に `repo` の行が増え、ルール「無い」と lint の warn が出る |
 | 27 | clone を止める | `https://user:token@host/g/p.git` を入れて送る。次に既存と同じ origin の URL を送る。次に既存の名前を大文字にして送る | それぞれ「資格情報」「既に clone している」「既にある」の赤い文が出て、ターミナルには何も送られない |
-| 28 | clone 後の設定 | 「.gitignore に足す」→ 行の「ワークスペースから写す」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告と行の warn が消える |
+| 28 | clone 後の設定 | 「.gitignore に追加」→ 行の「ワークスペースからコピー」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告と行の warn が消える |
 | 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」 | タブの題が「ccnavi ルール設定: <名前>」。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。ワークスペース版のパネルも同時に開いたままにできる |
 | 30 | プロジェクトのロック | そのプロジェクトの子チケットを `start` してから「保存」。次に別のプロジェクトの子だけを `start` にして「保存」 | 前者は「プロジェクト <名前> に作業中のチケットがある」で止まる。後者は保存できる |
 | 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |
 | 32 | fetch / pull | 行の「fetch」「pull」 | ターミナルで `cd projects/<名前> && git fetch` / `git pull` が走る |
-| 33 | プロジェクトになっていない .git | `参考/` のような `.git` 付きのディレクトリをワークスペース直下に置く。`projects/group/deep` に clone する | 「プロジェクトになっていない .git」の枠に、前者は「置き場の外」、後者は「置き場の 2 段目以下」の理由付きで出る。操作ボタンは無い |
+| 33 | プロジェクトとして認識されない git リポジトリ | `参考/` のような `.git` 付きのディレクトリをワークスペース直下に置く。`projects/group/deep` に clone する | 「プロジェクトとして認識されない git リポジトリ」の枠に、前者は「projects/ の外にあります」、後者は「projects/ の 2 階層目より深くにあります」の理由付きで出る。操作ボタンは無い |
 
 ## 構成
 
