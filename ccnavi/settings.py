@@ -139,6 +139,21 @@ KIND_RULES = "rules"
 KIND_PHASES = "phases"
 KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
+# 層の名前。記録の `source` と id の前置きに使う綴り（設計 §25.4）。ruleload が
+# 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
+# 行い、そこは ruleload を import できない（ruleload が phase を import する）。
+LAYER_COMMON = "common"
+LAYER_SELF = "self"
+
+
+def layer_script_home(conf: Settings) -> str:
+    """各層の `script:` に書ける唯一の綴り（`<傘>/scripts/`、"/" 区切り、設計 §25.4.2）。
+
+    共通層だけは今までどおり `.claude/ccnavi/` と `.claude/scripts/`（risk.SCRIPT_HOMES）。
+    たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
+    """
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
+    return f"{home}/scripts/"
 
 
 @dataclass

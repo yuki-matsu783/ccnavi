@@ -228,11 +228,56 @@ class Phase:
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
 
 
-def load_types(conf: settings.Settings) -> dict[str, phasetypes.PhaseType] | None:
-    """フェーズの種類。ファイルが無いか壊れていれば None。壊れていることは --lint が言う。"""
+def types_path(conf: settings.Settings, root: str, project: str) -> str:
+    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。"""
+    home = tree.project_root(conf.projects, project) if project else root
+    if not home:
+        return ""
+    return settings.layer_path(conf, home, settings.KIND_PHASES, project or settings.LAYER_SELF)
+
+
+def common_types(
+    conf: settings.Settings,
+) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
+    """共通層の種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
     if not conf.phases:
-        return None
-    types, _ = phasetypes.load(conf.phases)
+        return None, []
+    types, notes = phasetypes.load(conf.phases)
+    phasetypes.mark_source(types, settings.LAYER_COMMON)
+    return types, list(notes)
+
+
+def layer_types(
+    conf: settings.Settings, root: str, project: str = ""
+) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
+    """共通層 + その層の種類と、**その層の**苦情（設計 §25.4.1）。
+
+    どの層を足すかは親の写しの `project:` が決める。空ならワークスペース自身の層。
+    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
+    言うと、層の話を読みに来た人が同じ文を 2 度読むことになる。
+
+    無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
+    組み込みへは落とさない。共通層が有るのに落とすと、共通層の種類が消える。
+    """
+    common, notes = common_types(conf)
+    if common is None and notes:
+        # 共通層が壊れている。層は足さない（設計 §25.2）。
+        return None, []
+    path = types_path(conf, root, project)
+    if not path or not os.path.exists(path):
+        return common, []
+    extra, layer_notes = phasetypes.load(path, refs=False)
+    if extra is None:
+        return common, list(layer_notes)
+    merged, problems = phasetypes.merge(common, extra, project or settings.LAYER_SELF)
+    return merged, list(layer_notes) + problems
+
+
+def load_types(
+    conf: settings.Settings, root: str = "", project: str = ""
+) -> dict[str, phasetypes.PhaseType] | None:
+    """判定が使うフェーズの種類。どの層にも無ければ None（番号だけの挙動）。"""
+    types, _ = layer_types(conf, root, project)
     return types
 
 
@@ -275,7 +320,9 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is not None and owner.has_plan:
-        types = load_types(conf) or {}
+        # 層は親の写しの `project:` が決める（設計 §25.4.1）。人が承認した値で、
+        # 子は親から継ぐので、判定が申告に依存する形にはならない。
+        types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
     # 閉じた写しは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
@@ -349,6 +396,15 @@ def gate_reason(phase: Phase, tool: str) -> str:
     )
 
 
+def _type_source(phase: Phase) -> dict:
+    """種類を根拠に置く印に足す、その種類の層（設計 §25.9）。
+
+    `review:` が絡む印（省略と保留）にだけ足す。他の印は種類を見ずに置くので、
+    層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
+    """
+    return {"source": phase.type.source} if phase.type is not None else {}
+
+
 def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。"""
     texts = []
@@ -370,7 +426,9 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 + _next_hint(parent, phases, n)
             )
         elif phase.review_required:
-            failed = approval.write_mark(conf.approved, parent.ticket, n, approval.MARK_PENDING, {})
+            failed = approval.write_mark(
+                conf.approved, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
+            )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
@@ -399,7 +457,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 parent.ticket,
                 n,
                 approval.MARK_SKIPPED,
-                {"tickets": [t.ticket for t in phase.tickets]},
+                {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")

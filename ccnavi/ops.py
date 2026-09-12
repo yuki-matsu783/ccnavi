@@ -158,7 +158,7 @@ def judge(
     if not found.is_child:
         stderr.write(f"ccnavi: {ticket_id} は子ではない。判定は子の差分に付ける\n")
         return 1
-    definition = risk.load_definition(conf)
+    definition = risk.load_definition(conf, root, _project_of(conf, found))
     factor = definition.factor(factor_id)
     if factor is None or factor.kind != risk.KIND_JUDGE:
         names = ", ".join(f.id for f in definition.judges) or "(無い)"
@@ -182,6 +182,8 @@ def judge(
         "reason": reason.strip(),
         "head": head,
         "at": approval.now(),
+        # その項目がどの層に書いてあるか（設計 §25.9）。
+        "source": factor.source,
     }
     failed = approval.write_child_record(
         conf.approved, found.parent, ticket_id, approval.CHILD_RECORD_JUDGE, record
@@ -196,6 +198,22 @@ def judge(
     return 0
 
 
+def _project_of(conf: settings.Settings, found: ticket_mod.Ticket) -> str:
+    """このチケットの層を決める `project:`（設計 §25.4.1、§25.4.2）。
+
+    権威は承認済みの写しの側。子は親から継ぐので、親の写しを引く。提案の側に
+    書いてある値は人が承認していないので、判定の根拠にしない。
+    """
+    if not found.is_child:
+        return found.project
+    copies, _ = approval.copies(conf.approved)
+    parent = approval.by_id(copies).get(found.parent)
+    if parent is None:
+        closed, _ = approval.copies(conf.approved, closed=True)
+        parent = approval.by_id(closed).get(found.parent)
+    return parent.project if parent is not None else found.project
+
+
 def _score_child(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> list[str] | None:
@@ -206,7 +224,7 @@ def _score_child(
     if not found.is_child:
         return []
     worktree = tree.worktree_path(root, found.ticket)
-    definition = risk.load_definition(conf)
+    definition = risk.load_definition(conf, root, _project_of(conf, found))
     if definition.fallback:
         stderr.write(f"ccnavi: {definition.fallback}\n")
     diff, why = risk.measure(worktree, found.base_sha)
@@ -249,6 +267,10 @@ def _score_child(
     record = score.as_dict()
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
     record["summary"] = diff.summary()
+    if definition.dropped:
+        # 空として扱った層の名前を残す（設計 §25.2）。共通層だけで測ったことが、
+        # あとから記録を読んだ人に分かる。
+        record["fallback"] = ",".join(definition.dropped)
     failed = approval.write_child_record(
         conf.approved, found.parent, found.ticket, approval.CHILD_RECORD_RISK, record
     )
@@ -352,7 +374,7 @@ def _deliverables_missing(
     if parent is None or not parent.has_plan:
         return False
     item = parent.item_at(found.phase)
-    types = phase.load_types(conf) or {}
+    types = phase.load_types(conf, root, parent.project) or {}
     pt = types.get(item.type) if item is not None else None
     if pt is None or not pt.deliverables:
         return False

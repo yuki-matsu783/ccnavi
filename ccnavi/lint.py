@@ -52,6 +52,7 @@ from . import (
     hookio,
     judge,
     modes,
+    phase,
     phasetypes,
     review,
     risk,
@@ -240,21 +241,33 @@ def check(
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
     problems.extend(_phases(conf))
-    problems.extend(_risk(conf))
+    problems.extend(_risk(conf, root))
     problems.extend(_ticket(conf, root))
     problems.extend(_projects(conf, root))
     # 層の読み込みは判定と同じ経路（ruleload.survey）を通る。読めない層の苦情は
     # そこが書く標準エラーにも出るので、受け皿へ逃がして二重に言わない。
     problems.extend(_layers(io.StringIO(), conf, root))
+    problems.extend(_layer_configs(conf, root))
     return problems
 
 
-def _risk(conf: settings.Settings) -> list[Problem]:
-    """リスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。"""
+def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
+    """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
+
+    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
+    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §25.4.2）。
+    """
     if not conf.risk:
         return []
-    _, notes = risk.load(conf.risk)
-    return [Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}") for p in notes]
+    definition, notes = risk.load(conf.risk)
+    problems = [Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}") for p in notes]
+    if not definition.fallback:
+        risk.mark_layer(definition, settings.LAYER_COMMON, root)
+        problems += [
+            Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}")
+            for p in risk.script_problems(definition)
+        ]
+    return problems
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
@@ -265,11 +278,20 @@ def _phases(conf: settings.Settings) -> list[Problem]:
     return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
 
 
-def _phase_types(conf: settings.Settings):
-    if not conf.phases:
-        return None
-    types, _ = phasetypes.load(conf.phases)
-    return types
+def _types_resolver(conf: settings.Settings, root: str):
+    """`project:` から、そのチケットに効く種類を引く（設計 §25.4.1）。
+
+    束の中でチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
+    読み込みは 1 層 1 回。
+    """
+    cache: dict[str, dict | None] = {}
+
+    def resolve(project: str = ""):
+        if project not in cache:
+            cache[project] = phase.load_types(conf, root, project)
+        return cache[project]
+
+    return resolve
 
 
 def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
@@ -340,18 +362,19 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
     problems.extend(complaints)
 
-    types = _phase_types(conf)
+    resolve = _types_resolver(conf, root)
     for t in copies:
-        if not t.is_child and t.has_plan and types is None:
+        if not t.is_child and t.has_plan and resolve(t.project) is None:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     "(phases)",
-                    f"{t.ticket} は計画を持つのにフェーズの種類の定義（{conf.phases}）が読めない",
+                    f"{t.ticket} は計画を持つのにフェーズの種類の定義"
+                    f"（{conf.phases} と {t.project or '自身'} の層）が読めない",
                 )
             )
 
-    problems.extend(_proposal_problems(proposals, index, done, types))
+    problems.extend(_proposal_problems(proposals, index, done, resolve))
 
     worktrees = tree.worktrees(root, conf.projects)
     problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
@@ -393,7 +416,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     ]
 
 
-def _proposal_problems(proposals: list, index: dict, done: set[str], types) -> list[Problem]:
+def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
     """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
     problems: list[Problem] = []
     # 提案と写しを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
@@ -414,7 +437,7 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], types) -> l
             )
         if t.state not in ticket_mod.CLOSED:
             # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-            for p in approval.validate(t, pool, types):
+            for p in approval.validate(t, pool, resolve(approval.project_of(t, pool))):
                 problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.state == ticket_mod.DOING:
             waiting = [p for p in t.predecessors if p not in done]
@@ -523,6 +546,31 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
         for c in view.problems:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
+    return problems
+
+
+def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
+    """各層の phases / risk が、共通層と合成できるか（設計 §25.4.1、§25.4.2）。
+
+    見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
+    `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
+    全欄一致で捨てた写しを info で言う。共通層自身の苦情は `_phases` / `_risk` が
+    別に言うので、ここでは層の側だけを数える。
+
+    `.ccnavi/config/` が無いことは言わない。無いのは正常（無い層 = 空）。
+    """
+    problems: list[Problem] = []
+    names = [ruleload.LAYER_SELF]
+    names += [p.name for p in tree.projects(conf.projects) if p.name != ruleload.LAYER_SELF]
+    for name in names:
+        where = layer_where(name)
+        project = "" if name == ruleload.LAYER_SELF else name
+        _, notes = phase.layer_types(conf, root, project)
+        for p in notes:
+            problems.append(Problem(p.severity, f"{where} (phases) {p.rule}".rstrip(), p.detail))
+        definition, notes = risk.layer_definition(conf, root, project)
+        for p in [*notes, *risk.script_problems(definition, name)]:
+            problems.append(Problem(p.severity, f"{where} (risk) {p.rule}".rstrip(), p.detail))
     return problems
 
 

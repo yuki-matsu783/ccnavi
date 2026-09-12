@@ -267,6 +267,9 @@ class Candidate:
     complaints: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている写し。
     current: ticket_mod.Ticket | None = None
+    # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §25.4.1）。
+    # 束の中でチケットごとに違いうるので、候補が引いたものを持ち歩く。
+    types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
 
@@ -303,9 +306,11 @@ def approve(
 
     親の改版（計画の変更）も同じ束に載る。写しは動かないのが原則で、改版はその
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
-    """
-    from . import phase
 
+    フェーズの種類は束で 1 つに決まらない。どの層の種類が効くかは各チケットの
+    `project:` が決める（設計 §25.4.1）ので、候補を組むところで 1 件ずつ引き、
+    引いたものを `Candidate` が持ち歩く。
+    """
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -314,7 +319,6 @@ def approve(
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = copies(conf.approved, closed=True)
-    types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
     if not pending and not revisions:
@@ -323,7 +327,7 @@ def approve(
         # 無いのは正常だが、壊れた提案を「何も無い」で通す形にはしない。
         return 1 if any(p.severity == rules.SEVERITY_ERROR for p in problems) else 0
 
-    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved, types)
+    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
@@ -331,13 +335,23 @@ def approve(
     if not batch:
         return 1
 
-    stdout.write(screen(batch, pool, types) + "\n\n")
+    stdout.write(screen(batch, pool) + "\n\n")
     stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
     stdout.flush()
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
         return 1
-    return _apply(stdout, stderr, conf, batch, now())
+    code = _apply(stdout, stderr, conf, batch, now())
+    if code == 0 and rejected:
+        # 束の一部が落ちたときは、通ったぶんを写してから失敗で終わる。写しは置いた
+        # ので繰り返してよく、落ちたものは上で名指ししてある。成功で終わると、
+        # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
+        stderr.write(
+            f"ccnavi: {len(rejected)} 件は承認の対象にしなかった。"
+            "直して出し直すこと（通ったぶんの写しは置いた）\n"
+        )
+        return 1
+    return code
 
 
 def _candidates(
@@ -346,7 +360,6 @@ def _candidates(
     pending: list[ticket_mod.Ticket],
     revisions: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
-    types: dict | None,
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
     """束に載せるものと、落とすものに分ける。3 つめは親子を引くための池。"""
     from . import phase
@@ -355,14 +368,24 @@ def _candidates(
     pool = by_id(approved + pending)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
+    # 層ごとの読み込みは 1 プロジェクト 1 回。束の中に同じ層のチケットが
+    # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
+    cache: dict[str, dict | None] = {}
+
+    def types_for(t: ticket_mod.Ticket) -> dict | None:
+        name = project_of(t, pool)
+        if name not in cache:
+            cache[name] = phase.load_types(conf, root, name)
+        return cache[name]
 
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
+        types = types_for(t)
         complaints = revision_problems(root, conf, t, current, types)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        cand = Candidate(ticket=t, complaints=complaints, current=current)
+        cand = Candidate(ticket=t, complaints=complaints, current=current, types=types)
         if cand.plans_feedback:
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
@@ -371,6 +394,7 @@ def _candidates(
         pool[t.ticket] = t
 
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
+        types = types_for(t)
         complaints = validate(t, pool, types)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
@@ -380,8 +404,21 @@ def _candidates(
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        batch.append(Candidate(ticket=t, complaints=complaints))
+        batch.append(Candidate(ticket=t, complaints=complaints, types=types))
     return batch, rejected, pool
+
+
+def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
+    """このチケットの層を決める `project:`。子は親から継ぐ（設計 §25.4.1）。
+
+    `project_problems` が提案の欄を埋める前に呼ばれるので、ここでも親から引く。
+    親が池に居ないときだけ、提案に書かれた値をそのまま読む。
+    """
+    if t.is_child:
+        parent = pool.get(t.parent)
+        if parent is not None:
+            return parent.project
+    return t.project
 
 
 def _apply(
@@ -429,20 +466,20 @@ def _apply(
     return 0
 
 
-def screen(
-    batch: list[Candidate],
-    pool: dict[str, ticket_mod.Ticket],
-    types: dict | None = None,
-) -> str:
+def screen(batch: list[Candidate], pool: dict[str, ticket_mod.Ticket]) -> str:
     """承認を求める画面を組む。
 
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
     「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
+
+    種類は候補が持っているものを使う。束の中でチケットごとに層が違いうるので、
+    画面の側で 1 つに決めない。
     """
     lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
     for cand in batch:
         t = cand.ticket
+        types = cand.types
         if cand.is_revision and cand.current is not None:
             lines += ["", f"== {t.ticket}: {t.title}（親の改版）"]
             lines += _plan_diff_lines(cand.current, t, types)

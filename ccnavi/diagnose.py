@@ -442,23 +442,33 @@ def layer_phase_types(path: str) -> tuple[list, str]:
     """その層のフェーズの種類と、読めなかった理由。無い層は空。
 
     合成はしない。ここで出すのは「どの層に何が書いてあるか」で、id ごとに
-    合わせた結果は判定の側（phase）が持つ。
+    合わせた結果は判定の側（phase）が持つ。`overlap` / `requires` の参照は
+    確かめない。層は共通層の種類を指してよいので、1 本だけで確かめると
+    正しい定義まで「読めない」になる（設計 §25.4.1）。
     """
     if not path or not os.path.isfile(path):
         return [], ""
-    types, notes = phasetypes.load(path)
+    types, notes = phasetypes.load(path, refs=False)
     if types is None:
         return [], "; ".join(str(n) for n in notes) or "読めない"
     return list(types.values()), ""
 
 
-def layer_risk(path: str) -> tuple[list, str]:
-    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みへは落とさない）。"""
+def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
+    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みへは落とさない）。
+
+    `script:` に書ける綴りは層ごとに違う（設計 §25.4.2）ので、読み方も層ごとに分ける。
+    """
     if not path or not os.path.isfile(path):
         return [], ""
-    definition, notes = risk.load(path)
-    if definition.fallback:
-        return [], definition.fallback or "; ".join(str(n) for n in notes)
+    if name == ruleload.LAYER_COMMON:
+        definition, notes = risk.load(path)
+        if definition.fallback:
+            return [], definition.fallback or "; ".join(str(n) for n in notes)
+        return list(definition.factors), ""
+    definition, notes = risk.load_layer(path, (settings.layer_script_home(conf),))
+    if definition is None:
+        return [], "; ".join(str(n) for n in notes) or "読めない"
     return list(definition.factors), ""
 
 
@@ -487,10 +497,14 @@ def _explain_risk(
 ) -> None:
     """層ごとのリスクの配点（設計 §25.9）。閾値は共通層のものを出す。"""
     tables = [
-        (v.name, *layer_risk(layer_config(conf, root, v.name, settings.KIND_RISK))) for v in views
+        (v.name, *layer_risk(conf, v.name, layer_config(conf, root, v.name, settings.KIND_RISK)))
+        for v in views
     ]
     common, _ = risk.load(conf.risk)
-    levels = " / ".join(f"{k} {common.levels.get(k)}" for k in ("medium", "high", "critical"))
+    # 共通層の閾値。層の `levels` はキーごとに小さいほうが勝つので、実際に効く値は
+    # チケットの層で決まる（設計 §25.4.2）。ここに出すのは共通層の側の既定。
+    effective = risk.effective_levels(common.levels)
+    levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
     stdout.write(f"  {'id':<16}{'層':<10}{'当て方':<20}{'points':<8}message\n")
     for name, items, unreadable in tables:
@@ -704,7 +718,7 @@ def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) ->
         phases_path = layer_config(conf, root, view.name, settings.KIND_PHASES)
         risk_path = layer_config(conf, root, view.name, settings.KIND_RISK)
         types, phases_unreadable = layer_phase_types(phases_path)
-        factors, risk_unreadable = layer_risk(risk_path)
+        factors, risk_unreadable = layer_risk(conf, view.name, risk_path)
         out.append(
             {
                 "name": view.name,
