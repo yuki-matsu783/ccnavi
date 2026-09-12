@@ -84,7 +84,7 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 |---|---|
 | 止めるつもりのなかったものが `deny` に出ている | ルールの綴りを絞る。語の切れ目が要るなら `regex` へ |
 | 同じ呼び出しが `UNDECLARED` で並ぶ | `allow` に足す。1 行足すたびに人が見なくなる範囲が広がる |
-| `allow` で通っているが止めたいものがある | `deny` か `ask` に足す。強い区画が先に当たる |
+| `allow` で通っているが止めたいものがある | `deny` か `ask` に足す。強いタイプが先に当たる |
 
 直したら、そのつど 3 つを回す。
 
@@ -352,13 +352,13 @@ PyInstaller の同梱物は名前で引かれるので、前の版が残ると�
 
 ## ルール
 
-ルールファイルは YAML で、`deny` `ask` `allow` の 3 つの区画に分かれる。
+ルールファイルは YAML で、`deny` `ask` `allow` の 3 つのタイプに分かれる。
 1 件のルールは、当てるツール・探すもの・見つけたときに返す文を 1 組で持つ。
 `message` は `deny` だけに書く（必須）。止められたモデルに「なぜ止めたか、代わりに何を
 するか」を伝える文で、`permissionDecisionReason` として届く。`ask` と `allow` に書くと
 `--lint` が error にする。`ask` の文面は人の確認ダイアログにしか出ず、`allow` の文面は
 どこにも出ない（どちらも実測済み）。書いた人は「モデルに届く」と思って書くので、
-届かない欄を残さない。モデルに伝えたいことは区画によらず `additionalContext` に書く。
+届かない欄を残さない。モデルに伝えたいことはタイプによらず `additionalContext` に書く。
 
 ```yaml
 version: 3
@@ -389,16 +389,16 @@ allow:
 
 `additionalContext` は、そのルールに当たったときにモデルへ渡す文。`message` が
 止められた側に向けた言葉（なぜ止めたか、代わりに何をするか）なのに対し、こちらは
-進む側に向けた言葉で、「通すが、これを踏まえて進めろ」を書く。どの区画にも書ける。
+進む側に向けた言葉で、「通すが、これを踏まえて進めろ」を書く。どのタイプにも書ける。
 
-| 区画 | どう届くか（Claude Code 2.1 で実測） |
+| タイプ | どう届くか（Claude Code 2.1 で実測） |
 |---|---|
 | `allow` | 応答の `additionalContext` として届く。判定の理由は無いので、これだけが届く |
 | `ask` | 人が Yes を押したときだけ `additionalContext` が届く。No なら拒否の定型文だけが届いてターンが終わり、文は届かない。ダイアログには `[ccnavi] RULE_ASK (rule: …)` と subject が出る |
 | `deny` | `permissionDecisionReason`（`message`）と一緒に `additionalContext` として届く |
 | `dry-run` のとき | 止める代わりに返す文に続けて届く。`enable` に切り替えて初めて読まれる文を残さない |
 
-同じ区画に複数当たれば、全部の文を空行で割って並べる。`--test` と `--test --json` の
+同じタイプに複数当たれば、全部の文を空行で割って並べる。`--test` と `--test --json` の
 `response` には理由と一緒に出るので、書いた文が何と一緒に届くかはそこで見える。
 
 `additionalContextOnce` は、1 つの文脈で最初に当たったときだけ届く文。文脈はセッション 1 本で、
@@ -461,14 +461,14 @@ allow:
 強い順に `deny` `ask` `allow`。そのどれにも当たらなければ、ccnavi は判定を
 持たない。
 
-| 当たった区画 | 呼び出しはどうなるか |
+| 当たったタイプ | 呼び出しはどうなるか |
 |---|---|
 | `deny` | 止まる |
 | `ask` | 人に確認が出る（`RULE_ASK`） |
 | `allow` | 通る |
 | どこにも当たらない | Claude Code の権限モードに従う（`UNDECLARED`） |
 
-1 件でも `deny` に当たれば拒否で、弱い区画は見に行かない。同じ区画に複数
+1 件でも `deny` に当たれば拒否で、弱いタイプは見に行かない。同じタイプに複数
 当たったら全部の文面を返す。どれか 1 つを選ぶと、選ばれなかったルールの
 言い分は誰にも届かない。
 
@@ -934,7 +934,7 @@ phases.yml と risk.yml は在るときだけ、解決後の綴りで載る。�
 
 ### 書式
 
-frontmatter は rules.yml と同じ区画（`deny` / `ask` / `allow`）。効くのは Write / Edit 系の
+frontmatter は rules.yml と同じタイプ（`deny` / `ask` / `allow`）。効くのは Write / Edit 系の
 パスの項だけで、`match` に Bash を書いた項や `tools` は「効かない」と名指しで警告する。
 
 ```yaml
@@ -1000,7 +1000,7 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 親のツリーへ書けば親のチケットで判定される。main の直下と、チケットの無い作業ツリーは
 ルールだけで判定する。
 
-| ルールの 3 区画 | チケット | 結果 |
+| ルールの 3 タイプ | チケット | 結果 |
 |---|---|---|
 | `deny` に当たる | ― | 止まる |
 | `ask` に当たる | ― | 人に確認が出る（`RULE_ASK`） |
@@ -1339,7 +1339,7 @@ response:
   ...
 ```
 
-出るのは、判定と根拠コード、当たったルールとその区画、`glob` が翻訳された
+出るのは、判定と根拠コード、当たったルールとそのタイプ、`glob` が翻訳された
 正規表現、そして返る文面そのもの。パスを渡したときは行き着く先も出るので、
 当たらなかった理由が綴りなのかどうかを自分で辿れる。
 
@@ -1353,7 +1353,7 @@ Claude Code の権限モードは、人が確認できるセッションを前�
 `ask` として出るので、`auto` で classifier に渡る形や `bypassPermissions` で
 通さない形は、この試験では見えない。見たいなら payload を直接流す。
 
-いま効いている宣言を数え上げるには `--explain`。区画ごとのルール一覧と、
+いま効いている宣言を数え上げるには `--explain`。タイプごとのルール一覧と、
 承認されたチケットの作業範囲が出る。判定は行わない（REQ-DIA-01）。
 
 ### 見本で確かめる
@@ -1367,7 +1367,7 @@ uv run python testdata/check_rules.py     # 同じことを、写しと記録を
 ```
 
 `testdata/rule-samples.yml` の見本をすべて判定に掛け、期待と食い違った
-ものを名指しする。見本は `deny` `ask` `allow` の区画に置き、区画の名前が
+ものを名指しする。見本は `deny` `ask` `allow` のタイプに置き、タイプの名前が
 期待する判定になる。ルールを 1 件足したら見本も 1 行足す。食い違いが 1 件でも
 あれば終了コードは 1。`subject` の `/repo` は走らせたワークスペースルートに読み替わる。
 
@@ -1413,9 +1413,9 @@ ccnavi --test-samples testdata/rule-samples.yml --json
 | 鍵 | 何 |
 |---|---|
 | `version` / `root` / `rules_path` / `samples_path` | 上と同じ。加えて見本の場所 |
-| `counts` | 区画ごとの `{ok, total}` |
+| `counts` | タイプごとの `{ok, total}` |
 | `mismatches` / `skipped` | 食い違いの数と、allow の見本が判定に入らずに通った数 |
-| `samples[]` | 見本 1 件ごと。`{expected, tool, subject, resolved_subject, why, known, verdict, code, reason, rules, ok, skipped}`。`expected` は置いた区画、`resolved_subject` は `/repo` を読み替えた後、`ok` は期待どおりか、`skipped` は判定に入らずに通ったか |
+| `samples[]` | 見本 1 件ごと。`{expected, tool, subject, resolved_subject, why, known, verdict, code, reason, rules, ok, skipped}`。`expected` は置いたタイプ、`resolved_subject` は `/repo` を読み替えた後、`ok` は期待どおりか、`skipped` は判定に入らずに通ったか |
 
 ## 設定の検証
 
