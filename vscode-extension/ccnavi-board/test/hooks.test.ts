@@ -11,7 +11,7 @@ const SETTINGS = JSON.stringify({
     PostToolUse: [
       { matcher: "", hooks: [{ type: "command", command: "ccnavi", timeout: 10 }] },
       {
-        matcher: "Write|Edit|MultiEdit|NotebookEdit",
+        matcher: "Write|Edit|NotebookEdit",
         hooks: [{ type: "command", command: "sh lint-py.sh", timeout: 180 }],
       },
     ],
@@ -26,7 +26,7 @@ test("CB-T30 hooks をイベント・matcher・コマンドの平らな並びで
     [
       ["PreToolUse", "", "ccnavi", 10],
       ["PostToolUse", "", "ccnavi", 10],
-      ["PostToolUse", "Write|Edit|MultiEdit|NotebookEdit", "sh lint-py.sh", 180],
+      ["PostToolUse", "Write|Edit|NotebookEdit", "sh lint-py.sh", 180],
       ["Stop", "", "sh test-py.sh", null],
     ],
   );
