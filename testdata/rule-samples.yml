@@ -155,6 +155,12 @@ ask:
   - tool: Bash
     subject: "bash -c 'ls'"
     why: 読み切れないコマンド。allow は当てない
+  - tool: Bash
+    subject: "cat /repo/README.md | head -20"
+    why: >-
+      後ろに別のコマンドが続く行に prefer-read-grep は当てない。allow は当たった
+      時点で呼び出し全体を通すので、そこまで当てると cat と書いただけで隣の
+      コマンドまで無条件になる。Read ツールの勧めもここでは出ない
 
 allow:
   - tool: Bash
@@ -241,3 +247,8 @@ allow:
   - tool: Bash
     subject: "uv run python -m ccnavi --rules /repo/.claude/ccnavi/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ここを止めると点検ができない
+  - tool: Bash
+    subject: "grep -rn TODO /repo/ccnavi"
+    why: >-
+      1 本だけの検索。prefer-read-grep が当てて通し、Grep ツールのほうを
+      セッションに一度だけ勧める。読む手を取り上げるのが目的ではない
