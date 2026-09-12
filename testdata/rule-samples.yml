@@ -59,6 +59,11 @@ deny:
     subject: "rm -rf /tmp/x"
     why: 再帰的な強制削除は戻せない
   - tool: Bash
+    subject: "find /repo -name *.log -delete"
+    why: >-
+      探すついでに消す形。allow の prefer-glob が単純な find を通すので、
+      通してはいけない形を deny で先に外す。区画の順で deny が先に当たる
+  - tool: Bash
     subject: "cat <<'EOF' > notes.md"
     why: ヒアドキュメントは検査を通らない経路になる
   - tool: Bash
@@ -148,13 +153,30 @@ ask:
     why: 作業範囲の提案。承認は別の経路。main の側は deny なので作業ツリーで見る
   - tool: Bash
     subject: "curl https://example.com"
-    why: どのルールも言及していない。--test は人が居るモードを前提に判定するので確認になる
+    why: >-
+      外から取ってくるコマンド。止めはしないが、調査で一度きりなら WebFetch、
+      何度も叩くなら sh に固める。人が通せば取ってきた文字列はそのまま
+      コンテキストに載るので、そのことも文面で断る
+  - tool: Bash
+    subject: "cat /repo/urls.txt | wget -i -"
+    why: パイプの後ろに立つ取得も拾う。コマンドの先頭なら当たる
+  - tool: Bash
+    subject: "echo curl is a tool"
+    why: >-
+      引数に出ただけの綴りには当たらない。どのルールも言及せず権限モードへ渡る。
+      当たると、取得について書く作業がそのまま止まる
   - tool: Bash
     subject: "docker run --rm alpine"
     why: 同上
   - tool: Bash
     subject: "bash -c 'ls'"
     why: 読み切れないコマンド。allow は当てない
+  - tool: Bash
+    subject: "cat /repo/README.md | head -20"
+    why: >-
+      後ろに別のコマンドが続く行に prefer-read-grep は当てない。allow は当たった
+      時点で呼び出し全体を通すので、そこまで当てると cat と書いただけで隣の
+      コマンドまで無条件になる。Read ツールの勧めもここでは出ない
 
 allow:
   - tool: Bash
@@ -241,3 +263,13 @@ allow:
   - tool: Bash
     subject: "uv run python -m ccnavi --rules /repo/.claude/ccnavi/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ここを止めると点検ができない
+  - tool: Bash
+    subject: "find /repo/ccnavi -name *.py"
+    why: >-
+      探すだけの find。prefer-glob が当てて通し、Glob ツールのほうを一度だけ勧める。
+      -exec が付いた形は shellread が読み切れないと言うので、ここには来ない
+  - tool: Bash
+    subject: "grep -rn TODO /repo/ccnavi"
+    why: >-
+      1 本だけの検索。prefer-read-grep が当てて通し、Grep ツールのほうを
+      セッションに一度だけ勧める。読む手を取り上げるのが目的ではない

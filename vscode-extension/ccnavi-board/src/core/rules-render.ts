@@ -249,9 +249,17 @@ const STYLE = `  * { box-sizing: border-box; }
   .rule-row .field.w-id { width: 170px; }
   .rule-row .field.w-match { width: 230px; }
   .rule .field.block { margin-bottom: 6px; }
-  .tools { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: center; padding: 2px 0; }
-  .tools .tool { display: flex; gap: 3px; align-items: center; color: var(--vscode-editor-foreground); white-space: nowrap; }
-  .tools input { margin: 0; }
+  /* 押すと札が出る欄。欄そのものは普通のテキスト入力で、手でも書ける。 */
+  .picker { position: relative; }
+  .picker > input { width: 100%; box-sizing: border-box; }
+  .picker > .menu { display: none; }
+  .picker.open > .menu {
+    display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: 5; top: 100%; left: 0; min-width: 100%;
+    background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+    border-radius: 3px; padding: 5px 7px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, transparent);
+  }
+  .picker .tool { display: flex; gap: 5px; align-items: center; white-space: nowrap; cursor: pointer; }
+  .picker .tool input { margin: 0; }
   .with-button { display: flex; gap: 6px; align-items: center; }
   .with-button > input { flex: 1; min-width: 120px; }
   .with-button > button { margin-left: 0; white-space: nowrap; }
@@ -341,19 +349,46 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   // 打ち間違えると黙って当たらなくなる。書かせずに選ばせる。ファイルに書いてある
   // 知らない名前（MCP のツールなど）も、消さずにそのまま札にして出す。
   function matchField(rule) {
-    const chosen = rule.match.split("|").map((s) => s.trim()).filter((s) => s !== "");
-    const names = page.tools.concat(chosen.filter((t) => page.tools.indexOf(t) < 0));
+    const input = field(rule, "match", "f-match", "Bash / Write|Edit");
+    const menu = h("div", { class: "menu" });
     const boxes = [];
-    for (const name of names) {
-      const box = h("input", { type: "checkbox", class: "f-match", value: name });
-      box.checked = chosen.indexOf(name) >= 0;
-      box.addEventListener("change", () => {
-        rule.match = names.filter((n, i) => boxes[i].checked).join("|");
-        markDirty();
-      });
-      boxes.push(box);
+    const names = [];
+    function tokens() {
+      return rule.match.split("|").map((s) => s.trim()).filter((s) => s !== "");
     }
-    return captioned("match", h("span", { class: "tools" }, names.map((name, i) => h("label", { class: "tool" }, [boxes[i], document.createTextNode(name)]))), "grow");
+    // 札は「判定が対象を取り出せるツール」＋「いま欄に書いてある知らない名前」。
+    // 知らない名前も並べるのは、開いただけで消えたように見えないようにするため。
+    function fill() {
+      const chosen = tokens();
+      names.length = 0;
+      boxes.length = 0;
+      menu.textContent = "";
+      for (const name of page.tools.concat(chosen.filter((t) => page.tools.indexOf(t) < 0))) {
+        const box = h("input", { type: "checkbox", value: name });
+        box.checked = chosen.indexOf(name) >= 0;
+        box.addEventListener("change", () => {
+          rule.match = names.filter((n, i) => boxes[i].checked).join("|");
+          input.value = rule.match;
+          markDirty();
+        });
+        names.push(name);
+        boxes.push(box);
+        menu.appendChild(h("label", { class: "tool" }, [box, document.createTextNode(name)]));
+      }
+    }
+    // 手で書いた結果もチェックに映す。開くたびに作り直すので、書いた名前がそのまま札になる。
+    input.addEventListener("input", () => { if (wrap.classList.contains("open")) { fill(); } });
+    const wrap = h("div", { class: "picker" }, [input, menu]);
+    input.addEventListener("focus", () => { fill(); openPicker(wrap); });
+    input.addEventListener("click", () => { fill(); openPicker(wrap); });
+    return captioned("match", wrap, "w-match");
+  }
+  // 開いているポップアップは 1 つだけ。外を押すか Esc で閉じる。
+  function openPicker(wrap) {
+    for (const other of document.querySelectorAll(".picker.open")) {
+      if (other !== wrap) { other.classList.remove("open"); }
+    }
+    wrap.classList.add("open");
   }
   // ファイルを指す欄。手で書くほかに、VS Code のダイアログで選べる。選んだ結果は
   // 拡張側がルート相対にして "picked" で返す。
@@ -611,6 +646,16 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const input = document.querySelector('.rule[data-key="' + m.key + '"] .' + (m.field === "additionalContextFile" ? "f-context-file" : "f-once-file"));
       if (input) { input.value = m.path; }
     }
+  });
+  // ポップアップは、その欄と札の外を押したとき、または Esc で閉じる。
+  document.addEventListener("mousedown", (event) => {
+    for (const open of document.querySelectorAll(".picker.open")) {
+      if (!open.contains(event.target)) { open.classList.remove("open"); }
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") { return; }
+    for (const open of document.querySelectorAll(".picker.open")) { open.classList.remove("open"); }
   });
   const saved = vscode.getState();
   renderAll();
