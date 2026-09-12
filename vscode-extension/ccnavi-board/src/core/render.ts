@@ -88,7 +88,10 @@ function renderColumn(column: BoardColumn): string {
       ? '    <p class="empty">チケットはありません</p>'
       : `    <ul class="cards">\n${column.cards.map(renderCard).join("\n")}\n    </ul>`;
   return `  <section class="column" data-state="${escapeHtml(column.state)}">
-    <h2>${escapeHtml(column.label)} <span class="count">${column.count}</span></h2>
+    <h2>
+      <button type="button" class="fold" data-fold="${escapeHtml(column.state)}" aria-expanded="true" title="列を畳む / 広げる"><span class="fold-mark" aria-hidden="true"></span><span class="label">${escapeHtml(column.label)}</span></button>
+      <span class="count">${column.count}</span>
+    </h2>
 ${body}
   </section>`;
 }
@@ -251,13 +254,34 @@ const STYLE = `  * { box-sizing: border-box; }
     color: var(--vscode-editorWarning-foreground);
   }
   .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
+  /* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールに逃がす。
+     畳んだ列は縦書きの見出しだけの細い帯になる */
   .board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; }
   .column {
-    flex: 0 0 300px; min-width: 300px;
+    flex: 1 1 0; min-width: 220px;
     border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px;
   }
-  .column h2 { margin: 0 0 8px; font-size: 1em; display: flex; justify-content: space-between; }
+  .column h2 { margin: 0 0 8px; font-size: 1em; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .column .count { color: var(--vscode-descriptionForeground); }
+  button.fold {
+    display: flex; align-items: center; gap: 4px; min-width: 0;
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+    font: inherit; font-weight: inherit; color: inherit; text-align: left;
+  }
+  button.fold:hover .label { text-decoration: underline; }
+  button.fold:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+  .fold-mark {
+    display: inline-block; width: 0; height: 0;
+    border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+  }
+  .column.folded .fold-mark {
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
+  }
+  .column.folded { flex: 0 0 auto; min-width: 0; width: 36px; padding: 8px 4px; }
+  .column.folded h2 { margin: 0; flex-direction: column; justify-content: flex-start; }
+  .column.folded button.fold { flex-direction: column; }
+  .column.folded .label { writing-mode: vertical-rl; }
+  .column.folded .cards, .column.folded .empty { display: none; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .card {
@@ -328,6 +352,31 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "wrapup") { vscode.postMessage({ type: "wrapup", parent: button.getAttribute("data-parent") }); }
     });
   }
+  // 絞り込みと畳んだ列は、更新で HTML が作り直されても残るように webview の状態に置く。
+  const saved = vscode.getState() || {};
+  const state = {
+    project: typeof saved.project === "string" ? saved.project : "*",
+    folded: Array.isArray(saved.folded) ? saved.folded.filter((f) => typeof f === "string") : [],
+  };
+  function save() { vscode.setState({ project: state.project, folded: state.folded }); }
+
+  function setFolded(column, folded) {
+    column.classList.toggle("folded", folded);
+    const button = column.querySelector("button.fold");
+    if (button) { button.setAttribute("aria-expanded", folded ? "false" : "true"); }
+  }
+  for (const button of document.querySelectorAll("button.fold")) {
+    const column = button.closest(".column");
+    const key = button.getAttribute("data-fold") || "";
+    setFolded(column, state.folded.includes(key));
+    button.addEventListener("click", () => {
+      const folded = !column.classList.contains("folded");
+      setFolded(column, folded);
+      state.folded = folded ? state.folded.concat([key]) : state.folded.filter((f) => f !== key);
+      save();
+    });
+  }
+
   const filter = document.getElementById("project-filter");
   function applyFilter() {
     const value = filter ? filter.value : "*";
@@ -335,15 +384,15 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const own = card.getAttribute("data-project") || "";
       card.classList.toggle("hidden", value !== "*" && own !== value);
     }
-    vscode.setState({ project: value });
+    state.project = value;
+    save();
   }
   function selectProject(value) {
     if (!filter) { return; }
     if ([...filter.options].some((o) => o.value === value)) { filter.value = value; applyFilter(); }
   }
   if (filter) {
-    const saved = vscode.getState();
-    if (saved && typeof saved.project === "string") { selectProject(saved.project); }
+    selectProject(state.project);
     filter.addEventListener("change", applyFilter);
     applyFilter();
   }
