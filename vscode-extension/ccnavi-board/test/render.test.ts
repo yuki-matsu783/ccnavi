@@ -19,6 +19,14 @@ test("CB-T12 4 列と件数と承認ボタンを出す", () => {
   assert.ok(html.includes(`nonce="${OPTIONS.nonce}"`));
 });
 
+test("CB-T12b 列ごとに畳むボタンを出す", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  for (const state of ["todo", "doing", "done", "cancelled"]) {
+    assert.ok(html.includes(`data-fold="${state}" aria-expanded="true"`), state);
+  }
+  assert.equal((html.match(/class="fold"/g) ?? []).length, 4);
+});
+
 test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   assert.ok(html.includes("承認済"));
