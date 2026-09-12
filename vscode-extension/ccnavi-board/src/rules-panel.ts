@@ -132,7 +132,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-rules-")),
     watchers: [],
     loaded,
-    lock: lockFromError("まだ確かめていない"),
+    lock: lockFromError("まだ確認していない"),
     wroteAt: 0,
   };
   panels.set(key, current);
@@ -358,7 +358,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
     case "reload": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "未保存の編集がある。捨てて読み直す？",
+          "未保存の変更がある。破棄して読み直す？",
           { modal: true },
           "読み直す",
         );
@@ -385,7 +385,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
         canSelectFiles: true,
         canSelectFolders: false,
         canSelectMany: false,
-        openLabel: "この本文を渡す",
+        openLabel: "このファイルを渡す",
         title: `${message.field}: モデルへ渡すファイル`,
       });
       const chosen = picked?.[0];
@@ -394,7 +394,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       }
       const rel = path.relative(root, chosen.fsPath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
-        void vscode.window.showWarningMessage(`ワークスペースの外は指せない: ${chosen.fsPath}`);
+        void vscode.window.showWarningMessage(`ワークスペースの外のファイルは指定できない: ${chosen.fsPath}`);
         return;
       }
       void current.panel.webview.postMessage({
@@ -504,7 +504,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "ルールファイルが読み込んだ後に外で変わっている。再読込してから直し直す（この編集は上書きしない）");
+    fail(current, "ルールファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
     return;
   }
 

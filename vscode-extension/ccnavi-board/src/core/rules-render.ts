@@ -54,7 +54,7 @@ ${STYLE}
 </style>
 </head>
 <body>
-${renderModeBanner(page.mode)}<div id="changed" class="banner warn hidden">ファイルが外で変わった。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderModeBanner(page.mode)}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.rulesPath)}</span>
@@ -77,7 +77,7 @@ ${renderProblems(page.model.problems)}<nav class="tabs" role="tablist">
 ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
 </section>
 <section id="tab-judge" class="pane">
-  <p class="hint">判定は実行ファイルの <code>--test</code> を通る。編集中の内容で試すので、保存していなくてもよい。走っているセッションが dry-run でも、ここは enable の答えを返す。</p>
+  <p class="hint">判定は実行ファイルの <code>--test</code> で行う。編集中の内容で試すので保存は要らない。セッションが dry-run でも、ここは enable のときの判定を返す。</p>
   <div class="judge-form">
     <label>ツール <select id="tool">${KNOWN_TOOLS.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></label>
     <label class="grow">subject <input id="subject" type="text" placeholder="Bash ならコマンド、それ以外なら絶対パス" spellcheck="false"></label>
@@ -85,14 +85,14 @@ ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
   </div>
   <div id="judge-result" class="result hidden"></div>
   <div class="samples-head">
-    <button type="button" class="action" data-action="samples">見本を一括で流す</button>
+    <button type="button" class="action" data-action="samples">サンプルを一括で判定</button>
     <span class="path">${escapeHtml(page.samplesPath)}</span>
     <button type="button" class="action" data-action="open-samples">エディタで開く</button>
   </div>
   <div id="samples-result" class="result hidden"></div>
 </section>
 <section id="tab-hooks" class="pane">
-  <p class="hint">読むだけで書き換えない。載るのは <code>.claude/settings.json</code>${page.hookFiles.settingsLocal ? " と <code>.claude/settings.local.json</code>" : ""} の hooks。利用者ごとの設定（<code>~/.claude/settings.json</code>）は見ないのでここには載らない。</p>
+  <p class="hint">表示するだけで書き換えない。対象は <code>.claude/settings.json</code>${page.hookFiles.settingsLocal ? " と <code>.claude/settings.local.json</code>" : ""} の hooks。ユーザー個別の設定（<code>~/.claude/settings.json</code>）は対象外。</p>
 ${renderHooks(page.hooks, page.hookFiles)}
 </section>
 <footer class="foot"><span id="status"></span></footer>
@@ -122,15 +122,15 @@ function renderProblems(problems: readonly string[]): string {
 }
 
 const SECTION_LABELS = {
-  deny: "止める",
+  deny: "拒否する",
   ask: "人に確認する",
-  allow: "通す",
+  allow: "許可する",
 } as const;
 
 function renderSectionShell(section: "deny" | "ask" | "allow"): string {
   return `  <section class="rule-section" data-section="${section}">
-    <h2><button type="button" class="twist" data-action="fold-section" data-section="${section}" aria-expanded="true" title="このタイプを畳む／開く">▾</button> <span class="section-name ${section}">${section}</span> <span class="section-label">${SECTION_LABELS[section]}</span> <span class="count" data-count="${section}">0</span>
-      <button type="button" class="action small" data-action="add" data-section="${section}">＋ ルールを足す</button></h2>
+    <h2><button type="button" class="twist" data-action="fold-section" data-section="${section}" aria-expanded="true" title="このタイプを折りたたむ／開く">▾</button> <span class="section-name ${section}">${section}</span> <span class="section-label">${SECTION_LABELS[section]}</span> <span class="count" data-count="${section}">0</span>
+      <button type="button" class="action small" data-action="add" data-section="${section}">＋ ルールを追加</button></h2>
     <ul class="rules" data-list="${section}"></ul>
   </section>`;
 }
@@ -157,12 +157,12 @@ function renderHooks(
     )
     .join("\n");
   return `  <table class="hooks">
-    <thead><tr><th>イベント</th><th>matcher</th><th>コマンド</th><th>timeout</th><th>出所</th></tr></thead>
+    <thead><tr><th>イベント</th><th>matcher</th><th>コマンド</th><th>timeout</th><th>定義元</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
   </table>
-  <p class="hint">「判定を試す」でツール名を入れると、そのツールで走る hook をここから絞って出す。matcher の意味は Claude Code のもの（空か <code>*</code> で全部、それ以外はツール名への正規表現）。</p>`;
+  <p class="hint">「判定を試す」でツールを選ぶと、そのツールで実行される hook だけをここから絞り込んで出す。matcher の意味は Claude Code のもの（空か <code>*</code> で全部、それ以外はツール名への正規表現）。</p>`;
 }
 
 const STYLE = `  * { box-sizing: border-box; }
@@ -227,7 +227,7 @@ ${BUTTON_STYLE}
     background: var(--vscode-editorWidget-background);
   }
   .rule.hit { outline: 2px solid var(--vscode-focusBorder); }
-  /* 畳む印。タイプ（区画）と 1 件ずつのルールの両方に付く。 */
+  /* 畳む印。タイプ（タイプ）と 1 件ずつのルールの両方に付く。 */
   .twist {
     background: none; border: none; color: var(--vscode-descriptionForeground);
     font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
@@ -419,12 +419,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     // （lint が止めるので）そう言って、消すボタンだけ出す。
     let message;
     if (section === "deny") {
-      message = captioned("message", area(rule, "message", "f-message", "なぜ止めるかと、代わりに何をすればよいか（止められたモデルに届く）"), "block");
+      message = captioned("message", area(rule, "message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）"), "block");
     } else if (rule.message !== "") {
-      const drop = h("button", { type: "button", class: "action small", text: "message を消す" });
+      const drop = h("button", { type: "button", class: "action small", text: "message を削除" });
       drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
       message = h("p", { class: "stale" }, [
-        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint が止める。モデルに渡す文は additionalContext に移す: "),
+        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint がエラーにする。モデルに渡すプロンプトは additionalContext に移す: "),
         h("code", { text: rule.message }),
         drop,
       ]);
@@ -440,7 +440,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const del = h("button", { type: "button", class: "action small", text: "削除" });
     del.addEventListener("click", () => remove(key));
     // 畳んだときは要約だけを出す。要約は欄を打つたびに書き直す（入力は上へ伝わる）。
-    const twist = h("button", { type: "button", class: "twist", title: "このルールを畳む／開く" });
+    const twist = h("button", { type: "button", class: "twist", title: "このルールを折りたたむ／開く" });
     const sum = h("span", { class: "rule-sum" });
     const li = h("li", { class: "rule", "data-key": key, "data-id": rule.id }, [
       h("div", { class: "rule-head" }, [twist, sum, h("span", { class: "buttons" }, [up, down, del])]),
@@ -451,7 +451,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
           captioned("タイプ", sectionSelect),
         ]),
         h("div", { class: "rule-row" }, [
-          captioned("形", kindSelect),
+          captioned("形式", kindSelect),
           captioned(rule.kind, pattern, "grow"),
         ]),
         message,
@@ -463,10 +463,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     ]);
     function fillSummary() {
       sum.textContent = "";
-      sum.appendChild(h("span", { class: "sum-id", text: rule.id === "" ? "（id 無し）" : rule.id }));
+      sum.appendChild(h("span", { class: "sum-id", text: rule.id === "" ? "（id 未設定）" : rule.id }));
       sum.appendChild(h("span", { class: "sum-match", text: rule.match === "" ? "（全ツール）" : rule.match }));
       sum.appendChild(rule.pattern === ""
-        ? h("span", { class: "sum-empty", text: "（" + rule.kind + " 空）" })
+        ? h("span", { class: "sum-empty", text: "（" + rule.kind + " 未設定）" })
         : h("code", { text: rule.kind + " " + rule.pattern }));
     }
     function setFolded(on) {
@@ -577,7 +577,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function verdictEl(verdict) {
     const v = verdict || "none";
-    return h("span", { class: "verdict " + v, text: verdict || "（判定に入らない）" });
+    return h("span", { class: "verdict " + v, text: verdict || "（判定の対象外）" });
   }
   function dl(pairs) {
     const el = h("dl", { class: "kv" });
@@ -589,20 +589,20 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     return el;
   }
   function hitsTable(rules) {
-    if (rules.length === 0) { return h("p", { class: "empty", text: "どのルールにも当たらなかった" }); }
+    if (rules.length === 0) { return h("p", { class: "empty", text: "どのルールにも HIT しなかった" }); }
     const body = h("tbody", {}, rules.map((r) => h("tr", {}, [
       h("td", {}, [r.section ? h("span", { class: "verdict " + r.section, text: r.section }) : null]),
-      h("td", { text: r.id + (r.source === "outside" ? "（ルールファイルの外から来た根拠）" : "") }),
+      h("td", { text: r.id + (r.source === "outside" ? "（ルールファイル外の根拠）" : "") }),
       h("td", {}, [r.kind ? h("code", { text: r.kind + " " + r.written }) : null]),
       h("td", {}, [r.pattern ? h("code", { text: r.pattern }) : null]),
     ])));
     return h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "書いたもの" }), h("th", { text: "翻訳後" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "記述" }), h("th", { text: "変換後" })])]),
       body,
     ]);
   }
   function hooksTable(hooks) {
-    if (hooks.length === 0) { return h("p", { class: "empty", text: "走る hook は無い" }); }
+    if (hooks.length === 0) { return h("p", { class: "empty", text: "実行される hook は無い" }); }
     return h("table", {}, [
       h("thead", {}, [h("tr", {}, [h("th", { text: "イベント" }), h("th", { text: "matcher" }), h("th", { text: "コマンド" })])]),
       h("tbody", {}, hooks.map((k) => h("tr", {}, [
@@ -618,21 +618,21 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     box.classList.remove("hidden");
     for (const el of document.querySelectorAll(".rule.hit")) { el.classList.remove("hit"); }
     if (!result.known) {
-      box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定が対象を取り出せないツール。ルールを書いても当たらず、呼び出しはそのまま通る")]));
+      box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定の対象を取り出せないツール。ルールを書いても HIT せず、呼び出しはそのまま通る")]));
     } else {
       box.appendChild(h("p", {}, [verdictEl(result.verdict), document.createTextNode(result.code ? " " + result.code : "")]));
-      box.appendChild(dl([["tool", result.tool], ["subject", result.subject], ["resolved", result.resolved], ["reason", result.reason], ["degraded", result.degraded ? result.degraded + "（生の文字列に当てた）" : ""], ["fallback", result.fallback ? result.fallback + "（組み込みの既定で判定した）" : ""]]));
-      box.appendChild(h("h3", { text: "当たったルール" }));
+      box.appendChild(dl([["tool", result.tool], ["subject", result.subject], ["resolved", result.resolved], ["reason", result.reason], ["degraded", result.degraded ? result.degraded + "（生の文字列に対して判定）" : ""], ["fallback", result.fallback ? result.fallback + "（組み込みの既定で判定）" : ""]]));
+      box.appendChild(h("h3", { text: "HIT したルール" }));
       box.appendChild(hitsTable(result.rules));
       for (const r of result.rules) {
         for (const el of document.querySelectorAll(".rule[data-id]")) {
           if (el.getAttribute("data-id") === r.id) { el.classList.add("hit"); unfoldRule(el); }
         }
       }
-      box.appendChild(h("h3", { text: "返る文面" }));
-      box.appendChild(result.response ? h("pre", { class: "response", text: result.response }) : h("p", { class: "empty", text: "何も返さない" }));
+      box.appendChild(h("h3", { text: "返すメッセージ" }));
+      box.appendChild(result.response ? h("pre", { class: "response", text: result.response }) : h("p", { class: "empty", text: "メッセージは返さない" }));
     }
-    box.appendChild(h("h3", { text: "このツールで走る hook" }));
+    box.appendChild(h("h3", { text: "このツールで実行される hook" }));
     box.appendChild(hooksTable(hooks));
   }
   function showSamples(result) {
@@ -644,8 +644,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const c = result.counts[section] || { ok: 0, total: 0 };
       counts.appendChild(h("span", { class: c.ok === c.total ? "" : "ng", text: section + " " + c.ok + "/" + c.total }));
     }
-    counts.appendChild(h("span", { class: result.mismatches > 0 ? "ng" : "", text: "食い違い " + result.mismatches + " 件" }));
-    counts.appendChild(h("span", { text: "判定に入らなかったもの " + result.skipped + " 件" }));
+    counts.appendChild(h("span", { class: result.mismatches > 0 ? "ng" : "", text: "不一致 " + result.mismatches + " 件" }));
+    counts.appendChild(h("span", { text: "判定の対象外 " + result.skipped + " 件" }));
     box.appendChild(counts);
     const rows = result.samples.map((s) => h("tr", { class: s.ok ? (s.skipped ? "skipped" : "") : "ng" }, [
       h("td", {}, [h("span", { class: "verdict " + s.expected, text: s.expected })]),
@@ -656,7 +656,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("td", { text: s.why }),
     ]));
     box.appendChild(h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "期待" }), h("th", { text: "判定" }), h("th", { text: "tool" }), h("th", { text: "subject" }), h("th", { text: "当たったルール" }), h("th", { text: "なぜ" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "期待" }), h("th", { text: "判定" }), h("th", { text: "tool" }), h("th", { text: "subject" }), h("th", { text: "HIT したルール" }), h("th", { text: "理由" })])]),
       h("tbody", {}, rows),
     ]));
   }
@@ -671,16 +671,16 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const action = button.getAttribute("data-action");
     if (action === "add") { add(button.getAttribute("data-section")); }
     else if (action === "fold-section") { foldSection(button.getAttribute("data-section")); }
-    else if (action === "save") { setBusy(true, "検証して保存している…"); vscode.postMessage({ type: "save", sections: sections }); }
+    else if (action === "save") { setBusy(true, "検証して保存中…");vscode.postMessage({ type: "save", sections: sections }); }
     else if (action === "reload") { vscode.postMessage({ type: "reload", dirty: dirty }); }
     else if (action === "judge") {
       const tool = document.getElementById("tool").value;
       const subject = document.getElementById("subject").value;
-      if (subject.trim() === "") { status("subject が空", true); return; }
-      setBusy(true, "判定している…");
+      if (subject.trim() === "") { status("subject が未入力", true); return; }
+      setBusy(true, "判定中…");
       vscode.postMessage({ type: "judge", sections: sections, tool: tool, subject: subject });
     }
-    else if (action === "samples") { setBusy(true, "見本を流している…"); vscode.postMessage({ type: "samples", sections: sections }); }
+    else if (action === "samples") { setBusy(true, "サンプルを判定中…");vscode.postMessage({ type: "samples", sections: sections }); }
     else if (action === "open-rules") { vscode.postMessage({ type: "openFile", which: "rules" }); }
     else if (action === "open-samples") { vscode.postMessage({ type: "openFile", which: "samples" }); }
   });

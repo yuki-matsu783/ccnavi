@@ -1,9 +1,9 @@
 /**
  * ルールファイル（rules.yml）の読み書き。コメントを残したまま書き戻す。
  *
- * rules.yml は先頭に使い方の説明、区画やルールの前に理由のコメントを持つ。素直に
+ * rules.yml は先頭に使い方の説明、タイプやルールの前に理由のコメントを持つ。素直に
  * 読んで dump し直すとそれが全部消えるので、`yaml` の Document を保ち、変えるところ
- * だけを差し替える。ルールの入れ替え・区画の移動は、元のノードをそのまま別の並びへ
+ * だけを差し替える。ルールの入れ替え・タイプの移動は、元のノードをそのまま別の並びへ
  * 移すので、そのルールに付いていたコメントも一緒に動く。
  *
  * ここはルールの意味（当たる・当たらない）には触れない。判定は実行ファイルの仕事。
@@ -125,7 +125,7 @@ function applyTo(
   text: string,
   edited: Readonly<Record<Section, readonly RuleForm[]>>,
 ): string {
-  // 元のノードを先に全部拾っておく。区画をまたいで移すので、並びを書き換える前に取る。
+  // 元のノードを先に全部拾っておく。タイプをまたいで移すので、並びを書き換える前に取る。
   const originals = {} as Record<Section, YAMLMap[]>;
   const keeps: BlockKeep[] = [];
   for (const section of SECTIONS) {
@@ -151,7 +151,7 @@ function applyTo(
     });
     const existing = doc.get(section, true);
     if (isSeq(existing)) {
-      // 区画のコメントは並びのノードに付いているので、並びは残して中身だけ替える。
+      // タイプのコメントは並びのノードに付いているので、並びは残して中身だけ替える。
       // 空になったら `[]`、1 件でも入ったらブロックの並びに戻す。
       existing.items = nodes;
       existing.flow = nodes.length === 0;

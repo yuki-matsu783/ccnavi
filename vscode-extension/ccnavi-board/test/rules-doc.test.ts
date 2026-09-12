@@ -34,7 +34,7 @@ function forms(text: string) {
   return readRules(text).model.sections;
 }
 
-test("CB-T41 区画ごとに id / match / glob か regex / message を読む", () => {
+test("CB-T41 タイプごとに id / match / glob か regex / message を読む", () => {
   const { model } = readRules(TEXT);
   assert.equal(model.version, 3);
   assert.deepEqual(model.problems, []);
@@ -75,7 +75,7 @@ test("CB-T43 欄を変えても、他のルールのコメントと折り返し�
   assert.equal(again.allow[0].message, "見るだけ。書かない");
 });
 
-test("CB-T44 区画を移すとコメントごと動き、glob と regex は片方だけ残る", () => {
+test("CB-T44 タイプを移すとコメントごと動き、glob と regex は片方だけ残る", () => {
   const doc = readRules(TEXT);
   const s = doc.model.sections;
   const moved: RuleForm = { ...s.deny[0], kind: "regex", pattern: "\\bgit push\\b" };
@@ -111,7 +111,7 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
   assert.deepEqual(again.allow, []);
 });
 
-test("CB-T46 壊れた区画は苦情にして、他の区画は出す", () => {
+test("CB-T46 壊れたタイプは苦情にして、他のタイプは出す", () => {
   const { model } = readRules("version: 3\ndeny: nope\nallow:\n  - id: a\n    match: Read\n    glob: '*'\n    message: m\n");
   assert.equal(model.problems.length, 1);
   assert.match(model.problems[0], /deny/);

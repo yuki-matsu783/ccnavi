@@ -9,7 +9,7 @@ export interface RenderOptions {
   readonly nonce: string;
 }
 
-const COPY_LABELS = { none: "未承認", open: "承認済", closed: "閉" } as const;
+const COPY_LABELS = { none: "未承認", open: "承認済", closed: "クローズ" } as const;
 const MARK_LABELS: Readonly<Record<string, string>> = {
   pending: "終了を通知",
   skipped: "レビュー省略",
@@ -45,7 +45,7 @@ ${renderFilter(board.projects)}    <button type="button" class="action" data-act
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
-${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットが 1 枚もありません</p>\n' : ""}<div class="board">
+${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットはありません</p>\n' : ""}<div class="board">
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
@@ -66,8 +66,8 @@ function renderFilter(projects: readonly string[]): string {
     .join("\n");
   return `    <label class="filter">プロジェクト
       <select id="project-filter">
-      <option value="*">全部</option>
-      <option value="">ワークスペース自身</option>
+      <option value="*">すべて</option>
+      <option value="">ワークスペース本体</option>
 ${options}
       </select>
     </label>
@@ -89,7 +89,7 @@ function renderColumn(column: BoardColumn): string {
       : `    <ul class="cards">\n${column.cards.map(renderCard).join("\n")}\n    </ul>`;
   return `  <section class="column" data-state="${escapeHtml(column.state)}">
     <h2>
-      <button type="button" class="fold" data-fold="${escapeHtml(column.state)}" aria-expanded="true" title="列を畳む / 広げる"><span class="fold-mark" aria-hidden="true"></span><span class="label">${escapeHtml(column.label)}</span></button>
+      <button type="button" class="fold" data-fold="${escapeHtml(column.state)}" aria-expanded="true" title="列を折りたたむ／広げる"><span class="fold-mark" aria-hidden="true"></span><span class="label">${escapeHtml(column.label)}</span></button>
       <span class="count">${column.count}</span>
     </h2>
 ${body}
@@ -135,7 +135,7 @@ function renderBadges(card: Card): string {
   badges.push(
     card.worktreeExists
       ? badge("worktree", "作業ツリーあり", card.worktreePath)
-      : badge("worktree none", "作業ツリー無し"),
+      : badge("worktree none", "作業ツリーなし"),
   );
   for (const mark of card.marks) {
     badges.push(badge(`mark mark-${mark}`, MARK_LABELS[mark] ?? mark));
@@ -162,7 +162,7 @@ function renderBadges(card: Card): string {
   }
   if (card.seenIn.length > 1) {
     const where = card.seenIn.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
-    badges.push(badge("seen", `${card.seenIn.length} か所に写っている`, where));
+    badges.push(badge("seen", `${card.seenIn.length} か所にコピーあり`, where));
   }
   return badges.map((b) => `          ${b}`).join("\n");
 }

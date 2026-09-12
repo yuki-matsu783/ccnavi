@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <!-- 盾（ガード）に、区画を表す 3 本の線。アクティビティバーは currentColor で塗る -->
+  <!-- 盾（ガード）に、タイプを表す 3 本の線。アクティビティバーは currentColor で塗る -->
   <path d="M12 2.5 L20 5.5 V11.5 C20 16.5 16.5 20 12 21.5 C7.5 20 4 16.5 4 11.5 V5.5 Z" />
   <line x1="8" y1="9" x2="16" y2="9" />
   <line x1="8" y1="12.5" x2="16" y2="12.5" />

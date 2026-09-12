@@ -51,7 +51,7 @@
         "ccnaviBoard.samplesPath": {
           "type": "string",
           "default": "testdata/rule-samples.yml",
-          "description": "ルール設定画面が一括で流す見本（deny / ask / allow の区画に tool と subject を置いた YAML）。ワークスペースルートからの相対でも絶対でもよい。"
+          "description": "ルール設定画面が一括で判定するサンプル（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でもよい。"
         }
       }
     }

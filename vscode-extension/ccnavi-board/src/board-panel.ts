@@ -282,7 +282,7 @@ async function handleMessage(message: Message | undefined): Promise<void> {
       }
       const reason = await vscode.window.showInputBox({
         title: `${message.parent} を締める`,
-        prompt: "締める理由（--reason）。残りは別の issue に写る",
+        prompt: "締める理由（--reason）。残りは別の issue に起こす",
         validateInput: (value) => (value.trim() === "" ? "理由は空にできない" : undefined),
       });
       if (reason === undefined || reason.trim() === "") {

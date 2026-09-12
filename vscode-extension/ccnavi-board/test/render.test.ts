@@ -32,8 +32,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   assert.ok(html.includes("承認済"));
   assert.ok(html.includes("未承認"));
   assert.ok(html.includes("作業ツリーあり"));
-  assert.ok(html.includes("作業ツリー無し"));
-  assert.ok(html.includes("2 か所に写っている"));
+  assert.ok(html.includes("作業ツリーなし"));
+  assert.ok(html.includes("2 か所にコピーあり"));
   assert.ok(html.includes("親 i0001 / フェーズ 2"));
   assert.ok(html.includes('class="phases"'));
   assert.ok(html.includes('data-action="wrapup" data-parent="i0001"'));
@@ -43,7 +43,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   const html = renderBoard(buildBoard(empty), OPTIONS);
-  assert.ok(html.includes("チケットが 1 枚もありません"));
+  assert.ok(html.includes("チケットはありません"));
   assert.equal((html.match(/class="empty"/g) ?? []).length, 4);
   assert.ok(html.includes('data-action="approve" disabled'));
 });
