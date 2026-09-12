@@ -12,10 +12,12 @@
 from __future__ import annotations
 
 import contextlib
+import errno
 import json
 import os
 import re
 import time
+from collections.abc import Callable
 from typing import Any
 
 # ファイル名に混ぜられない字。セッションやエージェントの識別子をそのまま名前に
@@ -60,26 +62,51 @@ def read_bytes(path: str) -> bytes | None:
         return None
 
 
+# 同じ名前への書き込みが一時的に失敗する errno。同じイベントの hook は並列に走り、
+# 同じセッションの控えを同じ名前に書くので、片方が置き換え・削除している最中に
+# もう片方が開くことがある。Windows はそれを ERROR_DELETE_PENDING や共有違反で返し、
+# Python はそれぞれ EINVAL（表に無い Win32 エラーの既定）と EACCES にして投げる。
+# どちらも待てば通る失敗なので、数回だけ打ち直す。表に無い理由（ENOSPC など）は
+# 待っても変わらないので、すぐ返す。
+_TRANSIENT_ERRNO = (errno.EINVAL, errno.EACCES, errno.EPERM)
+_WRITE_RETRIES = 3
+_WRITE_RETRY_WAIT_SECONDS = 0.02
+
+
+def _write_with_retry(write: Callable[[], None]) -> str:
+    """書き込みを、一時的な失敗なら数回まで打ち直す。書けたら空文字、駄目なら理由。"""
+    for attempt in range(_WRITE_RETRIES + 1):
+        try:
+            write()
+        except OSError as exc:
+            if exc.errno not in _TRANSIENT_ERRNO or attempt == _WRITE_RETRIES:
+                return f"{exc}"
+            time.sleep(_WRITE_RETRY_WAIT_SECONDS)
+            continue
+        return ""
+    return ""
+
+
 def write_text(path: str, text: str, newline: str | None = None) -> str:
     """本文を書く。親ディレクトリが無ければ作る。書けたら空文字、駄目なら理由。"""
-    try:
+
+    def write() -> None:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "w", encoding="utf-8", newline=newline) as f:
             f.write(text)
-    except OSError as exc:
-        return f"{exc}"
-    return ""
+
+    return _write_with_retry(write)
 
 
 def write_bytes(path: str, content: bytes) -> str:
     """中身をそのまま書く。書けたら空文字、駄目なら理由。"""
-    try:
+
+    def write() -> None:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "wb") as f:
             f.write(content)
-    except OSError as exc:
-        return f"{exc}"
-    return ""
+
+    return _write_with_retry(write)
 
 
 def read_json(path: str) -> tuple[Any, Exception | None]:
