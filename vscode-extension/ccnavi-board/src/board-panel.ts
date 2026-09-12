@@ -17,13 +17,13 @@ import { ticketControl } from "./ticket-control.js";
 const DEBOUNCE_MS = 120;
 
 /**
- * 監視する場所。提案（main と全作業ツリー、プロジェクト向けの置き場も）、写しと印、
+ * 監視する場所。提案と写しと印（ワークスペース、プロジェクト、全作業ツリーの `.ccnavi/`）、
  * 作業ツリーの登録。glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [
-  "wip/**/tickets/**",
-  ".claude/worktrees/*/wip/**/tickets/**",
-  ".claude/ccnavi/tickets/**",
+  ".ccnavi/**",
+  "projects/*/.ccnavi/**",
+  ".claude/worktrees/*/.ccnavi/**",
   ".git/worktrees/*",
   "projects/*/.git/worktrees/*",
 ] as const;
