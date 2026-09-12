@@ -1505,7 +1505,7 @@ ccnavi --lint --json --project-rules-file lib=/tmp/edited.yml
 `--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに
 `<パス>` を読む。`--rules` がワークスペースのルールを差し替えるのと同じことを、
 プロジェクト 1 つに対して行う。VS Code の拡張が、編集中の `config/rules.yml` を保存する前に
-判定と検証に掛けるための旗で、`--test` / `--test-samples` / `--lint` / `--explain` でだけ効く。
+判定と検証に掛けるためのフラグで、`--test` / `--test-samples` / `--lint` / `--explain` でだけ効く。
 hook からの判定に渡しても無視する（標準エラーにその旨を出す）。保存していないルールが
 実運用の判定に効く道を作らないため。守る対象（selfguard）も差し替えを見ず、本来の場所を守る。
 
