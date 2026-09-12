@@ -179,6 +179,13 @@ hook には実行ファイルだけを登録すればよい。
 そのままにする。`--all` を足しに来た打ち直しが、その場で指定していない
 `CCNAVI_MODE` を既定へ落とさないため。
 
+守りの 3 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_CLI`）は
+`CCNAVI_MODE` と同じ値で書く。この 3 つは設定が無ければ `enable` で動くので、書かないまま
+`dry-run` で導入すると、判定は止めないのに戻す働きだけが本気で動く。様子を見ている間に
+手元のファイルが戻ることになるので、導入直後は同じ強さで並べる。代償として、`dry-run` で
+入れたまま忘れるとこの 3 つも `dry-run` のまま残る。`--mode enable` で打ち直すか、
+設定ファイルの 4 行を書き換えるまで、守りは弱いまま。
+
 hook は、そのイベントに ccnavi が登録されていなければ足す。別の綴りで登録されて
 いるように見えるイベントは、足さずに名前を挙げる。どちらが正しいかをスクリプトが
 決められないうえ、黙って足すと判定が 2 回走り、黙って飛ばすとそのイベントが
@@ -217,7 +224,10 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
     "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
-    "CCNAVI_BIN_PATH": "dist/ccnavi/ccnavi"
+    "CCNAVI_BIN_PATH": ".claude/ccnavi/ccnavi",
+    "CCNAVI_RESTORE_IF_DENY": "dry-run",
+    "CCNAVI_GUARD_CORE_FILES": "dry-run",
+    "CCNAVI_GUARD_CLI": "dry-run"
   }
 }
 ```
@@ -251,7 +261,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
-| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
+| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い（導入スクリプトは `.claude/ccnavi/ccnavi` と書く）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーのルートからの相対。既定は `wip/tickets` |
 | `CCNAVI_APPROVED` | 承認済みの写しの置き場。ワークスペースルートからの相対。既定は `.claude/ccnavi/tickets`。空文字にするとチケットによる範囲の制御を使わない |
 | `CCNAVI_PHASES` | フェーズの種類の定義。ワークスペースルートからの相対。既定は `.claude/ccnavi/phases.yml`。無ければフェーズは番号だけの挙動 |
@@ -276,21 +286,43 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 
 自分で持って行くことはできない。`dist/` は `.gitignore` に入っているので git では
 渡らないし、`CCNAVI_BIN_PATH` は絶対パスも `..` も受け付けないので、よそで組んだ
-実行ファイルを指すこともできない。`--deploy` に ccnavi を組み立てた場所を渡す。
+実行ファイルを指すこともできない。設定を書く 1 回で、そのまま写しも取る。
 
 ```sh
 # ccnavi のリポジトリで、まず組み立てる
 uv run --with pyinstaller python build.py
 
 # 対象プロジェクトへ、設定を書いて実行ファイルを配る
-sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run --deploy .
+sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 ```
+
+配り元は既定で、打ったスクリプトの置き場の 1 つ上――つまり ccnavi のリポジトリ。
+よそから配りたいときだけ `--deploy <ccnavi の根>` で名指しする。設定だけ書いて
+実行ファイルを置かない形は、hook が 7 つ登録されているのに何も起動しない、という
+一番分かりにくい壊れ方になるので、既定で写しまで取る。写しが要らないときは
+`--no-deploy`。
 
 | 配り元 | 配り先 |
 |---|---|
-| `dist/ccnavi/`（中身ごと） | `--bin` の 1 つ上のディレクトリ。既定なら `dist/ccnavi/` |
+| `dist/ccnavi/`（中身ごと） | `--bin` の 1 つ上のディレクトリ。既定なら `.claude/ccnavi/` |
 | `.claude/ccnavi/rules.yml` | 同じ綴り |
 | `.claude/scripts/ccnavi-{ticket,review,git}.sh` | 同じ綴り |
+
+写した実行ファイルは、配り先の `.gitignore` にも足す（配り先が git のリポジトリの
+ときだけ）。書かないと、次のコミットで実行ファイルと `_internal` がまるごと履歴に
+入る。入ってしまうと、消すには履歴を書き換えるしかない。
+
+```
+# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
+/.claude/ccnavi/ccnavi
+/.claude/ccnavi/ccnavi.exe
+/.claude/ccnavi/_internal/
+```
+
+置き場ごと無視はしない。`--bin` の綴りによっては、実行ファイルの置き場が `rules.yml` と
+同じディレクトリになる。そこを丸ごと無視すると、そのプロジェクトが何を止めるかまで
+git から消える。`.exe` の付く綴りと付かない綴りを両方書くのは、同じリポジトリを
+3 つの環境で開くため。
 
 配り先に既にあるものは触らない。並べて見せるだけで、入れ替えるのは `--force` を
 付けたときだけ。ルールもゲートの sh も、入れた先で直されている前提のもので、黙って
@@ -300,9 +332,14 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run --deploy .
 PyInstaller の同梱物は名前で引かれるので、前の版が残ると新しい実行ファイルが
 それを掴む。
 
-組み立てていない配り元は、報告ではなく終了コード 2 で断る。報告だけにすると
-「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、打った人は
-配れたものとして先へ進む。
+名指しした `--deploy` が組み立てられていなければ、報告ではなく終了コード 2 で断る。
+報告だけにすると「配ったはずなのに実行ファイルが無い」が最後の一覧にしか現れず、
+打った人は配れたものとして先へ進む。
+
+既定の配り元が使えないとき――組み立てていない、配り先が ccnavi 自身――は断らない。
+写しを諦めた理由を 1 行出して、`.claude/settings.json` は書く。名指ししていない配り元が
+空なのは打った人の誤りではないし、ここで断ると、組み立てていない機械では設定すら
+書けなくなる。
 
 ## ルール
 
