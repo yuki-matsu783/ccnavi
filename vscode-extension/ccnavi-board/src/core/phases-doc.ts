@@ -14,7 +14,9 @@
  * 要否が決まる）。ファイルが無いときに「作る」で書く雛形は README の例で、置き場の
  * 綴りはそのプロジェクトに合わせて画面で直す前提。
  */
-import { isMap, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
+import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
+
+import { yaml11Ambiguous } from "./yaml11.js";
 
 /** 種類の区分。ccnavi の phasetypes.KINDS と同じ並び */
 export const PHASE_KINDS = ["work", "feedback"] as const;
@@ -136,6 +138,9 @@ export function readPhases(text: string): PhasesDocument {
   for (const e of doc.errors) {
     problems.push(`YAML として読めない: ${e.message}`);
   }
+  if (doc.contents !== null && !isMap(doc.contents)) {
+    problems.push("最上位が対応表ではない。実行ファイルは読めない。保存すると中身を捨てて対応表から始める");
+  }
   const version = doc.get("version");
   if (version === undefined || version === null) {
     problems.push(`version が無い。保存すると version: ${PHASES_VERSION} を先頭に足す`);
@@ -153,7 +158,7 @@ export function readPhases(text: string): PhasesDocument {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身が対応表ではない。画面に出さない`);
+        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身が対応表ではない。画面に出さず、保存するとこの種類は消える（実行ファイルも読めない）`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
@@ -262,14 +267,22 @@ function scalarText(map: YAMLMap, key: string): string {
 }
 
 function applyTo(doc: Document, edited: PhasesForm): string {
-  const ids = edited.phases.map((p) => p.id.trim());
   const seen = new Set<string>();
-  for (const id of ids) {
+  const seenOrigins = new Set<number>();
+  for (const form of edited.phases) {
+    const id = form.id.trim();
     if (seen.has(id)) {
       // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで黙って上書きし、種類が 1 つ消える。
       throw new Error(`id \`${id}\` が 2 つある。同じ id の種類は 1 つにする`);
     }
     seen.add(id);
+    if (form.origin !== null) {
+      if (seenOrigins.has(form.origin)) {
+        // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出て、キーも重なる。
+        throw new Error(`${form.origin + 1} 件目の種類が 2 回送られた。再読込してから編集し直す`);
+      }
+      seenOrigins.add(form.origin);
+    }
   }
 
   // 空か、最上位が対応表でないファイルは、中身を捨てて対応表から始める（読み込みの苦情で言ってある）。
@@ -284,30 +297,43 @@ function applyTo(doc: Document, edited: PhasesForm): string {
   }
 
   // phases。元の組を先に全部拾っておき、編集した並びへ移す。
+  // `origin` は読み込んだときの生の位置。中身が対応表でない組は画面に載らず、保存で消える（苦情で言ってある）。
   const existing = top.get("phases", true);
   const originals: Pair[] = isMap(existing) ? existing.items.slice() : [];
-  if (isMap(existing)) {
-    adoptLeadingComment(existing, originals[0]);
-  }
+  const adopted = isMap(existing) ? adoptLeadingComment(existing, originals[0]) : undefined;
   const pairs = edited.phases.map((form) => {
+    const id = form.id.trim();
     const original = form.origin === null ? undefined : originals[form.origin];
-    const pair = original !== undefined && isMap(original.value) ? original : doc.createPair(form.id.trim(), new YAMLMap());
+    const pair = original !== undefined && isMap(original.value) ? original : doc.createPair(id, new YAMLMap());
     // 改名は組のキーの値だけを替える。キーの前のコメントはキーに付いているので一緒に動く。
-    const key = pair.key;
-    if (key instanceof Scalar) {
-      if (key.value !== form.id.trim()) {
-        key.value = form.id.trim();
-      }
+    // 実行ファイル（PyYAML）が別の型に読む語（yes / no / on / off など）は囲む。
+    let key: Scalar;
+    if (pair.key instanceof Scalar) {
+      key = pair.key;
     } else {
-      pair.key = doc.createNode(form.id.trim());
+      key = doc.createNode(id) as Scalar;
+      pair.key = key;
+    }
+    if (key.value !== id) {
+      key.value = id;
+    }
+    if (yaml11Ambiguous(id) && (key.type === Scalar.PLAIN || key.type === undefined)) {
+      key.type = Scalar.QUOTE_DOUBLE;
     }
     writePhase(doc, pair.value as YAMLMap, form, original === undefined);
     return pair;
   });
-  if (isMap(existing)) {
+  if (isMap(existing) && !existing.flow) {
+    // 先頭の種類を消したときは、付け替えたコメントを対応表の見出しとして戻す。
+    if (adopted !== undefined && !pairs.includes(adopted) && !existing.commentBefore) {
+      existing.commentBefore = (adopted.key as Scalar).commentBefore ?? null;
+    }
+    keepSpacing(existing.items, pairs);
     // 対応表の前後のコメントは対応表のノードに付いているので、対応表は残して中身だけ替える。
     existing.items = pairs;
   } else {
+    // 無い、対応表でない、`{}` の 1 行書き（flow）は、ブロックの対応表に置き換える。
+    // flow のまま中身を入れると全部が 1 行になり、以後の差分とコメントの置き場が壊れる。
     const map = new YAMLMap();
     map.items = pairs;
     top.set("phases", map);
@@ -318,16 +344,33 @@ function applyTo(doc: Document, edited: PhasesForm): string {
 /**
  * 対応表の先頭の組の前にあるコメントは、読み込みでは対応表のほうに付く。
  * そのままだと先頭の種類を移したときにコメントが置き去りになるので、組のキーに付け直す。
+ * 付け直した組を返す（呼び手は、その組が消えたときにコメントを対応表へ戻す）。
  */
-function adoptLeadingComment(map: YAMLMap, first: Pair | undefined): void {
+function adoptLeadingComment(map: YAMLMap, first: Pair | undefined): Pair | undefined {
   if (first === undefined || !map.commentBefore) {
-    return;
+    return undefined;
   }
   const key = first.key;
   if (key instanceof Scalar && !key.commentBefore) {
     key.commentBefore = map.commentBefore;
     map.commentBefore = null;
+    return first;
   }
+  return undefined;
+}
+
+/**
+ * 種類の前の空行は、種類ではなく「対応表の何番目か」に付いていたものとして揃える。
+ * 先頭に来た種類が空行を連れてくると `phases:` の直後に空白だけの行が出るため。
+ */
+function keepSpacing(before: readonly Pair[], after: readonly Pair[]): void {
+  const slots = before.map((p) => isNode(p.key) && p.key.spaceBefore === true);
+  const last = slots.length > 0 ? slots[slots.length - 1] : false;
+  after.forEach((pair, i) => {
+    if (isNode(pair.key)) {
+      pair.key.spaceBefore = i < slots.length ? slots[i] : last;
+    }
+  });
 }
 
 /** 欄を順に書く。変わっていない欄は触らず、元の書き方（引用符）を残す。新しい種類は kind と review を必ず書く */
@@ -398,7 +441,7 @@ function setList(
   seq.flow = true;
   seq.items = cleaned.map((v) => {
     const scalar = doc.createNode(v) as Scalar;
-    scalar.type = style;
+    scalar.type = style === Scalar.PLAIN && yaml11Ambiguous(v) ? Scalar.QUOTE_DOUBLE : style;
     return scalar;
   });
   if (current !== undefined && current !== null) {
@@ -427,8 +470,12 @@ function setValue(doc: Document, node: YAMLMap, key: string, value: string, styl
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符）は元のまま。値が変わっても書き方まで変えない。
+    // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
     if (current.value !== value) {
       current.value = value;
+      if (current.type === Scalar.PLAIN && yaml11Ambiguous(value)) {
+        current.type = Scalar.QUOTE_DOUBLE;
+      }
     }
     return;
   }
@@ -436,7 +483,7 @@ function setValue(doc: Document, node: YAMLMap, key: string, value: string, styl
     node.delete(key);
   }
   const scalar = doc.createNode(value) as Scalar;
-  scalar.type = style;
+  scalar.type = style === Scalar.PLAIN && yaml11Ambiguous(value) ? Scalar.QUOTE_DOUBLE : style;
   insertAfter(doc, node, key, scalar, before(key, node));
 }
 

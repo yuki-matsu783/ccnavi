@@ -53,6 +53,9 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
+  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読込のたびに張り直す */
+  fileWatchers: vscode.FileSystemWatcher[];
+  /** チケットの置き場の監視。開いている間ずっと同じ */
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
@@ -99,6 +102,7 @@ export async function openPhases(): Promise<void> {
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-phases-")),
+    fileWatchers: [],
     watchers: [],
     loaded,
     lock: lockFromError("まだ確認していない"),
@@ -110,9 +114,16 @@ export async function openPhases(): Promise<void> {
   void refreshLock(current);
 }
 
+/** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。実行ファイルが読む env の重なりと同じ */
 function phasesRelOf(root: string): string {
-  const settingsText = readText(path.join(root, ".claude", "settings.json"));
-  return (settingsText !== undefined && envFromSettingsJson(settingsText, "CCNAVI_PHASES")) || DEFAULT_PHASES;
+  for (const name of ["settings.local.json", "settings.json"]) {
+    const settingsText = readText(path.join(root, ".claude", name));
+    const found = settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_PHASES");
+    if (found !== "") {
+      return found;
+    }
+  }
+  return DEFAULT_PHASES;
 }
 
 function readPage(root: string): Loaded {
@@ -165,9 +176,10 @@ function registerPanelHandlers(current: PanelState): void {
         clearTimeout(timer);
       }
     }
-    for (const watcher of current.watchers) {
+    for (const watcher of [...current.fileWatchers, ...current.watchers]) {
       watcher.dispose();
     }
+    current.fileWatchers = [];
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
@@ -179,16 +191,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
-  // 種類のファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
-  const phasesRel = current.loaded?.phasesRel ?? DEFAULT_PHASES;
-  for (const pattern of [toGlob(phasesRel), ".claude/settings.json", ".claude/settings.local.json"]) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const changed = () => scheduleChanged(current);
-    watcher.onDidCreate(changed);
-    watcher.onDidChange(changed);
-    watcher.onDidDelete(changed);
-    current.watchers.push(watcher);
-  }
+  watchFiles(current);
   // チケットが動いたら、保存できるかを取り直す。
   for (const pattern of WATCH_PATTERNS) {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
@@ -198,6 +201,39 @@ function registerPanelHandlers(current: PanelState): void {
     watcher.onDidDelete(moved);
     current.watchers.push(watcher);
   }
+}
+
+/**
+ * 種類のファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
+ * ならないので、そのディレクトリを起点にする。
+ */
+function watchFiles(current: PanelState): void {
+  for (const watcher of current.fileWatchers) {
+    watcher.dispose();
+  }
+  current.fileWatchers = [];
+  const phasesRel = current.loaded?.phasesRel ?? DEFAULT_PHASES;
+  const patterns: vscode.RelativePattern[] = [
+    patternFor(current.folder, phasesRel),
+    new vscode.RelativePattern(current.folder, ".claude/settings.json"),
+    new vscode.RelativePattern(current.folder, ".claude/settings.local.json"),
+  ];
+  for (const pattern of patterns) {
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    const changed = () => scheduleChanged(current);
+    watcher.onDidCreate(changed);
+    watcher.onDidChange(changed);
+    watcher.onDidDelete(changed);
+    current.fileWatchers.push(watcher);
+  }
+}
+
+function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
+  if (path.isAbsolute(filePath)) {
+    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
+  }
+  return new vscode.RelativePattern(folder, toGlob(filePath));
 }
 
 function toGlob(rel: string): string {
@@ -275,6 +311,7 @@ function reload(current: PanelState): void {
     return;
   }
   show(current);
+  watchFiles(current);
   void refreshLock(current);
 }
 
@@ -339,6 +376,8 @@ function create(current: PanelState): void {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.phasesPath, TEMPLATE_PHASES_TEXT, { encoding: "utf8", flag: "wx" });
   } catch (error) {
+    // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
+    current.wroteAt = 0;
     fail(current, `${loaded.phasesRel} に書けない: ${(error as Error).message}`);
     return;
   }
@@ -379,7 +418,8 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report}`);
+    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }
 
@@ -410,6 +450,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.phasesPath, text, "utf8");
   } catch (error) {
+    current.wroteAt = 0;
     fail(current, `フェーズの種類のファイルに書けない: ${(error as Error).message}`);
     return;
   }

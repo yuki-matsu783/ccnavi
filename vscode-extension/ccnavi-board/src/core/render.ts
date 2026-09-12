@@ -243,7 +243,7 @@ export function escapeHtml(text: string): string {
 }
 
 /**
- * 3 つの画面（ボード・ルール設定・プロジェクト管理）で同じ見た目のボタン。
+ * 5 つの画面（ボード・ルール設定・リスク管理・フェーズ管理・プロジェクト管理）で同じ見た目のボタン。
  * 縁と薄い影で「押せる」と分かるようにし、押した瞬間に 1px 沈む。primary は VS Code の主ボタンの色。
  */
 export const BUTTON_STYLE = `  button.action {

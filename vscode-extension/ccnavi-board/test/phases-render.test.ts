@@ -26,7 +26,8 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
     ["research", "design", "acceptance", "implement", "implement-feedback"],
   );
   assert.equal(page.exists, true);
-  assert.ok(!html.includes("雛形でファイルを作る"));
+  // 作る帯は無いときだけ（スクリプトの文言には常に語が入るので、帯の要素で見る）
+  assert.ok(!html.includes('class="banner missing"'));
   assert.ok(!html.includes("チケット制御が <code>disable</code>"));
 
   const missing = renderPhasesPage(
@@ -40,6 +41,7 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
     },
     { nonce: "n0nce" },
   );
+  assert.ok(missing.includes('class="banner missing"'));
   assert.ok(missing.includes("雛形でファイルを作る"));
   assert.ok(missing.includes("チケット制御が <code>disable</code>"));
   assert.ok(missing.includes("&lt;苦情&gt;"));

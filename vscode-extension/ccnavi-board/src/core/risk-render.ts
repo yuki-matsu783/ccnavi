@@ -354,9 +354,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     el.textContent = text;
     el.parentElement.classList.toggle("error", !!isError);
   }
+  // 保存の往復（lint）の間に入れた編集は、保存が通ると再描画で消える。その間は欄ごと止める。
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
+    for (const el of document.querySelectorAll("#levels input, #factors input, #factors select, #factors button, button[data-action=add]")) { el.disabled = on || !page.exists; }
     updateSave();
     if (text) { status(text, false); }
   }

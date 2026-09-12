@@ -206,3 +206,38 @@ test("CB-T94 画面から来た内容は形だけ確かめる。並びに文字�
   assert.equal(asPhasesForm({ phases: "a" }), undefined);
   assert.equal(asPhasesForm(null), undefined);
 });
+
+test("CB-T101 scope を書いていない種類は、無関係な保存で scope: inherit が補われる（それ以外は 1 文字も変わらない）", () => {
+  const text = "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n  b:\n    kind: work\n    title: B\n    scope: inherit\n";
+  const doc = readPhases(text);
+  assert.equal(doc.apply(doc.model.form), "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    scope: inherit\n  b:\n    kind: work\n    title: B\n    scope: inherit\n");
+});
+
+test("CB-T102 先頭を動かしても空白だけの行は出ず、先頭を消せば見出しのコメントは対応表に残る", () => {
+  const doc = readPhases(SAMPLE);
+  const [research, design, ...rest] = doc.model.form.phases;
+  const swapped = doc.apply({ phases: [design, research, ...rest] });
+  assert.ok(!/\n {2,}\n/.test(swapped), "空白だけの行が無い");
+  assert.match(swapped, /^# フェーズの種類。人が持つ設定で、エージェントは書き換えない。\n#\n# id と title はどちらも一意。\nversion: 1\n\nphases:\n  # 触る場所が多いとき\n  design:\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n\n  # 分からないときだけ\n  research:\n    kind: work\n/);
+  const dropped = doc.apply({ phases: [design, ...rest] });
+  assert.match(dropped, /\nphases:\n  # 分からないときだけ\n  # 触る場所が多いとき\n  design:\n/);
+  assert.ok(!dropped.includes("  research:"));
+});
+
+test("CB-T103 同じ元ノードを 2 回送れば書き戻さない。yes / no の id は引用符で囲む。phases: {} はブロックに直す", () => {
+  const doc = readPhases(SAMPLE);
+  const [research] = doc.model.form.phases;
+  assert.throws(() => doc.apply({ phases: [research, { ...research, id: "x" }] }), /2 回送られた/);
+
+  const renamed = doc.apply({ phases: doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, id: "yes", overlap: ["no", "research"], when: "on" } : p)) });
+  assert.match(renamed, /\n  "yes":\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n    overlap: \["no", research\]\n    when: "on"\n/);
+  assert.deepEqual(readPhases(renamed).model.form.phases.map((p) => p.id), ["research", "yes", "implement", "acceptance", "implement-feedback"]);
+
+  const flow = readPhases("version: 1\nphases: {}\n");
+  assert.equal(
+    flow.apply({ phases: [phase("a", { title: "A" })] }),
+    "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    review: mr\n    scope: inherit\n",
+  );
+  assert.match(readPhases("- a\n").model.problems[0], /最上位が対応表ではない/);
+  assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの種類は消える/);
+});

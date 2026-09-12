@@ -305,7 +305,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const list = document.getElementById("phases");
     list.textContent = "";
     for (const phase of form.phases) { list.appendChild(renderPhase(phase)); }
-    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: "種類が無い。1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" })); }
+    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
     document.getElementById("phase-count").textContent = String(form.phases.length);
     const add = document.querySelector("button[data-action=add]");
     if (add) { add.disabled = !page.exists; }
@@ -339,7 +339,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const lockEl = document.getElementById("lock");
     lockEl.textContent = lock.reason;
     lockEl.classList.toggle("hidden", !lock.locked);
-    if (dup.size > 0) { status("id が重なっている（" + Array.from(dup).join(", ") + "）。1 つにするまで保存できない", true); dupShown = true; }
+    if (dup.size > 0) { status("id が重なっている（" + Array.from(dup).map((d) => d === "" ? "空" : d).join(", ") + "）。1 つにするまで保存できない", true); dupShown = true; }
     else if (dupShown) { status("", false); dupShown = false; }
   }
   function shift(key, delta) {
@@ -362,7 +362,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add() {
-    form.phases = form.phases.concat([{ origin: null, id: "", title: "", kind: "work", review: "mr", inherit: false, scope: [], deliverables: [], overlap: [], requires: [], agent: "", when: "" }]);
+    // 既定は inherit。scope: [] （何も書けない）の種類を、glob を埋め忘れただけで作らないため。
+    form.phases = form.phases.concat([{ origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], agent: "", when: "" }]);
     markDirty();
     renderAll();
     const items = document.querySelectorAll("#phases .phase");
@@ -374,9 +375,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     el.textContent = text;
     el.parentElement.classList.toggle("error", !!isError);
   }
+  // 保存の往復（lint）の間に入れた編集は、保存が通ると再描画で消える。その間は欄ごと止める。
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
+    for (const el of document.querySelectorAll("#phases input, #phases select, #phases button, button[data-action=add]")) { el.disabled = on || !page.exists; }
     updateSave();
     if (text) { status(text, false); }
   }
