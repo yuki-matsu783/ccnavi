@@ -57,6 +57,8 @@ from dataclasses import dataclass, field
 
 import yaml
 
+from .globmatch import translate
+
 # このビルドが読めるルールファイルの書式の版。
 # 2 で区画が 3 つに分かれ、ファイルの形式も JSON から YAML になった。
 VERSION = 3
@@ -270,8 +272,6 @@ def parse(data: dict, root: str = "") -> tuple[RuleSet, list[Problem]]:
 def _build(
     raw: object, section: str, index: int, root: str = ""
 ) -> tuple[Rule, None] | tuple[None, Problem]:
-    from .globmatch import translate
-
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
         return None, Problem(SEVERITY_ERROR, where, "ルールがキーと値の並びではない")

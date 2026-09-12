@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, phase, settings, tree
+from . import approval, fsio, gitcmd, ops, phase, settings, tree
 from . import ticket as ticket_mod
 
 # 投稿に付ける印。機構自身の投稿を、確認のときに除くため。
@@ -560,8 +560,6 @@ def ready(
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものは人が行う。
     """
-    from . import ops
-
     parent = _parent_any(stderr, root, conf, cwd)
     if parent is None:
         return 1
@@ -786,8 +784,6 @@ def _settle(
     返すのは取り消した子、省略の印を置いた番号、済んだ扱いにした番号。
     途中で失敗したら None。そこまでの変更は戻さない（印は次に打てば重ねられる）。
     """
-    from . import ops
-
     cancelled: list[str] = []
     for t in left.todo:
         if ops.cancel(stdout, stderr, root, conf, t.ticket, f"wrapup: {reason.strip()}") != 0:

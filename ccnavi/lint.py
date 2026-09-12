@@ -44,7 +44,23 @@ import json
 import os
 from typing import TextIO
 
-from . import ctxfile, gitcmd, gitstate, hookio, judge, modes, rules, selfguard, settings
+from . import (
+    approval,
+    ctxfile,
+    gitcmd,
+    gitstate,
+    hookio,
+    judge,
+    modes,
+    phasetypes,
+    review,
+    risk,
+    rules,
+    selfguard,
+    settings,
+    tree,
+)
+from . import ticket as ticket_mod
 from .modes import EXIT_ERROR, EXIT_OK
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
@@ -169,8 +185,6 @@ def check(
 
 def _risk(conf: settings.Settings) -> list[Problem]:
     """リスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。"""
-    from . import risk
-
     if not conf.risk:
         return []
     _, notes = risk.load(conf.risk)
@@ -179,8 +193,6 @@ def _risk(conf: settings.Settings) -> list[Problem]:
 
 def _phases(conf: settings.Settings) -> list[Problem]:
     """フェーズの種類の定義が読めるか。無いのは不備ではない（番号だけの挙動）。"""
-    from . import phasetypes
-
     if not conf.phases:
         return []
     _, notes = phasetypes.load(conf.phases)
@@ -188,8 +200,6 @@ def _phases(conf: settings.Settings) -> list[Problem]:
 
 
 def _phase_types(conf: settings.Settings):
-    from . import phasetypes
-
     if not conf.phases:
         return None
     types, _ = phasetypes.load(conf.phases)
@@ -204,9 +214,6 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     いないが、書いた人は書いたとおりに効いていると思っている。
     検証はその思い違いを名指しする場所になる。
     """
-    from . import approval, tree
-    from . import ticket as ticket_mod
-
     problems: list[Problem] = []
     for name in conf.retired:
         problems.append(
@@ -229,24 +236,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
         # 他の報告ごと読まれなくなる。
         return problems
 
-    # 写しの置き場が守られているか。ルールが Write を止めていなければ、
-    # エージェントが写しを書けて、承認の意味が無い。
-    try:
-        rule_set, _ = rules.load(conf.rules, root)
-    except (OSError, ValueError):
-        rule_set = None
-    probe = os.path.join(conf.approved, "probe.md")
-    if rule_set is not None and not any(
-        rule.matches("Write", probe) for rule in rule_set.deny + rule_set.ask
-    ):
-        problems.append(
-            Problem(
-                SEVERITY_ERROR,
-                "(ticket)",
-                f"写しの置き場 {conf.approved} への Write をルールが止めていない。"
-                "エージェントが写しを書けるので、承認の意味が無い",
-            )
-        )
+    problems.extend(_approved_guarded(conf, root))
 
     copies, notes = approval.copies(conf.approved)
     for note in notes:
@@ -269,6 +259,51 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 )
             )
 
+    problems.extend(_proposal_problems(proposals, index, done, types))
+
+    worktrees = tree.worktrees(root, conf.projects)
+    problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
+    names = {t.name for t in worktrees}
+    if any(not t.is_child for t in copies):
+        problems.extend(_review_token(root))
+    problems.extend(_ticket_hooks(root))
+    for stray in _stray_claude_dirs(root, names):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{stray} は作業ツリーでも main でもないのに .claude/ を持つ。"
+                "cd 1 回で別のワークスペースルートに見える",
+            )
+        )
+    return problems
+
+
+def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
+    """写しの置き場が守られているか。
+
+    ルールが Write を止めていなければ、エージェントが写しを書けて、承認の意味が無い。
+    """
+    try:
+        rule_set, _ = rules.load(conf.rules, root)
+    except (OSError, ValueError):
+        return []
+    probe = os.path.join(conf.approved, "probe.md")
+    if any(rule.matches("Write", probe) for rule in rule_set.deny + rule_set.ask):
+        return []
+    return [
+        Problem(
+            SEVERITY_ERROR,
+            "(ticket)",
+            f"写しの置き場 {conf.approved} への Write をルールが止めていない。"
+            "エージェントが写しを書けるので、承認の意味が無い",
+        )
+    ]
+
+
+def _proposal_problems(proposals: list, index: dict, done: set[str], types) -> list[Problem]:
+    """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
+    problems: list[Problem] = []
     # 提案と写しを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
@@ -305,8 +340,14 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             problems.append(
                 Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
             )
+    return problems
 
-    worktrees = tree.worktrees(root, conf.projects)
+
+def _worktree_problems(
+    root: str, conf: settings.Settings, worktrees: list, index: dict, copies: list
+) -> list[Problem]:
+    """作業ツリーの側。チケットの無いツリー、迷い込んだ写し、切り元の食い違い、ツリーの無い写し。"""
+    problems: list[Problem] = []
     for t in worktrees:
         if t.name not in index:
             problems.append(
@@ -350,18 +391,6 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                     f"{tree.worktree_path(root, t.ticket)} が無い。作るまで効かない",
                 )
             )
-    if any(not t.is_child for t in copies):
-        problems.extend(_review_token(root))
-    problems.extend(_ticket_hooks(root))
-    for stray in _stray_claude_dirs(root, names):
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"{stray} は作業ツリーでも main でもないのに .claude/ を持つ。"
-                "cd 1 回で別のワークスペースルートに見える",
-            )
-        )
     return problems
 
 
@@ -372,8 +401,6 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     各プロジェクトのルールが読めること、プロジェクトが `.claude/` を持たないことを見る。
     どれも error にしない。判定は動いていて、読めないプロジェクトは組み込みの既定に落ちる。
     """
-    from . import tree
-
     problems: list[Problem] = []
     found = tree.projects(conf.projects)
     if not found:
@@ -427,8 +454,6 @@ def _ignored(root: str, rel: str) -> bool | None:
 
 def _review_token(root: str) -> list[Problem]:
     """sh がリモートを読み書きできる形か。gh / glab か、curl とホストに合うトークン。"""
-    from . import review
-
     rc, out = gitcmd.output(root, ["remote", "get-url", "origin"], 5)
     url = out.strip() if rc == 0 else ""
     if not url:
@@ -472,8 +497,6 @@ def _ticket_hooks(root: str) -> list[Problem]:
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:
     """main か作業ツリーのどこかに提案の置き場があるか。"""
-    from . import tree
-
     for t in [tree.main_tree(root), *tree.worktrees(root)]:
         if os.path.isdir(os.path.join(t.root, tickets_rel.replace("/", os.sep))):
             return True
@@ -688,78 +711,78 @@ def _rules(path: str, root: str = "", home: str = "") -> list[Problem]:
                 )
             )
         seen.add(rule.id)
+        problems.extend(_rule_problems(rule, name, home))
 
-        for tool in _inert(rule.match):
+    return problems
+
+
+def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
+    """ルール 1 件の中身。当たらない match、届かない message、指すファイル、広い allow。"""
+    problems: list[Problem] = []
+    for tool in _inert(rule.match):
+        problems.append(
+            Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
+        )
+
+    if rule.message and rule.decision != rules.DENY:
+        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
+        # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
+        # ルールは効いているので判定は変わらない。直すまで CI が落ちるだけ。
+        where = (
+            "人の確認ダイアログにしか出ない" if rule.decision == rules.ASK else "どこにも届かない"
+        )
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"{rule.decision} に message がある。{where}ので、モデルに渡す文は "
+                "additionalContext に書き、message は消す",
+            )
+        )
+
+    # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
+    # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。
+    for key, rel in (
+        ("additionalContextFile", rule.additional_context_file),
+        ("additionalContextOnceFile", rule.additional_context_once_file),
+    ):
+        if not rel:
+            continue
+        why = ctxfile.bad_path(rel)
+        if why:
+            problems.append(Problem(SEVERITY_ERROR, name, f"{key} の {rel}: {why}"))
+            continue
+        full = ctxfile.locate([home], rel)
+        if not full:
             problems.append(
                 Problem(
-                    SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない"
-                )
-            )
-
-        if rule.message and rule.decision != rules.DENY:
-            # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
-            # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
-            # ルールは効いているので判定は変わらない。直すまで CI が落ちるだけ。
-            where = (
-                "人の確認ダイアログにしか出ない"
-                if rule.decision == rules.ASK
-                else "どこにも届かない"
-            )
-            problems.append(
-                Problem(
-                    SEVERITY_ERROR,
+                    SEVERITY_WARN,
                     name,
-                    f"{rule.decision} に message がある。{where}ので、モデルに渡す文は "
-                    "additionalContext に書き、message は消す",
+                    f"{key} の {rel} が無い。作業ツリーにもルートにも無ければ何も足さない",
+                )
+            )
+        elif ctxfile.over_limit(full):
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"{key} の {rel} は {ctxfile.MAX_CHARS} 文字を超える。"
+                    "先頭だけが届き、切ったことを末尾に添える",
                 )
             )
 
-        # ルールが指すファイルは、ルートの中を指していて、いま在って、上限に収まるか。
-        # 無いのは warn。作るまで何も足さないだけで、判定は変わらない。
-        for key, rel in (
-            ("additionalContextFile", rule.additional_context_file),
-            ("additionalContextOnceFile", rule.additional_context_once_file),
-        ):
-            if not rel:
-                continue
-            why = ctxfile.bad_path(rel)
-            if why:
-                problems.append(Problem(SEVERITY_ERROR, name, f"{key} の {rel}: {why}"))
-                continue
-            full = ctxfile.locate([home], rel)
-            if not full:
-                problems.append(
-                    Problem(
-                        SEVERITY_WARN,
-                        name,
-                        f"{key} の {rel} が無い。作業ツリーにもルートにも無ければ何も足さない",
-                    )
+    # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
+    if (rule.additional_context or rule.additional_context_file) and rule.decision == rules.ALLOW:
+        why = _broad(rule)
+        if why:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    name,
+                    f"広い allow に additionalContext がある（{why}）。"
+                    "当たるたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
                 )
-            elif ctxfile.over_limit(full):
-                problems.append(
-                    Problem(
-                        SEVERITY_WARN,
-                        name,
-                        f"{key} の {rel} は {ctxfile.MAX_CHARS} 文字を超える。"
-                        "先頭だけが届き、切ったことを末尾に添える",
-                    )
-                )
-
-        # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
-        if (
-            rule.additional_context or rule.additional_context_file
-        ) and rule.decision == rules.ALLOW:
-            why = _broad(rule)
-            if why:
-                problems.append(
-                    Problem(
-                        SEVERITY_WARN,
-                        name,
-                        f"広い allow に additionalContext がある（{why}）。"
-                        "当たるたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
-                    )
-                )
-
+            )
     return problems
 
 

@@ -30,7 +30,7 @@ import shutil
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import fsio, rules, settings
+from . import fsio, phasetypes, rules, settings, tree
 from . import ticket as ticket_mod
 
 # 写しの下の置き場。
@@ -572,8 +572,6 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
 
 def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
     """親の計画が種類の定義と噛み合っているか（設計 §24.15.2）。"""
-    from . import phasetypes
-
     problems: list[rules.Problem] = []
     if not t.has_plan:
         return problems
@@ -756,8 +754,6 @@ def project_problems(
     子は親から継ぐ。提案に書いていなければここで埋め、写しに書かれる。書いてあって
     親と違えば承認しない。決めるのは人で、承認の画面に出た値が写しに残る。
     """
-    from . import tree
-
     if t.is_child:
         parent = pool.get(t.parent)
         if parent is None:
@@ -792,8 +788,6 @@ def validate(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], types: dict | None = None
 ) -> list[rules.Problem]:
     """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。"""
-    from . import phasetypes
-
     problems: list[rules.Problem] = []
     if not t.is_child:
         return plan_problems(t, types)

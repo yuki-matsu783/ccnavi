@@ -29,7 +29,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, gitcmd, phasetypes, rules, settings, tree
+from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, tree
 from . import ticket as ticket_mod
 
 # ゲートの中でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -85,8 +85,6 @@ def forbidden(subject: str) -> bool:
 
 def cli_guard_rule(bin_path: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。"""
-    from . import selfguard
-
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
     if clause:
@@ -149,10 +147,8 @@ class Phase:
     @property
     def risk_escalates(self) -> bool:
         """実績のリスクが、宣言に関わらずレビューを要る扱いにする段階か。"""
-        from . import risk as risk_mod
-
         record = self.risk
-        return record is not None and str(record.get("level") or "") in risk_mod.ESCALATE_FROM
+        return record is not None and str(record.get("level") or "") in risk.ESCALATE_FROM
 
     @property
     def risk_line(self) -> str:

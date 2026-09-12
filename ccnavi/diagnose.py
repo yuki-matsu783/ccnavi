@@ -27,7 +27,10 @@ import json
 import time
 from typing import TextIO
 
-from . import audit, hookio, judge, modes, ruleload, rules, settings
+import yaml
+
+from . import approval, audit, hookio, judge, modes, phase, ruleload, rules, settings, tree
+from . import ticket as ticket_mod
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
 BOARD_VERSION = 1
@@ -262,8 +265,6 @@ def load_samples(path: str, root: str) -> list[dict]:
     区画の名前が期待する判定になる。`deny` なら止まるはず、`allow` なら通るはず。
     `subject` の合言葉 `/repo` は走らせた場所に読み替える。
     """
-    import yaml
-
     with open(path, encoding="utf-8") as f:
         raw = yaml.safe_load(f)
     if not isinstance(raw, dict):
@@ -388,8 +389,6 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     それはまだ無いので、ここで言えるのは「どのルールがどの区画にあるか」と
     「チケットの範囲が効いているか」まで。言えないことは言わない。
     """
-    from . import approval, phase, tree
-
     rule_set, source = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
 
@@ -500,9 +499,6 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
 
 def board(conf: settings.Settings, root: str) -> dict:
     """ボードの中身。形は設計 §24.10 と README「ボードの JSON」に書いてある。"""
-    from . import approval, phase, tree
-    from . import ticket as ticket_mod
-
     problems: list[str] = []
     trees = tree.all_trees(root, conf.projects)
     payload: dict = {

@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import globmatch, rules, tree
+from . import globmatch, rules, selfguard, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -349,6 +349,9 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     """読み込み済みの文面からチケットを組み立てる。
 
     ファイルを開く部分と分けてあるのは、テストと承認の画面が同じ道を通るため。
+
+    欄は種類ごとに読み手を分けてある。どれかが「これ以上読めない」と言えば
+    そこで止め、それまでの苦情を全部返す。苦情の並びは欄の並びのまま。
     """
     front, body, problems = _frontmatter(text)
     if front is None:
@@ -365,8 +368,16 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
     if not ticket.ticket:
         problems.append(Problem(SEVERITY_ERROR, "ticket", "チケット識別子が無い"))
         return None, problems
-    name = ticket.ticket
 
+    for read in (_read_identity, _read_relations, _read_review, _read_scope):
+        if read(ticket, front, problems):
+            return None, problems
+    return ticket, problems
+
+
+def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+    """版と識別子と親子の形。読めなければ True。"""
+    name = ticket.ticket
     version = front.get("version")
     if version != VERSION:
         problems.append(
@@ -377,11 +388,11 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
                 "区画は rules.yml と同じ deny / ask / allow で、`target_directories` は読まない",
             )
         )
-        return None, problems
+        return True
 
     if not _ID.match(name):
         problems.append(Problem(SEVERITY_ERROR, name, "識別子に使えない文字がある"))
-        return None, problems
+        return True
 
     if ticket.parent:
         matched = _CHILD.match(name)
@@ -393,11 +404,11 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
                     f"子の識別子は `{ticket.parent}-<2 桁連番>` の形で書く。親の識別子が名前空間",
                 )
             )
-            return None, problems
+            return True
         phase = front.get("phase")
         if isinstance(phase, bool) or not isinstance(phase, int) or phase < 0:
             problems.append(Problem(SEVERITY_ERROR, name, "子には `phase`（0 以上の整数）が要る"))
-            return None, problems
+            return True
         ticket.phase = phase
     else:
         for key in ("phase", "predecessors"):
@@ -405,7 +416,12 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
                 problems.append(
                     Problem(SEVERITY_WARN, name, f"`{key}` は子だけの欄。親では読まない")
                 )
+    return False
 
+
+def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+    """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
+    name = ticket.ticket
     # 子の `project` は承認が親から継いで写しに書く。提案の子に書いてあれば、
     # 親と同じでなければならない。それを見るのも承認（approval.project_problems）。
     ticket.project = _text(front.get("project")).strip()
@@ -415,7 +431,7 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
         ticket.predecessors = [_text(p).strip() for p in raw_preds if _text(p).strip()]
     elif raw_preds is not None:
         problems.append(Problem(SEVERITY_ERROR, name, "`predecessors` は並びで書く"))
-        return None, problems
+        return True
 
     for key in ("plan", "feedback"):
         raw_plan = front.get(key)
@@ -427,7 +443,7 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
         items, bad = _plan(name, key, raw_plan)
         problems.extend(bad)
         if items is None:
-            return None, problems
+            return True
         if key == "plan":
             ticket.plan = items
         else:
@@ -440,12 +456,17 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
             problems.append(
                 Problem(SEVERITY_ERROR, name, "`issue` は課題の番号（正の整数）で書く。`#12` も可")
             )
-            return None, problems
+            return True
         if ticket.is_child:
             problems.append(Problem(SEVERITY_WARN, name, "`issue` は親だけの欄。子では読まない"))
         else:
             ticket.issue = number
+    return False
 
+
+def _read_review(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+    """人間レビューの要否と理由。読めなければ True。"""
+    name = ticket.ticket
     review = front.get("human_review")
     if isinstance(review, dict):
         required = review.get("required", True)
@@ -453,7 +474,7 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
             problems.append(
                 Problem(SEVERITY_ERROR, name, "`human_review.required` は true か false")
             )
-            return None, problems
+            return True
         ticket.review_required = required
         ticket.review_reason = _text(review.get("reason"))
     elif isinstance(review, bool):
@@ -462,14 +483,19 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
         problems.append(
             Problem(SEVERITY_ERROR, name, "`human_review` は {required:, reason:} で書く")
         )
-        return None, problems
+        return True
     if not ticket.review_required and not ticket.review_reason:
         problems.append(
             Problem(
                 SEVERITY_WARN, name, "人間レビューを省くなら `human_review.reason` に理由を書く"
             )
         )
+    return False
 
+
+def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
+    """効かない欄への注意、スクリプトの欄、範囲の項。範囲が成り立たなければ True。"""
+    name = ticket.ticket
     for key in ("tools", "deny_commands", "target_directories"):
         if key in front:
             problems.append(
@@ -497,7 +523,7 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
                 "何も書けない",
             )
         )
-        return None, problems
+        return True
 
     if len(entries) > MAX_SCOPE_ENTRIES:
         problems.append(
@@ -508,9 +534,8 @@ def parse(text: str) -> tuple[Ticket | None, list[Problem]]:
                 "作業を分けるか、範囲をまとめること",
             )
         )
-        return None, problems
-
-    return ticket, problems
+        return True
+    return False
 
 
 def render(ticket: Ticket, extra: dict | None = None) -> str:
@@ -700,8 +725,6 @@ def guard_rules(tickets_rel: str) -> list[rules.Rule]:
     通るのは状態を動かすスクリプトだけ。そのスクリプトの呼び出し文字列には
     置き場の綴りが現れないので、ここに当たらない。
     """
-    from . import selfguard
-
     place = state_dir_regex(tickets_rel)
     message = (
         "チケットの状態は置き場（doing/ done/ cancelled/）で表し、動かすのは "

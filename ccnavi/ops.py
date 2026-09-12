@@ -14,7 +14,7 @@ import os
 import shutil
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, settings, tree
+from . import approval, fsio, gitcmd, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -145,8 +145,6 @@ def judge(
 
     判定は子の HEAD に結ぶ。HEAD が動いたら判定は古く、閉じるときに取り直しになる。
     """
-    from . import risk
-
     answer = answer.strip().lower()
     if answer not in ("yes", "no"):
         stderr.write("ccnavi: 判定は yes か no\n")
@@ -205,8 +203,6 @@ def _score_child(
 
     返すのは、閉じたあとに出す行（点と内訳）。親は数えない。
     """
-    from . import risk
-
     if not found.is_child:
         return []
     worktree = tree.worktree_path(root, found.ticket)
@@ -309,8 +305,6 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     進んでよい状態は同じもの。人が wrapup で締めていれば、開いている子以外は問わない。
     人が締めたあとに残っているものは、締めたときに別の issue へ写してある。
     """
-    from . import phase
-
     copies, _ = approval.copies(conf.approved)
     open_children = [t.ticket for t in copies if t.parent == parent_id]
     if open_children:
@@ -351,8 +345,6 @@ def _deliverables_missing(
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は塞げる。
     """
-    from . import phase
-
     if not found.is_child or found.phase is None:
         return False
     copies, _ = approval.copies(conf.approved)
