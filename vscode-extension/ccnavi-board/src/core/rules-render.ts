@@ -20,11 +20,11 @@ import type { RulesModel } from "./rules-doc.js";
 export const KNOWN_TOOLS = [
   "Bash",
   "PowerShell",
-  "Monitor",
   "Read",
-  "Write",
+  "Grep",
+  "Glob",
   "Edit",
-  "MultiEdit",
+  "Write",
   "NotebookEdit",
   "Skill",
   "Agent",
@@ -95,7 +95,7 @@ ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
   <p class="hint">判定は実行ファイルの <code>--test</code> で行う。編集中の内容で試すので保存は要らない。セッションが dry-run でも、ここは enable のときの判定を返す。</p>
   <div class="judge-form">
     <label>ツール <select id="tool">${KNOWN_TOOLS.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></label>
-    <label class="grow">subject <input id="subject" type="text" placeholder="Bash / PowerShell / Monitor ならコマンド、Read / Write / Edit なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
+    <label class="grow">subject <input id="subject" type="text" placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
     <button type="button" class="action primary" data-action="judge">判定</button>
   </div>
   <div id="judge-result" class="result hidden"></div>
