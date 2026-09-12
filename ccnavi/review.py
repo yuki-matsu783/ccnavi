@@ -188,13 +188,10 @@ def prepare(
     body_file: str,
 ) -> int:
     """前提を全部確かめ、投稿する本文を控えの置き場に書き出す。標準出力はその置き場。"""
-    parent = _parent(stderr, root, conf, cwd)
-    if parent is None:
+    found = _parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
         return 1
-    ph = _phase(root, conf, parent, phase_no)
-    if ph is None:
-        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い\n")
-        return 1
+    parent, ph = found
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。投稿する本文を置く場所が無い\n")
         return 1
@@ -272,19 +269,15 @@ def requested(
     result_path: str,
 ) -> int:
     """投稿の結果を受けて、依頼の印を置く。"""
-    parent = _parent(stderr, root, conf, cwd)
-    if parent is None:
+    found = _parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
         return 1
-    ph = _phase(root, conf, parent, phase_no)
-    if ph is None:
-        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い\n")
-        return 1
+    parent, ph = found
     if approval.MARK_REQUESTED in ph.marks:
         stderr.write(f"ccnavi: フェーズ {phase_no} は依頼済み\n")
         return 1
-    result = _result(stderr, result_path)
-    if result is None or result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+    result = _result_with_mr(stderr, result_path)
+    if result is None:
         return 1
     if not result.url:
         stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないなら印は置かない\n")
@@ -300,7 +293,8 @@ def requested(
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     # since はホストの時計。手元の時計と比べると、依頼直後の指摘が「依頼より前」に
     # 落ちて黙って除かれる。
-    failed = approval.write_mark(
+    if not _mark(
+        stderr,
         conf.approved,
         parent.ticket,
         phase_no,
@@ -312,9 +306,7 @@ def requested(
             "host": result.host,
             "since": result.created_at,
         },
-    )
-    if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+    ):
         return 1
     if conf.state:
         fsio.remove(
@@ -336,13 +328,10 @@ def check(
     result_path: str,
 ) -> int:
     """依頼の後を見る。通れば印を置いてゲートが開く。"""
-    parent = _parent(stderr, root, conf, cwd)
-    if parent is None:
+    found = _parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
         return 1
-    ph = _phase(root, conf, parent, phase_no)
-    if ph is None:
-        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い\n")
-        return 1
+    parent, ph = found
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
@@ -390,15 +379,14 @@ def check(
             )
         return 1
     assert result.mr is not None
-    failed = approval.write_mark(
+    if not _mark(
+        stderr,
         conf.approved,
         parent.ticket,
         phase_no,
         approval.MARK_REVIEWED,
         {"mr": result.mr.number, "accepted": []},
-    )
-    if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+    ):
         return 1
     stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。ゲートが開いた\n")
     return 0
@@ -419,13 +407,10 @@ def reviewed(
 
     受け入れたスレッドの一覧は控えの置き場に書き出す。sh がそれを MR のコメントに写す。
     """
-    parent = _parent(stderr, root, conf, cwd)
-    if parent is None:
+    found = _parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
         return 1
-    ph = _phase(root, conf, parent, phase_no)
-    if ph is None:
-        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {phase_no} の子が無い\n")
-        return 1
+    parent, ph = found
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
@@ -460,7 +445,7 @@ def reviewed(
         stdout.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
     stdout.write("これらを残したまま次のフェーズへ進めてよいなら y、やめるならそれ以外: ")
     stdout.flush()
-    if approval._read(stdin).strip().lower() not in ("y", "yes"):
+    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 受け入れなかった\n")
         return 1
     accepted = [t.url or t.id for t in unresolved]
@@ -471,15 +456,14 @@ def reviewed(
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
-    failed = approval.write_mark(
+    if not _mark(
+        stderr,
         conf.approved,
         parent.ticket,
         phase_no,
         approval.MARK_REVIEWED,
         {"mr": result.mr.number, "accepted": accepted},
-    )
-    if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+    ):
         return 1
     if accepted and conf.state:
         path = os.path.join(conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no))
@@ -529,9 +513,8 @@ def handoff(
     if body is None or not body.strip():
         stderr.write(f"ccnavi: 題と本文を読めない ({body_file})。1 行目が題\n")
         return 1
-    result = _result(stderr, result_path)
-    if result is None or result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+    result = _result_with_mr(stderr, result_path)
+    if result is None:
         return 1
     accepted = approval.accepted_threads(conf.approved, parent.ticket)
     remaining = _unresolved(result.threads, accepted)
@@ -593,9 +576,8 @@ def ready(
             "'sh .claude/scripts/ccnavi-review.sh wrapup --reason <理由>' を打つ\n"
         )
         return 1
-    result = _result(stderr, result_path)
-    if result is None or result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+    result = _result_with_mr(stderr, result_path)
+    if result is None:
         return 1
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。note の下書きを置く場所が無い\n")
@@ -613,14 +595,13 @@ def ready(
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
-    failed = approval.write_parent_mark(
+    if not _parent_mark(
+        stderr,
         conf.approved,
         parent.ticket,
         approval.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
-    )
-    if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+    ):
         return 1
     stdout.write(path + "\n")
     return 0
@@ -650,8 +631,6 @@ def wrapup(
 
     作業中の子がいる間は打てない。締めるのは、手が止まっているときだけ。
     """
-    from . import ops
-
     if not reason.strip():
         stderr.write("ccnavi: wrapup には --reason <理由> が要る\n")
         return 1
@@ -661,10 +640,10 @@ def wrapup(
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。下書きを置く場所が無い\n")
         return 1
-    result = _result(stderr, result_path)
-    if result is None or result.mr is None:
-        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+    result = _result_with_mr(stderr, result_path)
+    if result is None:
         return 1
+    assert result.mr is not None
     if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
@@ -680,74 +659,25 @@ def wrapup(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    todo = [t for ph in phases for t in ph.tickets if ph.states.get(t.ticket) == ticket_mod.TODO]
-    not_ended = [ph for ph in phases if not ph.ended]
-    unreviewed = [ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)]
-    unresolved = _unresolved(
-        result.threads, approval.accepted_threads(conf.approved, parent.ticket)
-    )
-    stdout.write(f"{parent.ticket}（{parent.title}）を締める。残っているもの:\n")
-    for t in todo:
-        stdout.write(f"  - 未着手の子 {t.ticket}（{t.title}）→ 取り消す\n")
-    for ph in not_ended:
-        if not ph.tickets or all(ph.states.get(t.ticket) == ticket_mod.TODO for t in ph.tickets):
-            stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略の印\n")
-    for ph in unreviewed:
-        stdout.write(f"  - フェーズ {ph.label}: レビューが済んでいない → 済んだ扱い\n")
-    if parent.has_plan and parent.feedback is None:
-        stdout.write("  - フィードバック計画: 未計画 → 対応なしの扱い\n")
-    for t in unresolved:
-        stdout.write(f"  - 未解決 {t.url} {t.path}:{t.line} {_first_line(t.body)} → 受け入れる\n")
-    if not (todo or not_ended or unreviewed or unresolved) and not (
-        parent.has_plan and parent.feedback is None
-    ):
-        stdout.write("  （何も残っていない。ready で足りる）\n")
-    stdout.write("残りは別の issue に写す。締めてよいなら y、やめるならそれ以外: ")
-    stdout.flush()
-    if approval._read(stdin).strip().lower() not in ("y", "yes"):
+    left = _leftovers(conf, parent, phases, result)
+    _show_leftovers(stdout, parent, left)
+    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
         return 1
     stamp = approval.now()
-    cancelled: list[str] = []
-    for t in todo:
-        code = ops.cancel(stdout, stderr, root, conf, t.ticket, f"wrapup: {reason.strip()}")
-        if code != 0:
-            return 1
-        cancelled.append(t.ticket)
-    skipped: list[int] = []
-    settled: list[int] = []
-    for ph in phases:
-        if ph.number in {p.number for p in not_ended}:
-            if approval.MARK_SKIPPED not in ph.marks:
-                failed = approval.write_mark(
-                    conf.approved,
-                    parent.ticket,
-                    ph.number,
-                    approval.MARK_SKIPPED,
-                    {"by": "wrapup", "at": stamp},
-                )
-                if failed:
-                    stderr.write(f"ccnavi: 印を置けない: {failed}\n")
-                    return 1
-                skipped.append(ph.number)
-        elif ph in unreviewed:
-            failed = approval.write_mark(
-                conf.approved,
-                parent.ticket,
-                ph.number,
-                approval.MARK_REVIEWED,
-                {"by": "wrapup", "at": stamp, "mr": result.mr.number, "accepted": []},
-            )
-            if failed:
-                stderr.write(f"ccnavi: 印を置けない: {failed}\n")
-                return 1
-            settled.append(ph.number)
-    accepted = [t.url or t.id for t in unresolved]
+    settled = _settle(
+        stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason
+    )
+    if settled is None:
+        return 1
+    cancelled, skipped, reviewed_now = settled
+    accepted = [t.url or t.id for t in left.unresolved]
     failed = approval.remember_accepted(conf.approved, parent.ticket, accepted)
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
-    failed = approval.write_parent_mark(
+    if not _parent_mark(
+        stderr,
         conf.approved,
         parent.ticket,
         approval.PARENT_MARK_WRAPUP,
@@ -757,52 +687,12 @@ def wrapup(
             "mr": result.mr.number,
             "cancelled": cancelled,
             "skipped": skipped,
-            "settled": settled,
+            "settled": reviewed_now,
             "accepted": accepted,
         },
-    )
-    if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+    ):
         return 1
-    # 残りを写す issue の下書き。1 行目が題、空行のあとが本文。
-    issue = [f"{parent.title} の残り", ""]
-    issue += [
-        f"元のマージリクエスト: {result.mr.url}（チケット `{parent.ticket}`）",
-        f"締めた理由: {reason.strip()}",
-        "",
-        "## 残した作業",
-        "",
-    ]
-    rest = [f"- {t.ticket}: {t.title}" for t in todo]
-    rest += [
-        f"- フェーズ {ph.label}: 手を付けていない"
-        for ph in not_ended
-        if not ph.tickets or all(ph.states.get(t.ticket) == ticket_mod.TODO for t in ph.tickets)
-    ]
-    if parent.has_plan and parent.feedback is None:
-        rest.append("- フィードバック計画は立てていない")
-    issue += rest or ["（残した作業は無い）"]
-    issue += ["", "## 引き継ぐ指摘", ""]
-    issue += [f"- {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in unresolved] or [
-        "（未解決のスレッドは残っていない）"
-    ]
-    issue.append("")
-    issue_path = os.path.join(conf.state, WRAPUP_ISSUE_FILE.format(parent=parent.ticket))
-    failed = _write_text(issue_path, "\n".join(issue))
-    if failed:
-        stderr.write(f"ccnavi: {failed}\n")
-        return 1
-    note = [
-        MARKER_WRAPUP,
-        f"利用者が締めた（{stamp}）: {reason.strip()}",
-        f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
-        f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
-        "残りは別の issue に写す。親が片付けて ready を打てば Draft が外れる。"
-        "マージは利用者が行う。",
-        "",
-    ]
-    note_path = os.path.join(conf.state, WRAPUP_NOTE_FILE.format(parent=parent.ticket))
-    failed = _write_text(note_path, "\n".join(note))
+    failed = _wrapup_drafts(conf, parent, result, reason, stamp, left, cancelled, skipped, accepted)
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
@@ -814,6 +704,173 @@ def wrapup(
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
+
+
+@dataclass
+class Leftovers:
+    """締めるときに残っているもの。見せるものと、締めたあとに issue へ写すもの。"""
+
+    # 未着手の子。取り消す。
+    todo: list[ticket_mod.Ticket]
+    # 終わっていないフェーズ。省略の印を置く。
+    not_ended: list[phase.Phase]
+    # 終わっていないフェーズのうち、手を付けていないもの（子が無いか全部未着手）。
+    untouched: list[phase.Phase]
+    # 終わったがレビューが済んでいないフェーズ。済んだ扱いにする。
+    unreviewed: list[phase.Phase]
+    # フィードバック計画がまだ無い。対応なしの扱いにする。
+    unplanned: bool
+    # 未解決のスレッド。受け入れる。
+    unresolved: list[Thread]
+
+    @property
+    def nothing(self) -> bool:
+        return not (
+            self.todo or self.not_ended or self.unreviewed or self.unresolved or self.unplanned
+        )
+
+
+def _leftovers(
+    conf: settings.Settings, parent: ticket_mod.Ticket, phases: list[phase.Phase], result: Result
+) -> Leftovers:
+    not_ended = [ph for ph in phases if not ph.ended]
+    return Leftovers(
+        todo=[t for ph in phases for t in ph.tickets if ph.states.get(t.ticket) == ticket_mod.TODO],
+        not_ended=not_ended,
+        untouched=[
+            ph
+            for ph in not_ended
+            if not ph.tickets or all(ph.states.get(t.ticket) == ticket_mod.TODO for t in ph.tickets)
+        ],
+        unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
+        unplanned=parent.has_plan and parent.feedback is None,
+        unresolved=_unresolved(
+            result.threads, approval.accepted_threads(conf.approved, parent.ticket)
+        ),
+    )
+
+
+def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) -> None:
+    """残っているものと、締めたら何が起きるかを人に見せて、y/N を促す。"""
+    stdout.write(f"{parent.ticket}（{parent.title}）を締める。残っているもの:\n")
+    for t in left.todo:
+        stdout.write(f"  - 未着手の子 {t.ticket}（{t.title}）→ 取り消す\n")
+    for ph in left.untouched:
+        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略の印\n")
+    for ph in left.unreviewed:
+        stdout.write(f"  - フェーズ {ph.label}: レビューが済んでいない → 済んだ扱い\n")
+    if left.unplanned:
+        stdout.write("  - フィードバック計画: 未計画 → 対応なしの扱い\n")
+    for t in left.unresolved:
+        stdout.write(f"  - 未解決 {t.url} {t.path}:{t.line} {_first_line(t.body)} → 受け入れる\n")
+    if left.nothing:
+        stdout.write("  （何も残っていない。ready で足りる）\n")
+    stdout.write("残りは別の issue に写す。締めてよいなら y、やめるならそれ以外: ")
+    stdout.flush()
+
+
+def _settle(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    phases: list[phase.Phase],
+    left: Leftovers,
+    mr_number: int,
+    stamp: str,
+    reason: str,
+) -> tuple[list[str], list[int], list[int]] | None:
+    """未着手の子を取り消し、フェーズに印を置く。
+
+    返すのは取り消した子、省略の印を置いた番号、済んだ扱いにした番号。
+    途中で失敗したら None。そこまでの変更は戻さない（印は次に打てば重ねられる）。
+    """
+    from . import ops
+
+    cancelled: list[str] = []
+    for t in left.todo:
+        if ops.cancel(stdout, stderr, root, conf, t.ticket, f"wrapup: {reason.strip()}") != 0:
+            return None
+        cancelled.append(t.ticket)
+    skipped: list[int] = []
+    settled: list[int] = []
+    pending = {ph.number for ph in left.not_ended}
+    for ph in phases:
+        if ph.number in pending:
+            if approval.MARK_SKIPPED in ph.marks:
+                continue
+            if not _mark(
+                stderr,
+                conf.approved,
+                parent.ticket,
+                ph.number,
+                approval.MARK_SKIPPED,
+                {"by": "wrapup", "at": stamp},
+            ):
+                return None
+            skipped.append(ph.number)
+        elif ph in left.unreviewed:
+            if not _mark(
+                stderr,
+                conf.approved,
+                parent.ticket,
+                ph.number,
+                approval.MARK_REVIEWED,
+                {"by": "wrapup", "at": stamp, "mr": mr_number, "accepted": []},
+            ):
+                return None
+            settled.append(ph.number)
+    return cancelled, skipped, settled
+
+
+def _wrapup_drafts(
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    result: Result,
+    reason: str,
+    stamp: str,
+    left: Leftovers,
+    cancelled: list[str],
+    skipped: list[int],
+    accepted: list[str],
+) -> str:
+    """残りを写す issue の下書きと、MR へ残す note の下書きを書く。書けなければ理由。"""
+    assert result.mr is not None
+    # 1 行目が題、空行のあとが本文。
+    issue = [f"{parent.title} の残り", ""]
+    issue += [
+        f"元のマージリクエスト: {result.mr.url}（チケット `{parent.ticket}`）",
+        f"締めた理由: {reason.strip()}",
+        "",
+        "## 残した作業",
+        "",
+    ]
+    rest = [f"- {t.ticket}: {t.title}" for t in left.todo]
+    rest += [f"- フェーズ {ph.label}: 手を付けていない" for ph in left.untouched]
+    if left.unplanned:
+        rest.append("- フィードバック計画は立てていない")
+    issue += rest or ["（残した作業は無い）"]
+    issue += ["", "## 引き継ぐ指摘", ""]
+    issue += [f"- {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in left.unresolved] or [
+        "（未解決のスレッドは残っていない）"
+    ]
+    issue.append("")
+    issue_path = os.path.join(conf.state, WRAPUP_ISSUE_FILE.format(parent=parent.ticket))
+    failed = _write_text(issue_path, "\n".join(issue))
+    if failed:
+        return failed
+    note = [
+        MARKER_WRAPUP,
+        f"利用者が締めた（{stamp}）: {reason.strip()}",
+        f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
+        f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
+        "残りは別の issue に写す。親が片付けて ready を打てば Draft が外れる。"
+        "マージは利用者が行う。",
+        "",
+    ]
+    note_path = os.path.join(conf.state, WRAPUP_NOTE_FILE.format(parent=parent.ticket))
+    return _write_text(note_path, "\n".join(note))
 
 
 def wip_root(conf: settings.Settings) -> str:
@@ -981,6 +1038,49 @@ def _phase(
         if ph.number == number:
             return ph
     return None
+
+
+def _parent_phase(
+    stderr: TextIO, root: str, conf: settings.Settings, cwd: str, number: int
+) -> tuple[ticket_mod.Ticket, phase.Phase] | None:
+    """cwd の親と、その番号のフェーズ。どちらか無ければ言って None。"""
+    parent = _parent(stderr, root, conf, cwd)
+    if parent is None:
+        return None
+    ph = _phase(root, conf, parent, number)
+    if ph is None:
+        stderr.write(f"ccnavi: {parent.ticket} にフェーズ {number} の子が無い\n")
+        return None
+    return parent, ph
+
+
+def _result_with_mr(stderr: TextIO, path: str) -> Result | None:
+    """写しを読み、マージリクエストが入っていることまで確かめる。無ければ言って None。"""
+    result = _result(stderr, path)
+    if result is None or result.mr is None:
+        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+        return None
+    return result
+
+
+def _mark(
+    stderr: TextIO, approved_dir: str, parent: str, number: int, kind: str, data: dict
+) -> bool:
+    """フェーズの印を置く。置けなければ言って False。"""
+    failed = approval.write_mark(approved_dir, parent, number, kind, data)
+    if failed:
+        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+        return False
+    return True
+
+
+def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data: dict) -> bool:
+    """親の印を置く。置けなければ言って False。"""
+    failed = approval.write_parent_mark(approved_dir, parent, name, data)
+    if failed:
+        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+        return False
+    return True
 
 
 def _unmet(tree_root: str, ph: phase.Phase) -> list[str]:

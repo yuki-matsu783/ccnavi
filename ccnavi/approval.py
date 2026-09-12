@@ -364,7 +364,7 @@ def approve(
     stdout.write(screen(batch, pool, types) + "\n\n")
     stdout.write(f"この {len(batch)} 件を承認する場合は y、やめる場合はそれ以外: ")
     stdout.flush()
-    if _read(stdin).strip().lower() not in ("y", "yes"):
+    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
         return 1
 
@@ -835,13 +835,6 @@ def validate(
             return problems
         problems.extend(phasetypes.scope_problems(t, pt))
     return problems
-
-
-def _read(stdin: TextIO) -> str:
-    try:
-        return stdin.readline()
-    except (OSError, ValueError):
-        return ""
 
 
 def _write(path: str, text: str) -> str:

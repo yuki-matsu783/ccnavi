@@ -108,6 +108,14 @@ def write_json(path: str, data: Any, indent: int | None = None) -> str:
     return write_text(path, json.dumps(data, ensure_ascii=False, indent=indent))
 
 
+def read_line(stream: Any) -> str:
+    """人の答えを 1 行読む。読めなければ空文字（端末が閉じている、など）。"""
+    try:
+        return stream.readline()
+    except (OSError, ValueError):
+        return ""
+
+
 def remove(path: str) -> None:
     """消す。無くても、消せなくても黙る。"""
     with contextlib.suppress(OSError):
