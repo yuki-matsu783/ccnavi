@@ -63,6 +63,8 @@ export interface TicketJson {
   readonly cancelled_at: string;
   readonly cancel_reason: string;
   readonly seen_in: readonly SeenInJson[];
+  /** どれが本物か決まらない写りの全部。決まっていれば空 */
+  readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
 }
@@ -237,12 +239,17 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     base_sha: str(raw.base_sha),
     cancelled_at: str(raw.cancelled_at),
     cancel_reason: str(raw.cancel_reason),
-    seen_in: list(raw.seen_in)
-      .filter(isRecord)
-      .map((s) => ({ tree: str(s.tree), state: str(s.state), path: str(s.path) })),
+    seen_in: seenIn(raw.seen_in),
+    scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,
     judge: isRecord(raw.judge) ? raw.judge : null,
   };
+}
+
+function seenIn(value: unknown): readonly SeenInJson[] {
+  return list(value)
+    .filter(isRecord)
+    .map((s) => ({ tree: str(s.tree), state: str(s.state), path: str(s.path) }));
 }
 
 function proposal(raw: Record<string, unknown>): ProposalJson | null {
