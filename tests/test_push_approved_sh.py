@@ -130,8 +130,42 @@ class Workspace(unittest.TestCase):
             errors="replace",
         )
 
-    def push(self, *args, cwd=None):
-        return self.run_sh("ccnavi-push-approved.sh", *args, cwd=cwd)
+    def push(self, *args, cwd=None, env=None):
+        return self.run_sh("ccnavi-push-approved.sh", *args, cwd=cwd, env=env)
+
+    def repository(self, path, branch):
+        """ワークスペースの下に別のリポジトリを置く。bare のリモートを付けて返す。"""
+        git(self._tmp.name, "init", "-q", "-b", "main", path)
+        for key, value in (
+            ("user.email", "t@example.invalid"),
+            ("user.name", "t"),
+            ("commit.gpgsign", "false"),
+        ):
+            git(path, "config", key, value)
+        write(os.path.join(path, "README.md"), "project\n")
+        git(path, "add", "--", "README.md")
+        git(path, "commit", "-q", "-m", "seed")
+        git(path, "checkout", "-q", "-b", branch)
+        remote = os.path.join(self._tmp.name, os.path.basename(path) + ".git")
+        git(self._tmp.name, "init", "-q", "--bare", remote)
+        git(path, "remote", "add", "origin", remote)
+        return remote
+
+    def head_of(self, remote, branch):
+        done = git(
+            self._tmp.name,
+            "--git-dir",
+            remote,
+            "rev-parse",
+            "--verify",
+            "-q",
+            f"refs/heads/{branch}",
+            check=False,
+        )
+        return done.stdout.strip() if done.returncode == 0 else ""
+
+    def staged(self, tree):
+        return git(tree, "diff", "--cached", "--name-only").stdout.strip()
 
     def head(self, tree):
         return git(tree, "rev-parse", "HEAD").stdout.strip()
@@ -247,6 +281,72 @@ class PushApprovedTest(Workspace):
         # 飛ばしても、他のツリーは運ぶ。
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.remote_head("i0002"), self.head(tree))
+
+    # ---- チケット approve-carry-04 の 11〜14
+
+    def test_carries_a_tree_under_projects(self):
+        """11. `projects/<名前>/` の下のツリーの置き場も、コミットして push する。"""
+        project = os.path.join(self.ws, "projects", "app")
+        remote = self.repository(project, "work")
+        self.place(project)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.subject(project), MESSAGE)
+        self.assertEqual(self.committed(project), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.head_of(remote, "work"), self.head(project))
+        self.assertNotIn(NOTHING, result.stdout)
+
+    def test_carries_the_place_named_by_ccnavi_approved(self):
+        """12. `CCNAVI_APPROVED` を既定と違う綴りにすると、その置き場を運ぶ。
+
+        既定の置き場（`.ccnavi/tickets`）は運ばない。
+        """
+        other = "approved/tickets"
+        tree = self.worktree("i0001")
+        write(os.path.join(tree, *other.split("/"), "i0001.md"), "approved\n")
+        self.place(tree, "i0002")
+
+        result = self.push(env=self.env(CCNAVI_APPROVED=other))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.committed(tree), [f"{other}/i0001.md"])
+        self.assertTrue(self.dirty(tree, APPROVED))
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_leaves_nothing_of_others_in_the_index(self):
+        """13. 実行後、同じツリーの他人の変更がステージ（インデックス）に載っていない。
+
+        書きかけは書きかけのまま（ステージしていない変更と未追跡のファイル）で残す。
+        """
+        tree = self.worktree("i0001")
+        self.place(tree)
+        write(os.path.join(tree, "README.md"), "書きかけ\n")
+        write(os.path.join(tree, "src", "draft.py"), "x\n")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.staged(tree), "")
+        self.assertEqual(self.dirty(tree, "README.md"), "M README.md")
+        self.assertTrue(self.dirty(tree, "src").startswith("??"), self.dirty(tree, "src"))
+
+    def test_only_a_detached_tree_is_skipped_without_saying_nothing(self):
+        """14. detached のツリーにしか変更が無いときは 0 で終わる。
+
+        「運ぶ承認済みチケットは無い。」とは言わず、飛ばしたことを標準エラーに言う。
+        """
+        loose = self.worktree("loose", detach=True)
+        self.place(loose)
+        before = self.head(loose)
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn(NOTHING, result.stdout)
+        self.assertNotIn(NOTHING, result.stderr)
+        self.assertIn("loose", result.stderr)
+        self.assertEqual(self.head(loose), before)
+        self.assertTrue(self.dirty(loose, APPROVED))
 
     # ---- 1.2・1.3 引数と置き場
 

@@ -17,6 +17,7 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import unittest
@@ -36,9 +37,17 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
-    def yes(self, tickets, *extra):
-        """`--approve --yes <識別子,…> --json [<絞り>...]`。extra は絞りかフラグ。"""
-        return self.ccnavi("--approve", "--yes", ",".join(tickets), "--json", *extra)
+    def yes(self, tickets, *extra, digest=None):
+        """`--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。extra は絞りかフラグ。
+
+        拡張と同じく、直前に同じ extra でプレビューして、見せた本文の指紋（`digest`）を渡す。
+        digest を名指しすると、その値をそのまま渡す（見せたあとに提案が変わった形）。
+        """
+        if digest is None:
+            digest = self.preview(*extra)["digest"]
+        return self.ccnavi(
+            "--approve", "--yes", ",".join(tickets), "--digest", digest, "--json", *extra
+        )
 
     def copy_exists(self, name):
         return os.path.exists(os.path.join(self.approved, name + ".md"))
@@ -191,10 +200,83 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
-        result = self.ccnavi("--approve", "--yes", "i0001,i0001-01")
+        digest = self.preview()["digest"]
+        result = self.ccnavi("--approve", "--yes", "i0001,i0001-01", "--digest", digest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
+
+    # ---- 4b. 見せた本文の指紋を照合する（チケット approve-carry-04 の 1〜5）
+
+    def test_preview_carries_a_stable_digest_of_the_text(self):
+        """1. preview の答えに `digest`（`text` を UTF-8 にした SHA-256 の 16 進）が載る。"""
+        self.pending_parent_and_child()
+        first = self.preview()
+        self.assertEqual(first["digest"], hashlib.sha256(first["text"].encode("utf-8")).hexdigest())
+        # 同じ状態でもう一度見せても同じ値になる。
+        self.assertEqual(self.preview()["digest"], first["digest"])
+
+    def test_yes_with_the_shown_digest_approves(self):
+        """2. 見せた `digest` を `--yes` に渡すと承認できる。"""
+        self.pending_parent_and_child()
+        shown = self.preview()["digest"]
+        result = self.yes(["i0001", "i0001-01"], digest=shown)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01"])
+        self.assertTrue(self.copy_exists("i0001-01"))
+
+    def test_yes_refuses_when_the_shown_text_changed(self):
+        """3. 見せたあとで子の中身を書き換えると、識別子が同じでも承認しない。"""
+        inside = "wip/research/*"
+        beyond = "src/a/*"
+        for label, old, new in (
+            ("題", "title: 子 i0001-01", "title: 書き換えた題"),
+            ("理由", "rationale: r", "rationale: 書き換えた理由"),
+            ("範囲（上限の内側）", f'glob: "{inside}"', 'glob: "wip/research/sub/*"'),
+            ("範囲（上限の外）", f'glob: "{beyond}"', 'glob: "src/b/*"'),
+        ):
+            with self.subTest(label):
+                self.setUp()
+                self.pending_parent_and_child()
+                path = self.propose(
+                    "i0001-01", child_text("i0001-01", "i0001", 1, (inside, beyond), False)
+                )
+                self.commit_parent()
+                shown = self.preview()
+                self.assertIn(beyond, shown["text"])
+
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+                self.assertIn(old, text)
+                write(path, text.replace(old, new, 1))
+                self.commit_parent("edit after preview")
+
+                result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                body = json.loads(result.stdout)
+                self.assertEqual(body["version"], APPROVE_VERSION)
+                mismatch = body["mismatch"]
+                self.assertEqual(mismatch["expected"], ["i0001", "i0001-01"])
+                self.assertEqual(mismatch["current"], ["i0001", "i0001-01"])
+                self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
+                self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
+                self.assertEqual(mismatch["digest"]["current"], self.preview()["digest"])
+                self.assertFalse(self.copy_exists("i0001"))
+                self.assertFalse(self.copy_exists("i0001-01"))
+
+    def test_yes_without_a_digest_is_refused(self):
+        """4. `--yes` に `--digest` が無ければ承認しない。誤りとして言う。"""
+        self.pending_parent_and_child()
+        for args in (
+            ("--approve", "--yes", "i0001,i0001-01", "--json"),
+            ("--approve", "--yes", "i0001,i0001-01"),
+        ):
+            with self.subTest(" ".join(args)):
+                result = self.ccnavi(*args)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("--digest", result.stderr)
+                self.assertFalse(self.copy_exists("i0001"))
+                self.assertFalse(self.copy_exists("i0001-01"))
 
     # ---- 5. 端末の壁
 
@@ -247,6 +329,25 @@ class ApproveJsonTest(PhaseHarness):
 
     # 走らせるたびに変わる欄。フィクスチャと比べるときは外す。
     VOLATILE = ("generated_at",)
+    # 本文の指紋。本文は一時ディレクトリのパスを含むので、走らせるたびに値が変わる。
+    # 形（SHA-256 の 16 進）だけ確かめて、固定の綴りに置き換えてから比べる。
+    DIGEST = "<digest>"
+
+    def _mask_digests(self, portable):
+        def mask(value):
+            self.assertRegex(value, r"^[0-9a-f]{64}$")
+            return self.DIGEST
+
+        masked = dict(portable)
+        if "digest" in masked:
+            masked["digest"] = mask(masked["digest"])
+        mismatch = masked.get("mismatch")
+        if isinstance(mismatch, dict) and isinstance(mismatch.get("digest"), dict):
+            masked["mismatch"] = {
+                **mismatch,
+                "digest": {k: mask(v) for k, v in mismatch["digest"].items()},
+            }
+        return masked
 
     def _check_fixture(self, name, body):
         """拡張のフィクスチャと突き合わせる。鍵だけでなく値まで見る。
@@ -254,7 +355,7 @@ class ApproveJsonTest(PhaseHarness):
         鍵の集合だけを比べると、識別子や本文が入れ替わっても気づけない。
         機械に依らない形（`_portable`）に直したうえで、時刻の欄だけ外して比べる。
         """
-        portable = _portable(body, self.root)
+        portable = self._mask_digests(_portable(body, self.root))
         if os.environ.get("CCNAVI_BOARD_FIXTURE"):
             # 時刻は固定の綴りで書く。走らせるたびに変わる欄をそのまま置くと、
             # 形が同じでもフィクスチャに差分が出る。

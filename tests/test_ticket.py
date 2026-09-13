@@ -956,6 +956,30 @@ class TicketTest(unittest.TestCase):
         result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
+    def test_approval_scripts_are_denied_in_any_letter_case(self):
+        """9・10. 止める綴りは大文字小文字を区別しない。文面は人が確かめる前提を言わない。
+
+        Windows と macOS の既定のファイルシステムは綴りの大小を区別しないので、
+        綴りを変えただけの sh も同じものが走る。ボードは Enter まで送るので、
+        「利用者が確かめて実行します」は実際の動きと合わない。
+        """
+        for command in (
+            "sh .ccnavi/scripts/CCNAVI-PUSH-APPROVED.sh",
+            "SH .ccnavi/scripts/ccnavi-push-approved.sh",
+            "sh .ccnavi/scripts/CCNAVI-APPROVE.sh",
+        ):
+            with self.subTest(command):
+                result = self.hook(
+                    "PreToolUse",
+                    "Bash",
+                    self.parent_tree,
+                    command=command,
+                    guard_ticket_approval="enable",
+                )
+                reason = self.reason(result)
+                self.assertIn("DENY_TICKET_APPROVAL_CLI", reason)
+                self.assertNotIn("利用者が確かめて実行します", reason)
+
     def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
         refused = self.ccnavi("--approve", "--guard-ticket-approval", "enable", stdin="y\n")
