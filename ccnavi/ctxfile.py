@@ -188,11 +188,16 @@ def forget(state_dir: str, session: str) -> None:
     mine = os.path.basename(_once_path(state_dir, session, "")).rsplit("-", 1)[0] + "-"
     cutoff = time.time() - ONCE_KEEP_DAYS * 86400
     for name in os.listdir(state_dir):
-        if not name.startswith("once-") or not name.endswith(".json"):
+        if not name.endswith(".json"):
+            continue
+        # 承認を伝えた控え（approval.news）は同じ場所に置く。こちらはセッションの
+        # 再開で捨てず、古いものだけ一緒に掃く。
+        stale = name.startswith("approved-")
+        if not stale and not name.startswith("once-"):
             continue
         path = os.path.join(state_dir, name)
         try:
-            if name.startswith(mine) or os.path.getmtime(path) < cutoff:
+            if (not stale and name.startswith(mine)) or os.path.getmtime(path) < cutoff:
                 os.remove(path)
         except OSError:
             # 消せなくても次の開始でまた試す。ここで止めるほどのものではない。

@@ -47,22 +47,25 @@ HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # もう効かない環境変数（settings.py の RETIRED_ENVS）。書かれていたら
 # ccnavi の --lint が苦情を言う。導入スクリプトが作ってはいけない。
 RETIRED_ENV = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_PROJECT_RULES")
-# --deploy が写すゲートの sh。拒否の文面が案内する「代わりに通る形」で、
+# --deploy が配るゲートの sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側に逃げ道がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
+# 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
+# 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
+DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh")
 RULES_PARTS = (".claude", "ccnavi", "rules.yml")
-# --deploy が写す残りの設定 2 本（設計 §25.9）。リスクの配点は共通層、
+# --deploy が配る残りの設定 2 本（設計 §25.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".claude", "ccnavi", "risk.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 
 
 def quiet_deploy(args):
-    """配り元を名指ししていない呼び出しから、写しを外す。
+    """配布元を名指ししていない呼び出しから、配布を外す。
 
-    写しは既定で走る。設定の話をするテストでそれを許すと、テストが「コードの
+    配布は既定で走る。設定の話をするテストでそれを許すと、テストが「コードの
     こと」ではなく「走った機械に dist/ が組み立ててあるかどうか」を報告する。
-    写しそのものは DeploysWhatTheProjectNeeds が、偽の配り元を作って見る。
+    配布そのものは DeploysWhatTheProjectNeeds が、偽の配布元を作って見る。
     """
     if any(a in ("--deploy", "--no-deploy") for a in args):
         return list(args)
@@ -314,9 +317,9 @@ class KeepsWhatItFinds(SetupTest):
         self.assertEqual(len(self.commands_of(data, "PostToolUse")), 2)
 
     def test_keeps_the_copy_it_took_before_the_first_change(self):
-        """写しは最初の 1 回だけ取る。
+        """控えは最初の 1 回だけ取る。
 
-        毎回取り直すと、打ち直した数だけ写しが新しくなり、戻れるのは 1 手前
+        毎回取り直すと、打ち直した数だけ控えが新しくなり、戻れるのは 1 手前
         ――そこには既に ccnavi が入っている――までになる。入れる前の姿へ
         戻す手立てが消える。
         """
@@ -652,7 +655,7 @@ class WritesWithoutLeavingTraces(SetupTest):
 
 
 class DeploysWhatTheProjectNeeds(SetupTest):
-    """`--deploy` が、設定だけでは動かないものを配り元から写す。
+    """`--deploy` が、設定だけでは動かないものを配布元から配る。
 
     `dist/` は .gitignore に入っていて git では渡らず、`CCNAVI_BIN_PATH` は相対で
     しか書けない。よそで組んだ実行ファイルを指すこともできないので、対象
@@ -660,10 +663,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     """
 
     def make_source(self, built=True, parts=True):
-        """配り元のふりをするディレクトリを作る。
+        """配布元のふりをするディレクトリを作る。
 
         本物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
-        「どこから何を写すか」であって、実行ファイルの中身ではない。
+        「どこから何を配るか」であって、実行ファイルの中身ではない。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
@@ -694,7 +697,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
             os.makedirs(os.path.join(src, ".claude", "scripts"))
-            for name in GATE_SCRIPTS:
+            for name in DEPLOY_SCRIPTS:
                 with open(
                     os.path.join(src, ".claude", "scripts", name),
                     "w",
@@ -704,10 +707,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return src
 
     def install_script(self, src):
-        """配り元のふりをするディレクトリに、このスクリプト自身を置く。
+        """配布元のふりをするディレクトリに、このスクリプト自身を置く。
 
-        既定の配り元は「打ったスクリプトの置き場の 1 つ上」。本物の ccnavi の
-        根をそのまま配り元にすると、テストが走った機械に dist/ が組み立てて
+        既定の配布元は「打ったスクリプトの置き場の 1 つ上」。本物の ccnavi の
+        根をそのまま配布元にすると、テストが走った機械に dist/ が組み立てて
         あるかどうかで結果が変わる。
         """
         scripts = os.path.join(src, "scripts")
@@ -717,7 +720,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return copied
 
     def run_copied(self, script, *args):
-        """写しを既定のまま走らせる。quiet_deploy を通さない。"""
+        """配布を既定のまま走らせる。quiet_deploy を通さない。"""
         return subprocess.run(
             [SHELL, script, self.dir, *args],
             capture_output=True,
@@ -727,7 +730,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         )
 
     def make_git(self):
-        """配り先を git のリポジトリに見せる。.gitignore を書くのはここだけ。"""
+        """配布先を git のリポジトリに見せる。.gitignore を書くのはここだけ。"""
         os.makedirs(os.path.join(self.dir, ".git"), exist_ok=True)
 
     def gitignore(self):
@@ -741,7 +744,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return os.path.join(self.dir, *parts)
 
     def test_writes_the_settings_and_copies_the_parts_in_one_run(self):
-        """1 回で、設定を書き、実行ファイル・ルール・ゲートの sh を写す。"""
+        """1 回で、設定を書き、実行ファイル・ルール・ゲートの sh を配る。"""
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -754,21 +757,21 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
-        for name in GATE_SCRIPTS:
+        for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
 
     def test_says_nothing_is_missing_after_it_copied(self):
-        """写したあとは「まだ無いもの」が出ない。
+        """配ったあとは「まだ無いもの」が出ない。
 
         ここが出たままだと、配ったのか配れなかったのかを人が読み取れない。
         """
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertNotIn("まだ無いもの", result.stdout)
-        self.assertIn("写した", result.stdout)
+        self.assertIn("配った", result.stdout)
 
     def test_no_deploy_writes_only_the_settings(self):
-        """`--no-deploy` は写しを取らない。何が無いかと、戻し方を見せる。"""
+        """`--no-deploy` は配布物を置かない。何が無いかと、戻し方を見せる。"""
         result = self.run_setup("--mode", "enable", "--no-deploy")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
@@ -785,7 +788,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertFalse(os.path.exists(self.settings_path()))
 
     def test_copies_without_being_told_where_from(self):
-        """配り元を名指ししなくても写す。既定はスクリプト自身の置き場の 1 つ上。
+        """配布元を名指ししなくても配る。既定はスクリプト自身の置き場の 1 つ上。
 
         設定だけ書かれて実行ファイルが無い形は、hook が 7 つ登録されているのに
         何も起動しない、という一番分かりにくい壊れ方になる。そこが、打った人が
@@ -799,13 +802,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
         self.assertTrue(os.path.isfile(self.deployed(".claude", "ccnavi", "ccnavi")))
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
-        for name in GATE_SCRIPTS:
+        for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
 
     def test_writes_the_settings_when_the_default_source_is_not_built(self):
-        """既定の配り元が組み立てられていなくても、設定は書く。
+        """既定の配布元が組み立てられていなくても、設定は書く。
 
-        名指しされていない配り元が空なのは、打った人の誤りではない。ここで
+        名指しされていない配布元が空なのは、打った人の誤りではない。ここで
         断ると、組み立てていない機械では設定すら書けなくなる。
         """
         src = self.make_source(built=False)
@@ -813,11 +816,11 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_copied(script, "--mode", "enable")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
-        self.assertIn("写していません", result.stdout)
+        self.assertIn("配っていません", result.stdout)
         self.assertIn("build.py", result.stdout)
 
     def test_does_not_refuse_when_the_default_source_is_the_target(self):
-        """ccnavi 自身に打っても止まらない。写す先が無いので、写しだけ諦める。"""
+        """ccnavi 自身に打っても止まらない。配る先が無いので、配布だけ諦める。"""
         src = self.make_source()
         script = self.install_script(src)
         result = subprocess.run(
@@ -828,7 +831,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             errors="replace",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("配り元と配り先が同じ", result.stdout)
+        self.assertIn("配布元と配布先が同じ", result.stdout)
         with open(os.path.join(src, ".claude", "settings.json"), encoding="utf-8") as f:
             self.assertEqual(json.load(f)["env"]["CCNAVI_MODE"], "enable")
 
@@ -844,7 +847,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.access(self.deployed(".claude", "ccnavi", "ccnavi"), os.X_OK))
 
     def test_running_twice_does_not_copy_again(self):
-        """2 回目は写さない。既にあるものとして並べる。"""
+        """2 回目は配らない。既にあるものとして並べる。"""
         src = self.make_source()
         self.run_setup("--deploy", src)
         with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:
@@ -852,7 +855,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("配り先に既にあるので写していないもの", result.stdout)
+        self.assertIn("配布先に既にあるので配っていないもの", result.stdout)
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
 
@@ -889,12 +892,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], "tools/ccnavi/ccnavi")
         self.assertTrue(os.path.isfile(self.deployed("tools", "ccnavi", "ccnavi")))
-        # 既定の置き場には置かれない。rules.yml は同じディレクトリへ写るので、
+        # 既定の置き場には置かれない。rules.yml は同じディレクトリへ配られるので、
         # 見るのはディレクトリではなく実行ファイルの有無。
         self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi", "ccnavi")))
 
     def test_refuses_a_source_that_was_never_built(self):
-        """組み立てていない配り元では、黙って進まない。
+        """組み立てていない配布元では、黙って進まない。
 
         報告だけにすると「配ったはずなのに実行ファイルが無い」が最後の一覧に
         しか出ず、打った人は配れたものとして先へ進む。
@@ -906,7 +909,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertFalse(os.path.exists(self.settings_path()))
 
     def test_names_what_the_source_does_not_have(self):
-        """配り元に無いものは、黙って飛ばさずに名前を挙げる。
+        """配布元に無いものは、黙って飛ばさずに名前を挙げる。
 
         判定するものだけが入って何を止めるかが入らない形は、配った側の
         落ち度に見えないまま残る。
@@ -914,16 +917,16 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         src = self.make_source(parts=False)
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("配り元に無くて写せないもの", result.stdout)
+        self.assertIn("配布元に無くて配れないもの", result.stdout)
         self.assertIn("rules.yml", result.stdout)
         self.assertTrue(os.path.isfile(self.deployed(".claude", "ccnavi", "ccnavi")))
 
     def test_check_does_not_copy(self):
-        """`--check` は写さない。揃っていないので 1 を返す。"""
+        """`--check` は配らない。揃っていないので 1 を返す。"""
         src = self.make_source()
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("写す", result.stdout)
+        self.assertIn("配る", result.stdout)
         self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi")))
 
     def test_check_is_settled_once_everything_is_there(self):
@@ -933,7 +936,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stdout)
 
     def test_refuses_to_deploy_onto_itself(self):
-        """配り元と配り先が同じなら断る。写す先が無い。"""
+        """配布元と配布先が同じなら断る。配る先が無い。"""
         src = self.make_source()
         result = self.run_raw(src, "--deploy", src)
         self.assertEqual(result.returncode, 2)
@@ -949,9 +952,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
 
 class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
-    """写した実行ファイルを .gitignore に足す。
+    """配った実行ファイルを .gitignore に足す。
 
-    配り先は git で持ち回るのが普通なので、書かないと次のコミットで実行ファイルと
+    配布先は git で持ち回るのが普通なので、書かないと次のコミットで実行ファイルと
     _internal がまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
     ない。
     """
@@ -1021,7 +1024,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertNotIn("rules.yml", written)
 
     def test_writes_nothing_when_the_target_is_not_a_git_repository(self):
-        """git で持っていない配り先に .gitignore を置いても、誰も読まない。"""
+        """git で持っていない配布先に .gitignore を置いても、誰も読まない。"""
         src = self.make_source()
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1036,7 +1039,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertIsNone(self.gitignore())
 
     def test_is_not_settled_while_the_lines_are_missing(self):
-        """写しが済んでいても、.gitignore が欠けていれば揃っていない。
+        """配布が済んでいても、.gitignore が欠けていれば揃っていない。
 
         --check を門にしている手順がそこを通すと、次のコミットで実行ファイルが
         履歴に入る。
@@ -1065,7 +1068,7 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertEqual(self.read_vscode(), {"git.detectWorktrees": True})
 
     def test_keeps_settings_that_have_nothing_to_do_with_ccnavi(self):
-        """VS Code の他の設定は残す。写しも 1 つ取る。"""
+        """VS Code の他の設定は残す。控えも 1 つ取る。"""
         self.write_vscode({"editor.tabSize": 2})
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)

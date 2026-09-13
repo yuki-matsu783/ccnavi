@@ -249,6 +249,7 @@ def check(
     problems.extend(_layers(io.StringIO(), conf, root))
     problems.extend(_layer_configs(conf, root))
     problems.extend(_worktree_layers(conf, root))
+    problems.extend(_ticket_places(conf, root))
     return problems
 
 
@@ -296,9 +297,9 @@ def _types_resolver(conf: settings.Settings, root: str):
 
 
 def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
-    """チケットと写しと作業ツリーが噛み合っているかを見る（REQ-TKT-25）。
+    """チケットと承認済みチケットと作業ツリーが噛み合っているかを見る（REQ-TKT-25）。
 
-    判定に効くのは写しの側だけなので、ここで問うのは「効いている範囲は何か」と
+    判定に効くのは承認済みチケットの側だけなので、ここで問うのは「効いている範囲は何か」と
     「作業ツリーと提案がそれと一致しているか」。一致していない状態は壊れては
     いないが、書いた人は書いたとおりに効いていると思っている。
     検証はその思い違いを名指しする場所になる。
@@ -314,7 +315,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             f"旧の綴りに置いたままのルールは 1 件も効いていない"
         ),
     }
-    default = f"提案は {settings.TICKETS_ENV}、写しは {settings.APPROVED_ENV} で指す"
+    default = f"提案は {settings.TICKETS_ENV}、承認済みチケットは {settings.APPROVED_ENV} で指す"
     for name in conf.retired:
         problems.append(
             Problem(
@@ -346,7 +347,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
         return problems
     root = root or os.path.dirname(os.path.dirname(os.path.dirname(conf.approved)))
     if not os.path.isdir(conf.approved) and not tree_has_tickets(root, conf.tickets):
-        # 写しも提案も無い状態は不備ではない。チケットによる制御は任意で、
+        # 承認済みチケットも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
         # 他の報告ごと読まれなくなる。
         return problems
@@ -396,9 +397,9 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
 
 
 def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
-    """写しの置き場が守られているか。
+    """承認済みチケットの置き場が守られているか。
 
-    ルールが Write を止めていなければ、エージェントが写しを書けて、承認の意味が無い。
+    ルールが Write を止めていなければ、エージェントが承認済みチケットを書けて、承認の意味が無い。
     """
     try:
         rule_set, _ = rules.load(conf.rules, root)
@@ -411,8 +412,8 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"写しの置き場 {conf.approved} への Write をルールが止めていない。"
-            "エージェントが写しを書けるので、承認の意味が無い",
+            f"承認済みチケットの置き場 {conf.approved} への Write をルールが止めていない。"
+            "エージェントが承認済みチケットを書けるので、承認の意味が無い",
         )
     ]
 
@@ -420,7 +421,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
 def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
     """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
     problems: list[Problem] = []
-    # 提案と写しを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
+    # 提案と承認済みチケットを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
         pool.setdefault(t.ticket, t)
@@ -462,7 +463,7 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) ->
 def _worktree_problems(
     root: str, conf: settings.Settings, worktrees: list, index: dict, copies: list
 ) -> list[Problem]:
-    """作業ツリーの側。チケットの無いツリー、迷い込んだ写し、切り元の食い違い、ツリーの無い写し。"""
+    """作業ツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、切り元の食い違い、ツリーの無い承認済みチケット。"""
     problems: list[Problem] = []
     for t in worktrees:
         if t.name not in index:
@@ -479,7 +480,8 @@ def _worktree_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"作業ツリー {t.name} の側に写しの置き場がある。読むのは main の側だけ",
+                    f"作業ツリー {t.name} の側に承認済みチケットの置き場がある。"
+                    "読むのは main の側だけ",
                 )
             )
         bound = index.get(t.name)
@@ -491,9 +493,10 @@ def _worktree_problems(
                     Problem(
                         SEVERITY_ERROR,
                         "(ticket)",
-                        f"作業ツリー {t.name} の切り元（{t.project or 'ワークスペース'}）が写しの "
+                        f"作業ツリー {t.name} の切り元（{t.project or 'ワークスペース'}）が"
+                        "承認済みチケットの "
                         f"project（{owner or 'ワークスペース'}）と違う。そこへの書き込みは止まる。"
-                        "写しが指すリポジトリから切り直す",
+                        "承認済みチケットが指すリポジトリから切り直す",
                     )
                 )
     names = {t.name for t in worktrees}
@@ -683,6 +686,44 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"見える。プロジェクトの設定は {conf.project_home}/ に置く",
                 )
             )
+    return problems
+
+
+def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
+    """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
+
+    プロジェクト向けの提案はワークスペースの `wip/<名前>/tickets/` に置き、名前は
+    `projects/` にあるプロジェクトのものでなければ走査されない（設計 §25.5）。走査
+    されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
+    いちばん困るので名指しする。error にはしない。判定は動いている。
+    """
+    parts = [p for p in conf.tickets.split("/") if p]
+    if len(parts) < 2:
+        # 名前を挟む位置が置き場の綴りから決められない。言えないことは言わない。
+        return []
+    head, tail = parts[0], parts[1:]
+    known = {p.name for p in tree.projects(conf.projects)}
+    where = os.path.relpath(conf.projects, root).replace(os.sep, "/") if conf.projects else "(無し)"
+    problems: list[Problem] = []
+    try:
+        names = sorted(os.listdir(os.path.join(root, head)))
+    except OSError:
+        return []
+    for name in names:
+        if name == tail[0] or name in known:
+            continue
+        place = os.path.join(root, head, name, *tail)
+        if not os.path.isdir(place):
+            continue
+        rel = "/".join([head, name, *tail])
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(projects)",
+                f"{rel}/ の提案は走査されていない。{name} が {where} のプロジェクトとして"
+                "数えられていない（`.git` がまだ無いか、名前が違う）",
+            )
+        )
     return problems
 
 

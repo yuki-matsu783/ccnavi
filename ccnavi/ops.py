@@ -30,16 +30,16 @@ def start(
     if found.state != ticket_mod.TODO:
         stderr.write(f"ccnavi: {ticket_id} は未着手ではない（いまは {found.state}/）\n")
         return 1
-    # 承認の無いチケットは着手させない。写しが無ければ範囲は効かず、フェーズにも
+    # 承認の無いチケットは着手させない。承認済みチケットが無ければ範囲は効かず、フェーズにも
     # 数えられないので、着手した子が「無いもの」として進んでしまう。
     open_copies, _ = approval.copies(conf.approved)
     if found.ticket not in approval.by_id(open_copies):
         stderr.write(
-            f"ccnavi: {ticket_id} は承認されていない（写しが無い）。"
+            f"ccnavi: {ticket_id} は承認されていない（承認済みチケットが無い）。"
             "先に利用者が 'ccnavi --approve' を通すこと\n"
         )
         return 1
-    # 作業ツリーは写しの `project` が指すリポジトリから切られていること（REQ-MLT-13）。
+    # 作業ツリーは承認済みチケットの `project` が指すリポジトリから切られていること（REQ-MLT-13）。
     # 切り元が違えば、判定はそのツリーの切り元で行われ、チケットと噛み合わない。
     copy = approval.by_id(open_copies)[found.ticket]
     owner = tree.project_root(conf.projects, copy.project) or root
@@ -47,7 +47,8 @@ def start(
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
         where = f"projects/{copy.project} の中で " if copy.project else ""
         stderr.write(
-            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、切り元が写しの project"
+            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、"
+            "切り元が承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
             f'先に {where}\'sh .claude/scripts/ccnavi-git.sh worktree add "{worktree}" '
             f"-b {ticket_id}' で作ること\n"
@@ -70,7 +71,7 @@ def start(
 
 
 def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str) -> int:
-    """doing/ → done/。完了の時刻を書く。写しは次の hook が closed/ へ動かす。"""
+    """doing/ → done/。完了の時刻を書く。承認済みチケットは次の hook が closed/ へ動かす。"""
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
@@ -309,7 +310,7 @@ def _parent_still_busy(
 ) -> bool:
     """親を閉じてよいか。開いている子や閉じたゲートがある間は閉じさせない。
 
-    親の写しが閉じるとゲートの鍵（cwd から引く親）が消え、レビュー要の
+    親の承認済みチケットが閉じるとゲートの鍵（cwd から引く親）が消え、レビュー要の
     フェーズが終わっていても誰も止めなくなる。
     """
     if found.is_child:
@@ -446,7 +447,7 @@ def _move(
                 f"人が {found.state}/ の側を消すこと\n"
             )
         return 1
-    # 写しがあれば、欄をすぐ写す。次の hook でも写るが、ここで写しておくと
+    # 承認済みチケットがあれば、欄をすぐ写す。次の hook でも写るが、ここで写しておくと
     # スクリプトの直後に走る検査が古い基準点を見ない。
     copies, _ = approval.copies(conf.approved)
     copy = approval.by_id(copies).get(found.ticket)

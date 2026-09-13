@@ -247,7 +247,11 @@ class SetupTest(unittest.TestCase):
         )
 
     def make_source(self):
-        """配り元のふり。実行ファイルと、共通層の rules / risk と、自身の層の phases。"""
+        """配布元のふり。実行ファイルと、共通層の rules / risk と、自身の層の phases。
+
+        ゲートの sh 3 本は起動して最初に共通部（ccnavi-common.sh）を読むので、配布元にも
+        それを置く。無いと「配布元に無くて配れないもの」として名指しされる。
+        """
         src = tempfile.mkdtemp(prefix="ccnavi-union-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
         binary = os.path.join(src, "dist", "ccnavi", "ccnavi")
@@ -257,7 +261,7 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, ".claude", "ccnavi", "rules.yml"), "deny: []\n")
         write(os.path.join(src, ".claude", "ccnavi", "risk.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)
-        for name in ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh"):
+        for name in ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh", "ccnavi-common.sh"):
             write(os.path.join(src, ".claude", "scripts", name), f"# {name}\n")
         return src
 

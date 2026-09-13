@@ -6,9 +6,9 @@
 範囲の外で止められたエージェントが、チケットに 1 行足して自分の首輪を伸ばせる。
 止められた側が止め方を書き換えられる仕組みは、止めていない。
 
-判定が使うのは承認済みの写し（approval.py）だけ。作業ツリーの提案は、人に見せて
+判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、人に見せて
 承認を求めるためのもので、承認されるまで判定には 1 ミリも効かない。承認されたあとに
-提案を書き換えても、効いているのは写しの側なので範囲は広がらない。
+提案を書き換えても、効いているのは承認済みチケットの側なので範囲は広がらない。
 
 ## 絞ることしかできない
 
@@ -71,7 +71,7 @@ DOING = "doing"
 DONE = "done"
 CANCELLED = "cancelled"
 STATES = (TODO, DOING, DONE, CANCELLED)
-# 閉じた状態。写しが closed/ へ動く。
+# 閉じた状態。承認済みチケットが closed/ へ動く。
 CLOSED = (DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (DOING, DONE, CANCELLED)
@@ -92,10 +92,10 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
 
 # スクリプトだけが書く欄。人もエージェントも書かない。hook はこの 3 つ（と
-# 取り消しの 2 つ）だけを提案から写しへ写す。
+# 取り消しの 2 つ）だけを提案から承認済みチケットへ写す。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
-# 写しにだけある欄。承認の記録。
+# 承認済みチケットにだけある欄。承認の記録。
 APPROVAL_KEY = "ccnavi_approved"
 
 # glob のワイルドカード。これより前が字義どおりの前置。
@@ -227,7 +227,7 @@ class PlanItem:
 
 @dataclass
 class Ticket:
-    """チケット 1 本ぶん。提案としても写しとしても同じ形。"""
+    """チケット 1 本ぶん。提案としても承認済みチケットとしても同じ形。"""
 
     ticket: str = ""
     parent: str = ""
@@ -236,10 +236,15 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
-    # project は作業のプロジェクト（`projects/` の名前、設計 §25.5）。親だけが書き、子は親から
-    # 継ぐ。空ならワークスペース自身の作業。人が承認で確定し、判定は行き先の作業ツリーの
-    # 切り元と突き合わせる。
+    # project は作業のプロジェクト（`projects/` の名前、設計 §25.5）。決めるのは提案を
+    # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、作業ツリーの中なら
+    # その切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
+    # 継ぐ段は無い。判定は行き先の作業ツリーの切り元と突き合わせる。
     project: str = ""
+    # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
+    # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき
+    # （`load` を直に呼ぶ経路）は project と同じ値になる。
+    declared_project: str = ""
     # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
     # 「見たうえで対応なし」。設計 §24.15.2。
@@ -256,15 +261,15 @@ class Ticket:
     base_sha: str = ""
     cancelled_at: str = ""
     cancel_reason: str = ""
-    # 読んだままの frontmatter。写しを作るときに使う。
+    # 読んだままの frontmatter。承認済みチケットを作るときに使う。
     raw: dict = field(default_factory=dict)
     body: str = ""
-    # 見つけた場所。提案なら状態と作業ツリー、写しなら承認の記録から。
+    # 見つけた場所。提案なら状態と作業ツリー、承認済みチケットなら承認の記録から。
     state: str = ""
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 写しにだけある。
+    # 承認済みチケットにだけある。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
@@ -423,9 +428,10 @@ def _read_identity(ticket: Ticket, front: dict, problems: list[Problem]) -> bool
 def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
     """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
     name = ticket.ticket
-    # 子の `project` は承認が親から継いで写しに書く。提案の子に書いてあれば、
-    # 親と同じでなければならない。それを見るのも承認（approval.project_problems）。
-    ticket.project = _text(front.get("project")).strip()
+    # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
+    # `scan` が上書きする（設計 §25.5）。`scan` を通さない経路ではこの値が残る。
+    ticket.declared_project = _text(front.get("project")).strip()
+    ticket.project = ticket.declared_project
 
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):
@@ -540,7 +546,7 @@ def _read_scope(ticket: Ticket, front: dict, problems: list[Problem]) -> bool:
 
 
 def render(ticket: Ticket, extra: dict | None = None) -> str:
-    """チケットを文面に戻す。写しを作るときと、スクリプトが欄を書くときに使う。
+    """チケットを文面に戻す。承認済みチケットを作るときと、スクリプトが欄を書くときに使う。
 
     読んだ frontmatter をそのまま出す。並びが変わっても意味は変わらない。
     """
@@ -610,6 +616,12 @@ def tickets_rel_for(tickets_rel: str, project: str) -> str:
     return "/".join([parts[0], project, *parts[1:]])
 
 
+def project_segment(tickets_rel: str) -> int:
+    """`tickets_rel_for` がプロジェクトの名前を挟む位置（区切りで数えて 0 始まり）。"""
+    parts = [p for p in tickets_rel.split("/") if p]
+    return 0 if len(parts) < 2 else 1
+
+
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
     """main と全作業ツリーの提案を集める。状態と置き場を添える。
 
@@ -632,10 +644,42 @@ def scan_all(
     found: list[Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    places = [(t, tickets_rel) for t in [ws, *tree.worktrees(root, projects_dir)]]
-    places += [(ws, tickets_rel_for(tickets_rel, p.name)) for p in tree.projects(projects_dir)]
-    for t, rel in places:
+    # 置き場がプロジェクトを決める（設計 §25.5）。ワークスペースの `wip/tickets/` は
+    # ワークスペース自身、`wip/<名前>/tickets/` はそのプロジェクト、作業ツリーの中は
+    # その作業ツリーの切り元。frontmatter の `project:` は照合に使うだけ。
+    # 4 つめは、名前が綴りどおりか確かめるディレクトリ。プロジェクトの名前が path の
+    # 区切りに出るのはワークスペースの側だけで、作業ツリーの側は切り元から決まる。
+    places = [(t, tickets_rel, t.project, "") for t in [ws, *tree.worktrees(root, projects_dir)]]
+    for p in tree.projects(projects_dir):
+        rel = tickets_rel_for(tickets_rel, p.name)
+        parts = [q for q in rel.split("/") if q]
+        segment = os.path.join(ws.root, *parts[: project_segment(tickets_rel) + 1])
+        places.append((ws, rel, p.name, segment))
+    for t, rel, place_project, segment in places:
         base = os.path.join(t.root, rel.replace("/", os.sep))
+        # 大文字小文字を区別しない機械では `wip/Lib/` が `wip/lib/` として開ける。
+        # 置き場がプロジェクトを決めるので、綴りまで同じディレクトリだけを読む。
+        if segment and os.path.basename(os.path.realpath(segment)) != place_project:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    place_project,
+                    f"{os.path.relpath(segment, root)} の綴りがプロジェクトの名前 "
+                    f"`{place_project}` と違うので読まない",
+                )
+            )
+            continue
+        if place_project and t.kind == tree.KIND_WORKTREE:
+            # プロジェクトのリポジトリの中に提案は置かない（REQ-MLT-14）。読みはするが言う。
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    place_project,
+                    f"作業ツリー {t.name}（{place_project} から切った）の中に提案がある。"
+                    f"プロジェクトの提案はワークスペースの "
+                    f"{tickets_rel_for(tickets_rel, place_project)}/ に置く",
+                )
+            )
         for state in STATES:
             directory = os.path.join(base, state)
             try:
@@ -674,6 +718,12 @@ def scan_all(
                     )
                     continue
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
+                ticket.project = place_project
+                if place_project and not ticket.declared_project:
+                    # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
+                    # （親が閉じた）子の承認済みチケットの
+                    # `project` を見る。ここで入れないとその落ち先が空になる。
+                    ticket.raw["project"] = place_project
                 found.append(ticket)
     return found, problems
 
