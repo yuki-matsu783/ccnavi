@@ -274,8 +274,8 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/bin/ccnavi` と書く。これは振り分けの sh で、実行ファイルはその隣の `<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
-| `CCNAVI_TICKETS` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
-| `CCNAVI_APPROVED` | 承認済みチケットとフェーズの印の置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
+| `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
+| `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズの印の置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PHASES` | **共通層**のフェーズの種類の定義。ワークスペースルートからの相対。既定は `.ccnavi/common/phases.yml`。どの層にも無ければフェーズは番号だけの挙動 |
 | `CCNAVI_RISK` | **共通層**の実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.ccnavi/common/risk.yml`。どの層にも無ければ組み込みの配点 |
@@ -285,7 +285,8 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `CCNAVI_TICKET` と `CCNAVI_LEDGER` と `CCNAVI_GUARD_CLI` と `CCNAVI_PROJECT_RULES` はもう効かない。指定してあれば
-`--lint` が言う（ADR-0023、ADR-0029）。
+`--lint` が言う（ADR-0023、ADR-0029）。`CCNAVI_TICKETS` と `CCNAVI_APPROVED` も同じで、それぞれ
+`CCNAVI_TICKETS_PROPOSAL` と `CCNAVI_TICKETS_APPROVED` に改名した。
 
 `CCNAVI_PROJECT_RULES` は `CCNAVI_PROJECT_HOME` に置き換わった。プロジェクトが持てるのがルール 1 本から
 設定 3 本になったので、1 本ずつのパスではなく ccnavi ディレクトリの名前を渡す形にした。旧の置き場（`config/rules.yml`）は
@@ -1845,8 +1846,8 @@ error 2 件、warn 2 件、info 0 件
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
 | warn | 上書き設定ファイル（`ccnavi.settings.local.json`。ccnavi 自身のソースツリーだけで読む。設計 §4.3）が読めない |
-| warn | もう効かない環境変数（`CCNAVI_TICKET` / `CCNAVI_LEDGER` / `CCNAVI_GUARD_CLI` / `CCNAVI_PROJECT_RULES`）が書いてある |
-| warn | `CCNAVI_APPROVED` が空文字（切るのは `CCNAVI_TICKET_CONTROL` の仕事） |
+| warn | もう効かない環境変数（`CCNAVI_TICKET` / `CCNAVI_LEDGER` / `CCNAVI_GUARD_CLI` / `CCNAVI_PROJECT_RULES` / `CCNAVI_TICKETS` / `CCNAVI_APPROVED`）が書いてある |
+| warn | `CCNAVI_TICKETS_APPROVED` が空文字（切るのは `CCNAVI_TICKET_CONTROL` の仕事） |
 | warn | `CCNAVI_TICKET_CONTROL=disable`（チケットの範囲もゲートも効かない） |
 
 **層**

@@ -64,7 +64,13 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # もう効かない環境変数（settings.py の RETIRED_ENVS）。書かれていたら
 # ccnavi の --lint が苦情を言う。導入スクリプトが作ってはいけない。
-RETIRED_ENV = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_PROJECT_RULES")
+RETIRED_ENV = (
+    "CCNAVI_TICKET",
+    "CCNAVI_LEDGER",
+    "CCNAVI_PROJECT_RULES",
+    "CCNAVI_TICKETS",
+    "CCNAVI_APPROVED",
+)
 # --deploy が配るゲートの sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側に逃げ道がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
@@ -307,7 +313,8 @@ class WritesTheExpectedShape(SetupTest):
         """--all は、既定と同じ値のつまみも設定ファイルに並べる。"""
         self.run_setup("--all")
         env = self.read_settings()["env"]
-        self.assertEqual(env["CCNAVI_TICKETS"], "wip/tickets")
+        self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/tickets")
+        self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/tickets")
         self.assertEqual(env["CCNAVI_PHASES"], ".ccnavi/common/phases.yml")
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 

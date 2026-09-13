@@ -5,7 +5,7 @@
  "settings": {
   "ticket_control": "enable",
   "tickets": "wip/tickets",
-  "approved": "<root>/.claude/ccnavi/tickets",
+  "approved": ".ccnavi/tickets",
   "projects": "<root>/projects"
  },
  "trees": [
@@ -167,7 +167,7 @@
     "status": "open",
     "approved_at": "2026-09-12T23:34:53+0900",
     "source_tree": "i0001",
-    "path": "<root>/.claude/ccnavi/tickets/i0001.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001.md"
    },
    "worktree": {
     "exists": true,
@@ -221,7 +221,7 @@
     "status": "closed",
     "approved_at": "2026-09-12T23:34:54+0900",
     "source_tree": "i0001",
-    "path": "<root>/.claude/ccnavi/tickets/closed/i0001-01.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/closed/i0001-01.md"
    },
    "worktree": {
     "exists": true,
@@ -284,7 +284,7 @@
     "status": "open",
     "approved_at": "2026-09-12T23:34:55+0900",
     "source_tree": "i0001",
-    "path": "<root>/.claude/ccnavi/tickets/i0001-02.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001-02.md"
    },
    "worktree": {
     "exists": true,
