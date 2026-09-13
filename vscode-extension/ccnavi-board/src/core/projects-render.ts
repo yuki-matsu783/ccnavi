@@ -33,7 +33,7 @@ ${STYLE}
     <span class="path" title="${escapeHtml(page.projectsDir)}">置き場: ${escapeHtml(page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`)}</span>
   </div>
   <div class="controls">
-    <button type="button" class="action" data-action="open-rules" data-name="" title="共通層のルール（どのツリーにも効く。既定 .claude/ccnavi/rules.yml）を編集します">ルール管理</button>
+    <button type="button" class="action" data-action="open-rules" data-name="" title="共通層のルール（どのツリーにも効く。既定 .ccnavi/common/rules.yml）を編集します">ルール管理</button>
 ${page.ticketsEnabled ? '    <button type="button" class="action" data-action="open-board" data-name="*">チケット管理</button>\n' : ""}    <button type="button" class="action" data-action="refresh">更新</button>
   </div>
 </header>

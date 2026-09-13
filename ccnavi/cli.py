@@ -80,7 +80,7 @@ To try one call against the rules without running it, or to run every sample
 in a file against them, run
 
     ccnavi --test Bash "git push" [--json]
-    ccnavi --test-samples .claude/ccnavi/rule-samples.yml [--json]
+    ccnavi --test-samples .ccnavi/common/rule-samples.yml [--json]
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
@@ -93,7 +93,7 @@ To review the pending tickets and approve the work areas they declare, run
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
-.claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
+.ccnavi/tickets/. Only the copies are consulted when judging calls, so
 editing a ticket never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.

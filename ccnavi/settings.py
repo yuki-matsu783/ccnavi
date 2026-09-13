@@ -107,11 +107,19 @@ OWN_PROJECT = "ccnavi"
 LOCAL_FILE = "ccnavi.settings.local.json"
 
 # 既定の置き場。ワークスペースルートからの相対。
-DEFAULT_LOG = os.path.join(".claude", "ccnavi", "log.jsonl")
-DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
+#
+# 人が持つ設定（共通層の 3 本）は層の傘の下の `.ccnavi/common/`、実行のたびに書かれる
+# 記録と控えは `logs/` に置く（ADR-0042）。`.claude/` には Claude Code 自身のもの
+# （settings.json・hooks・skills・worktrees）だけを残す。前の既定は `.claude/ccnavi/` の
+# 下で、env で前の綴りを指したままのワークスペースは、そのまま前の置き場を読む。
+#
+# 共通層の置き場は傘の名前（CCNAVI_PROJECT_HOME）に付いて動かない。傘の名前は各層の
+# 綴りで、共通層を動かすなら CCNAVI_RULES / CCNAVI_PHASES / CCNAVI_RISK で動かす。
+DEFAULT_LOG = os.path.join("logs", "log.jsonl")
+DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
-DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
+DEFAULT_STATE = os.path.join("logs", "state")
 # 提案は各作業ツリーの `wip/tickets/` に置く。人が読み、人が承認するものなので、
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
@@ -123,9 +131,14 @@ DEFAULT_TICKETS = "wip/tickets"
 # ルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_APPROVED = ".ccnavi/tickets"
 # フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
-DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
+DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
-DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
+DEFAULT_RISK = os.path.join(".ccnavi", "common", "risk.yml")
+# 前の既定の置き場（ワークスペースルートからの相対、"/" 区切り）。ここに設定が残って
+# いて、今の設定がそこを読んでいなければ `--lint` が言う。黙って無視すると、書いた人は
+# 効いていると思い続ける。
+OLD_COMMON_DIR = ".claude/ccnavi"
+OLD_COMMON_FILES = ("rules.yml", "phases.yml", "risk.yml")
 # プロジェクトの置き場。ワークスペースの直下に固定するのは、列挙が速いことと、
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
@@ -208,7 +221,7 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
 def layer_script_home(conf: Settings) -> str:
     """各層の `script:` に書ける唯一の綴り（`<傘>/scripts/`、"/" 区切り、設計 §25.4.2）。
 
-    共通層だけは今までどおり `.claude/ccnavi/` と `.claude/scripts/`（risk.SCRIPT_HOMES）。
+    共通層だけは `.ccnavi/common/scripts/`（risk.SCRIPT_HOMES）。
     たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
     """
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")

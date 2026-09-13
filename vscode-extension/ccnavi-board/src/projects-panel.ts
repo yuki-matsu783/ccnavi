@@ -44,7 +44,7 @@ import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 300;
-const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
+const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 /** 実行ファイルが自身の層を出さない（古い版）ときに監視する層の綴り。既定の傘 `.ccnavi` の形 */
 const DEFAULT_LAYER_DIR = ".ccnavi/config";
 

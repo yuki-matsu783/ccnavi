@@ -226,15 +226,23 @@ _COPY_END = r"(?:[\\/]|$)"
 # `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
 # だから傘と違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
 # `.claude/` に続く綴り全部が入り、作業ツリーの片付けまで止まる。
+# `.claude/ccnavi/` は前の置き場。今の既定は `.ccnavi/common/` だが、env で前の綴りを
+# 指したままのワークスペースがあるので、守る場所からは外さない。
+#
+# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。前は `.claude/ccnavi/`
+# の中にあって、そこを守る綴りに一緒に入っていた。移したぶん守りが外れないよう、名前を
+# 絞って足す。`logs/` の下の git ラッパの記録は、消しても判定に効かないので守らない。
 _PLACES = (
     r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
+    r"logs[\\/](log\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
     r"\.claude(?:[\\/](ccnavi|hooks|scripts|settings)|" + _COPY_TERM + r")",
     # 行き先が傘そのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
+    r"logs[\\/](log\.jsonl|state)" + _COPY_END,
     r"ccnavi-git\.sh",
 )
 

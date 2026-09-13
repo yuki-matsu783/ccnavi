@@ -94,13 +94,19 @@ DEPLOY_LAUNCHER="scripts/ccnavi-launcher.sh"
 # どの機械向けに組み立てたかの印。build.py が `<os>-<arch>` の 1 行で書く。
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へ写すことはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
-DEPLOY_RULES=".claude/ccnavi/rules.yml"
-# 設定 3 本のひな形。rules と risk は汎用なので共通層（.claude/ccnavi/）へ、
+DEPLOY_RULES=".ccnavi/common/rules.yml"
+# 設定 3 本のひな形。rules と risk は汎用なので共通層（.ccnavi/common/）へ、
 # phases はワークスペースのレイアウト（scope の綴り）に付くので自身の層
 # （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
 # projects/ の下のプロジェクトにも効いてしまう（設計 §25.12）。
-DEPLOY_RISK=".claude/ccnavi/risk.yml"
+DEPLOY_RISK=".ccnavi/common/risk.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
+# 共通層の前の既定の置き場（ADR-0042）。ここに残った設定は新しい置き場へ移し、前の版の
+# 導入スクリプトが env に書いた綴りも一緒に書き換える。記録と控えは logs/ に移ったが、
+# 前の置き場に残ったものは読まれないだけなので、名前を挙げるだけにする。
+OLD_COMMON_DIR=".claude/ccnavi"
+NEW_COMMON_DIR=".ccnavi/common"
+OLD_COMMON_FILES="rules.yml risk.yml phases.yml rule-samples.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
 # 起動時に落ちる。
@@ -151,10 +157,11 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
 
-実行ファイル・振り分けの sh・設定 3 本（.claude/ccnavi/rules.yml、.claude/ccnavi/risk.yml、
+実行ファイル・振り分けの sh・設定 3 本（.ccnavi/common/rules.yml、.ccnavi/common/risk.yml、
 .ccnavi/config/phases.yml）・ゲートの sh は、既定で ccnavi の根から配る。配った
 振り分けの sh と実行ファイルの置き場は、配布先の .gitignore に足す。前の置き場
-（.claude/ccnavi/ の実行ファイル）は、新しい置き場が揃ってから消す。
+（.claude/ccnavi/ の実行ファイル）は、新しい置き場が揃ってから消す。前の置き場の
+共通層の設定（.claude/ccnavi/*.yml）は .ccnavi/common/ へ移し、env の綴りも書き換える。
 USAGE
 }
 
@@ -480,6 +487,72 @@ note_deploy() {
 	esac
 }
 
+in_list() {
+	# $1 空白区切りの並び / $2 探す語
+	case " $1 " in
+	*" $2 "*) return 0 ;;
+	esac
+	return 1
+}
+
+# 共通層の設定を前の置き場（.claude/ccnavi/）から新しい置き場（.ccnavi/common/）へ移すか。
+#
+# 移すのは、前の置き場に在って新しい置き場に無いものだけ。両方に在るなら触らずに言う。
+# どちらが読まれているかは env が決めていて、どちらが正しいかをここでは決められない。
+#
+# ひな形を配るより先に決める。前の置き場にそのプロジェクトで育てたルールがあるのに、
+# 新しい置き場へ汎用のひな形を配ると、env を書き換えた時点で育てたルールが読まれなくなり、
+# 守りが黙ってひな形の強さに戻る。
+#
+# このスクリプトを打ったセッションの env がまだ前の綴りを読んでいるなら移さない。
+# 移した瞬間からそのセッションの判定は読むファイルを失い、組み込みの既定に落ちる。
+# そのファイルのひな形も配らない。配ると、開き直して打ち直したときに「両方に在る」に
+# なって移せなくなる。
+common_move=""
+common_move_paths=""
+common_move_lines=""
+common_both=""
+common_both_paths=""
+common_held=""
+common_held_note=""
+for name in $OLD_COMMON_FILES; do
+	if [ ! -f "$root/$OLD_COMMON_DIR/$name" ]; then
+		continue
+	fi
+	if [ -e "$root/$NEW_COMMON_DIR/$name" ]; then
+		common_both="$common_both$OLD_COMMON_DIR/$name
+"
+		common_both_paths="$common_both_paths $NEW_COMMON_DIR/$name"
+		continue
+	fi
+	case "$name" in
+	rules.yml) session_value="${CCNAVI_RULES:-}" ;;
+	risk.yml) session_value="${CCNAVI_RISK:-}" ;;
+	phases.yml) session_value="${CCNAVI_PHASES:-}" ;;
+	*) session_value="" ;;
+	esac
+	if [ "$session_value" = "$OLD_COMMON_DIR/$name" ]; then
+		common_held="$common_held $NEW_COMMON_DIR/$name"
+		common_held_note="$common_held_note$OLD_COMMON_DIR/$name
+"
+		continue
+	fi
+	common_move="$common_move $name"
+	common_move_paths="$common_move_paths $NEW_COMMON_DIR/$name"
+	common_move_lines="$common_move_lines$OLD_COMMON_DIR/$name -> $NEW_COMMON_DIR/$name
+"
+done
+
+common_arriving() {
+	# $1 新しい置き場の綴り。前の置き場から移してくるか、移すのを待っているなら 0。
+	# そういうものにはひな形を配らない。--force でも配らない。入れ替えると、移したばかりの
+	# 育てたルールをひな形で潰す。
+	if in_list "$common_move_paths" "$1" || in_list "$common_held" "$1"; then
+		return 0
+	fi
+	return 1
+}
+
 # 振り分けの sh の行き先も、組み立ての置き場も --bin が決める。CCNAVI_BIN_PATH に
 # 書く綴りと、実体を置く場所を 1 つの値から出す。ここが割れると、設定は書けているのに
 # hook がどこにも無いものを起動する形になる。
@@ -506,21 +579,25 @@ if [ -n "$deploy" ]; then
 	launcher_verdict=$(verdict "$source_root/$DEPLOY_LAUNCHER" "$launcher_there")
 	note_deploy "$launcher_verdict" "$bin" "$DEPLOY_LAUNCHER"
 
-	if [ -e "$root/$DEPLOY_RULES" ]; then
-		rules_there=yes
-	else
-		rules_there=no
+	if ! common_arriving "$DEPLOY_RULES"; then
+		if [ -e "$root/$DEPLOY_RULES" ]; then
+			rules_there=yes
+		else
+			rules_there=no
+		fi
+		rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
+		note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
 	fi
-	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
-	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
 
-	if [ -e "$root/$DEPLOY_RISK" ]; then
-		risk_there=yes
-	else
-		risk_there=no
+	if ! common_arriving "$DEPLOY_RISK"; then
+		if [ -e "$root/$DEPLOY_RISK" ]; then
+			risk_there=yes
+		else
+			risk_there=no
+		fi
+		risk_verdict=$(verdict "$source_root/$DEPLOY_RISK" "$risk_there")
+		note_deploy "$risk_verdict" "$DEPLOY_RISK" "$DEPLOY_RISK"
 	fi
-	risk_verdict=$(verdict "$source_root/$DEPLOY_RISK" "$risk_there")
-	note_deploy "$risk_verdict" "$DEPLOY_RISK" "$DEPLOY_RISK"
 
 	if [ -e "$root/$DEPLOY_PHASES" ]; then
 		phases_there=yes
@@ -646,8 +723,8 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
-	CCNAVI_RULES: ".claude/ccnavi/rules.yml",
-	CCNAVI_LOG: ".claude/ccnavi/log.jsonl",
+	CCNAVI_RULES: ".ccnavi/common/rules.yml",
+	CCNAVI_LOG: "logs/log.jsonl",
 	CCNAVI_BIN_PATH: $bin,
 	CCNAVI_RESTORE_IF_DENY: $mode,
 	CCNAVI_GUARD_CORE_FILES: $mode,
@@ -659,14 +736,72 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" --arg ticket_control "$tick
 # 設定ファイルの中で見つけられること。
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {
-		CCNAVI_STATE: ".claude/ccnavi/state",
+		CCNAVI_STATE: "logs/state",
 		CCNAVI_TICKETS: "wip/tickets",
 		CCNAVI_APPROVED: ".ccnavi/tickets",
-		CCNAVI_PHASES: ".claude/ccnavi/phases.yml",
-		CCNAVI_RISK: ".claude/ccnavi/risk.yml",
+		CCNAVI_PHASES: ".ccnavi/common/phases.yml",
+		CCNAVI_RISK: ".ccnavi/common/risk.yml",
 		CCNAVI_PROJECT_HOME: ".ccnavi"
 	}')
 fi
+
+# 前の既定の綴りを指したままの env を、新しい既定へ書き換える（ADR-0042）。
+#
+# 書き換えるのは、値がこのスクリプト自身の前の既定と一字一句同じときだけ。人が別の
+# 綴りを書いていれば触らない。設定 3 本は、書き換えたあとに新しい置き場で読めるときだけ
+# 書き換える。読めないまま書き換えると、前の置き場に残したルールが読まれなくなる。
+# 記録と控えは読めるかどうかに懸からないので、いつも書き換える。前の置き場の記録は
+# 残るが、読まれないだけで判定には効かない。
+rewrite_json='{}'
+env_rewrite_blocked=""
+common_ready() {
+	# $1 新しい置き場の綴り / $2 そのファイルを配る判定（配らないなら空）
+	if in_list "$common_held" "$1"; then
+		return 1
+	fi
+	if [ -e "$root/$1" ] || in_list "$common_move_paths" "$1"; then
+		return 0
+	fi
+	case "$2" in
+	copy | replace) return 0 ;;
+	esac
+	return 1
+}
+rewrite_env() {
+	# $1 キー / $2 前の綴り / $3 新しい綴り / $4 新しい綴りで読めるか（yes/no）
+	rewrite_value=$(printf '%s' "$current" | jq -r --arg k "$1" '(.env // {})[$k] // "" | if type == "string" then . else "" end')
+	if [ "$rewrite_value" != "$2" ]; then
+		return 0
+	fi
+	if [ "$4" = no ]; then
+		env_rewrite_blocked="$env_rewrite_blocked$1 は前の置き場（${2}）を指したままです。${3} に読めるものが揃わないので、書き換えていません。
+"
+		return 0
+	fi
+	rewrite_json=$(printf '%s' "$rewrite_json" | jq --arg k "$1" --arg v "$3" '. + {($k): $v}')
+}
+rewrite_common() {
+	# $1 キー / $2 ファイル名 / $3 そのファイルを配る判定
+	# 両方の置き場に在るものと、このセッションが読んでいて移すのを待っているものは、
+	# env も触らない。どちらを読むかを変えると、読まれるルールがここで入れ替わる。
+	# 理由はそれぞれの一覧で既に言う。
+	if in_list "$common_both_paths" "$NEW_COMMON_DIR/$2" || in_list "$common_held" "$NEW_COMMON_DIR/$2"; then
+		return 0
+	fi
+	if common_ready "$NEW_COMMON_DIR/$2" "$3"; then
+		rewrite_env "$1" "$OLD_COMMON_DIR/$2" "$NEW_COMMON_DIR/$2" yes
+	else
+		rewrite_env "$1" "$OLD_COMMON_DIR/$2" "$NEW_COMMON_DIR/$2" no
+	fi
+}
+rewrite_common CCNAVI_RULES rules.yml "$rules_verdict"
+rewrite_common CCNAVI_RISK risk.yml "$risk_verdict"
+rewrite_common CCNAVI_PHASES phases.yml ""
+rewrite_env CCNAVI_LOG "$OLD_COMMON_DIR/log.jsonl" "logs/log.jsonl" yes
+rewrite_env CCNAVI_STATE "$OLD_COMMON_DIR/state" "logs/state" yes
+# 書き換える値は、置き換えてよいキーとして env の組み立てに混ぜる。値の違う env として
+# 「変えません」と並べる側に出ないように。
+env_json=$(jq -n --argjson a "$env_json" --argjson b "$rewrite_json" '$a + $b')
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
@@ -710,6 +845,9 @@ fi
 if [ "$migrate" = yes ]; then
 	forced="$forced CCNAVI_BIN_PATH"
 fi
+for rewrite_key in $(printf '%s' "$rewrite_json" | jq -r 'keys[]'); do
+	forced="$forced $rewrite_key"
+done
 
 # 前の置き場（.claude/ccnavi/ の実行ファイルと同梱物）を片付けるか。
 #
@@ -964,6 +1102,21 @@ report_deploy() {
 		printf '前の置き場から消せなかったもの（使っているセッションがあるかもしれません。閉じてから打ち直してください）:\n'
 		printf '%s' "$old_failed" | sed 's/^/  /'
 	fi
+	if [ -n "$common_move_lines" ]; then
+		printf '%s:\n' "$5"
+		printf '%s' "$common_move_lines" | sed 's/^/  /'
+	fi
+	if [ -n "$common_both" ]; then
+		printf '前の置き場と新しい置き場（%s/）の両方にある共通層の設定（どちらも触っていません。env が読む側を確かめ、要らないほうを消してください）:\n' "$NEW_COMMON_DIR"
+		printf '%s' "$common_both" | sed 's/^/  /'
+	fi
+	if [ -n "$common_held_note" ]; then
+		printf 'このセッションがまだ読んでいるので移していない共通層の設定（セッションを開き直してから打ち直すと移します）:\n'
+		printf '%s' "$common_held_note" | sed 's/^/  /'
+	fi
+	if [ -n "$env_rewrite_blocked" ]; then
+		printf '%s' "$env_rewrite_blocked"
+	fi
 	if [ -n "$migrate_blocked" ]; then
 		printf '%s\n' "$migrate_blocked"
 	fi
@@ -981,7 +1134,7 @@ report_deploy() {
 old_failed=""
 
 report_deploy_plan() {
-	report_deploy '配る' '入れ替える' '.gitignore に足す' '前の置き場から消す'
+	report_deploy '配る' '入れ替える' '.gitignore に足す' '前の置き場から消す' '前の置き場から移す'
 }
 
 # 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
@@ -1004,6 +1157,10 @@ fi
 # 前の置き場が片付いていないのも数える。残っている理由が何であれ、人かこのスクリプトが
 # もう 1 度手を動かすまで、2 つの置き場が並んだまま。
 if [ -n "$old_todo" ] || [ -n "$old_note" ] || [ -n "$migrate_blocked" ]; then
+	settled=no
+fi
+if [ -n "$common_move" ] || [ -n "$common_both" ] || [ -n "$common_held" ] ||
+	[ -n "$env_rewrite_blocked" ]; then
 	settled=no
 fi
 
@@ -1040,7 +1197,7 @@ fi
 printf '%s\n' "$settings"
 
 old_work=no
-if [ -n "$old_todo" ]; then
+if [ -n "$old_todo" ] || [ -n "$common_move" ]; then
 	old_work=yes
 fi
 
@@ -1097,6 +1254,16 @@ write_json() {
 		trap - EXIT INT TERM
 	fi
 }
+
+# 共通層の設定を前の置き場から移す。env を書き換えるより先に回す。移す途中で落ちたときに、
+# env だけが新しい置き場を指して、ルールが前の置き場に取り残される形を作らないため。
+# 追跡しているファイルなら、git からは消えて足された形に見える。コミットは人がする。
+if [ -n "$common_move" ]; then
+	mkdir -p "$root/$NEW_COMMON_DIR"
+	for name in $common_move; do
+		mv "$root/$OLD_COMMON_DIR/$name" "$root/$NEW_COMMON_DIR/$name"
+	done
+fi
 
 settings_backed_up=no
 settings_linked=no
@@ -1238,7 +1405,7 @@ if [ -n "$old_todo" ]; then
 	old_todo="$old_done"
 fi
 
-report_deploy '配った' '入れ替えた' '.gitignore に足した' '前の置き場から消した'
+report_deploy '配った' '入れ替えた' '.gitignore に足した' '前の置き場から消した' '前の置き場から移した'
 if [ -n "$old_todo" ]; then
 	printf '開いている Claude Code のセッションは、開き直すまで前の置き場を起動しようとして hook が動きません。開き直してください。\n'
 fi
@@ -1301,6 +1468,19 @@ for name in $DEPLOY_SCRIPTS; do
 done
 if [ -n "$old_scripts" ]; then
 	printf '前の置き場に残っているゲートの sh（今は %s/ を使います。要らなければ消してください）:\n%s' "$DEPLOY_SCRIPT_DIR" "$old_scripts"
+fi
+
+# 記録と控えは logs/ に移した（ADR-0042）。前の置き場に残ったものは読まれないまま残る。
+# 記録には調べ物の手がかりが入っているので、消すかどうかは人が決める。
+old_records=""
+for name in log.jsonl state session; do
+	if [ -e "$root/$OLD_COMMON_DIR/$name" ]; then
+		old_records="$old_records  $OLD_COMMON_DIR/$name
+"
+	fi
+done
+if [ -n "$old_records" ]; then
+	printf '前の置き場に残っている記録と控え（今は logs/ に書きます。要らなければ消してください）:\n%s' "$old_records"
 fi
 
 printf 'env の値はセッションを開き直すまで効きません。\n'

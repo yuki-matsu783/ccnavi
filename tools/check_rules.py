@@ -24,7 +24,7 @@ SAMPLES = os.path.join(ROOT, ".claude", "ccnavi", "rule-samples.yml")
 
 def main() -> int:
     rules_path = (
-        sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, ".claude", "ccnavi", "rules.yml")
+        sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
     )
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     done = subprocess.run(

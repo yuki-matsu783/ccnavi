@@ -1,4 +1,4 @@
-"""実績で測るリスク。`.claude/ccnavi/risk.yml` を読み、子を閉じるときに差分を数える。
+"""実績で測るリスク。`.ccnavi/common/risk.yml` を読み、子を閉じるときに差分を数える。
 
 ## 宣言ではなく実績を測る
 
@@ -35,7 +35,7 @@
       - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
       - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
       - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
-      - {id: complexity, points: 30, script: .claude/ccnavi/risk/complexity.sh, message: 複雑度}
+      - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 
 ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、
@@ -76,7 +76,7 @@ KIND_JUDGE = "judge"
 KINDS = (KIND_LINES, KIND_FILES, KIND_DELETED, KIND_GLOB, KIND_SCRIPT, KIND_JUDGE)
 
 # スクリプトを置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
-SCRIPT_HOMES = (".claude/ccnavi/", ".claude/scripts/")
+SCRIPT_HOMES = (".ccnavi/common/scripts/",)
 SCRIPT_TIMEOUT_SECONDS = 30.0
 # 差分を数える git に与える時間。閉じるときにしか走らないので、判定より長くてよい。
 GIT_TIMEOUT_SECONDS = 10.0
@@ -210,7 +210,7 @@ def parse(
 ) -> tuple[Definition | None, list[Problem]]:
     """定義 1 本を読む。`script_homes` はこの層で `script:` に書ける綴りの先頭。
 
-    共通層は `.claude/ccnavi/` と `.claude/scripts/`、各層はその `<傘>/scripts/` だけ。
+    共通層は `.ccnavi/common/scripts/`、各層はその `<傘>/scripts/` だけ。
     たがいの側を指す定義はここで error にする（設計 §25.4.2）。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
     """

@@ -36,7 +36,7 @@ export const KIND_LABELS: Readonly<Record<(typeof KINDS)[number], { readonly lab
   files_over: { label: "ファイル数が超えたら", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
   deleted_over: { label: "消したファイル数が超えたら", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
   glob: { label: "当たったファイルごとに", placeholder: ".github/**（作業ツリーのルートからの相対。当たるごとに points を加点、max で上限）" },
-  script: { label: "スクリプトが出す点", placeholder: ".claude/ccnavi/risk/xxx.sh（.claude/ccnavi/ か .claude/scripts/ の下。失敗は points を加点）" },
+  script: { label: "スクリプトが出す点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗は points を加点）" },
   judge: { label: "サブエージェントの判定", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
 };
 

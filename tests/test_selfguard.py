@@ -412,6 +412,20 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
+    def test_記録と控えの置き場もシェルからの書き込みで止まる(self):
+        # 前は .claude/ccnavi/ の中にあって、そこを守る綴りに一緒に入っていた。
+        # logs/ へ移したぶん守りが外れないこと。
+        for command in ("rm logs/log.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_git_ラッパの記録は止めない(self):
+        # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
+        result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
+
+        self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
     # 実行ファイル
 
     def test_実行ファイルはシェルからの書き込みで止まる(self):

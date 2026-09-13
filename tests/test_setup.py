@@ -71,10 +71,10 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh")
-RULES_PARTS = (".claude", "ccnavi", "rules.yml")
+RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本（設計 §25.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
-RISK_PARTS = (".claude", "ccnavi", "risk.yml")
+RISK_PARTS = (".ccnavi", "common", "risk.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 # 既定の置き場。hook が起動する振り分けの sh と、その隣の機械ごとの組み立て。
 BIN_DIR_PARTS = (".ccnavi", "bin")
@@ -219,8 +219,8 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_MODE"], "enable")
-        self.assertEqual(env["CCNAVI_RULES"], ".claude/ccnavi/rules.yml")
-        self.assertEqual(env["CCNAVI_LOG"], ".claude/ccnavi/log.jsonl")
+        self.assertEqual(env["CCNAVI_RULES"], ".ccnavi/common/rules.yml")
+        self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
 
     def test_bin_path_points_at_the_launcher(self):
         """指すのは振り分けの sh で、どの環境でも 1 行のまま。
@@ -308,7 +308,7 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--all")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_TICKETS"], "wip/tickets")
-        self.assertEqual(env["CCNAVI_PHASES"], ".claude/ccnavi/phases.yml")
+        self.assertEqual(env["CCNAVI_PHASES"], ".ccnavi/common/phases.yml")
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 
     def test_says_what_is_still_missing(self):
@@ -737,9 +737,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             # 振り分けの sh は本物を写す。配布先で中身が同じであることを見るため。
             os.makedirs(os.path.join(src, "scripts"), exist_ok=True)
             shutil.copy(LAUNCHER, os.path.join(src, "scripts", "ccnavi-launcher.sh"))
-            os.makedirs(os.path.join(src, ".claude", "ccnavi"))
+            os.makedirs(os.path.dirname(os.path.join(src, *RULES_PARTS)))
             with open(
-                os.path.join(src, ".claude", "ccnavi", "rules.yml"),
+                os.path.join(src, *RULES_PARTS),
                 "w",
                 encoding="utf-8",
             ) as f:
@@ -1208,7 +1208,8 @@ class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
 
     CCNAVI_BIN_PATH が前の綴りのままなら新しい綴りへ書き換え、前の実行ファイルと
     同梱物を消す。どちらも、新しい置き場で hook が起動できるときだけ。同じ
-    ディレクトリの rules.yml と risk.yml には触らない。
+    ディレクトリの rules.yml は消さずに .ccnavi/common/ へ移す
+    （MovesCommonConfigOutOfTheOldPlace）。
     """
 
     def old_place(self):
@@ -1230,7 +1231,7 @@ class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
         self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
         self.assertFalse(os.path.exists(os.path.join(old, "ccnavi")))
         self.assertFalse(os.path.exists(os.path.join(old, "_internal")))
-        with open(os.path.join(old, "rules.yml"), encoding="utf-8") as f:
+        with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトのルール", f.read())
         self.assertIn("前の置き場から消した", result.stdout)
         self.assertIn("開き直して", result.stdout)
@@ -1291,12 +1292,134 @@ class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(os.path.exists(os.path.join(old, "_internal")))
         self.assertTrue(os.path.isfile(os.path.join(old, THIS_MACHINE, "ccnavi")))
-        self.assertNotIn("前の置き場", result.stdout)
+        self.assertNotIn("前の置き場から消", result.stdout)
 
     def test_says_nothing_when_there_is_no_old_place(self):
         result = self.run_setup("--deploy", self.make_source())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("前の置き場", result.stdout)
+
+
+class MovesCommonConfigOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
+    """共通層の設定を前の置き場（.claude/ccnavi/）から .ccnavi/common/ へ移す（ADR-0042）。
+
+    前の置き場にそのプロジェクトで育てたルールがあるのに新しい置き場へひな形を配ると、
+    env を書き換えた時点で育てたルールが読まれなくなり、守りが黙ってひな形の強さに戻る。
+    """
+
+    OLD_ENV = {
+        "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
+        "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
+        "CCNAVI_STATE": ".claude/ccnavi/state",
+        "CCNAVI_PHASES": ".claude/ccnavi/phases.yml",
+        "CCNAVI_RISK": ".claude/ccnavi/risk.yml",
+    }
+    NAMES = ("rules.yml", "risk.yml", "phases.yml", "rule-samples.yml")
+
+    def old_common(self, *names):
+        self.write_settings({"env": dict(self.OLD_ENV)})
+        for name in names or self.NAMES:
+            path = self.deployed(".claude", "ccnavi", name)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(f"# このプロジェクトの {name}\n")
+
+    def common(self, name):
+        path = self.deployed(".ccnavi", "common", name)
+        if not os.path.exists(path):
+            return None
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+
+    def test_moves_the_files_instead_of_deploying_the_templates(self):
+        self.old_common()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for name in self.NAMES:
+            self.assertEqual(self.common(name), f"# このプロジェクトの {name}\n", name)
+            self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi", name)), name)
+        self.assertIn("前の置き場から移した", result.stdout)
+        # 移してくるものは「配布先に既にあるので配っていない」側にも並べない。
+        self.assertNotIn("配布先に既にあるので", result.stdout)
+
+    def test_force_does_not_overwrite_what_it_just_moved(self):
+        """--force は配布先に既にあるものを入れ替えるが、移したばかりの設定は入れ替えない。"""
+        self.old_common("rules.yml", "risk.yml")
+        result = self.run_setup("--deploy", self.make_source(), "--force")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.common("rules.yml"), "# このプロジェクトの rules.yml\n")
+        self.assertEqual(self.common("risk.yml"), "# このプロジェクトの risk.yml\n")
+
+    def test_rewrites_the_env_spelled_the_old_way(self):
+        self.old_common()
+        result = self.run_setup("--no-deploy")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        env = self.read_settings()["env"]
+        self.assertEqual(env["CCNAVI_RULES"], ".ccnavi/common/rules.yml")
+        self.assertEqual(env["CCNAVI_RISK"], ".ccnavi/common/risk.yml")
+        self.assertEqual(env["CCNAVI_PHASES"], ".ccnavi/common/phases.yml")
+        self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
+        self.assertEqual(env["CCNAVI_STATE"], "logs/state")
+
+    def test_leaves_env_that_a_person_spelled_differently(self):
+        self.write_settings({"env": {"CCNAVI_RULES": "config/my-rules.yml"}})
+        self.run_setup("--no-deploy")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_RULES"], "config/my-rules.yml")
+
+    def test_does_not_point_the_rules_env_at_nothing(self):
+        """前の置き場に無く、新しい置き場にも配らないなら、書き換えると読むものが無くなる。"""
+        self.write_settings({"env": dict(self.OLD_ENV)})
+        result = self.run_setup("--no-deploy")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        env = self.read_settings()["env"]
+        self.assertEqual(env["CCNAVI_RULES"], ".claude/ccnavi/rules.yml")
+        self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
+        self.assertIn("書き換えていません", result.stdout)
+
+    def test_touches_neither_file_nor_env_when_both_places_have_it(self):
+        self.old_common("rules.yml")
+        os.makedirs(self.deployed(".ccnavi", "common"))
+        with open(self.deployed(".ccnavi", "common", "rules.yml"), "w", encoding="utf-8") as f:
+            f.write("# 新しいほう\n")
+        result = self.run_setup("--no-deploy")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.exists(self.deployed(".claude", "ccnavi", "rules.yml")))
+        self.assertEqual(self.common("rules.yml"), "# 新しいほう\n")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_RULES"], ".claude/ccnavi/rules.yml")
+        self.assertIn("両方にある", result.stdout)
+
+    def test_waits_while_this_session_still_reads_the_old_rules(self):
+        """打ったセッションの env は開き直すまで変わらない。移すとその判定が既定に落ちる。"""
+        self.old_common("rules.yml")
+        src = self.make_source()
+        result = self.run_setup(
+            "--deploy", src, env=clean_env(CCNAVI_RULES=".claude/ccnavi/rules.yml")
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.exists(self.deployed(".claude", "ccnavi", "rules.yml")))
+        # ひな形も配らない。配ると、打ち直したときに「両方にある」になって移せない。
+        self.assertIsNone(self.common("rules.yml"))
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_RULES"], ".claude/ccnavi/rules.yml")
+        self.assertIn("開き直してから打ち直す", result.stdout)
+
+        again = self.run_setup("--deploy", src)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertEqual(self.common("rules.yml"), "# このプロジェクトの rules.yml\n")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_RULES"], ".ccnavi/common/rules.yml")
+
+    def test_check_names_the_moves_without_moving(self):
+        self.old_common("rules.yml")
+        result = self.run_setup("--no-deploy", "--check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("前の置き場から移す", result.stdout)
+        self.assertTrue(os.path.exists(self.deployed(".claude", "ccnavi", "rules.yml")))
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_RULES"], ".claude/ccnavi/rules.yml")
+
+    def test_names_records_left_in_the_old_place_without_removing_them(self):
+        os.makedirs(self.deployed(".claude", "ccnavi", "state"))
+        result = self.run_setup("--no-deploy")
+        self.assertIn("前の置き場に残っている記録と控え", result.stdout)
+        self.assertTrue(os.path.isdir(self.deployed(".claude", "ccnavi", "state")))
 
 
 class NamesTheOldScriptPlace(SetupTest):

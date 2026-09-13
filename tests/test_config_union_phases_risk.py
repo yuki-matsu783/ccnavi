@@ -32,10 +32,11 @@ from tests.test_config_union import (
 
 # 共通層に足す項目。どれも `factors:` の続きなので、COMMON_RISK の後ろに繋げる。
 COMMON_SCRIPT_FACTOR = (
-    "  - {id: common-counted, points: 5, script: .claude/ccnavi/count.sh, message: 共通で数えた}\n"
+    "  - {id: common-counted, points: 5, script: .ccnavi/common/scripts/count.sh,"
+    " message: 共通で数えた}\n"
 )
 COMMON_MISSING_SCRIPT_FACTOR = (
-    "  - {id: gone, points: 5, script: .claude/ccnavi/gone.sh, message: 無い}\n"
+    "  - {id: gone, points: 5, script: .ccnavi/common/scripts/gone.sh, message: 無い}\n"
 )
 COMMON_JUDGE_FACTOR = "  - {id: outward, points: 10, judge: 外に出す変更か, message: 外向き}\n"
 
@@ -317,14 +318,14 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertTrue(any("high" in p["detail"] for p in errors), errors)
 
     def test_script_outside_its_layer_is_an_error(self):
-        """§25.4.2: 共通層は `.claude/...`、層は `.ccnavi/scripts/...` だけ。互いに指せない。"""
+        """§25.4.2: 共通層と各層は、互いの scripts/ を指せない。"""
         write_layer(
             self.lib,
             risk="version: 1\nfactors:\n"
-            "  - {id: x, points: 5, script: .claude/scripts/x.sh, message: x}\n",
+            "  - {id: x, points: 5, script: .ccnavi/common/scripts/x.sh, message: x}\n",
         )
         errors = self.risk_problems("error", "lib")
-        self.assertTrue(any(".claude/scripts/x.sh" in p["detail"] for p in errors), errors)
+        self.assertTrue(any(".ccnavi/common/scripts/x.sh" in p["detail"] for p in errors), errors)
 
         write_layer(self.lib, risk=None)
         self.risk = write(
@@ -371,7 +372,7 @@ class RiskUnionTest(ConfigUnionHarness):
     def test_script_in_the_common_layer_runs_through_the_merge(self):
         """§25.4.2: 合成を通しても、共通層の `script:` はワークスペースルートから解いて走る。"""
         write(
-            os.path.join(self.ws, ".claude", "ccnavi", "count.sh"),
+            os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"),
             'printf \'{"points": 7, "message": "%s"}\' "$CCNAVI_TICKET"\n',
         )
         write(self.risk, COMMON_RISK + COMMON_SCRIPT_FACTOR)

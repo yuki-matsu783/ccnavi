@@ -2,7 +2,7 @@
  * フェーズ管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.claude/ccnavi/phases.yml`、`CCNAVI_PHASES`）、
+ * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`、`CCNAVI_PHASES`）、
  * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。対象ごとに 1 パネルで、並べて開ける。
  * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
@@ -35,7 +35,7 @@ import { escapeHtml } from "./core/render.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_PHASES = ".claude/ccnavi/phases.yml";
+const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 /** 層のファイルを最初の保存で作るときに、先頭へ置く説明 */
