@@ -26,6 +26,27 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 `PreToolUse` のルール照合と `PostToolUse` の事後監視。dry-run で自分自身に
 仕掛けてある。
 
+設定 3 本（ルール・フェーズの種類・リスクの配点）は**層の和**で判定する（設計 §25.2〜§25.4.2、REQ-MLT）。
+共通層 `.claude/ccnavi/`、ワークスペース自身の層 `.ccnavi/config/`、プロジェクトの層
+`projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
+
+- Write / Edit / NotebookEdit は共通層 + 行き先の 1 層、Bash は共通層 + 全部の層。足すだけで上書きは無い
+- 層の id は `self:id` / `<名前>:id`。写し（全欄一致）は後ろを捨てて info、ルールの同 id 中身違いは両方効いて warn、
+  種類と配点の同 id 中身違いはその層を空にして error
+- フェーズの種類と配点は親の写しの `project:` の層を足す。`levels` は書かれた鍵だけがキーごとに min。`overlap` / `requires` は合成後に確かめる
+- 予約名 `common` / `self`（`casefold`）のプロジェクトは層として数えず、そこへの書き込みは共通層だけで判定する
+- `glob` は機械の見方で大文字小文字を扱い、`regex` は区別を残す。裸の `id` にコロンは書けない
+- 記録の `source`、`--explain` の層ごとの全件、`--explain --json` の `layers[]`
+
+自己保護（selfguard）の中核は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
+それらの作業ツリーの中の写し（切り元基準で列挙）まで広がった。層の傘 `.ccnavi/` の下は組み込みの deny
+（`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
+`rm -rf .ccnavi` のように傘ごと消す形も止める。`.ccnavi/scripts/` は中核に入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
+
+**移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧 `.claude/ccnavi/phases.yml` の削除は、
+新しい実行ファイルを配ったあとに人が行う。逆順にすると古い実行ファイルが自身の層を読まず、フェーズの種類が全部消える（実際に起きた。設計 §25.12）。
+層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える件）は別の issue で決める。
+
 ```
 main.py                     配布物の入口。PyInstaller が渡すスクリプト
 ccnavi/hookio.py            stdin の payload の解釈と stdout に返す応答
@@ -123,6 +144,8 @@ Claude Code が開き、その下の `projects/<名前>/` に clone したプロ
 チケットは `project:` を持ち、承認が置き場に在ることを確かめて子に継がせ、作業ツリーの切り元と
 違えばルールより先に止める（`DENY_TICKET_PROJECT_MISMATCH`）。プロジェクトのルールファイルは
 selfguard の中核に入る。`projects/` が無ければ前と同じに動く。
+（この段落は入った時点の形。ルールの置き場と判定は、のちに設定 3 本の層の和へ置き換わった。今の形は「いま動くもの」と設計 §25。
+`config/rules.yml` はもう読まない。）
 
 残っているもの。
 
@@ -139,6 +162,8 @@ selfguard の中核に入る。`projects/` が無ければ前と同じに動く�
 診断だけで効く `--project-rules-file <名前>=<パス>`（REQ-DIA-09。hook からの判定では無視する。selfguard は
 本来の場所を守る）。`tests/test_lint.py` と `tests/test_projects.py` の末尾のテストが通す。拡張の
 手動確認は README の表 25〜33。まだ拡張開発ホストでは通していないので、次に入る人が 25〜33 を 1 度踏む。
+**拡張は層の和に追従していない。** プロジェクト管理画面とルール設定画面は今も `CCNAVI_PROJECT_RULES` / `config/rules.yml` を
+読み書きするので、そこで保存したルールは判定に効かない（設計 §25.11）。`.ccnavi/config/rules.yml` を開く形へ直すのは別の作業。
 
 **並行するチケット（REQ-TKT、設計 §24）は入った。** `tests/test_ticket.py` が親 1 本と子 2 本を
 フェーズ 1 つで通す。残っているのは実測が要るもの。
