@@ -260,11 +260,11 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
     読むのは safe_load に限る。任意の Python の型を組み立てる load は、
     エージェントが書ける場所にあるファイルに向けては使わない。
 
-    YAML の解析の失敗は ValueError に包み直す。呼び手はここが投げるものを
+    YAML の解析の失敗は ValueError に変換して投げ直す。呼び手はここが投げるものを
     OSError と ValueError の 2 つで受けていて、素通りする例外が 1 つでもあると、
     ルールファイルの書き損じがそのまま hook の異常終了になる。既定に落ちる
     経路（REQ-PRE-06）を通らずに落ちるので、壊れたファイルを直す呼び出しも
-    止まる。読み手を替えるたびに、包み直しの側も一緒に見ること。
+    止まる。読み手を替えるたびに、変換の側も一緒に見ること。
     """
     with open(path, encoding="utf-8") as f:
         try:

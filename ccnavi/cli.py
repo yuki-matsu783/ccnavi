@@ -402,7 +402,7 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     `--approve` と `--reviewed` は人の合意そのもの。エージェントが Bash から打てば
     その合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
-    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない配管のため）。
+    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
     """
     if conf.guard_ticket_approval == selfguard.DISABLE:
         return True
