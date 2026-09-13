@@ -27,6 +27,7 @@ allow:
     glob: "ccnavi.md"
 started_at: "2026-09-13T13:01:33+0900"
 base_sha: "9a26c0867f3e710fc664de1f6eca567c14e3b92f"
+completed_at: "2026-09-13T13:04:59+0900"
 ---
 
 # 文書: shellread の印を 2 つに分けた
