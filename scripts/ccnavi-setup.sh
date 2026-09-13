@@ -109,8 +109,9 @@ NEW_COMMON_DIR=".ccnavi/common"
 OLD_COMMON_FILES="rules.yml risk.yml phases.yml rule-samples.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
-# 起動時に落ちる。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh"
+# 起動時に落ちる。ccnavi-push-approved.sh はボードが承認のあと端末に送る 1 行の中身。
+# 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh"
 
 mode="$DEFAULT_MODE"
 bin="$DEFAULT_BIN"
