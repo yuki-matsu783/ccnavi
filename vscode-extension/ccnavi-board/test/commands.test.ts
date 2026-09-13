@@ -5,6 +5,7 @@ import {
   acceptCommand,
   approveArgs,
   previewArgs,
+  pushApprovedCommand,
   shellQuote,
   toPosixPath,
 } from "../src/core/commands.js";
@@ -55,5 +56,20 @@ test("CB-T19 accept は親の作業ツリーで sh を打つ", () => {
   assert.equal(
     acceptCommand("/ws/.claude/worktrees/i0001", 2),
     "cd '/ws/.claude/worktrees/i0001' && sh .ccnavi/scripts/ccnavi-review.sh accept 2",
+  );
+});
+
+test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペースルートからの絶対パスで送る", () => {
+  // 絶対パスなので、前に accept が親の作業ツリーへ cd したターミナルでも届く。
+  assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh'");
+  // Windows の区切りは "/" に直す（Git Bash が読める形）。
+  assert.equal(
+    pushApprovedCommand("C:\\Users\\x\\ws"),
+    "sh 'C:/Users/x/ws/.ccnavi/scripts/ccnavi-push-approved.sh'",
+  );
+  // 単引用符を含むパスは割って囲む。
+  assert.equal(
+    pushApprovedCommand("/tmp/it's ws"),
+    `sh '/tmp/it'\\''s ws/.ccnavi/scripts/ccnavi-push-approved.sh'`,
   );
 });
