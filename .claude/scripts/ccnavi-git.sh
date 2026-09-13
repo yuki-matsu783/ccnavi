@@ -87,6 +87,8 @@ sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
 
 通さないもの (代わりの手段):
   reset clean   git stash push -u で退避する。消さない
+                ブランチをリモートに合わせるなら checkout -B <ブランチ> <リモート>/<ブランチ>
+                (外れるコミットの変更が行き先に入っていることを確かめてから)
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
   config clone submodule  利用者に依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
@@ -530,7 +532,10 @@ push)
 		esac
 	done
 	;;
-reset | clean)
+reset)
+	reject "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。ブランチをリモートに合わせたい（squash マージの後で fast-forward できない、など）なら、$SELF fetch <リモート> <ブランチ> のあと $SELF checkout -B <ブランチ> <リモート>/<ブランチ> を使ってください。書きかけとぶつかるなら git が拒みます。ただし、そのブランチにしか無いコミットは黙って外れます。先に $SELF log --oneline <リモート>/<ブランチ>..HEAD で外れるコミットを見て、それが触ったファイルについて $SELF diff HEAD <リモート>/<ブランチ> -- <ファイル> が空（変更が行き先に入っている）ことを確かめてから打ってください。空でなければ打たずに利用者に伝えてください。"
+	;;
+clean)
 	reject "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
 	;;
 rebase | cherry-pick | revert | am | apply | bisect | filter-branch | replace | update-ref | symbolic-ref | reflog | gc | notes)

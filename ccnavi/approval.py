@@ -915,8 +915,7 @@ def _apply(
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
 
-    stdout.write(f"\n承認した。親のツリーの {conf.approved} に承認済みチケットを置いた。\n")
-    stdout.write("この範囲は次のツール呼び出しから効く。\n")
+    stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
     return 0
 
 
