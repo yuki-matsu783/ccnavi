@@ -1093,7 +1093,7 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 シェルから止める場所は、`.claude/` の `ccnavi/` `hooks/` `scripts/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、
 `ccnavi-git.sh`、実行ファイル、それに記録と控え（`logs/log.jsonl` と `logs/state`）。記録と控えは前は `.claude/ccnavi/` の
 中にあって、そこを守る綴りに一緒に入っていた。`logs/` へ移したぶん守りが外れないよう、名前を絞って足してある。
-`logs/` の下の git ラッパの記録は守らない。消しても判定に効かないため。`.claude/ccnavi/` は前の置き場だが、env で前の綴りを
+`logs/` の下の git のラッパースクリプトの記録は守らない。消しても判定に効かないため。`.claude/ccnavi/` は前の置き場だが、env で前の綴りを
 指したままのワークスペースがあるので、守る場所に残してある。
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。`CCNAVI_BIN_PATH` を指定して
@@ -1191,7 +1191,7 @@ phases.yml と risk.yml は在るときだけ、解決後の綴りで載る。�
 `doing/` `done/` `cancelled/` への直接の作成・移動は、Write でもシェルでも、誰がやっても止まる
 （`builtin-ticket-state`）。動かせるのはスクリプトだけで、スクリプトはサブエージェントには
 打てない（`DENY_SUBAGENT_TICKET_OP`）。同じ理由で push もサブエージェントには打てず、
-子チケットの作業ツリーからは git ラッパが拒む。合流と push と閉じるのは親の仕事。
+子チケットの作業ツリーからは git のラッパースクリプトが拒む。合流と push と閉じるのは親の仕事。
 
 `start` は着手の時刻と基準点（その作業ツリーの HEAD）を書く。`done` は完了の時刻を書き、
 承認済みチケットは次の hook が `closed/` へ動かす。作業ツリーの削除は親のマージ手順に任せる。
@@ -1482,7 +1482,7 @@ origin の綴りはホストのポートと scheme をそのまま使う。`http
 読み飛ばし、出力では伏せる。どう読んだかは `sh .ccnavi/scripts/ccnavi-review.sh origin` で出る。
 
 push の認証は git の設定側に置く（Git Credential Manager に保存しておく、か `credential.helper`）。
-git ラッパは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落とし、`GIT_TERMINAL_PROMPT=0` で
+git のラッパースクリプトは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落とし、`GIT_TERMINAL_PROMPT=0` で
 入力待ちを即失敗に倒すので、環境変数で helper を差し替える形も、認証画面で入れる形も通らない。
 GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰り返す道具は `tools/gitlab/probe_gitlab.py`。
 
@@ -2044,7 +2044,7 @@ VS Code の拡張が、承認をターミナルではなくボードのオーバ
 1 つの引数にまとめると検査が自分自身と比べる形になり、常に一致してしまう。絞り込みが無ければ
 `<絞り>` は空で、承認待ち全部と比べる。
 
-## 生の git は止めてラッパへ寄せる
+## 生の git は止めてラッパースクリプトへ寄せる
 
 `.ccnavi/scripts/ccnavi-git.sh` は、安全な git だけを通し、出力を抑えて結果だけを返す。
 生の `git` はルールで拒否し、拒否の文面からここへ誘導する。
@@ -2090,7 +2090,7 @@ commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 統合を決めるのは人なので、マージは人の側に残す。
 
 送るのは親だけ。子チケットの作業ツリー（承認済みチケットに `parent:` があるもの）からの
-push はラッパが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）。
+push はラッパースクリプトが拒み、サブエージェントからの push は hook が拒む（`DENY_SUBAGENT_TICKET_OP`）。
 リモートに置く枝はマージリクエストの付いた親ブランチ 1 本で、子の成果は親が手元で合流してから
 親のツリーで送る。子が自分の枝をリモートへ置くと、レビューの外にある枝ができる。
 
@@ -2149,7 +2149,7 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `scripts/ccnavi-launcher.sh` | 配布先で hook が起動する sh。隣の `<os>-<arch>/` から、この機械の実行ファイルを選ぶ |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
-| `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
+| `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
 | `.ccnavi/scripts/ccnavi-approve.sh` | 承認し、承認済みチケットをコミットして親のブランチへ push する。人が端末で打つ。本体は `ccnavi --approve` |
