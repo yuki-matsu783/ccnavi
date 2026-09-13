@@ -26,7 +26,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 ## いま動くもの
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
-`SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、中核ファイルの
+`SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
 自己防衛、チケット制御（提案・承認・承認済みチケット・フェーズ・ゲート・レビュー・実績のリスク）、
 複数のリポジトリ、診断（`--test` `--test-samples` `--explain` `--lint` とその JSON）、
 VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理）。dry-run で自分自身に
@@ -47,10 +47,10 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 - 端末から打つ `--approve` は、束の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
 - `CCNAVI_PROJECT_RULES` と旧の置き場 `config/rules.yml` はもう読まない（`--lint` が warn で言う）
 
-中核ファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
+コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
 それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。層の傘 `.ccnavi/` の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
-`rm -rf .ccnavi` のように傘ごと消す形も止める。`.ccnavi/scripts/` は中核に入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
+`rm -rf .ccnavi` のように傘ごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
 
 **移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧 `.claude/ccnavi/phases.yml` の削除は、
 新しい実行ファイルを配ったあとに人が行う。逆順にすると古い実行ファイルが自身の層を読まず、フェーズの種類が全部消える（実際に起きた。設計 §11.12）。
@@ -302,7 +302,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 - GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
   書いただけ。GitLab の変更要求（`request_changes`）だけは CE に無い機能で、EE でしか当てられない
 - `.claude/scripts/` への Write は `guard-scripts` が止める。sh 3 本はこのリポジトリで作ったので
-  入っているが、他のプロジェクトへ配るときは導入スクリプトが写す
+  入っているが、他のプロジェクトへは導入スクリプトが配る
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
 
