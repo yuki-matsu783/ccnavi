@@ -18,13 +18,12 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import unittest
 
 from tests.test_board import _portable
-from tests.test_phases import PhaseHarness, child_text, parent_text
+from tests.test_phases import PHASES, PhaseHarness, child_text, parent_text
 from tests.test_ticket import ROOT, write
 
 FIXTURES = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures")
@@ -210,10 +209,14 @@ class ApproveJsonTest(PhaseHarness):
     # ---- 4b. 見せた本文の指紋を照合する（チケット approve-carry-04 の 1〜5）
 
     def test_preview_carries_a_stable_digest_of_the_text(self):
-        """1. preview の答えに `digest`（`text` を UTF-8 にした SHA-256 の 16 進）が載る。"""
+        """1. preview の答えに `digest`（SHA-256 の 16 進 64 文字）が載る。
+
+        覆う中身は本文に加えて、承認済みチケットとして書き出す中身（チケット approve-carry-05）。
+        値の作り方は実装が決めるので、形と、同じ状態で同じ値になることだけを見る。
+        """
         self.pending_parent_and_child()
         first = self.preview()
-        self.assertEqual(first["digest"], hashlib.sha256(first["text"].encode("utf-8")).hexdigest())
+        self.assertRegex(first["digest"], r"^[0-9a-f]{64}$")
         # 同じ状態でもう一度見せても同じ値になる。
         self.assertEqual(self.preview()["digest"], first["digest"])
 
@@ -278,6 +281,84 @@ class ApproveJsonTest(PhaseHarness):
                 self.assertIn("--digest", result.stderr)
                 self.assertFalse(self.copy_exists("i0001"))
                 self.assertFalse(self.copy_exists("i0001-01"))
+
+    # ---- 4c. 指紋は承認済みチケットに写る欄も覆う（チケット approve-carry-05 の 1〜5）
+
+    def pending_parent_with_issue_and_child(self, issue=4242):
+        """`issue:` を持つ親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
+        parent = self.propose("i0001", parent_text("i0001", ["research", "design"], issue=issue))
+        child = self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False)
+        )
+        self.commit_parent()
+        return parent, child
+
+    def assert_refused_after_edit(self, path, old, new, shown):
+        """見せたあとで path の old を new に書き換えてコミットすると、見せた指紋では承認しない。"""
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn(old, text)
+        write(path, text.replace(old, new, 1))
+        self.commit_parent("edit after preview")
+
+        result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["version"], APPROVE_VERSION)
+        mismatch = body["mismatch"]
+        self.assertEqual(mismatch["expected"], ["i0001", "i0001-01"])
+        self.assertEqual(mismatch["current"], ["i0001", "i0001-01"])
+        self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
+        self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
+        self.assertFalse(self.copy_exists("i0001"))
+        self.assertFalse(self.copy_exists("i0001-01"))
+
+    def test_yes_refuses_when_only_the_issue_of_the_parent_changed(self):
+        """1. 見せたあとで親の `issue:` だけを書き換えると、見せた指紋では承認しない。"""
+        parent, _ = self.pending_parent_with_issue_and_child(4242)
+        shown = self.preview()
+        self.assert_refused_after_edit(parent, "issue: 4242", "issue: 4343", shown)
+
+    def test_yes_refuses_when_only_the_markdown_body_of_a_child_changed(self):
+        """2. 見せたあとで子の Markdown の本文だけを書き換えても、見せた指紋では承認しない。"""
+        self.pending_parent_and_child()
+        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        shown = self.preview()
+        self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
+
+    def test_digest_changes_when_only_the_overflow_changes(self):
+        """3. 提案はそのままで、種類の scope が変わって子の超過が増えると、指紋が変わる。"""
+        self.pending_parent_and_child()
+        before = self.preview()
+        self.assertEqual(before["batch"][1]["overflow"], [])
+
+        # 種類 research の scope を、子の範囲を覆わない綴りに書き換える。
+        narrowed = PHASES.replace('scope: ["wip/research/*"]', 'scope: ["wip/elsewhere/*"]', 1)
+        self.assertNotEqual(narrowed, PHASES)
+        write(self.phases, narrowed)
+
+        after = self.preview()
+        self.assertEqual(
+            [b["ticket"] for b in after["batch"]], [b["ticket"] for b in before["batch"]]
+        )
+        self.assertTrue(after["batch"][1]["overflow"], after["batch"][1])
+        self.assertNotEqual(after["digest"], before["digest"])
+
+    def test_yes_accepts_the_shown_digest_in_upper_case(self):
+        """4. 見せた `digest` を大文字にして `--yes` に渡しても承認できる。"""
+        self.pending_parent_and_child()
+        shown = self.preview()["digest"]
+        result = self.yes(["i0001", "i0001-01"], digest=shown.upper())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["approved"], ["i0001", "i0001-01"])
+        self.assertTrue(self.copy_exists("i0001"))
+        self.assertTrue(self.copy_exists("i0001-01"))
+
+    def test_preview_text_shows_the_issue_of_the_parent(self):
+        """5. `issue:` を持つ親のプレビューの `text` に、その番号が出る。"""
+        self.pending_parent_with_issue_and_child(4242)
+        body = self.preview()
+        self.assertIn("4242", body["text"])
 
     # ---- 5. 端末の壁
 

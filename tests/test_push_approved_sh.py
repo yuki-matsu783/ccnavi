@@ -298,10 +298,25 @@ class PushApprovedTest(Workspace):
         self.assertNotIn(NOTHING, result.stdout)
 
     def test_carries_the_place_named_by_ccnavi_approved(self):
-        """12. `CCNAVI_APPROVED` を既定と違う綴りにすると、その置き場を運ぶ。
+        """12. `CCNAVI_TICKETS_APPROVED` を既定と違う綴りにすると、その置き場を運ぶ。
 
-        既定の置き場（`.ccnavi/tickets`）は運ばない。
+        既定の置き場（`.ccnavi/tickets`）は運ばない。環境変数の名前は `ccnavi/settings.py` の
+        `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
         """
+        other = "approved/tickets"
+        tree = self.worktree("i0001")
+        write(os.path.join(tree, *other.split("/"), "i0001.md"), "approved\n")
+        self.place(tree, "i0002")
+
+        result = self.push(env=self.env(CCNAVI_TICKETS_APPROVED=other))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.committed(tree), [f"{other}/i0001.md"])
+        self.assertTrue(self.dirty(tree, APPROVED))
+        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    def test_old_name_ccnavi_approved_is_not_read(self):
+        """6. 旧名 `CCNAVI_APPROVED` だけを設定しても、その置き場は運ばない。既定の置き場を運ぶ。"""
         other = "approved/tickets"
         tree = self.worktree("i0001")
         write(os.path.join(tree, *other.split("/"), "i0001.md"), "approved\n")
@@ -309,10 +324,68 @@ class PushApprovedTest(Workspace):
 
         result = self.push(env=self.env(CCNAVI_APPROVED=other))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.subject(tree), MESSAGE)
-        self.assertEqual(self.committed(tree), [f"{other}/i0001.md"])
-        self.assertTrue(self.dirty(tree, APPROVED))
+        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0002.md"])
+        self.assertTrue(self.dirty(tree, other))
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
+
+    # ---- チケット approve-carry-05 の 7・8
+
+    def said(self, result, name):
+        """sh 自身が標準エラーに name を名指ししたか。git のエラー文に紛れた綴りは数えない。"""
+        return any(
+            line.startswith("ccnavi-push-approved:") and name in line
+            for line in result.stderr.splitlines()
+        )
+
+    def test_a_failed_add_in_one_tree_does_not_stop_the_others(self):
+        """7. 1 本のツリーで `git add` が落ちても、もう 1 本は運ぶ。
+
+        終了コードは 1 で、落ちたツリーを標準エラーで名指しする。
+        """
+        locked = self.worktree("locked")
+        self.place(locked)
+        before = self.head(locked)
+        # そのツリーのインデックスを他のプロセスが握っている形。`git add` が落ちる。
+        gitdir = git(locked, "rev-parse", "--absolute-git-dir").stdout.strip()
+        write(os.path.join(gitdir, "index.lock"))
+        tree = self.worktree("i0002")
+        self.place(tree, "i0002")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertTrue(self.said(result, "locked"), result.stderr)
+        self.assertEqual(self.head(locked), before)
+        self.assertEqual(self.remote_head("locked"), "")
+        # 落ちたツリーのあとでも、他のツリーは運ぶ。
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0002.md"])
+        self.assertEqual(self.remote_head("i0002"), self.head(tree))
+
+    def test_a_symlink_under_worktrees_is_not_followed(self):
+        """8. `.claude/worktrees/` の下のシンボリックリンクは辿らない。標準エラーに言う。
+
+        リンク先はワークスペースの外のリポジトリ。本物の作業ツリーは運ぶ。
+        """
+        outside = os.path.join(self._tmp.name, "outside")
+        outside_remote = self.repository(outside, "work")
+        self.place(outside)
+        before = self.head(outside)
+        tree = self.worktree("i0002")
+        self.place(tree, "i0002")
+        link = os.path.join(self.ws, ".claude", "worktrees", "linked")
+        try:
+            os.symlink(outside, link, target_is_directory=True)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"シンボリックリンクが作れない: {error}")
+
+        result = self.push()
+        # 飛ばしたリンクがあるときの終了コードはチケットで決まっていないので見ない。
+        self.assertTrue(self.said(result, "linked"), result.stderr)
+        self.assertEqual(self.head(outside), before)
+        self.assertTrue(self.dirty(outside, APPROVED))
+        self.assertEqual(self.head_of(outside_remote, "work"), "")
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.remote_head("i0002"), self.head(tree))
 
     def test_leaves_nothing_of_others_in_the_index(self):
         """13. 実行後、同じツリーの他人の変更がステージ（インデックス）に載っていない。
