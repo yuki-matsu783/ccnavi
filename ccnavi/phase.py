@@ -65,7 +65,9 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
 # 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
 # 前のコマンドの `--approve` を免除する。
-_NOT_PREVIEW = r"(?![^\x00;&|\r\n]*--preview\b)"
+# 語の中の印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
+# `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
+_NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*--preview\b)"
 _CLI_FORMS = (
     rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
     r"|\b(ticket|review)\s+"
