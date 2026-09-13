@@ -8,8 +8,8 @@
  * `--approve --yes … --json`（見せた束を承認する。人がオーバーレイで押したときだけ）。
  * 判定と検証はルールファイルを差し替えられる。
  * ワークスペースのルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
- * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases` で差し替えられる
- * （リスク管理画面・フェーズ管理画面）。
+ * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（層の種類なら `--project-phases-file <名前>=<パス>`）で
+ * 差し替えられる（リスク管理画面・フェーズ管理画面）。
  * 編集中の内容を一時ファイルに置いて試すため。承認済みチケットと控えは外し、記録も残さない
  * （試し打ちで記録を汚さない）。
  */
@@ -79,13 +79,15 @@ export type RulesOverride =
 
 /**
  * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、リスクの配点を `--risk` で、
- * フェーズの種類を `--phases` で差し替えられる。判定（`--test`）には配点も種類も関係ないので、
- * そちらは RulesOverride だけを受ける。
+ * 共通層のフェーズの種類を `--phases` で、層（`self` かプロジェクト）の種類を
+ * `--project-phases-file <名前>=<パス>` で差し替えられる。層の種類は共通層と合成して確かめられる。
+ * 判定（`--test`）には配点も種類も関係ないので、そちらは RulesOverride だけを受ける。
  */
 export type LintOverride =
   | RulesOverride
   | { readonly kind: "risk"; readonly path: string }
-  | { readonly kind: "phases"; readonly path: string };
+  | { readonly kind: "phases"; readonly path: string }
+  | { readonly kind: "layerPhases"; readonly name: string; readonly path: string };
 
 function overrideArgs(override: LintOverride): string[] {
   switch (override.kind) {
@@ -99,6 +101,8 @@ function overrideArgs(override: LintOverride): string[] {
       return ["--risk", override.path];
     case "phases":
       return ["--phases", override.path];
+    case "layerPhases":
+      return ["--project-phases-file", `${override.name}=${override.path}`];
   }
 }
 

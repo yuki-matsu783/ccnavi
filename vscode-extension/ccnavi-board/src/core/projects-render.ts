@@ -107,6 +107,7 @@ function renderSelfRules(page: ProjectsPage): string {
     ? `<span class="ok">あり</span> ${rel}`
     : `<span class="dim">なし</span> ${rel} <button type="button" class="action small" data-action="create-self-rules" title="共通層の rules.yml を自身の層にコピーします。文面の sh のパスは {root} 付きに置き換えます">共通層からコピー</button>`;
   return `  <div class="self-rules"><span>自身の層のルール</span> ${state} <button type="button" class="action small" data-action="open-self-rules" ${page.selfRulesExists ? "" : "disabled "}title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足して当たるルールを編集し、判定を試します">ルール管理</button></div>
+  <div class="self-rules"><span>自身の層のフェーズの種類</span> <button type="button" class="action small" data-action="open-self-phases" title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集します。無ければ画面から作れます">フェーズ管理</button></div>
 `;
 }
 
@@ -156,7 +157,8 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
           <div class="field wide"><dt>検証</dt><dd>${lint}</dd></div>
       </dl>
       <div class="ops">
-          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試します">ルール管理</button>${board}
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試します">ルール管理</button>
+          <button type="button" class="action" data-action="open-phases" data-name="${escapeHtml(row.name)}" ${row.rulesRel === "" ? "disabled " : ""}title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集します。無ければ画面から作れます">フェーズ管理</button>${board}
           <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルで実行します">fetch</button>
           <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルで実行します。衝突があれば git が止めます">pull</button>
       </div>
@@ -297,6 +299,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "open-rules") { vscode.postMessage({ type: "openRules", name: target }); }
       else if (action === "create-self-rules") { vscode.postMessage({ type: "createSelfRules" }); }
       else if (action === "open-self-rules") { vscode.postMessage({ type: "openSelfRules" }); }
+      else if (action === "open-phases") { vscode.postMessage({ type: "openPhases", name: target }); }
+      else if (action === "open-self-phases") { vscode.postMessage({ type: "openSelfPhases" }); }
       else if (action === "open-board") { vscode.postMessage({ type: "openBoard", name: target }); }
       else if (action === "fetch") { vscode.postMessage({ type: "fetch", name: target }); }
       else if (action === "pull") { vscode.postMessage({ type: "pull", name: target }); }

@@ -98,19 +98,24 @@ export interface ParentJson {
   readonly phases: readonly PhaseJson[];
 }
 
+/** 層の設定ファイル 1 本の置き場 */
+export interface LayerFileJson {
+  /** 実行ファイルが解いたパス。ファイルが無くても本来の置き場を指す */
+  readonly path: string;
+  /** 読めなかった理由。空なら読めた（無いファイルも空として読めた扱い） */
+  readonly unreadable: string;
+}
+
 /**
- * 層 1 つ（設計 §11.2）。拡張が使うのはルールファイルの置き場だけなので、それだけを読む。
- * 宣言の中身、phases と risk は読まない（フェーズ管理画面とリスク管理画面は層に追従していない、設計 §11.11）。
+ * 層 1 つ（設計 §11.2）。拡張が使うのはルールとフェーズの種類のファイルの置き場だけなので、それだけを読む。
+ * 宣言の中身と risk は読まない（リスク管理画面は層に追従していない、設計 §11.11）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
-  readonly rules: {
-    /** 実行ファイルが解いたルールファイルのパス。ファイルが無くても本来の置き場を指す */
-    readonly path: string;
-    /** 読めなかった理由。空なら読めた（無いファイルも空として読めた扱い） */
-    readonly unreadable: string;
-  };
+  readonly rules: LayerFileJson;
+  /** フェーズの種類のファイル（`phases_file`）。共通層は `CCNAVI_PHASES` の綴り */
+  readonly phasesFile: LayerFileJson;
 }
 
 export interface BoardJson {
@@ -194,8 +199,11 @@ function tree(raw: Record<string, unknown>): TreeJson {
 }
 
 function layer(raw: Record<string, unknown>): LayerJson {
-  const rules = isRecord(raw.rules) ? raw.rules : {};
-  return { name: str(raw.name), rules: { path: str(rules.path), unreadable: str(rules.unreadable) } };
+  const file = (value: unknown): LayerFileJson => {
+    const record = isRecord(value) ? value : {};
+    return { path: str(record.path), unreadable: str(record.unreadable) };
+  };
+  return { name: str(raw.name), rules: file(raw.rules), phasesFile: file(raw.phases_file) };
 }
 
 function ticket(raw: Record<string, unknown>): TicketJson {
