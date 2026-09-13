@@ -1,8 +1,8 @@
 """設定 3 本の和の受入テスト。守る面（設計 §25.6）と導入スクリプト（§25.9 末尾）。
 
-selfguard の中核に、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
+selfguard のコアに、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
 Write / Edit の拒否、シェルからの書き込みの拒否、控えと復元の 3 つとも、今 rules.yml に
-掛けているものをそのまま掛ける。切り元から切った作業ツリーの中の写しも対象。
+掛けているものをそのまま掛ける。切り元から切った作業ツリー側の設定も対象。
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
@@ -101,10 +101,12 @@ class RestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_copies_in_a_worktree_cut_from_a_project_are_restored(self):
-        """§25.6: 切り元のプロジェクトから切った作業ツリーの中の写しも対象。"""
+        """§25.6: 切り元のプロジェクトから切った作業ツリー側の設定も対象。"""
         tree = self.worktree(self.lib, "w1")
         copy = layer_path(tree, "rules")
-        self.assertTrue(os.path.exists(copy), "lib の .ccnavi/ は追跡されているので写しがある")
+        self.assertTrue(
+            os.path.exists(copy), "lib の .ccnavi/ は追跡されているので作業ツリー側の設定がある"
+        )
 
         before, after, result = self.break_and_restore(copy)
         self.assertEqual(after, before, self.said(result))
@@ -112,23 +114,25 @@ class RestoreTest(GuardHarness):
         self.assertIn("統合すれば", result.stdout, self.said(result))
 
     def test_copies_in_a_worktree_cut_from_the_workspace_are_restored(self):
-        """§25.6: ワークスペースから切った作業ツリーの中の自身の層の写しも対象。"""
+        """§25.6: ワークスペースから切った作業ツリー側の、自身の層の設定も対象。"""
         tree = self.worktree(self.ws, "w2")
         copy = layer_path(tree, "phases")
         before, after, result = self.break_and_restore(copy, broken="version: 1\nphases: {}\n")
         self.assertEqual(after, before, self.said(result))
 
     def test_copies_of_the_common_layer_in_a_worktree_are_restored(self):
-        """§25.6: ワークスペースから切った作業ツリーの中の共通層の写しも対象（既存の穴）。
+        """§25.6: ワークスペースから切った作業ツリー側の、共通層の設定も対象（既存の穴）。
 
-        共通層の 3 本はワークスペースの git が追跡しているので、作業ツリーにも写しが入る。
+        共通層の 3 本はワークスペースの git が追跡しているので、作業ツリー側の設定もできる。
         今はそこがルールの allow `worktrees` に当たって書けてしまい、戻りもしない。
         """
         tree = self.worktree(self.ws, "w3")
         for name in ("rules.yml", "phases.yml", "risk.yml"):
             with self.subTest(name=name):
                 copy = os.path.join(tree, ".claude", "ccnavi", name)
-                self.assertTrue(os.path.exists(copy), "共通層は追跡されているので写しがある")
+                self.assertTrue(
+                    os.path.exists(copy), "共通層は追跡されているので作業ツリー側の設定がある"
+                )
                 broken = "version: 3\ndeny: []\n" if name == "rules.yml" else "version: 1\n"
                 before, after, result = self.break_and_restore(copy, broken=broken)
                 self.assertEqual(after, before, self.said(result, name))

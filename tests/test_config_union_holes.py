@@ -542,7 +542,7 @@ class ReservedLayerRestoreTest(GuardHarness):
 class ScriptTamperTest(GuardHarness):
     """A-6: 既に参照されている `.ccnavi/scripts/` のスクリプトを書き換える・消す道。
 
-    中核（控えと復元）には入れない。止まることだけを確かめる（A-2 と A-3 の結果）。
+    コア（控えと復元）には入れない。止まることだけを確かめる（A-2 と A-3 の結果）。
     """
 
     def setUp(self):

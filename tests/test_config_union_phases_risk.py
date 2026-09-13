@@ -4,7 +4,7 @@ fixture は tests/test_config_union.py の ConfigUnionHarness を継ぐ。
 共通層に `design`、自身の層に `docs`、lib の層に `build` / `release` がある。
 risk は共通層に `big-diff`、lib の層に `schema` と `levels: {critical: 50}` がある。
 
-どの層を足すかは親の写しの `project:` で決まる。lib 向けの提案は
+どの層を足すかは親の承認済みチケットの `project:` で決まる。lib 向けの提案は
 `wip/lib/tickets/` に置き、ワークスペース向けは `wip/tickets/` に置く。
 
 実装はまだ無い。このテストは実装フェーズが緑にする。
@@ -67,7 +67,7 @@ phases:
     scope: ["src/*"]
 """
 
-# 共通層の design を全欄そのまま写した lib の層。
+# 共通層の design と全欄が同じ定義を持つ lib の層。
 LIB_PHASES_COPIED = LIB_PHASES + COMMON_PHASES.split("phases:\n", 1)[1]
 
 # 閉じるときの点を見るための、範囲の上限が無くレビュー不要の種類。
@@ -156,7 +156,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
 
     def test_identical_type_in_a_later_layer_is_dropped_with_info(self):
-        """§25.4.1: 全欄一致は写しとみなして後ろを捨て、info で言う。承認は通る。"""
+        """§25.4.1: 全欄一致は重複とみなして後ろを捨て、info で言う。承認は通る。"""
         write_layer(self.lib, phases=LIB_PHASES_COPIED)
 
         self.assertEqual(self.phase_problems("error"), [])
@@ -304,7 +304,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("lib", closed.stdout + closed.stderr)
 
     def test_identical_factor_in_a_later_layer_is_dropped_with_info(self):
-        """§25.4.2: 全欄一致なら写しとして後ろを捨て、info で言う。"""
+        """§25.4.2: 全欄一致なら重複として後ろを捨て、info で言う。"""
         copied = COMMON_RISK.replace("levels: {medium: 20, high: 40, critical: 70}\n", "")
         write_layer(self.lib, risk=copied)
 

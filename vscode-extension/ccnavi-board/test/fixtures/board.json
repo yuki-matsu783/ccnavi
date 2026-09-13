@@ -50,7 +50,7 @@
       "kind": "glob",
       "written": "*/.claude/ccnavi/*",
       "pattern": "(?s:(?>.*?[///]/.claude[///]ccnavi[///]).*)/Z",
-      "message": "ガードの設定と写しです。利用者に依頼してください。"
+      "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。"
      }
     ],
     "ask": [],
