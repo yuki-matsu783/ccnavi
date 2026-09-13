@@ -38,9 +38,9 @@ allow:
   glob: HANDOVER.md
 - match: Write|Edit
   glob: CONTEXT.md
-started_at: ""
+started_at: "2026-09-13T21:05:25+0900"
 completed_at: ""
-base_sha: ""
+base_sha: "45ba15a407056db7d6fd0e9e0ec41c9b04aecfba"
 ---
 
 # ルールとチケットの判定を合わせ、厳しい側を採る
