@@ -3,7 +3,7 @@
 VS Code のボード拡張が読む形を、判定と同じ関数で組んでいることを確かめる。
 見るのは 4 つ。
 
-1. 提案・承認済みチケット・印・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
+1. 提案・承認済みチケット・マーカー・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
 2. 承認待ち（承認済みチケットの無い提案）が `pending_approval` に出る
 3. 親のフェーズとゲートが `parents` に出る
 4. チケット制御が disable なら、空のボードと理由を返す
@@ -116,7 +116,7 @@ class BoardTest(PhaseHarness):
     def test_settings_say_ticket_control_is_enabled_by_default(self):
         board = self.board()
         self.assertEqual(board["settings"]["ticket_control"], "enable")
-        # 承認済みチケットの置き場を空文字で指しても、もう切れない。既定の置き場で有効のまま。
+        # 承認済みチケットの置き場を空文字で指しても切れない。既定の置き場で有効のまま。
         board = self.board("--approved", "")
         self.assertEqual(board["settings"]["ticket_control"], "enable")
         self.assertTrue(board["settings"]["approved"].endswith("tickets"))

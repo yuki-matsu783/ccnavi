@@ -13,7 +13,7 @@
     deny:
       - id: guard-config
         match: Write|Edit
-        glob: "*/.claude/ccnavi/*"
+        glob: "*/.ccnavi/*"
         message: ガード自身の設定です。利用者に依頼してください。
     ask:
       - id: migrations
@@ -76,7 +76,7 @@ VERSION = 3
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 # info は「そう書いてあるとおりに効いているが、書いた人が知りたいはずのこと」。
-# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 §25.4）。
+# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 §11.4）。
 # warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
 # 混ぜると本当に緩んでいる warn が埋もれるため。
 SEVERITY_INFO = "info"
@@ -88,7 +88,7 @@ ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
 # 文面が要るタイプ。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
-# 通すだけで届く先が無い（どちらも実測済み、設計 §24.12）。モデルに渡す文は
+# 通すだけで届く先が無い（どちらも実測済み、設計 付録 C）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
 # ここで落とすとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
 _NEEDS_MESSAGE = (DENY,)
@@ -110,15 +110,21 @@ ROOT_PLACEHOLDER = "{root}"
 
 # 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、層を添えた形と見分けが付かない。
-# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §25.4）。
+# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §11.4）。
 ID_SEPARATOR = ":"
+
+# 組み込みの守りの名前の頭。ルールファイルからは書けない（読み込まずに error）。
+# 以前は同じ id で書いたルールがあると組み込みを足さなかったので、何にも当たらない 1 本を
+# その名前で書くだけで守りが黙って消えた。ルールファイルの記述に依らず足すのが組み込みの
+# 役目なので、置き換えの道ごと閉じる。外したいなら env で面ごと切る。
+RESERVED_ID_PREFIX = "builtin-guard-"
 
 
 def root_pattern(root: str) -> str:
     """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
-    解いた綴り（cli.full_path）で、Windows では `\\` になるが、ルールを書く人は
+    解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書く人は
     `/` で考える。大文字小文字を区別しない機械では、綴りの違いも許す
     （`c:` と `C:` は同じ場所）。
     """
@@ -135,6 +141,19 @@ def root_glob(root: str) -> str:
     区切りは `/` に寄せ、翻訳の側が両方に当てる。
     """
     return os.path.realpath(root).replace("\\", "/").rstrip("/")
+
+
+def fill_root(text: str, root: str) -> str:
+    """モデルへ渡す文の `{root}` を、ワークスペースルートの実パスに置き換える。
+
+    文面で sh を案内するときは `{root}` から書く（スクリプトはワークスペースにしか無く、
+    作業ツリーやプロジェクトの中からは相対の綴りが届かない）。綴りは glob に埋めるのと
+    同じ形で、区切りは `/`。ルートが渡らない読み方（診断で `--root` が無い）では
+    置き換えずにそのまま返す。
+    """
+    if not root or ROOT_PLACEHOLDER not in text:
+        return text
+    return text.replace(ROOT_PLACEHOLDER, root_glob(root))
 
 
 @dataclass
@@ -157,12 +176,12 @@ class Rule:
     # 層の和では `lib:schema` のように層の名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
     # bare_id は書かれたままの id。層の名前を添える前の綴りで、層をまたいで
-    # 同じルールかどうかを見るときの鍵になる（設計 §25.4「重複は後ろを捨てる」）。
+    # 同じルールかどうかを見るときの鍵になる（設計 §11.4「重複は後ろを捨てる」）。
     # id から前置きを剥がして求める形にすると、`:` を含む id を書いた人の定義が
     # 剥がされる側に倒れるので、書いたときの綴りをそのまま持つ。
     bare_id: str = ""
     # source はこのルールが来た層（common / self / プロジェクトの名前）。記録の
-    # `source` 欄と `--explain` がこれを読む（設計 §25.9）。
+    # `source` 欄と `--explain` がこれを読む（設計 §11.9）。
     source: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
@@ -194,11 +213,19 @@ class Rule:
     # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
+    # root は読んだときのワークスペースルート。文面の `{root}` を、モデルへ渡すときに
+    # 置き換える先（spoken_message）。書いた文面（message）は置き換えずに持つ。
+    # 報告と --explain は書いた綴りを出す（glob / regex と同じ扱い）。
+    root: str = ""
 
     compiled: re.Pattern | None = None
 
+    def spoken_message(self) -> str:
+        """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。"""
+        return fill_root(self.message, self.root)
+
     def key(self) -> tuple:
-        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §25.4、§25.8）。
+        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §11.4、§11.8）。
 
         比べるのは書いた綴りではなく、`{root}` を置き換えたあとの式。共通層と
         プロジェクトの層に同じ `{root}/...` を書いた定義は、置き換え先が同じ
@@ -267,22 +294,44 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
     止まる。読み手を替えるたびに、変換の側も一緒に見ること。
     """
     with open(path, encoding="utf-8") as f:
-        try:
-            data = yaml.safe_load(f)
-        except yaml.YAMLError as exc:
-            raise ValueError(f"{path} を YAML として読めない: {exc}") from exc
+        text = f.read()
+    return parse(_decode(text, path), root)
+
+
+def readable(content: bytes) -> bool:
+    """その中身を、load がルールファイルとして読めるか。
+
+    読めなければ呼び手（ruleload.load_rules）は組み込みの既定に落ちる。控えの中身を見て
+    「この呼び出しの直前に既定に落ちていたか」を決めるのに使う（selfguard）。線を load と
+    別に引くと、既定に落ちていたのに落ちていないと読む、あるいはその逆が起きる。
+    """
+    try:
+        _decode(content.decode("utf-8"), "(content)")
+    except ValueError:
+        return False
+    return True
+
+
+def _decode(text: str, path: str) -> dict:
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{path} を YAML として読めない: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"{path} のルールがキーと値の並びではない")
-    return parse(data, root)
+    return data
 
 
-def parse(data: dict, root: str = "") -> tuple[RuleSet, list[Problem]]:
+def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, list[Problem]]:
     """読み込み済みのルールを組み立てる。
 
     ファイルを開く部分と分けてあるのは、組み込みの既定ルールが同じ経路を通るため。
     別の道で組み立てると、ファイルから読んだときと既定に落ちたときで
     ルールの意味が食い違いうる。食い違えば、ガードが落ちている最中に
     さらに読み違えることになる。
+
+    builtin は組み込み自身（builtin / selfguard）が組み立てるという目印。`RESERVED_ID_PREFIX` で
+    始まる id を書けるのはこちらだけ。
     """
     rule_set = RuleSet(version=data.get("version") or 0)
     problems: list[Problem] = []
@@ -308,7 +357,7 @@ def parse(data: dict, root: str = "") -> tuple[RuleSet, list[Problem]]:
             problems.append(Problem(SEVERITY_ERROR, f"({name})", f"`{name}` が並びではない"))
             continue
         for i, raw in enumerate(raw_section):
-            rule, problem = _build(raw, name, i, root)
+            rule, problem = _build(raw, name, i, root, builtin)
             if problem is not None:
                 problems.append(problem)
                 continue
@@ -318,7 +367,7 @@ def parse(data: dict, root: str = "") -> tuple[RuleSet, list[Problem]]:
 
 
 def _build(
-    raw: object, section: str, index: int, root: str = ""
+    raw: object, section: str, index: int, root: str = "", builtin: bool = False
 ) -> tuple[Rule, None] | tuple[None, Problem]:
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
@@ -337,6 +386,7 @@ def _build(
         additional_context_file=str(raw.get("additionalContextFile") or ""),
         additional_context_once_file=str(raw.get("additionalContextOnceFile") or ""),
         decision=section,
+        root=root,
     )
     name = f"{section}:{rule.id}" if rule.id else where
 
@@ -347,6 +397,15 @@ def _build(
             f"id に `{ID_SEPARATOR}` は書けない。層の名前を添えた形"
             f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
             "見分けが付かず、記録を読んだ人がどのファイルを直すのか決められない",
+        )
+    if not builtin and written_id.lower().startswith(RESERVED_ID_PREFIX):
+        return None, Problem(
+            SEVERITY_ERROR,
+            name,
+            f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みの守りの名前で、"
+            "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
+            "別の名前にすること。"
+            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で面ごと切る",
         )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(

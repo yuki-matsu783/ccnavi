@@ -37,10 +37,13 @@ export function ticketControlFrom(texts: SettingsTexts): TicketControl {
   return "enable";
 }
 
-/** 実行ファイルの答え（ボードの JSON の settings.ticket_control）と設定ファイルの読みが食い違うか */
+/**
+ * 実行ファイルの答え（ボードの JSON の settings.ticket_control）と設定ファイルの読みが食い違うか。
+ * 実行ファイルは常に enable か disable を出すので、空（JSON に無い）も食い違いとして言う。
+ */
 export function ticketControlMismatch(fromFiles: TicketControl, fromBoard: string): string {
   const board = fromBoard.trim().toLowerCase();
-  if (board === "" || board === fromFiles) {
+  if (board === fromFiles) {
     return "";
   }
   return `${TICKET_CONTROL_ENV} の読みが食い違う（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめる`;

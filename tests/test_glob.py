@@ -40,7 +40,7 @@ class TranslateTest(unittest.TestCase):
         self.assertTrue(self.hit("*git push*", "legit push"))
 
     def test_ワイルドカードは語の中でも当たる(self):
-        # 自前の翻訳が語の切れ目を勝手に挟んでいた頃は、ここが当たらなかった。
+        # 語の切れ目を勝手に挟むと、ここが当たらなくなる。
         for glob, subject in (
             ("*foo*bar*", "foobar"),
             ("*foo*bar*", "fooXbar"),
@@ -60,8 +60,8 @@ class TranslateTest(unittest.TestCase):
             ("*git push*", "git status", False),
             ("*rm -rf *", "rm -rf /tmp/x", True),
             ("*rm -rf *", "rm -r /tmp/x", False),
-            ("*/.claude/ccnavi/*", "/repo/.claude/ccnavi/rules.yml", True),
-            ("*/.claude/ccnavi/*", "/repo/.claude/hooks/lint.sh", False),
+            ("*/.ccnavi/*", "/repo/.ccnavi/common/rules.yml", True),
+            ("*/.ccnavi/*", "/repo/.claude/hooks/lint.sh", False),
             ("*/.current-ticket.md", "/repo/.current-ticket.md", True),
             ("*.env*", "/repo/.env.local", True),
             ("*", "なんでも", True),

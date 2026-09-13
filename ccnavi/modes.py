@@ -39,7 +39,7 @@ ENABLE = "enable"  # 判定を呼び出しに適用する
 def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> str:
     """設定された値をモードにする。
 
-    設定ファイルが決められるのは warn と block だけで、その編集は次のツール
+    設定ファイルが決められるのは enable と dry-run だけで、その編集は次のツール
     呼び出しから効く。disable を言えるのは環境だけ。設定ファイルは作業ツリーの中に
     あってエージェントが書けるので、そこに書かれた disable を効かせると、
     見張られている側が見張りを止められてしまう。

@@ -141,7 +141,7 @@ class ApprovalNewsTest(PhaseHarness):
     # ---- 4b. 伝え漏れ（敵対的レビューが見つけた 3 つ）
 
     def test_a_revision_of_the_parent_is_told_once(self):
-        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。印まで見て伝える。"""
+        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。版まで見て伝える。"""
         self.parent_only()
         self.prompt()  # 起点
         self.approve_yes(["i0001"])

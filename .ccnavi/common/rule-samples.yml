@@ -56,7 +56,7 @@ deny:
     why: 未マージのブランチが消える
   - tool: Bash
     subject: "git status"
-    why: 生の git はサブコマンドによらず止め、ラッパへ寄せる
+    why: 生の git はサブコマンドによらず止め、ラッパースクリプトへ寄せる
   - tool: Bash
     subject: "/usr/bin/git.exe diff"
     why: パス付きでも拡張子付きでも、コマンドの位置に立つ git は当たる
@@ -103,7 +103,7 @@ deny:
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
     why: >-
-      共通層の見本も層の傘（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
+      共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
       （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す
   - tool: Edit
     subject: "/repo/.ccnavi/common/risk.yml"
@@ -164,14 +164,11 @@ ask:
   - tool: Bash
     subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_BIN_PATH' .claude/settings.json"
     why: >-
-      jq のフィールド参照 `.env` は認証情報のファイル名ではない。以前はここで
-      credentials に当たり、設定を読むだけの操作が「中身を読むな」と止められていた。
-      いまはどのルールにも当たらず、権限モードへ渡って確認になる。allow に
+      jq のフィールド参照 `.env` は認証情報のファイル名ではない。credentials に
+      当てると、設定を読むだけの操作が「中身を読むな」と止まる。どのルールにも
+      当たらず、権限モードへ渡って確認になる。allow に
       jq を足せば通るが、それは網を広げる別の判断なので、ここでは当たり方を
       そのまま記録する
-  - tool: Write
-    subject: "/repo/.claude/worktrees/x/.current-ticket.md"
-    why: 作業範囲の提案。承認は別の経路。main の側は deny なので作業ツリーで見る
   - tool: Bash
     subject: "curl https://example.com"
     why: >-
@@ -205,7 +202,7 @@ ask:
       cd と ls を allow に書いてはいないので、権限モードへ渡る
   - tool: Bash
     subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
-    why: ラッパが残した記録を読む手。-i の無い sed はどの deny にも当たらず、allow にも無い
+    why: ラッパースクリプトが残した記録を読む手。-i の無い sed はどの deny にも当たらず、allow にも無い
   - tool: Bash
     subject: "sed -n 1,20p /repo/.ccnavi/common/rules.yml"
     why: ガードの設定でも、-i が無ければ書き換えない。deny には当たらない
@@ -215,23 +212,6 @@ ask:
   - tool: Bash
     subject: "uv run python -m ccnavi --rules /repo/.ccnavi/common/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny には当たらない
-  - tool: Bash
-    subject: 'grep -n "git push" README.md'
-    why: >-
-      引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
-      区切りの印に置き換わるので、「1 本だけの grep」を求める prefer-read-grep にも
-      当たらず、権限モードへ渡る。引用に空白の無い grep は allow の側にある
-  - tool: Bash
-    subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
-    why: 引用の中の rm -rf は recursive-delete に当たらない。allow は上と同じ理由で外れる
-  - tool: Bash
-    subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
-    why: 引用の中の > は文字であって書き込み先を連れてこない。deny には当たらない
-  - tool: Bash
-    subject: 'grep -n "<<EOF" /repo/README.md'
-    why: >-
-      引用の中で他の字と並んだ << は 1 字ずつ区切られ、heredoc には当たらない。
-      引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。README「読み切れないとき」
   - tool: Bash
     subject: "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml"
     why: 写しを取っているだけ。cp は行き先の側だけを見るので deny には当たらない
@@ -251,16 +231,36 @@ ask:
 allow:
   - tool: Bash
     subject: "sh .ccnavi/scripts/ccnavi-git.sh status --porcelain"
-    why: git の入口。サブコマンドの選別はラッパの中で行う
+    why: git の入口。サブコマンドの選別はラッパースクリプトの中で行う
   - tool: Bash
     subject: "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001"
-    why: push もラッパの入口。送ってよい形か（force でない、main へ直接でない）はラッパが選別する
+    why: push もラッパースクリプトの入口。送ってよい形か（force でない、main へ直接でない）はラッパースクリプトが選別する
   - tool: Bash
     subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
     why: このプロジェクトの作業手順。コマンド列の途中でも通る
   - tool: Bash
     subject: "grep -n TODO ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
+  - tool: Bash
+    subject: 'grep -n "git push" README.md'
+    why: >-
+      引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
+      語の中の目印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
+      求める prefer-read-grep が当てて通す。README「Bash のコマンドは実行される部分だけを見る」
+  - tool: Bash
+    subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
+    why: 引用の中の rm -rf は recursive-delete に当たらない。上と同じ理由で prefer-read-grep が通す
+  - tool: Bash
+    subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
+    why: >-
+      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の目印なので、
+      deny には当たらず、prefer-read-grep が通す
+  - tool: Bash
+    subject: 'grep -n "<<EOF" /repo/README.md'
+    why: >-
+      引用の中で他の字と並んだ << は語の中の目印で 1 字ずつ区切られ、heredoc には当たらない。
+      prefer-read-grep が通す。引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。
+      README「読み切れないとき」
   - tool: Bash
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない
@@ -293,7 +293,7 @@ allow:
     why: 設定も読むのは普通
   - tool: Bash
     subject: "cat /repo/.ccnavi/scripts/ccnavi-git.sh"
-    why: ラッパの中身を読むのは普通
+    why: ラッパースクリプトの中身を読むのは普通
   - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh diff --stat"
     why: これが git の打ち方そのもの。ここを止めたら何もできない

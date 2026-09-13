@@ -4,7 +4,7 @@
  * `accept` と `wrapup` は端末（tty）から打つものと ccnavi が決めていて、拡張はここで組んだ
  * 1 行をターミナルに送り、y/N は人が押す。承認だけは違う。ボードのオーバーレイで人が押した
  * 承認を、拡張が子プロセスで `--approve --yes <識別子,…>` として打つ。端末の壁は無く、
- * 代わりに「見せた束と今の束が同じ」ことを実行ファイルが求める。エージェントが Bash で
+ * 代わりに「見せた一覧と今の一覧が同じ」ことを実行ファイルが求める。エージェントが Bash で
  * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。
  *
  * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
@@ -39,18 +39,18 @@ function ccnaviInvocation(launcher: Launcher, root: string): string {
 }
 
 /**
- * `--approve --preview --json [<識別子>...]`。束を見るだけで承認済みチケットは置かない（子プロセスの引数）。
- * 識別子を並べればその分だけの束、空なら承認待ち全部。ボードは絞り込みで見えている分を渡す。
+ * `--approve --preview --json [<識別子>...]`。一覧を見るだけで承認済みチケットは置かない（子プロセスの引数）。
+ * 識別子を並べればその分だけが対象、空なら承認待ち全部が対象。ボードは絞り込みで見えている分を渡す。
  */
 export function previewArgs(tickets: readonly string[] = []): readonly string[] {
   return ["--approve", "--preview", "--json", ...tickets];
 }
 
 /**
- * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた束をそのまま承認する（子プロセスの引数）。
+ * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
  * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた本文の指紋（preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
- * 絞りを渡さないと、実行ファイルは「絞らない束」と見せた識別子を比べるので、
+ * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
  * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
  */
 export function approveArgs(
@@ -64,10 +64,12 @@ export function approveArgs(
 /**
  * `ccnavi-review.sh accept <N>`。sh がレビューのスレッドを取ってきて、未解決のまま進める
  * ことを人が受け入れる。sh は実行した場所を親の作業ツリーとして exe に渡すので、
- * 先に親の作業ツリーへ cd する。
+ * 先に親の作業ツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
+ * 切った作業ツリーには届かないので、sh はワークスペースルートから綴る。
  */
-export function acceptCommand(parentTree: string, phase: number): string {
-  return `cd ${shellQuote(toPosixPath(parentTree))} && sh .ccnavi/scripts/ccnavi-review.sh accept ${phase}`;
+export function acceptCommand(root: string, parentTree: string, phase: number): string {
+  const script = shellQuote(`${toPosixPath(root)}/.ccnavi/scripts/ccnavi-review.sh`);
+  return `cd ${shellQuote(toPosixPath(parentTree))} && sh ${script} accept ${phase}`;
 }
 
 /**

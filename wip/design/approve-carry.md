@@ -9,7 +9,7 @@ requirements.md の REQ-TKT-04・REQ-TKT-30。
 |---|---|---|
 | 承認済みチケットのコミットと push | `ccnavi-approve.sh` の後半だけ。ボードの承認では起きない | `ccnavi-push-approved.sh` に切り出す。端末の承認は sh から、ボードの承認は端末送りで呼ぶ |
 | エージェントが運ぶ sh を打つ | ― | `DENY_TICKET_APPROVAL_CLI` で止める |
-| 子の範囲が親の範囲を超える | 承認で error（束から外す） | 承認で warn。判定は今までどおり親で切り詰める |
+| 子の範囲が親の範囲を超える | 承認で error（承認の対象から外す） | 承認で warn。判定は今までどおり親で切り詰める |
 | 子の範囲が種類の scope を超える | 承認で error | 承認で warn。**判定で種類の scope でも切り詰める**（新規） |
 | 子の範囲が regex | 承認で error | 承認で warn。判定は実際のパスで親と種類に当てる |
 | dry-run | 承認は超過で止まる | 承認は通る。判定は今の dry-run の文面で「enable なら止めた」と言って通す |

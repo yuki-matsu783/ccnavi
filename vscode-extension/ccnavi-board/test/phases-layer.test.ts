@@ -24,8 +24,6 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
     rel: "projects/lib",
     rulesRel: "projects/lib/.ccnavi/config/rules.yml",
     rulesExists: true,
-    oldRulesRel: "projects/lib/config/rules.yml",
-    oldRulesExists: false,
     hasClaudeDir: false,
     origin: "",
     originKey: "",
@@ -74,7 +72,7 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   assert.ok(layer.includes('<div class="banner warn">読めない &lt;理由&gt;</div>'));
 
   // 共通層は今までどおり雛形を作るまで触れない。注意が無ければ帯を足さない（「外で変わった」の帯は hidden で常にある）
-  const common = renderPhasesPage(phasesPage({ phasesPath: ".claude/ccnavi/phases.yml" }), { nonce: "n" });
+  const common = renderPhasesPage(phasesPage({ phasesPath: ".ccnavi/common/phases.yml" }), { nonce: "n" });
   assert.ok(common.includes('data-action="create">雛形でファイルを作る</button>'));
   assert.equal(embedded(common).editable, false);
   assert.ok(!common.includes('<div class="banner warn">'));
@@ -92,8 +90,6 @@ test("CB-T115 プロジェクト管理画面はカードと本体の枠からフ
   const workspace = html.slice(html.indexOf('<section class="workspace">'), html.indexOf("<footer"));
   assert.match(workspace, /自身の層のフェーズの種類<\/span> <button type="button" class="action small" data-action="open-self-phases"/);
   assert.match(html, /action === "open-self-phases"\) \{ vscode\.postMessage\(\{ type: "openSelfPhases" \}\)/);
-  // 古い実行ファイル（層を出さない）なら本体の枠に層の入口を出さない
-  assert.doesNotMatch(renderProjectsPage(projectsPage([], { selfRulesRel: "" }), { nonce: "n" }), /data-action="open-self-phases"/);
 });
 
 test("CB-T116 無いファイル（空の本文）に種類を足して書き戻すと、version と種類を持つ読めるファイルになる", () => {

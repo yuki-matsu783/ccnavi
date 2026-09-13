@@ -24,7 +24,7 @@ from ccnavi import platformtag  # noqa: E402
 # 実行ファイルの置き場。hook はここを指す。
 DIST = os.path.join(ROOT, "dist")
 NAME = "ccnavi"
-# どの機械向けに組み立てたかの印。scripts/ccnavi-setup.sh が配る前に読む。
+# どの機械向けに組み立てたかの目印。scripts/ccnavi-setup.sh が配る前に読む。
 # dist/ccnavi/ の外に置く。中に置くと、配布が実行ファイルと一緒に配布先へ写す。
 TARGET = os.path.join(DIST, NAME + ".target")
 

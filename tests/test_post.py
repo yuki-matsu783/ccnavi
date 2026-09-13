@@ -467,8 +467,8 @@ class PostToolUseTest(unittest.TestCase):
         self.assertEqual(line["detail"], "not-a-git-worktree")
 
     def test_自分が書く場所は自分の違反にしない(self):
-        # 記録と控えを保護領域の中に置く。このリポジトリのルールが
-        # `.claude/ccnavi/*` を守っていて、記録も控えもそこにあるのと同じ形。
+        # 記録と控えを保護領域の中に置く。置き場を設定でルールが守る場所の中へ
+        # 指したときの形。
         self.state = os.path.join(self.repo, "protected", "state")
         self.log = os.path.join(self.repo, "protected", "log.jsonl")
 

@@ -4,10 +4,10 @@
 
     uv run python tools/check_rules.py [ルールファイル]
 
-中身は `ccnavi --test-samples` を呼ぶだけの薄いラッパ。見本の読み方も突き合わせも実行ファイルの
-側にあり、ここは引数を足して呼ぶだけ。VS Code 拡張のルール設定画面も同じコマンドを
-`--json` 付きで呼ぶ。判定を 2 か所で作らないのが肝で、別の道で確かめると、
-見本が通ったのに実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
+中身は `ccnavi --test-samples` を呼ぶだけの薄いラッパースクリプト。見本の読み方も
+突き合わせも実行ファイルの側にあり、ここは引数を足して渡すだけ。VS Code 拡張の
+ルール設定画面も同じコマンドを `--json` 付きで使う。判定を 2 か所で作らないのが肝で、
+別の道で確かめると、見本が通ったのに実運用で落ちる、という一番まずい形になる（REQ-DIA-03）。
 
 終了コードは実行ファイルのものをそのまま返す。食い違いが 1 件でもあれば 1。無ければ 0。
 """
@@ -19,13 +19,13 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAMPLES = os.path.join(ROOT, ".claude", "ccnavi", "rule-samples.yml")
+# 共通層のルールと見本の既定の置き場（ADR-0042）。
+RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
+SAMPLES = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
 
 
 def main() -> int:
-    rules_path = (
-        sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
-    )
+    rules_path = sys.argv[1] if len(sys.argv) > 1 else RULES
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     done = subprocess.run(
         [

@@ -4,8 +4,8 @@
  *
  * 走らせるのは 7 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
- * 機械可読で。プロジェクト管理画面が読む）、`--approve --preview --json`（承認の束を見る）、
- * `--approve --yes … --json`（見せた束を承認する。人がオーバーレイで押したときだけ）。
+ * 機械可読で。プロジェクト管理画面が読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
+ * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）。
  * 判定と検証はルールファイルを差し替えられる。
  * ワークスペースのルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（層の種類なら `--project-phases-file <名前>=<パス>`）で
@@ -209,7 +209,7 @@ export type ApproveOutcome =
   | { readonly ok: false; readonly error: string };
 
 /**
- * 承認の束を見る（`--approve --preview --json`）。承認済みチケットは置かれない。
+ * 承認待ちの一覧を見る（`--approve --preview --json`）。承認済みチケットは置かれない。
  * 記録と控えは外さない。承認の経路は試し打ちではないので、実運用の設定のまま走らせる。
  */
 export async function runApprovePreview(
@@ -223,15 +223,17 @@ export async function runApprovePreview(
   }
   const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --approve --preview --json が失敗した: ${firstLine(ran.stderr)}` };
+    // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
+    // 読めない提案の行より後ろに出るので、1 行目だけでは届かない。
+    return { ok: false, error: `ccnavi --approve --preview --json が失敗した:\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
 /**
- * 見せた束をそのまま承認する（`--approve --yes <識別子,…> --digest <指紋> --json`）。
- * 実行ファイルは見せた束と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
+ * 見せた一覧をそのまま承認する（`--approve --yes <識別子,…> --digest <指紋> --json`）。
+ * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
 export async function runApproveYes(
   root: string,

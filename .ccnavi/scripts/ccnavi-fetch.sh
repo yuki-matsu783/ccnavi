@@ -3,7 +3,7 @@
 #
 #   sh .ccnavi/scripts/ccnavi-fetch.sh
 #
-# 承認済みチケットと印は親チケットのブランチに乗り、A の機械から push されて届く
+# 承認済みチケットとマーカーは親チケットのブランチに乗り、A の機械から push されて届く
 # （設計 §9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに範囲が
 # 効かない、レビュー済みなのにゲートが閉じたまま、という形になる。
 #
@@ -22,7 +22,7 @@ set -u
 # 共通部分。ワークスペースルートの探し方はここにある（設計 §11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-approved="${CCNAVI_APPROVED:-.ccnavi/tickets}"
+approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
 projects="${CCNAVI_PROJECTS:-projects}"
 
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
@@ -61,7 +61,7 @@ report=$(
 			continue
 		fi
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
-			printf '%s: 承認済みチケットと印を %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
+			printf '%s: 承認済みチケットとマーカーを %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
 		else
 			printf '%s: リモートと分岐しているので進めない。人が合流させること（%s）\n' \
 				"$name" "$branch"
@@ -70,6 +70,6 @@ report=$(
 )
 
 [ -n "$report" ] || exit 0
-printf '[ccnavi] 承認済みチケットと印は親ブランチに乗って届く。セッションの頭で取ってきた結果:\n'
+printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに乗って届く。セッションの頭で取ってきた結果:\n'
 printf '%s\n' "$report"
 exit 0

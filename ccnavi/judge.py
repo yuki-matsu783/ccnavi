@@ -161,15 +161,17 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
+        selfguard.add_rules(
+            rule_set, conf.bin, conf.project_home, root, selfguard.common_layer_files(conf)
+        )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
-            rule_set.deny.append(phase.ticket_approval_rule(conf.bin))
+            rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
     subject = screen(payload.tool_name, record.subject, record)
 
@@ -207,7 +209,7 @@ def decide_before(
             stdout, mode, record, rules.DENY, notices + [reasons.subagent_forbidden(subject)]
         )
 
-    # ゲート。人間レビュー要のフェーズが終わっていて印が無い間、サブエージェントの
+    # ゲート。人間レビュー要のフェーズが終わっていてマーカーが無い間、サブエージェントの
     # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
     if conf.tickets_enabled and payload.tool_name in phase.GATED_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
@@ -215,7 +217,7 @@ def decide_before(
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if closed is not None and not exempt:
             record.code, record.rules = phase.CODE_GATE, [reasons.TICKET_RULE]
-            reason = phase.gate_reason(closed, payload.tool_name)
+            reason = phase.gate_reason(closed, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
@@ -250,7 +252,7 @@ def decide_before(
             break
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
-    # 判定を下したのは最初に当たったルール（設計 §25.9）。その層を 1 欄で残す。
+    # 判定を下したのは最初に当たったルール（設計 §11.9）。その層を 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
     # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
     if group:
@@ -433,9 +435,9 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     git push を引用した文書は push ではないし、そこで拒否を返すことは、
     やっていないことをやったと読み手に告げることになる。
 
-    読み切れないコマンドは生の文字列に落とす。これは以前の挙動そのものなので、
-    今まで捕まえていたものが抜けることはない。変わるのは、返す拒否が
-    どちらの拒否なのかを名乗らなければならない点。
+    読み切れないコマンドは生の文字列に落とす。生の文字列には実行される部分が
+    すべて含まれるので、捕まえるべきものが抜けることはない。その代わり、返す拒否は
+    どちらの拒否なのかを名乗る。
     """
     if tool != "Bash":
         return subject

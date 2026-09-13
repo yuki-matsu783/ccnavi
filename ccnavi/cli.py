@@ -32,10 +32,6 @@ from . import (
     selfguard,
     settings,
 )
-
-# パスの解決は judge に移した。tests/test_paths.py がここから import しているので、
-# 名前だけ残す。
-from .judge import full_path as full_path
 from .modes import EXIT_ERROR, EXIT_OK
 
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
@@ -124,9 +120,12 @@ scripts in .ccnavi/scripts/, which call
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
 
-A human accepts unresolved review threads with
+A human accepts unresolved review threads, from the parent worktree, with
 
-    sh .ccnavi/scripts/ccnavi-review.sh accept N
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh accept N
+
+(the scripts live only in the workspace, so a worktree cut from a project
+cannot reach them by the relative path)
 
 which fetches the threads and runs
 
@@ -134,7 +133,7 @@ which fetches the threads and runs
 
 A human closes a parent early ("good enough for now") with
 
-    sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
 
 which runs `ccnavi review wrapup --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.
@@ -167,10 +166,6 @@ def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
         value = getattr(args, name)
         if value is not None and (accepts_empty or value):
             setattr(conf, name, value)
-    # 承認済みチケットの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
-    # 今は --ticket-control の仕事。置き場は既定のままにして、--lint が言う。
-    if args.approved == "":
-        conf.approved_blank = True
     for name in RELATIVE_OVERRIDES:
         value = getattr(args, name)
         if value:
@@ -194,10 +189,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
-    # 承認の束を見るだけ（承認済みチケットを置かない）。
+    # 承認の対象の一覧を見るだけ（承認済みチケットを置かない）。
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
-    # 見せた束の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
+    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文の指紋（preview の `digest`）。`--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
@@ -210,7 +205,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 §25）。
+    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 §11）。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
@@ -323,11 +318,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
-        # `--approve` と同じで、束に載せる識別子（ボードの絞り込みで見えている分）。
+        # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
             code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた束と今の束が
+        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
@@ -345,8 +340,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
-        rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
-        # `--approve` の後ろに並べた語は、束に載せる識別子。無ければ承認待ち全部。
+        rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
+        # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = approval.approve(
             stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
         )

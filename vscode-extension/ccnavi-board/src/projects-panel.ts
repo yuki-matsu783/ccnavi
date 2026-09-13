@@ -3,8 +3,8 @@
  * VS Code の API と子プロセスに触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
- * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、層のルールファイル・旧の置き場
- * `config/rules.yml`・`.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
+ * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、層のルールファイル・
+ * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
  * 層のルールファイルの置き場は layers の答えを使い、`CCNAVI_PROJECT_HOME` から自分で組まない。
  *
  * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこで人が行い、完了は `projects/<名前>/.git`
@@ -19,7 +19,7 @@ import * as vscode from "vscode";
 import { openBoard } from "./board-panel.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
-import { OLD_PROJECT_RULES, projectLayer, selfLayer } from "./core/layers.js";
+import { projectLayer, selfLayer } from "./core/layers.js";
 import {
   buildProjectsPage,
   checkName,
@@ -45,8 +45,6 @@ import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-/** 実行ファイルが自身の層を出さない（古い版）ときに監視する層の綴り。ccnavi ディレクトリの既定の名前 `.ccnavi` の形 */
-const DEFAULT_LAYER_DIR = ".ccnavi/config";
 
 type Message =
   | { readonly type: "refresh" }
@@ -131,7 +129,6 @@ async function gather(root: string): Promise<Gathered> {
   const origins: Record<string, string> = {};
   const rulesRels: Record<string, string> = {};
   const rulesExists: Record<string, boolean> = {};
-  const oldRulesExists: Record<string, boolean> = {};
   const hasClaudeDir: Record<string, boolean> = {};
   await Promise.all(
     projects.map(async (t) => {
@@ -142,7 +139,6 @@ async function gather(root: string): Promise<Gathered> {
         rulesRels[t.name] = toPosix(path.relative(root, rulesPath));
         rulesExists[t.name] = isFile(rulesPath);
       }
-      oldRulesExists[t.name] = isFile(path.join(t.root, ...OLD_PROJECT_RULES.split("/")));
       hasClaudeDir[t.name] = isDir(path.join(t.root, ".claude"));
     }),
   );
@@ -167,7 +163,6 @@ async function gather(root: string): Promise<Gathered> {
       ignored: gitignoreHasProjects(readText(path.join(root, ".gitignore")), projectsRel),
       rulesRels,
       rulesExists,
-      oldRulesExists,
       hasClaudeDir,
       selfRulesRel: selfRulesPath === "" ? "" : toPosix(path.relative(root, selfRulesPath)),
       selfRulesExists: selfRulesPath !== "" && isFile(selfRulesPath),
@@ -238,17 +233,16 @@ function registerPanelHandlers(current: PanelState, projectsRel: string, selfRul
     }
   });
 
-  // clone の完了（`.git` の出現）、層のルールファイルと旧の置き場の出入り、origin の変化、作業ツリーの登録、`.gitignore`。
+  // clone の完了（`.git` の出現）、層のルールファイルの出入り、origin の変化、作業ツリーの登録、`.gitignore`。
   // 層の綴り（ccnavi ディレクトリの下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 §11.2）。
+  // 自身の層のパスが取れない（壊れた JSON）なら、層の監視は張らない。
   const rel = projectsRel === "" ? "projects" : projectsRel;
-  const layerDir = selfRulesRel === "" ? DEFAULT_LAYER_DIR : path.posix.dirname(selfRulesRel);
+  const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
   const patterns = [
     `${rel}/*/.git`,
     `${rel}/*/.git/config`,
     `${rel}/*/.git/worktrees/*`,
-    `${rel}/*/${layerDir}/*`,
-    `${rel}/*/${OLD_PROJECT_RULES}`,
-    `${layerDir}/*`,
+    ...(layerDir === "" ? [] : [`${rel}/*/${layerDir}/*`, `${layerDir}/*`]),
     `${rel}/*/.claude`,
     ".gitignore",
     ".claude/settings.json",
@@ -469,7 +463,7 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
 
 function createSelfRules(current: PanelState, page: ProjectsPage): void {
   if (page.selfRulesRel === "") {
-    fail(current, "実行ファイルが自身の層を出していないため、置く先を決められません。層に対応した版の実行ファイルを使ってください");
+    fail(current, "実行ファイルの答えに自身の層が無いため、置く先を決められません。更新してから押し直してください");
     return;
   }
   copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");

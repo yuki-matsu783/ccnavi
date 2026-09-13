@@ -9,7 +9,7 @@ function fixtureText(name: string): string {
   return fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", name), "utf8");
 }
 
-test("CB-T104 承認の preview を読む（束・範囲の超過・本文・対象外・読めない提案）", () => {
+test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・対象外・読めない提案）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {
@@ -25,7 +25,7 @@ test("CB-T104 承認の preview を読む（束・範囲の超過・本文・対
       ["i0001-02", "i0001", 1, false],
     ],
   );
-  // 種類の範囲を超える子は承認を止めず、束に載って超過を持つ（判定で止まる）。
+  // 種類の範囲を超える子は承認を止めず、一覧に載って超過を持つ（判定で止まる）。
   assert.deepEqual(preview.batch[0].overflow, []);
   assert.deepEqual(preview.batch[1].overflow, []);
   assert.equal(preview.batch[2].overflow.length, 1);
@@ -53,7 +53,7 @@ test("CB-T104b 超過の欄が無い古い答えは、空の並びとして読�
   assert.ok(parsed.ok && parsed.value.batch[0].overflow.length === 0);
 });
 
-test("CB-T105 承認の答えを読む（承認した / 束が違った）", () => {
+test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", () => {
   const done = parseApproveResult(fixtureText("approve-yes.json"));
   assert.ok(done.ok);
   if (done.ok) {

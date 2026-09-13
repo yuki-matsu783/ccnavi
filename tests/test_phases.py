@@ -1,4 +1,4 @@
-"""フェーズの種類と計画（REQ-TKT-26〜35、設計 §24.15）の受入テスト。
+"""フェーズの種類と計画（REQ-TKT-26〜35、設計 §9.7）の受入テスト。
 
 見るのは 8 つ。
 
@@ -122,7 +122,7 @@ class PhaseHarness(unittest.TestCase):
         self.phases = write(os.path.join(self.root, "phases.yml"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
@@ -272,7 +272,7 @@ class PhaseHarness(unittest.TestCase):
         )
 
     def family(self, plan=("research", "design"), feedback=None):
-        """親を提案して承認する。plan の 1 番目の子も同じ束で承認する。"""
+        """親を提案して承認する。plan の 1 番目の子もまとめて承認する。"""
         self.propose("i0001", parent_text("i0001", list(plan), feedback))
         self.commit_parent()
         result = self.approve()
@@ -281,7 +281,7 @@ class PhaseHarness(unittest.TestCase):
 
 
 class ApproveOnlyTest(PhaseHarness):
-    """`--approve <識別子>...` で束を絞っても、絞らない束で落ちるものは通らない。"""
+    """`--approve <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
 
     def test_child_cannot_be_approved_without_the_parents_pending_revision(self):
         self.family(plan=("acceptance", "implement"))
@@ -289,7 +289,7 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
-        # 絞らない束では、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
+        # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
         # 「判定で止まるもの」として出る（設計 approve-carry §3.2）。n で何も適用しない
         whole = self.ccnavi("--approve", stdin="n\n")
         self.assertIn("判定で止まるもの", whole.stdout)
@@ -440,7 +440,7 @@ class PhaseTest(PhaseHarness):
         self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
         self.assertEqual(self.close_child("i0001-01").returncode, 0)
         self.commit_parent("close 01")
-        # レビュー不要の種類なので、印は skipped。2 番目が承認される。
+        # レビュー不要の種類なので、マーカーは skipped。2 番目が承認される。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -454,6 +454,62 @@ class PhaseTest(PhaseHarness):
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+
+    def test_a_batch_does_not_pass_a_later_child_over_one_that_reopens_an_earlier_phase(self):
+        """前のフェーズに足す子と次のフェーズの子を一緒に承認しても、次の子は通さない（issue #31）。
+
+        1 本ずつ承認すれば、前の子の承認でフェーズが開き直り、次の子は落ちる。まとめて承認しても
+        同じ答えにする。
+        識別子の順（-02 が -03 より先）で検査すると、開き直す前の状態で次の子が通っていた。
+        """
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        # フェーズ 1 は閉じてレビュー不要。次のフェーズの子と、フェーズ 1 に足す子を一緒に出す。
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.propose(
+            "i0001-03", child_text("i0001-03", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent("propose 02 03")
+        result = self.approve()
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-03.md")), result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        self.assertIn("同じ承認で i0001-03 を足すので開き直る", result.stderr)
+
+    def test_a_new_parent_and_a_later_phase_child_together_still_keep_the_order(self):
+        """承認済みチケットの無い親と、2 番目のフェーズの子を一緒に承認しても、子は通さない。
+
+        1 本ずつなら、親を承認したあと子は「1 が閉じるまで」で落ちる。一緒に出すと親の計画が
+        ディスクに無く、フェーズが 1 つも並ばないので、順序の検査が何も見ずに通っていた。
+        """
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent()
+        result = self.approve()
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")), result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertIn("1（調査） が閉じるまで承認しない（子がまだ無い）", result.stderr)
+
+    def test_a_new_parent_with_children_in_two_phases_passes_only_the_first(self):
+        """親・1 番目の子・2 番目の子を一緒に承認すると、1 番目の子までが通り、2 番目は落ちる。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent()
+        result = self.approve()
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")), result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")), result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        self.assertIn("同じ承認で i0001-01 を足すが、まだ閉じていない", result.stderr)
 
     # ---- 4. 成果物
 
@@ -699,7 +755,7 @@ class PhaseTest(PhaseHarness):
         refused = self.ready(fixture)
         self.assertIn("push されていない", refused.stderr)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        # 片付いて push 済み。ready が通り、印と note の下書きができる。
+        # 片付いて push 済み。ready が通り、マーカーと note の下書きができる。
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         with open(passed.stdout.strip(), encoding="utf-8") as f:

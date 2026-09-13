@@ -25,7 +25,7 @@ import tempfile
 import unittest
 
 from ccnavi import phase as phase_mod
-from ccnavi import shellread
+from ccnavi import settings, shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,7 +35,7 @@ RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.claude/ccnavi/*",
+            "glob": "*/.ccnavi/*",
             "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
         }
     ],
@@ -118,7 +118,7 @@ class TicketTest(unittest.TestCase):
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
@@ -394,7 +394,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_child))
         self.assertNotIn("limit:", self.reason(beyond_child))
 
-    # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
+    # ---- 2b. 承認の対象を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
 
     def test_approve_only_the_listed_tickets(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -407,7 +407,7 @@ class TicketTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0002.md")))
-        # 残した分は次の --approve の束に載る
+        # 残した分は次の --approve で承認の対象に入る
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0002.md")))
 
@@ -507,8 +507,8 @@ class TicketTest(unittest.TestCase):
     def test_subagent_cannot_push(self):
         """リモートに置く枝は親ブランチ 1 本で、送るのは親の仕事。
 
-        ラッパは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
-        cd して打てばラッパは通す。素性で止める層を hook に持つ。
+        ラッパースクリプトは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
+        cd して打てばラッパースクリプトは通す。素性で止める層を hook に持つ。
         """
         self.family()
         for command in (
@@ -605,11 +605,39 @@ class TicketTest(unittest.TestCase):
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
         self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
 
+    def test_gate_guides_sh_from_workspace_root(self):
+        """ゲートと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
+
+        `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切った作業ツリーでは
+        相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
+        """
+        self.family()
+        self.close_phase()
+        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
+        said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn(f"{review_sh} request --phase 1", self.reason(said))
+        self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
+
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
+        self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
+        self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
+
+        # 案内どおりに打った形は、ゲートの例外に当たる。
+        guided = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f"{review_sh} request --phase 1 --body-file b.md",
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(guided), self.reason(guided))
+
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
-        """ゲートが閉じている間、引用に空白を含むラッパ呼び出しも免除されること。
+        """ゲートが閉じている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
 
-        免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ印で
+        免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ目印で
         渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に
         当たらず、レビューの依頼そのものが止まっていた（wip/design/shellread-sep.md §3）。
         """
@@ -622,16 +650,16 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command='sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"',
+            command='sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"',
         )
         self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
 
         # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形に当たる。
-        reading = shellread.read('sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"')
+        reading = shellread.read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
         self.assertEqual(len(phase_mod.commands(reading.text)), 1, reading.text)
         self.assertTrue(phase_mod.exempt(reading.text, reading.reason))
         # 連結の片方が違えば止める側は変わらない。
-        joined = shellread.read('ls; sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"')
+        joined = shellread.read('ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
 
     def test_phase_without_review_skips_the_gate(self):
@@ -819,7 +847,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001-03", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("印", result.stdout)
+        self.assertIn("マーカー", result.stdout)
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending"))
         )
@@ -907,7 +935,7 @@ class TicketTest(unittest.TestCase):
             "ccnavi --explain",
             "ccnavi --lint",
             "sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
-            # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
+            # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --approve --preview --json",
             "echo --approve --preview",
         ):
@@ -1108,7 +1136,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(first.returncode, 0)
         self.assertIn("未解決", first.stderr)
 
-        # 印を消して依頼をやり直す（新しい子が承認された形）。指摘は残ったまま。
+        # マーカーを消して依頼をやり直す（新しい子が承認された形）。指摘は残ったまま。
         os.remove(mark)
         self.assertEqual(self.request(fixture).returncode, 0)
         again = self.check(fixture)
@@ -1132,9 +1160,9 @@ class TicketTest(unittest.TestCase):
     def test_the_acceptance_survives_a_later_check(self):
         """人が受け入れたスレッドは、あとから走った check で消えないこと。
 
-        受け入れをフェーズの印に書いていた版では、次に通った check が同じ印を
+        受け入れをフェーズのマーカーに書いていた版では、次に通った check が同じマーカーを
         `accepted: []` で上書きし、記録が飛んだ。人がもう一度同じスレッドを
-        受け入れることになる。控えは印と別の場所に置く。
+        受け入れることになる。控えはマーカーと別の場所に置く。
         """
         self.family()
         self.close_phase()
@@ -1157,7 +1185,7 @@ class TicketTest(unittest.TestCase):
         kept = os.path.join(self.approved, "phases", "i0001", "accepted.json")
         self.assertIn("u1", read_json(kept)["threads"])
 
-        # check が通ると印は書き換わるが、控えは残る。
+        # check が通るとマーカーは書き換わるが、控えは残る。
         self.assertEqual(self.check(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])
 
@@ -1237,7 +1265,7 @@ class TicketTest(unittest.TestCase):
         bare = self.ccnavi("--cwd", self.parent_tree, "--phase", "1", "review", "check")
         self.assertNotEqual(bare.returncode, 0)
         self.assertIn("--result", bare.stderr)
-        # 投稿の url が無い結果では印を置かない。
+        # 投稿の url が無い結果ではマーカーを置かない。
         prepared = self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -1270,10 +1298,9 @@ class TicketTest(unittest.TestCase):
     def test_review_script_keeps_the_port_and_scheme_of_origin(self):
         """origin の綴りから、ホスト・ポート・scheme を落とさずに API の綴りを組むこと。
 
-        以前は host を `[^/:]+` で切っていたのでポートが落ち、落ちたポートが
-        プロジェクトのパスの先頭に混ざり（`8929/demo/greeter`）、しかも scheme が
-        https に決め打ちだった。手元や社内に平文で立てた GitLab
-        （`http://localhost:8929`）はこれで全滅する。
+        host を `[^/:]+` で切るとポートが落ち、落ちたポートがプロジェクトのパスの先頭に
+        混ざる（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
+        平文で立てた GitLab（`http://localhost:8929`）に届かない。
         """
         script = self.script()
         cases = [
@@ -1389,9 +1416,8 @@ class TicketTest(unittest.TestCase):
             os.path.join(self.root, ".claude", "settings.json"),
             json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
         )
-        result = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_LEDGER": "x"})
+        result = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("stray にチケットが無い", result.stdout)
-        self.assertIn("CCNAVI_LEDGER はもう効かない", result.stdout)
         self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=disable", result.stdout)
         self.assertIn("SubagentStop", result.stdout)
         self.assertIn("origin が無い", result.stdout)
