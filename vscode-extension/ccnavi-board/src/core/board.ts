@@ -73,6 +73,8 @@ export interface Card {
   readonly riskLevel: string;
   readonly riskPoints: number | null;
   readonly seenIn: readonly SeenInJson[];
+  /** どの写りが本物か決まらないときの、候補の全部。決まっていれば空 */
+  readonly scattered: readonly SeenInJson[];
   /** 子なら自分のフェーズの印、親なら空 */
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
@@ -204,6 +206,7 @@ function toCard(
     riskLevel: typeof t.risk?.level === "string" ? t.risk.level : "",
     riskPoints: typeof t.risk?.points === "number" ? t.risk.points : null,
     seenIn: t.seen_in,
+    scattered: scatteredCopies(t),
     marks: isParent ? [] : marks,
     gateClosed: !isParent && (ownPhase?.gate_closed ?? false),
     pendingApproval: pending.has(t.ticket),
@@ -230,6 +233,23 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   }
   issues.push("提案が見つからない（承認済みチケットだけがある）");
   return "todo";
+}
+
+/**
+ * 同じ識別子の写りのうち、どれが本物か決まらないときの候補。決まっていれば空。
+ *
+ * 子の作業ツリーは親のブランチから切るので、親と兄弟の提案がそのまま写っている。
+ * 写りがあること自体は普通なので、数だけでは食い違いにならない。権威のあるツリー
+ * （親のツリー。親自身なら自分のツリー）に 1 つあれば、それが本物で残りは写し。
+ * 権威のツリーに無ければ全部が候補になり、権威のツリーに 2 つ（別の状態の置き場に）
+ * あればどちらか決まらない。実行ファイルの `ticket.dedupe` と同じ畳み方で、残りが
+ * 2 つ以上なら `--lint` が ERROR で「複数の場所にある」と言う状態。
+ */
+function scatteredCopies(t: TicketJson): readonly SeenInJson[] {
+  const home = t.parent || t.ticket;
+  const atHome = t.seen_in.filter((s) => s.tree === home);
+  const kept = atHome.length > 0 ? atHome : t.seen_in;
+  return kept.length > 1 ? kept : [];
 }
 
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
