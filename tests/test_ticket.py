@@ -7,7 +7,7 @@
 
 1. 判定の鍵がファイルの行き先であること。親の cwd から子のツリーへ絶対パスで
    書いても、子のチケットで判定される
-2. 子は親の部分集合で、超えた子は承認されないこと
+2. 子が親の範囲を超えても承認はでき、超えた場所への書き込みは判定で止まること
 3. 状態の置き場への直接の作成と、サブエージェントからの状態の移動が止まること
 4. フェーズが終わるとゲートが閉じ、レビューが済むと開くこと
 5. 変更要求のレビューは人の端末からも通せないこと
@@ -343,21 +343,56 @@ class TicketTest(unittest.TestCase):
 
     # ---- 2. 子は親の部分集合
 
-    def test_child_beyond_parent_is_not_approved(self):
-        """超えている子だけが落ち、兄弟は承認済みチケットになる。落ちたものがあるので
-        終了コードは 1。
+    def test_child_beyond_parent_is_approved_with_a_warning(self):
+        """親の範囲を超える子も承認できる。超えた項は承認画面の「判定で止まるもの」に出る。
 
-        束の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
-        全部通ったと読む。通ったぶんの承認済みチケットは置くので、直して出し直せばよい。
+        判定は親の範囲で切り詰めるので、承認で止める理由が無い（設計 approve-carry §3.1）。
+        超えた項は承認しても書けないことを、承認する人がその場で読めるようにする。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
-        self.assertNotEqual(result.returncode, 0, result.stderr)
-        self.assertIn("超えている", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("判定で止まるもの", result.stdout)
+        self.assertIn("`docs/*` は親 i0001 の範囲を超えている", result.stdout)
+        self.assertNotIn("承認の対象にしない", result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+
+    def test_write_beyond_the_parent_is_denied_and_names_the_parent(self):
+        """子の範囲の中でも親の範囲の外は止まり、文面の `limit:` 行が親を名指しする。
+
+        子自身の範囲の外は今までどおりで、`limit:` 行を足さない（`scope:` 行で足りる）。
+        """
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "docs/*"))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        child = self.worktree("i0001-01", "i0001")
+        started = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+
+        inside = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "a", "x.py")
+        )
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
+        beyond_parent = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "docs", "x.md")
+        )
+        out = json.loads(beyond_parent.stdout)["hookSpecificOutput"]
+        self.assertEqual(out["permissionDecision"], "deny")
+        self.assertIn("DENY_TICKET_SCOPE", out["permissionDecisionReason"])
+        self.assertIn("limit: parent i0001: src/*, wip/*", out["permissionDecisionReason"])
+
+        beyond_child = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_child))
+        self.assertNotIn("limit:", self.reason(beyond_child))
 
     # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
 
@@ -850,6 +885,11 @@ class TicketTest(unittest.TestCase):
             "ccnavi --approve --yes i0001 --preview",
             # 承認のスクリプトも人の経路。中身は --approve と承認済みチケットの push。
             "sh .ccnavi/scripts/ccnavi-approve.sh",
+            # 承認済みチケットを運ぶ sh も人が打つ。push は外へ出す操作で、時機は人が決める
+            # （設計 approve-carry §1.6）。
+            "sh .ccnavi/scripts/ccnavi-push-approved.sh",
+            "bash /abs/.ccnavi/scripts/ccnavi-push-approved.sh",
+            "ls; sh .ccnavi/scripts/ccnavi-push-approved.sh",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -859,6 +899,9 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+            if "push-approved" in command:
+                # 止めた理由に、運ぶ sh も人が打つことを書く。
+                self.assertIn("ccnavi-push-approved.sh", self.reason(result), command)
         # 読むだけの形と、スクリプト経由は通る。
         for command in (
             "ccnavi --explain",

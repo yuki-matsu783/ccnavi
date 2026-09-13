@@ -170,7 +170,11 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
     def test_scope_stays_relative_to_the_worktree(self):
-        """§25.4.1: `scope` は作業ツリーのルートからの相対のまま。"""
+        """§25.4.1: `scope` は作業ツリーのルートからの相対のまま。
+
+        種類の超過は承認を拒まず、承認画面の「判定で止まるもの」に出る（設計 approve-carry
+        §3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
+        """
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["build"], allow=("src/*", "docs/*")),
@@ -181,19 +185,18 @@ class PhaseUnionTest(ConfigUnionHarness):
             ticket_text("i0001-01", project="lib", parent="i0001", phase=1, allow=("docs/*",)),
             project="lib",
         )
-        refused = self.approve()
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("超えている", refused.stderr)
-        self.assertFalse(os.path.exists(self.approved_copy("i0001-01")))
-
         self.propose(
-            "i0001-01",
-            ticket_text("i0001-01", project="lib", parent="i0001", phase=1, allow=("src/a/*",)),
+            "i0001-02",
+            ticket_text("i0001-02", project="lib", parent="i0001", phase=1, allow=("src/a/*",)),
             project="lib",
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertIn("判定で止まるもの", approved.stdout)
+        self.assertIn("`docs/*` は種類", approved.stdout)
+        self.assertNotIn("`src/a/*` は種類", approved.stdout)
         self.assertTrue(os.path.exists(self.approved_copy("i0001-01")))
+        self.assertTrue(os.path.exists(self.approved_copy("i0001-02")))
 
     def test_broken_project_phases_is_an_error_and_the_layer_is_empty(self):
         """§25.2: 壊れた層の phases は空 + --lint error。共通層の種類は使える。"""

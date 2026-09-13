@@ -4,7 +4,8 @@ VS Code のボード拡張がオーバーレイで承認するための経路。
 見るのは 6 つ。
 
 1. `--preview` は束の本文と識別子、対象外の提案、読めない提案を JSON で返す。
-   承認済みチケットは置かない
+   承認済みチケットは置かない。範囲の超過だけの子は束に載り `overflow[]` を持つ
+   （設計 wip/design/approve-carry.md §3.3）
 2. 承認待ちが無くても `--preview` は `batch: []` で exit 0
 3. `--yes` に束と同じ識別子を渡すと承認済みチケットが置かれ、`prompt`（Claude Code に渡す文）が返る
 4. `--yes` の識別子が束と違えば承認済みチケットを置かず、`mismatch` で exit 1
@@ -52,30 +53,57 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_preview_lists_the_batch_and_does_not_place_copies(self):
         self.pending_parent_and_child()
-        # 種類の範囲を超える子。承認の対象にしない側に載る。
+        # 種類の範囲を超える子。超過は承認を拒まないので束に載り、overflow[] を持つ
+        # （設計 approve-carry §3.3）。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("wip/design/*",)))
+        # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
+        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
         # frontmatter の読めない提案。読めない提案の側に載る。
         write(os.path.join(self.parent_tree, "wip", "tickets", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
         body = self.preview()
         self.assertEqual(body["version"], APPROVE_VERSION)
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01"])
-        parent, child = body["batch"]
+        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01", "i0001-02"])
+        parent, child, beyond = body["batch"]
         self.assertIsNone(parent["parent"])
         self.assertIsNone(parent["phase"])
         self.assertFalse(parent["revision"])
+        self.assertEqual(parent["overflow"], [])
         self.assertEqual(child["parent"], "i0001")
         self.assertEqual(child["phase"], 1)
         self.assertTrue(child["path"].replace("\\", "/").endswith("wip/tickets/todo/i0001-01.md"))
-        self.assertIn("Ticket 承認リクエスト: 2 件", body["text"])
+        self.assertEqual(child["overflow"], [])
+        # 超えた項は文字列の並びで、種類の名前と「超えている」を含む。
+        self.assertTrue(beyond["overflow"], beyond)
+        self.assertTrue(all(isinstance(p, str) for p in beyond["overflow"]), beyond)
+        self.assertTrue(
+            any("超えている" in p and "調査" in p for p in beyond["overflow"]), beyond["overflow"]
+        )
+        self.assertIn("Ticket 承認リクエスト: 3 件", body["text"])
         self.assertIn("== i0001-01", body["text"])
-        self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-02"])
-        self.assertTrue(any("超えている" in p for p in body["rejected"][0]["problems"]))
+        self.assertIn("== i0001-02", body["text"])
+        self.assertIn("判定で止まるもの", body["text"])
+        # rejected[] に残るのは形の壊れた子だけ。
+        self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05"])
+        self.assertTrue(any("計画に無い" in p for p in body["rejected"][0]["problems"]))
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
         # 見ただけ。承認済みチケットは置かれていない。
         self.assertFalse(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01"))
+        self.assertFalse(self.copy_exists("i0001-02"))
+
+    def test_letter_case_alone_is_not_an_overflow(self):
+        """綴りの大文字小文字だけが種類の範囲と違う子は、超過にならない（overflow[] が空）。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("WIP/Research/*",), False))
+        self.commit_parent()
+
+        body = self.preview()
+        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01"])
+        self.assertEqual(body["batch"][1]["overflow"], [])
+        self.assertEqual(body["rejected"], [])
+        self.assertNotIn("判定で止まるもの", body["text"])
 
     # ---- 2. 承認待ちが無い
 
