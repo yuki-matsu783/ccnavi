@@ -23,6 +23,7 @@ allow:
     glob: "wip/design/*"
 started_at: "2026-09-13T13:11:20+0900"
 base_sha: "6ddeb7145a6ef80f167d8310eaec7db3f380e12b"
+completed_at: "2026-09-13T13:14:59+0900"
 ---
 
 # 設計フィードバック: 影響一覧の漏れを埋める
