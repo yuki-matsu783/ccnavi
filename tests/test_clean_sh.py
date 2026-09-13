@@ -3,8 +3,8 @@
 確かめるのは 3 つ。決まった名前の生成物だけが消えること。`.claude/worktrees/` の直下の
 名前以外は受け付けないこと。未コミットの変更がある作業ツリーでは何も消さないこと。
 
-同じ検査を 2 回回す。node で消す側と、node が無いときに sh で消す側。node の有無は
-`CCNAVI_NODE` に無い名前を渡して作る。
+同じ検査を 2 回回す。node で消す側と、node が無いときに sh で消す側。node が無い状態は、
+sh に渡す PATH から node のあるディレクトリを外して作る。
 
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
@@ -26,7 +26,8 @@ NODE = shutil.which("node")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = ("ccnavi-clean.sh", "ccnavi-clean.js", "ccnavi-common.sh")
-NO_NODE = "ccnavi-no-such-node"
+# ccnavi-clean.sh と ccnavi-common.sh が呼ぶ外部コマンド。node を外した PATH でも見えるように残す。
+TOOLS = ("basename", "cat", "dirname", "find", "git", "head", "rm", "sed", "sleep", "sort", "tr")
 # Windows は chmod で消せなくならず、root は権限を無視して消す。
 CANNOT_LOCK = os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0)
 
@@ -65,10 +66,39 @@ def link_dir(target, link):
         return False
 
 
-class CleanCases:
-    """node で消す側と sh で消す側に共通の検査。node_name が None なら既定の node を使う。"""
+def path_without_node(shim):
+    """PATH から node のあるディレクトリを外す。リンクが張れなければ None。
 
-    node_name = None
+    node と同じディレクトリに sh の使う道具があることがある（Linux の /usr/bin）。
+    丸ごと外すと find や git まで消えるので、TOOLS だけを shim にリンクして、外した場所に置く。
+    """
+    dirs = []
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        if not d:
+            continue
+        if not shutil.which("node", path=d):
+            dirs.append(d)
+            continue
+        for tool in TOOLS:
+            found = shutil.which(tool, path=d)
+            if not found:
+                continue
+            dest = os.path.join(shim, os.path.basename(found))
+            if os.path.lexists(dest):
+                continue  # 先に外した場所のものが勝つ。PATH の並びと同じ
+            try:
+                os.symlink(found, dest)
+            except OSError:
+                return None
+        if shim not in dirs:
+            dirs.append(shim)
+    return os.pathsep.join(dirs)
+
+
+class CleanCases:
+    """node で消す側と sh で消す側に共通の検査。strip_node が真なら PATH から node を外す。"""
+
+    strip_node = False
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -81,13 +111,21 @@ class CleanCases:
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         self.worktrees = os.path.join(self.ws, ".claude", "worktrees")
         os.makedirs(self.worktrees)
+        self.path = None
+        if self.strip_node:
+            shim = os.path.join(self._tmp.name, "bin")
+            os.makedirs(shim)
+            self.path = path_without_node(shim)
+            if self.path is None:
+                self.skipTest("node を外した PATH が作れない（リンクが張れない）")
+            if shutil.which("node", path=self.path):
+                self.skipTest("PATH から node を外しきれない")
 
     def run_clean(self, *args, cwd=None):
         env = dict(os.environ)
         env.pop("CCNAVI_WORKSPACE", None)  # 本物のワークスペースを指させない
-        env.pop("CCNAVI_NODE", None)
-        if self.node_name:
-            env["CCNAVI_NODE"] = self.node_name
+        if self.path is not None:
+            env["PATH"] = self.path
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],
@@ -233,7 +271,7 @@ class CleanWithNodeTest(CleanCases, unittest.TestCase):
 
 @unittest.skipUnless(SHELL, "sh が要る")
 class CleanWithoutNodeTest(CleanCases, unittest.TestCase):
-    node_name = NO_NODE
+    strip_node = True
 
     def test_says_it_cleans_with_sh(self):
         self.make_shell("shell")
