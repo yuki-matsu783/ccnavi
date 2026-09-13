@@ -75,6 +75,9 @@ DEFAULT_BIN=".claude/ccnavi/ccnavi"
 # リポジトリの .claude/ の形に決め打ちで対応する。配布先の綴りは --bin に
 # 従うので、実行ファイルだけは行き先が動く。
 DEPLOY_BIN_DIR="dist/ccnavi"
+# どの機械向けに組み立てたかの印。build.py が `<os>-<arch>` の 1 行で書く。
+# dist/ccnavi/ の外にあるので、copy_tree が配布先へ写すことはない。
+DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".claude/ccnavi/rules.yml"
 # 設定 3 本のひな形。rules と risk は汎用なので共通層（.claude/ccnavi/）へ、
 # phases はワークスペースのレイアウト（scope の綴り）に付くので自身の層
@@ -312,6 +315,68 @@ if [ -n "$deploy" ] && [ ! -d "$source_root/$DEPLOY_BIN_DIR" ]; then
 	source_root=""
 fi
 
+# 実行ファイルがこの機械で動くか。PyInstaller の実行ファイルは組み立てた機械の
+# OS と CPU でしか動かない。Windows の .exe を WSL へ、macOS 向けを Linux へ配っても
+# ファイルは在るので、ここで見ないと hook が起動できないまま黙って死ぬ。
+#
+# 前提は、これを打つ機械が Claude Code を動かす機械と同じであること。Windows と
+# WSL で同じフォルダを開く使い方では、打った側の OS で判定する。
+#
+# 断り方は上の「組み立てていない」と揃える。名指しの --deploy なら 2、既定の
+# 配布元なら配るのを諦めて理由を出す。印が無い（古い build.py で組んだ）か、
+# この機械を読めないときは、確かめていないことを 1 行出して配る。
+host_target() {
+	# 語は build.py の build_target と揃える。
+	case "$(uname -s 2>/dev/null)" in
+	Linux*) host_os=linux ;;
+	Darwin*) host_os=darwin ;;
+	MINGW* | MSYS* | CYGWIN*) host_os=windows ;;
+	*) host_os=unknown ;;
+	esac
+	case "$(uname -m 2>/dev/null)" in
+	x86_64 | amd64 | AMD64) host_arch=x86_64 ;;
+	arm64 | aarch64 | ARM64) host_arch=arm64 ;;
+	*) host_arch=unknown ;;
+	esac
+	printf '%s-%s' "$host_os" "$host_arch"
+}
+
+runs_here() {
+	# $1 印の値 / $2 この機械。arm64 の macOS と Windows は x86_64 の実行ファイルを
+	# 変換して動かす（Rosetta 2 / Windows on Arm）ので通す。
+	[ "$1" = "$2" ] && return 0
+	case "$2" in
+	darwin-arm64) [ "$1" = darwin-x86_64 ] ;;
+	windows-arm64) [ "$1" = windows-x86_64 ] ;;
+	*) return 1 ;;
+	esac
+}
+
+deploy_target_note=""
+if [ -n "$deploy" ]; then
+	host=$(host_target)
+	built=""
+	if [ -f "$source_root/$DEPLOY_TARGET_FILE" ]; then
+		built=$(head -n 1 "$source_root/$DEPLOY_TARGET_FILE" | tr -d '\r')
+	fi
+	case "$host" in
+	unknown-* | *-unknown)
+		deploy_target_note="この機械の OS か CPU を読めない（${host}）ので、実行ファイルがこの機械で動くかを確かめていません。"
+		;;
+	*)
+		if [ -z "$built" ]; then
+			deploy_target_note="$source_root/$DEPLOY_TARGET_FILE が無いので、実行ファイルがこの機械（${host}）向けかを確かめていません。配布元で 'uv run --with pyinstaller python build.py' を回し直すと書かれます。"
+		elif ! runs_here "$built" "$host"; then
+			[ "$deploy_given" = no ] ||
+				die "$source_root/$DEPLOY_BIN_DIR は ${built} 向けで、この機械（${host}）では動きません。この機械で build.py を回した配布元を名指ししてください。"
+			deploy_skipped="$source_root/$DEPLOY_BIN_DIR は ${built} 向けで、この機械（${host}）では動かないので配っていません（この機械で 'uv run --with pyinstaller python build.py' を回すと作り直せます）。"
+			deploy=""
+			source_root=""
+		fi
+		;;
+	esac
+fi
+
 # 書けない形を、jq を回す前に見つける。あとで mkdir が失敗すると、終了コードが
 # 1（--check の「揃っていない」）と衝突したうえ、生のエラーだけが出る。
 if [ -e "$claude_dir" ] && [ ! -d "$claude_dir" ]; then
@@ -353,7 +418,7 @@ shape=$(printf '%s' "$current" | jq -r '
 		".hooks の中に、文字列でない command があります"
 	else "" end
 ')
-[ -z "$shape" ] || die "$SETTINGS_REL の形を扱えません: $shape。直してから打ち直してください。"
+[ -z "$shape" ] || die "$SETTINGS_REL の形を扱えません: ${shape}。直してから打ち直してください。"
 
 # 必ず書く env。既定を持たない CCNAVI_BIN_PATH、既定と同じでも書いておきたい
 # 2 つのパス、そして守りのつまみ。設定ファイルだけを見て、どこを読み書きするかと、
@@ -744,6 +809,9 @@ report_deploy() {
 	if [ -n "$deploy_skipped" ]; then
 		printf '%s\n' "$deploy_skipped"
 	fi
+	if [ -n "$deploy_target_note" ]; then
+		printf '%s\n' "$deploy_target_note"
+	fi
 }
 
 report_deploy_plan() {
@@ -978,20 +1046,20 @@ note_missing() {
 "
 }
 if [ ! -f "$root/$bin" ] && [ ! -f "$root/$bin.exe" ]; then
-	note_missing "$bin（ccnavi の実行ファイル。build.py で組み立てる）"
+	note_missing "${bin}（ccnavi の実行ファイル。build.py で組み立てる）"
 fi
 if [ ! -f "$root/$DEPLOY_RULES" ]; then
-	note_missing "$DEPLOY_RULES（何を止めるか。無いと組み込みの既定だけで判定する）"
+	note_missing "${DEPLOY_RULES}（何を止めるか。無いと組み込みの既定だけで判定する）"
 fi
 if [ ! -f "$root/$DEPLOY_RISK" ]; then
-	note_missing "$DEPLOY_RISK（リスクの配点。無いと組み込みの配点で測る）"
+	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"
 fi
 if [ ! -f "$root/$DEPLOY_PHASES" ]; then
-	note_missing "$DEPLOY_PHASES（フェーズの種類。無いと番号だけの挙動になる）"
+	note_missing "${DEPLOY_PHASES}（フェーズの種類。無いと番号だけの挙動になる）"
 fi
 for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh; do
 	if [ ! -f "$root/.claude/scripts/$name" ]; then
-		note_missing ".claude/scripts/$name（ゲートの中で通る形）"
+		note_missing ".claude/scripts/${name}（ゲートの中で通る形）"
 	fi
 done
 if [ -n "$missing_parts" ]; then

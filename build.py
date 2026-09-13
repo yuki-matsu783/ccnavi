@@ -11,6 +11,7 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 from __future__ import annotations
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -20,12 +21,36 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 # 実行ファイルの置き場。hook はここを指す。
 DIST = os.path.join(ROOT, "dist")
 NAME = "ccnavi"
+# どの機械向けに組み立てたかの印。scripts/ccnavi-setup.sh が配る前に読む。
+# dist/ccnavi/ の外に置く。中に置くと、配布が実行ファイルと一緒に配布先へ写す。
+TARGET = os.path.join(DIST, NAME + ".target")
 
 
 def executable() -> str:
     """このプラットフォームでの実行ファイルのパス。"""
     suffix = ".exe" if sys.platform == "win32" else ""
     return os.path.join(DIST, NAME, NAME + suffix)
+
+
+def build_target() -> str:
+    """組み立てた実行ファイルが動く機械の `<os>-<arch>`。
+
+    PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。
+    語は scripts/ccnavi-setup.sh の host_target と揃える。
+    """
+    if sys.platform == "win32":
+        system = "windows"
+    elif sys.platform == "darwin":
+        system = "darwin"
+    elif sys.platform.startswith("linux"):
+        system = "linux"
+    else:
+        system = sys.platform
+    machine = platform.machine().lower()
+    arch = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "arm64", "aarch64": "arm64"}.get(
+        machine, machine or "unknown"
+    )
+    return f"{system}-{arch}"
 
 
 def build() -> int:
@@ -55,7 +80,10 @@ def build() -> int:
         return result.returncode
 
     _swap(os.path.join(staging, NAME), os.path.join(DIST, NAME))
-    print(f"built {executable()}")
+    target = build_target()
+    with open(TARGET, "w", encoding="utf-8", newline="\n") as f:
+        f.write(target + "\n")
+    print(f"built {executable()} ({target})")
     return 0
 
 
