@@ -362,6 +362,37 @@ PyInstaller の同梱物は名前で引かれるので、前の版が残ると�
 空なのは打った人の誤りではないし、ここで断ると、組み立てていない機械では設定すら
 書けなくなる。
 
+#### 既存のワークスペースを移行する
+
+フェーズの種類の置き場は、共通層 `.claude/ccnavi/phases.yml` から自身の層 `.ccnavi/config/phases.yml` へ移った
+（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値。設計は [ccnavi.md](ccnavi.md) の §25.12）。既に動いている
+ワークスペースを移すときは、**新しい実行ファイルを配ったあとに、旧 `.claude/ccnavi/phases.yml` を消す。** 順番を守る。
+
+1. 自身の層 `.ccnavi/config/phases.yml` に種類を置く。中身は旧 `.claude/ccnavi/phases.yml` のまま写す。
+   旧 `.claude/ccnavi/phases.yml` は**まだ消さない**
+2. 新しい実行ファイルを組んで、ワークスペースルートの配り先へ配る（上の手順）
+3. 旧 `.claude/ccnavi/phases.yml` を消す
+
+1 と 2 のあいだは、共通層と自身の層に同じ種類が並ぶ。全欄一致の重複として自身の層の側が捨てられるだけで、判定は変わらない
+（`--lint` が info で言う。「ルールは 3 層の和で当たる」）。
+
+順番があるのは、古い実行ファイルが共通層 `.claude/ccnavi/phases.yml` しか読まず、自身の層を読まないため。hook が呼ぶのは
+ワークスペースルートに配られている版で、作業ツリーで組み直しても hook の側は変わらない。配る前に旧ファイルを消すと、
+フェーズの種類が全部消える。
+
+逆にすると、`ccnavi --approve` が次のように言って、`plan` を持つチケットを承認しない。ゲートもそこで止まる。
+
+```
+error: <チケット>: `plan` があるのにフェーズの種類の定義（phases.yml）が読めない
+error: <子チケット>: <N> 番目の種類 `<種類>` の定義が読めない
+```
+
+これが出たら、`.ccnavi/config/phases.yml` を `.claude/ccnavi/phases.yml` に写し戻し、新しい実行ファイルを配ってから、
+旧 `.claude/ccnavi/phases.yml` を消し直す。
+
+旧ファイルの削除も `.ccnavi/config/` への書き込みも人が行う。どちらも中核ファイルの保護と組み込みの deny が先に当たるので、
+エージェントには書けない（「中核ファイルを守る」）。
+
 ## ルール
 
 ルールファイルは YAML で、`deny` `ask` `allow` の 3 つのタイプに分かれる。
@@ -1652,7 +1683,7 @@ ccnavi --lint --json
 | `version` | 形の版。整数（いま 1）。欄を足すだけなら上げない |
 | `root` / `rules` / `mode` / `ticket_control` | 何を見て検証したか。人向けの文面が先頭に出すものと同じ |
 | `projects[]` | 検証の対象になったプロジェクトの名前 |
-| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(自身の層) (phases) design` など。ファイル全体への苦情なら空） |
+| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design` など。ファイル全体への苦情なら空） |
 | `errors` / `warns` / `infos` | 件数 |
 
 ### 1 つのプロジェクトのルールを保存せずに試す
