@@ -66,13 +66,16 @@ const NOT_FOUND =
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
 
 /**
- * 判定と検証に掛けるルールファイルの差し替え。ワークスペースのルールは `--rules` で、
+ * 判定と検証に掛けるルールファイルの差し替え。ワークスペースのルール（共通層）は `--rules` で、
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
- * どちらも診断でだけ効き、hook からの判定には届かない。
+ * 自身の層は同じオプションに名札 `self` で渡す。実行ファイルは層の名前で差し替えを引き、
+ * `self` を名乗るプロジェクトは層として数えないので取り違えない。
+ * どれも診断でだけ効き、hook からの判定には届かない。
  */
 export type RulesOverride =
   | { readonly kind: "workspace"; readonly path: string }
-  | { readonly kind: "project"; readonly name: string; readonly path: string };
+  | { readonly kind: "project"; readonly name: string; readonly path: string }
+  | { readonly kind: "self"; readonly path: string };
 
 /**
  * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、リスクの配点を `--risk` で、
@@ -90,6 +93,8 @@ function overrideArgs(override: LintOverride): string[] {
       return ["--rules", override.path];
     case "project":
       return ["--project-rules-file", `${override.name}=${override.path}`];
+    case "self":
+      return ["--project-rules-file", `self=${override.path}`];
     case "risk":
       return ["--risk", override.path];
     case "phases":
