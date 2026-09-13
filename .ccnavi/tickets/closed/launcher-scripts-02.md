@@ -29,6 +29,9 @@ ccnavi_approved:
   approved_at: 2026-09-13T21:39:05+0900
   source_tree: launcher-scripts
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/launcher-scripts/wip/tickets/todo/launcher-scripts-02.md
+started_at: 2026-09-13T21:41:09+0900
+base_sha: 6c54b41c00a128d12ca69d365d7c45ca672d926f
+completed_at: 2026-09-13T22:06:59+0900
 ---
 
 # 受入テストを書く
