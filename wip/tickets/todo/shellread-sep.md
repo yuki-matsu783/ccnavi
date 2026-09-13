@@ -30,6 +30,8 @@ plan:
   - {type: acceptance, review: defer}
   - implement
   - docs
+feedback:
+  - design-feedback
 allow:
   - match: Write|Edit
     glob: "ccnavi/*"
