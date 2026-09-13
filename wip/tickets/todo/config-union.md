@@ -16,6 +16,11 @@ plan:
   - acceptance
   - implement
   - docs
+# フィードバック計画。4 フェーズのレビューで出た指摘は、同じフェーズに子を足して応えた
+# （02 → 06、03〜05 → 07 と 09、08 → 10）。この MR の中で追加の対応はしない。残りは
+# 承認のあと handoff で別の issue に切り出す: 層が無いことを --lint が言うか、VS Code 拡張が
+# 旧置き場を読む件、共通層の 3 本を組み込みで止めるか、傘を動かしたときの組み込みの既定の綴り。
+feedback: []
 allow:
   - match: Write|Edit
     glob: "wip/design/*"
