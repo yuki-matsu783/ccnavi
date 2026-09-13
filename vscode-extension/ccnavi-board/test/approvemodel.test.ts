@@ -32,6 +32,9 @@ test("CB-T104 承認の preview を読む（束・範囲の超過・本文・対
   assert.ok(preview.batch[2].overflow[0].includes("超えている"));
   assert.ok(preview.text.startsWith("Ticket 承認リクエスト: 3 件"));
   assert.ok(preview.text.includes("判定で止まるもの"));
+  // 本文の指紋。承認するときに --digest で返す。値は作業ツリーの絶対パスに依るので、
+  // フィクスチャでは伏せてある。
+  assert.equal(preview.digest, "<digest>");
   // 対象にしないのは形の壊れた子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
   assert.equal(preview.rejected[0].ticket, "i0001-05");
@@ -66,7 +69,17 @@ test("CB-T105 承認の答えを読む（承認した / 束が違った）", () 
   if ("mismatch" in changed) {
     assert.deepEqual(changed.mismatch.expected, ["i0001-09"]);
     assert.deepEqual(changed.mismatch.current, []);
+    assert.deepEqual(changed.mismatch.digest, { expected: "<digest>", current: "<digest>" });
   }
+});
+
+test("CB-T105b 指紋の欄の無い食い違い（古い実行ファイル）は digest を持たない。preview の指紋は空", () => {
+  const changed = parseApproveResult(
+    JSON.stringify({ version: APPROVE_VERSION, mismatch: { expected: ["i0001"], current: [] } }),
+  );
+  assert.ok(!changed.ok && "mismatch" in changed && changed.mismatch.digest === undefined);
+  const old = parseApprovePreview(JSON.stringify({ version: APPROVE_VERSION, batch: [], text: "x" }));
+  assert.ok(old.ok && old.value.digest === "");
 });
 
 test("CB-T106 版が違う・JSON でない答えは読まない", () => {
