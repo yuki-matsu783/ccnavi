@@ -472,5 +472,66 @@ class WorktreeRemoveHintTest(GitWrapperTest):
         self.assertEqual([], hint_lines(result.stdout))
 
 
+def git_out(cwd, *args):
+    """素の git の標準出力。見本のリポジトリの状態を読むために使う。"""
+    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True).stdout.strip()
+
+
+class ResetGuidanceTest(GitWrapperTest):
+    """reset は通さず、ブランチをリモートに合わせたいときは checkout -B を案内する。
+
+    squash マージの後は、ローカルのブランチがリモートと分かれて fast-forward できない。
+    reset --hard は書きかけごと消すので通さない。checkout -B は書きかけとぶつかれば git が
+    拒むが、ブランチにしか無いコミットは黙って外すので、案内には外れるものの確かめ方を添える。
+    """
+
+    def diverge(self):
+        """squash マージの後の形。upstream が先に進み、今のブランチにだけコミットがある。"""
+        branch = git_out(self.dir, "branch", "--show-current")
+        git(self.dir, "checkout", "-q", "-b", "upstream")
+        with open(os.path.join(self.dir, "tracked.txt"), "w", encoding="utf-8") as f:
+            f.write("upstream\n")
+        git(self.dir, "commit", "-q", "-am", "upstream")
+        git(self.dir, "checkout", "-q", branch)
+        with open(os.path.join(self.dir, "local.txt"), "w", encoding="utf-8") as f:
+            f.write("local\n")
+        git(self.dir, "add", "local.txt")
+        git(self.dir, "commit", "-q", "-m", "local")
+        return branch
+
+    def test_reset_names_checkout_B_and_how_to_check_what_it_drops(self):
+        stderr = self.assertRejected("reset", "--hard", "origin/main").stderr
+        for form in ("checkout -B", "fetch", "log --oneline", "diff HEAD", "黙って外れ", "利用者"):
+            self.assertIn(form, stderr)
+        # 勧める形はラッパの形で名乗る。生の git を勧めると、勧めた先でもう 1 度止まる。
+        rest = stderr.replace("ccnavi-git.sh", "")
+        for raw in ("git checkout", "git log", "git diff", "git fetch", "git stash"):
+            self.assertNotIn(raw, rest)
+
+    def test_clean_does_not_mention_checkout_B(self):
+        stderr = self.assertRejected("clean", "-fd").stderr
+        self.assertNotIn("checkout -B", stderr)
+
+    def test_the_named_checkout_B_moves_the_branch_and_keeps_untracked_files(self):
+        branch = self.diverge()
+        result = self.run_wrapper("checkout", "-B", branch, "upstream")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(
+            git_out(self.dir, "rev-parse", "upstream"), git_out(self.dir, "rev-parse", "HEAD")
+        )
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "untracked.txt")))
+
+    def test_the_named_checkout_B_refuses_and_keeps_work_in_progress(self):
+        branch = self.diverge()
+        before = git_out(self.dir, "rev-parse", "HEAD")
+        with open(os.path.join(self.dir, "tracked.txt"), "w", encoding="utf-8") as f:
+            f.write("書きかけ\n")
+        result = self.run_wrapper("checkout", "-B", branch, "upstream")
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(before, git_out(self.dir, "rev-parse", "HEAD"))
+        with open(os.path.join(self.dir, "tracked.txt"), encoding="utf-8") as f:
+            self.assertEqual("書きかけ\n", f.read())
+
+
 if __name__ == "__main__":
     unittest.main()
