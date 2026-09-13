@@ -537,9 +537,10 @@ def _messages(group: list[rules.Rule]) -> str:
     """
     seen, out = set(), []
     for rule in group:
-        if rule.message not in seen:
-            seen.add(rule.message)
-            out.append(rule.message)
+        said = rule.spoken_message()
+        if said not in seen:
+            seen.add(said)
+            out.append(said)
     return "\n".join(out)
 
 
