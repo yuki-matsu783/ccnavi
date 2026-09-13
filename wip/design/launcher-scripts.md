@@ -1,7 +1,7 @@
 # 設計: 振り分けの sh を .ccnavi/scripts/ に移し、--bin を廃止する
 
 親チケット `launcher-scripts`、フェーズ 1（設計）の成果物。ADR-0041 を改める。
-コードと文書本体には触らない。人が決めることは 15 節にまとめた。
+コードと文書本体には触らない。人が決めたことは 15 節にまとめた。
 
 ## 0. 何を解くか
 
@@ -298,7 +298,7 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 | `vscode-extension/ccnavi-board/src/core/locate.ts` | 7 節 | implement |
 | `vscode-extension/ccnavi-board/src/ccnavi.ts`・`package.json`・`README.md` | 文面 | implement / docs |
 | `.claude/settings.json` | `CCNAVI_BIN_PATH` | implement |
-| `.gitignore` | `/.ccnavi/bin/` | D-4 |
+| `.gitignore` | `/.ccnavi/bin/` | 人が直す（staging の `COPY.md`。D-4） |
 | `tests/test_launcher.py` | `LAUNCHER` の綴り、12 節 L1–L5 | acceptance |
 | `tests/test_setup.py` | `--bin` 系の 6 本を「断る」1 本に、配置と移し替えを 12 節 S1–S14 に | acceptance |
 | `tests/test_selfguard.py` | 12 節 G1–G5（今の `launcher_layout` は前の形として残す） | acceptance |
@@ -311,7 +311,7 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 | `ccnavi.md` | §4.6 の表と本文、§8.1 の表の行、§8.2 の説明 | docs |
 | `requirements.md` | 14 節 | docs |
 | `docs/adr/0043-launcher-in-scripts.md`（新規）と `docs/adr/README.md` の一覧 | 13 節 | docs |
-| `.claude/skills/ccnavi-config/SKILL.md` | `.ccnavi/bin/ccnavi` の綴り（46–47 行） | allow の外（D-6） |
+| `.claude/skills/ccnavi-config/SKILL.md` | `.ccnavi/bin/ccnavi` の綴り（46–47 行） | 人が直す（staging の `COPY.md`。D-6） |
 
 `tools/gitlab/probe_gitlab.py`（`dist/` の実体を直に使う）と `HANDOVER.md`（過去の記録）は変えない。
 
@@ -340,7 +340,7 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 - S11 `--check` は古い sh を消さずに名前を挙げる
 - S12 「まだ無いもの」に sh と `.ccnavi/bin/<host>/ccnavi` が並ぶ
 - S13 配布元に `.ccnavi/scripts/ccnavi-launcher.sh` が無ければ「配布元に無くて配れないもの」に出る
-- S14 配布先の sh の実行ビットが落ちていれば、配らない回（keep）でも付け直す（D-3 で A を採る場合）
+- S14 配布先の sh の実行ビットが落ちていれば、配らない回（keep）でも付け直す（D-3）
 
 **自己保護（`test_selfguard.py`）**
 
@@ -411,16 +411,21 @@ sh が選ぶ・語を揃える、は引き継ぐ）
 - **REQ-SLF-07 の説明文に足す** 位置が振り分けのスクリプトを指すとき、そのスクリプトが起動する実行ファイルの置き場も守る対象に含める。スクリプトだけを守ると、実体を差し替えても判定が入れ替わったことに気付かない
 - **承認の経路の要求の説明文に足す（該当する REQ を docs で引く）** 実行ファイルをシェルの引数として起動する形（`sh <位置>`）も、直に起動する形と同じく止めること
 
-## 15. 人が決めること
+## 15. 人が決めたこと
+
+**決定（利用者、2026-09-13）:** D-1・D-2・D-3・D-5 は推す案。D-4 と D-6 は人が直す。
+改版で変えられるのは `plan` と `feedback` だけで（README「改版」）、`allow` には足せないため。
+直し方（`.gitignore` に 1 行、`SKILL.md` の 46–47 行）は staging の `COPY.md` に書き、人が `launcher-scripts` の
+ブランチでコミットする。
 
 | # | 何を決めるか | 推す案 | 得るもの | 失うもの | 代案 |
 |---|---|---|---|---|---|
 | D-1 | `--bin` を渡されたとき | 2 で断る | 名指しを黙って無視しない（打った人が指した場所に置いたつもりで進まない） | `--bin .ccnavi/bin/ccnavi` を書いた手順書や CI が止まる | 受けて無視し 1 行出す |
 | D-2 | 名前が `ccnavi-launcher.sh` でない `CCNAVI_BIN_PATH` の「隣を探す」形 | 残す | 打ち直す前のワークスペースでも隣の実体を守り続ける | `binary_clause` と `launched_executable` が 2 つの形を持ち続ける | 消す（打ち直すまで隣の実体の `builtin-guard-binary` と控えが外れる。組み込みの `.ccnavi` の守りは残る） |
 | D-3 | 配布先での sh の実行ビット | A: 追跡し、導入スクリプトが毎回 `chmod +x`、lint が error | ゲートの sh と同じ扱いで 1 つの置き場にまとまる | Windows（`core.filemode=false`）で最初に足すとモード 100644 で入り、別の機械で clone した直後は導入スクリプトを打つまで hook が 126 で起動しない（実行ファイルも無視されているので、どのみち打つ手順ではある） | B: 配布先では sh を無視し、機械ごとに配る（同じ置き場に追跡と無視が混ざる）／C: hook の `command` を `sh "…"` にする（実行ビットが要らなくなるが、登録済みの hook の書き換えと `looks` の見分けが要り、範囲が広がる） |
-| D-4 | このリポジトリの `.gitignore` に `/.ccnavi/bin/` | 親チケットを改版して allow に `.gitignore` を足す | implement の中で閉じる | 改版の承認が 1 回増える | 人が 1 行足す |
+| D-4 | このリポジトリの `.gitignore` に `/.ccnavi/bin/` | **人が 1 行足す（決定）** | チケットが増えない | 人の手が 1 つ増える | 親チケットの allow に足す（改版では足せないので、別の親を出すか親を出し直すことになる） |
 | D-5 | 承認の経路の `sh`/`bash` 前置 | 今回入れる | 今の既定の配置にもある穴を、`.sh` の名前で打ちやすくなる前に塞ぐ | チケットの「変える場所」に無い変更が 1 つ増える | 別チケットに分ける（分けるまで `sh .ccnavi/scripts/ccnavi-launcher.sh --approve --yes` が通る） |
-| D-6 | `.claude/skills/ccnavi-config/SKILL.md` の綴り | 人が直す | 範囲を広げない | 人の手が 1 つ増える | 親チケットの allow に足す |
+| D-6 | `.claude/skills/ccnavi-config/SKILL.md` の綴り | **人が直す（決定）** | 範囲を広げない | 人の手が 1 つ増える | 親チケットの allow に足す |
 
 ## 16. 今回入れないもの
 
