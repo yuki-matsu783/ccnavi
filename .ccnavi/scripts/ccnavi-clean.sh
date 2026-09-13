@@ -17,9 +17,6 @@
 # sh の rm は Windows の深い node_modules で粘りきれないことがあり、そのときは
 # 消し残しとして 1 で返る。
 #
-# CCNAVI_NODE で呼ぶ node の名前を差し替えられる。既定は node。無い名前を渡すと
-# sh で消す側を通る（テストはこれで両方を叩く）。
-#
 # 作業ツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
 # そこで作業している見込みが高い。git に登録の残っていない抜け殻（.git が無い、
 # または .git が指す先が消えている）は確かめようが無いので、確かめずに進める。
@@ -235,10 +232,9 @@ EOF
 	return 0
 }
 
-node_bin="${CCNAVI_NODE:-node}"
-if command -v "$node_bin" >/dev/null 2>&1; then
-	exec "$node_bin" "$(dirname "$0")/ccnavi-clean.js" "$target" ${dry:+--dry-run}
+if command -v node >/dev/null 2>&1; then
+	exec node "$(dirname "$0")/ccnavi-clean.js" "$target" ${dry:+--dry-run}
 fi
 
-printf 'ccnavi-clean: %s が見つからないので、sh で消します。\n' "$node_bin" >&2
+printf 'ccnavi-clean: node が見つからないので、sh で消します。\n' >&2
 clean_with_sh "$target"
