@@ -367,6 +367,8 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   それでも「自分のテストが走っている間に自分の作業ツリーを消せない」は残る。落ちたら、
   掴みが離れるのを待つか、抜け殻を `mv` で `.claude/worktrees/` の外へ出して
   `git worktree prune` する（rename は通るので、これは必ず成功する）。
+  消す前に `sh .claude/scripts/ccnavi-clean.sh <名前>` で生成物を消しておくと、pnpm の深い
+  node_modules で止まる分は避けられる。掴まれている `.pyd` は避けられず、消し残しとして出る。
 
 - **`${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。**
   中括弧のままの文字列が渡る。`env` には相対パスを書く

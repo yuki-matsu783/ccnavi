@@ -80,6 +80,9 @@
 - `<統合先>` が保護されていて直接は入れられないなら、マージまでやらない。
 - 統合が済んでから `ccnavi-git.sh worktree remove <パス>` と `ccnavi-git.sh branch -d <名前>` で
   片付ける。MR に出した場合は、取り込まれたのを確かめてから片付ける
+- `worktree remove` の前に `ccnavi-clean.sh <名前>` で生成物（node_modules・.venv など）を消す。
+  Windows では、これが残っていると削除が途中で止まり、抜け殻が残る。未コミットの変更がある
+  作業ツリーでは何も消さずに止まる
 
 #### 何がどこに置かれるか
 
