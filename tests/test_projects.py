@@ -3,7 +3,7 @@
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
 `projects/` の直下に clone した別のリポジトリで、それぞれ層の 3 本の置き場
-（`.ccnavi/config/`、設計 §25.2）に rules.yml を持つ。
+（`.ccnavi/config/`、設計 §11.2）に rules.yml を持つ。
 
 見るのは 5 つ。
 
@@ -170,7 +170,7 @@ class ProjectsTest(unittest.TestCase):
         self.app = self.project("app", APP_RULES)
         self.lib = self.project("lib", LIB_RULES)
         # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
-        # （設計 §24.5）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
+        # （設計 §9.2）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
         self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "log.jsonl")
@@ -319,7 +319,7 @@ class ProjectsTest(unittest.TestCase):
     # ---- 3. 読めないプロジェクトのルール
 
     def test_unreadable_project_rules_are_empty_and_drop_out_of_the_union(self):
-        """壊れた層は空として扱い、記録が層の名前を残す（設計 §25.2、REQ-MLT-06）。
+        """壊れた層は空として扱い、記録が層の名前を残す（設計 §11.2、REQ-MLT-06）。
 
         組み込みの既定へは落ちない。共通層が有るのに落とすと、共通層の deny が
         消える側に倒れる。
@@ -357,7 +357,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
 
     def test_worktree_cut_from_the_wrong_project_is_refused_by_the_ticket(self):
-        # プロジェクトの提案はそのプロジェクトの wip/tickets/ に置く（設計 §25.5）。
+        # プロジェクトの提案はそのプロジェクトの wip/tickets/ に置く（設計 §11.5）。
         # 置き場がプロジェクトを決めるので、frontmatter の project は書かなくてよい。
         write(
             os.path.join(self.lib, "wip", "tickets", "todo", "i0007.md"),
@@ -385,7 +385,7 @@ class ProjectsTest(unittest.TestCase):
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
-    # ---- 4b. プロジェクトを決めるのは提案を置いた場所（設計 §25.5）
+    # ---- 4b. プロジェクトを決めるのは提案を置いた場所（設計 §11.5）
 
     def test_the_place_decides_the_project_for_parent_and_child_alike(self):
         write(
@@ -442,7 +442,7 @@ class ProjectsTest(unittest.TestCase):
 
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/tickets/ に置く。プロジェクトの作業ツリーの中も普通の置き場で、
-        # 承認をプロジェクトの git で運ぶために、そこに置く（設計 §24.5、REQ-MLT-14）。
+        # 承認をプロジェクトの git で運ぶために、そこに置く（設計 §9.4、REQ-MLT-14）。
         # 置き場は作業ツリーの切り元で決まり、承認済みチケットは記録した道から引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
         write(
@@ -540,7 +540,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("(projects/lib)", out)
         self.assertIn(".claude/ を持つ", out)
 
-        # `--explain` は層ごとに並べる（設計 §25.9）。読めない層はその位置で言う。
+        # `--explain` は層ごとに並べる（設計 §11.9）。読めない層はその位置で言う。
         explained = self.ccnavi("--explain")
         self.assertIn("■ rules app", explained.stdout)
         self.assertIn("■ rules lib", explained.stdout)

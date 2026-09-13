@@ -197,7 +197,7 @@ def judge(
         "reason": reason.strip(),
         "head": head,
         "at": approval.now(),
-        # その項目がどの層に書いてあるか（設計 §25.9）。
+        # その項目がどの層に書いてあるか（設計 §11.9）。
         "source": factor.source,
     }
     failed = approval.write_child_record(
@@ -214,7 +214,7 @@ def judge(
 
 
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
-    """このチケットの層を決める `project:`（設計 §25.4.1、§25.4.2）。
+    """このチケットの層を決める `project:`（設計 §11.4.1、§11.4.2）。
 
     権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値は人が承認していないので、判定の根拠にしない。
@@ -283,7 +283,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
-        # 空として扱った層の名前を残す（設計 §25.2）。共通層だけで測ったことが、
+        # 空として扱った層の名前を残す（設計 §11.2）。共通層だけで測ったことが、
         # あとから記録を読んだ人に分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval.write_child_record(
@@ -379,7 +379,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
 def _deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §24.15.6）。
+    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は塞げる。

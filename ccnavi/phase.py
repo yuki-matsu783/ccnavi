@@ -143,7 +143,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に種類と計画の項が付く（設計 §24.15）。持たなければ
+    親が計画を持てば、番号に種類と計画の項が付く（設計 §9.7）。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -256,7 +256,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
     if settings.is_reserved_layer_name(project):
@@ -281,7 +281,7 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 §25.4.1）。
+    """共通層 + その層の種類と、**その層の**苦情（設計 §11.4.1）。
 
     どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
@@ -292,7 +292,7 @@ def layer_types(
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 §25.2）。
+        # 共通層が壊れている。層は足さない（設計 §11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -352,7 +352,7 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 §25.4.1）。人が承認した値で、
+        # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():
@@ -435,7 +435,7 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置く印に足す、その種類の層（設計 §25.9）。
+    """種類を根拠に置く印に足す、その種類の層（設計 §11.9）。
 
     `review:` が絡む印（省略と保留）にだけ足す。他の印は種類を見ずに置くので、
     層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
@@ -547,7 +547,7 @@ def order_problems(
     types: dict[str, phasetypes.PhaseType] | None,
     adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §24.15.4）。
+    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
 
@@ -649,7 +649,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの段階にいるか（設計 §24.15.8）。計画が無ければ空文字。"""
+    """親がいまどの段階にいるか（設計 §9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)

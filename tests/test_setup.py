@@ -69,7 +69,7 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh")
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
-# --deploy が配る残りの設定 2 本（設計 §25.9）。リスクの配点は共通層、
+# --deploy が配る残りの設定 2 本（設計 §11.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risk.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
@@ -732,7 +732,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 §25.9）。
+            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 §11.9）。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config"))

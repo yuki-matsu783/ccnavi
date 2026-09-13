@@ -209,7 +209,7 @@ class WordSepTest(unittest.TestCase):
                 self.assertEqual(show(self.readable(src)), show(want))
 
     def test_引用だけの二重の山括弧は今までどおり諦める(self):
-        # 許容した誤検知（ccnavi.md §12.3）。印を分けても変わらない。
+        # 許容した誤検知（ccnavi.md §12.2）。印を分けても変わらない。
         result = read('grep -n "<<" f')
         self.assertTrue(result.degraded, "引用の << を普通に読んでしまった")
         self.assertEqual(result.reason, REASON_UNTERMINATED)

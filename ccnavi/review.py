@@ -364,7 +364,7 @@ def check(
         review_sh = settings.script_command(root, "ccnavi-review.sh")
         if _is_last_feedback_review(parent, phase_no):
             # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §24.15.7）。
+            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §9.11）。
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
@@ -497,7 +497,7 @@ def handoff(
     body_file: str,
     result_path: str,
 ) -> int:
-    """残った指摘を別の issue に切り出す下書きを書き出す（設計 §24.15.7）。
+    """残った指摘を別の issue に切り出す下書きを書き出す（設計 §9.11）。
 
     作るのは sh。ここは、切り出してよい段階か（フィードバック計画が承認済み）を確かめ、
     親が書いた題と本文に、写しの中の未解決スレッドの URL を添えて、控えの置き場に置く。
@@ -889,7 +889,7 @@ WIP_ROOT = "wip"
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """作業ツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しと印はこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §24.5）。
+    写しと印はこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
     印はフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     印をコミットしろ」と言い続けることになる。印と写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。

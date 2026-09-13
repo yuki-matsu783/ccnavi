@@ -362,7 +362,7 @@ class Candidate:
     complaints: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
-    # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §25.4.1）。
+    # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §11.4.1）。
     # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持ち歩く。
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -401,7 +401,7 @@ def approve(
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
 
     親の改版（計画の変更）も一緒に承認の対象に入る。承認済みチケットは動かないのが原則で、改版はその
-    唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
+    唯一の例外（設計 §9.7）。変えられるのは `plan` と `feedback` だけ。
 
     `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
@@ -495,7 +495,7 @@ def gather(
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
 
     フェーズの種類は承認の対象全体で 1 つに決まらない。どの層の種類が効くかは各チケットの
-    `project:` が決める（設計 §25.4.1）ので、候補を組むところで 1 件ずつ引き、
+    `project:` が決める（設計 §11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` が持ち歩く。`Gathered.types` は対象全体の種類を持たず、
     いつも None。画面は候補が持つ種類を使う。
     """
@@ -864,7 +864,7 @@ def _candidates(
 
 
 def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
-    """このチケットの層を決める `project:`（設計 §25.4.1）。
+    """このチケットの層を決める `project:`（設計 §11.4.1）。
 
     子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
     `project_problems` が落とす。親が池に居ないときだけ、子の置き場の値をそのまま読む。
@@ -1109,7 +1109,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
 
 
 def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
-    """親の計画が種類の定義と噛み合っているか（設計 §24.15.2）。"""
+    """親の計画が種類の定義と噛み合っているか（設計 §9.7）。"""
     problems: list[rules.Problem] = []
     if not t.has_plan:
         return problems
@@ -1188,7 +1188,7 @@ def revision_problems(
     current: ticket_mod.Ticket,
     types: dict | None,
 ) -> list[rules.Problem]:
-    """親の改版を受けてよいか（設計 §24.15.5）。"""
+    """親の改版を受けてよいか（設計 §9.7）。"""
     from . import phase
 
     problems = plan_problems(revised, types)
@@ -1285,7 +1285,7 @@ def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str
 
 
 def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """`project:` が層の名札に予約してある綴りなら error（設計 §25.4）。"""
+    """`project:` が層の名札に予約してある綴りなら error（設計 §11.4）。"""
     if not t.project or not settings.is_reserved_layer_name(t.project):
         return []
     reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
@@ -1306,7 +1306,7 @@ def project_problems(
 ) -> list[rules.Problem]:
     """`project` が置き場と噛み合っているか（REQ-MLT-11）。
 
-    プロジェクトを決めるのは提案を置いた場所（設計 §25.5）。frontmatter の `project:` は
+    プロジェクトを決めるのは提案を置いた場所（設計 §11.5）。frontmatter の `project:` は
     宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
     無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
 

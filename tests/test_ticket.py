@@ -118,7 +118,7 @@ class TicketTest(unittest.TestCase):
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具

@@ -201,7 +201,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 §25）。
+    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 §11）。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。

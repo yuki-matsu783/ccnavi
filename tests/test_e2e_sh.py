@@ -1,7 +1,7 @@
 """モード B の受入テスト。本物のワークスペースを組み立てて sh を外から叩く。
 
 モード B は、道具を持つワークスペースの下の `projects/<名前>/` に別々のリポジトリを
-clone する形（設計 §25）。ここで確かめるのは、保護済み sh が「自分の根」を
+clone する形（設計 §11）。ここで確かめるのは、保護済み sh が「自分の根」を
 ワークスペースルートとして正しく取れること、その結果として記録・実行ファイル・
 状態の置き場がワークスペース側に揃うこと、そしてモード A（`projects/` が無い形）が
 退行しないこと。
@@ -487,7 +487,7 @@ class HookTest(WorkspaceTest):
 
 @unittest.skipIf(SKIP, SKIP)
 class ModeATest(unittest.TestCase):
-    """projects/ が無いワークスペースで、§25 の前と同じに動くこと（REQ-MLT-15）。"""
+    """projects/ が無いワークスペースで、§11 の前と同じに動くこと（REQ-MLT-15）。"""
 
     @classmethod
     def setUpClass(cls):

@@ -1,6 +1,6 @@
 /**
  * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/` の直下で `.git` を持つもの、
- * 設計 §25.2）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
+ * 設計 §11.2）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
  *
  * ここは vscode にも子プロセスにも触れない。ファイルの有無や git の答えは呼び手が渡す。
  * 何がプロジェクトかは実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）に
@@ -212,7 +212,7 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
     return text ?? "";
   }
   const head = text === undefined || text === "" ? "" : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
-  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 §25.2）。\n/${projectsRel}/\n`;
+  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 §11.2）。\n/${projectsRel}/\n`;
 }
 
 /**

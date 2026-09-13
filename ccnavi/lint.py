@@ -257,7 +257,7 @@ def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
     """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
-    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §25.4.2）。
+    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §11.4.2）。
     """
     if not conf.risk:
         return []
@@ -281,7 +281,7 @@ def _phases(conf: settings.Settings) -> list[Problem]:
 
 
 def _types_resolver(conf: settings.Settings, root: str):
-    """`project:` から、そのチケットに効く種類を引く（設計 §25.4.1）。
+    """`project:` から、そのチケットに効く種類を引く（設計 §11.4.1）。
 
     承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 層 1 回。
@@ -492,7 +492,7 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """層が噛み合っているか（設計 §25.9、REQ-MLT-16）。
+    """層が噛み合っているか（設計 §11.9、REQ-MLT-16）。
 
     見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
     `.ccnavi/config/` が無いことは言わない。
@@ -523,7 +523,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各層の phases / risk が、共通層と合成できるか（設計 §25.4.1、§25.4.2）。
+    """各層の phases / risk が、共通層と合成できるか（設計 §11.4.1、§11.4.2）。
 
     見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
@@ -550,7 +550,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """作業ツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §25.6）。
+    """作業ツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §11.6）。
 
     判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
     作業ツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
@@ -652,7 +652,7 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
 
     プロジェクト向けの提案はワークスペースの `wip/<名前>/tickets/` に置き、名前は
-    `projects/` にあるプロジェクトのものでなければ走査されない（設計 §25.5）。走査
+    `projects/` にあるプロジェクトのものでなければ走査されない（設計 §11.5）。走査
     されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
     いちばん困るので名指しする。error にはしない。判定は動いている。
     """

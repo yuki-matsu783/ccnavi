@@ -1,4 +1,4 @@
-"""フェーズの種類と計画（REQ-TKT-26〜35、設計 §24.15）の受入テスト。
+"""フェーズの種類と計画（REQ-TKT-26〜35、設計 §9.7）の受入テスト。
 
 見るのは 8 つ。
 
@@ -120,7 +120,7 @@ class PhaseHarness(unittest.TestCase):
         self.phases = write(os.path.join(self.root, "phases.yml"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具

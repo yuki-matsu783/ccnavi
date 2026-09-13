@@ -119,7 +119,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["code"], "UNDECLARED")
 
     def test_引用だけの二重の山括弧は読めないまま止まる(self):
-        # 許容した誤検知（ccnavi.md §12.3、tests/test_acceptance.py）。生の文字列に
+        # 許容した誤検知（ccnavi.md §12.2、tests/test_acceptance.py）。生の文字列に
         # heredoc が当たり、読めなかったことを名乗る。
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")

@@ -88,7 +88,7 @@ def watched_for(
     record: audit.Record,
     payload: hookio.Input | None = None,
 ) -> list[post.Watched]:
-    """実行後に見るツリーと、それぞれに当てるルール（設計 §25.7）。
+    """実行後に見るツリーと、それぞれに当てるルール（設計 §11.7）。
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。

@@ -300,7 +300,7 @@ class HeredocTest(unittest.TestCase):
         # shlex は引用された << と素の << を同じ文字列で返し、どちらだったかを
         # 問い合わせる手段が無い。だからこれはヒアドキュメントに見えて止まる。
         # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある
-        # （ccnavi.md §12.3 ①、§23.1 L-7）。このテストは、次に来た人が
+        # （ccnavi.md §6.3、§12.2）。このテストは、次に来た人が
         # 黙って直して別のところを壊さないように、決めた側を固定する。
         out = verdict(self, run(payload=pre_tool_use("Bash", "command", 'grep -n "<<" README.md')))
 
