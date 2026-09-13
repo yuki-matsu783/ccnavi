@@ -39,7 +39,7 @@ import yaml
 
 from . import globmatch, rules
 from . import ticket as ticket_mod
-from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from .rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 VERSION = 1
 
@@ -71,10 +71,32 @@ class PhaseType:
     requires: list[str] = field(default_factory=list)
     agent: str = ""
     when: str = ""
+    # source はこの種類が書いてある層の名前（`common` / `self` / プロジェクト名）。
+    # id は裸のままで、層は記録と `--explain` の欄に出す（設計 §25.4.1）。
+    source: str = ""
 
     @property
     def inherits_scope(self) -> bool:
         return self.scope is None
+
+    def key(self) -> tuple:
+        """層をまたいで「同じ定義か」を比べるための全欄。`source` は含めない。
+
+        含めると、中身は同じで出どころの層だけが違う定義が衝突扱いになる。比べたいのは
+        中身で、置いてある場所ではない。
+        """
+        return (
+            self.id,
+            self.title,
+            self.kind,
+            self.review,
+            None if self.scope is None else tuple(self.scope_globs),
+            tuple(self.deliverables),
+            tuple(self.overlap),
+            tuple(self.requires),
+            self.agent,
+            self.when,
+        )
 
     def decide(self, rel: str) -> str:
         """この種類の範囲が、作業ツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
@@ -90,8 +112,14 @@ class PhaseType:
         return other.id in self.overlap or self.id in other.overlap
 
 
-def load(path: str) -> tuple[dict[str, PhaseType] | None, list[Problem]]:
-    """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。"""
+def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, list[Problem]]:
+    """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。
+
+    `refs` を False にすると `overlap` / `requires` が指す先の確認を飛ばす。層の
+    ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 §25.4.1）、
+    その相手はファイルの中に居ないので、1 本だけで確かめると必ず落ちる。確かめる
+    のは合成したあと（`merge`）。
+    """
     try:
         with open(path, encoding="utf-8") as f:
             text = f.read()
@@ -99,10 +127,12 @@ def load(path: str) -> tuple[dict[str, PhaseType] | None, list[Problem]]:
         return None, []
     except OSError as exc:
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
-    return parse(text, path)
+    return parse(text, path, refs)
 
 
-def parse(text: str, where: str = "(phases)") -> tuple[dict[str, PhaseType] | None, list[Problem]]:
+def parse(
+    text: str, where: str = "(phases)", refs: bool = True
+) -> tuple[dict[str, PhaseType] | None, list[Problem]]:
     problems: list[Problem] = []
     try:
         data = yaml.safe_load(text)
@@ -126,6 +156,19 @@ def parse(text: str, where: str = "(phases)") -> tuple[dict[str, PhaseType] | No
     titles: dict[str, str] = {}
     for key, body in raw.items():
         ident = str(key).strip()
+        if rules.ID_SEPARATOR in ident:
+            # 層の名前を添えた形（`lib:build`）と見分けが付かない。共通層に書けば
+            # lib の定義に見え、記録を読んだ人がどのファイルを直すのか決められない。
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"識別子に `{rules.ID_SEPARATOR}` は書けない。"
+                    f"層の名前を添えた形（`self{rules.ID_SEPARATOR}id` / "
+                    f"`<プロジェクト名>{rules.ID_SEPARATOR}id`）と見分けが付かない",
+                )
+            )
+            continue
         if not _ID.match(ident):
             problems.append(Problem(SEVERITY_ERROR, ident, "識別子に使えない文字がある"))
             continue
@@ -147,18 +190,98 @@ def parse(text: str, where: str = "(phases)") -> tuple[dict[str, PhaseType] | No
         titles[pt.title] = ident
         types[ident] = pt
 
-    # overlap / requires が指す先は、同じファイルの中に居なければならない。
-    for pt in types.values():
+    if refs:
+        problems.extend(reference_problems(types.values(), types))
+    if any(p.severity == SEVERITY_ERROR for p in problems):
+        return None, problems
+    return types, problems
+
+
+def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
+    """`overlap` / `requires` が指す先が、その集合の中に居るか。
+
+    見るのは `checked` の側だけで、居てよい先は `pool` 全部。層の種類が共通層の
+    種類を指す形（設計 §25.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
+    """
+    problems: list[Problem] = []
+    for pt in checked:
         for name in pt.overlap + pt.requires:
-            if name not in types:
+            if name not in pool:
                 problems.append(
                     Problem(
                         SEVERITY_ERROR, pt.id, f"`{name}` という種類は無い（overlap / requires）"
                     )
                 )
+    return problems
+
+
+def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
+    """この集合の種類が、どの層から来たかを名乗らせる。記録の `source` になる。"""
+    for pt in (types or {}).values():
+        pt.source = layer
+
+
+def merge(
+    common: dict[str, PhaseType] | None, extra: dict[str, PhaseType] | None, layer: str
+) -> tuple[dict[str, PhaseType], list[Problem]]:
+    """共通層の種類に、行き先の層の種類を id ごとに足す（設計 §25.4.1）。
+
+    足すだけで、後ろの層が前の層を上書きすることはない。同 `id` で全欄が一致する
+    ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも
+    層をまたいで error（人は表示名で見るので、承認画面で見分けられない）。
+
+    error があるとき、その層は空として扱い、共通層の種類だけを返す。衝突した片方を
+    黙って採ると、どちらの `review:` が効いているかを人が読めない。止まる側に倒す。
+
+    `overlap` / `requires` が指す先は合成後の集合で確かめる。層から共通層の種類を
+    指すのは正しい形なので、層 1 本の中では確かめられない。
+    """
+    base = dict(common or {})
+    problems: list[Problem] = []
+    titles = {pt.title: ident for ident, pt in base.items()}
+    added: dict[str, PhaseType] = {}
+    for ident, pt in (extra or {}).items():
+        pt.source = layer
+        prior = base.get(ident)
+        if prior is not None:
+            if prior.key() == pt.key():
+                problems.append(
+                    Problem(
+                        SEVERITY_INFO,
+                        ident,
+                        f"`{ident}` は前の層と全欄が同じなので、{layer} の側を捨てた。"
+                        "判定は前の層の 1 本で行う",
+                    )
+                )
+            else:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        ident,
+                        f"`{ident}` は前の層（{prior.source or 'common'}）と同じ id で中身が違う。"
+                        f"{layer} の層は空として扱う。どちらの `review:` が効いているかを"
+                        "人が読めないので、片方を黙って採らない",
+                    )
+                )
+            continue
+        if pt.title in titles:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    ident,
+                    f"表示名 `{pt.title}` が `{titles[pt.title]}` と重なる。"
+                    f"{layer} の層は空として扱う",
+                )
+            )
+            continue
+        titles[pt.title] = ident
+        added[ident] = pt
+    merged = dict(base)
+    merged.update(added)
+    problems.extend(reference_problems(added.values(), merged))
     if any(p.severity == SEVERITY_ERROR for p in problems):
-        return None, problems
-    return types, problems
+        return base, problems
+    return merged, problems
 
 
 def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:

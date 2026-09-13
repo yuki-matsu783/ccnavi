@@ -19,7 +19,7 @@ import tempfile
 import time
 import unittest
 
-from ccnavi import selfguard
+from ccnavi import selfguard, settings
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -341,19 +341,27 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
         self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
 
-    def test_プロジェクトのルールファイルも作業ツリー側が対象になる(self):
-        # 置き場に並ぶプロジェクトのルールファイルも、root の下に在れば
-        # 作業ツリー側にも入り、統合で main へ届く道は同じ。
+    def test_プロジェクトの層は自分のgitから戻し作業ツリー側の向きも切り元で決まる(self):
+        # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
+        # なくそのプロジェクトで、作業ツリー側の設定が入るのもそのプロジェクトから切った
+        # 作業ツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
+        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py が黒箱で見る。
         self.worktree()
-        project = os.path.join(self.repo, "projects", "lib", "config", "rules.yml")
+        projects = os.path.join(self.repo, "projects")
+        home = os.path.join(projects, "lib")
+        project = os.path.join(home, ".ccnavi", "config", "rules.yml")
         write(project, json.dumps(RULES))
 
-        found = selfguard.targets(self.repo, self.rules, "", [("lib", project)])
+        layers = [settings.LayerFile(settings.ORIGIN_PROJECT, "lib", "rules", project)]
+        found = selfguard.targets(self.repo, self.rules, "", layers, projects)
 
-        copies = {t.label for t in found if t.top}
-        self.assertIn(
-            os.path.join(".claude", "worktrees", "w1", "projects", "lib", "config", "rules.yml"),
-            copies,
+        own = [t for t in found if t.key == "rules:lib"]
+        self.assertEqual(len(own), 1, [t.key for t in found])
+        self.assertEqual(own[0].top, home)
+        self.assertFalse(own[0].copy)
+        self.assertEqual(
+            [t.label for t in found if t.copy],
+            self.own_copies((".claude", "ccnavi", "rules.yml")),
         )
 
     def test_root_の外を指すルールファイルには作業ツリー側が無い(self):
@@ -364,14 +372,21 @@ class SelfGuardTest(unittest.TestCase):
 
         found = selfguard.targets(self.repo, outside, "")
 
-        self.assertEqual([t.label for t in found if t.top], self.settings_copies())
+        self.assertEqual([t.label for t in found if t.copy], self.own_copies())
 
-    def settings_copies(self):
-        """作業ツリー w1 の中の、設定ファイル 2 つの綴り。"""
-        return [
-            os.path.join(".claude", "worktrees", "w1", ".claude", "settings.json"),
-            os.path.join(".claude", "worktrees", "w1", ".claude", "settings.local.json"),
+    def own_copies(self, *rels):
+        """作業ツリー w1 の中の作業ツリー側の設定の綴り。root からの相対で、並ぶ順のまま。
+
+        ワークスペースから切ったツリーには、ワークスペースが追跡しているもの
+        だけが入る。設定ファイル 2 つは必ず入り、残りは渡した層のうち root の
+        下に在るぶん。無いファイルもそのまま並ぶ（在るかどうかは控えの側が見る）。
+        """
+        head = (".claude", "worktrees", "w1")
+        found = [
+            os.path.join(*head, ".claude", "settings.json"),
+            os.path.join(*head, ".claude", "settings.local.json"),
         ]
+        return found + [os.path.join(*head, *rel) for rel in rels]
 
     # 戻す前に止める
 

@@ -52,9 +52,11 @@ from . import (
     hookio,
     judge,
     modes,
+    phase,
     phasetypes,
     review,
     risk,
+    ruleload,
     rules,
     selfguard,
     settings,
@@ -62,7 +64,7 @@ from . import (
 )
 from . import ticket as ticket_mod
 from .modes import EXIT_ERROR, EXIT_OK
-from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from .rules import SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 # Claude Code の設定ファイル。ccnavi 自身はこのファイルを読まない。ここに書かれた
 # env は Claude Code がプロセスに渡し、ccnavi はそれを環境変数として受け取る。
@@ -161,7 +163,10 @@ def report(
         )
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
-    warns = len(problems) - errors
+    warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
+    # info は数えるが、終了コードには効かない。層をまたいだ重複のように「そう
+    # 書いてあるとおりに効いているが、書いた人が知りたいはずのこと」が入る。
+    infos = sum(1 for p in problems if p.severity == SEVERITY_INFO)
     if as_json:
         payload = {
             "version": LINT_VERSION,
@@ -175,6 +180,7 @@ def report(
             ],
             "errors": errors,
             "warns": warns,
+            "infos": infos,
         }
         stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
         stdout.write("\n")
@@ -183,7 +189,7 @@ def report(
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
-    stdout.write(f"  中核ファイルを守る: {guard_core_files}\n")
+    stdout.write(f"  コアファイルを守る: {guard_core_files}\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
     if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
@@ -195,7 +201,7 @@ def report(
     for problem in problems:
         stdout.write(f"{problem}\n")
 
-    stdout.write(f"error {errors} 件、warn {warns} 件\n")
+    stdout.write(f"error {errors} 件、warn {warns} 件、info {infos} 件\n")
     return EXIT_ERROR if errors else EXIT_OK
 
 
@@ -235,19 +241,35 @@ def check(
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
     problems.extend(_phases(conf))
-    problems.extend(_risk(conf))
+    problems.extend(_risk(conf, root))
     problems.extend(_ticket(conf, root))
     problems.extend(_projects(conf, root))
+    # 層の読み込みは判定と同じ経路（ruleload.survey）を通る。読めない層の苦情は
+    # そこが書く標準エラーにも出るので、受け皿へ逃がして二重に言わない。
+    problems.extend(_layers(io.StringIO(), conf, root))
+    problems.extend(_layer_configs(conf, root))
+    problems.extend(_worktree_layers(conf, root))
     problems.extend(_ticket_places(conf, root))
     return problems
 
 
-def _risk(conf: settings.Settings) -> list[Problem]:
-    """リスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。"""
+def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
+    """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
+
+    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
+    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §25.4.2）。
+    """
     if not conf.risk:
         return []
-    _, notes = risk.load(conf.risk)
-    return [Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}") for p in notes]
+    definition, notes = risk.load(conf.risk)
+    problems = [Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}") for p in notes]
+    if not definition.fallback:
+        risk.mark_layer(definition, settings.LAYER_COMMON, root)
+        problems += [
+            Problem(p.severity, "(risk)", f"{p.rule}: {p.detail}")
+            for p in risk.script_problems(definition)
+        ]
+    return problems
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
@@ -258,11 +280,20 @@ def _phases(conf: settings.Settings) -> list[Problem]:
     return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
 
 
-def _phase_types(conf: settings.Settings):
-    if not conf.phases:
-        return None
-    types, _ = phasetypes.load(conf.phases)
-    return types
+def _types_resolver(conf: settings.Settings, root: str):
+    """`project:` から、そのチケットに効く種類を引く（設計 §25.4.1）。
+
+    束の中でチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
+    読み込みは 1 層 1 回。
+    """
+    cache: dict[str, dict | None] = {}
+
+    def resolve(project: str = ""):
+        if project not in cache:
+            cache[project] = phase.load_types(conf, root, project)
+        return cache[project]
+
+    return resolve
 
 
 def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
@@ -278,6 +309,11 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     # 置き場の話しかしない案内が、置き場とは関係ない名前にも付く。
     replacements = {
         "CCNAVI_GUARD_CLI": f"{settings.GUARD_TICKET_APPROVAL_ENV} に改名した",
+        "CCNAVI_PROJECT_RULES": (
+            f"層の設定は {settings.PROJECT_HOME_ENV}（既定 {settings.DEFAULT_PROJECT_HOME}）の下の "
+            f"{settings.LAYER_CONFIG_DIR}/ に 3 本まとめて置く。"
+            f"旧の綴りに置いたままのルールは 1 件も効いていない"
+        ),
     }
     default = f"提案は {settings.TICKETS_ENV}、承認済みチケットは {settings.APPROVED_ENV} で指す"
     for name in conf.retired:
@@ -328,18 +364,19 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
     problems.extend(complaints)
 
-    types = _phase_types(conf)
+    resolve = _types_resolver(conf, root)
     for t in copies:
-        if not t.is_child and t.has_plan and types is None:
+        if not t.is_child and t.has_plan and resolve(t.project) is None:
             problems.append(
                 Problem(
                     SEVERITY_ERROR,
                     "(phases)",
-                    f"{t.ticket} は計画を持つのにフェーズの種類の定義（{conf.phases}）が読めない",
+                    f"{t.ticket} は計画を持つのにフェーズの種類の定義"
+                    f"（{conf.phases} と {t.project or '自身'} の層）が読めない",
                 )
             )
 
-    problems.extend(_proposal_problems(proposals, index, done, types))
+    problems.extend(_proposal_problems(proposals, index, done, resolve))
 
     worktrees = tree.worktrees(root, conf.projects)
     problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
@@ -381,7 +418,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     ]
 
 
-def _proposal_problems(proposals: list, index: dict, done: set[str], types) -> list[Problem]:
+def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
     """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
     problems: list[Problem] = []
     # 提案と承認済みチケットを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
@@ -402,7 +439,7 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], types) -> l
             )
         if t.state not in ticket_mod.CLOSED:
             # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-            for p in approval.validate(t, pool, types):
+            for p in approval.validate(t, pool, resolve(approval.project_of(t, pool))):
                 problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.state == ticket_mod.DOING:
             waiting = [p for p in t.predecessors if p not in done]
@@ -476,12 +513,129 @@ def _worktree_problems(
     return problems
 
 
+def layer_where(name: str) -> str:
+    """その層の苦情の出どころの綴り。VS Code 拡張がこの前置きでプロジェクトを引く。"""
+    if name == ruleload.LAYER_COMMON:
+        return "(rules)"
+    if name == ruleload.LAYER_SELF:
+        return "(self)"
+    return f"(projects/{name})"
+
+
+def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
+    """層が噛み合っているか（設計 §25.9、REQ-MLT-16）。
+
+    見るのは 3 つ。層のファイルが読めること、層をまたいだ重複と同名の衝突、
+    旧の置き場に置いたままのルール。`.ccnavi/config/` が無いことは言わない。
+    無いのは正常（無い層 = 空）で、言うと本当に言うべきものが埋もれる。
+
+    共通層は `_rules` が別に見ているので、ここでは層の 2 つ目以降だけを回す。
+    """
+    problems: list[Problem] = []
+    for view in ruleload.survey(stderr, conf, root)[1:]:
+        where = layer_where(view.name)
+        if view.unreadable:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    where,
+                    f"{view.path} を読めない ({view.unreadable})。この層は空として扱っている。"
+                    "共通層だけで判定しているので、ここに書いた宣言は 1 件も効いていない",
+                )
+            )
+            continue
+        if view.missing:
+            continue
+        for c in _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True):
+            problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
+        for c in view.problems:
+            problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
+    return problems
+
+
+def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
+    """各層の phases / risk が、共通層と合成できるか（設計 §25.4.1、§25.4.2）。
+
+    見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
+    `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
+    全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
+    別に言うので、ここでは層の側だけを数える。
+
+    `.ccnavi/config/` が無いことは言わない。無いのは正常（無い層 = 空）。
+    """
+    problems: list[Problem] = []
+    names = [ruleload.LAYER_SELF]
+    names += [
+        p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)
+    ]
+    for name in names:
+        where = layer_where(name)
+        project = "" if name == ruleload.LAYER_SELF else name
+        _, notes = phase.layer_types(conf, root, project)
+        for p in notes:
+            problems.append(Problem(p.severity, f"{where} (phases) {p.rule}".rstrip(), p.detail))
+        definition, notes = risk.layer_definition(conf, root, project)
+        for p in [*notes, *risk.script_problems(definition, name)]:
+            problems.append(Problem(p.severity, f"{where} (risk) {p.rule}".rstrip(), p.detail))
+    return problems
+
+
+def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
+    """作業ツリーの層の傘に、切り元の git プロジェクトルートに無いファイルがあるか（設計 §25.6）。
+
+    判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
+    作業ツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
+    効かないものを書いた人は、書いたとおりに効いていると思ったまま進む。統合の前に
+    気づけるように、ここで名前を挙げる。
+
+    足したファイルを咎めているのではない。設定を育てる場所は作業ツリーでよく、
+    そこから統合する道も普通の道。言うのは「今はまだ効いていない」という 1 点だけ。
+
+    中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
+    差分が拾う。ここが拾うのは、切り元に無くて差分にも出ない新しい綴りのほう。
+    """
+    problems: list[Problem] = []
+    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    for work in tree.worktrees(root, conf.projects):
+        origin = tree.project_root(conf.projects, work.project) if work.project else root
+        for rel in _files_under(os.path.join(work.root, home)):
+            if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
+                continue
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
+                    f"{conf.project_home}/{rel} は作業ツリーにしかない。判定が読むのは"
+                    "切り元の git プロジェクトルートの版なので、このファイルは統合されるまで"
+                    "効かない",
+                )
+            )
+    return problems
+
+
+def _files_under(base: str) -> list[str]:
+    """base の下のファイルを、base からの相対（"/" 区切り）で並べる。順は綴り順。"""
+    found = []
+    for parent, _, names in os.walk(base):
+        for name in sorted(names):
+            rel = os.path.relpath(os.path.join(parent, name), base)
+            found.append(rel.replace(os.sep, "/"))
+    return sorted(found)
+
+
+def _layer_home(conf: settings.Settings, root: str, name: str) -> str:
+    if name == ruleload.LAYER_SELF:
+        return root
+    return tree.project_root(conf.projects, name)
+
+
 def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     """プロジェクトの置き場が噛み合っているか（REQ-MLT-16）。
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
-    各プロジェクトのルールが読めること、プロジェクトが `.claude/` を持たないことを見る。
-    どれも error にしない。判定は動いていて、読めないプロジェクトは組み込みの既定に落ちる。
+    予約名（`common` / `self`、綴り違いも含む）を使っていないこと、プロジェクトが
+    `.claude/` を持たないこと、旧の置き場のルールが残っていないことを見る。層の中身は
+    `_layers` が見る。
     """
     problems: list[Problem] = []
     found = tree.projects(conf.projects)
@@ -499,26 +653,37 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
         )
     for p in found:
         where = f"(projects/{p.name})"
-        path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.name))
-        if not os.path.isfile(path):
+        if settings.is_reserved_layer_name(p.name):
+            reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    where,
+                    f"{reserved} は層の名札に予約してある（`{settings.LAYER_COMMON}` は共通層、"
+                    f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
+                    f"層として数えていない（id の `{p.name}:` がどちらの層の話か決まらない。"
+                    "綴りの大文字小文字は問わない）。ここに置いた宣言は 1 件も効いておらず、"
+                    "このプロジェクトへの Write / Edit は共通層だけで判定している。"
+                    "別の名前に変える",
+                )
+            )
+        old = os.path.join(p.root, settings.OLD_PROJECT_RULES.replace("/", os.sep))
+        if os.path.isfile(old):
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     where,
-                    f"ルール {conf.project_rules} が無い。このプロジェクトへの書き込みは組み込みの"
-                    "既定で判定し、Bash の合成からは外れる",
+                    f"{settings.OLD_PROJECT_RULES} があるが、もう読まない。"
+                    f"{settings.layer_real_path(conf, '', settings.KIND_RULES)} へ人が移す",
                 )
             )
-        else:
-            for c in _rules(path, root, home=p.root):
-                problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
         if os.path.isdir(os.path.join(p.root, ".claude")):
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     where,
                     ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに"
-                    f"見える。プロジェクトの設定は {conf.project_rules} に置く",
+                    f"見える。プロジェクトの設定は {conf.project_home}/ に置く",
                 )
             )
     return problems
@@ -773,15 +938,20 @@ def _project_settings(root: str) -> list[Problem]:
     return problems
 
 
-def _rules(path: str, root: str = "", home: str = "") -> list[Problem]:
+def _rules(path: str, root: str = "", home: str = "", layer: bool = False) -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
     落ちるという、検証があるぶんかえって危ない形になる。
 
-    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。プロジェクトの
-    ルールならそのプロジェクトのルート。省けばワークスペースルート、それも無ければ
-    ルールファイルの隣。
+    `home` は、ルールが指すファイル（additionalContextFile）を探す起点。層の
+    ルールならその層の git プロジェクトルート。省けばワークスペースルート、
+    それも無ければルールファイルの隣。
+
+    `layer` は共通層より後ろの層かどうか。層は共通層に足すものなので、`deny` や
+    `allow` が空でも穴にはならない（空の層 = 何も足さない）。共通層に掛けている
+    「空のガードは入っていないのと同じ」の問いを、層にまで広げると、allow を
+    1 件だけ足した層が毎回 error を出し続けることになる。
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -793,7 +963,7 @@ def _rules(path: str, root: str = "", home: str = "") -> list[Problem]:
 
     problems = list(problems)
 
-    if not rule_set.deny:
+    if not rule_set.deny and not layer:
         problems.append(
             Problem(
                 SEVERITY_ERROR,
@@ -803,7 +973,7 @@ def _rules(path: str, root: str = "", home: str = "") -> list[Problem]:
             )
         )
 
-    if not rule_set.allow:
+    if not rule_set.allow and not layer:
         # allow が 1 件も無いと、どの呼び出しも ccnavi の判定を受けずに
         # 権限モードへ渡る。判定は動いているので error ではないが、外から見ると
         # ガードが何も言わない状態と区別が付かない。

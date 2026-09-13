@@ -332,11 +332,17 @@ class TicketTest(unittest.TestCase):
     # ---- 2. 子は親の部分集合
 
     def test_child_beyond_parent_is_not_approved(self):
+        """超えている子だけが落ち、兄弟は承認済みチケットになる。落ちたものがあるので
+        終了コードは 1。
+
+        束の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
+        全部通ったと読む。通ったぶんの承認済みチケットは置くので、直して出し直せばよい。
+        """
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertIn("超えている", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))

@@ -147,7 +147,7 @@ OVERRIDES = (
     ("projects", True),
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
-RELATIVE_OVERRIDES = ("tickets", "project_rules")
+RELATIVE_OVERRIDES = ("tickets", "project_home")
 
 
 def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
@@ -201,9 +201,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、プロジェクトごとのルールファイル（設計 §25）。
+    # プロジェクトの置き場と、層の傘（設計 §25）。
     parser.add_argument("--projects", default=None)
-    parser.add_argument("--project-rules", default="")
+    parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
     # VS Code 拡張が編集中のプロジェクトのルールを保存せずに試すために渡す。
     parser.add_argument("--project-rules-file", default="")

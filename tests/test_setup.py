@@ -46,7 +46,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 # もう効かない環境変数（settings.py の RETIRED_ENVS）。書かれていたら
 # ccnavi の --lint が苦情を言う。導入スクリプトが作ってはいけない。
-RETIRED_ENV = ("CCNAVI_TICKET", "CCNAVI_LEDGER")
+RETIRED_ENV = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_PROJECT_RULES")
 # --deploy が配るゲートの sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側に逃げ道がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
@@ -54,6 +54,10 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh")
 RULES_PARTS = (".claude", "ccnavi", "rules.yml")
+# --deploy が配る残りの設定 2 本（設計 §25.9）。リスクの配点は共通層、
+# フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
+RISK_PARTS = (".claude", "ccnavi", "risk.yml")
+PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 
 
 def quiet_deploy(args):
@@ -262,6 +266,7 @@ class WritesTheExpectedShape(SetupTest):
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_TICKETS"], "wip/tickets")
         self.assertEqual(env["CCNAVI_PHASES"], ".claude/ccnavi/phases.yml")
+        self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 
     def test_says_what_is_still_missing(self):
         """登録しただけでは動かないので、人が置くものを挙げる。"""
@@ -685,6 +690,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
+            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 §25.9）。
+            with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
+                f.write("version: 1\nlevels: {}\nfactors: []\n")
+            os.makedirs(os.path.join(src, ".ccnavi", "config"))
+            with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
+                f.write("version: 1\nphases: {}\n")
             os.makedirs(os.path.join(src, ".claude", "scripts"))
             for name in DEPLOY_SCRIPTS:
                 with open(
@@ -744,6 +755,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             os.path.isfile(self.deployed(".claude", "ccnavi", "_internal", "base_library.zip"))
         )
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
+        self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
+        self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
 

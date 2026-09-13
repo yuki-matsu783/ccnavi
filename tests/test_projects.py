@@ -2,17 +2,21 @@
 
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
-`projects/` の直下に clone した別のリポジトリで、それぞれ `config/rules.yml` を持つ。
+`projects/` の直下に clone した別のリポジトリで、それぞれ層の 3 本の置き場
+（`.ccnavi/config/`、設計 §25.2）に rules.yml を持つ。
 
 見るのは 5 つ。
 
-1. パスを持つツールは行き先のプロジェクトのルールで判定される。ワークスペースへの
-   書き込みはワークスペースのルール
-2. Bash はワークスペースと全プロジェクトのルールの和で判定され、cwd がどこでも同じ
-3. 読めないプロジェクトのルールは、書き込みなら組み込みの既定、Bash なら和から外れる
+1. パスを持つツールは共通層 + 行き先のプロジェクトの層で判定される。ワークスペースへの
+   書き込みは共通層 + 自身の層
+2. Bash は共通層と全部の層の和で判定され、cwd がどこでも同じ
+3. 読めない層は空として扱われ、記録が層の名前を残す。組み込みの既定へは落ちない
 4. プロジェクトから切った作業ツリーが認識され、切り元とチケットの `project:` が
    食い違えば止まる
 5. `projects/` を数えない設定では、この機能が入る前と同じに動く
+
+層の和そのもの（重複の排除、同 id、`--explain`）は tests/test_config_union.py が見る。
+ここが見るのは、置き場とツリーの結び付きが今までどおり噛み合っていること。
 """
 
 from __future__ import annotations
@@ -101,6 +105,15 @@ def write(path, text):
     return path
 
 
+# 層の 3 本の置き場（`CCNAVI_PROJECT_HOME` の既定）。
+LAYER = os.path.join(".ccnavi", "config")
+
+
+def layer_rules(root):
+    """その git プロジェクトルートの層のルールファイル。"""
+    return os.path.join(root, LAYER, "rules.yml")
+
+
 def ticket_text(name, *, project="", allow=()):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if project:
@@ -166,7 +179,7 @@ class ProjectsTest(unittest.TestCase):
         root = os.path.join(self.projects, name)
         os.makedirs(root)
         git(root, "init", "--quiet", "-b", "main")
-        write(os.path.join(root, "config", "rules.yml"), json.dumps(rules))
+        write(layer_rules(root), json.dumps(rules))
         write(os.path.join(root, "src", "keep.py"), "print(1)\n")
         write(os.path.join(root, "schema", "keep.sql"), "-- keep\n")
         git(root, "add", "-A")
@@ -295,21 +308,32 @@ class ProjectsTest(unittest.TestCase):
 
     # ---- 3. 読めないプロジェクトのルール
 
-    def test_unreadable_project_rules_fall_back_for_writes_and_drop_out_of_the_union(self):
-        write(os.path.join(self.app, "config", "rules.yml"), "version: 3\ndeny: [\n")
+    def test_unreadable_project_rules_are_empty_and_drop_out_of_the_union(self):
+        """壊れた層は空として扱い、記録が層の名前を残す（設計 §25.2、REQ-MLT-06）。
+
+        組み込みの既定へは落ちない。共通層が有るのに落とすと、共通層の deny が
+        消える側に倒れる。
+        """
+        write(layer_rules(self.app), "version: 3\ndeny: [\n")
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         record = self.last_record()
-        self.assertTrue(record.get("fallback"), record)
+        self.assertEqual(record.get("fallback"), "app", record)
         self.assertIn("app", record["detail"])
-        self.assertIn("built-in defaults", self.reason(passed))
+        self.assertNotIn("built-in defaults", self.reason(passed))
+
+        # 共通層の deny は壊れた層の上でも効いたまま。
+        guarded = os.path.join(self.app, ".claude", "ccnavi", "x")
+        denied = self.hook("Write", self.ws, file_path=guarded)
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("guard-approved", self.reason(denied))
 
         denied = self.hook("Bash", self.app, command="psql")
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("lib:raw-psql", self.reason(denied))
         record = self.last_record()
-        self.assertNotIn("fallback", record)
-        self.assertIn("unreadable project rules: app", record["detail"])
+        self.assertEqual(record.get("fallback"), "app", record)
+        self.assertIn("unreadable layer: app", record["detail"])
 
     # ---- 4. プロジェクトから切った作業ツリー
 
@@ -399,7 +423,8 @@ class ProjectsTest(unittest.TestCase):
             child_text("i0007-01", "i0007", allow=("src/a/*",)),
         )
         result = self.ccnavi("--approve", stdin="y\n")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 束の一部（子）が落ちたので、通ったぶん（親）を置いてから 1 で終わる（REQ-MLT-31）。
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子は親と同じ置き場に置く", result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0007.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007-01.md")))
@@ -489,7 +514,7 @@ class ProjectsTest(unittest.TestCase):
     # ---- 6. --lint がプロジェクトの配線を言う
 
     def test_lint_names_project_wiring_problems(self):
-        write(os.path.join(self.app, "config", "rules.yml"), "version: 3\ndeny: [\n")
+        write(layer_rules(self.app), "version: 3\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
         git(self.ws, "add", "-A")
@@ -502,8 +527,10 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("(projects/lib)", out)
         self.assertIn(".claude/ を持つ", out)
 
+        # `--explain` は層ごとに並べる（設計 §25.9）。読めない層はその位置で言う。
         explained = self.ccnavi("--explain")
-        self.assertIn("■ プロジェクト（2 件", explained.stdout)
+        self.assertIn("■ rules app", explained.stdout)
+        self.assertIn("■ rules lib", explained.stdout)
         self.assertIn("読めない", explained.stdout)
 
     # ---- 7. projects/ を数えない設定では前と同じ

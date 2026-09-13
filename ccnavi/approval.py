@@ -268,6 +268,9 @@ class Candidate:
     complaints: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
+    # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §25.4.1）。
+    # 束の中でチケットごとに違いうるので、候補が引いたものを持ち歩く。
+    types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
 
@@ -332,7 +335,17 @@ def approve(
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
         return 1
-    return _apply(stdout, stderr, conf, gathered.batch, now())
+    code = _apply(stdout, stderr, conf, gathered.batch, now())
+    if code == 0 and gathered.rejected:
+        # 束の一部が落ちたときは、通ったぶんを置いてから失敗で終わる。置いたので
+        # 繰り返してよく、落ちたものは上で名指ししてある。成功で終わると、
+        # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
+        stderr.write(
+            f"ccnavi: {len(gathered.rejected)} 件は承認の対象にしなかった。"
+            "直して出し直すこと（通ったぶんの承認済みチケットは置いた）\n"
+        )
+        return 1
+    return code
 
 
 # 承認の JSON の版。`--approve --preview --json` と `--approve --yes … --json` が名乗る。
@@ -386,9 +399,13 @@ def gather(
     承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の改版が
     承認待ちなのに束から外した子も何も承認しない（外すと旧計画で検証される）。
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
-    """
-    from . import phase
 
+    フェーズの種類は束で 1 つに決まらない。どの層の種類が効くかは各チケットの
+    `project:` が決める（設計 §25.4.1）ので、候補を組むところで 1 件ずつ引き、
+    引いたものを `Candidate` が持ち歩く。`Gathered.types` は束全体の種類を持たず、
+    いつも None。画面は候補が持つ種類を使う。
+    """
+    types = None
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -397,7 +414,6 @@ def gather(
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = copies(conf.approved, closed=True)
-    types = phase.load_types(conf)
 
     pending, revisions = waiting(proposals, approved, closed)
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
@@ -436,7 +452,7 @@ def gather(
     if not pending and not revisions:
         return Gathered([], [], texts, {}, types, True, broken, "", note)
 
-    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved, types)
+    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
@@ -687,7 +703,6 @@ def _candidates(
     pending: list[ticket_mod.Ticket],
     revisions: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
-    types: dict | None,
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
     """束に載せるものと、落とすものに分ける。3 つめは親子を引くための池。"""
     from . import phase
@@ -700,14 +715,24 @@ def _candidates(
     pool = by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
+    # 層ごとの読み込みは 1 プロジェクト 1 回。束の中に同じ層のチケットが
+    # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
+    cache: dict[str, dict | None] = {}
+
+    def types_for(t: ticket_mod.Ticket) -> dict | None:
+        name = project_of(t, pool)
+        if name not in cache:
+            cache[name] = phase.load_types(conf, root, name)
+        return cache[name]
 
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
+        types = types_for(t)
         complaints = revision_problems(root, conf, t, current, types)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        cand = Candidate(ticket=t, complaints=complaints, current=current)
+        cand = Candidate(ticket=t, complaints=complaints, current=current, types=types)
         if cand.plans_feedback:
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
@@ -716,6 +741,7 @@ def _candidates(
         pool[t.ticket] = t
 
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
+        types = types_for(t)
         complaints = validate(t, pool, types)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
@@ -725,9 +751,22 @@ def _candidates(
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        batch.append(Candidate(ticket=t, complaints=complaints))
+        batch.append(Candidate(ticket=t, complaints=complaints, types=types))
         pool[t.ticket] = t
     return batch, rejected, pool
+
+
+def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
+    """このチケットの層を決める `project:`（設計 §25.4.1）。
+
+    子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
+    `project_problems` が落とす。親が池に居ないときだけ、子の置き場の値をそのまま読む。
+    """
+    if t.is_child:
+        parent = pool.get(t.parent)
+        if parent is not None:
+            return parent.project
+    return t.project
 
 
 def _apply(
@@ -797,13 +836,17 @@ def screen(
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
     「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
+
+    種類は候補が持っているものを使う。束の中でチケットごとに層が違いうるので、
+    画面の側で 1 つに決めない。
     """
     lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
     for cand in batch:
         t = cand.ticket
+        cand_types = cand.types if cand.types is not None else types
         if cand.is_revision and cand.current is not None:
             lines += ["", f"== {t.ticket}: {t.title}（親の改版）"]
-            lines += _plan_diff_lines(cand.current, t, types)
+            lines += _plan_diff_lines(cand.current, t, cand_types)
             for note in cand.notes:
                 lines.append(f"    {note}")
             lines.append(_origin_line(t))
@@ -812,7 +855,7 @@ def screen(
             "",
             f"== {t.ticket}: {t.title}"
             + (
-                f"（親 {t.parent}、フェーズ {_phase_label(t, pool, types)}）"
+                f"（親 {t.parent}、フェーズ {_phase_label(t, pool, cand_types)}）"
                 if t.is_child
                 else "（親）"
             ),
@@ -828,7 +871,7 @@ def screen(
                 else "(承認済みチケットが無い)"
             )
             lines.append(f"    {head}")
-            bound = _type_of(t, pool, types)
+            bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
                 lines.append(f"    種類 {bound.title}: " + ", ".join(bound.scope_globs))
         else:
@@ -846,10 +889,12 @@ def screen(
                 lines.append(f"■ 先行: {', '.join(t.predecessors)}")
         elif t.has_plan:
             lines.append("■ 全体計画（この並びに合意する）")
-            lines += _plan_lines(t.plan, 1, types)
+            lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
-                lines += _plan_lines(t.feedback, len(t.plan) + 1, types) or ["    （対応なし）"]
+                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or [
+                    "    （対応なし）"
+                ]
         if t.rationale.strip():
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
@@ -1126,6 +1171,23 @@ def _last_phase_with_children(conf: settings.Settings, parent_id: str) -> int:
     return max(numbers) if numbers else 0
 
 
+def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
+    """`project:` が層の名札に予約してある綴りなら error（設計 §25.4）。"""
+    if not t.project or not settings.is_reserved_layer_name(t.project):
+        return []
+    reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"`project: {t.project}` は層の名札に予約してある綴り（{reserved}）。"
+            "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
+            "ワークスペース自身の提案は `wip/tickets/` に置く。プロジェクトの提案なら、"
+            "そのプロジェクトの名前を変えてから置く",
+        )
+    ]
+
+
 def project_problems(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], conf: settings.Settings
 ) -> list[rules.Problem]:
@@ -1134,6 +1196,10 @@ def project_problems(
     プロジェクトを決めるのは提案を置いた場所（設計 §25.5）。frontmatter の `project:` は
     宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
     無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
+
+    予約名（`common` / `self`）は指せない。置き場にその名前のディレクトリが在っても
+    層としては数えないので（`ruleload.layers`）、指せると「層が決まらないチケット」を
+    承認することになる。
     """
     if t.declared_project and t.declared_project != t.project:
         where = ticket_mod.tickets_rel_for(conf.tickets, t.declared_project)
@@ -1146,6 +1212,9 @@ def project_problems(
                 f"{t.declared_project} の提案はワークスペースの {where}/ に置く",
             )
         ]
+    reserved = _reserved_project(t)
+    if reserved:
+        return reserved
     if t.is_child:
         parent = pool.get(t.parent)
         if parent is None or t.project == parent.project:
@@ -1158,7 +1227,11 @@ def project_problems(
                 f"{parent.project or 'ワークスペース'}と違う。子は親と同じ置き場に置く",
             )
         ]
-    known = {p.name for p in tree.projects(conf.projects)}
+    # 予約名は `known` から外す。置き場に `projects/self/` が在っても、それは層では
+    # ないので、指せてはいけない。素の一覧で見ると通ってしまう。
+    known = {
+        p.name for p in tree.projects(conf.projects) if not settings.is_reserved_layer_name(p.name)
+    }
     if t.project and t.project not in known:
         return [
             rules.Problem(

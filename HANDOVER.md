@@ -26,11 +26,38 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 ## いま動くもの
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
-`SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、中核ファイルの
+`SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
 自己防衛、チケット制御（提案・承認・承認済みチケット・フェーズ・ゲート・レビュー・実績のリスク）、
 複数のリポジトリ、診断（`--test` `--test-samples` `--explain` `--lint` とその JSON）、
 VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理）。dry-run で自分自身に
 仕掛けてある。
+
+設定 3 本（ルール・フェーズの種類・リスクの配点）は**層の和**で判定する（設計 §11.2〜§11.4.2、REQ-MLT）。
+共通層 `.claude/ccnavi/`、ワークスペース自身の層 `.ccnavi/config/`、プロジェクトの層
+`projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
+
+- Write / Edit / NotebookEdit は共通層 + 行き先の 1 層、Bash は共通層 + 全部の層。足すだけで上書きは無い
+- 層の id は `self:id` / `<名前>:id`。重複（全欄一致）は後ろを捨てて info、ルールの同 id 中身違いは両方効いて warn、
+  種類と配点の同 id 中身違いはその層を空にして error
+- フェーズの種類と配点は親の承認済みチケットの `project:`（提案を置いた場所が決める）の層を足す。`levels` は書かれた鍵だけがキーごとに min。
+  `overlap` / `requires` は合成後に確かめる
+- 予約名 `common` / `self`（`casefold`）のプロジェクトは層として数えず、そこへの書き込みは共通層だけで判定する
+- `glob` は機械の見方で大文字小文字を扱い、`regex` は区別を残す。裸の `id` にコロンは書けない
+- 記録の `source`、`--explain` の層ごとの全件、`--explain --json` の `layers[]`
+- 端末から打つ `--approve` は、束の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
+- `CCNAVI_PROJECT_RULES` と旧の置き場 `config/rules.yml` はもう読まない（`--lint` が warn で言う）
+
+コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
+それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。層の傘 `.ccnavi/` の下は組み込みの deny
+（`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
+`rm -rf .ccnavi` のように傘ごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
+
+**移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧 `.claude/ccnavi/phases.yml` の削除は、
+新しい実行ファイルを配ったあとに人が行う。逆順にすると古い実行ファイルが自身の層を読まず、フェーズの種類が全部消える（実際に起きた。設計 §11.12）。
+層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える件）は別の issue で決める。
+
+**VS Code 拡張は層の和に追従していない。** プロジェクト管理画面とルール設定画面は今も `CCNAVI_PROJECT_RULES` / `config/rules.yml` を
+読み書きするので、そこで保存したルールは判定に効かない（設計 §11.11）。`.ccnavi/config/rules.yml` を開く形へ直すのは別の作業。
 
 ```
 main.py                     配布物の入口。PyInstaller が渡すスクリプト
@@ -160,8 +187,8 @@ CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 
 ### 未了: 要求表と設計書への反映
 
-`ccnavi.md` §25 と `requirements.md` の REQ-MLT 表に、上の振る舞いを**書いていない**。
-進行中の `config-union` が §25 を構造ごと改版するため、先に足すと解き直しになる。
+`ccnavi.md` §11（旧 §25）と `requirements.md` の REQ-MLT 表に、上の振る舞いを**書いていない**。
+進行中の `config-union` が §11 を構造ごと改版するため、先に足すと解き直しになる。
 **実装が入っているのに要求表に無い期間ができている。** `config-union` が統合先に
 入ったら足すこと。
 
@@ -275,7 +302,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 - GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
   書いただけ。GitLab の変更要求（`request_changes`）だけは CE に無い機能で、EE でしか当てられない
 - `.claude/scripts/` への Write は `guard-scripts` が止める。sh 3 本はこのリポジトリで作ったので
-  入っているが、他のプロジェクトへ配るときは導入スクリプトが写す
+  入っているが、他のプロジェクトへは導入スクリプトが配る
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
 

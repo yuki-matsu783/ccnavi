@@ -14,6 +14,7 @@ from typing import TextIO
 from . import (
     approval,
     audit,
+    builtin,
     ctxfile,
     hookio,
     modes,
@@ -112,7 +113,9 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin, ruleload.project_rules_files(conf)),
+        selfguard.targets(
+            root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+        ),
     )
     if not outcomes:
         return ""
@@ -155,12 +158,10 @@ def decide_before(
     # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
     if (
-        not record.fallback
+        record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(
-            rule_set, conf.bin, selfguard.project_rules_clause(conf.projects, conf.project_rules)
-        )
+        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
@@ -182,7 +183,14 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    fallback = reasons.fallen_back(record.detail or conf.rules) if record.fallback else ""
+    # 組み込みの既定に落ちたときだけ言う。層が壊れて空になったのは組み込みへの
+    # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
+    # そちらは記録の `fallback` に層の名前が残り、`--lint` が error で言う。
+    fallback = (
+        reasons.fallen_back(record.detail or conf.rules)
+        if record.fallback == builtin.FALLBACK
+        else ""
+    )
     notices = [text for text in (guard, fallback) if text]
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
@@ -242,6 +250,11 @@ def decide_before(
             break
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
+    # 判定を下したのは最初に当たったルール（設計 §25.9）。その層を 1 欄で残す。
+    # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
+    # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
+    if group:
+        record.source = group[0].source
 
     # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
     # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、

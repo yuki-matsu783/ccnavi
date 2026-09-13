@@ -8,7 +8,7 @@
 AI にさせる」、`auto` は新規ファイルを削除する、だった。実装の初期には `CCNAVI_RESTORE` を
 `off` / `auto` の 2 値にしていた。その後 `CCNAVI_RESTORE_IF_DENY` を 3 値にしたが、
 `post.py` は `enable` しか見ておらず、`dry-run` と `disable` が同じ挙動になっていた。
-中核ファイル側は `would-restore` を出していたので、片方だけ抜けていた。
+コアファイル側は `would-restore` を出していたので、片方だけ抜けていた。
 
 ## 決定
 
