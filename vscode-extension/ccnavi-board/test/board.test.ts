@@ -138,3 +138,46 @@ test("CB-T11 親の作業ツリーを引ける", () => {
   assert.equal(parentTreeOf(board, "i0001-01"), undefined);
   assert.equal(parentTreeOf(board, "nope"), undefined);
 });
+
+test("CB-T117 写りは権威のツリーで畳み、本物が決まらないときだけ散在として出す", () => {
+  const base = fixture();
+  const cards = cardsOf(buildBoard(base));
+  // 正常な場面。親と兄弟の作業ツリーに写っていても、権威のツリー（親のツリー）に
+  // 1 つあるので散在ではない。状態が食い違っていても、ブランチを切った時点の
+  // 写しなので普通。
+  for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03"]) {
+    assert.deepEqual(cards.get(id)!.scattered, [], id);
+  }
+
+  // 権威のツリーに無い。どれが本物か決まらないので全部が候補。
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const homeless: TicketJson = {
+    ...child,
+    seen_in: [
+      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    ],
+  };
+  const lost = cardsOf(buildBoard({ ...base, tickets: [homeless] })).get("i0001-03")!;
+  assert.deepEqual(
+    lost.scattered.map((s) => `${s.tree}:${s.state}`),
+    [":todo", "i0001-02:todo"],
+  );
+
+  // 権威のツリーの中で 2 つの置き場にある。どちらの状態か決まらない。
+  const doubled: TicketJson = {
+    ...child,
+    seen_in: [
+      { tree: "i0001", state: "todo", path: "/x/w/i0001/wip/tickets/todo/i0001-03.md" },
+      { tree: "i0001", state: "doing", path: "/x/w/i0001/wip/tickets/doing/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    ],
+  };
+  const split = cardsOf(buildBoard({ ...base, tickets: [doubled] })).get("i0001-03")!;
+  assert.deepEqual(
+    split.scattered.map((s) => `${s.tree}:${s.state}`),
+    ["i0001:todo", "i0001:doing"],
+  );
+  // 写り自体は残す。開いたファイルからカードを引き当てるのに使う。
+  assert.equal(split.seenIn.length, 3);
+});
