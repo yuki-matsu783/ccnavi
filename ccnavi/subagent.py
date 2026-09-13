@@ -154,7 +154,7 @@ def at_stop(
 
 
 def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
-    """終わったサブエージェントが差し戻しを受けていたなら、その旨。印は消す。"""
+    """終わったサブエージェントが差し戻しを受けていたなら、その旨。マーカーは消す。"""
     if payload.tool_name != judge.AGENT_TOOL:
         return ""
     agent_id = str(payload.tool_response.get("agentId") or "")

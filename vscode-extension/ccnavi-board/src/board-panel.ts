@@ -18,7 +18,7 @@ const DEBOUNCE_MS = 120;
 
 /**
  * 監視する場所。提案（ワークスペース、プロジェクト、全作業ツリーの `wip/tickets/`）、
- * 承認済みチケットと印（同じツリーの `.ccnavi/tickets/`）、作業ツリーの登録。
+ * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、作業ツリーの登録。
  * glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [

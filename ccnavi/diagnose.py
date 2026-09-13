@@ -596,7 +596,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
             stdout.write(f"  {parent.ticket} は Draft を外した。マージは利用者が行う\n")
         for ph in phase.phases_of(root, conf, parent.ticket):
-            marks = ", ".join(sorted(ph.marks)) or "印なし"
+            marks = ", ".join(sorted(ph.marks)) or "マーカーなし"
             if not ph.tickets:
                 state = "未計画（子がまだ無い）"
             elif ph.ended:
@@ -622,7 +622,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
     """`--explain` が言うことのうち、チケットに関わる部分を機械可読で出す。
 
-    読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・印を自分で解釈せず、ここが
+    読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・マーカーを自分で解釈せず、ここが
     出した形をそのまま並べる。「ゲートが閉じているか」「承認待ちは何か」の答えを
     2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
     ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 §4 P11）。
@@ -890,7 +890,7 @@ def _phase_record(ph: phase.Phase) -> dict:
 def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
-    """親 1 件。段階、計画、親の印、フェーズの並び。"""
+    """親 1 件。段階、計画、親のマーカー、フェーズの並び。"""
     where = approval.home_dir(conf, root, parent.ticket, "")
     return {
         "ticket": parent.ticket,

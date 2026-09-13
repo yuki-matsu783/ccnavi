@@ -385,10 +385,10 @@ class RecordTest(unittest.TestCase):
         )
 
         self.assertEqual(len(got), 2)
-        self.assertNotIn("degraded", got[0], "読めたコマンドに印が付いている")
+        self.assertNotIn("degraded", got[0], "読めたコマンドに degraded が付いている")
         # これが無いと、ガードが止めたもののうちどれだけが読み切れないまま
         # 出た判定なのかを記録が答えられない。
-        self.assertIn("degraded", got[1], "生の文字列で下した判定に印が無い")
+        self.assertIn("degraded", got[1], "生の文字列で下した判定に degraded が無い")
 
 
 if __name__ == "__main__":

@@ -433,7 +433,7 @@ class SetupTest(unittest.TestCase):
         os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
         write(binary, "#!/bin/sh\nexit 0\n")
         os.chmod(binary, 0o755)
-        # 置き場の名前になる印と、hook が起動する振り分けの sh（ADR-0041）。
+        # 置き場の名前になる目印と、hook が起動する振り分けの sh（ADR-0041）。
         write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
         os.makedirs(os.path.join(src, "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, "scripts", "ccnavi-launcher.sh"))

@@ -330,7 +330,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
     ルールの意味が食い違いうる。食い違えば、ガードが落ちている最中に
     さらに読み違えることになる。
 
-    builtin は組み込み自身（builtin / selfguard）が組み立てる印。`RESERVED_ID_PREFIX` で
+    builtin は組み込み自身（builtin / selfguard）が組み立てるという目印。`RESERVED_ID_PREFIX` で
     始まる id を書けるのはこちらだけ。
     """
     rule_set = RuleSet(version=data.get("version") or 0)

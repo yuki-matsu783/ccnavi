@@ -107,7 +107,7 @@ RETIRED_ENVS = (
 # --lint が「あるが読まない」と言うために覚えておく（設計 §25.12）。
 OLD_PROJECT_RULES = "config/rules.yml"
 
-# own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
+# own_project は ccnavi 自身のソースツリーを見分ける目印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
 
 # LOCAL_FILE は ccnavi 自身を開発しているときだけ読む上書き設定。
@@ -174,7 +174,7 @@ def script_command(root: str, name: str) -> str:
 
     空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、ゲートの例外と
     サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
-    区切りと別の印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
+    区切りと別の目印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
     まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符に落とす。
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
@@ -249,7 +249,7 @@ def is_reserved_layer_name(name: str) -> bool:
 def approved_dir(conf: Settings, tree_root: str) -> str:
     """このツリーの承認済みチケットの置き場（絶対）。
 
-    写しと印はそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
+    写しとマーカーはそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
     （設計 §24.5）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
     """
     return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
@@ -497,7 +497,7 @@ def own_source_tree(root: str) -> bool:
     そこにあるプロジェクト定義が名乗る名前で判断する。
 
     これは安全性の検査ではない。1 つのリポジトリを「道具を作っている場所」として
-    印を付け、ルールを試す人がセッションを開き直さずに変更を見られるようにする
+    目印を付け、ルールを試す人がセッションを開き直さずに変更を見られるようにする
     だけのもの。他のプロジェクトは環境変数だけが設定の出所のままなので、
     そこでエージェントが設定ファイルを書き換えても、人がセッションを開き直すまで
     ガードには届かない。

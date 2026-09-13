@@ -248,7 +248,7 @@ allow:
     subject: 'grep -n "git push" README.md'
     why: >-
       引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
-      語の中の印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
+      語の中の目印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
       求める prefer-read-grep が当てて通す。README「Bash のコマンドは実行される部分だけを見る」
   - tool: Bash
     subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
@@ -256,12 +256,12 @@ allow:
   - tool: Bash
     subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
     why: >-
-      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の印なので、
+      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の目印なので、
       deny には当たらず、prefer-read-grep が通す
   - tool: Bash
     subject: 'grep -n "<<EOF" /repo/README.md'
     why: >-
-      引用の中で他の字と並んだ << は語の中の印で 1 字ずつ区切られ、heredoc には当たらない。
+      引用の中で他の字と並んだ << は語の中の目印で 1 字ずつ区切られ、heredoc には当たらない。
       prefer-read-grep が通す。引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。
       README「読み切れないとき」
   - tool: Bash
