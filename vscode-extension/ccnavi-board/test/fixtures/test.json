@@ -10,6 +10,7 @@
  "code": "DENY_COMMAND_PATTERN",
  "reason": "",
  "degraded": "",
+ "unwrapped": "",
  "fallback": "",
  "rules": [
   {

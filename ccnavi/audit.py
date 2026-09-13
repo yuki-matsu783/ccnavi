@@ -83,6 +83,11 @@ class Record:
     # 別に数えられないと、ガードの出力のどれだけが読み切れないまま出たものかを
     # あとから言えなくなる。
     degraded: str = ""
+    # unwrapped は、ルールに当たったのが元の形ではなく、実行役のコマンド（`env` `sudo`
+    # `sh -c` など）が中で実行するコマンドだったときの、そのコマンド。複数なら `\x00` で
+    # つなぐ。元の形で当たったときは空。元の形だけを見ても、どこが当たったのかは
+    # 分からないので残す。数えれば、実行役のコマンド越しに止めた件数も分かる。
+    unwrapped: str = ""
     # fallback は、ルールファイルを読めずに組み込みの既定で判定したことを示す。
     # そのとき効いているのはプロジェクトのルールではないので、記録を数えるときに
     # 混ぜられない。ガードが落ちたまま何回動いたかも、これでしか分からない。
@@ -146,9 +151,8 @@ class Log:
             os.close(fd)
 
     def _as_dict(self, record: Record) -> dict:
-        subject = record.subject
-        if len(subject) > SUBJECT_LIMIT:
-            subject = subject[:SUBJECT_LIMIT] + f"…(+{len(record.subject) - SUBJECT_LIMIT})"
+        subject = _limited(record.subject)
+        unwrapped = _limited(record.unwrapped)
 
         elapsed_ms = (time.perf_counter() - self._start) * 1000
         out: dict = {
@@ -172,6 +176,7 @@ class Log:
             ("code", record.code),
             ("reason", record.reason),
             ("degraded", record.degraded),
+            ("unwrapped", unwrapped),
             ("fallback", record.fallback),
             ("detail", record.detail),
             ("tree", record.tree),
@@ -191,3 +196,10 @@ class Log:
 
         out["ms"] = round(elapsed_ms, 3)
         return out
+
+
+def _limited(text: str) -> str:
+    """記録に残す文字列を上限で切る。切ったら残りの長さを添える。"""
+    if len(text) <= SUBJECT_LIMIT:
+        return text
+    return text[:SUBJECT_LIMIT] + f"…(+{len(text) - SUBJECT_LIMIT})"

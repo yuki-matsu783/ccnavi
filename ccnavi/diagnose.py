@@ -88,6 +88,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
         "code": "",
         "reason": "",
         "degraded": "",
+        "unwrapped": "",
         "fallback": "",
         "rules": [],
         "response": "",
@@ -131,6 +132,8 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["resolved"] = record.subject if record.subject and record.subject != subject else ""
     out["reason"] = record.reason or ""
     out["degraded"] = record.degraded or ""
+    # 実行役のコマンドが中で実行するコマンドで当たったときの、そのコマンド。
+    out["unwrapped"] = record.unwrapped or ""
     out["fallback"] = record.fallback or ""
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
@@ -170,6 +173,10 @@ def test(
         stdout.write(f"reason: {out['reason']}\n")
     if out["degraded"]:
         stdout.write(f"degraded: {out['degraded']}（生の文字列に当てた）\n")
+    if out["unwrapped"]:
+        for layer in out["unwrapped"].split("\x00"):
+            shown = " ".join(layer.replace("\x01", " ").split())
+            stdout.write(f"unwrapped: {shown}（中で実行されるコマンドに当てた）\n")
     if out["fallback"]:
         stdout.write(f"fallback: {out['fallback']}（組み込みの既定で判定した）\n")
 
