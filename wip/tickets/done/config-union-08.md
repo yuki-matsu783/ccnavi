@@ -25,9 +25,9 @@ allow:
     glob: "CONTEXT.md"
   - match: Write|Edit
     glob: "HANDOVER.md"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-13T08:40:56+0900"
+completed_at: "2026-09-13T09:06:37+0900"
+base_sha: "a4fe0bda8e88c97b8412222f54a691ec9c438f4e"
 ---
 
 # 設定 3 本の和を文書に反映する
