@@ -342,15 +342,27 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
     return remaining
 
 
-def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]:
+def phases_of(
+    root: str,
+    conf: settings.Settings,
+    parent_id: str,
+    proposed: ticket_mod.Ticket | None = None,
+) -> list[Phase]:
     """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
+
+    `proposed` は、承認済みチケットがまだ無いときに計画を読む親。承認で同じときに通った親の
+    提案を渡す（`order_problems`）。渡さないと、親と後のフェーズの子を一緒に承認したとき
+    計画が読めずフェーズが 1 つも並ばず、順序の検査が何も見ないまま通る。承認済みチケットが
+    あればそちらが勝つ（改版の計画は承認されるまで効かない）。
     """
     open_copies, _ = approval.scan(conf, root)
     closed_copies, _ = approval.scan(conf, root, closed=True)
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
+    if owner is None and proposed is not None and proposed.ticket == parent_id:
+        owner = proposed
     if owner is not None and owner.has_plan:
         # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
@@ -570,7 +582,7 @@ def order_problems(
     # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
-    for phase in phases_of(root, conf, parent.ticket):
+    for phase in phases_of(root, conf, parent.ticket, parent):
         if phase.number >= child.phase:
             break
         if phase.type is not None and my_type is not None and phase.type.overlaps(my_type):
@@ -580,7 +592,12 @@ def order_problems(
             continue
         if not ended:
             if phase.number in reopened:
-                state = f"同じ承認で {', '.join(reopened[phase.number])} を足すので開き直る"
+                names = ", ".join(reopened[phase.number])
+                state = (
+                    f"同じ承認で {names} を足すので開き直る"
+                    if phase.ended
+                    else f"同じ承認で {names} を足すが、まだ閉じていない"
+                )
             else:
                 state = "子がまだ無い" if not phase.tickets else "子が開いている"
             problems.append(

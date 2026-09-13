@@ -366,11 +366,20 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
     return;
   }
   if ("mismatch" in outcome) {
-    // 絞りは外す。一覧が変わったのだから、いま何が承認待ちなのかを全部見せる。
-    current.approvalOnly = [];
-    const again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+    // まず同じ絞りで読み直す。カードの「この 1 件を承認」で全部の一覧に切り替わると、1 件のつもりで
+    // 押し続けて全部を承認しかねない。絞りが通らない（その識別子がもう承認待ちに無い、親の改版が
+    // 承認待ちに入った）ときだけ絞りを外し、いま何が承認待ちなのかを全部見せる。
+    const only = current.approvalOnly ?? [];
+    let again = await runApprovePreview(current.folder.uri.fsPath, binSetting(), only);
     if (state !== current) {
       return;
+    }
+    if (!again.ok && only.length > 0) {
+      current.approvalOnly = [];
+      again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+      if (state !== current) {
+        return;
+      }
     }
     current.approval = again.ok
       ? { kind: "preview", preview: again.value, notice: "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する" }

@@ -469,6 +469,34 @@ class PhaseTest(PhaseHarness):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
         self.assertIn("同じ承認で i0001-03 を足すので開き直る", result.stderr)
 
+    def test_a_new_parent_and_a_later_phase_child_together_still_keep_the_order(self):
+        """承認済みチケットの無い親と、2 番目のフェーズの子を一緒に承認しても、子は通さない。
+
+        1 本ずつなら、親を承認したあと子は「1 が閉じるまで」で落ちる。一緒に出すと親の計画が
+        ディスクに無く、フェーズが 1 つも並ばないので、順序の検査が何も見ずに通っていた。
+        """
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent()
+        result = self.approve()
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")), result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertIn("1（調査） が閉じるまで承認しない（子がまだ無い）", result.stderr)
+
+    def test_a_new_parent_with_children_in_two_phases_passes_only_the_first(self):
+        """親・1 番目の子・2 番目の子を一緒に承認すると、1 番目の子までが通り、2 番目は落ちる。"""
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent()
+        result = self.approve()
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")), result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")), result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        self.assertIn("同じ承認で i0001-01 を足すが、まだ閉じていない", result.stderr)
+
     # ---- 4. 成果物
 
     def test_last_child_cannot_close_without_deliverables(self):
