@@ -41,6 +41,11 @@
             "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/scripts/ccnavi-fetch.sh\"",
+            "timeout": 60
           }
         ]
       }

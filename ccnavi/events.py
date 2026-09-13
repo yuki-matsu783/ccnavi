@@ -123,10 +123,8 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
     """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
     if not conf.tickets_enabled:
         return None
-    copies, _ = approval.copies(conf.approved)
-    return post.ScopeGuard(
-        root=root, approved=conf.approved, copies=approval.by_id(copies), projects=conf.projects
-    )
+    copies, _ = approval.scan(conf, root)
+    return post.ScopeGuard(root=root, copies=approval.by_id(copies), projects=conf.projects)
 
 
 def decide_at_prompt(
@@ -149,7 +147,7 @@ def decide_at_prompt(
     """
     watched, scope = watch_context(stderr, conf, root, record)
     post.at_prompt(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
-    told = approval.news(stderr, conf, payload.session_id, payload.agent_id)
+    told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
@@ -220,7 +218,7 @@ def decide_at_start(
     ctxfile.forget(conf.state, payload.session_id)
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
-    approval.baseline(stderr, conf, payload.session_id, payload.agent_id)
+    approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:

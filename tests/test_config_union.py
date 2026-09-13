@@ -358,7 +358,9 @@ class ConfigUnionHarness(unittest.TestCase):
         self.rules = os.path.join(common, "rules.yml")
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risk.yml")
-        self.approved = os.path.join(common, "tickets")
+        # 承認済みチケットと印は、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
+        # （設計 §24.5）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
+        self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "log.jsonl")
 
@@ -381,9 +383,34 @@ class ConfigUnionHarness(unittest.TestCase):
         return path
 
     def propose(self, name, text, project=""):
-        """提案を置く。プロジェクト向けは `wip/<名前>/tickets/`（設計 §25.5）。"""
-        parts = ["wip", *([project] if project else []), "tickets", "todo", name + ".md"]
-        return write(os.path.join(self.ws, *parts), text)
+        """提案を置く。プロジェクト向けはそのプロジェクトの `wip/tickets/`（設計 §25.5）。"""
+        base = os.path.join(self.projects, project) if project else self.ws
+        return write(os.path.join(base, "wip", "tickets", "todo", name + ".md"), text)
+
+    def approved_dir_of(self, project=""):
+        """このプロジェクトの承認済みチケットの置き場。"""
+        base = os.path.join(self.projects, project) if project else self.ws
+        return os.path.join(base, ".ccnavi", "tickets")
+
+    def approved_path(self, *parts, project=""):
+        """承認済みチケットの置き場の下のパス。プロジェクトを渡さなければ、在る側を探す。"""
+        if project:
+            return os.path.join(self.approved_dir_of(project), *parts)
+        for where in (self.ws, self.lib, self.app):
+            path = os.path.join(where, ".ccnavi", "tickets", *parts)
+            if os.path.exists(path):
+                return path
+        return os.path.join(self.approved, *parts)
+
+    def approved_copy(self, name, project=""):
+        """承認済みチケットのパス。プロジェクトを渡さなければ、在る側を探す。"""
+        if project:
+            return os.path.join(self.approved_dir_of(project), name + ".md")
+        for where in (self.ws, self.lib, self.app):
+            path = os.path.join(where, ".ccnavi", "tickets", name + ".md")
+            if os.path.exists(path):
+                return path
+        return os.path.join(self.approved, name + ".md")
 
     # ---- 起動
 
@@ -404,7 +431,7 @@ class ConfigUnionHarness(unittest.TestCase):
                 "--projects",
                 self.projects if projects is None else projects,
                 "--approved",
-                self.approved,
+                ".ccnavi/tickets",
                 "--state",
                 self.state,
                 "--log",

@@ -289,7 +289,6 @@ class ScopeGuard:
     """
 
     root: str
-    approved: str
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
     # プロジェクトの置き場。作業ツリーの切り元をプロジェクトまで広げる（設計 §25.3）。
     projects: str = ""
@@ -323,7 +322,8 @@ class ScopeGuard:
                 "covers it and ask the user to run 'ccnavi --approve'."
             ),
         )
-        return rule, os.path.join(self.approved, ticket.ticket + ".md")
+        # 出所はその写し自身の場所。写しはツリーごとに在るので、1 か所には畳めない。
+        return rule, ticket.path
 
 
 @dataclass

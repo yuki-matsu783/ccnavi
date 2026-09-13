@@ -470,7 +470,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
                 refused = self.approve()
                 self.assertNotEqual(refused.returncode, 0, refused.stdout + refused.stderr)
                 self.assertIn("予約", refused.stderr, refused.stderr)
-                self.assertFalse(os.path.exists(os.path.join(self.approved, number + ".md")))
+                self.assertFalse(os.path.exists(self.approved_copy(number)))
                 # 次の 1 件と混ざらないように片付ける。
                 os.remove(proposal)
 

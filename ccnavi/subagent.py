@@ -49,16 +49,20 @@ def at_start(
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:
         return EXIT_OK
-    copies, _ = approval.copies(conf.approved)
-    index = approval.by_id(copies)
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
-    bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
+    if t is None or t.is_main:
+        return EXIT_OK
+    # 権威のある側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
+    # 写しにだけ入るので、子のツリーに checkout されている版では足りない。
+    copies, _ = approval.scan(conf, root)
+    index = approval.by_id(copies)
+    bound = tree.lookup(index, t.name)
     if bound is None:
         return EXIT_OK
     children = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     if not children:
         return EXIT_OK
-    closed, _ = approval.copies(conf.approved, closed=True)
+    closed, _ = approval.scan(conf, root, closed=True)
     done = {t.ticket for t in closed}
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
@@ -109,9 +113,9 @@ def at_stop(
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:
         return EXIT_OK
-    copies, _ = approval.copies(conf.approved)
-    index = approval.by_id(copies)
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
+    copies, _ = approval.scan(conf, root)
+    index = approval.by_id(copies)
     targets: list[ticket_mod.Ticket] = []
     bound = tree.lookup(index, t.name) if t is not None and not t.is_main else None
     if bound is not None:

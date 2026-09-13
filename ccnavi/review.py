@@ -196,7 +196,7 @@ def prepare(
         stderr.write("ccnavi: 控えの置き場が空。投稿する本文を置く場所が無い\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    unmet = _unmet(tree_root, ph)
+    unmet = _unmet(tree_root, conf, ph)
     body = _read_body(_resolve(cwd, body_file))
     if body is None:
         unmet.append(f"依頼文を読めない ({body_file})")
@@ -284,7 +284,7 @@ def requested(
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
     # 投稿と印の間に HEAD が動いていないか。動いていれば、人が見るものと印が食い違う。
-    unmet = _unmet(tree_root, ph)
+    unmet = _unmet(tree_root, conf, ph)
     if unmet:
         stderr.write("ccnavi: 投稿の後に前提が崩れた。印は置かない\n")
         for line in unmet:
@@ -295,7 +295,7 @@ def requested(
     # 落ちて黙って除かれる。
     if not _mark(
         stderr,
-        conf.approved,
+        approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         phase_no,
         approval.MARK_REQUESTED,
@@ -354,7 +354,8 @@ def check(
             stderr.write(f"  - {r.url}\n")
         return 1
     unresolved = _unresolved(
-        result.threads, approval.accepted_threads(conf.approved, parent.ticket)
+        result.threads,
+        approval.accepted_threads(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket),
     )
     if unresolved:
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
@@ -381,7 +382,7 @@ def check(
     assert result.mr is not None
     if not _mark(
         stderr,
-        conf.approved,
+        approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         phase_no,
         approval.MARK_REVIEWED,
@@ -436,7 +437,8 @@ def reviewed(
         )
         return 1
     unresolved = _unresolved(
-        result.threads, approval.accepted_threads(conf.approved, parent.ticket)
+        result.threads,
+        approval.accepted_threads(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket),
     )
     stdout.write(
         f"フェーズ {phase_no}（親 {parent.ticket}）の未解決スレッド: {len(unresolved)} 件\n"
@@ -452,13 +454,15 @@ def reviewed(
     assert result.mr is not None
     # 印より先に控えへ。印は上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
-    failed = approval.remember_accepted(conf.approved, parent.ticket, accepted)
+    failed = approval.remember_accepted(
+        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
+    )
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
     if not _mark(
         stderr,
-        conf.approved,
+        approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         phase_no,
         approval.MARK_REVIEWED,
@@ -516,7 +520,9 @@ def handoff(
     result = _result_with_mr(stderr, result_path)
     if result is None:
         return 1
-    accepted = approval.accepted_threads(conf.approved, parent.ticket)
+    accepted = approval.accepted_threads(
+        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket
+    )
     remaining = _unresolved(result.threads, accepted)
     lines = body.rstrip("\n").splitlines()
     title = lines[0].strip() if lines else ""
@@ -580,7 +586,9 @@ def ready(
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。note の下書きを置く場所が無い\n")
         return 1
-    wrapped = approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP)
+    wrapped = approval.read_parent_mark(
+        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
+    )
     text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
     text.append(
         f"`{wip_root(conf)}/` は片付けてある。マージするかどうかは利用者が決める。"
@@ -595,7 +603,7 @@ def ready(
         return 1
     if not _parent_mark(
         stderr,
-        conf.approved,
+        approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         approval.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
@@ -657,7 +665,7 @@ def wrapup(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    left = _leftovers(conf, parent, phases, result)
+    left = _leftovers(approval.home_dir(conf, root, parent.ticket, ""), parent, phases, result)
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
@@ -670,13 +678,15 @@ def wrapup(
         return 1
     cancelled, skipped, reviewed_now = settled
     accepted = [t.url or t.id for t in left.unresolved]
-    failed = approval.remember_accepted(conf.approved, parent.ticket, accepted)
+    failed = approval.remember_accepted(
+        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
+    )
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
     if not _parent_mark(
         stderr,
-        conf.approved,
+        approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         approval.PARENT_MARK_WRAPUP,
         {
@@ -729,7 +739,7 @@ class Leftovers:
 
 
 def _leftovers(
-    conf: settings.Settings, parent: ticket_mod.Ticket, phases: list[phase.Phase], result: Result
+    approved_dir: str, parent: ticket_mod.Ticket, phases: list[phase.Phase], result: Result
 ) -> Leftovers:
     not_ended = [ph for ph in phases if not ph.ended]
     return Leftovers(
@@ -743,7 +753,7 @@ def _leftovers(
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
         unresolved=_unresolved(
-            result.threads, approval.accepted_threads(conf.approved, parent.ticket)
+            result.threads, approval.accepted_threads(approved_dir, parent.ticket)
         ),
     )
 
@@ -798,7 +808,7 @@ def _settle(
                 continue
             if not _mark(
                 stderr,
-                conf.approved,
+                approval.home_dir(conf, root, parent.ticket, ""),
                 parent.ticket,
                 ph.number,
                 approval.MARK_SKIPPED,
@@ -809,7 +819,7 @@ def _settle(
         elif ph in left.unreviewed:
             if not _mark(
                 stderr,
-                conf.approved,
+                approval.home_dir(conf, root, parent.ticket, ""),
                 parent.ticket,
                 ph.number,
                 approval.MARK_REVIEWED,
@@ -869,14 +879,37 @@ def _wrapup_drafts(
     return _write_text(note_path, "\n".join(note))
 
 
-def wip_root(conf: settings.Settings) -> str:
-    """途中の作業を置く場所。提案の置き場（`wip/tickets`）のいちばん上の階層。
+# 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に丸ごと消す。
+# 既定のブランチに残す場所はマージリクエストと issue。
+#
+# 以前は提案の置き場（`wip/tickets`）の上の階層として導いていた。提案は `.ccnavi/` へ
+# 移り、そこは承認済みの写しと同じ場所で、消さずにマージへ乗せるもの（設計 §24.5）に
+# なったので、導くのをやめて綴りを固定する。
+WIP_ROOT = "wip"
 
-    マージのときにはここを丸ごと消す。途中の記録（チケットの置き場、調査や設計の文書）は
-    既定のブランチに残さない。残す場所はマージリクエストと issue。
+
+def wip_root(conf: settings.Settings | None = None) -> str:
+    """途中の作業を置く場所。conf は取らないが、呼び出しの形を変えないために残す。"""
+    return WIP_ROOT
+
+
+def _dirty(tree_root: str, conf: settings.Settings) -> bool:
+    """作業ツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
+
+    写しと印はこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §24.5）。
+    印はフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
+    印をコミットしろ」と言い続けることになる。印と写しをコミットして push するのは
+    `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
     """
-    rel = (conf.tickets or settings.DEFAULT_TICKETS).replace("\\", "/").strip("/")
-    return rel.split("/")[0] if rel else "wip"
+    rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
+    if rc != 0:
+        return True
+    skip = (conf.approved or settings.DEFAULT_APPROVED).strip("/")
+    for line in status.splitlines():
+        path = line[3:].strip().replace("\\", "/")
+        if path and not path.startswith(skip + "/"):
+            return True
+    return False
 
 
 def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
@@ -897,8 +930,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
             "途中の作業は既定のブランチに残さない。"
             f"'sh .claude/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
         )
-    rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
-    if rc != 0 or status.strip():
+    if _dirty(tree_root, conf):
         problems.append("親の作業ツリーに未コミットの変更がある")
     branch = _branch(tree_root)
     if not branch:
@@ -919,7 +951,7 @@ def _parent_any(
         return parent
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
-        closed, _ = approval.copies(conf.approved, closed=True)
+        closed, _ = approval.scan(conf, root, closed=True)
         found = tree.lookup(approval.by_id(closed), t.name)
         if found is not None and not found.is_child:
             return found
@@ -1079,7 +1111,7 @@ def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data
     return True
 
 
-def _unmet(tree_root: str, ph: phase.Phase) -> list[str]:
+def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str]:
     """依頼の前提のうち、作業ツリーの中で分かるもの。"""
     unmet: list[str] = []
     if not ph.ended:
@@ -1098,8 +1130,7 @@ def _unmet(tree_root: str, ph: phase.Phase) -> list[str]:
             unmet.append(f"子 {child.ticket} のブランチが親に取り込まれていない")
     # 未追跡は数えない。依頼文そのものを作業ツリーに置く形が普通にあり、それが
     # 前提を落とすと依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
-    rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
-    if rc != 0 or status.strip():
+    if _dirty(tree_root, conf):
         unmet.append("親の作業ツリーに未コミットの変更がある")
     branch = _branch(tree_root)
     if not branch:

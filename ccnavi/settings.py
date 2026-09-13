@@ -61,8 +61,8 @@ BIN_SUFFIXES = (".exe",)
 # 以前は APPROVED_ENV を空文字にすることがこの宣言を兼ねていた。置き場のパスが
 # 空であることと機能を切ることは別の話なので、名前を分けた。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# チケット制御が使う置き場 2 つ。TICKETS_ENV は提案の置き場で、各作業ツリーの
-# ルートからの相対。APPROVED_ENV は承認済みチケットの置き場で、ワークスペースルートからの相対。
+# チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
+# git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
 # 判定が読むのは承認済みチケットだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
@@ -116,9 +116,12 @@ DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/tickets"
-# 承認済みチケットは設定と同じ場所。そこはルールが Write / Edit を止め、組み込みの既定が
-# シェル経由の書き込みを止めている。承認済みチケットのために別の保護を足さずに済む。
-DEFAULT_APPROVED = os.path.join(".claude", "ccnavi", "tickets")
+# 承認済みチケットは層の傘（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
+# 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
+# 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
+# B の機械で作業する流れが成り立たない（設計 §24.5）。区切りは "/" で持ち、ツリーの
+# ルートに継ぎ足すときに os の区切りへ直す。
+DEFAULT_APPROVED = ".ccnavi/tickets"
 # フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
@@ -193,6 +196,15 @@ def is_reserved_layer_name(name: str) -> bool:
     return any(folded == reserved.casefold() for reserved in RESERVED_LAYER_NAMES)
 
 
+def approved_dir(conf: Settings, tree_root: str) -> str:
+    """このツリーの承認済みチケットの置き場（絶対）。
+
+    写しと印はそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
+    （設計 §24.5）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
+    """
+    return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
+
+
 def layer_script_home(conf: Settings) -> str:
     """各層の `script:` に書ける唯一の綴り（`<傘>/scripts/`、"/" 区切り、設計 §25.4.2）。
 
@@ -257,7 +269,9 @@ class Settings:
     ticket_control_declared: str = ""
 
     # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
-    # approved は承認済みチケットの置き場（絶対）。判定が読むのは approved だけ。
+    # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
+    # 絶対で 1 か所を指さないのは、そのツリーの git に乗って運ばれるから。判定が読むのは
+    # approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     # approved_blank は、置き場を空文字で指定されたこと。以前はそれが「使わない」の
     # 宣言だったので、--lint が今の書き方を案内する。
@@ -325,7 +339,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
         approved_blank=APPROVED_ENV in os.environ and os.environ[APPROVED_ENV] == "",
-        approved=os.path.join(root, DEFAULT_APPROVED),
+        approved=DEFAULT_APPROVED,
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
         projects=os.path.join(root, DEFAULT_PROJECTS),
@@ -346,7 +360,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ("log", LOG_ENV, _log_or_none, True),
         ("state", STATE_ENV, _log_or_none, True),
         ("tickets", TICKETS_ENV, _relative, False),
-        ("approved", APPROVED_ENV, _resolve, False),
+        ("approved", APPROVED_ENV, _relative, False),
     )
     for name, env, read, accepts_empty in overrides:
         if env in os.environ and (accepts_empty or os.environ[env]):

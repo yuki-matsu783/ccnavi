@@ -630,6 +630,14 @@ if [ "$status" -eq 0 ]; then
 else
 	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
 	body | tail -n "$FAIL_LINES"
+	# Windows では、プロセスの cwd がそのディレクトリを掴む。Bash ツールの cwd は呼び出しを
+	# またいで残る親のシェルのものなので、作業ツリーの中へ cd したまま remove すると、git が
+	# 中身を消したあと最後のディレクトリで Permission denied になり、空のディレクトリが残る。
+	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
+	# 起きたときに立て直し方を言う。
+	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
+		printf '案内: 作業ツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
+	fi
 fi
 
 # 世代で切る。新しい順に並べ、上限より後ろを消す。
