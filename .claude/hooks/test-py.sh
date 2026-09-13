@@ -24,7 +24,7 @@ session=$(printf '%s' "$payload" |
 	sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 [ -z "$session" ] && session=unknown
 
-state=".claude/ccnavi/session"
+state="logs/session"
 counter="$state/$session.retries"
 trees="$state/$session.trees"
 

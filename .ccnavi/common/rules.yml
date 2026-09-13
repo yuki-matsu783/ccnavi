@@ -115,7 +115,7 @@ deny:
   # 承認済みチケット。判定はここだけを読むので、ここを書けると承認の意味が無い。
   - id: guard-approved-tickets
     match: Write|Edit|NotebookEdit
-    glob: "*/.claude/ccnavi/tickets/*"
+    glob: "*/.ccnavi/tickets/*"
     message: >-
       承認済みチケットです。承認は利用者が VS Code のボード（端末なら
       'ccnavi --approve'）で行い、
@@ -125,11 +125,13 @@ deny:
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）。人が持つ設定で、エージェントが
   # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリー側の
   # 設定も止める。統合でそのまま main の設定になる道を持つので、main の側だけ止めても
-  # 時間差で効く。同じ置き場の見本（rule-samples.yml）は止めない。ルールを足したら
-  # 見本も足すのはエージェントの仕事。
+  # 時間差で効く。前の置き場（.claude/ccnavi/）も、env で指したままのワークスペースが
+  # あるので並べてある。見本（rule-samples.yml）はこのルールでは止めないが、
+  # .ccnavi/common/ に置いた見本は組み込みの傘のルールが止める。見本の下書きは
+  # scratchpad に置き、ルールの下書きと一緒に利用者に渡す。
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
-    regex: '[\\/]\.claude[\\/]ccnavi[\\/](rules|phases|risk)\.yml$'
+    regex: '[\\/](\.claude[\\/]ccnavi|\.ccnavi[\\/]common)[\\/](rules|phases|risk)\.yml$'
     message: >-
       ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください

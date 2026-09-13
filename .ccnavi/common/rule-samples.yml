@@ -90,45 +90,50 @@ deny:
     subject: "cat /repo/secrets/token.txt"
     why: 同上
   - tool: Write
-    subject: "/repo/.claude/ccnavi/rules.yml"
+    subject: "/repo/.ccnavi/common/rules.yml"
     why: ガード自身の設定
   - tool: Edit
-    subject: "/repo/.claude/worktrees/x/.claude/ccnavi/rules.yml"
+    subject: "/repo/.claude/worktrees/x/.ccnavi/common/rules.yml"
     why: >-
       作業ツリー側の設定も止める（guard-ccnavi-config）。統合すればそのまま main の
       ルールになる。直したい形は下書きを検証して利用者に渡す
   - tool: Write
-    subject: "/repo/.claude/worktrees/x/.claude/ccnavi/phases.yml"
+    subject: "/repo/.claude/worktrees/x/.ccnavi/common/phases.yml"
     why: フェーズの種類は人が持つ。エージェントが書けるとレビュー不要の種類を作ってから使える
   - tool: Edit
-    subject: "/repo/.claude/ccnavi/risk.yml"
+    subject: "/repo/.claude/worktrees/x/.ccnavi/common/rule-samples.yml"
+    why: >-
+      共通層の見本も層の傘（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
+      （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す
+  - tool: Edit
+    subject: "/repo/.ccnavi/common/risk.yml"
     why: リスクの配点も同じ。自分の作業の重さを自分で決められる
   - tool: Write
     subject: "/repo/.claude/hooks/lint-py.sh"
     why: ガードを起動する hook 本体
   - tool: Edit
-    subject: "/repo/docs/../.claude/ccnavi/rules.yml"
+    subject: "/repo/docs/../.ccnavi/common/rules.yml"
     why: 迂回した綴りでも行き着く先で当たる
   - tool: Bash
-    subject: "echo x > /repo/.claude/ccnavi/rules.yml"
+    subject: "echo x > /repo/.ccnavi/common/rules.yml"
     why: Write で拒否した場所。リダイレクトで同じところに届く
   - tool: Bash
     subject: "cd /repo && printf x >> .claude/hooks/lint-py.sh"
     why: 相対の綴りでも、追記でも同じ場所
   - tool: Bash
-    subject: "sed -i s/deny/allow/ /repo/.claude/ccnavi/rules.yml"
+    subject: "sed -i s/deny/allow/ /repo/.ccnavi/common/rules.yml"
     why: その場で書き換える形
   - tool: Bash
     subject: "cp /tmp/x /repo/.claude/hooks/lint-py.sh"
     why: 別の場所から上書きする形。行き先に名前が来ている
   - tool: Bash
-    subject: "mv /repo/.claude/ccnavi/rules.yml /tmp/old.yml"
+    subject: "mv /repo/.ccnavi/common/rules.yml /tmp/old.yml"
     why: 移した元が消える。ルールが読めなくなる
   - tool: Bash
-    subject: "rm /repo/.claude/ccnavi/log.jsonl"
+    subject: "rm /repo/logs/log.jsonl"
     why: 記録を消すのも書き換えのうち
   - tool: Bash
-    subject: "echo x | tee /repo/.claude/ccnavi/rules.yml"
+    subject: "echo x | tee /repo/.ccnavi/common/rules.yml"
     why: リダイレクトを使わない書き込み
   - tool: Write
     subject: "/repo/.claude/settings.json"
@@ -202,13 +207,13 @@ ask:
     subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
     why: ラッパが残した記録を読む手。-i の無い sed はどの deny にも当たらず、allow にも無い
   - tool: Bash
-    subject: "sed -n 1,20p /repo/.claude/ccnavi/rules.yml"
+    subject: "sed -n 1,20p /repo/.ccnavi/common/rules.yml"
     why: ガードの設定でも、-i が無ければ書き換えない。deny には当たらない
   - tool: Bash
     subject: "uv run python -m unittest discover -s tests -t ."
     why: 検査コマンド。どのルールも言及しない
   - tool: Bash
-    subject: "uv run python -m ccnavi --rules /repo/.claude/ccnavi/rules.yml --test Bash ls"
+    subject: "uv run python -m ccnavi --rules /repo/.ccnavi/common/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny には当たらない
   - tool: Bash
     subject: 'grep -n "git push" README.md'
@@ -217,10 +222,10 @@ ask:
       区切りの印に置き換わるので、「1 本だけの grep」を求める prefer-read-grep にも
       当たらず、権限モードへ渡る。引用に空白の無い grep は allow の側にある
   - tool: Bash
-    subject: 'grep -n "rm -rf" /repo/.claude/ccnavi/rules.yml'
+    subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
     why: 引用の中の rm -rf は recursive-delete に当たらない。allow は上と同じ理由で外れる
   - tool: Bash
-    subject: "grep -n \"regex: '(>\" /repo/.claude/ccnavi/rules.yml"
+    subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
     why: 引用の中の > は文字であって書き込み先を連れてこない。deny には当たらない
   - tool: Bash
     subject: 'grep -n "<<EOF" /repo/README.md'
@@ -228,7 +233,7 @@ ask:
       引用の中で他の字と並んだ << は 1 字ずつ区切られ、heredoc には当たらない。
       引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。README「読み切れないとき」
   - tool: Bash
-    subject: "cp /repo/.claude/ccnavi/rules.yml /tmp/backup.yml"
+    subject: "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml"
     why: 写しを取っているだけ。cp は行き先の側だけを見るので deny には当たらない
   - tool: Bash
     subject: "diff /repo/.claude/settings.json /repo/.claude/settings.local.json"
@@ -240,7 +245,7 @@ ask:
     subject: "/repo/.claude/settings.json"
     why: 設定の Read も止めない。止めると何が効いているか分からなくなる
   - tool: Read
-    subject: "/repo/.claude/ccnavi/phases.yml"
+    subject: "/repo/.ccnavi/common/phases.yml"
     why: guard-ccnavi-config は Write / Edit だけ。読むのは止めない
 
 allow:
@@ -271,22 +276,17 @@ allow:
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.vscode/settings.json"
     why: guard-settings が止めるのは .claude/ の下の settings だけ。エディタの設定は作業ツリーで直せる
-  - tool: Edit
-    subject: "/repo/.claude/worktrees/x/.claude/ccnavi/rule-samples.yml"
-    why: >-
-      同じ置き場でも見本は止めない（guard-ccnavi-config は rules / phases / risk の 3 本だけ）。
-      ルールを足したら見本も足すのはエージェントの仕事
   - tool: Write
     subject: "/repo/.claude/worktrees/x/wip/tickets/todo/i0001.md"
     why: 提案は作業ツリーで書く。効くのは承認済みチケットの側
   - tool: Bash
-    subject: "cat /repo/.claude/ccnavi/rules.yml"
+    subject: "cat /repo/.ccnavi/common/rules.yml"
     why: ガードの設定は読むほうが普通。名前が出ただけでは止めない
   - tool: Bash
     subject: "grep -n cp /repo/.claude/hooks/lint-py.sh"
     why: 書き込むコマンドの名前を探しているだけ。コマンドの先頭に無い
   - tool: Bash
-    subject: "cat /repo/.claude/ccnavi/rules.yml > /tmp/x"
+    subject: "cat /repo/.ccnavi/common/rules.yml > /tmp/x"
     why: リダイレクトはあるが行き先が別の場所
   - tool: Bash
     subject: "cat /repo/.claude/settings.json"
