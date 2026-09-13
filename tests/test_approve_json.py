@@ -3,11 +3,12 @@
 VS Code のボード拡張がオーバーレイで承認するための経路。設計 wip/design/approve-popup.md §2。
 見るのは 6 つ。
 
-1. `--preview` は束の本文と識別子、対象外の提案、読めない提案を JSON で返す。
+1. `--preview` は一覧の本文と識別子、対象外の提案、読めない提案を JSON で返す。
    承認済みチケットは置かない
 2. 承認待ちが無くても `--preview` は `batch: []` で exit 0
-3. `--yes` に束と同じ識別子を渡すと承認済みチケットが置かれ、`prompt`（Claude Code に渡す文）が返る
-4. `--yes` の識別子が束と違えば承認済みチケットを置かず、`mismatch` で exit 1
+3. `--yes` に一覧と同じ識別子を渡すと承認済みチケットが置かれ、
+   `prompt`（Claude Code に渡す文）が返る
+4. `--yes` の識別子が一覧と違えば承認済みチケットを置かず、`mismatch` で exit 1
 5. `--yes` は端末の壁を通らない。素の `--approve` は今までどおり壁で止まる
 6. 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/approve-*.json）と同じ形
 
@@ -85,7 +86,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(body["rejected"], [])
         self.assertIn("承認待ちのチケットは無い", body["text"])
 
-    # ---- 3. yes は束と一致すれば承認する
+    # ---- 3. yes は一覧と一致すれば承認する
 
     def test_yes_with_the_shown_batch_places_copies_and_returns_a_prompt(self):
         self.pending_parent_and_child()
@@ -102,7 +103,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("i0001-01", body["prompt"])
         self.assertIn("承認", body["prompt"])
         self.assertIn("ccnavi-ticket.sh start", body["prompt"])
-        # 承認したので束は空になる。
+        # 承認したので一覧は空になる。
         self.assertEqual(self.preview()["batch"], [])
 
     def test_yes_order_of_identifiers_does_not_matter(self):
@@ -111,7 +112,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.copy_exists("i0001-01"))
 
-    # ---- 4. 見せた束と違えば承認しない
+    # ---- 4. 見せた一覧と違えば承認しない
 
     def test_yes_refuses_when_the_batch_changed(self):
         self.pending_parent_and_child()
@@ -136,11 +137,11 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(self.copy_exists("i0001"))
         self.assertFalse(self.copy_exists("i0001-01"))
-        # 絞りを添えずに同じことを頼めば、絞らない束と比べて食い違いになる。
+        # 絞りを添えずに同じことを頼めば、絞らない一覧と比べて食い違いになる。
         self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01")
 
     def test_yes_without_the_filter_compares_against_the_whole_batch(self):
-        """絞りを添えない `--yes` は、絞らない束と比べる。部分だけを黙って通さない。"""
+        """絞りを添えない `--yes` は、絞らない一覧と比べる。部分だけを黙って通さない。"""
         self.pending_parent_and_child()
         result = self.yes(["i0001"])
         self.assertEqual(result.returncode, 1)

@@ -27,6 +27,7 @@ from tests.test_config_union import (
     layer_path,
     read,
     write,
+    write_layer,
 )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +41,9 @@ OPEN_RULES = {
     "version": 3,
     "allow": [{"id": "anything", "match": "Bash|Read|Write|Edit|NotebookEdit", "regex": "."}],
 }
+
+# YAML として読めない。共通層のルールがこれなら組み込みの既定に落ちる。
+BROKEN_RULES = "version: 3\ndeny: [\n"
 
 
 class GuardHarness(ConfigUnionHarness):
@@ -169,9 +173,95 @@ class RestoreTest(GuardHarness):
             line["guarded"],
         )
 
+    # 組み込みの既定に落ちている間の修復（REQ-PRE-06、selfguard._left_as_repair）
+
+    def test_a_repair_of_an_unreadable_common_rules_file_is_left(self):
+        """REQ-PRE-06: 読めない共通層のルールを名指しのツールで直した結果は、実行後に戻さない。"""
+        fixed = json.dumps(OPEN_RULES)
+        for tool in ("Write", "Edit"):
+            with self.subTest(tool=tool):
+                write(self.rules, BROKEN_RULES)
+                self.guarded_hook(tool, self.ws, file_path=self.rules)
+                write(self.rules, fixed)
+                result = self.guarded_hook(tool, self.ws, event="PostToolUse", file_path=self.rules)
+                self.assertEqual(read(self.rules), fixed, self.said(result))
+                self.assertIn("left-as-repair", result.stdout, self.said(result))
+
+    def test_breaking_a_readable_common_rules_file_is_still_restored(self):
+        """実行前に読めていたなら、名指しのツールで壊した結果は戻す。
+
+        実行後の中身で決めると、壊すことが戻されない道になる。
+        """
+        before = read(self.rules)
+        self.guarded_hook("Edit", self.ws, file_path=self.rules)
+        write(self.rules, BROKEN_RULES)
+        result = self.guarded_hook("Edit", self.ws, event="PostToolUse", file_path=self.rules)
+        self.assertEqual(read(self.rules), before, self.said(result))
+        self.assertIn("restored", result.stdout, self.said(result))
+
+    def test_only_the_common_rules_file_the_call_wrote_is_left(self):
+        """戻さないのは、その呼び出しが書いた共通層のルールだけ。一緒に変わった設定は戻す。"""
+        write(self.rules, BROKEN_RULES)
+        phases = read(self.phases)
+        self.guarded_hook("Edit", self.ws, file_path=self.rules)
+        fixed = json.dumps(OPEN_RULES)
+        write(self.rules, fixed)
+        write(self.phases, "version: 1\n")
+        result = self.guarded_hook("Edit", self.ws, event="PostToolUse", file_path=self.rules)
+        self.assertEqual(read(self.rules), fixed, self.said(result))
+        self.assertEqual(read(self.phases), phases, self.said(result))
+
+    def test_a_shell_write_to_an_unreadable_common_rules_file_is_restored(self):
+        """シェルからの書き込みは、読めない間でも戻す。既定でも止める経路なので。"""
+        write(self.rules, BROKEN_RULES)
+        self.run_hook("PreToolUse")
+        write(self.rules, json.dumps(OPEN_RULES))
+        result = self.run_hook("PostToolUse")
+        self.assertEqual(read(self.rules), BROKEN_RULES, self.said(result))
+
 
 class DenyTest(GuardHarness):
     """`.ccnavi/` 全体への組み込みの deny（§25.6）。ルールに宣言が無くても止まる。"""
+
+    def test_a_rule_named_like_a_builtin_does_not_replace_it(self):
+        """組み込みの名前（`builtin-guard-`）のルールは読み込まず、組み込みは常に足す。
+
+        以前は何にも当たらない 1 本をこの名前で書くだけで、共通層の守りが黙って消えた。
+        """
+        decoy = dict(
+            OPEN_RULES,
+            deny=[
+                {
+                    "id": "builtin-guard-common-layer",
+                    "match": "Write|Edit|NotebookEdit",
+                    "regex": "never-matches-anything",
+                    "message": "decoy",
+                }
+            ],
+        )
+        write(self.rules, json.dumps(decoy))
+        result = self.guarded_hook("Write", self.ws, file_path=self.phases)
+        self.assert_denied(result, "builtin-guard-common-layer")
+        self.assertIn("builtin-guard-", result.stderr, self.said(result))
+
+    def test_lint_names_a_rule_named_like_a_builtin_in_any_layer(self):
+        """プロジェクトの層に書いても `--lint` が error で名指しする。"""
+        write_layer(
+            self.lib,
+            rules={
+                "version": 3,
+                "deny": [
+                    {
+                        "id": "builtin-guard-setting-files",
+                        "match": "Bash",
+                        "regex": "never-matches-anything",
+                        "message": "decoy",
+                    }
+                ],
+            },
+        )
+        errors = self.problems("error", where=self.project_where("lib"))
+        self.assertTrue(any("builtin-guard-" in p["detail"] for p in errors), errors)
 
     def test_named_tool_writes_into_project_home_are_denied(self):
         """§25.6: `*/.ccnavi/*` への Write / Edit は `builtin-guard-project-home` で止まる。"""
@@ -224,6 +314,85 @@ class DenyTest(GuardHarness):
         """§25.6: 守る面を disable にすれば組み込みの deny も足さない。"""
         result = self.hook("Write", self.ws, file_path=layer_path(self.lib, "rules"))
         self.assertNotIn("builtin-guard-project-home", self.reason(result))
+        result = self.hook("Write", self.ws, file_path=self.phases)
+        self.assertNotIn("builtin-guard-common-layer", self.reason(result))
+
+    def test_named_tool_writes_into_the_common_layer_are_denied(self):
+        """§25.6: 共通層の 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
+
+        土台の共通層は前の置き場（`.claude/ccnavi/`）にあり、ccnavi ディレクトリの外。
+        以前はここがルールの `guard-ccnavi-config` の 1 行だけで守られていた（issue #14）。
+        """
+        for path in (self.rules, self.phases, self.risk):
+            for tool in ("Write", "Edit"):
+                with self.subTest(tool=tool, path=os.path.basename(path)):
+                    result = self.guarded_hook(tool, self.ws, file_path=path)
+                    self.assert_denied(result, "builtin-guard-common-layer")
+
+    def test_common_layer_deny_holds_when_the_project_home_is_moved(self):
+        """§25.6: ccnavi ディレクトリの名前を動かしても、既定の置き場の共通層は止まる。
+
+        共通層の置き場は ccnavi ディレクトリの名前に付いて動かないので、`*/.navi/*` からは外れる。
+        """
+        common = os.path.join(self.ws, ".ccnavi", "common")
+        os.makedirs(common, exist_ok=True)
+        moved = []
+        for old in (self.rules, self.phases, self.risk):
+            new = os.path.join(common, os.path.basename(old))
+            shutil.copy(old, new)
+            moved.append(new)
+        self.rules, self.phases, self.risk = moved
+        for path in moved:
+            with self.subTest(path=os.path.basename(path)):
+                result = self.hook(
+                    "Write",
+                    self.ws,
+                    guard="enable",
+                    env={"CCNAVI_PROJECT_HOME": ".navi"},
+                    file_path=path,
+                )
+                self.assert_denied(result, "builtin-guard-common-layer")
+
+    def test_common_layer_copies_in_a_worktree_are_denied(self):
+        """§25.6: ワークスペースから切った作業ツリー側の共通層も止まる。
+
+        統合すればそのまま main の設定になる。
+        """
+        tree = self.worktree(self.ws, "w5")
+        copy = os.path.join(tree, ".claude", "ccnavi", "phases.yml")
+        self.assert_denied(
+            self.guarded_hook("Write", self.ws, file_path=copy), "builtin-guard-common-layer"
+        )
+
+    def test_common_layer_deny_names_only_those_files(self):
+        """§25.6: 同じ名前の別のファイルは止めない。
+
+        当てるのはワークスペースルートと、そこから切った作業ツリーの下の同じ相対だけ。
+        """
+        for path in (
+            os.path.join(self.ws, "src", "rules.yml"),
+            os.path.join(self.app, ".claude", "ccnavi", "rules.yml"),
+        ):
+            with self.subTest(path=os.path.relpath(path, self.ws)):
+                self.assert_not_denied(self.guarded_hook("Write", self.ws, file_path=path))
+
+    def test_shell_writes_into_a_moved_common_layer_are_denied(self):
+        """§25.6: 共通層が既定の名前の外にあっても、シェルからの書き込みは組み込みで止まる。"""
+        policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
+        for command in (
+            "echo x > policy/rules.yml",
+            "sed -i s/deny/allow/ policy/rules.yml",
+            "cp /tmp/x policy/rules.yml",
+            f"echo x > {policy}",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
+                self.assert_denied(result, "builtin-guard-setting-files")
+        # 名前の途中で当たったものは別のファイル。
+        result = self.hook(
+            "Bash", self.ws, guard="enable", rules=policy, command="echo x > otherpolicy/rules.yml"
+        )
+        self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """§25.6: 作業ツリーの `.ccnavi/` に切り元に無いファイルがあれば --lint warn。"""

@@ -22,7 +22,7 @@ test("CB-T18 承認は子プロセスの引数で、preview は見るだけ、ye
   assert.equal((commands as Record<string, unknown>).approveCommand, undefined);
 });
 
-test("CB-T18b preview に識別子を並べると、その分だけの束になる", () => {
+test("CB-T18b preview に識別子を並べると、その分だけが対象になる", () => {
   assert.deepEqual(previewArgs(["i0002", "i0002-01"]), [
     "--approve",
     "--preview",
@@ -42,7 +42,7 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
     "--json",
     "i0002",
   ]);
-  // 絞り込み無し。絞りは空で、実行ファイルは絞らない束と見せた識別子を比べる。
+  // 絞り込み無し。絞りは空で、実行ファイルは絞らないときの対象と見せた識別子を比べる。
   assert.deepEqual(approveArgs(["i0002", "i0002-01"]), [
     "--approve",
     "--yes",

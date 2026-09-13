@@ -433,7 +433,8 @@ class ProjectsTest(unittest.TestCase):
             child_text("i0007-01", "i0007", allow=("src/a/*",)),
         )
         result = self.ccnavi("--approve", stdin="y\n")
-        # 束の一部（子）が落ちたので、通ったぶん（親）を置いてから 1 で終わる（REQ-MLT-31）。
+        # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
+        # 1 で終わる（REQ-MLT-31）。
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子は親と同じ置き場に置く", result.stderr)
         self.assertTrue(os.path.exists(self.approved_path("i0007.md")))

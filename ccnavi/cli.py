@@ -122,9 +122,12 @@ scripts in .ccnavi/scripts/, which call
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
 
-A human accepts unresolved review threads with
+A human accepts unresolved review threads, from the parent worktree, with
 
-    sh .ccnavi/scripts/ccnavi-review.sh accept N
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh accept N
+
+(the scripts live only in the workspace, so a worktree cut from a project
+cannot reach them by the relative path)
 
 which fetches the threads and runs
 
@@ -132,7 +135,7 @@ which fetches the threads and runs
 
 A human closes a parent early ("good enough for now") with
 
-    sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
 
 which runs `ccnavi review wrapup --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.
@@ -192,10 +195,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
-    # 承認の束を見るだけ（承認済みチケットを置かない）。
+    # 承認の対象の一覧を見るだけ（承認済みチケットを置かない）。
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
-    # 見せた束の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
+    # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
@@ -319,11 +322,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
-        # `--approve` と同じで、束に載せる識別子（ボードの絞り込みで見えている分）。
+        # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
             code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))
             return EXIT_OK if code == 0 else EXIT_ERROR
-        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた束と今の束が
+        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた一覧と今の一覧が
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
@@ -334,8 +337,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
-        rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
-        # `--approve` の後ろに並べた語は、束に載せる識別子。無ければ承認待ち全部。
+        rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
+        # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = approval.approve(
             stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
         )
