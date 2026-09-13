@@ -210,7 +210,7 @@ def parse(
 ) -> tuple[Definition | None, list[Problem]]:
     """定義 1 本を読む。`script_homes` はこの層で `script:` に書ける綴りの先頭。
 
-    共通層は `.ccnavi/common/scripts/`、各層はその `<傘>/scripts/` だけ。
+    共通層は `.ccnavi/common/scripts/`、各層はその `<ccnavi ディレクトリ>/scripts/` だけ。
     たがいの側を指す定義はここで error にする（設計 §25.4.2）。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
     """

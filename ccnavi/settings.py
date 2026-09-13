@@ -72,10 +72,10 @@ PHASES_ENV = "CCNAVI_PHASES"
 RISK_ENV = "CCNAVI_RISK"
 # PROJECTS_ENV はプロジェクトの置き場（設計 §25）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
-# PROJECT_HOME_ENV は層の傘（設計 §25.2）。各 git プロジェクトルートからの相対で、
+# PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 §25.2）。各 git プロジェクトルートからの相対で、
 # その下の `config/{rules,phases,risk}.yml` が層の 3 本になる。自身の層
 # （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
-# 動かせるのは傘の名前だけで、`config/` と 3 本のファイル名は固定。
+# 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # もう効かない環境変数。指定されていたら --lint が言う。黙って無視すると、書いた人は
@@ -108,13 +108,14 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 
 # 既定の置き場。ワークスペースルートからの相対。
 #
-# 人が持つ設定（共通層の 3 本）は層の傘の下の `.ccnavi/common/`、実行のたびに書かれる
+# 人が持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、実行のたびに書かれる
 # 記録と控えは `logs/` に置く（ADR-0042）。`.claude/` には Claude Code 自身のもの
 # （settings.json・hooks・skills・worktrees）だけを残す。前の既定は `.claude/ccnavi/` の
 # 下で、env で前の綴りを指したままのワークスペースは、そのまま前の置き場を読む。
 #
-# 共通層の置き場は傘の名前（CCNAVI_PROJECT_HOME）に付いて動かない。傘の名前は各層の
-# 綴りで、共通層を動かすなら CCNAVI_RULES / CCNAVI_PHASES / CCNAVI_RISK で動かす。
+# 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
+# ccnavi ディレクトリの名前は各層の綴りで、共通層を動かすなら CCNAVI_RULES / CCNAVI_PHASES /
+# CCNAVI_RISK で動かす。
 DEFAULT_LOG = os.path.join("logs", "log.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
@@ -124,7 +125,7 @@ DEFAULT_STATE = os.path.join("logs", "state")
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/tickets"
-# 承認済みチケットは層の傘（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
+# 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない（設計 §24.5）。区切りは "/" で持ち、ツリーの
@@ -143,13 +144,13 @@ OLD_COMMON_FILES = ("rules.yml", "phases.yml", "risk.yml")
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
 DEFAULT_PROJECTS = "projects"
-# 層の傘。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
+# ccnavi ディレクトリ。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
 # 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
 # `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
-# スクリプトを 1 つの傘にまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
+# スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
 # 済ませるため（設計 §25.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
-# 傘の下の固定の綴り。層はこの形でしか置けない。
+# ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。
 LAYER_CONFIG_DIR = "config"
 # 層が持てる設定。3 本は独立に無くてよい。
 KIND_RULES = "rules"
@@ -219,7 +220,9 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各層の `script:` に書ける唯一の綴り（`<傘>/scripts/`、"/" 区切り、設計 §25.4.2）。
+    """各層の `script:` に書ける唯一の綴り（設計 §25.4.2）。
+
+    形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
 
     共通層だけは `.ccnavi/common/scripts/`（risk.SCRIPT_HOMES）。
     たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
@@ -296,7 +299,7 @@ class Settings:
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
     # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、この設定が
-    # 入る前と同じに動く。project_home は層の傘（git プロジェクトルートからの相対、
+    # 入る前と同じに動く。project_home は ccnavi ディレクトリ（git プロジェクトルートからの相対、
     # "/" 区切り）。自身の層とプロジェクトの層の両方に効く。
     projects: str = ""
     project_home: str = ""
