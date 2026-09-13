@@ -15,6 +15,10 @@
 **要点: 置き場を 2 つに分けて固定する。** sh は `.ccnavi/scripts/ccnavi-launcher.sh`、実行ファイルは
 `.ccnavi/bin/<os>-<arch>/`。sh は自分の隣ではなく `../bin/` を探す。置き場が動かないので `--bin` は要らない。
 
+**あわせて塞ぐもの（3.5 節）:** `env`・`sudo`・`sh -c` などでコマンドを包むと、組み込みの守り（設定ファイル・チケットの状態・承認）と
+サブエージェントの禁止が当たらない穴。振り分けの sh の名前に `.sh` が付くと `sh <sh> --approve --yes` が自然な打ち方になるので、
+その発見から広げて、包みを外した形を止める側のルールに当てる仕組みで直す。
+
 ## 1. 置き場（改版後）
 
 | 何 | ccnavi のリポジトリ | 配布先 | 前 |
@@ -160,34 +164,145 @@ def launched_executable(launcher: str, host: str | None = None) -> str:
 間接起動は黙って通ってはいないが、承認のルールでは止まらず、確認に落ちている。判定を権限モードに渡すモード
 （読み切れる形だけ）では、モードの側で通りうる。前の版の表（`sh`/`bash` の 2 列だけ）は狭すぎた（敵対的レビュー 1）。
 
-**塞ぎ方の候補を当てた結果**（止めたい 25 形、通したい 9 形、止めすぎの候補 7 形。読み切れない形は判定と同じく生の文字列に当てた）:
+**塞ぎ方: 承認のルールの正規表現は変えず、3.5 節の「包みを外した形」に当てて塞ぐ（D-8）。**
+包みの問題は承認のルールだけでなく、組み込みの守りと利用者のルールに共通していた（3.5 節の実測）。承認のルールにだけ
+ラッパの一覧を持たせる案は、同じ穴を 1 本ずつ塞ぐことになるのでやめた。`--approve --preview` を通す既存の除外と、
+`--yes` を独立した枝で当てる形は変えない。
 
-| 案 | 止めたい形を止めた数 | 通したい形を止めた数 | 止めすぎの候補を止めた数 | 止まらずに残る形 |
-|---|---|---|---|---|
-| 前の版の案 `((sh\|bash)\s+)?` | 一部（`/bin/sh`・`env`・`command`・`exec`・`nohup`・`zsh`・`dash`・`sh -x`・`sh -c`・`.`・`source` が残る） | 0 | 0 | 左の列 |
-| A: 同じコマンドの中なら語の位置を問わない | 25 / 25 | 0 / 9 | **7 / 7** | なし |
-| **B: ラッパの並び + 引用（推す）** | 23 / 25 | 0 / 9 | 0 / 7 | `sudo -u me sh -c '…'`、`find … -exec ccnavi …`（どちらも読み切れない形で、今のまま ask） |
+launcher-scripts-03 で比べた、承認のルール専用の案（記録として残す）:
 
-止めすぎの候補: 引用しない `echo ccnavi --approve --yes x`、`grep -rn ccnavi --yes docs`、`printf '%s\n' ccnavi --yes`、
-`uv run pytest -k ccnavi --yes`、`git log --grep ccnavi --yes`、ゲートの sh の引数に綴りが出る形、`time ls ccnavi --yes`。
-
-**B の形**（`phase.ticket_approval_rule` の `launcher` の前に置く）:
-
-```python
-_WRAPPERS = r"(env|command|exec|nohup|time|nice|sudo|sh|bash|zsh|dash|ksh|\.|source|xargs)"
-# 環境変数の代入か、ラッパ（オプション付き、区切りの前の道筋も可）の並び。最後に引用の始まりを 1 つ許す。
-_BEFORE = rf"((\w+=\S*\s+)|((\S*[\\/])?{_WRAPPERS}(\s+-\S+)*\s+))*['\"]?"
-expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{_BEFORE}{launcher}\s+[^\x00]*{_CLI_FORMS}|{script}"
-```
-
-- `.`・`source`・`xargs` と `sh -c` の引用は、shellread が読み切れない形として生の文字列に落とすので、同じ 1 本が生の文字列に当たる。
-  読み切れない形に deny と ask を当てる既存の扱い（`judge.py` の「生の文字列に当たりすぎるぶんは厳しい側へ外れる」）と揃う
-- `echo`・`grep`・`printf` のような「実行ファイルを起動しない」語はラッパに入れない。A の止めすぎはここから来る
-- 残る 2 形はオプションが値を取る形（`sudo -u me`）と、`find` の `-exec`。どちらも読み切れない形で ask に落ちるので、
-  人の確認を通らずには承認できない。塞ぐならラッパのオプションの値の読み方を足すことになり、正規表現の読みにくさと引き換えになる
-- `--approve --preview` を通す既存の除外と、`--yes` を独立した枝で当てる形は変えない
+| 案 | 止めたい 25 形 | 止めすぎの候補 7 形 | 残る形 |
+|---|---|---|---|
+| 前の版の `((sh\|bash)\s+)?` | 一部 | 0 | `/bin/sh`・`env`・`command`・`exec`・`zsh`・`sh -c`・`source` など |
+| A: 同じコマンドの中なら語の位置を問わない | 25 | **7**（引用しない `echo ccnavi --approve --yes x`、`git log --grep ccnavi --yes` など） | なし |
+| B: ラッパの並び + 引用 | 23 | 0 | `sudo -u me sh -c '…'`、`find -exec`（ask） |
+| **3.5 節の外した形（採る）** | 25（試作で確かめた 20 形を含む） | 0（`echo` などは包むコマンドではないので外さない） | 包むコマンドの一覧に無いもの（3.5.6） |
 
 **止まる側への変更**で、チケットの「変える場所」には書かれていない（15 節 D-5・D-8）。
+
+### 3.5 包みを外した形を、止める側のルールに当てる
+
+利用者の決定（2026-09-13）により、launcher-scripts の中でまとめて直す。
+
+#### 3.5.1 何が起きているか（実測）
+
+このリポジトリの `rules.yml` と組み込みで `--test Bash … --json` を打った。包み方は `env`・`FOO=1`・`command`・`exec`・`nohup`・
+`time`・`sudo`・`sudo -u me`・`timeout 5`・`nice -n 5`・`stdbuf -o0`・`/usr/bin/env` の 13 通り（「包み 13」）と、
+読み切れない形の `sh -c '…'`・`echo x | xargs …`。
+
+| 守り | 包まない | 包み 13 | `sh -c`・`xargs` | 原因 |
+|---|---|---|---|---|
+| 設定ファイル（`builtin-guard-setting-files`。`rm`・`mv`・`tee`・`sed -i`・`cp`・`truncate` で `.ccnavi/common/rules.yml`・`.claude/settings.json`） | deny | **ask（すべて）** | ask | `selfguard._WRITE_VERBS` が `(^\|\x00)(mv\|rm\|…)` で先頭に固定 |
+| チケットの状態（`builtin-ticket-state-shell`。`mv … wip/tickets/doing/`） | deny | **ask** | ask | 同じ `_WRITE_VERBS` を使う |
+| 承認（`builtin-guard-ticket-approval`） | deny | **ask** | ask | `launcher` を先頭に固定（3.4 節） |
+| 実行ファイル・記録（`rm -rf .ccnavi/bin/…`、`rm -rf logs/state`） | deny | deny（組み込みは外れ、利用者のルール `recursive-delete` だけが当たる） | deny（同） | 同上 |
+| リダイレクト（`env echo x > .ccnavi/common/rules.yml`） | deny | deny | deny | `>` の行き先は包みの外に付く |
+| 利用者: `raw-git`・`recursive-delete` | deny | deny | deny | 正規表現が語の途中にも当たる書き方 |
+| 利用者: `prefer-webfetch`（`curl`） | ask | **当たらない**（未宣言の ask） | 当たらない | `(^\|\x00)` で先頭に固定 |
+| サブエージェントの禁止（`phase.forbidden`。`sh .ccnavi/scripts/ccnavi-ticket.sh start`） | 禁止 | **`env sh`・`command sh`・`/bin/sh` は素通り** | 素通り | `(^\|[;&\|]\s*)(sh\|bash)\s+` で先頭に固定 |
+| ゲートの中で通す形（`phase.exempt`） | 通す | 包むと通さない（広がっていない） | — | — |
+
+`cd /tmp && …`・`( … )`・`$( … )` は今も当たる。切り分けは効いていて、足りないのは「包み」だけ。
+
+ask に落ちる形は人に確認されるが、読み切れる形は判定を権限モードに渡すので（`undeclared_verdict`）、モードによっては
+尋ねずに通る。サブエージェントの禁止には確認の段が無い。
+
+#### 3.5.2 外し方（`shellread`）
+
+`shellread` に「1 本のコマンドから、包みを 1 枚ずつ外した層を全部返す」処理を足す。元の形は含めない。途中の層も残す
+（`env sh .ccnavi/scripts/ccnavi-approve.sh` の `sh …approve.sh` の層に、承認のルールの `script` の枝が当たるため）。深さは 4 まで。
+
+| 形 | 外した層 |
+|---|---|
+| `FOO=1 <cmd>` | `<cmd>` |
+| `/bin/sh x`、`git.exe x`（区切りの前の道筋や拡張子が付いた名前） | `sh x`、`git x`（`_base` で読み替えた層） |
+| 包むコマンド `env` `command` `exec` `nohup` `time` `nice` `sudo` `doas` `timeout` `stdbuf` `chrt` `ionice` `taskset` | オプション（`-` で始まる語）、値を取るオプションの値、位置引数、`--`、`env` の `FOO=1` を飛ばした残り |
+| `sh` `bash` `zsh` `dash` `ksh` `<ファイル> <引数>` | `<ファイル> <引数>` |
+| `sh -c '<文字列>'`（`-lc` のような組み合わせも） | 文字列を読み直したコマンドと、その層 |
+| `eval <語…>` | 語をつないで読み直したコマンドと、その層 |
+| `.` / `source` `<ファイル> <引数>` | `<ファイル> <引数>` |
+| `xargs [オプション] <cmd…>` | `<cmd…>` |
+| `find … -exec` / `-execdir` / `-ok` / `-okdir` `<cmd…> ;` または `+` | `<cmd…>`（`-exec` が複数ならそれぞれ） |
+
+値を取るオプション（試作の一覧。実装で `--help` と突き合わせる）:
+
+| コマンド | 値を取る | 位置引数 |
+|---|---|---|
+| `env` | `-u` `--unset` `-C` `--chdir` | 0 |
+| `exec` | `-a` | 0 |
+| `time` | `-f` `-o` | 0 |
+| `nice` | `-n` `--adjustment` | 0 |
+| `sudo` | `-u` `-g` `-C` `-h` `-p` `-U` `-r` `-t` `-T` | 0 |
+| `doas` | `-u` `-C` | 0 |
+| `timeout` | `-s` `--signal` `-k` `--kill-after` | 1（時間） |
+| `stdbuf` | `-i` `-o` `-e` | 0 |
+| `chrt` / `taskset` | — | 1 |
+| `ionice` | `-c` `-n` `-p` | 0 |
+| `xargs` | `-I` `-n` `-P` `-d` `-L` `-s` `-E` `-a` `--max-args` `--max-procs` `--delimiter` | 0 |
+
+`Reading` に欄 `unwrapped: str` を足す。全コマンドの層を `SEP` でつないだ文字列で、層が無ければ空。**読み切れない形
+（`degraded`）でも、トークンに割れる限り作る。** 閉じない引用と閉じないヒアドキュメントでは作らない。`degraded` と
+理由はそのまま残す。
+
+#### 3.5.3 当てる先の線引き（`judge`）
+
+| 当てる先 | 元の形（読めれば組み直した文字列、読み切れなければ生の文字列） | 外した形 |
+|---|---|---|
+| deny（組み込み・利用者） | 当てる | **当てる** |
+| ask（組み込み・利用者） | 当てる | **当てる** |
+| allow（利用者） | 読み切れたときだけ当てる（今のまま） | **当てない** |
+| サブエージェントの禁止（`phase.forbidden`） | 当てる | **当てる** |
+| ゲートの中で通す形（`phase.exempt`） | 当てる（今のまま） | **当てない** |
+| チケットの範囲（`ticket_verdict`） | 今のまま | 当てない |
+
+`Rule.matches` は変えない。`judge` がタイプごとに当てる文字列の並び（deny・ask は元の形と外した形、allow は元の形だけ）を
+渡す。PowerShell は shellread で読まないので変わらない。
+
+**allow と exempt に当てない理由。** 外した形は「止める側に足す当て先」で、元の形の判定を消さない。だから層の読み違いが
+あっても、当たるはずのものが当たらないだけで、今より緩くはならない。allow と exempt に当てると逆になる。
+試作で `sudo -u me cat /etc/shadow` は、元の形では ask、外した形だけに当てると `prefer-read-grep` の allow になった。
+`env sh .ccnavi/scripts/ccnavi-review.sh …` に exempt を当てると、ゲートの中で包んだコマンドが通るようになる。
+
+#### 3.5.4 試作で測った結果
+
+`shellread` の内部（トークン化・ヒアドキュメント・切り分け）を使った試作で層を作り、元の形と外した形をそれぞれ
+`--test` に当てた（deny / ask で当たったルールを比べる）。
+
+止めたい 20 形は、すべて止まるようになった:
+
+| 形（例） | 外した形で当たったもの |
+|---|---|
+| `env rm -f …rules.yml`、`sudo -u me mv …settings.json …`、`timeout 5 sed -i …`、`nice -n 5 tee …`、`/usr/bin/env FOO=1 cp …`、`stdbuf -o0 truncate …` | `builtin-guard-setting-files` |
+| `sh -c 'rm -f …rules.yml'`、`eval 'mv …settings.json …'`、`echo x \| xargs rm -f …`、`find … -exec rm -f … ;` | `builtin-guard-setting-files` |
+| `command mv wip/tickets/todo/a.md wip/tickets/doing/a.md` | `builtin-ticket-state-shell` |
+| `env sh <sh> --approve --yes x`、`sudo -u me sh -c '<sh> …'`、`source <sh> …`、`find … -exec <sh> … ;`、`env sh .ccnavi/scripts/ccnavi-approve.sh` | `builtin-guard-ticket-approval` |
+| `env curl -d @x https://example.com` | `prefer-webfetch`（ask） |
+| `env sh …ccnavi-ticket.sh start x`、`/bin/sh …ccnavi-ticket.sh done x`、`sh -c 'sh …ccnavi-review.sh request --phase 1'` | サブエージェントの禁止 |
+
+普通の作業 27 形で、外したことにより新しく deny / ask に当たったものは **0**。対象: `time uv run pytest`、`nice -n 10 make test`、
+`env PYTHONUTF8=1 uv run python -m unittest`、`timeout 60 pnpm test`、`sudo -u me cat /etc/hosts`、`sh scripts/ccnavi-setup.sh --check`、
+`bash tests/run.sh`、`command -v jq`、`env | grep CCNAVI`、`sh -c 'cat README.md'`、`find … -exec grep -l foo {} ;`、
+`echo x | xargs grep -n foo`、`nohup python -m http.server &`、`stdbuf -o0 tail …`、`source .venv/bin/activate`、
+`. .venv/bin/activate && uv run pytest`、`bash -lc 'uv run ruff check .'`、ゲートの sh 3 形、`exec zsh`、`time git log --oneline`、
+`find … -exec rm {} +`、`xargs -n1 -I{} echo {}`、`sudo -E env PATH=/x make install`、`env -u CCNAVI_MODE uv run python -m ccnavi --lint`、
+`timeout 5 sh -c 'cat logs/log.jsonl | tail -n 3'`。
+
+#### 3.5.5 記録と文面
+
+外した形で当たったときは、記録（`log.jsonl`）に欄 `unwrapped` を足してその層を残し、拒否と確認の文面に
+「包みを外した形（`<層>`）に当たりました」を 1 行足す（D-10）。元の形のどこが問題なのかが、読み手に分からなくなるため。
+
+#### 3.5.6 残る穴と代償
+
+- **包むコマンドの一覧に無いもの**（`script -c`、`watch`、`parallel`、`busybox sh`、`ssh host <cmd>`、`perl -e`、`python -c`）は外さない。
+  先頭に固定したルールは今と同じく抜け、未宣言なら ask に落ちる。一覧は shellread の組み込みに持つ（D-9）
+- **値を取るオプションの読み違い。** 一覧に無いオプション（`sudo --preserve-env=X` は 1 語なので正しく飛ぶが、将来の
+  `sudo -R dir` など）は、値を命令と読んで層がずれる。ずれても当たらないだけで、今より緩くはならない（3.5.3）
+- **変数・alias・関数**（`$SUDO rm …`）には届かない。shellread の既知の限界のまま
+- **止めすぎ。** 外した形は止める側にしか足さないので、起こりうるのは止めすぎだけ。試作の 27 形では 0 だったが、
+  `time` や `nice` の後ろに利用者の deny に当たるコマンドを書く普通の作業は、これから止まる（その deny は元々そのコマンドを
+  止めるために書かれたものなので、意図どおり）
+- **判定の期限。** 当てる文字列が 1 本増える。層の数は深さ 4 と語数で抑える
 
 ## 4. 導入スクリプト（`scripts/ccnavi-setup.sh`）
 
@@ -348,7 +463,10 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 | `scripts/ccnavi-setup.sh` | `--bin` の廃止、定数、sh を `DEPLOY_SCRIPTS` へ、移し替え、古い sh の片付け、`.gitignore`、まだ無いもの（4 節） | implement |
 | `ccnavi/platformtag.py` | `LAUNCHER_NAME`、`launched_executable` の 2 つの形、冒頭の説明 | implement |
 | `ccnavi/selfguard.py` | `binary_clause` の 2 つの形、説明の直し | implement |
-| `ccnavi/phase.py` | 承認の綴りの当て方を 3.4 節の形にする（D-5・D-8） | implement |
+| `ccnavi/shellread.py` | 包みを外した層を作る処理と、包むコマンド・値を取るオプションの一覧、`Reading.unwrapped`（3.5.2） | implement |
+| `ccnavi/judge.py` | deny・ask とサブエージェントの禁止に外した形も当てる。allow・exempt・チケットの範囲には当てない（3.5.3） | implement |
+| `ccnavi/audit.py`・`ccnavi/reasons.py` | 記録の欄 `unwrapped` と、文面の 1 行（3.5.5） | implement |
+| `ccnavi/phase.py` | `forbidden` が外した形も受け取る口。承認のルールの正規表現は変えない（3.4 節、D-8） | implement |
 | `ccnavi/settings.py` | `OLD_BIN_PATHS` | implement |
 | `ccnavi/lint.py` | 前の既定の warn、実行できない sh の error | implement |
 | `build.py` | `install()` で `.ccnavi/bin/<target>/` へ写す | implement |
@@ -359,7 +477,10 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 | `tests/test_launcher.py` | `LAUNCHER` の綴り、12 節 L1–L5 | acceptance |
 | `tests/test_setup.py` | `--bin` を使う 10 か所（関数 9 本とループ 1 か所）を 12 節の表のとおり直し、配置と移し替えを 12 節 S1–S14 に | acceptance |
 | `tests/test_selfguard.py` | 12 節 G1–G5（今の `launcher_layout` は前の形として残す） | acceptance |
-| `tests/test_repo_rules.py` | 12 節 A1–A3 | acceptance |
+| `tests/test_repo_rules.py` | 12 節 A1–A4、W1–W4、W6 | acceptance |
+| `tests/test_shellread.py`（無ければ新規） | 12 節 U1–U3 | acceptance |
+| `tests/test_phase.py` | 12 節 W5（サブエージェントの禁止） | acceptance |
+| `tests/test_audit.py`（無ければ新規） | 12 節 W7（記録と文面） | acceptance |
 | `tests/test_lint.py` | 12 節 N1–N2 | acceptance |
 | `tests/test_config_union_guard.py` | 偽の配布元に sh を置く綴りを `.ccnavi/scripts/` に | acceptance |
 | `tests/test_build.py`（新規） | 12 節 B1 | acceptance |
@@ -435,8 +556,23 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
   `sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md`、`echo <sh>`、
   `git commit -m 'docs: ccnavi --approve --yes の説明'`（`raw-git` には当たる）、
   引用しない `echo ccnavi --approve --yes x`、`grep -rn ccnavi --yes docs`、`git log --grep ccnavi --yes`
-- A4 B の形で残る `sudo -u me sh -c 'ccnavi --approve --yes x'` と `find . -name x -exec ccnavi --approve --yes {} \;` は、
-  承認のルールには当たらないが、読み切れない形として ask（`PARSE_UNCERTAIN`）に落ちる。allow には落ちない（D-8 の代償を固定する）
+- A4 `sudo -u me sh -c 'ccnavi --approve --yes x'` と `find . -name x -exec ccnavi --approve --yes {} \;` も、外した形で
+  `builtin-guard-ticket-approval` に当たって止まる（3.5 節。B の案で残っていた 2 形）
+
+**包みを外した形（`test_shellread.py`・`test_repo_rules.py`・`test_phase.py`）**
+
+- U1 3.5.2 の表の形ごとに、外した層が表のとおりになる（途中の層も並ぶ。深さ 4 で止まる）
+- U2 読み切れない形（`sh -c`・`bash -lc`・`eval`・`source`・`.`・`xargs`・`find -exec`）でも層を作り、`degraded` と理由は残る
+- U3 閉じない引用・閉じないヒアドキュメントでは層を作らない
+- W1 組み込みの守りが、包み 13 と `sh -c`・`eval`・`xargs`・`find -exec` で包んだ形でも deny になる
+  （設定ファイルの 6 動詞、チケットの状態、承認、`env sh .ccnavi/scripts/ccnavi-approve.sh`）
+- W2 利用者の先頭に固定したルール（`prefer-webfetch`）も、`env curl …` で当たる（ask）
+- W3 外した形は allow に当てない: `sudo -u me cat /etc/hosts` は `prefer-read-grep` に当たらない
+- W4 外した形は exempt に当てない: レビュー待ちのゲートの中で、`env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1` は通らない
+- W5 サブエージェントの禁止: `env sh …ccnavi-ticket.sh start x`、`/bin/sh …ccnavi-ticket.sh done x`、
+  `sh -c 'sh …ccnavi-review.sh request --phase 1'` が禁止される
+- W6 3.5.4 の普通の作業 27 形で、deny / ask に当たるルールが元の形のときから増えない
+- W7 外した形で当たったとき、記録に `unwrapped` の層が残り、文面に「包みを外した形」の 1 行が出る。元の形で当たったときは出ない
 
 **設定lint（`test_lint.py`）**
 
@@ -485,6 +621,27 @@ sh が選ぶ・語を揃える、は引き継ぐ）
 **採らなかった案:** 自分に導入スクリプトを当てる（ビルドのたびに 1 手増える）。sh を `.ccnavi/bin/` に残して
 名前だけ揃える（sh と実行ファイルの混在が残る）。hook の `command` を `sh "…"` にする（D-3 の案 C）
 
+### ADR-0044 の骨子（判定の当て方の変更は ADR-0043 と分ける）
+
+**題:** シェルのコマンドは、包みを外した形にも止める側のルールだけを当てる
+
+**状況:** 3.5.1 の表。組み込みの守りとサブエージェントの禁止が先頭の語に固定されていて、`env`・`sudo`・`sh -c` などで包むと当たらない
+
+**決定:** shellread が包みを外した層を作り、deny・ask・サブエージェントの禁止に元の形と一緒に当てる。allow・exempt・チケットの範囲には当てない
+
+**理由:** 包みの問題はルールの書き方ではなく、読みの側の不足。ルールごとに包みを書かせると、組み込みも利用者のルールも同じ穴を 1 本ずつ塞ぐことになる。
+止める側にだけ足すので、層の読み違いは緩む方向に効かない
+
+**得たもの・失ったもの:**
+
+- 得たもの: 組み込み・利用者のルール・サブエージェントの禁止で同じ判断になる。ルールを書く人が包みを意識しなくてよい
+- 失ったもの: 包むコマンドと値を取るオプションの一覧を shellread が持ち、足すまで一覧に無い包みは抜ける
+- 失ったもの: 当てる文字列が 1 本増え、記録の欄が 1 つ増える
+- 失ったもの: 包みの後ろに書いた、利用者の deny に当たるコマンドが止まるようになる（意図どおりだが、今まで通っていた）
+
+**採らなかった案:** 承認のルールだけにラッパの一覧を持たせる（B。同じ穴が他の守りに残る）。語の位置を問わずに当てる（A。止めすぎる）。
+外した形を allow にも当てる（`sudo -u me cat …` が通るようになる）
+
 ## 14. requirements.md の候補（文面だけ）
 
 番号は docs フェーズで空きを取る。
@@ -492,7 +649,9 @@ sh が選ぶ・語を揃える、は引き継ぐ）
 - **新規（HKS）** 常時 | 導入スクリプトは、hook が起動する振り分けのスクリプトと実行ファイルを、それぞれ決まった置き場に置き、置き場を引数で動かせないこと
 - **新規（MLT）** 事象 | 前の既定の置き場を指す実行ファイルの位置の設定を見つけたとき、導入スクリプトは、新しい置き場で起動できる場合に限りそれを書き換え、既定でない位置は書き換えずに名指しすること
 - **REQ-SLF-07 の説明文に足す** 位置が振り分けのスクリプトを指すとき、そのスクリプトが起動する実行ファイルの置き場も守る対象に含める。スクリプトだけを守ると、実体を差し替えても判定が入れ替わったことに気付かない
-- **承認の経路の要求の説明文に足す（該当する REQ を docs で引く）** 実行ファイルを、シェルや他のコマンドの引数として起動する形（`sh <位置>`、`env sh <位置>` など）と、文字列として実行させる形（`sh -c`、`source`）も、直に起動する形と同じく止めること。読み切れない形では生の文字列に当て、当たりすぎは止める側に倒す
+- **新規（PRE）** 常時 | シェルのコマンドが他のコマンドに包まれて起動される場合（環境変数の代入、`env`・`sudo`・`timeout` などの包み、`sh -c` の文字列、`xargs`・`find -exec` の後ろ）、ccnavi は、拒否と確認のルールとサブエージェントの禁止を、包みを外した形にも当てること
+- **新規（PRE）** 常時 | ccnavi は、包みを外した形に、許可のルールとゲートの中で通す形を当てないこと
+- **新規（PRE）** 事象 | 包みを外した形でルールに当たったとき、ccnavi は、その層を記録と返す文面に残すこと
 
 ## 15. 人が決めたこと
 
@@ -504,6 +663,10 @@ sh が選ぶ・語を揃える、は引き継ぐ）
 **launcher-scripts-03 で足したもの（まだ決まっていない。このレビューで決める）:** D-7（浅い綴りの相対のシェル書き込み）と
 D-8（承認の経路の塞ぎ方）。D-5 は「塞ぐ」ことは決まっているが、前の版が推した塞ぎ方では塞ぎきれていなかったので、塞ぎ方を D-8 に分けた。
 
+**利用者の決定（2026-09-13、launcher-scripts-03 のレビューの途中）:** D-7 は受け入れる（守らない）。D-8 はいったん B としたが、
+組み込みの守りとサブエージェントの禁止にも同じ穴があることを実測で確かめ（3.5.1）、利用者の決定で「全部このチケットで直す」に
+なった。launcher-scripts-04 で D-8 を「3.5 節の外した形で塞ぐ」に書き直し、D-9・D-10 を足した（まだ決まっていない。このレビューで決める）。
+
 | # | 何を決めるか | 推す案 | 得るもの | 失うもの | 代案 |
 |---|---|---|---|---|---|
 | D-1 | `--bin` を渡されたとき | 2 で断る | 名指しを黙って無視しない（打った人が指した場所に置いたつもりで進まない） | `--bin .ccnavi/bin/ccnavi` を書いた手順書や CI が止まる | 受けて無視し 1 行出す |
@@ -511,8 +674,10 @@ D-8（承認の経路の塞ぎ方）。D-5 は「塞ぐ」ことは決まって�
 | D-3 | 配布先での sh の実行ビット | A: 追跡し、導入スクリプトが毎回 `chmod +x`、lint が error | ゲートの sh と同じ扱いで 1 つの置き場にまとまる | Windows（`core.filemode=false`）で最初に足すとモード 100644 で入り、別の機械で clone した直後は導入スクリプトを打つまで hook が 126 で起動しない（実行ファイルも無視されているので、どのみち打つ手順ではある） | B: 配布先では sh を無視し、機械ごとに配る（同じ置き場に追跡と無視が混ざる）／C: hook の `command` を `sh "…"` にする（実行ビットが要らなくなるが、登録済みの hook の書き換えと `looks` の見分けが要り、範囲が広がる） |
 | D-4 | このリポジトリの `.gitignore` に `/.ccnavi/bin/` | **人が 1 行足す（決定）** | チケットが増えない | 人の手が 1 つ増える | 親チケットの allow に足す（改版では足せないので、別の親を出すか親を出し直すことになる） |
 | D-5 | 承認の経路の間接起動を塞ぐか | 今回入れる（決定）。塞ぎ方は D-8 | 今の既定の配置にもある穴を、`.sh` の名前で打ちやすくなる前に塞ぐ | チケットの「変える場所」に無い変更が 1 つ増える。前の版が推した `((sh\|bash)\s+)?` では `/bin/sh`・`env`・`zsh`・`sh -c`・`source` などが通り、塞ぎきれていなかった（敵対的レビュー 1） | 別チケットに分ける（分けるまで間接起動は ask に落ちるだけで、承認のルールでは止まらない） |
-| D-7 | 浅い綴り（`scripts/ccnavi-launcher.sh`、`ccnavi-launcher.sh`）での相対のシェル書き込み | 受け入れて書き残す。導入スクリプトはその綴りを作らない | ルールが素直なまま。どのディレクトリの `bin/linux-x86_64` にも当たる形を持ち込まない | 既定でない浅い綴りで `rm -rf bin/linux-x86_64` が `builtin-guard-binary` に当たらない（実行後の控えと復元は効く）。前の形にも同じ限界がある（`CCNAVI_BIN_PATH=ccnavi` で `rm -rf linux-x86_64` が通ることを今の実装で確かめた） | `bin/<os>-<arch>` を位置を問わず当てる（2 段は塞がるが当たりすぎる。1 段の `../bin/` は塞がらない）／浅い綴りを lint で warn する（止めはしないが気づける。lint の項目が 1 つ増える） |
-| D-8 | 承認の経路の塞ぎ方（3.4 節） | B: ラッパの並び + 引用 | 測った 25 形のうち 23 形を承認のルールで止め、止めすぎの候補 7 形を 1 つも止めない | `sudo -u me sh -c '…'` と `find -exec` は承認のルールに当たらず、今のまま ask（人の確認）に落ちる。ラッパの一覧を持ち、増えたラッパ（`stdbuf`、`timeout` など）は一覧に足すまで ask のまま | A: 語の位置を問わない（25 形すべてを止めるが、引用しない `echo ccnavi --yes` や `git log --grep ccnavi --yes` まで deny になる）／前の版の `((sh\|bash)\s+)?`（`/bin/sh`・`env`・`sh -c`・`source` などが残る） |
+| D-7 | 浅い綴り（`scripts/ccnavi-launcher.sh`、`ccnavi-launcher.sh`）での相対のシェル書き込み | **受け入れて書き残す（決定）**。導入スクリプトはその綴りを作らない | ルールが素直なまま。どのディレクトリの `bin/linux-x86_64` にも当たる形を持ち込まない | 既定でない浅い綴りで `rm -rf bin/linux-x86_64` が `builtin-guard-binary` に当たらない（実行後の控えと復元は効く）。前の形にも同じ限界がある（`CCNAVI_BIN_PATH=ccnavi` で `rm -rf linux-x86_64` が通ることを今の実装で確かめた） | `bin/<os>-<arch>` を位置を問わず当てる（2 段は塞がるが当たりすぎる。1 段の `../bin/` は塞がらない）／浅い綴りを lint で warn する（止めはしないが気づける。lint の項目が 1 つ増える） |
+| D-8 | 承認の経路の塞ぎ方（3.4 節） | 3.5 節の外した形で塞ぐ（承認のルールの正規表現は変えない） | 承認だけでなく、組み込みの守り・利用者のルール・サブエージェントの禁止の同じ穴が一緒に塞がる。B で残った 2 形も止まる | 判定の仕組みの変更で、すべての Bash の判定に効く。包むコマンドの一覧を shellread が持つ | B: ラッパの並び + 引用（承認だけ。23/25。他の守りの穴が残る）／A: 語の位置を問わない（止めすぎる） |
+| D-9 | 包むコマンドと値を取るオプションの一覧の置き場 | shellread の組み込み | 利用者のルールファイルから消せない（守りの根拠を守られる側に置かない、ADR-0021 と同じ向き） | 一覧に足すには ccnavi を作り直す | `rules.yml` に足せる欄を作る（利用者が足せるが、消すこともできる） |
+| D-10 | 外した形で当たったことを記録と文面に残すか | 残す（記録の欄 `unwrapped`、文面の 1 行） | 元の形だけを見た読み手に、どこが当たったのかが分かる。記録を数えれば、包みで当たった件数が分かる | 記録の欄と文面が 1 つずつ増える。`--test` の JSON の形が変わる | 残さない（文面が短いが、`env rm …` がなぜ止まったのか読み手に分からない） |
 | D-6 | `.claude/skills/ccnavi-config/SKILL.md` の綴り | **人が直す（決定）** | 範囲を広げない | 人の手が 1 つ増える | 親チケットの allow に足す |
 
 ## 16. 今回入れないもの
