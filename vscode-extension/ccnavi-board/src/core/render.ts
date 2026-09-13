@@ -268,7 +268,7 @@ function badge(kind: string, text: string, title = ""): string {
 function renderPhases(phases: readonly PhaseChip[]): string {
   const rows = phases
     .map((p) => {
-      const marks = p.marks.map((m) => MARK_LABELS[m] ?? m).join("・") || "印なし";
+      const marks = p.marks.map((m) => MARK_LABELS[m] ?? m).join("・") || "マーカーなし";
       const gate = p.gateClosed ? "ゲート閉" : "ゲート開";
       const review = p.reviewRequired ? "レビュー要" : "レビュー不要";
       const risk = p.riskLine !== "" ? ` / ${p.riskLine}` : "";
