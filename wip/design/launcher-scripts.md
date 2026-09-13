@@ -86,7 +86,11 @@ hook は sh を `sh` 経由ではなく直に起動するので、sh に実行�
 
 既定の配置では両方が組み込みの `.ccnavi` の守りで二重に止まる。`CCNAVI_BIN_PATH` 由来の守りは、
 REQ-SLF-07 を ccnavi ディレクトリの守りに寄りかからせないためと、既定でない綴り（テストの
-`sys.executable`、前の形のワークスペース）のために残す。**緩めるところは無い。**
+`sys.executable`、前の形のワークスペース）のために残す。
+
+**既定の配置では緩めるところは無い。** 既定でない浅い綴り（`scripts/ccnavi-launcher.sh` など）では、相対のシェル書き込み
+（`rm -rf bin/linux-x86_64`）が `builtin-guard-binary` に当たらない形が残る（3.2 節の表、15 節 D-7）。前の形にも
+同じ種類の限界がある。実行後の控えと復元（`bin-launched`）は、どの綴りでも効く。
 
 ### 3.2 `binary_clause` の新しい形
 
@@ -97,15 +101,33 @@ LAUNCHER_NAME = "ccnavi-launcher.sh"
 # selfguard.py
 def binary_clause(bin_path: str) -> str:
     parts = [...]                      # 今と同じ分解
-    if len(parts) >= 3 and parts[-1] == platformtag.LAUNCHER_NAME:
-        home, scripts, name = (re.escape(p) for p in parts[-3:])
-        return rf"{home}[\\/](?:{scripts}[\\/]{name}|bin[\\/]{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
+    if parts and parts[-1] == platformtag.LAUNCHER_NAME:
+        sh = r"[\\/]".join(re.escape(p) for p in parts[-2:])
+        home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
+        return rf"(?:{sh}|{home}bin[\\/]{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
     # それ以外は今の形（末尾 2 要素と、隣の組み立ての置き場）
 ```
 
-- **sh かどうかは名前で決める。** ファイルを読まないので判定の期限に効かず、在るかどうかに依らず同じ綴りを返す。
+- **sh かどうかは名前だけで決め、`launched_executable`（3.3 節）と条件を揃える。** 前の版は「3 段以上」も
+  求めていて、名前だけで切り替える `launched_executable` と食い違っていた（敵対的レビュー 2）。
+  ファイルを読まないので判定の期限に効かず、在るかどうかに依らず同じ綴りを返す。
   代償: 別の名前で置いた sh は前の形で扱われ、その sh の `../bin/` は `builtin-guard-binary` から外れる。
   導入スクリプトはもうその形を作らない
+- **判定に渡る綴りは絶対パス。** `settings._resolve_bin` がワークスペースルートを継ぎ足すので、段数はふつう
+  3 以上になる。名指しのツール（解決済みの絶対パスに当てる）は浅い綴りでも止まる。残るのは、相対で書かれた
+  シェルのコマンドだけ
+
+測った結果（`CCNAVI_BIN_PATH` の綴りごと。ワークスペースルートは `/ws/proj`）:
+
+| 綴り | Write: 実体 | Write: sh | シェル: 相対 | シェル: 絶対 |
+|---|---|---|---|---|
+| `.ccnavi/scripts/ccnavi-launcher.sh` | 止まる | 止まる | 止まる（`rm -rf .ccnavi/bin/linux-x86_64`） | 止まる |
+| `tools/scripts/ccnavi-launcher.sh` | 止まる | 止まる | 止まる（`rm -rf tools/bin/linux-x86_64`） | 止まる |
+| `scripts/ccnavi-launcher.sh` | 止まる | 止まる | **通る**（`rm -rf bin/linux-x86_64`） | 止まる |
+| `ccnavi-launcher.sh` | 止まる | 止まる | **通る**（`rm -rf ../bin/linux-x86_64`） | 止まる |
+
+浅い 2 行の「通る」は、`bin/<os>-<arch>` を位置を問わず当てれば 2 段のほうは塞がるが、どのディレクトリの
+`bin/linux-x86_64` にも当たる。1 段のほうは、それでも塞がらない（15 節 D-7）
 - **前の形を残す。** `.ccnavi/bin/ccnavi` を指したままのワークスペース（導入スクリプトを打ち直すまで）で、
   隣の実体を守り続けるため。外すと打ち直すまでの間だけ守りが緩む（15 節 D-2）
 
@@ -121,23 +143,51 @@ def launched_executable(launcher: str, host: str | None = None) -> str:
     ...                                # 探す順は sh と同じ
 ```
 
-`selfguard.targets` は変えない。sh（数 KB）も今と同じく heavy のまま控える。
+切り替えの条件は `binary_clause` と同じ「名前が `ccnavi-launcher.sh`」だけ。どちらかだけ条件を足すと、
+守る場所と控える場所が食い違う。`selfguard.targets` は変えない。sh（数 KB）も今と同じく heavy のまま控える。
 
 ### 3.4 承認の経路（`builtin-guard-ticket-approval`）
 
-`phase.ticket_approval_rule` を今の実装に当てて確かめた（`--approve --yes x` を付けた綴り）。
+**今の実装で起きること**（`CCNAVI_BIN_PATH=.ccnavi/scripts/ccnavi-launcher.sh`、このリポジトリの `rules.yml` で
+`--test Bash … --json` を打って確かめた。`<sh>` は sh の綴り、末尾はすべて `--approve --yes x`）:
 
-| `CCNAVI_BIN_PATH` | 直に起動 | `/ws/` から起動 | `sh <綴り>` | `bash <綴り>` |
+| 形 | 判定 | コード | 当たったルール |
+|---|---|---|---|
+| `<sh> …`、`/ws/…/<sh> …` | deny | `DENY_TICKET_APPROVAL_CLI` | `builtin-guard-ticket-approval` |
+| `sh <sh>`、`bash`、`/bin/sh`、`env sh`、`env FOO=1 sh`、`command sh`、`exec sh`、`nohup sh`、`zsh`、`dash`、`sh -x`、`cd /tmp && sh <sh>`、`sh .ccnavi/bin/ccnavi`（前の形） | ask | `UNDECLARED` | なし |
+| `sh -c '<sh> …'`、`bash -lc "…"`、`. <sh>`、`source <sh>` | ask | `PARSE_UNCERTAIN`（読み切れない） | なし |
+
+間接起動は黙って通ってはいないが、承認のルールでは止まらず、確認に落ちている。判定を権限モードに渡すモード
+（読み切れる形だけ）では、モードの側で通りうる。前の版の表（`sh`/`bash` の 2 列だけ）は狭すぎた（敵対的レビュー 1）。
+
+**塞ぎ方の候補を当てた結果**（止めたい 25 形、通したい 9 形、止めすぎの候補 7 形。読み切れない形は判定と同じく生の文字列に当てた）:
+
+| 案 | 止めたい形を止めた数 | 通したい形を止めた数 | 止めすぎの候補を止めた数 | 止まらずに残る形 |
 |---|---|---|---|---|
-| `.ccnavi/bin/ccnavi`（今の既定） | 止まる | 止まる | **通る** | **通る** |
-| `.ccnavi/scripts/ccnavi-launcher.sh`（新規） | 止まる | 止まる | **通る** | **通る** |
-| `dist/ccnavi/ccnavi` | 止まる | 止まる | **通る** | **通る** |
+| 前の版の案 `((sh\|bash)\s+)?` | 一部（`/bin/sh`・`env`・`command`・`exec`・`nohup`・`zsh`・`dash`・`sh -x`・`sh -c`・`.`・`source` が残る） | 0 | 0 | 左の列 |
+| A: 同じコマンドの中なら語の位置を問わない | 25 / 25 | 0 / 9 | **7 / 7** | なし |
+| **B: ラッパの並び + 引用（推す）** | 23 / 25 | 0 / 9 | 0 / 7 | `sudo -u me sh -c '…'`、`find … -exec ccnavi …`（どちらも読み切れない形で、今のまま ask） |
 
-`sh`/`bash` を前に付けた形は、今の既定の配置でもすでに通っている。名前に `.sh` が付くと
-`sh .ccnavi/scripts/ccnavi-launcher.sh …` が自然な打ち方になるので、ここで塞ぐ。
+止めすぎの候補: 引用しない `echo ccnavi --approve --yes x`、`grep -rn ccnavi --yes docs`、`printf '%s\n' ccnavi --yes`、
+`uv run pytest -k ccnavi --yes`、`git log --grep ccnavi --yes`、ゲートの sh の引数に綴りが出る形、`time ls ccnavi --yes`。
 
-変更: `launcher` の綴りの前に `((sh|bash)\s+)?` を許す。**止まる側への変更**で、チケットの「変える場所」には
-書かれていない（15 節 D-5）。`--approve --preview` を通す既存の除外はそのまま効く。
+**B の形**（`phase.ticket_approval_rule` の `launcher` の前に置く）:
+
+```python
+_WRAPPERS = r"(env|command|exec|nohup|time|nice|sudo|sh|bash|zsh|dash|ksh|\.|source|xargs)"
+# 環境変数の代入か、ラッパ（オプション付き、区切りの前の道筋も可）の並び。最後に引用の始まりを 1 つ許す。
+_BEFORE = rf"((\w+=\S*\s+)|((\S*[\\/])?{_WRAPPERS}(\s+-\S+)*\s+))*['\"]?"
+expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{_BEFORE}{launcher}\s+[^\x00]*{_CLI_FORMS}|{script}"
+```
+
+- `.`・`source`・`xargs` と `sh -c` の引用は、shellread が読み切れない形として生の文字列に落とすので、同じ 1 本が生の文字列に当たる。
+  読み切れない形に deny と ask を当てる既存の扱い（`judge.py` の「生の文字列に当たりすぎるぶんは厳しい側へ外れる」）と揃う
+- `echo`・`grep`・`printf` のような「実行ファイルを起動しない」語はラッパに入れない。A の止めすぎはここから来る
+- 残る 2 形はオプションが値を取る形（`sudo -u me`）と、`find` の `-exec`。どちらも読み切れない形で ask に落ちるので、
+  人の確認を通らずには承認できない。塞ぐならラッパのオプションの値の読み方を足すことになり、正規表現の読みにくさと引き換えになる
+- `--approve --preview` を通す既存の除外と、`--yes` を独立した枝で当てる形は変えない
+
+**止まる側への変更**で、チケットの「変える場所」には書かれていない（15 節 D-5・D-8）。
 
 ## 4. 導入スクリプト（`scripts/ccnavi-setup.sh`）
 
@@ -279,8 +329,15 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
   揃っていないと hook は 127 で起動しない
   1. `.ccnavi/scripts/ccnavi-launcher.sh`（staging の成果物を人が写す。100755）
   2. `.ccnavi/bin/<この機械>/ccnavi`（ワークスペースルートで `build.py` を回す）
-- `COPY.md` に「写す → 組み立てる → 開き直す」の順と、確かめる 1 行
-  （`echo '{}' | .ccnavi/scripts/ccnavi-launcher.sh; echo $?` が 127 以外）を書く
+- `COPY.md` に「写す → 組み立てる → 確かめる → 開き直す」の順を書く。確かめる手順は原因ごとに分ける
+  （敵対的レビュー 4。`echo $?` だけでは 126 と 127 を区別できない）
+  1. 実行ビット: `[ -x .ccnavi/scripts/ccnavi-launcher.sh ] && echo ok || echo NOT-EXECUTABLE`
+  2. git のモード: `git ls-files -s .ccnavi/scripts/ccnavi-launcher.sh` の先頭が `100755`
+  3. 起動: `echo '{}' | .ccnavi/scripts/ccnavi-launcher.sh; echo $?` の読み方
+     - 126: 実行ビットが無い（1 に戻る）
+     - 127 で `ccnavi: この機械（…）で動く実行ファイルが…` が出る: 実体が無い（`build.py` を回す）
+     - 127 で ccnavi の文面が出ない: sh 自体が無いか綴りが違う
+     - それ以外: 実体まで届いている
 
 ## 11. 実装の入口ごとの変更点
 
@@ -291,7 +348,7 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 | `scripts/ccnavi-setup.sh` | `--bin` の廃止、定数、sh を `DEPLOY_SCRIPTS` へ、移し替え、古い sh の片付け、`.gitignore`、まだ無いもの（4 節） | implement |
 | `ccnavi/platformtag.py` | `LAUNCHER_NAME`、`launched_executable` の 2 つの形、冒頭の説明 | implement |
 | `ccnavi/selfguard.py` | `binary_clause` の 2 つの形、説明の直し | implement |
-| `ccnavi/phase.py` | 承認の綴りに `sh`/`bash` の前置を許す（D-5） | implement |
+| `ccnavi/phase.py` | 承認の綴りの当て方を 3.4 節の形にする（D-5・D-8） | implement |
 | `ccnavi/settings.py` | `OLD_BIN_PATHS` | implement |
 | `ccnavi/lint.py` | 前の既定の warn、実行できない sh の error | implement |
 | `build.py` | `install()` で `.ccnavi/bin/<target>/` へ写す | implement |
@@ -300,9 +357,9 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 | `.claude/settings.json` | `CCNAVI_BIN_PATH` | implement |
 | `.gitignore` | `/.ccnavi/bin/` | 人が直す（staging の `COPY.md`。D-4） |
 | `tests/test_launcher.py` | `LAUNCHER` の綴り、12 節 L1–L5 | acceptance |
-| `tests/test_setup.py` | `--bin` 系の 6 本を「断る」1 本に、配置と移し替えを 12 節 S1–S14 に | acceptance |
+| `tests/test_setup.py` | `--bin` を使う 10 か所（関数 9 本とループ 1 か所）を 12 節の表のとおり直し、配置と移し替えを 12 節 S1–S14 に | acceptance |
 | `tests/test_selfguard.py` | 12 節 G1–G5（今の `launcher_layout` は前の形として残す） | acceptance |
-| `tests/test_repo_rules.py` | 12 節 A1–A2 | acceptance |
+| `tests/test_repo_rules.py` | 12 節 A1–A3 | acceptance |
 | `tests/test_lint.py` | 12 節 N1–N2 | acceptance |
 | `tests/test_config_union_guard.py` | 偽の配布元に sh を置く綴りを `.ccnavi/scripts/` に | acceptance |
 | `tests/test_build.py`（新規） | 12 節 B1 | acceptance |
@@ -342,6 +399,19 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 - S13 配布元に `.ccnavi/scripts/ccnavi-launcher.sh` が無ければ「配布元に無くて配れないもの」に出る
 - S14 配布先の sh の実行ビットが落ちていれば、配らない回（keep）でも付け直す（D-3）
 
+今の `tests/test_setup.py` で `--bin` を使うところ（`grep -n '"--bin"'` と `grep -n 'def test_.*bin'` で洗い出した 10 か所。
+前の版の「6 本」は数え違い。敵対的レビュー 3）の扱い:
+
+| 今のテスト | 扱い |
+|---|---|
+| `test_bin_path_points_at_the_launcher` | S1 に書き直す |
+| `test_refuses_a_bin_spelled_with_exe` / `_a_newline_in_the_bin_path` / `_an_empty_bin_path` / `_a_bin_path_that_climbs_out_of_the_project` / `_an_absolute_bin_path` | 消す。S4 の 1 本が `--bin` そのものを断る |
+| `test_follows_the_bin_option_for_where_it_puts_the_executable` | S3 に書き直す（置き場は固定） |
+| `test_does_not_move_a_named_bin_without_force` | 消す（名指しの `--bin` が無くなる）。既定でない綴りを書き換えないことは S10 が見る |
+| `test_leaves_the_old_directory_alone_when_bin_lives_there` | 消す（sh を `.claude/ccnavi/` に置く形が作れなくなる） |
+| `test_does_not_ignore_the_rules_that_sit_next_to_the_executable` | S5 に吸収する。足すのが `/.ccnavi/bin/<built>/` だけで、`.ccnavi/` や `.ccnavi/common/` を無視しないことを S5 で確かめる |
+| `test_refuses_an_option_without_its_value` のループ（`--mode` / `--bin`） | `--bin` を外す。`--bin` は値の有無に依らず S4 で断る |
+
 **自己保護（`test_selfguard.py`）**
 
 - G1 `CCNAVI_BIN_PATH` が `.ccnavi/scripts/ccnavi-launcher.sh` なら、`.ccnavi/bin/<host>/ccnavi` をセッション開始で控え、差し替えを戻す
@@ -349,11 +419,24 @@ env が無いときの既定の探し先（`dist/ccnavi/ccnavi` → ソース）
 - G3 `rm -rf .ccnavi/bin/linux-x86_64` は止まる
 - G4 sh を `tools/scripts/ccnavi-launcher.sh` に置いたとき、`tools/scripts/linux-x86_64/x` は `builtin-guard-binary` に当たらず、`tools/bin/linux-x86_64/x` は当たる
 - G5 前の形（`tools/bin/ccnavi` と隣の `<os>-<arch>/`）は今のテストのまま通る
+- G6 `CCNAVI_BIN_PATH=scripts/ccnavi-launcher.sh`（浅い綴り）でも、`bin/<host>/_internal/x` への Write は `builtin-guard-binary` で止まり、
+  `launched_executable` が控える場所と同じ置き場を指す（3.2・3.3 節の条件が揃っていること）
 
 **承認の経路（`test_repo_rules.py`）**
 
-- A1 `sh .ccnavi/scripts/ccnavi-launcher.sh --approve --yes x` と `bash …` を止める。`sh … --approve --preview` は通す
-- A2 `sh .ccnavi/bin/ccnavi --approve --yes x`（前の形）も止まる
+- A1 次を `builtin-guard-ticket-approval` で止める（`<sh>` は `.ccnavi/scripts/ccnavi-launcher.sh`）:
+  `<sh> --approve --yes x`、`sh <sh> …`、`bash <sh> …`、`/bin/sh <sh> …`、`env sh <sh> …`、`env FOO=1 sh <sh> …`、
+  `command sh <sh> …`、`exec sh <sh> …`、`nohup sh <sh> …`、`zsh <sh> …`、`dash <sh> …`、`sh -x <sh> …`、
+  `cd /tmp && sh <sh> …`、`sh <sh> ticket start x`、`sh .ccnavi/bin/ccnavi …`（前の形）、`sh .ccnavi/bin/<host>/ccnavi …`、`sh ccnavi …`
+- A2 読み切れない形（`sh -c '<sh> --approve --yes x'`、`bash -lc "…"`、`. <sh> …`、`source <sh> …`）も同じルールで止まり、
+  コードが `DENY_TICKET_APPROVAL_CLI` になる（今は ask の `PARSE_UNCERTAIN` に落ちる）
+- A3 次は承認のルールに当たらない: `<sh> --approve --preview x`、`sh <sh> --approve --preview x`、`cat <sh>`、
+  `grep -n 'ccnavi --approve --yes' README.md`、`sed -n 1,20p <sh>`、`sh .ccnavi/scripts/ccnavi-ticket.sh start x`、
+  `sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md`、`echo <sh>`、
+  `git commit -m 'docs: ccnavi --approve --yes の説明'`（`raw-git` には当たる）、
+  引用しない `echo ccnavi --approve --yes x`、`grep -rn ccnavi --yes docs`、`git log --grep ccnavi --yes`
+- A4 B の形で残る `sudo -u me sh -c 'ccnavi --approve --yes x'` と `find . -name x -exec ccnavi --approve --yes {} \;` は、
+  承認のルールには当たらないが、読み切れない形として ask（`PARSE_UNCERTAIN`）に落ちる。allow には落ちない（D-8 の代償を固定する）
 
 **設定lint（`test_lint.py`）**
 
@@ -409,7 +492,7 @@ sh が選ぶ・語を揃える、は引き継ぐ）
 - **新規（HKS）** 常時 | 導入スクリプトは、hook が起動する振り分けのスクリプトと実行ファイルを、それぞれ決まった置き場に置き、置き場を引数で動かせないこと
 - **新規（MLT）** 事象 | 前の既定の置き場を指す実行ファイルの位置の設定を見つけたとき、導入スクリプトは、新しい置き場で起動できる場合に限りそれを書き換え、既定でない位置は書き換えずに名指しすること
 - **REQ-SLF-07 の説明文に足す** 位置が振り分けのスクリプトを指すとき、そのスクリプトが起動する実行ファイルの置き場も守る対象に含める。スクリプトだけを守ると、実体を差し替えても判定が入れ替わったことに気付かない
-- **承認の経路の要求の説明文に足す（該当する REQ を docs で引く）** 実行ファイルをシェルの引数として起動する形（`sh <位置>`）も、直に起動する形と同じく止めること
+- **承認の経路の要求の説明文に足す（該当する REQ を docs で引く）** 実行ファイルを、シェルや他のコマンドの引数として起動する形（`sh <位置>`、`env sh <位置>` など）と、文字列として実行させる形（`sh -c`、`source`）も、直に起動する形と同じく止めること。読み切れない形では生の文字列に当て、当たりすぎは止める側に倒す
 
 ## 15. 人が決めたこと
 
@@ -418,13 +501,18 @@ sh が選ぶ・語を揃える、は引き継ぐ）
 直し方（`.gitignore` に 1 行、`SKILL.md` の 46–47 行）は staging の `COPY.md` に書き、人が `launcher-scripts` の
 ブランチでコミットする。
 
+**launcher-scripts-03 で足したもの（まだ決まっていない。このレビューで決める）:** D-7（浅い綴りの相対のシェル書き込み）と
+D-8（承認の経路の塞ぎ方）。D-5 は「塞ぐ」ことは決まっているが、前の版が推した塞ぎ方では塞ぎきれていなかったので、塞ぎ方を D-8 に分けた。
+
 | # | 何を決めるか | 推す案 | 得るもの | 失うもの | 代案 |
 |---|---|---|---|---|---|
 | D-1 | `--bin` を渡されたとき | 2 で断る | 名指しを黙って無視しない（打った人が指した場所に置いたつもりで進まない） | `--bin .ccnavi/bin/ccnavi` を書いた手順書や CI が止まる | 受けて無視し 1 行出す |
 | D-2 | 名前が `ccnavi-launcher.sh` でない `CCNAVI_BIN_PATH` の「隣を探す」形 | 残す | 打ち直す前のワークスペースでも隣の実体を守り続ける | `binary_clause` と `launched_executable` が 2 つの形を持ち続ける | 消す（打ち直すまで隣の実体の `builtin-guard-binary` と控えが外れる。組み込みの `.ccnavi` の守りは残る） |
 | D-3 | 配布先での sh の実行ビット | A: 追跡し、導入スクリプトが毎回 `chmod +x`、lint が error | ゲートの sh と同じ扱いで 1 つの置き場にまとまる | Windows（`core.filemode=false`）で最初に足すとモード 100644 で入り、別の機械で clone した直後は導入スクリプトを打つまで hook が 126 で起動しない（実行ファイルも無視されているので、どのみち打つ手順ではある） | B: 配布先では sh を無視し、機械ごとに配る（同じ置き場に追跡と無視が混ざる）／C: hook の `command` を `sh "…"` にする（実行ビットが要らなくなるが、登録済みの hook の書き換えと `looks` の見分けが要り、範囲が広がる） |
 | D-4 | このリポジトリの `.gitignore` に `/.ccnavi/bin/` | **人が 1 行足す（決定）** | チケットが増えない | 人の手が 1 つ増える | 親チケットの allow に足す（改版では足せないので、別の親を出すか親を出し直すことになる） |
-| D-5 | 承認の経路の `sh`/`bash` 前置 | 今回入れる | 今の既定の配置にもある穴を、`.sh` の名前で打ちやすくなる前に塞ぐ | チケットの「変える場所」に無い変更が 1 つ増える | 別チケットに分ける（分けるまで `sh .ccnavi/scripts/ccnavi-launcher.sh --approve --yes` が通る） |
+| D-5 | 承認の経路の間接起動を塞ぐか | 今回入れる（決定）。塞ぎ方は D-8 | 今の既定の配置にもある穴を、`.sh` の名前で打ちやすくなる前に塞ぐ | チケットの「変える場所」に無い変更が 1 つ増える。前の版が推した `((sh\|bash)\s+)?` では `/bin/sh`・`env`・`zsh`・`sh -c`・`source` などが通り、塞ぎきれていなかった（敵対的レビュー 1） | 別チケットに分ける（分けるまで間接起動は ask に落ちるだけで、承認のルールでは止まらない） |
+| D-7 | 浅い綴り（`scripts/ccnavi-launcher.sh`、`ccnavi-launcher.sh`）での相対のシェル書き込み | 受け入れて書き残す。導入スクリプトはその綴りを作らない | ルールが素直なまま。どのディレクトリの `bin/linux-x86_64` にも当たる形を持ち込まない | 既定でない浅い綴りで `rm -rf bin/linux-x86_64` が `builtin-guard-binary` に当たらない（実行後の控えと復元は効く）。前の形にも同じ限界がある（`CCNAVI_BIN_PATH=ccnavi` で `rm -rf linux-x86_64` が通ることを今の実装で確かめた） | `bin/<os>-<arch>` を位置を問わず当てる（2 段は塞がるが当たりすぎる。1 段の `../bin/` は塞がらない）／浅い綴りを lint で warn する（止めはしないが気づける。lint の項目が 1 つ増える） |
+| D-8 | 承認の経路の塞ぎ方（3.4 節） | B: ラッパの並び + 引用 | 測った 25 形のうち 23 形を承認のルールで止め、止めすぎの候補 7 形を 1 つも止めない | `sudo -u me sh -c '…'` と `find -exec` は承認のルールに当たらず、今のまま ask（人の確認）に落ちる。ラッパの一覧を持ち、増えたラッパ（`stdbuf`、`timeout` など）は一覧に足すまで ask のまま | A: 語の位置を問わない（25 形すべてを止めるが、引用しない `echo ccnavi --yes` や `git log --grep ccnavi --yes` まで deny になる）／前の版の `((sh\|bash)\s+)?`（`/bin/sh`・`env`・`sh -c`・`source` などが残る） |
 | D-6 | `.claude/skills/ccnavi-config/SKILL.md` の綴り | **人が直す（決定）** | 範囲を広げない | 人の手が 1 つ増える | 親チケットの allow に足す |
 
 ## 16. 今回入れないもの
