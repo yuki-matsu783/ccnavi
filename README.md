@@ -2154,7 +2154,7 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
 | `.ccnavi/scripts/ccnavi-approve.sh` | 承認し、承認済みチケットをコミットして親のブランチへ push する。人が端末で打つ。本体は `ccnavi --approve` |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチを取ってきて承認済みチケットを新しくする。進めるのは fast-forward だけ |
-| `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | 作業ツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。配らない |
+| `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | 作業ツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
