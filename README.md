@@ -832,7 +832,7 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 
 切れ目にはルールから見える印が置かれ、印は 2 つある。コマンドとコマンドの間は `\x00`、
 引用がつないだ空白と語の中の演算子の両側は `\x01` になる。だからルールの regex で
-`[^\x00]*` と書けば「同じコマンドの中」を指す。`.claude/ccnavi/rules.yml` では、
+`[^\x00]*` と書けば「同じコマンドの中」を指す。`.ccnavi/common/rules.yml` では、
 `grep -n "git push" README.md` や `find . -name "a b"` のような引用付きの grep / cat / find が、
 後ろにコマンドが続かなければ `prefer-read-grep` / `prefer-glob`（allow）に当たる。
 `cat README.md | head -20` は `\x00` をまたぐので当たらない。
