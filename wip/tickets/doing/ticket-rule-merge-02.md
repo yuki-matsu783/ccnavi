@@ -15,9 +15,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: tests/*
-started_at: ""
+started_at: "2026-09-13T22:52:29+0900"
 completed_at: ""
-base_sha: ""
+base_sha: "9701f70175fb2f8a32d336b9224b4450d20b9e2d"
 ---
 
 # 受入テスト: ルールとチケットの判定を合わせる
