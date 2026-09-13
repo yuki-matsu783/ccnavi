@@ -124,7 +124,14 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root)
-    return post.ScopeGuard(root=root, copies=approval.by_id(copies), projects=conf.projects)
+    # 種類の上限は層（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
+    types: dict[str, dict] = {}
+    for copy in copies:
+        if copy.has_plan and copy.project not in types:
+            types[copy.project] = phase.load_types(conf, root, copy.project) or {}
+    return post.ScopeGuard(
+        root=root, copies=approval.by_id(copies), projects=conf.projects, types=types
+    )
 
 
 def decide_at_prompt(

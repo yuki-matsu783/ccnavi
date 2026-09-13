@@ -102,13 +102,16 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
     呼び出しと写しの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
     端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
     「なぜ通らないのか」が当たったルールの id で分かる。
+
+    承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
+    合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
     if clause:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
-    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-approve\.sh\b"
+    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
     expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
@@ -120,7 +123,10 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "'sh .ccnavi/scripts/ccnavi-ticket.sh' と 'sh .ccnavi/scripts/ccnavi-review.sh' を"
             "使い、承認は利用者が VS Code のボードか "
             "'sh .ccnavi/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
-            "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            "行います。承認済みチケットのコミットと push"
+            "（'sh .ccnavi/scripts/ccnavi-push-approved.sh'）も人が打ちます。"
+            "ボードで承認したあと端末に送られた 1 行を、利用者が確かめて実行します。"
+            "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -652,13 +658,124 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     return "閉じられる" if not in_feedback else "閉じられる（フィードバック対応済み）"
 
 
+# 範囲の外へ出した上限の名前（ScopeVerdict.limit）。
+LIMIT_TICKET = "ticket"
+LIMIT_PARENT = "parent"
+LIMIT_TYPE = "type"
+
+# 範囲の外として止める判定。
+_OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
+
+
+@dataclass
+class ScopeVerdict:
+    """子の作業ツリーの 1 つのパスについて、範囲の上限を合わせた判定。
+
+    上限は子自身・親・フェーズの種類の 3 つで、厳しい側が勝つ。どれが外へ出したかを
+    持つのは、文面でその上限を名指しするため。名指しが無いと、承認で見た範囲の中なのに
+    止まった理由を、止められた側が読めない。
+    """
+
+    # ALLOW / ASK / DENY / OUTSIDE
+    verdict: str
+    # 外へ出した上限。中なら空。
+    limit: str = ""
+    type: phasetypes.PhaseType | None = None
+
+    @property
+    def outside(self) -> bool:
+        return self.verdict in _OUTSIDE
+
+
+def scope_verdict(
+    child: ticket_mod.Ticket,
+    parent: ticket_mod.Ticket | None,
+    pt: phasetypes.PhaseType | None,
+    rel: str,
+) -> ScopeVerdict:
+    """子の範囲を、親の範囲と種類の上限で切り詰める。
+
+    範囲を当てる 3 か所（実行前の判定、実行後の監視、SubagentStop の差し戻し）はこれを
+    通す。別に書くと、同じ書き込みが実行前は通って実行後に咎められる。承認は範囲の超過を
+    警告で通すので、超えた分を止めるのはここだけになる。
+
+    順は 子 → 親 → 種類。厳しい側が勝つので順は判定を変えないが、`limit` は最初に
+    外へ出した上限を名指しする。種類の上限は allow か外しか言わない。子が ask と書いた
+    場所が種類の中なら ask のまま。
+    """
+    verdict = child.decide(rel)
+    limit = LIMIT_TICKET if verdict in _OUTSIDE else ""
+    if parent is not None:
+        verdict = ticket_mod.combine(verdict, parent.decide(rel))
+        if not limit and verdict in _OUTSIDE:
+            limit = LIMIT_PARENT
+    if pt is not None and not pt.inherits_scope:
+        verdict = ticket_mod.combine(verdict, pt.decide(rel))
+        if not limit and verdict in _OUTSIDE:
+            limit = LIMIT_TYPE
+    return ScopeVerdict(verdict, limit, pt)
+
+
+def plan_item(
+    child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
+) -> ticket_mod.PlanItem | None:
+    """子の番号が指す、親の計画の項。親が計画を持たない、番号が無い、計画に無いなら None。"""
+    if parent is None or not parent.has_plan or child.phase is None:
+        return None
+    return parent.item_at(child.phase)
+
+
+def type_for(
+    conf: settings.Settings,
+    root: str,
+    child: ticket_mod.Ticket,
+    parent: ticket_mod.Ticket | None,
+    types: dict[str, phasetypes.PhaseType] | None = None,
+) -> phasetypes.PhaseType | None:
+    """子の番号の種類。親が計画を持たない、番号が無い、種類が引けないなら None。
+
+    `types` を渡せばそこから引き、ファイルは読まない（実行後の監視は層ごとに 1 度だけ
+    読んで持つ）。渡さなければ、親が計画を持つときだけ親の `project:` の層を読む。
+    """
+    item = plan_item(child, parent)
+    if item is None or parent is None:
+        return None
+    if types is None:
+        types = load_types(conf, root, parent.project)
+    return (types or {}).get(item.type)
+
+
+def unread_type(
+    conf: settings.Settings,
+    root: str,
+    child: ticket_mod.Ticket,
+    parent: ticket_mod.Ticket | None,
+    types: dict[str, phasetypes.PhaseType] | None,
+) -> str:
+    """子の番号の種類が読めないなら、その種類の id。読めた、または読むものが無ければ空。
+
+    `types` は `load_types` が返したもの（None を含む）。phases.yml がどの層にも無いのは
+    番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに種類が
+    引けない（壊れた・種類を消した）ときだけ返す。そのとき判定は種類では切り詰めない。
+    deny に倒すと、人が phases.yml を直している間、全部の子の作業ツリーで書き込みが止まる。
+    """
+    item = plan_item(child, parent)
+    if item is None or parent is None:
+        return ""
+    if types is not None:
+        return "" if item.type in types else item.type
+    files = (conf.phases, types_path(conf, root, parent.project))
+    return item.type if any(p and os.path.exists(p) for p in files) else ""
+
+
 def scope_findings(
     root: str, conf: settings.Settings, child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
-) -> tuple[list[str], str]:
-    """子の作業ツリーに残っている範囲外の変更。2 つめは読めなかった理由。
+) -> tuple[list[tuple[str, ScopeVerdict]], str]:
+    """子の作業ツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
 
     見るのは `base_sha..HEAD` のコミット済みの差分と、未コミットの変更の両方。
     未コミットだけ見る検査では、範囲外を書いてコミットしたものが映らない。
+    範囲は実行前の判定と同じく、親の範囲と種類の上限で切り詰める（scope_verdict）。
     """
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
@@ -679,6 +796,7 @@ def scope_findings(
     for entry in out.split("\0"):
         if len(entry) > 3 and entry[2] == " ":
             paths.add(entry[3:])
+    pt = type_for(conf, root, child, parent)
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
@@ -686,11 +804,9 @@ def scope_findings(
         # 承認がブランチに乗る道を塞がないため。
         if any(rel.startswith(p + "/") for p in (conf.tickets, conf.approved) if p):
             continue
-        verdict = child.decide(rel)
-        if parent is not None:
-            verdict = ticket_mod.combine(verdict, parent.decide(rel))
-        if verdict in (ticket_mod.OUTSIDE, rules.DENY):
-            outside.append(rel)
+        found = scope_verdict(child, parent, pt, rel)
+        if found.outside:
+            outside.append((rel, found))
     return outside, ""
 
 
