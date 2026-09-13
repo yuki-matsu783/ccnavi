@@ -274,8 +274,8 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い（導入スクリプトは `.claude/ccnavi/ccnavi` と書く）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
-| `CCNAVI_TICKETS` | チケットの提案の置き場。各作業ツリーのルートからの相対。既定は `wip/tickets` |
-| `CCNAVI_APPROVED` | 承認済みチケットの置き場。ワークスペースルートからの相対。既定は `.claude/ccnavi/tickets`。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
+| `CCNAVI_TICKETS` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
+| `CCNAVI_APPROVED` | 承認済みチケットとフェーズの印の置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（層の傘の下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PHASES` | **共通層**のフェーズの種類の定義。ワークスペースルートからの相対。既定は `.claude/ccnavi/phases.yml`。どの層にも無ければフェーズは番号だけの挙動 |
 | `CCNAVI_RISK` | **共通層**の実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.claude/ccnavi/risk.yml`。どの層にも無ければ組み込みの配点 |
@@ -1070,7 +1070,7 @@ phases.yml と risk.yml は在るときだけ、解決後の綴りで載る。�
 
 ### 置き場と状態
 
-提案は `wip/tickets/<状態>/<識別子>.md`。状態は置き場が表す。
+提案は `.ccnavi/proposals/<状態>/<識別子>.md`。状態は置き場が表す。
 
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
@@ -1138,14 +1138,15 @@ base_sha: ""
 
 ### 効くのは承認したものだけ
 
-判定が読むのは `.claude/ccnavi/tickets/` の承認済みチケットであって、`wip/tickets/` の提案ではない。
+判定が読むのは `.ccnavi/tickets/` の承認済みチケットであって、`wip/tickets/` の提案ではない。
+どちらも親チケットのツリーに置かれ、そのツリーの git が追跡する。
 
 ```sh
 ccnavi --approve
 ccnavi --approve i0002 i0002-01   # 並べた識別子だけを束にする
 ```
 
-ワークスペースルートと全作業ツリーの `wip/tickets/` を走査し、未承認のものをまとめて
+全ツリー（ワークスペース、プロジェクト、作業ツリー）の `wip/tickets/` を走査し、未承認のものをまとめて
 見せる。親が 1 本、その下に子が複数、というのが普通。識別子を並べた
 `ccnavi --approve <識別子>...` はその分だけを束にする（VS Code 拡張が、絞り込みで見えている
 承認待ちを渡す）。絞りは束を狭めるだけで、絞らない束で落ちるものを通さない。承認待ちに無い
@@ -1154,6 +1155,21 @@ ccnavi --approve i0002 i0002-01   # 並べた識別子だけを束にする
 落ちる。画面に出るのは、親が新たに書けるようにする領域、
 子が親からどれだけ絞ったか、子ごとの人間レビュー要否、計画。承認すると
 チケットごとに承認済みチケットを置く。承認後に提案を書き足しても効く範囲は変わらない。
+
+**承認済みチケットは親チケットのブランチに乗って他の機械へ届く。** 端末から打つときは
+`sh .claude/scripts/ccnavi-approve.sh` を使う。承認のあと、置き場だけをパスで限って
+コミットし、そのブランチへ push する。A が承認して B の機械で作業し A がレビューする、
+という流れはこの push で成り立つ。承認しても push しなければ、B の機械では
+「承認されなかったこと」になる。統合先が `main` / `master` / `develop` / `release` のときは
+push せず、コミットまでで止める。そこへ直接送る判断は人のものだから。
+
+B の側はセッションの頭に `.claude/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは
+fast-forward だけで、未コミットの変更があるツリーやリモートと分岐したツリーは触らず、
+理由を 1 行で言う。
+
+順序は「承認 → 承認済みチケットをコミット → 子の作業ツリーを作る → `start`」。コミットの前に
+作業ツリーを作ると、その子には範囲が効かない（そのブランチに乗っていないため）。
+
 宣言の広さで数えるリスクの点は持たない。宣言の広さは親が `human_review.reason` で言い、
 リスクは子を閉じるときに実績で測る（「実績のリスク」）。
 
@@ -2020,6 +2036,8 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `.claude/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
 | `.claude/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
 | `.claude/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
+| `.claude/scripts/ccnavi-approve.sh` | 承認し、承認済みチケットをコミットして親のブランチへ push する。人が端末で打つ。本体は `ccnavi --approve` |
+| `.claude/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチを取ってきて承認済みチケットを新しくする。進めるのは fast-forward だけ |
 | `.claude/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | 作業ツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |

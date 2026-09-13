@@ -85,9 +85,6 @@ phases:
 class PhaseUnionTest(ConfigUnionHarness):
     """phases の合成（§25.4.1）。承認と --lint で見る。"""
 
-    def approved_copy(self, name):
-        return os.path.join(self.approved, name + ".md")
-
     def phase_problems(self, severity, layer=""):
         """phases の Problem。`layer` を渡すと、その層のものだけ。
 
@@ -247,7 +244,7 @@ class RiskUnionTest(ConfigUnionHarness):
         return tree
 
     def judge_record(self):
-        path = os.path.join(self.approved, "phases", "i0001", "i0001-01.judge.json")
+        path = self.approved_path("phases", "i0001", "i0001-01.judge.json")
         return json.loads(read(path))
 
     def commit(self, tree, rel, text):
@@ -256,7 +253,7 @@ class RiskUnionTest(ConfigUnionHarness):
         git(tree, "commit", "--quiet", "-m", rel)
 
     def record(self):
-        path = os.path.join(self.approved, "phases", "i0001", "i0001-01.risk.json")
+        path = self.approved_path("phases", "i0001", "i0001-01.risk.json")
         return json.loads(read(path))
 
     def test_factors_concatenate_and_levels_take_the_minimum(self):
@@ -442,7 +439,7 @@ class RiskUnionTest(ConfigUnionHarness):
 
         said = self.hook("Bash", self.parent_tree, event="PostToolUse", command="ls")
         self.assertIn("省略", self.reason(said))
-        mark = json.loads(read(os.path.join(self.approved, "phases", "i0001", "1.skipped")))
+        mark = json.loads(read(self.approved_path("phases", "i0001", "1.skipped")))
         self.assertEqual(mark.get("source"), "lib", mark)
 
 

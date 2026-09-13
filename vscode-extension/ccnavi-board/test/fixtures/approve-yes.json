@@ -5,8 +5,8 @@
   "i0001-01"
  ],
  "copies": [
-  "<root>/.claude/ccnavi/tickets/i0001.md",
-  "<root>/.claude/ccnavi/tickets/i0001-01.md"
+  "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001.md",
+  "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001-01.md"
  ],
  "lines": [
   "承認した。<root>/.claude/ccnavi/tickets に承認済みチケットを置いた。",

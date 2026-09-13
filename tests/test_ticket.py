@@ -114,9 +114,10 @@ class TicketTest(unittest.TestCase):
         git(self.root, "commit", "--quiet", "-m", "init")
 
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
-        self.approved = os.path.join(self.root, ".claude", "ccnavi", "tickets")
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
+        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
 
@@ -136,7 +137,7 @@ class TicketTest(unittest.TestCase):
                 "--rules",
                 self.rules,
                 "--approved",
-                self.approved,
+                ".ccnavi/tickets",
                 "--state",
                 self.state,
                 "--log",
@@ -184,7 +185,16 @@ class TicketTest(unittest.TestCase):
         )
 
     def approve(self, answer="y"):
-        return self.ccnavi("--approve", stdin=answer + "\n")
+        """承認して、写しを親のブランチに乗せる。
+
+        写しは親のツリーに置かれ、コミットして初めて子の作業ツリーへ渡る。
+        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
+        """
+        result = self.ccnavi("--approve", stdin=answer + "\n")
+        if os.path.isdir(self.approved):
+            git(self.parent_tree, "add", "-A")
+            git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
+        return result
 
     def family(self, review=(True, False)):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子の作業ツリーを作って着手する。"""
@@ -807,6 +817,8 @@ class TicketTest(unittest.TestCase):
             # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
             "ccnavi --approve --preview --yes i0001 --json",
             "ccnavi --approve --yes i0001 --preview",
+            # 承認のスクリプトも人の経路。中身は --approve と承認済みチケットの push。
+            "sh .claude/scripts/ccnavi-approve.sh",
         ):
             result = self.hook(
                 "PreToolUse",

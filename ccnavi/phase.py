@@ -94,13 +94,20 @@ def forbidden(subject: str) -> bool:
 
 
 def ticket_approval_rule(bin_path: str) -> rules.Rule:
-    """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。"""
+    """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
+
+    承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
+    呼び出しと写しの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
+    端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
+    「なぜ通らないのか」が当たったルールの id で分かる。
+    """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
     if clause:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
-    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
+    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-approve\.sh\b"
+    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
@@ -109,8 +116,9 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
             "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
-            "使い、承認は利用者が VS Code のボードで、未解決の受け入れは利用者が端末で行います。"
-            "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            "使い、承認は利用者が VS Code のボードか "
+            "'sh .claude/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
+            "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -301,17 +309,18 @@ def load_types(
 
 def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.Ticket]:
     """提案の状態を承認済みチケットへ写し、閉じたものを閉じる。開いている承認済みチケットを返す。"""
-    open_copies, notes = approval.copies(conf.approved)
+    open_copies, notes = approval.scan(conf, root)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     remaining = []
     for copy in open_copies:
         state, path = _proposal(root, conf, copy)
         if state in ticket_mod.CLOSED:
+            where = approval.dir_of(conf, copy)
             proposal, _ = ticket_mod.load(path)
             if proposal is not None:
-                approval.update_copy(conf.approved, copy, _script_fields(proposal))
-            failed = approval.close_copy(conf.approved, copy.ticket)
+                approval.update_copy(where, copy, _script_fields(proposal))
+            failed = approval.close_copy(where, copy.ticket)
             if failed:
                 stderr.write(f"ccnavi: {copy.ticket}: {failed}\n")
                 remaining.append(copy)
@@ -321,7 +330,7 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
             if proposal is not None:
                 fields = _script_fields(proposal)
                 if any(getattr(copy, k) != v for k, v in fields.items()):
-                    approval.update_copy(conf.approved, copy, fields)
+                    approval.update_copy(approval.dir_of(conf, copy), copy, fields)
                     for k, v in fields.items():
                         setattr(copy, k, v)
         remaining.append(copy)
@@ -333,8 +342,8 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
     """
-    open_copies, _ = approval.copies(conf.approved)
-    closed_copies, _ = approval.copies(conf.approved, closed=True)
+    open_copies, _ = approval.scan(conf, root)
+    closed_copies, _ = approval.scan(conf, root, closed=True)
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is not None and owner.has_plan:
@@ -360,11 +369,14 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         phase.tickets.append(t)
         state, _ = _proposal(root, conf, t)
         phase.states[t.ticket] = state
+    # 印と記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
+    # 印を子の側に書くと、同じフェーズの印が複数のツリーに散る。
+    where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
-        phase.marks = approval.marks(conf.approved, parent_id, phase.number)
+        phase.marks = approval.marks(where, parent_id, phase.number)
         for t in phase.tickets:
             record = approval.read_child_record(
-                conf.approved, parent_id, t.ticket, approval.CHILD_RECORD_RISK
+                where, parent_id, t.ticket, approval.CHILD_RECORD_RISK
             )
             if record:
                 phase.risks[t.ticket] = record
@@ -384,7 +396,9 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
-    open_copies, _ = approval.copies(conf.approved)
+    # 権威のある側を読む。承認は親の作業ツリーを作る前にも打てるので、そのときの
+    # 承認済みチケットは提案があったツリー（プロジェクトのルート）に在る。
+    open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval.by_id(open_copies), t.name)
     if found is None or found.is_child:
         return None
@@ -426,6 +440,7 @@ def _type_source(phase: Phase) -> dict:
 def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。"""
     texts = []
+    where = approval.home_dir(conf, root, parent.ticket, "")
     phases = phases_of(root, conf, parent.ticket)
     for phase in phases:
         if not phase.ended or phase.marks:
@@ -434,7 +449,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
         if phase.deferred:
             at = phase.review_at
             failed = approval.write_mark(
-                conf.approved, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
+                where, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
@@ -445,7 +460,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
         elif phase.review_required:
             failed = approval.write_mark(
-                conf.approved, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
+                where, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
@@ -471,7 +486,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
         else:
             failed = approval.write_mark(
-                conf.approved,
+                where,
                 parent.ticket,
                 n,
                 approval.MARK_SKIPPED,
@@ -591,7 +606,7 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_mod.Ticket)
     return False
 
 
-def settle_last_review(conf: settings.Settings, parent: ticket_mod.Ticket, stamp: str) -> str:
+def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str) -> str:
     """フィードバック計画の承認で、全体計画の最後のレビューを済んだ扱いにする。
 
     人がレビューの結果を見たうえで対応を計画したので、その計画の承認がレビューの
@@ -601,10 +616,10 @@ def settle_last_review(conf: settings.Settings, parent: ticket_mod.Ticket, stamp
     if not parent.has_plan:
         return ""
     last = len(parent.plan)
-    if approval.read_mark(conf.approved, parent.ticket, last, approval.MARK_REVIEWED) is not None:
+    if approval.read_mark(approved_dir, parent.ticket, last, approval.MARK_REVIEWED) is not None:
         return ""
     return approval.write_mark(
-        conf.approved,
+        approved_dir,
         parent.ticket,
         last,
         approval.MARK_REVIEWED,
@@ -620,7 +635,9 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     closed = gate(root, conf, parent.ticket)
     if closed is not None:
         return f"レビュー待ち（{closed.label}）"
-    if approval.read_parent_mark(conf.approved, parent.ticket, approval.PARENT_MARK_WRAPUP):
+    if approval.read_parent_mark(
+        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
+    ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
         return "閉じられる（利用者が締めた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
@@ -663,7 +680,9 @@ def scope_findings(
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
-        if rel.startswith(conf.tickets + "/"):
+        # チケットの置き場（提案も写しも印も）は範囲の外でも咎めない。次の提案を書く道と、
+        # 承認がブランチに乗る道を塞がないため。
+        if any(rel.startswith(p + "/") for p in (conf.tickets, conf.approved) if p):
             continue
         verdict = child.decide(rel)
         if parent is not None:
@@ -685,10 +704,8 @@ def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root:
     """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
 
     承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
-    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。`project` から組み直すと、
-    同じ名前を生む置き場が 2 つある（ワークスペースの `wip/<名前>/tickets/` と、その
-    プロジェクトから切った作業ツリーの `wip/tickets/`）ので、片方を必ず外す。
-    記録の無い古い承認済みチケットだけ、名前から組む。
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。記録の無い古い
+    承認済みチケットだけ、設定の綴りをそのまま使う（提案はどのツリーでも同じ相対に在る）。
     """
     if copy.source_path:
         base = os.path.dirname(os.path.dirname(copy.source_path))
@@ -698,13 +715,13 @@ def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root:
             rel = ""
         if rel and rel != "." and not rel.startswith("../"):
             return rel
-    return ticket_mod.tickets_rel_for(conf.tickets, copy.project)
+    return conf.tickets
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:
     if name == tree.MAIN:
         return tree.main_tree(root).root
-    for t in tree.worktrees(root, projects_dir):
+    for t in [*tree.projects(projects_dir), *tree.worktrees(root, projects_dir)]:
         if t.name == name:
             return t.root
     return ""
