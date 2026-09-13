@@ -352,7 +352,7 @@ def now() -> str:
 
 @dataclass
 class Candidate:
-    """承認の束の 1 件。新規の提案か、親の改版か。
+    """承認の対象の 1 件。新規の提案か、親の改版か。
 
     リスクの点はここに無い。宣言の広さで数える点はやめた。点は子を閉じるときに
     実績（差分）で数える（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
@@ -363,7 +363,7 @@ class Candidate:
     # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
     # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §25.4.1）。
-    # 束の中でチケットごとに違いうるので、候補が引いたものを持ち歩く。
+    # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持ち歩く。
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
     notes: list[str] = field(default_factory=list)
@@ -391,24 +391,24 @@ def approve(
     root: str,
     only: list[str] | None = None,
 ) -> int:
-    """未承認の提案を束で人に見せ、承認されたら承認済みチケットを置く。
+    """未承認の提案をまとめて人に見せ、承認されたら承認済みチケットを置く。
 
     エージェントではなく人が端末から叩く経路。提案を書き直す道は用意しない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
     承認した人が承認したものの作者になる。
 
-    束は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
+    承認の対象は「いま承認待ちのもの全部」。親が 1 本、その下の子が複数、という形が普通。
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
 
-    親の改版（計画の変更）も同じ束に載る。承認済みチケットは動かないのが原則で、改版はその
+    親の改版（計画の変更）も一緒に承認の対象に入る。承認済みチケットは動かないのが原則で、改版はその
     唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
 
-    `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
-    ボードが絞り込みで見えている分だけを渡す。絞りは束を狭めるだけで、絞らない束で
+    `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
+    ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
     落ちるものを通してはいけない。だから、承認待ちに無い識別子が混じっていたら
     何も承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の
-    改版が承認待ちなのに束から外した子も何も承認しない（外すと旧計画で検証される）。
-    絞った束に載らない親を持つ子は「親が承認されていない」で落ちる。
+    改版が承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
+    絞った対象に入らない親を持つ子は「親が承認されていない」で落ちる。
     """
     gathered = gather(stderr, conf, root, only)
     if gathered.refused:
@@ -431,7 +431,7 @@ def approve(
         return 1
     code = _apply(stdout, stderr, root, conf, gathered.batch, now())
     if code == 0 and gathered.rejected:
-        # 束の一部が落ちたときは、通ったぶんを置いてから失敗で終わる。置いたので
+        # 承認の対象の一部が落ちたときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、落ちたものは上で名指ししてある。成功で終わると、
         # 端末を見ていない側（スクリプト、CI）は全部通ったと読む。
         stderr.write(
@@ -449,9 +449,9 @@ APPROVE_VERSION = 1
 
 @dataclass
 class Gathered:
-    """いま `--approve` が見せる束と、その周りのもの。見せる・承認するの両方がここから出る。
+    """いま `--approve` が見せる一覧と、その周りのもの。見せる・承認するの両方がここから出る。
 
-    束を組む関数を 1 つにしてあるのは、拡張が見せたものと実行ファイルが承認する
+    一覧を組む関数を 1 つにしてあるのは、拡張が見せたものと実行ファイルが承認する
     ものを同じ答えにするため。`--explain --json` の `pending_approval` も同じ
     `waiting` を通る。
     """
@@ -465,7 +465,7 @@ class Gathered:
     broken: bool
     # 絞り込み（`only`）が通らなかった理由。空でなければ何も承認しない。
     refused: str = ""
-    # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを束にする」）。
+    # 端末に出す 1 行（「承認待ち N 件のうち、指定の M 件だけを承認の対象にする」）。
     note: str = ""
 
     @property
@@ -482,21 +482,21 @@ class Gathered:
 def gather(
     stderr: TextIO, conf: settings.Settings, root: str, only: list[str] | None = None
 ) -> Gathered:
-    """束を組む。提案を走査し、承認済みチケットと突き合わせ、載せるものと落とすものに分ける。
+    """承認の対象を組む。提案を走査し、承認済みチケットと突き合わせ、載せるものと落とすものに分ける。
 
     読めない提案や承認済みチケット、落とした提案の理由は標準エラーにも出す。端末の人は
     そこで読み、拡張は JSON の `problems` / `rejected` で読む。
 
-    `only` は束を識別子で絞る（`ccnavi --approve <識別子>...`、拡張のオーバーレイ）。
-    ボードが絞り込みで見えている分だけを渡す。絞りは束を狭めるだけで、絞らない束で
+    `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`、拡張のオーバーレイ）。
+    ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
     落ちるものを通してはいけない。だから、承認待ちに無い識別子が混じっていたら何も
     承認しない（ボードが古いときに、見せた以外のものを通さないため）。親の改版が
-    承認待ちなのに束から外した子も何も承認しない（外すと旧計画で検証される）。
+    承認待ちなのに対象から外した子も何も承認しない（外すと旧計画で検証される）。
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
 
-    フェーズの種類は束で 1 つに決まらない。どの層の種類が効くかは各チケットの
+    フェーズの種類は承認の対象全体で 1 つに決まらない。どの層の種類が効くかは各チケットの
     `project:` が決める（設計 §25.4.1）ので、候補を組むところで 1 件ずつ引き、
-    引いたものを `Candidate` が持ち歩く。`Gathered.types` は束全体の種類を持たず、
+    引いたものを `Candidate` が持ち歩く。`Gathered.types` は対象全体の種類を持たず、
     いつも None。画面は候補が持つ種類を使う。
     """
     types = None
@@ -528,12 +528,14 @@ def gather(
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
             return Gathered([], [], texts, {}, types, False, broken, "\n".join(lines))
-        # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らない束なら
+        # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らなければ
         # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
         skipped = {t.ticket for t in revisions if t.ticket not in wanted}
         blocked = [t for t in pending if t.ticket in wanted and t.is_child and t.parent in skipped]
         if blocked:
-            lines = [f"{t.ticket}: 親 {t.parent} の改版が承認待ちなのに束に無い" for t in blocked]
+            lines = [
+                f"{t.ticket}: 親 {t.parent} の改版が承認待ちなのに承認の対象に無い" for t in blocked
+            ]
             lines.append("何も承認しない。親も並べる")
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
@@ -541,7 +543,7 @@ def gather(
         waiting_count = len(pending) + len(revisions)
         pending = [t for t in pending if t.ticket in wanted]
         revisions = [t for t in revisions if t.ticket in wanted]
-        note = f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを束にする。"
+        note = f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを承認の対象にする。"
 
     if not pending and not revisions:
         return Gathered([], [], texts, {}, types, True, broken, "", note)
@@ -562,11 +564,11 @@ def preview(
     as_json: bool,
     only: list[str] | None = None,
 ) -> int:
-    """`--approve --preview`。束を見せるだけで、承認済みチケットは置かない。端末の壁は要らない。
+    """`--approve --preview`。一覧を見せるだけで、承認済みチケットは置かない。端末の壁は要らない。
 
-    JSON の形は README「承認の JSON」。束が空でも 0 で返す。拡張は `batch` が空なら
+    JSON の形は README「承認の JSON」。一覧が空でも 0 で返す。拡張は `batch` が空なら
     「承認待ちは無い」と出す。`only` はボードの絞り込みで見えている分（`--approve` と
-    同じ意味）。見せる束と承認する束が同じ絞りを通るようにする。
+    同じ意味）。見せる一覧と承認する対象が同じ絞りを通るようにする。
     """
     gathered = gather(stderr, conf, root, only)
     if gathered.refused:
@@ -616,20 +618,20 @@ def approve_yes(
 ) -> int:
     """`--approve --yes <識別子,…> [<絞り>...]`。拡張のオーバーレイで人が押した承認。
 
-    端末の壁は通らない。代わりに、見せた束と今の束が同じであることを求める。
+    端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
     ものを承認する道を塞ぐため。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
     「そのとき掛けていた絞り」（`--approve --preview` に渡したものと同じ）。分けないと検査が
-    素通りする。絞りだけで束を狭めて、その狭めた束と見せた識別子を比べると、いつでも一致する。
-    絞りは preview と同じものを通し、比べるのは「その絞りで今できる束」と「見せた識別子」。
+    素通りする。絞りだけで対象を狭めて、その狭めた対象と見せた識別子を比べると、いつでも一致する。
+    絞りは preview と同じものを通し、比べるのは「その絞りで今できる一覧」と「見せた識別子」。
     """
     wanted = sorted({s.strip() for s in expected if s.strip()})
     narrowed = [s.strip() for s in (only or []) if s.strip()]
     gathered = gather(stderr, conf, root, narrowed)
     # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
-    # ボードが古い。拡張には食い違いとして返し、束を読み直させる。
+    # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる。
     current = gather(stderr, conf, root).identifiers if gathered.refused else gathered.identifiers
     if wanted != current:
         if as_json:
@@ -639,7 +641,7 @@ def approve_yes(
             }
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
         stderr.write(
-            "ccnavi: 見せた束と今の束が違う（見せた: "
+            "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
             f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
             "見直してから承認する\n"
         )
@@ -654,7 +656,7 @@ def approve_yes(
         return code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = _approved_text(tickets, revisions)
+    prompt = _approved_text(tickets, revisions, root)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
@@ -672,10 +674,10 @@ def approve_yes(
     return 0
 
 
-def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str]) -> str:
+def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
     from . import reasons
 
-    return reasons.approved(tickets, revisions)
+    return reasons.approved(tickets, revisions, root)
 
 
 # ---- 承認の事実を hook がモデルへ伝える
@@ -788,7 +790,7 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
     # 次の回に同じ承認をもう一度伝えることになる。
     _write_known(stderr, path, {**known, **marks})
-    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known})
+    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
 def _candidates(
@@ -798,18 +800,18 @@ def _candidates(
     revisions: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
-    """束に載せるものと、落とすものに分ける。3 つめは親子を引くための池。"""
+    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。"""
     from . import phase
 
     open_index = by_id(approved)
-    # 親子を引く池は、承認済みチケットと、この束で通ったものだけ。落ちた親を池に残すと、承認されない
-    # 親の範囲で子が検証され、親の承認という門を通らずに子の承認済みチケットができる。
+    # 親子を引く池は、承認済みチケットと、今回の承認で通ったものだけ。落ちた親を池に残すと、
+    # 承認されない親の範囲で子が検証され、親の承認という門を通らずに子の承認済みチケットができる。
     # pending は親が子より前に並ぶ（並べ替えの鍵が親の識別子）ので、子が引くときには
     # 親の通過が決まっている。
     pool = by_id(approved)
     batch: list[Candidate] = []
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]] = []
-    # 層ごとの読み込みは 1 プロジェクト 1 回。束の中に同じ層のチケットが
+    # 層ごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じ層のチケットが
     # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
     cache: dict[str, dict | None] = {}
 
@@ -830,23 +832,34 @@ def _candidates(
         if cand.plans_feedback:
             cand.notes = feedback_notes(root, conf, t)
         batch.append(cand)
-        # 通った改版だけ、同じ束の子から見える親にする。落ちた改版の計画で子を
+        # 通った改版だけ、一緒に承認する子から見える親にする。落ちた改版の計画で子を
         # 通すと、承認されない番号の子が承認済みチケットになる。
         pool[t.ticket] = t
 
-    for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
+    # 今回の承認で通った子を親ごとに。後に続く子の順序の検査が、そのフェーズを
+    # 開き直したものとして読む。
+    # 子はフェーズの番号の順に並べる。識別子の順だと、後のフェーズの子（-02）が前のフェーズに
+    # 足す子（-03）より先に検査され、開き直す前の印で通ってしまう。
+    added: dict[str, list[ticket_mod.Ticket]] = {}
+    for t in sorted(
+        pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
+    ):
         types = types_for(t)
         complaints = validate(t, pool, types)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
-                complaints += phase.order_problems(root, conf, t, parent, types)
+                complaints += phase.order_problems(
+                    root, conf, t, parent, types, added.get(t.parent)
+                )
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
         batch.append(Candidate(ticket=t, complaints=complaints, types=types))
         pool[t.ticket] = t
+        if t.is_child:
+            added.setdefault(t.parent, []).append(t)
     return batch, rejected, pool
 
 
@@ -871,7 +884,7 @@ def _apply(
     batch: list[Candidate],
     stamp: str,
 ) -> int:
-    """承認された束を承認済みチケットに落とす。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
+    """承認された対象を承認済みチケットに落とす。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
     from . import phase
 
     for cand in batch:
@@ -937,7 +950,7 @@ def screen(
     「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
-    種類は候補が持っているものを使う。束の中でチケットごとに層が違いうるので、
+    種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
     画面の側で 1 つに決めない。
     """
     lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
@@ -961,7 +974,7 @@ def screen(
             ),
         ]
         if t.is_child:
-            # 親は同じ束の中に居ることが普通。承認済みチケットだけを引くと
+            # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
             lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
@@ -1060,7 +1073,7 @@ def waiting(
     approved: list[ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
-    """いま `--approve` の束に載るもの。新規の承認待ちと、親の改版。
+    """いま `--approve` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは承認済みチケットが無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
     改版は、開いている親の承認済みチケットがあり、提案の計画が承認済みチケットと違うもの。

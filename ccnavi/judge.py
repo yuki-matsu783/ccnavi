@@ -161,15 +161,17 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
+        selfguard.add_rules(
+            rule_set, conf.bin, conf.project_home, root, selfguard.common_layer_files(conf)
+        )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
-            rule_set.deny.append(phase.ticket_approval_rule(conf.bin))
+            rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
     subject = screen(payload.tool_name, record.subject, record)
 
@@ -215,7 +217,7 @@ def decide_before(
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if closed is not None and not exempt:
             record.code, record.rules = phase.CODE_GATE, [reasons.TICKET_RULE]
-            reason = phase.gate_reason(closed, payload.tool_name)
+            reason = phase.gate_reason(closed, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。

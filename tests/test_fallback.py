@@ -19,9 +19,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 
-def run(rules_path, payload, log=""):
+def run(rules_path, payload, log="", env=None):
     """道具を 1 回動かす。ルールファイルの場所を呼び出しごとに変えられる。"""
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment.update(env or {})
     return run_ccnavi(
         [
             "--rules",
@@ -142,6 +143,31 @@ class FallbackTest(unittest.TestCase):
             with self.subTest(command=command):
                 out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
+
+    def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
+        # 実行ファイル・ccnavi ディレクトリ・共通層は設定で動く。既定の側だけ空の設定で
+        # 組んでいると、動かしたワークスペースではルールファイルが壊れたときにだけ
+        # そこへの書き込みが止まらない（issue #14）。
+        #
+        # 控えと復元は切る。ここはリポジトリ自身をワークスペースルートにして動くので、
+        # ccnavi ディレクトリの名前を動かすと、自身の層の控えが動かした先へ書き戻される。
+        # 組み込みの既定はこの設定に依らず入るので、見たいものは変わらない。
+        quiet = {"CCNAVI_GUARD_CORE_FILES": "disable"}
+        for env, command in [
+            ({"CCNAVI_PROJECT_HOME": ".navi"}, "echo x > projects/lib/.navi/config/rules.yml"),
+            ({"CCNAVI_PROJECT_HOME": ".navi"}, "rm -rf .navi"),
+            ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
+            ({}, f"echo x > {self.broken}"),
+        ]:
+            with self.subTest(command=command):
+                out = out_of(
+                    self,
+                    run(
+                        self.broken, pre_tool_use("Bash", "command", command), env={**quiet, **env}
+                    ),
+                )
+                self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
+                self.assertIn("builtin-guard-config-via-bash", out["permissionDecisionReason"])
 
     def test_既定はマージの解決を妨げない(self):
         # 衝突マーカーの入ったルールファイルは YAML として読めないので、

@@ -361,22 +361,23 @@ def check(
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
         for t in unresolved:
             stderr.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
+        review_sh = settings.script_command(root, "ccnavi-review.sh")
         if _is_last_feedback_review(parent, phase_no):
             # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
             # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §24.15.7）。
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
-                "  - 'sh .ccnavi/scripts/ccnavi-review.sh handoff --body-file <題と本文>' で"
+                f"  - '{review_sh} handoff --body-file <題と本文>' で"
                 "別の issue に切り出し、利用者が端末で "
-                f"'sh .ccnavi/scripts/ccnavi-review.sh accept {phase_no}' を打って"
+                f"'{review_sh} accept {phase_no}' を打って"
                 "残りを受け入れる\n"
                 "新しいフィードバック作業フェーズは足せません。\n"
             )
         else:
             stderr.write(
                 "解決してもらって再実行するか、同じフェーズに子を足してやり直すか、利用者が端末で "
-                f"'sh .ccnavi/scripts/ccnavi-review.sh accept {phase_no}' を打つ\n"
+                f"'{review_sh} accept {phase_no}' を打つ\n"
             )
         return 1
     assert result.mr is not None
@@ -419,7 +420,8 @@ def reviewed(
     if not accept_unresolved:
         stderr.write(
             "ccnavi: 未解決を受け入れるなら --accept-unresolved を付ける。"
-            "受け入れないなら 'sh .ccnavi/scripts/ccnavi-review.sh check' で足りる\n"
+            "受け入れないなら "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} check' で足りる\n"
         )
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
@@ -570,14 +572,14 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
-    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf)
+    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
         for p in problems:
             stderr.write(f"  - {p}\n")
         stderr.write(
             "全部片付けてから打ち直す。まだ残るものを承知で締めるなら、利用者が端末で "
-            "'sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <理由>' を打つ\n"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} wrapup --reason <理由>' を打つ\n"
         )
         return 1
     result = _result_with_mr(stderr, result_path)
@@ -903,8 +905,8 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     return False
 
 
-def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
-    """マージに進む前に作業ツリーの側で満たしていること。
+def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
+    """マージに進む前に作業ツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
     途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
     人がマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
@@ -919,7 +921,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
         problems.append(
             f"`{wip}/` に追跡されているファイルが {n} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
+            f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親の作業ツリーに未コミットの変更がある")

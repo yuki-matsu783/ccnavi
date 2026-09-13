@@ -283,7 +283,7 @@ def _phases(conf: settings.Settings) -> list[Problem]:
 def _types_resolver(conf: settings.Settings, root: str):
     """`project:` から、そのチケットに効く種類を引く（設計 §25.4.1）。
 
-    束の中でチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
+    承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 層 1 回。
     """
     cache: dict[str, dict | None] = {}
@@ -399,7 +399,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
 def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
     """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
     problems: list[Problem] = []
-    # 提案と承認済みチケットを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
+    # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
         pool.setdefault(t.ticket, t)
