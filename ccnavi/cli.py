@@ -109,7 +109,7 @@ The next UserPromptSubmit / PreToolUse tells the model once about the new
 copies (the same text the extension hands to Claude Code).
 
 The parent agent moves tickets between states and asks for reviews through the
-scripts in .claude/scripts/, which call
+scripts in .ccnavi/scripts/, which call
 
     ccnavi ticket start|done|cancel <id> [--reason <why>]
     ccnavi ticket judge <child> <factor> yes|no --reason <why>   (qualitative risk)
@@ -124,7 +124,7 @@ its threads and reviews, and hands them over as --result <json>.
 
 A human accepts unresolved review threads with
 
-    sh .claude/scripts/ccnavi-review.sh accept N
+    sh .ccnavi/scripts/ccnavi-review.sh accept N
 
 which fetches the threads and runs
 
@@ -132,7 +132,7 @@ which fetches the threads and runs
 
 A human closes a parent early ("good enough for now") with
 
-    sh .claude/scripts/ccnavi-review.sh wrapup --reason <why>
+    sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
 
 which runs `ccnavi review wrapup --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.
@@ -188,7 +188,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--guard-ticket-approval", default="")
     # チケット制御を使うか。enable / disable。VS Code 拡張が試し打ちで disable を渡す。
     parser.add_argument("--ticket-control", default="")
-    # リモートの写し（JSON）。.claude/scripts/ccnavi-review.sh が取ってきて渡す。
+    # リモートの写し（JSON）。.ccnavi/scripts/ccnavi-review.sh が取ってきて渡す。
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")

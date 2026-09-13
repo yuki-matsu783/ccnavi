@@ -1,5 +1,5 @@
 /**
- * ccnavi の実行ファイルの探し方。.claude/scripts/*.sh と同じ順で探す。
+ * ccnavi の実行ファイルの探し方。.ccnavi/scripts/*.sh と同じ順で探す。
  *
  *   1. 拡張の設定 `ccnaviBoard.binPath`
  *   2. `.claude/settings.json` の env `CCNAVI_BIN_PATH`

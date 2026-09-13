@@ -17,7 +17,7 @@ import unittest
 from ccnavi import review
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh")
+SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
@@ -54,9 +54,11 @@ class OriginSubcommandTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-origin-")
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
-        # ワークスペースルートにもする。sh は `.claude/scripts/` を持つディレクトリを
-        # cwd から上へ探して根を決めるので、無いと判定まで届かない。
-        os.makedirs(os.path.join(self.dir, ".claude", "scripts"), exist_ok=True)
+        # ワークスペースルートにもする。sh は `.ccnavi/scripts/ccnavi-common.sh` を持つ
+        # ディレクトリを cwd から上へ探して根を決めるので、無いと判定まで届かない。
+        marker = os.path.join(self.dir, ".ccnavi", "scripts", "ccnavi-common.sh")
+        os.makedirs(os.path.dirname(marker), exist_ok=True)
+        open(marker, "a", encoding="utf-8").close()
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=self.dir, check=True)
         # sh は今居るブランチを rev-parse で読む。コミットが無いと HEAD が解けない。
         subprocess.run(

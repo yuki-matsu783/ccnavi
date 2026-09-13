@@ -1,8 +1,8 @@
 #!/bin/sh
 # ccnavi-clean — 作業ツリー 1 本の生成物を消す。`git worktree remove` の前に打つ。
 #
-#   sh .claude/scripts/ccnavi-clean.sh <名前>
-#   sh .claude/scripts/ccnavi-clean.sh <名前> --dry-run
+#   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
+#   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
 #
 # Windows では、pnpm の node_modules が深すぎる（260 文字を超える）ことと、uv の
 # .venv が掴まれていることで、`git worktree remove` が途中で止まって抜け殻が残る。
@@ -29,7 +29,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .claude/scripts/ccnavi-clean.sh <名前> [--dry-run]
+sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
 
   <名前>     .claude/worktrees/ の直下の名前。パスは書けない
   --dry-run  消すものを並べるだけで、消さない
@@ -77,7 +77,7 @@ case "$name" in
 esac
 
 root=$(ccnavi_workspace) || {
-	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
 

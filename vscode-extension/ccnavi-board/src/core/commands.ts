@@ -58,5 +58,5 @@ export function approveArgs(
  * 先に親の作業ツリーへ cd する。
  */
 export function acceptCommand(parentTree: string, phase: number): string {
-  return `cd ${shellQuote(toPosixPath(parentTree))} && sh .claude/scripts/ccnavi-review.sh accept ${phase}`;
+  return `cd ${shellQuote(toPosixPath(parentTree))} && sh .ccnavi/scripts/ccnavi-review.sh accept ${phase}`;
 }

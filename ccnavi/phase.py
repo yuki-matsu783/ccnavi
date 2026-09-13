@@ -115,9 +115,9 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
         message=(
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
-            "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
+            "'sh .ccnavi/scripts/ccnavi-ticket.sh' と 'sh .ccnavi/scripts/ccnavi-review.sh' を"
             "使い、承認は利用者が VS Code のボードか "
-            "'sh .claude/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
+            "'sh .ccnavi/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
             "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
@@ -419,9 +419,9 @@ def gate_reason(phase: Phase, tool: str) -> str:
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
             f"レビュー済みの印が置かれるまで、ゲートが{what}を止めます。",
             "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'sh .claude/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+            f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら 'sh .claude/scripts/ccnavi-review.sh check --phase {n}' "
+            f"利用者がレビューを終えたら 'sh .ccnavi/scripts/ccnavi-review.sh check --phase {n}' "
             "で確かめます。次のフェーズの計画（wip/tickets/todo/ への提案）は"
             "レビュー前に進めて構いません。",
         ]
@@ -479,7 +479,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
                 f"子の成果を親ブランチへ合流して push し、"
-                f"'sh .claude/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+                f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
                 f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。指摘があれば同じ"
                 "フェーズに子を足せます。レビュー済みになるまで、ゲートがサブエージェントの起動と"
                 "シェル実行を止めます。"

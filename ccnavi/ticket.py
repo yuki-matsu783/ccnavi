@@ -732,7 +732,7 @@ def guard_rules(tickets_rel: str) -> list[rules.Rule]:
     place = state_dir_regex(tickets_rel)
     message = (
         "チケットの状態は置き場（doing/ done/ cancelled/）で表し、動かすのは "
-        "'sh .claude/scripts/ccnavi-ticket.sh start|done|cancel <識別子>' だけです。"
+        "'sh .ccnavi/scripts/ccnavi-ticket.sh start|done|cancel <識別子>' だけです。"
         "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
     )
     write_rule = rules.Rule(

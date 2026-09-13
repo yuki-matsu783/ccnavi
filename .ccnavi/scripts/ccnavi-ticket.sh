@@ -1,10 +1,10 @@
 #!/bin/sh
 # ccnavi-ticket — チケットの状態を動かす。親（メインエージェント）だけが呼ぶ。
 #
-#   sh .claude/scripts/ccnavi-ticket.sh start  <識別子>
-#   sh .claude/scripts/ccnavi-ticket.sh done   <識別子>
-#   sh .claude/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>
-#   sh .claude/scripts/ccnavi-ticket.sh judge  <子> <項目> yes|no --reason <根拠>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh start  <識別子>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh done   <識別子>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh judge  <子> <項目> yes|no --reason <根拠>
 #
 # judge は、実績のリスクの定性項目（risk.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は done で閉じられない。
@@ -25,8 +25,8 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .claude/scripts/ccnavi-ticket.sh <start|done|cancel> <識別子> [--reason <理由>]
-sh .claude/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠>
+sh .ccnavi/scripts/ccnavi-ticket.sh <start|done|cancel> <識別子> [--reason <理由>]
+sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠>
 
   start   todo/ -> doing/  作業ツリー .claude/worktrees/<識別子> が要る。着手の時刻と基準点を書く
   done    doing/ -> done/  完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
@@ -57,7 +57,7 @@ esac
 # cwd がプロジェクトの中にあると git はプロジェクトを答える。それは git として
 # 正しい答えで、ここで欲しいもの（道具の置き場）とは違う（設計 §25.8）。
 root=$(ccnavi_workspace) || {
-	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
 

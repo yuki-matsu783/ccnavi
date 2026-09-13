@@ -266,7 +266,7 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, ".claude", "ccnavi", "risk.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)
         for name in ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh", "ccnavi-common.sh"):
-            write(os.path.join(src, ".claude", "scripts", name), f"# {name}\n")
+            write(os.path.join(src, ".ccnavi", "scripts", name), f"# {name}\n")
         return src
 
     def settings(self):

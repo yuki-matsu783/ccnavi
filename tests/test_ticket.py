@@ -456,14 +456,14 @@ class TicketTest(unittest.TestCase):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
         parent = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
 
@@ -475,8 +475,8 @@ class TicketTest(unittest.TestCase):
         """
         self.family()
         for command in (
-            "sh .claude/scripts/ccnavi-git.sh push -u origin i0001-01",
-            "cd ../i0001 && sh .claude/scripts/ccnavi-git.sh push origin i0001",
+            "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001-01",
+            "cd ../i0001 && sh .ccnavi/scripts/ccnavi-git.sh push origin i0001",
         ):
             with self.subTest(command=command):
                 result = self.hook(
@@ -492,7 +492,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="sh .claude/scripts/ccnavi-git.sh push -u origin i0001",
+            command="sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001",
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
         # 読むだけの形は、サブエージェントでも通る。
@@ -501,7 +501,7 @@ class TicketTest(unittest.TestCase):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .claude/scripts/ccnavi-git.sh status",
+            command="sh .ccnavi/scripts/ccnavi-git.sh status",
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(reading))
 
@@ -553,7 +553,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="sh .claude/scripts/ccnavi-git.sh status",
+            command="sh .ccnavi/scripts/ccnavi-git.sh status",
         )
         self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt))
         # 次のフェーズの計画は通る。
@@ -818,7 +818,7 @@ class TicketTest(unittest.TestCase):
             "ccnavi --approve --preview --yes i0001 --json",
             "ccnavi --approve --yes i0001 --preview",
             # 承認のスクリプトも人の経路。中身は --approve と承認済みチケットの push。
-            "sh .claude/scripts/ccnavi-approve.sh",
+            "sh .ccnavi/scripts/ccnavi-approve.sh",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -832,7 +832,7 @@ class TicketTest(unittest.TestCase):
         for command in (
             "ccnavi --explain",
             "ccnavi --lint",
-            "sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
             # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --approve --preview --json",
             "echo --approve --preview",
@@ -908,7 +908,7 @@ class TicketTest(unittest.TestCase):
             "PowerShell",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
@@ -1215,11 +1215,11 @@ class TicketTest(unittest.TestCase):
         ccnavi-common.sh も一緒に置く。sh は起動して最初に隣の共通部を読むので、
         片方だけだと判定の前に「読めない」で落ちる。
         """
-        where = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
+        where = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-review.sh")
         os.makedirs(os.path.dirname(where), exist_ok=True)
         for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
             shutil.copy(
-                os.path.join(ROOT, ".claude", "scripts", name),
+                os.path.join(ROOT, ".ccnavi", "scripts", name),
                 os.path.join(os.path.dirname(where), name),
             )
         return where

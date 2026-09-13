@@ -16,7 +16,7 @@ Windows のパスの綴りが実物でしか出ない。
     CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 
 `CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。実装フェーズの成果物は
-`wip/design/scripts/` に置かれ、人が写すまで `.claude/scripts/` には入らない。
+`wip/design/scripts/` に置かれ、人が写すまで `.ccnavi/scripts/` には入らない。
 写す前に新しい sh を測るときは、そこを指す。
 
     CCNAVI_E2E=1 CCNAVI_SH_DIR=wip/design/scripts uv run python -m unittest tests.test_e2e_sh
@@ -48,7 +48,7 @@ def walk_up_for(relative, skip_worktrees=True):
     実装（`ccnavi_workspace`）と同じ規則にしてある。**`.claude/worktrees/` の下は
     候補にしない。**
 
-    これを外すと、作業ツリーから回したときに作業ツリー自身を掴む。`.claude/scripts/`
+    これを外すと、作業ツリーから回したときに作業ツリー自身を掴む。`.ccnavi/scripts/`
     は git が運ぶのでどの作業ツリーにも写しがあるが、実際に効くのはワークスペース側の
     1 本だけ。写したあとに作業ツリーから回すと、写す前の版を測って赤になる（実際に
     起きた）。`dist/` は追跡外なので作業ツリーには無く、こちらは上へ歩くだけでよい。
@@ -72,7 +72,7 @@ def find_scripts():
     named = os.environ.get("CCNAVI_SH_DIR", "")
     if named:
         return os.path.join(ROOT, named)
-    return walk_up_for(os.path.join(".claude", "scripts"))
+    return walk_up_for(os.path.join(".ccnavi", "scripts"))
 
 
 def find_dist():
@@ -184,7 +184,7 @@ class WorkspaceTest(unittest.TestCase):
     def build_workspace(cls, ws, projects=()):
         """道具を持つワークスペースを作る。実行ファイルと sh を実物で置く。"""
         make_repo(ws)
-        scripts = os.path.join(ws, ".claude", "scripts")
+        scripts = os.path.join(ws, ".ccnavi", "scripts")
         os.makedirs(scripts, exist_ok=True)
         for name in sorted(os.listdir(SH_DIR)):
             if name.endswith(".sh"):
@@ -202,7 +202,7 @@ class WorkspaceTest(unittest.TestCase):
         shutil.copytree(DIST, os.path.join(ws, "dist", "ccnavi"))
         os.makedirs(os.path.join(ws, ".claude", "ccnavi", "tickets"), exist_ok=True)
         write(os.path.join(ws, ".gitignore"), "/logs/\n/projects/\n/dist/\n/.claude/worktrees/\n")
-        git(ws, "add", ".gitignore", ".claude/scripts", ".claude/hooks")
+        git(ws, "add", ".gitignore", ".ccnavi/scripts", ".claude/hooks")
         git(ws, "commit", "-q", "-m", "tools")
         for name in projects:
             make_repo(os.path.join(ws, "projects", name))
@@ -222,7 +222,7 @@ class WorkspaceTest(unittest.TestCase):
     # ---- 道具
 
     def script(self, name):
-        return os.path.join(self.ws, ".claude", "scripts", name)
+        return os.path.join(self.ws, ".ccnavi", "scripts", name)
 
     def run_sh(self, name, *args, cwd=None, env=None):
         environment = dict(os.environ)
@@ -512,7 +512,7 @@ class ModeATest(unittest.TestCase):
         environment = dict(os.environ)
         environment.pop("CCNAVI_WORKSPACE", None)
         return subprocess.run(
-            [SHELL, os.path.join(self.ws, ".claude", "scripts", name), *args],
+            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", name), *args],
             cwd=cwd or self.ws,
             capture_output=True,
             text=True,

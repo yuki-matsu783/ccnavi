@@ -135,7 +135,7 @@ class FallbackTest(unittest.TestCase):
         for command in [
             "echo x >> .claude/hooks/lint-py.sh",
             "sed -i s/deny/allow/ .claude/ccnavi/rules.yml",
-            "cp /tmp/x .claude/scripts/ccnavi-git.sh",
+            "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
         ]:
@@ -148,8 +148,8 @@ class FallbackTest(unittest.TestCase):
         # 衝突を解いている最中は必ず既定に落ちている。そこで解決の手が止まると、
         # ガードが落ちた状態から出られない。どれもファイルに新しい文面を書かない。
         for command in [
-            "sh .claude/scripts/ccnavi-git.sh restore --ours -- .claude/ccnavi/rules.yml",
-            "sh .claude/scripts/ccnavi-git.sh add -- .claude/ccnavi/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .claude/ccnavi/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh add -- .claude/ccnavi/rules.yml",
             "cat .claude/ccnavi/rules.yml",
             "grep -n conflict .claude/ccnavi/rules.yml",
         ]:

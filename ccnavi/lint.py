@@ -767,13 +767,13 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 )
             )
     for name in TICKET_SCRIPTS:
-        path = os.path.join(root, ".claude", "scripts", name)
+        path = os.path.join(root, ".ccnavi", "scripts", name)
         if not os.path.isfile(path):
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
-                    f".claude/scripts/{name} が無い。ゲートの中で通る形が無くなる",
+                    f".ccnavi/scripts/{name} が無い。ゲートの中で通る形が無くなる",
                 )
             )
     return problems

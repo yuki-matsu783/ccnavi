@@ -720,10 +720,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             os.makedirs(os.path.join(src, ".ccnavi", "config"))
             with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
-            os.makedirs(os.path.join(src, ".claude", "scripts"))
+            os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
             for name in DEPLOY_SCRIPTS:
                 with open(
-                    os.path.join(src, ".claude", "scripts", name),
+                    os.path.join(src, ".ccnavi", "scripts", name),
                     "w",
                     encoding="utf-8",
                 ) as f:
@@ -782,7 +782,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
-            self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
+            self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
 
     def test_says_nothing_is_missing_after_it_copied(self):
         """配ったあとは「まだ無いもの」が出ない。
@@ -827,7 +827,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertTrue(os.path.isfile(self.deployed(".claude", "ccnavi", "ccnavi")))
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         for name in DEPLOY_SCRIPTS:
-            self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
+            self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
 
     def test_writes_the_settings_when_the_default_source_is_not_built(self):
         """既定の配布元が組み立てられていなくても、設定は書く。
@@ -1122,6 +1122,29 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
         self.assertIn(".gitignore に足す", result.stdout)
+
+
+class NamesTheOldScriptPlace(SetupTest):
+    """ゲートの sh の置き場を .claude/scripts/ から .ccnavi/scripts/ へ移した。
+
+    前の配布で置いた写しは読まれないまま残る。消すのは人なので、名前を挙げるだけにする。
+    """
+
+    def test_names_scripts_left_in_the_old_place_without_removing_them(self):
+        old = os.path.join(self.dir, ".claude", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(old))
+        with open(old, "w", encoding="utf-8") as f:
+            f.write("# old\n")
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("前の置き場に残っているゲートの sh", result.stdout)
+        self.assertIn(".claude/scripts/ccnavi-git.sh", result.stdout)
+        self.assertTrue(os.path.isfile(old))
+
+    def test_says_nothing_when_the_old_place_is_empty(self):
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("前の置き場", result.stdout)
 
 
 class WritesTheVscodeSettings(SetupTest):

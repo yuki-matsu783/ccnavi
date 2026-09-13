@@ -226,7 +226,7 @@ class RiskTest(PhaseHarness):
             "session_id": "s1",
             "agent_id": "sub-1",
             "tool_input": {
-                "command": "sh .claude/scripts/ccnavi-ticket.sh judge i0001-01 untested yes "
+                "command": "sh .ccnavi/scripts/ccnavi-ticket.sh judge i0001-01 untested yes "
                 "--reason x"
             },
         }

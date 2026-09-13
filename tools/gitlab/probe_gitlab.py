@@ -40,9 +40,9 @@ import urllib.error
 import urllib.request
 
 ROOT_OF_CCNAVI = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".claude", "scripts", "ccnavi-review.sh")
-GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".claude", "scripts", "ccnavi-git.sh")
-TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".claude", "scripts", "ccnavi-ticket.sh")
+REVIEW_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-review.sh")
+GIT_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-git.sh")
+TICKET_SH = os.path.join(ROOT_OF_CCNAVI, ".ccnavi", "scripts", "ccnavi-ticket.sh")
 GITLAB = os.environ.get("CCNAVI_PROBE_GITLAB", "http://localhost:8929").rstrip("/")
 API = GITLAB + "/api/v4"
 

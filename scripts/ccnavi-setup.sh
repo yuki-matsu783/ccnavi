@@ -85,7 +85,7 @@ DEPLOY_RULES=".claude/ccnavi/rules.yml"
 # projects/ の下のプロジェクトにも効いてしまう（設計 §25.12）。
 DEPLOY_RISK=".claude/ccnavi/risk.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
-DEPLOY_SCRIPT_DIR=".claude/scripts"
+DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
 # 起動時に落ちる。
 DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh"
@@ -1058,8 +1058,8 @@ if [ ! -f "$root/$DEPLOY_PHASES" ]; then
 	note_missing "${DEPLOY_PHASES}（フェーズの種類。無いと番号だけの挙動になる）"
 fi
 for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh; do
-	if [ ! -f "$root/.claude/scripts/$name" ]; then
-		note_missing ".claude/scripts/${name}（ゲートの中で通る形）"
+	if [ ! -f "$root/.ccnavi/scripts/$name" ]; then
+		note_missing ".ccnavi/scripts/${name}（ゲートの中で通る形）"
 	fi
 done
 if [ -n "$missing_parts" ]; then
@@ -1071,6 +1071,19 @@ if [ -n "$missing_parts" ]; then
 		# 読んで落ちる。
 		printf '%s\n' "--no-deploy を外すと、ccnavi の根から配ります。"
 	fi
+fi
+
+# 置き場を .claude/scripts/ から .ccnavi/scripts/ へ移した。前の配布で置いた写しは、
+# もう誰にも読まれないまま残る。消すかどうかは人が決めるので、名前を挙げるだけにする。
+old_scripts=""
+for name in $DEPLOY_SCRIPTS; do
+	if [ -f "$root/.claude/scripts/$name" ]; then
+		old_scripts="$old_scripts  .claude/scripts/$name
+"
+	fi
+done
+if [ -n "$old_scripts" ]; then
+	printf '前の置き場に残っているゲートの sh（今は %s/ を使います。要らなければ消してください）:\n%s' "$DEPLOY_SCRIPT_DIR" "$old_scripts"
 fi
 
 printf 'env の値はセッションを開き直すまで効きません。\n'

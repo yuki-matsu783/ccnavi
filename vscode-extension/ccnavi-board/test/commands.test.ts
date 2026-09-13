@@ -54,6 +54,6 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
 test("CB-T19 accept は親の作業ツリーで sh を打つ", () => {
   assert.equal(
     acceptCommand("/ws/.claude/worktrees/i0001", 2),
-    "cd '/ws/.claude/worktrees/i0001' && sh .claude/scripts/ccnavi-review.sh accept 2",
+    "cd '/ws/.claude/worktrees/i0001' && sh .ccnavi/scripts/ccnavi-review.sh accept 2",
   );
 });

@@ -1,11 +1,11 @@
 #!/bin/sh
 # ccnavi-review — レビューの依頼と確認。親（メインエージェント）だけが呼ぶ。
 #
-#   sh .claude/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文>
-#   sh .claude/scripts/ccnavi-review.sh check   --phase <N>
-#   sh .claude/scripts/ccnavi-review.sh note    --body-file <本文>
-#   sh .claude/scripts/ccnavi-review.sh accept  <N>          （人が端末で打つ）
-#   sh .claude/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
+#   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文>
+#   sh .ccnavi/scripts/ccnavi-review.sh check   --phase <N>
+#   sh .ccnavi/scripts/ccnavi-review.sh note    --body-file <本文>
+#   sh .ccnavi/scripts/ccnavi-review.sh accept  <N>          （人が端末で打つ）
+#   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・印）
@@ -31,7 +31,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .claude/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <N>] [--body-file <path>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <N>] [--body-file <path>]
 
   request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿して印を置く
   check    --phase <N>                         依頼より後の未解決スレッドが無ければ印を置く
@@ -78,7 +78,7 @@ esac
 # プロジェクトを答え、写し・印・状態の置き場がプロジェクト側にずれる。
 # 道具の置き場は上へ歩いて探す（設計 §25.8）。
 root=$(ccnavi_workspace) ||
-	fail "ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+	fail "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 here="$(pwd -W 2>/dev/null || pwd)"
 state="$root/${CCNAVI_STATE:-.claude/ccnavi/state}"
 

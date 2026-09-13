@@ -3,7 +3,7 @@
 #   . "$(dirname "$0")/ccnavi-common.sh"
 #
 # 呼ぶ側の `set -eu` の直後に置く。`$0` は呼ばれたときの綴りそのままなので、
-# `sh .claude/scripts/ccnavi-git.sh` でも `sh ../../scripts/ccnavi-git.sh` でも
+# `sh .ccnavi/scripts/ccnavi-git.sh` でも `sh ../../../.ccnavi/scripts/ccnavi-git.sh` でも
 # 同じディレクトリを指す。**この読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない**（下の ccnavi_workspace の但し書き）。
 #
@@ -82,13 +82,15 @@ ccnavi_abs() {
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
 # 正しい答えで、ここで欲しいものとは違う（設計 §25.8）。
 #
-# 印は `.claude/scripts/`。自分自身の置き場なので、無ければそもそも sh が呼べていない。
+# 印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
+# ディレクトリの `.ccnavi/scripts/` だけでは足りない。層の傘の下には配点が呼ぶスクリプトの
+# 置き場として同じ綴りがあり、プロジェクトの中から打つとそのプロジェクトを根と取り違える。
 # `.git` は駄目（プロジェクトも持つ）。`.claude/` だけも駄目（Claude Code が作る場合が
 # あり、プロジェクト側にできたものに当たる）。
 #
 # **作業ツリーは飛ばし、最初に当たったものを返す。**
 #
-# `.claude/scripts/` は git で追跡されているので、どの作業ツリーにも写しがある。
+# `.ccnavi/scripts/` は git で追跡されているので、どの作業ツリーにも写しがある。
 # 単純に「最初に当たったもの」にすると、作業ツリーの中から打ったとき作業ツリー自身が
 # 根になる。ところが `.claude/ccnavi/tickets/`（承認済みチケット）と `state/` は
 # 追跡外で作業ツリーには無いので、チケットも印も見つからなくなる。道具のうち
@@ -98,19 +100,19 @@ ccnavi_abs() {
 # 「作業ツリーでない」ディレクトリが根になる。
 #
 # 最外を取る形にはしない。ワークスペースが利用者のホームの下にあり、そこに
-# `~/.claude/scripts/` が在ると、そちらを掴む。近いほうから決める。
+# `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを掴む。近いほうから決める。
 #
 # `cd` は使わない。`set -e` の下で戻り忘れが事故になる。パスを削って登る。
 ccnavi_workspace() {
 	if [ -n "${CCNAVI_WORKSPACE:-}" ]; then
 		ccnavi_ws_named=$(ccnavi_abs "$CCNAVI_WORKSPACE") || return 1
-		[ -d "$ccnavi_ws_named/.claude/scripts" ] || return 1
+		[ -f "$ccnavi_ws_named/.ccnavi/scripts/ccnavi-common.sh" ] || return 1
 		printf '%s\n' "$ccnavi_ws_named"
 		return 0
 	fi
 	ccnavi_ws_here=$(ccnavi_abs .) || return 1
 	while :; do
-		if [ -d "$ccnavi_ws_here/.claude/scripts" ]; then
+		if [ -f "$ccnavi_ws_here/.ccnavi/scripts/ccnavi-common.sh" ]; then
 			case "$ccnavi_ws_here" in
 			*/.claude/worktrees/*) ;; # 作業ツリーの中の写し。根ではない
 			*)

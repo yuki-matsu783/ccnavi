@@ -4,7 +4,7 @@
 
 ここはネットワークに出ない。フェーズが終わっているか、子のブランチが親に入っているか、
 未コミットが無いか、push 済みか、印がどうなっているか。分かるのはそこまでで、
-マージリクエストの中身は `.claude/scripts/ccnavi-review.sh` が取ってきて JSON で渡す
+マージリクエストの中身は `.ccnavi/scripts/ccnavi-review.sh` が取ってきて JSON で渡す
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
 以前は exe が GitHub / GitLab の API を直接叩いていた。実測できていない部分
@@ -367,16 +367,16 @@ def check(
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
-                "  - 'sh .claude/scripts/ccnavi-review.sh handoff --body-file <題と本文>' で"
+                "  - 'sh .ccnavi/scripts/ccnavi-review.sh handoff --body-file <題と本文>' で"
                 "別の issue に切り出し、利用者が端末で "
-                f"'sh .claude/scripts/ccnavi-review.sh accept {phase_no}' を打って"
+                f"'sh .ccnavi/scripts/ccnavi-review.sh accept {phase_no}' を打って"
                 "残りを受け入れる\n"
                 "新しいフィードバック作業フェーズは足せません。\n"
             )
         else:
             stderr.write(
                 "解決してもらって再実行するか、同じフェーズに子を足してやり直すか、利用者が端末で "
-                f"'sh .claude/scripts/ccnavi-review.sh accept {phase_no}' を打つ\n"
+                f"'sh .ccnavi/scripts/ccnavi-review.sh accept {phase_no}' を打つ\n"
             )
         return 1
     assert result.mr is not None
@@ -419,7 +419,7 @@ def reviewed(
     if not accept_unresolved:
         stderr.write(
             "ccnavi: 未解決を受け入れるなら --accept-unresolved を付ける。"
-            "受け入れないなら 'sh .claude/scripts/ccnavi-review.sh check' で足りる\n"
+            "受け入れないなら 'sh .ccnavi/scripts/ccnavi-review.sh check' で足りる\n"
         )
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
@@ -577,7 +577,7 @@ def ready(
             stderr.write(f"  - {p}\n")
         stderr.write(
             "全部片付けてから打ち直す。まだ残るものを承知で締めるなら、利用者が端末で "
-            "'sh .claude/scripts/ccnavi-review.sh wrapup --reason <理由>' を打つ\n"
+            "'sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <理由>' を打つ\n"
         )
         return 1
     result = _result_with_mr(stderr, result_path)
@@ -928,7 +928,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
         problems.append(
             f"`{wip}/` に追跡されているファイルが {n} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'sh .claude/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
+            f"'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親の作業ツリーに未コミットの変更がある")

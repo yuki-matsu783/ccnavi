@@ -112,17 +112,17 @@ test("CB-T65 .gitignore の置き場の行を見つけ、無ければ足す", ()
 });
 
 test("CB-T66 写すときは出どころのコメントを足し、sh の綴りだけを {root} 付きにする", () => {
-  const source = "deny:\n  - id: raw-git\n    message: |\n      'sh .claude/scripts/ccnavi-git.sh <サブコマンド>' を使う。\n      glob: '*/.claude/scripts/*' は変えない\n";
+  const source = "deny:\n  - id: raw-git\n    message: |\n      'sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド>' を使う。\n      glob: '*/.ccnavi/scripts/*' は変えない\n";
   const out = rewriteRulesForProject(source, ".claude/ccnavi/rules.yml", "lib", "2026-09-12");
   assert.match(out, /^# lib のルール。共通層の \.claude\/ccnavi\/rules\.yml を 2026-09-12 に写した/);
   assert.match(out, /共通層に足して当たる（上書きはしない）/);
-  assert.match(out, /'sh \{root\}\/\.claude\/scripts\/ccnavi-git\.sh <サブコマンド>'/);
-  assert.match(out, /glob: '\*\/\.claude\/scripts\/\*' は変えない/);
+  assert.match(out, /'sh \{root\}\/\.ccnavi\/scripts\/ccnavi-git\.sh <サブコマンド>'/);
+  assert.match(out, /glob: '\*\/\.ccnavi\/scripts\/\*' は変えない/);
   // 置き換えは 1 種類だけで、既に {root} 付きの綴りには重ねない
-  assert.ok(!out.includes("sh .claude/scripts/"));
+  assert.ok(!out.includes("sh .ccnavi/scripts/"));
   const twice = rewriteRulesForProject(out, "x", "lib", "d");
   assert.ok(!twice.includes("{root}/{root}"));
-  assert.ok(!twice.includes("sh {root}/.claude/scripts/{root}"));
+  assert.ok(!twice.includes("sh {root}/.ccnavi/scripts/{root}"));
 });
 
 test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引ける", () => {

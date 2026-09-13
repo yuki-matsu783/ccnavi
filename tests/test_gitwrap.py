@@ -17,7 +17,7 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPT = os.path.join(ROOT, ".claude", "scripts", "ccnavi-git.sh")
+SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-git.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 
 
@@ -29,11 +29,13 @@ def git(cwd, *args):
 def make_repo(cwd):
     """コミットが 1 件あり、追跡外のファイルが 1 件ある使い捨てのリポジトリ。
 
-    ワークスペースルートにもする。ラッパは `.claude/scripts/` を持つディレクトリを
+    ワークスペースルートにもする。ラッパは `.ccnavi/scripts/ccnavi-common.sh` を持つディレクトリを
     cwd から上へ探して根を決める（`ccnavi_workspace`）ので、それが無いと
     「ワークスペースの外」として断られ、判定まで届かない。
     """
-    os.makedirs(os.path.join(cwd, ".claude", "scripts"), exist_ok=True)
+    marker = os.path.join(cwd, ".ccnavi", "scripts", "ccnavi-common.sh")
+    os.makedirs(os.path.dirname(marker), exist_ok=True)
+    open(marker, "a", encoding="utf-8").close()
     git(cwd, "init", "-q")
     git(cwd, "config", "user.email", "t@example.invalid")
     git(cwd, "config", "user.name", "t")
