@@ -208,7 +208,7 @@ ROOT_RULE = {
 # YAML として壊れている。閉じていない並び。
 BROKEN = "version: 3\ndeny: [\n"
 
-# 層の傘の既定の名前（設計 §25.2、`CCNAVI_PROJECT_HOME` の既定）。
+# ccnavi ディレクトリの既定の名前（設計 §25.2、`CCNAVI_PROJECT_HOME` の既定）。
 HOME = ".ccnavi"
 
 
@@ -907,7 +907,10 @@ class WiringTest(ConfigUnionHarness):
         self.assertTrue(any("self" in p["detail"] for p in errors), errors)
 
     def test_project_home_env_moves_the_umbrella(self):
-        """§25.2: `CCNAVI_PROJECT_HOME` で傘の名前が動く。`config/` と 3 本の名前は固定。"""
+        """§25.2: `CCNAVI_PROJECT_HOME` で ccnavi ディレクトリの名前が動く。
+
+        `config/` と 3 本の名前は固定。
+        """
         moved = {
             "version": 3,
             "deny": [

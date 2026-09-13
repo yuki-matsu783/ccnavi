@@ -76,8 +76,8 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart 
 DEFAULT_MODE="dry-run"
 # 配布先での既定の置き場。配布元の dist/ は組み立ての出力で、.gitignore に
 # 入っている場所。配られた側にとっては、そこは「自分が組み立てた物の置き場」
-# ではなく、ccnavi が入っている場所。層の傘（.ccnavi/）の下に置けば、ゲートの sh と
-# 同じ並びに収まり、傘を守るルールがそのまま実行ファイルにも効く。
+# ではなく、ccnavi が入っている場所。ccnavi ディレクトリ（.ccnavi/）の下に置けば、ゲートの sh と
+# 同じ並びに収まり、ccnavi ディレクトリを守るルールがそのまま実行ファイルにも効く。
 #
 # 指すのは振り分けの sh。実体はその隣の `<os>-<arch>/` に入る。
 DEFAULT_BIN=".ccnavi/bin/ccnavi"

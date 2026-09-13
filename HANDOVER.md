@@ -53,10 +53,10 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
 - `CCNAVI_PROJECT_RULES` と旧の置き場 `config/rules.yml` はもう読まない（`--lint` が warn で言う）
 
 コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
-それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。層の傘 `.ccnavi/` の下は組み込みの deny
+それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
-`rm -rf .ccnavi` のように傘ごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
-共通層も傘の下に入ったので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
+`rm -rf .ccnavi` のように ccnavi ディレクトリごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
+共通層も ccnavi ディレクトリの下に入ったので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
 （前は `.claude/ccnavi/` の中で一緒に守られていた。`logs/` の下の git ラッパの記録は守らない）。
 
 **移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧共通層の `phases.yml`（置き場の移し替えで
