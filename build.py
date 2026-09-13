@@ -11,13 +11,16 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 from __future__ import annotations
 
 import os
-import platform
 import shutil
 import subprocess
 import sys
 import time
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+
+from ccnavi import platformtag  # noqa: E402
+
 # 実行ファイルの置き場。hook はここを指す。
 DIST = os.path.join(ROOT, "dist")
 NAME = "ccnavi"
@@ -36,21 +39,9 @@ def build_target() -> str:
     """組み立てた実行ファイルが動く機械の `<os>-<arch>`。
 
     PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。
-    語は scripts/ccnavi-setup.sh の host_target と揃える。
+    導入スクリプトはこの語を配布先のディレクトリ名にする（ccnavi/platformtag.py）。
     """
-    if sys.platform == "win32":
-        system = "windows"
-    elif sys.platform == "darwin":
-        system = "darwin"
-    elif sys.platform.startswith("linux"):
-        system = "linux"
-    else:
-        system = sys.platform
-    machine = platform.machine().lower()
-    arch = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "arm64", "aarch64": "arm64"}.get(
-        machine, machine or "unknown"
-    )
-    return f"{system}-{arch}"
+    return platformtag.host_target()
 
 
 def build() -> int:

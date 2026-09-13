@@ -26,7 +26,7 @@ import {
 } from "./core/approvemodel.js";
 import { approveArgs, previewArgs, type Launcher } from "./core/commands.js";
 import { parseLintJson, type LintJson } from "./core/lintmodel.js";
-import { binFromSettingsJson, locate } from "./core/locate.js";
+import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import {
   parseSamplesJson,
@@ -60,7 +60,7 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
 const APPROVE_TIMEOUT_MS = 60_000;
 
 const NOT_FOUND =
-  "ccnavi の実行ファイルが見つからない（dist/ccnavi/ccnavi、.claude/settings.json の CCNAVI_BIN_PATH、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
+  "ccnavi の実行ファイルが見つからない（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
 
 /** 見るのはルールだけ。チケット制御と控えは外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
@@ -111,6 +111,7 @@ export function findLauncher(root: string, setting: string): Launcher | undefine
     root,
     setting,
     settingsEnvBin: readSettingsEnvBin(root),
+    hostTarget: hostTarget(process.platform, process.arch),
     exists: (p) => {
       try {
         return fs.statSync(p).isFile();
