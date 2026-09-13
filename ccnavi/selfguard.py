@@ -166,6 +166,13 @@ ACTION_RESTORED_GIT = "restored-from-git"  # 控えが無く、git から戻し�
 ACTION_MISSING = "missing"  # 対象が無く、戻す先も無い
 ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
+ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
+
+# 共通層のルールファイルに付ける控えの key（_places）。
+COMMON_RULES_KEY = "rules"
+
+# 名指しのツールで書くもの。修復として戻さない判断は、この経路で書いた先にだけ掛ける。
+REPAIR_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
 # 区切り文字が混じった値でファイルを別の場所へ書かせない。
@@ -190,10 +197,10 @@ _SETTINGS_FILES = (
 #   1. リダイレクトの行き先。`>` `>>` `>|` `&>` はどれも `>` を含み、
 #      shellread が `> 行き先` の形に均してから渡してくる。
 #   2. 名指ししたところを必ず書き換えるコマンド。`\x00` はコマンドの切れ目に
-#      shellread が置く印で、`(^|\x00)` はコマンドの先頭を意味する。
-#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の印
+#      shellread が置く目印で、`(^|\x00)` はコマンドの先頭を意味する。
+#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の目印
 #      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
-#      1 のリダイレクトの行き先だけは、語の中の印まで食うと引用の中の `> 場所` が
+#      1 のリダイレクトの行き先だけは、語の中の目印まで食うと引用の中の `> 場所` が
 #      書き込み先に見えるので、そちらも除外する。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。
 #
@@ -212,7 +219,7 @@ _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 # `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
 # `mv .ccnavi .ccnavi.bak` も、ccnavi ディレクトリごと消す・退かす形なので、下のファイルを 1 本ずつ
 # 書き換えるのと同じだけ守りが消える（敵対的レビュー A-3）。
-# 語の中の印も終わりに数える。数えないと、`rm ".ccnavi x"` のように引用がつないだ
+# 語の中の目印も終わりに数える。数えないと、`rm ".ccnavi x"` のように引用がつないだ
 # 綴りが通る。
 _TERM = rf"(?:[ {_NOT_A_WORD}]|$)"
 # 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
@@ -426,9 +433,9 @@ def _spelled(path: str) -> str:
     return r"[\\/]".join(re.escape(part) for part in re.split(r"[\\/]", path))
 
 
-# 足すルールの id。プロジェクトが同じ名前で書いていれば、そちらを優先して
-# 足さない。組み込みが黙って上書きすると、ルールファイルを読んだ人が
-# 「ここに書いてあるとおりに効いている」と読めなくなる。
+# 足すルールの id。どれも rules.RESERVED_ID_PREFIX で始まり、ルールファイルからは
+# 書けない。同じ名前のルールと重なることが無いので、当たった id を名指しされた人は
+# 組み込みのルールだと分かる。
 SHELL_RULE_ID = "builtin-guard-setting-files"
 
 SHELL_MESSAGE = (
@@ -557,9 +564,9 @@ def add_rules(
     既定の置き場なら ccnavi ディレクトリを守る 1 本とも重なるが、共通層を名乗る
     こちらを先に出す。
 
-    同じ id が既にあるなら足さない。プロジェクトが自分で書いているなら、
-    書いたとおりに効いているほうがよい。組み込みが黙って重ねると、当たった
-    ルールを名指しされた人が、ルールファイルを見ても見つけられなくなる。
+    ルールファイルに何が書いてあっても足す。以前は同じ id の deny があれば足さず、
+    何にも当たらない 1 本をその名前で書くだけで守りが黙って消えた。今は組み込みの名前
+    （rules.RESERVED_ID_PREFIX）をルールファイルに書けないので、重なりは起きない。
     """
     _insert(
         rule_set,
@@ -611,9 +618,7 @@ def add_rules(
 
 
 def _insert(rule_set: rules.RuleSet, raw: dict) -> None:
-    if any(rule.id == raw["id"] for rule in rule_set.deny):
-        return
-    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]})
+    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, builtin=True)
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
         # しない。止まると、直すための呼び出しごと止まる。
@@ -873,7 +878,7 @@ def before(
         content = _read(target.path)
         if content is None:
             # 戻せなかった。控えも git も持っていないなら、そもそも
-            # 置かれていないファイルなので、印を残して次から黙る。
+            # 置かれていないファイルなので、マーカーを残して次から黙る。
             if saved is None:
                 _note_absent(state_dir, session, target)
                 continue
@@ -891,12 +896,16 @@ def after(
     session: str,
     root: str,
     found: list[Target],
+    written: str = "",
 ) -> list[Outcome]:
     """実行後。控えと突き合わせて、変わっていれば戻す。
 
     控えが読めなければ git のコミット済みの内容へ落ちる。落ちたことは
     報告に書く。戻した先が直前の断面なのかコミット済みの内容なのかで、
     人の書きかけが残っているかどうかが変わるので。
+
+    written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
+    パス。組み込みの既定に落ちている間の修復だけは戻さない（_left_as_repair）。
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -915,10 +924,20 @@ def after(
         if saved is not None and now == saved:
             continue
 
+        if _left_as_repair(target, written, saved, now):
+            outcomes.append(
+                Outcome(
+                    target,
+                    ACTION_LEFT,
+                    "ルールファイルが読めない間に名指しのツールで直したので、戻さなかった",
+                )
+            )
+            continue
+
         if saved is None:
             if now is None:
                 # 対象も控えも無い。置いていないファイルなので何も言わない。
-                # 実行前がここに印を残しているが、印が読めない場合でも
+                # 実行前がここにマーカーを残しているが、マーカーが読めない場合でも
                 # 「無いものが無いまま」を事件として扱わない。
                 continue
             if _absent_noted(state_dir, session, target):
@@ -953,6 +972,32 @@ def after(
     # 何も起きていない回は落とす。ACTION_KEPT はここまでの経路で「調べたが
     # 変わっていなかった」を運ぶための値で、報告に出す用件ではない。
     return [o for o in outcomes if o.action != ACTION_KEPT]
+
+
+def _left_as_repair(target: Target, written: str, saved: bytes | None, now: bytes | None) -> bool:
+    """組み込みの既定に落ちている間の修復か。そうなら戻さない（REQ-PRE-06）。
+
+    共通層のルールファイルが読めないと、組み込みの既定は Write / Edit による修復を通す。
+    ところが実行前に取る控えは壊れた中身なので、そのまま戻すと、直した結果が同じ呼び出しの
+    中で消える。「Write / Edit で直せ」という案内と実際が食い違う。
+
+    戻さないのは次の 4 つが揃ったときだけ。
+      1. 対象が共通層のルールファイルそのもの。組み込みの既定に落ちる原因になるのはこの
+         1 本だけで、作業ツリー側の設定や他の層の設定は読めなくても既定に落ちない
+      2. この呼び出しが名指しのツールでそこを書いた。シェルからの書き込みは既定でも止める
+         経路なので、ここでも戻す
+      3. 控え（この呼び出しの直前の中身）がルールファイルとして読めない。実行後の中身で
+         決めると、読める版を壊した書き込み（dry-run の deny は止めない）がそのまま残り、
+         壊すことが戻されない道になる
+      4. 今もファイルが在る。消した呼び出しは修復ではない
+    """
+    if not written or target.copy or target.key != COMMON_RULES_KEY:
+        return False
+    if saved is None or now is None:
+        return False
+    if os.path.realpath(written) != target.path:
+        return False
+    return not rules.readable(saved)
 
 
 def at_start(
@@ -1008,7 +1053,7 @@ def at_start(
         content = _read(target.path)
         if content is None:
             # 最初から無い。`settings.local.json` を置いていない形がこれで、
-            # 事件ではない。無いことの印は実行前の側が残す。開始の時点では
+            # 事件ではない。無いことのマーカーは実行前の側が残す。開始の時点では
             # まだ「消された」と「置いていない」を見分ける手がかりが無い。
             continue
         _clear_absent(state_dir, session, target)
@@ -1283,10 +1328,18 @@ def report(outcomes: list[Outcome]) -> str:
             "作業ツリー側の設定は、その場では誰も読みませんが、統合すれば main の "
             "hook の登録とルールになります。"
         )
-    lines.append(
-        "変更が要るなら、何をなぜ変えたいのかを利用者に伝えて依頼してください。"
-        "自分で書き換えると、次の呼び出しで同じように戻ります。"
-    )
+    if any(outcome.action == ACTION_LEFT for outcome in outcomes):
+        # 戻さなかった回。「次も戻る」と言うと嘘になる。代わりに、人が中身を見る
+        # 用件を渡す。ルールが読めない間の書き込みは、どれだけ緩めたかを誰も判定していない。
+        lines.append(
+            "読めなかった共通層のルールファイルへの修復は戻していません。"
+            "直した中身が意図どおりかを、利用者に確かめてもらってください。"
+        )
+    if any(outcome.action != ACTION_LEFT for outcome in outcomes):
+        lines.append(
+            "変更が要るなら、何をなぜ変えたいのかを利用者に伝えて依頼してください。"
+            "自分で書き換えると、次の呼び出しで同じように戻ります。"
+        )
     return "\n".join(lines)
 
 
@@ -1345,9 +1398,9 @@ def _fall_back_to_git(setting: str, root: str, target: Target, now: bytes | None
 
 
 def _absent_path(state_dir: str, session: str, target: Target) -> str:
-    """「このファイルは置かれていない」という印の置き場。
+    """「このファイルは置かれていない」というマーカーの置き場。
 
-    印を持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
+    マーカーを持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
     置いていないプロジェクトでは、無いことがそのプロジェクトの正常な姿になる。
     そこで呼び出しのたびに外部プロセスを起こすと、何も起きていない作業が
     いちばん重くなる。
@@ -1364,7 +1417,7 @@ def _note_absent(state_dir: str, session: str, target: Target) -> None:
 
 
 def _clear_absent(state_dir: str, session: str, target: Target) -> None:
-    """印を消す。無かったはずのものが現れたら、次からは普通に控える。"""
+    """マーカーを消す。無かったはずのものが現れたら、次からは普通に控える。"""
     with contextlib.suppress(OSError):
         os.remove(_absent_path(state_dir, session, target))
 

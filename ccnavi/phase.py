@@ -6,8 +6,8 @@
 そのフェーズは終わり。`cancelled/` だけのフェーズは終わりではない（何も成果が無い）。
 
 終わりの扱いは、`done/` の子に `human_review.required: true` が 1 枚でもあるかで分かれる。
-あればゲートが閉じ、レビュー済みの印が置かれるまでサブエージェントの起動とシェルを止める。
-無ければ省略の印を置いて進ませる。
+あればゲートが閉じ、レビュー済みのマーカーが置かれるまでサブエージェントの起動とシェルを止める。
+無ければ省略のマーカーを置いて進ませる。
 
 ## ゲートの鍵は cwd
 
@@ -66,7 +66,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
 # 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
 # 前のコマンドの `--approve` を免除する。
-# 語の中の印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
+# 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*--preview\b)"
 _CLI_FORMS = (
@@ -374,8 +374,8 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         phase.tickets.append(t)
         state, _ = _proposal(root, conf, t)
         phase.states[t.ticket] = state
-    # 印と記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
-    # 印を子の側に書くと、同じフェーズの印が複数のツリーに散る。
+    # マーカーと記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
+    # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに散る。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
         phase.marks = approval.marks(where, parent_id, phase.number)
@@ -423,7 +423,7 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
         [
             f"[ccnavi] {CODE_GATE} (parent: {phase.parent}, phase: {n}, {marks})",
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
-            f"レビュー済みの印が置かれるまで、ゲートが{what}を止めます。",
+            f"レビュー済みのマーカーが置かれるまで、ゲートが{what}を止めます。",
             "やること: 子の成果を親ブランチへ合流して push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
@@ -435,9 +435,9 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置く印に足す、その種類の層（設計 §11.9）。
+    """種類を根拠に置くマーカーに足す、その種類の層（設計 §11.9）。
 
-    `review:` が絡む印（省略と保留）にだけ足す。他の印は種類を見ずに置くので、
+    `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
     層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
     """
     return {"source": phase.type.source} if phase.type is not None else {}
@@ -458,7 +458,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 where, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
                 f"レビューは {at} 番目と一緒に見る計画なので、ここでは止めません。"
@@ -469,7 +469,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 where, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
             covers = (
                 f"（{', '.join(str(c) for c in phase.covers)} 番目の分も含めて）"
@@ -500,7 +500,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             risk_note = f"{phase.risk_line}。" if phase.risk_line else ""
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"
@@ -552,7 +552,7 @@ def order_problems(
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
 
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
-    増え、印も消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
+    増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
     フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
     次の子が一緒に承認され、1 本ずつ承認したときに落ちるものが、まとめて承認すると通る。
     """
@@ -567,7 +567,7 @@ def order_problems(
         if t.phase is not None:
             reopened.setdefault(t.phase, []).append(t.ticket)
     # 同じ承認でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
-    # 済む（settle_last_review）。承認の前に印は無いので、ここでは計画の側から読む。
+    # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
     for phase in phases_of(root, conf, parent.ticket):
@@ -701,7 +701,7 @@ def scope_findings(
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
-        # チケットの置き場（提案も写しも印も）は範囲の外でも咎めない。次の提案を書く道と、
+        # チケットの置き場（提案も写しもマーカーも）は範囲の外でも咎めない。次の提案を書く道と、
         # 承認がブランチに乗る道を塞がないため。
         if any(rel.startswith(p + "/") for p in (conf.tickets, conf.approved) if p):
             continue

@@ -358,7 +358,7 @@ class ConfigUnionHarness(unittest.TestCase):
         self.rules = os.path.join(common, "rules.yml")
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risk.yml")
-        # 承認済みチケットと印は、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
+        # 承認済みチケットとマーカーは、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
         # （設計 §9.2）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
         self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
         self.state = os.path.join(self.ws, "logs", "state")

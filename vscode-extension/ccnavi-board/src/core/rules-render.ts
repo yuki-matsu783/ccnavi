@@ -248,7 +248,7 @@ ${BUTTON_STYLE}
     background: var(--vscode-editorWidget-background);
   }
   .rule.hit { outline: 2px solid var(--vscode-focusBorder); }
-  /* 畳む印。タイプ（タイプ）と 1 件ずつのルールの両方に付く。 */
+  /* 畳むボタン。タイプ（タイプ）と 1 件ずつのルールの両方に付く。 */
   .twist {
     background: none; border: none; color: var(--vscode-descriptionForeground);
     font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;

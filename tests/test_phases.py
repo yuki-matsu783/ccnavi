@@ -120,7 +120,7 @@ class PhaseHarness(unittest.TestCase):
         self.phases = write(os.path.join(self.root, "phases.yml"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
+        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
@@ -426,7 +426,7 @@ class PhaseTest(PhaseHarness):
         self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
         self.assertEqual(self.close_child("i0001-01").returncode, 0)
         self.commit_parent("close 01")
-        # レビュー不要の種類なので、印は skipped。2 番目が承認される。
+        # レビュー不要の種類なので、マーカーは skipped。2 番目が承認される。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -713,7 +713,7 @@ class PhaseTest(PhaseHarness):
         refused = self.ready(fixture)
         self.assertIn("push されていない", refused.stderr)
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        # 片付いて push 済み。ready が通り、印と note の下書きができる。
+        # 片付いて push 済み。ready が通り、マーカーと note の下書きができる。
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         with open(passed.stdout.strip(), encoding="utf-8") as f:

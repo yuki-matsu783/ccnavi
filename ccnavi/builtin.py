@@ -60,19 +60,18 @@ from __future__ import annotations
 from . import rules, selfguard, settings
 
 
-def rule_data(root: str = "", conf: settings.Settings | None = None) -> dict:
+def rule_data(root: str, conf: settings.Settings) -> dict:
     """組み込みの既定ルール。ファイルから読むルールと同じ形で、同じ `rules.parse` を通す。
 
     シェルの書き込みに当てる場所は、呼び出しごとに実際の設定から組む。実行ファイル・
     ccnavi ディレクトリ・共通層の 3 本は設定で動くので、空の設定で 1 度だけ組んだ形だと、
     動かしたワークスペースではルールファイルが壊れたときにだけ守りが外れる。
+
+    設定は省けない。省ける形にしておくと、渡し忘れた呼び出しがその弱い形で黙って動く。
     """
-    if conf is None:
-        shell = selfguard.guard_shell_regex(root)
-    else:
-        shell = selfguard.guard_shell_regex(
-            root, conf.bin, conf.project_home, selfguard.common_layer_files(conf)
-        )
+    shell = selfguard.guard_shell_regex(
+        root, conf.bin, conf.project_home, selfguard.common_layer_files(conf)
+    )
     return {
         "version": rules.VERSION,
         "deny": [_config_via_bash(shell), *_DENY],
@@ -149,7 +148,7 @@ _ALLOW: list[dict] = [
     },
 ]
 
-# 既定に落ちたことを記録に残すための印。呼び出しごとの記録を数えれば、
+# 既定に落ちたことを記録に残すための値。呼び出しごとの記録を数えれば、
 # ガードが落ちたまま何回動いたかが後から分かる。
 FALLBACK = "builtin-rules"
 
@@ -159,12 +158,10 @@ FALLBACK = "builtin-rules"
 SOURCE = "(ccnavi built-in defaults)"
 
 
-def load(
-    root: str = "", conf: settings.Settings | None = None
-) -> tuple[rules.RuleSet, list[rules.Problem]]:
+def load(root: str, conf: settings.Settings) -> tuple[rules.RuleSet, list[rules.Problem]]:
     """組み込みの既定ルールを組み立てる。
 
     ここが問題を返したら、それはルールファイルではなくこのビルドの不備なので、
     呼び手はそのまま報告してよい。
     """
-    return rules.parse(rule_data(root, conf))
+    return rules.parse(rule_data(root, conf), builtin=True)

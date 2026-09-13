@@ -3,7 +3,7 @@
 ## exe が見るのは作業ツリーの中だけ
 
 ここはネットワークに出ない。フェーズが終わっているか、子のブランチが親に入っているか、
-未コミットが無いか、push 済みか、印がどうなっているか。分かるのはそこまでで、
+未コミットが無いか、push 済みか、マーカーがどうなっているか。分かるのはそこまでで、
 マージリクエストの中身は `.ccnavi/scripts/ccnavi-review.sh` が取ってきて JSON で渡す
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
@@ -13,14 +13,14 @@ sh ならプロジェクトごとに直せる。
 
 ## 依頼は prepare と requested の 2 段
 
-投稿の前に前提を全部確かめ（`prepare`）、投稿は sh がして、その結果で印を置く
+投稿の前に前提を全部確かめ（`prepare`）、投稿は sh がして、その結果でマーカーを置く
 （`requested`）。段の名前が違えば、どちらで止まったかが exit code を見なくても分かる。
 `prepare` はマーカー付きの本文を控えの置き場に書き出し、sh はそれを投稿する。
 
 ## 変更要求は人の端末でも通せない
 
 未解決スレッドは人が `--reviewed --accept-unresolved` で受け入れて進めるが、
-変更要求（changes requested）のレビューが立っている間は印を置かない。
+変更要求（changes requested）のレビューが立っている間はマーカーを置かない。
 「このままではマージしない」の意思表示を、別の人が端末から上書きする形は残さない。
 
 ## 未解決の指摘は、付いた時刻で絞らない
@@ -46,7 +46,7 @@ from typing import TextIO
 from . import approval, fsio, gitcmd, ops, phase, settings, tree
 from . import ticket as ticket_mod
 
-# 投稿に付ける印。機構自身の投稿を、確認のときに除くため。
+# 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
 MARKER_REQUEST = "<!-- ccnavi:request "
 MARKER_NOTE = "<!-- ccnavi:note -->"
 MARKER_ACCEPT = "<!-- ccnavi:accept -->"
@@ -268,7 +268,7 @@ def requested(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """投稿の結果を受けて、依頼の印を置く。"""
+    """投稿の結果を受けて、依頼のマーカーを置く。"""
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
@@ -280,13 +280,13 @@ def requested(
     if result is None:
         return 1
     if not result.url:
-        stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないなら印は置かない\n")
+        stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないならマーカーは置かない\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    # 投稿と印の間に HEAD が動いていないか。動いていれば、人が見るものと印が食い違う。
+    # 投稿とマーカーの間に HEAD が動いていないか。動いていれば、人が見るものとマーカーが食い違う。
     unmet = _unmet(tree_root, conf, ph)
     if unmet:
-        stderr.write("ccnavi: 投稿の後に前提が崩れた。印は置かない\n")
+        stderr.write("ccnavi: 投稿の後に前提が崩れた。マーカーは置かない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
@@ -327,7 +327,7 @@ def check(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """依頼の後を見る。通れば印を置いてゲートが開く。"""
+    """依頼の後を見る。通ればマーカーを置いてゲートが開く。"""
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
@@ -454,7 +454,7 @@ def reviewed(
         return 1
     accepted = [t.url or t.id for t in unresolved]
     assert result.mr is not None
-    # 印より先に控えへ。印は上書きも一括の消去もされるので、人が 1 度言った
+    # マーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
     failed = approval.remember_accepted(
         approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
@@ -561,7 +561,7 @@ def ready(
     cwd: str,
     result_path: str,
 ) -> int:
-    """Draft を外してよいかを確かめ、印と note の下書きを置く。外すのは sh。
+    """Draft を外してよいかを確かめ、マーカーと note の下書きを置く。外すのは sh。
 
     条件は「親を閉じられる」と同じ（ops.close_problems）。閉じてよい状態と、
     マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた承認済みチケットも引く）。
@@ -629,8 +629,8 @@ def wrapup(
 
     残っているもの（未着手の子、子の無いフェーズ、終わっていないレビュー、
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
-    未着手の子を取り消し、フェーズに省略とレビュー済みの印を置き、未解決を受け入れ、
-    親の印 `wrapup.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
+    未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
+    親のマーカー `wrapup.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
     issue を作る。黙って消えるものは作らない。
 
     Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
@@ -722,7 +722,7 @@ class Leftovers:
 
     # 未着手の子。取り消す。
     todo: list[ticket_mod.Ticket]
-    # 終わっていないフェーズ。省略の印を置く。
+    # 終わっていないフェーズ。省略のマーカーを置く。
     not_ended: list[phase.Phase]
     # 終わっていないフェーズのうち、手を付けていないもの（子が無いか全部未着手）。
     untouched: list[phase.Phase]
@@ -766,7 +766,7 @@ def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) 
     for t in left.todo:
         stdout.write(f"  - 未着手の子 {t.ticket}（{t.title}）→ 取り消す\n")
     for ph in left.untouched:
-        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略の印\n")
+        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略のマーカー\n")
     for ph in left.unreviewed:
         stdout.write(f"  - フェーズ {ph.label}: レビューが済んでいない → 済んだ扱い\n")
     if left.unplanned:
@@ -791,10 +791,10 @@ def _settle(
     stamp: str,
     reason: str,
 ) -> tuple[list[str], list[int], list[int]] | None:
-    """未着手の子を取り消し、フェーズに印を置く。
+    """未着手の子を取り消し、フェーズにマーカーを置く。
 
-    返すのは取り消した子、省略の印を置いた番号、済んだ扱いにした番号。
-    途中で失敗したら None。そこまでの変更は戻さない（印は次に打てば重ねられる）。
+    返すのは取り消した子、省略のマーカーを置いた番号、済んだ扱いにした番号。
+    途中で失敗したら None。そこまでの変更は戻さない（マーカーは次に打てば重ねられる）。
     """
     cancelled: list[str] = []
     for t in left.todo:
@@ -889,9 +889,9 @@ WIP_ROOT = "wip"
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """作業ツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しと印はこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
-    印はフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
-    印をコミットしろ」と言い続けることになる。印と写しをコミットして push するのは
+    写しとマーカーはこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
+    マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
+    マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
     """
     rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
@@ -1087,19 +1087,19 @@ def _result_with_mr(stderr: TextIO, path: str) -> Result | None:
 def _mark(
     stderr: TextIO, approved_dir: str, parent: str, number: int, kind: str, data: dict
 ) -> bool:
-    """フェーズの印を置く。置けなければ言って False。"""
+    """フェーズのマーカーを置く。置けなければ言って False。"""
     failed = approval.write_mark(approved_dir, parent, number, kind, data)
     if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+        stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
         return False
     return True
 
 
 def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data: dict) -> bool:
-    """親の印を置く。置けなければ言って False。"""
+    """親のマーカーを置く。置けなければ言って False。"""
     failed = approval.write_parent_mark(approved_dir, parent, name, data)
     if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+        stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
         return False
     return True
 

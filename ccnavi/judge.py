@@ -209,7 +209,7 @@ def decide_before(
             stdout, mode, record, rules.DENY, notices + [reasons.subagent_forbidden(subject)]
         )
 
-    # ゲート。人間レビュー要のフェーズが終わっていて印が無い間、サブエージェントの
+    # ゲート。人間レビュー要のフェーズが終わっていてマーカーが無い間、サブエージェントの
     # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
     if conf.tickets_enabled and payload.tool_name in phase.GATED_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)

@@ -51,7 +51,8 @@ class RootPlaceholderTest(unittest.TestCase):
                             "id": "wip",
                             "match": "Write",
                             "glob": "{root}/wip/*",
-                            "message": "glob でもワークスペースルートを指せる",
+                            "message": "glob でもワークスペースルートを指せる。"
+                            "'sh {root}/.ccnavi/scripts/ccnavi-git.sh rm -r wip' で消す",
                         },
                     ],
                     "allow": [
@@ -136,6 +137,27 @@ class RootPlaceholderTest(unittest.TestCase):
         if os.path.normcase("A") == "a":
             swapped = os.path.join(self.root.swapcase(), "README.md")
             self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")
+
+    def test_message_names_the_root(self):
+        """止めたときにモデルへ渡す文面の `{root}` も、ワークスペースルートの実パスになる。
+
+        置き換わらないと、案内どおりに `sh {root}/...` を打っても `{root}` という
+        ディレクトリは無く、どこからも届かない。
+        """
+        out = self.judge("Write", os.path.join(self.root, "wip", "a.md"))
+        reason = out.get("permissionDecisionReason", "")
+        spelled = self.root.replace("\\", "/")
+        self.assertIn(f"'sh {spelled}/.ccnavi/scripts/ccnavi-git.sh rm -r wip'", reason)
+        self.assertNotIn("{root}", reason)
+
+    def test_written_message_is_kept(self):
+        """書いた文面は残る。置き換えるのはモデルへ渡すときだけ（glob / regex と同じ）。"""
+        rule_set, _ = rules.load(self.rules, self.root)
+        wip = rule_set.deny[1]
+        self.assertIn("{root}", wip.message)
+        self.assertNotIn("{root}", wip.spoken_message())
+        # ルートが渡らない読み方では置き換えない。
+        self.assertEqual(rules.fill_root(wip.message, ""), wip.message)
 
     def test_placeholder_needs_a_root(self):
         _, problems = rules.load(self.rules)

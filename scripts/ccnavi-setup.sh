@@ -83,7 +83,7 @@ DEFAULT_BIN=".ccnavi/bin/ccnavi"
 # 従うので、実行ファイルと振り分けの sh だけは行き先が動く。
 DEPLOY_BIN_DIR="dist/ccnavi"
 DEPLOY_LAUNCHER="scripts/ccnavi-launcher.sh"
-# どの機械向けに組み立てたかの印。build.py が `<os>-<arch>` の 1 行で書く。
+# どの機械向けに組み立てたかの目印。build.py が `<os>-<arch>` の 1 行で書く。
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へ写すことはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/common/rules.yml"
@@ -217,7 +217,7 @@ while [ "$#" -gt 0 ]; do
 		;;
 	*)
 		# 空文字を「まだ受け取っていない」と読むと 2 つ受け取れてしまうので、
-		# 受け取ったかどうかは別の印で持つ。
+		# 受け取ったかどうかは別の目印で持つ。
 		[ "$target" = "" ] || die "ワークスペースルートは 1 つだけ受け取ります。"
 		[ "$1" != "" ] || die "ワークスペースルートが空です。"
 		target="$1"
@@ -334,13 +334,13 @@ fi
 # 実行ファイルをどの機械向けの置き場へ入れるか。PyInstaller の実行ファイルは組み立てた
 # 機械の OS と CPU でしか動かないので、配布先では `<os>-<arch>` のディレクトリに分けて
 # 並べ、hook が起動する振り分けの sh（scripts/ccnavi-launcher.sh）が起動の時に選ぶ。
-# 置き場の名前は build.py が dist/ccnavi.target に書いた印から取る。
+# 置き場の名前は build.py が dist/ccnavi.target に書いた目印から取る。
 #
 # 別の機械向けの組み立てでも配る。そのディレクトリに入るだけで、この機械の実行ファイルを
 # 上書きしないから。Windows と WSL で同じフォルダを開くなら、両方の組み立てを並べて
 # 置ける。この機械で動くものが揃っていないことは、1 行と、最後の「まだ無いもの」で言う。
 #
-# 印が無いか読めない配布元からは、実行ファイルの置き場を
+# 目印が無いか読めない配布元からは、実行ファイルの置き場を
 # 決められない。推測で置くと、別の機械向けをこの機械のディレクトリへ入れうる。
 # 断り方は上の「組み立てていない」と揃える。名指しの --deploy なら 2、既定の
 # 配布元なら配るのを諦めて理由を出す。
@@ -372,7 +372,7 @@ runnable_targets() {
 }
 
 runs_here() {
-	# $1 印の値 / $2 runnable_targets の並び
+	# $1 目印の値 / $2 runnable_targets の並び
 	case " $2 " in
 	*" $1 "*) return 0 ;;
 	esac
@@ -387,7 +387,7 @@ if [ -n "$deploy" ]; then
 	if [ -f "$source_root/$DEPLOY_TARGET_FILE" ]; then
 		built=$(head -n 1 "$source_root/$DEPLOY_TARGET_FILE" | tr -d '\r')
 	fi
-	# 印はそのままディレクトリ名になる。区切りや `..` を含む値で、置き場の外へ書かせない。
+	# 目印はそのままディレクトリ名になる。区切りや `..` を含む値で、置き場の外へ書かせない。
 	case "$built" in
 	'' | *[!a-z0-9_-]* | -* | *-) built_ok=no ;;
 	*-*) built_ok=yes ;;
@@ -626,8 +626,8 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$bin" --arg ticket_control "$tick
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {
 		CCNAVI_STATE: "logs/state",
-		CCNAVI_TICKETS: "wip/tickets",
-		CCNAVI_APPROVED: ".ccnavi/tickets",
+		CCNAVI_TICKETS_PROPOSAL: "wip/tickets",
+		CCNAVI_TICKETS_APPROVED: ".ccnavi/tickets",
 		CCNAVI_PHASES: ".ccnavi/common/phases.yml",
 		CCNAVI_RISK: ".ccnavi/common/risk.yml",
 		CCNAVI_PROJECT_HOME: ".ccnavi"

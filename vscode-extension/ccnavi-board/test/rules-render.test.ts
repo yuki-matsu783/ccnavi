@@ -69,7 +69,7 @@ test("CB-T52 settings.json が無ければ hook の表にそう書く", () => {
   assert.match(html, /settings\.json が無い/);
 });
 
-test("CB-T69 タイプごとに畳む印を出す", () => {
+test("CB-T69 タイプごとに畳むボタンを出す", () => {
   const html = renderRulesPage(page(), { nonce: "n" });
   for (const section of ["deny", "ask", "allow"]) {
     assert.match(html, new RegExp(`data-action="fold-section" data-section="${section}"`));
