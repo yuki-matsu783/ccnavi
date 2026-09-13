@@ -143,6 +143,19 @@ def root_glob(root: str) -> str:
     return os.path.realpath(root).replace("\\", "/").rstrip("/")
 
 
+def fill_root(text: str, root: str) -> str:
+    """モデルへ渡す文の `{root}` を、ワークスペースルートの実パスに置き換える。
+
+    文面で sh を案内するときは `{root}` から書く（スクリプトはワークスペースにしか無く、
+    作業ツリーやプロジェクトの中からは相対の綴りが届かない）。綴りは glob に埋めるのと
+    同じ形で、区切りは `/`。ルートが渡らない読み方（診断で `--root` が無い）では
+    置き換えずにそのまま返す。
+    """
+    if not root or ROOT_PLACEHOLDER not in text:
+        return text
+    return text.replace(ROOT_PLACEHOLDER, root_glob(root))
+
+
 @dataclass
 class Problem:
     """ルールファイルへの苦情 1 件。直せるように名指しする。"""
@@ -200,8 +213,16 @@ class Rule:
     # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
+    # root は読んだときのワークスペースルート。文面の `{root}` を、モデルへ渡すときに
+    # 置き換える先（spoken_message）。書いた文面（message）は置き換えずに持つ。
+    # 報告と --explain は書いた綴りを出す（glob / regex と同じ扱い）。
+    root: str = ""
 
     compiled: re.Pattern | None = None
+
+    def spoken_message(self) -> str:
+        """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。"""
+        return fill_root(self.message, self.root)
 
     def key(self) -> tuple:
         """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §25.4、§25.8）。
@@ -365,6 +386,7 @@ def _build(
         additional_context_file=str(raw.get("additionalContextFile") or ""),
         additional_context_once_file=str(raw.get("additionalContextOnceFile") or ""),
         decision=section,
+        root=root,
     )
     name = f"{section}:{rule.id}" if rule.id else where
 

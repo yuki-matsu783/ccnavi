@@ -187,7 +187,7 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     lines = [f"[ccnavi] {code} ({source})", f"subject: {shown}"]
     if degraded:
         lines.append(unreadable(degraded))
-    lines.append(rule.message)
+    lines.append(rule.spoken_message())
     return "\n".join(lines)
 
 
