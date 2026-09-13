@@ -334,7 +334,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
-        rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
+        rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
         # `--approve` の後ろに並べた語は、束に載せる識別子。無ければ承認待ち全部。
         approved = approval.approve(
             stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)

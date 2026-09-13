@@ -161,7 +161,9 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
+        selfguard.add_rules(
+            rule_set, conf.bin, conf.project_home, root, selfguard.common_layer_files(conf)
+        )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:

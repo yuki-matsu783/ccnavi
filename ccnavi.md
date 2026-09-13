@@ -550,27 +550,33 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 ### 8.2 止める側
 
-この面が有効な間、`deny` の先頭に最大 3 本を挿す。常に入るのは `builtin-guard-setting-files`（Bash）
+この面が有効な間、`deny` の先頭に最大 4 本を挿す。常に入るのは `builtin-guard-setting-files`（Bash）
 の 1 本で、`builtin-guard-binary` は `CCNAVI_BIN_PATH` が設定されているとき、
-`builtin-guard-project-home` は ccnavi ディレクトリの綴り（`CCNAVI_PROJECT_HOME`）が決まっているときだけ足す（§11.6）。
+`builtin-guard-project-home` は ccnavi ディレクトリの綴り（`CCNAVI_PROJECT_HOME`）が決まっているとき、
+`builtin-guard-common-layer` は共通層の 3 本の置き場が決まっているときだけ足す（§11.6）。
 1 本目は書き込む綴り
 （`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln`
 `install` の行き先）と場所（`.claude/ccnavi/` `.claude/hooks/` `.claude/scripts/`、
-`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、記録と控えの `logs/log.jsonl` `logs/state`）の組で止める。
+`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`CCNAVI_RULES` などが指す場所）、記録と控えの `logs/log.jsonl` `logs/state`）の組で止める。
 記録と控えは前は `.claude/ccnavi/` の中にあって一緒に守られていたので、`logs/` へ移したぶんを名前を絞って足した。`logs/` の下の
 git のラッパースクリプトの記録は、消しても判定に効かないので守らない。`.claude/ccnavi/` は前の置き場だが、env で前の綴りを指したままの
 ワークスペースがあるので残す（ADR-0042）。
-`builtin-guard-binary` と `builtin-guard-project-home` は `Write` `Edit` `NotebookEdit` を止める。
+`builtin-guard-binary` と `builtin-guard-project-home` と `builtin-guard-common-layer` は `Write` `Edit` `NotebookEdit` を止める。
 
 止めるのは書き込む綴りと場所の組で、場所の名前が出ただけでは止めない。`cat rules.yml` も
 `git add <パス>` も通る。プロジェクトが同じ id で自分の `deny` を書いていれば、組み込みは足さない（見るのは `deny` だけ。
 `ask` や `allow` に同じ id を置いても重なる）。
-既定に落ちている間と `disable` のときは足さない。
+既定に落ちている間と `disable` のときは足さない。既定に落ちている間は、組み込みの既定（REQ-PRE-06）がシェルの 1 本
+（`builtin-guard-config-via-bash`）を持つ。こちらも呼び出しごとに同じ設定から組むので、実行ファイル・ccnavi ディレクトリ・共通層を
+動かしたワークスペースでも、動かした先への書き込みを止める。以前は空の設定で 1 度だけ組んでいて、動かしたワークスペースでは
+ルールファイルが壊れたときにだけ守りが外れた。
 
-共通層の設定ファイルの既定の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの下なので、ccnavi ディレクトリの名前を動かしていなければ
-`builtin-guard-project-home` が `Write` / `Edit` からも止める。見本（`rule-samples.yml`）も同じ。env で共通層を ccnavi ディレクトリの外に
-置いたときに `Write` / `Edit` から守るぶんはルールに任せる。`deny` に 1 行書けば済み、書いたことが読める場所に残る。
-実行ファイルと ccnavi ディレクトリは置き場が設定で動くので、組み込みで持つ。
+共通層の 3 本は、置き場がどこでも `builtin-guard-common-layer` が `Write` / `Edit` から止める。当てるのはワークスペースルートと、
+そこから切った作業ツリーの下の同じ相対（ワークスペースルートの外に置いたなら、そのパス）。既定の置き場（`.ccnavi/common/`）なら
+`builtin-guard-project-home` とも重なるが、共通層を名乗るこちらが先に当たる。見本（`rule-samples.yml`）は 3 本に入らず、既定の置き場なら
+`builtin-guard-project-home` が止める。以前は ccnavi ディレクトリの外に置いたときをルールの 1 行（`guard-ccnavi-config`）に任せていたが、
+その 1 行は守られるファイルそのものの中にあり、消した・書き換えたルールファイルのもとでは通った。
+実行ファイル・ccnavi ディレクトリ・共通層は置き場が設定で動くので、組み込みで持つ。
 
 ### 8.3 戻す側
 
@@ -1390,10 +1396,11 @@ info で言い、`--explain` は残った 1 本だけ出す。Bash の和でも�
 
 **共通層のフェーズの種類と配点を足すのは既存の穴の修正。** この 2 本は「人の持ち物」としてルールの 1 行で止めていただけで、
 控えと復元の対象ではなかった。ルールで止める形は、ルールの並びと書き方で緩みうるし、作業ツリー側の設定は統合で統合先へ入る道を持つ。
-コアへ入れて、シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通層の 3 本を守るぶんは、既定の置き場
-（`.ccnavi/common/`）なら ccnavi ディレクトリを守る組み込みの deny が止める。env で ccnavi ディレクトリの外に置いたときは、共通層のルールの 1 行（`/ccnavi-config` への
-案内付き）に任せる。そこは `deny` を 1 行書けば済み、書いたことが読める場所に残る。組み込みで名指しのツールを
-止めるのは、置き場が設定で動く実行ファイルと ccnavi ディレクトリの 2 つだけ。
+コアへ入れて、シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通層の 3 本を守るぶんも組み込み
+（`builtin-guard-common-layer`）で持つ。以前は既定の置き場なら ccnavi ディレクトリを守る deny に頼り、env で外に置いたときは共通層の
+ルールの 1 行に任せていたが、その 1 行は守られるファイルの中にあるので、書き換えたルールファイルのもとでは通った。組み込みで名指しの
+ツールを止めるのは、置き場が設定で動く実行ファイル・ccnavi ディレクトリ・共通層の 3 つ。hook の登録（`.claude/settings*.json`）は
+ルールの `deny` に任せる。
 
 **プロジェクトから切った作業ツリー側の設定を足すのも既存の穴の修正。** 以前は作業ツリーを切り元無しで列挙していたので、プロジェクトから切った
 作業ツリーは列挙されず、作業ツリー側の設定の相対も「ワークスペースルートから」で組んでいた（`projects/lib/...`）ため、作業ツリーの中にその綴りは無かった。

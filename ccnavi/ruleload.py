@@ -53,7 +53,7 @@ class Layer:
 
 
 def load_rules(
-    stderr: TextIO, rules_path: str, record: audit.Record, root: str = ""
+    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str = ""
 ) -> tuple[rules.RuleSet, str]:
     """共通層のルール集合と、それがどこから来たかを返す。
 
@@ -61,16 +61,18 @@ def load_rules(
     ではなく「設定が壊れている」。拒否側へ倒すと、壊れたファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
     ファイルを置く前に hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
+    既定は設定を丸ごと受け取る。守る場所の綴りは設定で動くので（builtin.rule_data）。
 
     出所は、いま当てているルールがどこから来たか。既定に落ちているなら
     読めなかったファイルではない。そのファイルを名乗ると、見に行った人が
     当たったルールを見つけられない。
     """
+    rules_path = conf.rules
     try:
         rule_set, problems = rules.load(rules_path, root)
     except (OSError, ValueError) as exc:
         stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
-        rule_set, problems = builtin.load()
+        rule_set, problems = builtin.load(root, conf)
         record.fallback = builtin.FALLBACK
         record.detail = rules_path
     for problem in problems:
@@ -158,7 +160,7 @@ def rules_for(
     if payload.tool_name in PATH_TOOLS:
         target = tree.tree_of(root, record.subject, conf.projects)
 
-    rule_set, source = load_rules(stderr, conf.rules, record, root)
+    rule_set, source = load_rules(stderr, conf, record, root)
     if record.fallback == builtin.FALLBACK:
         # 共通層が壊れている。層は足さない。壊れた共通層の上に層を足しても、
         # 何が効いているのかを人が読めない。
@@ -275,7 +277,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     `merge_rules` の 1 本に寄せてある。
     """
     record = audit.Record()
-    common, _ = load_rules(stderr, conf.rules, record, root)
+    common, _ = load_rules(stderr, conf, record, root)
     views = [LayerView(LAYER_COMMON, conf.rules, common)]
     if record.fallback == builtin.FALLBACK:
         views[0].unreadable = record.detail or conf.rules
