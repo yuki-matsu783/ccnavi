@@ -111,7 +111,7 @@ class FallbackTest(unittest.TestCase):
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
                 result = run(
-                    self.broken, pre_tool_use(tool, "file_path", ".claude/ccnavi/rules.yml")
+                    self.broken, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml")
                 )
                 self.assertNotEqual(
                     out_of(self, result).get("permissionDecision"),
@@ -124,7 +124,7 @@ class FallbackTest(unittest.TestCase):
         # 緩んだ既定に落ちる、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
-            run(self.broken, pre_tool_use("Bash", "command", "echo x > .claude/ccnavi/rules.yml")),
+            run(self.broken, pre_tool_use("Bash", "command", "echo x > .ccnavi/common/rules.yml")),
         )
 
         self.assertEqual(out.get("permissionDecision"), "deny")
@@ -134,7 +134,7 @@ class FallbackTest(unittest.TestCase):
     def test_既定でもシェルからの書き込みは綴りを変えても止まる(self):
         for command in [
             "echo x >> .claude/hooks/lint-py.sh",
-            "sed -i s/deny/allow/ .claude/ccnavi/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/common/rules.yml",
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
@@ -148,10 +148,10 @@ class FallbackTest(unittest.TestCase):
         # 衝突を解いている最中は必ず既定に落ちている。そこで解決の手が止まると、
         # ガードが落ちた状態から出られない。どれもファイルに新しい文面を書かない。
         for command in [
-            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .claude/ccnavi/rules.yml",
-            "sh .ccnavi/scripts/ccnavi-git.sh add -- .claude/ccnavi/rules.yml",
-            "cat .claude/ccnavi/rules.yml",
-            "grep -n conflict .claude/ccnavi/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/common/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh add -- .ccnavi/common/rules.yml",
+            "cat .ccnavi/common/rules.yml",
+            "grep -n conflict .ccnavi/common/rules.yml",
         ]:
             with self.subTest(command=command):
                 out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))

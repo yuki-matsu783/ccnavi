@@ -43,8 +43,8 @@ def at_start(
 
     渡すのは cwd で決める。親の作業ツリーならその親の開いている子、子の作業ツリーなら
     その子自身。main と、チケットの無い作業ツリーからの起動には何も渡さない。
-    全部の子を渡していた版は、別のセッションが main で調査を委譲したときにも無関係な
-    子の範囲を案内し、調査役が自分の居場所を迷う形になった（SubagentStop と同じ絞り方）。
+    全部の子を渡すと、別のセッションが main で調査を委譲したときにも無関係な
+    子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:

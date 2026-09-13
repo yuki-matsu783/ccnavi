@@ -104,11 +104,11 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         ):
             stdout.write("Draft は外してある。マージは利用者が行う\n")
         else:
-            from .review import wip_root
+            from .review import WIP_ROOT
 
             stdout.write(
-                f"次は、この移動をコミットし、`{wip_root(conf)}/` を消して"
-                f"（'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip_root(conf)}'）コミットし、"
+                f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
+                f"（'sh .ccnavi/scripts/ccnavi-git.sh rm -r {WIP_ROOT}'）コミットし、"
                 "push してから 'sh .ccnavi/scripts/ccnavi-review.sh ready' で Draft を外す"
                 "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
                 "マージは利用者が squash で行う\n"

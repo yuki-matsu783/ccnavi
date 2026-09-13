@@ -43,8 +43,8 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # 呼び出しを止め、`--approve` と `--reviewed` は標準入力が端末でなければ拒む。
 # テストは disable にする。
 #
-# 守る対象で名乗る。以前は CCNAVI_GUARD_CLI といって、守る手段（CLI から打つ形）の
-# ほうを名前にしていた。切りたい人が何を切ることになるのかが、名前から読めなかった。
+# 守る手段（CLI から打つ形）ではなく守る対象で名乗る。切りたい人が何を切ることになるのかを、
+# 名前から読めるようにする。
 GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
@@ -58,8 +58,7 @@ BIN_SUFFIXES = (".exe",)
 # チケット制御は、提案を承認して承認済みチケットを作り、その範囲・フェーズのゲート・
 # サブエージェントの制限を判定に掛ける働き全体。全体ルールは全プロジェクトが使うが、
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
-# 以前は APPROVED_ENV を空文字にすることがこの宣言を兼ねていた。置き場のパスが
-# 空であることと機能を切ることは別の話なので、名前を分けた。
+# 置き場のパス（APPROVED_ENV）とは分けてある。パスが空であることと機能を切ることは別の話。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
 # git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
@@ -78,25 +77,6 @@ RISK_ENV = "CCNAVI_RISK"
 # 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
-# もう効かない環境変数。指定されていたら --lint が言う。黙って無視すると、書いた人は
-# 効いていると思い続ける。
-#
-# 前の 2 つは以前の形（チケット 1 本と台帳 jsonl）のもの。CCNAVI_GUARD_CLI は
-# CCNAVI_GUARD_TICKET_APPROVAL に改名した。旧名で disable と書いてあった設定は、
-# 読まれなくなった時点で既定の enable に戻る――守りが消える向きには倒れない――が、
-# 切ったつもりの人には止まる理由が分からないので、名前を挙げて知らせる。
-RETIRED_ENVS = (
-    "CCNAVI_TICKET",
-    "CCNAVI_LEDGER",
-    "CCNAVI_GUARD_CLI",
-    # 層の置き場が 3 本まとめて `CCNAVI_PROJECT_HOME` の下に移った（設計 §25.2）。
-    # 旧の綴り（`config/rules.yml`）はもう読まない。
-    "CCNAVI_PROJECT_RULES",
-)
-
-# 旧のプロジェクトのルールの置き場。読まないが、まだそこに置いてあるワークスペースに
-# --lint が「あるが読まない」と言うために覚えておく（設計 §25.12）。
-OLD_PROJECT_RULES = "config/rules.yml"
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -110,8 +90,7 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 #
 # 人が持つ設定（共通層の 3 本）は ccnavi ディレクトリの下の `.ccnavi/common/`、実行のたびに書かれる
 # 記録と控えは `logs/` に置く（ADR-0042）。`.claude/` には Claude Code 自身のもの
-# （settings.json・hooks・skills・worktrees）だけを残す。前の既定は `.claude/ccnavi/` の
-# 下で、env で前の綴りを指したままのワークスペースは、そのまま前の置き場を読む。
+# （settings.json・hooks・skills・worktrees）だけを残す。
 #
 # 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
 # ccnavi ディレクトリの名前は各層の綴りで、共通層を動かすなら CCNAVI_RULES / CCNAVI_PHASES /
@@ -135,11 +114,6 @@ DEFAULT_APPROVED = ".ccnavi/tickets"
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
 DEFAULT_RISK = os.path.join(".ccnavi", "common", "risk.yml")
-# 前の既定の置き場（ワークスペースルートからの相対、"/" 区切り）。ここに設定が残って
-# いて、今の設定がそこを読んでいなければ `--lint` が言う。黙って無視すると、書いた人は
-# 効いていると思い続ける。
-OLD_COMMON_DIR = ".claude/ccnavi"
-OLD_COMMON_FILES = ("rules.yml", "phases.yml", "risk.yml")
 # プロジェクトの置き場。ワークスペースの直下に固定するのは、列挙が速いことと、
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
@@ -289,17 +263,14 @@ class Settings:
     # 絶対で 1 か所を指さないのは、そのツリーの git に乗って運ばれるから。判定が読むのは
     # approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
-    # approved_blank は、置き場を空文字で指定されたこと。以前はそれが「使わない」の
-    # 宣言だったので、--lint が今の書き方を案内する。
     tickets: str = ""
     approved: str = ""
-    approved_blank: bool = False
     # phases はフェーズの種類の定義（絶対）。無ければフェーズは番号だけ。
     phases: str = ""
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
-    # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、この設定が
-    # 入る前と同じに動く。project_home は ccnavi ディレクトリ（git プロジェクトルートからの相対、
+    # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、ワークスペース
+    # 自身だけで動く。project_home は ccnavi ディレクトリ（git プロジェクトルートからの相対、
     # "/" 区切り）。自身の層とプロジェクトの層の両方に効く。
     projects: str = ""
     project_home: str = ""
@@ -313,8 +284,6 @@ class Settings:
     # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
     # 編集中の層の種類を保存せずに検証するために使う。
     project_phases_files: dict[str, str] = field(default_factory=dict)
-    # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
-    retired: list[str] = field(default_factory=list)
 
     @property
     def tickets_enabled(self) -> bool:
@@ -354,13 +323,11 @@ def load(root: str) -> tuple[Settings, list[str]]:
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
-        approved_blank=APPROVED_ENV in os.environ and os.environ[APPROVED_ENV] == "",
         approved=DEFAULT_APPROVED,
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
         projects=os.path.join(root, DEFAULT_PROJECTS),
         project_home=DEFAULT_PROJECT_HOME,
-        retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
     # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
     # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
@@ -405,8 +372,6 @@ def load(root: str) -> tuple[Settings, list[str]]:
     for name in ("guard_ticket_approval", "ticket_control"):
         if isinstance(conf.get(name), str):
             setattr(settings, f"{name}_declared", conf[name])
-    if conf.get("approved") == "":
-        settings.approved_blank = True
     for name, _, read, accepts_empty in overrides:
         value = conf.get(name)
         if isinstance(value, str) and (accepts_empty or value):

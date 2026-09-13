@@ -131,7 +131,7 @@ class RestoreTest(GuardHarness):
         tree = self.worktree(self.ws, "w3")
         for name in ("rules.yml", "phases.yml", "risk.yml"):
             with self.subTest(name=name):
-                copy = os.path.join(tree, ".claude", "ccnavi", name)
+                copy = os.path.join(tree, ".ccnavi", "common", name)
                 self.assertTrue(
                     os.path.exists(copy), "共通層は追跡されているので作業ツリー側の設定がある"
                 )
@@ -305,7 +305,6 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         env = self.settings()["env"]
         self.assertEqual(env.get("CCNAVI_PROJECT_HOME"), ".ccnavi")
-        self.assertNotIn("CCNAVI_PROJECT_RULES", env)
 
 
 if __name__ == "__main__":

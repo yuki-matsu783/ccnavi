@@ -240,7 +240,6 @@ def check(
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
-    problems.extend(_old_common(conf, root))
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
     problems.extend(_ticket(conf, root))
@@ -306,36 +305,6 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     検証はその思い違いを名指しする場所になる。
     """
     problems: list[Problem] = []
-    # 退役した名前ごとに、代わりに何を書くのかを言う。まとめて 1 つの文面にすると、
-    # 置き場の話しかしない案内が、置き場とは関係ない名前にも付く。
-    replacements = {
-        "CCNAVI_GUARD_CLI": f"{settings.GUARD_TICKET_APPROVAL_ENV} に改名した",
-        "CCNAVI_PROJECT_RULES": (
-            f"層の設定は {settings.PROJECT_HOME_ENV}（既定 {settings.DEFAULT_PROJECT_HOME}）の下の "
-            f"{settings.LAYER_CONFIG_DIR}/ に 3 本まとめて置く。"
-            f"旧の綴りに置いたままのルールは 1 件も効いていない"
-        ),
-    }
-    default = f"提案は {settings.TICKETS_ENV}、承認済みチケットは {settings.APPROVED_ENV} で指す"
-    for name in conf.retired:
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"{name} はもう効かない。{replacements.get(name, default)}",
-            )
-        )
-    if conf.approved_blank:
-        # 以前は空文字が「チケット制御を使わない」の宣言だった。今は置き場のパスで
-        # しかなく、空は既定の置き場に戻る。切りたかった人には今の書き方を言う。
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"{settings.APPROVED_ENV} が空文字。空で切ることはもうできず、"
-                f"既定の置き場で動いている。切るなら {settings.TICKET_CONTROL_ENV}=disable",
-            )
-        )
     if not conf.tickets_enabled:
         problems.append(
             Problem(
@@ -525,8 +494,8 @@ def layer_where(name: str) -> str:
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
     """層が噛み合っているか（設計 §25.9、REQ-MLT-16）。
 
-    見るのは 3 つ。層のファイルが読めること、層をまたいだ重複と同名の衝突、
-    旧の置き場に置いたままのルール。`.ccnavi/config/` が無いことは言わない。
+    見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
+    `.ccnavi/config/` が無いことは言わない。
     無いのは正常（無い層 = 空）で、言うと本当に言うべきものが埋もれる。
 
     共通層は `_rules` が別に見ているので、ここでは層の 2 つ目以降だけを回す。
@@ -634,7 +603,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、綴り違いも含む）を使っていないこと、プロジェクトが
-    `.claude/` を持たないこと、旧の置き場のルールが残っていないことを見る。層の中身は
+    `.claude/` を持たないことを見る。層の中身は
     `_layers` が見る。
     """
     problems: list[Problem] = []
@@ -667,16 +636,6 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     "別の名前に変える",
                 )
             )
-        old = os.path.join(p.root, settings.OLD_PROJECT_RULES.replace("/", os.sep))
-        if os.path.isfile(old):
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    where,
-                    f"{settings.OLD_PROJECT_RULES} があるが、もう読まない。"
-                    f"{settings.layer_real_path(conf, '', settings.KIND_RULES)} へ人が移す",
-                )
-            )
         if os.path.isdir(os.path.join(p.root, ".claude")):
             problems.append(
                 Problem(
@@ -686,34 +645,6 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"見える。プロジェクトの設定は {conf.project_home}/ に置く",
                 )
             )
-    return problems
-
-
-def _old_common(conf: settings.Settings, root: str) -> list[Problem]:
-    """前の既定の置き場（`.claude/ccnavi/`）に、読まれない共通層の設定が残っていないか（ADR-0042）。
-
-    言うのは、今の設定がそこを読んでいないときだけ。env が前の綴りのままで読んでいる
-    ワークスペースは動いているので咎めない（導入スクリプトを打ち直せば移る）。読まれずに
-    残っているものは、黙っていると書いた人は効いていると思い続ける。判定は動いているので
-    warn にする。
-    """
-    reading = {
-        os.path.normcase(os.path.realpath(p)) for p in (conf.rules, conf.phases, conf.risk) if p
-    }
-    problems: list[Problem] = []
-    for name in settings.OLD_COMMON_FILES:
-        rel = f"{settings.OLD_COMMON_DIR}/{name}"
-        old = os.path.join(root, rel.replace("/", os.sep))
-        if not os.path.isfile(old) or os.path.normcase(os.path.realpath(old)) in reading:
-            continue
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(settings)",
-                f"{rel} があるが、もう読まない。共通層の既定の置き場は .ccnavi/common/{name}。"
-                "scripts/ccnavi-setup.sh を打ち直すと移る",
-            )
-        )
     return problems
 
 

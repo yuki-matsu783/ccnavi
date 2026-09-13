@@ -5,14 +5,14 @@
 
 層は 3 種。
 
-- 共通層: `.claude/ccnavi/{rules,phases,risk}.yml`（`--rules` / `--phases` / `--risk`）
+- 共通層: `.ccnavi/common/{rules,phases,risk}.yml`（`--rules` / `--phases` / `--risk`）
 - ワークスペース自身の層: `<ワークスペースルート>/.ccnavi/config/`
 - プロジェクトの層: `projects/<名前>/.ccnavi/config/`
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空）。
 
-`.gitignore` は実物に合わせて 4 つだけ無視する（`projects/`、作業ツリー、状態、承認済み
-チケット）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切った作業ツリーに
+`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、作業ツリー、記録と控えの
+`logs/`）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切った作業ツリーに
 作業ツリー側の設定ができ、設計 §25.6 が名指しした穴（作業ツリー側の設定が書けて戻らない）を
 再現できる。
 
@@ -54,7 +54,7 @@ COMMON_RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.claude/ccnavi/*",
+            "glob": "*/.ccnavi/tickets/*",
             "message": "guard settings. ask the user.",
         },
     ],
@@ -292,11 +292,11 @@ def ticket_text(
 # どの git プロジェクトルートにも置く、判定の的になるファイル。
 KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 
-# ワークスペースの git が無視するもの。実物の .gitignore と同じ 4 つだけ。
-# `/.claude/` を丸ごと無視すると共通層の 3 本が追跡されず、作業ツリー側の設定ができない。
+# ワークスペースの git が無視するもの。実物の .gitignore と同じ 3 つだけ。
+# `/.ccnavi/` を丸ごと無視すると共通層の 3 本が追跡されず、作業ツリー側の設定ができない。
 # それができないと、設計 §25.6 が名指しした穴（共通層の作業ツリー側の設定が書けて
 # 戻らない）を一度も踏めない。
-GITIGNORE = "/projects/\n/.claude/worktrees/\n/.claude/ccnavi/state/\n/.claude/ccnavi/tickets/\n"
+GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
 # 雛形のワークスペース。1 度だけ組んで、以後は写しを配る。
 #
@@ -329,7 +329,7 @@ def build_template():
     for rel in KEEP:
         write(os.path.join(ws, *rel.split("/")), "keep\n")
     write_layer(ws, rules=OWN_RULES, phases=OWN_PHASES)
-    common = os.path.join(ws, ".claude", "ccnavi")
+    common = os.path.join(ws, ".ccnavi", "common")
     write(os.path.join(common, "rules.yml"), json.dumps(COMMON_RULES))
     write(os.path.join(common, "phases.yml"), COMMON_PHASES)
     write(os.path.join(common, "risk.yml"), COMMON_RISK)
@@ -354,15 +354,15 @@ class ConfigUnionHarness(unittest.TestCase):
         self.ws = os.path.join(base, "ws")
         shutil.copytree(_TEMPLATE, self.ws)
 
-        common = os.path.join(self.ws, ".claude", "ccnavi")
+        common = os.path.join(self.ws, ".ccnavi", "common")
         self.rules = os.path.join(common, "rules.yml")
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risk.yml")
         # 承認済みチケットと印は、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
         # （設計 §24.5）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
         self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
-        self.state = os.path.join(self.ws, "state")
-        self.log = os.path.join(self.ws, "log.jsonl")
+        self.state = os.path.join(self.ws, "logs", "state")
+        self.log = os.path.join(self.ws, "logs", "log.jsonl")
 
         self.projects = os.path.join(self.ws, "projects")
         self.lib = os.path.join(self.projects, "lib")
@@ -611,7 +611,7 @@ class WriteUnionTest(ConfigUnionHarness):
         common = self.hook(
             "NotebookEdit",
             self.ws,
-            notebook_path=os.path.join(self.lib, ".claude", "ccnavi", "a.ipynb"),
+            notebook_path=os.path.join(self.lib, ".ccnavi", "tickets", "a.ipynb"),
         )
         self.assert_denied(common, "guard-approved")
 
@@ -892,7 +892,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
 
 
 class WiringTest(ConfigUnionHarness):
-    """置き場と環境変数（§25.2、§25.9、§25.12）。"""
+    """置き場と環境変数（§25.2、§25.9）。"""
 
     def test_project_named_self_is_not_counted(self):
         """§25.4: `projects/self/` は `self:id` と区別できないので数えず、--lint が error。"""
@@ -924,37 +924,17 @@ class WiringTest(ConfigUnionHarness):
             "Write", self.ws, env=env, file_path=os.path.join(self.lib, "vendor", "x.py")
         )
         self.assert_denied(denied, "lib:vendor")
-        # 既定の `.ccnavi/config/` はもう読まない。
+        # 動かしたら、既定の `.ccnavi/config/` は読まない。
         self.assert_not_denied(
             self.hook(
                 "Write", self.ws, env=env, file_path=os.path.join(self.lib, "schema", "x.sql")
             )
         )
 
-    def test_retired_project_rules_env_is_warned(self):
-        """§25.2: `CCNAVI_PROJECT_RULES` は廃止。設定されていれば --lint が warn で名指しする。"""
-        warns = self.problems("warn", env={"CCNAVI_PROJECT_RULES": "config/rules.yml"})
-        self.assertTrue(any("CCNAVI_PROJECT_RULES" in p["detail"] for p in warns), warns)
-
-    def test_old_config_rules_is_not_read_and_warned(self):
-        """§25.12: 旧の `config/rules.yml` は読まない。--lint が warn で言う。"""
-        old = {
-            "version": 3,
-            "deny": [
-                {"id": "vendor", "match": "Write|Edit", "glob": "*/vendor/*", "message": "no."}
-            ],
-        }
-        write(os.path.join(self.app, "config", "rules.yml"), json.dumps(old))
-
-        self.assert_not_denied(
-            self.hook("Write", self.ws, file_path=os.path.join(self.app, "vendor", "x.py"))
-        )
-        warns = self.problems("warn", where=self.project_where("app"))
-        self.assertTrue(any("config/rules.yml" in p["detail"] for p in warns), warns)
-
     def test_workspace_without_projects_or_own_layer_is_unchanged(self):
-        """§25.12 / REQ-MLT-15: `projects/` を数えず自身の層も無ければ、判定と記録は今のまま。"""
-        shutil.rmtree(os.path.join(self.ws, HOME))
+        """REQ-MLT-15: `projects/` を数えず自身の層も無ければ、共通層だけで判定し記録する。"""
+        # 自身の層だけを消す。共通層も同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
+        shutil.rmtree(os.path.join(self.ws, HOME, "config"))
 
         allowed = self.hook(
             "Write", self.ws, projects="", file_path=os.path.join(self.ws, "src", "a.py")

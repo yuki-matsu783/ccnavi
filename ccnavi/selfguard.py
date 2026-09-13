@@ -184,7 +184,7 @@ _SETTINGS_FILES = (
 # 止める。止めるほうが本筋で、戻すほうは止めきれなかったぶんの受け皿になる。
 #
 # 前半の括弧が書き込む綴りで、後ろに続く場所と組で当たる。場所の名前が出ただけでは
-# 止めない。`cat .claude/ccnavi/rules.yml` も `git add <パス>` も、中身を書かない。
+# 止めない。`cat .ccnavi/common/rules.yml` も `git add <パス>` も、中身を書かない。
 # 名前で止める形にすると、いちばんガードを直したいときにいちばん強く効く。
 #
 #   1. リダイレクトの行き先。`>` `>>` `>|` `&>` はどれも `>` を含み、
@@ -212,8 +212,8 @@ _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 # `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
 # `mv .ccnavi .ccnavi.bak` も、ccnavi ディレクトリごと消す・退かす形なので、下のファイルを 1 本ずつ
 # 書き換えるのと同じだけ守りが消える（敵対的レビュー A-3）。
-# 語の中の印も終わりに数える。印が 1 つだった頃は `rm ".ccnavi x"` がここで止まって
-# いた。数えないと、印を分けただけでその綴りが通るようになる。
+# 語の中の印も終わりに数える。数えないと、`rm ".ccnavi x"` のように引用がつないだ
+# 綴りが通る。
 _TERM = rf"(?:[ {_NOT_A_WORD}]|$)"
 # 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
 # 当たり、`.ccnavixyz` のような別名には当たらない。
@@ -233,20 +233,19 @@ _COPY_END = r"(?:[\\/]|$)"
 # `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
 # だから ccnavi ディレクトリと違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
 # `.claude/` に続く綴り全部が入り、作業ツリーの片付けまで止まる。
-# `.claude/ccnavi/` は前の置き場。今の既定は `.ccnavi/common/` だが、env で前の綴りを
-# 指したままのワークスペースがあるので、守る場所からは外さない。
+# ゲートの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
-# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。前は `.claude/ccnavi/`
-# の中にあって、そこを守る綴りに一緒に入っていた。移したぶん守りが外れないよう、名前を
-# 絞って足す。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
+# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。どちらも判定が読むので
+# 名前を絞って守る。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので
+# 守らない。
 _PLACES = (
-    r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
+    r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
     r"logs[\\/](log\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
-    r"\.claude(?:[\\/](ccnavi|hooks|scripts|settings)|" + _COPY_TERM + r")",
+    r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
     r"logs[\\/](log\.jsonl|state)" + _COPY_END,

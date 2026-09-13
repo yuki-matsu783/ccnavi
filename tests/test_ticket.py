@@ -35,7 +35,7 @@ RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.claude/ccnavi/*",
+            "glob": "*/.ccnavi/*",
             "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
         }
     ],
@@ -587,16 +587,16 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command='sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"',
+            command='sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"',
         )
         self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
 
         # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形に当たる。
-        reading = shellread.read('sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"')
+        reading = shellread.read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
         self.assertEqual(len(phase_mod.commands(reading.text)), 1, reading.text)
         self.assertTrue(phase_mod.exempt(reading.text, reading.reason))
         # 連結の片方が違えば止める側は変わらない。
-        joined = shellread.read('ls; sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"')
+        joined = shellread.read('ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
 
     def test_phase_without_review_skips_the_gate(self):
@@ -1203,10 +1203,9 @@ class TicketTest(unittest.TestCase):
     def test_review_script_keeps_the_port_and_scheme_of_origin(self):
         """origin の綴りから、ホスト・ポート・scheme を落とさずに API の綴りを組むこと。
 
-        以前は host を `[^/:]+` で切っていたのでポートが落ち、落ちたポートが
-        プロジェクトのパスの先頭に混ざり（`8929/demo/greeter`）、しかも scheme が
-        https に決め打ちだった。手元や社内に平文で立てた GitLab
-        （`http://localhost:8929`）はこれで全滅する。
+        host を `[^/:]+` で切るとポートが落ち、落ちたポートがプロジェクトのパスの先頭に
+        混ざる（`8929/demo/greeter`）。scheme を https に決め打ちすると、手元や社内に
+        平文で立てた GitLab（`http://localhost:8929`）に届かない。
         """
         script = self.script()
         cases = [
@@ -1322,9 +1321,8 @@ class TicketTest(unittest.TestCase):
             os.path.join(self.root, ".claude", "settings.json"),
             json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
         )
-        result = self.ccnavi("--lint", "--mode", "enable", env={"CCNAVI_LEDGER": "x"})
+        result = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("stray にチケットが無い", result.stdout)
-        self.assertIn("CCNAVI_LEDGER はもう効かない", result.stdout)
         self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=disable", result.stdout)
         self.assertIn("SubagentStop", result.stdout)
         self.assertIn("origin が無い", result.stdout)

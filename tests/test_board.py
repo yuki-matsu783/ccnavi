@@ -116,7 +116,7 @@ class BoardTest(PhaseHarness):
     def test_settings_say_ticket_control_is_enabled_by_default(self):
         board = self.board()
         self.assertEqual(board["settings"]["ticket_control"], "enable")
-        # 承認済みチケットの置き場を空文字で指しても、もう切れない。既定の置き場で有効のまま。
+        # 承認済みチケットの置き場を空文字で指しても切れない。既定の置き場で有効のまま。
         board = self.board("--approved", "")
         self.assertEqual(board["settings"]["ticket_control"], "enable")
         self.assertTrue(board["settings"]["approved"].endswith("tickets"))

@@ -32,10 +32,6 @@ from . import (
     selfguard,
     settings,
 )
-
-# パスの解決は judge に移した。tests/test_paths.py がここから import しているので、
-# 名前だけ残す。
-from .judge import full_path as full_path
 from .modes import EXIT_ERROR, EXIT_OK
 
 USAGE = """ccnavi guards agent tool calls and guides the agent to a safer alternative.
@@ -165,10 +161,6 @@ def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
         value = getattr(args, name)
         if value is not None and (accepts_empty or value):
             setattr(conf, name, value)
-    # 承認済みチケットの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
-    # 今は --ticket-control の仕事。置き場は既定のままにして、--lint が言う。
-    if args.approved == "":
-        conf.approved_blank = True
     for name in RELATIVE_OVERRIDES:
         value = getattr(args, name)
         if value:

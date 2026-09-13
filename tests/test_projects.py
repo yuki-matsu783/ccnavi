@@ -44,7 +44,7 @@ WS_RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.claude/ccnavi/*",
+            "glob": "*/.ccnavi/tickets/*",
             "message": "guard settings. ask the user.",
         },
     ],
@@ -333,7 +333,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("built-in defaults", self.reason(passed))
 
         # 共通層の deny は壊れた層の上でも効いたまま。
-        guarded = os.path.join(self.app, ".claude", "ccnavi", "x")
+        guarded = os.path.join(self.app, ".ccnavi", "tickets", "x")
         denied = self.hook("Write", self.ws, file_path=guarded)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("guard-approved", self.reason(denied))

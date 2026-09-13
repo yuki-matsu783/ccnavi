@@ -355,8 +355,8 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     穴が再現する形に組む。ワークスペース自身の層に広い `allow`（`self:wide`）と
     deny（`self:generated`）を置き、プロジェクトの層に deny（`secret`）を置く。
-    直す前は `self:wide` が勝って通り、`self:generated` で止まる。直したあとは
-    層無しなので共通層だけで判定し、どちらも記録に現れない。
+    名札で層を引くと `self:wide` が勝って通り、`self:generated` で止まる。予約名の
+    プロジェクトは層無しなので共通層だけで判定し、どちらも記録に現れない。
     """
 
     def setUp(self):
@@ -383,7 +383,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         result = self.hook("Write", self.ws, file_path=os.path.join(project, "secret", "x.txt"))
 
         record = self.last_record()
-        # 穴の本体。直す前はここに `self:wide` が入り、decision が allow になる。
+        # 穴の本体。名札で層を引くと、ここに `self:wide` が入り、decision が allow になる。
         self.assertNotIn("self:wide", record.get("rules", []), record)
         self.assertNotEqual(record["decision"], "allow", record)
         # プロジェクトの層も足さない（層無し）。共通層に `*/secret/*` は無いので deny でもない。
@@ -399,7 +399,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
             "self:generated",
         )
 
-        # 直す前はここも `self:generated` で止まる。層無しなら共通層だけ。
+        # 名札で層を引くと、ここも `self:generated` で止まる。層無しなら共通層だけ。
         self.assert_not_denied(
             self.hook("Write", self.ws, file_path=os.path.join(project, "generated", "x.py"))
         )
@@ -484,7 +484,7 @@ class ReservedLayerRestoreTest(GuardHarness):
     共通層の key と完全に一致し、`_places` の重複の排除で先に積んだ共通層だけが
     残る。プロジェクトが名前を 1 つ選ぶだけで、その 3 本が守られなくなる。
 
-    直す前はこのクラスの最初の 2 つが落ちる（戻らないので中身が壊れたまま）。
+    key が共通層と重なると、このクラスの最初の 2 つが落ちる（戻らないので中身が壊れたまま）。
     """
 
     def setUp(self):

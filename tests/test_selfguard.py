@@ -72,7 +72,7 @@ class SelfGuardTest(unittest.TestCase):
 
         git(self.repo, "init", "--quiet")
         self.settings = os.path.join(self.repo, ".claude", "settings.json")
-        self.rules = os.path.join(self.repo, ".claude", "ccnavi", "rules.yml")
+        self.rules = os.path.join(self.repo, ".ccnavi", "common", "rules.yml")
         write(self.settings, json.dumps(SETTINGS, indent=2) + "\n")
         write(self.rules, json.dumps(RULES))
         git(self.repo, "add", "-A")
@@ -283,7 +283,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_作業ツリーの中のルールファイルも戻る(self):
         work = self.worktree()
-        copy = self.copy_in(work, "ccnavi", "rules.yml")
+        copy = os.path.join(work, ".ccnavi", "common", "rules.yml")
         self.run_hook("PreToolUse")
         write(copy, json.dumps({"version": 3, "deny": []}))
 
@@ -361,7 +361,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertFalse(own[0].copy)
         self.assertEqual(
             [t.label for t in found if t.copy],
-            self.own_copies((".claude", "ccnavi", "rules.yml")),
+            self.own_copies((".ccnavi", "common", "rules.yml")),
         )
 
     def test_root_の外を指すルールファイルには作業ツリー側が無い(self):
@@ -393,7 +393,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_ルールに書かなくてもシェルからの書き込みは止まる(self):
         # RULES にこの場所を守るルールは 1 件も無い。それでも止まるのが要点で、
         # 止める側もルールファイルの外に置いてあることを確かめている。
-        result = self.run_hook("PreToolUse", command="echo x > .claude/ccnavi/rules.yml")
+        result = self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
 
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -401,20 +401,19 @@ class SelfGuardTest(unittest.TestCase):
     def test_設定ファイルを読むだけなら通る(self):
         # 場所の名前が出たかどうかでは止めない。ここは読むほうが普通の場所で、
         # 名前で止めると、いちばんガードを直したいときにいちばん強く効く。
-        result = self.run_hook("PreToolUse", command="cat .claude/ccnavi/rules.yml")
+        result = self.run_hook("PreToolUse", command="cat .ccnavi/common/rules.yml")
 
         self.assertNotIn("deny", result.stdout)
 
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
-            "PreToolUse", setting="disable", command="echo x > .claude/ccnavi/rules.yml"
+            "PreToolUse", setting="disable", command="echo x > .ccnavi/common/rules.yml"
         )
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
     def test_記録と控えの置き場もシェルからの書き込みで止まる(self):
-        # 前は .claude/ccnavi/ の中にあって、そこを守る綴りに一緒に入っていた。
-        # logs/ へ移したぶん守りが外れないこと。
+        # 記録と控えは判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
         for command in ("rm logs/log.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)

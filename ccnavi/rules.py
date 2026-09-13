@@ -13,7 +13,7 @@
     deny:
       - id: guard-config
         match: Write|Edit
-        glob: "*/.claude/ccnavi/*"
+        glob: "*/.ccnavi/*"
         message: ガード自身の設定です。利用者に依頼してください。
     ask:
       - id: migrations
@@ -118,7 +118,7 @@ def root_pattern(root: str) -> str:
     """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
-    解いた綴り（cli.full_path）で、Windows では `\\` になるが、ルールを書く人は
+    解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書く人は
     `/` で考える。大文字小文字を区別しない機械では、綴りの違いも許す
     （`c:` と `C:` は同じ場所）。
     """

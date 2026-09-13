@@ -707,18 +707,19 @@ def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root:
     """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
 
     承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
-    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。記録の無い古い
-    承認済みチケットだけ、設定の綴りをそのまま使う（提案はどのツリーでも同じ相対に在る）。
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。
+
+    その残りをこのツリーの下の相対に直せないときは、設定の綴りを使う。別のドライブ
+    （Windows）、ツリーの外、ツリーのルートそのもの（相対が `.`）がそれにあたる。
     """
-    if copy.source_path:
-        base = os.path.dirname(os.path.dirname(copy.source_path))
-        try:
-            rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
-        except ValueError:  # 別のドライブ（Windows）
-            rel = ""
-        if rel and rel != "." and not rel.startswith("../"):
-            return rel
-    return conf.tickets
+    base = os.path.dirname(os.path.dirname(copy.source_path))
+    try:
+        rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
+    except ValueError:  # 別のドライブ（Windows）
+        return conf.tickets
+    if rel == "." or rel.startswith("../"):
+        return conf.tickets
+    return rel
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:

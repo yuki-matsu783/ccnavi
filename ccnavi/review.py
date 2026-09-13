@@ -7,9 +7,9 @@
 マージリクエストの中身は `.ccnavi/scripts/ccnavi-review.sh` が取ってきて JSON で渡す
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
-以前は exe が GitHub / GitLab の API を直接叩いていた。実測できていない部分
-（API のパス、トークンの権限、ページング、セルフホストの差）が配布物の中に閉じて、
-壊れたときに exe を作り直すしかなかった。sh ならプロジェクトごとに直せる。
+API のパス、トークンの権限、ページング、セルフホストの差は実物に当てないと決まらない。
+exe が API を直接叩くと、それが配布物の中に閉じて、壊れたときに exe を作り直すしかない。
+sh ならプロジェクトごとに直せる。
 
 ## 依頼は prepare と requested の 2 段
 
@@ -25,10 +25,10 @@
 
 ## 未解決の指摘は、付いた時刻で絞らない
 
-数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えていた版は、
+数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えると、
 指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで前回の
-指摘が数から消えた。人が解決も受け入れもしていないのに通る形で、実物の GitLab で
-流れを通したときに出た。除くのは機構自身の投稿と、人が受け入れたものだけ。
+指摘が数から消える。人が解決も受け入れもしていないのに通る形になる。
+除くのは機構自身の投稿と、人が受け入れたものだけ。
 
 レビューの状態（変更要求）はレビュアーごとの最新だけを見る。こちらは時刻で
 比べるので、ホストの `Z` と手元のオフセットをエポック秒に直してから並べる。
@@ -591,7 +591,7 @@ def ready(
     )
     text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
     text.append(
-        f"`{wip_root(conf)}/` は片付けてある。マージするかどうかは利用者が決める。"
+        f"`{WIP_ROOT}/` は片付けてある。マージするかどうかは利用者が決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )
     if wrapped:
@@ -708,7 +708,7 @@ def wrapup(
     # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を締めた。あとは親に、状態の移動をコミットし、"
-        f"'ticket done {parent.ticket}' で閉じ、`{wip_root(conf)}/` を消して push し、"
+        f"'ticket done {parent.ticket}' で閉じ、`{WIP_ROOT}/` を消して push し、"
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
@@ -880,17 +880,8 @@ def _wrapup_drafts(
 
 
 # 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に丸ごと消す。
-# 既定のブランチに残す場所はマージリクエストと issue。
-#
-# 以前は提案の置き場（`wip/tickets`）の上の階層として導いていた。提案は `.ccnavi/` へ
-# 移り、そこは承認済みの写しと同じ場所で、消さずにマージへ乗せるもの（設計 §24.5）に
-# なったので、導くのをやめて綴りを固定する。
+# 既定のブランチに残す場所はマージリクエストと issue。綴りは設定から導かず固定する。
 WIP_ROOT = "wip"
-
-
-def wip_root(conf: settings.Settings | None = None) -> str:
-    """途中の作業を置く場所。conf は取らないが、呼び出しの形を変えないために残す。"""
-    return WIP_ROOT
 
 
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
@@ -921,7 +912,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
     problems: list[str] = []
     if not os.path.isdir(tree_root):
         return [f"親の作業ツリーが無い ({tree_root})"]
-    wip = wip_root(conf)
+    wip = WIP_ROOT
     rc, tracked = _git(tree_root, ["ls-files", "--", wip])
     if rc == 0 and tracked.strip():
         n = len(tracked.strip().splitlines())
@@ -1179,9 +1170,9 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
 def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
     """まだ解決されていない指摘。
 
-    付いた時刻では絞らない。依頼より後のものだけを数えていた版は、
+    付いた時刻では絞らない。依頼より後のものだけを数えると、
     指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで
-    前回の指摘が数から消えた。人が解決も受け入れもしていないのに通る形になる。
+    前回の指摘が数から消える。人が解決も受け入れもしていないのに通る形になる。
 
     数えないのは 2 つだけ。機構自身が置いた投稿と、人が「未解決のまま進める」と
     受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。

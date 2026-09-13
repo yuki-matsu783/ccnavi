@@ -702,11 +702,6 @@ def _known(path: str) -> dict[str, str] | None:
     known = data.get("known") if isinstance(data, dict) else None
     if isinstance(known, dict):
         return {k: str(v) for k, v in known.items() if isinstance(k, str)}
-    if isinstance(known, list):
-        # 印を持たなかった頃の控え。識別子は伝えたものとして扱い、印は空にする。
-        # 空の印は「伝えたが、いつの承認済みチケットかは分からない」の意味で、_fresh が改版と
-        # 見なさない（承認済みチケットは必ず approved_at を持つので、空は古い控えにしか無い）。
-        return {s: "" for s in known if isinstance(s, str)}
     return {}
 
 
@@ -746,7 +741,7 @@ def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list
     out = []
     for ident, t in sorted(current.items()):
         recorded = known.get(ident)
-        if recorded is None or (recorded != "" and recorded != _mark(t)):
+        if recorded is None or recorded != _mark(t):
             out.append(t)
     return out
 
