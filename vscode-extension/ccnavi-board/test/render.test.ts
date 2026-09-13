@@ -194,13 +194,11 @@ test("CB-T16 本文の文字列で表示を壊さない", () => {
 test("CB-T118 本物が決まらない写りだけをバッジにし、場所を tooltip に出す", () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
-  const homeless: TicketJson = {
-    ...child,
-    seen_in: [
-      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
-      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
-    ],
-  };
+  const where = [
+    { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+    { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+  ];
+  const homeless: TicketJson = { ...child, seen_in: where, scattered: where };
   const html = renderBoard(buildBoard({ ...base, tickets: [homeless] }), OPTIONS);
   assert.ok(html.includes("複数の場所にある（2 か所）"));
   assert.ok(html.includes('title="main:todo, i0001-02:todo"'));
