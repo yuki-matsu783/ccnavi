@@ -43,7 +43,8 @@ deny:
     glob: "*"
     message: >-
       PowerShell は使いません。同じことを Bash ツールで打ってください。
-      ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。      
+      ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。 
+      PowerShell でしか実行できないことはユーザに実行を依頼してください。     
 
   # 生の git はまとめて止め、入口を .claude/scripts/ccnavi-git.sh の 1 本に寄せる。
   # 止める理由は 2 つ。
