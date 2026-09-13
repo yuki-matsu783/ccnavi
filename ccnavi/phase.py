@@ -112,7 +112,12 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
-    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
+    # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
+    # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
+    # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
+    # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
+    # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
+    expression = rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
@@ -125,7 +130,8 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "'sh .ccnavi/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
             "行います。承認済みチケットのコミットと push"
             "（'sh .ccnavi/scripts/ccnavi-push-approved.sh'）も人が打ちます。"
-            "ボードで承認したあと端末に送られた 1 行を、利用者が確かめて実行します。"
+            "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
+            "エージェントは打ちません。"
             "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
