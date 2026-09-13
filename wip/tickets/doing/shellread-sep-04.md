@@ -25,6 +25,8 @@ allow:
     glob: "README.md"
   - match: Write|Edit
     glob: "ccnavi.md"
+started_at: "2026-09-13T13:01:33+0900"
+base_sha: "9a26c0867f3e710fc664de1f6eca567c14e3b92f"
 ---
 
 # 文書: shellread の印を 2 つに分けた
