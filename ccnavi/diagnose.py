@@ -678,9 +678,16 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     open_index = approval.by_id(open_copies)
     closed_index = approval.by_id(closed_copies)
     # 同じ識別子が写っている場所の全部。権威の側は proposal に、残りは seen_in に出す。
-    seen: dict[str, list[dict]] = {}
-    for t in everything:
-        seen.setdefault(t.ticket, []).append({"tree": t.tree, "state": t.state, "path": t.path})
+    # 写りがあること自体は普通（子の作業ツリーは親のブランチから切る）なので、数は
+    # 食い違いを意味しない。権威のツリーで畳んで 2 つ以上残る＝どれが本物か決まらない
+    # ぶんだけを scattered に出す。--lint が ERROR で言うのと同じ条件で、読む側に
+    # 畳み直させない（同じ答えを 2 か所で出さない）。
+    grouped = ticket_mod.by_ticket(everything)
+    seen = {tid: [_where(t) for t in hits] for tid, hits in grouped.items()}
+    scattered: dict[str, list[dict]] = {}
+    for tid, hits in grouped.items():
+        folded = ticket_mod.fold(hits)
+        scattered[tid] = [_where(t) for t in folded] if len(folded) > 1 else []
 
     for ticket_id in sorted(set(proposal_index) | set(open_index) | set(closed_index)):
         payload["tickets"].append(
@@ -693,6 +700,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
                 closed_index,
                 worktrees,
                 seen.get(ticket_id, []),
+                scattered.get(ticket_id, []),
             )
         )
 
@@ -781,6 +789,11 @@ def _factor_record(layer: str, factor) -> dict:
     }
 
 
+def _where(t: ticket_mod.Ticket) -> dict:
+    """写りが 1 つ。どのツリーの、どの置き場の、どのファイルか。"""
+    return {"tree": t.tree, "state": t.state, "path": t.path}
+
+
 def _ticket_record(
     conf: settings.Settings,
     root: str,
@@ -790,6 +803,7 @@ def _ticket_record(
     closed_index: dict,
     worktrees: dict,
     seen_in: list[dict],
+    scattered: list[dict],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットと作業ツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -845,6 +859,7 @@ def _ticket_record(
         "cancelled_at": source.cancelled_at,
         "cancel_reason": source.cancel_reason,
         "seen_in": seen_in,
+        "scattered": scattered,
         "risk": None,
         "judge": None,
     }
