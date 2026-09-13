@@ -16,9 +16,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: wip/design/*
-started_at: ""
+started_at: "2026-09-13T21:55:15+0900"
 completed_at: ""
-base_sha: ""
+base_sha: "81d92346b63c4a2c0cea69e6bb2996ff69e96e38"
 ---
 
 # 設計: ルールとチケットの判定を合わせる
