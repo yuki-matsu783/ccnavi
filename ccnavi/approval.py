@@ -612,10 +612,14 @@ def approval_digest(text: str, batch: list[Candidate]) -> str:
     書き出した中身は承認のときに書くもの（`_apply` の `write_copy` / `revise_copy`）と
     同じ組み立てで、承認の記録の欄（`ccnavi_approved`）だけを除く。記録は承認した時刻を
     持つので、入れると呼ぶたびに指紋が変わる。本文も呼ぶたびに変わる中身を持たない。
-    区切りは `\\x00`。YAML の文面にも本文にも出ないので、つなぎ目をずらして同じ指紋は作れない。
+
+    部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
+    区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
+    本文は生の制御文字（`\\x00` も）を素通しするので、どの文字も「中身に出ない」とは言えない。
     """
     parts = [text] + [_carried(cand) for cand in batch]
-    return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
+    lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
 def _carried(cand: Candidate) -> str:
