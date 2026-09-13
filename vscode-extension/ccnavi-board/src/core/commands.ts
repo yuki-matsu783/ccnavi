@@ -48,7 +48,7 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 
 /**
  * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた本文の指紋（preview の `digest`）、
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文と承認済みチケットに写る中身。preview の `digest`）、
  * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
  * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
