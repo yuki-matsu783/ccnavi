@@ -564,7 +564,8 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(exe), "ELF fake executable\n")
 
     def test_振り分けの隣の実体は名指しのツールから止まる(self):
-        # 傘（.ccnavi/）の外へ動かした置き場は、傘のルールでは止まらない。
+        # ccnavi ディレクトリ（.ccnavi/）の外へ動かした置き場は、
+        # ccnavi ディレクトリを守るルールでは止まらない。
         launcher, exe = self.launcher_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "base_library.zip")
 

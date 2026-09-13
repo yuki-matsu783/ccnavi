@@ -214,7 +214,8 @@ class BuiltinGlobCaseTest(GuardHarness):
 
     def test_the_builtin_project_home_deny_matches_a_swapped_spelling(self):
         """§25.6: `.Ccnavi/config/rules.yml` への Write も組み込みの deny で止まる。"""
-        # 傘がディスクに無いことが前提。あると realpath が綴りを補正して、問いが消える。
+        # ccnavi ディレクトリがディスクに無いことが前提。あると realpath が綴りを補正して、
+        # 問いが消える。
         self.assertFalse(os.path.exists(os.path.join(self.app, HOME)))
         exact = os.path.join(self.app, HOME, "config", "rules.yml")
         self.assert_denied(
@@ -230,10 +231,10 @@ class BuiltinGlobCaseTest(GuardHarness):
 
 
 class ShellPlaceTest(GuardHarness):
-    """A-3: 区切りが続かない綴り。傘ごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
+    """A-3: 区切りが続かない綴り。ディレクトリごと消す・退かす形（`_PLACES` / `_COPY_PLACES`）。"""
 
     def test_removing_or_moving_the_umbrella_itself_is_denied(self):
-        """§25.6: 傘の名前で終わる綴りも `builtin-guard-setting-files` で止まる。"""
+        """§25.6: `.ccnavi` で終わる綴りも `builtin-guard-setting-files` で止まる。"""
         for command in (
             "rm -rf .ccnavi",
             "rm -rf projects/lib/.ccnavi",
@@ -257,8 +258,8 @@ class ShellPlaceTest(GuardHarness):
         """§25.6: 当たる範囲が広がっても、別名には誤爆しない。
 
         `.claudexyz` や `.ccnavi-notes.md` は別のファイル。`.claude/worktrees/` は
-        守る対象ではないので、片付けは通る（`.claude` の側を傘と同じ `_END` で
-        閉じると、ここが止まる）。傘から外へ写すだけの読みも通る。
+        守る対象ではないので、片付けは通る（`.claude` の側を ccnavi ディレクトリと同じ `_END` で
+        閉じると、ここが止まる）。ccnavi ディレクトリから外へ写すだけの読みも通る。
         """
         for command in (
             "rm -rf .claudexyz",
@@ -273,7 +274,7 @@ class ShellPlaceTest(GuardHarness):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
     def test_the_moved_umbrella_is_closed_the_same_way(self):
-        """§25.6: 傘の名前を動かしてあるときも、名前で終わる綴りで止まる。"""
+        """§25.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わる綴りで止まる。"""
         result = self.hook(
             "Bash",
             self.ws,
@@ -568,15 +569,16 @@ class ScriptTamperTest(GuardHarness):
         swapped = os.path.join(self.lib, ".Ccnavi", "scripts", "count.sh")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
         if CASE_INSENSITIVE:
-            # 区別しない機械では、この綴りで書けば本物が書き換わる。ここは傘が実在する
-            # 形なので `os.path.realpath` がディスクの綴りへ補正する道でも止まる。
-            # 補正が無い形（傘がまだ無いところを綴り違いで作る）は BuiltinGlobCaseTest。
+            # 区別しない機械では、この綴りで書けば本物が書き換わる。ここは ccnavi ディレクトリが
+            # 実在する形なので `os.path.realpath` がディスクの綴りへ補正する道でも止まる。
+            # 補正が無い形（ccnavi ディレクトリがまだ無いところを綴り違いで作る）は
+            # BuiltinGlobCaseTest。
             self.assert_denied(result, "builtin-guard-project-home")
         else:
             self.assert_not_denied(result)
 
     def test_the_shell_cannot_rewrite_or_delete_it(self):
-        """§25.6: シェルも同じ。傘ごと消す形も、綴りを変えた形も止まる。"""
+        """§25.6: シェルも同じ。ccnavi ディレクトリごと消す形も、綴りを変えた形も止まる。"""
         for command in (
             "rm -rf projects/lib/.ccnavi/scripts/count.sh",
             "echo x > projects/lib/.ccnavi/scripts/count.sh",
