@@ -1821,6 +1821,7 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `.claude/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
 | `.claude/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
 | `.claude/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
+| `.claude/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | 作業ツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
