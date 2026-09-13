@@ -106,8 +106,8 @@
 | git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` |
 | 判定の記録と控え | ワークスペースの `logs/log.jsonl` と `logs/state/` |
 | 作業ツリー | ワークスペースの `.claude/worktrees/<名前>` |
-| ワークスペースのルール | `.ccnavi/common/rules.yml`（共通層。フェーズの種類とリスクの配点も同じ場所） |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risk.yml`。旧の `config/rules.yml` はもう読まない） |
+| ワークスペースのルール | `.ccnavi/common/rules.yml`（共通層。リスクの配点も同じ場所）。フェーズの種類は自身の層 `.ccnavi/config/phases.yml` |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risk.yml`） |
 
 **プロジェクトのリポジトリに入るのは、この表の最後の 1 行だけ。** 他はすべてワークスペース側。
 
