@@ -8,7 +8,7 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
   const html = renderPhasesPage(
     {
       root: "/ws",
-      phasesPath: ".claude/ccnavi/phases.yml",
+      phasesPath: ".ccnavi/common/phases.yml",
       exists: true,
       ticketControl: "enable",
       model: doc.model,
@@ -33,7 +33,7 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
   const missing = renderPhasesPage(
     {
       root: "/ws",
-      phasesPath: ".claude/ccnavi/phases.yml",
+      phasesPath: ".ccnavi/common/phases.yml",
       exists: false,
       ticketControl: "disable",
       model: { version: null, form: { phases: [] }, problems: ["<苦情>"] },

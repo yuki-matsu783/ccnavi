@@ -76,14 +76,13 @@ deny が止める。承認できたら通知に「コピー」「新しいセッ
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
 | ルールの置き場 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（実行ファイルが `CCNAVI_PROJECT_HOME` を読んで解く。既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは層として数えないので、置き場もボタンも出ない |
 | ルールが無い | 行に「共通層からコピー」のボタンが出る。`.ccnavi/common/rules.yml`（`CCNAVI_RULES`）を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
-| 旧の置き場が残っている | `projects/<名前>/config/rules.yml` があれば、ルール欄に「判定に読まれていない。中身を層のルールファイルへ移し、旧のファイルを消す」と出す。拡張は移さず、消さない |
 | 自身の層 | 「ワークスペース本体」の枠に、自身の層のルール（既定 `.ccnavi/config/rules.yml`）の有無と「ルール管理」「共通層からコピー」が出る。無いのは正常なので warn の色にしない |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
 | ルール管理 | そのプロジェクトのルール設定画面を開く（下の節）。ルールが無い行では押せない |
 | チケット管理 | ボードを開き、絞り込みをそのプロジェクトにする。チケット制御が disable なら出ない |
 | fetch / pull | `git fetch` / `git pull` を `projects/<名前>` でターミナルへ送る。未コミットの有無は見ない。衝突すれば git が止める |
 | プロジェクトとして認識されない git リポジトリ | ワークスペース直下を深さ 2 まで歩き（`node_modules` `.venv` `.claude` `.git` の中は歩かない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。置き場の外にあるか、置き場の 2 段目以下にあるか。表示だけで操作は無い |
-| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/*`、`projects/*/config/rules.yml`、`.ccnavi/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
+| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/*`、`.ccnavi/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
 
 入れていないもの。プロジェクトを外す操作（作業ツリーと承認済みチケットが残ったままディレクトリだけ消してしまう事故につながる。消したいならエクスプローラで消す）、
 clone のオプション欄（ブランチ、`--depth`、submodule。要るならターミナルで打つ）、ブランチと未コミットの表示（VS Code の Git 表示で見る）。
@@ -98,8 +97,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 実行ファイルに渡す。保存を止める条件は、ワークスペース版と自身の層はどのツリーの `doing` でも（どちらも全ツリーの Bash に効く）、
 プロジェクト版はそのプロジェクトの `doing` だけ。
 
-上部に注意が出ることがある。プロジェクトに旧の置き場 `config/rules.yml` が残っている（判定はそこを読まない）ときと、
-実行ファイルがこの層のファイルを読めず空として扱っている（ここのルールは 1 件も効いていない）とき。
+実行ファイルがこの層のファイルを読めず空として扱っている（ここのルールは 1 件も効いていない）ときは、上部に注意が出る。
 
 タブは 3 つ。
 
@@ -162,7 +160,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 種類は共通層に層を足して使い、どの層を足すかは親チケットの `project:` で決まる（設計 §11.4.1）。
 編集中の内容は一時ファイルに書き、共通層なら `--lint --phases <パス>`、層なら `--lint --project-phases-file <名前>=<パス>`
 （自身の層は `self=<パス>`）で実行ファイルに渡す。層の種類は共通層と合成して確かめる（同じ id で中身が違う、表示名が層をまたいで重なる、
-overlap / requires の指す先）。このオプションを知らない古い実行ファイルでは、層の保存は `--lint` の失敗で止まる。保存の往復の間は欄を止める。
+overlap / requires の指す先）。保存の往復の間は欄を止める。
 `--lint` は設定全体を見るので、`rules.yml` などに error がある間は種類も保存できない。先に rules を直す。
 YAML として読めないファイルは画面から直せない（エディタで直す）。
 
@@ -238,7 +236,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.ccnavi/common/rules.yml`。
 プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。自身の層とプロジェクトの層のルールファイルは
 拡張が組まず、`--explain --json` の `layers[]` のパスを使う（実行ファイルが `env.CCNAVI_PROJECT_HOME` を読んで解く。
-既定は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。`CCNAVI_PROJECT_RULES` はもう読まない。
+既定は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。
 
 ## 組み立てと導入
 
@@ -328,7 +326,6 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 27 | clone を止める | `https://user:token@host/g/p.git` を入れて送る。次に既存と同じ origin の URL を送る。次に既存の名前を大文字にして送る | それぞれ「資格情報」「既に clone している」「既にある」の赤い文が出て、ターミナルには何も送られない |
 | 28 | clone 後の設定 | 「.gitignore に追加」→ 行の「共通層からコピー」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/.ccnavi/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.ccnavi/scripts/...` の綴り。上部の警告が消え、行のルールが「あり」になる |
 | 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」。そのあと保存し、ターミナルで `ccnavi --explain` | タブの題が「ccnavi ルール設定: <名前>」。上部の path が `projects/<名前>/.ccnavi/config/rules.yml`。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。保存したルールが `--explain` の `■ rules <名前>` に出る（判定に効いている）。ワークスペース版のパネルも同時に開いたままにできる |
-| 29b | 旧の置き場 | プロジェクトに `config/rules.yml` を置いて一覧を見る。そのまま行の「ルール管理」 | 行のルール欄に「旧の置き場 … は判定に読まれていません」。検証にも lint の warn が出る。ルール設定画面の上部にも同じ注意。旧のファイルを消すと、一覧から注意が消える |
 | 29c | 自身の層のルール管理 | 「ワークスペース本体」の枠で「共通層からコピー」→「ルール管理」。glob を変えて保存せずに、`Write` とワークスペースルートの下のパスで「判定」 | `.ccnavi/config/rules.yml` が出来る。タブの題が「ccnavi ルール設定: 自身の層」。当たったルールの id が `self:...`。どのツリーの子チケットを `start` しても保存が止まる |
 | 30 | プロジェクトごとに保存を止める | そのプロジェクトの子チケットを `start` してから「保存」。次に別のプロジェクトの子だけを `start` にして「保存」 | 前者は「プロジェクト <名前> に作業中のチケットがある」で止まる。後者は保存できる |
 | 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |

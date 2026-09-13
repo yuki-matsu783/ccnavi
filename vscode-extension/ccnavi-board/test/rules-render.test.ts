@@ -16,7 +16,7 @@ allow: []
 function page(overrides: Partial<RulesPage> = {}): RulesPage {
   return {
     root: "/ws",
-    rulesPath: ".claude/ccnavi/rules.yml",
+    rulesPath: ".ccnavi/common/rules.yml",
     mode: "dry-run",
     model: readRules(RULES).model,
     hooks: parseHooks(
@@ -24,7 +24,7 @@ function page(overrides: Partial<RulesPage> = {}): RulesPage {
       "settings",
     ),
     hookFiles: { settings: true, settingsLocal: false },
-    samplesPath: ".claude/ccnavi/rule-samples.yml",
+    samplesPath: ".ccnavi/common/rule-samples.yml",
     lock: { locked: false, reason: "", doing: [] },
     ...overrides,
   };

@@ -113,8 +113,8 @@ test("CB-T65 .gitignore の置き場の行を見つけ、無ければ足す", ()
 
 test("CB-T66 写すときは出どころのコメントを足し、sh の綴りだけを {root} 付きにする", () => {
   const source = "deny:\n  - id: raw-git\n    message: |\n      'sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド>' を使う。\n      glob: '*/.ccnavi/scripts/*' は変えない\n";
-  const out = rewriteRulesForProject(source, ".claude/ccnavi/rules.yml", "lib", "2026-09-12");
-  assert.match(out, /^# lib のルール。共通層の \.claude\/ccnavi\/rules\.yml を 2026-09-12 に写した/);
+  const out = rewriteRulesForProject(source, ".ccnavi/common/rules.yml", "lib", "2026-09-12");
+  assert.match(out, /^# lib のルール。共通層の \.ccnavi\/common\/rules\.yml を 2026-09-12 に写した/);
   assert.match(out, /共通層に足して当たる（上書きはしない）/);
   assert.match(out, /'sh \{root\}\/\.ccnavi\/scripts\/ccnavi-git\.sh <サブコマンド>'/);
   assert.match(out, /glob: '\*\/\.ccnavi\/scripts\/\*' は変えない/);
@@ -130,13 +130,13 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
     JSON.stringify({
       version: 1,
       root: "/ws",
-      rules: "/ws/.claude/ccnavi/rules.yml",
+      rules: "/ws/.ccnavi/common/rules.yml",
       mode: "enable",
       ticket_control: "enable",
       projects: ["app", "lib"],
       problems: [
         { severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" },
-        { severity: "warn", where: "(projects/lib)", detail: "config/rules.yml があるが、もう読まない" },
+        { severity: "warn", where: "(projects/lib)", detail: ".claude/ がある" },
         { severity: "error", where: "(projects/app) no-message", detail: "文面が無い" },
         { severity: "warn", where: "(projects/application)", detail: "別のプロジェクト" },
       ],
@@ -167,7 +167,6 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
     ignored: false,
     rulesRels: { app: "projects/app/.ccnavi/config/rules.yml", lib: "projects/lib/.ccnavi/config/rules.yml" },
     rulesExists: { app: true },
-    oldRulesExists: { lib: true },
     hasClaudeDir: { lib: true },
     selfRulesRel: ".ccnavi/config/rules.yml",
     selfRulesExists: false,
@@ -176,17 +175,14 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
   const [app, lib] = page.rows;
   assert.equal(app.originKey, "gitlab.example.com/g/app");
   assert.equal(app.rulesRel, "projects/app/.ccnavi/config/rules.yml");
-  assert.equal(app.oldRulesExists, false);
   assert.equal(app.problems.length, 1);
   assert.equal(app.problems[0].severity, "error");
   assert.equal(lib.rulesExists, false);
-  assert.equal(lib.oldRulesRel, "projects/lib/config/rules.yml");
-  assert.equal(lib.oldRulesExists, true);
   assert.equal(lib.hasClaudeDir, true);
   assert.deepEqual(lib.worktrees, ["i0002"]);
   assert.equal(lib.tickets, 1);
   assert.equal(lib.doing, 1);
-  assert.deepEqual(lib.problems.map((p) => p.detail), ["config/rules.yml があるが、もう読まない"]);
+  assert.deepEqual(lib.problems.map((p) => p.detail), [".claude/ がある"]);
   assert.equal(page.dirProblems.length, 1);
   assert.deepEqual(page.workspaceWorktrees, ["i0001"]);
   assert.equal(page.selfRulesRel, ".ccnavi/config/rules.yml");

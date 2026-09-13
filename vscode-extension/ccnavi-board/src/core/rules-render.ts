@@ -43,7 +43,7 @@ export interface RulesPage {
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly samplesPath: string;
   readonly lock: Lock;
-  /** 上部に出す注意（旧の置き場が残っている、実行ファイルがこの層を読めていない、など） */
+  /** 上部に出す注意（実行ファイルがこの層を読めていない、など） */
   readonly notices?: readonly string[];
 }
 

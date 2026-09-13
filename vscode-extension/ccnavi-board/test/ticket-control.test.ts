@@ -31,9 +31,9 @@ test("CB-T58 settings.local.json が settings.json に勝つ。local が空な�
   assert.equal(ticketControlFrom({ settings: env("disable"), local: env("off") }), "disable");
 });
 
-test("CB-T59 実行ファイルの答えと食い違えば言う。空（古い実行ファイル）は問わない", () => {
+test("CB-T59 実行ファイルの答えと食い違えば言う", () => {
   assert.equal(ticketControlMismatch("enable", "enable"), "");
-  assert.equal(ticketControlMismatch("enable", ""), "");
+  assert.equal(ticketControlMismatch("disable", " Disable "), "");
   assert.match(ticketControlMismatch("enable", "disable"), /設定ファイル: enable、実行ファイル: disable/);
   assert.match(ticketControlMismatch("disable", "enable"), /CCNAVI_TICKET_CONTROL/);
 });
