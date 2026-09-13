@@ -41,7 +41,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | 引数に現れない書き込みは実行後に拾う | 実行前の判定はツール呼び出しの引数しか見ない。ビルドの出力やスクリプトの中のファイル操作は、走ったあとの作業ツリーを git で読んで拾う（§7） |
 | ガード自身の設定はルールの外で守る | ルールを空にされた形も壊れた形も、ルールから導いた保護領域は 0 件になる。hook の登録・ルール・実行ファイルは組み込みで控えて戻す（§8） |
 | チケットは絞る向きにだけ効く | 承認された範囲の外を止め、中は聞かない。ルールが何も言わないときだけ見る。判定の鍵はファイルの行き先が属する作業ツリー（§9） |
-| 実行ファイルは自分のディレクトリの外を見ない | マージリクエストやレビューのスレッドは `.claude/scripts/` の sh が取ってきて写しで渡す。実行ファイルはネットワークに出ない（§9.10） |
+| 実行ファイルは自分のディレクトリの外を見ない | マージリクエストやレビューのスレッドは `.ccnavi/scripts/` の sh が取ってきて写しで渡す。実行ファイルはネットワークに出ない（§9.10） |
 
 ### 1.3 失敗の向き
 
@@ -207,7 +207,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_RULES` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身、`rules.yml`、`.claude/scripts/ccnavi-{ticket,review,git}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える |
+| 配るもの | `dist/ccnavi/` の中身、`rules.yml`、`.ccnavi/scripts/ccnavi-{ticket,review,git}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える |
 | 配布先の `.gitignore` | 実行ファイルと同梱物の 3 行（配布先が git のリポジトリで、配るときだけ） |
 
 `--mode disable` は断る（設定ファイルに書いても効かないので、§4.3）。`--check` は書かずに
@@ -1005,7 +1005,7 @@ HIGH 以上（§9.9）、のどれかで決まる。延期の項は自分では�
 
 ### 9.10 レビューの依頼と確認
 
-リモート（GitHub / GitLab）を読み書きするのは `.claude/scripts/ccnavi-review.sh` で、実行ファイルは
+リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11、ADR-0028）。実行ファイルが持つのは作業ツリーの中で分かる前提検査と、
 sh が渡す写し（`--result <JSON>`）の判定と印の操作だけ。写しの形が sh と実行ファイルの契約で、
 テストも同じ経路を通る。
@@ -1415,7 +1415,7 @@ git プロジェクトルートで見た変更に当てるのは共通層 + そ�
 
 ### 11.8 保護済みスクリプトと案内
 
-sh はワークスペースにしかない。プロジェクトの中に `cwd` があるとき、`sh .claude/scripts/ccnavi-git.sh` は届かない。
+sh はワークスペースにしかない。プロジェクトの中に `cwd` があるとき、`sh .ccnavi/scripts/ccnavi-git.sh` は届かない。
 Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来ない（実測済み。hook の環境にだけ来る）。だから拒否の文面が案内する
 綴りは、ルールファイルの `message` に `{root}` で書く。`{root}` はルールを読むときにワークスペースルートの絶対パスへ
 置き換わる。自身の層とプロジェクトの層のルールでも同じで、置き換わる先はそのプロジェクトではなく
