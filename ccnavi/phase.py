@@ -40,8 +40,9 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # サブエージェントに許さない操作。状態を動かす形・レビューの形・リモートへ送る形を、
 # コマンドの位置で。読むだけの `cat` や `--help` は止めない。
 # push を含めるのは、リモートに置く枝は親ブランチ 1 本で、それを送るのが親の仕事だから。
-# git ラッパも子チケットのツリーからの push を拒むが、そちらは cwd のツリーで見る。
-# サブエージェントが親のツリーへ cd して打てばラッパは通すので、素性で止める層をここに持つ。
+# git のラッパースクリプトも子チケットのツリーからの push を拒むが、そちらは cwd のツリーで見る。
+# サブエージェントが親のツリーへ cd して打てばラッパースクリプトは通すので、素性で止める層を
+# ここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
     r"(start|done|cancel|judge|request|check|note|accept|handoff|ready|wrapup|push)\b"

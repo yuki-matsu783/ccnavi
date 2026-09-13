@@ -238,7 +238,7 @@ _COPY_END = r"(?:[\\/]|$)"
 #
 # `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。前は `.claude/ccnavi/`
 # の中にあって、そこを守る綴りに一緒に入っていた。移したぶん守りが外れないよう、名前を
-# 絞って足す。`logs/` の下の git ラッパの記録は、消しても判定に効かないので守らない。
+# 絞って足す。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
 _PLACES = (
     r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
