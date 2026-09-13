@@ -15,9 +15,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: wip/design/*
-started_at: ''
-completed_at: ''
-base_sha: ''
+started_at: 2026-09-13T19:32:00+0900
+completed_at: 2026-09-13T19:52:13+0900
+base_sha: d4951e6c37847dca28ccfb334c4ef72287dc05cd
 ccnavi_approved:
   approved_at: 2026-09-13T19:15:00+0900
   source_tree: launcher-scripts
