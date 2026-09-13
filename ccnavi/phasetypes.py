@@ -125,7 +125,10 @@ def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, lis
             text = f.read()
     except FileNotFoundError:
         return None, []
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
+        # ファイルとして苦情付きで返す。上げると、判定（実行前・ゲート・実行後の監視）が
+        # 例外で落ち、読めない種類を「種類では切り詰めない」として扱う道に届かない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     return parse(text, path, refs)
 
