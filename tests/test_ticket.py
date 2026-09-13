@@ -25,7 +25,7 @@ import tempfile
 import unittest
 
 from ccnavi import phase as phase_mod
-from ccnavi import shellread
+from ccnavi import settings, shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -569,6 +569,34 @@ class TicketTest(unittest.TestCase):
         # main からの起動にはゲートが無い。
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
         self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
+
+    def test_gate_guides_sh_from_workspace_root(self):
+        """ゲートと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
+
+        `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切った作業ツリーでは
+        相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
+        """
+        self.family()
+        self.close_phase()
+        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
+        said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn(f"{review_sh} request --phase 1", self.reason(said))
+        self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
+
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
+        self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
+        self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
+
+        # 案内どおりに打った形は、ゲートの例外に当たる。
+        guided = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f"{review_sh} request --phase 1 --body-file b.md",
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(guided), self.reason(guided))
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
