@@ -755,6 +755,8 @@ Windows でも Linux でも同じ意味にするための、`fnmatch` の外で�
 実パス。「ワークスペースの下」を絶対パスの直書きなしに書くためのもので、Windows と WSL と
 Linux で綴りが割れない。glob なら `{root}/wip/*`、regex なら `^{root}[\\/]` のように書く。
 区切りは `/` と `\` のどちらにも当たり、大文字小文字を区別しない機械では綴りの違いも許す。
+文面（`message` / `additionalContext` / `additionalContextOnce`）に書いた `{root}` も、モデルへ渡すときに
+実パス（区切りは `/`）になる。拒否の文面で sh を案内するときは `'sh {root}/.ccnavi/scripts/...'` と書く。
 `--explain` と `--test` は書いた綴りのまま `{root}` を出す。このリポジトリのルールでは、
 ワークスペースルート直下の Write / Edit を止める `main-tree` がこれを使っている（作業は
 `.claude/worktrees/` の中だけで行い、ff-only で main に戻す）。
