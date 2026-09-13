@@ -200,8 +200,36 @@ class LintTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("チケット制御: enable", result.stdout)
-        self.assertIn("CCNAVI_APPROVED が空文字", result.stdout)
+        self.assertIn("CCNAVI_TICKETS_APPROVED が空文字", result.stdout)
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
+
+    def test_改名前のチケットの置き場の環境変数はwarnで新しい名前を言う(self):
+        # 旧名はもう読まない。書いたままの人は既定の置き場で動いていることに気づかないので、
+        # 1 つずつ新しい名前を挙げる。
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.update({"CCNAVI_TICKETS": "wip/tickets", "CCNAVI_APPROVED": ".ccnavi/tickets"})
+        result = run_ccnavi(
+            [
+                "--root",
+                self.root,
+                "--lint",
+                "--rules",
+                rules_file(self.root, SOUND),
+                "--mode",
+                "enable",
+            ],
+            input="",
+            cwd=ROOT,
+            env=environment,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "CCNAVI_TICKETS はもう効かない。CCNAVI_TICKETS_PROPOSAL に改名した", result.stdout
+        )
+        self.assertIn(
+            "CCNAVI_APPROVED はもう効かない。CCNAVI_TICKETS_APPROVED に改名した", result.stdout
+        )
 
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))

@@ -309,6 +309,8 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     # 置き場の話しかしない案内が、置き場とは関係ない名前にも付く。
     replacements = {
         "CCNAVI_GUARD_CLI": f"{settings.GUARD_TICKET_APPROVAL_ENV} に改名した",
+        "CCNAVI_TICKETS": f"{settings.TICKETS_ENV} に改名した",
+        "CCNAVI_APPROVED": f"{settings.APPROVED_ENV} に改名した",
         "CCNAVI_PROJECT_RULES": (
             f"層の設定は {settings.PROJECT_HOME_ENV}（既定 {settings.DEFAULT_PROJECT_HOME}）の下の "
             f"{settings.LAYER_CONFIG_DIR}/ に 3 本まとめて置く。"

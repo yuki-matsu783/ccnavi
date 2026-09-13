@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-approve.sh
 #
 # 承認そのものは ccnavi の `--approve`。承認済みチケットは親チケットのツリーの
-# $CCNAVI_APPROVED（既定 .ccnavi/tickets）に置かれる。そこはプロジェクトの git が
+# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/tickets）に置かれる。そこはプロジェクトの git が
 # 追跡していて、コミットして push するまで他の機械には届かない（設計 §9.2）。
 # A が承認して B の機械で作業する流れは、この push で成り立つ。
 #
@@ -71,7 +71,7 @@ fi
 # 承認。落ちたらそこで終わり。承認済みチケットが 1 つも書かれていないので、運ぶものも無い。
 "$@" || exit 1
 
-approved="${CCNAVI_APPROVED:-.ccnavi/tickets}"
+approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
 projects="${CCNAVI_PROJECTS:-projects}"
 
 # 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、作業ツリー。

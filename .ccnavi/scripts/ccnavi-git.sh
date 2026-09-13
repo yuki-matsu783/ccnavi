@@ -480,9 +480,9 @@ push)
 		"$push_root"/.claude/worktrees/*)
 			push_name="${push_top#"$push_root"/.claude/worktrees/}"
 			push_name="${push_name%%/*}"
-			case "${CCNAVI_APPROVED:-}" in
-			/* | [A-Za-z]:*) push_copies="$CCNAVI_APPROVED" ;;
-			*) push_copies="$push_root/${CCNAVI_APPROVED:-.claude/ccnavi/tickets}" ;;
+			case "${CCNAVI_TICKETS_APPROVED:-}" in
+			/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
+			*) push_copies="$push_root/${CCNAVI_TICKETS_APPROVED:-.claude/ccnavi/tickets}" ;;
 			esac
 			# 閉じた承認済みチケット（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
 			# そのツリーは子のもので、送ってよくなるわけではない。
