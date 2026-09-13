@@ -222,7 +222,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 | もの | 版 |
 |---|---|
 | VS Code | 1.90 以上 |
-| ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が勝つ）の `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi[.exe]` → ソースがあれば `uv run python -m ccnavi` |
+| ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が勝つ）の `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/bin/ccnavi` → ソースがあれば `uv run python -m ccnavi`。振り分けの sh（`.ccnavi/bin/ccnavi`）を指していれば、sh を通さず隣の `<os>-<arch>/` にあるこの機械向けの実行ファイルを使う（Windows では sh を直接起動できないため） |
 | bash | accept と clone / fetch / pull を送るターミナル。承認は通らない（子プロセスで打つ）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone / fetch / pull を打つ |
 | Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
