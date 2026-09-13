@@ -347,7 +347,7 @@ class TicketTest(unittest.TestCase):
         """超えている子だけが落ち、兄弟は承認済みチケットになる。落ちたものがあるので
         終了コードは 1。
 
-        束の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
+        承認の対象の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
         全部通ったと読む。通ったぶんの承認済みチケットは置くので、直して出し直せばよい。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -359,7 +359,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
 
-    # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
+    # ---- 2b. 承認の対象を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
 
     def test_approve_only_the_listed_tickets(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -372,7 +372,7 @@ class TicketTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0002.md")))
-        # 残した分は次の --approve の束に載る
+        # 残した分は次の --approve で承認の対象に入る
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0002.md")))
 
@@ -892,7 +892,7 @@ class TicketTest(unittest.TestCase):
             "ccnavi --explain",
             "ccnavi --lint",
             "sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
-            # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
+            # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --approve --preview --json",
             "echo --approve --preview",
         ):

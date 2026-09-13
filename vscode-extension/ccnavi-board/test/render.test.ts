@@ -18,7 +18,7 @@ function approvePreview(): ApprovePreview {
   return parsed.value;
 }
 
-test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
+test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
   const preview = approvePreview();
   const html = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview } });
   assert.ok(html.includes('class="approval-backdrop" data-approval="preview"'));
@@ -38,7 +38,7 @@ test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、
   assert.ok(escaped.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
 });
 
-test("CB-T108 束が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
+test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
   const preview = approvePreview();
   const empty = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
@@ -52,9 +52,9 @@ test("CB-T108 束が空なら承認ボタンを出さず、承認中はボタン
   assert.ok(/data-action="approve-confirm"[^>]*disabled/.test(approving));
   const noticed = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
-    approval: { kind: "preview", preview, notice: "見せた束と今の束が違った" },
+    approval: { kind: "preview", preview, notice: "見せた一覧と今の一覧が違った" },
   });
-  assert.ok(noticed.includes('class="approval-note warn">見せた束と今の束が違った'));
+  assert.ok(noticed.includes('class="approval-note warn">見せた一覧と今の一覧が違った'));
   const failed = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "error", error: "実行ファイルが無い" } });
   assert.ok(failed.includes('class="approval-note error">実行ファイルが無い'));
 });

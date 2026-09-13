@@ -268,7 +268,7 @@ class PhaseHarness(unittest.TestCase):
         )
 
     def family(self, plan=("research", "design"), feedback=None):
-        """親を提案して承認する。plan の 1 番目の子も同じ束で承認する。"""
+        """親を提案して承認する。plan の 1 番目の子もまとめて承認する。"""
         self.propose("i0001", parent_text("i0001", list(plan), feedback))
         self.commit_parent()
         result = self.approve()
@@ -277,7 +277,7 @@ class PhaseHarness(unittest.TestCase):
 
 
 class ApproveOnlyTest(PhaseHarness):
-    """`--approve <識別子>...` で束を絞っても、絞らない束で落ちるものは通らない。"""
+    """`--approve <識別子>...` で承認の対象を絞っても、絞らないときに落ちるものは通らない。"""
 
     def test_child_cannot_be_approved_without_the_parents_pending_revision(self):
         self.family(plan=("acceptance", "implement"))
@@ -285,7 +285,7 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
-        # 絞らない束では、改版後の計画で検証されて落ちる（n で何も適用しない）
+        # 絞らないときは、改版後の計画で検証されて落ちる（n で何も適用しない）
         whole = self.ccnavi("--approve", stdin="n\n")
         self.assertIn("超えている", whole.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
