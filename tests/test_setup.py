@@ -27,9 +27,14 @@ def _launcher_source():
     """偽の配布元に置く振り分けの sh の中身。
 
     原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。人が写す前の
-    ツリーにはまだ無いので、そのときは前の原本 `scripts/ccnavi-launcher.sh` を読む。
+    ツリーにはまだ無いので、`test_launcher.py` と同じく環境変数 `CCNAVI_TEST_LAUNCHER` で
+    名指しできる（相対ならリポジトリのルートから）。名指しが無ければ前の原本
+    `scripts/ccnavi-launcher.sh` を読む。
     ここで見たいのは「どこへ配るか」と「中身が同じまま届くか」で、中身の版は問わない。
     """
+    named = os.environ.get("CCNAVI_TEST_LAUNCHER")
+    if named:
+        return os.path.join(ROOT, named)
     for parts in ((".ccnavi", "scripts", "ccnavi-launcher.sh"), ("scripts", "ccnavi-launcher.sh")):
         path = os.path.join(ROOT, *parts)
         if os.path.isfile(path):
