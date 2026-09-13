@@ -44,7 +44,7 @@
           },
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/scripts/ccnavi-fetch.sh\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh\"",
             "timeout": 60
           }
         ]

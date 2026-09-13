@@ -88,7 +88,7 @@ ccnavi --explain --log "" --state ""
 意図に合うかどうかの見積もり。**見積もりであって判定ではない**と報告に書く。
 
 ```sh
-sh .claude/scripts/ccnavi-git.sh log --shortstat -20
+sh .ccnavi/scripts/ccnavi-git.sh log --shortstat -20
 ```
 
 - 最近の子 1 本ぶんの差分（行数・ファイル数）を閾値と並べる。普通の子が毎回 HIGH に届く

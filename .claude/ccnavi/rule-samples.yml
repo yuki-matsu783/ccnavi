@@ -143,10 +143,10 @@ deny:
     subject: "cp /tmp/x /repo/.claude/settings.local.json"
     why: 行き先に来た設定ファイル
   - tool: Write
-    subject: "/repo/.claude/scripts/ccnavi-git.sh"
+    subject: "/repo/.ccnavi/scripts/ccnavi-git.sh"
     why: git の入口。書き換えれば git のルールがまとめて外れる
   - tool: Bash
-    subject: "sed -i s/push/x/ /repo/.claude/scripts/ccnavi-git.sh"
+    subject: "sed -i s/push/x/ /repo/.ccnavi/scripts/ccnavi-git.sh"
     why: 通さないはずのサブコマンドを通す形に変えられる
   - tool: Bash
     subject: "cd /repo/.claude/worktrees/x && echo x > ../../scripts/ccnavi-git.sh"
@@ -245,13 +245,13 @@ ask:
 
 allow:
   - tool: Bash
-    subject: "sh .claude/scripts/ccnavi-git.sh status --porcelain"
+    subject: "sh .ccnavi/scripts/ccnavi-git.sh status --porcelain"
     why: git の入口。サブコマンドの選別はラッパの中で行う
   - tool: Bash
-    subject: "sh .claude/scripts/ccnavi-git.sh push -u origin i0001"
+    subject: "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001"
     why: push もラッパの入口。送ってよい形か（force でない、main へ直接でない）はラッパが選別する
   - tool: Bash
-    subject: "cd /repo && sh .claude/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
+    subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
     why: このプロジェクトの作業手順。コマンド列の途中でも通る
   - tool: Bash
     subject: "grep -n TODO ccnavi/cli.py"
@@ -292,13 +292,13 @@ allow:
     subject: "cat /repo/.claude/settings.json"
     why: 設定も読むのは普通
   - tool: Bash
-    subject: "cat /repo/.claude/scripts/ccnavi-git.sh"
+    subject: "cat /repo/.ccnavi/scripts/ccnavi-git.sh"
     why: ラッパの中身を読むのは普通
   - tool: Bash
-    subject: "sh /repo/.claude/scripts/ccnavi-git.sh diff --stat"
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh diff --stat"
     why: これが git の打ち方そのもの。ここを止めたら何もできない
   - tool: Bash
-    subject: "cp /repo/.claude/scripts/ccnavi-git.sh /tmp/backup.sh"
+    subject: "cp /repo/.ccnavi/scripts/ccnavi-git.sh /tmp/backup.sh"
     why: 控えを取っているだけ。ccnavi-git.sh の名前が出るので allow に当たる
   - tool: Bash
     subject: "find /repo/ccnavi -name *.py"

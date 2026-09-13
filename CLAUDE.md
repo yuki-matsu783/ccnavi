@@ -40,13 +40,13 @@
 
 - 他セッションでも並行して作業が進められるよう、worktreeを使って作業すること
 - git は直接呼ばず `ccnavi-git.sh` を通す。通る形はそのスクリプトの `--help` に出る
-- **sh の綴りは、どこから打つかで変わる。** `.claude/scripts/` はワークスペースにしか無い
+- **sh の綴りは、どこから打つかで変わる。** `.ccnavi/scripts/` はワークスペースにしか無い
 
   | cwd | 綴り |
   |---|---|
-  | ワークスペースルート | `sh .claude/scripts/ccnavi-git.sh ...` |
-  | 作業ツリーの中 | `sh ../../scripts/ccnavi-git.sh ...` |
-  | `projects/<名前>` の中 | `sh ../../.claude/scripts/ccnavi-git.sh ...` |
+  | ワークスペースルート | `sh .ccnavi/scripts/ccnavi-git.sh ...` |
+  | 作業ツリーの中 | `sh ../../../.ccnavi/scripts/ccnavi-git.sh ...` |
+  | `projects/<名前>` の中 | `sh ../../.ccnavi/scripts/ccnavi-git.sh ...` |
 
   拒否の文面が案内する綴りは `{root}` から始まる絶対パスで出る。そのまま打てばどこからでも通る
 
@@ -109,11 +109,11 @@
 `rules.yml` の `message` で sh を案内するときは `{root}` から書く。
 
 ```yaml
-message: 生の git は実行しません。'sh {root}/.claude/scripts/ccnavi-git.sh ...' を使ってください。
+message: 生の git は実行しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh ...' を使ってください。
 ```
 
 `{root}` はルールを読むときにワークスペースルートの絶対パスに置き換わる。相対で
-`sh .claude/scripts/...` と書くと、`cwd` がプロジェクトの中にあるときに届かないパスを案内することになる。
+`sh .ccnavi/scripts/...` と書くと、`cwd` がプロジェクトの中にあるときに届かないパスを案内することになる。
 
 ## 提案と判断
 
@@ -134,7 +134,7 @@ message: 生の git は実行しません。'sh {root}/.claude/scripts/ccnavi-gi
 - ccnavi の実行ファイルはネットワークに出ない。自分で見て判断するのは、プロジェクトの
   ディレクトリの中で把握できるもの（作業ツリー、git、承認済みチケット、印、hook の payload）だけ
 - その外にあるもの（マージリクエスト、レビューのスレッド、ホストの API、認証）は
-  `.claude/scripts/` の sh が取ってきて、`--result` に渡す。実行ファイルが持つのは
+  `.ccnavi/scripts/` の sh が取ってきて、`--result` に渡す。実行ファイルが持つのは
   写しを読んでチケットと印を動かすところだけ
 - 実行ファイルに「外を見に行く」コードを足さない。足したくなったら sh の仕事に分け、
   実行ファイルには「その結果をどう読むか」だけを足す。写しの形が sh と実行ファイルの契約で、
