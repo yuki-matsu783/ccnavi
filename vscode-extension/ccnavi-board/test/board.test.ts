@@ -56,7 +56,7 @@ test("CB-T07 提案の無い承認済みチケットは不備として出し、�
     ...base.tickets[1],
     ticket: "i0001-09",
     proposal: null,
-    copy: { status: "open", path: "/x/.claude/ccnavi/tickets/i0001-09.md" },
+    copy: { status: "open", path: "/x/.ccnavi/tickets/i0001-09.md" },
   };
   const closed: TicketJson = {
     ...orphan,
@@ -68,7 +68,7 @@ test("CB-T07 提案の無い承認済みチケットは不備として出し、�
   const cards = cardsOf(buildBoard(json));
   assert.equal(cards.get("i0001-09")!.column, "todo");
   assert.match(cards.get("i0001-09")!.issues[0], /提案が見つからない/);
-  assert.equal(cards.get("i0001-09")!.openPath, "/x/.claude/ccnavi/tickets/i0001-09.md");
+  assert.equal(cards.get("i0001-09")!.openPath, "/x/.ccnavi/tickets/i0001-09.md");
   assert.equal(cards.get("i0001-08")!.column, "cancelled");
   assert.equal(buildBoard(json).issueCount, 1);
 });
