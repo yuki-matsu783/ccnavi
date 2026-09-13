@@ -40,6 +40,9 @@ ccnavi_approved:
   approved_at: 2026-09-13T21:08:40+0900
   source_tree: launcher-scripts
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/launcher-scripts/wip/tickets/todo/launcher-scripts-04.md
+started_at: 2026-09-13T21:12:25+0900
+base_sha: a0359592dbc49507b90f8d954104fc3c98c38000
+completed_at: 2026-09-13T21:18:39+0900
 ---
 
 # 設計を直す（包んだコマンドを外す）
