@@ -1091,7 +1091,8 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 シェルで、`RM` が通る保証は無い。
 
 シェルから止める場所は、`.claude/` の `ccnavi/` `hooks/` `scripts/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、
-`ccnavi-git.sh`、実行ファイル、それに記録と控え（`logs/log.jsonl` と `logs/state`）。記録と控えは前は `.claude/ccnavi/` の
+`ccnavi-git.sh`、実行ファイル、共通層の 3 本（`CCNAVI_RULES` などが指す場所）、それに記録と控え（`logs/log.jsonl` と `logs/state`）。
+ルールファイルが壊れて組み込みの既定に落ちている間も、同じ場所を同じ設定から組んで止める。記録と控えは前は `.claude/ccnavi/` の
 中にあって、そこを守る綴りに一緒に入っていた。`logs/` へ移したぶん守りが外れないよう、名前を絞って足してある。
 `logs/` の下の git のラッパースクリプトの記録は守らない。消しても判定に効かないため。`.claude/ccnavi/` は前の置き場だが、env で前の綴りを
 指したままのワークスペースがあるので、守る場所に残してある。
@@ -1100,10 +1101,10 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 いればそのパスと、同じ親の下の `<os>-<arch>/` の中を書く呼び出しは拒否され、ccnavi ディレクトリの下（`*/.ccnavi/*`）も
 同じく拒否される（`builtin-guard-project-home`）。
 どちらもルールファイルの外に置くのは、置き場が設定で動くことと、そのプロジェクトのルール自身に
-任せると書けた瞬間に緩められるため。共通層の 3 本も、既定の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの下なので、ccnavi ディレクトリの名前を
-動かしていなければ同じ 1 本が止める。見本 `.ccnavi/common/rule-samples.yml` も同じで、エージェントは直接書けない。
-見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す。env で共通層を ccnavi ディレクトリの外（前の `.claude/ccnavi/` など）に
-置いているなら、そこを名指しのツールから守るぶんはルールの 1 行に任せる（`deny` を 1 行書けば済み、書いたことが読める場所に残る）。
+任せると書けた瞬間に緩められるため。共通層の 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル）も、
+置き場がどこでも組み込みで止まる（`builtin-guard-common-layer`）。ワークスペースから切った作業ツリーの中の同じファイルも止まる。
+見本 `.ccnavi/common/rule-samples.yml` は 3 本に入らないが、ccnavi ディレクトリの下なので `builtin-guard-project-home` が止め、
+エージェントは直接書けない。見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す。
 
 止めるのは書き込む綴りと場所の組で、場所の名前が出ただけでは止めない。
 `cat .ccnavi/common/rules.yml` も `git add <パス>` も、中身を書かないので通る。
