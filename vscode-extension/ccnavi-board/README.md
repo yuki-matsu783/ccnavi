@@ -271,7 +271,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 2 つだけで、引数は取らない。`rm -rf` は ccnavi のルール（`recursive-delete`）が止めるので使わない。
 作業ツリー（`.claude/worktrees/<名前>`）でこの拡張を組み立てたら、`git worktree remove` の**前に**
 これを走らせる。pnpm の `node_modules/.pnpm/` は深くて symlink も含み、git の削除が途中で止まって
-抜け殻が残ることがある。
+消しきれなかったディレクトリが残ることがある。
 
 ## 拡張開発ホストで動かす
 
