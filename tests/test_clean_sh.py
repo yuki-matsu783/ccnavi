@@ -6,7 +6,7 @@
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
 `CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
-`.claude/scripts/`（テストしているソースそのもの）。
+`.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHELL = shutil.which("sh") or shutil.which("bash")
 NODE = shutil.which("node")
 GIT = shutil.which("git")
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".claude/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = ("ccnavi-clean.sh", "ccnavi-clean.js", "ccnavi-common.sh")
 
 
@@ -64,7 +64,7 @@ class CleanTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.ws = os.path.join(self._tmp.name, "ws")
-        scripts = os.path.join(self.ws, ".claude", "scripts")
+        scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
         for name in SCRIPTS:
             shutil.copy(os.path.join(SH_DIR, name), scripts)
@@ -77,7 +77,7 @@ class CleanTest(unittest.TestCase):
     def run_clean(self, *args, cwd=None):
         env = dict(os.environ)
         env.pop("CCNAVI_WORKSPACE", None)  # 本物のワークスペースを指させない
-        script = os.path.join(self.ws, ".claude", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
+        script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],
             cwd=cwd or self.ws,

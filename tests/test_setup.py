@@ -20,6 +20,7 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
+LAUNCHER = os.path.join(ROOT, "scripts", "ccnavi-launcher.sh")
 
 
 def _load_build():
@@ -75,6 +76,22 @@ RULES_PARTS = (".claude", "ccnavi", "rules.yml")
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".claude", "ccnavi", "risk.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
+# 既定の置き場。hook が起動する振り分けの sh と、その隣の機械ごとの組み立て。
+BIN_DIR_PARTS = (".ccnavi", "bin")
+LAUNCHER_PARTS = (*BIN_DIR_PARTS, "ccnavi")
+# 前の既定の置き場。rules.yml と risk.yml が同じディレクトリにある。
+OLD_BIN = ".claude/ccnavi/ccnavi"
+
+
+def clean_env(**extra):
+    """テストを走らせているセッションの CCNAVI_* を持ち込まない。
+
+    導入スクリプトは、打ったセッションの CCNAVI_BIN_PATH を見て前の置き場を消すかを
+    決める。持ち込むと、テストが「コードのこと」ではなく「走らせた人のセッション」を報告する。
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    env.update(extra)
+    return env
 
 
 def quiet_deploy(args):
@@ -96,13 +113,14 @@ class SetupTest(unittest.TestCase):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
 
-    def run_setup(self, *args):
+    def run_setup(self, *args, env=None):
         return subprocess.run(
             [SHELL, SCRIPT, self.dir, *quiet_deploy(args)],
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=env or clean_env(),
         )
 
     def run_raw(self, *args):
@@ -113,6 +131,7 @@ class SetupTest(unittest.TestCase):
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=clean_env(),
         )
 
     def settings_path(self):
@@ -203,14 +222,21 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_RULES"], ".claude/ccnavi/rules.yml")
         self.assertEqual(env["CCNAVI_LOG"], ".claude/ccnavi/log.jsonl")
 
-    def test_bin_path_is_spelled_without_the_exe_suffix(self):
-        """実行ファイルの綴りは 3 つの環境で 1 行のまま。
+    def test_bin_path_points_at_the_launcher(self):
+        """指すのは振り分けの sh で、どの環境でも 1 行のまま。
 
-        `.exe` を書き足すのは PyInstaller のほうで、設定の側は書かない。
-        設定に `.exe` が入ると、その 1 行が Windows でしか当たらなくなる。
+        実行ファイルは機械ごとに隣の `<os>-<arch>/` に入り、どれを起動するかは sh が選ぶ。
+        設定に機械の語や `.exe` が入ると、その 1 行が 1 つの環境でしか当たらなくなる。
         """
         self.run_setup()
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".claude/ccnavi/ccnavi")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
+
+    def test_refuses_a_bin_spelled_with_exe(self):
+        """`.exe` を付けると、振り分けの sh を .exe の名前で置くことになる。"""
+        result = self.run_setup("--bin", ".ccnavi/bin/ccnavi.exe")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(".exe", result.stderr)
+        self.assertFalse(os.path.exists(self.settings_path()))
 
     def test_writes_the_guards_at_the_same_strength_as_the_mode(self):
         """戻す働きの 2 つは CCNAVI_MODE と同じ値で並ぶ。
@@ -288,7 +314,8 @@ class WritesTheExpectedShape(SetupTest):
     def test_says_what_is_still_missing(self):
         """登録しただけでは動かないので、人が置くものを挙げる。"""
         result = self.run_setup()
-        self.assertIn(".claude/ccnavi/ccnavi", result.stdout)
+        self.assertIn(".ccnavi/bin/ccnavi", result.stdout)
+        self.assertIn(f".ccnavi/bin/{THIS_MACHINE}/ccnavi", result.stdout)
         self.assertIn("rules.yml", result.stdout)
         self.assertIn("ccnavi-git.sh", result.stdout)
 
@@ -707,6 +734,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             ) as f:
                 f.write("同梱物")
         if parts:
+            # 振り分けの sh は本物を写す。配布先で中身が同じであることを見るため。
+            os.makedirs(os.path.join(src, "scripts"), exist_ok=True)
+            shutil.copy(LAUNCHER, os.path.join(src, "scripts", "ccnavi-launcher.sh"))
             os.makedirs(os.path.join(src, ".claude", "ccnavi"))
             with open(
                 os.path.join(src, ".claude", "ccnavi", "rules.yml"),
@@ -720,10 +750,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             os.makedirs(os.path.join(src, ".ccnavi", "config"))
             with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
-            os.makedirs(os.path.join(src, ".claude", "scripts"))
+            os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
             for name in DEPLOY_SCRIPTS:
                 with open(
-                    os.path.join(src, ".claude", "scripts", name),
+                    os.path.join(src, ".ccnavi", "scripts", name),
                     "w",
                     encoding="utf-8",
                 ) as f:
@@ -751,7 +781,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=clean_env(),
         )
+
+    def built(self, target=THIS_MACHINE, *rest):
+        """配った組み立ての置き場。rest を足すとその下。"""
+        return self.deployed(*BIN_DIR_PARTS, target, *rest)
 
     def make_git(self):
         """配布先を git のリポジトリに見せる。.gitignore を書くのはここだけ。"""
@@ -774,15 +809,18 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
-        self.assertTrue(os.path.isfile(self.deployed(".claude", "ccnavi", "ccnavi")))
-        self.assertTrue(
-            os.path.isfile(self.deployed(".claude", "ccnavi", "_internal", "base_library.zip"))
-        )
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
+        with (
+            open(self.deployed(*LAUNCHER_PARTS), encoding="utf-8") as f,
+            open(LAUNCHER, encoding="utf-8") as g,
+        ):
+            self.assertEqual(f.read(), g.read())
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
-            self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
+            self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
 
     def test_says_nothing_is_missing_after_it_copied(self):
         """配ったあとは「まだ無いもの」が出ない。
@@ -799,7 +837,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--mode", "enable", "--no-deploy")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
-        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi")))
+        self.assertFalse(os.path.exists(self.deployed(*BIN_DIR_PARTS)))
         self.assertIn("まだ無いもの", result.stdout)
         self.assertIn("--no-deploy を外すと", result.stdout)
 
@@ -824,10 +862,11 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
-        self.assertTrue(os.path.isfile(self.deployed(".claude", "ccnavi", "ccnavi")))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
+        self.assertTrue(os.path.isfile(self.deployed(*LAUNCHER_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         for name in DEPLOY_SCRIPTS:
-            self.assertTrue(os.path.isfile(self.deployed(".claude", "scripts", name)))
+            self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
 
     def test_writes_the_settings_when_the_default_source_is_not_built(self):
         """既定の配布元が組み立てられていなくても、設定は書く。
@@ -868,7 +907,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
-        self.assertTrue(os.access(self.deployed(".claude", "ccnavi", "ccnavi"), os.X_OK))
+        self.assertTrue(os.access(self.built(THIS_MACHINE, "ccnavi"), os.X_OK))
+        self.assertTrue(os.access(self.deployed(*LAUNCHER_PARTS), os.X_OK))
 
     def test_running_twice_does_not_copy_again(self):
         """2 回目は配らない。既にあるものとして並べる。"""
@@ -891,7 +931,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
-        stale = self.deployed(".claude", "ccnavi", "_internal", "古い同梱物.so")
+        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
         with open(stale, "w", encoding="utf-8") as f:
             f.write("前の版")
         with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:
@@ -916,9 +956,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], "tools/ccnavi/ccnavi")
         self.assertTrue(os.path.isfile(self.deployed("tools", "ccnavi", "ccnavi")))
-        # 既定の置き場には置かれない。rules.yml は同じディレクトリへ配られるので、
-        # 見るのはディレクトリではなく実行ファイルの有無。
-        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi", "ccnavi")))
+        self.assertTrue(os.path.isfile(self.deployed("tools", "ccnavi", THIS_MACHINE, "ccnavi")))
+        self.assertFalse(os.path.exists(self.deployed(*BIN_DIR_PARTS)))
+        self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_refuses_a_source_that_was_never_built(self):
         """組み立てていない配布元では、黙って進まない。
@@ -943,7 +983,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("配布元に無くて配れないもの", result.stdout)
         self.assertIn("rules.yml", result.stdout)
-        self.assertTrue(os.path.isfile(self.deployed(".claude", "ccnavi", "ccnavi")))
+        self.assertIn("ccnavi-launcher.sh", result.stdout)
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
 
     def test_check_does_not_copy(self):
         """`--check` は配らない。揃っていないので 1 を返す。"""
@@ -951,7 +992,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
         self.assertIn("配る", result.stdout)
-        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi")))
+        self.assertFalse(os.path.exists(self.deployed(*BIN_DIR_PARTS)))
 
     def test_check_is_settled_once_everything_is_there(self):
         src = self.make_source()
@@ -976,48 +1017,79 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
 
 class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
-    """実行ファイルがこの機械で動くかを、配る前に見る。
+    """実行ファイルを、組み立てた機械の置き場（`<os>-<arch>/`）に入れる。
 
-    PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かない。別の機械
-    向けを配ってもファイルは在るので、見ないと hook が起動できないまま黙って死ぬ。
+    PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かない。機械ごとに
+    置き場を分けるので、別の機械向けを配ってもこの機械の実行ファイルは上書きされない。
+    ただしこの機械で動くものが無いことは、黙らずに言う。
     """
 
-    def bin_deployed(self):
-        return os.path.exists(self.deployed(".claude", "ccnavi", "ccnavi"))
-
-    def test_refuses_a_named_source_built_for_another_machine(self):
+    def test_places_a_named_source_for_another_machine_in_its_own_place(self):
         src = self.make_source(target=ANOTHER_MACHINE)
         result = self.run_setup("--deploy", src)
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn(f"{ANOTHER_MACHINE} 向け", result.stderr)
-        self.assertFalse(self.bin_deployed())
-        self.assertFalse(os.path.exists(self.settings_path()))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isfile(self.built(ANOTHER_MACHINE, "ccnavi")))
+        self.assertFalse(os.path.exists(self.built(THIS_MACHINE)))
+        self.assertIn(f"{ANOTHER_MACHINE} 向け", result.stdout)
+        self.assertIn("まだ無いもの", result.stdout)
+        self.assertIn(f"{THIS_MACHINE}/ccnavi", result.stdout)
 
-    def test_default_source_for_another_machine_writes_only_the_settings(self):
-        """既定の配布元は「組み立てていない」と同じ扱い。配らずに理由を出し、設定は書く。"""
+    def test_default_source_for_another_machine_is_placed_too(self):
         src = self.make_source(target=ANOTHER_MACHINE)
         result = self.run_copied(self.install_script(src))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"{ANOTHER_MACHINE} 向け", result.stdout)
-        self.assertFalse(self.bin_deployed())
+        self.assertTrue(os.path.isfile(self.built(ANOTHER_MACHINE, "ccnavi")))
         self.assertTrue(os.path.exists(self.settings_path()))
+
+    def test_keeps_builds_for_two_machines_side_by_side(self):
+        """Windows と WSL で同じフォルダを開く形。片方を配っても、もう片方は残る。"""
+        self.run_setup("--deploy", self.make_source(target=ANOTHER_MACHINE))
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.isfile(self.built(ANOTHER_MACHINE, "ccnavi")))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
+        self.assertNotIn("まだ無いもの", result.stdout)
 
     def test_deploys_a_build_for_this_machine_without_a_note(self):
         src = self.make_source()
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.bin_deployed())
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
         self.assertNotIn("確かめていません", result.stdout)
+        self.assertNotIn("向けで", result.stdout)
         # 印は dist/ccnavi/ の外にあるので、配布先へは写らない。
-        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi.target")))
-        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi", "ccnavi.target")))
+        for parts in (
+            (".ccnavi", "ccnavi.target"),
+            (*BIN_DIR_PARTS, "ccnavi.target"),
+            (*BIN_DIR_PARTS, THIS_MACHINE, "ccnavi.target"),
+        ):
+            self.assertFalse(os.path.exists(self.deployed(*parts)), parts)
 
-    def test_deploys_an_old_build_without_the_mark_and_says_so(self):
+    def test_refuses_a_named_source_without_the_mark(self):
+        """印が無いと置き場を決められない。推測で置くと、別の機械向けを入れうる。"""
         src = self.make_source(target=None)
         result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("ccnavi.target", result.stderr)
+        self.assertFalse(os.path.exists(self.settings_path()))
+
+    def test_default_source_without_the_mark_writes_only_the_settings(self):
+        src = self.make_source(target=None)
+        result = self.run_copied(self.install_script(src))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.bin_deployed())
-        self.assertIn("ccnavi.target が無いので", result.stdout)
+        self.assertIn("配っていません", result.stdout)
+        self.assertFalse(os.path.exists(self.deployed(*BIN_DIR_PARTS)))
+        self.assertTrue(os.path.exists(self.settings_path()))
+
+    def test_refuses_a_mark_that_would_leave_the_place(self):
+        """印はそのままディレクトリ名になる。区切りを含む値で置き場の外へ書かせない。"""
+        for mark in ("../escape", "linux/x86_64", "linux"):
+            with self.subTest(mark=mark):
+                src = self.make_source(target=mark)
+                result = self.run_setup("--deploy", src)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertFalse(os.path.exists(self.deployed(".ccnavi", "escape")))
+                self.assertFalse(os.path.exists(self.deployed("escape")))
 
 
 class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
@@ -1035,12 +1107,19 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertEqual(result.returncode, 0, result.stderr)
 
         written = self.gitignore()
-        self.assertIn("/.claude/ccnavi/ccnavi\n", written)
-        # 3 つの環境で同じリポジトリを開くので、両方の綴りを書く。PyInstaller が
-        # Windows でだけ .exe を付ける。
-        self.assertIn("/.claude/ccnavi/ccnavi.exe\n", written)
-        self.assertIn("/.claude/ccnavi/_internal/\n", written)
+        self.assertIn("/.ccnavi/bin/ccnavi\n", written)
+        self.assertIn(f"/.ccnavi/bin/{THIS_MACHINE}/\n", written)
         self.assertIn(".gitignore に足した", result.stdout)
+
+    def test_adds_the_place_of_each_machine_that_was_deployed(self):
+        """別の機械の組み立てを配れば、その置き場も足す。"""
+        self.make_git()
+        self.run_setup("--deploy", self.make_source())
+        self.run_setup("--deploy", self.make_source(target=ANOTHER_MACHINE))
+        written = self.gitignore()
+        self.assertIn(f"/.ccnavi/bin/{THIS_MACHINE}/\n", written)
+        self.assertIn(f"/.ccnavi/bin/{ANOTHER_MACHINE}/\n", written)
+        self.assertEqual(written.count("/.ccnavi/bin/ccnavi\n"), 1)
 
     def test_keeps_the_lines_that_were_already_there(self):
         src = self.make_source()
@@ -1051,7 +1130,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.run_setup("--deploy", src)
         written = self.gitignore()
         self.assertIn("node_modules/\n", written)
-        self.assertIn("/.claude/ccnavi/_internal/\n", written)
+        self.assertIn(f"/.ccnavi/bin/{THIS_MACHINE}/\n", written)
 
     def test_does_not_lose_the_last_line_without_a_newline(self):
         """末尾に改行が無いファイルへ足しても、最後の行と繋がらない。"""
@@ -1088,7 +1167,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
 
         written = self.gitignore()
         self.assertIn("/.claude/ccnavi/ccnavi\n", written)
-        self.assertIn("/.claude/ccnavi/_internal/\n", written)
+        self.assertIn(f"/.claude/ccnavi/{THIS_MACHINE}/\n", written)
         self.assertNotIn("/.claude/ccnavi/\n", written)
         self.assertNotIn("rules.yml", written)
 
@@ -1122,6 +1201,125 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
         self.assertIn(".gitignore に足す", result.stdout)
+
+
+class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
+    """前の既定の置き場（.claude/ccnavi/ の実行ファイル）から移る。
+
+    CCNAVI_BIN_PATH が前の綴りのままなら新しい綴りへ書き換え、前の実行ファイルと
+    同梱物を消す。どちらも、新しい置き場で hook が起動できるときだけ。同じ
+    ディレクトリの rules.yml と risk.yml には触らない。
+    """
+
+    def old_place(self):
+        self.write_settings({"env": {"CCNAVI_BIN_PATH": OLD_BIN}})
+        old = self.deployed(".claude", "ccnavi")
+        os.makedirs(os.path.join(old, "_internal"))
+        for name in ("ccnavi", os.path.join("_internal", "base_library.zip")):
+            with open(os.path.join(old, name), "w", encoding="utf-8") as f:
+                f.write("前の版\n")
+        with open(os.path.join(old, "rules.yml"), "w", encoding="utf-8") as f:
+            f.write("# このプロジェクトのルール\n")
+        return old
+
+    def test_moves_the_setting_and_removes_the_old_executable(self):
+        old = self.old_place()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
+        self.assertFalse(os.path.exists(os.path.join(old, "ccnavi")))
+        self.assertFalse(os.path.exists(os.path.join(old, "_internal")))
+        with open(os.path.join(old, "rules.yml"), encoding="utf-8") as f:
+            self.assertIn("このプロジェクトのルール", f.read())
+        self.assertIn("前の置き場から消した", result.stdout)
+        self.assertIn("開き直して", result.stdout)
+
+    def test_keeps_the_old_place_when_the_new_one_is_not_ready(self):
+        """新しい置き場で起動できないまま移すと、hook が何も起動しなくなる。"""
+        old = self.old_place()
+        result = self.run_setup("--no-deploy")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_BIN)
+        self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
+        self.assertIn("移していません", result.stdout)
+
+    def test_keeps_the_old_place_when_only_another_machines_build_arrives(self):
+        old = self.old_place()
+        result = self.run_setup("--deploy", self.make_source(target=ANOTHER_MACHINE))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_BIN)
+        self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
+
+    def test_waits_while_this_session_still_runs_the_old_place(self):
+        """打ったセッションの env は開き直すまで変わらない。消すとその hook が止まる。"""
+        old = self.old_place()
+        src = self.make_source()
+        result = self.run_setup("--deploy", src, env=clean_env(CCNAVI_BIN_PATH=OLD_BIN))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
+        self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
+        self.assertIn("開き直してから打ち直す", result.stdout)
+
+        # 開き直したセッションから打ち直すと消える。
+        again = self.run_setup("--deploy", src)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertFalse(os.path.exists(os.path.join(old, "ccnavi")))
+
+    def test_check_names_the_old_place_without_removing_it(self):
+        old = self.old_place()
+        result = self.run_setup("--deploy", self.make_source(), "--check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("前の置き場から消す", result.stdout)
+        self.assertIn(".claude/ccnavi/_internal", result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_BIN)
+
+    def test_does_not_move_a_named_bin_without_force(self):
+        """--bin を名指ししたときの置き換えは、これまでどおり --force の仕事。"""
+        old = self.old_place()
+        result = self.run_setup("--bin", "tools/bin/ccnavi", "--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_BIN)
+        self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
+        self.assertIn("まだそこを指している", result.stdout)
+
+    def test_leaves_the_old_directory_alone_when_bin_lives_there(self):
+        """--bin が .claude/ccnavi/ なら、そこの ccnavi は振り分けの sh になる。"""
+        old = self.old_place()
+        result = self.run_setup("--bin", OLD_BIN, "--force", "--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(old, "_internal")))
+        self.assertTrue(os.path.isfile(os.path.join(old, THIS_MACHINE, "ccnavi")))
+        self.assertNotIn("前の置き場", result.stdout)
+
+    def test_says_nothing_when_there_is_no_old_place(self):
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("前の置き場", result.stdout)
+
+
+class NamesTheOldScriptPlace(SetupTest):
+    """ゲートの sh の置き場を .claude/scripts/ から .ccnavi/scripts/ へ移した。
+
+    前の配布で置いた写しは読まれないまま残る。消すのは人なので、名前を挙げるだけにする。
+    """
+
+    def test_names_scripts_left_in_the_old_place_without_removing_them(self):
+        old = os.path.join(self.dir, ".claude", "scripts", "ccnavi-git.sh")
+        os.makedirs(os.path.dirname(old))
+        with open(old, "w", encoding="utf-8") as f:
+            f.write("# old\n")
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("前の置き場に残っているゲートの sh", result.stdout)
+        self.assertIn(".claude/scripts/ccnavi-git.sh", result.stdout)
+        self.assertTrue(os.path.isfile(old))
+
+    def test_says_nothing_when_the_old_place_is_empty(self):
+        result = self.run_setup()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("前の置き場", result.stdout)
 
 
 class WritesTheVscodeSettings(SetupTest):

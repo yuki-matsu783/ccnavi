@@ -41,7 +41,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | 引数に現れない書き込みは実行後に拾う | 実行前の判定はツール呼び出しの引数しか見ない。ビルドの出力やスクリプトの中のファイル操作は、走ったあとの作業ツリーを git で読んで拾う（§7） |
 | ガード自身の設定はルールの外で守る | ルールを空にされた形も壊れた形も、ルールから導いた保護領域は 0 件になる。hook の登録・ルール・実行ファイルは組み込みで控えて戻す（§8） |
 | チケットは絞る向きにだけ効く | 承認された範囲の外を止め、中は聞かない。ルールが何も言わないときだけ見る。判定の鍵はファイルの行き先が属する作業ツリー（§9） |
-| 実行ファイルは自分のディレクトリの外を見ない | マージリクエストやレビューのスレッドは `.claude/scripts/` の sh が取ってきて写しで渡す。実行ファイルはネットワークに出ない（§9.10） |
+| 実行ファイルは自分のディレクトリの外を見ない | マージリクエストやレビューのスレッドは `.ccnavi/scripts/` の sh が取ってきて写しで渡す。実行ファイルはネットワークに出ない（§9.10） |
 
 ### 1.3 失敗の向き
 
@@ -207,15 +207,20 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_RULES` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身、`rules.yml`、`.claude/scripts/ccnavi-{ticket,review,git}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える |
-| 配布先の `.gitignore` | 実行ファイルと同梱物の 3 行（配布先が git のリポジトリで、配るときだけ） |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、`scripts/ccnavi-launcher.sh` を `.ccnavi/bin/ccnavi` へ、`rules.yml`、`.ccnavi/scripts/ccnavi-{ticket,review,git}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える |
+| 配布先の `.gitignore` | 振り分けの sh と、配った機械の置き場の 2 行（配布先が git のリポジトリで、配るときだけ） |
+| 前の置き場 | `.claude/ccnavi/` の `ccnavi`・`ccnavi.exe`・`_internal/` を消し、`CCNAVI_BIN_PATH` が前の綴りなら書き換える。新しい置き場で hook が起動できるときだけ |
+
+`CCNAVI_BIN_PATH` が指すのは振り分けの sh で、実行ファイルはその隣に機械ごとに並ぶ。`settings.json` は
+どの環境でも同じものを開き、hook の `command` は 1 行なので、どの実行ファイルを起動するかは起動した
+機械が決める（ADR-0041）。置き場の名前は `build.py` が書く `dist/ccnavi.target` の `<os>-<arch>` で、
+語は `ccnavi/platformtag.py`・`scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` の 3 か所で揃える。
 
 `--mode disable` は断る（設定ファイルに書いても効かないので、§4.3）。`--check` は書かずに
 揃っていないところだけを並べ、揃っていなければ終了コード 1。名指しした `--deploy` が
-組み立てられていなければ終了コード 2 で断るが、既定の配布元が使えないだけなら理由を 1 行出して
-設定は書く。実行ファイルが打った機械向けでない（`build.py` が書く `dist/ccnavi.target` の
-`<os>-<arch>` が `uname` と食い違う）ときも同じ扱いにする。印が無ければ確かめずに配り、そう言う。
-仕様は `tests/test_setup.py` が固定している。
+組み立てられていないか、印が無くて置き場を決められなければ終了コード 2 で断るが、既定の配布元が
+使えないだけなら理由を 1 行出して設定は書く。別の機械向けの組み立ては、その機械の置き場へ配り、
+この機械で動くものが無いことを言う。仕様は `tests/test_setup.py` と `tests/test_launcher.py` が固定している。
 
 ### 4.7 記録
 
@@ -1009,7 +1014,7 @@ HIGH 以上（§9.9）、のどれかで決まる。延期の項は自分では�
 
 ### 9.10 レビューの依頼と確認
 
-リモート（GitHub / GitLab）を読み書きするのは `.claude/scripts/ccnavi-review.sh` で、実行ファイルは
+リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11、ADR-0028）。実行ファイルが持つのは作業ツリーの中で分かる前提検査と、
 sh が渡す写し（`--result <JSON>`）の判定と印の操作だけ。写しの形が sh と実行ファイルの契約で、
 テストも同じ経路を通る。
@@ -1421,7 +1426,7 @@ git プロジェクトルートで見た変更に当てるのは共通層 + そ�
 
 ### 11.8 保護済みスクリプトと案内
 
-sh はワークスペースにしかない。プロジェクトの中に `cwd` があるとき、`sh .claude/scripts/ccnavi-git.sh` は届かない。
+sh はワークスペースにしかない。プロジェクトの中に `cwd` があるとき、`sh .ccnavi/scripts/ccnavi-git.sh` は届かない。
 Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来ない（実測済み。hook の環境にだけ来る）。だから拒否の文面が案内する
 綴りは、ルールファイルの `message` に `{root}` で書く。`{root}` はルールを読むときにワークスペースルートの絶対パスへ
 置き換わる。自身の層とプロジェクトの層のルールでも同じで、置き換わる先はそのプロジェクトではなく

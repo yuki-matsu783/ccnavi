@@ -17,7 +17,7 @@
 # `sh -c` や `python -c` に埋めれば hook の文字列一致は外れる。そこまで塞ぐなら
 # permissions.deny か sandbox が要る。
 #
-# 使い方:  sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
+# 使い方:  sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
 # 終了コード: 0 成功 / 1 git が失敗 / 2 引数か環境の誤り (拒否を含む)
 
 set -eu
@@ -62,13 +62,13 @@ reject() {
 
 # ワークスペースルート。道具と記録の置き場。git のトップとは別物で、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
-# 上へ歩いて `.claude/scripts/` を探す（設計 §25.8）。
+# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 §25.8）。
 WS=$(ccnavi_workspace) ||
-	reject "ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
+	reject "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 
 usage() {
 	cat <<'USAGE'
-sh .claude/scripts/ccnavi-git.sh <サブコマンド> [引数...]
+sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
 
 通すもの:
   読む      status log show diff blame shortlog describe rev-parse rev-list
@@ -548,7 +548,7 @@ clone | submodule | lfs)
 	reject "$sub は外から中身を持ち込みます。通しません。利用者に依頼してください。"
 	;;
 *)
-	reject "$sub はホワイトリストにありません。使える形は sh .claude/scripts/ccnavi-git.sh --help で確認してください。"
+	reject "$sub はホワイトリストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
 	;;
 esac
 

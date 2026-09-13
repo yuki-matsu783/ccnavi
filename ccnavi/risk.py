@@ -786,7 +786,7 @@ def judge_prompt(child: str, parent: str, diff: Diff, pending: list[Factor], wor
         "",
         "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",
         "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
-        f"'sh .claude/scripts/ccnavi-ticket.sh judge {child} <項目> yes|no --reason <根拠>' "
+        f"'sh .ccnavi/scripts/ccnavi-ticket.sh judge {child} <項目> yes|no --reason <根拠>' "
         "で 1 項目ずつ。",
         "",
     ]

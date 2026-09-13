@@ -245,7 +245,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
         "- チケット作業: 大きな修正（設計に触れる、複数の段階になる、人のレビューが要る）は、",
         f"  {conf.tickets}/ に提案を書いて承認を受け、フェーズ{phases}と",
         f"  リスクの配点{risk}に従って issue と MR を作りながら進める。",
-        "  操作は sh .claude/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。",
+        "  操作は sh .ccnavi/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。",
         "どちらで進めるか迷ったら、利用者に聞く。",
     ]
     if mode == DRY_RUN:
@@ -275,7 +275,7 @@ def approved(tickets, revisions: set[str]) -> str:
         lines.append(f"- {t.ticket}{title}（{where}）")
     lines.append(
         "後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-        "'sh .claude/scripts/ccnavi-ticket.sh start <識別子>' で着手する。"
+        "'sh .ccnavi/scripts/ccnavi-ticket.sh start <識別子>' で着手する。"
     )
     return "\n".join(lines)
 

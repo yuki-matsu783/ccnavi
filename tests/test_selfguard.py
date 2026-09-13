@@ -19,7 +19,7 @@ import tempfile
 import time
 import unittest
 
-from ccnavi import selfguard, settings, shellread
+from ccnavi import platformtag, selfguard, settings, shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -528,6 +528,56 @@ class SelfGuardTest(unittest.TestCase):
         self.run_hook("PostToolUse", bin=path)
 
         self.assertEqual(read(path), "ELF fake executable\n")
+
+    # 振り分けの sh と、その隣の機械ごとの組み立て
+
+    def launcher_layout(self, place=("tools", "bin")):
+        """配布先の形。指す先は sh で、hook が実際に走らせるのは隣の実体。"""
+        launcher = os.path.join(self.repo, *place, "ccnavi")
+        exe = os.path.join(self.repo, *place, platformtag.host_target(), "ccnavi")
+        write(launcher, "#!/bin/sh\n")
+        write(exe, "ELF fake executable\n")
+        return launcher, exe
+
+    def test_振り分けの隣の実体もセッション開始で控え実行後に戻す(self):
+        # sh だけを控えると、隣の実体を差し替えても判定が入れ替わったことに気付かない。
+        launcher, exe = self.launcher_layout()
+
+        self.run_hook("SessionStart", bin=launcher)
+        write(exe, "ELF replaced\n")
+        self.run_hook("PostToolUse", bin=launcher)
+
+        self.assertEqual(read(exe), "ELF fake executable\n")
+
+    def test_振り分けの隣の実体は名指しのツールから止まる(self):
+        # 傘（.ccnavi/）の外へ動かした置き場は、傘のルールでは止まらない。
+        launcher, exe = self.launcher_layout()
+        bundled = os.path.join(os.path.dirname(exe), "_internal", "base_library.zip")
+
+        result = self.run_hook("PreToolUse", bin=launcher, tool="Write", file_path=bundled)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_振り分けの隣の実体はシェルからの書き込みで止まる(self):
+        launcher, _ = self.launcher_layout()
+
+        result = self.run_hook("PreToolUse", bin=launcher, command="rm -rf tools/bin/linux-x86_64")
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_振り分けの親の下でも組み立ての置き場でなければ当たらない(self):
+        launcher, _ = self.launcher_layout()
+
+        result = self.run_hook(
+            "PreToolUse",
+            bin=launcher,
+            tool="Write",
+            file_path=os.path.join(self.repo, "tools", "bin", "notes.md"),
+        )
+
+        self.assertNotIn("deny", result.stdout)
 
     # セッション開始の控え
 

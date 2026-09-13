@@ -235,7 +235,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
     "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".claude/ccnavi/rules.yml",
     "CCNAVI_LOG": ".claude/ccnavi/log.jsonl",
-    "CCNAVI_BIN_PATH": ".claude/ccnavi/ccnavi",
+    "CCNAVI_BIN_PATH": ".ccnavi/bin/ccnavi",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
     "CCNAVI_GUARD_TICKET_APPROVAL": "enable"
@@ -273,7 +273,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `.claude/ccnavi/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
-| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い（導入スクリプトは `.claude/ccnavi/ccnavi` と書く）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
+| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/bin/ccnavi` と書く。これは振り分けの sh で、実行ファイルはその隣の `<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
 | `CCNAVI_APPROVED` | 承認済みチケットとフェーズの印の置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（層の傘の下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
@@ -321,42 +321,60 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 一番分かりにくい壊れ方になるので、既定で配布物まで置く。配布物が要らないときは
 `--no-deploy`。
 
-実行ファイルは、組み立てた機械の OS と CPU でしか動かない。`build.py` は
-`dist/ccnavi.target` に `darwin-arm64` や `windows-x86_64` の形で印を書き、導入スクリプトは
-配る前にそれを打った機械の `uname` と比べる。食い違えば、名指しの `--deploy` は終了コード 2 で
-断り、既定の配布元なら配らずに理由を出して設定だけ書く。arm64 の macOS と Windows は x86_64 の
-実行ファイルを変換して動かすので通す。印が無い（前の `build.py` で組んだ）ときは、確かめて
-いないことを 1 行出して配る。判定は打った機械で行うので、Windows と WSL で同じフォルダを開くなら、
-Claude Code を動かす側で打つ。
+実行ファイルは、組み立てた機械の OS と CPU でしか動かない。一方で `settings.json` は Windows・WSL・
+Linux・macOS で同じものを開き、hook の `command` は 1 行しか書けない。そこで配布先では機械ごとに
+置き場を分け、hook が起動するのは振り分けの sh（`scripts/ccnavi-launcher.sh` を配ったもの）にする。
+sh は起動のたびに `uname` を 1 回読み、合う置き場の実行ファイルへ引数と標準入力をそのまま渡す（ADR-0041）。
+
+```
+.ccnavi/bin/ccnavi                    ← CCNAVI_BIN_PATH が指す振り分けの sh
+.ccnavi/bin/darwin-arm64/ccnavi       ← 機械ごとの組み立て（_internal/ も同じ置き場）
+.ccnavi/bin/linux-x86_64/ccnavi
+.ccnavi/bin/windows-x86_64/ccnavi.exe
+```
+
+置き場の名前は、`build.py` が `dist/ccnavi.target` に書く `<os>-<arch>` の印から取る。別の機械向けの
+組み立てでも配る。その機械の置き場に入るだけで、この機械の実行ファイルを上書きしないからで、
+Windows と WSL で同じフォルダを開くなら、それぞれの機械で打てば両方が並ぶ。この機械で動くものが
+無ければ、1 行と最後の「まだ無いもの」で言う。arm64 の macOS と Windows は、自分向けが無ければ
+x86_64 の組み立てを変換して動かす。どこにも無ければ sh は 127 で終わる。
+
+印が無い（前の `build.py` で組んだ）か読めない配布元からは、置き場を決められないので配らない。
+名指しの `--deploy` なら終了コード 2 で断り、既定の配布元なら理由を出して設定だけ書く。
+
+振り分けの代償は、ツール呼び出しのたびに sh の起動と `uname` 1 回ぶんが乗ること。macOS の実測で
+約 9 ms。Git Bash は fork が遅いので、Windows ではこれより大きくなる。VS Code 拡張は sh を通さず、
+隣の実行ファイルを自分で選んで起動する（Windows では sh を直接起動できないため）。
 
 | 配布元 | 配布先 |
 |---|---|
-| `dist/ccnavi/`（中身ごと） | `--bin` の 1 つ上のディレクトリ。既定なら `.claude/ccnavi/` |
+| `dist/ccnavi/`（中身ごと） | `--bin` の 1 つ上の下の `<os>-<arch>/`。既定なら `.ccnavi/bin/<os>-<arch>/` |
+| `scripts/ccnavi-launcher.sh` | `--bin` の綴り。既定なら `.ccnavi/bin/ccnavi` |
 | `.claude/ccnavi/rules.yml` | 同じ綴り |
 | `.claude/ccnavi/risk.yml` | 同じ綴り |
 | `.ccnavi/config/phases.yml` | 同じ綴り |
-| `.claude/scripts/ccnavi-{ticket,review,git}.sh` | 同じ綴り |
+| `.ccnavi/scripts/ccnavi-{ticket,review,git}.sh` | 同じ綴り |
 
 ルールと配点のひな形は共通層（`.claude/ccnavi/`）へ、フェーズの種類のひな形はワークスペース自身の層
 （`.ccnavi/config/`。`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）へ配る。種類の `scope` はそのワークスペースの
 レイアウトに合わせて書くもので、共通層に置くと全プロジェクトに効いてしまう（「ルールは 3 層の和で当たる」）。
 3 本とも、無ければ最後の点検が「まだ無いもの」として並べる。
 
-配った実行ファイルは、配布先の `.gitignore` にも足す（配布先が git のリポジトリの
-ときだけ）。書かないと、次のコミットで実行ファイルと `_internal` がまるごと履歴に
-入る。入ってしまうと、消すには履歴を書き換えるしかない。
+配った振り分けの sh と組み立ての置き場は、配布先の `.gitignore` にも足す（配布先が git の
+リポジトリのときだけ）。書かないと、次のコミットで実行ファイルと `_internal` がまるごと履歴に
+入る。入ってしまうと、消すには履歴を書き換えるしかない。置き場は配った機械のぶんだけ足し、
+別の機械で打ち直せばその機械のぶんが足される。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
-/.claude/ccnavi/ccnavi
-/.claude/ccnavi/ccnavi.exe
-/.claude/ccnavi/_internal/
+/.ccnavi/bin/ccnavi
+/.ccnavi/bin/darwin-arm64/
 ```
 
-置き場ごと無視はしない。`--bin` の綴りによっては、実行ファイルの置き場が `rules.yml` と
+置き場ごと無視はしない。`--bin` の綴りによっては、振り分けの sh の置き場が `rules.yml` と
 同じディレクトリになる。そこを丸ごと無視すると、そのプロジェクトが何を止めるかまで
-git から消える。`.exe` の付く綴りと付かない綴りを両方書くのは、同じリポジトリを
-3 つの環境で開くため。
+git から消える。`--bin` に `.exe` は付けない（付けると終了コード 2）。指すのは sh で、
+`.exe` が付くのは隣の実行ファイルの側。
 
 配布先に既にあるものは触らない。並べて見せるだけで、入れ替えるのは `--force` を
 付けたときだけ。ルールもゲートの sh も、入れた先で直されている前提のもので、黙って
@@ -374,6 +392,29 @@ PyInstaller の同梱物は名前で引かれるので、前の版が残ると�
 配るのを諦めた理由を 1 行出して、`.claude/settings.json` は書く。名指ししていない配布元が
 空なのは打った人の誤りではないし、ここで断ると、組み立てていない機械では設定すら
 書けなくなる。
+
+#### 前の置き場（`.claude/ccnavi/ccnavi`）から移る
+
+前の版の導入スクリプトは、実行ファイルを `.claude/ccnavi/` に直に置き、`CCNAVI_BIN_PATH` を
+`.claude/ccnavi/ccnavi` と書いていた。今の導入スクリプトを打ち直せば、次の順で移る。
+
+1. 新しい置き場（`.ccnavi/bin/`）に振り分けの sh と、この機械で動く実行ファイルを配る
+2. `CCNAVI_BIN_PATH` が前の綴りのままなら `.ccnavi/bin/ccnavi` へ書き換える。既にある env を
+   書き換えるのはここだけで、書かれているのが導入スクリプト自身の前の綴りだから
+3. 前の置き場の `ccnavi`・`ccnavi.exe`・`_internal/` を消す。同じディレクトリの `rules.yml` と
+   `risk.yml` には触らない
+
+2 と 3 は、新しい置き場で hook が起動できる（sh とこの機械の実行ファイルが揃う）ときだけ行う。
+`--no-deploy` や、別の機械向けの組み立てしか配れなかった回は、どちらもせずに理由を出す。
+`--bin` を名指しした回は 2 をしない（名指しの値で置き換えるのは、これまでどおり `--force`）。
+
+3 はもう 1 つ条件がある。導入スクリプトを打ったセッションの `CCNAVI_BIN_PATH` がまだ前の綴りなら
+消さない。env はセッションを開き直すまで変わらないので、消した瞬間からそのセッションの hook は
+何も起動しなくなる。そのときは「開き直してから打ち直す」と出る。端末から打った場合はこの条件に
+当たらないので、消したあとに開いているセッションを開き直す。Windows で使用中のファイルが
+消せなかったときは、並べて先へ進む。`.gitignore` に前の綴りの行が残るが、害は無いので触らない。
+
+`--check` は、消すものを「前の置き場から消す」として並べ、終了コード 1 を返す。
 
 #### 既存のワークスペースを移行する
 
@@ -947,6 +988,7 @@ undo: git clean -f -- ".claude/ccnavi/probe.json"
 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml`（自身の層の 3 本） | 同上 | ツール実行前 |
 | `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml`（各プロジェクトの層の 3 本） | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル | 判定器の実体 | セッション開始 |
+| それが振り分けの sh なら、隣の `<os>-<arch>/` にあるこの機械の実行ファイル | 同上。hook が実際に走らせるもの | セッション開始 |
 
 上のうち git が追跡しているものは、その切り元から切った作業ツリーが持つ同じファイル（作業ツリー側の設定）も対象に入る。
 作業ツリー側の設定は今この瞬間には誰にも読まれないが、ブランチを統合すればそのまま hook の登録と設定になる。実行前の `deny` は
@@ -1006,7 +1048,8 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 シェルで、`RM` が通る保証は無い。
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。`CCNAVI_BIN_PATH` を指定して
-いればそのパスを書く呼び出しは拒否され、層の傘の下（`*/.ccnavi/*`）も同じく拒否される。
+いればそのパスと、同じ親の下の `<os>-<arch>/` の中を書く呼び出しは拒否され、層の傘の下（`*/.ccnavi/*`）も
+同じく拒否される。
 どちらもルールファイルの外に置くのは、置き場が設定で動くことと、そのプロジェクトのルール自身に
 任せると書けた瞬間に緩められるため。共通層の 3 本を名指しのツールから守るぶんは、今もルールの
 1 行に任せてある（そこは `deny` を 1 行書けば済み、書いたことが読める場所に残る）。
@@ -1074,7 +1117,7 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 - チケット作業: 大きな修正（設計に触れる、複数のフェーズに分かれる、人のレビューが要る）は、
   wip/tickets/ に提案を書いて承認を受け、フェーズ（.claude/ccnavi/phases.yml）と
   リスクの配点（.claude/ccnavi/risk.yml）に従って issue とマージリクエストを作りながら進める。
-  操作は sh .claude/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。
+  操作は sh .ccnavi/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。
 どちらで進めるか迷ったら、利用者に聞く。
 （現状: CCNAVI_MODE=dry-run。deny判定でも止めずに言うだけ）
 ```
@@ -1090,9 +1133,9 @@ phases.yml と risk.yml は在るときだけ、解決後の綴りで載る。�
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
 | `todo/` | 未着手 | 親が書く。作成と編集は自由 |
-| `doing/` | 作業中 | `sh .claude/scripts/ccnavi-ticket.sh start <識別子>` |
-| `done/` | 完了 | `sh .claude/scripts/ccnavi-ticket.sh done <識別子>` |
-| `cancelled/` | 取り消し | `sh .claude/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>` |
+| `doing/` | 作業中 | `sh .ccnavi/scripts/ccnavi-ticket.sh start <識別子>` |
+| `done/` | 完了 | `sh .ccnavi/scripts/ccnavi-ticket.sh done <識別子>` |
+| `cancelled/` | 取り消し | `sh .ccnavi/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>` |
 
 `doing/` `done/` `cancelled/` への直接の作成・移動は、Write でもシェルでも、誰がやっても止まる
 （`builtin-ticket-state`）。動かせるのはスクリプトだけで、スクリプトはサブエージェントには
@@ -1172,13 +1215,13 @@ ccnavi --approve i0002 i0002-01   # 並べた識別子だけを束にする
 チケットごとに承認済みチケットを置く。承認後に提案を書き足しても効く範囲は変わらない。
 
 **承認済みチケットは親チケットのブランチに乗って他の機械へ届く。** 端末から打つときは
-`sh .claude/scripts/ccnavi-approve.sh` を使う。承認のあと、置き場だけをパスで限って
+`sh .ccnavi/scripts/ccnavi-approve.sh` を使う。承認のあと、置き場だけをパスで限って
 コミットし、そのブランチへ push する。A が承認して B の機械で作業し A がレビューする、
 という流れはこの push で成り立つ。承認しても push しなければ、B の機械では
 「承認されなかったこと」になる。統合先が `main` / `master` / `develop` / `release` のときは
 push せず、コミットまでで止める。そこへ直接送る判断は人のものだから。
 
-B の側はセッションの頭に `.claude/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは
+B の側はセッションの頭に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは
 fast-forward だけで、未コミットの変更があるツリーやリモートと分岐したツリーは触らず、
 理由を 1 行で言う。
 
@@ -1322,9 +1365,9 @@ feedback:                              # フィードバック計画。レビュ
 ### レビューの依頼と確認
 
 ```sh
-sh .claude/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md
-sh .claude/scripts/ccnavi-review.sh check --phase 2
-sh .claude/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
+sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md
+sh .ccnavi/scripts/ccnavi-review.sh check --phase 2
+sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 ```
 
 `request` は前提を全部確かめてから依頼コメントを投稿し、依頼の時点を印に残す。前提は、
@@ -1352,7 +1395,7 @@ ccnavi --reviewed 2 --accept-unresolved --cwd .claude/worktrees/i0050
 
 **リモートを読み書きするのは sh で、ccnavi の実行ファイルはネットワークに出ない。** 実行ファイルが
 見るのは作業ツリーの中（フェーズ・ブランチ・未コミット・push・印）だけで、マージリクエストの中身は
-`.claude/scripts/ccnavi-review.sh` が取ってきて JSON で渡す（`--result <path>`）。この JSON の形が
+`.ccnavi/scripts/ccnavi-review.sh` が取ってきて JSON で渡す（`--result <path>`）。この JSON の形が
 sh と実行ファイルの契約で、テストも同じ経路を通る。
 
 | sh の動き | 実行ファイルの段 |
@@ -1385,7 +1428,7 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 
 origin の綴りはホストのポートと scheme をそのまま使う。`http://localhost:8929/g/p.git` なら
 `http://localhost:8929/api/v4` を叩く。URL に埋めた資格情報（`https://oauth2:<token>@host/...`）は
-読み飛ばし、出力では伏せる。どう読んだかは `sh .claude/scripts/ccnavi-review.sh origin` で出る。
+読み飛ばし、出力では伏せる。どう読んだかは `sh .ccnavi/scripts/ccnavi-review.sh origin` で出る。
 
 push の認証は git の設定側に置く（Git Credential Manager に保存しておく、か `credential.helper`）。
 git ラッパは設定の注入を塞ぐために `GIT_CONFIG_COUNT` を落とし、`GIT_TERMINAL_PROMPT=0` で
@@ -1443,7 +1486,7 @@ factors:
 |---|---|---|
 | 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
 | 定量（スクリプト） | `script: <.claude/ccnavi/ か .claude/scripts/ の下>` | ccnavi が `sh` で走らせる。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は**重い側に倒し**、その項目の点を加える |
-| 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`done` が問いと差分の要約を `state/risk-judge-<子>.md` に書くので、親がそれをサブエージェントに渡し、報告を `sh .claude/scripts/ccnavi-ticket.sh judge <子> <項目> yes\|no --reason <根拠>` で記録する。判定は子の HEAD に結ぶので、HEAD が動けば取り直し |
+| 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`done` が問いと差分の要約を `state/risk-judge-<子>.md` に書くので、親がそれをサブエージェントに渡し、報告を `sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes\|no --reason <根拠>` で記録する。判定は子の HEAD に結ぶので、HEAD が動けば取り直し |
 
 閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
 （「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に、点と加点した理由が出る。
@@ -1763,7 +1806,7 @@ error 2 件、warn 2 件、info 0 件
 |---|---|
 | warn | `PostToolUse` / `SubagentStart` / `SubagentStop` に ccnavi が登録されていない |
 | warn | 登録はされているが git の作業ツリーではない（監視が何も検知しない） |
-| warn | `.claude/scripts/ccnavi-{ticket,review,git}.sh` が無い |
+| warn | `.ccnavi/scripts/ccnavi-{ticket,review,git}.sh` が無い |
 
 **チケットとフェーズ**（チケット制御が有効なときだけ）
 
@@ -1947,13 +1990,13 @@ VS Code の拡張が、承認をターミナルではなくボードのオーバ
 
 ## 生の git は止めてラッパへ寄せる
 
-`.claude/scripts/ccnavi-git.sh` は、安全な git だけを通し、出力を抑えて結果だけを返す。
+`.ccnavi/scripts/ccnavi-git.sh` は、安全な git だけを通し、出力を抑えて結果だけを返す。
 生の `git` はルールで拒否し、拒否の文面からここへ誘導する。
 
 ```sh
-sh .claude/scripts/ccnavi-git.sh status
-sh .claude/scripts/ccnavi-git.sh log -p
-sh .claude/scripts/ccnavi-git.sh --help    # 通す形と通さない形の一覧
+sh .ccnavi/scripts/ccnavi-git.sh status
+sh .ccnavi/scripts/ccnavi-git.sh log -p
+sh .ccnavi/scripts/ccnavi-git.sh --help    # 通す形と通さない形の一覧
 ```
 
 狙いは 2 つある。
@@ -1966,7 +2009,7 @@ sh .claude/scripts/ccnavi-git.sh --help    # 通す形と通さない形の一�
   書けるのは、入口を 1 本にしたここだけになる
 
 ```
-$ sh .claude/scripts/ccnavi-git.sh log -p
+$ sh .ccnavi/scripts/ccnavi-git.sh log -p
 ok  git log  56 コミット  log=logs/git-20260907-061907-23235.log
 commit 845d832e329aa533ee8e0acf3ee61ea1990c47ca
 ...
@@ -2045,15 +2088,17 @@ push はラッパが拒み、サブエージェントからの push は hook が
 | `ccnavi/gitcmd.py` | git を 1 回起こす |
 | `ccnavi/fsio.py` | ファイルの読み書きの型。控え・印・承認済みチケット・下書きが全部これを通る |
 | `build.py` | 配布物の組み立て |
+| `ccnavi/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての印と、振り分けの sh が起動する実体の探し方 |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
+| `scripts/ccnavi-launcher.sh` | 配布先で hook が起動する sh。隣の `<os>-<arch>/` から、この機械の実行ファイルを選ぶ |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
-| `.claude/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
-| `.claude/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
-| `.claude/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
-| `.claude/scripts/ccnavi-approve.sh` | 承認し、承認済みチケットをコミットして親のブランチへ push する。人が端末で打つ。本体は `ccnavi --approve` |
-| `.claude/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチを取ってきて承認済みチケットを新しくする。進めるのは fast-forward だけ |
-| `.claude/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | 作業ツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。配らない |
+| `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパ |
+| `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
+| `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
+| `.ccnavi/scripts/ccnavi-approve.sh` | 承認し、承認済みチケットをコミットして親のブランチへ push する。人が端末で打つ。本体は `ccnavi --approve` |
+| `.ccnavi/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチを取ってきて承認済みチケットを新しくする。進めるのは fast-forward だけ |
+| `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | 作業ツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |

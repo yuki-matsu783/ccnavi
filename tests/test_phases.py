@@ -790,8 +790,8 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("端末", result.stderr)
         for command in (
-            "sh .claude/scripts/ccnavi-review.sh wrapup --reason x",
-            "sh .claude/scripts/ccnavi-review.sh ready",
+            "sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason x",
+            "sh .ccnavi/scripts/ccnavi-review.sh ready",
         ):
             payload = {
                 "hook_event_name": "PreToolUse",

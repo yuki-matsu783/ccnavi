@@ -5,7 +5,7 @@
 #   sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 #
 #   --mode <enable|dry-run>  CCNAVI_MODE。既定は dry-run
-#   --bin <相対パス>         CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
+#   --bin <相対パス>         CCNAVI_BIN_PATH。既定は .ccnavi/bin/ccnavi
 #   --ticket-control <enable|disable>
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
@@ -38,6 +38,15 @@
 # 諦めて理由を 1 行出し、settings.json は書く。名指しされた `--deploy` が使えない
 # ときだけ 2 で断る。人が名指ししたものが無いのは、環境の誤りとして扱う。
 #
+# 実行ファイルは機械ごとのディレクトリに分けて置く（.ccnavi/bin/<os>-<arch>/）。
+# CCNAVI_BIN_PATH が指すのはその 1 つ上の振り分けの sh で、hook が起動した機械に
+# 合うものを sh が選ぶ。settings.json は Windows・WSL・Linux・macOS で同じものを開くので、
+# 1 行の command から機械ごとに違う実体を起動するには、ここで選ぶしかない。
+#
+# 前の置き場（.claude/ccnavi/ の実行ファイルと _internal）は、新しい置き場にこの機械で
+# 動くものが揃ってから消す。CCNAVI_BIN_PATH が前の既定の綴りのままなら、新しい綴りへ
+# 書き換える。
+#
 # 配布先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルもゲートの sh も、入れた先で直されている前提のもの。黙って上書き
 # すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配布元の形へ戻す。
@@ -67,14 +76,21 @@ EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart 
 DEFAULT_MODE="dry-run"
 # 配布先での既定の置き場。配布元の dist/ は組み立ての出力で、.gitignore に
 # 入っている場所。配られた側にとっては、そこは「自分が組み立てた物の置き場」
-# ではなく、ccnavi が入っている場所。.claude/ の下に置けば、rules.yml や
-# ゲートの sh と同じ並びに収まる。
-DEFAULT_BIN=".claude/ccnavi/ccnavi"
+# ではなく、ccnavi が入っている場所。層の傘（.ccnavi/）の下に置けば、ゲートの sh と
+# 同じ並びに収まり、傘を守るルールがそのまま実行ファイルにも効く。
+#
+# 指すのは振り分けの sh。実体はその隣の `<os>-<arch>/` に入る。
+DEFAULT_BIN=".ccnavi/bin/ccnavi"
+# 前の既定の置き場。ここに残った実行ファイルは、新しい置き場が揃ってから消す。
+# 同じディレクトリに rules.yml と risk.yml があるので、消すのは名前を決め打ちした 3 つだけ。
+OLD_BIN_DIR=".claude/ccnavi"
+OLD_BIN_PARTS="ccnavi ccnavi.exe _internal"
 
 # 配るもの。配布元での置き場は build.py の出力（dist/ccnavi）と、ccnavi の
 # リポジトリの .claude/ の形に決め打ちで対応する。配布先の綴りは --bin に
-# 従うので、実行ファイルだけは行き先が動く。
+# 従うので、実行ファイルと振り分けの sh だけは行き先が動く。
 DEPLOY_BIN_DIR="dist/ccnavi"
+DEPLOY_LAUNCHER="scripts/ccnavi-launcher.sh"
 # どの機械向けに組み立てたかの印。build.py が `<os>-<arch>` の 1 行で書く。
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へ写すことはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
@@ -85,7 +101,7 @@ DEPLOY_RULES=".claude/ccnavi/rules.yml"
 # projects/ の下のプロジェクトにも効いてしまう（設計 §25.12）。
 DEPLOY_RISK=".claude/ccnavi/risk.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
-DEPLOY_SCRIPT_DIR=".claude/scripts"
+DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
 # 起動時に落ちる。
 DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh"
@@ -122,7 +138,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 
   <ワークスペースルート>      既定は現在の作業ディレクトリ
   --mode <enable|dry-run>   CCNAVI_MODE。既定は dry-run
-  --bin <相対パス>          CCNAVI_BIN_PATH。既定は .claude/ccnavi/ccnavi
+  --bin <相対パス>          CCNAVI_BIN_PATH。既定は .ccnavi/bin/ccnavi。ここに振り分けの sh を、
+                            隣の <os>-<arch>/ に実行ファイルを置く
   --ticket-control <enable|disable>
                             CCNAVI_TICKET_CONTROL。チケット制御（提案・承認・フェーズ）を
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
@@ -134,9 +151,10 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
 
-実行ファイル・設定 3 本（.claude/ccnavi/rules.yml、.claude/ccnavi/risk.yml、
+実行ファイル・振り分けの sh・設定 3 本（.claude/ccnavi/rules.yml、.claude/ccnavi/risk.yml、
 .ccnavi/config/phases.yml）・ゲートの sh は、既定で ccnavi の根から配る。配った
-実行ファイルと _internal は、配布先の .gitignore に足す。
+振り分けの sh と実行ファイルの置き場は、配布先の .gitignore に足す。前の置き場
+（.claude/ccnavi/ の実行ファイル）は、新しい置き場が揃ってから消す。
 USAGE
 }
 
@@ -255,6 +273,13 @@ case "/$(printf '%s' "$bin" | tr '\\' '/')/" in
 	die "--bin に .. を含められません。ワークスペースルートの外にある実行ファイルは、ここからは指せません。"
 	;;
 esac
+# 指すのは振り分けの sh で、.exe を付けるのは隣に置く実行ファイルの側。付けたまま
+# 配ると、sh を .exe の名前で置くことになり、Windows ではそれを起動しようとして落ちる。
+case "$bin" in
+*.exe | *.EXE)
+	die "--bin に .exe を付けないでください。指すのは振り分けの sh で、実行ファイルはその隣の <os>-<arch>/ に置きます。"
+	;;
+esac
 
 command -v jq >/dev/null 2>&1 || die "jq が要ります。"
 
@@ -315,16 +340,19 @@ if [ -n "$deploy" ] && [ ! -d "$source_root/$DEPLOY_BIN_DIR" ]; then
 	source_root=""
 fi
 
-# 実行ファイルがこの機械で動くか。PyInstaller の実行ファイルは組み立てた機械の
-# OS と CPU でしか動かない。Windows の .exe を WSL へ、macOS 向けを Linux へ配っても
-# ファイルは在るので、ここで見ないと hook が起動できないまま黙って死ぬ。
+# 実行ファイルをどの機械向けの置き場へ入れるか。PyInstaller の実行ファイルは組み立てた
+# 機械の OS と CPU でしか動かないので、配布先では `<os>-<arch>` のディレクトリに分けて
+# 並べ、hook が起動する振り分けの sh（scripts/ccnavi-launcher.sh）が起動の時に選ぶ。
+# 置き場の名前は build.py が dist/ccnavi.target に書いた印から取る。
 #
-# 前提は、これを打つ機械が Claude Code を動かす機械と同じであること。Windows と
-# WSL で同じフォルダを開く使い方では、打った側の OS で判定する。
+# 別の機械向けの組み立てでも配る。そのディレクトリに入るだけで、この機械の実行ファイルを
+# 上書きしないから。Windows と WSL で同じフォルダを開くなら、両方の組み立てを並べて
+# 置ける。この機械で動くものが揃っていないことは、1 行と、最後の「まだ無いもの」で言う。
 #
+# 印が無い（古い build.py で組んだ）か読めない配布元からは、実行ファイルの置き場を
+# 決められない。推測で置くと、別の機械向けをこの機械のディレクトリへ入れうる。
 # 断り方は上の「組み立てていない」と揃える。名指しの --deploy なら 2、既定の
-# 配布元なら配るのを諦めて理由を出す。印が無い（古い build.py で組んだ）か、
-# この機械を読めないときは、確かめていないことを 1 行出して配る。
+# 配布元なら配るのを諦めて理由を出す。
 host_target() {
 	# 語は build.py の build_target と揃える。
 	case "$(uname -s 2>/dev/null)" in
@@ -341,40 +369,215 @@ host_target() {
 	printf '%s-%s' "$host_os" "$host_arch"
 }
 
-runs_here() {
-	# $1 印の値 / $2 この機械。arm64 の macOS と Windows は x86_64 の実行ファイルを
-	# 変換して動かす（Rosetta 2 / Windows on Arm）ので通す。
-	[ "$1" = "$2" ] && return 0
-	case "$2" in
-	darwin-arm64) [ "$1" = darwin-x86_64 ] ;;
-	windows-arm64) [ "$1" = windows-x86_64 ] ;;
-	*) return 1 ;;
+runnable_targets() {
+	# $1 この機械。この機械で動く組み立ての語を、先に選ぶ順に空白で並べる。
+	# arm64 の macOS と Windows は x86_64 の実行ファイルを変換して動かす（Rosetta 2 /
+	# Windows on Arm）。語と順は scripts/ccnavi-launcher.sh と ccnavi/platformtag.py と揃える。
+	case "$1" in
+	darwin-arm64) printf '%s' "$1 darwin-x86_64" ;;
+	windows-arm64) printf '%s' "$1 windows-x86_64" ;;
+	*) printf '%s' "$1" ;;
 	esac
 }
 
+runs_here() {
+	# $1 印の値 / $2 runnable_targets の並び
+	case " $2 " in
+	*" $1 "*) return 0 ;;
+	esac
+	return 1
+}
+
+host=$(host_target)
+runnable=$(runnable_targets "$host")
+built=""
 deploy_target_note=""
 if [ -n "$deploy" ]; then
-	host=$(host_target)
-	built=""
 	if [ -f "$source_root/$DEPLOY_TARGET_FILE" ]; then
 		built=$(head -n 1 "$source_root/$DEPLOY_TARGET_FILE" | tr -d '\r')
 	fi
-	case "$host" in
-	unknown-* | *-unknown)
-		deploy_target_note="この機械の OS か CPU を読めない（${host}）ので、実行ファイルがこの機械で動くかを確かめていません。"
+	# 印はそのままディレクトリ名になる。区切りや `..` を含む値で、置き場の外へ書かせない。
+	case "$built" in
+	'' | *[!a-z0-9_-]* | -* | *-) built_ok=no ;;
+	*-*) built_ok=yes ;;
+	*) built_ok=no ;;
+	esac
+	if [ "$built_ok" = no ]; then
+		[ "$deploy_given" = no ] ||
+			die "$source_root/$DEPLOY_TARGET_FILE が無いか読めないので、実行ファイルをどの機械向けの置き場に入れるかを決められません。配布元で 'uv run --with pyinstaller python build.py' を回し直してください。"
+		deploy_skipped="$source_root/$DEPLOY_TARGET_FILE が無いか読めないので配っていません（配布元で 'uv run --with pyinstaller python build.py' を回し直すと書かれます）。"
+		deploy=""
+		source_root=""
+		built=""
+	else
+		case "$host" in
+		unknown-* | *-unknown)
+			deploy_target_note="この機械の OS か CPU を読めない（${host}）ので、${built} 向けの実行ファイルがこの機械で動くかを確かめていません。"
+			;;
+		*)
+			if ! runs_here "$built" "$runnable"; then
+				deploy_target_note="配布元の実行ファイルは ${built} 向けで、この機械（${host}）では動きません。${built} の置き場へ入れます。"
+			fi
+			;;
+		esac
+	fi
+fi
+
+# 配るものを決める。配布先に既にあるものは触らない。入れ替えるのは --force の
+# ときだけで、そのときも配布元に在るものだけを動かす。
+#
+# 「配布元に無い」を黙って飛ばさない。ルールファイルやゲートの sh が欠けた
+# 配布元から配ると、判定するものだけが入って何を止めるかが入らない。その形は
+# 最後の「まだ無いもの」にしか出ず、配った側の落ち度に見えない。
+#
+# 設定を書くより前に決める。CCNAVI_BIN_PATH を前の置き場から移してよいかが、
+# 新しい置き場に何が揃うかで決まるから。
+deploy_new=""
+deploy_replacing=""
+deploy_kept=""
+deploy_absent=""
+build_dir_rel=""
+bin_verdict=""
+launcher_verdict=""
+rules_verdict=""
+risk_verdict=""
+phases_verdict=""
+scripts_todo=""
+
+# 配布元に在るか、配布先に在るか、--force か。この 3 つだけで決まる。
+verdict() {
+	# $1 配布元の絶対パス / $2 配布先に既にあるか（yes/no）
+	if [ ! -e "$1" ]; then
+		printf 'absent'
+	elif [ "$2" = no ]; then
+		printf 'copy'
+	elif [ "$force" = yes ]; then
+		printf 'replace'
+	else
+		printf 'keep'
+	fi
+}
+
+note_deploy() {
+	# $1 verdict / $2 配布先の綴り / $3 配布元の綴り
+	case "$1" in
+	copy)
+		deploy_new="$deploy_new$2
+"
 		;;
-	*)
-		if [ -z "$built" ]; then
-			deploy_target_note="$source_root/$DEPLOY_TARGET_FILE が無いので、実行ファイルがこの機械（${host}）向けかを確かめていません。配布元で 'uv run --with pyinstaller python build.py' を回し直すと書かれます。"
-		elif ! runs_here "$built" "$host"; then
-			[ "$deploy_given" = no ] ||
-				die "$source_root/$DEPLOY_BIN_DIR は ${built} 向けで、この機械（${host}）では動きません。この機械で build.py を回した配布元を名指ししてください。"
-			deploy_skipped="$source_root/$DEPLOY_BIN_DIR は ${built} 向けで、この機械（${host}）では動かないので配っていません（この機械で 'uv run --with pyinstaller python build.py' を回すと作り直せます）。"
-			deploy=""
-			source_root=""
-		fi
+	replace)
+		deploy_replacing="$deploy_replacing$2
+"
+		;;
+	keep)
+		deploy_kept="$deploy_kept$2
+"
+		;;
+	absent)
+		deploy_absent="$deploy_absent$2（配布元の $3 にありません）
+"
 		;;
 	esac
+}
+
+# 振り分けの sh の行き先も、組み立ての置き場も --bin が決める。CCNAVI_BIN_PATH に
+# 書く綴りと、実体を置く場所を 1 つの値から出す。ここが割れると、設定は書けているのに
+# hook がどこにも無いものを起動する形になる。
+bin_dir_rel=$(dirname "$bin")
+if [ -n "$deploy" ]; then
+	case "$bin_dir_rel" in
+	.) build_dir_rel="$built" ;;
+	*) build_dir_rel="$bin_dir_rel/$built" ;;
+	esac
+	# 在るかどうかは 2 つの綴りで見る。PyInstaller が Windows でだけ .exe を付ける。
+	if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
+		bin_there=yes
+	else
+		bin_there=no
+	fi
+	bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$bin_there")
+	note_deploy "$bin_verdict" "$build_dir_rel" "$DEPLOY_BIN_DIR"
+
+	if [ -f "$root/$bin" ]; then
+		launcher_there=yes
+	else
+		launcher_there=no
+	fi
+	launcher_verdict=$(verdict "$source_root/$DEPLOY_LAUNCHER" "$launcher_there")
+	note_deploy "$launcher_verdict" "$bin" "$DEPLOY_LAUNCHER"
+
+	if [ -e "$root/$DEPLOY_RULES" ]; then
+		rules_there=yes
+	else
+		rules_there=no
+	fi
+	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
+	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
+
+	if [ -e "$root/$DEPLOY_RISK" ]; then
+		risk_there=yes
+	else
+		risk_there=no
+	fi
+	risk_verdict=$(verdict "$source_root/$DEPLOY_RISK" "$risk_there")
+	note_deploy "$risk_verdict" "$DEPLOY_RISK" "$DEPLOY_RISK"
+
+	if [ -e "$root/$DEPLOY_PHASES" ]; then
+		phases_there=yes
+	else
+		phases_there=no
+	fi
+	phases_verdict=$(verdict "$source_root/$DEPLOY_PHASES" "$phases_there")
+	note_deploy "$phases_verdict" "$DEPLOY_PHASES" "$DEPLOY_PHASES"
+
+	for name in $DEPLOY_SCRIPTS; do
+		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
+			script_there=yes
+		else
+			script_there=no
+		fi
+		script_verdict=$(verdict "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$script_there")
+		note_deploy "$script_verdict" "$DEPLOY_SCRIPT_DIR/$name" "$DEPLOY_SCRIPT_DIR/$name"
+		case "$script_verdict" in
+		copy | replace)
+			scripts_todo="$scripts_todo $name"
+			;;
+		esac
+	done
+fi
+
+# この機械で動く実行ファイルが、振り分けの sh の隣に在るか。sh と同じ順で探す。
+runnable_there() {
+	for runnable_target in $runnable; do
+		for runnable_name in ccnavi ccnavi.exe; do
+			if [ -f "$root/$bin_dir_rel/$runnable_target/$runnable_name" ]; then
+				return 0
+			fi
+		done
+	done
+	return 1
+}
+
+# 配り終えたあと、新しい置き場で hook が起動できるか。振り分けの sh と、この機械で
+# 動く実行ファイルの両方が要る。前の置き場から移すかどうかは、これだけで決める。
+launcher_ready=no
+if [ -f "$root/$bin" ]; then
+	launcher_ready=yes
+fi
+case "$launcher_verdict" in
+copy | replace) launcher_ready=yes ;;
+esac
+exe_ready=no
+if runnable_there; then
+	exe_ready=yes
+elif [ -n "$built" ] && runs_here "$built" "$runnable"; then
+	case "$bin_verdict" in
+	copy | replace) exe_ready=yes ;;
+	esac
+fi
+new_ready=no
+if [ "$launcher_ready" = yes ] && [ "$exe_ready" = yes ]; then
+	new_ready=yes
 fi
 
 # 書けない形を、jq を回す前に見つける。あとで mkdir が失敗すると、終了コードが
@@ -467,7 +670,31 @@ fi
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# --force が置き換えてよいキー。人がこの実行で名指しした 3 つだけ。
+# 前の置き場からの移し替え。CCNAVI_BIN_PATH が前の既定の綴りのままなら、新しい既定へ
+# 書き換える。「既にある env は触らない」の例外はここだけで、書かれているのが
+# このスクリプト自身が前に書いた綴りだから。
+#
+# 移すのは、新しい置き場で hook が起動できるときだけ。揃わないまま移すと、前の置き場を
+# 残していても hook は何も起動しなくなる。--bin を名指ししたときは移さない。人が決めた
+# 綴りへ置き換えるのは、これまでどおり --force の仕事。
+is_old_bin() {
+	case "$1" in
+	"$OLD_BIN_DIR/ccnavi" | "$OLD_BIN_DIR/ccnavi.exe") return 0 ;;
+	esac
+	return 1
+}
+current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_BIN_PATH // "" | if type == "string" then . else "" end')
+migrate=no
+migrate_blocked=""
+if [ "$bin_given" = no ] && is_old_bin "$current_bin" && ! is_old_bin "$bin"; then
+	if [ "$new_ready" = yes ]; then
+		migrate=yes
+	else
+		migrate_blocked="CCNAVI_BIN_PATH は前の置き場（${current_bin}）を指したままです。${bin} とその隣にこの機械で動く実行ファイルが揃わないので、移していません。"
+	fi
+fi
+
+# --force が置き換えてよいキー。人がこの実行で名指しした 3 つと、前の置き場からの移し替え。
 forced=""
 if [ "$force" = yes ]; then
 	if [ "$mode_given" = yes ]; then
@@ -478,6 +705,47 @@ if [ "$force" = yes ]; then
 	fi
 	if [ "$ticket_control_given" = yes ]; then
 		forced="$forced CCNAVI_TICKET_CONTROL"
+	fi
+fi
+if [ "$migrate" = yes ]; then
+	forced="$forced CCNAVI_BIN_PATH"
+fi
+
+# 前の置き場（.claude/ccnavi/ の実行ファイルと同梱物）を片付けるか。
+#
+# 消すのは、書き終えたあとの CCNAVI_BIN_PATH がもうそこを指さず、新しい置き場で hook が
+# 起動できるときだけ。加えて、このスクリプトを打ったセッションの hook がまだ前の置き場を
+# 起動しているなら消さない。env はセッションを開き直すまで変わらないので、消した瞬間から
+# そのセッションの hook は何も起動しなくなり、守りが黙って消える。
+#
+# --bin が前の置き場そのもの（.claude/ccnavi/）なら何もしない。そこの ccnavi は振り分けの sh。
+bin_after="$bin"
+if [ -n "$current_bin" ]; then
+	case " $forced " in
+	*" CCNAVI_BIN_PATH "*) ;;
+	*) bin_after="$current_bin" ;;
+	esac
+fi
+old_todo=""
+old_note=""
+if [ "$(printf '%s' "$bin_dir_rel" | tr '\\' '/')" != "$OLD_BIN_DIR" ]; then
+	old_found=""
+	for name in $OLD_BIN_PARTS; do
+		if [ -e "$root/$OLD_BIN_DIR/$name" ]; then
+			old_found="$old_found$OLD_BIN_DIR/$name
+"
+		fi
+	done
+	if [ -n "$old_found" ] && [ -z "$migrate_blocked" ]; then
+		if is_old_bin "$bin_after"; then
+			old_note="前の置き場（${OLD_BIN_DIR}/）に実行ファイルが残っています。CCNAVI_BIN_PATH がまだそこを指しているので消していません。"
+		elif [ "$new_ready" = no ]; then
+			old_note="前の置き場（${OLD_BIN_DIR}/）に実行ファイルが残っています。${bin} の隣にこの機械で動く実行ファイルが揃うまで消しません。"
+		elif is_old_bin "${CCNAVI_BIN_PATH:-}"; then
+			old_note="前の置き場（${OLD_BIN_DIR}/）に実行ファイルが残っています。このセッションの hook はまだそこを起動しているので消していません。セッションを開き直してから打ち直すと消します。"
+		else
+			old_todo="$old_found"
+		fi
 	fi
 fi
 forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
@@ -528,125 +796,16 @@ other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --a
 	| select(\$root | looks(\$ev)) | \$ev
 ")
 
-# 配るものを決める。配布先に既にあるものは触らない。入れ替えるのは --force の
-# ときだけで、そのときも配布元に在るものだけを動かす。
-#
-# 「配布元に無い」を黙って飛ばさない。ルールファイルやゲートの sh が欠けた
-# 配布元から配ると、判定するものだけが入って何を止めるかが入らない。その形は
-# 最後の「まだ無いもの」にしか出ず、配った側の落ち度に見えない。
-deploy_new=""
-deploy_replacing=""
-deploy_kept=""
-deploy_absent=""
-bin_dir_rel=""
-bin_verdict=""
-rules_verdict=""
-risk_verdict=""
-phases_verdict=""
-scripts_todo=""
-
-# 配布元に在るか、配布先に在るか、--force か。この 3 つだけで決まる。
-verdict() {
-	# $1 配布元の絶対パス / $2 配布先に既にあるか（yes/no）
-	if [ ! -e "$1" ]; then
-		printf 'absent'
-	elif [ "$2" = no ]; then
-		printf 'copy'
-	elif [ "$force" = yes ]; then
-		printf 'replace'
-	else
-		printf 'keep'
-	fi
-}
-
-note_deploy() {
-	# $1 verdict / $2 配布先の綴り / $3 配布元の綴り
-	case "$1" in
-	copy)
-		deploy_new="$deploy_new$2
-"
-		;;
-	replace)
-		deploy_replacing="$deploy_replacing$2
-"
-		;;
-	keep)
-		deploy_kept="$deploy_kept$2
-"
-		;;
-	absent)
-		deploy_absent="$deploy_absent$2（配布元の $3 にありません）
-"
-		;;
-	esac
-}
-
-if [ -n "$deploy" ]; then
-	# 実行ファイルの行き先は --bin が決める。CCNAVI_BIN_PATH に書く綴りと、
-	# 実体を置く場所を 1 つの値から出す。ここが割れると、設定は書けているのに
-	# hook がどこにも無いものを起動する形になる。
-	bin_dir_rel=$(dirname "$bin")
-	# 在るかどうかは 2 つの綴りで見る。PyInstaller が Windows でだけ .exe を
-	# 付けるので、同じ設定が環境によって違うファイル名に当たる。
-	if [ -f "$root/$bin" ] || [ -f "$root/$bin.exe" ]; then
-		bin_there=yes
-	else
-		bin_there=no
-	fi
-	bin_verdict=$(verdict "$source_root/$DEPLOY_BIN_DIR" "$bin_there")
-	note_deploy "$bin_verdict" "$bin_dir_rel" "$DEPLOY_BIN_DIR"
-
-	if [ -e "$root/$DEPLOY_RULES" ]; then
-		rules_there=yes
-	else
-		rules_there=no
-	fi
-	rules_verdict=$(verdict "$source_root/$DEPLOY_RULES" "$rules_there")
-	note_deploy "$rules_verdict" "$DEPLOY_RULES" "$DEPLOY_RULES"
-
-	if [ -e "$root/$DEPLOY_RISK" ]; then
-		risk_there=yes
-	else
-		risk_there=no
-	fi
-	risk_verdict=$(verdict "$source_root/$DEPLOY_RISK" "$risk_there")
-	note_deploy "$risk_verdict" "$DEPLOY_RISK" "$DEPLOY_RISK"
-
-	if [ -e "$root/$DEPLOY_PHASES" ]; then
-		phases_there=yes
-	else
-		phases_there=no
-	fi
-	phases_verdict=$(verdict "$source_root/$DEPLOY_PHASES" "$phases_there")
-	note_deploy "$phases_verdict" "$DEPLOY_PHASES" "$DEPLOY_PHASES"
-
-	for name in $DEPLOY_SCRIPTS; do
-		if [ -e "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
-			script_there=yes
-		else
-			script_there=no
-		fi
-		script_verdict=$(verdict "$source_root/$DEPLOY_SCRIPT_DIR/$name" "$script_there")
-		note_deploy "$script_verdict" "$DEPLOY_SCRIPT_DIR/$name" "$DEPLOY_SCRIPT_DIR/$name"
-		case "$script_verdict" in
-		copy | replace)
-			scripts_todo="$scripts_todo $name"
-			;;
-		esac
-	done
-fi
-
 # 配った実行ファイルを git に入れない。配布先は git で持ち回るのが普通なので、
 # .gitignore に無いと、次のコミットで実行ファイルと _internal がまるごと履歴に
 # 入る。入ってしまうと、消すには履歴を書き換えるしかない。
 #
-# 置き場ごと無視はしない。--bin の綴りによっては、実行ファイルの置き場が
+# 置き場ごと無視はしない。--bin の綴りによっては、振り分けの sh の置き場が
 # rules.yml と同じディレクトリ（.claude/ccnavi）になる。そこを丸ごと無視すると、
 # そのプロジェクトが何を止めるかまで git から消える。
 #
-# 綴りは 3 つ。実行ファイルの 2 つの名前（PyInstaller が Windows でだけ .exe を
-# 付ける）と、同梱物の _internal。同じリポジトリを 3 つの環境で開くので、
-# 打った機械に在るほうだけでなく両方を書く。
+# 綴りは 2 つ。振り分けの sh と、配った組み立ての置き場（`<os>-<arch>/`）。置き場は
+# 配った機械のぶんだけ足す。別の機械で打ち直せば、その機械のぶんが足される。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 ignore_todo=""
 ignore_kept=""
@@ -658,13 +817,6 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 	. | "") ignore_prefix="/" ;;
 	*) ignore_prefix="/$ignore_dir/" ;;
 	esac
-	ignore_name=$(basename "$bin")
-	# `--bin` に .exe まで書かれていたら、足すのはその 1 つだけ。
-	case "$ignore_name" in
-	*.exe) ignore_names="$ignore_name" ;;
-	*) ignore_names="$ignore_name $ignore_name.exe" ;;
-	esac
-
 	note_ignore() {
 		if [ -f "$root/.gitignore" ] && grep -qxF "$1" "$root/.gitignore"; then
 			ignore_kept="$ignore_kept$1
@@ -674,10 +826,8 @@ if [ -n "$deploy" ] && [ -e "$root/.git" ]; then
 "
 		fi
 	}
-	for ignore_name in $ignore_names; do
-		note_ignore "$ignore_prefix$ignore_name"
-	done
-	note_ignore "${ignore_prefix}_internal/"
+	note_ignore "$ignore_prefix$(basename "$bin")"
+	note_ignore "$ignore_prefix$built/"
 fi
 
 copy_tree() {
@@ -806,6 +956,20 @@ report_deploy() {
 		printf '%s:\n' "$3"
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
 	fi
+	if [ -n "$old_todo" ]; then
+		printf '%s:\n' "$4"
+		printf '%s' "$old_todo" | sed 's/^/  /'
+	fi
+	if [ -n "$old_failed" ]; then
+		printf '前の置き場から消せなかったもの（使っているセッションがあるかもしれません。閉じてから打ち直してください）:\n'
+		printf '%s' "$old_failed" | sed 's/^/  /'
+	fi
+	if [ -n "$migrate_blocked" ]; then
+		printf '%s\n' "$migrate_blocked"
+	fi
+	if [ -n "$old_note" ]; then
+		printf '%s\n' "$old_note"
+	fi
 	if [ -n "$deploy_skipped" ]; then
 		printf '%s\n' "$deploy_skipped"
 	fi
@@ -814,8 +978,10 @@ report_deploy() {
 	fi
 }
 
+old_failed=""
+
 report_deploy_plan() {
-	report_deploy '配る' '入れ替える' '.gitignore に足す'
+	report_deploy '配る' '入れ替える' '.gitignore に足す' '前の置き場から消す'
 }
 
 # 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
@@ -833,6 +999,11 @@ fi
 # 履歴に入る。
 if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ] ||
 	[ -n "$ignore_todo" ]; then
+	settled=no
+fi
+# 前の置き場が片付いていないのも数える。残っている理由が何であれ、人かこのスクリプトが
+# もう 1 度手を動かすまで、2 つの置き場が並んだまま。
+if [ -n "$old_todo" ] || [ -n "$old_note" ] || [ -n "$migrate_blocked" ]; then
 	settled=no
 fi
 
@@ -868,7 +1039,13 @@ fi
 
 printf '%s\n' "$settings"
 
-if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no ]; then
+old_work=no
+if [ -n "$old_todo" ]; then
+	old_work=yes
+fi
+
+if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no ] &&
+	[ "$old_work" = no ]; then
 	printf '書き足すものはありません。\n'
 	report_missing
 	report_deploy_plan
@@ -975,21 +1152,27 @@ if [ "$vscode_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
 fi
 
-# 配る。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズの種類）→
-# ゲートの sh。途中で落ちたときに、判定するものだけが在って何を止めるかが無い、
-# という形にしないため。
+# 配る。順は実行ファイル → 振り分けの sh → 設定 3 本（ルール・リスクの配点・
+# フェーズの種類）→ ゲートの sh。途中で落ちたときに、判定するものだけが在って
+# 何を止めるかが無い、という形にしないため。
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
 	copy | replace)
-		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$bin_dir_rel"
+		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"
 		# 実行の許しを付け直す。cp は元のモードを umask で削って写すので、
 		# 配布元の側の置き方によってはここが落ちる。落ちていると hook は
 		# 「実行ファイルが無い」ではなく「起動できない」で黙って死ぬ。
-		for spelling in "$root/$bin" "$root/$bin.exe"; do
+		for spelling in "$root/$build_dir_rel/ccnavi" "$root/$build_dir_rel/ccnavi.exe"; do
 			if [ -f "$spelling" ]; then
 				chmod +x "$spelling" 2>/dev/null || true
 			fi
 		done
+		;;
+	esac
+	case "$launcher_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_LAUNCHER" "$root/$bin"
+		chmod +x "$root/$bin" 2>/dev/null || true
 		;;
 	esac
 	case "$rules_verdict" in
@@ -1032,22 +1215,56 @@ if [ "$deploy_work" = yes ]; then
 	fi
 fi
 
-report_deploy '配った' '入れ替えた' '.gitignore に足した'
+# 前の置き場を片付ける。配り終えたあとに回す。新しい置き場が揃ったことは上で確かめて
+# あるが、ここより前に消すと、配る途中で落ちたときに両方とも無い形が残る。
+#
+# 消せなかったものは並べて先へ進む。Windows では走っている実行ファイルを消せない。
+# 別のセッションの hook がちょうど起動している瞬間に当たることがある。
+if [ -n "$old_todo" ]; then
+	old_done=""
+	for name in $OLD_BIN_PARTS; do
+		if [ ! -e "$root/$OLD_BIN_DIR/$name" ]; then
+			continue
+		fi
+		rm -rf "$root/$OLD_BIN_DIR/$name" 2>/dev/null || true
+		if [ -e "$root/$OLD_BIN_DIR/$name" ]; then
+			old_failed="$old_failed$OLD_BIN_DIR/$name
+"
+		else
+			old_done="$old_done$OLD_BIN_DIR/$name
+"
+		fi
+	done
+	old_todo="$old_done"
+fi
+
+report_deploy '配った' '入れ替えた' '.gitignore に足した' '前の置き場から消した'
+if [ -n "$old_todo" ]; then
+	printf '開いている Claude Code のセッションは、開き直すまで前の置き場を起動しようとして hook が動きません。開き直してください。\n'
+fi
 
 # 登録しただけでは動かない。配り終えたあとの姿をそのまま見て、まだ無いものを
 # 挙げる。配布が通っていれば普通はここで何も出ない。出たときは、配るのを切ったか、
 # 配布元に無かったか、配布先に別のものが既にあって配っていないか、のどれか。
 #
-# ここでは取りに行ったり作ったりはしない。実行ファイルは PyInstaller が Windows
-# でだけ .exe を付けるので、両方の綴りで探す（settings.py の _resolve_bin）。
+# ここでは取りに行ったり作ったりはしない。実行ファイルは振り分けの sh と同じ順で、
+# この機械で動く置き場を探す。
 missing_parts=""
 note_missing() {
 	missing_parts="$missing_parts  $1
 "
 }
-if [ ! -f "$root/$bin" ] && [ ! -f "$root/$bin.exe" ]; then
-	note_missing "${bin}（ccnavi の実行ファイル。build.py で組み立てる）"
+if [ ! -f "$root/$bin" ]; then
+	note_missing "${bin}（hook が起動する振り分けの sh。ccnavi の根の scripts/ccnavi-launcher.sh を配る）"
 fi
+case "$host" in
+unknown-* | *-unknown) ;;
+*)
+	if ! runnable_there; then
+		note_missing "${bin_dir_rel}/${host}/ccnavi（この機械で動く実行ファイル。この機械で build.py を回して配る）"
+	fi
+	;;
+esac
 if [ ! -f "$root/$DEPLOY_RULES" ]; then
 	note_missing "${DEPLOY_RULES}（何を止めるか。無いと組み込みの既定だけで判定する）"
 fi
@@ -1058,8 +1275,8 @@ if [ ! -f "$root/$DEPLOY_PHASES" ]; then
 	note_missing "${DEPLOY_PHASES}（フェーズの種類。無いと番号だけの挙動になる）"
 fi
 for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh; do
-	if [ ! -f "$root/.claude/scripts/$name" ]; then
-		note_missing ".claude/scripts/${name}（ゲートの中で通る形）"
+	if [ ! -f "$root/.ccnavi/scripts/$name" ]; then
+		note_missing ".ccnavi/scripts/${name}（ゲートの中で通る形）"
 	fi
 done
 if [ -n "$missing_parts" ]; then
@@ -1071,6 +1288,19 @@ if [ -n "$missing_parts" ]; then
 		# 読んで落ちる。
 		printf '%s\n' "--no-deploy を外すと、ccnavi の根から配ります。"
 	fi
+fi
+
+# 置き場を .claude/scripts/ から .ccnavi/scripts/ へ移した。前の配布で置いた写しは、
+# もう誰にも読まれないまま残る。消すかどうかは人が決めるので、名前を挙げるだけにする。
+old_scripts=""
+for name in $DEPLOY_SCRIPTS; do
+	if [ -f "$root/.claude/scripts/$name" ]; then
+		old_scripts="$old_scripts  .claude/scripts/$name
+"
+	fi
+done
+if [ -n "$old_scripts" ]; then
+	printf '前の置き場に残っているゲートの sh（今は %s/ を使います。要らなければ消してください）:\n%s' "$DEPLOY_SCRIPT_DIR" "$old_scripts"
 fi
 
 printf 'env の値はセッションを開き直すまで効きません。\n'

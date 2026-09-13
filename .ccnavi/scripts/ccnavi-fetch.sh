@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-fetch — セッションの頭で、親ブランチのリモートを取ってきて承認済みチケットを新しくする。
 #
-#   sh .claude/scripts/ccnavi-fetch.sh
+#   sh .ccnavi/scripts/ccnavi-fetch.sh
 #
 # 承認済みチケットと印は親チケットのブランチに乗り、A の機械から push されて届く
 # （設計 §9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに範囲が

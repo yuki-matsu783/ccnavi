@@ -1,4 +1,4 @@
-"""GitLab API v4 の代役。`.claude/scripts/ccnavi-review.sh` を実物なしで通すための的。
+"""GitLab API v4 の代役。`.ccnavi/scripts/ccnavi-review.sh` を実物なしで通すための的。
 
 自動テストからは呼んでいない。人が手で 1 周させるための道具として置いてある。
 

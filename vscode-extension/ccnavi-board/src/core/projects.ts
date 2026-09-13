@@ -218,19 +218,19 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
 
 /**
  * 共通層のルールを層（プロジェクトの層か自身の層）のルールファイルに写すときの加工。
- * 先頭に出どころのコメントを足し、文面の `sh .claude/scripts/` を `sh {root}/.claude/scripts/` にする。
- * プロジェクトの中に cwd があるエージェントには `.claude/scripts/` が届かず、`{root}` はルールを
+ * 先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` を `sh {root}/.ccnavi/scripts/` にする。
+ * プロジェクトの中に cwd があるエージェントには `.ccnavi/scripts/` が届かず、`{root}` はルールを
  * 読むときにワークスペースルートの絶対パスへ置き換わる（設計 §11.8）。置換は 1 種類だけ。
  */
 export function rewriteRulesForProject(text: string, sourceRel: string, layer: string, date: string): string {
   const header = [
     `# ${layer} のルール。共通層の ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
     "# このファイルは共通層に足して当たる（上書きはしない）。共通層と全欄が同じ行は重複として捨てられ、--lint が info で言う。",
-    "# 文面の sh の綴りは {root}/.claude/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
+    "# 文面の sh の綴りは {root}/.ccnavi/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
     "# 置き換えた行は共通層の行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
     "",
   ].join("\n");
-  return header + text.split("sh .claude/scripts/").join("sh {root}/.claude/scripts/");
+  return header + text.split("sh .ccnavi/scripts/").join("sh {root}/.ccnavi/scripts/");
 }
 
 // ---- 画面の中身

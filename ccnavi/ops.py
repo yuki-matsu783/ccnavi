@@ -1,6 +1,6 @@
 """チケットの状態を動かす操作。`ccnavi ticket start|done|cancel <識別子>`。
 
-親が `.claude/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
+親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
 サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
 
 やることは置き場を動かして欄を書くことだけ。作業ツリーの削除は親のマージ手順に
@@ -50,7 +50,7 @@ def start(
             f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、"
             "切り元が承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
-            f'先に {where}\'sh .claude/scripts/ccnavi-git.sh worktree add "{worktree}" '
+            f'先に {where}\'sh .ccnavi/scripts/ccnavi-git.sh worktree add "{worktree}" '
             f"-b {ticket_id}' で作ること\n"
         )
         return 1
@@ -108,8 +108,8 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
 
             stdout.write(
                 f"次は、この移動をコミットし、`{wip_root(conf)}/` を消して"
-                f"（'sh .claude/scripts/ccnavi-git.sh rm -r {wip_root(conf)}'）コミットし、"
-                "push してから 'sh .claude/scripts/ccnavi-review.sh ready' で Draft を外す"
+                f"（'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip_root(conf)}'）コミットし、"
+                "push してから 'sh .ccnavi/scripts/ccnavi-review.sh ready' で Draft を外す"
                 "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
                 "マージは利用者が squash で行う\n"
             )
@@ -269,7 +269,7 @@ def _score_child(
         stderr.write(
             f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
             "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
-            f"'sh .claude/scripts/ccnavi-ticket.sh judge {found.ticket} <項目> yes|no "
+            f"'sh .ccnavi/scripts/ccnavi-ticket.sh judge {found.ticket} <項目> yes|no "
             "--reason <根拠>' で記録してから閉じ直すこと\n"
         )
         if where:

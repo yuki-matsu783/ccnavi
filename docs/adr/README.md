@@ -35,6 +35,7 @@
 | [0005](0005-settings-env.md) | 設定は `.claude/settings.json` の `env` に置く |
 | [0006](0006-disable-from-env-only.md) | `disable` は起動側の環境からしか効かせない |
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
+| [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する |
 
 ### ルールと判定
 

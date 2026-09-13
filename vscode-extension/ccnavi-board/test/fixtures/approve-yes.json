@@ -11,5 +11,5 @@
  "lines": [
   "承認した。.ccnavi/tickets に承認済みチケットを置いた。"
  ],
- "prompt": "[ccnavi] 承認済みチケットが置かれた。\n- i0001: 親（親）\n- i0001-01: 子 i0001-01（親 i0001、フェーズ 1）\n後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、'sh .claude/scripts/ccnavi-ticket.sh start <識別子>' で着手する。"
+ "prompt": "[ccnavi] 承認済みチケットが置かれた。\n- i0001: 親（親）\n- i0001-01: 子 i0001-01（親 i0001、フェーズ 1）\n後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、'sh .ccnavi/scripts/ccnavi-ticket.sh start <識別子>' で着手する。"
 }

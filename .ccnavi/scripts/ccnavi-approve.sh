@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-approve — 提案を承認し、承認済みチケットを親のブランチに乗せて push する。人が端末で打つ。
 #
-#   sh .claude/scripts/ccnavi-approve.sh
+#   sh .ccnavi/scripts/ccnavi-approve.sh
 #
 # 承認そのものは ccnavi の `--approve`。承認済みチケットは親チケットのツリーの
 # $CCNAVI_APPROVED（既定 .ccnavi/tickets）に置かれる。そこはプロジェクトの git が
@@ -26,7 +26,7 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .claude/scripts/ccnavi-approve.sh
+sh .ccnavi/scripts/ccnavi-approve.sh
 
   承認待ちのチケットを束で見せ、承認したら承認済みチケットをコミットして push する。
   端末から人が打つ。エージェントからは呼べない。
@@ -48,7 +48,7 @@ esac
 
 # main の根。作業ツリーの中から呼ばれても、ツリーの一覧は main の側から数える。
 root=$(ccnavi_workspace) || {
-	printf 'ccnavi-approve: ワークスペースルートが見つかりません（.claude/scripts/ を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
+	printf 'ccnavi-approve: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
 

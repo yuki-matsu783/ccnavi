@@ -41,7 +41,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnavi の実行ファイル。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、それも無ければ uv run python -m ccnavi の順に探す。ワークスペースルートからの相対でも絶対でもよい。"
+          "description": "ccnavi の実行ファイル。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、次に .ccnavi/bin/ccnavi、それも無ければ uv run python -m ccnavi の順に探す。振り分けの sh を指していれば、隣の <os>-<arch>/ にあるこの機械向けの実行ファイルを使う。ワークスペースルートからの相対でも絶対でもよい。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
