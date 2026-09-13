@@ -1078,6 +1078,8 @@ def screen(
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or [
                     "    （対応なし）"
                 ]
+        if not t.is_child and t.issue is not None:
+            lines.append(f"■ 課題: #{t.issue}（マージリクエストの本文で Closes に使う）")
         if t.rationale.strip():
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
