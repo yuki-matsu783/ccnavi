@@ -24,6 +24,10 @@ from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# 振り分けの sh の名前。この名前なら、実体は隣ではなく `../bin/<os>-<arch>/` に在る
+# （設計 launcher-scripts 3.2・3.3）。名前が入る前でもファイルごと落ちないように取る。
+LAUNCHER_NAME = getattr(platformtag, "LAUNCHER_NAME", "ccnavi-launcher.sh")
+
 RULES = {
     "version": 3,
     "deny": [
@@ -111,6 +115,7 @@ class SelfGuardTest(unittest.TestCase):
         session="s1",
         tool="Bash",
         bin="",
+        home="",
         **tool_input,
     ):
         payload = json.dumps(
@@ -124,6 +129,8 @@ class SelfGuardTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
+        if home:
+            environment["CCNAVI_PROJECT_HOME"] = home
         return run_ccnavi(
             [
                 "--root",
@@ -543,10 +550,13 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(read(path), "ELF fake executable\n")
 
-    # 振り分けの sh と、その隣の機械ごとの組み立て
+    # 振り分けの sh と、その隣の機械ごとの組み立て（前の形）
+    #
+    # 導入スクリプトを打ち直すまでは、`.ccnavi/bin/ccnavi` を指したままのワークスペースが
+    # 残る。そこで隣の実体を守り続けるために、前の形のテストはそのまま通らなければならない。
 
     def launcher_layout(self, place=("tools", "bin")):
-        """配布先の形。指す先は sh で、hook が実際に走らせるのは隣の実体。"""
+        """前の配布先の形。指す先は sh で、hook が実際に走らせるのは隣の実体。"""
         launcher = os.path.join(self.repo, *place, "ccnavi")
         exe = os.path.join(self.repo, *place, platformtag.host_target(), "ccnavi")
         write(launcher, "#!/bin/sh\n")
@@ -593,6 +603,127 @@ class SelfGuardTest(unittest.TestCase):
         )
 
         self.assertNotIn("deny", result.stdout)
+
+    # 振り分けの sh を `<置き場>/scripts/` に、実体を `<置き場>/bin/<os>-<arch>/` に分けた形
+    #
+    # 指す先の名前が振り分けの sh なら、実体は sh の隣ではなく `../bin/` に在る。守る綴り
+    # （binary_clause）と控える先（launched_executable）は同じ条件で切り替わらなければ
+    # ならない。片方だけ切り替わると、守っている場所と控えている場所が食い違う。
+
+    def scripts_layout(self, place=(".ccnavi",)):
+        """sh を `<place>/scripts/`、実体を `<place>/bin/<この機械>/` に置く。
+
+        返すのは (CCNAVI_BIN_PATH に書く相対の綴り, sh の絶対パス, 実体の絶対パス)。
+        place を空にすると、ワークスペースルートの直下に `scripts/` と `bin/` が並ぶ。
+        """
+        spelled = "/".join([*place, "scripts", LAUNCHER_NAME])
+        launcher = os.path.join(self.repo, *place, "scripts", LAUNCHER_NAME)
+        exe = os.path.join(self.repo, *place, "bin", platformtag.host_target(), "ccnavi")
+        write(launcher, "#!/bin/sh\n")
+        write(exe, "ELF fake executable\n")
+        return spelled, launcher, exe
+
+    def test_scripts_に置いた振り分けの実体はセッション開始で控え実行後に戻す(self):
+        # G1。hook が実際に走らせるのは `.ccnavi/bin/<この機械>/ccnavi`。sh の隣
+        # （`.ccnavi/scripts/<この機械>/`）を探していると、控えが無いまま差し替えを見逃す。
+        spelled, _, exe = self.scripts_layout()
+
+        self.run_hook("SessionStart", bin=spelled)
+        write(exe, "ELF replaced\n")
+        result = self.run_hook("PostToolUse", bin=spelled)
+
+        self.assertEqual(read(exe), "ELF fake executable\n")
+        self.assertIn("restored", result.stdout)
+
+    def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
+        # G2。既定の置き場では ccnavi ディレクトリの守り（`*/.ccnavi/*`）と二重に止まり、
+        # 先に名指しされるのはそちら。ccnavi ディレクトリを動かすとそちらは外れるので、
+        # 残った実行ファイル由来の守りが止めていることをそこで確かめる
+        # （REQ-SLF-07 を ccnavi ディレクトリの守りに寄りかからせない）。
+        spelled, _, exe = self.scripts_layout()
+        bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
+
+        with self.subTest(home="(既定)"):
+            result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
+
+            self.assertIn("deny", result.stdout)
+
+        with self.subTest(home=".navi"):
+            result = self.run_hook(
+                "PreToolUse", bin=spelled, home=".navi", tool="Write", file_path=bundled
+            )
+
+            self.assertIn("deny", result.stdout)
+            self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_scripts_に置いた振り分けの実体の置き場はシェルからの書き込みで止まる(self):
+        # G3
+        spelled, _, exe = self.scripts_layout()
+        absolute = os.path.dirname(exe).replace("\\", "/")
+
+        for command in ("rm -rf .ccnavi/bin/linux-x86_64", f"rm -rf {absolute}"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=spelled, command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_scripts_に置いた振り分けの守りは隣ではなく_bin_の下に当たる(self):
+        # G4。sh の隣は配る場所ではない。そこに当てると守る必要の無い場所を止め、
+        # 本当に実体が在る `../bin/` を外す。
+        spelled, _, _ = self.scripts_layout(("tools",))
+        cases = (
+            (("tools", "scripts", "linux-x86_64", "x"), False),
+            (("tools", "bin", "linux-x86_64", "x"), True),
+        )
+
+        for parts, guarded in cases:
+            path = os.path.join(self.repo, *parts)
+            with self.subTest(path="/".join(parts)):
+                result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=path)
+
+                if guarded:
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-binary", result.stdout)
+                else:
+                    self.assertNotIn("builtin-guard-binary", result.stdout)
+
+    def test_scripts_に置いた振り分けの_bin_の下はシェルからの書き込みでも止まる(self):
+        # G4 と同じ置き場。ccnavi ディレクトリの外なので、止めるのは実行ファイルの綴りだけ。
+        spelled, _, _ = self.scripts_layout(("tools",))
+
+        result = self.run_hook("PreToolUse", bin=spelled, command="rm -rf tools/bin/linux-x86_64")
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_浅い綴りの振り分けでも守る場所と控える場所が揃う(self):
+        # G6。`scripts/ccnavi-launcher.sh` は段が 2 つしかない。段の数で切り替えると、
+        # 名前だけで切り替える控えの側と食い違う。
+        spelled, launcher, exe = self.scripts_layout(())
+
+        launched = platformtag.launched_executable(launcher)
+        self.assertEqual(
+            os.path.normcase(os.path.realpath(launched or launcher)),
+            os.path.normcase(os.path.realpath(exe)),
+            "控える先が `../bin/<この機械>/ccnavi` になっていない",
+        )
+
+        bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
+        result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_浅い綴りの振り分けでも実体をセッション開始で控え実行後に戻す(self):
+        # G6 の控える側を、hook を通して確かめる。
+        spelled, _, exe = self.scripts_layout(())
+
+        self.run_hook("SessionStart", bin=spelled)
+        write(exe, "ELF replaced\n")
+        self.run_hook("PostToolUse", bin=spelled)
+
+        self.assertEqual(read(exe), "ELF fake executable\n")
 
     # セッション開始の控え
 

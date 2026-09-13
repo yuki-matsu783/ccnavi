@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -20,7 +21,23 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
-LAUNCHER = os.path.join(ROOT, "scripts", "ccnavi-launcher.sh")
+
+
+def _launcher_source():
+    """偽の配布元に置く振り分けの sh の中身。
+
+    原本は `.ccnavi/scripts/ccnavi-launcher.sh`（設計 launcher-scripts）。人が写す前の
+    ツリーにはまだ無いので、そのときは前の原本 `scripts/ccnavi-launcher.sh` を読む。
+    ここで見たいのは「どこへ配るか」と「中身が同じまま届くか」で、中身の版は問わない。
+    """
+    for parts in ((".ccnavi", "scripts", "ccnavi-launcher.sh"), ("scripts", "ccnavi-launcher.sh")):
+        path = os.path.join(ROOT, *parts)
+        if os.path.isfile(path):
+            return path
+    return os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-launcher.sh")
+
+
+LAUNCHER = _launcher_source()
 
 
 def _load_build():
@@ -76,11 +93,41 @@ RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risk.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
-# 既定の置き場。hook が起動する振り分けの sh と、その隣の機械ごとの組み立て。
+# 置き場は 2 つに分けて固定する（設計 launcher-scripts §1）。hook が起動する振り分けの sh は
+# ゲートの sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
-LAUNCHER_PARTS = (*BIN_DIR_PARTS, "ccnavi")
-# 前の既定の置き場。rules.yml と risk.yml が同じディレクトリにある。
+LAUNCHER_NAME = "ccnavi-launcher.sh"
+LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
+# CCNAVI_BIN_PATH に書く綴り。固定。
+BIN_PATH = "/".join(LAUNCHER_PARTS)
+# 1 つ前の既定。振り分けの sh を組み立ての置き場（.ccnavi/bin/）に ccnavi の名前で置いていた。
+OLD_LAUNCHER_PARTS = (*BIN_DIR_PARTS, "ccnavi")
+OLD_LAUNCHER = "/".join(OLD_LAUNCHER_PARTS)
+# 2 つ前の既定の置き場。rules.yml と risk.yml が同じディレクトリにある。
 OLD_BIN = ".claude/ccnavi/ccnavi"
+
+
+def section(stdout, heading):
+    """見出しで始まる塊の、字下げされた行を並べる。
+
+    文面の中に綴りが 1 回出るだけを見ると、別の塊（置き換える env など）に出た綴りでも
+    通ってしまう。どの塊に並んだかまで見る。
+    """
+    out = []
+    inside = False
+    for line in stdout.splitlines():
+        if inside and line.startswith("  "):
+            out.append(line.strip())
+            continue
+        inside = line.startswith(heading)
+    return out
+
+
+def names(lines, path):
+    """行のどれかが、その綴りそのもので始まるか。`.ccnavi/bin/ccnavi` は
+    `.ccnavi/bin/<os>-<arch>/ccnavi` の頭と取り違えない。"""
+    pattern = re.compile(re.escape(path) + r"(?![\w./-])")
+    return any(pattern.match(line) for line in lines)
 
 
 def clean_env(**extra):
@@ -223,20 +270,13 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
 
     def test_bin_path_points_at_the_launcher(self):
-        """指すのは振り分けの sh で、どの環境でも 1 行のまま。
+        """指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
 
-        実行ファイルは機械ごとに隣の `<os>-<arch>/` に入り、どれを起動するかは sh が選ぶ。
+        実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に入り、どれを起動するかは sh が選ぶ。
         設定に機械の語や `.exe` が入ると、その 1 行が 1 つの環境でしか当たらなくなる。
         """
         self.run_setup()
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
-
-    def test_refuses_a_bin_spelled_with_exe(self):
-        """`.exe` を付けると、振り分けの sh を .exe の名前で置くことになる。"""
-        result = self.run_setup("--bin", ".ccnavi/bin/ccnavi.exe")
-        self.assertEqual(result.returncode, 2)
-        self.assertIn(".exe", result.stderr)
-        self.assertFalse(os.path.exists(self.settings_path()))
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
 
     def test_writes_the_guards_at_the_same_strength_as_the_mode(self):
         """戻す働きの 2 つは CCNAVI_MODE と同じ値で並ぶ。
@@ -312,12 +352,19 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 
     def test_says_what_is_still_missing(self):
-        """登録しただけでは動かないので、人が置くものを挙げる。"""
+        """登録しただけでは動かないので、人が置くものを挙げる（S12）。
+
+        振り分けの sh はゲートの sh と同じ並びに出る。前の綴り（.ccnavi/bin/ccnavi）を
+        挙げると、人がそこへ sh を置き、hook の起動しない形を自分で作る。
+        """
         result = self.run_setup()
-        self.assertIn(".ccnavi/bin/ccnavi", result.stdout)
-        self.assertIn(f".ccnavi/bin/{THIS_MACHINE}/ccnavi", result.stdout)
-        self.assertIn("rules.yml", result.stdout)
-        self.assertIn("ccnavi-git.sh", result.stdout)
+        missing = section(result.stdout, "まだ無いもの")
+        self.assertTrue(names(missing, BIN_PATH), result.stdout)
+        self.assertTrue(names(missing, f".ccnavi/bin/{THIS_MACHINE}/ccnavi"), result.stdout)
+        self.assertFalse(names(missing, OLD_LAUNCHER), result.stdout)
+        self.assertTrue(names(missing, "/".join(RULES_PARTS)), result.stdout)
+        for name in DEPLOY_SCRIPTS:
+            self.assertTrue(names(missing, f".ccnavi/scripts/{name}"), name)
 
 
 class KeepsWhatItFinds(SetupTest):
@@ -387,51 +434,6 @@ class DoesNotWeakenTheGuard(SetupTest):
         self.assertEqual(result.returncode, 2)
         self.assertIn("disable", result.stderr)
         self.assertFalse(os.path.exists(self.settings_path()))
-
-    def test_refuses_a_newline_in_the_bin_path(self):
-        """`--bin` に改行を入れて env を注ぎ込む形を止める。
-
-        値を「名前=値」の行に組んでから割ると、値の中の改行がそのまま行の
-        区切りになる。しかも実行ファイルの行は最後なので、注いだ分が後勝ちで
-        効く。ここを通すと、上のテストが拒んだ disable を --bin から書ける。
-        """
-        result = self.run_setup(
-            "--mode", "enable", "--bin", "dist/ccnavi/ccnavi\nCCNAVI_MODE=disable"
-        )
-        self.assertEqual(result.returncode, 2)
-        self.assertFalse(os.path.exists(self.settings_path()))
-
-    def test_refuses_an_empty_bin_path(self):
-        """空の実行ファイルは、7 つの hook すべてを壊す。
-
-        書かれるのはワークスペースルートのディレクトリを起動しようとする 1 行に
-        なり、しかも「まだ無いもの」にも挙がらない（ディレクトリは在るので）。
-        """
-        result = self.run_setup("--bin", "")
-        self.assertEqual(result.returncode, 2)
-        self.assertFalse(os.path.exists(self.settings_path()))
-
-    def test_refuses_a_bin_path_that_climbs_out_of_the_project(self):
-        """`..` はプロジェクトの外を指す。絶対パスを拒む理由がそのまま当たる。
-
-        実行ファイルの綴りは判定器の実体そのもの（selfguard.py 冒頭）。
-        差し替えられると、ルールを 1 行も変えずに判定を入れ替えられる。
-        """
-        result = self.run_setup("--bin", "../../elsewhere/fake")
-        self.assertEqual(result.returncode, 2)
-        self.assertFalse(os.path.exists(self.settings_path()))
-
-    def test_refuses_an_absolute_bin_path(self):
-        """実行ファイルの綴りは相対だけ。
-
-        `env` では `${CLAUDE_PROJECT_DIR}` が展開されないので、絶対で書くと
-        3 つの環境で同じ 1 行が使えなくなる。
-        """
-        for path in ("/opt/ccnavi/ccnavi", "C:/opt/ccnavi", "//server/share/ccnavi"):
-            with self.subTest(path=path):
-                result = self.run_setup("--bin", path)
-                self.assertEqual(result.returncode, 2)
-                self.assertFalse(os.path.exists(self.settings_path()))
 
 
 class TellsWhatItDidNotChange(SetupTest):
@@ -624,13 +626,16 @@ class ReadsItsArguments(SetupTest):
         result = self.run_raw("--help")
         self.assertEqual(result.returncode, 0)
         self.assertIn("--mode", result.stdout)
+        # 廃止したオプションを案内しない。
+        self.assertNotIn("--bin", result.stdout)
 
     def test_refuses_an_unknown_option(self):
         result = self.run_setup("--nope")
         self.assertEqual(result.returncode, 2)
 
     def test_refuses_an_option_without_its_value(self):
-        for option in ("--mode", "--bin"):
+        # --bin は値の有無に依らず断る（DeploysWhatTheProjectNeeds の S4）。
+        for option in ("--mode",):
             with self.subTest(option=option):
                 result = self.run_raw(option)
                 self.assertEqual(result.returncode, 2)
@@ -706,7 +711,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     プロジェクトの中に実体を置く経路がこのスクリプトに要る。
     """
 
-    def make_source(self, built=True, parts=True, target=THIS_MACHINE):
+    def make_source(self, built=True, parts=True, target=THIS_MACHINE, launcher=True):
         """配布元のふりをするディレクトリを作る。
 
         本物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
@@ -714,6 +719,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         target は build.py が dist/ccnavi.target に書く印。None なら書かない
         （印を書く前の build.py で組んだ配布元）。
+
+        launcher が偽なら、.ccnavi/scripts/ccnavi-launcher.sh だけを置かない。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
@@ -734,9 +741,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             ) as f:
                 f.write("同梱物")
         if parts:
-            # 振り分けの sh は本物を写す。配布先で中身が同じであることを見るため。
-            os.makedirs(os.path.join(src, "scripts"), exist_ok=True)
-            shutil.copy(LAUNCHER, os.path.join(src, "scripts", "ccnavi-launcher.sh"))
             os.makedirs(os.path.dirname(os.path.join(src, *RULES_PARTS)))
             with open(
                 os.path.join(src, *RULES_PARTS),
@@ -758,6 +762,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     encoding="utf-8",
                 ) as f:
                     f.write(f"# {name}\n")
+            if launcher:
+                # 振り分けの sh は本物を写し、ゲートの sh と同じ置き場に置く。配布先で
+                # 中身が同じであることを見るため。モードは落として置く。配布元の置き方に
+                # 依らず、配った先で実行ビットが付くことを見るため。
+                shutil.copy(LAUNCHER, os.path.join(src, *LAUNCHER_PARTS))
+                os.chmod(os.path.join(src, *LAUNCHER_PARTS), 0o644)
         return src
 
     def install_script(self, src):
@@ -831,6 +841,68 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertNotIn("まだ無いもの", result.stdout)
         self.assertIn("配った", result.stdout)
+
+    def test_deploys_the_launcher_next_to_the_gate_scripts(self):
+        """振り分けの sh は .ccnavi/scripts/ へ、中身を変えずに配り、実行ビットを付ける（S2）。
+
+        hook は sh を `sh` 経由でなく直に起動する。実行ビットが無いと 126 で起動せず、
+        判定が 1 行も走らない。前の置き場（.ccnavi/bin/ccnavi）には置かない。そこに置くと
+        組み立ての置き場に sh と実行ファイルが混ざる。
+        """
+        src = self.make_source()
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with (
+            open(self.deployed(*LAUNCHER_PARTS), encoding="utf-8") as f,
+            open(LAUNCHER, encoding="utf-8") as g,
+        ):
+            self.assertEqual(f.read(), g.read())
+        if os.name != "nt":
+            self.assertTrue(os.access(self.deployed(*LAUNCHER_PARTS), os.X_OK))
+        self.assertFalse(os.path.exists(self.deployed(*OLD_LAUNCHER_PARTS)))
+        # sh の隣に機械ごとの置き場を作らない。sh はそこを探さない。
+        self.assertFalse(os.path.exists(self.deployed(".ccnavi", "scripts", THIS_MACHINE)))
+
+    def test_puts_the_executable_in_the_fixed_place(self):
+        """実行ファイルは .ccnavi/bin/<built>/ に置く。置き場は固定（S3）。
+
+        設定に書く綴りと実体の置き場が割れると、設定は書けているのに hook が
+        どこにも無いものを起動する形になる。sh は自分の隣でなく ../bin/ を探すので、
+        置き場がこの 1 か所に決まっていれば割れない。
+        """
+        src = self.make_source()
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
+        self.assertEqual(sorted(os.listdir(self.deployed(*BIN_DIR_PARTS))), [THIS_MACHINE])
+        self.assertNotIn("まだ無いもの", result.stdout)
+
+    def test_refuses_the_retired_bin_option_and_writes_nothing(self):
+        """`--bin` は廃止した。値の有無に依らず 2 で断り、何も書かない（S4）。
+
+        受けて無視すると、打った人は指した場所に置いたつもりで進む。値が今の固定の綴りと
+        同じでも断る。通すと、手順書に残った `--bin` がいつ止まるかが値しだいになる。
+        """
+        src = self.make_source()
+        for args in (
+            ("--bin", OLD_LAUNCHER),
+            ("--bin", BIN_PATH),
+            ("--bin", "tools/ccnavi/ccnavi"),
+            ("--bin",),
+        ):
+            with self.subTest(args=args):
+                self.dir = tempfile.mkdtemp(prefix="ccnavi-setup-")
+                self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+                self.make_git()
+                result = self.run_setup("--mode", "enable", "--deploy", src, *args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("--bin", result.stderr)
+                self.assertIn(BIN_PATH, result.stderr)
+                self.assertEqual(os.listdir(self.dir), [".git"])
 
     def test_no_deploy_writes_only_the_settings(self):
         """`--no-deploy` は配布物を置かない。何が無いかと、戻し方を見せる。"""
@@ -944,22 +1016,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertEqual(f.read(), "deny: []\n")
 
-    def test_follows_the_bin_option_for_where_it_puts_the_executable(self):
-        """実行ファイルの行き先は `--bin` が決める。
-
-        設定に書く綴りと実体の置き場が割れると、設定は書けているのに hook が
-        どこにも無いものを起動する形になる。
-        """
-        src = self.make_source()
-        result = self.run_setup("--bin", "tools/ccnavi/ccnavi", "--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], "tools/ccnavi/ccnavi")
-        self.assertTrue(os.path.isfile(self.deployed("tools", "ccnavi", "ccnavi")))
-        self.assertTrue(os.path.isfile(self.deployed("tools", "ccnavi", THIS_MACHINE, "ccnavi")))
-        self.assertFalse(os.path.exists(self.deployed(*BIN_DIR_PARTS)))
-        self.assertNotIn("まだ無いもの", result.stdout)
-
     def test_refuses_a_source_that_was_never_built(self):
         """組み立てていない配布元では、黙って進まない。
 
@@ -986,6 +1042,45 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertIn("ccnavi-launcher.sh", result.stdout)
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
 
+    def test_names_the_launcher_the_source_does_not_have(self):
+        """配布元の .ccnavi/scripts/ に sh が無ければ、配れないものに挙げる（S13）。
+
+        前の原本の置き場（scripts/ccnavi-launcher.sh）に在っても、そこからは配らない。
+        拾うと、配布元の版が混ざったまま「配った」に見える。
+        """
+        src = self.make_source(launcher=False)
+        os.makedirs(os.path.join(src, "scripts"), exist_ok=True)
+        shutil.copy(LAUNCHER, os.path.join(src, "scripts", LAUNCHER_NAME))
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        absent = section(result.stdout, "配布元に無くて配れないもの")
+        self.assertTrue(names(absent, BIN_PATH), result.stdout)
+        self.assertFalse(os.path.exists(self.deployed(*LAUNCHER_PARTS)))
+        self.assertFalse(os.path.exists(self.deployed(*OLD_LAUNCHER_PARTS)))
+        self.assertTrue(names(section(result.stdout, "まだ無いもの"), BIN_PATH), result.stdout)
+
+    @unittest.skipIf(os.name == "nt", "Windows の実行の許しは別の仕組み")
+    def test_puts_the_run_bit_back_on_a_launcher_it_keeps(self):
+        """配布先の sh の実行ビットが落ちていれば、配らない回でも付け直す（S14）。
+
+        sh は追跡するので、Windows で足した sh は 100644 で入り、別の機械で clone した
+        直後は実行ビットが無い。配布先に既に在るからと触らずにいると、打ち直しても
+        hook は 126 で起動しないままになる。中身は入れ替えない。
+        """
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        launcher = self.deployed(*LAUNCHER_PARTS)
+        with open(launcher, "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh\n# このプロジェクトで直した sh\n")
+        os.chmod(launcher, 0o644)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(os.access(launcher, os.X_OK))
+        with open(launcher, encoding="utf-8") as f:
+            self.assertIn("このプロジェクトで直した", f.read())
+
     def test_check_does_not_copy(self):
         """`--check` は配らない。揃っていないので 1 を返す。"""
         src = self.make_source()
@@ -993,6 +1088,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 1)
         self.assertIn("配る", result.stdout)
         self.assertFalse(os.path.exists(self.deployed(*BIN_DIR_PARTS)))
+        self.assertFalse(os.path.exists(self.deployed(*LAUNCHER_PARTS)))
 
     def test_check_is_settled_once_everything_is_there(self):
         src = self.make_source()
@@ -1100,16 +1196,48 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
     ない。
     """
 
-    def test_adds_the_executable_and_its_bundle(self):
+    def test_adds_only_the_place_of_the_build(self):
+        """足すのは /.ccnavi/bin/<built>/ の 1 行だけ（S5）。
+
+        振り分けの sh はゲートの sh と同じく追跡する側に置く。無視すると、clone した先に
+        sh が届かず hook が起動しない。置き場ごと（.ccnavi/ や .ccnavi/bin/）も無視しない。
+        同じ .ccnavi/ の下にある rules.yml まで git から消え、そのプロジェクトが何を
+        止めるかが渡らなくなる。
+        """
         src = self.make_source()
         self.make_git()
         result = self.run_setup("--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
         written = self.gitignore()
-        self.assertIn("/.ccnavi/bin/ccnavi\n", written)
-        self.assertIn(f"/.ccnavi/bin/{THIS_MACHINE}/\n", written)
+        lines = [line for line in written.splitlines() if line.strip() and not line.startswith("#")]
+        self.assertEqual(lines, [f"/.ccnavi/bin/{THIS_MACHINE}/"])
+        for wide in (
+            "/.ccnavi/",
+            "/.ccnavi/bin/",
+            "/.ccnavi/common/",
+            "/.ccnavi/scripts/",
+            f"/{BIN_PATH}",
+            f"/{OLD_LAUNCHER}",
+        ):
+            self.assertNotIn(wide + "\n", written, wide)
+        self.assertNotIn("rules.yml", written)
         self.assertIn(".gitignore に足した", result.stdout)
+
+    def test_keeps_the_line_it_added_for_the_old_launcher(self):
+        """前に足した /.ccnavi/bin/ccnavi の行は残す。
+
+        人が書いた行と見分けられない。残しても害は無い。
+        """
+        src = self.make_source()
+        self.make_git()
+        before = f"node_modules/\n/{OLD_LAUNCHER}\n/.ccnavi/bin/{THIS_MACHINE}/\n"
+        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8") as f:
+            f.write(before)
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.gitignore(), before)
 
     def test_adds_the_place_of_each_machine_that_was_deployed(self):
         """別の機械の組み立てを配れば、その置き場も足す。"""
@@ -1117,9 +1245,9 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.run_setup("--deploy", self.make_source())
         self.run_setup("--deploy", self.make_source(target=ANOTHER_MACHINE))
         written = self.gitignore()
-        self.assertIn(f"/.ccnavi/bin/{THIS_MACHINE}/\n", written)
-        self.assertIn(f"/.ccnavi/bin/{ANOTHER_MACHINE}/\n", written)
-        self.assertEqual(written.count("/.ccnavi/bin/ccnavi\n"), 1)
+        self.assertEqual(written.count(f"/.ccnavi/bin/{THIS_MACHINE}/\n"), 1)
+        self.assertEqual(written.count(f"/.ccnavi/bin/{ANOTHER_MACHINE}/\n"), 1)
+        self.assertNotIn(f"/{OLD_LAUNCHER}\n", written)
 
     def test_keeps_the_lines_that_were_already_there(self):
         src = self.make_source()
@@ -1152,24 +1280,6 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.gitignore(), first)
         self.assertNotIn(".gitignore に足した", result.stdout)
-
-    def test_does_not_ignore_the_rules_that_sit_next_to_the_executable(self):
-        """置き場ごと無視しない。
-
-        `--bin` の綴りによっては、実行ファイルの置き場が rules.yml と同じ
-        ディレクトリになる。そこを丸ごと無視すると、そのプロジェクトが何を
-        止めるかまで git から消える。
-        """
-        src = self.make_source()
-        self.make_git()
-        result = self.run_setup("--bin", ".claude/ccnavi/ccnavi", "--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-        written = self.gitignore()
-        self.assertIn("/.claude/ccnavi/ccnavi\n", written)
-        self.assertIn(f"/.claude/ccnavi/{THIS_MACHINE}/\n", written)
-        self.assertNotIn("/.claude/ccnavi/\n", written)
-        self.assertNotIn("rules.yml", written)
 
     def test_writes_nothing_when_the_target_is_not_a_git_repository(self):
         """git で持っていない配布先に .gitignore を置いても、誰も読まない。"""
@@ -1204,37 +1314,216 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
 
 
 class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
-    """前の既定の置き場（.claude/ccnavi/ の実行ファイル）から移る。
+    """前の既定の置き場から移る。前の既定は 2 つある。
 
-    CCNAVI_BIN_PATH が前の綴りのままなら新しい綴りへ書き換え、前の実行ファイルと
-    同梱物を消す。どちらも、新しい置き場で hook が起動できるときだけ。同じ
-    ディレクトリの rules.yml は消さずに .ccnavi/common/ へ移す
-    （MovesCommonConfigOutOfTheOldPlace）。
+    - .claude/ccnavi/ の実行ファイル（2 つ前）
+    - .ccnavi/bin/ccnavi の振り分けの sh（1 つ前。組み立ては隣の <os>-<arch>/）
+
+    CCNAVI_BIN_PATH が前の綴りのままなら .ccnavi/scripts/ccnavi-launcher.sh へ 1 回で
+    書き換え、前に置いたものを消す。どちらも、新しい置き場で hook が起動できるときだけ。
+    同じディレクトリの rules.yml は消さずに .ccnavi/common/ へ移す
+    （MovesCommonConfigOutOfTheOldPlace）。.ccnavi/bin/<os>-<arch>/ は新しい置き場
+    そのものなので触らない。
     """
 
-    def old_place(self):
-        self.write_settings({"env": {"CCNAVI_BIN_PATH": OLD_BIN}})
+    def old_place(self, spelling=OLD_BIN):
+        self.write_settings({"env": {"CCNAVI_BIN_PATH": spelling}})
         old = self.deployed(".claude", "ccnavi")
         os.makedirs(os.path.join(old, "_internal"))
-        for name in ("ccnavi", os.path.join("_internal", "base_library.zip")):
+        for name in (os.path.basename(spelling), os.path.join("_internal", "base_library.zip")):
             with open(os.path.join(old, name), "w", encoding="utf-8") as f:
                 f.write("前の版\n")
         with open(os.path.join(old, "rules.yml"), "w", encoding="utf-8") as f:
             f.write("# このプロジェクトのルール\n")
         return old
 
+    def old_launcher(self, build=True, spelling=OLD_LAUNCHER):
+        """1 つ前の導入スクリプトが配った形を作る。
+
+        振り分けの sh を .ccnavi/bin/ccnavi に置き、env はそこを指す。build が真なら、
+        この機械の組み立ても隣の .ccnavi/bin/<os>-<arch>/ に在る。返すのは前の sh の場所。
+        """
+        self.write_settings({"env": {"CCNAVI_BIN_PATH": spelling}})
+        old = self.deployed(*OLD_LAUNCHER_PARTS)
+        os.makedirs(os.path.dirname(old), exist_ok=True)
+        shutil.copy(LAUNCHER, old)
+        os.chmod(old, 0o755)
+        if build:
+            os.makedirs(self.built(THIS_MACHINE, "_internal"))
+            with open(self.built(THIS_MACHINE, "ccnavi"), "w", encoding="utf-8") as f:
+                f.write("#!/bin/sh\nexit 0\n")
+            os.chmod(self.built(THIS_MACHINE, "ccnavi"), 0o755)
+            with open(
+                self.built(THIS_MACHINE, "_internal", "base_library.zip"), "w", encoding="utf-8"
+            ) as f:
+                f.write("前に配った同梱物")
+        return old
+
     def test_moves_the_setting_and_removes_the_old_executable(self):
+        """.claude/ccnavi/ccnavi からも、途中の綴りを経ずに 1 回で新しい綴りへ（S7）。"""
         old = self.old_place()
         result = self.run_setup("--deploy", self.make_source())
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
         self.assertFalse(os.path.exists(os.path.join(old, "ccnavi")))
         self.assertFalse(os.path.exists(os.path.join(old, "_internal")))
+        self.assertFalse(os.path.exists(self.deployed(*OLD_LAUNCHER_PARTS)))
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトのルール", f.read())
         self.assertIn("前の置き場から消した", result.stdout)
         self.assertIn("開き直して", result.stdout)
+
+    def test_moves_the_exe_spelling_in_one_run_too(self):
+        """.claude/ccnavi/ccnavi.exe も前の既定の綴り。同じく 1 回で新しい綴りへ（S7）。"""
+        old = self.old_place(spelling=OLD_BIN + ".exe")
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertFalse(os.path.exists(os.path.join(old, "ccnavi.exe")))
+        self.assertFalse(os.path.exists(self.deployed(*OLD_LAUNCHER_PARTS)))
+
+    def test_rewrites_the_old_launcher_path_and_removes_the_old_sh(self):
+        """前の既定 .ccnavi/bin/ccnavi を新しい綴りへ書き換え、前の sh を消す（S6）。
+
+        機械ごとの組み立て（.ccnavi/bin/<os>-<arch>/）は新しい置き場そのもの。消すと、
+        書き換えた env の先で hook が起動しない。
+        """
+        old = self.old_launcher()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertTrue(os.path.isfile(self.deployed(*LAUNCHER_PARTS)))
+        self.assertFalse(os.path.exists(old))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
+
+    def test_keeps_the_old_launcher_while_the_new_sh_is_missing(self):
+        """組み立てが在っても、新しい置き場に sh が無ければ書き換えも消しもしない（S8）。
+
+        書き換えると env の先に何も無く、hook が 127 で起動しなくなる。前の sh を消すと、
+        書き換えなかった env の先も無くなる。
+        """
+        old = self.old_launcher()
+        result = self.run_setup("--no-deploy")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_LAUNCHER)
+        self.assertTrue(os.path.isfile(old))
+        self.assertIn("移していません", result.stdout)
+
+    def test_keeps_the_old_launcher_when_only_another_machines_build_arrives(self):
+        """sh が届いても、この機械で動く組み立てが無ければ書き換えも消しもしない（S8）。"""
+        old = self.old_launcher(build=False)
+        result = self.run_setup("--deploy", self.make_source(target=ANOTHER_MACHINE))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_LAUNCHER)
+        self.assertTrue(os.path.isfile(old))
+        self.assertTrue(os.path.isfile(self.built(ANOTHER_MACHINE, "ccnavi")))
+
+    def test_keeps_the_old_launcher_when_the_source_has_no_sh(self):
+        """配布元に sh が無ければ新しい置き場は揃わない。書き換えも消しもしない（S8・S13）。"""
+        old = self.old_launcher()
+        result = self.run_setup("--deploy", self.make_source(launcher=False))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_LAUNCHER)
+        self.assertTrue(os.path.isfile(old))
+        self.assertFalse(os.path.exists(self.deployed(*LAUNCHER_PARTS)))
+
+    def test_does_not_remove_a_directory_at_the_old_launcher_path(self):
+        """.ccnavi/bin/ccnavi がディレクトリなら触らない（4.5 の 1）。
+
+        導入スクリプトが配ったのは通常のファイルだけ。ディレクトリは人が置いたもので、
+        中身が何かをここでは決められない。
+        """
+        self.write_settings({"env": {"CCNAVI_BIN_PATH": OLD_LAUNCHER}})
+        kept = self.deployed(*OLD_LAUNCHER_PARTS, "人が置いたもの.txt")
+        os.makedirs(os.path.dirname(kept))
+        with open(kept, "w", encoding="utf-8") as f:
+            f.write("消さない\n")
+
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertTrue(os.path.isfile(kept))
+
+    def test_rewrites_but_keeps_the_old_sh_while_this_session_runs_it(self):
+        """打ったセッションの env が前の sh を指していれば、書き換えるが消さない（S9）。
+
+        env はセッションを開き直すまで変わらない。消すと、そのセッションの hook が
+        開き直すまで何も起動せず、守りが黙って消える。開き直してから打ち直せば消える。
+        """
+        old = self.old_launcher()
+        src = self.make_source()
+        result = self.run_setup("--deploy", src, env=clean_env(CCNAVI_BIN_PATH=OLD_LAUNCHER))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
+        self.assertTrue(os.path.isfile(old))
+        self.assertIn("開き直してから打ち直す", result.stdout)
+
+        again = self.run_setup("--deploy", src)
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertFalse(os.path.exists(old))
+
+    def test_leaves_a_path_it_did_not_write_and_names_it(self):
+        """既定でない綴りは書き換えず、名指しで 1 行出す。終了コードは 0（S10）。
+
+        人が決めた綴りを、このスクリプトが前に書いた綴りと同じ扱いで置き換えない。前に
+        置いた sh と組み立てにも触らない。案内は `--bin --force` ではなく settings.json の
+        値の直し方。`--bin` はもう無い。
+        """
+        custom = "dist/ccnavi/ccnavi"
+        old = self.old_launcher(spelling=custom)
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], custom)
+        self.assertTrue(
+            any(custom in line and BIN_PATH in line for line in result.stdout.splitlines()),
+            result.stdout,
+        )
+        self.assertNotIn("--bin", result.stdout)
+        self.assertTrue(os.path.isfile(old))
+        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
+
+    def test_check_is_not_settled_by_a_path_it_did_not_write(self):
+        """既定でない綴りは、--check では「揃っていない」に数える（S10）。"""
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        settled = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(settled.returncode, 0, settled.stdout)
+
+        data = self.read_settings()
+        data["env"]["CCNAVI_BIN_PATH"] = "dist/ccnavi/ccnavi"
+        self.write_settings(data)
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("dist/ccnavi/ccnavi", result.stdout)
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], "dist/ccnavi/ccnavi")
+
+    def test_check_names_the_old_sh_without_removing_it(self):
+        """--check は前の sh を消さずに名前を挙げる（S11）。打てば消える。"""
+        old = self.old_launcher()
+        src = self.make_source()
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 1)
+        # 置き換える env の行と、配れないものの塊に出た綴りは数えない。どちらも
+        # 「消す」とは別の話で、そこに出ただけで通すと名前を挙げていないのに緑になる。
+        pattern = re.compile(r"(?<![\w./-])" + re.escape(OLD_LAUNCHER) + r"(?![\w./-])")
+        absent = section(result.stdout, "配布元に無くて配れないもの")
+        named = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if pattern.search(line) and "CCNAVI_BIN_PATH" not in line and line.strip() not in absent
+        ]
+        self.assertTrue(named, result.stdout)
+        self.assertTrue(os.path.isfile(old))
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_LAUNCHER)
+        self.assertFalse(os.path.exists(self.deployed(*LAUNCHER_PARTS)))
+
+        applied = self.run_setup("--deploy", src)
+        self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
+        self.assertFalse(os.path.exists(old))
 
     def test_keeps_the_old_place_when_the_new_one_is_not_ready(self):
         """新しい置き場で起動できないまま移すと、hook が何も起動しなくなる。"""
@@ -1258,7 +1547,7 @@ class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
         src = self.make_source()
         result = self.run_setup("--deploy", src, env=clean_env(CCNAVI_BIN_PATH=OLD_BIN))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], ".ccnavi/bin/ccnavi")
+        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], BIN_PATH)
         self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
         self.assertIn("開き直してから打ち直す", result.stdout)
 
@@ -1275,24 +1564,6 @@ class MovesOutOfTheOldPlace(DeploysWhatTheProjectNeeds):
         self.assertIn(".claude/ccnavi/_internal", result.stdout)
         self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
         self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_BIN)
-
-    def test_does_not_move_a_named_bin_without_force(self):
-        """--bin を名指ししたときの置き換えは、これまでどおり --force の仕事。"""
-        old = self.old_place()
-        result = self.run_setup("--bin", "tools/bin/ccnavi", "--deploy", self.make_source())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_BIN_PATH"], OLD_BIN)
-        self.assertTrue(os.path.exists(os.path.join(old, "ccnavi")))
-        self.assertIn("まだそこを指している", result.stdout)
-
-    def test_leaves_the_old_directory_alone_when_bin_lives_there(self):
-        """--bin が .claude/ccnavi/ なら、そこの ccnavi は振り分けの sh になる。"""
-        old = self.old_place()
-        result = self.run_setup("--bin", OLD_BIN, "--force", "--deploy", self.make_source())
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(os.path.exists(os.path.join(old, "_internal")))
-        self.assertTrue(os.path.isfile(os.path.join(old, THIS_MACHINE, "ccnavi")))
-        self.assertNotIn("前の置き場から消", result.stdout)
 
     def test_says_nothing_when_there_is_no_old_place(self):
         result = self.run_setup("--deploy", self.make_source())

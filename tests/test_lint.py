@@ -433,6 +433,63 @@ class LintTest(unittest.TestCase):
 
         self.assertNotIn("登録されていない", result.stdout)
 
+    # 振り分けの sh を指す env（設計 launcher-scripts 9 節）
+
+    def project_env(self, **env: str) -> None:
+        """`.claude/settings.json` の env だけを書く。hook の登録は書かない。"""
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"env": env}),
+        )
+
+    def lines(self, text: str, severity: str) -> list[str]:
+        return [line for line in text.splitlines() if line.startswith(f"{severity}:")]
+
+    def test_実行ファイルを前の既定の綴りで指していればwarnになる(self):
+        # N1。判定は動いているので warn。導入スクリプトを打ち直せば新しい綴りへ書き換わる。
+        # 件数は新しい綴りの回と比べる。設定ファイルを置いたこと自体が言われる分を数えないため。
+        rules_path = rules_file(self.root, SOUND)
+        self.project_env(CCNAVI_BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh")
+        base = lint(self.root, rules_path)
+        self.assertEqual(base.returncode, 0, base.stdout + base.stderr)
+
+        for old in (".ccnavi/bin/ccnavi", ".claude/ccnavi/ccnavi", ".claude/ccnavi/ccnavi.exe"):
+            with self.subTest(old=old):
+                self.project_env(CCNAVI_BIN_PATH=old)
+
+                result = lint(self.root, rules_path)
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                errors, warns = counts(result.stdout)
+                self.assertEqual(errors, counts(base.stdout)[0], result.stdout)
+                self.assertEqual(warns, counts(base.stdout)[1] + 1, result.stdout)
+                named = [line for line in self.lines(result.stdout, "warn") if old in line]
+                self.assertTrue(named, f"{old} を warn で名指ししていない: {result.stdout}")
+                self.assertIn("ccnavi-setup.sh", named[0])
+
+    @unittest.skipIf(os.name == "nt", "実行ビットは POSIX でだけ見る")
+    def test_指す先が在るのに実行できなければerrorになる(self):
+        # N2。hook は sh を直に起動するので、実行ビットが無いと 126 で起動しない。
+        # 判定そのものが動いていないので error。
+        spelled = ".ccnavi/scripts/ccnavi-launcher.sh"
+        launcher = write(self.root, os.path.join(".ccnavi", "scripts", "ccnavi-launcher.sh"), "")
+        rules_path = rules_file(self.root, SOUND)
+        self.project_env(CCNAVI_BIN_PATH=spelled)
+
+        os.chmod(launcher, 0o755)
+        runnable = lint(self.root, rules_path)
+        os.chmod(launcher, 0o644)
+        result = lint(self.root, rules_path)
+
+        self.assertEqual(counts(runnable.stdout)[0], 0, runnable.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 1, result.stdout)
+        named = [
+            line for line in self.lines(result.stdout, "error") if "ccnavi-launcher.sh" in line
+        ]
+        self.assertTrue(named, f"実行できない sh を error で名指ししていない: {result.stdout}")
+
     def test_git_の作業ツリーでなければ監視が何も見ないとwarnになる(self):
         # 登録はされているのに見る先が無い状態。実行後の監視は git の差分で
         # 見るので、リポジトリでない場所では 1 件も検知しない。
