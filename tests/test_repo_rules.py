@@ -1,7 +1,7 @@
 """このリポジトリの本物のルール（.ccnavi/common/rules.yml）と組み込みルールで判定する受入テスト。
 
 tests/fixtures/ のルールではなく、運用に使っている rules.yml をそのまま `--test` に
-渡す。見るのは、shellread が印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
+渡す。見るのは、shellread が目印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
 §4「見本 → 判定」）。ルールの `[^\\x00]*` が「同じコマンドの中」だけを指すようになり、
 引用付きの grep / find が allow に当たる一方、引用の空白をまたいだ書き換えが deny に
 届くこと。変わってはいけないもの（§3）も同じ表で固定する。
@@ -87,7 +87,7 @@ class RepoRulesTest(unittest.TestCase):
             'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml',
             """grep -n "regex: '(>" /repo/.ccnavi/common/rules.yml""",
             'grep -n "<<EOF" /repo/README.md',
-            # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の印を
+            # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の目印を
             # 食わなくなって、はじめて allow に届く。
             'grep -n "> /repo/.ccnavi/common/rules.yml" f',
         ]:
@@ -106,7 +106,7 @@ class RepoRulesTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", rule_id)
 
-    def test_入力に混ざった語の中の印は取り除かれる(self):
+    def test_入力に混ざった語の中の目印は取り除かれる(self):
         # `git␁push` のまま読むと実在しない 1 語で、どのルールにも当たらない。
         # 取り除いて `git push` と読み、raw-git に当たる。
         self.assert_verdict("git" + shellread.WORD_SEP + "push", "deny", "raw-git")
@@ -143,8 +143,8 @@ class RepoRulesTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
 
-    def test_設定の場所の名前は語の中の印でも終わる(self):
-        # selfguard の `_TERM` / `_END` は語の中の印も語の終わりとして数える。
+    def test_設定の場所の名前は語の中の目印でも終わる(self):
+        # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
         # 数えないと、分ける前に止まっていた綴りが通るようになる。
         for subject in [
             'rm ".ccnavi x"',

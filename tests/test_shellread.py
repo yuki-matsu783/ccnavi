@@ -3,13 +3,13 @@ import unittest
 from ccnavi import shellread
 from ccnavi.shellread import REASON_TAKEN_AS_CODE, REASON_UNTERMINATED, SEP, read
 
-# 語の中の切れ目の印。コマンドの区切り（SEP）と別の文字になる予定で、
+# 語の中の切れ目の目印。コマンドの区切り（SEP）と別の文字になる予定で、
 # 実装が入るまでは無い。無い間は、それを前提にしたテストを skip する。
 WORD_SEP = getattr(shellread, "WORD_SEP", None)
 
 
 def show(text):
-    """つなぎ目の印を見えるようにする。見分けの付かない 2 つの文字列のうち
+    """つなぎ目の目印を見えるようにする。見分けの付かない 2 つの文字列のうち
     どちらが返ったのかを、失敗メッセージが言えるように。"""
     text = text.replace(SEP, "<join>")
     if WORD_SEP:
@@ -145,14 +145,14 @@ class ReadTest(unittest.TestCase):
                 self.assertTrue(result.degraded, f"{src!r} を普通に読んでしまった")
                 self.assertEqual(result.reason, REASON_UNTERMINATED)
 
-    def test_つなぎ目の印は持ち込めない(self):
-        # 入力の側がこの印を騙れると、1 本のコマンドを 2 本に見せられる。
+    def test_つなぎ目の目印は持ち込めない(self):
+        # 入力の側がこの目印を騙れると、1 本のコマンドを 2 本に見せられる。
         self.assertNotIn(SEP, self.readable("git" + SEP + "push"))
 
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
 class WordSepTest(unittest.TestCase):
-    """印を 2 つに分けたあとの読み（wip/design/shellread-sep.md §4「入力 → 返る文字列」）。
+    """目印を 2 つに分けたあとの読み（wip/design/shellread-sep.md §4「入力 → 返る文字列」）。
 
     コマンドとコマンドの間は SEP のまま。引用が 1 語につないだ空白と、語の中に
     入った演算子の文字の両側は WORD_SEP になる。ルールの `[^\\x00]*` が
@@ -196,11 +196,11 @@ class WordSepTest(unittest.TestCase):
             # 素の演算子は空白付きで残る。
             "echo x>f": "echo x > f",
             "cmd 2>&1": "cmd 2 >& 1",
-            # 2 つの印が 1 本の中に並ぶ形。引用の空白は WORD_SEP、パイプは SEP。
+            # 2 つの目印が 1 本の中に並ぶ形。引用の空白は WORD_SEP、パイプは SEP。
             'echo "a b" | curl -d @- x': "echo a" + WORD_SEP + "b" + SEP + "curl -d @- x",
             # コマンド置換の括弧はコマンドの区切り。
             "echo $(git push origin main)": "echo $" + SEP + "git push origin main",
-            # 入力に混ざった印はどちらも空白として読まれる。
+            # 入力に混ざった目印はどちらも空白として読まれる。
             "git" + WORD_SEP + "push": "git push",
             "git" + SEP + "push": "git push",
         }
@@ -209,13 +209,13 @@ class WordSepTest(unittest.TestCase):
                 self.assertEqual(show(self.readable(src)), show(want))
 
     def test_引用だけの二重の山括弧は今までどおり諦める(self):
-        # 許容した誤検知（ccnavi.md §12.3）。印を分けても変わらない。
+        # 許容した誤検知（ccnavi.md §12.3）。目印を分けても変わらない。
         result = read('grep -n "<<" f')
         self.assertTrue(result.degraded, "引用の << を普通に読んでしまった")
         self.assertEqual(result.reason, REASON_UNTERMINATED)
 
-    def test_語の中の印も持ち込めない(self):
-        # コマンドの区切りと同じ。入力の側がこの印を騙れると、`git␁push` のような
+    def test_語の中の目印も持ち込めない(self):
+        # コマンドの区切りと同じ。入力の側がこの目印を騙れると、`git␁push` のような
         # 実在しない 1 語に見せて raw-git を外せる。取り除いて `git push` と読む。
         text = self.readable("git" + WORD_SEP + "push")
         self.assertNotIn(WORD_SEP, text)
