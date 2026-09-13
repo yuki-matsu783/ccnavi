@@ -162,7 +162,8 @@ Claude Code がセッションのプロセスに環境変数として渡す（AD
 `--lint` が error で名指しし、導入スクリプトは `--mode disable` を断る。
 
 読めない値は報告して `enable` に倒す。緩む側には倒れない。廃止した変数（`CCNAVI_TICKET`、
-`CCNAVI_LEDGER`、`CCNAVI_GUARD_CLI`、`CCNAVI_PROJECT_RULES`）は `--lint` が名指しする。
+`CCNAVI_LEDGER`、`CCNAVI_GUARD_CLI`、`CCNAVI_PROJECT_RULES`、`CCNAVI_TICKETS`、`CCNAVI_APPROVED`）は
+`--lint` が名指しする。
 
 ### 4.4 動作モード
 
@@ -634,8 +635,8 @@ compact・clear のどの回も）にこの使い分けをモデルへ渡す。�
 
 | 何 | 場所 | 誰が書く | git |
 |---|---|---|---|
-| 提案（親も子も） | `wip/tickets/<状態>/<識別子>.md`（`CCNAVI_TICKETS`、ツリーのルートからの相対）。状態は `todo` / `doing` / `done` / `cancelled` の 4 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（§11） | `todo/` は親が書く。置き場を動かすのは保護済みスクリプトだけ | それを持つリポジトリにコミット |
-| 承認済みチケット | 親チケットのツリーの `.ccnavi/tickets/<識別子>.md`（`CCNAVI_APPROVED`、ツリーのルートからの相対） | `ccnavi --approve`（人）。コミットと push は `ccnavi-approve.sh` | 親のブランチにコミット |
+| 提案（親も子も） | `wip/tickets/<状態>/<識別子>.md`（`CCNAVI_TICKETS_PROPOSAL`、ツリーのルートからの相対）。状態は `todo` / `doing` / `done` / `cancelled` の 4 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（§11） | `todo/` は親が書く。置き場を動かすのは保護済みスクリプトだけ | それを持つリポジトリにコミット |
+| 承認済みチケット | 親チケットのツリーの `.ccnavi/tickets/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`、ツリーのルートからの相対） | `ccnavi --approve`（人）。コミットと push は `ccnavi-approve.sh` | 親のブランチにコミット |
 | 閉じた承認済みチケット | 同 `closed/<識別子>.md` | hook が提案の `done/` `cancelled/` を見て動かす | 親のブランチにコミット |
 | フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `wrapup.json`、受け入れた指摘の `accepted.json` | レビューのスクリプト、人 | 親のブランチにコミット |
