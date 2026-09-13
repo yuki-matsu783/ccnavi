@@ -33,6 +33,9 @@ ccnavi_approved:
   approved_at: 2026-09-13T22:18:50+0900
   source_tree: launcher-scripts
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/launcher-scripts/wip/tickets/todo/launcher-scripts-05.md
+started_at: 2026-09-13T22:25:25+0900
+base_sha: c88c399a92df08a4f54c5c73f640b1a69e47951b
+completed_at: 2026-09-13T22:58:23+0900
 ---
 
 # 実装する
