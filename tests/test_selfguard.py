@@ -345,7 +345,7 @@ class SelfGuardTest(unittest.TestCase):
         # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
         # なくそのプロジェクトで、作業ツリー側の設定が入るのもそのプロジェクトから切った
         # 作業ツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
-        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py が黒箱で見る。
+        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py がブラックボックスで見る。
         self.worktree()
         projects = os.path.join(self.repo, "projects")
         home = os.path.join(projects, "lib")
