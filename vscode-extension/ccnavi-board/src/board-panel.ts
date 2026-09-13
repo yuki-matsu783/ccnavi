@@ -350,10 +350,12 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   current.approval = { kind: "approving", preview };
   redraw(current);
   // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らない束と比べて食い違いにする。
+  // 見せた本文の指紋も渡す。識別子が同じでも、見せたあとに提案の中身が変われば承認しない。
   const outcome = await runApproveYes(
     current.folder.uri.fsPath,
     binSetting(),
     tickets,
+    preview.digest,
     current.approvalOnly ?? [],
   );
   if (state !== current) {
@@ -375,8 +377,12 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
     if (state !== current) {
       return;
     }
+    const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
+    const notice = sameIds
+      ? "見せた承認画面と今の本文が違った（提案の中身が変わった）。見直してから承認する"
+      : "見せた束と今の束が違った（提案が増えたか減った）。見直してから承認する";
     current.approval = again.ok
-      ? { kind: "preview", preview: again.value, notice: "見せた束と今の束が違った（提案が増えたか減った）。見直してから承認する" }
+      ? { kind: "preview", preview: again.value, notice }
       : { kind: "error", error: again.error };
     redraw(current);
     return;

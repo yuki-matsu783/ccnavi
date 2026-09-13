@@ -24,6 +24,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -586,6 +587,7 @@ def preview(
         "generated_at": now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
+        "digest": text_digest(gathered.text),
         "rejected": [
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
@@ -594,6 +596,17 @@ def preview(
     }
     stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     return 0
+
+
+def text_digest(text: str) -> str:
+    """承認画面の本文の指紋。UTF-8 にした SHA-256 の 16 進（小文字）。
+
+    ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
+    見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
+    人が合意したのは画面に出た本文なので、本文ごと比べる。本文は呼ぶたびに変わる
+    中身（時刻など）を持たない。
+    """
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _batch_entry(cand: Candidate) -> dict:
@@ -618,12 +631,15 @@ def approve_yes(
     expected: list[str],
     as_json: bool,
     only: list[str] | None = None,
+    digest: str = "",
 ) -> int:
-    """`--approve --yes <識別子,…> [<絞り>...]`。拡張のオーバーレイで人が押した承認。
+    """`--approve --yes <識別子,…> --digest <指紋> [<絞り>...]`。拡張のオーバーレイで押した承認。
 
     端末の壁は通らない。代わりに、見せた束と今の束が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する道を塞ぐため。
+    ものを承認する道を塞ぐため。識別子に加えて、見せた本文の指紋（`digest`）も比べる。
+    識別子が同じでも、見せたあとに提案の範囲や計画が書き換われば承認しない。
+    指紋が無ければ承認しない（指紋を渡さない古いボード）。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
     「そのとき掛けていた絞り」（`--approve --preview` に渡したものと同じ）。分けないと検査が
@@ -632,22 +648,40 @@ def approve_yes(
     """
     wanted = sorted({s.strip() for s in expected if s.strip()})
     narrowed = [s.strip() for s in (only or []) if s.strip()]
+    shown = digest.strip()
+    if not shown:
+        stderr.write(
+            "ccnavi: --yes には --digest（見せた承認画面の本文の指紋）が要る。"
+            "ボードが古いので、入れ直してから承認の画面を開き直す\n"
+        )
+        return 1
     gathered = gather(stderr, conf, root, narrowed)
     # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
     # ボードが古い。拡張には食い違いとして返し、束を読み直させる。
-    current = gather(stderr, conf, root).identifiers if gathered.refused else gathered.identifiers
-    if wanted != current:
+    now_shown = gather(stderr, conf, root) if gathered.refused else gathered
+    current, current_digest = now_shown.identifiers, text_digest(now_shown.text)
+    if wanted != current or shown.lower() != current_digest:
         if as_json:
             body = {
                 "version": APPROVE_VERSION,
-                "mismatch": {"expected": wanted, "current": current},
+                "mismatch": {
+                    "expected": wanted,
+                    "current": current,
+                    "digest": {"expected": digest, "current": current_digest},
+                },
             }
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        stderr.write(
-            "ccnavi: 見せた束と今の束が違う（見せた: "
-            f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-            "見直してから承認する\n"
-        )
+        if wanted != current:
+            stderr.write(
+                "ccnavi: 見せた束と今の束が違う（見せた: "
+                f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
+                "見直してから承認する\n"
+            )
+        else:
+            stderr.write(
+                "ccnavi: 見せた承認画面の本文と今の本文が違う（識別子は同じで、提案の中身が"
+                "変わった）。見直してから承認する\n"
+            )
         return 1
     if not gathered.batch:
         stderr.write("ccnavi: 承認するものが無い\n")

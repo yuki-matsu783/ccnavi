@@ -8,7 +8,7 @@
  * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。
  *
  * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
- * ターミナルに送る。push は外へ出す操作なので、送った 1 行を人が見て、そのまま走らせる。
+ * ターミナルに Enter まで送る。承認と同時に端末で走り、人は端末でその結果を見る。
  */
 import * as path from "node:path";
 
@@ -47,16 +47,18 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 }
 
 /**
- * `--approve --yes <識別子,…> --json [<絞り>...]`。見せた束をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`only` はそのとき preview に渡した絞り。
+ * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた束をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた本文の指紋（preview の `digest`）、
+ * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らない束」と見せた識別子を比べるので、
- * 絞り込み中の承認がいつも食い違いになる。
+ * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
  */
 export function approveArgs(
   tickets: readonly string[],
+  digest: string,
   only: readonly string[] = [],
 ): readonly string[] {
-  return ["--approve", "--yes", tickets.join(","), "--json", ...only];
+  return ["--approve", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /**
