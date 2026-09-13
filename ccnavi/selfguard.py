@@ -100,7 +100,7 @@ import time
 from dataclasses import dataclass
 from typing import TextIO
 
-from . import fsio, gitstate, rules, tree
+from . import fsio, gitstate, rules, shellread, tree
 from .modes import DISABLE, DRY_RUN, ENABLE
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
@@ -169,12 +169,17 @@ _SETTINGS_FILES = (
 #      shellread が `> 行き先` の形に均してから渡してくる。
 #   2. 名指ししたところを必ず書き換えるコマンド。`\x00` はコマンドの切れ目に
 #      shellread が置く印で、`(^|\x00)` はコマンドの先頭を意味する。
+#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の印
+#      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
+#      1 のリダイレクトの行き先だけは、語の中の印まで食うと引用の中の `> 場所` が
+#      書き込み先に見えるので、そちらも除外する。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。
 #
 # 元と行き先がある cp / ln / install は組が違うので後ろに分けてある。見るのは
 # 行き先の側だけで、行き先は最後の引数なので、コマンドの終わりに来た形に絞る。
+_NOT_A_WORD = re.escape(shellread.SEP) + re.escape(shellread.WORD_SEP)
 _WRITE_VERBS = (
-    r"(>[>|&]* ?[^ \x00]*"
+    rf"(>[>|&]* ?[^ {_NOT_A_WORD}]*"
     r"|(^|\x00)(mv|rm|tee|dd|truncate|patch|shred)\b[^\x00]*"
     r"|(^|\x00)sed\b[^\x00]*-i[^\x00]*)"
 )
