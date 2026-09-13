@@ -38,6 +38,7 @@ import {
 import { renderProjectsPage } from "./core/projects-render.js";
 import { escapeHtml } from "./core/render.js";
 import { readOrigin } from "./git.js";
+import { openPhases } from "./phases-panel.js";
 import { openRules } from "./rules-panel.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
@@ -56,6 +57,8 @@ type Message =
   | { readonly type: "createSelfRules" }
   | { readonly type: "openRules"; readonly name: string }
   | { readonly type: "openSelfRules" }
+  | { readonly type: "openPhases"; readonly name: string }
+  | { readonly type: "openSelfPhases" }
   | { readonly type: "openBoard"; readonly name: string }
   | { readonly type: "fetch"; readonly name: string }
   | { readonly type: "pull"; readonly name: string };
@@ -358,6 +361,12 @@ async function handleMessage(current: PanelState, message: Message | undefined):
     case "openSelfRules":
       await openRules({ kind: "self" });
       return;
+    case "openPhases":
+      await openPhases({ kind: "project", name: message.name });
+      return;
+    case "openSelfPhases":
+      await openPhases({ kind: "self" });
+      return;
     case "openBoard":
       if (ticketControl() !== "enable") {
         fail(current, "このワークスペースではチケット制御が無効です（CCNAVI_TICKET_CONTROL=disable）");
@@ -504,11 +513,13 @@ function asMessage(message: unknown): Message | undefined {
     case "fixIgnore":
     case "createSelfRules":
     case "openSelfRules":
+    case "openSelfPhases":
       return { type: m.type };
     case "clone":
       return typeof m.url === "string" && named !== undefined ? { type: "clone", url: m.url, name: named } : undefined;
     case "createRules":
     case "openRules":
+    case "openPhases":
     case "openBoard":
     case "fetch":
     case "pull":

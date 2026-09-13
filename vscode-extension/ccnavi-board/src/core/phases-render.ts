@@ -24,6 +24,13 @@ export interface PhasesPage {
   readonly ticketControl: string;
   readonly model: PhasesModel;
   readonly lock: Lock;
+  /**
+   * 層（自身の層かプロジェクト）の種類か。層はファイルが無くても編集でき、最初の保存でファイルを作る。
+   * 雛形は置かない（雛形の id は共通層の種類と重なりやすい）
+   */
+  readonly layer?: boolean;
+  /** 上部に出す注意（実行ファイルがこの層を読めていない、など） */
+  readonly notices?: readonly string[];
 }
 
 export interface RenderOptions {
@@ -48,6 +55,8 @@ export function renderPhasesPage(page: PhasesPage, options: RenderOptions): stri
     form: page.model.form,
     lock: page.lock,
     exists: page.exists,
+    // 欄を触れるか。共通層はファイルが無ければ「雛形で作る」まで触れない。層は無くても足して保存できる。
+    editable: page.exists || page.layer === true,
     kinds: PHASE_KINDS.map((k) => ({ value: k, label: KIND_LABELS[k] })),
     reviews: REVIEWS.map((r) => ({ value: r, label: REVIEW_LABELS[r] })),
   }).replace(/</g, "\\u003c");
@@ -63,7 +72,7 @@ ${STYLE}
 </style>
 </head>
 <body>
-${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.phasesPath)}</span>
@@ -99,9 +108,16 @@ function renderTicketControlBanner(ticketControl: string): string {
   return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効かない</div>\n`;
 }
 
+function renderNotices(notices: readonly string[]): string {
+  return notices.map((n) => `<div class="banner warn">${escapeHtml(n)}</div>\n`).join("");
+}
+
 function renderMissing(page: PhasesPage): string {
   if (page.exists) {
     return "";
+  }
+  if (page.layer === true) {
+    return `<div class="banner missing"><span>${escapeHtml(page.phasesPath)} が無い。無い層は空で、共通層の種類だけが使われる。この層に種類を足すなら、下で足して保存する（最初の保存でファイルが作られる）。雛形は置かない。雛形の id は共通層の種類と重なりやすく、中身が違えばこの層が空として扱われるため。</span></div>\n`;
   }
   return `<div class="banner missing"><span>${escapeHtml(page.phasesPath)} が無い。実行ファイルはフェーズを番号だけで扱っていて、親チケットの <code>plan:</code> も読めない。種類を使うにはまずファイルを作る。雛形は README の例で、<code>scope</code> の綴りは作ったあとにこのプロジェクトの置き場へ直す。</span><button type="button" class="action primary" data-action="create">雛形でファイルを作る</button></div>\n`;
 }
@@ -222,7 +238,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function field(target, name, className, placeholder) {
     const input = h("input", { type: "text", class: className, spellcheck: "false", placeholder: placeholder || "" });
     input.value = target[name];
-    input.disabled = !page.exists;
+    input.disabled = !page.editable;
     input.addEventListener("input", () => { target[name] = input.value; markDirty(); });
     return input;
   }
@@ -230,7 +246,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function listField(target, name, className, placeholder) {
     const input = h("input", { type: "text", class: className, spellcheck: "false", placeholder: placeholder || "" });
     input.value = target[name].join(", ");
-    input.disabled = !page.exists;
+    input.disabled = !page.editable;
     input.addEventListener("input", () => { target[name] = splitList(input.value); markDirty(); });
     return input;
   }
@@ -243,7 +259,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function selectField(target, name, choices, className, onChange) {
     const select = h("select", { class: className }, choices.map((c) => option(c.value, c.label, c.value === target[name])));
-    select.disabled = !page.exists;
+    select.disabled = !page.editable;
     select.addEventListener("change", () => { target[name] = select.value; markDirty(); if (onChange) { onChange(); } });
     return select;
   }
@@ -257,7 +273,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       option("inherit", "inherit（親の範囲そのまま）", phase.inherit),
       option("globs", "上限を書く（glob の並び）", !phase.inherit),
     ]);
-    scopeSelect.disabled = !page.exists;
+    scopeSelect.disabled = !page.editable;
     scopeSelect.addEventListener("change", () => { phase.inherit = scopeSelect.value === "inherit"; markDirty(); renderAll(); });
     const rows = [
       h("div", { class: "phase-row" }, [
@@ -285,19 +301,19 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
-    b.disabled = !page.exists;
+    b.disabled = !page.editable;
     b.addEventListener("click", () => shift(key, -1));
     return b;
   }
   function downButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
-    b.disabled = !page.exists;
+    b.disabled = !page.editable;
     b.addEventListener("click", () => shift(key, 1));
     return b;
   }
   function deleteButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "削除" });
-    b.disabled = !page.exists;
+    b.disabled = !page.editable;
     b.addEventListener("click", () => remove(key));
     return b;
   }
@@ -305,10 +321,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const list = document.getElementById("phases");
     list.textContent = "";
     for (const phase of form.phases) { list.appendChild(renderPhase(phase)); }
-    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
+    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : page.editable ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
     document.getElementById("phase-count").textContent = String(form.phases.length);
     const add = document.querySelector("button[data-action=add]");
-    if (add) { add.disabled = !page.exists; }
+    if (add) { add.disabled = !page.editable; }
     updateSave();
   }
   function markDirty() {
@@ -335,7 +351,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       if (phase && input) { input.classList.toggle("duplicate", dup.has(phase.id.trim())); }
     }
     const save = document.getElementById("save");
-    save.disabled = !dirty || lock.locked || busy || !page.exists || dup.size > 0;
+    save.disabled = !dirty || lock.locked || busy || !page.editable || dup.size > 0;
     const lockEl = document.getElementById("lock");
     lockEl.textContent = lock.reason;
     lockEl.classList.toggle("hidden", !lock.locked);
@@ -379,7 +395,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
-    for (const el of document.querySelectorAll("#phases input, #phases select, #phases button, button[data-action=add]")) { el.disabled = on || !page.exists; }
+    for (const el of document.querySelectorAll("#phases input, #phases select, #phases button, button[data-action=add]")) { el.disabled = on || !page.editable; }
     updateSave();
     if (text) { status(text, false); }
   }
