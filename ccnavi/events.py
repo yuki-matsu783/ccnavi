@@ -108,7 +108,7 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            rule_set, source = ruleload.load_rules(stderr, conf.rules, record, root)
+            rule_set, source = ruleload.load_rules(stderr, conf, record, root)
             if source != builtin.SOURCE:
                 ruleload.add_layers(
                     stderr, rule_set, ruleload.layer_for(conf, root, t), root, record
