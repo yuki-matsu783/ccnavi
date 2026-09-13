@@ -245,7 +245,10 @@ api_failed() {
 pages() {
 	rel="$1"
 	page=1
-	sep=$(case "$rel" in *\?*) echo '&' ;; *) echo '?' ;; esac)
+	case "$rel" in
+	*\?*) sep='&' ;;
+	*) sep='?' ;;
+	esac
 	all='[]'
 	while :; do
 		chunk=$(api GET "$rel${sep}per_page=100&page=$page")
@@ -548,7 +551,7 @@ ready)
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	still=$(undraft "$number")
-	[ "$still" = "false" ] || fail "Draft を外せなかった（$url）。ホストの返事は上に出ている。"
+	[ "$still" = "false" ] || fail "Draft を外せなかった（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi

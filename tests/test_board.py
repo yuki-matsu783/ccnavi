@@ -145,8 +145,15 @@ def _portable(value, root: str):
         return [_portable(v, root) for v in value]
     if isinstance(value, str):
         # 作業ツリーの根は normcase 済み（Windows では小文字）で出るので、綴りを問わず置き換える。
+        # ccnavi は根を行き着く先まで解いた綴りで出す（macOS の /var → /private/var）。
+        # 解いた綴りを先に置き換える。後にすると、中に含まれる元の綴りだけが先に
+        # 置き換わって `/private<root>` が残る。
         text = value.replace("\\", "/")
-        return re.sub(re.escape(root.replace("\\", "/")), "<root>", text, flags=re.IGNORECASE)
+        for spelling in dict.fromkeys((os.path.realpath(root), root)):
+            text = re.sub(
+                re.escape(spelling.replace("\\", "/")), "<root>", text, flags=re.IGNORECASE
+            )
+        return text
     return value
 
 

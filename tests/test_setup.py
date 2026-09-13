@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shutil
@@ -19,6 +20,22 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
+
+
+def _load_build():
+    """build.py を名前でなく場所で読む。`import build` は PyInstaller の作業場所
+    （build/）や同名のパッケージを掴みうる。"""
+    spec = importlib.util.spec_from_file_location("ccnavi_build", os.path.join(ROOT, "build.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# この機械で組み立てたときに build.py が書く印。導入スクリプトはこれを自分の uname と
+# 比べる。ここを本物の build_target から取るので、2 つの語がずれればテストが落ちる。
+THIS_MACHINE = _load_build().build_target()
+# どの機械とも一致しない印。
+ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 
@@ -662,15 +679,22 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     プロジェクトの中に実体を置く経路がこのスクリプトに要る。
     """
 
-    def make_source(self, built=True, parts=True):
+    def make_source(self, built=True, parts=True, target=THIS_MACHINE):
         """配布元のふりをするディレクトリを作る。
 
         本物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
         「どこから何を配るか」であって、実行ファイルの中身ではない。
+
+        target は build.py が dist/ccnavi.target に書く印。None なら書かない
+        （印を書く前の build.py で組んだ配布元）。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
         if built:
+            if target is not None:
+                os.makedirs(os.path.join(src, "dist"), exist_ok=True)
+                with open(os.path.join(src, "dist", "ccnavi.target"), "w", encoding="utf-8") as f:
+                    f.write(target + "\n")
             binary = os.path.join(src, "dist", "ccnavi", "ccnavi")
             os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
             with open(binary, "w", encoding="utf-8") as f:
@@ -949,6 +973,51 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     def test_refuses_deploy_without_its_value(self):
         result = self.run_setup("--deploy")
         self.assertEqual(result.returncode, 2)
+
+
+class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
+    """実行ファイルがこの機械で動くかを、配る前に見る。
+
+    PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かない。別の機械
+    向けを配ってもファイルは在るので、見ないと hook が起動できないまま黙って死ぬ。
+    """
+
+    def bin_deployed(self):
+        return os.path.exists(self.deployed(".claude", "ccnavi", "ccnavi"))
+
+    def test_refuses_a_named_source_built_for_another_machine(self):
+        src = self.make_source(target=ANOTHER_MACHINE)
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(f"{ANOTHER_MACHINE} 向け", result.stderr)
+        self.assertFalse(self.bin_deployed())
+        self.assertFalse(os.path.exists(self.settings_path()))
+
+    def test_default_source_for_another_machine_writes_only_the_settings(self):
+        """既定の配布元は「組み立てていない」と同じ扱い。配らずに理由を出し、設定は書く。"""
+        src = self.make_source(target=ANOTHER_MACHINE)
+        result = self.run_copied(self.install_script(src))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"{ANOTHER_MACHINE} 向け", result.stdout)
+        self.assertFalse(self.bin_deployed())
+        self.assertTrue(os.path.exists(self.settings_path()))
+
+    def test_deploys_a_build_for_this_machine_without_a_note(self):
+        src = self.make_source()
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.bin_deployed())
+        self.assertNotIn("確かめていません", result.stdout)
+        # 印は dist/ccnavi/ の外にあるので、配布先へは写らない。
+        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi.target")))
+        self.assertFalse(os.path.exists(self.deployed(".claude", "ccnavi", "ccnavi.target")))
+
+    def test_deploys_an_old_build_without_the_mark_and_says_so(self):
+        src = self.make_source(target=None)
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.bin_deployed())
+        self.assertIn("ccnavi.target が無いので", result.stdout)
 
 
 class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):

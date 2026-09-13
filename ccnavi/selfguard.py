@@ -1285,8 +1285,12 @@ def _write(path: str, content: bytes) -> str:
 
 def _relative(base: str, path: str) -> str:
     """報告と git に渡すための、base からの相対。
-    別のドライブに在るなど、相対にできないものは絶対のまま返す。"""
+    別のドライブに在るなど、相対にできないものは絶対のまま返す。
+
+    base も行き着く先まで解く。path（Target.path）は解いた綴りで来るので、base が
+    リンクを含むまま（macOS の /var → /private/var など）だと、相対が base の外へ
+    `../` で回り込み、git に渡す綴りが別の場所を指して戻せなくなる。"""
     try:
-        return os.path.relpath(path, base)
+        return os.path.relpath(path, os.path.realpath(base))
     except ValueError:
         return path
