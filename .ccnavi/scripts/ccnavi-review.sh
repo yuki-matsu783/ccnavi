@@ -379,7 +379,7 @@ undraft() {
 		pr=$(api GET "repos/$path/pulls/$mr_number")
 		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
 		[ -n "$node" ] || fail "マージリクエスト #$mr_number の node_id を読めない。"
-		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は旗で持つので、旗を下ろすときに題からも落とす。
+		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも落とす。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
