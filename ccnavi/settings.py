@@ -66,8 +66,10 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
 # git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
 # 判定が読むのは承認済みチケットだけで、提案のほうは承認の画面と状態の同期しか読まない。
-TICKETS_ENV = "CCNAVI_TICKETS"
-APPROVED_ENV = "CCNAVI_APPROVED"
+# 2 つとも `CCNAVI_TICKETS_` で始めて対にする。以前は CCNAVI_TICKETS と CCNAVI_APPROVED で、
+# 後者が何の置き場なのかが名前から読めなかった。
+TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL"
+APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
 # PHASES_ENV はフェーズの種類の定義。ワークスペースルートからの相対。無ければ番号だけの挙動。
 PHASES_ENV = "CCNAVI_PHASES"
 # RISK_ENV は実績で測るリスクの配点。ワークスペースルートからの相対。無ければ組み込みの配点。
@@ -94,6 +96,11 @@ RETIRED_ENVS = (
     # 層の置き場が 3 本まとめて `CCNAVI_PROJECT_HOME` の下に移った（設計 §25.2）。
     # 旧の綴り（`config/rules.yml`）はもう読まない。
     "CCNAVI_PROJECT_RULES",
+    # チケットの置き場 2 つを CCNAVI_TICKETS_PROPOSAL / CCNAVI_TICKETS_APPROVED に改名した。
+    # 旧名で既定と違う置き場を指していた設定は、既定の置き場で動く。書いた人には
+    # チケットが見つからない理由が分からないので、名前を挙げて知らせる。
+    "CCNAVI_TICKETS",
+    "CCNAVI_APPROVED",
 )
 
 # 旧のプロジェクトのルールの置き場。読まないが、まだそこに置いてあるワークスペースに
