@@ -10,7 +10,7 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.cli import full_path
+from ccnavi.judge import full_path
 
 
 class FullPathTest(unittest.TestCase):

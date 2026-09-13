@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・印・ゲート・作業ツリーは
+ * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・ゲート・作業ツリーは
  * カードのバッジで出す。ゲートの開閉や承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
@@ -75,7 +75,7 @@ export interface Card {
   readonly seenIn: readonly SeenInJson[];
   /** どれが本物か決まらない写りの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
   readonly scattered: readonly SeenInJson[];
-  /** 子なら自分のフェーズの印、親なら空 */
+  /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
   readonly pendingApproval: boolean;

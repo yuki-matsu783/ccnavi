@@ -12,13 +12,7 @@ export const LAYER_SELF = "self";
 /** 層の名札に予約してある綴り。この名前のプロジェクトは層として数えない */
 const RESERVED = ["common", LAYER_SELF];
 
-/**
- * 旧のプロジェクトのルールの置き場。git プロジェクトルートからの相対。実行ファイルはもう読まない（設計 §11.12）。
- * 残っていれば「読まれていない」と示すためだけに持つ。
- */
-export const OLD_PROJECT_RULES = "config/rules.yml";
-
-/** ワークスペース自身の層。古い実行ファイルなら undefined */
+/** ワークスペース自身の層。実行ファイルは常に出す。JSON に無ければ undefined */
 export function selfLayer(board: BoardJson): LayerJson | undefined {
   return board.layers.find((l) => l.name === LAYER_SELF);
 }

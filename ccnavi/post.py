@@ -59,7 +59,7 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 READ_ONLY_TOOLS = ("Read", "Grep", "Glob", "WebFetch", "WebSearch")
 
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
-# 設計 §18.6 が監査に残す事象名がそのまま POST_VIOLATION。
+# 設計 §7.2 が監査に残す事象名がそのまま POST_VIOLATION。
 CODE_VIOLATION = "POST_VIOLATION"
 # 前から在った変更には別のコードを立てる。同じコードで送ると、受け取った側に
 # 「直前の実行が壊したもの」と「元から汚れていたもの」を見分ける手が無くなる。
@@ -112,13 +112,12 @@ def check(
     （dry-run）では復元も行わない。呼び出しにも作業ツリーにも手を出さないことが
     そのモードの約束なので、自分の判断でファイルを動かしては意味がない。
 
-    mine は ccnavi 自身が書く場所。記録と控えがそれで、どちらも保護領域の
-    中に置かれることがある。実際このリポジトリのルールは `.claude/ccnavi/*`
-    を守っていて、記録も控えもそこにある。自分の書き込みを自分の違反として
+    mine は ccnavi 自身が書く場所。記録と控えがそれで、置き場は設定で動くので、
+    ルールが守る場所の中を指すこともある。自分の書き込みを自分の違反として
     報告しはじめると、監視は 1 回目から嘘しか言わなくなる。
 
     watched は見るツリー。ワークスペースルートと、この呼び出しが触ったツリー
-    （設計 §25.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
+    （設計 §11.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
@@ -290,7 +289,7 @@ class ScopeGuard:
 
     root: str
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
-    # プロジェクトの置き場。作業ツリーの切り元をプロジェクトまで広げる（設計 §25.3）。
+    # プロジェクトの置き場。作業ツリーの切り元をプロジェクトまで広げる（設計 §11.3）。
     projects: str = ""
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
@@ -351,7 +350,7 @@ class Finding:
 
 @dataclass
 class Watched:
-    """実行後に見るツリー 1 つと、そこに当てるルール（設計 §25.7）。
+    """実行後に見るツリー 1 つと、そこに当てるルール（設計 §11.7）。
 
     ワークスペースのツリーにはワークスペースのルール、プロジェクトとその作業ツリーには
     そのプロジェクトのルール。実行前の判定と同じ引き方でなければ、実行前に通った

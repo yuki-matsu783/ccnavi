@@ -102,7 +102,7 @@ class RootPlaceholderTest(unittest.TestCase):
             os.path.join(self.root, "README.md"),
             os.path.join(self.root, "ccnavi", "cli.py"),
             os.path.join(self.root, ".gitignore"),
-            os.path.join(self.root, ".claude", "ccnavi", "rules.yml"),
+            os.path.join(self.root, ".ccnavi", "common", "rules.yml"),
             os.path.join(self.root, ".claude", "settings.json"),
             os.path.join(self.root, ".claude", "skills", "x", "SKILL.md"),
         ]
@@ -114,7 +114,7 @@ class RootPlaceholderTest(unittest.TestCase):
         allowed = [
             os.path.join(self.root, ".claude", "worktrees", "x", "README.md"),
             os.path.join(self.root, ".claude", "worktrees", "x", "ccnavi", "cli.py"),
-            os.path.join(self.root, ".claude", "worktrees", "x", ".claude", "ccnavi", "rules.yml"),
+            os.path.join(self.root, ".claude", "worktrees", "x", ".ccnavi", "common", "rules.yml"),
         ]
         for path in allowed:
             with self.subTest(path=path):

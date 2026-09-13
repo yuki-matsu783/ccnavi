@@ -19,7 +19,7 @@
 
 ## 書式
 
-`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §24.3。
+`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
@@ -79,7 +79,7 @@ GUARDED_STATES = (DOING, DONE, CANCELLED)
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 範囲の件数の上限。設計 §9.4 の max_ticket_rules。大量に並べて人のレビューを
+# 範囲の件数の上限。設計 §9.3。大量に並べて人のレビューを
 # 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
@@ -236,7 +236,7 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
-    # project は作業のプロジェクト（`projects/` の名前、設計 §25.5）。決めるのは提案を
+    # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、作業ツリーの中なら
     # その切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
     # 継ぐ段は無い。判定は行き先の作業ツリーの切り元と突き合わせる。
@@ -247,7 +247,7 @@ class Ticket:
     declared_project: str = ""
     # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
-    # 「見たうえで対応なし」。設計 §24.15.2。
+    # 「見たうえで対応なし」。設計 §9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
     review_required: bool = True
@@ -429,7 +429,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
     name = ticket.ticket
     # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
-    # `scan` が上書きする（設計 §25.5）。`scan` を通さない経路ではこの値が残る。
+    # `scan` が上書きする（設計 §11.5）。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
 
@@ -623,9 +623,9 @@ def scan_all(
     found: list[Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    # 置き場がプロジェクトを決める（設計 §25.5）。提案はどのツリーでも同じ相対の置き場に
+    # 置き場がプロジェクトを決める（設計 §11.5）。提案はどのツリーでも同じ相対の置き場に
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
-    # git で運ぶので、提案も同じブランチに乗せる（設計 §24.5、REQ-MLT-14）。
+    # git で運ぶので、提案も同じブランチに乗せる（設計 §9.2、REQ-MLT-14）。
     # frontmatter の `project:` は照合に使うだけ。
     places = [
         (t, tickets_rel, t.project)

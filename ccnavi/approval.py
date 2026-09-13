@@ -16,9 +16,9 @@
 範囲が消える向きなので、エージェントが動かしても危険は増えない。逆に承認済みチケットを
 戻す（再開）のは人の手でやる。
 
-## フェーズの印
+## フェーズのマーカー
 
-`phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みの印を置く。
+`phases/<親>/<N>.<種類>` に、依頼・レビュー済み・省略・通知済みのマーカーを置く。
 ゲート（phase.py）はこれを見る。中身は JSON 1 つで、いつ誰が置いたかが入る。
 """
 
@@ -38,11 +38,11 @@ from . import ticket as ticket_mod
 CLOSED_DIR = "closed"
 PHASES_DIR = "phases"
 
-# フェーズの印の種類。
+# フェーズのマーカーの種類。
 MARK_REQUESTED = "requested"
 MARK_REVIEWED = "reviewed"
 MARK_SKIPPED = "skipped"
-# pending は「終わったと 1 度伝えた」の印。同じ文を呼び出しごとに繰り返さないため。
+# pending は「終わったと 1 度伝えた」のマーカー。同じ文を呼び出しごとに繰り返さないため。
 MARK_PENDING = "pending"
 MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
 
@@ -164,9 +164,9 @@ def home_dir(
 
     探す順は、すでに持っているツリー（親のツリー → ワークスペースかプロジェクトの
     ルート → その他）、親のツリー、fallback_root（提案があったツリー）、
-    ワークスペースルート。すでに在る側を先に見るのは、印と記録を承認済みチケットと
+    ワークスペースルート。すでに在る側を先に見るのは、マーカーと記録を承認済みチケットと
     同じ場所に置くため。親の作業ツリーは承認のあとに作られることがあり、そこを
-    先に見ると、承認済みチケットと印が別のツリーに分かれる。
+    先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
     """
     home = parent or ticket_id
     named = ""
@@ -246,7 +246,7 @@ def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict
 
 
 def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
-    """このフェーズの印を全部消す。消せた種類を返す。"""
+    """このフェーズのマーカーを全部消す。消せた種類を返す。"""
     cleared = []
     for kind in MARKS:
         path = mark_path(approved_dir, parent, phase, kind)
@@ -258,7 +258,7 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
     return cleared
 
 
-# 親ごとの印。フェーズの番号に付かないもの。
+# 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。マージに進んでよいの合図
 #   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
 PARENT_MARK_READY = "ready"
@@ -304,7 +304,7 @@ def write_child_record(approved_dir: str, parent: str, child: str, kind: str, da
     )
 
 
-# 人が受け入れたスレッドの控え。フェーズの印とは別の場所に、親ごとに 1 つ置く。
+# 人が受け入れたスレッドの控え。フェーズのマーカーとは別の場所に、親ごとに 1 つ置く。
 ACCEPTED_FILE = "accepted.json"
 
 
@@ -323,7 +323,7 @@ def accepted_threads(approved_dir: str, parent: str) -> set[str]:
 def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str:
     """受け入れたスレッドを控えに足す。失敗したら、その説明を返す。
 
-    フェーズの印とは別の場所に置く。印は 2 つの理由で消える。同じ番号の印は
+    フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
     `check` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
     丸ごと消す。どちらでも受け入れの記録が飛び、人がもう一度同じスレッドを
     受け入れることになる。人が 1 度言った「これは承知で進める」は、
@@ -362,7 +362,7 @@ class Candidate:
     complaints: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
-    # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §25.4.1）。
+    # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §11.4.1）。
     # 承認の対象の中でもチケットごとに違いうるので、候補が引いたものを持ち歩く。
     types: dict | None = None
     # 承認画面に足す 1 行ずつの注記（フィードバック計画の証跡など）。
@@ -401,7 +401,7 @@ def approve(
     子は親の部分集合なので、新たに書けるようになる領域は親の分だけ。
 
     親の改版（計画の変更）も一緒に承認の対象に入る。承認済みチケットは動かないのが原則で、改版はその
-    唯一の例外（設計 §24.15.5）。変えられるのは `plan` と `feedback` だけ。
+    唯一の例外（設計 §9.7）。変えられるのは `plan` と `feedback` だけ。
 
     `only` は承認の対象を識別子で絞る（`ccnavi --approve <識別子>...`）。VS Code 拡張の
     ボードが絞り込みで見えている分だけを渡す。絞りは対象を狭めるだけで、絞らないときに
@@ -495,7 +495,7 @@ def gather(
     通らなかった理由は `refused` に入れて返す。呼び手はそれを見て何もしない。
 
     フェーズの種類は承認の対象全体で 1 つに決まらない。どの層の種類が効くかは各チケットの
-    `project:` が決める（設計 §25.4.1）ので、候補を組むところで 1 件ずつ引き、
+    `project:` が決める（設計 §11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` が持ち歩く。`Gathered.types` は対象全体の種類を持たず、
     いつも None。画面は候補が持つ種類を使う。
     """
@@ -692,7 +692,7 @@ def _news_path(state_dir: str, session: str, agent_id: str) -> str:
 
 
 def _known(path: str) -> dict[str, str] | None:
-    """控えにある「識別子 → 印」。控えが無ければ None。
+    """控えにある「識別子 → 版」。控えが無ければ None。
 
     読めるのに壊れているときは空の辞書を返す。「無い」と同じに扱うと、まだ伝えて
     いない承認ごと現状を起点にして黙ることになる。何も知らないことにして、
@@ -704,11 +704,6 @@ def _known(path: str) -> dict[str, str] | None:
     known = data.get("known") if isinstance(data, dict) else None
     if isinstance(known, dict):
         return {k: str(v) for k, v in known.items() if isinstance(k, str)}
-    if isinstance(known, list):
-        # 印を持たなかった頃の控え。識別子は伝えたものとして扱い、印は空にする。
-        # 空の印は「伝えたが、いつの承認済みチケットかは分からない」の意味で、_fresh が改版と
-        # 見なさない（承認済みチケットは必ず approved_at を持つので、空は古い控えにしか無い）。
-        return {s: "" for s in known if isinstance(s, str)}
     return {}
 
 
@@ -719,10 +714,10 @@ def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
 
 
 def _mark(t: ticket_mod.Ticket) -> str:
-    """承認済みチケット 1 枚の印。承認した時刻と、改版した時刻。
+    """承認済みチケット 1 枚の版。承認した時刻と、改版した時刻。
 
     改版（`revise_copy`）は承認済みチケットを書き換えるだけで識別子を増やさないので、識別子だけを
-    比べても新しい合意だと分からない。印まで見る。
+    比べても新しい合意だと分からない。版まで見る。
     """
     meta = t.raw.get(ticket_mod.APPROVAL_KEY)
     meta = meta if isinstance(meta, dict) else {}
@@ -744,11 +739,11 @@ def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Tick
 
 
 def _fresh(known: dict[str, str], current: dict[str, ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """まだ伝えていない承認済みチケット。印が変わったもの（改版）も含む。"""
+    """まだ伝えていない承認済みチケット。版が変わったもの（改版）も含む。"""
     out = []
     for ident, t in sorted(current.items()):
         recorded = known.get(ident)
-        if recorded is None or (recorded != "" and recorded != _mark(t)):
+        if recorded is None or recorded != _mark(t):
             out.append(t)
     return out
 
@@ -772,7 +767,7 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     """このセッションがまだ知らない承認済みチケットがあれば、その承認を伝える文。1 度だけ。
 
     最初の hook で控えが無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
-    それより後に置かれた承認済みチケットと、印の変わった承認済みチケット（親の改版）が「新しい承認」になる。
+    それより後に置かれた承認済みチケットと、版の変わった承認済みチケット（親の改版）が「新しい承認」になる。
     控えを置けない（`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側に倒す。
     サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
 
@@ -844,7 +839,7 @@ def _candidates(
     # 今回の承認で通った子を親ごとに。後に続く子の順序の検査が、そのフェーズを
     # 開き直したものとして読む。
     # 子はフェーズの番号の順に並べる。識別子の順だと、後のフェーズの子（-02）が前のフェーズに
-    # 足す子（-03）より先に検査され、開き直す前の印で通ってしまう。
+    # 足す子（-03）より先に検査され、開き直す前のマーカーで通ってしまう。
     added: dict[str, list[ticket_mod.Ticket]] = {}
     for t in sorted(
         pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
@@ -869,7 +864,7 @@ def _candidates(
 
 
 def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
-    """このチケットの層を決める `project:`（設計 §25.4.1）。
+    """このチケットの層を決める `project:`（設計 §11.4.1）。
 
     子は親と同じ置き場に並ぶので、種類を引くには親のプロジェクトを使う。食い違えば
     `project_problems` が落とす。親が池に居ないときだけ、子の置き場の値をそのまま読む。
@@ -906,7 +901,7 @@ def _apply(
                 # レビューの結果を見たうえでの計画なので、最後のレビューはここで済む。
                 failed = phase.settle_last_review(where, t, stamp)
                 if failed:
-                    stderr.write(f"ccnavi: {t.ticket}: 印を置けない: {failed}\n")
+                    stderr.write(f"ccnavi: {t.ticket}: マーカーを置けない: {failed}\n")
                     return 1
                 stdout.write(
                     "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
@@ -918,13 +913,14 @@ def _apply(
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return 1
-        # 終わったフェーズに子を足したら、そのフェーズの印は消す。印は
+        # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
         # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
         if t.is_child and t.phase is not None:
             cleared = clear_marks(home_dir(conf, root, t.parent, ""), t.parent, t.phase)
             if cleared:
+                kinds = ", ".join(cleared)
                 stdout.write(
-                    f"  {t.parent} のフェーズ {t.phase} の印（{', '.join(cleared)}）を消した。"
+                    f"  {t.parent} のフェーズ {t.phase} のマーカー（{kinds}）を消した。"
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
 
@@ -1114,7 +1110,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
 
 
 def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Problem]:
-    """親の計画が種類の定義と噛み合っているか（設計 §24.15.2）。"""
+    """親の計画が種類の定義と噛み合っているか（設計 §9.7）。"""
     problems: list[rules.Problem] = []
     if not t.has_plan:
         return problems
@@ -1193,7 +1189,7 @@ def revision_problems(
     current: ticket_mod.Ticket,
     types: dict | None,
 ) -> list[rules.Problem]:
-    """親の改版を受けてよいか（設計 §24.15.5）。"""
+    """親の改版を受けてよいか（設計 §9.7）。"""
     from . import phase
 
     problems = plan_problems(revised, types)
@@ -1290,7 +1286,7 @@ def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str
 
 
 def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
-    """`project:` が層の名札に予約してある綴りなら error（設計 §25.4）。"""
+    """`project:` が層の名札に予約してある綴りなら error（設計 §11.4）。"""
     if not t.project or not settings.is_reserved_layer_name(t.project):
         return []
     reserved = " と ".join(f"`{name}`" for name in settings.RESERVED_LAYER_NAMES)
@@ -1311,7 +1307,7 @@ def project_problems(
 ) -> list[rules.Problem]:
     """`project` が置き場と噛み合っているか（REQ-MLT-11）。
 
-    プロジェクトを決めるのは提案を置いた場所（設計 §25.5）。frontmatter の `project:` は
+    プロジェクトを決めるのは提案を置いた場所（設計 §11.5）。frontmatter の `project:` は
     宣言ではなく照合で、置き場と違えば承認しない。親と子は同じ置き場に並ぶので、継ぐ段は
     無い。承認の画面が置き場から引いた値を出し、それが承認済みチケットに残る。
 

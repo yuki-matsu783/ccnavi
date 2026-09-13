@@ -1,4 +1,4 @@
-"""フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 §24.15.1）。
+"""フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 §9.7）。
 
 ## 種類は人が持つ
 
@@ -72,7 +72,7 @@ class PhaseType:
     agent: str = ""
     when: str = ""
     # source はこの種類が書いてある層の名前（`common` / `self` / プロジェクト名）。
-    # id は裸のままで、層は記録と `--explain` の欄に出す（設計 §25.4.1）。
+    # id は裸のままで、層は記録と `--explain` の欄に出す（設計 §11.4.1）。
     source: str = ""
 
     @property
@@ -116,7 +116,7 @@ def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, lis
     """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。
 
     `refs` を False にすると `overlap` / `requires` が指す先の確認を飛ばす。層の
-    ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 §25.4.1）、
+    ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 §11.4.1）、
     その相手はファイルの中に居ないので、1 本だけで確かめると必ず落ちる。確かめる
     のは合成したあと（`merge`）。
     """
@@ -201,7 +201,7 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
     """`overlap` / `requires` が指す先が、その集合の中に居るか。
 
     見るのは `checked` の側だけで、居てよい先は `pool` 全部。層の種類が共通層の
-    種類を指す形（設計 §25.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
+    種類を指す形（設計 §11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
     """
     problems: list[Problem] = []
     for pt in checked:
@@ -224,7 +224,7 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
 def merge(
     common: dict[str, PhaseType] | None, extra: dict[str, PhaseType] | None, layer: str
 ) -> tuple[dict[str, PhaseType], list[Problem]]:
-    """共通層の種類に、行き先の層の種類を id ごとに足す（設計 §25.4.1）。
+    """共通層の種類に、行き先の層の種類を id ごとに足す（設計 §11.4.1）。
 
     足すだけで、後ろの層が前の層を上書きすることはない。同 `id` で全欄が一致する
     ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも

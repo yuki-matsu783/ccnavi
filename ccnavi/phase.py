@@ -6,8 +6,8 @@
 そのフェーズは終わり。`cancelled/` だけのフェーズは終わりではない（何も成果が無い）。
 
 終わりの扱いは、`done/` の子に `human_review.required: true` が 1 枚でもあるかで分かれる。
-あればゲートが閉じ、レビュー済みの印が置かれるまでサブエージェントの起動とシェルを止める。
-無ければ省略の印を置いて進ませる。
+あればゲートが閉じ、レビュー済みのマーカーが置かれるまでサブエージェントの起動とシェルを止める。
+無ければ省略のマーカーを置いて進ませる。
 
 ## ゲートの鍵は cwd
 
@@ -66,7 +66,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
 # 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
 # 前のコマンドの `--approve` を免除する。
-# 語の中の印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
+# 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*--preview\b)"
 _CLI_FORMS = (
@@ -143,7 +143,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に種類と計画の項が付く（設計 §24.15）。持たなければ
+    親が計画を持てば、番号に種類と計画の項が付く（設計 §9.7）。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -256,7 +256,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
     if settings.is_reserved_layer_name(project):
@@ -281,7 +281,7 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 §25.4.1）。
+    """共通層 + その層の種類と、**その層の**苦情（設計 §11.4.1）。
 
     どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
@@ -292,7 +292,7 @@ def layer_types(
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 §25.2）。
+        # 共通層が壊れている。層は足さない（設計 §11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -342,17 +342,29 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
     return remaining
 
 
-def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]:
+def phases_of(
+    root: str,
+    conf: settings.Settings,
+    parent_id: str,
+    proposed: ticket_mod.Ticket | None = None,
+) -> list[Phase]:
     """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
+
+    `proposed` は、承認済みチケットがまだ無いときに計画を読む親。承認で同じときに通った親の
+    提案を渡す（`order_problems`）。渡さないと、親と後のフェーズの子を一緒に承認したとき
+    計画が読めずフェーズが 1 つも並ばず、順序の検査が何も見ないまま通る。承認済みチケットが
+    あればそちらが勝つ（改版の計画は承認されるまで効かない）。
     """
     open_copies, _ = approval.scan(conf, root)
     closed_copies, _ = approval.scan(conf, root, closed=True)
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
+    if owner is None and proposed is not None and proposed.ticket == parent_id:
+        owner = proposed
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 §25.4.1）。人が承認した値で、
+        # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():
@@ -374,8 +386,8 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         phase.tickets.append(t)
         state, _ = _proposal(root, conf, t)
         phase.states[t.ticket] = state
-    # 印と記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
-    # 印を子の側に書くと、同じフェーズの印が複数のツリーに散る。
+    # マーカーと記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
+    # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに散る。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
         phase.marks = approval.marks(where, parent_id, phase.number)
@@ -423,7 +435,7 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
         [
             f"[ccnavi] {CODE_GATE} (parent: {phase.parent}, phase: {n}, {marks})",
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
-            f"レビュー済みの印が置かれるまで、ゲートが{what}を止めます。",
+            f"レビュー済みのマーカーが置かれるまで、ゲートが{what}を止めます。",
             "やること: 子の成果を親ブランチへ合流して push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
@@ -435,9 +447,9 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置く印に足す、その種類の層（設計 §25.9）。
+    """種類を根拠に置くマーカーに足す、その種類の層（設計 §11.9）。
 
-    `review:` が絡む印（省略と保留）にだけ足す。他の印は種類を見ずに置くので、
+    `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
     層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
     """
     return {"source": phase.type.source} if phase.type is not None else {}
@@ -458,7 +470,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 where, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
                 f"レビューは {at} 番目と一緒に見る計画なので、ここでは止めません。"
@@ -469,7 +481,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 where, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
             covers = (
                 f"（{', '.join(str(c) for c in phase.covers)} 番目の分も含めて）"
@@ -500,7 +512,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             risk_note = f"{phase.risk_line}。" if phase.risk_line else ""
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"
@@ -547,12 +559,12 @@ def order_problems(
     types: dict[str, phasetypes.PhaseType] | None,
     adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §24.15.4）。
+    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
 
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
-    増え、印も消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
+    増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
     フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
     次の子が一緒に承認され、1 本ずつ承認したときに落ちるものが、まとめて承認すると通る。
     """
@@ -567,10 +579,10 @@ def order_problems(
         if t.phase is not None:
             reopened.setdefault(t.phase, []).append(t.ticket)
     # 同じ承認でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
-    # 済む（settle_last_review）。承認の前に印は無いので、ここでは計画の側から読む。
+    # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
-    for phase in phases_of(root, conf, parent.ticket):
+    for phase in phases_of(root, conf, parent.ticket, parent):
         if phase.number >= child.phase:
             break
         if phase.type is not None and my_type is not None and phase.type.overlaps(my_type):
@@ -580,7 +592,12 @@ def order_problems(
             continue
         if not ended:
             if phase.number in reopened:
-                state = f"同じ承認で {', '.join(reopened[phase.number])} を足すので開き直る"
+                names = ", ".join(reopened[phase.number])
+                state = (
+                    f"同じ承認で {names} を足すので開き直る"
+                    if phase.ended
+                    else f"同じ承認で {names} を足すが、まだ閉じていない"
+                )
             else:
                 state = "子がまだ無い" if not phase.tickets else "子が開いている"
             problems.append(
@@ -649,7 +666,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの段階にいるか（設計 §24.15.8）。計画が無ければ空文字。"""
+    """親がいまどの段階にいるか（設計 §9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
@@ -701,7 +718,7 @@ def scope_findings(
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
-        # チケットの置き場（提案も写しも印も）は範囲の外でも咎めない。次の提案を書く道と、
+        # チケットの置き場（提案も写しもマーカーも）は範囲の外でも咎めない。次の提案を書く道と、
         # 承認がブランチに乗る道を塞がないため。
         if any(rel.startswith(p + "/") for p in (conf.tickets, conf.approved) if p):
             continue
@@ -725,18 +742,19 @@ def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root:
     """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
 
     承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
-    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。記録の無い古い
-    承認済みチケットだけ、設定の綴りをそのまま使う（提案はどのツリーでも同じ相対に在る）。
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。
+
+    その残りをこのツリーの下の相対に直せないときは、設定の綴りを使う。別のドライブ
+    （Windows）、ツリーの外、ツリーのルートそのもの（相対が `.`）がそれにあたる。
     """
-    if copy.source_path:
-        base = os.path.dirname(os.path.dirname(copy.source_path))
-        try:
-            rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
-        except ValueError:  # 別のドライブ（Windows）
-            rel = ""
-        if rel and rel != "." and not rel.startswith("../"):
-            return rel
-    return conf.tickets
+    base = os.path.dirname(os.path.dirname(copy.source_path))
+    try:
+        rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
+    except ValueError:  # 別のドライブ（Windows）
+        return conf.tickets
+    if rel == "." or rel.startswith("../"):
+        return conf.tickets
+    return rel
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:

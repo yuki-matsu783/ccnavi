@@ -13,7 +13,7 @@
     deny:
       - id: guard-config
         match: Write|Edit
-        glob: "*/.claude/ccnavi/*"
+        glob: "*/.ccnavi/*"
         message: ガード自身の設定です。利用者に依頼してください。
     ask:
       - id: migrations
@@ -76,7 +76,7 @@ VERSION = 3
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 # info は「そう書いてあるとおりに効いているが、書いた人が知りたいはずのこと」。
-# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 §25.4）。
+# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 §11.4）。
 # warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
 # 混ぜると本当に緩んでいる warn が埋もれるため。
 SEVERITY_INFO = "info"
@@ -88,7 +88,7 @@ ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
 # 文面が要るタイプ。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
-# 通すだけで届く先が無い（どちらも実測済み、設計 §24.12）。モデルに渡す文は
+# 通すだけで届く先が無い（どちらも実測済み、設計 付録 C）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、
 # ここで落とすとその文面のせいでルールごと外れて通ってしまうので、読み込みは通す。
 _NEEDS_MESSAGE = (DENY,)
@@ -110,7 +110,7 @@ ROOT_PLACEHOLDER = "{root}"
 
 # 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、層を添えた形と見分けが付かない。
-# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §25.4）。
+# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §11.4）。
 ID_SEPARATOR = ":"
 
 # 組み込みの守りの名前の頭。ルールファイルからは書けない（読み込まずに error）。
@@ -124,7 +124,7 @@ def root_pattern(root: str) -> str:
     """ワークスペースルートの実パスを、regex に埋めて安全な形にする。
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
-    解いた綴り（cli.full_path）で、Windows では `\\` になるが、ルールを書く人は
+    解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書く人は
     `/` で考える。大文字小文字を区別しない機械では、綴りの違いも許す
     （`c:` と `C:` は同じ場所）。
     """
@@ -176,12 +176,12 @@ class Rule:
     # 層の和では `lib:schema` のように層の名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
     # bare_id は書かれたままの id。層の名前を添える前の綴りで、層をまたいで
-    # 同じルールかどうかを見るときの鍵になる（設計 §25.4「重複は後ろを捨てる」）。
+    # 同じルールかどうかを見るときの鍵になる（設計 §11.4「重複は後ろを捨てる」）。
     # id から前置きを剥がして求める形にすると、`:` を含む id を書いた人の定義が
     # 剥がされる側に倒れるので、書いたときの綴りをそのまま持つ。
     bare_id: str = ""
     # source はこのルールが来た層（common / self / プロジェクトの名前）。記録の
-    # `source` 欄と `--explain` がこれを読む（設計 §25.9）。
+    # `source` 欄と `--explain` がこれを読む（設計 §11.9）。
     source: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
@@ -225,7 +225,7 @@ class Rule:
         return fill_root(self.message, self.root)
 
     def key(self) -> tuple:
-        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §25.4、§25.8）。
+        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §11.4、§11.8）。
 
         比べるのは書いた綴りではなく、`{root}` を置き換えたあとの式。共通層と
         プロジェクトの層に同じ `{root}/...` を書いた定義は、置き換え先が同じ
@@ -330,7 +330,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
     ルールの意味が食い違いうる。食い違えば、ガードが落ちている最中に
     さらに読み違えることになる。
 
-    builtin は組み込み自身（builtin / selfguard）が組み立てる印。`RESERVED_ID_PREFIX` で
+    builtin は組み込み自身（builtin / selfguard）が組み立てるという目印。`RESERVED_ID_PREFIX` で
     始まる id を書けるのはこちらだけ。
     """
     rule_set = RuleSet(version=data.get("version") or 0)

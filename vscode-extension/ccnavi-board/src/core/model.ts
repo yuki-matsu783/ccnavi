@@ -125,14 +125,14 @@ export interface BoardJson {
   readonly root: string;
   readonly generated_at: string;
   readonly settings: {
-    /** チケット制御を使うか。実行ファイルが解決した値（enable / disable）。古い実行ファイルは空 */
+    /** チケット制御を使うか。実行ファイルが解決した値（enable / disable） */
     readonly ticket_control: string;
     readonly tickets: string;
     readonly approved: string;
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 並びは 共通層 → 自身の層 → プロジェクト（名前順）。古い実行ファイルは空 */
+  /** 並びは 共通層 → 自身の層 → プロジェクト（名前順） */
   readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];

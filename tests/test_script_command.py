@@ -46,7 +46,7 @@ class ScriptCommandTest(unittest.TestCase):
         """空白を含むルートでも、案内どおりに打った形がゲートの例外と禁止に当たること。
 
         判定は hook と同じく shellread を通した文字列に当てる。引用の中の空白は
-        区切りと別の印になるので、`\\S*ccnavi-...` がパスを 1 語として読める。
+        区切りと別の目印になるので、`\\S*ccnavi-...` がパスを 1 語として読める。
         """
         with tempfile.TemporaryDirectory() as tmp:
             root = os.path.join(tmp, "My Projects", "ws")

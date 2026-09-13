@@ -206,7 +206,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     if (layer === undefined || layer.phasesFile.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルが自身の層を出していない（層に対応していない古い版）"
+          ? "実行ファイルの答えに自身の層が無い"
           : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
       );
     }

@@ -1,6 +1,6 @@
 /**
  * プロジェクト管理画面の判断。ワークスペース内のプロジェクト（`projects/` の直下で `.git` を持つもの、
- * 設計 §25.2）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
+ * 設計 §11.2）を一覧し、clone の入力を検査し、ターミナルへ送るコマンド行を組む。
  *
  * ここは vscode にも子プロセスにも触れない。ファイルの有無や git の答えは呼び手が渡す。
  * 何がプロジェクトかは実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）に
@@ -8,7 +8,6 @@
  * プロジェクトになっていない `.git` の探し方だけ。
  */
 import { shellQuote, toPosixPath } from "./commands.js";
-import { OLD_PROJECT_RULES } from "./layers.js";
 import { problemsOfProject, problemsOfProjectsDir, type LintJson, type LintProblem } from "./lintmodel.js";
 import type { BoardJson } from "./model.js";
 
@@ -213,7 +212,7 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
     return text ?? "";
   }
   const head = text === undefined || text === "" ? "" : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
-  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 §25.2）。\n/${projectsRel}/\n`;
+  return `${head}# ccnavi のプロジェクト置き場。各プロジェクトは自分の git を持つ（設計 §11.2）。\n/${projectsRel}/\n`;
 }
 
 /**
@@ -243,9 +242,6 @@ export interface ProjectRow {
   /** プロジェクトの層のルールファイル。ルートからの相対、"/" 区切り。層として数えられていない（予約名）なら空 */
   readonly rulesRel: string;
   readonly rulesExists: boolean;
-  /** 旧の置き場（`config/rules.yml`）。ルートからの相対、"/" 区切り。判定には読まれない */
-  readonly oldRulesRel: string;
-  readonly oldRulesExists: boolean;
   readonly hasClaudeDir: boolean;
   readonly origin: string;
   readonly originKey: string;
@@ -269,7 +265,7 @@ export interface ProjectsPage {
   readonly rows: readonly ProjectRow[];
   readonly strays: readonly Stray[];
   readonly workspaceWorktrees: readonly string[];
-  /** 自身の層のルールファイル。ルートからの相対、"/" 区切り。空なら実行ファイルが層を出していない（古い版） */
+  /** 自身の層のルールファイル。ルートからの相対、"/" 区切り */
   readonly selfRulesRel: string;
   readonly selfRulesExists: boolean;
   /** 名前の衝突を見る既存のツリー名（ワークスペース自身の空は除く） */
@@ -289,8 +285,6 @@ export interface PageInput {
   /** プロジェクト名 → 層のルールファイルのルート相対（`layers[]` の path から）。層として数えられていなければ無い */
   readonly rulesRels: Readonly<Record<string, string>>;
   readonly rulesExists: Readonly<Record<string, boolean>>;
-  /** プロジェクト名 → 旧の置き場にファイルが残っているか */
-  readonly oldRulesExists: Readonly<Record<string, boolean>>;
   readonly hasClaudeDir: Readonly<Record<string, boolean>>;
   readonly selfRulesRel: string;
   readonly selfRulesExists: boolean;
@@ -310,8 +304,6 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
         rel: `${input.projectsRel}/${t.name}`,
         rulesRel: input.rulesRels[t.name] ?? "",
         rulesExists: input.rulesExists[t.name] === true,
-        oldRulesRel: `${input.projectsRel}/${t.name}/${OLD_PROJECT_RULES}`,
-        oldRulesExists: input.oldRulesExists[t.name] === true,
         hasClaudeDir: input.hasClaudeDir[t.name] === true,
         origin,
         originKey: remoteKeyOf(origin),

@@ -24,7 +24,7 @@ test("CB-T05 列は提案の置き場で、親のあとに子が並ぶ", () => {
   assert.equal(board.remainingCount, 3);
 });
 
-test("CB-T06 カードに承認済みチケット・作業ツリー・印・承認待ちが載る", () => {
+test("CB-T06 カードに承認済みチケット・作業ツリー・マーカー・承認待ちが載る", () => {
   const cards = cardsOf(buildBoard(fixture()));
   const parent = cards.get("i0001")!;
   assert.equal(parent.isParent, true);
@@ -99,7 +99,7 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   assert.deepEqual(card.phases[0].actions, []);
   assert.deepEqual(card.phases[1].actions, [{ kind: "accept", parent: "i0001", phase: 2 }]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 子のカードには自分のフェーズの印とゲートが写る
+  // 子のカードには自分のフェーズのマーカーとゲートが写る
   assert.equal(cards.get("i0001-02")!.gateClosed, true);
   assert.deepEqual(cards.get("i0001-02")!.marks, ["requested"]);
 });

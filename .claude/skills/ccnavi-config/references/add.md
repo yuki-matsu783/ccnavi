@@ -78,7 +78,7 @@ allow:
 **広い `allow` には書かない。** `ls` のたびに同じ文が積まれ、2 回目から読まれなくなる。
 lint は何にでも当たる allow と選択肢が 3 つ以上ある regex を warn にする。
 
-**見本を一緒に足す。** ルールを 1 件足したら `.claude/ccnavi/rule-samples.yml` に、当たってほしい
+**見本を一緒に足す。** ルールを 1 件足したら `.ccnavi/common/rule-samples.yml` に、当たってほしい
 見本と**当たってほしくない見本を両方**足す。片側だけでは広げすぎに気づけない。見本は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
 ワークスペースルートに読み替わる。見本の下書きも scratchpad に置き、`--test-samples` で
@@ -150,7 +150,7 @@ factors:
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
   - {id: ci,         points: 35, glob: ".github/**", max: 35, message: CI に触った}
   - {id: deletes,    points: 20, deleted_over: 3,   message: 消したファイルが多い}
-  - {id: complexity, points: 30, script: .claude/ccnavi/risk/complexity.sh, message: 複雑度}
+  - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
   - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 ```
 
@@ -160,7 +160,7 @@ factors:
 |---|---|---|
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が閾値を**超えた**ら加点 | 閾値はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
 | `glob` | 当たったファイル**ごと**に加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。作業ツリーのルートからの相対。`**` が使える |
-| `script` | `.claude/ccnavi/` か `.claude/scripts/` の下の sh。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
+| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh judge <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。段階の名前は増やせない（知らない名前は warn）。
@@ -173,7 +173,7 @@ factors:
 ## 利用者に渡す形
 
 ```
-変えるもの: .claude/ccnavi/rules.yml（下書き: <scratchpad のパス>）
+変えるもの: .ccnavi/common/rules.yml（下書き: <scratchpad のパス>）
 なぜ: <1 行>
 得るもの: <何が止まる / 通る / 変わるか>
 失うもの: <広がる沈黙、増える確認、閉じにくくなるフェーズ、など>
@@ -181,7 +181,7 @@ factors:
 検証: --lint error 0 / warn N（内容）、見本 deny a/b ask c/d allow e/f 食い違い 0
 差分:
   <本物との diff>
-見本の追加: .claude/ccnavi/rule-samples.yml に <n> 件（下書き: <パス>）
+見本の追加: .ccnavi/common/rule-samples.yml に <n> 件（下書き: <パス>）
 ```
 
 置いたあとに `/ccnavi-config` の確かめる側をもう一度回す。下書きで通った検証は、置き場所が

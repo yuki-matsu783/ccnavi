@@ -8,7 +8,7 @@
 壊れて組み込みの既定に落ちた形も、どちらも保護領域は 0 件になり、監視は何も
 検知しない。守りの根拠が、守られる対象の中に置いてあることが原因になる。
 
-だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 §25.6）。
+だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 §11.6）。
 
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
@@ -191,16 +191,16 @@ _SETTINGS_FILES = (
 # 止める。止めるほうが本筋で、戻すほうは止めきれなかったぶんの受け皿になる。
 #
 # 前半の括弧が書き込む綴りで、後ろに続く場所と組で当たる。場所の名前が出ただけでは
-# 止めない。`cat .claude/ccnavi/rules.yml` も `git add <パス>` も、中身を書かない。
+# 止めない。`cat .ccnavi/common/rules.yml` も `git add <パス>` も、中身を書かない。
 # 名前で止める形にすると、いちばんガードを直したいときにいちばん強く効く。
 #
 #   1. リダイレクトの行き先。`>` `>>` `>|` `&>` はどれも `>` を含み、
 #      shellread が `> 行き先` の形に均してから渡してくる。
 #   2. 名指ししたところを必ず書き換えるコマンド。`\x00` はコマンドの切れ目に
-#      shellread が置く印で、`(^|\x00)` はコマンドの先頭を意味する。
-#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の印
+#      shellread が置く目印で、`(^|\x00)` はコマンドの先頭を意味する。
+#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の目印
 #      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
-#      1 のリダイレクトの行き先だけは、語の中の印まで食うと引用の中の `> 場所` が
+#      1 のリダイレクトの行き先だけは、語の中の目印まで食うと引用の中の `> 場所` が
 #      書き込み先に見えるので、そちらも除外する。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。
 #
@@ -219,8 +219,8 @@ _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 # `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
 # `mv .ccnavi .ccnavi.bak` も、ccnavi ディレクトリごと消す・退かす形なので、下のファイルを 1 本ずつ
 # 書き換えるのと同じだけ守りが消える（敵対的レビュー A-3）。
-# 語の中の印も終わりに数える。印が 1 つだった頃は `rm ".ccnavi x"` がここで止まって
-# いた。数えないと、印を分けただけでその綴りが通るようになる。
+# 語の中の目印も終わりに数える。数えないと、`rm ".ccnavi x"` のように引用がつないだ
+# 綴りが通る。
 _TERM = rf"(?:[ {_NOT_A_WORD}]|$)"
 # 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
 # 当たり、`.ccnavixyz` のような別名には当たらない。
@@ -232,7 +232,7 @@ _END = rf"(?:[\\/ {_NOT_A_WORD}]|$)"
 _COPY_TERM = r"$"
 _COPY_END = r"(?:[\\/]|$)"
 
-# `.ccnavi/` は ccnavi ディレクトリの既定の綴り（設計 §25.2）。その下には各層の設定 3 本と、
+# `.ccnavi/` は ccnavi ディレクトリの既定の綴り（設計 §11.2）。その下には各層の設定 3 本と、
 # 配点が呼ぶスクリプトが入る。どちらも判定の中身そのものなので、ccnavi ディレクトリごと止める。
 # 既定の綴りをここに書いておくのは、ccnavi ディレクトリの名前を動かしていないワークスペースが、
 # 設定の受け渡しに依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
@@ -240,20 +240,19 @@ _COPY_END = r"(?:[\\/]|$)"
 # `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
 # だから ccnavi ディレクトリと違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
 # `.claude/` に続く綴り全部が入り、作業ツリーの片付けまで止まる。
-# `.claude/ccnavi/` は前の置き場。今の既定は `.ccnavi/common/` だが、env で前の綴りを
-# 指したままのワークスペースがあるので、守る場所からは外さない。
+# ゲートの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
-# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。前は `.claude/ccnavi/`
-# の中にあって、そこを守る綴りに一緒に入っていた。移したぶん守りが外れないよう、名前を
-# 絞って足す。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
+# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。どちらも判定が読むので
+# 名前を絞って守る。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので
+# 守らない。
 _PLACES = (
-    r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
+    r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
     r"logs[\\/](log\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
-    r"\.claude(?:[\\/](ccnavi|hooks|scripts|settings)|" + _COPY_TERM + r")",
+    r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
     r"logs[\\/](log\.jsonl|state)" + _COPY_END,
@@ -298,7 +297,7 @@ def _folded(clause: str) -> str:
 
 
 def project_home_clause(project_home: str) -> str:
-    """ccnavi ディレクトリの綴りを、シェルの書き込みに当てる形に直す（設計 §25.6）。
+    """ccnavi ディレクトリの綴りを、シェルの書き込みに当てる形に直す（設計 §11.6）。
 
     ccnavi ディレクトリの下は丸ごと守る。層の設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
     既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
@@ -383,8 +382,8 @@ def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
 def common_shell_clause(root: str, path: str) -> str:
     """共通層の 1 本を、シェルの書き込みに当てる形に直す。
 
-    既定の置き場（`.ccnavi/common/`）も前の置き場（`.claude/ccnavi/`）も _PLACES が
-    持っているが、`CCNAVI_RULES` などは任意の場所を指せる。そこを名前で拾えないと、
+    既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`CCNAVI_RULES` などは
+    任意の場所を指せる。そこを名前で拾えないと、
     共通層を動かしたワークスペースでは `echo x > <その場所>` が通る。
 
     ワークスペースルートの下ならその相対、外なら書かれた綴りと行き着く先の両方で当てる。
@@ -404,7 +403,7 @@ def common_shell_clause(root: str, path: str) -> str:
 
 
 def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
-    """共通層の 3 本を、名指しのツールに当てる形に直す（設計 §25.6）。
+    """共通層の 3 本を、名指しのツールに当てる形に直す（設計 §11.6）。
 
     当てる先は解決済みの絶対パス。ワークスペースルートの下に在るなら、ワークスペースと、
     そこから切った作業ツリー（`.claude/worktrees/<名前>/`）の同じ相対に当てる。作業ツリー側の
@@ -634,7 +633,7 @@ def targets(
     layers: list[settings.LayerFile] = (),
     projects_dir: str = "",
 ) -> list[Target]:
-    """守る対象を組み立てる（設計 §25.6）。
+    """守る対象を組み立てる（設計 §11.6）。
 
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
@@ -879,7 +878,7 @@ def before(
         content = _read(target.path)
         if content is None:
             # 戻せなかった。控えも git も持っていないなら、そもそも
-            # 置かれていないファイルなので、印を残して次から黙る。
+            # 置かれていないファイルなので、マーカーを残して次から黙る。
             if saved is None:
                 _note_absent(state_dir, session, target)
                 continue
@@ -938,7 +937,7 @@ def after(
         if saved is None:
             if now is None:
                 # 対象も控えも無い。置いていないファイルなので何も言わない。
-                # 実行前がここに印を残しているが、印が読めない場合でも
+                # 実行前がここにマーカーを残しているが、マーカーが読めない場合でも
                 # 「無いものが無いまま」を事件として扱わない。
                 continue
             if _absent_noted(state_dir, session, target):
@@ -1054,7 +1053,7 @@ def at_start(
         content = _read(target.path)
         if content is None:
             # 最初から無い。`settings.local.json` を置いていない形がこれで、
-            # 事件ではない。無いことの印は実行前の側が残す。開始の時点では
+            # 事件ではない。無いことのマーカーは実行前の側が残す。開始の時点では
             # まだ「消された」と「置いていない」を見分ける手がかりが無い。
             continue
         _clear_absent(state_dir, session, target)
@@ -1399,9 +1398,9 @@ def _fall_back_to_git(setting: str, root: str, target: Target, now: bytes | None
 
 
 def _absent_path(state_dir: str, session: str, target: Target) -> str:
-    """「このファイルは置かれていない」という印の置き場。
+    """「このファイルは置かれていない」というマーカーの置き場。
 
-    印を持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
+    マーカーを持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
     置いていないプロジェクトでは、無いことがそのプロジェクトの正常な姿になる。
     そこで呼び出しのたびに外部プロセスを起こすと、何も起きていない作業が
     いちばん重くなる。
@@ -1418,7 +1417,7 @@ def _note_absent(state_dir: str, session: str, target: Target) -> None:
 
 
 def _clear_absent(state_dir: str, session: str, target: Target) -> None:
-    """印を消す。無かったはずのものが現れたら、次からは普通に控える。"""
+    """マーカーを消す。無かったはずのものが現れたら、次からは普通に控える。"""
     with contextlib.suppress(OSError):
         os.remove(_absent_path(state_dir, session, target))
 

@@ -43,7 +43,7 @@ const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "overlap"
  * ファイルが無いときに「作る」で書き出す雛形。README「フェーズの種類と計画」の例と同じ。
  * `scope` の綴りは例なので、作ったあとに画面でそのプロジェクトの置き場に直す。
  */
-export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 §24.15）。人が持つ設定で、エージェントは書き換えない。
+export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 §9.7）。人が持つ設定で、エージェントは書き換えない。
 #
 # 親チケットの \`plan:\` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
 # \`ccnavi --approve\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に

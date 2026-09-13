@@ -98,24 +98,6 @@ class LintTest(unittest.TestCase):
         # 報告と見分けが付かない。
         self.assertIn("rules.yml", result.stdout)
 
-    def test_前の置き場に読まれない共通層の設定が残っていればwarnで名指しする(self):
-        # ADR-0042。黙って無視すると、書いた人は効いていると思い続ける。
-        write(self.root, os.path.join(".claude", "ccnavi", "risk.yml"), "version: 1\n")
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(".claude/ccnavi/risk.yml があるが、もう読まない", result.stdout)
-
-    def test_前の置き場を今も読んでいるなら咎めない(self):
-        # env が前の綴りのままのワークスペースは動いている。導入スクリプトを打ち直せば移る。
-        body = json.dumps({"version": 3, "deny": [SOUND], "allow": [ALLOWED]})
-        old = write(self.root, os.path.join(".claude", "ccnavi", "rules.yml"), body)
-
-        result = lint(self.root, old)
-
-        self.assertNotIn("もう読まない", result.stdout)
-
     def test_読めないルールはerrorで非ゼロで終わる(self):
         # block モードではこれが全ツール呼び出しの拒否になり、直すための
         # 呼び出しまで止まる。検証がいちばん先に見つけなければならない形。
@@ -203,51 +185,6 @@ class LintTest(unittest.TestCase):
         self.assertIn("チケット制御: disable", result.stdout)
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 0)
-
-    def test_承認済みチケットの置き場を空文字にしてももう切れずwarnで今の書き方を言う(self):
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            "--approved",
-            "",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("チケット制御: enable", result.stdout)
-        self.assertIn("CCNAVI_TICKETS_APPROVED が空文字", result.stdout)
-        self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
-
-    def test_改名前のチケットの置き場の環境変数はwarnで新しい名前を言う(self):
-        # 旧名はもう読まない。書いたままの人は既定の置き場で動いていることに気づかないので、
-        # 1 つずつ新しい名前を挙げる。
-        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-        environment.update({"CCNAVI_TICKETS": "wip/tickets", "CCNAVI_APPROVED": ".ccnavi/tickets"})
-        result = run_ccnavi(
-            [
-                "--root",
-                self.root,
-                "--lint",
-                "--rules",
-                rules_file(self.root, SOUND),
-                "--mode",
-                "enable",
-            ],
-            input="",
-            cwd=ROOT,
-            env=environment,
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(
-            "CCNAVI_TICKETS はもう効かない。CCNAVI_TICKETS_PROPOSAL に改名した", result.stdout
-        )
-        self.assertIn(
-            "CCNAVI_APPROVED はもう効かない。CCNAVI_TICKETS_APPROVED に改名した", result.stdout
-        )
 
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))
