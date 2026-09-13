@@ -54,7 +54,8 @@ class ApprovalNewsTest(PhaseHarness):
         )
 
     def approve_yes(self, tickets):
-        # ボードと同じく、見せた本文の指紋を渡す。渡さない `--yes` は承認しない。
+        # ボードと同じく、見せた指紋（承認画面の本文と承認済みチケットに写る中身）を渡す。
+        # 渡さない `--yes` は承認しない。
         shown = self.ccnavi("--approve", "--preview", "--json")
         digest = json.loads(shown.stdout)["digest"]
         result = self.ccnavi("--approve", "--yes", ",".join(tickets), "--digest", digest, "--json")
