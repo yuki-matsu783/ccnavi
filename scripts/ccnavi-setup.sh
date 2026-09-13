@@ -1442,9 +1442,19 @@ fi
 if [ ! -f "$root/$DEPLOY_PHASES" ]; then
 	note_missing "${DEPLOY_PHASES}（フェーズの種類。無いと番号だけの挙動になる）"
 fi
-for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh; do
-	if [ ! -f "$root/.ccnavi/scripts/$name" ]; then
-		note_missing ".ccnavi/scripts/${name}（ゲートの中で通る形）"
+# 配るものの一覧（DEPLOY_SCRIPTS）で見る。ここで名前を決め打ちすると、配る sh を
+# 足したときに、無いことをこの一覧だけが言わなくなる。
+for name in $DEPLOY_SCRIPTS; do
+	if [ ! -f "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
+		case "$name" in
+		ccnavi-push-approved.sh)
+			why="ボードが承認のあと端末で走らせる、承認済みチケットのコミットと push"
+			;;
+		*)
+			why="ゲートの中で通る形"
+			;;
+		esac
+		note_missing "${DEPLOY_SCRIPT_DIR}/${name}（${why}）"
 	fi
 done
 if [ -n "$missing_parts" ]; then
