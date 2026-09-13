@@ -326,6 +326,37 @@ class ApproveJsonTest(PhaseHarness):
         shown = self.preview()
         self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
 
+    def test_nul_in_the_markdown_body_still_approves(self):
+        """本文に生の NUL があっても、見せた指紋で承認できる（指紋は区切りの文字に頼らない）。"""
+        self.pending_parent_and_child()
+        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        with open(child, encoding="utf-8") as f:
+            text = f.read()
+        write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
+        self.commit_parent("nul in body")
+
+        shown = self.preview()
+        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01"])
+        result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.copy_exists("i0001-01"))
+
+    def test_moving_a_nul_in_the_body_after_preview_is_refused(self):
+        """見せたあとで本文の NUL の位置だけをずらすと、見せた指紋では承認しない。
+
+        つなぎ目をずらす形の書き換え。区切りの文字でつないでいた頃の実装でもここは止まる
+        （各部分が frontmatter から始まるため）ので、この確かめは振る舞いを固定するためのもの。
+        """
+        self.pending_parent_and_child()
+        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        with open(child, encoding="utf-8") as f:
+            text = f.read()
+        write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
+        self.commit_parent("nul in body")
+
+        shown = self.preview()
+        self.assert_refused_after_edit(child, "前\x00後\n", "前後\x00\n", shown)
+
     def test_digest_changes_when_only_the_overflow_changes(self):
         """3. 提案はそのままで、種類の scope が変わって子の超過が増えると、指紋が変わる。"""
         self.pending_parent_and_child()
