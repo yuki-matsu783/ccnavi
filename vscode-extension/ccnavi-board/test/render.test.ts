@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
 import { buildBoard } from "../src/core/board.js";
 import { escapeHtml, renderBoard } from "../src/core/render.js";
+import type { TicketJson } from "../src/core/model.js";
 import { fixture } from "./fixture.js";
 
 const OPTIONS = { nonce: "TEST-NONCE-123" };
@@ -143,7 +144,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   assert.ok(html.includes("未承認"));
   assert.ok(html.includes("作業ツリーあり"));
   assert.ok(html.includes("作業ツリーなし"));
-  assert.ok(html.includes("2 か所にコピーあり"));
+  // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
+  assert.ok(!html.includes("複数の場所にある"));
   assert.ok(html.includes("親 i0001 / フェーズ 2"));
   assert.ok(html.includes('class="phases"'));
   // 締める（wrapup）のボタンは出さない
@@ -187,4 +189,17 @@ test("CB-T16 本文の文字列で表示を壊さない", () => {
   assert.ok(!html.includes(`<script>alert("x")</script>`));
   assert.ok(html.includes("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"));
   assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
+});
+
+test("CB-T118 本物が決まらない写りだけをバッジにし、場所を tooltip に出す", () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const where = [
+    { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+    { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+  ];
+  const homeless: TicketJson = { ...child, seen_in: where, scattered: where };
+  const html = renderBoard(buildBoard({ ...base, tickets: [homeless] }), OPTIONS);
+  assert.ok(html.includes("複数の場所にある（2 か所）"));
+  assert.ok(html.includes('title="main:todo, i0001-02:todo"'));
 });

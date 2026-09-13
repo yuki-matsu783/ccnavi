@@ -681,21 +681,32 @@ def scan_all(
     return found, problems
 
 
-def dedupe(found: list[Ticket]) -> list[Ticket]:
-    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。
+def fold(hits: list[Ticket]) -> list[Ticket]:
+    """同じ識別子の写りを、権威のあるツリーで畳む。
 
     子の作業ツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
-    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに無い
-    ときは全部残し、検証が「複数の場所にある」と言う。
+    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
+    あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
+    なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
     """
-    by_id: dict[str, list[Ticket]] = {}
+    home = hits[0].parent or hits[0].ticket
+    at_home = [t for t in hits if t.tree == home]
+    return at_home if at_home else hits
+
+
+def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
+    """識別子ごとの写りの全部。並びは見つけた順。"""
+    grouped: dict[str, list[Ticket]] = {}
     for t in found:
-        by_id.setdefault(t.ticket, []).append(t)
+        grouped.setdefault(t.ticket, []).append(t)
+    return grouped
+
+
+def dedupe(found: list[Ticket]) -> list[Ticket]:
+    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。"""
     kept: list[Ticket] = []
-    for hits in by_id.values():
-        home = hits[0].parent or hits[0].ticket
-        at_home = [t for t in hits if t.tree == home]
-        kept.extend(at_home if at_home else hits)
+    for hits in by_ticket(found).values():
+        kept.extend(fold(hits))
     return kept
 
 

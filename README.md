@@ -1877,6 +1877,7 @@ ccnavi --explain --json
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物の作業ツリーか（設計 §9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子の作業ツリーは親のブランチから切るので、親の提案が写っているのが普通 |
+| `scattered[]` | どれが本物か決まらない写りの全部。`{tree, state, path}`。権威のツリー（親のツリー。親自身なら自分のツリー）で畳んで 2 つ以上残ったときだけ入り、決まっていれば空。`--lint` が ERROR で「複数の場所にある」と言うのと同じ条件。写りがあること自体は普通なので `seen_in` の数は食い違いを意味しない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 
 `parents[]` の 1 件。
