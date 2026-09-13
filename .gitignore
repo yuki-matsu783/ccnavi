@@ -23,10 +23,6 @@ __pycache__/
 /logs/
 *.jsonl
 
-# 前の置き場に残った記録と控え。今は logs/ の下に書く。
-/.claude/ccnavi/session/
-/.claude/ccnavi/state/
-
 # 並行セッションのワークツリー。ワークスペースルートの中に置かれるので、
 # セッションの道具と権限が届く代わりに git の邪魔になる。
 /.claude/worktrees/
