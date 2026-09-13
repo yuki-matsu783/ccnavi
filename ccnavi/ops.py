@@ -50,7 +50,8 @@ def start(
             f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、"
             "切り元が承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
-            f'先に {where}\'sh .ccnavi/scripts/ccnavi-git.sh worktree add "{worktree}" '
+            f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
+            f'worktree add "{worktree}" '
             f"-b {ticket_id}' で作ること\n"
         )
         return 1
@@ -258,7 +259,7 @@ def _score_child(
     }
     score = risk.evaluate(definition, diff, root, worktree, env, judgements)
     if score.pending:
-        prompt = risk.judge_prompt(found.ticket, found.parent, diff, score.pending, worktree)
+        prompt = risk.judge_prompt(found.ticket, found.parent, diff, score.pending, worktree, root)
         where = ""
         if conf.state:
             path = os.path.join(conf.state, f"risk-judge-{found.ticket}.md")
@@ -271,7 +272,8 @@ def _score_child(
         stderr.write(
             f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
             "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
-            f"'sh .ccnavi/scripts/ccnavi-ticket.sh judge {found.ticket} <項目> yes|no "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} judge {found.ticket} "
+            "<項目> yes|no "
             "--reason <根拠>' で記録してから閉じ直すこと\n"
         )
         if where:

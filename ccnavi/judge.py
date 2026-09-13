@@ -165,7 +165,7 @@ def decide_before(
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:

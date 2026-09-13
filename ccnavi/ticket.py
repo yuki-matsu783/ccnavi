@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import globmatch, rules, selfguard, tree
+from . import globmatch, rules, selfguard, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -723,16 +723,17 @@ def state_dir_regex(tickets_rel: str) -> str:
     return rf"(^|[\\/]){_place(tickets_rel)}[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
 
 
-def guard_rules(tickets_rel: str) -> list[rules.Rule]:
+def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     """状態の置き場を守るルール。組み込みで、ルールファイルには書かない。
 
     通るのは状態を動かすスクリプトだけ。そのスクリプトの呼び出し文字列には
-    置き場の綴りが現れないので、ここに当たらない。
+    置き場の綴りが現れないので、ここに当たらない。root は文面の sh の綴りに使う。
     """
     place = state_dir_regex(tickets_rel)
     message = (
         "チケットの状態は置き場（doing/ done/ cancelled/）で表し、動かすのは "
-        "'sh .ccnavi/scripts/ccnavi-ticket.sh start|done|cancel <識別子>' だけです。"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start|done|cancel <識別子>' "
+        "だけです。"
         "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
     )
     write_rule = rules.Rule(

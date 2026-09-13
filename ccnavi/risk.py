@@ -776,8 +776,10 @@ def run_script(root: str, rel: str, worktree: str, env: dict[str, str]) -> tuple
     return None, f"{rel} の出力を点として読めない: {text[:60]}"
 
 
-def judge_prompt(child: str, parent: str, diff: Diff, pending: list[Factor], worktree: str) -> str:
-    """親がサブエージェントに渡す、定性項目の問いと差分の要約。"""
+def judge_prompt(
+    child: str, parent: str, diff: Diff, pending: list[Factor], worktree: str, root: str
+) -> str:
+    """親がサブエージェントに渡す、定性項目の問いと差分の要約。root は sh の綴りに使う。"""
     lines = [
         f"# {child} のリスク判定（定性）",
         "",
@@ -786,7 +788,8 @@ def judge_prompt(child: str, parent: str, diff: Diff, pending: list[Factor], wor
         "",
         "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",
         "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
-        f"'sh .ccnavi/scripts/ccnavi-ticket.sh judge {child} <項目> yes|no --reason <根拠>' "
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} judge {child} <項目> yes|no "
+        "--reason <根拠>' "
         "で 1 項目ずつ。",
         "",
     ]
