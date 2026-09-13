@@ -292,7 +292,7 @@ class LogPlacementTest(WorkspaceTest):
         opened = False
         for piece in shown.replace("\n", " ").split():
             candidate = piece.strip("()")
-            # ラッパは `log=<綴り>` の形で返す。接頭辞を落としてから開く。
+            # ラッパースクリプトは `log=<綴り>` の形で返す。接頭辞を落としてから開く。
             if "=" in candidate:
                 candidate = candidate.split("=", 1)[1]
             if not candidate.endswith(".log"):

@@ -1,4 +1,4 @@
-"""git ラッパの受入テスト。外からスクリプトを動かす。
+"""git のラッパースクリプトの受入テスト。外からスクリプトを動かす。
 
 読み返すのは標準出力・標準エラー・終了コードと、logs/ に残った記録だけ。
 中の関数も変数も見ないので、書き方が変わってもテストは真であり続ける。
@@ -22,15 +22,15 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 
 
 def git(cwd, *args):
-    """素の git。ラッパを通さずに見本のリポジトリを組み立てるために使う。"""
+    """素の git。ラッパースクリプトを通さずに見本のリポジトリを組み立てるために使う。"""
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
 
 
 def make_repo(cwd):
     """コミットが 1 件あり、追跡外のファイルが 1 件ある使い捨てのリポジトリ。
 
-    ワークスペースルートにもする。ラッパは `.ccnavi/scripts/ccnavi-common.sh` を持つディレクトリを
-    cwd から上へ探して根を決める（`ccnavi_workspace`）ので、それが無いと
+    ワークスペースルートにもする。ラッパースクリプトは `.ccnavi/scripts/ccnavi-common.sh` を
+    持つディレクトリを cwd から上へ探して根を決める（`ccnavi_workspace`）ので、それが無いと
     「ワークスペースの外」として断られ、判定まで届かない。
     """
     marker = os.path.join(cwd, ".ccnavi", "scripts", "ccnavi-common.sh")
@@ -203,7 +203,7 @@ class RejectTest(GitWrapperTest):
     def test_the_alternative_it_names_is_not_a_denied_form(self):
         # 生の git は PreToolUse で止まる。案内が `git stash push -u` と書くと、
         # 案内された先でもう 1 度拒否される。代わりの手段が拒否される案内は、
-        # 案内が無いのとほとんど同じ。名乗るならラッパの形で名乗る。
+        # 案内が無いのとほとんど同じ。名乗るならラッパースクリプトの形で名乗る。
         for args in (
             ("reset", "--hard"),
             ("clean", "-fd"),
@@ -413,7 +413,7 @@ class EnvironmentTest(GitWrapperTest):
 
 
 def hint_lines(stdout):
-    """ラッパが失敗の文面の末尾に足す案内の行。"""
+    """ラッパースクリプトが失敗の文面の末尾に足す案内の行。"""
     return [line for line in stdout.splitlines() if line.startswith("案内:")]
 
 
@@ -447,7 +447,7 @@ class WorktreeRemoveHintTest(GitWrapperTest):
         hint = hints[0]
         for word in ("cwd", "サブシェル", "worktree list", "rmdir", "利用者"):
             self.assertIn(word, hint)
-        # 案内が勧める形は、生の git ではなくラッパの形で名乗る。
+        # 案内が勧める形は、生の git ではなくラッパースクリプトの形で名乗る。
         self.assertIn("ccnavi-git.sh worktree list", hint)
         self.assertNotIn("git worktree", hint.replace("ccnavi-git.sh worktree", ""))
         # 消し残しを消す rmdir には、打ったパスをそのまま入れる。
@@ -503,7 +503,7 @@ class ResetGuidanceTest(GitWrapperTest):
         stderr = self.assertRejected("reset", "--hard", "origin/main").stderr
         for form in ("checkout -B", "fetch", "log --oneline", "diff HEAD", "黙って外れ", "利用者"):
             self.assertIn(form, stderr)
-        # 勧める形はラッパの形で名乗る。生の git を勧めると、勧めた先でもう 1 度止まる。
+        # 勧める形はラッパースクリプトの形で名乗る。生の git を勧めると、勧めた先でもう 1 度止まる。
         rest = stderr.replace("ccnavi-git.sh", "")
         for raw in ("git checkout", "git log", "git diff", "git fetch", "git stash"):
             self.assertNotIn(raw, rest)

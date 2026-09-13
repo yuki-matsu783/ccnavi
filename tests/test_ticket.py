@@ -472,8 +472,8 @@ class TicketTest(unittest.TestCase):
     def test_subagent_cannot_push(self):
         """リモートに置く枝は親ブランチ 1 本で、送るのは親の仕事。
 
-        ラッパは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
-        cd して打てばラッパは通す。素性で止める層を hook に持つ。
+        ラッパースクリプトは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
+        cd して打てばラッパースクリプトは通す。素性で止める層を hook に持つ。
         """
         self.family()
         for command in (
@@ -572,7 +572,7 @@ class TicketTest(unittest.TestCase):
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
-        """ゲートが閉じている間、引用に空白を含むラッパ呼び出しも免除されること。
+        """ゲートが閉じている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
 
         免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ印で
         渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に

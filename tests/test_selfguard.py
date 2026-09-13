@@ -420,7 +420,7 @@ class SelfGuardTest(unittest.TestCase):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
-    def test_git_ラッパの記録は止めない(self):
+    def test_git_ラッパースクリプトの記録は止めない(self):
         # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
         result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
 

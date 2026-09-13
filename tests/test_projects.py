@@ -525,7 +525,7 @@ class ProjectsTest(unittest.TestCase):
 
     # ---- 6. --lint がプロジェクトまわりの設定の誤りを言う
 
-    def test_lint_names_project_wiring_problems(self):
+    def test_lint_names_project_config_problems(self):
         write(layer_rules(self.app), "version: 3\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
