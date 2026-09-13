@@ -273,7 +273,7 @@ def decide_before(
     # このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）は、
     # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）に合流させる。
-    told = approval.news(stderr, conf, payload.session_id, payload.agent_id)
+    told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
         context = "\n\n".join(p for p in (told, context) if p)
 
@@ -451,7 +451,10 @@ def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str
     """
     if t.is_main:
         return ""
-    copies, _ = approval.copies(conf.approved)
+    # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
+    # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
+    # チケットの範囲がいつまでも効く。
+    copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     ticket = index.get(t.name)
     if ticket is None:
@@ -460,7 +463,7 @@ def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str
     owner = parent.project if parent is not None else ticket.project
     if owner == t.project:
         return ""
-    source = approval.copy_path(conf.approved, t.name)
+    source = ticket.path
     return "\n".join(
         [
             f"[ccnavi] {reasons.CODE_TICKET_PROJECT} (source: {source})",
@@ -500,7 +503,7 @@ def ticket_verdict(
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
         return "", ""
-    copies, _ = approval.copies(conf.approved)
+    copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切った作業ツリーは案内では
@@ -517,7 +520,7 @@ def ticket_verdict(
         return rules.ALLOW, ""
 
     area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
-    source = approval.copy_path(conf.approved, t.name)
+    source = ticket.path
     head = [
         f"subject: {full}",
         f"ticket: {ticket.ticket} ({ticket.title}), approved {ticket.approved_at}, "

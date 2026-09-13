@@ -601,27 +601,6 @@ def combine(child: str, parent: str) -> str:
     return child if order[child] >= order[parent] else parent
 
 
-def tickets_rel_for(tickets_rel: str, project: str) -> str:
-    """このプロジェクトの提案の置き場。ワークスペースルートからの相対（設計 §25.5）。
-
-    `wip/tickets` なら `wip/<project>/tickets`。プロジェクトの名前は最初の区切りの
-    あとに挟む。プロジェクトのリポジトリの中には書かない。そこは public で、提案は
-    ワークスペースの運用の痕跡だから（REQ-MLT-14）。空の名前ならそのまま。
-    """
-    if not project:
-        return tickets_rel
-    parts = [p for p in tickets_rel.split("/") if p]
-    if len(parts) < 2:
-        return "/".join([project, *parts])
-    return "/".join([parts[0], project, *parts[1:]])
-
-
-def project_segment(tickets_rel: str) -> int:
-    """`tickets_rel_for` がプロジェクトの名前を挟む位置（区切りで数えて 0 始まり）。"""
-    parts = [p for p in tickets_rel.split("/") if p]
-    return 0 if len(parts) < 2 else 1
-
-
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
     """main と全作業ツリーの提案を集める。状態と置き場を添える。
 
@@ -644,42 +623,16 @@ def scan_all(
     found: list[Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    # 置き場がプロジェクトを決める（設計 §25.5）。ワークスペースの `wip/tickets/` は
-    # ワークスペース自身、`wip/<名前>/tickets/` はそのプロジェクト、作業ツリーの中は
-    # その作業ツリーの切り元。frontmatter の `project:` は照合に使うだけ。
-    # 4 つめは、名前が綴りどおりか確かめるディレクトリ。プロジェクトの名前が path の
-    # 区切りに出るのはワークスペースの側だけで、作業ツリーの側は切り元から決まる。
-    places = [(t, tickets_rel, t.project, "") for t in [ws, *tree.worktrees(root, projects_dir)]]
-    for p in tree.projects(projects_dir):
-        rel = tickets_rel_for(tickets_rel, p.name)
-        parts = [q for q in rel.split("/") if q]
-        segment = os.path.join(ws.root, *parts[: project_segment(tickets_rel) + 1])
-        places.append((ws, rel, p.name, segment))
-    for t, rel, place_project, segment in places:
+    # 置き場がプロジェクトを決める（設計 §25.5）。提案はどのツリーでも同じ相対の置き場に
+    # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
+    # git で運ぶので、提案も同じブランチに乗せる（設計 §24.5、REQ-MLT-14）。
+    # frontmatter の `project:` は照合に使うだけ。
+    places = [
+        (t, tickets_rel, t.project)
+        for t in [ws, *tree.projects(projects_dir), *tree.worktrees(root, projects_dir)]
+    ]
+    for t, rel, place_project in places:
         base = os.path.join(t.root, rel.replace("/", os.sep))
-        # 大文字小文字を区別しない機械では `wip/Lib/` が `wip/lib/` として開ける。
-        # 置き場がプロジェクトを決めるので、綴りまで同じディレクトリだけを読む。
-        if segment and os.path.basename(os.path.realpath(segment)) != place_project:
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    place_project,
-                    f"{os.path.relpath(segment, root)} の綴りがプロジェクトの名前 "
-                    f"`{place_project}` と違うので読まない",
-                )
-            )
-            continue
-        if place_project and t.kind == tree.KIND_WORKTREE:
-            # プロジェクトのリポジトリの中に提案は置かない（REQ-MLT-14）。読みはするが言う。
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    place_project,
-                    f"作業ツリー {t.name}（{place_project} から切った）の中に提案がある。"
-                    f"プロジェクトの提案はワークスペースの "
-                    f"{tickets_rel_for(tickets_rel, place_project)}/ に置く",
-                )
-            )
         for state in STATES:
             directory = os.path.join(base, state)
             try:

@@ -345,8 +345,8 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             )
         )
         return problems
-    root = root or os.path.dirname(os.path.dirname(os.path.dirname(conf.approved)))
-    if not os.path.isdir(conf.approved) and not tree_has_tickets(root, conf.tickets):
+    root = root or os.getcwd()
+    if not _any_copies(conf, root) and not tree_has_tickets(root, conf.tickets):
         # 承認済みチケットも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
         # 他の報告ごと読まれなくなる。
@@ -354,10 +354,10 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
 
     problems.extend(_approved_guarded(conf, root))
 
-    copies, notes = approval.copies(conf.approved)
+    copies, notes = approval.scan(conf, root)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
-    closed, _ = approval.copies(conf.approved, closed=True)
+    closed, _ = approval.scan(conf, root, closed=True)
     index = approval.by_id(copies)
     done = {t.ticket for t in closed}
 
@@ -396,24 +396,32 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     return problems
 
 
+def _any_copies(conf: settings.Settings, root: str) -> bool:
+    """どこかのツリーに承認済みチケットの置き場があるか。"""
+    return any(
+        os.path.isdir(settings.approved_dir(conf, t.root)) for t in approval.trees(conf, root)
+    )
+
+
 def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     """承認済みチケットの置き場が守られているか。
 
-    ルールが Write を止めていなければ、エージェントが承認済みチケットを書けて、承認の意味が無い。
+    置き場は層の傘（`.ccnavi/`）の下にあり、守るのは組み込みの 1 本
+    （`builtin-guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
+    ここで見るのは、置き場が本当に傘の下にあるか。傘の外に向けると、その 1 本が当たらず、
+    エージェントが承認済みチケットを書けて承認の意味が無くなる。
     """
-    try:
-        rule_set, _ = rules.load(conf.rules, root)
-    except (OSError, ValueError):
-        return []
-    probe = os.path.join(conf.approved, "probe.md")
-    if any(rule.matches("Write", probe) for rule in rule_set.deny + rule_set.ask):
+    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
+    approved = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/").strip("/")
+    if home and (approved == home or approved.startswith(home + "/")):
         return []
     return [
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"承認済みチケットの置き場 {conf.approved} への Write をルールが止めていない。"
-            "エージェントが承認済みチケットを書けるので、承認の意味が無い",
+            f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が"
+            f"層の傘（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
+            "組み込みが守らないので、エージェントが承認済みチケットを書けて承認の意味が無い",
         )
     ]
 
@@ -474,16 +482,7 @@ def _worktree_problems(
                     f"作業ツリー {t.name} にチケットが無い。そこへの書き込みはルールだけで判定する",
                 )
             )
-        stray = os.path.join(t.root, os.path.relpath(conf.approved, root))
-        if os.path.isdir(stray) and os.listdir(stray):
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    "(ticket)",
-                    f"作業ツリー {t.name} の側に承認済みチケットの置き場がある。"
-                    "読むのは main の側だけ",
-                )
-            )
+
         bound = index.get(t.name)
         if bound is not None:
             parent = index.get(bound.parent) if bound.is_child else None

@@ -118,9 +118,10 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "commit", "--quiet", "-m", "init")
         self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
         self.phases = write(os.path.join(self.root, "phases.yml"), PHASES)
-        self.approved = os.path.join(self.root, ".claude", "ccnavi", "tickets")
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
+        # 写しと印は親のツリーに置かれ、親のブランチに乗る（設計 §24.5）。
+        self.approved = os.path.join(self.parent_tree, ".ccnavi", "tickets")
 
     # ---- 道具
 
@@ -139,7 +140,7 @@ class PhaseHarness(unittest.TestCase):
                 "--rules",
                 self.rules,
                 "--approved",
-                self.approved,
+                ".ccnavi/tickets",
                 "--phases",
                 phases or self.phases,
                 "--state",
@@ -179,7 +180,16 @@ class PhaseHarness(unittest.TestCase):
         return write(os.path.join(self.parent_tree, "wip", "tickets", "todo", name + ".md"), text)
 
     def approve(self):
-        return self.ccnavi("--approve", stdin="y\n")
+        """承認して、写しを親のブランチに乗せる。
+
+        写しは親のツリーに置かれるので、コミットするまで作業ツリーは汚れたまま。
+        本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
+        """
+        result = self.ccnavi("--approve", stdin="y\n")
+        if os.path.isdir(self.approved):
+            git(self.parent_tree, "add", "-A")
+            git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
+        return result
 
     def commit_parent(self, message="tickets"):
         git(self.parent_tree, "add", "-A")
