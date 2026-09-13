@@ -321,6 +321,14 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 一番分かりにくい壊れ方になるので、既定で配布物まで置く。配布物が要らないときは
 `--no-deploy`。
 
+実行ファイルは、組み立てた機械の OS と CPU でしか動かない。`build.py` は
+`dist/ccnavi.target` に `darwin-arm64` や `windows-x86_64` の形で印を書き、導入スクリプトは
+配る前にそれを打った機械の `uname` と比べる。食い違えば、名指しの `--deploy` は終了コード 2 で
+断り、既定の配布元なら配らずに理由を出して設定だけ書く。arm64 の macOS と Windows は x86_64 の
+実行ファイルを変換して動かすので通す。印が無い（前の `build.py` で組んだ）ときは、確かめて
+いないことを 1 行出して配る。判定は打った機械で行うので、Windows と WSL で同じフォルダを開くなら、
+Claude Code を動かす側で打つ。
+
 | 配布元 | 配布先 |
 |---|---|
 | `dist/ccnavi/`（中身ごと） | `--bin` の 1 つ上のディレクトリ。既定なら `.claude/ccnavi/` |
