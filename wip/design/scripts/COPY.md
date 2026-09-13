@@ -1,7 +1,7 @@
 # 写す手順（launcher-scripts）
 
 このディレクトリの `ccnavi-launcher.sh` は、エージェントが書けない場所（`.ccnavi/scripts/`）に置く
-振り分けの sh の完成品です。チケット `launcher-scripts` のフェーズ 4（launcher-scripts-06）の成果物。
+振り分けの sh の完成品です。チケット `launcher-scripts` のフェーズ 4（launcher-scripts-06。手順の直しは launcher-scripts-08）の成果物。
 差分ではなく全文を置いてあります。
 
 あわせて、エージェントの範囲の外にある 3 か所を人が直します。
@@ -66,8 +66,9 @@ cmp wip/design/scripts/ccnavi-launcher.sh .ccnavi/scripts/ccnavi-launcher.sh && 
 無いと、5 の組み立ての出力が `.ccnavi/` の下の未追跡として git に出て、実行後の監視が報告し、
 作業ツリーの `worktree remove` も未追跡のファイルで止まります。
 
-冒頭の 4〜7 行を、次の 8 行に置き換えます（コメントの「dist は hook が指す実行ファイルの置き場」は、
-切り替えのあと正しくなくなるので一緒に直す）。
+冒頭の 4〜7 行（4 行）を、次の 7 行に置き換えます。すぐ後ろの 8 行目の空行（次の「Python の中間物」の段との
+区切り）はそのまま残します。コメントの「dist は hook が指す実行ファイルの置き場」は、切り替えのあと正しくなく
+なるので一緒に直します。
 
 直す前:
 
@@ -88,10 +89,9 @@ cmp wip/design/scripts/ccnavi-launcher.sh .ccnavi/scripts/ccnavi-launcher.sh && 
 /dist/
 /build/
 /.ccnavi/bin/
-
 ```
 
-（末尾の空行は、次の「Python の中間物」の段との区切りとして今もある 1 行です）
+直したあとの 4〜11 行は、上の 7 行と空行 1 行になります（空行が 2 行続いていないこと）。
 
 ### 4. `SKILL.md` の綴りを直す（D-6）
 
@@ -119,11 +119,18 @@ cmp wip/design/scripts/ccnavi-launcher.sh .ccnavi/scripts/ccnavi-launcher.sh && 
 uv run --with pyinstaller python build.py
 cat dist/ccnavi.target
 ls .ccnavi/bin/
-git status --short .ccnavi/
+git status --short .ccnavi/bin/
+git check-ignore -v .ccnavi/bin/"$(cat dist/ccnavi.target)"
 ```
 
 - `cat` がこの機械の語（例 `darwin-arm64`）を出し、`ls` に同じ名前のディレクトリがあること
-- `git status` に `.ccnavi/bin/` が出ないこと（出たら 3 が効いていない）。出てよいのは `A  .ccnavi/scripts/ccnavi-launcher.sh` だけ
+- `git status --short .ccnavi/bin/` が何も出さないこと（出たら 3 が効いていない）
+- `git check-ignore -v` が `.gitignore:10:/.ccnavi/bin/` で始まる 1 行を出すこと。何も出ないなら 3 が効いていない。
+  `git status` は、無視されているときも置き場がそもそも無いときも何も出さず、`check-ignore` は置き場が無くても
+  ルールだけで答えます。なので「置き場がある」は上の `ls` で、「無視されている」はこの `check-ignore` で、分けて見ます
+- `.ccnavi/` 全体の `git status` は見ません。親の作業ツリーには、フェーズのマーカー
+  （`.ccnavi/tickets/phases/launcher-scripts/<番号>.pending` など）がまだコミットされずに出ていることがあり、
+  それは切り替えとは関係ありません
 - 組み立てが 4 段目（`.ccnavi/bin/` へ写す）で落ちたら、`dist/ は新しい。.ccnavi/bin/<target>/ は前のまま` と出て 1 で終わります。
   `dist/` はできているので、原因（ディスク、権限、Windows で走っている実行ファイルのロック）を直して回し直してください
 
@@ -211,8 +218,10 @@ uv run python -m ccnavi --lint --log "" --state ""
 ```
 
 コミットの分け方の案（1 行のメッセージ、フッター無し）。最初のコミットは、2 で `--chmod=+x` を付けて足した
-sh だけが入った状態で打ちます。`git commit -- <パス>` の形は作業ツリーから入れ直すので、`core.filemode=false` の
-機械ではモードが 100644 に戻ります。使わないでください。
+sh だけが入った状態で打ちます。`git commit -- <パス>` の形は、そのパスを作業ツリーから入れ直します。
+`core.filemode=true` の機械（macOS・Linux・多くの WSL）で、作業ツリーの sh に実行ビットが付いていないと
+（2 の `chmod +x` が効いていない、別の手で写し直した、など）、`--chmod=+x` で入れた 100755 が 100644 に戻ります。
+原因を問わず、この形は使わないでください。
 
 ```sh
 git diff --cached --name-only    # .ccnavi/scripts/ccnavi-launcher.sh の 1 行だけであること
@@ -235,9 +244,16 @@ git push origin launcher-scripts
 
 MR（#30）が main に入ったあとに打ちます。
 
-**このワークスペースの Claude Code のセッションを、並行しているものも含めてすべて閉じてから始めます。**
+**始める前に、このワークスペースを開いているものをすべて閉じます。**
+
+- Claude Code のセッション（並行しているもの、別の作業ツリーで動いているものも含む）
+- このワークスペースを開いている VS Code のウィンドウ（ボード拡張が ccnavi の実行ファイルを起動する）
+- 同じフォルダを別の機械（Windows と WSL など）から開いているなら、そちらも
+
 pull で `settings.json` が新しい綴りに変わってから `.ccnavi/bin/<この機械>/` ができるまでの間に hook が走ると、
 sh が 127 で終わります。Claude Code はそれを hook のエラーとして扱い、その回は判定が走りません（止まらない側に倒れる）。
+Windows では、実行ファイルを起動しているものが残っていると、組み立ての入れ替え（`.ccnavi/bin/<target>/` への rename）が
+落ちることがあります。
 
 ```sh
 cd <ワークスペースルート>
@@ -245,13 +261,18 @@ git pull
 uv run --with pyinstaller python build.py
 ```
 
+`build.py` が 1 で終わったら（`dist/ は新しい。.ccnavi/bin/<target>/ は前のまま`）、**開き直しません。**
+初回は `.ccnavi/bin/<target>/` がまだ無いので、そのまま開くと hook が 127 で起動しません。閉じ忘れたものを閉じるなど
+原因を直して回し直すか、回し直せなければ「戻し方」の B に進みます。
+
 続けて、6 の 3 段をワークスペースルートで打ちます（2) の `ls-files` は `100755` のはず）。
 
 ```sh
 [ -x .ccnavi/scripts/ccnavi-launcher.sh ] && echo ok || echo NOT-EXECUTABLE
 git ls-files -s .ccnavi/scripts/ccnavi-launcher.sh
 .ccnavi/scripts/ccnavi-launcher.sh --lint --log "" --state ""; echo "exit=$?"
-git status --short .ccnavi/
+git status --short .ccnavi/bin/
+git check-ignore -v .ccnavi/bin/"$(cat dist/ccnavi.target)"
 ```
 
 3 段が揃ったら、Claude Code を開き直します（env の `CCNAVI_BIN_PATH` の変更は、ここで効きます）。
@@ -274,7 +295,11 @@ tail -n 1 logs/log.jsonl
 
 ## 戻し方
 
-**A の途中（コミット前）:**
+**戻す間の監視:** 「写す前に」と同じく、`CCNAVI_GUARD_CORE_FILES=enable` にしているなら、戻す間もこのワークスペースの
+Claude Code のセッションを止めてください。止めないと、ツール呼び出しのあとの監視が、戻した `.ccnavi/`・`.claude/` の
+変更を控えから元に戻します（dry-run なら報告だけ）。
+
+**A の途中（8 の最初のコミットより前）:**
 
 ```sh
 cd <ワークスペースルート>/.claude/worktrees/launcher-scripts
@@ -283,6 +308,21 @@ rm .ccnavi/scripts/ccnavi-launcher.sh
 git restore -- .gitignore .claude/skills/ccnavi-config/SKILL.md .claude/settings.json
 rm -rf .ccnavi/bin
 ```
+
+**A の 8 でコミットしたあと（push の前でも後でも）:** 履歴を書き換えず、打ち消すコミットを足します。
+push の後に書き換えると、取り込んだ人の手元と食い違うためです。
+
+```sh
+cd <ワークスペースルート>/.claude/worktrees/launcher-scripts
+git log --oneline -5    # 8 で作ったコミット（最大 3 つ）を確かめる
+git revert --no-edit <新しいほうから順に SHA を並べる>
+rm -rf .ccnavi/bin
+git ls-files .ccnavi/scripts/ccnavi-launcher.sh    # 何も出ないこと
+git push origin launcher-scripts                   # push 済みだったときだけ
+```
+
+8 のコミットの途中（1 つ目だけ済んだ、など）でやめたなら、済んだコミットだけを `revert` し、まだコミットしていない
+ファイルは上の「最初のコミットより前」の `git restore` で戻します。
 
 **B のあと、hook が起動しない:** ワークスペースルートの `.claude/settings.json` の `CCNAVI_BIN_PATH` を
 `dist/ccnavi/ccnavi` に戻して開き直します。9 の `build.py` が `dist/ccnavi/` も作り直しているので、前と同じく
