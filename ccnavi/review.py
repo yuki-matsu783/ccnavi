@@ -572,7 +572,7 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
-    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf)
+    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
         for p in problems:
@@ -914,8 +914,8 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     return False
 
 
-def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
-    """マージに進む前に作業ツリーの側で満たしていること。
+def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
+    """マージに進む前に作業ツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
     途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
     人がマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
@@ -930,7 +930,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
         problems.append(
             f"`{wip}/` に追跡されているファイルが {n} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
+            f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親の作業ツリーに未コミットの変更がある")

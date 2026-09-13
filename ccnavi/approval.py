@@ -656,7 +656,7 @@ def approve_yes(
         return code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
-    prompt = _approved_text(tickets, revisions)
+    prompt = _approved_text(tickets, revisions, root)
     if not as_json:
         stdout.write(lines.getvalue())
         return 0
@@ -674,10 +674,10 @@ def approve_yes(
     return 0
 
 
-def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str]) -> str:
+def _approved_text(tickets: list[ticket_mod.Ticket], revisions: set[str], root: str) -> str:
     from . import reasons
 
-    return reasons.approved(tickets, revisions)
+    return reasons.approved(tickets, revisions, root)
 
 
 # ---- 承認の事実を hook がモデルへ伝える
@@ -795,7 +795,7 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
     # 次の回に同じ承認をもう一度伝えることになる。
     _write_known(stderr, path, {**known, **marks})
-    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known})
+    return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
 def _candidates(

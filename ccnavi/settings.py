@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import shlex
 import tomllib
 from dataclasses import dataclass, field
 from typing import NamedTuple
@@ -150,6 +152,10 @@ DEFAULT_PROJECTS = "projects"
 # スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
 # 済ませるため（設計 §25.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
+# 引用せずにシェルへ渡せる綴り。空白とシェルの記号を含まない。
+_BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
+# 二重引用符の中でも意味を持つ文字。
+_SPECIAL_IN_DOUBLE_QUOTES = re.compile(r'["\\$`!]')
 
 
 def script_command(root: str, name: str) -> str:
@@ -157,11 +163,20 @@ def script_command(root: str, name: str) -> str:
 
     スクリプトはワークスペースにしか無く、プロジェクトから切った作業ツリーでは相対の
     `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
-    区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。引用はしない。ゲートの例外と
-    サブエージェントの禁止は `\\S*ccnavi-...` で見るので、引用すると当たらなくなる。
+    区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。
+
+    空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、ゲートの例外と
+    サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
+    区切りと別の印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
+    まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符に落とす。
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
-    return f"sh {base}/{DEFAULT_PROJECT_HOME}/scripts/{name}"
+    path = f"{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}"
+    if _BARE_PATH.fullmatch(path):
+        return f"sh {path}"
+    if not _SPECIAL_IN_DOUBLE_QUOTES.search(path):
+        return f'sh "{path}"'
+    return f"sh {shlex.quote(path)}"
 
 
 # ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。
