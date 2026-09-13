@@ -2,7 +2,7 @@
  * リスク管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象はワークスペースの配点（`.claude/ccnavi/risk.yml`、`CCNAVI_RISK`）の 1 本だけ。配点は
+ * 対象はワークスペースの配点（`.ccnavi/common/risk.yml`、`CCNAVI_RISK`）の 1 本だけ。配点は
  * プロジェクトごとには持たない（設計 §25）。パネルは 1 つ。
  *
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --risk <パス>` で渡す。
@@ -26,7 +26,7 @@ import { renderRiskPage } from "./core/risk-render.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_RISK = ".claude/ccnavi/risk.yml";
+const DEFAULT_RISK = ".ccnavi/common/risk.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 

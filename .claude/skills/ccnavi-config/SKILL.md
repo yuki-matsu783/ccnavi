@@ -1,7 +1,7 @@
 ---
 name: ccnavi-config
 description: >-
-  ccnavi の設定 3 本（.claude/ccnavi/ の rules.yml・phases.yml・risk.yml）を書く・足す・直す・
+  ccnavi の設定 3 本（.ccnavi/common/ の rules.yml・phases.yml・risk.yml）を書く・足す・直す・
   確かめる。ルールを足したい、フェーズの種類やリスクの配点を変えたい、書いた設定が
   意図どおりに効いているか疑わしい、`/ccnavi-config` と打たれた、のどれでも使う。
   足すときは下書きを検証してから利用者に渡し、確かめるときは lint と見本を回して
@@ -15,9 +15,9 @@ ccnavi の判定と進め方は、3 本のファイルで決まる。どれも**
 
 | ファイル | 決めるもの | 無いとき |
 |---|---|---|
-| `.claude/ccnavi/rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定に落ち、`--lint` が言う |
-| `.claude/ccnavi/phases.yml` | フェーズの種類。親の `plan:` に並べる名前と、その範囲・レビュー・成果物 | 番号だけのフェーズ。`plan:` は読めない |
-| `.claude/ccnavi/risk.yml` | 子を閉じるときに差分を数える配点。HIGH 以上でゲートが閉じる | 組み込みの配点（定量 4 項目） |
+| `.ccnavi/common/rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定に落ち、`--lint` が言う |
+| `.ccnavi/common/phases.yml` | フェーズの種類。親の `plan:` に並べる名前と、その範囲・レビュー・成果物 | 番号だけのフェーズ。`plan:` は読めない |
+| `.ccnavi/common/risk.yml` | 子を閉じるときに差分を数える配点。HIGH 以上でゲートが閉じる | 組み込みの配点（定量 4 項目） |
 
 このスキルの仕事は 2 つで、入口で分かれる。
 
@@ -64,4 +64,4 @@ ccnavi --explain --log "" --state ""
 
 **`--test` に禁止語を書かない。** `ccnavi --test Bash "git push"` は、その Bash 自体が
 `raw-git` に当たる。単発で試したいものも見本ファイルを scratchpad に書いて
-`--test-samples` で回す。見本の形は `.claude/ccnavi/rule-samples.yml` の先頭のコメントにある。
+`--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。

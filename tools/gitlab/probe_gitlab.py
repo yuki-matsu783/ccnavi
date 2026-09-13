@@ -16,7 +16,7 @@ tests/test_ticket.py と同じ形で一時リポジトリを作り、使い捨�
 
 ## 認証画面を出さない
 
-push は URL にトークンを埋めない（埋めると origin の綴りに混ざる）。git ラッパは
+push は URL にトークンを埋めない（埋めると origin の綴りに混ざる）。git のラッパースクリプトは
 `GIT_CONFIG_COUNT` を落とすので環境変数でも差し替えられない。一時リポジトリの
 `credential.helper` を空文字で一度リセットしてから（system / global の GCM を外す）、
 トークンを返す helper を足す。
@@ -378,8 +378,9 @@ def main() -> int:
     origin = f"{GITLAB}/root/{project_path}.git"
     git(ROOT, "remote", "add", "origin", origin)
     # 認証は git の設定側に置く。空文字で system / global の helper（GCM）を外し、
-    # 環境変数 GITLAB_TOKEN を返す helper を足す。ラッパが落とすのは GIT_CONFIG_COUNT だけで、
-    # 環境変数は helper の sh に届く。トークンをファイルに書かない（置き去りになる）。
+    # 環境変数 GITLAB_TOKEN を返す helper を足す。ラッパースクリプトが落とすのは
+    # GIT_CONFIG_COUNT だけで、環境変数は helper の sh に届く。トークンをファイルに
+    # 書かない（置き去りになる）。
     git(ROOT, "config", "--add", "credential.helper", "")
     git(
         ROOT,
@@ -438,7 +439,7 @@ def main() -> int:
         "i0001-01",
     )
     record(
-        "子の作業ツリーからの push はラッパが拒む",
+        "子の作業ツリーからの push はラッパースクリプトが拒む",
         child_push.returncode != 0 and "子チケット" in (child_push.stderr + child_push.stdout),
     )
 
@@ -470,7 +471,7 @@ def main() -> int:
 
     pushed = sh(GIT_SH, parent_tree, "push", "-u", "origin", "i0001")
     record(
-        "親の push（ラッパ経由、認証画面なし）",
+        "親の push（ラッパースクリプト経由、認証画面なし）",
         pushed.returncode == 0,
         redact(pushed.stdout + pushed.stderr).strip()[:120],
     )

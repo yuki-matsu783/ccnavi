@@ -75,7 +75,7 @@ deny が止める。承認できたら通知に「コピー」「新しいセッ
 | 置き場が無い | 上部に警告が出る。「作成」で `projects/` を作る。clone すれば git が作るので、無くても clone はできる |
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
 | ルールの置き場 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（実行ファイルが `CCNAVI_PROJECT_HOME` を読んで解く。既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは層として数えないので、置き場もボタンも出ない |
-| ルールが無い | 行に「共通層からコピー」のボタンが出る。`.claude/ccnavi/rules.yml`（`CCNAVI_RULES`）を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
+| ルールが無い | 行に「共通層からコピー」のボタンが出る。`.ccnavi/common/rules.yml`（`CCNAVI_RULES`）を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
 | 旧の置き場が残っている | `projects/<名前>/config/rules.yml` があれば、ルール欄に「判定に読まれていない。中身を層のルールファイルへ移し、旧のファイルを消す」と出す。拡張は移さず、消さない |
 | 自身の層 | 「ワークスペース本体」の枠に、自身の層のルール（既定 `.ccnavi/config/rules.yml`）の有無と「ルール管理」「共通層からコピー」が出る。無いのは正常なので warn の色にしない |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
@@ -90,7 +90,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 ### ルール設定画面
 
-対象は 3 種（ccnavi の README「ルールは 3 層の和で当たる」）。ワークスペースのルール（共通層、`.claude/ccnavi/rules.yml`）、
+対象は 3 種（ccnavi の README「ルールは 3 層の和で当たる」）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
 ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層（既定 `projects/<名前>/.ccnavi/config/rules.yml`）。
 自身の層とプロジェクト版はプロジェクト管理画面の「ルール管理」から開き、対象ごとに 1 パネルで並べて開ける。
 層の置き場は `--explain --json` の `layers[]` から取るので、実行ファイルが見つからないと層の画面は開かない。
@@ -112,7 +112,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 守っていること。
 
 - **判定は実行ファイルが出す。** 拡張は `--test` の答えを並べるだけで、glob も regex も自分で当てない。
-  hook の「走る／走らない」だけは matcher を拡張で当てる（Claude Code の配線であって ccnavi の判定ではない）
+  hook の「走る／走らない」だけは matcher を拡張で当てる（Claude Code の hook の登録であって ccnavi の判定ではない）
 - **作業中のチケットがある間は保存できない。** 提案が `doing` のチケットが 1 件でもあれば（どの作業ツリーでも）、
   編集はできるが保存ボタンが押せない。hook はツール呼び出しのたびにルールを読み直すので、セッションの途中で
   判定が変わるのを避ける。ボードの JSON が読めないときも保存しない（確かめられないなら閉じる側）
@@ -125,7 +125,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 ### リスク管理画面
 
-対象はワークスペースの配点（`.claude/ccnavi/risk.yml`、`env.CCNAVI_RISK`。`settings.local.json` が勝つ）の 1 本。プロジェクトごとの配点は
+対象はワークスペースの配点（`.ccnavi/common/risk.yml`、`env.CCNAVI_RISK`。`settings.local.json` が勝つ）の 1 本。プロジェクトごとの配点は
 無い（設計 §11）。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。保存の往復の間は欄を止める
 （その間の編集は保存後の再描画で消えるため）。`--lint` は設定全体を見るので、`rules.yml` などに error がある間は配点も保存できない。
 先に rules を直す。YAML として読めないファイルは画面から直せない（エディタで直す）。
@@ -155,7 +155,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 ### フェーズ管理画面
 
-対象は 3 種。共通層の種類（`.claude/ccnavi/phases.yml`、`env.CCNAVI_PHASES`。`settings.local.json` が勝つ）、ワークスペース自身の層
+対象は 3 種。共通層の種類（`.ccnavi/common/phases.yml`、`env.CCNAVI_PHASES`。`settings.local.json` が勝つ）、ワークスペース自身の層
 （既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層（既定 `projects/<名前>/.ccnavi/config/phases.yml`）。サイドパネルからは共通層を、
 プロジェクト管理画面の「ワークスペース本体」の枠と各行の「フェーズ管理」から層を開く。対象ごとに 1 パネルで並べて開ける。
 層の置き場は `--explain --json` の `layers[].phases_file` から取るので、実行ファイルが見つからないと層の画面は開かない。
@@ -201,13 +201,13 @@ YAML として読めないファイルは画面から直せない（エディタ
 | オーバーレイの「やめる」/ Esc | 何もせず閉じる。承認している最中は閉じない |
 | 通知の「コピー」 | Claude Code に渡す文（`--yes` の `prompt`）をクリップボードに入れる。進行中のセッションに貼って送る |
 | 通知の「新しいセッションで開く」 | `vscode://anthropic.claude-code/open?prompt=…` を開く。Claude Code の新しいタブに文が埋まる。送信は人が Enter |
-| フェーズ行の「受け入れ」 | 依頼済みでゲートが閉じたままのフェーズに出る。親の作業ツリーに `cd` して `sh .ccnavi/scripts/ccnavi-review.sh accept <N>` を送る |
+| フェーズ行の「受け入れ」 | 依頼済みでゲートが閉じたままのフェーズに出る。親の作業ツリーに `cd` して `sh '<ワークスペースルート>/.ccnavi/scripts/ccnavi-review.sh' accept <N>` を送る（プロジェクトの作業ツリーには `.ccnavi/scripts/` が無いので、ルートから綴る） |
 | プロジェクトの絞り込み | `projects/` があるときだけ出る。選択は Webview の状態として覚える |
 | 親の絞り込み | 親チケットが 1 つでもあれば出る。選んだ親とその子だけを出す。プロジェクトの絞り込みと重ねて効く。選択は Webview の状態として覚える |
 | 絞り込みと件数 | 列の見出しの件数と「承認待ち N 件を承認」の N は、絞り込みで見えている分の数になる。上部の「残り／全／不備／承認待ち」はボード全体の数のまま |
 | 「更新」 | ボードを読み直す |
 
-- 提案（`wip/**/tickets/`、全作業ツリーの同じ場所）・承認済みチケットと印（各ツリーの `.ccnavi/tickets/`）・
+- 提案（`wip/**/tickets/`、全作業ツリーの同じ場所）・承認済みチケットと印（`.ccnavi/tickets/`）・
   作業ツリーの登録（`.git/worktrees/`、`projects/*/.git/worktrees/`）を監視し、変化から 120 ミリ秒
   静まったら自動で読み直す。承認の後も、承認済みチケットが置かれたことで読み直す。オーバーレイの状態は
   拡張側が持つので、読み直しで HTML が作り直されても消えない
@@ -233,9 +233,9 @@ YAML として読めないファイルは画面から直せない（エディタ
 |---|---|
 | `ccnaviBoard.binPath` | 実行ファイルの場所。空なら上の順で探す。相対ならワークスペースルートから |
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |
-| `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `.claude/ccnavi/rule-samples.yml`。相対ならワークスペースルートから |
+| `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `.ccnavi/common/rule-samples.yml`。相対ならワークスペースルートから |
 
-ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.claude/ccnavi/rules.yml`。
+ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.ccnavi/common/rules.yml`。
 プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。自身の層とプロジェクトの層のルールファイルは
 拡張が組まず、`--explain --json` の `layers[]` のパスを使う（実行ファイルが `env.CCNAVI_PROJECT_HOME` を読んで解く。
 既定は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。`CCNAVI_PROJECT_RULES` はもう読まない。
@@ -271,14 +271,14 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 2 つだけで、引数は取らない。`rm -rf` は ccnavi のルール（`recursive-delete`）が止めるので使わない。
 作業ツリー（`.claude/worktrees/<名前>`）でこの拡張を組み立てたら、`git worktree remove` の**前に**
 これを走らせる。pnpm の `node_modules/.pnpm/` は深くて symlink も含み、git の削除が途中で止まって
-抜け殻が残ることがある。
+消しきれなかったディレクトリが残ることがある。
 
 ## 拡張開発ホストで動かす
 
 1. `pnpm install && pnpm run compile`
 2. VS Code で `vscode-extension/ccnavi-board/` を開く
 3. `F5`（実行とデバッグ → 拡張機能）で拡張開発ホストを起動する
-4. そのウィンドウで、ccnavi を入れたリポジトリ（`.claude/ccnavi/` を持つフォルダ）を開く
+4. そのウィンドウで、ccnavi を入れたリポジトリ（`.ccnavi/common/` を持つフォルダ）を開く
 5. コマンドパレットから `ccnavi ボード: ボードを開く` を実行する
 
 ## 手動確認の手順
@@ -334,12 +334,12 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |
 | 32 | fetch / pull | 行の「fetch」「pull」 | ターミナルで `cd projects/<名前> && git fetch` / `git pull` が走る |
 | 33 | プロジェクトとして認識されない git リポジトリ | `参考/` のような `.git` 付きのディレクトリをワークスペース直下に置く。`projects/group/deep` に clone する | 「プロジェクトとして認識されない git リポジトリ」の枠に、前者は「projects/ の外にあります」、後者は「projects/ の 2 階層目より深くにあります」の理由付きで出る。操作ボタンは無い |
-| 34 | リスク管理画面が開く | サイドパネルの「リスク管理」 | 閾値 3 欄と項目 4 件（このリポジトリの `risk.yml`）。上部の path が `.claude/ccnavi/risk.yml` |
+| 34 | リスク管理画面が開く | サイドパネルの「リスク管理」 | 閾値 3 欄と項目 4 件（このリポジトリの `risk.yml`）。上部の path が `.ccnavi/common/risk.yml` |
 | 35 | lint で止まる | high を critical より大きくして「保存」 | 下部に `--lint` の error（`levels` は medium <= high <= critical の順）が出て保存されない |
 | 36 | コメントが残る | 項目を 1 つ上へ動かし、points を変えて保存し、`git diff` を見る | 動かした項目と変えた行だけが差分。先頭の説明と末尾の例のコメントは残っている |
 | 37 | 無ければ作る | `risk.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「組み込みの配点でファイルを作る」。欄は押せない。押すとファイルが出来て、帯が消えて編集できる |
 | 38 | 作業中は保存できない | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
-| 39 | フェーズ管理画面が開く | サイドパネルの「フェーズ管理」 | 種類 7 件（このリポジトリの `phases.yml`）。`implement-feedback` の scope が inherit で、feedback の 2 件に左端の色。上部の path が `.claude/ccnavi/phases.yml` |
+| 39 | フェーズ管理画面が開く | サイドパネルの「フェーズ管理」 | 種類 7 件（このリポジトリの `phases.yml`）。`implement-feedback` の scope が inherit で、feedback の 2 件に左端の色。上部の path が `.ccnavi/common/phases.yml` |
 | 40 | lint で止まる | `implement-feedback` の review を none にして「保存」。次に戻して `implement` の requires に `nothing` を書いて「保存」 | どちらも下部に `--lint` の error（`review: mr` でなければならない / `nothing` という種類は無い）が出て保存されない |
 | 41 | id の重なり | `design` の id を `research` に変える | id の欄が赤くなり、下部に「id が重なっている」。保存ボタンが押せない。戻すと消える |
 | 42 | コメントが残る | `acceptance` を 1 つ上へ動かし、`docs` の scope に `wip/docs/*` を足して保存し、`git diff` を見る | 動かした 2 つの種類のブロックと、変えた `scope` の行だけが差分。先頭の説明は残っている。`overlap: [implement]` のような裸の並びはそのまま。空白だけの行は出ない |

@@ -48,8 +48,8 @@ done
 # どのツリーを触ったかを残す。ターンの終わりに Stop の hook が、ここに挙がった
 # ツリーだけをテストする。触っていないツリーを巻き添えにすると、他セッションの
 # 書きかけでこちらが差し戻される。
-mkdir -p "$main/.claude/ccnavi/session"
-printf '%s\n' "$tree" >>"$main/.claude/ccnavi/session/$session.trees"
+mkdir -p "$main/logs/session"
+printf '%s\n' "$tree" >>"$main/logs/session/$session.trees"
 
 cd "$tree" || exit 0
 

@@ -44,8 +44,8 @@ import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 300;
-const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
-/** 実行ファイルが自身の層を出さない（古い版）ときに監視する層の綴り。既定の傘 `.ccnavi` の形 */
+const DEFAULT_RULES = ".ccnavi/common/rules.yml";
+/** 実行ファイルが自身の層を出さない（古い版）ときに監視する層の綴り。ccnavi ディレクトリの既定の名前 `.ccnavi` の形 */
 const DEFAULT_LAYER_DIR = ".ccnavi/config";
 
 type Message =
@@ -239,7 +239,7 @@ function registerPanelHandlers(current: PanelState, projectsRel: string, selfRul
   });
 
   // clone の完了（`.git` の出現）、層のルールファイルと旧の置き場の出入り、origin の変化、作業ツリーの登録、`.gitignore`。
-  // 層の綴り（傘の下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 §11.2）。
+  // 層の綴り（ccnavi ディレクトリの下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 §11.2）。
   const rel = projectsRel === "" ? "projects" : projectsRel;
   const layerDir = selfRulesRel === "" ? DEFAULT_LAYER_DIR : path.posix.dirname(selfRulesRel);
   const patterns = [

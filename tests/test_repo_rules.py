@@ -1,4 +1,4 @@
-"""このリポジトリの本物のルール（.claude/ccnavi/rules.yml）と組み込みルールで判定する受入テスト。
+"""このリポジトリの本物のルール（.ccnavi/common/rules.yml）と組み込みルールで判定する受入テスト。
 
 tests/fixtures/ のルールではなく、運用に使っている rules.yml をそのまま `--test` に
 渡す。見るのは、shellread が印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
@@ -20,7 +20,7 @@ from ccnavi import shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES = os.path.join(ROOT, ".claude", "ccnavi", "rules.yml")
+RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
 
 # 見本のパスに書く合言葉。--test-samples と同じ読み替えを、ここでは自分で行う。
 PLACEHOLDER = "/repo"
@@ -84,12 +84,12 @@ class RepoRulesTest(unittest.TestCase):
         # 課題そのもの。`[^\x00]*$` が引用の空白で止まって外れていた。
         for subject in [
             'grep -n "git push" README.md',
-            'grep -n "rm -rf" /repo/.claude/ccnavi/rules.yml',
-            """grep -n "regex: '(>" /repo/.claude/ccnavi/rules.yml""",
+            'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml',
+            """grep -n "regex: '(>" /repo/.ccnavi/common/rules.yml""",
             'grep -n "<<EOF" /repo/README.md',
             # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の印を
             # 食わなくなって、はじめて allow に届く。
-            'grep -n "> /repo/.claude/ccnavi/rules.yml" f',
+            'grep -n "> /repo/.ccnavi/common/rules.yml" f',
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "allow", "prefer-read-grep")
@@ -101,7 +101,7 @@ class RepoRulesTest(unittest.TestCase):
         # 今まで穴だった側。`[^\x00]*` が引用の空白をまたげるようになる。
         for subject, rule_id in [
             ('find /repo -name "a b" -delete', "find-writes"),
-            ('sed -i "s/a b/c/" /repo/.claude/ccnavi/rules.yml', "builtin-guard-setting-files"),
+            ('sed -i "s/a b/c/" /repo/.ccnavi/common/rules.yml', "builtin-guard-setting-files"),
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", rule_id)

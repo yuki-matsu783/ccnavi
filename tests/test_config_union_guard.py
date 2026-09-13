@@ -268,8 +268,8 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
         os.makedirs(os.path.join(src, "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, "scripts", "ccnavi-launcher.sh"))
-        write(os.path.join(src, ".claude", "ccnavi", "rules.yml"), "deny: []\n")
-        write(os.path.join(src, ".claude", "ccnavi", "risk.yml"), COMMON_RISK)
+        write(os.path.join(src, ".ccnavi", "common", "rules.yml"), "deny: []\n")
+        write(os.path.join(src, ".ccnavi", "common", "risk.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)
         for name in ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh", "ccnavi-common.sh"):
             write(os.path.join(src, ".ccnavi", "scripts", name), f"# {name}\n")
@@ -285,8 +285,8 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
 
-        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".claude", "ccnavi", "rules.yml")))
-        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".claude", "ccnavi", "risk.yml")))
+        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "rules.yml")))
+        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "risk.yml")))
         self.assertTrue(os.path.isfile(os.path.join(self.dir, HOME, "config", "phases.yml")))
         self.assertNotIn("まだ無いもの", result.stdout)
 
@@ -295,8 +295,8 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("--mode", "enable", "--no-deploy")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("まだ無いもの", result.stdout)
-        self.assertIn(".claude/ccnavi/rules.yml", result.stdout)
-        self.assertIn(".claude/ccnavi/risk.yml", result.stdout)
+        self.assertIn(".ccnavi/common/rules.yml", result.stdout)
+        self.assertIn(".ccnavi/common/risk.yml", result.stdout)
         self.assertIn(".ccnavi/config/phases.yml", result.stdout)
 
     def test_all_writes_project_home(self):

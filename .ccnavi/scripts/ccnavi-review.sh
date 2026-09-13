@@ -80,7 +80,7 @@ esac
 root=$(ccnavi_workspace) ||
 	fail "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 here="$(pwd -W 2>/dev/null || pwd)"
-state="$root/${CCNAVI_STATE:-.claude/ccnavi/state}"
+state="$root/${CCNAVI_STATE:-logs/state}"
 
 # ---- 実行ファイル。設定に書かれた綴りを優先し、無ければ既定の置き場、それも無ければソース。
 
@@ -379,7 +379,7 @@ undraft() {
 		pr=$(api GET "repos/$path/pulls/$mr_number")
 		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
 		[ -n "$node" ] || fail "マージリクエスト #$mr_number の node_id を読めない。"
-		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は旗で持つので、旗を下ろすときに題からも落とす。
+		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも落とす。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then

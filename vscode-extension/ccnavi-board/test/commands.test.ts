@@ -51,9 +51,14 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 accept は親の作業ツリーで sh を打つ", () => {
+test("CB-T19 accept は親の作業ツリーで、ワークスペースルートから綴った sh を打つ", () => {
   assert.equal(
-    acceptCommand("/ws/.claude/worktrees/i0001", 2),
-    "cd '/ws/.claude/worktrees/i0001' && sh .ccnavi/scripts/ccnavi-review.sh accept 2",
+    acceptCommand("/ws", "/ws/.claude/worktrees/i0001", 2),
+    "cd '/ws/.claude/worktrees/i0001' && sh '/ws/.ccnavi/scripts/ccnavi-review.sh' accept 2",
+  );
+  // Windows の区切りと、単引用符を含むルート。
+  assert.equal(
+    acceptCommand("C:\\it's\\ws", "C:\\it's\\ws\\.claude\\worktrees\\i0001", 1),
+    `cd 'C:/it'\\''s/ws/.claude/worktrees/i0001' && sh 'C:/it'\\''s/ws/.ccnavi/scripts/ccnavi-review.sh' accept 1`,
   );
 });

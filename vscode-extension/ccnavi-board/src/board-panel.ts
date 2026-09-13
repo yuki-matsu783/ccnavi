@@ -294,7 +294,7 @@ function handleMessage(message: Message | undefined): void {
         vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーが無いので accept を送れない`);
         return;
       }
-      runInTerminal(root, acceptCommand(tree, message.phase));
+      runInTerminal(root, acceptCommand(root, tree, message.phase));
       return;
     }
   }

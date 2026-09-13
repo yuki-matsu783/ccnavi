@@ -36,6 +36,7 @@
 | [0006](0006-disable-from-env-only.md) | `disable` は起動側の環境からしか効かせない |
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
 | [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する |
+| [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
 
 ### ルールと判定
 
@@ -69,7 +70,7 @@
 |---|---|
 | [0022](0022-ticket-narrows-only.md) | チケットは絞る向きにしか使わず、未承認は何も効かせない |
 | [0023](0023-copies-not-ledger.md) | 承認済みの姿はチケットごとのファイルにし、台帳をやめる |
-| [0024](0024-parallel-tickets.md) | 並行するチケットの骨：行き先で結ぶ、子は親の部分集合、状態は置き場 |
+| [0024](0024-parallel-tickets.md) | 並行するチケットの骨子：行き先で結ぶ、子は親の部分集合、状態は置き場 |
 | [0025](0025-reference-workflow.md) | 参考にした運用から採ったもの、採らなかったもの |
 | [0026](0026-phase-types.md) | フェーズに種類を与え、親が計画を持つ |
 | [0027](0027-risk-by-result.md) | リスクは宣言ではなく実績で測る |

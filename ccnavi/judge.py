@@ -219,7 +219,7 @@ def decide_before(
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
-    # 範囲の宣言ではなく配線の誤りなので、ルールが allow と言っていても通さない。
+    # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject)
         if mismatch:
@@ -445,7 +445,7 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
 def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:
     """作業ツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
 
-    範囲の宣言ではなく配線の誤りなので、ルールより先に見る（REQ-MLT-12）。ルールが
+    範囲の宣言ではなく取り違えなので、ルールより先に見る（REQ-MLT-12）。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
     行き先のツリーが誰のものかは、そのツリーの `.git` が指す先で決まっている。
     """

@@ -2,7 +2,7 @@
  * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象は 3 種（設計 §11.2）。ワークスペースのルール（共通層、`.claude/ccnavi/rules.yml`）、
+ * 対象は 3 種（設計 §11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
  * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。対象ごとに 1 パネルで、並べて開ける。
  * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
@@ -28,8 +28,8 @@ import { asSections, readRules, type RuleForm, type RulesDocument, type Section 
 import { renderRulesPage } from "./core/rules-render.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
-const DEFAULT_SAMPLES = ".claude/ccnavi/rule-samples.yml";
+const DEFAULT_RULES = ".ccnavi/common/rules.yml";
+const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 

@@ -345,7 +345,7 @@ class SelfGuardTest(unittest.TestCase):
         # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
         # なくそのプロジェクトで、作業ツリー側の設定が入るのもそのプロジェクトから切った
         # 作業ツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
-        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py が黒箱で見る。
+        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py がブラックボックスで見る。
         self.worktree()
         projects = os.path.join(self.repo, "projects")
         home = os.path.join(projects, "lib")
@@ -409,6 +409,20 @@ class SelfGuardTest(unittest.TestCase):
         result = self.run_hook(
             "PreToolUse", setting="disable", command="echo x > .claude/ccnavi/rules.yml"
         )
+
+        self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_記録と控えの置き場もシェルからの書き込みで止まる(self):
+        # 前は .claude/ccnavi/ の中にあって、そこを守る綴りに一緒に入っていた。
+        # logs/ へ移したぶん守りが外れないこと。
+        for command in ("rm logs/log.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_git_ラッパースクリプトの記録は止めない(self):
+        # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
+        result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
@@ -550,7 +564,8 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(exe), "ELF fake executable\n")
 
     def test_振り分けの隣の実体は名指しのツールから止まる(self):
-        # 傘（.ccnavi/）の外へ動かした置き場は、傘のルールでは止まらない。
+        # ccnavi ディレクトリ（.ccnavi/）の外へ動かした置き場は、
+        # ccnavi ディレクトリを守るルールでは止まらない。
         launcher, exe = self.launcher_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "base_library.zip")
 

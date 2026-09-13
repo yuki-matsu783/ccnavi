@@ -1,4 +1,4 @@
-"""フェーズの種類。`.claude/ccnavi/phases.yml` を読む（設計 §24.15.1）。
+"""フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 §24.15.1）。
 
 ## 種類は人が持つ
 

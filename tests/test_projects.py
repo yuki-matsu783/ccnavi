@@ -523,9 +523,9 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(stopped.returncode, 0, stopped.stderr)
         self.assertIn("app: schema/x.sql", self.system_message(stopped))
 
-    # ---- 6. --lint がプロジェクトの配線を言う
+    # ---- 6. --lint がプロジェクトまわりの設定の誤りを言う
 
-    def test_lint_names_project_wiring_problems(self):
+    def test_lint_names_project_config_problems(self):
         write(layer_rules(self.app), "version: 3\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")

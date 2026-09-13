@@ -33,8 +33,13 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 仕掛けてある。
 
 設定 3 本（ルール・フェーズの種類・リスクの配点）は**層の和**で判定する（設計 §11.2〜§11.4.2、REQ-MLT）。
-共通層 `.claude/ccnavi/`、ワークスペース自身の層 `.ccnavi/config/`、プロジェクトの層
+共通層 `.ccnavi/common/`、ワークスペース自身の層 `.ccnavi/config/`、プロジェクトの層
 `projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
+
+**設定と記録の置き場を移した（ADR-0042）。** 共通層の 3 本と見本 `rule-samples.yml` は `.claude/ccnavi/` から `.ccnavi/common/` へ、
+判定の記録と控えは `logs/log.jsonl` と `logs/state/` へ、開発用 hook のセッション状態は `logs/session/` へ移った。`.claude/` には
+Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけが残る。構造（共通層はどのツリーにも効く）は変えていない。
+既存のワークスペースは `scripts/ccnavi-setup.sh` を打ち直せば移る（README「共通層の設定と記録を `.claude/ccnavi/` から移る」）。
 
 - Write / Edit / NotebookEdit は共通層 + 行き先の 1 層、Bash は共通層 + 全部の層。足すだけで上書きは無い
 - 層の id は `self:id` / `<名前>:id`。重複（全欄一致）は後ろを捨てて info、ルールの同 id 中身違いは両方効いて warn、
@@ -48,11 +53,14 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 - `CCNAVI_PROJECT_RULES` と旧の置き場 `config/rules.yml` はもう読まない（`--lint` が warn で言う）
 
 コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
-それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。層の傘 `.ccnavi/` の下は組み込みの deny
+それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
-`rm -rf .ccnavi` のように傘ごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
+`rm -rf .ccnavi` のように ccnavi ディレクトリごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
+共通層も ccnavi ディレクトリの下に入ったので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
+（前は `.claude/ccnavi/` の中で一緒に守られていた。`logs/` の下の git のラッパースクリプトの記録は守らない）。
 
-**移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧 `.claude/ccnavi/phases.yml` の削除は、
+**移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧共通層の `phases.yml`（置き場の移し替えで
+今は `.ccnavi/common/phases.yml`。前は `.claude/ccnavi/phases.yml`）の削除は、
 新しい実行ファイルを配ったあとに人が行う。逆順にすると古い実行ファイルが自身の層を読まず、フェーズの種類が全部消える（実際に起きた。設計 §11.12）。
 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える件）は別の issue で決める。
 
@@ -156,8 +164,8 @@ CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 ```
 
 走り出しに、測った `sh` と `exe` の場所が出る。**`sh =` がワークスペースルート側を
-指していることを確かめること。** 作業ツリーの `.claude/scripts` を指していたら、
-そのツリーに checkout された写しを測っている。`.claude/scripts/` は git が運ぶので
+指していることを確かめること。** 作業ツリーの `.ccnavi/scripts` を指していたら、
+そのツリーに checkout された写しを測っている。`.ccnavi/scripts/` は git が運ぶので
 どの作業ツリーにも写しがあるが、実際に効くのはワークスペース側の 1 本だけ。
 テストは実装（`ccnavi_workspace`）と同じ規則で `.claude/worktrees/` の下を候補から
 外して上へ歩くので、既定ではワークスペース側を向く。
@@ -218,7 +226,7 @@ CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
    ワークスペース向けの `allow` が孤児の中で効く。判定は変えず、`--lint` と `--explain` が
    名指しする方針で決まっている
 6. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い
-   `.claude/scripts/` の綴りがある」を warn で言うようにする
+   `.ccnavi/scripts/` の綴りがある」を warn で言うようにする
 
 ### 伝えること: `config-union` に残る見込みの穴
 
@@ -260,7 +268,7 @@ Write が deny にならないことを見る
 
 usage の `check` の説明が「依頼より後の未解決スレッドが無ければ」のままで、いまの挙動
 （時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `handoff` `ready`
-`wrapup` `origin` が無い。文面だけの修正だが、`.claude/scripts/` は `deny` なので
+`wrapup` `origin` が無い。文面だけの修正だが、`.ccnavi/scripts/` は `deny` なので
 人が直すか、`staging` 種別のフェーズを持つチケットで写す版を作る。
 
 **複数のリポジトリ（REQ-MLT、設計 §11）で残っているもの。**
@@ -275,7 +283,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   CLAUDE.md を読むか。読まれるならワークスペースの CLAUDE.md と矛盾しないように書く
 - `cwd` がプロジェクトの中にあるとき、hook の `${CLAUDE_PROJECT_DIR}` がワークスペースルートのままか
 
-**`.claude/ccnavi/rules.yml` に、もう当たらないルールが 1 件残っている（人が直す）。** `ask` の
+**`.ccnavi/common/rules.yml` に、もう当たらないルールが 1 件残っている（人が直す）。** `ask` の
 `current-ticket` が `*/.current-ticket.md` に当てているが、提案の置き場は `wip/tickets/<状態>/` に
 変わっていて（ADR-0023）、この綴りのファイルはもう作られない。文面も「承認台帳の側」という
 廃止した言い方をしている。消すか、`*/wip/tickets/*` に当てて文面を承認済みチケットの話に直す。設定 3 本は
@@ -303,7 +311,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   決まるので止め方は変わらないが、ゲートは cwd で親を引くので、そこが割れる
 - GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
   書いただけ。GitLab の変更要求（`request_changes`）だけは CE に無い機能で、EE でしか当てられない
-- `.claude/scripts/` への Write は `guard-scripts` が止める。sh 3 本はこのリポジトリで作ったので
+- `.ccnavi/scripts/` への Write は `guard-scripts` と組み込みの `builtin-guard-project-home` が止める。sh 3 本はこのリポジトリで作ったので
   入っているが、他のプロジェクトへは導入スクリプトが配る
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
@@ -331,7 +339,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 `ms` の欄で `PreToolUse` の行と比べられる。
 
 **誤検知の数を実測で比べる。** 記録に `degraded` が付くので、止めたもののうちどれだけが
-読み切れないまま出た判定かを数えられる。`.claude/ccnavi/log.jsonl` を貯めて、導入前の誤検知
+読み切れないまま出た判定かを数えられる。`logs/log.jsonl` を貯めて、導入前の誤検知
 （`echo "git push"` `grep -n "git push"` の類）が消えたことと、`degraded` の割合が小さいことを
 確かめる。割合が大きければ縮退の条件が広すぎる。
 
@@ -350,7 +358,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 測り直したときは両方を直す。
 
 - **作業ツリーが消せない（Windows）。`git worktree remove` が `Permission denied` で落ち、
-  `.venv` の 1 ファイルだけの抜け殻が残る。** 原因は uv のハードリンクと Windows の
+  `.venv` の 1 ファイルだけが入ったディレクトリが残る。** 原因は uv のハードリンクと Windows の
   削除規則の組み合わせで、消そうとしている作業ツリーで**何も走っていなくても**起きる。
   2026-09-11 に隔離した場所で再現させて確かめた（`fsutil hardlink list` と、掴む側 /
   消す側を分けた実験）。
@@ -367,9 +375,9 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   ぶんから。いま在るものを切り替えるなら、テストが走っていないときに各作業ツリーの
   `.venv` を消して作り直す。
   それでも「自分のテストが走っている間に自分の作業ツリーを消せない」は残る。落ちたら、
-  掴みが離れるのを待つか、抜け殻を `mv` で `.claude/worktrees/` の外へ出して
+  掴みが離れるのを待つか、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して
   `git worktree prune` する（rename は通るので、これは必ず成功する）。
-  消す前に `sh .claude/scripts/ccnavi-clean.sh <名前>` で生成物を消しておくと、pnpm の深い
+  消す前に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消しておくと、pnpm の深い
   node_modules で止まる分は避けられる。掴まれている `.pyd` は避けられず、消し残しとして出る。
 
 - **`${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。**
@@ -421,7 +429,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 |---|---|
 | 変更要求（`POST .../request_changes`）は CE の `lib/api` に無い。EE 限定 | 当てられない。sh の `requested_changes` の読みは EE の文書どおりのまま。CE では `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
 | URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh は利用者の情報を落とし、出力で伏せる。実行ファイルの `remote_kind` も読み飛ばす。`tests/test_review_origin.py` |
-| ラッパ経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら Git Credential Manager に保存しておく |
+| ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら Git Credential Manager に保存しておく |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tools/gitlab/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
 | 未解決の一覧で、位置の無い討論が ` :0 ` と出る | 直していない。読めるので後回し |
@@ -443,7 +451,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 検査もテストも、通らないと exit 2 で差し戻される。うるさければ hooks から外す。
 
 Stop の差し戻しには上限がある。3 回で打ち切って止まらせる。回数はセッションごとに
-`.claude/ccnavi/session/<セッション>.retries` に置いて数える。数の一生は次のとおり。作るのは
+`logs/session/<セッション>.retries` に置いて数える。数の一生は次のとおり。作るのは
 差し戻すときだけ。消えるのは、テストが通ったとき、新しい連鎖が始まったとき
 （`stop_hook_active` が false）、上限に達したとき、そして 1 時間経ったとき。最後の 1 つが
 要るのは、連鎖の途中でセッションが終わるとファイルが取り残されるから。
@@ -455,5 +463,5 @@ Stop の差し戻しには上限がある。3 回で打ち切って止まらせ�
 実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
 動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。
 
-`dist/`、`build/`、`.claude/ccnavi/log.jsonl` は git 管理外。
+`dist/`、`build/`、`logs/`（`logs/log.jsonl` を含む）は git 管理外。
 記録には絶対パスとコマンド全文が入るのでコミットしない。

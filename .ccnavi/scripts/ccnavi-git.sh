@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-git — 安全な git だけを通し、出力を抑えて結果だけ返すラッパ。
+# ccnavi-git — 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト。
 #
 # 生の `git` は PreToolUse で拒否し、拒否の文面からここへ誘導する。狙いは 2 つ。
 #
@@ -133,7 +133,7 @@ for arg in ${1+"$@"}; do
 		reject "設定の一時上書き ($arg) は受け取りません。素の形で書き直してください。"
 		;;
 	--output | --output=* | --upload-pack* | --receive-pack* | --exec-path* | --exec=* | --ext-diff | --textconv)
-		reject "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパが logs/ に全量を残すのでそちらを読んでください。"
+		reject "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
 		;;
 	--git-dir | --git-dir=* | --work-tree | --work-tree=* | --namespace | --namespace=* | -C)
 		reject "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
@@ -365,7 +365,7 @@ merge)
 	# 早送り以外も通す。CLAUDE.md の worktree 手順は、main が先に進んだ状態から
 	# ブランチへ main を取り込む形を必ず通る。そこを --ff-only に絞ると、
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
-	# 解こうとする手をラッパが止めてしまっては、止めた先に進む道が無くなる。
+	# 解こうとする手をラッパースクリプトが止めてしまっては、止めた先に進む道が無くなる。
 	#
 	# 止めるのは、衝突を人が見ないまま片側を捨てる形だけ。`-X ours` と `-s ours` は
 	# もう一方の変更を黙って落とす。並行して動いている他セッションの書きかけが
@@ -466,7 +466,7 @@ push)
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
-	# 見分けるのは承認済みチケット（main の `.claude/ccnavi/tickets/<名前>.md`）に
+	# 見分けるのは承認済みチケット（main の `.ccnavi/tickets/<名前>.md`）に
 	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# 作業ツリーはワークスペースの .claude/worktrees/ の下にある。切り元が
 	# プロジェクトでも置き場はワークスペース（設計 §25.2）なので、git の
@@ -482,7 +482,9 @@ push)
 			push_name="${push_name%%/*}"
 			case "${CCNAVI_TICKETS_APPROVED:-}" in
 			/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
-			*) push_copies="$push_root/${CCNAVI_TICKETS_APPROVED:-.claude/ccnavi/tickets}" ;;
+			# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
+			# env を書いていないワークスペースで、この検査が黙って飛ぶ。
+			*) push_copies="$push_root/${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}" ;;
 			esac
 			# 閉じた承認済みチケット（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
 			# そのツリーは子のもので、送ってよくなるわけではない。

@@ -32,7 +32,7 @@ lint しても、本物と組み合わせたときの答えになる。それで
 
 ```sh
 uv run python tools/check_rules.py            # このリポジトリ。承認済みチケットと記録を外して回す
-ccnavi --test-samples .claude/ccnavi/rule-samples.yml --log "" --state "" --approved ""
+ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --approved ""
 ```
 
 出力は 3 つに分かれる。
@@ -106,7 +106,7 @@ sh .ccnavi/scripts/ccnavi-git.sh log --shortstat -20
 食い違っていなくても、次に当たるものは黙って通さずに聞く。まとめて 1 回で、
 AskUserQuestion。聞くのは「この設定をどうするか」で、「この呼び出しを通してよいか」ではない。
 
-- **権限モードへの委譲（`UNDECLARED`）が多い。** `.claude/ccnavi/log.jsonl` の
+- **権限モードへの委譲（`UNDECLARED`）が多い。** `logs/log.jsonl` の
   `decision == "handover"` を数える。同じ場所が繰り返し出るなら allow に 1 行足す先が決まって
   いるということで、毎回違う場所なら allow の粒度が細かすぎる。どちらかを添えて聞く
 - **広すぎる allow、広すぎる deny。** `*` 単独、語の切れ目の無い glob、コマンド名を挟まない

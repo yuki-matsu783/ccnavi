@@ -80,7 +80,7 @@ To try one call against the rules without running it, or to run every sample
 in a file against them, run
 
     ccnavi --test Bash "git push" [--json]
-    ccnavi --test-samples .claude/ccnavi/rule-samples.yml [--json]
+    ccnavi --test-samples .ccnavi/common/rule-samples.yml [--json]
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
@@ -93,7 +93,7 @@ To review the pending tickets and approve the work areas they declare, run
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
-.ccnavi/tickets/ in the parent ticket's tree. Only the copies are consulted when judging calls, so
+.ccnavi/tickets/. Only the copies are consulted when judging calls, so
 editing a ticket never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.
@@ -206,7 +206,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、層の傘（設計 §25）。
+    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 §25）。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
@@ -402,7 +402,7 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
     `--approve` と `--reviewed` は人の合意そのもの。エージェントが Bash から打てば
     その合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
-    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない配管のため）。
+    CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
     """
     if conf.guard_ticket_approval == selfguard.DISABLE:
         return True

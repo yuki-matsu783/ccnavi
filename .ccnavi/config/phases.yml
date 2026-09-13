@@ -1,7 +1,7 @@
 # フェーズの種類（設計 §24.15、§25.12）。人が持つ設定で、エージェントは書き換えない。
 #
 # ここは自身の層（ワークスペース自身の層）。`scope` の綴りはこのワークスペースの
-# レイアウトに付いているので、共通層（.claude/ccnavi/phases.yml）ではなくこちらに置く。
+# レイアウトに付いているので、共通層（.ccnavi/common/phases.yml）ではなくこちらに置く。
 # 共通層に置くと、projects/ の下のプロジェクトにも同じ scope が効いてしまう。
 #
 # 親チケットの `plan:` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
@@ -41,7 +41,7 @@ phases:
     kind: work
     title: 実装とテスト
     review: mr
-    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".claude/ccnavi/phases.yml", "vscode-extension/*"]
+    scope: ["ccnavi/*", "tests/*", "build.py", "pyproject.toml", "scripts/*", ".ccnavi/*", ".ccnavi/common/phases.yml", "vscode-extension/*"]
     requires: [acceptance]
 
   staging:

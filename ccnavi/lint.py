@@ -240,6 +240,7 @@ def check(
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
+    problems.extend(_old_common(conf, root))
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
     problems.extend(_ticket(conf, root))
@@ -408,10 +409,10 @@ def _any_copies(conf: settings.Settings, root: str) -> bool:
 def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     """承認済みチケットの置き場が守られているか。
 
-    置き場は層の傘（`.ccnavi/`）の下にあり、守るのは組み込みの 1 本
+    置き場は ccnavi ディレクトリ（`.ccnavi/`）の下にあり、守るのは組み込みの 1 本
     （`builtin-guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
-    ここで見るのは、置き場が本当に傘の下にあるか。傘の外に向けると、その 1 本が当たらず、
-    エージェントが承認済みチケットを書けて承認の意味が無くなる。
+    ここで見るのは、置き場が本当に ccnavi ディレクトリの下にあるか。外に向けると、
+    その 1 本が当たらず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
     """
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     approved = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/").strip("/")
@@ -422,7 +423,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
             SEVERITY_ERROR,
             "(ticket)",
             f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が"
-            f"層の傘（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
+            f"ccnavi ディレクトリ（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
             "組み込みが守らないので、エージェントが承認済みチケットを書けて承認の意味が無い",
         )
     ]
@@ -582,7 +583,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """作業ツリーの層の傘に、切り元の git プロジェクトルートに無いファイルがあるか（設計 §25.6）。
+    """作業ツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §25.6）。
 
     判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
     作業ツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
@@ -687,6 +688,34 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"見える。プロジェクトの設定は {conf.project_home}/ に置く",
                 )
             )
+    return problems
+
+
+def _old_common(conf: settings.Settings, root: str) -> list[Problem]:
+    """前の既定の置き場（`.claude/ccnavi/`）に、読まれない共通層の設定が残っていないか（ADR-0042）。
+
+    言うのは、今の設定がそこを読んでいないときだけ。env が前の綴りのままで読んでいる
+    ワークスペースは動いているので咎めない（導入スクリプトを打ち直せば移る）。読まれずに
+    残っているものは、黙っていると書いた人は効いていると思い続ける。判定は動いているので
+    warn にする。
+    """
+    reading = {
+        os.path.normcase(os.path.realpath(p)) for p in (conf.rules, conf.phases, conf.risk) if p
+    }
+    problems: list[Problem] = []
+    for name in settings.OLD_COMMON_FILES:
+        rel = f"{settings.OLD_COMMON_DIR}/{name}"
+        old = os.path.join(root, rel.replace("/", os.sep))
+        if not os.path.isfile(old) or os.path.normcase(os.path.realpath(old)) in reading:
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(settings)",
+                f"{rel} があるが、もう読まない。共通層の既定の置き場は .ccnavi/common/{name}。"
+                "scripts/ccnavi-setup.sh を打ち直すと移る",
+            )
+        )
     return problems
 
 

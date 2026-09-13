@@ -113,7 +113,7 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
             "status",
             "--porcelain",
             # -z は綴りをそのまま NUL 区切りで返す。既定の出力は空白や
-            # 非 ASCII を含むパスを引用符で包んで自前の escape を掛けるので、
+            # 非 ASCII を含むパスを引用符で囲んで自前の escape を掛けるので、
             # 読み戻す側がその escape を解く羽目になる。解き損ねたパスは
             # 保護領域のルールを外す。
             "-z",

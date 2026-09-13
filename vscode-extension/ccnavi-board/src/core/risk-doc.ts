@@ -35,7 +35,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #
 # 項目は 3 系統。1 件につき当て方を 1 つだけ書く。
 #   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
-#   定量（スクリプト）: script: <.claude/ccnavi/ か .claude/scripts/ の下>。cwd は子の作業ツリー、
+#   定量（スクリプト）: script: <.ccnavi/common/scripts/ の下>。cwd は子の作業ツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
 #                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
 #   定性（サブエージェント）: judge: <問い>。親がサブエージェントに判断させ、

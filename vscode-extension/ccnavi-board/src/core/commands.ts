@@ -55,8 +55,10 @@ export function approveArgs(
 /**
  * `ccnavi-review.sh accept <N>`。sh がレビューのスレッドを取ってきて、未解決のまま進める
  * ことを人が受け入れる。sh は実行した場所を親の作業ツリーとして exe に渡すので、
- * 先に親の作業ツリーへ cd する。
+ * 先に親の作業ツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
+ * 切った作業ツリーには届かないので、sh はワークスペースルートから綴る。
  */
-export function acceptCommand(parentTree: string, phase: number): string {
-  return `cd ${shellQuote(toPosixPath(parentTree))} && sh .ccnavi/scripts/ccnavi-review.sh accept ${phase}`;
+export function acceptCommand(root: string, parentTree: string, phase: number): string {
+  const script = shellQuote(`${toPosixPath(root)}/.ccnavi/scripts/ccnavi-review.sh`);
+  return `cd ${shellQuote(toPosixPath(parentTree))} && sh ${script} accept ${phase}`;
 }

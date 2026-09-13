@@ -24,7 +24,7 @@ session=$(printf '%s' "$payload" |
 	sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
 [ -z "$session" ] && session=unknown
 
-state=".claude/ccnavi/session"
+state="logs/session"
 counter="$state/$session.retries"
 trees="$state/$session.trees"
 
@@ -35,7 +35,7 @@ trees="$state/$session.trees"
 # 連鎖の途中でセッションが終わったときで、その session_id は二度と現れないから
 # 誰も消さない。1 セッションにつき溜まっていく。
 #
-# 窓を 1 時間にしてあるのは、連鎖の長さより十分に長く、放置の長さより十分に
+# 保持期間を 1 時間にしてあるのは、連鎖の長さより十分に長く、放置の長さより十分に
 # 短いから。走っている連鎖のファイルは書くたびに新しくなるので巻き添えにならない。
 find "$state" -type f -mmin +60 -delete 2>/dev/null
 
