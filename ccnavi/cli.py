@@ -63,6 +63,11 @@ by the project's name (this flag is for --test, --test-samples, --lint and
 
     ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
 
+The phase types of one layer are handed in the same way (self is the
+workspace's own layer; the common layer keeps using --phases):
+
+    ccnavi --lint --project-phases-file self=/tmp/phases.yml
+
 To list the tickets, their approved copies, the phase marks and the gates
 in a machine-readable form (the VS Code board extension reads this), run
 
@@ -83,11 +88,25 @@ documented in README.md ("試験の JSON"); the VS Code extension reads it.
 To review the pending tickets and approve the work areas they declare, run
 
     ccnavi --approve
+    ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board;
+                                            ids go last, after every flag)
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
 .claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
-editing a ticket never widens the area on its own.
+editing a ticket never widens the area on its own. Ids only narrow the batch:
+an id that is not pending, or a child listed without its pending parent or
+its parent's pending revision, approves nothing.
+
+The VS Code board extension approves from an overlay instead of the terminal:
+
+    ccnavi --approve --preview --json [<id>...]  (show the batch; places nothing)
+    ccnavi --approve --yes <id,id,...> --json [<id>...]  (approve exactly what was shown;
+                                                 the trailing ids are the same filter)
+
+--yes needs no terminal; it refuses when the batch changed since it was shown.
+The next UserPromptSubmit / PreToolUse tells the model once about the new
+copies (the same text the extension hands to Claude Code).
 
 The parent agent moves tickets between states and asks for reviews through the
 scripts in .claude/scripts/, which call
@@ -133,7 +152,7 @@ OVERRIDES = (
     ("projects", True),
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
-RELATIVE_OVERRIDES = ("tickets", "project_rules")
+RELATIVE_OVERRIDES = ("tickets", "project_home")
 
 
 def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
@@ -146,7 +165,7 @@ def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
         value = getattr(args, name)
         if value is not None and (accepts_empty or value):
             setattr(conf, name, value)
-    # 写しの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
+    # 承認済みチケットの置き場の空文字は、以前は「チケット制御を使わない」の宣言だった。
     # 今は --ticket-control の仕事。置き場は既定のままにして、--lint が言う。
     if args.approved == "":
         conf.approved_blank = True
@@ -173,6 +192,11 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--result", default="")
     parser.add_argument("--lint", action="store_true")
     parser.add_argument("--approve", action="store_true")
+    # 承認の束を見るだけ（承認済みチケットを置かない）。
+    # VS Code の拡張がオーバーレイに出すために打つ。
+    parser.add_argument("--preview", action="store_true")
+    # 見せた束の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
+    parser.add_argument("--yes", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
@@ -182,12 +206,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、プロジェクトごとのルールファイル（設計 §25）。
+    # プロジェクトの置き場と、層の傘（設計 §25）。
     parser.add_argument("--projects", default=None)
-    parser.add_argument("--project-rules", default="")
+    parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
     # VS Code 拡張が編集中のプロジェクトのルールを保存せずに試すために渡す。
     parser.add_argument("--project-rules-file", default="")
+    # 同じ差し替えを層のフェーズの種類に対して行う（<名前>=<パス>、名前は self かプロジェクト）。
+    # VS Code 拡張のフェーズ管理画面が、編集中の層の種類を保存せずに検証するために渡す。
+    parser.add_argument("--project-phases-file", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", default="")
@@ -233,20 +260,23 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
-    # プロジェクトのルールの差し替えは診断の経路でだけ効く。hook からの判定にも
-    # 差し替えの手段を残すと、ルールを保存せずに緩める道になるので、そこでは無視する。
+    # 層のルールと種類の差し替えは診断の経路でだけ効く。hook からの判定にも
+    # 差し替えの手段を残すと、設定を保存せずに緩める道になるので、そこでは無視する。
     diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
-    if args.project_rules_file:
+    for flag, value, swaps in (
+        ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
+        ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
+    ):
+        if not value:
+            continue
         if not diagnosing:
-            stderr.write(
-                "ccnavi: --project-rules-file は診断（--test / --lint / --explain）でだけ効く\n"
-            )
-        else:
-            name, sep, path = args.project_rules_file.partition("=")
-            if not sep or not name or not path:
-                stderr.write("ccnavi: --project-rules-file は <名前>=<パス> の形で書く\n")
-                return EXIT_ERROR
-            conf.project_rules_files[name] = os.path.abspath(path)
+            stderr.write(f"ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n")
+            continue
+        name, sep, path = value.partition("=")
+        if not sep or not name or not path:
+            stderr.write(f"ccnavi: {flag} は <名前>=<パス> の形で書く\n")
+            return EXIT_ERROR
+        swaps[name] = os.path.abspath(path)
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
@@ -285,10 +315,30 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not conf.tickets_enabled:
             stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
             return EXIT_ERROR
+        if args.preview and args.yes:
+            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            return EXIT_ERROR
+        # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
+        # `--approve` と同じで、束に載せる識別子（ボードの絞り込みで見えている分）。
+        if args.preview:
+            code = approval.preview(stdout, stderr, conf, root, args.json, list(args.command))
+            return EXIT_OK if code == 0 else EXIT_ERROR
+        # 拡張のオーバーレイで人が押した承認。端末の壁の代わりに、見せた束と今の束が
+        # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
+        # deny（phase.ticket_approval_rule）が止める。
+        if args.yes:
+            # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
+            code = approval.approve_yes(
+                stdout, stderr, conf, root, args.yes.split(","), args.json, list(args.command)
+            )
+            return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
         rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
-        approved = approval.approve(stdin, stdout, stderr, conf, rule_set, root)
+        # `--approve` の後ろに並べた語は、束に載せる識別子。無ければ承認待ち全部。
+        approved = approval.approve(
+            stdin, stdout, stderr, conf, rule_set, root, only=list(args.command)
+        )
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。

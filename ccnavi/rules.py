@@ -40,6 +40,14 @@ Claude Code の権限モードに従う（判定は cli.py）。
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` の穴を開ける道具ではない。
 
+## 綴りの大文字小文字
+
+`glob` で書いたルールは、その機械がパスを見るのと同じ見方で当てる。大文字小文字を
+区別しない機械では `*/.ccnavi/*` が `.Ccnavi/config/rules.yml` にも当たる。同じ場所を
+指しているのに守りが外れる形を残さないため（risk.py と phasetypes.py の範囲も同じ）。
+`regex` で書いたルールは区別する。書いた人が `(?i:...)` を自分で書けるので、
+意図を持てる側に任せる。
+
 ## ワークスペースルートの合言葉
 
 `{root}` はワークスペースルート（hook なら CLAUDE_PROJECT_DIR、端末なら --root）の実パスに
@@ -57,6 +65,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
+from . import tree
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。
@@ -66,6 +75,11 @@ VERSION = 3
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
+# info は「そう書いてあるとおりに効いているが、書いた人が知りたいはずのこと」。
+# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 §25.4）。
+# warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
+# 混ぜると本当に緩んでいる warn が埋もれるため。
+SEVERITY_INFO = "info"
 
 # タイプの名前。強い順。cli.py の判定もこの順に見る。
 DENY = "deny"
@@ -93,6 +107,11 @@ _BACKREFERENCE = re.compile(r"\\[1-9]")
 
 # ワークスペースルートを指す合言葉。glob と regex の中で使え、読み込み時にその実パスに置き換わる。
 ROOT_PLACEHOLDER = "{root}"
+
+# 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
+# 書かれたままの id にこれが入っていると、層を添えた形と見分けが付かない。
+# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §25.4）。
+ID_SEPARATOR = ":"
 
 
 def root_pattern(root: str) -> str:
@@ -135,7 +154,16 @@ class Rule:
     """探すものと、見つけたときに言うことの組。"""
 
     # id は報告でルールを名指しするための名前。壊れたものを指させるように。
+    # 層の和では `lib:schema` のように層の名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
+    # bare_id は書かれたままの id。層の名前を添える前の綴りで、層をまたいで
+    # 同じルールかどうかを見るときの鍵になる（設計 §25.4「重複は後ろを捨てる」）。
+    # id から前置きを剥がして求める形にすると、`:` を含む id を書いた人の定義が
+    # 剥がされる側に倒れるので、書いたときの綴りをそのまま持つ。
+    bare_id: str = ""
+    # source はこのルールが来た層（common / self / プロジェクトの名前）。記録の
+    # `source` 欄と `--explain` がこれを読む（設計 §25.9）。
+    source: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
     # glob は fnmatch と同じ意味の glob。文字列全体に当たるので、部分一致が
@@ -168,6 +196,26 @@ class Rule:
     decision: str = ""
 
     compiled: re.Pattern | None = None
+
+    def key(self) -> tuple:
+        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §25.4、§25.8）。
+
+        比べるのは書いた綴りではなく、`{root}` を置き換えたあとの式。共通層と
+        プロジェクトの層に同じ `{root}/...` を書いた定義は、置き換え先が同じ
+        ワークスペースルートなので、ここで一致する。書いた綴りで比べると、
+        同じ場所を指す 2 本を別物として両方効かせることになる。
+        """
+        return (
+            self.bare_id,
+            self.match,
+            self.compiled.pattern if self.compiled else "",
+            self.message,
+            self.additional_context,
+            self.additional_context_once,
+            self.additional_context_file,
+            self.additional_context_once_file,
+            self.decision,
+        )
 
     def matches(self, tool: str, subject: str) -> bool:
         """このルールがこのツールと対象に当たるかどうか。"""
@@ -276,8 +324,10 @@ def _build(
     if not isinstance(raw, dict):
         return None, Problem(SEVERITY_ERROR, where, "ルールがキーと値の並びではない")
 
+    written_id = str(raw.get("id") or "")
     rule = Rule(
-        id=str(raw.get("id") or ""),
+        id=written_id,
+        bare_id=written_id,
         match=str(raw.get("match") or ""),
         glob=str(raw.get("glob") or ""),
         regex=str(raw.get("regex") or ""),
@@ -290,6 +340,14 @@ def _build(
     )
     name = f"{section}:{rule.id}" if rule.id else where
 
+    if ID_SEPARATOR in written_id:
+        return None, Problem(
+            SEVERITY_ERROR,
+            name,
+            f"id に `{ID_SEPARATOR}` は書けない。層の名前を添えた形"
+            f"（`self{ID_SEPARATOR}id` / `<プロジェクト名>{ID_SEPARATOR}id`）と"
+            "見分けが付かず、記録を読んだ人がどのファイルを直すのか決められない",
+        )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(
             SEVERITY_ERROR, name, "文面が無い。ルールは代わりに何をすべきかを言わなければならない"
@@ -317,12 +375,19 @@ def _build(
         expression = (
             rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
         )
+        # `regex` で書いた範囲だけは綴りの区別を残す。書いた人が `(?i:...)` を
+        # 自分で書けるので、意図を持てる側に任せる（ticket.py の範囲と同じ理屈）。
+        flags = 0
     else:
         glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
         expression = translate(glob)
+        # glob は、その機械がパスを見るのと同じ見方で当てる。区別しない機械で
+        # `*/.ccnavi/*` と書いたルールが `.Ccnavi/` を素通りさせると、同じ場所を
+        # 指しているのに守りが外れる（phasetypes._globs / risk._factors と同じ形）。
+        flags = re.IGNORECASE if tree.CASE_INSENSITIVE else 0
 
     try:
-        rule.compiled = re.compile(expression)
+        rule.compiled = re.compile(expression, flags)
     except re.error as exc:
         return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
 

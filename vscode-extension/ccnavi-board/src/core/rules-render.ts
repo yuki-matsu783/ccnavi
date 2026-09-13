@@ -43,6 +43,8 @@ export interface RulesPage {
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly samplesPath: string;
   readonly lock: Lock;
+  /** 上部に出す注意（旧の置き場が残っている、実行ファイルがこの層を読めていない、など） */
+  readonly notices?: readonly string[];
 }
 
 export interface RenderOptions {
@@ -69,7 +71,7 @@ ${STYLE}
 </style>
 </head>
 <body>
-${renderModeBanner(page.mode)}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderModeBanner(page.mode)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.rulesPath)}</span>
@@ -126,6 +128,10 @@ function renderModeBanner(mode: string): string {
   }
   const shown = mode === "" ? "未設定" : mode;
   return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。deny, ask 判定に HIT しても tool_use は停止しない</div>\n`;
+}
+
+function renderNotices(notices: readonly string[]): string {
+  return notices.map((n) => `<div class="banner warn">${escapeHtml(n)}</div>\n`).join("");
 }
 
 function renderProblems(problems: readonly string[]): string {

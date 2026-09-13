@@ -54,6 +54,9 @@ class OriginSubcommandTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-origin-")
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        # ワークスペースルートにもする。sh は `.claude/scripts/` を持つディレクトリを
+        # cwd から上へ探して根を決めるので、無いと判定まで届かない。
+        os.makedirs(os.path.join(self.dir, ".claude", "scripts"), exist_ok=True)
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=self.dir, check=True)
         # sh は今居るブランチを rev-parse で読む。コミットが無いと HEAD が解けない。
         subprocess.run(

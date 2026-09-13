@@ -34,6 +34,23 @@ test("CB-T03 JSON でなければ理由を返す", () => {
   assert.equal(notObject.ok, false);
 });
 
+test("CB-T110 layers[] からルールファイルの置き場を読み、無ければ空の並びにする", () => {
+  const board = fixture();
+  assert.deepEqual(board.layers.map((l) => l.name), ["common", "self"]);
+  assert.equal(board.layers[1].rules.path, "<root>/.ccnavi/config/rules.yml");
+  assert.equal(board.layers[1].rules.unreadable, "");
+  assert.equal(board.layers[1].phasesFile.path, "<root>/.ccnavi/config/phases.yml");
+  assert.equal(board.layers[0].phasesFile.path, "<root>/phases.yml");
+  const old = parseBoardJson(JSON.stringify({ version: BOARD_VERSION }));
+  assert.ok(old.ok);
+  assert.deepEqual(old.board.layers, []);
+  const broken = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, layers: [{ name: "lib" }, "x"] }));
+  assert.ok(broken.ok);
+  assert.deepEqual(broken.board.layers, [
+    { name: "lib", rules: { path: "", unreadable: "" }, phasesFile: { path: "", unreadable: "" } },
+  ]);
+});
+
 test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () => {
   const parsed = parseBoardJson(
     JSON.stringify({

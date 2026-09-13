@@ -98,6 +98,26 @@ export interface ParentJson {
   readonly phases: readonly PhaseJson[];
 }
 
+/** 層の設定ファイル 1 本の置き場 */
+export interface LayerFileJson {
+  /** 実行ファイルが解いたパス。ファイルが無くても本来の置き場を指す */
+  readonly path: string;
+  /** 読めなかった理由。空なら読めた（無いファイルも空として読めた扱い） */
+  readonly unreadable: string;
+}
+
+/**
+ * 層 1 つ（設計 §11.2）。拡張が使うのはルールとフェーズの種類のファイルの置き場だけなので、それだけを読む。
+ * 宣言の中身と risk は読まない（リスク管理画面は層に追従していない、設計 §11.11）。
+ */
+export interface LayerJson {
+  /** `common` / `self` / プロジェクトの名前 */
+  readonly name: string;
+  readonly rules: LayerFileJson;
+  /** フェーズの種類のファイル（`phases_file`）。共通層は `CCNAVI_PHASES` の綴り */
+  readonly phasesFile: LayerFileJson;
+}
+
 export interface BoardJson {
   readonly version: number;
   readonly root: string;
@@ -110,6 +130,8 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
+  /** 並びは 共通層 → 自身の層 → プロジェクト（名前順）。古い実行ファイルは空 */
+  readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];
   readonly pending_approval: readonly string[];
@@ -156,6 +178,7 @@ export function parseBoardJson(text: string): ParseResult {
         projects: str(settings.projects),
       },
       trees: list(raw.trees).filter(isRecord).map(tree),
+      layers: list(raw.layers).filter(isRecord).map(layer),
       projects: list(raw.projects).map(str),
       problems: list(raw.problems).map(str),
       pending_approval: list(raw.pending_approval).map(str),
@@ -173,6 +196,14 @@ function tree(raw: Record<string, unknown>): TreeJson {
     project: str(raw.project),
     kind: kind === "project" || kind === "worktree" ? kind : "main",
   };
+}
+
+function layer(raw: Record<string, unknown>): LayerJson {
+  const file = (value: unknown): LayerFileJson => {
+    const record = isRecord(value) ? value : {};
+    return { path: str(record.path), unreadable: str(record.unreadable) };
+  };
+  return { name: str(raw.name), rules: file(raw.rules), phasesFile: file(raw.phases_file) };
 }
 
 function ticket(raw: Record<string, unknown>): TicketJson {

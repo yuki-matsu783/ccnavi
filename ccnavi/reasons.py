@@ -253,6 +253,33 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     return "\n".join(lines)
 
 
+def approved(tickets, revisions: set[str]) -> str:
+    """チケットが承認されたことをモデルに伝える文。
+
+    `--approve --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
+    UserPromptSubmit / PreToolUse で渡す `additionalContext` の両方がここから出る。
+    2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
+
+    tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
+    revisions は親の改版だった識別子。
+    """
+    lines = ["[ccnavi] 承認済みチケットが置かれた。この範囲は次のツール呼び出しから効く。"]
+    for t in tickets:
+        if t.ticket in revisions:
+            where = "親の改版。計画が新しくなった"
+        elif t.is_child:
+            where = f"親 {t.parent}、フェーズ {t.phase}"
+        else:
+            where = "親"
+        title = f": {t.title}" if t.title else ""
+        lines.append(f"- {t.ticket}{title}（{where}）")
+    lines.append(
+        "後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、"
+        "'sh .claude/scripts/ccnavi-ticket.sh start <識別子>' で着手する。"
+    )
+    return "\n".join(lines)
+
+
 def _relative_or_omit(path: str, root: str) -> str:
     """案内に載せる設定ファイルの綴り。ワークスペースルートからの相対で括弧に入れる。
     無ければ空文字で、呼び手が括弧ごと省ける。"""

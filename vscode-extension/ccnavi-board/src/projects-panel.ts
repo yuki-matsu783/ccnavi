@@ -2,13 +2,14 @@
  * プロジェクト管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API と子プロセスに触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 一覧は実行ファイルの答え（`--explain --json` の trees、`--lint --json` の苦情）を並べる。
- * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ルールファイルと `.claude/` の有無、
- * `.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
+ * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
+ * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、層のルールファイル・旧の置き場
+ * `config/rules.yml`・`.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
+ * 層のルールファイルの置き場は layers の答えを使い、`CCNAVI_PROJECT_HOME` から自分で組まない。
  *
  * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこで人が行い、完了は `projects/<名前>/.git`
  * の出現を監視して拾う。書くのは、人がボタンを押したときの `.gitignore`、置き場のディレクトリ、
- * プロジェクトの `config/rules.yml`（無いときだけ）の 3 つ。
+ * 層（プロジェクトか自身の層）のルールファイル（無いときだけ）の 3 つ。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -18,6 +19,7 @@ import * as vscode from "vscode";
 import { openBoard } from "./board-panel.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
+import { OLD_PROJECT_RULES, projectLayer, selfLayer } from "./core/layers.js";
 import {
   buildProjectsPage,
   checkName,
@@ -36,13 +38,15 @@ import {
 import { renderProjectsPage } from "./core/projects-render.js";
 import { escapeHtml } from "./core/render.js";
 import { readOrigin } from "./git.js";
+import { openPhases } from "./phases-panel.js";
 import { openRules } from "./rules-panel.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
-const DEFAULT_PROJECT_RULES = "config/rules.yml";
+/** 実行ファイルが自身の層を出さない（古い版）ときに監視する層の綴り。既定の傘 `.ccnavi` の形 */
+const DEFAULT_LAYER_DIR = ".ccnavi/config";
 
 type Message =
   | { readonly type: "refresh" }
@@ -50,7 +54,11 @@ type Message =
   | { readonly type: "createDir" }
   | { readonly type: "fixIgnore" }
   | { readonly type: "createRules"; readonly name: string }
+  | { readonly type: "createSelfRules" }
   | { readonly type: "openRules"; readonly name: string }
+  | { readonly type: "openSelfRules" }
+  | { readonly type: "openPhases"; readonly name: string }
+  | { readonly type: "openSelfPhases" }
   | { readonly type: "openBoard"; readonly name: string }
   | { readonly type: "fetch"; readonly name: string }
   | { readonly type: "pull"; readonly name: string };
@@ -98,7 +106,7 @@ export async function openProjects(): Promise<void> {
   });
   const current: PanelState = { panel, folder, watchers: [], loading: false, again: false };
   state = current;
-  registerPanelHandlers(current, first.page.projectsRel);
+  registerPanelHandlers(current, first.page.projectsRel, first.page.selfRulesRel);
   show(current, first.page);
 }
 
@@ -116,17 +124,25 @@ async function gather(root: string): Promise<Gathered> {
   const lint = await runLintJson(root, binSetting());
   const projectsDir = board.settings.projects;
   const projectsRel = projectsDir === "" ? "" : toPosix(path.relative(root, projectsDir));
-  const settingsText = readText(path.join(root, ".claude", "settings.json"));
-  const projectRules = (settingsText !== undefined && envFromSettingsJson(settingsText, "CCNAVI_PROJECT_RULES")) || DEFAULT_PROJECT_RULES;
+  const self = selfLayer(board);
+  const selfRulesPath = self === undefined || self.rules.path === "" ? "" : resolveIn(root, self.rules.path);
 
   const projects = board.trees.filter((t) => t.kind === "project");
   const origins: Record<string, string> = {};
+  const rulesRels: Record<string, string> = {};
   const rulesExists: Record<string, boolean> = {};
+  const oldRulesExists: Record<string, boolean> = {};
   const hasClaudeDir: Record<string, boolean> = {};
   await Promise.all(
     projects.map(async (t) => {
       origins[t.name] = await readOrigin(t.root);
-      rulesExists[t.name] = isFile(path.join(t.root, ...projectRules.split("/")));
+      const layer = projectLayer(board, t.name);
+      if (layer !== undefined && layer.rules.path !== "") {
+        const rulesPath = resolveIn(root, layer.rules.path);
+        rulesRels[t.name] = toPosix(path.relative(root, rulesPath));
+        rulesExists[t.name] = isFile(rulesPath);
+      }
+      oldRulesExists[t.name] = isFile(path.join(t.root, ...OLD_PROJECT_RULES.split("/")));
       hasClaudeDir[t.name] = isDir(path.join(t.root, ".claude"));
     }),
   );
@@ -149,9 +165,12 @@ async function gather(root: string): Promise<Gathered> {
       projectsRel,
       projectsDirExists: projectsDir !== "" && isDir(projectsDir),
       ignored: gitignoreHasProjects(readText(path.join(root, ".gitignore")), projectsRel),
-      projectRules,
+      rulesRels,
       rulesExists,
+      oldRulesExists,
       hasClaudeDir,
+      selfRulesRel: selfRulesPath === "" ? "" : toPosix(path.relative(root, selfRulesPath)),
+      selfRulesExists: selfRulesPath !== "" && isFile(selfRulesPath),
     }),
   };
 }
@@ -192,9 +211,13 @@ function toPosix(p: string): string {
   return p.split(path.sep).join("/");
 }
 
+function resolveIn(root: string, filePath: string): string {
+  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+}
+
 // ---- パネル
 
-function registerPanelHandlers(current: PanelState, projectsRel: string): void {
+function registerPanelHandlers(current: PanelState, projectsRel: string, selfRulesRel: string): void {
   const { panel, folder } = current;
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
@@ -215,13 +238,17 @@ function registerPanelHandlers(current: PanelState, projectsRel: string): void {
     }
   });
 
-  // clone の完了（`.git` の出現）、ルールファイルの出現、origin の変化、作業ツリーの登録、`.gitignore`。
+  // clone の完了（`.git` の出現）、層のルールファイルと旧の置き場の出入り、origin の変化、作業ツリーの登録、`.gitignore`。
+  // 層の綴り（傘の下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 §11.2）。
   const rel = projectsRel === "" ? "projects" : projectsRel;
+  const layerDir = selfRulesRel === "" ? DEFAULT_LAYER_DIR : path.posix.dirname(selfRulesRel);
   const patterns = [
     `${rel}/*/.git`,
     `${rel}/*/.git/config`,
     `${rel}/*/.git/worktrees/*`,
-    `${rel}/*/config/*`,
+    `${rel}/*/${layerDir}/*`,
+    `${rel}/*/${OLD_PROJECT_RULES}`,
+    `${layerDir}/*`,
     `${rel}/*/.claude`,
     ".gitignore",
     ".claude/settings.json",
@@ -325,8 +352,20 @@ async function handleMessage(current: PanelState, message: Message | undefined):
     case "createRules":
       createRules(current, page, message.name);
       return;
+    case "createSelfRules":
+      createSelfRules(current, page);
+      return;
     case "openRules":
       await openRules(message.name === "" ? { kind: "workspace" } : { kind: "project", name: message.name });
+      return;
+    case "openSelfRules":
+      await openRules({ kind: "self" });
+      return;
+    case "openPhases":
+      await openPhases({ kind: "project", name: message.name });
+      return;
+    case "openSelfPhases":
+      await openPhases({ kind: "self" });
       return;
     case "openBoard":
       if (ticketControl() !== "enable") {
@@ -416,15 +455,32 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
 }
 
 function createRules(current: PanelState, page: ProjectsPage, name: string): void {
-  const root = current.folder.uri.fsPath;
   const row = page.rows.find((r) => r.name === name);
   if (row === undefined) {
     fail(current, `プロジェクト ${name} が一覧にありません。更新してから押し直してください`);
     return;
   }
-  const target = path.join(root, ...row.rulesRel.split("/"));
+  if (row.rulesRel === "") {
+    fail(current, `プロジェクト ${name} は層として数えられていないため、ルールを置く先がありません`);
+    return;
+  }
+  copyCommonRules(current, row.rulesRel, name, "プロジェクトの git");
+}
+
+function createSelfRules(current: PanelState, page: ProjectsPage): void {
+  if (page.selfRulesRel === "") {
+    fail(current, "実行ファイルが自身の層を出していないため、置く先を決められません。層に対応した版の実行ファイルを使ってください");
+    return;
+  }
+  copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");
+}
+
+/** 共通層のルールを層のルールファイル（ルートからの相対）に写す。既にあれば上書きしない */
+function copyCommonRules(current: PanelState, targetRel: string, label: string, repo: string): void {
+  const root = current.folder.uri.fsPath;
+  const target = path.join(root, ...targetRel.split("/"));
   if (fs.existsSync(target)) {
-    fail(current, `${row.rulesRel} は既に存在するため、上書きしません`);
+    fail(current, `${targetRel} は既に存在するため、上書きしません`);
     return;
   }
   const settingsText = readText(path.join(root, ".claude", "settings.json"));
@@ -436,12 +492,12 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
   }
   try {
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, rewriteRulesForProject(source, sourceRel, name, new Date().toISOString().slice(0, 10)), { encoding: "utf8", flag: "wx" });
+    fs.writeFileSync(target, rewriteRulesForProject(source, sourceRel, label, new Date().toISOString().slice(0, 10)), { encoding: "utf8", flag: "wx" });
   } catch (error) {
-    fail(current, `${row.rulesRel} に書き込めません: ${(error as Error).message}`);
+    fail(current, `${targetRel} に書き込めません: ${(error as Error).message}`);
     return;
   }
-  info(current, `${row.rulesRel} にワークスペースのルールをコピーしました。内容を確認してからプロジェクトの git にコミットしてください`);
+  info(current, `${targetRel} に共通層のルールをコピーしました。内容を確認してから${repo}にコミットしてください`);
   void update();
 }
 
@@ -455,11 +511,15 @@ function asMessage(message: unknown): Message | undefined {
     case "refresh":
     case "createDir":
     case "fixIgnore":
+    case "createSelfRules":
+    case "openSelfRules":
+    case "openSelfPhases":
       return { type: m.type };
     case "clone":
       return typeof m.url === "string" && named !== undefined ? { type: "clone", url: m.url, name: named } : undefined;
     case "createRules":
     case "openRules":
+    case "openPhases":
     case "openBoard":
     case "fetch":
     case "pull":
