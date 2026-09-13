@@ -293,25 +293,30 @@ class ApproveJsonTest(PhaseHarness):
         self.commit_parent()
         return parent, child
 
-    def assert_refused_after_edit(self, path, old, new, shown):
-        """見せたあとで path の old を new に書き換えてコミットすると、見せた指紋では承認しない。"""
+    def assert_refused_after_edit(self, path, old, new, shown, tickets=("i0001", "i0001-01")):
+        """見せたあとで path の old を new に書き換えてコミットすると、見せた指紋では承認しない。
+
+        tickets は見せた束の識別子。承認済みチケットがまだ無いものは、置かれないことも見る。
+        """
+        tickets = list(tickets)
+        missing = [name for name in tickets if not self.copy_exists(name)]
         with open(path, encoding="utf-8") as f:
             text = f.read()
         self.assertIn(old, text)
         write(path, text.replace(old, new, 1))
         self.commit_parent("edit after preview")
 
-        result = self.yes(["i0001", "i0001-01"], digest=shown["digest"])
+        result = self.yes(tickets, digest=shown["digest"])
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         body = json.loads(result.stdout)
         self.assertEqual(body["version"], APPROVE_VERSION)
         mismatch = body["mismatch"]
-        self.assertEqual(mismatch["expected"], ["i0001", "i0001-01"])
-        self.assertEqual(mismatch["current"], ["i0001", "i0001-01"])
+        self.assertEqual(mismatch["expected"], tickets)
+        self.assertEqual(mismatch["current"], tickets)
         self.assertEqual(mismatch["digest"]["expected"], shown["digest"])
         self.assertNotEqual(mismatch["digest"]["current"], shown["digest"])
-        self.assertFalse(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01"))
+        for name in missing:
+            self.assertFalse(self.copy_exists(name), name)
 
     def test_yes_refuses_when_only_the_issue_of_the_parent_changed(self):
         """1. 見せたあとで親の `issue:` だけを書き換えると、見せた指紋では承認しない。"""
@@ -325,6 +330,64 @@ class ApproveJsonTest(PhaseHarness):
         child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
         shown = self.preview()
         self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
+
+    # ---- 4d. 指紋は画面に出ない欄と改版で書く中身も覆う（チケット approve-carry-07）
+
+    def test_yes_refuses_when_only_an_unknown_field_of_a_child_changed(self):
+        """見せたあとで、承認画面に出ない frontmatter の欄だけを書き換えると承認しない。
+
+        ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに写る。
+        """
+        self.pending_parent_and_child()
+        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        with open(child, encoding="utf-8") as f:
+            text = f.read()
+        write(child, text.replace("rationale: r\n", "rationale: r\nnote: x\n", 1))
+        self.commit_parent("unknown field")
+
+        shown = self.preview()
+        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001", "i0001-01"])
+        self.assertNotIn("note", shown["text"])
+        self.assert_refused_after_edit(child, "note: x", "note: y", shown)
+
+    def pending_revision(self):
+        """親 i0001 を承認したあと、計画を足した改版を提案したまま（未承認）にする。
+
+        足すのは `acceptance`。`implement` は `acceptance` を要る（requires）ので、単独で
+        足すと改版は拒まれて束に入らない。
+        """
+        self.family(plan=("research", "design"))
+        path = self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
+        self.commit_parent("revise")
+        shown = self.preview()
+        self.assertEqual([b["ticket"] for b in shown["batch"]], ["i0001"])
+        self.assertTrue(shown["batch"][0]["revision"], shown["batch"][0])
+        return path, shown
+
+    def test_yes_refuses_when_the_revision_proposal_changed(self):
+        """親の改版を見せたあとで、改版の提案の計画を書き換えると、見せた指紋では承認しない。
+
+        書き換えたあとも改版として成り立つ並び（足す項を `design` に）にして、束に残したまま
+        書く計画だけを変える。
+        """
+        path, shown = self.pending_revision()
+        with open(os.path.join(self.approved, "i0001.md"), encoding="utf-8") as f:
+            before = f.read()
+        self.assert_refused_after_edit(
+            path, "  - acceptance\n", "  - design\n", shown, tickets=["i0001"]
+        )
+        with open(os.path.join(self.approved, "i0001.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), before)
+
+    def test_yes_refuses_when_the_copy_under_revision_changed(self):
+        """親の改版を見せたあとで、今の承認済みチケットの frontmatter だけが変わると承認しない。
+
+        改版で書くのは、今の承認済みチケットの frontmatter の計画だけを差し替えた中身
+        （`revise_copy`）。提案の frontmatter をそのまま指紋に入れる実装では、この書き換えを見逃す。
+        """
+        path, shown = self.pending_revision()
+        copy = os.path.join(self.approved, "i0001.md")
+        self.assert_refused_after_edit(copy, "---\n", "---\nnote: x\n", shown, tickets=["i0001"])
 
     def test_nul_in_the_markdown_body_still_approves(self):
         """本文に生の NUL があっても、見せた指紋で承認できる（指紋は区切りの文字に頼らない）。"""

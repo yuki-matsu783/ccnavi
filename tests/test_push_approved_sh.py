@@ -387,6 +387,56 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.remote_head("i0002"), self.head(tree))
 
+    # ---- チケット approve-carry-07（3 回目の敵対的レビュー）
+
+    def symlink_or_skip(self, target, link):
+        os.makedirs(os.path.dirname(link), exist_ok=True)
+        try:
+            os.symlink(target, link, target_is_directory=True)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"シンボリックリンクが作れない: {error}")
+
+    def outside_repository(self, holder):
+        """ワークスペースの外の holder/app にリポジトリを置き、承認済みチケットを 1 枚置く。"""
+        app = os.path.join(self._tmp.name, holder, "app")
+        remote = self.repository(app, "work")
+        self.place(app)
+        return app, remote
+
+    def assert_not_carried(self, app, remote, before):
+        self.assertEqual(self.head(app), before)
+        self.assertTrue(self.dirty(app, APPROVED))
+        self.assertEqual(self.head_of(remote, "work"), "")
+
+    def test_projects_itself_as_a_symlink_is_not_followed(self):
+        """`projects/` そのものがシンボリックリンクなら、その下のリポジトリにコミットしない。
+
+        リンク先の中の 1 件ずつはリンクではないので、置き場の段で確かめないと辿ってしまう。
+        飛ばしたことは標準エラーに言う。本物の作業ツリーは運ぶ。
+        """
+        app, remote = self.outside_repository("elsewhere-projects")
+        before = self.head(app)
+        tree = self.worktree("i0002")
+        self.place(tree, "i0002")
+        self.symlink_or_skip(os.path.dirname(app), os.path.join(self.ws, "projects"))
+
+        result = self.push()
+        self.assertTrue(self.said(result, "projects"), result.stderr)
+        self.assert_not_carried(app, remote, before)
+        self.assertEqual(self.subject(tree), MESSAGE)
+        self.assertEqual(self.remote_head("i0002"), self.head(tree))
+
+    def test_worktrees_itself_as_a_symlink_is_not_followed(self):
+        """`.claude/worktrees/` そのものがシンボリックリンクなら、その下にコミットしない。"""
+        app, remote = self.outside_repository("elsewhere-worktrees")
+        before = self.head(app)
+        link = os.path.join(self.ws, ".claude", "worktrees")
+        self.symlink_or_skip(os.path.dirname(app), link)
+
+        result = self.push()
+        self.assertTrue(self.said(result, "worktrees"), result.stderr)
+        self.assert_not_carried(app, remote, before)
+
     def test_leaves_nothing_of_others_in_the_index(self):
         """13. 実行後、同じツリーの他人の変更がステージ（インデックス）に載っていない。
 
