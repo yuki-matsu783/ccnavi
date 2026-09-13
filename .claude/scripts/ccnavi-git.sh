@@ -489,7 +489,7 @@ push)
 			for push_copy in "$push_copies/$push_name.md" "$push_copies/closed/$push_name.md"; do
 				if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
 					push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
-					reject "$push_name は子チケットの作業ツリーです。子のブランチはリモートへ送りません。親（$push_parent）が子の成果を合流してから、親の作業ツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
+					reject "$push_name は子チケットの作業ツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を合流してから、親の作業ツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
 				fi
 			done
 			;;
@@ -526,7 +526,7 @@ push)
 			if [ -z "$push_seen_remote" ]; then
 				push_seen_remote="$arg"
 			elif [ "$arg" != "$push_branch" ] && [ "$arg" != "HEAD" ]; then
-				reject "$arg は今居るブランチ（$push_branch）ではありません。他のブランチは、そこへ移ってから送ってください。"
+				reject "$arg は今居るブランチ（${push_branch}）ではありません。他のブランチは、そこへ移ってから送ってください。"
 			fi
 			;;
 		esac
