@@ -441,6 +441,34 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
 
+    def test_a_batch_does_not_pass_a_later_child_over_one_that_reopens_an_earlier_phase(self):
+        """前のフェーズに足す子と次のフェーズの子を一緒に承認しても、次の子は通さない（issue #31）。
+
+        1 本ずつ承認すれば、前の子の承認でフェーズが開き直り、次の子は落ちる。まとめて承認しても
+        同じ答えにする。
+        識別子の順（-02 が -03 より先）で検査すると、開き直す前の状態で次の子が通っていた。
+        """
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        # フェーズ 1 は閉じてレビュー不要。次のフェーズの子と、フェーズ 1 に足す子を一緒に出す。
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.propose(
+            "i0001-03", child_text("i0001-03", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent("propose 02 03")
+        result = self.approve()
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-03.md")), result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+        self.assertIn("同じ承認で i0001-03 を足すので開き直る", result.stderr)
+
     # ---- 4. 成果物
 
     def test_last_child_cannot_close_without_deliverables(self):

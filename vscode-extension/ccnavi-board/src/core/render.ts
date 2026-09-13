@@ -14,7 +14,9 @@ export type ApprovalOverlay =
   | { readonly kind: "loading" }
   | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string }
   | { readonly kind: "approving"; readonly preview: ApprovePreview }
-  | { readonly kind: "error"; readonly error: string };
+  | { readonly kind: "error"; readonly error: string }
+  /** 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す */
+  | { readonly kind: "done"; readonly count: number; readonly prompt: string };
 
 export interface RenderOptions {
   readonly nonce: string;
@@ -87,6 +89,11 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
       case "preview":
       case "approving":
         return renderApprovalBody(overlay.preview, overlay.kind === "approving", overlay.kind === "preview" ? overlay.notice : undefined);
+      case "done":
+        return `<h2 id="approval-title">${overlay.count} 件を承認した</h2>
+<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く（送信は人が Enter）。</p>
+<pre class="approval-text">${escapeHtml(overlay.prompt)}</pre>
+<div class="approval-actions"><button type="button" class="action primary" data-action="prompt-copy">コピー</button><button type="button" class="action" data-action="prompt-open">新しいセッションで開く</button><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
     }
   })();
   return `<div class="approval-backdrop" data-approval="${overlay.kind}">
@@ -298,7 +305,8 @@ function renderActions(actions: readonly Action[], id: string): string {
 function renderActionButton(action: Action, id: string): string {
   switch (action.kind) {
     case "approve":
-      return `<button type="button" class="action" data-action="approve" title="まとめて承認する（ccnavi --approve）。絞り込み中は、見えている承認待ちだけが対象になる">承認</button>`;
+      // このカードだけを承認の対象にする（`--approve --preview --json <識別子>`）。同じ親の承認待ちが他にあっても巻き込まない。
+      return `<button type="button" class="action" data-action="approve-one" data-ticket="${escapeHtml(id)}" title="このチケットだけを承認する（ccnavi --approve ${escapeHtml(id)}）。まとめて承認するなら上部のボタン">この 1 件を承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
   }
@@ -464,7 +472,7 @@ ${BUTTON_STYLE}
   .approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
   .approval-note { margin: 4px 0 8px; }
   .approval-note.warn { color: var(--vscode-editorWarning-foreground); }
-  .approval-note.error { color: var(--vscode-editorError-foreground); }
+  .approval-note.error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
   .approval-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }`;
 
 const SCRIPT = `  const vscode = acquireVsCodeApi();
@@ -493,6 +501,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const action = button.getAttribute("data-action");
       if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
       else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() }); }
+      else if (action === "approve-one") { vscode.postMessage({ type: "approve", tickets: [button.getAttribute("data-ticket") || ""], filtered: true }); }
+      else if (action === "prompt-copy") { vscode.postMessage({ type: "promptCopy" }); }
+      else if (action === "prompt-open") { vscode.postMessage({ type: "promptOpen" }); }
       else if (action === "approve-confirm") {
         const tickets = (button.getAttribute("data-tickets") || "").split(",").filter((t) => t !== "");
         vscode.postMessage({ type: "approveConfirm", tickets: tickets });
@@ -503,10 +514,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       }
     });
   }
-  // 承認のオーバーレイ。Esc でやめる。承認している最中は閉じない。開いたら「やめる」に焦点を置く。
+  // 承認のオーバーレイ。Esc でやめる。承認している最中は閉じない。開いたら「やめる」に焦点を置く
+  //（承認したあとは「コピー」）。
   const approval = document.querySelector(".approval-backdrop");
   if (approval) {
-    const cancel = approval.querySelector('button[data-action="approve-cancel"]');
+    const cancel = approval.querySelector('button[data-action="prompt-copy"]') || approval.querySelector('button[data-action="approve-cancel"]');
     if (cancel && !cancel.disabled) { cancel.focus(); }
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && approval.getAttribute("data-approval") !== "approving") {

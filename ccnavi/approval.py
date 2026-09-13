@@ -841,19 +841,30 @@ def _candidates(
         # 通すと、承認されない番号の子が承認済みチケットになる。
         pool[t.ticket] = t
 
-    for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
+    # 今回の承認で通った子を親ごとに。後に続く子の順序の検査が、そのフェーズを
+    # 開き直したものとして読む。
+    # 子はフェーズの番号の順に並べる。識別子の順だと、後のフェーズの子（-02）が前のフェーズに
+    # 足す子（-03）より先に検査され、開き直す前の印で通ってしまう。
+    added: dict[str, list[ticket_mod.Ticket]] = {}
+    for t in sorted(
+        pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
+    ):
         types = types_for(t)
         complaints = validate(t, pool, types)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
             if parent is not None:
-                complaints += phase.order_problems(root, conf, t, parent, types)
+                complaints += phase.order_problems(
+                    root, conf, t, parent, types, added.get(t.parent)
+                )
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
         batch.append(Candidate(ticket=t, complaints=complaints, types=types))
         pool[t.ticket] = t
+        if t.is_child:
+            added.setdefault(t.parent, []).append(t)
     return batch, rejected, pool
 
 
