@@ -22,6 +22,9 @@ ccnavi_approved:
   approved_at: 2026-09-14T01:06:54+0900
   source_tree: launcher-scripts
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/launcher-scripts/wip/tickets/todo/launcher-scripts-08.md
+started_at: 2026-09-14T01:08:12+0900
+base_sha: 43efa03fd7d99f9ff9d910e96a8bacbaa85c208c
+completed_at: 2026-09-14T01:12:40+0900
 ---
 
 # 写す手順を直す
