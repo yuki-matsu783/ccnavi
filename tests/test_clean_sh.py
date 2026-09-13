@@ -3,6 +3,9 @@
 確かめるのは 3 つ。決まった名前の生成物だけが消えること。`.claude/worktrees/` の直下の
 名前以外は受け付けないこと。未コミットの変更がある作業ツリーでは何も消さないこと。
 
+同じ検査を 2 回回す。node で消す側と、node が無いときに sh で消す側。node の有無は
+`CCNAVI_NODE` に無い名前を渡して作る。
+
 読み返すのは終了コード・出力と、ファイルシステムに残ったものだけ。
 
 `CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
@@ -23,6 +26,9 @@ NODE = shutil.which("node")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = ("ccnavi-clean.sh", "ccnavi-clean.js", "ccnavi-common.sh")
+NO_NODE = "ccnavi-no-such-node"
+# Windows は chmod で消せなくならず、root は権限を無視して消す。
+CANNOT_LOCK = os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0)
 
 
 def write(path, text=""):
@@ -59,10 +65,15 @@ def link_dir(target, link):
         return False
 
 
-@unittest.skipUnless(SHELL and NODE, "sh と node が要る")
-class CleanTest(unittest.TestCase):
+class CleanCases:
+    """node で消す側と sh で消す側に共通の検査。node_name が None なら既定の node を使う。"""
+
+    node_name = None
+
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
+        # tearDown ではなく addCleanup で消す。テストが足す片付け（権限の戻し）が先に走る。
+        self.addCleanup(self._tmp.cleanup)
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
@@ -71,12 +82,12 @@ class CleanTest(unittest.TestCase):
         self.worktrees = os.path.join(self.ws, ".claude", "worktrees")
         os.makedirs(self.worktrees)
 
-    def tearDown(self):
-        self._tmp.cleanup()
-
     def run_clean(self, *args, cwd=None):
         env = dict(os.environ)
         env.pop("CCNAVI_WORKSPACE", None)  # 本物のワークスペースを指させない
+        env.pop("CCNAVI_NODE", None)
+        if self.node_name:
+            env["CCNAVI_NODE"] = self.node_name
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-clean.sh").replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],
@@ -94,6 +105,9 @@ class CleanTest(unittest.TestCase):
         write(os.path.join(top, "node_modules", ".pnpm", "x", "index.js"))
         write(os.path.join(top, "ext", "package.json"), "{}")
         write(os.path.join(top, "ext", "out", "extension.js"))
+        write(os.path.join(top, "ext", "out", "node_modules", "z", "index.js"))  # out ごと消える
+        # 並べると ext/out と ext/out/node_modules の間に来る。
+        write(os.path.join(top, "ext", "out-x", "node_modules", "w", "index.js"))
         write(os.path.join(top, "ext", "node_modules", "y", "index.js"))
         write(os.path.join(top, "docs", "out", "keep.txt"), "keep")  # package.json の隣ではない
         write(os.path.join(top, ".venv", "pyvenv.cfg"))
@@ -107,7 +121,9 @@ class CleanTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(files_under(top), ["docs/out/keep.txt", "ext/package.json", "src/a.txt"])
         self.assertIn("removed node_modules", result.stdout)
-        self.assertIn("removed ext/out", result.stdout)
+        self.assertIn("removed ext/out\n", result.stdout)
+        self.assertIn("removed ext/out-x/node_modules", result.stdout)
+        self.assertNotIn("ext/out/node_modules", result.stdout)
 
     def test_workspace_root_is_found_from_inside_a_worktree(self):
         top = self.make_shell("shell")
@@ -152,12 +168,18 @@ class CleanTest(unittest.TestCase):
     def test_does_not_follow_links(self):
         precious = os.path.join(self._tmp.name, "precious")
         write(os.path.join(precious, "node_modules", "keep.js"))
+        write(os.path.join(precious, "out", "keep.js"))
         top = self.make_shell("shell")
         if not link_dir(precious, os.path.join(top, "linked")):
             self.skipTest("リンクが作れない")
+        # 生成物の名前をしたリンクは、リンクだけが消えて先は残る。
+        link_dir(os.path.join(precious, "out"), os.path.join(top, "ext", "out-link"))
+        link_dir(os.path.join(precious, "node_modules"), os.path.join(top, "src", "node_modules"))
         result = self.run_clean("shell")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(precious, "node_modules", "keep.js")))
+        self.assertTrue(os.path.exists(os.path.join(precious, "out", "keep.js")))
+        self.assertFalse(os.path.lexists(os.path.join(top, "src", "node_modules")))
 
     def test_rejects_worktree_directory_that_is_a_link(self):
         precious = os.path.join(self._tmp.name, "precious")
@@ -167,6 +189,18 @@ class CleanTest(unittest.TestCase):
         result = self.run_clean("linked")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertTrue(os.path.exists(os.path.join(precious, "node_modules", "keep.js")))
+
+    @unittest.skipIf(CANNOT_LOCK, "権限で消せない状態が作れない")
+    def test_reports_what_could_not_be_removed(self):
+        top = self.make_shell("shell")
+        locked = os.path.join(top, "node_modules", ".pnpm")
+        os.chmod(locked, 0o555)
+        self.addCleanup(os.chmod, locked, 0o755)
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("消せなかった: node_modules", result.stderr)
+        self.assertIn("消し残しがあります", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(top, ".venv")))  # 他は消す
 
     @unittest.skipUnless(GIT, "git が要る")
     def test_stops_on_uncommitted_changes_then_cleans_when_clean(self):
@@ -190,6 +224,35 @@ class CleanTest(unittest.TestCase):
         result = self.run_clean("wt")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(os.path.exists(os.path.join(top, "node_modules")))
+
+
+@unittest.skipUnless(SHELL and NODE, "sh と node が要る")
+class CleanWithNodeTest(CleanCases, unittest.TestCase):
+    pass
+
+
+@unittest.skipUnless(SHELL, "sh が要る")
+class CleanWithoutNodeTest(CleanCases, unittest.TestCase):
+    node_name = NO_NODE
+
+    def test_says_it_cleans_with_sh(self):
+        self.make_shell("shell")
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("sh で消します", result.stderr)
+
+    @unittest.skipIf(os.name == "nt", "Windows は名前に改行を入れられない")
+    def test_stops_on_a_name_with_a_newline(self):
+        # 行で読むと `../other/node_modules` が現れる名前。隣の作業ツリーを消させない。
+        other = os.path.join(self.worktrees, "other", "node_modules", "keep.js")
+        write(other)
+        top = self.make_shell("shell")
+        write(os.path.join(top, "a\n..", "other", "node_modules", "x.js"))
+        result = self.run_clean("shell")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("改行", result.stderr)
+        self.assertTrue(os.path.exists(other))
+        self.assertTrue(os.path.exists(os.path.join(top, "node_modules")))
 
 
 if __name__ == "__main__":
