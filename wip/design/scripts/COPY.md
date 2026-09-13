@@ -124,7 +124,9 @@ git check-ignore -v .ccnavi/bin/"$(cat dist/ccnavi.target)"
 ```
 
 - `cat` がこの機械の語（例 `darwin-arm64`）を出し、`ls` に同じ名前のディレクトリがあること
-- `git status --short .ccnavi/bin/` が何も出さないこと（出たら 3 が効いていない）
+- `git status --short .ccnavi/bin/` が何も出さないこと（出たら 3 が効いていない）。置き場そのものが無いと
+  `warning: could not open directory '.ccnavi/bin/'` が出ることがあります。そのときは直前の `ls` も失敗しているので、
+  組み立てが写す段まで届いていません。組み立ての出力を読み直してください
 - `git check-ignore -v` が `.gitignore:10:/.ccnavi/bin/` で始まる 1 行を出すこと。何も出ないなら 3 が効いていない。
   `git status` は、無視されているときも置き場がそもそも無いときも何も出さず、`check-ignore` は置き場が無くても
   ルールだけで答えます。なので「置き場がある」は上の `ls` で、「無視されている」はこの `check-ignore` で、分けて見ます
@@ -214,8 +216,14 @@ uv run python -m unittest discover -s tests -t .
 指す先が在るのに実行できなければ error を出す）。
 
 ```sh
-uv run python -m ccnavi --lint --log "" --state ""
+uv run python -m ccnavi --lint --log "" --state ""; echo "exit=$?"
 ```
+
+| 出たもの | 読み方 |
+|---|---|
+| 最後の行が `error 0 件、warn <n> 件、info <n> 件` で `exit=0` | 揃っている。warn は切り替えと別の指摘（dry-run のモードなど）なので、ここでは読むだけでよい |
+| `error: (project): .claude/settings.json の env の CCNAVI_BIN_PATH=.ccnavi/scripts/ccnavi-launcher.sh は在るが実行できない。…` の行があり、最後の行が `error 1 件、…` で `exit=1` | sh の実行ビットが落ちている。6 の 1) に戻る |
+| 上と別の `error:` の行があって `exit=1` | 切り替えとは別の指摘。直してから進むか、利用者に相談する |
 
 コミットの分け方の案（1 行のメッセージ、フッター無し）。最初のコミットは、2 で `--chmod=+x` を付けて足した
 sh だけが入った状態で打ちます。`git commit -- <パス>` の形は、そのパスを作業ツリーから入れ直します。
@@ -257,7 +265,31 @@ Windows では、実行ファイルを起動しているものが残っている
 
 ```sh
 cd <ワークスペースルート>
-git pull
+git status --short
+git pull; echo "exit=$?"
+```
+
+**pull の前に `git status --short` を見ます。** 何か出たら、それは他のセッションの書きかけかもしれません
+（CLAUDE.md「他セッションの作業を踏まないために」）。commit・stash・reset・checkout で片付けず、誰のものかを
+確かめてから進みます。
+
+**pull が `exit=0` 以外で終わったら、ここで止まります。** 次のどれかが出ます。
+
+| 出たもの | 何が起きたか |
+|---|---|
+| `error: Your local changes to the following files would be overwritten by merge:`（`exit=1`） | 上の `git status` に出た変更が、取り込む変更と重なった |
+| `fatal: Need to specify how to reconcile divergent branches.` や `fatal: Not possible to fast-forward, aborting.`（`exit=128`） | ワークスペースルートの main に、origin に無いコミットがある |
+| `CONFLICT` | 取り込みが衝突した（pull の設定でマージしようとした） |
+
+どの場合も、`build.py` は回さず、開き直しもしません。`exit=1` と `exit=128` のときは何も取り込まれていないので、
+`.claude/settings.json` は前の `dist/ccnavi/ccnavi` のままで、そのまま開き直しても前の形で動きます。
+`CONFLICT` のときは、マージで取り込んでいたなら `git merge --abort`、リベースで取り込んでいたなら（`pull.rebase=true`）
+`git rebase --abort` で取り込む前に戻し、`git status --short` が pull の前と同じになってから開き直します。どれも、原因を確かめて利用者に相談してから
+やり直します。
+
+pull が `exit=0` で終わったら、組み立てます。
+
+```sh
 uv run --with pyinstaller python build.py
 ```
 
@@ -299,12 +331,23 @@ tail -n 1 logs/log.jsonl
 Claude Code のセッションを止めてください。止めないと、ツール呼び出しのあとの監視が、戻した `.ccnavi/`・`.claude/` の
 変更を控えから元に戻します（dry-run なら報告だけ）。
 
-**A の途中（8 の最初のコミットより前）:**
+**作業ツリーがもう無いとき:** MR を Ready にしたあとは作業ツリー `launcher-scripts` を片付けるので、A の戻し方を
+打つ時点で無いことがあります。ブランチは残っているので、作業ツリーとして作り直してから下を打ちます
+（`-b` を付けない。付けると別のブランチができる）。
+
+```sh
+cd <ワークスペースルート>
+git worktree add .claude/worktrees/launcher-scripts launcher-scripts
+```
+
+エージェントに頼むときは、ラッパーを通す綴り `sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/launcher-scripts launcher-scripts` になります。
+
+**A の途中（8 の最初のコミットより前）:** 2 の写す段より前にやめた場合など、まだ無いものは飛ばされます。
 
 ```sh
 cd <ワークスペースルート>/.claude/worktrees/launcher-scripts
-git rm --cached -q -- .ccnavi/scripts/ccnavi-launcher.sh
-rm .ccnavi/scripts/ccnavi-launcher.sh
+if [ -n "$(git ls-files .ccnavi/scripts/ccnavi-launcher.sh)" ]; then git rm --cached -q -- .ccnavi/scripts/ccnavi-launcher.sh; fi
+rm -f .ccnavi/scripts/ccnavi-launcher.sh
 git restore -- .gitignore .claude/skills/ccnavi-config/SKILL.md .claude/settings.json
 rm -rf .ccnavi/bin
 ```
@@ -320,6 +363,10 @@ rm -rf .ccnavi/bin
 git ls-files .ccnavi/scripts/ccnavi-launcher.sh    # 何も出ないこと
 git push origin launcher-scripts                   # push 済みだったときだけ
 ```
+
+`git revert` が `CONFLICT` と `error: could not revert …` を出して `exit=1` で止まったら、手で解きません。
+8 のあとに同じ行を直したコミットが入っています。`git revert --abort` で revert する前の状態に戻し
+（`git status --short` が何も出さないこと）、利用者に相談します。
 
 8 のコミットの途中（1 つ目だけ済んだ、など）でやめたなら、済んだコミットだけを `revert` し、まだコミットしていない
 ファイルは上の「最初のコミットより前」の `git restore` で戻します。
