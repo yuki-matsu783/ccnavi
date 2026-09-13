@@ -3,13 +3,15 @@
 見るのは 8 つ。
 
 1. 種類の定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
-2. 全体計画の承認と、計画に合わない子の拒否（kind、範囲の上限、無い番号）
+2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
 3. 順序は承認で止まる（前が閉じてレビューが済むまで次の番号は承認されない、overlap は例外）
 4. 成果物が無ければフェーズの最後の子を閉じられない
 5. 延期したフェーズではゲートが閉じず、次の依頼に含まれる
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
 7. 親はフィードバック計画が承認されるまで閉じられない
 8. 残った指摘の切り出しの下書き
+
+範囲の上限（設計 wip/design/approve-carry.md §3・§4）は ScopeLimitTest が見る。
 """
 
 from __future__ import annotations
@@ -160,7 +162,7 @@ class PhaseHarness(unittest.TestCase):
             env=environment,
         )
 
-    def hook(self, event, tool, cwd, **tool_input):
+    def hook(self, event, tool, cwd, mode="enable", agent_id="", **tool_input):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -168,7 +170,9 @@ class PhaseHarness(unittest.TestCase):
             "session_id": "s1",
             "tool_input": tool_input,
         }
-        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        if agent_id:
+            payload["agent_id"] = agent_id
+        return self.ccnavi("--mode", mode, stdin=json.dumps(payload))
 
     def reason(self, result):
         if not result.stdout.strip():
@@ -285,11 +289,11 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
-        # 絞らない束では、改版後の計画で検証される。種類の上限の超過は承認を止めず、
-        # 画面が「判定で止まるもの」として言う（n で何も適用しない）
+        # 絞らない束では、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
+        # 「判定で止まるもの」として出る（設計 approve-carry §3.2）。n で何も適用しない
         whole = self.ccnavi("--approve", stdin="n\n")
+        self.assertIn("判定で止まるもの", whole.stdout)
         self.assertIn("超えている", whole.stdout)
-        self.assertIn("設計", whole.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
         only = self.ccnavi("--approve", "i0001-02", stdin="y\n")
@@ -379,13 +383,21 @@ class PhaseTest(PhaseHarness):
                 self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")), name)
 
     def test_child_must_fit_the_phase_type(self):
+        """種類の範囲の超過は承認を拒まず、承認画面で見せる。計画に無い番号は今までどおり拒む。
+
+        超過は判定が切り詰めるので、承認で止める理由が無い（設計 approve-carry §3.1）。
+        チケットの形の誤り（計画に無い番号）は判定で補えないので、承認で止める。
+        """
         self.family(plan=["research", "design"])
-        # 種類の範囲を超える子。
+        # 種類の範囲を超える子。承認でき、承認済みチケットが置かれる。
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["src/a/*"]))
-        refused = self.approve()
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("超えている", refused.stderr)
-        self.assertIn("調査", refused.stderr)
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertIn("判定で止まるもの", approved.stdout)
+        self.assertIn("超えている", approved.stdout)
+        self.assertIn("調査", approved.stdout)
+        self.assertNotIn("i0001-01 は承認の対象にしない", approved.stderr)
         # 計画に無い番号。
         os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md"))
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ["wip/research/*"]))
@@ -822,6 +834,262 @@ class PhaseTest(PhaseHarness):
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+
+
+def scoped_child_text(name, parent, phase, allow=(), ask=(), regex=()):
+    """`child_text` に ask と regex の項を足せる版。regex は allow の項として書く。"""
+    lines = [
+        "---",
+        "version: 1",
+        f"ticket: {name}",
+        f"parent: {parent}",
+        f"phase: {phase}",
+        "human_review:",
+        "  required: true",
+        "  reason: t",
+        f"title: 子 {name}",
+        "rationale: r",
+    ]
+    if allow or regex:
+        lines.append("allow:")
+        for g in allow:
+            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
+        for r in regex:
+            lines += ["  - match: Write|Edit", f"    regex: '{r}'"]
+    if ask:
+        lines.append("ask:")
+        for g in ask:
+            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
+    return "\n".join(lines) + "\n"
+
+
+# 種類 research を消した phases.yml。親の計画の 1 番目の種類が引けなくなる。
+PHASES_WITHOUT_RESEARCH = PHASES.split("  research:", 1)[0] + (
+    "  design:" + PHASES.split("  design:", 1)[1]
+)
+
+# scope を inherit にした作業の種類だけを持つ phases.yml。
+PHASES_INHERIT = """
+version: 1
+phases:
+  open:
+    kind: work
+    title: 自由
+    review: none
+    scope: inherit
+"""
+
+
+class ScopeLimitTest(PhaseHarness):
+    """範囲の上限（設計 wip/design/approve-carry.md §3・§4、§6.1〜§6.2）。
+
+    承認は範囲の超過を拒まず「判定で止まるもの」として見せる。判定は子 → 親 → 種類の
+    厳しい側で切り詰め、外へ出した上限を `limit:` 行で名指しする。
+    親の範囲は既定で `src/*`, `wip/*`, `tests/*`、フェーズ 1 の種類 research は `wip/research/*`。
+    """
+
+    def approved_child(self, text, name="i0001-01", plan=("research", "design")):
+        """親を承認し、子を提案して承認し、子の作業ツリーを作って着手する。作業ツリーを返す。"""
+        self.family(plan=plan)
+        self.propose(name, text)
+        self.commit_parent("propose child")
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, name + ".md")))
+        self.last_approval = approved
+        return self.run_child(name)
+
+    def write_to(self, tree, rel, mode="enable"):
+        return self.hook(
+            "PreToolUse",
+            "Write",
+            tree,
+            mode=mode,
+            file_path=os.path.join(tree, *rel.split("/")),
+            content="x\n",
+        )
+
+    def decision(self, result):
+        if not result.stdout.strip():
+            return ""
+        out = json.loads(result.stdout).get("hookSpecificOutput", {})
+        return out.get("permissionDecision", "")
+
+    # ---- 6.1 承認
+
+    def test_regex_child_is_approved_and_shown_as_stopped_by_the_judge(self):
+        """4. regex の子は承認でき、「判定で止まるもの」に出る。"""
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01",
+            scoped_child_text("i0001-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",)),
+        )
+        self.commit_parent("propose child")
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertIn("判定で止まるもの", approved.stdout)
+        self.assertIn("regex", approved.stdout.split("判定で止まるもの", 1)[1])
+        self.assertNotIn("承認の対象にしない", approved.stderr)
+
+    # ---- 6.2 判定
+
+    def test_write_beyond_the_phase_type_is_denied_and_names_the_type(self):
+        """7. enable: 種類の上限の外で子の範囲の中への Write は DENY_TICKET_SCOPE。"""
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        inside = self.write_to(tree, "wip/research/note.md")
+        self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
+        denied = self.write_to(tree, "src/a/x.py")
+        self.assertEqual(denied.returncode, 0, denied.stderr)
+        self.assertEqual(self.decision(denied), "deny", denied.stdout)
+        reason = self.reason(denied)
+        self.assertIn("DENY_TICKET_SCOPE", reason)
+        self.assertIn("limit: phase type 調査 (research): wip/research/*", reason)
+
+    def test_dry_run_lets_the_write_through_and_says_which_limit(self):
+        """8. dry-run: 同じ Write は通り、enable なら止めたことと `limit: phase type` が出る。
+
+        dry-run の文面は今の judge.decide_before のもの（設計 §4.4「新しい処理は足さない」）。
+        """
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        result = self.write_to(tree, "src/a/x.py", mode="dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotEqual(self.decision(result), "deny", result.stdout)
+        text = self.reason(result)
+        self.assertIn("[ccnavi dry-run] enable would have", text)
+        self.assertIn("DENY_TICKET_SCOPE", text)
+        self.assertIn("limit: phase type", text)
+
+    def test_ask_inside_the_phase_type_stays_ask(self):
+        """9. 種類の上限の中で子が `ask` と書いた場所は TICKET_ASK のまま。外なら止まる。"""
+        tree = self.approved_child(
+            scoped_child_text(
+                "i0001-01",
+                "i0001",
+                1,
+                allow=("wip/research/a/*",),
+                ask=("wip/research/b/*", "src/b/*"),
+            )
+        )
+        asked = self.write_to(tree, "wip/research/b/x.md")
+        self.assertEqual(self.decision(asked), "ask", asked.stdout)
+        self.assertIn("TICKET_ASK", self.reason(asked))
+        # 種類は allow か外しか言わない。ask と書いた場所でも種類の外なら外が勝つ。
+        beyond = self.write_to(tree, "src/b/x.py")
+        self.assertEqual(self.decision(beyond), "deny", beyond.stdout)
+        self.assertIn("limit: phase type", self.reason(beyond))
+
+    def test_inherit_scope_does_not_cut_by_the_type(self):
+        """10. 種類の scope が inherit なら、種類では切り詰めない。"""
+        write(self.phases, PHASES_INHERIT)
+        tree = self.approved_child(child_text("i0001-01", "i0001", 1, ["src/a/*"]), plan=["open"])
+        result = self.write_to(tree, "src/a/x.py")
+        self.assertNotEqual(self.decision(result), "deny", result.stdout)
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
+        self.assertNotIn("limit:", self.reason(result))
+
+    def test_no_phases_file_anywhere_does_not_cut_by_type(self):
+        """11. どの層にも phases.yml が無ければ種類では切り詰めない（番号だけの挙動）。"""
+        from tests.test_ticket import ticket_text
+
+        self.phases = os.path.join(self.root, "no-phases.yml")
+        self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*")))
+        self.propose(
+            "i0001-01", ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        )
+        self.commit_parent()
+        approved = self.approve()
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        tree = self.run_child("i0001-01")
+        inside = self.write_to(tree, "src/a/x.py")
+        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+        self.assertNotIn("読めない", self.reason(inside))
+        # 子自身の範囲の外は今までどおり止まり、`limit:` 行は足さない。
+        outside = self.write_to(tree, "src/b/x.py")
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+        self.assertNotIn("limit:", self.reason(outside))
+
+    def test_unreadable_type_does_not_cut_by_type_but_says_so(self):
+        """12. 親が計画を持ち番号の種類が読めないとき、種類では切り詰めず notice。親では止まる。"""
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
+        )
+        for label, text in (
+            ("種類を消した", PHASES_WITHOUT_RESEARCH),
+            ("phases.yml が壊れた", "version: 1\nphases: [\n"),
+        ):
+            with self.subTest(label):
+                write(self.phases, text)
+                inside = self.write_to(tree, "src/a/x.py")
+                self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+                self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+                self.assertIn("research", self.reason(inside))
+                self.assertIn("種類の上限では切り詰めていない", self.reason(inside))
+                beyond_parent = self.write_to(tree, "docs/x.md")
+                self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
+                self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
+                self.assertIn("limit: parent i0001", self.reason(beyond_parent))
+
+    def test_regex_child_is_judged_by_the_real_path(self):
+        """14. regex の子: 実際のパスで親と種類に当てる。"""
+        tree = self.approved_child(
+            scoped_child_text("i0001-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",))
+        )
+        inside = self.write_to(tree, "wip/research/x.md")
+        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
+        beyond_type = self.write_to(tree, "src/a/x.py")
+        self.assertEqual(self.decision(beyond_type), "deny", beyond_type.stdout)
+        self.assertIn("limit: phase type 調査 (research)", self.reason(beyond_type))
+
+        beyond_parent = self.write_to(tree, "docs/x.md")
+        self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
+        self.assertIn("limit: parent i0001", self.reason(beyond_parent))
+
+    def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
+        """15. 実行後の監視: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        self.hook("UserPromptSubmit", "", tree)
+        first = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        # 種類の中への書き込みは言わない。
+        write(os.path.join(tree, "wip", "research", "gen.md"), "ok\n")
+        quiet = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
+        self.assertEqual(quiet.returncode, 0, quiet.stdout + quiet.stderr)
+        self.assertNotIn("POST_TICKET_SCOPE", quiet.stdout + quiet.stderr)
+        # 子の範囲の中だが種類の外。
+        write(os.path.join(tree, "src", "a", "gen.py"), "x\n")
+        after = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
+        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
+        self.assertIn("POST_TICKET_SCOPE", after.stderr)
+        self.assertIn("src/a/gen.py", after.stderr.replace("\\", "/"))
+        self.assertIn("調査", after.stderr)
+
+    def test_subagent_stop_bounces_a_change_beyond_the_type_and_names_it(self):
+        """16. SubagentStop: 種類の上限の外の変更で差し戻し、上限の名指しが付く。"""
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        write(os.path.join(tree, "wip", "research", "ok.md"), "ok\n")
+        write(os.path.join(tree, "src", "a", "stray.py"), "x\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "stray")
+        result = self.hook("SubagentStop", "", tree, agent_id="sub-1")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("POST_TICKET_SCOPE", result.stderr)
+        self.assertIn("src/a/stray.py", result.stderr)
+        self.assertIn("（種類 調査 の上限の外）", result.stderr)
+        self.assertNotIn("wip/research/ok.md", result.stderr)
 
 
 if __name__ == "__main__":
