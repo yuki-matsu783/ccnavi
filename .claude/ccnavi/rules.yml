@@ -37,6 +37,14 @@ deny:
       .claude/worktrees/<名前> -b <名前>' で作業ツリーを切り、その中で編集して、
       ff-only で main に戻してください。
 
+  # PowerShell はまとめて止め、Bash に寄せる。
+  - id: no-powershell
+    match: PowerShell
+    glob: "*"
+    message: >-
+      PowerShell は使いません。同じことを Bash ツールで打ってください。
+      ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。      
+
   # 生の git はまとめて止め、入口を .claude/scripts/ccnavi-git.sh の 1 本に寄せる。
   # 止める理由は 2 つ。
   #
