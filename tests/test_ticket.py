@@ -343,20 +343,21 @@ class TicketTest(unittest.TestCase):
 
     # ---- 2. 子は親の部分集合
 
-    def test_child_beyond_parent_is_not_approved(self):
-        """超えている子だけが落ち、兄弟は承認済みチケットになる。落ちたものがあるので
-        終了コードは 1。
+    def test_child_beyond_parent_is_approved_with_the_overflow_shown(self):
+        """親の範囲を超える子も承認は通り、超えた項は承認の画面が言う。
 
-        束の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
-        全部通ったと読む。通ったぶんの承認済みチケットは置くので、直して出し直せばよい。
+        範囲の広さは判定が親の範囲で切り詰めるので、承認で止める理由が無い。超えた項は
+        「判定で止まるもの」の見出しに出し、判定に効かない記述の注意とは混ぜない。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
-        self.assertNotEqual(result.returncode, 0, result.stderr)
-        self.assertIn("超えている", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("判定で止まるもの", result.stdout)
+        self.assertIn("`docs/*` は親 i0001 の範囲を超えている", result.stdout)
+        self.assertNotIn("記述のうち、判定に効かないもの", result.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
 
     # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）

@@ -285,9 +285,11 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["design", "acceptance", "implement"]))
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
-        # 絞らない束では、改版後の計画で検証されて落ちる（n で何も適用しない）
+        # 絞らない束では、改版後の計画で検証される。種類の上限の超過は承認を止めず、
+        # 画面が「判定で止まるもの」として言う（n で何も適用しない）
         whole = self.ccnavi("--approve", stdin="n\n")
-        self.assertIn("超えている", whole.stderr)
+        self.assertIn("超えている", whole.stdout)
+        self.assertIn("設計", whole.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
         only = self.ccnavi("--approve", "i0001-02", stdin="y\n")

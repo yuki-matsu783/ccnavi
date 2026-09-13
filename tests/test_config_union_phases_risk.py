@@ -181,19 +181,23 @@ class PhaseUnionTest(ConfigUnionHarness):
             ticket_text("i0001-01", project="lib", parent="i0001", phase=1, allow=("docs/*",)),
             project="lib",
         )
-        refused = self.approve()
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("超えている", refused.stderr)
-        self.assertFalse(os.path.exists(self.approved_copy("i0001-01")))
+        # 種類の上限（src/*）を超える子も承認は通り、超えたことは承認の画面が言う。
+        # 書き込みは判定が種類の上限で切り詰める。
+        over = self.approve()
+        self.assertEqual(over.returncode, 0, over.stdout + over.stderr)
+        self.assertIn("判定で止まるもの", over.stdout)
+        self.assertIn("`docs/*` は種類", over.stdout)
+        self.assertTrue(os.path.exists(self.approved_copy("i0001-01")))
 
         self.propose(
-            "i0001-01",
-            ticket_text("i0001-01", project="lib", parent="i0001", phase=1, allow=("src/a/*",)),
+            "i0001-02",
+            ticket_text("i0001-02", project="lib", parent="i0001", phase=1, allow=("src/a/*",)),
             project="lib",
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.assertTrue(os.path.exists(self.approved_copy("i0001-01")))
+        self.assertNotIn("超えている", approved.stdout)
+        self.assertTrue(os.path.exists(self.approved_copy("i0001-02")))
 
     def test_broken_project_phases_is_an_error_and_the_layer_is_empty(self):
         """§25.2: 壊れた層の phases は空 + --lint error。共通層の種類は使える。"""

@@ -9,7 +9,7 @@ function fixtureText(name: string): string {
   return fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", name), "utf8");
 }
 
-test("CB-T104 承認の preview を読む（束・本文・対象外・読めない提案）", () => {
+test("CB-T104 承認の preview を読む（束・範囲の超過・本文・対象外・読めない提案）", () => {
   const parsed = parseApprovePreview(fixtureText("approve-preview.json"));
   assert.ok(parsed.ok);
   if (!parsed.ok) {
@@ -22,13 +22,32 @@ test("CB-T104 承認の preview を読む（束・本文・対象外・読めな
     [
       ["i0001", null, null, false],
       ["i0001-01", "i0001", 1, false],
+      ["i0001-02", "i0001", 1, false],
     ],
   );
-  assert.ok(preview.text.startsWith("Ticket 承認リクエスト: 2 件"));
+  // 種類の範囲を超える子は承認を止めず、束に載って超過を持つ（判定で止まる）。
+  assert.deepEqual(preview.batch[0].overflow, []);
+  assert.deepEqual(preview.batch[1].overflow, []);
+  assert.equal(preview.batch[2].overflow.length, 1);
+  assert.ok(preview.batch[2].overflow[0].includes("超えている"));
+  assert.ok(preview.text.startsWith("Ticket 承認リクエスト: 3 件"));
+  assert.ok(preview.text.includes("判定で止まるもの"));
+  // 対象にしないのは形の壊れた子（計画に無い番号）だけ。
   assert.equal(preview.rejected.length, 1);
-  assert.equal(preview.rejected[0].ticket, "i0001-02");
-  assert.ok(preview.rejected[0].problems[0].includes("超えている"));
+  assert.equal(preview.rejected[0].ticket, "i0001-05");
+  assert.ok(preview.rejected[0].problems[0].includes("計画に無い"));
   assert.deepEqual(preview.problems, []);
+});
+
+test("CB-T104b 超過の欄が無い古い答えは、空の並びとして読む", () => {
+  const parsed = parseApprovePreview(
+    JSON.stringify({
+      version: APPROVE_VERSION,
+      batch: [{ ticket: "i0001", title: "親", parent: null, phase: null, revision: false, tree: "", path: "" }],
+    }),
+  );
+  assert.ok(parsed.ok);
+  assert.ok(parsed.ok && parsed.value.batch[0].overflow.length === 0);
 });
 
 test("CB-T105 承認の答えを読む（承認した / 束が違った）", () => {

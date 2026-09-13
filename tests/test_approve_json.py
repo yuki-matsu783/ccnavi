@@ -191,11 +191,17 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_shapes_match_the_extension_fixtures(self):
         self.pending_parent_and_child()
+        # 種類の範囲を超える子は束に載り、`overflow` を持つ。計画に無い番号の子は
+        # 承認の対象にしない側に載る。拡張は両方の形を読むので、同じ束に並べて写す。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("wip/design/*",)))
+        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
         self.commit_parent()
         preview = self.preview()
         self._check_fixture("approve-preview.json", preview)
 
+        # 承認の答えは親と子 1 枚の形で写す。超過のある子は提案を下げてから承認する。
+        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-02.md"))
+        self.commit_parent()
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self._check_fixture("approve-yes.json", json.loads(result.stdout))
