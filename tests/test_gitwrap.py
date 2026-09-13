@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -407,6 +408,66 @@ class EnvironmentTest(GitWrapperTest):
         result = self.run_wrapper("status", "--porcelain", env=self.INJECT)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("untracked.txt", result.stdout, "環境からの設定注入が通っている")
+
+
+def hint_lines(stdout):
+    """ラッパが失敗の文面の末尾に足す案内の行。"""
+    return [line for line in stdout.splitlines() if line.startswith("案内:")]
+
+
+class WorktreeRemoveHintTest(GitWrapperTest):
+    """worktree remove が Permission denied で止まったときだけ、立て直し方を案内する。
+
+    Windows では、プロセスの cwd がそのディレクトリを掴む。Bash ツールの cwd は呼び出しを
+    またいで残る親のシェルのものなので、作業ツリーの中へ cd したまま remove すると、
+    最後のディレクトリで Permission denied になり、空のディレクトリが残る。
+    """
+
+    def add_worktree(self, name):
+        path = os.path.join(self.dir, ".claude", "worktrees", name)
+        git(self.dir, "worktree", "add", "-q", path, "-b", name)
+        return path
+
+    @unittest.skipUnless(os.name == "nt", "cwd がディレクトリを掴んで消せなくなるのは Windows だけ")
+    def test_permission_denied_on_remove_tells_how_to_recover(self):
+        path = self.add_worktree("held")
+        # 作業ツリーの中に cwd を持つプロセス。Bash ツールの残った親のシェルの代わり。
+        holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"], cwd=path)
+        self.addCleanup(holder.wait)
+        self.addCleanup(holder.kill)
+
+        result = self.run_wrapper("worktree", "remove", path)
+
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Permission denied", result.stdout)
+        hints = hint_lines(result.stdout)
+        self.assertEqual(1, len(hints), result.stdout)
+        hint = hints[0]
+        for word in ("cwd", "サブシェル", "worktree list", "rmdir", "利用者"):
+            self.assertIn(word, hint)
+        # 案内が勧める形は、生の git ではなくラッパの形で名乗る。
+        self.assertIn("ccnavi-git.sh worktree list", hint)
+        self.assertNotIn("git worktree", hint.replace("ccnavi-git.sh worktree", ""))
+        # 消し残しを消す rmdir には、打ったパスをそのまま入れる。
+        self.assertIn(f"rmdir {path}", hint)
+
+    def test_other_remove_failures_get_no_hint(self):
+        missing = self.run_wrapper("worktree", "remove", os.path.join(self.dir, "no-such"))
+        self.assertEqual(1, missing.returncode, missing.stdout + missing.stderr)
+        self.assertEqual([], hint_lines(missing.stdout))
+
+        # 未追跡のファイルが残っている作業ツリーは git が消さない。これは cwd の話ではない。
+        path = self.add_worktree("dirty")
+        with open(os.path.join(path, "left.txt"), "w", encoding="utf-8") as f:
+            f.write("x\n")
+        dirty = self.run_wrapper("worktree", "remove", path)
+        self.assertEqual(1, dirty.returncode, dirty.stdout + dirty.stderr)
+        self.assertEqual([], hint_lines(dirty.stdout))
+
+    def test_failures_of_other_subcommands_get_no_hint(self):
+        result = self.run_wrapper("show", "no-such-ref")
+        self.assertEqual(1, result.returncode)
+        self.assertEqual([], hint_lines(result.stdout))
 
 
 if __name__ == "__main__":
