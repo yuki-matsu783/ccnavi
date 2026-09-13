@@ -2,11 +2,11 @@
 
 PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。配布先では
 この語をディレクトリ名にして、機械ごとの組み立てを並べて置く（`.ccnavi/bin/<語>/`）。
-hook が起動するのはその 1 つ上に置いた振り分けの sh で、sh が自分の機械の語を読んで
-合うディレクトリへ渡す。
+hook が起動するのは `.ccnavi/scripts/ccnavi-launcher.sh` に置いた振り分けの sh で、sh が
+自分の機械の語を読んで、自分の隣ではなく `../bin/` の合うディレクトリへ渡す（ADR-0043）。
 
 語は 3 か所で揃える。ここ、scripts/ccnavi-setup.sh の host_target、
-scripts/ccnavi-launcher.sh。どれかだけ変えると、配った場所と探す場所がずれる。
+.ccnavi/scripts/ccnavi-launcher.sh。どれかだけ変えると、配った場所と探す場所がずれる。
 """
 
 from __future__ import annotations
@@ -20,6 +20,11 @@ SYSTEMS = ("darwin", "linux", "windows")
 
 # 実行ファイルの名前。PyInstaller が Windows でだけ `.exe` を付ける。
 EXECUTABLE_NAMES = ("ccnavi", "ccnavi.exe")
+
+# 振り分けの sh の名前。この名前なら実体は `../bin/<語>/` に在り、それ以外の名前は
+# 前の形（隣の `<語>/`）として読む。selfguard.binary_clause も同じ条件で切り替える。
+# どちらかだけ条件を足すと、守る場所と控える場所が食い違う。
+LAUNCHER_NAME = "ccnavi-launcher.sh"
 
 
 def host_target(system: str | None = None, machine: str | None = None) -> str:
@@ -54,13 +59,23 @@ def runnable_targets(host: str) -> tuple[str, ...]:
 def launched_executable(launcher: str, host: str | None = None) -> str:
     """振り分けの sh が、この機械で起動する実行ファイル。無ければ空文字。
 
-    sh と同じ順で探す。自己防衛が sh だけを見ていると、隣の実体を差し替えられても
+    sh と同じ順で探す。自己防衛が sh だけを見ていると、実体を差し替えられても
     気付かない。hook が実際に走らせるのはこちら。
+
+    名前が LAUNCHER_NAME なら `../bin/` を探し、隣は見ない。sh が起動しない置き場を
+    控える場所として返すと、控えた実体と走る実体が別のものになる。それ以外の名前は
+    前の形として隣を探す。`.ccnavi/bin/ccnavi` を指したままのワークスペース
+    （導入スクリプトを打ち直すまで）で、隣の実体を控え続けるために残す。
+    `..` は解かない。sh も `$here/../bin` をそのまま使う。
     """
     here = os.path.dirname(launcher)
+    if os.path.basename(launcher) == LAUNCHER_NAME:
+        places = os.path.join(os.path.dirname(here), "bin")
+    else:
+        places = here
     for target in runnable_targets(host or host_target()):
         for name in EXECUTABLE_NAMES:
-            found = os.path.join(here, target, name)
+            found = os.path.join(places, target, name)
             if os.path.isfile(found):
                 return found
     return ""
