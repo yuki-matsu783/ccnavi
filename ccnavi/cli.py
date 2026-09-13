@@ -122,9 +122,12 @@ scripts in .ccnavi/scripts/, which call
 ccnavi never reaches the remote itself. The script fetches the merge request,
 its threads and reviews, and hands them over as --result <json>.
 
-A human accepts unresolved review threads with
+A human accepts unresolved review threads, from the parent worktree, with
 
-    sh .ccnavi/scripts/ccnavi-review.sh accept N
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh accept N
+
+(the scripts live only in the workspace, so a worktree cut from a project
+cannot reach them by the relative path)
 
 which fetches the threads and runs
 
@@ -132,7 +135,7 @@ which fetches the threads and runs
 
 A human closes a parent early ("good enough for now") with
 
-    sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
 
 which runs `ccnavi review wrapup --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.

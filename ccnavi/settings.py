@@ -150,6 +150,20 @@ DEFAULT_PROJECTS = "projects"
 # スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
 # 済ませるため（設計 §25.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
+
+
+def script_command(root: str, name: str) -> str:
+    """文面で案内する `.ccnavi/scripts/` の sh の綴り。ワークスペースルートから書く。
+
+    スクリプトはワークスペースにしか無く、プロジェクトから切った作業ツリーでは相対の
+    `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
+    区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。引用はしない。ゲートの例外と
+    サブエージェントの禁止は `\\S*ccnavi-...` で見るので、引用すると当たらなくなる。
+    """
+    base = os.path.realpath(root).replace("\\", "/").rstrip("/")
+    return f"sh {base}/{DEFAULT_PROJECT_HOME}/scripts/{name}"
+
+
 # ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。
 LAYER_CONFIG_DIR = "config"
 # 層が持てる設定。3 本は独立に無くてよい。

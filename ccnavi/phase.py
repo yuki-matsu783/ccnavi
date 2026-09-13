@@ -96,7 +96,7 @@ def forbidden(subject: str) -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject))
 
 
-def ticket_approval_rule(bin_path: str) -> rules.Rule:
+def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
     承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
@@ -118,10 +118,12 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
         message=(
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
-            "'sh .ccnavi/scripts/ccnavi-ticket.sh' と 'sh .ccnavi/scripts/ccnavi-review.sh' を"
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
-            "'sh .ccnavi/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
-            "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
+            "未解決の受け入れは利用者が端末で行います。"
+            "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -408,8 +410,9 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     return found
 
 
-def gate_reason(phase: Phase, tool: str) -> str:
+def gate_reason(phase: Phase, tool: str, root: str) -> str:
     """ゲートが止めたときに返す文。次に何をすればよいかを言う。"""
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
     marks = "依頼済み" if approval.MARK_REQUESTED in phase.marks else "未依頼"
     n = phase.number
@@ -422,9 +425,9 @@ def gate_reason(phase: Phase, tool: str) -> str:
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
             f"レビュー済みの印が置かれるまで、ゲートが{what}を止めます。",
             "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+            f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら 'sh .ccnavi/scripts/ccnavi-review.sh check --phase {n}' "
+            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
             "で確かめます。次のフェーズの計画（wip/tickets/todo/ への提案）は"
             "レビュー前に進めて構いません。",
         ]
@@ -482,7 +485,8 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
                 f"子の成果を親ブランチへ合流して push し、"
-                f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+                f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
+                "--body-file <依頼文>' "
                 f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。指摘があれば同じ"
                 "フェーズに子を足せます。レビュー済みになるまで、ゲートがサブエージェントの起動と"
                 "シェル実行を止めます。"

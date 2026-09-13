@@ -106,10 +106,12 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         else:
             from .review import wip_root
 
+            git_sh = settings.script_command(root, "ccnavi-git.sh")
+            review_sh = settings.script_command(root, "ccnavi-review.sh")
             stdout.write(
                 f"次は、この移動をコミットし、`{wip_root(conf)}/` を消して"
-                f"（'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip_root(conf)}'）コミットし、"
-                "push してから 'sh .ccnavi/scripts/ccnavi-review.sh ready' で Draft を外す"
+                f"（'{git_sh} rm -r {wip_root(conf)}'）コミットし、"
+                f"push してから '{review_sh} ready' で Draft を外す"
                 "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
                 "マージは利用者が squash で行う\n"
             )
