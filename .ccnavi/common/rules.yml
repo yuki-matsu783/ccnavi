@@ -127,7 +127,7 @@ deny:
   # 設定も止める。統合でそのまま main の設定になる道を持つので、main の側だけ止めても
   # 時間差で効く。前の置き場（.claude/ccnavi/）も、env で指したままのワークスペースが
   # あるので並べてある。見本（rule-samples.yml）はこのルールでは止めないが、
-  # .ccnavi/common/ に置いた見本は組み込みの傘のルールが止める。見本の下書きは
+  # .ccnavi/common/ に置いた見本は ccnavi ディレクトリを守る組み込みのルールが止める。見本の下書きは
   # scratchpad に置き、ルールの下書きと一緒に利用者に渡す。
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
