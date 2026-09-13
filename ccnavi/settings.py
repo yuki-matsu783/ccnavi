@@ -278,6 +278,11 @@ class Settings:
     # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
     # VS Code 拡張が、編集中のプロジェクトのルールを保存せずに試すために使う。
     project_rules_files: dict[str, str] = field(default_factory=dict)
+    # project_phases_files は同じ差し替えを層のフェーズの種類に対して行う（名前 → 絶対パス）。
+    # `--project-phases-file <名前>=<パス>` が入れる。名前は `self` かプロジェクトの名前で、
+    # 共通層の種類は今までどおり `--phases` で差し替える。VS Code 拡張のフェーズ管理画面が、
+    # 編集中の層の種類を保存せずに検証するために使う。
+    project_phases_files: dict[str, str] = field(default_factory=dict)
     # retired は、もう効かない環境変数が指定されていたときの名前。--lint が言う。
     retired: list[str] = field(default_factory=list)
 
@@ -387,12 +392,13 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
     プロジェクトの層ならその git プロジェクトルートを渡す。3 種とも同じ形なので、
     rules だけの経路を別に持たない。
 
-    `--project-rules-file` で名前が差し替えられていれば、rules に限ってそのパス。
-    差し替えは診断のためのもので、phases と risk には効かない。守る対象（selfguard）は
+    `--project-rules-file` / `--project-phases-file` で名前が差し替えられていれば、rules / phases に
+    限ってそのパス。差し替えは診断のためのもので、risk には効かない。守る対象（selfguard）は
     差し替えを見ない `layer_real_path` を使う。
     """
-    if kind == KIND_RULES:
-        override = conf.project_rules_files.get(layer or _layer_name(home_root))
+    swaps = {KIND_RULES: conf.project_rules_files, KIND_PHASES: conf.project_phases_files}.get(kind)
+    if swaps:
+        override = swaps.get(layer or _layer_name(home_root))
         if override:
             return override
     return layer_real_path(conf, home_root, kind)

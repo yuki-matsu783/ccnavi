@@ -63,6 +63,11 @@ by the project's name (this flag is for --test, --test-samples, --lint and
 
     ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
 
+The phase types of one layer are handed in the same way (self is the
+workspace's own layer; the common layer keeps using --phases):
+
+    ccnavi --lint --project-phases-file self=/tmp/phases.yml
+
 To list the tickets, their approved copies, the phase marks and the gates
 in a machine-readable form (the VS Code board extension reads this), run
 
@@ -207,6 +212,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
     # VS Code 拡張が編集中のプロジェクトのルールを保存せずに試すために渡す。
     parser.add_argument("--project-rules-file", default="")
+    # 同じ差し替えを層のフェーズの種類に対して行う（<名前>=<パス>、名前は self かプロジェクト）。
+    # VS Code 拡張のフェーズ管理画面が、編集中の層の種類を保存せずに検証するために渡す。
+    parser.add_argument("--project-phases-file", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", default="")
@@ -252,20 +260,23 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
-    # プロジェクトのルールの差し替えは診断の経路でだけ効く。hook からの判定にも
-    # 差し替えの手段を残すと、ルールを保存せずに緩める道になるので、そこでは無視する。
+    # 層のルールと種類の差し替えは診断の経路でだけ効く。hook からの判定にも
+    # 差し替えの手段を残すと、設定を保存せずに緩める道になるので、そこでは無視する。
     diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
-    if args.project_rules_file:
+    for flag, value, swaps in (
+        ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
+        ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
+    ):
+        if not value:
+            continue
         if not diagnosing:
-            stderr.write(
-                "ccnavi: --project-rules-file は診断（--test / --lint / --explain）でだけ効く\n"
-            )
-        else:
-            name, sep, path = args.project_rules_file.partition("=")
-            if not sep or not name or not path:
-                stderr.write("ccnavi: --project-rules-file は <名前>=<パス> の形で書く\n")
-                return EXIT_ERROR
-            conf.project_rules_files[name] = os.path.abspath(path)
+            stderr.write(f"ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n")
+            continue
+        name, sep, path = value.partition("=")
+        if not sep or not name or not path:
+            stderr.write(f"ccnavi: {flag} は <名前>=<パス> の形で書く\n")
+            return EXIT_ERROR
+        swaps[name] = os.path.abspath(path)
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
