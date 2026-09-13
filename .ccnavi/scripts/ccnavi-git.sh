@@ -466,7 +466,7 @@ push)
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
-	# 見分けるのは承認済みチケット（main の `.claude/ccnavi/tickets/<名前>.md`）に
+	# 見分けるのは承認済みチケット（main の `.ccnavi/tickets/<名前>.md`）に
 	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# 作業ツリーはワークスペースの .claude/worktrees/ の下にある。切り元が
 	# プロジェクトでも置き場はワークスペース（設計 §25.2）なので、git の
@@ -482,7 +482,9 @@ push)
 			push_name="${push_name%%/*}"
 			case "${CCNAVI_APPROVED:-}" in
 			/* | [A-Za-z]:*) push_copies="$CCNAVI_APPROVED" ;;
-			*) push_copies="$push_root/${CCNAVI_APPROVED:-.claude/ccnavi/tickets}" ;;
+			# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
+			# env を書いていないワークスペースで、この検査が黙って飛ぶ。
+			*) push_copies="$push_root/${CCNAVI_APPROVED:-.ccnavi/tickets}" ;;
 			esac
 			# 閉じた承認済みチケット（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
 			# そのツリーは子のもので、送ってよくなるわけではない。

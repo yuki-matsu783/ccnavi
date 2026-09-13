@@ -297,7 +297,7 @@ class PassTest(GitWrapperTest):
         """
         bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
-        copies = os.path.join(self.dir, ".claude", "ccnavi", "tickets")
+        copies = os.path.join(self.dir, ".ccnavi", "tickets")
         os.makedirs(copies)
         with open(os.path.join(copies, "i0001.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001\n---\n")
