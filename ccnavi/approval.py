@@ -360,6 +360,10 @@ class Candidate:
 
     ticket: ticket_mod.Ticket
     complaints: list[rules.Problem] = field(default_factory=list)
+    # 範囲の超過（親の範囲・種類の上限を超えた項、regex の項）。承認は止めず、判定が
+    # 切り詰める。判定に効く（止まる）ので、判定に効かない記述の注意（complaints の warn）とは
+    # 混ぜずに持つ。
+    overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
     # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §25.4.1）。
@@ -602,6 +606,7 @@ def _batch_entry(cand: Candidate) -> dict:
         "revision": cand.is_revision,
         "tree": t.tree or "",
         "path": t.path,
+        "overflow": [p.detail for p in cand.overflow],
     }
 
 
@@ -841,7 +846,7 @@ def _candidates(
 
     for t in sorted(pending, key=lambda x: (x.parent or x.ticket, x.ticket)):
         types = types_for(t)
-        complaints = validate(t, pool, types)
+        complaints, overflow = validate(t, pool, types)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
@@ -850,7 +855,7 @@ def _candidates(
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        batch.append(Candidate(ticket=t, complaints=complaints, types=types))
+        batch.append(Candidate(ticket=t, complaints=complaints, overflow=overflow, types=types))
         pool[t.ticket] = t
     return batch, rejected, pool
 
@@ -985,6 +990,11 @@ def screen(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
+        if cand.overflow:
+            # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
+            # 注意と混ぜると、承認すれば書けると読み違える。
+            lines.append("■ 範囲のうち、判定で止まるもの（承認しても書けない）")
+            lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
             lines.append(
@@ -1350,25 +1360,32 @@ def project_problems(
 
 def validate(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], types: dict | None = None
-) -> list[rules.Problem]:
-    """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。"""
+) -> tuple[list[rules.Problem], list[rules.Problem]]:
+    """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
+
+    返すのは 2 つの並び。1 つめはチケットの形の苦情で、error があれば承認しない。
+    2 つめは範囲の超過（親の範囲・種類の上限を超えた項、regex の項）で、承認は止めない。
+    判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。形の検査は判定では
+    補えない（親が無い子は、どの範囲で切り詰めるかが決まらない）ので残す。
+    """
     problems: list[rules.Problem] = []
+    overflow: list[rules.Problem] = []
     if not t.is_child:
-        return plan_problems(t, types)
+        return plan_problems(t, types), overflow
     parent = pool.get(t.parent)
     if parent is None:
         problems.append(
             rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} が承認されていない")
         )
-        return problems
+        return problems, overflow
     if parent.is_child:
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
             )
         )
-        return problems
-    problems.extend(ticket_mod.subset_problems(t, parent))
+        return problems, overflow
+    overflow.extend(ticket_mod.subset_problems(t, parent))
     if parent.has_plan and t.phase is not None:
         item = parent.item_at(t.phase)
         if item is None:
@@ -1380,7 +1397,7 @@ def validate(
                     f"（計画は {len(parent.numbered())} 番目まで）",
                 )
             )
-            return problems
+            return problems, overflow
         pt = (types or {}).get(item.type)
         if pt is None:
             problems.append(
@@ -1390,9 +1407,16 @@ def validate(
                     f"{t.phase} 番目の種類 `{item.type}` の定義が読めない",
                 )
             )
-            return problems
-        problems.extend(phasetypes.scope_problems(t, pt))
-    return problems
+            return problems, overflow
+        overflow.extend(phasetypes.scope_problems(t, pt))
+    # regex の項は親の検査と種類の検査が同じ文で言う。画面に 2 度並べない。
+    seen: set[str] = set()
+    distinct = []
+    for p in overflow:
+        if p.detail not in seen:
+            seen.add(p.detail)
+            distinct.append(p)
+    return problems, distinct
 
 
 def _write(path: str, text: str) -> str:

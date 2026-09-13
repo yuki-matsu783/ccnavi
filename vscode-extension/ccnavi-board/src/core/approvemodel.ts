@@ -18,6 +18,8 @@ export interface ApproveBatchEntry {
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
+  /** 範囲のうち、判定で止まるもの（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
+  readonly overflow: readonly string[];
 }
 
 export interface ApproveRejected {
@@ -143,6 +145,7 @@ function entry(raw: Record<string, unknown>): ApproveBatchEntry {
     revision: raw.revision === true,
     tree: str(raw.tree),
     path: str(raw.path),
+    overflow: list(raw.overflow).map(str),
   };
 }
 

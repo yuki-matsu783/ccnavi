@@ -564,6 +564,9 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
     親に当てる。前置が親の allow か ask に入っていれば中、入っていなければ外。
     `src/components/*` の前置は `src/components/`、`*` の前置は空文字で、
     空文字を中と言える親は `*` を持つ親だけになる。
+
+    超えていても承認は止めない（warn）。判定が親の範囲で切り詰めるので、承認で止める
+    理由が無い。承認の画面は「判定で止まるもの」として別の見出しで見せる。
     """
     problems = []
     for entry in child.entries:
@@ -571,12 +574,7 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
             continue
         if entry.regex:
             problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    child.ticket,
-                    f"子の範囲に regex `{entry.regex}` は書けない。親の部分集合であることを"
-                    "確かめられない",
-                )
+                Problem(SEVERITY_WARN, child.ticket, regex_overflow_detail(entry.regex))
             )
             continue
         # ワイルドカードがあれば、前置に 1 文字足した綴りを親に当てる。`src/b/*` なら
@@ -587,12 +585,20 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
         if verdict not in (rules.ALLOW, rules.ASK):
             problems.append(
                 Problem(
-                    SEVERITY_ERROR,
+                    SEVERITY_WARN,
                     child.ticket,
                     f"`{entry.glob}` は親 {parent.ticket} の範囲を超えている",
                 )
             )
     return problems
+
+
+def regex_overflow_detail(regex: str) -> str:
+    """子の範囲の regex を名指しする文。親の検査と種類の検査の両方が同じ文を使う。
+
+    同じ文にしておけば、承認の画面で 2 度並べずに畳める。
+    """
+    return f"子の範囲に regex `{regex}` は書けない。親と種類の上限に入るかを判定のときに当てる"
 
 
 def combine(child: str, parent: str) -> str:

@@ -448,7 +448,9 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) ->
             )
         if t.state not in ticket_mod.CLOSED:
             # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-            for p in approval.validate(t, pool, resolve(approval.project_of(t, pool))):
+            # 範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
+            complaints, overflow = approval.validate(t, pool, resolve(approval.project_of(t, pool)))
+            for p in complaints + overflow:
                 problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.state == ticket_mod.DOING:
             waiting = [p for p in t.predecessors if p not in done]
