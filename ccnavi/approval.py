@@ -810,7 +810,6 @@ def _apply(
                 )
 
     stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
-    stdout.write("この範囲は次のツール呼び出しから効く。\n")
     return 0
 
 
