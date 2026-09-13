@@ -281,7 +281,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_RISK` | **共通層**の実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.ccnavi/common/risk.yml`。どの層にも無ければ組み込みの配点 |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、この機能が入る前と同じに動く |
 | `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risk}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の既定の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かない。共通層を動かすなら `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` で動かす |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや端末を持たない配管で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `CCNAVI_TICKET` と `CCNAVI_LEDGER` と `CCNAVI_GUARD_CLI` と `CCNAVI_PROJECT_RULES` はもう効かない。指定してあれば
