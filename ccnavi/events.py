@@ -147,7 +147,7 @@ def decide_at_prompt(
     """
     watched, scope = watch_context(stderr, conf, root, record)
     post.at_prompt(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
-    told = approval.news(stderr, conf, payload.session_id, payload.agent_id)
+    told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
@@ -218,7 +218,7 @@ def decide_at_start(
     ctxfile.forget(conf.state, payload.session_id)
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
-    approval.baseline(stderr, conf, payload.session_id, payload.agent_id)
+    approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:

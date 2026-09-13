@@ -171,7 +171,7 @@ def judge(
     if not found.is_child:
         stderr.write(f"ccnavi: {ticket_id} は子ではない。判定は子の差分に付ける\n")
         return 1
-    definition = risk.load_definition(conf, root, _project_of(conf, found))
+    definition = risk.load_definition(conf, root, _project_of(conf, root, found))
     factor = definition.factor(factor_id)
     if factor is None or factor.kind != risk.KIND_JUDGE:
         names = ", ".join(f.id for f in definition.judges) or "(無い)"
@@ -210,7 +210,7 @@ def judge(
     return 0
 
 
-def _project_of(conf: settings.Settings, found: ticket_mod.Ticket) -> str:
+def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
     """このチケットの層を決める `project:`（設計 §25.4.1、§25.4.2）。
 
     権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
@@ -218,10 +218,10 @@ def _project_of(conf: settings.Settings, found: ticket_mod.Ticket) -> str:
     """
     if not found.is_child:
         return found.project
-    copies, _ = approval.copies(conf.approved)
+    copies, _ = approval.scan(conf, root)
     parent = approval.by_id(copies).get(found.parent)
     if parent is None:
-        closed, _ = approval.copies(conf.approved, closed=True)
+        closed, _ = approval.scan(conf, root, closed=True)
         parent = approval.by_id(closed).get(found.parent)
     return parent.project if parent is not None else found.project
 
@@ -236,7 +236,7 @@ def _score_child(
     if not found.is_child:
         return []
     worktree = tree.worktree_path(root, found.ticket)
-    definition = risk.load_definition(conf, root, _project_of(conf, found))
+    definition = risk.load_definition(conf, root, _project_of(conf, root, found))
     if definition.fallback:
         stderr.write(f"ccnavi: {definition.fallback}\n")
     diff, why = risk.measure(worktree, found.base_sha)

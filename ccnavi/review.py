@@ -951,7 +951,7 @@ def _parent_any(
         return parent
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is not None and not t.is_main:
-        closed, _ = approval.copies(settings.approved_dir(conf, t.root), closed=True)
+        closed, _ = approval.scan(conf, root, closed=True)
         found = tree.lookup(approval.by_id(closed), t.name)
         if found is not None and not found.is_child:
             return found
