@@ -5,6 +5,13 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 続かない）が、引用の中の空白にも当たって外れる。(1) コマンドの間は `\x00` のまま、(2) 引用が
 つないだ空白と (3) 語の中の演算子の両側を別の 1 文字にする。
 
+> **main 取り込み後の見直し（フェーズ 5 で追記）。** §2 の一覧は main を取り込む前のコードで書いた。
+> 実装の途中で main を取り込んだところ、`\x00` を使う式が 2 か所増えていて、一覧に無かった。
+> `phase.py` の `_NOT_PREVIEW` と、`selfguard.py` の `_TERM` / `_END` である。どちらも「語の中」の
+> 使い方で、印を分けただけだと判定が緩む（deny → ask）。取り込み後に分ける前と後の判定を
+> 見本 34 件で比べて見つけた。実装では `_NOT_A_WORD`（`\x00` と `\x01`）を使う形にして今の判定を
+> 保ち、フェーズ 3 のレビューで受け入れられた。§2 と §3 に足し、行番号も取り込み後のコードに合わせた。
+
 ## 1. 決めたこと
 
 ### 語の中の切れ目の文字: `\x01`
@@ -23,8 +30,8 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 
 ### 入力からの除去
 
-- 今の場所: `ccnavi/shellread.py` `read()` の先頭、`src = src.replace(SEP, " ")`（102 行目）。
-  行継続の除去（109 行目）と `_tokenize` より前で、shlex に渡す前の唯一の入口
+- 今の場所: `ccnavi/shellread.py` `read()` の先頭、`src = src.replace(SEP, " ")`（取り込み後は 107 行目）。
+  行継続の除去と `_tokenize` より前で、shlex に渡す前の唯一の入口
 - 方針: 同じ行で `WORD_SEP` も空白に置き換える。`src = src.replace(SEP, " ").replace(WORD_SEP, " ")`
 - 効果: 入力 `git\x01push` は今 `git\x01push` の 1 語（どのルールにも当たらない。実在しない
   コマンド名なので害も無い）だが、変更後は `git push` と読まれ raw-git に当たる。厳しい側
@@ -39,12 +46,12 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 | 引用が演算子だけの 1 語 | `grep -n ">" f` → `grep -n > f` | 演算子 | 演算子のまま（shlex が引用の有無を返さない。今どおり） |
 | 引用が `<<` だけの 1 語 | `grep -n "<<" f` | degraded（unterminated-quote） | 変わらず。許容した誤検知（ccnavi.md §12.3、tests/test_acceptance.py 299 行目） |
 
-`_join` の中の 2 か所（313 行目 `out.append(SEP)`、315 行目 `out.append(SEP + c + SEP)`）を
-`WORD_SEP` に変えるだけ。`_render`（299 行目）は `SEP` のまま。
+`_join` の中の 2 か所（取り込み後は 318 行目 `out.append(SEP)`、320 行目 `out.append(SEP + c + SEP)`）を
+`WORD_SEP` に変えるだけ。`_render`（304 行目）は `SEP` のまま。
 
 ## 2. 影響の洗い出し
 
-`\x00` と `SEP` の使用箇所。「区切り」= コマンドの区切りの意味だけ（変更後も同じ判定）、
+`\x00` と `SEP` の使用箇所（行番号は main を取り込んだ後のコード）。「区切り」= コマンドの区切りの意味だけ（変更後も同じ判定）、
 「語の中」= 語の中の切れ目まで含めて使っている（判定が変わる）。判定の変化は隔離した
 スクリプトで `_join` だけ差し替えて実測した。
 
@@ -52,26 +59,27 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 
 | 場所 | 使い方 | 区分 | 根拠 |
 |---|---|---|---|
-| shellread.py:42 `SEP = "\x00"` | 定義 | 区切り | 名前と値はそのまま。`WORD_SEP` を隣に足す |
-| shellread.py:102 `src.replace(SEP, " ")` | 入力からの除去 | 語の中 | `WORD_SEP` も同じ行で取り除く。`git\x01push` が `git push` と読まれるようになる（厳しい側） |
-| shellread.py:299 `SEP.join(...)` | コマンドの連結 | 区切り | (1) の置き先そのもの。変えない |
-| shellread.py:313, 315 `out.append(SEP…)` | 語の中の空白・演算子 | 語の中 | (2)(3) の置き先。`WORD_SEP` に変える |
+| shellread.py:46 `SEP = "\x00"` | 定義 | 区切り | 名前と値はそのまま。`WORD_SEP` を隣に足す |
+| shellread.py:107 `src.replace(SEP, " ")` | 入力からの除去 | 語の中 | `WORD_SEP` も同じ行で取り除く。`git\x01push` が `git push` と読まれるようになる（厳しい側） |
+| shellread.py:304 `SEP.join(...)` | コマンドの連結 | 区切り | (1) の置き先そのもの。変えない |
+| shellread.py:318, 320 `out.append(SEP…)` | 語の中の空白・演算子 | 語の中 | (2)(3) の置き先。`WORD_SEP` に変える |
 | shellread.py:28-41 冒頭コメント | 説明 | — | 「置く先は 3 つ」を「印は 2 つ」に書き直す |
-| phase.py:70 `subject.split("\x00")` | `commands()`。ゲートの免除と子の禁止形をコマンド 1 本ずつに当てる | 語の中 | 今は引用の空白でも割れる。`sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"` は `['sh … -m docs:', 'a', 'b']` の 3 本になり `exempt()` が偽。変更後は 1 本で `exempt()` が真。ゲートが閉じている間、引用に空白を含むラッパ呼び出しが通るようになる（緩む方向だが、これが本来の読み。§3 に見本） |
-| phase.py:83 `forbidden()`（`_FORBIDDEN_COMMAND`） | 同じ `commands()` を使う | 区切り | `(sh\|bash)\s+` は `\x01` をまたげない。`echo "sh ccnavi-ticket.sh done x"` は今も変更後も偽、`ls; sh … done x` は今も変更後も真 |
+| phase.py:82 `subject.split("\x00")` | `commands()`。ゲートの免除と子の禁止形をコマンド 1 本ずつに当てる | 語の中 | 今は引用の空白でも割れる。`sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"` は `['sh … -m docs:', 'a', 'b']` の 3 本になり `exempt()` が偽。変更後は 1 本で `exempt()` が真。ゲートが閉じている間、引用に空白を含むラッパ呼び出しが通るようになる（緩む方向だが、これが本来の読み。§3 に見本） |
+| phase.py:93 `forbidden()`（`_FORBIDDEN_COMMAND`） | 同じ `commands()` を使う | 区切り | `(sh\|bash)\s+` は `\x01` をまたげない。`echo "sh ccnavi-ticket.sh done x"` は今も変更後も偽、`ls; sh … done x` は今も変更後も真 |
 | phase.py:38 `_EXEMPT_COMMAND` | `^(sh\|bash)\s+\S*ccnavi-…\.sh(\s\|$)` | 区切り | `\x00` を含まない。`commands()` の割り方が変わる影響は上の行 |
-| phase.py:93 `ticket_approval_rule` `(^\|\x00\|[;&\|]\s*)…\s+[^\x00]*{_CLI_FORMS}` | `(^\|\x00)` はコマンドの先頭、`[^\x00]*` は同じコマンドの中 | 語の中 | `uv run python -m ccnavi --rules r.yml --test Bash "ccnavi --approve x"` が今は当たらず、変更後は `[^\x00]*` が `ccnavi␁--approve` をまたいで deny になる（厳しい側。`--test` の対象に承認の綴りを書く形だけ） |
-| selfguard.py:170-171 コメント | 説明 | 区切り | 「`\x00` はコマンドの切れ目」の説明は変更後も正しい。語の中の印が別にあることを 1 行足す |
-| selfguard.py:177 `>[>\|&]* ?[^ \x00]*` | リダイレクトの行き先 | 語の中 | **直す必要あり**。`grep -n "> /repo/.claude/ccnavi/rules.yml" f` は今 `␀>␀␀/repo/…` で当たらないが、変更後 `␁>␁␁/repo/…` は `[^ \x00]*` が `␁␁/repo/.claude/…` を食って deny になる（誤検知が増える）。`[^ \x00\x01]*` にする。素の `echo x > /repo/.claude/ccnavi/rules.yml` は `> ` の後ろが `/repo` なので今どおり当たる |
-| selfguard.py:178 `(^\|\x00)(mv\|rm\|tee\|…)\b[^\x00]*` | 書き換える動詞から行き先まで | 語の中 | `tee "a b" /repo/.claude/ccnavi/rules.yml` は今 `tee a␀b …` で `[^\x00]*` が止まり当たらない（穴）。変更後は deny。厳しい側 |
-| selfguard.py:179 `(^\|\x00)sed\b[^\x00]*-i[^\x00]*` | 同上 | 語の中 | `sed -i "s/a b/c/" /repo/.claude/ccnavi/rules.yml` が今は通り、変更後は deny。厳しい側 |
-| selfguard.py:181 `_COPY_VERBS` `(^\|\x00)(cp\|ln\|install)\b[^\x00]*` | 同上 | 語の中 | `cp "a b" /repo/.claude/ccnavi/rules.yml` が今は通り、変更後は deny。厳しい側 |
-| selfguard.py:206 `[^ \x00]*($\|\x00)` | 写す動詞の行き先が最後の引数 | 区切り | `($\|\x00)` はコマンドの終わり。`[^ \x00]*` は `\x01` を含みうるが、行き先の名前に引用の空白がある形が当たる側に倒れるだけ |
-| selfguard.py:222 `[^\\/ \x00]+` | プロジェクト名 1 語 | 区切り | 同上。`\x01` を含む名前は当たる側 |
-| ticket.py:712 `[^\\/\s\x00]+` | 置き場の綴りのプロジェクト名 | 区切り | 同上 |
-| ticket.py:751 `[^ \x00]*($\|\x00)` | 写す動詞の行き先 | 区切り | 同上 |
-| ticket.py:752 `_WRITE_VERBS` / `_COPY_VERBS` を使う | 状態の置き場を守るシェル側のルール | 語の中 | selfguard.py:178-181 と同じ理由で `mv "a b" wip/tickets/done/` が今は通り、変更後は deny。厳しい側 |
-| judge.py:415-419 `screen()` | `shellread.read` の結果をそのまま subject にする | — | `\x00` を直接は見ない。返る文面（reasons.py の `subject:` 行）に `\x01` が混ざるようになるが、`\x00` が混ざるのと同じ |
+| phase.py:105 `ticket_approval_rule` `(^\|\x00\|[;&\|]\s*)…\s+[^\x00]*{_CLI_FORMS}` | `(^\|\x00)` はコマンドの先頭、`[^\x00]*` は同じコマンドの中 | 語の中 | `uv run python -m ccnavi --rules r.yml --test Bash "ccnavi --approve x"` が今は当たらず、変更後は `[^\x00]*` が `ccnavi␁--approve` をまたいで deny になる（厳しい側。`--test` の対象に承認の綴りを書く形だけ） |
+| phase.py:70 `_NOT_PREVIEW` `(?![^\x00;&\|\r\n]*--preview\b)`（main 取り込み後に追記） | `--approve` の免除。同じコマンドの中に `--preview` があるか | 語の中 | **直す必要あり**。分けただけだと `\x01` をまたぎ、`ccnavi --approve x "a --preview"` が deny から ask に落ちる（引数の値に書いた `--preview` が免除の理由になる。緩む方向）。`selfguard._NOT_A_WORD` を使い `\x01` もまたがない形にして今の判定を保つ |
+| selfguard.py:192-193 コメント | 説明 | 区切り | 「`\x00` はコマンドの切れ目」の説明は変更後も正しい。語の中の印が別にあることを 1 行足す |
+| selfguard.py:204 `>[>\|&]* ?[^ \x00]*` | リダイレクトの行き先 | 語の中 | **直す必要あり**。`grep -n "> /repo/.claude/ccnavi/rules.yml" f` は今 `␀>␀␀/repo/…` で当たらないが、変更後 `␁>␁␁/repo/…` は `[^ \x00]*` が `␁␁/repo/.claude/…` を食って deny になる（誤検知が増える）。`[^ \x00\x01]*` にする。素の `echo x > /repo/.claude/ccnavi/rules.yml` は `> ` の後ろが `/repo` なので今どおり当たる |
+| selfguard.py:205 `(^\|\x00)(mv\|rm\|tee\|…)\b[^\x00]*` | 書き換える動詞から行き先まで | 語の中 | `tee "a b" /repo/.claude/ccnavi/rules.yml` は今 `tee a␀b …` で `[^\x00]*` が止まり当たらない（穴）。変更後は deny。厳しい側 |
+| selfguard.py:206 `(^\|\x00)sed\b[^\x00]*-i[^\x00]*` | 同上 | 語の中 | `sed -i "s/a b/c/" /repo/.claude/ccnavi/rules.yml` が今は通り、変更後は deny。厳しい側 |
+| selfguard.py:208 `_COPY_VERBS` `(^\|\x00)(cp\|ln\|install)\b[^\x00]*` | 同上 | 語の中 | `cp "a b" /repo/.claude/ccnavi/rules.yml` が今は通り、変更後は deny。厳しい側 |
+| selfguard.py:217, 220 `_TERM` `(?:[ \x00]\|$)` / `_END` `(?:[\\/ \x00]\|$)`（main 取り込み後に追記） | 場所の名前がそこで終わる形（`rm -rf .ccnavi`） | 語の中 | **直す必要あり**。分けただけだと `\x01` を語の終わりに数えず、`rm ".ccnavi x"`・`rm ".claude x"`・`mv ".ccnavi;x" y` が deny から ask に落ちる。指す名前は `.ccnavi x` などの別名なので今の deny は誤検知だが、印を分ける変更のついでに緩めない。`_NOT_A_WORD` を使い `\x01` も数える |
+| selfguard.py:269 `[^ \x00]*($\|\x00)` | 写す動詞の行き先が最後の引数 | 区切り | `($\|\x00)` はコマンドの終わり。`[^ \x00]*` は `\x01` を含みうるが、行き先の名前に引用の空白がある形が当たる側に倒れるだけ |
+| ticket.py:762 `[^\\/\s\x00]+` | 置き場の綴りのプロジェクト名 | 区切り | 同上。`\x01` を含む名前は当たる側 |
+| ticket.py:801 `[^ \x00]*($\|\x00)` | 写す動詞の行き先 | 区切り | 同上 |
+| ticket.py:802 `_WRITE_VERBS` / `_COPY_VERBS` を使う | 状態の置き場を守るシェル側のルール | 語の中 | selfguard.py:178-181 と同じ理由で `mv "a b" wip/tickets/done/` が今は通り、変更後は deny。厳しい側 |
+| judge.py:424 `screen()` | `shellread.read` の結果をそのまま subject にする | — | `\x00` を直接は見ない。返る文面（reasons.py の `subject:` 行）に `\x01` が混ざるようになるが、`\x00` が混ざるのと同じ |
 | post.py | — | — | `\x00` も `shellread` も使っていない |
 | reasons.py / diagnose.py / audit.py | `degraded` の理由だけ | — | 印は見ない |
 
@@ -79,14 +87,14 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 
 | ルール | regex の `\x00` | 区分 | 根拠 |
 |---|---|---|---|
-| raw-git（51） | 無し。`(^\|[^\w.-])…git(\.exe)?\s` | 区切り | `\x00` も `\x01` も `[^\w.-]` に当たる。`grep -n x"git" push` のような形は今も変更後も同じ当たり方 |
-| find-writes（91）`(^\|\x00)…find…\s[^\x00]*\s-(delete\|…)\b` | 先頭は区切り、`[^\x00]*` は語の中 | 語の中 | `find /repo -name "a b" -delete` が今は当たらず（穴）、変更後は deny。厳しい側 |
+| raw-git（49） | 無し。`(^\|[^\w.-])…git(\.exe)?\s` | 区切り | `\x00` も `\x01` も `[^\w.-]` に当たる。`grep -n x"git" push` のような形は今も変更後も同じ当たり方 |
+| find-writes（89）`(^\|\x00)…find…\s[^\x00]*\s-(delete\|…)\b` | 先頭は区切り、`[^\x00]*` は語の中 | 語の中 | `find /repo -name "a b" -delete` が今は当たらず（穴）、変更後は deny。厳しい側 |
 | prefer-webfetch（158）`(^\|\x00)…(curl\|wget)…\s` | 先頭だけ | 区切り | `echo "a b" \| curl -d @- x` は今も変更後も ask |
 | prefer-read-grep（184）`…\s[^\x00]*$` | 後ろにコマンドが続かない | 語の中 | **課題そのもの**。`grep -n "git push" README.md` が allow になる。`cat f \| head` は `␀` が残るので今どおり当たらない |
 | prefer-glob（194）`…find…\s[^\x00]*$` | 同上 | 語の中 | `find /repo -name "a b"` が allow になる（`-delete` 付きは deny が先） |
-| heredoc（99）`<<` | 無し | 区切り | `grep -n "<<EOF" f` は `␁<␁␁<␁EOF` で今も変更後も当たらない |
+| heredoc（97）`<<` | 無し | 区切り | `grep -n "<<EOF" f` は `␁<␁␁<␁EOF` で今も変更後も当たらない |
 | recursive-delete / git-reset-hard / git-branch-force-delete（glob） | 無し | 区切り | 引用の中は `␁` で繋がるので `rm -rf ` の空白に当たらない。今と同じ |
-| credentials（77） | 無し。`(^\|[ \\/])\.(env…)` | 区切り | `\x00` も `\x01` も `[ \\/]` に無い。同じ |
+| credentials（75） | 無し。`(^\|[ \\/])\.(env…)` | 区切り | `\x00` も `\x01` も `[ \\/]` に無い。同じ |
 
 ### tests/
 
@@ -106,8 +114,8 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 
 | 場所 | 内容 | 区分 |
 |---|---|---|
-| README.md:612-620「引用が 1 語につないだ空白は…」「語の中に入った `>` …」 | 2 種類の印があることは書いていないが、`grep -n "git push"` が「通る」と書いてある。allow に当たるようになった旨（Read / Grep の勧めが出る）を 1 文足す | 語の中 |
-| ccnavi.md:994-997「前者は両側に区切りの印を置いて渡す」 | 「区切りの印」を「語の中の印（コマンドの区切りとは別の文字）」に直す | 語の中 |
+| README.md:737-745「引用が 1 語につないだ空白は…」「語の中に入った `>` …」 | 2 種類の印があることは書いていないが、`grep -n "git push"` が「通る」と書いてある。allow に当たるようになった旨（Read / Grep の勧めが出る）を 1 文足す | 語の中 |
+| ccnavi.md:383-386（shellread の読み方の手順 7） | 「区切りの印」を「語の中の印（コマンドの区切りとは別の文字）」に直す | 語の中 |
 | ccnavi.md:999-1006、README.md:619-620 `grep -n "<<"` の限界 | 変わらない | 区切り |
 | requirements.md | `\x00` にも印の文字にも触れていない | — |
 | .claude/ccnavi/rule-samples.yml:213-229 | ask 節の引用付き grep 4 件（`"git push"`、`"rm -rf"`、`"regex: '(>"`、`"<<EOF"`）。`why` に「権限モードへ渡る」と書いてある | 語の中。allow 節へ移し、why を書き直す |
@@ -133,7 +141,7 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 | `cp "a b" /repo/.claude/ccnavi/rules.yml` | UNDECLARED（穴） | deny | 同上 |
 | `mv "a b" wip/tickets/done/` | UNDECLARED（穴） | deny（状態の置き場） | 同上 |
 | `uv run python -m ccnavi --rules r.yml --test Bash "ccnavi --approve x"` | UNDECLARED | deny（ticket-approval） | `[^\x00]*` が `ccnavi␁--approve` をまたぐ。厳しい側。試すなら `--test` の対象をファイルに逃がす |
-| ゲートが閉じている間の `sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"` | DENY_PHASE_GATE（`commands()` が 3 本に割る） | 免除（1 本） | phase.py:70。緩む方向なので受入テストで固定する |
+| ゲートが閉じている間の `sh .claude/scripts/ccnavi-git.sh commit -m "docs: a b"` | DENY_PHASE_GATE（`commands()` が 3 本に割る） | 免除（1 本） | phase.py:82。緩む方向なので受入テストで固定する |
 
 ### 変わってはいけないもの
 
@@ -143,7 +151,7 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 | `grep -n ">" f` | allow（`grep -n > f`。演算子扱い） | 引用だけの 1 語は今どおり |
 | `grep -n ">" /repo/.claude/ccnavi/rules.yml` | deny（リダイレクトに見える） | 今と同じ許容した誤検知 |
 | `grep -n "<<" README.md` | deny（PARSE_UNCERTAIN、raw text） | degraded は変わらない |
-| `grep -n "> /repo/.claude/ccnavi/rules.yml" f` | UNDECLARED | selfguard.py:177 を `[^ \x00\x01]*` に直す前提。直さないと deny に変わる |
+| `grep -n "> /repo/.claude/ccnavi/rules.yml" f` | UNDECLARED | selfguard.py:204 を `[^ \x00\x01]*` に直す前提。直さないと deny に変わる |
 | `echo $(git push origin main)` | deny（raw-git） | `$␀git push …`。`(` は演算子で区切り |
 | `cd /repo && git push` | deny | 区切りは `␀` のまま |
 | `echo x>f` | `echo x > f`。deny には当たらない | 素の演算子は空白付きで残る |
@@ -153,6 +161,10 @@ rules.yml の regex からは 3 つが区別できず、`prefer-read-grep` の `
 | `echo "sh ccnavi-ticket.sh done x"`（子） | 禁止形に当たらない | `(sh\|bash)\s+` が `␁` をまたげない |
 | `cat "/home/u/.env"` | deny（credentials） | 引用の中身はそのまま |
 | `git` + `\x00` + `push`（入力に印を混ぜる） | deny（`git push` と読む） | 除去は今どおり |
+| `ccnavi --approve i0001 "a --preview"`（main 取り込み後に追記） | deny（ticket-approval） | `_NOT_PREVIEW` が `␁` をまたがない。またぐと引数の値の `--preview` が免除になる |
+| `rm ".ccnavi x"`（同上） | deny（selfguard） | `_END` が `␁` も語の終わりに数える |
+| `rm ".claude x"`（同上） | deny（selfguard） | `_TERM` が `␁` も語の終わりに数える |
+| `mv ".ccnavi;x" y`（同上） | deny（selfguard） | `;` の両側の `␁` を `_END` が語の終わりに数える |
 
 ## 4. 受入テストに渡す対応表
 
