@@ -29,7 +29,7 @@ import io
 import json
 import os
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TextIO
 
 from . import fsio, phasetypes, rules, settings, tree
@@ -589,7 +589,7 @@ def preview(
         "generated_at": now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
-        "digest": text_digest(gathered.text),
+        "digest": approval_digest(gathered.text, gathered.batch),
         "rejected": [
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
@@ -600,15 +600,37 @@ def preview(
     return 0
 
 
-def text_digest(text: str) -> str:
-    """承認画面の本文の指紋。UTF-8 にした SHA-256 の 16 進（小文字）。
+def approval_digest(text: str, batch: list[Candidate]) -> str:
+    """承認の指紋。承認画面の本文と承認済みチケットに写る中身の SHA-256 の 16 進（小文字）。
 
     ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
     見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
-    人が合意したのは画面に出た本文なので、本文ごと比べる。本文は呼ぶたびに変わる
-    中身（時刻など）を持たない。
+    本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
+    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。だから、本文に続けて
+    束のチケットを順に書き出した中身も覆う。
+
+    書き出した中身は承認のときに書くもの（`_apply` の `write_copy` / `revise_copy`）と
+    同じ組み立てで、承認の記録の欄（`ccnavi_approved`）だけを除く。記録は承認した時刻を
+    持つので、入れると呼ぶたびに指紋が変わる。本文も呼ぶたびに変わる中身を持たない。
+    区切りは `\\x00`。YAML の文面にも本文にも出ないので、つなぎ目をずらして同じ指紋は作れない。
     """
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    parts = [text] + [_carried(cand) for cand in batch]
+    return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
+
+
+def _carried(cand: Candidate) -> str:
+    """承認済みチケットに写る中身。承認の記録の欄を足す前の姿で書き出す。
+
+    改版は承認済みチケットの frontmatter の計画だけを差し替え、本文は承認済みチケットの
+    ものを残す（`revise_copy`）。新規は提案をそのまま写す（`write_copy`）。
+    """
+    t = cand.ticket
+    if cand.is_revision and cand.current is not None:
+        front, body = revised_front(cand.current, t), cand.current.body
+    else:
+        front, body = dict(t.raw), t.body
+    front.pop(ticket_mod.APPROVAL_KEY, None)
+    return ticket_mod.render(replace(t, raw=front, body=body))
 
 
 def _batch_entry(cand: Candidate) -> dict:
@@ -639,8 +661,9 @@ def approve_yes(
 
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する道を塞ぐため。識別子に加えて、見せた本文の指紋（`digest`）も比べる。
-    識別子が同じでも、見せたあとに提案の範囲や計画が書き換われば承認しない。
+    ものを承認する道を塞ぐため。識別子に加えて、見せた承認画面の本文と承認済みチケットに
+    写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
+    画面に出ない欄（`issue` など）が書き換われば承認しない。
     指紋が無ければ承認しない（指紋を渡さない古いボード）。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
@@ -653,7 +676,8 @@ def approve_yes(
     shown = digest.strip()
     if not shown:
         stderr.write(
-            "ccnavi: --yes には --digest（見せた承認画面の本文の指紋）が要る。"
+            "ccnavi: --yes には --digest（見せた承認画面の本文と承認済みチケットに写る中身の"
+            "指紋）が要る。"
             "ボードが古いので、入れ直してから承認の画面を開き直す\n"
         )
         return 1
@@ -661,7 +685,8 @@ def approve_yes(
     # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
     # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる。
     now_shown = gather(stderr, conf, root) if gathered.refused else gathered
-    current, current_digest = now_shown.identifiers, text_digest(now_shown.text)
+    current = now_shown.identifiers
+    current_digest = approval_digest(now_shown.text, now_shown.batch)
     if wanted != current or shown.lower() != current_digest:
         if as_json:
             body = {
@@ -681,8 +706,8 @@ def approve_yes(
             )
         else:
             stderr.write(
-                "ccnavi: 見せた承認画面の本文と今の本文が違う（識別子は同じで、提案の中身が"
-                "変わった）。見直してから承認する\n"
+                "ccnavi: 見せた承認画面の本文と承認済みチケットに写る中身が、今のものと違う"
+                "（識別子は同じで、提案の中身が変わった）。見直してから承認する\n"
             )
         return 1
     if not gathered.batch:
@@ -1300,10 +1325,7 @@ def revise_copy(
     feedback_planned: bool,
 ) -> str:
     """承認済みチケットの計画を差し替える。範囲と承認の記録はそのまま。"""
-    front = dict(current.raw)
-    front["plan"] = [item.as_raw() for item in revised.plan]
-    if revised.feedback is not None:
-        front["feedback"] = [item.as_raw() for item in revised.feedback]
+    front = revised_front(current, revised)
     meta = dict(front.get(ticket_mod.APPROVAL_KEY) or {})
     meta["revised_at"] = stamp
     if feedback_planned:
@@ -1311,6 +1333,19 @@ def revise_copy(
     front[ticket_mod.APPROVAL_KEY] = meta
     current.raw = front
     return _write(copy_path(approved_dir, current.ticket), ticket_mod.render(current))
+
+
+def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dict:
+    """改版で書く frontmatter。承認済みチケットの frontmatter の計画だけを差し替えた写し。
+
+    `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
+    中身と書く中身がずれない。
+    """
+    front = dict(current.raw)
+    front["plan"] = [item.as_raw() for item in revised.plan]
+    if revised.feedback is not None:
+        front["feedback"] = [item.as_raw() for item in revised.feedback]
+    return front
 
 
 def _scope_signature(t: ticket_mod.Ticket) -> tuple:

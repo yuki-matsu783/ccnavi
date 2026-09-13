@@ -194,7 +194,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--preview", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
-    # 見せた承認画面の本文の指紋（preview の `digest`）。`--yes` と一緒に渡す。
+    # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
+    # `--yes` と一緒に渡す。
     parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
