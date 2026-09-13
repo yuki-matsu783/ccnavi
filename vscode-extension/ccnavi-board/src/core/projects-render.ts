@@ -33,7 +33,7 @@ ${STYLE}
     <span class="path" title="${escapeHtml(page.projectsDir)}">置き場: ${escapeHtml(page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`)}</span>
   </div>
   <div class="controls">
-    <button type="button" class="action" data-action="open-rules" data-name="" title="ワークスペースのルール（.claude/ccnavi/rules.yml）を編集します">ルール管理</button>
+    <button type="button" class="action" data-action="open-rules" data-name="" title="共通層のルール（どのツリーにも効く。既定 .claude/ccnavi/rules.yml）を編集します">ルール管理</button>
 ${page.ticketsEnabled ? '    <button type="button" class="action" data-action="open-board" data-name="*">チケット管理</button>\n' : ""}    <button type="button" class="action" data-action="refresh">更新</button>
   </div>
 </header>
@@ -53,7 +53,7 @@ ${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだあり
 ${renderStrays(page.strays)}<section class="workspace">
   <h2>ワークスペース本体</h2>
   <p class="hint"><span class="mono">${escapeHtml(page.root)}</span>（作業ツリー ${page.workspaceWorktrees.length} 件${page.workspaceWorktrees.length > 0 ? `: ${escapeHtml(page.workspaceWorktrees.join(", "))}` : ""}）</p>
-</section>
+${renderSelfRules(page)}</section>
 <footer class="foot">最終更新 ${escapeHtml(page.generatedAt)}（${escapeHtml(page.root)}）</footer>
 <script nonce="${nonce}">
 ${SCRIPT}
@@ -97,10 +97,35 @@ function renderList(page: ProjectsPage): string {
   return `  <ul class="projects">\n${items}\n  </ul>`;
 }
 
+/** ワークスペース自身の層のルール。無いのは正常なので warn の色は使わない */
+function renderSelfRules(page: ProjectsPage): string {
+  if (page.selfRulesRel === "") {
+    return "";
+  }
+  const rel = `<span class="mono small">${escapeHtml(page.selfRulesRel)}</span>`;
+  const state = page.selfRulesExists
+    ? `<span class="ok">あり</span> ${rel}`
+    : `<span class="dim">なし</span> ${rel} <button type="button" class="action small" data-action="create-self-rules" title="共通層の rules.yml を自身の層にコピーします。文面の sh のパスは {root} 付きに置き換えます">共通層からコピー</button>`;
+  return `  <div class="self-rules"><span>自身の層のルール</span> ${state} <button type="button" class="action small" data-action="open-self-rules" ${page.selfRulesExists ? "" : "disabled "}title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足して当たるルールを編集し、判定を試します">ルール管理</button></div>
+`;
+}
+
+function renderRules(row: ProjectRow): string {
+  const current =
+    row.rulesRel === ""
+      ? '<span class="dim">層として数えられていません（検証の error を見てください）</span>'
+      : row.rulesExists
+        ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
+        : `<span class="warn-text">なし</span> <span class="mono small dim">${escapeHtml(row.rulesRel)}</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="共通層の rules.yml をこのプロジェクトの層にコピーします。文面の sh のパスは {root} 付きに置き換えます">共通層からコピー</button>`;
+  if (!row.oldRulesExists) {
+    return current;
+  }
+  const to = row.rulesRel === "" ? "層の置き場" : `<span class="mono">${escapeHtml(row.rulesRel)}</span>`;
+  return `${current}<div class="warn-text small">旧の置き場 <span class="mono">${escapeHtml(row.oldRulesRel)}</span> は判定に読まれていません。中身を ${to} へ移し、旧のファイルを消してください</div>`;
+}
+
 function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
-  const rules = row.rulesExists
-    ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
-    : `<span class="warn-text">なし</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="ワークスペースの rules.yml をこのプロジェクトにコピーします。文面の sh のパスは {root} 付きに置き換えます">ワークスペースからコピー</button>`;
+  const rules = renderRules(row);
   const worktrees = row.worktrees.length === 0 ? '<span class="dim">なし</span>' : `${row.worktrees.length} 件 <span class="small dim">${escapeHtml(row.worktrees.join(", "))}</span>`;
   const tickets = ticketsEnabled
     ? `\n          <div class="field"><dt>チケット</dt><dd>${row.tickets} 件${row.doing > 0 ? `<span class="dim">、作業中 ${row.doing} 件</span>` : ""}</dd></div>`
@@ -131,7 +156,7 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
           <div class="field wide"><dt>検証</dt><dd>${lint}</dd></div>
       </dl>
       <div class="ops">
-          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの config/rules.yml を編集し、判定を試します">ルール管理</button>${board}
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試します">ルール管理</button>${board}
           <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルで実行します">fetch</button>
           <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルで実行します。衝突があれば git が止めます">pull</button>
       </div>
@@ -231,6 +256,7 @@ ${BUTTON_STYLE}
   .lint li { overflow-wrap: anywhere; }
   .lint li.warn { color: var(--vscode-editorWarning-foreground); }
   .lint li.error { color: var(--vscode-editorError-foreground); }
+  .self-rules { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; overflow-wrap: anywhere; }
   .stray-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
   .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }`;
 
@@ -269,6 +295,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "fix-ignore") { vscode.postMessage({ type: "fixIgnore" }); }
       else if (action === "create-rules") { vscode.postMessage({ type: "createRules", name: target }); }
       else if (action === "open-rules") { vscode.postMessage({ type: "openRules", name: target }); }
+      else if (action === "create-self-rules") { vscode.postMessage({ type: "createSelfRules" }); }
+      else if (action === "open-self-rules") { vscode.postMessage({ type: "openSelfRules" }); }
       else if (action === "open-board") { vscode.postMessage({ type: "openBoard", name: target }); }
       else if (action === "fetch") { vscode.postMessage({ type: "fetch", name: target }); }
       else if (action === "pull") { vscode.postMessage({ type: "pull", name: target }); }
