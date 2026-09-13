@@ -2,17 +2,21 @@
 
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
-`projects/` の直下に clone した別のリポジトリで、それぞれ `config/rules.yml` を持つ。
+`projects/` の直下に clone した別のリポジトリで、それぞれ層の 3 本の置き場
+（`.ccnavi/config/`、設計 §25.2）に rules.yml を持つ。
 
 見るのは 5 つ。
 
-1. パスを持つツールは行き先のプロジェクトのルールで判定される。ワークスペースへの
-   書き込みはワークスペースのルール
-2. Bash はワークスペースと全プロジェクトのルールの和で判定され、cwd がどこでも同じ
-3. 読めないプロジェクトのルールは、書き込みなら組み込みの既定、Bash なら和から外れる
+1. パスを持つツールは共通層 + 行き先のプロジェクトの層で判定される。ワークスペースへの
+   書き込みは共通層 + 自身の層
+2. Bash は共通層と全部の層の和で判定され、cwd がどこでも同じ
+3. 読めない層は空として扱われ、記録が層の名前を残す。組み込みの既定へは落ちない
 4. プロジェクトから切った作業ツリーが認識され、切り元とチケットの `project:` が
    食い違えば止まる
 5. `projects/` を数えない設定では、この機能が入る前と同じに動く
+
+層の和そのもの（重複の排除、同 id、`--explain`）は tests/test_config_union.py が見る。
+ここが見るのは、置き場とツリーの結び付きが今までどおり噛み合っていること。
 """
 
 from __future__ import annotations
@@ -101,6 +105,15 @@ def write(path, text):
     return path
 
 
+# 層の 3 本の置き場（`CCNAVI_PROJECT_HOME` の既定）。
+LAYER = os.path.join(".ccnavi", "config")
+
+
+def layer_rules(root):
+    """その git プロジェクトルートの層のルールファイル。"""
+    return os.path.join(root, LAYER, "rules.yml")
+
+
 def ticket_text(name, *, project="", allow=()):
     lines = ["---", "version: 1", f"ticket: {name}"]
     if project:
@@ -110,6 +123,26 @@ def ticket_text(name, *, project="", allow=()):
         "  required: false",
         "  reason: テスト",
         "title: 作業",
+        "rationale: |",
+        "  理由",
+    ]
+    if allow:
+        lines.append("allow:")
+        for g in allow:
+            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
+    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
+    return "\n".join(lines) + "\n"
+
+
+def child_text(name, parent, *, project="", allow=()):
+    lines = ["---", "version: 1", f"ticket: {name}", f"parent: {parent}", "phase: 1"]
+    if project:
+        lines.append(f"project: {project}")
+    lines += [
+        "human_review:",
+        "  required: false",
+        "  reason: テスト",
+        f"title: 子 {name}",
         "rationale: |",
         "  理由",
     ]
@@ -146,7 +179,7 @@ class ProjectsTest(unittest.TestCase):
         root = os.path.join(self.projects, name)
         os.makedirs(root)
         git(root, "init", "--quiet", "-b", "main")
-        write(os.path.join(root, "config", "rules.yml"), json.dumps(rules))
+        write(layer_rules(root), json.dumps(rules))
         write(os.path.join(root, "src", "keep.py"), "print(1)\n")
         write(os.path.join(root, "schema", "keep.sql"), "-- keep\n")
         git(root, "add", "-A")
@@ -275,21 +308,32 @@ class ProjectsTest(unittest.TestCase):
 
     # ---- 3. 読めないプロジェクトのルール
 
-    def test_unreadable_project_rules_fall_back_for_writes_and_drop_out_of_the_union(self):
-        write(os.path.join(self.app, "config", "rules.yml"), "version: 3\ndeny: [\n")
+    def test_unreadable_project_rules_are_empty_and_drop_out_of_the_union(self):
+        """壊れた層は空として扱い、記録が層の名前を残す（設計 §25.2、REQ-MLT-06）。
+
+        組み込みの既定へは落ちない。共通層が有るのに落とすと、共通層の deny が
+        消える側に倒れる。
+        """
+        write(layer_rules(self.app), "version: 3\ndeny: [\n")
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         record = self.last_record()
-        self.assertTrue(record.get("fallback"), record)
+        self.assertEqual(record.get("fallback"), "app", record)
         self.assertIn("app", record["detail"])
-        self.assertIn("built-in defaults", self.reason(passed))
+        self.assertNotIn("built-in defaults", self.reason(passed))
+
+        # 共通層の deny は壊れた層の上でも効いたまま。
+        guarded = os.path.join(self.app, ".claude", "ccnavi", "x")
+        denied = self.hook("Write", self.ws, file_path=guarded)
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("guard-approved", self.reason(denied))
 
         denied = self.hook("Bash", self.app, command="psql")
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("lib:raw-psql", self.reason(denied))
         record = self.last_record()
-        self.assertNotIn("fallback", record)
-        self.assertIn("unreadable project rules: app", record["detail"])
+        self.assertEqual(record.get("fallback"), "app", record)
+        self.assertIn("unreadable layer: app", record["detail"])
 
     # ---- 4. プロジェクトから切った作業ツリー
 
@@ -303,12 +347,14 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
 
     def test_worktree_cut_from_the_wrong_project_is_refused_by_the_ticket(self):
+        # プロジェクトの提案はワークスペースの wip/<名前>/tickets/ に置く（設計 §25.5）。
+        # 置き場がプロジェクトを決めるので、frontmatter の project は書かなくてよい。
         write(
-            os.path.join(self.ws, "wip", "tickets", "todo", "i0007.md"),
-            ticket_text("i0007", project="lib", allow=("src/*",)),
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
         )
         write(
-            os.path.join(self.ws, "wip", "tickets", "todo", "i0008.md"),
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0008.md"),
             ticket_text("i0008", project="lib", allow=("src/*",)),
         )
         approved = self.ccnavi("--approve", stdin="y\n")
@@ -328,6 +374,112 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("DENY", self.reason(allowed))
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    # ---- 4b. プロジェクトを決めるのは提案を置いた場所（設計 §25.5）
+
+    def test_the_place_decides_the_project_for_parent_and_child_alike(self):
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007-01.md"),
+            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+        )
+        # 承認の前から、親も子も同じプロジェクトとしてボードに出る
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        found = {t["ticket"]: t["project"] for t in board["tickets"]}
+        self.assertEqual(found, {"i0007": "lib", "i0007-01": "lib"})
+        self.assertEqual(board["pending_approval"], ["i0007", "i0007-01"])
+
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        # 承認の画面は、書き込みが向かうリポジトリを人に見せる（REQ-MLT-11）
+        self.assertIn("■ プロジェクト: lib", approved.stdout)
+        # 継ぐ段は無いが、承認済みチケットには残る
+        # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
+        for name in ("i0007", "i0007-01"):
+            with open(os.path.join(self.approved, name + ".md"), encoding="utf-8") as f:
+                self.assertIn("project: lib", f.read())
+
+    def test_a_declaration_that_disagrees_with_the_place_is_not_approved(self):
+        write(
+            os.path.join(self.ws, "wip", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", project="lib", allow=("src/*",)),
+        )
+        result = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("置き場（ワークスペース）と違う", result.stderr)
+        self.assertIn("wip/lib/tickets/ に置く", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007.md")))
+
+    def test_a_child_placed_apart_from_its_parent_is_not_approved(self):
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        write(
+            os.path.join(self.ws, "wip", "app", "tickets", "todo", "i0007-01.md"),
+            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+        )
+        result = self.ccnavi("--approve", stdin="y\n")
+        # 束の一部（子）が落ちたので、通ったぶん（親）を置いてから 1 で終わる（REQ-MLT-31）。
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("子は親と同じ置き場に置く", result.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0007.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007-01.md")))
+
+    def test_a_proposal_inside_a_project_worktree_is_read_but_named(self):
+        # プロジェクトのリポジトリの中に提案は置かない（REQ-MLT-14）。読むのはやめないが言う。
+        # 置き場は作業ツリーの切り元で決まり、承認済みチケットは記録した道から引くので閉じられる。
+        tree = self.worktree(self.lib, "i0010")
+        write(
+            os.path.join(tree, "wip", "tickets", "todo", "i0010.md"),
+            ticket_text("i0010", allow=("src/*",)),
+        )
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertIn("作業ツリー i0010（lib から切った）の中に提案がある", approved.stderr)
+        self.assertIn("■ プロジェクト: lib", approved.stdout)
+
+        os.makedirs(os.path.join(tree, "wip", "tickets", "done"))
+        os.replace(
+            os.path.join(tree, "wip", "tickets", "todo", "i0010.md"),
+            os.path.join(tree, "wip", "tickets", "done", "i0010.md"),
+        )
+        after = self.hook("Bash", self.ws, event="PostToolUse", command="true")
+        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0010.md")))
+
+    def test_lint_names_a_ticket_place_that_is_not_scanned(self):
+        write(
+            os.path.join(self.ws, "wip", "gone", "tickets", "todo", "i0009.md"),
+            ticket_text("i0009", allow=("src/*",)),
+        )
+        result = self.ccnavi("--lint")
+        out = result.stdout + result.stderr
+        self.assertIn("wip/gone/tickets", out)
+        self.assertIn("走査されていない", out)
+        # 置き場が走査されないので、提案はどこにも出ない
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        self.assertEqual(board["tickets"], [])
+
+    def test_the_copys_proposal_is_found_through_the_recorded_path(self):
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            ticket_text("i0007", allow=("src/*",)),
+        )
+        self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
+        # 提案を done/ へ動かすと、承認済みチケットが閉じる。置き場を project から組み直すのではなく
+        # 承認のときに記録した道から引くので、どの置き場でも見つかる
+        os.makedirs(os.path.join(self.ws, "wip", "lib", "tickets", "done"))
+        os.replace(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0007.md"),
+            os.path.join(self.ws, "wip", "lib", "tickets", "done", "i0007.md"),
+        )
+        after = self.hook("Bash", self.ws, event="PostToolUse", command="true")
+        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0007.md")))
 
     # ---- 5. 実行後の監視はツリーごと
 
@@ -362,7 +514,7 @@ class ProjectsTest(unittest.TestCase):
     # ---- 6. --lint がプロジェクトの配線を言う
 
     def test_lint_names_project_wiring_problems(self):
-        write(os.path.join(self.app, "config", "rules.yml"), "version: 3\ndeny: [\n")
+        write(layer_rules(self.app), "version: 3\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
         git(self.ws, "add", "-A")
@@ -375,8 +527,10 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("(projects/lib)", out)
         self.assertIn(".claude/ を持つ", out)
 
+        # `--explain` は層ごとに並べる（設計 §25.9）。読めない層はその位置で言う。
         explained = self.ccnavi("--explain")
-        self.assertIn("■ プロジェクト（2 件", explained.stdout)
+        self.assertIn("■ rules app", explained.stdout)
+        self.assertIn("■ rules lib", explained.stdout)
         self.assertIn("読めない", explained.stdout)
 
     # ---- 7. projects/ を数えない設定では前と同じ

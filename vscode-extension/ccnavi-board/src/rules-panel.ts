@@ -2,11 +2,13 @@
  * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象はワークスペースのルール（`.claude/ccnavi/rules.yml`）か、プロジェクト 1 つのルール
- * （`projects/<名前>/config/rules.yml`、設計 §25.4）。対象ごとに 1 パネルで、並べて開ける。
+ * 対象は 3 種（設計 §11.2）。ワークスペースのルール（共通層、`.claude/ccnavi/rules.yml`）、
+ * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
+ * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。対象ごとに 1 パネルで、並べて開ける。
+ * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  *
  * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、ワークスペースなら `--rules`、
- * プロジェクトなら `--project-rules-file <名前>=<パス>` で渡す。保存は、検証（`--lint`）を通り、
+ * 層なら `--project-rules-file <名前>=<パス>`（自身の層は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う。
  */
@@ -19,6 +21,7 @@ import * as vscode from "vscode";
 import { WATCH_PATTERNS } from "./board-panel.js";
 import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
+import { OLD_PROJECT_RULES, projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { escapeHtml } from "./core/render.js";
 import { asSections, readRules, type RuleForm, type RulesDocument, type Section } from "./core/rules-doc.js";
@@ -26,14 +29,15 @@ import { renderRulesPage } from "./core/rules-render.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".claude/ccnavi/rules.yml";
-const DEFAULT_PROJECTS = "projects";
-const DEFAULT_PROJECT_RULES = "config/rules.yml";
 const DEFAULT_SAMPLES = ".claude/ccnavi/rule-samples.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
-/** 画面が直すルールファイル。ワークスペースのものか、プロジェクト 1 つのもの */
-export type RulesTarget = { readonly kind: "workspace" } | { readonly kind: "project"; readonly name: string };
+/** 画面が直すルールファイル。ワークスペースのもの（共通層）、自身の層、プロジェクト 1 つの層 */
+export type RulesTarget =
+  | { readonly kind: "workspace" }
+  | { readonly kind: "self" }
+  | { readonly kind: "project"; readonly name: string };
 
 type Sections = Readonly<Record<Section, readonly RuleForm[]>>;
 
@@ -53,8 +57,10 @@ interface Loaded {
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
-  /** ワークスペースルートからの相対で見せる綴り。プロジェクトなら `projects/<名前>/config/rules.yml` */
+  /** ワークスペースルートからの相対で見せる綴り。プロジェクトなら `projects/<名前>/.ccnavi/config/rules.yml` */
   readonly rulesRel: string;
+  /** 上部に出す注意。旧の置き場が残っている、実行ファイルがこの層を読めていない */
+  readonly notices: readonly string[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly mode: string;
@@ -75,15 +81,36 @@ interface PanelState {
   wroteAt: number;
 }
 
-/** 対象ごとのパネル。鍵はワークスペースが空、プロジェクトはその名前 */
+/** 対象ごとのパネル。鍵はワークスペースが空、自身の層が `self`、プロジェクトは `project/<名前>` */
 const panels = new Map<string, PanelState>();
+/** 開いている途中の鍵。層の置き場を実行ファイルに聞く間に、同じ対象をもう 1 枚開かない */
+const opening = new Set<string>();
 
 function keyOf(target: RulesTarget): string {
-  return target.kind === "workspace" ? "" : target.name;
+  switch (target.kind) {
+    case "workspace":
+      return "";
+    case "self":
+      return "self";
+    case "project":
+      return `project/${target.name}`;
+  }
 }
 
+/** 保存を止めるチケットを絞るプロジェクト。共通層と自身の層は絞らない（どちらも全ツリーの Bash に効く） */
 function projectOf(target: RulesTarget): string | undefined {
-  return target.kind === "workspace" ? undefined : target.name;
+  return target.kind === "project" ? target.name : undefined;
+}
+
+function titleOf(target: RulesTarget): string {
+  switch (target.kind) {
+    case "workspace":
+      return "ccnavi ルール設定";
+    case "self":
+      return "ccnavi ルール設定: 自身の層";
+    case "project":
+      return `ccnavi ルール設定: ${target.name}`;
+  }
 }
 
 function binSetting(): string {
@@ -107,18 +134,23 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     existing.panel.reveal(existing.panel.viewColumn);
     return;
   }
-
-  const root = folder.uri.fsPath;
-  let loaded: Loaded;
-  try {
-    loaded = readPage(root, target);
-  } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${(error as Error).message}`);
+  if (opening.has(key)) {
     return;
   }
 
-  const title = target.kind === "workspace" ? "ccnavi ルール設定" : `ccnavi ルール設定: ${target.name}`;
-  const panel = vscode.window.createWebviewPanel("ccnaviRules", title, vscode.ViewColumn.One, {
+  const root = folder.uri.fsPath;
+  let loaded: Loaded;
+  opening.add(key);
+  try {
+    loaded = await readPage(root, target);
+  } catch (error) {
+    vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${(error as Error).message}`);
+    return;
+  } finally {
+    opening.delete(key);
+  }
+
+  const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
@@ -141,22 +173,43 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
   void refreshLock(current);
 }
 
-function readPage(root: string, target: RulesTarget): Loaded {
+async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   const settingsText = readText(path.join(root, ".claude", "settings.json"));
   const localText = readText(path.join(root, ".claude", "settings.local.json"));
   const env = (name: string) => (settingsText !== undefined && envFromSettingsJson(settingsText, name)) || "";
   let rulesPath: string;
   let rulesRel: string;
+  const notices: string[] = [];
   if (target.kind === "workspace") {
     rulesRel = env("CCNAVI_RULES") || DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
-    // プロジェクトのルールは git プロジェクトルートからの相対（既定 config/rules.yml）。
-    // 作業ツリーの中の版は読まない（設計 §25.4）。置き場は CCNAVI_PROJECTS、既定 projects/。
-    const projectsDir = resolveIn(root, env("CCNAVI_PROJECTS") || DEFAULT_PROJECTS);
-    const projectRules = env("CCNAVI_PROJECT_RULES") || DEFAULT_PROJECT_RULES;
-    rulesPath = path.join(projectsDir, target.name, ...projectRules.split("/"));
+    // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
+    // ずれたときに、この画面で保存したルールが判定に効かなくなる。答えは git プロジェクトルートの版で、
+    // 作業ツリーの中の版は指さない（設計 §11.2）。
+    const board = await loadBoard(root, binSetting());
+    if (!board.ok) {
+      throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);
+    }
+    const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
+    if (layer === undefined || layer.rules.path === "") {
+      throw new Error(
+        target.kind === "self"
+          ? "実行ファイルが自身の層を出していない（層に対応していない古い版）"
+          : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
+      );
+    }
+    rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
+    if (layer.rules.unreadable !== "") {
+      notices.push(`実行ファイルはこのファイルを読めず、層を空として扱っている（ここのルールは 1 件も効いていない）: ${layer.rules.unreadable}`);
+    }
+    const tree = target.kind === "project" ? board.board.trees.find((t) => t.kind === "project" && t.name === target.name) : undefined;
+    const old = tree === undefined ? undefined : path.join(tree.root, ...OLD_PROJECT_RULES.split("/"));
+    if (old !== undefined && fs.existsSync(old)) {
+      const oldRel = path.relative(root, old).split(path.sep).join("/");
+      notices.push(`旧の置き場 ${oldRel} が残っている。判定はそこを読まない。中身をこのファイル（${rulesRel}）へ移し、旧のファイルを消す`);
+    }
   }
   let text: string;
   let mtimeMs: number;
@@ -164,7 +217,8 @@ function readPage(root: string, target: RulesTarget): Loaded {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
-    throw new Error(`ルールファイルを読めない（${rulesRel}）: ${(error as Error).message}`);
+    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通層からコピー」で作る";
+    throw new Error(`ルールファイルを読めない（${rulesRel}）: ${(error as Error).message}${hint}`);
   }
   const hooks = [
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
@@ -177,6 +231,7 @@ function readPage(root: string, target: RulesTarget): Loaded {
     doc: readRules(text),
     rulesPath,
     rulesRel,
+    notices,
     hooks,
     hookFiles: { settings: settingsText !== undefined, settingsLocal: localText !== undefined },
     mode: env("CCNAVI_MODE"),
@@ -283,7 +338,7 @@ function scheduleLock(current: PanelState): void {
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * ワークスペースのルールはどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
+ * ワークスペースのルールと自身の層はどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
@@ -310,18 +365,26 @@ function show(current: PanelState): void {
       hookFiles: loaded.hookFiles,
       samplesPath: loaded.samplesRel,
       lock: current.lock,
+      notices: loaded.notices,
     },
     { nonce: crypto.randomBytes(16).toString("base64") },
   );
 }
 
-function reload(current: PanelState): void {
+async function reload(current: PanelState): Promise<void> {
+  let loaded: Loaded;
   try {
-    current.loaded = readPage(current.folder.uri.fsPath, current.target);
+    loaded = await readPage(current.folder.uri.fsPath, current.target);
   } catch (error) {
-    current.panel.webview.html = renderError((error as Error).message);
+    if (alive(current)) {
+      current.panel.webview.html = renderError((error as Error).message);
+    }
     return;
   }
+  if (!alive(current)) {
+    return;
+  }
+  current.loaded = loaded;
   show(current);
   void refreshLock(current);
 }
@@ -346,7 +409,14 @@ function stage(current: PanelState, sections: Sections): RulesOverride {
 }
 
 function overrideFor(target: RulesTarget, tmp: string): RulesOverride {
-  return target.kind === "workspace" ? { kind: "workspace", path: tmp } : { kind: "project", name: target.name, path: tmp };
+  switch (target.kind) {
+    case "workspace":
+      return { kind: "workspace", path: tmp };
+    case "self":
+      return { kind: "self", path: tmp };
+    case "project":
+      return { kind: "project", name: target.name, path: tmp };
+  }
 }
 
 async function handleMessage(current: PanelState, message: Message | undefined): Promise<void> {
@@ -366,7 +436,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
           return;
         }
       }
-      reload(current);
+      await reload(current);
       return;
     }
     case "openFile": {
@@ -515,7 +585,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     fail(current, `ルールファイルに書けない: ${(error as Error).message}`);
     return;
   }
-  reload(current);
+  await reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
   vscode.window.showInformationMessage(`${loaded.rulesRel} に保存した（${tail}）`);
 }

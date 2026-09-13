@@ -8,35 +8,57 @@
 壊れて組み込みの既定に落ちた形も、どちらも保護領域は 0 件になり、監視は何も
 検知しない。守りの根拠が、守られる対象の中に置いてあることが原因になる。
 
-だからこの 3 つだけは、ルールファイルの外に、組み込みで持つ。
+だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 §25.6）。
 
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
-    CCNAVI_RULES が指すファイル          判定の中身そのもの
+    共通層の 3 本                       CCNAVI_RULES / CCNAVI_PHASES / CCNAVI_RISK
+    自身の層の 3 本                     <root>/.ccnavi/config/{rules,phases,risk}.yml
+    プロジェクトの層の 3 本             projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml
+
+守る場所は層の数だけ増えるが、守る対象の種類は「設定 3 本」の 1 種のまま。
+rules.yml は何を止めるかを、phases.yml はレビューが要るかを、risk.yml は点が
+幾つかを決める。3 本とも判定の中身そのもので、ここが書けると、エージェントが
+自分のルールとレビューの要否とリスクの配点を緩められ、次の呼び出しから効く。
+ファイル単位で見るので、無いものは対象から外れる（REQ-SLF-03）。
 
 数を増やさない。ここに足したものは、プロジェクトが宣言を書かなくても、
 そして宣言を消しても守られる。それは強い扱いなので、ccnavi が動くこと自体が
 懸かっているものに限る。それ以外は `deny` に書いて、ルール由来の保護
 （`CCNAVI_RESTORE_IF_DENY`）に任せる。切りたいプロジェクトが切れる側に置く。
 
-## 作業ツリーの中の写しも同じ扱い
+## `.ccnavi/scripts/` はコアに入れない
 
-この 3 つは追跡されているので、`.claude/worktrees/<名前>/` の中にも複製が入る。
-写しは今この瞬間には誰にも読まれない。hook の登録を読むのはセッションを起こした
-ワークスペースルートの側で、判定のルートも `CLAUDE_PROJECT_DIR` に留まるから、作業ツリーの
-中の `settings.json` を書き換えても、その場では何も変わらない。
+層の傘の下には、配点が呼ぶスクリプトも入る。そちらはコアにしない。スクリプトは
+risk.yml から `script:` で参照されて初めて効き、参照が無ければ何もしない。その
+risk.yml がここで守られているので、新しい参照を足すことはできない。残る道は
+「既に参照されているスクリプトの中身を書き換える」だけで、そこは組み込みの deny
+（`*/.ccnavi/*`、add_rules）とルール由来の保護に任せる。止まり、抜けても戻る。
 
-それでも守るのは、写しが main へ入る道を持っているから。作業ツリーで書き換えて
+コアの控えと復元まで持たせない理由はもう 1 つある。傘の下のファイル数は定まらない。
+呼び出しのたびに全部を読んで比べることになり、実行前の判定に張った期限に効く。
+数が定まっているのは設定 3 本のほうで、そこがコアとコアでないものの境になる。
+
+## 作業ツリー側の設定も同じ扱い
+
+上のファイルは追跡されているので、`.claude/worktrees/<名前>/` の中にも同じものが入る。
+この作業ツリー側の設定は、今この瞬間には誰にも読まれない。hook の登録を読むのはセッションを
+起こしたワークスペースルートの側で、判定が読む層も git プロジェクトルートに checkout されている版
+（REQ-MLT-04）だから、作業ツリーの中の `settings.json` や `.ccnavi/config/rules.yml` を
+書き換えても、その場では何も変わらない。
+
+それでも守るのは、作業ツリー側の設定が main へ入る道を持っているから。作業ツリーで書き換えて
 ブランチを統合すれば、そのまま main の hook の登録とルールになる。実行前の `deny` は
 「今の 1 回」を止めるが、統合は別の日の別のセッションが行うので、そこには届かない。
 しかも main の側と違って、作業ツリーは `.gitignore` の中にあり、実行後の監視が読む
 git の変更一覧にも出てこない。止める側も気づく側も無いまま、時間差で効く道になる。
 
-守る場所は増えるが、守る対象の種類は増えていない。上の 3 つが、それぞれの
-作業ツリーにもう 1 つずつ在るというだけ。プロジェクトごとのルールファイルも
-同じで、root の下に在れば同じ道を持つ。
+守る場所は増えるが、守る対象の種類は増えていない。上の一式が、それぞれの
+作業ツリーにもう 1 つずつ在るというだけ。作業ツリー側の設定を探す先は切り元で決まる。
+プロジェクトから切った作業ツリーには、そのプロジェクトが追跡しているファイル
+だけが入り、綴りは切り元の git プロジェクトルートからの相対になる。
 
-実行ファイルだけは写しを持たない。置き場が `.gitignore` の中にあり、統合で
+実行ファイルだけは作業ツリー側に持たない。置き場が `.gitignore` の中にあり、統合で
 main へ入る道が無い。
 
 ## なぜ控えを実行前に取るか
@@ -100,7 +122,7 @@ import time
 from dataclasses import dataclass
 from typing import TextIO
 
-from . import fsio, gitstate, rules, tree
+from . import fsio, gitstate, rules, settings, tree
 from .modes import DISABLE, DRY_RUN, ENABLE
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
@@ -108,7 +130,7 @@ SETTINGS = (ENABLE, DRY_RUN, DISABLE)
 # 戻す働きを持たない門の値。dry-run が無い。
 #
 # 「止めずに報告する」は、止めたあとに何が起きたかを見せられる働き――deny の場所を
-# 戻す、中核ファイルを控えから戻す――があって初めて意味を持つ。チケットの承認の経路は
+# 戻す、コアファイルを控えから戻す――があって初めて意味を持つ。チケットの承認の経路は
 # その形を持たない。通せば承認が済んでしまい、済んだものは報告では戻らない。
 # 半分開けた状態を作れないので、書ける値を 2 つに絞る。
 GATE_SETTINGS = (ENABLE, DISABLE)
@@ -180,8 +202,41 @@ _WRITE_VERBS = (
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
-_PLACES = (r"\.claude[\\/]((ccnavi|hooks|scripts)[\\/]|settings[\w.-]*\.json)", r"ccnavi-git\.sh")
-_COPY_PLACES = (r"\.claude[\\/](ccnavi|hooks|scripts|settings)", r"ccnavi-git\.sh")
+#
+# 名前がそこで終わる形。空白とコマンドの切れ目（`\x00`）を語の終わりとして数える。
+# `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
+# `mv .ccnavi .ccnavi.bak` も、傘ごと消す・退かす形なので、下のファイルを 1 本ずつ
+# 書き換えるのと同じだけ守りが消える（敵対的レビュー A-3）。
+_TERM = r"(?:[ \x00]|$)"
+# 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
+# 当たり、`.ccnavixyz` のような別名には当たらない。
+_END = r"(?:[\\/ \x00]|$)"
+# 元と行き先がある cp / ln / install のための終わり。空白とコマンドの切れ目を
+# 数えない。あちらは行き先（最後の引数）だけを見る形で、後ろに `[^ \x00]*($|\x00)`
+# が続く。空白を数えると `cp .ccnavi /tmp/x` のように傘から外へ写すだけの読みが
+# 止まり、`\x00` を数えるとその切れ目を先に食ってしまって後ろの当てが外れる。
+_COPY_TERM = r"$"
+_COPY_END = r"(?:[\\/]|$)"
+
+# `.ccnavi/` は層の傘（設計 §25.2）。その下には各層の設定 3 本と、配点が呼ぶ
+# スクリプトが入る。どちらも判定の中身そのものなので、傘ごと止める。既定の綴りを
+# ここに書いておくのは、傘の名前を動かしていないワークスペースが、設定の受け渡しに
+# 依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
+#
+# `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
+# だから傘と違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
+# `.claude/` に続く綴り全部が入り、作業ツリーの片付けまで止まる。
+_PLACES = (
+    r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
+    r"\.ccnavi" + _END,
+    r"ccnavi-git\.sh",
+)
+_COPY_PLACES = (
+    r"\.claude(?:[\\/](ccnavi|hooks|scripts|settings)|" + _COPY_TERM + r")",
+    # 行き先が傘そのもの（`cp /tmp/x .ccnavi`）でも止める。
+    r"\.ccnavi" + _COPY_END,
+    r"ccnavi-git\.sh",
+)
 
 
 def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
@@ -192,7 +247,8 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
     ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
     `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
 
-    extra_clause はプロジェクトのルールファイルの綴り（project_rules_clause）。
+    extra_clause は層の傘の綴り（project_home_clause）。既定の名前は _PLACES に
+    書いてあるので、ここで足すのは傘を動かしてある場合の綴りになる。層の設定は
     行き先の判定に使うので、書けるとエージェントが自分のルールを緩められる。
     """
     places = [*_PLACES]
@@ -201,25 +257,51 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
         if clause:
             places.append(clause)
             copy_places.append(clause)
-    where = "(" + "|".join(places) + ")"
-    copy_where = "(" + "|".join(copy_places) + ")"
+    where = _folded("(" + "|".join(places) + ")")
+    copy_where = _folded("(" + "|".join(copy_places) + ")")
     return rf"{_WRITE_VERBS}{where}|{_COPY_VERBS}{copy_where}[^ \x00]*($|\x00)"
 
 
-def project_rules_clause(projects_dir: str, project_rules: str) -> str:
-    """プロジェクトのルールファイルの綴りを、当てる形に直す（設計 §25.6）。
+def _folded(clause: str) -> str:
+    """場所の綴りを、その機械がパスを見るのと同じ見方にする。
 
-    置き場の名前と、 git プロジェクトルートからの相対を、間に任意の 1 語（プロジェクトの
-    名前）を挟んで繋ぐ。`projects/<名前>/config/rules.yml` の形。区切りはどちらの
-    綴りにも当てる。
+    大文字小文字を区別しない機械では `.Ccnavi/scripts/count.sh` は
+    `.ccnavi/scripts/count.sh` そのもので、消せば本物が消える。区別する側に
+    立つと、綴りを 1 文字変えるだけで傘の中が書けた（敵対的レビュー A-2 / A-6）。
+    畳むのは場所の綴りだけ。コマンドの名前（`rm` / `cp`）は畳まない。そこを決める
+    のは機械のファイルシステムではなくシェルで、`RM` が通る保証は無い。
     """
-    if not projects_dir or not project_rules:
+    return f"(?i:{clause})" if tree.CASE_INSENSITIVE else clause
+
+
+def project_home_clause(project_home: str) -> str:
+    """層の傘の綴りを、シェルの書き込みに当てる形に直す（設計 §25.6）。
+
+    傘の下は丸ごと守る。層の設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
+    既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
+    ある場合の綴り。区切りはどちらの綴りにも当て、名前がそこで終わる形（傘ごと
+    消す・退かす）にも当てる。
+
+    返す 1 本は書き込む側と写す側の両方に足される。写す側だけは既定の名前が
+    `_COPY_END`（空白を数えない）で閉じているので、動かしてある傘のほうが
+    `cp <傘> <外>` まで止める、というぶんだけ広い。広い側が deny なので倒れる向きは
+    安全だが、綴りを揃えるなら足し方を 2 つに分けることになる。
+    """
+    parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
+    if not parts:
         return ""
-    base = os.path.basename(os.path.normpath(projects_dir))
-    parts = [re.escape(p) for p in project_rules.split("/") if p]
-    if not base or not parts:
-        return ""
-    return re.escape(base) + r"[\\/][^\\/ \x00]+[\\/]" + r"[\\/]".join(parts)
+    return r"[\\/]".join(parts) + _END
+
+
+def project_home_glob(project_home: str) -> str:
+    """層の傘の下を、名指しのツールで止める glob。`*/.ccnavi/*` の形。"""
+    home = _home_name(project_home)
+    return f"*/{home}/*" if home else ""
+
+
+def _home_name(project_home: str) -> str:
+    """傘の名前。前後の区切りは落とし、区切りを含む綴りはそのまま 1 つの節にする。"""
+    return (project_home or "").replace("\\", "/").strip("/")
 
 
 def binary_clause(bin_path: str) -> str:
@@ -262,12 +344,13 @@ BINARY_MESSAGE = (
     "伝えて利用者に依頼してください。"
 )
 
-PROJECT_RULES_RULE_ID = "builtin-guard-project-rules"
+PROJECT_HOME_RULE_ID = "builtin-guard-project-home"
 
-PROJECT_RULES_MESSAGE = (
-    "プロジェクトのルールファイルです。このプロジェクトへの書き込みはここで判定される"
-    "ので、エージェントが書き換えると自分のルールを緩められます。変更が要るなら、"
-    "何をなぜ変えたいのかを伝えて利用者に依頼してください。"
+PROJECT_HOME_MESSAGE = (
+    "層の設定の置き場です。ここに入っているルール・フェーズの種類・リスクの配点が"
+    "このツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩め"
+    "られます。変更が要るなら、何をなぜ変えたいのかを伝えて利用者に依頼してください。"
+    "読むだけなら止まりません。"
 )
 
 
@@ -288,11 +371,16 @@ class Target:
     # 判定に張った期限に効く。控えはセッション開始で 1 度だけ取り、
     # 突き合わせは大きさと更新時刻で行う。
     heavy: bool = False
-    # top は、この対象を git から戻すときに渡す作業ツリーのルート。作業ツリーの
-    # 中の写しだけが持つ。空なら root の側から戻す。main の git に
-    # `.claude/worktrees/...` を聞いても、そこは `.gitignore` の中なので
-    # 何も持っていない。写しを持っているのは、その作業ツリー自身の git。
+    # top は、この対象を git から戻すときに渡すルート。空なら root の側から戻す。
+    # 持つのは 2 通り。作業ツリー側の設定と、プロジェクトの層の設定。main の git に
+    # `.claude/worktrees/...` を聞いても、そこは `.gitignore` の中なので何も持っていない。
+    # `projects/...` も同じで、プロジェクトは自分の git を持つ。持っているのは
+    # その作業ツリー自身の git と、そのプロジェクト自身の git。
     top: str = ""
+    # copy は、これが作業ツリー側の設定であること。報告の文面がここで分かれる。
+    # 作業ツリー側の設定は今この瞬間には誰も読まないので、「何も起きていないのに
+    # 戻された」と読まれる。統合で効く道であることを言わないと、同じ手が繰り返される。
+    copy: bool = False
 
 
 @dataclass
@@ -330,19 +418,19 @@ def resolve(
     return ENABLE
 
 
-def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str = "") -> None:
+def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_home: str = "") -> None:
     """ガード自身を守るルールを、判定に足す。
 
     ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
 
     3 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
-    名指しのツールでプロジェクトのルールファイルを書く形。ワークスペースの設定
+    名指しのツールで層の傘（`.ccnavi/`）の下を書く形。ワークスペースの設定
     ファイルを名指しのツールから守るぶんはワークスペースのルールに任せる。
     そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルと
-    プロジェクトのルールは置き場が設定で動くので、ルールファイルに綴りを固定できない。
-    プロジェクトのルールは行き先の判定に使うので、そのプロジェクトのルール自身に
-    任せると、書けた瞬間に緩められる（REQ-MLT-08）。
+    層の傘は置き場が設定で動くので、ルールファイルに綴りを固定できない。
+    層の設定は行き先の判定に使うので、その層のルール自身に任せると、書けた瞬間に
+    緩められる（REQ-MLT-08）。
 
     同じ id が既にあるなら足さない。プロジェクトが自分で書いているなら、
     書いたとおりに効いているほうがよい。組み込みが黙って重ねると、当たった
@@ -353,7 +441,7 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
         {
             "id": SHELL_RULE_ID,
             "match": "Bash",
-            "regex": shell_write_regex(bin_path, project_clause),
+            "regex": shell_write_regex(bin_path, project_home_clause(project_home)),
             "message": SHELL_MESSAGE,
         },
     )
@@ -369,14 +457,18 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_clause: str =
                 "message": BINARY_MESSAGE,
             },
         )
-    if project_clause:
+    home_glob = project_home_glob(project_home)
+    if home_glob:
         _insert(
             rule_set,
             {
-                "id": PROJECT_RULES_RULE_ID,
+                "id": PROJECT_HOME_RULE_ID,
                 "match": "Write|Edit|NotebookEdit",
-                "regex": project_clause + "$",
-                "message": PROJECT_RULES_MESSAGE,
+                # 傘の下は丸ごと。層の設定 3 本だけを名指しすると、配点が呼ぶ
+                # スクリプトが外れる。当てる先は解決済みの絶対パスなので、
+                # どの層の傘（ワークスペース、プロジェクト、作業ツリー）にも同じ 1 本が当たる。
+                "glob": home_glob,
+                "message": PROJECT_HOME_MESSAGE,
             },
         )
 
@@ -396,61 +488,150 @@ def targets(
     root: str,
     rules_path: str,
     bin_path: str = "",
-    project_rules: list[tuple[str, str]] = (),
+    layers: list[settings.LayerFile] = (),
+    projects_dir: str = "",
 ) -> list[Target]:
-    """守る対象を組み立てる。
+    """守る対象を組み立てる（設計 §25.6）。
 
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
-    project_rules は (プロジェクトの名前, そのルールファイル) の並び（REQ-MLT-08）。
+
+    layers は `settings.LayerFile`（層の種別, 名札, kind, そのファイル）の並び
+    （`ruleload.layer_files`）。kind は rules / phases / risk。共通層は phases と
+    risk の 2 本で来る。rules は `rules_path` が運んでいて、両方から並べると同じ
+    ファイルを 2 度守ることになる。
+
+    控えの key は層ごとに分ける。共通層は kind そのまま（`rules` / `phases` /
+    `risk`）、それ以外は `rules:self` / `phases:lib` の形。key はそのまま控えの
+    名前になるので、層が違えば別の断面として残り、取り違えが起きない。
     """
+    places = _places(root, projects_dir, rules_path, layers)
     found = [
-        Target(key=key, path=os.path.realpath(os.path.join(root, rel)), label=rel)
-        for key, rel in _SETTINGS_FILES
+        Target(key=key, path=path, label=_relative(root, path), top=_home_top(root, home))
+        for key, home, path in places
     ]
-    if rules_path:
-        full = os.path.realpath(rules_path)
-        found.append(Target(key="rules", path=full, label=_relative(root, full)))
-    for name, path in project_rules:
-        full = os.path.realpath(path)
-        found.append(Target(key=f"rules:{name}", path=full, label=_relative(root, full)))
     if bin_path:
         full = os.path.realpath(bin_path)
         found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))
-    found.extend(_worktree_copies(root, rules_path, project_rules))
+    found.extend(_worktree_copies(root, projects_dir, places))
     return found
 
 
-def _worktree_copies(
-    root: str, rules_path: str, project_rules: list[tuple[str, str]] = ()
-) -> list[Target]:
-    """作業ツリーの中にある、同じ設定ファイルの写し。
+def _places(
+    root: str,
+    projects_dir: str,
+    rules_path: str,
+    layers: list[settings.LayerFile],
+) -> list[tuple[str, str, str]]:
+    """守る対象の (控えの key, 追跡している git プロジェクトルート, 絶対パス)。
 
-    なぜ守るかは冒頭の「作業ツリーの中の写しも同じ扱い」に書いた。ここでは
+    git プロジェクトルートを一緒に持つのは 2 つの用が在るから。git から戻すときに
+    どの git に聞くか（プロジェクトの層はそのプロジェクト自身の git）と、作業ツリー側の
+    設定をどこからの相対で組むか（切り元の git プロジェクトルートから）。
+
+    同じ key が二度来たら後ろを捨てる。控えの名前が key で決まるので、重なったまま
+    並べると、同じ控えを 2 つの対象が奪い合う。
+    """
+    found = [(key, root, os.path.join(root, rel)) for key, rel in _SETTINGS_FILES]
+    if rules_path:
+        found.append(("rules", root, rules_path))
+    for origin, layer, kind, path in layers:
+        if not path:
+            continue
+        found.append(
+            (
+                _layer_key(origin, layer, kind),
+                _layer_home(root, projects_dir, origin, layer),
+                path,
+            )
+        )
+
+    seen = set()
+    places = []
+    for key, home, path in found:
+        if key in seen:
+            continue
+        seen.add(key)
+        places.append((key, home, os.path.realpath(path)))
+    return places
+
+
+def _layer_key(origin: str, layer: str, kind: str) -> str:
+    """控えの key。共通層は kind そのまま、それ以外は `<kind>:<層>`。
+
+    決めるのは層の種別（`settings.ORIGIN_*`）で、名札の綴りではない。名札で
+    比べると、`projects/common/` の 3 本が共通層と同じ key（`rules` / `phases` /
+    `risk`）になり、`_places` の重複の排除でその層の 3 本が控えと復元の対象から
+    丸ごと落ちる。プロジェクトが名前を 1 つ選ぶだけで守りが外れることになる。
+
+    予約名のプロジェクトは置き場を添える（`rules:projects/self`）。`projects/self/`
+    の 3 本を素の `rules:self` にすると、こんどはワークスペース自身の層と
+    ぶつかって、先に積んだほうだけが残る。名札に予約してある綴りは、名札の側に
+    譲って、プロジェクトの側が名乗り直す。
+    """
+    if origin == settings.ORIGIN_COMMON:
+        return kind
+    if origin == settings.ORIGIN_PROJECT and settings.is_reserved_layer_name(layer):
+        return f"{kind}:{settings.PROJECT_KEY_HOME}{layer}"
+    return f"{kind}:{layer}"
+
+
+def _layer_home(root: str, projects_dir: str, origin: str, layer: str) -> str:
+    """その層の設定を追跡している git プロジェクトルート。
+
+    共通層と自身の層はワークスペースルート、プロジェクトの層はそのプロジェクト。
+    ここも名札では決めない。`projects/common/` の設定はそのプロジェクトの git が
+    追跡しているので、名札で共通層と同じに扱うと、ワークスペースの git に戻し方を
+    聞きに行くことになる。
+
+    名前を引けないものはワークスペースルートに寄せる。そこから切った作業ツリーに
+    作業ツリー側の設定が無ければ対象から落ちるだけで、別の場所を守りに行くことにはならない。
+    """
+    if origin != settings.ORIGIN_PROJECT:
+        return root
+    return tree.project_root(projects_dir, layer) or root
+
+
+def _home_top(root: str, home: str) -> str:
+    """git から戻すときに渡すルート。ワークスペースルートなら空（root の側から戻す）。"""
+    if not home or os.path.realpath(home) == os.path.realpath(root):
+        return ""
+    return home
+
+
+def _worktree_copies(
+    root: str, projects_dir: str, places: list[tuple[str, str, str]]
+) -> list[Target]:
+    """作業ツリー側の設定。root の下と同じ設定ファイルが、作業ツリーの中にもある。
+
+    なぜ守るかは冒頭の「作業ツリー側の設定も同じ扱い」に書いた。ここでは
     対象の組み立て方だけ。
 
     作業ツリーの一覧は `tree.worktrees` から取る。`.claude/worktrees/` の下に
-    在るだけでは作業ツリーと呼ばず、`.git` ファイルと main の登録の相互参照が
+    在るだけでは作業ツリーと呼ばず、`.git` ファイルと切り元の登録の相互参照が
     両向きに揃ったものだけを数える。参照実装の写しのような、ただの
     ディレクトリを守りに行かないため。git は起こさないので、呼び出しごとに
     通っても外部プロセスは増えない。
 
-    ルールファイルの置き場は設定で動く。root の外を指しているなら、作業ツリーの
-    中に対応する写しは無いので、そこは対象から落ちる。プロジェクトごとの
-    ルールファイルも同じ扱いで、root の下に在るぶんだけ写しを守る。
+    切り元付きで列挙する。作業ツリーはワークスペースからもプロジェクトからも
+    切れて、中に入っている作業ツリー側の設定は切り元が追跡しているものだけになる。
+    lib から切ったツリーに `.claude/settings.json` は無いし、lib の層の綴りは
+    `projects/lib/.ccnavi/config/rules.yml` ではなく `.ccnavi/config/rules.yml`。
+    ワークスペースルートからの相対で組むと、どちらの向きにも当たらない。
+
+    設定の置き場は設定で動く。切り元の外を指しているなら、作業ツリーの中に
+    対応するものは無いので、そこは対象から落ちる。
     """
-    places = [*_SETTINGS_FILES]
-    inside = _inside(root, rules_path)
-    if inside:
-        places.append(("rules", inside))
-    for name, path in project_rules:
-        rel = _inside(root, path)
+    by_home: dict[str, list[tuple[str, str]]] = {}
+    for key, home, path in places:
+        rel = _inside(home, path)
         if rel:
-            places.append((f"rules:{name}", rel))
+            by_home.setdefault(os.path.realpath(home), []).append((key, rel))
 
     copies = []
-    for work in tree.worktrees(root):
-        for key, rel in places:
+    for work in tree.worktrees(root, projects_dir):
+        home = tree.project_root(projects_dir, work.project) if work.project else root
+        for key, rel in by_home.get(os.path.realpath(home), ()):
             full = os.path.realpath(os.path.join(work.root, rel))
             copies.append(
                 Target(
@@ -458,13 +639,14 @@ def _worktree_copies(
                     path=full,
                     label=_relative(root, full),
                     top=work.root,
+                    copy=True,
                 )
             )
     return copies
 
 
 def _copy_key(key: str, name: str) -> str:
-    """写しの控えの名前。
+    """作業ツリー側の設定の控えの名前。
 
     key はそのままファイル名になるので、作業ツリーの名前を素で混ぜると、
     区切り文字の入った名前で控えが別の場所へ書かれる。潰した綴りだけにすると、
@@ -948,12 +1130,12 @@ def report(outcomes: list[Outcome]) -> str:
     ]
     for outcome in outcomes:
         lines.append(f"  {outcome.target.label}: {outcome.action} — {outcome.detail}")
-    if any(outcome.target.top for outcome in outcomes):
-        # 作業ツリーの中の写しが混じっている。今この瞬間の判定は変わらないので、
+    if any(outcome.target.copy for outcome in outcomes):
+        # 作業ツリー側の設定が混じっている。今この瞬間の判定は変わらないので、
         # 「何も起きていないのに戻された」と読まれる。時間差で効く道であることを
         # 言わないと、次に同じ手が繰り返される。
         lines.append(
-            "作業ツリーの中の写しは、その場では誰も読みませんが、統合すれば main の "
+            "作業ツリー側の設定は、その場では誰も読みませんが、統合すれば main の "
             "hook の登録とルールになります。"
         )
     lines.append(
@@ -1052,7 +1234,18 @@ def _safe(session: str) -> str:
 
 
 def _backup_path(state_dir: str, session: str, target: Target) -> str:
-    return os.path.join(state_dir, BACKUP_DIR, _safe(session), target.key)
+    """控えの置き場。key はそのままでは名前にしない。
+
+    層の key には `:` が入る（`rules:self`、`phases:lib`）。Windows でその綴りの
+    ファイルを開くと、同じ名前のファイルの代替データストリームに書くことになり、
+    控えが在るのに読めない形になる。名前に使える字へ均してから置く。
+
+    切り詰めない。作業ツリー側の設定の key は末尾に作業ツリーの名前の digest を持っていて、
+    そこを落とすと別の作業ツリーの控えと同じ名前に落ちる。長さで落ちるなら、
+    書けなかったことが報告に出るほうがよい。
+    """
+    name = fsio.safe_name(target.key, limit=None)
+    return os.path.join(state_dir, BACKUP_DIR, _safe(session), name)
 
 
 def _ref_path(state_dir: str, session: str, target: Target) -> str:

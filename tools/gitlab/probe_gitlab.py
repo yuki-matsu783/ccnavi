@@ -84,7 +84,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.claude/ccnavi/*",
-            "message": "ガードの設定と写しです。利用者に依頼してください。",
+            "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
         }
     ],
 }
