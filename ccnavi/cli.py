@@ -93,7 +93,7 @@ To review the pending tickets and approve the work areas they declare, run
 
 It scans wip/tickets/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
-.claude/ccnavi/tickets/. Only the copies are consulted when judging calls, so
+.ccnavi/tickets/ in the parent ticket's tree. Only the copies are consulted when judging calls, so
 editing a ticket never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.
