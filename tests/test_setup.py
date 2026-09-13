@@ -70,7 +70,8 @@ RETIRED_ENV = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_PROJECT_RULES")
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
-DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh")
+# ボードが承認のあと端末に送る、承認済みチケットを運ぶ sh も配る。
+DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh", "ccnavi-push-approved.sh")
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本（設計 §25.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
