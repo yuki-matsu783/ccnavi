@@ -202,7 +202,7 @@ def judge(
 def _project_of(conf: settings.Settings, found: ticket_mod.Ticket) -> str:
     """このチケットの層を決める `project:`（設計 §25.4.1、§25.4.2）。
 
-    権威は承認済みの写しの側。子は親から継ぐので、親の写しを引く。提案の側に
+    権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値は人が承認していないので、判定の根拠にしない。
     """
     if not found.is_child:

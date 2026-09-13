@@ -270,7 +270,7 @@ def layer_types(
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
     """共通層 + その層の種類と、**その層の**苦情（設計 §25.4.1）。
 
-    どの層を足すかは親の写しの `project:` が決める。空ならワークスペース自身の層。
+    どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
     言うと、層の話を読みに来た人が同じ文を 2 度読むことになる。
 
@@ -338,7 +338,7 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is not None and owner.has_plan:
-        # 層は親の写しの `project:` が決める（設計 §25.4.1）。人が承認した値で、
+        # 層は親の承認済みチケットの `project:` が決める（設計 §25.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():

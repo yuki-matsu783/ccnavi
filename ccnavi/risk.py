@@ -395,7 +395,7 @@ def mark_layer(definition: Definition, layer: str, home: str) -> None:
 def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
     """共通層の配点に、行き先の層の配点を足す（設計 §25.4.2）。
 
-    `factors` は連結。同 `id` で全欄が一致すれば写しとして後ろを捨て（info）、
+    `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
     中身が違えば error。`levels` は書かれた鍵だけが参加し、キーごとに小さいほうを
     採る。どの層も書いていない鍵は既定（`DEFAULT_LEVELS`）。
 
@@ -481,7 +481,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
                     SEVERITY_ERROR,
                     f.id,
                     f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
-                    "作業ツリーの中の写しは読まないので、git プロジェクトルートに置く",
+                    "作業ツリーの中のものは読まないので、git プロジェクトルートに置く",
                 )
             )
     return problems
@@ -536,7 +536,7 @@ def layer_definition(
 
 
 def load_definition(conf: settings.Settings, root: str = "", project: str = "") -> Definition:
-    """判定が使う配点。共通層に、親の写しの `project:` が指す層を足したもの。"""
+    """判定が使う配点。共通層に、親の承認済みチケットの `project:` が指す層を足したもの。"""
     definition, _ = layer_definition(conf, root, project)
     return definition
 

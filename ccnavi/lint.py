@@ -164,7 +164,7 @@ def report(
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
-    # info は数えるが、終了コードには効かない。層をまたいだ写しのように「そう
+    # info は数えるが、終了コードには効かない。層をまたいだ重複のように「そう
     # 書いてあるとおりに効いているが、書いた人が知りたいはずのこと」が入る。
     infos = sum(1 for p in problems if p.severity == SEVERITY_INFO)
     if as_json:
@@ -189,7 +189,7 @@ def report(
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
-    stdout.write(f"  中核ファイルを守る: {guard_core_files}\n")
+    stdout.write(f"  コアファイルを守る: {guard_core_files}\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
     if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
@@ -558,7 +558,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
     見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
-    全欄一致で捨てた写しを info で言う。共通層自身の苦情は `_phases` / `_risk` が
+    全欄一致で捨てた重複を info で言う。共通層自身の苦情は `_phases` / `_risk` が
     別に言うので、ここでは層の側だけを数える。
 
     `.ccnavi/config/` が無いことは言わない。無いのは正常（無い層 = 空）。
