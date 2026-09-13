@@ -185,7 +185,7 @@ allow:
     match: Write|Edit
     glob: "*/.claude/worktrees/*"
 
-  # git の入口。サブコマンドの選別はラッパの中で行うので、ここでは区別しない。
+  # git の入口。サブコマンドの選別はラッパースクリプトの中で行うので、ここでは区別しない。
   - id: ccnavi-git
     match: Bash
     glob: "*ccnavi-git.sh*"

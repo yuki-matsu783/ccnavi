@@ -56,7 +56,7 @@ deny:
     why: 未マージのブランチが消える
   - tool: Bash
     subject: "git status"
-    why: 生の git はサブコマンドによらず止め、ラッパへ寄せる
+    why: 生の git はサブコマンドによらず止め、ラッパースクリプトへ寄せる
   - tool: Bash
     subject: "/usr/bin/git.exe diff"
     why: パス付きでも拡張子付きでも、コマンドの位置に立つ git は当たる
@@ -205,7 +205,7 @@ ask:
       cd と ls を allow に書いてはいないので、権限モードへ渡る
   - tool: Bash
     subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
-    why: ラッパが残した記録を読む手。-i の無い sed はどの deny にも当たらず、allow にも無い
+    why: ラッパースクリプトが残した記録を読む手。-i の無い sed はどの deny にも当たらず、allow にも無い
   - tool: Bash
     subject: "sed -n 1,20p /repo/.ccnavi/common/rules.yml"
     why: ガードの設定でも、-i が無ければ書き換えない。deny には当たらない
@@ -251,10 +251,10 @@ ask:
 allow:
   - tool: Bash
     subject: "sh .ccnavi/scripts/ccnavi-git.sh status --porcelain"
-    why: git の入口。サブコマンドの選別はラッパの中で行う
+    why: git の入口。サブコマンドの選別はラッパースクリプトの中で行う
   - tool: Bash
     subject: "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001"
-    why: push もラッパの入口。送ってよい形か（force でない、main へ直接でない）はラッパが選別する
+    why: push もラッパースクリプトの入口。送ってよい形か（force でない、main へ直接でない）はラッパースクリプトが選別する
   - tool: Bash
     subject: "cd /repo && sh .ccnavi/scripts/ccnavi-git.sh worktree add .claude/worktrees/x -b x"
     why: このプロジェクトの作業手順。コマンド列の途中でも通る
@@ -293,7 +293,7 @@ allow:
     why: 設定も読むのは普通
   - tool: Bash
     subject: "cat /repo/.ccnavi/scripts/ccnavi-git.sh"
-    why: ラッパの中身を読むのは普通
+    why: ラッパースクリプトの中身を読むのは普通
   - tool: Bash
     subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh diff --stat"
     why: これが git の打ち方そのもの。ここを止めたら何もできない
