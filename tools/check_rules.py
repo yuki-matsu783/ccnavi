@@ -19,13 +19,13 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAMPLES = os.path.join(ROOT, ".claude", "ccnavi", "rule-samples.yml")
+# 共通層のルールと見本の既定の置き場（ADR-0042）。前は `.claude/ccnavi/` の下にあった。
+RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
+SAMPLES = os.path.join(ROOT, ".ccnavi", "common", "rule-samples.yml")
 
 
 def main() -> int:
-    rules_path = (
-        sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
-    )
+    rules_path = sys.argv[1] if len(sys.argv) > 1 else RULES
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     done = subprocess.run(
         [

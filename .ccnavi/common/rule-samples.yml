@@ -216,23 +216,6 @@ ask:
     subject: "uv run python -m ccnavi --rules /repo/.ccnavi/common/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny には当たらない
   - tool: Bash
-    subject: 'grep -n "git push" README.md'
-    why: >-
-      引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
-      区切りの印に置き換わるので、「1 本だけの grep」を求める prefer-read-grep にも
-      当たらず、権限モードへ渡る。引用に空白の無い grep は allow の側にある
-  - tool: Bash
-    subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
-    why: 引用の中の rm -rf は recursive-delete に当たらない。allow は上と同じ理由で外れる
-  - tool: Bash
-    subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
-    why: 引用の中の > は文字であって書き込み先を連れてこない。deny には当たらない
-  - tool: Bash
-    subject: 'grep -n "<<EOF" /repo/README.md'
-    why: >-
-      引用の中で他の字と並んだ << は 1 字ずつ区切られ、heredoc には当たらない。
-      引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。README「読み切れないとき」
-  - tool: Bash
     subject: "cp /repo/.ccnavi/common/rules.yml /tmp/backup.yml"
     why: 写しを取っているだけ。cp は行き先の側だけを見るので deny には当たらない
   - tool: Bash
@@ -261,6 +244,26 @@ allow:
   - tool: Bash
     subject: "grep -n TODO ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
+  - tool: Bash
+    subject: 'grep -n "git push" README.md'
+    why: >-
+      引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
+      語の中の印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
+      求める prefer-read-grep が当てて通す。README「Bash のコマンドは実行される部分だけを見る」
+  - tool: Bash
+    subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
+    why: 引用の中の rm -rf は recursive-delete に当たらない。上と同じ理由で prefer-read-grep が通す
+  - tool: Bash
+    subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
+    why: >-
+      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の印なので、
+      deny には当たらず、prefer-read-grep が通す
+  - tool: Bash
+    subject: 'grep -n "<<EOF" /repo/README.md'
+    why: >-
+      引用の中で他の字と並んだ << は語の中の印で 1 字ずつ区切られ、heredoc には当たらない。
+      prefer-read-grep が通す。引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。
+      README「読み切れないとき」
   - tool: Bash
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない
