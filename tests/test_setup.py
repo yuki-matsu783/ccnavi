@@ -834,6 +834,24 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertNotIn("まだ無いもの", result.stdout)
         self.assertIn("配った", result.stdout)
 
+    def test_names_the_push_script_when_the_source_lacks_it(self):
+        """15. 配布元に ccnavi-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
+
+        ボードは承認のあとこの sh を端末に送る。配れなかったことが最後の一覧に出ないと、
+        配布先で運べない理由を人が読み取れない。
+        """
+        src = self.make_source()
+        os.remove(os.path.join(src, ".ccnavi", "scripts", "ccnavi-push-approved.sh"))
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertIn("まだ無いもの", result.stdout, result.stdout + result.stderr)
+        missing = result.stdout.split("まだ無いもの", 1)[1]
+        self.assertIn("ccnavi-push-approved.sh", missing)
+        self.assertFalse(
+            os.path.exists(self.deployed(".ccnavi", "scripts", "ccnavi-push-approved.sh"))
+        )
+        # 他の sh は配ったので、一覧には出ない。
+        self.assertNotIn("ccnavi-ticket.sh", missing)
+
     def test_no_deploy_writes_only_the_settings(self):
         """`--no-deploy` は配布物を置かない。何が無いかと、戻し方を見せる。"""
         result = self.run_setup("--mode", "enable", "--no-deploy")

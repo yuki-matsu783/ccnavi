@@ -1037,6 +1037,67 @@ class ScopeLimitTest(PhaseHarness):
                 self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
                 self.assertIn("limit: parent i0001", self.reason(beyond_parent))
 
+    # ---- 判定が落ちない（チケット approve-carry-04 の 6〜8）
+
+    def assert_answered(self, result):
+        """hook が例外で終わらず、判定の答えとして読める形で返したこと。"""
+        self.assertIn(result.returncode, (0, 2), result.stdout + result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        if result.stdout.strip():
+            json.loads(result.stdout)
+
+    def break_phases_encoding(self):
+        """共通層の phases.yml に、UTF-8 として読めないバイト列を混ぜる。"""
+        with open(self.phases, "wb") as f:
+            f.write(PHASES.encode("utf-8").replace("調査".encode(), b"\xff\xfe\x80"))
+
+    def test_undecodable_phases_file_does_not_crash_the_write_judge(self):
+        """6. phases.yml が UTF-8 として読めなくても、Write の判定は例外で終わらない。"""
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        self.break_phases_encoding()
+        result = self.write_to(tree, "src/a/x.py")
+        self.assert_answered(result)
+        # 読めない種類は「壊れている」と同じ扱い。種類では切り詰めず、そう言う。
+        self.assertNotEqual(self.decision(result), "deny", result.stdout)
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
+        self.assertIn("種類の上限では切り詰めていない", self.reason(result))
+
+    def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
+        """7. 同じ状態で、Bash の実行前の判定（ゲートの経路）も例外で終わらない。"""
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        self.break_phases_encoding()
+        for command in (
+            "ls",
+            "echo x > src/a/x.py",
+            "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+        ):
+            with self.subTest(command):
+                self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
+
+    def test_no_phases_file_with_a_plan_says_nothing_about_the_type(self):
+        """8. 親が計画を持ち番号が計画にあっても、phases.yml がどの層にも無ければ注記しない。
+
+        「種類が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
+        （設計 §4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。
+        """
+        tree = self.approved_child(
+            child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+        )
+        self.phases = os.path.join(self.root, "no-phases.yml")
+        self.assertFalse(os.path.exists(self.phases))
+        for rel in ("wip/research/note.md", "src/a/x.py"):
+            with self.subTest(rel):
+                result = self.write_to(tree, rel)
+                self.assert_answered(result)
+                self.assertNotEqual(self.decision(result), "deny", result.stdout)
+                self.assertNotIn("切り詰めていない", self.reason(result))
+                self.assertNotIn("読めない", self.reason(result))
+                self.assertNotIn("limit:", self.reason(result))
+
     def test_regex_child_is_judged_by_the_real_path(self):
         """14. regex の子: 実際のパスで親と種類に当てる。"""
         tree = self.approved_child(
