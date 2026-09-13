@@ -210,6 +210,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、`scripts/ccnavi-launcher.sh` を `.ccnavi/bin/ccnavi` へ、`rules.yml`、`.ccnavi/scripts/ccnavi-{ticket,review,git}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える |
 | 配布先の `.gitignore` | 振り分けの sh と、配った機械の置き場の 2 行（配布先が git のリポジトリで、配るときだけ） |
 | 前の置き場 | `.claude/ccnavi/` の `ccnavi`・`ccnavi.exe`・`_internal/` を消し、`CCNAVI_BIN_PATH` が前の綴りなら書き換える。新しい置き場で hook が起動できるときだけ |
+| 共通層の設定と記録の前の置き場 | `.claude/ccnavi/` の `rules.yml`・`risk.yml`・`phases.yml`・`rule-samples.yml` を、`.ccnavi/common/` に無ければひな形を配るより先に `mv` で移す。両方にあれば触らず並べ、打ったセッションの env が前の綴りならそのファイルは移さずひな形も配らない。env が前の既定の綴りと一字一句同じなら書き換える（設定 3 本は新しい置き場で読めるときだけ、`CCNAVI_LOG` / `CCNAVI_STATE` はいつも）。残った `log.jsonl`・`state`・`session` は名前を挙げるだけ（ADR-0042） |
 
 `CCNAVI_BIN_PATH` が指すのは振り分けの sh で、実行ファイルはその隣に機械ごとに並ぶ。`settings.json` は
 どの環境でも同じものを開き、hook の `command` は 1 行なので、どの実行ファイルを起動するかは起動した
@@ -225,7 +226,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 ### 4.7 記録
 
 判定した呼び出しは、通したものも判定しなかったものも 1 件 1 行の JSON として `CCNAVI_LOG`
-（既定 `.claude/ccnavi/log.jsonl`）に追記する。1 行の欄は付録 B。
+（既定 `logs/log.jsonl`）に追記する。1 行の欄は付録 B。
 
 | 欄 | 数えるもの |
 |---|---|
@@ -320,7 +321,7 @@ ccnavi は判定を持たない（§6.5）。
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める |
 | 認証情報の置き場（`.env`、`.ssh/`、`id_rsa`、`.netrc`、`.npmrc` など）への `Bash` `Read` `Write` `Edit` | 止める |
-| シェルから `.claude/ccnavi/` `.claude/hooks/` `.claude/scripts/` `.claude/settings*.json` `ccnavi-git.sh` へ書き込む形 | 止める（書き込む綴りと場所の組で見る。§8.2） |
+| シェルから `.claude/ccnavi/` `.claude/hooks/` `.claude/scripts/` `.claude/settings*.json`、層の傘 `.ccnavi`、`logs/log.jsonl` `logs/state`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込む綴りと場所の組で見る。§8.2） |
 | `Read`（認証情報の置き場を除く。強いタイプが先に当たる） | 通す |
 | `Write` / `Edit` でルールファイルを直す | 既定では止めない。権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
@@ -538,7 +539,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 対象 | 何が懸かっているか | 控えを取る時点 |
 |---|---|---|
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前 |
-| `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本） | 判定の中身そのもの | ツール実行前 |
+| `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/`） | 判定の中身そのもの | ツール実行前 |
 | 自身の層と各プロジェクトの層の `.ccnavi/config/{rules,phases,risk}.yml` | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル | 判定器の実体 | セッション開始 |
 
@@ -553,7 +554,10 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 1 本目は書き込む綴り
 （`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln`
 `install` の行き先）と場所（`.claude/ccnavi/` `.claude/hooks/` `.claude/scripts/`、
-`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と層の傘）の組で止める。
+`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と層の傘、記録と控えの `logs/log.jsonl` `logs/state`）の組で止める。
+記録と控えは前は `.claude/ccnavi/` の中にあって一緒に守られていたので、`logs/` へ移したぶんを名前を絞って足した。`logs/` の下の
+git ラッパの記録は、消しても判定に効かないので守らない。`.claude/ccnavi/` は前の置き場だが、env で前の綴りを指したままの
+ワークスペースがあるので残す（ADR-0042）。
 `builtin-guard-binary` と `builtin-guard-project-home` は `Write` `Edit` `NotebookEdit` を止める。
 
 止めるのは書き込む綴りと場所の組で、場所の名前が出ただけでは止めない。`cat rules.yml` も
@@ -561,8 +565,10 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 `ask` や `allow` に同じ id を置いても重なる）。
 既定に落ちている間と `disable` のときは足さない。
 
-共通層の設定ファイルを `Write` / `Edit` から守るぶんはルールに任せてある。`deny` に 1 行
-書けば済み、書いたことが読める場所に残る。実行ファイルと層の傘は置き場が設定で動くので、組み込みで持つ。
+共通層の設定ファイルの既定の置き場（`.ccnavi/common/`）は層の傘の下なので、傘の名前を動かしていなければ
+`builtin-guard-project-home` が `Write` / `Edit` からも止める。見本（`rule-samples.yml`）も同じ。env で共通層を傘の外に
+置いたときに `Write` / `Edit` から守るぶんはルールに任せる。`deny` に 1 行書けば済み、書いたことが読める場所に残る。
+実行ファイルと層の傘は置き場が設定で動くので、組み込みで持つ。
 
 ### 8.3 戻す側
 
@@ -1002,7 +1008,7 @@ HIGH 以上（§9.9）、のどれかで決まる。延期の項は自分では�
 | 系統 | 書き方 | 誰が測るか |
 |---|---|---|
 | 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
-| 定量（スクリプト） | `script: <.claude/ccnavi/ か .claude/scripts/ の下>` | ccnavi が `sh` で走らせる。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は重い側に倒し、その項目の点を加える |
+| 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通層。層ごとの解決先は §11.4.2） | ccnavi が `sh` で走らせる。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は重い側に倒し、その項目の点を加える |
 | 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`done` が問いと差分の要約を `state/risk-judge-<子>.md` に書き、親がサブエージェントに渡し、報告を `ccnavi-ticket.sh judge <子> <項目> yes\|no --reason` で記録する。判定は子の HEAD に結び、HEAD が動けば取り直し。記録できるのは親だけ |
 
 点と等級と加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの
@@ -1163,20 +1169,26 @@ Bash は共通層 + 全部の層**。**チケットのプロジェクトは提�
 | 何 | 場所 | git |
 |---|---|---|
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
-| **共通層**のルール / フェーズの種類 / リスクの配点 | `.claude/ccnavi/{rules,phases,risk}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | ワークスペース |
+| **共通層**のルール / フェーズの種類 / リスクの配点 | `.ccnavi/common/{rules,phases,risk}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | ワークスペース |
+| ルールの見本 | `.ccnavi/common/rule-samples.yml` | ワークスペース |
 | **ワークスペース自身の層**の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml` | ワークスペース |
 | **プロジェクトの層**の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml` | プロジェクト |
-| 固有スクリプト（配点の `script:` が指す先） | 共通層は `.claude/ccnavi/` と `.claude/scripts/`。自身の層とプロジェクトの層は、それぞれの `.ccnavi/scripts/` | 層と同じ |
+| 固有スクリプト（配点の `script:` が指す先） | 共通層は `.ccnavi/common/scripts/`。自身の層とプロジェクトの層は、それぞれの `.ccnavi/scripts/` | 層と同じ |
 | プロジェクト | `projects/<名前>/`（`CCNAVI_PROJECTS`、既定 `projects`、ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | 作業ツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
 | 提案 | そのツリーの `wip/tickets/<状態>/<識別子>.md`。プロジェクト向けはそのプロジェクトの git が持つ | そのツリーのリポジトリ |
 | 承認済みチケット（閉じたものを含む）、フェーズの印 | 親チケットのツリーの `.ccnavi/tickets/`（§9.2）。承認済みチケットに `project:` が入る | そのツリーのリポジトリ |
-| 記録、控え、セッションの状態 | ワークスペースの `.claude/ccnavi/` | 管理外 |
+| 記録、控え、セッションの状態 | ワークスペースの `logs/`（`logs/log.jsonl`、`logs/state/`、`logs/session/`） | 管理外 |
 | git ラッパの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` | 管理外 |
 
 `.ccnavi/` は層の傘の既定の綴りで、`CCNAVI_PROJECT_HOME` の既定値。以下この章で `.ccnavi/` と書くのは既定のままの綴りを指す。
 
-**層は 3 種で、形は同じ。** 共通層は「どのツリーにも効くもの」を置く場所で、今の `.claude/ccnavi/` のまま。自身の層とプロジェクトの層は
+**層は 3 種で、形は同じ。** 共通層は「どのツリーにも効くもの」を置く場所で、ワークスペースルートの `.ccnavi/common/` に置く。
+前は `.claude/ccnavi/` に記録と控えと一緒に置いていた。人が持つ設定を層の傘の下へ、実行のたびに書かれる記録と控えを `logs/` へ移し、
+`.claude/` には Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを残した（ADR-0042）。変えたのは置き場だけで、
+共通層がどのツリーにも効き、自身の層がワークスペースのツリーにだけ効く構造は同じ。傘の下に入ったので、傘の名前を動かしていなければ、共通層の 3 本と見本も
+名指しのツールから組み込みの deny（`*/.ccnavi/*`）が止める。共通層の置き場は傘の名前（`CCNAVI_PROJECT_HOME`）に付いて動かず、
+動かすなら `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` で動かす。自身の層とプロジェクトの層は
 「そのツリーにだけ効くもの」を置く場所で、どちらも git プロジェクトルートの下の `.ccnavi/config/` に同じ形で置く。ワークスペース自身に層を
 分けるのは、ワークスペースのフェーズの種類（`scope: ["ccnavi/*", ...]`）がワークスペースのレイアウトにしか合わないから。共通層に置くと
 全プロジェクトに効いて、2 つ目のプロジェクトで破綻する。
@@ -1322,11 +1334,11 @@ info で言い、`--explain` は残った 1 本だけ出す。Bash の和でも�
 
 | 層 | `script:` に書ける綴り | 解決の基準 |
 |---|---|---|
-| 共通層 | `.claude/ccnavi/...` か `.claude/scripts/...` | ワークスペースルート |
+| 共通層 | `.ccnavi/common/scripts/...` | ワークスペースルート |
 | 自身の層 | `.ccnavi/scripts/...`（`CCNAVI_PROJECT_HOME` に従う） | ワークスペースルート |
 | プロジェクトの層 | `.ccnavi/scripts/...`（同上） | そのプロジェクトの git プロジェクトルート |
 
-共通層から `.ccnavi/scripts/` を、層から `.claude/scripts/` を指す定義は読み込みで error。指す先が git プロジェクトルートに無ければ
+共通層から `.ccnavi/scripts/` を、層から `.ccnavi/common/scripts/` を指す定義は読み込みで error。指す先が git プロジェクトルートに無ければ
 `--lint` が error（走らせるときは今どおり「測れなかった」でその項目の点を加える）。作業ツリーの中のスクリプトは読まない。`cwd` は今どおり
 子の作業ツリーで、環境変数（`CCNAVI_BASE_SHA` 等）も同じ。
 
@@ -1374,8 +1386,9 @@ info で言い、`--explain` は残った 1 本だけ出す。Bash の和でも�
 
 **共通層のフェーズの種類と配点を足すのは既存の穴の修正。** この 2 本は「人の持ち物」としてルールの 1 行で止めていただけで、
 控えと復元の対象ではなかった。ルールで止める形は、ルールの並びと書き方で緩みうるし、作業ツリー側の設定は統合で統合先へ入る道を持つ。
-コアへ入れて、シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通層の 3 本を守るぶんは、今も共通層のルールの
-1 行（`/ccnavi-config` への案内付き）に任せる。そこは `deny` を 1 行書けば済み、書いたことが読める場所に残る。組み込みで名指しのツールを
+コアへ入れて、シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通層の 3 本を守るぶんは、既定の置き場
+（`.ccnavi/common/`）なら層の傘の組み込みの deny が止める。env で傘の外に置いたときは、共通層のルールの 1 行（`/ccnavi-config` への
+案内付き）に任せる。そこは `deny` を 1 行書けば済み、書いたことが読める場所に残る。組み込みで名指しのツールを
 止めるのは、置き場が設定で動く実行ファイルと層の傘の 2 つだけ。
 
 **プロジェクトから切った作業ツリー側の設定を足すのも既存の穴の修正。** 以前は作業ツリーを切り元無しで列挙していたので、プロジェクトから切った
@@ -1442,7 +1455,7 @@ git ラッパの記録はワークスペースの `logs/<プロジェクト>/` �
 重複で捨てた定義は出さない。フェーズの種類と配点は `id / 出どころの層 / 主な欄` の表を足す。
 
 ```
-■ rules 共通層（.claude/ccnavi/rules.yml、deny 12 / ask 3 / allow 4）
+■ rules 共通層（.ccnavi/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  guard-hooks          Write|Edit|NotebookEdit  */.claude/hooks/*
   ...
 ■ rules 自身の層（.ccnavi/config/rules.yml、deny 0 / ask 0 / allow 1）
@@ -1535,7 +1548,7 @@ dry-run でまず層の分布を見て、Bash の和と `glob` の綴りの畳�
 
 ### 11.12 移行
 
-- 今の `.claude/ccnavi/phases.yml` の 7 種（research / design / acceptance / implement / docs / design-feedback / implement-feedback）を
+- 共通層の `.claude/ccnavi/phases.yml` にあった 7 種（research / design / acceptance / implement / docs / design-feedback / implement-feedback）を
   全部 `<ワークスペースルート>/.ccnavi/config/phases.yml` へ移す。共通層のフェーズの種類は空から始める。`scope` はワークスペースの
   レイアウトのものなので、共通層に残すとプロジェクトに効いてしまう。ルールと配点は汎用なので共通層に残す
 - `plan:` と印は裸の `id` で種類を指すので、既存のチケットと承認済みチケットは書き換えない

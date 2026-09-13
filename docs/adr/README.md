@@ -36,6 +36,7 @@
 | [0006](0006-disable-from-env-only.md) | `disable` は起動側の環境からしか効かせない |
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
 | [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する |
+| [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
 
 ### ルールと判定
 
