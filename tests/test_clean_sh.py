@@ -88,7 +88,7 @@ class CleanTest(unittest.TestCase):
         )
 
     def make_shell(self, name):
-        """git に登録の無い抜け殻。生成物と、消えてはいけないものを混ぜて置く。"""
+        """git の登録が外れたディレクトリ。生成物と、消えてはいけないものを混ぜて置く。"""
         top = os.path.join(self.worktrees, name)
         write(os.path.join(top, "src", "a.txt"), "keep")
         write(os.path.join(top, "node_modules", ".pnpm", "x", "index.js"))
