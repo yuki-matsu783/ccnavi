@@ -21,9 +21,9 @@ allow:
     glob: "ccnavi/*"
   - match: Write|Edit
     glob: "tests/*"
-started_at: ""
+started_at: "2026-09-12T19:02:42+0900"
 completed_at: ""
-base_sha: ""
+base_sha: "efcd128e22dd557249c621012d90dd268dfd7469"
 ---
 
 # 実装: shellread の印を分ける
