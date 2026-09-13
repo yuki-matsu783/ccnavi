@@ -22,8 +22,13 @@ UNDECLARED_COMMAND = "docker run --rm alpine"
 
 
 def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable"):
-    """道具を 1 回動かし、標準出力と記録の 1 行を返す。"""
+    """道具を 1 回動かし、標準出力と記録の 1 行を返す。
+
+    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    切らないと、作業ツリーで消した設定ファイルが `logs/state` の控えから書き戻される。
+    """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",

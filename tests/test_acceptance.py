@@ -24,8 +24,12 @@ def run(mode="enable", payload="", log=""):
     モードは環境ではなくフラグで固定する。このリポジトリは ccnavi を自分自身に
     仕掛けているので、テストを走らせるセッションが既にモードを持っている。
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
+
+    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    切らないと、作業ツリーで消した設定ファイルが `logs/state` の控えから書き戻される。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
 
     args = ["--rules", RULES, "--mode", mode]
     args += ["--log", log] if log else ["--log", ""]
