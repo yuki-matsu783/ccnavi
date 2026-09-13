@@ -6,7 +6,14 @@
  * 承認を、拡張が子プロセスで `--approve --yes <識別子,…>` として打つ。端末の壁は無く、
  * 代わりに「見せた束と今の束が同じ」ことを実行ファイルが求める。エージェントが Bash で
  * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。
+ *
+ * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
+ * ターミナルに送る。push は外へ出す操作なので、送った 1 行を人が見て、そのまま走らせる。
  */
+import * as path from "node:path";
+
+/** 承認済みチケットを運ぶ sh の、ワークスペースルートからの綴り */
+export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
 export type Launcher =
@@ -59,4 +66,12 @@ export function approveArgs(
  */
 export function acceptCommand(parentTree: string, phase: number): string {
   return `cd ${shellQuote(toPosixPath(parentTree))} && sh .ccnavi/scripts/ccnavi-review.sh accept ${phase}`;
+}
+
+/**
+ * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
+ * 絶対パスで組む。ターミナルは使い回すので、前に accept が親の作業ツリーへ cd していても届く。
+ */
+export function pushApprovedCommand(root: string): string {
+  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;
 }

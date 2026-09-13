@@ -3,11 +3,18 @@
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
-import { acceptCommand, type Launcher } from "./core/commands.js";
+import {
+  acceptCommand,
+  PUSH_APPROVED_SCRIPT,
+  pushApprovedCommand,
+  type Launcher,
+} from "./core/commands.js";
 import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
@@ -331,8 +338,9 @@ async function openApproval(current: PanelState, only: readonly string[] = []): 
 /**
  * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが束の一致を
  * 確かめ、違えば何も置かずに `mismatch` を返すので、束を読み直して出し直す。
- * 承認できたら、Claude Code に渡す文を通知の 2 ボタン（コピー / 新しいセッションで開く）で渡す。
- * 押すまで何もしない。ボードの読み直しは承認済みチケットの監視が起こす。
+ * 承認できたら、承認済みチケットをコミットして push する sh をターミナルに送り、
+ * Claude Code に渡す文を通知の 2 ボタン（コピー / 新しいセッションで開く）で渡す。
+ * 通知は押すまで何もしない。ボードの読み直しは承認済みチケットの監視が起こす。
  */
 async function confirmApproval(current: PanelState, tickets: readonly string[]): Promise<void> {
   if (current.approval?.kind !== "preview" || tickets.length === 0) {
@@ -354,7 +362,10 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   if (outcome.ok) {
     current.approval = undefined;
     redraw(current);
-    void offerPrompt(outcome.value.approved.length, outcome.value.prompt);
+    const count = outcome.value.approved.length;
+    // 通知より先に送る。通知は押されるまで待つが、運ぶ 1 行は承認と同じ時点で端末に出しておく。
+    const carried = count > 0 && carryApproved(current.folder.uri.fsPath);
+    void offerPrompt(count, outcome.value.prompt, carried);
     return;
   }
   if ("mismatch" in outcome) {
@@ -374,6 +385,31 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   redraw(current);
 }
 
+/**
+ * 承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）をターミナルに送る。
+ * 承認の実行ファイルは承認済みチケットを置くだけで、運ぶのはこの sh。y/N は無い。
+ * sh が無ければ送らずに警告し、false を返す。送って `No such file` を見せるより、
+ * 何をすればよいかが先に分かる。
+ */
+function carryApproved(root: string): boolean {
+  if (!isFile(path.join(root, PUSH_APPROVED_SCRIPT))) {
+    void vscode.window.showWarningMessage(
+      `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、導入スクリプト（scripts/ccnavi-setup.sh）で配る`,
+    );
+    return false;
+  }
+  runInTerminal(root, pushApprovedCommand(root));
+  return true;
+}
+
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 const COPY_PROMPT = "コピー";
 const OPEN_PROMPT = "新しいセッションで開く";
 
@@ -381,10 +417,12 @@ const OPEN_PROMPT = "新しいセッションで開く";
  * 承認の文を Claude Code に渡す。走っているセッションに送る公開の API は無いので、
  * クリップボードに入れて進行中のセッションに貼るか、`vscode://anthropic.claude-code/open?prompt=…`
  * で新しいセッションに文を埋める（送信は人が Enter）。
+ * `carried` は運ぶ sh を端末に送ったか。送ったときだけ、そう言う。
  */
-async function offerPrompt(count: number, prompt: string): Promise<void> {
+async function offerPrompt(count: number, prompt: string, carried: boolean): Promise<void> {
+  const sent = carried ? "コミットと push を端末に送った。" : "";
   const chosen = await vscode.window.showInformationMessage(
-    `${count} 件を承認した。Claude Code に伝える文を用意した`,
+    `${count} 件を承認した。${sent}Claude Code に伝える文を用意した`,
     COPY_PROMPT,
     OPEN_PROMPT,
   );
