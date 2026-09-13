@@ -1,9 +1,9 @@
 /**
  * 承認の JSON の形（実行ファイルとの契約）と読み取り。README「承認の JSON」。
  *
- * `--approve --preview --json` が束を見せ、`--approve --yes <識別子,…> --json` が承認する。
- * 拡張は束の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
- * 束を自分で組み直したり、提案を読んだりはしない。
+ * `--approve --preview --json` が承認待ちの一覧を見せ、`--approve --yes <識別子,…> --json` が承認する。
+ * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
+ * 承認の対象を自分で組み直したり、提案を読んだりはしない。
  */
 
 export const APPROVE_VERSION = 1;
@@ -29,7 +29,7 @@ export interface ApprovePreview {
   readonly version: number;
   readonly root: string;
   readonly generated_at: string;
-  /** `--approve` が承認する束。空なら承認待ちが無い */
+  /** `--approve` が承認する対象。空なら承認待ちが無い */
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
@@ -85,7 +85,7 @@ export function parseApprovePreview(text: string): PreviewParse {
   };
 }
 
-/** `--yes` の答え。承認できたか、束が変わっていたか、読めなかったか */
+/** `--yes` の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
   const top = parseTop(text);
   if (!top.ok) {

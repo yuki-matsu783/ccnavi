@@ -55,7 +55,7 @@ interface PanelState {
   filter?: string;
   /** 承認のオーバーレイ。あれば描くたびにボードの上に被せる。監視の更新で消えない */
   approval?: ApprovalOverlay;
-  /** そのオーバーレイが見せている束の絞り（ボードの絞り込みで見えている識別子）。空なら全部 */
+  /** そのオーバーレイが見せている一覧の絞り（ボードの絞り込みで見えている識別子）。空なら全部 */
   approvalOnly?: readonly string[];
 }
 
@@ -260,7 +260,7 @@ function handleMessage(message: Message | undefined): void {
       openTicket(current, message.filePath);
       return;
     case "approve": {
-      // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを束にする。
+      // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを承認の対象にする。
       let only: readonly string[] = [];
       if (message.filtered) {
         if (message.tickets.length === 0) {
@@ -308,7 +308,7 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * 「承認」。束を読んでオーバーレイに出す。承認済みチケットはまだ置かれない。
+ * 「承認」。一覧を読んでオーバーレイに出す。承認済みチケットはまだ置かれない。
  * 読んでいる間も「読んでいる…」のオーバーレイを出し、二重に開かない。
  */
 async function openApproval(current: PanelState, only: readonly string[] = []): Promise<void> {
@@ -316,7 +316,7 @@ async function openApproval(current: PanelState, only: readonly string[] = []): 
     return;
   }
   current.approval = { kind: "loading" };
-  // 読み直し（束が変わったとき）も同じ絞りを通す。絞りを忘れると、絞り込んで見せた
+  // 読み直し（一覧が変わったとき）も同じ絞りを通す。絞りを忘れると、絞り込んで見せた
   // つもりのオーバーレイが承認待ち全部に化ける。
   current.approvalOnly = only;
   redraw(current);
@@ -329,8 +329,8 @@ async function openApproval(current: PanelState, only: readonly string[] = []): 
 }
 
 /**
- * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが束の一致を
- * 確かめ、違えば何も置かずに `mismatch` を返すので、束を読み直して出し直す。
+ * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが一覧の一致を
+ * 確かめ、違えば何も置かずに `mismatch` を返すので、一覧を読み直して出し直す。
  * 承認できたら、Claude Code に渡す文を通知の 2 ボタン（コピー / 新しいセッションで開く）で渡す。
  * 押すまで何もしない。ボードの読み直しは承認済みチケットの監視が起こす。
  */
@@ -341,7 +341,7 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   const preview = current.approval.preview;
   current.approval = { kind: "approving", preview };
   redraw(current);
-  // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らない束と比べて食い違いにする。
+  // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
   const outcome = await runApproveYes(
     current.folder.uri.fsPath,
     binSetting(),
@@ -358,14 +358,14 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
     return;
   }
   if ("mismatch" in outcome) {
-    // 絞りは外す。束が変わったのだから、いま何が承認待ちなのかを全部見せる。
+    // 絞りは外す。一覧が変わったのだから、いま何が承認待ちなのかを全部見せる。
     current.approvalOnly = [];
     const again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
     if (state !== current) {
       return;
     }
     current.approval = again.ok
-      ? { kind: "preview", preview: again.value, notice: "見せた束と今の束が違った（提案が増えたか減った）。見直してから承認する" }
+      ? { kind: "preview", preview: again.value, notice: "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する" }
       : { kind: "error", error: again.error };
     redraw(current);
     return;

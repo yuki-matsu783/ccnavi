@@ -71,7 +71,7 @@ ${SCRIPT}
 }
 
 /**
- * 承認のオーバーレイ。束の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
+ * 承認のオーバーレイ。一覧の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
  * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
  */
 export function renderApproval(overlay: ApprovalOverlay | undefined): string {
@@ -81,7 +81,7 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
   const inner = (() => {
     switch (overlay.kind) {
       case "loading":
-        return `<p class="approval-note">承認の束を読んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
+        return `<p class="approval-note">承認待ちの一覧を読んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
       case "error":
         return `<p class="approval-note error">${escapeHtml(overlay.error)}</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
       case "preview":
@@ -298,7 +298,7 @@ function renderActions(actions: readonly Action[], id: string): string {
 function renderActionButton(action: Action, id: string): string {
   switch (action.kind) {
     case "approve":
-      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。絞り込み中は、見えている承認待ちだけの束になる">承認</button>`;
+      return `<button type="button" class="action" data-action="approve" title="まとめて承認する（ccnavi --approve）。絞り込み中は、見えている承認待ちだけが対象になる">承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
   }
@@ -604,7 +604,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const count = column.querySelector(":scope > h2 > .count");
       if (count) { count.textContent = String(column.querySelectorAll(".card:not(.hidden)").length); }
     }
-    // 「承認待ち N 件を承認」だけは、押したときに束になるもの（見えている承認待ち）の数にする。
+    // 「承認待ち N 件を承認」だけは、押したときに承認の対象になるもの（見えている承認待ち）の数にする。
     const approve = document.querySelector('.controls button[data-action="approve"]');
     if (approve) {
       const n = document.querySelectorAll(".card.pending:not(.hidden)").length;

@@ -1,4 +1,4 @@
-"""フェーズとゲート。子チケットの束が終わったときに何をするかと、進もうとしたら止めること。
+"""フェーズとゲート。子チケットのまとまりが終わったときに何をするかと、進もうとしたら止めること。
 
 ## フェーズの終わり
 
@@ -57,7 +57,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# `--approve --preview` は束を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
+# `--approve --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
 # `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
 # 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
@@ -123,7 +123,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             "使い、承認は利用者が VS Code のボードか "
             f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
             "未解決の受け入れは利用者が端末で行います。"
-            "束を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            "承認待ちの一覧を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -556,7 +556,7 @@ def order_problems(
     if mine is None:
         return []
     my_type = (types or {}).get(mine.type)
-    # 同じ束でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
+    # 同じ承認でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
     # 済む（settle_last_review）。承認の前に印は無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
