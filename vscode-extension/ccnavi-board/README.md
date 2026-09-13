@@ -37,8 +37,9 @@ deny が止める。承認できたら通知に「コピー」「新しいセッ
 読めるかを確かめる入口だけを持つ。
 
 同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 §11）を
-一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の設定（`.gitignore`、`config/rules.yml`）を
+一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の設定（`.gitignore`、層のルール `.ccnavi/config/rules.yml`）を
 ボタンで整える。各行からそのプロジェクトのルール設定画面とチケット管理（ボードの絞り込み）へ飛べる。
+ワークスペース自身の層のルールも同じ画面から開ける。
 
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
 「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の 5 つの入口が並ぶ。「チケット管理」が出るのは、ワークスペースが
@@ -68,29 +69,37 @@ deny が止める。承認できたら通知に「コピー」「新しいセッ
 
 | 何 | どう出るか、何が起きるか |
 |---|---|
-| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・`config/rules.yml` の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
+| 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・層のルール（既定 `.ccnavi/config/rules.yml`）の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
 | clone | URL と名前を入れて「clone」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
 | clone を止める条件 | URL が https / ssh / `git@host:path` のどの形でもない、資格情報（`user:token@`）が入っている、名前が英数字と `. _ -` 以外を含む（先頭は英数字）、既存のツリー名と衝突する（大文字小文字だけ違う名前も）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` を落とした `host/path` で比べる）、clone 先が既にあって空でない |
 | 置き場が無い | 上部に警告が出る。「作成」で `projects/` を作る。clone すれば git が作るので、無くても clone はできる |
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
-| ルールが無い | 行に「ワークスペースからコピー」のボタンが出る。`.claude/ccnavi/rules.yml`（`CCNAVI_RULES`）を `projects/<名前>/config/rules.yml` に写す。先頭に出どころのコメントを足し、文面の `sh .claude/scripts/` は `sh {root}/.claude/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う |
+| ルールの置き場 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（実行ファイルが `CCNAVI_PROJECT_HOME` を読んで解く。既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは層として数えないので、置き場もボタンも出ない |
+| ルールが無い | 行に「共通層からコピー」のボタンが出る。`.claude/ccnavi/rules.yml`（`CCNAVI_RULES`）を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .claude/scripts/` は `sh {root}/.claude/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
+| 旧の置き場が残っている | `projects/<名前>/config/rules.yml` があれば、ルール欄に「判定に読まれていない。中身を層のルールファイルへ移し、旧のファイルを消す」と出す。拡張は移さず、消さない |
+| 自身の層 | 「ワークスペース本体」の枠に、自身の層のルール（既定 `.ccnavi/config/rules.yml`）の有無と「ルール管理」「共通層からコピー」が出る。無いのは正常なので warn の色にしない |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
 | ルール管理 | そのプロジェクトのルール設定画面を開く（下の節）。ルールが無い行では押せない |
 | チケット管理 | ボードを開き、絞り込みをそのプロジェクトにする。チケット制御が disable なら出ない |
 | fetch / pull | `git fetch` / `git pull` を `projects/<名前>` でターミナルへ送る。未コミットの有無は見ない。衝突すれば git が止める |
 | プロジェクトとして認識されない git リポジトリ | ワークスペース直下を深さ 2 まで歩き（`node_modules` `.venv` `.claude` `.git` の中は歩かない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。置き場の外にあるか、置き場の 2 段目以下にあるか。表示だけで操作は無い |
-| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
+| 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/*`、`projects/*/config/rules.yml`、`.ccnavi/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
 
 入れていないもの。プロジェクトを外す操作（作業ツリーと承認済みチケットが残ったままディレクトリだけ消してしまう事故につながる。消したいならエクスプローラで消す）、
 clone のオプション欄（ブランチ、`--depth`、submodule。要るならターミナルで打つ）、ブランチと未コミットの表示（VS Code の Git 表示で見る）。
 
 ### ルール設定画面
 
-対象はワークスペースのルール（`.claude/ccnavi/rules.yml`）か、プロジェクト 1 つのルール
-（`projects/<名前>/config/rules.yml`）。プロジェクト版はプロジェクト管理画面の「ルール管理」から開き、
-対象ごとに 1 パネルで並べて開ける。編集中の内容は、ワークスペースなら `--rules`、プロジェクトなら
-`--project-rules-file <名前>=<パス>` で実行ファイルに渡す。保存を止める条件は、ワークスペース版は
-どのツリーの `doing` でも、プロジェクト版はそのプロジェクトの `doing` だけ。
+対象は 3 種（ccnavi の README「ルールは 3 層の和で当たる」）。ワークスペースのルール（共通層、`.claude/ccnavi/rules.yml`）、
+ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層（既定 `projects/<名前>/.ccnavi/config/rules.yml`）。
+自身の層とプロジェクト版はプロジェクト管理画面の「ルール管理」から開き、対象ごとに 1 パネルで並べて開ける。
+層の置き場は `--explain --json` の `layers[]` から取るので、実行ファイルが見つからないと層の画面は開かない。
+編集中の内容は、ワークスペースなら `--rules`、層なら `--project-rules-file <名前>=<パス>`（自身の層は `self=<パス>`）で
+実行ファイルに渡す。保存を止める条件は、ワークスペース版と自身の層はどのツリーの `doing` でも（どちらも全ツリーの Bash に効く）、
+プロジェクト版はそのプロジェクトの `doing` だけ。
+
+上部に注意が出ることがある。プロジェクトに旧の置き場 `config/rules.yml` が残っている（判定はそこを読まない）ときと、
+実行ファイルがこの層のファイルを読めず空として扱っている（ここのルールは 1 件も効いていない）とき。
 
 タブは 3 つ。
 
@@ -219,8 +228,9 @@ YAML として読めないファイルは画面から直せない（エディタ
 | `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `.claude/ccnavi/rule-samples.yml`。相対ならワークスペースルートから |
 
 ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.claude/ccnavi/rules.yml`。
-プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。プロジェクトのルールは
-`env.CCNAVI_PROJECT_RULES`、無ければ `config/rules.yml`（git プロジェクトルートからの相対）。
+プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。自身の層とプロジェクトの層のルールファイルは
+拡張が組まず、`--explain --json` の `layers[]` のパスを使う（実行ファイルが `env.CCNAVI_PROJECT_HOME` を読んで解く。
+既定は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。`CCNAVI_PROJECT_RULES` はもう読まない。
 
 ## 組み立てと導入
 
@@ -306,10 +316,12 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 | 23 | ファイルを選ぶ | additionalContextFile の「選ぶ…」でワークスペース内の md を選ぶ。もう一度押して外のファイルを選ぶ | 欄にルート相対のパス（`/` 区切り）が入り、保存ボタンが押せるようになる。外のファイルは「ワークスペースの外は指せない」の通知で欄が変わらない |
 | 24 | match を選ぶ | match の欄を押して札を出し、`Write` にチェック、`Bash` を外す。次に欄へ直接ツール名を縦棒でつないで打つ。最後に欄の外を押す | 札で選ぶと欄の文字が変わり、手で打つと札のチェックがそれを追う。外を押すか Esc で札が閉じる |
 | 25 | プロジェクト管理が開く | サイドパネルの「プロジェクト管理」 | `projects/` の各プロジェクトが表に並び、origin・ルールの有無・作業ツリー・チケット数・検証が出る。`projects/` が `.gitignore` に無ければ上部に警告とボタン |
-| 26 | clone | URL に `git@host:group/repo.git` を入れる（名前が `repo` に埋まる）。「clone」 | 「ccnavi」ターミナルで `git clone -- ... projects/repo` が走る。終わると表に `repo` の行が増え、ルール「無い」と lint の warn が出る |
+| 26 | clone | URL に `git@host:group/repo.git` を入れる（名前が `repo` に埋まる）。「clone」 | 「ccnavi」ターミナルで `git clone -- ... projects/repo` が走る。終わると表に `repo` の行が増え、ルール「なし」と置き場 `projects/repo/.ccnavi/config/rules.yml` が出る（無いことは lint の warn にならない） |
 | 27 | clone を止める | `https://user:token@host/g/p.git` を入れて送る。次に既存と同じ origin の URL を送る。次に既存の名前を大文字にして送る | それぞれ「資格情報」「既に clone している」「既にある」の赤い文が出て、ターミナルには何も送られない |
-| 28 | clone 後の設定 | 「.gitignore に追加」→ 行の「ワークスペースからコピー」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告と行の warn が消える |
-| 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」 | タブの題が「ccnavi ルール設定: <名前>」。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。ワークスペース版のパネルも同時に開いたままにできる |
+| 28 | clone 後の設定 | 「.gitignore に追加」→ 行の「共通層からコピー」 | `.gitignore` の末尾に `/projects/`。`projects/<名前>/.ccnavi/config/rules.yml` が出来て、先頭に出どころのコメント、`sh {root}/.claude/scripts/...` の綴り。上部の警告が消え、行のルールが「あり」になる |
+| 29 | プロジェクトのルール管理 | 行の「ルール管理」。glob を変えて保存せずに、`Write` と `projects/<名前>/docs/x.md` で「判定」。そのあと保存し、ターミナルで `ccnavi --explain` | タブの題が「ccnavi ルール設定: <名前>」。上部の path が `projects/<名前>/.ccnavi/config/rules.yml`。変えた後のルールで判定され、当たったルールの id が `<名前>:...`。保存したルールが `--explain` の `■ rules <名前>` に出る（判定に効いている）。ワークスペース版のパネルも同時に開いたままにできる |
+| 29b | 旧の置き場 | プロジェクトに `config/rules.yml` を置いて一覧を見る。そのまま行の「ルール管理」 | 行のルール欄に「旧の置き場 … は判定に読まれていません」。検証にも lint の warn が出る。ルール設定画面の上部にも同じ注意。旧のファイルを消すと、一覧から注意が消える |
+| 29c | 自身の層のルール管理 | 「ワークスペース本体」の枠で「共通層からコピー」→「ルール管理」。glob を変えて保存せずに、`Write` とワークスペースルートの下のパスで「判定」 | `.ccnavi/config/rules.yml` が出来る。タブの題が「ccnavi ルール設定: 自身の層」。当たったルールの id が `self:...`。どのツリーの子チケットを `start` しても保存が止まる |
 | 30 | プロジェクトごとに保存を止める | そのプロジェクトの子チケットを `start` してから「保存」。次に別のプロジェクトの子だけを `start` にして「保存」 | 前者は「プロジェクト <名前> に作業中のチケットがある」で止まる。後者は保存できる |
 | 31 | チケット管理への導線 | 行の「チケット管理」 | ボードが開き、絞り込みがそのプロジェクトになっている |
 | 32 | fetch / pull | 行の「fetch」「pull」 | ターミナルで `cd projects/<名前> && git fetch` / `git pull` が走る |
