@@ -225,7 +225,7 @@ class RejectTest(GitWrapperTest):
 
     def test_long_option_values_do_not_trip_the_short_option_scan(self):
         # `--contains=feature/dev` の f と d を -f -d と読み違えないこと。
-        # 短いオプションの束 (-rd) を 1 文字ずつ見る判定の巻き添え。
+        # 短いオプションをまとめた形 (-rd) を 1 文字ずつ見る判定の巻き添え。
         result = self.run_wrapper("branch", "--contains=feature/dev")
         self.assertNotEqual(2, result.returncode, result.stderr)
 

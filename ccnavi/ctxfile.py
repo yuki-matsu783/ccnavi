@@ -111,8 +111,12 @@ def for_rules(
     parts: list[str] = []
     remembered: set[str] | None = None
     for rule in group:
+        # 文の `{root}` は、止めたときの文面と同じくワークスペースルートの実パスにする。
         every = _with_file(
-            stderr, bases or [], rule.additional_context, rule.additional_context_file
+            stderr,
+            bases or [],
+            rules.fill_root(rule.additional_context, rule.root),
+            rule.additional_context_file,
         )
         if every:
             parts.append(every)
@@ -126,7 +130,10 @@ def for_rules(
                 continue
             remembered.add(key)
         once = _with_file(
-            stderr, bases or [], rule.additional_context_once, rule.additional_context_once_file
+            stderr,
+            bases or [],
+            rules.fill_root(rule.additional_context_once, rule.root),
+            rule.additional_context_once_file,
         )
         if once:
             parts.append(once)

@@ -25,7 +25,7 @@ import tempfile
 import unittest
 
 from ccnavi import phase as phase_mod
-from ccnavi import shellread
+from ccnavi import settings, shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -347,7 +347,7 @@ class TicketTest(unittest.TestCase):
         """超えている子だけが落ち、兄弟は承認済みチケットになる。落ちたものがあるので
         終了コードは 1。
 
-        束の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
+        承認の対象の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
         全部通ったと読む。通ったぶんの承認済みチケットは置くので、直して出し直せばよい。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -359,7 +359,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
 
-    # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
+    # ---- 2b. 承認の対象を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
 
     def test_approve_only_the_listed_tickets(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -372,7 +372,7 @@ class TicketTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0002.md")))
-        # 残した分は次の --approve の束に載る
+        # 残した分は次の --approve で承認の対象に入る
         self.assertEqual(self.approve().returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0002.md")))
 
@@ -569,6 +569,34 @@ class TicketTest(unittest.TestCase):
         # main からの起動にはゲートが無い。
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
         self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
+
+    def test_gate_guides_sh_from_workspace_root(self):
+        """ゲートと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
+
+        `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切った作業ツリーでは
+        相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
+        """
+        self.family()
+        self.close_phase()
+        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
+        said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn(f"{review_sh} request --phase 1", self.reason(said))
+        self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
+
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
+        self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
+        self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
+
+        # 案内どおりに打った形は、ゲートの例外に当たる。
+        guided = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f"{review_sh} request --phase 1 --body-file b.md",
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(guided), self.reason(guided))
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
@@ -864,7 +892,7 @@ class TicketTest(unittest.TestCase):
             "ccnavi --explain",
             "ccnavi --lint",
             "sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
-            # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
+            # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --approve --preview --json",
             "echo --approve --preview",
         ):

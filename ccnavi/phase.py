@@ -1,4 +1,4 @@
-"""フェーズとゲート。子チケットの束が終わったときに何をするかと、進もうとしたら止めること。
+"""フェーズとゲート。子チケットのまとまりが終わったときに何をするかと、進もうとしたら止めること。
 
 ## フェーズの終わり
 
@@ -57,7 +57,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# `--approve --preview` は束を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
+# `--approve --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
 # `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
 # 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
@@ -96,7 +96,7 @@ def forbidden(subject: str) -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject))
 
 
-def ticket_approval_rule(bin_path: str) -> rules.Rule:
+def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
     承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
@@ -118,10 +118,12 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
         message=(
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
-            "'sh .ccnavi/scripts/ccnavi-ticket.sh' と 'sh .ccnavi/scripts/ccnavi-review.sh' を"
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
-            "'sh .ccnavi/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
-            "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
+            "未解決の受け入れは利用者が端末で行います。"
+            "承認待ちの一覧を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -408,8 +410,9 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     return found
 
 
-def gate_reason(phase: Phase, tool: str) -> str:
+def gate_reason(phase: Phase, tool: str, root: str) -> str:
     """ゲートが止めたときに返す文。次に何をすればよいかを言う。"""
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
     marks = "依頼済み" if approval.MARK_REQUESTED in phase.marks else "未依頼"
     n = phase.number
@@ -422,9 +425,9 @@ def gate_reason(phase: Phase, tool: str) -> str:
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
             f"レビュー済みのマーカーが置かれるまで、ゲートが{what}を止めます。",
             "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+            f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら 'sh .ccnavi/scripts/ccnavi-review.sh check --phase {n}' "
+            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
             "で確かめます。次のフェーズの計画（wip/tickets/todo/ への提案）は"
             "レビュー前に進めて構いません。",
         ]
@@ -482,7 +485,8 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
                 f"子の成果を親ブランチへ合流して push し、"
-                f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+                f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
+                "--body-file <依頼文>' "
                 f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。指摘があれば同じ"
                 "フェーズに子を足せます。レビュー済みになるまで、ゲートがサブエージェントの起動と"
                 "シェル実行を止めます。"
@@ -541,10 +545,16 @@ def order_problems(
     child: ticket_mod.Ticket,
     parent: ticket_mod.Ticket,
     types: dict[str, phasetypes.PhaseType] | None,
+    adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §24.15.4）。
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
+
+    `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
+    増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
+    フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
+    次の子が一緒に承認され、1 本ずつ承認したときに落ちるものが、まとめて承認すると通る。
     """
     if not parent.has_plan or child.phase is None:
         return []
@@ -552,7 +562,11 @@ def order_problems(
     if mine is None:
         return []
     my_type = (types or {}).get(mine.type)
-    # 同じ束でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
+    reopened: dict[int, list[str]] = {}
+    for t in adding or []:
+        if t.phase is not None:
+            reopened.setdefault(t.phase, []).append(t.ticket)
+    # 同じ承認でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
     # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
@@ -561,10 +575,14 @@ def order_problems(
             break
         if phase.type is not None and my_type is not None and phase.type.overlaps(my_type):
             continue
-        if phase.number == settled and phase.ended:
+        ended = phase.ended and phase.number not in reopened
+        if phase.number == settled and ended:
             continue
-        if not phase.ended:
-            state = "子がまだ無い" if not phase.tickets else "子が開いている"
+        if not ended:
+            if phase.number in reopened:
+                state = f"同じ承認で {', '.join(reopened[phase.number])} を足すので開き直る"
+            else:
+                state = "子がまだ無い" if not phase.tickets else "子が開いている"
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,

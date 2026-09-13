@@ -167,4 +167,4 @@ def load(
     ここが問題を返したら、それはルールファイルではなくこのビルドの不備なので、
     呼び手はそのまま報告してよい。
     """
-    return rules.parse(rule_data(root, conf))
+    return rules.parse(rule_data(root, conf), builtin=True)
