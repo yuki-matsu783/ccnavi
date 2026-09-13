@@ -5,7 +5,7 @@
 ## 状況
 
 導入スクリプトは実行ファイルを `.claude/ccnavi/` に直に置き、`CCNAVI_BIN_PATH` をそこへ向けていた。
-PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かないので、配る前に印
+PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かないので、配る前に目印
 （`dist/ccnavi.target`）と `uname` を比べ、食い違えば配らなかった。
 
 これだと 1 つの配布先に置ける組み立ては 1 種類だけになる。`settings.json` は git で共有され、
@@ -24,7 +24,7 @@ x86_64 の組み立てへ回る。どこにも無ければ 127 で終わる。
 hook が起動できるようになってから消し、`CCNAVI_BIN_PATH` が前の既定の綴りなら書き換える。
 
 語（`darwin-arm64` など）は `ccnavi/platformtag.py`・sh・導入スクリプトの 3 か所で揃える。
-`build.py` は platformtag から印を書く。
+`build.py` は platformtag から目印を書く。
 
 ## 理由
 
