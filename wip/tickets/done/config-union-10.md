@@ -19,9 +19,9 @@ allow:
     glob: "README.md"
   - match: Write|Edit
     glob: "ccnavi.md"
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-13T09:23:50+0900"
+completed_at: "2026-09-13T09:27:32+0900"
+base_sha: "54208d29294e849c657ede0b0b962b2cc2b97585"
 ---
 
 # 文書と実装の食い違い 2 件を直す
