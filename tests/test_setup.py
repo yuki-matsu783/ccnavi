@@ -32,10 +32,10 @@ def _load_build():
     return module
 
 
-# この機械で組み立てたときに build.py が書く印。導入スクリプトはこれを自分の uname と
+# この機械で組み立てたときに build.py が書く目印。導入スクリプトはこれを自分の uname と
 # 比べる。ここを本物の build_target から取るので、2 つの語がずれればテストが落ちる。
 THIS_MACHINE = _load_build().build_target()
-# どの機械とも一致しない印。
+# どの機械とも一致しない目印。
 ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
@@ -712,8 +712,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         本物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
         「どこから何を配るか」であって、実行ファイルの中身ではない。
 
-        target は build.py が dist/ccnavi.target に書く印。None なら書かない
-        （印を書く前の build.py で組んだ配布元）。
+        target は build.py が dist/ccnavi.target に書く目印。None なら書かない
+        （目印を書く前の build.py で組んだ配布元）。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
@@ -1057,7 +1057,7 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
         self.assertNotIn("確かめていません", result.stdout)
         self.assertNotIn("向けで", result.stdout)
-        # 印は dist/ccnavi/ の外にあるので、配布先へは写らない。
+        # 目印は dist/ccnavi/ の外にあるので、配布先へは写らない。
         for parts in (
             (".ccnavi", "ccnavi.target"),
             (*BIN_DIR_PARTS, "ccnavi.target"),
@@ -1066,7 +1066,7 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
             self.assertFalse(os.path.exists(self.deployed(*parts)), parts)
 
     def test_refuses_a_named_source_without_the_mark(self):
-        """印が無いと置き場を決められない。推測で置くと、別の機械向けを入れうる。"""
+        """目印が無いと置き場を決められない。推測で置くと、別の機械向けを入れうる。"""
         src = self.make_source(target=None)
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
@@ -1082,7 +1082,7 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
         self.assertTrue(os.path.exists(self.settings_path()))
 
     def test_refuses_a_mark_that_would_leave_the_place(self):
-        """印はそのままディレクトリ名になる。区切りを含む値で置き場の外へ書かせない。"""
+        """目印はそのままディレクトリ名になる。区切りを含む値で置き場の外へ書かせない。"""
         for mark in ("../escape", "linux/x86_64", "linux"):
             with self.subTest(mark=mark):
                 src = self.make_source(target=mark)

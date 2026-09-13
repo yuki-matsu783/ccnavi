@@ -432,7 +432,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(record["untested"].get("source"), "lib", record)
 
     def test_the_mark_that_rests_on_a_type_names_its_layer(self):
-        """§25.9: 種類を根拠に置く印（`review: none` の skipped）には、その種類の層。"""
+        """§25.9: 種類を根拠に置くマーカー（`review: none` の skipped）には、その種類の層。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "1\n")
         closed = self.ccnavi("ticket", "done", "i0001-01")
