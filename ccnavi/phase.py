@@ -541,10 +541,16 @@ def order_problems(
     child: ticket_mod.Ticket,
     parent: ticket_mod.Ticket,
     types: dict[str, phasetypes.PhaseType] | None,
+    adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
     """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §24.15.4）。
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
+
+    `adding` は同じ束で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
+    増え、印も消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
+    フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
+    次の子が一緒に承認され、1 本ずつ承認したときに落ちるものが束では通る。
     """
     if not parent.has_plan or child.phase is None:
         return []
@@ -552,6 +558,10 @@ def order_problems(
     if mine is None:
         return []
     my_type = (types or {}).get(mine.type)
+    reopened: dict[int, list[str]] = {}
+    for t in adding or []:
+        if t.phase is not None:
+            reopened.setdefault(t.phase, []).append(t.ticket)
     # 同じ束でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
     # 済む（settle_last_review）。承認の前に印は無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
@@ -561,10 +571,14 @@ def order_problems(
             break
         if phase.type is not None and my_type is not None and phase.type.overlaps(my_type):
             continue
-        if phase.number == settled and phase.ended:
+        ended = phase.ended and phase.number not in reopened
+        if phase.number == settled and ended:
             continue
-        if not phase.ended:
-            state = "子がまだ無い" if not phase.tickets else "子が開いている"
+        if not ended:
+            if phase.number in reopened:
+                state = f"同じ束で {', '.join(reopened[phase.number])} を足すので開き直る"
+            else:
+                state = "子がまだ無い" if not phase.tickets else "子が開いている"
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,

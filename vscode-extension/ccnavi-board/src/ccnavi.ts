@@ -223,7 +223,9 @@ export async function runApprovePreview(
   }
   const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --approve --preview --json が失敗した: ${firstLine(ran.stderr)}` };
+    // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに束に無い」など）は
+    // 読めない提案の行より後ろに出るので、1 行目だけでは届かない。
+    return { ok: false, error: `ccnavi --approve --preview --json が失敗した:\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
