@@ -5,7 +5,7 @@ import type { BoardJson, LayerJson } from "../src/core/model.js";
 import { fixture } from "./fixture.js";
 
 function layer(name: string, path: string): LayerJson {
-  return { name, rules: { path, unreadable: "" } };
+  return { name, rules: { path, unreadable: "" }, phasesFile: { path: "", unreadable: "" } };
 }
 
 function board(layers: readonly LayerJson[]): BoardJson {
