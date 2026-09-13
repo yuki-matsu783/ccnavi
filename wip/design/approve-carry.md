@@ -13,16 +13,21 @@ requirements.md の REQ-TKT-04・REQ-TKT-30。
 | 子の範囲が種類の scope を超える | 承認で error | 承認で warn。**判定で種類の scope でも切り詰める**（新規） |
 | 子の範囲が regex | 承認で error | 承認で warn。判定は実際のパスで親と種類に当てる |
 | dry-run | 承認は超過で止まる | 承認は通る。判定は今の dry-run の文面で「enable なら止めた」と言って通す |
+| ボードで見せたあとに提案が書き換わる | 書き換わった中身が承認される | 指紋が合わなければ承認しない（3.4） |
 
 ## 1. `ccnavi-push-approved.sh`
 
 ### 1.1 役割
 
-承認済みチケットの置き場（`$CCNAVI_APPROVED`、既定 `.ccnavi/tickets`）に変更があるツリーごとに、
+承認済みチケットの置き場（`$CCNAVI_TICKETS_APPROVED`、既定 `.ccnavi/tickets`。`settings.APPROVED_ENV`）に変更があるツリーごとに、
 その置き場だけをコミットし、保護されたブランチでなければ push する。今の
 `ccnavi-approve.sh:74-121` をそのまま移す。承認はしない。実行ファイルも起動しない。
 
 名前は処理を言う。対になるのはセッションの頭に取ってくる `ccnavi-fetch.sh`。
+
+完成品は `wip/design/scripts/` にある（`ccnavi-push-approved.sh`、差し替えの `ccnavi-approve.sh`、
+写す手順の `README.md`）。`.ccnavi/scripts/` は保護されているので、人が 2 本を同時に写す
+（片方だけ写すと、承認のあと運ばれないか、無い sh を呼ぶ）。
 
 ### 1.2 形
 
@@ -33,6 +38,9 @@ sh .ccnavi/scripts/ccnavi-push-approved.sh
 - 引数は取らない（`-h` / `--help` / `help` だけ）。`ccnavi-approve.sh` と同じ
 - ワークスペースルートは `ccnavi-common.sh` の `ccnavi_workspace` で探す。見つからなければ 2
 - 数えるツリー: ワークスペース、`$CCNAVI_PROJECTS/*`、`.claude/worktrees/*`（今と同じ）
+- シンボリックリンクは辿らない。`$root/projects` と `$root/.claude/worktrees` そのもの、その下の
+  1 件ずつのどちらがリンクでも、標準エラーに名指しして飛ばす（リンクの先はワークスペースの外の
+  リポジトリでありうる）
 - ツリーごとに `git status --porcelain -- "$approved"` が空でなければ `git add -- "$approved"` →
   `git commit -m "ccnavi: 承認済みチケットを更新"`。パスを限る。`-a` も `add -A` も使わない
 - ブランチの上に居ない（detached）ツリーは名指しして飛ばす
@@ -43,13 +51,16 @@ sh .ccnavi/scripts/ccnavi-push-approved.sh
 
 | 終了コード | いつ |
 |---|---|
-| 0 | 運ぶものが無い、または全部コミットした（push しなかったブランチを含む） |
-| 1 | コミットできなかったツリーか、push が落ちたツリーが 1 つ以上ある |
+| 0 | 運ぶものが無い、または全部コミットした（push しなかったブランチ、飛ばしたツリーを含む） |
+| 1 | `git add` か `commit` が落ちたツリー、または push が落ちたツリーが 1 つ以上ある |
 | 2 | 引数の誤り、ワークスペースルートが見つからない |
 
+- `git add` の失敗は `commit` の失敗と同じく捕まえ、そのツリーを飛ばして次へ進む。最後に 1
 - 運んだツリーは 1 行ずつ標準出力、飛ばしたツリーと失敗は標準エラー（今の文面を移す）
-- 運ぶものが無ければ `運ぶ承認済みチケットは無い。` を 1 行出す。ボードから端末に送ったとき、
-  何も起きなかったのか動かなかったのかを人が見分けられるように
+- 運ぶものがどのツリーにも無ければ `運ぶ承認済みチケットは無い。` を 1 行出す。ボードから端末に
+  送ったとき、何も起きなかったのか動かなかったのかを人が見分けられるように
+- 変更が detached のツリーにしか無いときは、この 1 行を出さない（運ぶものはある）。飛ばしたことを
+  標準エラーに言って 0
 
 ### 1.4 `ccnavi-approve.sh` からの呼び方
 
@@ -60,7 +71,7 @@ exit 0
 ```
 
 承認が通ったあとは今までどおり 0 で終わる（運ぶ失敗で承認が失敗に見えないように。コミットは残り、
-もう一度打てば送れる）。`$CCNAVI_APPROVED` / `$CCNAVI_PROJECTS` は環境で引き継ぐ。
+もう一度打てば送れる）。`$CCNAVI_TICKETS_APPROVED` / `$CCNAVI_PROJECTS` は環境で引き継ぐ。
 
 ### 1.5 配る
 
@@ -74,14 +85,19 @@ exit 0
 `phase.ticket_approval_rule` の `script` を広げる。
 
 ```python
-script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
+script = r"(?i)(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
 ```
 
-文面に 1 文足す: 「承認済みチケットのコミットと push（`ccnavi-push-approved.sh`）も人が打ちます。
-ボードで承認したあと端末に送られた 1 行を、利用者が確かめて実行します。」
+- 大文字小文字を区別しない。macOS と Windows のファイルシステムは `CCNAVI-Approve.SH` でも同じ sh を
+  開くので、区別すると綴りを変えるだけで通る
+- 文面に 1 文足す: 「ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。
+  エージェントは打ちません。」
 
 理由: 承認済みチケットを運ぶことは合意そのものではないが、push は外へ出す操作で、運ぶ時機を
 決めるのは人（2026-09-13 の決定）。
+
+止めるのはこの組み込みの deny だけ。sh の側で標準入力が端末かを確かめる検査は入れない。push は
+そこまで守らなくてよい（2026-09-14 の決定）。
 
 ## 2. ボード
 
@@ -112,8 +128,9 @@ export function pushApprovedCommand(root: string): string {
 
 ### 2.2 見せ方
 
-`offerPrompt` の通知の文を「N 件を承認した。コミットと push を端末に送った。Claude Code に伝える文を用意した」
-にする。
+- 承認のあとの画面は main のオーバーレイ（`done`）に載せる
+- 端末に送ったときだけ「コミットと push を端末に送った」を出す。sh が無くて送らなかったときは出さない
+  （警告の方が出る）
 
 ## 3. 承認: 範囲の超過を warn に下げる
 
@@ -131,8 +148,8 @@ export function pushApprovedCommand(root: string): string {
 下げる 3 つは「範囲の広さ」の検査で、判定が切り詰めるので承認で止める理由が無い。残すものは
 「チケットの形」の検査で、判定では補えない（親が無い子はどの範囲で切り詰めるかが決まらない）。
 
-2 つの関数を呼んでいるのは `approval.validate` だけ（`--lint` ほかからは呼ばれていない）なので、
-関数の中で severity を変えてよい。
+severity は 2 つの関数の中で変える。`--lint` も `approval.validate` を共有するので、`--lint` でも
+子の範囲の超過は warn になり、CI の終了コードは落ちなくなる（判定で止まるので、承認と揃える）。
 
 ### 3.2 承認画面
 
@@ -148,6 +165,9 @@ export function pushApprovedCommand(root: string): string {
 `Candidate` に `overflow: list[Problem]` を持たせ、`validate` から超過の 3 つを別の並びで返す
 （`complaints` と混ぜない）。文面の「承認を拒む」旨の言い回しは消す。
 
+新規の子の画面には親の `issue:` を出す（何の課題の子かを承認の前に見せる）。改版では出さない
+（改版で `issue` は変わらない）。
+
 ### 3.3 `--approve --preview --json`
 
 - `batch[]` に `overflow[]`（文字列の並び）を足す。空なら `[]`
@@ -157,6 +177,28 @@ export function pushApprovedCommand(root: string): string {
   `overflow` を読んでおく（ボードの承認待ちの行に「範囲の超過あり」を出すのは今回入れない）
 - `vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` を書き直す
   （`CCNAVI_BOARD_FIXTURE=1`）
+
+### 3.4 ボードの承認の指紋
+
+ボードは中身を見せてから承認を送るので、その間に提案が書き換わると、見ていないものが承認される。
+見せた中身と一致するときだけ承認済みチケットを置く。
+
+| 呼び方 | 振る舞い |
+|---|---|
+| `--approve --preview --json` | 出力に `digest` を足す |
+| `--approve --yes <識別子,…> --digest <値>` | 承認のときに読み直した中身の指紋と比べる。一致すれば承認 |
+| 指紋が違う | 何も置かず `mismatch`、`digest: {expected, current}` を返して 1 |
+| `--digest` が無い | 1（ボードの経路で指紋を省けないように） |
+
+- 値の大文字小文字は吸収する
+- 覆うもの: 承認画面の本文と、束のチケットごとに承認のとき書き出す中身
+  - 新規: 提案の frontmatter と本文
+  - 改版: 今の承認済みチケットの frontmatter の計画だけを差し替えたもの
+  - `ccnavi_approved` は除く（承認のときに付くので、見せたときには無い）
+- 画面の本文だけでは足りない。画面に出ない欄（`issue`、Markdown の本文、知らない欄）を見せたあとに
+  書き換えても通ってしまう
+- 計算: 部分ごとの SHA-256 を件数と一緒に改行で並べ、その全体の SHA-256。区切り文字でつなぐ形は
+  取らない。Markdown の本文は生の制御文字を素通しするので、区切りを本文に含めてつなぎ目をずらせる
 
 ## 4. 判定: 種類の scope でも切り詰める
 
@@ -172,9 +214,10 @@ export function pushApprovedCommand(root: string): string {
 # phase.py
 @dataclass
 class ScopeVerdict:
-    verdict: str          # ALLOW / ASK / DENY / OUTSIDE
-    limit: str            # 外に出した上限。"" / "ticket" / "parent" / "type"
+    verdict: str  # ALLOW / ASK / DENY / OUTSIDE
+    limit: str  # 外に出した上限。"" / "ticket" / "parent" / "type"
     type: phasetypes.PhaseType | None
+
 
 def scope_verdict(child, parent, pt, rel) -> ScopeVerdict:
     verdict = child.decide(rel)
@@ -186,12 +229,13 @@ def scope_verdict(child, parent, pt, rel) -> ScopeVerdict:
             limit = "parent"
         verdict = combined
     if pt is not None and not pt.inherits_scope:
-        t = pt.decide(rel)       # ALLOW か OUTSIDE
+        t = pt.decide(rel)  # ALLOW か OUTSIDE
         combined = ticket_mod.combine(verdict, t)
         if not limit and combined in (OUTSIDE, DENY):
             limit = "type"
         verdict = combined
     return ScopeVerdict(verdict, limit, pt)
+
 
 def type_for(conf, root, child, parent, types=None) -> PhaseType | None:
     """子の番号の種類。親が計画を持たない、番号が無い、種類が引けないなら None。"""
@@ -210,7 +254,12 @@ def type_for(conf, root, child, parent, types=None) -> PhaseType | None:
 |---|---|---|
 | どの層にも phases.yml が無い（番号だけの挙動） | 種類では切り詰めない | 何も言わない（今と同じ） |
 | 種類の scope が `inherit` | 種類では切り詰めない | 何も言わない |
-| 親が計画を持ち、その番号の種類が読めない（phases.yml が壊れた・種類を消した） | 種類では切り詰めない。親では切り詰める | 実行前の判定で notice「種類 `<id>` が読めないので、種類の上限では切り詰めていない」 |
+| 親が計画を持ち、phases.yml が実在するのにその番号の種類を引けない（壊れた・種類を消した） | 種類では切り詰めない。親では切り詰める | 実行前の判定で notice「種類 `<id>` が読めないので、種類の上限では切り詰めていない」 |
+
+- 「読めない」と言うのは phases.yml が実在するときだけ。どの層にも無いときは言わない（1 行目）
+- phases.yml の読み込みで上がる `ValueError` 系（`UnicodeDecodeError` を含む）も「壊れている」と
+  扱い、苦情を付けて None を返す。例外を外へ出さない。判定が例外で終わると終了コード 1 になり、
+  Claude Code はそれを止める合図と読まないので、止めるはずの書き込みが通る
 
 壊れたときに deny へ倒さないのは、phases.yml が保護されたコアファイル（§8）でエージェントが
 壊せないことと、親の範囲の切り詰めは残ることによる。deny に倒すと、人が phases.yml を編集している
@@ -240,7 +289,7 @@ limit: parent i0001: src/*, tests/*
 ### 4.4 dry-run
 
 新しい処理は足さない。`judge.decide_before` はモードが dry-run なら今も
-`[ccnavi dry-run] enable would have denied this call:` を前に付けて通す（`judge.py:369`）。
+`[ccnavi dry-run] enable would have stopped this call:` を前に付けて通す（`judge.decide_before`）。
 その下に 4.3 の `limit:` 行が載るので、「dry-run であること」と「どの上限を超えたか」が一緒に届く。
 実行後の監視（`events.py:313`）と SubagentStop も今の dry-run の扱いのまま。
 
@@ -255,8 +304,8 @@ limit: parent i0001: src/*, tests/*
 
 | 場所 | 変えること |
 |---|---|
-| `.ccnavi/scripts/ccnavi-push-approved.sh` | 新規（1 章）。staging で人が写す |
-| `.ccnavi/scripts/ccnavi-approve.sh` | 後半を消し、`ccnavi-push-approved.sh` を呼ぶ（1.4）。staging |
+| `.ccnavi/scripts/ccnavi-push-approved.sh` | 新規（1 章）。完成品は `wip/design/scripts/`。人が写す |
+| `.ccnavi/scripts/ccnavi-approve.sh` | 後半を消し、`ccnavi-push-approved.sh` を呼ぶ（1.4）。上と同時に人が写す |
 | `scripts/ccnavi-setup.sh` | `DEPLOY_SCRIPTS` に加える |
 | `ccnavi/phase.py` | `ticket_approval_rule` の `script` と文面（1.6）。`scope_verdict` / `type_for` を足し、`scope_findings` をそれで書き直す |
 | `ccnavi/judge.py` | `ticket_verdict` を `scope_verdict` で書き直し、`limit:` 行と文面（4.3）、種類が読めない notice（4.2） |
@@ -264,9 +313,10 @@ limit: parent i0001: src/*, tests/*
 | `ccnavi/subagent.py` | `at_stop` の差し戻しに上限の名指しを添える |
 | `ccnavi/ticket.py` | `subset_problems` の severity を warn に |
 | `ccnavi/phasetypes.py` | `scope_problems` の severity を warn に |
-| `ccnavi/approval.py` | `validate` が超過を別の並びで返す、`Candidate.overflow`、`screen` の見出し（3.2）、JSON の `overflow[]`（3.3） |
+| `ccnavi/approval.py` | `validate` が超過を別の並びで返す、`Candidate.overflow`、`screen` の見出しと親の `issue:`（3.2）、JSON の `overflow[]`（3.3）、指紋（3.4） |
+| `ccnavi/phasetypes.py` の読み込み | `ValueError` 系を苦情付きの None に（4.2） |
 | `vscode-extension/ccnavi-board/src/core/commands.ts` | `pushApprovedCommand` |
-| `vscode-extension/ccnavi-board/src/board-panel.ts` | `confirmApproval` で端末に送る、sh が無いときの警告、通知の文 |
+| `vscode-extension/ccnavi-board/src/board-panel.ts` | `confirmApproval` で端末に送る、sh が無いときの警告、`done` のオーバーレイの文、`--digest` を渡す |
 | `vscode-extension/ccnavi-board/src/core/approvemodel.ts` | `overflow[]` を読む |
 | `vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` | 書き直す |
 | README.md | 「承認の JSON」の `overflow[]`、`rejected[]` に載る条件、スクリプトの一覧、ボードの承認の流れ |
@@ -285,11 +335,17 @@ limit: parent i0001: src/*, tests/*
 5. `--approve --preview --json`: 超過だけの子は `batch[]` に載り `overflow[]` を持つ。`rejected[]` には
    形の壊れた子（計画に無い番号）だけが載る（`test_approve_json.test_preview_lists_the_batch_...` を書き直す）
 6. 大文字小文字だけ違う子は、今までどおり超過にならない（`overflow[]` が空）
+6a. 指紋: preview の `digest` を `--digest` に渡せば承認される。大文字にしても通る。`--digest` が
+    無ければ 1
+6b. 見せたあとに書き換えると `mismatch` で 1、何も置かれない。書き換える先ごとに押さえる:
+    画面の本文、画面に出ない欄（`issue`、Markdown の本文、知らない欄）、NUL を含む本文、改版の計画
+6c. 新規の子の画面に親の `issue:` が出て、改版では出ない
+6d. `--lint`: 子の範囲の超過は warn で、終了コードは 0
 
 ### 6.2 判定
 
 7. enable: 種類の上限の外で子の範囲の中への Write は `DENY_TICKET_SCOPE`、文面に `limit: phase type` と種類名
-8. dry-run: 同じ Write は通り、`[ccnavi dry-run] enable would have denied` と `limit: phase type` が出る
+8. dry-run: 同じ Write は通り、`[ccnavi dry-run] enable would have stopped` と `limit: phase type` が出る
 9. 種類の上限の中で子が `ask` と書いた場所は `TICKET_ASK` のまま
 10. 種類の scope が `inherit` なら種類では切り詰めない
 11. phases.yml がどの層にも無ければ種類では切り詰めない
@@ -298,20 +354,30 @@ limit: parent i0001: src/*, tests/*
 14. regex の子: 実際のパスで親と種類に当たる
 15. 実行後の監視: Bash が種類の上限の外に書くと `POST_TICKET_SCOPE`
 16. SubagentStop: 種類の上限の外の変更で差し戻し、上限の名指しが付く
+16a. phases.yml の読み込みで `ValueError` 系（UTF-8 でないバイト列など）が上がっても判定は例外で
+     終わらず、12 と同じく notice を出して親で切り詰める
 
 ### 6.3 運ぶ
 
 17. `ccnavi-push-approved.sh`: 置き場の変更だけをコミットし、同じツリーの他の未コミットは運ばない
+17a. `projects/` の下のツリーも運ぶ。`$CCNAVI_TICKETS_APPROVED` の置き場を見る。ステージ済みの
+     置き場の外の変更はコミットに入らない
 18. 運ぶものが無ければ 0 で `運ぶ承認済みチケットは無い。`
 19. `main` の上のツリーはコミットして push しない（0、標準エラーに綴り）
 20. push が落ちると 1、コミットは残る
-21. detached のツリーは飛ばす
+20a. `git add` が落ちたツリーは飛ばして次へ進み、最後に 1
+21. detached のツリーは飛ばす。変更が detached のツリーにしか無ければ `運ぶ承認済みチケットは無い。` を
+    出さず、標準エラーに言って 0
+21a. シンボリックリンクは辿らない: `projects` そのもの、`.claude/worktrees` そのもの、その下の 1 件の
+     3 つとも、標準エラーに言って飛ばす
 22. `ccnavi-approve.sh` が承認のあと運ぶ（今のテストの手順を sh 経由に）
 23. エージェントの Bash で `sh .ccnavi/scripts/ccnavi-push-approved.sh`、`bash /abs/.ccnavi/scripts/ccnavi-push-approved.sh`、
-    `ls; sh .ccnavi/scripts/ccnavi-push-approved.sh` が `DENY_TICKET_APPROVAL_CLI`
+    `ls; sh .ccnavi/scripts/ccnavi-push-approved.sh` が `DENY_TICKET_APPROVAL_CLI`。大文字小文字を変えた
+    `SH .ccnavi/scripts/CCNAVI-Push-Approved.SH` も同じ
     （`test_ticket.test_cli_paths_are_denied_from_the_shell_unless_disabled` に足す）
 24. `test_sh_portability` が新しい sh を拾う
-25. 導入スクリプトが `ccnavi-push-approved.sh` を配る（`test_setup`）
+25. 導入スクリプトが `ccnavi-push-approved.sh` を配る（`test_setup`）。配布元にまだ無いときは、
+    落ちずにまだ無いことを言う
 26. 拡張: `pushApprovedCommand` の綴り（Windows の区切り、単引用符）
 
 sh のテストは `tests/test_clean_sh.py` と同じく、一時ディレクトリに git と bare のリモートを作って走らせる。
@@ -324,6 +390,11 @@ sh のテストは `tests/test_clean_sh.py` と同じく、一時ディレクト
 - ボードの承認待ちの行に「範囲の超過あり」を出すこと
 - 承認の処理が `CCNAVI_MODE` を読む形
 - 種類の上限の外に独自の理由コードを持たせること
+- 運ぶ sh で標準入力が端末かを確かめる検査（§1.6）
+- 起動子の多様さ（`dash`、`env sh`、`./ccnavi-push-approved.sh`）で止める式を抜ける穴。前からある
+- phases.yml の大きさの上限
+- 保護ブランチの名前の大文字小文字を吸収すること
+- 本文の NUL を承認で拒む検査（指紋はずらされないので、今は拒まない）
 
 ## 8. requirements.md
 
@@ -339,5 +410,8 @@ sh のテストは `tests/test_clean_sh.py` と同じく、一時ディレクト
 - 利用者が VS Code 拡張のボードで承認したとき、ccnavi は、承認済みチケットをコミットして push する手順を利用者の端末に渡すこと
 - エージェントが承認済みチケットをコミットして push する sh を実行しようとしたとき、ccnavi は、それを止めること
 - フェーズの種類の上限を読めないとき、ccnavi は、その上限で切り詰めていないことを示すこと
+- 利用者が VS Code 拡張のボードで承認したとき、ccnavi は、見せた中身と承認のときの中身が一致するときだけ承認済みチケットを置くこと
+- フェーズの種類の定義が読めないときも、ccnavi の判定は、例外で終わらず判定を返すこと
+- エージェントが承認の経路の sh を実行しようとしたとき、ccnavi は、綴りの大文字小文字によらずそれを止めること
 
 受入テストの表（requirements.md 655 行付近の 11）に、上の REQ を足す。
