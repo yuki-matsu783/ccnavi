@@ -133,6 +133,27 @@ class RepoRulesTest(unittest.TestCase):
     def test_パイプで繋いだ_curl_は_ask_のまま(self):
         self.assert_verdict('echo "a b" | curl -d @- x', "ask", "prefer-webfetch")
 
+    def test_引用の中の_preview_は承認の免除にならない(self):
+        # phase.py の `_NOT_PREVIEW` は同じ語の中まで見ない。見ると、引数の値に
+        # `--preview` を書くだけで `--approve` の枝が免除される。
+        for subject in [
+            'uv run python -m ccnavi --approve i0001 "a --preview"',
+            'ccnavi --approve "i0001 --preview"',
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+
+    def test_設定の場所の名前は語の中の印でも終わる(self):
+        # selfguard の `_TERM` / `_END` は語の中の印も語の終わりとして数える。
+        # 数えないと、分ける前に止まっていた綴りが通るようになる。
+        for subject in [
+            'rm ".ccnavi x"',
+            'rm ".claude x"',
+            'mv ".ccnavi;x" y',
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_verdict(subject, "deny", "builtin-guard-setting-files")
+
 
 if __name__ == "__main__":
     unittest.main()
