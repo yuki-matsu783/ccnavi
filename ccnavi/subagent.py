@@ -69,7 +69,7 @@ def at_start(
         "書き込みは行き先の作業ツリーのチケットで判定される。"
     ]
     parents = approval.by_id(copies)
-    types = phase.load_types(conf) or {}
+    types = phase.load_types(conf, root, bound.project) or {}
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
         state = "作業ツリーあり" if os.path.isdir(where) else "作業ツリー無し（効かない）"

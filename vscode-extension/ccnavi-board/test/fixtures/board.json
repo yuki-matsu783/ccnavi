@@ -1,7 +1,7 @@
 {
  "version": 1,
  "root": "<root>",
- "generated_at": "2026-09-11T08:56:45+0900",
+ "generated_at": "2026-09-12T23:34:55+0900",
  "settings": {
   "ticket_control": "enable",
   "tickets": "wip/tickets",
@@ -35,6 +35,111 @@
   }
  ],
  "projects": [],
+ "layers": [
+  {
+   "name": "common",
+   "rules": {
+    "path": "<root>/rules.yml",
+    "unreadable": "",
+    "deny": [
+     {
+      "id": "guard-approved",
+      "section": "deny",
+      "source": "common",
+      "match": "Write|Edit|NotebookEdit",
+      "kind": "glob",
+      "written": "*/.claude/ccnavi/*",
+      "pattern": "(?s:(?>.*?[///]/.claude[///]ccnavi[///]).*)/Z",
+      "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。"
+     }
+    ],
+    "ask": [],
+    "allow": []
+   },
+   "phases": [
+    {
+     "id": "research",
+     "source": "common",
+     "kind": "work",
+     "title": "調査",
+     "review": "none",
+     "scope": [
+      "wip/research/*"
+     ]
+    },
+    {
+     "id": "design",
+     "source": "common",
+     "kind": "work",
+     "title": "設計",
+     "review": "mr",
+     "scope": [
+      "wip/design/*"
+     ]
+    },
+    {
+     "id": "acceptance",
+     "source": "common",
+     "kind": "work",
+     "title": "受入テスト作成",
+     "review": "mr",
+     "scope": [
+      "tests/*"
+     ]
+    },
+    {
+     "id": "implement",
+     "source": "common",
+     "kind": "work",
+     "title": "実装とテスト",
+     "review": "mr",
+     "scope": [
+      "src/*",
+      "tests/*"
+     ]
+    },
+    {
+     "id": "implement-feedback",
+     "source": "common",
+     "kind": "feedback",
+     "title": "実装フィードバック対応",
+     "review": "mr",
+     "scope": [
+      "inherit"
+     ]
+    }
+   ],
+   "risk": {
+    "path": "<root>/.claude/ccnavi/risk.yml",
+    "unreadable": "",
+    "factors": []
+   },
+   "phases_file": {
+    "path": "<root>/phases.yml",
+    "unreadable": ""
+   }
+  },
+  {
+   "name": "self",
+   "rules": {
+    "path": "<root>/.ccnavi/config/rules.yml",
+    "unreadable": "",
+    "deny": [],
+    "ask": [],
+    "allow": []
+   },
+   "phases": [],
+   "risk": {
+    "path": "<root>/.ccnavi/config/risk.yml",
+    "unreadable": "",
+    "factors": []
+   },
+   "phases_file": {
+    "path": "<root>/.ccnavi/config/phases.yml",
+    "unreadable": ""
+   }
+  }
+ ],
  "problems": [],
  "pending_approval": [
   "i0001-03"
@@ -60,7 +165,7 @@
    },
    "copy": {
     "status": "open",
-    "approved_at": "2026-09-11T08:56:41+0900",
+    "approved_at": "2026-09-12T23:34:53+0900",
     "source_tree": "i0001",
     "path": "<root>/.claude/ccnavi/tickets/i0001.md"
    },
@@ -114,7 +219,7 @@
    },
    "copy": {
     "status": "closed",
-    "approved_at": "2026-09-11T08:56:42+0900",
+    "approved_at": "2026-09-12T23:34:54+0900",
     "source_tree": "i0001",
     "path": "<root>/.claude/ccnavi/tickets/closed/i0001-01.md"
    },
@@ -123,9 +228,9 @@
     "path": "<root>/.claude/worktrees/i0001-01",
     "project": ""
    },
-   "started_at": "2026-09-11T08:56:43+0900",
-   "completed_at": "2026-09-11T08:56:44+0900",
-   "base_sha": "fe4306169fdbf020d6a1546117c043afba0b3ebb",
+   "started_at": "2026-09-12T23:34:54+0900",
+   "completed_at": "2026-09-12T23:34:54+0900",
+   "base_sha": "dad94a52029fd00b4f5f0dc6e788114feb5c0387",
    "cancelled_at": "",
    "cancel_reason": "",
    "seen_in": [
@@ -150,9 +255,9 @@
     "level": "LOW",
     "hits": [],
     "unmeasured": [],
-    "head": "313380801664fcc6ca57a8d8770c6874878c5783",
-    "base": "fe4306169fdbf020d6a1546117c043afba0b3ebb",
-    "at": "2026-09-11T08:56:44+0900",
+    "head": "fc883d9491782920df3dd935ca48cae0b06549a4",
+    "base": "dad94a52029fd00b4f5f0dc6e788114feb5c0387",
+    "at": "2026-09-12T23:34:54+0900",
     "summary": "1 ファイル、+1 -0 行、消したファイル 0"
    },
    "judge": null
@@ -177,7 +282,7 @@
    },
    "copy": {
     "status": "open",
-    "approved_at": "2026-09-11T08:56:44+0900",
+    "approved_at": "2026-09-12T23:34:55+0900",
     "source_tree": "i0001",
     "path": "<root>/.claude/ccnavi/tickets/i0001-02.md"
    },
@@ -186,9 +291,9 @@
     "path": "<root>/.claude/worktrees/i0001-02",
     "project": ""
    },
-   "started_at": "2026-09-11T08:56:45+0900",
+   "started_at": "2026-09-12T23:34:55+0900",
    "completed_at": "",
-   "base_sha": "5039c0d13439a9c58ad02523a36efdb55ae95f4e",
+   "base_sha": "1dae9828fc2e61159698852a1f88176ec47ecbbc",
    "cancelled_at": "",
    "cancel_reason": "",
    "seen_in": [
@@ -289,9 +394,9 @@
       "level": "LOW",
       "hits": [],
       "unmeasured": [],
-      "head": "313380801664fcc6ca57a8d8770c6874878c5783",
-      "base": "fe4306169fdbf020d6a1546117c043afba0b3ebb",
-      "at": "2026-09-11T08:56:44+0900",
+      "head": "fc883d9491782920df3dd935ca48cae0b06549a4",
+      "base": "dad94a52029fd00b4f5f0dc6e788114feb5c0387",
+      "at": "2026-09-12T23:34:54+0900",
       "summary": "1 ファイル、+1 -0 行、消したファイル 0"
      },
      "risk_escalates": false,

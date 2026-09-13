@@ -8,6 +8,7 @@
  * プロジェクトになっていない `.git` の探し方だけ。
  */
 import { shellQuote, toPosixPath } from "./commands.js";
+import { OLD_PROJECT_RULES } from "./layers.js";
 import { problemsOfProject, problemsOfProjectsDir, type LintJson, type LintProblem } from "./lintmodel.js";
 import type { BoardJson } from "./model.js";
 
@@ -216,17 +217,17 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
 }
 
 /**
- * ワークスペースのルールをプロジェクトの `config/rules.yml` に写すときの加工。
+ * 共通層のルールを層（プロジェクトの層か自身の層）のルールファイルに写すときの加工。
  * 先頭に出どころのコメントを足し、文面の `sh .claude/scripts/` を `sh {root}/.claude/scripts/` にする。
  * プロジェクトの中に cwd があるエージェントには `.claude/scripts/` が届かず、`{root}` はルールを
- * 読むときにワークスペースルートの絶対パスへ置き換わる（設計 §25.8）。置換は 1 種類だけ。
+ * 読むときにワークスペースルートの絶対パスへ置き換わる（設計 §11.8）。置換は 1 種類だけ。
  */
-export function rewriteRulesForProject(text: string, sourceRel: string, project: string, date: string): string {
+export function rewriteRulesForProject(text: string, sourceRel: string, layer: string, date: string): string {
   const header = [
-    `# ${project} のルール。ワークスペースの ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
-    "# このプロジェクトへの Write / Edit はこのファイルで判定され、Bash はワークスペースと全プロジェクトの和。",
+    `# ${layer} のルール。共通層の ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
+    "# このファイルは共通層に足して当たる（上書きはしない）。共通層と全欄が同じ行は重複として捨てられ、--lint が info で言う。",
     "# 文面の sh の綴りは {root}/.claude/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
-    "# 写したままでは当たる先の無いルール（.claude/ 向けの guard-*）が残る。害は無いので、要らなければ消す。",
+    "# 置き換えた行は共通層の行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
     "",
   ].join("\n");
   return header + text.split("sh .claude/scripts/").join("sh {root}/.claude/scripts/");
@@ -239,9 +240,12 @@ export interface ProjectRow {
   readonly root: string;
   /** ルートからの相対、"/" 区切り */
   readonly rel: string;
-  /** プロジェクトのルールファイル。ルートからの相対、"/" 区切り */
+  /** プロジェクトの層のルールファイル。ルートからの相対、"/" 区切り。層として数えられていない（予約名）なら空 */
   readonly rulesRel: string;
   readonly rulesExists: boolean;
+  /** 旧の置き場（`config/rules.yml`）。ルートからの相対、"/" 区切り。判定には読まれない */
+  readonly oldRulesRel: string;
+  readonly oldRulesExists: boolean;
   readonly hasClaudeDir: boolean;
   readonly origin: string;
   readonly originKey: string;
@@ -265,6 +269,9 @@ export interface ProjectsPage {
   readonly rows: readonly ProjectRow[];
   readonly strays: readonly Stray[];
   readonly workspaceWorktrees: readonly string[];
+  /** 自身の層のルールファイル。ルートからの相対、"/" 区切り。空なら実行ファイルが層を出していない（古い版） */
+  readonly selfRulesRel: string;
+  readonly selfRulesExists: boolean;
   /** 名前の衝突を見る既存のツリー名（ワークスペース自身の空は除く） */
   readonly existingNames: readonly string[];
 }
@@ -279,10 +286,14 @@ export interface PageInput {
   readonly projectsRel: string;
   readonly projectsDirExists: boolean;
   readonly ignored: boolean;
-  /** プロジェクトのルールファイルの、git プロジェクトルートからの相対（既定 `config/rules.yml`） */
-  readonly projectRules: string;
+  /** プロジェクト名 → 層のルールファイルのルート相対（`layers[]` の path から）。層として数えられていなければ無い */
+  readonly rulesRels: Readonly<Record<string, string>>;
   readonly rulesExists: Readonly<Record<string, boolean>>;
+  /** プロジェクト名 → 旧の置き場にファイルが残っているか */
+  readonly oldRulesExists: Readonly<Record<string, boolean>>;
   readonly hasClaudeDir: Readonly<Record<string, boolean>>;
+  readonly selfRulesRel: string;
+  readonly selfRulesExists: boolean;
 }
 
 export function buildProjectsPage(input: PageInput): ProjectsPage {
@@ -297,8 +308,10 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
         name: t.name,
         root: t.root,
         rel: `${input.projectsRel}/${t.name}`,
-        rulesRel: `${input.projectsRel}/${t.name}/${input.projectRules}`,
+        rulesRel: input.rulesRels[t.name] ?? "",
         rulesExists: input.rulesExists[t.name] === true,
+        oldRulesRel: `${input.projectsRel}/${t.name}/${OLD_PROJECT_RULES}`,
+        oldRulesExists: input.oldRulesExists[t.name] === true,
         hasClaudeDir: input.hasClaudeDir[t.name] === true,
         origin,
         originKey: remoteKeyOf(origin),
@@ -321,6 +334,8 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
     rows,
     strays: input.strays,
     workspaceWorktrees: trees.filter((w) => w.kind === "worktree" && w.project === "").map((w) => w.name),
+    selfRulesRel: input.selfRulesRel,
+    selfRulesExists: input.selfRulesExists,
     existingNames: trees.map((t) => t.name).filter((n) => n !== ""),
   };
 }

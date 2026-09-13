@@ -15,11 +15,11 @@
 どの親の作業ツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
 サブエージェントの書き込みは行き先で止まるので、致命傷にならない。
 
-## 提案から写しへ写すもの
+## 提案から承認済みチケットへ写すもの
 
-スクリプトが書く欄（着手・完了の時刻と基準点）だけを、提案から写しへ写す。
+スクリプトが書く欄（着手・完了の時刻と基準点）だけを、提案から承認済みチケットへ写す。
 範囲に触らない欄なので、写しても承認の意味は変わらない。提案が `done/` か
-`cancelled/` に動いていたら、写しを `closed/` へ動かす。
+`cancelled/` に動いていたら、承認済みチケットを `closed/` へ動かす。
 """
 
 from __future__ import annotations
@@ -56,8 +56,18 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
+# `--approve --preview` は束を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
+# `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
+# 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
+# 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
+#
+# 免除の範囲はコマンド 1 本まで。Bash なら shellread が `\x00` で切るが、PowerShell は
+# 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
+# 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
+# 前のコマンドの `--approve` を免除する。
+_NOT_PREVIEW = r"(?![^\x00;&|\r\n]*--preview\b)"
 _CLI_FORMS = (
-    r"(--approve\b|--reviewed\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
     r"|\b(ticket|review)\s+"
     r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
 )
@@ -106,8 +116,9 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
             "'sh .claude/scripts/ccnavi-ticket.sh' と 'sh .claude/scripts/ccnavi-review.sh' を"
-            "使い、承認（'sh .claude/scripts/ccnavi-approve.sh'）と未解決の受け入れは"
-            "利用者が端末で行います。"
+            "使い、承認は利用者が VS Code のボードか "
+            "'sh .claude/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
+            "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -136,7 +147,7 @@ class Phase:
     tickets: list[ticket_mod.Ticket] = field(default_factory=list)
     states: dict[str, str] = field(default_factory=dict)
     marks: dict[str, dict] = field(default_factory=dict)
-    # 計画があるときだけ。item は計画の項、type は種類、owner は親の写し。
+    # 計画があるときだけ。item は計画の項、type は種類、owner は親の承認済みチケット。
     item: ticket_mod.PlanItem | None = None
     type: phasetypes.PhaseType | None = None
     owner: ticket_mod.Ticket | None = None
@@ -236,16 +247,68 @@ class Phase:
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
 
 
-def load_types(conf: settings.Settings) -> dict[str, phasetypes.PhaseType] | None:
-    """フェーズの種類。ファイルが無いか壊れていれば None。壊れていることは --lint が言う。"""
+def types_path(conf: settings.Settings, root: str, project: str) -> str:
+    """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
+
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
+    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
+    """
+    if settings.is_reserved_layer_name(project):
+        return ""
+    home = tree.project_root(conf.projects, project) if project else root
+    if not home:
+        return ""
+    return settings.layer_path(conf, home, settings.KIND_PHASES, project or settings.LAYER_SELF)
+
+
+def common_types(
+    conf: settings.Settings,
+) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
+    """共通層の種類。ファイルが無いか壊れていれば None（番号だけの挙動）。"""
     if not conf.phases:
-        return None
-    types, _ = phasetypes.load(conf.phases)
+        return None, []
+    types, notes = phasetypes.load(conf.phases)
+    phasetypes.mark_source(types, settings.LAYER_COMMON)
+    return types, list(notes)
+
+
+def layer_types(
+    conf: settings.Settings, root: str, project: str = ""
+) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
+    """共通層 + その層の種類と、**その層の**苦情（設計 §25.4.1）。
+
+    どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
+    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
+    言うと、層の話を読みに来た人が同じ文を 2 度読むことになる。
+
+    無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
+    組み込みへは落とさない。共通層が有るのに落とすと、共通層の種類が消える。
+    """
+    common, notes = common_types(conf)
+    if common is None and notes:
+        # 共通層が壊れている。層は足さない（設計 §25.2）。
+        return None, []
+    path = types_path(conf, root, project)
+    if not path or not os.path.exists(path):
+        return common, []
+    extra, layer_notes = phasetypes.load(path, refs=False)
+    if extra is None:
+        return common, list(layer_notes)
+    merged, problems = phasetypes.merge(common, extra, project or settings.LAYER_SELF)
+    return merged, list(layer_notes) + problems
+
+
+def load_types(
+    conf: settings.Settings, root: str = "", project: str = ""
+) -> dict[str, phasetypes.PhaseType] | None:
+    """判定が使うフェーズの種類。どの層にも無ければ None（番号だけの挙動）。"""
+    types, _ = layer_types(conf, root, project)
     return types
 
 
 def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.Ticket]:
-    """提案の状態を写しへ写し、閉じたものを閉じる。開いている写しを返す。"""
+    """提案の状態を承認済みチケットへ写し、閉じたものを閉じる。開いている承認済みチケットを返す。"""
     open_copies, notes = approval.scan(conf, root)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
@@ -275,7 +338,7 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
 
 
 def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]:
-    """この親のフェーズを番号順に。開いている写しと閉じた写しの両方から組む。
+    """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
     """
@@ -284,12 +347,14 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
     if owner is not None and owner.has_plan:
-        types = load_types(conf) or {}
+        # 層は親の承認済みチケットの `project:` が決める（設計 §25.4.1）。人が承認した値で、
+        # 子は親から継ぐので、判定が申告に依存する形にはならない。
+        types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
-    # 閉じた写しは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
+    # 閉じた承認済みチケットは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
     # 場所にあるので、消す・同じ識別子を todo/ に書く、でフェーズを開き直せては
-    # いけない。閉じたことの権威は写しの側。
+    # いけない。閉じたことの権威は承認済みチケットの側。
     for t in approval.children_of(closed_copies, parent_id):
         if t.phase is None:
             continue
@@ -327,11 +392,13 @@ def gate(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
 
 
 def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
-    """cwd が親の作業ツリーの中なら、その親の写し。"""
+    """cwd が親の作業ツリーの中なら、その親の承認済みチケット。"""
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
-    open_copies, _ = approval.copies(settings.approved_dir(conf, t.root))
+    # 権威のある側を読む。承認は親の作業ツリーを作る前にも打てるので、そのときの
+    # 承認済みチケットは提案があったツリー（プロジェクトのルート）に在る。
+    open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval.by_id(open_copies), t.name)
     if found is None or found.is_child:
         return None
@@ -361,6 +428,15 @@ def gate_reason(phase: Phase, tool: str) -> str:
     )
 
 
+def _type_source(phase: Phase) -> dict:
+    """種類を根拠に置く印に足す、その種類の層（設計 §25.9）。
+
+    `review:` が絡む印（省略と保留）にだけ足す。他の印は種類を見ずに置くので、
+    層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
+    """
+    return {"source": phase.type.source} if phase.type is not None else {}
+
+
 def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     """終わったばかりのフェーズについて 1 度だけ言う文。無ければ空文字。"""
     texts = []
@@ -383,7 +459,9 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 + _next_hint(parent, phases, n)
             )
         elif phase.review_required:
-            failed = approval.write_mark(where, parent.ticket, n, approval.MARK_PENDING, {})
+            failed = approval.write_mark(
+                where, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
+            )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
@@ -412,7 +490,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 parent.ticket,
                 n,
                 approval.MARK_SKIPPED,
-                {"tickets": [t.ticket for t in phase.tickets]},
+                {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
@@ -615,11 +693,29 @@ def scope_findings(
 
 
 def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tuple[str, str]:
-    """写しの元になった提案が、いまどの状態にあるか。"""
+    """承認済みチケットの元になった提案が、いまどの状態にあるか。"""
     tree_root = _tree_root(root, copy.source_tree, conf.projects)
     if not tree_root:
         return "", ""
-    return ticket_mod.locate(root, conf.tickets, tree_root, copy.ticket)
+    return ticket_mod.locate(root, _tickets_rel_of(conf, copy, tree_root), tree_root, copy.ticket)
+
+
+def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root: str) -> str:
+    """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
+
+    承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。記録の無い古い
+    承認済みチケットだけ、設定の綴りをそのまま使う（提案はどのツリーでも同じ相対に在る）。
+    """
+    if copy.source_path:
+        base = os.path.dirname(os.path.dirname(copy.source_path))
+        try:
+            rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
+        except ValueError:  # 別のドライブ（Windows）
+            rel = ""
+        if rel and rel != "." and not rel.startswith("../"):
+            return rel
+    return conf.tickets
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:

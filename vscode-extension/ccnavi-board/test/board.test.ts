@@ -23,7 +23,7 @@ test("CB-T05 列は提案の置き場で、親のあとに子が並ぶ", () => {
   assert.equal(board.remainingCount, 3);
 });
 
-test("CB-T06 カードに写し・作業ツリー・印・承認待ちが載る", () => {
+test("CB-T06 カードに承認済みチケット・作業ツリー・印・承認待ちが載る", () => {
   const cards = cardsOf(buildBoard(fixture()));
   const parent = cards.get("i0001")!;
   assert.equal(parent.isParent, true);
@@ -50,7 +50,7 @@ test("CB-T06 カードに写し・作業ツリー・印・承認待ちが載る"
   assert.equal(waiting.seenIn.length, 2);
 });
 
-test("CB-T07 提案の無い写しは不備として出し、閉じていれば完了に置く", () => {
+test("CB-T07 提案の無い承認済みチケットは不備として出し、閉じていれば完了に置く", () => {
   const base = fixture();
   const orphan: TicketJson = {
     ...base.tickets[1],

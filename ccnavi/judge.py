@@ -14,6 +14,7 @@ from typing import TextIO
 from . import (
     approval,
     audit,
+    builtin,
     ctxfile,
     hookio,
     modes,
@@ -112,7 +113,9 @@ def guard_setting_files(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin, ruleload.project_rules_files(conf)),
+        selfguard.targets(
+            root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+        ),
     )
     if not outcomes:
         return ""
@@ -155,22 +158,14 @@ def decide_before(
     # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
     if (
-        not record.fallback
+        record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(
-            rule_set,
-            conf.bin,
-            selfguard.project_rules_clause(conf.projects, conf.project_rules),
-            selfguard.approved_clause(conf.approved),
-        )
+        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
-        # 承認済みの写しは、チケット制御が効いている間はいつでも守る。ここが書けると
-        # 範囲を自分で広げられるので、ガード自身を守る面の設定には従わせない。
-        selfguard.add_approved_rule(rule_set, selfguard.approved_clause(conf.approved))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
@@ -188,7 +183,14 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    fallback = reasons.fallen_back(record.detail or conf.rules) if record.fallback else ""
+    # 組み込みの既定に落ちたときだけ言う。層が壊れて空になったのは組み込みへの
+    # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
+    # そちらは記録の `fallback` に層の名前が残り、`--lint` が error で言う。
+    fallback = (
+        reasons.fallen_back(record.detail or conf.rules)
+        if record.fallback == builtin.FALLBACK
+        else ""
+    )
     notices = [text for text in (guard, fallback) if text]
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
@@ -216,7 +218,7 @@ def decide_before(
             reason = phase.gate_reason(closed, payload.tool_name)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
-    # 作業ツリーの切り元と写しの `project:` の食い違いは、ルールより先に見る。
+    # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく配線の誤りなので、ルールが allow と言っていても通さない。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject)
@@ -248,6 +250,11 @@ def decide_before(
             break
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
+    # 判定を下したのは最初に当たったルール（設計 §25.9）。その層を 1 欄で残す。
+    # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
+    # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
+    if group:
+        record.source = group[0].source
 
     # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
     # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
@@ -263,6 +270,12 @@ def decide_before(
     context = ctxfile.for_rules(
         stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
     )
+    # このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）は、
+    # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
+    # 同じ経路（additionalContext）に合流させる。
+    told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    if told:
+        context = "\n\n".join(p for p in (told, context) if p)
 
     if verdict == rules.ALLOW:
         record.decision, record.enforced = audit.ALLOW, True
@@ -321,8 +334,12 @@ def decide_before(
         # 渡した先が判断するだけの回に毎度コンテキストを 1 段積むことになる。
         # 穴の在処は記録から読む。
         record.decision, record.enforced = audit.HANDOVER, False
-        if notices:
-            hookio.write_context(stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices))
+        # 新しい承認だけは、渡す回にも言う。言わないと、その承認を伝える機会が
+        # 権限モードに渡す呼び出しの分だけ遅れる。
+        if notices or told:
+            hookio.write_context(
+                stdout, hookio.PRE_TOOL_USE, "\n\n".join(notices + ([told] if told else []))
+            )
         return EXIT_OK
 
     return refuse(stdout, mode, record, verdict, notices + texts, context)
@@ -426,7 +443,7 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
 
 
 def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:
-    """作業ツリーの切り元と、そこに結び付く写しの `project:` が違えば、その理由の文。
+    """作業ツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
 
     範囲の宣言ではなく配線の誤りなので、ルールより先に見る（REQ-MLT-12）。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
@@ -470,7 +487,7 @@ def ticket_verdict(
     """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
-    同じ識別子の写しで判定する。main の直下ならチケットは無く、ルールだけで判定する。
+    同じ識別子の承認済みチケットで判定する。main の直下ならチケットは無く、ルールだけで判定する。
     呼び出し元の cwd も agent_id も使わない（REQ-TKT-01）。
 
     範囲の中は allow。ルールが何も言っていない場所で、チケットだけが
@@ -525,7 +542,8 @@ def ticket_verdict(
             *head,
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
-            "so it can propose a ticket that covers it and ask the user to run 'ccnavi --approve'. "
+            "so it can propose a ticket that covers it and ask the user to approve it (from the "
+            "ccnavi board in VS Code, or 'ccnavi --approve' in a terminal). "
             "Editing a proposal alone changes nothing.",
         ]
     )

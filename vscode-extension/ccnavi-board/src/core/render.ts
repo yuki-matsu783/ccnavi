@@ -3,10 +3,23 @@
  * 色は VS Code のテーマ変数だけを使う。チケットの本文に何が書かれていても、表示を壊さない
  * ように全部の文字列を実体参照にする。
  */
+import type { ApprovePreview } from "./approvemodel.js";
 import type { Action, Board, BoardColumn, Card, ParentOption, PhaseChip } from "./board.js";
+
+/**
+ * 承認のオーバーレイの状態。拡張側（board-panel）が持ち、描くたびに渡す。Webview の中に
+ * 持たないのは、監視の更新で HTML が作り直されてもオーバーレイが消えないようにするため。
+ */
+export type ApprovalOverlay =
+  | { readonly kind: "loading" }
+  | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string }
+  | { readonly kind: "approving"; readonly preview: ApprovePreview }
+  | { readonly kind: "error"; readonly error: string };
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** あれば、ボードの上に承認のオーバーレイを被せる */
+  readonly approval?: ApprovalOverlay;
 }
 
 const COPY_LABELS = { none: "未承認", open: "承認済", closed: "クローズ" } as const;
@@ -49,12 +62,71 @@ ${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-emp
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
-<script nonce="${nonce}">
+${renderApproval(options.approval)}<script nonce="${nonce}">
 ${SCRIPT}
 </script>
 </body>
 </html>
 `;
+}
+
+/**
+ * 承認のオーバーレイ。束の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
+ * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
+ */
+export function renderApproval(overlay: ApprovalOverlay | undefined): string {
+  if (overlay === undefined) {
+    return "";
+  }
+  const inner = (() => {
+    switch (overlay.kind) {
+      case "loading":
+        return `<p class="approval-note">承認の束を読んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
+      case "error":
+        return `<p class="approval-note error">${escapeHtml(overlay.error)}</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
+      case "preview":
+      case "approving":
+        return renderApprovalBody(overlay.preview, overlay.kind === "approving", overlay.kind === "preview" ? overlay.notice : undefined);
+    }
+  })();
+  return `<div class="approval-backdrop" data-approval="${overlay.kind}">
+<section class="approval" role="dialog" aria-modal="true" aria-labelledby="approval-title">
+${inner}
+</section>
+</div>
+`;
+}
+
+function renderApprovalBody(preview: ApprovePreview, approving: boolean, notice: string | undefined): string {
+  const count = preview.batch.length;
+  const tickets = preview.batch.map((b) => b.ticket).join(",");
+  const rows = preview.batch
+    .map((b) => {
+      const where = b.revision ? "親の改版" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`;
+      return `<tr><td class="approval-id">${escapeHtml(b.ticket)}</td><td>${escapeHtml(b.title)}</td><td>${escapeHtml(where)}</td></tr>`;
+    })
+    .join("\n");
+  const rejected =
+    preview.rejected.length === 0
+      ? ""
+      : `<h3>承認の対象にしない</h3>\n<ul class="approval-rejected">\n${preview.rejected
+          .map((r) => `<li><span class="approval-id">${escapeHtml(r.ticket)}</span>${r.problems.map((p) => `<div>${escapeHtml(p)}</div>`).join("")}</li>`)
+          .join("\n")}\n</ul>\n`;
+  const problems =
+    preview.problems.length === 0
+      ? ""
+      : `<h3>読めない提案・承認済みチケット</h3>\n<ul class="approval-problems">\n${preview.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join("\n")}\n</ul>\n`;
+  const confirm =
+    count === 0
+      ? ""
+      : `<button type="button" class="action primary" data-action="approve-confirm" data-tickets="${escapeHtml(tickets)}"${approving ? " disabled" : ""}>${approving ? "承認している…" : `この ${count} 件を承認する`}</button>`;
+  return `<h2 id="approval-title">Ticket 承認リクエスト: ${count} 件</h2>
+${notice ? `<p class="approval-note warn">${escapeHtml(notice)}</p>\n` : ""}${
+    count === 0 ? '<p class="approval-note">承認待ちのチケットは無い</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>どこ</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
+  }<pre class="approval-text">${escapeHtml(preview.text)}</pre>
+${rejected}${problems}<div class="approval-actions">
+${confirm}<button type="button" class="action" data-action="approve-cancel"${approving ? " disabled" : ""}>やめる</button>
+</div>`;
 }
 
 function renderFilter(projects: readonly string[]): string {
@@ -226,7 +298,7 @@ function renderActions(actions: readonly Action[], id: string): string {
 function renderActionButton(action: Action, id: string): string {
   switch (action.kind) {
     case "approve":
-      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。${escapeHtml(id)} だけを承認することはできない">承認</button>`;
+      return `<button type="button" class="action" data-action="approve" title="束で承認する（ccnavi --approve）。絞り込み中は、見えている承認待ちだけの束になる">承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
   }
@@ -319,7 +391,8 @@ ${BUTTON_STYLE}
   .column.folded .fold-mark {
     border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
   }
-  .column.folded { flex: 0 0 auto; min-width: 0; width: auto; }
+  /* ドラッグで固定した px 幅（インラインの style）より畳んだ状態を優先する。広げたときは固定幅に戻る */
+  .column.folded { flex: 0 0 auto; min-width: 0; width: auto !important; }
   .column.folded h2 { margin: 0; white-space: nowrap; }
   .column.folded .cards, .column.folded .empty, .column.folded .resizer { display: none; }
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
@@ -364,9 +437,43 @@ ${BUTTON_STYLE}
   }
   .issues li { overflow-wrap: anywhere; }
   .card-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }`;
+  .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+  .approval-backdrop {
+    position: fixed; inset: 0; z-index: 10;
+    background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .approval {
+    width: min(920px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
+    padding: 14px 16px; border-radius: 6px;
+    background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+    border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+  }
+  .approval h2 { margin: 0 0 8px; font-size: 1.1em; }
+  .approval h3 { margin: 12px 0 4px; font-size: .95em; color: var(--vscode-descriptionForeground); }
+  .approval-batch { border-collapse: collapse; width: 100%; font-size: .9em; margin-bottom: 8px; }
+  .approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
+  .approval-id { font-family: var(--vscode-editor-font-family); }
+  .approval-text {
+    margin: 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+    font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
+    background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: 4px;
+  }
+  .approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: .88em; color: var(--vscode-editorWarning-foreground); }
+  .approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
+  .approval-note { margin: 4px 0 8px; }
+  .approval-note.warn { color: var(--vscode-editorWarning-foreground); }
+  .approval-note.error { color: var(--vscode-editorError-foreground); }
+  .approval-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }`;
 
 const SCRIPT = `  const vscode = acquireVsCodeApi();
+  // 絞り込みで見えている承認待ちの識別子と、絞り込み中かどうか。「絞り込み無し」は空の並びでは
+  // なく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認に化ける。
+  function filtering() { return document.body.classList.contains("filtering"); }
+  function visiblePending() {
+    return [...document.querySelectorAll(".card.pending:not(.hidden)")].map((card) => card.getAttribute("data-id") || "");
+  }
   function open(card) {
     const filePath = card.getAttribute("data-path");
     if (filePath) { vscode.postMessage({ type: "open", filePath: filePath }); }
@@ -385,9 +492,25 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       event.stopPropagation();
       const action = button.getAttribute("data-action");
       if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
-      else if (action === "approve") { vscode.postMessage({ type: "approve" }); }
+      else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() }); }
+      else if (action === "approve-confirm") {
+        const tickets = (button.getAttribute("data-tickets") || "").split(",").filter((t) => t !== "");
+        vscode.postMessage({ type: "approveConfirm", tickets: tickets });
+      }
+      else if (action === "approve-cancel") { vscode.postMessage({ type: "approveCancel" }); }
       else if (action === "accept") {
         vscode.postMessage({ type: "accept", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) });
+      }
+    });
+  }
+  // 承認のオーバーレイ。Esc でやめる。承認している最中は閉じない。開いたら「やめる」に焦点を置く。
+  const approval = document.querySelector(".approval-backdrop");
+  if (approval) {
+    const cancel = approval.querySelector('button[data-action="approve-cancel"]');
+    if (cancel && !cancel.disabled) { cancel.focus(); }
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && approval.getAttribute("data-approval") !== "approving") {
+        vscode.postMessage({ type: "approveCancel" });
       }
     });
   }
@@ -473,6 +596,20 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const ownFamily = card.getAttribute("data-family") || "";
       const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent);
       card.classList.toggle("hidden", hidden);
+    }
+    document.body.classList.toggle("filtering", project !== "*" || parent !== "*");
+    // 列の件数は絞り込み後に見えているカードの数にする。上部の集計（残り・全・不備・承認待ち）は
+    // 絞り込みに関係なくボード全体の数のまま。
+    for (const column of document.querySelectorAll(".column")) {
+      const count = column.querySelector(":scope > h2 > .count");
+      if (count) { count.textContent = String(column.querySelectorAll(".card:not(.hidden)").length); }
+    }
+    // 「承認待ち N 件を承認」だけは、押したときに束になるもの（見えている承認待ち）の数にする。
+    const approve = document.querySelector('.controls button[data-action="approve"]');
+    if (approve) {
+      const n = document.querySelectorAll(".card.pending:not(.hidden)").length;
+      approve.textContent = "承認待ち " + n + " 件を承認";
+      approve.disabled = n === 0;
     }
     state.project = project;
     state.parent = parent;

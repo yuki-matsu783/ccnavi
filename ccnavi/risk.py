@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 import yaml
 
 from . import gitcmd, globmatch, settings, tree
-from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
+from .rules import ID_SEPARATOR, SEVERITY_ERROR, SEVERITY_INFO, SEVERITY_WARN, Problem
 
 VERSION = 1
 
@@ -97,19 +97,35 @@ class Factor:
     # glob の上限。当たるごとに加点するので、無ければ青天井。
     max: int | None = None
     compiled: re.Pattern | None = None
+    # source はこの項目が書いてある層の名前（`common` / `self` / プロジェクト名）。
+    # 記録の hit と judge の項目に残す（設計 §25.9）。
+    source: str = ""
+    # home は `script:` を解く基準ディレクトリ。共通層と自身の層はワークスペース
+    # ルート、プロジェクトの層はそのプロジェクトの git プロジェクトルート
+    # （設計 §25.4.2）。定義を読んだ側が埋める。
+    home: str = ""
 
     def matches(self, rel: str) -> bool:
         return self.compiled is not None and self.compiled.match(rel) is not None
 
+    def key(self) -> tuple:
+        """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。"""
+        return (self.id, self.points, self.message, self.kind, self.value, self.max)
+
 
 @dataclass
 class Definition:
-    levels: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_LEVELS))
+    # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
+    # （`level_of`）。既定で埋めて持つと、合成のときに「書いていない層」が
+    # 共通層の緩めた閾値を黙って戻すことになる（設計 §25.4.2）。
+    levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
     source: str = BUILTIN
-    # 読めなかった理由（組み込みに落ちたとき）。
+    # 読めなかった理由（組み込みに落ちたとき、か、層を空として扱ったとき）。
     fallback: str = ""
+    # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 §25.2）。
+    dropped: list[str] = field(default_factory=list)
 
     @property
     def judges(self) -> list[Factor]:
@@ -151,7 +167,7 @@ def builtin() -> Definition:
 
 
 def load(path: str) -> tuple[Definition, list[Problem]]:
-    """定義を読む。無ければ組み込み。壊れていれば組み込みに落ち、苦情を返す。"""
+    """共通層の定義を読む。無ければ組み込み。壊れていれば組み込みに落ち、苦情を返す。"""
     if not path:
         return builtin(), []
     try:
@@ -171,7 +187,33 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
     return definition, problems
 
 
-def parse(text: str, where: str = "(risk)") -> tuple[Definition | None, list[Problem]]:
+def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
+    """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みへは落とさない。
+
+    共通層が有るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 §25.2）。
+    壊れた層は空として扱い、苦情だけを返す。
+    """
+    if not path:
+        return None, []
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return None, []
+    except OSError as exc:
+        return None, [Problem(SEVERITY_ERROR, "(risk)", f"{path} を読めない ({exc})")]
+    return parse(text, path, script_homes)
+
+
+def parse(
+    text: str, where: str = "(risk)", script_homes: tuple[str, ...] = SCRIPT_HOMES
+) -> tuple[Definition | None, list[Problem]]:
+    """定義 1 本を読む。`script_homes` はこの層で `script:` に書ける綴りの先頭。
+
+    共通層は `.claude/ccnavi/` と `.claude/scripts/`、各層はその `<傘>/scripts/` だけ。
+    たがいの側を指す定義はここで error にする（設計 §25.4.2）。プロジェクトの
+    リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
+    """
     problems: list[Problem] = []
     try:
         data = yaml.safe_load(text)
@@ -187,7 +229,9 @@ def parse(text: str, where: str = "(risk)") -> tuple[Definition | None, list[Pro
                 f"版 {data.get('version')!r} は扱えない（このビルドが読むのは {VERSION}）",
             )
         ]
-    levels = dict(DEFAULT_LEVELS)
+    # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていない層」が
+    # 共通層の緩めた閾値を黙って戻す（設計 §25.4.2）。順を見るときだけ既定で補う。
+    levels: dict[str, int] = {}
     raw_levels = data.get("levels")
     if raw_levels is not None:
         if not isinstance(raw_levels, dict):
@@ -206,7 +250,7 @@ def parse(text: str, where: str = "(risk)") -> tuple[Definition | None, list[Pro
             problems.append(
                 Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らない段階。名前は固定")
             )
-    if not (levels["medium"] <= levels["high"] <= levels["critical"]):
+    if not ordered(levels):
         problems.append(
             Problem(SEVERITY_ERROR, where, "`levels` は medium <= high <= critical の順で書く")
         )
@@ -215,14 +259,27 @@ def parse(text: str, where: str = "(risk)") -> tuple[Definition | None, list[Pro
         raw_factors = []
     if not isinstance(raw_factors, list):
         return None, [Problem(SEVERITY_ERROR, where, "`factors` が並びではない")]
-    factors, more = _factors(raw_factors, where)
+    factors, more = _factors(raw_factors, where, script_homes)
     problems += more
     if any(p.severity == SEVERITY_ERROR for p in problems):
         return None, problems
     return Definition(levels=levels, factors=factors, source=where), problems
 
 
-def _factors(raw: list, where: str) -> tuple[list[Factor], list[Problem]]:
+def effective_levels(levels: dict[str, int]) -> dict[str, int]:
+    """書かれた鍵に既定を足した、実際に効く閾値。"""
+    return {**DEFAULT_LEVELS, **levels}
+
+
+def ordered(levels: dict[str, int]) -> bool:
+    """`medium <= high <= critical` になっているか。書かれていない鍵は既定で読む。"""
+    effective = effective_levels(levels)
+    return effective["medium"] <= effective["high"] <= effective["critical"]
+
+
+def _factors(
+    raw: list, where: str, script_homes: tuple[str, ...] = SCRIPT_HOMES
+) -> tuple[list[Factor], list[Problem]]:
     problems: list[Problem] = []
     factors: list[Factor] = []
     seen: set[str] = set()
@@ -231,6 +288,19 @@ def _factors(raw: list, where: str) -> tuple[list[Factor], list[Problem]]:
             problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}]` が辞書ではない"))
             continue
         ident = str(item.get("id") or "").strip()
+        if ID_SEPARATOR in ident:
+            # 層の名前を添えた形（`lib:schema`）と見分けが付かない。共通層に書けば
+            # lib の配点に見え、記録を読んだ人がどのファイルを直すのか決められない。
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    where,
+                    f"`factors[{i}].id` に `{ID_SEPARATOR}` は書けない。"
+                    f"層の名前を添えた形（`self{ID_SEPARATOR}id` / "
+                    f"`<プロジェクト名>{ID_SEPARATOR}id`）と見分けが付かない",
+                )
+            )
+            continue
         if not _ID.match(ident):
             problems.append(Problem(SEVERITY_ERROR, where, f"`factors[{i}].id` が無いか形が違う"))
             continue
@@ -283,14 +353,15 @@ def _factors(raw: list, where: str) -> tuple[list[Factor], list[Problem]]:
                 problems.append(Problem(SEVERITY_ERROR, ident, "`script` が文字列ではない"))
                 continue
             rel = value.strip().replace("\\", "/")
-            if os.path.isabs(rel) or ".." in rel or not rel.startswith(SCRIPT_HOMES):
+            if os.path.isabs(rel) or ".." in rel or not rel.startswith(tuple(script_homes)):
                 problems.append(
                     Problem(
                         SEVERITY_ERROR,
                         ident,
-                        "`script` は "
-                        + " か ".join(f"`{h}`" for h in SCRIPT_HOMES)
-                        + " の下に、ワークスペースルートからの相対で置く（守られた場所）",
+                        f"`script` の `{rel}` はこの層から指せない。"
+                        + " か ".join(f"`{h}`" for h in script_homes)
+                        + " の下に、その層の git プロジェクトルートからの相対で置く"
+                        "（守られた場所。層と共通層はたがいの側を指せない）",
                     )
                 )
                 continue
@@ -314,9 +385,159 @@ def _factors(raw: list, where: str) -> tuple[list[Factor], list[Problem]]:
     return factors, problems
 
 
-def load_definition(conf: settings.Settings) -> Definition:
-    """設定から定義を読む。壊れていれば組み込み（fallback に理由）。"""
+def mark_layer(definition: Definition, layer: str, home: str) -> None:
+    """この定義の項目に、層の名前と `script:` を解く基準ディレクトリを名乗らせる。"""
+    for f in definition.factors:
+        f.source = layer
+        f.home = home
+
+
+def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
+    """共通層の配点に、行き先の層の配点を足す（設計 §25.4.2）。
+
+    `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
+    中身が違えば error。`levels` は書かれた鍵だけが参加し、キーごとに小さいほうを
+    採る。どの層も書いていない鍵は既定（`DEFAULT_LEVELS`）。
+
+    error があるとき、その層は空として扱い、共通層だけを返す。点は小さくなる方向に
+    倒れうるので、`--lint` を error にして直すまで目に付く形にする。
+    """
+    problems: list[Problem] = []
+    ids = {f.id for f in common.factors}
+    keys = {f.key() for f in common.factors}
+    added: list[Factor] = []
+    for f in extra.factors:
+        if f.key() in keys:
+            problems.append(
+                Problem(
+                    SEVERITY_INFO,
+                    f.id,
+                    f"`{f.id}` は前の層と全欄が同じなので、{layer} の側を捨てた。"
+                    "点は前の層の 1 本で数える",
+                )
+            )
+            continue
+        if f.id in ids:
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    f.id,
+                    f"`{f.id}` が前の層と重複している。{layer} の層は空として扱う。"
+                    "同じ名前で違う配点があると、記録を読んだ人がどちらの話か決められない",
+                )
+            )
+            continue
+        ids.add(f.id)
+        keys.add(f.key())
+        added.append(f)
+    levels = dict(common.levels)
+    for name, value in extra.levels.items():
+        levels[name] = min(levels[name], value) if name in levels else value
+    if not ordered(levels):
+        shown = effective_levels(levels)
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                "(levels)",
+                f"合成後の `levels` が medium {shown['medium']} <= high {shown['high']} <= "
+                f"critical {shown['critical']} になっていない。{layer} の層は空として扱う",
+            )
+        )
+    if any(p.severity == SEVERITY_ERROR for p in problems):
+        dropped = Definition(
+            levels=dict(common.levels),
+            factors=list(common.factors),
+            source=common.source,
+            fallback=common.fallback,
+            dropped=[*common.dropped, layer],
+        )
+        return dropped, problems
+    merged = Definition(
+        levels=levels,
+        factors=[*common.factors, *added],
+        source=common.source,
+        fallback=common.fallback,
+        dropped=list(common.dropped),
+    )
+    return merged, problems
+
+
+def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
+    """`script:` が指す先が、その層の git プロジェクトルートに在るか（設計 §25.4.2）。
+
+    `layer` を渡すと、その層から来た項目だけを見る。走らせるときは今までどおり
+    「測れなかった」でその項目の点を加えるが、`--lint` は在ることを先に言う。
+    """
+    problems: list[Problem] = []
+    for f in definition.factors:
+        if f.kind != KIND_SCRIPT:
+            continue
+        if layer and f.source != layer:
+            continue
+        path = os.path.join(f.home, str(f.value).replace("/", os.sep))
+        if not os.path.isfile(path):
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    f.id,
+                    f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
+                    "作業ツリーの中のものは読まないので、git プロジェクトルートに置く",
+                )
+            )
+    return problems
+
+
+def definition_path(conf: settings.Settings, root: str, project: str) -> str:
+    """そのプロジェクトの層の risk.yml。空の `project` はワークスペース自身の層。
+
+    予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
+    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    名札と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
+    配点を書ける側が層を選べると、自分のリスクを自分で下げる道になる。
+    """
+    if settings.is_reserved_layer_name(project):
+        return ""
+    home = tree.project_root(conf.projects, project) if project else root
+    if not home:
+        return ""
+    return settings.layer_path(conf, home, settings.KIND_RISK, project or settings.LAYER_SELF)
+
+
+def layer_definition(
+    conf: settings.Settings, root: str = "", project: str = ""
+) -> tuple[Definition, list[Problem]]:
+    """共通層 + その層の配点と、**その層の**苦情（設計 §25.4.2）。
+
+    共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
+    言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに落ち、
+    そのときは層を足さない（設計 §25.2）。
+    """
     definition, _ = load(conf.risk)
+    mark_layer(definition, settings.LAYER_COMMON, root)
+    if definition.fallback:
+        return definition, []
+    home = tree.project_root(conf.projects, project) if project else root
+    layer = project or settings.LAYER_SELF
+    path = definition_path(conf, root, project)
+    if not path or not os.path.exists(path):
+        return definition, []
+    extra, notes = load_layer(path, (settings.layer_script_home(conf),))
+    if extra is None:
+        definition.dropped.append(layer)
+        definition.fallback = f"{layer} の配点が壊れている。この層は空として数える"
+        return definition, list(notes)
+    mark_layer(extra, layer, home)
+    merged, problems = merge(definition, extra, layer)
+    if merged.dropped:
+        merged.fallback = (
+            f"{', '.join(merged.dropped)} の配点が衝突している。この層は空として数える"
+        )
+    return merged, list(notes) + problems
+
+
+def load_definition(conf: settings.Settings, root: str = "", project: str = "") -> Definition:
+    """判定が使う配点。共通層に、親の承認済みチケットの `project:` が指す層を足したもの。"""
+    definition, _ = layer_definition(conf, root, project)
     return definition
 
 
@@ -418,6 +639,8 @@ class Hit:
     id: str
     points: int
     detail: str
+    # この項目が書いてある層（設計 §25.9）。記録に残す。
+    source: str = ""
 
 
 @dataclass
@@ -440,7 +663,10 @@ class Score:
         return {
             "points": self.points,
             "level": self.level,
-            "hits": [{"id": h.id, "points": h.points, "detail": h.detail} for h in self.hits],
+            "hits": [
+                {"id": h.id, "points": h.points, "detail": h.detail, "source": h.source}
+                for h in self.hits
+            ],
             "unmeasured": list(self.unmeasured),
         }
 
@@ -456,19 +682,26 @@ def evaluate(
     """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。"""
     score = Score()
     for f in definition.factors:
+        # 加点した項目には、その定義が書いてある層を残す（設計 §25.9）。
+        where = f.source
         if f.kind == KIND_LINES:
             if diff.lines > int(f.value):
                 detail = f"{f.message}（{diff.lines} 行 > {f.value}）"
-                score.hits.append(Hit(f.id, f.points, detail))
+                score.hits.append(Hit(f.id, f.points, detail, where))
         elif f.kind == KIND_FILES:
             if diff.files > int(f.value):
                 score.hits.append(
-                    Hit(f.id, f.points, f"{f.message}（{diff.files} ファイル > {f.value}）")
+                    Hit(f.id, f.points, f"{f.message}（{diff.files} ファイル > {f.value}）", where)
                 )
         elif f.kind == KIND_DELETED:
             if diff.deleted_files > int(f.value):
                 score.hits.append(
-                    Hit(f.id, f.points, f"{f.message}（消した {diff.deleted_files} > {f.value}）")
+                    Hit(
+                        f.id,
+                        f.points,
+                        f"{f.message}（消した {diff.deleted_files} > {f.value}）",
+                        where,
+                    )
                 )
         elif f.kind == KIND_GLOB:
             hit = [c.path for c in diff.changes if f.matches(c.path)]
@@ -477,21 +710,27 @@ def evaluate(
                 if f.max is not None:
                     points = min(points, f.max)
                 shown = ", ".join(hit[:3]) + ("…" if len(hit) > 3 else "")
-                score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）"))
+                score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）", where))
         elif f.kind == KIND_SCRIPT:
-            points, note = run_script(root, str(f.value), worktree, env)
+            # 解く基準はその層の git プロジェクトルート。共通層と自身の層は
+            # ワークスペースルート、プロジェクトの層はそのプロジェクト（設計 §25.4.2）。
+            points, note = run_script(f.home or root, str(f.value), worktree, env)
             if points is None:
-                score.hits.append(Hit(f.id, f.points, f"{f.message}（測れなかった: {note}）"))
+                score.hits.append(
+                    Hit(f.id, f.points, f"{f.message}（測れなかった: {note}）", where)
+                )
                 score.unmeasured.append(f"{f.id}: {note}")
             elif points > 0:
-                score.hits.append(Hit(f.id, points, f"{f.message}（{note or 'スクリプト'}）"))
+                score.hits.append(
+                    Hit(f.id, points, f"{f.message}（{note or 'スクリプト'}）", where)
+                )
         elif f.kind == KIND_JUDGE:
             verdict = judgements.get(f.id)
             if not isinstance(verdict, dict) or verdict.get("head") != diff.head:
                 score.pending.append(f)
             elif verdict.get("hit"):
                 reason = str(verdict.get("reason") or "").strip()
-                score.hits.append(Hit(f.id, f.points, f"{f.message}（判定: {reason}）"))
+                score.hits.append(Hit(f.id, f.points, f"{f.message}（判定: {reason}）", where))
     score.points = sum(h.points for h in score.hits)
     score.level = definition.level_of(score.points)
     return score

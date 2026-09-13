@@ -562,7 +562,7 @@ def ready(
     """Draft を外してよいかを確かめ、印と note の下書きを置く。外すのは sh。
 
     条件は「親を閉じられる」と同じ（ops.close_problems）。閉じてよい状態と、
-    マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた写しも引く）。
+    マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた承認済みチケットも引く）。
     同じ親に 2 度打っても通る。sh が Draft を外し損ねたときに打ち直せるように。
     マージそのものは人が行う。
     """
@@ -945,7 +945,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
 def _parent_any(
     stderr: TextIO, root: str, conf: settings.Settings, cwd: str
 ) -> ticket_mod.Ticket | None:
-    """cwd の親。閉じた写しも引く（親を閉じたあとに Draft を外す道のため）。"""
+    """cwd の親。閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す道のため）。"""
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is not None:
         return parent

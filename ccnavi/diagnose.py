@@ -24,12 +24,27 @@ from __future__ import annotations
 import dataclasses
 import io
 import json
+import os
 import time
 from typing import TextIO
 
 import yaml
 
-from . import approval, audit, hookio, judge, modes, phase, ruleload, rules, settings, tree
+from . import (
+    approval,
+    audit,
+    builtin,
+    hookio,
+    judge,
+    modes,
+    phase,
+    phasetypes,
+    risk,
+    ruleload,
+    rules,
+    settings,
+    tree,
+)
 from . import ticket as ticket_mod
 
 # `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
@@ -60,7 +75,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     判定が対象を取り出せないもので、他の鍵は空のまま。
     """
     # 試験は控えを持たない。「1 度だけ渡す文」を試しで消費すると、本番の最初の
-    # 1 回で届かなくなる。控えを外すと selfguard の写しも取らないが、試験は
+    # 1 回で届かなくなる。置き場を外すと selfguard も控えを取らないが、試験は
     # 実行しないのでそもそも戻すものが無い。
     conf = dataclasses.replace(conf, state="")
 
@@ -205,22 +220,15 @@ def _rules_hit(
     当たらなかった理由を人が自分で辿れない。
 
     `source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように、
-    ルールファイルの外から来た根拠）。プロジェクトのルールは `lib:source` の形の id で
-    当たるので（REQ-MLT-07）、同じ綴りで引けるように名前を添えて並べる。
+    ルールファイルの外から来た根拠）。層のルールは `self:docs` / `lib:source` の形の
+    id で当たるので（REQ-MLT-07）、同じ綴りで引けるように層ごと並べる。
     """
     if not record.rules:
         return []
 
-    rule_set, _ = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
-    by_id = {rule.id: rule for rule in rule_set.all() if rule.id}
-    for p in tree.projects(conf.projects):
-        path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.name))
-        try:
-            extra, _ = rules.load(path, root)
-        except (OSError, ValueError):
-            continue
-        ruleload.prefix_ids(extra, p.name)
-        by_id.update({rule.id: rule for rule in extra.all() if rule.id})
+    by_id = {}
+    for view in ruleload.survey(stderr, conf, root):
+        by_id.update({rule.id: rule for rule in view.rule_set.all() if rule.id})
 
     hits = []
     for name in record.rules:
@@ -391,6 +399,125 @@ def test_samples(
     return 1 if body["mismatches"] else 0
 
 
+# 層の見出し。共通層と自身の層だけ日本語で名乗る。プロジェクトは名前そのもので、
+# それが id の前置き（`lib:schema`）と同じ綴りになる。
+LAYER_LABELS = {ruleload.LAYER_COMMON: "共通層", ruleload.LAYER_SELF: "自身の層"}
+
+
+def layer_label(name: str) -> str:
+    return LAYER_LABELS.get(name, name)
+
+
+def _shown(root: str, path: str) -> str:
+    """綴りをワークスペースルートからの相対で出す。外に在るなら書かれたまま。"""
+    if not path:
+        return "(無し)"
+    try:
+        rel = os.path.relpath(path, root)
+    except ValueError:
+        return path
+    return path if rel.startswith(os.pardir) else rel.replace(os.sep, "/")
+
+
+def layer_home(conf: settings.Settings, root: str, name: str) -> str:
+    """その層の git プロジェクトルート。共通層は持たない（ワークスペースルートを返す）。"""
+    if name in (ruleload.LAYER_COMMON, ruleload.LAYER_SELF):
+        return root
+    return tree.project_root(conf.projects, name)
+
+
+def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> str:
+    """その層の phases / risk の綴り。共通層は今までどおり `CCNAVI_PHASES` / `CCNAVI_RISK`。"""
+    if name == ruleload.LAYER_COMMON:
+        return conf.phases if kind == settings.KIND_PHASES else conf.risk
+    return settings.layer_path(conf, layer_home(conf, root, name), kind, name)
+
+
+def _written(entry) -> str:
+    """範囲の 1 件を、書かれた綴りで出す。翻訳後の式ではなく、人が書いたほう。"""
+    return entry.glob or entry.regex
+
+
+def layer_phase_types(path: str) -> tuple[list, str]:
+    """その層のフェーズの種類と、読めなかった理由。無い層は空。
+
+    合成はしない。ここで出すのは「どの層に何が書いてあるか」で、id ごとに
+    合わせた結果は判定の側（phase）が持つ。`overlap` / `requires` の参照は
+    確かめない。層は共通層の種類を指してよいので、1 本だけで確かめると
+    正しい定義まで「読めない」になる（設計 §25.4.1）。
+    """
+    if not path or not os.path.isfile(path):
+        return [], ""
+    types, notes = phasetypes.load(path, refs=False)
+    if types is None:
+        return [], "; ".join(str(n) for n in notes) or "読めない"
+    return list(types.values()), ""
+
+
+def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
+    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みへは落とさない）。
+
+    `script:` に書ける綴りは層ごとに違う（設計 §25.4.2）ので、読み方も層ごとに分ける。
+    """
+    if not path or not os.path.isfile(path):
+        return [], ""
+    if name == ruleload.LAYER_COMMON:
+        definition, notes = risk.load(path)
+        if definition.fallback:
+            return [], definition.fallback or "; ".join(str(n) for n in notes)
+        return list(definition.factors), ""
+    definition, notes = risk.load_layer(path, (settings.layer_script_home(conf),))
+    if definition is None:
+        return [], "; ".join(str(n) for n in notes) or "読めない"
+    return list(definition.factors), ""
+
+
+def _explain_phases(
+    stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
+) -> None:
+    """層ごとのフェーズの種類（設計 §25.9）。id は裸のまま、層は欄で出す。"""
+    tables = [
+        (v.name, *layer_phase_types(layer_config(conf, root, v.name, settings.KIND_PHASES)))
+        for v in views
+    ]
+    counts = "、".join(f"{layer_label(name)} {len(items)} 種" for name, items, _ in tables)
+    stdout.write(f"\n■ phases（{counts}）\n")
+    stdout.write(f"  {'id':<16}{'層':<10}{'kind':<8}{'title':<16}{'review':<8}scope\n")
+    for name, items, unreadable in tables:
+        if unreadable:
+            stdout.write(f"  {layer_label(name)}: 読めない: {unreadable}。この層は空として扱う\n")
+        for pt in items:
+            scope = ", ".join(_written(e) for e in pt.scope) if pt.scope else "inherit"
+            head = f"  {pt.id:<16}{layer_label(name):<10}{pt.kind:<8}{pt.title:<16}"
+            stdout.write(f"{head}{pt.review:<8}{scope}\n")
+
+
+def _explain_risk(
+    stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
+) -> None:
+    """層ごとのリスクの配点（設計 §25.9）。閾値は共通層のものを出す。"""
+    tables = [
+        (v.name, *layer_risk(conf, v.name, layer_config(conf, root, v.name, settings.KIND_RISK)))
+        for v in views
+    ]
+    common, _ = risk.load(conf.risk)
+    # 共通層の閾値。層の `levels` はキーごとに小さいほうが勝つので、実際に効く値は
+    # チケットの層で決まる（設計 §25.4.2）。ここに出すのは共通層の側の既定。
+    effective = risk.effective_levels(common.levels)
+    levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
+    stdout.write(f"\n■ risk（levels: {levels}）\n")
+    stdout.write(f"  {'id':<16}{'層':<10}{'当て方':<20}{'points':<8}message\n")
+    for name, items, unreadable in tables:
+        if unreadable:
+            stdout.write(f"  {layer_label(name)}: 読めない: {unreadable}。この層は空として扱う\n")
+        for factor in items:
+            how = f"{factor.kind} {factor.value}"
+            stdout.write(
+                f"  {factor.id:<16}{layer_label(name):<10}{how:<20}"
+                f"{factor.points:<8}{factor.message}\n"
+            )
+
+
 def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
     """いま効いている宣言を、判定を行わずに一覧する（REQ-DIA-01）。
 
@@ -399,33 +526,31 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     それはまだ無いので、ここで言えるのは「どのルールがどのタイプにあるか」と
     「チケットの範囲が効いているか」まで。言えないことは言わない。
     """
-    rule_set, source = ruleload.load_rules(stderr, conf.rules, audit.Record(), root)
+    views = ruleload.survey(stderr, conf, root)
+    source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
+    stdout.write(
+        "  書き込み系は 共通層 + 行き先の層、Bash は全部の層の和で判定する（設計 §25.4）\n"
+    )
 
-    for name in rules.SECTIONS:
-        section = rule_set.section(name)
-        stdout.write(f"\n■ {name}（{len(section)} 件）\n")
-        for rule in section:
-            written = rule.glob or rule.regex
-            stdout.write(f"  {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n")
+    for view in views:
+        counts = " / ".join(f"{name} {len(view.rule_set.section(name))}" for name in rules.SECTIONS)
+        stdout.write(f"\n■ rules {layer_label(view.name)}（{_shown(root, view.path)}、{counts}）\n")
+        if view.unreadable:
+            stdout.write(f"  読めない: {view.unreadable}。この層は空として扱う\n")
+            continue
+        if view.missing:
+            stdout.write("  この層は置いていない（無い = 空）\n")
+            continue
+        for name in rules.SECTIONS:
+            for rule in view.rule_set.section(name):
+                written = rule.glob or rule.regex
+                stdout.write(
+                    f"  {name:<5} {rule.id or '(id 無し)':<28} {rule.match:<34} {written}\n"
+                )
 
-    projects = tree.projects(conf.projects)
-    if projects:
-        stdout.write(f"\n■ プロジェクト（{len(projects)} 件、置き場 {conf.projects}）\n")
-        stdout.write(
-            "  パスを持つツールは行き先のプロジェクトのルールで判定し、Bash は"
-            "ワークスペースと全プロジェクトのルールの和で判定する（設計 §25.4）\n"
-        )
-        for p in projects:
-            path = settings.project_rules_path(conf, tree.project_root(conf.projects, p.name))
-            try:
-                extra, _ = rules.load(path, root)
-            except (OSError, ValueError) as exc:
-                stdout.write(f"  {p.name:<28} 読めない: {exc}\n")
-                stdout.write("    書き込みは組み込みの既定で判定し、Bash の和からは外れる\n")
-                continue
-            counts = " ".join(f"{name} {len(extra.section(name))}" for name in rules.SECTIONS)
-            stdout.write(f"  {p.name:<28} {path}  {counts}\n")
+    _explain_phases(stdout, conf, root, views)
+    _explain_risk(stdout, conf, root, views)
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
@@ -433,7 +558,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("    default / acceptEdits / plan  人に確認が出る\n")
     stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
-    stdout.write("\n■ チケットの作業範囲（承認済みの写し）\n")
+    stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
     if not conf.tickets_enabled:
         stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")
@@ -497,17 +622,17 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) -> int:
     """`--explain` が言うことのうち、チケットに関わる部分を機械可読で出す。
 
-    読み手は VS Code のボード拡張。拡張は提案・写し・印を自分で解釈せず、ここが
+    読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・印を自分で解釈せず、ここが
     出した形をそのまま並べる。「ゲートが閉じているか」「承認待ちは何か」の答えを
     2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
     ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 §4 P11）。
     """
-    stdout.write(json.dumps(board(conf, root), ensure_ascii=True, indent=1))
+    stdout.write(json.dumps(board(conf, root, stderr), ensure_ascii=True, indent=1))
     stdout.write("\n")
     return 0
 
 
-def board(conf: settings.Settings, root: str) -> dict:
+def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> dict:
     """ボードの中身。形は設計 §24.10 と README「ボードの JSON」に書いてある。"""
     problems: list[str] = []
     trees = tree.all_trees(root, conf.projects)
@@ -525,6 +650,7 @@ def board(conf: settings.Settings, root: str) -> dict:
             {"name": t.name, "root": t.root, "project": t.project, "kind": t.kind} for t in trees
         ],
         "projects": [t.name for t in trees if t.kind == tree.KIND_PROJECT],
+        "layers": _layers(conf, root, stderr),
         "problems": problems,
         "pending_approval": [],
         "tickets": [],
@@ -570,12 +696,89 @@ def board(conf: settings.Settings, root: str) -> dict:
             )
         )
 
-    # 親ごとの段階とフェーズ。写しのある親だけ。承認前の親はフェーズを持たない。
+    # 親ごとの段階とフェーズ。承認済みチケットのある親だけ。承認前の親はフェーズを持たない。
     for parent in sorted(open_copies + closed_copies, key=lambda x: x.ticket):
         if parent.is_child:
             continue
         payload["parents"].append(_parent_record(conf, root, parent, closed_index))
     return payload
+
+
+def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
+    """層ごとの宣言（設計 §25.9）。並びは 共通層 → 自身の層 → プロジェクト（名前順）。
+
+    rules は重複を捨てたあとの、その層から実際に判定へ入ったぶん。phases と risk は
+    その層のファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
+    側に出る）。読めない層は `unreadable` に理由が入り、中身は空になる。
+    """
+    said = stderr if stderr is not None else io.StringIO()
+    out = []
+    for view in ruleload.survey(said, conf, root):
+        phases_path = layer_config(conf, root, view.name, settings.KIND_PHASES)
+        risk_path = layer_config(conf, root, view.name, settings.KIND_RISK)
+        types, phases_unreadable = layer_phase_types(phases_path)
+        factors, risk_unreadable = layer_risk(conf, view.name, risk_path)
+        out.append(
+            {
+                "name": view.name,
+                "rules": {
+                    "path": view.path,
+                    "unreadable": view.unreadable,
+                    **{
+                        section: [_rule_record(rule) for rule in view.rule_set.section(section)]
+                        for section in rules.SECTIONS
+                    },
+                },
+                "phases": [_phase_type_record(view.name, pt) for pt in types],
+                "risk": {
+                    "path": risk_path,
+                    "unreadable": risk_unreadable,
+                    "factors": [_factor_record(view.name, f) for f in factors],
+                },
+                "phases_file": {"path": phases_path, "unreadable": phases_unreadable},
+            }
+        )
+    return out
+
+
+def _rule_record(rule: rules.Rule) -> dict:
+    """ルール 1 件。id は層の名前付き、書いた綴りと翻訳後の式の両方を出す。"""
+    return {
+        "id": rule.id,
+        "section": rule.decision,
+        "source": rule.source,
+        "match": rule.match,
+        "kind": "glob" if rule.glob else "regex",
+        "written": rule.glob or rule.regex,
+        "pattern": rule.compiled.pattern if rule.compiled else "",
+        "message": rule.message,
+    }
+
+
+def _phase_type_record(layer: str, pt) -> dict:
+    """フェーズの種類 1 つ。id は裸のまま、層は欄で出す（設計 §25.4.1）。"""
+    return {
+        "id": pt.id,
+        "source": layer,
+        "kind": pt.kind,
+        "title": pt.title,
+        "review": pt.review,
+        # scope は `inherit`（親の範囲を継ぐ）のとき None。空の並びと区別が付くように、
+        # 継ぐことは `inherit` の 1 語で出す。
+        "scope": [_written(e) for e in pt.scope] if pt.scope else ["inherit"],
+    }
+
+
+def _factor_record(layer: str, factor) -> dict:
+    """リスクの項目 1 つ。"""
+    return {
+        "id": factor.id,
+        "source": layer,
+        "kind": factor.kind,
+        "value": factor.value if isinstance(factor.value, (int, str)) else str(factor.value),
+        "points": factor.points,
+        "message": factor.message,
+    }
 
 
 def _ticket_record(
@@ -588,7 +791,7 @@ def _ticket_record(
     worktrees: dict,
     seen_in: list[dict],
 ) -> dict:
-    """チケット 1 件。提案と写しと作業ツリーの今を 1 つにまとめる。"""
+    """チケット 1 件。提案と承認済みチケットと作業ツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
     source = proposal or copy
     assert source is not None

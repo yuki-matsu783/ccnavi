@@ -105,6 +105,11 @@ class Record:
     # ワークスペースなら空。dry-run でまず分布を見て、和で増えた確認を数えるための欄。
     tree: str = ""
     project: str = ""
+    # source は、判定を下したルールがどの層から来たか（設計 §25.9）。
+    # `common` / `self` / プロジェクトの名前。ルールが当たらなかった行と、
+    # ルールファイルの外から足した根拠で下した行は空。層ごとに数えられないと、
+    # 和で増えた拒否がどの層のものかを、id を全部読むまで言えない。
+    source: str = ""
 
 
 class Log:
@@ -171,6 +176,7 @@ class Log:
             ("detail", record.detail),
             ("tree", record.tree),
             ("project", record.project),
+            ("source", record.source),
         ):
             if value:
                 out[key] = value

@@ -34,7 +34,7 @@ RULES = {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
             "glob": "*/.claude/ccnavi/*",
-            "message": "ガードの設定と写しです。利用者に依頼してください。",
+            "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
         }
     ],
 }
@@ -180,7 +180,7 @@ class TicketTest(unittest.TestCase):
 
     def propose(self, name, **kw):
         return write(
-            os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", name + ".md"),
+            os.path.join(self.parent_tree, "wip", "tickets", "todo", name + ".md"),
             ticket_text(name, **kw),
         )
 
@@ -321,7 +321,7 @@ class TicketTest(unittest.TestCase):
 
     @unittest.skipUnless(os.path.normcase("A") == "a", "大文字小文字を区別する機械")
     def test_worktree_name_case_does_not_drop_the_ticket(self):
-        """区別しない機械で綴り違いに切った作業ツリーでも、判定は写しで行う。
+        """区別しない機械で綴り違いに切った作業ツリーでも、判定は承認済みチケットで行う。
 
         案内（SubagentStart）は綴りの違いを吸収するのに判定だけ厳密だと、
         「効いている」と言われながら権限モード任せに落ちる（敵対的レビューで実測）。
@@ -342,14 +342,60 @@ class TicketTest(unittest.TestCase):
     # ---- 2. 子は親の部分集合
 
     def test_child_beyond_parent_is_not_approved(self):
+        """超えている子だけが落ち、兄弟は承認済みチケットになる。落ちたものがあるので
+        終了コードは 1。
+
+        束の一部が落ちたときに 0 で終わると、端末を見ていない側（スクリプト、CI）が
+        全部通ったと読む。通ったぶんの承認済みチケットは置くので、直して出し直せばよい。
+        """
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stderr)
         self.assertIn("超えている", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
+
+    # ---- 2b. 束を識別子で絞る（VS Code 拡張が絞り込みで見えている分だけを渡す）
+
+    def test_approve_only_the_listed_tickets(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0002", allow=("docs/*",))
+        result = self.ccnavi("--approve", "i0001", "i0001-01", stdin="y\n")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
+        self.assertNotIn("i0002", result.stdout.split("Ticket 承認リクエスト")[1])
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0002.md")))
+        # 残した分は次の --approve の束に載る
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "i0002.md")))
+
+    def test_listed_child_without_its_pending_parent_is_refused(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        result = self.ccnavi("--approve", "i0001-01", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("親 i0001 が承認されていない", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
+
+    def test_listed_id_with_nothing_pending_is_refused_too(self):
+        # 承認待ちが空でも、識別子を並べたなら「無い」は失敗。
+        # 終了コードが他の承認待ちの有無で変わらない
+        result = self.ccnavi("--approve", "i0001", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("承認待ちに無い: i0001", result.stderr)
+
+    def test_listed_id_that_is_not_pending_approves_nothing(self):
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        result = self.ccnavi("--approve", "i0001", "i0009", stdin="y\n")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("承認待ちに無い: i0009", result.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001.md")))
 
     def test_grandchild_is_refused(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -362,9 +408,9 @@ class TicketTest(unittest.TestCase):
     def test_editing_the_proposal_does_not_widen_the_scope(self):
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
-        # 承認後に提案を書き足しても、効いているのは写し。
+        # 承認後に提案を書き足しても、効いているのは承認済みチケット。
         write(
-            os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001-01.md"),
+            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001-01.md"),
             ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*", "src/b/*")),
         )
         result = self.hook(
@@ -388,18 +434,18 @@ class TicketTest(unittest.TestCase):
 
     def test_state_directories_cannot_be_written_directly(self):
         self.family()
-        target = os.path.join(self.parent_tree, ".ccnavi", "proposals", "done", "i0001-01.md")
+        target = os.path.join(self.parent_tree, "wip", "tickets", "done", "i0001-01.md")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
         self.assertIn("builtin-ticket-state", self.reason(result))
         moved = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="mv .ccnavi/proposals/doing/i0001-01.md .ccnavi/proposals/done/",
+            command="mv wip/tickets/doing/i0001-01.md wip/tickets/done/",
         )
         self.assertIn("builtin-ticket-state", self.reason(moved))
         # todo/ への作成は自由。
-        todo = os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001-03.md")
+        todo = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md")
         free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
         self.assertNotIn("builtin-ticket-state", self.reason(free))
 
@@ -464,9 +510,7 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("ticket", "done", "i0001-01")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(
-            os.path.exists(
-                os.path.join(self.parent_tree, ".ccnavi", "proposals", "done", "i0001-01.md")
-            )
+            os.path.exists(os.path.join(self.parent_tree, "wip", "tickets", "done", "i0001-01.md"))
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-01.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "closed", "i0001-01.md")))
@@ -517,7 +561,7 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Write",
             self.parent_tree,
-            file_path=os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001-03.md"),
+            file_path=os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md"),
         )
         self.assertNotIn("DENY_PHASE_GATE", self.reason(plan))
         # main からの起動にはゲートが無い。
@@ -555,7 +599,7 @@ class TicketTest(unittest.TestCase):
         return fixture
 
     def request(self, fixture, phase="1"):
-        """sh の request と同じ 3 段。prepare → 投稿（写しに書く）→ requested。"""
+        """sh の request と同じ 3 段。prepare → 投稿（承認済みチケットに書く）→ requested。"""
         body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
         prepared = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "--body-file", body, "review", "prepare"
@@ -767,7 +811,13 @@ class TicketTest(unittest.TestCase):
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
             "ls && ./ccnavi review check --phase 1",
-            # 承認のスクリプトも人の経路。中身は --approve と写しの push。
+            # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
+            "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
+            "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
+            # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
+            "ccnavi --approve --preview --yes i0001 --json",
+            "ccnavi --approve --yes i0001 --preview",
+            # 承認のスクリプトも人の経路。中身は --approve と承認済みチケットの push。
             "sh .claude/scripts/ccnavi-approve.sh",
         ):
             result = self.hook(
@@ -783,6 +833,9 @@ class TicketTest(unittest.TestCase):
             "ccnavi --explain",
             "ccnavi --lint",
             "sh .claude/scripts/ccnavi-ticket.sh done i0001-01",
+            # 束を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
+            "uv run python -m ccnavi --approve --preview --json",
+            "echo --approve --preview",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -792,15 +845,39 @@ class TicketTest(unittest.TestCase):
                 guard_ticket_approval="enable",
             )
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # PowerShell も同じ。
+        # PowerShell も同じ。PowerShell は shellread で読めないので生の文字列に当たる。
+        # 免除の範囲がコマンドをまたぐと、後ろに --preview を書くだけで前の承認が通る。
+        for command in (
+            "& ccnavi.exe --approve",
+            "ccnavi --approve --yes i0001,i0001-01 --json; ccnavi --approve --preview",
+            "ccnavi --approve; echo --preview",
+            "ccnavi --approve --yes i0001 | findstr --preview",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "PowerShell",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
         result = self.hook(
             "PreToolUse",
             "PowerShell",
             self.parent_tree,
-            command="& ccnavi.exe --approve",
+            command="ccnavi --approve --preview --json",
             guard_ticket_approval="enable",
         )
-        self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        # ccnavi の起動でない --yes は当てない。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="apt-get install --yes git",
+            guard_ticket_approval="enable",
+        )
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
         # 切ると通る。
         result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
@@ -856,13 +933,13 @@ class TicketTest(unittest.TestCase):
 
     def test_moving_state_keeps_the_proposal_text(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
-        path = os.path.join(self.parent_tree, ".ccnavi", "proposals", "todo", "i0001.md")
+        path = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001.md")
         with open(path, encoding="utf-8") as f:
             text = f.read()
         write(path, text.replace("---\n", "---\n# 人の覚え書き\n", 1))
         self.assertEqual(self.approve().returncode, 0)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-        moved = os.path.join(self.parent_tree, ".ccnavi", "proposals", "doing", "i0001.md")
+        moved = os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md")
         with open(moved, encoding="utf-8") as f:
             after = f.read()
         self.assertIn("# 人の覚え書き", after)
@@ -1055,7 +1132,7 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(check.returncode, 0, check.stderr)
 
     def test_exe_never_reaches_the_remote_and_needs_a_matching_result(self):
-        """写しが無ければ動かず、依頼したのと違うマージリクエストの写しでは開かない。"""
+        """承認済みチケットが無ければ動かず、依頼したのと違うマージリクエストの承認済みチケットでは開かない。"""
         self.family()
         self.close_phase()
         fixture = self.remote()
@@ -1133,10 +1210,18 @@ class TicketTest(unittest.TestCase):
             self.assertEqual(got.get("api_base"), expected, url)
 
     def script(self):
-        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。"""
+        """このリポジトリの ccnavi-review.sh を、テスト用の木へ置く。
+
+        ccnavi-common.sh も一緒に置く。sh は起動して最初に隣の共通部を読むので、
+        片方だけだと判定の前に「読めない」で落ちる。
+        """
         where = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
         os.makedirs(os.path.dirname(where), exist_ok=True)
-        shutil.copy(os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh"), where)
+        for name in ("ccnavi-review.sh", "ccnavi-common.sh"):
+            shutil.copy(
+                os.path.join(ROOT, ".claude", "scripts", name),
+                os.path.join(os.path.dirname(where), name),
+            )
         return where
 
     def run_script(self, script, *args, env=None):
@@ -1161,9 +1246,7 @@ class TicketTest(unittest.TestCase):
         """sh の前半（場所と道具の解決）が Windows でも通ること。origin が読めなければ止まる。"""
         self.family()
         self.remote()
-        script = os.path.join(self.root, ".claude", "scripts", "ccnavi-review.sh")
-        os.makedirs(os.path.dirname(script), exist_ok=True)
-        shutil.copy(os.path.join(ROOT, ".claude", "scripts", "ccnavi-review.sh"), script)
+        script = self.script()
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_BIN_PATH"] = sys.executable
         done = subprocess.run(

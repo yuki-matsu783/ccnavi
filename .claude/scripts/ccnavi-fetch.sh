@@ -1,10 +1,10 @@
 #!/bin/sh
-# ccnavi-fetch — セッションの頭で、親ブランチのリモートを取ってきて写しを新しくする。
+# ccnavi-fetch — セッションの頭で、親ブランチのリモートを取ってきて承認済みチケットを新しくする。
 #
 #   sh .claude/scripts/ccnavi-fetch.sh
 #
-# 承認済みの写しと印は親チケットのブランチに乗り、A の機械から push されて届く
-# （設計 §24.5）。取ってこないと、B の機械は古い写しで判定する。承認したのに範囲が
+# 承認済みチケットと印は親チケットのブランチに乗り、A の機械から push されて届く
+# （設計 §9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに範囲が
 # 効かない、レビュー済みなのにゲートが閉じたまま、という形になる。
 #
 # 進めるのは fast-forward だけ。マージも rebase もしない。作業ツリーに未コミットの
@@ -19,18 +19,16 @@
 
 set -u
 
+# 共通部分。ワークスペースルートの探し方はここにある（設計 §11.8）。
+. "$(dirname "$0")/ccnavi-common.sh"
+
 approved="${CCNAVI_APPROVED:-.ccnavi/tickets}"
 projects="${CCNAVI_PROJECTS:-projects}"
 
-common=$(git rev-parse --git-common-dir 2>/dev/null || :)
-[ -z "$common" ] && exit 0
-case "$common" in
-*/.git) root="${common%/.git}" ;;
-.git) root="$(pwd -W 2>/dev/null || pwd)" ;;
-*) root="$common" ;;
-esac
+# 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
+root=$(ccnavi_workspace) || exit 0
 
-# 写しを持ちうるツリー。ワークスペース、プロジェクト、作業ツリー。
+# 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、作業ツリー。
 trees="$root"
 for dir in "$root/$projects"/* "$root/.claude/worktrees"/*; do
 	[ -d "$dir" ] || continue
@@ -50,7 +48,7 @@ report=$(
 
 		name=$(basename "$tree")
 		git -C "$tree" fetch --quiet origin "$branch" 2>/dev/null || {
-			printf '%s: リモートを取ってこられなかった。手元の写しで判定する\n' "$name"
+			printf '%s: リモートを取ってこられなかった。手元の版で判定する\n' "$name"
 			continue
 		}
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
@@ -63,7 +61,7 @@ report=$(
 			continue
 		fi
 		if git -C "$tree" merge --ff-only --quiet "@{u}" 2>/dev/null; then
-			printf '%s: 写しと印を %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
+			printf '%s: 承認済みチケットと印を %s 件分だけ新しくした（%s）\n' "$name" "$behind" "$branch"
 		else
 			printf '%s: リモートと分岐しているので進めない。人が合流させること（%s）\n' \
 				"$name" "$branch"
@@ -72,6 +70,6 @@ report=$(
 )
 
 [ -n "$report" ] || exit 0
-printf '[ccnavi] 承認済みの写しと印は親ブランチに乗って届く。セッションの頭で取ってきた結果:\n'
+printf '[ccnavi] 承認済みチケットと印は親ブランチに乗って届く。セッションの頭で取ってきた結果:\n'
 printf '%s\n' "$report"
 exit 0

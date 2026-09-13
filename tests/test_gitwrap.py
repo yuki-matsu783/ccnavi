@@ -26,7 +26,13 @@ def git(cwd, *args):
 
 
 def make_repo(cwd):
-    """コミットが 1 件あり、追跡外のファイルが 1 件ある使い捨てのリポジトリ。"""
+    """コミットが 1 件あり、追跡外のファイルが 1 件ある使い捨てのリポジトリ。
+
+    ワークスペースルートにもする。ラッパは `.claude/scripts/` を持つディレクトリを
+    cwd から上へ探して根を決める（`ccnavi_workspace`）ので、それが無いと
+    「ワークスペースの外」として断られ、判定まで届かない。
+    """
+    os.makedirs(os.path.join(cwd, ".claude", "scripts"), exist_ok=True)
     git(cwd, "init", "-q")
     git(cwd, "config", "user.email", "t@example.invalid")
     git(cwd, "config", "user.name", "t")
@@ -283,8 +289,8 @@ class PassTest(GitWrapperTest):
     def test_push_from_a_child_ticket_worktree_is_rejected(self):
         """子チケットの作業ツリーからは送れない。親が合流してから親のツリーで送る。
 
-        見分けるのは承認済みの写しに `parent:` があるかだけ。写しの無いツリーと
-        親の写しを持つツリーは通す。
+        見分けるのは承認済みチケットに `parent:` があるかだけ。承認済みチケットの無いツリーと
+        親の承認済みチケットを持つツリーは通す。
         """
         bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
@@ -294,7 +300,7 @@ class PassTest(GitWrapperTest):
             f.write("---\nversion: 1\nticket: i0001\n---\n")
         with open(os.path.join(copies, "i0001-01.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
-        # 閉じた子。写しは closed/ に動いているが、ツリーはまだ子のもの。
+        # 閉じた子。承認済みチケットは closed/ に動いているが、ツリーはまだ子のもの。
         os.makedirs(os.path.join(copies, "closed"))
         with open(os.path.join(copies, "closed", "i0001-02.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001-02\nparent: i0001\nphase: 1\n---\n")

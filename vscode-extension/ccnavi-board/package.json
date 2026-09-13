@@ -1,8 +1,8 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
-  "description": "ccnavi のチケット（提案・写し・印・作業ツリー）をカンバンで表示し、人の承認をターミナルへ送る。ルールと hook を画面で眺め、ルールを直し、判定を試す。実績で測るリスクの配点とフェーズの種類を画面で直す。projects/ のプロジェクトを一覧し、clone をターミナルへ送る",
-  "version": "0.5.0",
+  "description": "ccnavi のチケット（提案・承認済みチケット・印・作業ツリー）をカンバンで表示し、承認内容をオーバーレイで見せて人の承認を受け付け、承認の文を Claude Code に渡す。ルールと hook を画面で眺め、ルールを直し、判定を試す。実績で測るリスクの配点とフェーズの種類を画面で直す。projects/ のプロジェクトを一覧し、clone をターミナルへ送る",
+  "version": "0.7.0",
   "publisher": "local",
   "private": true,
   "license": "MIT",
@@ -24,7 +24,6 @@
     "commands": [
       { "command": "ccnaviBoard.open", "title": "ccnavi ボード: ボードを開く" },
       { "command": "ccnaviBoard.refresh", "title": "ccnavi ボード: ボードを更新" },
-      { "command": "ccnaviBoard.approve", "title": "ccnavi ボード: 承認待ちを承認する（--approve）" },
       { "command": "ccnaviBoard.openRules", "title": "ccnavi ボード: ルール設定画面を開く" },
       { "command": "ccnaviBoard.openProjects", "title": "ccnavi ボード: プロジェクト管理を開く" },
       { "command": "ccnaviBoard.openRisk", "title": "ccnavi ボード: リスク管理画面を開く" },
@@ -33,8 +32,7 @@
     "menus": {
       "commandPalette": [
         { "command": "ccnaviBoard.open", "when": "ccnaviBoard.ticketControl == 'enable'" },
-        { "command": "ccnaviBoard.refresh", "when": "ccnaviBoard.ticketControl == 'enable'" },
-        { "command": "ccnaviBoard.approve", "when": "ccnaviBoard.ticketControl == 'enable'" }
+        { "command": "ccnaviBoard.refresh", "when": "ccnaviBoard.ticketControl == 'enable'" }
       ]
     },
     "configuration": {

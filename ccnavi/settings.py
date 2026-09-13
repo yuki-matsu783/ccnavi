@@ -20,6 +20,7 @@ import json
 import os
 import tomllib
 from dataclasses import dataclass, field
+from typing import NamedTuple
 
 # ccnavi が読む環境変数。
 MODE_ENV = "CCNAVI_MODE"
@@ -54,15 +55,15 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
 # TICKET_CONTROL_ENV は、チケット制御を使うか。enable（既定）/ disable の 2 値。
-# チケット制御は、提案を承認して写しを作り、その範囲・フェーズのゲート・
+# チケット制御は、提案を承認して承認済みチケットを作り、その範囲・フェーズのゲート・
 # サブエージェントの制限を判定に掛ける働き全体。全体ルールは全プロジェクトが使うが、
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
 # 以前は APPROVED_ENV を空文字にすることがこの宣言を兼ねていた。置き場のパスが
 # 空であることと機能を切ることは別の話なので、名前を分けた。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# チケット制御が使う置き場 2 つ。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みの
-# 写しの置き場。どちらも各ツリーのルートからの相対で、そのツリーの git が追跡する。
-# 判定が読むのは写しだけで、提案のほうは承認の画面と状態の同期しか読まない。
+# チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
+# git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
+# 判定が読むのは承認済みチケットだけで、提案のほうは承認の画面と状態の同期しか読まない。
 TICKETS_ENV = "CCNAVI_TICKETS"
 APPROVED_ENV = "CCNAVI_APPROVED"
 # PHASES_ENV はフェーズの種類の定義。ワークスペースルートからの相対。無ければ番号だけの挙動。
@@ -71,9 +72,12 @@ PHASES_ENV = "CCNAVI_PHASES"
 RISK_ENV = "CCNAVI_RISK"
 # PROJECTS_ENV はプロジェクトの置き場（設計 §25）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
-# PROJECT_RULES_ENV はプロジェクトごとのルールファイル。各 git プロジェクトルートからの相対。
+# PROJECT_HOME_ENV は層の傘（設計 §25.2）。各 git プロジェクトルートからの相対で、
+# その下の `config/{rules,phases,risk}.yml` が層の 3 本になる。自身の層
+# （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
+# 動かせるのは傘の名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
-PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
+PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 # もう効かない環境変数。指定されていたら --lint が言う。黙って無視すると、書いた人は
 # 効いていると思い続ける。
 #
@@ -81,7 +85,18 @@ PROJECT_RULES_ENV = "CCNAVI_PROJECT_RULES"
 # CCNAVI_GUARD_TICKET_APPROVAL に改名した。旧名で disable と書いてあった設定は、
 # 読まれなくなった時点で既定の enable に戻る――守りが消える向きには倒れない――が、
 # 切ったつもりの人には止まる理由が分からないので、名前を挙げて知らせる。
-RETIRED_ENVS = ("CCNAVI_TICKET", "CCNAVI_LEDGER", "CCNAVI_GUARD_CLI")
+RETIRED_ENVS = (
+    "CCNAVI_TICKET",
+    "CCNAVI_LEDGER",
+    "CCNAVI_GUARD_CLI",
+    # 層の置き場が 3 本まとめて `CCNAVI_PROJECT_HOME` の下に移った（設計 §25.2）。
+    # 旧の綴り（`config/rules.yml`）はもう読まない。
+    "CCNAVI_PROJECT_RULES",
+)
+
+# 旧のプロジェクトのルールの置き場。読まないが、まだそこに置いてあるワークスペースに
+# --lint が「あるが読まない」と言うために覚えておく（設計 §25.12）。
+OLD_PROJECT_RULES = "config/rules.yml"
 
 # own_project は ccnavi 自身のソースツリーを見分ける印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -97,14 +112,17 @@ DEFAULT_RULES = os.path.join(".claude", "ccnavi", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join(".claude", "ccnavi", "state")
-# 提案も写しも、そのツリーの `.ccnavi/` に置く。プロジェクトの git で運ぶためで、
-# 承認した人の機械にだけ在る形だと、A が承認して B の機械で作業する流れが成り立たない
-# （設計 §24.5）。プロジェクトに `.claude/` は置けない（Claude Code がそこのスキルを
-# 読み、`--lint` が迷い子として拾う）ので `.ccnavi/` を使う。守りは組み込みが持つ。
-# 区切りは "/" で持つ。ツリーのルートに継ぎ足すときに os の区切りへ直す。
-DEFAULT_TICKETS = ".ccnavi/proposals"
+# 提案は各作業ツリーの `wip/tickets/` に置く。人が読み、人が承認するものなので、
+# ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
+# 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
+DEFAULT_TICKETS = "wip/tickets"
+# 承認済みチケットは層の傘（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
+# 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
+# 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
+# B の機械で作業する流れが成り立たない（設計 §24.5）。区切りは "/" で持ち、ツリーの
+# ルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_APPROVED = ".ccnavi/tickets"
-# フェーズの種類は人が持つ設定なので、写しと同じ保護の内側に置く。
+# フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".claude", "ccnavi", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
 DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
@@ -112,10 +130,89 @@ DEFAULT_RISK = os.path.join(".claude", "ccnavi", "risk.yml")
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
 DEFAULT_PROJECTS = "projects"
-# プロジェクトのルールはプロジェクトの git で育てる。`.claude/` の下には置かない。
-# プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、`--lint` が
-# 迷い子として拾う。
-DEFAULT_PROJECT_RULES = "config/rules.yml"
+# 層の傘。プロジェクトの設定はプロジェクトの git で育てるので、`.claude/` の下には
+# 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
+# `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
+# スクリプトを 1 つの傘にまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
+# 済ませるため（設計 §25.2）。
+DEFAULT_PROJECT_HOME = ".ccnavi"
+# 傘の下の固定の綴り。層はこの形でしか置けない。
+LAYER_CONFIG_DIR = "config"
+# 層が持てる設定。3 本は独立に無くてよい。
+KIND_RULES = "rules"
+KIND_PHASES = "phases"
+KIND_RISK = "risk"
+LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
+# 層の名前。記録の `source` と id の前置きに使う綴り（設計 §25.4）。ruleload が
+# 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
+# 行い、そこは ruleload を import できない（ruleload が phase を import する）。
+LAYER_COMMON = "common"
+LAYER_SELF = "self"
+# 層の名札に予約してある綴り。プロジェクトはこの名前を名乗れない。
+RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
+# 予約名のプロジェクトの控えの key に添える前置き。名札の側（`rules:self`）と
+# プロジェクトの側を分ける（_layer_key）。
+PROJECT_KEY_HOME = "projects/"
+
+# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 §25.4）。
+#
+# 名札の綴りでは種別を決められない。`projects/common/` は `common` を名乗るが
+# 共通層ではないし、`projects/self/` は `self` を名乗るがワークスペース自身の層
+# ではない。`layer == LAYER_COMMON` のような文字列比較で種別を決めると、
+# プロジェクトが名前を 1 つ選ぶだけで、共通層と同じ扱いに滑り込める。
+ORIGIN_COMMON = "common-layer"
+ORIGIN_SELF = "self-layer"
+ORIGIN_PROJECT = "project-layer"
+
+
+class LayerFile(NamedTuple):
+    """層 1 つの設定ファイル。守る対象（selfguard）へ渡す形（`ruleload.layer_files`）。
+
+    `origin` は層の種別（ORIGIN_*）、`layer` は名札（`common` / `self` /
+    プロジェクトの名前）、`kind` は rules / phases / risk、`path` はその綴り。
+    種別を添えるのは、受け取る側が名札の文字列比較をしなくて済むようにするため。
+    """
+
+    origin: str
+    layer: str
+    kind: str
+    path: str
+
+
+def is_reserved_layer_name(name: str) -> bool:
+    """その名前が層の名札に予約してあるか（`common` / `self`、設計 §25.4）。
+
+    予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
+    lint（名指しする）、approval（`project:` を承認しない）、phase / risk
+    （層の phases / risk を足さない）が同じ答えを引く。片側にしか予約が
+    掛かっていないと、数えない層の名前で別の層の判定を引ける。
+
+    綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
+    `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
+    取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも
+    同じに畳む。`--lint` が error で名指しする（lint._projects）。
+    """
+    folded = (name or "").casefold()
+    return any(folded == reserved.casefold() for reserved in RESERVED_LAYER_NAMES)
+
+
+def approved_dir(conf: Settings, tree_root: str) -> str:
+    """このツリーの承認済みチケットの置き場（絶対）。
+
+    写しと印はそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
+    （設計 §24.5）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
+    """
+    return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
+
+
+def layer_script_home(conf: Settings) -> str:
+    """各層の `script:` に書ける唯一の綴り（`<傘>/scripts/`、"/" 区切り、設計 §25.4.2）。
+
+    共通層だけは今までどおり `.claude/ccnavi/` と `.claude/scripts/`（risk.SCRIPT_HOMES）。
+    たがいの側は指せない。プロジェクトの `.ccnavi/` はそのプロジェクトだけで閉じる。
+    """
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
+    return f"{home}/scripts/"
 
 
 @dataclass
@@ -171,9 +268,10 @@ class Settings:
     ticket_control: str = ""
     ticket_control_declared: str = ""
 
-    # tickets は提案の置き場、approved は承認済みの写しの置き場。どちらも各ツリーの
-    # ルートからの相対（"/" 区切り）。絶対で 1 か所を指さないのは、どちらもそのツリーの
-    # git に乗って運ばれるから（設計 §24.5）。判定が読むのは approved だけ。
+    # tickets は提案の置き場（各作業ツリーのルートからの相対、"/" 区切り）、
+    # approved は承認済みチケットの置き場（各ツリーのルートからの相対、"/" 区切り）。
+    # 絶対で 1 か所を指さないのは、そのツリーの git に乗って運ばれるから。判定が読むのは
+    # approved だけ。
     # チケット制御を使うかは ticket_control が決める。approved はパスでしかない。
     # approved_blank は、置き場を空文字で指定されたこと。以前はそれが「使わない」の
     # 宣言だったので、--lint が今の書き方を案内する。
@@ -185,10 +283,10 @@ class Settings:
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
     # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、この設定が
-    # 入る前と同じに動く。project_rules は各プロジェクトのルールファイル
-    # （git プロジェクトルートからの相対、"/" 区切り）。
+    # 入る前と同じに動く。project_home は層の傘（git プロジェクトルートからの相対、
+    # "/" 区切り）。自身の層とプロジェクトの層の両方に効く。
     projects: str = ""
-    project_rules: str = ""
+    project_home: str = ""
     # project_rules_files は、名前で指したプロジェクトのルールファイルの差し替え
     # （名前 → 絶対パス）。`--project-rules-file <名前>=<パス>` が入れる。診断（--test /
     # --test-samples / --lint / --explain）だけが使い、hook からの判定では空のまま。
@@ -240,16 +338,16 @@ def load(root: str) -> tuple[Settings, list[str]]:
         phases=os.path.join(root, DEFAULT_PHASES),
         risk=os.path.join(root, DEFAULT_RISK),
         projects=os.path.join(root, DEFAULT_PROJECTS),
-        project_rules=DEFAULT_PROJECT_RULES,
+        project_home=DEFAULT_PROJECT_HOME,
         retired=[name for name in RETIRED_ENVS if name in os.environ],
     )
     # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
     # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
-    # 言えるようにしてある。写しの置き場は空文字を受けない。チケット制御を切るのは
+    # 言えるようにしてある。承認済みチケットの置き場は空文字を受けない。チケット制御を切るのは
     # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
-        ("project_rules", PROJECT_RULES_ENV, _relative, False),
+        ("project_home", PROJECT_HOME_ENV, _relative, False),
         ("phases", PHASES_ENV, _resolve, False),
         ("risk", RISK_ENV, _resolve, False),
         ("rules", RULES_ENV, _resolve, False),
@@ -296,42 +394,40 @@ def load(root: str) -> tuple[Settings, list[str]]:
     return settings, problems
 
 
-def approved_dir(conf: Settings, tree_root: str) -> str:
-    """このツリーの写しの置き場（絶対）。"""
-    return _under(tree_root, conf.approved or DEFAULT_APPROVED)
+def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> str:
+    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 §25.2）。
 
+    `home_root` はその層の git プロジェクトルート。自身の層ならワークスペースルート、
+    プロジェクトの層ならその git プロジェクトルートを渡す。3 種とも同じ形なので、
+    rules だけの経路を別に持たない。
 
-def tickets_dir(conf: Settings, tree_root: str) -> str:
-    """このツリーの提案の置き場（絶対）。状態の置き場はこの下。"""
-    return _under(tree_root, conf.tickets or DEFAULT_TICKETS)
-
-
-def _under(tree_root: str, rel: str) -> str:
-    return os.path.join(tree_root, rel.replace("/", os.sep))
-
-
-def project_rules_path(conf: Settings, project_root: str) -> str:
-    """このプロジェクトのルールファイルの絶対パス。判定と診断が読む先。
-
-    `--project-rules-file` で名前が差し替えられていれば、そのパス。守る対象
-    （selfguard）は差し替えを見ない `project_rules_real_path` を使う。
+    `--project-rules-file` で名前が差し替えられていれば、rules に限ってそのパス。
+    差し替えは診断のためのもので、phases と risk には効かない。守る対象（selfguard）は
+    差し替えを見ない `layer_real_path` を使う。
     """
-    override = conf.project_rules_files.get(os.path.basename(project_root))
-    if override:
-        return override
-    return project_rules_real_path(conf, project_root)
+    if kind == KIND_RULES:
+        override = conf.project_rules_files.get(layer or _layer_name(home_root))
+        if override:
+            return override
+    return layer_real_path(conf, home_root, kind)
 
 
-def project_rules_real_path(conf: Settings, project_root: str) -> str:
-    """このプロジェクトのルールファイルが本来ある場所。差し替えを見ない。"""
-    return os.path.join(project_root, conf.project_rules.replace("/", os.sep))
+def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
+    """層の設定ファイルが本来ある場所。差し替えを見ない。"""
+    home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
+    return os.path.join(home_root, home, LAYER_CONFIG_DIR, f"{kind}.yml")
+
+
+def _layer_name(home_root: str) -> str:
+    """差し替えを引くときの名前。プロジェクトの層は置き場の下のディレクトリ名。"""
+    return os.path.basename(os.path.normpath(home_root)) if home_root else ""
 
 
 def _relative(root: str, path: str) -> str:
-    """置き場の綴りを、ツリーのルートからの相対に揃える。
+    """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
 
-    絶対パスは受けない。ツリーごとに違うルートに継ぎ足すものなので、
-    絶対で書かれた 1 か所を全ツリーが指すと、どのツリーのものなのかが
+    絶対パスは受けない。作業ツリーごとに違うルートに継ぎ足すものなので、
+    絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
     分からなくなる。絶対で来たら先頭の区切りだけ落として相対として読む。
     root は使わない。他の読み方と並べて表に置けるように、引数の形だけ揃えてある。
     """

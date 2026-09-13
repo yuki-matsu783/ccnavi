@@ -54,9 +54,9 @@ def decide(
     if payload.event == hookio.POST_TOOL_USE:
         return decide_after(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SESSION_START:
-        return decide_at_start(stdout, mode, conf, root, payload, record)
+        return decide_at_start(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.USER_PROMPT_SUBMIT:
-        return decide_at_prompt(stderr, conf, root, payload, record)
+        return decide_at_prompt(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
@@ -92,8 +92,8 @@ def watched_for(
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
-    ルールの引き方は実行前の判定と同じ。プロジェクトとその作業ツリーには
-    そのプロジェクトのルール、ワークスペースのツリーにはワークスペースのルール。
+    ルールの引き方は実行前の判定と同じで、共通層にそのツリーの層を足した和。
+    別に書くと、実行前に通った書き込みがターンの終わりに咎められる。
     """
     ws = tree.main_tree(root)
     if payload is None:
@@ -108,15 +108,11 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            if t.project:
-                home = tree.project_root(conf.projects, t.project)
-                rule_set, source = ruleload.load_rules(
-                    stderr, settings.project_rules_path(conf, home), record, root
+            rule_set, source = ruleload.load_rules(stderr, conf.rules, record, root)
+            if source != builtin.SOURCE:
+                ruleload.add_layers(
+                    stderr, rule_set, ruleload.layer_for(conf, root, t), root, record
                 )
-                if source != builtin.SOURCE:
-                    ruleload.prefix_ids(rule_set, t.project)
-            else:
-                rule_set, source = ruleload.load_rules(stderr, conf.rules, record, root)
             loaded[t.project] = (rule_set, source)
         rule_set, source = loaded[t.project]
         out.append(post.Watched(t, rule_set, source))
@@ -124,7 +120,7 @@ def watched_for(
 
 
 def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
-    """承認済みの写しを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
+    """承認済みチケットを、実行後の側から当てる持ち物。チケット制御が disable なら None。"""
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root)
@@ -132,6 +128,7 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
 
 
 def decide_at_prompt(
+    stdout: TextIO,
     stderr: TextIO,
     conf: settings.Settings,
     root: str,
@@ -140,12 +137,19 @@ def decide_at_prompt(
 ) -> int:
     """利用者が何か言ったとき。ターンの基準をここで取る。
 
-    何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
+    原則として何も返さない。このイベントで返した文はモデルのコンテキストに入るので、
     まだ何も起きていない時点で 1 段積むことになる。ここでやるのは、
     ターンの終わりに「このターンで何が変わったか」を言えるようにする控えだけ。
+
+    例外は、このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）。
+    それは 1 度だけ伝える。伝えないと、人が「承認した」とチャットで打つまで
+    モデルは後工程に入れない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     post.at_prompt(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
+    told = approval.news(stderr, conf, payload.session_id, payload.agent_id)
+    if told:
+        hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
 
 
@@ -180,6 +184,7 @@ def decide_at_stop(
 
 def decide_at_start(
     stdout: TextIO,
+    stderr: TextIO,
     mode: str,
     conf: settings.Settings,
     root: str,
@@ -204,11 +209,16 @@ def decide_at_start(
         conf.state,
         payload.session_id,
         root,
-        selfguard.targets(root, conf.rules, conf.bin, ruleload.project_rules_files(conf)),
+        selfguard.targets(
+            root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
+        ),
     )
     # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
     # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
     ctxfile.forget(conf.state, payload.session_id)
+    # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
+    # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
+    approval.baseline(stderr, conf, payload.session_id, payload.agent_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:
@@ -249,7 +259,7 @@ def decide_after(
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 提案の状態を写しへ写す。閉じた子の写しはここで closed/ へ動く。
+    # 提案の状態を承認済みチケットへ写す。閉じた子の承認済みチケットはここで closed/ へ動く。
     # 範囲は実行前の判定と同じ経路で解く。
     if conf.tickets_enabled:
         phase.sync(stderr, root, conf)

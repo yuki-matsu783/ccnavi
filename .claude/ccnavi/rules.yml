@@ -33,7 +33,7 @@ deny:
     match: Write|Edit|NotebookEdit
     regex: '^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)'
     message: >-
-      チェックアウトしたブランチ直下では編集しません。'sh .claude/scripts/ccnavi-git.sh worktree add
+      チェックアウトしたブランチ直下では編集しません。'sh {root}/.claude/scripts/ccnavi-git.sh worktree add
       .claude/worktrees/<名前> -b <名前>' で作業ツリーを切り、その中で編集して、
       ff-only で main に戻してください。
 
@@ -50,7 +50,7 @@ deny:
     match: Bash
     regex: '(^|[^\w.-])(\S*[\\/])?git(\.exe)?\s'
     message: >-
-      生の git は実行しません。'sh .claude/scripts/ccnavi-git.sh <サブコマンド> ...'
+      生の git は実行しません。'sh {root}/.claude/scripts/ccnavi-git.sh <サブコマンド> ...'
       を使ってください。通る形は同じスクリプトの --help 参照。返るのは要約と
       先頭 40 行だけで、全量は logs/ に残ります。
 
@@ -103,18 +103,19 @@ deny:
       渡してください。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
-  # 承認済みのチケットの写し。判定はここだけを読むので、ここを書けると承認の意味が無い。
+  # 承認済みチケット。判定はここだけを読むので、ここを書けると承認の意味が無い。
   - id: guard-approved-tickets
     match: Write|Edit|NotebookEdit
     glob: "*/.claude/ccnavi/tickets/*"
     message: >-
-      承認済みのチケットの写しです。承認は利用者が 'ccnavi --approve' で行い、
-      閉じるのは 'sh .claude/scripts/ccnavi-ticket.sh done <識別子>' です。
+      承認済みチケットです。承認は利用者が VS Code のボード（端末なら
+      'ccnavi --approve'）で行い、
+      閉じるのは 'sh {root}/.claude/scripts/ccnavi-ticket.sh done <識別子>' です。
       範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
 
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）。人が持つ設定で、エージェントが
-  # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリーの写しも
-  # 止める。写しは統合でそのまま main の設定になる道を持つので、main の側だけ止めても
+  # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリー側の
+  # 設定も止める。統合でそのまま main の設定になる道を持つので、main の側だけ止めても
   # 時間差で効く。同じ置き場の見本（rule-samples.yml）は止めない。ルールを足したら
   # 見本も足すのはエージェントの仕事。
   - id: guard-ccnavi-config
@@ -125,13 +126,13 @@ deny:
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
       （/ccnavi-config）。
 
-  # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、作業ツリーの写しは
-  # 統合で main へ入る道を持つので、写しも名前で止める。
+  # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、作業ツリー側の設定は
+  # 統合で main へ入る道を持つので、そちらも名前で止める。
   - id: guard-settings
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
     message: >-
-      hook の登録そのものです。作業ツリーの写しも統合で main の設定になります。
+      hook の登録そのものです。作業ツリー側の設定も統合で main の設定になります。
       エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼ください。
 
 ask:
@@ -149,7 +150,8 @@ ask:
     glob: "*/.current-ticket.md"
     additionalContextOnce: >-
       作業範囲の提案です。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
-      人が読んで 'ccnavi --approve' を通すまでは提案のままです。
+      人が読んで承認する（VS Code のボード、端末なら 'ccnavi --approve'）までは
+      提案のままです。
 
   # 外から取ってくるコマンド。止めはしないが、行き先を 2 つに分ける。
   # 調査で一度きりなら WebFetch ツール、何度も叩くなら .claude/scripts/ の sh。
