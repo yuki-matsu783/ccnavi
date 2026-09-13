@@ -222,5 +222,173 @@ class WordSepTest(unittest.TestCase):
         self.assertEqual(text, "git push")
 
 
+class UnwrappedTest(unittest.TestCase):
+    """中で実行されるコマンドの層（wip/design/launcher-scripts.md 3.5.2 節、12 節 U1〜U3）。
+
+    `env` `sudo` `sh -c` `xargs` のような実行役のコマンドは、別のコマンドを実行する。
+    `read(src).unwrapped` は、実行役のコマンドを 1 枚ずつ外した層を SEP でつないだもの。
+    元の形は含めない。層が無ければ空。
+    """
+
+    def layers(self, src):
+        result = read(src)
+        unwrapped = getattr(result, "unwrapped", None)
+        self.assertIsNotNone(unwrapped, "Reading に unwrapped の欄が無い")
+        if not unwrapped:
+            return []
+        # 語の中の印（引用がつないだ空白）は層の区切りではない。見る対象は層の並びなので空白に戻す。
+        word_sep = WORD_SEP or "\x01"
+        return [layer.replace(word_sep, " ") for layer in unwrapped.split(SEP)]
+
+    def test_形ごとの層は表のとおり(self):
+        # U1。3.5.2 節の表を 1 行ずつ。
+        cases = {
+            # 代入
+            "FOO=1 rm x": ["rm x"],
+            # 区切りの前の道筋や拡張子が付いた名前
+            "/usr/bin/git push": ["git push"],
+            "git.exe status": ["git status"],
+            # 実行役のコマンドと、飛ばすオプション・値・位置引数
+            "env rm x": ["rm x"],
+            "env FOO=1 BAR=2 rm x": ["rm x"],
+            "env -u HOME rm x": ["rm x"],
+            "env --unset HOME rm x": ["rm x"],
+            "env -C /tmp rm x": ["rm x"],
+            "env -- rm x": ["rm x"],
+            "command rm x": ["rm x"],
+            "exec rm x": ["rm x"],
+            "exec -a name rm x": ["rm x"],
+            "nohup rm x": ["rm x"],
+            "time rm x": ["rm x"],
+            "time -f %e rm x": ["rm x"],
+            "nice rm x": ["rm x"],
+            "nice -n 5 rm x": ["rm x"],
+            "sudo rm x": ["rm x"],
+            "sudo -u me rm x": ["rm x"],
+            "sudo -E -u me rm x": ["rm x"],
+            "sudo -- rm x": ["rm x"],
+            "doas rm x": ["rm x"],
+            "doas -u me rm x": ["rm x"],
+            "timeout 5 rm x": ["rm x"],
+            "timeout -s KILL 5 rm x": ["rm x"],
+            "timeout -k 1 5 rm x": ["rm x"],
+            "stdbuf -o0 rm x": ["rm x"],
+            "stdbuf -o 0 rm x": ["rm x"],
+            "chrt 10 rm x": ["rm x"],
+            "ionice -c 3 rm x": ["rm x"],
+            "taskset 1 rm x": ["rm x"],
+            # シェルにファイルを渡す形
+            "sh x.sh a": ["x.sh a"],
+            "sh -x x.sh a": ["x.sh a"],
+            "bash x.sh a": ["x.sh a"],
+            "zsh x.sh a": ["x.sh a"],
+            "dash x.sh a": ["x.sh a"],
+            "ksh x.sh a": ["x.sh a"],
+            # 文字列を読み直す形
+            "sh -c 'rm x'": ["rm x"],
+            "bash -lc 'rm x'": ["rm x"],
+            "eval rm x": ["rm x"],
+            "eval 'rm x'": ["rm x"],
+            # . / source
+            ". x.sh a": ["x.sh a"],
+            "source x.sh a": ["x.sh a"],
+            # xargs
+            "xargs rm x": ["rm x"],
+            "xargs -0 rm": ["rm"],
+            "xargs -n 1 -I {} rm {}": ["rm {}"],
+            # find -exec の類
+            "find . -name a -exec rm {} \\;": ["rm {}"],
+            "find . -execdir rm {} +": ["rm {}"],
+            "find . -ok rm {} \\;": ["rm {}"],
+            "find . -okdir rm {} \\;": ["rm {}"],
+            "find . -exec grep -l a {} \\; -exec rm {} \\;": ["grep -l a {}", "rm {}"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(self.layers(src), want)
+
+    def test_途中の層も並ぶ(self):
+        # U1。承認のルールの `script` の枝は `sh …approve.sh` の層に当たる。外側から内側へ並ぶ。
+        cases = {
+            "env sh .ccnavi/scripts/ccnavi-approve.sh": [
+                "sh .ccnavi/scripts/ccnavi-approve.sh",
+                ".ccnavi/scripts/ccnavi-approve.sh",
+            ],
+            "/bin/sh x.sh": ["sh x.sh", "x.sh"],
+            "/usr/bin/env rm x": ["env rm x", "rm x"],
+            "nohup env rm x": ["env rm x", "rm x"],
+            "sudo -u me sh -c 'rm x'": ["sh -c rm x", "rm x"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(self.layers(src), want)
+
+    def test_層は深さ_4_で止まる(self):
+        # U1。
+        self.assertEqual(
+            self.layers("env env env env rm x"),
+            ["env env env rm x", "env env rm x", "env rm x", "rm x"],
+        )
+        layers = self.layers("env env env env env rm x")
+        self.assertEqual(len(layers), 4, layers)
+        self.assertNotIn("rm x", layers)
+
+    def test_コマンドごとの層がつながる(self):
+        # U1。全コマンドの層を SEP でつなぐ。層の無いコマンドは何も足さない。
+        cases = {
+            "cd /tmp && env rm x": ["rm x"],
+            "env rm a; nohup rm b": ["rm a", "rm b"],
+            "echo $(env rm x)": ["rm x"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(self.layers(src), want)
+
+    def test_実行役でないコマンドには層が無い(self):
+        # U1。`echo` や `grep` の引数に書いたコマンド名は、実行されない。
+        for src in [
+            "rm -f x",
+            "cat README.md",
+            "echo env rm x",
+            "git log --grep env",
+            "grep -rn sudo docs",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(getattr(read(src), "unwrapped", None), "")
+
+    def test_読み切れない形でも層を作り_degraded_と理由は残る(self):
+        # U2。読み切れない形こそ、中で何が実行されるかを見たい。
+        cases = {
+            "sh -c 'rm x'": ["rm x"],
+            'bash -lc "rm x"': ["rm x"],
+            "eval 'rm x'": ["rm x"],
+            "source x.sh a": ["x.sh a"],
+            ". x.sh a": ["x.sh a"],
+            "echo a | xargs rm x": ["rm x"],
+            "find . -name a -exec rm {} \\;": ["rm {}"],
+            'sudo -u deploy sh -c "git push"': ["sh -c git push", "git push"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertTrue(result.degraded, f"{src!r} を普通に読んでしまった")
+                self.assertEqual(result.reason, REASON_TAKEN_AS_CODE)
+                self.assertEqual(self.layers(src), want)
+
+    def test_閉じない引用とヒアドキュメントでは層を作らない(self):
+        # U3。トークンに割れないので、層も推測しない。
+        for src in [
+            "env rm 'x",
+            "sh -c 'rm x",
+            'sudo -u me sh -c "rm x',
+            "env cat <<EOF\nrm x\n",
+        ]:
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertTrue(result.degraded, f"{src!r} を普通に読んでしまった")
+                self.assertEqual(result.reason, REASON_UNTERMINATED)
+                self.assertEqual(getattr(result, "unwrapped", None), "")
+
+
 if __name__ == "__main__":
     unittest.main()

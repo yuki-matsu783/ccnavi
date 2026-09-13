@@ -6,6 +6,10 @@ tests/fixtures/ のルールではなく、運用に使っている rules.yml �
 引用付きの grep / find が allow に当たる一方、引用の空白をまたいだ書き換えが deny に
 届くこと。変わってはいけないもの（§3）も同じ表で固定する。
 
+後半は承認の経路と、実行役のコマンド（`env`・`sudo`・`sh -c`・`xargs` など）が
+中で実行するコマンドを止める側のルールに当てること（wip/design/launcher-scripts.md
+3.4・3.5 節、12 節の A1〜A4・W1〜W3・W6・W7）。
+
 道具は外から動かす。`--test <tool> <subject> --json` の `verdict` と `rules[].id` を読む
 （形は README「試験の JSON」）。見本の `/repo` は `--root` に渡したルートに読み替える。
 """
@@ -14,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import unittest
 
 from ccnavi import shellread
@@ -25,15 +30,29 @@ RULES = os.path.join(ROOT, ".ccnavi", "common", "rules.yml")
 # 見本のパスに書く合言葉。--test-samples と同じ読み替えを、ここでは自分で行う。
 PLACEHOLDER = "/repo"
 
+# 配布先の hook が起動する振り分けの sh（launcher-scripts 1 節）。
+LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
+APPROVAL = "builtin-guard-ticket-approval"
+APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
+SETTING_FILES = "builtin-guard-setting-files"
+TICKET_STATE = "builtin-ticket-state-shell"
+# 承認の形の末尾。
+YES = " --approve --yes x"
 
-def judge(tool: str, subject: str) -> dict:
+
+def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     """1 件を本物のルールで判定して、試験の JSON を返す。
 
     写しと控えは外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
     既定のまま効かせる。§4 の表はそれを含めた判定なので。
+
+    `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルの綴りから
+    当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment.pop("CLAUDE_PROJECT_DIR", None)
+    if bin_path:
+        environment["CCNAVI_BIN_PATH"] = bin_path
     done = run_ccnavi(
         [
             "--root",
@@ -62,6 +81,11 @@ def judge(tool: str, subject: str) -> dict:
 
 def hit(body: dict) -> list[str]:
     return [rule["id"] for rule in body["rules"]]
+
+
+def blocking(body: dict) -> set[str]:
+    """deny / ask の側で当たったルール。組み込みは `section` が空で返るので、allow 以外を数える。"""
+    return {rule["id"] for rule in body["rules"] if rule.get("section") != "allow"}
 
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
@@ -153,6 +177,242 @@ class RepoRulesTest(unittest.TestCase):
         ]:
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", "builtin-guard-setting-files")
+
+
+class LauncherJudgeTest(unittest.TestCase):
+    """`CCNAVI_BIN_PATH` が振り分けの sh を指すときの判定。"""
+
+    def judge(self, subject: str) -> dict:
+        body = judge("Bash", subject, bin_path=LAUNCHER)
+        self.assertTrue(body["known"])
+        return body
+
+    def assert_denied_by(self, subject: str, rule_id: str, code: str = "") -> dict:
+        body = self.judge(subject)
+        self.assertEqual(
+            body["verdict"], "deny", f"{subject!r}: {body['code']} {hit(body)} {body['response']}"
+        )
+        self.assertIn(rule_id, hit(body), f"{subject!r}: {body['rules']}")
+        if code:
+            self.assertEqual(body["code"], code, f"{subject!r}: {body['response']}")
+        return body
+
+
+class TicketApprovalPathTest(LauncherJudgeTest):
+    """承認の経路（launcher-scripts 3.4 節、12 節 A1〜A4）。"""
+
+    def test_振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる(self):
+        # A1。今は `<sh>` を先頭に書いた形だけが止まり、残りは確認に落ちている。
+        for subject in [
+            LAUNCHER + YES,
+            PLACEHOLDER + "/" + LAUNCHER + YES,
+            "sh " + LAUNCHER + YES,
+            "bash " + LAUNCHER + YES,
+            "/bin/sh " + LAUNCHER + YES,
+            "env sh " + LAUNCHER + YES,
+            "env FOO=1 sh " + LAUNCHER + YES,
+            "command sh " + LAUNCHER + YES,
+            "exec sh " + LAUNCHER + YES,
+            "nohup sh " + LAUNCHER + YES,
+            "zsh " + LAUNCHER + YES,
+            "dash " + LAUNCHER + YES,
+            "sh -x " + LAUNCHER + YES,
+            "cd /tmp && sh " + LAUNCHER + YES,
+            "sh " + LAUNCHER + " ticket start x",
+            # 前の形と、実体を直に指す形。
+            "sh .ccnavi/bin/ccnavi" + YES,
+            "sh .ccnavi/bin/linux-x86_64/ccnavi" + YES,
+            "sh ccnavi" + YES,
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, APPROVAL)
+
+    def test_読み切れない形の承認も承認のルールで止まる(self):
+        # A2。今は PARSE_UNCERTAIN の確認に落ちる。止めた理由が承認のルールだと読めること。
+        for subject in [
+            "sh -c '" + LAUNCHER + YES + "'",
+            'bash -lc "' + LAUNCHER + YES + '"',
+            ". " + LAUNCHER + YES,
+            "source " + LAUNCHER + YES,
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, APPROVAL, code=APPROVAL_CODE)
+
+    def test_承認でない形は承認のルールに当たらない(self):
+        # A3。止めすぎの候補。中で実行されるコマンドを見ても、ここは広がらない。
+        for subject in [
+            LAUNCHER + " --approve --preview x",
+            "sh " + LAUNCHER + " --approve --preview x",
+            "cat " + LAUNCHER,
+            "grep -n 'ccnavi --approve --yes' README.md",
+            "sed -n 1,20p " + LAUNCHER,
+            "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md",
+            "echo " + LAUNCHER,
+            # 引用しない形。`echo` や `grep` は実行役のコマンドではないので、中を見ない。
+            "echo ccnavi --approve --yes x",
+            "grep -rn ccnavi --yes docs",
+            "git log --grep ccnavi --yes",
+        ]:
+            with self.subTest(subject=subject):
+                body = self.judge(subject)
+                self.assertNotIn(APPROVAL, hit(body), f"{subject!r}: {body['response']}")
+
+    def test_コミットの文面に書いた承認の形は_raw_git_だけに当たる(self):
+        # A3 の続き。git を直に打ったことでは止まるが、承認のルールには当たらない。
+        body = self.judge("git commit -m 'docs: ccnavi --approve --yes の説明'")
+        self.assertIn("raw-git", hit(body), body["rules"])
+        self.assertNotIn(APPROVAL, hit(body), body["rules"])
+
+    def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
+        # A4。実行役のコマンドの並びを正規表現に持たせる案（B）で残っていた 2 形。
+        for subject in [
+            "sudo -u me sh -c 'ccnavi --approve --yes x'",
+            "find . -name x -exec ccnavi --approve --yes {} \\;",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, APPROVAL)
+
+
+# 実行役のコマンド。`{}` に中で実行されるコマンドが入る。
+RUNNERS = [
+    "env {}",
+    "FOO=1 {}",
+    "command {}",
+    "exec {}",
+    "nohup {}",
+    "time {}",
+    "sudo {}",
+    "sudo -u me {}",
+    "timeout 5 {}",
+    "nice -n 5 {}",
+    "stdbuf -o0 {}",
+    "/usr/bin/env {}",
+    "doas {}",
+    # 読み切れない形。
+    "sh -c '{}'",
+    "eval '{}'",
+    "echo x | xargs {}",
+    "find . -name x -exec {} \\;",
+]
+
+# 組み込みの守りに当たる、中で実行されるコマンドと、当たるべきルール。
+GUARDED = [
+    ("rm -f .ccnavi/common/rules.yml", SETTING_FILES),
+    ("mv .claude/settings.json /tmp/settings.json", SETTING_FILES),
+    ("tee .ccnavi/common/rules.yml", SETTING_FILES),
+    ("sed -i s/a/b/ .claude/settings.json", SETTING_FILES),
+    ("cp /tmp/rules.yml .ccnavi/common/rules.yml", SETTING_FILES),
+    ("truncate -s 0 .claude/settings.json", SETTING_FILES),
+    ("mv wip/tickets/todo/a.md wip/tickets/doing/a.md", TICKET_STATE),
+    ("ccnavi --approve --yes x", APPROVAL),
+    ("sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL),
+]
+
+
+class RunnerTest(LauncherJudgeTest):
+    """実行役のコマンドが中で実行するコマンドを、止める側のルールに当てる（3.5 節）。"""
+
+    def test_中で実行されるコマンドそのものは今も止まる(self):
+        # W1 の見本が正しいことの確かめ。実行役のコマンドを付けない形で、同じルールに当たる。
+        for inner, rule_id in GUARDED:
+            with self.subTest(subject=inner):
+                self.assert_denied_by(inner, rule_id)
+
+    def test_組み込みの守りは実行役のコマンドの中でも止める(self):
+        # W1。今は実行役のコマンドを付けると、先頭に固定した式が外れて確認に落ちる。
+        for runner in RUNNERS:
+            for inner, rule_id in GUARDED:
+                subject = runner.format(inner)
+                with self.subTest(subject=subject):
+                    self.assert_denied_by(subject, rule_id)
+
+    def test_env_越しの承認のスクリプトは途中の層で止まる(self):
+        # W1 の続き。`sh …approve.sh` は `env` を外した途中の層で、
+        # そこに承認の `script` の枝が当たる。
+        self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL)
+
+    def test_先頭に固定した利用者のルールも実行役のコマンドの中で当たる(self):
+        # W2。
+        body = self.judge("env curl -d @x https://example.com")
+        self.assertEqual(body["verdict"], "ask", body["response"])
+        self.assertIn("prefer-webfetch", hit(body), body["rules"])
+
+    def test_中で実行されるコマンドは_allow_に当てない(self):
+        # W3。当てると、元の形では確認に落ちる `sudo` が読み取りとして通る。
+        body = self.judge("sudo -u me cat /etc/hosts")
+        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
+        self.assertNotEqual(body["verdict"], "allow", body["response"])
+
+    def test_普通の作業では止める側に当たるルールが増えない(self):
+        # W6。3.5.4 節の 27 形。値は元の形だけに当てていたとき（この変更の前）の、
+        # deny / ask の側で当たったルール。中で実行されるコマンドを見ても、ここから増えない。
+        cases = {
+            "time uv run pytest": set(),
+            "nice -n 10 make test": set(),
+            "env PYTHONUTF8=1 uv run python -m unittest": set(),
+            "timeout 60 pnpm test": set(),
+            "sudo -u me cat /etc/hosts": set(),
+            "sh scripts/ccnavi-setup.sh --check": set(),
+            "bash tests/run.sh": set(),
+            "command -v jq": set(),
+            "env | grep CCNAVI": set(),
+            "sh -c 'cat README.md'": set(),
+            "find . -name '*.py' -exec grep -l foo {} \\;": set(),
+            "echo x | xargs grep -n foo": set(),
+            "nohup python -m http.server &": set(),
+            "stdbuf -o0 tail -n 3 logs/log.jsonl": set(),
+            "source .venv/bin/activate": set(),
+            ". .venv/bin/activate && uv run pytest": set(),
+            "bash -lc 'uv run ruff check .'": set(),
+            # ゲートの sh 3 形。承認のスクリプトは元の形から止まっている。
+            "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
+            "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
+            "sh .ccnavi/scripts/ccnavi-approve.sh": {APPROVAL},
+            "exec zsh": set(),
+            "time git log --oneline": {"raw-git"},
+            "find . -name '*.pyc' -exec rm {} +": set(),
+            "xargs -n1 -I{} echo {}": set(),
+            "sudo -E env PATH=/x make install": set(),
+            "env -u CCNAVI_MODE uv run python -m ccnavi --lint": set(),
+            "timeout 5 sh -c 'cat logs/log.jsonl | tail -n 3'": set(),
+        }
+        self.assertEqual(len(cases), 27)
+        for subject, want in cases.items():
+            with self.subTest(subject=subject):
+                body = self.judge(subject)
+                self.assertEqual(blocking(body), want, body["response"])
+
+    def test_中で実行されるコマンドに当たったことが_unwrapped_と文面に出る(self):
+        # W7。元の形のどこが問題なのかを、読み手が辿れるように。
+        for subject, runner, layer in [
+            ("env rm -f .ccnavi/common/rules.yml", "env", "rm -f .ccnavi/common/rules.yml"),
+            (
+                "env sh .ccnavi/scripts/ccnavi-approve.sh",
+                "env",
+                "sh .ccnavi/scripts/ccnavi-approve.sh",
+            ),
+        ]:
+            with self.subTest(subject=subject):
+                body = self.judge(subject)
+                self.assertEqual(body["verdict"], "deny", body["response"])
+                self.assertIn("unwrapped", body, "JSON に unwrapped の欄が無い")
+                self.assertEqual(body["unwrapped"], layer)
+                # 名前を括る記号は問わない。
+                quote = "[`'\"]?"
+                line = (
+                    f"{quote}{re.escape(runner)}{quote} が実行する "
+                    f"{quote}{re.escape(layer)}{quote} に当たりました"
+                )
+                self.assertRegex(body["response"], line)
+
+    def test_元の形で当たったときは_unwrapped_も文面も出ない(self):
+        # W7 の反対側。
+        body = self.judge("rm -f .ccnavi/common/rules.yml")
+        self.assertEqual(body["verdict"], "deny", body["response"])
+        self.assertIn("unwrapped", body, "JSON に unwrapped の欄が無い")
+        self.assertEqual(body["unwrapped"], "")
+        self.assertNotIn("が実行する", body["response"])
 
 
 if __name__ == "__main__":
