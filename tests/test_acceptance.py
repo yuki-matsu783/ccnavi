@@ -12,6 +12,7 @@ import os
 import tempfile
 import unittest
 
+from ccnavi import shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -393,6 +394,22 @@ class RecordTest(unittest.TestCase):
         # これが無いと、ガードが止めたもののうちどれだけが読み切れないまま
         # 出た判定なのかを記録が答えられない。
         self.assertIn("degraded", got[1], "生の文字列で下した判定に degraded が無い")
+
+    @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+    def test_引用の中から切り出したコマンドに当たったことを記録する(self):
+        # 書いた側が文字のつもりでいた場所に当たった判定を、あとから数えられるように
+        # （wip/design/shellread-subst.md §1.4）。
+        got = self.logged(
+            "enable",
+            pre_tool_use("Bash", "command", 'gh issue create --body "use `git push` here"'),
+            pre_tool_use("Bash", "command", "echo $(git push origin main)"),
+        )
+
+        self.assertEqual(len(got), 2)
+        self.assertEqual(got[0]["decision"], "deny")
+        self.assertEqual(got[0].get("quoted"), ["git-push"])
+        self.assertEqual(got[1]["decision"], "deny")
+        self.assertNotIn("quoted", got[1], "引用の外の置換に quoted が付いている")
 
 
 if __name__ == "__main__":
