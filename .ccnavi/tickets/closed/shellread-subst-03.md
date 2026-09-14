@@ -7,17 +7,26 @@ predecessors:
 - shellread-subst-01
 - shellread-subst-02
 title: コマンド置換・改行・プロセス置換を読む走査を入れ、受入テストを通す
-rationale: |
-  設計（wip/design/shellread-subst.md）§1 と §5 のとおりに実装する。shellread.py に shlex の前の
+rationale: '設計（wip/design/shellread-subst.md）§1 と §5 のとおりに実装する。shellread.py に shlex
+  の前の
+
   走査（試作 wip/design/shellread-subst-proto.py）を入れ、切り出した中身を外側の後ろにつなぎ、
+
   `bare` と縮退の理由 2 つを足す。判定の側は、`bare` に当て直して引用の中の断りを足し、
+
   記録と `--test` に `quoted` を出す。完了の条件は、2 番目で書いた受入テスト（skip 付き）が
+
   skip されずに全部通ること。既存のテストも全部通ること。
 
+
   範囲には、設計 §0 で足した 4 つの穴（改行、プロセス置換、語の途中の `#`、予約語の直後）を含む。
+
   うち 3 つは今 allow が後ろのコマンドまで通している。
 
+
   このフェーズの終わりに、1 番目（設計）と 2 番目（受入テスト）の分も含めて人のレビューを受ける。
+
+  '
 human_review:
   required: true
   reason: 判定の入力の形が変わる。組み込みのルールと既存の regex 全部に影響し、allow が外れる形と deny に変わる形がある
@@ -26,6 +35,13 @@ allow:
   glob: ccnavi/*
 - match: Write|Edit
   glob: tests/*
+ccnavi_approved:
+  approved_at: 2026-09-14T23:10:05+0900
+  source_tree: shellread-subst
+  source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/shellread-subst/wip/tickets/todo/shellread-subst-03.md
+started_at: 2026-09-14T23:14:25+0900
+base_sha: 9762461cbf98d82bc96f7617904775e6e881f0d1
+completed_at: 2026-09-14T23:39:36+0900
 ---
 
 # 実装: コマンド置換・改行・プロセス置換を読む
