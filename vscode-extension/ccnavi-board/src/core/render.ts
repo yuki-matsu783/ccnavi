@@ -263,9 +263,10 @@ function renderBadges(card: Card): string {
   if (card.baseSha !== "") {
     badges.push(badge("sha", `base ${card.baseSha.slice(0, 7)}`, card.baseSha));
   }
-  if (card.seenIn.length > 1) {
-    const where = card.seenIn.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
-    badges.push(badge("seen", `${card.seenIn.length} か所にコピーあり`, where));
+  // 写りがあること自体は普通なので数では出さない。どれが本物か決まらないときだけ言う。
+  if (card.scattered.length > 0) {
+    const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
+    badges.push(badge("seen", `複数の場所にある（${card.scattered.length} か所）`, where));
   }
   return badges.map((b) => `          ${b}`).join("\n");
 }
@@ -433,10 +434,10 @@ ${BUTTON_STYLE}
   }
   .badge.copy-open { color: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .badge.copy-none { color: var(--vscode-charts-blue); border-color: var(--vscode-charts-blue); }
-  .badge.gate, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); border-color: var(--vscode-editorError-foreground); }
+  .badge.gate, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); border-color: var(--vscode-editorError-foreground); }
   .badge.mark-reviewed { color: var(--vscode-charts-green); }
   .badge.mark-requested { color: var(--vscode-charts-yellow); }
-  .badge.seen, .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
+  .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
   .phases { list-style: none; margin: 6px 0 0; padding: 0; font-size: .85em; display: flex; flex-direction: column; gap: 2px; }
   .phase { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }

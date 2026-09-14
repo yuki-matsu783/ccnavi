@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard, isKnownPath, parentTreeOf, type Card } from "../src/core/board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../src/core/model.js";
-import { fixture } from "./fixture.js";
+import { parseBoardJson } from "../src/core/model.js";
+import { fixture, fixtureText } from "./fixture.js";
 
 function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
   return new Map(board.columns.flatMap((c) => c.cards).map((card) => [card.id, card]));
@@ -137,4 +138,50 @@ test("CB-T11 親の作業ツリーを引ける", () => {
   assert.match(parentTreeOf(board, "i0001") ?? "", /worktrees\/i0001$/);
   assert.equal(parentTreeOf(board, "i0001-01"), undefined);
   assert.equal(parentTreeOf(board, "nope"), undefined);
+});
+
+test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り自体は数えない", () => {
+  const base = fixture();
+  const cards = cardsOf(buildBoard(base));
+  // 正常な場面。親と兄弟の作業ツリーに写っていても、状態が食い違っていても、
+  // 実行ファイルが「本物は決まっている」と言うので散在ではない。
+  for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03"]) {
+    assert.deepEqual(cards.get(id)!.scattered, [], id);
+    assert.ok(cards.get(id)!.seenIn.length > 1, id);
+  }
+
+  // 決まらないときは、実行ファイルが挙げた候補をそのまま持つ。畳み直さない。
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const lost: TicketJson = {
+    ...child,
+    seen_in: [
+      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    ],
+    scattered: [
+      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    ],
+  };
+  const card = cardsOf(buildBoard({ ...base, tickets: [lost] })).get("i0001-03")!;
+  assert.deepEqual(
+    card.scattered.map((s) => `${s.tree}:${s.state}`),
+    [":todo", "i0001-02:todo"],
+  );
+  // 写り自体は残す。開いたファイルからカードを引き当てるのに使う。
+  assert.equal(card.seenIn.length, 2);
+});
+
+test("CB-T117b 古い実行ファイルが scattered を出さなくても、散在無しとして読む", () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const raw = JSON.parse(fixtureText()) as { tickets: Record<string, unknown>[] };
+  for (const t of raw.tickets) {
+    delete t.scattered;
+  }
+  const parsed = parseBoardJson(JSON.stringify(raw));
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.error);
+  const cards = cardsOf(buildBoard(parsed.board));
+  assert.deepEqual(cards.get(child.ticket)!.scattered, []);
+  assert.ok(cards.get(child.ticket)!.seenIn.length > 1);
 });

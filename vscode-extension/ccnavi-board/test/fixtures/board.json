@@ -1,7 +1,7 @@
 {
  "version": 1,
  "root": "<root>",
- "generated_at": "2026-09-13T21:05:00+0900",
+ "generated_at": "2026-09-13T13:50:22+0000",
  "settings": {
   "ticket_control": "enable",
   "tickets": "wip/tickets",
@@ -165,7 +165,7 @@
    },
    "copy": {
     "status": "open",
-    "approved_at": "2026-09-13T21:04:58+0900",
+    "approved_at": "2026-09-13T13:50:21+0000",
     "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001.md"
    },
@@ -196,6 +196,7 @@
      "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/todo/i0001.md"
     }
    ],
+   "scattered": [],
    "risk": null,
    "judge": null
   },
@@ -219,7 +220,7 @@
    },
    "copy": {
     "status": "closed",
-    "approved_at": "2026-09-13T21:04:59+0900",
+    "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/closed/i0001-01.md"
    },
@@ -228,9 +229,9 @@
     "path": "<root>/.claude/worktrees/i0001-01",
     "project": ""
    },
-   "started_at": "2026-09-13T21:04:59+0900",
-   "completed_at": "2026-09-13T21:04:59+0900",
-   "base_sha": "0db0b2fdda538fe6714ff0d789fbe188baa6b505",
+   "started_at": "2026-09-13T13:50:22+0000",
+   "completed_at": "2026-09-13T13:50:22+0000",
+   "base_sha": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
    "cancelled_at": "",
    "cancel_reason": "",
    "seen_in": [
@@ -250,14 +251,15 @@
      "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/done/i0001-01.md"
     }
    ],
+   "scattered": [],
    "risk": {
     "points": 0,
     "level": "LOW",
     "hits": [],
     "unmeasured": [],
-    "head": "8d6e6aca894d9820febb7805ef69c09033940dbd",
-    "base": "0db0b2fdda538fe6714ff0d789fbe188baa6b505",
-    "at": "2026-09-13T21:04:59+0900",
+    "head": "596e9f5ea27eec025c386e28a7fb70f44182c0fb",
+    "base": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
+    "at": "2026-09-13T13:50:22+0000",
     "summary": "1 ファイル、+1 -0 行、消したファイル 0"
    },
    "judge": null
@@ -282,7 +284,7 @@
    },
    "copy": {
     "status": "open",
-    "approved_at": "2026-09-13T21:04:59+0900",
+    "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
     "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001-02.md"
    },
@@ -291,9 +293,9 @@
     "path": "<root>/.claude/worktrees/i0001-02",
     "project": ""
    },
-   "started_at": "2026-09-13T21:05:00+0900",
+   "started_at": "2026-09-13T13:50:22+0000",
    "completed_at": "",
-   "base_sha": "1458af560c3ad190121a1ecf4d6ab28baae17f75",
+   "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
    "cancelled_at": "",
    "cancel_reason": "",
    "seen_in": [
@@ -308,6 +310,7 @@
      "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/todo/i0001-02.md"
     }
    ],
+   "scattered": [],
    "risk": null,
    "judge": null
   },
@@ -353,6 +356,7 @@
      "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/todo/i0001-03.md"
     }
    ],
+   "scattered": [],
    "risk": null,
    "judge": null
   }
@@ -394,9 +398,9 @@
       "level": "LOW",
       "hits": [],
       "unmeasured": [],
-      "head": "8d6e6aca894d9820febb7805ef69c09033940dbd",
-      "base": "0db0b2fdda538fe6714ff0d789fbe188baa6b505",
-      "at": "2026-09-13T21:04:59+0900",
+      "head": "596e9f5ea27eec025c386e28a7fb70f44182c0fb",
+      "base": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
+      "at": "2026-09-13T13:50:22+0000",
       "summary": "1 ファイル、+1 -0 行、消したファイル 0"
      },
      "risk_escalates": false,

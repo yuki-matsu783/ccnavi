@@ -123,8 +123,9 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 ### リスク管理画面
 
-対象はワークスペースの配点（`.ccnavi/common/risk.yml`、`env.CCNAVI_RISK`。`settings.local.json` が勝つ）の 1 本。プロジェクトごとの配点は
-無い（設計 §11）。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。保存の往復の間は欄を止める
+対象は共通層の配点（`.ccnavi/common/risk.yml`、`env.CCNAVI_RISK`。`settings.local.json` が勝つ）の 1 本。自身の層
+（`.ccnavi/config/risk.yml`）とプロジェクトの層（`projects/<名前>/.ccnavi/config/risk.yml`）も配点を持ち、判定は共通層と親の
+`project:` の層の和で行う（設計 §11.4.2）が、この画面ではそれらを開かない（設計 §11.11）。層の配点はエディタで直す。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。保存の往復の間は欄を止める
 （その間の編集は保存後の再描画で消えるため）。`--lint` は設定全体を見るので、`rules.yml` などに error がある間は配点も保存できない。
 先に rules を直す。YAML として読めないファイルは画面から直せない（エディタで直す）。
 

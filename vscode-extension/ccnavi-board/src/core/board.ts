@@ -73,6 +73,8 @@ export interface Card {
   readonly riskLevel: string;
   readonly riskPoints: number | null;
   readonly seenIn: readonly SeenInJson[];
+  /** どれが本物か決まらない写りの全部。決まっていれば空。判定と同じ答えを実行ファイルが出す */
+  readonly scattered: readonly SeenInJson[];
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
@@ -204,6 +206,7 @@ function toCard(
     riskLevel: typeof t.risk?.level === "string" ? t.risk.level : "",
     riskPoints: typeof t.risk?.points === "number" ? t.risk.points : null,
     seenIn: t.seen_in,
+    scattered: t.scattered,
     marks: isParent ? [] : marks,
     gateClosed: !isParent && (ownPhase?.gate_closed ?? false),
     pendingApproval: pending.has(t.ticket),
