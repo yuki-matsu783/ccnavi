@@ -55,7 +55,17 @@ root=$(ccnavi_workspace) || {
 approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
 projects="${CCNAVI_PROJECTS:-projects}"
 # 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
+approved="${approved%/}"
 projects="${projects%/}"
+# 落として空になる綴り（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
+# ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
+# どちらも頼まれた置き場ではないので、既定に戻す。
+case "$approved" in
+"" | .) approved=".ccnavi/tickets" ;;
+esac
+case "$projects" in
+"" | .) projects="projects" ;;
+esac
 
 # ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための控え。
 state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {

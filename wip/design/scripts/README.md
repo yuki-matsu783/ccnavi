@@ -3,6 +3,9 @@
 `.ccnavi/scripts/` はエージェントが書けない場所なので、完成品をここに置き、人が写す。
 設計は `wip/design/approve-carry.md` §1。
 
+**この手順は人が端末で打つ。** エージェントは `.ccnavi/scripts/` に書けず、git も `ccnavi-git.sh` を
+通すので、ここに書いた `cp` や生の `git` をエージェントがそのまま実行しない。
+
 | ここのファイル | 写す先 | 中身 |
 |---|---|---|
 | `ccnavi-push-approved.sh` | `.ccnavi/scripts/ccnavi-push-approved.sh` | 新規。承認済みチケットの置き場だけをコミットして push する |
@@ -21,7 +24,11 @@
 
 ```sh
 cp wip/design/scripts/ccnavi-push-approved.sh wip/design/scripts/ccnavi-approve.sh .ccnavi/scripts/
+git add .ccnavi/scripts/ccnavi-push-approved.sh .ccnavi/scripts/ccnavi-approve.sh
 ```
+
+`ccnavi-push-approved.sh` は新しいファイルなので、次の `git update-index --chmod` より先に `git add` しておく。
+add していないと、git の知らないパスとして失敗する。
 
 ### 実行ビット
 
