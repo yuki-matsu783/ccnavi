@@ -437,6 +437,38 @@ class PushApprovedTest(Workspace):
         self.assertTrue(self.said(result, "worktrees"), result.stderr)
         self.assert_not_carried(app, remote, before)
 
+    def test_projects_that_names_the_workspace_root_falls_back_to_the_default(self):
+        """`CCNAVI_PROJECTS=/` は末尾の `/` を落とすと空になり、ルートの直下を全部数えることになる。
+
+        既定の `projects` に戻すので、ルートの直下に置いた別のリポジトリは運ばない。
+        本物の作業ツリーは運ぶ。
+        """
+        app = os.path.join(self.ws, "stray")
+        remote = self.repository(app, "work")
+        self.place(app)
+        before = self.head(app)
+        tree = self.worktree("i0002")
+        self.place(tree, "i0002")
+
+        result = self.push(env=self.env(CCNAVI_PROJECTS="/"))
+        self.assert_not_carried(app, remote, before)
+        self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
+        self.assertEqual(self.remote_head("i0002"), self.head(tree))
+
+    def test_approved_place_that_names_the_tree_root_falls_back_to_the_default(self):
+        """`CCNAVI_TICKETS_APPROVED=.` はツリー全体を指す。
+
+        既定の置き場に戻し、書きかけは運ばない。
+        """
+        tree = self.worktree("i0001")
+        self.place(tree)
+        write(os.path.join(tree, "README.md"), "書きかけ\n")
+
+        result = self.push(env=self.env(CCNAVI_TICKETS_APPROVED="."))
+        self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
+        self.assertTrue(self.dirty(tree, "README.md"))
+        self.assertFalse(self.dirty(tree, APPROVED))
+
     def test_leaves_nothing_of_others_in_the_index(self):
         """13. 実行後、同じツリーの他人の変更がステージ（インデックス）に載っていない。
 
