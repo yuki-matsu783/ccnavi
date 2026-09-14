@@ -16,9 +16,9 @@ human_review:
 allow:
 - match: Write|Edit
   glob: wip/design/*
-started_at: ""
-completed_at: ""
-base_sha: ""
+started_at: "2026-09-14T01:10:51+0900"
+completed_at: "2026-09-14T09:11:26+0900"
+base_sha: "c6f431cc943e8905d6d08257a7190464f6569635"
 ---
 
 # 設計: コマンド置換を読む
