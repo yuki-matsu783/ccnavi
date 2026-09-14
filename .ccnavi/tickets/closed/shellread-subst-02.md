@@ -37,6 +37,11 @@ ccnavi_approved:
   approved_at: 2026-09-14T21:38:32+0900
   source_tree: shellread-subst
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/shellread-subst/wip/tickets/todo/shellread-subst-02.md
+started_at: 2026-09-14T21:40:09+0900
+base_sha: 78a89f3dd7cbd9ae150193aebcdd9c98979ea100
+completed_at: 2026-09-14T21:52:41+0900
+cancelled_at: ''
+cancel_reason: ''
 ---
 
 # 受入テスト: コマンド置換・改行・プロセス置換を読む
