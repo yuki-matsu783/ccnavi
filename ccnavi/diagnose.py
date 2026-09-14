@@ -134,6 +134,11 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["fallback"] = record.fallback or ""
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
+    # 引用の中から切り出したコマンドにだけ当たったルールの id。記録と同じく、
+    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の並びを、
+    # この場合が無い呼び出しで変えないため。
+    if record.quoted:
+        out["quoted"] = list(record.quoted)
     return out
 
 
@@ -184,6 +189,10 @@ def test(
                 continue
             stdout.write(f"  {hit['section']}:{hit['id']}  {hit['kind']} {hit['written']!r}\n")
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
+    if out.get("quoted"):
+        stdout.write(
+            f"quoted: {', '.join(out['quoted'])}（引用の中から切り出したコマンドにだけ当たった）\n"
+        )
 
     if not out["response"]:
         stdout.write("response: (何も返さない)\n")
