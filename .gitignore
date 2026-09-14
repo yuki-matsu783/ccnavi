@@ -1,10 +1,13 @@
 # 参照専用の資料。配布物には入らない。
 knowledge
 
-# 組み立ての出力。dist は hook が指す実行ファイルの置き場、
-# build は PyInstaller の作業場所。
+# 組み立ての出力。dist は PyInstaller の出力、build はその作業場所。
+# .ccnavi/bin は build.py が dist から写す、hook が起動する実行ファイルの置き場で、
+# 機械ごとに <os>-<arch>/ が並ぶ。振り分けの sh は .ccnavi/scripts/ にあり、
+# そちらは追跡する。
 /dist/
 /build/
+/.ccnavi/bin/
 
 # Python の中間物。
 __pycache__/
