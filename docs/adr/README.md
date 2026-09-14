@@ -35,8 +35,9 @@
 | [0005](0005-settings-env.md) | 設定は `.claude/settings.json` の `env` に置く |
 | [0006](0006-disable-from-env-only.md) | `disable` は起動側の環境からしか効かせない |
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
-| [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する |
+| [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0043）） |
 | [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
+| [0043](0043-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
 
 ### ルールと判定
 
@@ -53,6 +54,7 @@
 | [0016](0016-test-same-path.md) | 判定を実行せずに試す道を、判定と同じ関数で作る |
 | [0032](0032-main-tree.md) | ワークスペースルート直下の編集をルールで止める |
 | [0034](0034-all-reasons-claude-only.md) | 該当した理由を全部 1 回で返し、対象は Claude Code に絞る |
+| [0044](0044-inner-commands.md) | シェルのコマンドは、実行役のコマンドの中で実行されるコマンドにも止める側のルールだけを当てる |
 
 ### 実行後の監視と自己防衛
 
