@@ -666,6 +666,40 @@ class SubstRepoRulesTest(unittest.TestCase):
             ]
         )
 
+    def test_引用の外のブレース展開は一律に止める(self):
+        # Issue #38（ADR-0046）。どのルールにも当たらないまま、bash は広げた語を実行していた。
+        brace, code = "(brace-expansion)", "DENY_BRACE_EXPANSION"
+        self.check(
+            [
+                ("{git,push,origin,main}", "deny", brace, code),
+                ("{rm,-rf,/tmp/x}", "deny", brace, code),
+                # 生の CR を挟んでも止まる。挟むとルールにも当たらず、
+                # auto では権限モードに渡っていた。
+                ("{git,\rpush,origin,main}", "deny", brace, code),
+                ("grep -rn x --exclude-dir={node_modules,.git} /repo", "deny", brace, code),
+                ("cp f{,.bak}", "deny", brace, code),
+                ('echo "$({git,push})"', "deny", brace, code),
+                ("sh -c '{git,push}'", "deny", brace, code),
+                # 書き直した形と、文字として書いた形は今までどおり。
+                (
+                    "grep -rn x --exclude-dir=node_modules --exclude-dir=.git /repo",
+                    "allow",
+                    "prefer-read-grep",
+                    "",
+                ),
+                ("grep -n '{a,b}' f", "allow", "prefer-read-grep", ""),
+                ("git show HEAD@{1}", "deny", "raw-git", ""),
+            ]
+        )
+
+    def test_ブレース展開を止めた文面は書き直し方を言う(self):
+        body = judge("Bash", "grep -rn x --exclude-dir={node_modules,.git} .")
+        self.assertIn("`{node_modules,.git}`", body["response"])
+        self.assertIn("--exclude-dir=a --exclude-dir=b", body["response"])
+        # 読めなかったのではない。読めなかった断りを付けない。
+        self.assertNotIn("PARSE_UNCERTAIN", body["response"])
+        self.assertNotIn("raw text", body["response"])
+
 
 if __name__ == "__main__":
     unittest.main()
