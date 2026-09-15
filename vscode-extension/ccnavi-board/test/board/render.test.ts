@@ -173,7 +173,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
   // 属性は列からはみ出さず、フェーズ行の右側は折り返す
   assert.match(html, /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
-  assert.match(html, /\.phase-status \{ text-align: right; overflow-wrap: anywhere; \}/);
+  assert.match(html, /\.phase-status \{ text-align: right; overflow-wrap: anywhere; max-width: 55%; justify-self: end; \}/);
+  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) minmax\(0, auto\);/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
@@ -207,7 +208,7 @@ test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () 
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   const html = renderBoard(buildBoard(empty), OPTIONS);
-  assert.ok(html.includes("チケットはありません"));
+  assert.ok(html.includes("チケットは無い"));
   assert.equal((html.match(/class="empty"/g) ?? []).length, 4);
   assert.ok(html.includes('data-action="approve" disabled'));
 });

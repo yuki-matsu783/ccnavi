@@ -17,6 +17,12 @@ factors:
     glob: ".github/**"
     max: 35
     message: "CI に触った"
+  - id: sh
+    points: 10
+    script: ".ccnavi/common/scripts/risk.sh"
+  - id: q
+    points: 20
+    judge: "テストの無い変更を含むか"
 `;
 
 function html(overrides: Partial<RiskPage> = {}): string {
@@ -31,7 +37,10 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
   try {
     assert.equal(page.all(".factor.open").length, 0);
     assert.equal(page.one('.factor[data-key="f1"] .sum .clip').textContent, "差分が 300 行を超えたら加点行数が多い");
-    assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, ".github/** にヒットしたファイル 1 つにつき加点（上限 35 点）CI に触った");
+    assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, ".github/** にヒットしたファイルが 1 つあるごとに加点（上限 35 点）CI に触った");
+    // script は「出した点を加点」で、points は測れなかったときの保険。judge は yes で加点
+    assert.equal(page.one('.factor[data-key="f3"] .sum .clip').textContent, "スクリプト .ccnavi/common/scripts/risk.sh が出した点を加点（測れなければ 10 点）");
+    assert.equal(page.one('.factor[data-key="f4"] .sum .clip').textContent, "問い「テストの無い変更を含むか」に yes だったら加点");
     page.click(page.one('.factor[data-key="f2"] .row-head'));
     assert.ok(page.one('.factor[data-key="f2"]').classList.contains("open"));
     assert.deepEqual((page.state() as { open: string[] }).open, ["ci"]);
@@ -63,11 +72,11 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
   try {
     page.click(page.one('.factor[data-key="f1"] .row-head'));
     page.type(page.one("#find"), "ヒットしたファイル");
-    assert.equal(page.one("#factor-count").textContent, "1 / 2（開いたまま 1）", "画面に出ている語で当たる");
+    assert.equal(page.one("#factor-count").textContent, "1 / 4（開いたまま 1）", "画面に出ている語で当たる");
     page.type(page.one("#find"), "github");
     assert.ok(page.one('.factor[data-key="f1"]').classList.contains("hidden-by-find"));
     assert.ok(page.one('.factor[data-key="f1"]').classList.contains("open"));
-    assert.equal(page.one("#factor-count").textContent, "1 / 2（開いたまま 1）");
+    assert.equal(page.one("#factor-count").textContent, "1 / 4（開いたまま 1）");
     // 保存の往復の間は欄を止めるが、行の開閉（twist）は止めない
     page.type(page.one('.factor[data-key="f1"] input.f-points'), "30");
     page.click(page.one("#save"));

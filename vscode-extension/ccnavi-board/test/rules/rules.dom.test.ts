@@ -10,7 +10,7 @@ import { renderRulesPage } from "../../src/core/rules-render.js";
 import { loadPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-const RULES = `version: 3
+const RULES = `version: 1
 deny:
   - id: git-push
     match: Bash

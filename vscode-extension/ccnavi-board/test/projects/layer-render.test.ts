@@ -116,6 +116,10 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   for (const action of ["open-rules", "open-phases", "open-board", "fetch", "pull"]) {
     assert.match(card, new RegExp(`data-action="${action}" data-name="lib"`), action);
   }
+  // 置き場の案内は層のルールの置き場から逆算する。ディレクトリを挟まない形や層でない行は既定
+  const flat = renderProjectsPage(page([row({ hasClaudeDir: true, rulesRel: "projects/lib/rules.yml" }), row({ name: "app", rel: "projects/app", hasClaudeDir: true, rulesRel: "projects/app/conf/ccnavi/rules.yml" }), row({ name: "Self", rel: "projects/Self", hasClaudeDir: true, rulesRel: "" })]), { nonce: "n" });
+  const dirs = [...flat.matchAll(/プロジェクトの設定は ([^ ]+)\/ に置く/g)].map((m) => m[1]);
+  assert.deepEqual(dirs, [".ccnavi/config", "conf/ccnavi", ".ccnavi/config"]);
   // .gitignore が済んでいれば lint の指摘はそのまま出る
   const fine = renderProjectsPage(page([row()], { dirProblems: [{ severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" }] }), { nonce: "n" });
   assert.match(fine, /warn: projects\/ がワークスペースの git で無視されていない/);

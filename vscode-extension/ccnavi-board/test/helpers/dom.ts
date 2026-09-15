@@ -52,8 +52,7 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
   const window = new Window({ url: "vscode-webview://ccnavi/" });
   const posted: Posted[] = [];
   // イベントハンドラの中の例外は happy-dom が window の error に流す。黙って通さず、テストを落とす。
-  // 非同期のハンドラ（async や Promise）の例外は window には来ず Node の unhandledRejection に回るので、
-  // 画面を開いている間はそちらも拾う。
+  // 非同期のハンドラ（async や Promise）の例外は window の unhandledrejection に来る。
   const errors: Error[] = [];
   const toError = (value: unknown, fallback: string): Error => (value instanceof Error ? value : new Error(String(value ?? fallback)));
   window.addEventListener("error", (event) => {
@@ -63,10 +62,6 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
   window.addEventListener("unhandledrejection", (event) => {
     errors.push(toError((event as unknown as { reason?: unknown }).reason, "unhandledrejection"));
   });
-  const onRejection = (reason: unknown): void => {
-    errors.push(toError(reason, "unhandledRejection"));
-  };
-  process.on("unhandledRejection", onRejection);
   // 溜めた例外は 1 度投げたら消す。次の raise が同じ文面を繰り返さず、後片付けの close で
   // 本来の失敗を上書きしない。
   const raise = (): void => {
@@ -148,7 +143,6 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
     settle,
     async close() {
       await window.happyDOM.close();
-      process.off("unhandledRejection", onRejection);
       raise();
     },
   };
