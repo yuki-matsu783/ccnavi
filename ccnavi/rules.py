@@ -42,9 +42,9 @@ Claude Code の権限モードに従う（判定は cli.py）。
 
 ## 綴りの大文字小文字
 
-`glob` で書いたルールは、その機械がパスを見るのと同じ見方で当てる。大文字小文字を
-区別しない機械では `*/.ccnavi/*` が `.Ccnavi/config/rules.yml` にも当たる。同じ場所を
-指しているのに守りが外れる形を残さないため（risk.py と phasetypes.py の範囲も同じ）。
+`glob` で書いたルールは、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は
+`.Ccnavi/config/rules.yml` にも当たる。当たり方が機械で変わると、同じルールファイルが
+ある機械では止め、別の機械では通す（risk.py と phasetypes.py の範囲も同じ）。
 `regex` で書いたルールは区別する。書いた人が `(?i:...)` を自分で書けるので、
 意図を持てる側に任せる。
 
@@ -65,7 +65,6 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import tree
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。
@@ -440,10 +439,12 @@ def _build(
     else:
         glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
         expression = translate(glob)
-        # glob は、その機械がパスを見るのと同じ見方で当てる。区別しない機械で
-        # `*/.ccnavi/*` と書いたルールが `.Ccnavi/` を素通りさせると、同じ場所を
-        # 指しているのに守りが外れる（phasetypes._globs / risk._factors と同じ形）。
-        flags = re.IGNORECASE if tree.CASE_INSENSITIVE else 0
+        # glob は、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で変えると、
+        # 同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた守りを
+        # `.Ccnavi/` で素通りでき、どの機械でも区別しないチケットの範囲とも食い違う。
+        # ルールは人が宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
+        # （phasetypes._globs / risk._factors / チケットの範囲と同じ形）。
+        flags = re.IGNORECASE
 
     try:
         rule.compiled = re.compile(expression, flags)

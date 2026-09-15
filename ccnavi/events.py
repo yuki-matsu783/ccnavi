@@ -131,7 +131,12 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
         if copy.has_plan and copy.project not in types:
             types[copy.project] = phase.load_types(conf, root, copy.project) or {}
     return post.ScopeGuard(
-        root=root, copies=approval.by_id(copies), projects=conf.projects, types=types
+        root=root,
+        copies=approval.by_id(copies),
+        projects=conf.projects,
+        tickets=conf.tickets,
+        approved=conf.approved,
+        types=types,
     )
 
 

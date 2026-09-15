@@ -230,10 +230,23 @@ def decide_before(
             reason = phase.gate_reason(closed, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
+    # 承認済みチケットの索引。作業ツリーへの書き込みでは、プロジェクトの食い違いの点検と
+    # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
+    # 1 度だけ読んで両方に渡す（設計 §9）。main への書き込みとシェルでは読まない。
+    index = None
+    if (
+        conf.tickets_enabled
+        and target is not None
+        and not target.is_main
+        and payload.tool_name in SCOPE_TOOLS
+    ):
+        copies, _ = approval.scan(conf, root)
+        index = approval.by_id(copies)
+
     # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
-        mismatch = project_mismatch(conf, root, target, record.subject)
+        mismatch = project_mismatch(conf, root, target, record.subject, index)
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
@@ -317,18 +330,27 @@ def decide_before(
         ]
     record.quoted = [name for name, hit in zip(record.rules, inside, strict=True) if hit]
 
-    # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
-    # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
-    # 人が書いた宣言よりエージェントが書いた宣言のほうが強くなる。
+    # ルールの判定とチケットの判定を合わせ、強い側を採る（設計 §9.5）。同じ強さならルール。
+    # ルールの deny はどう書いても最も強いので、そのときはチケットを見ない。
+    # チケットは閉じる向きにしか効かない（範囲の外・deny・ask）。人が書いたルールの allow を
+    # 作業 1 本のあいだ狭めることはあっても、ルールの deny や ask を開けることは無い。
+    # チケットが効くのは人が承認したあとだけで、承認画面が「ルールの allow も範囲の外では
+    # 止まる」と言う。
     ticket_reason = ""
-    if not verdict:
-        verdict, ticket_reason, ticket_notice = ticket_verdict(
-            conf, root, payload.tool_name, record.subject
+    if verdict != rules.DENY:
+        rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
+        ticket_decision, text, ticket_notice = ticket_verdict(
+            conf, root, payload.tool_name, record.subject, index, rule_hit
         )
-        if ticket_reason:
-            record.rules = [reasons.TICKET_RULE]
         if ticket_notice:
             notices.append(ticket_notice)
+        if STRENGTH[ticket_decision] > STRENGTH[verdict]:
+            verdict, ticket_reason = ticket_decision, text
+            if ticket_reason:
+                # 判定を下したのは層を持たないチケット。狭められたルールの id は後ろに残し、
+                # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
+                record.rules = [reasons.TICKET_RULE, *record.rules]
+                record.source = ""
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
@@ -355,8 +377,10 @@ def decide_before(
             )
         return EXIT_OK
 
-    if verdict == rules.DENY and group:
-        # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
+    # どちらの文面を返すかは、判定を決めた側で分ける。ルールが当たっていても、
+    # チケットが強かった回はチケットの文面になる（ticket_reason があるのはその回だけ）。
+    if verdict == rules.DENY and not ticket_reason:
+        # ルールの deny。当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
             reasons.reason_for(
@@ -371,10 +395,11 @@ def decide_before(
         if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
             record.code = phase.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
-        # チケットの範囲の外。ルールが 1 件も当たっていないので group は空。
+        # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
+        # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_SCOPE
-    elif verdict == rules.ASK and group:
+    elif verdict == rules.ASK and not ticket_reason:
         texts = [
             reasons.reason_for(
                 rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
@@ -384,6 +409,7 @@ def decide_before(
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。人が 1 度見る場所として宣言されている。
+        # ルールは何も言わないか、allow に当たっている。
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
     else:
@@ -536,20 +562,30 @@ def screen(
     return reading.text, reading.bare, inner, reading.braces
 
 
-def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:
+def project_mismatch(
+    conf: settings.Settings,
+    root: str,
+    t: tree.Tree,
+    full: str,
+    index: dict[str, ticket_mod.Ticket] | None = None,
+) -> str:
     """作業ツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
 
     範囲の宣言ではなく取り違えなので、ルールより先に見る（REQ-MLT-12）。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
     行き先のツリーが誰のものかは、そのツリーの `.git` が指す先で決まっている。
+
+    index は承認済みチケットの索引。呼び手がチケットの範囲の判定と共有して渡す。
+    無ければここで読む。
     """
     if t.is_main:
         return ""
     # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも効く。
-    copies, _ = approval.scan(conf, root)
-    index = approval.by_id(copies)
+    if index is None:
+        copies, _ = approval.scan(conf, root)
+        index = approval.by_id(copies)
     ticket = index.get(t.name)
     if ticket is None:
         return ""
@@ -572,11 +608,18 @@ def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str
     )
 
 
+# 判定の強さ。ルールの判定とチケットの判定を合わせるとき、強い側を採る（設計 §1）。
+# 何も言わない（空）がいちばん弱い。同じ強さならルールを採る。
+STRENGTH = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, "": 0}
+
+
 def ticket_verdict(
     conf: settings.Settings,
     root: str,
     tool: str,
     full: str,
+    index: dict[str, ticket_mod.Ticket] | None = None,
+    rule_hit: tuple[str, str] | None = None,
 ) -> tuple[str, str, str]:
     """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文と、注記。
 
@@ -584,17 +627,23 @@ def ticket_verdict(
     同じ識別子の承認済みチケットで判定する。main の直下ならチケットは無く、ルールだけで判定する。
     呼び出し元の cwd も agent_id も使わない（REQ-TKT-01）。
 
-    範囲の中は allow。ルールが何も言っていない場所で、チケットだけが
-    「ここで作業する」と宣言しているので、そこは聞かずに通す。範囲の外は deny。
+    範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
     子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側が勝つ（phase.scope_verdict）。
     承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
-    名指しする。
+    名指しする。ルールの判定と比べて強い側を採るのは呼び手。
 
     注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
     切り詰めない（親の範囲では切り詰める）ので、効いていない上限があることを判定に添える。
 
-    チケット自身の提案ファイルについては何も言わない。承認された範囲の外に
+    index は承認済みチケットの索引。1 回の判定で走査を 1 度にするため、呼び手が
+    プロジェクトの食い違いの点検と共有して渡す。無ければここで読む。
+
+    rule_hit は、ルールが当たっていたときの (ルールの id, タイプ)。チケットがそれより
+    厳しい判定を返すときは文面で名指しする。ルールは通しているのに止まった理由が
+    読めないと、受け取った側はルールファイルを探しに行って見つけられない。
+
+    チケットの置き場（提案と承認済みチケット）については何も言わない。承認された範囲の外に
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
@@ -602,15 +651,18 @@ def ticket_verdict(
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
         return "", "", ""
-    copies, _ = approval.scan(conf, root)
-    index = approval.by_id(copies)
+    if index is None:
+        copies, _ = approval.scan(conf, root)
+        index = approval.by_id(copies)
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切った作業ツリーは案内では
-    # 「効いている」と言われながら判定では権限モード任せに落ちる（敵対的レビューで実測）。
+    # 「効いている」と言われながら判定では権限モード任せに落ちる。
     ticket = tree.lookup(index, t.name)
-    if ticket is None or ticket.is_own_file(full):
+    if ticket is None:
         return "", "", ""
     rel = tree.relative(t, full)
+    if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
+        return "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
     # phases.yml を開かない。
@@ -638,6 +690,20 @@ def ticket_verdict(
         f"worktree {t.name}",
         f"scope: {area}",
     ]
+    decided = rules.ASK if found.verdict == rules.ASK else rules.DENY
+    if rule_hit is not None and STRENGTH[decided] > STRENGTH[rule_hit[1]]:
+        rule_id, rule_type = rule_hit
+        head.append(
+            f"rule: {rule_id} ({rule_type}) lets this through, "
+            "but the ticket for this worktree narrows it"
+        )
+    if found.verdict == rules.DENY:
+        # 範囲の外ではなく、チケットが deny と書いた項に当たったなら、どの項かを名指しする。
+        for owner in (ticket, parent):
+            entry = owner.entry_for(rel) if owner is not None else None
+            if entry is not None and entry.decision == rules.DENY:
+                head.append(f"ticket entry: deny {entry.glob or entry.regex}")
+                break
     if found.verdict == rules.ASK:
         return (
             rules.ASK,

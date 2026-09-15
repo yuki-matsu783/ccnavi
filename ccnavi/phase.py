@@ -847,8 +847,8 @@ def scope_findings(
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
         # チケットの置き場（提案も写しもマーカーも）は範囲の外でも咎めない。次の提案を書く道と、
-        # 承認がブランチに乗る道を塞がないため。
-        if any(rel.startswith(p + "/") for p in (conf.tickets, conf.approved) if p):
+        # 承認がブランチに乗る道を塞がないため。実行前の判定と実行後の監視も同じ関数で外す。
+        if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
         found = scope_verdict(child, parent, pt, rel)
         if found.outside:
