@@ -26,13 +26,15 @@ export function onDidChangeAppearance(listener: (appearance: Appearance) => void
  * 開いている Webview に今の見た目を送る。パネルを作ったときに購読し、閉じたら外す。
  * 裏に回っている間は postMessage が届かない（retainContextWhenHidden が偽の画面は HTML ごと捨てられ、
  * 再表示で作り直される）ので、見えるようになったときにも今の値を送り直す。
+ * 購読の取っ手は subs にまとめ、閉じたときにまとめて外す。onDidDispose の分も同じ配列に入れる
+ * （dispose は何度呼んでも安全なので、後始末の途中で自分を外しても問題ない）。
  */
 export function followAppearance(panel: vscode.WebviewPanel): void {
   const send = (appearance: Appearance): void => {
     const message: AppearanceMessage = { type: "appearance", value: appearance };
     void panel.webview.postMessage(message);
   };
-  const subs = [
+  const subs: vscode.Disposable[] = [
     onDidChangeAppearance(send),
     panel.onDidChangeViewState((event) => {
       if (event.webviewPanel.visible) {
@@ -40,11 +42,13 @@ export function followAppearance(panel: vscode.WebviewPanel): void {
       }
     }),
   ];
-  panel.onDidDispose(() => {
-    for (const sub of subs) {
-      sub.dispose();
-    }
-  });
+  subs.push(
+    panel.onDidDispose(() => {
+      for (const sub of subs) {
+        sub.dispose();
+      }
+    }),
+  );
 }
 
 /**
