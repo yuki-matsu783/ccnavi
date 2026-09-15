@@ -1,15 +1,15 @@
 """ルールとチケットの判定を合わせ、厳しい側を採ることの受入テスト。
 
-表は wip/design/ticket-rule-merge.md の §12。道具を外から叩いて、応答と記録だけを見る。
+道具を外から叩いて、応答と記録だけを見る。
 
 見るのは 5 つ。
 
 1. 実行前の判定。ルール（deny / ask / allow / 何も言わない）とチケット（deny / ask / allow /
-   範囲の外 / チケットが無い）の全組み合わせで、判定・理由コード・どちらの文面か・記録の欄（§12.1）
-2. 実行後の監視。シェルが書いたあとに報告するか、どのコードか（§12.2）
-3. チケットの置き場を範囲の外から外すこと。実行前・実行後・サブエージェント終了時で同じ答え（§12.3）
-4. チケットが効かない場面と、ルールより先に見る点検（§12.4）
-5. 診断の出力（§12.5）
+   範囲の外 / チケットが無い）の全組み合わせで、判定・理由コード・どちらの文面か・記録の欄
+2. 実行後の監視。シェルが書いたあとに報告するか、どのコードか
+3. チケットの置き場を範囲の外から外すこと。実行前・実行後・サブエージェント終了時で同じ答え
+4. チケットが効かない場面と、ルールより先に見る点検
+5. 診断の出力
 
 ルールは作業ツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
 
@@ -292,7 +292,7 @@ class Workspace(unittest.TestCase):
 
 
 class PreToolUseTable(Workspace):
-    """§12.1 実行前の判定。"""
+    """実行前の判定。"""
 
     # (チケットの列の名前, 書き込み先の作業ツリーを選ぶ鍵, 相対パス)
     COLUMNS = (
@@ -413,7 +413,7 @@ class PreToolUseTable(Workspace):
 
 
 class PostToolUseTable(Workspace):
-    """§12.2 実行後の監視。作業ツリーでシェルが書いたあと。"""
+    """実行後の監視。作業ツリーでシェルが書いたあと。"""
 
     # (ルールのタイプ, チケットの列, 相対パスの接頭, 報告のコード。None は報告しない)
     CASES = (
@@ -470,7 +470,7 @@ class PostToolUseTable(Workspace):
 
 
 class TicketPlaces(Workspace):
-    """§12.3 チケットの置き場は範囲の外でも咎めない。ルールは作業ツリーを allow で開ける。"""
+    """チケットの置き場は範囲の外でも咎めない。ルールは作業ツリーを allow で開ける。"""
 
     def setUp(self):
         super().setUp()
@@ -539,14 +539,14 @@ class TicketPlaces(Workspace):
 
 
 class TicketPlacesElsewhere(TicketPlaces):
-    """§12.3 置き場の綴りを変えても、その綴りで外れる。既定の綴りを決め打ちしていないこと。"""
+    """置き場の綴りを変えても、その綴りで外れる。既定の綴りを決め打ちしていないこと。"""
 
     TICKETS = "work/proposals"
     APPROVED = ".ccnavi/copies"
 
 
 class Boundaries(Workspace):
-    """§12.4 チケットが効かない場面と、ルールより先に見る点検。
+    """チケットが効かない場面と、ルールより先に見る点検。
 
     ルールは作業ツリーを allow で開ける。
     """
@@ -638,7 +638,7 @@ class Boundaries(Workspace):
 
 
 class Diagnostics(Workspace):
-    """§12.5 診断の出力。"""
+    """診断の出力。"""
 
     def test_test_command_names_both_the_rule_and_the_ticket(self):
         self.family()
