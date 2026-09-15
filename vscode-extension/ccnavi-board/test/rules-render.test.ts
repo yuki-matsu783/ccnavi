@@ -119,6 +119,10 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   // タブの控えが開いた行の控えを消さない。
   assert.doesNotMatch(body, /vscode\.setState\(\{ tab: name \}\)/);
   assert.match(html, /\.row\.open \.row-body \{ display: grid; \}/);
+  // 札で選んだあとは要約を今の値で書き直す（チェックボックスの input は change より先に伝わるため）
+  assert.match(body, /markDirty\(\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*wrap\.dispatchEvent\(new Event\("input", \{ bubbles: true \}\)\);/);
+  // 絞り込み中は畳んだタイプの矢印も開いた向きにする
+  assert.match(body, /const shownAsOpen = q !== "" \|\| !el\.classList\.contains\("folded"\);/);
 });
 
 test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", () => {
