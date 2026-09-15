@@ -94,3 +94,40 @@ test("CB-T70 画面に埋める script は構文として通る", () => {
   const body = html.split('<script nonce="n">')[1].split("</script>")[0];
   assert.doesNotThrow(() => new Function(body));
 });
+
+test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち、開いた行を id で state に控える", () => {
+  const html = renderRulesPage(page(), { nonce: "n" });
+  assert.match(html, /<input id="find" type="search"/);
+  assert.match(html, /<ul class="list" data-list="deny"><\/ul>/);
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  // 行の見出し（要約）と本体。開いた行だけ本体が出る。
+  assert.match(body, /class: "row-head"/);
+  assert.match(body, /class: "row-body"/);
+  assert.match(body, /\.row\.open \.row-body|classList\.toggle\("open", on\)/);
+  // コンテキストの 4 欄は details に畳み、値があるときだけ open。
+  assert.match(body, /h\("details", \{ class: "more" \}/);
+  assert.match(body, /if \(moreOpen\.has\(key\) \? moreOpen\.get\(key\) : hasContext\(rule\)\) \{ more\.setAttribute\("open", ""\); \}/);
+  // 判定で当たった行の展開は控えに入れない。控えを書くのは利用者が押したときだけ。
+  assert.match(body, /function unfoldRule\(el\) \{[\s\S]*?setOpen\(el, true, false\);/);
+  assert.match(body, /setOpen\(li, opened\.has\(key\), false\)/);
+  // 開いている行は絞り込みで隠さない
+  assert.match(html, /\.row\.hidden-by-find:not\(\.open\) \{ display: none; \}/);
+  assert.doesNotMatch(html, /\.list \{[^}]*overflow: hidden/);
+  // 開いた行は id で控える（空 id は控えない）。
+  assert.match(body, /if \(found && found\.rule\.id !== ""\) \{ ids\.push\(found\.rule\.id\); \}/);
+  assert.match(body, /savedOpen\.has\(rule\.id\)/);
+  // タブの控えが開いた行の控えを消さない。
+  assert.doesNotMatch(body, /vscode\.setState\(\{ tab: name \}\)/);
+  assert.match(html, /\.row\.open \.row-body \{ display: grid; \}/);
+});
+
+test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", () => {
+  const html = renderRulesPage(page(), { nonce: "n" });
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  assert.match(body, /if \(key\) \{ cap\.setAttribute\("title", "YAML のキー: " \+ key\); \}/);
+  for (const [label, key] of [["ツール", "match"], ["文面", "message"], ["渡す文", "additionalContext"]]) {
+    assert.match(body, new RegExp(`captioned\\("${label}", [^\\n]*"${key}"\\)`), label);
+  }
+  assert.match(body, /fileField\(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile"/);
+  assert.match(html, /title="--test の subject">対象 /);
+});

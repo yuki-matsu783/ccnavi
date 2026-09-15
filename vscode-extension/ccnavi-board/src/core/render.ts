@@ -53,10 +53,7 @@ ${STYLE}
 <body>
 <header class="toolbar">
   <div class="summary">
-    <span class="remaining">残り ${board.remainingCount} 件</span>
-    <span class="total">全 ${board.totalCount} 件</span>
-    <span class="issues${board.issueCount > 0 ? " warn" : ""}">不備 ${board.issueCount} 件</span>
-    <span class="pending${approveCount > 0 ? " warn" : ""}">承認待ち ${approveCount} 件</span>
+${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount} 件</span>\n` : ""}${board.issueCount > 0 ? `    <span class="issues warn">不備 ${board.issueCount} 件</span>\n` : ""}    <span class="counts">残り ${board.remainingCount} / 全 ${board.totalCount}</span>
   </div>
   <div class="controls">
 ${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button type="button" class="action" data-action="refresh">更新</button>
@@ -211,64 +208,96 @@ function renderCard(card: Card): string {
     classes.push("pending");
   }
   const badges = renderBadges(card);
+  const facts = renderFacts(card);
   const phases = card.phases.length > 0 ? renderPhases(card.phases) : "";
   const issues = renderIssues(card.issues);
   const actions = renderActions(card.actions, card.id);
   const stage = card.stage ? `\n        <div class="stage">${escapeHtml(card.stage)}</div>` : "";
+  const where = card.isParent ? "親" : `子 · 親 ${card.parent} / フェーズ ${card.phase ?? "?"}`;
   return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" data-family="${escapeHtml(card.family)}" tabindex="0">
-        <div class="card-head"><span class="num">${escapeHtml(card.id)}</span><span class="title">${escapeHtml(card.title)}</span></div>${stage}
-        <div class="badges">
-${badges}
-        </div>${phases}${issues}${actions}
+        <div class="card-head"><span class="num">${escapeHtml(card.id)}</span><span class="title">${escapeHtml(card.title)}</span><span class="where">${escapeHtml(where)}</span></div>${stage}${badges}${facts}${phases}${issues}${actions}
       </li>`;
 }
 
+/**
+ * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、作業ツリーなし（閉じたチケットは除く）、
+ * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち）、本物が決まらない写り。
+ * 出す札が無ければ行ごと出さない。
+ */
 function renderBadges(card: Card): string {
   const badges: string[] = [];
-  if (!card.isParent) {
-    badges.push(badge("phase", `親 ${card.parent} / フェーズ ${card.phase ?? "?"}`));
-  }
-  if (card.project !== "") {
-    badges.push(badge("project", `project ${card.project}`));
-  }
-  badges.push(badge(`copy copy-${card.copyStatus}`, COPY_LABELS[card.copyStatus]));
-  badges.push(
-    badge("review", `人レビュー ${card.reviewRequired ? "要" : "不要"}`, card.reviewReason),
-  );
-  badges.push(
-    card.worktreeExists
-      ? badge("worktree", "作業ツリーあり", card.worktreePath)
-      : badge("worktree none", "作業ツリーなし"),
-  );
-  for (const mark of card.marks) {
-    badges.push(badge(`mark mark-${mark}`, MARK_LABELS[mark] ?? mark));
+  if (card.copyStatus === "none") {
+    badges.push(badge("copy copy-none", COPY_LABELS.none));
   }
   if (card.gateClosed) {
     badges.push(badge("gate", "ゲート閉"));
   }
-  if (card.ready) {
-    badges.push(badge("ready", "Draft 解除済"));
+  if (!card.worktreeExists && card.copyStatus !== "closed") {
+    badges.push(badge("worktree none", "作業ツリーなし"));
   }
-  if (card.wrapped) {
-    badges.push(badge("wrapped", "締めた"));
+  for (const mark of card.marks) {
+    if (mark === "requested") {
+      badges.push(badge("mark mark-requested", MARK_LABELS.requested));
+    }
   }
-  if (card.riskLevel !== "") {
-    badges.push(
-      badge(
-        `risk risk-${card.riskLevel.toLowerCase()}`,
-        `リスク ${card.riskPoints ?? ""} ${card.riskLevel}`.replace(/\s+/g, " "),
-      ),
-    );
-  }
-  if (card.baseSha !== "") {
-    badges.push(badge("sha", `base ${card.baseSha.slice(0, 7)}`, card.baseSha));
+  if (card.riskLevel === "HIGH" || card.riskLevel === "CRITICAL") {
+    badges.push(badge(`risk risk-${card.riskLevel.toLowerCase()}`, riskText(card)));
   }
   // 写りがあること自体は普通なので数では出さない。どれが本物か決まらないときだけ言う。
   if (card.scattered.length > 0) {
     const where = card.scattered.map((s) => `${s.tree || "main"}:${s.state}`).join(", ");
     badges.push(badge("seen", `複数の場所にある（${card.scattered.length} か所）`, where));
   }
-  return badges.map((b) => `          ${b}`).join("\n");
+  if (badges.length === 0) {
+    return "";
+  }
+  return `\n        <div class="badges">\n${badges.map((b) => `          ${b}`).join("\n")}\n        </div>`;
+}
+
+/**
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、作業ツリー、
+ * マーカー（依頼済は札のほう）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ */
+function renderFacts(card: Card): string {
+  const facts: string[] = [];
+  if (card.copyStatus !== "none") {
+    facts.push(fact(`copy-${card.copyStatus}`, COPY_LABELS[card.copyStatus]));
+  }
+  facts.push(fact("review", `レビュー ${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
+  if (card.worktreeExists) {
+    facts.push(fact("worktree", `作業ツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
+  }
+  for (const mark of card.marks) {
+    if (mark !== "requested") {
+      facts.push(fact(`mark mark-${mark}`, MARK_LABELS[mark] ?? mark));
+    }
+  }
+  if (card.ready) {
+    facts.push(fact("ready", "Draft 解除済"));
+  }
+  if (card.wrapped) {
+    facts.push(fact("wrapped", "締めた"));
+  }
+  if (card.riskLevel !== "" && card.riskLevel !== "HIGH" && card.riskLevel !== "CRITICAL") {
+    facts.push(fact(`risk risk-${card.riskLevel.toLowerCase()}`, riskText(card)));
+  }
+  if (card.baseSha !== "") {
+    facts.push(fact("sha", `base ${card.baseSha.slice(0, 7)}`, card.baseSha));
+  }
+  if (card.project !== "") {
+    facts.push(fact("project", `project ${card.project}`));
+  }
+  return `\n        <div class="facts">\n${facts.map((f) => `          ${f}`).join("\n")}\n        </div>`;
+}
+
+function riskText(card: Card): string {
+  return `リスク ${card.riskPoints ?? ""} ${card.riskLevel}`.replace(/\s+/g, " ");
+}
+
+/** 作業ツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
+function worktreeName(path: string): string {
+  const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+  return name === "" ? "あり" : name;
 }
 
 function badge(kind: string, text: string, title = ""): string {
@@ -276,16 +305,36 @@ function badge(kind: string, text: string, title = ""): string {
   return `<span class="badge ${escapeHtml(kind)}"${tip}>${escapeHtml(text)}</span>`;
 }
 
+function fact(kind: string, text: string, title = ""): string {
+  const tip = title !== "" ? ` title="${escapeHtml(title)}"` : "";
+  return `<span class="fact ${escapeHtml(kind)}"${tip}>${escapeHtml(text)}</span>`;
+}
+
+/**
+ * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
+ * 右には人が見るべきことだけを出す。ゲートが開いている、マーカーが無い、レビューが要らない、は
+ * 普通の状態なので書かない。
+ */
 function renderPhases(phases: readonly PhaseChip[]): string {
   const rows = phases
     .map((p) => {
-      const marks = p.marks.map((m) => MARK_LABELS[m] ?? m).join("・") || "マーカーなし";
-      const gate = p.gateClosed ? "ゲート閉" : "ゲート開";
-      const review = p.reviewRequired ? "レビュー要" : "レビュー不要";
-      const risk = p.riskLine !== "" ? ` / ${p.riskLine}` : "";
-      const tickets = p.tickets.length > 0 ? ` / ${p.tickets.join(", ")}` : "";
+      const notes: string[] = [];
+      if (p.gateClosed) {
+        notes.push("ゲート閉");
+      }
+      for (const m of p.marks) {
+        notes.push(MARK_LABELS[m] ?? m);
+      }
+      if (p.reviewRequired) {
+        notes.push("レビュー要");
+      }
+      if (p.riskLine !== "") {
+        notes.push(p.riskLine);
+      }
+      const status = [PHASE_STATE_LABELS[p.state], ...notes].join(" · ");
+      const tickets = p.tickets.length > 0 ? `<span class="phase-tickets">${escapeHtml(p.tickets.join(", "))}</span>` : "";
       const actions = p.actions.map((a) => renderActionButton(a, `${p.parent}:${p.number}`)).join("");
-      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}"><span class="phase-label">${escapeHtml(p.label)}</span> ${escapeHtml(PHASE_STATE_LABELS[p.state])} / ${escapeHtml(marks)} / ${escapeHtml(gate)} / ${escapeHtml(review)}${escapeHtml(risk)}${escapeHtml(tickets)}${actions}</li>`;
+      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status">${escapeHtml(status)}${actions}</span></li>`;
     })
     .join("\n");
   return `\n        <ul class="phases">\n${rows}\n        </ul>`;
@@ -346,7 +395,11 @@ export const BUTTON_STYLE = `  button.action {
   button.action.small { min-height: 20px; padding: 0 8px; font-size: .9em; }
   button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }`;
 
-const STYLE = `  * { box-sizing: border-box; }
+/**
+ * 5 つの画面で同じ骨組み。本文・見出し上のツールバー（左にパス、右にボタン）・帯・注意・欄・脚注。
+ * 画面ごとの部品（ボードの列、設定 3 画面の一覧、プロジェクトのカード）は各画面が足す。
+ */
+export const PAGE_STYLE = `  * { box-sizing: border-box; }
   body {
     margin: 0; padding: 12px;
     background: var(--vscode-editor-background);
@@ -354,21 +407,120 @@ const STYLE = `  * { box-sizing: border-box; }
     font-family: var(--vscode-font-family);
     font-size: var(--vscode-font-size);
   }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 12px; }
-  .summary { display: flex; gap: 16px; font-weight: 600; }
-  .summary .warn { color: var(--vscode-editorWarning-foreground); }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-  .filter { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
-  select {
-    background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border); border-radius: 2px; padding: 2px 4px;
+  code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
+  .hidden { display: none !important; }
+  .mono { font-family: var(--vscode-editor-font-family); }
+  .small { font-size: .85em; }
+  .dim { color: var(--vscode-descriptionForeground); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 10px; }
+  .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+  .summary .warn { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+  .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+  .dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
+  .banner {
+    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--vscode-panel-border);
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
   }
-${BUTTON_STYLE}
+  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
+  .banner.error { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
+  .banner.missing { border-color: var(--vscode-editorInfo-foreground); }
+  .banner.missing > span { flex: 1 1 320px; }
+  .lock {
+    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
+  }
   .problems {
     margin: 0 0 12px; padding: 8px 8px 8px 24px;
     border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
     color: var(--vscode-editorWarning-foreground);
   }
+  h2 { margin: 0 0 8px; font-size: 1em; }
+  .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
+  .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  details.help { margin: 0 0 8px; font-size: .92em; }
+  details.help > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; }
+  details.help > summary::-webkit-details-marker { display: none; }
+  details.help > summary::before { content: "▸ "; }
+  details.help[open] > summary::before { content: "▾ "; }
+  details.help > .hint { margin: 4px 0 0; }
+${BUTTON_STYLE}
+  input[type=text], input[type=search], textarea, select {
+    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
+    min-height: 24px; padding: 2px 6px; font: inherit;
+  }
+  input[type=text]:focus, input[type=search]:focus, textarea:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
+  input:disabled, select:disabled, textarea:disabled { opacity: .6; }
+  .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
+  .foot.error { color: var(--vscode-editorError-foreground); }`;
+
+/**
+ * 設定 3 画面（ルール設定・リスク管理・フェーズ管理）の一覧。1 件 1 行で、押した行だけ下に欄が開く。
+ * 行の見出し（.row-head）の列の幅は画面ごとに決める。欄名は欄の左に置き、欄と欄名は親の格子に並ぶ
+ * （.field は display: contents）。出番の少ない欄は details.more に畳み、値があるときだけ開いて出す。
+ */
+export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
+  .list:empty { display: none; }
+  .row { border-top: 1px solid var(--vscode-panel-border); }
+  .row:first-child { border-top: 0; }
+  .row:first-child > .row-head { border-radius: 4px 4px 0 0; }
+  .row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
+  /* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
+  .row.hidden-by-find:not(.open) { display: none; }
+  .finding .rule-section.folded .list { display: block; }
+  .row-head { display: grid; gap: 10px; align-items: center; padding: 5px 8px; cursor: pointer; }
+  .row-head:hover { background: var(--vscode-list-hoverBackground); }
+  .row.open .row-head { background: var(--vscode-editorWidget-background); }
+  .twist {
+    background: none; border: none; color: var(--vscode-descriptionForeground);
+    font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
+  }
+  .sum { display: contents; }
+  .sum .sum-id { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sum .dim { color: var(--vscode-descriptionForeground); }
+  .sum .mono { font-family: var(--vscode-editor-font-family); font-size: .92em; }
+  .sum .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sum .sum-note { color: var(--vscode-descriptionForeground); margin-left: 10px; }
+  .sum .sum-flag { width: 8px; height: 8px; border-radius: 50%; justify-self: center; }
+  .sum .sum-flag.on { background: var(--vscode-charts-blue); }
+  .sum .tag { font-size: .85em; padding: 0 7px; border-radius: 999px; border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); justify-self: start; }
+  .row-body {
+    display: none; padding: 4px 10px 10px 36px; gap: 6px 12px; align-items: center;
+    grid-template-columns: 150px minmax(0, 1fr); background: var(--vscode-editorWidget-background);
+  }
+  .row.open .row-body { display: grid; }
+  .row-body .buttons { grid-column: 1 / -1; display: flex; gap: 4px; justify-content: flex-end; padding-top: 4px; }
+  .row-body .buttons button { margin-left: 0; }
+  .row-body .wide { grid-column: 1 / -1; }
+  .row-body textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }
+  .field { display: contents; }
+  .field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: .95em; }
+  .field > input, .field > select, .field > textarea, .field > .inline, .field > .picker, .field > .with-button { width: 100%; box-sizing: border-box; margin: 0; min-width: 0; }
+  .field > input.narrow, .field > select.narrow { max-width: 260px; }
+  .field > input.num { max-width: 90px; }
+  .inline { display: flex; gap: 6px; align-items: center; }
+  .inline > input { flex: 1; min-width: 120px; }
+  .inline > input.num { flex: 0 0 90px; min-width: 0; }
+  .inline > .cap { color: var(--vscode-descriptionForeground); }
+  details.more { grid-column: 1 / -1; }
+  details.more > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; padding: 2px 0; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more > summary::before { content: "▸ "; }
+  details.more[open] > summary::before { content: "▾ "; }
+  details.more > summary b { font-weight: 500; color: var(--vscode-editor-foreground); }
+  details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 12px; align-items: center; padding-top: 4px; }
+  .find { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
+  .find input { width: 320px; max-width: 100%; }
+  .find .hint { margin: 0; }`;
+
+const STYLE = `${PAGE_STYLE}
+  .toolbar { padding-bottom: 12px; }
+  .summary .counts { color: var(--vscode-descriptionForeground); }
+  .filter { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
   .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
   /* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールに逃がす。
      右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
@@ -419,29 +571,40 @@ ${BUTTON_STYLE}
     background: var(--vscode-list-hoverBackground);
   }
   .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
-  .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }
   .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
+  .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }
   .card.hidden { display: none; }
-  .card-head { display: flex; gap: 6px; align-items: baseline; }
-  .num { color: var(--vscode-descriptionForeground); font-variant-numeric: tabular-nums; }
+  .card-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .num { font-weight: 600; font-variant-numeric: tabular-nums; }
   .title { overflow-wrap: anywhere; }
-  .stage { margin-top: 4px; font-size: .9em; color: var(--vscode-descriptionForeground); }
+  .where { margin-left: auto; font-size: .85em; color: var(--vscode-descriptionForeground); white-space: nowrap; }
+  .stage { margin-top: 2px; font-size: .9em; color: var(--vscode-descriptionForeground); }
+  /* 札は人が動く必要がある状態だけ。属性は枠無しの薄い文字で 1 行に並べる */
   .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .badge {
     font-size: .82em; padding: 0 6px; border-radius: 999px;
-    border: 1px solid var(--vscode-panel-border);
-    color: var(--vscode-descriptionForeground);
+    border: 1px solid currentColor; color: var(--vscode-descriptionForeground);
   }
-  .badge.copy-open { color: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
-  .badge.copy-none { color: var(--vscode-charts-blue); border-color: var(--vscode-charts-blue); }
-  .badge.gate, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); border-color: var(--vscode-editorError-foreground); }
-  .badge.mark-reviewed { color: var(--vscode-charts-green); }
+  .badge.copy-none { color: var(--vscode-charts-blue); }
+  .badge.gate, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); }
   .badge.mark-requested { color: var(--vscode-charts-yellow); }
   .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
-  .phases { list-style: none; margin: 6px 0 0; padding: 0; font-size: .85em; display: flex; flex-direction: column; gap: 2px; }
-  .phase { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+  .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }
+  .fact { white-space: nowrap; }
+  .fact.copy-open::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
+  .fact.sha { font-family: var(--vscode-editor-font-family); }
+  /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右に人が見るべきことだけ */
+  .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; }
+  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
+  .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
+  .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
+  .phase-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
-  .phase.gate-closed { color: var(--vscode-editorError-foreground); }
+  .phase-tickets::before { content: "·"; margin: 0 5px; }
+  .phase-status { text-align: right; }
+  .phase-active .phase-status { color: var(--vscode-charts-blue); }
+  .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
   .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
   .issues {
     list-style: none; margin: 6px 0 0; padding: 0;
@@ -449,7 +612,6 @@ ${BUTTON_STYLE}
   }
   .issues li { overflow-wrap: anywhere; }
   .card-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
   .approval-backdrop {
     position: fixed; inset: 0; z-index: 10;
     background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
