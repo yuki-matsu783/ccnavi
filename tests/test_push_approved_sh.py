@@ -8,6 +8,7 @@
 20. push が落ちると 1、コミットは残る
 21. detached のツリーは飛ばす
 22. `ccnavi-approve.sh` が承認のあと運ぶ
+23. `ccnavi-approve.sh` は並べた識別子を `--approve` の後ろに渡し、`-` で始まる語と空の語は断る
 
 ワークスペースは一時ディレクトリに git と bare のリモートで作る。承認そのものは
 ccnavi の実行ファイルの代わりに、承認済みチケットを 1 枚置くだけの sh（stub）で済ませる。
@@ -38,8 +39,10 @@ APPROVED = ".ccnavi/tickets"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "運ぶ承認済みチケットは無い。"
 
-# 承認の代わり。STUB_EXIT が 0 でなければ落ち、STUB_TREE があればそこに承認済みチケットを置く。
+# 承認の代わり。STUB_ARGS があれば受けた引数を 1 行ずつ書き、STUB_EXIT が 0 でなければ落ち、
+# STUB_TREE があればそこに承認済みチケットを置く。
 STUB = """#!/bin/sh
+[ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
 [ "${STUB_EXIT:-0}" = 0 ] || exit "$STUB_EXIT"
 [ -n "${STUB_TREE:-}" ] || exit 0
 mkdir -p "$STUB_TREE/.ccnavi/tickets"
@@ -526,12 +529,68 @@ class ApproveCarriesTest(Workspace):
         self.stub = write(os.path.join(self._tmp.name, "bin", "ccnavi"), STUB)
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
 
-    def approve(self, **extra):
+    def approve(self, *ids, **extra):
         env = self.env(
             CCNAVI_BIN_PATH=posix(self.stub),
-            **{k: posix(v) if k == "STUB_TREE" else v for k, v in extra.items()},
+            **{k: posix(v) if k in ("STUB_TREE", "STUB_ARGS") else v for k, v in extra.items()},
         )
-        return self.run_sh("ccnavi-approve.sh", env=env)
+        return self.run_sh("ccnavi-approve.sh", *ids, env=env)
+
+    def received(self, path):
+        with open(path, encoding="utf-8") as f:
+            return f.read().splitlines()
+
+    def test_approve_passes_ids_after_approve(self):
+        """23. 並べた識別子だけを承認の対象にする。
+
+        同じ親の承認待ちのうち 1 本だけを先に承認する形（#31）。
+        """
+        self.worktree("i0001")
+        args = os.path.join(self._tmp.name, "args")
+        result = self.approve("i0002-03", "i0002-04", STUB_ARGS=args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        got = self.received(args)
+        self.assertEqual(got[:1], ["--root"], got)
+        self.assertEqual(got[2:], ["--approve", "i0002-03", "i0002-04"], got)
+
+    def test_approve_without_ids_takes_all_pending(self):
+        self.worktree("i0001")
+        args = os.path.join(self._tmp.name, "args")
+        result = self.approve(STUB_ARGS=args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.received(args)[2:], ["--approve"])
+
+    def test_approve_refuses_words_that_are_not_ids(self):
+        """識別子でない語は断り、実行ファイルを呼ばない。
+
+        `--yes` や `--root` を混ぜると、端末の y/N を経ない経路や別のワークスペースに化ける。
+        """
+        tree = self.worktree("i0001")
+        args = os.path.join(self._tmp.name, "args")
+        for ids in (("--yes", "i0002"), ("i0002", "--root", "/elsewhere"), ("-x",), ("",)):
+            with self.subTest(ids=ids):
+                result = self.approve(*ids, STUB_ARGS=args, STUB_TREE=tree)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("識別子でない引数", result.stderr)
+                self.assertFalse(os.path.exists(args))
+                self.assertEqual(self.remote_head("i0001"), "")
+
+    def test_approve_help_still_shows_usage(self):
+        for word in ("-h", "--help", "help"):
+            with self.subTest(word=word):
+                result = self.approve(word)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("<識別子>", result.stdout)
+
+    def test_approve_help_next_to_ids_is_an_id(self):
+        """使い方を出すのは語が 1 つのときだけ。識別子と並んだ `help` を黙って捨てない。"""
+        self.worktree("i0001")
+        args = os.path.join(self._tmp.name, "args")
+        result = self.approve("help", "i0002-01", STUB_ARGS=args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.received(args)[2:], ["--approve", "help", "i0002-01"])
+        refused = self.approve("--help", "i0002-01")
+        self.assertEqual(refused.returncode, 2, refused.stdout + refused.stderr)
 
     def test_approve_carries_after_approval(self):
         tree = self.worktree("i0001")
