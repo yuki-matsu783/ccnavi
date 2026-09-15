@@ -285,11 +285,12 @@ YAML として読めないファイルは画面から直せない（エディタ
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm run lint      # eslint（型を見る検査込み）。--fix は pnpm run lint:fix
 pnpm run compile   # tsc -p . で out/ に出し、esbuild で out/extension.js に束ねる
 pnpm test          # tsc のあと node --test "out/test/**/*.test.js"（全部）
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
-pnpm run package   # scripts/package.sh: install → compile → test → vsce package
+pnpm run package   # scripts/package.sh: install → lint → compile → test → vsce package
 ```
 
 `pnpm run package` は `dist/ccnavi-board-<version>.vsix`（リポジトリの `dist/`、gitignore 済み）に出す。
@@ -452,6 +453,29 @@ test/
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て
+eslint.config.mjs     eslint の設定（flat config）。型を見る検査は tsconfig.test.json を使う
 ```
 
 `core/` は `vscode` を import しない。ここだけを `node --test` で試す。
+
+### 後始末（Disposable）の決まり
+
+VS Code の `onDid*` や `registerCommand` は、購読を外すための `Disposable` を返す。外さないと、
+渡した関数とそれが掴んでいるもの（パネル、読み込んだ YAML、一時ディレクトリ）が残り続ける。
+**取っ手を持つかどうかは、登録先が誰の持ち物かで決まる。**
+
+| 登録先 | 置き場 | 例 |
+|---|---|---|
+| 拡張が生きている間ずっと（`vscode.workspace.*` / `vscode.window.*` / 自分で作った watcher） | `context.subscriptions` | `extension.ts` のコマンド、`sidebar.ts`、`ticket-control.ts` の watcher |
+| パネルが生きている間だけ | `PanelState` の配列。`panel.onDidDispose` でまとめて外す | 各パネルの `watchers`、`appearance.ts` の `followAppearance` |
+| パネル自身・watcher 自身の出来事（`panel.onDidDispose` / `webview.onDidReceiveMessage` / `watcher.onDidChange`） | 持たない | 相手が dispose されれば購読も一緒に消える |
+
+**3 行目は「捨ててよい」であって「捨てなければならない」ではない。** 迷ったら持つ側に倒す。
+持ってはいけない場面は無い。
+
+`PanelState` が watcher を 2 つに分けている画面（rules / risk / phases）は、分かれていること自体が
+決まりの一部。`fileWatchers` は編集対象のパスが設定で変わるので再読込のたびに張り直し、`watchers`
+（チケットの置き場）は開いている間ずっと同じ。1 本にまとめると「古い方だけ落とす」が書けなくなる。
+
+外部に配る API（`ticket-control.ts` の `onDidChangeTicketControl` など）は `Disposable` を返す。
+返さないと、呼ぶ側が正しく書こうとしても外せない。
