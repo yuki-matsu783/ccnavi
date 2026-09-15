@@ -262,9 +262,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function splitList(text) {
     return text.split(",").map((s) => s.trim()).filter((s) => s !== "");
   }
-  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
-  function captioned(name, control, className) {
-    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  // 欄名は日本語で欄の左に出す。YAML のキー名は欄名の title（ツールチップ）に載せる。
+  function captioned(name, control, className, key) {
+    const cap = h("span", { class: "cap", text: name });
+    if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
+    return h("div", { class: "field " + (className || "") }, [cap, control]);
   }
   function selectField(target, name, choices, className, onChange) {
     const select = h("select", { class: className }, choices.map((c) => option(c.value, c.label, c.value === target[name])));
@@ -292,10 +294,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const more = h("details", { class: "more" }, [
       moreSummary,
       h("div", { class: "sub" }, [
-        captioned("overlap", listField(phase, "overlap", "f-overlap", "並行してよい種類の id")),
-        captioned("requires", listField(phase, "requires", "f-requires", "計画に置くなら一緒に要る種類の id")),
-        captioned("agent", field(phase, "agent", "f-agent narrow", "案内に出すサブエージェント名")),
-        captioned("when", field(phase, "when", "f-when", "この種類を計画に置く目安。案内にだけ使う")),
+        captioned("並行できる種類", listField(phase, "overlap", "f-overlap", "並行してよい種類の id"), "", "overlap"),
+        captioned("一緒に要る種類", listField(phase, "requires", "f-requires", "計画に置くなら一緒に要る種類の id"), "", "requires"),
+        captioned("エージェント", field(phase, "agent", "f-agent narrow", "案内に出すサブエージェント名"), "", "agent"),
+        captioned("置く目安", field(phase, "when", "f-when", "この種類を計画に置く目安。案内にだけ使う"), "", "when"),
       ]),
     ]);
     if (moreOpen.has(key) ? moreOpen.get(key) : hasRelations(phase)) { more.setAttribute("open", ""); }
@@ -306,15 +308,15 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const li = h("li", { class: "row phase " + phase.kind, "data-key": key }, [
       head,
       h("div", { class: "row-body" }, [
-        captioned("id", idInput),
-        captioned("title", field(phase, "title", "f-title narrow", "実装とテスト（空なら id）")),
-        captioned("kind", kindSelect),
-        captioned("review", reviewSelect),
-        captioned("scope", h("div", { class: "inline" }, [
+        captioned("id", idInput, "", "id"),
+        captioned("題", field(phase, "title", "f-title narrow", "実装とテスト（空なら id）"), "", "title"),
+        captioned("区分", kindSelect, "", "kind"),
+        captioned("レビュー", reviewSelect, "", "review"),
+        captioned("範囲", h("div", { class: "inline" }, [
           scopeSelect,
           phase.inherit ? null : listField(phase, "scope", "f-scope-globs", "src/*, tests/*（作業ツリーのルートからの相対。子の範囲はこの中に収まる）"),
-        ])),
-        captioned("deliverables", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に在って追跡されているべきもの）")),
+        ]), "", "scope"),
+        captioned("成果物", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に在って追跡されているべきもの）"), "", "deliverables"),
         more,
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
@@ -324,12 +326,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.appendChild(h("span", { class: "sum-id" + (phase.id === "" ? " dim" : ""), text: phase.id === "" ? "（id 未設定）" : phase.id }));
       sum.appendChild(h("span", { class: "clip", text: phase.title === "" ? "" : phase.title, title: phase.title }));
       sum.appendChild(h("span", { class: "tag " + phase.kind, text: phase.kind }));
-      sum.appendChild(h("span", { class: "dim", text: "review " + phase.review }));
+      sum.appendChild(h("span", { class: "dim", text: "レビュー " + phase.review, title: "review" }));
       sum.appendChild(h("span", { class: "clip dim mono", text: phase.inherit ? "inherit" : phase.scope.length === 0 ? "（scope 未設定）" : phase.scope.join(", "), title: phase.inherit ? "親の範囲そのまま" : phase.scope.join(", ") }));
       li.setAttribute("data-find", (phase.id + " " + phase.title + " " + phase.scope.join(" ") + " " + phase.deliverables.join(" ") + " " + phase.when).toLowerCase());
       moreSummary.textContent = "";
       moreSummary.appendChild(h("b", { text: "関係と案内" }));
-      moreSummary.appendChild(document.createTextNode(hasRelations(phase) ? "（設定あり）" : "（未設定）— overlap・requires・agent・when"));
+      moreSummary.appendChild(document.createTextNode(hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に要る種類・エージェント・置く目安"));
     }
     head.addEventListener("click", () => {
       if (window.getSelection && String(window.getSelection()) !== "") { return; }

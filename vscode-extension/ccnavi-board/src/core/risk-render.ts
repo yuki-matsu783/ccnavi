@@ -191,6 +191,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   const page = JSON.parse(document.getElementById("page").textContent);
   const LEVELS = ["medium", "high", "critical"];
   const NUMERIC = ["lines_over", "files_over", "deleted_over"];
+  const KINDS_KEYS = page.kinds.map((k) => k.kind).join(" / ");
   const form = page.form;
   let lock = page.lock;
   let dirty = false;
@@ -239,9 +240,18 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     input.addEventListener("input", () => { target[name] = input.value; markDirty(); });
     return input;
   }
-  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
-  function captioned(name, control, className) {
-    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  // 欄名は日本語で欄の左に出す。YAML のキー名は欄名の title（ツールチップ）に載せる。
+  function captioned(name, control, className, key) {
+    const cap = h("span", { class: "cap", text: name });
+    if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
+    return h("div", { class: "field " + (className || "") }, [cap, control]);
+  }
+  // 値の欄の名前。当て方で意味が変わる
+  function valueLabel(kind) {
+    if (kind === "glob") { return "glob"; }
+    if (kind === "script") { return "スクリプト"; }
+    if (kind === "judge") { return "問い"; }
+    return "しきい値";
   }
   function kindInfo(kind) {
     for (const k of page.kinds) { if (k.kind === kind) { return k; } }
@@ -254,7 +264,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const input = field(form.levels, name, "f-level", "既定 " + page.builtinLevels[name]);
       input.setAttribute("inputmode", "numeric");
       input.setAttribute("title", name.toUpperCase() + " 以上になる点");
-      box.appendChild(captioned(name, input, "w-level"));
+      box.appendChild(captioned(name.toUpperCase(), input, "w-level", "levels." + name));
     }
   }
   function renderFactor(factor) {
@@ -280,20 +290,20 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const li = h("li", { class: "row factor", "data-key": key }, [
       head,
       h("div", { class: "row-body" }, [
-        captioned("id", field(factor, "id", "f-id narrow", "big-diff")),
-        captioned("points", points),
-        captioned("当て方", kindSelect),
-        captioned(factor.kind, factor.kind === "glob"
-          ? h("div", { class: "inline" }, [value, h("span", { class: "cap", text: "max" }), field(factor, "max", "f-max num", "上限。空なら青天井")])
-          : value),
-        captioned("message", field(factor, "message", "f-message", "加点した理由として依頼文と閉じたときの出力に出る短い文。空なら id")),
+        captioned("id", field(factor, "id", "f-id narrow", "big-diff"), "", "id"),
+        captioned("点", points, "", "points"),
+        captioned("当て方", kindSelect, "", KINDS_KEYS),
+        captioned(valueLabel(factor.kind), factor.kind === "glob"
+          ? h("div", { class: "inline" }, [value, h("span", { class: "cap", text: "上限", title: "YAML のキー: max" }), field(factor, "max", "f-max num", "上限。空なら青天井")])
+          : value, "", factor.kind),
+        captioned("文面", field(factor, "message", "f-message", "加点した理由として依頼文と閉じたときの出力に出る短い文。空なら id"), "", "message"),
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
     ]);
     function fillSummary() {
       sum.textContent = "";
       sum.appendChild(h("span", { class: "sum-id" + (factor.id === "" ? " dim" : ""), text: factor.id === "" ? "（id 未設定）" : factor.id }));
-      sum.appendChild(h("span", { class: "sum-points" + (factor.points === "" ? " dim" : ""), text: factor.points === "" ? "—" : factor.points + " 点" }));
+      sum.appendChild(h("span", { class: "sum-points" + (factor.points === "" ? " dim" : ""), text: factor.points === "" ? "—" : factor.points + " 点", title: "points" }));
       sum.appendChild(h("span", { class: "dim", text: kindInfo(factor.kind).label }));
       sum.appendChild(h("span", { class: "clip", title: factor.value }, [
         factor.value === "" ? h("span", { class: "dim", text: "（" + factor.kind + " 未設定）" }) : h("code", { text: factor.value + (factor.kind === "glob" && factor.max !== "" ? "（max " + factor.max + "）" : "") }),

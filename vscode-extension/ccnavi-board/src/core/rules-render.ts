@@ -100,7 +100,7 @@ ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
   <p class="hint">判定は実行ファイルの <code>--test</code> で行う。編集中の内容で試すので保存は要らない。セッションが dry-run でも、ここは enable のときの判定を返す。</p>
   <div class="judge-form">
     <label>ツール <select id="tool">${KNOWN_TOOLS.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></label>
-    <label class="grow">subject <input id="subject" type="text" placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
+    <label class="grow" title="--test の subject">対象 <input id="subject" type="text" placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
     <button type="button" class="action primary" data-action="judge">判定</button>
   </div>
   <div id="judge-result" class="result hidden"></div>
@@ -365,9 +365,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     textarea.addEventListener("input", () => { rule[name] = textarea.value; markDirty(); });
     return textarea;
   }
-  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
-  function captioned(name, control, className) {
-    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  // 欄名は日本語で欄の左に出す。YAML のキー名は欄名の title（ツールチップ）に載せる。
+  function captioned(name, control, className, key) {
+    const cap = h("span", { class: "cap", text: name });
+    if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
+    return h("div", { class: "field " + (className || "") }, [cap, control]);
   }
   // match はツール名を "|" で並べたもの。判定は名前をそのまま突き合わせるので、
   // 打ち間違えると黙って当たらなくなる。書かせずに選ばせる。ファイルに書いてある
@@ -405,7 +407,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const wrap = h("div", { class: "picker" }, [input, menu]);
     input.addEventListener("focus", () => { fill(); openPicker(wrap); });
     input.addEventListener("click", () => { fill(); openPicker(wrap); });
-    return captioned("match", wrap, "w-match");
+    return captioned("ツール", wrap, "", "match");
   }
   // 開いているポップアップは 1 つだけ。外を押すか Esc で閉じる。
   function openPicker(wrap) {
@@ -416,11 +418,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   // ファイルを指す欄。手で書くほかに、VS Code のダイアログで選べる。選んだ結果は
   // 拡張側がルート相対にして "picked" で返す。
-  function fileField(rule, key, name, className, placeholder) {
+  function fileField(rule, key, label, name, className, placeholder) {
     const input = field(rule, name, className, placeholder);
     const pick = h("button", { type: "button", class: "action small", text: "選ぶ…", title: "ファイルを選ぶ" });
     pick.addEventListener("click", () => vscode.postMessage({ type: "pickFile", key: key, field: name }));
-    return captioned(name, h("div", { class: "with-button" }, [input, pick]));
+    return captioned(label, h("div", { class: "with-button" }, [input, pick]), "", name);
   }
   function hasContext(rule) {
     return rule.additionalContext !== "" || rule.additionalContextOnce !== "" || rule.additionalContextFile !== "" || rule.additionalContextOnceFile !== "";
@@ -436,7 +438,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     // （lint が止めるので）そう言って、消すボタンだけ出す。
     let message;
     if (section === "deny") {
-      message = captioned("message", area(rule, "message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）"));
+      message = captioned("文面", area(rule, "message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）"), "", "message");
     } else if (rule.message !== "") {
       const drop = h("button", { type: "button", class: "action small", text: "message を削除" });
       drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
@@ -451,10 +453,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const more = h("details", { class: "more" }, [
       moreSummary,
       h("div", { class: "sub" }, [
-        captioned("additionalContext", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト")),
-        fileField(rule, key, "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）"),
-        captioned("additionalContextOnce", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト")),
-        fileField(rule, key, "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）"),
+        captioned("渡す文", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト"), "", "additionalContext"),
+        fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）"),
+        captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト"), "", "additionalContextOnce"),
+        fileField(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）"),
       ]),
     ]);
     if (moreOpen.has(key) ? moreOpen.get(key) : hasContext(rule)) { more.setAttribute("open", ""); }
@@ -472,10 +474,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const li = h("li", { class: "row rule", "data-key": key, "data-id": rule.id }, [
       head,
       h("div", { class: "row-body" }, [
-        captioned("id", field(rule, "id", "f-id narrow", "git-push")),
+        captioned("id", field(rule, "id", "f-id narrow", "git-push"), "", "id"),
         matchField(rule),
-        captioned("タイプ", sectionSelect),
-        captioned("形式", h("div", { class: "inline" }, [kindSelect, pattern])),
+        captioned("タイプ", sectionSelect, "", "deny / ask / allow"),
+        captioned("パターン", h("div", { class: "inline" }, [kindSelect, pattern]), "", "glob / regex"),
         message,
         more,
         h("span", { class: "buttons" }, [up, down, del]),
@@ -495,7 +497,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.appendChild(h("span", { class: "sum-flag" + (hasContext(rule) ? " on" : ""), title: hasContext(rule) ? "コンテキストの追加あり" : "" }));
       moreSummary.textContent = "";
       moreSummary.appendChild(h("b", { text: "コンテキストの追加" }));
-      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）— HIT したときにモデルへ渡すプロンプトやファイル"));
+      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）— HIT したときにモデルへ渡す文やファイル"));
       li.setAttribute("data-find", (rule.id + " " + rule.match + " " + rule.pattern + " " + rule.message + " " + rule.additionalContext + " " + rule.additionalContextOnce).toLowerCase());
     }
     head.addEventListener("click", () => {
@@ -732,7 +734,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (action === "judge") {
       const tool = document.getElementById("tool").value;
       const subject = document.getElementById("subject").value;
-      if (subject.trim() === "") { status("subject が未入力", true); return; }
+      if (subject.trim() === "") { status("対象が未入力", true); return; }
       setBusy(true, "判定中…");
       vscode.postMessage({ type: "judge", sections: sections, tool: tool, subject: subject });
     }
