@@ -341,7 +341,8 @@ def _factors(
                 problems.append(Problem(SEVERITY_ERROR, ident, "`glob` が文字列ではない"))
                 continue
             glob = value.strip().replace("\\", "/").strip("/")
-            flags = re.IGNORECASE if tree.CASE_INSENSITIVE else 0
+            # ルールの glob と同じく、どの機械でも大文字小文字を区別しない。
+            flags = re.IGNORECASE
             try:
                 compiled = re.compile("^" + globmatch.translate(glob), flags)
             except re.error as exc:

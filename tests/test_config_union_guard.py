@@ -377,11 +377,13 @@ class DenyTest(GuardHarness):
     def test_shell_writes_into_a_moved_common_layer_are_denied(self):
         """§11.6: 共通層が既定の名前の外にあっても、シェルからの書き込みは組み込みで止まる。"""
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
+        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # そのコマンドは設定ファイルに書かない。
         for command in (
             "echo x > policy/rules.yml",
             "sed -i s/deny/allow/ policy/rules.yml",
             "cp /tmp/x policy/rules.yml",
-            f"echo x > {policy}",
+            f"echo x > {policy.replace(os.sep, '/')}",
         ):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
