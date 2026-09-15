@@ -155,11 +155,13 @@ class FallbackTest(unittest.TestCase):
         # 実行ファイル・ccnavi ディレクトリ・共通層は設定で動く。既定の側だけ空の設定で
         # 組んでいると、動かしたワークスペースではルールファイルが壊れたときにだけ
         # そこへの書き込みが止まらない（issue #14）。
+        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # そのコマンドは設定ファイルに書かない。
         for env, command in [
             ({"CCNAVI_PROJECT_HOME": ".navi"}, "echo x > projects/lib/.navi/config/rules.yml"),
             ({"CCNAVI_PROJECT_HOME": ".navi"}, "rm -rf .navi"),
             ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
-            ({}, f"echo x > {self.broken}"),
+            ({}, f"echo x > {self.broken.replace(os.sep, '/')}"),
         ]:
             with self.subTest(command=command):
                 out = out_of(
