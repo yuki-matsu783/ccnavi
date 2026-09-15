@@ -696,6 +696,11 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 
 端末からの試験（§10）には `permission_mode` が来ないので、言及の無い呼び出しは `ask` として出る。
 
+**`allow` に当たった呼び出しにも、ccnavi は判定を返さない。** `permissionDecision` を返すのは `deny` と `ask` だけで
+（`judge.refuse`）、`allow` は記録に残して終わる。`allow` の値打ちは、この表の結末（確認と、確認できる者が居ないモードでの
+拒否）を起こさないことと、`additionalContext` を当てる先になること。Claude Code 側の権限の扱いは変わらないので、
+`allow` を足しても Claude Code の確認は飛ばせない。飛ばせる形にすると、ルールを 1 行足すだけで権限を配れることになる。
+
 ### 6.6 モデルへ渡す文
 
 当たったルールの `additionalContext`（毎回）と `additionalContextOnce`（文脈で最初の 1 回）を、

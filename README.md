@@ -649,12 +649,25 @@ allow:
 |---|---|
 | `deny` | 止まる |
 | `ask` | 人に確認が出る（`RULE_ASK`） |
-| `allow` | 通る |
+| `allow` | ccnavi は何も返さない。その先は Claude Code の権限モードが決める |
 | どこにも当たらない | Claude Code の権限モードに従う（`UNDECLARED`） |
 
 1 件でも `deny` に当たれば拒否で、弱いタイプは見に行かない。同じタイプに複数
 当たったら全部の文面を返す。どれか 1 つを選ぶと、選ばれなかったルールの
 言い分は誰にも届かない。
+
+**`allow` は Claude Code に「許可」を返すのではない。** ccnavi が判定（`permissionDecision`）を
+返すのは `deny` と `ask` のときだけで、`allow` のときは何も返さずに終わる（ルールに
+`additionalContext` があれば、それだけを添える）。`allow` に当たった呼び出しも、その先は
+Claude Code の権限モードと `settings.json` の `permissions` が決める。ルールファイルに `allow` を
+1 行足しても、Claude Code 側の確認は飛ばせない。飛ばせる形にすると、ルールを 1 行足すだけで
+権限を配れることになる。
+
+`allow` を書くと消えるのは、**ccnavi 自身が出す確認と拒否**。言及の無い呼び出しは、
+`default` / `acceptEdits` / `plan` / 不明なモードでは ccnavi が確認を出し、
+`dontAsk` / `bypassPermissions` では通さない（次の節）。`allow` に当たればどちらも起きない。
+`auto` はもともと権限モードに渡すので変わらない。記録には `decision` が `allow` の行が残り、
+`additionalContext` を当てる先にもなる。
 
 作業ツリーに結び付いた承認済みチケットがあれば、その範囲の判定とも比べて強い側を採る。
 ルールの `allow` に当たっても、範囲の外なら止まる（「判定の鍵はファイルの行き先」）。
