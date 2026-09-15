@@ -126,7 +126,8 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
         lines.append(
             "ccnavi is asking rather than deciding because it could not tell what this call "
             "would actually do. Say what the command is for, or rewrite it in a form that can "
-            "be read: no heredoc, no string handed to something that runs it."
+            "be read: no heredoc, no string handed to something that runs it, no case inside "
+            "$( )."
         )
     elif refused:
         lines.append(
@@ -148,7 +149,16 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
     return "\n".join(lines)
 
 
-def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degraded: str) -> str:
+def reason_for(
+    rule: rules.Rule,
+    tool: str,
+    subject: str,
+    rules_path: str,
+    degraded: str,
+    runner: str = "",
+    inner: str = "",
+    quoted: bool = False,
+) -> str:
     """当たったルール 1 件を、それだけで読んで成立する理由に組む。
 
     載せるのは 3 つ。何に当たったか（対象）、どういう筋の根拠か（理由コード）、
@@ -156,10 +166,16 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     自分の呼び出しのどこが引っかかったのかを自分では辿れず、
     文面を信じるか無視するかの二択になる。
 
+    quoted は、このルールが引用の中から切り出したコマンドにだけ当たったこと
+    （judge が bare に当て直して決める）。そのときは断りを 1 文足す。
+
     件ごとに閉じた形にするのは、1 回の応答に複数の理由が入り、そのうちどれが
     利用者の目に入るかが決まらないため。「上に書いた事情が下の全部に掛かる」形は、
     1 件だけが切り出されて見えた瞬間に意味を失う。読めなかったという断りが
     件ごとに繰り返されるのはその代金で、繰り返しのほうが誤読より安い。
+
+    inner は、ルールに当たったのが実行役のコマンド（runner）が中で実行するコマンドだった
+    ときの、そのコマンド。元の形で当たったときは空。
     """
     shown = subject
     if len(shown) > SUBJECT_LIMIT:
@@ -171,6 +187,11 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     # コードはルールが置かれていたタイプから決まる。拒否と確認で同じコードを
     # 返すと、受け取った側は「止まった」のか「聞かれている」のかを文面から
     # 推し量ることになる。
+    #
+    # 中で実行されるコマンドで当たったときは、読めなかった断りを付けない。当てた先は
+    # 生の文字列ではなく、読み直したコマンドなので。
+    if inner:
+        degraded = ""
     code = CODE_RULE_ASK if rule.decision == rules.ASK else code_for(tool, degraded)
     # 出所はルールの id で名乗る。プロジェクトのルールの id には `lib:git-push` の形で
     # プロジェクトの名前が付く（REQ-MLT-07）ので、id だけでどのファイルを見に行けばよいかが
@@ -185,10 +206,48 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
         )
 
     lines = [f"[ccnavi] {code} ({source})", f"subject: {shown}"]
+    if inner:
+        lines.append(ran_by(runner, inner))
     if degraded:
         lines.append(unreadable(degraded))
     lines.append(rule.spoken_message())
+    if quoted:
+        lines.append(inside_quotes())
     return "\n".join(lines)
+
+
+def ran_by(runner: str, inner: str) -> str:
+    """実行役のコマンドが中で実行するコマンドに当たったことを言う 1 行。
+
+    元の形（`env rm -f …`）だけを見た読み手には、ルールのどこが当たったのかが分からない。
+    ルールは `rm` について書かれていて、`env` については何も言っていないので。
+    """
+    return f"`{_one_line(runner)}` が実行する `{_one_line(inner)}` に当たりました。"
+
+
+def _one_line(text: str) -> str:
+    """コマンドを文面に載せる形にする。目印を空白に戻し、1 行に畳んで上限で切る。"""
+    shown = " ".join(text.replace(shellread.SEP, " ").replace(shellread.WORD_SEP, " ").split())
+    if len(shown) > SUBJECT_LIMIT:
+        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
+    return shown
+
+
+def inside_quotes() -> str:
+    """引用の中から切り出したコマンドにルールが当たったときに添える断り。
+
+    書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
+    文字を書いただけのつもりでいる。実際にはシェルが実行するので止めるのは正しいが、
+    文字として渡す道を知らなければ、同じ形を書き直しては止まる。道はあるので名指しする。
+    git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 手になる。
+    """
+    return (
+        "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
+        "shell runs $( ) and backquotes there; they are not only written down. To keep them as "
+        "text, use single quotes, escape them as \\$( and \\`, or pass the text from a file "
+        "(git commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
+        "print it with one command first and write the value into the next."
+    )
 
 
 def unreadable(reason: str) -> str:
@@ -203,6 +262,11 @@ def unreadable(reason: str) -> str:
         shellread.REASON_TAKEN_AS_CODE: (
             "this command hands a string to something that runs it as code"
         ),
+        shellread.REASON_UNTERMINATED_SUBST: "a $( ) or backquote in this command never closes",
+        shellread.REASON_AMBIGUOUS_SUBST: (
+            "a $( ) in this command holds a form that shells read differently "
+            "(such as case inside $( )), or nests too deep"
+        ),
     }.get(reason, "this command could not be read")
     return (
         "note: " + what + ", so this rule was matched against the raw text of the "
@@ -212,12 +276,14 @@ def unreadable(reason: str) -> str:
     )
 
 
-def subagent_forbidden(subject: str) -> str:
+def subagent_forbidden(subject: str, runner: str = "", inner: str = "") -> str:
+    """サブエージェントに許さない操作を止めた文。inner は reason_for と同じ。"""
     shown = " ".join(subject.split())[:SUBJECT_LIMIT]
     return "\n".join(
         [
             f"[ccnavi] {phase.CODE_SUBAGENT}",
             f"subject: {shown}",
+            *([ran_by(runner, inner)] if inner else []),
             "チケットの状態を動かす操作、レビューの依頼・確認、リモートへの push は、"
             "親（メインエージェント）だけが行います。サブエージェントは自分のチケットの"
             "範囲で作業を終えたら、コミットまでして結果を報告して終わってください。"

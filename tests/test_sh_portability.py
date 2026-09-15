@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import subprocess
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +66,25 @@ class ShPortabilityTest(unittest.TestCase):
 
     def test_case_is_not_written_inside_command_substitution(self):
         self.assertEqual([], self.found(CASE_IN_SUBSHELL), "case 文で変数に入れてください")
+
+    def test_sh_files_are_checked_out_with_lf(self):
+        # Windows で core.autocrlf=true だと、取り出すときに CRLF になり、シバンが
+        # `#!/bin/sh\r` になって直に起動する sh（振り分けの sh）が動かない。.gitattributes で
+        # LF に固定する。綴りを読む検査ではなく、git が決める属性を聞く。
+        git = shutil.which("git")
+        if git is None:
+            self.skipTest("git が無い")
+        paths = [os.path.relpath(p, ROOT).replace(os.sep, "/") for p in shell_scripts()]
+        result = subprocess.run(
+            [git, "-C", ROOT, "check-attr", "eol", "--", *paths],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            self.skipTest("git の作業ツリーではない")
+        wrong = [line for line in result.stdout.splitlines() if not line.endswith(": eol: lf")]
+        self.assertEqual([], wrong, ".gitattributes で *.sh を eol=lf にしてください")
 
 
 if __name__ == "__main__":

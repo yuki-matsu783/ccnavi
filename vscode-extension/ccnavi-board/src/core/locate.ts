@@ -4,14 +4,18 @@
  *   1. 拡張の設定 `ccnaviBoard.binPath`
  *   2. `.claude/settings.json` の env `CCNAVI_BIN_PATH`
  *   3. `dist/ccnavi/ccnavi`
- *   4. `.ccnavi/bin/ccnavi`（scripts/ccnavi-setup.sh の既定の配布先）
- *   5. ソースがあれば `uv run python -m ccnavi`
+ *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
+ *   5. `.ccnavi/bin/ccnavi`（前の既定の配布先。移し替える前のワークスペースのため）
+ *   6. ソースがあれば `uv run python -m ccnavi`
  *
  * どれも相対ならワークスペースルートからの相対。Windows の `.exe` は綴りに無くても試す。
  *
- * 配布先では、指す先は振り分けの sh で、実体はその隣の `<os>-<arch>/` に並ぶ。
- * 拡張は sh を通さず、隣の実体を先に探す。Windows では sh を直接起動できないので、
- * sh を返すと起動に失敗する。語は ccnavi/platformtag.py と揃える。
+ * 指す先が振り分けの sh（名前が `ccnavi-launcher.sh`）なら、実体は sh の置き場の親の
+ * `bin/<os>-<arch>/` に並ぶ（`.ccnavi/scripts/` の sh なら `.ccnavi/bin/<os>-<arch>/`）。
+ * 拡張は sh を通さずその実体を探し、sh そのものは返さない。Windows では sh を直接起動
+ * できないので、sh を返すと起動に失敗する。実体が無ければ次の候補へ進む。
+ * それ以外の綴りは、隣の `<os>-<arch>/` を先に探し、次に綴りそのものを探す（前の形の
+ * `.ccnavi/bin/ccnavi` は隣に実体が並ぶ）。語は ccnavi/platformtag.py と揃える。
  *
  * ファイルの有無は呼び手が渡す（テストで実際のファイルシステムを要らなくするため）。
  */
@@ -31,7 +35,13 @@ export interface LocateInput {
   readonly isAbsolute: (filePath: string) => boolean;
 }
 
-export const DEFAULT_BINS = ["dist/ccnavi/ccnavi", ".ccnavi/bin/ccnavi"] as const;
+export const DEFAULT_BINS = [
+  "dist/ccnavi/ccnavi",
+  ".ccnavi/scripts/ccnavi-launcher.sh",
+  ".ccnavi/bin/ccnavi",
+] as const;
+/** 振り分けの sh の名前。ccnavi/platformtag.py の LAUNCHER_NAME と揃える */
+export const LAUNCHER_NAME = "ccnavi-launcher.sh";
 export const SOURCE_MARKER = "ccnavi/__main__.py";
 const SUFFIXES = ["", ".exe"] as const;
 const EXECUTABLE_NAMES = ["ccnavi", "ccnavi.exe"] as const;
@@ -60,21 +70,44 @@ function dirOf(filePath: string): string {
   return cut < 0 ? "" : filePath.slice(0, cut);
 }
 
+function nameOf(filePath: string): string {
+  const cut = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+  return filePath.slice(cut + 1);
+}
+
+/** `dir/<target>/ccnavi[.exe]` を、この機械で動く組み立ての順に探す */
+function builtIn(input: LocateInput, dir: string): Launcher | undefined {
+  for (const target of runnableTargets(input.hostTarget)) {
+    for (const name of EXECUTABLE_NAMES) {
+      const filePath = input.join(dir, target, name);
+      if (input.exists(filePath)) {
+        return { kind: "exe", path: filePath };
+      }
+    }
+  }
+  return undefined;
+}
+
 export function locate(input: LocateInput): Launcher | undefined {
   const candidates = [input.setting, input.settingsEnvBin ?? "", ...DEFAULT_BINS].filter(
     (c) => c !== "",
   );
   for (const candidate of candidates) {
     const base = input.isAbsolute(candidate) ? candidate : input.join(input.root, candidate);
+    if (nameOf(base) === LAUNCHER_NAME) {
+      // sh は `../bin/` を探す。sh そのものは返さない
+      const home = dirOf(dirOf(base));
+      const found = home === "" ? undefined : builtIn(input, input.join(home, "bin"));
+      if (found !== undefined) {
+        return found;
+      }
+      continue;
+    }
     const dir = dirOf(base);
     if (dir !== "") {
-      for (const target of runnableTargets(input.hostTarget)) {
-        for (const name of EXECUTABLE_NAMES) {
-          const filePath = input.join(dir, target, name);
-          if (input.exists(filePath)) {
-            return { kind: "exe", path: filePath };
-          }
-        }
+      const found = builtIn(input, dir);
+      if (found !== undefined) {
+        return found;
       }
     }
     for (const suffix of SUFFIXES) {

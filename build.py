@@ -6,6 +6,10 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 単一ファイルではなくフォルダごと置くことになるが、払う代わりに得るものが大きい。
 
     uv run --with pyinstaller python build.py
+
+組み立てた `dist/ccnavi/` は `.ccnavi/bin/<os>-<arch>/` へ写す。hook が起動する振り分けの sh
+（`.ccnavi/scripts/ccnavi-launcher.sh`）は `../bin/` のこちらを探すので、写すまで hook は
+新しい実行ファイルを起動しない。
 """
 
 from __future__ import annotations
@@ -21,12 +25,15 @@ sys.path.insert(0, ROOT)
 
 from ccnavi import platformtag  # noqa: E402
 
-# 実行ファイルの置き場。hook はここを指す。
+# 組み立ての出力。導入スクリプトはここから配り、ゲートの sh は env が無いときここを探す。
 DIST = os.path.join(ROOT, "dist")
 NAME = "ccnavi"
 # どの機械向けに組み立てたかの目印。scripts/ccnavi-setup.sh が配る前に読む。
 # dist/ccnavi/ の外に置く。中に置くと、配布が実行ファイルと一緒に配布先へ写す。
 TARGET = os.path.join(DIST, NAME + ".target")
+# 振り分けの sh が起動する実行ファイルの置き場（ワークスペースルートからの相対）。
+# <os>-<arch>/ はこの下に並ぶ。
+BIN_ROOT = os.path.join(".ccnavi", "bin")
 
 
 def executable() -> str:
@@ -75,7 +82,41 @@ def build() -> int:
     with open(TARGET, "w", encoding="utf-8", newline="\n") as f:
         f.write(target + "\n")
     print(f"built {executable()} ({target})")
+
+    try:
+        live = install(os.path.join(DIST, NAME), ROOT, target)
+    except OSError as e:
+        where = os.path.join(BIN_ROOT, target)
+        print(f"{where} へ写せなかった: {e}", file=sys.stderr)
+        print(f"dist/ は新しい。{where}{os.sep} は前のまま", file=sys.stderr)
+        return 1
+    print(f"installed {live}")
     return 0
+
+
+def install(dist_dir: str, root: str, target: str) -> str:
+    """組み立ての出力 `dist_dir`（`dist/ccnavi/` そのもの）を `.ccnavi/bin/<target>/` へ写す。
+
+    `.ccnavi/bin/` は `root` の下に取る。
+
+    写すのであって移すのではない。`dist/` は導入スクリプトの配布元で、ゲートの sh の既定の
+    探し先でもある。起動中の置き場へ上書きで写すと、onedir の `_internal/` が前後の版で
+    混ざるので、隣の `<target>.new` に写し切ってから `_swap` で入れ替える。前の版にだけ
+    あったファイルは、入れ替えで退避した側ごと消える。
+
+    落ちたら OSError をそのまま投げる。置き場は前のままで、写しかけの `<target>.new` は消す。
+    写した先のパスを返す。
+    """
+    live = os.path.join(root, BIN_ROOT, target)
+    new = live + ".new"
+    shutil.rmtree(new, ignore_errors=True)
+    try:
+        # PyInstaller の出力にはシンボリックリンクが入ることがある（macOS）。辿らずにそのまま写す。
+        shutil.copytree(dist_dir, new, symlinks=True)
+        _swap(new, live)
+    finally:
+        shutil.rmtree(new, ignore_errors=True)
+    return live
 
 
 def _swap(new: str, live: str) -> None:
@@ -84,6 +125,7 @@ def _swap(new: str, live: str) -> None:
     Windows は走っている実行ファイルを上書きできない。名前の変更はできるので、
     古いほうを退避してから新しいほうを移し、退避した側を消す。hook は 0.2 秒で
     終わるが、ちょうど走っている瞬間に当たることはある。数回やり直せば抜ける。
+    やり直しきれなかったら、退避した側を置き場に戻してから投げる。
     """
     os.makedirs(os.path.dirname(live), exist_ok=True)
     old = live + ".old"
@@ -97,6 +139,8 @@ def _swap(new: str, live: str) -> None:
             break
         except OSError:
             if attempt == 4:
+                if os.path.exists(old) and not os.path.exists(live):
+                    os.rename(old, live)
                 raise
             time.sleep(0.3)
 

@@ -156,6 +156,27 @@ Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`Pos
 実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
 動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。
 
+このリポジトリの hook も、配布先と同じく振り分けの sh（`.ccnavi/scripts/ccnavi-launcher.sh`）を通る。
+`build.py` は `dist/ccnavi/` に組み立てたあと、それを `.ccnavi/bin/<os>-<arch>/` へ写す（隣の `<os>-<arch>.new` に
+写し切ってから入れ替える）。hook が新しい実行ファイルを起動するのは写し終えてから。`.ccnavi/bin/` は `.gitignore` に
+入っている。写す段で落ちたら、次の行を出して終了コード 1 で終わる。`dist/` は作り直してあるので、原因（ディスク、
+権限、Windows で走っている実行ファイルのロック）を直して回し直す。
+
+```
+dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
+```
+
+作業ツリーで組み立てると、写す先はその作業ツリーの `.ccnavi/bin/` になる。hook が起動するのはワークスペースルートの
+sh なので、走っている hook は変わらない。ワークスペースルートで組み立て直したあとは、セッション開始で取った実行ファイルの
+控えと大きさ・時刻が食い違う（「コアファイルを守る」）。`CCNAVI_GUARD_CORE_FILES` が `dry-run` なら開き直すまで
+「戻すはずだった」の報告が出るだけだが、`enable` なら次のツール呼び出しのあと、組み立てた実行ファイルが
+セッション開始の時点のものに戻される。ワークスペースルートで組み立てたら、セッションを開き直す。
+
+`dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_BIN_PATH` を
+`dist/ccnavi/ccnavi` にする。自己保護も同じ env を読むので、守る実体と起動する実体は食い違わない。代償は、その機械では
+振り分けの sh を通らないので、sh の不具合に気づけないこと。`ccnavi.settings.local.json` のキー `bin` でも
+`CCNAVI_BIN_PATH` を上書きできるが、変わるのは自己保護が何を守るかだけで、hook が何を起動するかは変わらない。
+
 ### 配布物
 
 PyInstaller の onedir で組み立てる。Windows なら `dist/ccnavi/ccnavi.exe`、
@@ -180,9 +201,10 @@ hook には実行ファイルだけを登録すればよい。
 同じ 1 回で `.vscode/settings.json` も見る（次の節）。触ってほしくないときは `--no-vscode`。
 
 既にある値は置き換えない。値が違えば、変えずに並べて見せる。置き換えるのは
-`--mode` か `--bin` か `--ticket-control` を名指しして `--force` を付けたときだけで、
+`--mode` か `--ticket-control` を名指しして `--force` を付けたときだけで、
 名指ししていない値はそのままにする。`--all` を足しに来た打ち直しが、その場で指定していない
-`CCNAVI_MODE` を既定へ落とさないため。
+`CCNAVI_MODE` を既定へ落とさないため。例外は、導入スクリプト自身が前の版で書いた綴り
+（「前の置き場から移る」）。
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と
 同じ値で書く。`CCNAVI_MODE` が `dry-run` のうちは、この 2 つに `enable` と書いてあっても
@@ -235,7 +257,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
     "CCNAVI_MODE": "dry-run",
     "CCNAVI_RULES": ".ccnavi/common/rules.yml",
     "CCNAVI_LOG": "logs/log.jsonl",
-    "CCNAVI_BIN_PATH": ".ccnavi/bin/ccnavi",
+    "CCNAVI_BIN_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
     "CCNAVI_GUARD_TICKET_APPROVAL": "enable"
@@ -273,7 +295,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
-| `CCNAVI_BIN_PATH` | ccnavi 自身の実行ファイル。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/bin/ccnavi` と書く。これは振り分けの sh で、実行ファイルはその隣の `<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
+| `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh` と書く。これは振り分けの sh で、実行ファイルは sh の 1 つ上の `bin/<os>-<arch>/`、つまり `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
@@ -314,59 +336,81 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 `--no-deploy`。
 
 実行ファイルは、組み立てた機械の OS と CPU でしか動かない。一方で `settings.json` は Windows・WSL・
-Linux・macOS で同じものを開き、hook の `command` は 1 行しか書けない。そこで配布先では機械ごとに
-置き場を分け、hook が起動するのは振り分けの sh（`scripts/ccnavi-launcher.sh` を配ったもの）にする。
-sh は起動のたびに `uname` を 1 回読み、合う置き場の実行ファイルへ引数と標準入力をそのまま渡す（ADR-0041）。
+Linux・macOS で同じものを開き、hook の `command` は 1 行しか書けない。そこで実行ファイルは機械ごとに
+置き場を分け、hook が起動するのは振り分けの sh（`.ccnavi/scripts/ccnavi-launcher.sh`）にする。
+sh は起動のたびに `uname` を 1 回読み、自分の 1 つ上の `bin/<os>-<arch>/` から合う実行ファイルを選んで、
+引数と標準入力をそのまま渡す（ADR-0044。機械ごとに並べて sh が選ぶ形は ADR-0041 から引き継いだ）。
 
 ```
-.ccnavi/bin/ccnavi                    ← CCNAVI_BIN_PATH が指す振り分けの sh
-.ccnavi/bin/darwin-arm64/ccnavi       ← 機械ごとの組み立て（_internal/ も同じ置き場）
+.ccnavi/scripts/ccnavi-launcher.sh      ← CCNAVI_BIN_PATH が指す振り分けの sh（追跡する）
+.ccnavi/scripts/ccnavi-ticket.sh など   ← ゲートの sh（同じ置き場）
+.ccnavi/bin/darwin-arm64/ccnavi         ← 機械ごとの組み立て（_internal/ も同じ置き場。無視する）
 .ccnavi/bin/linux-x86_64/ccnavi
 .ccnavi/bin/windows-x86_64/ccnavi.exe
+```
+
+置き場は 2 つとも固定で、原本（ccnavi のリポジトリ）と配布先で同じ綴りになる。振り分けの sh はゲートの sh と同じく
+置いた場所でそのまま動く sh なので `.ccnavi/scripts/` に置き、`.ccnavi/bin/` には実行ファイルだけが並ぶ。
+sh は自分の隣（`.ccnavi/scripts/<os>-<arch>/`）は探さない。そこは配る場所ではなく、探すと自己保護の綴りが
+当たらない置き場から実体を起動する道ができる。
+
+置き場が動かないので、置き場を名指しする `--bin` は廃止した。渡すと、値の有無に依らず終了コード 2 で断り、
+何も書かない。受けて無視すると、打った人は指した場所に置いたつもりで進むため。`--bin` で置き場を動かしていた
+配布先は、手で既定の置き場へ戻す（既定でない綴りの扱いは「前の置き場から移る」）。
+
+```
+ccnavi-setup: --bin は廃止しました。振り分けの sh は .ccnavi/scripts/ccnavi-launcher.sh、実行ファイルは .ccnavi/bin/<os>-<arch>/ に固定です。
 ```
 
 置き場の名前は、`build.py` が `dist/ccnavi.target` に書く `<os>-<arch>` の目印から取る。別の機械向けの
 組み立てでも配る。その機械の置き場に入るだけで、この機械の実行ファイルを上書きしないからで、
 Windows と WSL で同じフォルダを開くなら、それぞれの機械で打てば両方が並ぶ。この機械で動くものが
 無ければ、1 行と最後の「まだ無いもの」で言う。arm64 の macOS と Windows は、自分向けが無ければ
-x86_64 の組み立てを変換して動かす。どこにも無ければ sh は 127 で終わる。
+x86_64 の組み立てを変換して動かす。どこにも無ければ sh は、この機械の `<os>-<arch>` と探した置き場を名指しして
+終了コード 127 で終わる。実行ファイルは在るが実行できないときは 126 になる。
 
 目印が無いか読めない配布元からは、置き場を決められないので配らない。
 名指しの `--deploy` なら終了コード 2 で断り、既定の配布元なら理由を出して設定だけ書く。
 
 振り分けの代償は、ツール呼び出しのたびに sh の起動と `uname` 1 回ぶんが乗ること。macOS の実測で
 約 9 ms。Git Bash は fork が遅いので、Windows ではこれより大きくなる。VS Code 拡張は sh を通さず、
-隣の実行ファイルを自分で選んで起動する（Windows では sh を直接起動できないため）。
+env が振り分けの sh を指していれば、sh と同じ順で `.ccnavi/bin/<os>-<arch>/` の実行ファイルを自分で選んで起動する
+（Windows では sh を直接起動できないため）。sh そのものは起動せず、実行ファイルが無ければ次の候補へ進む。
 
 | 配布元 | 配布先 |
 |---|---|
-| `dist/ccnavi/`（中身ごと） | `--bin` の 1 つ上の下の `<os>-<arch>/`。既定なら `.ccnavi/bin/<os>-<arch>/` |
-| `scripts/ccnavi-launcher.sh` | `--bin` の綴り。既定なら `.ccnavi/bin/ccnavi` |
+| `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/`（`<os>-<arch>` は `dist/ccnavi.target` の目印） |
 | `.ccnavi/common/rules.yml` | 同じ綴り |
 | `.ccnavi/common/risk.yml` | 同じ綴り |
 | `.ccnavi/config/phases.yml` | 同じ綴り |
-| `.ccnavi/scripts/ccnavi-{ticket,review,git}.sh` | 同じ綴り |
+| `.ccnavi/scripts/ccnavi-{ticket,review,git,common}.sh` | 同じ綴り |
+| `.ccnavi/scripts/ccnavi-launcher.sh` | 同じ綴り。配ったあと実行ビットを付ける |
 
 ルールと配点のひな形は共通層（`.ccnavi/common/`）へ、フェーズの種類のひな形はワークスペース自身の層
 （`.ccnavi/config/`。`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）へ配る。種類の `scope` はそのワークスペースの
 レイアウトに合わせて書くもので、共通層に置くと全プロジェクトに効いてしまう（「ルールは 3 層の和で当たる」）。
-3 本とも、無ければ最後の点検が「まだ無いもの」として並べる。
+3 本とも、無ければ最後の点検が「まだ無いもの」として並べる。振り分けの sh と、この機械で動く
+実行ファイル（`.ccnavi/bin/<この機械>/ccnavi`）も同じ一覧に出る。
 
-配った振り分けの sh と組み立ての置き場は、配布先の `.gitignore` にも足す（配布先が git の
-リポジトリのときだけ）。書かないと、次のコミットで実行ファイルと `_internal` がまるごと履歴に
-入る。入ってしまうと、消すには履歴を書き換えるしかない。置き場は配った機械のぶんだけ足し、
-別の機械で打ち直せばその機械のぶんが足される。
+振り分けの sh は、hook が `sh` 経由ではなく直に起動するので実行ビットが要る。配った回は `chmod +x` を掛ける。
+配布先に既にあって配らない回でも、実行ビットが落ちていれば付け直す（中身は入れ替えない）。sh は追跡するので、
+Windows（`core.filemode=false`）で足すとモード 100644 で入り、別の機械で clone した直後は実行ビットが無いことがある。
+`--no-deploy` の回と、配布元と配布先が同じ回には触らない。付けられなかったら名指しする。`--check` は、実行ビットの
+落ちた sh を揃っていないものに数える。実行できないまま残った sh は `--lint` が error で言う（「設定の検証」）。
+
+配った組み立ての置き場は、配布先の `.gitignore` にも足す（配布先が git のリポジトリのときだけ）。
+書かないと、次のコミットで実行ファイルと `_internal` がまるごと履歴に入る。入ってしまうと、消すには
+履歴を書き換えるしかない。置き場は配った機械のぶんだけ足し、別の機械で打ち直せばその機械のぶんが足される。
 
 ```
 # ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
-/.ccnavi/bin/ccnavi
 /.ccnavi/bin/darwin-arm64/
 ```
 
-置き場ごと無視はしない。`--bin` の綴りによっては、振り分けの sh の置き場が `rules.yml` と
-同じディレクトリになる。そこを丸ごと無視すると、そのプロジェクトが何を止めるかまで
-git から消える。`--bin` に `.exe` は付けない（付けると終了コード 2）。指すのは sh で、
-`.exe` が付くのは隣の実行ファイルの側。
+足すのは `/.ccnavi/bin/<os>-<arch>/` だけ。振り分けの sh はゲートの sh と同じく追跡する側に置き、無視しない。
+無視すると、clone した先に sh が届かず hook が起動しない。`.ccnavi/` を丸ごと無視もしない。同じ `.ccnavi/` の
+下に `rules.yml` があり、丸ごと無視すると、そのプロジェクトが何を止めるかまで git から消える。前の版が足した
+`/.ccnavi/bin/ccnavi` の行は残す。人が書いた行と見分けられず、残っていても害は無い。
 
 配布先に既にあるものは触らない。並べて見せるだけで、入れ替えるのは `--force` を
 付けたときだけ。ルールもゲートの sh も、入れた先で直されている前提のもので、黙って
@@ -384,6 +428,54 @@ PyInstaller の同梱物は名前で引かれるので、前の版が残ると�
 配るのを諦めた理由を 1 行出して、`.claude/settings.json` は書く。名指ししていない配布元が
 空なのは打った人の誤りではないし、ここで断ると、組み立てていない機械では設定すら
 書けなくなる。
+
+#### 前の置き場（`.ccnavi/bin/ccnavi`）から移る
+
+前の版の導入スクリプトは `CCNAVI_BIN_PATH` を `.ccnavi/bin/ccnavi`（振り分けの sh を実行ファイルの
+隣に置いた）と書いていた。今の導入スクリプトを打ち直せば、env の値ごとに次のように動く。
+
+| 今の `CCNAVI_BIN_PATH` | 動き |
+|---|---|
+| 無い | `.ccnavi/scripts/ccnavi-launcher.sh` を書く（足りない env と同じ） |
+| `.ccnavi/scripts/ccnavi-launcher.sh` | 何もしない |
+| 前の既定の綴り（`.ccnavi/bin/ccnavi`）で、新しい置き場で hook が起動できる | 新しい綴りへ書き換える |
+| 前の既定の綴りで、新しい置き場で hook が起動できない | 書き換えず、理由を 1 行出す |
+| それ以外（既定でない綴り） | 書き換えず、名指しの 1 行を出す。前に置いた sh にも触らない |
+
+既にある env を書き換えるのはここだけで、書かれているのが導入スクリプト自身の前の綴りだから。
+「新しい置き場で hook が起動できる」は、振り分けの sh と、この機械で動く実行ファイルが、この回に配るものも
+含めて揃うこと。`--no-deploy` や、別の機械向けの組み立てしか配れなかった回は揃わない。揃わないまま書き換えると、
+hook は何も起動しなくなる。
+
+既定でない綴りは、人が決めた綴りの先で何が使われているかを決められないので書き換えない。導入は止めず、
+終了コードも変えない（`--check` では揃っていないものに数えて 1 を返す）。`--force` を付けても置き換わらないので、
+「値が違う env」の一覧には重ねず、この 1 行だけで言う。
+
+```
+CCNAVI_BIN_PATH は既定でない綴り（<値>）です。書き換えていません。揃えるなら .claude/settings.json の値を .ccnavi/scripts/ccnavi-launcher.sh に直してください（前に置いた sh と実行ファイルは消していません）。
+```
+
+移したあと、前の振り分けの sh `.ccnavi/bin/ccnavi` を消す。通常のファイルのときだけで、ディレクトリやリンクには
+触らない。同じ置き場の `<os>-<arch>/` は新しい置き場そのものなので残す。
+
+消すのは、次の条件がすべて揃ったときだけ。
+
+1. 新しい置き場で hook が起動できる
+2. 書き終えたあとの `CCNAVI_BIN_PATH` が前の既定の綴りでない
+3. 導入スクリプトを打ったセッションの `CCNAVI_BIN_PATH` が前の置き場を指していない
+4. この回に env を前の既定から書き換えたか、env が既に `.ccnavi/scripts/ccnavi-launcher.sh` を指している。
+   env が無かった回は消さず、「打ち直すと消します」と出す
+
+既定でない綴りの回と、前の既定から移せなかった回は、どちらも消さない。
+
+3 の条件は、env がセッションを開き直すまで変わらないため。消した瞬間からそのセッションの hook は何も
+起動しなくなる。そのときは「開き直してから打ち直す」と出る。端末から打った場合はこの条件に当たらないので、
+消したあとに開いているセッションを開き直す。Windows で使用中のファイルが消せなかったときは、並べて先へ進む。
+
+消すと戻せないが、消すのは前の版の導入スクリプトが配った、無視されている生成物だけで、前の版で配り直せる。
+
+`--check` は、消すものを「前の置き場から消す」として並べ、終了コード 1 を返す。消さずに残した理由の行、
+移せなかった前の既定、既定でない綴りも、揃っていないものに数える。
 
 ## ルール
 
@@ -705,8 +797,10 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 ```sh
 grep -n "git push" README.md      # 通る。git push は grep の引数
 echo "git push origin main"       # 通る
+grep -n '$(git push)' f           # 通る。単一引用の中は文字
+grep -n "\$(git push)" f          # 通る。\$( は置換にならない
 # git push origin main            # 通る。コメント
-cat <<'EOF' > notes.md            # 通る。ヒアドキュメントの本文は実行位置ではない
+cat <<'EOF' > notes.md            # 通る。区切りを引用したヒアドキュメントの本文は文字
 git push origin main
 EOF
 
@@ -715,7 +809,21 @@ cd /repo && git push              # 止まる
 /usr/bin/git push                 # 止まる
 GIT_DIR=/repo/.git git push       # 止まる
 echo $(git push origin main)      # 止まる。$( ) の中は実行される
+echo "$(git push origin main)"    # 止まる。二重引用の中の $( ) も実行される
+cat <(git push)                   # 止まる。プロセス置換の中も実行される
+if true; then git push; fi        # 止まる。予約語の後ろはコマンドの先頭
 ```
+
+シェルが実行する中身は、書いた場所によらず独立したコマンドとして読む。二重引用の中の `$( )` と
+バッククォート、プロセス置換 `<( )` `>( )`、区切りを引用しないヒアドキュメント（`<<EOF`）の本文の
+`$( )` とバッククォートがこれにあたる。中身は外側のコマンドの後ろにつながれ、外側の置換のあった場所には
+`$` が 1 文字残る。`grep -n "$(git push)" f` は `grep -n $ f` と `git push` の 2 本として読まれるので、
+grep の allow は後ろの `git push` まで通さない。外側は割れないので、`find $(pwd) -name x -delete` の
+`-delete` は find と同じコマンドとして見える。
+
+同じ理由で、引用の外の改行はコマンドの区切りになり、2 行目のコマンドは 1 行目の引数として読まれない。
+`#` がコメントになるのは語の始まりだけで、`a#b` や `$#` の `#` は文字。`if` `then` `do` `coproc` `{` などの
+予約語はコマンドの位置にあればそれだけで 1 本になり、後ろの語がコマンドの先頭になる。
 
 引用が 1 語につないだ空白は、コマンドと引数の間の空白としては読まれない。
 これが `"git push"` と `git push` を分ける。引用の中身そのものは残るので、
@@ -733,6 +841,21 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 素の `echo x>f` は演算子として残るので、書き込み先を見るルールには当たる。
 例外は、引用符の中身が演算子の文字だけでできている 1 語（`grep -n ">" f`）。
 `shlex` が引用されていたかどうかを返さないので、演算子と区別が付かない。
+
+### 文字として書きたいとき
+
+二重引用の中の `$( )` とバッククォートは、書いた側が文字のつもりでも、シェルは実行する。だから止まる。
+引用の中から切り出したコマンドにだけルールが当たったときは、返る文面にそのことと回避策が添えられ、
+記録と `--test` に `quoted`（そのルールの id）が出る。文字として渡す道は必ず残してある。
+
+| 書きたいもの | 止まる書き方 | 通る書き方 |
+|---|---|---|
+| 本文にバッククォートを含む issue や PR | ``gh issue create --body "use `git push` here"`` | `` \` `` で書く、単一引用で包む、`--body-file <ファイル>` |
+| 複数行のコミットメッセージ | `commit -m "$(cat <<'EOF' … EOF)"`（heredoc のルール） | 本文を Write で置いて `commit -F <ファイル>`、改行を含む `-m "…"` |
+| git の値を使うコマンド | `cd "$(git rev-parse --show-toplevel)"` | ラッパースクリプトで値を出して読み、次のコマンドにその値を書く |
+| 今の場所を渡す検索 | `grep -rn foo "$(pwd)"`（allow から外れて確認になる） | 値をそのまま書く |
+
+単一引用の中に `'` を書くときは `'"'"'` とつなぐ。どんな文字列も単一引用で文字として渡せる。
 
 ### 読み切れないとき
 
@@ -754,6 +877,13 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 |---|---|
 | 文字列をコードとして実行する呼び出し | `bash -c`、`sh -c`、`eval`、`xargs`、`find -exec` |
 | 引用やヒアドキュメントが閉じていない | `echo "git push` |
+| 置換が閉じていない | ``echo `git push``、`echo $(git push` |
+| シェルによって読みが割れる置換、深すぎる入れ子 | `echo "$(case a in a) git push;; esac)"`、16 段を超える `$( )` |
+
+置換の中身が 1 つでも読み切れなければ、コマンド全体が縮退する。`$( )` の中の `case` は、bash 3.2 が
+`)` を置換の終わりと読んで構文エラーにし、zsh は実行する。どちらかに決めて読むと片方で素通りに
+なりうるので、`case` という語が現れたら縮退させる。コマンドの先頭ではない語（`"$(echo just in case)"`）
+でも縮退するのは、許容した誤検知（[ccnavi.md](ccnavi.md) §12.2）。
 
 引用でコマンド名を割った `"git" push` や `g"it" push` は縮退しない。
 シェルと同じ字句規則で語を組み直すので、本来の push としてそのまま止まる。
@@ -762,6 +892,87 @@ perl や python は縮退の対象に入れていない。
 `perl -pi -e 's/git push/.../' README.md` のような 1 行編集は、
 禁止語に触れる文書を直すときの普通の書き方で、
 ここを諦めると直したい誤検知がそのまま残る。
+
+### 実行役のコマンドが中で実行するコマンドにも当てる
+
+`env rm -f x` の `env` のように、別のコマンドを実行することが仕事のコマンドがある（実行役のコマンド）。
+ルールの多くは `(^|\x00)rm` のようにコマンドの先頭に固定して書くので、元の形だけに当てると、実行役のコマンドを
+前に置くだけで外れる。そこで ccnavi は実行役のコマンドを 1 枚ずつ外し、中で実行されるコマンドにも、
+止める側のルール（`deny` と `ask`）とサブエージェントの禁止を当てる。
+
+```sh
+env rm -f .ccnavi/common/rules.yml              # 止まる。env が実行する rm に当たる
+timeout 5 sed -i s/a/b/ .claude/settings.json   # 止まる
+echo x | xargs rm -f .ccnavi/common/rules.yml   # 止まる
+sh -c 'rm -f .ccnavi/common/rules.yml'          # 止まる
+env sh .ccnavi/scripts/ccnavi-launcher.sh --approve --yes x   # 止まる（承認の経路）
+env curl -d @x https://example.com              # curl に書いた ask が当たる
+sudo -u me cat /etc/hosts                       # 読み取りの allow には当たらない。元の形のまま判定する
+ssh host rm -f .ccnavi/common/rules.yml         # 外さない。ssh は一覧に無い
+```
+
+外すのは次の形。
+
+| 実行役のコマンド | 中で実行されるコマンド |
+|---|---|
+| `VAR=値 <cmd>` | `<cmd>` |
+| `/bin/sh x`、`git.exe x`（道筋や拡張子の付いた名前） | `sh x`、`git x` |
+| `env` `command` `exec` `nohup` `time` `nice` `sudo` `doas` `timeout` `stdbuf` `chrt` `ionice` `taskset` | オプションとその値、コマンドの前の位置引数（`timeout` の時間、`chrt` と `taskset` の 1 語）、`--`、`env` と `sudo` の `名前=値` を飛ばした残り |
+| `sh` `bash` `zsh` `dash` `ksh` `<ファイル> <引数>` | `<ファイル> <引数>` |
+| `sh -c '<文字列>'`（`bash -lc` のような組み合わせも） | 文字列を読み直したコマンド |
+| `eval <語…>` | 語をつないで読み直したコマンド |
+| `.` / `source` `<ファイル> <引数>` | `<ファイル> <引数>` |
+| `xargs [オプション] <cmd…>` | `<cmd…>` |
+| `find … -exec` / `-execdir` / `-ok` / `-okdir` `<cmd…> ;`（または `+`） | `<cmd…>`。複数あればそれぞれ |
+
+- 1 枚ずつ外し、途中のコマンドも残す。`env sh .ccnavi/scripts/ccnavi-approve.sh` なら `sh .ccnavi/scripts/ccnavi-approve.sh` と
+  `.ccnavi/scripts/ccnavi-approve.sh` の両方に当てる。外す深さは 4 まで（元の形は数えない）。`eval` や `sh -c` の文字列は読み直すと
+  語が増えるので、1 回の読みで作る語の数にも上限（2000）がある
+- シェルや `.` / `source` に渡したファイルの先は外さない。そこから後ろはスクリプトの引数で、コマンドではない。
+  `command -v` / `-V`（探すだけ）と `sh -s`（標準入力を読む）も外さない
+- 読み切れない形（`sh -c`・`eval`・`xargs`・`find -exec`・`source`・`.`）でも、語に割れる限り外す。こうした形こそ、
+  中で何が実行されるかを見たい。閉じない引用と閉じないヒアドキュメントでは外さない
+- 一覧は ccnavi の組み込みで、`rules.yml` からは足せない。足せるようにすると消すこともでき、守りの根拠を
+  守られる側に置くことになる。一覧に無いもの（`ssh host <cmd>`・`python -c`・`perl -e`・`script -c`・`watch`・
+  `busybox sh` など）は外さないので、先頭に固定したルールはこれまでどおり外れる。変数・alias・関数
+  （`$SUDO rm …`）にも届かない
+
+当てる先は止める側だけにする。
+
+| 当てる先 | 元の形 | 中で実行されるコマンド |
+|---|---|---|
+| `deny` | 当てる | 当てる |
+| `ask` | 当てる | 当てる |
+| サブエージェントの禁止 | 当てる | 当てる |
+| `allow` | 読み切れたときだけ当てる | 当てない |
+| ゲートの中で通す形 | 当てる | 当てない |
+| チケットの範囲 | 当てる | 当てない |
+
+中で実行されるコマンドは、止める側に足す当て先で、元の形の判定を消さない。だから外し方を読み違えても、当たるはずの
+ものが当たらないだけで、今より緩くはならない。`allow` に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では
+どのルールにも当たらず確認に落ちるが、中の `cat /etc/hosts` に読み取りの `allow` を当てると通るようになる。
+ゲートの中で通す形も同じで、当てると `env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1` のような、実行役のコマンドを
+前に置いた形がゲートの中で通るようになる。
+
+代償として、実行役のコマンドの後ろに書いた、`deny` に当たるコマンドはこれから止まる（`time` や `nice` の後ろなど）。
+その `deny` はもともとそのコマンドを止めるために書いたものなので、意図どおりの側に倒れる。
+
+中で実行されるコマンドで当たったときは、拒否と確認の文面に 1 行足す。元の形だけを見ても、ルールのどこが当たったのかが
+分からないため。ルールは `rm` について書かれていて、`env` については何も言っていない。
+
+```
+[ccnavi] DENY_COMMAND_PATTERN (rule: builtin-guard-setting-files)
+subject: env rm -f .ccnavi/common/rules.yml
+`env` が実行する `rm -f .ccnavi/common/rules.yml` に当たりました。
+ガード自身の設定と hook を、シェルからの書き込みで変えようとしています。…
+```
+
+記録には欄 `unwrapped` に当たったコマンドが残り（「記録」）、`--test` は `unwrapped:` の行で出す（「ルールが何に当たるかを確かめる」）。
+
+読み切れない形（`sh -c '…'`・`xargs` など）で、当たったルールが全部中で実行されるコマンドで当たったときは、拒否のコードを
+`PARSE_UNCERTAIN` ではなく `DENY_COMMAND_PATTERN` にし、「読めなかったので文字列に当てた」の断りも付けない。当てた先が
+生の文字列ではなく、読み直したコマンドだから。記録の `degraded` は残る。`PARSE_UNCERTAIN` の件数で読み切れない拒否を
+数えている集計とはずれる。
 
 ### ヒアドキュメント自体は既定のルールで止める
 
@@ -921,8 +1132,8 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/{rules,phases,risk}.yml`） | 判定の中身そのもの | ツール実行前 |
 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml`（自身の層の 3 本） | 同上 | ツール実行前 |
 | `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml`（各プロジェクトの層の 3 本） | 同上 | ツール実行前 |
-| `CCNAVI_BIN_PATH` が指すファイル | 判定器の実体 | セッション開始 |
-| それが振り分けの sh なら、隣の `<os>-<arch>/` にあるこの機械の実行ファイル | 同上。hook が実際に走らせるもの | セッション開始 |
+| `CCNAVI_BIN_PATH` が指すファイル（既定の配置では振り分けの sh） | 判定器の実体 | セッション開始 |
+| それが振り分けの sh（名前が `ccnavi-launcher.sh`）なら、1 つ上の `bin/<os>-<arch>/` にあるこの機械の実行ファイル。それ以外の名前（前の `.ccnavi/bin/ccnavi`）なら隣の `<os>-<arch>/` | 同上。hook が実際に走らせるもの | セッション開始 |
 
 上のうち git が追跡しているものは、その切り元から切った作業ツリーが持つ同じファイル（作業ツリー側の設定）も対象に入る。
 作業ツリー側の設定は今この瞬間には誰にも読まれないが、ブランチを統合すればそのまま hook の登録と設定になる。実行前の `deny` は
@@ -987,8 +1198,9 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 `logs/` の下の git のラッパースクリプトの記録は守らない。消しても判定に効かないため。
 
 名指しのツール（`Write` / `Edit` / `NotebookEdit`）からも守る。`CCNAVI_BIN_PATH` を指定して
-いればそのパスと、同じ親の下の `<os>-<arch>/` の中を書く呼び出しは拒否され、ccnavi ディレクトリの下（`*/.ccnavi/*`）も
-同じく拒否される（`builtin-guard-project-home`）。
+いればそのパスと、sh が起動する実行ファイルの置き場（名前が `ccnavi-launcher.sh` なら 1 つ上の `bin/<os>-<arch>/`、
+それ以外の名前なら隣の `<os>-<arch>/`）の中を書く呼び出しは拒否され、ccnavi ディレクトリの下（`*/.ccnavi/*`）も
+同じく拒否される（`builtin-guard-project-home`）。既定の配置では sh も実行ファイルも `.ccnavi/` の下なので、両方で止まる。
 どちらもルールファイルの外に置くのは、置き場が設定で動くことと、そのプロジェクトのルール自身に
 任せると書けた瞬間に緩められるため。共通層の 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル）も、
 置き場がどこでも組み込みで止まる（`builtin-guard-common-layer`）。ワークスペースから切った作業ツリーの中の同じファイルも止まる。
@@ -1570,7 +1782,7 @@ factors:
 
 `tree` と `project` には、その呼び出しの行き先が属するツリーとプロジェクトの名前が入る。
 複数のプロジェクトを横断しているときに、どこで何が起きたかを数え分ける欄。`permission_mode` は
-Claude Code から来たモードで、`handover` の行と合わせて読む。全 20 欄は
+Claude Code から来たモードで、`handover` の行と合わせて読む。全 23 欄は
 [ccnavi.md](ccnavi.md) の付録 B。
 
 実行後の監視が検知した回は `paths` に「種類とパス」が並ぶ。件数ではなく綴りで
@@ -1582,8 +1794,20 @@ Claude Code から来たモードで、`handover` の行と合わせて読む。
 切り替えたときに何件が戻るのかが分かる。
 
 コマンドを読み切れずに生の文字列で判定した回は、判定を下したうえで `degraded` が付く。
-`command-taken-as-code` と `unterminated-quote` の 2 つ。
+`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution` の 4 つ。
 止めたもののうち、どれだけが読み切れないまま出た判定かを後から数えられる。
+
+止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったものは `quoted` に id が並ぶ
+（「文字として書きたいとき」）。書いた側が文字のつもりでいた場所で止めた回を数えられる。多ければ、
+直すのは文面の案内か、よく書かれる形のほう。
+
+実行役のコマンド（`env`・`sudo`・`sh -c` など）が中で実行するコマンドでルールに当たった回は、`unwrapped` に
+そのコマンドが入る。複数なら `\x00` でつなぐ。元の形で当たった回は空で、欄ごと落ちる。数えれば、実行役のコマンド
+越しに止めた件数が分かる（「実行役のコマンドが中で実行するコマンドにも当てる」）。
+
+```sh
+jq -r 'select(.unwrapped) | .rules[]' logs/log.jsonl | sort | uniq -c
+```
 
 ルールファイルを読めず組み込みの既定で判定した回は `fallback` が付き、
 `detail` に読めなかったファイルのパスが入る。ガードが落ちたまま何回動いたかは、
@@ -1628,7 +1852,8 @@ response:
 
 出るのは、判定と根拠コード、当たったルールとそのタイプ、`glob` が翻訳された
 正規表現、そして返る文面そのもの。パスを渡したときは行き着く先も出るので、
-当たらなかった理由が綴りなのかどうかを自分で辿れる。
+当たらなかった理由が綴りなのかどうかを自分で辿れる。実行役のコマンドが中で実行するコマンドで当たったときは、
+`unwrapped:` の行にそのコマンドが出る（「実行役のコマンドが中で実行するコマンドにも当てる」）。
 
 判定は実運用と同じ関数を通る（REQ-DIA-03）。ここで判定を作り直すと、
 試験で通ったものが実運用で落ちる、という一番まずい形になる。
@@ -1709,15 +1934,17 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 
 | 鍵 | 何 |
 |---|---|
-| `version` | 形の版。整数。いま 1 |
+| `version` | 形の版。整数。いま 1。欄を足しただけでは上げない（拡張は知らない欄を読み飛ばす） |
 | `root` / `rules_path` | ワークスペースルートと、当てたルールファイル |
 | `known` | 判定が対象を取り出せるツールか。偽なら以下は空のまま（ルールを書いても当たらない） |
 | `tool` / `subject` | 試した入力そのまま |
 | `resolved` | パスを行き着く先まで解いた結果。入力と同じなら空 |
 | `verdict` / `code` | 判定（`deny` / `ask` / `allow` / `skip`）と根拠コード |
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
+| `unwrapped` | 実行役のコマンドが中で実行するコマンドでルールに当たったときの、そのコマンド。複数なら `\x00` でつなぐ。元の形で当たったとき・当たらなかったときは空。後から足した欄 |
 | `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob` か `regex`、`written` は書いたまま、`pattern` は翻訳後の正規表現 |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
+| `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 
 `--test-samples --json` の最上位。
 
@@ -1785,10 +2012,12 @@ error 2 件、warn 2 件、info 0 件
 |---|---|
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=disable` を宣言している |
 | error | `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL` が 2 値として読めない値（`enable` に倒して動く） |
+| error | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が指す先が在るのに実行できない（hook が 126 で起動せず、何も判定していない。POSIX だけで見る。Windows は実行ビットを持たない。書いた綴りをそのまま見て、`.exe` は補わない） |
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
 | warn | 上書き設定ファイル（`ccnavi.settings.local.json`。ccnavi 自身のソースツリーだけで読む。設計 §4.3）が読めない |
 | warn | `CCNAVI_TICKET_CONTROL=disable`（チケットの範囲もゲートも効かない） |
+| warn | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が前の既定の綴り（`.ccnavi/bin/ccnavi`）。判定は動いている。`scripts/ccnavi-setup.sh` を打ち直すと書き換わる |
 
 **層**
 
@@ -2056,7 +2285,7 @@ push はラッパースクリプトが拒み、サブエージェントからの
 `GIT_CONFIG_COUNT` と `GIT_EXTERNAL_DIFF` は実行前に消す。
 
 これは事故と浪費を減らすためのもので、敵対的な回避への防御ではない。
-`sh -c` や `python -c` に埋めれば hook の文字列一致は外れる。そこまで塞ぐなら
+`python -c` や `ssh` のように、実行役のコマンドの一覧に無いものに埋めれば hook の文字列一致は外れる。そこまで塞ぐなら
 `permissions.deny` か sandbox が要る。
 
 記録は `logs/git-<日時>-<pid>.log` に成功でも失敗でも全量を書く。捨てると
@@ -2099,12 +2328,12 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `ccnavi/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
 | `ccnavi/gitcmd.py` | git を 1 回起こす |
 | `ccnavi/fsio.py` | ファイルの読み書きの型。控え・マーカー・承認済みチケット・下書きが全部これを通る |
-| `build.py` | 配布物の組み立て |
+| `build.py` | 配布物の組み立て。`dist/ccnavi/` を `.ccnavi/bin/<os>-<arch>/` へ写す |
 | `ccnavi/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
-| `scripts/ccnavi-launcher.sh` | 配布先で hook が起動する sh。隣の `<os>-<arch>/` から、この機械の実行ファイルを選ぶ |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
 | `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
+| `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じ綴り。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
 | `.ccnavi/scripts/ccnavi-ticket.sh` | チケットの状態を動かす。親だけが呼ぶ。本体は `ccnavi ticket` |
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |

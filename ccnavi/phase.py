@@ -91,9 +91,14 @@ def exempt(subject: str, degraded: str) -> bool:
     return bool(parts) and all(_EXEMPT_COMMAND.match(c) for c in parts)
 
 
-def forbidden(subject: str) -> bool:
-    """サブエージェントに許さない形を含むか。"""
-    return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject))
+def forbidden(subject: str, unwrapped: str = "") -> bool:
+    """サブエージェントに許さない形を含むか。
+
+    unwrapped は shellread が作る、中で実行されるコマンドの層（`\\x00` でつないだもの）。
+    禁止の形はコマンドの先頭の `sh` に固定しているので、`env sh …` や `sh -c '…'` は
+    元の形では当たらない。層にも当てる。止める側にだけ足す当て先で、`exempt` には渡さない。
+    """
+    return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 
 
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
