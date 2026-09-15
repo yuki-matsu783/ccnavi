@@ -117,6 +117,10 @@ uv run --with ruff ruff format --check .
 uv run --with pyinstaller python build.py
 ```
 
+テストは `python -m unittest`（`discover` か `tests.<グループ>.test_x`）で回す。`python tests/sh/test_setup.py` の
+ようにファイルを直接実行すると、`tests` パッケージを import できずに落ちる。どのグループを回すかは
+`.claude/skills/commit/references/test-groups.md` の表で決める。
+
 ## 未実装
 
 要件書にあって手が付いていないもの。
