@@ -4,7 +4,15 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
 import { buildBoard } from "../src/core/board.js";
-import { escapeHtml, renderBoard } from "../src/core/render.js";
+import { PAGE_STYLE, escapeHtml, renderBoard } from "../src/core/render.js";
+import { renderRulesPage } from "../src/core/rules-render.js";
+import { readRules } from "../src/core/rules-doc.js";
+import { renderRiskPage } from "../src/core/risk-render.js";
+import { readRisk, BUILTIN_RISK_TEXT } from "../src/core/risk-doc.js";
+import { renderPhasesPage } from "../src/core/phases-render.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../src/core/phases-doc.js";
+import { renderProjectsPage } from "../src/core/projects-render.js";
+import { buildProjectsPage } from "../src/core/projects.js";
 import type { TicketJson } from "../src/core/model.js";
 import { fixture } from "./fixture.js";
 
@@ -229,4 +237,23 @@ test("CB-T118 本物が決まらない写りだけをバッジにし、場所を
   const html = renderBoard(buildBoard({ ...base, tickets: [homeless] }), OPTIONS);
   assert.ok(html.includes("複数の場所にある（2 か所）"));
   assert.ok(html.includes('title="main:todo, i0001-02:todo"'));
+});
+
+test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・欄・脚注）を 1 つの定数から持つ", () => {
+  const lock = { locked: false, reason: "", doing: [] };
+  const pages = [
+    renderBoard(buildBoard(fixture()), OPTIONS),
+    renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, OPTIONS),
+    renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, OPTIONS),
+    renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, OPTIONS),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), OPTIONS),
+  ];
+  assert.match(PAGE_STYLE, /\.toolbar \{/);
+  assert.match(PAGE_STYLE, /\.banner\.warn \{/);
+  assert.match(PAGE_STYLE, /input\[type=text\], input\[type=search\], textarea, select \{/);
+  for (const html of pages) {
+    assert.ok(html.includes(PAGE_STYLE));
+    // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
+    assert.equal((html.match(/  \.toolbar \{ display: flex;/g) ?? []).length, 1);
+  }
 });
