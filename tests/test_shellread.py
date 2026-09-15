@@ -624,5 +624,103 @@ class SubstTest(unittest.TestCase):
                 self.assertEqual(show(result.text), show(marked(text)))
 
 
+class BraceTest(unittest.TestCase):
+    """引用の外のブレース展開を並べる（ADR-0046）。展開はしない。
+
+    期待は bash 3.2 と zsh で実測した結果。どちらかのシェルが広げる形を並べる。
+    """
+
+    def test_どちらかのシェルが広げる形を並べる(self):
+        cases = {
+            "{git,push,origin,main}": ["{git,push,origin,main}"],
+            "{rm,-rf,/tmp/x}": ["{rm,-rf,/tmp/x}"],
+            "cp f{,.bak}": ["{,.bak}"],
+            "grep -rn x --exclude-dir={node_modules,.git} .": ["{node_modules,.git}"],
+            "echo {1..3}": ["{1..3}"],
+            "echo {a..c}": ["{a..c}"],
+            "echo {-2..1}": ["{-2..1}"],
+            # zsh（と bash 4 以降）だけが広げる形。
+            "echo {1..5..2}": ["{1..5..2}"],
+            "echo {1..a}": ["{1..a}"],
+            "echo ${x:-{a,b}}": ["{a,b}"],
+            # 中に引用や置換があっても、カンマが引用の外なら広がる。
+            'echo {a,"b c"}': ['{a,"b c"}'],
+            "echo {a,'b'}": ["{a,'b'}"],
+            "echo {a,$(echo b)}": ["{a,$(echo b)}"],
+            "echo $(echo p){a,b}": ["{a,b}"],
+            # 入れ子は外側だけ。外側が閉じなければ内側。
+            "echo {a,{b,c}}": ["{a,{b,c}}"],
+            "echo {x{a,b}": ["{a,b}"],
+            "echo a{b,c}d{e,f}": ["{b,c}", "{e,f}"],
+            "echo {,}": ["{,}"],
+            # シェルは代入の右辺を広げないが、並べる（許容した誤検知。ccnavi.md §12.2）。
+            "x={a,b}": ["{a,b}"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(read(src).braces, want)
+
+    def test_広がらない形は並べない(self):
+        for src in [
+            "echo {a}",
+            "echo {}",
+            "echo {a..}",
+            "echo {aa..c}",
+            "echo '{a,b}'",
+            'echo "{a,b}"',
+            "echo $'{a,b}'",
+            "echo \\{a,b}",
+            "echo {a\\,b}",
+            'echo {"a,b"}',
+            "echo { a,b }",
+            "echo {a,b",
+            "echo a,b}",
+            "echo {a,b;echo c}",
+            'echo "${x:-{a,b}}"',
+            "find . -exec rm {} \\;",
+            "git show HEAD@{1}",
+            "docker ps --format {{.ID}},{{.Names}}",
+            "{ echo a; }",
+            "cat <<EOF\n{a,b}\nEOF",
+            "cat <<'EOF'\n{a,b}\nEOF",
+            "echo hi # {a,b}",
+            "sh -c \"echo '{a,b}'\"",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(read(src).braces, [])
+
+    def test_置換の中身と読み直す文字列の中も並べる(self):
+        cases = {
+            'echo "$({git,push})"': ["{git,push}"],
+            "echo `{git,push}`": ["{git,push}"],
+            "cat <<EOF\n$({git,push})\nEOF": ["{git,push}"],
+            "sh -c '{git,push}'": ["{git,push}"],
+            "eval '{a,b}'": ["{a,b}"],
+            # 外側と読み直しの両方で見つけても 1 件。
+            "eval echo {a,b}": ["{a,b}"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(read(src).braces, want)
+
+    def test_読みそのものは変えない(self):
+        # 判定がルールより先に止めるので、読みを変える理由が無い。
+        for src, text in {
+            "echo {a,b}": "echo {a,b}",
+            "cp f{,.bak}": "cp f{,.bak}",
+            "echo ${x:-{a}} {b,c}": "echo ${x:-{a}} {b,c}",
+        }.items():
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertFalse(result.degraded, result.reason)
+                self.assertEqual(result.text, text)
+
+    def test_縮退しても並べる(self):
+        result = read("echo {a,b} | xargs rm")
+        self.assertTrue(result.degraded)
+        self.assertEqual(result.reason, REASON_TAKEN_AS_CODE)
+        self.assertEqual(result.braces, ["{a,b}"])
+
+
 if __name__ == "__main__":
     unittest.main()
