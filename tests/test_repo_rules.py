@@ -35,6 +35,10 @@ LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
 APPROVAL = "builtin-guard-ticket-approval"
 APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
 SETTING_FILES = "builtin-guard-setting-files"
+# 書き直しを求める形で止めたときの、記録のルール名（ADR-0047）。
+NAME = "(command-name-expansion)"
+BACKQUOTE = "(backquote)"
+AMBIGUOUS = "(ambiguous-form)"
 TICKET_STATE = "builtin-ticket-state-shell"
 # 承認の形の末尾。
 YES = " --approve --yes x"
@@ -447,11 +451,9 @@ class SubstRepoRulesTest(unittest.TestCase):
             [
                 ('echo "$(git push origin main)"', "deny", "raw-git", ""),
                 ('grep -n "$(git push)" f', "deny", "raw-git", ""),
-                ('grep -n "`rm -rf /tmp/x`" f', "deny", "recursive-delete", ""),
                 ('h="$(git rev-parse HEAD)"', "deny", "raw-git", ""),
                 ('echo "$(rm -rf /tmp/x)"', "deny", "recursive-delete", ""),
-                ("echo `find . -delete`", "deny", "find-writes", ""),
-                ("cat <<EOF\nuse `rm -rf /tmp/x`\nEOF", "deny", "recursive-delete", ""),
+                ("cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF", "deny", "recursive-delete", ""),
             ]
         )
 
@@ -531,7 +533,8 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("cat a.txt\n", "allow", "prefer-read-grep", ""),
                 ("curl -s 'https://example.com/a#frag'", "ask", "prefer-webfetch", ""),
                 ('export PATH="$(go env GOPATH)/bin:$PATH"', "ask", "", "UNDECLARED"),
-                ('eval "$(ssh-agent -s)"', "ask", "", "PARSE_UNCERTAIN"),
+                # eval は置換の出力を読み直して実行する。何が走るかが綴りに無い（ADR-0047）。
+                ('eval "$(ssh-agent -s)"', "deny", NAME, "DENY_COMMAND_NAME_EXPANSION"),
                 (
                     "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
                     "ask",
@@ -569,19 +572,12 @@ class SubstRepoRulesTest(unittest.TestCase):
                     "heredoc",
                     "",
                 ),
-                ('gh issue create --title t --body "use `git push` here"', "deny", "raw-git", ""),
-                (
-                    'gh issue create --title t --body "odd ` backtick and git push"',
-                    "deny",
-                    "raw-git",
-                    "PARSE_UNCERTAIN",
-                ),
+                ('gh issue create --title t --body "use $(git push) here"', "deny", "raw-git", ""),
                 ('cd "$(git rev-parse --show-toplevel)"', "deny", "raw-git", ""),
                 ('grep -rn foo "$(pwd)"', "ask", "", "UNDECLARED"),
                 ('find "$(pwd)" -name x', "ask", "", "UNDECLARED"),
                 ('cat "$(ls -t logs/git-*.log | head -1)"', "ask", "", "UNDECLARED"),
                 ("grep -n foo f\ngrep -n bar g", "ask", "", "UNDECLARED"),
-                ('echo "$(case a in a) git push;; esac)"', "deny", "raw-git", "PARSE_UNCERTAIN"),
                 ('echo "$(xargs echo < f)"', "ask", "", "PARSE_UNCERTAIN"),
             ]
         )
@@ -627,7 +623,7 @@ class SubstRepoRulesTest(unittest.TestCase):
     # 文面（§4.3）
 
     def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
-        quoted = judge("Bash", 'gh issue create --title t --body "use `git push` here"')
+        quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')
         self.assertIn("inside double quotes", quoted["response"])
         self.assertEqual(quoted.get("quoted"), ["raw-git"])
 
@@ -639,12 +635,8 @@ class SubstRepoRulesTest(unittest.TestCase):
         responses = {}
         for subject, reason, phrase in [
             ('echo "git push', shellread.REASON_UNTERMINATED, "quote or heredoc"),
-            ("echo `git push", shellread.REASON_UNTERMINATED_SUBST, "backquote"),
-            (
-                'echo "$(case a in a) git push;; esac)"',
-                shellread.REASON_AMBIGUOUS_SUBST,
-                "shells read differently",
-            ),
+            ("echo $(git push", shellread.REASON_UNTERMINATED_SUBST, "$( ) in this command never"),
+            ("bash -c x; git push origin main", shellread.REASON_TAKEN_AS_CODE, "runs it as code"),
         ]:
             with self.subTest(subject=subject):
                 body = judge("Bash", subject)
@@ -653,18 +645,90 @@ class SubstRepoRulesTest(unittest.TestCase):
                 responses[reason] = body["response"]
         self.assertEqual(len(set(responses.values())), 3, "理由の違う縮退に同じ文面を返した")
 
-    def test_coproc_の中身も_find_writes_に当たる(self):
-        # 敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）。
+    def test_シェルで読みが割れる形は一律に止める(self):
+        # ADR-0047。`coproc` は敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）で、
+        # NAME の読みが bash 4 と zsh で割れる。読み分けずに止める。
+        code = "DENY_AMBIGUOUS_FORM"
         self.check(
             [
-                ("coproc { find . -delete; }", "deny", "find-writes", ""),
-                ("coproc find . -delete", "deny", "find-writes", ""),
-                ("coproc NAME { find . -delete; }", "deny", "find-writes", ""),
-                ("coproc while true; do find . -delete; done", "deny", "find-writes", ""),
-                ("coproc ( find . -delete )", "deny", "find-writes", ""),
+                ('echo "$(case a in a) git push;; esac)"', "deny", AMBIGUOUS, code),
+                ("echo $((echo a) | cat)", "deny", AMBIGUOUS, code),
+                ("coproc { find . -delete; }", "deny", AMBIGUOUS, code),
+                ("coproc find . -delete", "deny", AMBIGUOUS, code),
+                ("coproc NAME { find . -delete; }", "deny", AMBIGUOUS, code),
+                ("coproc NAME find . -delete", "deny", AMBIGUOUS, code),
+                ("select x in a b; do echo $x; done", "deny", AMBIGUOUS, code),
+                # 引数に書いた同じ綴りは予約語ではない。
                 ("echo coproc", "ask", "", "UNDECLARED"),
+                ("echo select", "ask", "", "UNDECLARED"),
+                ("echo $((1 << 2))", "ask", "", "UNDECLARED"),
             ]
         )
+
+    def test_バッククォートは一律に止める(self):
+        # ADR-0047。二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。
+        code = "DENY_BACKQUOTE"
+        self.check(
+            [
+                ("echo `find . -delete`", "deny", BACKQUOTE, code),
+                ('grep -n "`rm -rf /tmp/x`" f', "deny", BACKQUOTE, code),
+                ("cat <<EOF\nuse `rm -rf /tmp/x`\nEOF", "deny", BACKQUOTE, code),
+                ('gh issue create --title t --body "use `git push` here"', "deny", BACKQUOTE, code),
+                ('gh issue create --title t --body "odd ` backtick"', "deny", BACKQUOTE, code),
+                ('echo "$(echo `id`)"', "deny", BACKQUOTE, code),
+                # 文字として渡す綴りは止まらない。
+                ('grep -n "\\`git push\\`" f', "allow", "prefer-read-grep", ""),
+                ("grep -n '`git push`' f", "allow", "prefer-read-grep", ""),
+            ]
+        )
+        body = judge("Bash", 'gh issue create --title t --body "use `x` here"')
+        self.assertIn("$( )", body["response"])
+        self.assertIn("--body-file", body["response"])
+
+    def test_実行するときに決まるコマンド名は一律に止める(self):
+        # ADR-0047。どれもどのルールにも当たらず、auto では権限モードに渡っていた。
+        code = "DENY_COMMAND_NAME_EXPANSION"
+        self.check(
+            [
+                ("c=git; $c push origin main", "deny", NAME, code),
+                ("$(echo git) push origin main", "deny", NAME, code),
+                ("/usr/bin/gi? push origin main", "deny", NAME, code),
+                ("git${IFS}push origin main", "deny", NAME, code),
+                ("/bin/r? -rf /tmp/x", "deny", NAME, code),
+                ("$'git' push origin main", "deny", NAME, code),
+                ("FOO=1 $c status", "deny", NAME, code),
+                (">/dev/null $c status", "deny", NAME, code),
+                ("2>&1 $c status", "deny", NAME, code),
+                ("env $c status", "deny", NAME, code),
+                (">/dev/null env $c status", "deny", NAME, code),
+                ("sudo -u me $c status", "deny", NAME, code),
+                ("sh $G status", "deny", NAME, code),
+                ("if $c status; then :; fi", "deny", NAME, code),
+                ('sh -c "$c status"', "deny", NAME, code),
+                ('"$(git rev-parse --show-toplevel)/x.sh"', "deny", NAME, code),
+            ]
+        )
+        body = judge("Bash", "c=git; $c status")
+        self.assertIn("`$c`", body["response"])
+        self.assertIn("becomes `git status`", body["response"])
+
+    def test_コマンド名でない位置の変数とグロブは止めない(self):
+        for subject in [
+            "echo $HOME",
+            "x=$(pwd)",
+            "FOO=$HOME/x make",
+            "ls *.py",
+            "[ -f x ] && echo y",
+            "[[ -f x ]] && echo y",
+            "case $x in a) echo a;; esac",
+            "for f in *.py; do echo $f; done",
+            "a[1]=x",
+            "timeout $T make",
+            "cd $S && ls",
+        ]:
+            with self.subTest(subject=subject):
+                body = judge("Bash", subject)
+                self.assertNotEqual(body["code"], "DENY_COMMAND_NAME_EXPANSION", body["response"])
 
     def test_引用の外のブレース展開は一律に止める(self):
         # Issue #38（ADR-0046）。どのルールにも当たらないまま、bash は広げた語を実行していた。

@@ -319,6 +319,9 @@ class UnwrappedTest(unittest.TestCase):
             "/usr/bin/env rm x": ["env rm x", "rm x"],
             "nohup env rm x": ["env rm x", "rm x"],
             "sudo -u me sh -c 'rm x'": ["sh -c rm x", "rm x"],
+            # 前に置いたリダイレクトは外す。外さないと実行役のコマンドが先頭に立たない。
+            ">/dev/null env rm x": ["env rm x", "rm x"],
+            "2>&1 env rm x": ["env rm x", "rm x"],
         }
         for src, want in cases.items():
             with self.subTest(src=src):
@@ -403,7 +406,8 @@ SUBST_MARK = re.compile(r"(^|\x00)zzmark($|[ \x00])")
 #   それ以外は縮退の理由
 SHELL_CASES = [
     ("01", 'echo "$(M)"', "中"),
-    ("02", 'echo "`M`"', "中"),
+    # バッククォートは読まずに止める（ADR-0047）。実行されるものは 02 16 18 20 22 35 40。
+    ("02", 'echo "`M`"', "backquote"),
     ("03", 'echo "\\$(M)"', "-"),
     ("04", 'echo "\\`M\\`"', "-"),
     ("05", 'echo "\\\\$(M)"', "中"),
@@ -417,13 +421,13 @@ SHELL_CASES = [
     ("13", 'cat <<"EOF"\n$(M) `M`\nEOF', "-"),
     ("14", "cat <<\\EOF\n$(M) `M`\nEOF", "-"),
     ("15", "cat <<EOF\n$(M)\nEOF", "中"),
-    ("16", "cat <<EOF\nuse `M` here\nEOF", "中"),
+    ("16", "cat <<EOF\nuse `M` here\nEOF", "backquote"),
     ("17", "echo \"$(cat <<'EOF'\nfix: use `M` and $(M) (see §6)\ndon't\nEOF\n)\"", "-"),
-    ("18", 'echo "$(cat <<EOF\nuse `M`\nEOF\n)"', "中"),
+    ("18", 'echo "$(cat <<EOF\nuse `M`\nEOF\n)"', "backquote"),
     ("19", 'echo "$(echo "$(M)")"', "中"),
-    ("20", "echo `echo \\`M\\``", "外"),
+    ("20", "echo `echo \\`M\\``", "backquote"),
     ("21", 'echo "${x:-$(M)}"', "中"),
-    ("22", 'echo "${x:-`M`}"', "中"),
+    ("22", 'echo "${x:-`M`}"', "backquote"),
     ("23", 'echo "$((1 + 2))"', "-"),
     ("24", 'echo "$(( $(M) + 1 ))"', "中"),
     ("25", 'echo "$( (M) )"', "中"),
@@ -436,12 +440,12 @@ SHELL_CASES = [
     ("32", 'echo "$(echo a # )\nM)"', "中"),
     ("33", "echo \"$(echo '$(M)')\"", "-"),
     ("34", 'echo "$(M"', "unterminated-quote"),
-    ("35", 'echo "`M"', "unterminated-substitution"),
+    ("35", 'echo "`M"', "backquote"),
     ("36", 'cat <<< "$(M)"', "中"),
     ("37", 'echo "$(\nM\n)"', "中"),
     ("38", 'h="$(M)"', "中"),
     ("39", "h=$(M)", "外"),
-    ("40", "h=`M`", "外"),
+    ("40", "h=`M`", "backquote"),
     ("41", 'echo "\\"$(M)\\""', "中"),
     ("42", 'a=(1); echo "${a[$(M)]}"', "中"),
     ("43", 'echo "$[1+2]"', "-"),
@@ -474,7 +478,6 @@ READINGS = [
     ('echo "$(git push origin main)"', "echo $␀git push origin main", "echo $"),
     ('grep -n "$(git push)" f', "grep -n $ f␀git push", "grep -n $ f"),
     ('h="$(git rev-parse HEAD)"', "h=$␀git rev-parse HEAD", "h=$"),
-    ("echo `find . -delete`", "echo $␀find . -delete", "echo $␀find . -delete"),
     ("echo $(git push origin main)", "echo $␀git push origin main", "echo $␀git push origin main"),
     ("echo $(git push) foo", "echo $ foo␀git push", "echo $ foo␀git push"),
     ("find $(pwd) -name x -delete", "find $ -name x -delete␀pwd", "find $ -name x -delete␀pwd"),
@@ -488,7 +491,7 @@ READINGS = [
         "if␀true␀then␀find . -delete␀fi",
     ),
     ("! grep x f", "!␀grep x f", "!␀grep x f"),
-    ("cat <<EOF\nuse `rm -rf /tmp/x`\nEOF", "cat << EOF␀rm -rf /tmp/x", "cat << EOF"),
+    ("cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF", "cat << EOF␀rm -rf /tmp/x", "cat << EOF"),
     (
         "cat <<'EOF' > notes.md\n$(git push)\nEOF\necho done",
         "cat << EOF > notes.md␀echo done",
@@ -500,7 +503,7 @@ READINGS = [
         "sh .ccnavi/scripts/ccnavi-git.sh commit -m $",
     ),
     (
-        'gh issue create --body "use `git push` here"',
+        'gh issue create --body "use $(git push) here"',
         "gh issue create --body use␁$␁here␀git push",
         "gh issue create --body use␁$␁here",
     ),
@@ -553,8 +556,8 @@ class SubstTest(unittest.TestCase):
             ('grep -n "<<" f', shellread.REASON_UNTERMINATED),
             ('echo "$(git push"', shellread.REASON_UNTERMINATED),
             ("echo $(git push", shellread.REASON_UNTERMINATED_SUBST),
-            ("echo `git push", shellread.REASON_UNTERMINATED_SUBST),
-            ('echo "`git push"', shellread.REASON_UNTERMINATED_SUBST),
+            ("echo `git push", shellread.REASON_BACKQUOTE),
+            ('echo "`git push"', shellread.REASON_BACKQUOTE),
             ('echo "$(case a in a) git push;; esac)"', shellread.REASON_AMBIGUOUS_SUBST),
             ('echo "$(xargs echo < f)"', REASON_TAKEN_AS_CODE),
             ("cat <<'EOF' > notes.md", REASON_UNTERMINATED),
@@ -604,24 +607,6 @@ class SubstTest(unittest.TestCase):
     def test_置換の中の状態を動かすスクリプトもサブエージェントに許さない(self):
         inner = read('echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh done x)"')
         self.assertTrue(phase.forbidden(inner.text), show(inner.text))
-
-    def test_coproc_の後ろをコマンドの先頭として読む(self):
-        # 敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）。zsh は名前の無い形の
-        # 中身を実行し、bash 4 以降は `coproc NAME <複合コマンド>` を持つ。
-        for src, text in [
-            ("coproc { find . -delete; }", "coproc␀{␀find . -delete␀}"),
-            ("coproc find . -delete", "coproc␀find . -delete"),
-            ("coproc NAME { find . -delete; }", "coproc␀NAME␀{␀find . -delete␀}"),
-            ("coproc NAME while true; do x; done", "coproc␀NAME␀while␀true␀do␀x␀done"),
-            ("coproc NAME find . -delete", "coproc␀NAME find . -delete"),
-            ("coproc ( find . -delete )", "coproc␀find . -delete"),
-            ("echo coproc", "echo coproc"),
-            ("echo coproc { x; }", "echo coproc { x␀}"),
-        ]:
-            with self.subTest(src=src):
-                result = read(src)
-                self.assertFalse(result.degraded, result.reason)
-                self.assertEqual(show(result.text), show(marked(text)))
 
 
 class BraceTest(unittest.TestCase):
@@ -698,7 +683,6 @@ class BraceTest(unittest.TestCase):
     def test_置換の中身と読み直す文字列の中も並べる(self):
         cases = {
             'echo "$({git,push})"': ["{git,push}"],
-            "echo `{git,push}`": ["{git,push}"],
             "cat <<EOF\n$({git,push})\nEOF": ["{git,push}"],
             "sh -c '{git,push}'": ["{git,push}"],
             "eval '{a,b}'": ["{a,b}"],
@@ -726,6 +710,125 @@ class BraceTest(unittest.TestCase):
         self.assertTrue(result.degraded)
         self.assertEqual(result.reason, REASON_TAKEN_AS_CODE)
         self.assertEqual(result.braces, ["{a,b}"])
+
+
+def rewrites_of(src, form):
+    return [text for f, text in read(src).rewrites if f == form]
+
+
+class CommandNameTest(unittest.TestCase):
+    """実行するときにシェルが決めるコマンド名を並べる（ADR-0047）。"""
+
+    def test_コマンド名の位置の展開とグロブを並べる(self):
+        cases = {
+            "c=git; $c push origin main": ["$c"],
+            # 置換は走査が `$` 1 文字に置き換える。
+            "$(echo git) push origin main": ["$"],
+            "/usr/bin/gi? push origin main": ["/usr/bin/gi?"],
+            "/bin/r[m] -rf /tmp/x": ["/bin/r[m]"],
+            "git${IFS}push origin main": ["git${IFS}push"],
+            '"$c" push': ["$c"],
+            "FOO=1 $c status": ["$c"],
+            ">/dev/null $c status": ["$c"],
+            "2>&1 $c status": ["$c"],
+            "! $c status": ["$c"],
+            "if $c; then :; fi": ["$c"],
+            "echo $($c status)": ["$c"],
+            # 実行役のコマンドを外した層の先頭。
+            "env $c status": ["$c"],
+            ">/dev/null env $c status": ["$c"],
+            "sudo -u me $c status": ["$c"],
+            "sh $G status": ["$G"],
+            ". $venv/bin/activate": ["$venv/bin/activate"],
+            'sh -c "$c status"': ["$c"],
+            'eval "$(ssh-agent -s)"': ["$"],
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(rewrites_of(src, shellread.FORM_COMMAND_NAME), want)
+
+    def test_コマンド名でない位置は並べない(self):
+        for src in [
+            "echo $HOME *.py",
+            "x=$(pwd)",
+            "FOO=$HOME/x make",
+            "a[1]=x",
+            "x+=1",
+            "[ -f x ] && echo y",
+            "[[ -f $x ]] && echo y",
+            "case $x in a) echo a;; esac",
+            "for f in *.py; do echo $f; done",
+            "timeout $T make",
+            "nice -n $N make",
+            "command -v $x",
+            "cd $S && ls",
+            "echo '$c' | cat",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(rewrites_of(src, shellread.FORM_COMMAND_NAME), [])
+
+
+class BackquoteTest(unittest.TestCase):
+    """実行されるバッククォートで読みを止める（ADR-0047）。"""
+
+    def test_実行されるバッククォートを並べる(self):
+        cases = {
+            "echo `id`": "`id`",
+            'echo "`id`"': "`id`",
+            'echo "odd ` one"': "`",
+            "h=`id`": "`id`",
+            'echo "${x:-`id`}"': "`id`",
+            "echo $((`id` + 1))": "`id`",
+            'echo "$(echo `id`)"': "`id`",
+            "cat <<EOF\nuse `id`\nEOF": "`id`",
+            "sh -c 'echo `id`'": "`id`",
+        }
+        for src, shown in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(rewrites_of(src, shellread.FORM_BACKQUOTE), [shown])
+
+    def test_文字として書いたバッククォートは並べない(self):
+        for src in [
+            "echo '`id`'",
+            'echo "\\`id\\`"',
+            "echo \\`id\\`",
+            "echo $'`id`'",
+            "cat <<'EOF'\n`id`\nEOF",
+            "echo hi # `id`",
+        ]:
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertFalse(result.degraded, result.reason)
+                self.assertEqual(result.rewrites, [])
+
+
+class AmbiguousFormTest(unittest.TestCase):
+    """シェルで読みが割れる形を並べる（ADR-0047）。"""
+
+    def test_読みが割れる形を並べる(self):
+        deep = "echo " + '"$(echo ' * 17 + "x" + ')"' * 17
+        cases = {
+            'echo "$(case a in a) x;; esac)"': "case inside $( )",
+            "echo $((echo a) | cat)": "$((…) …)",
+            deep: "$( ) nested more than 16 deep",
+            "coproc { find . -delete; }": "coproc",
+            "coproc NAME find . -delete": "coproc",
+            "select x in a b; do :; done": "select",
+        }
+        for src, shown in cases.items():
+            with self.subTest(src=src[:40]):
+                self.assertIn(shown, rewrites_of(src, shellread.FORM_AMBIGUOUS))
+
+    def test_引数に書いた予約語は並べない(self):
+        for src in [
+            "echo coproc",
+            "echo select",
+            "psql -c 'select 1'",
+            "echo $((1 << 2))",
+            'echo "$(echo just in time)"',
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(rewrites_of(src, shellread.FORM_AMBIGUOUS), [])
 
 
 if __name__ == "__main__":

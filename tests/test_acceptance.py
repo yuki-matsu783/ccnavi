@@ -402,7 +402,7 @@ class RecordTest(unittest.TestCase):
         # （wip/design/shellread-subst.md §1.4）。
         got = self.logged(
             "enable",
-            pre_tool_use("Bash", "command", 'gh issue create --body "use `git push` here"'),
+            pre_tool_use("Bash", "command", 'gh issue create --body "use $(git push) here"'),
             pre_tool_use("Bash", "command", "echo $(git push origin main)"),
         )
 
