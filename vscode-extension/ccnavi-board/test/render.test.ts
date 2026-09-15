@@ -114,8 +114,10 @@ test("CB-T12 4 列と件数と承認ボタンを出す", () => {
     assert.ok(html.includes(label), label);
   }
   assert.equal((html.match(/class="column"/g) ?? []).length, 4);
-  assert.ok(html.includes("残り 3 件"));
-  assert.ok(html.includes("全 4 件"));
+  assert.ok(html.includes("残り 3 / 全 4"));
+  assert.ok(html.includes('<span class="pending warn">承認待ち 1 件</span>'));
+  // 0 件のものは見出しに出さない
+  assert.ok(!html.includes("不備 0 件"));
   assert.ok(html.includes("承認待ち 1 件を承認"));
   assert.ok(!html.includes('data-action="approve" disabled'));
   assert.ok(html.includes(`nonce="${OPTIONS.nonce}"`));
@@ -149,20 +151,32 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
 });
 
-test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
+test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人が動く状態だけで、属性は枠無しの行に出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  assert.ok(html.includes("承認済"));
-  assert.ok(html.includes("未承認"));
-  assert.ok(html.includes("作業ツリーあり"));
-  assert.ok(html.includes("作業ツリーなし"));
+  // 人が動く状態は枠付きの札
+  assert.ok(html.includes('<span class="badge copy copy-none">未承認</span>'));
+  assert.ok(html.includes('<span class="badge worktree none">作業ツリーなし</span>'));
+  // 属性は枠無しの fact。承認済・レビューの要否・作業ツリーの名前・base
+  assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
+  assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
+  assert.ok(/<span class="fact review" title="[^"]*">レビュー 要<\/span>/.test(html));
+  assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
+  assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
+  assert.ok(!html.includes('class="badge copy copy-open"'));
+  assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
   assert.ok(!html.includes("複数の場所にある"));
-  assert.ok(html.includes("親 i0001 / フェーズ 2"));
+  assert.ok(html.includes('<span class="where">子 · 親 i0001 / フェーズ 2</span>'));
   assert.ok(html.includes('class="phases"'));
+  // 親のフェーズは 1 段階 1 行。ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
+  assert.ok(html.includes('<li class="phase phase-ended"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status">終了 · リスク: 0 (LOW)</span></li>'));
+  assert.ok(html.includes('<span class="phase-status">進行中 · レビュー要</span>'));
+  assert.ok(!html.includes("ゲート開"));
+  assert.ok(!html.includes("マーカーなし"));
+  assert.ok(!html.includes("レビュー不要 "));
   // 締める（wrapup）のボタンは出さない
   assert.ok(!html.includes('data-action="wrapup"'));
   assert.ok(!html.includes("締める"));
-  assert.ok(html.includes("base "));
 });
 
 test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {
