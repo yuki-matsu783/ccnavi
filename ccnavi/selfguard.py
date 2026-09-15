@@ -285,15 +285,17 @@ def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
 
 
 def _folded(clause: str) -> str:
-    """場所の綴りを、その機械がパスを見るのと同じ見方にする。
+    """場所の綴りを、大文字小文字を区別しない形にする。どの機械でも同じ。
 
     大文字小文字を区別しない機械では `.Ccnavi/scripts/count.sh` は
-    `.ccnavi/scripts/count.sh` そのもので、消せば本物が消える。区別する側に
-    立つと、綴りを 1 文字変えるだけで ccnavi ディレクトリの中が書けた（敵対的レビュー A-2 / A-6）。
+    `.ccnavi/scripts/count.sh` そのもので、消せば本物が消える。区別すると、綴りを
+    1 文字変えるだけで ccnavi ディレクトリの中が書ける。
+    区別する機械でも畳む。ルールの glob とチケットの範囲はどの機械でも区別しないので、
+    守りだけが機械で当たり方を変えると、同じ綴りの扱いがルールと守りで食い違う。
     畳むのは場所の綴りだけ。コマンドの名前（`rm` / `cp`）は畳まない。そこを決める
     のは機械のファイルシステムではなくシェルで、`RM` が通る保証は無い。
     """
-    return f"(?i:{clause})" if tree.CASE_INSENSITIVE else clause
+    return f"(?i:{clause})"
 
 
 def project_home_clause(project_home: str) -> str:
