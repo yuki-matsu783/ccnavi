@@ -1205,6 +1205,27 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(reviewed.returncode, 0)
         self.assertIn("レビュー済み", reviewed.stderr)
 
+    def test_request_refuses_a_phase_settled_without_request(self):
+        """依頼せずにレビュー済みになったフェーズへ、依頼を投稿しないこと。
+
+        `wrapup` は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを
+        先に見ていた版では、人が締めたフェーズに request が通り、MR に依頼が投稿された。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        write(
+            os.path.join(self.approved, "phases", "i0001", "1.reviewed"),
+            json.dumps({"by": "wrapup", "mr": 7, "accepted": []}),
+        )
+        refused = self.request(fixture)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("レビュー済み", refused.stderr)
+        self.assertNotIn("comments", read_json(fixture))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.requested"))
+        )
+
     def test_request_refuses_when_a_child_branch_is_gone(self):
         self.family()
         self.close_phase()
@@ -1298,8 +1319,10 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(self.check(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])
 
-        # 依頼をやり直しても、受け入れた分は数えない。
-        os.remove(os.path.join(self.approved, "phases", "i0001", "1.requested"))
+        # 依頼をやり直しても、受け入れた分は数えない。子を足したときの clear_marks と同じく、
+        # そのフェーズのマーカーを全部消してから頼み直す。
+        for kind in ("requested", "reviewed"):
+            os.remove(os.path.join(self.approved, "phases", "i0001", f"1.{kind}"))
         self.assertEqual(self.request(fixture).returncode, 0)
         self.assertEqual(self.check(fixture).returncode, 0)
 
