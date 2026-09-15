@@ -68,9 +68,7 @@ import yaml
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。`deny` `ask` `allow` の 3 タイプで、探すものは
-# `glob`（fnmatch の glob）か `regex`。版が違うファイルは `--lint` と判定のたびに error で
-# 知らせるが、ルールは読んで当てる。版の数字だけが違うファイルで守りを外すと、書き直すまでの間、
-# 止めるはずの呼び出しが通るため。
+# `glob`（fnmatch の glob）か `regex`。
 VERSION = 1
 
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
@@ -342,8 +340,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             Problem(
                 SEVERITY_ERROR,
                 "",
-                f"ルール書式の版 {rule_set.version} は、このビルドの版（{VERSION}）と違う。"
-                f"ルールは読んで当てているので、`version: {VERSION}` に直す。"
+                f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
                 f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、探すものは `glob` か `regex`。"
                 "`glob` は fnmatch の glob で文字列全体に当たるので、"
                 "部分一致が要るなら前後に `*` を書く",
