@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BOARD_VERSION, parseBoardJson } from "../src/core/model.js";
-import { fixture, fixtureText } from "./fixture.js";
+import { BOARD_VERSION, parseBoardJson } from "../../src/core/model.js";
+import { fixture, fixtureText } from "../helpers/fixture.js";
 
 test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", () => {
   const board = fixture();

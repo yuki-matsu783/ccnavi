@@ -568,7 +568,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "ルールファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+    fail(current, "ルールファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
     return;
   }
 

@@ -33,7 +33,7 @@ ${STYLE}
     <span class="path" title="${escapeHtml(page.projectsDir)}">置き場: ${escapeHtml(page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`)}</span>
   </div>
   <div class="controls">
-    <button type="button" class="action" data-action="open-rules" data-name="" title="共通層のルール（どのツリーにも効く。既定 .ccnavi/common/rules.yml）を編集します">ルール管理</button>
+    <button type="button" class="action" data-action="open-rules" data-name="" title="共通層のルール（どのツリーにも効く。既定 .ccnavi/common/rules.yml）を編集し、判定を試す">ルール管理</button>
 ${page.ticketsEnabled ? '    <button type="button" class="action" data-action="open-board" data-name="*">チケット管理</button>\n' : ""}    <button type="button" class="action" data-action="refresh">更新</button>
   </div>
 </header>
@@ -41,14 +41,14 @@ ${renderBanners(page)}<section class="clone">
   <h2>リポジトリを clone する</h2>
   <div class="clone-form">
     <label class="grow">URL <input id="url" type="text" placeholder="https://gitlab.example.com/group/repo.git" spellcheck="false"></label>
-    <label>名前 <input id="name" type="text" placeholder="URL から自動で入ります" spellcheck="false"></label>
-    <button type="button" class="action primary" data-action="clone" title="git clone を「ccnavi」ターミナルで実行します。認証が必要ならターミナルで入力してください">clone</button>
+    <label>名前 <input id="name" type="text" placeholder="URL から自動で入る" spellcheck="false"></label>
+    <button type="button" class="action primary" data-action="clone" title="git clone を「ccnavi」ターミナルで実行する。認証が要るならターミナルで入れる">clone</button>
   </div>
   <p id="status" class="status hidden"></p>
 </section>
 <section class="list">
   <h2>ワークスペース内のプロジェクト <span class="count">${page.rows.length}</span></h2>
-${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだありません。上の欄から clone するか、既存のリポジトリを置き場の直下へ移動してください</p>' : renderList(page)}
+${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderList(page)}
 </section>
 ${renderStrays(page.strays)}<section class="workspace">
   <h2>ワークスペース本体</h2>
@@ -66,20 +66,20 @@ ${SCRIPT}
 function renderBanners(page: ProjectsPage): string {
   const banners: string[] = [];
   if (page.lintError !== "") {
-    banners.push(`<div class="banner warn">検証結果を取得できなかったため、プロジェクトごとの検証結果は表示できません。${escapeHtml(page.lintError)}</div>`);
+    banners.push(`<div class="banner warn">検証結果を取得できなかったので、プロジェクトごとの検証結果は出せない。${escapeHtml(page.lintError)}</div>`);
   }
   if (page.projectsRel === "") {
-    banners.push(`<div class="banner warn">置き場が無効です（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われません</div>`);
+    banners.push(`<div class="banner warn">置き場が無効（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われない</div>`);
     return `${banners.join("\n")}\n`;
   }
   if (!page.projectsDirExists) {
     banners.push(
-      `<div class="banner"><code>${escapeHtml(page.projectsRel)}/</code> がまだありません。<button type="button" class="action" data-action="create-dir">作成</button> clone すると git が作るので、無いままでも clone はできます</div>`,
+      `<div class="banner"><code>${escapeHtml(page.projectsRel)}/</code> がまだ無い。<button type="button" class="action" data-action="create-dir">作成</button> clone すると git が作るので、無いままでも clone はできる</div>`,
     );
   }
   if (!page.ignored) {
     banners.push(
-      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> がありません。各プロジェクトは自分の git リポジトリを持つため、ワークスペースの git からは除外する必要があります。<button type="button" class="action" data-action="fix-ignore">.gitignore に追加</button></div>`,
+      `<div class="banner warn"><code>.gitignore</code> に <code>/${escapeHtml(page.projectsRel)}/</code> が無い。各プロジェクトは自分の git リポジトリを持つので、ワークスペースの git からは除外する。<button type="button" class="action" data-action="fix-ignore">.gitignore に追加</button></div>`,
     );
   }
   for (const p of page.dirProblems) {
@@ -106,18 +106,18 @@ function renderSelfRules(page: ProjectsPage): string {
   const rel = `<span class="mono small">${escapeHtml(page.selfRulesRel)}</span>`;
   const state = page.selfRulesExists
     ? `<span class="ok">あり</span> ${rel}`
-    : `<span class="dim">なし</span> ${rel} <button type="button" class="action small" data-action="create-self-rules" title="共通層の rules.yml を自身の層にコピーします。文面の sh のパスは {root} 付きに置き換えます">共通層からコピー</button>`;
-  return `  <div class="self-rules"><span>自身の層のルール</span> ${state} <button type="button" class="action small" data-action="open-self-rules" ${page.selfRulesExists ? "" : "disabled "}title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足して当たるルールを編集し、判定を試します">ルール管理</button></div>
-  <div class="self-rules"><span>自身の層のフェーズの種類</span> <button type="button" class="action small" data-action="open-self-phases" title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集します。無ければ画面から作れます">フェーズ管理</button></div>
+    : `<span class="dim">なし</span> ${rel} <button type="button" class="action small" data-action="create-self-rules" title="共通層の rules.yml を自身の層にコピーする。文面の sh のパスは {root} 付きに置き換える">共通層からコピー</button>`;
+  return `  <div class="self-rules"><span>自身の層のルール</span> ${state} <button type="button" class="action small" data-action="open-self-rules" ${page.selfRulesExists ? "" : "disabled "}title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足して当たるルールを編集し、判定を試す">ルール管理</button></div>
+  <div class="self-rules"><span>自身の層のフェーズの種類</span> <button type="button" class="action small" data-action="open-self-phases" title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集する。無ければ画面から作れる">フェーズ管理</button></div>
 `;
 }
 
 function renderRules(row: ProjectRow): string {
   return row.rulesRel === ""
-      ? '<span class="dim">層として数えられていません（検証の error を見てください）</span>'
+      ? '<span class="dim">層として数えられていない（検証の error を見る）</span>'
       : row.rulesExists
         ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
-        : `<span class="warn-text">なし</span> <span class="mono small dim">${escapeHtml(row.rulesRel)}</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="共通層の rules.yml をこのプロジェクトの層にコピーします。文面の sh のパスは {root} 付きに置き換えます">共通層からコピー</button>`;
+        : `<span class="warn-text">なし</span> <span class="mono small dim">${escapeHtml(row.rulesRel)}</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="共通層の rules.yml をこのプロジェクトの層にコピーする。文面の sh のパスは {root} 付きに置き換える">共通層からコピー</button>`;
 }
 
 function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
@@ -126,15 +126,16 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   const tickets = ticketsEnabled
     ? `\n          <div class="field"><dt>チケット</dt><dd>${row.tickets} 件${row.doing > 0 ? `<span class="dim">、作業中 ${row.doing} 件</span>` : ""}</dd></div>`
     : "";
-  // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（".claude/ がある"）は重ねない
+  // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（ccnavi/lint.py の文面「.claude/ を持つ。…」）は
+  // 重ねない。".claude/settings.json を読めない" のような別の指摘まで消さないよう、文面の先頭で当てる。
   const problems = [
-    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ があります。Claude Code はそこのスキルを読み込み、cd すると別のワークスペースルートに見えます" }] : []),
-    ...row.problems.filter((p) => !(row.hasClaudeDir && /\.claude\/ があ/.test(p.detail))),
+    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: `.claude/ がある。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見える。プロジェクトの設定は ${settingsDir(row)}/ に置く` }] : []),
+    ...row.problems.filter((p) => !(row.hasClaudeDir && p.detail.startsWith(".claude/ を持つ"))),
   ];
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
   const origin = row.origin === "" ? '<span class="dim">不明</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;
   const board = ticketsEnabled
-    ? `\n          <button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="このプロジェクトに絞ってチケット管理を開きます">チケット管理</button>`
+    ? `\n          <button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="このプロジェクトに絞ってチケット管理を開く">チケット管理</button>`
     : "";
   const flags = [
     row.doing > 0 ? `<span class="badge doing">作業中 ${row.doing}</span>` : "",
@@ -156,19 +157,27 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
         <details class="menu">
           <summary class="action">開く ▾</summary>
           <div class="menu-items">
-          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試します">ルール管理</button>
-          <button type="button" class="action" data-action="open-phases" data-name="${escapeHtml(row.name)}" ${row.rulesRel === "" ? "disabled " : ""}title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集します。無ければ画面から作れます">フェーズ管理</button>${board}
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試す">ルール管理</button>
+          <button type="button" class="action" data-action="open-phases" data-name="${escapeHtml(row.name)}" ${row.rulesRel === "" ? "disabled " : ""}title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集する。無ければ画面から作れる">フェーズ管理</button>${board}
           </div>
         </details>
         <details class="menu">
           <summary class="action">git ▾</summary>
           <div class="menu-items">
-          <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルで実行します">fetch</button>
-          <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルで実行します。衝突があれば git が止めます">pull</button>
+          <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルで実行する">fetch</button>
+          <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルで実行する。衝突があれば git が止める">pull</button>
           </div>
         </details>
       </div>
     </li>`;
+}
+
+/** 層の設定の置き場（プロジェクトのルートからの相対）。層のルールの置き場から逆算し、無ければ既定 */
+function settingsDir(row: ProjectRow): string {
+  const prefix = `${row.rel}/`;
+  const inside = row.rulesRel.startsWith(prefix) ? row.rulesRel.slice(prefix.length) : "";
+  const cut = inside.lastIndexOf("/");
+  return cut < 0 ? ".ccnavi/config" : inside.slice(0, cut);
 }
 
 function renderProblems(problems: readonly LintProblem[]): string {
@@ -187,7 +196,7 @@ function renderStrays(strays: readonly Stray[]): string {
     .join("\n");
   return `<section class="strays">
   <h2>プロジェクトとして認識されない git リポジトリ <span class="count">${strays.length}</span></h2>
-  <p class="hint">ワークスペース直下から 2 階層までを探して見つかったものです（node_modules、.venv、.claude の中は探しません）。プロジェクトとして扱うには <code>projects/</code> の直下へ移動してください。この画面からは操作できません。</p>
+  <p class="hint">ワークスペース直下から 2 階層までを探して見つかったもの（node_modules、.venv、.claude の中は探さない）。プロジェクトとして扱うには <code>projects/</code> の直下へ移す。この画面からは操作できない。</p>
   <ul class="stray-list">
 ${items}
   </ul>

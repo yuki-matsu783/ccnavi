@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lockFromBoard, lockFromError } from "../src/core/lock.js";
-import { fixture } from "./fixture.js";
+import { lockFromBoard, lockFromError } from "../../src/core/lock.js";
+import { fixture } from "../helpers/fixture.js";
 
 test("CB-T34 提案が doing のチケットがあれば保存できない", () => {
   const lock = lockFromBoard(fixture());

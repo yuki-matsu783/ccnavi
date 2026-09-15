@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { APPROVE_VERSION, parseApprovePreview, parseApproveResult } from "../src/core/approvemodel.js";
+import { APPROVE_VERSION, parseApprovePreview, parseApproveResult } from "../../src/core/approvemodel.js";
 
 /** Python 側のテスト（tests/ticket/test_approve_json.py）が書き出した、実行ファイルの出力そのもの */
 function fixtureText(name: string): string {
-  return fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", name), "utf8");
+  return fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", name), "utf8");
 }
 
 test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・対象外・読めない提案）", () => {

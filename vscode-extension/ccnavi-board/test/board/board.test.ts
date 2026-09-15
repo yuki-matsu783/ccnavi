@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildBoard, isKnownPath, parentTreeOf, type Card } from "../src/core/board.js";
-import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../src/core/model.js";
-import { parseBoardJson } from "../src/core/model.js";
-import { fixture, fixtureText } from "./fixture.js";
+import { buildBoard, isKnownPath, parentTreeOf, type Card } from "../../src/core/board.js";
+import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
+import { parseBoardJson } from "../../src/core/model.js";
+import { fixture, fixtureText } from "../helpers/fixture.js";
 
 function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
   return new Map(board.columns.flatMap((c) => c.cards).map((card) => [card.id, card]));

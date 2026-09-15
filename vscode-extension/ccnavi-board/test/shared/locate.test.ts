@@ -6,7 +6,7 @@ import {
   locate,
   runnableTargets,
   type LocateInput,
-} from "../src/core/locate.js";
+} from "../../src/core/locate.js";
 
 function input(existing: readonly string[], overrides: Partial<LocateInput> = {}): LocateInput {
   return {

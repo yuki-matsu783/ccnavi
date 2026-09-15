@@ -639,6 +639,8 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 )
             )
         if os.path.isdir(os.path.join(p.root, ".claude")):
+            # 文面の先頭「.claude/ を持つ」は VS Code 拡張（vscode-extension/ccnavi-board の
+            # projects-render.ts）が同じ事象の説明と重ねないために見ている。変えるならそちらも直す
             problems.append(
                 Problem(
                     SEVERITY_WARN,

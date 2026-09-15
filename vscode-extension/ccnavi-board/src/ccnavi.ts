@@ -346,7 +346,7 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
   }
   const ran = await run(launcher, root, ["--lint", "--json"]);
   if (ran.code < 0 || ran.code > 1) {
-    return { ok: false, error: `ccnavi --lint --json が失敗しました: ${firstLine(ran.stderr)}` };
+    return { ok: false, error: `ccnavi --lint --json が失敗した: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseLintJson(ran.stdout);
   if (parsed.ok) {
@@ -355,5 +355,5 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
   // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
-  return { ok: false, error: said === "" ? `ccnavi --lint --json の出力を読み取れません（${parsed.error}）` : `ccnavi --lint --json の出力: ${said}` };
+  return { ok: false, error: said === "" ? `ccnavi --lint --json の出力を読めない（${parsed.error}）` : `ccnavi --lint --json の出力: ${said}` };
 }

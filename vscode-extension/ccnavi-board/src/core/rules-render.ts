@@ -71,7 +71,7 @@ ${STYLE}
 </style>
 </head>
 <body>
-${renderModeBanner(page.mode)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderModeBanner(page.mode)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.rulesPath)}</span>
@@ -126,11 +126,11 @@ ${SCRIPT}
 }
 
 function renderModeBanner(mode: string): string {
-  if (mode === "enable") {
+  // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
+  if (mode === "enable" || mode === "") {
     return "";
   }
-  const shown = mode === "" ? "未設定" : mode;
-  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。deny, ask 判定に HIT しても tool_use は停止しない</div>\n`;
+  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(mode)}</strong>。判定と記録はするが、deny や ask にヒットしてもツールの呼び出し（tool_use）を止めない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -208,6 +208,8 @@ ${LIST_STYLE}
   .section-name.allow { color: var(--vscode-charts-green); }
   .section-label, .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
   .rule-section.folded .list { display: none; }
+  /* 絞り込み中は畳んだタイプの中も見せる（矢印は applyFind が合わせる） */
+  .finding .rule-section.folded .list { display: block; }
   /* 1 行 = 開閉、id、match、パターンと文面、コンテキストの有無 */
   .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) 14px; }
   .rule.hit .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
@@ -313,7 +315,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (selected) { el.selected = true; }
     return el;
   }
-  function field(rule, name, className, placeholder, width) {
+  function field(rule, name, className, placeholder) {
     const input = h("input", { type: "text", class: className, spellcheck: "false", placeholder: placeholder || "" });
     input.value = rule[name];
     input.addEventListener("input", () => { rule[name] = input.value; markDirty(); });
@@ -356,6 +358,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
           rule.match = names.filter((n, i) => boxes[i].checked).join("|");
           input.value = rule.match;
           markDirty();
+          // チェックボックス自身の input は change より先に上へ伝わり、その時点では rule.match が古い。
+          // 書き換えたあとに札の枠から input を流し直して、行の要約を今の値で書き直させる。
+          wrap.dispatchEvent(new Event("input", { bubbles: true }));
         });
         names.push(name);
         boxes.push(box);
@@ -403,7 +408,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const drop = h("button", { type: "button", class: "action small", text: "message を削除" });
       drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
       message = h("p", { class: "stale" }, [
-        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint がエラーにする。モデルに渡すプロンプトは additionalContext に移す: "),
+        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint が error にする。モデルに渡すプロンプトは「渡す文」（additionalContext）に移す: "),
         h("code", { text: rule.message }),
         drop,
       ]);
@@ -413,10 +418,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const more = h("details", { class: "more" }, [
       moreSummary,
       h("div", { class: "sub" }, [
-        captioned("渡す文", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト"), "", "additionalContext"),
-        fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）"),
-        captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト"), "", "additionalContextOnce"),
-        fileField(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）"),
+        captioned("渡す文", area(rule, "additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト"), "", "additionalContext"),
+        fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）"),
+        captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト"), "", "additionalContextOnce"),
+        fileField(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭 4000 文字まで）"),
       ]),
     ]);
     if (moreOpen.has(key) ? moreOpen.get(key) : hasContext(rule)) { more.setAttribute("open", ""); }
@@ -457,7 +462,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.appendChild(h("span", { class: "sum-flag" + (hasContext(rule) ? " on" : ""), title: hasContext(rule) ? "コンテキストの追加あり" : "" }));
       moreSummary.textContent = "";
       moreSummary.appendChild(h("b", { text: "コンテキストの追加" }));
-      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）— HIT したときにモデルへ渡す文やファイル"));
+      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイル"));
       li.setAttribute("data-find", (rule.id + " " + rule.match + " " + rule.pattern + " " + rule.message + " " + rule.additionalContext + " " + rule.additionalContextOnce).toLowerCase());
     }
     head.addEventListener("click", () => {
@@ -480,6 +485,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     twist.setAttribute("aria-expanded", on ? "true" : "false");
     if (persist) { persistOpen(); }
   }
+  // 絞り込み中の件数。一致した数のほかに、一致しないが開いたままで見えている行があればその数も言う。
+  function countText(q, shown, total, kept) {
+    if (q === "") { return String(total); }
+    return shown + " / " + total + (kept > 0 ? "（開いたまま " + kept + "）" : "");
+  }
   // 絞り込み。要約に含む文字で行を隠すだけで、ルールの中身と並びには触らない。
   function applyFind() {
     const q = document.getElementById("find").value.trim().toLowerCase();
@@ -489,8 +499,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     }
     for (const section of SECTIONS) {
       const total = sections[section].length;
-      const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find), [data-list=" + section + "] .rule.open").length;
-      document.querySelector("[data-count=" + section + "]").textContent = q === "" ? String(total) : shown + " / " + total;
+      const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find)").length;
+      const kept = document.querySelectorAll("[data-list=" + section + "] .rule.hidden-by-find.open").length;
+      document.querySelector("[data-count=" + section + "]").textContent = countText(q, shown, total, kept);
+      syncTwist(document.querySelector(".rule-section[data-section=" + section + "]"));
     }
   }
   // タイプごとの畳み。画面の見え方だけで、ルールの中身と並びには触らない。
@@ -499,16 +511,21 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!el) { return; }
     const next = on === undefined ? !el.classList.contains("folded") : on;
     el.classList.toggle("folded", next);
+    syncTwist(el);
+  }
+  // タイプの矢印。絞り込み中は畳んでいても中身が見えるので、開いた向きにする
+  function syncTwist(el) {
+    const finding = document.getElementById("find").value.trim() !== "";
+    const shownAsOpen = finding || !el.classList.contains("folded");
     const twist = el.querySelector("h2 > .twist");
-    twist.textContent = next ? "▸" : "▾";
-    twist.setAttribute("aria-expanded", next ? "false" : "true");
+    twist.textContent = shownAsOpen ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", shownAsOpen ? "true" : "false");
   }
   // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
   // その場だけの展開で、開いた行の控えには入れない（判定を繰り返しても既定の畳みが崩れない）。
   function unfoldRule(el) {
     const section = el.closest(".rule-section");
     if (section) { foldSection(section.getAttribute("data-section"), false); }
-    el.classList.remove("hidden-by-find");
     setOpen(el, true, false);
   }
   function renderAll() {
@@ -526,7 +543,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       document.querySelector("[data-count=" + section + "]").textContent = String(sections[section].length);
     }
     for (const el of document.querySelectorAll("input.f-id")) {
-      el.addEventListener("input", () => { el.closest(".rule").setAttribute("data-id", el.value); persistOpen(); });
+      el.addEventListener("input", () => { el.closest(".rule").setAttribute("data-id", el.value); });
+      el.addEventListener("change", () => persistOpen());
     }
     applyFind();
   }
@@ -607,7 +625,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     return el;
   }
   function hitsTable(rules) {
-    if (rules.length === 0) { return h("p", { class: "empty", text: "どのルールにも HIT しなかった" }); }
+    if (rules.length === 0) { return h("p", { class: "empty", text: "どのルールにもヒットしなかった" }); }
     const body = h("tbody", {}, rules.map((r) => h("tr", {}, [
       h("td", {}, [r.section ? h("span", { class: "verdict " + r.section, text: r.section }) : null]),
       h("td", { text: r.id + (r.source === "outside" ? "（ルールファイル外の根拠）" : "") }),
@@ -615,7 +633,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("td", {}, [r.pattern ? h("code", { text: r.pattern }) : null]),
     ])));
     return h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "記述" }), h("th", { text: "変換後" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "書いたパターン" }), h("th", { text: "正規表現に直した形" })])]),
       body,
     ]);
   }
@@ -634,19 +652,25 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const box = document.getElementById("judge-result");
     box.textContent = "";
     box.classList.remove("hidden");
-    for (const el of document.querySelectorAll(".rule.hit")) { el.classList.remove("hit"); }
+    for (const el of document.querySelectorAll(".rule.hit")) {
+      el.classList.remove("hit");
+      // 前の判定でその場だけ開いた行は畳む。利用者が開いた行（控えにある）はそのまま
+      if (!opened.has(el.getAttribute("data-key"))) { setOpen(el, false, false); }
+    }
     if (!result.known) {
-      box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定の対象を取り出せないツール。ルールを書いても HIT せず、呼び出しはそのまま通る")]));
+      box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定の対象を取り出せないツール。ルールを書いてもヒットせず、呼び出しはそのまま通る")]));
     } else {
       box.appendChild(h("p", {}, [verdictEl(result.verdict), document.createTextNode(result.code ? " " + result.code : "")]));
       box.appendChild(dl([["tool", result.tool], ["subject", result.subject], ["resolved", result.resolved], ["reason", result.reason], ["degraded", result.degraded ? result.degraded + "（生の文字列に対して判定）" : ""], ["fallback", result.fallback ? result.fallback + "（組み込みの既定で判定）" : ""]]));
-      box.appendChild(h("h3", { text: "HIT したルール" }));
+      box.appendChild(h("h3", { text: "ヒットしたルール" }));
       box.appendChild(hitsTable(result.rules));
       for (const r of result.rules) {
         for (const el of document.querySelectorAll(".rule[data-id]")) {
           if (el.getAttribute("data-id") === r.id) { el.classList.add("hit"); unfoldRule(el); }
         }
       }
+      // 開いた行が増えたので、絞り込みの件数（開いたままの数）を書き直す
+      applyFind();
       box.appendChild(h("h3", { text: "返すメッセージ" }));
       box.appendChild(result.response ? h("pre", { class: "response", text: result.response }) : h("p", { class: "empty", text: "メッセージは返さない" }));
     }
@@ -674,7 +698,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("td", { text: s.why }),
     ]));
     box.appendChild(h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "期待" }), h("th", { text: "判定" }), h("th", { text: "tool" }), h("th", { text: "subject" }), h("th", { text: "HIT したルール" }), h("th", { text: "理由" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "期待" }), h("th", { text: "判定" }), h("th", { text: "ツール" }), h("th", { text: "対象" }), h("th", { text: "ヒットしたルール" }), h("th", { text: "理由" })])]),
       h("tbody", {}, rows),
     ]));
   }
@@ -694,7 +718,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (action === "judge") {
       const tool = document.getElementById("tool").value;
       const subject = document.getElementById("subject").value;
-      if (subject.trim() === "") { status("対象が未入力", true); return; }
+      if (subject.trim() === "") { status("対象を入れる", true); return; }
       setBusy(true, "判定中…");
       vscode.postMessage({ type: "judge", sections: sections, tool: tool, subject: subject });
     }

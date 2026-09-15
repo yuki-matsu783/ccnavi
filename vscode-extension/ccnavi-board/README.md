@@ -5,7 +5,7 @@ ccnavi のチケットが、どの作業ツリーでどこまで進んでいる�
 （未承認・ゲート閉・作業ツリーなし・レビュー依頼済・実績のリスクが HIGH 以上・本物が決まらない写り）。
 承認済／クローズ、人レビューの要否、作業ツリーの名前、レビュー済／省略、MEDIUM 以下のリスク、base は
 枠の無い薄い文字で 1 行に並ぶ。親カードにはフェーズの一覧が 1 段階 1 行で付き、左の丸が段階
-（終了は緑、進行中は青）、右にはゲート閉・マーカー・レビュー要・リスクなど人が見るべきことだけが出る。
+（終了は緑の塗り、進行中は青の輪）、右にはゲート閉、マーカー、人レビュー要、リスクなど人が見るべきことだけが出る。ゲートが閉じた段階は名前も右の状態も赤になる。
 上部の見出しは承認待ちと不備の件数を 1 件以上のときだけ出し、残りと全体は薄く添える。
 列は画面の幅に合わせて伸び縮みし、1 列が 220px を割るほど狭い（エディタを分割した、サイドパネルが広い）
 ときだけ横スクロールになる。列の見出しを押すとその列を見出し 1 行ぶんの幅に畳める。列の右端を
@@ -45,7 +45,7 @@ deny が止める。承認できたら同じオーバーレイが「承認した
 ワークスペース自身の層のルールも同じ画面から開ける。
 
 入れると VS Code の左端（アクティビティバー）に ccnavi のアイコンが出る。押すとサイドパネルに
-「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の 5 つの入口が名前だけで並ぶ（何ができるかはポインタを載せると出る）。「チケット管理」が出るのは、ワークスペースが
+「プロジェクト管理」「ルール管理」「リスク管理」「フェーズ管理」「チケット管理」の 5 つの入口が名前だけで並ぶ（何ができるかはマウスを重ねると出る）。「チケット管理」が出るのは、ワークスペースが
 チケット制御を使っているときだけ。`.claude/settings.json`（`settings.local.json` が勝つ）の
 `env.CCNAVI_TICKET_CONTROL` が `disable` なら、入口もコマンドパレットの「ボードを開く」「ボードを更新」
 も出ない。書いていなければ enable。設定ファイルが変わればその場で読み直す。
@@ -106,11 +106,11 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 | タブ | 何ができるか |
 |---|---|
-| ルール | `rules.yml` をタイプ（deny / ask / allow）ごとに一覧し、id・match（手でも書けるし、欄を押すと判定が対象を取り出せるツールの札が出て選べる。欄に書いてある知らない名前も札として並ぶ）・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。一覧は 1 ルール 1 行（id・match・pattern・文面の先頭・コンテキストの有無の ●）で、既定は全部畳んである。行を押すとその下に欄が開き、欄名は欄の左に出る。additionalContext 系の 4 欄は「コンテキストの追加」の 1 行に畳んであり、値があるルールだけ最初から開く。開いた行は id で控え、再読込のあとも開いたまま。上の絞り込み欄に打つと、id・match・pattern・文面に含む行だけが残る。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す（足した行は開いて出る）・消す・上下に動かす・タイプを移す。タイプの見出しの畳むボタンでそのタイプごと畳める。判定に当たったルールは畳んであっても開く。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
-| 判定を試す | ツール名と subject を入れて `--test --json` に掛ける。判定・根拠コード・当たったルール（翻訳後の正規表現まで）・返る文面と、そのツールで走る hook を出す。「見本を一括で流す」は `--test-samples --json` で見本をすべて回し、期待と食い違ったものを赤く出す。どちらも**編集中の内容**で試す（保存は要らない） |
+| ルール | `rules.yml` をタイプ（deny / ask / allow）ごとに一覧し、id・match（手でも書けるし、欄を押すと判定が対象を取り出せるツールの札が出て選べる。欄に書いてある知らない名前も札として並ぶ）・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。一覧は 1 ルール 1 行（id、match、pattern と文面の先頭、コンテキストの有無の ●）で、既定は全部畳んである。行を押すとその下に欄が開き、欄名は欄の左に出る。additionalContext 系の 4 欄は「コンテキストの追加」の 1 行に畳んであり、値があるルールだけ最初から開く。開いた行は id で控え、再読込のあとも開いたまま。上の絞り込み欄に打つと、id・match・pattern・文面・渡す文に含む行だけが残る（開いている行は隠れない）。見出しの件数は「一致した数 / 全体」になり、一致しないが開いたままの行があればその数も添える。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す（足した行は開いて出る）・消す・上下に動かす・タイプを移す。タイプの見出しの畳むボタンでそのタイプごと畳める。判定に当たったルールは畳んであっても開く。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
+| 判定を試す | ツールと対象（`--test` の subject）を入れて `--test --json` に掛ける。判定・根拠コード・当たったルール（翻訳後の正規表現まで）・返る文面と、そのツールで走る hook を出す。「見本を一括で流す」は `--test-samples --json` で見本をすべて回し、期待と食い違ったものを赤く出す。どちらも**編集中の内容**で試す（保存は要らない） |
 | hook | `.claude/settings.json` と `.claude/settings.local.json` の hooks を読むだけの一覧。書き換えない。利用者ごとの設定（`~/.claude/settings.json`）は載らない |
 
-欄名は日本語で、`rules.yml` のキー名は欄名にポインタを載せると（title）出る。対応は次のとおり。
+欄名は日本語で、`rules.yml` のキー名は欄名にマウスを重ねると（title）出る。対応は次のとおり。
 
 | 欄名 | キー |
 |---|---|
@@ -151,11 +151,11 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | 何 | どう出るか、何が起きるか |
 |---|---|
 | 段階の閾値 | `levels` の medium / high / critical の 3 欄を 1 行に。空ならその段階は組み込みの値（20 / 40 / 70）で、保存しても欄を書かない。説明は見出しの下の「この欄の説明」を開くと出る |
-| 項目 | `factors` を 1 件 1 行（id・points・当て方・値・message）で並べる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す（足した行は開いて出る）・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
+| 項目 | `factors` を 1 件 1 行（id、points、当て方と値をつないだ「〜たら加点」の文と message）で並べる。絞り込みは画面に出ている語（当て方の札・要約の文）でもキーの綴りでも当たる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す（足した行は開いて出る）・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
 | 保存 | 一時ファイルへ書いて `--lint --risk` を通し、error があれば保存しない。整数でない points や逆順の閾値はここで止まる |
 | ファイルが無い | 組み込みの配点を読み取り専用で見せ、「組み込みの配点でファイルを作る」で同じ値のファイルを書き出す。値が同じなので数え方は変わらない。既にあれば上書きしない |
 | チケット制御が disable | 上部に「配点は何にも効かない」と出る。編集と保存はできる |
-| 欄名 | 日本語で、`risks.yml` のキー名は欄名にポインタを載せると出る。id = `id`、点 = `points`、当て方 = `lines_over` / `files_over` / `deleted_over` / `glob` / `script` / `judge`、しきい値・glob・スクリプト・問い = 当て方の値、上限 = `max`、文面 = `message`、MEDIUM / HIGH / CRITICAL = `levels` の各段 |
+| 欄名 | 日本語で、`risks.yml` のキー名は欄名にマウスを重ねると出る。id = `id`、点 = `points`、当て方 = `lines_over` / `files_over` / `deleted_over` / `glob` / `script` / `judge`、しきい値・glob・スクリプト・問い = 当て方の値、上限 = `max`、文面 = `message`、MEDIUM / HIGH / CRITICAL = `levels` の各段 |
 | 監視 | 配点のファイル（絶対パスでも）、`.claude/settings.json`、`.claude/settings.local.json`、チケットの置き場。外で変われば「外で変わった」、チケットが動けば保存の可否を取り直す。再読込で配点のパスが変わっていれば監視も張り直す |
 
 守っていること。
@@ -189,7 +189,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 |---|---|
 | 種類 | `phases` を 1 件 1 行（id・title・kind の札・review・scope）で並べる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id（対応表のキー）・title・kind（work / feedback）・review（none / mr）・scope（inherit か glob の並び）・deliverables と、「関係と案内」の 1 行に畳んだ overlap・requires・agent・when（値がある種類だけ最初から開く）。並びの欄は `,` 区切りの 1 欄。足す（足した行は開いて出る）・消す・上下に動かす・改名する。足した種類の既定は `scope: inherit`（glob を埋め忘れて「何も書けない」種類にならないように） |
 | 保存 | 一時ファイルへ書いて `--lint --phases` を通し、error があれば保存しない。識別子に使えない id、title の重なり、feedback で `review: none`、overlap / requires が指す先の無い種類、提案が作業ツリーに在る親の計画が指す種類を消したとき、はここで止まる（承認済みチケットの計画は照合しない。定義が読めなくなるときだけ止まる。チケット制御が disable なら照合は走らない）。同じ id が 2 つあるときは画面が先に止める（実行ファイルは後ろの定義で黙って上書きするため） |
-| 欄名 | 日本語で、`phases.yml` のキー名は欄名にポインタを載せると出る。id = `id`、題 = `title`、区分 = `kind`、レビュー = `review`、範囲 = `scope`、成果物 = `deliverables`、並行できる種類 = `overlap`、一緒に要る種類 = `requires`、エージェント = `agent`、置く目安 = `when` |
+| 欄名 | 日本語で、`phases.yml` のキー名は欄名にマウスを重ねると出る。id = `id`、題 = `title`、区分 = `kind`、レビュー = `review`、範囲 = `scope`、成果物 = `deliverables`、並行できる種類 = `overlap`、一緒に要る種類 = `requires`、エージェント = `agent`、置く目安 = `when` |
 | ファイルが無い | 空の画面と「雛形でファイルを作る」。雛形は README「フェーズの種類と計画」の例で、`scope` の綴りは作ったあとにこのプロジェクトの置き場へ直す。組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。既にあれば上書きしない。層には雛形を置かず、作るボタンも出ない。欄はそのまま触れ、種類を足して保存すると、`--lint` を通った最初の保存でファイルが作られる（先頭に説明のコメントが付く）。雛形の id は共通層の種類と重なりやすく、中身が違えばその層が空として扱われるため。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない |
 | 層が読めない | 実行ファイルがその層のファイルを読めず空として扱っているとき、上部にその理由が出る |
 | チケット制御が disable | 上部に「種類は何にも効かない」と出る。編集と保存はできる |
@@ -268,7 +268,9 @@ YAML として読めないファイルは画面から直せない（エディタ
 ```sh
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p . で out/ に出し、esbuild で out/extension.js に束ねる
-pnpm test          # tsc のあと node --test out/test/*.test.js
+pnpm test          # tsc のあと node --test "out/test/**/*.test.js"（全部）
+pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
+pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
 pnpm run package   # scripts/package.sh: install → compile → test → vsce package
 ```
 
@@ -282,9 +284,16 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 入れたあと、開いているウィンドウは再読み込み（`Developer: Reload Window`）で新しい版になる。
 
-`node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
+`node --test` にはディレクトリではなくグロブ（`out/test/**/*.test.js`）を渡す。
 
-実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。vsix には `node_modules/` を入れず、
+テストは画面の領域ごとのディレクトリに分けてあり、一部を直したときはその領域だけを流せる。
+HTML を文字列で見る単体テスト（`*.test.ts`）と、画面に埋めたスクリプトを happy-dom で実際に動かす
+テスト（`*.dom.test.ts`）を同じディレクトリに置く。happy-dom で動かないものが出たときだけ jsdom を足す
+（いまは無い）。`pnpm test` と `pnpm run compile` は tsc の出力（`out/src` と `out/test`）を先に消す（tsc は消さないので、
+置き場を動かした古いテストが残る）。esbuild が束ねた `out/extension.js` は消さないので、package の compile → test の順でも入口は残る。
+出荷物の型検査は `tsconfig.json`（src だけ）で、テストは `tsconfig.test.json`（`skipLibCheck` で依存の `.d.ts` の検査を飛ばす。happy-dom の型定義が `@types/node` 22 と噛み合わないため）。
+
+実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom を足してある。vsix には `node_modules/` を入れず、
 `scripts/bundle.js`（esbuild）が本体ごと `out/extension.js` に束ねる。テストは束ねる前の
 `out/src/` を使う。
 
@@ -412,7 +421,16 @@ test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/core/test_test_json.py が書き出す
   fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T109
+  helpers/fixture.ts  board.json を読む
+  helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を控える
+  board/              ボード（board, render, model, approvemodel）
+  rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
+  risk/               リスク管理（risk-doc, risk-render）
+  phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
+  projects/           プロジェクト管理（projects, layer-render）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control）
+  */*.test.ts         HTML の文字列を見る単体テスト CB-T01〜
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て
