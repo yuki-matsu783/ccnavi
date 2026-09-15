@@ -6,6 +6,8 @@
  */
 import * as vscode from "vscode";
 
+import { onDidChangeAppearance, readAppearance } from "./appearance.js";
+import { APPEARANCE_LABELS } from "./core/appearance.js";
 import { onDidChangeTicketControl, ticketControl } from "./ticket-control.js";
 
 interface Entry {
@@ -53,6 +55,13 @@ const ENTRIES: readonly Entry[] = [
     icon: "checklist",
     needsTickets: true,
   },
+  {
+    label: "見た目",
+    description: "配色の切り替え（VS Code のテーマ / Claude ライト / Claude ダーク）",
+    command: "ccnaviBoard.appearance",
+    icon: "color-mode",
+    needsTickets: false,
+  },
 ];
 
 class EntryProvider implements vscode.TreeDataProvider<Entry> {
@@ -67,6 +76,10 @@ class EntryProvider implements vscode.TreeDataProvider<Entry> {
     const item = new vscode.TreeItem(entry.label, vscode.TreeItemCollapsibleState.None);
     // 並びは名前だけにして、説明はマウスを重ねたときに出す（横に並べると狭いパネルで切れて読めない）
     item.tooltip = entry.description;
+    // 見た目だけは今の値を横に出す。何が選ばれているかは開かなくても分かるほうがよい
+    if (entry.command === "ccnaviBoard.appearance") {
+      item.description = APPEARANCE_LABELS[readAppearance()];
+    }
     item.iconPath = new vscode.ThemeIcon(entry.icon);
     item.command = { command: entry.command, title: entry.label };
     return item;
@@ -84,4 +97,5 @@ export function registerSidebar(context: vscode.ExtensionContext): void {
     vscode.window.registerTreeDataProvider("ccnaviBoard.entries", provider),
   );
   onDidChangeTicketControl(() => provider.refresh());
+  context.subscriptions.push(onDidChangeAppearance(() => provider.refresh()));
 }

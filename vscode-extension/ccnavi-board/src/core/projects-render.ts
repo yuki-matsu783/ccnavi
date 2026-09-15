@@ -7,10 +7,13 @@
  */
 import type { LintProblem } from "./lintmodel.js";
 import type { ProjectRow, ProjectsPage, Stray } from "./projects.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
 import { PAGE_STYLE, escapeHtml } from "./render.js";
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 export function renderProjectsPage(page: ProjectsPage, options: RenderOptions): string {
@@ -26,7 +29,7 @@ export function renderProjectsPage(page: ProjectsPage, options: RenderOptions): 
 ${STYLE}
 </style>
 </head>
-<body>
+${bodyTag(options.appearance)}
 <header class="toolbar">
   <div class="summary">
     <span>プロジェクト ${page.rows.length} 件</span>
@@ -252,8 +255,10 @@ const STYLE = `${PAGE_STYLE}
     background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
     border-radius: 3px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .3));
   }
-  .menu > .menu-items > button.action { justify-content: flex-start; border-color: transparent; box-shadow: none; background: none; }
+  .menu > .menu-items > button.action { justify-content: flex-start; border-color: var(--vscode-contrastBorder, transparent); box-shadow: none; background: none; }
   .menu > .menu-items > button.action:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+  /* HC では押せない項目も点線の枠で「在るが押せない」と分かるようにする */
+  .menu > .menu-items > button.action:disabled { border-style: dashed; }
   .badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
   .badge.doing { color: var(--vscode-charts-yellow); border-color: var(--vscode-charts-yellow); }
   .badge.warn { color: var(--vscode-editorWarning-foreground); border-color: var(--vscode-editorWarning-foreground); }
@@ -328,4 +333,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (data.type === "failed") { show("failed", String(data.message || "")); }
     else if (data.type === "info") { show("info", String(data.message || "")); }
     else if (data.type === "cloned") { url.value = ""; name.value = ""; nameTouched = false; remember(); show("info", String(data.message || "")); }
-  });`;
+  });
+${APPEARANCE_SCRIPT}`;
