@@ -63,6 +63,12 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
 TICKET_RULE = "(ticket-scope)"
 
+# 引用の外にブレース展開を書いた。シェルは実行する前に語を広げるので、ccnavi が読んだ語と
+# 実行される語が違う。展開を推し量らずに止め、語を並べて書き直させる（ADR-0046）。
+# ルールに当たったのではないので、ルール名は TICKET_RULE と同じく括弧付き。
+CODE_BRACE_EXPANSION = "DENY_BRACE_EXPANSION"
+BRACE_RULE = "(brace-expansion)"
+
 # 理由に載せる対象の長さの上限。対象はエージェントが今書いたものなので、
 # ここでは同じものを指せれば足りる。ヒアドキュメントは 1 ファイル分を運べるので、
 # 全文を載せると理由の本体が下へ流れて読まれなくなる。
@@ -290,6 +296,40 @@ def subagent_forbidden(subject: str, runner: str = "", inner: str = "") -> str:
             "合流と push と閉じるのは親の仕事です。",
         ]
     )
+
+
+def brace_expansion(subject: str, braces: list[str]) -> str:
+    """引用の外のブレース展開を止めた文。
+
+    ルールに当たったのではないので、禁止された操作をしたとは言わない。止めたのは読みの
+    決めごとで、書き直す道は必ずある（語を並べる、文字なら引用する）。道を名指ししないと、
+    同じ省略を書き直しては止まる。
+    """
+    shown = " ".join(subject.split())
+    if len(shown) > SUBJECT_LIMIT:
+        shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
+    listed = ", ".join(f"`{_one_line(b)}`" for b in braces[:_BRACES_SHOWN])
+    if len(braces) > _BRACES_SHOWN:
+        listed += f" (+{len(braces) - _BRACES_SHOWN})"
+    return "\n".join(
+        [
+            f"[ccnavi] {CODE_BRACE_EXPANSION}",
+            f"subject: {shown}",
+            f"brace expansion outside quotes: {listed}",
+            "Outside quotes the shell expands these into several words before the command runs, "
+            "so the words ccnavi reads are not the words that would run. bash and zsh expand them "
+            "differently, so ccnavi does not guess the result; it stops the call, also in the few "
+            "places where no shell expands them (an assignment, a case pattern, [[ ]]). Write the "
+            "words out instead: "
+            "`--exclude-dir={a,b}` becomes `--exclude-dir=a --exclude-dir=b`, `cp f{,.bak}` "
+            "becomes `cp f f.bak`, `{1..3}` becomes `1 2 3`. If the braces are meant as text, "
+            "put them in single quotes: '{a,b}'.",
+        ]
+    )
+
+
+# ブレース展開を止めた文に並べる綴りの数。1 つ直せば残りも同じ直し方になる。
+_BRACES_SHOWN = 5
 
 
 def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:

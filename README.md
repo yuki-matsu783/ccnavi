@@ -893,6 +893,27 @@ perl や python は縮退の対象に入れていない。
 禁止語に触れる文書を直すときの普通の書き方で、
 ここを諦めると直したい誤検知がそのまま残る。
 
+### ブレース展開は語を並べて書く
+
+引用の外の `{a,b}` や `{1..3}` は、シェルが実行する前に複数の語に広げる。`{git,push,origin,main}` は
+1 語に見えるが、bash は `git push origin main` を実行する。ccnavi はこれを展開して読まず、見つけたら
+ルールより先にコード `DENY_BRACE_EXPANSION` で止める。広げ方が bash と zsh で割れるので、どちらかに
+決めて読むと片方で素通りになりうるため（[ADR-0046](docs/adr/0046-brace-expansion.md)）。止めた文面は
+見つけた綴りと書き直し方を言う。
+
+| 止まる書き方 | 通る書き方 |
+|---|---|
+| `grep -rn foo --exclude-dir={node_modules,.git} .` | `grep -rn foo --exclude-dir=node_modules --exclude-dir=.git .` |
+| `cp f{,.bak}` | `cp f f.bak` |
+| `mkdir -p src/{a,b}` | `mkdir -p src/a src/b` |
+| `touch file{1..3}` | `touch file1 file2 file3` |
+| ブレースを文字として渡す `echo {a,b}` | `echo '{a,b}'` |
+
+引用の中、`\{`、ヒアドキュメントの本文、コメントのブレースは止まらない。`find . -exec rm {} \;` や
+`HEAD@{1}` のように、カンマも範囲も無いブレースも止まらない。代入の右辺（`x={a,b}`）、case のパターン
+（`case $x in {a,b})`）、`[[ $f == *.{jpg,png} ]]` はシェルが広げないが止まる。許容した誤検知で
+（[ccnavi.md](ccnavi.md) §12.2）、引用するか、パターンを `a|b)` や `*.jpg || … *.png` のように書けば通る。
+
 ### 実行役のコマンドが中で実行するコマンドにも当てる
 
 `env rm -f x` の `env` のように、別のコマンドを実行することが仕事のコマンドがある（実行役のコマンド）。
@@ -1595,6 +1616,7 @@ sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 
 依頼の後に親の HEAD が動いたら、レビュー済みになる前なら `request` を打ち直せる。依頼文を
 投稿し直し、マーカーの HEAD を今のものに書き換える。HEAD が依頼時のままなら「依頼済み」で止まる。
+レビュー済みのフェーズ（`wrapup` で締めて、依頼をしていないものも含む）は「レビュー済み」で止まる。
 
 **マージリクエストが無ければ作る。** 人はレビューをそこで行うので、入れ物が無いことで
 止めない。題・本文・`Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue`
