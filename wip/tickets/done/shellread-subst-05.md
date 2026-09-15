@@ -7,29 +7,18 @@ predecessors:
 - shellread-subst-03
 - shellread-subst-04
 title: コマンド置換・改行・プロセス置換を読むようになったことを文書に書く
-rationale: 'フェーズ 3（shellread-subst-03 / -04）で、shellread は shlex の前に原文を走査し、引用の中の `$(
-  )` と
-
+rationale: |
+  フェーズ 3（shellread-subst-03 / -04）で、shellread は shlex の前に原文を走査し、引用の中の `$( )` と
   バッククォート、プロセス置換、引用しない heredoc の本文の置換を独立したコマンドとして読むようになった。
-
   改行はコマンドの区切り、語の途中の `#` は文字、予約語（`coproc` を含む）の後ろはコマンドの先頭になった。
-
   文書はまだ前の読み（「`$( )` の中身は独立したコマンドになる」は引用の外だけで成り立つ、heredoc の本文は
-
   トークンの行番号で落とす）のまま。設計 wip/design/shellread-subst.md §2「文書」の表のとおりに直す。
 
-
   あわせて、フェーズ 3 の敵対的レビューで出た指摘のうち、利用者の判断（2026-09-15）で直さずに残した 2 つを、
-
   許容した限界として書く。
-
   - `$( )` の中の、コマンドの先頭ではない `case` の語でも `ambiguous-substitution` に縮退する（厳しい側の誤検知）
-
   - 置換を大量に並べると読みだけで遅い（8 万個・949KB で 3.6 秒。読み終わったあと期限切れで止める側に倒れる）
-
   ブレース展開の件は `ccnavi-review.sh handoff` で別の issue に切り出したので、ここでは限界の一覧に 1 行だけ書く。
-
-  '
 human_review:
   required: true
   reason: 文書フェーズは review mr。判定が変わる形（今 allow の heredoc の commit など）と回避策を利用者向けに書くので、書き方を見てもらう
@@ -40,10 +29,9 @@ allow:
   glob: ccnavi.md
 - match: Write|Edit
   glob: HANDOVER.md
-ccnavi_approved:
-  approved_at: 2026-09-15T16:59:57+0900
-  source_tree: shellread-subst
-  source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/shellread-subst/wip/tickets/todo/shellread-subst-05.md
+started_at: "2026-09-15T17:00:29+0900"
+base_sha: "ef744c9b1743c79ea97065ad799a8f306ded4994"
+completed_at: "2026-09-15T17:08:13+0900"
 ---
 
 # 文書: コマンド置換・改行・プロセス置換を読む
