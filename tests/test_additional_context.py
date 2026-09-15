@@ -44,7 +44,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.addCleanup(self.dir.cleanup)
 
     def rules(self, **sections) -> str:
-        body = {"version": 3, **sections}
+        body = {"version": 1, **sections}
         return write(os.path.join(self.root, "rules.yml"), json.dumps(body))
 
     def run_ccnavi(

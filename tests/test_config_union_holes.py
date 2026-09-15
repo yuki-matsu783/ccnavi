@@ -47,7 +47,7 @@ from tests.test_config_union_guard import GuardHarness
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
 # `regex` は書いた人が `(?i:...)` で選べるので、書いたとおりに区別する。
 CASE_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "glob-secret",
@@ -67,7 +67,7 @@ CASE_RULES = {
 
 # A-4 の的。裸の `id` にコロンがある。共通層に置けば lib の定義に見える。
 COLON_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "lib:custom",
@@ -97,7 +97,7 @@ factors:
 
 # A-5 の的。`projects/Self/` の層に置く deny。数えないので、当たってはいけない。
 SELF_PROJECT_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "kube",
@@ -112,7 +112,7 @@ SELF_PROJECT_RULES = {
 # 予約名のプロジェクトの層を名札で引くとこの層に当たるので、そのプロジェクトへの
 # Write がここの allow で通り、ここの deny で止まる。どちらも起きてはいけない。
 WIDE_OWN_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "generated",
@@ -127,7 +127,7 @@ WIDE_OWN_RULES = {
 # 穴 1 の的。予約名のプロジェクトの層に置く deny。層として数えないので当たらない。
 # 当たらないことは「緩い」のではない。共通層だけで判定するので、allow も無い。
 RESERVED_PROJECT_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "secret",
@@ -494,7 +494,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         for kind in settings.LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)
-                broken = "version: 3\ndeny: []\n" if kind == "rules" else "version: 1\n"
+                broken = "version: 1\ndeny: []\n" if kind == "rules" else "version: 1\n"
                 before, after, result = self.break_and_restore(path, broken=broken)
                 self.assertEqual(after, before, self.said(result, kind))
                 self.assertIn("restored", result.stdout, self.said(result, kind))
@@ -528,7 +528,7 @@ class ReservedLayerRestoreTest(GuardHarness):
         for home, kind in ((project, "rules"), (project, "phases"), (self.ws, "risk")):
             with self.subTest(home=os.path.basename(home), kind=kind):
                 path = layer_path(home, kind)
-                broken = "version: 3\ndeny: []\n" if kind == "rules" else "version: 1\n"
+                broken = "version: 1\ndeny: []\n" if kind == "rules" else "version: 1\n"
                 before, after, result = self.break_and_restore(path, broken=broken)
                 self.assertEqual(after, before, self.said(result, kind))
 

@@ -44,12 +44,12 @@ HAS_JQ = shutil.which("jq") is not None
 
 # 何でも通す。deny が 1 件も無いので、止まったものはルールの外で止まっている。
 OPEN_RULES = {
-    "version": 3,
+    "version": 1,
     "allow": [{"id": "anything", "match": "Bash|Read|Write|Edit|NotebookEdit", "regex": "."}],
 }
 
 # YAML として読めない。共通層のルールがこれなら組み込みの既定に落ちる。
-BROKEN_RULES = "version: 3\ndeny: [\n"
+BROKEN_RULES = "version: 1\ndeny: [\n"
 
 
 class GuardHarness(ConfigUnionHarness):
@@ -66,7 +66,7 @@ class GuardHarness(ConfigUnionHarness):
         """Bash 1 回。実行前で控えを取り、実行後で戻す。"""
         return self.guarded_hook("Bash", self.ws, event=event, command=command)
 
-    def break_and_restore(self, path, broken="version: 3\ndeny: []\n"):
+    def break_and_restore(self, path, broken="version: 1\ndeny: []\n"):
         """控えを取らせ、壊し、実行後に戻ったかを返す。"""
         before = read(path)
         self.run_hook("PreToolUse")
@@ -145,7 +145,7 @@ class RestoreTest(GuardHarness):
                 self.assertTrue(
                     os.path.exists(copy), "共通層は追跡されているので作業ツリー側の設定がある"
                 )
-                broken = "version: 3\ndeny: []\n" if name == "rules.yml" else "version: 1\n"
+                broken = "version: 1\ndeny: []\n" if name == "rules.yml" else "version: 1\n"
                 before, after, result = self.break_and_restore(copy, broken=broken)
                 self.assertEqual(after, before, self.said(result, name))
                 self.assertIn("restored", result.stdout, self.said(result, name))
@@ -255,7 +255,7 @@ class DenyTest(GuardHarness):
         write_layer(
             self.lib,
             rules={
-                "version": 3,
+                "version": 1,
                 "deny": [
                     {
                         "id": "builtin-guard-setting-files",

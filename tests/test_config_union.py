@@ -37,7 +37,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 共通層。どのツリーにも効いてほしい deny と、ワークスペースの allow。
 COMMON_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "credentials",
@@ -66,7 +66,7 @@ COMMON_RULES = {
 
 # ワークスペース自身の層。ワークスペースのツリーにだけ効く。
 OWN_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "generated",
@@ -86,7 +86,7 @@ OWN_RULES = {
 
 # lib の層。lib のツリーにだけ効く。
 LIB_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "schema",
@@ -156,7 +156,7 @@ factors:
 
 # app の層。fixture では置かない（無い層 = 空）。2 つ目の非空の層を要るテストだけが置く。
 APP_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "kube",
@@ -206,7 +206,7 @@ ROOT_RULE = {
 }
 
 # YAML として壊れている。閉じていない並び。
-BROKEN = "version: 3\ndeny: [\n"
+BROKEN = "version: 1\ndeny: [\n"
 
 # ccnavi ディレクトリの既定の名前（設計 §11.2、`CCNAVI_PROJECT_HOME` の既定）。
 HOME = ".ccnavi"
@@ -900,7 +900,7 @@ class WiringTest(ConfigUnionHarness):
     def test_project_named_self_is_not_counted(self):
         """§11.4: `projects/self/` は `self:id` と区別できないので数えず、--lint が error。"""
         deny = {
-            "version": 3,
+            "version": 1,
             "deny": [{"id": "dump", "match": "Bash", "glob": "*mysqldump*", "message": "no."}],
         }
         self.project("self", rules=deny)
@@ -915,7 +915,7 @@ class WiringTest(ConfigUnionHarness):
         `config/` と 3 本の名前は固定。
         """
         moved = {
-            "version": 3,
+            "version": 1,
             "deny": [
                 {"id": "vendor", "match": "Write|Edit", "glob": "*/vendor/*", "message": "no."}
             ],

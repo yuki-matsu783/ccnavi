@@ -39,7 +39,7 @@ class RootPlaceholderTest(unittest.TestCase):
             os.path.join(self.root, "rules.yml"),
             json.dumps(
                 {
-                    "version": 3,
+                    "version": 1,
                     "deny": [
                         {
                             "id": "main-tree",

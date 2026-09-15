@@ -49,7 +49,7 @@ class SectionsTest(unittest.TestCase):
         読み手がそのまま受け取る。タイプの強さを見たいテストで、YAML の綴りの
         話に付き合わずに済む。
         """
-        body = {"version": 3, **sections}
+        body = {"version": 1, **sections}
         return write(os.path.join(self.root, "rules.yml"), json.dumps(body))
 
     def judge(self, rules_path: str, tool: str, subject: str) -> dict:

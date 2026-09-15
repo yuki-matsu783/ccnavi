@@ -56,14 +56,14 @@ EXPLAIN_NOTE = (
 
 # ルールが何も言わない列に置くルール。Write には当たらない。
 SILENT = {
-    "version": 3,
+    "version": 1,
     "deny": [{"id": "push", "match": "Bash", "glob": "*git push*", "message": "push は人が行う"}],
 }
 
 
 def rules_with(section: str) -> dict:
     """作業ツリーを丸ごと指すルールを、指定のタイプに 1 本だけ置く。"""
-    body = {"version": 3, "deny": list(SILENT["deny"])}
+    body = {"version": 1, "deny": list(SILENT["deny"])}
     entry = {
         "id": f"rule-{section}",
         "match": "Write|Edit|NotebookEdit",
@@ -584,7 +584,7 @@ class Boundaries(Workspace):
         self.family()
         self.use_rules(
             {
-                "version": 3,
+                "version": 1,
                 "allow": [{"id": "anything", "match": "Write|Edit", "glob": "*", "message": "x"}],
             }
         )
@@ -596,7 +596,7 @@ class Boundaries(Workspace):
         self.family()
         self.use_rules(
             {
-                "version": 3,
+                "version": 1,
                 "allow": [{"id": "shell", "match": "Bash", "regex": ".", "message": "x"}],
             }
         )
@@ -621,7 +621,7 @@ class Boundaries(Workspace):
 
     def test_builtin_fallback_still_applies_the_ticket(self):
         self.family()
-        write(self.rules, "version: 3\ndeny: [\n  - id: x\n")
+        write(self.rules, "version: 1\ndeny: [\n  - id: x\n")
         result = self.write_hook(self.child, TICKET_OUTSIDE)
         self.assertEqual(self.decision(result), "deny", self.reason(result))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
