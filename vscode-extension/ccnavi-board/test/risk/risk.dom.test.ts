@@ -30,8 +30,8 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
   const page = await loadPage(html());
   try {
     assert.equal(page.all(".factor.open").length, 0);
-    assert.equal(page.one('.factor[data-key="f1"] .sum .clip').textContent, "差分が 300 行を超えたら行数が多い");
-    assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, ".github/** にヒットしたファイルごと（上限 35 点）CI に触った");
+    assert.equal(page.one('.factor[data-key="f1"] .sum .clip').textContent, "差分が 300 行を超えたら加点行数が多い");
+    assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, ".github/** にヒットしたファイル 1 つにつき加点（上限 35 点）CI に触った");
     page.click(page.one('.factor[data-key="f2"] .row-head'));
     assert.ok(page.one('.factor[data-key="f2"]').classList.contains("open"));
     assert.deepEqual((page.state() as { open: string[] }).open, ["ci"]);
@@ -45,14 +45,14 @@ test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では�
   const page = await loadPage(html());
   try {
     page.click(page.one('.factor[data-key="f2"] .row-head'));
-    page.type(page.one('.factor[data-key="f2"] select.f-kind'), "files_over");
+    page.change(page.one('.factor[data-key="f2"] select.f-kind'), "files_over");
     const row = page.one('.factor[data-key="f2"]');
     assert.ok(row.classList.contains("open"));
     assert.equal(page.all('.factor[data-key="f2"] input.f-max').length, 0);
     assert.equal(page.one<HTMLInputElement>('.factor[data-key="f2"] input.f-value').value, "");
     assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, "（しきい値 未設定）CI に触った");
     page.type(page.one('.factor[data-key="f2"] input.f-value'), "10");
-    assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, "変えたファイルが 10 件を超えたらCI に触った");
+    assert.equal(page.one('.factor[data-key="f2"] .sum .clip').textContent, "変えたファイルが 10 件を超えたら加点CI に触った");
   } finally {
     await page.close();
   }

@@ -93,7 +93,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
 test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだけ出し、行末のボタンは 2 つのメニューにまとめる", () => {
   const html = renderProjectsPage(
     page(
-      [row({ hasClaudeDir: true, problems: [{ severity: "warn", where: "(projects/lib)", detail: ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える" }, { severity: "error", where: "(projects/lib) x", detail: "文面が無い" }] })],
+      [row({ hasClaudeDir: true, problems: [{ severity: "warn", where: "(projects/lib)", detail: ".claude/ を持つ。Claude Code がそこのスキルを読み、cd 1 回で別のルートに見える" }, { severity: "warn", where: "(projects/lib)", detail: ".claude/settings.json を読めない: 壊れている" }, { severity: "error", where: "(projects/lib) x", detail: "文面が無い" }] })],
       { ignored: false, dirProblems: [{ severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" }, { severity: "warn", where: "(projects)", detail: "別の指摘" }] },
     ),
     { nonce: "n" },
@@ -102,9 +102,11 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   assert.match(html, /data-action="fix-ignore"/);
   assert.doesNotMatch(html, /無視されていない/);
   assert.match(html, /warn: 別の指摘/);
-  // .claude/ の説明があるので、lint の同じ指摘（実物の文面「.claude/ を持つ。…」）は重ねない。他の指摘は出る
-  assert.equal((html.match(/\.claude\/ /g) ?? []).length, 1);
+  // .claude/ の説明があるので、lint の同じ指摘（実物の文面「.claude/ を持つ。…」）は重ねない。
+  // ".claude/settings.json を読めない" のような別の warn と error は出る
   assert.doesNotMatch(html, /\.claude\/ を持つ/);
+  assert.match(html, /warn: \.claude\/settings\.json を読めない: 壊れている/);
+  assert.match(html, /\.claude\/ がある。Claude Code は/);
   assert.match(html, /error: 文面が無い/);
   // 行末は「開く ▾」と「git ▾」の 2 つ。中のボタンの data-action は前のまま
   const card = html.slice(html.indexOf('<li class="project'), html.indexOf("    </li>"));

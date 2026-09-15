@@ -33,7 +33,7 @@ test("CB-D21 範囲を inherit に変えると glob の欄が消え、行は開�
   const page = await loadPage(html());
   try {
     page.click(page.one('.phase[data-key="p2"] .row-head'));
-    page.type(page.one('.phase[data-key="p2"] select.f-scope'), "inherit");
+    page.change(page.one('.phase[data-key="p2"] select.f-scope'), "inherit");
     assert.ok(page.one('.phase[data-key="p2"]').classList.contains("open"));
     assert.equal(page.all('.phase[data-key="p2"] input.f-scope-globs').length, 0);
     assert.equal(page.one('.phase[data-key="p2"] .sum .mono').textContent, "inherit");
@@ -47,11 +47,14 @@ test("CB-D21 範囲を inherit に変えると glob の欄が消え、行は開�
   }
 });
 
-test("CB-D22 絞り込みは title と scope にも当たり、一致した行だけを数える。足した種類は開いて焦点が id に来る", async () => {
+test("CB-D22 絞り込みは title と scope にも当たり、開いている行は隠さず、一致した行だけを数える。足した種類は開いて焦点が id に来る", async () => {
   const page = await loadPage(html());
   try {
+    page.click(page.one('.phase[data-key="p1"] .row-head'));
     page.type(page.one("#find"), "設計");
-    assert.equal(page.one("#phase-count").textContent, "1 / 5");
+    assert.equal(page.one("#phase-count").textContent, "1 / 5", "開いている research は一致しないので数えない");
+    assert.ok(page.one('.phase[data-key="p1"]').classList.contains("hidden-by-find"));
+    assert.ok(page.one('.phase[data-key="p1"]').classList.contains("open"));
     assert.ok(!page.one('.phase[data-key="p2"]').classList.contains("hidden-by-find"));
     page.type(page.one("#find"), "");
     page.click(page.one('button[data-action="add"]'));
@@ -60,6 +63,23 @@ test("CB-D22 絞り込みは title と scope にも当たり、一致した行�
     assert.ok(added.classList.contains("open"));
     assert.equal(page.document.activeElement, added.querySelector("input.f-id"));
     assert.equal(added.querySelector(".sum .mono")?.textContent, "inherit");
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D23 保存の往復の間は欄を止めるが、行の開閉のボタンは止めない。失敗が返れば欄は戻る", async () => {
+  const page = await loadPage(html());
+  try {
+    page.click(page.one('.phase[data-key="p1"] .row-head'));
+    page.type(page.one('.phase[data-key="p1"] input.f-title'), "調べる");
+    page.click(page.one("#save"));
+    assert.equal(page.posted.filter((m) => m.type === "save").length, 1);
+    assert.ok(page.one<HTMLInputElement>('.phase[data-key="p1"] input.f-title').disabled);
+    assert.ok(!page.one<HTMLButtonElement>('.phase[data-key="p1"] .row-head .twist').disabled);
+    await page.send({ type: "failed", message: "lint error" });
+    assert.ok(!page.one<HTMLInputElement>('.phase[data-key="p1"] input.f-title').disabled);
+    assert.equal(page.one("#status").textContent, "lint error");
   } finally {
     await page.close();
   }

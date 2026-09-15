@@ -182,6 +182,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(!html.includes("ゲート開"));
   assert.ok(!html.includes("マーカーなし"));
   assert.doesNotMatch(html, /class="phase-status">[^<]*レビュー不要/);
+  // ゲート閉のフェーズ行は段階名も右の状態も赤
+  assert.match(html, /\.phase\.gate-closed \.phase-label, \.phase\.gate-closed \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
   // ゲート閉の左線は承認待ちの左線より後に書き、勝つ
   assert.ok(html.indexOf(".card.pending { border-left") < html.indexOf(".card.gate-closed { border-left"));
   // 締める（wrapup）のボタンは出さない

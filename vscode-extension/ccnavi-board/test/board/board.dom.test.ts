@@ -35,7 +35,7 @@ test("CB-D41 親で絞り込むと他の家族のカードが隠れ、列の件�
   const page = await loadPage(renderBoard(buildBoard(json), OPTIONS));
   try {
     assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち 2 件を承認");
-    page.type(page.one("#parent-filter"), "i0001");
+    page.change(page.one("#parent-filter"), "i0001");
     assert.ok(page.document.body.classList.contains("filtering"));
     assert.ok(page.one('.card[data-id="i0002"]').classList.contains("hidden"));
     assert.ok(!page.one('.card[data-id="i0001"]').classList.contains("hidden"));

@@ -64,6 +64,36 @@ test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開い�
   }
 });
 
+test("CB-D08 id を打っている途中は控えを書き直さず、確定（change）したときに新しい id で控える", async () => {
+  const page = await loadPage(html());
+  try {
+    page.click(page.one('.rule[data-id="git-push"] .row-head'));
+    assert.deepEqual((page.state() as { open: string[] }).open, ["git-push"]);
+    const id = page.one('.rule[data-id="git-push"] input.f-id');
+    page.type(id, "git-pu");
+    assert.deepEqual((page.state() as { open: string[] }).open, ["git-push"], "打っている途中は前の id のまま");
+    page.type(id, "git-push-2");
+    page.change(id);
+    assert.deepEqual((page.state() as { open: string[] }).open, ["git-push-2"]);
+    assert.equal(page.one('.rule[data-id="git-push-2"] .sum .sum-id').textContent, "git-push-2");
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない", async () => {
+  const page = await loadPage(html());
+  try {
+    page.one("#find").addEventListener("input", () => {
+      throw new Error("わざと");
+    });
+    assert.throws(() => page.type(page.one("#find"), "x"), /わざと/);
+    assert.equal(page.errors.length, 1);
+  } finally {
+    await page.window.happyDOM.close();
+  }
+});
+
 test("CB-D02 state に控えた id の行は、読み直したあとも開いている", async () => {
   const page = await loadPage(html(), { open: ["deps"], tab: "rules" });
   try {
@@ -85,7 +115,7 @@ test("CB-D03 コンテキストの欄は値があるルールだけ最初から�
     more.removeAttribute("open");
     more.dispatchEvent(new page.window.Event("toggle"));
     page.click(page.one('.rule[data-id="no-rm"] .row-head'));
-    page.type(page.one('.rule[data-id="no-rm"] select.f-kind'), "regex");
+    page.change(page.one('.rule[data-id="no-rm"] select.f-kind'), "regex");
     assert.ok(!page.one('.rule[data-id="no-rm"] details.more').hasAttribute("open"));
     assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"), "描き直しても開いたまま");
   } finally {
@@ -152,6 +182,13 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     await page.send(judged("no-rm"));
     assert.ok(!page.one('.rule[data-id="git-push"]').classList.contains("open"));
     assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"));
+    // 絞り込み中に 2 件当たっても、両方開き、件数は一致した行だけを数える
+    page.type(page.one("#find"), "pyproject");
+    await page.send({ ...judged("git-push"), result: { ...judged("git-push").result, rules: [judged("git-push").result.rules[0], judged("no-rm").result.rules[0]] } });
+    assert.ok(page.one('.rule[data-id="git-push"]').classList.contains("open"));
+    assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"));
+    assert.equal(page.one('[data-count="deny"]').textContent, "0 / 2");
+    assert.equal(page.one('[data-count="ask"]').textContent, "1 / 1");
   } finally {
     await page.close();
   }
@@ -165,7 +202,7 @@ test("CB-D07 足したルールは開いて焦点が id に来る。タイプを
     assert.ok(added.classList.contains("open"));
     assert.equal(page.document.activeElement, page.one('[data-list="allow"] .rule input.f-id'));
     page.type(page.one('[data-list="allow"] .rule input.f-id'), "new-one");
-    page.type(page.one('[data-list="allow"] .rule select.f-section'), "ask");
+    page.change(page.one('[data-list="allow"] .rule select.f-section'), "ask");
     assert.equal(page.all('[data-list="allow"] .rule').length, 0);
     const moved = page.one('.rule[data-id="new-one"]');
     assert.ok(moved.closest('[data-list="ask"]') !== null);
