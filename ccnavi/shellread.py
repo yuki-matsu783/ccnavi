@@ -110,11 +110,18 @@ _RESERVED = frozenset(
         "esac",
         "select",
         "time",
+        "coproc",
         "!",
         "{",
         "}",
     }
 )
+
+# 複合コマンドの始まりになる予約語。`coproc NAME { … }`（bash 4 以降）の NAME を、後ろの
+# 複合コマンドから切り離すのに使う。切らないと `{` がコマンドの位置に立たず、中身の先頭が
+# コマンドの先頭として読まれない。zsh は名前付きの形を持たず、`coproc NAME cmd` は NAME を
+# 実行する。どちらでも NAME を 1 本のコマンドとして読むのは外れない。
+_COMPOUND_START = frozenset({"{", "while", "until", "for", "if", "case", "select"})
 
 # 頼まれたときだけ文字列を実行するコマンド。bash にスクリプトファイルを渡すのは
 # 普通の操作で、読める状態を保たないといけないので、フラグが付いた形だけを数える。
@@ -689,18 +696,28 @@ def _split_commands(tokens: list[str]) -> list[list[str]]:
     """区切り記号でトークン列を切り、コマンド 1 本ずつのリストにする。"""
     commands: list[list[str]] = []
     current: list[str] = []
+    # 直前に coproc を 1 本にし、current がその名前かもしれない 1 語だけのとき真。
+    after_coproc = False
     for token in tokens:
         if token in _OPERATORS:
             if current:
                 commands.append(current)
                 current = []
+            after_coproc = False
             continue
+        if after_coproc and len(current) == 1 and token in _COMPOUND_START:
+            # `coproc NAME { … }`。NAME は名前で、後ろの複合コマンドの先頭は予約語。
+            commands.append(current)
+            current = []
         if not current and token in _RESERVED:
             # コマンドの位置に立つ予約語は、それだけで 1 本にする。後ろの語を
             # コマンドの先頭として読ませるため（`then find . -delete`）。
             # 落とさないのは、`! grep x f` を `grep x f` と読んで allow に当てないため。
             commands.append([token])
+            after_coproc = token == "coproc"
             continue
+        if current:
+            after_coproc = False
         current.append(token)
     if current:
         commands.append(current)
