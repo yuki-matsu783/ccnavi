@@ -24,6 +24,9 @@ ccnavi_approved:
   approved_at: 2026-09-15T17:13:42+0900
   source_tree: launcher-scripts
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/launcher-scripts/wip/tickets/todo/launcher-scripts-10.md
+started_at: 2026-09-15T17:15:40+0900
+base_sha: 3651f423b5497ea568493cccaa6f85ab721f6f2e
+completed_at: 2026-09-15T17:18:34+0900
 ---
 
 # 文書を直す（フェーズ 5 の敵対的レビュー）
