@@ -151,7 +151,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | 何 | どう出るか、何が起きるか |
 |---|---|
 | 段階の閾値 | `levels` の medium / high / critical の 3 欄を 1 行に。空ならその段階は組み込みの値（20 / 40 / 70）で、保存しても欄を書かない。説明は見出しの下の「この欄の説明」を開くと出る |
-| 項目 | `factors` を 1 件 1 行（id、points、当て方と値をつないだ文と message）で並べる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す（足した行は開いて出る）・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
+| 項目 | `factors` を 1 件 1 行（id、points、当て方と値をつないだ「〜なら加点」の文と message）で並べる。絞り込みは画面に出ている語（当て方の札・要約の文）でもキーの綴りでも当たる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す（足した行は開いて出る）・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
 | 保存 | 一時ファイルへ書いて `--lint --risk` を通し、error があれば保存しない。整数でない points や逆順の閾値はここで止まる |
 | ファイルが無い | 組み込みの配点を読み取り専用で見せ、「組み込みの配点でファイルを作る」で同じ値のファイルを書き出す。値が同じなので数え方は変わらない。既にあれば上書きしない |
 | チケット制御が disable | 上部に「配点は何にも効かない」と出る。編集と保存はできる |
@@ -289,7 +289,8 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 テストは画面の領域ごとのディレクトリに分けてあり、一部を直したときはその領域だけを流せる。
 HTML を文字列で見る単体テスト（`*.test.ts`）と、画面に埋めたスクリプトを happy-dom で実際に動かす
 テスト（`*.dom.test.ts`）を同じディレクトリに置く。happy-dom で動かないものが出たときだけ jsdom を足す
-（いまは無い）。`pnpm test` は古い `out/` を先に消す（tsc は消さないので、置き場を動かした古いテストが残る）。
+（いまは無い）。`pnpm test` と `pnpm run compile` は tsc の出力（`out/src` と `out/test`）を先に消す（tsc は消さないので、
+置き場を動かした古いテストが残る）。esbuild が束ねた `out/extension.js` は消さないので、package の compile → test の順でも入口は残る。
 出荷物の型検査は `tsconfig.json`（src だけ）で、テストは `tsconfig.test.json`（happy-dom の型定義の検査だけ飛ばす）。
 
 実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom を足してある。vsix には `node_modules/` を入れず、
