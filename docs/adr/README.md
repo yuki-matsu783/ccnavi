@@ -35,9 +35,9 @@
 | [0005](0005-settings-env.md) | 設定は `.claude/settings.json` の `env` に置く |
 | [0006](0006-disable-from-env-only.md) | `disable` は起動側の環境からしか効かせない |
 | [0007](0007-mode-names.md) | モードの名前を `enable` / `dry-run` / `disable` にする |
-| [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0043）） |
+| [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0044）） |
 | [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
-| [0043](0043-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
+| [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
 
 ### ルールと判定
 
@@ -54,7 +54,7 @@
 | [0016](0016-test-same-path.md) | 判定を実行せずに試す道を、判定と同じ関数で作る |
 | [0032](0032-main-tree.md) | ワークスペースルート直下の編集をルールで止める |
 | [0034](0034-all-reasons-claude-only.md) | 該当した理由を全部 1 回で返し、対象は Claude Code に絞る |
-| [0044](0044-inner-commands.md) | シェルのコマンドは、実行役のコマンドの中で実行されるコマンドにも止める側のルールだけを当てる |
+| [0045](0045-inner-commands.md) | シェルのコマンドは、実行役のコマンドの中で実行されるコマンドにも止める側のルールだけを当てる |
 
 ### 実行後の監視と自己防衛
 
@@ -72,7 +72,7 @@
 |---|---|
 | [0022](0022-ticket-narrows-only.md) | チケットは絞る向きにしか使わず、未承認は何も効かせない |
 | [0023](0023-copies-not-ledger.md) | 承認済みの姿はチケットごとのファイルにし、台帳をやめる |
-| [0024](0024-parallel-tickets.md) | 並行するチケットの骨：行き先で結ぶ、子は親の部分集合、状態は置き場 |
+| [0024](0024-parallel-tickets.md) | 並行するチケットの骨子：行き先で結ぶ、子は親の部分集合、状態は置き場 |
 | [0025](0025-reference-workflow.md) | 参考にした運用から採ったもの、採らなかったもの |
 | [0026](0026-phase-types.md) | フェーズに種類を与え、親が計画を持つ |
 | [0027](0027-risk-by-result.md) | リスクは宣言ではなく実績で測る |
@@ -80,8 +80,9 @@
 | [0029](0029-approval-path.md) | チケットの承認の経路を守る |
 | [0030](0030-three-human-touches.md) | push とマージリクエストの作成を親に渡し、人の手を 3 回にする |
 | [0031](0031-unresolved-not-by-time.md) | 未解決の指摘は時刻で絞らず、いま残っている全部を数える |
-| [0039](0039-approve-narrowing.md) | 承認の束は識別子で狭められる（狭めるだけ） |
+| [0039](0039-approve-narrowing.md) | 承認の対象は識別子で狭められる（狭めるだけ） |
 | [0040](0040-approve-from-the-board.md) | 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える |
+| [0043](0043-approve-carry.md) | 承認済みチケットは sh が運び、範囲の超過は判定で止め、ボードの承認は指紋で照合する |
 
 ### 複数のリポジトリと VS Code 拡張
 

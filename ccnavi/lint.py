@@ -240,7 +240,6 @@ def check(
     problems.extend(_project_settings(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
-    problems.extend(_old_common(conf, root))
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
     problems.extend(_ticket(conf, root))
@@ -258,7 +257,7 @@ def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
     """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
-    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §25.4.2）。
+    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §11.4.2）。
     """
     if not conf.risk:
         return []
@@ -282,9 +281,9 @@ def _phases(conf: settings.Settings) -> list[Problem]:
 
 
 def _types_resolver(conf: settings.Settings, root: str):
-    """`project:` から、そのチケットに効く種類を引く（設計 §25.4.1）。
+    """`project:` から、そのチケットに効く種類を引く（設計 §11.4.1）。
 
-    束の中でチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
+    承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 層 1 回。
     """
     cache: dict[str, dict | None] = {}
@@ -306,36 +305,6 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     検証はその思い違いを名指しする場所になる。
     """
     problems: list[Problem] = []
-    # 退役した名前ごとに、代わりに何を書くのかを言う。まとめて 1 つの文面にすると、
-    # 置き場の話しかしない案内が、置き場とは関係ない名前にも付く。
-    replacements = {
-        "CCNAVI_GUARD_CLI": f"{settings.GUARD_TICKET_APPROVAL_ENV} に改名した",
-        "CCNAVI_PROJECT_RULES": (
-            f"層の設定は {settings.PROJECT_HOME_ENV}（既定 {settings.DEFAULT_PROJECT_HOME}）の下の "
-            f"{settings.LAYER_CONFIG_DIR}/ に 3 本まとめて置く。"
-            f"旧の綴りに置いたままのルールは 1 件も効いていない"
-        ),
-    }
-    default = f"提案は {settings.TICKETS_ENV}、承認済みチケットは {settings.APPROVED_ENV} で指す"
-    for name in conf.retired:
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"{name} はもう効かない。{replacements.get(name, default)}",
-            )
-        )
-    if conf.approved_blank:
-        # 以前は空文字が「チケット制御を使わない」の宣言だった。今は置き場のパスで
-        # しかなく、空は既定の置き場に戻る。切りたかった人には今の書き方を言う。
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"{settings.APPROVED_ENV} が空文字。空で切ることはもうできず、"
-                f"既定の置き場で動いている。切るなら {settings.TICKET_CONTROL_ENV}=disable",
-            )
-        )
     if not conf.tickets_enabled:
         problems.append(
             Problem(
@@ -430,7 +399,7 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
 def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
     """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
     problems: list[Problem] = []
-    # 提案と承認済みチケットを合わせた池。親子の制約は、親が同じ束で提案されている形も含めて見る。
+    # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
         pool.setdefault(t.ticket, t)
@@ -448,7 +417,9 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) ->
             )
         if t.state not in ticket_mod.CLOSED:
             # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-            for p in approval.validate(t, pool, resolve(approval.project_of(t, pool))):
+            # 範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
+            complaints, overflow = approval.validate(t, pool, resolve(approval.project_of(t, pool)))
+            for p in complaints + overflow:
                 problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         if t.state == ticket_mod.DOING:
             waiting = [p for p in t.predecessors if p not in done]
@@ -523,10 +494,10 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """層が噛み合っているか（設計 §25.9、REQ-MLT-16）。
+    """層が噛み合っているか（設計 §11.9、REQ-MLT-16）。
 
-    見るのは 3 つ。層のファイルが読めること、層をまたいだ重複と同名の衝突、
-    旧の置き場に置いたままのルール。`.ccnavi/config/` が無いことは言わない。
+    見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
+    `.ccnavi/config/` が無いことは言わない。
     無いのは正常（無い層 = 空）で、言うと本当に言うべきものが埋もれる。
 
     共通層は `_rules` が別に見ているので、ここでは層の 2 つ目以降だけを回す。
@@ -554,7 +525,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各層の phases / risk が、共通層と合成できるか（設計 §25.4.1、§25.4.2）。
+    """各層の phases / risk が、共通層と合成できるか（設計 §11.4.1、§11.4.2）。
 
     見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
@@ -581,7 +552,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """作業ツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §25.6）。
+    """作業ツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §11.6）。
 
     判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
     作業ツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
@@ -634,7 +605,7 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 
     置き場が無いのは不備ではない。あるなら、ワークスペースの git で無視されていること、
     予約名（`common` / `self`、綴り違いも含む）を使っていないこと、プロジェクトが
-    `.claude/` を持たないこと、旧の置き場のルールが残っていないことを見る。層の中身は
+    `.claude/` を持たないことを見る。層の中身は
     `_layers` が見る。
     """
     problems: list[Problem] = []
@@ -667,16 +638,6 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     "別の名前に変える",
                 )
             )
-        old = os.path.join(p.root, settings.OLD_PROJECT_RULES.replace("/", os.sep))
-        if os.path.isfile(old):
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    where,
-                    f"{settings.OLD_PROJECT_RULES} があるが、もう読まない。"
-                    f"{settings.layer_real_path(conf, '', settings.KIND_RULES)} へ人が移す",
-                )
-            )
         if os.path.isdir(os.path.join(p.root, ".claude")):
             problems.append(
                 Problem(
@@ -689,39 +650,11 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     return problems
 
 
-def _old_common(conf: settings.Settings, root: str) -> list[Problem]:
-    """前の既定の置き場（`.claude/ccnavi/`）に、読まれない共通層の設定が残っていないか（ADR-0042）。
-
-    言うのは、今の設定がそこを読んでいないときだけ。env が前の綴りのままで読んでいる
-    ワークスペースは動いているので咎めない（導入スクリプトを打ち直せば移る）。読まれずに
-    残っているものは、黙っていると書いた人は効いていると思い続ける。判定は動いているので
-    warn にする。
-    """
-    reading = {
-        os.path.normcase(os.path.realpath(p)) for p in (conf.rules, conf.phases, conf.risk) if p
-    }
-    problems: list[Problem] = []
-    for name in settings.OLD_COMMON_FILES:
-        rel = f"{settings.OLD_COMMON_DIR}/{name}"
-        old = os.path.join(root, rel.replace("/", os.sep))
-        if not os.path.isfile(old) or os.path.normcase(os.path.realpath(old)) in reading:
-            continue
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(settings)",
-                f"{rel} があるが、もう読まない。共通層の既定の置き場は .ccnavi/common/{name}。"
-                "scripts/ccnavi-setup.sh を打ち直すと移る",
-            )
-        )
-    return problems
-
-
 def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
 
     プロジェクト向けの提案はワークスペースの `wip/<名前>/tickets/` に置き、名前は
-    `projects/` にあるプロジェクトのものでなければ走査されない（設計 §25.5）。走査
+    `projects/` にあるプロジェクトのものでなければ走査されない（設計 §11.5）。走査
     されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
     いちばん困るので名指しする。error にはしない。判定は動いている。
     """

@@ -43,8 +43,8 @@ def at_start(
 
     渡すのは cwd で決める。親の作業ツリーならその親の開いている子、子の作業ツリーなら
     その子自身。main と、チケットの無い作業ツリーからの起動には何も渡さない。
-    全部の子を渡していた版は、別のセッションが main で調査を委譲したときにも無関係な
-    子の範囲を案内し、調査役が自分の居場所を迷う形になった（SubagentStop と同じ絞り方）。
+    全部の子を渡すと、別のセッションが main で調査を委譲したときにも無関係な
+    子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:
@@ -109,6 +109,8 @@ def at_stop(
 
     見るのは、cwd が子の作業ツリーならその子、親の作業ツリーならその親の開いている
     子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
+    範囲は実行前の判定と同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
+    上限の外なら、どの上限かをパスの後ろに添える。
     """
     record.decision, record.enforced = audit.ALLOW, True
     if not conf.tickets_enabled:
@@ -126,20 +128,20 @@ def at_stop(
         if unreadable:
             stderr.write(f"ccnavi: {child.ticket} の作業ツリーを読めない: {unreadable}\n")
             continue
-        for rel in outside:
-            findings.append((child, rel))
+        for rel, found in outside:
+            findings.append((child, rel, found))
     if not findings:
         return EXIT_OK
 
-    record.decision, record.paths = audit.DENY, [f"{c.ticket}:{rel}" for c, rel in findings]
+    record.decision, record.paths = audit.DENY, [f"{c.ticket}:{rel}" for c, rel, _ in findings]
     record.rules, record.code = [reasons.TICKET_RULE], post.CODE_TICKET_SCOPE
     lines = [
         f"[ccnavi] {post.CODE_TICKET_SCOPE}: 子チケットの範囲の外に変更が残っています（"
         f"{len(findings)} 件）。範囲の中へ戻すか、要るなら親に伝えて次のチケットにしてください。"
     ]
-    for child, rel in findings[: post.REPORT_LIMIT]:
+    for child, rel, found in findings[: post.REPORT_LIMIT]:
         area = ", ".join(child.paths(rules.ALLOW) + child.paths(rules.ASK)) or "(空)"
-        lines.append(f"  {child.ticket}: {rel}  範囲は {area}")
+        lines.append(f"  {child.ticket}: {rel}{_limit_note(child, found)}  範囲は {area}")
     text = "\n".join(lines)
 
     already = _bounced(conf.state, payload.agent_id)
@@ -153,8 +155,21 @@ def at_stop(
     return EXIT_OK
 
 
+def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
+    """子の範囲の中なのに外とされたパスに添える、止めた上限の名指し。子の範囲の外なら空。
+
+    添えないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
+    戻せと言われても戻し先が分からない。
+    """
+    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+        return f"（種類 {found.type.title} の上限の外）"
+    if found.limit == phase.LIMIT_PARENT:
+        return f"（親 {child.parent} の範囲の外）"
+    return ""
+
+
 def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
-    """終わったサブエージェントが差し戻しを受けていたなら、その旨。印は消す。"""
+    """終わったサブエージェントが差し戻しを受けていたなら、その旨。マーカーは消す。"""
     if payload.tool_name != judge.AGENT_TOOL:
         return ""
     agent_id = str(payload.tool_response.get("agentId") or "")

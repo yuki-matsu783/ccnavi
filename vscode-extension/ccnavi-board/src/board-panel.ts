@@ -3,11 +3,18 @@
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
-import { acceptCommand, type Launcher } from "./core/commands.js";
+import {
+  acceptCommand,
+  PUSH_APPROVED_SCRIPT,
+  pushApprovedCommand,
+  type Launcher,
+} from "./core/commands.js";
 import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
@@ -18,7 +25,7 @@ const DEBOUNCE_MS = 120;
 
 /**
  * 監視する場所。提案（ワークスペース、プロジェクト、全作業ツリーの `wip/tickets/`）、
- * 承認済みチケットと印（同じツリーの `.ccnavi/tickets/`）、作業ツリーの登録。
+ * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、作業ツリーの登録。
  * glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [
@@ -38,6 +45,8 @@ type Message =
   | { readonly type: "approve"; readonly tickets: readonly string[]; readonly filtered: boolean }
   | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
   | { readonly type: "approveCancel" }
+  | { readonly type: "promptCopy" }
+  | { readonly type: "promptOpen" }
   | { readonly type: "accept"; readonly parent: string; readonly phase: number };
 
 interface PanelState {
@@ -55,7 +64,7 @@ interface PanelState {
   filter?: string;
   /** 承認のオーバーレイ。あれば描くたびにボードの上に被せる。監視の更新で消えない */
   approval?: ApprovalOverlay;
-  /** そのオーバーレイが見せている束の絞り（ボードの絞り込みで見えている識別子）。空なら全部 */
+  /** そのオーバーレイが見せている一覧の絞り（ボードの絞り込みで見えている識別子）。空なら全部 */
   approvalOnly?: readonly string[];
 }
 
@@ -260,7 +269,8 @@ function handleMessage(message: Message | undefined): void {
       openTicket(current, message.filePath);
       return;
     case "approve": {
-      // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを束にする。
+      // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを承認の対象にする。
+      // カードの「この 1 件を承認」は、そのカードの識別子だけを絞りとして送ってくる。
       let only: readonly string[] = [];
       if (message.filtered) {
         if (message.tickets.length === 0) {
@@ -288,13 +298,17 @@ function handleMessage(message: Message | undefined): void {
         redraw(current);
       }
       return;
+    case "promptCopy":
+    case "promptOpen":
+      void handOverPrompt(current, message.type);
+      return;
     case "accept": {
       const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
       if (tree === undefined) {
         vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーが無いので accept を送れない`);
         return;
       }
-      runInTerminal(root, acceptCommand(tree, message.phase));
+      runInTerminal(root, acceptCommand(root, tree, message.phase));
       return;
     }
   }
@@ -308,15 +322,15 @@ function redraw(current: PanelState): void {
 }
 
 /**
- * 「承認」。束を読んでオーバーレイに出す。承認済みチケットはまだ置かれない。
+ * 「承認」。一覧を読んでオーバーレイに出す。承認済みチケットはまだ置かれない。
  * 読んでいる間も「読んでいる…」のオーバーレイを出し、二重に開かない。
  */
 async function openApproval(current: PanelState, only: readonly string[] = []): Promise<void> {
-  if (current.approval !== undefined && current.approval.kind !== "error") {
+  if (current.approval !== undefined && current.approval.kind !== "error" && current.approval.kind !== "done") {
     return;
   }
   current.approval = { kind: "loading" };
-  // 読み直し（束が変わったとき）も同じ絞りを通す。絞りを忘れると、絞り込んで見せた
+  // 読み直し（一覧が変わったとき）も同じ絞りを通す。絞りを忘れると、絞り込んで見せた
   // つもりのオーバーレイが承認待ち全部に化ける。
   current.approvalOnly = only;
   redraw(current);
@@ -329,9 +343,11 @@ async function openApproval(current: PanelState, only: readonly string[] = []): 
 }
 
 /**
- * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが束の一致を
- * 確かめ、違えば何も置かずに `mismatch` を返すので、束を読み直して出し直す。
- * 承認できたら、Claude Code に渡す文を通知の 2 ボタン（コピー / 新しいセッションで開く）で渡す。
+ * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが一覧と本文の一致を
+ * 確かめ、違えば何も置かずに `mismatch` を返すので、一覧を読み直して出し直す。
+ * 承認できたら、承認済みチケットをコミットして push する sh をターミナルに送り、
+ * 同じオーバーレイを「承認した」に切り替え、Claude Code に渡す文を
+ * 2 ボタン（コピー / 新しいセッションで開く）で渡す。右下の通知は見落とすので使わない。
  * 押すまで何もしない。ボードの読み直しは承認済みチケットの監視が起こす。
  */
 async function confirmApproval(current: PanelState, tickets: readonly string[]): Promise<void> {
@@ -341,31 +357,49 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   const preview = current.approval.preview;
   current.approval = { kind: "approving", preview };
   redraw(current);
-  // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らない束と比べて食い違いにする。
+  // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
+  // 見せた指紋（承認画面の本文と承認済みチケットに写る中身）も渡す。識別子が同じでも、見せたあとに提案の中身が変われば承認しない。
   const outcome = await runApproveYes(
     current.folder.uri.fsPath,
     binSetting(),
     tickets,
+    preview.digest,
     current.approvalOnly ?? [],
   );
   if (state !== current) {
     return;
   }
   if (outcome.ok) {
-    current.approval = undefined;
+    const count = outcome.value.approved.length;
+    // 文を渡すより先に送る。ボタンは押されるまで待つが、運ぶ 1 行は承認と同じ時点で端末に出しておく。
+    const carried = count > 0 && carryApproved(current.folder.uri.fsPath);
+    current.approval = { kind: "done", count, prompt: outcome.value.prompt, carried };
+    current.approvalOnly = [];
     redraw(current);
-    void offerPrompt(outcome.value.approved.length, outcome.value.prompt);
     return;
   }
   if ("mismatch" in outcome) {
-    // 絞りは外す。束が変わったのだから、いま何が承認待ちなのかを全部見せる。
-    current.approvalOnly = [];
-    const again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+    // まず同じ絞りで読み直す。カードの「この 1 件を承認」で全部の一覧に切り替わると、1 件のつもりで
+    // 押し続けて全部を承認しかねない。絞りが通らない（その識別子がもう承認待ちに無い、親の改版が
+    // 承認待ちに入った）ときだけ絞りを外し、いま何が承認待ちなのかを全部見せる。
+    const only = current.approvalOnly ?? [];
+    let again = await runApprovePreview(current.folder.uri.fsPath, binSetting(), only);
     if (state !== current) {
       return;
     }
+    if (!again.ok && only.length > 0) {
+      current.approvalOnly = [];
+      again = await runApprovePreview(current.folder.uri.fsPath, binSetting());
+      if (state !== current) {
+        return;
+      }
+    }
+    const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
+    const notice = sameIds
+      ? "見せた承認画面と今の本文が違った（提案の中身が変わった）。見直してから承認する"
+      : "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する";
     current.approval = again.ok
-      ? { kind: "preview", preview: again.value, notice: "見せた束と今の束が違った（提案が増えたか減った）。見直してから承認する" }
+      ? { kind: "preview", preview: again.value, notice }
       : { kind: "error", error: again.error };
     redraw(current);
     return;
@@ -374,24 +408,49 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   redraw(current);
 }
 
-const COPY_PROMPT = "コピー";
-const OPEN_PROMPT = "新しいセッションで開く";
+/**
+ * 承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）をターミナルに送る。
+ * 承認の実行ファイルは承認済みチケットを置くだけで、運ぶのはこの sh。y/N は無い。
+ * sh が無ければ送らずに警告し、false を返す。送って `No such file` を見せるより、
+ * 何をすればよいかが先に分かる。
+ */
+function carryApproved(root: string): boolean {
+  if (!isFile(path.join(root, PUSH_APPROVED_SCRIPT))) {
+    void vscode.window.showWarningMessage(
+      `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、導入スクリプト（scripts/ccnavi-setup.sh）で配る`,
+    );
+    return false;
+  }
+  runInTerminal(root, pushApprovedCommand(root));
+  return true;
+}
+
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 承認の文を Claude Code に渡す。走っているセッションに送る公開の API は無いので、
  * クリップボードに入れて進行中のセッションに貼るか、`vscode://anthropic.claude-code/open?prompt=…`
  * で新しいセッションに文を埋める（送信は人が Enter）。
+ * 文は拡張が持っている分を使う。Webview から届いた文を URL に埋めない。
+ * 渡したらオーバーレイを閉じる。
  */
-async function offerPrompt(count: number, prompt: string): Promise<void> {
-  const chosen = await vscode.window.showInformationMessage(
-    `${count} 件を承認した。Claude Code に伝える文を用意した`,
-    COPY_PROMPT,
-    OPEN_PROMPT,
-  );
-  if (chosen === COPY_PROMPT) {
+async function handOverPrompt(current: PanelState, how: "promptCopy" | "promptOpen"): Promise<void> {
+  if (current.approval?.kind !== "done") {
+    return;
+  }
+  const prompt = current.approval.prompt;
+  current.approval = undefined;
+  redraw(current);
+  if (how === "promptCopy") {
     await vscode.env.clipboard.writeText(prompt);
     vscode.window.setStatusBarMessage("承認の文をクリップボードに入れた。Claude Code に貼って送る", 5000);
-  } else if (chosen === OPEN_PROMPT) {
+  } else {
     await vscode.env.openExternal(vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(prompt)}`));
   }
 }
@@ -449,6 +508,8 @@ function asMessage(message: unknown): Message | undefined {
   switch (m.type) {
     case "refresh":
     case "approveCancel":
+    case "promptCopy":
+    case "promptOpen":
       return { type: m.type };
     case "approve":
       // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きに倒れる。

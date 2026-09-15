@@ -99,9 +99,6 @@ function renderList(page: ProjectsPage): string {
 
 /** ワークスペース自身の層のルール。無いのは正常なので warn の色は使わない */
 function renderSelfRules(page: ProjectsPage): string {
-  if (page.selfRulesRel === "") {
-    return "";
-  }
   const rel = `<span class="mono small">${escapeHtml(page.selfRulesRel)}</span>`;
   const state = page.selfRulesExists
     ? `<span class="ok">あり</span> ${rel}`
@@ -112,17 +109,11 @@ function renderSelfRules(page: ProjectsPage): string {
 }
 
 function renderRules(row: ProjectRow): string {
-  const current =
-    row.rulesRel === ""
+  return row.rulesRel === ""
       ? '<span class="dim">層として数えられていません（検証の error を見てください）</span>'
       : row.rulesExists
         ? `<span class="ok">あり</span> <span class="mono small">${escapeHtml(row.rulesRel)}</span>`
         : `<span class="warn-text">なし</span> <span class="mono small dim">${escapeHtml(row.rulesRel)}</span> <button type="button" class="action small" data-action="create-rules" data-name="${escapeHtml(row.name)}" title="共通層の rules.yml をこのプロジェクトの層にコピーします。文面の sh のパスは {root} 付きに置き換えます">共通層からコピー</button>`;
-  if (!row.oldRulesExists) {
-    return current;
-  }
-  const to = row.rulesRel === "" ? "層の置き場" : `<span class="mono">${escapeHtml(row.rulesRel)}</span>`;
-  return `${current}<div class="warn-text small">旧の置き場 <span class="mono">${escapeHtml(row.oldRulesRel)}</span> は判定に読まれていません。中身を ${to} へ移し、旧のファイルを消してください</div>`;
 }
 
 function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {

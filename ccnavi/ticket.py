@@ -19,7 +19,7 @@
 
 ## 書式
 
-`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §24.3。
+`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import globmatch, rules, selfguard, tree
+from . import globmatch, rules, selfguard, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -79,7 +79,7 @@ GUARDED_STATES = (DOING, DONE, CANCELLED)
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 範囲の件数の上限。設計 §9.4 の max_ticket_rules。大量に並べて人のレビューを
+# 範囲の件数の上限。設計 §9.3。大量に並べて人のレビューを
 # 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
@@ -236,7 +236,7 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
-    # project は作業のプロジェクト（`projects/` の名前、設計 §25.5）。決めるのは提案を
+    # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、作業ツリーの中なら
     # その切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
     # 継ぐ段は無い。判定は行き先の作業ツリーの切り元と突き合わせる。
@@ -247,7 +247,7 @@ class Ticket:
     declared_project: str = ""
     # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
-    # 「見たうえで対応なし」。設計 §24.15.2。
+    # 「見たうえで対応なし」。設計 §9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
     review_required: bool = True
@@ -429,7 +429,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
     name = ticket.ticket
     # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
-    # `scan` が上書きする（設計 §25.5）。`scan` を通さない経路ではこの値が残る。
+    # `scan` が上書きする（設計 §11.5）。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
 
@@ -564,6 +564,9 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
     親に当てる。前置が親の allow か ask に入っていれば中、入っていなければ外。
     `src/components/*` の前置は `src/components/`、`*` の前置は空文字で、
     空文字を中と言える親は `*` を持つ親だけになる。
+
+    超えていても承認は止めない（warn）。判定が親の範囲で切り詰めるので、承認で止める
+    理由が無い。承認の画面は「判定で止まるもの」として別の見出しで見せる。
     """
     problems = []
     for entry in child.entries:
@@ -571,12 +574,7 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
             continue
         if entry.regex:
             problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    child.ticket,
-                    f"子の範囲に regex `{entry.regex}` は書けない。親の部分集合であることを"
-                    "確かめられない",
-                )
+                Problem(SEVERITY_WARN, child.ticket, regex_overflow_detail(entry.regex))
             )
             continue
         # ワイルドカードがあれば、前置に 1 文字足した綴りを親に当てる。`src/b/*` なら
@@ -587,12 +585,20 @@ def subset_problems(child: Ticket, parent: Ticket) -> list[Problem]:
         if verdict not in (rules.ALLOW, rules.ASK):
             problems.append(
                 Problem(
-                    SEVERITY_ERROR,
+                    SEVERITY_WARN,
                     child.ticket,
                     f"`{entry.glob}` は親 {parent.ticket} の範囲を超えている",
                 )
             )
     return problems
+
+
+def regex_overflow_detail(regex: str) -> str:
+    """子の範囲の regex を名指しする文。親の検査と種類の検査の両方が同じ文を使う。
+
+    同じ文にしておけば、承認の画面で 2 度並べずに畳める。
+    """
+    return f"子の範囲に regex `{regex}` は書けない。親と種類の上限に入るかを判定のときに当てる"
 
 
 def combine(child: str, parent: str) -> str:
@@ -623,9 +629,9 @@ def scan_all(
     found: list[Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    # 置き場がプロジェクトを決める（設計 §25.5）。提案はどのツリーでも同じ相対の置き場に
+    # 置き場がプロジェクトを決める（設計 §11.5）。提案はどのツリーでも同じ相対の置き場に
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
-    # git で運ぶので、提案も同じブランチに乗せる（設計 §24.5、REQ-MLT-14）。
+    # git で運ぶので、提案も同じブランチに乗せる（設計 §9.2、REQ-MLT-14）。
     # frontmatter の `project:` は照合に使うだけ。
     places = [
         (t, tickets_rel, t.project)
@@ -681,21 +687,32 @@ def scan_all(
     return found, problems
 
 
-def dedupe(found: list[Ticket]) -> list[Ticket]:
-    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。
+def fold(hits: list[Ticket]) -> list[Ticket]:
+    """同じ識別子の写りを、権威のあるツリーで畳む。
 
     子の作業ツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
-    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに無い
-    ときは全部残し、検証が「複数の場所にある」と言う。
+    写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
+    あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
+    なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
     """
-    by_id: dict[str, list[Ticket]] = {}
+    home = hits[0].parent or hits[0].ticket
+    at_home = [t for t in hits if t.tree == home]
+    return at_home if at_home else hits
+
+
+def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
+    """識別子ごとの写りの全部。並びは見つけた順。"""
+    grouped: dict[str, list[Ticket]] = {}
     for t in found:
-        by_id.setdefault(t.ticket, []).append(t)
+        grouped.setdefault(t.ticket, []).append(t)
+    return grouped
+
+
+def dedupe(found: list[Ticket]) -> list[Ticket]:
+    """同じ識別子が複数のツリーにあるとき、権威のあるツリーの側だけを残す。"""
     kept: list[Ticket] = []
-    for hits in by_id.values():
-        home = hits[0].parent or hits[0].ticket
-        at_home = [t for t in hits if t.tree == home]
-        kept.extend(at_home if at_home else hits)
+    for hits in by_ticket(found).values():
+        kept.extend(fold(hits))
     return kept
 
 
@@ -723,16 +740,17 @@ def state_dir_regex(tickets_rel: str) -> str:
     return rf"(^|[\\/]){_place(tickets_rel)}[\\/]({'|'.join(GUARDED_STATES)})[\\/]"
 
 
-def guard_rules(tickets_rel: str) -> list[rules.Rule]:
+def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     """状態の置き場を守るルール。組み込みで、ルールファイルには書かない。
 
     通るのは状態を動かすスクリプトだけ。そのスクリプトの呼び出し文字列には
-    置き場の綴りが現れないので、ここに当たらない。
+    置き場の綴りが現れないので、ここに当たらない。root は文面の sh の綴りに使う。
     """
     place = state_dir_regex(tickets_rel)
     message = (
         "チケットの状態は置き場（doing/ done/ cancelled/）で表し、動かすのは "
-        "'sh .ccnavi/scripts/ccnavi-ticket.sh start|done|cancel <識別子>' だけです。"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start|done|cancel <識別子>' "
+        "だけです。"
         "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
     )
     write_rule = rules.Rule(

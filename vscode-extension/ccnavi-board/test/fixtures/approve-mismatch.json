@@ -4,6 +4,10 @@
   "expected": [
    "i0001-09"
   ],
-  "current": []
+  "current": [],
+  "digest": {
+   "expected": "<digest>",
+   "current": "<digest>"
+  }
  }
 }

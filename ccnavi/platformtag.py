@@ -3,7 +3,7 @@
 PyInstaller の実行ファイルは、組み立てた機械の OS と CPU でしか動かない。配布先では
 この語をディレクトリ名にして、機械ごとの組み立てを並べて置く（`.ccnavi/bin/<語>/`）。
 hook が起動するのは `.ccnavi/scripts/ccnavi-launcher.sh` に置いた振り分けの sh で、sh が
-自分の機械の語を読んで、自分の隣ではなく `../bin/` の合うディレクトリへ渡す（ADR-0043）。
+自分の機械の語を読んで、自分の隣ではなく `../bin/` の合うディレクトリへ渡す（ADR-0044）。
 
 語は 3 か所で揃える。ここ、scripts/ccnavi-setup.sh の host_target、
 .ccnavi/scripts/ccnavi-launcher.sh。どれかだけ変えると、配った場所と探す場所がずれる。

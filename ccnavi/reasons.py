@@ -126,7 +126,8 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
         lines.append(
             "ccnavi is asking rather than deciding because it could not tell what this call "
             "would actually do. Say what the command is for, or rewrite it in a form that can "
-            "be read: no heredoc, no string handed to something that runs it."
+            "be read: no heredoc, no string handed to something that runs it, no case inside "
+            "$( )."
         )
     elif refused:
         lines.append(
@@ -156,6 +157,7 @@ def reason_for(
     degraded: str,
     runner: str = "",
     inner: str = "",
+    quoted: bool = False,
 ) -> str:
     """当たったルール 1 件を、それだけで読んで成立する理由に組む。
 
@@ -163,6 +165,9 @@ def reason_for(
     それを言っているのはどの設定か（出所）。どれが欠けても、受け取った側は
     自分の呼び出しのどこが引っかかったのかを自分では辿れず、
     文面を信じるか無視するかの二択になる。
+
+    quoted は、このルールが引用の中から切り出したコマンドにだけ当たったこと
+    （judge が bare に当て直して決める）。そのときは断りを 1 文足す。
 
     件ごとに閉じた形にするのは、1 回の応答に複数の理由が入り、そのうちどれが
     利用者の目に入るかが決まらないため。「上に書いた事情が下の全部に掛かる」形は、
@@ -205,7 +210,9 @@ def reason_for(
         lines.append(ran_by(runner, inner))
     if degraded:
         lines.append(unreadable(degraded))
-    lines.append(rule.message)
+    lines.append(rule.spoken_message())
+    if quoted:
+        lines.append(inside_quotes())
     return "\n".join(lines)
 
 
@@ -219,11 +226,28 @@ def ran_by(runner: str, inner: str) -> str:
 
 
 def _one_line(text: str) -> str:
-    """コマンドを文面に載せる形にする。印を空白に戻し、1 行に畳んで上限で切る。"""
+    """コマンドを文面に載せる形にする。目印を空白に戻し、1 行に畳んで上限で切る。"""
     shown = " ".join(text.replace(shellread.SEP, " ").replace(shellread.WORD_SEP, " ").split())
     if len(shown) > SUBJECT_LIMIT:
         shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
     return shown
+
+
+def inside_quotes() -> str:
+    """引用の中から切り出したコマンドにルールが当たったときに添える断り。
+
+    書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
+    文字を書いただけのつもりでいる。実際にはシェルが実行するので止めるのは正しいが、
+    文字として渡す道を知らなければ、同じ形を書き直しては止まる。道はあるので名指しする。
+    git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 手になる。
+    """
+    return (
+        "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
+        "shell runs $( ) and backquotes there; they are not only written down. To keep them as "
+        "text, use single quotes, escape them as \\$( and \\`, or pass the text from a file "
+        "(git commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
+        "print it with one command first and write the value into the next."
+    )
 
 
 def unreadable(reason: str) -> str:
@@ -237,6 +261,11 @@ def unreadable(reason: str) -> str:
         shellread.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
         shellread.REASON_TAKEN_AS_CODE: (
             "this command hands a string to something that runs it as code"
+        ),
+        shellread.REASON_UNTERMINATED_SUBST: "a $( ) or backquote in this command never closes",
+        shellread.REASON_AMBIGUOUS_SUBST: (
+            "a $( ) in this command holds a form that shells read differently "
+            "(such as case inside $( )), or nests too deep"
         ),
     }.get(reason, "this command could not be read")
     return (
@@ -282,7 +311,8 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
         "- チケット作業: 大きな修正（設計に触れる、複数の段階になる、人のレビューが要る）は、",
         f"  {conf.tickets}/ に提案を書いて承認を受け、フェーズ{phases}と",
         f"  リスクの配点{risk}に従って issue と MR を作りながら進める。",
-        "  操作は sh .ccnavi/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。",
+        f"  操作は {settings.script_command(root, 'ccnavi-ticket.sh')} と "
+        f"{settings.script_command(root, 'ccnavi-review.sh')} を通す。",
         "どちらで進めるか迷ったら、利用者に聞く。",
     ]
     if mode == DRY_RUN:
@@ -290,7 +320,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     return "\n".join(lines)
 
 
-def approved(tickets, revisions: set[str]) -> str:
+def approved(tickets, revisions: set[str], root: str) -> str:
     """チケットが承認されたことをモデルに伝える文。
 
     `--approve --yes` の `prompt`（拡張が Claude Code に渡す）と、hook が次の
@@ -298,7 +328,7 @@ def approved(tickets, revisions: set[str]) -> str:
     2 か所で文を持つと、人が貼った文と hook が渡した文が食い違う。
 
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
-    revisions は親の改版だった識別子。
+    revisions は親の改版だった識別子。root はワークスペースルートで、sh の綴りに使う。
     """
     lines = ["[ccnavi] 承認済みチケットが置かれた。"]
     for t in tickets:
@@ -312,7 +342,7 @@ def approved(tickets, revisions: set[str]) -> str:
         lines.append(f"- {t.ticket}{title}（{where}）")
     lines.append(
         "後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-        "'sh .ccnavi/scripts/ccnavi-ticket.sh start <識別子>' で着手する。"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start <識別子>' で着手する。"
     )
     return "\n".join(lines)
 

@@ -1,4 +1,4 @@
-"""`python -m ccnavi` の入口の煙テスト。ここだけは本物のプロセスを起こす。
+"""`python -m ccnavi` の入口のスモークテスト。ここだけは本物のプロセスを起こす。
 
 他のテストは tests/inproc.py で cli.run を同じプロセスの中で呼ぶ。速いが、
 パッケージとして起動できること、標準入出力が UTF-8 に付け替わること、
@@ -20,6 +20,9 @@ RULES = os.path.join(ROOT, "tests", "fixtures", "rules.yml")
 
 def spawn(*args, payload=""):
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    # コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    # 切らないと、作業ツリーで消した設定ファイルが `logs/state` の控えから書き戻される。
+    environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     # コンソールのコードページに関係なく UTF-8 で通ることを見たいので、
     # 親から Python の入出力の指定は渡さない。
     environment.pop("PYTHONIOENCODING", None)

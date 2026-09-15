@@ -56,6 +56,8 @@ class ShPortabilityTest(unittest.TestCase):
         names = {os.path.basename(p) for p in shell_scripts()}
         self.assertIn("ccnavi-setup.sh", names)
         self.assertIn("ccnavi-git.sh", names)
+        # 承認済みチケットを運ぶ sh（設計 approve-carry §1）。配るので、同じ検査を通す。
+        self.assertIn("ccnavi-push-approved.sh", names)
 
     def test_variable_is_braced_before_a_wide_character(self):
         self.assertEqual([], self.found(NAME_THEN_WIDE), "${name} と括ってください")

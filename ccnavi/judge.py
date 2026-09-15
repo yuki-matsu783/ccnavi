@@ -161,17 +161,19 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
+        selfguard.add_rules(
+            rule_set, conf.bin, conf.project_home, root, selfguard.common_layer_files(conf)
+        )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
-            rule_set.deny.append(phase.ticket_approval_rule(conf.bin))
+            rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
-    subject, inner = screen(payload.tool_name, record.subject, record)
+    subject, bare, inner = screen(payload.tool_name, record.subject, record)
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
@@ -200,13 +202,13 @@ def decide_before(
         conf.tickets_enabled
         and payload.agent_id
         and payload.tool_name in phase.SHELL_TOOLS
-        and phase.forbidden(subject, shellread.SEP.join(layer for _, layer in inner))
+        and phase.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
         # 禁止は中で実行されるコマンドにも当てる。`env sh …ccnavi-ticket.sh start` を
         # 元の形だけで見ると、先頭の `sh` に固定した形が外れて素通りになる。
         runner, layer = ("", "")
         if not phase.forbidden(subject):
-            runner, layer = next((r, x) for r, x in inner if phase.forbidden(x))
+            runner, layer = next((r, x) for r, x, _ in inner if phase.forbidden(x))
         record.code, record.rules = phase.CODE_SUBAGENT, [reasons.TICKET_RULE]
         record.unwrapped = layer
         return refuse(
@@ -217,7 +219,7 @@ def decide_before(
             notices + [reasons.subagent_forbidden(subject, runner, layer)],
         )
 
-    # ゲート。人間レビュー要のフェーズが終わっていて印が無い間、サブエージェントの
+    # ゲート。人間レビュー要のフェーズが終わっていてマーカーが無い間、サブエージェントの
     # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
     if conf.tickets_enabled and payload.tool_name in phase.GATED_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
@@ -225,11 +227,11 @@ def decide_before(
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if closed is not None and not exempt:
             record.code, record.rules = phase.CODE_GATE, [reasons.TICKET_RULE]
-            reason = phase.gate_reason(closed, payload.tool_name)
+            reason = phase.gate_reason(closed, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
-    # 範囲の宣言ではなく配線の誤りなので、ルールが allow と言っていても通さない。
+    # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject)
         if mismatch:
@@ -240,9 +242,10 @@ def decide_before(
     # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
     # 確認もしろ」という読めない結論に届く道ができる。
     verdict, group = "", []
-    # group と同じ並びで、中で実行されるコマンドで当たったときの（実行役のコマンド, そのコマンド）。
-    # 元の形で当たったルールは ("", "")。
-    via: list[tuple[str, str]] = []
+    # group と同じ並びで、中で実行されるコマンドで当たったときの
+    # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
+    # 元の形で当たったルールは ("", "", False)。
+    via: list[tuple[str, str, bool]] = []
     for name in rules.SECTIONS:
         if name == rules.ALLOW and record.degraded:
             # 読み切れなかったコマンドに allow は当てない。当てる先は
@@ -255,7 +258,10 @@ def decide_before(
         # 層を読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
         # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認に落ちるが、
         # 中の `cat …` が読み取りの allow に当たって通るようになる。
-        layers = inner if name != rules.ALLOW else []
+        #
+        # 引用の外の層を先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
+        # ことにする。引用の中の断りは、引用の中にだけ当たったときに付けるものなので。
+        layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
                 stderr.write("ccnavi: 判定を終える前に期限に達した\n")
@@ -263,33 +269,52 @@ def decide_before(
                 return modes.fail_closed(mode)
             if rule.matches(payload.tool_name, subject):
                 group.append(rule)
-                via.append(("", ""))
+                via.append(("", "", False))
                 continue
-            for runner, layer in layers:
+            for runner, layer, quoted in layers:
                 if rule.matches(payload.tool_name, layer):
                     group.append(rule)
-                    via.append((runner, layer))
+                    via.append((runner, layer, quoted))
                     break
         if group:
             verdict = name
             break
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
-    record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer in via if layer))
-    # 判定を下したのは最初に当たったルール（設計 §25.9）。その層を 1 欄で残す。
+    record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
+    # 判定を下したのは最初に当たったルール（設計 §11.9）。その層を 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
     # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
     if group:
         record.source = group[0].source
+
+    # 止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったもの。
+    # 書いた側は文字を書いただけのつもりでいるので、回避策を知らせないと、
+    # 同じ形を書き直しては止まる。どこに当たったかは一致位置から推し量らず、
+    # 引用の中の中身を除いた読み（bare）に当て直して、当たらなければそうだとする。
+    # こうするとルールの書き方（glob / regex、`^` / `(^|\x00)`）に依らない。
+    # 中で実行されるコマンドで当たったルールは、bare に当て直せない（bare は元の形の読み）。
+    # そちらは、当たった層が引用の中から切り出したコマンドのものかどうかで決める。
+    inside = [False] * len(group)
+    if verdict in (rules.DENY, rules.ASK):
+        inside = [
+            quoted if layer else bare != subject and not rule.matches(payload.tool_name, bare)
+            for rule, (_, layer, quoted) in zip(group, via, strict=True)
+        ]
+    record.quoted = [name for name, hit in zip(record.rules, inside, strict=True) if hit]
 
     # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
     # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
     # 人が書いた宣言よりエージェントが書いた宣言のほうが強くなる。
     ticket_reason = ""
     if not verdict:
-        verdict, ticket_reason = ticket_verdict(conf, root, payload.tool_name, record.subject)
+        verdict, ticket_reason, ticket_notice = ticket_verdict(
+            conf, root, payload.tool_name, record.subject
+        )
         if ticket_reason:
             record.rules = [reasons.TICKET_RULE]
+        if ticket_notice:
+            notices.append(ticket_notice)
 
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
@@ -321,13 +346,13 @@ def decide_before(
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
             reasons.reason_for(
-                rule, payload.tool_name, subject, source, record.degraded, runner, layer
+                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
             )
-            for rule, (runner, layer) in zip(group, via, strict=True)
+            for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
         # 全部が中で実行されるコマンドで当たったなら、当てた先は読み直したコマンドであって
         # 生の文字列ではない。読み切れなかったことを根拠のコードにしない。
-        read_through = all(layer for _, layer in via)
+        read_through = all(layer for _, layer, _ in via)
         record.code = reasons.code_for(payload.tool_name, "" if read_through else record.degraded)
         if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
             record.code = phase.CODE_TICKET_APPROVAL
@@ -338,9 +363,9 @@ def decide_before(
     elif verdict == rules.ASK and group:
         texts = [
             reasons.reason_for(
-                rule, payload.tool_name, subject, source, record.degraded, runner, layer
+                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
             )
-            for rule, (runner, layer) in zip(group, via, strict=True)
+            for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
@@ -454,38 +479,51 @@ def full_path(path: str, cwd: str) -> str:
         return os.path.normpath(os.path.abspath(joined))
 
 
-def screen(tool: str, subject: str, record: audit.Record) -> tuple[str, list[tuple[str, str]]]:
+def screen(
+    tool: str, subject: str, record: audit.Record
+) -> tuple[str, str, list[tuple[str, str, bool]]]:
     """シェルのコマンドを、実際に実行される部分まで絞る。読み切れなかったときは
     record にそう書き残す。
+
+    返すのは 3 つ。1 つめはルールを当てる読み。2 つめはそこから引用の中で切り出した
+    コマンドを除いた読み（shellread.Reading.bare）で、文面の断りを決めるためだけに使う。
+    シェルでないツールと読み切れなかったコマンドでは、1 つめと 2 つめは同じになる。
 
     ルールはコマンドについて書かれたものであって、文字列についてではない。
     git push を引用した文書は push ではないし、そこで拒否を返すことは、
     やっていないことをやったと読み手に告げることになる。
 
-    読み切れないコマンドは生の文字列に落とす。これは以前の挙動そのものなので、
-    今まで捕まえていたものが抜けることはない。変わるのは、返す拒否が
-    どちらの拒否なのかを名乗らなければならない点。
+    読み切れないコマンドは生の文字列に落とす。生の文字列には実行される部分が
+    すべて含まれるので、捕まえるべきものが抜けることはない。その代わり、返す拒否は
+    どちらの拒否なのかを名乗る。
 
-    2 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
-    1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド）。読み切れないコマンドでも
-    トークンに割れる限り返る。Bash 以外は空。
+    3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
+    1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
+    コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
     """
     if tool != "Bash":
-        return subject, []
+        return subject, subject, []
     reading = shellread.read(subject)
     inner = []
     if reading.unwrapped:
-        inner = list(zip(reading.runners, reading.unwrapped.split(shellread.SEP), strict=True))
+        inner = list(
+            zip(
+                reading.runners,
+                reading.unwrapped.split(shellread.SEP),
+                reading.quoted_layers,
+                strict=True,
+            )
+        )
     if reading.degraded:
         record.degraded = reading.reason
-        return subject, inner
-    return reading.text, inner
+        return subject, subject, inner
+    return reading.text, reading.bare, inner
 
 
 def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:
     """作業ツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
 
-    範囲の宣言ではなく配線の誤りなので、ルールより先に見る（REQ-MLT-12）。ルールが
+    範囲の宣言ではなく取り違えなので、ルールより先に見る（REQ-MLT-12）。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
     行き先のツリーが誰のものかは、そのツリーの `.git` が指す先で決まっている。
     """
@@ -523,8 +561,8 @@ def ticket_verdict(
     root: str,
     tool: str,
     full: str,
-) -> tuple[str, str]:
-    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文。
+) -> tuple[str, str, str]:
+    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文と、注記。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。main の直下ならチケットは無く、ルールだけで判定する。
@@ -533,16 +571,21 @@ def ticket_verdict(
     範囲の中は allow。ルールが何も言っていない場所で、チケットだけが
     「ここで作業する」と宣言しているので、そこは聞かずに通す。範囲の外は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
-    子は親と合わせて厳しい側が勝つ。
+    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側が勝つ（phase.scope_verdict）。
+    承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
+    名指しする。
+
+    注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
+    切り詰めない（親の範囲では切り詰める）ので、効いていない上限があることを判定に添える。
 
     チケット自身の提案ファイルについては何も言わない。承認された範囲の外に
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
-        return "", ""
+        return "", "", ""
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
-        return "", ""
+        return "", "", ""
     copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
@@ -550,14 +593,26 @@ def ticket_verdict(
     # 「効いている」と言われながら判定では権限モード任せに落ちる（敵対的レビューで実測）。
     ticket = tree.lookup(index, t.name)
     if ticket is None or ticket.is_own_file(full):
-        return "", ""
+        return "", "", ""
     rel = tree.relative(t, full)
-    verdict = ticket.decide(rel)
     parent = index.get(ticket.parent) if ticket.is_child else None
-    if parent is not None:
-        verdict = ticket_mod.combine(verdict, parent.decide(rel))
-    if verdict == rules.ALLOW:
-        return rules.ALLOW, ""
+    # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
+    # phases.yml を開かない。
+    pt, notice = None, ""
+    if parent is not None and phase.plan_item(ticket, parent) is not None:
+        types = phase.load_types(conf, root, parent.project)
+        pt = phase.type_for(conf, root, ticket, parent, types or {})
+        missing = phase.unread_type(conf, root, ticket, parent, types)
+        if missing:
+            notice = (
+                f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
+                "読めないので、種類の上限では切り詰めていない（親 "
+                f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
+                "種類が消えている。利用者に伝えて直してもらう（'ccnavi --lint' が箇所を言う）。"
+            )
+    found = phase.scope_verdict(ticket, parent, pt, rel)
+    if found.verdict == rules.ALLOW:
+        return rules.ALLOW, "", notice
 
     area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
     source = ticket.path
@@ -567,25 +622,52 @@ def ticket_verdict(
         f"worktree {t.name}",
         f"scope: {area}",
     ]
-    if verdict == rules.ASK:
-        return rules.ASK, "\n".join(
-            [
-                f"[ccnavi] {reasons.CODE_TICKET_ASK} (source: {source})",
-                *head,
-                "This path is one the ticket marks `ask`: the user looks at each write here. "
-                "Say what you are changing and why.",
-            ]
+    if found.verdict == rules.ASK:
+        return (
+            rules.ASK,
+            "\n".join(
+                [
+                    f"[ccnavi] {reasons.CODE_TICKET_ASK} (source: {source})",
+                    *head,
+                    "This path is one the ticket marks `ask`: the user looks at each write here. "
+                    "Say what you are changing and why.",
+                ]
+            ),
+            notice,
         )
-    return rules.DENY, "\n".join(
-        [
-            f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})",
-            *head,
+    # 上限ごとに次の一手が違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
+    # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
+    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+        pt = found.type
+        head.append(f"limit: phase type {pt.title} ({pt.id}): {', '.join(pt.scope_globs)}")
+        body = (
+            "This path is inside the ticket's work area but outside what phase type "
+            f"{pt.title} ({pt.id}) allows. The ticket was approved with that overflow shown as "
+            "a warning; writes there stay blocked. Do the work in a later phase whose type "
+            "covers this path, or ask the user to change phases.yml."
+        )
+    elif found.limit == phase.LIMIT_PARENT and parent is not None:
+        parent_area = ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(空)"
+        head.append(f"limit: parent {parent.ticket}: {parent_area}")
+        body = (
+            "This path is inside the ticket's work area but outside its parent "
+            f"{parent.ticket}. The ticket was approved with that overflow shown as a warning; "
+            "writes there stay blocked. Do the work inside the parent's area, or, if the task "
+            "genuinely needs this path, tell the parent so it can propose a ticket whose parent "
+            "covers it and ask the user to approve it."
+        )
+    else:
+        body = (
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
             "so it can propose a ticket that covers it and ask the user to approve it (from the "
             "ccnavi board in VS Code, or 'ccnavi --approve' in a terminal). "
-            "Editing a proposal alone changes nothing.",
-        ]
+            "Editing a proposal alone changes nothing."
+        )
+    return (
+        rules.DENY,
+        "\n".join([f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})", *head, body]),
+        notice,
     )
 
 

@@ -7,7 +7,7 @@
 3. ルールが置いた確認と権限モードへの委譲が区別して返ること
 4. ルールがチケットより強いこと
 
-3 つ目が要る理由は設計 §13.2 にある。権限モードへの委譲は設定の穴に起因するので、
+3 つ目が要る理由は ADR-0009 にある。権限モードへの委譲は設定の穴に起因するので、
 穴が塞がるまで同じ問いが繰り返される。ルールが置いた確認は人が意図して置いた
 確認ポイントで、繰り返されること自体に価値がある。混ぜると前者の数に
 後者が埋もれる。
@@ -100,7 +100,7 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("UNDECLARED", out["permissionDecisionReason"])
 
     def test_未言及の文は危険の表明ではないと言う(self):
-        # 設計 §13.2。危険だと書くと、受け取った側は存在しない危険を探しに行く。
+        # ADR-0009。危険だと書くと、受け取った側は存在しない危険を探しに行く。
         path = self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         reason = self.judge(path, "Bash", "ls -la")["permissionDecisionReason"]
@@ -182,7 +182,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_読み切れないコマンドは拒否ではなく確認になる(self):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
-        # 設計 §13.1 の PARSE_UNCERTAIN は ask 系に置かれている。
+        # 設計 §6.3 の PARSE_UNCERTAIN は人に確認を出す。
         path = self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],

@@ -1,7 +1,7 @@
 """モード B の受入テスト。本物のワークスペースを組み立てて sh を外から叩く。
 
 モード B は、道具を持つワークスペースの下の `projects/<名前>/` に別々のリポジトリを
-clone する形（設計 §25）。ここで確かめるのは、保護済み sh が「自分の根」を
+clone する形（設計 §11）。ここで確かめるのは、保護済み sh が「自分の根」を
 ワークスペースルートとして正しく取れること、その結果として記録・実行ファイル・
 状態の置き場がワークスペース側に揃うこと、そしてモード A（`projects/` が無い形）が
 退行しないこと。
@@ -200,7 +200,7 @@ class WorkspaceTest(unittest.TestCase):
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(hooks, name))
         shutil.copytree(DIST, os.path.join(ws, "dist", "ccnavi"))
-        os.makedirs(os.path.join(ws, ".claude", "ccnavi", "tickets"), exist_ok=True)
+        os.makedirs(os.path.join(ws, ".ccnavi", "tickets"), exist_ok=True)
         write(os.path.join(ws, ".gitignore"), "/logs/\n/projects/\n/dist/\n/.claude/worktrees/\n")
         git(ws, "add", ".gitignore", ".ccnavi/scripts", ".claude/hooks")
         git(ws, "commit", "-q", "-m", "tools")
@@ -292,7 +292,7 @@ class LogPlacementTest(WorkspaceTest):
         opened = False
         for piece in shown.replace("\n", " ").split():
             candidate = piece.strip("()")
-            # ラッパは `log=<綴り>` の形で返す。接頭辞を落としてから開く。
+            # ラッパースクリプトは `log=<綴り>` の形で返す。接頭辞を落としてから開く。
             if "=" in candidate:
                 candidate = candidate.split("=", 1)[1]
             if not candidate.endswith(".log"):
@@ -326,16 +326,9 @@ class PushGuardTest(WorkspaceTest):
     """子チケットの作業ツリーからは送らない（設計 4.1）。"""
 
     def test_a_child_worktree_cut_from_a_project_cannot_push(self):
-        write(
-            os.path.join(self.ws, ".claude", "ccnavi", "tickets", "wp1.md"),
-            "---\nversion: 1\nticket: wp1\nparent: oya\n---\n本文\n",
-        )
-        self.addCleanup(
-            lambda: (
-                os.path.exists(os.path.join(self.ws, ".claude", "ccnavi", "tickets", "wp1.md"))
-                and os.remove(os.path.join(self.ws, ".claude", "ccnavi", "tickets", "wp1.md"))
-            )
-        )
+        ticket = os.path.join(self.ws, ".ccnavi", "tickets", "wp1.md")
+        write(ticket, "---\nversion: 1\nticket: wp1\nparent: oya\n---\n本文\n")
+        self.addCleanup(lambda: os.path.exists(ticket) and os.remove(ticket))
         bare = os.path.join(self.tmp, "origin.git")
         if not os.path.isdir(bare):
             git(self.tmp, "init", "-q", "--bare", bare)
@@ -456,7 +449,7 @@ class WorkspaceDiscoveryTest(WorkspaceTest):
         os.makedirs(empty, exist_ok=True)
         p1 = os.path.join(self.ws, "projects", "p1")
         result = self.run_sh("ccnavi-git.sh", "status", cwd=p1, env={"CCNAVI_WORKSPACE": empty})
-        self.assertNotEqual(0, result.returncode, "印の無い場所を黙って受けた")
+        self.assertNotEqual(0, result.returncode, "目印の無い場所を黙って受けた")
 
     def test_outside_any_workspace_it_stops_and_says_how(self):
         stray = os.path.join(self.tmp, "stray")
@@ -494,7 +487,7 @@ class HookTest(WorkspaceTest):
 
 @unittest.skipIf(SKIP, SKIP)
 class ModeATest(unittest.TestCase):
-    """projects/ が無いワークスペースで、§25 の前と同じに動くこと（REQ-MLT-15）。"""
+    """projects/ が無いワークスペースで、§11 の前と同じに動くこと（REQ-MLT-15）。"""
 
     @classmethod
     def setUpClass(cls):

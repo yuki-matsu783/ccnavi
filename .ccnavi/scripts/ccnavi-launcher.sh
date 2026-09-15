@@ -1,6 +1,6 @@
 #!/bin/sh
 # ccnavi-launcher — hook が起動する 1 本。CCNAVI_BIN_PATH はここを指す。1 つ上の bin/ に
-# 並ぶ機械ごとの組み立てから、この機械で動くものを選んで起動する（ADR-0043）。
+# 並ぶ機械ごとの組み立てから、この機械で動くものを選んで起動する（ADR-0044）。
 #
 #   .ccnavi/scripts/ccnavi-launcher.sh      ← これ
 #   .ccnavi/bin/darwin-arm64/ccnavi

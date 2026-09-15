@@ -19,9 +19,17 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 
-def run(rules_path, payload, log=""):
-    """道具を 1 回動かす。ルールファイルの場所を呼び出しごとに変えられる。"""
+def run(rules_path, payload, log="", env=None):
+    """道具を 1 回動かす。ルールファイルの場所を呼び出しごとに変えられる。
+
+    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
+    `logs/state` の控えが書き戻される。組み込みの既定はこの設定に依らず入るので、
+    見たいものは変わらない。
+    """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
+    environment.update(env or {})
     return run_ccnavi(
         [
             "--rules",
@@ -111,7 +119,7 @@ class FallbackTest(unittest.TestCase):
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
                 result = run(
-                    self.broken, pre_tool_use(tool, "file_path", ".claude/ccnavi/rules.yml")
+                    self.broken, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml")
                 )
                 self.assertNotEqual(
                     out_of(self, result).get("permissionDecision"),
@@ -124,7 +132,7 @@ class FallbackTest(unittest.TestCase):
         # 緩んだ既定に落ちる、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
-            run(self.broken, pre_tool_use("Bash", "command", "echo x > .claude/ccnavi/rules.yml")),
+            run(self.broken, pre_tool_use("Bash", "command", "echo x > .ccnavi/common/rules.yml")),
         )
 
         self.assertEqual(out.get("permissionDecision"), "deny")
@@ -134,7 +142,7 @@ class FallbackTest(unittest.TestCase):
     def test_既定でもシェルからの書き込みは綴りを変えても止まる(self):
         for command in [
             "echo x >> .claude/hooks/lint-py.sh",
-            "sed -i s/deny/allow/ .claude/ccnavi/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/common/rules.yml",
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
@@ -143,15 +151,33 @@ class FallbackTest(unittest.TestCase):
                 out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
+    def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
+        # 実行ファイル・ccnavi ディレクトリ・共通層は設定で動く。既定の側だけ空の設定で
+        # 組んでいると、動かしたワークスペースではルールファイルが壊れたときにだけ
+        # そこへの書き込みが止まらない（issue #14）。
+        for env, command in [
+            ({"CCNAVI_PROJECT_HOME": ".navi"}, "echo x > projects/lib/.navi/config/rules.yml"),
+            ({"CCNAVI_PROJECT_HOME": ".navi"}, "rm -rf .navi"),
+            ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
+            ({}, f"echo x > {self.broken}"),
+        ]:
+            with self.subTest(command=command):
+                out = out_of(
+                    self,
+                    run(self.broken, pre_tool_use("Bash", "command", command), env=env),
+                )
+                self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
+                self.assertIn("builtin-guard-config-via-bash", out["permissionDecisionReason"])
+
     def test_既定はマージの解決を妨げない(self):
         # 衝突マーカーの入ったルールファイルは YAML として読めないので、
         # 衝突を解いている最中は必ず既定に落ちている。そこで解決の手が止まると、
         # ガードが落ちた状態から出られない。どれもファイルに新しい文面を書かない。
         for command in [
-            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .claude/ccnavi/rules.yml",
-            "sh .ccnavi/scripts/ccnavi-git.sh add -- .claude/ccnavi/rules.yml",
-            "cat .claude/ccnavi/rules.yml",
-            "grep -n conflict .claude/ccnavi/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/common/rules.yml",
+            "sh .ccnavi/scripts/ccnavi-git.sh add -- .ccnavi/common/rules.yml",
+            "cat .ccnavi/common/rules.yml",
+            "grep -n conflict .ccnavi/common/rules.yml",
         ]:
             with self.subTest(command=command):
                 out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))

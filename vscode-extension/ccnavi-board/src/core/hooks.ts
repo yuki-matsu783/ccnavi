@@ -8,7 +8,7 @@
  * matcher の意味は Claude Code のもので、ccnavi の判定ではない。空か `*` なら全部、
  * それ以外はツール名に対する正規表現（`Write|Edit` のように書ける）。正規表現として
  * 読めなければ文字列そのものと比べる。ここは ccnavi の答えを出し直す場所ではなく、
- * 配線を見せる場所。
+ * hook の登録を見せる場所。
  */
 
 export type HookSource = "settings" | "settings-local";

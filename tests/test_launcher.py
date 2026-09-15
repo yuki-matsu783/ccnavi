@@ -1,6 +1,6 @@
 """振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）と、機械の語（ccnavi/platformtag.py）。
 
-sh は `.ccnavi/scripts/` に、実体は `.ccnavi/bin/<os>-<arch>/` に並ぶ（ADR-0043）。sh は自分の
+sh は `.ccnavi/scripts/` に、実体は `.ccnavi/bin/<os>-<arch>/` に並ぶ（ADR-0044）。sh は自分の
 隣ではなく `../bin/` を探す。語を読む場所は 3 つ（sh、platformtag、ccnavi-setup.sh）あり、
 どれかだけずれると配った場所と探す場所が食い違う。ここでは sh を外から動かし、選んだ置き場を見る。
 

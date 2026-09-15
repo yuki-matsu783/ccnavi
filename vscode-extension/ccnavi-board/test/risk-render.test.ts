@@ -14,7 +14,7 @@ factors:
 function page(overrides: Partial<RiskPage> = {}): RiskPage {
   return {
     root: "/ws",
-    riskPath: ".claude/ccnavi/risk.yml",
+    riskPath: ".ccnavi/common/risk.yml",
     exists: true,
     ticketControl: "enable",
     model: readRisk(RISK).model,
@@ -45,7 +45,7 @@ test("CB-T81 埋め込む配点は JSON で、文面の < は実体にして scr
 
 test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", () => {
   const missing = renderRiskPage(page({ exists: false, model: readRisk(BUILTIN_RISK_TEXT).model }), { nonce: "n" });
-  assert.match(missing, /\.claude\/ccnavi\/risk\.yml が無い。実行ファイルは組み込みの配点で数えている/);
+  assert.match(missing, /\.ccnavi\/common\/risk\.yml が無い。実行ファイルは組み込みの配点で数えている/);
   assert.match(missing, /data-action="create"/);
   assert.match(missing, /data-action="open-risk" disabled/);
   assert.match(missing, /"exists":false/);

@@ -2,7 +2,7 @@
 //
 // 実行時の依存（yaml）を vsix に入れるため。package.sh は vsce を --no-dependencies で
 // 走らせて node_modules を見に行かないので、依存はここで本体に取り込んでおく。
-// テストは tsc が out/src と out/test に出したものを使い、この束は使わない。
+// テストは tsc が out/src と out/test に出したものを使い、この 1 本にまとめたものは使わない。
 "use strict";
 
 const path = require("node:path");
