@@ -123,7 +123,7 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   // 札で選んだあとは要約を今の値で書き直す（チェックボックスの input は change より先に伝わるため）
   assert.match(body, /markDirty\(\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*wrap\.dispatchEvent\(new Event\("input", \{ bubbles: true \}\)\);/);
   // 絞り込み中は畳んだタイプの矢印も開いた向きにする
-  assert.match(body, /const shownAsOpen = q !== "" \|\| !el\.classList\.contains\("folded"\);/);
+  assert.match(body, /function syncTwist\(el\) \{[\s\S]*?const shownAsOpen = finding \|\| !el\.classList\.contains\("folded"\);/);
 });
 
 test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", () => {

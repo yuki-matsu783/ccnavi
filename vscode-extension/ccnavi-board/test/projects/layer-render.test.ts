@@ -106,7 +106,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   // ".claude/settings.json を読めない" のような別の warn と error は出る
   assert.doesNotMatch(html, /\.claude\/ を持つ/);
   assert.match(html, /warn: \.claude\/settings\.json を読めない: 壊れている/);
-  assert.match(html, /\.claude\/ がある。Claude Code は/);
+  assert.match(html, /\.claude\/ がある。Claude Code は[^<]*プロジェクトの設定は \.ccnavi\/config\/ に置く/);
   assert.match(html, /error: 文面が無い/);
   // 行末は「開く ▾」と「git ▾」の 2 つ。中のボタンの data-action は前のまま
   const card = html.slice(html.indexOf('<li class="project'), html.indexOf("    </li>"));

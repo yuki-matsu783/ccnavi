@@ -81,16 +81,40 @@ test("CB-D08 id を打っている途中は控えを書き直さず、確定（c
   }
 });
 
-test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない", async () => {
+test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない。非同期の例外も拾い、1 度投げたら消す", async () => {
   const page = await loadPage(html());
   try {
     page.one("#find").addEventListener("input", () => {
       throw new Error("わざと");
-    });
+    }, { once: true });
     assert.throws(() => page.type(page.one("#find"), "x"), /わざと/);
-    assert.equal(page.errors.length, 1);
+    assert.equal(page.errors.length, 0, "投げたら消える");
+    page.one("#find").addEventListener("input", async () => {
+      await Promise.resolve();
+      throw new Error("あとで");
+    });
+    page.type(page.one("#find"), "y");
+    await assert.rejects(page.settle(), /あとで/);
   } finally {
-    await page.window.happyDOM.close();
+    await page.close();
+  }
+});
+
+test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向きのまま。足したルールのタイプは開く", async () => {
+  const page = await loadPage(html());
+  try {
+    page.type(page.one("#find"), "git");
+    page.click(page.one('button[data-action="fold-section"][data-section="deny"]'));
+    assert.ok(page.one('.rule-section[data-section="deny"]').classList.contains("folded"));
+    assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
+    page.type(page.one("#find"), "");
+    assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▸");
+    page.click(page.one('button[data-action="fold-section"][data-section="allow"]'));
+    page.click(page.one('button[data-action="add"][data-section="allow"]'));
+    assert.ok(!page.one('.rule-section[data-section="allow"]').classList.contains("folded"));
+    assert.equal(page.one('.rule-section[data-section="allow"] h2 > .twist').textContent, "▾");
+  } finally {
+    await page.close();
   }
 });
 

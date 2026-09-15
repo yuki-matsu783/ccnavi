@@ -62,6 +62,8 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
   const page = await loadPage(html());
   try {
     page.click(page.one('.factor[data-key="f1"] .row-head'));
+    page.type(page.one("#find"), "ヒットしたファイル");
+    assert.equal(page.one("#factor-count").textContent, "1 / 2（開いたまま 1）", "画面に出ている語で当たる");
     page.type(page.one("#find"), "github");
     assert.ok(page.one('.factor[data-key="f1"]').classList.contains("hidden-by-find"));
     assert.ok(page.one('.factor[data-key="f1"]').classList.contains("open"));

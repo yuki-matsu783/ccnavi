@@ -40,7 +40,7 @@ export interface DomPage {
   all<T extends Element = HTMLElement>(selector: string): T[];
   /** 保留中の処理（タイマー・イベント）を流す。画面のスクリプトが例外を投げていれば、ここで落ちる */
   settle(): Promise<void>;
-  /** 画面のスクリプトが投げた例外（settle / close が拾う前に読みたいとき） */
+  /** 画面のスクリプトが投げてまだ拾われていない例外。raise（settle / close / click / type / change）が投げると消える */
   readonly errors: Error[];
   close(): Promise<void>;
 }
@@ -52,15 +52,27 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
   const window = new Window({ url: "vscode-webview://ccnavi/" });
   const posted: Posted[] = [];
   // イベントハンドラの中の例外は happy-dom が window の error に流す。黙って通さず、テストを落とす。
+  // 非同期のハンドラ（async や Promise）の例外は window には来ず Node の unhandledRejection に回るので、
+  // 画面を開いている間はそちらも拾う。
   const errors: Error[] = [];
+  const toError = (value: unknown, fallback: string): Error => (value instanceof Error ? value : new Error(String(value ?? fallback)));
   window.addEventListener("error", (event) => {
-    const error = (event as unknown as { error?: unknown }).error;
-    errors.push(error instanceof Error ? error : new Error(String((event as unknown as { message?: string }).message ?? error)));
+    const e = event as unknown as { error?: unknown; message?: string };
+    errors.push(toError(e.error, e.message ?? "error"));
   });
+  window.addEventListener("unhandledrejection", (event) => {
+    errors.push(toError((event as unknown as { reason?: unknown }).reason, "unhandledrejection"));
+  });
+  const onRejection = (reason: unknown): void => {
+    errors.push(toError(reason, "unhandledRejection"));
+  };
+  process.on("unhandledRejection", onRejection);
+  // 溜めた例外は 1 度投げたら消す。次の raise が同じ文面を繰り返さず、後片付けの close で
+  // 本来の失敗を上書きしない。
   const raise = (): void => {
     if (errors.length > 0) {
-      const first = errors[0];
-      throw new Error(`画面のスクリプトが例外を投げた（${errors.length} 件）: ${first.message}`, { cause: first });
+      const taken = errors.splice(0);
+      throw new Error(`画面のスクリプトが例外を投げた（${taken.length} 件）: ${taken[0].message}`, { cause: taken[0] });
     }
   };
   let state: unknown = initialState;
@@ -88,6 +100,9 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
     }
     (window as unknown as { eval: (code: string) => unknown }).eval(script.textContent ?? "");
   }
+  // 本物の Webview では script のあとに DOMContentLoaded と load が流れる。待って初期化する書き方にも備える
+  document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
+  window.dispatchEvent(new window.Event("load"));
   const settle = async (): Promise<void> => {
     await window.happyDOM.waitUntilComplete();
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -133,6 +148,7 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
     settle,
     async close() {
       await window.happyDOM.close();
+      process.off("unhandledRejection", onRejection);
       raise();
     },
   };
