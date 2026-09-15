@@ -48,6 +48,9 @@ ccnavi_approved:
   approved_at: 2026-09-13T19:09:37+0900
   source_tree: launcher-scripts
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/launcher-scripts/wip/tickets/todo/launcher-scripts.md
+  revised_at: 2026-09-15T17:59:50+0900
+  feedback_at: 2026-09-15T17:59:50+0900
+feedback: []
 ---
 
 # 振り分けの sh を .ccnavi/scripts/ に移し、このリポジトリも経由する
