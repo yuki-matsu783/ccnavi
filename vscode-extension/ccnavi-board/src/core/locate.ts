@@ -5,8 +5,7 @@
  *   2. `.claude/settings.json` の env `CCNAVI_BIN_PATH`
  *   3. `dist/ccnavi/ccnavi`
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けの sh。scripts/ccnavi-setup.sh が配る）
- *   5. `.ccnavi/bin/ccnavi`（前の既定の配布先。移し替える前のワークスペースのため）
- *   6. ソースがあれば `uv run python -m ccnavi`
+ *   5. ソースがあれば `uv run python -m ccnavi`
  *
  * どれも相対ならワークスペースルートからの相対。Windows の `.exe` は綴りに無くても試す。
  *
@@ -14,8 +13,7 @@
  * `bin/<os>-<arch>/` に並ぶ（`.ccnavi/scripts/` の sh なら `.ccnavi/bin/<os>-<arch>/`）。
  * 拡張は sh を通さずその実体を探し、sh そのものは返さない。Windows では sh を直接起動
  * できないので、sh を返すと起動に失敗する。実体が無ければ次の候補へ進む。
- * それ以外の綴りは、隣の `<os>-<arch>/` を先に探し、次に綴りそのものを探す（前の形の
- * `.ccnavi/bin/ccnavi` は隣に実体が並ぶ）。語は ccnavi/platformtag.py と揃える。
+ * それ以外の綴りは、綴りそのものを探す。語は ccnavi/platformtag.py と揃える。
  *
  * ファイルの有無は呼び手が渡す（テストで実際のファイルシステムを要らなくするため）。
  */
@@ -38,7 +36,6 @@ export interface LocateInput {
 export const DEFAULT_BINS = [
   "dist/ccnavi/ccnavi",
   ".ccnavi/scripts/ccnavi-launcher.sh",
-  ".ccnavi/bin/ccnavi",
 ] as const;
 /** 振り分けの sh の名前。ccnavi/platformtag.py の LAUNCHER_NAME と揃える */
 export const LAUNCHER_NAME = "ccnavi-launcher.sh";
@@ -102,13 +99,6 @@ export function locate(input: LocateInput): Launcher | undefined {
         return found;
       }
       continue;
-    }
-    const dir = dirOf(base);
-    if (dir !== "") {
-      const found = builtIn(input, dir);
-      if (found !== undefined) {
-        return found;
-      }
     }
     for (const suffix of SUFFIXES) {
       const filePath = base + suffix;

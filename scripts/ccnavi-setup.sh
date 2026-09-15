@@ -44,9 +44,7 @@
 # 同じものを開くので、1 行の command から機械ごとに違う実体を起動するには、そこで選ぶしかない。
 # 置き場が動かないので、置き場を名指しするオプションは持たない。
 #
-# CCNAVI_BIN_PATH が前の既定の綴り（.ccnavi/bin/ccnavi）のままなら、新しい置き場に
-# この機械で動くものが揃ってから、新しい綴りへ書き換え、前に置いたもの（.ccnavi/bin/ccnavi の
-# sh）を消す。既定でない綴りは書き換えず、名指しするだけにする。
+# CCNAVI_BIN_PATH が既定でない綴りなら書き換えず、名指しするだけにする。
 #
 # 配布先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
 # ルールファイルもゲートの sh も、入れた先で直されている前提のもの。黙って上書き
@@ -81,10 +79,6 @@ DEFAULT_MODE="dry-run"
 BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh"
 # 実行ファイルの置き場。<os>-<arch>/ はこの下に並ぶ。sh はここを探す。
 BUILD_ROOT=".ccnavi/bin"
-# 前の既定の綴り。ここを指した env は新しい綴りへ書き換える。
-OLD_BIN_PATHS=".ccnavi/bin/ccnavi"
-# 前の既定で振り分けの sh を置いていた場所。新しい置き場が揃ってから消す。
-OLD_LAUNCHER="$BUILD_ROOT/ccnavi"
 
 # 配るもの。配布元での置き場は build.py の出力（dist/ccnavi）と、ccnavi の
 # リポジトリの .ccnavi/ の形に決め打ちで対応する。
@@ -154,8 +148,7 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
 .ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・ゲートの sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場は、配布先の
-.gitignore に足す。前の既定の置き場（.ccnavi/bin/ccnavi の sh）は、新しい置き場が揃ってから
-env を書き換えて消す。
+.gitignore に足す。
 USAGE
 }
 
@@ -171,12 +164,6 @@ while [ "$#" -gt 0 ]; do
 		mode="$2"
 		mode_given=yes
 		shift 2
-		;;
-	--bin)
-		# 受けて無視すると、打った人は指した場所に置いたつもりで進む。値の有無にも、値が
-		# 今の固定の綴りと同じかにも依らず断る。通すと、手順書に残った --bin がいつ止まるかが
-		# 値しだいになる。書く前にここで止めるので、何も書かない。
-		die "--bin は廃止しました。振り分けの sh は ${BIN_PATH}、実行ファイルは ${BUILD_ROOT}/<os>-<arch>/ に固定です。"
 		;;
 	--ticket-control)
 		[ "$#" -ge 2 ] || die "--ticket-control に値がありません。"
@@ -451,14 +438,6 @@ note_deploy() {
 	esac
 }
 
-in_list() {
-	# $1 空白区切りの並び / $2 探す語
-	case " $1 " in
-	*" $2 "*) return 0 ;;
-	esac
-	return 1
-}
-
 # 振り分けの sh の行き先も、組み立ての置き場も固定。sh は自分の 1 つ上の bin/ を探すので、
 # 2 つの置き場が決まっていれば、設定に書く綴りと実体を置く場所は割れない。
 if [ -n "$deploy" ]; then
@@ -543,28 +522,6 @@ runnable_there() {
 	done
 	return 1
 }
-
-# 配り終えたあと、新しい置き場で hook が起動できるか。振り分けの sh と、この機械で
-# 動く実行ファイルの両方が要る。前の置き場から移すかどうかは、これだけで決める。
-launcher_ready=no
-if [ -f "$root/$BIN_PATH" ]; then
-	launcher_ready=yes
-fi
-case "$launcher_verdict" in
-copy | replace) launcher_ready=yes ;;
-esac
-exe_ready=no
-if runnable_there; then
-	exe_ready=yes
-elif [ -n "$built" ] && runs_here "$built" "$runnable"; then
-	case "$bin_verdict" in
-	copy | replace) exe_ready=yes ;;
-	esac
-fi
-new_ready=no
-if [ "$launcher_ready" = yes ] && [ "$exe_ready" = yes ]; then
-	new_ready=yes
-fi
 
 # 書けない形を、jq を回す前に見つける。あとで mkdir が失敗すると、終了コードが
 # 1（--check の「揃っていない」）と衝突したうえ、生のエラーだけが出る。
@@ -656,33 +613,15 @@ fi
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 前の置き場からの移し替え。CCNAVI_BIN_PATH が前の既定の綴りのままなら、新しい既定へ
-# 書き換える。「既にある env は触らない」の例外はここだけで、書かれているのが
-# このスクリプト自身が前に書いた綴りだから。
-#
-# 移すのは、新しい置き場で hook が起動できるときだけ。揃わないまま移すと、前の置き場を
-# 残していても hook は何も起動しなくなる。
-#
-# 前の既定でも新しい綴りでもない値（人が決めた綴り）は書き換えず、名指しで 1 行出す。
+# 既定でない CCNAVI_BIN_PATH（人が決めた綴り）は書き換えず、名指しで 1 行出す。
 # 導入は止めず、終了コードも変えない（--check では「揃っていない」に数える）。
-is_old_bin() {
-	in_list "$OLD_BIN_PATHS" "$1"
-}
 current_bin=$(printf '%s' "$current" | jq -r '(.env // {}).CCNAVI_BIN_PATH // "" | if type == "string" then . else "" end')
-migrate=no
-migrate_blocked=""
 bin_custom=""
-if is_old_bin "$current_bin"; then
-	if [ "$new_ready" = yes ]; then
-		migrate=yes
-	else
-		migrate_blocked="CCNAVI_BIN_PATH は前の置き場（${current_bin}）を指したままです。${BIN_PATH} と ${BUILD_ROOT}/ にこの機械で動く実行ファイルが揃わないので、移していません。"
-	fi
-elif [ -n "$current_bin" ] && [ "$current_bin" != "$BIN_PATH" ]; then
-	bin_custom="CCNAVI_BIN_PATH は既定でない綴り（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください（前に置いた sh と実行ファイルは消していません）。"
+if [ -n "$current_bin" ] && [ "$current_bin" != "$BIN_PATH" ]; then
+	bin_custom="CCNAVI_BIN_PATH は既定でない綴り（${current_bin}）です。書き換えていません。揃えるなら .claude/settings.json の値を ${BIN_PATH} に直してください。"
 fi
 
-# --force が置き換えてよいキー。人がこの実行で名指しした 2 つと、前の置き場からの移し替え。
+# --force が置き換えてよいキー。人がこの実行で名指しした 2 つだけ。
 forced=""
 if [ "$force" = yes ]; then
 	if [ "$mode_given" = yes ]; then
@@ -690,60 +629,6 @@ if [ "$force" = yes ]; then
 	fi
 	if [ "$ticket_control_given" = yes ]; then
 		forced="$forced CCNAVI_TICKET_CONTROL"
-	fi
-fi
-if [ "$migrate" = yes ]; then
-	forced="$forced CCNAVI_BIN_PATH"
-fi
-
-# 前の置き場（.ccnavi/bin/ccnavi の振り分けの sh）を片付けるか。
-#
-# 消すのは、書き終えたあとの CCNAVI_BIN_PATH がもうそこを指さず、新しい置き場で hook が
-# 起動できるときだけ。加えて、このスクリプトを打ったセッションの hook がまだ前の置き場を
-# 起動しているなら消さない。env はセッションを開き直すまで変わらないので、消した瞬間から
-# そのセッションの hook は何も起動しなくなり、守りが黙って消える。
-#
-# CCNAVI_BIN_PATH が既定でない綴りなら触らない。人が決めた綴りの先で何が
-# 使われているかを、ここでは決められない。
-bin_after="$BIN_PATH"
-if [ -n "$current_bin" ]; then
-	case " $forced " in
-	*" CCNAVI_BIN_PATH "*) ;;
-	*) bin_after="$current_bin" ;;
-	esac
-fi
-old_todo=""
-old_note=""
-if [ -z "$migrate_blocked" ] && [ -z "$bin_custom" ]; then
-	# 前の振り分けの sh（.ccnavi/bin/ccnavi）。消すのは次のすべてが揃ったときだけ。
-	#
-	# - 通常のファイルとして在る。ディレクトリやリンクは人が置いたもので、中身を決められない
-	# - CCNAVI_BIN_PATH が前の既定の綴りで、この実行で新しい綴りへ書き換える、または既に
-	#   新しい綴りを指している。env が無かった回は消さない（書いた次の回に消す）
-	# - 書き終えたあとの CCNAVI_BIN_PATH がそこを指さない
-	# - 新しい置き場で hook が起動できる
-	# - このスクリプトを打ったセッションの env がそこを指さない
-	#
-	# 消すのは前の版の導入スクリプトが配った、無視されている生成物だけ。前の版で配り直せる。
-	# 同じ置き場の <os>-<arch>/ は新しい置き場そのものなので触らない。
-	if [ -f "$root/$OLD_LAUNCHER" ] && [ ! -L "$root/$OLD_LAUNCHER" ]; then
-		if [ "$migrate" = yes ] || [ "$current_bin" = "$BIN_PATH" ]; then
-			if [ "$bin_after" = "$OLD_LAUNCHER" ]; then
-				:
-			elif [ "$new_ready" = no ]; then
-				old_note="${old_note:+$old_note
-}前の振り分けの sh（${OLD_LAUNCHER}）が残っています。${BIN_PATH} と ${BUILD_ROOT}/ にこの機械で動く実行ファイルが揃うまで消しません。"
-			elif [ "${CCNAVI_BIN_PATH:-}" = "$OLD_LAUNCHER" ]; then
-				old_note="${old_note:+$old_note
-}前の振り分けの sh（${OLD_LAUNCHER}）が残っています。このセッションの hook はまだそこを起動しているので消していません。セッションを開き直してから打ち直すと消します。"
-			else
-				old_todo="$old_todo$OLD_LAUNCHER
-"
-			fi
-		elif [ -z "$current_bin" ]; then
-			old_note="${old_note:+$old_note
-}前の振り分けの sh（${OLD_LAUNCHER}）が残っています。CCNAVI_BIN_PATH が書かれていなかったので消していません。打ち直すと消します。"
-		fi
 	fi
 fi
 forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
@@ -773,10 +658,10 @@ replacing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjs
 	| select(.key as $k | $forced | index($k) != null)
 	| "\(.key): \($cur[.key]) -> \(.value)"
 ')
-# CCNAVI_BIN_PATH は、前の既定のまま移せなかったときと既定でない綴りのときに、それぞれ
-# 専用の 1 行で言う。ここに並べると、--force で置き換えられるかのような見出しの下に出る。
+# CCNAVI_BIN_PATH は、既定でない綴りのときに専用の 1 行で言う。ここに並べると、
+# --force で置き換えられるかのような見出しの下に出る。
 bin_named=no
-if [ -n "$migrate_blocked" ] || [ -n "$bin_custom" ]; then
+if [ -n "$bin_custom" ]; then
 	bin_named=yes
 fi
 differing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" --argjson forced "$forced_json" --arg bin_named "$bin_named" '
@@ -811,7 +696,7 @@ other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --a
 # 綴りは配った組み立ての置き場（`.ccnavi/bin/<os>-<arch>/`）だけ。振り分けの sh は
 # ゲートの sh と同じく追跡する側に置く。無視すると、clone した先に sh が届かず hook が
 # 起動しない。置き場は配った機械のぶんだけ足す。別の機械で打ち直せば、その機械のぶんが
-# 足される。前の版が足した /.ccnavi/bin/ccnavi の行は残す。人が書いた行と見分けられない。
+# 足される。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
 ignore_todo=""
 ignore_kept=""
@@ -954,25 +839,11 @@ report_deploy() {
 		printf '%s' "$ignore_todo" | sed 's/^/  /'
 	fi
 	if [ -n "$launcher_mode_todo" ]; then
-		printf '%s:\n' "$5"
-		printf '%s' "$launcher_mode_todo" | sed 's/^/  /'
-	fi
-	if [ -n "$old_todo" ]; then
 		printf '%s:\n' "$4"
-		printf '%s' "$old_todo" | sed 's/^/  /'
-	fi
-	if [ -n "$old_failed" ]; then
-		printf '前の置き場から消せなかったもの（使っているセッションがあるかもしれません。閉じてから打ち直してください）:\n'
-		printf '%s' "$old_failed" | sed 's/^/  /'
-	fi
-	if [ -n "$migrate_blocked" ]; then
-		printf '%s\n' "$migrate_blocked"
+		printf '%s' "$launcher_mode_todo" | sed 's/^/  /'
 	fi
 	if [ -n "$bin_custom" ]; then
 		printf '%s\n' "$bin_custom"
-	fi
-	if [ -n "$old_note" ]; then
-		printf '%s\n' "$old_note"
 	fi
 	if [ -n "$deploy_skipped" ]; then
 		printf '%s\n' "$deploy_skipped"
@@ -982,11 +853,10 @@ report_deploy() {
 	fi
 }
 
-old_failed=""
 launcher_mode_failed=""
 
 report_deploy_plan() {
-	report_deploy '配る' '入れ替える' '.gitignore に足す' '前の置き場から消す' '実行ビットを付ける'
+	report_deploy '配る' '入れ替える' '.gitignore に足す' '実行ビットを付ける'
 }
 
 # 揃っているか。値の違いと、別の綴りの登録も「揃っていない」に数える。
@@ -1006,9 +876,8 @@ if [ -n "$deploy_new" ] || [ -n "$deploy_replacing" ] || [ -n "$deploy_absent" ]
 	[ -n "$ignore_todo" ] || [ -n "$launcher_mode_todo" ]; then
 	settled=no
 fi
-# 前の置き場が片付いていないのも数える。残っている理由が何であれ、人かこのスクリプトが
-# もう 1 度手を動かすまで、2 つの置き場が並んだまま。既定でない綴りも数える。
-if [ -n "$old_todo" ] || [ -n "$old_note" ] || [ -n "$migrate_blocked" ] || [ -n "$bin_custom" ]; then
+# 既定でない綴りも数える。
+if [ -n "$bin_custom" ]; then
 	settled=no
 fi
 
@@ -1045,13 +914,7 @@ fi
 
 printf '%s\n' "$settings"
 
-old_work=no
-if [ -n "$old_todo" ]; then
-	old_work=yes
-fi
-
-if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no ] &&
-	[ "$old_work" = no ]; then
+if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no ]; then
 	printf '書き足すものはありません。\n'
 	report_missing
 	report_deploy_plan
@@ -1228,38 +1091,10 @@ if [ "$deploy_work" = yes ]; then
 	fi
 fi
 
-# 前の置き場を片付ける。配り終えたあとに回す。新しい置き場が揃ったことは上で確かめて
-# あるが、ここより前に消すと、配る途中で落ちたときに両方とも無い形が残る。
-#
-# 消せなかったものは並べて先へ進む。Windows では使っているファイルを消せない。
-# 別のセッションの hook がちょうど起動している瞬間に当たることがある。
-if [ -n "$old_todo" ]; then
-	old_done=""
-	# 並びの綴りは空白を含まない（OLD_LAUNCHER の決め打ち）。
-	for old_path in $old_todo; do
-		# 決めた時と同じく、通常のファイルのときだけ消す。ディレクトリへは rm -r を向けない。
-		if [ ! -f "$root/$old_path" ] || [ -L "$root/$old_path" ]; then
-			continue
-		fi
-		rm -f "$root/$old_path" 2>/dev/null || true
-		if [ -e "$root/$old_path" ]; then
-			old_failed="$old_failed$old_path
-"
-		else
-			old_done="$old_done$old_path
-"
-		fi
-	done
-	old_todo="$old_done"
-fi
-
-report_deploy '配った' '入れ替えた' '.gitignore に足した' '前の置き場から消した' '実行ビットを付けた'
+report_deploy '配った' '入れ替えた' '.gitignore に足した' '実行ビットを付けた'
 if [ -n "$launcher_mode_failed" ]; then
 	printf '実行ビットを付けられなかった振り分けの sh（hook が起動しません。chmod +x で付けてください）:\n'
 	printf '%s' "$launcher_mode_failed" | sed 's/^/  /'
-fi
-if [ -n "$old_todo" ]; then
-	printf '開いている Claude Code のセッションは、開き直すまで前の置き場を起動しようとして hook が動きません。開き直してください。\n'
 fi
 
 # 登録しただけでは動かない。配り終えたあとの姿をそのまま見て、まだ無いものを

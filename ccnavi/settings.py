@@ -53,11 +53,6 @@ GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
 # 守ることになる。hook の登録に書いた綴りをそのまま渡してもらう。
 BIN_ENV = "CCNAVI_BIN_PATH"
-# OLD_BIN_PATHS は前の既定の綴り。今の既定の配置では振り分けの sh を
-# `.ccnavi/scripts/ccnavi-launcher.sh` に置くが（ADR-0044）、ここでも既定としては持たない。
-# 前の綴りを指したままのワークスペースは動いているので、lint が warn で名指しするだけに使う。
-# scripts/ccnavi-setup.sh の側にも同じ一覧があり、そちらはここを指した env を書き換える。
-OLD_BIN_PATHS = (".ccnavi/bin/ccnavi",)
 # BIN_SUFFIXES は、書かれた綴りに無いときだけ継ぎ足して探す拡張子。
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
@@ -70,8 +65,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
 # git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
 # 判定が読むのは承認済みチケットだけで、提案のほうは承認の画面と状態の同期しか読まない。
-# 2 つとも `CCNAVI_TICKETS_` で始めて対にする。以前は CCNAVI_TICKETS と CCNAVI_APPROVED で、
-# 後者が何の置き場なのかが名前から読めなかった。
+# 2 つとも `CCNAVI_TICKETS_` で始めて対にする。
 TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL"
 APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
 # PHASES_ENV はフェーズの種類の定義。ワークスペースルートからの相対。無ければ番号だけの挙動。

@@ -348,8 +348,7 @@ def binary_clause(bin_path: str) -> str:
       その 1 つ上の親の下の `bin/<os>-<arch>/`。sh の隣の `<os>-<arch>/` は sh が探さない
       ので当てない。親が無い浅い綴りでは `bin/<os>-<arch>/` を親を問わずに当てる。判定に
       渡る綴りは絶対パスなので、名指しのツールはそれでも止まる
-    - それ以外の名前は前の形。末尾 2 要素と、同じ親の下の `<os>-<arch>/`。`.ccnavi/bin/ccnavi`
-      を指したままのワークスペースで、隣の実体を守り続けるために残す
+    - それ以外の名前は実行ファイルそのもの。末尾 2 要素だけに当てる
 
     既定の置き場（`.ccnavi/`）は ccnavi ディレクトリを守るルールでも止まるが、ccnavi
     ディレクトリを動かしたときや、既定でない綴りを指したときはここでしか止まらない。
@@ -363,13 +362,10 @@ def binary_clause(bin_path: str) -> str:
         sh = r"[\\/]".join(re.escape(p) for p in parts[-2:])
         home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
         return rf"(?:{sh}|{home}bin[\\/]{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
-    tail = [re.escape(p) for p in parts[-2:]]
-    if len(tail) < 2:
-        return tail[0]
-    return rf"{tail[0]}[\\/](?:{tail[1]}|{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
+    return r"[\\/]".join(re.escape(p) for p in parts[-2:])
 
 
-# 機械ごとの組み立ての置き場。`bin/` の下（今の形）か、sh の隣（前の形）に並ぶ。
+# 機械ごとの組み立ての置き場。`bin/` の下に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
 
@@ -670,8 +666,8 @@ def targets(
     if bin_path:
         full = os.path.realpath(bin_path)
         found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))
-        # 指す先が振り分けの sh なら、hook が実際に走らせるのは `../bin/` の実体（前の形では
-        # 隣の実体）。そちらも控える。探す先は binary_clause が守る置き場と同じ条件で決まる。
+        # 指す先が振り分けの sh なら、hook が実際に走らせるのは `../bin/` の実体。
+        # そちらも控える。探す先は binary_clause が守る置き場と同じ条件で決まる。
         # 見つからなければ足さない。組み立てが無いことは sh が起動の時に言う。
         launched = platformtag.launched_executable(bin_path)
         if launched:
