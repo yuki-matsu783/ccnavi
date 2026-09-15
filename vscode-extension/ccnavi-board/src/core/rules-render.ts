@@ -485,6 +485,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     twist.setAttribute("aria-expanded", on ? "true" : "false");
     if (persist) { persistOpen(); }
   }
+  // 絞り込み中の件数。一致した数のほかに、一致しないが開いたままで見えている行があればその数も言う。
+  function countText(q, shown, total, kept) {
+    if (q === "") { return String(total); }
+    return shown + " / " + total + (kept > 0 ? "（開いたまま " + kept + "）" : "");
+  }
   // 絞り込み。要約に含む文字で行を隠すだけで、ルールの中身と並びには触らない。
   function applyFind() {
     const q = document.getElementById("find").value.trim().toLowerCase();
@@ -495,7 +500,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     for (const section of SECTIONS) {
       const total = sections[section].length;
       const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find)").length;
-      document.querySelector("[data-count=" + section + "]").textContent = q === "" ? String(total) : shown + " / " + total;
+      const kept = document.querySelectorAll("[data-list=" + section + "] .rule.hidden-by-find.open").length;
+      document.querySelector("[data-count=" + section + "]").textContent = countText(q, shown, total, kept);
       // 絞り込み中は畳んだタイプの中も見せるので、矢印もそれに合わせる（畳んだ状態そのものは変えない）。
       const el = document.querySelector(".rule-section[data-section=" + section + "]");
       const twist = el.querySelector("h2 > .twist");

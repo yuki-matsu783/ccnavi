@@ -309,7 +309,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
     }
     const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find)").length;
-    document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length;
+    const kept = document.querySelectorAll("#phases .phase.hidden-by-find.open").length;
+    document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length + (kept > 0 ? "（開いたまま " + kept + "）" : "");
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });

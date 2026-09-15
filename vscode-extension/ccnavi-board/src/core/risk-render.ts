@@ -298,7 +298,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
     }
     const shown = document.querySelectorAll("#factors .factor:not(.hidden-by-find)").length;
-    document.getElementById("factor-count").textContent = q === "" ? String(form.factors.length) : shown + " / " + form.factors.length;
+    const kept = document.querySelectorAll("#factors .factor.hidden-by-find.open").length;
+    document.getElementById("factor-count").textContent = q === "" ? String(form.factors.length) : shown + " / " + form.factors.length + (kept > 0 ? "（開いたまま " + kept + "）" : "");
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
