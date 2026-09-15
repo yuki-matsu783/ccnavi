@@ -106,7 +106,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 | タブ | 何ができるか |
 |---|---|
-| ルール | `rules.yml` をタイプ（deny / ask / allow）ごとに一覧し、id・match（手でも書けるし、欄を押すと判定が対象を取り出せるツールの札が出て選べる。欄に書いてある知らない名前も札として並ぶ）・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。一覧は 1 ルール 1 行（id・match・pattern・文面の先頭・コンテキストの有無の ●）で、既定は全部畳んである。行を押すとその下に欄が開き、欄名は欄の左に出る。additionalContext 系の 4 欄は「コンテキストの追加」の 1 行に畳んであり、値があるルールだけ最初から開く。開いた行は id で控え、再読込のあとも開いたまま。上の絞り込み欄に打つと、id・match・pattern・文面に含む行だけが残る。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す（足した行は開いて出る）・消す・上下に動かす・タイプを移す。タイプの見出しの畳むボタンでそのタイプごと畳める。判定に当たったルールは畳んであっても開く。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
+| ルール | `rules.yml` をタイプ（deny / ask / allow）ごとに一覧し、id・match（手でも書けるし、欄を押すと判定が対象を取り出せるツールの札が出て選べる。欄に書いてある知らない名前も札として並ぶ）・glob か regex・message（deny だけ。止められたモデルに届く文）・additionalContext（当たるたびにモデルへ渡す文）・additionalContextOnce（文脈で最初に当たったときだけ渡す文）・additionalContextFile / additionalContextOnceFile（文に続けて本文を渡すファイル。ルートからの相対パス。「選ぶ…」で VS Code のダイアログから選べ、外のファイルは入らない）を直す。一覧は 1 ルール 1 行（id、match、pattern と文面の先頭、コンテキストの有無の ●）で、既定は全部畳んである。行を押すとその下に欄が開き、欄名は欄の左に出る。additionalContext 系の 4 欄は「コンテキストの追加」の 1 行に畳んであり、値があるルールだけ最初から開く。開いた行は id で控え、再読込のあとも開いたまま。上の絞り込み欄に打つと、id・match・pattern・文面・渡す文に含む行だけが残る（開いている行は隠れない）。見出しの件数は一致した数になる。ask と allow に message の欄は無く、残っていれば消すボタンだけが出る。足す（足した行は開いて出る）・消す・上下に動かす・タイプを移す。タイプの見出しの畳むボタンでそのタイプごと畳める。判定に当たったルールは畳んであっても開く。保存の前に一時ファイルへ書いて `--lint` を通し、error があれば保存しない |
 | 判定を試す | ツール名と subject を入れて `--test --json` に掛ける。判定・根拠コード・当たったルール（翻訳後の正規表現まで）・返る文面と、そのツールで走る hook を出す。「見本を一括で流す」は `--test-samples --json` で見本をすべて回し、期待と食い違ったものを赤く出す。どちらも**編集中の内容**で試す（保存は要らない） |
 | hook | `.claude/settings.json` と `.claude/settings.local.json` の hooks を読むだけの一覧。書き換えない。利用者ごとの設定（`~/.claude/settings.json`）は載らない |
 
@@ -151,7 +151,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | 何 | どう出るか、何が起きるか |
 |---|---|
 | 段階の閾値 | `levels` の medium / high / critical の 3 欄を 1 行に。空ならその段階は組み込みの値（20 / 40 / 70）で、保存しても欄を書かない。説明は見出しの下の「この欄の説明」を開くと出る |
-| 項目 | `factors` を 1 件 1 行（id・points・当て方・値・message）で並べる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す（足した行は開いて出る）・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
+| 項目 | `factors` を 1 件 1 行（id、points、当て方と値をつないだ文と message）で並べる。既定は全部畳んであり、行を押すとその下に欄が開く。開いた行は id で控え、再読込のあとも開いたまま。欄は id・points・当て方（lines_over / files_over / deleted_over / glob / script / judge から 1 つ）・その値・max（glob だけ）・message。足す（足した行は開いて出る）・消す・上下に動かす。当て方を変えると前の当て方の欄は消え、値は持ち越さない |
 | 保存 | 一時ファイルへ書いて `--lint --risk` を通し、error があれば保存しない。整数でない points や逆順の閾値はここで止まる |
 | ファイルが無い | 組み込みの配点を読み取り専用で見せ、「組み込みの配点でファイルを作る」で同じ値のファイルを書き出す。値が同じなので数え方は変わらない。既にあれば上書きしない |
 | チケット制御が disable | 上部に「配点は何にも効かない」と出る。編集と保存はできる |
@@ -268,7 +268,9 @@ YAML として読めないファイルは画面から直せない（エディタ
 ```sh
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p . で out/ に出し、esbuild で out/extension.js に束ねる
-pnpm test          # tsc のあと node --test out/test/*.test.js
+pnpm test          # tsc のあと node --test "out/test/**/*.test.js"（全部）
+pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
+pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
 pnpm run package   # scripts/package.sh: install → compile → test → vsce package
 ```
 
@@ -282,9 +284,14 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 入れたあと、開いているウィンドウは再読み込み（`Developer: Reload Window`）で新しい版になる。
 
-`node --test` にはディレクトリではなくグロブ（`out/test/*.test.js`）を渡す。
+`node --test` にはディレクトリではなくグロブ（`out/test/**/*.test.js`）を渡す。
 
-実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。vsix には `node_modules/` を入れず、
+テストは画面の領域ごとのディレクトリに分けてあり、一部を直したときはその領域だけを流せる。
+HTML を文字列で見る単体テスト（`*.test.ts`）と、画面に埋めたスクリプトを happy-dom で実際に動かす
+テスト（`*.dom.test.ts`）を同じディレクトリに置く。happy-dom で動かないものだけ jsdom に逃がす方針で、
+いまのところ jsdom が要るものは無い。
+
+実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom を足してある。vsix には `node_modules/` を入れず、
 `scripts/bundle.js`（esbuild）が本体ごと `out/extension.js` に束ねる。テストは束ねる前の
 `out/src/` を使う。
 
@@ -412,7 +419,16 @@ test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
   fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
   fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/test_approve_json.py が書き出す
-  *.test.ts           core の単体テスト CB-T01〜CB-T109
+  helpers/fixture.ts  board.json を読む
+  helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を控える
+  board/              ボード（board, render, model, approvemodel）
+  rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
+  risk/               リスク管理（risk-doc, risk-render）
+  phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
+  projects/           プロジェクト管理（projects, layer-render）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control）
+  */*.test.ts         HTML の文字列を見る単体テスト CB-T01〜
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   package.sh          vsix の組み立て
