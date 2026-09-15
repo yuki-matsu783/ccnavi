@@ -89,6 +89,8 @@ test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない�
     }, { once: true });
     assert.throws(() => page.type(page.one("#find"), "x"), /わざと/);
     assert.equal(page.errors.length, 0, "投げたら消える");
+    // 非同期のハンドラの例外が unhandledrejection に来ることを確かめる。渡すのが目的
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     page.one("#find").addEventListener("input", async () => {
       await Promise.resolve();
       throw new Error("あとで");
