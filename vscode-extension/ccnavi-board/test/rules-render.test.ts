@@ -120,3 +120,14 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   assert.doesNotMatch(body, /vscode\.setState\(\{ tab: name \}\)/);
   assert.match(html, /\.row\.open \.row-body \{ display: grid; \}/);
 });
+
+test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", () => {
+  const html = renderRulesPage(page(), { nonce: "n" });
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  assert.match(body, /if \(key\) \{ cap\.setAttribute\("title", "YAML のキー: " \+ key\); \}/);
+  for (const [label, key] of [["ツール", "match"], ["文面", "message"], ["渡す文", "additionalContext"]]) {
+    assert.match(body, new RegExp(`captioned\\("${label}", [^\\n]*"${key}"\\)`), label);
+  }
+  assert.match(body, /fileField\(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile"/);
+  assert.match(html, /title="--test の subject">対象 /);
+});

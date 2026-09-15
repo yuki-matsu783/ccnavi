@@ -90,3 +90,12 @@ test("CB-T122 項目の一覧は 1 件 1 行で既定は畳み、開いた行を
   // 閾値の飾りの札は出さない
   assert.doesNotMatch(body, /level-name/);
 });
+
+test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が変わり、YAML のキー名は title に載せる", () => {
+  const html = renderRiskPage(page(), { nonce: "n" });
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  assert.match(body, /captioned\("点", points, "", "points"\)/);
+  assert.match(body, /captioned\("文面", [^\n]*"message"\)/);
+  assert.match(body, /function valueLabel\(kind\) \{[\s\S]*?"しきい値"/);
+  assert.match(body, /captioned\(name\.toUpperCase\(\), input, "w-level", "levels\." \+ name\)/);
+});

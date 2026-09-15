@@ -62,3 +62,15 @@ test("CB-T121 種類の一覧は 1 件 1 行で既定は畳み、関係と案内
   assert.match(body, /if \(phase && phase\.id !== ""\) \{ ids\.push\(phase\.id\); \}/);
   assert.doesNotThrow(() => new Function(body));
 });
+
+test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の title に載せる", () => {
+  const doc = readPhases(TEMPLATE_PHASES_TEXT);
+  const html = renderPhasesPage(
+    { root: "/ws", phasesPath: ".ccnavi/config/phases.yml", exists: true, ticketControl: "enable", model: doc.model, lock: { locked: false, reason: "", doing: [] } },
+    { nonce: "n" },
+  );
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  for (const [label, key] of [["題", "title"], ["区分", "kind"], ["範囲", "scope"], ["成果物", "deliverables"], ["並行できる種類", "overlap"], ["置く目安", "when"]]) {
+    assert.match(body, new RegExp(`captioned\\("${label}", [\\s\\S]*?"${key}"\\)`), label);
+  }
+});
