@@ -91,7 +91,7 @@ class RestoreTest(GuardHarness):
                 before, after, result = self.break_and_restore(path)
                 self.assertEqual(after, before, self.said(result, kind))
                 self.assertIn("restored", result.stdout, self.said(result, kind))
-                self.assertIn(f"{kind}.yml", result.stdout, self.said(result, kind))
+                self.assertIn(os.path.basename(path), result.stdout, self.said(result, kind))
 
     def test_own_layer_files_are_restored(self):
         """§11.6: 自身の層 `<ワークスペースルート>/.ccnavi/config/` の 3 本も対象。"""
@@ -104,7 +104,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, kind))
 
     def test_common_phases_and_risk_are_restored(self):
-        """§11.6: 共通層の phases.yml / risk.yml を足す（既存の穴の修正）。"""
+        """§11.6: 共通層の phases.yml / risks.yml を足す（既存の穴の修正）。"""
         for path in (self.phases, self.risk):
             name = os.path.basename(path)
             with self.subTest(path=name):
@@ -139,7 +139,7 @@ class RestoreTest(GuardHarness):
         今はそこがルールの allow `worktrees` に当たって書けてしまい、戻りもしない。
         """
         tree = self.worktree(self.ws, "w3")
-        for name in ("rules.yml", "phases.yml", "risk.yml"):
+        for name in ("rules.yml", "phases.yml", "risks.yml"):
             with self.subTest(name=name):
                 copy = os.path.join(tree, ".ccnavi", "common", name)
                 self.assertTrue(
@@ -298,7 +298,7 @@ class DenyTest(GuardHarness):
             "echo x >> .ccnavi/config/rules.yml",
             "sed -i s/deny/allow/ projects/lib/.ccnavi/config/rules.yml",
             "cp /tmp/x .ccnavi/config/phases.yml",
-            "cd projects/lib && echo x > .ccnavi/config/risk.yml",
+            "cd projects/lib && echo x > .ccnavi/config/risks.yml",
         ):
             with self.subTest(command=command):
                 result = self.guarded_hook("Bash", self.ws, command=command)
@@ -438,7 +438,7 @@ class SetupTest(unittest.TestCase):
         os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))
         write(os.path.join(src, ".ccnavi", "common", "rules.yml"), "deny: []\n")
-        write(os.path.join(src, ".ccnavi", "common", "risk.yml"), COMMON_RISK)
+        write(os.path.join(src, ".ccnavi", "common", "risks.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)
         # 承認済みチケットを運ぶ sh も配るもの。無いと「まだ無いもの」に名前が出る。
         for name in (
@@ -456,13 +456,13 @@ class SetupTest(unittest.TestCase):
             return json.load(f)
 
     def test_deploy_copies_common_rules_and_risk_and_own_phases(self):
-        """§11.9: 共通層に rules.yml と risk.yml、自身の層に phases.yml のひな形を配る。"""
+        """§11.9: 共通層に rules.yml と risks.yml、自身の層に phases.yml のひな形を配る。"""
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
 
         self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "rules.yml")))
-        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "risk.yml")))
+        self.assertTrue(os.path.isfile(os.path.join(self.dir, ".ccnavi", "common", "risks.yml")))
         self.assertTrue(os.path.isfile(os.path.join(self.dir, HOME, "config", "phases.yml")))
         self.assertNotIn("まだ無いもの", result.stdout)
 
@@ -472,7 +472,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("まだ無いもの", result.stdout)
         self.assertIn(".ccnavi/common/rules.yml", result.stdout)
-        self.assertIn(".ccnavi/common/risk.yml", result.stdout)
+        self.assertIn(".ccnavi/common/risks.yml", result.stdout)
         self.assertIn(".ccnavi/config/phases.yml", result.stdout)
 
     def test_all_writes_project_home(self):

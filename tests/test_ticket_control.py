@@ -82,7 +82,7 @@ class TicketControlTest(unittest.TestCase):
         self.assertIn("リスクの配点に", without)
 
         write(self.root, os.path.join(".ccnavi", "common", "phases.yml"), "phases: []\n")
-        write(self.root, os.path.join(".ccnavi", "common", "risk.yml"), "levels: {}\n")
+        write(self.root, os.path.join(".ccnavi", "common", "risks.yml"), "levels: {}\n")
         with_files = self.context(self.start("--mode", "enable"))
         self.assertIn("フェーズ（.ccnavi/common/phases.yml）", with_files)
-        self.assertIn("リスクの配点（.ccnavi/common/risk.yml）", with_files)
+        self.assertIn("リスクの配点（.ccnavi/common/risks.yml）", with_files)

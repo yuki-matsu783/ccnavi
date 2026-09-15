@@ -5,7 +5,7 @@
 
 層は 3 種。
 
-- 共通層: `.ccnavi/common/{rules,phases,risk}.yml`（`--rules` / `--phases` / `--risk`）
+- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（`--rules` / `--phases` / `--risk`）
 - ワークスペース自身の層: `<ワークスペースルート>/.ccnavi/config/`
 - プロジェクトの層: `projects/<名前>/.ccnavi/config/`
 
@@ -238,9 +238,12 @@ def read(path):
         return f.read()
 
 
+FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
+
+
 def layer_path(root, kind, home=HOME):
     """その git プロジェクトルートの層のファイル（rules / phases / risk）の綴り。"""
-    return os.path.join(root, home, "config", f"{kind}.yml")
+    return os.path.join(root, home, "config", FILE_NAMES[kind])
 
 
 def write_layer(root, *, rules=None, phases=None, risk=None, home=HOME):
@@ -332,7 +335,7 @@ def build_template():
     common = os.path.join(ws, ".ccnavi", "common")
     write(os.path.join(common, "rules.yml"), json.dumps(COMMON_RULES))
     write(os.path.join(common, "phases.yml"), COMMON_PHASES)
-    write(os.path.join(common, "risk.yml"), COMMON_RISK)
+    write(os.path.join(common, "risks.yml"), COMMON_RISK)
     git(ws, "add", "-A")
     git(ws, "commit", "--quiet", "-m", "init")
 
@@ -357,7 +360,7 @@ class ConfigUnionHarness(unittest.TestCase):
         common = os.path.join(self.ws, ".ccnavi", "common")
         self.rules = os.path.join(common, "rules.yml")
         self.phases = os.path.join(common, "phases.yml")
-        self.risk = os.path.join(common, "risk.yml")
+        self.risk = os.path.join(common, "risks.yml")
         # 承認済みチケットとマーカーは、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
         # （設計 §9.2）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
         self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
