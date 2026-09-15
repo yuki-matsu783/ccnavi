@@ -9,7 +9,7 @@
 ルールファイルは `deny` `ask` `allow` の 3 つに分かれる。どれも同じ形の
 ルールを並べるだけで、置かれたタイプがその判定になる。
 
-    version: 3
+    version: 1
     deny:
       - id: guard-config
         match: Write|Edit
@@ -68,8 +68,7 @@ import yaml
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。
-# 2 でタイプが 3 つに分かれ、ファイルの形式も JSON から YAML になった。
-VERSION = 3
+VERSION = 1
 
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
 SEVERITY_ERROR = "error"
@@ -340,11 +339,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             Problem(
                 SEVERITY_ERROR,
                 "",
-                f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
-                f"版 1 は 1 本の `rules` の並び、版 2 は "
-                f"`{'` `'.join(SECTIONS)}` の 3 タイプで欄の名前が `pattern`。"
-                "版 3 は欄の名前が `glob` で、意味も fnmatch の glob になった。"
-                "文字列全体に当たるので、部分一致が要るなら前後に `*` を書く",
+                f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）",
             )
         )
 

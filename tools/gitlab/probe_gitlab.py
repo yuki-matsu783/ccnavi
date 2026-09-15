@@ -78,7 +78,7 @@ RESULTS: list[tuple[str, bool, str]] = []
 API_SEQ = 0
 
 RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "guard-approved",
