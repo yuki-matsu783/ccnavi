@@ -1,4 +1,5 @@
 import re
+import time
 import unittest
 
 from ccnavi import phase, shellread
@@ -740,8 +741,11 @@ class CommandNameTest(unittest.TestCase):
             "sudo -u me $c status": ["$c"],
             "sh $G status": ["$G"],
             ". $venv/bin/activate": ["$venv/bin/activate"],
-            'sh -c "$c status"': ["$c"],
-            'eval "$(ssh-agent -s)"': ["$"],
+            # bash 4.1 以降の名前付き fd も、前に置いたリダイレクト（敵対的レビュー）。
+            "{fd}>/dev/null $c push": ["$c"],
+            "{fd}>&2 $c push": ["$c"],
+            # 外側が縮退していない `eval` は、読み直した層も見る。
+            'FOO=1 eval "$c status"': ["$c"],
         }
         for src, want in cases.items():
             with self.subTest(src=src):
@@ -763,9 +767,21 @@ class CommandNameTest(unittest.TestCase):
             "command -v $x",
             "cd $S && ls",
             "echo '$c' | cat",
+            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認に落ちる（ADR-0047）。
+            'sh -c "$c status"',
+            'eval "$(ssh-agent -s)"',
+            'eval "$x"',
         ]:
             with self.subTest(src=src):
                 self.assertEqual(rewrites_of(src, shellread.FORM_COMMAND_NAME), [])
+
+    def test_コマンドを大量に並べても線形で読む(self):
+        # 敵対的レビュー。並べた綴りの重複除去が二乗で、8000 本で 20 秒を超えていた。
+        src = "; ".join(f"$c{i} push" for i in range(8000))
+        start = time.monotonic()
+        names = rewrites_of(src, shellread.FORM_COMMAND_NAME)
+        self.assertEqual(len(names), 8000)
+        self.assertLess(time.monotonic() - start, 3.0)
 
 
 class BackquoteTest(unittest.TestCase):
@@ -824,6 +840,10 @@ class AmbiguousFormTest(unittest.TestCase):
             "echo coproc",
             "echo select",
             "psql -c 'select 1'",
+            # `for` と `case` の直後の語は変数名と調べる値（敵対的レビュー）。
+            "for select in a b; do echo $select; done",
+            "for coproc in a b; do :; done",
+            "case select in select) echo hi;; esac",
             "echo $((1 << 2))",
             'echo "$(echo just in time)"',
         ]:

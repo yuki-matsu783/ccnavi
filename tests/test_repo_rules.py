@@ -533,8 +533,8 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("cat a.txt\n", "allow", "prefer-read-grep", ""),
                 ("curl -s 'https://example.com/a#frag'", "ask", "prefer-webfetch", ""),
                 ('export PATH="$(go env GOPATH)/bin:$PATH"', "ask", "", "UNDECLARED"),
-                # eval は置換の出力を読み直して実行する。何が走るかが綴りに無い（ADR-0047）。
-                ('eval "$(ssh-agent -s)"', "deny", NAME, "DENY_COMMAND_NAME_EXPANSION"),
+                # eval の文字列の中はコマンド名を見ない。外側が縮退して確認に落ちる（ADR-0047）。
+                ('eval "$(ssh-agent -s)"', "ask", "", "PARSE_UNCERTAIN"),
                 (
                     "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
                     "ask",
@@ -661,6 +661,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 # 引数に書いた同じ綴りは予約語ではない。
                 ("echo coproc", "ask", "", "UNDECLARED"),
                 ("echo select", "ask", "", "UNDECLARED"),
+                ("for select in a b; do echo $select; done", "ask", "", "UNDECLARED"),
                 ("echo $((1 << 2))", "ask", "", "UNDECLARED"),
             ]
         )
@@ -704,7 +705,11 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("sudo -u me $c status", "deny", NAME, code),
                 ("sh $G status", "deny", NAME, code),
                 ("if $c status; then :; fi", "deny", NAME, code),
-                ('sh -c "$c status"', "deny", NAME, code),
+                ("{fd}>/dev/null $c status", "deny", NAME, code),
+                ('FOO=1 eval "$c status"', "deny", NAME, code),
+                # 外側が縮退する `sh -c` と `eval` の文字列の中は、止めずに確認に落とす。
+                ('sh -c "$c status"', "ask", "", "PARSE_UNCERTAIN"),
+                ('eval "$(pyenv init -)"', "ask", "", "PARSE_UNCERTAIN"),
                 ('"$(git rev-parse --show-toplevel)/x.sh"', "deny", NAME, code),
             ]
         )
