@@ -316,9 +316,11 @@ def brace_expansion(subject: str, braces: list[str]) -> str:
             f"[ccnavi] {CODE_BRACE_EXPANSION}",
             f"subject: {shown}",
             f"brace expansion outside quotes: {listed}",
-            "The shell expands these into several words before the command runs, so the words "
-            "ccnavi reads are not the words that would run. bash and zsh expand them differently, "
-            "so ccnavi does not guess the result; it stops the call. Write the words out instead: "
+            "Outside quotes the shell expands these into several words before the command runs, "
+            "so the words ccnavi reads are not the words that would run. bash and zsh expand them "
+            "differently, so ccnavi does not guess the result; it stops the call, also in the few "
+            "places where no shell expands them (an assignment, a case pattern, [[ ]]). Write the "
+            "words out instead: "
             "`--exclude-dir={a,b}` becomes `--exclude-dir=a --exclude-dir=b`, `cp f{,.bak}` "
             "becomes `cp f f.bak`, `{1..3}` becomes `1 2 3`. If the braces are meant as text, "
             "put them in single quotes: '{a,b}'.",
