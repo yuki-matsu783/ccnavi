@@ -65,7 +65,6 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from . import tree
 from .globmatch import translate
 
 # このビルドが読めるルールファイルの書式の版。
@@ -381,10 +380,12 @@ def _build(
     else:
         glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
         expression = translate(glob)
-        # glob は、その機械がパスを見るのと同じ見方で当てる。区別しない機械で
-        # `*/.ccnavi/*` と書いたルールが `.Ccnavi/` を素通りさせると、同じ場所を
-        # 指しているのに守りが外れる（phasetypes._globs / risk._factors と同じ形）。
-        flags = re.IGNORECASE if tree.CASE_INSENSITIVE else 0
+        # glob は、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で変えると、
+        # 同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた守りを
+        # `.Ccnavi/` で素通りでき、どの機械でも区別しないチケットの範囲とも食い違う。
+        # ルールは人が宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
+        # （phasetypes._globs / risk._factors / チケットの範囲と同じ形）。
+        flags = re.IGNORECASE
 
     try:
         rule.compiled = re.compile(expression, flags)
