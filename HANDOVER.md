@@ -331,8 +331,6 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 ### 未了: `ticket-rule-merge` の作業で見つかった別件
 
-- `ccnavi-review.sh check` が「request をやり直せ」と案内するのに、依頼の印（`<N>.requested`）が残っていると `request` が通らない。
-  印を人が消すまで先へ進めない
 - `--lint`（`lint._worktree_layers`）が、作業ツリーにある承認済みチケットと印を「統合されるまで効かない」と warn で言う。
   承認済みチケットは `approval.scan` が全部のツリーから読むので効いている。承認済みチケットの置き場をこの点検から外す
 - 組み直し（`build.py` の置き換え）が `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
