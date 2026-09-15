@@ -40,7 +40,8 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 判定の記録と控えは `logs/log.jsonl` と `logs/state/`、開発用 hook のセッション状態は `logs/session/`。`.claude/` には
 Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを置く。
 
-- Write / Edit / NotebookEdit は共通層 + 行き先の 1 層、Bash は共通層 + 全部の層。足すだけで上書きは無い
+- パスを持つツール（Read / Grep / Glob / Write / Edit / NotebookEdit）は共通層 + 行き先の 1 層、パスを持たないツール
+  （Bash / PowerShell / WebFetch / Skill / Agent）は共通層 + 全部の層。足すだけで上書きは無い
 - 層の id は `self:id` / `<名前>:id`。重複（全欄一致）は後ろを捨てて info、ルールの同 id 中身違いは両方効いて warn、
   種類と配点の同 id 中身違いはその層を空にして error
 - フェーズの種類と配点は親の承認済みチケットの `project:`（提案を置いた場所が決める）の層を足す。`levels` は書かれた鍵だけがキーごとに min。
