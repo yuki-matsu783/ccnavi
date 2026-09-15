@@ -222,7 +222,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 | もの | 版 |
 |---|---|
 | VS Code | 1.90 以上 |
-| ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が勝つ）の `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → `.ccnavi/bin/ccnavi`（前の既定。移し替える前のワークスペースのため） → ソースがあれば `uv run python -m ccnavi`。振り分けの sh（名前が `ccnavi-launcher.sh`）を指していれば、sh を通さず `../bin/<os>-<arch>/` にあるこの機械向けの実行ファイルを使い、無ければ次の候補へ進む（Windows では sh を直接起動できないため、sh そのものは使わない）。それ以外の綴り（前の形の `.ccnavi/bin/ccnavi` など）は、隣の `<os>-<arch>/` を先に探す |
+| ccnavi の実行ファイル | 探す順は、設定 `ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json` が勝つ）の `CCNAVI_BIN_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → ソースがあれば `uv run python -m ccnavi`。振り分けの sh（名前が `ccnavi-launcher.sh`）を指していれば、sh を通さず `../bin/<os>-<arch>/` にあるこの機械向けの実行ファイルを使い、無ければ次の候補へ進む（Windows では sh を直接起動できないため、sh そのものは使わない）。それ以外の綴りは、綴りそのものを実行ファイルとして使う |
 | bash | accept と clone / fetch / pull を送るターミナル。承認は通らない（子プロセスで打つ）。Windows は Git Bash（`C:\Program Files\Git\bin\bash.exe`、無ければ PATH の `bash`） |
 | git | PATH にあること。プロジェクト管理画面が origin を読み、ターミナルで clone / fetch / pull を打つ |
 | Node.js / pnpm | 22 以上 / 10。組み立てとテストにだけ要る |
