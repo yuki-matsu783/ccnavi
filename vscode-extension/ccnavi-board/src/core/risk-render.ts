@@ -227,7 +227,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const input = field(form.levels, name, "f-level", "既定 " + page.builtinLevels[name]);
       input.setAttribute("inputmode", "numeric");
       input.setAttribute("title", name.toUpperCase() + " 以上になる点");
-      box.appendChild(captioned(name.toUpperCase(), input, "w-level", "levels." + name));
+      box.appendChild(captioned(name.toUpperCase(), input, "", "levels." + name));
     }
   }
   function renderFactor(factor) {
@@ -297,7 +297,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     for (const li of document.querySelectorAll("#factors .factor")) {
       li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
     }
-    const shown = document.querySelectorAll("#factors .factor:not(.hidden-by-find), #factors .factor.open").length;
+    const shown = document.querySelectorAll("#factors .factor:not(.hidden-by-find)").length;
     document.getElementById("factor-count").textContent = q === "" ? String(form.factors.length) : shown + " / " + form.factors.length;
   }
   function upButton(key) {
@@ -385,7 +385,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
-    for (const el of document.querySelectorAll("#levels input, #factors input, #factors select, #factors button, button[data-action=add]")) { el.disabled = on || !page.exists; }
+    for (const el of document.querySelectorAll("#levels input, #factors .row-body input, #factors .row-body select, #factors .row-body button, button[data-action=add]")) { el.disabled = on || !page.exists; }
     updateSave();
     if (text) { status(text, false); }
   }

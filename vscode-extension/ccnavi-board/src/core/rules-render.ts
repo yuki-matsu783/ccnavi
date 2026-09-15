@@ -130,7 +130,7 @@ function renderModeBanner(mode: string): string {
     return "";
   }
   const shown = mode === "" ? "未設定" : mode;
-  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。deny や ask にヒットしてもツールの呼び出しは止まらない</div>\n`;
+  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。判定と記録はするが、deny や ask にヒットしてもツールの呼び出し（tool_use）を止めない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -208,6 +208,8 @@ ${LIST_STYLE}
   .section-name.allow { color: var(--vscode-charts-green); }
   .section-label, .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
   .rule-section.folded .list { display: none; }
+  /* 絞り込み中は畳んだタイプの中も見せる（矢印は applyFind が合わせる） */
+  .finding .rule-section.folded .list { display: block; }
   /* 1 行 = 開閉、id、match、パターンと文面、コンテキストの有無 */
   .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) 14px; }
   .rule.hit .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
@@ -313,7 +315,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (selected) { el.selected = true; }
     return el;
   }
-  function field(rule, name, className, placeholder, width) {
+  function field(rule, name, className, placeholder) {
     const input = h("input", { type: "text", class: className, spellcheck: "false", placeholder: placeholder || "" });
     input.value = rule[name];
     input.addEventListener("input", () => { rule[name] = input.value; markDirty(); });
@@ -492,7 +494,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     }
     for (const section of SECTIONS) {
       const total = sections[section].length;
-      const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find), [data-list=" + section + "] .rule.open").length;
+      const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find)").length;
       document.querySelector("[data-count=" + section + "]").textContent = q === "" ? String(total) : shown + " / " + total;
       // 絞り込み中は畳んだタイプの中も見せるので、矢印もそれに合わせる（畳んだ状態そのものは変えない）。
       const el = document.querySelector(".rule-section[data-section=" + section + "]");
@@ -534,7 +536,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       document.querySelector("[data-count=" + section + "]").textContent = String(sections[section].length);
     }
     for (const el of document.querySelectorAll("input.f-id")) {
-      el.addEventListener("input", () => { el.closest(".rule").setAttribute("data-id", el.value); persistOpen(); });
+      el.addEventListener("input", () => { el.closest(".rule").setAttribute("data-id", el.value); });
+      el.addEventListener("change", () => persistOpen());
     }
     applyFind();
   }
@@ -642,7 +645,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const box = document.getElementById("judge-result");
     box.textContent = "";
     box.classList.remove("hidden");
-    for (const el of document.querySelectorAll(".rule.hit")) { el.classList.remove("hit"); }
+    for (const el of document.querySelectorAll(".rule.hit")) {
+      el.classList.remove("hit");
+      // 前の判定でその場だけ開いた行は畳む。利用者が開いた行（控えにある）はそのまま
+      if (!opened.has(el.getAttribute("data-key"))) { setOpen(el, false, false); }
+    }
     if (!result.known) {
       box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定の対象を取り出せないツール。ルールを書いてもヒットせず、呼び出しはそのまま通る")]));
     } else {

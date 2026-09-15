@@ -308,7 +308,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     for (const li of document.querySelectorAll("#phases .phase")) {
       li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
     }
-    const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find), #phases .phase.open").length;
+    const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find)").length;
     document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length;
   }
   function upButton(key) {
@@ -416,7 +416,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
-    for (const el of document.querySelectorAll("#phases input, #phases select, #phases button, button[data-action=add]")) { el.disabled = on || !page.editable; }
+    for (const el of document.querySelectorAll("#phases .row-body input, #phases .row-body select, #phases .row-body button, button[data-action=add]")) { el.disabled = on || !page.editable; }
     updateSave();
     if (text) { status(text, false); }
   }

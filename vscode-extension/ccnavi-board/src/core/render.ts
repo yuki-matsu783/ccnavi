@@ -471,7 +471,6 @@ export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; bo
   .row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
   /* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
   .row.hidden-by-find:not(.open) { display: none; }
-  .finding .rule-section.folded .list { display: block; }
   .row-head { display: grid; gap: 10px; align-items: center; padding: 5px 8px; cursor: pointer; }
   .row-head:hover { background: var(--vscode-list-hoverBackground); }
   .row.open .row-head { background: var(--vscode-editorWidget-background); }
@@ -590,19 +589,19 @@ const STYLE = `${PAGE_STYLE}
   .badge.mark-requested { color: var(--vscode-charts-yellow); }
   .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
   .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }
-  .fact { white-space: nowrap; }
+  .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .fact.copy-open::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
   .fact.sha { font-family: var(--vscode-editor-font-family); }
   /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右に人が見るべきことだけ */
   .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; }
-  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  .phase { display: grid; grid-template-columns: 12px auto minmax(0, 1fr); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
   .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
-  .phase-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phase-name { white-space: nowrap; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase-tickets::before { content: "·"; margin: 0 5px; }
-  .phase-status { text-align: right; }
+  .phase-status { text-align: right; overflow-wrap: anywhere; }
   .phase-active .phase-status { color: var(--vscode-charts-blue); }
   .phase.gate-closed .phase-label, .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
   .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
