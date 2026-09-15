@@ -1228,12 +1228,16 @@ def _already_requested(tree_root: str, ph: phase.Phase, phase_no: int) -> str:
     エージェントの打てる手が無くなる。出し直しても緩むものは無い。check は新しい HEAD との
     一致を求め直し、未解決の指摘は付いた時刻で絞らないので、前の依頼への指摘も数え続ける。
     HEAD が依頼時のままなら、同じ依頼を二重に投稿するだけなので止める。
+
+    レビュー済みは依頼の有無より先に見る。`wrapup` は依頼していないフェーズにも
+    レビュー済みを置くので、依頼の記録が無いことを先に見ると、人が締めたフェーズに
+    依頼が投稿される。
     """
+    if approval.MARK_REVIEWED in ph.marks:
+        return f"フェーズ {phase_no} はレビュー済み"
     mark = ph.marks.get(approval.MARK_REQUESTED)
     if mark is None:
         return ""
-    if approval.MARK_REVIEWED in ph.marks:
-        return f"フェーズ {phase_no} は依頼済みで、レビュー済み"
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     recorded = str(mark.get("head") or "")
     if rc == 0 and recorded and head.strip() != recorded:
