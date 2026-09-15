@@ -8,7 +8,7 @@
 # 前後に `*` を自分で書く。語の切れ目は入らないので、右側だけなら
 # `*sed *` のように空白を書いて守る。左側の切れ目は glob では書けない。
 # `*git push*` は `legit push` にも当たる。左記を避けたい場合は regex を使う。
-version: 3
+version: 1
 
 deny:
   # フックスクリプト の場所
@@ -26,6 +26,15 @@ deny:
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
+
+  # ccnavi の設定（ルール・フェーズの種類・リスクの配点）
+  - id: guard-ccnavi-config
+    match: Write|Edit|NotebookEdit
+    regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risk)\.yml$'
+    message: >-
+      ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
+      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
+      （/ccnavi-config）
 
   # チェックアウトしたブランチでは編集しない。`.claude/worktrees/` だけが編集可能。
   # `{root}` はワークスペースルートの実パスに置き換わる。
@@ -63,22 +72,6 @@ deny:
       を使ってください。通る形は同じスクリプトの --help 参照。返るのは要約と
       先頭 40 行だけで、全量は logs/ に残ります。
 
-  # git reset --hard は止める。作業中の変更が消える。
-  - id: git-reset-hard
-    match: Bash
-    glob: "*git reset --hard*"
-    message: >-
-      作業中の変更が消えます。'ccnavi-git.sh stash push -u' で退避するか、戻したい
-      ファイルを名指しして 'ccnavi-git.sh restore <パス>' を使ってください。
-
-  # git branch -D は未マージのブランチが消えるのでユーザに作業依頼。
-  - id: git-branch-force-delete
-    match: Bash
-    glob: "*git branch -D*"
-    message: >-
-      未マージのブランチが消えます。'ccnavi-git.sh branch -d <名前>' で安全側の削除を
-      試し、それでも消したいならユーザに変更を依頼ください。
-
   # settings.json の permissions.deny と同じ場所を並べてある。
   # `.pem` と `.key` は拡張子として書かれた形だけに絞ってある。
   - id: credentials
@@ -94,13 +87,12 @@ deny:
       再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
       'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
 
-  # find は探すだけのつもりで書かれるが、-delete と -fprintf は消す・書く。
+  # find の-delete と -fprintf は消す・書くができるので止める。
   - id: find-writes
     match: Bash
     regex: '(^|\x00)(\S*[\\/])?find(\.exe)?\s[^\x00]*\s-(delete|fprintf|fls|fprint)\b'
     message: >-
-      探すついでに消す・書く形の find です。探すだけなら
-      Glob ツール、または -delete を外した find にしてください。
+      探すにはGlob ツール、または -delete を外した find にしてください。
 
   # ヒアドキュメントによるファイルの書き込みは止める。Write / Edit ツールで書くのが正しい。
   - id: heredoc
@@ -112,29 +104,15 @@ deny:
       渡してください。ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
-  # 承認済みチケット。判定はここだけを読むので、ここを書けると承認の意味が無い。
+  # 承認済みチケットへの書き込みを禁止
   - id: guard-approved-tickets
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/tickets/*"
     message: >-
-      承認済みチケットです。承認は利用者が VS Code のボード（端末なら
+      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
       'ccnavi --approve'）で行い、
       閉じるのは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh done <識別子>' です。
       範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
-
-  # ccnavi の設定（ルール・フェーズの種類・リスクの配点）。人が持つ設定で、エージェントが
-  # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリー側の
-  # 設定も止める。統合でそのまま main の設定になる道を持つので、main の側だけ止めても
-  # 時間差で効く。見本（rule-samples.yml）はこのルールでは止めないが、
-  # .ccnavi/common/ に置いた見本は ccnavi ディレクトリを守る組み込みのルールが止める。見本の下書きは
-  # scratchpad に置き、ルールの下書きと一緒に利用者に渡す。
-  - id: guard-ccnavi-config
-    match: Write|Edit|NotebookEdit
-    regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risk)\.yml$'
-    message: >-
-      ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
-      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
-      （/ccnavi-config）。
 
   # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、作業ツリー側の設定は
   # 統合で main へ入る道を持つので、そちらも名前で止める。
