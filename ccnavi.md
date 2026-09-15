@@ -597,8 +597,11 @@ subject: env rm -f .ccnavi/common/rules.yml
 
 - 層で当たった件には、読めなかった断り（§6.3 の縮退）を付けない。当てた先は生の文字列ではなく、読み直したコマンドだから
 - `deny` のコードは、当たったルールが全部層で当たったなら、縮退していても `PARSE_UNCERTAIN` にせず `DENY_COMMAND_PATTERN` にする。
-  承認のルールが入っていれば `DENY_TICKET_APPROVAL_CLI`。1 本でも元の形で当たり、縮退していれば今までどおり `PARSE_UNCERTAIN`。
-  判定（deny / ask）はどちらでも変わらない。代償として、`PARSE_UNCERTAIN` の件数で数える集計とはずれる。`ask` は `RULE_ASK` のまま
+  1 本でも元の形で当たり、縮退していれば今までどおり `PARSE_UNCERTAIN`。ただし承認のルール（`builtin-guard-ticket-approval`）が
+  当たった件に入っていれば、層で当たったか元の形で当たったか、縮退しているかに依らず `DENY_TICKET_APPROVAL_CLI` を優先する
+  （今回より前からの扱い）。元の形が縮退したまま承認のルールに当たったときは、コードは `DENY_TICKET_APPROVAL_CLI` で、
+  読めなかった断りは付く。判定（deny / ask）はどちらでも変わらない。代償として、`PARSE_UNCERTAIN` の件数で数える集計とはずれる。
+  `ask` は `RULE_ASK` のまま
 - 記録の欄 `unwrapped` には、当たった層だけを `\x00` でつないで残す（同じ層は 1 回）。層全部ではない。どの層で当たったかを
   読むための欄で、元の形で当たったルールの分は空。数えれば、実行役のコマンド越しに止めた件数が分かる。サブエージェントの
   禁止は、元の形で当たらず層で当たったときにその層を残す。`--test --json` にも同じ欄が出る
@@ -1894,7 +1897,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 `ts`（ISO 8601、ローカルのオフセット付き）、`mode`、`permission_mode`、`event`、`tool`、`subject`
 （1000 字で切り `…(+N)`）、`decision`、`enforced`、`code`、`reason`、`degraded`、`unwrapped`（当たった中で実行されるコマンド。
 `\x00` でつなぎ、1000 字で切る。§6.3.1）、`fallback`、`detail`、
-`tree`、`project`、`rules[]`、`paths[]`、`guarded[]`、`session`、`ms`。空欄は落とす。
+`tree`、`project`、`source`、`rules[]`、`paths[]`、`guarded[]`、`session`、`ms` の 22 欄。空欄は落とす。
 `ts` / `mode` / `decision` / `enforced` / `ms` は常に出る。`O_APPEND` で 1 行を 1 回の write で書く。
 
 ## 付録 C. 実測で確かめた前提

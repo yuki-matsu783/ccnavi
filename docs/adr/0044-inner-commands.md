@@ -67,8 +67,10 @@ ask に落ちる形は人に確認されるが、読み切れる形は判定を�
   1 行足す（例:「`env` が実行する `rm -f .ccnavi/common/rules.yml` に当たりました。」）
 - 中で実行されるコマンドで当たった理由には、「読み切れなかったので生の文字列に当てた」断りを付けない
 - 拒否で、当たったルールがすべて中で実行されるコマンドで当たったなら、元の形が読み切れていなくても理由コードを
-  `PARSE_UNCERTAIN` にせず `DENY_COMMAND_PATTERN` にする（承認のルールなら `DENY_TICKET_APPROVAL_CLI`）。1 件でも元の
-  読み切れない形で当たっていれば `PARSE_UNCERTAIN` のまま。判定（deny / ask）はどちらでも変わらない
+  `PARSE_UNCERTAIN` にせず `DENY_COMMAND_PATTERN` にする。1 件でも元の読み切れない形で当たっていれば `PARSE_UNCERTAIN` のまま。
+  例外は承認のルール（`builtin-guard-ticket-approval`）で、当たった件に入っていれば、どう当たったか・読み切れたかに依らず
+  `DENY_TICKET_APPROVAL_CLI` を優先する（この決定より前からの扱いで、変えない）。元の形が読み切れないまま承認のルールに
+  当たったときも、読み切れなかった断りは付く。判定（deny / ask）はどちらでも変わらない
 
 ## 理由
 
