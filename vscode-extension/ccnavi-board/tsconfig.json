@@ -3,9 +3,7 @@
     "target": "ES2022",
     "module": "Node16",
     "moduleResolution": "Node16",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "outDir": "out",
     "rootDir": ".",
     "strict": true,
@@ -13,7 +11,5 @@
     "declaration": false,
     "resolveJsonModule": false
   },
-  "include": [
-    "src/**/*.ts"
-  ]
+  "include": ["src/**/*.ts"]
 }
