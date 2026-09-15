@@ -173,7 +173,7 @@ def decide_before(
         if conf.guard_ticket_approval != selfguard.DISABLE:
             rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
-    subject = screen(payload.tool_name, record.subject, record)
+    subject, bare, inner = screen(payload.tool_name, record.subject, record)
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
@@ -202,11 +202,21 @@ def decide_before(
         conf.tickets_enabled
         and payload.agent_id
         and payload.tool_name in phase.SHELL_TOOLS
-        and phase.forbidden(subject)
+        and phase.forbidden(subject, shellread.SEP.join(layer for _, layer, _ in inner))
     ):
+        # 禁止は中で実行されるコマンドにも当てる。`env sh …ccnavi-ticket.sh start` を
+        # 元の形だけで見ると、先頭の `sh` に固定した形が外れて素通りになる。
+        runner, layer = ("", "")
+        if not phase.forbidden(subject):
+            runner, layer = next((r, x) for r, x, _ in inner if phase.forbidden(x))
         record.code, record.rules = phase.CODE_SUBAGENT, [reasons.TICKET_RULE]
+        record.unwrapped = layer
         return refuse(
-            stdout, mode, record, rules.DENY, notices + [reasons.subagent_forbidden(subject)]
+            stdout,
+            mode,
+            record,
+            rules.DENY,
+            notices + [reasons.subagent_forbidden(subject, runner, layer)],
         )
 
     # ゲート。人間レビュー要のフェーズが終わっていてマーカーが無い間、サブエージェントの
@@ -232,6 +242,10 @@ def decide_before(
     # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
     # 確認もしろ」という読めない結論に届く道ができる。
     verdict, group = "", []
+    # group と同じ並びで、中で実行されるコマンドで当たったときの
+    # （実行役のコマンド, そのコマンド, 引用の中から切り出したコマンドの層か）。
+    # 元の形で当たったルールは ("", "", False)。
+    via: list[tuple[str, str, bool]] = []
     for name in rules.SECTIONS:
         if name == rules.ALLOW and record.degraded:
             # 読み切れなかったコマンドに allow は当てない。当てる先は
@@ -240,6 +254,14 @@ def decide_before(
             # deny と ask は当てたままにする。生の文字列に当たりすぎるぶんは
             # 厳しい側へ外れるだけで、そのことは文面が断る。
             break
+        # 中で実行されるコマンドは deny と ask にだけ当てる。止める側に足す当て先なので、
+        # 層を読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
+        # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認に落ちるが、
+        # 中の `cat …` が読み取りの allow に当たって通るようになる。
+        #
+        # 引用の外の層を先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
+        # ことにする。引用の中の断りは、引用の中にだけ当たったときに付けるものなので。
+        layers = sorted(inner, key=lambda x: x[2]) if name != rules.ALLOW else []
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
                 stderr.write("ccnavi: 判定を終える前に期限に達した\n")
@@ -247,16 +269,39 @@ def decide_before(
                 return modes.fail_closed(mode)
             if rule.matches(payload.tool_name, subject):
                 group.append(rule)
+                via.append(("", "", False))
+                continue
+            for runner, layer, quoted in layers:
+                if rule.matches(payload.tool_name, layer):
+                    group.append(rule)
+                    via.append((runner, layer, quoted))
+                    break
         if group:
             verdict = name
             break
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
+    record.unwrapped = shellread.SEP.join(dict.fromkeys(layer for _, layer, _ in via if layer))
     # 判定を下したのは最初に当たったルール（設計 §11.9）。その層を 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
     # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
     if group:
         record.source = group[0].source
+
+    # 止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったもの。
+    # 書いた側は文字を書いただけのつもりでいるので、回避策を知らせないと、
+    # 同じ形を書き直しては止まる。どこに当たったかは一致位置から推し量らず、
+    # 引用の中の中身を除いた読み（bare）に当て直して、当たらなければそうだとする。
+    # こうするとルールの書き方（glob / regex、`^` / `(^|\x00)`）に依らない。
+    # 中で実行されるコマンドで当たったルールは、bare に当て直せない（bare は元の形の読み）。
+    # そちらは、当たった層が引用の中から切り出したコマンドのものかどうかで決める。
+    inside = [False] * len(group)
+    if verdict in (rules.DENY, rules.ASK):
+        inside = [
+            quoted if layer else bare != subject and not rule.matches(payload.tool_name, bare)
+            for rule, (_, layer, quoted) in zip(group, via, strict=True)
+        ]
+    record.quoted = [name for name, hit in zip(record.rules, inside, strict=True) if hit]
 
     # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
     # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
@@ -300,10 +345,15 @@ def decide_before(
         # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
-            reasons.reason_for(rule, payload.tool_name, subject, source, record.degraded)
-            for rule in group
+            reasons.reason_for(
+                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+            )
+            for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
-        record.code = reasons.code_for(payload.tool_name, record.degraded)
+        # 全部が中で実行されるコマンドで当たったなら、当てた先は読み直したコマンドであって
+        # 生の文字列ではない。読み切れなかったことを根拠のコードにしない。
+        read_through = all(layer for _, layer, _ in via)
+        record.code = reasons.code_for(payload.tool_name, "" if read_through else record.degraded)
         if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
             record.code = phase.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
@@ -312,8 +362,10 @@ def decide_before(
         record.code = reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and group:
         texts = [
-            reasons.reason_for(rule, payload.tool_name, subject, source, record.degraded)
-            for rule in group
+            reasons.reason_for(
+                rule, payload.tool_name, subject, source, record.degraded, runner, layer, quoted
+            )
+            for rule, (runner, layer, _), quoted in zip(group, via, inside, strict=True)
         ]
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
@@ -427,9 +479,15 @@ def full_path(path: str, cwd: str) -> str:
         return os.path.normpath(os.path.abspath(joined))
 
 
-def screen(tool: str, subject: str, record: audit.Record) -> str:
+def screen(
+    tool: str, subject: str, record: audit.Record
+) -> tuple[str, str, list[tuple[str, str, bool]]]:
     """シェルのコマンドを、実際に実行される部分まで絞る。読み切れなかったときは
     record にそう書き残す。
+
+    返すのは 3 つ。1 つめはルールを当てる読み。2 つめはそこから引用の中で切り出した
+    コマンドを除いた読み（shellread.Reading.bare）で、文面の断りを決めるためだけに使う。
+    シェルでないツールと読み切れなかったコマンドでは、1 つめと 2 つめは同じになる。
 
     ルールはコマンドについて書かれたものであって、文字列についてではない。
     git push を引用した文書は push ではないし、そこで拒否を返すことは、
@@ -438,14 +496,28 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     読み切れないコマンドは生の文字列に落とす。生の文字列には実行される部分が
     すべて含まれるので、捕まえるべきものが抜けることはない。その代わり、返す拒否は
     どちらの拒否なのかを名乗る。
+
+    3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
+    1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
+    コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
     """
     if tool != "Bash":
-        return subject
+        return subject, subject, []
     reading = shellread.read(subject)
+    inner = []
+    if reading.unwrapped:
+        inner = list(
+            zip(
+                reading.runners,
+                reading.unwrapped.split(shellread.SEP),
+                reading.quoted_layers,
+                strict=True,
+            )
+        )
     if reading.degraded:
         record.degraded = reading.reason
-        return subject
-    return reading.text
+        return subject, subject, inner
+    return reading.text, reading.bare, inner
 
 
 def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:

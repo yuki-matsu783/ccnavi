@@ -896,6 +896,47 @@ def _project_settings(root: str) -> list[Problem]:
                     f"モードとして読めない。{modes.ENABLE} に落ちる",
                 )
             )
+    problems.extend(_bin_path(root, env.get(settings.BIN_ENV)))
+    return problems
+
+
+def _bin_path(root: str, declared: object) -> list[Problem]:
+    """`.claude/settings.json` の env の実行ファイルの綴りを見る（設計 launcher-scripts 9 節）。
+
+    プロセスの環境ではなく設定ファイルを読む。hook が起動するのは、ここに書いた綴り
+    （`"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"`）だから。
+
+    - 前の既定の綴り（settings.OLD_BIN_PATHS）なら warn。判定は動いているので止めない
+      （_old_common と同じ扱い）。導入スクリプトを打ち直せば新しい綴りへ書き換わる
+    - 指す先が在るのに実行できなければ error。hook は sh を直に起動するので 126 で起動せず、
+      判定そのものが動いていない。無いときは言わない。組み立ての前や、利用者ごとの設定で
+      別の綴りを渡している形があり、無いことは selfguard が missing と言う。
+      Windows では実行ビットを持たないので見ない
+    """
+    if not isinstance(declared, str) or not declared:
+        return []
+    problems: list[Problem] = []
+    spelled = declared.replace("\\", "/").removeprefix("./")
+    if spelled in settings.OLD_BIN_PATHS:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(project)",
+                f"{PROJECT_SETTINGS} の env の {settings.BIN_ENV}={declared} は前の既定の綴り。"
+                "scripts/ccnavi-setup.sh を打ち直すと書き換わる",
+            )
+        )
+    full = declared if os.path.isabs(declared) else os.path.join(root, declared)
+    if os.name != "nt" and os.path.isfile(full) and not os.access(full, os.X_OK):
+        problems.append(
+            Problem(
+                SEVERITY_ERROR,
+                "(project)",
+                f"{PROJECT_SETTINGS} の env の {settings.BIN_ENV}={declared} は在るが実行できない。"
+                "hook が起動しないので何も判定していない。実行ビットを付ける"
+                f"（chmod +x {declared}）か、scripts/ccnavi-setup.sh を打ち直す",
+            )
+        )
     return problems
 
 

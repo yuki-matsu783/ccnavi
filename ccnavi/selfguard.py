@@ -337,24 +337,37 @@ def binary_clause(bin_path: str) -> str:
     区切りはどちらの綴りにも当てる。ルールは 1 回書いてどの機械でも同じ意味で
     なければならない、という globmatch と同じ約束をここでも守る。
 
-    配布先では、指す先は振り分けの sh で、実体はその隣の `<os>-<arch>/` に並ぶ
-    （platformtag）。sh だけを守ると、隣の実体を差し替えれば判定が入れ替わるので、
-    同じ親の下の組み立ての置き場にも当てる。既定の置き場（`.ccnavi/bin/`）は
-    ccnavi ディレクトリを守るルールでも止まるが、`--bin` で ccnavi ディレクトリの外へ
-    動かした置き場はここでしか止まらない。
+    指す先は振り分けの sh で、hook が実際に走らせるのは実体のほう（platformtag）。
+    sh だけを守ると、実体を差し替えれば判定が入れ替わるので、組み立ての置き場にも当てる。
+    どこを置き場と読むかは sh の名前だけで決め、platformtag.launched_executable と揃える。
+    段の数など別の条件を足すと、守る場所と控える場所が食い違う。
+
+    - 名前が LAUNCHER_NAME なら、sh の末尾 2 要素（`scripts/ccnavi-launcher.sh`）と、
+      その 1 つ上の親の下の `bin/<os>-<arch>/`。sh の隣の `<os>-<arch>/` は sh が探さない
+      ので当てない。親が無い浅い綴りでは `bin/<os>-<arch>/` を親を問わずに当てる。判定に
+      渡る綴りは絶対パスなので、名指しのツールはそれでも止まる
+    - それ以外の名前は前の形。末尾 2 要素と、同じ親の下の `<os>-<arch>/`。`.ccnavi/bin/ccnavi`
+      を指したままのワークスペースで、隣の実体を守り続けるために残す
+
+    既定の置き場（`.ccnavi/`）は ccnavi ディレクトリを守るルールでも止まるが、ccnavi
+    ディレクトリを動かしたときや、既定でない綴りを指したときはここでしか止まらない。
     """
     if not bin_path:
         return ""
     parts = [p for p in re.split(r"[\\/]", bin_path) if p and p not in (".", "..")]
     if not parts:
         return ""
+    if parts[-1] == platformtag.LAUNCHER_NAME:
+        sh = r"[\\/]".join(re.escape(p) for p in parts[-2:])
+        home = re.escape(parts[-3]) + r"[\\/]" if len(parts) >= 3 else ""
+        return rf"(?:{sh}|{home}bin[\\/]{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
     tail = [re.escape(p) for p in parts[-2:]]
     if len(tail) < 2:
         return tail[0]
     return rf"{tail[0]}[\\/](?:{tail[1]}|{_BUILD_DIR}(?:[\\/][^\x00]*)?)"
 
 
-# 振り分けの sh の隣に並ぶ、機械ごとの組み立ての置き場。
+# 機械ごとの組み立ての置き場。`bin/` の下（今の形）か、sh の隣（前の形）に並ぶ。
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
 
@@ -655,7 +668,8 @@ def targets(
     if bin_path:
         full = os.path.realpath(bin_path)
         found.append(Target(key="bin", path=full, label=_relative(root, full), heavy=True))
-        # 指す先が振り分けの sh なら、hook が実際に走らせるのは隣の実体。そちらも控える。
+        # 指す先が振り分けの sh なら、hook が実際に走らせるのは `../bin/` の実体（前の形では
+        # 隣の実体）。そちらも控える。探す先は binary_clause が守る置き場と同じ条件で決まる。
         # 見つからなければ足さない。組み立てが無いことは sh が起動の時に言う。
         launched = platformtag.launched_executable(bin_path)
         if launched:

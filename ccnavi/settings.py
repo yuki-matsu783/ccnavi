@@ -53,6 +53,11 @@ GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
 # 守ることになる。hook の登録に書いた綴りをそのまま渡してもらう。
 BIN_ENV = "CCNAVI_BIN_PATH"
+# OLD_BIN_PATHS は前の既定の綴り。今の既定の配置では振り分けの sh を
+# `.ccnavi/scripts/ccnavi-launcher.sh` に置くが（ADR-0044）、ここでも既定としては持たない。
+# 前の綴りを指したままのワークスペースは動いているので、lint が warn で名指しするだけに使う。
+# scripts/ccnavi-setup.sh の側にも同じ一覧があり、そちらはここを指した env を書き換える。
+OLD_BIN_PATHS = (".ccnavi/bin/ccnavi",)
 # BIN_SUFFIXES は、書かれた綴りに無いときだけ継ぎ足して探す拡張子。
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)

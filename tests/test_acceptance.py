@@ -12,6 +12,7 @@ import os
 import tempfile
 import unittest
 
+from ccnavi import shellread
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -301,8 +302,9 @@ class HeredocTest(unittest.TestCase):
                 self.assertEqual(result.stdout, "", f"代替手段を止めた: {command!r}")
 
     def test_引用された記号を止めるのは許容した誤検知(self):
-        # shlex は引用された << と素の << を同じ文字列で返し、どちらだったかを
-        # 問い合わせる手段が無い。だからこれはヒアドキュメントに見えて止まる。
+        # 走査は引用の中の << をヒアドキュメントと読まないが、その先の shlex は
+        # 引用された << と素の << を同じトークンで返す。走査が読まなかった << が
+        # トークンに出たら、閉じない本文として縮退させ、ヒアドキュメントに見えて止まる。
         # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある
         # （ccnavi.md §6.3、§12.2）。このテストは、次に来た人が
         # 黙って直して別のところを壊さないように、決めた側を固定する。
@@ -393,6 +395,22 @@ class RecordTest(unittest.TestCase):
         # これが無いと、ガードが止めたもののうちどれだけが読み切れないまま
         # 出た判定なのかを記録が答えられない。
         self.assertIn("degraded", got[1], "生の文字列で下した判定に degraded が無い")
+
+    @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+    def test_引用の中から切り出したコマンドに当たったことを記録する(self):
+        # 書いた側が文字のつもりでいた場所に当たった判定を、あとから数えられるように
+        # （wip/design/shellread-subst.md §1.4）。
+        got = self.logged(
+            "enable",
+            pre_tool_use("Bash", "command", 'gh issue create --body "use `git push` here"'),
+            pre_tool_use("Bash", "command", "echo $(git push origin main)"),
+        )
+
+        self.assertEqual(len(got), 2)
+        self.assertEqual(got[0]["decision"], "deny")
+        self.assertEqual(got[0].get("quoted"), ["git-push"])
+        self.assertEqual(got[1]["decision"], "deny")
+        self.assertNotIn("quoted", got[1], "引用の外の置換に quoted が付いている")
 
 
 if __name__ == "__main__":

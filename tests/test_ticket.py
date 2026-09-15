@@ -542,6 +542,31 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(reading))
 
+    def test_subagent_cannot_move_state_through_a_runner_command(self):
+        """実行役のコマンドを前に置いても、サブエージェントの禁止は外れない。
+
+        禁止の形はコマンドの先頭の `sh` に固定していたので、`env sh` `command sh` `/bin/sh`
+        と `sh -c '…'` は素通りだった（wip/design/launcher-scripts.md §3.5.1、12 節 W5）。
+        禁止は中で実行されるコマンドにも当てる（§3.5.3）。先頭の形は対照として今のまま止まる。
+        """
+        self.family()
+        for command in (
+            "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh done x",
+            "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh request --phase 1'",
+        ):
+            with self.subTest(command=command):
+                result = self.hook(
+                    "PreToolUse",
+                    "Bash",
+                    self.parent_tree,
+                    agent_id="sub-1",
+                    command=command,
+                )
+                self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result), self.reason(result))
+
     def test_done_closes_the_copy_without_approval(self):
         self.family()
         result = self.ccnavi("ticket", "done", "i0001-01")
@@ -661,6 +686,34 @@ class TicketTest(unittest.TestCase):
         # 連結の片方が違えば止める側は変わらない。
         joined = shellread.read('ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
+
+    def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
+        """ゲートの中で通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
+
+        禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、ゲートが閉じている間に
+        `env sh …ccnavi-review.sh` の形で何でも前に置けるようになる
+        （wip/design/launcher-scripts.md §3.5.3、12 節 W4）。先頭の `sh` の形は今のまま通る。
+        """
+        self.family()
+        self.close_phase()
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+
+        exempt = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+
+        for command in (
+            "env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+            "sudo sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
+                self.assertIn("DENY_PHASE_GATE", self.reason(result), self.reason(result))
 
     def test_phase_without_review_skips_the_gate(self):
         self.family(review=(False, False))
@@ -1095,6 +1148,62 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
+
+    def test_request_again_after_head_moved(self):
+        """依頼の後に HEAD が動いたら、request で依頼を出し直せること（#36）。
+
+        check が「request をやり直す」と案内する一方で、request が「依頼済み」で
+        止まり、人がマーカーを外すまで進めなかった。出し直しても、前の依頼への
+        未解決の指摘は数え続ける。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+        before = read_json(mark)["head"]
+
+        # HEAD が依頼時のままなら、二重に投稿しない。
+        same = self.request(fixture)
+        self.assertNotEqual(same.returncode, 0)
+        self.assertIn("依頼済み", same.stderr)
+
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "later")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "直して"}]
+        write(fixture, json.dumps(data))
+
+        moved = self.check(fixture)
+        self.assertNotEqual(moved.returncode, 0)
+        self.assertIn("HEAD が動いている", moved.stderr)
+        self.assertIn("request --phase 1", moved.stderr)
+
+        redo = self.request(fixture)
+        self.assertEqual(redo.returncode, 0, redo.stderr)
+        self.assertIn("依頼し直した", redo.stdout)
+        self.assertNotEqual(read_json(mark)["head"], before)
+        self.assertEqual(len(read_json(fixture)["comments"]), 2)
+
+        # 前の依頼への指摘は、出し直しても数から消えない。
+        left = self.check(fixture)
+        self.assertNotEqual(left.returncode, 0)
+        self.assertIn("未解決", left.stderr)
+        data = read_json(fixture)
+        data["threads"][0]["resolved"] = True
+        write(fixture, json.dumps(data))
+        self.assertEqual(self.check(fixture).returncode, 0)
+
+        # レビュー済みになったあとは、HEAD が動いても出し直さない。
+        write(os.path.join(self.parent_tree, "src", "after.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "after")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        reviewed = self.request(fixture)
+        self.assertNotEqual(reviewed.returncode, 0)
+        self.assertIn("レビュー済み", reviewed.stderr)
 
     def test_request_refuses_when_a_child_branch_is_gone(self):
         self.family()

@@ -203,8 +203,9 @@ def prepare(
         body = ""
     if not body.strip():
         unmet.append("依頼文が空")
-    if approval.MARK_REQUESTED in ph.marks:
-        unmet.append(f"フェーズ {phase_no} は依頼済み")
+    already = _already_requested(tree_root, ph, phase_no)
+    if already:
+        unmet.append(already)
     if ph.deferred:
         unmet.append(
             f"フェーズ {ph.label} のレビューは {ph.review_at} 番目と一緒に見る計画。"
@@ -273,16 +274,18 @@ def requested(
     if found is None:
         return 1
     parent, ph = found
-    if approval.MARK_REQUESTED in ph.marks:
-        stderr.write(f"ccnavi: フェーズ {phase_no} は依頼済み\n")
+    tree_root = tree.worktree_path(root, parent.ticket)
+    already = _already_requested(tree_root, ph, phase_no)
+    if already:
+        stderr.write(f"ccnavi: {already}\n")
         return 1
+    again = approval.MARK_REQUESTED in ph.marks
     result = _result_with_mr(stderr, result_path)
     if result is None:
         return 1
     if not result.url:
         stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないならマーカーは置かない\n")
         return 1
-    tree_root = tree.worktree_path(root, parent.ticket)
     # 投稿とマーカーの間に HEAD が動いていないか。動いていれば、人が見るものとマーカーが食い違う。
     unmet = _unmet(tree_root, conf, ph)
     if unmet:
@@ -312,8 +315,9 @@ def requested(
         fsio.remove(
             os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
         )
+    done = "依頼し直した" if again else "依頼した"
     stdout.write(
-        f"OK: レビューを依頼した（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
+        f"OK: レビューを{done}（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
     )
     return 0
 
@@ -339,7 +343,9 @@ def check(
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = _moved_since_request(tree_root, requested_mark)
     if moved:
-        stderr.write(f"ccnavi: {moved}。人が見たものと今の HEAD が違う。request をやり直すこと\n")
+        stderr.write(
+            f"ccnavi: {moved}。人が見たものと今の HEAD が違う。{_redo_request(root, phase_no)}\n"
+        )
         return 1
     result = _matching(stderr, result_path, requested_mark)
     if result is None:
@@ -427,7 +433,7 @@ def reviewed(
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = _moved_since_request(tree_root, requested_mark)
     if moved:
-        stderr.write(f"ccnavi: {moved}。request をやり直すこと\n")
+        stderr.write(f"ccnavi: {moved}。{_redo_request(root, phase_no)}\n")
         return 1
     result = _matching(stderr, result_path, requested_mark)
     if result is None:
@@ -1212,6 +1218,36 @@ def _moved_since_request(tree_root: str, requested_mark: dict) -> str:
     if rc != 0 or ahead.strip():
         return "親ブランチの HEAD が push されていない"
     return ""
+
+
+def _already_requested(tree_root: str, ph: phase.Phase, phase_no: int) -> str:
+    """依頼済みで、出し直せないならその説明。未依頼か、出し直せるなら空。
+
+    出し直せるのは、依頼の後に親の HEAD が動き、まだレビュー済みになっていないときだけ。
+    そのとき check は「人が見たものと今の HEAD が違う」で止まるので、ここも止めると
+    エージェントの打てる手が無くなる。出し直しても緩むものは無い。check は新しい HEAD との
+    一致を求め直し、未解決の指摘は付いた時刻で絞らないので、前の依頼への指摘も数え続ける。
+    HEAD が依頼時のままなら、同じ依頼を二重に投稿するだけなので止める。
+    """
+    mark = ph.marks.get(approval.MARK_REQUESTED)
+    if mark is None:
+        return ""
+    if approval.MARK_REVIEWED in ph.marks:
+        return f"フェーズ {phase_no} は依頼済みで、レビュー済み"
+    rc, head = _git(tree_root, ["rev-parse", "HEAD"])
+    recorded = str(mark.get("head") or "")
+    if rc == 0 and recorded and head.strip() != recorded:
+        return ""
+    return f"フェーズ {phase_no} は依頼済み（HEAD は依頼時のまま）"
+
+
+def _redo_request(root: str, phase_no: int) -> str:
+    """HEAD が動いたときの案内。push 済みの今の HEAD で依頼を出し直す。"""
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    return (
+        f"push してから '{review_sh} request --phase {phase_no} --body-file <依頼文>' で"
+        "依頼を出し直すこと"
+    )
 
 
 def _resolve(cwd: str, path: str) -> str:

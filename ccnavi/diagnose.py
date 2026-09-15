@@ -88,6 +88,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
         "code": "",
         "reason": "",
         "degraded": "",
+        "unwrapped": "",
         "fallback": "",
         "rules": [],
         "response": "",
@@ -131,9 +132,16 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["resolved"] = record.subject if record.subject and record.subject != subject else ""
     out["reason"] = record.reason or ""
     out["degraded"] = record.degraded or ""
+    # 実行役のコマンドが中で実行するコマンドで当たったときの、そのコマンド。
+    out["unwrapped"] = record.unwrapped or ""
     out["fallback"] = record.fallback or ""
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
+    # 引用の中から切り出したコマンドにだけ当たったルールの id。記録と同じく、
+    # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の並びを、
+    # この場合が無い呼び出しで変えないため。
+    if record.quoted:
+        out["quoted"] = list(record.quoted)
     return out
 
 
@@ -170,6 +178,10 @@ def test(
         stdout.write(f"reason: {out['reason']}\n")
     if out["degraded"]:
         stdout.write(f"degraded: {out['degraded']}（生の文字列に当てた）\n")
+    if out["unwrapped"]:
+        for layer in out["unwrapped"].split("\x00"):
+            shown = " ".join(layer.replace("\x01", " ").split())
+            stdout.write(f"unwrapped: {shown}（中で実行されるコマンドに当てた）\n")
     if out["fallback"]:
         stdout.write(f"fallback: {out['fallback']}（組み込みの既定で判定した）\n")
 
@@ -184,6 +196,10 @@ def test(
                 continue
             stdout.write(f"  {hit['section']}:{hit['id']}  {hit['kind']} {hit['written']!r}\n")
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
+    if out.get("quoted"):
+        stdout.write(
+            f"quoted: {', '.join(out['quoted'])}（引用の中から切り出したコマンドにだけ当たった）\n"
+        )
 
     if not out["response"]:
         stdout.write("response: (何も返さない)\n")
