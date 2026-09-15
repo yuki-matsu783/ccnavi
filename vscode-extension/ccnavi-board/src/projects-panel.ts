@@ -18,6 +18,7 @@ import * as vscode from "vscode";
 
 import { openBoard } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
+import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
@@ -310,7 +311,7 @@ function show(current: PanelState, page: ProjectsPage): void {
 }
 
 function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi プロジェクト管理</title></head><body><p>プロジェクトの一覧を読み直せなかった。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi プロジェクト管理</title></head>${bodyTag(readAppearance())}<p>プロジェクトの一覧を読み直せなかった。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
 function fail(current: PanelState, message: string): void {

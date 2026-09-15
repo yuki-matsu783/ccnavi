@@ -59,7 +59,7 @@
           "enum": ["vscode", "claude-light", "claude-dark"],
           "enumDescriptions": ["VS Code のテーマに従う", "Claude の配色（ライト）", "Claude の配色（ダーク）"],
           "default": "vscode",
-          "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字を Claude の配色に置き換える（意味の色は変えない）。サイドパネルの「見た目」からも切り替えられ、開いている画面にはその場で効く。"
+          "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換える（ハイコントラストのテーマでは効かない）。サイドパネルの「見た目」からも切り替えられ、開いている画面にはその場で効く。"
         }
       }
     }

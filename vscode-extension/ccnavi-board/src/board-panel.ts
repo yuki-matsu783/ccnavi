@@ -8,6 +8,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, readAppearance } from "./appearance.js";
+import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
 import {
@@ -255,7 +256,7 @@ function show(current: PanelState, board: Board): void {
 }
 
 function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ボード</title></head><body><p>ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ボード</title></head>${bodyTag(readAppearance())}<p>ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
 function handleMessage(message: Message | undefined): void {

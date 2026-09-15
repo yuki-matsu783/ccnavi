@@ -462,7 +462,7 @@ ${BUTTON_STYLE}
   .foot.error { color: var(--vscode-editorError-foreground); }
   /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
      無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは効かない */
-  button.action:hover:not(:disabled) { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
+  button.action:hover:not(:disabled):not(:focus-visible) { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
   button.action:disabled { border-color: var(--vscode-contrastBorder, transparent); border-style: dashed; }
 ${APPEARANCE_STYLE}`;
 
@@ -572,6 +572,7 @@ const STYLE = `${PAGE_STYLE}
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .card {
+    position: relative;
     border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
     background: var(--vscode-editorWidget-background); cursor: pointer;
   }
@@ -580,7 +581,8 @@ const STYLE = `${PAGE_STYLE}
     outline: 1px solid var(--vscode-focusBorder);
     background: var(--vscode-list-hoverBackground);
   }
-  .card:hover { outline: 1px dashed var(--vscode-contrastActiveBorder, var(--vscode-focusBorder)); }
+  /* HC のホバーの点線。疑似要素に描き、上の outline（実線。焦点の輪でもある）には触らない。他のテーマでは透明 */
+  .card:hover::after { content: ""; position: absolute; inset: 0; border-radius: 5px; pointer-events: none; border: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
   .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
   .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
   .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }

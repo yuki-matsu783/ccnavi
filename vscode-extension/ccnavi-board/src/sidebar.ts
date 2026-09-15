@@ -57,7 +57,7 @@ const ENTRIES: readonly Entry[] = [
   },
   {
     label: "見た目",
-    description: "画面の配色。VS Code のテーマに従うか、Claude のライト／ダークにするか",
+    description: "配色の切り替え（VS Code のテーマ / Claude ライト / Claude ダーク）",
     command: "ccnaviBoard.appearance",
     icon: "color-mode",
     needsTickets: false,
