@@ -637,6 +637,57 @@ class WriteUnionTest(ConfigUnionHarness):
         self.assertEqual(self.decision(here), "ask", here.stdout + here.stderr)
 
 
+class ToolLayerTest(ConfigUnionHarness):
+    """パスを持つツールは行き先の層、持たないツールは全部の層の和（§11.4）。"""
+
+    SECRETS = {
+        "id": "secrets",
+        "match": "Read|Grep|Glob",
+        "glob": "*/secrets*",
+        "message": "secrets は探さない。",
+    }
+
+    def test_grep_and_glob_use_the_layer_of_the_place_they_search(self):
+        """§11.4: Grep と Glob は Read と同じく行き先の層。探す場所を省けば cwd。"""
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], self.SECRETS]))
+        secrets = os.path.join(self.lib, "secrets")
+
+        self.assert_denied(self.hook("Read", self.ws, file_path=secrets), "lib:secrets")
+        self.assert_denied(self.hook("Grep", self.ws, pattern="token", path=secrets), "lib:secrets")
+        self.assert_denied(self.hook("Glob", self.ws, pattern="*", path=secrets), "lib:secrets")
+        # 探す場所を省くと cwd。
+        self.assert_denied(self.hook("Grep", secrets, pattern="token"), "lib:secrets")
+        # 行き先の層だけなので、app の secrets には lib のルールは効かない。
+        self.assert_not_denied(
+            self.hook("Grep", self.ws, pattern="token", path=os.path.join(self.app, "secrets"))
+        )
+
+    def test_tools_without_a_path_use_the_union_of_every_layer(self):
+        """§11.4: WebFetch・Skill・Agent は、Bash と同じく全部の層の和。cwd によらない。"""
+        own = {
+            "id": "fetch-internal",
+            "match": "WebFetch",
+            "glob": "*internal.example.com*",
+            "message": "社内のページは取りに行かない。",
+        }
+        write_layer(self.ws, rules=dict(OWN_RULES, deny=[*OWN_RULES["deny"], own]))
+        skill = {"id": "release", "match": "Skill", "glob": "release*", "message": "人が回す。"}
+        agent = {"id": "migrate", "match": "Agent", "glob": "*migrate*", "message": "人が回す。"}
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=[*LIB_RULES["deny"], skill, agent]))
+
+        for cwd in (self.ws, self.lib, self.app):
+            with self.subTest(cwd=os.path.basename(cwd)):
+                self.assert_denied(
+                    self.hook("WebFetch", cwd, url="https://internal.example.com/a", prompt="read"),
+                    "self:fetch-internal",
+                )
+                self.assert_denied(self.hook("Skill", cwd, skill="release"), "lib:release")
+                self.assert_denied(
+                    self.hook("Agent", cwd, description="migrate the db", prompt="go"),
+                    "lib:migrate",
+                )
+
+
 class RootPlaceholderUnionTest(ConfigUnionHarness):
     """`{root}` の置換先はどの層でもワークスペースルート（§11.8）。"""
 
