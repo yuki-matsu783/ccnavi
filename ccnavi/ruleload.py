@@ -10,7 +10,8 @@
 - 自身の層: ワークスペースルートの `<CCNAVI_PROJECT_HOME>/config/rules.yml`
 - プロジェクトの層: `projects/<名前>/<CCNAVI_PROJECT_HOME>/config/rules.yml`
 
-Write / Edit / NotebookEdit は共通層 + 行き先の層の 1 つ。Bash は共通層 + 自身の層 +
+パスを持つツール（Read / Grep / Glob / Write / Edit / NotebookEdit）は共通層 + 行き先の層の 1 つ。
+パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）は共通層 + 自身の層 +
 全プロジェクトの層。順は 共通層 → 自身の層 → プロジェクト（名前順）で、`deny` `ask`
 `allow` の順は変わらない。
 
@@ -29,7 +30,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, builtin, hookio, phase, rules, settings, tree
+from . import audit, builtin, hookio, rules, settings, tree
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 
 # 層の名前。共通層と自身の層は固定で、プロジェクトの層はその名前を名乗る。
@@ -81,8 +82,9 @@ def load_rules(
     return rule_set, builtin.SOURCE if record.fallback else rules_path
 
 
-# 行き先で判定するツール。subject に解決済みのパスが入っている。
-PATH_TOOLS = ("Read", "Write", "Edit", "NotebookEdit")
+# 行き先の層で判定するツール。subject に解決済みのパスが入っている（judge.subject_of）。
+# Grep と Glob は探す場所を省けば cwd。ここに無いツールは全部の層の和で判定する。
+PATH_TOOLS = ("Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit")
 
 
 def layers(conf: settings.Settings, root: str) -> list[Layer]:
@@ -147,14 +149,14 @@ def rules_for(
 ) -> tuple[rules.RuleSet, str, tree.Tree | None]:
     """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 §11.4）。
 
-    パスを持つツールは行き先で 1 本に決まる。共通層に、行き先のツリーの層を足す。
+    パスを持つツール（PATH_TOOLS）は行き先で 1 本に決まる。共通層に、行き先のツリーの層を足す。
     行き先がプロジェクトならその層、ワークスペースのツリーなら自身の層。
 
-    Bash は全部の和。呼び出しがどのプロジェクトのものかは当てない。当てる仕掛け
-    （cwd、cd の追跡、引数の語の走査）は「どのルールファイルを引くか」にしか効かず、
-    副作用は結局実行後の監視が拾う。和なら deny と ask は増える側に倒れ、緩むのは
-    allow の共有だけになる（REQ-MLT-05）。読めない層は和から外し、外したことを
-    記録に残す（REQ-MLT-06）。
+    パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）は全部の和。呼び出しが
+    どのプロジェクトのものかは当てない。Bash で当てる仕掛け（cwd、cd の追跡、引数の語の走査）は
+    「どのルールファイルを引くか」にしか効かず、副作用は結局実行後の監視が拾う。WebFetch・Skill・
+    Agent は当てる材料を持たない。和なら deny と ask は増える側に倒れ、緩むのは allow の共有だけに
+    なる（REQ-MLT-05）。読めない層は和から外し、外したことを記録に残す（REQ-MLT-06）。
     """
     target = None
     if payload.tool_name in PATH_TOOLS:
@@ -169,8 +171,6 @@ def rules_for(
     if payload.tool_name in PATH_TOOLS:
         add_layers(stderr, rule_set, layer_for(conf, root, target), root, record)
         return rule_set, source, target
-    if payload.tool_name not in phase.SHELL_TOOLS:
-        return rule_set, source, None
     add_layers(stderr, rule_set, layers(conf, root), root, record)
     return rule_set, source, None
 

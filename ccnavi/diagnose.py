@@ -556,7 +556,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
     stdout.write(
-        "  書き込み系は 共通層 + 行き先の層、Bash は全部の層の和で判定する（設計 §11.4）\n"
+        "  パスを持つツールは 共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
+        "（設計 §11.4）\n"
     )
 
     for view in views:
