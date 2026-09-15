@@ -332,7 +332,7 @@ class RiskUnionTest(ConfigUnionHarness):
 
         write_layer(self.lib, risk=None)
         self.risk = write(
-            os.path.join(self.ws, ".ccnavi", "common", "risk.yml"),
+            os.path.join(self.ws, ".ccnavi", "common", "risks.yml"),
             "version: 1\nfactors:\n"
             "  - {id: y, points: 5, script: .ccnavi/scripts/y.sh, message: y}\n",
         )

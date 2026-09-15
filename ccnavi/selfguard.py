@@ -13,11 +13,11 @@
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
     共通層の 3 本                       CCNAVI_RULES / CCNAVI_PHASES / CCNAVI_RISK
-    自身の層の 3 本                     <root>/.ccnavi/config/{rules,phases,risk}.yml
-    プロジェクトの層の 3 本             projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml
+    自身の層の 3 本                     <root>/.ccnavi/config/{rules,phases,risks}.yml
+    プロジェクトの層の 3 本             projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml
 
 守る場所は層の数だけ増えるが、守る対象の種類は「設定 3 本」の 1 種のまま。
-rules.yml は何を止めるかを、phases.yml はレビューが要るかを、risk.yml は点が
+rules.yml は何を止めるかを、phases.yml はレビューが要るかを、risks.yml は点が
 幾つかを決める。3 本とも判定の中身そのもので、ここが書けると、エージェントが
 自分のルールとレビューの要否とリスクの配点を緩められ、次の呼び出しから効く。
 ファイル単位で見るので、無いものは対象から外れる（REQ-SLF-03）。
@@ -30,8 +30,8 @@ rules.yml は何を止めるかを、phases.yml はレビューが要るかを�
 ## `.ccnavi/scripts/` はコアに入れない
 
 ccnavi ディレクトリの下には、配点が呼ぶスクリプトも入る。そちらはコアにしない。スクリプトは
-risk.yml から `script:` で参照されて初めて効き、参照が無ければ何もしない。その
-risk.yml がここで守られているので、新しい参照を足すことはできない。残る道は
+risks.yml から `script:` で参照されて初めて効き、参照が無ければ何もしない。その
+risks.yml がここで守られているので、新しい参照を足すことはできない。残る道は
 「既に参照されているスクリプトの中身を書き換える」だけで、そこは組み込みの deny
 （`*/.ccnavi/*`、add_rules）とルール由来の保護に任せる。止まり、抜けても戻る。
 

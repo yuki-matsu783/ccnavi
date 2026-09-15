@@ -77,7 +77,7 @@ ccnavi/post.py              実行後の監視。検知・差し戻しの文・�
 ccnavi/ticket.py            チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合
 ccnavi/tree.py              作業ツリーの特定。判定の鍵はファイルの行き先
 ccnavi/approval.py          承認済みチケット・フェーズのマーカー・子ごとの記録・承認の画面
-ccnavi/risk.py              実績で測るリスク。risk.yml・差分の計測・スクリプト・定性項目
+ccnavi/risk.py              実績で測るリスク。risks.yml・差分の計測・スクリプト・定性項目
 ccnavi/phase.py             フェーズの終わりとゲート。提案から承認済みチケットへの同期
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
 ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない

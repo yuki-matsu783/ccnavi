@@ -55,7 +55,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --appr
 （`--test` に直接書くと、禁止語を含む Bash 自体が当たる）。`--json` を付ければ翻訳後の
 正規表現（`pattern`）と返る文面（`response`）まで出る。
 
-**守られているかも見本で見る。** rules.yml と phases.yml と risk.yml、承認済みチケットの
+**守られているかも見本で見る。** rules.yml と phases.yml と risks.yml、承認済みチケットの
 置き場、settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート
 直下と、**実在する作業ツリーの名前**での設定の両方。作業ツリー側の設定は、ブランチを
 統合すればそのまま main の設定になる道を持つ。このリポジトリでは `guard-ccnavi-config` と

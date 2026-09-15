@@ -6,7 +6,7 @@
 #   sh .ccnavi/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>
 #   sh .ccnavi/scripts/ccnavi-ticket.sh judge  <子> <項目> yes|no --reason <根拠>
 #
-# judge は、実績のリスクの定性項目（risk.yml の `judge:`）の判定を記録する。判断するのは
+# judge は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は done で閉じられない。
 #
 # 状態は置き場（wip/tickets/{todo,doing,done,cancelled}/）で表す。動かすのはこの

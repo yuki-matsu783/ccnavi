@@ -29,7 +29,7 @@
 
 - **プロジェクトの作業は、プロジェクトに入ってから始める。** `cd projects/<名前>` してから
   `ccnavi-git.sh` を打つ。git の操作はそのリポジトリに対して行われる
-- **プロジェクトのリポジトリに書くのは設定 3 本（`.ccnavi/config/` の `rules.yml`・`phases.yml`・`risk.yml`）だけ。** 提案・記録・
+- **プロジェクトのリポジトリに書くのは設定 3 本（`.ccnavi/config/` の `rules.yml`・`phases.yml`・`risks.yml`）だけ。** 提案・記録・
   承認済みチケットはワークスペース側に置かれる。プロジェクトは公開されることがあるので、
   運用の痕跡を残さない
 - **チケットは `project:` を持つ。** 値は `projects/` の名前で、決めるのは人の承認。
@@ -107,7 +107,7 @@
 | 判定の記録と控え | ワークスペースの `logs/log.jsonl` と `logs/state/` |
 | 作業ツリー | ワークスペースの `.claude/worktrees/<名前>` |
 | ワークスペースのルール | `.ccnavi/common/rules.yml`（共通層。リスクの配点も同じ場所）。フェーズの種類は自身の層 `.ccnavi/config/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risk.yml`） |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/`（`rules.yml`・`phases.yml`・`risks.yml`） |
 
 **プロジェクトのリポジトリに入るのは、この表の最後の 1 行だけ。** 他はすべてワークスペース側。
 

@@ -1,4 +1,4 @@
-"""実績で測るリスク。`.ccnavi/common/risk.yml` を読み、子を閉じるときに差分を数える。
+"""実績で測るリスク。`.ccnavi/common/risks.yml` を読み、子を閉じるときに差分を数える。
 
 ## 宣言ではなく実績を測る
 
@@ -489,7 +489,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
 
 
 def definition_path(conf: settings.Settings, root: str, project: str) -> str:
-    """そのプロジェクトの層の risk.yml。空の `project` はワークスペース自身の層。
+    """そのプロジェクトの層の risks.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
     （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
