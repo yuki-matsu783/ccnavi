@@ -63,11 +63,15 @@ CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
 TICKET_RULE = "(ticket-scope)"
 
-# 引用の外にブレース展開を書いた。シェルは実行する前に語を広げるので、ccnavi が読んだ語と
-# 実行される語が違う。展開を推し量らずに止め、語を並べて書き直させる（ADR-0046）。
-# ルールに当たったのではないので、ルール名は TICKET_RULE と同じく括弧付き。
-CODE_BRACE_EXPANSION = "DENY_BRACE_EXPANSION"
-BRACE_RULE = "(brace-expansion)"
+# 書き直しを求める形（shellread の FORM_*）ごとの理由コード。ルールに当たったのではなく読みの
+# 決めごとで止めたので、記録のルール名は TICKET_RULE と同じく括弧付きの形の名前にする
+# （rewrite_rule、ADR-0046、ADR-0047）。
+CODE_REWRITE = {
+    shellread.FORM_BRACE: "DENY_BRACE_EXPANSION",
+    shellread.FORM_COMMAND_NAME: "DENY_COMMAND_NAME_EXPANSION",
+    shellread.FORM_BACKQUOTE: "DENY_BACKQUOTE",
+    shellread.FORM_AMBIGUOUS: "DENY_AMBIGUOUS_FORM",
+}
 
 # 理由に載せる対象の長さの上限。対象はエージェントが今書いたものなので、
 # ここでは同じものを指せれば足りる。ヒアドキュメントは 1 ファイル分を運べるので、
@@ -268,11 +272,7 @@ def unreadable(reason: str) -> str:
         shellread.REASON_TAKEN_AS_CODE: (
             "this command hands a string to something that runs it as code"
         ),
-        shellread.REASON_UNTERMINATED_SUBST: "a $( ) or backquote in this command never closes",
-        shellread.REASON_AMBIGUOUS_SUBST: (
-            "a $( ) in this command holds a form that shells read differently "
-            "(such as case inside $( )), or nests too deep"
-        ),
+        shellread.REASON_UNTERMINATED_SUBST: "a $( ) in this command never closes",
     }.get(reason, "this command could not be read")
     return (
         "note: " + what + ", so this rule was matched against the raw text of the "
@@ -298,38 +298,71 @@ def subagent_forbidden(subject: str, runner: str = "", inner: str = "") -> str:
     )
 
 
-def brace_expansion(subject: str, braces: list[str]) -> str:
-    """引用の外のブレース展開を止めた文。
+def rewrite_rule(form: str) -> str:
+    """書き直しを求める形で止めたときに、記録の `rules` に残す名前。"""
+    return f"({form})"
+
+
+def rewrite(subject: str, form: str, found: list[str]) -> str:
+    """書き直しを求める形を止めた文。形ごとに 1 件。
 
     ルールに当たったのではないので、禁止された操作をしたとは言わない。止めたのは読みの
-    決めごとで、書き直す道は必ずある（語を並べる、文字なら引用する）。道を名指ししないと、
-    同じ省略を書き直しては止まる。
+    決めごとで、書き直す道は必ずある。道を名指ししないと、同じ形を書き直しては止まる。
     """
     shown = " ".join(subject.split())
     if len(shown) > SUBJECT_LIMIT:
         shown = shown[:SUBJECT_LIMIT] + f"…(+{len(shown) - SUBJECT_LIMIT})"
-    listed = ", ".join(f"`{_one_line(b)}`" for b in braces[:_BRACES_SHOWN])
-    if len(braces) > _BRACES_SHOWN:
-        listed += f" (+{len(braces) - _BRACES_SHOWN})"
+    listed = ", ".join(f"`{_one_line(text)}`" for text in found[:_REWRITES_SHOWN])
+    if len(found) > _REWRITES_SHOWN:
+        listed += f" (+{len(found) - _REWRITES_SHOWN})"
+    what, how = _REWRITE_TEXT[form]
     return "\n".join(
-        [
-            f"[ccnavi] {CODE_BRACE_EXPANSION}",
-            f"subject: {shown}",
-            f"brace expansion outside quotes: {listed}",
-            "Outside quotes the shell expands these into several words before the command runs, "
-            "so the words ccnavi reads are not the words that would run. bash and zsh expand them "
-            "differently, so ccnavi does not guess the result; it stops the call, also in the few "
-            "places where no shell expands them (an assignment, a case pattern, [[ ]]). Write the "
-            "words out instead: "
-            "`--exclude-dir={a,b}` becomes `--exclude-dir=a --exclude-dir=b`, `cp f{,.bak}` "
-            "becomes `cp f f.bak`, `{1..3}` becomes `1 2 3`. If the braces are meant as text, "
-            "put them in single quotes: '{a,b}'.",
-        ]
+        [f"[ccnavi] {CODE_REWRITE[form]}", f"subject: {shown}", f"{what}: {listed}", how]
     )
 
 
-# ブレース展開を止めた文に並べる綴りの数。1 つ直せば残りも同じ直し方になる。
-_BRACES_SHOWN = 5
+# 止めた文に並べる綴りの数。1 つ直せば残りも同じ直し方になる。
+_REWRITES_SHOWN = 5
+
+# 形ごとの（見つけたものの呼び名, 書き直し方）。
+_REWRITE_TEXT = {
+    shellread.FORM_BRACE: (
+        "brace expansion outside quotes",
+        "Outside quotes the shell expands these into several words before the command runs, "
+        "so the words ccnavi reads are not the words that would run. bash and zsh expand them "
+        "differently, so ccnavi does not guess the result; it stops the call, also in the few "
+        "places where no shell expands them (an assignment, a case pattern, [[ ]]). Write the "
+        "words out instead: "
+        "`--exclude-dir={a,b}` becomes `--exclude-dir=a --exclude-dir=b`, `cp f{,.bak}` "
+        "becomes `cp f f.bak`, `{1..3}` becomes `1 2 3`. If the braces are meant as text, "
+        "put them in single quotes: '{a,b}'.",
+    ),
+    shellread.FORM_COMMAND_NAME: (
+        "command name the shell works out when it runs",
+        "The shell decides this command name only when it runs (from a variable, $( ), or a "
+        "glob), so ccnavi cannot tell which program would run, and no rule can match it; it "
+        "stops the call. Write the command name out: `c=git; $c status` becomes `git status`, "
+        '`"$(command -v python3)" x.py` becomes `python3 x.py`, `/usr/bin/gi? status` becomes '
+        "`/usr/bin/git status`. The same goes for a script handed to sh or source: write its "
+        "path, not `sh $SCRIPT`.",
+    ),
+    shellread.FORM_BACKQUOTE: (
+        "backquote",
+        "The shell runs what is between backquotes, also inside double quotes and unquoted "
+        "heredocs. ccnavi does not read backquotes; it stops the call. For a command "
+        "substitution, write $( ) instead. To keep backquotes as text (Markdown in an issue or "
+        "PR body, for example), put the text in single quotes, escape each one as \\`, or pass "
+        "the text from a file (gh --body-file <file>, git commit -F <file>).",
+    ),
+    shellread.FORM_AMBIGUOUS: (
+        "form that shells read differently",
+        "bash and zsh read this form differently, or it nests too deep, so ccnavi cannot tell "
+        "what would run; it stops the call. Write it in a plain form: if/elif instead of case "
+        "inside $( ); a space in $( (cmd) | x ) so it is not read as arithmetic; run the inner "
+        "command first and write its value into the next command instead of nesting $( ) "
+        "deeply; & instead of coproc; a for loop instead of select.",
+    ),
+}
 
 
 def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:

@@ -173,7 +173,7 @@ def decide_before(
         if conf.guard_ticket_approval != selfguard.DISABLE:
             rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
-    subject, bare, inner, braces = screen(payload.tool_name, record.subject, record)
+    subject, bare, inner, rewrites = screen(payload.tool_name, record.subject, record)
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
@@ -251,19 +251,21 @@ def decide_before(
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
 
-    # 引用の外のブレース展開は、ルールより先に止める（ADR-0046）。シェルは実行する前に語を
-    # 広げるので、ルールを当てる読みと実行される語が違う。`{git,push,origin,main}` は raw-git に
-    # 当たらないまま `git push origin main` を実行する。展開して当てる道は取らない。広げ方が
-    # bash と zsh で割れ、読み違えると allow に当たって通る側に倒れる。語を並べれば必ず書ける。
-    if braces:
-        record.code, record.rules = reasons.CODE_BRACE_EXPANSION, [reasons.BRACE_RULE]
-        return refuse(
-            stdout,
-            mode,
-            record,
-            rules.DENY,
-            notices + [reasons.brace_expansion(record.subject, braces)],
-        )
+    # 書き直しを求める形は、ルールより先に止める（ADR-0046、ADR-0047）。ブレース展開と、実行する
+    # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
+    # `{git,push,origin,main}` も `c=git; $c push origin main` も、raw-git に当たらないまま push を
+    # 実行する。バッククォートとシェルで読みが割れる形は、読み分けると規則が増え、読み違えると
+    # 素通りに倒れる。どれも書き直す道が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
+    # 1 回で返す。
+    if rewrites:
+        forms = list(dict.fromkeys(form for form, _ in rewrites))
+        record.code = reasons.CODE_REWRITE[forms[0]]
+        record.rules = [reasons.rewrite_rule(form) for form in forms]
+        parts = [
+            reasons.rewrite(record.subject, form, [text for f, text in rewrites if f == form])
+            for form in forms
+        ]
+        return refuse(stdout, mode, record, rules.DENY, notices + parts)
 
     # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
     # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
@@ -521,7 +523,7 @@ def full_path(path: str, cwd: str) -> str:
 
 def screen(
     tool: str, subject: str, record: audit.Record
-) -> tuple[str, str, list[tuple[str, str, bool]], list[str]]:
+) -> tuple[str, str, list[tuple[str, str, bool]], list[tuple[str, str]]]:
     """シェルのコマンドを、実際に実行される部分まで絞る。読み切れなかったときは
     record にそう書き残す。
 
@@ -541,7 +543,7 @@ def screen(
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
     コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
 
-    4 つめは、引用の外に書かれたブレース展開の綴り（shellread.Reading.braces）。Bash 以外は空。
+    4 つめは、書き直しを求める形の（形, 綴り）の並び（shellread.Reading.rewrites）。Bash 以外は空。
     """
     if tool != "Bash":
         return subject, subject, [], []
@@ -558,8 +560,8 @@ def screen(
         )
     if reading.degraded:
         record.degraded = reading.reason
-        return subject, subject, inner, reading.braces
-    return reading.text, reading.bare, inner, reading.braces
+        return subject, subject, inner, reading.rewrites
+    return reading.text, reading.bare, inner, reading.rewrites
 
 
 def project_mismatch(
