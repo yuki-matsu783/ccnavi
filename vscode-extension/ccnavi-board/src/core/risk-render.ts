@@ -32,11 +32,11 @@ export interface RenderOptions {
 
 /** 当て方の説明。select の札と、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<(typeof KINDS)[number], { readonly label: string; readonly placeholder: string }>> = {
-  lines_over: { label: "差分の行数が超えたら", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
-  files_over: { label: "ファイル数が超えたら", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
-  deleted_over: { label: "消したファイル数が超えたら", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
-  glob: { label: "当たったファイルごとに", placeholder: ".github/**（作業ツリーのルートからの相対。当たるごとに points を加点、max で上限）" },
-  script: { label: "スクリプトが出す点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗は points を加点）" },
+  lines_over: { label: "差分の行数がしきい値を超えたら", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
+  files_over: { label: "変えたファイル数がしきい値を超えたら", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
+  deleted_over: { label: "消したファイル数がしきい値を超えたら", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
+  glob: { label: "glob にヒットしたファイルごとに", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
+  script: { label: "スクリプトが出す点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗したら points を加点）" },
   judge: { label: "サブエージェントの判定", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
 };
 
@@ -61,7 +61,7 @@ ${STYLE}
 </style>
 </head>
 <body>
-${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.riskPath)}</span>
@@ -75,7 +75,7 @@ ${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner 
 </header>
 <p id="lock" class="lock${page.lock.locked ? "" : " hidden"}">${escapeHtml(page.lock.reason)}</p>
 ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="block">
-  <h2>段階の閾値 <span class="count">点がその値以上で LOW → MEDIUM → HIGH → CRITICAL。HIGH 以上でゲートが閉じる</span></h2>
+  <h2>段階の閾値 <span class="count">点がこの値以上になると段階が上がる。HIGH 以上でゲートが閉じる</span></h2>
   <details class="help"><summary>この欄の説明</summary><p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上でフェーズのゲートが閉じ</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p></details>
   <div class="levels" id="levels"></div>
 </section>
@@ -86,7 +86,7 @@ ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="bloc
     <input id="find" type="search" placeholder="id・当て方・値・文面で絞り込む" spellcheck="false">
     <span class="hint">行を押すと開く</span>
   </div>
-  <details class="help"><summary>この欄の説明</summary><p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> の失敗と読めない出力は重い側に倒れて points がそのまま加点され、<code>judge</code> は判定が揃うまで子を閉じられない。</p></details>
+  <details class="help"><summary>この欄の説明</summary><p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられない。</p></details>
   <ul class="list" id="factors"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
@@ -103,14 +103,14 @@ function renderTicketControlBanner(ticketControl: string): string {
   if (ticketControl !== "disable") {
     return "";
   }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効かない</div>\n`;
+  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderMissing(page: RiskPage): string {
   if (page.exists) {
     return "";
   }
-  return `<div class="banner missing"><span>${escapeHtml(page.riskPath)} が無い。実行ファイルは組み込みの配点で数えている（画面の値はその組み込み）。直すにはまずファイルを作る。</span><button type="button" class="action primary" data-action="create">組み込みの配点でファイルを作る</button></div>\n`;
+  return `<div class="banner missing"><span>${escapeHtml(page.riskPath)} が無い。実行ファイルは組み込みの配点で数えている（画面の値はその組み込みの配点）。直すにはまずファイルを作る。</span><button type="button" class="action primary" data-action="create">組み込みの配点でファイルを作る</button></div>\n`;
 }
 
 function renderProblems(problems: readonly string[]): string {
@@ -130,8 +130,8 @@ const STYLE = `${PAGE_STYLE}
   .levels .field > .cap { text-align: left; }
   .levels .field > input { width: 90px; }
 ${LIST_STYLE}
-  /* 1 行 = 開閉、id、points、当て方と値、文面 */
-  .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px max-content minmax(0, 1fr); }
+  /* 1 行 = 開閉、id、points、当て方と値と文面 */
+  .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px minmax(0, 1fr); }
   .sum .sum-points { text-align: right; font-variant-numeric: tabular-nums; }
   .field > select.f-kind { max-width: 300px; }
 `;
@@ -196,6 +196,19 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
     return h("div", { class: "field " + (className || "") }, [cap, control]);
   }
+  // 要約の行に出す、当て方と値をつないだ文。読んで意味が通る語順にする
+  function describe(factor) {
+    const v = factor.value;
+    const code = (t) => h("code", { text: t });
+    const dim = (t) => h("span", { class: "dim", text: t });
+    if (v === "") { return [dim("（" + valueLabel(factor.kind) + " 未設定）")]; }
+    if (factor.kind === "lines_over") { return [dim("差分が "), code(v), dim(" 行を超えたら")]; }
+    if (factor.kind === "files_over") { return [dim("変えたファイルが "), code(v), dim(" 件を超えたら")]; }
+    if (factor.kind === "deleted_over") { return [dim("消したファイルが "), code(v), dim(" 件を超えたら")]; }
+    if (factor.kind === "glob") { return [code(v), dim(" にヒットしたファイルごと" + (factor.max !== "" ? "（上限 " + factor.max + " 点）" : ""))]; }
+    if (factor.kind === "script") { return [dim("スクリプト "), code(v)]; }
+    return [dim("問い「"), code(v), dim("」")];
+  }
   // 値の欄の名前。当て方で意味が変わる
   function valueLabel(kind) {
     if (kind === "glob") { return "glob"; }
@@ -244,9 +257,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         captioned("点", points, "", "points"),
         captioned("当て方", kindSelect, "", KINDS_KEYS),
         captioned(valueLabel(factor.kind), factor.kind === "glob"
-          ? h("div", { class: "inline" }, [value, h("span", { class: "cap", text: "上限", title: "YAML のキー: max" }), field(factor, "max", "f-max num", "上限。空なら青天井")])
+          ? h("div", { class: "inline" }, [value, h("span", { class: "cap", text: "上限", title: "YAML のキー: max" }), field(factor, "max", "f-max num", "上限。空なら上限なし")])
           : value, "", factor.kind),
-        captioned("文面", field(factor, "message", "f-message", "加点した理由として依頼文と閉じたときの出力に出る短い文。空なら id"), "", "message"),
+        captioned("文面", field(factor, "message", "f-message", "加点の理由として依頼文と閉じたときの出力に出る短い文。空なら id をそのまま使う"), "", "message"),
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
     ]);
@@ -254,11 +267,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.textContent = "";
       sum.appendChild(h("span", { class: "sum-id" + (factor.id === "" ? " dim" : ""), text: factor.id === "" ? "（id 未設定）" : factor.id }));
       sum.appendChild(h("span", { class: "sum-points" + (factor.points === "" ? " dim" : ""), text: factor.points === "" ? "—" : factor.points + " 点", title: "points" }));
-      sum.appendChild(h("span", { class: "dim", text: kindInfo(factor.kind).label }));
-      sum.appendChild(h("span", { class: "clip", title: factor.value }, [
-        factor.value === "" ? h("span", { class: "dim", text: "（" + factor.kind + " 未設定）" }) : h("code", { text: factor.value + (factor.kind === "glob" && factor.max !== "" ? "（max " + factor.max + "）" : "") }),
+      sum.appendChild(h("span", { class: "clip", title: kindInfo(factor.kind).label + (factor.value === "" ? "" : ": " + factor.value) }, describe(factor).concat([
         factor.message === "" ? null : h("span", { class: "sum-note", text: factor.message }),
-      ]));
+      ])));
       li.setAttribute("data-find", (factor.id + " " + factor.kind + " " + factor.value + " " + factor.message).toLowerCase());
     }
     head.addEventListener("click", () => {

@@ -128,7 +128,7 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
     : "";
   // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（".claude/ がある"）は重ねない
   const problems = [
-    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ があります。Claude Code はそこのスキルを読み込み、cd すると別のワークスペースルートに見えます" }] : []),
+    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ があります。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見えます" }] : []),
     ...row.problems.filter((p) => !(row.hasClaudeDir && /\.claude\/ があ/.test(p.detail))),
   ];
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);

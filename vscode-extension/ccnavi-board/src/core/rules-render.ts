@@ -71,7 +71,7 @@ ${STYLE}
 </style>
 </head>
 <body>
-${renderModeBanner(page.mode)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderModeBanner(page.mode)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.rulesPath)}</span>
@@ -130,7 +130,7 @@ function renderModeBanner(mode: string): string {
     return "";
   }
   const shown = mode === "" ? "未設定" : mode;
-  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。deny, ask 判定に HIT しても tool_use は停止しない</div>\n`;
+  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。deny や ask にヒットしてもツールの呼び出しは止まらない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -403,7 +403,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const drop = h("button", { type: "button", class: "action small", text: "message を削除" });
       drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
       message = h("p", { class: "stale" }, [
-        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint がエラーにする。モデルに渡すプロンプトは additionalContext に移す: "),
+        document.createTextNode(section + " の message は" + (section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない") + "ので lint が error にする。モデルに渡すプロンプトは「渡す文」（additionalContext）に移す: "),
         h("code", { text: rule.message }),
         drop,
       ]);
@@ -413,10 +413,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const more = h("details", { class: "more" }, [
       moreSummary,
       h("div", { class: "sub" }, [
-        captioned("渡す文", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト"), "", "additionalContext"),
-        fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）"),
-        captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト"), "", "additionalContextOnce"),
-        fileField(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）"),
+        captioned("渡す文", area(rule, "additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト"), "", "additionalContext"),
+        fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）"),
+        captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト"), "", "additionalContextOnce"),
+        fileField(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭 4000 文字まで）"),
       ]),
     ]);
     if (moreOpen.has(key) ? moreOpen.get(key) : hasContext(rule)) { more.setAttribute("open", ""); }
@@ -457,7 +457,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.appendChild(h("span", { class: "sum-flag" + (hasContext(rule) ? " on" : ""), title: hasContext(rule) ? "コンテキストの追加あり" : "" }));
       moreSummary.textContent = "";
       moreSummary.appendChild(h("b", { text: "コンテキストの追加" }));
-      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）— HIT したときにモデルへ渡す文やファイル"));
+      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイル"));
       li.setAttribute("data-find", (rule.id + " " + rule.match + " " + rule.pattern + " " + rule.message + " " + rule.additionalContext + " " + rule.additionalContextOnce).toLowerCase());
     }
     head.addEventListener("click", () => {
@@ -607,7 +607,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     return el;
   }
   function hitsTable(rules) {
-    if (rules.length === 0) { return h("p", { class: "empty", text: "どのルールにも HIT しなかった" }); }
+    if (rules.length === 0) { return h("p", { class: "empty", text: "どのルールにもヒットしなかった" }); }
     const body = h("tbody", {}, rules.map((r) => h("tr", {}, [
       h("td", {}, [r.section ? h("span", { class: "verdict " + r.section, text: r.section }) : null]),
       h("td", { text: r.id + (r.source === "outside" ? "（ルールファイル外の根拠）" : "") }),
@@ -615,7 +615,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("td", {}, [r.pattern ? h("code", { text: r.pattern }) : null]),
     ])));
     return h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "記述" }), h("th", { text: "変換後" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "タイプ" }), h("th", { text: "id" }), h("th", { text: "書いたパターン" }), h("th", { text: "正規表現に直した形" })])]),
       body,
     ]);
   }
@@ -636,11 +636,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     box.classList.remove("hidden");
     for (const el of document.querySelectorAll(".rule.hit")) { el.classList.remove("hit"); }
     if (!result.known) {
-      box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定の対象を取り出せないツール。ルールを書いても HIT せず、呼び出しはそのまま通る")]));
+      box.appendChild(h("p", {}, [verdictEl(""), document.createTextNode(" " + result.tool + " は判定の対象を取り出せないツール。ルールを書いてもヒットせず、呼び出しはそのまま通る")]));
     } else {
       box.appendChild(h("p", {}, [verdictEl(result.verdict), document.createTextNode(result.code ? " " + result.code : "")]));
       box.appendChild(dl([["tool", result.tool], ["subject", result.subject], ["resolved", result.resolved], ["reason", result.reason], ["degraded", result.degraded ? result.degraded + "（生の文字列に対して判定）" : ""], ["fallback", result.fallback ? result.fallback + "（組み込みの既定で判定）" : ""]]));
-      box.appendChild(h("h3", { text: "HIT したルール" }));
+      box.appendChild(h("h3", { text: "ヒットしたルール" }));
       box.appendChild(hitsTable(result.rules));
       for (const r of result.rules) {
         for (const el of document.querySelectorAll(".rule[data-id]")) {
@@ -674,7 +674,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("td", { text: s.why }),
     ]));
     box.appendChild(h("table", {}, [
-      h("thead", {}, [h("tr", {}, [h("th", { text: "期待" }), h("th", { text: "判定" }), h("th", { text: "tool" }), h("th", { text: "subject" }), h("th", { text: "HIT したルール" }), h("th", { text: "理由" })])]),
+      h("thead", {}, [h("tr", {}, [h("th", { text: "期待" }), h("th", { text: "判定" }), h("th", { text: "ツール" }), h("th", { text: "対象" }), h("th", { text: "ヒットしたルール" }), h("th", { text: "理由" })])]),
       h("tbody", {}, rows),
     ]));
   }
@@ -694,7 +694,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (action === "judge") {
       const tool = document.getElementById("tool").value;
       const subject = document.getElementById("subject").value;
-      if (subject.trim() === "") { status("対象が未入力", true); return; }
+      if (subject.trim() === "") { status("対象が入っていない", true); return; }
       setBusy(true, "判定中…");
       vscode.postMessage({ type: "judge", sections: sections, tool: tool, subject: subject });
     }

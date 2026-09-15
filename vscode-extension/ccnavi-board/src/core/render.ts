@@ -83,7 +83,7 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
   const inner = (() => {
     switch (overlay.kind) {
       case "loading":
-        return `<p class="approval-note">承認待ちの一覧を読んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
+        return `<p class="approval-note">承認待ちの一覧を読み込んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
       case "error":
         return `<p class="approval-note error">${escapeHtml(overlay.error)}</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
       case "preview":
@@ -91,7 +91,7 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
         return renderApprovalBody(overlay.preview, overlay.kind === "approving", overlay.kind === "preview" ? overlay.notice : undefined);
       case "done":
         return `<h2 id="approval-title">${overlay.count} 件を承認した</h2>
-${overlay.carried === true ? `<p class="approval-note">承認済みチケットのコミットと push を端末に送った。</p>\n` : ""}<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く（送信は人が Enter）。</p>
+${overlay.carried === true ? `<p class="approval-note">承認済みチケットのコミットと push を端末に送った。</p>\n` : ""}<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く。送るときは自分で Enter を押す。</p>
 <pre class="approval-text">${escapeHtml(overlay.prompt)}</pre>
 <div class="approval-actions"><button type="button" class="action primary" data-action="prompt-copy">コピー</button><button type="button" class="action" data-action="prompt-open">新しいセッションで開く</button><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
     }
@@ -126,10 +126,10 @@ function renderApprovalBody(preview: ApprovePreview, approving: boolean, notice:
   const confirm =
     count === 0
       ? ""
-      : `<button type="button" class="action primary" data-action="approve-confirm" data-tickets="${escapeHtml(tickets)}"${approving ? " disabled" : ""}>${approving ? "承認している…" : `この ${count} 件を承認する`}</button>`;
+      : `<button type="button" class="action primary" data-action="approve-confirm" data-tickets="${escapeHtml(tickets)}"${approving ? " disabled" : ""}>${approving ? "承認中…" : `この ${count} 件を承認する`}</button>`;
   return `<h2 id="approval-title">Ticket 承認リクエスト: ${count} 件</h2>
 ${notice ? `<p class="approval-note warn">${escapeHtml(notice)}</p>\n` : ""}${
-    count === 0 ? '<p class="approval-note">承認待ちのチケットは無い</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>どこ</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
+    count === 0 ? '<p class="approval-note">承認待ちのチケットは無い</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>場所</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
   }<pre class="approval-text">${escapeHtml(preview.text)}</pre>
 ${rejected}${problems}<div class="approval-actions">
 ${confirm}<button type="button" class="action" data-action="approve-cancel"${approving ? " disabled" : ""}>やめる</button>
@@ -263,7 +263,7 @@ function renderFacts(card: Card): string {
   if (card.copyStatus !== "none") {
     facts.push(fact(`copy-${card.copyStatus}`, COPY_LABELS[card.copyStatus]));
   }
-  facts.push(fact("review", `レビュー ${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
+  facts.push(fact("review", `人レビュー${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
   if (card.worktreeExists) {
     facts.push(fact("worktree", `作業ツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
   }
@@ -291,7 +291,7 @@ function renderFacts(card: Card): string {
 }
 
 function riskText(card: Card): string {
-  return `リスク ${card.riskPoints ?? ""} ${card.riskLevel}`.replace(/\s+/g, " ");
+  return card.riskPoints === null ? `リスク ${card.riskLevel}` : `リスク ${card.riskLevel}（${card.riskPoints} 点）`;
 }
 
 /** 作業ツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
