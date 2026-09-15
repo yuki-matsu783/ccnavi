@@ -61,7 +61,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
   assert.ok(!empty.includes('data-action="approve-confirm"'));
   const approving = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "approving", preview } });
   assert.ok(approving.includes('data-approval="approving"'));
-  assert.ok(approving.includes("承認している…"));
+  assert.ok(approving.includes("承認中…"));
   assert.ok(/data-action="approve-confirm"[^>]*disabled/.test(approving));
   const noticed = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
@@ -167,7 +167,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   // 属性は枠無しの fact。承認済・レビューの要否・作業ツリーの名前・base
   assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
   assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
-  assert.ok(/<span class="fact review" title="[^"]*">レビュー 要<\/span>/.test(html));
+  assert.ok(/<span class="fact review" title="[^"]*">人レビュー要<\/span>/.test(html));
   assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
   assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
   assert.ok(!html.includes('class="badge copy copy-open"'));
