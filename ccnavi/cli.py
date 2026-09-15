@@ -172,6 +172,23 @@ def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
             setattr(conf, name, fsio.slashed(value).strip("/"))
 
 
+def _json_out_of_test(argv: list[str]) -> list[str]:
+    """`--test` が取る 2 語に混ざった `--json` を外し、末尾へ回す。
+
+    `--test` は TOOL と SUBJECT の 2 語を取るので、`--test --json Bash ls` と書くと `--json` を
+    TOOL として取る。`--json` はツールの名前にも調べるコマンドにもならない綴りなので、
+    出力の形の指定として読む。
+    """
+    if "--test" not in argv:
+        return argv
+    at = argv.index("--test")
+    taken = argv[at + 1 : at + 3]
+    if "--json" not in taken:
+        return argv
+    kept = [word for word in taken if word != "--json"]
+    return [*argv[: at + 1], *kept, *argv[at + 3 :], "--json"]
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
@@ -225,7 +242,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     try:
-        args = parser.parse_args(argv)
+        args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
         return EXIT_ERROR
     if args.help:
