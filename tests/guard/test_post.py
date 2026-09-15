@@ -19,7 +19,7 @@ from tests import ROOT
 from tests.inproc import run_ccnavi
 
 RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "protected",

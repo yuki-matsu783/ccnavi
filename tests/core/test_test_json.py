@@ -27,7 +27,7 @@ from tests.inproc import run_ccnavi
 FIXTURES = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures")
 
 RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "git-push",
@@ -176,7 +176,7 @@ class TestJsonTest(unittest.TestCase):
             "named.yml",
             json.dumps(
                 {
-                    "version": 3,
+                    "version": 1,
                     "deny": [
                         {
                             "id": "ps",

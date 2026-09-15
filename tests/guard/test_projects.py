@@ -32,7 +32,7 @@ from tests import ROOT
 from tests.inproc import run_ccnavi
 
 WS_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "ws-rm",
@@ -54,7 +54,7 @@ WS_RULES = {
 }
 
 APP_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "schema",
@@ -70,7 +70,7 @@ APP_RULES = {
 }
 
 LIB_RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "raw-psql",
@@ -323,7 +323,7 @@ class ProjectsTest(unittest.TestCase):
         組み込みの既定へは落ちない。共通層が有るのに落とすと、共通層の deny が
         消える側に倒れる。
         """
-        write(layer_rules(self.app), "version: 3\ndeny: [\n")
+        write(layer_rules(self.app), "version: 1\ndeny: [\n")
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         record = self.last_record()
@@ -526,7 +526,7 @@ class ProjectsTest(unittest.TestCase):
     # ---- 6. --lint がプロジェクトまわりの設定の誤りを言う
 
     def test_lint_names_project_config_problems(self):
-        write(layer_rules(self.app), "version: 3\ndeny: [\n")
+        write(layer_rules(self.app), "version: 1\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
         git(self.ws, "add", "-A")
@@ -601,7 +601,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotEqual(json.loads(other.stdout)["verdict"], "deny", other.stdout)
 
         # --lint --json も差し替えた側を読む。壊れた一時ファイルは lib の error として出る。
-        broken = write(os.path.join(self.ws, "tmp", "broken.yml"), "version: 3\ndeny: [\n")
+        broken = write(os.path.join(self.ws, "tmp", "broken.yml"), "version: 1\ndeny: [\n")
         linted = self.ccnavi("--lint", "--json", "--project-rules-file", f"lib={broken}")
         report = json.loads(linted.stdout)
         self.assertEqual(report["projects"], ["app", "lib"])

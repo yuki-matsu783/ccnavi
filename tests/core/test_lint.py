@@ -38,7 +38,7 @@ def write(directory: str, name: str, text: str) -> str:
 ALLOWED = {"id": "anything", "match": "Read", "regex": "."}
 
 
-def rules_file(directory: str, *rules, version: int = 3, allow: bool = True) -> str:
+def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> str:
     """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
@@ -225,7 +225,7 @@ class LintTest(unittest.TestCase):
         # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
         # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
         body = {
-            "version": 3,
+            "version": 1,
             "deny": [SOUND],
             "ask": [
                 {"id": "mig", "match": "Write", "glob": "*/migrations/*", "message": "人が見る"},

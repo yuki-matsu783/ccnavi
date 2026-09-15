@@ -28,7 +28,7 @@ from tests.inproc import run_ccnavi
 LAUNCHER_NAME = getattr(platformtag, "LAUNCHER_NAME", "ccnavi-launcher.sh")
 
 RULES = {
-    "version": 3,
+    "version": 1,
     "deny": [
         {
             "id": "push",
@@ -184,7 +184,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_書き換えられたルールファイルは直前の内容に戻る(self):
         self.run_hook("PreToolUse")
-        write(self.rules, json.dumps({"version": 3, "deny": []}))
+        write(self.rules, json.dumps({"version": 1, "deny": []}))
 
         result = self.run_hook("PostToolUse")
 
@@ -197,7 +197,7 @@ class SelfGuardTest(unittest.TestCase):
         # されるとその一覧ごと消えるので、実行後の監視は何も検知しない。
         # この面はルールを読まずに対象を決めるので、そこで止まらない。
         self.run_hook("PreToolUse")
-        write(self.rules, json.dumps({"version": 3, "deny": [], "ask": [], "allow": []}))
+        write(self.rules, json.dumps({"version": 1, "deny": [], "ask": [], "allow": []}))
         write(self.settings, "{}\n")
 
         self.run_hook("PostToolUse")
@@ -220,7 +220,7 @@ class SelfGuardTest(unittest.TestCase):
         # 控えから戻せば、戻る先はこのツール呼び出しの直前になる。
         edited = json.dumps(
             RULES
-            | {"version": 3, "ask": [{"id": "x", "match": "Bash", "regex": "y", "message": "z"}]}
+            | {"version": 1, "ask": [{"id": "x", "match": "Bash", "regex": "y", "message": "z"}]}
         )
         write(self.rules, edited)
         self.run_hook("PreToolUse")
@@ -291,7 +291,7 @@ class SelfGuardTest(unittest.TestCase):
         work = self.worktree()
         copy = os.path.join(work, ".ccnavi", "common", "rules.yml")
         self.run_hook("PreToolUse")
-        write(copy, json.dumps({"version": 3, "deny": []}))
+        write(copy, json.dumps({"version": 1, "deny": []}))
 
         self.run_hook("PostToolUse")
 
