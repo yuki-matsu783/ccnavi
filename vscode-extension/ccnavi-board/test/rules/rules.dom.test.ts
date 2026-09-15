@@ -135,7 +135,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
     // 開いている deps は hidden-by-find でも表示は消えない（CSS の :not(.open)）
     assert.ok(page.one("#tab-rules").classList.contains("finding"));
     assert.equal(page.one('[data-count="deny"]').textContent, "1 / 2");
-    assert.equal(page.one('[data-count="ask"]').textContent, "0 / 1");
+    assert.equal(page.one('[data-count="ask"]').textContent, "0 / 1（開いたまま 1）");
     assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
     // 空に戻すと元どおり
     page.type(page.one("#find"), "");
@@ -187,8 +187,16 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     await page.send({ ...judged("git-push"), result: { ...judged("git-push").result, rules: [judged("git-push").result.rules[0], judged("no-rm").result.rules[0]] } });
     assert.ok(page.one('.rule[data-id="git-push"]').classList.contains("open"));
     assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"));
-    assert.equal(page.one('[data-count="deny"]').textContent, "0 / 2");
+    assert.equal(page.one('[data-count="deny"]').textContent, "0 / 2（開いたまま 2）");
     assert.equal(page.one('[data-count="ask"]').textContent, "1 / 1");
+    // 畳んだタイプの中のルールが当たれば、タイプが開いて矢印もそれに合う
+    page.type(page.one("#find"), "");
+    page.click(page.one('button[data-action="fold-section"][data-section="ask"]'));
+    assert.equal(page.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▸");
+    await page.send({ ...judged("deps"), result: { ...judged("deps").result, rules: [{ section: "ask", id: "deps", kind: "regex", written: "x", pattern: "x", source: "file" }] } });
+    assert.ok(!page.one('.rule-section[data-section="ask"]').classList.contains("folded"));
+    assert.equal(page.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▾");
+    assert.ok(page.one('.rule[data-id="deps"]').classList.contains("open"));
   } finally {
     await page.close();
   }

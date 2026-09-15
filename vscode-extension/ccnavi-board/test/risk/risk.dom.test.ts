@@ -65,7 +65,7 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
     page.type(page.one("#find"), "github");
     assert.ok(page.one('.factor[data-key="f1"]').classList.contains("hidden-by-find"));
     assert.ok(page.one('.factor[data-key="f1"]').classList.contains("open"));
-    assert.equal(page.one("#factor-count").textContent, "1 / 2");
+    assert.equal(page.one("#factor-count").textContent, "1 / 2（開いたまま 1）");
     // 保存の往復の間は欄を止めるが、行の開閉（twist）は止めない
     page.type(page.one('.factor[data-key="f1"] input.f-points'), "30");
     page.click(page.one("#save"));

@@ -52,7 +52,7 @@ test("CB-D22 絞り込みは title と scope にも当たり、開いている�
   try {
     page.click(page.one('.phase[data-key="p1"] .row-head'));
     page.type(page.one("#find"), "設計");
-    assert.equal(page.one("#phase-count").textContent, "1 / 5", "開いている research は一致しないので数えない");
+    assert.equal(page.one("#phase-count").textContent, "1 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(page.one('.phase[data-key="p1"]').classList.contains("hidden-by-find"));
     assert.ok(page.one('.phase[data-key="p1"]').classList.contains("open"));
     assert.ok(!page.one('.phase[data-key="p2"]').classList.contains("hidden-by-find"));
