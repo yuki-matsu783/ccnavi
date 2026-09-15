@@ -17,6 +17,7 @@ plan:
 - acceptance
 - implement
 - docs
+feedback: []
 allow:
 - match: Write|Edit
   glob: wip/design/*
@@ -157,6 +158,10 @@ base_sha: "45ba15a407056db7d6fd0e9e0ec41c9b04aecfba"
 
 保護済みファイル（`.ccnavi/scripts/`、`.claude/hooks/`、`.ccnavi/common/rules.yml`）は触らない見込み。
 触る必要が出たら `staging` の種類で写す版を作る。
+
+## フィードバック計画
+
+対応なし（`feedback: []`）。設計・受入テスト・実装・文書の 4 フェーズとも、PR #34 のレビューで指摘は残っていない。
 
 ## 確かめ方
 
