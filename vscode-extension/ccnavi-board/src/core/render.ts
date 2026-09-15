@@ -400,11 +400,15 @@ export const BUTTON_STYLE = `  button.action {
  * 行の見出し（.row-head）の列の幅は画面ごとに決める。欄名は欄の左に置き、欄と欄名は親の格子に並ぶ
  * （.field は display: contents）。出番の少ない欄は details.more に畳み、値があるときだけ開いて出す。
  */
-export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--vscode-panel-border); border-radius: 5px; overflow: hidden; }
+export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
   .list:empty { display: none; }
   .row { border-top: 1px solid var(--vscode-panel-border); }
   .row:first-child { border-top: 0; }
-  .row.hidden-by-find { display: none; }
+  .row:first-child > .row-head { border-radius: 4px 4px 0 0; }
+  .row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
+  /* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
+  .row.hidden-by-find:not(.open) { display: none; }
+  .finding .rule-section.folded .list { display: block; }
   .row-head { display: grid; gap: 10px; align-items: center; padding: 5px 8px; cursor: pointer; }
   .row-head:hover { background: var(--vscode-list-hoverBackground); }
   .row.open .row-head { background: var(--vscode-editorWidget-background); }
@@ -413,7 +417,7 @@ export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; bo
     font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
   }
   .sum { display: contents; }
-  .sum .sum-id { font-weight: 600; overflow-wrap: anywhere; }
+  .sum .sum-id { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sum .dim { color: var(--vscode-descriptionForeground); }
   .sum .mono { font-family: var(--vscode-editor-font-family); font-size: .92em; }
   .sum .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -524,8 +528,8 @@ ${BUTTON_STYLE}
     background: var(--vscode-list-hoverBackground);
   }
   .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
-  .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }
   .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
+  .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }
   .card.hidden { display: none; }
   .card-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
   .num { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -551,7 +555,7 @@ ${BUTTON_STYLE}
   .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
   .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
-  .phase-active .phase-dot { background: var(--vscode-charts-blue); border-color: var(--vscode-charts-blue); }
+  .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
   .phase-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase-tickets::before { content: "·"; margin: 0 5px; }

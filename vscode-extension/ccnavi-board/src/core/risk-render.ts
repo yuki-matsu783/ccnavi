@@ -75,14 +75,18 @@ ${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner 
 </header>
 <p id="lock" class="lock${page.lock.locked ? "" : " hidden"}">${escapeHtml(page.lock.reason)}</p>
 ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="block">
-  <h2>段階の閾値</h2>
-  <p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上でフェーズのゲートが閉じ</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p>
+  <h2>段階の閾値 <span class="count">点がその値以上で LOW → MEDIUM → HIGH → CRITICAL。HIGH 以上でゲートが閉じる</span></h2>
+  <details class="help"><summary>この欄の説明</summary><p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上でフェーズのゲートが閉じ</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p></details>
   <div class="levels" id="levels"></div>
 </section>
 <section class="block">
   <h2>項目 <span class="count" id="factor-count">0</span>
     <button type="button" class="action small" data-action="add">＋ 項目を追加</button></h2>
-  <p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> の失敗と読めない出力は重い側に倒れて points がそのまま加点され、<code>judge</code> は判定が揃うまで子を閉じられない。</p>
+  <div class="find">
+    <input id="find" type="search" placeholder="id・当て方・値・文面で絞り込む" spellcheck="false">
+    <span class="hint">行を押すと開く</span>
+  </div>
+  <details class="help"><summary>この欄の説明</summary><p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> の失敗と読めない出力は重い側に倒れて points がそのまま加点され、<code>judge</code> は判定が揃うまで子を閉じられない。</p></details>
   <ul class="list" id="factors"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
@@ -150,29 +154,30 @@ const STYLE = `  * { box-sizing: border-box; }
     color: var(--vscode-editorWarning-foreground);
   }
   .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  details.help { margin: 0 0 8px; font-size: .92em; }
+  details.help > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; }
+  details.help > summary::-webkit-details-marker { display: none; }
+  details.help > summary::before { content: "▸ "; }
+  details.help[open] > summary::before { content: "▾ "; }
+  details.help > .hint { margin: 4px 0 0; }
   .empty { color: var(--vscode-descriptionForeground); padding: 6px 8px; margin: 0; }
 ${BUTTON_STYLE}
   button.action.small { margin-left: auto; }
-  input[type=text], select {
+  input[type=text], input[type=search], select {
     background: var(--vscode-input-background); color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
     padding: 3px 6px; font: inherit;
   }
-  input[type=text]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
+  input[type=text]:focus, input[type=search]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
   select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
   input:disabled, select:disabled { opacity: .6; }
   .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
   .block h2 { margin: 0 0 8px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
   .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
-  .levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: flex-end; }
-  /* 欄名は欄の上に小さく常に出す。placeholder は説明で、入れると消えてよい。 */
-  .field { display: flex; flex-direction: column; gap: 1px; }
-  .field > .cap { font-size: .78em; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); }
-  .field > input, .field > select { width: 100%; box-sizing: border-box; margin: 0; }
-  .field.w-level input { width: 90px; }
-  .level-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
-  .level-name.medium { color: var(--vscode-editorWarning-foreground); }
-  .level-name.high, .level-name.critical { color: var(--vscode-editorError-foreground); }
+  .levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+  .levels .field { display: flex; flex-direction: row; gap: 6px; align-items: center; }
+  .levels .field > .cap { text-align: left; }
+  .levels .field > input { width: 90px; }
 ${LIST_STYLE}
   /* 1 行 = 開閉、id、points、当て方と値、文面 */
   .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px max-content minmax(0, 1fr); }
@@ -248,8 +253,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     for (const name of LEVELS) {
       const input = field(form.levels, name, "f-level", "既定 " + page.builtinLevels[name]);
       input.setAttribute("inputmode", "numeric");
+      input.setAttribute("title", name.toUpperCase() + " 以上になる点");
       box.appendChild(captioned(name, input, "w-level"));
-      box.appendChild(h("span", { class: "level-name " + name, text: name.toUpperCase() + " 以上" }));
     }
   }
   function renderFactor(factor) {
@@ -294,19 +299,35 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         factor.value === "" ? h("span", { class: "dim", text: "（" + factor.kind + " 未設定）" }) : h("code", { text: factor.value + (factor.kind === "glob" && factor.max !== "" ? "（max " + factor.max + "）" : "") }),
         factor.message === "" ? null : h("span", { class: "sum-note", text: factor.message }),
       ]));
+      li.setAttribute("data-find", (factor.id + " " + factor.kind + " " + factor.value + " " + factor.message).toLowerCase());
     }
-    function setOpen(on) {
-      if (on) { opened.add(key); } else { opened.delete(key); }
-      li.classList.toggle("open", on);
-      twist.textContent = on ? "▾" : "▸";
-      twist.setAttribute("aria-expanded", on ? "true" : "false");
-      persistOpen();
-    }
-    head.addEventListener("click", () => setOpen(!li.classList.contains("open")));
-    li.addEventListener("input", fillSummary);
+    head.addEventListener("click", () => {
+      if (window.getSelection && String(window.getSelection()) !== "") { return; }
+      setOpen(li, !li.classList.contains("open"), true);
+    });
+    li.addEventListener("input", () => { fillSummary(); applyFind(); });
     fillSummary();
-    setOpen(opened.has(key));
+    setOpen(li, opened.has(key), false);
     return li;
+  }
+  // 行を開く／畳む。persist が真なら控えも書く（利用者の操作だけ。描画のやり直しでは書かない）。
+  function setOpen(li, on, persist) {
+    const key = li.getAttribute("data-key");
+    if (persist) { if (on) { opened.add(key); } else { opened.delete(key); } }
+    li.classList.toggle("open", on);
+    const twist = li.querySelector(".row-head > .twist");
+    twist.textContent = on ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", on ? "true" : "false");
+    if (persist) { persistOpen(); }
+  }
+  // 絞り込み。要約に含む文字で行を隠すだけで、項目の中身と並びには触らない。開いている行は隠さない。
+  function applyFind() {
+    const q = document.getElementById("find").value.trim().toLowerCase();
+    for (const li of document.querySelectorAll("#factors .factor")) {
+      li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
+    }
+    const shown = document.querySelectorAll("#factors .factor:not(.hidden-by-find), #factors .factor.open").length;
+    document.getElementById("factor-count").textContent = q === "" ? String(form.factors.length) : shown + " / " + form.factors.length;
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
@@ -340,6 +361,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     document.getElementById("factor-count").textContent = String(form.factors.length);
     const add = document.querySelector("button[data-action=add]");
     if (add) { add.disabled = !page.exists; }
+    applyFind();
   }
   function markDirty() {
     dirty = true;
@@ -412,5 +434,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
   });
+  document.getElementById("find").addEventListener("input", applyFind);
   renderAll();
   updateSave();`;

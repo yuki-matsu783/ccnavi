@@ -308,6 +308,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   // 開いているルールの鍵。既定は全部畳む。鍵はルールごとなので、並べ替えても移しても開いたまま。
   // Webview の state には id で控え、再読込のあとも同じルールが開く。
   const opened = new Set();
+  // 「コンテキストの追加」の開閉。最初は値の有無で決め、以後は利用者の操作を鍵で覚える。
+  const moreOpen = new Map();
   const saved = vscode.getState() || {};
   const savedOpen = new Set(saved.open || []);
   function saveState(patch) {
@@ -455,7 +457,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         fileField(rule, key, "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）"),
       ]),
     ]);
-    if (hasContext(rule)) { more.setAttribute("open", ""); }
+    if (moreOpen.has(key) ? moreOpen.get(key) : hasContext(rule)) { more.setAttribute("open", ""); }
+    more.addEventListener("toggle", () => moreOpen.set(key, more.open));
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
@@ -495,24 +498,37 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）— HIT したときにモデルへ渡すプロンプトやファイル"));
       li.setAttribute("data-find", (rule.id + " " + rule.match + " " + rule.pattern + " " + rule.message + " " + rule.additionalContext + " " + rule.additionalContextOnce).toLowerCase());
     }
-    function setOpen(on) {
-      if (on) { opened.add(key); } else { opened.delete(key); }
-      li.classList.toggle("open", on);
-      twist.textContent = on ? "▾" : "▸";
-      twist.setAttribute("aria-expanded", on ? "true" : "false");
-      persistOpen();
-    }
-    head.addEventListener("click", () => setOpen(!li.classList.contains("open")));
+    head.addEventListener("click", () => {
+      // 文字を選んでいるときは、コピーしようとしただけなので開閉しない
+      if (window.getSelection && String(window.getSelection()) !== "") { return; }
+      setOpen(li, !li.classList.contains("open"), true);
+    });
     li.addEventListener("input", () => { fillSummary(); applyFind(); });
     fillSummary();
-    setOpen(opened.has(key));
+    setOpen(li, opened.has(key), false);
     return li;
+  }
+  // 行を開く／畳む。persist が真なら控えも書く（利用者の操作だけ。描画のやり直しでは書かない）。
+  function setOpen(li, on, persist) {
+    const key = li.getAttribute("data-key");
+    if (persist) { if (on) { opened.add(key); } else { opened.delete(key); } }
+    li.classList.toggle("open", on);
+    const twist = li.querySelector(".row-head > .twist");
+    twist.textContent = on ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", on ? "true" : "false");
+    if (persist) { persistOpen(); }
   }
   // 絞り込み。要約に含む文字で行を隠すだけで、ルールの中身と並びには触らない。
   function applyFind() {
     const q = document.getElementById("find").value.trim().toLowerCase();
+    document.getElementById("tab-rules").classList.toggle("finding", q !== "");
     for (const li of document.querySelectorAll(".rule")) {
       li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
+    }
+    for (const section of SECTIONS) {
+      const total = sections[section].length;
+      const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find), [data-list=" + section + "] .rule.open").length;
+      document.querySelector("[data-count=" + section + "]").textContent = q === "" ? String(total) : shown + " / " + total;
     }
   }
   // タイプごとの畳み。画面の見え方だけで、ルールの中身と並びには触らない。
@@ -526,17 +542,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     twist.setAttribute("aria-expanded", next ? "false" : "true");
   }
   // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
+  // その場だけの展開で、開いた行の控えには入れない（判定を繰り返しても既定の畳みが崩れない）。
   function unfoldRule(el) {
     const section = el.closest(".rule-section");
     if (section) { foldSection(section.getAttribute("data-section"), false); }
     el.classList.remove("hidden-by-find");
-    if (el.classList.contains("open")) { return; }
-    opened.add(el.getAttribute("data-key"));
-    el.classList.add("open");
-    const twist = el.querySelector(".row-head > .twist");
-    twist.textContent = "▾";
-    twist.setAttribute("aria-expanded", "true");
-    persistOpen();
+    setOpen(el, true, false);
   }
   function renderAll() {
     // 前に開いていたルールは id で覚えている。最初の描画でだけ鍵に写す。
@@ -607,7 +618,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     foldSection(section, false);
     const items = document.querySelectorAll("[data-list=" + section + "] .rule");
     const last = items[items.length - 1];
-    if (last) { last.classList.remove("hidden-by-find"); last.querySelector("input.f-id").focus(); }
+    if (last) { last.querySelector("input.f-id").focus(); }
   }
   function status(text, isError) {
     const el = document.getElementById("status");

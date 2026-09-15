@@ -83,6 +83,10 @@ function renderBanners(page: ProjectsPage): string {
     );
   }
   for (const p of page.dirProblems) {
+    // .gitignore の帯（直すボタン付き）と同じ事象は 2 度出さない
+    if (!page.ignored && /無視されていない/.test(p.detail)) {
+      continue;
+    }
     banners.push(`<div class="banner ${p.severity}">${escapeHtml(p.severity)}: ${escapeHtml(p.detail)}</div>`);
   }
   return banners.length === 0 ? "" : `${banners.join("\n")}\n`;
@@ -122,9 +126,10 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   const tickets = ticketsEnabled
     ? `\n          <div class="field"><dt>チケット</dt><dd>${row.tickets} 件${row.doing > 0 ? `<span class="dim">、作業中 ${row.doing} 件</span>` : ""}</dd></div>`
     : "";
+  // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（".claude/ がある"）は重ねない
   const problems = [
     ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ があります。Claude Code はそこのスキルを読み込み、cd すると別のワークスペースルートに見えます" }] : []),
-    ...row.problems,
+    ...row.problems.filter((p) => !(row.hasClaudeDir && /\.claude\/ があ/.test(p.detail))),
   ];
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
   const origin = row.origin === "" ? '<span class="dim">不明</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;
@@ -148,10 +153,20 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
           <div class="field wide"><dt>検証</dt><dd>${lint}</dd></div>
       </dl>
       <div class="ops">
+        <details class="menu">
+          <summary class="action">開く ▾</summary>
+          <div class="menu-items">
           <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試します">ルール管理</button>
           <button type="button" class="action" data-action="open-phases" data-name="${escapeHtml(row.name)}" ${row.rulesRel === "" ? "disabled " : ""}title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集します。無ければ画面から作れます">フェーズ管理</button>${board}
+          </div>
+        </details>
+        <details class="menu">
+          <summary class="action">git ▾</summary>
+          <div class="menu-items">
           <button type="button" class="action" data-action="fetch" data-name="${escapeHtml(row.name)}" title="git fetch をターミナルで実行します">fetch</button>
           <button type="button" class="action" data-action="pull" data-name="${escapeHtml(row.name)}" title="git pull をターミナルで実行します。衝突があれば git が止めます">pull</button>
+          </div>
+        </details>
       </div>
     </li>`;
 }
@@ -241,6 +256,25 @@ ${BUTTON_STYLE}
   .field dd { margin: 0; overflow-wrap: anywhere; }
   .field dd button.action { vertical-align: middle; }
   .ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
+  /* 行末のボタンは 2 つのメニューにまとめる。開いたメニューは外を押すか Esc で閉じる */
+  .menu { position: relative; }
+  .menu > summary {
+    list-style: none; display: inline-flex; align-items: center; min-height: 24px; padding: 2px 12px; line-height: 1.3;
+    background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border, rgba(128, 128, 128, .4)); border-radius: 3px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .25); cursor: pointer; user-select: none;
+  }
+  .menu > summary:hover, .menu[open] > summary { background: var(--vscode-button-secondaryHoverBackground); border-color: var(--vscode-focusBorder); }
+  .menu > summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+  .menu > summary::-webkit-details-marker { display: none; }
+  .menu > .menu-items {
+    position: absolute; z-index: 5; top: 100%; left: 0; margin-top: 2px; min-width: 100%;
+    display: flex; flex-direction: column; gap: 2px; padding: 4px;
+    background: var(--vscode-editorWidget-background); border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+    border-radius: 3px; box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, .3));
+  }
+  .menu > .menu-items > button.action { justify-content: flex-start; border-color: transparent; box-shadow: none; background: none; }
+  .menu > .menu-items > button.action:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
   .badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
   .badge.doing { color: var(--vscode-charts-yellow); border-color: var(--vscode-charts-yellow); }
   .badge.warn { color: var(--vscode-editorWarning-foreground); border-color: var(--vscode-editorWarning-foreground); }
@@ -297,6 +331,19 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "pull") { vscode.postMessage({ type: "pull", name: target }); }
     });
   }
+  // メニューは 1 つだけ開く。項目を押したら閉じ、外を押すか Esc でも閉じる
+  function closeMenus(except) {
+    for (const menu of document.querySelectorAll("details.menu[open]")) { if (menu !== except) { menu.removeAttribute("open"); } }
+  }
+  for (const menu of document.querySelectorAll("details.menu")) {
+    menu.addEventListener("toggle", () => { if (menu.open) { closeMenus(menu); } });
+    for (const button of menu.querySelectorAll("button")) { button.addEventListener("click", () => closeMenus()); }
+  }
+  document.addEventListener("mousedown", (event) => {
+    const inside = event.target.closest ? event.target.closest("details.menu") : null;
+    closeMenus(inside);
+  });
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeMenus(); } });
   window.addEventListener("message", (event) => {
     const data = event.data || {};
     if (data.type === "failed") { show("failed", String(data.message || "")); }

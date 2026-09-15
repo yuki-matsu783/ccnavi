@@ -88,7 +88,11 @@ ${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? 
 ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="block">
   <h2>フェーズの種類 <span class="count" id="phase-count">0</span>
     <button type="button" class="action small" data-action="add">＋ 種類を追加</button></h2>
-  <p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に在って追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p>
+  <div class="find">
+    <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellcheck="false">
+    <span class="hint">行を押すと開く</span>
+  </div>
+  <details class="help"><summary>この画面の説明</summary><p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に在って追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p></details>
   <ul class="list" id="phases"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
@@ -163,15 +167,21 @@ const STYLE = `  * { box-sizing: border-box; }
     color: var(--vscode-editorWarning-foreground);
   }
   .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  details.help { margin: 0 0 8px; font-size: .92em; }
+  details.help > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; }
+  details.help > summary::-webkit-details-marker { display: none; }
+  details.help > summary::before { content: "▸ "; }
+  details.help[open] > summary::before { content: "▾ "; }
+  details.help > .hint { margin: 4px 0 0; }
   .empty { color: var(--vscode-descriptionForeground); padding: 6px 8px; margin: 0; }
 ${BUTTON_STYLE}
   button.action.small { margin-left: auto; }
-  input[type=text], select {
+  input[type=text], input[type=search], select {
     background: var(--vscode-input-background); color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
     padding: 3px 6px; font: inherit;
   }
-  input[type=text]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
+  input[type=text]:focus, input[type=search]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
   select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
   input:disabled, select:disabled { opacity: .6; }
   input.duplicate { border-color: var(--vscode-editorError-foreground); }
@@ -199,6 +209,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   const keys = new Map();
   // 開いている種類の鍵。既定は全部畳む。Webview の state には id で控え、再読込のあとも同じ種類が開く。
   const opened = new Set();
+  // 「関係と案内」の開閉。最初は値の有無で決め、以後は利用者の操作を鍵で覚える。
+  const moreOpen = new Map();
   const savedOpen = new Set((vscode.getState() || {}).open || []);
   function persistOpen() {
     const ids = [];
@@ -286,7 +298,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         captioned("when", field(phase, "when", "f-when", "この種類を計画に置く目安。案内にだけ使う")),
       ]),
     ]);
-    if (hasRelations(phase)) { more.setAttribute("open", ""); }
+    if (moreOpen.has(key) ? moreOpen.get(key) : hasRelations(phase)) { more.setAttribute("open", ""); }
+    more.addEventListener("toggle", () => moreOpen.set(key, more.open));
     const twist = h("button", { type: "button", class: "twist", title: "この種類を開く／畳む" });
     const sum = h("span", { class: "sum" });
     const head = h("div", { class: "row-head" }, [twist, sum]);
@@ -313,22 +326,38 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.appendChild(h("span", { class: "tag " + phase.kind, text: phase.kind }));
       sum.appendChild(h("span", { class: "dim", text: "review " + phase.review }));
       sum.appendChild(h("span", { class: "clip dim mono", text: phase.inherit ? "inherit" : phase.scope.length === 0 ? "（scope 未設定）" : phase.scope.join(", "), title: phase.inherit ? "親の範囲そのまま" : phase.scope.join(", ") }));
+      li.setAttribute("data-find", (phase.id + " " + phase.title + " " + phase.scope.join(" ") + " " + phase.deliverables.join(" ") + " " + phase.when).toLowerCase());
       moreSummary.textContent = "";
       moreSummary.appendChild(h("b", { text: "関係と案内" }));
       moreSummary.appendChild(document.createTextNode(hasRelations(phase) ? "（設定あり）" : "（未設定）— overlap・requires・agent・when"));
     }
-    function setOpen(on) {
-      if (on) { opened.add(key); } else { opened.delete(key); }
-      li.classList.toggle("open", on);
-      twist.textContent = on ? "▾" : "▸";
-      twist.setAttribute("aria-expanded", on ? "true" : "false");
-      persistOpen();
-    }
-    head.addEventListener("click", () => setOpen(!li.classList.contains("open")));
-    li.addEventListener("input", fillSummary);
+    head.addEventListener("click", () => {
+      if (window.getSelection && String(window.getSelection()) !== "") { return; }
+      setOpen(li, !li.classList.contains("open"), true);
+    });
+    li.addEventListener("input", () => { fillSummary(); applyFind(); });
     fillSummary();
-    setOpen(opened.has(key));
+    setOpen(li, opened.has(key), false);
     return li;
+  }
+  // 行を開く／畳む。persist が真なら控えも書く（利用者の操作だけ。描画のやり直しでは書かない）。
+  function setOpen(li, on, persist) {
+    const key = li.getAttribute("data-key");
+    if (persist) { if (on) { opened.add(key); } else { opened.delete(key); } }
+    li.classList.toggle("open", on);
+    const twist = li.querySelector(".row-head > .twist");
+    twist.textContent = on ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", on ? "true" : "false");
+    if (persist) { persistOpen(); }
+  }
+  // 絞り込み。要約に含む文字で行を隠すだけで、種類の中身と並びには触らない。開いている行は隠さない。
+  function applyFind() {
+    const q = document.getElementById("find").value.trim().toLowerCase();
+    for (const li of document.querySelectorAll("#phases .phase")) {
+      li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
+    }
+    const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find), #phases .phase.open").length;
+    document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length;
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
@@ -361,6 +390,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     document.getElementById("phase-count").textContent = String(form.phases.length);
     const add = document.querySelector("button[data-action=add]");
     if (add) { add.disabled = !page.editable; }
+    applyFind();
     updateSave();
   }
   function markDirty() {
@@ -454,4 +484,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
   });
+  document.getElementById("find").addEventListener("input", applyFind);
   renderAll();`;
