@@ -10,7 +10,7 @@
  */
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
-import { BUTTON_STYLE, escapeHtml } from "./render.js";
+import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 import type { RulesModel } from "./rules-doc.js";
 
 /**
@@ -90,14 +90,17 @@ ${renderProblems(page.model.problems)}<nav class="tabs" role="tablist">
   <button type="button" class="tab" data-tab="hooks" role="tab">hook</button>
 </nav>
 <section id="tab-rules" class="pane active">
-  <p class="hint">判定は強い順に deny &gt; ask &gt; allow</p>
+  <div class="find">
+    <input id="find" type="search" placeholder="id・ツール・パターン・文面で絞り込む" spellcheck="false">
+    <span class="hint">判定は強い順に deny &gt; ask &gt; allow。行を押すと開く</span>
+  </div>
 ${(["deny", "ask", "allow"] as const).map(renderSectionShell).join("\n")}
 </section>
 <section id="tab-judge" class="pane">
   <p class="hint">判定は実行ファイルの <code>--test</code> で行う。編集中の内容で試すので保存は要らない。セッションが dry-run でも、ここは enable のときの判定を返す。</p>
   <div class="judge-form">
     <label>ツール <select id="tool">${KNOWN_TOOLS.map((t) => `<option value="${t}">${t}</option>`).join("")}</select></label>
-    <label class="grow">subject <input id="subject" type="text" placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
+    <label class="grow" title="--test の subject">対象 <input id="subject" type="text" placeholder="Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write なら絶対パス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL" spellcheck="false"></label>
     <button type="button" class="action primary" data-action="judge">判定</button>
   </div>
   <div id="judge-result" class="result hidden"></div>
@@ -152,7 +155,7 @@ function renderSectionShell(section: "deny" | "ask" | "allow"): string {
   return `  <section class="rule-section" data-section="${section}">
     <h2><button type="button" class="twist" data-action="fold-section" data-section="${section}" aria-expanded="true" title="このタイプを折りたたむ／開く">▾</button> <span class="section-name ${section}">${section}</span> <span class="section-label">${SECTION_LABELS[section]}</span> <span class="count" data-count="${section}">0</span>
       <button type="button" class="action small" data-action="add" data-section="${section}">＋ ルールを追加</button></h2>
-    <ul class="rules" data-list="${section}"></ul>
+    <ul class="list" data-list="${section}"></ul>
   </section>`;
 }
 
@@ -186,36 +189,7 @@ ${rows}
   <p class="hint">「判定を試す」でツールを選ぶと、そのツールで実行される hook だけをここから絞り込んで出す。matcher の意味は Claude Code のもの（空か <code>*</code> で全部、それ以外はツール名への正規表現）。</p>`;
 }
 
-const STYLE = `  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 12px;
-    background: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-  }
-  code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
-  .hidden { display: none !important; }
-  .banner {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-panel-border);
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  }
-  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 8px; }
-  .summary { display: flex; gap: 12px; align-items: center; }
-  .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
-  .dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-  .lock {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
-  }
-  .problems {
-    margin: 0 0 12px; padding: 8px 8px 8px 24px;
-    border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
-    color: var(--vscode-editorWarning-foreground);
-  }
+const STYLE = `${PAGE_STYLE}
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 10px; }
   .tab {
     background: none; border: none; border-bottom: 2px solid transparent; color: var(--vscode-descriptionForeground);
@@ -224,63 +198,23 @@ const STYLE = `  * { box-sizing: border-box; }
   .tab.active { color: var(--vscode-editor-foreground); border-bottom-color: var(--vscode-focusBorder); }
   .pane { display: none; }
   .pane.active { display: block; }
-  .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
-  .empty { color: var(--vscode-descriptionForeground); }
-${BUTTON_STYLE}
   button.action.small { margin-left: auto; }
-  input[type=text], textarea, select {
-    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
-    padding: 3px 6px; font: inherit;
-  }
-  input[type=text]:focus, textarea:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
-  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
-  .rule-section { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-  .rule-section h2 { margin: 0 0 8px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
-  .section-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
+${LIST_STYLE}
+  .rule-section { margin-bottom: 14px; }
+  .rule-section h2 { margin: 0 0 4px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
+  .section-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; font-size: .85em; font-family: var(--vscode-editor-font-family); }
   .section-name.deny { color: var(--vscode-editorError-foreground); }
   .section-name.ask { color: var(--vscode-editorWarning-foreground); }
   .section-name.allow { color: var(--vscode-charts-green); }
   .section-label, .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
-  .rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .rule {
-    border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
-    background: var(--vscode-editorWidget-background);
-  }
-  .rule.hit { outline: 2px solid var(--vscode-focusBorder); }
-  /* 畳むボタン。タイプ（タイプ）と 1 件ずつのルールの両方に付く。 */
-  .twist {
-    background: none; border: none; color: var(--vscode-descriptionForeground);
-    font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
-  }
-  .rule-section.folded .rules { display: none; }
-  .rule-head { display: flex; gap: 8px; align-items: center; }
-  .rule-head .buttons { margin-left: auto; display: flex; gap: 4px; }
-  /* 開いているときは欄がそのまま出るので、要約は畳んだときだけ出す。 */
-  .rule-sum { display: none; }
-  .rule.folded .rule-sum { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; cursor: pointer; overflow-wrap: anywhere; }
-  .rule.folded .rule-body { display: none; }
-  .rule-sum .sum-id { font-weight: 600; }
-  .rule-sum .sum-match, .rule-sum .sum-empty { color: var(--vscode-descriptionForeground); }
-  .rule-sum code { font-family: var(--vscode-editor-font-family); }
-  .rule-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 6px; }
-  .rule-row label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
-  .rule-row .grow { flex: 1 1 240px; }
-  .rule-row .grow input { flex: 1; min-width: 120px; }
-  .rule-row input.f-id { width: 160px; }
-  .rule-row input.f-match { width: 220px; }
-  .rule-row .buttons { margin-left: auto; display: flex; gap: 4px; }
-  .rule textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; margin-bottom: 4px; }
-  /* 欄名は欄の上に小さく常に出す。placeholder は説明で、入れると消えてよい。 */
-  .field { display: flex; flex-direction: column; gap: 1px; }
-  .field > .cap { font-size: .78em; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); }
-  .field > input, .field > textarea { width: 100%; box-sizing: border-box; margin: 0; }
-  .rule-row .field.w-id { width: 170px; }
-  .rule-row .field.w-match { width: 230px; }
-  .rule .field.block { margin-bottom: 6px; }
+  .rule-section.folded .list { display: none; }
+  /* 1 行 = 開閉、id、match、パターンと文面、コンテキストの有無 */
+  .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) 14px; }
+  .rule.hit .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
+  select.f-section { max-width: 120px; }
   /* 押すと札が出る欄。欄そのものは普通のテキスト入力で、手でも書ける。 */
   .picker { position: relative; }
-  .picker > input { width: 100%; box-sizing: border-box; }
+  .picker > input { width: 100%; box-sizing: border-box; max-width: 360px; }
   .picker > .menu { display: none; }
   .picker.open > .menu {
     display: flex; flex-direction: column; gap: 2px; position: absolute; z-index: 5; top: 100%; left: 0; min-width: 100%;
@@ -292,7 +226,7 @@ ${BUTTON_STYLE}
   .with-button { display: flex; gap: 6px; align-items: center; }
   .with-button > input { flex: 1; min-width: 120px; }
   .with-button > button { margin-left: 0; white-space: nowrap; }
-  .rule .stale { margin: 0 0 6px; font-size: .9em; color: var(--vscode-editorError-foreground); overflow-wrap: anywhere; }
+  .rule .stale { grid-column: 1 / -1; margin: 0; font-size: .9em; color: var(--vscode-editorError-foreground); overflow-wrap: anywhere; }
   .rule .stale code { margin: 0 6px; }
   .rule .pattern { font-family: var(--vscode-editor-font-family); }
   .judge-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
@@ -319,8 +253,7 @@ ${BUTTON_STYLE}
   .samples-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
   .counts { display: flex; gap: 14px; margin-bottom: 6px; }
   .counts .ng { color: var(--vscode-editorError-foreground); font-weight: 600; }
-  .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; }
-  .foot.error { color: var(--vscode-editorError-foreground); }`;
+`;
 
 // 中のスクリプトはテンプレート文字列に埋めるので、バッククォートと \${ を使わない。
 const SCRIPT = `  const vscode = acquireVsCodeApi();
@@ -332,8 +265,28 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   let busy = false;
   let seq = 0;
   const keys = new Map();
-  // 畳んであるルールの鍵。鍵はルールごとなので、並べ替えても移しても畳んだままになる。
-  const folded = new Set();
+  // 開いているルールの鍵。既定は全部畳む。鍵はルールごとなので、並べ替えても移しても開いたまま。
+  // Webview の state には id で控え、再読込のあとも同じルールが開く。
+  const opened = new Set();
+  // 「コンテキストの追加」の開閉。最初は値の有無で決め、以後は利用者の操作を鍵で覚える。
+  const moreOpen = new Map();
+  const saved = vscode.getState() || {};
+  const savedOpen = new Set(saved.open || []);
+  function saveState(patch) {
+    vscode.setState(Object.assign({}, vscode.getState() || {}, patch));
+  }
+  function persistOpen() {
+    const ids = [];
+    for (const key of opened) {
+      const found = ruleByKey(key);
+      if (found && found.rule.id !== "") { ids.push(found.rule.id); }
+    }
+    saveState({ open: ids });
+  }
+  function excerpt(text, max) {
+    const one = text.replace(/\\s+/g, " ").trim();
+    return one.length > max ? one.slice(0, max) + "…" : one;
+  }
 
   function h(tag, attrs, children) {
     const el = document.createElement(tag);
@@ -372,9 +325,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     textarea.addEventListener("input", () => { rule[name] = textarea.value; markDirty(); });
     return textarea;
   }
-  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
-  function captioned(name, control, className) {
-    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  // 欄名は日本語で欄の左に出す。YAML のキー名は欄名の title（ツールチップ）に載せる。
+  function captioned(name, control, className, key) {
+    const cap = h("span", { class: "cap", text: name });
+    if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
+    return h("div", { class: "field " + (className || "") }, [cap, control]);
   }
   // match はツール名を "|" で並べたもの。判定は名前をそのまま突き合わせるので、
   // 打ち間違えると黙って当たらなくなる。書かせずに選ばせる。ファイルに書いてある
@@ -412,7 +367,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const wrap = h("div", { class: "picker" }, [input, menu]);
     input.addEventListener("focus", () => { fill(); openPicker(wrap); });
     input.addEventListener("click", () => { fill(); openPicker(wrap); });
-    return captioned("match", wrap, "w-match");
+    return captioned("ツール", wrap, "", "match");
   }
   // 開いているポップアップは 1 つだけ。外を押すか Esc で閉じる。
   function openPicker(wrap) {
@@ -423,11 +378,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   // ファイルを指す欄。手で書くほかに、VS Code のダイアログで選べる。選んだ結果は
   // 拡張側がルート相対にして "picked" で返す。
-  function fileField(rule, key, name, className, placeholder) {
+  function fileField(rule, key, label, name, className, placeholder) {
     const input = field(rule, name, className, placeholder);
     const pick = h("button", { type: "button", class: "action small", text: "選ぶ…", title: "ファイルを選ぶ" });
     pick.addEventListener("click", () => vscode.postMessage({ type: "pickFile", key: key, field: name }));
-    return captioned(name, h("div", { class: "with-button" }, [input, pick]), "block");
+    return captioned(label, h("div", { class: "with-button" }, [input, pick]), "", name);
+  }
+  function hasContext(rule) {
+    return rule.additionalContext !== "" || rule.additionalContextOnce !== "" || rule.additionalContextFile !== "" || rule.additionalContextOnceFile !== "";
   }
   function renderRule(section, rule) {
     const key = keyOf(rule);
@@ -440,7 +398,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     // （lint が止めるので）そう言って、消すボタンだけ出す。
     let message;
     if (section === "deny") {
-      message = captioned("message", area(rule, "message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）"), "block");
+      message = captioned("文面", area(rule, "message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）"), "", "message");
     } else if (rule.message !== "") {
       const drop = h("button", { type: "button", class: "action small", text: "message を削除" });
       drop.addEventListener("click", () => { rule.message = ""; markDirty(); renderAll(); });
@@ -450,59 +408,90 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         drop,
       ]);
     }
-    const context = captioned("additionalContext", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト"), "block");
-    const once = captioned("additionalContextOnce", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト"), "block");
-    const contextFile = fileField(rule, key, "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）");
-    const onceFile = fileField(rule, key, "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）");
+    // コンテキストの 4 欄は出番が少ないので見出し 1 行に畳む。値があるルールだけ最初から開く。
+    const moreSummary = h("summary", {});
+    const more = h("details", { class: "more" }, [
+      moreSummary,
+      h("div", { class: "sub" }, [
+        captioned("渡す文", area(rule, "additionalContext", "f-context", "HIT したときにコンテキストに追加するプロンプト"), "", "additionalContext"),
+        fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "HIT したときにコンテキストに追加するファイル（先頭 4000 文字まで）"),
+        captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初に HIT したときにコンテキストに追加するプロンプト"), "", "additionalContextOnce"),
+        fileField(rule, key, "初回だけ渡すファイル", "additionalContextOnceFile", "f-once-file", "セッションで最初に HIT したときにコンテキストに追加するファイル（同上）"),
+      ]),
+    ]);
+    if (moreOpen.has(key) ? moreOpen.get(key) : hasContext(rule)) { more.setAttribute("open", ""); }
+    more.addEventListener("toggle", () => moreOpen.set(key, more.open));
     const up = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
     up.addEventListener("click", () => shift(key, -1));
     const down = h("button", { type: "button", class: "action small", text: "↓", title: "下へ" });
     down.addEventListener("click", () => shift(key, 1));
     const del = h("button", { type: "button", class: "action small", text: "削除" });
     del.addEventListener("click", () => remove(key));
-    // 畳んだときは要約だけを出す。要約は欄を打つたびに書き直す（入力は上へ伝わる）。
-    const twist = h("button", { type: "button", class: "twist", title: "このルールを折りたたむ／開く" });
-    const sum = h("span", { class: "rule-sum" });
-    const li = h("li", { class: "rule", "data-key": key, "data-id": rule.id }, [
-      h("div", { class: "rule-head" }, [twist, sum, h("span", { class: "buttons" }, [up, down, del])]),
-      h("div", { class: "rule-body" }, [
-        h("div", { class: "rule-row" }, [
-          captioned("id", field(rule, "id", "f-id", "git-push"), "w-id"),
-          matchField(rule),
-          captioned("タイプ", sectionSelect),
-        ]),
-        h("div", { class: "rule-row" }, [
-          captioned("形式", kindSelect),
-          captioned(rule.kind, pattern, "grow"),
-        ]),
+    // 見出しの行は要約。要約は欄を打つたびに書き直す（入力は上へ伝わる）。
+    const twist = h("button", { type: "button", class: "twist", title: "このルールを開く／畳む" });
+    const sum = h("span", { class: "sum" });
+    const head = h("div", { class: "row-head" }, [twist, sum]);
+    const li = h("li", { class: "row rule", "data-key": key, "data-id": rule.id }, [
+      head,
+      h("div", { class: "row-body" }, [
+        captioned("id", field(rule, "id", "f-id narrow", "git-push"), "", "id"),
+        matchField(rule),
+        captioned("タイプ", sectionSelect, "", "deny / ask / allow"),
+        captioned("パターン", h("div", { class: "inline" }, [kindSelect, pattern]), "", "glob / regex"),
         message,
-        context,
-        contextFile,
-        once,
-        onceFile,
+        more,
+        h("span", { class: "buttons" }, [up, down, del]),
       ]),
     ]);
     function fillSummary() {
       sum.textContent = "";
-      sum.appendChild(h("span", { class: "sum-id", text: rule.id === "" ? "（id 未設定）" : rule.id }));
-      sum.appendChild(h("span", { class: "sum-match", text: rule.match === "" ? "（全ツール）" : rule.match }));
-      sum.appendChild(rule.pattern === ""
-        ? h("span", { class: "sum-empty", text: "（" + rule.kind + " 未設定）" })
-        : h("code", { text: rule.kind + " " + rule.pattern }));
+      sum.appendChild(h("span", { class: "sum-id" + (rule.id === "" ? " dim" : ""), text: rule.id === "" ? "（id 未設定）" : rule.id }));
+      sum.appendChild(h("span", { class: "dim mono clip", text: rule.match === "" ? "（全ツール）" : rule.match, title: rule.match }));
+      const shown = section === "deny" ? rule.message : (rule.additionalContext || rule.additionalContextOnce);
+      sum.appendChild(h("span", { class: "clip", title: rule.pattern === "" ? "" : rule.kind + " " + rule.pattern }, [
+        rule.pattern === ""
+          ? h("span", { class: "dim", text: "（" + rule.kind + " 未設定）" })
+          : h("code", { text: rule.pattern }),
+        shown === "" ? null : h("span", { class: "sum-note", text: excerpt(shown, 60) }),
+      ]));
+      sum.appendChild(h("span", { class: "sum-flag" + (hasContext(rule) ? " on" : ""), title: hasContext(rule) ? "コンテキストの追加あり" : "" }));
+      moreSummary.textContent = "";
+      moreSummary.appendChild(h("b", { text: "コンテキストの追加" }));
+      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）— HIT したときにモデルへ渡す文やファイル"));
+      li.setAttribute("data-find", (rule.id + " " + rule.match + " " + rule.pattern + " " + rule.message + " " + rule.additionalContext + " " + rule.additionalContextOnce).toLowerCase());
     }
-    function setFolded(on) {
-      if (on) { folded.add(key); } else { folded.delete(key); }
-      li.classList.toggle("folded", on);
-      twist.textContent = on ? "▸" : "▾";
-      twist.setAttribute("aria-expanded", on ? "false" : "true");
-      if (on) { fillSummary(); }
-    }
-    twist.addEventListener("click", () => setFolded(!li.classList.contains("folded")));
-    sum.addEventListener("click", () => setFolded(false));
-    li.addEventListener("input", () => { if (li.classList.contains("folded")) { fillSummary(); } });
+    head.addEventListener("click", () => {
+      // 文字を選んでいるときは、コピーしようとしただけなので開閉しない
+      if (window.getSelection && String(window.getSelection()) !== "") { return; }
+      setOpen(li, !li.classList.contains("open"), true);
+    });
+    li.addEventListener("input", () => { fillSummary(); applyFind(); });
     fillSummary();
-    setFolded(folded.has(key));
+    setOpen(li, opened.has(key), false);
     return li;
+  }
+  // 行を開く／畳む。persist が真なら控えも書く（利用者の操作だけ。描画のやり直しでは書かない）。
+  function setOpen(li, on, persist) {
+    const key = li.getAttribute("data-key");
+    if (persist) { if (on) { opened.add(key); } else { opened.delete(key); } }
+    li.classList.toggle("open", on);
+    const twist = li.querySelector(".row-head > .twist");
+    twist.textContent = on ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", on ? "true" : "false");
+    if (persist) { persistOpen(); }
+  }
+  // 絞り込み。要約に含む文字で行を隠すだけで、ルールの中身と並びには触らない。
+  function applyFind() {
+    const q = document.getElementById("find").value.trim().toLowerCase();
+    document.getElementById("tab-rules").classList.toggle("finding", q !== "");
+    for (const li of document.querySelectorAll(".rule")) {
+      li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
+    }
+    for (const section of SECTIONS) {
+      const total = sections[section].length;
+      const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find), [data-list=" + section + "] .rule.open").length;
+      document.querySelector("[data-count=" + section + "]").textContent = q === "" ? String(total) : shown + " / " + total;
+    }
   }
   // タイプごとの畳み。画面の見え方だけで、ルールの中身と並びには触らない。
   function foldSection(section, on) {
@@ -515,17 +504,21 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     twist.setAttribute("aria-expanded", next ? "false" : "true");
   }
   // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
+  // その場だけの展開で、開いた行の控えには入れない（判定を繰り返しても既定の畳みが崩れない）。
   function unfoldRule(el) {
-    folded.delete(el.getAttribute("data-key"));
     const section = el.closest(".rule-section");
     if (section) { foldSection(section.getAttribute("data-section"), false); }
-    if (!el.classList.contains("folded")) { return; }
-    el.classList.remove("folded");
-    const twist = el.querySelector(".rule-head > .twist");
-    twist.textContent = "▾";
-    twist.setAttribute("aria-expanded", "true");
+    el.classList.remove("hidden-by-find");
+    setOpen(el, true, false);
   }
   function renderAll() {
+    // 前に開いていたルールは id で覚えている。最初の描画でだけ鍵に写す。
+    if (savedOpen.size > 0) {
+      for (const section of SECTIONS) {
+        for (const rule of sections[section]) { if (savedOpen.has(rule.id)) { opened.add(keyOf(rule)); } }
+      }
+      savedOpen.clear();
+    }
     for (const section of SECTIONS) {
       const list = document.querySelector("[data-list=" + section + "]");
       list.textContent = "";
@@ -533,8 +526,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       document.querySelector("[data-count=" + section + "]").textContent = String(sections[section].length);
     }
     for (const el of document.querySelectorAll("input.f-id")) {
-      el.addEventListener("input", () => { el.closest(".rule").setAttribute("data-id", el.value); });
+      el.addEventListener("input", () => { el.closest(".rule").setAttribute("data-id", el.value); persistOpen(); });
     }
+    applyFind();
   }
   function markDirty() {
     dirty = true;
@@ -577,7 +571,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add(section) {
-    sections[section] = sections[section].concat([{ origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "" }]);
+    const rule = { origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "" };
+    sections[section] = sections[section].concat([rule]);
+    // 足したルールは開いて出す。畳んだままでは何を足したか分からない。
+    opened.add(keyOf(rule));
     markDirty();
     renderAll();
     foldSection(section, false);
@@ -684,7 +681,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function showTab(name) {
     for (const tab of document.querySelectorAll(".tab")) { tab.classList.toggle("active", tab.getAttribute("data-tab") === name); }
     for (const pane of document.querySelectorAll(".pane")) { pane.classList.toggle("active", pane.id === "tab-" + name); }
-    vscode.setState({ tab: name });
+    saveState({ tab: name });
   }
   document.body.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
@@ -697,7 +694,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (action === "judge") {
       const tool = document.getElementById("tool").value;
       const subject = document.getElementById("subject").value;
-      if (subject.trim() === "") { status("subject が未入力", true); return; }
+      if (subject.trim() === "") { status("対象が未入力", true); return; }
       setBusy(true, "判定中…");
       vscode.postMessage({ type: "judge", sections: sections, tool: tool, subject: subject });
     }
@@ -711,6 +708,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   document.getElementById("subject").addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); document.querySelector("button[data-action=judge]").click(); }
   });
+  document.getElementById("find").addEventListener("input", applyFind);
   window.addEventListener("message", (event) => {
     const m = event.data || {};
     if (m.type === "judged") { setBusy(false, ""); showJudged(m.result, m.hooks); showTab("judge"); }
@@ -737,7 +735,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (event.key !== "Escape") { return; }
     for (const open of document.querySelectorAll(".picker.open")) { open.classList.remove("open"); }
   });
-  const saved = vscode.getState();
   renderAll();
   updateSave();
-  if (saved && saved.tab) { showTab(saved.tab); }`;
+  if (saved.tab) { showTab(saved.tab); }`;
