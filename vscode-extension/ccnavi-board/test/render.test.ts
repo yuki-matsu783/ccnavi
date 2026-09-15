@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
 import { buildBoard } from "../src/core/board.js";
 import { escapeHtml, renderBoard } from "../src/core/render.js";
+import type { TicketJson } from "../src/core/model.js";
 import { fixture } from "./fixture.js";
 
 const OPTIONS = { nonce: "TEST-NONCE-123" };
@@ -18,18 +19,22 @@ function approvePreview(): ApprovePreview {
   return parsed.value;
 }
 
-test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
+test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し、見せた識別子を承認ボタンに持たせる", () => {
   const preview = approvePreview();
   const html = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview } });
   assert.ok(html.includes('class="approval-backdrop" data-approval="preview"'));
-  assert.ok(html.includes("Ticket 承認リクエスト: 2 件"));
-  assert.ok(html.includes('data-action="approve-confirm" data-tickets="i0001,i0001-01"'));
-  assert.ok(html.includes("この 2 件を承認する"));
+  // 種類の範囲を超える子（i0001-02）は承認を止めないので一覧に載り、超過は本文の見出しに出る。
+  assert.ok(html.includes("Ticket 承認リクエスト: 3 件"));
+  assert.ok(html.includes('data-action="approve-confirm" data-tickets="i0001,i0001-01,i0001-02"'));
+  assert.ok(html.includes("この 3 件を承認する"));
   assert.ok(html.includes('data-action="approve-cancel"'));
   assert.ok(html.includes('<pre class="approval-text">Ticket 承認リクエスト'));
-  assert.ok(html.includes("承認の対象にしない"));
-  assert.ok(html.includes("i0001-02"));
+  assert.ok(html.includes("判定で止まるもの"));
   assert.ok(html.includes("超えている"));
+  // 対象にしないのは形の壊れた子（計画に無い番号）。
+  assert.ok(html.includes("承認の対象にしない"));
+  assert.ok(html.includes("i0001-05"));
+  assert.ok(html.includes("計画に無い"));
   assert.ok(!html.includes("読めない提案・承認済みチケット"));
   // 本文は実体参照にする。
   const spiked = { ...preview, text: "<script>alert(1)</script>" };
@@ -38,7 +43,7 @@ test("CB-T107 承認のオーバーレイに束・本文・対象外を出し、
   assert.ok(escaped.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
 });
 
-test("CB-T108 束が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
+test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", () => {
   const preview = approvePreview();
   const empty = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
@@ -52,11 +57,47 @@ test("CB-T108 束が空なら承認ボタンを出さず、承認中はボタン
   assert.ok(/data-action="approve-confirm"[^>]*disabled/.test(approving));
   const noticed = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
-    approval: { kind: "preview", preview, notice: "見せた束と今の束が違った" },
+    approval: { kind: "preview", preview, notice: "見せた一覧と今の一覧が違った" },
   });
-  assert.ok(noticed.includes('class="approval-note warn">見せた束と今の束が違った'));
+  assert.ok(noticed.includes('class="approval-note warn">見せた一覧と今の一覧が違った'));
   const failed = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "error", error: "実行ファイルが無い" } });
   assert.ok(failed.includes('class="approval-note error">実行ファイルが無い'));
+});
+
+test("CB-T108b 承認したら同じオーバーレイに文とコピー・新しいセッションで開く・閉じるを出す", () => {
+  const html = renderBoard(buildBoard(fixture()), {
+    ...OPTIONS,
+    approval: { kind: "done", count: 1, prompt: "i0001-03 を承認した <b>" },
+  });
+  assert.ok(html.includes('class="approval-backdrop" data-approval="done"'));
+  assert.ok(html.includes("1 件を承認した</h2>"));
+  assert.ok(html.includes('<pre class="approval-text">i0001-03 を承認した &lt;b&gt;</pre>'), "文は実体参照にして見せる");
+  assert.ok(html.includes('data-action="prompt-copy"'));
+  assert.ok(html.includes('data-action="prompt-open"'));
+  assert.ok(html.includes('data-action="approve-cancel"'));
+  // 文は Webview から送らせない。拡張が持っている文を使う。
+  assert.ok(html.includes('vscode.postMessage({ type: "promptCopy" })'));
+  assert.ok(html.includes('vscode.postMessage({ type: "promptOpen" })'));
+  // 運ぶ sh を端末に送ったときだけ、そう言う。
+  assert.ok(!html.includes("端末に送った"));
+  const carried = renderBoard(buildBoard(fixture()), {
+    ...OPTIONS,
+    approval: { kind: "done", count: 1, prompt: "i0001-03 を承認した", carried: true },
+  });
+  assert.ok(carried.includes("承認済みチケットのコミットと push を端末に送った。"));
+});
+
+test("CB-T108c カードの承認はそのカードの識別子だけを絞りとして送る", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  const pending = fixture().pending_approval[0];
+  assert.ok(html.includes(`data-action="approve-one" data-ticket="${pending}"`));
+  assert.ok(html.includes("この 1 件を承認"));
+  assert.ok(
+    html.includes('vscode.postMessage({ type: "approve", tickets: [button.getAttribute("data-ticket") || ""], filtered: true })'),
+    "1 件だけを絞りとして送る",
+  );
+  // 上部のボタンは今までどおり見えている承認待ち全部。
+  assert.ok(html.includes('<button type="button" class="action primary" data-action="approve"'));
 });
 
 test("CB-T109 オーバーレイを渡さなければ出ない", () => {
@@ -114,7 +155,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
   assert.ok(html.includes("未承認"));
   assert.ok(html.includes("作業ツリーあり"));
   assert.ok(html.includes("作業ツリーなし"));
-  assert.ok(html.includes("2 か所にコピーあり"));
+  // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
+  assert.ok(!html.includes("複数の場所にある"));
   assert.ok(html.includes("親 i0001 / フェーズ 2"));
   assert.ok(html.includes('class="phases"'));
   // 締める（wrapup）のボタンは出さない
@@ -158,4 +200,17 @@ test("CB-T16 本文の文字列で表示を壊さない", () => {
   assert.ok(!html.includes(`<script>alert("x")</script>`));
   assert.ok(html.includes("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;"));
   assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
+});
+
+test("CB-T118 本物が決まらない写りだけをバッジにし、場所を tooltip に出す", () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const where = [
+    { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+    { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+  ];
+  const homeless: TicketJson = { ...child, seen_in: where, scattered: where };
+  const html = renderBoard(buildBoard({ ...base, tickets: [homeless] }), OPTIONS);
+  assert.ok(html.includes("複数の場所にある（2 か所）"));
+  assert.ok(html.includes('title="main:todo, i0001-02:todo"'));
 });

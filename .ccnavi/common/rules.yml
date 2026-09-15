@@ -125,13 +125,12 @@ deny:
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）。人が持つ設定で、エージェントが
   # 書けると、レビュー不要の種類や軽い配点を自分で作ってから使える。作業ツリー側の
   # 設定も止める。統合でそのまま main の設定になる道を持つので、main の側だけ止めても
-  # 時間差で効く。前の置き場（.claude/ccnavi/）も、env で指したままのワークスペースが
-  # あるので並べてある。見本（rule-samples.yml）はこのルールでは止めないが、
+  # 時間差で効く。見本（rule-samples.yml）はこのルールでは止めないが、
   # .ccnavi/common/ に置いた見本は ccnavi ディレクトリを守る組み込みのルールが止める。見本の下書きは
   # scratchpad に置き、ルールの下書きと一緒に利用者に渡す。
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
-    regex: '[\\/](\.claude[\\/]ccnavi|\.ccnavi[\\/]common)[\\/](rules|phases|risk)\.yml$'
+    regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risk)\.yml$'
     message: >-
       ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
@@ -154,15 +153,6 @@ ask:
     additionalContextOnce: >-
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
       1 本になります。何を足すのか、外せない理由は何かを言ってください。
-
-  # 作業範囲の提案。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
-  - id: current-ticket
-    match: Write|Edit
-    glob: "*/.current-ticket.md"
-    additionalContextOnce: >-
-      作業範囲の提案です。書き換えても効く範囲は変わりません（効くのは承認台帳の側）。
-      人が読んで承認する（VS Code のボード、端末なら 'ccnavi --approve'）までは
-      提案のままです。
 
   # 外から取ってくるコマンド。止めはしないが、行き先を 2 つに分ける。
   # 調査で一度きりなら WebFetch ツール、何度も叩くなら .ccnavi/scripts/ の sh。

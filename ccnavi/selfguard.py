@@ -8,7 +8,7 @@
 壊れて組み込みの既定に落ちた形も、どちらも保護領域は 0 件になり、監視は何も
 検知しない。守りの根拠が、守られる対象の中に置いてあることが原因になる。
 
-だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 §25.6）。
+だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 §11.6）。
 
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
@@ -166,6 +166,13 @@ ACTION_RESTORED_GIT = "restored-from-git"  # 控えが無く、git から戻し�
 ACTION_MISSING = "missing"  # 対象が無く、戻す先も無い
 ACTION_FAILED = "failed"  # 戻そうとして駄目だった
 ACTION_WOULD = "would-restore"  # dry-run。戻す代わりに言うだけ
+ACTION_LEFT = "left-as-repair"  # 読めないルールファイルへの修復なので戻さなかった
+
+# 共通層のルールファイルに付ける控えの key（_places）。
+COMMON_RULES_KEY = "rules"
+
+# 名指しのツールで書くもの。修復として戻さない判断は、この経路で書いた先にだけ掛ける。
+REPAIR_TOOLS = ("Write", "Edit", "NotebookEdit")
 
 # 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
 # 区切り文字が混じった値でファイルを別の場所へ書かせない。
@@ -184,16 +191,16 @@ _SETTINGS_FILES = (
 # 止める。止めるほうが本筋で、戻すほうは止めきれなかったぶんの受け皿になる。
 #
 # 前半の括弧が書き込む綴りで、後ろに続く場所と組で当たる。場所の名前が出ただけでは
-# 止めない。`cat .claude/ccnavi/rules.yml` も `git add <パス>` も、中身を書かない。
+# 止めない。`cat .ccnavi/common/rules.yml` も `git add <パス>` も、中身を書かない。
 # 名前で止める形にすると、いちばんガードを直したいときにいちばん強く効く。
 #
 #   1. リダイレクトの行き先。`>` `>>` `>|` `&>` はどれも `>` を含み、
 #      shellread が `> 行き先` の形に均してから渡してくる。
 #   2. 名指ししたところを必ず書き換えるコマンド。`\x00` はコマンドの切れ目に
-#      shellread が置く印で、`(^|\x00)` はコマンドの先頭を意味する。
-#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の印
+#      shellread が置く目印で、`(^|\x00)` はコマンドの先頭を意味する。
+#      語の中の切れ目（引用がつないだ空白、語の中の演算子の両側）は別の目印
 #      `shellread.WORD_SEP` なので、`[^\x00]*` は同じコマンドの中を丸ごと指す。
-#      1 のリダイレクトの行き先だけは、語の中の印まで食うと引用の中の `> 場所` が
+#      1 のリダイレクトの行き先だけは、語の中の目印まで食うと引用の中の `> 場所` が
 #      書き込み先に見えるので、そちらも除外する。
 #   3. sed だけは `-i` が付いた形に絞る。`sed -n 1,20p` はただの読み。
 #
@@ -212,8 +219,8 @@ _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 # `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
 # `mv .ccnavi .ccnavi.bak` も、ccnavi ディレクトリごと消す・退かす形なので、下のファイルを 1 本ずつ
 # 書き換えるのと同じだけ守りが消える（敵対的レビュー A-3）。
-# 語の中の印も終わりに数える。印が 1 つだった頃は `rm ".ccnavi x"` がここで止まって
-# いた。数えないと、印を分けただけでその綴りが通るようになる。
+# 語の中の目印も終わりに数える。数えないと、`rm ".ccnavi x"` のように引用がつないだ
+# 綴りが通る。
 _TERM = rf"(?:[ {_NOT_A_WORD}]|$)"
 # 区切りが続く形と、そこで終わる形の両方。`.ccnavi/config/x` にも `.ccnavi` にも
 # 当たり、`.ccnavixyz` のような別名には当たらない。
@@ -225,7 +232,7 @@ _END = rf"(?:[\\/ {_NOT_A_WORD}]|$)"
 _COPY_TERM = r"$"
 _COPY_END = r"(?:[\\/]|$)"
 
-# `.ccnavi/` は ccnavi ディレクトリの既定の綴り（設計 §25.2）。その下には各層の設定 3 本と、
+# `.ccnavi/` は ccnavi ディレクトリの既定の綴り（設計 §11.2）。その下には各層の設定 3 本と、
 # 配点が呼ぶスクリプトが入る。どちらも判定の中身そのものなので、ccnavi ディレクトリごと止める。
 # 既定の綴りをここに書いておくのは、ccnavi ディレクトリの名前を動かしていないワークスペースが、
 # 設定の受け渡しに依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
@@ -233,20 +240,19 @@ _COPY_END = r"(?:[\\/]|$)"
 # `.claude` の側は、その下の名前を絞ってある（`worktrees/` は守る対象ではない）。
 # だから ccnavi ディレクトリと違って、名前がそこで終わる形は `_TERM` で閉じる。`_END` にすると
 # `.claude/` に続く綴り全部が入り、作業ツリーの片付けまで止まる。
-# `.claude/ccnavi/` は前の置き場。今の既定は `.ccnavi/common/` だが、env で前の綴りを
-# 指したままのワークスペースがあるので、守る場所からは外さない。
+# ゲートの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
-# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。前は `.claude/ccnavi/`
-# の中にあって、そこを守る綴りに一緒に入っていた。移したぶん守りが外れないよう、名前を
-# 絞って足す。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
+# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。どちらも判定が読むので
+# 名前を絞って守る。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので
+# 守らない。
 _PLACES = (
-    r"\.claude(?:[\\/]((ccnavi|hooks|scripts)" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
+    r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
     r"logs[\\/](log\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
-    r"\.claude(?:[\\/](ccnavi|hooks|scripts|settings)|" + _COPY_TERM + r")",
+    r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
     r"logs[\\/](log\.jsonl|state)" + _COPY_END,
@@ -254,7 +260,7 @@ _COPY_PLACES = (
 )
 
 
-def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
+def shell_write_regex(bin_path: str = "", *extra_clauses: str) -> str:
     """設定ファイルへシェルから書き込む形。実行ファイルの綴りは設定で動くので、
     ここで組み立てる。
 
@@ -262,13 +268,14 @@ def shell_write_regex(bin_path: str = "", extra_clause: str = "") -> str:
     ルールを 1 行も変えずに判定そのものを入れ替えられる。しかも置き場は
     `.gitignore` の中にあることが多く、そうなると実行後の監視からも見えない。
 
-    extra_clause は ccnavi ディレクトリの綴り（project_home_clause）。既定の名前は _PLACES に
-    書いてあるので、ここで足すのは ccnavi ディレクトリを動かしてある場合の綴りになる。層の設定は
-    行き先の判定に使うので、書けるとエージェントが自分のルールを緩められる。
+    extra_clauses は設定で動く場所の綴り。ccnavi ディレクトリ（project_home_clause）と
+    共通層の 3 本（common_shell_clause）が来る。既定の名前は _PLACES に書いてあるので、
+    ここで足すのは動かしてある場合の綴りになる。層の設定は行き先の判定に使うので、
+    書けるとエージェントが自分のルールを緩められる。
     """
     places = [*_PLACES]
     copy_places = [*_COPY_PLACES]
-    for clause in (binary_clause(bin_path), extra_clause):
+    for clause in (binary_clause(bin_path), *extra_clauses):
         if clause:
             places.append(clause)
             copy_places.append(clause)
@@ -292,7 +299,7 @@ def _folded(clause: str) -> str:
 
 
 def project_home_clause(project_home: str) -> str:
-    """ccnavi ディレクトリの綴りを、シェルの書き込みに当てる形に直す（設計 §25.6）。
+    """ccnavi ディレクトリの綴りを、シェルの書き込みに当てる形に直す（設計 §11.6）。
 
     ccnavi ディレクトリの下は丸ごと守る。層の設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
     既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
@@ -353,11 +360,84 @@ def binary_clause(bin_path: str) -> str:
 _BUILD_DIR = r"(?:" + "|".join(platformtag.SYSTEMS) + r")-[a-z0-9_]+"
 
 
-SHELL_WRITE_REGEX = shell_write_regex()
+def guard_shell_regex(
+    root: str, bin_path: str = "", project_home: str = "", common_files: tuple[str, ...] = ()
+) -> str:
+    """この設定で組んだ、シェルから書き込む形。
 
-# 足すルールの id。プロジェクトが同じ名前で書いていれば、そちらを優先して
-# 足さない。組み込みが黙って上書きすると、ルールファイルを読んだ人が
-# 「ここに書いてあるとおりに効いている」と読めなくなる。
+    実行前の判定（add_rules）と組み込みの既定（builtin）の両方がここから取る。以前は
+    既定の側だけ、モジュールを読んだ時点の空の設定で組んだ 1 本を使っていて、ccnavi
+    ディレクトリや実行ファイルを動かしたワークスペースでは、ルールファイルが壊れた
+    ときだけ動かした先への書き込みが止まらなかった。2 か所で組むと、片方だけが
+    弱いほうへずれる。
+    """
+    clauses = [project_home_clause(project_home)]
+    clauses.extend(common_shell_clause(root, path) for path in common_files)
+    return shell_write_regex(bin_path, *clauses)
+
+
+def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
+    """共通層の 3 本。rules / phases / risk の順。"""
+    return (conf.rules, conf.phases, conf.risk)
+
+
+def common_shell_clause(root: str, path: str) -> str:
+    """共通層の 1 本を、シェルの書き込みに当てる形に直す。
+
+    既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`CCNAVI_RULES` などは
+    任意の場所を指せる。そこを名前で拾えないと、
+    共通層を動かしたワークスペースでは `echo x > <その場所>` が通る。
+
+    ワークスペースルートの下ならその相対、外なら書かれた綴りと行き着く先の両方で当てる。
+    綴りの前には名前の途中でないことを求める。`rules.yml` を直下に置いたワークスペースで、
+    `myrules.yml` への書き込みまで止めないため。ルールの regex は後読みを受けない
+    （rules._UNSUPPORTED）ので、前の 1 文字を食う形で書く。行き先の前には必ず 1 文字ある。
+    shellread がリダイレクトを `> 行き先` に均し、コマンドの語は空白で区切られている。
+    """
+    if not path:
+        return ""
+    rel = _inside(root, path) if root else ""
+    names = [rel] if rel else sorted({path, os.path.realpath(path)})
+    spelled = [_spelled(name) for name in names if name]
+    if not spelled:
+        return ""
+    return r"(?:^|[^\w.-])(?:" + "|".join(spelled) + ")" + _TERM
+
+
+def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
+    """共通層の 3 本を、名指しのツールに当てる形に直す（設計 §11.6）。
+
+    当てる先は解決済みの絶対パス。ワークスペースルートの下に在るなら、ワークスペースと、
+    そこから切った作業ツリー（`.claude/worktrees/<名前>/`）の同じ相対に当てる。作業ツリー側の
+    設定は統合で main の設定になる道を持つ。ワークスペースルートより上で閉じないと、
+    同じ名前のファイル（`tests/fixtures/rules.yml` など）まで止まる。
+    """
+    alternatives = []
+    bases = sorted({os.path.realpath(root), os.path.abspath(root)}) if root else []
+    worktrees = r"(?:[\\/]" + _spelled(tree.WORKTREES_DIR) + r"[\\/][^\\/]+)?"
+    for path in common_files:
+        if not path:
+            continue
+        rel = _inside(root, path) if root else ""
+        if rel:
+            alternatives.extend(
+                _spelled(base) + worktrees + r"[\\/]" + _spelled(rel) for base in bases
+            )
+        else:
+            alternatives.extend(_spelled(p) for p in sorted({path, os.path.realpath(path)}))
+    if not alternatives:
+        return ""
+    return _folded("^(?:" + "|".join(alternatives) + ")$")
+
+
+def _spelled(path: str) -> str:
+    """パスを、区切りをどちらの綴りでも当てる形にする。"""
+    return r"[\\/]".join(re.escape(part) for part in re.split(r"[\\/]", path))
+
+
+# 足すルールの id。どれも rules.RESERVED_ID_PREFIX で始まり、ルールファイルからは
+# 書けない。同じ名前のルールと重なることが無いので、当たった id を名指しされた人は
+# 組み込みのルールだと分かる。
 SHELL_RULE_ID = "builtin-guard-setting-files"
 
 SHELL_MESSAGE = (
@@ -375,6 +455,15 @@ BINARY_MESSAGE = (
     "ccnavi 自身の実行ファイルです。ここが差し替わると、ルールを 1 行も変えずに"
     "判定そのものを入れ替えられます。作り直しが要るなら、何をなぜ変えたいのかを"
     "伝えて利用者に依頼してください。"
+)
+
+COMMON_LAYER_RULE_ID = "builtin-guard-common-layer"
+
+COMMON_LAYER_MESSAGE = (
+    "ccnavi の共通層の設定（ルール・フェーズの種類・リスクの配点）です。どのツリーの判定にも"
+    "効くので、エージェントが書き換えると自分の判定を緩められます。変更が要るなら、下書きを"
+    "検証したうえで何をなぜ変えたいのかを伝えて利用者に依頼してください（/ccnavi-config）。"
+    "読むだけなら止まりません。"
 )
 
 PROJECT_HOME_RULE_ID = "builtin-guard-project-home"
@@ -451,30 +540,42 @@ def resolve(
     return ENABLE
 
 
-def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_home: str = "") -> None:
+def add_rules(
+    rule_set: rules.RuleSet,
+    bin_path: str = "",
+    project_home: str = "",
+    root: str = "",
+    common_files: tuple[str, ...] = (),
+) -> None:
     """ガード自身を守るルールを、判定に足す。
 
     ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
 
-    3 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
-    名指しのツールで ccnavi ディレクトリ（`.ccnavi/`）の下を書く形。ワークスペースの設定
-    ファイルを名指しのツールから守るぶんはワークスペースのルールに任せる。
-    そこは `deny` に 1 行書けば済み、書いたことが読める場所に残る。実行ファイルと
-    ccnavi ディレクトリは置き場が設定で動くので、ルールファイルに綴りを固定できない。
-    層の設定は行き先の判定に使うので、その層のルール自身に任せると、書けた瞬間に
-    緩められる（REQ-MLT-08）。
+    4 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
+    名指しのツールで ccnavi ディレクトリ（`.ccnavi/`）の下を書く形、名指しのツールで
+    共通層の 3 本を書く形。hook の登録（`.claude/settings*.json`）を名指しのツールから
+    守るぶんはワークスペースのルールに任せる。そこは `deny` に 1 行書けば済み、書いたことが
+    読める場所に残る。実行ファイルと ccnavi ディレクトリは置き場が設定で動くので、
+    ルールファイルに綴りを固定できない。層の設定は行き先の判定に使うので、その層の
+    ルール自身に任せると、書けた瞬間に緩められる（REQ-MLT-08）。
 
-    同じ id が既にあるなら足さない。プロジェクトが自分で書いているなら、
-    書いたとおりに効いているほうがよい。組み込みが黙って重ねると、当たった
-    ルールを名指しされた人が、ルールファイルを見ても見つけられなくなる。
+    共通層の 3 本も同じ理由で組み込みに持つ。以前は既定の置き場が ccnavi ディレクトリの
+    下にあることに頼り、動かしたときはルールの 1 行に任せていた。その 1 行は守られる
+    ファイルそのものの中にあるので、消した・書き換えたルールファイルのもとでは通る。
+    既定の置き場なら ccnavi ディレクトリを守る 1 本とも重なるが、共通層を名乗る
+    こちらを先に出す。
+
+    ルールファイルに何が書いてあっても足す。以前は同じ id の deny があれば足さず、
+    何にも当たらない 1 本をその名前で書くだけで守りが黙って消えた。今は組み込みの名前
+    （rules.RESERVED_ID_PREFIX）をルールファイルに書けないので、重なりは起きない。
     """
     _insert(
         rule_set,
         {
             "id": SHELL_RULE_ID,
             "match": "Bash",
-            "regex": shell_write_regex(bin_path, project_home_clause(project_home)),
+            "regex": guard_shell_regex(root, bin_path, project_home, common_files),
             "message": SHELL_MESSAGE,
         },
     )
@@ -504,12 +605,22 @@ def add_rules(rule_set: rules.RuleSet, bin_path: str = "", project_home: str = "
                 "message": PROJECT_HOME_MESSAGE,
             },
         )
+    common = common_layer_regex(root, common_files)
+    if common:
+        # 先頭に挿すので、後に足したこちらが ccnavi ディレクトリの 1 本より先に当たる。
+        _insert(
+            rule_set,
+            {
+                "id": COMMON_LAYER_RULE_ID,
+                "match": "Write|Edit|NotebookEdit",
+                "regex": common,
+                "message": COMMON_LAYER_MESSAGE,
+            },
+        )
 
 
 def _insert(rule_set: rules.RuleSet, raw: dict) -> None:
-    if any(rule.id == raw["id"] for rule in rule_set.deny):
-        return
-    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]})
+    built, problems = rules.parse({"version": rules.VERSION, "deny": [raw]}, builtin=True)
     if problems or not built.deny:
         # 組み立てられないのは、このファイルの書き損じ。判定を止める理由には
         # しない。止まると、直すための呼び出しごと止まる。
@@ -524,7 +635,7 @@ def targets(
     layers: list[settings.LayerFile] = (),
     projects_dir: str = "",
 ) -> list[Target]:
-    """守る対象を組み立てる（設計 §25.6）。
+    """守る対象を組み立てる（設計 §11.6）。
 
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
@@ -769,7 +880,7 @@ def before(
         content = _read(target.path)
         if content is None:
             # 戻せなかった。控えも git も持っていないなら、そもそも
-            # 置かれていないファイルなので、印を残して次から黙る。
+            # 置かれていないファイルなので、マーカーを残して次から黙る。
             if saved is None:
                 _note_absent(state_dir, session, target)
                 continue
@@ -787,12 +898,16 @@ def after(
     session: str,
     root: str,
     found: list[Target],
+    written: str = "",
 ) -> list[Outcome]:
     """実行後。控えと突き合わせて、変わっていれば戻す。
 
     控えが読めなければ git のコミット済みの内容へ落ちる。落ちたことは
     報告に書く。戻した先が直前の断面なのかコミット済みの内容なのかで、
     人の書きかけが残っているかどうかが変わるので。
+
+    written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
+    パス。組み込みの既定に落ちている間の修復だけは戻さない（_left_as_repair）。
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -811,10 +926,20 @@ def after(
         if saved is not None and now == saved:
             continue
 
+        if _left_as_repair(target, written, saved, now):
+            outcomes.append(
+                Outcome(
+                    target,
+                    ACTION_LEFT,
+                    "ルールファイルが読めない間に名指しのツールで直したので、戻さなかった",
+                )
+            )
+            continue
+
         if saved is None:
             if now is None:
                 # 対象も控えも無い。置いていないファイルなので何も言わない。
-                # 実行前がここに印を残しているが、印が読めない場合でも
+                # 実行前がここにマーカーを残しているが、マーカーが読めない場合でも
                 # 「無いものが無いまま」を事件として扱わない。
                 continue
             if _absent_noted(state_dir, session, target):
@@ -849,6 +974,32 @@ def after(
     # 何も起きていない回は落とす。ACTION_KEPT はここまでの経路で「調べたが
     # 変わっていなかった」を運ぶための値で、報告に出す用件ではない。
     return [o for o in outcomes if o.action != ACTION_KEPT]
+
+
+def _left_as_repair(target: Target, written: str, saved: bytes | None, now: bytes | None) -> bool:
+    """組み込みの既定に落ちている間の修復か。そうなら戻さない（REQ-PRE-06）。
+
+    共通層のルールファイルが読めないと、組み込みの既定は Write / Edit による修復を通す。
+    ところが実行前に取る控えは壊れた中身なので、そのまま戻すと、直した結果が同じ呼び出しの
+    中で消える。「Write / Edit で直せ」という案内と実際が食い違う。
+
+    戻さないのは次の 4 つが揃ったときだけ。
+      1. 対象が共通層のルールファイルそのもの。組み込みの既定に落ちる原因になるのはこの
+         1 本だけで、作業ツリー側の設定や他の層の設定は読めなくても既定に落ちない
+      2. この呼び出しが名指しのツールでそこを書いた。シェルからの書き込みは既定でも止める
+         経路なので、ここでも戻す
+      3. 控え（この呼び出しの直前の中身）がルールファイルとして読めない。実行後の中身で
+         決めると、読める版を壊した書き込み（dry-run の deny は止めない）がそのまま残り、
+         壊すことが戻されない道になる
+      4. 今もファイルが在る。消した呼び出しは修復ではない
+    """
+    if not written or target.copy or target.key != COMMON_RULES_KEY:
+        return False
+    if saved is None or now is None:
+        return False
+    if os.path.realpath(written) != target.path:
+        return False
+    return not rules.readable(saved)
 
 
 def at_start(
@@ -904,7 +1055,7 @@ def at_start(
         content = _read(target.path)
         if content is None:
             # 最初から無い。`settings.local.json` を置いていない形がこれで、
-            # 事件ではない。無いことの印は実行前の側が残す。開始の時点では
+            # 事件ではない。無いことのマーカーは実行前の側が残す。開始の時点では
             # まだ「消された」と「置いていない」を見分ける手がかりが無い。
             continue
         _clear_absent(state_dir, session, target)
@@ -1179,10 +1330,18 @@ def report(outcomes: list[Outcome]) -> str:
             "作業ツリー側の設定は、その場では誰も読みませんが、統合すれば main の "
             "hook の登録とルールになります。"
         )
-    lines.append(
-        "変更が要るなら、何をなぜ変えたいのかを利用者に伝えて依頼してください。"
-        "自分で書き換えると、次の呼び出しで同じように戻ります。"
-    )
+    if any(outcome.action == ACTION_LEFT for outcome in outcomes):
+        # 戻さなかった回。「次も戻る」と言うと嘘になる。代わりに、人が中身を見る
+        # 用件を渡す。ルールが読めない間の書き込みは、どれだけ緩めたかを誰も判定していない。
+        lines.append(
+            "読めなかった共通層のルールファイルへの修復は戻していません。"
+            "直した中身が意図どおりかを、利用者に確かめてもらってください。"
+        )
+    if any(outcome.action != ACTION_LEFT for outcome in outcomes):
+        lines.append(
+            "変更が要るなら、何をなぜ変えたいのかを利用者に伝えて依頼してください。"
+            "自分で書き換えると、次の呼び出しで同じように戻ります。"
+        )
     return "\n".join(lines)
 
 
@@ -1241,9 +1400,9 @@ def _fall_back_to_git(setting: str, root: str, target: Target, now: bytes | None
 
 
 def _absent_path(state_dir: str, session: str, target: Target) -> str:
-    """「このファイルは置かれていない」という印の置き場。
+    """「このファイルは置かれていない」というマーカーの置き場。
 
-    印を持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
+    マーカーを持つのは、無いことを毎回 git に確かめに行かないため。設定ファイルを
     置いていないプロジェクトでは、無いことがそのプロジェクトの正常な姿になる。
     そこで呼び出しのたびに外部プロセスを起こすと、何も起きていない作業が
     いちばん重くなる。
@@ -1260,7 +1419,7 @@ def _note_absent(state_dir: str, session: str, target: Target) -> None:
 
 
 def _clear_absent(state_dir: str, session: str, target: Target) -> None:
-    """印を消す。無かったはずのものが現れたら、次からは普通に控える。"""
+    """マーカーを消す。無かったはずのものが現れたら、次からは普通に控える。"""
     with contextlib.suppress(OSError):
         os.remove(_absent_path(state_dir, session, target))
 

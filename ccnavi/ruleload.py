@@ -1,6 +1,6 @@
 """この呼び出しに当てるルール集合を決める。
 
-共通層に、そのツリーの層を足したものが答えになる（設計 §25.4）。足すだけで、
+共通層に、そのツリーの層を足したものが答えになる（設計 §11.4）。足すだけで、
 後ろの層が前の層を上書きしたり取り消したりすることはない。共通層が読めなければ
 組み込みの既定に落ち、落ちたことを記録に残す。判定そのものはここに無い。
 
@@ -53,7 +53,7 @@ class Layer:
 
 
 def load_rules(
-    stderr: TextIO, rules_path: str, record: audit.Record, root: str = ""
+    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str = ""
 ) -> tuple[rules.RuleSet, str]:
     """共通層のルール集合と、それがどこから来たかを返す。
 
@@ -61,16 +61,18 @@ def load_rules(
     ではなく「設定が壊れている」。拒否側へ倒すと、壊れたファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
     ファイルを置く前に hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
+    既定は設定を丸ごと受け取る。守る場所の綴りは設定で動くので（builtin.rule_data）。
 
     出所は、いま当てているルールがどこから来たか。既定に落ちているなら
     読めなかったファイルではない。そのファイルを名乗ると、見に行った人が
     当たったルールを見つけられない。
     """
+    rules_path = conf.rules
     try:
         rule_set, problems = rules.load(rules_path, root)
     except (OSError, ValueError) as exc:
         stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
-        rule_set, problems = builtin.load()
+        rule_set, problems = builtin.load(root, conf)
         record.fallback = builtin.FALLBACK
         record.detail = rules_path
     for problem in problems:
@@ -88,7 +90,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
     予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
     `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
-    接頭辞の綴りを別にするより安い（設計 §25.4）。綴り違い（`projects/Self/`）も
+    接頭辞の綴りを別にするより安い（設計 §11.4）。綴り違い（`projects/Self/`）も
     同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
 
     数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
@@ -114,7 +116,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
 
 def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[Layer]:
-    """このツリーに足す層。行き先の 1 つだけ（設計 §25.4 書き込み系）。
+    """このツリーに足す層。行き先の 1 つだけ（設計 §11.4 書き込み系）。
 
     ワークスペースのツリー（ワークスペースルートと、そこから切った作業ツリー）なら
     自身の層。プロジェクトのツリーならその層。ワークスペースルートの外に行き先が
@@ -143,7 +145,7 @@ def rules_for(
     payload: hookio.Input,
     record: audit.Record,
 ) -> tuple[rules.RuleSet, str, tree.Tree | None]:
-    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 §25.4）。
+    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 §11.4）。
 
     パスを持つツールは行き先で 1 本に決まる。共通層に、行き先のツリーの層を足す。
     行き先がプロジェクトならその層、ワークスペースのツリーなら自身の層。
@@ -158,7 +160,7 @@ def rules_for(
     if payload.tool_name in PATH_TOOLS:
         target = tree.tree_of(root, record.subject, conf.projects)
 
-    rule_set, source = load_rules(stderr, conf.rules, record, root)
+    rule_set, source = load_rules(stderr, conf, record, root)
     if record.fallback == builtin.FALLBACK:
         # 共通層が壊れている。層は足さない。壊れた共通層の上に層を足しても、
         # 何が効いているのかを人が読めない。
@@ -275,7 +277,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
     `merge_rules` の 1 本に寄せてある。
     """
     record = audit.Record()
-    common, _ = load_rules(stderr, conf.rules, record, root)
+    common, _ = load_rules(stderr, conf, record, root)
     views = [LayerView(LAYER_COMMON, conf.rules, common)]
     if record.fallback == builtin.FALLBACK:
         views[0].unreadable = record.detail or conf.rules
@@ -290,7 +292,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
             view.missing = True
             continue
         if views[0].unreadable:
-            # 共通層が壊れているときは層を足さない（設計 §25.2）。診断もそう見せる。
+            # 共通層が壊れているときは層を足さない（設計 §11.2）。診断もそう見せる。
             continue
         try:
             extra, notes = rules.load(layer.path, root)

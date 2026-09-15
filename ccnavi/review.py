@@ -3,32 +3,32 @@
 ## exe が見るのは作業ツリーの中だけ
 
 ここはネットワークに出ない。フェーズが終わっているか、子のブランチが親に入っているか、
-未コミットが無いか、push 済みか、印がどうなっているか。分かるのはそこまでで、
+未コミットが無いか、push 済みか、マーカーがどうなっているか。分かるのはそこまでで、
 マージリクエストの中身は `.ccnavi/scripts/ccnavi-review.sh` が取ってきて JSON で渡す
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
-以前は exe が GitHub / GitLab の API を直接叩いていた。実測できていない部分
-（API のパス、トークンの権限、ページング、セルフホストの差）が配布物の中に閉じて、
-壊れたときに exe を作り直すしかなかった。sh ならプロジェクトごとに直せる。
+API のパス、トークンの権限、ページング、セルフホストの差は実物に当てないと決まらない。
+exe が API を直接叩くと、それが配布物の中に閉じて、壊れたときに exe を作り直すしかない。
+sh ならプロジェクトごとに直せる。
 
 ## 依頼は prepare と requested の 2 段
 
-投稿の前に前提を全部確かめ（`prepare`）、投稿は sh がして、その結果で印を置く
+投稿の前に前提を全部確かめ（`prepare`）、投稿は sh がして、その結果でマーカーを置く
 （`requested`）。段の名前が違えば、どちらで止まったかが exit code を見なくても分かる。
 `prepare` はマーカー付きの本文を控えの置き場に書き出し、sh はそれを投稿する。
 
 ## 変更要求は人の端末でも通せない
 
 未解決スレッドは人が `--reviewed --accept-unresolved` で受け入れて進めるが、
-変更要求（changes requested）のレビューが立っている間は印を置かない。
+変更要求（changes requested）のレビューが立っている間はマーカーを置かない。
 「このままではマージしない」の意思表示を、別の人が端末から上書きする形は残さない。
 
 ## 未解決の指摘は、付いた時刻で絞らない
 
-数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えていた版は、
+数えるのは「いま解決されていない指摘」全部。依頼より後のものだけを数えると、
 指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで前回の
-指摘が数から消えた。人が解決も受け入れもしていないのに通る形で、実物の GitLab で
-流れを通したときに出た。除くのは機構自身の投稿と、人が受け入れたものだけ。
+指摘が数から消える。人が解決も受け入れもしていないのに通る形になる。
+除くのは機構自身の投稿と、人が受け入れたものだけ。
 
 レビューの状態（変更要求）はレビュアーごとの最新だけを見る。こちらは時刻で
 比べるので、ホストの `Z` と手元のオフセットをエポック秒に直してから並べる。
@@ -46,7 +46,7 @@ from typing import TextIO
 from . import approval, fsio, gitcmd, ops, phase, settings, tree
 from . import ticket as ticket_mod
 
-# 投稿に付ける印。機構自身の投稿を、確認のときに除くため。
+# 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
 MARKER_REQUEST = "<!-- ccnavi:request "
 MARKER_NOTE = "<!-- ccnavi:note -->"
 MARKER_ACCEPT = "<!-- ccnavi:accept -->"
@@ -268,7 +268,7 @@ def requested(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """投稿の結果を受けて、依頼の印を置く。"""
+    """投稿の結果を受けて、依頼のマーカーを置く。"""
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
@@ -280,13 +280,13 @@ def requested(
     if result is None:
         return 1
     if not result.url:
-        stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないなら印は置かない\n")
+        stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないならマーカーは置かない\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    # 投稿と印の間に HEAD が動いていないか。動いていれば、人が見るものと印が食い違う。
+    # 投稿とマーカーの間に HEAD が動いていないか。動いていれば、人が見るものとマーカーが食い違う。
     unmet = _unmet(tree_root, conf, ph)
     if unmet:
-        stderr.write("ccnavi: 投稿の後に前提が崩れた。印は置かない\n")
+        stderr.write("ccnavi: 投稿の後に前提が崩れた。マーカーは置かない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
         return 1
@@ -327,7 +327,7 @@ def check(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """依頼の後を見る。通れば印を置いてゲートが開く。"""
+    """依頼の後を見る。通ればマーカーを置いてゲートが開く。"""
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
@@ -361,22 +361,23 @@ def check(
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
         for t in unresolved:
             stderr.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
+        review_sh = settings.script_command(root, "ccnavi-review.sh")
         if _is_last_feedback_review(parent, phase_no):
             # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §24.15.7）。
+            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §9.11）。
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
-                "  - 'sh .ccnavi/scripts/ccnavi-review.sh handoff --body-file <題と本文>' で"
+                f"  - '{review_sh} handoff --body-file <題と本文>' で"
                 "別の issue に切り出し、利用者が端末で "
-                f"'sh .ccnavi/scripts/ccnavi-review.sh accept {phase_no}' を打って"
+                f"'{review_sh} accept {phase_no}' を打って"
                 "残りを受け入れる\n"
                 "新しいフィードバック作業フェーズは足せません。\n"
             )
         else:
             stderr.write(
                 "解決してもらって再実行するか、同じフェーズに子を足してやり直すか、利用者が端末で "
-                f"'sh .ccnavi/scripts/ccnavi-review.sh accept {phase_no}' を打つ\n"
+                f"'{review_sh} accept {phase_no}' を打つ\n"
             )
         return 1
     assert result.mr is not None
@@ -419,7 +420,8 @@ def reviewed(
     if not accept_unresolved:
         stderr.write(
             "ccnavi: 未解決を受け入れるなら --accept-unresolved を付ける。"
-            "受け入れないなら 'sh .ccnavi/scripts/ccnavi-review.sh check' で足りる\n"
+            "受け入れないなら "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} check' で足りる\n"
         )
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
@@ -452,7 +454,7 @@ def reviewed(
         return 1
     accepted = [t.url or t.id for t in unresolved]
     assert result.mr is not None
-    # 印より先に控えへ。印は上書きも一括の消去もされるので、人が 1 度言った
+    # マーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
     failed = approval.remember_accepted(
         approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
@@ -495,7 +497,7 @@ def handoff(
     body_file: str,
     result_path: str,
 ) -> int:
-    """残った指摘を別の issue に切り出す下書きを書き出す（設計 §24.15.7）。
+    """残った指摘を別の issue に切り出す下書きを書き出す（設計 §9.11）。
 
     作るのは sh。ここは、切り出してよい段階か（フィードバック計画が承認済み）を確かめ、
     親が書いた題と本文に、写しの中の未解決スレッドの URL を添えて、控えの置き場に置く。
@@ -559,7 +561,7 @@ def ready(
     cwd: str,
     result_path: str,
 ) -> int:
-    """Draft を外してよいかを確かめ、印と note の下書きを置く。外すのは sh。
+    """Draft を外してよいかを確かめ、マーカーと note の下書きを置く。外すのは sh。
 
     条件は「親を閉じられる」と同じ（ops.close_problems）。閉じてよい状態と、
     マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた承認済みチケットも引く）。
@@ -570,14 +572,14 @@ def ready(
     if parent is None:
         return 1
     problems = ops.close_problems(root, conf, parent.ticket)
-    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf)
+    problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
         for p in problems:
             stderr.write(f"  - {p}\n")
         stderr.write(
             "全部片付けてから打ち直す。まだ残るものを承知で締めるなら、利用者が端末で "
-            "'sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason <理由>' を打つ\n"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} wrapup --reason <理由>' を打つ\n"
         )
         return 1
     result = _result_with_mr(stderr, result_path)
@@ -591,7 +593,7 @@ def ready(
     )
     text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
     text.append(
-        f"`{wip_root(conf)}/` は片付けてある。マージするかどうかは利用者が決める。"
+        f"`{WIP_ROOT}/` は片付けてある。マージするかどうかは利用者が決める。"
         "取り込むときは squash で、途中のコミットを既定のブランチに残さない。"
     )
     if wrapped:
@@ -627,8 +629,8 @@ def wrapup(
 
     残っているもの（未着手の子、子の無いフェーズ、終わっていないレビュー、
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
-    未着手の子を取り消し、フェーズに省略とレビュー済みの印を置き、未解決を受け入れ、
-    親の印 `wrapup.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
+    未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
+    親のマーカー `wrapup.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
     issue を作る。黙って消えるものは作らない。
 
     Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
@@ -708,7 +710,7 @@ def wrapup(
     # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を締めた。あとは親に、状態の移動をコミットし、"
-        f"'ticket done {parent.ticket}' で閉じ、`{wip_root(conf)}/` を消して push し、"
+        f"'ticket done {parent.ticket}' で閉じ、`{WIP_ROOT}/` を消して push し、"
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
@@ -720,7 +722,7 @@ class Leftovers:
 
     # 未着手の子。取り消す。
     todo: list[ticket_mod.Ticket]
-    # 終わっていないフェーズ。省略の印を置く。
+    # 終わっていないフェーズ。省略のマーカーを置く。
     not_ended: list[phase.Phase]
     # 終わっていないフェーズのうち、手を付けていないもの（子が無いか全部未着手）。
     untouched: list[phase.Phase]
@@ -764,7 +766,7 @@ def _show_leftovers(stdout: TextIO, parent: ticket_mod.Ticket, left: Leftovers) 
     for t in left.todo:
         stdout.write(f"  - 未着手の子 {t.ticket}（{t.title}）→ 取り消す\n")
     for ph in left.untouched:
-        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略の印\n")
+        stdout.write(f"  - フェーズ {ph.label}: 手を付けていない → 省略のマーカー\n")
     for ph in left.unreviewed:
         stdout.write(f"  - フェーズ {ph.label}: レビューが済んでいない → 済んだ扱い\n")
     if left.unplanned:
@@ -789,10 +791,10 @@ def _settle(
     stamp: str,
     reason: str,
 ) -> tuple[list[str], list[int], list[int]] | None:
-    """未着手の子を取り消し、フェーズに印を置く。
+    """未着手の子を取り消し、フェーズにマーカーを置く。
 
-    返すのは取り消した子、省略の印を置いた番号、済んだ扱いにした番号。
-    途中で失敗したら None。そこまでの変更は戻さない（印は次に打てば重ねられる）。
+    返すのは取り消した子、省略のマーカーを置いた番号、済んだ扱いにした番号。
+    途中で失敗したら None。そこまでの変更は戻さない（マーカーは次に打てば重ねられる）。
     """
     cancelled: list[str] = []
     for t in left.todo:
@@ -880,25 +882,16 @@ def _wrapup_drafts(
 
 
 # 途中の作業の置き場。調査や設計の下書きを置く場所で、マージの前に丸ごと消す。
-# 既定のブランチに残す場所はマージリクエストと issue。
-#
-# 以前は提案の置き場（`wip/tickets`）の上の階層として導いていた。提案は `.ccnavi/` へ
-# 移り、そこは承認済みの写しと同じ場所で、消さずにマージへ乗せるもの（設計 §24.5）に
-# なったので、導くのをやめて綴りを固定する。
+# 既定のブランチに残す場所はマージリクエストと issue。綴りは設定から導かず固定する。
 WIP_ROOT = "wip"
-
-
-def wip_root(conf: settings.Settings | None = None) -> str:
-    """途中の作業を置く場所。conf は取らないが、呼び出しの形を変えないために残す。"""
-    return WIP_ROOT
 
 
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """作業ツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しと印はこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §24.5）。
-    印はフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
-    印をコミットしろ」と言い続けることになる。印と写しをコミットして push するのは
+    写しとマーカーはこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
+    マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
+    マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
     """
     rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
@@ -912,8 +905,8 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     return False
 
 
-def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
-    """マージに進む前に作業ツリーの側で満たしていること。
+def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
+    """マージに進む前に作業ツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
     途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
     人がマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
@@ -921,14 +914,14 @@ def _merge_problems(tree_root: str, conf: settings.Settings) -> list[str]:
     problems: list[str] = []
     if not os.path.isdir(tree_root):
         return [f"親の作業ツリーが無い ({tree_root})"]
-    wip = wip_root(conf)
+    wip = WIP_ROOT
     rc, tracked = _git(tree_root, ["ls-files", "--", wip])
     if rc == 0 and tracked.strip():
         n = len(tracked.strip().splitlines())
         problems.append(
             f"`{wip}/` に追跡されているファイルが {n} 件ある。"
             "途中の作業は既定のブランチに残さない。"
-            f"'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip}' で消してコミットする"
+            f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
         )
     if _dirty(tree_root, conf):
         problems.append("親の作業ツリーに未コミットの変更がある")
@@ -1094,19 +1087,19 @@ def _result_with_mr(stderr: TextIO, path: str) -> Result | None:
 def _mark(
     stderr: TextIO, approved_dir: str, parent: str, number: int, kind: str, data: dict
 ) -> bool:
-    """フェーズの印を置く。置けなければ言って False。"""
+    """フェーズのマーカーを置く。置けなければ言って False。"""
     failed = approval.write_mark(approved_dir, parent, number, kind, data)
     if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+        stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
         return False
     return True
 
 
 def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data: dict) -> bool:
-    """親の印を置く。置けなければ言って False。"""
+    """親のマーカーを置く。置けなければ言って False。"""
     failed = approval.write_parent_mark(approved_dir, parent, name, data)
     if failed:
-        stderr.write(f"ccnavi: 印を置けない: {failed}\n")
+        stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
         return False
     return True
 
@@ -1179,9 +1172,9 @@ def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
 def _unresolved(threads: list[Thread], accepted: set[str]) -> list[Thread]:
     """まだ解決されていない指摘。
 
-    付いた時刻では絞らない。依頼より後のものだけを数えていた版は、
+    付いた時刻では絞らない。依頼より後のものだけを数えると、
     指摘が残ったまま「子をもう 1 本足して承認してもらい、依頼をやり直す」だけで
-    前回の指摘が数から消えた。人が解決も受け入れもしていないのに通る形になる。
+    前回の指摘が数から消える。人が解決も受け入れもしていないのに通る形になる。
 
     数えないのは 2 つだけ。機構自身が置いた投稿と、人が「未解決のまま進める」と
     受け入れたもの。受け入れた分を数え続けると、その親が二度と通らなくなる。

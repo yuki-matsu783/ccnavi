@@ -50,7 +50,8 @@ def start(
             f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、"
             "切り元が承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
-            f'先に {where}\'sh .ccnavi/scripts/ccnavi-git.sh worktree add "{worktree}" '
+            f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
+            f'worktree add "{worktree}" '
             f"-b {ticket_id}' で作ること\n"
         )
         return 1
@@ -104,12 +105,14 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         ):
             stdout.write("Draft は外してある。マージは利用者が行う\n")
         else:
-            from .review import wip_root
+            from .review import WIP_ROOT
 
+            git_sh = settings.script_command(root, "ccnavi-git.sh")
+            review_sh = settings.script_command(root, "ccnavi-review.sh")
             stdout.write(
-                f"次は、この移動をコミットし、`{wip_root(conf)}/` を消して"
-                f"（'sh .ccnavi/scripts/ccnavi-git.sh rm -r {wip_root(conf)}'）コミットし、"
-                "push してから 'sh .ccnavi/scripts/ccnavi-review.sh ready' で Draft を外す"
+                f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
+                f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
+                f"push してから '{review_sh} ready' で Draft を外す"
                 "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
                 "マージは利用者が squash で行う\n"
             )
@@ -194,7 +197,7 @@ def judge(
         "reason": reason.strip(),
         "head": head,
         "at": approval.now(),
-        # その項目がどの層に書いてあるか（設計 §25.9）。
+        # その項目がどの層に書いてあるか（設計 §11.9）。
         "source": factor.source,
     }
     failed = approval.write_child_record(
@@ -211,7 +214,7 @@ def judge(
 
 
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
-    """このチケットの層を決める `project:`（設計 §25.4.1、§25.4.2）。
+    """このチケットの層を決める `project:`（設計 §11.4.1、§11.4.2）。
 
     権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値は人が承認していないので、判定の根拠にしない。
@@ -256,7 +259,7 @@ def _score_child(
     }
     score = risk.evaluate(definition, diff, root, worktree, env, judgements)
     if score.pending:
-        prompt = risk.judge_prompt(found.ticket, found.parent, diff, score.pending, worktree)
+        prompt = risk.judge_prompt(found.ticket, found.parent, diff, score.pending, worktree, root)
         where = ""
         if conf.state:
             path = os.path.join(conf.state, f"risk-judge-{found.ticket}.md")
@@ -269,7 +272,8 @@ def _score_child(
         stderr.write(
             f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
             "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
-            f"'sh .ccnavi/scripts/ccnavi-ticket.sh judge {found.ticket} <項目> yes|no "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} judge {found.ticket} "
+            "<項目> yes|no "
             "--reason <根拠>' で記録してから閉じ直すこと\n"
         )
         if where:
@@ -279,7 +283,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
-        # 空として扱った層の名前を残す（設計 §25.2）。共通層だけで測ったことが、
+        # 空として扱った層の名前を残す（設計 §11.2）。共通層だけで測ったことが、
         # あとから記録を読んだ人に分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval.write_child_record(
@@ -375,7 +379,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
 def _deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §24.15.6）。
+    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は塞げる。

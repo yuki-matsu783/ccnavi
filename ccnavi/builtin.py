@@ -27,13 +27,13 @@ block なので、ファイルを置く前に hook を登録した時点でセ�
 
 止めるのは書き込む綴りだけで、場所の名前が出たかどうかでは止めない。
 プロジェクトのルールの `guard-shell-write` と同じ形を、同じ場所に当てている。
-以前はどちらでも当てていたが、それだと `git add <パス>` も
-`git restore --ours -- <パス>` も止まった。どちらもファイルの中身を書かないのに。
+場所の名前で止めると、`git add <パス>` も `git restore --ours -- <パス>` も止まる。
+どちらもファイルの中身を書かないのに。
 
 これが問題になるのはマージの衝突を解くとき。衝突マーカーの入ったルールファイルは
 YAML として読めないので既定に落ちる。そこで解決の手が止まると、ガードが落ちた
 状態から出られなくなる。名前が出たら止める形は、いちばんガードを直したいときに
-いちばん強く効いていた。
+いちばん強く効く。
 
 シェルから入れられるのは、既にコミットされている内容だけになる。新しい文面は
 Write / Edit を通る。壊す側と直す側を分ける狙いはそこで保たれている。
@@ -57,79 +57,98 @@ Write / Edit を通る。壊す側と直す側を分ける狙いはそこで保�
 
 from __future__ import annotations
 
-from . import rules, selfguard
+from . import rules, selfguard, settings
 
-# ファイルから読むルールと同じ形。同じ `rules.parse` を通す。
-RULES: dict = {
-    "version": rules.VERSION,
-    "deny": [
-        {
-            "id": "builtin-guard-config-via-bash",
-            "match": "Bash",
-            # 当てる形は selfguard と同じものを使う。以前はここに書き写しがあり、
-            # 「片方を直したらもう片方も」という注意書きが付いていた。既定が弱い
-            # ほうへずれると、ルールファイルを壊すことがそのまま緩めることになる。
-            # 注意書きで守るのをやめて、1 か所から取る。
-            "regex": selfguard.SHELL_WRITE_REGEX,
-            "message": (
-                "ccnavi is running on its built-in defaults because its rule file "
-                "could not be read, and the shell is not the way to write it. "
-                "Put new content there with the Write or Edit tool, so the repair "
-                "goes through a path that is checked and recorded. Resolving a merge "
-                "conflict is not blocked: 'git add' and 'git restore --ours' put back "
-                "a version that is already committed instead of writing new content."
-            ),
-        },
-        {
-            "id": "builtin-recursive-delete",
-            "match": "Bash",
-            "glob": "*rm -rf *",
-            "message": (
-                "A recursive forced delete cannot be undone. Name what to remove "
-                "one at a time, or use 'git rm' when the files are tracked."
-            ),
-        },
-        {
-            "id": "builtin-git-push",
-            "match": "Bash",
-            "glob": "*git push*",
-            "message": (
-                "git push is not run by the agent. Leave the branch as it is and "
-                "ask the user to push."
-            ),
-        },
-        {
-            "id": "builtin-git-reset-hard",
-            "match": "Bash",
-            "glob": "*git reset --hard*",
-            "message": (
-                "Work in progress would be lost. Use 'git stash' to set it aside, "
-                "or name the files and use 'git restore'."
-            ),
-        },
-        {
-            "id": "builtin-credentials",
-            "match": "Bash|Read|Write|Edit",
-            "regex": r"\.env|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc",
-            "message": (
-                "This is a place credentials live. Do not read it; ask the user "
-                "for the value you need."
-            ),
-        },
-    ],
-    "allow": [
-        {
-            # 作業ツリーを変えようがない読み取り。既定に落ちている最中でも、
-            # ここまで確認を出すと、本当に見てほしい 1 件がその中に埋もれる。
-            # Grep と Glob は書かない。判定が対象を取り出せないので当たらない。
-            "id": "builtin-read-anything",
-            "match": "Read",
-            "glob": "*",
-        },
-    ],
-}
 
-# 既定に落ちたことを記録に残すための印。呼び出しごとの記録を数えれば、
+def rule_data(root: str, conf: settings.Settings) -> dict:
+    """組み込みの既定ルール。ファイルから読むルールと同じ形で、同じ `rules.parse` を通す。
+
+    シェルの書き込みに当てる場所は、呼び出しごとに実際の設定から組む。実行ファイル・
+    ccnavi ディレクトリ・共通層の 3 本は設定で動くので、空の設定で 1 度だけ組んだ形だと、
+    動かしたワークスペースではルールファイルが壊れたときにだけ守りが外れる。
+
+    設定は省けない。省ける形にしておくと、渡し忘れた呼び出しがその弱い形で黙って動く。
+    """
+    shell = selfguard.guard_shell_regex(
+        root, conf.bin, conf.project_home, selfguard.common_layer_files(conf)
+    )
+    return {
+        "version": rules.VERSION,
+        "deny": [_config_via_bash(shell), *_DENY],
+        "allow": _ALLOW,
+    }
+
+
+def _config_via_bash(regex: str) -> dict:
+    return {
+        "id": "builtin-guard-config-via-bash",
+        "match": "Bash",
+        # 当てる形は selfguard と同じものを使う。以前はここに書き写しがあり、
+        # 「片方を直したらもう片方も」という注意書きが付いていた。既定が弱い
+        # ほうへずれると、ルールファイルを壊すことがそのまま緩めることになる。
+        # 注意書きで守るのをやめて、1 か所から取る。
+        "regex": regex,
+        "message": (
+            "ccnavi is running on its built-in defaults because its rule file "
+            "could not be read, and the shell is not the way to write it. "
+            "Put new content there with the Write or Edit tool, so the repair "
+            "goes through a path that is checked and recorded. Resolving a merge "
+            "conflict is not blocked: 'git add' and 'git restore --ours' put back "
+            "a version that is already committed instead of writing new content."
+        ),
+    }
+
+
+# 設定で動かない残り。
+_DENY: list[dict] = [
+    {
+        "id": "builtin-recursive-delete",
+        "match": "Bash",
+        "glob": "*rm -rf *",
+        "message": (
+            "A recursive forced delete cannot be undone. Name what to remove "
+            "one at a time, or use 'git rm' when the files are tracked."
+        ),
+    },
+    {
+        "id": "builtin-git-push",
+        "match": "Bash",
+        "glob": "*git push*",
+        "message": (
+            "git push is not run by the agent. Leave the branch as it is and ask the user to push."
+        ),
+    },
+    {
+        "id": "builtin-git-reset-hard",
+        "match": "Bash",
+        "glob": "*git reset --hard*",
+        "message": (
+            "Work in progress would be lost. Use 'git stash' to set it aside, "
+            "or name the files and use 'git restore'."
+        ),
+    },
+    {
+        "id": "builtin-credentials",
+        "match": "Bash|Read|Write|Edit",
+        "regex": r"\.env|\.ssh[\\/]|id_rsa|id_ed25519|\.netrc|\.npmrc",
+        "message": (
+            "This is a place credentials live. Do not read it; ask the user for the value you need."
+        ),
+    },
+]
+
+_ALLOW: list[dict] = [
+    {
+        # 作業ツリーを変えようがない読み取り。既定に落ちている最中でも、
+        # ここまで確認を出すと、本当に見てほしい 1 件がその中に埋もれる。
+        # Grep と Glob は書かない。判定が対象を取り出せないので当たらない。
+        "id": "builtin-read-anything",
+        "match": "Read",
+        "glob": "*",
+    },
+]
+
+# 既定に落ちたことを記録に残すための値。呼び出しごとの記録を数えれば、
 # ガードが落ちたまま何回動いたかが後から分かる。
 FALLBACK = "builtin-rules"
 
@@ -139,10 +158,10 @@ FALLBACK = "builtin-rules"
 SOURCE = "(ccnavi built-in defaults)"
 
 
-def load() -> tuple[rules.RuleSet, list[rules.Problem]]:
+def load(root: str, conf: settings.Settings) -> tuple[rules.RuleSet, list[rules.Problem]]:
     """組み込みの既定ルールを組み立てる。
 
     ここが問題を返したら、それはルールファイルではなくこのビルドの不備なので、
     呼び手はそのまま報告してよい。
     """
-    return rules.parse(RULES)
+    return rules.parse(rule_data(root, conf), builtin=True)

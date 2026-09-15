@@ -98,11 +98,11 @@ class Factor:
     max: int | None = None
     compiled: re.Pattern | None = None
     # source はこの項目が書いてある層の名前（`common` / `self` / プロジェクト名）。
-    # 記録の hit と judge の項目に残す（設計 §25.9）。
+    # 記録の hit と judge の項目に残す（設計 §11.9）。
     source: str = ""
     # home は `script:` を解く基準ディレクトリ。共通層と自身の層はワークスペース
     # ルート、プロジェクトの層はそのプロジェクトの git プロジェクトルート
-    # （設計 §25.4.2）。定義を読んだ側が埋める。
+    # （設計 §11.4.2）。定義を読んだ側が埋める。
     home: str = ""
 
     def matches(self, rel: str) -> bool:
@@ -117,14 +117,14 @@ class Factor:
 class Definition:
     # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていない層」が
-    # 共通層の緩めた閾値を黙って戻すことになる（設計 §25.4.2）。
+    # 共通層の緩めた閾値を黙って戻すことになる（設計 §11.4.2）。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
     source: str = BUILTIN
     # 読めなかった理由（組み込みに落ちたとき、か、層を空として扱ったとき）。
     fallback: str = ""
-    # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 §25.2）。
+    # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 §11.2）。
     dropped: list[str] = field(default_factory=list)
 
     @property
@@ -190,7 +190,7 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
 def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
     """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みへは落とさない。
 
-    共通層が有るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 §25.2）。
+    共通層が有るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 §11.2）。
     壊れた層は空として扱い、苦情だけを返す。
     """
     if not path:
@@ -211,7 +211,7 @@ def parse(
     """定義 1 本を読む。`script_homes` はこの層で `script:` に書ける綴りの先頭。
 
     共通層は `.ccnavi/common/scripts/`、各層はその `<ccnavi ディレクトリ>/scripts/` だけ。
-    たがいの側を指す定義はここで error にする（設計 §25.4.2）。プロジェクトの
+    たがいの側を指す定義はここで error にする（設計 §11.4.2）。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
     """
     problems: list[Problem] = []
@@ -230,7 +230,7 @@ def parse(
             )
         ]
     # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていない層」が
-    # 共通層の緩めた閾値を黙って戻す（設計 §25.4.2）。順を見るときだけ既定で補う。
+    # 共通層の緩めた閾値を黙って戻す（設計 §11.4.2）。順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
     raw_levels = data.get("levels")
     if raw_levels is not None:
@@ -394,7 +394,7 @@ def mark_layer(definition: Definition, layer: str, home: str) -> None:
 
 
 def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
-    """共通層の配点に、行き先の層の配点を足す（設計 §25.4.2）。
+    """共通層の配点に、行き先の層の配点を足す（設計 §11.4.2）。
 
     `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
     中身が違えば error。`levels` は書かれた鍵だけが参加し、キーごとに小さいほうを
@@ -464,7 +464,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
 
 
 def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
-    """`script:` が指す先が、その層の git プロジェクトルートに在るか（設計 §25.4.2）。
+    """`script:` が指す先が、その層の git プロジェクトルートに在るか（設計 §11.4.2）。
 
     `layer` を渡すと、その層から来た項目だけを見る。走らせるときは今までどおり
     「測れなかった」でその項目の点を加えるが、`--lint` は在ることを先に言う。
@@ -492,7 +492,7 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の risk.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
     配点を書ける側が層を選べると、自分のリスクを自分で下げる道になる。
     """
@@ -507,11 +507,11 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
 def layer_definition(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> tuple[Definition, list[Problem]]:
-    """共通層 + その層の配点と、**その層の**苦情（設計 §25.4.2）。
+    """共通層 + その層の配点と、**その層の**苦情（設計 §11.4.2）。
 
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
     言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに落ち、
-    そのときは層を足さない（設計 §25.2）。
+    そのときは層を足さない（設計 §11.2）。
     """
     definition, _ = load(conf.risk)
     mark_layer(definition, settings.LAYER_COMMON, root)
@@ -640,7 +640,7 @@ class Hit:
     id: str
     points: int
     detail: str
-    # この項目が書いてある層（設計 §25.9）。記録に残す。
+    # この項目が書いてある層（設計 §11.9）。記録に残す。
     source: str = ""
 
 
@@ -683,7 +683,7 @@ def evaluate(
     """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。"""
     score = Score()
     for f in definition.factors:
-        # 加点した項目には、その定義が書いてある層を残す（設計 §25.9）。
+        # 加点した項目には、その定義が書いてある層を残す（設計 §11.9）。
         where = f.source
         if f.kind == KIND_LINES:
             if diff.lines > int(f.value):
@@ -714,7 +714,7 @@ def evaluate(
                 score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）", where))
         elif f.kind == KIND_SCRIPT:
             # 解く基準はその層の git プロジェクトルート。共通層と自身の層は
-            # ワークスペースルート、プロジェクトの層はそのプロジェクト（設計 §25.4.2）。
+            # ワークスペースルート、プロジェクトの層はそのプロジェクト（設計 §11.4.2）。
             points, note = run_script(f.home or root, str(f.value), worktree, env)
             if points is None:
                 score.hits.append(
@@ -777,8 +777,10 @@ def run_script(root: str, rel: str, worktree: str, env: dict[str, str]) -> tuple
     return None, f"{rel} の出力を点として読めない: {text[:60]}"
 
 
-def judge_prompt(child: str, parent: str, diff: Diff, pending: list[Factor], worktree: str) -> str:
-    """親がサブエージェントに渡す、定性項目の問いと差分の要約。"""
+def judge_prompt(
+    child: str, parent: str, diff: Diff, pending: list[Factor], worktree: str, root: str
+) -> str:
+    """親がサブエージェントに渡す、定性項目の問いと差分の要約。root は sh の綴りに使う。"""
     lines = [
         f"# {child} のリスク判定（定性）",
         "",
@@ -787,7 +789,8 @@ def judge_prompt(child: str, parent: str, diff: Diff, pending: list[Factor], wor
         "",
         "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",
         "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
-        f"'sh .ccnavi/scripts/ccnavi-ticket.sh judge {child} <項目> yes|no --reason <根拠>' "
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} judge {child} <項目> yes|no "
+        "--reason <根拠>' "
         "で 1 項目ずつ。",
         "",
     ]

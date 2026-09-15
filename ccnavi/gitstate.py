@@ -165,7 +165,7 @@ def _parse(top: str, entry: str) -> Change | None:
 def _full(top: str, path: str) -> str:
     """git の綴りを、行き着く先が 1 つに決まる絶対パスに直す。
 
-    cli.full_path と同じことを、同じ理由でやっている。消えたファイルは
+    judge.full_path と同じことを、同じ理由でやっている。消えたファイルは
     解けないので、絶対パスにして `..` を畳むところまでで止める。
     """
     joined = os.path.join(top, path)

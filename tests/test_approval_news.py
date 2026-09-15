@@ -54,7 +54,11 @@ class ApprovalNewsTest(PhaseHarness):
         )
 
     def approve_yes(self, tickets):
-        result = self.ccnavi("--approve", "--yes", ",".join(tickets), "--json")
+        # ボードと同じく、見せた指紋（承認画面の本文と承認済みチケットに写る中身）を渡す。
+        # 渡さない `--yes` は承認しない。
+        shown = self.ccnavi("--approve", "--preview", "--json")
+        digest = json.loads(shown.stdout)["digest"]
+        result = self.ccnavi("--approve", "--yes", ",".join(tickets), "--digest", digest, "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)["prompt"]
 
@@ -138,7 +142,7 @@ class ApprovalNewsTest(PhaseHarness):
     # ---- 4b. 伝え漏れ（敵対的レビューが見つけた 3 つ）
 
     def test_a_revision_of_the_parent_is_told_once(self):
-        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。印まで見て伝える。"""
+        """親の改版は承認済みチケットを書き換えるだけで識別子が増えない。版まで見て伝える。"""
         self.parent_only()
         self.prompt()  # 起点
         self.approve_yes(["i0001"])

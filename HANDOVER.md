@@ -14,7 +14,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 | 文書 | 中身 |
 |---|---|
-| [CONTEXT.md](CONTEXT.md) | 用語集。全体ルール・チケット制御・直接作業・チケット作業・提案・承認済みチケット・印。実装のことは書かない |
+| [CONTEXT.md](CONTEXT.md) | 用語集。全体ルール・チケット制御・直接作業・チケット作業・提案・承認済みチケット・マーカー。実装のことは書かない |
 | [requirements.md](requirements.md) | 外から観測できる要求だけ。実装の理屈は書かない |
 | [ccnavi.md](ccnavi.md) | 設計書。いまの実装がどう作られているか。経緯は書かない |
 | [README.md](README.md) | 設定、ルールの書き方、モード、記録の読み方、JSON の形 |
@@ -36,10 +36,9 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 共通層 `.ccnavi/common/`、ワークスペース自身の層 `.ccnavi/config/`、プロジェクトの層
 `projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
 
-**設定と記録の置き場を移した（ADR-0042）。** 共通層の 3 本と見本 `rule-samples.yml` は `.claude/ccnavi/` から `.ccnavi/common/` へ、
-判定の記録と控えは `logs/log.jsonl` と `logs/state/` へ、開発用 hook のセッション状態は `logs/session/` へ移った。`.claude/` には
-Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけが残る。構造（共通層はどのツリーにも効く）は変えていない。
-既存のワークスペースは `scripts/ccnavi-setup.sh` を打ち直せば移る（README「共通層の設定と記録を `.claude/ccnavi/` から移る」）。
+**設定と記録の置き場（ADR-0042）。** 共通層の 3 本と見本 `rule-samples.yml` は `.ccnavi/common/`、
+判定の記録と控えは `logs/log.jsonl` と `logs/state/`、開発用 hook のセッション状態は `logs/session/`。`.claude/` には
+Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを置く。
 
 - Write / Edit / NotebookEdit は共通層 + 行き先の 1 層、Bash は共通層 + 全部の層。足すだけで上書きは無い
 - 層の id は `self:id` / `<名前>:id`。重複（全欄一致）は後ろを捨てて info、ルールの同 id 中身違いは両方効いて warn、
@@ -49,25 +48,20 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
 - 予約名 `common` / `self`（`casefold`）のプロジェクトは層として数えず、そこへの書き込みは共通層だけで判定する
 - `glob` は機械の見方で大文字小文字を扱い、`regex` は区別を残す。裸の `id` にコロンは書けない
 - 記録の `source`、`--explain` の層ごとの全件、`--explain --json` の `layers[]`
-- 端末から打つ `--approve` は、束の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
-- `CCNAVI_PROJECT_RULES` と旧の置き場 `config/rules.yml` はもう読まない（`--lint` が warn で言う）
+- 端末から打つ `--approve` は、承認の対象の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
 
 コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
 それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
 `rm -rf .ccnavi` のように ccnavi ディレクトリごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
-共通層も ccnavi ディレクトリの下に入ったので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
-（前は `.claude/ccnavi/` の中で一緒に守られていた。`logs/` の下の git のラッパースクリプトの記録は守らない）。
+共通層も ccnavi ディレクトリの下にあるので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
+（`logs/` の下の git のラッパースクリプトの記録は守らない）。
 
-**移行の途中。** このワークスペースの自身の層 `.ccnavi/config/phases.yml` は置いてある。旧共通層の `phases.yml`（置き場の移し替えで
-今は `.ccnavi/common/phases.yml`。前は `.claude/ccnavi/phases.yml`）の削除は、
-新しい実行ファイルを配ったあとに人が行う。逆順にすると古い実行ファイルが自身の層を読まず、フェーズの種類が全部消える（実際に起きた。設計 §11.12）。
 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える件）は別の issue で決める。
 
 **VS Code 拡張はルールとフェーズの種類で層に追従した。** ルール設定画面とフェーズ管理画面は `--explain --json` の `layers[]` から置き場を取り、
-プロジェクト管理画面から自身の層とプロジェクトの層を開く。旧の置き場 `config/rules.yml` が残っていれば画面が「読まれていない」と出す。
-層の種類は実行ファイルの `--project-phases-file <名前>=<パス>`（診断だけ）で共通層と合成して検証してから保存するので、
-拡張 0.8.0 の層の保存には、このオプションを持つ実行ファイルの配布が要る。リスク管理画面は今も共通層の 1 本だけを開く（設計 §11.11）。
+プロジェクト管理画面から自身の層とプロジェクトの層を開く。
+層の種類は実行ファイルの `--project-phases-file <名前>=<パス>`（診断だけ）で共通層と合成して検証してから保存する。リスク管理画面は今も共通層の 1 本だけを開く（設計 §11.11）。
 
 ```
 main.py                     配布物の入口。PyInstaller が渡すスクリプト
@@ -81,7 +75,7 @@ ccnavi/gitstate.py          作業ツリーで実際に何が変わったかを 
 ccnavi/post.py              実行後の監視。検知・差し戻しの文・復元
 ccnavi/ticket.py            チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合
 ccnavi/tree.py              作業ツリーの特定。判定の鍵はファイルの行き先
-ccnavi/approval.py          承認済みチケット・フェーズの印・子ごとの記録・承認の画面
+ccnavi/approval.py          承認済みチケット・フェーズのマーカー・子ごとの記録・承認の画面
 ccnavi/risk.py              実績で測るリスク。risk.yml・差分の計測・スクリプト・定性項目
 ccnavi/phase.py             フェーズの終わりとゲート。提案から承認済みチケットへの同期
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
@@ -214,7 +208,7 @@ CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
    プロジェクトが 1 つあると、それ以降のツリーが「組み込み」扱いになり `zzz:own` が
    `own` になる（`ruleload.py:37`、`events.py:116`）。REQ-MLT-07 が壊れている
 2. **プロジェクト名に空白が入ると自己防衛が抜ける。** `selfguard.py:222` の
-   `[^\\/ \x00]+` が空白を除いているため、`projects/has space/config/rules.yml` への
+   `[^\\/ \x00]+` が空白を除いているため、`projects/has space/.ccnavi/config/rules.yml` への
    Write もシェル書き込みも止まらない。同じ欠陥が `ticket.py:712` の `wip/<名前>/` にも
    ある。**エージェントが自分のルールを緩められる穴**
 3. **プロジェクトから切った作業ツリーの控えが作られない。** `selfguard.py:452` が
@@ -235,7 +229,7 @@ CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 穴がそのまま移植される。再現は次のとおり。
 
 ```
-projects/has space/ を作り、config/rules.yml（移行後は .ccnavi/config/rules.yml）への
+projects/has space/ を作り、.ccnavi/config/rules.yml への
 Write が deny にならないことを見る
 ```
 
@@ -243,7 +237,7 @@ Write が deny にならないことを見る
 
 どれも回避して進めたが、次に同じことをする人も同じ場所で止まる。
 
-1. **保護済みファイルを直すチケットが行き止まりに入る。** 直す対象（`.claude/scripts/`、
+1. **保護済みファイルを直すチケットが行き止まりに入る。** 直す対象（`.ccnavi/scripts/`、
    `.claude/hooks/`、`rules.yml`）は `deny` なのでエージェントは書けない。完成品を
    `wip/design/scripts/` に置いて人が写す形にしたが、`implement` の種類の `scope` に
    `wip/design/*` が無く、承認が拒まれる。親の `allow` は改版で変えられない
@@ -252,13 +246,8 @@ Write が deny にならないことを見る
    今回は `phases.yml` に `staging`（写す版の作成、`scope: [wip/design/*, tests/*]`）を
    足して回避した。**`phases.yml` は人が持つ設定なので、エージェントは足せない。**
    同じ形の作業が来たら、この種類を使うこと
-2. **`.claude/` の中で、git が運ぶものと運ばないものが混ざっている。** `scripts/` と
-   `hooks/` は追跡されるので作業ツリーに写しがある。`ccnavi/tickets/`（承認済みチケット）と
-   `ccnavi/state/` は `.gitignore` に入るので運ばれない。この非対称のせいで、
-   「道具のある場所」を印にして根を決めると作業ツリーが自分を根と見なし、チケットが
-   見つからなくなる。sh 側は `.claude/worktrees/` を候補から外して解いた
-3. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。**
-   コマンドの文字列に `.claude/scripts` が含まれるだけで当たるので、一時ディレクトリに
+2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。**
+   コマンドの文字列に `.ccnavi` が含まれるだけで当たるので、一時ディレクトリに
    検証用のワークスペースを作る `cp` も止まる。受入テストは Python の中で写すので
    通るが、手で確かめるときに踏む
 ### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
@@ -283,18 +272,6 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   CLAUDE.md を読むか。読まれるならワークスペースの CLAUDE.md と矛盾しないように書く
 - `cwd` がプロジェクトの中にあるとき、hook の `${CLAUDE_PROJECT_DIR}` がワークスペースルートのままか
 
-**`.ccnavi/common/rules.yml` に、もう当たらないルールが 1 件残っている（人が直す）。** `ask` の
-`current-ticket` が `*/.current-ticket.md` に当てているが、提案の置き場は `wip/tickets/<状態>/` に
-変わっていて（ADR-0023）、この綴りのファイルはもう作られない。文面も「承認台帳の側」という
-廃止した言い方をしている。消すか、`*/wip/tickets/*` に当てて文面を承認済みチケットの話に直す。設定 3 本は
-エージェントが触らない決まりなので、`/ccnavi-config` で下書きを作って渡す。
-
-**コードのコメントに残る旧設計書の節番号（約 30 か所）。** ADR-0037 の対応表で引けるが、旧 §9 と
-新 §9、旧 §11 と新 §11、旧 §4 と新 §3 は同じ綴りで別の中身を指すので、読み手が体系を当てることに
-なる。とくに `vscode-extension/ccnavi-board/src/core/projects.ts` は、他プロジェクトの `.gitignore` に
-「（設計 §25.2）」と**書き込む**ので、次に clone した人の手元に古い参照が入る。`ccnavi/modes.py` の
-`resolve_mode` の docstring も旧モード名（`warn` と `block`）のまま。まとめて 1 本のチケットで直す。
-
 **VS Code 拡張のプロジェクト管理画面（0.3.0）・リスク管理画面（0.4.0）・フェーズ管理画面（0.5.0）は、
 まだ拡張開発ホストで通していない。** 拡張の README の手動確認の表 25〜44 を 1 度踏む。
 
@@ -318,10 +295,10 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 - `ticket start` / `done` は承認済みチケットの有無を見ない。未承認のまま `doing/` `done/` まで進める。止めるか、
   せめて「未承認」を stderr に出すかは決めていない（`--lint` は言う）
-- `--approve` は `done/` にある未承認の提案も束に入れる。承認した承認済みチケットは次の hook で即座に閉じる。
+- `--approve` は `done/` にある未承認の提案も承認の対象に入れる。承認した承認済みチケットは次の hook で即座に閉じる。
   `cancelled/` と同じく `done/` も除くほうが自然に見える
 - 人が子を再開しても、そのフェーズの `reviewed` は残る。再び `done` にしてもゲートは閉じず、
-  告知も出ない。再開の手順に「印も消す」を入れるか、承認済みチケットを戻したときに機構が消すかは決めていない
+  告知も出ない。再開の手順に「マーカーも消す」を入れるか、承認済みチケットを戻したときに機構が消すかは決めていない
 
 **権限モードへの委譲がどれだけ出るかを実測する。** ここがいちばん未知。記録の `code` が
 `UNDECLARED` の行を数え、`tool` と `subject` の傾向を見る。

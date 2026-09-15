@@ -1,9 +1,9 @@
 /**
  * 承認の JSON の形（実行ファイルとの契約）と読み取り。README「承認の JSON」。
  *
- * `--approve --preview --json` が束を見せ、`--approve --yes <識別子,…> --json` が承認する。
- * 拡張は束の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
- * 束を自分で組み直したり、提案を読んだりはしない。
+ * `--approve --preview --json` が承認待ちの一覧を見せ、`--approve --yes <識別子,…> --json` が承認する。
+ * 拡張は一覧の本文（`text`）をそのまま並べ、承認するときは見せた識別子をそのまま返す。
+ * 承認の対象を自分で組み直したり、提案を読んだりはしない。
  */
 
 export const APPROVE_VERSION = 1;
@@ -18,6 +18,8 @@ export interface ApproveBatchEntry {
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
+  /** 範囲のうち、判定で止まるもの（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
+  readonly overflow: readonly string[];
 }
 
 export interface ApproveRejected {
@@ -29,10 +31,12 @@ export interface ApprovePreview {
   readonly version: number;
   readonly root: string;
   readonly generated_at: string;
-  /** `--approve` が承認する束。空なら承認待ちが無い */
+  /** `--approve` が承認する対象。空なら承認待ちが無い */
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
+  /** 承認画面の本文と承認済みチケットに写る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す。古い実行ファイルなら空 */
+  readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
   /** 読めない提案や承認済みチケットの説明 */
@@ -52,6 +56,8 @@ export interface ApproveResult {
 export interface ApproveMismatch {
   readonly expected: readonly string[];
   readonly current: readonly string[];
+  /** 見せた指紋（渡した値）と今の指紋。実行ファイルが載せなければ無い */
+  readonly digest?: { readonly expected: string; readonly current: string };
 }
 
 export type PreviewParse =
@@ -77,6 +83,7 @@ export function parseApprovePreview(text: string): PreviewParse {
       generated_at: str(raw.generated_at),
       batch: list(raw.batch).filter(isRecord).map(entry),
       text: str(raw.text),
+      digest: str(raw.digest),
       rejected: list(raw.rejected)
         .filter(isRecord)
         .map((r) => ({ ticket: str(r.ticket), problems: list(r.problems).map(str) })),
@@ -85,7 +92,7 @@ export function parseApprovePreview(text: string): PreviewParse {
   };
 }
 
-/** `--yes` の答え。承認できたか、束が変わっていたか、読めなかったか */
+/** `--yes` の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
   const top = parseTop(text);
   if (!top.ok) {
@@ -93,9 +100,14 @@ export function parseApproveResult(text: string): ResultParse {
   }
   const raw = top.raw;
   if (isRecord(raw.mismatch)) {
+    const digest = raw.mismatch.digest;
     return {
       ok: false,
-      mismatch: { expected: list(raw.mismatch.expected).map(str), current: list(raw.mismatch.current).map(str) },
+      mismatch: {
+        expected: list(raw.mismatch.expected).map(str),
+        current: list(raw.mismatch.current).map(str),
+        ...(isRecord(digest) ? { digest: { expected: str(digest.expected), current: str(digest.current) } } : {}),
+      },
     };
   }
   return {
@@ -143,6 +155,7 @@ function entry(raw: Record<string, unknown>): ApproveBatchEntry {
     revision: raw.revision === true,
     tree: str(raw.tree),
     path: str(raw.path),
+    overflow: list(raw.overflow).map(str),
   };
 }
 

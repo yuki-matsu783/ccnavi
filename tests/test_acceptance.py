@@ -24,8 +24,12 @@ def run(mode="enable", payload="", log=""):
     モードは環境ではなくフラグで固定する。このリポジトリは ccnavi を自分自身に
     仕掛けているので、テストを走らせるセッションが既にモードを持っている。
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
+
+    コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
+    切らないと、作業ツリーで消した設定ファイルが `logs/state` の控えから書き戻される。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
 
     args = ["--rules", RULES, "--mode", mode]
     args += ["--log", log] if log else ["--log", ""]
@@ -300,7 +304,7 @@ class HeredocTest(unittest.TestCase):
         # shlex は引用された << と素の << を同じ文字列で返し、どちらだったかを
         # 問い合わせる手段が無い。だからこれはヒアドキュメントに見えて止まる。
         # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある
-        # （ccnavi.md §12.3 ①、§23.1 L-7）。このテストは、次に来た人が
+        # （ccnavi.md §6.3、§12.2）。このテストは、次に来た人が
         # 黙って直して別のところを壊さないように、決めた側を固定する。
         out = verdict(self, run(payload=pre_tool_use("Bash", "command", 'grep -n "<<" README.md')))
 
@@ -385,10 +389,10 @@ class RecordTest(unittest.TestCase):
         )
 
         self.assertEqual(len(got), 2)
-        self.assertNotIn("degraded", got[0], "読めたコマンドに印が付いている")
+        self.assertNotIn("degraded", got[0], "読めたコマンドに degraded が付いている")
         # これが無いと、ガードが止めたもののうちどれだけが読み切れないまま
         # 出た判定なのかを記録が答えられない。
-        self.assertIn("degraded", got[1], "生の文字列で下した判定に印が無い")
+        self.assertIn("degraded", got[1], "生の文字列で下した判定に degraded が無い")
 
 
 if __name__ == "__main__":

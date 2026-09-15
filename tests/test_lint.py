@@ -98,24 +98,6 @@ class LintTest(unittest.TestCase):
         # 報告と見分けが付かない。
         self.assertIn("rules.yml", result.stdout)
 
-    def test_前の置き場に読まれない共通層の設定が残っていればwarnで名指しする(self):
-        # ADR-0042。黙って無視すると、書いた人は効いていると思い続ける。
-        write(self.root, os.path.join(".claude", "ccnavi", "risk.yml"), "version: 1\n")
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(".claude/ccnavi/risk.yml があるが、もう読まない", result.stdout)
-
-    def test_前の置き場を今も読んでいるなら咎めない(self):
-        # env が前の綴りのままのワークスペースは動いている。導入スクリプトを打ち直せば移る。
-        body = json.dumps({"version": 3, "deny": [SOUND], "allow": [ALLOWED]})
-        old = write(self.root, os.path.join(".claude", "ccnavi", "rules.yml"), body)
-
-        result = lint(self.root, old)
-
-        self.assertNotIn("もう読まない", result.stdout)
-
     def test_読めないルールはerrorで非ゼロで終わる(self):
         # block モードではこれが全ツール呼び出しの拒否になり、直すための
         # 呼び出しまで止まる。検証がいちばん先に見つけなければならない形。
@@ -203,23 +185,6 @@ class LintTest(unittest.TestCase):
         self.assertIn("チケット制御: disable", result.stdout)
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 0)
-
-    def test_承認済みチケットの置き場を空文字にしてももう切れずwarnで今の書き方を言う(self):
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            "--approved",
-            "",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("チケット制御: enable", result.stdout)
-        self.assertIn("CCNAVI_APPROVED が空文字", result.stdout)
-        self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
 
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))
