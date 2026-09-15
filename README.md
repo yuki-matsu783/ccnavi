@@ -2002,7 +2002,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 終了コードで見分けられるように。
 
 実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json` にあり、
-`tests/test_test_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を
+`tests/core/test_test_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を
 付けてそのテストを走らせ、例を書き直す）。
 
 `--test --json` の最上位。
@@ -2214,7 +2214,7 @@ ccnavi --explain --json
 
 最上位は 1 つのオブジェクト。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに
 版の違いを伝える。実例は `vscode-extension/ccnavi-board/test/fixtures/board.json` にあり、
-`tests/test_board.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けて
+`tests/ticket/test_board.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けて
 そのテストを走らせ、例を書き直す）。
 
 | 鍵 | 何 |
@@ -2262,7 +2262,7 @@ ccnavi --approve --yes <識別子,…> --digest <値> --json [<絞り>...]    # 
 
 VS Code の拡張が、承認をターミナルではなくボードのオーバーレイで行うための 2 本。承認の対象を組むのは
 `--approve` と同じ関数で、`--explain --json` の `pending_approval` と答えが割れない。実例は
-`vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` ほかにあり、`tests/test_approve_json.py`
+`vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` ほかにあり、`tests/ticket/test_approve_json.py`
 が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 `version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
 

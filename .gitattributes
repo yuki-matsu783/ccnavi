@@ -1,5 +1,5 @@
 # sh は LF で取り出す。Windows で core.autocrlf=true にしていると、取り出すときに CRLF になり、
 # シバンの行が `#!/bin/sh\r` と読まれて起動できない。hook は振り分けの sh
 # （.ccnavi/scripts/ccnavi-launcher.sh）を直に起動するので、起動できないと判定が走らない。
-# 他の sh も bash が `\r` を語の一部に読んで壊れる。tests/test_sh_portability.py が見る。
+# 他の sh も bash が `\r` を語の一部に読んで壊れる。tests/core/test_sh_portability.py が見る。
 *.sh text eol=lf

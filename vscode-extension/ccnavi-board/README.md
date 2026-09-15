@@ -285,7 +285,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 `extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `projects-panel.ts` / `sidebar.ts` /
 `terminal.ts` / `ccnavi.ts` / `git.ts` は VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
-`tests/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を
+`tests/ticket/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を
 実際のリポジトリで踏む。
 
 | # | 確認すること | 手順 | 期待 |
@@ -388,9 +388,9 @@ src/
 media/
   icon.svg            アクティビティバーのアイコン
 test/
-  fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/test_board.py が書き出す
-  fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/test_test_json.py が書き出す
-  fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/test_approve_json.py が書き出す
+  fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
+  fixtures/test.json, samples.json  --test --json / --test-samples --json の実例。tests/core/test_test_json.py が書き出す
+  fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
   *.test.ts           core の単体テスト CB-T01〜CB-T109
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる

@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { APPROVE_VERSION, parseApprovePreview, parseApproveResult } from "../src/core/approvemodel.js";
 
-/** Python 側のテスト（tests/test_approve_json.py）が書き出した、実行ファイルの出力そのもの */
+/** Python 側のテスト（tests/ticket/test_approve_json.py）が書き出した、実行ファイルの出力そのもの */
 function fixtureText(name: string): string {
   return fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", name), "utf8");
 }
