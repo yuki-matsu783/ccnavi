@@ -328,7 +328,7 @@ def decide_before(
             record.code = phase.CODE_TICKET_APPROVAL
     elif verdict == rules.DENY:
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
-        # allow / ask だった（それなら文面がルールの id を名指ししている）。
+        # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
@@ -339,7 +339,7 @@ def decide_before(
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
         # チケットが ask と書いた場所。人が 1 度見る場所として宣言されている。
-        # ルールは何も言わないか allow だった。
+        # ルールは何も言わないか、allow に当たっている。
         texts = [ticket_reason]
         record.code = reasons.CODE_TICKET_ASK
     else:
@@ -559,7 +559,7 @@ def ticket_verdict(
         index = approval.by_id(copies)
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切った作業ツリーは案内では
-    # 「効いている」と言われながら判定では権限モード任せに落ちる（敵対的レビューで実測）。
+    # 「効いている」と言われながら判定では権限モード任せに落ちる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
         return "", ""
