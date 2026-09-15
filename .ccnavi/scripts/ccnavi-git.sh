@@ -62,7 +62,7 @@ reject() {
 
 # ワークスペースルート。道具と記録の置き場。git のトップとは別物で、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
-# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 §25.8）。
+# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 §11.8）。
 WS=$(ccnavi_workspace) ||
 	reject "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 
@@ -285,7 +285,7 @@ worktree)
 				wt_spell="$wt_up.claude/worktrees/$wt_name"
 				;;
 			esac
-			reject "作業ツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §25.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+			reject "作業ツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
 		;;
 	list | prune) ;;
@@ -469,7 +469,7 @@ push)
 	# 見分けるのは承認済みチケット（main の `.ccnavi/tickets/<名前>.md`）に
 	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# 作業ツリーはワークスペースの .claude/worktrees/ の下にある。切り元が
-	# プロジェクトでも置き場はワークスペース（設計 §25.2）なので、git の
+	# プロジェクトでも置き場はワークスペース（設計 §11.2）なので、git の
 	# --git-common-dir から導くと、モード B では切り元のプロジェクトを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
@@ -480,11 +480,11 @@ push)
 		"$push_root"/.claude/worktrees/*)
 			push_name="${push_top#"$push_root"/.claude/worktrees/}"
 			push_name="${push_name%%/*}"
-			case "${CCNAVI_APPROVED:-}" in
-			/* | [A-Za-z]:*) push_copies="$CCNAVI_APPROVED" ;;
+			case "${CCNAVI_TICKETS_APPROVED:-}" in
+			/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
 			# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
 			# env を書いていないワークスペースで、この検査が黙って飛ぶ。
-			*) push_copies="$push_root/${CCNAVI_APPROVED:-.ccnavi/tickets}" ;;
+			*) push_copies="$push_root/${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}" ;;
 			esac
 			# 閉じた承認済みチケット（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
 			# そのツリーは子のもので、送ってよくなるわけではない。

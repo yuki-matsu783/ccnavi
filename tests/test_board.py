@@ -3,7 +3,7 @@
 VS Code のボード拡張が読む形を、判定と同じ関数で組んでいることを確かめる。
 見るのは 4 つ。
 
-1. 提案・承認済みチケット・印・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
+1. 提案・承認済みチケット・マーカー・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
 2. 承認待ち（承認済みチケットの無い提案）が `pending_approval` に出る
 3. 親のフェーズとゲートが `parents` に出る
 4. チケット制御が disable なら、空のボードと理由を返す
@@ -84,6 +84,36 @@ class BoardTest(PhaseHarness):
         self.assertEqual(parent["parent"], "")
         self.assertEqual(parent["copy"]["status"], "open")
 
+    def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
+        """写りがあること自体は普通。権威のツリーに 1 つあれば散在ではない。"""
+        self.scene()
+        for t in self.board()["tickets"]:
+            self.assertEqual(t["scattered"], [], t["ticket"])
+        # 正常な場面でも、写りは複数あるし状態も食い違う（作業ツリーはブランチを
+        # 切った時点の写しを持つ）。数や状態の違いを食い違いに数えない。
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
+        self.assertEqual(
+            sorted({s["state"] for s in by_id["i0001-01"]["seen_in"]}), ["done", "todo"]
+        )
+
+    def test_scattered_lists_every_copy_when_the_home_tree_holds_none(self):
+        """権威のツリーに無ければ、どれが本物か決まらない。候補を全部出す。"""
+        self.scene()
+        home = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md")
+        with open(home, encoding="utf-8") as f:
+            text = f.read()
+        os.remove(home)
+        write(os.path.join(self.root, "wip", "tickets", "todo", "i0001-03.md"), text)
+
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(
+            [(s["tree"], s["state"]) for s in by_id["i0001-03"]["scattered"]],
+            [("", "todo"), ("i0001-02", "todo")],
+        )
+        # 巻き込まれていない識別子は空のまま。
+        self.assertEqual(by_id["i0001-02"]["scattered"], [])
+
     def test_pending_approval_lists_proposals_without_a_copy(self):
         self.scene()
         self.assertEqual(self.board()["pending_approval"], ["i0001-03"])
@@ -116,7 +146,7 @@ class BoardTest(PhaseHarness):
     def test_settings_say_ticket_control_is_enabled_by_default(self):
         board = self.board()
         self.assertEqual(board["settings"]["ticket_control"], "enable")
-        # 承認済みチケットの置き場を空文字で指しても、もう切れない。既定の置き場で有効のまま。
+        # 承認済みチケットの置き場を空文字で指しても切れない。既定の置き場で有効のまま。
         board = self.board("--approved", "")
         self.assertEqual(board["settings"]["ticket_control"], "enable")
         self.assertTrue(board["settings"]["approved"].endswith("tickets"))

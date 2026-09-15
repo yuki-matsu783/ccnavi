@@ -161,15 +161,17 @@ def decide_before(
         record.fallback != builtin.FALLBACK
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
-        selfguard.add_rules(rule_set, conf.bin, conf.project_home)
+        selfguard.add_rules(
+            rule_set, conf.bin, conf.project_home, root, selfguard.common_layer_files(conf)
+        )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
-        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets))
+        rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
-            rule_set.deny.append(phase.ticket_approval_rule(conf.bin))
+            rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
     subject = screen(payload.tool_name, record.subject, record)
 
@@ -207,7 +209,7 @@ def decide_before(
             stdout, mode, record, rules.DENY, notices + [reasons.subagent_forbidden(subject)]
         )
 
-    # ゲート。人間レビュー要のフェーズが終わっていて印が無い間、サブエージェントの
+    # ゲート。人間レビュー要のフェーズが終わっていてマーカーが無い間、サブエージェントの
     # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
     if conf.tickets_enabled and payload.tool_name in phase.GATED_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
@@ -215,7 +217,7 @@ def decide_before(
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
         if closed is not None and not exempt:
             record.code, record.rules = phase.CODE_GATE, [reasons.TICKET_RULE]
-            reason = phase.gate_reason(closed, payload.tool_name)
+            reason = phase.gate_reason(closed, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 承認済みチケットの索引。作業ツリーへの書き込みでは、プロジェクトの食い違いの点検と
@@ -263,7 +265,7 @@ def decide_before(
             break
 
     record.rules = [rule.id or f"({verdict})" for rule in group]
-    # 判定を下したのは最初に当たったルール（設計 §25.9）。その層を 1 欄で残す。
+    # 判定を下したのは最初に当たったルール（設計 §11.9）。その層を 1 欄で残す。
     # id の前置きからも読めるが、欄にしておくと記録を層で数えられる。ルールファイルの
     # 外から足したルール（組み込みの守り、チケット）は層を持たないので空のまま。
     if group:
@@ -278,9 +280,11 @@ def decide_before(
     ticket_reason = ""
     if verdict != rules.DENY:
         rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
-        ticket_decision, text = ticket_verdict(
+        ticket_decision, text, ticket_notice = ticket_verdict(
             conf, root, payload.tool_name, record.subject, index, rule_hit
         )
+        if ticket_notice:
+            notices.append(ticket_notice)
         if STRENGTH[ticket_decision] > STRENGTH[verdict]:
             verdict, ticket_reason = ticket_decision, text
             if ticket_reason:
@@ -457,9 +461,9 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     git push を引用した文書は push ではないし、そこで拒否を返すことは、
     やっていないことをやったと読み手に告げることになる。
 
-    読み切れないコマンドは生の文字列に落とす。これは以前の挙動そのものなので、
-    今まで捕まえていたものが抜けることはない。変わるのは、返す拒否が
-    どちらの拒否なのかを名乗らなければならない点。
+    読み切れないコマンドは生の文字列に落とす。生の文字列には実行される部分が
+    すべて含まれるので、捕まえるべきものが抜けることはない。その代わり、返す拒否は
+    どちらの拒否なのかを名乗る。
     """
     if tool != "Bash":
         return subject
@@ -528,8 +532,8 @@ def ticket_verdict(
     full: str,
     index: dict[str, ticket_mod.Ticket] | None = None,
     rule_hit: tuple[str, str] | None = None,
-) -> tuple[str, str]:
-    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文。
+) -> tuple[str, str, str]:
+    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文と、注記。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。main の直下ならチケットは無く、ルールだけで判定する。
@@ -537,7 +541,12 @@ def ticket_verdict(
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
     チケットが境界を明示している以上、外に出たことは「宣言に反した」になる。
-    子は親と合わせて厳しい側が勝つ。ルールの判定と比べて強い側を採るのは呼び手。
+    子は親の範囲とフェーズの種類の上限で切り詰め、厳しい側が勝つ（phase.scope_verdict）。
+    承認は範囲の超過を警告で通すので、超えた分はここで止まる。止めた上限を `limit:` 行で
+    名指しする。ルールの判定と比べて強い側を採るのは呼び手。
+
+    注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
+    切り詰めない（親の範囲では切り詰める）ので、効いていない上限があることを判定に添える。
 
     index は承認済みチケットの索引。1 回の判定で走査を 1 度にするため、呼び手が
     プロジェクトの食い違いの点検と共有して渡す。無ければここで読む。
@@ -550,10 +559,10 @@ def ticket_verdict(
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
-        return "", ""
+        return "", "", ""
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
-        return "", ""
+        return "", "", ""
     if index is None:
         copies, _ = approval.scan(conf, root)
         index = approval.by_id(copies)
@@ -562,16 +571,28 @@ def ticket_verdict(
     # 「効いている」と言われながら判定では権限モード任せに落ちる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
-        return "", ""
+        return "", "", ""
     rel = tree.relative(t, full)
     if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
-        return "", ""
-    verdict = ticket.decide(rel)
+        return "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
-    if parent is not None:
-        verdict = ticket_mod.combine(verdict, parent.decide(rel))
-    if verdict == rules.ALLOW:
-        return rules.ALLOW, ""
+    # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
+    # phases.yml を開かない。
+    pt, notice = None, ""
+    if parent is not None and phase.plan_item(ticket, parent) is not None:
+        types = phase.load_types(conf, root, parent.project)
+        pt = phase.type_for(conf, root, ticket, parent, types or {})
+        missing = phase.unread_type(conf, root, ticket, parent, types)
+        if missing:
+            notice = (
+                f"[ccnavi] {ticket.ticket} のフェーズ {ticket.phase} の種類 `{missing}` が"
+                "読めないので、種類の上限では切り詰めていない（親 "
+                f"{parent.ticket} の範囲では切り詰めている）。phases.yml が壊れているか、"
+                "種類が消えている。利用者に伝えて直してもらう（'ccnavi --lint' が箇所を言う）。"
+            )
+    found = phase.scope_verdict(ticket, parent, pt, rel)
+    if found.verdict == rules.ALLOW:
+        return rules.ALLOW, "", notice
 
     area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
     source = ticket.path
@@ -581,39 +602,66 @@ def ticket_verdict(
         f"worktree {t.name}",
         f"scope: {area}",
     ]
-    decided = rules.ASK if verdict == rules.ASK else rules.DENY
+    decided = rules.ASK if found.verdict == rules.ASK else rules.DENY
     if rule_hit is not None and STRENGTH[decided] > STRENGTH[rule_hit[1]]:
         rule_id, rule_type = rule_hit
         head.append(
             f"rule: {rule_id} ({rule_type}) lets this through, "
             "but the ticket for this worktree narrows it"
         )
-    if verdict == rules.DENY:
-        # 範囲の外ではなく、チケットが deny と書いた項に当たった。どの項かを名指しする。
+    if found.verdict == rules.DENY:
+        # 範囲の外ではなく、チケットが deny と書いた項に当たったなら、どの項かを名指しする。
         for owner in (ticket, parent):
             entry = owner.entry_for(rel) if owner is not None else None
             if entry is not None and entry.decision == rules.DENY:
                 head.append(f"ticket entry: deny {entry.glob or entry.regex}")
                 break
-    if verdict == rules.ASK:
-        return rules.ASK, "\n".join(
-            [
-                f"[ccnavi] {reasons.CODE_TICKET_ASK} (source: {source})",
-                *head,
-                "This path is one the ticket marks `ask`: the user looks at each write here. "
-                "Say what you are changing and why.",
-            ]
+    if found.verdict == rules.ASK:
+        return (
+            rules.ASK,
+            "\n".join(
+                [
+                    f"[ccnavi] {reasons.CODE_TICKET_ASK} (source: {source})",
+                    *head,
+                    "This path is one the ticket marks `ask`: the user looks at each write here. "
+                    "Say what you are changing and why.",
+                ]
+            ),
+            notice,
         )
-    return rules.DENY, "\n".join(
-        [
-            f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})",
-            *head,
+    # 上限ごとに次の一手が違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
+    # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
+    if found.limit == phase.LIMIT_TYPE and found.type is not None:
+        pt = found.type
+        head.append(f"limit: phase type {pt.title} ({pt.id}): {', '.join(pt.scope_globs)}")
+        body = (
+            "This path is inside the ticket's work area but outside what phase type "
+            f"{pt.title} ({pt.id}) allows. The ticket was approved with that overflow shown as "
+            "a warning; writes there stay blocked. Do the work in a later phase whose type "
+            "covers this path, or ask the user to change phases.yml."
+        )
+    elif found.limit == phase.LIMIT_PARENT and parent is not None:
+        parent_area = ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(空)"
+        head.append(f"limit: parent {parent.ticket}: {parent_area}")
+        body = (
+            "This path is inside the ticket's work area but outside its parent "
+            f"{parent.ticket}. The ticket was approved with that overflow shown as a warning; "
+            "writes there stay blocked. Do the work inside the parent's area, or, if the task "
+            "genuinely needs this path, tell the parent so it can propose a ticket whose parent "
+            "covers it and ask the user to approve it."
+        )
+    else:
+        body = (
             "This path is outside the work area the ticket for this worktree declares. Do the "
             "work inside that area, or, if the task genuinely needs this path, tell the parent "
             "so it can propose a ticket that covers it and ask the user to approve it (from the "
             "ccnavi board in VS Code, or 'ccnavi --approve' in a terminal). "
-            "Editing a proposal alone changes nothing.",
-        ]
+            "Editing a proposal alone changes nothing."
+        )
+    return (
+        rules.DENY,
+        "\n".join([f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})", *head, body]),
+        notice,
     )
 
 

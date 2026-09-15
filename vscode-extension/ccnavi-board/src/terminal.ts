@@ -1,6 +1,7 @@
 /**
- * accept と clone / fetch / pull を送る統合ターミナル。「ccnavi」という名前の 1 本を使い回す。
- * 承認はここを通らない（ボードのオーバーレイから子プロセスで打つ。ccnavi.ts）。
+ * accept と clone / fetch / pull、承認のあと承認済みチケットを運ぶ sh を送る統合ターミナル。
+ * 「ccnavi」という名前の 1 本を使い回す。
+ * 承認そのものはここを通らない（ボードのオーバーレイから子プロセスで打つ。ccnavi.ts）。
  * Windows では Git Bash を使う（sh のスクリプトと `cd ... && ...` の形をそのまま通すため）。
  */
 import * as fs from "node:fs";

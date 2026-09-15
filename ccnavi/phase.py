@@ -1,4 +1,4 @@
-"""フェーズとゲート。子チケットの束が終わったときに何をするかと、進もうとしたら止めること。
+"""フェーズとゲート。子チケットのまとまりが終わったときに何をするかと、進もうとしたら止めること。
 
 ## フェーズの終わり
 
@@ -6,8 +6,8 @@
 そのフェーズは終わり。`cancelled/` だけのフェーズは終わりではない（何も成果が無い）。
 
 終わりの扱いは、`done/` の子に `human_review.required: true` が 1 枚でもあるかで分かれる。
-あればゲートが閉じ、レビュー済みの印が置かれるまでサブエージェントの起動とシェルを止める。
-無ければ省略の印を置いて進ませる。
+あればゲートが閉じ、レビュー済みのマーカーが置かれるまでサブエージェントの起動とシェルを止める。
+無ければ省略のマーカーを置いて進ませる。
 
 ## ゲートの鍵は cwd
 
@@ -57,7 +57,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
-# `--approve --preview` は束を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
+# `--approve --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
 # `--approve` の枝にしか掛けない。承認そのものを行う `--yes` は独立した枝で必ず当てる。
 # 免除の条件を 1 つにまとめると、同じコマンドに `--preview` を書き足すだけで `--yes` まで
 # 免除される（実際にそうなっていた）。承認を通す形は、免除の理由が何であっても止める。
@@ -66,7 +66,7 @@ GATED_TOOLS = ("Agent", *SHELL_TOOLS)
 # 読めないので生の文字列に当たる（judge.screen）。生の文字列には `\x00` が無いので、
 # 区切りとして `;` `&` `|` と改行も見る。見ないと、後ろのコマンドに書いた `--preview` が
 # 前のコマンドの `--approve` を免除する。
-# 語の中の印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
+# 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*--preview\b)"
 _CLI_FORMS = (
@@ -96,21 +96,29 @@ def forbidden(subject: str) -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject))
 
 
-def ticket_approval_rule(bin_path: str) -> rules.Rule:
+def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
     承認のスクリプト（`ccnavi-approve.sh`）も同じ形で止める。中身は `--approve` の
     呼び出しと写しの push で、打つのは端末に座っている人。実行ファイルの側は標準入力が
     端末であることを求めるので、hook から呼んでも通らないが、綴りで止めておけば
     「なぜ通らないのか」が当たったルールの id で分かる。
+
+    承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
+    合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
     if clause:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
-    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-approve\.sh\b"
-    expression = rf"(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
+    script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
+    # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
+    # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
+    # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
+    # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
+    # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
+    expression = rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
@@ -118,10 +126,15 @@ def ticket_approval_rule(bin_path: str) -> rules.Rule:
         message=(
             "ccnavi の承認・レビュー済みの受け入れ・チケットの状態の操作は、エージェントが"
             "直接打つものではありません。状態の移動とレビューは "
-            "'sh .ccnavi/scripts/ccnavi-ticket.sh' と 'sh .ccnavi/scripts/ccnavi-review.sh' を"
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')}' と "
+            f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
-            "'sh .ccnavi/scripts/ccnavi-approve.sh' で、未解決の受け入れは利用者が端末で"
-            "行います。束を見るだけなら 'ccnavi --approve --preview' は通ります。"
+            f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
+            "未解決の受け入れは利用者が端末で行います。承認済みチケットのコミットと push"
+            f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
+            "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
+            "エージェントは打ちません。"
+            "承認待ちの一覧を見るだけなら 'ccnavi --approve --preview' は通ります。"
         ),
         decision=rules.DENY,
     )
@@ -141,7 +154,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に種類と計画の項が付く（設計 §24.15）。持たなければ
+    親が計画を持てば、番号に種類と計画の項が付く（設計 §9.7）。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -254,7 +267,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §25.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
     if settings.is_reserved_layer_name(project):
@@ -279,7 +292,7 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 §25.4.1）。
+    """共通層 + その層の種類と、**その層の**苦情（設計 §11.4.1）。
 
     どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
@@ -290,7 +303,7 @@ def layer_types(
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 §25.2）。
+        # 共通層が壊れている。層は足さない（設計 §11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -340,17 +353,29 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
     return remaining
 
 
-def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]:
+def phases_of(
+    root: str,
+    conf: settings.Settings,
+    parent_id: str,
+    proposed: ticket_mod.Ticket | None = None,
+) -> list[Phase]:
     """この親のフェーズを番号順に。開いている承認済みチケットと閉じた承認済みチケットの両方から組む。
 
     親が計画を持てば、まだ子の無い番号も並ぶ（計画が言っている番号は全部フェーズ）。
+
+    `proposed` は、承認済みチケットがまだ無いときに計画を読む親。承認で同じときに通った親の
+    提案を渡す（`order_problems`）。渡さないと、親と後のフェーズの子を一緒に承認したとき
+    計画が読めずフェーズが 1 つも並ばず、順序の検査が何も見ないまま通る。承認済みチケットが
+    あればそちらが勝つ（改版の計画は承認されるまで効かない）。
     """
     open_copies, _ = approval.scan(conf, root)
     closed_copies, _ = approval.scan(conf, root, closed=True)
     by_number: dict[int, Phase] = {}
     owner = approval.by_id(open_copies + closed_copies).get(parent_id)
+    if owner is None and proposed is not None and proposed.ticket == parent_id:
+        owner = proposed
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 §25.4.1）。人が承認した値で、
+        # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():
@@ -372,8 +397,8 @@ def phases_of(root: str, conf: settings.Settings, parent_id: str) -> list[Phase]
         phase.tickets.append(t)
         state, _ = _proposal(root, conf, t)
         phase.states[t.ticket] = state
-    # 印と記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
-    # 印を子の側に書くと、同じフェーズの印が複数のツリーに散る。
+    # マーカーと記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
+    # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに散る。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
         phase.marks = approval.marks(where, parent_id, phase.number)
@@ -408,8 +433,9 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     return found
 
 
-def gate_reason(phase: Phase, tool: str) -> str:
+def gate_reason(phase: Phase, tool: str, root: str) -> str:
     """ゲートが止めたときに返す文。次に何をすればよいかを言う。"""
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
     marks = "依頼済み" if approval.MARK_REQUESTED in phase.marks else "未依頼"
     n = phase.number
@@ -420,11 +446,11 @@ def gate_reason(phase: Phase, tool: str) -> str:
         [
             f"[ccnavi] {CODE_GATE} (parent: {phase.parent}, phase: {n}, {marks})",
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
-            f"レビュー済みの印が置かれるまで、ゲートが{what}を止めます。",
+            f"レビュー済みのマーカーが置かれるまで、ゲートが{what}を止めます。",
             "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+            f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら 'sh .ccnavi/scripts/ccnavi-review.sh check --phase {n}' "
+            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
             "で確かめます。次のフェーズの計画（wip/tickets/todo/ への提案）は"
             "レビュー前に進めて構いません。",
         ]
@@ -432,9 +458,9 @@ def gate_reason(phase: Phase, tool: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置く印に足す、その種類の層（設計 §25.9）。
+    """種類を根拠に置くマーカーに足す、その種類の層（設計 §11.9）。
 
-    `review:` が絡む印（省略と保留）にだけ足す。他の印は種類を見ずに置くので、
+    `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
     層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
     """
     return {"source": phase.type.source} if phase.type is not None else {}
@@ -455,7 +481,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 where, parent.ticket, n, approval.MARK_SKIPPED, {"deferred_to": at}
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
                 f"レビューは {at} 番目と一緒に見る計画なので、ここでは止めません。"
@@ -466,7 +492,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 where, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             required = [t.ticket for t in phase.tickets if t.review_required]
             covers = (
                 f"（{', '.join(str(c) for c in phase.covers)} 番目の分も含めて）"
@@ -482,7 +508,8 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
                 f"子の成果を親ブランチへ合流して push し、"
-                f"'sh .ccnavi/scripts/ccnavi-review.sh request --phase {n} --body-file <依頼文>' "
+                f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
+                "--body-file <依頼文>' "
                 f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。指摘があれば同じ"
                 "フェーズに子を足せます。レビュー済みになるまで、ゲートがサブエージェントの起動と"
                 "シェル実行を止めます。"
@@ -496,7 +523,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 {"tickets": [t.ticket for t in phase.tickets], **_type_source(phase)},
             )
             if failed:
-                stderr.write(f"ccnavi: フェーズの印を書けない: {failed}\n")
+                stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
             risk_note = f"{phase.risk_line}。" if phase.risk_line else ""
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"
@@ -541,10 +568,16 @@ def order_problems(
     child: ticket_mod.Ticket,
     parent: ticket_mod.Ticket,
     types: dict[str, phasetypes.PhaseType] | None,
+    adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §24.15.4）。
+    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
+
+    `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
+    増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
+    フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
+    次の子が一緒に承認され、1 本ずつ承認したときに落ちるものが、まとめて承認すると通る。
     """
     if not parent.has_plan or child.phase is None:
         return []
@@ -552,19 +585,32 @@ def order_problems(
     if mine is None:
         return []
     my_type = (types or {}).get(mine.type)
-    # 同じ束でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
-    # 済む（settle_last_review）。承認の前に印は無いので、ここでは計画の側から読む。
+    reopened: dict[int, list[str]] = {}
+    for t in adding or []:
+        if t.phase is not None:
+            reopened.setdefault(t.phase, []).append(t.ticket)
+    # 同じ承認でフィードバック計画を出しているなら、全体計画の最後のレビューはその承認で
+    # 済む（settle_last_review）。承認の前にマーカーは無いので、ここでは計画の側から読む。
     settled = len(parent.plan) if parent.feedback is not None else 0
     problems: list[rules.Problem] = []
-    for phase in phases_of(root, conf, parent.ticket):
+    for phase in phases_of(root, conf, parent.ticket, parent):
         if phase.number >= child.phase:
             break
         if phase.type is not None and my_type is not None and phase.type.overlaps(my_type):
             continue
-        if phase.number == settled and phase.ended:
+        ended = phase.ended and phase.number not in reopened
+        if phase.number == settled and ended:
             continue
-        if not phase.ended:
-            state = "子がまだ無い" if not phase.tickets else "子が開いている"
+        if not ended:
+            if phase.number in reopened:
+                names = ", ".join(reopened[phase.number])
+                state = (
+                    f"同じ承認で {names} を足すので開き直る"
+                    if phase.ended
+                    else f"同じ承認で {names} を足すが、まだ閉じていない"
+                )
+            else:
+                state = "子がまだ無い" if not phase.tickets else "子が開いている"
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
@@ -631,7 +677,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの段階にいるか（設計 §24.15.8）。計画が無ければ空文字。"""
+    """親がいまどの段階にいるか（設計 §9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
@@ -653,13 +699,124 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     return "閉じられる" if not in_feedback else "閉じられる（フィードバック対応済み）"
 
 
+# 範囲の外へ出した上限の名前（ScopeVerdict.limit）。
+LIMIT_TICKET = "ticket"
+LIMIT_PARENT = "parent"
+LIMIT_TYPE = "type"
+
+# 範囲の外として止める判定。
+_OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
+
+
+@dataclass
+class ScopeVerdict:
+    """子の作業ツリーの 1 つのパスについて、範囲の上限を合わせた判定。
+
+    上限は子自身・親・フェーズの種類の 3 つで、厳しい側が勝つ。どれが外へ出したかを
+    持つのは、文面でその上限を名指しするため。名指しが無いと、承認で見た範囲の中なのに
+    止まった理由を、止められた側が読めない。
+    """
+
+    # ALLOW / ASK / DENY / OUTSIDE
+    verdict: str
+    # 外へ出した上限。中なら空。
+    limit: str = ""
+    type: phasetypes.PhaseType | None = None
+
+    @property
+    def outside(self) -> bool:
+        return self.verdict in _OUTSIDE
+
+
+def scope_verdict(
+    child: ticket_mod.Ticket,
+    parent: ticket_mod.Ticket | None,
+    pt: phasetypes.PhaseType | None,
+    rel: str,
+) -> ScopeVerdict:
+    """子の範囲を、親の範囲と種類の上限で切り詰める。
+
+    範囲を当てる 3 か所（実行前の判定、実行後の監視、SubagentStop の差し戻し）はこれを
+    通す。別に書くと、同じ書き込みが実行前は通って実行後に咎められる。承認は範囲の超過を
+    警告で通すので、超えた分を止めるのはここだけになる。
+
+    順は 子 → 親 → 種類。厳しい側が勝つので順は判定を変えないが、`limit` は最初に
+    外へ出した上限を名指しする。種類の上限は allow か外しか言わない。子が ask と書いた
+    場所が種類の中なら ask のまま。
+    """
+    verdict = child.decide(rel)
+    limit = LIMIT_TICKET if verdict in _OUTSIDE else ""
+    if parent is not None:
+        verdict = ticket_mod.combine(verdict, parent.decide(rel))
+        if not limit and verdict in _OUTSIDE:
+            limit = LIMIT_PARENT
+    if pt is not None and not pt.inherits_scope:
+        verdict = ticket_mod.combine(verdict, pt.decide(rel))
+        if not limit and verdict in _OUTSIDE:
+            limit = LIMIT_TYPE
+    return ScopeVerdict(verdict, limit, pt)
+
+
+def plan_item(
+    child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
+) -> ticket_mod.PlanItem | None:
+    """子の番号が指す、親の計画の項。親が計画を持たない、番号が無い、計画に無いなら None。"""
+    if parent is None or not parent.has_plan or child.phase is None:
+        return None
+    return parent.item_at(child.phase)
+
+
+def type_for(
+    conf: settings.Settings,
+    root: str,
+    child: ticket_mod.Ticket,
+    parent: ticket_mod.Ticket | None,
+    types: dict[str, phasetypes.PhaseType] | None = None,
+) -> phasetypes.PhaseType | None:
+    """子の番号の種類。親が計画を持たない、番号が無い、種類が引けないなら None。
+
+    `types` を渡せばそこから引き、ファイルは読まない（実行後の監視は層ごとに 1 度だけ
+    読んで持つ）。渡さなければ、親が計画を持つときだけ親の `project:` の層を読む。
+    """
+    item = plan_item(child, parent)
+    if item is None or parent is None:
+        return None
+    if types is None:
+        types = load_types(conf, root, parent.project)
+    return (types or {}).get(item.type)
+
+
+def unread_type(
+    conf: settings.Settings,
+    root: str,
+    child: ticket_mod.Ticket,
+    parent: ticket_mod.Ticket | None,
+    types: dict[str, phasetypes.PhaseType] | None,
+) -> str:
+    """子の番号の種類が読めないなら、その種類の id。読めた、または読むものが無ければ空。
+
+    `types` は `load_types` が返したもの（None を含む）。phases.yml がどの層にも無いのは
+    番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに種類が
+    引けない（壊れた・種類を消した）ときだけ返す。そのとき判定は種類では切り詰めない。
+    deny に倒すと、人が phases.yml を直している間、全部の子の作業ツリーで書き込みが止まる。
+    """
+    item = plan_item(child, parent)
+    if item is None or parent is None:
+        return ""
+    if types is not None:
+        return "" if item.type in types else item.type
+    files = (conf.phases, types_path(conf, root, parent.project))
+    return item.type if any(p and os.path.exists(p) for p in files) else ""
+
+
 def scope_findings(
     root: str, conf: settings.Settings, child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
-) -> tuple[list[str], str]:
-    """子の作業ツリーに残っている範囲外の変更。2 つめは読めなかった理由。
+) -> tuple[list[tuple[str, ScopeVerdict]], str]:
+    """子の作業ツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
 
     見るのは `base_sha..HEAD` のコミット済みの差分と、未コミットの変更の両方。
     未コミットだけ見る検査では、範囲外を書いてコミットしたものが映らない。
+    範囲は実行前の判定と同じく、親の範囲と種類の上限で切り詰める（scope_verdict）。
     """
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
@@ -680,18 +837,17 @@ def scope_findings(
     for entry in out.split("\0"):
         if len(entry) > 3 and entry[2] == " ":
             paths.add(entry[3:])
+    pt = type_for(conf, root, child, parent)
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
-        # チケットの置き場（提案も写しも印も）は範囲の外でも咎めない。次の提案を書く道と、
+        # チケットの置き場（提案も写しもマーカーも）は範囲の外でも咎めない。次の提案を書く道と、
         # 承認がブランチに乗る道を塞がないため。実行前の判定と実行後の監視も同じ関数で外す。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
             continue
-        verdict = child.decide(rel)
-        if parent is not None:
-            verdict = ticket_mod.combine(verdict, parent.decide(rel))
-        if verdict in (ticket_mod.OUTSIDE, rules.DENY):
-            outside.append(rel)
+        found = scope_verdict(child, parent, pt, rel)
+        if found.outside:
+            outside.append((rel, found))
     return outside, ""
 
 
@@ -707,18 +863,19 @@ def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root:
     """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
 
     承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
-    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。記録の無い古い
-    承認済みチケットだけ、設定の綴りをそのまま使う（提案はどのツリーでも同じ相対に在る）。
+    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。
+
+    その残りをこのツリーの下の相対に直せないときは、設定の綴りを使う。別のドライブ
+    （Windows）、ツリーの外、ツリーのルートそのもの（相対が `.`）がそれにあたる。
     """
-    if copy.source_path:
-        base = os.path.dirname(os.path.dirname(copy.source_path))
-        try:
-            rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
-        except ValueError:  # 別のドライブ（Windows）
-            rel = ""
-        if rel and rel != "." and not rel.startswith("../"):
-            return rel
-    return conf.tickets
+    base = os.path.dirname(os.path.dirname(copy.source_path))
+    try:
+        rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
+    except ValueError:  # 別のドライブ（Windows）
+        return conf.tickets
+    if rel == "." or rel.startswith("../"):
+        return conf.tickets
+    return rel
 
 
 def _tree_root(root: str, name: str, projects_dir: str = "") -> str:

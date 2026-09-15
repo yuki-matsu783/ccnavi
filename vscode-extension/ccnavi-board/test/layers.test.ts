@@ -14,7 +14,7 @@ function board(layers: readonly LayerJson[]): BoardJson {
 
 test("CB-T111 層は layers[] から名前で引き、予約名のプロジェクトは大文字小文字を問わず層を引かない", () => {
   const b = board([
-    layer("common", "/ws/.claude/ccnavi/rules.yml"),
+    layer("common", "/ws/.ccnavi/common/rules.yml"),
     layer("self", "/ws/.ccnavi/config/rules.yml"),
     layer("lib", "/ws/projects/lib/.ccnavi/config/rules.yml"),
   ]);
@@ -25,6 +25,4 @@ test("CB-T111 層は layers[] から名前で引き、予約名のプロジェ�
     assert.equal(projectLayer(b, reserved), undefined, reserved);
   }
   assert.equal(projectLayer(b, "app"), undefined);
-  // 古い実行ファイルは layers を出さない
-  assert.equal(selfLayer(board([])), undefined);
 });

@@ -8,16 +8,16 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
-# ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・印）
+# ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。
 #
 #   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
 #            下書きを書き出す → ここが（無ければ）MR を下書きで作り、依頼を投稿する
-#            → `ccnavi review requested` が印を置く
+#            → `ccnavi review requested` がマーカーを置く
 #            人はレビューを MR で行うので、入れ物が無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
-#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定して印を置く
-#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せて印を置く
+#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置く
+#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せてマーカーを置く
 #            → 受け入れた一覧をここがコメントに写す
 #
 # リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
@@ -33,8 +33,8 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <N>] [--body-file <path>]
 
-  request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿して印を置く
-  check    --phase <N>                         依頼より後の未解決スレッドが無ければ印を置く
+  request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿してマーカーを置く
+  check    --phase <N>                         依頼より後の未解決スレッドが無ければマーカーを置く
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
   accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
   handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
@@ -75,8 +75,8 @@ esac
 # ---- 場所。ワークスペースルートと、いまの作業ツリー。Windows の Git Bash では pwd -W で綴りを直す。
 #
 # 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
-# プロジェクトを答え、写し・印・状態の置き場がプロジェクト側にずれる。
-# 道具の置き場は上へ歩いて探す（設計 §25.8）。
+# プロジェクトを答え、写し・マーカー・状態の置き場がプロジェクト側にずれる。
+# 道具の置き場は上へ歩いて探す（設計 §11.8）。
 root=$(ccnavi_workspace) ||
 	fail "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 here="$(pwd -W 2>/dev/null || pwd)"
@@ -472,7 +472,7 @@ request)
 	posted=$(comment "$number" "$url" "$file")
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
-	# 段 3: 印。
+	# 段 3: マーカー。
 	ccnavi review requested "$@" --result "$result"
 	;;
 note)
@@ -544,7 +544,7 @@ handoff)
 	printf 'OK: #%s に引き継いだ（%s）。残りは利用者が accept で受け入れて閉じる\n' "$issue_no" "$issue_url"
 	;;
 ready)
-	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめて印と note の下書きを置き、
+	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーと note の下書きを置き、
 	# ここが外して note を投稿する。マージは人。
 	fetch_all >"$result"
 	noted=$(ccnavi review ready --result "$result") || exit $?
@@ -558,7 +558,7 @@ ready)
 	printf 'OK: Draft を外した（%s）。マージは利用者が行う\n' "$url"
 	;;
 wrapup)
-	# 人が端末で打つ。exe が残りを見せて y/N を取り、印を置いて下書きを書く。
+	# 人が端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
 	# ここが残りを issue に写し、note を投稿する。Draft を外すのは、親が片付けて
 	# push したあとの ready（外す道は 1 本）。
 	reason=""

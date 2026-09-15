@@ -21,7 +21,7 @@ import * as vscode from "vscode";
 import { WATCH_PATTERNS } from "./board-panel.js";
 import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
-import { OLD_PROJECT_RULES, projectLayer, selfLayer } from "./core/layers.js";
+import { projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { escapeHtml } from "./core/render.js";
 import { asSections, readRules, type RuleForm, type RulesDocument, type Section } from "./core/rules-doc.js";
@@ -59,7 +59,7 @@ interface Loaded {
   readonly rulesPath: string;
   /** ワークスペースルートからの相対で見せる綴り。プロジェクトなら `projects/<名前>/.ccnavi/config/rules.yml` */
   readonly rulesRel: string;
-  /** 上部に出す注意。旧の置き場が残っている、実行ファイルがこの層を読めていない */
+  /** 上部に出す注意。実行ファイルがこの層を読めていない、など */
   readonly notices: readonly string[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
@@ -195,7 +195,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルが自身の層を出していない（層に対応していない古い版）"
+          ? "実行ファイルの答えに自身の層が無い"
           : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
       );
     }
@@ -203,12 +203,6 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
       notices.push(`実行ファイルはこのファイルを読めず、層を空として扱っている（ここのルールは 1 件も効いていない）: ${layer.rules.unreadable}`);
-    }
-    const tree = target.kind === "project" ? board.board.trees.find((t) => t.kind === "project" && t.name === target.name) : undefined;
-    const old = tree === undefined ? undefined : path.join(tree.root, ...OLD_PROJECT_RULES.split("/"));
-    if (old !== undefined && fs.existsSync(old)) {
-      const oldRel = path.relative(root, old).split(path.sep).join("/");
-      notices.push(`旧の置き場 ${oldRel} が残っている。判定はそこを読まない。中身をこのファイル（${rulesRel}）へ移し、旧のファイルを消す`);
     }
   }
   let text: string;

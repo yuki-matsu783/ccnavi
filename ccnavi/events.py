@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import functools
 from typing import TextIO
 
 from . import (
@@ -88,7 +89,7 @@ def watched_for(
     record: audit.Record,
     payload: hookio.Input | None = None,
 ) -> list[post.Watched]:
-    """実行後に見るツリーと、それぞれに当てるルール（設計 §25.7）。
+    """実行後に見るツリーと、それぞれに当てるルール（設計 §11.7）。
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
@@ -108,7 +109,7 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            rule_set, source = ruleload.load_rules(stderr, conf.rules, record, root)
+            rule_set, source = ruleload.load_rules(stderr, conf, record, root)
             if source != builtin.SOURCE:
                 ruleload.add_layers(
                     stderr, rule_set, ruleload.layer_for(conf, root, t), root, record
@@ -124,12 +125,18 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root)
+    # 種類の上限は層（計画を持つ親の `project:`）ごとに、ここで 1 度だけ読む。
+    types: dict[str, dict] = {}
+    for copy in copies:
+        if copy.has_plan and copy.project not in types:
+            types[copy.project] = phase.load_types(conf, root, copy.project) or {}
     return post.ScopeGuard(
         root=root,
         copies=approval.by_id(copies),
         projects=conf.projects,
         tickets=conf.tickets,
         approved=conf.approved,
+        types=types,
     )
 
 
@@ -237,6 +244,13 @@ def decide_at_start(
     return EXIT_OK
 
 
+def _written(payload: hookio.Input, record: audit.Record) -> str:
+    """この呼び出しが名指しのツールで書いた先の、解決済みのパス。書かないツールなら空。"""
+    if payload.tool_name not in selfguard.REPAIR_TOOLS or not record.subject:
+        return ""
+    return judge.full_path(record.subject, payload.cwd)
+
+
 def decide_after(
     stdout: TextIO,
     stderr: TextIO,
@@ -257,7 +271,10 @@ def decide_after(
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
     # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
-    guard = judge.guard_setting_files(stderr, mode, conf, root, payload, record, selfguard.after)
+    # 書いた先を渡すのは、組み込みの既定に落ちている間の修復を戻さないため
+    # （selfguard._left_as_repair）。
+    restore = functools.partial(selfguard.after, written=_written(payload, record))
+    guard = judge.guard_setting_files(stderr, mode, conf, root, payload, record, restore)
 
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:

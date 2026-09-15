@@ -36,7 +36,7 @@ WORKTREES_DIR = os.path.join(".claude", "worktrees")
 # main の名前。空文字。チケットは持たない。
 MAIN = ""
 
-# ツリーの種類（設計 §25.3）。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
+# ツリーの種類（設計 §11.3）。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
 # リポジトリ）、作業ツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
 KIND_MAIN = "main"
 KIND_PROJECT = "project"

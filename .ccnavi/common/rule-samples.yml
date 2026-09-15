@@ -164,14 +164,11 @@ ask:
   - tool: Bash
     subject: "jq -r '.hooks.PostToolUse[0].hooks[0].command, .env.CCNAVI_BIN_PATH' .claude/settings.json"
     why: >-
-      jq のフィールド参照 `.env` は認証情報のファイル名ではない。以前はここで
-      credentials に当たり、設定を読むだけの操作が「中身を読むな」と止められていた。
-      いまはどのルールにも当たらず、権限モードへ渡って確認になる。allow に
+      jq のフィールド参照 `.env` は認証情報のファイル名ではない。credentials に
+      当てると、設定を読むだけの操作が「中身を読むな」と止まる。どのルールにも
+      当たらず、権限モードへ渡って確認になる。allow に
       jq を足せば通るが、それは網を広げる別の判断なので、ここでは当たり方を
       そのまま記録する
-  - tool: Write
-    subject: "/repo/.claude/worktrees/x/.current-ticket.md"
-    why: 作業範囲の提案。承認は別の経路。main の側は deny なので作業ツリーで見る
   - tool: Bash
     subject: "curl https://example.com"
     why: >-
@@ -248,7 +245,7 @@ allow:
     subject: 'grep -n "git push" README.md'
     why: >-
       引用された語は実行位置ではないので raw-git には当たらない。引用の中の空白は
-      語の中の印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
+      語の中の目印（\x01）になり、コマンドの区切り（\x00）とは別なので、「後ろにコマンドが続かない」を
       求める prefer-read-grep が当てて通す。README「Bash のコマンドは実行される部分だけを見る」
   - tool: Bash
     subject: 'grep -n "rm -rf" /repo/.ccnavi/common/rules.yml'
@@ -256,12 +253,12 @@ allow:
   - tool: Bash
     subject: "grep -n \"regex: '(>\" /repo/.ccnavi/common/rules.yml"
     why: >-
-      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の印なので、
+      引用の中の > は文字であって書き込み先を連れてこない。両側に置かれるのは語の中の目印なので、
       deny には当たらず、prefer-read-grep が通す
   - tool: Bash
     subject: 'grep -n "<<EOF" /repo/README.md'
     why: >-
-      引用の中で他の字と並んだ << は語の中の印で 1 字ずつ区切られ、heredoc には当たらない。
+      引用の中で他の字と並んだ << は語の中の目印で 1 字ずつ区切られ、heredoc には当たらない。
       prefer-read-grep が通す。引用が << だけの 1 語（grep -n "<<" f）は区別が付かず止まる。
       README「読み切れないとき」
   - tool: Bash

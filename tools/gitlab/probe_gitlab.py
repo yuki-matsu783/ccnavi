@@ -83,7 +83,7 @@ RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.claude/ccnavi/*",
+            "glob": "*/.ccnavi/*",
             "message": "ガードの設定と承認済みチケットです。利用者に依頼してください。",
         }
     ],
@@ -393,7 +393,7 @@ def main() -> int:
     record(
         "main を push（認証画面なし）", pushed.returncode == 0, redact(pushed.stderr.strip())[:200]
     )
-    write(os.path.join(ROOT, ".claude", "ccnavi", "rules.yml"), json.dumps(RULES))
+    write(os.path.join(ROOT, ".ccnavi", "common", "rules.yml"), json.dumps(RULES))
 
     # ---- 1. 親 1 本と子 2 本、フェーズ 1
     parent_tree = worktree("i0001", "main")
@@ -491,7 +491,7 @@ def main() -> int:
 
     requested = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
     say("request:\n" + redact(requested.stdout + requested.stderr))
-    record("request が通る（MR を作って投稿して印）", requested.returncode == 0)
+    record("request が通る（MR を作って投稿してマーカー）", requested.returncode == 0)
     mr = mr_of(pid, "i0001")
     record(
         "MR が Draft で作られている",
@@ -506,7 +506,7 @@ def main() -> int:
         return finish()
     iid = mr["iid"]
     record(
-        "依頼の note に ccnavi:request の印がある",
+        "依頼の note に ccnavi:request のマーカーがある",
         has_marker(notes_of(pid, iid), "<!-- ccnavi:request i0001:1 -->"),
     )
     again = sh(REVIEW_SH, parent_tree, "request", "--phase", "1", "--body-file", body)
@@ -617,7 +617,10 @@ def main() -> int:
     )
     noted = sh(REVIEW_SH, parent_tree, "note", "--body-file", memo)
     record("note が投稿される", noted.returncode == 0, (noted.stdout + noted.stderr).strip()[:160])
-    record("note に ccnavi:note の印がある", has_marker(notes_of(pid, iid), "<!-- ccnavi:note -->"))
+    record(
+        "note に ccnavi:note のマーカーがある",
+        has_marker(notes_of(pid, iid), "<!-- ccnavi:note -->"),
+    )
 
     status, disc2 = api(
         "POST",

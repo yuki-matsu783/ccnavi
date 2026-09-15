@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard, isKnownPath, parentTreeOf, type Card } from "../src/core/board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../src/core/model.js";
-import { fixture } from "./fixture.js";
+import { parseBoardJson } from "../src/core/model.js";
+import { fixture, fixtureText } from "./fixture.js";
 
 function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
   return new Map(board.columns.flatMap((c) => c.cards).map((card) => [card.id, card]));
@@ -23,7 +24,7 @@ test("CB-T05 列は提案の置き場で、親のあとに子が並ぶ", () => {
   assert.equal(board.remainingCount, 3);
 });
 
-test("CB-T06 カードに承認済みチケット・作業ツリー・印・承認待ちが載る", () => {
+test("CB-T06 カードに承認済みチケット・作業ツリー・マーカー・承認待ちが載る", () => {
   const cards = cardsOf(buildBoard(fixture()));
   const parent = cards.get("i0001")!;
   assert.equal(parent.isParent, true);
@@ -56,7 +57,7 @@ test("CB-T07 提案の無い承認済みチケットは不備として出し、�
     ...base.tickets[1],
     ticket: "i0001-09",
     proposal: null,
-    copy: { status: "open", path: "/x/.claude/ccnavi/tickets/i0001-09.md" },
+    copy: { status: "open", path: "/x/.ccnavi/tickets/i0001-09.md" },
   };
   const closed: TicketJson = {
     ...orphan,
@@ -68,7 +69,7 @@ test("CB-T07 提案の無い承認済みチケットは不備として出し、�
   const cards = cardsOf(buildBoard(json));
   assert.equal(cards.get("i0001-09")!.column, "todo");
   assert.match(cards.get("i0001-09")!.issues[0], /提案が見つからない/);
-  assert.equal(cards.get("i0001-09")!.openPath, "/x/.claude/ccnavi/tickets/i0001-09.md");
+  assert.equal(cards.get("i0001-09")!.openPath, "/x/.ccnavi/tickets/i0001-09.md");
   assert.equal(cards.get("i0001-08")!.column, "cancelled");
   assert.equal(buildBoard(json).issueCount, 1);
 });
@@ -98,7 +99,7 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   assert.deepEqual(card.phases[0].actions, []);
   assert.deepEqual(card.phases[1].actions, [{ kind: "accept", parent: "i0001", phase: 2 }]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 子のカードには自分のフェーズの印とゲートが写る
+  // 子のカードには自分のフェーズのマーカーとゲートが写る
   assert.equal(cards.get("i0001-02")!.gateClosed, true);
   assert.deepEqual(cards.get("i0001-02")!.marks, ["requested"]);
 });
@@ -137,4 +138,50 @@ test("CB-T11 親の作業ツリーを引ける", () => {
   assert.match(parentTreeOf(board, "i0001") ?? "", /worktrees\/i0001$/);
   assert.equal(parentTreeOf(board, "i0001-01"), undefined);
   assert.equal(parentTreeOf(board, "nope"), undefined);
+});
+
+test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り自体は数えない", () => {
+  const base = fixture();
+  const cards = cardsOf(buildBoard(base));
+  // 正常な場面。親と兄弟の作業ツリーに写っていても、状態が食い違っていても、
+  // 実行ファイルが「本物は決まっている」と言うので散在ではない。
+  for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03"]) {
+    assert.deepEqual(cards.get(id)!.scattered, [], id);
+    assert.ok(cards.get(id)!.seenIn.length > 1, id);
+  }
+
+  // 決まらないときは、実行ファイルが挙げた候補をそのまま持つ。畳み直さない。
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const lost: TicketJson = {
+    ...child,
+    seen_in: [
+      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    ],
+    scattered: [
+      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    ],
+  };
+  const card = cardsOf(buildBoard({ ...base, tickets: [lost] })).get("i0001-03")!;
+  assert.deepEqual(
+    card.scattered.map((s) => `${s.tree}:${s.state}`),
+    [":todo", "i0001-02:todo"],
+  );
+  // 写り自体は残す。開いたファイルからカードを引き当てるのに使う。
+  assert.equal(card.seenIn.length, 2);
+});
+
+test("CB-T117b 古い実行ファイルが scattered を出さなくても、散在無しとして読む", () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
+  const raw = JSON.parse(fixtureText()) as { tickets: Record<string, unknown>[] };
+  for (const t of raw.tickets) {
+    delete t.scattered;
+  }
+  const parsed = parseBoardJson(JSON.stringify(raw));
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.error);
+  const cards = cardsOf(buildBoard(parsed.board));
+  assert.deepEqual(cards.get(child.ticket)!.scattered, []);
+  assert.ok(cards.get(child.ticket)!.seenIn.length > 1);
 });
