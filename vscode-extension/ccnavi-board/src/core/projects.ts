@@ -39,7 +39,7 @@ export function checkRemote(raw: string): RemoteCheck {
   if (/\s/.test(url)) {
     return { ok: false, error: "URL に空白が入っている" };
   }
-  let userinfo = "";
+  let userinfo: string;
   let host: string;
   let repoPath: string;
   const full = /^(https|ssh):\/\/([^/]*)(\/.*)?$/i.exec(url);

@@ -119,8 +119,8 @@ export function findLauncher(root: string, setting: string): Launcher | undefine
         return false;
       }
     },
-    join: path.join,
-    isAbsolute: path.isAbsolute,
+    join: (...parts: string[]) => path.join(...parts),
+    isAbsolute: (target: string) => path.isAbsolute(target),
   });
 }
 
@@ -175,7 +175,7 @@ function run(
           error === null
             ? 0
             : typeof (error as { code?: unknown }).code === "number"
-              ? ((error as { code: number }).code as number)
+              ? (error as { code: number }).code
               : -1;
         resolve({
           code,

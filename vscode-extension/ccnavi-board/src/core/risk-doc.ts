@@ -235,7 +235,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
   const adopted = isSeq(existing) ? adoptLeadingComment(existing, originals[0]) : undefined;
   const nodes = edited.factors.map((form) => {
     const original = form.origin === null ? undefined : originals[form.origin];
-    const node = original ?? (doc.createNode({}) as YAMLMap);
+    const node = original ?? doc.createNode({});
     writeFactor(doc, node, form);
     return node;
   });

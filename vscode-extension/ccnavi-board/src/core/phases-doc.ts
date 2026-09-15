@@ -311,7 +311,7 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     if (pair.key instanceof Scalar) {
       key = pair.key;
     } else {
-      key = doc.createNode(id) as Scalar;
+      key = doc.createNode(id);
       pair.key = key;
     }
     if (key.value !== id) {
@@ -576,7 +576,7 @@ function texts(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || !value.every((v) => typeof v === "string")) {
     return undefined;
   }
-  return value as string[];
+  return value;
 }
 
 /** 欄は文字で持つ。数で来ても文字にする（JSON を経ても同じ形にするため） */

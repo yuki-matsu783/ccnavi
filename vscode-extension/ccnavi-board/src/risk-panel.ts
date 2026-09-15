@@ -71,8 +71,8 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openRisk` の本体 */
-export async function openRisk(): Promise<void> {
+/** `ccnaviBoard.openRisk` の本体。読みが同期なので、開くまでの待ちが無い */
+export function openRisk(): void {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、リスク管理画面を表示できない");
@@ -140,7 +140,7 @@ function readPage(root: string): Loaded {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`配点のファイルを読めない（${riskRel}）: ${(error as Error).message}`);
+      throw new Error(`配点のファイルを読めない（${riskRel}）: ${(error as Error).message}`, { cause: error });
     }
     // 無いのは不備ではない（組み込みの配点）。画面は組み込みを見せ、「作る」だけができる。
     text = BUILTIN_RISK_TEXT;

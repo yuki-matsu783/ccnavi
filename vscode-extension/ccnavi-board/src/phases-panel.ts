@@ -227,7 +227,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズの種類のファイルを読めない（${phasesRel}）: ${(error as Error).message}`);
+      throw new Error(`フェーズの種類のファイルを読めない（${phasesRel}）: ${(error as Error).message}`, { cause: error });
     }
     // 無いのは不備ではない（番号だけのフェーズ、無い層は空）。画面は空を見せ、「作る」だけができる。
     text = "";

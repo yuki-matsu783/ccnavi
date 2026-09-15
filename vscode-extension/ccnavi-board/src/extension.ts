@@ -24,7 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
       void openRules(typeof project === "string" && project !== "" ? { kind: "project", name: project } : { kind: "workspace" }),
     ),
     vscode.commands.registerCommand("ccnaviBoard.openProjects", () => void openProjects()),
-    vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void openRisk()),
+    vscode.commands.registerCommand("ccnaviBoard.openRisk", () => { openRisk(); }),
     vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void openPhases()),
     vscode.commands.registerCommand("ccnaviBoard.appearance", () => void pickAppearance()),
   );
