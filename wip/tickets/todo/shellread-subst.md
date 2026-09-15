@@ -30,6 +30,7 @@ plan:
   review: defer
 - implement
 - docs
+feedback: []
 allow:
 - match: Write|Edit
   glob: ccnavi/*
