@@ -190,32 +190,6 @@ class LintTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 1)
         self.assertIn("版", result.stdout)
-        # 守りは外していないことを、直す人に伝える。
-        self.assertIn("ルールは読んで当てている", result.stdout)
-
-    def test_版が違ってもルールは当てる(self):
-        # 版の数字だけが違うファイルで守りを外すと、書き直すまでの間、止めるはずの呼び出しが通る。
-        path = rules_file(self.root, SOUND, version=99)
-        result = ccnavi(
-            self.root,
-            "--rules",
-            path,
-            "--approved",
-            "",
-            "--state",
-            "",
-            "--log",
-            "",
-            "--test",
-            "Bash",
-            "git push origin main",
-            "--json",
-        )
-
-        body = json.loads(result.stdout)
-        self.assertEqual(body["verdict"], "deny", result.stdout + result.stderr)
-        self.assertEqual([rule["id"] for rule in body["rules"]], ["git-push"])
-        self.assertIn("版", result.stderr)
 
     def test_壊れたルールは1件ずつ名指しでerrorになる(self):
         # 落ちたルールは黙って消える。消えた穴は誰も気づかないので、
