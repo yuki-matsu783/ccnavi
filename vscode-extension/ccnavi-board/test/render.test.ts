@@ -4,7 +4,15 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
 import { buildBoard } from "../src/core/board.js";
-import { escapeHtml, renderBoard } from "../src/core/render.js";
+import { PAGE_STYLE, escapeHtml, renderBoard } from "../src/core/render.js";
+import { renderRulesPage } from "../src/core/rules-render.js";
+import { readRules } from "../src/core/rules-doc.js";
+import { renderRiskPage } from "../src/core/risk-render.js";
+import { readRisk, BUILTIN_RISK_TEXT } from "../src/core/risk-doc.js";
+import { renderPhasesPage } from "../src/core/phases-render.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../src/core/phases-doc.js";
+import { renderProjectsPage } from "../src/core/projects-render.js";
+import { buildProjectsPage } from "../src/core/projects.js";
 import type { TicketJson } from "../src/core/model.js";
 import { fixture } from "./fixture.js";
 
@@ -114,8 +122,10 @@ test("CB-T12 4 列と件数と承認ボタンを出す", () => {
     assert.ok(html.includes(label), label);
   }
   assert.equal((html.match(/class="column"/g) ?? []).length, 4);
-  assert.ok(html.includes("残り 3 件"));
-  assert.ok(html.includes("全 4 件"));
+  assert.ok(html.includes("残り 3 / 全 4"));
+  assert.ok(html.includes('<span class="pending warn">承認待ち 1 件</span>'));
+  // 0 件のものは見出しに出さない
+  assert.ok(!html.includes("不備 0 件"));
   assert.ok(html.includes("承認待ち 1 件を承認"));
   assert.ok(!html.includes('data-action="approve" disabled'));
   assert.ok(html.includes(`nonce="${OPTIONS.nonce}"`));
@@ -149,20 +159,34 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
 });
 
-test("CB-T13 カードにバッジ・フェーズ・操作を出す", () => {
+test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人が動く状態だけで、属性は枠無しの行に出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  assert.ok(html.includes("承認済"));
-  assert.ok(html.includes("未承認"));
-  assert.ok(html.includes("作業ツリーあり"));
-  assert.ok(html.includes("作業ツリーなし"));
+  // 人が動く状態は枠付きの札
+  assert.ok(html.includes('<span class="badge copy copy-none">未承認</span>'));
+  assert.ok(html.includes('<span class="badge worktree none">作業ツリーなし</span>'));
+  // 属性は枠無しの fact。承認済・レビューの要否・作業ツリーの名前・base
+  assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
+  assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
+  assert.ok(/<span class="fact review" title="[^"]*">レビュー 要<\/span>/.test(html));
+  assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
+  assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
+  assert.ok(!html.includes('class="badge copy copy-open"'));
+  assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
   assert.ok(!html.includes("複数の場所にある"));
-  assert.ok(html.includes("親 i0001 / フェーズ 2"));
+  assert.ok(html.includes('<span class="where">子 · 親 i0001 / フェーズ 2</span>'));
   assert.ok(html.includes('class="phases"'));
+  // 親のフェーズは 1 段階 1 行。ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
+  assert.ok(html.includes('<li class="phase phase-ended"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status">終了 · リスク: 0 (LOW)</span></li>'));
+  assert.ok(html.includes('<span class="phase-status">進行中 · レビュー要</span>'));
+  assert.ok(!html.includes("ゲート開"));
+  assert.ok(!html.includes("マーカーなし"));
+  assert.ok(!html.includes("レビュー不要 "));
+  // ゲート閉の左線は承認待ちの左線より後に書き、勝つ
+  assert.ok(html.indexOf(".card.pending { border-left") < html.indexOf(".card.gate-closed { border-left"));
   // 締める（wrapup）のボタンは出さない
   assert.ok(!html.includes('data-action="wrapup"'));
   assert.ok(!html.includes("締める"));
-  assert.ok(html.includes("base "));
 });
 
 test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {
@@ -213,4 +237,23 @@ test("CB-T118 本物が決まらない写りだけをバッジにし、場所を
   const html = renderBoard(buildBoard({ ...base, tickets: [homeless] }), OPTIONS);
   assert.ok(html.includes("複数の場所にある（2 か所）"));
   assert.ok(html.includes('title="main:todo, i0001-02:todo"'));
+});
+
+test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・欄・脚注）を 1 つの定数から持つ", () => {
+  const lock = { locked: false, reason: "", doing: [] };
+  const pages = [
+    renderBoard(buildBoard(fixture()), OPTIONS),
+    renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, OPTIONS),
+    renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, OPTIONS),
+    renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, OPTIONS),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), OPTIONS),
+  ];
+  assert.match(PAGE_STYLE, /\.toolbar \{/);
+  assert.match(PAGE_STYLE, /\.banner\.warn \{/);
+  assert.match(PAGE_STYLE, /input\[type=text\], input\[type=search\], textarea, select \{/);
+  for (const html of pages) {
+    assert.ok(html.includes(PAGE_STYLE));
+    // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
+    assert.equal((html.match(/  \.toolbar \{ display: flex;/g) ?? []).length, 1);
+  }
 });
