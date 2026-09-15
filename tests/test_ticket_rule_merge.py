@@ -1,4 +1,4 @@
-"""ルールとチケットの判定を合わせ、厳しい側を採る（チケット ticket-rule-merge）の受入テスト。
+"""ルールとチケットの判定を合わせ、厳しい側を採ることの受入テスト。
 
 表は wip/design/ticket-rule-merge.md の §12。道具を外から叩いて、応答と記録だけを見る。
 
@@ -8,11 +8,10 @@
    範囲の外 / チケットが無い）の全組み合わせで、判定・理由コード・どちらの文面か・記録の欄（§12.1）
 2. 実行後の監視。シェルが書いたあとに報告するか、どのコードか（§12.2）
 3. チケットの置き場を範囲の外から外すこと。実行前・実行後・サブエージェント終了時で同じ答え（§12.3）
-4. 今と変わらないこと（§12.4）
+4. チケットが効かない場面と、ルールより先に見る点検（§12.4）
 5. 診断の出力（§12.5）
 
 ルールは作業ツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
-このワークスペースの `worktrees` の allow と同じ形で、これがチケットの範囲を覆っていたのが発端。
 
 チケットの範囲は子 `i0001-01` のもの。
 
@@ -21,14 +20,6 @@
     deny:  src/deny/*
 
 範囲の外には `docs/` を使う。チケットの無い行は、main から切った別の作業ツリー `free` に書く。
-
-## 実装待ちの行
-
-判定の合わせ方で答えが変わる行（21 件）は、実装が入るまで飛ばす。目印は `MERGED`。
-今の振る舞いを守る行は飛ばさず、実装の前も後も毎回走る。
-
-目印の名前に頼ると、実装が別の名前で入ったときに 21 件が黙って飛ばされたままになる。
-`Marker` のテストは飛ばさずに走り、目印の有無と実際の振る舞いが食い違えば落ちる。
 """
 
 from __future__ import annotations
@@ -40,16 +31,9 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi import ticket as ticket_mod
 from tests.inproc import run_ccnavi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# 実装が入ったかの目印。設計 §2 の、チケットの置き場を範囲の外から外す関数。
-# これが無い間は、判定の合わせ方で答えが変わる行を飛ばす（shellread-sep-02 と同じ形）。
-# 実装フェーズはこの名前で関数を足し、飛ばしていた行を全部通すことを完了の条件にする。
-MERGED = hasattr(ticket_mod, "is_ticket_place")
-PENDING = "ticket-rule-merge の実装待ち"
 
 NOTE = "ルールの additionalContext。判定を決めた側に関わらず載る。"
 
@@ -61,7 +45,7 @@ TICKET_ASK = "src/ask/x.py"
 TICKET_ALLOW = "src/ok/x.py"
 TICKET_OUTSIDE = "docs/x.md"
 
-# 設計 §7 と §8 が足す文面。
+# 承認画面と `--explain` が添える文面。
 APPROVAL_NOTE = (
     "ルールの allow で開けてある場所も、この範囲の外では止まる。"
     "ルールの deny はこの範囲の中でも止まる"
@@ -174,11 +158,6 @@ class Workspace(unittest.TestCase):
         self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
 
     # ---- 道具
-
-    def pending(self):
-        """判定の合わせ方で答えが変わる行を、実装が入るまで飛ばす。"""
-        if not MERGED:
-            self.skipTest(PENDING)
 
     def use_rules(self, body):
         write(self.rules, json.dumps(body))
@@ -312,33 +291,6 @@ class Workspace(unittest.TestCase):
         self.free = self.worktree("free", "main")
 
 
-class Marker(Workspace):
-    """目印 `MERGED` と実際の振る舞いが食い違っていないか。飛ばさずに毎回走る。
-
-    飛ばしている 21 件は目印の名前だけで決まる。実装が別の名前で入ると、21 件は黙って
-    飛ばされたままになり、全体は通ったように見える。いちばん素直な 1 行（ルール allow ×
-    チケットの範囲の外）を目印に頼らずに叩き、目印の有無と答えが合っているかを見る。
-    """
-
-    def test_marker_matches_the_behaviour(self):
-        self.family()
-        self.use_rules(rules_with("allow"))
-        result = self.write_hook(self.child, TICKET_OUTSIDE)
-        behaves_merged = self.decision(result) == "deny"
-        if behaves_merged and not MERGED:
-            self.fail(
-                "ルールの allow をチケットの範囲の外が止めているのに、目印 "
-                "ccnavi.ticket.is_ticket_place が無い。実装は入っているのに、飛ばしている 21 件が"
-                "走っていない。目印の名前で関数を足すこと"
-            )
-        if MERGED and not behaves_merged:
-            self.fail(
-                "目印 ccnavi.ticket.is_ticket_place はあるのに、ルールの allow の場所で"
-                "チケットの範囲の外が通っている。判定の合わせ方が入っていない: "
-                + self.reason(result)
-            )
-
-
 class PreToolUseTable(Workspace):
     """§12.1 実行前の判定。"""
 
@@ -379,23 +331,12 @@ class PreToolUseTable(Workspace):
             "deny": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
             "outside": ("deny", "DENY_TICKET_SCOPE", "ticket", "(ticket-scope)"),
             "ask": ("ask", "TICKET_ASK", "ticket", "(ticket-scope)"),
-            # チケットの範囲の中で、ルールも何も言わない。今と同じく、ルールの id は残らない。
+            # チケットの範囲の中で、ルールも何も言わない。ルールの id もチケットの印も残らない。
             "allow": ("allow", "", "", None),
             # 権限モードに委ねる行。payload に permission_mode を入れないので、委ねた先の
             # 答えは見ない（判定を ask に倒すか渡すかは権限モード次第）。見るのはコードだけ。
             "no-ticket": (None, "UNDECLARED", "", None),
         },
-    }
-
-    # 判定の合わせ方で答えが変わる行（ルールの列, チケットの列）。実装が入るまで飛ばす。
-    # 最後の 1 行は、チケットの deny の項を名指しする文面の行が足されるため。
-    CHANGED = {
-        ("ask", "deny"),
-        ("ask", "outside"),
-        ("allow", "deny"),
-        ("allow", "outside"),
-        ("allow", "ask"),
-        ("silent", "deny"),
     }
 
     def setUp(self):
@@ -407,8 +348,6 @@ class PreToolUseTable(Workspace):
         for column, where, rel in self.COLUMNS:
             decision, code, text_from, first_rule = self.EXPECTED[rule_section][column]
             with self.subTest(rule=rule_section, ticket=column):
-                if (rule_section, column) in self.CHANGED:
-                    self.pending()
                 tree = self.child if where == "child" else self.free
                 result = self.write_hook(tree, rel)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -439,8 +378,8 @@ class PreToolUseTable(Workspace):
                 if text_from == "ticket":
                     # 判定を下したのが層を持たないチケットなら、層の欄は空。
                     self.assertEqual(record.get("source", ""), "", record)
-                    # 設計 §3 の足す行。場面が重なれば（ルールを狭め、かつチケットの deny に
-                    # 当たった）、行も両方載る。
+                    # 足す行は場面ごとに独立していて、重なれば（ルールを狭め、かつチケットの
+                    # deny に当たった）両方載る。
                     if rule_section in ("ask", "allow"):
                         # チケットがルールを狭めた回は、ルールの id も記録に残し、文面が名指しする。
                         self.assertIn(f"rule-{rule_section}", rules, rules)
@@ -469,7 +408,7 @@ class PreToolUseTable(Workspace):
     def test_rule_allow_is_narrowed_by_ticket_deny_outside_and_ask(self):
         self.check_column("allow")
 
-    def test_silent_rules_leave_the_ticket_as_it_is_today(self):
+    def test_silent_rules_leave_the_decision_to_the_ticket(self):
         self.check_column("silent")
 
 
@@ -494,10 +433,7 @@ class PostToolUseTable(Workspace):
         ("silent", "allow", "src/ok", None),
     )
 
-    # 判定の合わせ方で答えが変わる行。実装が入るまで飛ばす。
-    CHANGED = {("allow", "deny"), ("allow", "outside")}
-
-    # チケットの無い作業ツリー。ルールだけで決まり、今と変わらない。
+    # チケットの無い作業ツリー。ルールだけで決まる。
     NO_TICKET = (
         ("deny", "POST_VIOLATION"),
         ("ask", "POST_VIOLATION"),
@@ -521,8 +457,6 @@ class PostToolUseTable(Workspace):
     def test_post_reports_follow_the_merged_verdict(self):
         for n, (rule_section, column, prefix, code) in enumerate(self.CASES):
             with self.subTest(rule=rule_section, ticket=column):
-                if (rule_section, column) in self.CHANGED:
-                    self.pending()
                 self.use_rules(rules_for(rule_section))
                 rel = f"{prefix}/case{n}.txt"
                 self.check(self.after_shell(self.child, rel, session=f"post-{n}"), rel, code)
@@ -544,18 +478,16 @@ class TicketPlaces(Workspace):
         self.use_rules(rules_with("allow"))
 
     def test_pre_tool_use_exempts_the_ticket_places_only(self):
-        # (相対パス, 判定, code, 判定の合わせ方で答えが変わるか)
+        # (相対パス, 判定, code)
         cases = (
-            (f"{self.TICKETS}/todo/i0001-01.md", "allow", "", False),
-            (f"{self.TICKETS}/todo/i0009.md", "allow", "", False),
+            (f"{self.TICKETS}/todo/i0001-01.md", "allow", ""),
+            (f"{self.TICKETS}/todo/i0009.md", "allow", ""),
             # 置き場の綴りの前置に続けただけの場所は置き場ではない。前置は `/` の境で切る。
-            (f"{self.TICKETS}X/a.md", "deny", "DENY_TICKET_SCOPE", True),
-            ("docs/a.md", "deny", "DENY_TICKET_SCOPE", True),
+            (f"{self.TICKETS}X/a.md", "deny", "DENY_TICKET_SCOPE"),
+            ("docs/a.md", "deny", "DENY_TICKET_SCOPE"),
         )
-        for rel, decision, code, changed in cases:
+        for rel, decision, code in cases:
             with self.subTest(path=rel):
-                if changed:
-                    self.pending()
                 result = self.write_hook(self.child, rel)
                 self.assertEqual(self.decision(result), decision, self.reason(result))
                 self.assertEqual(self.last_record().get("code", ""), code, self.reason(result))
@@ -573,17 +505,15 @@ class TicketPlaces(Workspace):
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_post_tool_use_exempts_the_ticket_places_only(self):
-        # (相対パス, 報告のコード。None は報告しない, 判定の合わせ方で答えが変わるか)
+        # (相対パス, 報告のコード。None は報告しない)
         cases = (
-            (f"{self.TICKETS}/todo/i0001-01.md", None, False),
-            (f"{self.TICKETS}/todo/i0009.md", None, False),
-            (f"{self.TICKETS}X/b.md", "POST_TICKET_SCOPE", True),
-            ("docs/b.md", "POST_TICKET_SCOPE", True),
+            (f"{self.TICKETS}/todo/i0001-01.md", None),
+            (f"{self.TICKETS}/todo/i0009.md", None),
+            (f"{self.TICKETS}X/b.md", "POST_TICKET_SCOPE"),
+            ("docs/b.md", "POST_TICKET_SCOPE"),
         )
-        for n, (rel, code, changed) in enumerate(cases):
+        for n, (rel, code) in enumerate(cases):
             with self.subTest(path=rel):
-                if changed:
-                    self.pending()
                 result = self.after_shell(self.child, rel, session=f"p{n}")
                 if code is None:
                     self.assertNotIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
@@ -609,18 +539,20 @@ class TicketPlaces(Workspace):
 
 
 class TicketPlacesElsewhere(TicketPlaces):
-    """§12.3 置き場の綴りを変えても、変えた綴りで外れる。既定の綴りを決め打ちしていないこと。"""
+    """§12.3 置き場の綴りを変えても、その綴りで外れる。既定の綴りを決め打ちしていないこと。"""
 
     TICKETS = "work/proposals"
     APPROVED = ".ccnavi/copies"
 
 
-class Unchanged(Workspace):
-    """§12.4 今と変わらないこと（ルールが allow で作業ツリーを開けていても）。"""
+class Boundaries(Workspace):
+    """§12.4 チケットが効かない場面と、ルールより先に見る点検。
 
-    # ルールが allow のときも親子の合成が効くのは、判定の合わせ方で初めて成り立つ。
-    @unittest.skipUnless(MERGED, PENDING)
+    ルールは作業ツリーを allow で開ける。
+    """
+
     def test_parent_and_child_strictest_wins_under_rule_allow(self):
+        """ルールが allow の場所でも、親子の判定は厳しい側を採る。"""
         self.family(
             parent={"allow": ("src/a/*",), "ask": ("src/b/*",)},
             child={"allow": ("src/a/*", "src/b/*")},
@@ -677,9 +609,8 @@ class Unchanged(Workspace):
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
-    # ルールが allow の場所でチケットが止めるのは、判定の合わせ方で初めて成り立つ。
-    @unittest.skipUnless(MERGED, PENDING)
     def test_dry_run_says_what_enable_would_do(self):
+        """ルールが allow の場所でチケットが止める判定も、dry-run では止めずに言うだけ。"""
         self.family()
         self.use_rules(rules_with("allow"))
         result = self.write_hook(self.child, TICKET_OUTSIDE, mode="dry-run")
@@ -696,7 +627,7 @@ class Unchanged(Workspace):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_child_approval_screen_gets_no_new_note(self):
-        """設計 §7。子の画面の「親からどれだけ絞ったか」は変えない。注記は親の画面だけ。"""
+        """子の画面の「親からどれだけ絞ったか」には注記を添えない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.ccnavi("--approve", "--preview")
@@ -707,9 +638,8 @@ class Unchanged(Workspace):
 
 
 class Diagnostics(Workspace):
-    """§12.5 診断。3 件とも、判定の合わせ方で足す出力を見る。"""
+    """§12.5 診断の出力。"""
 
-    @unittest.skipUnless(MERGED, PENDING)
     def test_test_command_names_both_the_rule_and_the_ticket(self):
         self.family()
         self.use_rules(rules_with("allow"))
@@ -720,7 +650,6 @@ class Diagnostics(Workspace):
         self.assertIn("(ticket-scope)", result.stdout)
         self.assertIn("rule-allow", result.stdout)
 
-    @unittest.skipUnless(MERGED, PENDING)
     def test_approval_screen_says_rule_allow_stops_outside_the_area(self):
         self.propose("i0001", allow=("src/*",))
         result = self.ccnavi("--approve", "--preview")
@@ -729,7 +658,6 @@ class Diagnostics(Workspace):
         parent = section_of(result.stdout, "■ このチケットで書き込みが許される領域")
         self.assertIn(APPROVAL_NOTE, parent, result.stdout)
 
-    @unittest.skipUnless(MERGED, PENDING)
     def test_explain_says_the_ticket_is_stronger_than_rule_allow(self):
         self.family()
         result = self.ccnavi("--explain")
