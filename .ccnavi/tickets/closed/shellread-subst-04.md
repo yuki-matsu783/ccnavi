@@ -6,20 +6,14 @@ phase: 3
 predecessors:
 - shellread-subst-03
 title: coproc の後ろをコマンドの先頭として読む
-rationale: |
-  3 番目（shellread-subst-03）を閉じたあとの敵対的レビュー（2026-09-15）で、予約語の直後を
-  コマンドの先頭として読む変更（設計 §0 の 4 つ目の穴）に `coproc` が漏れていると分かった。
-  `coproc { find . -delete; }` の find が `(^|\x00)` の直後に立たず、find-writes に当たらない
-  （ask。deny のはず）。zsh で中身が実行されることを実測した。3 番目が埋めた穴と同じ種類なので、
-  利用者の判断（2026-09-15）でフェーズ 3 の中で直す。
-
-  レビューで出た残りの 3 件は、同じ判断で次のとおり扱う。ここでは直さない。
-  - `$( )` の中の、コマンドの先頭ではない `case` の語でも縮退する（厳しい側の誤検知）。今のまま残し、
-    4 番目（文書）で許容した誤検知として書く
-  - 置換を大量に並べると読みだけで遅い（8 万個・949KB で 3.6 秒。読み終わったあと期限切れで止める側に倒れる）。
-    今のまま残し、4 番目（文書）で書く
-  - ブレース展開 `{git,push,origin,main}`（bash が実行し、読みでは 1 語）。今回の変更の前からある限界で、
-    `ccnavi-review.sh handoff` で別の issue に切り出す
+rationale: "3 番目（shellread-subst-03）を閉じたあとの敵対的レビュー（2026-09-15）で、予約語の直後を\nコマンドの先頭として読む変更（設計\
+  \ §0 の 4 つ目の穴）に `coproc` が漏れていると分かった。\n`coproc { find . -delete; }` の find が `(^|\\\
+  x00)` の直後に立たず、find-writes に当たらない\n（ask。deny のはず）。zsh で中身が実行されることを実測した。3 番目が埋めた穴と同じ種類なので、\n\
+  利用者の判断（2026-09-15）でフェーズ 3 の中で直す。\n\nレビューで出た残りの 3 件は、同じ判断で次のとおり扱う。ここでは直さない。\n- `$(\
+  \ )` の中の、コマンドの先頭ではない `case` の語でも縮退する（厳しい側の誤検知）。今のまま残し、\n  4 番目（文書）で許容した誤検知として書く\n\
+  - 置換を大量に並べると読みだけで遅い（8 万個・949KB で 3.6 秒。読み終わったあと期限切れで止める側に倒れる）。\n  今のまま残し、4 番目（文書）で書く\n\
+  - ブレース展開 `{git,push,origin,main}`（bash が実行し、読みでは 1 語）。今回の変更の前からある限界で、\n  `ccnavi-review.sh\
+  \ handoff` で別の issue に切り出す\n"
 human_review:
   required: true
   reason: 判定の読みが変わる（止まるものが増える向き）。3 番目と一緒にフェーズ 3 のレビューで見る
@@ -28,6 +22,13 @@ allow:
   glob: ccnavi/*
 - match: Write|Edit
   glob: tests/*
+ccnavi_approved:
+  approved_at: 2026-09-15T16:40:38+0900
+  source_tree: shellread-subst
+  source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/shellread-subst/wip/tickets/todo/shellread-subst-04.md
+started_at: 2026-09-15T16:42:07+0900
+base_sha: b4b1b95e1c7617fcf36dc76989734a67a5d799e9
+completed_at: 2026-09-15T16:48:54+0900
 ---
 
 # 実装: coproc の後ろをコマンドの先頭として読む
