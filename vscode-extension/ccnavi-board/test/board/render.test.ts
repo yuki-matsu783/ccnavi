@@ -262,5 +262,28 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.ok(html.includes(PAGE_STYLE));
     // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
     assert.equal((html.match(/  \.toolbar \{ display: flex;/g) ?? []).length, 1);
+    // 見た目を指定しなければ素の body。Claude の配色の CSS と、切り替えの受け口は常に持つ
+    assert.ok(html.includes("\n<body>\n"));
+    assert.ok(html.includes("body.ccnavi-claude-light {"));
+    assert.ok(html.includes('if (data.type === "appearance") { applyAppearance(data.value); }'));
   }
+  const themed = [
+    renderBoard(buildBoard(fixture()), { ...OPTIONS, appearance: "claude-dark" }),
+    renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, { ...OPTIONS, appearance: "claude-dark" }),
+    renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
+    renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), { ...OPTIONS, appearance: "claude-dark" }),
+  ];
+  for (const html of themed) {
+    assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));
+  }
+});
+
+test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使い、他のテーマでは効かない書き方になっている", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  // 一覧（設定 3 画面）の開いた行の縁は LIST_STYLE にあるので、ルール設定画面で見る
+  const rules = renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock: { locked: false, reason: "", doing: [] } }, OPTIONS);
+  assert.match(rules, /\.row\.open > \.row-head, \.row\.open > \.row-body \{ box-shadow: inset 3px 0 0 var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\); \}/);
+  assert.match(html, /button\.action:disabled \{ border-color: var\(--vscode-contrastBorder, transparent\); border-style: dashed; \}/);
+  assert.match(html, /\.card:hover \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\); \}/);
 });

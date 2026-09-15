@@ -18,6 +18,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { WATCH_PATTERNS } from "./board-panel.js";
+import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
@@ -98,6 +99,7 @@ export async function openRisk(): Promise<void> {
     // 編集の途中を持つので、タブを裏に回しても捨てない。
     retainContextWhenHidden: true,
   });
+  followAppearance(panel);
   const current: PanelState = {
     panel,
     folder,
@@ -296,7 +298,7 @@ function show(current: PanelState): void {
       model: loaded.doc.model,
       lock: current.lock,
     },
-    { nonce: crypto.randomBytes(16).toString("base64") },
+    { nonce: crypto.randomBytes(16).toString("base64"), appearance: readAppearance() },
   );
 }
 

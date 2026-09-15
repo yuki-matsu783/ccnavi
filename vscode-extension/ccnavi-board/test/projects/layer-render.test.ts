@@ -120,6 +120,9 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   const flat = renderProjectsPage(page([row({ hasClaudeDir: true, rulesRel: "projects/lib/rules.yml" }), row({ name: "app", rel: "projects/app", hasClaudeDir: true, rulesRel: "projects/app/conf/ccnavi/rules.yml" }), row({ name: "Self", rel: "projects/Self", hasClaudeDir: true, rulesRel: "" })]), { nonce: "n" });
   const dirs = [...flat.matchAll(/プロジェクトの設定は ([^ ]+)\/ に置く/g)].map((m) => m[1]);
   assert.deepEqual(dirs, [".ccnavi/config", "conf/ccnavi", ".ccnavi/config"]);
+  // メニューの項目は HC で枠が出る書き方（contrastBorder の変数）。押せない項目は点線
+  assert.match(html, /\.menu > \.menu-items > button\.action \{ justify-content: flex-start; border-color: var\(--vscode-contrastBorder, transparent\);/);
+  assert.match(html, /\.menu > \.menu-items > button\.action:disabled \{ border-style: dashed; \}/);
   // .gitignore が済んでいれば lint の指摘はそのまま出る
   const fine = renderProjectsPage(page([row()], { dirProblems: [{ severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" }] }), { nonce: "n" });
   assert.match(fine, /warn: projects\/ がワークスペースの git で無視されていない/);

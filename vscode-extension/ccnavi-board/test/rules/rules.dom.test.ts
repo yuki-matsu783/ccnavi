@@ -118,6 +118,24 @@ test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向き�
   }
 });
 
+test("CB-D0b 見た目のメッセージで body のクラスが付け替わり、開いている行と入力は消えない", async () => {
+  const page = await loadPage(html());
+  try {
+    page.click(page.one('.rule[data-id="git-push"] .row-head'));
+    page.type(page.one('.rule[data-id="git-push"] input.f-id'), "git-push-x");
+    await page.send({ type: "appearance", value: "claude-light" });
+    assert.deepEqual(Array.from(page.document.body.classList), ["ccnavi-claude-light"]);
+    await page.send({ type: "appearance", value: "claude-dark" });
+    assert.deepEqual(Array.from(page.document.body.classList), ["ccnavi-claude-dark"]);
+    await page.send({ type: "appearance", value: "vscode" });
+    assert.deepEqual(Array.from(page.document.body.classList), []);
+    assert.ok(page.one('.rule[data-id="git-push-x"]').classList.contains("open"));
+    assert.equal(page.one<HTMLInputElement>('.rule[data-id="git-push-x"] input.f-id').value, "git-push-x");
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-D02 state に控えた id の行は、読み直したあとも開いている", async () => {
   const page = await loadPage(html(), { open: ["deps"], tab: "rules" });
   try {

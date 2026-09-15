@@ -11,6 +11,7 @@
  * 色は VS Code のテーマ変数だけを使う。文字列は全部実体参照にする。
  */
 import type { Lock } from "./lock.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
 import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 import { BUILTIN_LEVELS, KINDS, LEVEL_NAMES, type RiskModel } from "./risk-doc.js";
 
@@ -28,6 +29,8 @@ export interface RiskPage {
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 /** 当て方の説明。select の札と、値の欄の placeholder */
@@ -60,7 +63,7 @@ export function renderRiskPage(page: RiskPage, options: RenderOptions): string {
 ${STYLE}
 </style>
 </head>
-<body>
+${bodyTag(options.appearance)}
 ${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
@@ -409,4 +412,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   });
   document.getElementById("find").addEventListener("input", applyFind);
   renderAll();
-  updateSave();`;
+  updateSave();
+${APPEARANCE_SCRIPT}`;
