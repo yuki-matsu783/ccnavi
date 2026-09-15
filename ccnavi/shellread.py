@@ -280,6 +280,9 @@ _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
 # 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。`[` だけの test コマンドと `[[` は当たらない。
 _NAME_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
 
+# bash 4.1 以降の名前付き fd。`{fd}>/dev/null cmd` のリダイレクトの前に付く。
+_NAMED_FD = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
+
 # 語の終わりになる文字（コマンドの文脈）。ヒアドキュメントの区切りの語を読むときに使う。
 _WORD_END = " \t\r\n;&|()<>"
 
@@ -818,15 +821,22 @@ def read(src: str) -> Reading:
     reading, commands = _read(src, 0)
     # `sh -c` と `eval` に渡った文字列はシェルが読み直すので、そこで見つけた形も並べる。
     reread: list[tuple[str, str]] = []
-    layers = _unwrap(commands, reread)
+    marks: list[bool] = []
+    layers = _unwrap(commands, reread, marks)
     reading.unwrapped = SEP.join(_render_command(layer) for _, layer, _ in layers)
     reading.runners = [runner for runner, _, _ in layers]
     reading.quoted_layers = [quoted for _, _, quoted in layers]
     # コマンド名は、読んだコマンドと、実行役のコマンドを外した層の両方で見る。
     # `env $c push` の `$c` と `sh $SCRIPT` の `$SCRIPT` は、層の先頭にしか立たない。
-    names = _expanded_names(
-        [command for command, _ in commands] + [layer for _, layer, _ in layers]
-    )
+    # `eval` と `sh -c` の文字列を読み直した層は、外側が縮退していれば見ない。そのときは確認に
+    # 落ちるので、止めて書き直させると、書き直し先がファイルになって中身が見えなくなる（ADR-0047）。
+    # 縮退していない（`FOO=1 eval "$c"`）なら確認に落ちる保証が無いので、見る。
+    looked = [
+        layer
+        for (_, layer, _), reread_layer in zip(layers, marks, strict=True)
+        if not (reread_layer and reading.degraded)
+    ]
+    names = _expanded_names([command for command, _ in commands] + looked)
     rewrites = reading.rewrites + reread + [(FORM_COMMAND_NAME, name) for name in names]
     reading.rewrites = list(dict.fromkeys(rewrites))
     return reading
@@ -862,11 +872,16 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         return Reading(degraded=True, reason=REASON_UNTERMINATED, rewrites=rewrites), []
 
     commands = _split_commands(tokens)
-    rewrites.extend(
-        (FORM_AMBIGUOUS, command[0])
-        for command in commands
-        if len(command) == 1 and command[0] in _AMBIGUOUS_RESERVED
-    )
+    # `for select in` と `case coproc in` の語は変数名と調べる値で、予約語ではない。
+    previous: list[str] = []
+    for command in commands:
+        if (
+            len(command) == 1
+            and command[0] in _AMBIGUOUS_RESERVED
+            and not (len(previous) == 1 and previous[0] in _TAKES_A_WORD)
+        ):
+            rewrites.append((FORM_AMBIGUOUS, command[0]))
+        previous = command
     # 層を作る先は、読みを止める理由があっても集める。そのために中身も先に読んでおく。
     runnable = [(command, False) for command in _with_time(commands)]
     inners: list[tuple[Reading, bool]] = []
@@ -1061,14 +1076,17 @@ def _with_time(commands: list[list[str]]) -> list[list[str]]:
 def _expanded_names(commands: list[list[str]]) -> list[str]:
     """コマンドの位置に、実行するときにシェルが決める語があれば並べる。"""
     found: list[str] = []
+    # 並べた綴りの、パスを落とした形。`/usr/bin/gi?` は、パスを落とした層にも `gi?` として立つ。
+    # 同じものを 2 度並べない。コマンドを数万本並べても線形で済むよう、集合で引く。
+    seen: set[str] = set()
     previous: list[str] = []
     for command in commands:
         name = _command_name(command)
         if len(previous) == 1 and previous[0] in _TAKES_A_WORD:
             name = ""
-        # `/usr/bin/gi?` は、パスを落とした層にも `gi?` として立つ。同じものを 2 度並べない。
-        if name and _NAME_EXPANDS.search(name) and not any(_base(f) == name for f in found):
+        if name and _NAME_EXPANDS.search(name) and name not in seen:
             found.append(name)
+            seen.update((name, _base(name)))
         previous = command
     return found
 
@@ -1092,23 +1110,28 @@ def _redirect_width(command: list[str], i: int) -> int:
 
     shlex は `>/dev/null` を `>` `/dev/null` に、`2>&1` を `2` `>&` `1` に割る。区切りの演算子は
     _split_commands が切り出してあるので、コマンドの中に残る演算子の塊はリダイレクト。
+    演算子の前には、fd の番号か、bash 4.1 以降の名前付き fd（`{fd}>/dev/null`）が付く。
     """
-    k = i + 1 if command[i].isdigit() and i + 1 < len(command) else i
+    fd = command[i].isdigit() or _NAMED_FD.fullmatch(command[i])
+    k = i + 1 if fd and i + 1 < len(command) else i
     return k - i + 2 if _is_operator(command[k]) else 0
 
 
 def _unwrap(
-    commands: list[tuple[list[str], bool]], rewrites: list[tuple[str, str]]
+    commands: list[tuple[list[str], bool]],
+    rewrites: list[tuple[str, str]],
+    marks: list[bool],
 ) -> list[tuple[str, list[str], bool]]:
     """全コマンドの層を、コマンドの順・外側から内側の順に並べる。
 
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出したか）。
-    読み直した文字列の中で見つけた、書き直しを求める形は rewrites に足す。
+    読み直した文字列の中で見つけた、書き直しを求める形は rewrites に足す。marks には層と同じ
+    並びで、`eval` か `sh -c` の文字列を読み直した層（とその内側）かどうかを足す。
     """
     out: list[tuple[str, list[str], bool]] = []
     budget = [UNWRAP_WORDS]
     for command, quoted in commands:
-        _layers(command, 0, out, budget, quoted, rewrites)
+        _layers(command, 0, out, budget, quoted, rewrites, marks, False)
     return out
 
 
@@ -1119,6 +1142,8 @@ def _layers(
     budget: list[int],
     quoted: bool,
     rewrites: list[tuple[str, str]],
+    marks: list[bool],
+    reread: bool,
 ) -> None:
     """1 本のコマンドから、実行役のコマンドを 1 枚ずつ外した層を out に足す。
 
@@ -1128,13 +1153,16 @@ def _layers(
     if depth >= UNWRAP_DEPTH:
         return
     runner, inners, further = _peel(command, rewrites)
+    # シェルの層をさらに外してよいのは `-c` の文字列を読み直したときだけ。
+    reread = reread or runner == "eval" or (runner in _SHELLS and further)
     for inner in inners:
         budget[0] -= len(inner)
         if budget[0] < 0:
             return
         out.append((runner, inner, quoted))
+        marks.append(reread)
         if further:
-            _layers(inner, depth + 1, out, budget, quoted, rewrites)
+            _layers(inner, depth + 1, out, budget, quoted, rewrites, marks, reread)
 
 
 def _peel(command: list[str], rewrites: list[tuple[str, str]]) -> tuple[str, list[list[str]], bool]:
