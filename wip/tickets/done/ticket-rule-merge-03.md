@@ -4,17 +4,12 @@ ticket: ticket-rule-merge-03
 parent: ticket-rule-merge
 phase: 3
 title: ルールとチケットの判定を合わせる実装
-rationale: '設計 wip/design/ticket-rule-merge.md（フェーズ 1 でレビュー済み）を実装する。
-
+rationale: |
+  設計 wip/design/ticket-rule-merge.md（フェーズ 1 でレビュー済み）を実装する。
   実行前の判定でルールとチケットの判定を両方出して厳しい側を採り、実行後の監視も同じ順にそろえ、
-
   チケットの置き場を範囲の外から外す判定を 3 か所で 1 つの関数にまとめる。
-
   受入テスト tests/test_ticket_rule_merge.py（フェーズ 2）が実装待ちで飛ばしている 21 行を
-
   全部通すことを完了の条件にする。目印は ccnavi.ticket.is_ticket_place。
-
-  '
 human_review:
   required: true
   reason: 実行前の判定の順番を逆にする本体で、ガードの効き方が変わるため
@@ -25,13 +20,9 @@ allow:
   glob: tests/*
 - match: Write|Edit
   glob: vscode-extension/*
-started_at: 2026-09-15T14:18:13+0900
-completed_at: ''
-base_sha: cbc1494d55e5bf911b00742701a8ccab3786ae2f
-ccnavi_approved:
-  approved_at: 2026-09-15T14:16:22+0900
-  source_tree: ticket-rule-merge
-  source_path: C:\Users\taniyama\Desktop\git\ccnavi\.claude\worktrees\ticket-rule-merge\wip\tickets\todo\ticket-rule-merge-03.md
+started_at: "2026-09-15T14:18:13+0900"
+completed_at: "2026-09-15T15:03:37+0900"
+base_sha: "cbc1494d55e5bf911b00742701a8ccab3786ae2f"
 ---
 
 # 実装: ルールとチケットの判定を合わせる
