@@ -126,7 +126,8 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
         lines.append(
             "ccnavi is asking rather than deciding because it could not tell what this call "
             "would actually do. Say what the command is for, or rewrite it in a form that can "
-            "be read: no heredoc, no string handed to something that runs it."
+            "be read: no heredoc, no string handed to something that runs it, no case inside "
+            "$( )."
         )
     elif refused:
         lines.append(
@@ -148,13 +149,23 @@ def undeclared(tool: str, subject: str, rules_path: str, degraded: str, refused:
     return "\n".join(lines)
 
 
-def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degraded: str) -> str:
+def reason_for(
+    rule: rules.Rule,
+    tool: str,
+    subject: str,
+    rules_path: str,
+    degraded: str,
+    quoted: bool = False,
+) -> str:
     """当たったルール 1 件を、それだけで読んで成立する理由に組む。
 
     載せるのは 3 つ。何に当たったか（対象）、どういう筋の根拠か（理由コード）、
     それを言っているのはどの設定か（出所）。どれが欠けても、受け取った側は
     自分の呼び出しのどこが引っかかったのかを自分では辿れず、
     文面を信じるか無視するかの二択になる。
+
+    quoted は、このルールが引用の中から切り出したコマンドにだけ当たったこと
+    （judge が bare に当て直して決める）。そのときは断りを 1 文足す。
 
     件ごとに閉じた形にするのは、1 回の応答に複数の理由が入り、そのうちどれが
     利用者の目に入るかが決まらないため。「上に書いた事情が下の全部に掛かる」形は、
@@ -188,7 +199,26 @@ def reason_for(rule: rules.Rule, tool: str, subject: str, rules_path: str, degra
     if degraded:
         lines.append(unreadable(degraded))
     lines.append(rule.spoken_message())
+    if quoted:
+        lines.append(inside_quotes())
     return "\n".join(lines)
+
+
+def inside_quotes() -> str:
+    """引用の中から切り出したコマンドにルールが当たったときに添える断り。
+
+    書いた側は、二重引用や引用しないヒアドキュメントの中の `$( )` とバッククォートを、
+    文字を書いただけのつもりでいる。実際にはシェルが実行するので止めるのは正しいが、
+    文字として渡す道を知らなければ、同じ形を書き直しては止まる。道はあるので名指しする。
+    git の値を変数に取る形は、ラッパースクリプトで出して読み、値を次に書く 2 手になる。
+    """
+    return (
+        "note: this rule matched a command inside double quotes or an unquoted heredoc. The "
+        "shell runs $( ) and backquotes there; they are not only written down. To keep them as "
+        "text, use single quotes, escape them as \\$( and \\`, or pass the text from a file "
+        "(git commit -F <file>, gh --body-file <file>). To use a value such as a git revision, "
+        "print it with one command first and write the value into the next."
+    )
 
 
 def unreadable(reason: str) -> str:
@@ -202,6 +232,11 @@ def unreadable(reason: str) -> str:
         shellread.REASON_UNTERMINATED: ("a quote or heredoc in this command never closes"),
         shellread.REASON_TAKEN_AS_CODE: (
             "this command hands a string to something that runs it as code"
+        ),
+        shellread.REASON_UNTERMINATED_SUBST: "a $( ) or backquote in this command never closes",
+        shellread.REASON_AMBIGUOUS_SUBST: (
+            "a $( ) in this command holds a form that shells read differently "
+            "(such as case inside $( )), or nests too deep"
         ),
     }.get(reason, "this command could not be read")
     return (

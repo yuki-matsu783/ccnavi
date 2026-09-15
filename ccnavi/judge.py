@@ -173,7 +173,7 @@ def decide_before(
         if conf.guard_ticket_approval != selfguard.DISABLE:
             rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
-    subject = screen(payload.tool_name, record.subject, record)
+    subject, bare = screen(payload.tool_name, record.subject, record)
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
@@ -258,6 +258,16 @@ def decide_before(
     if group:
         record.source = group[0].source
 
+    # 止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったもの。
+    # 書いた側は文字を書いただけのつもりでいるので、回避策を知らせないと、
+    # 同じ形を書き直しては止まる。どこに当たったかは一致位置から推し量らず、
+    # 引用の中の中身を除いた読み（bare）に当て直して、当たらなければそうだとする。
+    # こうするとルールの書き方（glob / regex、`^` / `(^|\x00)`）に依らない。
+    inside = [False] * len(group)
+    if verdict in (rules.DENY, rules.ASK) and bare != subject:
+        inside = [not rule.matches(payload.tool_name, bare) for rule in group]
+    record.quoted = [name for name, hit in zip(record.rules, inside, strict=True) if hit]
+
     # チケットはルールが何も言わなかったときだけ見る。ルールのほうが強い。
     # 順番を逆にすると、ルールが許した場所をチケットが閉じられることになり、
     # 人が書いた宣言よりエージェントが書いた宣言のほうが強くなる。
@@ -300,8 +310,8 @@ def decide_before(
         # 当たった理由はまとめて 1 回で返す。1 つずつ返すと、エージェントも
         # 1 つずつ直すことになり、そのたびに往復が 1 回増える。
         texts = [
-            reasons.reason_for(rule, payload.tool_name, subject, source, record.degraded)
-            for rule in group
+            reasons.reason_for(rule, payload.tool_name, subject, source, record.degraded, quoted)
+            for rule, quoted in zip(group, inside, strict=True)
         ]
         record.code = reasons.code_for(payload.tool_name, record.degraded)
         if any(rule.id == phase.TICKET_APPROVAL_RULE_ID for rule in group):
@@ -312,8 +322,8 @@ def decide_before(
         record.code = reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and group:
         texts = [
-            reasons.reason_for(rule, payload.tool_name, subject, source, record.degraded)
-            for rule in group
+            reasons.reason_for(rule, payload.tool_name, subject, source, record.degraded, quoted)
+            for rule, quoted in zip(group, inside, strict=True)
         ]
         record.code = reasons.CODE_RULE_ASK
     elif verdict == rules.ASK:
@@ -427,9 +437,13 @@ def full_path(path: str, cwd: str) -> str:
         return os.path.normpath(os.path.abspath(joined))
 
 
-def screen(tool: str, subject: str, record: audit.Record) -> str:
+def screen(tool: str, subject: str, record: audit.Record) -> tuple[str, str]:
     """シェルのコマンドを、実際に実行される部分まで絞る。読み切れなかったときは
     record にそう書き残す。
+
+    返すのは、ルールを当てる読みと、そこから引用の中で切り出したコマンドを除いた読み
+    （shellread.Reading.bare）。後者は文面の断りを決めるためだけに使う。シェルでない
+    ツールと読み切れなかったコマンドでは、2 つは同じになる。
 
     ルールはコマンドについて書かれたものであって、文字列についてではない。
     git push を引用した文書は push ではないし、そこで拒否を返すことは、
@@ -440,12 +454,12 @@ def screen(tool: str, subject: str, record: audit.Record) -> str:
     どちらの拒否なのかを名乗る。
     """
     if tool != "Bash":
-        return subject
+        return subject, subject
     reading = shellread.read(subject)
     if reading.degraded:
         record.degraded = reading.reason
-        return subject
-    return reading.text
+        return subject, subject
+    return reading.text, reading.bare
 
 
 def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:

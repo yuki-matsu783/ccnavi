@@ -702,8 +702,10 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 ```sh
 grep -n "git push" README.md      # 通る。git push は grep の引数
 echo "git push origin main"       # 通る
+grep -n '$(git push)' f           # 通る。単一引用の中は文字
+grep -n "\$(git push)" f          # 通る。\$( は置換にならない
 # git push origin main            # 通る。コメント
-cat <<'EOF' > notes.md            # 通る。ヒアドキュメントの本文は実行位置ではない
+cat <<'EOF' > notes.md            # 通る。区切りを引用したヒアドキュメントの本文は文字
 git push origin main
 EOF
 
@@ -712,7 +714,21 @@ cd /repo && git push              # 止まる
 /usr/bin/git push                 # 止まる
 GIT_DIR=/repo/.git git push       # 止まる
 echo $(git push origin main)      # 止まる。$( ) の中は実行される
+echo "$(git push origin main)"    # 止まる。二重引用の中の $( ) も実行される
+cat <(git push)                   # 止まる。プロセス置換の中も実行される
+if true; then git push; fi        # 止まる。予約語の後ろはコマンドの先頭
 ```
+
+シェルが実行する中身は、書いた場所によらず独立したコマンドとして読む。二重引用の中の `$( )` と
+バッククォート、プロセス置換 `<( )` `>( )`、区切りを引用しないヒアドキュメント（`<<EOF`）の本文の
+`$( )` とバッククォートがこれにあたる。中身は外側のコマンドの後ろにつながれ、外側の置換のあった場所には
+`$` が 1 文字残る。`grep -n "$(git push)" f` は `grep -n $ f` と `git push` の 2 本として読まれるので、
+grep の allow は後ろの `git push` まで通さない。外側は割れないので、`find $(pwd) -name x -delete` の
+`-delete` は find と同じコマンドとして見える。
+
+同じ理由で、引用の外の改行はコマンドの区切りになり、2 行目のコマンドは 1 行目の引数として読まれない。
+`#` がコメントになるのは語の始まりだけで、`a#b` や `$#` の `#` は文字。`if` `then` `do` `coproc` `{` などの
+予約語はコマンドの位置にあればそれだけで 1 本になり、後ろの語がコマンドの先頭になる。
 
 引用が 1 語につないだ空白は、コマンドと引数の間の空白としては読まれない。
 これが `"git push"` と `git push` を分ける。引用の中身そのものは残るので、
@@ -730,6 +746,21 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 素の `echo x>f` は演算子として残るので、書き込み先を見るルールには当たる。
 例外は、引用符の中身が演算子の文字だけでできている 1 語（`grep -n ">" f`）。
 `shlex` が引用されていたかどうかを返さないので、演算子と区別が付かない。
+
+### 文字として書きたいとき
+
+二重引用の中の `$( )` とバッククォートは、書いた側が文字のつもりでも、シェルは実行する。だから止まる。
+引用の中から切り出したコマンドにだけルールが当たったときは、返る文面にそのことと回避策が添えられ、
+記録と `--test` に `quoted`（そのルールの id）が出る。文字として渡す道は必ず残してある。
+
+| 書きたいもの | 止まる書き方 | 通る書き方 |
+|---|---|---|
+| 本文にバッククォートを含む issue や PR | ``gh issue create --body "use `git push` here"`` | `` \` `` で書く、単一引用で包む、`--body-file <ファイル>` |
+| 複数行のコミットメッセージ | `commit -m "$(cat <<'EOF' … EOF)"`（heredoc のルール） | 本文を Write で置いて `commit -F <ファイル>`、改行を含む `-m "…"` |
+| git の値を使うコマンド | `cd "$(git rev-parse --show-toplevel)"` | ラッパースクリプトで値を出して読み、次のコマンドにその値を書く |
+| 今の場所を渡す検索 | `grep -rn foo "$(pwd)"`（allow から外れて確認になる） | 値をそのまま書く |
+
+単一引用の中に `'` を書くときは `'"'"'` とつなぐ。どんな文字列も単一引用で文字として渡せる。
 
 ### 読み切れないとき
 
@@ -751,6 +782,13 @@ echo $(git push origin main)      # 止まる。$( ) の中は実行される
 |---|---|
 | 文字列をコードとして実行する呼び出し | `bash -c`、`sh -c`、`eval`、`xargs`、`find -exec` |
 | 引用やヒアドキュメントが閉じていない | `echo "git push` |
+| 置換が閉じていない | ``echo `git push``、`echo $(git push` |
+| シェルによって読みが割れる置換、深すぎる入れ子 | `echo "$(case a in a) git push;; esac)"`、16 段を超える `$( )` |
+
+置換の中身が 1 つでも読み切れなければ、コマンド全体が縮退する。`$( )` の中の `case` は、bash 3.2 が
+`)` を置換の終わりと読んで構文エラーにし、zsh は実行する。どちらかに決めて読むと片方で素通りに
+なりうるので、`case` という語が現れたら縮退させる。コマンドの先頭ではない語（`"$(echo just in case)"`）
+でも縮退するのは、許容した誤検知（[ccnavi.md](ccnavi.md) §12.2）。
 
 引用でコマンド名を割った `"git" push` や `g"it" push` は縮退しない。
 シェルと同じ字句規則で語を組み直すので、本来の push としてそのまま止まる。
@@ -1543,7 +1581,7 @@ factors:
 
 `tree` と `project` には、その呼び出しの行き先が属するツリーとプロジェクトの名前が入る。
 複数のプロジェクトを横断しているときに、どこで何が起きたかを数え分ける欄。`permission_mode` は
-Claude Code から来たモードで、`handover` の行と合わせて読む。全 20 欄は
+Claude Code から来たモードで、`handover` の行と合わせて読む。全 21 欄は
 [ccnavi.md](ccnavi.md) の付録 B。
 
 実行後の監視が検知した回は `paths` に「種類とパス」が並ぶ。件数ではなく綴りで
@@ -1555,8 +1593,12 @@ Claude Code から来たモードで、`handover` の行と合わせて読む。
 切り替えたときに何件が戻るのかが分かる。
 
 コマンドを読み切れずに生の文字列で判定した回は、判定を下したうえで `degraded` が付く。
-`command-taken-as-code` と `unterminated-quote` の 2 つ。
+`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution` の 4 つ。
 止めたもののうち、どれだけが読み切れないまま出た判定かを後から数えられる。
+
+止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったものは `quoted` に id が並ぶ
+（「文字として書きたいとき」）。書いた側が文字のつもりでいた場所で止めた回を数えられる。多ければ、
+直すのは文面の案内か、よく書かれる形のほう。
 
 ルールファイルを読めず組み込みの既定で判定した回は `fallback` が付き、
 `detail` に読めなかったファイルのパスが入る。ガードが落ちたまま何回動いたかは、
@@ -1691,6 +1733,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 | `reason` / `degraded` / `fallback` | `skip` の理由、生の文字列に当てたかどうか、組み込みの既定で判定したかどうか。無ければ空 |
 | `rules[]` | 当たったルール。`{id, source, section, kind, written, pattern}`。`source` は `file`（ルールファイルの中）か `outside`（チケットの範囲のように外から来た根拠）。`kind` は `glob` か `regex`、`written` は書いたまま、`pattern` は翻訳後の正規表現 |
 | `response` | エージェントに返る文面そのもの。無ければ空 |
+| `quoted` | 当たったルールのうち、引用の中から切り出したコマンドにだけ当たったものの id。そういうルールがあるときだけ出る |
 
 `--test-samples --json` の最上位。
 

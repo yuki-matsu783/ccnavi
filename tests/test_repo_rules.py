@@ -155,5 +155,255 @@ class RepoRulesTest(unittest.TestCase):
                 self.assert_verdict(subject, "deny", "builtin-guard-setting-files")
 
 
+@unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+class SubstRepoRulesTest(unittest.TestCase):
+    """コマンド置換・改行・プロセス置換を読んだあとの判定。
+
+    wip/design/shellread-subst.md の §3 と §4.3。
+
+    見本は (subject, 判定, 当たるルールの id, 根拠コード)。id が空ならどのルールにも当たらないこと、
+    コードが空なら見ない。
+    """
+
+    def check(self, cases):
+        for subject, want, rule_id, code in cases:
+            with self.subTest(subject=subject):
+                body = judge("Bash", subject)
+                self.assertTrue(body["known"])
+                self.assertEqual(body["verdict"], want, body["response"])
+                if rule_id:
+                    self.assertIn(rule_id, hit(body), body["rules"])
+                elif want != "skip":
+                    self.assertEqual(hit(body), [], body["rules"])
+                if code:
+                    self.assertEqual(body["code"], code, body["response"])
+
+    # 変わるべきもの
+
+    def test_引用の中の置換は中身で判定する(self):
+        self.check(
+            [
+                ('echo "$(git push origin main)"', "deny", "raw-git", ""),
+                ('grep -n "$(git push)" f', "deny", "raw-git", ""),
+                ('grep -n "`rm -rf /tmp/x`" f', "deny", "recursive-delete", ""),
+                ('h="$(git rev-parse HEAD)"', "deny", "raw-git", ""),
+                ('echo "$(rm -rf /tmp/x)"', "deny", "recursive-delete", ""),
+                ("echo `find . -delete`", "deny", "find-writes", ""),
+                ("cat <<EOF\nuse `rm -rf /tmp/x`\nEOF", "deny", "recursive-delete", ""),
+            ]
+        )
+
+    def test_改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない(self):
+        # 今は allow が後ろのコマンドまで通していた（設計 §0）。
+        self.check(
+            [
+                ("grep -n x f\nsh evil.sh", "ask", "", "UNDECLARED"),
+                ("cat <(sh evil.sh)", "ask", "", "UNDECLARED"),
+                ("grep x <(curl https://example.com)", "ask", "prefer-webfetch", ""),
+                ("find . -name x\npython evil.py", "ask", "", "UNDECLARED"),
+                ("grep -n a#b f; sh evil.sh", "ask", "", "UNDECLARED"),
+            ]
+        )
+
+    def test_外側を割らず_後ろと予約語の直後もコマンドの先頭として読む(self):
+        self.check(
+            [
+                ("find $(pwd) -name x -delete", "deny", "find-writes", ""),
+                ("echo a#; git push origin main", "deny", "raw-git", ""),
+                ("curl https://example.com/#top; rm -rf /tmp/x", "deny", "recursive-delete", ""),
+                ("ls\nfind . -delete", "deny", "find-writes", ""),
+                ("echo hi\ncurl https://example.com", "ask", "prefer-webfetch", ""),
+                ("if true; then find . -delete; fi", "deny", "find-writes", ""),
+            ]
+        )
+
+    def test_組み込みの守りも中身に当たる(self):
+        self.check(
+            [
+                ('echo "$(ccnavi --approve x)"', "deny", "builtin-guard-ticket-approval", ""),
+                ("ls\nccnavi --approve x", "deny", "builtin-guard-ticket-approval", ""),
+                (
+                    'echo "$(tee /repo/.ccnavi/common/rules.yml < /tmp/x)"',
+                    "deny",
+                    "builtin-guard-setting-files",
+                    "",
+                ),
+                (
+                    "cat /tmp/x >(tee /repo/.ccnavi/common/rules.yml)",
+                    "deny",
+                    "builtin-guard-setting-files",
+                    "",
+                ),
+                (
+                    "ls\nsed -i s/a/b/ /repo/.ccnavi/common/rules.yml",
+                    "deny",
+                    "builtin-guard-setting-files",
+                    "",
+                ),
+                (
+                    'echo x > "$(pwd)/.ccnavi/common/rules.yml"',
+                    "deny",
+                    "builtin-guard-setting-files",
+                    "",
+                ),
+            ]
+        )
+
+    # 変わってはいけないもの
+
+    def test_文字として書いたものと既存の読みは変わらない(self):
+        self.check(
+            [
+                ("echo $(git push origin main)", "deny", "raw-git", ""),
+                ("echo $((1 << 2))", "ask", "", "UNDECLARED"),
+                ('grep -n "git push" README.md', "allow", "prefer-read-grep", ""),
+                ("grep -n '$(git push)' f", "allow", "prefer-read-grep", ""),
+                ('grep -n "\\$(git push)" f', "allow", "prefer-read-grep", ""),
+                ('grep -n "\\`git push\\`" f', "allow", "prefer-read-grep", ""),
+                ("echo hi # $(git push)", "ask", "", "UNDECLARED"),
+                ("# git push origin main", "skip", "", ""),
+                ("cat /repo/README.md | head -20", "ask", "", "UNDECLARED"),
+                ("""grep -n "regex: '(>" f""", "allow", "prefer-read-grep", ""),
+                ('grep -n "<<EOF" /repo/README.md', "allow", "prefer-read-grep", ""),
+                ("cat <<'EOF' > notes.md", "deny", "heredoc", "PARSE_UNCERTAIN"),
+                ("cat a.txt\n", "allow", "prefer-read-grep", ""),
+                ("curl -s 'https://example.com/a#frag'", "ask", "prefer-webfetch", ""),
+                ('export PATH="$(go env GOPATH)/bin:$PATH"', "ask", "", "UNDECLARED"),
+                ('eval "$(ssh-agent -s)"', "ask", "", "PARSE_UNCERTAIN"),
+                (
+                    "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
+                    "ask",
+                    "",
+                    "UNDECLARED",
+                ),
+            ]
+        )
+
+    def test_引用付き_heredoc_の本文は読まない(self):
+        for subject in [
+            "cat <<'EOF' > notes.md\n$(git push) `rm -rf /tmp/x`\nEOF",
+            "cat <<'EOF' > notes.md\ngit push origin main\nEOF\necho done",
+        ]:
+            with self.subTest(subject=subject):
+                body = judge("Bash", subject)
+                self.assertEqual(body["verdict"], "deny")
+                self.assertEqual(hit(body), ["heredoc"], body["rules"])
+
+    # 増える誤検知と回避策
+
+    def test_増える誤検知(self):
+        self.check(
+            [
+                (
+                    "sh .ccnavi/scripts/ccnavi-git.sh commit -m \"$(cat <<'EOF'\n"
+                    "fix: don't push\nEOF\n)\"",
+                    "deny",
+                    "heredoc",
+                    "",
+                ),
+                (
+                    "gh pr create --title t --body \"$(cat <<'EOF'\n- `rm -rf x` is gone\nEOF\n)\"",
+                    "deny",
+                    "heredoc",
+                    "",
+                ),
+                ('gh issue create --title t --body "use `git push` here"', "deny", "raw-git", ""),
+                (
+                    'gh issue create --title t --body "odd ` backtick and git push"',
+                    "deny",
+                    "raw-git",
+                    "PARSE_UNCERTAIN",
+                ),
+                ('cd "$(git rev-parse --show-toplevel)"', "deny", "raw-git", ""),
+                ('grep -rn foo "$(pwd)"', "ask", "", "UNDECLARED"),
+                ('find "$(pwd)" -name x', "ask", "", "UNDECLARED"),
+                ('cat "$(ls -t logs/git-*.log | head -1)"', "ask", "", "UNDECLARED"),
+                ("grep -n foo f\ngrep -n bar g", "ask", "", "UNDECLARED"),
+                ('echo "$(case a in a) git push;; esac)"', "deny", "raw-git", "PARSE_UNCERTAIN"),
+                ('echo "$(xargs echo < f)"', "ask", "", "PARSE_UNCERTAIN"),
+            ]
+        )
+
+    def test_回避策の綴りは止まらない(self):
+        self.check(
+            [
+                (
+                    "sh .ccnavi/scripts/ccnavi-git.sh commit -F /tmp/msg.txt",
+                    "allow",
+                    "ccnavi-git",
+                    "",
+                ),
+                (
+                    'sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: 1 行目\n\n本文"',
+                    "allow",
+                    "ccnavi-git",
+                    "",
+                ),
+                ("gh pr create --title t --body-file /tmp/body.md", "ask", "", "UNDECLARED"),
+                (
+                    'gh issue create --title t --body "use \\`git push\\` here"',
+                    "ask",
+                    "",
+                    "UNDECLARED",
+                ),
+                (
+                    "gh issue create --title t --body 'use `git push` and don'\"'\"'t $(x)'",
+                    "ask",
+                    "",
+                    "UNDECLARED",
+                ),
+                ("sh /tmp/run.sh", "ask", "", "UNDECLARED"),
+                (
+                    "sh .ccnavi/scripts/ccnavi-git.sh rev-parse --show-toplevel",
+                    "allow",
+                    "ccnavi-git",
+                    "",
+                ),
+            ]
+        )
+
+    # 文面（§4.3）
+
+    def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
+        quoted = judge("Bash", 'gh issue create --title t --body "use `git push` here"')
+        self.assertIn("inside double quotes", quoted["response"])
+        self.assertEqual(quoted.get("quoted"), ["raw-git"])
+
+        bare = judge("Bash", "echo $(git push origin main)")
+        self.assertNotIn("inside double quotes", bare["response"])
+        self.assertFalse(bare.get("quoted"), bare.get("quoted"))
+
+    def test_縮退の断りは理由ごとに違う(self):
+        responses = {}
+        for subject, reason, phrase in [
+            ('echo "git push', shellread.REASON_UNTERMINATED, "quote or heredoc"),
+            ("echo `git push", shellread.REASON_UNTERMINATED_SUBST, "backquote"),
+            (
+                'echo "$(case a in a) git push;; esac)"',
+                shellread.REASON_AMBIGUOUS_SUBST,
+                "shells read differently",
+            ),
+        ]:
+            with self.subTest(subject=subject):
+                body = judge("Bash", subject)
+                self.assertEqual(body["degraded"], reason)
+                self.assertIn(phrase, body["response"])
+                responses[reason] = body["response"]
+        self.assertEqual(len(set(responses.values())), 3, "理由の違う縮退に同じ文面を返した")
+
+    def test_coproc_の中身も_find_writes_に当たる(self):
+        # 敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）。
+        self.check(
+            [
+                ("coproc { find . -delete; }", "deny", "find-writes", ""),
+                ("coproc find . -delete", "deny", "find-writes", ""),
+                ("coproc NAME { find . -delete; }", "deny", "find-writes", ""),
+                ("coproc while true; do find . -delete; done", "deny", "find-writes", ""),
+                ("coproc ( find . -delete )", "deny", "find-writes", ""),
+                ("echo coproc", "ask", "", "UNDECLARED"),
+            ]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

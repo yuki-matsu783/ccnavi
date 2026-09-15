@@ -91,6 +91,10 @@ class Record:
     # これが無いと、設置を誤った状態が「どのファイルのことか分からない理由」に見える。
     detail: str = ""
     rules: list[str] = field(default_factory=list)
+    # quoted は rules のうち、引用の中から切り出したコマンドにだけ当たったもの。
+    # 書いた側が文字のつもりでいた場所で止めた回を、あとから数えられるように。
+    # 多ければ、直すのは文面の案内か、よく書かれる形の側。
+    quoted: list[str] = field(default_factory=list)
     # paths は実行後の監視が保護領域の中に見つけた変更。件数ではなく綴りで
     # 残すのは、同じ場所が繰り返し汚れているのか毎回違う場所なのかで、
     # 直す先が変わるため。前者は出力先の設定 1 つ、後者は経路そのもの。
@@ -182,6 +186,8 @@ class Log:
                 out[key] = value
         if record.rules:
             out["rules"] = record.rules
+        if record.quoted:
+            out["quoted"] = record.quoted
         if record.paths:
             out["paths"] = record.paths
         if record.guarded:
