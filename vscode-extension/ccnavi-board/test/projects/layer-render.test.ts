@@ -78,7 +78,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
   assert.match(lib, /data-action="create-rules" data-name="lib"/);
   assert.match(lib, /data-action="open-rules" data-name="lib" disabled /);
   // 予約名のプロジェクトは層が無いので、置く先も作るボタンも出さない
-  assert.match(reserved, /層として数えられていません/);
+  assert.match(reserved, /層として数えられていない/);
   assert.doesNotMatch(reserved, /create-rules/);
 
   const workspace = html.slice(html.indexOf('<section class="workspace">'));
