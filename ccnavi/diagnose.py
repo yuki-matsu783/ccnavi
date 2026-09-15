@@ -559,6 +559,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
+    stdout.write(
+        "  作業ツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。"
+        "範囲の外は止まる\n"
+    )
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
     if not conf.tickets_enabled:
         stdout.write(f"  {settings.TICKET_CONTROL_ENV}=disable。範囲の制限は掛かっていない\n")

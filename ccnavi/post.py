@@ -292,20 +292,25 @@ class ScopeGuard:
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
     # プロジェクトの置き場。作業ツリーの切り元をプロジェクトまで広げる（設計 §25.3）。
     projects: str = ""
+    # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
+    tickets: str = ""
+    approved: str = ""
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、咎める文面と出所を返す。中なら None。
 
-        チケット自身の提案ファイルは外でも咎めない。次のチケットを提案する道を
-        塞ぐと、いちど承認した範囲から永久に出られなくなる。
+        チケットの置き場は外でも咎めない。次のチケットを提案する道を塞ぐと、
+        いちど承認した範囲から永久に出られなくなる。外し方は実行前の判定と同じ関数。
         """
         t = tree.tree_of(self.root, full, self.projects)
         if t is None or t.is_main:
             return None
         ticket = tree.lookup(self.copies, t.name)
-        if ticket is None or ticket.is_own_file(full):
+        if ticket is None:
             return None
         rel = tree.relative(t, full)
+        if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
+            return None
         verdict = ticket.decide(rel)
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
         if parent is not None:
@@ -402,9 +407,13 @@ def _findings(
     ccnavi 自身が書く場所は先に落とす。落とさないと、記録を 1 行足すたびに
     自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
 
-    ルールに当たった変更は、範囲の外でもルールの側で報告する。ルールのほうが
-    強く、範囲を広げても通らないから。ここで範囲の側の文面を返すと、
+    ルールの deny と ask に当たった変更は、範囲の外でもルールの側で報告する。
+    範囲を広げても済まない場所だから。ここで範囲の側の文面を返すと、
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
+
+    ルールの allow に当たる変更も、チケットの範囲は当てる。実行前の判定がルールと
+    チケットの厳しい側を採るのと同じ（設計 §5）。allow を理由に飛ばすと、実行前に
+    止まる書き込みがシェルから入ったときに誰も言わない。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
     name = where.name if where is not None else ""
@@ -417,7 +426,7 @@ def _findings(
         if group:
             found.append(Finding(change, group, source, CODE_VIOLATION, name, top))
             continue
-        if scope is None or _allowed(rule_set, change.full):
+        if scope is None:
             continue
         hit = scope.finding(change.full)
         if hit is not None:
@@ -433,21 +442,11 @@ def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
     言っている場所だから。シェルやビルドが書いたぶんは誰にも確認が出ないまま
     通っているので、あとから言う先がここしかない。
 
-    `allow` は入れない。通してよいと宣言された場所なので、変わっていることは
-    報告することではない。ただし `deny` や `ask` と同じ場所に当たる `allow` が
-    あっても、強いほうが勝つ。当てる順は実行前の判定と同じ。
+    `allow` は入れない。ルールとしては通してよいと宣言された場所なので、ルールの側から
+    報告することではない。チケットの範囲は `_findings` が別に当てる。`deny` や `ask` と
+    同じ場所に当たる `allow` があっても、強いほうが勝つ。当てる順は実行前の判定と同じ。
     """
     return rule_set.deny + rule_set.ask
-
-
-def _allowed(rule_set: rules.RuleSet, path: str) -> bool:
-    """この場所への書き込みが `allow` で宣言されているか。
-
-    宣言されていればチケットの範囲の外でも咎めない。実行前の判定でルールが
-    チケットより強いのと同じ順で、実行後もルールを先に見る。片方だけ順番が
-    違うと、実行前に通った書き込みが実行後に差し戻されることになる。
-    """
-    return any(_guards_writes(rule, path) for rule in rule_set.allow)
 
 
 def _guards_writes(rule: rules.Rule, path: str) -> bool:

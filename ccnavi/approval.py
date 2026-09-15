@@ -981,6 +981,12 @@ def screen(
                 lines.append(f"    種類 {bound.title}: " + ", ".join(bound.scope_globs))
         else:
             lines.append("■ このチケットで書き込みが許される領域（これ以外はすべて止まる）")
+            # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
+            # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
+            lines.append(
+                "    ルールの allow で開けてある場所も、この範囲の外では止まる。"
+                "ルールの deny はこの範囲の中でも止まる"
+            )
         for name in rules.SECTIONS:
             paths = t.paths(name)
             if paths:
