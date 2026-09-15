@@ -2,7 +2,7 @@
  * リスク管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象は共通層の配点（`.ccnavi/common/risk.yml`、`CCNAVI_RISK`）の 1 本だけ。自身の層とプロジェクトの層も
+ * 対象は共通層の配点（`.ccnavi/common/risks.yml`、`CCNAVI_RISK`）の 1 本だけ。自身の層とプロジェクトの層も
  * 配点を持ち、判定は共通層と親の `project:` の層の和で行う（設計 §11.4.2）が、この画面ではそれらを開かない
  * （設計 §11.11）。パネルは 1 つ。
  *
@@ -27,7 +27,7 @@ import { renderRiskPage } from "./core/risk-render.js";
 import { ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
-const DEFAULT_RISK = ".ccnavi/common/risk.yml";
+const DEFAULT_RISK = ".ccnavi/common/risks.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
@@ -396,7 +396,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   let text: string;
   try {
     text = loaded.doc.apply(form);
-    tmp = path.join(current.tmpDir, "risk.yml");
+    tmp = path.join(current.tmpDir, "risks.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
     fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);

@@ -97,7 +97,7 @@ DEPLOY_RULES=".ccnavi/common/rules.yml"
 # phases はワークスペースのレイアウト（scope の綴り）に付くので自身の層
 # （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
 # projects/ の下のプロジェクトにも効いてしまう（設計 §11.2）。
-DEPLOY_RISK=".ccnavi/common/risk.yml"
+DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
@@ -152,7 +152,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
-.ccnavi/common/risk.yml、.ccnavi/config/phases.yml）・ゲートの sh と振り分けの sh
+.ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・ゲートの sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場は、配布先の
 .gitignore に足す。前の既定の置き場（.ccnavi/bin/ccnavi の sh）は、新しい置き場が揃ってから
 env を書き換えて消す。
@@ -649,7 +649,7 @@ if [ "$all" = yes ]; then
 		CCNAVI_TICKETS_PROPOSAL: "wip/tickets",
 		CCNAVI_TICKETS_APPROVED: ".ccnavi/tickets",
 		CCNAVI_PHASES: ".ccnavi/common/phases.yml",
-		CCNAVI_RISK: ".ccnavi/common/risk.yml",
+		CCNAVI_RISK: ".ccnavi/common/risks.yml",
 		CCNAVI_PROJECT_HOME: ".ccnavi"
 	}')
 fi

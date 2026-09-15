@@ -106,7 +106,7 @@ deny:
       共通層の見本も ccnavi ディレクトリ（.ccnavi/）の下なので、組み込みの builtin-guard-project-home が止める
       （ADR-0042）。見本の下書きは scratchpad に置き、ルールの下書きと一緒に利用者に渡す
   - tool: Edit
-    subject: "/repo/.ccnavi/common/risk.yml"
+    subject: "/repo/.ccnavi/common/risks.yml"
     why: リスクの配点も同じ。自分の作業の重さを自分で決められる
   - tool: Write
     subject: "/repo/.claude/hooks/lint-py.sh"
