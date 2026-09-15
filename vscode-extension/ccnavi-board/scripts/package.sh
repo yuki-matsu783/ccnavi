@@ -7,6 +7,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 cd "$here"
 
 pnpm install --frozen-lockfile
+pnpm run lint
 pnpm run compile
 pnpm test
 
