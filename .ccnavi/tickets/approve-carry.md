@@ -45,6 +45,9 @@ ccnavi_approved:
   approved_at: 2026-09-13T19:36:21+0900
   source_tree: approve-carry
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/approve-carry/wip/tickets/todo/approve-carry.md
+  revised_at: 2026-09-15T16:40:38+0900
+  feedback_at: 2026-09-15T16:40:38+0900
+feedback: []
 ---
 
 # ボードの承認もコミットと push まで運び、範囲の超過は承認で止めず判定で止める
