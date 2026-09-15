@@ -604,7 +604,7 @@ const STYLE = `${PAGE_STYLE}
   .phase-tickets::before { content: "·"; margin: 0 5px; }
   .phase-status { text-align: right; }
   .phase-active .phase-status { color: var(--vscode-charts-blue); }
-  .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
+  .phase.gate-closed .phase-label, .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
   .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
   .issues {
     list-style: none; margin: 6px 0 0; padding: 0;

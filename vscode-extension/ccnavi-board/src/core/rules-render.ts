@@ -356,6 +356,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
           rule.match = names.filter((n, i) => boxes[i].checked).join("|");
           input.value = rule.match;
           markDirty();
+          // チェックボックス自身の input は change より先に上へ伝わり、その時点では rule.match が古い。
+          // 書き換えたあとに札の枠から input を流し直して、行の要約を今の値で書き直させる。
+          wrap.dispatchEvent(new Event("input", { bubbles: true }));
         });
         names.push(name);
         boxes.push(box);
@@ -491,6 +494,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const total = sections[section].length;
       const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find), [data-list=" + section + "] .rule.open").length;
       document.querySelector("[data-count=" + section + "]").textContent = q === "" ? String(total) : shown + " / " + total;
+      // 絞り込み中は畳んだタイプの中も見せるので、矢印もそれに合わせる（畳んだ状態そのものは変えない）。
+      const el = document.querySelector(".rule-section[data-section=" + section + "]");
+      const twist = el.querySelector("h2 > .twist");
+      const shownAsOpen = q !== "" || !el.classList.contains("folded");
+      twist.textContent = shownAsOpen ? "▾" : "▸";
+      twist.setAttribute("aria-expanded", shownAsOpen ? "true" : "false");
     }
   }
   // タイプごとの畳み。画面の見え方だけで、ルールの中身と並びには触らない。
@@ -499,9 +508,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!el) { return; }
     const next = on === undefined ? !el.classList.contains("folded") : on;
     el.classList.toggle("folded", next);
-    const twist = el.querySelector("h2 > .twist");
-    twist.textContent = next ? "▸" : "▾";
-    twist.setAttribute("aria-expanded", next ? "false" : "true");
+    // 矢印は絞り込みの有無も見て決めるので、applyFind に任せる
+    applyFind();
   }
   // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
   // その場だけの展開で、開いた行の控えには入れない（判定を繰り返しても既定の畳みが崩れない）。
