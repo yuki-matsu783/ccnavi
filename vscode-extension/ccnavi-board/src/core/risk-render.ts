@@ -11,7 +11,7 @@
  * 色は VS Code のテーマ変数だけを使う。文字列は全部実体参照にする。
  */
 import type { Lock } from "./lock.js";
-import { BUTTON_STYLE, escapeHtml } from "./render.js";
+import { BUTTON_STYLE, LIST_STYLE, escapeHtml } from "./render.js";
 import { BUILTIN_LEVELS, KINDS, LEVEL_NAMES, type RiskModel } from "./risk-doc.js";
 
 export interface RiskPage {
@@ -83,7 +83,7 @@ ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="bloc
   <h2>項目 <span class="count" id="factor-count">0</span>
     <button type="button" class="action small" data-action="add">＋ 項目を追加</button></h2>
   <p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> の失敗と読めない出力は重い側に倒れて points がそのまま加点され、<code>judge</code> は判定が揃うまで子を閉じられない。</p>
-  <ul class="factors" id="factors"></ul>
+  <ul class="list" id="factors"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
 <script nonce="${nonce}" type="application/json" id="page">${embedded}</script>
@@ -150,7 +150,7 @@ const STYLE = `  * { box-sizing: border-box; }
     color: var(--vscode-editorWarning-foreground);
   }
   .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
-  .empty { color: var(--vscode-descriptionForeground); }
+  .empty { color: var(--vscode-descriptionForeground); padding: 6px 8px; margin: 0; }
 ${BUTTON_STYLE}
   button.action.small { margin-left: auto; }
   input[type=text], select {
@@ -173,18 +173,11 @@ ${BUTTON_STYLE}
   .level-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
   .level-name.medium { color: var(--vscode-editorWarning-foreground); }
   .level-name.high, .level-name.critical { color: var(--vscode-editorError-foreground); }
-  .factors { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .factor {
-    border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
-    background: var(--vscode-editorWidget-background);
-  }
-  .factor-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 6px; }
-  .factor-row:last-child { margin-bottom: 0; }
-  .factor-row .grow { flex: 1 1 260px; }
-  .factor-row .field.w-id { width: 170px; }
-  .factor-row .field.w-num { width: 90px; }
-  .factor-row .field.w-kind { width: 230px; }
-  .factor-row .buttons { margin-left: auto; display: flex; gap: 4px; }
+${LIST_STYLE}
+  /* 1 行 = 開閉、id、points、当て方と値、文面 */
+  .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px max-content minmax(0, 1fr); }
+  .sum .sum-points { text-align: right; font-variant-numeric: tabular-nums; }
+  .field > select.f-kind { max-width: 300px; }
   .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; }
   .foot.error { color: var(--vscode-editorError-foreground); }`;
 
@@ -199,6 +192,17 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   let busy = false;
   let seq = 0;
   const keys = new Map();
+  // 開いている項目の鍵。既定は全部畳む。Webview の state には id で控え、再読込のあとも同じ項目が開く。
+  const opened = new Set();
+  const savedOpen = new Set((vscode.getState() || {}).open || []);
+  function persistOpen() {
+    const ids = [];
+    for (const key of opened) {
+      const factor = factorByKey(key);
+      if (factor && factor.id !== "") { ids.push(factor.id); }
+    }
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { open: ids }));
+  }
 
   function h(tag, attrs, children) {
     const el = document.createElement(tag);
@@ -261,26 +265,48 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       markDirty();
       renderAll();
     });
-    const points = field(factor, "points", "f-points", "25");
+    const points = field(factor, "points", "f-points num", "25");
     points.setAttribute("inputmode", "numeric");
     const value = field(factor, "value", "f-value", info.placeholder);
     if (NUMERIC.indexOf(factor.kind) >= 0) { value.setAttribute("inputmode", "numeric"); }
-    const rows = [
-      h("div", { class: "factor-row" }, [
-        captioned("id", field(factor, "id", "f-id", "big-diff"), "w-id"),
-        captioned("points", points, "w-num"),
-        captioned("当て方", kindSelect, "w-kind"),
+    const twist = h("button", { type: "button", class: "twist", title: "この項目を開く／畳む" });
+    const sum = h("span", { class: "sum" });
+    const head = h("div", { class: "row-head" }, [twist, sum]);
+    const li = h("li", { class: "row factor", "data-key": key }, [
+      head,
+      h("div", { class: "row-body" }, [
+        captioned("id", field(factor, "id", "f-id narrow", "big-diff")),
+        captioned("points", points),
+        captioned("当て方", kindSelect),
+        captioned(factor.kind, factor.kind === "glob"
+          ? h("div", { class: "inline" }, [value, h("span", { class: "cap", text: "max" }), field(factor, "max", "f-max num", "上限。空なら青天井")])
+          : value),
+        captioned("message", field(factor, "message", "f-message", "加点した理由として依頼文と閉じたときの出力に出る短い文。空なら id")),
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
-      h("div", { class: "factor-row" }, [
-        captioned(factor.kind, value, "grow"),
-        factor.kind === "glob" ? captioned("max", field(factor, "max", "f-max", "上限。空なら青天井"), "w-num") : null,
-      ]),
-      h("div", { class: "factor-row" }, [
-        captioned("message", field(factor, "message", "f-message", "加点した理由として依頼文と閉じたときの出力に出る短い文。空なら id"), "grow"),
-      ]),
-    ];
-    return h("li", { class: "factor", "data-key": key }, rows);
+    ]);
+    function fillSummary() {
+      sum.textContent = "";
+      sum.appendChild(h("span", { class: "sum-id" + (factor.id === "" ? " dim" : ""), text: factor.id === "" ? "（id 未設定）" : factor.id }));
+      sum.appendChild(h("span", { class: "sum-points" + (factor.points === "" ? " dim" : ""), text: factor.points === "" ? "—" : factor.points + " 点" }));
+      sum.appendChild(h("span", { class: "dim", text: kindInfo(factor.kind).label }));
+      sum.appendChild(h("span", { class: "clip", title: factor.value }, [
+        factor.value === "" ? h("span", { class: "dim", text: "（" + factor.kind + " 未設定）" }) : h("code", { text: factor.value + (factor.kind === "glob" && factor.max !== "" ? "（max " + factor.max + "）" : "") }),
+        factor.message === "" ? null : h("span", { class: "sum-note", text: factor.message }),
+      ]));
+    }
+    function setOpen(on) {
+      if (on) { opened.add(key); } else { opened.delete(key); }
+      li.classList.toggle("open", on);
+      twist.textContent = on ? "▾" : "▸";
+      twist.setAttribute("aria-expanded", on ? "true" : "false");
+      persistOpen();
+    }
+    head.addEventListener("click", () => setOpen(!li.classList.contains("open")));
+    li.addEventListener("input", fillSummary);
+    fillSummary();
+    setOpen(opened.has(key));
+    return li;
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
@@ -302,6 +328,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function renderAll() {
     renderLevels();
+    // 前に開いていた項目は id で覚えている。最初の描画でだけ鍵に写す。
+    if (savedOpen.size > 0) {
+      for (const factor of form.factors) { if (savedOpen.has(factor.id)) { opened.add(keyOf(factor)); } }
+      savedOpen.clear();
+    }
     const list = document.getElementById("factors");
     list.textContent = "";
     for (const factor of form.factors) { list.appendChild(renderFactor(factor)); }
@@ -342,7 +373,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add() {
-    form.factors = form.factors.concat([{ origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" }]);
+    const factor = { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" };
+    form.factors = form.factors.concat([factor]);
+    // 足した項目は開いて出す。畳んだままでは何を足したか分からない。
+    opened.add(keyOf(factor));
     markDirty();
     renderAll();
     const items = document.querySelectorAll("#factors .factor");
