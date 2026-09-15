@@ -831,6 +831,37 @@ class LayerFailureTest(ConfigUnionHarness):
         self.assertNotIn("lib:schema", self.reason(passed))
 
 
+class ProblemsSaidOnceTest(ConfigUnionHarness):
+    """ルールの苦情は、1 回の起動で 1 度だけ出す。
+
+    hook はツリーの層ごとに共通層を読み直し、`--lint` は層のファイルを 2 つの経路で読む。
+    読むたびに言うと、同じ苦情が層やツリーの数だけ並ぶ。
+    """
+
+    SILENT = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
+
+    def test_hooks_say_a_common_layer_problem_once(self):
+        common = write(
+            os.path.join(self.ws, "silent-rules.yml"),
+            json.dumps({"version": 1, "deny": [self.SILENT]}),
+        )
+        for event in ("UserPromptSubmit", "Stop"):
+            with self.subTest(event=event):
+                done = self.hook("", self.ws, event=event, rules=common)
+                self.assertEqual(done.stderr.count("deny:silent"), 1, done.stderr)
+
+    def test_lint_counts_a_layer_problem_once(self):
+        write_layer(self.lib, rules={"version": 1, "deny": [self.SILENT]})
+
+        said = [
+            (p["where"], p["detail"])
+            for p in self.lint_json()["problems"]
+            if p["where"].startswith(self.project_where("lib")) and "silent" in p["where"]
+        ]
+        self.assertTrue(said, "層の苦情が出ていない")
+        self.assertEqual(len(said), len(set(said)), said)
+
+
 class PostMonitoringUnionTest(ConfigUnionHarness):
     """実行後の監視も「共通層 + そのツリーの層」の和（§11.7）。
 

@@ -129,6 +129,34 @@ class TestJsonTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def test_json_right_after_test_is_the_output_form(self):
+        # `--test` は 2 語を取る。直後に `--json` を書いても TOOL として取らない。
+        for args in (
+            ("--test", "--json", "Bash", "cd /repo && git push"),
+            ("--test", "Bash", "--json", "cd /repo && git push"),
+        ):
+            with self.subTest(args=args):
+                done = ccnavi(self.root, self.rules_path, *args)
+                body = json.loads(done.stdout)
+                self.assertEqual(body["tool"], "Bash")
+                self.assertEqual(body["verdict"], "deny", done.stdout + done.stderr)
+
+    def test_rule_problems_are_said_once(self):
+        # 試験は判定と当たったルールの一覧で共通層を 2 度読み、見本は 1 件ずつ判定する。
+        # どちらでも、同じ苦情を 2 度出さない。
+        silent = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
+        body = {**RULES, "deny": [*RULES["deny"], silent]}
+        rules_path = write(self.tmp.name, "silent.yml", json.dumps(body))
+        for args in (
+            ("--test", "Bash", "cd /repo && git push"),
+            ("--test", "Bash", "cd /repo && git push", "--json"),
+            ("--test-samples", self.samples_path),
+            ("--test-samples", self.samples_path, "--json"),
+        ):
+            with self.subTest(args=args):
+                done = ccnavi(self.root, rules_path, *args)
+                self.assertEqual(done.stderr.count("deny:silent"), 1, done.stderr)
+
     def test_one_call_carries_verdict_rules_and_response(self):
         done = ccnavi(
             self.root, self.rules_path, "--test", "Bash", "cd /repo && git push", "--json"
