@@ -110,11 +110,16 @@ vscode-extension/ccnavi-board/  VS Code 拡張
 確認コマンド。
 
 ```sh
-uv run python -m unittest discover -s tests -t .
+uv run python -m unittest discover -s tests -t .          # 全件
+uv run python -m unittest discover -s tests/core -t .     # 1 グループ（core guard config ticket sh e2e）
 uv run --with ruff ruff check .
 uv run --with ruff ruff format --check .
 uv run --with pyinstaller python build.py
 ```
+
+テストは `python -m unittest`（`discover` か `tests.<グループ>.test_x`）で回す。`python tests/sh/test_setup.py` の
+ようにファイルを直接実行すると、`tests` パッケージを import できずに落ちる。どのグループを回すかは
+`.claude/skills/commit/references/test-groups.md` の表で決める。
 
 ## 未実装
 
@@ -155,7 +160,7 @@ uv run --with pyinstaller python build.py
 確かめ方。
 
 ```
-CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
+uv run python -m unittest tests.e2e.test_e2e_sh -v
 ```
 
 走り出しに、測った `sh` と `exe` の場所が出る。**`sh =` がワークスペースルート側を
@@ -167,8 +172,10 @@ CCNAVI_E2E=1 uv run python -m unittest tests.test_e2e_sh -v
 
 写す前の版を測りたいときは `CCNAVI_SH_DIR=<場所>` で出どころを差し替える。
 
-`tests/test_e2e_sh.py` は重い（実 git・実行ファイル 18MB の写し）ので `CCNAVI_E2E` が
-無ければ skip する。**モード B（`projects/` を使う形）に触ったら回すこと。**
+`tests/e2e/test_e2e_sh.py` は実 git と実行ファイルの写しを使うが、20 件が 8 秒ほどで終わるので
+既定で走る（以前は `CCNAVI_E2E` が無ければ skip していた）。組み立て済みの実行ファイルが無ければ
+skip する。試すのは組み立て済みの実行ファイルなので、`ccnavi/` を直したら組み立て直してから回す。
+**モード B（`projects/` を使う形）に触ったら回すこと。**
 
 写す版で直したもの。
 
@@ -336,7 +343,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 - 組み直し（`build.py` の置き換え）が `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
 - ワークスペースの `.git` の commit-graph の控えの一覧が、欠けた控えを指している。`git commit-graph write --reachable --split=replace` で直る
 - 提案と承認済みチケットの書き込みが原子的でない。書いている途中で機械が落ちると、中身が NUL で埋まる
-- Windows で `tests.test_config_union_guard`（動かした共通層へのシェルの書き込み）と `tests.test_fallback`（動かした置き場への
+- Windows で `tests.config.test_config_union_guard`（動かした共通層へのシェルの書き込み）と `tests.guard.test_fallback`（動かした置き場への
   シェルの書き込み）が 1 件ずつ落ちる。テストが絶対パスを引用せずにコマンドへ埋め込んでおり、bash は `\` をエスケープとして
   落とすので、そのコマンドは設定ファイルに書かない。ガードの判定は正しく、テストの綴りを直す
 
@@ -389,7 +396,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   そのままでは `grep -n "$(git push)" f` の中身、`a#b; cmd` の後ろ、2 行目のコマンドが読みに入らず、
   allow が後ろまで通していた。だから `shellread.py` は shlex の前に原文を走査し（`_Scanner`）、
   置換の中身・ヒアドキュメントの本文・コメント・改行を先に片付けてから、語の分割だけを shlex に任せる。
-  引用の規則を走査と shlex の 2 か所で持つので、どちらかに手を入れたら `tests/test_shellread.py` の
+  引用の規則を走査と shlex の 2 か所で持つので、どちらかに手を入れたら `tests/core/test_shellread.py` の
   `SHELL_CASES`（bash 3.2 と zsh で実測した 65 形）を回す
 - **`shlex` は引用された `<<` と素の `<<` を区別しない。** どちらも同じ文字列で
   返ってくるので、`grep -n "<<" README.md` はヒアドキュメントの始まりに見える。
@@ -424,7 +431,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 | 分かったこと | どうしたか |
 |---|---|
 | 変更要求（`POST .../request_changes`）は CE の `lib/api` に無い。EE 限定 | 当てられない。sh の `requested_changes` の読みは EE の文書どおりのまま。CE では `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
-| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh は利用者の情報を落とし、出力で伏せる。実行ファイルの `remote_kind` も読み飛ばす。`tests/test_review_origin.py` |
+| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh は利用者の情報を落とし、出力で伏せる。実行ファイルの `remote_kind` も読み飛ばす。`tests/core/test_review_origin.py` |
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら Git Credential Manager に保存しておく |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tools/gitlab/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |

@@ -1,0 +1,849 @@
+"""ccnavi 自身の設定ファイルを守る面の受入テスト。
+
+道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、実行前の
+payload で控えを取らせ、設定ファイルを壊してから実行後の payload を渡し、
+ファイルが実際にどうなったかを読む。
+
+ここで確かめたいのは 1 つに尽きる。ルールファイルを壊す道と、壊れたことに
+気づく道が、同じファイルに乗っていないこと。ルール由来の保護は、ルールを
+空にされると保護領域ごと消える。この面はそこを埋めるために在る。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+import time
+import unittest
+
+from ccnavi import platformtag, selfguard, settings, shellread
+from tests import ROOT
+from tests.inproc import run_ccnavi
+
+# 振り分けの sh の名前。この名前なら、実体は隣ではなく `../bin/<os>-<arch>/` に在る
+# （設計 launcher-scripts 3.2・3.3）。名前が入る前でもファイルごと落ちないように取る。
+LAUNCHER_NAME = getattr(platformtag, "LAUNCHER_NAME", "ccnavi-launcher.sh")
+
+RULES = {
+    "version": 1,
+    "deny": [
+        {
+            "id": "push",
+            "match": "Bash",
+            "glob": "*git push*",
+            "message": "git push is not run by the agent.",
+        }
+    ],
+    "allow": [{"id": "anything-else", "match": "Bash|Read|Write|Edit", "regex": "."}],
+}
+
+SETTINGS = {"hooks": {"PreToolUse": [], "PostToolUse": []}, "env": {"CCNAVI_MODE": "enable"}}
+
+
+def git(repo, *args):
+    done = subprocess.run(
+        ["git", "-c", "user.email=t@example.com", "-c", "user.name=t", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if done.returncode != 0:
+        raise AssertionError(f"git {args}: {done.stderr}")
+    return done.stdout
+
+
+def write(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+class SelfGuardTest(unittest.TestCase):
+    def setUp(self):
+        self.repo = tempfile.mkdtemp(prefix="ccnavi-selfguard-")
+        self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
+
+        git(self.repo, "init", "--quiet")
+        self.settings = os.path.join(self.repo, ".claude", "settings.json")
+        self.rules = os.path.join(self.repo, ".ccnavi", "common", "rules.yml")
+        write(self.settings, json.dumps(SETTINGS, indent=2) + "\n")
+        write(self.rules, json.dumps(RULES))
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "--quiet", "-m", "init")
+
+        self.state = os.path.join(self.repo, "state")
+        self.log = os.path.join(self.repo, "log.jsonl")
+
+    def binary(self, text="MZ fake executable\n"):
+        """実行ファイルの代わりを置く。`.gitignore` の中に在る想定なので、
+        コミットしない。git から戻せない対象がこれにあたる。"""
+        path = os.path.join(self.repo, "dist", "ccnavi", "ccnavi.exe")
+        write(path, text)
+        return path
+
+    def worktree(self, name="w1"):
+        """本物の作業ツリーを `.claude/worktrees/<名前>` に作る。
+
+        git に作らせる。守る側は `.git` ファイルと main の登録の相互参照が
+        両向きに揃ったものだけを作業ツリーと呼ぶので、手でディレクトリを
+        置いただけでは対象にならない。
+        """
+        path = os.path.join(self.repo, ".claude", "worktrees", name)
+        git(self.repo, "worktree", "add", "--quiet", "-b", name, path)
+        return path
+
+    def copy_in(self, work, *parts):
+        """作業ツリー側の設定の綴り。"""
+        return os.path.join(work, ".claude", *parts)
+
+    def run_hook(
+        self,
+        event,
+        mode="enable",
+        setting="enable",
+        session="s1",
+        tool="Bash",
+        bin="",
+        home="",
+        **tool_input,
+    ):
+        payload = json.dumps(
+            {
+                "hook_event_name": event,
+                "tool_name": tool,
+                "tool_input": tool_input or {"command": "ls"},
+                "session_id": session,
+            }
+        )
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        if bin:
+            environment["CCNAVI_BIN_PATH"] = bin
+        if home:
+            environment["CCNAVI_PROJECT_HOME"] = home
+        return run_ccnavi(
+            [
+                "--root",
+                self.repo,
+                "--rules",
+                self.rules,
+                "--state",
+                self.state,
+                "--log",
+                self.log,
+                "--mode",
+                mode,
+                "--guard-core-files",
+                setting,
+                # ルール由来の保護は切っておく。両方が同じファイルについて
+                # 別々に口を出すと、どちらが戻したのかがテストから見えない。
+                "--restore-if-deny",
+                "disable",
+            ],
+            input=payload,
+            cwd=ROOT,
+            env=environment,
+        )
+
+    def store(self):
+        """実体の置き場に在るものの中身。セッションをまたいで共有する側。"""
+        found = os.path.join(self.state, "selfguard", "store")
+        if not os.path.isdir(found):
+            return []
+        return sorted(read(os.path.join(found, name)) for name in os.listdir(found))
+
+    def sessions(self):
+        """控えを持っているセッションの名前。"""
+        found = os.path.join(self.state, "selfguard")
+        return sorted(
+            name for name in os.listdir(found) if os.path.isdir(os.path.join(found, name))
+        )
+
+    def backdate(self, *paths, days=10):
+        """置き場ごと更新時刻を古くする。掃除の日付をまたがせるため。"""
+        old = time.time() - days * 86400
+        for path in paths:
+            for name in os.listdir(path):
+                os.utime(os.path.join(path, name), (old, old))
+            os.utime(path, (old, old))
+
+    def records(self):
+        with open(self.log, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+
+    # 控えを取って戻す
+
+    def test_書き換えられたルールファイルは直前の内容に戻る(self):
+        self.run_hook("PreToolUse")
+        write(self.rules, json.dumps({"version": 1, "deny": []}))
+
+        result = self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.rules)), RULES)
+        self.assertIn("rules.yml", result.stdout)
+        self.assertIn("restored", result.stdout)
+
+    def test_ルールを空にされても保護は消えない(self):
+        # ルール由来の保護は、保護領域をルールファイルから導く。deny を空に
+        # されるとその一覧ごと消えるので、実行後の監視は何も検知しない。
+        # この面はルールを読まずに対象を決めるので、そこで止まらない。
+        self.run_hook("PreToolUse")
+        write(self.rules, json.dumps({"version": 1, "deny": [], "ask": [], "allow": []}))
+        write(self.settings, "{}\n")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.rules)), RULES)
+        self.assertEqual(json.loads(read(self.settings)), SETTINGS)
+
+    def test_hook_の登録を消された設定ファイルも戻る(self):
+        self.run_hook("PreToolUse")
+        broken = dict(SETTINGS)
+        broken["hooks"] = {"PreToolUse": []}
+        write(self.settings, json.dumps(broken))
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.settings))["hooks"], SETTINGS["hooks"])
+
+    def test_直前の断面に戻すのでコミットしていない編集は残る(self):
+        # git から戻すとコミット済みの内容まで巻き戻り、人の書きかけが消える。
+        # 控えから戻せば、戻る先はこのツール呼び出しの直前になる。
+        edited = json.dumps(
+            RULES
+            | {"version": 1, "ask": [{"id": "x", "match": "Bash", "regex": "y", "message": "z"}]}
+        )
+        write(self.rules, edited)
+        self.run_hook("PreToolUse")
+        write(self.rules, "{}")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(self.rules)), json.loads(edited))
+
+    # 消されたとき
+
+    def test_消された設定ファイルは実行前に戻る(self):
+        self.run_hook("PreToolUse")
+        os.remove(self.settings)
+
+        result = self.run_hook("PreToolUse")
+
+        self.assertTrue(os.path.exists(self.settings))
+        self.assertEqual(json.loads(read(self.settings)), SETTINGS)
+        self.assertIn("settings.json", result.stdout)
+
+    def test_控えが無ければ_git_から戻る(self):
+        # 実行前を通らずに消された場合。控えの置き場ごと消えた形も同じ。
+        os.remove(self.rules)
+
+        self.run_hook("PreToolUse")
+
+        self.assertTrue(os.path.exists(self.rules))
+        self.assertEqual(json.loads(read(self.rules)), RULES)
+
+    # 置いていないファイル
+
+    def test_置いていない設定ファイルについては何も言わない(self):
+        # settings.local.json は置かないのが普通。無いことを毎回報告すると、
+        # 呼び出しのたびに 1 行増えて、本当に言うべき 1 行が埋もれる。
+        result = self.run_hook("PreToolUse")
+
+        self.assertNotIn("settings.local.json", result.stdout)
+        self.assertEqual(result.stderr, "")
+
+    def test_置いていない設定ファイルが現れたら言うが消さない(self):
+        self.run_hook("PreToolUse")
+        local = os.path.join(self.repo, ".claude", "settings.local.json")
+        write(local, '{"hooks": {}}\n')
+
+        result = self.run_hook("PostToolUse")
+
+        self.assertTrue(os.path.exists(local), "人が置くこともあるファイルを消さない")
+        self.assertIn("settings.local.json", result.stdout)
+
+    # 作業ツリー側の設定
+
+    def test_作業ツリーの中の設定ファイルも戻る(self):
+        # その場では誰も読まないファイルだが、統合すれば main の hook の
+        # 登録になる。止める側も気づく側も無い道なので、ここで戻す。
+        work = self.worktree()
+        copy = self.copy_in(work, "settings.json")
+        self.run_hook("PreToolUse")
+        write(copy, "{}\n")
+
+        result = self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), SETTINGS)
+        self.assertIn("restored", result.stdout)
+        self.assertIn("統合すれば", result.stdout)
+
+    def test_作業ツリーの中のルールファイルも戻る(self):
+        work = self.worktree()
+        copy = os.path.join(work, ".ccnavi", "common", "rules.yml")
+        self.run_hook("PreToolUse")
+        write(copy, json.dumps({"version": 1, "deny": []}))
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), RULES)
+
+    def test_作業ツリーでないディレクトリは守らない(self):
+        # `.claude/worktrees/` の下に在るだけのディレクトリ。参考実装の写しを
+        # 置いた形がこれで、守りに行くと人のファイルを勝手に戻すことになる。
+        fake = os.path.join(self.repo, ".claude", "worktrees", "not-a-tree")
+        copy = self.copy_in(fake, "settings.json")
+        write(copy, "{}\n")
+        self.run_hook("PreToolUse")
+        write(copy, '{"changed": true}\n')
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), {"changed": True})
+
+    def test_消された作業ツリー側の設定は実行前に戻る(self):
+        work = self.worktree()
+        copy = self.copy_in(work, "settings.json")
+        self.run_hook("PreToolUse")
+        os.remove(copy)
+
+        self.run_hook("PreToolUse")
+
+        self.assertEqual(json.loads(read(copy)), SETTINGS)
+
+    def test_控えが無ければ作業ツリーの側の_git_から戻る(self):
+        # 控えを取る前に書き換えられた回。main の git は
+        # `.claude/worktrees/` を無視しているので、作業ツリー側の設定のコミット済みの内容を
+        # 持っているのは、その作業ツリー自身の git のほうになる。
+        work = self.worktree()
+        copy = self.copy_in(work, "settings.json")
+        write(copy, "{}\n")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(copy)), SETTINGS)
+
+    def test_作業ツリー側の設定の控えは作業ツリーごとに分かれる(self):
+        # 取り違えると、片方の作業ツリーの内容がもう片方に書き戻される。
+        one = self.copy_in(self.worktree("w1"), "settings.json")
+        two = self.copy_in(self.worktree("w2"), "settings.json")
+        write(one, json.dumps({"env": {"A": "1"}}))
+        write(two, json.dumps({"env": {"B": "2"}}))
+        self.run_hook("PreToolUse")
+        write(one, "{}\n")
+        write(two, "{}\n")
+
+        self.run_hook("PostToolUse")
+
+        self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
+        self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
+
+    def test_プロジェクトの層は自分のgitから戻し作業ツリー側の向きも切り元で決まる(self):
+        # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
+        # なくそのプロジェクトで、作業ツリー側の設定が入るのもそのプロジェクトから切った
+        # 作業ツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
+        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py がブラックボックスで見る。
+        self.worktree()
+        projects = os.path.join(self.repo, "projects")
+        home = os.path.join(projects, "lib")
+        project = os.path.join(home, ".ccnavi", "config", "rules.yml")
+        write(project, json.dumps(RULES))
+
+        layers = [settings.LayerFile(settings.ORIGIN_PROJECT, "lib", "rules", project)]
+        found = selfguard.targets(self.repo, self.rules, "", layers, projects)
+
+        own = [t for t in found if t.key == "rules:lib"]
+        self.assertEqual(len(own), 1, [t.key for t in found])
+        self.assertEqual(own[0].top, home)
+        self.assertFalse(own[0].copy)
+        self.assertEqual(
+            [t.label for t in found if t.copy],
+            self.own_copies((".ccnavi", "common", "rules.yml")),
+        )
+
+    def test_root_の外を指すルールファイルには作業ツリー側が無い(self):
+        # 置き場がワークスペースルートの外にあるなら、作業ツリーの中に対応する
+        # 作業ツリー側には無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
+        self.worktree()
+        outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
+
+        found = selfguard.targets(self.repo, outside, "")
+
+        self.assertEqual([t.label for t in found if t.copy], self.own_copies())
+
+    def own_copies(self, *rels):
+        """作業ツリー w1 の中の作業ツリー側の設定の綴り。root からの相対で、並ぶ順のまま。
+
+        ワークスペースから切ったツリーには、ワークスペースが追跡しているもの
+        だけが入る。設定ファイル 2 つは必ず入り、残りは渡した層のうち root の
+        下に在るぶん。無いファイルもそのまま並ぶ（在るかどうかは控えの側が見る）。
+        """
+        head = (".claude", "worktrees", "w1")
+        found = [
+            os.path.join(*head, ".claude", "settings.json"),
+            os.path.join(*head, ".claude", "settings.local.json"),
+        ]
+        return found + [os.path.join(*head, *rel) for rel in rels]
+
+    # 戻す前に止める
+
+    def test_ルールに書かなくてもシェルからの書き込みは止まる(self):
+        # RULES にこの場所を守るルールは 1 件も無い。それでも止まるのが要点で、
+        # 止める側もルールファイルの外に置いてあることを確かめている。
+        result = self.run_hook("PreToolUse", command="echo x > .ccnavi/common/rules.yml")
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_設定ファイルを読むだけなら通る(self):
+        # 場所の名前が出たかどうかでは止めない。ここは読むほうが普通の場所で、
+        # 名前で止めると、いちばんガードを直したいときにいちばん強く効く。
+        result = self.run_hook("PreToolUse", command="cat .ccnavi/common/rules.yml")
+
+        self.assertNotIn("deny", result.stdout)
+
+    def test_disable_なら止める側も足さない(self):
+        result = self.run_hook(
+            "PreToolUse", setting="disable", command="echo x > .ccnavi/common/rules.yml"
+        )
+
+        self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    def test_記録と控えの置き場もシェルからの書き込みで止まる(self):
+        # 記録と控えは判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
+        for command in ("rm logs/log.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_git_ラッパースクリプトの記録は止めない(self):
+        # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
+        result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
+
+        self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    # 引用に空白を含む形（wip/design/shellread-sep.md §3）。shellread が語の中の
+    # 切れ目をコマンドの区切りと別の目印で渡すようになると、`[^\x00]*` が引用の
+    # 空白をまたいで行き先まで届く。止める側はそれで穴が塞がり、リダイレクトの
+    # 行き先の式は語の中の目印を食わないように直す。
+
+    def rules_in_shell(self):
+        """シェルに書く綴りのルールファイル。引用の外に置くので区切りは `/`。"""
+        return self.rules.replace("\\", "/")
+
+    @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
+    def test_引用の中に書いたリダイレクトの行き先は書き込みではない(self):
+        # `> 場所` が引用の中にある。grep の引数であって、書き込み先を連れてこない。
+        # 語の中の目印がリダイレクトの行き先として読まれると、ここが止まる。
+        result = self.run_hook("PreToolUse", command=f'grep -n "> {self.rules_in_shell()}" f')
+
+        self.assertNotIn("deny", result.stdout)
+        self.assertNotIn("builtin-guard-setting-files", result.stdout)
+
+    @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
+    def test_引用に空白を含む書き換えも止まる(self):
+        # 動詞と行き先の間に引用の空白があっても、同じコマンドの中なら届く。
+        # 引用の空白がコマンドの区切りと同じ目印だった間は、ここが穴だった。
+        rules = self.rules_in_shell()
+        for command in [
+            f'sed -i "s/a b/c/" {rules}',
+            f'tee "a b" {rules}',
+            f'cp "a b" {rules}',
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    # 実行ファイル
+
+    def test_実行ファイルはシェルからの書き込みで止まる(self):
+        path = self.binary()
+
+        result = self.run_hook(
+            "PreToolUse", bin=path, command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe"
+        )
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_実行ファイルは名指しのツールからも止まる(self):
+        path = self.binary()
+
+        result = self.run_hook("PreToolUse", bin=path, tool="Write", file_path=path)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_指していなければ実行ファイルの綴りは当たらない(self):
+        # CCNAVI_BIN_PATH が空なら、そこは守る対象ではない。綴りを推測して
+        # 守ると、そこに在る別のファイルを実体として扱うことになる。
+        self.binary()
+
+        result = self.run_hook("PreToolUse", command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe")
+
+        self.assertNotIn("deny", result.stdout)
+
+    def test_セッション開始で控えを取り実行後に戻す(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path)
+        write(path, "MZ replaced\n")
+
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ fake executable\n")
+        self.assertIn("ccnavi.exe", result.stdout)
+
+    def test_セッション開始を通らなければ実行ファイルは黙って通る(self):
+        # 控えが無い状態。セッション開始のイベントに登録していないか、
+        # 実行ファイルを指していない設定がこれで、事件ではない。
+        path = self.binary()
+        write(path, "MZ replaced\n")
+
+        result = self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "MZ replaced\n")
+        self.assertEqual(result.stdout, "")
+
+    def test_実行ファイルが見つからなければセッション開始で言う(self):
+        missing = os.path.join(self.repo, "dist", "ccnavi", "ccnavi.exe")
+
+        result = self.run_hook("SessionStart", bin=missing)
+
+        self.assertIn("CCNAVI_BIN_PATH", result.stdout)
+
+    def test_拡張子を書かない綴りでも実行ファイルに当たる(self):
+        # hook の登録は 3 つの環境で同じ 1 行を使う。PyInstaller が Windows で
+        # だけ `.exe` を付けるので、設定に書いた綴りと在るファイルの綴りがずれる。
+        # 書いた側を直させるのではなく、在るほうを選ぶ。
+        path = self.binary()
+        spelled = os.path.join(self.repo, "dist", "ccnavi", "ccnavi")
+
+        self.run_hook("SessionStart", bin=spelled)
+        write(path, "MZ replaced\n")
+        self.run_hook("PostToolUse", bin=spelled)
+
+        self.assertEqual(read(path), "MZ fake executable\n")
+
+    def test_拡張子なしの実行ファイルはそのまま当たる(self):
+        # Linux の置き場がこれ。継ぎ足して探すのは書いた綴りが無いときだけで、
+        # 在るならそれを使う。Windows で `.exe` まで書いた設定も、同じ理由で
+        # 継ぎ足しに回らず、書いたとおりに当たる。
+        path = os.path.join(self.repo, "dist", "ccnavi", "ccnavi")
+        write(path, "ELF fake executable\n")
+
+        self.run_hook("SessionStart", bin=path)
+        write(path, "ELF replaced\n")
+        self.run_hook("PostToolUse", bin=path)
+
+        self.assertEqual(read(path), "ELF fake executable\n")
+
+    # 振り分けの sh と、その隣の機械ごとの組み立て（前の形）
+    #
+    # 導入スクリプトを打ち直すまでは、`.ccnavi/bin/ccnavi` を指したままのワークスペースが
+    # 残る。そこで隣の実体を守り続けるために、前の形のテストはそのまま通らなければならない。
+
+    def launcher_layout(self, place=("tools", "bin")):
+        """前の配布先の形。指す先は sh で、hook が実際に走らせるのは隣の実体。"""
+        launcher = os.path.join(self.repo, *place, "ccnavi")
+        exe = os.path.join(self.repo, *place, platformtag.host_target(), "ccnavi")
+        write(launcher, "#!/bin/sh\n")
+        write(exe, "ELF fake executable\n")
+        return launcher, exe
+
+    def test_振り分けの隣の実体もセッション開始で控え実行後に戻す(self):
+        # sh だけを控えると、隣の実体を差し替えても判定が入れ替わったことに気付かない。
+        launcher, exe = self.launcher_layout()
+
+        self.run_hook("SessionStart", bin=launcher)
+        write(exe, "ELF replaced\n")
+        self.run_hook("PostToolUse", bin=launcher)
+
+        self.assertEqual(read(exe), "ELF fake executable\n")
+
+    def test_振り分けの隣の実体は名指しのツールから止まる(self):
+        # ccnavi ディレクトリ（.ccnavi/）の外へ動かした置き場は、
+        # ccnavi ディレクトリを守るルールでは止まらない。
+        launcher, exe = self.launcher_layout()
+        bundled = os.path.join(os.path.dirname(exe), "_internal", "base_library.zip")
+
+        result = self.run_hook("PreToolUse", bin=launcher, tool="Write", file_path=bundled)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_振り分けの隣の実体はシェルからの書き込みで止まる(self):
+        launcher, _ = self.launcher_layout()
+
+        result = self.run_hook("PreToolUse", bin=launcher, command="rm -rf tools/bin/linux-x86_64")
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_振り分けの親の下でも組み立ての置き場でなければ当たらない(self):
+        launcher, _ = self.launcher_layout()
+
+        result = self.run_hook(
+            "PreToolUse",
+            bin=launcher,
+            tool="Write",
+            file_path=os.path.join(self.repo, "tools", "bin", "notes.md"),
+        )
+
+        self.assertNotIn("deny", result.stdout)
+
+    # 振り分けの sh を `<置き場>/scripts/` に、実体を `<置き場>/bin/<os>-<arch>/` に分けた形
+    #
+    # 指す先の名前が振り分けの sh なら、実体は sh の隣ではなく `../bin/` に在る。守る綴り
+    # （binary_clause）と控える先（launched_executable）は同じ条件で切り替わらなければ
+    # ならない。片方だけ切り替わると、守っている場所と控えている場所が食い違う。
+
+    def scripts_layout(self, place=(".ccnavi",)):
+        """sh を `<place>/scripts/`、実体を `<place>/bin/<この機械>/` に置く。
+
+        返すのは (CCNAVI_BIN_PATH に書く相対の綴り, sh の絶対パス, 実体の絶対パス)。
+        place を空にすると、ワークスペースルートの直下に `scripts/` と `bin/` が並ぶ。
+        """
+        spelled = "/".join([*place, "scripts", LAUNCHER_NAME])
+        launcher = os.path.join(self.repo, *place, "scripts", LAUNCHER_NAME)
+        exe = os.path.join(self.repo, *place, "bin", platformtag.host_target(), "ccnavi")
+        write(launcher, "#!/bin/sh\n")
+        write(exe, "ELF fake executable\n")
+        return spelled, launcher, exe
+
+    def test_scripts_に置いた振り分けの実体はセッション開始で控え実行後に戻す(self):
+        # G1。hook が実際に走らせるのは `.ccnavi/bin/<この機械>/ccnavi`。sh の隣
+        # （`.ccnavi/scripts/<この機械>/`）を探していると、控えが無いまま差し替えを見逃す。
+        spelled, _, exe = self.scripts_layout()
+
+        self.run_hook("SessionStart", bin=spelled)
+        write(exe, "ELF replaced\n")
+        result = self.run_hook("PostToolUse", bin=spelled)
+
+        self.assertEqual(read(exe), "ELF fake executable\n")
+        self.assertIn("restored", result.stdout)
+
+    def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
+        # G2。既定の置き場では ccnavi ディレクトリの守り（`*/.ccnavi/*`）と二重に止まり、
+        # 先に名指しされるのはそちら。ccnavi ディレクトリを動かすとそちらは外れるので、
+        # 残った実行ファイル由来の守りが止めていることをそこで確かめる
+        # （REQ-SLF-07 を ccnavi ディレクトリの守りに寄りかからせない）。
+        spelled, _, exe = self.scripts_layout()
+        bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
+
+        with self.subTest(home="(既定)"):
+            result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
+
+            self.assertIn("deny", result.stdout)
+
+        with self.subTest(home=".navi"):
+            result = self.run_hook(
+                "PreToolUse", bin=spelled, home=".navi", tool="Write", file_path=bundled
+            )
+
+            self.assertIn("deny", result.stdout)
+            self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_scripts_に置いた振り分けの実体の置き場はシェルからの書き込みで止まる(self):
+        # G3
+        spelled, _, exe = self.scripts_layout()
+        absolute = os.path.dirname(exe).replace("\\", "/")
+
+        for command in ("rm -rf .ccnavi/bin/linux-x86_64", f"rm -rf {absolute}"):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", bin=spelled, command=command)
+
+                self.assertIn("deny", result.stdout)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_scripts_に置いた振り分けの守りは隣ではなく_bin_の下に当たる(self):
+        # G4。sh の隣は配る場所ではない。そこに当てると守る必要の無い場所を止め、
+        # 本当に実体が在る `../bin/` を外す。
+        spelled, _, _ = self.scripts_layout(("tools",))
+        cases = (
+            (("tools", "scripts", "linux-x86_64", "x"), False),
+            (("tools", "bin", "linux-x86_64", "x"), True),
+        )
+
+        for parts, guarded in cases:
+            path = os.path.join(self.repo, *parts)
+            with self.subTest(path="/".join(parts)):
+                result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=path)
+
+                if guarded:
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-binary", result.stdout)
+                else:
+                    self.assertNotIn("builtin-guard-binary", result.stdout)
+
+    def test_scripts_に置いた振り分けの_bin_の下はシェルからの書き込みでも止まる(self):
+        # G4 と同じ置き場。ccnavi ディレクトリの外なので、止めるのは実行ファイルの綴りだけ。
+        spelled, _, _ = self.scripts_layout(("tools",))
+
+        result = self.run_hook("PreToolUse", bin=spelled, command="rm -rf tools/bin/linux-x86_64")
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_浅い綴りの振り分けでも守る場所と控える場所が揃う(self):
+        # G6。`scripts/ccnavi-launcher.sh` は段が 2 つしかない。段の数で切り替えると、
+        # 名前だけで切り替える控えの側と食い違う。
+        spelled, launcher, exe = self.scripts_layout(())
+
+        launched = platformtag.launched_executable(launcher)
+        self.assertEqual(
+            os.path.normcase(os.path.realpath(launched or launcher)),
+            os.path.normcase(os.path.realpath(exe)),
+            "控える先が `../bin/<この機械>/ccnavi` になっていない",
+        )
+
+        bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
+        result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
+
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin-guard-binary", result.stdout)
+
+    def test_浅い綴りの振り分けでも実体をセッション開始で控え実行後に戻す(self):
+        # G6 の控える側を、hook を通して確かめる。
+        spelled, _, exe = self.scripts_layout(())
+
+        self.run_hook("SessionStart", bin=spelled)
+        write(exe, "ELF replaced\n")
+        self.run_hook("PostToolUse", bin=spelled)
+
+        self.assertEqual(read(exe), "ELF fake executable\n")
+
+    # セッション開始の控え
+
+    def test_dry_run_でもセッション開始で控えを取る(self):
+        # 控えることは誰の書きかけも消さない。ここを enable に限ると、
+        # 切り替えた最初のセッションが戻す先を持たないまま走る。
+        path = self.binary()
+
+        self.run_hook("SessionStart", bin=path, mode="dry-run")
+
+        self.assertEqual(self.store(), ["MZ fake executable\n"])
+
+    def test_セッション開始では設定ファイルも控える(self):
+        # 実行前の控えが始まるのは最初のツール呼び出しから。それより前に
+        # 設定ファイルを消されると、控えを持たないまま実行後の監視に入る。
+        self.run_hook("SessionStart")
+
+        saved = os.path.join(self.state, "selfguard", "s1", "rules")
+        self.assertEqual(read(saved), read(self.rules))
+
+    # 控えを溜めない
+
+    def test_実行ファイルの控えはセッションをまたいで_1_本(self):
+        # 同じビルドのまま何セッション走っても、写しは 1 本で済むこと。
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path, session="s1")
+        self.run_hook("SessionStart", bin=path, session="s2")
+
+        self.assertEqual(self.store(), ["MZ fake executable\n"])
+        self.assertFalse(os.path.exists(os.path.join(self.state, "selfguard", "s1", "bin")))
+
+    def test_古い控えはセッション開始で落ちる(self):
+        self.run_hook("SessionStart", session="old")
+        self.backdate(os.path.join(self.state, "selfguard", "old"))
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertEqual(self.sessions(), ["s1"])
+
+    def test_動いているセッションの控えは巻き添えにしない(self):
+        # 実行前の控えは呼び出しのたびに書き直される。日付で切るのは
+        # そこに乗るため。並行しているセッションの戻す先を消さない。
+        self.run_hook("PreToolUse", session="other")
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertIn("other", self.sessions())
+
+    def test_自分の控えは日付を見ずに残る(self):
+        # 時計がずれている環境で、自分が戻す先を自分で消さないこと。
+        self.run_hook("SessionStart", session="s1")
+        self.backdate(os.path.join(self.state, "selfguard", "s1"))
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertIn("s1", self.sessions())
+
+    def test_参照されなくなった実体も落ちる(self):
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path, session="old")
+        self.backdate(
+            os.path.join(self.state, "selfguard", "old"),
+            os.path.join(self.state, "selfguard", "store"),
+        )
+
+        self.run_hook("SessionStart", session="s1")
+
+        self.assertEqual(self.store(), [])
+
+    def test_使われている実体は古くても残る(self):
+        # 何日も続いているセッションが、自分が戻す先を失わないこと。
+        path = self.binary()
+        self.run_hook("SessionStart", bin=path, session="s1")
+        self.backdate(os.path.join(self.state, "selfguard", "store"))
+
+        self.run_hook("SessionStart", session="s2")
+
+        self.assertEqual(self.store(), ["MZ fake executable\n"])
+
+    # 設定で切る
+
+    def test_disable_は控えも取らず戻しもしない(self):
+        self.run_hook("PreToolUse", setting="disable")
+        write(self.rules, "{}")
+
+        result = self.run_hook("PostToolUse", setting="disable")
+
+        self.assertEqual(read(self.rules), "{}")
+        self.assertEqual(result.stdout, "")
+
+    def test_dry_run_は戻さず戻すはずだったと言う(self):
+        self.run_hook("PreToolUse", setting="dry-run")
+        write(self.rules, "{}")
+
+        result = self.run_hook("PostToolUse", setting="dry-run")
+
+        self.assertEqual(read(self.rules), "{}", "言うだけで触らない")
+        self.assertIn("would-restore", result.stdout)
+
+    def test_モードが_dry_run_なら設定が_enable_でも触らない(self):
+        # dry-run は「呼び出しにも作業ツリーにも手を出さない」が約束。
+        # 守る側だけがその外に出ると、試している最中に誰も頼んでいない
+        # ファイル操作が起きる。
+        self.run_hook("PreToolUse", mode="dry-run")
+        write(self.rules, "{}")
+
+        result = self.run_hook("PostToolUse", mode="dry-run")
+
+        self.assertEqual(read(self.rules), "{}")
+        self.assertIn("would-restore", result.stdout)
+
+    # 記録
+
+    def test_記録に何をしたかが残る(self):
+        self.run_hook("PreToolUse")
+        write(self.rules, "{}")
+        self.run_hook("PostToolUse")
+
+        line = self.records()[-1]
+        self.assertIn("guarded", line)
+        self.assertIn("rules:restored", line["guarded"])
+
+
+if __name__ == "__main__":
+    unittest.main()

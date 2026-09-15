@@ -4,7 +4,7 @@ import { parseHooks } from "../../src/core/hooks.js";
 import { readRules } from "../../src/core/rules-doc.js";
 import { KNOWN_TOOLS, renderRulesPage, type RulesPage } from "../../src/core/rules-render.js";
 
-const RULES = `version: 3
+const RULES = `version: 1
 deny:
   - id: git-push
     match: Bash
@@ -60,7 +60,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", () => {
   assert.match(locked, /<p id="lock" class="lock">作業中のチケットがある（i0001-02）<\/p>/);
   const open = renderRulesPage(page(), { nonce: "n" });
   assert.match(open, /<p id="lock" class="lock hidden"><\/p>/);
-  const broken = renderRulesPage(page({ model: readRules("version: 3\ndeny: nope\n").model }), { nonce: "n" });
+  const broken = renderRulesPage(page({ model: readRules("version: 1\ndeny: nope\n").model }), { nonce: "n" });
   assert.match(broken, /<ul class="problems">/);
 });
 

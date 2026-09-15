@@ -1,0 +1,503 @@
+"""設定検証の受入テスト。内部の関数は呼ばず、標準出力と終了コードだけを見る。
+
+見るのは 3 つ。error があれば非ゼロで終わること、error と warn が分かれていること、
+そして検証が判定と同じ読み込みを使っていること。3 つ目が崩れると、検証が通ったのに
+実運用で落ちるという、検証があるぶんかえって危ない形になる。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import tempfile
+import unittest
+
+from tests import ROOT
+from tests.inproc import run_ccnavi
+
+# 不備の無いルール 1 件。ここに 1 つずつ壊した欄を足して試す。
+SOUND = {
+    "id": "git-push",
+    "match": "Bash",
+    "glob": "*git push*",
+    "message": "git push is not run by the agent. Ask the user to push.",
+}
+
+
+def write(directory: str, name: str, text: str) -> str:
+    path = os.path.join(directory, name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
+# 検証を通すのに要る最小の allow。無いと「allow が空」の warn が毎回 1 件増え、
+# 数を見ているテストが、そのテストの主題と関係の無い 1 件を数えることになる。
+ALLOWED = {"id": "anything", "match": "Read", "regex": "."}
+
+
+def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> str:
+    """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
+
+    書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
+    読み手がそのまま受け取る。タイプの形だけを見たいテストで、YAML の綴りの
+    話に付き合わずに済む。
+    """
+    body: dict = {"version": version, "deny": list(rules)}
+    if allow:
+        body["allow"] = [ALLOWED]
+    return write(directory, "rules.yml", json.dumps(body, indent=2))
+
+
+def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
+    """道具を 1 回動かす。
+
+    モードもルールもフラグで固定する。このリポジトリは ccnavi を自分自身に
+    仕掛けているので、テストを走らせるセッションが既に設定を持っている。
+    それを読むテストは、コードではなく走った機械のことを報告してしまう。
+    """
+    environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    return run_ccnavi(
+        ["--root", root, *args],
+        input="",
+        cwd=ROOT,
+        env=environment,
+    )
+
+
+def lint(root: str, rules_path: str, mode: str = "enable") -> subprocess.CompletedProcess:
+    return ccnavi(root, "--lint", "--rules", rules_path, "--mode", mode)
+
+
+def counts(text: str) -> tuple[int, int]:
+    """報告の最後の行から error と warn の件数を読む。"""
+    for line in reversed(text.splitlines()):
+        if line.startswith("error "):
+            fields = line.replace("件", "").replace("、", " ").split()
+            return int(fields[1]), int(fields[3])
+    raise AssertionError(f"件数の行が無い: {text!r}")
+
+
+class LintTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        # 空のディレクトリをワークスペースルートに使う。設定ファイルの有無まで自分で決められないと、
+        # テストが走った機械にあるファイルを報告することになる。
+        self.root = directory.name
+
+    def test_不備が無ければ何も咎めずに0で終わる(self):
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout), (0, 0))
+        # どのファイルを見た結果なのかを名乗らない報告は、別の設定についての
+        # 報告と見分けが付かない。
+        self.assertIn("rules.yml", result.stdout)
+
+    def test_読めないルールはerrorで非ゼロで終わる(self):
+        # block モードではこれが全ツール呼び出しの拒否になり、直すための
+        # 呼び出しまで止まる。検証がいちばん先に見つけなければならない形。
+        path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
+
+        result = lint(self.root, path)
+
+        self.assertEqual(result.returncode, 1, "error があるのに 0 で終わった")
+        self.assertIn("error:", result.stdout)
+        self.assertIn("ルールを読めない", result.stdout)
+
+    def test_無いルールファイルもerrorになる(self):
+        result = lint(self.root, os.path.join(self.root, "どこにも無い.yml"))
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(counts(result.stdout)[0], 1)
+
+    def test_承認の門にdry_runと書いたらerrorになる(self):
+        # この門は enable か disable しか取らない。dry-run と書いた人は止まらない
+        # つもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
+        # だけでは、その食い違いがどこにも現れない。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--guard-ticket-approval",
+            "dry-run",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("error:", result.stdout)
+        self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=dry-run", result.stdout)
+        # 倒れた先も言う。言わないと、止まっているのか通っているのかが分からない。
+        self.assertIn("enable として動いている", result.stdout)
+
+    def test_承認の門にenableと書いてもerrorにならない(self):
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--guard-ticket-approval",
+            "enable",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 0)
+
+    def test_チケット制御に読めない値を書いたらerrorになる(self):
+        # 切ったつもりの綴り違いは enable として動く。守りは消えないが、
+        # 書いた人は切れていると思い続けるので、直すまで error で名指しする。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--ticket-control",
+            "off",
+        )
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("CCNAVI_TICKET_CONTROL=off", result.stdout)
+        self.assertIn("enable として動いている", result.stdout)
+
+    def test_チケット制御をdisableにするとwarnで0のまま(self):
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--ticket-control",
+            "disable",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("チケット制御: disable", result.stdout)
+        self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 0)
+
+    def test_版が違うルールはerrorになる(self):
+        result = lint(self.root, rules_file(self.root, SOUND, version=99))
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("版", result.stdout)
+
+    def test_壊れたルールは1件ずつ名指しでerrorになる(self):
+        # 落ちたルールは黙って消える。消えた穴は誰も気づかないので、
+        # 1 件ずつ id で名指しする。
+        result = lint(
+            self.root,
+            rules_file(
+                self.root,
+                dict(SOUND, id="文面無し", message=""),
+                dict(SOUND, id="match無し", match=""),
+                dict(SOUND, id="当てるもの無し", glob="", regex=""),
+                dict(SOUND, id="二重指定", regex="git push"),
+                dict(SOUND, id="組み立て不能", glob="", regex="git push ("),
+                dict(SOUND, id="先読み", glob="", regex="git (?=push)"),
+            ),
+        )
+
+        self.assertEqual(result.returncode, 1)
+        for name in (
+            "文面無し",
+            "match無し",
+            "当てるもの無し",
+            "二重指定",
+            "組み立て不能",
+            "先読み",
+        ):
+            # 名前にはタイプが付く。同じ id が別のタイプに居ることがあるので、
+            # どちらの話なのかを名前が言えないと直しに行く先が決まらない。
+            self.assertIn(f"error: deny:{name}:", result.stdout, f"{name} を咎めていない")
+
+    def test_askとallowのmessageはerrorになりルールは効いたまま(self):
+        # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない（実測）。
+        # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
+        # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
+        body = {
+            "version": 1,
+            "deny": [SOUND],
+            "ask": [
+                {"id": "mig", "match": "Write", "glob": "*/migrations/*", "message": "人が見る"},
+                {"id": "quiet", "match": "Write", "glob": "*/quiet/*"},
+            ],
+            "allow": [dict(ALLOWED, message="通す")],
+        }
+        path = write(self.root, "rules.yml", json.dumps(body))
+        result = lint(self.root, path)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("error: mig: ask に message がある", result.stdout)
+        self.assertIn("error: anything: allow に message がある", result.stdout)
+        self.assertNotIn("quiet", result.stdout, "文面の無い ask は咎めない")
+        # 咎めたルールも読み込まれている（--explain に載る）。
+        shown = ccnavi(self.root, "--explain", "--rules", path, "--mode", "enable").stdout
+        self.assertIn("mig", shown)
+        self.assertIn("quiet", shown)
+
+    def test_denyが1件も無いのはerrorになる(self):
+        # 何も止めないガードは、入っていないガードと同じでありながら、
+        # 入っているように見える。いちばん見つけにくい壊れ方なので error。
+        result = lint(self.root, rules_file(self.root))
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("`deny` が空", result.stdout)
+
+    def test_allowが1件も無いのはwarnになる(self):
+        # 判定は動いている。ただし、どのルールも言及しない呼び出しが
+        # すべて Claude Code の権限モードに従うので、確認が出続ける状態と区別が付かない。
+        result = lint(self.root, rules_file(self.root, SOUND, allow=False))
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("`allow` が空", result.stdout)
+
+    def test_判定は動くが効かない記述はwarnで0のまま(self):
+        # ここが error と warn を分ける意味そのもの。ガードは動いているので
+        # CI を落とす必要は無く、しかし守っているつもりの穴は開いている。
+        result = lint(
+            self.root,
+            rules_file(
+                self.root,
+                dict(SOUND, id=""),
+                dict(SOUND, id="重複"),
+                dict(SOUND, id="重複", glob="*rm -rf *"),
+                dict(SOUND, id="当たらないツール", match="Task|Bash"),
+            ),
+        )
+
+        self.assertEqual(result.returncode, 0, "warn だけで非ゼロにしてはいけない")
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        # id 無しが 1 件、重複が 1 件、当たらない match が 1 件。重複は 2 件目だけを
+        # 咎める。1 件目は、他に同じ id が無ければそのままで正しいルールだから。
+        self.assertEqual(warns, 3, result.stdout)
+        self.assertIn("id が無い", result.stdout)
+        self.assertIn("id が重複", result.stdout)
+        self.assertIn("Task", result.stdout)
+
+    def test_権限ルールの名前で書いたmatchは咎めない(self):
+        # Claude Code の権限ルール `ToolName(指定子)` の括弧の中を除いた名前は、
+        # 判定が対象を取り出せる。PowerShell はコマンド、Grep / Glob は探す場所、
+        # Skill はスキル名、WebFetch は URL。lint の probe がその欄を渡し損ねると、
+        # 正しいルールを咎める。
+        result = lint(
+            self.root,
+            rules_file(
+                self.root,
+                dict(SOUND, id="ps", match="PowerShell"),
+                dict(SOUND, id="search", match="Grep|Glob", glob="*/secrets/*"),
+                dict(SOUND, id="skill", match="Skill", glob="deploy*"),
+                dict(SOUND, id="fetch", match="WebFetch", glob="*://example.com/*"),
+                dict(SOUND, id="gone", match="WebSearch|Task", glob="*"),
+            ),
+        )
+        self.assertEqual(result.returncode, 0)
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        # WebSearch は指定子を持たず、Task は今の Claude Code に無い。
+        # どちらも対象を取り出せないので、この 2 つだけを名前ごとに咎める。
+        self.assertEqual(warns, 2, result.stdout)
+        self.assertIn("WebSearch", result.stdout)
+        self.assertIn("Task", result.stdout)
+
+    def test_止めないモードはwarnとして報告される(self):
+        result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(counts(result.stdout), (0, 1))
+        self.assertIn("warn:", result.stdout)
+
+    def test_モードとして読めない値はwarnとして報告される(self):
+        result = lint(self.root, rules_file(self.root, SOUND), mode="blocking")
+
+        self.assertEqual(result.returncode, 0, "block に落ちるのでガードは弱まらない")
+        self.assertEqual(counts(result.stdout), (0, 1))
+        self.assertIn("blocking", result.stdout)
+
+    def test_作業ツリーの中に書かれたoffはerrorになる(self):
+        # 監視される側が書けるファイルから監視を止める記述。判定の側には
+        # 人が渡した off と見分ける手段が無いので、ここで見つけるしかない。
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"env": {"CCNAVI_MODE": "disable"}}),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("settings.json", result.stdout)
+        self.assertIn("disable", result.stdout)
+
+    def test_検証は判定と同じ読み込みを使う(self):
+        # 別の読み方をすると、検証は通ったのに実運用で落ちる。同じ壊れたルールに
+        # ついて、検証が名指しするものと、判定が走るときに苦情を言うものが
+        # 一致することで確かめる。
+        path = rules_file(self.root, SOUND, dict(SOUND, id="組み立て不能", glob="", regex="("))
+
+        checked = lint(self.root, path)
+        payload = json.dumps(
+            {
+                "hook_event_name": "PreToolUse",
+                "tool_name": "Bash",
+                "tool_input": {"command": "git status"},
+            }
+        )
+        decided = run_ccnavi(
+            ["--root", self.root, "--rules", path] + ["--mode", "enable", "--log", ""],
+            input=payload,
+            cwd=ROOT,
+            env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+        )
+
+        self.assertIn("組み立て不能", checked.stdout)
+        self.assertIn("組み立て不能", decided.stderr, "判定と検証が別のことを言っている")
+
+    def test_実行後の監視が登録されていなければwarnになる(self):
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, "実行前の判定は動くのでガードは消えていない")
+        self.assertEqual(counts(result.stdout), (0, 1))
+        self.assertIn("PostToolUse", result.stdout)
+
+    def test_実行ファイルを環境変数で指した登録も見つける(self):
+        # 実行ファイルの位置を env から取る形。そこでは名前が大文字で書かれる。
+        # 大文字小文字を区別すると、正しい設定に「登録されていない」と言う。
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps(
+                {
+                    "hooks": {
+                        "PostToolUse": [
+                            {"hooks": [{"command": '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'}]}
+                        ]
+                    }
+                }
+            ),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotIn("登録されていない", result.stdout)
+
+    # 振り分けの sh を指す env（設計 launcher-scripts 9 節）
+
+    def project_env(self, **env: str) -> None:
+        """`.claude/settings.json` の env だけを書く。hook の登録は書かない。"""
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"env": env}),
+        )
+
+    def lines(self, text: str, severity: str) -> list[str]:
+        return [line for line in text.splitlines() if line.startswith(f"{severity}:")]
+
+    def test_実行ファイルを前の既定の綴りで指していればwarnになる(self):
+        # N1。判定は動いているので warn。導入スクリプトを打ち直せば新しい綴りへ書き換わる。
+        # 件数は新しい綴りの回と比べる。設定ファイルを置いたこと自体が言われる分を数えないため。
+        rules_path = rules_file(self.root, SOUND)
+        self.project_env(CCNAVI_BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh")
+        base = lint(self.root, rules_path)
+        self.assertEqual(base.returncode, 0, base.stdout + base.stderr)
+
+        for old in (".ccnavi/bin/ccnavi",):
+            with self.subTest(old=old):
+                self.project_env(CCNAVI_BIN_PATH=old)
+
+                result = lint(self.root, rules_path)
+
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                errors, warns = counts(result.stdout)
+                self.assertEqual(errors, counts(base.stdout)[0], result.stdout)
+                self.assertEqual(warns, counts(base.stdout)[1] + 1, result.stdout)
+                named = [line for line in self.lines(result.stdout, "warn") if old in line]
+                self.assertTrue(named, f"{old} を warn で名指ししていない: {result.stdout}")
+                self.assertIn("ccnavi-setup.sh", named[0])
+
+    @unittest.skipIf(os.name == "nt", "実行ビットは POSIX でだけ見る")
+    def test_指す先が在るのに実行できなければerrorになる(self):
+        # N2。hook は sh を直に起動するので、実行ビットが無いと 126 で起動しない。
+        # 判定そのものが動いていないので error。
+        spelled = ".ccnavi/scripts/ccnavi-launcher.sh"
+        launcher = write(self.root, os.path.join(".ccnavi", "scripts", "ccnavi-launcher.sh"), "")
+        rules_path = rules_file(self.root, SOUND)
+        self.project_env(CCNAVI_BIN_PATH=spelled)
+
+        os.chmod(launcher, 0o755)
+        runnable = lint(self.root, rules_path)
+        os.chmod(launcher, 0o644)
+        result = lint(self.root, rules_path)
+
+        self.assertEqual(counts(runnable.stdout)[0], 0, runnable.stdout)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 1, result.stdout)
+        named = [
+            line for line in self.lines(result.stdout, "error") if "ccnavi-launcher.sh" in line
+        ]
+        self.assertTrue(named, f"実行できない sh を error で名指ししていない: {result.stdout}")
+
+    def test_git_の作業ツリーでなければ監視が何も見ないとwarnになる(self):
+        # 登録はされているのに見る先が無い状態。実行後の監視は git の差分で
+        # 見るので、リポジトリでない場所では 1 件も検知しない。
+        write(
+            self.root,
+            os.path.join(".claude", "settings.json"),
+            json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": "ccnavi"}]}]}}),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(counts(result.stdout), (0, 1))
+        self.assertIn("作業ツリーを読めない", result.stdout)
+
+    def test_設定ファイルが無ければ登録については何も言わない(self):
+        # hook は利用者ごとの設定にも書ける。そちらはここから見えないので、
+        # 見えないものを「無い」と報告すると正しい設定に苦情を出すことになる。
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(counts(result.stdout), (0, 0), result.stdout)
+
+    def test_json_は同じ苦情を機械可読な形で返し終了コードも同じ(self):
+        # VS Code 拡張が読む形（README「lint の JSON」）。文面の版と同じ判定を
+        # 同じ深刻度で運ぶ。error があれば終了コードも同じく非ゼロ。
+        path = write(self.root, "rules.yml", "version: 2\ndeny: [\n  - id: x\n")
+
+        result = ccnavi(self.root, "--lint", "--json", "--rules", path, "--mode", "dry-run")
+
+        self.assertEqual(result.returncode, 1, result.stdout)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["version"], 1)
+        self.assertEqual(body["rules"], path)
+        self.assertEqual(body["mode"], "dry-run")
+        self.assertEqual(body["projects"], [])
+        self.assertEqual(body["errors"], 1)
+        self.assertGreaterEqual(body["warns"], 1)
+        self.assertEqual(body["errors"] + body["warns"], len(body["problems"]))
+        severities = {p["severity"] for p in body["problems"]}
+        self.assertEqual(severities, {"error", "warn"})
+        errors = [p for p in body["problems"] if p["severity"] == "error"]
+        self.assertIn("ルールを読めない", errors[0]["detail"])
+        self.assertEqual(set(body["problems"][0]), {"severity", "where", "detail"})
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -5,7 +5,7 @@ import { asSections, readRules, type RuleForm } from "../../src/core/rules-doc.j
 const TEXT = `# 先頭の説明。消えてはいけない。
 #
 # glob と regex は必ず引用符で囲む。
-version: 3
+version: 1
 
 deny:
   # push は人が行う
@@ -36,7 +36,7 @@ function forms(text: string) {
 
 test("CB-T41 タイプごとに id / match / glob か regex / message を読む", () => {
   const { model } = readRules(TEXT);
-  assert.equal(model.version, 3);
+  assert.equal(model.version, 1);
   assert.deepEqual(model.problems, []);
   assert.deepEqual(
     model.sections.deny.map((r) => [r.id, r.match, r.kind, r.pattern, r.origin]),
@@ -112,7 +112,7 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
 });
 
 test("CB-T46 壊れたタイプは苦情にして、他のタイプは出す", () => {
-  const { model } = readRules("version: 3\ndeny: nope\nallow:\n  - id: a\n    match: Read\n    glob: '*'\n    message: m\n");
+  const { model } = readRules("version: 1\ndeny: nope\nallow:\n  - id: a\n    match: Read\n    glob: '*'\n    message: m\n");
   assert.equal(model.problems.length, 1);
   assert.match(model.problems[0], /deny/);
   assert.equal(model.sections.allow.length, 1);
@@ -133,7 +133,7 @@ test("CB-T47 画面から来た並びは形を確かめてから受け取る", (
 });
 
 test("CB-T53 additionalContext を読み、書き、変えていなければ折り返しを残す", () => {
-  const text = `version: 3
+  const text = `version: 1
 deny:
   - id: git-push
     match: Bash
@@ -173,7 +173,7 @@ allow:
   assert.equal(readRules(once).model.sections.deny[0].additionalContextOnce, "最初に 1 度だけ");
 });
 test("CB-T54 additionalContextFile は 1 行の値で、対応する文の直後に置く", () => {
-  const text = `version: 3
+  const text = `version: 1
 deny:
   - id: git-push
     match: Bash

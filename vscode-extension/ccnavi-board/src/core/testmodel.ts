@@ -2,7 +2,7 @@
  * `ccnavi --test --json` と `--test-samples --json`（試験の JSON）が出す形。
  * 実行ファイルと拡張の契約で、拡張はこれ以外を読まない。形の定義は ccnavi の README「試験の JSON」。
  * 同じ例が test/fixtures/test.json と samples.json にあり、Python 側のテスト
- * （tests/test_test_json.py）が同じ例で形を確かめる。
+ * （tests/core/test_test_json.py）が同じ例で形を確かめる。
  */
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
