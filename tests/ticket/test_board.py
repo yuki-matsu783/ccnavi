@@ -1,0 +1,191 @@
+"""`--explain --json`（ボードの JSON）の受入テスト。
+
+VS Code のボード拡張が読む形を、判定と同じ関数で組んでいることを確かめる。
+見るのは 4 つ。
+
+1. 提案・承認済みチケット・マーカー・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
+2. 承認待ち（承認済みチケットの無い提案）が `pending_approval` に出る
+3. 親のフェーズとゲートが `parents` に出る
+4. チケット制御が disable なら、空のボードと理由を返す
+
+拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/board.json）と
+同じ形であることも見る。形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてこのテストを
+走らせ、フィクスチャを書き直す。
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import unittest
+
+from tests.ticket.test_phases import PhaseHarness, child_text
+from tests.ticket.test_ticket import ROOT, write
+
+FIXTURE = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures", "board.json")
+
+
+class BoardTest(PhaseHarness):
+    def board(self, *extra):
+        result = self.ccnavi("--explain", "--json", *extra)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout)
+
+    def scene(self):
+        """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
+        同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子の作業ツリーにも写っている。"""
+        self.family(plan=("research", "design"))
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/research/summary.md", "まとめ\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.merge("i0001-01")
+
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ("wip/design/*",)))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        # 承認の後、作業ツリーを切る前に次の子を提案する。切った作業ツリーは
+        # 親のブランチの承認済みチケットなので、この提案がそこにも見える。
+        self.propose("i0001-03", child_text("i0001-03", "i0001", 2, ("wip/design/*",)))
+        self.commit_parent()
+        self.run_child("i0001-02")
+
+    def test_tickets_carry_proposal_copy_marks_and_worktree(self):
+        self.scene()
+        board = self.board()
+        self.assertEqual(board["version"], 1)
+        by_id = {t["ticket"]: t for t in board["tickets"]}
+        self.assertEqual(sorted(by_id), ["i0001", "i0001-01", "i0001-02", "i0001-03"])
+
+        closed = by_id["i0001-01"]
+        self.assertEqual(closed["proposal"]["state"], "done")
+        self.assertEqual(closed["copy"]["status"], "closed")
+        self.assertTrue(closed["worktree"]["exists"])
+        self.assertTrue(closed["completed_at"])
+
+        doing = by_id["i0001-02"]
+        self.assertEqual(doing["proposal"]["state"], "doing")
+        self.assertEqual(doing["copy"]["status"], "open")
+        self.assertTrue(doing["worktree"]["exists"])
+        self.assertTrue(doing["worktree"]["path"].endswith("i0001-02"))
+        self.assertEqual(doing["parent"], "i0001")
+        self.assertEqual(doing["phase"], 2)
+
+        waiting = by_id["i0001-03"]
+        self.assertEqual(waiting["proposal"]["state"], "todo")
+        self.assertEqual(waiting["proposal"]["tree"], "i0001")
+        self.assertEqual(waiting["copy"], {"status": "none"})
+        self.assertFalse(waiting["worktree"]["exists"])
+        self.assertEqual(sorted(s["tree"] for s in waiting["seen_in"]), ["i0001", "i0001-02"])
+
+        parent = by_id["i0001"]
+        self.assertEqual(parent["parent"], "")
+        self.assertEqual(parent["copy"]["status"], "open")
+
+    def test_scattered_is_empty_while_the_home_tree_holds_one_copy(self):
+        """写りがあること自体は普通。権威のツリーに 1 つあれば散在ではない。"""
+        self.scene()
+        for t in self.board()["tickets"]:
+            self.assertEqual(t["scattered"], [], t["ticket"])
+        # 正常な場面でも、写りは複数あるし状態も食い違う（作業ツリーはブランチを
+        # 切った時点の写しを持つ）。数や状態の違いを食い違いに数えない。
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
+        self.assertEqual(
+            sorted({s["state"] for s in by_id["i0001-01"]["seen_in"]}), ["done", "todo"]
+        )
+
+    def test_scattered_lists_every_copy_when_the_home_tree_holds_none(self):
+        """権威のツリーに無ければ、どれが本物か決まらない。候補を全部出す。"""
+        self.scene()
+        home = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md")
+        with open(home, encoding="utf-8") as f:
+            text = f.read()
+        os.remove(home)
+        write(os.path.join(self.root, "wip", "tickets", "todo", "i0001-03.md"), text)
+
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(
+            [(s["tree"], s["state"]) for s in by_id["i0001-03"]["scattered"]],
+            [("", "todo"), ("i0001-02", "todo")],
+        )
+        # 巻き込まれていない識別子は空のまま。
+        self.assertEqual(by_id["i0001-02"]["scattered"], [])
+
+    def test_pending_approval_lists_proposals_without_a_copy(self):
+        self.scene()
+        self.assertEqual(self.board()["pending_approval"], ["i0001-03"])
+
+    def test_parents_carry_phases_and_gates(self):
+        self.scene()
+        board = self.board()
+        self.assertEqual([p["ticket"] for p in board["parents"]], ["i0001"])
+        parent = board["parents"][0]
+        self.assertFalse(parent["closed"])
+        self.assertEqual(parent["plan"], ["research", "design"])
+        self.assertIn("作業中", parent["stage"])
+        phases = {p["number"]: p for p in parent["phases"]}
+        self.assertEqual(sorted(phases), [1, 2])
+        self.assertEqual(phases[1]["state"], "ended")
+        self.assertEqual(phases[1]["type"], "research")
+        self.assertFalse(phases[1]["gate_closed"])
+        self.assertEqual(phases[2]["state"], "active")
+        self.assertEqual(phases[2]["tickets"], ["i0001-02"])
+        self.assertEqual(phases[2]["states"], {"i0001-02": "doing"})
+        self.assertTrue(phases[2]["review_required"])
+
+    def test_with_ticket_control_disabled_the_board_is_empty_and_says_why(self):
+        board = self.board("--ticket-control", "disable")
+        self.assertEqual(board["tickets"], [])
+        self.assertEqual(board["parents"], [])
+        self.assertEqual(board["settings"]["ticket_control"], "disable")
+        self.assertTrue(any("CCNAVI_TICKET_CONTROL" in p for p in board["problems"]))
+
+    def test_settings_say_ticket_control_is_enabled_by_default(self):
+        board = self.board()
+        self.assertEqual(board["settings"]["ticket_control"], "enable")
+        # 承認済みチケットの置き場を空文字で指しても切れない。既定の置き場で有効のまま。
+        board = self.board("--approved", "")
+        self.assertEqual(board["settings"]["ticket_control"], "enable")
+        self.assertTrue(board["settings"]["approved"].endswith("tickets"))
+
+    def test_shape_matches_the_extension_fixture(self):
+        self.scene()
+        board = self.board()
+        if os.environ.get("CCNAVI_BOARD_FIXTURE"):
+            write(FIXTURE, json.dumps(_portable(board, self.root), ensure_ascii=False, indent=1))
+        with open(FIXTURE, encoding="utf-8") as f:
+            fixture = json.load(f)
+        self.assertEqual(sorted(fixture), sorted(board))
+        self.assertEqual(sorted(fixture["tickets"][0]), sorted(board["tickets"][0]))
+        self.assertEqual(sorted(fixture["parents"][0]), sorted(board["parents"][0]))
+        self.assertEqual(
+            sorted(fixture["parents"][0]["phases"][0]),
+            sorted(board["parents"][0]["phases"][0]),
+        )
+
+
+def _portable(value, root: str):
+    """絶対パスと時刻を、機械に依らない綴りに置き換える。フィクスチャに書く分だけ。"""
+    if isinstance(value, dict):
+        return {k: _portable(v, root) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_portable(v, root) for v in value]
+    if isinstance(value, str):
+        # 作業ツリーの根は normcase 済み（Windows では小文字）で出るので、綴りを問わず置き換える。
+        # ccnavi は根を行き着く先まで解いた綴りで出す（macOS の /var → /private/var）。
+        # 解いた綴りを先に置き換える。後にすると、中に含まれる元の綴りだけが先に
+        # 置き換わって `/private<root>` が残る。
+        text = value.replace("\\", "/")
+        for spelling in dict.fromkeys((os.path.realpath(root), root)):
+            text = re.sub(
+                re.escape(spelling.replace("\\", "/")), "<root>", text, flags=re.IGNORECASE
+            )
+        return text
+    return value
+
+
+if __name__ == "__main__":
+    unittest.main()
