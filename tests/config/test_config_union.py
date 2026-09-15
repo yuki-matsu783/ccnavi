@@ -687,6 +687,47 @@ class ToolLayerTest(ConfigUnionHarness):
                     "lib:migrate",
                 )
 
+    def test_glob_without_a_path_and_powershell_follow_the_same_split(self):
+        """§11.4: Glob は探す場所を省けば cwd の層。PowerShell は Bash と同じく全部の層の和。"""
+        powershell = {
+            "id": "ps-psql",
+            "match": "PowerShell",
+            "glob": "*psql*",
+            "message": "人が回す。",
+        }
+        deny = [*LIB_RULES["deny"], self.SECRETS, powershell]
+        write_layer(self.lib, rules=dict(LIB_RULES, deny=deny))
+
+        self.assert_denied(
+            self.hook("Glob", os.path.join(self.lib, "secrets"), pattern="*"), "lib:secrets"
+        )
+        for cwd in (self.ws, self.lib, self.app):
+            with self.subTest(cwd=os.path.basename(cwd)):
+                self.assert_denied(self.hook("PowerShell", cwd, command="psql"), "lib:ps-psql")
+
+    def test_a_layer_allow_now_reaches_grep_and_tools_without_a_path(self):
+        """ADR-0048 の代償。
+
+        行き先の層の allow が Grep に、層の allow がパスを持たないツールに効く。
+        """
+        allow = [
+            *LIB_RULES["allow"],
+            {"id": "grep-src", "match": "Grep", "glob": "*/src*"},
+            {"id": "fetch-docs", "match": "WebFetch", "glob": "*docs.example.com*"},
+        ]
+        write_layer(self.lib, rules=dict(LIB_RULES, allow=allow))
+
+        self.hook("Grep", self.ws, pattern="x", path=os.path.join(self.lib, "src"))
+        record = self.last_record()
+        self.assertEqual(record["decision"], "allow", record)
+        self.assertEqual(record["rules"], ["lib:grep-src"], record)
+
+        # lib の層の allow は、app に居る WebFetch にも効く（パスを持たないツールは全部の和）。
+        self.hook("WebFetch", self.app, url="https://docs.example.com/a", prompt="read")
+        record = self.last_record()
+        self.assertEqual(record["decision"], "allow", record)
+        self.assertEqual(record["rules"], ["lib:fetch-docs"], record)
+
 
 class RootPlaceholderUnionTest(ConfigUnionHarness):
     """`{root}` の置換先はどの層でもワークスペースルート（§11.8）。"""
