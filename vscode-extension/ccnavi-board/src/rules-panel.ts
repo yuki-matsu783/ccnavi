@@ -74,6 +74,9 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
+  /** ルールファイルと設定ファイルの監視。対象のパスが設定で変わるので、再読込のたびに張り直す */
+  fileWatchers: vscode.FileSystemWatcher[];
+  /** チケットの置き場の監視。開いている間ずっと同じ */
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
@@ -164,6 +167,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-rules-")),
+    fileWatchers: [],
     watchers: [],
     loaded,
     lock: lockFromError("まだ確認していない"),
@@ -214,7 +218,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
     const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通層からコピー」で作る";
-    throw new Error(`ルールファイルを読めない（${rulesRel}）: ${(error as Error).message}${hint}`);
+    throw new Error(`ルールファイルを読めない（${rulesRel}）: ${(error as Error).message}${hint}`, { cause: error });
   }
   const hooks = [
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
@@ -262,9 +266,10 @@ function registerPanelHandlers(current: PanelState): void {
         clearTimeout(timer);
       }
     }
-    for (const watcher of current.watchers) {
+    for (const watcher of [...current.fileWatchers, ...current.watchers]) {
       watcher.dispose();
     }
+    current.fileWatchers = [];
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
@@ -276,16 +281,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
-  // ルールファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
-  const rulesRel = current.loaded?.rulesRel ?? DEFAULT_RULES;
-  for (const pattern of [toGlob(rulesRel), ".claude/settings.json", ".claude/settings.local.json"]) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const changed = () => scheduleChanged(current);
-    watcher.onDidCreate(changed);
-    watcher.onDidChange(changed);
-    watcher.onDidDelete(changed);
-    current.watchers.push(watcher);
-  }
+  watchFiles(current);
   // チケットが動いたら、保存できるかを取り直す。
   for (const pattern of WATCH_PATTERNS) {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
@@ -295,6 +291,39 @@ function registerPanelHandlers(current: PanelState): void {
     watcher.onDidDelete(moved);
     current.watchers.push(watcher);
   }
+}
+
+/**
+ * ルールファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
+ * ならないので、そのディレクトリを起点にする。
+ */
+function watchFiles(current: PanelState): void {
+  for (const watcher of current.fileWatchers) {
+    watcher.dispose();
+  }
+  current.fileWatchers = [];
+  const rulesRel = current.loaded?.rulesRel ?? DEFAULT_RULES;
+  const patterns: vscode.RelativePattern[] = [
+    patternFor(current.folder, rulesRel),
+    new vscode.RelativePattern(current.folder, ".claude/settings.json"),
+    new vscode.RelativePattern(current.folder, ".claude/settings.local.json"),
+  ];
+  for (const pattern of patterns) {
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    const changed = () => scheduleChanged(current);
+    watcher.onDidCreate(changed);
+    watcher.onDidChange(changed);
+    watcher.onDidDelete(changed);
+    current.fileWatchers.push(watcher);
+  }
+}
+
+function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
+  if (path.isAbsolute(filePath)) {
+    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
+  }
+  return new vscode.RelativePattern(folder, toGlob(filePath));
 }
 
 function toGlob(rel: string): string {
@@ -381,6 +410,7 @@ async function reload(current: PanelState): Promise<void> {
     return;
   }
   current.loaded = loaded;
+  watchFiles(current);
   show(current);
   void refreshLock(current);
 }

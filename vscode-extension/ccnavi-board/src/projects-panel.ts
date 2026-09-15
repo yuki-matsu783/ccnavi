@@ -74,6 +74,8 @@ interface PanelState {
 }
 
 let state: PanelState | undefined;
+/** 開いている途中か。実行ファイルと git の答えを待つ間に、コマンドの連打でもう 1 枚開かない */
+let opening = false;
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
@@ -91,8 +93,17 @@ export async function openProjects(): Promise<void> {
     void update();
     return;
   }
+  if (opening) {
+    return;
+  }
 
-  const first = await gather(folder.uri.fsPath);
+  let first: Gathered;
+  opening = true;
+  try {
+    first = await gather(folder.uri.fsPath);
+  } finally {
+    opening = false;
+  }
   if (!first.ok) {
     vscode.window.showErrorMessage(`プロジェクト管理を表示できない: ${first.error}`);
     return;

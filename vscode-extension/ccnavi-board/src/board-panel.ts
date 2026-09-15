@@ -9,7 +9,7 @@ import * as vscode from "vscode";
 
 import { followAppearance, readAppearance } from "./appearance.js";
 import { bodyTag } from "./core/appearance.js";
-import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
+import { loadBoard, runApprovePreview, runApproveYes, type LoadResult } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
 import {
   acceptCommand,
@@ -71,6 +71,8 @@ interface PanelState {
 }
 
 let state: PanelState | undefined;
+/** 開いている途中か。実行ファイルの答えを待つ間に、コマンドの連打でもう 1 枚開かない */
+let opening = false;
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
@@ -96,9 +98,18 @@ export async function openBoard(project?: string): Promise<void> {
     void update();
     return;
   }
+  if (opening) {
+    return;
+  }
 
   // 開く前に 1 度読む。実行ファイルが無い・JSON が読めないなら、ボードを開かずに伝える。
-  const first = await loadBoard(folder.uri.fsPath, binSetting());
+  let first: LoadResult;
+  opening = true;
+  try {
+    first = await loadBoard(folder.uri.fsPath, binSetting());
+  } finally {
+    opening = false;
+  }
   if (!first.ok) {
     vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${first.error}`);
     return;
@@ -158,7 +169,7 @@ function registerPanelHandlers(current: PanelState): void {
   const { panel, folder } = current;
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
-    handleMessage(asMessage(message));
+    handleMessage(current, asMessage(message));
   });
 
   panel.onDidChangeViewState(() => {
@@ -259,9 +270,9 @@ function renderError(error: string): string {
   return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ボード</title></head>${bodyTag(readAppearance())}<p>ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p><pre>${escapeHtml(error)}</pre></body></html>`;
 }
 
-function handleMessage(message: Message | undefined): void {
-  const current = state;
-  if (message === undefined || current === undefined) {
+/** 送信元のパネルを受け取る。差し替えられた古いパネルのボタンは、今の状態に効かせない */
+function handleMessage(current: PanelState, message: Message | undefined): void {
+  if (message === undefined || state !== current) {
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -524,7 +535,7 @@ function asMessage(message: unknown): Message | undefined {
         : undefined;
     case "approveConfirm":
       return Array.isArray(m.tickets) && m.tickets.every((t) => typeof t === "string")
-        ? { type: "approveConfirm", tickets: m.tickets as string[] }
+        ? { type: "approveConfirm", tickets: m.tickets }
         : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
