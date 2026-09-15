@@ -35,11 +35,17 @@ uv run python -m unittest discover -s tests -t .         # 全件
 | `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-approve.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
-| `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js`・`ccnavi-fetch.sh` | `sh` `config` `e2e` |
-| `.claude/hooks/*.sh` | `guard` `e2e` |
+| `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
+| `.claude/hooks/test-py.sh` | `e2e` |
 | `tests/fixtures/` | `guard` `ticket` |
-| `vscode-extension/` | `ticket` |
+| `vscode-extension/` | `ticket`（`core` の `test_test_json` も例を読む） |
 | ドキュメントだけ（`*.md`・`docs/`） | 回さない |
+
+**自動テストが無いもの。** 次は、どのグループを回しても、全件を回しても中身が確かめられない。
+表に入れていないのはそのため。変えたら手で動かして確かめる。
+
+- `.claude/hooks/lint-py.sh`（`guard` の `test_fallback` がパスを文字列として使うだけで、実行しない）
+- `.ccnavi/scripts/ccnavi-fetch.sh`（テストから一度も呼ばれない）
 
 **全件を回すとき。**
 
