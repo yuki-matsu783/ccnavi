@@ -47,3 +47,17 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
   assert.ok(missing.includes("&lt;苦情&gt;"));
   assert.ok(missing.includes("作業中のチケットがある（i0001-02）"));
 });
+
+test("CB-T121 種類の一覧は 1 件 1 行で既定は畳み、関係と案内の 4 欄は値があるときだけ開く", () => {
+  const doc = readPhases(TEMPLATE_PHASES_TEXT);
+  const html = renderPhasesPage(
+    { root: "/ws", phasesPath: ".ccnavi/config/phases.yml", exists: true, ticketControl: "enable", model: doc.model, lock: { locked: false, reason: "", doing: [] } },
+    { nonce: "n" },
+  );
+  assert.match(html, /<ul class="list" id="phases"><\/ul>/);
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  assert.match(body, /class: "row-head"/);
+  assert.match(body, /if \(hasRelations\(phase\)\) \{ more\.setAttribute\("open", ""\); \}/);
+  assert.match(body, /if \(phase && phase\.id !== ""\) \{ ids\.push\(phase\.id\); \}/);
+  assert.doesNotThrow(() => new Function(body));
+});

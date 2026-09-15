@@ -78,3 +78,12 @@ test("CB-T85 画面に埋める script は構文として通る", () => {
   const body = html.split('<script nonce="n">')[1].split("</script>")[0];
   assert.doesNotThrow(() => new Function(body));
 });
+
+test("CB-T122 項目の一覧は 1 件 1 行で既定は畳み、開いた行を id で state に控える", () => {
+  const html = renderRiskPage(page(), { nonce: "n" });
+  assert.match(html, /<ul class="list" id="factors"><\/ul>/);
+  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
+  assert.match(body, /class: "row-head"/);
+  assert.match(body, /if \(factor && factor\.id !== ""\) \{ ids\.push\(factor\.id\); \}/);
+  assert.match(body, /savedOpen\.has\(factor\.id\)/);
+});
