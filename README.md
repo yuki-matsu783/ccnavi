@@ -488,7 +488,7 @@ CCNAVI_BIN_PATH は既定でない綴り（<値>）です。書き換えてい�
 届かない欄を残さない。モデルに伝えたいことはタイプによらず `additionalContext` に書く。
 
 ```yaml
-version: 3
+version: 1
 
 deny:
   - id: force-push
