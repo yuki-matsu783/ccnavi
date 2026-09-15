@@ -20,9 +20,9 @@ allow:
   glob: tests/*
 - match: Write|Edit
   glob: vscode-extension/*
-started_at: ""
+started_at: "2026-09-15T14:18:13+0900"
 completed_at: ""
-base_sha: ""
+base_sha: "cbc1494d55e5bf911b00742701a8ccab3786ae2f"
 ---
 
 # 実装: ルールとチケットの判定を合わせる
