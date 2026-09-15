@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import functools
+import io
 from typing import TextIO
 
 from . import (
@@ -109,7 +110,10 @@ def watched_for(
     out = []
     for t in trees:
         if t.project not in loaded:
-            rule_set, source = ruleload.load_rules(stderr, conf, record, root)
+            # 共通層はツリーの層ごとに読み直す（層を足すと集合が書き換わるため）。苦情は同じなので
+            # 最初の 1 回だけ書く。層の苦情はツリーごとに違うので、add_layers はそのまま書く。
+            said = stderr if not loaded else io.StringIO()
+            rule_set, source = ruleload.load_rules(said, conf, record, root)
             if source != builtin.SOURCE:
                 ruleload.add_layers(
                     stderr, rule_set, ruleload.layer_for(conf, root, t), root, record

@@ -517,9 +517,15 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
             continue
         if view.missing:
             continue
-        for c in _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True):
+        from_file = _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True)
+        for c in from_file:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
+        # `survey` は層のファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
+        # 読んで言ったものは数えない。数えると同じ苦情が 2 度並び、件数も水増しされる。
+        told = {(c.severity, c.rule, c.detail) for c in from_file}
         for c in view.problems:
+            if (c.severity, c.rule, c.detail) in told:
+                continue
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
     return problems
 
