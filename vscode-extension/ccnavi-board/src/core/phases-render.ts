@@ -12,6 +12,7 @@
  */
 import type { Lock } from "./lock.js";
 import { PHASE_KINDS, REVIEWS, type PhasesModel } from "./phases-doc.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
 import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 
 export interface PhasesPage {
@@ -35,6 +36,8 @@ export interface PhasesPage {
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 /** 区分の説明。select の札 */
@@ -71,7 +74,7 @@ export function renderPhasesPage(page: PhasesPage, options: RenderOptions): stri
 ${STYLE}
 </style>
 </head>
-<body>
+${bodyTag(options.appearance)}
 ${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
@@ -438,4 +441,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
   });
   document.getElementById("find").addEventListener("input", applyFind);
-  renderAll();`;
+  renderAll();
+${APPEARANCE_SCRIPT}`;

@@ -27,7 +27,8 @@
       { "command": "ccnaviBoard.openRules", "title": "ccnavi ボード: ルール設定画面を開く" },
       { "command": "ccnaviBoard.openProjects", "title": "ccnavi ボード: プロジェクト管理を開く" },
       { "command": "ccnaviBoard.openRisk", "title": "ccnavi ボード: リスク管理画面を開く" },
-      { "command": "ccnaviBoard.openPhases", "title": "ccnavi ボード: フェーズ管理画面を開く" }
+      { "command": "ccnaviBoard.openPhases", "title": "ccnavi ボード: フェーズ管理画面を開く" },
+      { "command": "ccnaviBoard.appearance", "title": "ccnavi ボード: 見た目を切り替える" }
     ],
     "menus": {
       "commandPalette": [
@@ -52,6 +53,13 @@
           "type": "string",
           "default": ".ccnavi/common/rule-samples.yml",
           "description": "ルール設定画面が一括で判定するサンプル（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でもよい。"
+        },
+        "ccnaviBoard.appearance": {
+          "type": "string",
+          "enum": ["vscode", "claude-light", "claude-dark"],
+          "enumDescriptions": ["VS Code のテーマに従う", "Claude の配色（ライト）", "Claude の配色（ダーク）"],
+          "default": "vscode",
+          "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字を Claude の配色に置き換える（意味の色は変えない）。サイドパネルの「見た目」からも切り替えられ、開いている画面にはその場で効く。"
         }
       }
     }

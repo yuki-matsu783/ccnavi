@@ -10,6 +10,7 @@
  */
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
 import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 import type { RulesModel } from "./rules-doc.js";
 
@@ -49,6 +50,8 @@ export interface RulesPage {
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 export function renderRulesPage(page: RulesPage, options: RenderOptions): string {
@@ -70,7 +73,7 @@ export function renderRulesPage(page: RulesPage, options: RenderOptions): string
 ${STYLE}
 </style>
 </head>
-<body>
+${bodyTag(options.appearance)}
 ${renderModeBanner(page.mode)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
@@ -761,4 +764,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   });
   renderAll();
   updateSave();
-  if (saved.tab) { showTab(saved.tab); }`;
+  if (saved.tab) { showTab(saved.tab); }
+${APPEARANCE_SCRIPT}`;

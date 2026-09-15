@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
+import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
 import {
@@ -113,6 +114,7 @@ export async function openBoard(project?: string): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
+  followAppearance(panel);
   const current: PanelState = {
     panel,
     folder,
@@ -243,6 +245,7 @@ function show(current: PanelState, board: Board): void {
   current.panel.webview.html = renderBoard(board, {
     nonce: crypto.randomBytes(16).toString("base64"),
     approval: current.approval,
+    appearance: readAppearance(),
   });
   if (current.filter !== undefined) {
     // HTML の差し替えの後に届く。Webview の中のスクリプトが select を合わせる。
