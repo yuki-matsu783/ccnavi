@@ -51,6 +51,9 @@ ccnavi_approved:
   approved_at: 2026-09-13T21:04:53+0900
   source_tree: ticket-rule-merge
   source_path: C:\Users\taniyama\Desktop\git\ccnavi\.claude\worktrees\ticket-rule-merge\wip\tickets\todo\ticket-rule-merge.md
+  revised_at: 2026-09-15T19:00:29+0900
+  feedback_at: 2026-09-15T19:00:29+0900
+feedback: []
 ---
 
 # ルールとチケットの判定を合わせ、厳しい側を採る
