@@ -23,7 +23,7 @@
 1 件のルールは「どのツールの」「何に当たったら」「何を言うか」の組。
 
 ```yaml
-version: 3
+version: 1
 deny:
   - id: force-push
     match: Bash
