@@ -2,8 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard, isKnownPath, parentTreeOf, type Card } from "../src/core/board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../src/core/model.js";
-import { parseBoardJson } from "../src/core/model.js";
-import { fixture, fixtureText } from "./fixture.js";
+import { fixture } from "./fixture.js";
 
 function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
   return new Map(board.columns.flatMap((c) => c.cards).map((card) => [card.id, card]));
@@ -170,18 +169,4 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
   );
   // 写り自体は残す。開いたファイルからカードを引き当てるのに使う。
   assert.equal(card.seenIn.length, 2);
-});
-
-test("CB-T117b 古い実行ファイルが scattered を出さなくても、散在無しとして読む", () => {
-  const base = fixture();
-  const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
-  const raw = JSON.parse(fixtureText()) as { tickets: Record<string, unknown>[] };
-  for (const t of raw.tickets) {
-    delete t.scattered;
-  }
-  const parsed = parseBoardJson(JSON.stringify(raw));
-  assert.ok(parsed.ok, parsed.ok ? "" : parsed.error);
-  const cards = cardsOf(buildBoard(parsed.board));
-  assert.deepEqual(cards.get(child.ticket)!.scattered, []);
-  assert.ok(cards.get(child.ticket)!.seenIn.length > 1);
 });

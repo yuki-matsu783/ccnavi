@@ -73,15 +73,6 @@ test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", 
   }
 });
 
-test("CB-T105b 指紋の欄の無い食い違い（古い実行ファイル）は digest を持たない。preview の指紋は空", () => {
-  const changed = parseApproveResult(
-    JSON.stringify({ version: APPROVE_VERSION, mismatch: { expected: ["i0001"], current: [] } }),
-  );
-  assert.ok(!changed.ok && "mismatch" in changed && changed.mismatch.digest === undefined);
-  const old = parseApprovePreview(JSON.stringify({ version: APPROVE_VERSION, batch: [], text: "x" }));
-  assert.ok(old.ok && old.value.digest === "");
-});
-
 test("CB-T106 版が違う・JSON でない答えは読まない", () => {
   const other = parseApprovePreview(JSON.stringify({ version: APPROVE_VERSION + 1, batch: [] }));
   assert.ok(!other.ok);

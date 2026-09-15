@@ -39,7 +39,7 @@ def write(directory: str, name: str, text: str) -> str:
 ALLOWED = {"id": "anything", "match": "Read", "regex": "."}
 
 
-def rules_file(directory: str, *rules, version: int = 3, allow: bool = True) -> str:
+def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> str:
     """ルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 
     書き出すのは JSON。YAML は JSON の上位互換なので、判定が読むのと同じ
@@ -226,7 +226,7 @@ class LintTest(unittest.TestCase):
         # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
         # ただしルールごと落とすと、文面を書いただけで ask が外れて通るので、読み込みは通す。
         body = {
-            "version": 3,
+            "version": 1,
             "deny": [SOUND],
             "ask": [
                 {"id": "mig", "match": "Write", "glob": "*/migrations/*", "message": "人が見る"},
@@ -410,28 +410,6 @@ class LintTest(unittest.TestCase):
 
     def lines(self, text: str, severity: str) -> list[str]:
         return [line for line in text.splitlines() if line.startswith(f"{severity}:")]
-
-    def test_実行ファイルを前の既定の綴りで指していればwarnになる(self):
-        # N1。判定は動いているので warn。導入スクリプトを打ち直せば新しい綴りへ書き換わる。
-        # 件数は新しい綴りの回と比べる。設定ファイルを置いたこと自体が言われる分を数えないため。
-        rules_path = rules_file(self.root, SOUND)
-        self.project_env(CCNAVI_BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh")
-        base = lint(self.root, rules_path)
-        self.assertEqual(base.returncode, 0, base.stdout + base.stderr)
-
-        for old in (".ccnavi/bin/ccnavi",):
-            with self.subTest(old=old):
-                self.project_env(CCNAVI_BIN_PATH=old)
-
-                result = lint(self.root, rules_path)
-
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                errors, warns = counts(result.stdout)
-                self.assertEqual(errors, counts(base.stdout)[0], result.stdout)
-                self.assertEqual(warns, counts(base.stdout)[1] + 1, result.stdout)
-                named = [line for line in self.lines(result.stdout, "warn") if old in line]
-                self.assertTrue(named, f"{old} を warn で名指ししていない: {result.stdout}")
-                self.assertIn("ccnavi-setup.sh", named[0])
 
     @unittest.skipIf(os.name == "nt", "実行ビットは POSIX でだけ見る")
     def test_指す先が在るのに実行できなければerrorになる(self):

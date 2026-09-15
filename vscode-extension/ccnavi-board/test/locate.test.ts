@@ -45,31 +45,6 @@ test("CB-T21 .exe は綴りに無くても試す", () => {
   );
 });
 
-test("CB-T23 振り分けの sh を指していれば、隣のこの機械向けの実体を起動する", () => {
-  // Windows では sh を直接起動できない。sh より先に隣の実体を探す。
-  assert.deepEqual(
-    locate(
-      input(["/ws/.ccnavi/bin/ccnavi", "/ws/.ccnavi/bin/windows-x86_64/ccnavi.exe", "/ws/.ccnavi/bin/linux-x86_64/ccnavi"], {
-        settingsEnvBin: ".ccnavi/bin/ccnavi",
-        hostTarget: "windows-x86_64",
-      }),
-    ),
-    { kind: "exe", path: "/ws/.ccnavi/bin/windows-x86_64/ccnavi.exe" },
-  );
-  // 設定が無くても既定の配布先を探す。
-  assert.deepEqual(
-    locate(input(["/ws/.ccnavi/bin/ccnavi", "/ws/.ccnavi/bin/linux-x86_64/ccnavi"])),
-    { kind: "exe", path: "/ws/.ccnavi/bin/linux-x86_64/ccnavi" },
-  );
-  // arm64 の macOS は、自分向けが無ければ x86_64 を使う。
-  assert.deepEqual(
-    locate(input(["/ws/.ccnavi/bin/darwin-x86_64/ccnavi"], { hostTarget: "darwin-arm64" })),
-    { kind: "exe", path: "/ws/.ccnavi/bin/darwin-x86_64/ccnavi" },
-  );
-  // 別の機械向けしか無ければ、実体としては選ばない。
-  assert.equal(locate(input(["/ws/.ccnavi/bin/darwin-arm64/ccnavi"])), undefined);
-});
-
 test("CB-T117 E1 振り分けの sh を指していれば、../bin/ のこの機械向けの実体を起動する", () => {
   assert.deepEqual(
     locate(
@@ -134,28 +109,23 @@ test("CB-T118 E2 振り分けの sh そのものは返さない。実体が無�
     locate(input([sh, "/ws/.ccnavi/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: ".ccnavi/scripts/ccnavi-launcher.sh" })),
     undefined,
   );
-  // 別の機械向けしか無ければ、前の既定の綴りまで進み、それも無ければソースへ。
+  // 別の機械向けしか無ければ、実体としては選ばずソースへ進む。
   assert.deepEqual(
     locate(input([sh, "/ws/.ccnavi/bin/darwin-arm64/ccnavi", "/ws/ccnavi/__main__.py"])),
     { kind: "uv", root: "/ws" },
   );
 });
 
-test("CB-T119 E3 前の .ccnavi/bin/ccnavi の形は今のまま隣を探す", () => {
-  // 移し替える前のワークスペース。sh は .ccnavi/bin/ccnavi にあり、実体はその隣に並ぶ。
+test("CB-T119 E3 名前が ccnavi-launcher.sh でない綴りは綴りそのものを探し、隣は見ない", () => {
   assert.deepEqual(
     locate(
-      input(["/ws/.ccnavi/bin/ccnavi", "/ws/.ccnavi/bin/windows-x86_64/ccnavi.exe"], {
-        settingsEnvBin: ".ccnavi/bin/ccnavi",
-        hostTarget: "windows-x86_64",
-      }),
+      input(["/ws/tools/scripts/ccnavi", "/ws/tools/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: "tools/scripts/ccnavi" }),
     ),
-    { kind: "exe", path: "/ws/.ccnavi/bin/windows-x86_64/ccnavi.exe" },
-  );
-  // 名前が ccnavi-launcher.sh でない綴りは、隣に実体が無ければ綴りそのものを返す（今のまま）。
-  assert.deepEqual(
-    locate(input(["/ws/tools/scripts/ccnavi", "/ws/tools/bin/linux-x86_64/ccnavi"], { settingsEnvBin: "tools/scripts/ccnavi" })),
     { kind: "exe", path: "/ws/tools/scripts/ccnavi" },
+  );
+  assert.equal(
+    locate(input(["/ws/tools/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: "tools/scripts/ccnavi" })),
+    undefined,
   );
 });
 

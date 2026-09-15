@@ -55,16 +55,12 @@ class HostTargetTest(unittest.TestCase):
 
 
 class LaunchedExecutableTest(unittest.TestCase):
-    """前の形。名前が `ccnavi-launcher.sh` でない sh は、隣の `<os>-<arch>/` を探す（D-2）。
-
-    導入スクリプトを打ち直す前のワークスペース（`.ccnavi/bin/ccnavi` を指したまま）で、
-    隣の実体を控え続けるために残す。
-    """
+    """探す順。`scripts/ccnavi-launcher.sh` から `../bin/<os>-<arch>/` を、sh と同じ順で探す。"""
 
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-launched-")
         self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
-        self.launcher = os.path.join(self.dir, "bin", "ccnavi")
+        self.launcher = os.path.join(self.dir, "scripts", platformtag.LAUNCHER_NAME)
         write(self.launcher, "#!/bin/sh\n")
 
     def test_prefers_its_own_build_over_a_translated_one(self):
@@ -84,7 +80,7 @@ class LaunchedExecutableTest(unittest.TestCase):
 
 
 class LaunchedFromScriptsTest(unittest.TestCase):
-    """L5: 名前が `ccnavi-launcher.sh` なら `../bin/` を探す。それ以外は隣（前の形）。
+    """L5: 名前が `ccnavi-launcher.sh` なら `../bin/` を探す。それ以外は探さない。
 
     切り替えの条件は名前だけ（3.3 節）。`binary_clause` と同じ条件で、どちらかだけ
     条件を足すと、守る場所と控える場所が食い違う。
@@ -131,15 +127,14 @@ class LaunchedFromScriptsTest(unittest.TestCase):
         write(os.path.join(self.scripts, "linux-x86_64", "ccnavi"), "elf\n")
         self.assertEqual(platformtag.launched_executable(launcher, "linux-x86_64"), "")
 
-    def test_other_names_still_look_next_to_themselves(self):
-        """前の形。同じ場所に置いても、名前が違えば `../bin/` は見ない。"""
+    def test_other_names_are_the_executable_itself(self):
+        """名前が違えば実行ファイルそのもの。`../bin/` も隣も探さない。"""
         self.launcher_name()
         launcher = os.path.join(self.scripts, "ccnavi")
         write(launcher, "#!/bin/sh\n")
         write(os.path.join(self.bin, "linux-x86_64", "ccnavi"), "bin\n")
         write(os.path.join(self.scripts, "linux-x86_64", "ccnavi"), "next\n")
-        found = platformtag.launched_executable(launcher, "linux-x86_64")
-        self.assertEqual(found, os.path.join(self.scripts, "linux-x86_64", "ccnavi"))
+        self.assertEqual(platformtag.launched_executable(launcher, "linux-x86_64"), "")
 
 
 @unittest.skipIf(os.name == "nt", "偽の uname と sh の実行ファイルを PATH で差し替える")

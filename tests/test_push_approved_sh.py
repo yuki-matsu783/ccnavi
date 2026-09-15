@@ -318,19 +318,6 @@ class PushApprovedTest(Workspace):
         self.assertTrue(self.dirty(tree, APPROVED))
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
-    def test_old_name_ccnavi_approved_is_not_read(self):
-        """6. 旧名 `CCNAVI_APPROVED` だけを設定しても、その置き場は運ばない。既定の置き場を運ぶ。"""
-        other = "approved/tickets"
-        tree = self.worktree("i0001")
-        write(os.path.join(tree, *other.split("/"), "i0001.md"), "approved\n")
-        self.place(tree, "i0002")
-
-        result = self.push(env=self.env(CCNAVI_APPROVED=other))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0002.md"])
-        self.assertTrue(self.dirty(tree, other))
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
-
     # ---- チケット approve-carry-05 の 7・8
 
     def said(self, result, name):

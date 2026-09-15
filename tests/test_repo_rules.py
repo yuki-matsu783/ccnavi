@@ -219,7 +219,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
             "sh -x " + LAUNCHER + YES,
             "cd /tmp && sh " + LAUNCHER + YES,
             "sh " + LAUNCHER + " ticket start x",
-            # 前の形と、実体を直に指す形。
+            # 別の名前の sh と、実体を直に指す形。
             "sh .ccnavi/bin/ccnavi" + YES,
             "sh .ccnavi/bin/linux-x86_64/ccnavi" + YES,
             "sh ccnavi" + YES,
