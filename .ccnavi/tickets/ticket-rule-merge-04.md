@@ -29,9 +29,9 @@ allow:
   glob: CONTEXT.md
 - match: Write|Edit
   glob: docs/*
-started_at: ''
+started_at: 2026-09-15T18:12:18+0900
 completed_at: ''
-base_sha: ''
+base_sha: e61f6d02f5aa35ee7133024a24b49269f706ad56
 ccnavi_approved:
   approved_at: 2026-09-15T17:18:41+0900
   source_tree: ticket-rule-merge
