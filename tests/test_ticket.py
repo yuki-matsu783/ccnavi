@@ -1149,6 +1149,62 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
 
+    def test_request_again_after_head_moved(self):
+        """依頼の後に HEAD が動いたら、request で依頼を出し直せること（#36）。
+
+        check が「request をやり直す」と案内する一方で、request が「依頼済み」で
+        止まり、人がマーカーを外すまで進めなかった。出し直しても、前の依頼への
+        未解決の指摘は数え続ける。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+        before = read_json(mark)["head"]
+
+        # HEAD が依頼時のままなら、二重に投稿しない。
+        same = self.request(fixture)
+        self.assertNotEqual(same.returncode, 0)
+        self.assertIn("依頼済み", same.stderr)
+
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "later")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "直して"}]
+        write(fixture, json.dumps(data))
+
+        moved = self.check(fixture)
+        self.assertNotEqual(moved.returncode, 0)
+        self.assertIn("HEAD が動いている", moved.stderr)
+        self.assertIn("request --phase 1", moved.stderr)
+
+        redo = self.request(fixture)
+        self.assertEqual(redo.returncode, 0, redo.stderr)
+        self.assertIn("依頼し直した", redo.stdout)
+        self.assertNotEqual(read_json(mark)["head"], before)
+        self.assertEqual(len(read_json(fixture)["comments"]), 2)
+
+        # 前の依頼への指摘は、出し直しても数から消えない。
+        left = self.check(fixture)
+        self.assertNotEqual(left.returncode, 0)
+        self.assertIn("未解決", left.stderr)
+        data = read_json(fixture)
+        data["threads"][0]["resolved"] = True
+        write(fixture, json.dumps(data))
+        self.assertEqual(self.check(fixture).returncode, 0)
+
+        # レビュー済みになったあとは、HEAD が動いても出し直さない。
+        write(os.path.join(self.parent_tree, "src", "after.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "after")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        reviewed = self.request(fixture)
+        self.assertNotEqual(reviewed.returncode, 0)
+        self.assertIn("レビュー済み", reviewed.stderr)
+
     def test_request_refuses_when_a_child_branch_is_gone(self):
         self.family()
         self.close_phase()
