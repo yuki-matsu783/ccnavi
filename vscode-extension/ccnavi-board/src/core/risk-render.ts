@@ -35,9 +35,9 @@ export const KIND_LABELS: Readonly<Record<(typeof KINDS)[number], { readonly lab
   lines_over: { label: "差分の行数がしきい値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
   files_over: { label: "変えたファイル数がしきい値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
   deleted_over: { label: "消したファイル数がしきい値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
-  glob: { label: "glob にヒットしたファイル 1 つにつき加点", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
-  script: { label: "スクリプトが失敗したら加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗したら points を加点）" },
-  judge: { label: "サブエージェントの答えが yes なら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
+  glob: { label: "glob にヒットしたファイルが 1 つあるごとに加点", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
+  script: { label: "スクリプトが出した点を加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。スクリプトが出した点を加点し、失敗や読めない出力なら points を加点）" },
+  judge: { label: "サブエージェントの答えが yes だったら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
 };
 
 export function renderRiskPage(page: RiskPage, options: RenderOptions): string {
@@ -205,9 +205,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (factor.kind === "lines_over") { return [dim("差分が "), code(v), dim(" 行を超えたら加点")]; }
     if (factor.kind === "files_over") { return [dim("変えたファイルが "), code(v), dim(" 件を超えたら加点")]; }
     if (factor.kind === "deleted_over") { return [dim("消したファイルが "), code(v), dim(" 件を超えたら加点")]; }
-    if (factor.kind === "glob") { return [code(v), dim(" にヒットしたファイル 1 つにつき加点" + (factor.max !== "" ? "（上限 " + factor.max + " 点）" : ""))]; }
-    if (factor.kind === "script") { return [dim("スクリプト "), code(v), dim(" が失敗したら加点")]; }
-    return [dim("問い「"), code(v), dim("」に yes なら加点")];
+    if (factor.kind === "glob") { return [code(v), dim(" にヒットしたファイルが 1 つあるごとに加点" + (factor.max !== "" ? "（上限 " + factor.max + " 点）" : ""))]; }
+    if (factor.kind === "script") { return [dim("スクリプト "), code(v), dim(" が出した点を加点（測れなければ " + (factor.points === "" ? "points" : factor.points + " 点") + "）")]; }
+    return [dim("問い「"), code(v), dim("」に yes だったら加点")];
   }
   // 値の欄の名前。当て方で意味が変わる
   function valueLabel(kind) {

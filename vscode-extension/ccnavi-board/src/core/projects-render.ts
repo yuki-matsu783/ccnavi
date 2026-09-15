@@ -175,10 +175,9 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
 /** 層の設定の置き場（プロジェクトのルートからの相対）。層のルールの置き場から逆算し、無ければ既定 */
 function settingsDir(row: ProjectRow): string {
   const prefix = `${row.rel}/`;
-  if (!row.rulesRel.startsWith(prefix)) {
-    return ".ccnavi/config";
-  }
-  return row.rulesRel.slice(prefix.length).replace(/\/[^/]*$/, "");
+  const inside = row.rulesRel.startsWith(prefix) ? row.rulesRel.slice(prefix.length) : "";
+  const cut = inside.lastIndexOf("/");
+  return cut < 0 ? ".ccnavi/config" : inside.slice(0, cut);
 }
 
 function renderProblems(problems: readonly LintProblem[]): string {

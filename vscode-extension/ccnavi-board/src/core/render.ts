@@ -60,7 +60,7 @@ ${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button t
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
-${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットはありません</p>\n' : ""}<div class="board">
+${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットは無い</p>\n' : ""}<div class="board">
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
@@ -184,7 +184,7 @@ function renderProblems(problems: readonly string[]): string {
 function renderColumn(column: BoardColumn): string {
   const body =
     column.count === 0
-      ? '    <p class="empty">チケットはありません</p>'
+      ? '    <p class="empty">チケットは無い</p>'
       : `    <ul class="cards">\n${column.cards.map(renderCard).join("\n")}\n    </ul>`;
   return `  <section class="column" data-state="${escapeHtml(column.state)}">
     <h2>
@@ -594,14 +594,14 @@ const STYLE = `${PAGE_STYLE}
   .fact.sha { font-family: var(--vscode-editor-font-family); }
   /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右に人が見るべきことだけ */
   .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; }
-  .phase { display: grid; grid-template-columns: 12px minmax(0, max-content) minmax(40%, 1fr); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) minmax(0, auto); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
   .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
   .phase-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase-tickets::before { content: "·"; margin: 0 5px; }
-  .phase-status { text-align: right; overflow-wrap: anywhere; }
+  .phase-status { text-align: right; overflow-wrap: anywhere; max-width: 55%; justify-self: end; }
   .phase-active .phase-status { color: var(--vscode-charts-blue); }
   .phase.gate-closed .phase-label, .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
   .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
