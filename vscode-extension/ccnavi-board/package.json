@@ -6,69 +6,33 @@
   "publisher": "local",
   "private": true,
   "license": "MIT",
-  "engines": {
-    "vscode": "^1.90.0"
-  },
-  "categories": [
-    "Visualization"
-  ],
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Visualization"],
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
-        {
-          "id": "ccnavi",
-          "title": "ccnavi",
-          "icon": "media/icon.svg"
-        }
+        { "id": "ccnavi", "title": "ccnavi", "icon": "media/icon.svg" }
       ]
     },
     "views": {
       "ccnavi": [
-        {
-          "id": "ccnaviBoard.entries",
-          "name": "画面",
-          "icon": "media/icon.svg"
-        }
+        { "id": "ccnaviBoard.entries", "name": "画面", "icon": "media/icon.svg" }
       ]
     },
     "commands": [
-      {
-        "command": "ccnaviBoard.open",
-        "title": "ccnavi ボード: ボードを開く"
-      },
-      {
-        "command": "ccnaviBoard.refresh",
-        "title": "ccnavi ボード: ボードを更新"
-      },
-      {
-        "command": "ccnaviBoard.openRules",
-        "title": "ccnavi ボード: ルール設定画面を開く"
-      },
-      {
-        "command": "ccnaviBoard.openProjects",
-        "title": "ccnavi ボード: プロジェクト管理を開く"
-      },
-      {
-        "command": "ccnaviBoard.openRisk",
-        "title": "ccnavi ボード: リスク管理画面を開く"
-      },
-      {
-        "command": "ccnaviBoard.openPhases",
-        "title": "ccnavi ボード: フェーズ管理画面を開く"
-      }
+      { "command": "ccnaviBoard.open", "title": "ccnavi ボード: ボードを開く" },
+      { "command": "ccnaviBoard.refresh", "title": "ccnavi ボード: ボードを更新" },
+      { "command": "ccnaviBoard.openRules", "title": "ccnavi ボード: ルール設定画面を開く" },
+      { "command": "ccnaviBoard.openProjects", "title": "ccnavi ボード: プロジェクト管理を開く" },
+      { "command": "ccnaviBoard.openRisk", "title": "ccnavi ボード: リスク管理画面を開く" },
+      { "command": "ccnaviBoard.openPhases", "title": "ccnavi ボード: フェーズ管理画面を開く" }
     ],
     "menus": {
       "commandPalette": [
-        {
-          "command": "ccnaviBoard.open",
-          "when": "ccnaviBoard.ticketControl == 'enable'"
-        },
-        {
-          "command": "ccnaviBoard.refresh",
-          "when": "ccnaviBoard.ticketControl == 'enable'"
-        }
+        { "command": "ccnaviBoard.open", "when": "ccnaviBoard.ticketControl == 'enable'" },
+        { "command": "ccnaviBoard.refresh", "when": "ccnaviBoard.ticketControl == 'enable'" }
       ]
     },
     "configuration": {
@@ -109,7 +73,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.20.2",
+    "@types/node": "^22.0.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.25.0",
