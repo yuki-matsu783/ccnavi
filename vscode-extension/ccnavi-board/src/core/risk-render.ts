@@ -11,7 +11,7 @@
  * 色は VS Code のテーマ変数だけを使う。文字列は全部実体参照にする。
  */
 import type { Lock } from "./lock.js";
-import { BUTTON_STYLE, LIST_STYLE, escapeHtml } from "./render.js";
+import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 import { BUILTIN_LEVELS, KINDS, LEVEL_NAMES, type RiskModel } from "./risk-doc.js";
 
 export interface RiskPage {
@@ -121,59 +121,10 @@ function renderProblems(problems: readonly string[]): string {
   return `<ul class="problems">\n${items}\n</ul>\n`;
 }
 
-const STYLE = `  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 12px;
-    background: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-  }
-  code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
-  .hidden { display: none !important; }
-  .banner {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-panel-border);
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  }
-  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
-  .banner.missing { border-color: var(--vscode-editorInfo-foreground); }
-  .banner.missing > span { flex: 1 1 320px; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 8px; }
-  .summary { display: flex; gap: 12px; align-items: center; }
-  .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
-  .dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-  .lock {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
-  }
-  .problems {
-    margin: 0 0 12px; padding: 8px 8px 8px 24px;
-    border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
-    color: var(--vscode-editorWarning-foreground);
-  }
-  .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
-  details.help { margin: 0 0 8px; font-size: .92em; }
-  details.help > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; }
-  details.help > summary::-webkit-details-marker { display: none; }
-  details.help > summary::before { content: "▸ "; }
-  details.help[open] > summary::before { content: "▾ "; }
-  details.help > .hint { margin: 4px 0 0; }
-  .empty { color: var(--vscode-descriptionForeground); padding: 6px 8px; margin: 0; }
-${BUTTON_STYLE}
+const STYLE = `${PAGE_STYLE}
   button.action.small { margin-left: auto; }
-  input[type=text], input[type=search], select {
-    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
-    padding: 3px 6px; font: inherit;
-  }
-  input[type=text]:focus, input[type=search]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
-  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
-  input:disabled, select:disabled { opacity: .6; }
   .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-  .block h2 { margin: 0 0 8px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
-  .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
+  .block h2 { display: flex; gap: 8px; align-items: center; }
   .levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
   .levels .field { display: flex; flex-direction: row; gap: 6px; align-items: center; }
   .levels .field > .cap { text-align: left; }
@@ -183,8 +134,7 @@ ${LIST_STYLE}
   .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px max-content minmax(0, 1fr); }
   .sum .sum-points { text-align: right; font-variant-numeric: tabular-nums; }
   .field > select.f-kind { max-width: 300px; }
-  .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; }
-  .foot.error { color: var(--vscode-editorError-foreground); }`;
+`;
 
 // 中のスクリプトはテンプレート文字列に埋めるので、バッククォートと \${ を使わない。
 const SCRIPT = `  const vscode = acquireVsCodeApi();

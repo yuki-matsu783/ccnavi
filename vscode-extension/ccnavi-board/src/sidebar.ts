@@ -65,7 +65,7 @@ class EntryProvider implements vscode.TreeDataProvider<Entry> {
 
   getTreeItem(entry: Entry): vscode.TreeItem {
     const item = new vscode.TreeItem(entry.label, vscode.TreeItemCollapsibleState.None);
-    item.description = entry.description;
+    // 並びは名前だけにして、説明はポインタを載せたときに出す（横に並べると狭いパネルで切れて読めない）
     item.tooltip = entry.description;
     item.iconPath = new vscode.ThemeIcon(entry.icon);
     item.command = { command: entry.command, title: entry.label };

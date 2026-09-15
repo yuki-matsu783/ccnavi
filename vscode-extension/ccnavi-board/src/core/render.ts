@@ -396,6 +396,69 @@ export const BUTTON_STYLE = `  button.action {
   button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }`;
 
 /**
+ * 5 つの画面で同じ骨組み。本文・見出し上のツールバー（左にパス、右にボタン）・帯・注意・欄・脚注。
+ * 画面ごとの部品（ボードの列、設定 3 画面の一覧、プロジェクトのカード）は各画面が足す。
+ */
+export const PAGE_STYLE = `  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 12px;
+    background: var(--vscode-editor-background);
+    color: var(--vscode-editor-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+  }
+  code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
+  .hidden { display: none !important; }
+  .mono { font-family: var(--vscode-editor-font-family); }
+  .small { font-size: .85em; }
+  .dim { color: var(--vscode-descriptionForeground); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 10px; }
+  .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+  .summary .warn { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+  .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+  .dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
+  .banner {
+    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--vscode-panel-border);
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
+  .banner.error { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
+  .banner.missing { border-color: var(--vscode-editorInfo-foreground); }
+  .banner.missing > span { flex: 1 1 320px; }
+  .lock {
+    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
+    border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
+  }
+  .problems {
+    margin: 0 0 12px; padding: 8px 8px 8px 24px;
+    border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
+    color: var(--vscode-editorWarning-foreground);
+  }
+  h2 { margin: 0 0 8px; font-size: 1em; }
+  .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
+  .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
+  details.help { margin: 0 0 8px; font-size: .92em; }
+  details.help > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; }
+  details.help > summary::-webkit-details-marker { display: none; }
+  details.help > summary::before { content: "▸ "; }
+  details.help[open] > summary::before { content: "▾ "; }
+  details.help > .hint { margin: 4px 0 0; }
+${BUTTON_STYLE}
+  input[type=text], input[type=search], textarea, select {
+    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
+    min-height: 24px; padding: 2px 6px; font: inherit;
+  }
+  input[type=text]:focus, input[type=search]:focus, textarea:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
+  input:disabled, select:disabled, textarea:disabled { opacity: .6; }
+  .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
+  .foot.error { color: var(--vscode-editorError-foreground); }`;
+
+/**
  * 設定 3 画面（ルール設定・リスク管理・フェーズ管理）の一覧。1 件 1 行で、押した行だけ下に欄が開く。
  * 行の見出し（.row-head）の列の幅は画面ごとに決める。欄名は欄の左に置き、欄と欄名は親の格子に並ぶ
  * （.field は display: contents）。出番の少ない欄は details.more に畳み、値があるときだけ開いて出す。
@@ -454,30 +517,10 @@ export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; bo
   .find input { width: 320px; max-width: 100%; }
   .find .hint { margin: 0; }`;
 
-const STYLE = `  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 12px;
-    background: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-  }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 12px; }
-  .summary { display: flex; gap: 14px; align-items: baseline; }
-  .summary .warn { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
+const STYLE = `${PAGE_STYLE}
+  .toolbar { padding-bottom: 12px; }
   .summary .counts { color: var(--vscode-descriptionForeground); }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
   .filter { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
-  select {
-    background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border); border-radius: 2px; padding: 2px 4px;
-  }
-${BUTTON_STYLE}
-  .problems {
-    margin: 0 0 12px; padding: 8px 8px 8px 24px;
-    border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
-    color: var(--vscode-editorWarning-foreground);
-  }
   .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
   /* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールに逃がす。
      右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
@@ -569,7 +612,6 @@ ${BUTTON_STYLE}
   }
   .issues li { overflow-wrap: anywhere; }
   .card-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .foot { margin-top: 12px; font-size: .82em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
   .approval-backdrop {
     position: fixed; inset: 0; z-index: 10;
     background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
