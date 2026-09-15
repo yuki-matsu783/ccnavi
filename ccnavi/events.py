@@ -124,7 +124,13 @@ def scope_guard(conf: settings.Settings, root: str) -> post.ScopeGuard | None:
     if not conf.tickets_enabled:
         return None
     copies, _ = approval.scan(conf, root)
-    return post.ScopeGuard(root=root, copies=approval.by_id(copies), projects=conf.projects)
+    return post.ScopeGuard(
+        root=root,
+        copies=approval.by_id(copies),
+        projects=conf.projects,
+        tickets=conf.tickets,
+        approved=conf.approved,
+    )
 
 
 def decide_at_prompt(

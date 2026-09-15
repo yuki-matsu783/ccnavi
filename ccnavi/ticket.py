@@ -13,7 +13,10 @@
 ## 絞ることしかできない
 
 チケットが宣言できるのは「ここだけ書く」であって「ここも書ける」ではない。
-ルールが何も言わなかった場所に、チケットは「宣言した範囲の外は止める」を足すだけ。
+判定はルールの判定とチケットの判定の厳しい側を採る（設計 §1）。チケットが足すのは
+「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
+ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
+例外はチケットの置き場（`is_ticket_place`）で、次の提案を書く道を残すために範囲を当てない。
 子は親の部分集合で、親子は厳しい側が勝つ。どう書いてもチケットが無いときより
 緩くはならない。
 
@@ -328,6 +331,17 @@ class Ticket:
                 return name
         return OUTSIDE
 
+    def entry_for(self, rel: str) -> Entry | None:
+        """decide がその判定の根拠にした項。どの項にも当たらなければ None。
+
+        判定の文面で「どの項に当たったか」を名指しするために使う。見る順は decide と同じ。
+        """
+        for name in rules.SECTIONS:
+            for e in self.entries:
+                if e.decision == name and e.matches(rel):
+                    return e
+        return None
+
     def is_own_file(self, full: str) -> bool:
         """この綴りがチケット自身の提案ファイルかどうか。"""
         for candidate in (self.path, self.source_path):
@@ -599,6 +613,31 @@ def combine(child: str, parent: str) -> str:
     """親子の判定を、厳しい側が勝つ形で合わせる。"""
     order = {rules.DENY: 3, rules.ASK: 2, rules.ALLOW: 1, OUTSIDE: 4}
     return child if order[child] >= order[parent] else parent
+
+
+def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
+    """ツリーのルートからの相対パスが、チケットの置き場の下にあるか。
+
+    置き場は提案の置き場（`CCNAVI_TICKETS`）と承認済みチケットの置き場（`CCNAVI_APPROVED`）。
+    ここはチケットの範囲の外でも咎めない。咎めると、親が自分の作業ツリーに次の子を
+    提案する道と、承認がブランチに乗る道が塞がる。
+
+    外すのは実行前の判定・実行後の監視・サブエージェント終了時の検査の 3 か所で、
+    どれもこの 1 つを通す。外し方が場所ごとに違うと、実行前に通った書き込みが
+    実行後やサブエージェントの終わりに差し戻される。
+
+    外して開くのは提案の `todo/` だけ。`doing/` 以降は `guard_rules`、承認済みチケットは
+    自己防衛の組み込みが deny で止め、ルールの deny はチケットより強い。
+
+    前置は `/` の境で切る（`wip/ticketsX/` は置き場ではない）。大文字小文字は範囲の照合と
+    同じく、どの機械でも区別しない。
+    """
+    here = _fold(rel.replace("\\", "/"))
+    for place in (tickets_rel, approved_rel):
+        base = _fold(place.replace("\\", "/").strip("/"))
+        if base and here.startswith(base + "/"):
+            return True
+    return False
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
