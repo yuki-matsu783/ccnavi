@@ -391,6 +391,19 @@ class SubstRepoRulesTest(unittest.TestCase):
                 responses[reason] = body["response"]
         self.assertEqual(len(set(responses.values())), 3, "理由の違う縮退に同じ文面を返した")
 
+    def test_coproc_の中身も_find_writes_に当たる(self):
+        # 敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）。
+        self.check(
+            [
+                ("coproc { find . -delete; }", "deny", "find-writes", ""),
+                ("coproc find . -delete", "deny", "find-writes", ""),
+                ("coproc NAME { find . -delete; }", "deny", "find-writes", ""),
+                ("coproc while true; do find . -delete; done", "deny", "find-writes", ""),
+                ("coproc ( find . -delete )", "deny", "find-writes", ""),
+                ("echo coproc", "ask", "", "UNDECLARED"),
+            ]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

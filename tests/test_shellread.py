@@ -437,6 +437,24 @@ class SubstTest(unittest.TestCase):
         inner = read('echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh done x)"')
         self.assertTrue(phase.forbidden(inner.text), show(inner.text))
 
+    def test_coproc_の後ろをコマンドの先頭として読む(self):
+        # 敵対的レビューで見つかった予約語の漏れ（shellread-subst-04）。zsh は名前の無い形の
+        # 中身を実行し、bash 4 以降は `coproc NAME <複合コマンド>` を持つ。
+        for src, text in [
+            ("coproc { find . -delete; }", "coproc␀{␀find . -delete␀}"),
+            ("coproc find . -delete", "coproc␀find . -delete"),
+            ("coproc NAME { find . -delete; }", "coproc␀NAME␀{␀find . -delete␀}"),
+            ("coproc NAME while true; do x; done", "coproc␀NAME␀while␀true␀do␀x␀done"),
+            ("coproc NAME find . -delete", "coproc␀NAME find . -delete"),
+            ("coproc ( find . -delete )", "coproc␀find . -delete"),
+            ("echo coproc", "echo coproc"),
+            ("echo coproc { x; }", "echo coproc { x␀}"),
+        ]:
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertFalse(result.degraded, result.reason)
+                self.assertEqual(show(result.text), show(marked(text)))
+
 
 if __name__ == "__main__":
     unittest.main()
