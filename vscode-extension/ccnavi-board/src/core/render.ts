@@ -15,8 +15,11 @@ export type ApprovalOverlay =
   | { readonly kind: "preview"; readonly preview: ApprovePreview; readonly notice?: string }
   | { readonly kind: "approving"; readonly preview: ApprovePreview }
   | { readonly kind: "error"; readonly error: string }
-  /** 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す */
-  | { readonly kind: "done"; readonly count: number; readonly prompt: string };
+  /**
+   * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
+   * `carried` は承認済みチケットを運ぶ sh を端末に送ったか。送ったときだけ、そう言う
+   */
+  | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean };
 
 export interface RenderOptions {
   readonly nonce: string;
@@ -91,7 +94,7 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
         return renderApprovalBody(overlay.preview, overlay.kind === "approving", overlay.kind === "preview" ? overlay.notice : undefined);
       case "done":
         return `<h2 id="approval-title">${overlay.count} 件を承認した</h2>
-<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く（送信は人が Enter）。</p>
+${overlay.carried === true ? `<p class="approval-note">承認済みチケットのコミットと push を端末に送った。</p>\n` : ""}<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く（送信は人が Enter）。</p>
 <pre class="approval-text">${escapeHtml(overlay.prompt)}</pre>
 <div class="approval-actions"><button type="button" class="action primary" data-action="prompt-copy">コピー</button><button type="button" class="action" data-action="prompt-open">新しいセッションで開く</button><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
     }

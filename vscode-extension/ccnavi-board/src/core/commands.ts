@@ -6,7 +6,14 @@
  * 承認を、拡張が子プロセスで `--approve --yes <識別子,…>` として打つ。端末の壁は無く、
  * 代わりに「見せた一覧と今の一覧が同じ」ことを実行ファイルが求める。エージェントが Bash で
  * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。
+ *
+ * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
+ * ターミナルに Enter まで送る。承認と同時に端末で走り、人は端末でその結果を見る。
  */
+import * as path from "node:path";
+
+/** 承認済みチケットを運ぶ sh の、ワークスペースルートからの綴り */
+export const PUSH_APPROVED_SCRIPT = ".ccnavi/scripts/ccnavi-push-approved.sh";
 
 /** ccnavi の起動の仕方。実行ファイルがあればそれ、無ければソースを uv で走らせる */
 export type Launcher =
@@ -40,16 +47,18 @@ export function previewArgs(tickets: readonly string[] = []): readonly string[] 
 }
 
 /**
- * `--approve --yes <識別子,…> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
- * `tickets` はオーバーレイに出ていた識別子、`only` はそのとき preview に渡した絞り。
+ * `--approve --yes <識別子,…> --digest <指紋> --json [<絞り>...]`。見せた一覧をそのまま承認する（子プロセスの引数）。
+ * `tickets` はオーバーレイに出ていた識別子、`digest` はそのとき見せた指紋（承認画面の本文と承認済みチケットに写る中身。preview の `digest`）、
+ * `only` はそのとき preview に渡した絞り。
  * 絞りを渡さないと、実行ファイルは「絞らないときの対象」と見せた識別子を比べるので、
- * 絞り込み中の承認がいつも食い違いになる。
+ * 絞り込み中の承認がいつも食い違いになる。指紋を渡さないと、実行ファイルは承認しない。
  */
 export function approveArgs(
   tickets: readonly string[],
+  digest: string,
   only: readonly string[] = [],
 ): readonly string[] {
-  return ["--approve", "--yes", tickets.join(","), "--json", ...only];
+  return ["--approve", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
 /**
@@ -61,4 +70,12 @@ export function approveArgs(
 export function acceptCommand(root: string, parentTree: string, phase: number): string {
   const script = shellQuote(`${toPosixPath(root)}/.ccnavi/scripts/ccnavi-review.sh`);
   return `cd ${shellQuote(toPosixPath(parentTree))} && sh ${script} accept ${phase}`;
+}
+
+/**
+ * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
+ * 絶対パスで組む。ターミナルは使い回すので、前に accept が親の作業ツリーへ cd していても届く。
+ */
+export function pushApprovedCommand(root: string): string {
+  return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;
 }

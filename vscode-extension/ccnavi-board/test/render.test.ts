@@ -23,14 +23,18 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   const preview = approvePreview();
   const html = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "preview", preview } });
   assert.ok(html.includes('class="approval-backdrop" data-approval="preview"'));
-  assert.ok(html.includes("Ticket 承認リクエスト: 2 件"));
-  assert.ok(html.includes('data-action="approve-confirm" data-tickets="i0001,i0001-01"'));
-  assert.ok(html.includes("この 2 件を承認する"));
+  // 種類の範囲を超える子（i0001-02）は承認を止めないので一覧に載り、超過は本文の見出しに出る。
+  assert.ok(html.includes("Ticket 承認リクエスト: 3 件"));
+  assert.ok(html.includes('data-action="approve-confirm" data-tickets="i0001,i0001-01,i0001-02"'));
+  assert.ok(html.includes("この 3 件を承認する"));
   assert.ok(html.includes('data-action="approve-cancel"'));
   assert.ok(html.includes('<pre class="approval-text">Ticket 承認リクエスト'));
-  assert.ok(html.includes("承認の対象にしない"));
-  assert.ok(html.includes("i0001-02"));
+  assert.ok(html.includes("判定で止まるもの"));
   assert.ok(html.includes("超えている"));
+  // 対象にしないのは形の壊れた子（計画に無い番号）。
+  assert.ok(html.includes("承認の対象にしない"));
+  assert.ok(html.includes("i0001-05"));
+  assert.ok(html.includes("計画に無い"));
   assert.ok(!html.includes("読めない提案・承認済みチケット"));
   // 本文は実体参照にする。
   const spiked = { ...preview, text: "<script>alert(1)</script>" };
@@ -74,6 +78,13 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
   // 文は Webview から送らせない。拡張が持っている文を使う。
   assert.ok(html.includes('vscode.postMessage({ type: "promptCopy" })'));
   assert.ok(html.includes('vscode.postMessage({ type: "promptOpen" })'));
+  // 運ぶ sh を端末に送ったときだけ、そう言う。
+  assert.ok(!html.includes("端末に送った"));
+  const carried = renderBoard(buildBoard(fixture()), {
+    ...OPTIONS,
+    approval: { kind: "done", count: 1, prompt: "i0001-03 を承認した", carried: true },
+  });
+  assert.ok(carried.includes("承認済みチケットのコミットと push を端末に送った。"));
 });
 
 test("CB-T108c カードの承認はそのカードの識別子だけを絞りとして送る", () => {

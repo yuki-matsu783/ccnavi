@@ -43,7 +43,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, fsio, gitstate, hookio, rules, selfguard, settings, tree
+from . import audit, fsio, gitstate, hookio, phase, phasetypes, rules, selfguard, settings, tree
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -291,10 +291,14 @@ class ScopeGuard:
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
     # プロジェクトの置き場。作業ツリーの切り元をプロジェクトまで広げる（設計 §11.3）。
     projects: str = ""
+    # フェーズの種類。親の `project:` の層ごとに、作るときに 1 度だけ読んだもの。
+    # 変更 1 件ごとに phases.yml を開かない。読めない層は空。
+    types: dict[str, dict[str, phasetypes.PhaseType]] = field(default_factory=dict)
 
     def finding(self, full: str) -> tuple[rules.Rule, str] | None:
         """この変更が範囲の外なら、咎める文面と出所を返す。中なら None。
 
+        範囲は実行前の判定と同じく、親の範囲と種類の上限で切り詰める（phase.scope_verdict）。
         チケット自身の提案ファイルは外でも咎めない。次のチケットを提案する道を
         塞ぐと、いちど承認した範囲から永久に出られなくなる。
         """
@@ -305,22 +309,53 @@ class ScopeGuard:
         if ticket is None or ticket.is_own_file(full):
             return None
         rel = tree.relative(t, full)
-        verdict = ticket.decide(rel)
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
-        if parent is not None:
-            verdict = ticket_mod.combine(verdict, parent.decide(rel))
-        if verdict in (rules.ALLOW, rules.ASK):
+        item = phase.plan_item(ticket, parent)
+        pt = (
+            self.types.get(parent.project, {}).get(item.type)
+            if item is not None and parent is not None
+            else None
+        )
+        found = phase.scope_verdict(ticket, parent, pt, rel)
+        if not found.outside:
             return None
         area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(empty)"
-        rule = rules.Rule(
-            id=TICKET_SCOPE_RULE,
-            message=(
+        inside = (
+            f"This path is inside the work area that ticket {ticket.ticket} declares ({area}) "
+            f"for worktree {t.name}, but "
+        )
+        overflow = (
+            "The ticket was approved with that overflow shown as a warning; writes there stay "
+            "blocked. "
+        )
+        if found.limit == phase.LIMIT_TYPE and found.type is not None:
+            message = (
+                inside + f"outside what phase type {found.type.title} ({found.type.id}) allows "
+                f"({', '.join(found.type.scope_globs)}). "
+                + overflow
+                + "Send the output to a path that type covers, do the work in a later phase "
+                "whose type covers this path, or ask the user to change phases.yml."
+            )
+        elif found.limit == phase.LIMIT_PARENT and parent is not None:
+            parent_area = (
+                ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK)) or "(empty)"
+            )
+            message = (
+                inside
+                + f"outside its parent {parent.ticket} ({parent_area}). "
+                + overflow
+                + "Send the output inside the parent's area, or, if the task genuinely needs "
+                "this path, tell the parent so it can propose a ticket whose parent covers it "
+                "and ask the user to run 'ccnavi --approve'."
+            )
+        else:
+            message = (
                 f"This path is outside the work area that ticket {ticket.ticket} declares "
                 f"({area}) for worktree {t.name}. Send the output inside that area, or, if the "
                 "task genuinely needs this path, tell the parent so it can propose a ticket that "
                 "covers it and ask the user to run 'ccnavi --approve'."
-            ),
-        )
+            )
+        rule = rules.Rule(id=TICKET_SCOPE_RULE, message=message)
         # 出所はその写し自身の場所。写しはツリーごとに在るので、1 か所には畳めない。
         return rule, ticket.path
 

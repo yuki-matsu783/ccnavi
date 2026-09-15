@@ -3,11 +3,18 @@
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
-import { acceptCommand, type Launcher } from "./core/commands.js";
+import {
+  acceptCommand,
+  PUSH_APPROVED_SCRIPT,
+  pushApprovedCommand,
+  type Launcher,
+} from "./core/commands.js";
 import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
@@ -336,9 +343,10 @@ async function openApproval(current: PanelState, only: readonly string[] = []): 
 }
 
 /**
- * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが一覧の一致を
+ * 「この N 件を承認する」。見せた識別子をそのまま `--yes` に渡す。実行ファイルが一覧と本文の一致を
  * 確かめ、違えば何も置かずに `mismatch` を返すので、一覧を読み直して出し直す。
- * 承認できたら、同じオーバーレイを「承認した」に切り替え、Claude Code に渡す文を
+ * 承認できたら、承認済みチケットをコミットして push する sh をターミナルに送り、
+ * 同じオーバーレイを「承認した」に切り替え、Claude Code に渡す文を
  * 2 ボタン（コピー / 新しいセッションで開く）で渡す。右下の通知は見落とすので使わない。
  * 押すまで何もしない。ボードの読み直しは承認済みチケットの監視が起こす。
  */
@@ -350,17 +358,22 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
   current.approval = { kind: "approving", preview };
   redraw(current);
   // 見せたときと同じ絞りを渡す。渡さないと、実行ファイルは絞らないときの対象と比べて食い違いにする。
+  // 見せた指紋（承認画面の本文と承認済みチケットに写る中身）も渡す。識別子が同じでも、見せたあとに提案の中身が変われば承認しない。
   const outcome = await runApproveYes(
     current.folder.uri.fsPath,
     binSetting(),
     tickets,
+    preview.digest,
     current.approvalOnly ?? [],
   );
   if (state !== current) {
     return;
   }
   if (outcome.ok) {
-    current.approval = { kind: "done", count: outcome.value.approved.length, prompt: outcome.value.prompt };
+    const count = outcome.value.approved.length;
+    // 文を渡すより先に送る。ボタンは押されるまで待つが、運ぶ 1 行は承認と同じ時点で端末に出しておく。
+    const carried = count > 0 && carryApproved(current.folder.uri.fsPath);
+    current.approval = { kind: "done", count, prompt: outcome.value.prompt, carried };
     current.approvalOnly = [];
     redraw(current);
     return;
@@ -381,14 +394,43 @@ async function confirmApproval(current: PanelState, tickets: readonly string[]):
         return;
       }
     }
+    const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
+    const notice = sameIds
+      ? "見せた承認画面と今の本文が違った（提案の中身が変わった）。見直してから承認する"
+      : "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する";
     current.approval = again.ok
-      ? { kind: "preview", preview: again.value, notice: "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する" }
+      ? { kind: "preview", preview: again.value, notice }
       : { kind: "error", error: again.error };
     redraw(current);
     return;
   }
   current.approval = { kind: "error", error: outcome.error };
   redraw(current);
+}
+
+/**
+ * 承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）をターミナルに送る。
+ * 承認の実行ファイルは承認済みチケットを置くだけで、運ぶのはこの sh。y/N は無い。
+ * sh が無ければ送らずに警告し、false を返す。送って `No such file` を見せるより、
+ * 何をすればよいかが先に分かる。
+ */
+function carryApproved(root: string): boolean {
+  if (!isFile(path.join(root, PUSH_APPROVED_SCRIPT))) {
+    void vscode.window.showWarningMessage(
+      `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、導入スクリプト（scripts/ccnavi-setup.sh）で配る`,
+    );
+    return false;
+  }
+  runInTerminal(root, pushApprovedCommand(root));
+  return true;
+}
+
+function isFile(filePath: string): boolean {
+  try {
+    return fs.statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /**

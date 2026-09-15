@@ -232,20 +232,21 @@ export async function runApprovePreview(
 }
 
 /**
- * 見せた一覧をそのまま承認する（`--approve --yes <識別子,…> --json`）。
- * 実行ファイルは見せた一覧と今の一覧が同じことを求め、違えば `mismatch` を返して何も置かない。
+ * 見せた一覧をそのまま承認する（`--approve --yes <識別子,…> --digest <指紋> --json`）。
+ * 実行ファイルは見せた一覧と本文が今と同じことを求め、違えば `mismatch` を返して何も置かない。
  */
 export async function runApproveYes(
   root: string,
   setting: string,
   tickets: readonly string[],
+  digest: string,
   only: readonly string[] = [],
 ): Promise<ApproveOutcome> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, approveArgs(tickets, only), APPROVE_TIMEOUT_MS);
+  const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0

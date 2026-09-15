@@ -18,6 +18,8 @@ export interface ApproveBatchEntry {
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
+  /** 範囲のうち、判定で止まるもの（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
+  readonly overflow: readonly string[];
 }
 
 export interface ApproveRejected {
@@ -33,6 +35,8 @@ export interface ApprovePreview {
   readonly batch: readonly ApproveBatchEntry[];
   /** 承認画面の本文そのまま */
   readonly text: string;
+  /** 承認画面の本文と承認済みチケットに写る中身の指紋（SHA-256、16 進）。中身は見ずに、承認するときに `--digest` で返す。古い実行ファイルなら空 */
+  readonly digest: string;
   /** 承認の対象にしない提案と、その理由 */
   readonly rejected: readonly ApproveRejected[];
   /** 読めない提案や承認済みチケットの説明 */
@@ -52,6 +56,8 @@ export interface ApproveResult {
 export interface ApproveMismatch {
   readonly expected: readonly string[];
   readonly current: readonly string[];
+  /** 見せた指紋（渡した値）と今の指紋。実行ファイルが載せなければ無い */
+  readonly digest?: { readonly expected: string; readonly current: string };
 }
 
 export type PreviewParse =
@@ -77,6 +83,7 @@ export function parseApprovePreview(text: string): PreviewParse {
       generated_at: str(raw.generated_at),
       batch: list(raw.batch).filter(isRecord).map(entry),
       text: str(raw.text),
+      digest: str(raw.digest),
       rejected: list(raw.rejected)
         .filter(isRecord)
         .map((r) => ({ ticket: str(r.ticket), problems: list(r.problems).map(str) })),
@@ -93,9 +100,14 @@ export function parseApproveResult(text: string): ResultParse {
   }
   const raw = top.raw;
   if (isRecord(raw.mismatch)) {
+    const digest = raw.mismatch.digest;
     return {
       ok: false,
-      mismatch: { expected: list(raw.mismatch.expected).map(str), current: list(raw.mismatch.current).map(str) },
+      mismatch: {
+        expected: list(raw.mismatch.expected).map(str),
+        current: list(raw.mismatch.current).map(str),
+        ...(isRecord(digest) ? { digest: { expected: str(digest.expected), current: str(digest.current) } } : {}),
+      },
     };
   }
   return {
@@ -143,6 +155,7 @@ function entry(raw: Record<string, unknown>): ApproveBatchEntry {
     revision: raw.revision === true,
     tree: str(raw.tree),
     path: str(raw.path),
+    overflow: list(raw.overflow).map(str),
   };
 }
 

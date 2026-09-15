@@ -67,7 +67,9 @@ HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
-DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh")
+# 承認済みチケットを運ぶ sh（ccnavi-push-approved.sh）も配る。ボードは承認のあとこれを
+# 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry §1.5）。
+DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh", "ccnavi-push-approved.sh")
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本（設計 §11.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
@@ -820,6 +822,24 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertNotIn("まだ無いもの", result.stdout)
         self.assertIn("配った", result.stdout)
+
+    def test_names_the_push_script_when_the_source_lacks_it(self):
+        """15. 配布元に ccnavi-push-approved.sh が無ければ、最後の「まだ無いもの」に挙げる。
+
+        ボードは承認のあとこの sh を端末に送る。配れなかったことが最後の一覧に出ないと、
+        配布先で運べない理由を人が読み取れない。
+        """
+        src = self.make_source()
+        os.remove(os.path.join(src, ".ccnavi", "scripts", "ccnavi-push-approved.sh"))
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertIn("まだ無いもの", result.stdout, result.stdout + result.stderr)
+        missing = result.stdout.split("まだ無いもの", 1)[1]
+        self.assertIn("ccnavi-push-approved.sh", missing)
+        self.assertFalse(
+            os.path.exists(self.deployed(".ccnavi", "scripts", "ccnavi-push-approved.sh"))
+        )
+        # 他の sh は配ったので、一覧には出ない。
+        self.assertNotIn("ccnavi-ticket.sh", missing)
 
     def test_no_deploy_writes_only_the_settings(self):
         """`--no-deploy` は配布物を置かない。何が無いかと、戻し方を見せる。"""

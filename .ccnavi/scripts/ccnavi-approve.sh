@@ -71,53 +71,6 @@ fi
 # 承認。落ちたらそこで終わり。承認済みチケットが 1 つも書かれていないので、運ぶものも無い。
 "$@" || exit 1
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
-projects="${CCNAVI_PROJECTS:-projects}"
-
-# 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、作業ツリー。
-# glob が何にも当たらなければ綴りのまま残るので、-d で落とす。
-trees="$root"
-for dir in "$root/$projects"/* "$root/.claude/worktrees"/*; do
-	[ -d "$dir" ] || continue
-	trees="$trees
-$dir"
-done
-
-printf '%s\n' "$trees" | while IFS= read -r tree; do
-	[ -n "$tree" ] || continue
-	[ -d "$tree/$approved" ] || continue
-	git -C "$tree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-	changed=$(git -C "$tree" status --porcelain -- "$approved" 2>/dev/null || :)
-	[ -n "$changed" ] || continue
-
-	name=$(basename "$tree")
-	branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-	if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
-		printf 'ccnavi-approve: %s はブランチの上に居ない。承認済みチケットは手でコミットしてください。\n' \
-			"$name" >&2
-		continue
-	fi
-
-	git -C "$tree" add -- "$approved"
-	git -C "$tree" commit --quiet -m "ccnavi: 承認済みチケットを更新" || {
-		printf 'ccnavi-approve: %s で承認済みチケットをコミットできない。\n' "$name" >&2
-		continue
-	}
-	case "$branch" in
-	main | master | develop | release | release/*)
-		printf 'ccnavi-approve: %s は %s の上に居るので push しません。送るかどうかは人が決めます。\n' \
-			"$name" "$branch" >&2
-		continue
-		;;
-	esac
-
-	# push は落ちても承認を巻き戻さない。コミットは残るので、人がもう一度送れる。
-	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
-		printf '承認済みチケットを %s へ送った（%s）。\n' "$branch" "$name"
-	else
-		printf 'ccnavi-approve: %s の push が通らなかった。手で送ってください（git push -u origin %s）。\n' \
-			"$name" "$branch" >&2
-	fi
-done
-
+# 運ぶのは ccnavi-push-approved.sh に任せる（設計 §1.4）。落ちても承認は巻き戻さない。
+sh "$(dirname "$0")/ccnavi-push-approved.sh" || :
 exit 0

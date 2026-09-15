@@ -95,8 +95,9 @@ DEPLOY_RISK=".ccnavi/common/risk.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
-# 起動時に落ちる。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh"
+# 起動時に落ちる。ccnavi-push-approved.sh はボードが承認のあと端末に送る 1 行の中身。
+# 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh"
 
 mode="$DEFAULT_MODE"
 bin="$DEFAULT_BIN"
@@ -1123,9 +1124,19 @@ fi
 if [ ! -f "$root/$DEPLOY_PHASES" ]; then
 	note_missing "${DEPLOY_PHASES}（フェーズの種類。無いと番号だけの挙動になる）"
 fi
-for name in ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh; do
-	if [ ! -f "$root/.ccnavi/scripts/$name" ]; then
-		note_missing ".ccnavi/scripts/${name}（ゲートの中で通る形）"
+# 配るものの一覧（DEPLOY_SCRIPTS）で見る。ここで名前を決め打ちすると、配る sh を
+# 足したときに、無いことをこの一覧だけが言わなくなる。
+for name in $DEPLOY_SCRIPTS; do
+	if [ ! -f "$root/$DEPLOY_SCRIPT_DIR/$name" ]; then
+		case "$name" in
+		ccnavi-push-approved.sh)
+			why="ボードが承認のあと端末で走らせる、承認済みチケットのコミットと push"
+			;;
+		*)
+			why="ゲートの中で通る形"
+			;;
+		esac
+		note_missing "${DEPLOY_SCRIPT_DIR}/${name}（${why}）"
 	fi
 done
 if [ -n "$missing_parts" ]; then

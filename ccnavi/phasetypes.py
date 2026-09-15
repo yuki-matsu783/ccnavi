@@ -125,7 +125,10 @@ def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, lis
             text = f.read()
     except FileNotFoundError:
         return None, []
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
+        # ファイルとして苦情付きで返す。上げると、判定（実行前・ゲート・実行後の監視）が
+        # 例外で落ち、読めない種類を「種類では切り詰めない」として扱う道に届かない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     return parse(text, path, refs)
 
@@ -373,7 +376,10 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
 
 
 def scope_problems(child: ticket_mod.Ticket, pt: PhaseType) -> list[Problem]:
-    """子の範囲が種類の上限を超えている項を名指しする。子 ⊆ 種類。"""
+    """子の範囲が種類の上限を超えている項を名指しする。子 ⊆ 種類。
+
+    超えていても承認は止めない（warn）。判定が種類の上限でも切り詰める（phase.scope_verdict）。
+    """
     if pt.inherits_scope:
         return []
     problems: list[Problem] = []
@@ -382,19 +388,14 @@ def scope_problems(child: ticket_mod.Ticket, pt: PhaseType) -> list[Problem]:
             continue
         if entry.regex:
             problems.append(
-                Problem(
-                    SEVERITY_ERROR,
-                    child.ticket,
-                    f"子の範囲に regex `{entry.regex}` は書けない。"
-                    "種類の上限に入るかを確かめられない",
-                )
+                Problem(SEVERITY_WARN, child.ticket, ticket_mod.regex_overflow_detail(entry.regex))
             )
             continue
         probe = entry.prefix() + "x" if entry.glob != entry.prefix() else entry.glob
         if pt.decide(probe) != rules.ALLOW:
             problems.append(
                 Problem(
-                    SEVERITY_ERROR,
+                    SEVERITY_WARN,
                     child.ticket,
                     f"`{entry.glob}` は種類 {pt.title}（{pt.id}）の範囲 "
                     f"{', '.join(pt.scope_globs)} を超えている",

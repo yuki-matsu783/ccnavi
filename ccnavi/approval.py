@@ -24,11 +24,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TextIO
 
 from . import fsio, phasetypes, rules, settings, tree
@@ -360,6 +361,10 @@ class Candidate:
 
     ticket: ticket_mod.Ticket
     complaints: list[rules.Problem] = field(default_factory=list)
+    # 範囲の超過（親の範囲・種類の上限を超えた項、regex の項）。承認は止めず、判定が
+    # 切り詰める。判定に効く（止まる）ので、判定に効かない記述の注意（complaints の warn）とは
+    # 混ぜずに持つ。
+    overflow: list[rules.Problem] = field(default_factory=list)
     # 改版なら、いま効いている承認済みチケット。
     current: ticket_mod.Ticket | None = None
     # このチケットに効くフェーズの種類（共通層 + `project:` が指す層、設計 §11.4.1）。
@@ -584,6 +589,7 @@ def preview(
         "generated_at": now(),
         "batch": [_batch_entry(c) for c in gathered.batch],
         "text": gathered.text,
+        "digest": approval_digest(gathered.text, gathered.batch),
         "rejected": [
             {"ticket": t.ticket, "problems": [str(p) for p in complaints]}
             for t, complaints in gathered.rejected
@@ -592,6 +598,43 @@ def preview(
     }
     stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
     return 0
+
+
+def approval_digest(text: str, batch: list[Candidate]) -> str:
+    """承認の指紋。承認画面の本文と承認済みチケットに写る中身の SHA-256 の 16 進（小文字）。
+
+    ボードは preview の指紋を `--yes` に `--digest` で返す。識別子だけを比べると、
+    見せたあとに提案の範囲や計画が書き換わっても、同じ識別子なら承認が通る。
+    本文だけを比べても、画面に出ないのに承認済みチケットへ写る欄（`issue`、Markdown の
+    本文、知らない frontmatter の欄）は見せたあとに書き換えられる。だから、本文に続けて
+    束のチケットを順に書き出した中身も覆う。
+
+    書き出した中身は承認のときに書くもの（`_apply` の `write_copy` / `revise_copy`）と
+    同じ組み立てで、承認の記録の欄（`ccnavi_approved`）だけを除く。記録は承認した時刻を
+    持つので、入れると呼ぶたびに指紋が変わる。本文も呼ぶたびに変わる中身を持たない。
+
+    部分をそのままつながず、部分ごとの指紋を件数と一緒に並べて、その並びの指紋を取る。
+    区切りの文字でつなぐと、その文字が部分の中に出たときにつなぎ目をずらせる。Markdown の
+    本文は生の制御文字（`\\x00` も）を素通しするので、どの文字も「中身に出ない」とは言えない。
+    """
+    parts = [text] + [_carried(cand) for cand in batch]
+    lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def _carried(cand: Candidate) -> str:
+    """承認済みチケットに写る中身。承認の記録の欄を足す前の姿で書き出す。
+
+    改版は承認済みチケットの frontmatter の計画だけを差し替え、本文は承認済みチケットの
+    ものを残す（`revise_copy`）。新規は提案をそのまま写す（`write_copy`）。
+    """
+    t = cand.ticket
+    if cand.is_revision and cand.current is not None:
+        front, body = revised_front(cand.current, t), cand.current.body
+    else:
+        front, body = dict(t.raw), t.body
+    front.pop(ticket_mod.APPROVAL_KEY, None)
+    return ticket_mod.render(replace(t, raw=front, body=body))
 
 
 def _batch_entry(cand: Candidate) -> dict:
@@ -604,6 +647,7 @@ def _batch_entry(cand: Candidate) -> dict:
         "revision": cand.is_revision,
         "tree": t.tree or "",
         "path": t.path,
+        "overflow": [p.detail for p in cand.overflow],
     }
 
 
@@ -615,12 +659,16 @@ def approve_yes(
     expected: list[str],
     as_json: bool,
     only: list[str] | None = None,
+    digest: str = "",
 ) -> int:
-    """`--approve --yes <識別子,…> [<絞り>...]`。拡張のオーバーレイで人が押した承認。
+    """`--approve --yes <識別子,…> --digest <指紋> [<絞り>...]`。拡張のオーバーレイで押した承認。
 
     端末の壁は通らない。代わりに、見せた一覧と今の一覧が同じであることを求める。
     拡張が見せたあとに提案が増えていれば承認せず、食い違いを返す。見ていない
-    ものを承認する道を塞ぐため。
+    ものを承認する道を塞ぐため。識別子に加えて、見せた承認画面の本文と承認済みチケットに
+    写る中身の指紋（`digest`）も比べる。識別子が同じでも、見せたあとに提案の範囲や計画、
+    画面に出ない欄（`issue` など）が書き換われば承認しない。
+    指紋が無ければ承認しない（指紋を渡さない古いボード）。
 
     引数は 2 つに分かれる。`--yes` は「オーバーレイに出ていた識別子」で、後ろに並べる語は
     「そのとき掛けていた絞り」（`--approve --preview` に渡したものと同じ）。分けないと検査が
@@ -629,22 +677,42 @@ def approve_yes(
     """
     wanted = sorted({s.strip() for s in expected if s.strip()})
     narrowed = [s.strip() for s in (only or []) if s.strip()]
+    shown = digest.strip()
+    if not shown:
+        stderr.write(
+            "ccnavi: --yes には --digest（見せた承認画面の本文と承認済みチケットに写る中身の"
+            "指紋）が要る。"
+            "ボードが古いので、入れ直してから承認の画面を開き直す\n"
+        )
+        return 1
     gathered = gather(stderr, conf, root, narrowed)
     # 絞りが通らなかった（承認待ちに無い識別子が混じっている、親の改版を外した）ときは、
     # ボードが古い。拡張には食い違いとして返し、一覧を読み直させる。
-    current = gather(stderr, conf, root).identifiers if gathered.refused else gathered.identifiers
-    if wanted != current:
+    now_shown = gather(stderr, conf, root) if gathered.refused else gathered
+    current = now_shown.identifiers
+    current_digest = approval_digest(now_shown.text, now_shown.batch)
+    if wanted != current or shown.lower() != current_digest:
         if as_json:
             body = {
                 "version": APPROVE_VERSION,
-                "mismatch": {"expected": wanted, "current": current},
+                "mismatch": {
+                    "expected": wanted,
+                    "current": current,
+                    "digest": {"expected": digest, "current": current_digest},
+                },
             }
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-        stderr.write(
-            "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
-            f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
-            "見直してから承認する\n"
-        )
+        if wanted != current:
+            stderr.write(
+                "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
+                f"{', '.join(wanted) or '(無し)'} / 今: {', '.join(current) or '(無し)'}）。"
+                "見直してから承認する\n"
+            )
+        else:
+            stderr.write(
+                "ccnavi: 見せた承認画面の本文と承認済みチケットに写る中身が、今のものと違う"
+                "（識別子は同じで、提案の中身が変わった）。見直してから承認する\n"
+            )
         return 1
     if not gathered.batch:
         stderr.write("ccnavi: 承認するものが無い\n")
@@ -845,7 +913,7 @@ def _candidates(
         pending, key=lambda x: (x.parent or x.ticket, x.is_child, x.phase or 0, x.ticket)
     ):
         types = types_for(t)
-        complaints = validate(t, pool, types)
+        complaints, overflow = validate(t, pool, types)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
@@ -856,7 +924,7 @@ def _candidates(
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
-        batch.append(Candidate(ticket=t, complaints=complaints, types=types))
+        batch.append(Candidate(ticket=t, complaints=complaints, overflow=overflow, types=types))
         pool[t.ticket] = t
         if t.is_child:
             added.setdefault(t.parent, []).append(t)
@@ -994,6 +1062,11 @@ def screen(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
+        if cand.overflow:
+            # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
+            # 注意と混ぜると、承認すれば書けると読み違える。
+            lines.append("■ 範囲のうち、判定で止まるもの（承認しても書けない）")
+            lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
             lines.append(
@@ -1009,6 +1082,8 @@ def screen(
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or [
                     "    （対応なし）"
                 ]
+        if not t.is_child and t.issue is not None:
+            lines.append(f"■ 課題: #{t.issue}（マージリクエストの本文で Closes に使う）")
         if t.rationale.strip():
             lines.append("■ 理由（エージェントの記述）")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
@@ -1256,10 +1331,7 @@ def revise_copy(
     feedback_planned: bool,
 ) -> str:
     """承認済みチケットの計画を差し替える。範囲と承認の記録はそのまま。"""
-    front = dict(current.raw)
-    front["plan"] = [item.as_raw() for item in revised.plan]
-    if revised.feedback is not None:
-        front["feedback"] = [item.as_raw() for item in revised.feedback]
+    front = revised_front(current, revised)
     meta = dict(front.get(ticket_mod.APPROVAL_KEY) or {})
     meta["revised_at"] = stamp
     if feedback_planned:
@@ -1267,6 +1339,19 @@ def revise_copy(
     front[ticket_mod.APPROVAL_KEY] = meta
     current.raw = front
     return _write(copy_path(approved_dir, current.ticket), ticket_mod.render(current))
+
+
+def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dict:
+    """改版で書く frontmatter。承認済みチケットの frontmatter の計画だけを差し替えた写し。
+
+    `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
+    中身と書く中身がずれない。
+    """
+    front = dict(current.raw)
+    front["plan"] = [item.as_raw() for item in revised.plan]
+    if revised.feedback is not None:
+        front["feedback"] = [item.as_raw() for item in revised.feedback]
+    return front
 
 
 def _scope_signature(t: ticket_mod.Ticket) -> tuple:
@@ -1359,25 +1444,32 @@ def project_problems(
 
 def validate(
     t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket], types: dict | None = None
-) -> list[rules.Problem]:
-    """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。"""
+) -> tuple[list[rules.Problem], list[rules.Problem]]:
+    """承認の対象にしてよいかを見る。親子の制約はここでしか見られない。
+
+    返すのは 2 つの並び。1 つめはチケットの形の苦情で、error があれば承認しない。
+    2 つめは範囲の超過（親の範囲・種類の上限を超えた項、regex の項）で、承認は止めない。
+    判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。形の検査は判定では
+    補えない（親が無い子は、どの範囲で切り詰めるかが決まらない）ので残す。
+    """
     problems: list[rules.Problem] = []
+    overflow: list[rules.Problem] = []
     if not t.is_child:
-        return plan_problems(t, types)
+        return plan_problems(t, types), overflow
     parent = pool.get(t.parent)
     if parent is None:
         problems.append(
             rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} が承認されていない")
         )
-        return problems
+        return problems, overflow
     if parent.is_child:
         problems.append(
             rules.Problem(
                 rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
             )
         )
-        return problems
-    problems.extend(ticket_mod.subset_problems(t, parent))
+        return problems, overflow
+    overflow.extend(ticket_mod.subset_problems(t, parent))
     if parent.has_plan and t.phase is not None:
         item = parent.item_at(t.phase)
         if item is None:
@@ -1389,7 +1481,7 @@ def validate(
                     f"（計画は {len(parent.numbered())} 番目まで）",
                 )
             )
-            return problems
+            return problems, overflow
         pt = (types or {}).get(item.type)
         if pt is None:
             problems.append(
@@ -1399,9 +1491,16 @@ def validate(
                     f"{t.phase} 番目の種類 `{item.type}` の定義が読めない",
                 )
             )
-            return problems
-        problems.extend(phasetypes.scope_problems(t, pt))
-    return problems
+            return problems, overflow
+        overflow.extend(phasetypes.scope_problems(t, pt))
+    # regex の項は親の検査と種類の検査が同じ文で言う。画面に 2 度並べない。
+    seen: set[str] = set()
+    distinct = []
+    for p in overflow:
+        if p.detail not in seen:
+            seen.add(p.detail)
+            distinct.append(p)
+    return problems, distinct
 
 
 def _write(path: str, text: str) -> str:

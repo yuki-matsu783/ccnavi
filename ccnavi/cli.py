@@ -97,10 +97,12 @@ its parent's pending revision, approves nothing.
 The VS Code board extension approves from an overlay instead of the terminal:
 
     ccnavi --approve --preview --json [<id>...]  (show the batch; places nothing)
-    ccnavi --approve --yes <id,id,...> --json [<id>...]  (approve exactly what was shown;
-                                                 the trailing ids are the same filter)
+    ccnavi --approve --yes <id,id,...> --digest <hex> --json [<id>...]
+        (approve exactly what was shown; --digest is the preview's `digest`,
+         the trailing ids are the same filter)
 
---yes needs no terminal; it refuses when the batch changed since it was shown.
+--yes needs no terminal; it refuses when the batch or the text changed since it
+was shown, and when --digest is missing.
 The next UserPromptSubmit / PreToolUse tells the model once about the new
 copies (the same text the extension hands to Claude Code).
 
@@ -192,6 +194,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--preview", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
+    # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
+    # `--yes` と一緒に渡す。
+    parser.add_argument("--digest", default="")
     parser.add_argument("--test", nargs=2, metavar=("TOOL", "SUBJECT"), default=None)
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
@@ -324,7 +329,14 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.yes:
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
             code = approval.approve_yes(
-                stdout, stderr, conf, root, args.yes.split(","), args.json, list(args.command)
+                stdout,
+                stderr,
+                conf,
+                root,
+                args.yes.split(","),
+                args.json,
+                list(args.command),
+                digest=args.digest,
             )
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
