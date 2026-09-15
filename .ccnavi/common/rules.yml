@@ -30,7 +30,7 @@ deny:
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
-    regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risk)\.yml$'
+    regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risks)\.yml$'
     message: >-
       ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください

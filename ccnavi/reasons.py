@@ -372,7 +372,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     自分で決められるようにする。判定はこの線引きを担保しない。チケットの無い作業ツリーと
     main 直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
 
-    phases.yml と risk.yml は解決後のパスで示す。無ければその括弧を省く。人が既定と
+    phases.yml と risks.yml は解決後のパスで示す。無ければその括弧を省く。人が既定と
     違う場所に置いていれば、そちらの綴りが出る。
     """
     phases = _relative_or_omit(conf.phases, root)

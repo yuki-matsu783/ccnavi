@@ -803,7 +803,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 |---|---|---|
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前 |
 | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/`） | 判定の中身そのもの | ツール実行前 |
-| 自身の層と各プロジェクトの層の `.ccnavi/config/{rules,phases,risk}.yml` | 同上 | ツール実行前 |
+| 自身の層と各プロジェクトの層の `.ccnavi/config/{rules,phases,risks}.yml` | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
 
 上のうち追跡されているものは、その切り元から切った作業ツリー側の設定も対象に入る（§11.6）。
@@ -1413,7 +1413,7 @@ HIGH 以上（§9.9）、のどれかで決まる。延期の項は自分では�
 `phases/<親>/<子>.risk.json` に残す。フェーズの点は子の最大値。HIGH 以上なら、宣言に関わらず
 そのフェーズは人間レビューが要る扱いになる。実績が小さくても宣言のレビュー要は下げない。
 
-配点は `risk.yml`（共通層と親の `project:` の層の和。§11.4.2）。どの層にも無ければ組み込みの 4 項目、壊れていれば
+配点は `risks.yml`（共通層と親の `project:` の層の和。§11.4.2）。どの層にも無ければ組み込みの 4 項目、壊れていれば
 組み込みに落ちて `--lint` と閉じたときの出力が言う。等級の名前は `LOW` / `MEDIUM` / `HIGH` /
 `CRITICAL` で固定、閾値（既定 20 / 40 / 70）だけ動かせる。閾値は「以上」。
 
@@ -1595,10 +1595,10 @@ Bash は共通層 + 全部の層**。**チケットのプロジェクトは提�
 | 何 | 場所 | git |
 |---|---|---|
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
-| **共通層**のルール / フェーズの種類 / リスクの配点 | `.ccnavi/common/{rules,phases,risk}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | ワークスペース |
+| **共通層**のルール / フェーズの種類 / リスクの配点 | `.ccnavi/common/{rules,phases,risks}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | ワークスペース |
 | ルールの見本 | `.ccnavi/common/rule-samples.yml` | ワークスペース |
-| **ワークスペース自身の層**の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml` | ワークスペース |
-| **プロジェクトの層**の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml` | プロジェクト |
+| **ワークスペース自身の層**の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース |
+| **プロジェクトの層**の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | プロジェクト |
 | 固有スクリプト（配点の `script:` が指す先） | 共通層は `.ccnavi/common/scripts/`。自身の層とプロジェクトの層は、それぞれの `.ccnavi/scripts/` | 層と同じ |
 | プロジェクト | `projects/<名前>/`（`CCNAVI_PROJECTS`、既定 `projects`、ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | 作業ツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
@@ -1800,8 +1800,8 @@ info で言い、`--explain` は残った 1 本だけ出す。Bash の和でも�
 |---|---|
 | hook の登録 | `.claude/settings.json`、`.claude/settings.local.json` |
 | 共通層の 3 本 | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル |
-| 自身の層の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml` |
-| プロジェクトの層の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml` |
+| 自身の層の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` |
+| プロジェクトの層の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` |
 | 実行ファイル | `CCNAVI_BIN_PATH`（振り分けの sh）と、sh が起動する実体（§8.2） |
 | 作業ツリー側の設定 | 上の各ファイルのうち追跡されているものについて、**その切り元から切った**作業ツリーが持つ同じファイル |
 
@@ -1938,7 +1938,7 @@ git のラッパースクリプトの記録はワークスペースの `logs/<�
 **端末から打つ `--approve` の終了コード。** 承認の対象の一部が落ちたら 1。通ったぶんの承認済みチケットは置き、落ちたものは名指しする。成功で終わると、
 端末を見ていない側（スクリプト、CI）は全部通ったと読む。拡張が子プロセスで打つ `--approve --yes`（§10）の終了コードは変えていない。
 
-**導入スクリプト。** `ccnavi-setup.sh` は共通層に `rules.yml` と `risk.yml`、自身の層に `phases.yml` のひな形を配る。3 本とも
+**導入スクリプト。** `ccnavi-setup.sh` は共通層に `rules.yml` と `risks.yml`、自身の層に `phases.yml` のひな形を配る。3 本とも
 「まだ無いもの」の点検に数える。`--all` の env に `CCNAVI_PROJECT_HOME: ".ccnavi"` を足す。
 
 dry-run でまず層の分布を見て、Bash の和と `glob` の綴りの畳み込みで増えた `ask` と `deny` を数えてから `enable` に切り替える。

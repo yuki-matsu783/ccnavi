@@ -110,7 +110,7 @@
     }
    ],
    "risk": {
-    "path": "<root>/.ccnavi/common/risk.yml",
+    "path": "<root>/.ccnavi/common/risks.yml",
     "unreadable": "",
     "factors": []
    },
@@ -130,7 +130,7 @@
    },
    "phases": [],
    "risk": {
-    "path": "<root>/.ccnavi/config/risk.yml",
+    "path": "<root>/.ccnavi/config/risks.yml",
     "unreadable": "",
     "factors": []
    },

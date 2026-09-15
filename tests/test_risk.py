@@ -33,7 +33,7 @@ factors:
 
 class DefinitionTest(unittest.TestCase):
     def test_builtin_is_used_when_there_is_no_file(self):
-        definition, problems = risk.load(os.path.join(os.sep, "no", "such", "risk.yml"))
+        definition, problems = risk.load(os.path.join(os.sep, "no", "such", "risks.yml"))
         self.assertEqual([], problems)
         self.assertEqual(risk.BUILTIN, definition.source)
         self.assertEqual(4, len(definition.factors))
@@ -69,7 +69,7 @@ class RiskTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        self.risk = write(os.path.join(self.root, "risk.yml"), RISK)
+        self.risk = write(os.path.join(self.root, "risks.yml"), RISK)
         # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
         self.phases = write(
             os.path.join(self.root, "phases-risk.yml"),

@@ -300,9 +300,9 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PHASES` | **共通層**のフェーズの種類の定義。ワークスペースルートからの相対。既定は `.ccnavi/common/phases.yml`。どの層にも無ければフェーズは番号だけの挙動 |
-| `CCNAVI_RISK` | **共通層**の実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.ccnavi/common/risk.yml`。どの層にも無ければ組み込みの配点 |
+| `CCNAVI_RISK` | **共通層**の実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.ccnavi/common/risks.yml`。どの層にも無ければ組み込みの配点 |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
-| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risk}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の既定の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かない。共通層を動かすなら `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` で動かす |
+| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の既定の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かない。共通層を動かすなら `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` で動かす |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -381,7 +381,7 @@ env が振り分けの sh を指していれば、sh と同じ順で `.ccnavi/bi
 |---|---|
 | `dist/ccnavi/`（中身ごと） | `.ccnavi/bin/<os>-<arch>/`（`<os>-<arch>` は `dist/ccnavi.target` の目印） |
 | `.ccnavi/common/rules.yml` | 同じ綴り |
-| `.ccnavi/common/risk.yml` | 同じ綴り |
+| `.ccnavi/common/risks.yml` | 同じ綴り |
 | `.ccnavi/config/phases.yml` | 同じ綴り |
 | `.ccnavi/scripts/ccnavi-{ticket,review,git,common}.sh` | 同じ綴り |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じ綴り。配ったあと実行ビットを付ける |
@@ -534,9 +534,9 @@ allow:
 
 | 層 | 置き場 | 何を置くか |
 |---|---|---|
-| 共通層 | `.ccnavi/common/{rules,phases,risk}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | どのツリーにも効くもの |
-| ワークスペース自身の層 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml` | ワークスペース自身のツリーにだけ効くもの |
-| プロジェクトの層 | `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml` | そのプロジェクトのツリーにだけ効くもの |
+| 共通層 | `.ccnavi/common/{rules,phases,risks}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | どのツリーにも効くもの |
+| ワークスペース自身の層 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ効くもの |
+| プロジェクトの層 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ効くもの |
 
 ccnavi ディレクトリの名前（`.ccnavi`）は `CCNAVI_PROJECT_HOME` の既定値で、変えられるのはそこだけ。`config/` と 3 本のファイル名は固定。
 自身の層とプロジェクトの層は形が同じで、どちらも git プロジェクトルートの直下に置く。
@@ -779,7 +779,7 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 （提案が `doing`）がある間は保存できない。hook はツール呼び出しのたびにルールを読み直すので、
 セッションの途中で判定が変わるのを避けるため。
 
-同じ拡張の「リスク管理画面」で、実績で測るリスクの配点（`.ccnavi/common/risk.yml`）の閾値と項目を
+同じ拡張の「リスク管理画面」で、実績で測るリスクの配点（`.ccnavi/common/risks.yml`）の閾値と項目を
 画面で直せる。保存の前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は差分を数えない。
 ファイルが無ければ組み込みと同じ値で作れる。
 
@@ -1194,9 +1194,9 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 |---|---|---|
 | `.claude/settings.json` | hook の登録そのもの | ツール実行前 |
 | `.claude/settings.local.json` | 同上。個人の上書き | ツール実行前 |
-| `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/{rules,phases,risk}.yml`） | 判定の中身そのもの | ツール実行前 |
-| `<ワークスペースルート>/.ccnavi/config/{rules,phases,risk}.yml`（自身の層の 3 本） | 同上 | ツール実行前 |
-| `projects/<名前>/.ccnavi/config/{rules,phases,risk}.yml`（各プロジェクトの層の 3 本） | 同上 | ツール実行前 |
+| `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前 |
+| `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml`（自身の層の 3 本） | 同上 | ツール実行前 |
+| `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml`（各プロジェクトの層の 3 本） | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル（既定の配置では振り分けの sh） | 判定器の実体 | セッション開始 |
 | それが振り分けの sh（名前が `ccnavi-launcher.sh`）なら、1 つ上の `bin/<os>-<arch>/` にあるこの機械の実行ファイル。それ以外の名前（前の `.ccnavi/bin/ccnavi`）なら隣の `<os>-<arch>/` | 同上。hook が実際に走らせるもの | セッション開始 |
 
@@ -1337,13 +1337,13 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
   人のレビューが要らない）は、チケットを起こさずそのまま進める。判定は全体ルールだけ。
 - チケット作業: 大きな修正（設計に触れる、複数のフェーズに分かれる、人のレビューが要る）は、
   wip/tickets/ に提案を書いて承認を受け、フェーズ（.ccnavi/common/phases.yml）と
-  リスクの配点（.ccnavi/common/risk.yml）に従って issue とマージリクエストを作りながら進める。
+  リスクの配点（.ccnavi/common/risks.yml）に従って issue とマージリクエストを作りながら進める。
   操作は sh .ccnavi/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。
 どちらで進めるか迷ったら、利用者に聞く。
 （現状: CCNAVI_MODE=dry-run。deny判定でも止めずに言うだけ）
 ```
 
-phases.yml と risk.yml は在るときだけ、解決後の綴りで載る。載るのは共通層（`CCNAVI_PHASES` / `CCNAVI_RISK`）の
+phases.yml と risks.yml は在るときだけ、解決後の綴りで載る。載るのは共通層（`CCNAVI_PHASES` / `CCNAVI_RISK`）の
 綴りだけで、自身の層とプロジェクトの層の綴りは載らない。共通層のフェーズの種類を置いていない（自身の層にだけ置いた）
 ワークスペースでは、フェーズの括弧が省かれる。最後の行は dry-run のときだけ。
 
@@ -1756,7 +1756,7 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 子の最大値。**HIGH 以上なら、宣言に関わらずそのフェーズは人間レビューが要る扱いになり、
 ゲートが閉じる。** 実績が小さくても宣言のレビュー要を下げることはしない。
 
-配点は `.ccnavi/common/risk.yml`（ccnavi ディレクトリの下で、組み込みの deny が守る場所。エージェントは書き換えない）。無ければ組み込み。
+配点は `.ccnavi/common/risks.yml`（ccnavi ディレクトリの下で、組み込みの deny が守る場所。エージェントは書き換えない）。無ければ組み込み。
 
 ```yaml
 version: 1
@@ -1781,7 +1781,7 @@ factors:
 閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
 （「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に、点と加点した理由が出る。
 レビュアーは「なぜこのフェーズにレビューが要ることになったか」を依頼文で読める。
-壊れた `risk.yml` は組み込みに落ち、`--lint` と閉じたときの出力がそう言う。
+壊れた `risks.yml` は組み込みに落ち、`--lint` と閉じたときの出力がそう言う。
 
 ### サブエージェントに渡すもの
 
@@ -2126,7 +2126,7 @@ error 2 件、warn 2 件、info 0 件
 | error | 孫を持つ子 |
 | warn | 範囲の超過がある子（親の範囲・フェーズの種類の `scope` を超える項、regex の項）。判定がその上限で切り詰めて止めるので、CI の終了コードは落とさない（承認と同じ扱い） |
 | error | 作業ツリーの切り元と承認済みチケットの `project:` が違う |
-| error | 親が計画を持つのに `phases.yml` が読めない、`phases.yml` / `risk.yml` 自身の誤り |
+| error | 親が計画を持つのに `phases.yml` が読めない、`phases.yml` / `risks.yml` 自身の誤り |
 | error | 承認済みチケットが読めない |
 | warn | 未承認の提案がある |
 | warn | `predecessors` が閉じていないのに `doing/` にある子 |
@@ -2384,7 +2384,7 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `ccnavi/ticket.py` | チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合の検査 |
 | `ccnavi/tree.py` | 作業ツリー（git worktree）の特定。判定の鍵はファイルの行き先 |
 | `ccnavi/approval.py` | 承認済みチケット、フェーズのマーカー、子ごとの記録、承認の画面 |
-| `ccnavi/risk.py` | 実績で測るリスク。`risk.yml` の読み込み、差分の計測、スクリプトと定性項目 |
+| `ccnavi/risk.py` | 実績で測るリスク。`risks.yml` の読み込み、差分の計測、スクリプトと定性項目 |
 | `ccnavi/phase.py` | フェーズの終わりとゲート。提案から承認済みチケットへの同期 |
 | `ccnavi/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
 | `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
@@ -2419,7 +2419,7 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
-| `.ccnavi/common/rules.yml` / `phases.yml` / `risk.yml` | このリポジトリ自身の共通層の設定 3 本 |
+| `.ccnavi/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通層の設定 3 本 |
 | `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
 | `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール設定・リスク管理・プロジェクト管理の画面 |

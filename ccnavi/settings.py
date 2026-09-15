@@ -81,7 +81,7 @@ RISK_ENV = "CCNAVI_RISK"
 # PROJECTS_ENV はプロジェクトの置き場（設計 §11）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
 # PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 §11.2）。各 git プロジェクトルートからの相対で、
-# その下の `config/{rules,phases,risk}.yml` が層の 3 本になる。自身の層
+# その下の `config/{rules,phases,risks}.yml` が層の 3 本になる。自身の層
 # （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
 # 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
@@ -122,7 +122,7 @@ DEFAULT_APPROVED = ".ccnavi/tickets"
 # フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。
-DEFAULT_RISK = os.path.join(".ccnavi", "common", "risk.yml")
+DEFAULT_RISK = os.path.join(".ccnavi", "common", "risks.yml")
 # プロジェクトの置き場。ワークスペースの直下に固定するのは、列挙が速いことと、
 # 何がプロジェクトかで迷わないため。ワークスペースの `.gitignore` に入れる
 # （プロジェクトは自分の git を持つ）。
@@ -167,6 +167,8 @@ KIND_RULES = "rules"
 KIND_PHASES = "phases"
 KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
+# 層の設定のファイル名。kind は記録と `--explain --json` の鍵の綴りなので、ファイル名とは別に持つ。
+LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
 # 層の名前。記録の `source` と id の前置きに使う綴り（設計 §11.4）。ruleload が
 # 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
@@ -438,7 +440,7 @@ def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> st
 def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
     """層の設定ファイルが本来ある場所。差し替えを見ない。"""
     home = (conf.project_home or DEFAULT_PROJECT_HOME).replace("/", os.sep)
-    return os.path.join(home_root, home, LAYER_CONFIG_DIR, f"{kind}.yml")
+    return os.path.join(home_root, home, LAYER_CONFIG_DIR, LAYER_FILE_NAMES[kind])
 
 
 def _layer_name(home_root: str) -> str:
