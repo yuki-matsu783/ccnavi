@@ -653,8 +653,14 @@ class BraceTest(unittest.TestCase):
             "echo {x{a,b}": ["{a,b}"],
             "echo a{b,c}d{e,f}": ["{b,c}", "{e,f}"],
             "echo {,}": ["{,}"],
-            # シェルは代入の右辺を広げないが、並べる（許容した誤検知。ccnavi.md §12.2）。
+            # 生の CR は語を割らない。bash は広げて `git` に `<CR>push origin main` を渡す
+            # （敵対的レビュー）。
+            "{git,\rpush,origin,main}": ["{git,\rpush,origin,main}"],
+            # シェルは代入の右辺、case のパターン、[[ ]] の中を広げないが、並べる
+            # （許容した誤検知。ccnavi.md §12.2）。
             "x={a,b}": ["{a,b}"],
+            "case $x in {a,b}) :;; esac": ["{a,b}"],
+            "[[ $f == *.{jpg,png} ]]": ["{jpg,png}"],
         }
         for src, want in cases.items():
             with self.subTest(src=src):

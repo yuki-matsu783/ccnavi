@@ -671,6 +671,9 @@ class SubstRepoRulesTest(unittest.TestCase):
             [
                 ("{git,push,origin,main}", "deny", brace, code),
                 ("{rm,-rf,/tmp/x}", "deny", brace, code),
+                # 生の CR を挟んでも止まる。挟むとルールにも当たらず、
+                # auto では権限モードに渡っていた。
+                ("{git,\rpush,origin,main}", "deny", brace, code),
                 ("grep -rn x --exclude-dir={node_modules,.git} /repo", "deny", brace, code),
                 ("cp f{,.bak}", "deny", brace, code),
                 ('echo "$({git,push})"', "deny", brace, code),
