@@ -173,7 +173,7 @@ def decide_before(
         if conf.guard_ticket_approval != selfguard.DISABLE:
             rule_set.deny.append(phase.ticket_approval_rule(conf.bin, root))
 
-    subject, bare, inner = screen(payload.tool_name, record.subject, record)
+    subject, bare, inner, braces = screen(payload.tool_name, record.subject, record)
 
     if not subject:
         # コマンドは在るが、実行される部分が残らなかった。コメントだけの行が
@@ -237,6 +237,20 @@ def decide_before(
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
+
+    # 引用の外のブレース展開は、ルールより先に止める（ADR-0046）。シェルは実行する前に語を
+    # 広げるので、ルールを当てる読みと実行される語が違う。`{git,push,origin,main}` は raw-git に
+    # 当たらないまま `git push origin main` を実行する。展開して当てる道は取らない。広げ方が
+    # bash と zsh で割れ、読み違えると allow に当たって通る側に倒れる。語を並べれば必ず書ける。
+    if braces:
+        record.code, record.rules = reasons.CODE_BRACE_EXPANSION, [reasons.BRACE_RULE]
+        return refuse(
+            stdout,
+            mode,
+            record,
+            rules.DENY,
+            notices + [reasons.brace_expansion(record.subject, braces)],
+        )
 
     # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
     # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
@@ -481,11 +495,11 @@ def full_path(path: str, cwd: str) -> str:
 
 def screen(
     tool: str, subject: str, record: audit.Record
-) -> tuple[str, str, list[tuple[str, str, bool]]]:
+) -> tuple[str, str, list[tuple[str, str, bool]], list[str]]:
     """シェルのコマンドを、実際に実行される部分まで絞る。読み切れなかったときは
     record にそう書き残す。
 
-    返すのは 3 つ。1 つめはルールを当てる読み。2 つめはそこから引用の中で切り出した
+    返すのは 4 つ。1 つめはルールを当てる読み。2 つめはそこから引用の中で切り出した
     コマンドを除いた読み（shellread.Reading.bare）で、文面の断りを決めるためだけに使う。
     シェルでないツールと読み切れなかったコマンドでは、1 つめと 2 つめは同じになる。
 
@@ -500,9 +514,11 @@ def screen(
     3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
     コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
+
+    4 つめは、引用の外に書かれたブレース展開の綴り（shellread.Reading.braces）。Bash 以外は空。
     """
     if tool != "Bash":
-        return subject, subject, []
+        return subject, subject, [], []
     reading = shellread.read(subject)
     inner = []
     if reading.unwrapped:
@@ -516,8 +532,8 @@ def screen(
         )
     if reading.degraded:
         record.degraded = reading.reason
-        return subject, subject, inner
-    return reading.text, reading.bare, inner
+        return subject, subject, inner, reading.braces
+    return reading.text, reading.bare, inner, reading.braces
 
 
 def project_mismatch(conf: settings.Settings, root: str, t: tree.Tree, full: str) -> str:

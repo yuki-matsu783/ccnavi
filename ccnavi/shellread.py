@@ -82,6 +82,20 @@ REASON_UNTERMINATED_SUBST = "unterminated-substitution"
 # どちらかに決めて読むと、決めなかった側のシェルで素通りになりうる。
 REASON_AMBIGUOUS_SUBST = "ambiguous-substitution"
 
+# ---- ブレース展開
+#
+# 引用の外の `{a,b}` と `{1..3}` は、シェルが実行する前に複数の語に広げる。
+# `{git,push,origin,main}` は 1 語に見えるが、bash は `git push origin main` を実行する。
+# 読みはこれを展開しない。展開の規則はシェルで割れる（`{1..5..2}` と `${x:-{a,b}}` は
+# zsh だけが広げ、`{01..03}` は bash 3.2 だけが 0 を落とす）ので、どちらかに決めて読むと
+# 決めなかった側で素通りになる。代わりに見つけた綴りを Reading.braces に並べ、判定が
+# ルールより先に止める（ADR-0046）。書き直す道は必ずある（語を並べて書く、引用する）。
+#
+# 並べるのは、どちらかのシェルが広げる形。数の範囲か 1 文字の範囲で、刻みが付いてもよい。
+_SEQUENCE = re.compile(r"(-?\d+\.\.-?\d+|.\.\..)(\.\.-?\d+)?")
+# 語の中でこの文字が引用の外に出たら、語が終わっている。開いたブレースは閉じない。
+_BRACE_BREAK = " \t\r;&|"
+
 # 入れ子の深さの上限。越えたら読み切れないとして縮退する。実際の作業で
 # 数段を超える入れ子は書かれないし、上限が無いと 1 本のコマンドで判定の期限を使い切れる。
 _MAX_DEPTH = 16
@@ -284,6 +298,10 @@ class Reading:
     # 層ごとの、引用の中から切り出したコマンドから作った層かどうか。unwrapped と同じ並び。
     # 層は bare に当て直せないので、文面の断り（引用の中に当たった）はこれで決める。
     quoted_layers: list[bool] = field(default_factory=list)
+    # 引用の外に書かれたブレース展開の綴り（`{a,b}`、`x{,.bak}` の `{,.bak}`）。書かれた順で、
+    # 重なりは除く。置換の中身と、`sh -c` と `eval` に渡った文字列の中のものも含む。
+    # degraded でも、走査が通った範囲で見つけたものは並ぶ。判定はこれがあれば止める。
+    braces: list[str] = field(default_factory=list)
 
 
 class _Unreadable(Exception):
@@ -292,6 +310,76 @@ class _Unreadable(Exception):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+@dataclass
+class _OpenBrace:
+    """開いたまま閉じていないブレース 1 つ。"""
+
+    # 原文での `{` の位置。
+    start: int
+    # 引用の外にカンマがあったか。
+    comma: bool = False
+    # 中身の文字。引用・エスケープ・置換・入れ子が混ざったら None で、範囲の端にならない。
+    inner: str | None = ""
+    # 中で見つけた展開。自分も展開なら、自分の綴りに置き換わる。
+    found: list[str] = field(default_factory=list)
+
+
+class _Braces:
+    """1 つの文脈（引用の外のコマンド、`${ }` の中）でブレース展開を探す。
+
+    引用・エスケープ・置換の中身はここに届かない（走査の別の関数が読む）ので、そこにある
+    `,` や `}` は数えない。`{"a,b"}` や `{a\\,b}` はシェルでも広がらない。
+    """
+
+    def __init__(self, scanner: _Scanner, record: bool) -> None:
+        self.x = scanner
+        self.record = record
+        self.open: list[_OpenBrace] = []
+
+    def text(self, chunk: str, at: int) -> None:
+        """引用の外の文字。at は chunk の先頭の、原文での位置。"""
+        if not self.open and "{" not in chunk:
+            return
+        for k, c in enumerate(chunk):
+            if c in _BRACE_BREAK:
+                self.reset()
+            elif c == "{":
+                self.opaque()
+                self.open.append(_OpenBrace(at + k))
+            elif not self.open:
+                continue
+            elif c == ",":
+                self.open[-1].comma = True
+            elif c == "}":
+                self.close(at + k + 1)
+            elif self.open[-1].inner is not None:
+                self.open[-1].inner += c
+
+    def opaque(self) -> None:
+        """引用・エスケープ・置換が語に入った。"""
+        if self.open:
+            self.open[-1].inner = None
+
+    def close(self, end: int) -> None:
+        brace = self.open.pop()
+        found = brace.found
+        if brace.comma or (brace.inner is not None and _SEQUENCE.fullmatch(brace.inner)):
+            # 入れ子は外側の綴りだけを並べる。`{a,{b,c}}` を 2 件と言っても直す先は 1 つ。
+            found = [self.x.s[brace.start : end]]
+        self.keep(found)
+
+    def reset(self) -> None:
+        """語が終わった。閉じなかったブレースの中の展開は、シェルでも広がる（`{x{a,b}`）。"""
+        while self.open:
+            self.keep(self.open.pop().found)
+
+    def keep(self, found: list[str]) -> None:
+        if self.open:
+            self.open[-1].found.extend(found)
+        elif self.record:
+            self.x.braces.extend(found)
 
 
 class _Scanner:
@@ -312,6 +400,8 @@ class _Scanner:
         # 引用の外でヒアドキュメントの始まりとして読んだ `<<` の数。
         # read() が、shlex の返した `<<` と数を突き合わせる。
         self.heads = 0
+        # 引用の外で見つけたブレース展開の綴り。
+        self.braces: list[str] = []
 
     def emit(self, text: str, collect: bool) -> None:
         if collect:
@@ -329,6 +419,8 @@ class _Scanner:
         s = self.s
         depth = 0
         word_start = True
+        # 閉じる位置を探すだけの走査（collect が偽）では並べない。中身は read() が読み直す。
+        braces = _Braces(self, collect)
         while self.i < len(s):
             m = _COMMAND_STOP.search(s, self.i)
             end = m.start() if m else len(s)
@@ -336,29 +428,35 @@ class _Scanner:
                 chunk = s[self.i : end]
                 if closing:
                     self.refuse_case(chunk, word_start)
+                braces.text(chunk, self.i)
                 self.emit(chunk, collect)
                 word_start = chunk[-1] in _BEFORE_WORD
                 self.i = end
                 continue
             c = s[self.i]
             if c == "\\":
+                braces.opaque()
                 self.emit(s[self.i : self.i + 2], collect)
                 self.i += 2
                 word_start = False
                 continue
             if c == "'":
+                braces.opaque()
                 self.single(collect)
                 word_start = False
                 continue
             if c == '"':
+                braces.opaque()
                 self.double(collect)
                 word_start = False
                 continue
             if c == "`":
+                braces.opaque()
                 self.backtick(collect, quoted=False)
                 word_start = False
                 continue
             if c == "$" and self.dollar(collect, quoted=False):
+                braces.opaque()
                 word_start = False
                 continue
             if c == "#" and word_start:
@@ -370,6 +468,7 @@ class _Scanner:
             if c == "\n":
                 # 引用の外の改行はコマンドの区切り。shlex はただの空白として読むので、
                 # 2 行目のコマンドが 1 行目の引数になり、allow が 2 行目まで通していた。
+                braces.reset()
                 self.emit(" ; ", collect)
                 self.i += 1
                 word_start = True
@@ -377,16 +476,19 @@ class _Scanner:
                 continue
             if s.startswith("<<<", self.i):
                 # here-string。本文を持たないので、演算子のまま shlex に渡す。
+                braces.reset()
                 self.emit("<<<", collect)
                 self.i += 3
                 word_start = True
                 continue
             if s.startswith("<<", self.i):
+                braces.reset()
                 self.heredoc_head(collect)
                 word_start = True
                 continue
             if c in "<>" and s.startswith("(", self.i + 1):
                 # プロセス置換。中身は $( ) と同じく独立したコマンドとして走る。
+                braces.reset()
                 self.substitution(collect, quoted=False)
                 word_start = False
                 continue
@@ -395,11 +497,17 @@ class _Scanner:
                     depth += 1
                 elif c == ")":
                     if depth == 0:
+                        braces.reset()
                         return
                     depth -= 1
+            if c in "<>()":
+                braces.reset()
+            else:
+                braces.text(c, self.i)
             self.emit(c, collect)
             self.i += 1
             word_start = c in _BEFORE_WORD
+        braces.reset()
         if closing:
             raise _Unreadable(REASON_UNTERMINATED_SUBST)
 
@@ -579,31 +687,42 @@ class _Scanner:
         raise _Unreadable(REASON_UNTERMINATED_SUBST)
 
     def brace(self, collect: bool, quoted: bool) -> None:
-        """`${ }`。既定値 `${x:-$(cmd)}` や添字 `${a[$(cmd)]}` の中の置換は走る。"""
+        """`${ }`。既定値 `${x:-$(cmd)}` や添字 `${a[$(cmd)]}` の中の置換は走る。
+
+        中の `{ }` は対にして数える（`${x:-{a}}` を閉じるのは 2 つめの `}`）。引用の外なら
+        中のブレース展開も並べる。bash は広げないが、zsh は `${x:-{a,b}}` を広げる。
+        """
         s = self.s
         self.emit("${", collect)
         self.i += 2
+        braces = _Braces(self, collect and not quoted)
         while self.i < len(s):
             c = s[self.i]
-            if c == "}":
+            if c == "}" and not braces.open:
                 self.emit(c, collect)
                 self.i += 1
                 return
             if c == "\\":
+                braces.opaque()
                 self.emit(s[self.i : self.i + 2], collect)
                 self.i += 2
                 continue
             if c == '"':
+                braces.opaque()
                 self.double(collect)
                 continue
             if c == "'" and not quoted:
+                braces.opaque()
                 self.single(collect)
                 continue
             if c == "`":
+                braces.opaque()
                 self.backtick(collect, quoted)
                 continue
             if c == "$" and self.dollar(collect, quoted):
+                braces.opaque()
                 continue
+            braces.text(c, self.i)
             self.emit(c, collect)
             self.i += 1
         raise _Unreadable(REASON_UNTERMINATED)
@@ -688,10 +807,13 @@ class _Scanner:
 def read(src: str) -> Reading:
     """コマンド文字列を 1 本読む。"""
     reading, commands = _read(src, 0)
-    layers = _unwrap(commands)
+    # `sh -c` と `eval` に渡った文字列はシェルが読み直すので、そこで広がるブレースも並べる。
+    reread_braces: list[str] = []
+    layers = _unwrap(commands, reread_braces)
     reading.unwrapped = SEP.join(_render_command(layer) for _, layer, _ in layers)
     reading.runners = [runner for runner, _, _ in layers]
     reading.quoted_layers = [quoted for _, _, quoted in layers]
+    reading.braces = list(dict.fromkeys(reading.braces + reread_braces))
     return reading
 
 
@@ -712,7 +834,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     src = src.replace("\\\r\n", "").replace("\\\n", "")
 
     try:
-        outer, found, heads = _scan(src)
+        outer, found, heads, braces = _scan(src)
     except _Unreadable as e:
         return Reading(degraded=True, reason=e.reason), []
 
@@ -721,7 +843,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     except ValueError:
         # 閉じない引用符で shlex が投げる。走査は通ったのに shlex が閉じないと読むのは、
         # `$'…\'…'` のように 2 つの読みが割れる形。読み切れないものとして扱う。
-        return Reading(degraded=True, reason=REASON_UNTERMINATED), []
+        return Reading(degraded=True, reason=REASON_UNTERMINATED, braces=braces), []
 
     commands = _split_commands(tokens)
     # 層を作る先は、読みを止める理由があっても集める。そのために中身も先に読んでおく。
@@ -730,17 +852,18 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     for body, quoted in found:
         inner, inner_commands = _read(body, depth + 1)
         inners.append((inner, quoted))
+        braces.extend(inner.braces)
         runnable.extend((command, quoted or q) for command, q in inner_commands)
 
     if sum(t in ("<<", "<<-") for t in tokens) > heads:
         # 走査がヒアドキュメントと読まなかった `<<` が、トークンに出た。引用が `<<` だけの
         # 1 語（`grep -n "<<" f`）で、shlex からは演算子と区別が付かない。今までどおり
         # 閉じない本文として縮退する（ccnavi.md §12.2 の許容した誤検知）。
-        return Reading(degraded=True, reason=REASON_UNTERMINATED), runnable
+        return Reading(degraded=True, reason=REASON_UNTERMINATED, braces=braces), runnable
 
     why = _classify(commands)
     if why:
-        return Reading(degraded=True, reason=why), runnable
+        return Reading(degraded=True, reason=why, braces=braces), runnable
 
     # 中身は外側の後ろにつなぐ。置換のあった位置で挟むと外側のコマンドが 2 本に割れ、
     # `find $(pwd) -name x -delete` の -delete が find と別のコマンドに見える。
@@ -752,19 +875,20 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         if inner.degraded:
             # 中身が 1 つでも読めなければ全体を読めないとする。複合コマンドで 1 区間が
             # 読めないときと同じ扱い。理由は中身のものを返す。
-            return inner, runnable
+            return Reading(degraded=True, reason=inner.reason, braces=braces), runnable
         texts.append(inner.text)
         if not quoted:
             bares.append(inner.bare)
     reading = Reading(
         text=SEP.join(t for t in texts if t),
         bare=SEP.join(t for t in bares if t),
+        braces=braces,
     )
     return reading, runnable
 
 
-def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int]:
-    """走査して、shlex に渡す文字列、切り出した中身、`<<` を読んだ数を返す。"""
+def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int, list[str]]:
+    """走査して、shlex に渡す文字列、切り出した中身、`<<` を読んだ数、ブレース展開を返す。"""
     x = _Scanner(src)
     try:
         x.command(collect=True, closing=False)
@@ -774,7 +898,7 @@ def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int]:
     if x.pending:
         # 本文が始まらないまま終わったヒアドキュメント（`cat <<'EOF' > f` だけ）。
         raise _Unreadable(REASON_UNTERMINATED)
-    return "".join(x.out), x.found, x.heads
+    return "".join(x.out), x.found, x.heads, x.braces
 
 
 def _tokenize(src: str) -> list[str]:
@@ -916,15 +1040,18 @@ def _with_time(commands: list[list[str]]) -> list[list[str]]:
     return out
 
 
-def _unwrap(commands: list[tuple[list[str], bool]]) -> list[tuple[str, list[str], bool]]:
+def _unwrap(
+    commands: list[tuple[list[str], bool]], braces: list[str]
+) -> list[tuple[str, list[str], bool]]:
     """全コマンドの層を、コマンドの順・外側から内側の順に並べる。
 
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出したか）。
+    読み直した文字列の中で見つけたブレース展開は braces に足す。
     """
     out: list[tuple[str, list[str], bool]] = []
     budget = [UNWRAP_WORDS]
     for command, quoted in commands:
-        _layers(command, 0, out, budget, quoted)
+        _layers(command, 0, out, budget, quoted, braces)
     return out
 
 
@@ -934,6 +1061,7 @@ def _layers(
     out: list[tuple[str, list[str], bool]],
     budget: list[int],
     quoted: bool,
+    braces: list[str],
 ) -> None:
     """1 本のコマンドから、実行役のコマンドを 1 枚ずつ外した層を out に足す。
 
@@ -942,17 +1070,17 @@ def _layers(
     """
     if depth >= UNWRAP_DEPTH:
         return
-    runner, inners, further = _peel(command)
+    runner, inners, further = _peel(command, braces)
     for inner in inners:
         budget[0] -= len(inner)
         if budget[0] < 0:
             return
         out.append((runner, inner, quoted))
         if further:
-            _layers(inner, depth + 1, out, budget, quoted)
+            _layers(inner, depth + 1, out, budget, quoted, braces)
 
 
-def _peel(command: list[str]) -> tuple[str, list[list[str]], bool]:
+def _peel(command: list[str], braces: list[str]) -> tuple[str, list[list[str]], bool]:
     """実行役のコマンドを 1 枚だけ外す。
 
     返すのは、外した実行役のコマンドの名前、中で実行されるコマンドの並び（無ければ空）、
@@ -983,12 +1111,12 @@ def _peel(command: list[str]) -> tuple[str, list[list[str]], bool]:
     if name in _RUNNERS:
         return name, _runner_command(name, command[1:]), True
     if name in _SHELLS:
-        return name, *_shell_commands(command[1:])
+        return name, *_shell_commands(command[1:], braces)
     if name in _SOURCES:
         rest = command[1:]
         return name, [rest] if rest else [], False
     if name == "eval":
-        return name, _reread(" ".join(command[1:])), True
+        return name, _reread(" ".join(command[1:]), braces), True
     if name == "xargs":
         rest = _skip_options(command[1:], _XARGS_VALUE_OPTIONS)
         return name, [rest] if rest else [], True
@@ -1050,7 +1178,7 @@ def _option_width(token: str, following: list[str], value_options: frozenset[str
     return 1
 
 
-def _shell_commands(args: list[str]) -> tuple[list[list[str]], bool]:
+def _shell_commands(args: list[str], braces: list[str]) -> tuple[list[list[str]], bool]:
     """`sh <ファイル> <引数>` ならファイルと引数、`sh -c '<文字列>'` なら読み直したコマンド。"""
     takes_code = False
     from_stdin = False
@@ -1074,7 +1202,7 @@ def _shell_commands(args: list[str]) -> tuple[list[list[str]], bool]:
     if not rest:
         return [], False
     if takes_code:
-        return _reread(rest[0]), True
+        return _reread(rest[0], braces), True
     if from_stdin:
         # `sh -s a b` は標準入力を読み、後ろの語は引数。
         return [], False
@@ -1098,13 +1226,14 @@ def _find_commands(command: list[str]) -> list[list[str]]:
     return out
 
 
-def _reread(src: str) -> list[list[str]]:
+def _reread(src: str, braces: list[str]) -> list[list[str]]:
     """`sh -c` と `eval` に渡った文字列を、コマンドとして読み直す。
 
     外側と同じ走査で読むので、文字列の中のコマンド置換の中身も並ぶ。
-    トークンに割れなければ層を作らない。
+    トークンに割れなければ層を作らない。中で見つけたブレース展開は braces に足す。
     """
-    _, commands = _read(src, 0)
+    reading, commands = _read(src, 0)
+    braces.extend(reading.braces)
     return [command for command, _ in commands]
 
 
