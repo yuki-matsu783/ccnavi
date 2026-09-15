@@ -1,23 +1,21 @@
-"""敵対的レビューが見つけた守りの穴の受入テスト（子チケット config-union-07 と -09）。
+"""`.ccnavi/` の組み込み deny と層の名前を、綴りを変えて回避できないことの受入テスト。
 
-どれも「判定が広がる側」の変更で、塞がないと `.ccnavi/` の組み込み deny が
-「守っている」と言いながら回避できる。4 件とも既存の穴でもあり、`.claude/` の側も
-同時に直る。
+どれも、塞がないと組み込み deny が「守っている」と言いながら回避できる形。
+`.claude/` の側も同じ当て方で守られる。
 
-- A-2 大文字小文字: `glob` で書いたルールを、その機械がパスを見るのと同じ見方で当てる
+- A-2 大文字小文字: `glob` で書いたルールと組み込みの守りを、どの機械でも区別せずに当てる
 - A-3 区切りが続かない綴り: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
 - A-4 生の `id` のコロン: 層の名前を添えた形と見分けが付かないものを error にする
 - A-5 `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
 - A-6 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、綴りを変えた形でも
   区切りの無い形でも、Write / Edit とシェルの両方で書き換えられない
 
-チケット -09 が足したのは、層の名札とプロジェクト名の衝突 2 件。どちらも予約が
-片側にしか掛かっていないことから来る。
+層の名札（`self` / `common`）とプロジェクト名が同じときも、予約は両側に掛かる。
 
-- 穴 1（高）: `projects/self/` への Write / Edit が、そのプロジェクトの deny を
-  一度も読まずに**ワークスペース自身の層**のルールで判定される（ReservedLayerNameTest）
-- 穴 2（中）: `projects/common/` の層の 3 本が、控えの key が共通層と衝突して
-  控えと復元の対象から丸ごと落ちる（ReservedLayerRestoreTest）
+- `projects/self/` への Write / Edit は、そのプロジェクトの deny で判定され、
+  ワークスペース自身の層のルールに落ちない（ReservedLayerNameTest）
+- `projects/common/` の層の 3 本は、控えの key が共通層と衝突せず、
+  控えと復元の対象に入る（ReservedLayerRestoreTest）
 
 道具は外から動かす（`tests/inproc.py` の `run_ccnavi`）。fixture は
 tests/test_config_union.py の ConfigUnionHarness と tests/test_config_union_guard.py の
@@ -44,12 +42,10 @@ from tests.test_config_union import (
 )
 from tests.test_config_union_guard import GuardHarness
 
-# その機械がパスの綴りの大文字小文字を区別するか（ccnavi/tree.py の CASE_INSENSITIVE と
-# 同じ問い）。区別しない機械では `.Ccnavi/scripts/count.sh` は本物そのものなので、
-# 判定もそう見なければ守りが外れる。区別する機械では別のファイルなので、当たらないのが正しい。
-CASE_INSENSITIVE = os.path.normcase("A") == "a"
-
 # A-2 の的。`glob` と `regex` を 1 本ずつ持つ。綴りの扱いがこの 2 つで分かれる。
+# `glob` と組み込みの守りは、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
+# 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
+# `regex` は書いた人が `(?i:...)` で選べるので、書いたとおりに区別する。
 CASE_RULES = {
     "version": 3,
     "deny": [
@@ -171,32 +167,30 @@ COUNT_RISK = (
 class GlobCaseTest(ConfigUnionHarness):
     """A-2: `glob` で書いたルールの綴りの扱い。
 
-    `rules.py` だけが区別する側にいて、`risk.py` / `phasetypes.py` / `ticket.py` は
-    畳んでいた。`.ccnavi/` を最初に `.Ccnavi/` で作れば組み込み deny を素通りできる、
-    という穴の土台がこれ。
+    `glob` は、`risk.py` / `phasetypes.py` / `ticket.py` の glob と同じく、どの機械でも
+    大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の綴りで作って
+    組み込み deny を素通りできる。
     """
 
     def setUp(self):
         super().setUp()
         write(self.rules, json.dumps(CASE_RULES))
 
-    def test_glob_matches_the_way_the_machine_reads_paths(self):
-        """§11.4: `glob` の deny は、その機械がパスを見るのと同じ見方で当たる。"""
+    def test_glob_ignores_case_on_every_machine(self):
+        """§11.4: `glob` の deny は、どの機械でも大文字小文字を区別せずに当たる。"""
         # 実体があると、区別しない機械では `os.path.realpath` が綴りをディスクの側へ
         # 補正してしまい、この問い自体が消える（フラグ無しでも当たる）。
         self.assertFalse(os.path.exists(os.path.join(self.ws, "secret")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "secret", "x.txt"))
         self.assert_denied(exact, "glob-secret")
 
+        # 区別する機械では `SECRET/` は本当に別のディレクトリだが、それでも当てる。
+        # 同じルールが機械によって当たったり当たらなかったりしないことを優先する。
         swapped = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "SECRET", "x.txt"))
-        if CASE_INSENSITIVE:
-            self.assert_denied(swapped, "glob-secret")
-        else:
-            # 区別する機械では本当に別のディレクトリ。当たらないのが正しい。
-            self.assert_not_denied(swapped)
+        self.assert_denied(swapped, "glob-secret")
 
     def test_regex_keeps_the_distinction(self):
-        """§11.4: `regex` で書いた範囲は今までどおり区別する（書いた人が意図を持てる）。"""
+        """§11.4: `regex` で書いた範囲は書いたとおりに区別する（書いた人が意図を持てる）。"""
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
         self.assert_denied(exact, "regex-token")
 
@@ -205,7 +199,7 @@ class GlobCaseTest(ConfigUnionHarness):
 
 
 class BuiltinGlobCaseTest(GuardHarness):
-    """A-2: 組み込みの `*/.ccnavi/*` も同じ見方で当たる（穴そのもの）。
+    """A-2: 組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずに当たる（穴そのもの）。
 
     的は app の層。fixture の app は `.ccnavi/` を持たないので、`.Ccnavi/` は
     ディスクに無く、`os.path.realpath` が綴りを補正しない。「まだ無いところを
@@ -222,12 +216,11 @@ class BuiltinGlobCaseTest(GuardHarness):
             self.guarded_hook("Write", self.ws, file_path=exact), "builtin-guard-project-home"
         )
 
+        # 区別する機械でも止める。組み込みの守りだけが機械で当たり方を変えると、
+        # どの機械でも区別しないルールの glob やチケットの範囲と食い違う。
         swapped = os.path.join(self.app, ".Ccnavi", "config", "rules.yml")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
-        if CASE_INSENSITIVE:
-            self.assert_denied(result, "builtin-guard-project-home")
-        else:
-            self.assert_not_denied(result)
+        self.assert_denied(result, "builtin-guard-project-home")
 
 
 class ShellPlaceTest(GuardHarness):
@@ -566,16 +559,13 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook(tool, self.ws, file_path=self.script),
                     "builtin-guard-project-home",
                 )
+        # どの機械でも止める。区別しない機械では、この綴りで書けば本物が書き換わる。
+        # 区別する機械では別のファイルだが、組み込みの守りの当たり方を機械で変えない。
+        # 補正が無い形（ccnavi ディレクトリがまだ無いところを綴り違いで作る）は
+        # BuiltinGlobCaseTest。
         swapped = os.path.join(self.lib, ".Ccnavi", "scripts", "count.sh")
         result = self.guarded_hook("Write", self.ws, file_path=swapped)
-        if CASE_INSENSITIVE:
-            # 区別しない機械では、この綴りで書けば本物が書き換わる。ここは ccnavi ディレクトリが
-            # 実在する形なので `os.path.realpath` がディスクの綴りへ補正する道でも止まる。
-            # 補正が無い形（ccnavi ディレクトリがまだ無いところを綴り違いで作る）は
-            # BuiltinGlobCaseTest。
-            self.assert_denied(result, "builtin-guard-project-home")
-        else:
-            self.assert_not_denied(result)
+        self.assert_denied(result, "builtin-guard-project-home")
 
     def test_the_shell_cannot_rewrite_or_delete_it(self):
         """§11.6: シェルも同じ。ccnavi ディレクトリごと消す形も、綴りを変えた形も止まる。"""
@@ -590,12 +580,10 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook("Bash", self.ws, command=command),
                     "builtin-guard-setting-files",
                 )
+        # シェルの側も、場所の綴りはどの機械でも区別せずに当てる（selfguard._folded）。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
-        if CASE_INSENSITIVE:
-            self.assert_denied(result, "builtin-guard-setting-files")
-        else:
-            self.assert_not_denied(result)
+        self.assert_denied(result, "builtin-guard-setting-files")
 
 
 if __name__ == "__main__":
