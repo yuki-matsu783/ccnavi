@@ -126,11 +126,11 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   const tickets = ticketsEnabled
     ? `\n          <div class="field"><dt>チケット</dt><dd>${row.tickets} 件${row.doing > 0 ? `<span class="dim">、作業中 ${row.doing} 件</span>` : ""}</dd></div>`
     : "";
-  // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（文面は「.claude/ を持つ。…」）は重ねない。
-  // 文面は実行ファイル側で変わりうるので、".claude/" を含む warn かどうかだけで見る。
+  // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（ccnavi/lint.py の文面「.claude/ を持つ。…」）は
+  // 重ねない。".claude/settings.json を読めない" のような別の指摘まで消さないよう、文面の先頭で当てる。
   const problems = [
-    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ があります。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見えます" }] : []),
-    ...row.problems.filter((p) => !(row.hasClaudeDir && p.severity === "warn" && p.detail.includes(".claude/"))),
+    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ がある。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見える" }] : []),
+    ...row.problems.filter((p) => !(row.hasClaudeDir && p.detail.startsWith(".claude/ を持つ"))),
   ];
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
   const origin = row.origin === "" ? '<span class="dim">不明</span>' : `<span class="mono small" title="${escapeHtml(row.origin)}">${escapeHtml(row.origin)}</span>`;

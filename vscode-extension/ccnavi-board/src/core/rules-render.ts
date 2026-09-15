@@ -126,11 +126,11 @@ ${SCRIPT}
 }
 
 function renderModeBanner(mode: string): string {
-  if (mode === "enable") {
+  // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
+  if (mode === "enable" || mode === "") {
     return "";
   }
-  const shown = mode === "" ? "未設定" : mode;
-  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(shown)}</strong>。判定と記録はするが、deny や ask にヒットしてもツールの呼び出し（tool_use）を止めない</div>\n`;
+  return `<div class="banner warn">現在の <code>CCNAVI_MODE</code>: <strong>${escapeHtml(mode)}</strong>。判定と記録はするが、deny や ask にヒットしてもツールの呼び出し（tool_use）を止めない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -510,15 +510,13 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!el) { return; }
     const next = on === undefined ? !el.classList.contains("folded") : on;
     el.classList.toggle("folded", next);
-    // 矢印は絞り込みの有無も見て決めるので、applyFind に任せる
-    applyFind();
+    // 矢印は絞り込みの有無も見て決めるので applyFind が合わせる。呼ぶ側が最後に 1 回呼ぶ
   }
   // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
   // その場だけの展開で、開いた行の控えには入れない（判定を繰り返しても既定の畳みが崩れない）。
   function unfoldRule(el) {
     const section = el.closest(".rule-section");
     if (section) { foldSection(section.getAttribute("data-section"), false); }
-    el.classList.remove("hidden-by-find");
     setOpen(el, true, false);
   }
   function renderAll() {
@@ -589,6 +587,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     markDirty();
     renderAll();
     foldSection(section, false);
+    applyFind();
     const items = document.querySelectorAll("[data-list=" + section + "] .rule");
     const last = items[items.length - 1];
     if (last) { last.querySelector("input.f-id").focus(); }
@@ -662,6 +661,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
           if (el.getAttribute("data-id") === r.id) { el.classList.add("hit"); unfoldRule(el); }
         }
       }
+      applyFind();
       box.appendChild(h("h3", { text: "返すメッセージ" }));
       box.appendChild(result.response ? h("pre", { class: "response", text: result.response }) : h("p", { class: "empty", text: "メッセージは返さない" }));
     }
@@ -703,7 +703,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!button) { return; }
     const action = button.getAttribute("data-action");
     if (action === "add") { add(button.getAttribute("data-section")); }
-    else if (action === "fold-section") { foldSection(button.getAttribute("data-section")); }
+    else if (action === "fold-section") { foldSection(button.getAttribute("data-section")); applyFind(); }
     else if (action === "save") { setBusy(true, "検証して保存中…");vscode.postMessage({ type: "save", sections: sections }); }
     else if (action === "reload") { vscode.postMessage({ type: "reload", dirty: dirty }); }
     else if (action === "judge") {

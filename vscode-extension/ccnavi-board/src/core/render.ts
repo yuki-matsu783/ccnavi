@@ -594,11 +594,11 @@ const STYLE = `${PAGE_STYLE}
   .fact.sha { font-family: var(--vscode-editor-font-family); }
   /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右に人が見るべきことだけ */
   .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; }
-  .phase { display: grid; grid-template-columns: 12px auto minmax(0, 1fr); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  .phase { display: grid; grid-template-columns: 12px minmax(0, max-content) minmax(40%, 1fr); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
   .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
-  .phase-name { white-space: nowrap; }
+  .phase-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase-tickets::before { content: "·"; margin: 0 5px; }
   .phase-status { text-align: right; overflow-wrap: anywhere; }

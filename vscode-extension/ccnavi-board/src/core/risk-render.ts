@@ -202,12 +202,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const code = (t) => h("code", { text: t });
     const dim = (t) => h("span", { class: "dim", text: t });
     if (v === "") { return [dim("（" + valueLabel(factor.kind) + " 未設定）")]; }
-    if (factor.kind === "lines_over") { return [dim("差分が "), code(v), dim(" 行を超えたら")]; }
-    if (factor.kind === "files_over") { return [dim("変えたファイルが "), code(v), dim(" 件を超えたら")]; }
-    if (factor.kind === "deleted_over") { return [dim("消したファイルが "), code(v), dim(" 件を超えたら")]; }
-    if (factor.kind === "glob") { return [code(v), dim(" にヒットしたファイルごと" + (factor.max !== "" ? "（上限 " + factor.max + " 点）" : ""))]; }
-    if (factor.kind === "script") { return [dim("スクリプト "), code(v)]; }
-    return [dim("問い「"), code(v), dim("」")];
+    if (factor.kind === "lines_over") { return [dim("差分が "), code(v), dim(" 行を超えたら加点")]; }
+    if (factor.kind === "files_over") { return [dim("変えたファイルが "), code(v), dim(" 件を超えたら加点")]; }
+    if (factor.kind === "deleted_over") { return [dim("消したファイルが "), code(v), dim(" 件を超えたら加点")]; }
+    if (factor.kind === "glob") { return [code(v), dim(" にヒットしたファイル 1 つにつき加点" + (factor.max !== "" ? "（上限 " + factor.max + " 点）" : ""))]; }
+    if (factor.kind === "script") { return [dim("スクリプト "), code(v), dim(" が失敗したら加点")]; }
+    return [dim("問い「"), code(v), dim("」に yes なら加点")];
   }
   // 値の欄の名前。当て方で意味が変わる
   function valueLabel(kind) {
