@@ -57,7 +57,8 @@ test("CB-T121 種類の一覧は 1 件 1 行で既定は畳み、関係と案内
   assert.match(html, /<ul class="list" id="phases"><\/ul>/);
   const body = html.split('<script nonce="n">')[1].split("</script>")[0];
   assert.match(body, /class: "row-head"/);
-  assert.match(body, /if \(hasRelations\(phase\)\) \{ more\.setAttribute\("open", ""\); \}/);
+  assert.match(body, /if \(moreOpen\.has\(key\) \? moreOpen\.get\(key\) : hasRelations\(phase\)\) \{ more\.setAttribute\("open", ""\); \}/);
+  assert.match(html, /<input id="find" type="search"/);
   assert.match(body, /if \(phase && phase\.id !== ""\) \{ ids\.push\(phase\.id\); \}/);
   assert.doesNotThrow(() => new Function(body));
 });

@@ -106,7 +106,13 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   assert.match(body, /\.row\.open \.row-body|classList\.toggle\("open", on\)/);
   // コンテキストの 4 欄は details に畳み、値があるときだけ open。
   assert.match(body, /h\("details", \{ class: "more" \}/);
-  assert.match(body, /if \(hasContext\(rule\)\) \{ more\.setAttribute\("open", ""\); \}/);
+  assert.match(body, /if \(moreOpen\.has\(key\) \? moreOpen\.get\(key\) : hasContext\(rule\)\) \{ more\.setAttribute\("open", ""\); \}/);
+  // 判定で当たった行の展開は控えに入れない。控えを書くのは利用者が押したときだけ。
+  assert.match(body, /function unfoldRule\(el\) \{[\s\S]*?setOpen\(el, true, false\);/);
+  assert.match(body, /setOpen\(li, opened\.has\(key\), false\)/);
+  // 開いている行は絞り込みで隠さない
+  assert.match(html, /\.row\.hidden-by-find:not\(\.open\) \{ display: none; \}/);
+  assert.doesNotMatch(html, /\.list \{[^}]*overflow: hidden/);
   // 開いた行は id で控える（空 id は控えない）。
   assert.match(body, /if \(found && found\.rule\.id !== ""\) \{ ids\.push\(found\.rule\.id\); \}/);
   assert.match(body, /savedOpen\.has\(rule\.id\)/);

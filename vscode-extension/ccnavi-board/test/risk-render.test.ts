@@ -86,4 +86,7 @@ test("CB-T122 項目の一覧は 1 件 1 行で既定は畳み、開いた行を
   assert.match(body, /class: "row-head"/);
   assert.match(body, /if \(factor && factor\.id !== ""\) \{ ids\.push\(factor\.id\); \}/);
   assert.match(body, /savedOpen\.has\(factor\.id\)/);
+  assert.match(html, /<input id="find" type="search"/);
+  // 閾値の飾りの札は出さない
+  assert.doesNotMatch(body, /level-name/);
 });
