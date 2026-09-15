@@ -65,6 +65,9 @@ ccnavi_approved:
   approved_at: 2026-09-14T01:06:54+0900
   source_tree: shellread-subst
   source_path: /Volumes/Data/git/ccnavi/.claude/worktrees/shellread-subst/wip/tickets/todo/shellread-subst.md
+  revised_at: 2026-09-15T17:50:05+0900
+  feedback_at: 2026-09-15T17:50:05+0900
+feedback: []
 ---
 
 # 引用の中のコマンド置換を読む
