@@ -1564,6 +1564,7 @@ sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 
 依頼の後に親の HEAD が動いたら、レビュー済みになる前なら `request` を打ち直せる。依頼文を
 投稿し直し、マーカーの HEAD を今のものに書き換える。HEAD が依頼時のままなら「依頼済み」で止まる。
+レビュー済みのフェーズ（`wrapup` で締めて、依頼をしていないものも含む）は「レビュー済み」で止まる。
 
 **マージリクエストが無ければ作る。** 人はレビューをそこで行うので、入れ物が無いことで
 止めない。題・本文・`Closes #<課題>` は親チケットの `title` / `rationale` / 本文 / `issue`
