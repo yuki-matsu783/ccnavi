@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { projectLayer, selfLayer } from "../src/core/layers.js";
-import type { BoardJson, LayerJson } from "../src/core/model.js";
-import { fixture } from "./fixture.js";
+import { projectLayer, selfLayer } from "../../src/core/layers.js";
+import type { BoardJson, LayerJson } from "../../src/core/model.js";
+import { fixture } from "../helpers/fixture.js";
 
 function layer(name: string, path: string): LayerJson {
   return { name, rules: { path, unreadable: "" }, phasesFile: { path: "", unreadable: "" } };

@@ -2,24 +2,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
-import { buildBoard } from "../src/core/board.js";
-import { PAGE_STYLE, escapeHtml, renderBoard } from "../src/core/render.js";
-import { renderRulesPage } from "../src/core/rules-render.js";
-import { readRules } from "../src/core/rules-doc.js";
-import { renderRiskPage } from "../src/core/risk-render.js";
-import { readRisk, BUILTIN_RISK_TEXT } from "../src/core/risk-doc.js";
-import { renderPhasesPage } from "../src/core/phases-render.js";
-import { readPhases, TEMPLATE_PHASES_TEXT } from "../src/core/phases-doc.js";
-import { renderProjectsPage } from "../src/core/projects-render.js";
-import { buildProjectsPage } from "../src/core/projects.js";
-import type { TicketJson } from "../src/core/model.js";
-import { fixture } from "./fixture.js";
+import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
+import { buildBoard } from "../../src/core/board.js";
+import { PAGE_STYLE, escapeHtml, renderBoard } from "../../src/core/render.js";
+import { renderRulesPage } from "../../src/core/rules-render.js";
+import { readRules } from "../../src/core/rules-doc.js";
+import { renderRiskPage } from "../../src/core/risk-render.js";
+import { readRisk, BUILTIN_RISK_TEXT } from "../../src/core/risk-doc.js";
+import { renderPhasesPage } from "../../src/core/phases-render.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import { renderProjectsPage } from "../../src/core/projects-render.js";
+import { buildProjectsPage } from "../../src/core/projects.js";
+import type { TicketJson } from "../../src/core/model.js";
+import { fixture } from "../helpers/fixture.js";
 
 const OPTIONS = { nonce: "TEST-NONCE-123" };
 
 function approvePreview(): ApprovePreview {
-  const text = fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
+  const text = fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
   const parsed = parseApprovePreview(text);
   if (!parsed.ok) {
     throw new Error(parsed.error);
@@ -181,7 +181,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="phase-status">進行中 · レビュー要</span>'));
   assert.ok(!html.includes("ゲート開"));
   assert.ok(!html.includes("マーカーなし"));
-  assert.ok(!html.includes("レビュー不要 "));
+  assert.doesNotMatch(html, /class="phase-status">[^<]*レビュー不要/);
   // ゲート閉の左線は承認待ちの左線より後に書き、勝つ
   assert.ok(html.indexOf(".card.pending { border-left") < html.indexOf(".card.gate-closed { border-left"));
   // 締める（wrapup）のボタンは出さない

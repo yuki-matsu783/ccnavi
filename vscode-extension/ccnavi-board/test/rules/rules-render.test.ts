@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseHooks } from "../src/core/hooks.js";
-import { readRules } from "../src/core/rules-doc.js";
-import { KNOWN_TOOLS, renderRulesPage, type RulesPage } from "../src/core/rules-render.js";
+import { parseHooks } from "../../src/core/hooks.js";
+import { readRules } from "../../src/core/rules-doc.js";
+import { KNOWN_TOOLS, renderRulesPage, type RulesPage } from "../../src/core/rules-render.js";
 
 const RULES = `version: 3
 deny:

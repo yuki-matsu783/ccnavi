@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ticketControlFrom, ticketControlMismatch } from "../src/core/ticket-control.js";
+import { ticketControlFrom, ticketControlMismatch } from "../../src/core/ticket-control.js";
 
 function env(value: string | undefined): string {
   return JSON.stringify({ env: value === undefined ? {} : { CCNAVI_TICKET_CONTROL: value } });

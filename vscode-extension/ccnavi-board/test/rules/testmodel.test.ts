@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { TEST_VERSION, parseSamplesJson, parseTestJson } from "../src/core/testmodel.js";
+import { TEST_VERSION, parseSamplesJson, parseTestJson } from "../../src/core/testmodel.js";
 
-const FIXTURES = path.join(__dirname, "..", "..", "test", "fixtures");
+const FIXTURES = path.join(__dirname, "..", "..", "..", "test", "fixtures");
 
 function read(name: string): string {
   return fs.readFileSync(path.join(FIXTURES, name), "utf8");

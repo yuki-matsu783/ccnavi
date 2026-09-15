@@ -16,9 +16,9 @@ import {
   remoteKeyOf,
   rewriteRulesForProject,
   type DirEntry,
-} from "../src/core/projects.js";
-import { parseLintJson } from "../src/core/lintmodel.js";
-import { fixture } from "./fixture.js";
+} from "../../src/core/projects.js";
+import { parseLintJson } from "../../src/core/lintmodel.js";
+import { fixture } from "../helpers/fixture.js";
 
 test("CB-T60 URL は https / ssh / scp 風の 3 形を通し、同じリポジトリは同じ鍵になる", () => {
   const https = checkRemote("https://GitLab.example.com/group/Repo.git");

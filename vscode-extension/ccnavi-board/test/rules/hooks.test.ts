@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { envFromSettingsJson, hooksFor, matcherHits, parseHooks } from "../src/core/hooks.js";
+import { envFromSettingsJson, hooksFor, matcherHits, parseHooks } from "../../src/core/hooks.js";
 
 const SETTINGS = JSON.stringify({
   env: { CCNAVI_MODE: "dry-run" },

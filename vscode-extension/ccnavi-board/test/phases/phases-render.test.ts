@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readPhases, TEMPLATE_PHASES_TEXT } from "../src/core/phases-doc.js";
-import { renderPhasesPage } from "../src/core/phases-render.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import { renderPhasesPage } from "../../src/core/phases-render.js";
 
 test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSON で埋め込み、無いときは作る帯を出す", () => {
   const doc = readPhases(TEMPLATE_PHASES_TEXT);
