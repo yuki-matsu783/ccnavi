@@ -923,8 +923,9 @@ perl や python は縮退の対象に入れていない。
 
 変数・置換・グロブをコマンド名に置くと、どのプログラムが走るかが綴りに無く、どのルールも当たらない。
 `c=git; $c push origin main` は raw-git をすり抜けて push を実行する。コード `DENY_COMMAND_NAME_EXPANSION` で止める。
-前に置いた代入とリダイレクト（`FOO=1 >/dev/null $c`）の後ろも、実行役のコマンドの中（`env $c`・`sudo $c`・
-`sh $SCRIPT`・`sh -c "$c"`・`eval "$(…)"`）も見る。
+前に置いた代入とリダイレクト（`FOO=1 >/dev/null $c`、`{fd}>/dev/null $c`）の後ろも、実行役のコマンドの中
+（`env $c`・`sudo $c`・`sh $SCRIPT`）も見る。`sh -c "$c"` と `eval "$(…)"` の文字列の中は見ず、これまでどおり
+読み切れないものとして確認に落とす。
 
 | 止まる書き方 | 通る書き方 |
 |---|---|
