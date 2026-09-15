@@ -307,6 +307,8 @@ GUARDED = [
     ("mv wip/tickets/todo/a.md wip/tickets/doing/a.md", TICKET_STATE),
     ("ccnavi --approve --yes x", APPROVAL),
     ("sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL),
+    # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
+    ("sh .ccnavi/scripts/ccnavi-approve.sh i0002-03 i0002-04", APPROVAL),
 ]
 
 
