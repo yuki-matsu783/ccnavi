@@ -502,12 +502,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const shown = document.querySelectorAll("[data-list=" + section + "] .rule:not(.hidden-by-find)").length;
       const kept = document.querySelectorAll("[data-list=" + section + "] .rule.hidden-by-find.open").length;
       document.querySelector("[data-count=" + section + "]").textContent = countText(q, shown, total, kept);
-      // 絞り込み中は畳んだタイプの中も見せるので、矢印もそれに合わせる（畳んだ状態そのものは変えない）。
-      const el = document.querySelector(".rule-section[data-section=" + section + "]");
-      const twist = el.querySelector("h2 > .twist");
-      const shownAsOpen = q !== "" || !el.classList.contains("folded");
-      twist.textContent = shownAsOpen ? "▾" : "▸";
-      twist.setAttribute("aria-expanded", shownAsOpen ? "true" : "false");
+      syncTwist(document.querySelector(".rule-section[data-section=" + section + "]"));
     }
   }
   // タイプごとの畳み。画面の見え方だけで、ルールの中身と並びには触らない。
@@ -516,7 +511,15 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!el) { return; }
     const next = on === undefined ? !el.classList.contains("folded") : on;
     el.classList.toggle("folded", next);
-    // 矢印は絞り込みの有無も見て決めるので applyFind が合わせる。呼ぶ側が最後に 1 回呼ぶ
+    syncTwist(el);
+  }
+  // タイプの矢印。絞り込み中は畳んでいても中身が見えるので、開いた向きにする
+  function syncTwist(el) {
+    const finding = document.getElementById("find").value.trim() !== "";
+    const shownAsOpen = finding || !el.classList.contains("folded");
+    const twist = el.querySelector("h2 > .twist");
+    twist.textContent = shownAsOpen ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", shownAsOpen ? "true" : "false");
   }
   // 判定に当たったルールは、畳んであっても開く。見えないところで光っても分からないので。
   // その場だけの展開で、開いた行の控えには入れない（判定を繰り返しても既定の畳みが崩れない）。
@@ -593,7 +596,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     markDirty();
     renderAll();
     foldSection(section, false);
-    applyFind();
     const items = document.querySelectorAll("[data-list=" + section + "] .rule");
     const last = items[items.length - 1];
     if (last) { last.querySelector("input.f-id").focus(); }
@@ -667,6 +669,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
           if (el.getAttribute("data-id") === r.id) { el.classList.add("hit"); unfoldRule(el); }
         }
       }
+      // 開いた行が増えたので、絞り込みの件数（開いたままの数）を書き直す
       applyFind();
       box.appendChild(h("h3", { text: "返すメッセージ" }));
       box.appendChild(result.response ? h("pre", { class: "response", text: result.response }) : h("p", { class: "empty", text: "メッセージは返さない" }));
@@ -709,13 +712,13 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (!button) { return; }
     const action = button.getAttribute("data-action");
     if (action === "add") { add(button.getAttribute("data-section")); }
-    else if (action === "fold-section") { foldSection(button.getAttribute("data-section")); applyFind(); }
+    else if (action === "fold-section") { foldSection(button.getAttribute("data-section")); }
     else if (action === "save") { setBusy(true, "検証して保存中…");vscode.postMessage({ type: "save", sections: sections }); }
     else if (action === "reload") { vscode.postMessage({ type: "reload", dirty: dirty }); }
     else if (action === "judge") {
       const tool = document.getElementById("tool").value;
       const subject = document.getElementById("subject").value;
-      if (subject.trim() === "") { status("対象が入っていない", true); return; }
+      if (subject.trim() === "") { status("対象を入れる", true); return; }
       setBusy(true, "判定中…");
       vscode.postMessage({ type: "judge", sections: sections, tool: tool, subject: subject });
     }

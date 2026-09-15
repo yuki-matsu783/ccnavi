@@ -437,7 +437,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "配点のファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+    fail(current, "配点のファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
     return;
   }
 

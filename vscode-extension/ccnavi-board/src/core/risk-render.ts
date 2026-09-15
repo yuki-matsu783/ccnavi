@@ -32,12 +32,12 @@ export interface RenderOptions {
 
 /** 当て方の説明。select の札と、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<(typeof KINDS)[number], { readonly label: string; readonly placeholder: string }>> = {
-  lines_over: { label: "差分の行数がしきい値を超えたら", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
-  files_over: { label: "変えたファイル数がしきい値を超えたら", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
-  deleted_over: { label: "消したファイル数がしきい値を超えたら", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
-  glob: { label: "glob にヒットしたファイルごとに", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
-  script: { label: "スクリプトが出す点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗したら points を加点）" },
-  judge: { label: "サブエージェントの判定", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
+  lines_over: { label: "差分の行数がしきい値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
+  files_over: { label: "変えたファイル数がしきい値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
+  deleted_over: { label: "消したファイル数がしきい値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
+  glob: { label: "glob にヒットしたファイル 1 つにつき加点", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
+  script: { label: "スクリプトが失敗したら加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗したら points を加点）" },
+  judge: { label: "サブエージェントの答えが yes なら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
 };
 
 export function renderRiskPage(page: RiskPage, options: RenderOptions): string {
@@ -270,7 +270,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       sum.appendChild(h("span", { class: "clip", title: kindInfo(factor.kind).label + (factor.value === "" ? "" : ": " + factor.value) }, describe(factor).concat([
         factor.message === "" ? null : h("span", { class: "sum-note", text: factor.message }),
       ])));
-      li.setAttribute("data-find", (factor.id + " " + factor.kind + " " + factor.value + " " + factor.message).toLowerCase());
+      // 画面に出ている語（当て方の札と要約の文）でも、キーの綴り（lines_over など）でも当たる
+      li.setAttribute("data-find", (factor.id + " " + factor.kind + " " + kindInfo(factor.kind).label + " " + sum.textContent).toLowerCase());
     }
     head.addEventListener("click", () => {
       if (window.getSelection && String(window.getSelection()) !== "") { return; }

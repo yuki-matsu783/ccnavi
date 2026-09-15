@@ -565,11 +565,11 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルが読み込み後に外部で作られている。再読込してから編集し直す（上書きしない）");
+    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）");
     return;
   }
 

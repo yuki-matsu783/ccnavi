@@ -129,7 +129,7 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   // .claude/ があることは説明付きの 1 行で言う。lint の同じ指摘（ccnavi/lint.py の文面「.claude/ を持つ。…」）は
   // 重ねない。".claude/settings.json を読めない" のような別の指摘まで消さないよう、文面の先頭で当てる。
   const problems = [
-    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: ".claude/ がある。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見える" }] : []),
+    ...(row.hasClaudeDir ? [{ severity: "warn" as const, where: "", detail: `.claude/ がある。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見える。プロジェクトの設定は ${settingsDir(row)}/ に置く` }] : []),
     ...row.problems.filter((p) => !(row.hasClaudeDir && p.detail.startsWith(".claude/ を持つ"))),
   ];
   const lint = problems.length === 0 ? '<span class="ok">問題なし</span>' : renderProblems(problems);
@@ -170,6 +170,15 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
         </details>
       </div>
     </li>`;
+}
+
+/** 層の設定の置き場（プロジェクトのルートからの相対）。層のルールの置き場から逆算し、無ければ既定 */
+function settingsDir(row: ProjectRow): string {
+  const prefix = `${row.rel}/`;
+  if (!row.rulesRel.startsWith(prefix)) {
+    return ".ccnavi/config";
+  }
+  return row.rulesRel.slice(prefix.length).replace(/\/[^/]*$/, "");
 }
 
 function renderProblems(problems: readonly LintProblem[]): string {
