@@ -32,7 +32,13 @@ from tests.test_config_union import (
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SETUP = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
-LAUNCHER = os.path.join(ROOT, "scripts", "ccnavi-launcher.sh")
+# 振り分けの sh の原本。写す前は CCNAVI_TEST_LAUNCHER で名指しできる
+# （tests/test_launcher.py と同じ）。
+LAUNCHER = os.path.join(
+    ROOT,
+    os.environ.get("CCNAVI_TEST_LAUNCHER")
+    or os.path.join(".ccnavi", "scripts", "ccnavi-launcher.sh"),
+)
 SHELL = shutil.which("sh") or shutil.which("bash")
 HAS_JQ = shutil.which("jq") is not None
 
@@ -425,10 +431,10 @@ class SetupTest(unittest.TestCase):
         os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
         write(binary, "#!/bin/sh\nexit 0\n")
         os.chmod(binary, 0o755)
-        # 置き場の名前になる目印と、hook が起動する振り分けの sh（ADR-0041）。
+        # 置き場の名前になる目印と、hook が起動する振り分けの sh（ADR-0044）。
         write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
-        os.makedirs(os.path.join(src, "scripts"))
-        shutil.copy(LAUNCHER, os.path.join(src, "scripts", "ccnavi-launcher.sh"))
+        os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
+        shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))
         write(os.path.join(src, ".ccnavi", "common", "rules.yml"), "deny: []\n")
         write(os.path.join(src, ".ccnavi", "common", "risk.yml"), COMMON_RISK)
         write(os.path.join(src, HOME, "config", "phases.yml"), COMMON_PHASES)

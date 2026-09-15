@@ -21,7 +21,10 @@
 状態機械は公開されておらず、中身を写すと Python の版で壊れる
 （wip/design/shellread-subst.md §1.1）。
 
-仕事を文字列として受け取って実行するコマンドは、ここでも中身が見えない。
+仕事を文字列として受け取って実行するコマンドは、読み切れないものとして扱う。
+その代わり、`env` `sudo` `sh -c` のような実行役のコマンドが中で実行するコマンドを、
+層として別に並べる（下の「中で実行されるコマンド」）。判定はそれを止める側のルールに
+だけ当てる。
 
 完全なシェルパーサではないし、回避しようとする相手に対する境界でもない。
 変数と alias は、シェルを実際に走らせない限りどうやっても届かない。
@@ -34,7 +37,7 @@ from __future__ import annotations
 
 import re
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # シェルなら一致がまたげない場所に置く目印。目印は 2 つ。
 # SEP はコマンドとコマンドの間。WORD_SEP は引用が 2 語を 1 語につないだ場所と、
@@ -140,6 +143,97 @@ _TAKES_CODE_FLAG = {
     "find": ("-exec", "-execdir", "-ok", "-okdir"),
 }
 
+# ---- 中で実行されるコマンド
+#
+# `env rm x` の `rm x` のように、別のコマンドを実行することが仕事のコマンド
+# （実行役のコマンド）がある。ルールの多くはコマンドの先頭に固定して書かれるので、
+# 実行役のコマンドを前に置くだけで外れる。ここでは実行役のコマンドを 1 枚ずつ外して、
+# 中で実行されるコマンドを並べる。判定はそれを止める側のルールにだけ当てる（judge）。
+#
+# 外す先は、走査と shlex で読んだコマンドのそれぞれ。置換の中身から切り出したコマンドも
+# 含む（`echo "$(env rm x)"` の `rm x`）。
+#
+# 一覧は組み込みで持つ。ルールファイルから足せるようにすると、消すこともできる。
+# 守りの根拠を守られる側に置かない。一覧に無い実行役のコマンド（`script -c`・`watch`・
+# `ssh host cmd`・`python -c` など）は外さない。
+
+# 深さの上限。元の形は数えない。判定の期限に効くので、層の数をここで抑える。
+UNWRAP_DEPTH = 4
+# 1 回の読みで作る層の語数の上限。`eval` や `sh -c` の文字列は読み直すと語が増えるので、
+# 深さだけでは抑えきれない。超えたら、そこから先の層は作らない。
+UNWRAP_WORDS = 2000
+
+# オプションと値を飛ばした残りがコマンドになるもの。値は、値を取るオプション
+# （`-u me` のように次の語を値に取るもの）と、コマンドの前に置く位置引数の数。
+# 一覧に無いオプションは値を取らないものとして読む。読み違えると値をコマンドと読んで
+# 層がずれるが、ずれた層は当たらないだけで、元の形の判定は変わらない。
+_RUNNERS: dict[str, tuple[frozenset[str], int]] = {
+    "env": (frozenset({"-u", "--unset", "-C", "--chdir"}), 0),
+    "command": (frozenset(), 0),
+    "exec": (frozenset({"-a"}), 0),
+    "nohup": (frozenset(), 0),
+    "time": (frozenset({"-f", "-o", "--format", "--output"}), 0),
+    "nice": (frozenset({"-n", "--adjustment"}), 0),
+    "sudo": (
+        frozenset(
+            {
+                "-u",
+                "-g",
+                "-C",
+                "-h",
+                "-p",
+                "-U",
+                "-r",
+                "-t",
+                "-T",
+                "-D",
+                "-R",
+                "--user",
+                "--group",
+                "--close-from",
+                "--host",
+                "--prompt",
+                "--other-user",
+                "--role",
+                "--type",
+                "--command-timeout",
+                "--chdir",
+                "--chroot",
+            }
+        ),
+        0,
+    ),
+    "doas": (frozenset({"-u", "-C"}), 0),
+    "timeout": (frozenset({"-s", "--signal", "-k", "--kill-after"}), 1),
+    "stdbuf": (frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}), 0),
+    "chrt": (frozenset(), 1),
+    "ionice": (frozenset({"-c", "-n", "-p", "--class", "--classdata", "--pid"}), 0),
+    "taskset": (frozenset(), 1),
+}
+
+# コマンドの前に `名前=値` を並べてよい実行役のコマンド。
+_TAKES_ASSIGNMENTS = frozenset({"env", "sudo"})
+
+# `command -v jq` はコマンドを探すだけで、実行しない。
+_LOOKUP_ONLY = {"command": frozenset("vV")}
+
+# ファイルを渡せばそれを、`-c` なら文字列を実行するシェル。
+_SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh"})
+# シェルのオプションで、次の語を値に取るもの。
+_SHELL_VALUE_OPTIONS = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-file"})
+
+# 最初の引数のファイルを、今のシェルで実行するもの。
+_SOURCES = frozenset({".", "source"})
+
+_XARGS_VALUE_OPTIONS = frozenset(
+    {"-I", "-n", "-P", "-d", "-L", "-s", "-E", "-a", "--max-args", "--max-procs", "--delimiter"}
+)
+
+# find の、後ろに書いたコマンドを実行する述語。`;` か `+` までがコマンド。
+_FIND_EXEC = frozenset(_TAKES_CODE_FLAG["find"])
+
+_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+
 # 語の終わりになる文字（コマンドの文脈）。ヒアドキュメントの区切りの語を読むときに使う。
 _WORD_END = " \t\r\n;&|()<>"
 
@@ -178,6 +272,18 @@ class Reading:
     # 書いた側が文字を書いただけのつもりでいる場所に当たったことになる。
     # そのときに回避策を文面で名指しするために持つ。判定そのものは text で下す。
     bare: str = ""
+    # 実行役のコマンドを 1 枚ずつ外した層を、SEP でつないだもの。コマンドごとに、
+    # 外側から内側の順に並ぶ。元の形は含めない。層が無ければ空。
+    # 読み切れない形（degraded）でも、トークンに割れる限り作る。`sh -c` や `xargs` の
+    # ような形こそ、中で何が実行されるかを見たい。閉じない引用と閉じない
+    # ヒアドキュメントのように、走査か shlex が止まった形では作らない。
+    unwrapped: str = ""
+    # 層ごとの、その層を実行する実行役のコマンドの名前。unwrapped と同じ並び。
+    # 文面で「`env` が実行する `rm x`」と言うために持つ。
+    runners: list[str] = field(default_factory=list)
+    # 層ごとの、引用の中から切り出したコマンドから作った層かどうか。unwrapped と同じ並び。
+    # 層は bare に当て直せないので、文面の断り（引用の中に当たった）はこれで決める。
+    quoted_layers: list[bool] = field(default_factory=list)
 
 
 class _Unreadable(Exception):
@@ -581,12 +687,22 @@ class _Scanner:
 
 def read(src: str) -> Reading:
     """コマンド文字列を 1 本読む。"""
-    return _read(src, 0)
+    reading, commands = _read(src, 0)
+    layers = _unwrap(commands)
+    reading.unwrapped = SEP.join(_render_command(layer) for _, layer, _ in layers)
+    reading.runners = [runner for runner, _, _ in layers]
+    reading.quoted_layers = [quoted for _, _, quoted in layers]
+    return reading
 
 
-def _read(src: str, depth: int) -> Reading:
+def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
+    """読みと、層を作る先のコマンドの並びを返す。
+
+    並びの 1 つずつは（コマンド, 引用の中から切り出したコマンドか）。外側のコマンドが先、
+    切り出した中身のコマンドが後ろ。読み切れない形でも、トークンに割れる限り返す。
+    """
     if depth > _MAX_DEPTH:
-        return Reading(degraded=True, reason=REASON_AMBIGUOUS_SUBST)
+        return Reading(degraded=True, reason=REASON_AMBIGUOUS_SUBST), []
     src = src.replace(SEP, " ").replace(WORD_SEP, " ")
     # 改行の前のバックスラッシュはシェルの行継続で、2 文字とも消える。
     # 2 行に割ったコマンドは 1 行で書いたのと同じ語の並びになる。
@@ -598,24 +714,33 @@ def _read(src: str, depth: int) -> Reading:
     try:
         outer, found, heads = _scan(src)
     except _Unreadable as e:
-        return Reading(degraded=True, reason=e.reason)
+        return Reading(degraded=True, reason=e.reason), []
 
     try:
         tokens = _tokenize(outer)
     except ValueError:
         # 閉じない引用符で shlex が投げる。走査は通ったのに shlex が閉じないと読むのは、
         # `$'…\'…'` のように 2 つの読みが割れる形。読み切れないものとして扱う。
-        return Reading(degraded=True, reason=REASON_UNTERMINATED)
+        return Reading(degraded=True, reason=REASON_UNTERMINATED), []
+
+    commands = _split_commands(tokens)
+    # 層を作る先は、読みを止める理由があっても集める。そのために中身も先に読んでおく。
+    runnable = [(command, False) for command in _with_time(commands)]
+    inners: list[tuple[Reading, bool]] = []
+    for body, quoted in found:
+        inner, inner_commands = _read(body, depth + 1)
+        inners.append((inner, quoted))
+        runnable.extend((command, quoted or q) for command, q in inner_commands)
+
     if sum(t in ("<<", "<<-") for t in tokens) > heads:
         # 走査がヒアドキュメントと読まなかった `<<` が、トークンに出た。引用が `<<` だけの
         # 1 語（`grep -n "<<" f`）で、shlex からは演算子と区別が付かない。今までどおり
         # 閉じない本文として縮退する（ccnavi.md §12.2 の許容した誤検知）。
-        return Reading(degraded=True, reason=REASON_UNTERMINATED)
+        return Reading(degraded=True, reason=REASON_UNTERMINATED), runnable
 
-    commands = _split_commands(tokens)
     why = _classify(commands)
     if why:
-        return Reading(degraded=True, reason=why)
+        return Reading(degraded=True, reason=why), runnable
 
     # 中身は外側の後ろにつなぐ。置換のあった位置で挟むと外側のコマンドが 2 本に割れ、
     # `find $(pwd) -name x -delete` の -delete が find と別のコマンドに見える。
@@ -623,19 +748,19 @@ def _read(src: str, depth: int) -> Reading:
     # 中身は `\x00` の直後に立つので `(^|\x00)` のルールもそのまま当たる。
     texts = [_render(commands)]
     bares = [texts[0]]
-    for body, quoted in found:
-        inner = _read(body, depth + 1)
+    for inner, quoted in inners:
         if inner.degraded:
             # 中身が 1 つでも読めなければ全体を読めないとする。複合コマンドで 1 区間が
             # 読めないときと同じ扱い。理由は中身のものを返す。
-            return inner
+            return inner, runnable
         texts.append(inner.text)
         if not quoted:
             bares.append(inner.bare)
-    return Reading(
+    reading = Reading(
         text=SEP.join(t for t in texts if t),
         bare=SEP.join(t for t in bares if t),
     )
+    return reading, runnable
 
 
 def _scan(src: str) -> tuple[str, list[tuple[str, bool]], int]:
@@ -772,6 +897,220 @@ def _base(name: str) -> str:
         if lowered.endswith(extension):
             return name[: -len(extension)]
     return name
+
+
+def _with_time(commands: list[list[str]]) -> list[list[str]]:
+    """層を作る先の並び。予約語として 1 本に切った `time` を、後ろのコマンドとつなぎ直す。
+
+    _split_commands は予約語を 1 本にするので、`time -f %e rm x` は `time` と
+    `-f %e rm x` の 2 本になり、`rm x` がどちらのコマンドの先頭にも立たない。`time` を
+    実行役のコマンドとして外すために、層を作るときだけつなぐ。後ろのコマンドもそのまま
+    残すので、つなぎ違えても層が増えるだけで、止める側に倒れる。
+    """
+    out: list[list[str]] = []
+    for k, command in enumerate(commands):
+        if command == ["time"] and k + 1 < len(commands):
+            out.append(["time", *commands[k + 1]])
+        else:
+            out.append(command)
+    return out
+
+
+def _unwrap(commands: list[tuple[list[str], bool]]) -> list[tuple[str, list[str], bool]]:
+    """全コマンドの層を、コマンドの順・外側から内側の順に並べる。
+
+    1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出したか）。
+    """
+    out: list[tuple[str, list[str], bool]] = []
+    budget = [UNWRAP_WORDS]
+    for command, quoted in commands:
+        _layers(command, 0, out, budget, quoted)
+    return out
+
+
+def _layers(
+    command: list[str],
+    depth: int,
+    out: list[tuple[str, list[str], bool]],
+    budget: list[int],
+    quoted: bool,
+) -> None:
+    """1 本のコマンドから、実行役のコマンドを 1 枚ずつ外した層を out に足す。
+
+    途中の層も残す。`env sh …approve.sh` の `sh …approve.sh` の層に、承認のルールの
+    `sh` から始まる枝が当たる。
+    """
+    if depth >= UNWRAP_DEPTH:
+        return
+    runner, inners, further = _peel(command)
+    for inner in inners:
+        budget[0] -= len(inner)
+        if budget[0] < 0:
+            return
+        out.append((runner, inner, quoted))
+        if further:
+            _layers(inner, depth + 1, out, budget, quoted)
+
+
+def _peel(command: list[str]) -> tuple[str, list[list[str]], bool]:
+    """実行役のコマンドを 1 枚だけ外す。
+
+    返すのは、外した実行役のコマンドの名前、中で実行されるコマンドの並び（無ければ空）、
+    その中をさらに外してよいか。シェルと `.` に渡したファイルはスクリプトであって
+    コマンドの名前ではないので、その先は外さない。
+    """
+    if not command:
+        return "", [], False
+    head = command[0]
+
+    # `FOO=1 rm x`。代入はコマンドではない。
+    if _ASSIGNMENT.match(head):
+        i = 0
+        while i < len(command) and _ASSIGNMENT.match(command[i]):
+            i += 1
+        rest = command[i:]
+        return head, [rest] if rest else [], True
+
+    # `/bin/sh x`・`git.exe x`。どのプログラムを指すかを変えない部分を落とした名前で読む。
+    name = _base(head)
+    if name != head and name:
+        return head, [[name, *command[1:]]], True
+
+    # find の述語の `;` は `\;` と書くが、shlex は区切り記号の `;` と同じ綴りで返すので、
+    # 2 つめの `-exec` からは別のコマンドの頭に来る。そこも find の続きとして読む。
+    if name == "find" or name in _FIND_EXEC:
+        return "find", _find_commands(command), True
+    if name in _RUNNERS:
+        return name, _runner_command(name, command[1:]), True
+    if name in _SHELLS:
+        return name, *_shell_commands(command[1:])
+    if name in _SOURCES:
+        rest = command[1:]
+        return name, [rest] if rest else [], False
+    if name == "eval":
+        return name, _reread(" ".join(command[1:])), True
+    if name == "xargs":
+        rest = _skip_options(command[1:], _XARGS_VALUE_OPTIONS)
+        return name, [rest] if rest else [], True
+    return "", [], False
+
+
+def _runner_command(name: str, args: list[str]) -> list[list[str]]:
+    """`env` `sudo` などのオプションと値と位置引数を飛ばした残り。"""
+    value_options, positionals = _RUNNERS[name]
+    lookup = _LOOKUP_ONLY.get(name, frozenset())
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--":
+            i += 1
+            break
+        if name in _TAKES_ASSIGNMENTS and _ASSIGNMENT.match(token):
+            i += 1
+            continue
+        if not token.startswith("-") or token == "-":
+            break
+        if lookup and not token.startswith("--") and lookup & set(token[1:]):
+            return []
+        i += _option_width(token, args[i + 1 :], value_options)
+    while i < len(args) and name in _TAKES_ASSIGNMENTS and _ASSIGNMENT.match(args[i]):
+        i += 1
+    i += positionals
+    rest = args[i:]
+    return [rest] if rest else []
+
+
+def _skip_options(args: list[str], value_options: frozenset[str]) -> list[str]:
+    """先頭のオプション（と値）を飛ばした残り。`--` はそこで終わる。"""
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--":
+            return args[i + 1 :]
+        if not token.startswith("-") or token == "-":
+            break
+        i += _option_width(token, args[i + 1 :], value_options)
+    return args[i:]
+
+
+def _option_width(token: str, following: list[str], value_options: frozenset[str]) -> int:
+    """オプション 1 つが占める語の数。値を別の語に取るなら 2。
+
+    `--unset=HOME` と `-o0` は値が同じ語に入っている。短いオプションはまとめて
+    書けるので（`-Eu me`）、値を取る文字が最後に来たときだけ次の語を値に取る。
+    """
+    if token.startswith("--"):
+        if "=" in token:
+            return 1
+        return 2 if token in value_options and following else 1
+    for k, letter in enumerate(token[1:], start=1):
+        if "-" + letter in value_options:
+            last = k == len(token) - 1
+            return 2 if last and following else 1
+    return 1
+
+
+def _shell_commands(args: list[str]) -> tuple[list[list[str]], bool]:
+    """`sh <ファイル> <引数>` ならファイルと引数、`sh -c '<文字列>'` なら読み直したコマンド。"""
+    takes_code = False
+    from_stdin = False
+    i = 0
+    while i < len(args):
+        token = args[i]
+        if token == "--":
+            i += 1
+            break
+        if token in _SHELL_VALUE_OPTIONS:
+            i += 2
+            continue
+        if token[:1] in ("-", "+") and len(token) > 1:
+            if not token.startswith("--"):
+                takes_code = takes_code or "c" in token
+                from_stdin = from_stdin or "s" in token
+            i += 1
+            continue
+        break
+    rest = args[i:]
+    if not rest:
+        return [], False
+    if takes_code:
+        return _reread(rest[0]), True
+    if from_stdin:
+        # `sh -s a b` は標準入力を読み、後ろの語は引数。
+        return [], False
+    return [rest], False
+
+
+def _find_commands(command: list[str]) -> list[list[str]]:
+    """find の `-exec` の類の後ろの、`;` か `+` までのコマンド。複数あればそれぞれ。"""
+    out: list[list[str]] = []
+    i = 0
+    while i < len(command):
+        if command[i] not in _FIND_EXEC:
+            i += 1
+            continue
+        j = i + 1
+        while j < len(command) and command[j] not in (";", "+"):
+            j += 1
+        if command[i + 1 : j]:
+            out.append(command[i + 1 : j])
+        i = j + 1
+    return out
+
+
+def _reread(src: str) -> list[list[str]]:
+    """`sh -c` と `eval` に渡った文字列を、コマンドとして読み直す。
+
+    外側と同じ走査で読むので、文字列の中のコマンド置換の中身も並ぶ。
+    トークンに割れなければ層を作らない。
+    """
+    _, commands = _read(src, 0)
+    return [command for command, _ in commands]
+
+
+def _render_command(command: list[str]) -> str:
+    """コマンド 1 本を、ルールを当てる形に組み直す。"""
+    return " ".join(_join(token) for token in command)
 
 
 def _render(commands: list[list[str]]) -> str:

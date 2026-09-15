@@ -542,6 +542,31 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(reading))
 
+    def test_subagent_cannot_move_state_through_a_runner_command(self):
+        """実行役のコマンドを前に置いても、サブエージェントの禁止は外れない。
+
+        禁止の形はコマンドの先頭の `sh` に固定していたので、`env sh` `command sh` `/bin/sh`
+        と `sh -c '…'` は素通りだった（wip/design/launcher-scripts.md §3.5.1、12 節 W5）。
+        禁止は中で実行されるコマンドにも当てる（§3.5.3）。先頭の形は対照として今のまま止まる。
+        """
+        self.family()
+        for command in (
+            "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+            "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh done x",
+            "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh request --phase 1'",
+        ):
+            with self.subTest(command=command):
+                result = self.hook(
+                    "PreToolUse",
+                    "Bash",
+                    self.parent_tree,
+                    agent_id="sub-1",
+                    command=command,
+                )
+                self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result), self.reason(result))
+
     def test_done_closes_the_copy_without_approval(self):
         self.family()
         result = self.ccnavi("ticket", "done", "i0001-01")
@@ -661,6 +686,34 @@ class TicketTest(unittest.TestCase):
         # 連結の片方が違えば止める側は変わらない。
         joined = shellread.read('ls; sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
+
+    def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
+        """ゲートの中で通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
+
+        禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、ゲートが閉じている間に
+        `env sh …ccnavi-review.sh` の形で何でも前に置けるようになる
+        （wip/design/launcher-scripts.md §3.5.3、12 節 W4）。先頭の `sh` の形は今のまま通る。
+        """
+        self.family()
+        self.close_phase()
+        shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+
+        exempt = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+        )
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+
+        for command in (
+            "env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+            "sudo sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
+                self.assertIn("DENY_PHASE_GATE", self.reason(result), self.reason(result))
 
     def test_phase_without_review_skips_the_gate(self):
         self.family(review=(False, False))
