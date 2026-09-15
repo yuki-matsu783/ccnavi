@@ -640,7 +640,8 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
                     f"層として数えていない（id の `{p.name}:` がどちらの層の話か決まらない。"
                     "綴りの大文字小文字は問わない）。ここに置いた宣言は 1 件も効いておらず、"
-                    "このプロジェクトへの Write / Edit は共通層だけで判定している。"
+                    "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
+                    "Edit / NotebookEdit）は共通層だけで判定している。"
                     "別の名前に変える",
                 )
             )
