@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseHooks } from "../src/core/hooks.js";
-import { readRules } from "../src/core/rules-doc.js";
-import { KNOWN_TOOLS, renderRulesPage, type RulesPage } from "../src/core/rules-render.js";
+import { parseHooks } from "../../src/core/hooks.js";
+import { readRules } from "../../src/core/rules-doc.js";
+import { KNOWN_TOOLS, renderRulesPage, type RulesPage } from "../../src/core/rules-render.js";
 
 const RULES = `version: 1
 deny:
@@ -46,9 +46,9 @@ test("CB-T49 埋め込むルールは JSON で、文面の < は実体にして 
   assert.match(html, /ccnavi &lt;exe&gt;/);
 });
 
-test("CB-T50 dry-run のときは enable でないことを言い、enable なら言わない", () => {
+test("CB-T50 dry-run のときは止めないことを言い、enable と未設定（実行ファイルは enable と扱う）なら言わない", () => {
   assert.match(renderRulesPage(page(), { nonce: "n" }), /CCNAVI_MODE<\/code>: <strong>dry-run<\/strong>/);
-  assert.match(renderRulesPage(page({ mode: "" }), { nonce: "n" }), /<strong>未設定<\/strong>/);
+  assert.doesNotMatch(renderRulesPage(page({ mode: "" }), { nonce: "n" }), /CCNAVI_MODE/);
   assert.doesNotMatch(renderRulesPage(page({ mode: "enable" }), { nonce: "n" }), /CCNAVI_MODE/);
 });
 
@@ -110,8 +110,9 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   // 判定で当たった行の展開は控えに入れない。控えを書くのは利用者が押したときだけ。
   assert.match(body, /function unfoldRule\(el\) \{[\s\S]*?setOpen\(el, true, false\);/);
   assert.match(body, /setOpen\(li, opened\.has\(key\), false\)/);
-  // 開いている行は絞り込みで隠さない
+  // 開いている行は絞り込みで隠さない。絞り込み中は畳んだタイプの中身も見せる
   assert.match(html, /\.row\.hidden-by-find:not\(\.open\) \{ display: none; \}/);
+  assert.match(html, /\.finding \.rule-section\.folded \.list \{ display: block; \}/);
   assert.doesNotMatch(html, /\.list \{[^}]*overflow: hidden/);
   // 開いた行は id で控える（空 id は控えない）。
   assert.match(body, /if \(found && found\.rule\.id !== ""\) \{ ids\.push\(found\.rule\.id\); \}/);
@@ -119,6 +120,10 @@ test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち
   // タブの控えが開いた行の控えを消さない。
   assert.doesNotMatch(body, /vscode\.setState\(\{ tab: name \}\)/);
   assert.match(html, /\.row\.open \.row-body \{ display: grid; \}/);
+  // 札で選んだあとは要約を今の値で書き直す（チェックボックスの input は change より先に伝わるため）
+  assert.match(body, /markDirty\(\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*wrap\.dispatchEvent\(new Event\("input", \{ bubbles: true \}\)\);/);
+  // 絞り込み中は畳んだタイプの矢印も開いた向きにする
+  assert.match(body, /function syncTwist\(el\) \{[\s\S]*?const shownAsOpen = finding \|\| !el\.classList\.contains\("folded"\);/);
 });
 
 test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", () => {

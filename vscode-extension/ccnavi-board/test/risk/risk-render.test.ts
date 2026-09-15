@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BUILTIN_RISK_TEXT, KINDS, readRisk } from "../src/core/risk-doc.js";
-import { KIND_LABELS, renderRiskPage, type RiskPage } from "../src/core/risk-render.js";
+import { BUILTIN_RISK_TEXT, KINDS, readRisk } from "../../src/core/risk-doc.js";
+import { KIND_LABELS, renderRiskPage, type RiskPage } from "../../src/core/risk-render.js";
 
 const RISK = `version: 1
 factors:
@@ -97,5 +97,5 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
   assert.match(body, /captioned\("点", points, "", "points"\)/);
   assert.match(body, /captioned\("文面", [^\n]*"message"\)/);
   assert.match(body, /function valueLabel\(kind\) \{[\s\S]*?"しきい値"/);
-  assert.match(body, /captioned\(name\.toUpperCase\(\), input, "w-level", "levels\." \+ name\)/);
+  assert.match(body, /captioned\(name\.toUpperCase\(\), input, "", "levels\." \+ name\)/);
 });

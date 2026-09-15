@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type FactorForm } from "../src/core/risk-doc.js";
+import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type FactorForm } from "../../src/core/risk-doc.js";
 
 const TEXT = `# 先頭の説明。消えてはいけない。
 version: 1

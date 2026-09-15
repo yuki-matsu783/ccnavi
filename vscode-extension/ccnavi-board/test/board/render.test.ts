@@ -2,24 +2,24 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseApprovePreview, type ApprovePreview } from "../src/core/approvemodel.js";
-import { buildBoard } from "../src/core/board.js";
-import { PAGE_STYLE, escapeHtml, renderBoard } from "../src/core/render.js";
-import { renderRulesPage } from "../src/core/rules-render.js";
-import { readRules } from "../src/core/rules-doc.js";
-import { renderRiskPage } from "../src/core/risk-render.js";
-import { readRisk, BUILTIN_RISK_TEXT } from "../src/core/risk-doc.js";
-import { renderPhasesPage } from "../src/core/phases-render.js";
-import { readPhases, TEMPLATE_PHASES_TEXT } from "../src/core/phases-doc.js";
-import { renderProjectsPage } from "../src/core/projects-render.js";
-import { buildProjectsPage } from "../src/core/projects.js";
-import type { TicketJson } from "../src/core/model.js";
-import { fixture } from "./fixture.js";
+import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
+import { buildBoard } from "../../src/core/board.js";
+import { PAGE_STYLE, escapeHtml, renderBoard } from "../../src/core/render.js";
+import { renderRulesPage } from "../../src/core/rules-render.js";
+import { readRules } from "../../src/core/rules-doc.js";
+import { renderRiskPage } from "../../src/core/risk-render.js";
+import { readRisk, BUILTIN_RISK_TEXT } from "../../src/core/risk-doc.js";
+import { renderPhasesPage } from "../../src/core/phases-render.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import { renderProjectsPage } from "../../src/core/projects-render.js";
+import { buildProjectsPage } from "../../src/core/projects.js";
+import type { TicketJson } from "../../src/core/model.js";
+import { fixture } from "../helpers/fixture.js";
 
 const OPTIONS = { nonce: "TEST-NONCE-123" };
 
 function approvePreview(): ApprovePreview {
-  const text = fs.readFileSync(path.join(__dirname, "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
+  const text = fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
   const parsed = parseApprovePreview(text);
   if (!parsed.ok) {
     throw new Error(parsed.error);
@@ -61,7 +61,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
   assert.ok(!empty.includes('data-action="approve-confirm"'));
   const approving = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "approving", preview } });
   assert.ok(approving.includes('data-approval="approving"'));
-  assert.ok(approving.includes("承認している…"));
+  assert.ok(approving.includes("承認中…"));
   assert.ok(/data-action="approve-confirm"[^>]*disabled/.test(approving));
   const noticed = renderBoard(buildBoard(fixture()), {
     ...OPTIONS,
@@ -167,9 +167,14 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   // 属性は枠無しの fact。承認済・レビューの要否・作業ツリーの名前・base
   assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
   assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
-  assert.ok(/<span class="fact review" title="[^"]*">レビュー 要<\/span>/.test(html));
+  assert.ok(/<span class="fact review" title="[^"]*">人レビュー要<\/span>/.test(html));
   assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
   assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
+  assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
+  // 属性は列からはみ出さず、フェーズ行の右側は折り返す
+  assert.match(html, /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
+  assert.match(html, /\.phase-status \{ text-align: right; overflow-wrap: anywhere; max-width: 55%; justify-self: end; \}/);
+  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) minmax\(0, auto\);/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
@@ -181,7 +186,9 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="phase-status">進行中 · レビュー要</span>'));
   assert.ok(!html.includes("ゲート開"));
   assert.ok(!html.includes("マーカーなし"));
-  assert.ok(!html.includes("レビュー不要 "));
+  assert.doesNotMatch(html, /class="phase-status">[^<]*レビュー不要/);
+  // ゲート閉のフェーズ行は段階名も右の状態も赤
+  assert.match(html, /\.phase\.gate-closed \.phase-label, \.phase\.gate-closed \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
   // ゲート閉の左線は承認待ちの左線より後に書き、勝つ
   assert.ok(html.indexOf(".card.pending { border-left") < html.indexOf(".card.gate-closed { border-left"));
   // 締める（wrapup）のボタンは出さない
@@ -201,7 +208,7 @@ test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () 
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   const html = renderBoard(buildBoard(empty), OPTIONS);
-  assert.ok(html.includes("チケットはありません"));
+  assert.ok(html.includes("チケットは無い"));
   assert.equal((html.match(/class="empty"/g) ?? []).length, 4);
   assert.ok(html.includes('data-action="approve" disabled'));
 });
@@ -255,5 +262,34 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.ok(html.includes(PAGE_STYLE));
     // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
     assert.equal((html.match(/  \.toolbar \{ display: flex;/g) ?? []).length, 1);
+    // 見た目を指定しなければ素の body。Claude の配色の CSS と、切り替えの受け口は常に持つ
+    assert.ok(html.includes("\n<body>\n"));
+    assert.ok(html.includes("body.ccnavi-claude-light:not("));
+    assert.ok(html.includes('if (data.type === "appearance") { applyAppearance(data.value); }'));
   }
+  const themed = [
+    renderBoard(buildBoard(fixture()), { ...OPTIONS, appearance: "claude-dark" }),
+    renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, { ...OPTIONS, appearance: "claude-dark" }),
+    renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
+    renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), { ...OPTIONS, appearance: "claude-dark" }),
+  ];
+  for (const html of themed) {
+    assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));
+  }
+});
+
+test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使い、他のテーマでは効かない書き方になっている", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  // 一覧（設定 3 画面）の開いた行の縁は LIST_STYLE にあるので、ルール設定画面で見る
+  const rules = renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock: { locked: false, reason: "", doing: [] } }, OPTIONS);
+  assert.match(rules, /\.row\.open > \.row-head, \.row\.open > \.row-body \{ box-shadow: inset 3px 0 0 var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\); \}/);
+  assert.match(html, /button\.action:disabled \{ border-color: var\(--vscode-contrastBorder, transparent\); border-style: dashed; \}/);
+  // カードのホバーの点線は疑似要素で、他のテーマでは透明。焦点の輪（outline の実線）には触らない
+  assert.match(html, /\.card:hover::after \{[^}]*border: 1px dashed var\(--vscode-contrastActiveBorder, transparent\); \}/);
+  assert.match(html, /\.card:hover, \.card:focus \{\s*outline: 1px solid var\(--vscode-focusBorder\);/);
+  assert.doesNotMatch(html, /\.card:hover \{ outline/);
+  // ホバーの点線はボタンの焦点の輪を消さない。行の見出しにも点線
+  assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
+  assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
 });

@@ -3,6 +3,7 @@
  * 色は VS Code のテーマ変数だけを使う。チケットの本文に何が書かれていても、表示を壊さない
  * ように全部の文字列を実体参照にする。
  */
+import { APPEARANCE_SCRIPT, APPEARANCE_STYLE, type Appearance, bodyTag } from "./appearance.js";
 import type { ApprovePreview } from "./approvemodel.js";
 import type { Action, Board, BoardColumn, Card, ParentOption, PhaseChip } from "./board.js";
 
@@ -25,6 +26,8 @@ export interface RenderOptions {
   readonly nonce: string;
   /** あれば、ボードの上に承認のオーバーレイを被せる */
   readonly approval?: ApprovalOverlay;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 const COPY_LABELS = { none: "未承認", open: "承認済", closed: "クローズ" } as const;
@@ -50,7 +53,7 @@ export function renderBoard(board: Board, options: RenderOptions): string {
 ${STYLE}
 </style>
 </head>
-<body>
+${bodyTag(options.appearance)}
 <header class="toolbar">
   <div class="summary">
 ${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount} 件</span>\n` : ""}${board.issueCount > 0 ? `    <span class="issues warn">不備 ${board.issueCount} 件</span>\n` : ""}    <span class="counts">残り ${board.remainingCount} / 全 ${board.totalCount}</span>
@@ -60,7 +63,7 @@ ${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button t
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
-${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットはありません</p>\n' : ""}<div class="board">
+${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットは無い</p>\n' : ""}<div class="board">
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
@@ -83,7 +86,7 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
   const inner = (() => {
     switch (overlay.kind) {
       case "loading":
-        return `<p class="approval-note">承認待ちの一覧を読んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
+        return `<p class="approval-note">承認待ちの一覧を読み込んでいる…</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">やめる</button></div>`;
       case "error":
         return `<p class="approval-note error">${escapeHtml(overlay.error)}</p>\n<div class="approval-actions"><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
       case "preview":
@@ -91,7 +94,7 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
         return renderApprovalBody(overlay.preview, overlay.kind === "approving", overlay.kind === "preview" ? overlay.notice : undefined);
       case "done":
         return `<h2 id="approval-title">${overlay.count} 件を承認した</h2>
-${overlay.carried === true ? `<p class="approval-note">承認済みチケットのコミットと push を端末に送った。</p>\n` : ""}<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く（送信は人が Enter）。</p>
+${overlay.carried === true ? `<p class="approval-note">承認済みチケットのコミットと push を端末に送った。</p>\n` : ""}<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く。送るときは自分で Enter を押す。</p>
 <pre class="approval-text">${escapeHtml(overlay.prompt)}</pre>
 <div class="approval-actions"><button type="button" class="action primary" data-action="prompt-copy">コピー</button><button type="button" class="action" data-action="prompt-open">新しいセッションで開く</button><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
     }
@@ -126,10 +129,10 @@ function renderApprovalBody(preview: ApprovePreview, approving: boolean, notice:
   const confirm =
     count === 0
       ? ""
-      : `<button type="button" class="action primary" data-action="approve-confirm" data-tickets="${escapeHtml(tickets)}"${approving ? " disabled" : ""}>${approving ? "承認している…" : `この ${count} 件を承認する`}</button>`;
+      : `<button type="button" class="action primary" data-action="approve-confirm" data-tickets="${escapeHtml(tickets)}"${approving ? " disabled" : ""}>${approving ? "承認中…" : `この ${count} 件を承認する`}</button>`;
   return `<h2 id="approval-title">Ticket 承認リクエスト: ${count} 件</h2>
 ${notice ? `<p class="approval-note warn">${escapeHtml(notice)}</p>\n` : ""}${
-    count === 0 ? '<p class="approval-note">承認待ちのチケットは無い</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>どこ</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
+    count === 0 ? '<p class="approval-note">承認待ちのチケットは無い</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>場所</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
   }<pre class="approval-text">${escapeHtml(preview.text)}</pre>
 ${rejected}${problems}<div class="approval-actions">
 ${confirm}<button type="button" class="action" data-action="approve-cancel"${approving ? " disabled" : ""}>やめる</button>
@@ -184,7 +187,7 @@ function renderProblems(problems: readonly string[]): string {
 function renderColumn(column: BoardColumn): string {
   const body =
     column.count === 0
-      ? '    <p class="empty">チケットはありません</p>'
+      ? '    <p class="empty">チケットは無い</p>'
       : `    <ul class="cards">\n${column.cards.map(renderCard).join("\n")}\n    </ul>`;
   return `  <section class="column" data-state="${escapeHtml(column.state)}">
     <h2>
@@ -263,7 +266,7 @@ function renderFacts(card: Card): string {
   if (card.copyStatus !== "none") {
     facts.push(fact(`copy-${card.copyStatus}`, COPY_LABELS[card.copyStatus]));
   }
-  facts.push(fact("review", `レビュー ${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
+  facts.push(fact("review", `人レビュー${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
   if (card.worktreeExists) {
     facts.push(fact("worktree", `作業ツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
   }
@@ -291,7 +294,7 @@ function renderFacts(card: Card): string {
 }
 
 function riskText(card: Card): string {
-  return `リスク ${card.riskPoints ?? ""} ${card.riskLevel}`.replace(/\s+/g, " ");
+  return card.riskPoints === null ? `リスク ${card.riskLevel}` : `リスク ${card.riskLevel}（${card.riskPoints} 点）`;
 }
 
 /** 作業ツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
@@ -456,7 +459,12 @@ ${BUTTON_STYLE}
   select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
   input:disabled, select:disabled, textarea:disabled { opacity: .6; }
   .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
-  .foot.error { color: var(--vscode-editorError-foreground); }`;
+  .foot.error { color: var(--vscode-editorError-foreground); }
+  /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
+     無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは効かない */
+  button.action:hover:not(:disabled):not(:focus-visible) { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
+  button.action:disabled { border-color: var(--vscode-contrastBorder, transparent); border-style: dashed; }
+${APPEARANCE_STYLE}`;
 
 /**
  * 設定 3 画面（ルール設定・リスク管理・フェーズ管理）の一覧。1 件 1 行で、押した行だけ下に欄が開く。
@@ -471,10 +479,12 @@ export const LIST_STYLE = `  .list { list-style: none; margin: 0; padding: 0; bo
   .row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
   /* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
   .row.hidden-by-find:not(.open) { display: none; }
-  .finding .rule-section.folded .list { display: block; }
   .row-head { display: grid; gap: 10px; align-items: center; padding: 5px 8px; cursor: pointer; }
-  .row-head:hover { background: var(--vscode-list-hoverBackground); }
+  .row-head:hover { background: var(--vscode-list-hoverBackground); outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
   .row.open .row-head { background: var(--vscode-editorWidget-background); }
+  /* 開いている行は左に縁を付ける。HC は contrastActiveBorder、他は focusBorder */
+  .row.open > .row-head, .row.open > .row-body { box-shadow: inset 3px 0 0 var(--vscode-contrastActiveBorder, var(--vscode-focusBorder)); }
+  .row.open > .row-body { border-top: 1px dashed var(--vscode-contrastBorder, transparent); }
   .twist {
     background: none; border: none; color: var(--vscode-descriptionForeground);
     font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
@@ -562,6 +572,7 @@ const STYLE = `${PAGE_STYLE}
   .empty { margin: 0; color: var(--vscode-descriptionForeground); font-size: .92em; }
   .cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .card {
+    position: relative;
     border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
     background: var(--vscode-editorWidget-background); cursor: pointer;
   }
@@ -570,6 +581,8 @@ const STYLE = `${PAGE_STYLE}
     outline: 1px solid var(--vscode-focusBorder);
     background: var(--vscode-list-hoverBackground);
   }
+  /* HC のホバーの点線。疑似要素に描き、上の outline（実線。焦点の輪でもある）には触らない。他のテーマでは透明 */
+  .card:hover::after { content: ""; position: absolute; inset: 0; border-radius: 5px; pointer-events: none; border: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
   .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
   .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
   .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }
@@ -590,21 +603,21 @@ const STYLE = `${PAGE_STYLE}
   .badge.mark-requested { color: var(--vscode-charts-yellow); }
   .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
   .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }
-  .fact { white-space: nowrap; }
+  .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .fact.copy-open::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
   .fact.sha { font-family: var(--vscode-editor-font-family); }
   /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右に人が見るべきことだけ */
   .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; }
-  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) minmax(0, auto); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
   .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
   .phase-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase-tickets::before { content: "·"; margin: 0 5px; }
-  .phase-status { text-align: right; }
+  .phase-status { text-align: right; overflow-wrap: anywhere; max-width: 55%; justify-self: end; }
   .phase-active .phase-status { color: var(--vscode-charts-blue); }
-  .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
+  .phase.gate-closed .phase-label, .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
   .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
   .issues {
     list-style: none; margin: 6px 0 0; padding: 0;
@@ -808,4 +821,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   window.addEventListener("message", (event) => {
     const data = event.data || {};
     if (data.type === "filter" && typeof data.project === "string") { selectProject(data.project); }
-  });`;
+  });
+${APPEARANCE_SCRIPT}`;

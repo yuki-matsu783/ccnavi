@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as commands from "../src/core/commands.js";
+import * as commands from "../../src/core/commands.js";
 import {
   acceptCommand,
   approveArgs,
@@ -8,7 +8,7 @@ import {
   pushApprovedCommand,
   shellQuote,
   toPosixPath,
-} from "../src/core/commands.js";
+} from "../../src/core/commands.js";
 
 test("CB-T17 単引用符で囲み、中の単引用符を割る", () => {
   assert.equal(shellQuote("abc"), "'abc'");

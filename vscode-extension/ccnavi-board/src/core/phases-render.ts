@@ -12,6 +12,7 @@
  */
 import type { Lock } from "./lock.js";
 import { PHASE_KINDS, REVIEWS, type PhasesModel } from "./phases-doc.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
 import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 
 export interface PhasesPage {
@@ -35,17 +36,19 @@ export interface PhasesPage {
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 /** 区分の説明。select の札 */
 export const KIND_LABELS: Readonly<Record<(typeof PHASE_KINDS)[number], string>> = {
-  work: "work（全体計画 plan: に置く）",
-  feedback: "feedback（フィードバック計画 feedback: に置く。review は mr 固定）",
+  work: "work（全体計画 plan: に並べる種類）",
+  feedback: "feedback（フィードバック計画 feedback: に並べる種類。レビューは mr 固定）",
 };
 
 /** レビューの既定の説明。select の札 */
 export const REVIEW_LABELS: Readonly<Record<(typeof REVIEWS)[number], string>> = {
-  none: "none（レビューを求めない既定。上限ではなく、実績のリスクが HIGH 以上なら要る）",
+  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上なら要る）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 
@@ -71,8 +74,8 @@ export function renderPhasesPage(page: PhasesPage, options: RenderOptions): stri
 ${STYLE}
 </style>
 </head>
-<body>
-${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${bodyTag(options.appearance)}
+${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.phasesPath)}</span>
@@ -92,7 +95,7 @@ ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="bloc
     <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellcheck="false">
     <span class="hint">行を押すと開く</span>
   </div>
-  <details class="help"><summary>この画面の説明</summary><p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に在って追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p></details>
+  <details class="help"><summary>この画面の説明</summary><p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p></details>
   <ul class="list" id="phases"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
@@ -109,7 +112,7 @@ function renderTicketControlBanner(ticketControl: string): string {
   if (ticketControl !== "disable") {
     return "";
   }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効かない</div>\n`;
+  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -229,7 +232,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function renderPhase(phase) {
     const key = keyOf(phase);
-    const idInput = field(phase, "id", "f-id narrow", "implement（英数字で始まり、英数字と . _ - だけ）");
+    const idInput = field(phase, "id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）");
     idInput.addEventListener("input", () => updateSave());
     const kindSelect = selectField(phase, "kind", page.kinds, "f-kind", () => renderAll());
     const reviewSelect = selectField(phase, "review", page.reviews, "f-review");
@@ -246,7 +249,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       h("div", { class: "sub" }, [
         captioned("並行できる種類", listField(phase, "overlap", "f-overlap", "並行してよい種類の id"), "", "overlap"),
         captioned("一緒に要る種類", listField(phase, "requires", "f-requires", "計画に置くなら一緒に要る種類の id"), "", "requires"),
-        captioned("エージェント", field(phase, "agent", "f-agent narrow", "案内に出すサブエージェント名"), "", "agent"),
+        captioned("エージェント", field(phase, "agent", "f-agent narrow", "案内に出すサブエージェントの名前"), "", "agent"),
         captioned("置く目安", field(phase, "when", "f-when", "この種類を計画に置く目安。案内にだけ使う"), "", "when"),
       ]),
     ]);
@@ -259,14 +262,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       head,
       h("div", { class: "row-body" }, [
         captioned("id", idInput, "", "id"),
-        captioned("題", field(phase, "title", "f-title narrow", "実装とテスト（空なら id）"), "", "title"),
+        captioned("題", field(phase, "title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）"), "", "title"),
         captioned("区分", kindSelect, "", "kind"),
         captioned("レビュー", reviewSelect, "", "review"),
         captioned("範囲", h("div", { class: "inline" }, [
           scopeSelect,
-          phase.inherit ? null : listField(phase, "scope", "f-scope-globs", "src/*, tests/*（作業ツリーのルートからの相対。子の範囲はこの中に収まる）"),
+          phase.inherit ? null : listField(phase, "scope", "f-scope-globs", "src/*, tests/*（作業ツリーのルートからの相対。子チケットの範囲はこの中に収める）"),
         ]), "", "scope"),
-        captioned("成果物", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に在って追跡されているべきもの）"), "", "deliverables"),
+        captioned("成果物", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に存在し、git に追跡されているべきもの）"), "", "deliverables"),
         more,
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
@@ -308,8 +311,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     for (const li of document.querySelectorAll("#phases .phase")) {
       li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
     }
-    const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find), #phases .phase.open").length;
-    document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length;
+    const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find)").length;
+    const kept = document.querySelectorAll("#phases .phase.hidden-by-find.open").length;
+    document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length + (kept > 0 ? "（開いたまま " + kept + "）" : "");
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
@@ -338,7 +342,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const list = document.getElementById("phases");
     list.textContent = "";
     for (const phase of form.phases) { list.appendChild(renderPhase(phase)); }
-    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : page.editable ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
+    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : page.editable ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
     document.getElementById("phase-count").textContent = String(form.phases.length);
     const add = document.querySelector("button[data-action=add]");
     if (add) { add.disabled = !page.editable; }
@@ -416,7 +420,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
-    for (const el of document.querySelectorAll("#phases input, #phases select, #phases button, button[data-action=add]")) { el.disabled = on || !page.editable; }
+    for (const el of document.querySelectorAll("#phases .row-body input, #phases .row-body select, #phases .row-body button, button[data-action=add]")) { el.disabled = on || !page.editable; }
     updateSave();
     if (text) { status(text, false); }
   }
@@ -437,4 +441,5 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
   });
   document.getElementById("find").addEventListener("input", applyFind);
-  renderAll();`;
+  renderAll();
+${APPEARANCE_SCRIPT}`;

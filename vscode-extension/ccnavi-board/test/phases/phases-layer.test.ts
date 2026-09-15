@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readPhases } from "../src/core/phases-doc.js";
-import { renderPhasesPage, type PhasesPage } from "../src/core/phases-render.js";
-import type { ProjectRow, ProjectsPage } from "../src/core/projects.js";
-import { renderProjectsPage } from "../src/core/projects-render.js";
+import { readPhases } from "../../src/core/phases-doc.js";
+import { renderPhasesPage, type PhasesPage } from "../../src/core/phases-render.js";
+import type { ProjectRow, ProjectsPage } from "../../src/core/projects.js";
+import { renderProjectsPage } from "../../src/core/projects-render.js";
 
 function phasesPage(overrides: Partial<PhasesPage> = {}): PhasesPage {
   return {
