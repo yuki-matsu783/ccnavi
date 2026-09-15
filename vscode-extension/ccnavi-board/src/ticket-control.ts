@@ -21,8 +21,15 @@ export function ticketControl(): TicketControl {
   return current;
 }
 
-export function onDidChangeTicketControl(listener: (value: TicketControl) => void): void {
+/** 値が変わったら呼ぶ。返す取っ手を捨てると外せないので、拡張の寿命の箱に入れる */
+export function onDidChangeTicketControl(listener: (value: TicketControl) => void): vscode.Disposable {
   listeners.push(listener);
+  return new vscode.Disposable(() => {
+    const at = listeners.indexOf(listener);
+    if (at >= 0) {
+      listeners.splice(at, 1);
+    }
+  });
 }
 
 /** ワークスペースの設定ファイルから読み直す。ファイルが無ければ enable */
@@ -43,7 +50,8 @@ export function watchTicketControl(context: vscode.ExtensionContext): void {
     }
     current = value;
     void vscode.commands.executeCommand("setContext", CONTEXT_KEY, value);
-    for (const listener of listeners) {
+    // 呼んでいる途中で解除されても走査が飛ばないよう、写しを回す
+    for (const listener of [...listeners]) {
       listener(value);
     }
   };

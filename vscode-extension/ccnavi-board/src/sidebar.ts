@@ -95,7 +95,7 @@ export function registerSidebar(context: vscode.ExtensionContext): void {
   const provider = new EntryProvider();
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("ccnaviBoard.entries", provider),
+    onDidChangeTicketControl(() => provider.refresh()),
+    onDidChangeAppearance(() => provider.refresh()),
   );
-  onDidChangeTicketControl(() => provider.refresh());
-  context.subscriptions.push(onDidChangeAppearance(() => provider.refresh()));
 }
