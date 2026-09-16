@@ -24,7 +24,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
+import { DEBOUNCE_MS, loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
@@ -35,7 +35,6 @@ import { renderPhasesPage } from "./core/phases-render.js";
 import { escapeHtml } from "./core/render.js";
 import { ticketControl } from "./ticket-control.js";
 
-const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;

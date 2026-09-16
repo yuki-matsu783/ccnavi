@@ -8,7 +8,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, readAppearance } from "./appearance.js";
-import { loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
+import { DEBOUNCE_MS, loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
 import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, type LoadResult } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
@@ -22,9 +22,6 @@ import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js"
 import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
-
-/** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
-const DEBOUNCE_MS = 120;
 
 type Message =
   | { readonly type: "open"; readonly filePath: string }
@@ -228,7 +225,8 @@ async function update(load: Loader = loadBoard): Promise<void> {
     current.loading = false;
     if (current.again) {
       current.again = false;
-      void update(load);
+      // 待たされた分だけ答えは古い。読み直しは分け合わず、新しい答えを取りに行く
+      void update();
     }
   }
 }

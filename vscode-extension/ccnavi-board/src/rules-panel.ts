@@ -18,7 +18,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
+import { DEBOUNCE_MS, loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
@@ -28,7 +28,6 @@ import { escapeHtml } from "./core/render.js";
 import { asSections, readRules, type RuleForm, type RulesDocument, type Section } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 
-const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
