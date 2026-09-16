@@ -4,7 +4,7 @@
 
 計画のときに「軽い」と思った作業が、やってみたら大きな変更になることがある。
 宣言（チケットの範囲や `human_review.required: false`）だけを信じると、それが
-レビューを通らずに進む。だから点は、子を閉じるときにその子の作業ツリーで
+レビューを通らずに進む。だから点は、子を閉じるときにその子のワークツリーで
 `base_sha..HEAD` の差分を数えて付ける。宣言の広さで数える点は持たない。
 宣言の広さは、親がチケットを書くときに `human_review.reason` で言えばよい。
 
@@ -482,7 +482,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
                     SEVERITY_ERROR,
                     f.id,
                     f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
-                    "作業ツリーの中のものは読まないので、git プロジェクトルートに置く",
+                    "ワークツリーの中のものは読まないので、元リポジトリに置く",
                 )
             )
     return problems
@@ -784,7 +784,7 @@ def judge_prompt(
     lines = [
         f"# {child} のリスク判定（定性）",
         "",
-        f"親: {parent}。作業ツリー: {worktree}。差分: `{diff.base[:12]}..{diff.head[:12]}`"
+        f"親: {parent}。ワークツリー: {worktree}。差分: `{diff.base[:12]}..{diff.head[:12]}`"
         f"（{diff.summary()}）。",
         "",
         "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",

@@ -49,11 +49,12 @@ ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` 
 
 ## 綴りの大文字小文字
 
-`glob` で書いたルールは、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は
+`glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。`*/.ccnavi/*` は
 `.Ccnavi/config/rules.yml` にも当たる。当たり方が機械で変わると、同じルールファイルが
 ある機械では止め、別の機械では通す（risk.py と phasetypes.py の範囲も同じ）。
-`regex` で書いたルールは区別する。書いた人が `(?i:...)` を自分で書けるので、
-意図を持てる側に任せる。
+区別が要る `regex` は `(?-i:...)` で囲む。囲むのは区別したい部分だけでよく、
+否定の文字クラス（`[^c]` のような除外）を持つルールは、区別せずに当てると除外の側が
+広がるのでそこを囲む。
 
 ## ワークスペースルートの合言葉
 
@@ -131,14 +132,11 @@ def root_pattern(root: str) -> str:
 
     区切りは `/` と `\\` のどちらにも当たる形にする。当てる対象は行き着く先まで
     解いた綴り（judge.full_path）で、Windows では `\\` になるが、ルールを書く人は
-    `/` で考える。大文字小文字を区別しない機械では、綴りの違いも許す
-    （`c:` と `C:` は同じ場所）。
+    `/` で考える。大文字小文字は式ごと区別せずに当てるので（_build）、ここでは機械を
+    見ない。見ると `c:` と `C:` の扱いが機械で割れる。
     """
     real = os.path.realpath(root).rstrip("\\/")
-    body = "".join("[\\\\/]" if ch in "\\/" else re.escape(ch) for ch in real)
-    if os.path.normcase("A") == "a":
-        return f"(?i:{body})"
-    return body
+    return "".join("[\\\\/]" if ch in "\\/" else re.escape(ch) for ch in real)
 
 
 def root_glob(root: str) -> str:
@@ -153,7 +151,7 @@ def fill_root(text: str, root: str) -> str:
     """モデルへ渡す文の `{root}` を、ワークスペースルートの実パスに置き換える。
 
     文面で sh を案内するときは `{root}` から書く（スクリプトはワークスペースにしか無く、
-    作業ツリーやプロジェクトの中からは相対の綴りが届かない）。綴りは glob に埋めるのと
+    ワークツリーやプロジェクトの中からは相対の綴りが届かない）。綴りは glob に埋めるのと
     同じ形で、区切りは `/`。ルートが渡らない読み方（診断で `--root` が無い）では
     置き換えずにそのまま返す。
     """
@@ -211,7 +209,7 @@ class Rule:
     # 初回は両方を並べ、2 回目からは additionalContext だけを渡す。
     additional_context_once: str = ""
     # additionalContextFile / additionalContextOnceFile は、文の代わりに（または文に
-    # 続けて）本文を渡すファイル。ルートからの相対パスで、行き先の作業ツリーにあれば
+    # 続けて）本文を渡すファイル。ルートからの相対パスで、行き先のワークツリーにあれば
     # そちらを、無ければルートのものを読む。無ければ何も足さない。長さは
     # ctxfile.MAX_CHARS で切り、切ったことを本文の末尾に添える。
     additional_context_file: str = ""
@@ -439,18 +437,17 @@ def _build(
         expression = (
             rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
         )
-        # `regex` で書いた範囲だけは綴りの区別を残す。書いた人が `(?i:...)` を
-        # 自分で書けるので、意図を持てる側に任せる（ticket.py の範囲と同じ理屈）。
-        flags = 0
     else:
         glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
         expression = translate(glob)
-        # glob は、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で変えると、
-        # 同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた守りを
-        # `.Ccnavi/` で素通りでき、どの機械でも区別しないチケットの範囲とも食い違う。
-        # ルールは人が宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
-        # （phasetypes._globs / risk._factors / チケットの範囲と同じ形）。
-        flags = re.IGNORECASE
+
+    # `glob` も `regex` も、どの機械でも大文字小文字を区別せずに当てる。区別するかを機械で
+    # 変えると、同じルールが Windows では当たり Linux では当たらない。`*/.ccnavi/*` と書いた
+    # 守りを `.Ccnavi/` で素通りでき、どの機械でも区別しないチケットの範囲とも食い違う。
+    # ルールは人が宣言する場所の意図なので、機械の都合ではなく綴りの意味で読む
+    # （phasetypes._globs / risk._factors / selfguard._folded / チケットの範囲と同じ形）。
+    # 区別が要る `regex` は `(?-i:...)` で囲む。
+    flags = re.IGNORECASE
 
     try:
         rule.compiled = re.compile(expression, flags)

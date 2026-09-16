@@ -4,7 +4,8 @@
 
 1. チケット制御が効いているセッションの頭で、直接作業とチケット作業の使い分けが届く
 2. `CCNAVI_TICKET_CONTROL=disable` なら届かない
-3. 文に載る設定ファイルの綴りと、dry-run の注記
+3. 入口の sh の綴りと、dry-run の注記。頭では言わないもの（レビューの sh、設定ファイルの
+   綴り）が載っていないこと
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import os
 import tempfile
 import unittest
 
-from tests.core.test_lint import ROOT, SOUND, rules_file, write
+from tests.core.test_lint import ROOT, SOUND, rules_file
 from tests.inproc import run_ccnavi
 
 
@@ -52,6 +53,15 @@ class TicketControlTest(unittest.TestCase):
         self.assertIn("ccnavi-ticket.sh", text)
         self.assertNotIn("dry-run", text)
 
+    def test_後から届くものは頭では言わない(self):
+        # レビューの sh はフェーズの段階と ready の手順で、設定ファイルの綴りは承認の
+        # ときの検査で名指しされる。頭で渡す文はそのぶん短くしてある。
+        text = self.context(self.start("--mode", "enable"))
+
+        self.assertNotIn("ccnavi-review.sh", text)
+        self.assertNotIn("phases.yml", text)
+        self.assertNotIn("risks.yml", text)
+
     def test_disableなら何も届かない(self):
         text = self.context(self.start("--mode", "enable", "--ticket-control", "disable"))
 
@@ -70,19 +80,12 @@ class TicketControlTest(unittest.TestCase):
         self.assertIn("直接作業", self.context(result))
         self.assertIn("CCNAVI_TICKET_CONTROL='off' is not a setting", result.stderr)
 
-    def test_dry_runなら末尾にその旨が付く(self):
+    def test_dry_runなら末尾にその旨と次からの従い方が付く(self):
         text = self.context(self.start("--mode", "dry-run"))
 
         self.assertIn("直接作業", text)
-        self.assertTrue(text.splitlines()[-1].startswith("（現状: CCNAVI_MODE=dry-run"), text)
-
-    def test_設定ファイルは在るときだけ相対の綴りで載る(self):
-        without = self.context(self.start("--mode", "enable"))
-        self.assertIn("フェーズと", without)
-        self.assertIn("リスクの配点に", without)
-
-        write(self.root, os.path.join(".ccnavi", "common", "phases.yml"), "phases: []\n")
-        write(self.root, os.path.join(".ccnavi", "common", "risks.yml"), "levels: {}\n")
-        with_files = self.context(self.start("--mode", "enable"))
-        self.assertIn("フェーズ（.ccnavi/common/phases.yml）", with_files)
-        self.assertIn("リスクの配点（.ccnavi/common/risks.yml）", with_files)
+        last = text.splitlines()[-1]
+        self.assertTrue(last.startswith("（現状: CCNAVI_MODE=dry-run"), text)
+        # 止まらないことだけで終えない。通ったことを許可と読ませない。
+        self.assertIn("許可と読まず", last)
+        self.assertIn("次から従う", last)

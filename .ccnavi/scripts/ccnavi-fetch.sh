@@ -28,7 +28,7 @@ projects="${CCNAVI_PROJECTS:-projects}"
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0
 
-# 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、作業ツリー。
+# 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、ワークツリー。
 trees="$root"
 for dir in "$root/$projects"/* "$root/.claude/worktrees"/*; do
 	[ -d "$dir" ] || continue

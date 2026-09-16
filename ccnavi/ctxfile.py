@@ -101,7 +101,7 @@ def for_rules(
     サブエージェントは親の文脈を持たないので、親で渡した文は子にも 1 度渡す。
 
     `additionalContextFile` / `additionalContextOnceFile` は、文に続けてファイルの本文を
-    渡す。探す先は `bases` の順（行き先の作業ツリー、プロジェクト、ルート）で、最初に
+    渡す。探す先は `bases` の順（行き先のワークツリー、プロジェクト、ルート）で、最初に
     在ったものを読む。無ければ文だけ。once の記憶は文とファイルで分けず、ルール 1 件で
     1 度と数える。
 
@@ -151,9 +151,9 @@ def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str) -> str:
 def bases(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[str]:
     """ルールが指すファイルを探すルートの並び。近いほうから。
 
-    行き先（Bash なら cwd）が作業ツリーの中なら、まずその作業ツリー。そこに無ければ
-    切り元のプロジェクト、最後にワークスペースルート。作業ツリーで直している最中の
-    案内文がそのまま効くように、作業ツリーを先に見る。
+    行き先（Bash なら cwd）がワークツリーの中なら、まずそのワークツリー。そこに無ければ
+    その元リポジトリ、最後にワークスペースルート。ワークツリーで直している最中の
+    案内文がそのまま効くように、ワークツリーを先に見る。
     """
     bases: list[str] = []
     if target is not None and not target.is_main:

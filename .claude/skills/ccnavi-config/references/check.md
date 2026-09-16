@@ -22,7 +22,7 @@ ccnavi --lint --log "" --state ""
 | `(rules)` / ルール id | 読めない、版が違う、`deny` が空、文面・match・glob を欠く、glob と regex の両方、`ask` `allow` に `message`、組めない正規表現、`additionalContextFile` が上に出る | `allow` が空、id 無し・重複、当てる対象の無いツール、広い allow に文、指すファイルが無い・長い |
 | `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が mr でない、id / title の重複、overlap / requires の先が無い、scope が外に出る | 自分を overlap / requires に挙げている |
 | `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、当て方が 0 か 2 つ、script の置き場が外、glob が組めない | 知らない段階名 |
-| `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親があるのに phases が読めない | dry-run、登録の欠け、作業ツリーとチケットの食い違い |
+| `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親があるのに phases が読めない | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
 下書きを見るときは `--rules` `--phases` `--risk` で差し替える。3 本は互いに読み合うので
 （承認済みチケットの置き場を rules が守っているか、親の計画が phases を指せるか）、1 本だけ差し替えて
@@ -51,13 +51,13 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --appr
 - **タイプの順で強い側が先に当たっている。** allow に置いた見本が deny の `raw-git` に当たる、
   など。この形なら見本の置き場かルールの広さのどちらかが間違っている
 
-単発で試したい形があれば、見本ファイルを scratchpad に書いて `--test-samples` で回す
+単発で試したい形があれば、見本ファイルをワークツリーの `scratchpad/` に書いて `--test-samples` で回す
 （`--test` に直接書くと、禁止語を含む Bash 自体が当たる）。`--json` を付ければ翻訳後の
 正規表現（`pattern`）と返る文面（`response`）まで出る。
 
 **守られているかも見本で見る。** rules.yml と phases.yml と risks.yml、承認済みチケットの
 置き場、settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート
-直下と、**実在する作業ツリーの名前**での設定の両方。作業ツリー側の設定は、ブランチを
+直下と、**実在するワークツリーの名前**での設定の両方。ワークツリー側の設定は、ブランチを
 統合すればそのまま main の設定になる道を持つ。このリポジトリでは `guard-ccnavi-config` と
 `guard-settings` が両方を止める。出るのはルールの判定だけで、組み込みの守り
 （settings.json と rules.yml を実行後に戻す働き）は `--test` には出ない。allow に見えた
@@ -95,7 +95,7 @@ sh .ccnavi/scripts/ccnavi-git.sh log --shortstat -20
   配点は宣言の意味を消し、どの子も MEDIUM に届かない配点は入っていないのと同じ
 - `glob` の項目は、当たるごとに加点で `max` が無ければ青天井。当たりそうな場所の
   ファイル数を数えて、1 回で CRITICAL に跳ねないか見る
-- `script` の項目は、その sh を子の作業ツリーで実際に打つ。`CCNAVI_BASE_SHA` と
+- `script` の項目は、その sh を子のワークツリーで実際に打つ。`CCNAVI_BASE_SHA` と
   `CCNAVI_HEAD` を環境変数で渡し、標準出力が整数か `{"points": N}` か、失敗したときに
   何も出さないか（重い側に倒れて丸ごと加点される）を見る
 - `judge` の問いは、差分だけを読んで yes / no で答えられるか。答えられない問いは、判定が

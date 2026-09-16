@@ -120,7 +120,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[Layer]:
     """このツリーに足す層。行き先の 1 つだけ（設計 §11.4 書き込み系）。
 
-    ワークスペースのツリー（ワークスペースルートと、そこから切った作業ツリー）なら
+    ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら
     自身の層。プロジェクトのツリーならその層。ワークスペースルートの外に行き先が
     あるなら、どの層でもないので何も足さない。
 

@@ -440,7 +440,7 @@ def main() -> int:
         "i0001-01",
     )
     record(
-        "子の作業ツリーからの push はラッパースクリプトが拒む",
+        "子のワークツリーからの push はラッパースクリプトが拒む",
         child_push.returncode != 0 and "子チケット" in (child_push.stderr + child_push.stdout),
     )
 

@@ -92,13 +92,13 @@ def load_copy(path: str) -> ticket_mod.Ticket | None:
     ticket.source_tree = str(meta.get("source_tree") or "")
     ticket.source_path = str(meta.get("source_path") or "")
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
-    # 提案を写したか）とは別物で、子の作業ツリーの checkout では食い違う。
+    # 提案を写したか）とは別物で、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
     return ticket
 
 
 def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
-    """承認済みチケットを持ちうるツリー全部。ワークスペース、プロジェクト、作業ツリー。"""
+    """承認済みチケットを持ちうるツリー全部。ワークスペース、プロジェクト、ワークツリー。"""
     return [
         tree.main_tree(root),
         *tree.projects(conf.projects),
@@ -111,7 +111,7 @@ def scan_all(
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """全ツリーの承認済みチケットを、重複を畳まずに集める。
 
-    承認済みチケットは親チケットのブランチに乗るので、そこから切った子の作業ツリーにも
+    承認済みチケットは親チケットのブランチに乗るので、そこから切った子のワークツリーにも
     同じものが checkout されている。畳まない側は、ボードが「どこに写っているか」を
     見せるために使う。
     """
@@ -132,10 +132,10 @@ def scan(
     """判定と承認が読む承認済みチケット。権威のあるツリーの側だけを残す。
 
     権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
-    落とす。子の作業ツリーに checkout されているのは切った時点の版なので、親のツリーで
+    落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
     閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」に倒すと、閉じたチケットが
     開いたものとして復活する。権威のツリーがその識別子を開閉どちらでも持っていない
-    ときだけ、見つかった側を残す（親の作業ツリーを作る前に承認した分を落とさないため）。
+    ときだけ、見つかった側を残す（親のワークツリーを作る前に承認した分を落とさないため）。
     """
     found, notes = scan_all(conf, root, closed)
     other, _ = scan_all(conf, root, not closed)
@@ -160,13 +160,13 @@ def home_dir(
 ) -> str:
     """この識別子の承認済みチケットを置くツリーの置き場。
 
-    書く先も読む先も 1 つに決めるためのもの。子の作業ツリーにも checkout されるが、
+    書く先も読む先も 1 つに決めるためのもの。子のワークツリーにも checkout されるが、
     そこへ書くと同じ識別子の承認済みチケットが 2 通りになる。
 
     探す順は、すでに持っているツリー（親のツリー → ワークスペースかプロジェクトの
     ルート → その他）、親のツリー、fallback_root（提案があったツリー）、
     ワークスペースルート。すでに在る側を先に見るのは、マーカーと記録を承認済みチケットと
-    同じ場所に置くため。親の作業ツリーは承認のあとに作られることがあり、そこを
+    同じ場所に置くため。親のワークツリーは承認のあとに作られることがあり、そこを
     先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
     """
     home = parent or ticket_id
@@ -262,8 +262,13 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
 # 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。マージに進んでよいの合図
 #   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
+#   closed.json  親を閉じた（`ticket done <親>`）。どのフェーズをどこで見たかを残す
+#
+# closed.json が要るのは、提案（wip/）が統合先へ戻す前に消えるから。マージリクエストを
+# 作らない運び方（全フェーズが `review: chat`）では、締めた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_WRAPUP = "wrapup"
+PARENT_MARK_CLOSED = "closed"
 
 
 def parent_mark_path(approved_dir: str, parent: str, name: str) -> str:
@@ -1003,7 +1008,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     """
     return (
         f"■ プロジェクト: {t.project or '(ワークスペース)'}"
-        f"  作業ツリー: {t.tree or '(main)'}  提案: {t.path}"
+        f"  ワークツリー: {t.tree or '(main)'}  提案: {t.path}"
     )
 
 
@@ -1112,7 +1117,10 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
         elif item.review == ticket_mod.PLAN_REVIEW_MR:
             review = "レビュー要（計画で強めた）"
         elif pt is not None:
-            review = "レビュー要" if pt.review == "mr" else "レビュー不要"
+            review = {
+                phasetypes.REVIEW_MR: "レビュー要（マージリクエスト）",
+                phasetypes.REVIEW_CHAT: "レビュー要（このセッションで）",
+            }.get(pt.review, "レビュー不要")
         lines.append(f"    {n}. {title}（{item.type}）" + (f"  {review}" if review else ""))
     return lines
 
@@ -1307,13 +1315,19 @@ def revision_problems(
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
     if revised.feedback != current.feedback:
         if current.feedback is not None:
+            # 残りの切り出し先は運び方で違う。MR があれば issue に切り出せるが、
+            # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
+            elsewhere = (
+                "残りは新しい親チケットの提案として wip/tickets/todo/ に書く"
+                if phase.chat_only(root, conf, current.ticket)
+                else "残りは別 issue に切り出す（ccnavi-review.sh handoff）"
+            )
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     revised.ticket,
                     "フィードバック計画は 1 回だけ。承認済みのフィードバック作業フェーズに"
-                    "子を足して"
-                    "やり直すか、残りは別 issue に切り出す（ccnavi-review.sh handoff）",
+                    f"子を足してやり直すか、{elsewhere}",
                 )
             )
         elif not phase.plan_finished(root, conf, current):

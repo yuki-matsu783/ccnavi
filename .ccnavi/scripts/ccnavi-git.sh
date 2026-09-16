@@ -49,7 +49,7 @@ unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJ
 # 拒否の文面で代わりの形を名乗るときの、自分の呼び方。生の git は PreToolUse で
 # 止まるので、案内に `git stash push -u` と書くと、案内された先でもう 1 度拒否される。
 # 代わりの手段が拒否される案内は、案内が無いのとほとんど同じ。
-# $0 は呼ばれたときの綴りそのままなので、worktree の中から相対で呼ばれても合う。
+# $0 は呼ばれたときの綴りそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
 
 reject() {
@@ -83,7 +83,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
-                   子チケットの作業ツリーからは送れない。親が合流してから親のツリーで送る)
+                   子チケットのワークツリーからは送れない。親が合流してから親のツリーで送る)
 
 通さないもの (代わりの手段):
   reset clean   git stash push -u で退避する。消さない
@@ -238,7 +238,7 @@ worktree)
 			--detach | -d | --force | -f | --checkout | --no-checkout | --lock | \
 				--guess-remote | --no-guess-remote | --track | --no-track | --quiet | -q) ;;
 			-*)
-				reject "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中に作業ツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
+				reject "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中にワークツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
 				;;
 			*)
 				if [ -z "$wt_dest" ]; then
@@ -285,7 +285,7 @@ worktree)
 				wt_spell="$wt_up.claude/worktrees/$wt_name"
 				;;
 			esac
-			reject "作業ツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+			reject "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
 		;;
 	list | prune) ;;
@@ -362,7 +362,7 @@ restore)
 	;;
 
 merge)
-	# 早送り以外も通す。CLAUDE.md の worktree 手順は、main が先に進んだ状態から
+	# 早送り以外も通す。CLAUDE.md のワークツリー手順は、main が先に進んだ状態から
 	# ブランチへ main を取り込む形を必ず通る。そこを --ff-only に絞ると、
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
 	# 解こうとする手をラッパースクリプトが止めてしまっては、止めた先に進む道が無くなる。
@@ -462,15 +462,15 @@ push)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
 		reject "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので通しません。"
 	fi
-	# 子チケットの作業ツリーからは送らない。レビューはマージリクエストの実物に結び、
+	# 子チケットのワークツリーからは送らない。レビューはマージリクエストの実物に結び、
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
 	# 見分けるのは承認済みチケット（main の `.ccnavi/tickets/<名前>.md`）に
 	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
-	# 作業ツリーはワークスペースの .claude/worktrees/ の下にある。切り元が
+	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
 	# プロジェクトでも置き場はワークスペース（設計 §11.2）なので、git の
-	# --git-common-dir から導くと、モード B では切り元のプロジェクトを指して
+	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
@@ -491,7 +491,7 @@ push)
 			for push_copy in "$push_copies/$push_name.md" "$push_copies/closed/$push_name.md"; do
 				if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
 					push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
-					reject "$push_name は子チケットの作業ツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を合流してから、親の作業ツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
+					reject "$push_name は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を合流してから、親のワークツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
 				fi
 			done
 			;;
@@ -638,12 +638,12 @@ else
 	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
 	body | tail -n "$FAIL_LINES"
 	# Windows では、プロセスの cwd がそのディレクトリを掴む。Bash ツールの cwd は呼び出しを
-	# またいで残る親のシェルのものなので、作業ツリーの中へ cd したまま remove すると、git が
+	# またいで残る親のシェルのものなので、ワークツリーの中へ cd したまま remove すると、git が
 	# 中身を消したあと最後のディレクトリで Permission denied になり、空のディレクトリが残る。
 	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
 	# 起きたときに立て直し方を言う。
 	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
-		printf '案内: 作業ツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
+		printf '案内: ワークツリーのディレクトリを消せませんでした。Windows では、シェルの cwd がその中にあると消せません（Bash ツールの cwd は呼び出しをまたいで残り、サブシェルの中の cd では動きません）。cwd をワークスペースルートに戻す cd を単独で打ち（cd %s）、%s worktree list で登録が外れたかを確かめてください。外れていて空のディレクトリだけが残っていれば rmdir %s で消し、登録が残っていれば同じ remove を打ち直します。中にファイルが残っているなら消さずに利用者に報告してください。\n' "$WS" "$SELF" "${2:-<パス>}"
 	fi
 fi
 

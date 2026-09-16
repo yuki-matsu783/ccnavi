@@ -32,8 +32,8 @@ session=$(printf '%s' "$payload" |
 
 # 編集したファイルが属するツリーを、いちばん近い pyproject.toml で決める。
 #
-# worktree で作業していても CLAUDE_PROJECT_DIR は元のディレクトリを指したままなので、
-# そこへ cd すると、直したのは worktree なのに検査するのは main になる。それでは
+# ワークツリーで作業していても CLAUDE_PROJECT_DIR は元のディレクトリを指したままなので、
+# そこへ cd すると、直したのはワークツリーなのに検査するのは main になる。それでは
 # 検査が嘘をつく。置き場の決まり (.claude/worktrees/) を焼き込まず、プロジェクトの
 # 目印を上に辿って見つけるのは、決まりを変えてもここが黙って古くならないように。
 tree=$(dirname "$file")

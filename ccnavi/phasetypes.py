@@ -3,7 +3,7 @@
 ## 種類は人が持つ
 
 エージェントが種類を書けると、レビュー不要の種類を作ってから使える。だから置き場は
-ルールの `guard-ccnavi-config` の内側で、作業ツリー側の設定も含めてエージェントの Write は
+ルールの `guard-ccnavi-config` の内側で、ワークツリー側の設定も含めてエージェントの Write は
 止まる。組み込みの既定は持たない。
 既定を組み込むと、意図せずレビューの要否が決まる。ファイルが無ければ、フェーズは
 番号だけの今までの挙動で、親の `plan` も読めない。
@@ -20,7 +20,7 @@
       research:
         kind: work            # work | feedback
         title: 調査
-        review: none          # none | mr
+        review: none          # none | chat | mr
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
         overlap: [design]     # 並行してよい種類（対称）
@@ -48,8 +48,23 @@ KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
 REVIEW_NONE = "none"
+# chat は、このセッションで人が差分を見る。ホストへは出ない。ゲートを開けるのは
+# 端末から打つ `ccnavi --reviewed <N> --chat` で、エージェントには打てない
+# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 §9.8）。
+REVIEW_CHAT = "chat"
 REVIEW_MR = "mr"
-REVIEWS = (REVIEW_NONE, REVIEW_MR)
+REVIEWS = (REVIEW_NONE, REVIEW_CHAT, REVIEW_MR)
+
+# 見る場所の強さ。厳しい側を採るときに使う（none < chat < mr）。
+REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_CHAT: 1, REVIEW_MR: 2}
+
+
+def stricter(a: str, b: str) -> str:
+    """見る場所の厳しい側。どちらかが知らない綴りなら mr に倒す。"""
+    if a not in REVIEW_RANK or b not in REVIEW_RANK:
+        return REVIEW_MR
+    return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
+
 
 # 種類の範囲が「親の範囲そのまま」であることを言う綴り。
 INHERIT = "inherit"
@@ -99,7 +114,7 @@ class PhaseType:
         )
 
     def decide(self, rel: str) -> str:
-        """この種類の範囲が、作業ツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
+        """この種類の範囲が、ワークツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
         if self.scope is None:
             return rules.ALLOW
         for entry in self.scope:
@@ -302,11 +317,14 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, f"`review` は {' か '.join(REVIEWS)}"))
         return None, problems
     pt.review = review
-    if kind == KIND_FEEDBACK and review != REVIEW_MR:
-        # フィードバック対応の結果を人が見ない道は作らない。
+    if kind == KIND_FEEDBACK and review == REVIEW_NONE:
+        # フィードバック対応の結果を人が見ない道は作らない。見る場所は chat でも mr でもよい。
         problems.append(
             Problem(
-                SEVERITY_ERROR, ident, "フィードバック対応の種類は `review: mr` でなければならない"
+                SEVERITY_ERROR,
+                ident,
+                f"フィードバック対応の種類に `review: {REVIEW_NONE}` は書けない"
+                f"（`{REVIEW_CHAT}` か `{REVIEW_MR}`）",
             )
         )
         return None, problems
@@ -336,7 +354,9 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
     for glob in pt.deliverables:
         if ".." in glob or os.path.isabs(glob):
             problems.append(
-                Problem(SEVERITY_ERROR, ident, f"`deliverables` の `{glob}` は作業ツリーの中で書く")
+                Problem(
+                    SEVERITY_ERROR, ident, f"`deliverables` の `{glob}` はワークツリーの中で書く"
+                )
             )
             return None, problems
     if ident in pt.overlap or ident in pt.requires:
@@ -358,7 +378,7 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         glob = item.strip()
         if ".." in glob or "~" in glob or "$" in glob or os.path.isabs(glob):
             problems.append(
-                Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` の `{glob}` は作業ツリーの中で書く")
+                Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` の `{glob}` はワークツリーの中で書く")
             )
             continue
         glob = glob.replace("\\", "/").strip("/")

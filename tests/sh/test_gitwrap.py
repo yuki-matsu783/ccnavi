@@ -291,7 +291,7 @@ class PassTest(GitWrapperTest):
         self.assertEqual(here.stdout.strip(), landed.stdout.strip())
 
     def test_push_from_a_child_ticket_worktree_is_rejected(self):
-        """子チケットの作業ツリーからは送れない。親が合流してから親のツリーで送る。
+        """子チケットのワークツリーからは送れない。親が合流してから親のツリーで送る。
 
         見分けるのは承認済みチケットに `parent:` があるかだけ。承認済みチケットの無いツリーと
         親の承認済みチケットを持つツリーは通す。
@@ -422,7 +422,7 @@ class WorktreeRemoveHintTest(GitWrapperTest):
     """worktree remove が Permission denied で止まったときだけ、立て直し方を案内する。
 
     Windows では、プロセスの cwd がそのディレクトリを掴む。Bash ツールの cwd は呼び出しを
-    またいで残る親のシェルのものなので、作業ツリーの中へ cd したまま remove すると、
+    またいで残る親のシェルのものなので、ワークツリーの中へ cd したまま remove すると、
     最後のディレクトリで Permission denied になり、空のディレクトリが残る。
     """
 
@@ -434,7 +434,7 @@ class WorktreeRemoveHintTest(GitWrapperTest):
     @unittest.skipUnless(os.name == "nt", "cwd がディレクトリを掴んで消せなくなるのは Windows だけ")
     def test_permission_denied_on_remove_tells_how_to_recover(self):
         path = self.add_worktree("held")
-        # 作業ツリーの中に cwd を持つプロセス。Bash ツールの残った親のシェルの代わり。
+        # ワークツリーの中に cwd を持つプロセス。Bash ツールの残った親のシェルの代わり。
         holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"], cwd=path)
         self.addCleanup(holder.wait)
         self.addCleanup(holder.kill)
@@ -459,7 +459,7 @@ class WorktreeRemoveHintTest(GitWrapperTest):
         self.assertEqual(1, missing.returncode, missing.stdout + missing.stderr)
         self.assertEqual([], hint_lines(missing.stdout))
 
-        # 未追跡のファイルが残っている作業ツリーは git が消さない。これは cwd の話ではない。
+        # 未追跡のファイルが残っているワークツリーは git が消さない。これは cwd の話ではない。
         path = self.add_worktree("dirty")
         with open(os.path.join(path, "left.txt"), "w", encoding="utf-8") as f:
             f.write("x\n")

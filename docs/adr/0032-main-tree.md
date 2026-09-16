@@ -11,7 +11,7 @@
 
 ルールに `{root}`（ワークスペースルートの実パスに読み込み時に置き換わる合言葉）を足し、
 deny の `main-tree` で「ワークスペースルートの下で、かつ `.claude/worktrees/` の外」を止める。
-worktree の中でも `.claude/settings*.json` は `guard-settings` で止める。作業ツリーの中は
+worktree の中でも `.claude/settings*.json` は `guard-settings` で止める。ワークツリーの中は
 `worktrees` の allow がまとめて通す。`source` と `project-files` は deny の陰で死ぬので消した。
 
 ## 理由

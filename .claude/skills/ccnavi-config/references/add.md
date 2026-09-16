@@ -12,8 +12,8 @@
    閉じるときの重さなら risk。2 本にまたがるなら別々の下書きにする
 3. **今の本物を読む。** 同じことを言うルールや種類が既に無いか。足すより直すほうが
    よいことが多い
-4. **下書きを scratchpad に書く。** 本物の全文を写して、そこに足す。断片だけだと lint に
-   掛けられない
+4. **下書きをワークツリーの `scratchpad/` に書く。** 本物の全文を写して、そこに足す。断片だけだと
+   lint に掛けられない。ワークツリーが無ければセッションの scratchpad に置く
 5. **検証する。** lint と、rules なら見本。通るまで直す（[check.md](check.md) の手順）
 6. **利用者に渡す。** 何をなぜ変えるか、得るもの、失うもの、下書きの場所、差分。
    置くのは利用者
@@ -62,6 +62,10 @@ allow:
   `^{root}[\\/]`。絶対パスを直書きしない
 - `regex` は先読み・後読み・後方参照が使えない。組み合わせ爆発を起こす書き方は、判定が
   固まって hook が期限切れで素通りする入口になる
+- 大文字小文字は `glob` も `regex` も、どの機械でも区別せずに当たる。コマンドの名前も同じで、
+  `CAT file` は `cat file` と同じ判定になる。区別が要る部分だけ `(?-i:...)` で囲む。綴りの文字を
+  除外する否定（`\.[^c\\/]` のような書き方）は、区別せずに当てると除外の側が広がるので、
+  そこは囲む（ADR-0051）
 - `match` に書けるのは、判定が対象を取り出せるツールだけ。`Bash` `PowerShell`（コマンド）、
   `Read` `Edit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
@@ -81,7 +85,7 @@ lint は何にでも当たる allow と選択肢が 3 つ以上ある regex を 
 **見本を一緒に足す。** ルールを 1 件足したら `.ccnavi/common/rule-samples.yml` に、当たってほしい
 見本と**当たってほしくない見本を両方**足す。片側だけでは広げすぎに気づけない。見本は
 `tool` `subject` `why` の 3 つで、置いたタイプが期待する判定。`subject` の `/repo` は
-ワークスペースルートに読み替わる。見本の下書きも scratchpad に置き、`--test-samples` で
+ワークスペースルートに読み替わる。見本の下書きも `scratchpad/` に置き、`--test-samples` で
 本物と一緒に回す。
 
 ## phases.yml
@@ -97,7 +101,7 @@ phases:
     title: 調査                 # id と title はどちらも一意
     review: none                # none | mr。既定であって上限ではない（計画の項で mr に強められる）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
-    deliverables: ["wip/research/summary.md"]   # 閉じる前に親の作業ツリーに在って追跡されているべきもの
+    deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
   implement:
     kind: work
@@ -124,7 +128,7 @@ phases:
   ただし実績のリスクが HIGH 以上なら宣言に関わらずゲートが閉じる（risks.yml の側）
 - `scope` は子 ⊆ 種類 ⊆ 親の真ん中。広く書けば子が何でも宣言できる。rules.yml の deny が
   止める場所（`.claude/hooks/*` など）を scope に入れても deny が勝つので、入れる意味は無い。
-  glob は作業ツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
+  glob はワークツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
 - `deliverables` は「在って追跡されている」ことだけ見る。中身は見ない。閉じるときに無ければ
   最後の子を閉じられないので、必ず作れる名前にする
 - `overlap` は対称に効く。`acceptance: overlap: [implement]` と書けば implement 側にも効く。
@@ -138,7 +142,7 @@ phases:
 
 ## risks.yml
 
-子を `ticket done` で閉じるとき、その子の作業ツリーで `base_sha..HEAD` の差分を数え、点を
+子を `ticket done` で閉じるとき、その子のワークツリーで `base_sha..HEAD` の差分を数え、点を
 付ける。フェーズの点は子の最大値。**HIGH 以上なら宣言に関わらずレビューが要る扱いになり、
 ゲートが閉じる。** 実績が小さくても宣言のレビュー要を下げることはしない。
 
@@ -159,8 +163,8 @@ factors:
 | 当て方 | 何を数えるか | 決めるときに考えること |
 |---|---|---|
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が閾値を**超えた**ら加点 | 閾値はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
-| `glob` | 当たったファイル**ごと**に加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。作業ツリーのルートからの相対。`**` が使える |
-| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
+| `glob` | 当たったファイル**ごと**に加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`**` が使える |
+| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh judge <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。段階の名前は増やせない（知らない名前は warn）。
@@ -173,7 +177,7 @@ factors:
 ## 利用者に渡す形
 
 ```
-変えるもの: .ccnavi/common/rules.yml（下書き: <scratchpad のパス>）
+変えるもの: .ccnavi/common/rules.yml（下書き: <下書きのパス>）
 なぜ: <1 行>
 得るもの: <何が止まる / 通る / 変わるか>
 失うもの: <広がる沈黙、増える確認、閉じにくくなるフェーズ、など>

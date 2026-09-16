@@ -595,7 +595,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
-        "  作業ツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。"
+        "  ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。"
         "範囲の外は止まる\n"
     )
     stdout.write(f"  チケット制御: {conf.ticket_control or settings.TICKET_CONTROL_ENABLE}\n")
@@ -612,7 +612,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     done = {t.ticket for t in closed}
     for t in sorted(copies, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
-        bound = "作業ツリーあり" if tree.is_worktree_of(root, where) else "作業ツリー無し"
+        bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{bound}）"
         if t.is_child:
             waiting = [p for p in t.predecessors if p not in done]
@@ -643,11 +643,14 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             else:
                 state = "進行中"
             gate = "ゲート閉" if ph.gate_closed else "ゲート開"
-            review = ""
+            review = {
+                phasetypes.REVIEW_MR: " / レビューはマージリクエストで",
+                phasetypes.REVIEW_CHAT: " / レビューはこのセッションで",
+            }.get(ph.review_kind, "")
             if ph.deferred:
                 review = f" / レビューは {ph.review_at} と一緒に"
             elif ph.covers:
-                review = f" / {', '.join(str(c) for c in ph.covers)} の分も見る"
+                review += f" / {', '.join(str(c) for c in ph.covers)} の分も見る"
             if ph.risk_line:
                 review += f" / {ph.risk_line}"
                 if ph.risk_escalates:
@@ -717,7 +720,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     open_index = approval.by_id(open_copies)
     closed_index = approval.by_id(closed_copies)
     # 同じ識別子が写っている場所の全部。権威の側は proposal に、残りは seen_in に出す。
-    # 写りがあること自体は普通（子の作業ツリーは親のブランチから切る）なので、数は
+    # 写りがあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
     # 食い違いを意味しない。権威のツリーで畳んで 2 つ以上残る＝どれが本物か決まらない
     # ぶんだけを scattered に出す。--lint が ERROR で言うのと同じ条件で、読む側に
     # 畳み直させない（同じ答えを 2 か所で出さない）。
@@ -844,7 +847,7 @@ def _ticket_record(
     seen_in: list[dict],
     scattered: list[dict],
 ) -> dict:
-    """チケット 1 件。提案と承認済みチケットと作業ツリーの今を 1 つにまとめる。"""
+    """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
     source = proposal or copy
     assert source is not None
@@ -931,6 +934,7 @@ def _phase_record(ph: phase.Phase) -> dict:
         "states": dict(ph.states),
         "marks": ph.marks,
         "review_required": ph.review_required,
+        "review_kind": ph.review_kind,
         "gate_closed": ph.gate_closed,
         "review_waiting": ph.review_waiting,
         "deferred": ph.deferred,
@@ -957,6 +961,9 @@ def _parent_record(
         ),
         "wrapup": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP),
         "ready": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY),
+        "closed_record": approval.read_parent_mark(
+            where, parent.ticket, approval.PARENT_MARK_CLOSED
+        ),
         "accepted_threads": sorted(approval.accepted_threads(where, parent.ticket)),
         "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket)],
     }

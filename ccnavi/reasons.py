@@ -8,8 +8,6 @@
 
 from __future__ import annotations
 
-import os
-
 from . import phase, rules, settings, shellread
 from .modes import DRY_RUN
 
@@ -56,7 +54,7 @@ CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
 # チケットが `ask` と書いた場所。ルールの `ask` と同じく、人が 1 度見る場所。
 CODE_TICKET_ASK = "TICKET_ASK"
 
-# 作業ツリーの切り元と、チケットが承認されたプロジェクトが食い違っている。
+# ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
@@ -369,27 +367,33 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     """セッションの頭で渡す、直接作業とチケット作業の使い分け。
 
     チケット制御が効いているワークスペースで、モデルが「この作業にチケットは要るか」を
-    自分で決められるようにする。判定はこの線引きを担保しない。チケットの無い作業ツリーと
+    自分で決められるようにする。判定はこの線引きを担保しない。チケットの無いワークツリーと
     main 直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
 
-    phases.yml と risks.yml は解決後のパスで示す。無ければその括弧を省く。人が既定と
-    違う場所に置いていれば、そちらの綴りが出る。
+    言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
+    のたびに届くので、後から必要な場所で改めて届くものを頭では言わない。名指しするのは、
+    レビューの sh の綴りが段階に来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
+    人がどこで見るか（`review` の `mr` / `chat`）がそのフェーズのゲート（`phase.py`）、
+    フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の綴りが
+    承認のときの検査（`approval.py`）、後工程の進め方が承認済みチケットが置かれたとき
+    （`approved`）。
+
+    dry-run の注記は「止まらない」だけで終えない。止まらないことだけを伝えると、通った
+    ことが許可の証拠として読まれる。案内に従うところまでを 1 行に入れる。
     """
-    phases = _relative_or_omit(conf.phases, root)
-    risk = _relative_or_omit(conf.risk, root)
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     lines = [
         "[ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。",
-        "- 直接作業: 調査や小さな修正（触るファイルが少ない、振る舞いが変わらない、",
-        "  人のレビューが要らない）は、チケットを起こさずそのまま進める。判定は全体ルールだけ。",
-        "- チケット作業: 大きな修正（設計に触れる、複数の段階になる、人のレビューが要る）は、",
-        f"  {conf.tickets}/ に提案を書いて承認を受け、フェーズ{phases}と",
-        f"  リスクの配点{risk}に従って issue と MR を作りながら進める。",
-        f"  操作は {settings.script_command(root, 'ccnavi-ticket.sh')} と "
-        f"{settings.script_command(root, 'ccnavi-review.sh')} を通す。",
+        "- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。",
+        f"- チケット作業（設計に触れる・複数の段階になる・人のレビューが要る）: {conf.tickets}/ に",
+        f"  提案を書いて承認を受ける。以後の操作は {ticket_sh} を通す（使い方は --help）。",
         "どちらで進めるか迷ったら、利用者に聞く。",
     ]
     if mode == DRY_RUN:
-        lines.append(f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny判定でも止めずに言うだけ）")
+        lines.append(
+            f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny に当たっても止まらない。"
+            "通ったことを許可と読まず、出た案内に次から従う）"
+        )
     return "\n".join(lines)
 
 
@@ -414,21 +418,7 @@ def approved(tickets, revisions: set[str], root: str) -> str:
         title = f": {t.title}" if t.title else ""
         lines.append(f"- {t.ticket}{title}（{where}）")
     lines.append(
-        "後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、"
+        "後工程を進める。子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start <識別子>' で着手する。"
     )
     return "\n".join(lines)
-
-
-def _relative_or_omit(path: str, root: str) -> str:
-    """案内に載せる設定ファイルの綴り。ワークスペースルートからの相対で括弧に入れる。
-    無ければ空文字で、呼び手が括弧ごと省ける。"""
-    if not path or not os.path.exists(path):
-        return ""
-    shown = path
-    if os.path.isabs(path):
-        try:
-            shown = os.path.relpath(path, root)
-        except ValueError:
-            shown = path
-    return f"（{shown.replace(os.sep, '/')}）"

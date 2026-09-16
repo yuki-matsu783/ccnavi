@@ -3,9 +3,9 @@
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
 サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
 
-やることは置き場を動かして欄を書くことだけ。作業ツリーの削除は親のマージ手順に
-任せる。順序は「子の成果をマージ → done → 作業ツリーを消す」で、done の前に
-作業ツリーを消すと base_sha の検査ができなくなる。
+やることは置き場を動かして欄を書くことだけ。ワークツリーの削除は親のマージ手順に
+任せる。順序は「子の成果をマージ → done → ワークツリーを消す」で、done の前に
+ワークツリーを消すと base_sha の検査ができなくなる。
 """
 
 from __future__ import annotations
@@ -39,16 +39,17 @@ def start(
             "先に利用者が 'ccnavi --approve' を通すこと\n"
         )
         return 1
-    # 作業ツリーは承認済みチケットの `project` が指すリポジトリから切られていること（REQ-MLT-13）。
-    # 切り元が違えば、判定はそのツリーの切り元で行われ、チケットと噛み合わない。
+    # ワークツリーは承認済みチケットの `project` が指すリポジトリから
+    # 切られていること（REQ-MLT-13）。
+    # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
     copy = approval.by_id(open_copies)[found.ticket]
     owner = tree.project_root(conf.projects, copy.project) or root
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
         where = f"projects/{copy.project} の中で " if copy.project else ""
         stderr.write(
-            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、"
-            "切り元が承認済みチケットの project"
+            f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
+            "元リポジトリが承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '
@@ -96,27 +97,54 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         for line in scored:
             stdout.write(line + "\n")
     if code == 0 and not found.is_child:
-        # 親を閉じた。マージに進んでよいの合図（Draft を外す）は、まだなら親が出す。
-        # マージそのものは人。
-        if approval.read_parent_mark(
-            approval.home_dir(conf, root, found.ticket, ""),
-            found.ticket,
-            approval.PARENT_MARK_READY,
-        ):
-            stdout.write("Draft は外してある。マージは利用者が行う\n")
-        else:
-            from .review import WIP_ROOT
-
-            git_sh = settings.script_command(root, "ccnavi-git.sh")
-            review_sh = settings.script_command(root, "ccnavi-review.sh")
-            stdout.write(
-                f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
-                f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
-                f"push してから '{review_sh} ready' で Draft を外す"
-                "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
-                "マージは利用者が squash で行う\n"
-            )
+        _close_parent(stdout, stderr, root, conf, found)
     return code
+
+
+def _close_parent(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> None:
+    """親を閉じたあとの記録と案内。
+
+    記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
+    統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
+    締めた事実の残る先がここしか無い（設計 §9.8）。
+
+    案内は運び方で分かれる。MR があるなら Draft を外す合図まで、無いなら統合先へ戻す
+    ところまで。ccnavi はどちらでもマージしない。
+    """
+    from .review import WIP_ROOT
+
+    where = approval.home_dir(conf, root, found.ticket, "")
+    venues = phase.review_venues(root, conf, found.ticket)
+    failed = approval.write_parent_mark(
+        where,
+        found.ticket,
+        approval.PARENT_MARK_CLOSED,
+        {"reviews": {str(n): venues[n] for n in sorted(venues)}},
+    )
+    if failed:
+        stderr.write(f"ccnavi: 締めた記録を書けない: {failed}\n")
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    if phase.chat_only(root, conf, found.ticket, venues):
+        stdout.write(
+            f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
+            f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、統合先のブランチへ戻す。"
+            "このチケットにはマージリクエストで見るフェーズが無いので、"
+            "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
+        )
+        return
+    if approval.read_parent_mark(where, found.ticket, approval.PARENT_MARK_READY):
+        stdout.write("Draft は外してある。マージは利用者が行う\n")
+        return
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    stdout.write(
+        f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
+        f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
+        f"push してから '{review_sh} ready' で Draft を外す"
+        "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
+        "マージは利用者が squash で行う\n"
+    )
 
 
 def cancel(
@@ -307,7 +335,7 @@ def _find(
     if not hits:
         stderr.write(
             f"ccnavi: 提案 {ticket_id} が見つからない"
-            f"（{conf.tickets}/ の下を全作業ツリーで探した）\n"
+            f"（{conf.tickets}/ の下を全ワークツリーで探した）\n"
         )
         for p in problems:
             stderr.write(f"  {p}\n")
@@ -416,7 +444,7 @@ def _deliverables_missing(
         return False
     stderr.write(
         f"ccnavi: フェーズ {found.phase}（{pt.title}）の成果物が無い: {', '.join(missing)}。"
-        "親か子の作業ツリーに置いて追跡（git add）してから閉じること\n"
+        "親か子のワークツリーに置いて追跡（git add）してから閉じること\n"
     )
     return True
 

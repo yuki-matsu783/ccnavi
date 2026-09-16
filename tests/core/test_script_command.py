@@ -1,7 +1,7 @@
 """文面で案内する `.ccnavi/scripts/` の sh の綴り（settings.script_command）。
 
 スクリプトはワークスペースにしか無いので、案内はワークスペースルートから綴る。
-プロジェクトから切った作業ツリーでは、相対の `sh .ccnavi/scripts/...` が届かない。
+プロジェクトから切ったワークツリーでは、相対の `sh .ccnavi/scripts/...` が届かない。
 """
 
 from __future__ import annotations

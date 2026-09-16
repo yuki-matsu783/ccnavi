@@ -146,7 +146,7 @@ _SPECIAL_IN_DOUBLE_QUOTES = re.compile(r'["\\$`!]')
 def script_command(root: str, name: str) -> str:
     """文面で案内する `.ccnavi/scripts/` の sh の綴り。ワークスペースルートから書く。
 
-    スクリプトはワークスペースにしか無く、プロジェクトから切った作業ツリーでは相対の
+    スクリプトはワークスペースにしか無く、プロジェクトから切ったワークツリーでは相対の
     `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
     区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。
 
@@ -220,7 +220,7 @@ def is_reserved_layer_name(name: str) -> bool:
     綴りの大文字小文字は問わない。`projects/Self/` を数えると、その層の id が
     `Self:schema` になり、記録を読む人が `self:schema`（ワークスペース自身の層）と
     取り違える。機械が綴りを区別するかどうかとは別の話なので、どの機械でも
-    同じに畳む。`--lint` が error で名指しする（lint._projects）。
+    大文字小文字を区別せずに扱う。`--lint` が error で名指しする（lint._projects）。
     """
     folded = (name or "").casefold()
     return any(folded == reserved.casefold() for reserved in RESERVED_LAYER_NAMES)

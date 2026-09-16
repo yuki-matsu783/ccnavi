@@ -11,7 +11,7 @@
 4. チケットが効かない場面と、ルールより先に見る点検
 5. 診断の出力
 
-ルールは作業ツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
+ルールはワークツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
 
 チケットの範囲は子 `i0001-01` のもの。
 
@@ -19,7 +19,7 @@
     ask:   src/ask/*
     deny:  src/deny/*
 
-範囲の外には `docs/` を使う。チケットの無い行は、main から切った別の作業ツリー `free` に書く。
+範囲の外には `docs/` を使う。チケットの無い行は、main から切った別のワークツリー `free` に書く。
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ NOTE = "ルールの additionalContext。判定を決めた側に関わらず載
 
 WORKTREES = "*/.claude/worktrees/*"
 
-# チケットの判定の列。子の作業ツリーのルートからの相対パス。
+# チケットの判定の列。子のワークツリーのルートからの相対パス。
 TICKET_DENY = "src/deny/x.py"
 TICKET_ASK = "src/ask/x.py"
 TICKET_ALLOW = "src/ok/x.py"
@@ -50,7 +50,7 @@ APPROVAL_NOTE = (
     "ルールの deny はこの範囲の中でも止まる"
 )
 EXPLAIN_NOTE = (
-    "作業ツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。範囲の外は止まる"
+    "ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。範囲の外は止まる"
 )
 
 # ルールが何も言わない列に置くルール。Write には当たらない。
@@ -61,7 +61,7 @@ SILENT = {
 
 
 def rules_with(section: str) -> dict:
-    """作業ツリーを丸ごと指すルールを、指定のタイプに 1 本だけ置く。"""
+    """ワークツリーを丸ごと指すルールを、指定のタイプに 1 本だけ置く。"""
     body = {"version": 1, "deny": list(SILENT["deny"])}
     entry = {
         "id": f"rule-{section}",
@@ -133,7 +133,7 @@ def section_of(text: str, head: str) -> str:
 
 
 class Workspace(unittest.TestCase):
-    """本物の git リポジトリに、承認済みの親 1 本と子 1 本と、チケットの無い作業ツリーを置く。"""
+    """本物の git リポジトリに、承認済みの親 1 本と子 1 本と、チケットの無いワークツリーを置く。"""
 
     # 提案と承認済みチケットの置き場。ツリーのルートからの相対で、道具にもそのまま渡す。
     # 子クラスで綴りを変え、置き場を決め打ちしていないことを確かめる。
@@ -271,7 +271,7 @@ class Workspace(unittest.TestCase):
         return result
 
     def family(self, parent=None, child=None):
-        """親と子を提案して承認し、子の作業ツリーを親のブランチから切って着手する。"""
+        """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
         self.propose(
             "i0001-01",
@@ -293,7 +293,7 @@ class Workspace(unittest.TestCase):
 class PreToolUseTable(Workspace):
     """実行前の判定。"""
 
-    # (チケットの列の名前, 書き込み先の作業ツリーを選ぶ鍵, 相対パス)
+    # (チケットの列の名前, 書き込み先のワークツリーを選ぶ鍵, 相対パス)
     COLUMNS = (
         ("deny", "child", TICKET_DENY),
         ("ask", "child", TICKET_ASK),
@@ -412,7 +412,7 @@ class PreToolUseTable(Workspace):
 
 
 class PostToolUseTable(Workspace):
-    """実行後の監視。作業ツリーでシェルが書いたあと。"""
+    """実行後の監視。ワークツリーでシェルが書いたあと。"""
 
     # (ルールのタイプ, チケットの列, 相対パスの接頭, 報告のコード。None は報告しない)
     CASES = (
@@ -432,7 +432,7 @@ class PostToolUseTable(Workspace):
         ("silent", "allow", "src/ok", None),
     )
 
-    # チケットの無い作業ツリー。ルールだけで決まる。
+    # チケットの無いワークツリー。ルールだけで決まる。
     NO_TICKET = (
         ("deny", "POST_VIOLATION"),
         ("ask", "POST_VIOLATION"),
@@ -469,7 +469,7 @@ class PostToolUseTable(Workspace):
 
 
 class TicketPlaces(Workspace):
-    """チケットの置き場は範囲の外でも咎めない。ルールは作業ツリーを allow で開ける。"""
+    """チケットの置き場は範囲の外でも咎めない。ルールはワークツリーを allow で開ける。"""
 
     def setUp(self):
         super().setUp()
@@ -544,10 +544,91 @@ class TicketPlacesElsewhere(TicketPlaces):
     APPROVED = ".ccnavi/copies"
 
 
+class ScratchPlace(Workspace):
+    """下書きの置き場（`scratchpad/`）を、実行前の判定だけが範囲の外でも咎めない。
+
+    外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
+    だから外すのは実行前の 1 か所に限り、実行後の監視とサブエージェント終了時の検査は
+    外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `scratchpad/` が
+    現れるのは追跡されているときだけで、それは根拠が崩れている証拠になる。
+
+    ルールはワークツリーを allow で開ける。
+    """
+
+    # (相対パス, 外すか, なぜ)。素の `scratchpad` は別の 1 本で見る。1 つのツリーに
+    # ディレクトリとファイルの両方は置けないので、この表には入れられない。
+    CASES = (
+        ("scratchpad/draft.yml", True, "下書きの置き場そのもの"),
+        ("scratchpad/staging/rules.yml", True, "その下も置き場"),
+        ("scratchpadX/a.md", False, "前置に続けただけの場所は置き場ではない"),
+        ("docs/scratchpad/a.md", False, "ルートの直下 1 段だけ。`.gitignore` も外さない"),
+        ("SCRATCHPAD/a.md", False, "綴りは区別する。Linux の `SCRATCHPAD/` は追跡される"),
+    )
+
+    def setUp(self):
+        super().setUp()
+        self.family(child={"allow": ("src/*",)})
+        self.use_rules(rules_with("allow"))
+
+    def test_pre_tool_use_exempts_the_scratch_place_only(self):
+        for rel, exempt, why in self.CASES:
+            with self.subTest(path=rel, why=why):
+                result = self.write_hook(self.child, rel)
+                want = "allow" if exempt else "deny"
+                code = "" if exempt else "DENY_TICKET_SCOPE"
+                self.assertEqual(self.decision(result), want, self.reason(result))
+                self.assertEqual(self.last_record().get("code", ""), code, self.reason(result))
+
+    def test_a_file_named_scratchpad_is_not_the_place(self):
+        # `.gitignore` の `/scratchpad/` は末尾の `/` でディレクトリにしか当たらない。
+        # 同じ名前のファイルは追跡されるので、範囲も当てる。
+        result = self.write_hook(self.child, "scratchpad")
+        self.assertEqual(self.decision(result), "deny", self.reason(result))
+        self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
+
+    def test_post_tool_use_reports_a_tracked_scratch_place(self):
+        """実行後の監視は下書きの置き場を外さない。
+
+        この土台の `.gitignore` は `scratchpad/` を無視しないので、ここに置いたものは
+        追跡される。追跡されるということは、外してよい根拠（統合先へ乗らない）が
+        崩れているということなので、黙らせずに言う。追跡から外れているリポジトリでは
+        そもそも `git status` に現れないので、この報告は出ない。
+        """
+        result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-tracked")
+        self.assertIn("POST_TICKET_SCOPE", result.stderr)
+        self.assertIn("scratchpad/draft.yml", result.stderr)
+
+    def test_post_tool_use_says_nothing_when_the_scratch_place_is_ignored(self):
+        """追跡から外れていれば、下書きは 1 件も報告されない。機能が成り立つ側。"""
+        write(os.path.join(self.child, ".gitignore"), "/scratchpad/\n")
+        result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-ignored")
+        self.assertNotIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
+
+    def test_subagent_stop_reports_a_tracked_scratch_place(self):
+        rel = "scratchpad/draft.yml"
+        write(os.path.join(self.child, *rel.split("/")), "x\n")
+        result = self.hook("SubagentStop", "", self.child, agent_id="sub-3")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("POST_TICKET_SCOPE", result.stderr)
+        self.assertIn(rel, result.stderr)
+
+    def test_subagent_stop_says_nothing_about_an_ignored_scratch_place(self):
+        """追跡から外れていれば、下書きは検査の入力にそもそも現れない。
+
+        `.gitignore` 自体はこの子の範囲（`src/*`）の外なので、それは報告に出る。
+        見るのは `scratchpad/` が出ないことのほう。
+        """
+        write(os.path.join(self.child, ".gitignore"), "/scratchpad/\n")
+        write(os.path.join(self.child, "scratchpad", "draft.yml"), "x\n")
+        result = self.hook("SubagentStop", "", self.child, agent_id="sub-4")
+        self.assertNotIn("scratchpad/draft.yml", result.stderr, result.stderr)
+        self.assertIn(".gitignore", result.stderr)
+
+
 class Boundaries(Workspace):
     """チケットが効かない場面と、ルールより先に見る点検。
 
-    ルールは作業ツリーを allow で開ける。
+    ルールはワークツリーを allow で開ける。
     """
 
     def test_parent_and_child_strictest_wins_under_rule_allow(self):

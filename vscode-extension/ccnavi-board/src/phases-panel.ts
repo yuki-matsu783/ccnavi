@@ -199,7 +199,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesPath = resolveIn(root, phasesRel);
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
-    // この画面で保存した種類が承認と着手に効かなくなる。答えは git プロジェクトルートの版（設計 §11.2）。
+    // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 §11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);

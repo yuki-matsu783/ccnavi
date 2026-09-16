@@ -208,12 +208,12 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   // 人が動く状態は枠付きの札
   assert.ok(html.includes('<span class="badge copy copy-none">未承認</span>'));
-  assert.ok(html.includes('<span class="badge worktree none">作業ツリーなし</span>'));
-  // 属性は枠無しの fact。承認済・レビューの要否・作業ツリーの名前・base
+  assert.ok(html.includes('<span class="badge worktree none">ワークツリーなし</span>'));
+  // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
   assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
   assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
   assert.ok(/<span class="fact review" title="[^"]*">人レビュー要<\/span>/.test(html));
-  assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
+  assert.ok(/<span class="fact worktree" title="[^"]*">ワークツリー i0001<\/span>/.test(html));
   assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
   assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
   // 属性は列からはみ出さない
@@ -231,7 +231,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
-  // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
+  // 写りは子のワークツリーに普通に入るので、正常な場面ではバッジを出さない
   assert.ok(!html.includes("複数の場所にある"));
   assert.ok(html.includes('<span class="where">子 · 親 i0001 / フェーズ 2</span>'));
   assert.ok(html.includes('class="phases"'));
@@ -394,4 +394,76 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   // ホバーの点線はボタンの焦点の輪を消さない。行の見出しにも点線
   assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
   assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
+});
+
+/** フェーズ 2 を人のレビュー待ちにし、依頼のマーカーに MR を持たせる */
+function waitingWithMr(url: string) {
+  const base = fixture();
+  const parent: ParentJson = {
+    ...base.parents[0],
+    phases: base.parents[0].phases.map((p): PhaseJson =>
+      p.number === 2
+        ? {
+            ...p,
+            state: "ended",
+            gate_closed: true,
+            review_required: true,
+            review_waiting: true,
+            marks: { requested: { head: "abc", mr: 18, url, host: "github", since: "t", at: "t" } },
+          }
+        : p,
+    ),
+  };
+  return { ...base, parents: [parent] };
+}
+
+test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードに MR へのリンクを出す。http(s) 以外はリンクにしない", () => {
+  const html = renderBoard(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")), OPTIONS);
+  // 受け入れの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
+  assert.ok(html.includes('data-action="accept" data-parent="i0001" data-phase="2"'));
+  assert.ok(
+    html.includes(
+      '<button type="button" class="action" data-action="reviewed" data-parent="i0001" data-phase="2" title="レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh check --phase 2 を打つ）">レビュー済み連絡</button>',
+    ),
+  );
+  assert.ok(html.includes('vscode.postMessage({ type: "reviewed", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) })'));
+  // フェーズ行は依頼の投稿へ、親カードはマージリクエスト自体へ
+  assert.ok(html.includes('<a class="fact mr mr-link" href="https://example.com/o/r/pull/18#issuecomment-5" title="フェーズ 2（設計） のレビューの依頼を開く">MR #18</a><button'));
+  assert.ok(html.includes('<a class="fact mr mr-link" href="https://example.com/o/r/pull/18" title="マージリクエストを開く">MR #18</a>'));
+  // リンクの上ではカードを開かない
+  assert.ok(html.includes('if (event.target.closest("button, a")) { return; }'));
+  // 依頼していない見本にはリンクもボタンも無い
+  const plain = renderBoard(buildBoard(fixture()), OPTIONS);
+  assert.ok(!plain.includes('class="fact mr mr-link"'));
+  assert.ok(!plain.includes('data-action="reviewed"'));
+  // http(s) 以外の URL は文字として出すだけで、href にしない
+  const spiked = renderBoard(buildBoard(waitingWithMr("javascript:alert(1)")), OPTIONS);
+  assert.ok(!spiked.includes('href="javascript:'));
+  assert.ok(spiked.includes('<span class="fact mr" title="javascript:alert(1)">MR #18</span>'));
+});
+
+test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注意・文と、承認と同じコピー・新しいセッションで開く・閉じる", () => {
+  const html = renderBoard(buildBoard(fixture()), {
+    ...OPTIONS,
+    approval: { kind: "prompt", title: "フェーズ 2 のレビュー済みを連絡", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
+  });
+  assert.ok(html.includes('class="approval-backdrop" data-approval="prompt"'));
+  assert.ok(html.includes('<h2 id="approval-title">フェーズ 2 のレビュー済みを連絡</h2>'));
+  assert.ok(html.includes('<p class="approval-note">注意 &lt;i&gt;</p>'));
+  assert.ok(html.includes('<pre class="approval-text">[ccnavi] レビューを終えた &lt;b&gt;</pre>'));
+  assert.ok(html.includes('data-action="prompt-copy"'));
+  assert.ok(html.includes('data-action="prompt-open"'));
+  assert.ok(html.includes('data-action="approve-cancel"'));
+  assert.ok(!html.includes("を承認した"));
+});
+
+test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", () => {
+  const html = renderBoard(buildBoard(fixture()), OPTIONS);
+  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
+  assert.match(html, /data-id="i0001-03"[^>]*data-attention="1"/);
+  assert.match(html, /data-id="i0001"[^>]*data-attention="0"/);
+  assert.match(html, /data-id="i0001-01"[^>]*data-attention="0"/);
+  assert.ok(html.includes('(attention && card.getAttribute("data-attention") !== "1")'));
+  // 絞り込み中の扱い（filtering）に入るので、承認は見えている承認待ちだけを送る
+  assert.ok(html.includes('document.body.classList.toggle("filtering", project !== "*" || parent !== "*" || attention)'));
 });
