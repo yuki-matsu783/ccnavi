@@ -32,8 +32,22 @@ sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠
   done    doing/ -> done/  完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
   cancel  todo/ か doing/ -> cancelled/  --reason が要る
   judge   定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
+
+  提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の
+  .ccnavi/common/phases.yml（CCNAVI_PHASES）、自身の層の .ccnavi/config/phases.yml、
+  プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どの層にも無ければ
+  フェーズは番号だけになる
 USAGE
 }
+
+# help は引数の数を数える前に見る。`--help` だけで打たれたときに、使い方を出しながら
+# 「引数の誤り」の終了コードを返さないため（ccnavi-review.sh と揃える）。
+case "${1:-}" in
+-h | --help | help)
+	usage
+	exit 0
+	;;
+esac
 
 [ "$#" -ge 2 ] || {
 	usage
@@ -41,10 +55,6 @@ USAGE
 }
 case "$1" in
 start | done | cancel | judge) ;;
--h | --help | help)
-	usage
-	exit 0
-	;;
 *)
 	printf 'ccnavi-ticket: %s は通しません。使えるのは start / done / cancel / judge です。\n' "$1" >&2
 	exit 2
