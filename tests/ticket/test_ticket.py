@@ -9,7 +9,7 @@
    書いても、子のチケットで判定される
 2. 子が親の範囲を超えても承認はでき、超えた場所への書き込みは判定で止まること
 3. 状態の置き場への直接の作成と、サブエージェントからの状態の移動が止まること
-4. フェーズが終わるとゲートが閉じ、レビューが済むと開くこと
+4. フェーズが終わるとレビューで止まり、レビューが済むと開くこと
 5. 変更要求のレビューは人の端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
 """
@@ -591,7 +591,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn(head.strip(), copy)
         self.assertIn("started_at:", copy)
 
-    # ---- 4. フェーズとゲート
+    # ---- 4. フェーズの終わりと HITL ポイント
 
     def close_phase(self):
         for child in ("i0001-01", "i0001-02"):
@@ -608,16 +608,16 @@ class TicketTest(unittest.TestCase):
         self.assertIn("request", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         exempt = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             command="sh .ccnavi/scripts/ccnavi-git.sh status",
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt))
         # 次のフェーズの計画は通る。
         plan = self.hook(
             "PreToolUse",
@@ -625,13 +625,13 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             file_path=os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md"),
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(plan))
-        # main からの起動にはゲートが無い。
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(plan))
+        # main からの起動は止まらない。
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(elsewhere))
 
     def test_gate_guides_sh_from_workspace_root(self):
-        """ゲートと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
+        """止めたときと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
 
         `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切ったワークツリーでは
         相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
@@ -644,23 +644,23 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
 
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
         self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
 
-        # 案内どおりに打った形は、ゲートの例外に当たる。
+        # 案内どおりに打った形は、止めている間の例外に当たる。
         guided = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             command=f"{review_sh} request --phase 1 --body-file b.md",
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(guided), self.reason(guided))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(guided), self.reason(guided))
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
-        """ゲートが閉じている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
+        """レビューで止まっている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
 
         免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ目印で
         渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に
@@ -669,7 +669,7 @@ class TicketTest(unittest.TestCase):
         self.family()
         self.close_phase()
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell), "レビューで止まっていない")
 
         exempt = self.hook(
             "PreToolUse",
@@ -677,7 +677,7 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             command='sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"',
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt), self.reason(exempt))
 
         # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形に当たる。
         reading = shellread.read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
@@ -688,16 +688,16 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
 
     def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
-        """ゲートの中で通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
+        """止めている間に通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
 
-        禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、ゲートが閉じている間に
+        禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、レビューで止まっている間に
         `env sh …ccnavi-review.sh` の形で何でも前に置けるようになる
         （wip/design/launcher-scripts.md §3.5.3、12 節 W4）。先頭の `sh` の形は今のまま通る。
         """
         self.family()
         self.close_phase()
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell), "レビューで止まっていない")
 
         exempt = self.hook(
             "PreToolUse",
@@ -705,7 +705,7 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             command="sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt), self.reason(exempt))
 
         for command in (
             "env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
@@ -713,7 +713,7 @@ class TicketTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertIn("DENY_PHASE_GATE", self.reason(result), self.reason(result))
+                self.assertIn("DENY_PHASE_REVIEW", self.reason(result), self.reason(result))
 
     def test_phase_without_review_skips_the_gate(self):
         self.family(review=(False, False))
@@ -722,7 +722,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("省略", self.reason(said))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.skipped")))
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     # ---- レビュー（sh の代わりに、テストがリモートの写しを渡す）
 
@@ -834,7 +834,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("未解決", check.stderr)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
         data["threads"][0]["resolved"] = True
         write(fixture, json.dumps(data))
@@ -850,7 +850,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertEqual(check.returncode, 0, check.stderr)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     def test_human_accepts_unresolved_but_not_changes_requested(self):
         self.family()
@@ -906,6 +906,79 @@ class TicketTest(unittest.TestCase):
         )
 
     # ---- 6. 基準点より後の範囲外
+
+    def test_a_rename_into_the_scope_still_shows_the_source(self):
+        """範囲外のファイルを範囲の中へ改名しても、移動元が数から消えないこと。
+
+        `git diff --name-only` は改名を 1 行（移動先）にまとめるので、まとめさせると
+        範囲外から範囲の中への移動が素通りする。
+        """
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        os.makedirs(os.path.join(child, "src", "a"), exist_ok=True)
+        git(child, "mv", "src/keep.py", "src/a/keep.py")
+        git(child, "commit", "--quiet", "-m", "範囲の中へ移す")
+        stopped = self.hook("SubagentStop", "", child, agent_id="sub-1")
+        self.assertEqual(stopped.returncode, 2, stopped.stdout + stopped.stderr)
+        self.assertIn("POST_TICKET_SCOPE", stopped.stderr)
+
+    def test_a_submodule_that_moved_is_counted(self):
+        """submodule の進みが数から消えないこと。未コミットでも、コミット後でも。
+
+        `.gitmodules` は追跡されるファイルで、そこに `ignore = all` があると git は
+        submodule の変更を差分にも状態にも出さない。設定は他の機械から届く。
+        """
+        sub = os.path.join(self.root, "sub")
+        os.makedirs(sub)
+        git(sub, "init", "--quiet", "-b", "main", ".")
+        write(os.path.join(sub, "f.txt"), "a\n")
+        git(sub, "add", "-A")
+        git(sub, "commit", "--quiet", "-m", "s1")
+        try:
+            # file:// の submodule は既定で拒まれる（CVE-2022-39253）。テストの中だけ通す。
+            git(
+                self.parent_tree,
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "--quiet",
+                sub,
+                "vendor/sub",
+            )
+        except AssertionError as exc:  # pragma: no cover - 機械側の事情
+            self.skipTest(f"submodule を作れない機械（{exc}）")
+        with open(os.path.join(self.parent_tree, ".gitmodules"), "a", encoding="utf-8") as f:
+            f.write("\tignore = all\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "submodule を足す")
+
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        write(os.path.join(sub, "f.txt"), "b\n")
+        git(sub, "commit", "--quiet", "-am", "s2")
+        after = git(sub, "rev-parse", "HEAD").strip()
+        git(
+            child,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "update",
+            "--init",
+            "--quiet",
+            "vendor/sub",
+        )
+        # まず作業ツリーの側。index はそのままで、submodule の中だけを進める。
+        git(os.path.join(child, "vendor", "sub"), "checkout", "--quiet", after)
+        uncommitted = self.hook("SubagentStop", "", child, agent_id="sub-1")
+        self.assertEqual(uncommitted.returncode, 2, uncommitted.stdout + uncommitted.stderr)
+        self.assertIn("POST_TICKET_SCOPE", uncommitted.stderr)
+        # コミットに乗せた側。こちらは基準点からの差分で見る。
+        git(child, "add", "--", "vendor/sub")
+        git(child, "commit", "--quiet", "-m", "submodule を進める")
+        committed = self.hook("SubagentStop", "", child, agent_id="sub-2")
+        self.assertEqual(committed.returncode, 2, committed.stdout + committed.stderr)
+        self.assertIn("POST_TICKET_SCOPE", committed.stderr)
 
     def test_subagent_stop_bounces_out_of_scope_once(self):
         self.family()
@@ -1104,11 +1177,11 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi("ticket", "cancel", "i0001", "--reason", "やめる")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("開いている子", refused.stderr)
-        # 子を閉じてもゲートが閉じている間は閉じない。
+        # 子を閉じてもレビューで止まっている間は閉じない。
         self.close_phase()
         refused = self.ccnavi("ticket", "done", "i0001")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("ゲート", refused.stderr)
+        self.assertIn("レビュー準備中", refused.stderr)
 
     def test_moving_state_keeps_the_proposal_text(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -1148,6 +1221,267 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
+
+    def commit_markers(self, push=True):
+        """ccnavi 自身の置き場だけをコミットする。ccnavi-push-approved.sh と同じ範囲。"""
+        git(self.parent_tree, "add", "--", ".ccnavi/tickets")
+        git(
+            self.parent_tree,
+            "commit",
+            "--quiet",
+            "-m",
+            "ccnavi: 承認済みチケットを更新",
+            "--",
+            ".ccnavi/tickets",
+        )
+        if push:
+            git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def test_a_japanese_name_in_the_store_is_still_the_store(self):
+        """置き場の中の日本語のファイルが、置き場の外に見えないこと。
+
+        `git status --porcelain` は `-z` が無いと非 ASCII を 8 進に逃がして引用符で包む。
+        そのまま前置き一致に当てると、置き場の中のファイルが「人の作業の汚れ」に化けて、
+        依頼が「未コミットの変更がある」で止まる。
+        """
+        self.family()
+        self.close_phase()
+        note = os.path.join(self.approved, "覚え書き.md")
+        write(note, "a\n")
+        git(self.parent_tree, "add", "--", ".ccnavi/tickets")
+        git(self.parent_tree, "commit", "--quiet", "-m", "置き場に日本語のファイル")
+        fixture = self.remote()
+        write(note, "b\n")
+        got = self.request(fixture)
+        self.assertEqual(got.returncode, 0, got.stderr)
+
+    def test_request_passes_when_only_the_markers_are_unpushed(self):
+        """置き場だけが手元に残っている形で、依頼が止まらないこと。
+
+        `ccnavi-push-approved.sh` は push が落ちてもコミットを残す。そこで止めると、
+        人の承認が落ちたせいで、まだ 1 度も依頼していないフェーズの依頼まで止まる。
+        置き場の外が 1 つでも残っていれば、従来どおり push を求める。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        write(os.path.join(self.approved, "unrelated.md"), "承認が落ちた形\n")
+        git(self.parent_tree, "add", "--", ".ccnavi/tickets")
+        git(self.parent_tree, "commit", "--quiet", "-m", "ccnavi: 承認済みチケットを更新")
+        self.assertEqual(self.request(fixture).returncode, 0)
+
+    def test_request_refuses_when_the_code_is_unpushed(self):
+        """置き場の外が手元に残っていれば、依頼は止まること。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "送っていない変更")
+        got = self.request(fixture)
+        self.assertNotEqual(got.returncode, 0)
+        self.assertIn("push されていない", got.stderr)
+
+    def test_check_passes_when_only_the_markers_moved(self):
+        """マーカーだけをコミットしても check が止まらないこと。
+
+        依頼のマーカーは親のブランチにコミットして運ぶ前提のもので、「依頼 → マーカー →
+        コミット」の順のせいで依頼の直後に必ず HEAD が 1 つ進む。人がレビューで見るものは
+        変わっていないので、ここで止めると自分の足を踏む。未コミットの側は同じ理由で
+        前提から外してある。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+        recorded = read_json(mark)["head"]
+        self.commit_markers()
+        self.assertNotEqual(git(self.parent_tree, "rev-parse", "HEAD").strip(), recorded)
+        check = self.check(fixture)
+        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertTrue(os.path.exists(os.path.join(os.path.dirname(mark), "1.reviewed")))
+
+    def test_check_passes_when_only_the_markers_are_unpushed(self):
+        """マーカーだけが手元に残っている形でも止まらないこと。
+
+        リモートにあるものと人が見るものは同じ。置き場の外が 1 つでも手元に残っていれば、
+        従来どおり push を求める。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        self.commit_markers(push=False)
+        self.assertEqual(self.check(fixture).returncode, 0)
+
+    def test_request_refuses_when_only_the_markers_moved(self):
+        """マーカーだけが動いた形では、依頼を出し直させないこと。
+
+        check が止まらないので、出し直しても依頼のコメントが増えるだけになる。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        self.commit_markers()
+        again = self.request(fixture)
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("依頼済み", again.stderr)
+        self.assertEqual(len(read_json(fixture)["comments"]), 1)
+
+    def test_check_refuses_when_code_rides_with_the_markers(self):
+        """マーカーと一緒に本物の変更が乗っていれば、従来どおり止まること。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "マーカーと一緒に")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        check = self.check(fixture)
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("HEAD が動いている", check.stderr)
+
+    def test_check_refuses_a_marker_head_that_is_not_a_sha(self):
+        """マーカーの `head` が sha でなければ、差分の相手にしないこと。
+
+        マーカーは親のブランチに乗って他の機械から届く。`HEAD` のような「今」を指す値を
+        revision として渡すと `head..HEAD` が空差分になり、人が見ていないコミットが
+        そのまま通る。出し直しの道は残す（残さないと打つ手が無くなる）。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        write(os.path.join(self.parent_tree, "src", "unseen.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "誰も見ていない変更")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+        for head in ("HEAD", "@", "-P", ""):
+            data = read_json(mark)
+            data["head"] = head
+            write(mark, json.dumps(data))
+            check = self.check(fixture)
+            self.assertNotEqual(check.returncode, 0, f"head={head!r} で通った")
+        data = read_json(mark)
+        data["head"] = "HEAD"
+        write(mark, json.dumps(data))
+        self.assertEqual(self.request(fixture).returncode, 0)
+
+    def test_check_refuses_a_file_renamed_into_the_store(self):
+        """置き場の外から中へ改名したファイルを、置き場の中だけの変更と数えないこと。
+
+        改名を 1 行にまとめられると移動元が消え、人が見た木から消えたことが映らない。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        git(self.parent_tree, "mv", "src/keep.py", ".ccnavi/tickets/keep.py")
+        git(self.parent_tree, "commit", "--quiet", "-m", "置き場へ移す")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        check = self.check(fixture)
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("HEAD が動いている", check.stderr)
+
+    def test_check_refuses_a_submodule_that_moved(self):
+        """submodule の進みを、置き場の中だけの変更と数えないこと。
+
+        `.gitmodules` は追跡されるファイルで、そこに `ignore = all` があると
+        `git diff` は gitlink の変更を 1 行も出さない。設定は他の機械から届く。
+        """
+        self.family()
+        self.close_phase()
+        sub = os.path.join(self.root, "sub")
+        os.makedirs(sub)
+        git(sub, "init", "--quiet", "-b", "main", ".")
+        write(os.path.join(sub, "f.txt"), "a\n")
+        git(sub, "add", "-A")
+        git(sub, "commit", "--quiet", "-m", "s1")
+        # file:// の submodule は既定で拒まれる（CVE-2022-39253）。テストの中だけ通す。
+        git(
+            self.parent_tree,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            "--quiet",
+            sub,
+            "sub",
+        )
+        with open(os.path.join(self.parent_tree, ".gitmodules"), "a", encoding="utf-8") as f:
+            f.write("\tignore = all\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "submodule を足す")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        write(os.path.join(sub, "f.txt"), "b\n")
+        git(sub, "commit", "--quiet", "-am", "s2")
+        git(os.path.join(self.parent_tree, "sub"), "pull", "--quiet", "origin", "main")
+        git(self.parent_tree, "commit", "--quiet", "-am", "submodule を進める")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        check = self.check(fixture)
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("HEAD が動いている", check.stderr)
+
+    @unittest.skipIf(os.name == "nt", "名前に \\ を含むファイルを作れない機械")
+    def test_check_refuses_a_path_that_only_looks_like_the_store(self):
+        """置き場の中に見える名前のファイルを、置き場の中と数えないこと。
+
+        `.ccnavi\\tickets\\x.py` はルート直下のファイル 1 個で、置き場の中ではない。
+        git が `-z` で返すパスを直しにかかると、ここが除外の側に落ちる。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        write(os.path.join(self.parent_tree, ".ccnavi\\tickets\\x.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "置き場に見える名前")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertNotEqual(self.check(fixture).returncode, 0)
+
+    def test_the_human_path_reads_the_markers_the_same_way(self):
+        """人が端末で打つ道（--reviewed）も check と同じ基準で見ること。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "ここ"}]
+        write(fixture, json.dumps(data))
+        self.commit_markers()
+        accepted = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--result",
+            fixture,
+            stdin="y\n",
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        write(os.path.join(self.parent_tree, "src", "unseen.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "誰も見ていない変更")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        refused = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--result",
+            fixture,
+            stdin="y\n",
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("HEAD が動いている", refused.stderr)
 
     def test_request_again_after_head_moved(self):
         """依頼の後に HEAD が動いたら、request で依頼を出し直せること（#36）。

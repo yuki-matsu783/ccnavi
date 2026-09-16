@@ -374,8 +374,39 @@ class DenyTest(GuardHarness):
             with self.subTest(path=os.path.relpath(path, self.ws)):
                 self.assert_not_denied(self.guarded_hook("Write", self.ws, file_path=path))
 
+    def test_shell_writes_into_the_common_layer_are_denied(self):
+        """§11.6: 共通層の 3 本へのシェルからの書き込みは組み込みで止まる。
+
+        置き場は `.ccnavi/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
+        （`_PLACES` の `\\.ccnavi`）が当てる。動かした置き場は
+        `test_shell_writes_into_a_moved_common_layer_are_denied` が見る。
+        """
+        for command in (
+            "echo x > .ccnavi/common/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/common/phases.yml",
+            "cp /tmp/x .ccnavi/common/risks.yml",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, guard="enable", command=command)
+                self.assert_denied(result, "builtin-guard-setting-files")
+        # 名前の途中で当たったものは別のファイル。
+        result = self.hook(
+            "Bash", self.ws, guard="enable", command="echo x > myccnavi/common/rules.yml"
+        )
+        self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+
     def test_shell_writes_into_a_moved_common_layer_are_denied(self):
-        """§11.6: 共通層が既定の名前の外にあっても、シェルからの書き込みは組み込みで止まる。"""
+        """§11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
+
+        置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけで、
+        env は ADR-0052 で廃止した。それでも動かせる以上、守りは動かした先を追う
+        （`common_shell_clause`）。名指しのツールは `common_layer_regex` が同じ先を追うので、
+        こちらを外すと、同じファイルが `Write` では止まってシェルでは通る形になる。
+
+        末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は
+        前の境界（`(?:^|[^\\w.-])`）だけを、`policy/rules.yml.bak` は後ろの境界
+        （`_TERM`）だけを落とす。片方しか置かないと、落としたほうの変異が緑のまま通る。
+        """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
         # そのコマンドは設定ファイルに書かない。
@@ -388,11 +419,14 @@ class DenyTest(GuardHarness):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
                 self.assert_denied(result, "builtin-guard-setting-files")
-        # 名前の途中で当たったものは別のファイル。
-        result = self.hook(
-            "Bash", self.ws, guard="enable", rules=policy, command="echo x > otherpolicy/rules.yml"
-        )
-        self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+        # 名前の途中で当たったものは別のファイル。前と後ろの両方を見る。
+        for command in (
+            "echo x > otherpolicy/rules.yml",
+            "echo x > policy/rules.yml.bak",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
+                self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """§11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
@@ -424,7 +458,7 @@ class SetupTest(unittest.TestCase):
     def make_source(self):
         """配布元のふり。実行ファイルと、共通層の rules / risk と、自身の層の phases。
 
-        ゲートの sh 3 本は起動して最初に共通部（ccnavi-common.sh）を読むので、配布元にも
+        代わりに通る sh 3 本は起動して最初に共通部（ccnavi-common.sh）を読むので、配布元にも
         それを置く。無いと「配布元に無くて配れないもの」として名指しされる。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-union-source-")

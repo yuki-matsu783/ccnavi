@@ -80,7 +80,7 @@ class InstallTest(unittest.TestCase):
                 )
 
     def test_leaves_the_build_output_in_place(self):
-        """写すのであって移すのではない。`dist/` はゲートの sh の既定の探し先でもある。"""
+        """写すのであって移すのではない。`dist/` は代わりに通る sh の既定の探し先でもある。"""
         self.fake_build("v1")
         self.install()
         self.assertEqual(

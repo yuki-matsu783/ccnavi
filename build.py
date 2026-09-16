@@ -25,7 +25,7 @@ sys.path.insert(0, ROOT)
 
 from ccnavi import platformtag  # noqa: E402
 
-# 組み立ての出力。導入スクリプトはここから配り、ゲートの sh は env が無いときここを探す。
+# 組み立ての出力。導入スクリプトはここから配り、代わりに通る sh は env が無いときここを探す。
 DIST = os.path.join(ROOT, "dist")
 NAME = "ccnavi"
 # どの機械向けに組み立てたかの目印。scripts/ccnavi-setup.sh が配る前に読む。
@@ -99,7 +99,7 @@ def install(dist_dir: str, root: str, target: str) -> str:
 
     `.ccnavi/bin/` は `root` の下に取る。
 
-    写すのであって移すのではない。`dist/` は導入スクリプトの配布元で、ゲートの sh の既定の
+    写すのであって移すのではない。`dist/` は導入スクリプトの配布元で、代わりに通る sh の既定の
     探し先でもある。起動中の置き場へ上書きで写すと、onedir の `_internal/` が前後の版で
     混ざるので、隣の `<target>.new` に写し切ってから `_swap` で入れ替える。前の版にだけ
     あったファイルは、入れ替えで退避した側ごと消える。

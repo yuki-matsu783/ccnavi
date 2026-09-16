@@ -6,7 +6,7 @@
 
 ## 層は 3 種
 
-- 共通層: `CCNAVI_RULES` が指すファイル。どのツリーにも効く
+- 共通層: `.ccnavi/common/rules.yml`。どのツリーにも効く。置き場は固定で、env では動かない
 - 自身の層: ワークスペースルートの `<CCNAVI_PROJECT_HOME>/config/rules.yml`
 - プロジェクトの層: `projects/<名前>/<CCNAVI_PROJECT_HOME>/config/rules.yml`
 

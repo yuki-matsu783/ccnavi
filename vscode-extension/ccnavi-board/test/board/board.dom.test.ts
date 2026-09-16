@@ -117,7 +117,7 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
     });
     page.click(page.one('.card[data-id="i0001"] a.mr-link'));
     assert.equal(page.posted.length, before, "リンクを押しても open を送らない");
-    // 要対応の絞り込みで、レビュー待ちの親とゲート閉の子は残る
+    // 要対応の絞り込みで、レビュー待ちの親と子は残る
     const box = page.one<HTMLInputElement>("#attention-filter");
     box.checked = true;
     page.change(box);

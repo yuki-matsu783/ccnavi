@@ -6,7 +6,7 @@
 2. 差分から点を数える（行数・ファイル数・消したファイル・glob）
 3. スクリプトの項目（点を受け取る。測れなければ重い側に倒す）
 4. 定性の項目（判定が揃うまで閉じられない。judge で記録。HEAD が動けば取り直し）
-5. HIGH 以上なら宣言に関わらずレビューが要る（ゲートが閉じ、依頼文にリスクの行が載る）
+5. HIGH 以上なら宣言に関わらずレビューが要る（レビューで止まり、依頼文にリスクの行が載る）
 6. --lint が壊れた定義を言い、壊れていれば組み込みに落ちる
 """
 
@@ -121,13 +121,13 @@ class RiskTest(PhaseHarness):
         self.assertEqual(
             {"big-diff", "many-files", "ci", "deletes"}, {h["id"] for h in record["hits"]}
         )
-        # 種類は review: none、子も required: false。それでもゲートが閉じる。
+        # 種類は review: none、子も required: false。それでもレビューで止まる。
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("実績のリスクが高い", self.reason(said))
         self.commit_parent("close 01")
         self.merge("i0001-01")
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         self.assertIn("実績のリスクが高い", self.reason(spawn))
         explained = self.ccnavi("--explain")
         self.assertIn("実績でレビュー要", explained.stdout)
