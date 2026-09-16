@@ -30,7 +30,8 @@ ccnavi の判定と進め方は、3 本のファイルで決まる。どれも**
 
 ## 絶対ルール
 
-- **3 本のファイルを書き換えない。** 下書きは scratchpad に置き、検証を通してから
+- **3 本のファイルを書き換えない。** 下書きは作業ツリーの `scratchpad/` に置き（作業ツリーが
+  無ければセッションの scratchpad。CLAUDE.md「下書きと使い捨ての置き場」）、検証を通してから
   「何をなぜ変えるか」と一緒に利用者に渡す。置くのは利用者。`dry-run` で警告だけで
   通っても同じ。判定が緩んだときに手順が変わる形にしない
 - **判定を目で真似しない。** 当たるかどうかは必ず `ccnavi --test-samples` か `--lint` に
@@ -63,5 +64,5 @@ ccnavi --explain --log "" --state ""
 - `--rules` / `--phases` / `--risk` で下書きを差し替えられる。本物を置く前に確かめる道
 
 **`--test` に禁止語を書かない。** `ccnavi --test Bash "git push"` は、その Bash 自体が
-`raw-git` に当たる。単発で試したいものも見本ファイルを scratchpad に書いて
+`raw-git` に当たる。単発で試したいものも見本ファイルを `scratchpad/` に書いて
 `--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。
