@@ -25,6 +25,15 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 ## いま動くもの
 
+**チケットは 2 つの置き場を行き来する 1 本のファイル（ADR-0055、2026-09-16）。** 提案の
+`wip/proposals/todo/` → 承認で `.ccnavi/approved/doing/` → `ticket done` で `wip/proposals/review/`
+（レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`check` / `accept` / `--reviewed --chat` /
+`wrapup`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
+`wip/proposals/` へ動かすのはエージェント。`accept` は「受け入れて進む」か「続きの子を
+`doing/` に直に起こす」かを人に選ばせる。旧の置き場（`.ccnavi/tickets/`、`wip/proposals/{doing,done,cancelled}/`）の
+残りは `--lint` が名指しする。既存のワークスペースは `.ccnavi/tickets` を `.ccnavi/approved` に
+（`closed/` は `done/` に）`git mv` すれば続きができる。
+
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
 `SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
 自己防衛、チケット制御（提案・承認・承認済みチケット・フェーズ・HITL ポイント・レビュー・実績のリスク）、
@@ -84,7 +93,7 @@ ccnavi/ticket.py            チケットの読み込みと、そこが宣言す�
 ccnavi/tree.py              ワークツリーの特定。判定の鍵はファイルの行き先
 ccnavi/approval.py          承認済みチケット・フェーズのマーカー・子ごとの記録・承認の画面
 ccnavi/risk.py              実績で測るリスク。risks.yml・差分の計測・スクリプト・定性項目
-ccnavi/phase.py             フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期
+ccnavi/phase.py             フェーズの終わりと HITL ポイント。置き場からフェーズの状態を組む
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
 ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
 ccnavi/ops.py               チケットの状態を動かす ticket start / done / cancel / judge
@@ -255,8 +264,8 @@ Write が deny にならないことを見る
    `.claude/hooks/`、`rules.yml`）は `deny` なのでエージェントは書けない。完成品を
    `wip/design/scripts/` に置いて人が写す形にしたが、`implement` の種類の `scope` に
    `wip/design/*` が無く、承認が拒まれる。親の `allow` は改版で変えられない
-   （変えられるのは `plan` と `feedback` だけ）。しかも着手後は親の提案が `doing/` に
-   あり、`builtin-ticket-state` が編集を止めるので `plan` の改版もできない。
+   （変えられるのは `plan` と `feedback` だけ）。改版は同じ識別子の提案を `todo/` に書いて
+   承認を受ける（ADR-0055 で、着手後も `todo/` は書けるようになった）。
    今回は `phases.yml` に `staging`（写す版の作成、`scope: [wip/design/*, tests/*]`）を
    足して回避した。**`phases.yml` は人が持つ設定なので、エージェントは足せない。**
    同じ形の作業が来たら、この種類を使うこと
@@ -307,10 +316,8 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
 
-- `ticket start` / `done` は承認済みチケットの有無を見ない。未承認のまま `doing/` `done/` まで進める。止めるか、
-  せめて「未承認」を stderr に出すかは決めていない（`--lint` は言う）
-- `--approve` は `done/` にある未承認の提案も承認の対象に入れる。承認した承認済みチケットは次の hook で即座に閉じる。
-  `cancelled/` と同じく `done/` も除くほうが自然に見える
+- （ADR-0055 で解消）`ticket start` / `done` は `doing/` の承認済みチケットにしか効かない。未承認の提案は
+  `todo/` から動かない。`--approve` の対象は `todo/` だけ
 - 人が子を再開しても、そのフェーズの `reviewed` は残る。再び `done` にしても止まらず、
   告知も出ない。再開の手順に「マーカーも消す」を入れるか、承認済みチケットを戻したときに機構が消すかは決めていない
 
