@@ -176,8 +176,10 @@ Claude Code がセッションのプロセスに環境変数として渡す（AD
 `dry-run` として振る舞う。呼び出しにも作業ツリーにも手を出さないことがそのモードの約束で、
 ファイルを動かすのはそれに反する。組み合わせの表は requirements.md §2.2。
 
-`CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL` は `enable` / `disable` の 2 値。
-承認は通れば済んでしまうので、「止めずに報告する」段が無い。
+`CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL`、`CCNAVI_GUARD_UNWATCHED` は
+`enable` / `disable` の 2 値。承認は通れば済んでしまうので、「止めずに報告する」段が無い。
+確認できる者が居ないモードの門（`CCNAVI_GUARD_UNWATCHED`、§6.5）は、報告する段を
+`CCNAVI_MODE=dry-run` が持つので、こちらには要らない。
 
 ### 4.5 応答の形と着地
 
@@ -203,7 +205,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 
 | 書くもの | 中身 |
 |---|---|
-| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_RULES` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
+| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_RULES` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,launcher}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
@@ -686,19 +688,24 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 | `permission_mode` | 結末 | 記録の `decision` |
 |---|---|---|
 | `auto` | classifier が判断する | `handover` |
-| `default` / `acceptEdits` / `plan` / 空 / 不明 | 人に確認が出る | `ask` |
-| `dontAsk` / `bypassPermissions` | 通さない（REQ-PRE-08） | `deny` |
+| `default` / `acceptEdits` / `plan` | Claude Code 自身の権限の仕組みが決める | `handover` |
+| 空 / 不明 | 人に確認が出る | `ask` |
+| `dontAsk` / `bypassPermissions` | 通さない（REQ-PRE-08）。`CCNAVI_GUARD_UNWATCHED=disable` なら委ねる | `deny` |
 
 理由コードは `UNDECLARED`。ルールの `ask` に当たった呼び出し（`RULE_ASK`）は権限モードによらず
-確認に出す。人が意図して置いた確認ポイントを classifier の判断で消さない。確認できる者が居ない
-モードで通さないのは、そこで ask を返しても「誰も答えないまま通る」に化けるため。知らないモードの
-名前は確認に倒す。縮退した呼び出しは委ねない（§6.3）。
+確認に出す。人が意図して置いた確認ポイントを classifier の判断で消さない。判断できる相手が居る
+4 つのモードに委ねるのは、ccnavi がそこに確認を上乗せしても判断する者が増えないため。`default` では
+Claude Code 自身が書き込みとシェルに確認を出すので、上乗せすると同じ呼び出しで 2 度聞かれる
+（ADR-0049）。確認できる者が居ないモードで通さないのは、そこで ask を返しても「誰も答えないまま
+通る」に化けるため。その門はプロジェクトが `CCNAVI_GUARD_UNWATCHED` で開けられる。知らないモードの
+名前は確認に倒す。縮退した呼び出しは委ねない（§6.3）。門を開けた層でも委ねない。
 
 端末からの試験（§10）には `permission_mode` が来ないので、言及の無い呼び出しは `ask` として出る。
 
 **`allow` に当たった呼び出しにも、ccnavi は判定を返さない。** `permissionDecision` を返すのは `deny` と `ask` だけで
-（`judge.refuse`）、`allow` は記録に残して終わる。`allow` の値打ちは、この表の結末（確認と、確認できる者が居ないモードでの
-拒否）を起こさないことと、`additionalContext` を当てる先になること。Claude Code 側の権限の扱いは変わらないので、
+（`judge.refuse`）、`allow` は記録に残して終わる。`allow` の値打ちは、この表の結末（知らないモードでの確認と、
+確認できる者が居ないモードでの拒否）を起こさないことと、`additionalContext` を当てる先になること。
+Claude Code 側の権限の扱いは変わらないので、
 `allow` を足しても Claude Code の確認は飛ばせない。飛ばせる形にすると、ルールを 1 行足すだけで権限を配れることになる。
 
 ### 6.6 モデルへ渡す文

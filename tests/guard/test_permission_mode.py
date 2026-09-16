@@ -21,7 +21,7 @@ RULES = os.path.join(ROOT, "tests", "fixtures", "rules-undeclared.yml")
 UNDECLARED_COMMAND = "docker run --rm alpine"
 
 
-def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable"):
+def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable", guard_unwatched=""):
     """道具を 1 回動かし、標準出力と記録の 1 行を返す。
 
     コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
@@ -29,6 +29,8 @@ def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable"):
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
+    if guard_unwatched:
+        environment["CCNAVI_GUARD_UNWATCHED"] = guard_unwatched
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -77,21 +79,24 @@ class HandoverTest(unittest.TestCase):
         self.assertEqual("auto", record["permission_mode"])
         self.assertFalse(record["enforced"])
 
+    def test_every_mode_with_a_judge_gets_no_verdict(self):
+        """判断できる相手が居るモードには渡す。auto は classifier が読み、残りは
+        Claude Code 自身の権限の仕組みが決める。ccnavi が確認を上乗せしても、
+        判断する者が増えるわけではない。"""
+        for permission_mode in ("auto", "default", "acceptEdits", "plan"):
+            with self.subTest(permission_mode=permission_mode):
+                result, record = run(permission_mode)
+                self.assertIsNone(decision_of(self, result), "判定を返している")
+                self.assertEqual("handover", record["decision"])
+
     def test_handover_is_not_counted_as_asking_the_user(self):
         """渡した回と人に聞いた回は、記録の上で混ざらない。"""
         _, handed = run("auto")
-        _, asked = run("default")
+        _, asked = run("someFutureMode")
         self.assertNotEqual(handed["decision"], asked["decision"])
 
 
 class AskTest(unittest.TestCase):
-    def test_default_still_asks(self):
-        """人が居るモードは今までどおり確認に出す。"""
-        result, record = run("default")
-        self.assertEqual("ask", decision_of(self, result))
-        self.assertEqual("ask", record["decision"])
-        self.assertEqual("UNDECLARED", record["code"])
-
     def test_an_unknown_mode_asks(self):
         """知らないモードは確認に倒す。名前が 1 つ増えても素通りにしない。"""
         result, _ = run("someFutureMode")
@@ -120,6 +125,25 @@ class NoJudgeTest(unittest.TestCase):
     def test_dont_ask_refuses(self):
         result, _ = run("dontAsk")
         self.assertEqual("deny", decision_of(self, result))
+
+    def test_the_project_can_open_this_gate(self):
+        """CCNAVI_GUARD_UNWATCHED=disable にした層では、ここも渡す側になる。"""
+        for permission_mode in ("dontAsk", "bypassPermissions"):
+            with self.subTest(permission_mode=permission_mode):
+                result, record = run(permission_mode, guard_unwatched="disable")
+                self.assertIsNone(decision_of(self, result), "判定を返している")
+                self.assertEqual("handover", record["decision"])
+
+    def test_an_unreadable_command_is_refused_even_with_the_gate_open(self):
+        """読み切れなかった呼び出しは、門を開けても渡さない（REQ-PRE-04）。
+        渡す先が「確認しない」と決まっている以上、読めなかったことを言える場所が他に無い。"""
+        result, record = run(
+            "bypassPermissions",
+            command="bash -c 'docker run --rm alpine'",
+            guard_unwatched="disable",
+        )
+        self.assertEqual("deny", decision_of(self, result))
+        self.assertEqual("PARSE_UNCERTAIN", record["code"])
 
     def test_the_refusal_says_asking_is_not_available(self):
         """断りの文面は、言えば通るかもしれない ask とは別の次の一手を示す。"""

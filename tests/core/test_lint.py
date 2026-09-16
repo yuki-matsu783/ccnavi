@@ -51,7 +51,7 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     return write(directory, "rules.yml", json.dumps(body, indent=2))
 
 
-def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
+def ccnavi(root: str, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
     """道具を 1 回動かす。
 
     モードもルールもフラグで固定する。このリポジトリは ccnavi を自分自身に
@@ -59,6 +59,7 @@ def ccnavi(root: str, *args: str) -> subprocess.CompletedProcess:
     それを読むテストは、コードではなく走った機械のことを報告してしまう。
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    environment.update(env or {})
     return run_ccnavi(
         ["--root", root, *args],
         input="",
@@ -134,6 +135,29 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=dry-run", result.stdout)
         # 倒れた先も言う。言わないと、止まっているのか通っているのかが分からない。
         self.assertIn("enable として動いている", result.stdout)
+
+    def test_確認できない側の門を切ったらwarnで言う(self):
+        # 切ってあること自体は設定として正しいので error にはしない。それでも
+        # 言うのは、切れている状態が外から見て「ルールが揃っている状態」と
+        # 区別が付かないため。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            env={"CCNAVI_GUARD_UNWATCHED": "disable"},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CCNAVI_GUARD_UNWATCHED=disable", result.stdout)
+        self.assertIn("確認できる者が居ないモードで守る: disable", result.stdout)
+
+    def test_確認できない側の門は既定でenableと出る(self):
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertIn("確認できる者が居ないモードで守る: enable", result.stdout)
 
     def test_承認の門にenableと書いてもerrorにならない(self):
         result = ccnavi(
