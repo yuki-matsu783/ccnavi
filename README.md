@@ -1121,7 +1121,7 @@ docs/../.env
 | 層 | 何を止めるか |
 |---|---|
 | `.gitignore`（ripgrep が読む） | `Grep` が起点から降りていく途中で出会うファイル |
-| `.claude/settings.json` の `permissions.deny` の `Read(...)` | ファイル 1 つ 1 つ。`Grep` のファイル読み取りにも効く |
+| `.claude/settings.json` の `permissions.deny` の `Read(...)` | ファイル 1 つ 1 つ。`Grep` のファイル読み取りにも、`cat .env` のようにファイルを名指しする Bash のコマンドにも効く |
 | ccnavi のルール | `Read` `Write` `Edit` `NotebookEdit` `Bash`。`Grep` と `Glob` は受け持たない |
 
 `projects/foo/.env` が foo の `.gitignore` に入っている場合の噛み合い方。
@@ -1131,10 +1131,37 @@ docs/../.env
 | `Grep(path=<git プロジェクトルート>)` | 当たらない | **弾く** | **弾く** |
 | `Grep(path=.../foo/.env)` | 当たらない | 当たらない | **弾く** |
 | `Read(.../foo/.env)` | **止める** | 当たらない | **弾く** |
-| `Bash: cat .../foo/.env` | **止める** | 当たらない | 当たらない |
+| `Bash: cat .../foo/.env` | **止める** | 当たらない | **弾く** |
+| `Bash: grep -rn <語> .` | 当たらない | 当たらない | 当たらない |
 
 2 行目は `Read()` の `deny` が唯一の守りになる。`permissions.deny` を持たない配布先では、
 ignore されたファイルを名指しした `Grep` は通る。
+
+**最後の行はどの層も受けていない。** Bash の `grep -rn <語> .` はファイルを名指ししないので
+`Read()` の `deny` に当たらず、コマンド文字列にも `.env` の綴りが出ないので ccnavi のルールにも
+当たらない。GNU の `grep` は `.gitignore` を読まないので、そちらも外れる。共通層の
+`prefer-read-grep` が Bash の `grep` から `Grep` ツールへ誘導しているのは、ここでは守りとしても
+働く。`Grep` ツールなら `.gitignore` と `Read()` の `deny` の 2 層が掛かる。
+
+### `Read()` の `deny` が Bash に及ぶ範囲
+
+`Read(...)` の `deny` は `Read` ツールだけのものではない。Claude Code 2.1.273 で確かめた結果。
+
+| Bash のコマンド | 結果 |
+|---|---|
+| `cat .env` | **拒否**。ファイルが存在しなくても、コマンドの文字列の段階で止まる |
+| `grep SECRET .env` | **拒否**。名指ししているため |
+| `> .env`（リダイレクト先） | **拒否**。`Read()` の `deny` がリダイレクトの行き先にも及ぶ |
+| `grep -rn <語> .` | **通る**。ファイルを名指ししていない |
+
+公式の文書（[Configure permissions](https://code.claude.com/docs/en/permissions)）が境目を
+こう書いている。`Read` と `Edit` の `deny` は、組み込みのファイルツールと、Claude Code が Bash の
+中で見分けるファイルのコマンド（`cat` `head` `tail` `sed` `tee` など）と、リダイレクトの行き先に
+及ぶ。ファイルを名指ししないコマンドや、自分でファイルを開くスクリプトには及ばない。
+
+**この挙動はバージョンに依る。** 2.1.257 で Bash の読み取りコマンドへ適用が始まり、2.1.259 で
+範囲が広がって行きすぎ、2.1.260 で一部が戻された。守りの前提として数えるなら、自分の版で
+確かめ直す（上の表は 2.1.273 での記録）。
 
 ### `.gitignore` を当てにしてよい範囲
 
