@@ -110,6 +110,7 @@ def for_rules(
     """
     parts: list[str] = []
     remembered: set[str] | None = None
+    consulted = False
     for rule in group:
         # 文の `{root}` は、止めたときの文面と同じくワークスペースルートの実パスにする。
         every = _with_file(
@@ -123,12 +124,18 @@ def for_rules(
         if not rule.additional_context_once and not rule.additional_context_once_file:
             continue
         if state_dir:
-            if remembered is None:
+            if not consulted:
                 remembered = _load_once(stderr, state_dir, payload)
-            key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
-            if key in remembered:
-                continue
-            remembered.add(key)
+                consulted = True
+            # 読めなかった（remembered が None）ときは、覚えていないものとして
+            # 文を渡し、書き戻さない。`--state ""` と同じ「覚えられないなら言う」
+            # 側だが、上書きだけはしない。ここで書くと、読めなかっただけの控えを
+            # 空で潰すことになる。
+            if remembered is not None:
+                key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
+                if key in remembered:
+                    continue
+                remembered.add(key)
         once = _with_file(
             stderr,
             bases or [],
@@ -170,12 +177,20 @@ def _once_path(state_dir: str, session: str, agent_id: str) -> str:
     return os.path.join(state_dir, f"once-{session_part}-{agent_part}.json")
 
 
-def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str]:
+def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str] | None:
+    """この文脈で渡した文の鍵。まだ無ければ空、**読めなければ None**。
+
+    「まだ無い」と「読めない」を分けて返すのは、呼ぶ側が上書きしてよいかを
+    決められるようにするため。同じ扱いにすると、読めなかった回に「まだ何も
+    渡していない」ものとして書き戻し、覚えていたぶんを消してしまう。
+    読めないのは控えが在るときにしか起きないので、消す先はいつも中身のある控えになる。
+    """
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: 1 度だけ渡す文の控えを読めない: {failed}\n")
+            return None
         return set()
     given = data.get("given") if isinstance(data, dict) else None
     return {s for s in given if isinstance(s, str)} if isinstance(given, list) else set()
@@ -183,7 +198,10 @@ def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str
 
 def _save_once(stderr: TextIO, state_dir: str, payload: hookio.Input, given: set[str]) -> None:
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
-    failed = fsio.write_json(path, {"given": sorted(given)})
+    # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
+    # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 度も渡していない」に
+    # 倒れる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
+    failed = fsio.write_json_atomic(path, {"given": sorted(given)})
     if failed:
         stderr.write(f"ccnavi: 1 度だけ渡す文の控えを書けない: {failed}\n")
 
