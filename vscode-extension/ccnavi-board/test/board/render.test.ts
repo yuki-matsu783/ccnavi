@@ -177,8 +177,9 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（ゲート閉・レ
           risk_line: "リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）",
         };
       }
-      // 依頼済みでゲートが閉じたまま。要約にゲート閉とレビュー要、受け入れボタンが並ぶ
-      return { ...p, state: "ended", gate_closed: true, marks: { requested: { at: "t" } } };
+      // 依頼済みでゲートが閉じたまま（判定は review_waiting で言う）。要約にゲート閉とレビュー依頼済、
+      // 受け入れボタンが並ぶ
+      return { ...p, state: "ended", gate_closed: true, review_waiting: true, marks: { requested: { at: "t" } } };
     }),
   };
   const html = renderBoard(buildBoard({ ...base, parents: [parent] }), OPTIONS);
@@ -194,7 +195,7 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（ゲート閉・レ
   // 依頼を出していないゲート閉は「ゲート閉」だけ。受け入れボタンも出ない
   const unasked: ParentJson = {
     ...parent,
-    phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {} } : p)),
+    phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {}, review_waiting: false } : p)),
   };
   const html3 = renderBoard(buildBoard({ ...base, parents: [unasked] }), OPTIONS);
   assert.ok(html3.includes('<span class="phase-brief" aria-hidden="true">ゲート閉</span><span class="phase-full">終了 · ゲート閉 · レビュー要</span></span>'));
@@ -249,6 +250,52 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   // 締める（wrapup）のボタンは出さない
   assert.ok(!html.includes('data-action="wrapup"'));
   assert.ok(!html.includes("締める"));
+});
+
+test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビューが済んでゲートが開いた子には出さない", () => {
+  const base = fixture();
+  // 判定が出す形に揃える。ゲート閉はレビュー要を含み、レビュー待ちは「依頼済 かつ ゲート閉」を判定が言う
+  const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
+    ...base,
+    parents: base.parents.map((parent) => ({
+      ...parent,
+      phases: parent.phases.map((p) =>
+        p.number === 1
+          ? {
+              ...p,
+              marks,
+              review_required: true,
+              gate_closed: gateClosed,
+              review_waiting: gateClosed && "requested" in marks,
+            }
+          : p,
+      ),
+    })),
+  });
+  const badge = '<span class="badge mark mark-requested">レビュー依頼済</span>';
+  const briefWith = (text: string) => `<span class="phase-brief" aria-hidden="true">${text}</span>`;
+  // クローズ・レビュー済・ゲート開の子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
+  // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済 · レビュー済」が残る
+  const done = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false)), OPTIONS);
+  assert.ok(!done.includes(badge));
+  assert.ok(done.includes('<span class="fact mark mark-reviewed">レビュー済</span>'));
+  assert.ok(done.includes(briefWith("") + '<span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 0 (LOW)</span>'));
+  assert.doesNotMatch(done, /class="phase-brief"[^>]*>[^<]*レビュー依頼済/);
+  // 依頼済のマーカーだけでゲートが開いている（判定が待ちと言わない）子にも、札と要約は出ない
+  const reopened = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, false)), OPTIONS);
+  assert.ok(!reopened.includes(badge));
+  assert.doesNotMatch(reopened, /class="phase-brief"[^>]*>[^<]*レビュー依頼済/);
+  // 依頼を出したのにゲートが閉じたままの子には札が出て、親のフェーズ行の要約にも出る。reviewed の有無では分岐しない
+  const waiting = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, true)), OPTIONS);
+  assert.ok(waiting.includes(badge));
+  assert.ok(waiting.includes('<span class="badge gate">ゲート閉</span>'));
+  assert.ok(waiting.includes(briefWith("ゲート閉 · レビュー依頼済") + '<span class="phase-full">終了 · ゲート閉 · レビュー依頼済 · レビュー要 · リスク: 0 (LOW)</span><button'));
+  const stillClosed = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, true)), OPTIONS);
+  assert.ok(stillClosed.includes(badge));
+  // 依頼を出していない子には、ゲートが閉じていても依頼済の札は出ない
+  const notRequested = renderBoard(buildBoard(withMarks({}, true)), OPTIONS);
+  assert.ok(!notRequested.includes("レビュー依頼済"));
+  assert.ok(notRequested.includes(briefWith("ゲート閉")));
 });
 
 test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {

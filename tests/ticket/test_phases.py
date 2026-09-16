@@ -271,6 +271,15 @@ class PhaseHarness(unittest.TestCase):
             "--cwd", self.parent_tree, "--phase", str(phase), "review", "check", "--result", fixture
         )
 
+    def board_phase(self, number, parent="i0001"):
+        """ボードの JSON のフェーズ 1 つを (gate_closed, review_waiting, マーカーの種類) で。"""
+        result = self.ccnavi("--explain", "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        board = json.loads(result.stdout)
+        owner = next(p for p in board["parents"] if p["ticket"] == parent)
+        ph = next(p for p in owner["phases"] if p["number"] == number)
+        return ph["gate_closed"], ph["review_waiting"], sorted(ph["marks"])
+
     def family(self, plan=("research", "design"), feedback=None):
         """親を提案して承認する。plan の 1 番目の子もまとめて承認する。"""
         self.propose("i0001", parent_text("i0001", list(plan), feedback))
@@ -590,7 +599,11 @@ class PhaseTest(PhaseHarness):
         self.merge("i0001-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
+        # ボードの JSON は「依頼済みでゲートが閉じたまま」を review_waiting で言う。レビューが
+        # 済んでゲートが開けば false に戻り、依頼のマーカーは残る。
+        self.assertEqual(self.board_phase(1), (True, True, ["requested"]))
         self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
         # 親はまだ閉じられない。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         refused = self.close_child("i0001")

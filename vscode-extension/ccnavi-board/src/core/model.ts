@@ -80,6 +80,8 @@ export interface PhaseJson {
   readonly marks: Readonly<Record<string, Record<string, unknown>>>;
   readonly review_required: boolean;
   readonly gate_closed: boolean;
+  /** 依頼を出したのにゲートが閉じたまま（人のレビュー待ち）。判定が出した値で、拡張は組み直さない */
+  readonly review_waiting: boolean;
   readonly deferred: boolean;
   readonly review_at: number | null;
   readonly covers: readonly number[];
@@ -299,6 +301,7 @@ function phase(raw: Record<string, unknown>): PhaseJson {
     marks,
     review_required: raw.review_required === true,
     gate_closed: raw.gate_closed === true,
+    review_waiting: raw.review_waiting === true,
     deferred: raw.deferred === true,
     review_at: num(raw.review_at),
     covers: list(raw.covers).map((c) => num(c) ?? 0),

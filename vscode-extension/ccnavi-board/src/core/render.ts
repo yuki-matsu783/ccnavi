@@ -224,7 +224,7 @@ function renderCard(card: Card): string {
 
 /**
  * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、作業ツリーなし（閉じたチケットは除く）、
- * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち）、本物が決まらない写り。
+ * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち。ゲートが閉じている間だけ）、本物が決まらない写り。
  * 出す札が無ければ行ごと出さない。
  */
 function renderBadges(card: Card): string {
@@ -238,10 +238,10 @@ function renderBadges(card: Card): string {
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(badge("worktree none", "作業ツリーなし"));
   }
-  for (const mark of card.marks) {
-    if (mark === "requested") {
-      badges.push(badge("mark mark-requested", MARK_LABELS.requested));
-    }
+  // 依頼済の札は、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）の間だけ。
+  // 待ちかどうかは判定が JSON の `review_waiting` で言う。ここで reviewed やゲートを見て判定し直さない。
+  if (card.reviewWaiting) {
+    badges.push(badge("mark mark-requested", MARK_LABELS.requested));
   }
   if (card.riskLevel === "HIGH" || card.riskLevel === "CRITICAL") {
     badges.push(badge(`risk risk-${card.riskLevel.toLowerCase()}`, riskText(card)));
@@ -259,7 +259,8 @@ function renderBadges(card: Card): string {
 
 /**
  * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、作業ツリー、
- * マーカー（依頼済は札のほう）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
+ * リスク（MEDIUM 以下）、base、プロジェクト。
  */
 function renderFacts(card: Card): string {
   const facts: string[] = [];
@@ -316,9 +317,9 @@ function fact(kind: string, text: string, title = ""): string {
 /**
  * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
  * 右の状態は 2 通り書いておき、どちらを見せるかは CSS（.phases）が幅で決める。
- * - 要約（狭い列）: 人が動くべきことだけ。ゲート閉、ゲートが閉じたままのレビュー依頼済、
- *   HIGH 以上のリスク。順調な段階は空。JSON が言ったことを並べるだけで、レビューの要否や済みを
- *   ここで判定し直さない。項目はカードの札（renderBadges）と同じ
+ * - 要約（狭い列）: 人が動くべきことだけ。ゲート閉、人のレビュー待ち（JSON の `review_waiting`）の
+ *   レビュー依頼済、HIGH 以上のリスク。順調な段階は空。JSON が言ったことを並べるだけで、レビューの
+ *   要否や済みをここで判定し直さない。項目はカードの札（renderBadges）と同じ
  * - 全文（広げたとき）: 段階の状態、マーカー、レビューの要否、リスクの点と理由
  * 要約は見た目だけのもの（aria-hidden）で、全文は狭いときも読み上げには渡す。狭いままマウスで
  * 読むときのために、全文を行のツールチップにも置く。
@@ -357,15 +358,16 @@ function phaseStatusFull(p: PhaseChip): string {
 
 /**
  * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードの札と同じ。
- * マーカーは積み重なる（依頼済のあとにレビュー済が付く）ので、依頼済はゲートが閉じている間だけ出す。
+ * マーカーは積み重なる（依頼済のあとにレビュー済が付く）ので、依頼済は人のレビュー待ちの間だけ出す。
+ * 待ちかどうかは判定が `review_waiting` で言い、ここでゲートとマーカーから組み直さない。
  */
 function phaseStatusBrief(p: PhaseChip): string {
   const notes: string[] = [];
   if (p.gateClosed) {
     notes.push("ゲート閉");
-    if (p.marks.includes("requested")) {
-      notes.push(MARK_LABELS.requested);
-    }
+  }
+  if (p.reviewWaiting) {
+    notes.push(MARK_LABELS.requested);
   }
   if (p.riskLevel === "HIGH" || p.riskLevel === "CRITICAL") {
     notes.push(`リスク ${p.riskLevel}`);
