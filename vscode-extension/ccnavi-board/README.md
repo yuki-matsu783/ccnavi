@@ -405,6 +405,7 @@ src/
   extension.ts        コマンド登録とサイドパネルの登録（vscode に依存する）
   sidebar.ts          左端のアイコンから開くサイドパネルの 5 つの入口。チケット制御が disable なら 4 つ（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
+  tickets.ts          チケットの置き場の監視と、実行ファイルの読みを 5 画面で分け合う（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
   rules-panel.ts      ルール設定画面の Webview パネル（ワークスペース / プロジェクトの対象ごとに 1 つ）。判定・検証・保存の受け付け（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
@@ -433,6 +434,7 @@ src/
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）
     commands.ts       ターミナルに送るコマンド行（accept / wrapup）と、承認を子プロセスで打つ引数の並び
     locate.ts         実行ファイルの探索順
+    share.ts          同じ答えを同時に取りに行く呼び出しを 1 つにまとめる（走っている間だけ分け合う）
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
 media/
   icon.svg            アクティビティバーのアイコン
@@ -447,7 +449,7 @@ test/
   risk/               リスク管理（risk-doc, risk-render）
   phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
   projects/           プロジェクト管理（projects, layer-render）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, share, appearance）
   */*.test.ts         HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜
 scripts/
@@ -467,7 +469,7 @@ VS Code の `onDid*` や `registerCommand` は、購読を外すための `Dispo
 | 登録先 | 置き場 | 例 |
 |---|---|---|
 | 拡張が生きている間ずっと（`vscode.workspace.*` / `vscode.window.*` / 自分で作った watcher） | `context.subscriptions` | `extension.ts` のコマンド、`sidebar.ts`、`ticket-control.ts` の watcher |
-| パネルが生きている間だけ | `PanelState` の配列。`panel.onDidDispose` でまとめて外す | 各パネルの `watchers`、`appearance.ts` の `followAppearance` |
+| パネルが生きている間だけ | `PanelState` の配列。`panel.onDidDispose` でまとめて外す | 各パネルの `subs` と `fileWatchers`、`appearance.ts` の `followAppearance` |
 | パネル自身・watcher 自身の出来事（`panel.onDidDispose` / `webview.onDidReceiveMessage` / `watcher.onDidChange`） | 持たない | 相手が dispose されれば購読も一緒に消える |
 
 **3 行目は「捨ててよい」であって「捨てなければならない」ではない。** 迷ったら持つ側に倒す。
@@ -477,5 +479,22 @@ VS Code の `onDid*` や `registerCommand` は、購読を外すための `Dispo
 決まりの一部。`fileWatchers` は編集対象のパスが設定で変わるので再読込のたびに張り直し、`watchers`
 （チケットの置き場）は開いている間ずっと同じ。1 本にまとめると「古い方だけ落とす」が書けなくなる。
 
-外部に配る API（`ticket-control.ts` の `onDidChangeTicketControl` など）は `Disposable` を返す。
-返さないと、呼ぶ側が正しく書こうとしても外せない。
+外部に配る API（`ticket-control.ts` の `onDidChangeTicketControl`、`tickets.ts` の
+`onTicketsChanged`）は `Disposable` を返す。返さないと、呼ぶ側が正しく書こうとしても外せない。
+
+### チケットの監視を分け合う
+
+ボード・ルール設定・リスク管理・フェーズ管理は、どれも同じ場所（提案・承認済みチケット・マーカー・
+作業ツリーの登録）を見て、同じ 1 つの変化で同じ答え（`--explain --json`）を取りに行く。ルール設定と
+フェーズ管理は対象ごとに開けるので、画面ごとに監視と子プロセスを持つとプロジェクトの数だけ増える。
+
+`tickets.ts` がワークスペースに 1 組だけ持つ。
+
+- `onTicketsChanged(folder, listener)` — 監視は 8 本を 1 組だけ張り、聞く画面が 1 つも無くなったら畳む
+- `loadBoardShared(root, setting)` — 走っている読みがあれば、その答えを待つ。1 つの変化で 4 画面が
+  同時に取りに行っても、子プロセスは 1 つ
+
+**答えが返った後は分け合わない。** 保存の直後のように新しい答えが要る場面は `loadBoard` を直に呼ぶ
+（書く前に始まった読みの答えを掴まないため）。画面が使い分ける形は、読む手を引数で渡す
+（`update(loadBoardShared)` / `refreshLock(current, loadBoardShared)`）。待ち時間で束ねるのは画面ごと
+（それぞれ別の仕事をする）で、`tickets.ts` は来た変化をそのまま配る。
