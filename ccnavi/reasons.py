@@ -385,8 +385,10 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     lines = [
         "[ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。",
         "- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。",
-        f"- チケット作業（設計に触れる・複数の段階になる・人のレビューが要る）: {conf.tickets}/ に",
-        f"  提案を書いて承認を受ける。以後の操作は {ticket_sh} を通す（使い方は --help）。",
+        "- チケット作業（設計に触れる・複数の段階になる・人のレビューが要る）: "
+        f"{conf.tickets}/todo/ に提案を書いて承認を受ける。"
+        f"承認されると {conf.approved}/doing/ へ動く。"
+        f"以後の操作は {ticket_sh} を通す（使い方は --help）。",
         "どちらで進めるか迷ったら、利用者に聞く。",
     ]
     if mode == DRY_RUN:
@@ -407,7 +409,7 @@ def approved(tickets, revisions: set[str], root: str) -> str:
     tickets は承認済みチケット（`ticket` `title` `parent` `phase` `is_child` を持つもの）。
     revisions は親の改版だった識別子。root はワークスペースルートで、sh の綴りに使う。
     """
-    lines = ["[ccnavi] 承認済みチケットが置かれた。"]
+    lines = ["[ccnavi] チケットが承認され、承認済みチケットの置き場（doing/）へ動いた。"]
     for t in tickets:
         if t.ticket in revisions:
             where = "親の改版。計画が新しくなった"

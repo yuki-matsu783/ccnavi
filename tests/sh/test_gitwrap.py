@@ -298,15 +298,15 @@ class PassTest(GitWrapperTest):
         """
         bare = self.make_bare()
         git(self.dir, "remote", "add", "origin", bare)
-        copies = os.path.join(self.dir, ".ccnavi", "tickets")
-        os.makedirs(copies)
-        with open(os.path.join(copies, "i0001.md"), "w", encoding="utf-8") as f:
+        copies = os.path.join(self.dir, ".ccnavi", "approved")
+        os.makedirs(os.path.join(copies, "doing"))
+        with open(os.path.join(copies, "doing", "i0001.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001\n---\n")
-        with open(os.path.join(copies, "i0001-01.md"), "w", encoding="utf-8") as f:
+        with open(os.path.join(copies, "doing", "i0001-01.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
-        # 閉じた子。承認済みチケットは closed/ に動いているが、ツリーはまだ子のもの。
-        os.makedirs(os.path.join(copies, "closed"))
-        with open(os.path.join(copies, "closed", "i0001-02.md"), "w", encoding="utf-8") as f:
+        # 閉じた子。承認済みチケットは done/ に動いているが、ツリーはまだ子のもの。
+        os.makedirs(os.path.join(copies, "done"))
+        with open(os.path.join(copies, "done", "i0001-02.md"), "w", encoding="utf-8") as f:
             f.write("---\nversion: 1\nticket: i0001-02\nparent: i0001\nphase: 1\n---\n")
         trees = {}
         for name in ("i0001", "i0001-01", "i0001-02", "free"):

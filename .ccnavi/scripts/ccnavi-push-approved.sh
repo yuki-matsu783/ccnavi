@@ -1,5 +1,6 @@
 #!/bin/sh
-# ccnavi-push-approved — 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ push する。
+# ccnavi-push-approved — 承認済みチケットの置き場（と、承認で todo/ から消えた提案）だけをコミットし、
+# 保護されたブランチでなければ push する。
 #
 #   sh .ccnavi/scripts/ccnavi-push-approved.sh
 #
@@ -8,7 +9,9 @@
 # ボードの承認は端末に送った 1 行が呼ぶ。対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
-# 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/tickets）。
+# 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
+# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かすので（ADR-0055）、
+# そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）は運ばない。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけを運ばない
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
@@ -52,16 +55,21 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
+approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
+proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
 projects="${CCNAVI_PROJECTS:-projects}"
 # 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
 approved="${approved%/}"
+proposals="${proposals%/}"
 projects="${projects%/}"
 # 落として空になる綴り（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
 # ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
 # どちらも頼まれた置き場ではないので、既定に戻す。
 case "$approved" in
-"" | .) approved=".ccnavi/tickets" ;;
+"" | .) approved=".ccnavi/approved" ;;
+esac
+case "$proposals" in
+"" | .) proposals="wip/proposals" ;;
 esac
 case "$projects" in
 "" | .) projects="projects" ;;
@@ -142,7 +150,20 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		printf 'fail\n' >>"$state"
 		continue
 	}
-	git -C "$tree" commit --quiet -m "ccnavi: 承認済みチケットを更新" -- "$approved" || {
+	# 承認で todo/ から消えた提案。追跡されていたものの削除だけを入れる（`ls-files --deleted`）。
+	# 未追跡の下書きも、編集中の提案も入れない。消えたものが無ければ pathspec にも足さない
+	# （git に知られていない綴りを pathspec に並べると commit が落ちる）。
+	gone=$(git -C "$tree" ls-files --deleted -z -- "$proposals/todo" 2>/dev/null | tr '\000' '\n' || :)
+	scope="$approved"
+	if [ -n "$gone" ]; then
+		printf '%s\n' "$gone" | while IFS= read -r removed; do
+			[ -n "$removed" ] || continue
+			git -C "$tree" add -u -- "$removed" 2>/dev/null || :
+		done
+		scope="$approved
+$proposals/todo"
+	fi
+	printf '%s\n' "$scope" | tr '\n' '\000' | xargs -0 git -C "$tree" commit --quiet -m "ccnavi: 承認済みチケットを更新" -- || {
 		printf 'ccnavi-push-approved: %s で承認済みチケットをコミットできない。\n' "$name" >&2
 		printf 'fail\n' >>"$state"
 		continue

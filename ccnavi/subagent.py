@@ -63,7 +63,9 @@ def at_start(
     if not children:
         return EXIT_OK
     closed, _ = approval.scan(conf, root, closed=True)
-    done = {t.ticket for t in closed}
+    review, _ = approval.scan_review(conf, root)
+    # 先行が「済んだ」は、閉じたかレビュー待ちか。レビュー待ちは作業としては終わっている。
+    done = {t.ticket for t in closed + review}
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"

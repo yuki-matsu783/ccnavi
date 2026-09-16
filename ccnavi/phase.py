@@ -248,10 +248,15 @@ class Phase:
 
     @property
     def ended(self) -> bool:
+        """終わったか。作業中（`doing/`）の子が無く、レビュー待ちか閉じた子が 1 枚以上。
+
+        取り消しだけのフェーズは終わらない。レビュー待ちは作業としては終わっていて、
+        人が見るのを待っている段（設計 §9.8）。
+        """
         states = list(self.states.values())
         if not states or any(s in (ticket_mod.TODO, ticket_mod.DOING, "") for s in states):
             return False
-        return ticket_mod.DONE in states
+        return any(s in (ticket_mod.REVIEW, ticket_mod.DONE) for s in states)
 
     @property
     def declared_review(self) -> str | None:
@@ -286,7 +291,9 @@ class Phase:
         if self.deferred:
             return phasetypes.REVIEW_NONE
         from_children = any(
-            t.review_required for t in self.tickets if self.states.get(t.ticket) == ticket_mod.DONE
+            t.review_required
+            for t in self.tickets
+            if self.states.get(t.ticket) in (ticket_mod.REVIEW, ticket_mod.DONE)
         )
         # 実績のリスクは、宣言を厳しい側にだけ上書きする（risk.py）。
         needed = from_children or self.risk_escalates
@@ -411,36 +418,6 @@ def load_types(
     return types
 
 
-def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.Ticket]:
-    """提案の状態を承認済みチケットへ写し、閉じたものを閉じる。開いている承認済みチケットを返す。"""
-    open_copies, notes = approval.scan(conf, root)
-    for note in notes:
-        stderr.write(f"ccnavi: {note}\n")
-    remaining = []
-    for copy in open_copies:
-        state, path = _proposal(root, conf, copy)
-        if state in ticket_mod.CLOSED:
-            where = approval.dir_of(conf, copy)
-            proposal, _ = ticket_mod.load(path)
-            if proposal is not None:
-                approval.update_copy(where, copy, _script_fields(proposal))
-            failed = approval.close_copy(where, copy.ticket)
-            if failed:
-                stderr.write(f"ccnavi: {copy.ticket}: {failed}\n")
-                remaining.append(copy)
-            continue
-        if path:
-            proposal, _ = ticket_mod.load(path)
-            if proposal is not None:
-                fields = _script_fields(proposal)
-                if any(getattr(copy, k) != v for k, v in fields.items()):
-                    approval.update_copy(approval.dir_of(conf, copy), copy, fields)
-                    for k, v in fields.items():
-                        setattr(copy, k, v)
-        remaining.append(copy)
-    return remaining
-
-
 def _covered_review(phase: Phase | None) -> str:
     """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 §9.8）。"""
     if phase is None or phase.declared_review is None:
@@ -484,23 +461,20 @@ def phases_of(
         # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
         for phase in by_number.values():
             phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
-    # 閉じた承認済みチケットは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
-    # 場所にあるので、消す・同じ識別子を todo/ に書く、でフェーズを開き直せては
-    # いけない。閉じたことの権威は承認済みチケットの側。
-    for t in approval.children_of(closed_copies, parent_id):
-        if t.phase is None:
-            continue
-        phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))
-        phase.tickets.append(t)
-        phase.states[t.ticket] = ticket_mod.CANCELLED if t.cancelled_at else ticket_mod.DONE
-    closed_ids = {t.ticket for t in closed_copies}
-    for t in approval.children_of(open_copies, parent_id):
-        if t.phase is None or t.ticket in closed_ids:
-            continue
-        phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))
-        phase.tickets.append(t)
-        state, _ = _proposal(root, conf, t)
-        phase.states[t.ticket] = state
+    # 状態は置き場そのもの（ADR-0055）。閉じた（`done/`）、レビュー待ち（`review/`）、
+    # 作業中（`doing/`）の順に読み、同じ識別子が 2 つの置き場に在れば閉じた側が勝つ。
+    # 閉じたことの権威は承認済みチケットの側で、エージェントが書ける `todo/` に同じ識別子を
+    # 書いてもフェーズは開き直らない（そちらは承認待ちにもならない。approval.waiting）。
+    review_copies, _ = approval.scan_review(conf, root)
+    seen: set[str] = set()
+    for pool in (closed_copies, review_copies, open_copies):
+        for t in approval.children_of(pool, parent_id):
+            if t.phase is None or t.ticket in seen:
+                continue
+            seen.add(t.ticket)
+            phase = by_number.setdefault(t.phase, Phase(parent_id, t.phase))
+            phase.tickets.append(t)
+            phase.states[t.ticket] = t.state
     # マーカーと記録は親のツリーに置く。子のワークツリーにも写しは checkout されるが、
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに散る。
     where = approval.home_dir(conf, root, parent_id, "")
@@ -1055,46 +1029,6 @@ def scope_findings(
         if found.outside:
             outside.append((rel, found))
     return outside, ""
-
-
-def _proposal(root: str, conf: settings.Settings, copy: ticket_mod.Ticket) -> tuple[str, str]:
-    """承認済みチケットの元になった提案が、いまどの状態にあるか。"""
-    tree_root = _tree_root(root, copy.source_tree, conf.projects)
-    if not tree_root:
-        return "", ""
-    return ticket_mod.locate(root, _tickets_rel_of(conf, copy, tree_root), tree_root, copy.ticket)
-
-
-def _tickets_rel_of(conf: settings.Settings, copy: ticket_mod.Ticket, tree_root: str) -> str:
-    """承認済みチケットの元になった提案の置き場（そのツリーのルートからの相対）。
-
-    承認のときに記録した `source_path` から引く。提案は状態のディレクトリの中を動くので、
-    下 2 段（`<状態>/<識別子>.md`）を落とした残りが置き場になる。
-
-    その残りをこのツリーの下の相対に直せないときは、設定の綴りを使う。別のドライブ
-    （Windows）、ツリーの外、ツリーのルートそのもの（相対が `.`）がそれにあたる。
-    """
-    base = os.path.dirname(os.path.dirname(copy.source_path))
-    try:
-        rel = os.path.relpath(base, tree_root).replace(os.sep, "/")
-    except ValueError:  # 別のドライブ（Windows）
-        return conf.tickets
-    if rel == "." or rel.startswith("../"):
-        return conf.tickets
-    return rel
-
-
-def _tree_root(root: str, name: str, projects_dir: str = "") -> str:
-    if name == tree.MAIN:
-        return tree.main_tree(root).root
-    for t in [*tree.projects(projects_dir), *tree.worktrees(root, projects_dir)]:
-        if t.name == name:
-            return t.root
-    return ""
-
-
-def _script_fields(proposal: ticket_mod.Ticket) -> dict[str, str]:
-    return {k: getattr(proposal, k) for k in ticket_mod.SCRIPT_FIELDS}
 
 
 def _git(cwd: str, args: list[str]) -> tuple[int, str]:

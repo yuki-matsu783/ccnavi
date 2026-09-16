@@ -6,15 +6,23 @@
 止められたエージェントが範囲を書き足して通れる。承認のときに承認済みチケットを置き、判定は
 承認済みチケットだけを読む。書き足した提案は承認済みチケットに届かない。
 
-## 承認済みチケットを守るのはルールの側
+## 承認済みチケットを守るのは置き場
 
-承認済みチケットは `.ccnavi/tickets/` に置く。
+承認済みチケットは `.ccnavi/approved/` に置く。ccnavi ディレクトリの下なので、組み込みの
+守りがエージェントの書き込みを止める。
+
+## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
+
+承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。写しを置いて
+提案を残す形はやめた。エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
+（レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、人がレビューを済ませると
+`review/` から `done/` へ動く。人が動かす向きは `.ccnavi/approved/` へ、エージェントが
+動かす向きは `wip/proposals/` へ。
 
 ## 閉じる向きだけは承認が要らない
 
-提案が `done/` か `cancelled/` に動いたら、hook が承認済みチケットを `closed/` へ動かす。
 範囲が消える向きなので、エージェントが動かしても危険は増えない。逆に承認済みチケットを
-戻す（再開）のは人の手でやる。
+`done/` から戻す（再開）のは人の手でやる。
 
 ## フェーズのマーカー
 
@@ -24,6 +32,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import io
 import json
@@ -35,9 +44,12 @@ from typing import TextIO
 from . import fsio, phasetypes, rules, settings, tree
 from . import ticket as ticket_mod
 
-# 承認済みチケットの下の置き場。
-CLOSED_DIR = "closed"
+# 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
+DOING_DIR = ticket_mod.DOING
+DONE_DIR = ticket_mod.DONE
 PHASES_DIR = "phases"
+# 旧の置き場（ADR-0055 まで）。開いたものは直下、閉じたものはここ。`--lint` だけが見る。
+LEGACY_CLOSED_DIR = "closed"
 
 # フェーズのマーカーの種類。
 MARK_REQUESTED = "requested"
@@ -49,16 +61,31 @@ MARKS = (MARK_REQUESTED, MARK_REVIEWED, MARK_SKIPPED, MARK_PENDING)
 
 
 def copy_path(approved_dir: str, ticket_id: str) -> str:
-    return os.path.join(approved_dir, ticket_id + ".md")
+    """作業中の承認済みチケット（`doing/`）の綴り。判定が読むのはここだけ。"""
+    return os.path.join(approved_dir, DOING_DIR, ticket_id + ".md")
 
 
 def closed_path(approved_dir: str, ticket_id: str) -> str:
-    return os.path.join(approved_dir, CLOSED_DIR, ticket_id + ".md")
+    """閉じた承認済みチケット（`done/`）の綴り。"""
+    return os.path.join(approved_dir, DONE_DIR, ticket_id + ".md")
+
+
+def review_path(tree_root: str, tickets_rel: str, ticket_id: str) -> str:
+    """レビュー待ちのチケット（提案の置き場の `review/`）の綴り。"""
+    base = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
+    return os.path.join(base, ticket_mod.REVIEW, ticket_id + ".md")
 
 
 def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Ticket], list[str]]:
-    """承認済みチケットの一覧。closed なら閉じたもの。2 つめは読めなかったものの説明。"""
-    directory = os.path.join(approved_dir, CLOSED_DIR) if closed else approved_dir
+    """承認済みチケットの一覧。closed なら閉じたもの。2 つめは読めなかったものの説明。
+
+    `state` を添える。閉じたものは取り消しの欄で `done` と `cancelled` に分ける。
+    """
+    directory = os.path.join(approved_dir, DONE_DIR if closed else DOING_DIR)
+    return _load_dir(directory)
+
+
+def _load_dir(directory: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
     try:
         names = sorted(os.listdir(directory))
     except FileNotFoundError:
@@ -77,8 +104,17 @@ def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Tic
         if ticket.ticket != name[:-3]:
             notes.append(f"承認済みチケット {path} の識別子 {ticket.ticket} がファイル名と違う")
             continue
+        ticket.state = state_of(directory, ticket)
         found.append(ticket)
     return found, notes
+
+
+def state_of(directory: str, ticket: ticket_mod.Ticket) -> str:
+    """置き場の名前から状態を引く。`done/` は取り消しの欄で 2 つに分ける。"""
+    name = os.path.basename(directory)
+    if name == DONE_DIR:
+        return ticket_mod.CANCELLED if ticket.cancelled_at else ticket_mod.DONE
+    return name
 
 
 def load_copy(path: str) -> ticket_mod.Ticket | None:
@@ -126,6 +162,24 @@ def scan_all(
     return found, notes
 
 
+def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
+    """全ツリーのレビュー待ち（提案の置き場の `review/`）を、重複を畳まずに集める。
+
+    ここに在るのは承認済みチケットが `done` で動いてきたもの。`ccnavi_approved` を持たない
+    ファイルは読まない（人が手で置いたものは承認を通っていない）。
+    """
+    found: list[ticket_mod.Ticket] = []
+    notes: list[str] = []
+    for t in trees(conf, root):
+        directory = os.path.join(t.root, conf.tickets.replace("/", os.sep), ticket_mod.REVIEW)
+        got, complaints = _load_dir(directory)
+        for c in got:
+            c.tree, c.tree_root, c.state = t.name, t.root, ticket_mod.REVIEW
+        found.extend(got)
+        notes.extend(complaints)
+    return found, notes
+
+
 def scan(
     conf: settings.Settings, root: str, closed: bool = False
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
@@ -134,12 +188,32 @@ def scan(
     権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
     落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
     閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」に倒すと、閉じたチケットが
-    開いたものとして復活する。権威のツリーがその識別子を開閉どちらでも持っていない
-    ときだけ、見つかった側を残す（親のワークツリーを作る前に承認した分を落とさないため）。
+    開いたものとして復活する。権威のツリーがその識別子をどの置き場（作業中・レビュー待ち・
+    閉じた）にも持っていないときだけ、見つかった側を残す（親のワークツリーを作る前に
+    承認した分を落とさないため）。
     """
     found, notes = scan_all(conf, root, closed)
-    other, _ = scan_all(conf, root, not closed)
-    at_home = {t.ticket for t in found + other if t.tree == (t.parent or t.ticket)}
+    return _authoritative(found, _everything(conf, root)), notes
+
+
+def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
+    """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
+    found, notes = review_all(conf, root)
+    return _authoritative(found, _everything(conf, root)), notes
+
+
+def _everything(conf: settings.Settings, root: str) -> list[ticket_mod.Ticket]:
+    """作業中・レビュー待ち・閉じたの全部を、重複を畳まずに。権威のツリーを決めるために使う。"""
+    open_all, _ = scan_all(conf, root)
+    closed_all, _ = scan_all(conf, root, closed=True)
+    review, _ = review_all(conf, root)
+    return open_all + closed_all + review
+
+
+def _authoritative(
+    found: list[ticket_mod.Ticket], everything: list[ticket_mod.Ticket]
+) -> list[ticket_mod.Ticket]:
+    at_home = {t.ticket for t in everything if t.tree == (t.parent or t.ticket)}
     by_id: dict[str, list[ticket_mod.Ticket]] = {}
     for t in found:
         by_id.setdefault(t.ticket, []).append(t)
@@ -147,7 +221,7 @@ def scan(
     for ticket_id, hits in by_id.items():
         home = hits[0].parent or hits[0].ticket
         kept.extend(hits if ticket_id not in at_home else [t for t in hits if t.tree == home])
-    return kept, notes
+    return kept
 
 
 def dir_of(conf: settings.Settings, ticket: ticket_mod.Ticket) -> str:
@@ -176,8 +250,10 @@ def home_dir(
         where = settings.approved_dir(conf, t.root)
         if t.name == home:
             named = where
-        if os.path.exists(copy_path(where, ticket_id)) or os.path.exists(
-            closed_path(where, ticket_id)
+        if (
+            os.path.exists(copy_path(where, ticket_id))
+            or os.path.exists(closed_path(where, ticket_id))
+            or os.path.exists(review_path(t.root, conf.tickets, ticket_id))
         ):
             holders.append((t, where))
     for wanted in (lambda t: t.name == home, lambda t: t.is_main, lambda t: True):
@@ -189,37 +265,196 @@ def home_dir(
     return settings.approved_dir(conf, fallback_root or tree.main_tree(root).root)
 
 
-def write_copy(
-    approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approved_at: str
-) -> str:
-    """承認した提案を写す。書けなかった理由を返す。書けたら空文字。"""
+def admit(approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approved_at: str) -> str:
+    """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
+
+    承認の記録（`ccnavi_approved`）を足して書き、元の提案を消す。消せなければ書いた側を
+    消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる。
+    """
     meta = {
         "approved_at": approved_at,
         "source_tree": source_tree,
         "source_path": ticket.path,
     }
-    return _write(
-        copy_path(approved_dir, ticket.ticket),
-        ticket_mod.render(ticket, {ticket_mod.APPROVAL_KEY: meta}),
-    )
+    target = copy_path(approved_dir, ticket.ticket)
+    # 人の書いた行（コメント、`|` のブロック）を保つ。読み直して書き出さず、承認の記録の
+    # 欄と、置き場から決まった `project:`（frontmatter に無ければ）だけを足す。
+    try:
+        with open(ticket.path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError as exc:
+        return f"提案を読めない ({exc})"
+    if ticket.project and not ticket.declared_project:
+        text = ticket_mod.insert_front(text, "project", ticket.project)
+    failed = _write(target, ticket_mod.insert_front(text, ticket_mod.APPROVAL_KEY, meta))
+    if failed:
+        return failed
+    try:
+        os.remove(ticket.path)
+    except OSError as exc:
+        fsio.remove(target)
+        return f"提案を todo/ から動かせない ({exc})"
+    return ""
 
 
 def update_copy(approved_dir: str, ticket: ticket_mod.Ticket, fields: dict) -> str:
-    """承認済みチケットの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
-    allowed = {k: v for k, v in fields.items() if k in ticket_mod.SCRIPT_FIELDS}
-    return _write(copy_path(approved_dir, ticket.ticket), ticket_mod.render(ticket, allowed))
+    """作業中の承認済みチケットの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
+    return update_fields(copy_path(approved_dir, ticket.ticket), fields)
+
+
+def update_fields(path: str, fields: dict) -> str:
+    """チケットの、スクリプトが書く欄だけを行単位で書き換える。人の書いた本文は保つ。"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except OSError as exc:
+        return f"読めない ({exc})"
+    return _write(path, ticket_mod.set_fields(text, fields))
 
 
 def close_copy(approved_dir: str, ticket_id: str) -> str:
-    """承認済みチケットを closed/ へ動かす。"""
-    source = copy_path(approved_dir, ticket_id)
-    target = closed_path(approved_dir, ticket_id)
+    """承認済みチケットを `doing/` から `done/` へ動かす。"""
+    return move_file(copy_path(approved_dir, ticket_id), closed_path(approved_dir, ticket_id))
+
+
+def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: str) -> str:
+    """承認済みチケットを `doing/` から提案の置き場の `review/` へ動かす。"""
+    return move_file(
+        copy_path(approved_dir, ticket_id), review_path(tree_root, tickets_rel, ticket_id)
+    )
+
+
+def move_file(source: str, target: str) -> str:
+    """チケットを置き場から置き場へ動かす。動かせなかった理由を返す。
+
+    行き先に同じ名前が既に在れば動かさない。黙って上書きすると、閉じた側の記録
+    （取り消しの欄など）が消える。同じ識別子が 2 つ在るのは `--lint` が名指しする。
+
+    同じファイルシステムの中なら rename で 1 手。またぐとき（EXDEV）だけ写して消す。
+    消せなければ写した側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で
+    止まる（`admit` と同じ）。Windows は開かれているファイルを消させないので、現実に起きる。
+
+    写して消す側へ流すのは EXDEV に限る。rename が他の理由（元が無い、など）で失敗した
+    ときまで流すと、写せずに戻す手が、その間に別のプロセスが置いた行き先を消す。
+    """
+    if os.path.exists(target):
+        return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
     try:
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        shutil.move(source, target)
+        os.rename(source, target)
+        return ""
     except OSError as exc:
-        return f"承認済みチケットを閉じられない ({exc})"
+        if exc.errno != errno.EXDEV:
+            return f"チケットを動かせない ({source} → {target}: {exc})"
+    try:
+        shutil.copy2(source, target)
+    except OSError as exc:
+        fsio.remove(target)
+        return f"チケットを動かせない ({source} → {target}: {exc})"
+    try:
+        os.remove(source)
+    except OSError as exc:
+        fsio.remove(target)
+        return f"チケットを動かせない ({source} → {target}: {exc})"
     return ""
+
+
+def settle_review(
+    conf: settings.Settings, root: str, parent_id: str, numbers: list[int]
+) -> tuple[list[str], str]:
+    """この親の、この番号のフェーズのレビュー待ちの子を `done/` へ動かす。
+
+    人がレビューを済ませたときに呼ぶ（`check` / `accept` / `--reviewed --chat` / `wrapup` と、
+    フィードバック計画の承認）。返すのは動かした識別子と、動かせなかった理由。
+    """
+    review, _ = scan_review(conf, root)
+    moved: list[str] = []
+    for t in sorted(review, key=lambda x: x.ticket):
+        if t.parent != parent_id or t.phase not in numbers:
+            continue
+        where = home_dir(conf, root, t.ticket, parent_id)
+        failed = move_file(t.path, closed_path(where, t.ticket))
+        if failed:
+            return moved, failed
+        moved.append(t.ticket)
+    return moved, ""
+
+
+def next_child_id(conf: settings.Settings, root: str, parent_id: str) -> str:
+    """この親の次の子の識別子。どの置き場に在る子よりも後ろの連番。"""
+    seen = _everything(conf, root)
+    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    used = 0
+    for t in seen + proposals:
+        m = ticket_mod.child_pattern().match(t.ticket)
+        if m and m.group("parent") == parent_id:
+            used = max(used, int(m.group("seq")))
+    return f"{parent_id}-{used + 1:02d}"
+
+
+def followup(
+    conf: settings.Settings,
+    root: str,
+    parent: ticket_mod.Ticket,
+    phase_no: int,
+    children: list[ticket_mod.Ticket],
+    items: list[str],
+    stamp: str,
+) -> tuple[str, str]:
+    """レビューで残った指摘の続きの子を、人の判断で `doing/` に直に起こす（ADR-0055）。
+
+    人が端末で「続きの子で直す」と選んだことが承認そのもの。同じフェーズの番号に足すので、
+    そのフェーズは開き直り、マーカーは消える（REQ-TKT-21）。範囲は見た子の範囲の和。
+    本文には指摘を写す。返すのは識別子と、起こせなかった理由。
+    """
+    ident = next_child_id(conf, root, parent.ticket)
+    where = home_dir(conf, root, parent.ticket, "")
+    front: dict = {
+        "version": ticket_mod.VERSION,
+        "ticket": ident,
+        "parent": parent.ticket,
+        "phase": phase_no,
+    }
+    if parent.project:
+        front["project"] = parent.project
+    front["predecessors"] = [c.ticket for c in children]
+    front["human_review"] = {"required": True, "reason": "レビューで残った指摘への対応"}
+    front["title"] = f"フェーズ {phase_no} のレビューの指摘に応える"
+    front["rationale"] = (
+        f"フェーズ {phase_no} のレビューで残った指摘に応える。"
+        "利用者が端末で起こした続きの子で、承認はその判断で済んでいる。\n"
+    )
+    for name in rules.SECTIONS:
+        entries = []
+        seen: set[tuple] = set()
+        for c in children:
+            for raw in c.raw.get(name) or []:
+                key = (
+                    tuple(sorted((str(k), str(v)) for k, v in raw.items()))
+                    if isinstance(raw, dict)
+                    else (str(raw),)
+                )
+                if key not in seen:
+                    seen.add(key)
+                    entries.append(raw)
+        if entries:
+            front[name] = entries
+    front.update({"started_at": "", "completed_at": "", "base_sha": ""})
+    front[ticket_mod.APPROVAL_KEY] = {
+        "approved_at": stamp,
+        "source_tree": "",
+        "source_path": "",
+        "followup_of": [c.ticket for c in children],
+    }
+    body = ["", "## 引き継ぐ指摘", ""]
+    body += [f"- {item}" for item in items] or ["（指摘の一覧は無い）"]
+    body.append("")
+    t = ticket_mod.Ticket(ticket=ident, raw=front, body="\n".join(body))
+    failed = _write(copy_path(where, ident), ticket_mod.render(t))
+    if failed:
+        return ident, failed
+    clear_marks(where, parent.ticket, phase_no)
+    return ident, ""
 
 
 def by_id(tickets: list[ticket_mod.Ticket]) -> dict[str, ticket_mod.Ticket]:
@@ -518,8 +753,9 @@ def gather(
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
     closed, _ = scan(conf, root, closed=True)
+    review, _ = scan_review(conf, root)
 
-    pending, revisions = waiting(proposals, approved, closed)
+    pending, revisions = waiting(proposals, approved, closed, review)
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
     texts = [str(p) for p in problems] + list(notes)
     note = ""
@@ -824,6 +1060,9 @@ def _copy_marks(conf: settings.Settings, root: str) -> dict[str, ticket_mod.Tick
         got, _ = scan(conf, root, closed=closed)
         for t in got:
             found[t.ticket] = t
+    review, _ = scan_review(conf, root)
+    for t in review:
+        found[t.ticket] = t
     return found
 
 
@@ -1000,6 +1239,10 @@ def _apply(
                 stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
                 return Applied(1, placed, t.ticket, failed)
             placed.append(t.ticket)
+            try:
+                os.remove(t.path)
+            except OSError as exc:
+                stderr.write(f"ccnavi: {t.ticket}: 改版の提案を todo/ から消せない ({exc})\n")
             what = "フィードバック計画" if cand.plans_feedback else "全体計画"
             stdout.write(f"  {t.ticket} の{what}を改版した\n")
             if cand.plans_feedback:
@@ -1008,13 +1251,20 @@ def _apply(
                 if failed:
                     stderr.write(f"ccnavi: {t.ticket}: マーカーを置けない: {failed}\n")
                     return Applied(1, placed, t.ticket, f"マーカーを置けない: {failed}")
+                # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
+                moved, failed = settle_review(conf, root, t.ticket, list(range(1, len(t.plan) + 1)))
+                if failed:
+                    stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
+                    return Applied(1, placed, t.ticket, failed)
+                if moved:
+                    stdout.write(f"  レビュー待ちの子を閉じた: {', '.join(moved)}\n")
                 stdout.write(
                     "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
                     "フィードバック作業フェーズの check が数える\n"
                 )
             continue
         where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-        failed = write_copy(where, t, t.tree, stamp)
+        failed = admit(where, t, t.tree, stamp)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return Applied(1, placed, t.ticket, failed)
@@ -1037,7 +1287,7 @@ def _apply(
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
 
-    stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
+    stdout.write(f"\n承認した。{conf.approved}/{DOING_DIR}/ へ動かした。\n")
     return Applied(0, placed)
 
 
@@ -1202,19 +1452,22 @@ def waiting(
     proposals: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
+    review: list[ticket_mod.Ticket] = (),
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
     """いま `--approve` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
-    承認待ちは承認済みチケットが無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
-    改版は、開いている親の承認済みチケットがあり、提案の計画が承認済みチケットと違うもの。
+    承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
+    無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
+    改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     """
-    known = by_id(approved + closed)
+    known = by_id(approved + closed + list(review))
     open_index = by_id(approved)
-    pending = [t for t in proposals if t.ticket not in known and t.state != ticket_mod.CANCELLED]
+    todo = [t for t in proposals if t.state == ticket_mod.TODO]
+    pending = [t for t in todo if t.ticket not in known]
     revisions = [
         t
-        for t in proposals
+        for t in todo
         if t.ticket in open_index
         and not t.is_child
         and t.has_plan
@@ -1420,12 +1673,8 @@ def _scope_signature(t: ticket_mod.Ticket) -> tuple:
 
 def _last_phase_with_children(conf: settings.Settings, root: str, parent_id: str) -> int:
     """この親で、子が承認された（開いていても閉じていても）いちばん後ろの番号。"""
-    open_copies, _ = scan(conf, root)
-    closed_copies, _ = scan(conf, root, closed=True)
     numbers = [
-        t.phase
-        for t in open_copies + closed_copies
-        if t.parent == parent_id and t.phase is not None
+        t.phase for t in _everything(conf, root) if t.parent == parent_id and t.phase is not None
     ]
     return max(numbers) if numbers else 0
 
