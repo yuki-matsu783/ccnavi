@@ -34,7 +34,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠
   judge   定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
 
   提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の
-  .ccnavi/common/phases.yml（CCNAVI_PHASES）、自身の層の .ccnavi/config/phases.yml、
+  .ccnavi/common/phases.yml、自身の層の .ccnavi/config/phases.yml、
   プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どの層にも無ければ
   フェーズは番号だけになる
 USAGE
