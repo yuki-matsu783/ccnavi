@@ -8,6 +8,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, readAppearance } from "./appearance.js";
+import { loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
 import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, type LoadResult } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
@@ -25,22 +26,6 @@ import { ticketControl } from "./ticket-control.js";
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
 
-/**
- * 監視する場所。提案（ワークスペース、プロジェクト、全作業ツリーの `wip/tickets/`）、
- * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、作業ツリーの登録。
- * glob は OS によらず "/" 区切り。
- */
-export const WATCH_PATTERNS = [
-  "wip/**/tickets/**",
-  "projects/*/wip/**/tickets/**",
-  ".claude/worktrees/*/wip/**/tickets/**",
-  ".ccnavi/tickets/**",
-  "projects/*/.ccnavi/tickets/**",
-  ".claude/worktrees/*/.ccnavi/tickets/**",
-  ".git/worktrees/*",
-  "projects/*/.git/worktrees/*",
-] as const;
-
 type Message =
   | { readonly type: "open"; readonly filePath: string }
   | { readonly type: "refresh" }
@@ -54,7 +39,8 @@ type Message =
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
-  watchers: vscode.FileSystemWatcher[];
+  /** チケットの監視の購読。パネルが閉じるまで */
+  subs: vscode.Disposable[];
   timer?: NodeJS.Timeout;
   board?: Board;
   launcher?: Launcher;
@@ -130,7 +116,7 @@ export async function openBoard(project?: string): Promise<void> {
   const current: PanelState = {
     panel,
     folder,
-    watchers: [],
+    subs: [],
     loading: false,
     again: false,
     wasVisible: panel.visible,
@@ -185,22 +171,16 @@ function registerPanelHandlers(current: PanelState): void {
       clearTimeout(current.timer);
       current.timer = undefined;
     }
-    for (const watcher of current.watchers) {
-      watcher.dispose();
+    for (const sub of current.subs) {
+      sub.dispose();
     }
-    current.watchers = [];
+    current.subs = [];
     if (state === current) {
       state = undefined;
     }
   });
 
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    watcher.onDidCreate(scheduleUpdate);
-    watcher.onDidChange(scheduleUpdate);
-    watcher.onDidDelete(scheduleUpdate);
-    current.watchers.push(watcher);
-  }
+  current.subs.push(onTicketsChanged(folder, scheduleUpdate));
 }
 
 function scheduleUpdate(): void {
@@ -214,13 +194,14 @@ function scheduleUpdate(): void {
   current.timer = setTimeout(() => {
     current.timer = undefined;
     if (state === current) {
-      void update();
+      // 同じ変化で他の画面も取りに行く。答えを分け合い、子プロセスを 1 つで済ませる
+      void update(loadBoardShared);
     }
   }, DEBOUNCE_MS);
 }
 
 /** 実行ファイルを走らせ直して Webview の内容を差し替える */
-async function update(): Promise<void> {
+async function update(load: Loader = loadBoard): Promise<void> {
   const current = state;
   if (current === undefined) {
     return;
@@ -231,7 +212,7 @@ async function update(): Promise<void> {
   }
   current.loading = true;
   try {
-    const result = await loadBoard(current.folder.uri.fsPath, binSetting());
+    const result = await load(current.folder.uri.fsPath, binSetting());
     if (state !== current) {
       return;
     }
@@ -247,7 +228,7 @@ async function update(): Promise<void> {
     current.loading = false;
     if (current.again) {
       current.again = false;
-      void update();
+      void update(load);
     }
   }
 }

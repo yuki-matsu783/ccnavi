@@ -17,7 +17,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { WATCH_PATTERNS } from "./board-panel.js";
+import { loadBoardShared, onTicketsChanged, type Loader } from "./tickets.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
@@ -56,8 +56,8 @@ interface PanelState {
   readonly tmpDir: string;
   /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読込のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
-  /** チケットの置き場の監視。開いている間ずっと同じ */
-  watchers: vscode.FileSystemWatcher[];
+  /** チケットの置き場の購読。開いている間ずっと同じ */
+  subs: vscode.Disposable[];
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
   loaded?: Loaded;
@@ -105,7 +105,7 @@ export function openRisk(): void {
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-risk-")),
     fileWatchers: [],
-    watchers: [],
+    subs: [],
     loaded,
     lock: lockFromError("まだ確認していない"),
     wroteAt: 0,
@@ -175,11 +175,14 @@ function registerPanelHandlers(current: PanelState): void {
         clearTimeout(timer);
       }
     }
-    for (const watcher of [...current.fileWatchers, ...current.watchers]) {
+    for (const watcher of current.fileWatchers) {
       watcher.dispose();
     }
     current.fileWatchers = [];
-    current.watchers = [];
+    for (const sub of current.subs) {
+      sub.dispose();
+    }
+    current.subs = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
     } catch {
@@ -192,14 +195,7 @@ function registerPanelHandlers(current: PanelState): void {
 
   watchFiles(current);
   // チケットが動いたら、保存できるかを取り直す。
-  for (const pattern of WATCH_PATTERNS) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const moved = () => scheduleLock(current);
-    watcher.onDidCreate(moved);
-    watcher.onDidChange(moved);
-    watcher.onDidDelete(moved);
-    current.watchers.push(watcher);
-  }
+  current.subs.push(onTicketsChanged(folder, () => scheduleLock(current)));
 }
 
 /**
@@ -265,7 +261,8 @@ function scheduleLock(current: PanelState): void {
   current.lockTimer = setTimeout(() => {
     current.lockTimer = undefined;
     if (alive(current)) {
-      void refreshLock(current);
+      // 同じ変化で他の画面も取りに行く。答えを分け合い、子プロセスを 1 つで済ませる
+      void refreshLock(current, loadBoardShared);
     }
   }, DEBOUNCE_MS);
 }
@@ -274,8 +271,8 @@ function scheduleLock(current: PanelState): void {
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
  * 配点はワークスペースに 1 本で、どのツリーの子を閉じるときにも読まれるので、どのツリーの doing でも止める。
  */
-async function refreshLock(current: PanelState): Promise<Lock> {
-  const result = await loadBoard(current.folder.uri.fsPath, binSetting());
+async function refreshLock(current: PanelState, load: Loader = loadBoard): Promise<Lock> {
+  const result = await load(current.folder.uri.fsPath, binSetting());
   const lock = result.ok ? lockFromBoard(result.board) : lockFromError(result.error);
   if (alive(current)) {
     current.lock = lock;
