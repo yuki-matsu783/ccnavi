@@ -1,7 +1,9 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。入口は 5 つで、どれも Webview パネルを開く。
- * 「チケット管理」はチケット制御（CCNAVI_TICKET_CONTROL）が disable のプロジェクトでは出さない。
- * 全体ルールだけを使うプロジェクトに、開いても空のボードしか出ない入口を見せないため。
+ * アクティビティバーの ccnavi から開くサイドパネル。入口は 6 つで、どれも Webview パネルを開く。
+ * 「チケット管理」「リスク管理」「フェーズ管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
+ * disable のワークスペースでは出さない。配点は子チケットを閉じるときに、フェーズの種類は親の
+ * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。効かない設定の
+ * 入口を残すと、直したのに効いていない、という読み違いの元になる。
  * VS Code の API に触れるので単体テストの対象外。
  */
 import * as vscode from "vscode";
@@ -39,14 +41,14 @@ const ENTRIES: readonly Entry[] = [
     description: "実績で測るリスクの配点（閾値と項目）の編集と保存",
     command: "ccnaviBoard.openRisk",
     icon: "pulse",
-    needsTickets: false,
+    needsTickets: true,
   },
   {
     label: "フェーズ管理",
     description: "フェーズの種類（計画に並べる型、範囲の上限、レビューの既定）の編集と保存",
     command: "ccnaviBoard.openPhases",
     icon: "milestone",
-    needsTickets: false,
+    needsTickets: true,
   },
   {
     label: "チケット管理",

@@ -99,15 +99,20 @@ function renderList(page: ProjectsPage): string {
   return `  <ul class="projects">\n${items}\n  </ul>`;
 }
 
-/** ワークスペース自身の層のルール。無いのは正常なので warn の色は使わない */
+/**
+ * ワークスペース自身の層のルール。無いのは正常なので warn の色は使わない。
+ * フェーズの種類の行は、チケット制御が disable なら出さない（種類はチケットにしか読まれない）。
+ */
 function renderSelfRules(page: ProjectsPage): string {
   const rel = `<span class="mono small">${escapeHtml(page.selfRulesRel)}</span>`;
   const state = page.selfRulesExists
     ? `<span class="ok">あり</span> ${rel}`
     : `<span class="dim">なし</span> ${rel} <button type="button" class="action small" data-action="create-self-rules" title="共通層の rules.yml を自身の層にコピーする。文面の sh のパスは {root} 付きに置き換える">共通層からコピー</button>`;
+  const selfPhases = page.ticketsEnabled
+    ? `  <div class="self-rules"><span>自身の層のフェーズの種類</span> <button type="button" class="action small" data-action="open-self-phases" title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集する。無ければ画面から作れる">フェーズ管理</button></div>\n`
+    : "";
   return `  <div class="self-rules"><span>自身の層のルール</span> ${state} <button type="button" class="action small" data-action="open-self-rules" ${page.selfRulesExists ? "" : "disabled "}title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足して当たるルールを編集し、判定を試す">ルール管理</button></div>
-  <div class="self-rules"><span>自身の層のフェーズの種類</span> <button type="button" class="action small" data-action="open-self-phases" title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集する。無ければ画面から作れる">フェーズ管理</button></div>
-`;
+${selfPhases}`;
 }
 
 function renderRules(row: ProjectRow): string {
@@ -135,6 +140,11 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
   const board = ticketsEnabled
     ? `\n          <button type="button" class="action" data-action="open-board" data-name="${escapeHtml(row.name)}" title="このプロジェクトに絞ってチケット管理を開く">チケット管理</button>`
     : "";
+  // フェーズの種類は親チケットの計画と子の範囲にしか読まれない。チケット制御が disable の間は
+  // 何も動かさないので、開く側（phases-panel）と揃えて入口を出さない。
+  const phases = ticketsEnabled
+    ? `\n          <button type="button" class="action" data-action="open-phases" data-name="${escapeHtml(row.name)}" ${row.rulesRel === "" ? "disabled " : ""}title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集する。無ければ画面から作れる">フェーズ管理</button>`
+    : "";
   const flags = [
     row.doing > 0 ? `<span class="badge doing">作業中 ${row.doing}</span>` : "",
     problems.some((p) => p.severity === "error") ? '<span class="badge error">error</span>' : "",
@@ -155,8 +165,7 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
         <details class="menu">
           <summary class="action">開く ▾</summary>
           <div class="menu-items">
-          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試す">ルール管理</button>
-          <button type="button" class="action" data-action="open-phases" data-name="${escapeHtml(row.name)}" ${row.rulesRel === "" ? "disabled " : ""}title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集する。無ければ画面から作れる">フェーズ管理</button>${board}
+          <button type="button" class="action" data-action="open-rules" data-name="${escapeHtml(row.name)}" ${row.rulesExists ? "" : "disabled "}title="このプロジェクトの ${escapeHtml(row.rulesRel === "" ? "層のルール" : row.rulesRel)} を編集し、判定を試す">ルール管理</button>${phases}${board}
           </div>
         </details>
         <details class="menu">
