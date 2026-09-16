@@ -339,7 +339,9 @@ def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str
         return ""
     path = accepted_path(approved_dir, parent)
     keep = sorted(accepted_threads(approved_dir, parent) | {str(t) for t in threads if str(t)})
-    failed = fsio.write_json(path, {"threads": keep, "at": now()}, indent=1)
+    # 読んで、足して、書き戻す形。同じファイルの `_write_known` と同じく、
+    # 途中を見せない書き方で置く。
+    failed = fsio.write_json_atomic(path, {"threads": keep, "at": now()}, indent=1)
     return f"{path} ({failed})" if failed else ""
 
 
@@ -797,7 +799,7 @@ def _known(path: str) -> dict[str, str] | None:
 
 
 def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
-    failed = fsio.write_json(path, {"known": dict(sorted(known.items()))})
+    failed = fsio.write_json_atomic(path, {"known": dict(sorted(known.items()))})
     if failed:
         stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
 
