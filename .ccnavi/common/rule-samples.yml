@@ -148,6 +148,19 @@ deny:
     subject: "cp /tmp/x /repo/.claude/settings.local.json"
     why: 行き先に来た設定ファイル
   - tool: Write
+    subject: "/repo/.claude/worktrees/x/.Claude/Settings.json"
+    why: >-
+      綴りを変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
+      組み込みの守りが畳んで止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
+  - tool: Bash
+    subject: "GIT push origin main"
+    why: >-
+      Windows では大文字でも同じコマンドが走る。綴りで判定が割れると、同じルールが
+      機械によって止めたり通したりする
+  - tool: Read
+    subject: "/repo/.claude/worktrees/x/.ENV"
+    why: 認証情報の場所も綴りを問わない
+  - tool: Write
     subject: "/repo/.ccnavi/scripts/ccnavi-git.sh"
     why: git の入口。書き換えれば git のルールがまとめて外れる
   - tool: Bash
@@ -178,6 +191,9 @@ ask:
   - tool: Bash
     subject: "cat /repo/urls.txt | wget -i -"
     why: パイプの後ろに立つ取得も拾う。コマンドの先頭なら当たる
+  - tool: Bash
+    subject: "CURL https://example.com"
+    why: 勧めるほうの文面も綴りを問わない。止める側だけ畳むと、案内が綴りで消える
   - tool: Bash
     subject: "echo curl is a tool"
     why: >-
