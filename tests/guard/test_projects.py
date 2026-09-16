@@ -476,6 +476,22 @@ class ProjectsTest(unittest.TestCase):
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
         self.assertEqual(board["tickets"], [])
 
+    def test_lint_names_a_workspace_side_place_even_for_a_known_project(self):
+        # 名前が projects/ に在っても、ワークスペースの wip/<名前>/tickets/ は走査されない。
+        # 提案はそのプロジェクトの側 projects/<名前>/wip/tickets/ に置く（設計 §11.5、REQ-MLT-14）。
+        # 黙ると提案が消えたように見えるので、正しい置き場を添えて名指しする
+        write(
+            os.path.join(self.ws, "wip", "lib", "tickets", "todo", "i0011.md"),
+            ticket_text("i0011", allow=("src/*",)),
+        )
+        result = self.ccnavi("--lint")
+        out = result.stdout + result.stderr
+        self.assertIn("wip/lib/tickets", out)
+        self.assertIn("走査されていない", out)
+        self.assertIn("projects/lib/wip/tickets", out)
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        self.assertEqual(board["tickets"], [])
+
     def test_the_copys_proposal_is_found_through_the_recorded_path(self):
         write(
             os.path.join(self.lib, "wip", "tickets", "todo", "i0007.md"),
