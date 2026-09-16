@@ -22,7 +22,7 @@ set -u
 # 共通部分。ワークスペースルートの探し方はここにある（設計 §11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
+approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 projects="${CCNAVI_PROJECTS:-projects}"
 
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
