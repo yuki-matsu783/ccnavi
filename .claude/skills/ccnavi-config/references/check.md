@@ -51,7 +51,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --appr
 - **タイプの順で強い側が先に当たっている。** allow に置いた見本が deny の `raw-git` に当たる、
   など。この形なら見本の置き場かルールの広さのどちらかが間違っている
 
-単発で試したい形があれば、見本ファイルを scratchpad に書いて `--test-samples` で回す
+単発で試したい形があれば、見本ファイルを作業ツリーの `tmp/` に書いて `--test-samples` で回す
 （`--test` に直接書くと、禁止語を含む Bash 自体が当たる）。`--json` を付ければ翻訳後の
 正規表現（`pattern`）と返る文面（`response`）まで出る。
 
