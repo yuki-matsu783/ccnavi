@@ -5,7 +5,7 @@
  "settings": {
   "ticket_control": "enable",
   "tickets": "wip/proposals",
-  "approved": ".ccnavi/tickets",
+  "approved": ".ccnavi/approved",
   "projects": "<root>/projects"
  },
  "trees": [
@@ -30,6 +30,12 @@
   {
    "name": "i0001-02",
    "root": "<root>/.claude/worktrees/i0001-02",
+   "project": "",
+   "kind": "worktree"
+  },
+  {
+   "name": "i0001-04",
+   "root": "<root>/.claude/worktrees/i0001-04",
    "project": "",
    "kind": "worktree"
   }
@@ -157,17 +163,12 @@
     "required": true,
     "reason": "t"
    },
-   "proposal": {
-    "state": "todo",
-    "tree": "i0001",
-    "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md"
-   },
+   "proposal": null,
    "copy": {
     "status": "open",
     "approved_at": "2026-09-13T13:50:21+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001.md"
    },
    "worktree": {
     "exists": true,
@@ -179,23 +180,7 @@
    "base_sha": "",
    "cancelled_at": "",
    "cancel_reason": "",
-   "seen_in": [
-    {
-     "tree": "i0001",
-     "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md"
-    },
-    {
-     "tree": "i0001-01",
-     "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-01/wip/proposals/todo/i0001.md"
-    },
-    {
-     "tree": "i0001-02",
-     "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001.md"
-    }
-   ],
+   "seen_in": [],
    "scattered": [],
    "risk": null,
    "judge": null
@@ -212,17 +197,12 @@
     "required": false,
     "reason": "t"
    },
-   "proposal": {
-    "state": "done",
-    "tree": "i0001",
-    "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/done/i0001-01.md"
-   },
+   "proposal": null,
    "copy": {
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/closed/i0001-01.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-01.md"
    },
    "worktree": {
     "exists": true,
@@ -234,23 +214,7 @@
    "base_sha": "e5b468badbc7004f744ee323f41c24cb3d36baf8",
    "cancelled_at": "",
    "cancel_reason": "",
-   "seen_in": [
-    {
-     "tree": "i0001",
-     "state": "done",
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/done/i0001-01.md"
-    },
-    {
-     "tree": "i0001-01",
-     "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-01/wip/proposals/todo/i0001-01.md"
-    },
-    {
-     "tree": "i0001-02",
-     "state": "done",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/done/i0001-01.md"
-    }
-   ],
+   "seen_in": [],
    "scattered": [],
    "risk": {
     "points": 0,
@@ -276,17 +240,12 @@
     "required": true,
     "reason": "t"
    },
-   "proposal": {
-    "state": "doing",
-    "tree": "i0001",
-    "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/proposals/doing/i0001-02.md"
-   },
+   "proposal": null,
    "copy": {
     "status": "open",
     "approved_at": "2026-09-13T13:50:22+0000",
     "source_tree": "i0001",
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/tickets/i0001-02.md"
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/doing/i0001-02.md"
    },
    "worktree": {
     "exists": true,
@@ -298,18 +257,7 @@
    "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
    "cancelled_at": "",
    "cancel_reason": "",
-   "seen_in": [
-    {
-     "tree": "i0001",
-     "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001/wip/proposals/doing/i0001-02.md"
-    },
-    {
-     "tree": "i0001-02",
-     "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001-02.md"
-    }
-   ],
+   "seen_in": [],
    "scattered": [],
    "risk": null,
    "judge": null
@@ -356,6 +304,98 @@
      "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001-03.md"
     }
    ],
+   "scattered": [],
+   "risk": null,
+   "judge": null
+  },
+  {
+   "ticket": "i0001-04",
+   "parent": "i0001",
+   "phase": 2,
+   "title": "子 i0001-04",
+   "project": "",
+   "issue": null,
+   "predecessors": [],
+   "human_review": {
+    "required": true,
+    "reason": "t"
+   },
+   "proposal": {
+    "state": "review",
+    "tree": "i0001",
+    "tree_root": "<root>/.claude/worktrees/i0001",
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
+   },
+   "copy": {
+    "status": "review",
+    "approved_at": "2026-09-13T13:50:22+0000",
+    "source_tree": "i0001",
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
+   },
+   "worktree": {
+    "exists": true,
+    "path": "<root>/.claude/worktrees/i0001-04",
+    "project": ""
+   },
+   "started_at": "2026-09-13T13:50:22+0000",
+   "completed_at": "2026-09-13T13:50:23+0000",
+   "base_sha": "7b48d1c301419efae9ea26026e061fb329be1b0e",
+   "cancelled_at": "",
+   "cancel_reason": "",
+   "seen_in": [
+    {
+     "tree": "i0001",
+     "state": "review",
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
+    },
+    {
+     "tree": "i0001-04",
+     "state": "review",
+     "path": "<root>/.claude/worktrees/i0001-04/wip/proposals/review/i0001-04.md"
+    }
+   ],
+   "scattered": [],
+   "risk": {
+    "points": 0,
+    "level": "LOW",
+    "hits": [],
+    "unmeasured": [],
+    "head": "9c1f2e3d4b5a69788796a5b4c3d2e1f0a9b8c7d6",
+    "base": "7b48d1c301419efae9ea26026e061fb329be1b0e",
+    "at": "2026-09-13T13:50:23+0000",
+    "summary": "1 ファイル、+2 -0 行、消したファイル 0"
+   },
+   "judge": null
+  },
+  {
+   "ticket": "i0001-05",
+   "parent": "i0001",
+   "phase": 2,
+   "title": "子 i0001-05",
+   "project": "",
+   "issue": null,
+   "predecessors": [],
+   "human_review": {
+    "required": true,
+    "reason": "t"
+   },
+   "proposal": null,
+   "copy": {
+    "status": "closed",
+    "approved_at": "2026-09-13T13:50:22+0000",
+    "source_tree": "i0001",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/done/i0001-05.md"
+   },
+   "worktree": {
+    "exists": false,
+    "path": "<root>/.claude/worktrees/i0001-05"
+   },
+   "started_at": "",
+   "completed_at": "",
+   "base_sha": "",
+   "cancelled_at": "2026-09-13T13:50:24+0000",
+   "cancel_reason": "やめた",
+   "seen_in": [],
    "scattered": [],
    "risk": null,
    "judge": null
@@ -416,10 +456,14 @@
      "label": "2（設計）",
      "state": "active",
      "tickets": [
-      "i0001-02"
+      "i0001-02",
+      "i0001-04",
+      "i0001-05"
      ],
      "states": {
-      "i0001-02": "doing"
+      "i0001-02": "doing",
+      "i0001-04": "review",
+      "i0001-05": "cancelled"
      },
      "marks": {},
      "review_required": true,

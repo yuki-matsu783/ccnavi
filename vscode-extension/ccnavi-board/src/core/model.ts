@@ -7,8 +7,17 @@
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
 export const BOARD_VERSION = 1;
 
-export type ProposalState = "todo" | "doing" | "done" | "cancelled";
-export type CopyStatus = "open" | "closed" | "none";
+/**
+ * ボードの列。`todo` / `review` は提案の置き場（`wip/proposals/<状態>/`）そのもの。`doing` / `done` は
+ * 承認済みチケットの置き場（`.ccnavi/approved/<状態>/`）から引いた列で、提案の側には無い（ADR-0055）
+ */
+export type ProposalState = "todo" | "doing" | "review" | "done";
+/**
+ * 承認済みチケットの今。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
+ * 人のレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は
+ * 承認待ちの提案だけ
+ */
+export type CopyStatus = "open" | "review" | "closed" | "none";
 export type PhaseState = "planned" | "active" | "ended";
 export type TreeKind = "main" | "project" | "worktree";
 
@@ -20,7 +29,8 @@ export interface TreeJson {
 }
 
 export interface ProposalJson {
-  readonly state: ProposalState;
+  /** 提案の置き場。`todo`（承認待ち）か `review`（レビュー待ち）だけ */
+  readonly state: "todo" | "review";
   readonly tree: string;
   readonly tree_root: string;
   readonly path: string;
@@ -226,7 +236,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     human_review: { required: raw !== undefined && review.required === true, reason: str(review.reason) },
     proposal: isRecord(raw.proposal) ? proposal(raw.proposal) : null,
     copy: {
-      status: status === "open" || status === "closed" ? status : "none",
+      status: status === "open" || status === "review" || status === "closed" ? status : "none",
       approved_at: str(copy.approved_at),
       source_tree: str(copy.source_tree),
       path: str(copy.path),
@@ -256,7 +266,7 @@ function seenIn(value: unknown): readonly SeenInJson[] {
 
 function proposal(raw: Record<string, unknown>): ProposalJson | null {
   const state = str(raw.state);
-  if (state !== "todo" && state !== "doing" && state !== "done" && state !== "cancelled") {
+  if (state !== "todo" && state !== "review") {
     return null;
   }
   return { state, tree: str(raw.tree), tree_root: str(raw.tree_root), path: str(raw.path) };

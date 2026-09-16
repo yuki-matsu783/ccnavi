@@ -120,11 +120,12 @@ test("CB-T109 オーバーレイを渡さなければ出ない", () => {
 
 test("CB-T12 4 列と件数と承認ボタンを出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  for (const label of ["未着手", "作業中", "完了", "取り消し"]) {
-    assert.ok(html.includes(label), label);
+  for (const label of ["承認待ち", "作業中", "レビュー待ち", "完了"]) {
+    assert.ok(html.includes(`<span class="label">${label}</span>`), label);
   }
+  assert.ok(!html.includes('<span class="label">取り消し</span>'));
   assert.equal((html.match(/class="column"/g) ?? []).length, 4);
-  assert.ok(html.includes("残り 3 / 全 4"));
+  assert.ok(html.includes("残り 4 / 全 6"));
   assert.ok(html.includes('<span class="pending warn">承認待ち 1 件</span>'));
   // 0 件のものは見出しに出さない
   assert.ok(!html.includes("不備 0 件"));
@@ -135,7 +136,7 @@ test("CB-T12 4 列と件数と承認ボタンを出す", () => {
 
 test("CB-T12b 列ごとに畳むボタンを出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  for (const state of ["todo", "doing", "done", "cancelled"]) {
+  for (const state of ["todo", "doing", "review", "done"]) {
     assert.ok(html.includes(`data-fold="${state}" aria-expanded="true"`), state);
   }
   assert.equal((html.match(/class="fold"/g) ?? []).length, 4);
@@ -211,7 +212,16 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="badge worktree none">ワークツリーなし</span>'));
   // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
   assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
+  assert.ok(html.includes('<span class="fact copy-review">レビュー待ち</span>'));
   assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
+  // 取り消しは完了列に入るので、閉じただけの子と見分ける属性を出す。理由は title。札（人が動く状態）ではない
+  assert.ok(html.includes('<span class="fact cancelled" title="やめた">取り消し</span>'));
+  assert.ok(!html.includes('class="badge cancelled"'));
+  assert.equal((html.match(/class="fact cancelled"/g) ?? []).length, 1);
+  assert.match(html, /<section class="column" data-state="done">[\s\S]*?data-id="i0001-05"[\s\S]*?<span class="fact cancelled"/);
+  assert.match(html, /\.fact\.cancelled \{ color: var\(--vscode-editorWarning-foreground\); \}/);
+  // 取り消した子にはワークツリーが無いが、閉じているので「ワークツリーなし」の札は出ない
+  assert.equal((html.match(/class="badge worktree none"/g) ?? []).length, 1);
   assert.ok(/<span class="fact review" title="[^"]*">人レビュー要<\/span>/.test(html));
   assert.ok(/<span class="fact worktree" title="[^"]*">ワークツリー i0001<\/span>/.test(html));
   assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
@@ -302,7 +312,7 @@ test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () 
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   assert.ok(html.includes('id="parent-filter"'));
   assert.ok(/<option value="i0001">i0001 [^<]+<\/option>/.test(html));
-  assert.equal((html.match(/data-family="i0001"/g) ?? []).length, 4);
+  assert.equal((html.match(/data-family="i0001"/g) ?? []).length, 6);
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   assert.ok(!renderBoard(buildBoard(empty), OPTIONS).includes('id="parent-filter"'));
 });
