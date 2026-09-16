@@ -13,7 +13,7 @@ import { renderPhasesPage } from "../../src/core/phases-render.js";
 import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import { renderProjectsPage } from "../../src/core/projects-render.js";
 import { buildProjectsPage } from "../../src/core/projects.js";
-import type { TicketJson } from "../../src/core/model.js";
+import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 
 const OPTIONS = { nonce: "TEST-NONCE-123" };
@@ -161,6 +161,37 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
 });
 
+test("CB-T13b フェーズ行の要約は人が動くべきことだけ。済んだレビューと MEDIUM 以下のリスクは全文にだけ出る", () => {
+  const base = fixture();
+  const parent: ParentJson = {
+    ...base.parents[0],
+    phases: base.parents[0].phases.map((p): PhaseJson => {
+      if (p.number === 1) {
+        // 済んだレビューと HIGH のリスク。要約はリスクだけ、全文には点と理由とマーカーが残る
+        return {
+          ...p,
+          review_required: true,
+          marks: { reviewed: { at: "t" } },
+          risk: { ...(p.risk ?? {}), points: 40, level: "HIGH" },
+          risk_line: "リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）",
+        };
+      }
+      // 依頼済みでゲートが閉じたまま。要約にゲート閉とレビュー要、受け入れボタンが並ぶ
+      return { ...p, state: "ended", gate_closed: true, marks: { requested: { at: "t" } } };
+    }),
+  };
+  const html = renderBoard(buildBoard({ ...base, parents: [parent] }), OPTIONS);
+  assert.ok(html.includes('<span class="phase-brief">リスク HIGH</span><span class="phase-full">終了 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 &gt; 300）</span>'));
+  assert.ok(html.includes('<span class="phase-brief">ゲート閉 · レビュー要</span><span class="phase-full">終了 · ゲート閉 · レビュー依頼済 · レビュー要</span><button type="button" class="action" data-action="accept"'));
+  // MEDIUM は要約に出ない
+  const medium: ParentJson = {
+    ...parent,
+    phases: parent.phases.map((p): PhaseJson => (p.number === 1 ? { ...p, risk: { ...(p.risk ?? {}), level: "MEDIUM" }, risk_line: "リスク: 25 (MEDIUM)" } : p)),
+  };
+  const html2 = renderBoard(buildBoard({ ...base, parents: [medium] }), OPTIONS);
+  assert.ok(html2.includes('<span class="phase-brief"></span><span class="phase-full">終了 · レビュー済 · レビュー要 · リスク: 25 (MEDIUM)</span>'));
+});
+
 test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人が動く状態だけで、属性は枠無しの行に出す", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   // 人が動く状態は枠付きの札
@@ -175,30 +206,31 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
   // 属性は列からはみ出さない
   assert.match(html, /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
-  // フェーズ行は狭ければ 2 段（丸と段階名、その下に状態）。幅を測るのはフェーズ一覧自身。
-  // 右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が 0 になって消えるので、
-  // 1 行に並べるのは広いときだけで、そのときも状態の列は 55% で止める
+  // フェーズ行は 1 段階 1 行。右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が
+  // 0 になって消えるので、状態の列は 55% で止める。幅を測るのはフェーズ一覧自身
   assert.match(html, /\.phases \{[^}]*container-type: inline-size; \}/);
-  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\); column-gap: 6px; row-gap: 0;/);
-  assert.match(html, /\.phase-name \{ grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
-  assert.match(html, /\.phase-status \{ grid-column: 2; grid-row: 2; min-width: 0; overflow-wrap: anywhere; \}/);
+  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
+  assert.match(html, /\.phase-name \{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
+  assert.doesNotMatch(html, /\.phase \{[^}]*minmax\(0, auto\)/);
+  // 既定の幅では要約だけ、480px 以上で全文に替わる
+  assert.match(html, /\.phase-full \{ display: none; \}/);
   const wide = html.match(/@container \(min-width: 480px\) \{[^@]*?\n  \}/);
   assert.ok(wide, "@container の塊がある");
-  assert.match(wide[0], /\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\); \}/);
-  assert.match(wide[0], /\.phase-status \{ grid-column: 3; grid-row: 1; text-align: right; justify-self: end; \}/);
-  assert.doesNotMatch(html, /\.phase \{[^}]*minmax\(0, auto\)/);
+  assert.match(wide[0], /\.phase-brief \{ display: none; \}/);
+  assert.match(wide[0], /\.phase-full \{ display: inline; \}/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
   assert.ok(!html.includes("複数の場所にある"));
   assert.ok(html.includes('<span class="where">子 · 親 i0001 / フェーズ 2</span>'));
   assert.ok(html.includes('class="phases"'));
-  // 親のフェーズは 1 段階 1 行。ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
-  assert.ok(html.includes('<li class="phase phase-ended"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status">終了 · リスク: 0 (LOW)</span></li>'));
-  assert.ok(html.includes('<span class="phase-status">進行中 · レビュー要</span>'));
+  // 親のフェーズは 1 段階 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
+  // 順調に終わった段階（LOW のリスク）は要約が空。ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
+  assert.ok(html.includes('<li class="phase phase-ended" title="終了 · リスク: 0 (LOW)"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status"><span class="phase-brief"></span><span class="phase-full">終了 · リスク: 0 (LOW)</span></span></li>'));
+  assert.ok(html.includes('<span class="phase-status"><span class="phase-brief">レビュー要</span><span class="phase-full">進行中 · レビュー要</span></span>'));
   assert.ok(!html.includes("ゲート開"));
   assert.ok(!html.includes("マーカーなし"));
-  assert.doesNotMatch(html, /class="phase-status">[^<]*レビュー不要/);
+  assert.doesNotMatch(html, /class="phase-(brief|full)">[^<]*レビュー不要/);
   // ゲート閉のフェーズ行は段階名も右の状態も赤
   assert.match(html, /\.phase\.gate-closed \.phase-label, \.phase\.gate-closed \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
   // ゲート閉の左線は承認待ちの左線より後に書き、勝つ

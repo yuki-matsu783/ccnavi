@@ -314,33 +314,58 @@ function fact(kind: string, text: string, title = ""): string {
 }
 
 /**
- * 親カードのフェーズ一覧。1 段階 1 項目で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
- * 状態には人が見るべきことだけを出す。ゲートが開いている、マーカーが無い、レビューが要らない、は
- * 普通の状態なので書かない。状態を段階名の右に置くか下に折り返すかは CSS（.phases）が幅で決める。
+ * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
+ * 右の状態は 2 通り書いておき、どちらを見せるかは CSS（.phases）が幅で決める。
+ * - 要約（既定の狭い列）: 人が動くべきことだけ。ゲート閉、まだ済んでいないレビュー要、
+ *   HIGH 以上のリスク。順調な段階は空。基準はカードの札と同じ
+ * - 全文（広げたとき）: 段階の状態、マーカー、レビューの要否、リスクの点と理由
+ * 全文は行のツールチップにも置くので、狭いままでもホバーで読める。
+ * ゲートが開いている、マーカーが無い、レビューが要らない、は普通の状態なのでどちらにも書かない。
  */
 function renderPhases(phases: readonly PhaseChip[]): string {
   const rows = phases
     .map((p) => {
-      const notes: string[] = [];
-      if (p.gateClosed) {
-        notes.push("ゲート閉");
-      }
-      for (const m of p.marks) {
-        notes.push(MARK_LABELS[m] ?? m);
-      }
-      if (p.reviewRequired) {
-        notes.push("レビュー要");
-      }
-      if (p.riskLine !== "") {
-        notes.push(p.riskLine);
-      }
-      const status = [PHASE_STATE_LABELS[p.state], ...notes].join(" · ");
+      const full = phaseStatusFull(p);
+      const brief = phaseStatusBrief(p);
       const tickets = p.tickets.length > 0 ? `<span class="phase-tickets">${escapeHtml(p.tickets.join(", "))}</span>` : "";
       const actions = p.actions.map((a) => renderActionButton(a, `${p.parent}:${p.number}`)).join("");
-      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status">${escapeHtml(status)}${actions}</span></li>`;
+      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}" title="${escapeHtml(full)}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status"><span class="phase-brief">${escapeHtml(brief)}</span><span class="phase-full">${escapeHtml(full)}</span>${actions}</span></li>`;
     })
     .join("\n");
   return `\n        <ul class="phases">\n${rows}\n        </ul>`;
+}
+
+/** フェーズ行の状態の全文。`終了 · レビュー依頼済 · レビュー要 · リスク: 25 (MEDIUM) — …` */
+function phaseStatusFull(p: PhaseChip): string {
+  const notes: string[] = [];
+  if (p.gateClosed) {
+    notes.push("ゲート閉");
+  }
+  for (const m of p.marks) {
+    notes.push(MARK_LABELS[m] ?? m);
+  }
+  if (p.reviewRequired) {
+    notes.push("レビュー要");
+  }
+  if (p.riskLine !== "") {
+    notes.push(p.riskLine);
+  }
+  return [PHASE_STATE_LABELS[p.state], ...notes].join(" · ");
+}
+
+/** フェーズ行の状態の要約。人が動くべきことだけで、無ければ空 */
+function phaseStatusBrief(p: PhaseChip): string {
+  const notes: string[] = [];
+  if (p.gateClosed) {
+    notes.push("ゲート閉");
+  }
+  if (p.reviewRequired && !p.marks.includes("reviewed") && !p.marks.includes("skipped")) {
+    notes.push("レビュー要");
+  }
+  if (p.riskLevel === "HIGH" || p.riskLevel === "CRITICAL") {
+    notes.push(`リスク ${p.riskLevel}`);
+  }
+  return notes.join(" · ");
 }
 
 function renderIssues(issues: readonly string[]): string {
@@ -606,24 +631,25 @@ const STYLE = `${PAGE_STYLE}
   .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .fact.copy-open::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
   .fact.sha { font-family: var(--vscode-editor-font-family); }
-  /* 親のフェーズ一覧。左の丸が段階。状態には人が見るべきことだけを出す。
-     置き方はフェーズ一覧の幅（カードの内寸）で変わる。狭ければ段階名の下に状態を折り返す 2 段、
-     480px 以上なら段階名の右に寄せる 1 行。既定の 4 列では 2 段になり、他の列を畳むか
-     ドラッグで広げると 1 行になる。右の列を auto にすると状態の 1 行分の幅が行を占め、
-     段階名の列が 0 になって省略記号ごと消えるので、1 行のときも状態の列は 55% で止める。
-     2 段のとき、どの状態がどの段階のものかは段階の間の余白（gap）で読ませる */
-  .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 7px; container-type: inline-size; }
-  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 6px; row-gap: 0; align-items: baseline; color: var(--vscode-descriptionForeground); }
-  .phase-dot { grid-column: 1; grid-row: 1; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
+  /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右が状態。
+     状態は要約（.phase-brief）と全文（.phase-full）を両方持ち、フェーズ一覧の幅（カードの内寸）で
+     どちらを見せるかを決める。既定の 4 列の幅では要約だけで、他の列を畳むかドラッグで広げて
+     480px 以上になると全文に替わる。全文は行の title にもあるので、狭いままでもホバーで読める。
+     右の列を auto にすると状態の 1 行分の幅が行を占め、段階名の列が 0 になって省略記号ごと
+     消えるので、状態の列は 55% で止める */
+  .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; container-type: inline-size; }
+  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) fit-content(55%); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  .phase-dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }
-  .phase-name { grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .phase-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .phase .phase-label { font-weight: 600; color: var(--vscode-editor-foreground); }
   .phase-tickets::before { content: "·"; margin: 0 5px; }
-  .phase-status { grid-column: 2; grid-row: 2; min-width: 0; overflow-wrap: anywhere; }
+  .phase-status { min-width: 0; text-align: right; overflow-wrap: anywhere; justify-self: end; }
+  .phase-full { display: none; }
   @container (min-width: 480px) {
-    .phase { grid-template-columns: 12px minmax(0, 1fr) fit-content(55%); }
-    .phase-status { grid-column: 3; grid-row: 1; text-align: right; justify-self: end; }
+    .phase-brief { display: none; }
+    .phase-full { display: inline; }
   }
   .phase-active .phase-status { color: var(--vscode-charts-blue); }
   .phase.gate-closed .phase-label, .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
