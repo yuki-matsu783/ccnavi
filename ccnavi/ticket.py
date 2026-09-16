@@ -241,8 +241,8 @@ class Ticket:
     issue: int | None = None
     # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、ワークツリーの中なら
-    # その切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
-    # 継ぐ段は無い。判定は行き先のワークツリーの切り元と突き合わせる。
+    # その元リポジトリ、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
+    # 継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
     project: str = ""
     # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき

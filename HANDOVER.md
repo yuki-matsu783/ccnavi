@@ -53,7 +53,7 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
 - 端末から打つ `--approve` は、承認の対象の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
 
 コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
-それらのワークツリー側の設定（切り元基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
+それらのワークツリー側の設定（元リポジトリ基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
 `rm -rf .ccnavi` のように ccnavi ディレクトリごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
 共通層も ccnavi ディレクトリの下にあるので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
@@ -224,7 +224,7 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
    `tree.worktrees(root)` を `projects_dir` 無しで呼ぶため空を返す
 4. **`--lint` の早期 return。** `lint.py:484-486` が、`projects/` があってもリポジトリが
    無ければ返るので、`.gitignore` の確認が行われない。clone する前が一番確かめたい時点
-5. **孤児のワークツリー。** 切り元のプロジェクトを消すと、相互参照が切れて列挙から静かに
+5. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと、相互参照が切れて列挙から静かに
    外れ、その中のパスがワークスペースルートとして判定される（`tree.py:133-159`）。
    ワークスペース向けの `allow` が孤児の中で効く。判定は変えず、`--lint` と `--explain` が
    名指しする方針で決まっている

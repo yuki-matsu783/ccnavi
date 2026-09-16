@@ -11,7 +11,7 @@
    書き込みは共通層 + 自身の層
 2. Bash は共通層と全部の層の和で判定され、cwd がどこでも同じ
 3. 読めない層は空として扱われ、記録が層の名前を残す。組み込みの既定へは落ちない
-4. プロジェクトから切ったワークツリーが認識され、切り元とチケットの `project:` が
+4. プロジェクトから切ったワークツリーが認識され、元リポジトリとチケットの `project:` が
    食い違えば止まる
 5. `projects/` を数えない設定では、この機能が入る前と同じに動く
 
@@ -442,7 +442,8 @@ class ProjectsTest(unittest.TestCase):
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/tickets/ に置く。プロジェクトのワークツリーの中も普通の置き場で、
         # 承認をプロジェクトの git で運ぶために、そこに置く（設計 §9.4、REQ-MLT-14）。
-        # 置き場はワークツリーの切り元で決まり、承認済みチケットは記録した道から引くので閉じられる。
+        # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録した道から
+        # 引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
         write(
             os.path.join(tree, "wip", "tickets", "todo", "i0010.md"),

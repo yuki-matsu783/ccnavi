@@ -250,7 +250,7 @@ def decide_before(
         copies, _ = approval.scan(conf, root)
         index = approval.by_id(copies)
 
-    # ワークツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
+    # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject, index)
@@ -578,7 +578,8 @@ def project_mismatch(
     full: str,
     index: dict[str, ticket_mod.Ticket] | None = None,
 ) -> str:
-    """ワークツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
+    """ワークツリーの元リポジトリと、そこに結び付く承認済みチケットの `project:` が
+    違えば、その理由の文。
 
     範囲の宣言ではなく取り違えなので、ルールより先に見る（REQ-MLT-12）。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。

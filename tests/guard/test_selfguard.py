@@ -347,11 +347,11 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
         self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
 
-    def test_プロジェクトの層は自分のgitから戻しワークツリー側の向きも切り元で決まる(self):
+    def test_プロジェクトの層は自分のgitから戻しワークツリー側の向きも元リポジトリで決まる(self):
         # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
         # なくそのプロジェクトで、ワークツリー側の設定が入るのもそのプロジェクトから切った
         # ワークツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
-        # 切り元から切ったワークツリー側の設定は test_config_union_guard.py が
+        # 元リポジトリから切ったワークツリー側の設定は test_config_union_guard.py が
         # ブラックボックスで見る。
         self.worktree()
         projects = os.path.join(self.repo, "projects")

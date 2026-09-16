@@ -48,8 +48,8 @@ class Tree:
     """ツリー 1 つ。name が空ならワークスペースルート。
 
     project は、このツリーがどのプロジェクトのものか。ワークスペースなら空、
-    プロジェクトならその名前、ワークツリーなら切り元のプロジェクトの名前
-    （ワークスペースから切ったワークツリーなら空）。
+    プロジェクトならその名前、ワークツリーなら元リポジトリがプロジェクトなら
+    その名前（ワークスペースから切ったワークツリーなら空）。
     """
 
     name: str
@@ -59,7 +59,7 @@ class Tree:
 
     @property
     def is_main(self) -> bool:
-        """チケットを持たないツリーか。ワークスペースルートと git プロジェクトルートがこれ。"""
+        """チケットを持たないツリーか。ワークスペースルートとプロジェクトがこれ。"""
         return self.kind != KIND_WORKTREE
 
 
@@ -88,7 +88,9 @@ def projects(projects_dir: str) -> list[Tree]:
 
 
 def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
-    """main の下にある、本物のワークツリーの一覧。切り元はワークスペースでもプロジェクトでもよい。
+    """main の下にある、本物のワークツリーの一覧。
+
+    元リポジトリはワークスペースでもプロジェクトでもよい。
 
     読むのはファイルシステムだけで、git は起こさない。実行前の判定の中で
     呼ばれるので、外部プロセスを起こす場所にはできない。
@@ -113,7 +115,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
 
 
 def owner_of(candidate: str, owners: list[Tree]) -> Tree | None:
-    """このワークツリーの切り元。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
+    """このワークツリーの元リポジトリ。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
     for owner in owners:
         if is_worktree_of(owner.root, candidate):
             return owner

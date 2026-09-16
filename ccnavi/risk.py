@@ -482,7 +482,7 @@ def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
                     SEVERITY_ERROR,
                     f.id,
                     f"`script` の `{f.value}` が {f.home or '(基準なし)'} に無い。"
-                    "ワークツリーの中のものは読まないので、git プロジェクトルートに置く",
+                    "ワークツリーの中のものは読まないので、元リポジトリに置く",
                 )
             )
     return problems

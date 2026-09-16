@@ -132,15 +132,15 @@ ccnavi_workspace() {
 # 第 2 引数にワークスペースルートを渡す。省くと自分で探す。
 #
 #   <ws>/projects/<名前>/...          -> <名前>
-#   <ws>/.claude/worktrees/<id>/...   -> 切り元のプロジェクトの名前
+#   <ws>/.claude/worktrees/<id>/...   -> 元リポジトリがプロジェクトならその名前
 #   それ以外                           -> 空
 #
-# ワークツリーの切り元は `.git` ファイルの `gitdir:` から取る。綴りは実測で確定して
+# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。綴りは実測で確定して
 # いる（git 2.39.2、Git Bash と PowerShell の両方）。絶対パス、区切りは `/` のみ、
 # ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
 #
 # **取れなければ空を返す。止めない。** `.git` が読めない、`gitdir:` が無い、
-# 切り元が消えている（孤児）のどれでも空。記録の置き場のために作業を止めるのは
+# 元リポジトリが消えている（孤児）のどれでも空。記録の置き場のために作業を止めるのは
 # 釣り合わない。
 ccnavi_project() {
 	ccnavi_pj_dir=$(ccnavi_abs "${1:-.}") || return 0
@@ -174,7 +174,7 @@ ccnavi_project() {
 		ccnavi_pj_id="${ccnavi_pj_id%%/*}"
 		ccnavi_pj_git="$ccnavi_pj_ws/.claude/worktrees/$ccnavi_pj_id/.git"
 		[ -f "$ccnavi_pj_git" ] || return 0
-		# gitdir: <切り元>/.git/worktrees/<id>
+		# gitdir: <元リポジトリ>/.git/worktrees/<id>
 		ccnavi_pj_gitdir=$(sed -n 's/^gitdir:[[:space:]]*//p' "$ccnavi_pj_git" | head -n 1)
 		[ -n "$ccnavi_pj_gitdir" ] || return 0
 		case "$ccnavi_pj_gitdir" in
@@ -182,7 +182,7 @@ ccnavi_project() {
 		*) return 0 ;;
 		esac
 		ccnavi_pj_owner="${ccnavi_pj_gitdir%/.git/worktrees/*}"
-		# 切り元がワークスペースそのものなら、プロジェクトではない。
+		# 元リポジトリがワークスペースそのものなら、プロジェクトではない。
 		ccnavi_pj_owner_abs=$(ccnavi_abs "$ccnavi_pj_owner" 2>/dev/null) || return 0
 		case "$ccnavi_pj_owner_abs" in
 		"$ccnavi_pj_ws") return 0 ;;

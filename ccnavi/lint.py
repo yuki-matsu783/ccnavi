@@ -469,7 +469,7 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) ->
 def _worktree_problems(
     root: str, conf: settings.Settings, worktrees: list, index: dict, copies: list
 ) -> list[Problem]:
-    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、切り元の食い違い、ツリーの無い承認済みチケット。"""
+    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、元リポジトリの食い違い、ツリーの無い承認済みチケット。"""
     problems: list[Problem] = []
     for t in worktrees:
         if t.name not in index:
@@ -491,7 +491,7 @@ def _worktree_problems(
                     Problem(
                         SEVERITY_ERROR,
                         "(ticket)",
-                        f"ワークツリー {t.name} の切り元（{t.project or 'ワークスペース'}）が"
+                        f"ワークツリー {t.name} の元リポジトリ（{t.project or 'ワークスペース'}）が"
                         "承認済みチケットの "
                         f"project（{owner or 'ワークスペース'}）と違う。そこへの書き込みは止まる。"
                         "承認済みチケットが指すリポジトリから切り直す",
@@ -585,9 +585,9 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """ワークツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §11.6）。
+    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか（設計 §11.6）。
 
-    判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
+    判定が読むのは元リポジトリに checkout されている版だけ（REQ-MLT-04）。
     ワークツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
     効かないものを書いた人は、書いたとおりに効いていると思ったまま進む。統合の前に
     気づけるように、ここで名前を挙げる。
@@ -596,7 +596,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
     そこから統合する道も普通の道。言うのは「今はまだ効いていない」という 1 点だけ。
 
     中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
-    差分が拾う。ここが拾うのは、切り元に無くて差分にも出ない新しい綴りのほう。
+    差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しい綴りのほう。
     """
     problems: list[Problem] = []
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
@@ -610,7 +610,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
                     SEVERITY_WARN,
                     f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
                     f"{conf.project_home}/{rel} はワークツリーにしかない。判定が読むのは"
-                    "切り元の git プロジェクトルートの版なので、このファイルは統合されるまで"
+                    "元リポジトリの版なので、このファイルは統合されるまで"
                     "効かない",
                 )
             )

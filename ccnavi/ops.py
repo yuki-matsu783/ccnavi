@@ -41,7 +41,7 @@ def start(
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
-    # 切り元が違えば、判定はそのツリーの切り元で行われ、チケットと噛み合わない。
+    # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
     copy = approval.by_id(open_copies)[found.ticket]
     owner = tree.project_root(conf.projects, copy.project) or root
     worktree = tree.worktree_path(root, ticket_id)
@@ -49,7 +49,7 @@ def start(
         where = f"projects/{copy.project} の中で " if copy.project else ""
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
-            "切り元が承認済みチケットの project"
+            "元リポジトリが承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '

@@ -289,7 +289,7 @@ class ScopeGuard:
 
     root: str
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
-    # プロジェクトの置き場。ワークツリーの切り元をプロジェクトまで広げる（設計 §11.3）。
+    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる（設計 §11.3）。
     projects: str = ""
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""

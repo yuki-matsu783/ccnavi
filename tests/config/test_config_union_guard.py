@@ -2,7 +2,7 @@
 
 selfguard のコアに、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
 Write / Edit の拒否、シェルからの書き込みの拒否、控えと復元の 3 つとも、今 rules.yml に
-掛けているものをそのまま掛ける。切り元から切ったワークツリー側の設定も対象。
+掛けているものをそのまま掛ける。元リポジトリから切ったワークツリー側の設定も対象。
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
@@ -113,7 +113,7 @@ class RestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_copies_in_a_worktree_cut_from_a_project_are_restored(self):
-        """§11.6: 切り元のプロジェクトから切ったワークツリー側の設定も対象。"""
+        """§11.6: プロジェクトである元リポジトリから切ったワークツリー側の設定も対象。"""
         tree = self.worktree(self.lib, "w1")
         copy = layer_path(tree, "rules")
         self.assertTrue(
@@ -395,7 +395,7 @@ class DenyTest(GuardHarness):
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
-        """§11.6: ワークツリーの `.ccnavi/` に切り元に無いファイルがあれば --lint warn。"""
+        """§11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
         tree = self.worktree(self.lib, "w1")
         write(os.path.join(tree, HOME, "scripts", "new.sh"), "echo new\n")
 

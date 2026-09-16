@@ -56,7 +56,7 @@ CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
 # チケットが `ask` と書いた場所。ルールの `ask` と同じく、人が 1 度見る場所。
 CODE_TICKET_ASK = "TICKET_ASK"
 
-# ワークツリーの切り元と、チケットが承認されたプロジェクトが食い違っている。
+# ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
