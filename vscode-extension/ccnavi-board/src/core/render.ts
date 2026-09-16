@@ -314,9 +314,9 @@ function fact(kind: string, text: string, title = ""): string {
 }
 
 /**
- * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
- * 右には人が見るべきことだけを出す。ゲートが開いている、マーカーが無い、レビューが要らない、は
- * 普通の状態なので書かない。
+ * 親カードのフェーズ一覧。1 段階 1 項目で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
+ * 状態には人が見るべきことだけを出す。ゲートが開いている、マーカーが無い、レビューが要らない、は
+ * 普通の状態なので書かない。状態を段階名の右に置くか下に折り返すかは CSS（.phases）が幅で決める。
  */
 function renderPhases(phases: readonly PhaseChip[]): string {
   const rows = phases
@@ -575,7 +575,6 @@ const STYLE = `${PAGE_STYLE}
     position: relative;
     border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
     background: var(--vscode-editorWidget-background); cursor: pointer;
-    container-type: inline-size;
   }
   .card.child { margin-left: 12px; }
   .card:hover, .card:focus {
@@ -607,11 +606,14 @@ const STYLE = `${PAGE_STYLE}
   .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .fact.copy-open::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
   .fact.sha { font-family: var(--vscode-editor-font-family); }
-  /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右に人が見るべきことだけ。
-     狭いカードでは段階名の下に状態を置く（2 段）。右に auto の列を置くと状態の 1 行分の幅が
-     行を占め、段階名の列が 0 になって省略記号ごと消える。広いカードだけ 3 列に戻す */
-  .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 4px; }
-  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 6px; row-gap: 1px; align-items: baseline; color: var(--vscode-descriptionForeground); }
+  /* 親のフェーズ一覧。左の丸が段階。状態には人が見るべきことだけを出す。
+     置き方はフェーズ一覧の幅（カードの内寸）で変わる。狭ければ段階名の下に状態を折り返す 2 段、
+     480px 以上なら段階名の右に寄せる 1 行。既定の 4 列では 2 段になり、他の列を畳むか
+     ドラッグで広げると 1 行になる。右の列を auto にすると状態の 1 行分の幅が行を占め、
+     段階名の列が 0 になって省略記号ごと消えるので、1 行のときも状態の列は 55% で止める。
+     2 段のとき、どの状態がどの段階のものかは段階の間の余白（gap）で読ませる */
+  .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 7px; container-type: inline-size; }
+  .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 6px; row-gap: 0; align-items: baseline; color: var(--vscode-descriptionForeground); }
   .phase-dot { grid-column: 1; grid-row: 1; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--vscode-descriptionForeground); align-self: center; }
   .phase-ended .phase-dot { background: var(--vscode-charts-green); border-color: var(--vscode-charts-green); }
   .phase-active .phase-dot { border: 2.5px solid var(--vscode-charts-blue); }

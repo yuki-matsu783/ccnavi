@@ -175,14 +175,18 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
   // 属性は列からはみ出さない
   assert.match(html, /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
-  // フェーズ行は狭いカードでは 2 段（丸と段階名、その下に状態）。右に auto の列を置くと状態の
-  // 1 行分の幅が行を占め、段階名の列が 0 になって消えるので、3 列は広いカードだけ
-  assert.match(html, /\.card \{[^}]*container-type: inline-size;/);
-  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\); column-gap: 6px; row-gap: 1px;/);
+  // フェーズ行は狭ければ 2 段（丸と段階名、その下に状態）。幅を測るのはフェーズ一覧自身。
+  // 右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が 0 になって消えるので、
+  // 1 行に並べるのは広いときだけで、そのときも状態の列は 55% で止める
+  assert.match(html, /\.phases \{[^}]*container-type: inline-size; \}/);
+  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\); column-gap: 6px; row-gap: 0;/);
   assert.match(html, /\.phase-name \{ grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
   assert.match(html, /\.phase-status \{ grid-column: 2; grid-row: 2; min-width: 0; overflow-wrap: anywhere; \}/);
-  assert.match(html, /@container \(min-width: 480px\) \{\n\s*\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\); \}\n\s*\.phase-status \{ grid-column: 3; grid-row: 1; text-align: right; justify-self: end; \}/);
-  assert.doesNotMatch(html, /minmax\(0, auto\)/);
+  const wide = html.match(/@container \(min-width: 480px\) \{[^@]*?\n  \}/);
+  assert.ok(wide, "@container の塊がある");
+  assert.match(wide[0], /\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\); \}/);
+  assert.match(wide[0], /\.phase-status \{ grid-column: 3; grid-row: 1; text-align: right; justify-self: end; \}/);
+  assert.doesNotMatch(html, /\.phase \{[^}]*minmax\(0, auto\)/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
