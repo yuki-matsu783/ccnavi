@@ -1050,13 +1050,18 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
     """
-    rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
+    rc, status = _git(
+        tree_root, ["status", "--porcelain", "-z", "--untracked-files=no", "--no-renames"]
+    )
     if rc != 0:
         return True
     skip = _approved_rel(conf)
-    for line in status.splitlines():
-        path = line[3:].strip().replace("\\", "/")
-        if path and not path.startswith(skip + "/"):
+    # `-z` で読む。既定の出力は非 ASCII を引用して 8 進に逃がすので、置き場の中の
+    # 日本語のファイルが置き場の外に見え、「未コミットがある」で依頼が止まる。
+    # `--no-renames` は、改名のときに出る 2 つめの綴り（移動元）が XY を持たない形で
+    # 混ざるのを避けるため。phase.scope_findings と同じ読み方。
+    for entry in status.split("\0"):
+        if len(entry) > 3 and entry[2] == " " and not entry[3:].startswith(skip + "/"):
             return True
     return False
 
