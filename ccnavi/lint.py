@@ -1237,8 +1237,14 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
 
     problems.extend(_every_problems(rule, name))
 
-    # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
-    if (rule.additional_context or rule.additional_context_file) and rule.decision == rules.ALLOW:
+    # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
+    # どちらも広さを咎めない。読めない every は 1（毎回渡る）に倒れているので、この式は
+    # 素通りしない（rules.readable_every）。
+    if (
+        (rule.additional_context or rule.additional_context_file)
+        and rule.decision == rules.ALLOW
+        and rule.every <= 1
+    ):
         why = _broad(rule)
         if why:
             problems.append(
