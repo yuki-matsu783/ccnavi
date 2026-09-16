@@ -79,7 +79,8 @@ BIN_SUFFIXES = (".exe",)
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
 # git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
-# 判定が読むのは承認済みチケットだけで、提案のほうは承認の画面と状態の同期しか読まない。
+# 判定が読むのは承認済みチケット（`doing/`）だけ。提案の置き場には承認待ち（`todo/`）と
+# レビュー待ち（`review/`）が並び、承認の画面とフェーズの終わりの判定が読む。
 # 2 つとも `CCNAVI_TICKETS_` で始めて対にする。
 TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL"
 APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
@@ -129,7 +130,12 @@ LEGACY_TICKETS = "wip/tickets"
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
 # B の機械で作業する流れが成り立たない（設計 §9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
-DEFAULT_APPROVED = ".ccnavi/tickets"
+# 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
+DEFAULT_APPROVED = ".ccnavi/approved"
+# 旧の綴り。既定は `.ccnavi/tickets` で、開いた承認済みチケットは直下、閉じたものは
+# `closed/` に置いていた。残っていると走査されないので `--lint` が名指しする
+# （lint._legacy_tickets）。判定はこの値を使わない。
+LEGACY_APPROVED = ".ccnavi/tickets"
 # フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。

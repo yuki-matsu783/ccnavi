@@ -56,7 +56,7 @@ phases:
     kind: work
     title: 文書
     review: mr
-    scope: ["README.md", "ccnavi.md", "requirements.md", "HANDOVER.md", "docs/*", "CONTEXT.md", "CLAUDE.md"]
+    scope: ["README.md", "ccnavi.md", "requirements.md", "HANDOVER.md", "docs/*", "CONTEXT.md", "CLAUDE.md", ".claude/skills/*"]
 
   design-feedback:
     kind: feedback

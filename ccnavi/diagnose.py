@@ -609,11 +609,13 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         stdout.write("  承認されたチケットが無い。範囲の制限は掛かっていない\n")
         return 0
     closed, _ = approval.scan(conf, root, closed=True)
-    done = {t.ticket for t in closed}
-    for t in sorted(copies, key=lambda x: (x.parent or x.ticket, x.ticket)):
+    review, _ = approval.scan_review(conf, root)
+    done = {t.ticket for t in closed + review}
+    for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
-        head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{bound}）"
+        place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
+        head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{place}、{bound}）"
         if t.is_child:
             waiting = [p for p in t.predecessors if p not in done]
             review = "要" if t.review_required else "不要"
@@ -705,19 +707,26 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     everything, scan_problems = ticket_mod.scan_all(root, conf.tickets, conf.projects)
     problems.extend(str(p) for p in scan_problems)
     proposals = ticket_mod.dedupe(everything)
+    # 写りの一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に在るものも数える。
+    # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る（ADR-0055）。
+    everything = everything + approval._everything(conf, root)
     open_copies, notes = approval.scan(conf, root)
     problems.extend(notes)
     closed_copies, notes = approval.scan(conf, root, closed=True)
     problems.extend(notes)
+    review_copies, notes = approval.scan_review(conf, root)
+    problems.extend(notes)
 
-    pending, revisions = approval.waiting(proposals, open_copies, closed_copies)
+    pending, revisions = approval.waiting(proposals, open_copies, closed_copies, review_copies)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )
 
     worktrees = {t.name: t for t in trees if t.kind == tree.KIND_WORKTREE}
+    # 提案の欄に出すのは `todo/` と `review/`。`review/` は承認済みチケットでもあるので、
+    # 承認の欄（`copy`）には `review` の状態で出す。
     proposal_index = approval.by_id(proposals)
-    open_index = approval.by_id(open_copies)
+    open_index = approval.by_id(open_copies + review_copies)
     closed_index = approval.by_id(closed_copies)
     # 同じ識別子が写っている場所の全部。権威の側は proposal に、残りは seen_in に出す。
     # 写りがあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
@@ -852,7 +861,7 @@ def _ticket_record(
     source = proposal or copy
     assert source is not None
     if ticket_id in open_index:
-        status = "open"
+        status = "review" if open_index[ticket_id].state == ticket_mod.REVIEW else "open"
     elif ticket_id in closed_index:
         status = "closed"
     else:

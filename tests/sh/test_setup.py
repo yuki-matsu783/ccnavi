@@ -363,7 +363,7 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--all")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/proposals")
-        self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/tickets")
+        self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/approved")
         self.assertEqual(env["CCNAVI_STATE"], "logs/state")
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 

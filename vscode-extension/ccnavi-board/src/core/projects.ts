@@ -247,6 +247,7 @@ export interface ProjectRow {
   readonly originKey: string;
   readonly worktrees: readonly string[];
   readonly tickets: number;
+  /** 作業中（ボードの作業中の列と同じ。`.ccnavi/approved/doing/` にあるものと、レビュー待ち `wip/proposals/review/`） */
   readonly doing: number;
   readonly problems: readonly LintProblem[];
 }
@@ -307,7 +308,7 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
         originKey: remoteKeyOf(origin),
         worktrees: trees.filter((w) => w.kind === "worktree" && w.project === t.name).map((w) => w.name),
         tickets: own.length,
-        doing: own.filter((k) => k.proposal !== null && k.proposal.state === "doing").length,
+        doing: own.filter((k) => (k.proposal === null && k.copy.status === "open") || k.proposal?.state === "review").length,
         problems: input.lint === undefined ? [] : problemsOfProject(input.lint, t.name),
       };
     });

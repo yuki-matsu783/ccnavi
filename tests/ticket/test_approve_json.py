@@ -50,7 +50,7 @@ class ApproveJsonTest(PhaseHarness):
         )
 
     def copy_exists(self, name):
-        return os.path.exists(os.path.join(self.approved, name + ".md"))
+        return os.path.exists(os.path.join(self.approved, "doing", name + ".md"))
 
     def pending_parent_and_child(self):
         """親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
@@ -371,12 +371,12 @@ class ApproveJsonTest(PhaseHarness):
         書く計画だけを変える。
         """
         path, shown = self.pending_revision()
-        with open(os.path.join(self.approved, "i0001.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             before = f.read()
         self.assert_refused_after_edit(
             path, "  - acceptance\n", "  - design\n", shown, tickets=["i0001"]
         )
-        with open(os.path.join(self.approved, "i0001.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
     def test_yes_refuses_when_the_copy_under_revision_changed(self):
@@ -386,7 +386,7 @@ class ApproveJsonTest(PhaseHarness):
         （`revise_copy`）。提案の frontmatter をそのまま指紋に入れる実装では、この書き換えを見逃す。
         """
         path, shown = self.pending_revision()
-        copy = os.path.join(self.approved, "i0001.md")
+        copy = os.path.join(self.approved, "doing", "i0001.md")
         self.assert_refused_after_edit(copy, "---\n", "---\nnote: x\n", shown, tickets=["i0001"])
 
     def test_nul_in_the_markdown_body_still_approves(self):
@@ -508,7 +508,7 @@ class ApproveJsonTest(PhaseHarness):
         混じるので、機械によって変わる。
         """
         self.pending_parent_and_child()
-        os.makedirs(os.path.join(self.approved, "i0001-01.md"))
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-01.md"))
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 1)
         body = json.loads(result.stdout)
@@ -544,7 +544,7 @@ class ApproveJsonTest(PhaseHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
         self.propose("i0001-03", child_text("i0001-03", "i0001", 1, ["wip/design/*"]))
         self.commit_parent("propose 02 03")
-        os.makedirs(os.path.join(self.approved, "i0001-03.md"))
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-03.md"))
         result = self.yes(["i0001-02", "i0001-03"])
         self.assertEqual(result.returncode, 1)
         partial = json.loads(result.stdout)["partial"]
@@ -558,7 +558,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_that_stops_before_placing_anything_says_so(self):
         """1 件目で止まったら placed は空。「一部だけ置かれた」と言わせない。"""
         self.pending_parent_and_child()
-        os.makedirs(os.path.join(self.approved, "i0001.md"))
+        os.makedirs(os.path.join(self.approved, "doing", "i0001.md"))
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 1)
         body = json.loads(result.stdout)
