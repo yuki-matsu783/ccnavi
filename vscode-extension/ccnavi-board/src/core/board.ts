@@ -43,6 +43,8 @@ export interface PhaseChip {
   /** 依頼を出したのにゲートが閉じたまま（人のレビュー待ち）。JSON の `review_waiting` の写し */
   readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
+  /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
+  readonly riskLevel: string;
   readonly riskLine: string;
   readonly tickets: readonly string[];
   readonly actions: readonly Action[];
@@ -258,6 +260,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     gateClosed: p.gate_closed,
     reviewWaiting: p.review_waiting,
     reviewRequired: p.review_required,
+    riskLevel: typeof p.risk?.level === "string" ? p.risk.level : "",
     riskLine: p.risk_line,
     tickets: p.tickets,
     actions,
