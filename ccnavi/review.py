@@ -391,6 +391,8 @@ def check(
             )
         return 1
     assert result.mr is not None
+    if not _settle_children(stdout, stderr, root, conf, parent, ph):
+        return 1
     if not _mark(
         stderr,
         approval.home_dir(conf, root, parent.ticket, ""),
@@ -399,8 +401,6 @@ def check(
         approval.MARK_REVIEWED,
         {"mr": result.mr.number, "accepted": []},
     ):
-        return 1
-    if not _settle_children(stdout, stderr, root, conf, parent, ph):
         return 1
     stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。先へ進める\n")
     return 0
@@ -417,6 +417,11 @@ def _settle_children(
     """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
 
     人が見たことの記録はマーカーで、場所の移動はその写し（ADR-0055）。動かせなければ言って False。
+
+    呼ぶ側はこれをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかった
+    ときに「レビュー済みなのに子が `review/` に残る」形になり、`check` は「レビュー済み」で
+    拒み、`--reviewed --chat` も「すでにレビュー済み」で戻るので、取り出す操作が無くなる。
+    逆順なら、動いたのにマーカーが置けなくても、次の `check` が置き直す（動かす分は空）。
     """
     moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
     if failed:
@@ -570,6 +575,8 @@ def reviewed(
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
+    if not _settle_children(stdout, stderr, root, conf, parent, ph):
+        return 1
     if not _mark(
         stderr,
         home,
@@ -578,8 +585,6 @@ def reviewed(
         approval.MARK_REVIEWED,
         {"mr": result.mr.number, "accepted": accepted},
     ):
-        return 1
-    if not _settle_children(stdout, stderr, root, conf, parent, ph):
         return 1
     if accepted and conf.state:
         path = os.path.join(conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no))
@@ -677,6 +682,8 @@ def _reviewed_in_chat(
         record = ph.risk or {}
         data["risk"] = str(record.get("level") or "")
         data["recommended"] = phasetypes.REVIEW_MR
+    if not _settle_children(stdout, stderr, root, conf, parent, ph):
+        return 1
     if not _mark(
         stderr,
         approval.home_dir(conf, root, parent.ticket, ""),
@@ -685,8 +692,6 @@ def _reviewed_in_chat(
         approval.MARK_REVIEWED,
         data,
     ):
-        return 1
-    if not _settle_children(stdout, stderr, root, conf, parent, ph):
         return 1
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘は人が打つ。
@@ -1046,6 +1051,8 @@ def _settle(
                 return None
             skipped.append(ph.number)
         elif ph in left.unreviewed:
+            if not _settle_children(stdout, stderr, root, conf, parent, ph):
+                return None
             if not _mark(
                 stderr,
                 approval.home_dir(conf, root, parent.ticket, ""),
@@ -1054,8 +1061,6 @@ def _settle(
                 approval.MARK_REVIEWED,
                 {"by": "wrapup", "at": stamp, "mr": mr_number, "accepted": []},
             ):
-                return None
-            if not _settle_children(stdout, stderr, root, conf, parent, ph):
                 return None
             settled.append(ph.number)
     return cancelled, skipped, settled
