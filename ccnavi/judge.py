@@ -670,7 +670,7 @@ def ticket_verdict(
     if ticket is None:
         return "", "", ""
     rel = tree.relative(t, full)
-    if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):
+    if ticket_mod.is_unscoped(rel, conf.tickets, conf.approved):
         return "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では

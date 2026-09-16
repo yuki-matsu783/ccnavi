@@ -269,6 +269,7 @@ def check(
     problems.extend(_phases(conf))
     problems.extend(_risk(conf, root))
     problems.extend(_ticket(conf, root))
+    problems.extend(_scratch(conf, root))
     problems.extend(_projects(conf, root))
     # 層の読み込みは判定と同じ経路（ruleload.survey）を通る。読めない層の苦情は
     # そこが書く標準エラーにも出るので、受け皿へ逃がして二重に言わない。
@@ -630,6 +631,82 @@ def _layer_home(conf: settings.Settings, root: str, name: str) -> str:
     if name == ruleload.LAYER_SELF:
         return root
     return tree.project_root(conf.projects, name)
+
+
+def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
+    """下書きの置き場が、そのリポジトリの git に追跡されていないか（REQ-TKT-44）。
+
+    実行前の判定はチケットの範囲を `tmp/` に当てない（`ticket.is_scratch_place`）。外して
+    よい根拠は「git が追跡しないので統合先のブランチに乗らない」ことの 1 つだけ。
+
+    **この警告は穴を塞ぐものではない。** 根拠が崩れた場合は、実行後の監視と
+    サブエージェント終了時の検査が `tmp/` の変更を範囲外として報告する（`is_unscoped` の
+    説明）。ここが言うのは、その報告が出はじめる前に人が気づけるようにするため。
+
+    問うのは 2 つ。**追跡されているファイルが既にあるか**（`git ls-files`）と、これから
+    書くものが追跡されるか（`git check-ignore`）。前者だけでは、まだ何も置いていない
+    リポジトリで見逃す。後者だけでは、`/{SCRATCH}/` を足す前から追跡されていたファイルを
+    見逃す（`.gitignore` は既に追跡されているファイルには効かない）。
+
+    見るのはワークスペースと各プロジェクトのそれぞれの git。プロジェクトは自分の
+    `.gitignore` を持つので、ワークスペース側の 1 行は届かない。作業ツリーは見ない。
+    あちらはブランチごとに中身が変わるうえ、実行時に監視が拾うので、ここで数え上げると
+    同じことを 2 度言うことになる。
+
+    チケット制御が切れているときは言わない。そのとき範囲の判定自体が動かない。
+
+    git が無ければ何も言わない。無いものを「入っていない」と報告すると、正しい設定に
+    苦情を出すことになる。
+    """
+    if not conf.tickets_enabled:
+        return []
+    problems: list[Problem] = []
+    # 名乗るのは `(scratch)` の側。プロジェクトのぶんも `(projects/<名前>)` とは名乗らない。
+    # あちらはその層の設定についての苦情で、ここは追跡の話。同じ名札にすると、
+    # 「層について何も言わない」ことを見ているテストや読み手に、別の話が混ざる。
+    where = [("(scratch)", root)]
+    where += [
+        (f"(scratch/{p.name})", tree.project_root(conf.projects, p.name))
+        for p in tree.projects(conf.projects)
+    ]
+    place = ticket_mod.SCRATCH
+    for name, home in where:
+        tracked = _tracked(home, place)
+        ignored = _ignored(home, place + "/")
+        if tracked:
+            why = f"`{place}/` に追跡されているファイルがある（{tracked}）"
+        elif ignored is False:
+            why = f"`{place}/` がこのリポジトリの git で無視されていない"
+        else:
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{why}。実行前の判定はチケットの範囲をここに当てないので、追跡されて"
+                "いると、承認した範囲の外のものがコミットに乗りうる。そうなったぶんは"
+                "実行後の監視とサブエージェント終了時の検査が範囲外として報告するので、"
+                "下書きがそのたびに咎められることになる。"
+                f"このリポジトリの `.gitignore` に `/{place}/` を足して追跡から外すか"
+                "（プロジェクトのリポジトリに運用の痕跡を残したくないなら"
+                f"`.git/info/exclude` でもよい）、`{place}/` を使わずにチケットの範囲の"
+                "中で作業する",
+            )
+        )
+    return problems
+
+
+def _tracked(root: str, rel: str) -> str:
+    """その置き場の下で git が追跡しているファイル 1 本。無ければ空。
+
+    `.gitignore` は既に追跡されているファイルには効かないので、無視の設定だけを見ても
+    「追跡されていない」は言えない。索引に何が入っているかを直接問う。
+    """
+    rc, out = gitcmd.output(root, ["ls-files", "--", rel + "/"], gitstate.TIMEOUT_SECONDS)
+    if rc != 0:
+        return ""
+    first = out.strip().splitlines()
+    return first[0] if first else ""
 
 
 def _projects(conf: settings.Settings, root: str) -> list[Problem]:
