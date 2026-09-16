@@ -65,6 +65,8 @@ allow:
 - 大文字小文字は `glob` も `regex` も、どの機械でも区別せずに当たる。区別が要る部分だけ
   `(?-i:...)` で囲む。綴りの文字を除外する否定（`\.[^c\\/]` のような書き方）は、畳むと
   除外の側が広がるので、そこは囲む（ADR-0051）
+- **`allow` でコマンドの名前に当てるときは囲む。** `deny` と `ask` は畳んでよい（止まる側に
+  倒れる）が、`allow` を畳むと綴りを変えた呼び出しまで通り、`UNDECLARED` の安全網が外れる
 - `match` に書けるのは、判定が対象を取り出せるツールだけ。`Bash` `PowerShell`（コマンド）、
   `Read` `Edit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
