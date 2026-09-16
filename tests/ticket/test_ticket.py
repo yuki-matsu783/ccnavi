@@ -907,6 +907,79 @@ class TicketTest(unittest.TestCase):
 
     # ---- 6. 基準点より後の範囲外
 
+    def test_a_rename_into_the_scope_still_shows_the_source(self):
+        """範囲外のファイルを範囲の中へ改名しても、移動元が数から消えないこと。
+
+        `git diff --name-only` は改名を 1 行（移動先）にまとめるので、まとめさせると
+        範囲外から範囲の中への移動が素通りする。
+        """
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        os.makedirs(os.path.join(child, "src", "a"), exist_ok=True)
+        git(child, "mv", "src/keep.py", "src/a/keep.py")
+        git(child, "commit", "--quiet", "-m", "範囲の中へ移す")
+        stopped = self.hook("SubagentStop", "", child, agent_id="sub-1")
+        self.assertEqual(stopped.returncode, 2, stopped.stdout + stopped.stderr)
+        self.assertIn("POST_TICKET_SCOPE", stopped.stderr)
+
+    def test_a_submodule_that_moved_is_counted(self):
+        """submodule の進みが数から消えないこと。未コミットでも、コミット後でも。
+
+        `.gitmodules` は追跡されるファイルで、そこに `ignore = all` があると git は
+        submodule の変更を差分にも状態にも出さない。設定は他の機械から届く。
+        """
+        sub = os.path.join(self.root, "sub")
+        os.makedirs(sub)
+        git(sub, "init", "--quiet", "-b", "main", ".")
+        write(os.path.join(sub, "f.txt"), "a\n")
+        git(sub, "add", "-A")
+        git(sub, "commit", "--quiet", "-m", "s1")
+        try:
+            # file:// の submodule は既定で拒まれる（CVE-2022-39253）。テストの中だけ通す。
+            git(
+                self.parent_tree,
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "add",
+                "--quiet",
+                sub,
+                "vendor/sub",
+            )
+        except AssertionError as exc:  # pragma: no cover - 機械側の事情
+            self.skipTest(f"submodule を作れない機械（{exc}）")
+        with open(os.path.join(self.parent_tree, ".gitmodules"), "a", encoding="utf-8") as f:
+            f.write("\tignore = all\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "submodule を足す")
+
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        write(os.path.join(sub, "f.txt"), "b\n")
+        git(sub, "commit", "--quiet", "-am", "s2")
+        after = git(sub, "rev-parse", "HEAD").strip()
+        git(
+            child,
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "update",
+            "--init",
+            "--quiet",
+            "vendor/sub",
+        )
+        # まず作業ツリーの側。index はそのままで、submodule の中だけを進める。
+        git(os.path.join(child, "vendor", "sub"), "checkout", "--quiet", after)
+        uncommitted = self.hook("SubagentStop", "", child, agent_id="sub-1")
+        self.assertEqual(uncommitted.returncode, 2, uncommitted.stdout + uncommitted.stderr)
+        self.assertIn("POST_TICKET_SCOPE", uncommitted.stderr)
+        # コミットに乗せた側。こちらは基準点からの差分で見る。
+        git(child, "add", "--", "vendor/sub")
+        git(child, "commit", "--quiet", "-m", "submodule を進める")
+        committed = self.hook("SubagentStop", "", child, agent_id="sub-2")
+        self.assertEqual(committed.returncode, 2, committed.stdout + committed.stderr)
+        self.assertIn("POST_TICKET_SCOPE", committed.stderr)
+
     def test_subagent_stop_bounces_out_of_scope_once(self):
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
@@ -1163,6 +1236,24 @@ class TicketTest(unittest.TestCase):
         )
         if push:
             git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def test_a_japanese_name_in_the_store_is_still_the_store(self):
+        """置き場の中の日本語のファイルが、置き場の外に見えないこと。
+
+        `git status --porcelain` は `-z` が無いと非 ASCII を 8 進に逃がして引用符で包む。
+        そのまま前置き一致に当てると、置き場の中のファイルが「人の作業の汚れ」に化けて、
+        依頼が「未コミットの変更がある」で止まる。
+        """
+        self.family()
+        self.close_phase()
+        note = os.path.join(self.approved, "覚え書き.md")
+        write(note, "a\n")
+        git(self.parent_tree, "add", "--", ".ccnavi/tickets")
+        git(self.parent_tree, "commit", "--quiet", "-m", "置き場に日本語のファイル")
+        fixture = self.remote()
+        write(note, "b\n")
+        got = self.request(fixture)
+        self.assertEqual(got.returncode, 0, got.stderr)
 
     def test_check_passes_when_only_the_markers_moved(self):
         """マーカーだけをコミットしても check が止まらないこと。
