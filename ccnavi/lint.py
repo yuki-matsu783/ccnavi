@@ -343,6 +343,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
         )
         return problems
     root = root or os.getcwd()
+    problems.extend(_legacy_tickets(conf, root))
     if not _any_copies(conf, root) and not tree_has_tickets(root, conf.tickets):
         # 承認済みチケットも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
@@ -766,9 +767,9 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
 
-    提案の置き場はどのツリーでも同じ相対（`wip/tickets/`）で、プロジェクト向けはその
+    提案の置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けはその
     プロジェクトのツリーに置く（設計 §11.5、REQ-MLT-14）。ワークスペースの
-    `wip/<名前>/tickets/` は、名前が `projects/` に在っても在らなくても走査されない。走査
+    `wip/<名前>/proposals/` は、名前が `projects/` に在っても在らなくても走査されない。走査
     されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
     いちばん困るので名指しし、名前が在るなら正しい置き場を案内する。error にはしない。
     判定は動いている。
@@ -857,6 +858,40 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 )
             )
     return problems
+
+
+def _legacy_tickets(conf: settings.Settings, root: str) -> list[Problem]:
+    """旧の綴り（`wip/tickets/`）が残っているツリーを名指しする。
+
+    提案の置き場の既定を `wip/tickets` から `wip/proposals` に変えた。綴りを設定で
+    指定していないツリーに旧の置き場だけが残っていると、そこの提案は 1 つも走査されず、
+    「承認待ちは無い」で通る。黙って通る向きなので、ここで言う。
+
+    見るのは既定のまま使っているときだけ。`CCNAVI_TICKETS_PROPOSAL` を書いた人は
+    綴りを自分で決めているので、その値が旧の綴りでも言うことは無い。
+    """
+    if conf.tickets != settings.DEFAULT_TICKETS:
+        return []
+    stale = [
+        t.name or "(main)"
+        for t in approval.trees(conf, root)
+        if os.path.isdir(os.path.join(t.root, settings.LEGACY_TICKETS.replace("/", os.sep)))
+        and not os.path.isdir(os.path.join(t.root, conf.tickets.replace("/", os.sep)))
+    ]
+    if not stale:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            "(ticket)",
+            f"提案の置き場の既定が `{settings.LEGACY_TICKETS}` から "
+            f"`{settings.DEFAULT_TICKETS}` に変わった。"
+            f"{', '.join(stale)} には旧の置き場だけが在るので、そこの提案は走査されない。"
+            f"ディレクトリを `{settings.DEFAULT_TICKETS}` に改名するか、"
+            f"`{settings.TICKETS_ENV}={settings.LEGACY_TICKETS}` を "
+            "`.claude/settings.json` の env に足すこと",
+        )
+    ]
 
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:

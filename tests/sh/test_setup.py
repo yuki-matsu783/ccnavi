@@ -350,7 +350,7 @@ class WritesTheExpectedShape(SetupTest):
         """--all は、既定と同じ値のつまみも設定ファイルに並べる。"""
         self.run_setup("--all")
         env = self.read_settings()["env"]
-        self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/tickets")
+        self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/proposals")
         self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/tickets")
         self.assertEqual(env["CCNAVI_PHASES"], ".ccnavi/common/phases.yml")
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")

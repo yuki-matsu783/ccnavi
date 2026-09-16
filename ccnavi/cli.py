@@ -87,7 +87,7 @@ To review the pending tickets and approve the work areas they declare, run
     ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board;
                                             ids go last, after every flag)
 
-It scans wip/tickets/ in every worktree, shows what each ticket makes writable
+It scans wip/proposals/ in every worktree, shows what each ticket makes writable
 and whether it needs a human review, then keeps an approved copy under
 .ccnavi/tickets/. Only the copies are consulted when judging calls, so
 editing a ticket never widens the area on its own. Ids only narrow the batch:

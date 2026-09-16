@@ -209,6 +209,48 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 0)
 
+    def test_旧い提案の置き場だけが残っていたらwarnで名指しする(self):
+        # 提案の置き場の既定を wip/tickets から wip/proposals に変えた。綴りを設定で
+        # 指していないツリーに旧の置き場だけが残っていると、提案が 1 つも走査されないまま
+        # 「承認待ちは無い」で通る。黙って通る向きなので、検証がここで言う。
+        os.makedirs(os.path.join(self.root, "wip", "tickets", "todo"))
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("wip/tickets", result.stdout)
+        self.assertIn("wip/proposals", result.stdout)
+        self.assertIn("CCNAVI_TICKETS_PROPOSAL", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 0)
+
+    def test_新しい置き場が在れば旧い置き場が残っていても言わない(self):
+        # 移し終えた人に、移し終えたことを毎回言わない。
+        os.makedirs(os.path.join(self.root, "wip", "tickets", "todo"))
+        os.makedirs(os.path.join(self.root, "wip", "proposals", "todo"))
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("既定が", result.stdout)
+
+    def test_綴りを設定で旧いままにしている人には言わない(self):
+        # 置き場を自分で決めた人は、その綴りで動かしている。既定の話は関係が無い。
+        os.makedirs(os.path.join(self.root, "wip", "tickets", "todo"))
+
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--tickets",
+            "wip/tickets",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("既定が", result.stdout)
+
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))
 

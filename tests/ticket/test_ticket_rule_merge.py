@@ -137,7 +137,7 @@ class Workspace(unittest.TestCase):
 
     # 提案と承認済みチケットの置き場。ツリーのルートからの相対で、道具にもそのまま渡す。
     # 子クラスで綴りを変え、置き場を決め打ちしていないことを確かめる。
-    TICKETS = "wip/tickets"
+    TICKETS = "wip/proposals"
     APPROVED = ".ccnavi/tickets"
 
     def setUp(self):

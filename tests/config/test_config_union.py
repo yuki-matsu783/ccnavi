@@ -385,9 +385,9 @@ class ConfigUnionHarness(unittest.TestCase):
         return path
 
     def propose(self, name, text, project=""):
-        """提案を置く。プロジェクト向けはそのプロジェクトの `wip/tickets/`（設計 §11.5）。"""
+        """提案を置く。プロジェクト向けはそのプロジェクトの `wip/proposals/`（設計 §11.5）。"""
         base = os.path.join(self.projects, project) if project else self.ws
-        return write(os.path.join(base, "wip", "tickets", "todo", name + ".md"), text)
+        return write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
 
     def approved_dir_of(self, project=""):
         """このプロジェクトの承認済みチケットの置き場。"""

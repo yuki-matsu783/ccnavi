@@ -113,10 +113,15 @@ DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。
 DEFAULT_STATE = os.path.join("logs", "state")
-# 提案は各作業ツリーの `wip/tickets/` に置く。人が読み、人が承認するものなので、
+# 提案は各作業ツリーの `wip/proposals/` に置く。人が読み、人が承認するものなので、
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
-DEFAULT_TICKETS = "wip/tickets"
+DEFAULT_TICKETS = "wip/proposals"
+# 旧の綴り。既定は `wip/tickets` だった。名前が承認済みチケットの置き場（`.ccnavi/tickets`）と
+# 同じで、どちらの「tickets」なのかが読めなかったので分けた。設定に綴りを書いていないツリーに
+# 旧の置き場だけが残っていると、提案が走査されないまま「承認待ちは無い」で通るので、
+# `--lint` がその形を名指しする（lint._legacy_tickets）。判定はこの値を使わない。
+LEGACY_TICKETS = "wip/tickets"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して

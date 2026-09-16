@@ -518,7 +518,7 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
     why = "人間レビューが要る子を含みます" if not phase.planned else "レビューが要るフェーズです"
     if phase.risk_escalates:
         why = f"実績のリスクが高い（{phase.risk_line}）ので、宣言に関わらずレビューが要ります"
-    later = "次のフェーズの計画（wip/tickets/todo/ への提案）はレビュー前に進めて構いません。"
+    later = "次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めて構いません。"
     if phase.review_in_chat:
         todo = (
             "やること: 子の成果を親ブランチへ合流し、利用者に差分を見てもらって、"

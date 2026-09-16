@@ -49,7 +49,7 @@ class TicketControlTest(unittest.TestCase):
         self.assertIn("チケット制御を使っている", text)
         self.assertIn("直接作業", text)
         self.assertIn("チケット作業", text)
-        self.assertIn("wip/tickets/", text)
+        self.assertIn("wip/proposals/", text)
         self.assertIn("ccnavi-ticket.sh", text)
         self.assertNotIn("dry-run", text)
 

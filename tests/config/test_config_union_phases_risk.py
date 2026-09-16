@@ -5,7 +5,7 @@ fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ�
 risk は共通層に `big-diff`、lib の層に `schema` と `levels: {critical: 50}` がある。
 
 どの層を足すかは親の承認済みチケットの `project:` で決まる。lib 向けの提案は
-`wip/lib/tickets/` に置き、ワークスペース向けは `wip/tickets/` に置く。
+`wip/lib/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く。
 
 実装はまだ無い。このテストは実装フェーズが緑にする。
 """
@@ -118,7 +118,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertIn("build", refused.stderr)
         self.assertFalse(os.path.exists(self.approved_copy("i0003")))
 
-        os.remove(os.path.join(self.ws, "wip", "tickets", "todo", "i0003.md"))
+        os.remove(os.path.join(self.ws, "wip", "proposals", "todo", "i0003.md"))
         self.propose(
             "i0004",
             ticket_text("i0004", project="lib", plan=["docs"], allow=("docs/*",)),

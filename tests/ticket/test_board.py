@@ -100,11 +100,11 @@ class BoardTest(PhaseHarness):
     def test_scattered_lists_every_copy_when_the_home_tree_holds_none(self):
         """権威のツリーに無ければ、どれが本物か決まらない。候補を全部出す。"""
         self.scene()
-        home = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md")
+        home = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-03.md")
         with open(home, encoding="utf-8") as f:
             text = f.read()
         os.remove(home)
-        write(os.path.join(self.root, "wip", "tickets", "todo", "i0001-03.md"), text)
+        write(os.path.join(self.root, "wip", "proposals", "todo", "i0001-03.md"), text)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(

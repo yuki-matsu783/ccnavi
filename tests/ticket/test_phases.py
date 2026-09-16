@@ -192,7 +192,7 @@ class PhaseHarness(unittest.TestCase):
         return out.get("permissionDecisionReason") or out.get("additionalContext") or ""
 
     def propose(self, name, text):
-        return write(os.path.join(self.parent_tree, "wip", "tickets", "todo", name + ".md"), text)
+        return write(os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md"), text)
 
     def approve(self):
         """承認して、写しを親のブランチに乗せる。
@@ -434,7 +434,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("調査", approved.stdout)
         self.assertNotIn("i0001-01 は承認の対象にしない", approved.stderr)
         # 計画に無い番号。
-        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md"))
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md"))
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ["wip/research/*"]))
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
@@ -638,9 +638,9 @@ class PhaseTest(PhaseHarness):
         # 空のフィードバック計画を改版で出す。証跡が残る。
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         # 提案は doing/ にあるので、そこを書き換える。
-        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001.md"))
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md"))
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=[]),
         )
         approved = self.approve()
@@ -652,7 +652,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("feedback_at", text)
         # 2 度目は拒む。
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=["implement-feedback"]),
         )
         again = self.approve()
@@ -660,7 +660,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("1 回だけ", again.stderr)
         # 閉じられる。
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=[]),
         )
         self.assertEqual(self.close_child("i0001").returncode, 0)
@@ -687,7 +687,7 @@ class PhaseTest(PhaseHarness):
         # ゲートが開く。指摘は消えず、フィードバック作業フェーズの check が数える。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=["implement-feedback"]),
         )
         planned = self.approve()
@@ -773,7 +773,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("フィードバック計画", refused.stderr)
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["design"], feedback=[]),
         )
         self.assertEqual(self.approve().returncode, 0)
@@ -850,7 +850,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("締めた", done.stdout)
         self.assertTrue(
             os.path.exists(
-                os.path.join(self.parent_tree, "wip", "tickets", "cancelled", "i0001-02.md")
+                os.path.join(self.parent_tree, "wip", "proposals", "cancelled", "i0001-02.md")
             )
         )
         self.assertFalse(os.path.exists(os.path.join(self.approved, "i0001-02.md")))
@@ -1157,7 +1157,7 @@ class ChatReviewTest(PhaseHarness):
         # フィードバック計画を承認して、2 番目（フィードバック対応）を回す。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["chores"], feedback=["chores-feedback"]),
         )
         self.assertEqual(self.approve().returncode, 0)
@@ -1189,7 +1189,7 @@ class ChatReviewTest(PhaseHarness):
         # フィードバック計画（対応が無くても空で）を承認してから親を閉じる。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
-            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            os.path.join(self.parent_tree, "wip", "proposals", "doing", "i0001.md"),
             parent_text("i0001", ["chores"], feedback=[]),
         )
         self.assertEqual(self.approve().returncode, 0)
