@@ -131,6 +131,14 @@ which fetches the threads and runs
 
     ccnavi --reviewed N --accept-unresolved --result <json> --cwd <parent worktree>
 
+A phase whose type says `review: chat` is reviewed in the session itself. There
+is no merge request and no copy to read, so a human opens that gate from the
+terminal with
+
+    ccnavi --reviewed N --chat --cwd <parent worktree>
+
+which only applies to phases whose type declared `chat`.
+
 A human closes a parent early ("good enough for now") with
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
@@ -240,6 +248,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--reason", default="")
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
+    parser.add_argument("--chat", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
@@ -480,6 +489,7 @@ def operate(
             args.reviewed,
             args.accept_unresolved,
             args.result,
+            args.chat,
         )
         return EXIT_OK if code == 0 else EXIT_ERROR
 

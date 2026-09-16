@@ -262,8 +262,13 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
 # 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。マージに進んでよいの合図
 #   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
+#   closed.json  親を閉じた（`ticket done <親>`）。どのフェーズをどこで見たかを残す
+#
+# closed.json が要るのは、提案（wip/）が統合先へ戻す前に消えるから。マージリクエストを
+# 作らない運び方（全フェーズが `review: chat`）では、締めた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
 PARENT_MARK_WRAPUP = "wrapup"
+PARENT_MARK_CLOSED = "closed"
 
 
 def parent_mark_path(approved_dir: str, parent: str, name: str) -> str:
@@ -1112,7 +1117,10 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
         elif item.review == ticket_mod.PLAN_REVIEW_MR:
             review = "レビュー要（計画で強めた）"
         elif pt is not None:
-            review = "レビュー要" if pt.review == "mr" else "レビュー不要"
+            review = {
+                phasetypes.REVIEW_MR: "レビュー要（マージリクエスト）",
+                phasetypes.REVIEW_CHAT: "レビュー要（このセッションで）",
+            }.get(pt.review, "レビュー不要")
         lines.append(f"    {n}. {title}（{item.type}）" + (f"  {review}" if review else ""))
     return lines
 
@@ -1307,13 +1315,19 @@ def revision_problems(
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
     if revised.feedback != current.feedback:
         if current.feedback is not None:
+            # 残りの切り出し先は運び方で違う。MR があれば issue に切り出せるが、
+            # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
+            elsewhere = (
+                "残りは新しい親チケットの提案として wip/tickets/todo/ に書く"
+                if phase.chat_only(root, conf, current.ticket)
+                else "残りは別 issue に切り出す（ccnavi-review.sh handoff）"
+            )
             problems.append(
                 rules.Problem(
                     rules.SEVERITY_ERROR,
                     revised.ticket,
                     "フィードバック計画は 1 回だけ。承認済みのフィードバック作業フェーズに"
-                    "子を足して"
-                    "やり直すか、残りは別 issue に切り出す（ccnavi-review.sh handoff）",
+                    f"子を足してやり直すか、{elsewhere}",
                 )
             )
         elif not phase.plan_finished(root, conf, current):

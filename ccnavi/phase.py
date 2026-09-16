@@ -174,6 +174,9 @@ class Phase:
     owner: ticket_mod.Ticket | None = None
     # 子ごとの実績のリスク（閉じるときに数えた記録）。子の識別子 → 記録。
     risks: dict[str, dict] = field(default_factory=dict)
+    # 延期を引き受けた前のフェーズが、種類として宣言している「見る場所」。引き受けた側は
+    # 厳しい側で見る（`review_kind`）。組むのは `phases_of`。
+    covered_reviews: list[str] = field(default_factory=list)
 
     @property
     def risk(self) -> dict | None:
@@ -243,25 +246,63 @@ class Phase:
         return ticket_mod.DONE in states
 
     @property
-    def review_required(self) -> bool:
-        """このフェーズの終わりに人のレビューが要るか。
+    def declared_review(self) -> str | None:
+        """このフェーズの種類と計画の項が言う「見る場所」。宣言が無ければ None。
 
-        計画があれば、種類の既定と計画の項と子の宣言のうち厳しい側が勝つ。延期した
-        フェーズは自分ではレビューを持たず、次にレビューがあるフェーズが引き受ける。
+        計画の項は `mr` にだけ強められる（`ticket.PLAN_REVIEWS`）ので、項が `mr` なら
+        種類より優先する。種類の無い番号（計画が無い、種類のファイルが無い、その名前の
+        種類が読めない）は、言っている者が居ないので None。
+        """
+        if self.item is not None and self.item.review == ticket_mod.PLAN_REVIEW_MR:
+            return phasetypes.REVIEW_MR
+        if self.type is not None:
+            return self.type.review
+        return None
+
+    @property
+    def review_kind(self) -> str:
+        """このフェーズの終わりに人がどこで見るか。`none` / `chat` / `mr`（設計 §9.8）。
+
+        見る場所を言えるのは、種類と計画の項と、引き受けた延期だけ。そのうち厳しい側が
+        勝つ。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
+        場所は言わないので、宣言が「見ない」だったフェーズを `chat` へ上げるにとどまる。
+        どちらも止める向きにしか働かず、宣言された `mr` を `chat` に落とすことはない。
+
+        場所を言う者が 1 人も居なければ（計画が無い、種類が読めない）今までどおりで、
+        子が「人が見る」と言うか実績が高ければ `mr`。緩い側に倒すと、種類のファイルが
+        読めないときにレビューの行き先が消える。延期を引き受けている番号は、覆っている分の
+        宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、ここには落ちない。
+
+        延期したフェーズは自分では見る場所を持たず、次に見るフェーズが引き受ける。
         """
         if self.deferred:
-            return False
+            return phasetypes.REVIEW_NONE
         from_children = any(
             t.review_required for t in self.tickets if self.states.get(t.ticket) == ticket_mod.DONE
         )
         # 実績のリスクは、宣言を厳しい側にだけ上書きする（risk.py）。
-        if self.risk_escalates:
-            return True
-        if not self.planned:
-            return from_children
-        by_type = self.type is not None and self.type.review == phasetypes.REVIEW_MR
-        by_item = self.item is not None and self.item.review == ticket_mod.PLAN_REVIEW_MR
-        return by_type or by_item or from_children or bool(self.covers)
+        needed = from_children or self.risk_escalates
+        declared = [d for d in [self.declared_review, *self.covered_reviews] if d is not None]
+        if not declared:
+            return phasetypes.REVIEW_MR if needed else phasetypes.REVIEW_NONE
+        where = declared[0]
+        for covered in declared[1:]:
+            where = phasetypes.stricter(where, covered)
+        # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。MR を
+        # 勧めるのは文の側の仕事で、強制はしない（ADR-0051）。
+        if needed and where == phasetypes.REVIEW_NONE:
+            where = phasetypes.REVIEW_CHAT
+        return where
+
+    @property
+    def review_required(self) -> bool:
+        """このフェーズの終わりに人のレビューが要るか。見る場所が `none` でなければ要る。"""
+        return self.review_kind != phasetypes.REVIEW_NONE
+
+    @property
+    def review_in_chat(self) -> bool:
+        """このセッションで人が見るフェーズか。ホストへは出ない。"""
+        return self.review_kind == phasetypes.REVIEW_CHAT
 
     @property
     def gate_closed(self) -> bool:
@@ -273,6 +314,11 @@ class Phase:
 
         ボードはこれを写すだけで、ゲートとマーカーから組み直さない。依頼していない
         フェーズは閉じていても待ちではなく、先に親が request を打つ。
+
+        これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは依頼を出さない
+        ので常に False。ボードの「受け入れ」（未解決スレッドを受け入れて進む）がこの欄に
+        繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
+        このセッションで見る待ちは `review_kind` と `gate_closed` で読む（設計 §9.8）。
         """
         return self.gate_closed and approval.MARK_REQUESTED in self.marks
 
@@ -367,6 +413,13 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
     return remaining
 
 
+def _covered_review(phase: Phase | None) -> str:
+    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 §9.8）。"""
+    if phase is None or phase.declared_review is None:
+        return phasetypes.REVIEW_MR
+    return phase.declared_review
+
+
 def phases_of(
     root: str,
     conf: settings.Settings,
@@ -394,6 +447,15 @@ def phases_of(
         types = load_types(conf, root, owner.project) or {}
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
+        # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
+        # `review_kind`。ここで渡さないと、chat の計画に mr の延期が混ざったときに
+        # 引き受けた側が chat のままになり、宣言した mr が消える。
+        #
+        # 覆っている分の宣言が読めない番号は `mr` に倒す。延期できるのはレビューのある
+        # 種類だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
+        # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
+        for phase in by_number.values():
+            phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
     # 閉じた承認済みチケットは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
     # 場所にあるので、消す・同じ識別子を todo/ に書く、でフェーズを開き直せては
     # いけない。閉じたことの権威は承認済みチケットの側。
@@ -456,17 +518,29 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
     why = "人間レビューが要る子を含みます" if not phase.planned else "レビューが要るフェーズです"
     if phase.risk_escalates:
         why = f"実績のリスクが高い（{phase.risk_line}）ので、宣言に関わらずレビューが要ります"
+    later = "次のフェーズの計画（wip/tickets/todo/ への提案）はレビュー前に進めて構いません。"
+    if phase.review_in_chat:
+        todo = (
+            "やること: 子の成果を親ブランチへ合流し、利用者に差分を見てもらって、"
+            "ターンを終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
+            "（review: chat）なので、マージリクエストは要りません。ゲートを開けるのは、"
+            f"利用者が端末で打つ 'ccnavi --reviewed {n} --chat' です"
+            f"（エージェントからは打てません）。{later}"
+        )
+    else:
+        todo = (
+            "やること: 子の成果を親ブランチへ合流して push し、"
+            f"'{review_sh} request --phase {n} --body-file <依頼文>' "
+            "でレビューを頼み、ターンを終えて利用者を待ってください。"
+            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
+            f"で確かめます。{later}"
+        )
     return "\n".join(
         [
             f"[ccnavi] {CODE_GATE} (parent: {phase.parent}, phase: {n}, {marks})",
             f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
             f"レビュー済みのマーカーが置かれるまで、ゲートが{what}を止めます。",
-            "やること: 子の成果を親ブランチへ合流して push し、"
-            f"'{review_sh} request --phase {n} --body-file <依頼文>' "
-            "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
-            "で確かめます。次のフェーズの計画（wip/tickets/todo/ への提案）は"
-            "レビュー前に進めて構いません。",
+            todo,
         ]
     )
 
@@ -503,7 +577,11 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
         elif phase.review_required:
             failed = approval.write_mark(
-                where, parent.ticket, n, approval.MARK_PENDING, _type_source(phase)
+                where,
+                parent.ticket,
+                n,
+                approval.MARK_PENDING,
+                {"review": phase.review_kind, **_type_source(phase)},
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
@@ -519,15 +597,39 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 who += f"（{phase.risk_line}）。"
             elif phase.risk_line:
                 who += f"{phase.risk_line}。"
-            texts.append(
-                f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
-                f"子の成果を親ブランチへ合流して push し、"
-                f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
-                "--body-file <依頼文>' "
-                f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。指摘があれば同じ"
-                "フェーズに子を足せます。レビュー済みになるまで、ゲートがサブエージェントの起動と"
-                "シェル実行を止めます。"
+            gate_note = (
+                "指摘があれば同じフェーズに子を足せます。レビュー済みになるまで、"
+                "ゲートがサブエージェントの起動とシェル実行を止めます。"
             )
+            if phase.review_in_chat:
+                # このセッションで人が見る。ホストへは出ないので push もしない。
+                # ゲートを開けるのは端末の人で、エージェントには打てない。
+                advise = (
+                    "実績のリスクが高いので、マージリクエストで見てもらうことを勧めます"
+                    "（種類の `review` を mr にするか、利用者に相談）。それでも chat で"
+                    "通すかは利用者が決めます。"
+                    if phase.risk_escalates
+                    else ""
+                )
+                texts.append(
+                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
+                    "このフェーズはこのセッションで見る計画（review: chat）です。"
+                    "子の成果を親ブランチへ合流し、利用者に差分を見てもらってください。"
+                    f"{advise}"
+                    "レビュー"
+                    f"{covers}が済んだら、利用者が端末で "
+                    f"'ccnavi --reviewed {n} --chat' を打つとゲートが開きます"
+                    "（この経路はエージェントには打てません）。"
+                    f"ターンを終えて利用者を待ってください。{gate_note}"
+                )
+            else:
+                texts.append(
+                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
+                    f"子の成果を親ブランチへ合流して push し、"
+                    f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
+                    "--body-file <依頼文>' "
+                    f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。{gate_note}"
+                )
         else:
             failed = approval.write_mark(
                 where,
@@ -667,6 +769,24 @@ def plan_finished(root: str, conf: settings.Settings, parent: ticket_mod.Ticket)
         if not reviewed_or_skipped(phase):
             return False
     return False
+
+
+def review_venues(root: str, conf: settings.Settings, parent_id: str) -> dict[int, str]:
+    """この親のフェーズ番号 → 人がどこで見るか（`none` / `chat` / `mr`）。"""
+    return {p.number: p.review_kind for p in phases_of(root, conf, parent_id)}
+
+
+def chat_only(
+    root: str, conf: settings.Settings, parent_id: str, venues: dict[int, str] | None = None
+) -> bool:
+    """マージリクエストに出さない運び方か。フェーズが 1 つも無ければ False。
+
+    1 つでも `mr` で見るフェーズがあれば、その親には MR が在る（レビューの依頼が作る）
+    ので、締めも Draft を外す道に乗る。`venues` は数え直しを省くための持ち込み。
+    """
+    if venues is None:
+        venues = review_venues(root, conf, parent_id)
+    return bool(venues) and phasetypes.REVIEW_MR not in venues.values()
 
 
 def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str) -> str:

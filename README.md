@@ -1345,7 +1345,8 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
   要らない）。チケットを起こさず、そのまま進める。判定は全体ルールだけ。ワークスペースルート直下と、
   承認済みチケットの無い作業ツリーがこれにあたる
 - **チケット作業**: 大きな修正（設計に触れる、複数のフェーズに分かれる、人のレビューが要る）。
-  提案を書いて承認を受け、フェーズとリスクの配点に従って issue とマージリクエストを作りながら進める
+  提案を書いて承認を受け、フェーズとリスクの配点に従って進める。人がどこで見るかは
+  フェーズの種類が決める（`review: mr` ならマージリクエスト、`chat` ならこのセッション）
 
 どちらで進めるかはモデルが決める。ccnavi はこの線引きを判定では担保せず、セッションの
 頭（`SessionStart`。起動・再開・compact・clear のどの回も）に次の案内を渡す。
@@ -1355,9 +1356,10 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 [ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。
 - 直接作業: 調査や小さな修正（触るファイルが少ない、振る舞いが変わらない、
   人のレビューが要らない）は、チケットを起こさずそのまま進める。判定は全体ルールだけ。
-- チケット作業: 大きな修正（設計に触れる、複数のフェーズに分かれる、人のレビューが要る）は、
+- チケット作業: 大きな修正（設計に触れる、複数の段階になる、人のレビューが要る）は、
   wip/tickets/ に提案を書いて承認を受け、フェーズ（.ccnavi/common/phases.yml）と
-  リスクの配点（.ccnavi/common/risks.yml）に従って issue とマージリクエストを作りながら進める。
+  リスクの配点（.ccnavi/common/risks.yml）に従って進める。フェーズの種類の `review` が
+  mr なら issue とマージリクエストを作り、chat ならこのセッションで利用者に見てもらう。
   操作は sh .ccnavi/scripts/ccnavi-ticket.sh と ccnavi-review.sh を通す。
 どちらで進めるか迷ったら、利用者に聞く。
 （現状: CCNAVI_MODE=dry-run。deny判定でも止めずに言うだけ）
@@ -1591,15 +1593,31 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 同じ親の同じ `phase` の子が全部 `done/` か `cancelled/` に動き、見つからない子も無く、
 `done/` に 1 枚以上あれば、そのフェーズは終わり。`cancelled/` だけのフェーズは終わらない。
 
-終わったときに何が起きるかは、そのフェーズにレビューが要るかで分かれる。要るのは次の
-どれかに当たるとき。フェーズの種類が `review: mr`、親の計画の項が `mr`、`done/` の子に
-`human_review.required: true` が 1 枚でもある、延期した番号の分を引き受けている、
-実績のリスクが HIGH 以上（「実績のリスク」）。
+終わったときに何が起きるかは、**そのフェーズを人がどこで見るか**で分かれる。場所は 3 つ
+（`none` / `chat` / `mr`）で、次の厳しい側が勝つ（`none` < `chat` < `mr`）。
 
-| | レビュー要 | 不要 |
-|---|---|---|
-| 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えて利用者を待て | レビューを省略して次のフェーズへ進める |
-| ゲート | 閉じる。レビュー済みのマーカーまで | 閉じない。省略のマーカーを残す |
+- フェーズの種類の `review`
+- 親の計画の項の `mr`（種類が `none` でも `mr` にする）
+- 延期した番号の分を引き受けているなら、その分の宣言
+
+`done/` の子の `human_review.required: true` と、実績のリスクが HIGH 以上（「実績のリスク」）は、
+**要るとだけ言って場所は言わない**。宣言が `none` のフェーズを `chat` に上げるだけで、
+宣言された `mr` が `chat` に落ちることはない。
+
+| | `mr` | `chat` | `none` |
+|---|---|---|---|
+| 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えて利用者を待て | 合流して利用者に差分を見てもらい、ターンを終えて待て | レビューを省略して次のフェーズへ進める |
+| ゲート | 閉じる。レビュー済みのマーカーまで | 閉じる。レビュー済みのマーカーまで | 閉じない。省略のマーカーを残す |
+| 開ける者 | `ccnavi-review.sh check` / `accept` | 人が端末で `ccnavi --reviewed <N> --chat` | — |
+
+`chat` はこのセッションで人が差分を見る進め方。ホストへ出ないので、マージリクエストも
+`GITHUB_TOKEN` / `GITLAB_TOKEN` も要らず、`.ccnavi/scripts/` の sh は動かない。ゲートを開ける
+`--chat` は**種類が `chat` と宣言したフェーズにしか当たらない**。`mr` のフェーズをこの経路で
+通そうとすると断る。`request` を出したあとのフェーズも断る（付いた指摘を数えずに開けないため。
+そこからは `check` と `accept`）。逆向き（`chat` のフェーズを `request` でマージリクエストに
+出す）は通る。
+止めるのは緩める側だけで、実績のリスクが高いときに勧めるのがこの向き。勧めるだけで止めはせず、
+`chat` で通したことは `reviewed` のマーカーに残る。
 
 ゲートは cwd の作業ツリーで親を引く。閉じている間、その親の cwd からの `Agent`（サブエージェントの
 起動）と Bash を止める（`DENY_PHASE_GATE`）。通すのは `ccnavi-ticket.sh` `ccnavi-review.sh`
@@ -1618,7 +1636,7 @@ phases:
   research:
     kind: work            # work は全体計画に、feedback はフィードバック計画にだけ置ける
     title: 調査           # id と title はどちらも一意
-    review: none          # none | mr。既定であって上限ではない
+    review: none          # none | chat | mr。既定であって上限ではない
     scope: ["wip/research/*"]          # 子の範囲の上限。省略か inherit なら親の範囲
     deliverables: ["wip/research/summary.md"]   # 閉じる前に在って追跡されているべきもの
     agent: explorer       # .claude/agents/<名前>.md。案内。判定には使わない
@@ -1629,6 +1647,11 @@ phases:
     review: mr
     scope: ["src/*", "tests/*"]
     requires: [acceptance]             # 計画に置くなら一緒に要る
+  chores:
+    kind: work
+    title: 片付け
+    review: chat          # このセッションで人が見る。マージリクエストは作らない
+    scope: ["src/*"]
   acceptance:
     kind: work
     title: 受入テスト作成
@@ -1638,7 +1661,7 @@ phases:
   implement-feedback:
     kind: feedback
     title: 実装フィードバック対応
-    review: mr                         # feedback は mr 固定
+    review: mr                         # feedback に none は書けない（chat は可）
     scope: inherit
 ```
 
@@ -1721,6 +1744,7 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 | `request` | `review prepare`（前提を確かめ、マーカー付きの本文を控えの置き場に書き出す）→ sh が投稿 → `review requested`（マーカーを置く） |
 | `check` | sh がスレッドとレビューを取ってくる → `review check`（判定してマーカーを置く） |
 | `accept N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せてマーカーを置く）→ 受け入れた一覧を sh がコメントに写す |
+| （`chat` のフェーズ） | sh は動かない。人が端末で `ccnavi --reviewed <N> --chat --cwd <親の作業ツリー>` を打つ。依頼も写しも無い |
 | `note` | sh が投稿する。実行ファイルは関わらない |
 | `handoff --body-file <題と本文>` | 残った指摘を別の issue に切り出す。`review handoff`（局面を確かめ、残ったスレッドの URL を添えた下書きを書く）→ sh が issue を作り、マージリクエストに引き継ぎの note を残す |
 | `ready` | Draft を外す（マージに進んでよいの合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` と note の下書きを置く）→ sh が Draft を外して note を投稿する。親が打つ。マージは人 |
@@ -1786,6 +1810,10 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 `base_sha..HEAD` の差分を数えて点を付け、`phases/<親>/<子>.risk.json` に残す。フェーズの点は
 子の最大値。**HIGH 以上なら、宣言に関わらずそのフェーズは人間レビューが要る扱いになり、
 ゲートが閉じる。** 実績が小さくても宣言のレビュー要を下げることはしない。
+
+要る扱いにするだけで、**どこで見るかは指さない**。宣言が `none` だったフェーズは `chat`
+（このセッションで見る）に上がる。そこでマージリクエストを勧める文は出るが、強制はしない。
+勧めたのに `chat` で通したことは `reviewed` のマーカーに残る。
 
 配点は `.ccnavi/common/risks.yml`（ccnavi ディレクトリの下で、組み込みの deny が守る場所。エージェントは書き換えない）。無ければ組み込み。
 
@@ -2280,9 +2308,9 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 §9.7 の文） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
-| `wrapup` / `ready` | 親のマーカー `wrapup.json` / `ready.json` の中身。無ければ `null` |
+| `wrapup` / `ready` / `closed_record` | 親のマーカー `wrapup.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
-| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`gate_closed` は判定が使うのと同じ値。`review_waiting` は依頼を出したのにゲートが閉じたまま（人のレビュー待ち）で、ボードはこれを写すだけで組み直さない |
+| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` は人がどこで見るか（`none` / `chat` / `mr`）。`gate_closed` は判定が使うのと同じ値。`review_waiting` は依頼を出したのにゲートが閉じたまま（人のレビュー待ち）で、ボードはこれを写すだけで組み直さない。これはマージリクエストの話で、`chat` のフェーズは依頼を出さないので常に `false`。このセッションで見る待ちは `review_kind` と `gate_closed` で読む |
 
 ## 承認の JSON
 

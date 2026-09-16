@@ -138,6 +138,32 @@ class RiskTest(PhaseHarness):
         self.assertIn("このレビューのリスク: リスク: 95 (CRITICAL)", self.last_request_body)
         self.assertIn("行数が多い", self.last_request_body)
 
+    def test_escalated_phase_is_seen_in_the_session_and_only_recommends_a_merge_request(self):
+        """実績は「要る」としか言わない。宣言が none のフェーズは chat に上がり、MR は勧めるだけ。
+
+        強制しないのは ADR-0051。勧めたのに chat で通したことはマーカーに残る。
+        """
+        tree = self.one_child(review=False)
+        write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
+        write(os.path.join(tree, "src", "b.py"), "b\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "big")
+        closed = self.close_child("i0001-01")
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
+        self.assertIn("実績のリスクが高い", said)
+        self.assertIn("マージリクエストで見てもらうことを勧めます", said)
+        self.assertIn("--reviewed 1 --chat", said)
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        self.assertIn("マージリクエストで見ることを勧める", passed.stdout)
+        mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        self.assertEqual(mark["by"], "chat")
+        self.assertEqual(mark["recommended"], "mr")
+        self.assertIn(mark["risk"], ("HIGH", "CRITICAL"))
+
     # ---- 3. スクリプト
 
     def test_script_factor_adds_its_points_and_fails_heavy(self):
