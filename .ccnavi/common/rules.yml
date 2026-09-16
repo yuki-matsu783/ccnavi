@@ -107,11 +107,12 @@ deny:
   # 承認済みチケットへの書き込みを禁止
   - id: guard-approved-tickets
     match: Write|Edit|NotebookEdit
-    glob: "*/.ccnavi/tickets/*"
+    glob: "*/.ccnavi/approved/*"
     message: >-
       承認済みチケットです。承認はユーザが VS Code のボード（端末なら
       'ccnavi --approve'）で行い、
-      閉じるのは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh done <識別子>' です。
+      作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh done <識別子>' で
+      レビュー待ち（wip/proposals/review/）へ動かします。
       範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
 
   # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、ワークツリー側の設定は
