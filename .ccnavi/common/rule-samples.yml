@@ -20,7 +20,7 @@
 deny:
   - tool: Write
     subject: "/repo/README.md"
-    why: main のワークツリーでは編集しない。作業は worktree の中で
+    why: main の作業ツリーでは編集しない。作業はワークツリーの中で
   - tool: Edit
     subject: "/repo/ccnavi/cli.py"
     why: 同上。ソースも main では触らない

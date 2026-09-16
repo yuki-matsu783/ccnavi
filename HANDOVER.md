@@ -81,7 +81,7 @@ ccnavi/approval.py          承認済みチケット・フェーズのマーカ�
 ccnavi/risk.py              実績で測るリスク。risks.yml・差分の計測・スクリプト・定性項目
 ccnavi/phase.py             フェーズの終わりとゲート。提案から承認済みチケットへの同期
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
-ccnavi/review.py            レビューの依頼と確認。ワークツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
+ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
 ccnavi/ops.py               チケットの状態を動かす ticket start / done / cancel / judge
 ccnavi/audit.py             1 行 1 件の追記記録
 ccnavi/lint.py              設定とルールの検証
