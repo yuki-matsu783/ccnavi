@@ -589,7 +589,6 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
-	CCNAVI_RULES: ".ccnavi/common/rules.yml",
 	CCNAVI_LOG: "logs/log.jsonl",
 	CCNAVI_BIN_PATH: $bin,
 	CCNAVI_RESTORE_IF_DENY: $mode,
@@ -601,13 +600,15 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
 # 書く利点は、あとで値を変えたくなった人が、つまみの一覧を README ではなく
 # 設定ファイルの中で見つけられること。
+#
+# 共通層の 3 本（rules / phases / risk）はここにも書かない。置き場は `.ccnavi/common/`
+# 固定で、env では動かないので、書いても読まれない（i0054）。読まれない語を
+# つまみの一覧に混ぜると、そこを直せば置き場が動くと読める。
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {
 		CCNAVI_STATE: "logs/state",
 		CCNAVI_TICKETS_PROPOSAL: "wip/tickets",
 		CCNAVI_TICKETS_APPROVED: ".ccnavi/tickets",
-		CCNAVI_PHASES: ".ccnavi/common/phases.yml",
-		CCNAVI_RISK: ".ccnavi/common/risks.yml",
 		CCNAVI_PROJECT_HOME: ".ccnavi"
 	}')
 fi

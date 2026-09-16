@@ -61,7 +61,8 @@ test("CB-T32 ツール名で走る hook を絞る。ツール名の無いイベ�
 
 test("CB-T33 env の値を読む。無ければ空", () => {
   assert.equal(envFromSettingsJson(SETTINGS, "CCNAVI_MODE"), "dry-run");
-  assert.equal(envFromSettingsJson(SETTINGS, "CCNAVI_RULES"), "");
+  // env の欄はあるが、その語は無い。共通層の置き場は固定なので拡張はここを引かない（i0054）。
+  assert.equal(envFromSettingsJson(SETTINGS, "CCNAVI_BIN_PATH"), "");
   assert.equal(envFromSettingsJson("{}", "CCNAVI_MODE"), "");
   assert.equal(envFromSettingsJson("broken", "CCNAVI_MODE"), "");
 });

@@ -374,23 +374,25 @@ class DenyTest(GuardHarness):
             with self.subTest(path=os.path.relpath(path, self.ws)):
                 self.assert_not_denied(self.guarded_hook("Write", self.ws, file_path=path))
 
-    def test_shell_writes_into_a_moved_common_layer_are_denied(self):
-        """§11.6: 共通層が既定の名前の外にあっても、シェルからの書き込みは組み込みで止まる。"""
-        policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
-        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
-        # そのコマンドは設定ファイルに書かない。
+    def test_shell_writes_into_the_common_layer_are_denied(self):
+        """§11.6: 共通層の 3 本へのシェルからの書き込みは組み込みで止まる。
+
+        置き場は `.ccnavi/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
+        （`_PLACES` の `\\.ccnavi`）が当てる。以前は共通層を env で動かせたため、
+        動かした先の綴りを 1 本ずつ足していた（`common_shell_clause`）。i0054 で
+        固定になり、その経路ごと消えた。
+        """
         for command in (
-            "echo x > policy/rules.yml",
-            "sed -i s/deny/allow/ policy/rules.yml",
-            "cp /tmp/x policy/rules.yml",
-            f"echo x > {policy.replace(os.sep, '/')}",
+            "echo x > .ccnavi/common/rules.yml",
+            "sed -i s/deny/allow/ .ccnavi/common/phases.yml",
+            "cp /tmp/x .ccnavi/common/risks.yml",
         ):
             with self.subTest(command=command):
-                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
+                result = self.hook("Bash", self.ws, guard="enable", command=command)
                 self.assert_denied(result, "builtin-guard-setting-files")
         # 名前の途中で当たったものは別のファイル。
         result = self.hook(
-            "Bash", self.ws, guard="enable", rules=policy, command="echo x > otherpolicy/rules.yml"
+            "Bash", self.ws, guard="enable", command="echo x > myccnavi/common/rules.yml"
         )
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 

@@ -2,7 +2,7 @@
  * フェーズ管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`、`CCNAVI_PHASES`）、
+ * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
  * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。対象ごとに 1 パネルで、並べて開ける。
  * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
@@ -178,15 +178,8 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
   void refreshLock(current);
 }
 
-/** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。実行ファイルが読む env の重なりと同じ */
-function phasesRelOf(root: string): string {
-  for (const name of ["settings.local.json", "settings.json"]) {
-    const settingsText = readText(path.join(root, ".claude", name));
-    const found = settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_PHASES");
-    if (found !== "") {
-      return found;
-    }
-  }
+/** 共通層の置き場は `.ccnavi/common/` 固定。env でも上書き設定ファイルでも動かない（i0054） */
+function phasesRelOf(_root: string): string {
   return DEFAULT_PHASES;
 }
 
