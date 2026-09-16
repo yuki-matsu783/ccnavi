@@ -998,6 +998,20 @@ def _approved_rel(conf: settings.Settings) -> str:
     return (conf.approved or settings.DEFAULT_APPROVED).strip("/")
 
 
+# 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
+_SHA = re.compile(r"^[0-9a-f]{7,64}$")
+
+
+def _is_sha(value: str) -> bool:
+    """マーカーの `head` が sha の形をしているか。
+
+    マーカーは親のブランチに乗って他の機械から届くファイル（設計 §9.2）なので、中身を
+    git の revision としてそのまま渡さない。`HEAD` や `@` のような「今」を指す値は
+    `head..HEAD` を空差分にして判定を素通りさせ、`-` で始まる値は git のオプションに化ける。
+    """
+    return bool(_SHA.match(value))
+
+
 def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
     """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
 
@@ -1005,14 +1019,24 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     引用して 8 進に逃がすので、そのまま当てると日本語のファイルが置き場の外か中かで
     読み違える。`--no-renames` を付けるのは、改名を 1 行にまとめられると移動元が消え、
     置き場の外から中へ動かしたファイルが「置き場の中だけ」に見えるため。
+    `--ignore-submodules=none` は、`.gitmodules` の `ignore = all` で submodule の
+    進みが差分から丸ごと消えるのを止める（`.gitmodules` は追跡されるので、外から届く）。
+
+    `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
+    `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
+    置き場の中のパスに化けて、除外の側に落ちる。
     """
-    rc, out = _git(tree_root, ["diff", "--name-only", "--no-renames", "-z", f"{ref}..HEAD"])
+    if not ref:
+        return [], "比べる相手が無い"
+    rc, out = _git(
+        tree_root,
+        ["diff", "--name-only", "--no-renames", "--ignore-submodules=none", "-z", f"{ref}..HEAD"],
+    )
     if rc != 0:
         return [], f"{ref[:12]} からの差分を読めない"
     skip = _approved_rel(conf)
     changed = []
     for path in out.split("\0"):
-        path = path.strip().replace("\\", "/")
         if path and not path.startswith(skip + "/"):
             changed.append(path)
     return changed, ""
@@ -1347,10 +1371,16 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     if rc != 0:
         return "親の HEAD を読めない"
     recorded = str(requested_mark.get("head") or "")
-    if recorded and head != recorded:
+    if not recorded:
+        # 記録が無ければ照合できない。素通りさせると、依頼の後のコミットが全部
+        # 「人が見たもの」になる。出し直しで書き直させる。
+        return "依頼時の親の HEAD が記録されていない"
+    if head != recorded:
         moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
+        # sha でない値は差分の相手にしない。読めない（依頼時のコミットが消えているなど）も同じ。
+        if not _is_sha(recorded):
+            return moved
         changed, failed = _outside_approved(tree_root, conf, recorded)
-        # 差分を読めない（依頼時のコミットが消えているなど）なら、動いた側に倒す。
         if failed or changed:
             return moved
     branch = _branch(tree_root)
@@ -1388,11 +1418,15 @@ def _already_requested(
         return ""
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     recorded = str(mark.get("head") or "")
-    if rc == 0 and recorded and head.strip() != recorded:
+    if not recorded:
+        return ""
+    if rc == 0 and head.strip() != recorded:
+        if not _is_sha(recorded):
+            return ""
         changed, failed = _outside_approved(tree_root, conf, recorded)
         if failed or changed:
             return ""
-    return f"フェーズ {phase_no} は依頼済み（HEAD は依頼時のまま）"
+    return f"フェーズ {phase_no} は依頼済み（人が見るものは依頼時のまま）"
 
 
 def _redo_request(root: str, phase_no: int) -> str:
