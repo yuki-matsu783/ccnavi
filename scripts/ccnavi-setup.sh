@@ -602,7 +602,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 # 設定ファイルの中で見つけられること。
 #
 # 共通層の 3 本（rules / phases / risk）はここにも書かない。置き場は `.ccnavi/common/`
-# 固定で、env では動かないので、書いても読まれない（i0054）。読まれない語を
+# 固定で、env では動かないので、書いても読まれない（ADR-0052）。読まれない語を
 # つまみの一覧に混ぜると、そこを直せば置き場が動くと読める。
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {

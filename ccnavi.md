@@ -205,7 +205,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 
 | 書くもの | 中身 |
 |---|---|
-| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_RULES` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
+| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,launcher}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
@@ -793,7 +793,7 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 | 対象 | 何が懸かっているか | 控えを取る時点 |
 |---|---|---|
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前 |
-| `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/`） | 判定の中身そのもの | ツール実行前 |
+| 共通層の 3 本（`.ccnavi/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前 |
 | 自身の層と各プロジェクトの層の `.ccnavi/config/{rules,phases,risks}.yml` | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
 
@@ -809,7 +809,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 1 本目は書き込む綴り
 （`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln`
 `install` の行き先）と場所（`.claude/hooks/`、
-`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`CCNAVI_RULES` などが指す場所）、記録と控えの `logs/log.jsonl` `logs/state`）の組で止める。
+`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、層の設定 3 本と ccnavi ディレクトリ、共通層の 3 本（`.ccnavi/common/`）、記録と控えの `logs/log.jsonl` `logs/state`）の組で止める。
 `logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
 `builtin-guard-binary` と `builtin-guard-project-home` と `builtin-guard-common-layer` は `Write` `Edit` `NotebookEdit` を止める。
 
@@ -1674,7 +1674,7 @@ Claude Code はワークスペースを開く。要求は requirements.md の RE
 | 何 | 場所 | git |
 |---|---|---|
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
-| **共通層**のルール / フェーズの種類 / リスクの配点 | `.ccnavi/common/{rules,phases,risks}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | ワークスペース |
+| **共通層**のルール / フェーズの種類 / リスクの配点 | `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定） | ワークスペース |
 | ルールの見本 | `.ccnavi/common/rule-samples.yml` | ワークスペース |
 | **ワークスペース自身の層**の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース |
 | **プロジェクトの層**の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | プロジェクト |
@@ -1693,7 +1693,7 @@ Claude Code はワークスペースを開く。要求は requirements.md の RE
 `.claude/` には Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを置く（ADR-0042）。
 共通層は ccnavi ディレクトリの下にあるので、ccnavi ディレクトリの名前を動かしていなければ、共通層の 3 本と見本も
 名指しのツールから組み込みの deny（`*/.ccnavi/*`）が止める。共通層の置き場は ccnavi ディレクトリの名前（`CCNAVI_PROJECT_HOME`）に付いて動かず、
-動かすなら `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` で動かす。自身の層とプロジェクトの層は
+env でも動かない（ADR-0052）。診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する。自身の層とプロジェクトの層は
 「そのツリーにだけ効くもの」を置く場所で、どちらも git プロジェクトルートの下の `.ccnavi/config/` に同じ形で置く。ワークスペース自身に層を
 分けるのは、ワークスペースのフェーズの種類（`scope: ["ccnavi/*", ...]`）がワークスペースのレイアウトにしか合わないから。共通層に置くと
 全プロジェクトに効いて、2 つ目のプロジェクトで破綻する。
@@ -1718,7 +1718,7 @@ implement-feedback など）は、上の理由で自身の層 `<ワークスペ�
 **層のファイルが無い = その層は空。** 3 本は独立に無くてよい。壊れている = その層は空 + 記録の `fallback` に層の名前 + `--lint` の error。
 組み込みの既定へは落とさない。共通層が有るのに組み込みに落とすと、共通層の deny が消える側に倒れるから。
 
-共通層のルール（`CCNAVI_RULES`）自身が読めないときは今のまま、組み込みの既定に落ちる（REQ-PRE-06）。そのとき自身の層とプロジェクトの層は足さない。
+共通層のルール（`.ccnavi/common/rules.yml`）自身が読めないときは今のまま、組み込みの既定に落ちる（REQ-PRE-06）。そのとき自身の層とプロジェクトの層は足さない。
 「共通層が壊れている = 設定が壊れている」の扱いを変えない。壊れた共通層の上に層を足しても、何が効いているかを人が読めない。
 
 **プロジェクトのリポジトリに書くのは、ccnavi ディレクトリと、人が合意したもの。** ccnavi ディレクトリ（設定 3 本と配点のスクリプト）に加えて、
@@ -1890,7 +1890,7 @@ info で言い、`--explain` は残った 1 本だけ出す。全部の和でも
 | 対象 | 場所 |
 |---|---|
 | hook の登録 | `.claude/settings.json`、`.claude/settings.local.json` |
-| 共通層の 3 本 | `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル |
+| 共通層の 3 本 | `<root>/.ccnavi/common/{rules,phases,risks}.yml` |
 | 自身の層の 3 本 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` |
 | プロジェクトの層の 3 本 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` |
 | 実行ファイル | `CCNAVI_BIN_PATH`（振り分けの sh）と、sh が起動する実体（§8.2） |
@@ -2045,7 +2045,7 @@ dry-run でまず層の分布を見て、Bash の和と、大文字小文字を�
 
 ### 11.11 見ないもの、入れないもの
 
-- VS Code 拡張のリスク管理画面の層への追従。共通層の 1 本（`CCNAVI_RISK`）だけを開き、自身の層とプロジェクトの層の risk は画面から
+- VS Code 拡張のリスク管理画面の層への追従。共通層の 1 本（`.ccnavi/common/risks.yml`）だけを開き、自身の層とプロジェクトの層の risk は画面から
   直せない（層の配点を差し替えて検証する口も無い）。ルール設定画面とフェーズ管理画面は `--explain --json` の `layers[]` から置き場を取り、
   プロジェクト管理画面から自身の層とプロジェクトの層を開く。層の種類は `--project-phases-file` で共通層と合成して検証してから保存する
 - `CCNAVI_TICKET_CONTROL` のプロジェクト単位化。あれはワークスペース単位のつまみで、README の語をその意味に直すだけ

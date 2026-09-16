@@ -36,6 +36,10 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 共通層 `.ccnavi/common/`、ワークスペース自身の層 `.ccnavi/config/`、プロジェクトの層
 `projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
 
+**共通層の置き場は固定（ADR-0052）。** `.ccnavi/common/{rules,phases,risks}.yml` から動かせない。
+`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` は廃止した。診断のために別の場所を指すのは
+`--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する。
+
 **設定と記録の置き場（ADR-0042）。** 共通層の 3 本と見本 `rule-samples.yml` は `.ccnavi/common/`、
 判定の記録と控えは `logs/log.jsonl` と `logs/state/`、開発用 hook のセッション状態は `logs/session/`。`.claude/` には
 Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だけを置く。
@@ -345,9 +349,12 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 - 組み直し（`build.py` の置き換え）が `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
 - ワークスペースの `.git` の commit-graph の控えの一覧が、欠けた控えを指している。`git commit-graph write --reachable --split=replace` で直る
 - 提案と承認済みチケットの書き込みが原子的でない。書いている途中で機械が落ちると、中身が NUL で埋まる
-- Windows で `tests.config.test_config_union_guard`（動かした共通層へのシェルの書き込み）と `tests.guard.test_fallback`（動かした置き場への
-  シェルの書き込み）が 1 件ずつ落ちる。テストが絶対パスを引用せずにコマンドへ埋め込んでおり、bash は `\` をエスケープとして
-  落とすので、そのコマンドは設定ファイルに書かない。ガードの判定は正しく、テストの綴りを直す
+- Windows で `tests.guard.test_fallback`（動かした置き場へのシェルの書き込み）が 1 件落ちる。テストが絶対パスを引用せずに
+  コマンドへ埋め込んでおり、bash は `\` をエスケープとして落とすので、そのコマンドは設定ファイルに書かない。
+  ガードの判定は正しく、テストの綴りを直す（`tests.config.test_config_union_guard` の同種の 1 件は、ADR-0052 で
+  既定の置き場を見るテストに差し替えたので絶対パスを使わなくなった）
+- シェルの守りは `cd` でディレクトリへ入ってからの書き込みに当たらない（issue #61）。`.claude/settings.json` と
+  `.claude/hooks/` にも及ぶ。実行後の監視は拾うので素通りではないが、実行前の門は綴りで避けられる
 
 ## 実測で分かった落とし穴
 
