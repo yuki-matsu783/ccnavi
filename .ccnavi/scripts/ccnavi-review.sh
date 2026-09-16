@@ -239,6 +239,17 @@ api() {
 
 api_failed() {
 	printf 'ccnavi-review: %s への %s %s が失敗した:\n%s\n' "$host" "$1" "$2" "$3" >&2
+	# GraphQL を塞いでいる実行環境がある（Claude Code のセッションは REST だけ通す）。
+	# GitHub ではスレッドの解決状態（threads）と Draft 外し（undraft）が GraphQL でしか
+	# 扱えないので、そこだけが 403 で止まる。curl の経路は -f が本文を捨てるため、
+	# 画面に残るのは番号だけになり、認証の失敗と見分けが付かない。詰まったその場で
+	# 逃げ道を名指しする。綴りは transport を選ぶところの案内と揃える。
+	case "$2" in
+	graphql)
+		printf 'ccnavi-review: %s\n' \
+			"GraphQL が塞がれている環境では check / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review check --phase <N> --result <json>' を打ってください。写しの形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+		;;
+	esac
 }
 
 # pages <path> — 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
