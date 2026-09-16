@@ -373,6 +373,8 @@
    "feedback": null,
    "wrapup": null,
    "ready": null,
+   "closed_record": null,
+  "closed_record": null,
    "accepted_threads": [],
    "phases": [
     {
@@ -389,6 +391,7 @@
      },
      "marks": {},
      "review_required": false,
+     "review_kind": "none",
      "gate_closed": false,
      "deferred": false,
      "review_at": 1,
@@ -420,6 +423,7 @@
      },
      "marks": {},
      "review_required": true,
+     "review_kind": "mr",
      "gate_closed": false,
      "deferred": false,
      "review_at": 2,

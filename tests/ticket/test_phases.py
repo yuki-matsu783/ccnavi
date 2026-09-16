@@ -10,6 +10,7 @@
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
 7. 親はフィードバック計画が承認されるまで閉じられない
 8. 残った指摘の切り出しの下書き
+9. このセッションで見るフェーズ（`review: chat`）のゲートと締め
 
 範囲の上限（設計 wip/design/approve-carry.md §3・§4）は ScopeLimitTest が見る。
 """
@@ -58,6 +59,11 @@ phases:
     title: 実装フィードバック対応
     review: mr
     scope: inherit
+  chores:
+    kind: work
+    title: 片付け
+    review: chat
+    scope: ["src/*"]
 """
 
 
@@ -326,10 +332,16 @@ class PhaseTest(PhaseHarness):
             "version: 1\nphases:\n  a: {title: 同じ, kind: work}\n  b: {title: 同じ, kind: work}\n"
         )
         self.assertTrue(any("表示名" in p.detail for p in problems), problems)
+        # フィードバック対応は人が見ない道を作らない。見る場所は chat でも mr でもよい。
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: none}\n"
         )
-        self.assertTrue(any("review: mr" in p.detail for p in problems), problems)
+        self.assertTrue(any("review: none" in p.detail for p in problems), problems)
+        types, problems = phasetypes.parse(
+            "version: 1\nphases:\n  fb: {title: 対応, kind: feedback, review: chat}\n"
+        )
+        self.assertEqual(problems, [])
+        self.assertEqual(types["fb"].review, phasetypes.REVIEW_CHAT)
         _, problems = phasetypes.parse(
             "version: 1\nphases:\n  a: {title: A, kind: work, overlap: [nope]}\n"
         )
@@ -337,7 +349,8 @@ class PhaseTest(PhaseHarness):
         types, problems = phasetypes.parse(PHASES)
         self.assertEqual(problems, [])
         self.assertEqual(
-            set(types), {"research", "design", "acceptance", "implement", "implement-feedback"}
+            set(types),
+            {"research", "design", "acceptance", "implement", "implement-feedback", "chores"},
         )
         self.assertTrue(types["acceptance"].overlaps(types["implement"]))
         self.assertTrue(types["implement"].overlaps(types["acceptance"]))
@@ -935,6 +948,133 @@ phases:
     review: none
     scope: inherit
 """
+
+
+class ChatReviewTest(PhaseHarness):
+    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0051）。"""
+
+    def chat_phase(self, plan=("chores", "design")):
+        """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
+        self.family(plan=list(plan))
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["src/a*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("src/a1.py", "x\n")])
+        closed = self.close_child("i0001-01")
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        return self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
+
+    def test_chat_phase_closes_the_gate_and_the_human_opens_it_from_the_terminal(self):
+        said = self.chat_phase()
+        # 告知は push も request も言わない。言うのは「見てもらって待て」と開け方。
+        self.assertIn("差分を見てもらって", said)
+        self.assertIn("--reviewed 1 --chat", said)
+        self.assertNotIn("request --phase", said)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
+        # レビューが要るフェーズなので、ゲートは mr のときと同じに閉じる。
+        spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("--reviewed 1 --chat", self.reason(spawn))
+        # n と答えればマーカーは置かれない。
+        refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="n\n")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01", refused.stdout)
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        )
+        # y でマーカーが置かれ、ゲートが開く。写しも依頼の記録も要らない。
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        self.assertEqual(mark["by"], "chat")
+        self.assertEqual(mark["tickets"], ["i0001-01"])
+        opened = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertNotIn("DENY_PHASE_GATE", self.reason(opened))
+        # 2 度打っても通る（同じことを言うだけ）。
+        again = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertIn("すでにレビュー済み", again.stdout)
+
+    def test_chat_does_not_open_a_phase_that_is_declared_for_a_merge_request(self):
+        """緩める側だけ止める。`mr` の宣言を安い経路で通させない。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("マージリクエスト", refused.stderr)
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        )
+        # 逆向きは通る。`chat` の宣言をマージリクエストに出すのは勧める向き。
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+
+    def test_chat_does_not_open_a_phase_that_was_already_requested(self):
+        """依頼を出したあとは、付いた指摘を数えずに開けない。"""
+        self.chat_phase(plan=["chores"])
+        fixture = self.remote()
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("依頼済み", refused.stderr)
+        self.assertIn("check --phase 1", refused.stderr)
+        self.assertEqual(self.check(fixture, 1).returncode, 0)
+
+    def test_a_chat_phase_that_covers_a_deferred_merge_request_phase_is_seen_in_the_merge_request(
+        self,
+    ):
+        """厳しい側が勝つ。延期を引き受けた側が、引き受けた分より緩い場所で見ない。"""
+        self.family(plan=[("design", "defer"), "chores"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        # 延期したフェーズではゲートが閉じない。
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-02", [("src/a1.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.commit_parent("close 02")
+        self.merge("i0001-02")
+        said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
+        self.assertIn("request --phase 2", said)
+        refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("マージリクエスト", refused.stderr)
+
+    def test_closing_a_chat_only_parent_records_where_each_phase_was_seen(self):
+        """締めた事実は親のブランチに残る。案内は Draft ではなく統合先へ戻すところまで。"""
+        self.chat_phase(plan=["chores"])
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        # フィードバック計画（対応が無くても空で）を承認してから親を閉じる。
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        write(
+            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            parent_text("i0001", ["chores"], feedback=[]),
+        )
+        self.assertEqual(self.approve().returncode, 0)
+        closed = self.ccnavi("ticket", "done", "i0001")
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.assertIn("統合先", closed.stdout)
+        self.assertNotIn("ready", closed.stdout)
+        self.assertNotIn("squash", closed.stdout)
+        record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
+        self.assertEqual(record["reviews"], {"1": "chat"})
 
 
 class ScopeLimitTest(PhaseHarness):
