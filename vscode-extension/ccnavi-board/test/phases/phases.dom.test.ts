@@ -8,7 +8,7 @@ import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "res
 
 function html(overrides: Partial<PhasesPage> = {}): string {
   return renderPhasesPage(
-    { root: "/ws", phasesPath: ".ccnavi/config/phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock: { locked: false, reason: "", doing: [] }, ...overrides },
+    { root: "/ws", phasesPath: ".ccnavi/config/phases.yml", exists: true, model: readPhases(TEMPLATE_PHASES_TEXT).model, lock: { locked: false, reason: "", doing: [] }, ...overrides },
     { nonce: "n" },
   );
 }
@@ -80,22 +80,6 @@ test("CB-D23 保存の往復の間は欄を止めるが、行の開閉のボタ�
     await page.send({ type: "failed", message: "lint error" });
     assert.ok(!page.one<HTMLInputElement>('.phase[data-key="p1"] input.f-title').disabled);
     assert.equal(page.one("#status").textContent, "lint error");
-  } finally {
-    await page.close();
-  }
-});
-
-test("CB-D45 開いたまま disable になったら帯を出し、enable に戻せば隠す", async () => {
-  const page = await loadPage(html());
-  try {
-    const banner = page.one("#ticket-off");
-    assert.ok(banner.classList.contains("hidden"), "enable では隠れている");
-    await page.send({ type: "ticketControl", value: "disable" });
-    assert.ok(!banner.classList.contains("hidden"));
-    assert.match(banner.textContent, /フェーズの種類は親チケットの計画と子の範囲にしか使われない/);
-    assert.deepEqual(page.posted, []);
-    await page.send({ type: "ticketControl", value: "enable" });
-    assert.ok(banner.classList.contains("hidden"));
   } finally {
     await page.close();
   }

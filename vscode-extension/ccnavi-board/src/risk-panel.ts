@@ -28,7 +28,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { escapeHtml } from "./core/render.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument, type RiskForm } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
-import { onDidChangeTicketControl, requireTickets, ticketControl } from "./ticket-control.js";
+import { requireTickets } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
@@ -69,11 +69,6 @@ interface PanelState {
 }
 
 let state: PanelState | undefined;
-
-// 開いたまま設定が変わったら、画面の帯を出し入れする。HTML は張り替えない（編集中の内容が消える）。
-onDidChangeTicketControl((value) => {
-  void state?.panel.webview.postMessage({ type: "ticketControl", value });
-});
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
@@ -305,7 +300,6 @@ function show(current: PanelState): void {
       root: current.folder.uri.fsPath,
       riskPath: loaded.riskRel,
       exists: loaded.exists,
-      ticketControl: ticketControl(),
       model: loaded.doc.model,
       lock: current.lock,
     },

@@ -37,7 +37,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
 import { escapeHtml } from "./core/render.js";
-import { onDidChangeTicketControl, requireTickets, ticketControl } from "./ticket-control.js";
+import { requireTickets } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
@@ -94,14 +94,6 @@ interface PanelState {
 
 /** 対象ごとのパネル。鍵は共通層が空、自身の層が `self`、プロジェクトは `project/<名前>` */
 const panels = new Map<string, PanelState>();
-
-// 開いたまま設定が変わったら、開いている画面すべての帯を出し入れする。
-// HTML は張り替えない（編集中の内容が消える）。
-onDidChangeTicketControl((value) => {
-  for (const open of panels.values()) {
-    void open.panel.webview.postMessage({ type: "ticketControl", value });
-  }
-});
 /** 開いている途中の鍵。層の置き場を実行ファイルに聞く間に、同じ対象をもう 1 枚開かない */
 const opening = new Set<string>();
 
@@ -407,7 +399,6 @@ function show(current: PanelState): void {
       root: current.folder.uri.fsPath,
       phasesPath: loaded.phasesRel,
       exists: loaded.exists,
-      ticketControl: ticketControl(),
       model: loaded.doc.model,
       lock: current.lock,
       layer: current.target.kind !== "common",

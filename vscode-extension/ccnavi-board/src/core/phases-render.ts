@@ -21,8 +21,6 @@ export interface PhasesPage {
   readonly phasesPath: string;
   /** ファイルが在るか。無ければ空の画面を見せ、「雛形で作る」だけができる */
   readonly exists: boolean;
-  /** `.claude/settings.json` の env.CCNAVI_TICKET_CONTROL の読み。disable なら種類は使われない */
-  readonly ticketControl: string;
   readonly model: PhasesModel;
   readonly lock: Lock;
   /**
@@ -75,7 +73,7 @@ ${STYLE}
 </style>
 </head>
 ${bodyTag(options.appearance)}
-${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.phasesPath)}</span>
@@ -106,16 +104,6 @@ ${SCRIPT}
 </body>
 </html>
 `;
-}
-
-/**
- * 帯は常に書き、enable なら隠しておく。disable のワークスペースではこの画面を開けないので、
- * 帯が出るのは「開いたまま設定が disable に変わった」ときだけ。画面を作り直すと編集中の内容が
- * 消えるので、そのときは HTML を張り替えず、この帯を出す指示（`ticketControl`）だけを送る。
- */
-function renderTicketControlBanner(ticketControl: string): string {
-  const hidden = ticketControl === "disable" ? "" : " hidden";
-  return `<div id="ticket-off" class="banner warn${hidden}">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -442,7 +430,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (m.type === "failed") { setBusy(false, ""); status(m.message, true); }
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
-    else if (m.type === "ticketControl") { document.getElementById("ticket-off").classList.toggle("hidden", m.value !== "disable"); }
   });
   document.getElementById("find").addEventListener("input", applyFind);
   renderAll();
