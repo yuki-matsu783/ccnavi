@@ -66,6 +66,19 @@ const APPROVE_TIMEOUT_MS = 60_000;
  */
 const EXPLAIN_TIMEOUT_MS = 60_000;
 
+/**
+ * 診断の 4 本（`--test` / `--test-samples` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
+ * この 4 本を待つ間、ルール設定・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
+ * 届いたときにしか活性へ戻さない。ボードと違って HTML の総取り替えも監視の読み直しも無いので、
+ * 返らないと画面を閉じるまで戻れない（編集中の内容は消える）。値はボードと承認に揃えて 60 秒。
+ */
+const DIAGNOSE_TIMEOUT_MS = 60_000;
+
+/** 期限で打ち切ったときの文面。標準エラーには何も残らないので、呼び手の代わりにここで組む */
+function cutOff(what: string, ms: number): string {
+  return `${what} を ${ms / 1000} 秒で打ち切った`;
+}
+
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つからない（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
 
@@ -238,7 +251,7 @@ export async function runApprovePreview(
   if (ran.killed) {
     return {
       ok: false,
-      error: `ccnavi --approve --preview --json を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。承認済みチケットは置かれていない`,
+      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。承認済みチケットは置かれていない`,
     };
   }
   if (ran.code !== 0) {
@@ -273,7 +286,7 @@ export async function runApproveYes(
     return {
       ok: false,
       error:
-        `ccnavi --approve --yes を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。` +
+        `${cutOff("ccnavi --approve --yes", APPROVE_TIMEOUT_MS)}。` +
         "一部だけ承認済みになっている可能性がある。承認済みチケットのコミットと push は送っていない" +
         "（送るのは承認できたときだけ）。ボードを更新して、何が承認されたかを確かめる",
     };
@@ -310,7 +323,10 @@ export async function runTest(
     tool,
     subject,
     "--json",
-  ]);
+  ], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --test --json", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi --test --json が失敗した: ${ran.stderr}` };
   }
@@ -335,7 +351,10 @@ export async function runSamples(
     "--test-samples",
     samplesPath,
     "--json",
-  ]);
+  ], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --test-samples --json", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi --test-samples --json が失敗した: ${ran.stderr}` };
   }
@@ -353,7 +372,10 @@ export async function runLint(
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"]);
+  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --lint", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code < 0 || ran.code > 1) {
     return { ok: false, error: `ccnavi --lint が失敗した: ${ran.stderr}` };
   }
@@ -375,7 +397,10 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--lint", "--json"]);
+  const ran = await run(launcher, root, ["--lint", "--json"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --lint --json", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code < 0 || ran.code > 1) {
     return { ok: false, error: `ccnavi --lint --json が失敗した: ${firstLine(ran.stderr)}` };
   }
