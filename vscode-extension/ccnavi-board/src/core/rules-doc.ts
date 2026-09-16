@@ -32,12 +32,15 @@ export interface RuleForm {
   readonly additionalContextOnceFile: string;
   /**
    * 渡す回の刻み（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
-   * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ
-   * null。刻みとして読めない値（`0`・`-1`・`"x"`）も null で受け取り、書き戻しでは
-   * 元の値をそのまま残す。読めない値を画面が黙って消すと、`ccnavi --lint` が
-   * 名指ししている対象が消えて、苦情の出どころが分からなくなる
+   * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
+   *
+   * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
+   * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
+   * 刻みを外す操作も、読めない値を画面から直す道も書けない。読めない値は書いたまま
+   * 書き戻し、咎めるのは保存前の `ccnavi --lint`。画面が黙って直すと、lint が名指し
+   * している対象が消えて苦情の出どころが分からなくなる
    */
-  readonly every: number | null;
+  readonly every: string;
 }
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
@@ -109,16 +112,18 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     additionalContextOnce: scalarText(map, "additionalContextOnce"),
     additionalContextFile: scalarText(map, "additionalContextFile"),
     additionalContextOnceFile: scalarText(map, "additionalContextOnceFile"),
-    every: everyOf(map.get("every")),
+    every: scalarText(map, "every"),
   };
 }
 
-/** 刻みとして読める値なら、その刻み。読めない値と書いていないときは null */
-function everyOf(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+/** 刻みとして読める文字なら、その刻み。読めない文字と空なら null（咎めるのは lint） */
+function everyOf(written: string): number | null {
+  const text = written.trim();
+  if (!/^\d+$/.test(text)) {
     return null;
   }
-  return value;
+  const value = Number(text);
+  return value >= 1 ? value : null;
 }
 
 function scalarText(map: YAMLMap, key: string): string {
@@ -290,19 +295,30 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   if (form.additionalContextOnceFile !== "" || node.has("additionalContextOnceFile")) {
     setText(doc, node, "additionalContextOnceFile", form.additionalContextOnceFile, Scalar.PLAIN, "additionalContextOnce");
   }
-  // every はまだ画面に欄が無いので、読めた刻みをそのまま書き戻すだけ。読めなかった値は
-  // form が null で持ち、元のノードに書かれたまま残る（消すと lint の苦情だけが宙に浮く）。
-  if (form.every !== null) {
-    setEvery(doc, node, form.every);
-  }
+  setEvery(doc, node, form.every);
 }
 
-/** 数の欄（`every`）。元と同じ値なら触らない。欄が無ければ match の直後に足す */
-function setEvery(doc: Document, node: YAMLMap, value: number): void {
+/**
+ * 刻みの欄（`every`）。書かれたままの文字を受け取り、1 以上の整数に読めれば数として、
+ * 読めなければ打った文字のまま書く（止めるのは保存前の `--lint`）。空なら欄ごと消す。
+ * 元に書いてある文字と同じなら何もしない。`every: "5"` のような書き方を画面が黙って
+ * 直さないためで、直してしまうと lint の error が操作で消える。欄が無ければ match の直後に足す。
+ */
+function setEvery(doc: Document, node: YAMLMap, written: string): void {
+  if (written === scalarText(node, "every")) {
+    return;
+  }
+  if (written === "") {
+    node.delete("every");
+    return;
+  }
+  const value: string | number = everyOf(written) ?? written;
   const current = node.get("every", true);
   if (current instanceof Scalar) {
-    if (current.value !== value) {
-      current.value = value;
+    current.value = value;
+    // 数に直したときだけ書き方も数のもの（引用符無し）に戻す。文字のままなら元の書き方を残す。
+    if (typeof value === "number") {
+      current.type = Scalar.PLAIN;
     }
     return;
   }
@@ -396,6 +412,6 @@ function asForm(raw: unknown): RuleForm | undefined {
     additionalContextOnce: text(r.additionalContextOnce),
     additionalContextFile: text(r.additionalContextFile),
     additionalContextOnceFile: text(r.additionalContextOnceFile),
-    every: everyOf(r.every),
+    every: text(r.every),
   };
 }
