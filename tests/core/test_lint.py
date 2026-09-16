@@ -334,6 +334,58 @@ class LintTest(unittest.TestCase):
         self.assertIn("WebSearch", result.stdout)
         self.assertIn("Task", result.stdout)
 
+    def test_場所を守るルールに混ぜた探すツールをwarnで言う(self):
+        # ファイルを守る狙いのルールに `|Grep` を足した形。Grep が当たるのは
+        # 探し始める場所のパスだけなので、ルートから探されれば素通りする。
+        # 判定は動いているので error にはしないが、守っているつもりの穴になる。
+        result = lint(
+            self.root,
+            rules_file(
+                self.root,
+                dict(SOUND, id="creds", match="Bash|Read|Write|Edit|Grep", glob="*/secrets/*"),
+            ),
+        )
+
+        self.assertEqual(result.returncode, 0, "warn だけで非ゼロにしてはいけない")
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        self.assertEqual(warns, 1, result.stdout)
+        self.assertIn("creds", result.stdout)
+        self.assertIn("探し始める場所のパスだけ", result.stdout)
+
+    def test_探すツールだけのルールと場所を守るツールだけのルールは咎めない(self):
+        # 「どこを起点に探すか」を縛るのは Grep・Glob の正しい使い方で、
+        # 混ざっていないルールは両方とも意図どおりに効く。ここを咎めると、
+        # ADR-0048 で層が効くようになった書き方が使えなくなる。
+        result = lint(
+            self.root,
+            rules_file(
+                self.root,
+                dict(SOUND, id="scope", match="Grep|Glob", glob="*/参考/*"),
+                dict(SOUND, id="paths", match="Read|Write|Edit", glob="*/secrets/*"),
+            ),
+        )
+
+        self.assertEqual(result.returncode, 0)
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        self.assertEqual(warns, 0, result.stdout)
+
+    def test_allowに混ぜた探すツールは咎めない(self):
+        # allow は Claude Code へ許可を返さない（ADR-0008）。守りが薄くなる向きに
+        # 倒れようがないので、混ざっていても穴にはならない。
+        body = {
+            "version": 1,
+            "deny": [SOUND],
+            "allow": [{"id": "read-anything", "match": "Read|Grep", "glob": "*"}],
+        }
+        result = lint(self.root, write(self.root, "rules.yml", json.dumps(body, indent=2)))
+
+        self.assertEqual(result.returncode, 0)
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        self.assertEqual(warns, 0, result.stdout)
+
     def test_止めないモードはwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")
 
