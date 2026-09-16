@@ -307,7 +307,7 @@ def decide_after(
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
-    # フェーズが終わったばかりなら、ここで 1 度だけ言う。ゲートは次の呼び出しから。
+    # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
     if conf.tickets_enabled:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         said = phase.announce(stderr, root, conf, parent) if parent is not None else ""

@@ -1,4 +1,6 @@
-"""フェーズとゲート。子チケットのまとまりが終わったときに何をするかと、進もうとしたら止めること。
+"""フェーズの終わりと HITL ポイント（Human In The Loop。人の手が入るところ）。
+
+子チケットのまとまりが終わったときに何をするかと、人を待たずに進もうとしたら止めること。
 
 ## フェーズの終わり
 
@@ -6,12 +8,13 @@
 そのフェーズは終わり。`cancelled/` だけのフェーズは終わりではない（何も成果が無い）。
 
 終わりの扱いは、`done/` の子に `human_review.required: true` が 1 枚でもあるかで分かれる。
-あればゲートが閉じ、レビュー済みのマーカーが置かれるまでサブエージェントの起動とシェルを止める。
+あれば HITL ポイントに来たということで、レビュー済みのマーカーが置かれるまで
+サブエージェントの起動とシェルを止める。
 無ければ省略のマーカーを置いて進ませる。
 
-## ゲートの鍵は cwd
+## 止めるときの鍵は cwd
 
-書き込みは行き先で結ぶが、起動とシェルには行き先が無い。ゲートは呼び出しの `cwd` が
+書き込みは行き先で結ぶが、起動とシェルには行き先が無い。止めるかどうかは呼び出しの `cwd` が
 どの親のワークツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
 サブエージェントの書き込みは行き先で止まるので、致命傷にならない。
 
@@ -32,7 +35,7 @@ from typing import TextIO
 from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, tree
 from . import ticket as ticket_mod
 
-# ゲートの中でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
+# 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
 # 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
@@ -51,8 +54,8 @@ _FORBIDDEN_COMMAND = re.compile(
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
 SHELL_TOOLS = ("Bash", "PowerShell")
 
-# ゲートが止めるツール。
-GATED_TOOLS = ("Agent", *SHELL_TOOLS)
+# レビューが済むまで止めるツール。
+HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
@@ -84,7 +87,7 @@ def commands(subject: str) -> list[str]:
 
 
 def exempt(subject: str, degraded: str) -> bool:
-    """ゲートの中でも通してよいか。読み切れなかったコマンドは通さない。"""
+    """止めている間でも通してよいか。読み切れなかったコマンドは通さない。"""
     if degraded:
         return False
     parts = commands(subject)
@@ -147,8 +150,13 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     return rule
 
 
+# 止めている間の呼び名。依頼のマーカーが境目で、未依頼はエージェントの番、
+# 依頼済みは人の番（設計 §9.8）。
+LABEL_PREPARING = "レビュー準備中"
+LABEL_WAITING = "レビュー待ち"
+
 # 返す文の理由コード。
-CODE_GATE = "DENY_PHASE_GATE"
+CODE_REVIEW = "DENY_PHASE_REVIEW"
 CODE_SUBAGENT = "DENY_SUBAGENT_TICKET_OP"
 
 # git に与える時間。
@@ -306,21 +314,41 @@ class Phase:
 
     @property
     def gate_closed(self) -> bool:
+        """レビューが済むまで止めているか。
+
+        欄の名前は JSON の綴り（`gate_closed`）に合わせてある。人に見せる名前は
+        `review_label` が出す「レビュー準備中」「レビュー待ち」で、この綴りは
+        判定とボードの間の契約としてだけ残っている（設計 §9.8）。
+        """
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
 
     @property
     def review_waiting(self) -> bool:
-        """依頼を出したのにゲートが閉じたまま。人のレビュー待ち。
+        """依頼を出したのにまだ止まっている。人のレビュー待ち。
 
-        ボードはこれを写すだけで、ゲートとマーカーから組み直さない。依頼していない
-        フェーズは閉じていても待ちではなく、先に親が request を打つ。
+        ボードはこれを写すだけで、止まっているかとマーカーから組み直さない。依頼していない
+        フェーズは止まっていても待ちではなく（レビュー準備中）、先に親が request を打つ。
 
-        これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは依頼を出さない
-        ので常に False。ボードの「受け入れ」（未解決スレッドを受け入れて進む）がこの欄に
-        繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
-        このセッションで見る待ちは `review_kind` と `gate_closed` で読む（設計 §9.8）。
+        これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは普段 `request` を
+        打たないので False のまま。ボードの「受け入れ」（未解決スレッドを受け入れて進む）が
+        この欄に繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
+        打ったときは（実績のリスクが高いときに勧める向き。設計 §9.10）ホストに写しがあるので、
+        `mr` と同じに True でよい。このセッションで見る待ちは `review_kind` と `gate_closed`
+        で読む（設計 §9.8）。
         """
         return self.gate_closed and approval.MARK_REQUESTED in self.marks
+
+    @property
+    def review_label(self) -> str:
+        """止めている間の呼び名。次に動く者で分かれる（設計 §9.8）。
+
+        まだ依頼していなければ動くのはエージェント（合流・push・依頼）なので
+        「レビュー準備中」、依頼が出ていれば動くのは人なので「レビュー待ち」。
+        `review: chat` のフェーズは普段この段を持たないので、人が端末で
+        `--reviewed --chat` を打つまで「レビュー準備中」のまま。`request` を通した
+        ときだけ（設計 §9.10）`mr` と同じに「レビュー待ち」へ移る。
+        """
+        return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
@@ -487,8 +515,8 @@ def phases_of(
     return [by_number[n] for n in sorted(by_number)]
 
 
-def gate(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
-    """閉じているゲート。無ければ None。"""
+def held_phase(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
+    """レビューが済むまで止めているフェーズ。無ければ None。"""
     for phase in phases_of(root, conf, parent_id):
         if phase.gate_closed:
             return phase
@@ -509,21 +537,31 @@ def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.T
     return found
 
 
-def gate_reason(phase: Phase, tool: str, root: str) -> str:
-    """ゲートが止めたときに返す文。次に何をすればよいかを言う。"""
+def hold_reason(phase: Phase, tool: str, root: str) -> str:
+    """止めたときに返す文。いまどの段にいて、次に何をすればよいかを言う。
+
+    段の名前（レビュー準備中／レビュー待ち）を見出しに置く。止まっている事実だけを
+    言っても次の一手が出ないので、段ごとにやることを書き分ける（設計 §9.8）。
+    """
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
-    marks = "依頼済み" if approval.MARK_REQUESTED in phase.marks else "未依頼"
     n = phase.number
     why = "人間レビューが要る子を含みます" if not phase.planned else "レビューが要るフェーズです"
     if phase.risk_escalates:
         why = f"実績のリスクが高い（{phase.risk_line}）ので、宣言に関わらずレビューが要ります"
     later = "次のフェーズの計画（wip/proposals/todo/ への提案）はレビュー前に進めて構いません。"
-    if phase.review_in_chat:
+    if phase.review_waiting:
+        # 依頼は出してある。ここで動くのは人で、エージェントは待つほうに回る。
+        todo = (
+            "やること: 利用者のレビューを待ってください。レビューが終わったら "
+            f"'{review_sh} check --phase {n}' で確かめます。指摘が付いていたら、"
+            f"同じフェーズに子を足してやり直せます。{later}"
+        )
+    elif phase.review_in_chat:
         todo = (
             "やること: 子の成果を親ブランチへ合流し、利用者に差分を見てもらって、"
             "ターンを終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
-            "（review: chat）なので、マージリクエストは要りません。ゲートを開けるのは、"
+            "（review: chat）なので、マージリクエストは要りません。先へ進めるのは、"
             f"利用者が端末で打つ 'ccnavi --reviewed {n} --chat' です"
             f"（エージェントからは打てません）。{later}"
         )
@@ -537,9 +575,10 @@ def gate_reason(phase: Phase, tool: str, root: str) -> str:
         )
     return "\n".join(
         [
-            f"[ccnavi] {CODE_GATE} (parent: {phase.parent}, phase: {n}, {marks})",
-            f"{phase.parent} のフェーズ {phase.label} は終わっていて、{why}。"
-            f"レビュー済みのマーカーが置かれるまで、ゲートが{what}を止めます。",
+            f"[ccnavi] {CODE_REVIEW} (parent: {phase.parent}, phase: {n}, {phase.review_label})",
+            f"{phase.parent} のフェーズ {phase.label} は{phase.review_label}です。"
+            f"フェーズは終わっていて、{why}。"
+            f"レビュー済みのマーカーが置かれるまで、{what}を止めます。",
             todo,
         ]
     )
@@ -597,13 +636,13 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 who += f"（{phase.risk_line}）。"
             elif phase.risk_line:
                 who += f"{phase.risk_line}。"
-            gate_note = (
+            hold_note = (
                 "指摘があれば同じフェーズに子を足せます。レビュー済みになるまで、"
-                "ゲートがサブエージェントの起動とシェル実行を止めます。"
+                "サブエージェントの起動とシェル実行は止まります。"
             )
             if phase.review_in_chat:
                 # このセッションで人が見る。ホストへは出ないので push もしない。
-                # ゲートを開けるのは端末の人で、エージェントには打てない。
+                # 先へ進めるのは端末の人で、エージェントには打てない。
                 advise = (
                     "実績のリスクが高いので、マージリクエストで見てもらうことを勧めます"
                     "（種類の `review` を mr にするか、利用者に相談）。それでも chat で"
@@ -612,23 +651,25 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                     else ""
                 )
                 texts.append(
-                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
+                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
+                    f"（{LABEL_PREPARING}）。{who}"
                     "このフェーズはこのセッションで見る計画（review: chat）です。"
                     "子の成果を親ブランチへ合流し、利用者に差分を見てもらってください。"
                     f"{advise}"
                     "レビュー"
                     f"{covers}が済んだら、利用者が端末で "
-                    f"'ccnavi --reviewed {n} --chat' を打つとゲートが開きます"
+                    f"'ccnavi --reviewed {n} --chat' を打つと先へ進めます"
                     "（この経路はエージェントには打てません）。"
-                    f"ターンを終えて利用者を待ってください。{gate_note}"
+                    f"ターンを終えて利用者を待ってください。{hold_note}"
                 )
             else:
                 texts.append(
-                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{who}"
+                    f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました"
+                    f"（{LABEL_PREPARING}）。{who}"
                     f"子の成果を親ブランチへ合流して push し、"
                     f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
                     "--body-file <依頼文>' "
-                    f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。{gate_note}"
+                    f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。{hold_note}"
                 )
         else:
             failed = approval.write_mark(
@@ -815,9 +856,9 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
-    closed = gate(root, conf, parent.ticket)
-    if closed is not None:
-        return f"レビュー待ち（{closed.label}）"
+    held = held_phase(root, conf, parent.ticket)
+    if held is not None:
+        return f"{held.review_label}（{held.label}）"
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
     ):
@@ -957,14 +998,41 @@ def scope_findings(
         return [], "ワークツリーが無い"
     # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用して 8 進に
     # 逃がすので、そのまま当てると範囲の中の日本語のファイルが必ず範囲外になる。
+    #
+    # `--no-renames` と `--ignore-submodules` は、差分から行が消える道を塞ぐ。改名を
+    # 1 行にまとめられると移動元が消え、範囲外のファイルを範囲の中へ改名したものが
+    # 素通りする。`.gitmodules` の `ignore = all` は submodule の進みを丸ごと消す
+    # （`.gitmodules` は追跡されるので、外から届く）。
+    #
+    # status だけ `dirty` なのは、submodule の中の汚れは親のコミットに乗らないから。
+    # 乗るのはポインタの移動で、`dirty` はそれを見せる。`none` にすると、submodule の
+    # 中に置かれた生成物まで範囲外として報告することになる。
     paths: set[str] = set()
     if child.base_sha:
-        rc, out = _git(worktree, ["diff", "--name-only", "-z", f"{child.base_sha}..HEAD"])
+        rc, out = _git(
+            worktree,
+            [
+                "diff",
+                "--name-only",
+                "--no-renames",
+                "--ignore-submodules=none",
+                "-z",
+                f"{child.base_sha}..HEAD",
+            ],
+        )
         if rc != 0:
             return [], "基準点からの差分を読めない"
         paths.update(p for p in out.split("\0") if p)
     rc, out = _git(
-        worktree, ["status", "--porcelain", "-z", "--untracked-files=all", "--no-renames"]
+        worktree,
+        [
+            "status",
+            "--porcelain",
+            "-z",
+            "--untracked-files=all",
+            "--no-renames",
+            "--ignore-submodules=dirty",
+        ],
     )
     if rc != 0:
         return [], "ワークツリーの状態を読めない"

@@ -237,7 +237,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 0)
 
     def test_旧い置き場に提案が残っていたらwarnで名指しする(self):
-        # 提案の置き場の既定を wip/tickets から wip/proposals に変えた（ADR-0052）。
+        # 提案の置き場の既定を wip/tickets から wip/proposals に変えた（ADR-0054）。
         # 旧の置き場に残った提案は走査されないまま「承認待ちは無い」で通る。
         # 黙って通る向きなので、検証がここで言う。
         proposal(self.root, "wip/tickets", "todo", "i0001")

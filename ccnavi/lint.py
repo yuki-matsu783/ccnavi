@@ -337,7 +337,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・ゲート・"
+                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・フェーズの HITL ポイント・"
                 "サブエージェントの制限は効かない",
             )
         )
@@ -854,7 +854,7 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
-                    f".ccnavi/scripts/{name} が無い。ゲートの中で通る形が無くなる",
+                    f".ccnavi/scripts/{name} が無い。止まっている間に通る形が無くなる",
                 )
             )
     return problems
@@ -863,7 +863,7 @@ def _ticket_hooks(root: str) -> list[Problem]:
 def _legacy_tickets(conf: settings.Settings, root: str) -> list[Problem]:
     """旧の綴り（`wip/tickets/`）に取り残された提案を名指しする。
 
-    提案の置き場の既定を `wip/tickets` から `wip/proposals` に変えた（ADR-0052）。
+    提案の置き場の既定を `wip/tickets` から `wip/proposals` に変えた（ADR-0054）。
     旧の置き場に提案が残っていると、そこは走査されないので「承認待ちは無い」で通る。
     黙って通る向きなので、ここで言う。
 

@@ -25,8 +25,13 @@ from dataclasses import dataclass, field
 from typing import NamedTuple
 
 # ccnavi が読む環境変数。
+#
+# 共通層の 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
+# `.ccnavi/common/` に固定で、env では動かない。3 層のうち共通層だけが別の決まり方を
+# していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かす道は `--rules` /
+# `--phases` / `--risk` のフラグが持つ。hook は引数を渡さずに起動するので、
+# 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
-RULES_ENV = "CCNAVI_RULES"
 LOG_ENV = "CCNAVI_LOG"
 # STATE_ENV はセッションごとの控えの置き場。
 STATE_ENV = "CCNAVI_STATE"
@@ -67,7 +72,7 @@ BIN_ENV = "CCNAVI_BIN_PATH"
 # PyInstaller は Windows でだけ `.exe` を付ける。build.py の側と対になる。
 BIN_SUFFIXES = (".exe",)
 # TICKET_CONTROL_ENV は、チケット制御を使うか。enable（既定）/ disable の 2 値。
-# チケット制御は、提案を承認して承認済みチケットを作り、その範囲・フェーズのゲート・
+# チケット制御は、提案を承認して承認済みチケットを作り、その範囲・フェーズの HITL ポイント・
 # サブエージェントの制限を判定に掛ける働き全体。全体ルールは全プロジェクトが使うが、
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
 # 置き場のパス（APPROVED_ENV）とは分けてある。パスが空であることと機能を切ることは別の話。
@@ -78,10 +83,6 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # 2 つとも `CCNAVI_TICKETS_` で始めて対にする。
 TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL"
 APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
-# PHASES_ENV はフェーズの種類の定義。ワークスペースルートからの相対。無ければ番号だけの挙動。
-PHASES_ENV = "CCNAVI_PHASES"
-# RISK_ENV は実績で測るリスクの配点。ワークスペースルートからの相対。無ければ組み込みの配点。
-RISK_ENV = "CCNAVI_RISK"
 # PROJECTS_ENV はプロジェクトの置き場（設計 §11）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
 # PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 §11.2）。各 git プロジェクトルートからの相対で、
@@ -106,8 +107,9 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # （settings.json・hooks・skills・worktrees）だけを残す。
 #
 # 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
-# ccnavi ディレクトリの名前は各層の綴りで、共通層を動かすなら CCNAVI_RULES / CCNAVI_PHASES /
-# CCNAVI_RISK で動かす。
+# ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
+# 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
+# hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
 DEFAULT_LOG = os.path.join("logs", "log.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
@@ -155,7 +157,7 @@ def script_command(root: str, name: str) -> str:
     `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
     区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。
 
-    空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、ゲートの例外と
+    空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、止めている間の例外と
     サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
     区切りと別の目印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
     まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符に落とす。
@@ -386,12 +388,13 @@ def load(root: str) -> tuple[Settings, list[str]]:
     # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
     # 言えるようにしてある。承認済みチケットの置き場は空文字を受けない。チケット制御を切るのは
     # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
+    #
+    # 共通層の 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
+    # 動かず、既定の `.ccnavi/common/` のまま。動かせるのはフラグだけで、そちらは
+    # cli._override が重ねる（ADR-0052）。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
         ("project_home", PROJECT_HOME_ENV, _relative, False),
-        ("phases", PHASES_ENV, _resolve, False),
-        ("risk", RISK_ENV, _resolve, False),
-        ("rules", RULES_ENV, _resolve, False),
         ("bin", BIN_ENV, _resolve_bin, False),
         ("log", LOG_ENV, _log_or_none, True),
         ("state", STATE_ENV, _log_or_none, True),

@@ -31,7 +31,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #
 # 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューを
 # 要る扱いにするためのもの。段階の名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
-# HIGH 以上でフェーズのゲートが閉じる。閾値は levels で動かす。
+# HIGH 以上はレビューが済むまでフェーズを止める。閾値は levels で動かす。
 #
 # 項目は 3 系統。1 件につき当て方を 1 つだけ書く。
 #   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）

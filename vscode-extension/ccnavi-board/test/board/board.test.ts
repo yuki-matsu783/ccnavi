@@ -80,7 +80,7 @@ test("CB-T08 親の無い子は不備", () => {
   assert.match(cards.get("i0002-01")!.issues[0], /親 i0002 が見つからない/);
 });
 
-test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締めた親にはバッジだけ", () => {
+test("CB-T09 依頼済みで止まったフェーズに accept、締めた親にはバッジだけ", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -88,7 +88,7 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
     phases: base.parents[0].phases.map((p): PhaseJson => {
       const marks: Record<string, Record<string, unknown>> =
         p.number === 2 ? { requested: { at: "t" } } : {};
-      // 判定が出す形に揃える。ゲート閉はレビュー要を含み、レビュー待ちは依頼済の閉じたフェーズだけ
+      // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは依頼済の閉じたフェーズだけ
       return {
         ...p,
         state: p.number === 2 ? "ended" : p.state,
@@ -113,7 +113,7 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
-  // 子のカードには自分のフェーズのマーカーとゲートとレビュー待ちが写る。親は false
+  // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが写る。親は false
   assert.equal(cards.get("i0001-02")!.gateClosed, true);
   assert.deepEqual(cards.get("i0001-02")!.marks, ["requested"]);
   assert.equal(cards.get("i0001-02")!.reviewWaiting, true);
@@ -121,7 +121,7 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   assert.equal(card.reviewWaiting, false);
 });
 
-test("CB-T09b レビューが済んでゲートが開いたフェーズは、依頼済のマーカーが残っていてもレビュー待ちではない", () => {
+test("CB-T09b レビューが済んで止まらなくなったフェーズは、依頼済のマーカーが残っていてもレビュー待ちではない", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -237,7 +237,7 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
   assert.equal(card.seenIn.length, 2);
 });
 
-/** フェーズ 2 を「依頼済みでゲートが閉じたまま（人のレビュー待ち）」にし、依頼のマーカーに MR を持たせる */
+/** フェーズ 2 を「依頼済みで止まったまま（人のレビュー待ち）」にし、依頼のマーカーに MR を持たせる */
 function waitingWithMr(url: string): BoardJson {
   const base = fixture();
   const parent: ParentJson = {
@@ -317,7 +317,7 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
   assert.equal(cancelled.get("i0001-03")!.column, "cancelled");
   assert.equal(cancelled.get("i0001-03")!.copyStatus, "none");
   assert.equal(cancelled.get("i0001-03")!.attention, false);
-  // 人のレビュー待ちのフェーズがあれば、その子（ゲート閉）も親（フェーズ行の要約）も要対応
+  // 人のレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応
   const waiting = cardsOf(buildBoard(waitingWithMr("u")));
   assert.equal(waiting.get("i0001")!.attention, true);
   assert.equal(waiting.get("i0001-02")!.attention, true);

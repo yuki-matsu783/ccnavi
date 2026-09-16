@@ -1,4 +1,4 @@
-# ADR-0052: 提案の置き場の既定を `wip/proposals` にする
+# ADR-0054: 提案の置き場の既定を `wip/proposals` にする
 
 状態: 採用
 

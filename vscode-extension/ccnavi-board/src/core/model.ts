@@ -80,7 +80,7 @@ export interface PhaseJson {
   readonly marks: Readonly<Record<string, Record<string, unknown>>>;
   readonly review_required: boolean;
   readonly gate_closed: boolean;
-  /** 依頼を出したのにゲートが閉じたまま（人のレビュー待ち）。判定が出した値で、拡張は組み直さない */
+  /** 依頼を出したのに止まったまま（人のレビュー待ち）。判定が出した値で、拡張は組み直さない */
   readonly review_waiting: boolean;
   readonly deferred: boolean;
   readonly review_at: number | null;
@@ -118,7 +118,7 @@ export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** フェーズの種類のファイル（`phases_file`）。共通層は `CCNAVI_PHASES` の綴り */
+  /** フェーズの種類のファイル（`phases_file`）。共通層は `.ccnavi/common/phases.yml` 固定 */
   readonly phasesFile: LayerFileJson;
 }
 
