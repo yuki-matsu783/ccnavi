@@ -240,8 +240,8 @@ class Ticket:
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
     # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
-    # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、作業ツリーの中なら
-    # その切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
+    # 置いた場所で、`scan` が入れる（プロジェクトの `wip/tickets/` ならその名前、作業ツリーの
+    # 中ならその切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
     # 継ぐ段は無い。判定は行き先の作業ツリーの切り元と突き合わせる。
     project: str = ""
     # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
@@ -640,10 +640,11 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
-    """main と全作業ツリーの提案を集める。状態と置き場を添える。
+    """ワークスペース・プロジェクト・全作業ツリーの提案を集める。状態と置き場を添える。
 
-    プロジェクト向けの提案はワークスペースルートの `wip/<project>/tickets/` にある。
-    作業ツリーの側には無い（プロジェクトのブランチには wip/ が無い）。
+    置き場はどのツリーでも同じ相対（`wip/tickets/`）で、プロジェクト向けの提案はその
+    プロジェクトのツリー（か、そこから切った作業ツリー）にある（設計 §11.5、REQ-MLT-14）。
+    ワークスペースの `wip/<名前>/tickets/` は読まない。
     同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
