@@ -2270,7 +2270,7 @@ ccnavi --explain --json
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `wrapup` / `ready` | 親のマーカー `wrapup.json` / `ready.json` の中身。無ければ `null` |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
-| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`gate_closed` は判定が使うのと同じ値 |
+| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`gate_closed` は判定が使うのと同じ値。`review_waiting` は依頼を出したのにゲートが閉じたまま（人のレビュー待ち）で、ボードはこれを写すだけで組み直さない |
 
 ## 承認の JSON
 
