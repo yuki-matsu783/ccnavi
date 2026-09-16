@@ -125,7 +125,10 @@ def for_rules(
         if state_dir and (rule.every > 1 or has_once):
             if counted is None:
                 counted = _load_once(stderr, state_dir, payload)
-            key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
+            # id が無いと、match/glob が同じで every だけ違う 2 本が同じ鍵を共有し、
+            # 互いの回数を食い合う（rules.Rule.key() は every を区別鍵に含めるのに、
+            # ここが含めないとその区別が数えに届かない）。every を鍵に足して分ける。
+            key = rule.id or f"{rule.match} {rule.glob or rule.regex} {rule.every}"
             hits = counted.get(key, 0) + 1
             counted[key] = hits
             # 渡す回は刻みの倍数になった回。その最初は刻みの回そのものなので、
