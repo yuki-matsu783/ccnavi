@@ -90,3 +90,36 @@ test("CB-T135 引数が複数でも、鍵の作り方で分け合う相手が決
   await shared("/w", "bin");
   assert.deepEqual(calls[1], ["/w", "bin"]);
 });
+
+test("CB-T136 run が同期で投げても Promise で返る。控えないので次は走り直す", async () => {
+  let calls = 0;
+  const run = (key: string): Promise<string> => {
+    calls += 1;
+    if (calls === 1) {
+      throw new Error(`最初だけ失敗 ${key}`);
+    }
+    return Promise.resolve("答え");
+  };
+  const shared = shareInFlight(run, (key: string) => key);
+
+  await assert.rejects(shared("a"), /最初だけ失敗 a/);
+  assert.equal(await shared("a"), "答え");
+  assert.equal(calls, 2);
+});
+
+test("CB-T137 鍵に世代を混ぜれば、前の世代の読みには合流しない", async () => {
+  const fake = fakeRun();
+  const shared = shareInFlight<[string, number], string>(
+    (root) => fake.run(root),
+    (root, at) => JSON.stringify([root, at]),
+  );
+
+  const before = shared("/w", 1);
+  const after = shared("/w", 2);
+  assert.equal(fake.calls.length, 2, "世代が違えば走らせ直す");
+
+  fake.pending[0]("古い");
+  fake.pending[1]("新しい");
+  assert.equal(await before, "古い");
+  assert.equal(await after, "新しい");
+});
