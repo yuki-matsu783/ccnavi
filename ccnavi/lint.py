@@ -1051,6 +1051,20 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
             Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
         )
 
+    mixed = _search_mixed_in(rule)
+    if mixed:
+        search, guarded = mixed
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"match で {'・'.join(search)} を {'・'.join(guarded)} と並べている。"
+                f"{'・'.join(search)} が当たるのは探し始める場所のパスだけなので、"
+                "そこから降りて読まれたファイルは止まらない。止まるのは、その場所を"
+                "起点に名指しされた呼び出しだけ",
+            )
+        )
+
     if rule.message and rule.decision != rules.DENY:
         # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
         # 書いた人は「モデルに届く」と思って書くので、届かない欄を残さない。
@@ -1149,6 +1163,43 @@ def _alternatives(regex: str) -> int:
         elif ch == "|":
             count += 1
     return count
+
+
+def _search_mixed_in(rule: rules.Rule) -> tuple[list[str], list[str]] | None:
+    """探すツールを、場所を守るツールと同じ match に並べていれば、その両方を返す。
+
+    Grep と Glob の対象は探し始める場所のパスで、そこから降りて読まれたファイルは
+    判定に届かない（ADR-0050）。ファイルを守る狙いで match に足しても、その場所を
+    起点に名指しされた呼び出ししか止まらず、ルートから探されれば素通りする。
+    止めているつもりの範囲だけが広がるので warn で言う。
+
+    狙いは書いた人の頭の中にしか無いので、形で見分ける。ファイルのパスかコマンドを
+    当てるツールと並べて書かれた deny・ask を「ファイルを守る狙い」と読む。
+    `credentials` のようなルールに `|Grep` を足した形がこれにあたる。Grep・Glob だけを
+    書いたルールは「どこを起点に探すか」を縛る正しい使い方なので咎めない。
+
+    allow も咎めない。allow は Claude Code へ許可を返さない（ADR-0008）ので、
+    守りが薄くなる向きに倒れようがない。
+
+    ツール名は judge の表から引く。写すと、判定側がツールを増やしたときに
+    こちらが黙って古くなる。
+    """
+    if rule.decision == rules.ALLOW:
+        return None
+    named = [want.strip() for want in rule.match.split("|") if want.strip()]
+    search = [tool for tool in named if tool in judge.SEARCH_TOOLS]
+    if not search:
+        return None
+    # ファイルのパスを当てるツール（探すツールを除く）と、コマンドを当てるツール。
+    guarded = [
+        tool
+        for tool in named
+        if tool not in judge.SEARCH_TOOLS
+        and (tool in judge.PATH_TOOLS or judge.SUBJECT_FIELDS.get(tool) == "command")
+    ]
+    if not guarded:
+        return None
+    return search, guarded
 
 
 def _inert(match: str) -> list[str]:
