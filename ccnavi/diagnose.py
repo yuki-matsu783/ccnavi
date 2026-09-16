@@ -643,11 +643,14 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
             else:
                 state = "進行中"
             gate = "ゲート閉" if ph.gate_closed else "ゲート開"
-            review = ""
+            review = {
+                phasetypes.REVIEW_MR: " / レビューはマージリクエストで",
+                phasetypes.REVIEW_CHAT: " / レビューはこのセッションで",
+            }.get(ph.review_kind, "")
             if ph.deferred:
                 review = f" / レビューは {ph.review_at} と一緒に"
             elif ph.covers:
-                review = f" / {', '.join(str(c) for c in ph.covers)} の分も見る"
+                review += f" / {', '.join(str(c) for c in ph.covers)} の分も見る"
             if ph.risk_line:
                 review += f" / {ph.risk_line}"
                 if ph.risk_escalates:
@@ -931,6 +934,7 @@ def _phase_record(ph: phase.Phase) -> dict:
         "states": dict(ph.states),
         "marks": ph.marks,
         "review_required": ph.review_required,
+        "review_kind": ph.review_kind,
         "gate_closed": ph.gate_closed,
         "deferred": ph.deferred,
         "review_at": ph.review_at,
@@ -956,6 +960,9 @@ def _parent_record(
         ),
         "wrapup": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP),
         "ready": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY),
+        "closed_record": approval.read_parent_mark(
+            where, parent.ticket, approval.PARENT_MARK_CLOSED
+        ),
         "accepted_threads": sorted(approval.accepted_threads(where, parent.ticket)),
         "phases": [_phase_record(ph) for ph in phase.phases_of(root, conf, parent.ticket)],
     }
