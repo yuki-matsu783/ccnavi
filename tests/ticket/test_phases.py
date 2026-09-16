@@ -64,6 +64,11 @@ phases:
     title: 片付け
     review: chat
     scope: ["src/*"]
+  chores-feedback:
+    kind: feedback
+    title: 片付けフィードバック対応
+    review: chat
+    scope: inherit
 """
 
 
@@ -350,7 +355,15 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(problems, [])
         self.assertEqual(
             set(types),
-            {"research", "design", "acceptance", "implement", "implement-feedback", "chores"},
+            {
+                "research",
+                "design",
+                "acceptance",
+                "implement",
+                "implement-feedback",
+                "chores",
+                "chores-feedback",
+            },
         )
         self.assertTrue(types["acceptance"].overlaps(types["implement"]))
         self.assertTrue(types["implement"].overlaps(types["acceptance"]))
@@ -761,6 +774,9 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("rm -r wip", closed.stdout)
         self.assertIn("squash", closed.stdout)
+        # 締めた記録は運び方によらず置く（REQ-TKT-47）。
+        record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
+        self.assertEqual(record["reviews"], {"1": "mr"})
         self.commit_parent("状態の移動")
         git(self.parent_tree, "rm", "-r", "-q", "wip")
         git(self.parent_tree, "commit", "--quiet", "-m", "chore: wip を片付ける")
@@ -1055,6 +1071,102 @@ class ChatReviewTest(PhaseHarness):
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("マージリクエスト", refused.stderr)
+
+    def test_the_approval_screen_says_where_each_phase_is_seen(self):
+        """承認の時点で、どのフェーズをどこで見るかが人に見える。"""
+        result = self.family(plan=["chores", "design"])
+        self.assertIn("レビュー要（このセッションで）", result.stdout)
+        self.assertIn("レビュー要（マージリクエスト）", result.stdout)
+
+    def test_chat_and_accept_unresolved_together_are_refused(self):
+        """chat に未解決スレッドは無い。取り違えを黙って通さない。"""
+        self.chat_phase(plan=["chores"])
+        refused = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--chat",
+            "--accept-unresolved",
+            stdin="y\n",
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("--accept-unresolved", refused.stderr)
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+        )
+
+    def test_a_covered_phase_falls_back_to_a_merge_request_when_the_type_is_unreadable(self):
+        """覆っている分の種類が読めなくなっても、延期したレビューは消えない。"""
+        self.family(plan=[("design", "defer"), "chores"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-02", [("src/a1.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        self.commit_parent("close 02")
+        self.merge("i0001-02")
+        # 承認のあとで種類が読めなくなる（人が phases.yml を触っている最中、層の切り替え）。
+        thin = write(os.path.join(self.root, "phases-thin.yml"), "version: 1\nphases: {}\n")
+        refused = self.ccnavi(
+            "--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n", phases=thin
+        )
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("マージリクエスト", refused.stderr)
+        # ゲートも開かない。読めないことでレビューが消える道は作らない。
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Agent",
+            "cwd": self.parent_tree,
+            "session_id": "s1",
+            "tool_input": {"description": "次の子"},
+        }
+        spawn = self.ccnavi("--mode", "enable", stdin=json.dumps(payload), phases=thin)
+        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+
+    def test_a_feedback_phase_can_be_seen_in_the_session_too(self):
+        """フィードバック対応も chat で回せる。人が見ない道にはなっていない。"""
+        self.chat_phase(plan=["chores"])
+        self.assertEqual(
+            self.ccnavi(
+                "--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n"
+            ).returncode,
+            0,
+        )
+        # フィードバック計画を承認して、2 番目（フィードバック対応）を回す。
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        write(
+            os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
+            parent_text("i0001", ["chores"], feedback=["chores-feedback"]),
+        )
+        self.assertEqual(self.approve().returncode, 0)
+        # 親を着手にすると、次の hook が承認済みチケットへ started_at を写す。写した跡を
+        # 残したまま先へ進むと、実行後の監視がそれを報告して告知が読めなくなる。
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.commit_parent("フィードバック計画")
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/b*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-02", [("src/b1.py", "y\n")])
+        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+        # 承認済みチケットの更新まで入れて commit する。残すと実行後の監視がそちらを報告し、
+        # フェーズの告知が読めない（実行後の監視は stderr、告知は stdout の JSON）。
+        self.commit_parent("close 02")
+        self.merge("i0001-02")
+        said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
+        self.assertIn("--reviewed 2 --chat", said)
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        mark = read_json(os.path.join(self.approved, "phases", "i0001", "2.reviewed"))
+        self.assertEqual(mark["by"], "chat")
 
     def test_closing_a_chat_only_parent_records_where_each_phase_was_seen(self):
         """締めた事実は親のブランチに残る。案内は Draft ではなく統合先へ戻すところまで。"""
