@@ -161,17 +161,18 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
 });
 
-test("CB-T13b フェーズ行の要約は人が動くべきことだけ。済んだレビューと MEDIUM 以下のリスクは全文にだけ出る", () => {
+test("CB-T13c フェーズ行の要約は札と同じ条件（ゲート閉・レビュー依頼済・HIGH 以上）だけ。マーカーの経過と MEDIUM 以下のリスクは全文にだけ出る", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
     phases: base.parents[0].phases.map((p): PhaseJson => {
       if (p.number === 1) {
-        // 済んだレビューと HIGH のリスク。要約はリスクだけ、全文には点と理由とマーカーが残る
+        // 依頼して済んだレビューと HIGH のリスク。要約はリスクだけ（依頼済はゲートが開けば出ない）、
+        // 全文には点と理由とマーカーが残る
         return {
           ...p,
           review_required: true,
-          marks: { reviewed: { at: "t" } },
+          marks: { requested: { at: "t" }, reviewed: { at: "t" } },
           risk: { ...(p.risk ?? {}), points: 40, level: "HIGH" },
           risk_line: "リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）",
         };
@@ -181,15 +182,25 @@ test("CB-T13b フェーズ行の要約は人が動くべきことだけ。済ん
     }),
   };
   const html = renderBoard(buildBoard({ ...base, parents: [parent] }), OPTIONS);
-  assert.ok(html.includes('<span class="phase-brief">リスク HIGH</span><span class="phase-full">終了 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 &gt; 300）</span>'));
-  assert.ok(html.includes('<span class="phase-brief">ゲート閉 · レビュー要</span><span class="phase-full">終了 · ゲート閉 · レビュー依頼済 · レビュー要</span><button type="button" class="action" data-action="accept"'));
+  assert.ok(html.includes('<span class="phase-brief" aria-hidden="true">リスク HIGH</span><span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 &gt; 300）</span>'));
+  assert.ok(html.includes('<span class="phase-brief" aria-hidden="true">ゲート閉 · レビュー依頼済</span><span class="phase-full">終了 · ゲート閉 · レビュー依頼済 · レビュー要</span><button type="button" class="action" data-action="accept"'));
   // MEDIUM は要約に出ない
   const medium: ParentJson = {
     ...parent,
     phases: parent.phases.map((p): PhaseJson => (p.number === 1 ? { ...p, risk: { ...(p.risk ?? {}), level: "MEDIUM" }, risk_line: "リスク: 25 (MEDIUM)" } : p)),
   };
   const html2 = renderBoard(buildBoard({ ...base, parents: [medium] }), OPTIONS);
-  assert.ok(html2.includes('<span class="phase-brief"></span><span class="phase-full">終了 · レビュー済 · レビュー要 · リスク: 25 (MEDIUM)</span>'));
+  assert.ok(html2.includes('<span class="phase-brief" aria-hidden="true"></span><span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 25 (MEDIUM)</span>'));
+  // 依頼を出していないゲート閉は「ゲート閉」だけ。受け入れボタンも出ない
+  const unasked: ParentJson = {
+    ...parent,
+    phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {} } : p)),
+  };
+  const html3 = renderBoard(buildBoard({ ...base, parents: [unasked] }), OPTIONS);
+  assert.ok(html3.includes('<span class="phase-brief" aria-hidden="true">ゲート閉</span><span class="phase-full">終了 · ゲート閉 · レビュー要</span></span>'));
+  // 狭いとき全文は画面の外に置くだけで、読み上げには残す。要約は見た目だけ
+  assert.match(html, /\.phase-full \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
+  assert.doesNotMatch(html, /\.phase-full \{ display: none/);
 });
 
 test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人が動く状態だけで、属性は枠無しの行に出す", () => {
@@ -212,12 +223,11 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
   assert.match(html, /\.phase-name \{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
   assert.doesNotMatch(html, /\.phase \{[^}]*minmax\(0, auto\)/);
-  // 既定の幅では要約だけ、480px 以上で全文に替わる
-  assert.match(html, /\.phase-full \{ display: none; \}/);
+  // 狭いときは要約だけを見せ、480px 以上で全文に替わる
   const wide = html.match(/@container \(min-width: 480px\) \{[^@]*?\n  \}/);
   assert.ok(wide, "@container の塊がある");
   assert.match(wide[0], /\.phase-brief \{ display: none; \}/);
-  assert.match(wide[0], /\.phase-full \{ display: inline; \}/);
+  assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
@@ -225,9 +235,10 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('<span class="where">子 · 親 i0001 / フェーズ 2</span>'));
   assert.ok(html.includes('class="phases"'));
   // 親のフェーズは 1 段階 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
-  // 順調に終わった段階（LOW のリスク）は要約が空。ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
-  assert.ok(html.includes('<li class="phase phase-ended" title="終了 · リスク: 0 (LOW)"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status"><span class="phase-brief"></span><span class="phase-full">終了 · リスク: 0 (LOW)</span></span></li>'));
-  assert.ok(html.includes('<span class="phase-status"><span class="phase-brief">レビュー要</span><span class="phase-full">進行中 · レビュー要</span></span>'));
+  // 順調に終わった段階（LOW のリスク）も、レビューが要るだけの進行中の段階も、要約は空。
+  // ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
+  assert.ok(html.includes('<li class="phase phase-ended" title="終了 · リスク: 0 (LOW)"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status"><span class="phase-brief" aria-hidden="true"></span><span class="phase-full">終了 · リスク: 0 (LOW)</span></span></li>'));
+  assert.ok(html.includes('<span class="phase-status"><span class="phase-brief" aria-hidden="true"></span><span class="phase-full">進行中 · レビュー要</span></span>'));
   assert.ok(!html.includes("ゲート開"));
   assert.ok(!html.includes("マーカーなし"));
   assert.doesNotMatch(html, /class="phase-(brief|full)">[^<]*レビュー不要/);
