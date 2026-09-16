@@ -377,7 +377,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 )
             )
 
-    problems.extend(_proposal_problems(proposals, index, done, resolve))
+    problems.extend(_proposal_problems(proposals, index, closed, done, resolve))
 
     worktrees = tree.worktrees(root, conf.projects)
     problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
@@ -427,11 +427,18 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     ]
 
 
-def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
+def _proposal_problems(
+    proposals: list, index: dict, closed: list, done: set[str], resolve
+) -> list[Problem]:
     """提案の側。承認待ち、承認で落ちるもの、先行が閉じていない着手済み、同じ識別子の重複。
 
     `todo/` に在るものは全部承認待ち。同じ識別子がどこかの置き場（作業中・レビュー待ち・
     閉じた）に在れば、親の改版でない限り書き損じなので名指しする。
+
+    `closed` は `done/` の承認済みチケット。`proposals` は `todo/` と `review/`。作業中と
+    レビュー待ちと閉じたの 3 つを横断して数えないと、`doing/` と `done/` に同じ識別子が
+    在る形（動かす途中で止まった跡）を CI が見逃し、状態の操作が「複数の場所にある」で
+    止まって初めて知ることになる。
     """
     problems: list[Problem] = []
     # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
@@ -441,6 +448,9 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) ->
     seen: dict[str, list[str]] = {}
     for t in index.values():
         state = t.state or ticket_mod.DOING
+        seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{state}")
+    for t in closed:
+        state = t.state or ticket_mod.DONE
         seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{state}")
     for t in proposals:
         seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{t.state}")
