@@ -23,7 +23,6 @@ import * as vscode from "vscode";
 import { WATCH_PATTERNS } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint } from "./ccnavi.js";
-import { envFromSettingsJson } from "./core/hooks.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { escapeHtml } from "./core/render.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument, type RiskForm } from "./core/risk-doc.js";
@@ -122,13 +121,9 @@ export async function openRisk(): Promise<void> {
   void refreshLock(current);
 }
 
-/** 共通層の置き場は `.ccnavi/common/` 固定。env でも上書き設定ファイルでも動かない（ADR-0052） */
-function riskRelOf(_root: string): string {
-  return DEFAULT_RISK;
-}
-
 function readPage(root: string): Loaded {
-  const riskRel = riskRelOf(root);
+  // 共通層の置き場は `.ccnavi/common/` 固定（ADR-0052）。
+  const riskRel = DEFAULT_RISK;
   const riskPath = resolveIn(root, riskRel);
   let text: string;
   let mtimeMs: number;
@@ -147,14 +142,6 @@ function readPage(root: string): Loaded {
     exists = false;
   }
   return { text, exists, mtimeMs, doc: readRisk(text), riskPath, riskRel };
-}
-
-function readText(filePath: string): string | undefined {
-  try {
-    return fs.readFileSync(filePath, "utf8");
-  } catch {
-    return undefined;
-  }
 }
 
 function resolveIn(root: string, filePath: string): string {

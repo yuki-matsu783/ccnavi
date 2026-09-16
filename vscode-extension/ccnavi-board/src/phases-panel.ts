@@ -31,7 +31,6 @@ import * as vscode from "vscode";
 import { WATCH_PATTERNS } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
-import { envFromSettingsJson } from "./core/hooks.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
@@ -185,17 +184,13 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
   void refreshLock(current);
 }
 
-/** 共通層の置き場は `.ccnavi/common/` 固定。env でも上書き設定ファイルでも動かない（ADR-0052） */
-function phasesRelOf(_root: string): string {
-  return DEFAULT_PHASES;
-}
-
 async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesRel: string;
   let phasesPath: string;
   const notices: string[] = [];
   if (target.kind === "common") {
-    phasesRel = phasesRelOf(root);
+    // 共通層の置き場は `.ccnavi/common/` 固定（ADR-0052）。
+    phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
@@ -243,14 +238,6 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
   return { text, exists, mtimeMs, doc, phasesPath, phasesRel, notices };
-}
-
-function readText(filePath: string): string | undefined {
-  try {
-    return fs.readFileSync(filePath, "utf8");
-  } catch {
-    return undefined;
-  }
 }
 
 function resolveIn(root: string, filePath: string): string {

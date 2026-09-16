@@ -20,7 +20,6 @@ import { openBoard } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
-import { envFromSettingsJson } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import {
   buildProjectsPage,
