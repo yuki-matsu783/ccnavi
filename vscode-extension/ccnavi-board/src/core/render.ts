@@ -238,9 +238,9 @@ function renderBadges(card: Card): string {
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(badge("worktree none", "作業ツリーなし"));
   }
-  // 依頼済の札は、依頼が生きている間（ゲートが閉じたまま）だけ。レビューが済んでゲートが開いた
-  // カードには出さない。済んだかどうかは JSON のゲートが言うことで、ここで reviewed を見て判定し直さない。
-  if (card.gateClosed && card.marks.includes("requested")) {
+  // 依頼済の札は、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）の間だけ。
+  // 済んだかどうかは board.ts が JSON のゲートから決め、ここで reviewed を見て判定し直さない。
+  if (card.reviewWaiting) {
     badges.push(badge("mark mark-requested", MARK_LABELS.requested));
   }
   if (card.riskLevel === "HIGH" || card.riskLevel === "CRITICAL") {
@@ -259,7 +259,8 @@ function renderBadges(card: Card): string {
 
 /**
  * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、作業ツリー、
- * マーカー（依頼済は札のほう）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
+ * リスク（MEDIUM 以下）、base、プロジェクト。
  */
 function renderFacts(card: Card): string {
   const facts: string[] = [];
@@ -316,7 +317,7 @@ function fact(kind: string, text: string, title = ""): string {
 /**
  * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
  * 右には人が見るべきことだけを出す。ゲートが開いている、マーカーが無い、レビューが要らない、は
- * 普通の状態なので書かない。
+ * 普通の状態なので書かない。依頼済は子カードの札と同じく、人のレビュー待ちの間だけ書く。
  */
 function renderPhases(phases: readonly PhaseChip[]): string {
   const rows = phases
@@ -326,6 +327,9 @@ function renderPhases(phases: readonly PhaseChip[]): string {
         notes.push("ゲート閉");
       }
       for (const m of p.marks) {
+        if (m === "requested" && !p.reviewWaiting) {
+          continue;
+        }
         notes.push(MARK_LABELS[m] ?? m);
       }
       if (p.reviewRequired) {

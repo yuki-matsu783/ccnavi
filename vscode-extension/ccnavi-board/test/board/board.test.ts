@@ -98,9 +98,31 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   assert.deepEqual(card.phases[0].actions, []);
   assert.deepEqual(card.phases[1].actions, [{ kind: "accept", parent: "i0001", phase: 2 }]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 子のカードには自分のフェーズのマーカーとゲートが写る
+  // 人のレビュー待ちは「依頼済 かつ ゲート閉」。依頼していないフェーズ 1 は閉じていても待ちではない
+  assert.equal(card.phases[0].reviewWaiting, false);
+  assert.equal(card.phases[1].reviewWaiting, true);
+  // 子のカードには自分のフェーズのマーカーとゲートとレビュー待ちが写る。親は false
   assert.equal(cards.get("i0001-02")!.gateClosed, true);
   assert.deepEqual(cards.get("i0001-02")!.marks, ["requested"]);
+  assert.equal(cards.get("i0001-02")!.reviewWaiting, true);
+  assert.equal(cards.get("i0001-01")!.reviewWaiting, false);
+  assert.equal(card.reviewWaiting, false);
+});
+
+test("CB-T09b レビューが済んでゲートが開いたフェーズは、依頼済のマーカーが残っていてもレビュー待ちではない", () => {
+  const base = fixture();
+  const parent: ParentJson = {
+    ...base.parents[0],
+    phases: base.parents[0].phases.map((p): PhaseJson =>
+      p.number === 1 ? { ...p, marks: { requested: { at: "t" }, reviewed: { at: "t" } }, gate_closed: false } : p,
+    ),
+  };
+  const cards = cardsOf(buildBoard({ ...base, parents: [parent] }));
+  const card = cards.get("i0001")!;
+  assert.deepEqual(card.phases[0].marks, ["requested", "reviewed"]);
+  assert.equal(card.phases[0].reviewWaiting, false);
+  assert.deepEqual(card.phases[0].actions, []);
+  assert.equal(cards.get("i0001-01")!.reviewWaiting, false);
 });
 
 test("CB-T10 表示しているパスだけを開く", () => {

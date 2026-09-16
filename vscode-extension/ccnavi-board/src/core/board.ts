@@ -40,6 +40,8 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
+  /** 依頼を出したのにゲートが閉じたまま。人のレビュー待ち */
+  readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
   readonly riskLine: string;
   readonly tickets: readonly string[];
@@ -78,6 +80,8 @@ export interface Card {
   /** 子なら自分のフェーズのマーカー、親なら空 */
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
+  /** 子なら自分のフェーズが人のレビュー待ちか、親なら false */
+  readonly reviewWaiting: boolean;
   readonly pendingApproval: boolean;
   /** 親だけ */
   readonly stage: string;
@@ -209,6 +213,7 @@ function toCard(
     scattered: t.scattered,
     marks: isParent ? [] : marks,
     gateClosed: !isParent && (ownPhase?.gate_closed ?? false),
+    reviewWaiting: !isParent && ownPhase !== undefined && reviewWaiting(ownPhase),
     pendingApproval: pending.has(t.ticket),
     stage: ownParent && isParent ? ownParent.stage : "",
     wrapped: isParent && wrapped,
@@ -235,12 +240,21 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   return "todo";
 }
 
+/**
+ * 依頼を出したのにゲートが閉じたまま（レビューが済んでいない）。ゲートの開閉は JSON が言うとおりで、
+ * reviewed の有無をここで見直さない。子カードの札・フェーズ行の「レビュー依頼済」・受け入れの操作は
+ * みなこれを読む。
+ */
+function reviewWaiting(p: PhaseJson): boolean {
+  return p.gate_closed && "requested" in p.marks;
+}
+
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
+  const waiting = reviewWaiting(p);
   const actions: Action[] = [];
-  // 受け入れて進めるのは、依頼を出したのにゲートが閉じたまま（未解決のスレッドが残っている）とき。
-  // 依頼を出していないフェーズは、先に親が request を打つ。
-  if (p.gate_closed && marks.includes("requested")) {
+  // 受け入れて進めるのは、人のレビュー待ちのとき。依頼を出していないフェーズは、先に親が request を打つ。
+  if (waiting) {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
   }
   return {
@@ -250,6 +264,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     state: p.state,
     marks,
     gateClosed: p.gate_closed,
+    reviewWaiting: waiting,
     reviewRequired: p.review_required,
     riskLine: p.risk_line,
     tickets: p.tickets,

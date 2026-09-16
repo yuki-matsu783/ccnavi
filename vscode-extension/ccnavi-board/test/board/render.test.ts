@@ -207,14 +207,20 @@ test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビュ
       phases: parent.phases.map((p) => (p.number === 1 ? { ...p, marks, gate_closed: gateClosed } : p)),
     })),
   });
-  // クローズ・レビュー済・ゲート開の子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る
+  // クローズ・レビュー済・ゲート開の子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
+  // 親カードのフェーズ行にも「レビュー依頼済」は残らない（画面のどこにも出ない）
   const done = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false)), OPTIONS);
-  assert.ok(!done.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
+  assert.ok(!done.includes("レビュー依頼済"));
   assert.ok(done.includes('<span class="fact mark mark-reviewed">レビュー済</span>'));
-  // 依頼を出したのにゲートが閉じたままの子には札が出る。reviewed の有無では分岐しない
+  assert.ok(done.includes('<span class="phase-status">終了 · レビュー済 · リスク: 0 (LOW)</span>'));
+  // 依頼を出した後に同じフェーズへ子を足すなどでゲートが開いた間も、動くのはレビュアーではないので出さない
+  const reopened = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, false)), OPTIONS);
+  assert.ok(!reopened.includes("レビュー依頼済"));
+  // 依頼を出したのにゲートが閉じたままの子には札が出て、親のフェーズ行にも出る。reviewed の有無では分岐しない
   const waiting = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, true)), OPTIONS);
   assert.ok(waiting.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
   assert.ok(waiting.includes('<span class="badge gate">ゲート閉</span>'));
+  assert.ok(waiting.includes('<span class="phase-status">終了 · ゲート閉 · レビュー依頼済 · リスク: 0 (LOW)<button'));
   const stillClosed = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, true)), OPTIONS);
   assert.ok(stillClosed.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
   // 依頼を出していない子には、ゲートが閉じていても依頼済の札は出ない
