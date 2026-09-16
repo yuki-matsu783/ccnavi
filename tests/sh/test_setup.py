@@ -269,6 +269,18 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_RULES"], ".ccnavi/common/rules.yml")
         self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
 
+    def test_does_not_write_the_common_layer_paths(self):
+        """i0054: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
+
+        既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
+        そこを直せば置き場が動くと読める。実装フェーズ（i0054-02）が緑にする。
+        """
+        self.run_setup("--mode", "enable")
+        env = self.read_settings()["env"]
+        for name in ("CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"):
+            with self.subTest(name=name):
+                self.assertNotIn(name, env)
+
     def test_bin_path_points_at_the_launcher(self):
         """指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
 
