@@ -980,13 +980,12 @@ def _apply(
                     "フィードバック作業フェーズの check が数える\n"
                 )
             continue
-        where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-        failed = write_copy(where, t, t.tree, stamp)
-        if failed:
-            stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-            return 1
         # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
         # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
+        # 承認済みチケットを置くより先に消す。この 2 つの間で落ちる（打ち切られる・電源が切れる）
+        # ことは避けられないので、どちらに転んでも安全な側へ倒す。先に置くと「子は増えたのに
+        # マーカーは残る」＝ゲートが開いたままになるが、先に消せば「マーカーだけ消えた」＝
+        # ゲートが余計に閉まるだけで、レビューをもう一度頼めば戻せる。
         if t.is_child and t.phase is not None:
             cleared = clear_marks(home_dir(conf, root, t.parent, ""), t.parent, t.phase)
             if cleared:
@@ -995,6 +994,11 @@ def _apply(
                     f"  {t.parent} のフェーズ {t.phase} のマーカー（{kinds}）を消した。"
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
+        where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
+        failed = write_copy(where, t, t.tree, stamp)
+        if failed:
+            stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
+            return 1
 
     stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
     return 0
