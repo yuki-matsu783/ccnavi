@@ -1010,12 +1010,21 @@ def _apply(
                     "フィードバック作業フェーズの check が数える\n"
                 )
             continue
+        where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
+        failed = write_copy(where, t, t.tree, stamp)
+        if failed:
+            stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
+            return Applied(1, placed, t.ticket, failed)
+        placed.append(t.ticket)
         # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
         # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
-        # 承認済みチケットを置くより先に消す。この 2 つの間で落ちる（打ち切られる・電源が切れる）
-        # ことは避けられないので、どちらに転んでも安全な側へ倒す。先に置くと「子は増えたのに
-        # マーカーは残る」＝ゲートが開いたままになるが、先に消せば「マーカーだけ消えた」＝
-        # ゲートが余計に閉まるだけで、レビューをもう一度頼めば戻せる。
+        # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）
+        # ときに、子は 1 枚も増えていないのに済んでいたレビューが巻き戻る
+        # （test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase）。
+        # 置いた直後に落ちる（打ち切られる・電源が切れる）と「子は増えたのにマーカーは残る」
+        # ＝ゲートが開いたままになるが、そちらは窓がファイル 1 つぶんで、頻度が桁違いに低い。
+        # 順番の入れ替えでは直らない（両方の穴を塞ぐなら、マーカーの時刻と子の承認時刻を
+        # 比べてゲートを決める作りが要る）。
         if t.is_child and t.phase is not None:
             cleared = clear_marks(home_dir(conf, root, t.parent, ""), t.parent, t.phase)
             if cleared:
@@ -1024,12 +1033,6 @@ def _apply(
                     f"  {t.parent} のフェーズ {t.phase} のマーカー（{kinds}）を消した。"
                     "全部閉じたらレビューをもう一度頼むことになる\n"
                 )
-        where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-        failed = write_copy(where, t, t.tree, stamp)
-        if failed:
-            stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-            return Applied(1, placed, t.ticket, failed)
-        placed.append(t.ticket)
 
     stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
     return Applied(0, placed)
