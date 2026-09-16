@@ -10,7 +10,6 @@ function phasesPage(overrides: Partial<PhasesPage> = {}): PhasesPage {
     root: "/ws",
     phasesPath: ".ccnavi/config/phases.yml",
     exists: false,
-   
     model: { version: null, form: { phases: [] }, problems: [] },
     lock: { locked: false, reason: "", doing: [] },
     ...overrides,

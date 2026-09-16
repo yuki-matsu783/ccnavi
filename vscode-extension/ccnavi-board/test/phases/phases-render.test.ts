@@ -10,7 +10,6 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
       root: "/ws",
       phasesPath: ".ccnavi/common/phases.yml",
       exists: true,
-     
       model: doc.model,
       lock: { locked: false, reason: "", doing: [] },
     },
