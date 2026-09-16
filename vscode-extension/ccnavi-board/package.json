@@ -33,7 +33,9 @@
     "menus": {
       "commandPalette": [
         { "command": "ccnaviBoard.open", "when": "ccnaviBoard.ticketControl == 'enable'" },
-        { "command": "ccnaviBoard.refresh", "when": "ccnaviBoard.ticketControl == 'enable'" }
+        { "command": "ccnaviBoard.refresh", "when": "ccnaviBoard.ticketControl == 'enable'" },
+        { "command": "ccnaviBoard.openRisk", "when": "ccnaviBoard.ticketControl == 'enable'" },
+        { "command": "ccnaviBoard.openPhases", "when": "ccnaviBoard.ticketControl == 'enable'" }
       ]
     },
     "configuration": {

@@ -21,8 +21,6 @@ export interface PhasesPage {
   readonly phasesPath: string;
   /** ファイルが在るか。無ければ空の画面を見せ、「雛形で作る」だけができる */
   readonly exists: boolean;
-  /** `.claude/settings.json` の env.CCNAVI_TICKET_CONTROL の読み。disable なら種類は使われない */
-  readonly ticketControl: string;
   readonly model: PhasesModel;
   readonly lock: Lock;
   /**
@@ -75,7 +73,7 @@ ${STYLE}
 </style>
 </head>
 ${bodyTag(options.appearance)}
-${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.phasesPath)}</span>
@@ -106,13 +104,6 @@ ${SCRIPT}
 </body>
 </html>
 `;
-}
-
-function renderTicketControlBanner(ticketControl: string): string {
-  if (ticketControl !== "disable") {
-    return "";
-  }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {

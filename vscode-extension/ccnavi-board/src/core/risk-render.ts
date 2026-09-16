@@ -21,8 +21,6 @@ export interface RiskPage {
   readonly riskPath: string;
   /** ファイルが在るか。無ければ組み込みの配点を見せ、「作る」だけができる */
   readonly exists: boolean;
-  /** `.claude/settings.json` の env.CCNAVI_TICKET_CONTROL の読み。disable なら配点は使われない */
-  readonly ticketControl: string;
   readonly model: RiskModel;
   readonly lock: Lock;
 }
@@ -64,7 +62,7 @@ ${STYLE}
 </style>
 </head>
 ${bodyTag(options.appearance)}
-${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.riskPath)}</span>
@@ -100,13 +98,6 @@ ${SCRIPT}
 </body>
 </html>
 `;
-}
-
-function renderTicketControlBanner(ticketControl: string): string {
-  if (ticketControl !== "disable") {
-    return "";
-  }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderMissing(page: RiskPage): string {

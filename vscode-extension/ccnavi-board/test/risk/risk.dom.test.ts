@@ -27,7 +27,7 @@ factors:
 
 function html(overrides: Partial<RiskPage> = {}): string {
   return renderRiskPage(
-    { root: "/ws", riskPath: ".ccnavi/common/risks.yml", exists: true, ticketControl: "enable", model: readRisk(RISK).model, lock: { locked: false, reason: "", doing: [] }, ...overrides },
+    { root: "/ws", riskPath: ".ccnavi/common/risks.yml", exists: true, model: readRisk(RISK).model, lock: { locked: false, reason: "", doing: [] }, ...overrides },
     { nonce: "n" },
   );
 }
