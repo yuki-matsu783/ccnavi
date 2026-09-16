@@ -324,11 +324,32 @@ def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: st
 
 
 def move_file(source: str, target: str) -> str:
-    """チケットを置き場から置き場へ動かす。動かせなかった理由を返す。"""
+    """チケットを置き場から置き場へ動かす。動かせなかった理由を返す。
+
+    行き先に同じ名前が既に在れば動かさない。黙って上書きすると、閉じた側の記録
+    （取り消しの欄など）が消える。同じ識別子が 2 つ在るのは `--lint` が名指しする。
+
+    同じファイルシステムの中なら rename で 1 手。またぐときは写して消す。消せなければ
+    写した側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる
+    （`admit` と同じ）。Windows は開かれているファイルを消させないので、現実に起きる。
+    """
+    if os.path.exists(target):
+        return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
     try:
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        shutil.move(source, target)
+        os.rename(source, target)
+        return ""
+    except OSError:
+        pass  # 別のファイルシステムなど。写して消す側で理由を返す
+    try:
+        shutil.copy2(source, target)
     except OSError as exc:
+        fsio.remove(target)
+        return f"チケットを動かせない ({source} → {target}: {exc})"
+    try:
+        os.remove(source)
+    except OSError as exc:
+        fsio.remove(target)
         return f"チケットを動かせない ({source} → {target}: {exc})"
     return ""
 
