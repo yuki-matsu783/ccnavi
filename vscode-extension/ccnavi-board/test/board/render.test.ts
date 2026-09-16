@@ -57,7 +57,9 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
     ...OPTIONS,
     approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
   });
-  assert.ok(empty.includes("承認待ちのチケットは無い"));
+  assert.ok(empty.includes('<p class="approval-note">承認待ちのチケット無し</p>'));
+  // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
+  assert.ok(empty.includes("承認待ちのチケットは無い。"));
   assert.ok(!empty.includes('data-action="approve-confirm"'));
   const approving = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "approving", preview } });
   assert.ok(approving.includes('data-approval="approving"'));
