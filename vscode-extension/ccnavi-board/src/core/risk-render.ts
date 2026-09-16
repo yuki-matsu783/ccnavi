@@ -102,11 +102,14 @@ ${SCRIPT}
 `;
 }
 
+/**
+ * 帯は常に書き、enable なら隠しておく。disable のワークスペースではこの画面を開けないので、
+ * 帯が出るのは「開いたまま設定が disable に変わった」ときだけ。画面を作り直すと編集中の内容が
+ * 消えるので、そのときは HTML を張り替えず、この帯を出す指示（`ticketControl`）だけを送る。
+ */
 function renderTicketControlBanner(ticketControl: string): string {
-  if (ticketControl !== "disable") {
-    return "";
-  }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効いていない</div>\n`;
+  const hidden = ticketControl === "disable" ? "" : " hidden";
+  return `<div id="ticket-off" class="banner warn${hidden}">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderMissing(page: RiskPage): string {
@@ -409,6 +412,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if (m.type === "failed") { setBusy(false, ""); status(m.message, true); }
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
+    else if (m.type === "ticketControl") { document.getElementById("ticket-off").classList.toggle("hidden", m.value !== "disable"); }
   });
   document.getElementById("find").addEventListener("input", applyFind);
   renderAll();

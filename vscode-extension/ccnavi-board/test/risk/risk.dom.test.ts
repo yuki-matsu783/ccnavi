@@ -103,3 +103,20 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
     await page.close();
   }
 });
+
+test("CB-D44 開いたまま disable になったら帯を出し、enable に戻せば隠す", async () => {
+  const page = await loadPage(html());
+  try {
+    const banner = page.one("#ticket-off");
+    assert.ok(banner.classList.contains("hidden"), "enable では隠れている");
+    await page.send({ type: "ticketControl", value: "disable" });
+    assert.ok(!banner.classList.contains("hidden"));
+    assert.match(banner.textContent, /配点は子チケットを閉じるときにしか使われない/);
+    // 帯を出すだけで、編集中の内容は残る（HTML を張り替えない）
+    assert.deepEqual(page.posted, []);
+    await page.send({ type: "ticketControl", value: "enable" });
+    assert.ok(banner.classList.contains("hidden"));
+  } finally {
+    await page.close();
+  }
+});

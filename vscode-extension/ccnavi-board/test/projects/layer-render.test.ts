@@ -126,3 +126,27 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   const fine = renderProjectsPage(page([row()], { dirProblems: [{ severity: "warn", where: "(projects)", detail: "projects/ がワークスペースの git で無視されていない" }] }), { nonce: "n" });
   assert.match(fine, /warn: projects\/ がワークスペースの git で無視されていない/);
 });
+
+test("CB-T133 チケット制御が disable なら、チケット管理とフェーズ管理の入口を出さない", () => {
+  const enabled = renderProjectsPage(page([row()]), { nonce: "n" });
+  for (const action of ["open-board", "open-phases", "open-self-phases"]) {
+    assert.match(enabled, new RegExp(`data-action="${action}"`), action);
+  }
+  // 配点とフェーズの種類はチケットにしか読まれない。disable の間は入口ごと消す
+  const off = renderProjectsPage(page([row()], { ticketsEnabled: false }), { nonce: "n" });
+  for (const action of ["open-board", "open-phases", "open-self-phases"]) {
+    assert.doesNotMatch(off, new RegExp(`data-action="${action}"`), action);
+  }
+  assert.doesNotMatch(off, /自身の層のフェーズの種類/);
+  assert.doesNotMatch(off, /フェーズ管理/);
+  assert.doesNotMatch(off, /チケット管理/);
+  // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる
+  const card = off.slice(off.indexOf('<li class="project'), off.indexOf("    </li>"));
+  for (const action of ["open-rules", "fetch", "pull"]) {
+    assert.match(card, new RegExp(`data-action="${action}" data-name="lib"`), action);
+  }
+  // 「開く ▾」に残るのはルール管理の 1 つだけ
+  assert.deepEqual([...card.matchAll(/data-action="(open-[a-z-]+)"/g)].map((m) => m[1]), ["open-rules"]);
+  assert.match(off, /data-action="open-self-rules"/);
+  assert.match(off, /自身の層のルール/);
+});

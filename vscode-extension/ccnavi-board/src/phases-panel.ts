@@ -17,6 +17,10 @@
  * 重なりやすく、中身が違えばその層が空として扱われる）。代わりに画面で種類を足させ、検証を通った最初の保存で
  * ファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
+ *
+ * チケット制御が disable のワークスペースでは、対象がどれでも開かない。種類は親チケットの計画と
+ * 子の範囲にしか読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット・
+ * プロジェクト管理画面のボタン）も同じ鍵で隠れる。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -33,7 +37,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
 import { escapeHtml } from "./core/render.js";
-import { ticketControl } from "./ticket-control.js";
+import { onDidChangeTicketControl, requireTickets, ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
@@ -90,6 +94,14 @@ interface PanelState {
 
 /** 対象ごとのパネル。鍵は共通層が空、自身の層が `self`、プロジェクトは `project/<名前>` */
 const panels = new Map<string, PanelState>();
+
+// 開いたまま設定が変わったら、開いている画面すべての帯を出し入れする。
+// HTML は張り替えない（編集中の内容が消える）。
+onDidChangeTicketControl((value) => {
+  for (const open of panels.values()) {
+    void open.panel.webview.postMessage({ type: "ticketControl", value });
+  }
+});
 /** 開いている途中の鍵。層の置き場を実行ファイルに聞く間に、同じ対象をもう 1 枚開かない */
 const opening = new Set<string>();
 
@@ -126,6 +138,9 @@ function binSetting(): string {
 
 /** `ccnaviBoard.openPhases` の本体。引数なしは共通層の種類 */
 export async function openPhases(target: PhasesTarget = { kind: "common" }): Promise<void> {
+  if (!requireTickets("フェーズ管理画面")) {
+    return;
+  }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、フェーズ管理画面を表示できない");

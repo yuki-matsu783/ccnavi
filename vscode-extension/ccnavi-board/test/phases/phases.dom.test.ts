@@ -84,3 +84,19 @@ test("CB-D23 保存の往復の間は欄を止めるが、行の開閉のボタ�
     await page.close();
   }
 });
+
+test("CB-D45 開いたまま disable になったら帯を出し、enable に戻せば隠す", async () => {
+  const page = await loadPage(html());
+  try {
+    const banner = page.one("#ticket-off");
+    assert.ok(banner.classList.contains("hidden"), "enable では隠れている");
+    await page.send({ type: "ticketControl", value: "disable" });
+    assert.ok(!banner.classList.contains("hidden"));
+    assert.match(banner.textContent, /フェーズの種類は親チケットの計画と子の範囲にしか使われない/);
+    assert.deepEqual(page.posted, []);
+    await page.send({ type: "ticketControl", value: "enable" });
+    assert.ok(banner.classList.contains("hidden"));
+  } finally {
+    await page.close();
+  }
+});

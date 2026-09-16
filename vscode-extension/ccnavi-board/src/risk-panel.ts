@@ -6,6 +6,9 @@
  * 配点を持ち、判定は共通層と親の `project:` の層の和で行う（設計 §11.4.2）が、この画面ではそれらを開かない
  * （設計 §11.11）。パネルは 1 つ。
  *
+ * チケット制御が disable のワークスペースでは開かない。配点は子チケットを閉じるときにしか
+ * 読まれないので、disable の間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じ鍵で隠れる。
+ *
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --risk <パス>` で渡す。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（どのツリーでも。配点は子を閉じる
  * ときに読まれるので、走っている最中に変えない）、ファイルが外で変わっていないときだけ行う。
@@ -25,7 +28,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { escapeHtml } from "./core/render.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument, type RiskForm } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
-import { ticketControl } from "./ticket-control.js";
+import { onDidChangeTicketControl, requireTickets, ticketControl } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
@@ -67,12 +70,20 @@ interface PanelState {
 
 let state: PanelState | undefined;
 
+// 開いたまま設定が変わったら、画面の帯を出し入れする。HTML は張り替えない（編集中の内容が消える）。
+onDidChangeTicketControl((value) => {
+  void state?.panel.webview.postMessage({ type: "ticketControl", value });
+});
+
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
 /** `ccnaviBoard.openRisk` の本体 */
 export async function openRisk(): Promise<void> {
+  if (!requireTickets("リスク管理画面")) {
+    return;
+  }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、リスク管理画面を表示できない");

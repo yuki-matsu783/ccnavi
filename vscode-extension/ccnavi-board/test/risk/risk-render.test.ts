@@ -54,9 +54,17 @@ test("CB-T82 ファイルが無ければ組み込みだと言って作るボタ�
   assert.match(present, /"exists":true/);
 });
 
-test("CB-T83 チケット制御が disable なら配点が効かないと言い、enable なら言わない", () => {
-  assert.match(renderRiskPage(page({ ticketControl: "disable" }), { nonce: "n" }), /チケット制御が <code>disable<\/code>/);
-  assert.doesNotMatch(renderRiskPage(page(), { nonce: "n" }), /CCNAVI_TICKET_CONTROL/);
+test("CB-T83 チケット制御が disable なら配点が効かないと言い、enable なら帯を隠す", () => {
+  // 帯は常に書く。開いたまま disable になったら、HTML を張り替えずに帯だけ出す（`ticketControl`）
+  assert.match(
+    renderRiskPage(page({ ticketControl: "disable" }), { nonce: "n" }),
+    /<div id="ticket-off" class="banner warn">このワークスペースはチケット制御が <code>disable<\/code>/,
+  );
+  assert.match(renderRiskPage(page(), { nonce: "n" }), /<div id="ticket-off" class="banner warn hidden">/);
+  assert.match(
+    renderRiskPage(page(), { nonce: "n" }),
+    /m\.type === "ticketControl".*ticket-off.*toggle\("hidden", m\.value !== "disable"\)/,
+  );
 });
 
 test("CB-T84 保存できない理由と読み込みの苦情を出す", () => {
