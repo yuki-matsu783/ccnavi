@@ -288,7 +288,7 @@ class LintTest(unittest.TestCase):
         # 数えると、履歴を残した人に毎回同じ 1 行が出て、他の報告ごと読まれなくなる。
         proposal(self.root, "wip/tickets", "done", "i0001")
         write(
-            os.path.join(self.root, ".ccnavi", "tickets", "closed"),
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
             "i0001.md",
             COPY.format(name="i0001"),
         )
