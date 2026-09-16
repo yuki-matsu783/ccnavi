@@ -80,8 +80,12 @@ class TicketControlTest(unittest.TestCase):
         self.assertIn("直接作業", self.context(result))
         self.assertIn("CCNAVI_TICKET_CONTROL='off' is not a setting", result.stderr)
 
-    def test_dry_runなら末尾にその旨が付く(self):
+    def test_dry_runなら末尾にその旨と次からの従い方が付く(self):
         text = self.context(self.start("--mode", "dry-run"))
 
         self.assertIn("直接作業", text)
-        self.assertTrue(text.splitlines()[-1].startswith("（現状: CCNAVI_MODE=dry-run"), text)
+        last = text.splitlines()[-1]
+        self.assertTrue(last.startswith("（現状: CCNAVI_MODE=dry-run"), text)
+        # 止まらないことだけで終えない。通ったことを許可と読ませない。
+        self.assertIn("許可と読まず", last)
+        self.assertIn("次から従う", last)

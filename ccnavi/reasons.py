@@ -375,17 +375,23 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     レビューの sh の綴りは段階に来たとき（`phase.py`）と `ready` の手順（`ops.py`）が、
     フェーズの種類とリスクの配点の綴りは承認のときの検査（`approval.py`）が、後工程の
     進め方は承認済みチケットが置かれたとき（`approved`）が名指しする。
+
+    dry-run の注記は「止まらない」だけで終えない。止まらないことだけを伝えると、通った
+    ことが許可の証拠として読まれる。案内に従うところまでを 1 行に入れる。
     """
     ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     lines = [
         "[ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。",
         "- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。",
         f"- チケット作業（設計に触れる・複数の段階になる・人のレビューが要る）: {conf.tickets}/ に",
-        f"  提案を書いて承認を受ける。以後の操作は {ticket_sh} を通す。",
+        f"  提案を書いて承認を受ける。以後の操作は {ticket_sh} を通す（使い方は --help）。",
         "どちらで進めるか迷ったら、利用者に聞く。",
     ]
     if mode == DRY_RUN:
-        lines.append(f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny判定でも止めずに言うだけ）")
+        lines.append(
+            f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny に当たっても止まらない。"
+            "通ったことを許可と読まず、出た案内に次から従う）"
+        )
     return "\n".join(lines)
 
 
