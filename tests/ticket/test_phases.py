@@ -1171,6 +1171,19 @@ class ScopeLimitTest(PhaseHarness):
         self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
         self.assertIn("limit: parent i0001", self.reason(beyond_parent))
 
+    def test_regex_child_ignores_case_like_the_glob_child(self):
+        """14. regex の子: 範囲の綴りは glob の子と同じく大文字小文字を区別しない。
+
+        範囲は人が宣言する意図なので、`regex` で書いても同じ場所を指す（設計 §9.3）。
+        区別が要るなら `(?-i:...)` で囲む。
+        """
+        tree = self.approved_child(
+            scoped_child_text("i0001-01", "i0001", 1, regex=("^wip/research/",))
+        )
+        inside = self.write_to(tree, "wip/Research/x.md")
+        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
     def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
         """15. 実行後の監視: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
         tree = self.approved_child(

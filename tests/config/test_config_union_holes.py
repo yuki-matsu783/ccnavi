@@ -3,7 +3,8 @@
 どれも、塞がないと組み込み deny が「守っている」と言いながら回避できる形。
 `.claude/` の側も同じ当て方で守られる。
 
-- A-2 大文字小文字: `glob` で書いたルールと組み込みの守りを、どの機械でも区別せずに当てる
+- A-2 大文字小文字: `glob` と `regex` で書いたルールと組み込みの守りを、どの機械でも
+  区別せずに当てる。区別が要る `regex` は `(?-i:...)` で囲む
 - A-3 区切りが続かない綴り: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
 - A-4 生の `id` のコロン: 層の名前を添えた形と見分けが付かないものを error にする
 - A-5 `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
@@ -42,10 +43,10 @@ from tests.config.test_config_union import (
 )
 from tests.config.test_config_union_guard import GuardHarness
 
-# A-2 の的。`glob` と `regex` を 1 本ずつ持つ。綴りの扱いがこの 2 つで分かれる。
-# `glob` と組み込みの守りは、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
+# A-2 の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
+# `glob` も `regex` も組み込みの守りも、どの機械でも大文字小文字を区別せずに当たる。機械で変えると、
 # 同じルールが Windows では当たり Linux では当たらず、区別しないチケットの範囲とも食い違う。
-# `regex` は書いた人が `(?i:...)` で選べるので、書いたとおりに区別する。
+# 区別が要るときだけ、書いた人が `(?-i:...)` で囲む。
 CASE_RULES = {
     "version": 1,
     "deny": [
@@ -60,6 +61,12 @@ CASE_RULES = {
             "match": "Write|Edit",
             "regex": r"[\\/]token[\\/]",
             "message": "token は人が置く。",
+        },
+        {
+            "id": "regex-exact",
+            "match": "Write|Edit",
+            "regex": r"[\\/](?-i:strict)[\\/]",
+            "message": "strict は書いた綴りのとおりに当てる。",
         },
     ],
     "allow": [{"id": "anything-read", "match": "Read", "regex": "."}],
@@ -165,11 +172,11 @@ COUNT_RISK = (
 
 
 class GlobCaseTest(ConfigUnionHarness):
-    """A-2: `glob` で書いたルールの綴りの扱い。
+    """A-2: ルールに書いた綴りの扱い。
 
-    `glob` は、`risk.py` / `phasetypes.py` / `ticket.py` の glob と同じく、どの機械でも
-    大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の綴りで作って
-    組み込み deny を素通りできる。
+    `glob` も `regex` も、`risk.py` / `phasetypes.py` / `ticket.py` の範囲と同じく、
+    どの機械でも大文字小文字を区別せずに当たる。区別すると、`.ccnavi/` を `.Ccnavi/` の
+    綴りで作って deny を素通りできる。区別が要るときは `(?-i:...)` で囲む。
     """
 
     def setUp(self):
@@ -189,12 +196,25 @@ class GlobCaseTest(ConfigUnionHarness):
         swapped = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "SECRET", "x.txt"))
         self.assert_denied(swapped, "glob-secret")
 
-    def test_regex_keeps_the_distinction(self):
-        """§11.4: `regex` で書いた範囲は書いたとおりに区別する（書いた人が意図を持てる）。"""
+    def test_regex_ignores_case_on_every_machine(self):
+        """§11.4: `regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
+
+        区別すると、`Write` の経路だけが綴り違いで外れる。同じ場所へシェルから書く形は
+        組み込みの守り（selfguard._folded）が畳んで止めているので、経路で答えが割れる。
+        """
+        self.assertFalse(os.path.exists(os.path.join(self.ws, "token")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
         self.assert_denied(exact, "regex-token")
 
         swapped = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "TOKEN", "x.txt"))
+        self.assert_denied(swapped, "regex-token")
+
+    def test_regex_can_keep_the_distinction_with_an_inline_flag(self):
+        """§11.4: 区別が要る `regex` は `(?-i:...)` で囲めば書いたとおりに当たる。"""
+        exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "strict", "x.txt"))
+        self.assert_denied(exact, "regex-exact")
+
+        swapped = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "STRICT", "x.txt"))
         self.assert_not_denied(swapped)
 
 
