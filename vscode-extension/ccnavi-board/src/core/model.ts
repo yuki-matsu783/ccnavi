@@ -118,7 +118,7 @@ export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** フェーズの種類のファイル（`phases_file`）。共通層は `CCNAVI_PHASES` の綴り */
+  /** フェーズの種類のファイル（`phases_file`）。共通層は `.ccnavi/common/phases.yml` 固定 */
   readonly phasesFile: LayerFileJson;
 }
 

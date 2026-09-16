@@ -21,7 +21,6 @@ Claude Code のツール呼び出しを hook で止め、止めた理由と代�
 ```json
 "env": {
   "CCNAVI_MODE": "dry-run",
-  "CCNAVI_RULES": ".ccnavi/common/rules.yml",
   "CCNAVI_LOG": "logs/log.jsonl"
 }
 ```
@@ -254,7 +253,6 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
   },
   "env": {
     "CCNAVI_MODE": "dry-run",
-    "CCNAVI_RULES": ".ccnavi/common/rules.yml",
     "CCNAVI_LOG": "logs/log.jsonl",
     "CCNAVI_BIN_PATH": ".ccnavi/scripts/ccnavi-launcher.sh",
     "CCNAVI_RESTORE_IF_DENY": "dry-run",
@@ -289,7 +287,6 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | 変数 | 意味 |
 |---|---|
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
-| `CCNAVI_RULES` | **共通層**のルールファイル。相対パスはワークスペースルートから。既定は `.ccnavi/common/rules.yml` |
 | `CCNAVI_LOG` | 記録先。既定は `logs/log.jsonl`。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
@@ -299,10 +296,8 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズのゲート・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
-| `CCNAVI_PHASES` | **共通層**のフェーズの種類の定義。ワークスペースルートからの相対。既定は `.ccnavi/common/phases.yml`。どの層にも無ければフェーズは番号だけの挙動 |
-| `CCNAVI_RISK` | **共通層**の実績で測るリスクの配点。ワークスペースルートからの相対。既定は `.ccnavi/common/risks.yml`。どの層にも無ければ組み込みの配点 |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
-| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の既定の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かない。共通層を動かすなら `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` で動かす |
+| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -483,7 +478,7 @@ allow:
 
 | 層 | 置き場 | 何を置くか |
 |---|---|---|
-| 共通層 | `.ccnavi/common/{rules,phases,risks}.yml`（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`） | どのツリーにも効くもの |
+| 共通層 | `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定） | どのツリーにも効くもの |
 | ワークスペース自身の層 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ効くもの |
 | プロジェクトの層 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ効くもの |
 
@@ -1222,7 +1217,7 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 |---|---|---|
 | `.claude/settings.json` | hook の登録そのもの | ツール実行前 |
 | `.claude/settings.local.json` | 同上。個人の上書き | ツール実行前 |
-| `CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル（共通層の 3 本。既定は `.ccnavi/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前 |
+| 共通層の 3 本（`.ccnavi/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前 |
 | `<ワークスペースルート>/.ccnavi/config/{rules,phases,risks}.yml`（自身の層の 3 本） | 同上 | ツール実行前 |
 | `projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml`（各プロジェクトの層の 3 本） | 同上 | ツール実行前 |
 | `CCNAVI_BIN_PATH` が指すファイル（既定の配置では振り分けの sh） | 判定器の実体 | セッション開始 |
@@ -1286,7 +1281,7 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 無いので守りが増えるわけではないが、止める側が広がるだけなのでそのままにしてある。
 
 シェルから止める場所は、`.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、
-`ccnavi-git.sh`、実行ファイル、共通層の 3 本（`CCNAVI_RULES` などが指す場所）、それに記録と控え（`logs/log.jsonl` と `logs/state`）。
+`ccnavi-git.sh`、実行ファイル、共通層の 3 本（`.ccnavi/common/`）、それに記録と控え（`logs/log.jsonl` と `logs/state`）。
 ルールファイルが壊れて組み込みの既定に落ちている間も、同じ場所を同じ設定から組んで止める。記録と控えは名前を絞って守る。
 `logs/` の下の git のラッパースクリプトの記録は守らない。消しても判定に効かないため。
 
@@ -1295,7 +1290,7 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 それ以外の名前なら隣の `<os>-<arch>/`）の中を書く呼び出しは拒否され、ccnavi ディレクトリの下（`*/.ccnavi/*`）も
 同じく拒否される（`builtin-guard-project-home`）。既定の配置では sh も実行ファイルも `.ccnavi/` の下なので、両方で止まる。
 どちらもルールファイルの外に置くのは、置き場が設定で動くことと、そのプロジェクトのルール自身に
-任せると書けた瞬間に緩められるため。共通層の 3 本（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` が指すファイル）も、
+任せると書けた瞬間に緩められるため。共通層の 3 本（`.ccnavi/common/{rules,phases,risks}.yml`）も、
 置き場がどこでも組み込みで止まる（`builtin-guard-common-layer`）。ワークスペースから切ったワークツリーの中の同じファイルも止まる。
 見本 `.ccnavi/common/rule-samples.yml` は 3 本に入らないが、ccnavi ディレクトリの下なので `builtin-guard-project-home` が止め、
 エージェントは直接書けない。見本の下書きはワークツリーの `scratchpad/` に置き、ルールの下書きと一緒に利用者に渡す。
