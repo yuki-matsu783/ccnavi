@@ -50,10 +50,10 @@ def walk_up_for(relative, skip_worktrees=True):
     実装（`ccnavi_workspace`）と同じ規則にしてある。**`.claude/worktrees/` の下は
     候補にしない。**
 
-    これを外すと、作業ツリーから回したときに作業ツリー自身を掴む。`.ccnavi/scripts/`
-    は git が運ぶのでどの作業ツリーにも写しがあるが、実際に効くのはワークスペース側の
-    1 本だけ。写したあとに作業ツリーから回すと、写す前の版を測って赤になる（実際に
-    起きた）。`dist/` は追跡外なので作業ツリーには無く、こちらは上へ歩くだけでよい。
+    これを外すと、ワークツリーから回したときにワークツリー自身を掴む。`.ccnavi/scripts/`
+    は git が運ぶのでどのワークツリーにも写しがあるが、実際に効くのはワークスペース側の
+    1 本だけ。写したあとにワークツリーから回すと、写す前の版を測って赤になる（実際に
+    起きた）。`dist/` は追跡外なのでワークツリーには無く、こちらは上へ歩くだけでよい。
 
     見つからなければ `ROOT` 直下の綴りを返す。呼ぶ側の skip 判定がそれを見る。
     """
@@ -78,7 +78,7 @@ def find_scripts():
 
 
 def find_dist():
-    """組み立てた実行ファイルの置き場。作業ツリーには無いので上へ歩く。"""
+    """組み立てた実行ファイルの置き場。ワークツリーには無いので上へ歩く。"""
     named = os.environ.get("CCNAVI_DIST", "")
     if named:
         return os.path.abspath(named)
@@ -156,7 +156,7 @@ SKIP = reason_to_skip()
 
 @unittest.skipIf(SKIP, SKIP)
 class WorkspaceTest(unittest.TestCase):
-    """ワークスペース 1 つ、プロジェクト 2 つ、作業ツリー 2 つ。
+    """ワークスペース 1 つ、プロジェクト 2 つ、ワークツリー 2 つ。
 
     組み立てが重いのでクラスで 1 度だけ作る。記録は各テストの前に消す。
     """
@@ -165,12 +165,12 @@ class WorkspaceTest(unittest.TestCase):
     def setUpClass(cls):
         # どこを測ったかを出す。緑と赤が「写したかどうか」と食い違ったとき、
         # 最初に見る情報がこれ。出していなかったせいで、写し済みなのに赤になった
-        # 原因（作業ツリーの古い写しを見ていた）を突き止めるのに 1 往復かかった。
+        # 原因（ワークツリーの古い写しを見ていた）を突き止めるのに 1 往復かかった。
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
         cls.tmp = tempfile.mkdtemp(prefix="ccnavi-e2e-")
         cls.ws = os.path.join(cls.tmp, "ws")
         cls.build_workspace(cls.ws, projects=("p1", "p2"))
-        # p1 から切った作業ツリーと、ワークスペースから切った作業ツリー。
+        # p1 から切ったワークツリーと、ワークスペースから切ったワークツリー。
         cls.wp1 = os.path.join(cls.ws, ".claude", "worktrees", "wp1")
         cls.w0 = os.path.join(cls.ws, ".claude", "worktrees", "w0")
         git(os.path.join(cls.ws, "projects", "p1"), "worktree", "add", "-q", cls.wp1, "-b", "wp1")
@@ -323,7 +323,7 @@ class BinaryDiscoveryTest(WorkspaceTest):
 
 
 class PushGuardTest(WorkspaceTest):
-    """子チケットの作業ツリーからは送らない（設計 4.1）。"""
+    """子チケットのワークツリーからは送らない（設計 4.1）。"""
 
     def test_a_child_worktree_cut_from_a_project_cannot_push(self):
         ticket = os.path.join(self.ws, ".ccnavi", "tickets", "wp1.md")
@@ -339,7 +339,7 @@ class PushGuardTest(WorkspaceTest):
 
 
 class WorktreeAddTest(WorkspaceTest):
-    """作業ツリーはワークスペースの .claude/worktrees/ の下に切る（設計 4.1）。"""
+    """ワークツリーはワークスペースの .claude/worktrees/ の下に切る（設計 4.1）。"""
 
     def cleanup_worktree(self, name):
         path = os.path.join(self.ws, ".claude", "worktrees", name)
@@ -361,7 +361,7 @@ class WorktreeAddTest(WorkspaceTest):
         self.assertEqual(2, result.returncode, f"通ってしまった: {result.stdout!r}")
         self.assertFalse(
             os.path.exists(os.path.join(p1, ".claude", "worktrees", "x")),
-            "プロジェクトの中に作業ツリーができた",
+            "プロジェクトの中にワークツリーができた",
         )
         self.assertIn("../../.claude/worktrees/", result.stderr, "正しい綴りを案内していない")
 
@@ -372,7 +372,7 @@ class WorktreeAddTest(WorkspaceTest):
             "ccnavi-git.sh", "worktree", "add", "../../.claude/worktrees/x2", "-b", "x2", cwd=p1
         )
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertTrue(os.path.isdir(path), "ワークスペースの下に作業ツリーができていない")
+        self.assertTrue(os.path.isdir(path), "ワークスペースの下にワークツリーができていない")
 
     def test_an_unknown_option_is_rejected(self):
         p1 = os.path.join(self.ws, "projects", "p1")
@@ -532,7 +532,7 @@ class ModeATest(unittest.TestCase):
         result = self.run_sh("ccnavi-git.sh", "status", cwd=self.w0)
         self.assertEqual(0, result.returncode, result.stderr)
         found = [n for n in files_under(os.path.join(self.ws, "logs")) if n.endswith(".log")]
-        self.assertTrue(found, "作業ツリーからの記録がワークスペースに出ていない")
+        self.assertTrue(found, "ワークツリーからの記録がワークスペースに出ていない")
 
     def test_an_empty_placement_dir_changes_nothing(self):
         os.makedirs(os.path.join(self.ws, "projects"), exist_ok=True)

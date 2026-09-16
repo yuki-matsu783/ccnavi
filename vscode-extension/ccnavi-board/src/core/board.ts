@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・ゲート・作業ツリーは
+ * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・ゲート・ワークツリーは
  * カードのバッジで出す。ゲートの開閉や承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
@@ -272,7 +272,7 @@ export function isKnownPath(board: Board, filePath: string): boolean {
   );
 }
 
-/** 親の識別子から、その親の作業ツリーのパス。承認の sh はそこで打つ */
+/** 親の識別子から、その親のワークツリーのパス。承認の sh はそこで打つ */
 export function parentTreeOf(board: Board, parent: string): string | undefined {
   for (const column of board.columns) {
     for (const card of column.cards) {

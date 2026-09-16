@@ -323,10 +323,10 @@ def _types_resolver(conf: settings.Settings, root: str):
 
 
 def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
-    """チケットと承認済みチケットと作業ツリーが噛み合っているかを見る（REQ-TKT-25）。
+    """チケットと承認済みチケットとワークツリーが噛み合っているかを見る（REQ-TKT-25）。
 
     判定に効くのは承認済みチケットの側だけなので、ここで問うのは「効いている範囲は何か」と
-    「作業ツリーと提案がそれと一致しているか」。一致していない状態は壊れては
+    「ワークツリーと提案がそれと一致しているか」。一致していない状態は壊れては
     いないが、書いた人は書いたとおりに効いていると思っている。
     検証はその思い違いを名指しする場所になる。
     """
@@ -385,7 +385,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{stray} は作業ツリーでも main でもないのに .claude/ を持つ。"
+                f"{stray} はワークツリーでも main でもないのに .claude/ を持つ。"
                 "cd 1 回で別のワークスペースルートに見える",
             )
         )
@@ -469,7 +469,7 @@ def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) ->
 def _worktree_problems(
     root: str, conf: settings.Settings, worktrees: list, index: dict, copies: list
 ) -> list[Problem]:
-    """作業ツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、切り元の食い違い、ツリーの無い承認済みチケット。"""
+    """ワークツリーの側。チケットの無いツリー、迷い込んだ承認済みチケット、切り元の食い違い、ツリーの無い承認済みチケット。"""
     problems: list[Problem] = []
     for t in worktrees:
         if t.name not in index:
@@ -477,7 +477,8 @@ def _worktree_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"作業ツリー {t.name} にチケットが無い。そこへの書き込みはルールだけで判定する",
+                    f"ワークツリー {t.name} にチケットが無い。"
+                    "そこへの書き込みはルールだけで判定する",
                 )
             )
 
@@ -490,7 +491,7 @@ def _worktree_problems(
                     Problem(
                         SEVERITY_ERROR,
                         "(ticket)",
-                        f"作業ツリー {t.name} の切り元（{t.project or 'ワークスペース'}）が"
+                        f"ワークツリー {t.name} の切り元（{t.project or 'ワークスペース'}）が"
                         "承認済みチケットの "
                         f"project（{owner or 'ワークスペース'}）と違う。そこへの書き込みは止まる。"
                         "承認済みチケットが指すリポジトリから切り直す",
@@ -503,7 +504,7 @@ def _worktree_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket} は承認済みだが作業ツリー "
+                    f"{t.ticket} は承認済みだがワークツリー "
                     f"{tree.worktree_path(root, t.ticket)} が無い。作るまで効かない",
                 )
             )
@@ -584,14 +585,14 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """作業ツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §11.6）。
+    """ワークツリーの ccnavi ディレクトリに、切り元に無いファイルがあるか（設計 §11.6）。
 
     判定が読むのは git プロジェクトルートに checkout されている版だけ（REQ-MLT-04）。
-    作業ツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
+    ワークツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
     効かないものを書いた人は、書いたとおりに効いていると思ったまま進む。統合の前に
     気づけるように、ここで名前を挙げる。
 
-    足したファイルを咎めているのではない。設定を育てる場所は作業ツリーでよく、
+    足したファイルを咎めているのではない。設定を育てる場所はワークツリーでよく、
     そこから統合する道も普通の道。言うのは「今はまだ効いていない」という 1 点だけ。
 
     中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
@@ -608,7 +609,7 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     f"({tree.WORKTREES_DIR.replace(os.sep, '/')}/{work.name})",
-                    f"{conf.project_home}/{rel} は作業ツリーにしかない。判定が読むのは"
+                    f"{conf.project_home}/{rel} はワークツリーにしかない。判定が読むのは"
                     "切り元の git プロジェクトルートの版なので、このファイルは統合されるまで"
                     "効かない",
                 )
@@ -777,7 +778,7 @@ def _ticket_hooks(root: str) -> list[Problem]:
 
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:
-    """main か作業ツリーのどこかに提案の置き場があるか。"""
+    """main かワークツリーのどこかに提案の置き場があるか。"""
     for t in [tree.main_tree(root), *tree.worktrees(root)]:
         if os.path.isdir(os.path.join(t.root, tickets_rel.replace("/", os.sep))):
             return True
@@ -785,7 +786,7 @@ def tree_has_tickets(root: str, tickets_rel: str) -> bool:
 
 
 def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
-    """リポジトリの中で `.claude/` を持つ、作業ツリーでも main でもないディレクトリ。
+    """リポジトリの中で `.claude/` を持つ、ワークツリーでも main でもないディレクトリ。
 
     浅くしか見ない。2 段まで。深く歩くと大きなリポジトリで検証が待たされる。
     """
@@ -1073,7 +1074,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     name,
-                    f"{key} の {rel} が無い。作業ツリーにもルートにも無ければ何も足さない",
+                    f"{key} の {rel} が無い。ワークツリーにもルートにも無ければ何も足さない",
                 )
             )
         elif ctxfile.over_limit(full):

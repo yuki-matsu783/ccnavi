@@ -63,7 +63,7 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 accept は親の作業ツリーで、ワークスペースルートから綴った sh を打つ", () => {
+test("CB-T19 accept は親のワークツリーで、ワークスペースルートから綴った sh を打つ", () => {
   assert.equal(
     acceptCommand("/ws", "/ws/.claude/worktrees/i0001", 2),
     "cd '/ws/.claude/worktrees/i0001' && sh '/ws/.ccnavi/scripts/ccnavi-review.sh' accept 2",
@@ -76,7 +76,7 @@ test("CB-T19 accept は親の作業ツリーで、ワークスペースルート
 });
 
 test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペースルートからの絶対パスで送る", () => {
-  // 絶対パスなので、前に accept が親の作業ツリーへ cd したターミナルでも届く。
+  // 絶対パスなので、前に accept が親のワークツリーへ cd したターミナルでも届く。
   assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh'");
   // Windows の区切りは "/" に直す（Git Bash が読める形）。
   assert.equal(

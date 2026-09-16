@@ -23,7 +23,7 @@ test("CB-T05 列は提案の置き場で、親のあとに子が並ぶ", () => {
   assert.equal(board.remainingCount, 3);
 });
 
-test("CB-T06 カードに承認済みチケット・作業ツリー・マーカー・承認待ちが載る", () => {
+test("CB-T06 カードに承認済みチケット・ワークツリー・マーカー・承認待ちが載る", () => {
   const cards = cardsOf(buildBoard(fixture()));
   const parent = cards.get("i0001")!;
   assert.equal(parent.isParent, true);
@@ -132,7 +132,7 @@ test("CB-T11b 親の絞り込みの候補は親だけを識別子順に並べる
   assert.equal(cardsOf(board).get("i0000-01")!.family, "i0000");
 });
 
-test("CB-T11 親の作業ツリーを引ける", () => {
+test("CB-T11 親のワークツリーを引ける", () => {
   const board = buildBoard(fixture());
   assert.match(parentTreeOf(board, "i0001") ?? "", /worktrees\/i0001$/);
   assert.equal(parentTreeOf(board, "i0001-01"), undefined);
@@ -142,7 +142,7 @@ test("CB-T11 親の作業ツリーを引ける", () => {
 test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り自体は数えない", () => {
   const base = fixture();
   const cards = cardsOf(buildBoard(base));
-  // 正常な場面。親と兄弟の作業ツリーに写っていても、状態が食い違っていても、
+  // 正常な場面。親と兄弟のワークツリーに写っていても、状態が食い違っていても、
   // 実行ファイルが「本物は決まっている」と言うので散在ではない。
   for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03"]) {
     assert.deepEqual(cards.get(id)!.scattered, [], id);

@@ -3,9 +3,9 @@
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
 サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
 
-やることは置き場を動かして欄を書くことだけ。作業ツリーの削除は親のマージ手順に
-任せる。順序は「子の成果をマージ → done → 作業ツリーを消す」で、done の前に
-作業ツリーを消すと base_sha の検査ができなくなる。
+やることは置き場を動かして欄を書くことだけ。ワークツリーの削除は親のマージ手順に
+任せる。順序は「子の成果をマージ → done → ワークツリーを消す」で、done の前に
+ワークツリーを消すと base_sha の検査ができなくなる。
 """
 
 from __future__ import annotations
@@ -39,7 +39,8 @@ def start(
             "先に利用者が 'ccnavi --approve' を通すこと\n"
         )
         return 1
-    # 作業ツリーは承認済みチケットの `project` が指すリポジトリから切られていること（REQ-MLT-13）。
+    # ワークツリーは承認済みチケットの `project` が指すリポジトリから
+    # 切られていること（REQ-MLT-13）。
     # 切り元が違えば、判定はそのツリーの切り元で行われ、チケットと噛み合わない。
     copy = approval.by_id(open_copies)[found.ticket]
     owner = tree.project_root(conf.projects, copy.project) or root
@@ -47,7 +48,7 @@ def start(
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
         where = f"projects/{copy.project} の中で " if copy.project else ""
         stderr.write(
-            f"ccnavi: {ticket_id} の作業ツリー {worktree} が無いか、"
+            f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "切り元が承認済みチケットの project"
             f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
@@ -307,7 +308,7 @@ def _find(
     if not hits:
         stderr.write(
             f"ccnavi: 提案 {ticket_id} が見つからない"
-            f"（{conf.tickets}/ の下を全作業ツリーで探した）\n"
+            f"（{conf.tickets}/ の下を全ワークツリーで探した）\n"
         )
         for p in problems:
             stderr.write(f"  {p}\n")
@@ -416,7 +417,7 @@ def _deliverables_missing(
         return False
     stderr.write(
         f"ccnavi: フェーズ {found.phase}（{pt.title}）の成果物が無い: {', '.join(missing)}。"
-        "親か子の作業ツリーに置いて追跡（git add）してから閉じること\n"
+        "親か子のワークツリーに置いて追跡（git add）してから閉じること\n"
     )
     return True
 

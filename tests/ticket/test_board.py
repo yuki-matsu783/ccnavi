@@ -3,7 +3,7 @@
 VS Code のボード拡張が読む形を、判定と同じ関数で組んでいることを確かめる。
 見るのは 4 つ。
 
-1. 提案・承認済みチケット・マーカー・作業ツリーの有無が、識別子ごとに 1 件にまとまって出る
+1. 提案・承認済みチケット・マーカー・ワークツリーの有無が、識別子ごとに 1 件にまとまって出る
 2. 承認待ち（承認済みチケットの無い提案）が `pending_approval` に出る
 3. 親のフェーズとゲートが `parents` に出る
 4. チケット制御が disable なら、空のボードと理由を返す
@@ -34,7 +34,7 @@ class BoardTest(PhaseHarness):
 
     def scene(self):
         """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
-        同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子の作業ツリーにも写っている。"""
+        同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも写っている。"""
         self.family(plan=("research", "design"))
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
@@ -46,7 +46,7 @@ class BoardTest(PhaseHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        # 承認の後、作業ツリーを切る前に次の子を提案する。切った作業ツリーは
+        # 承認の後、ワークツリーを切る前に次の子を提案する。切ったワークツリーは
         # 親のブランチの承認済みチケットなので、この提案がそこにも見える。
         self.propose("i0001-03", child_text("i0001-03", "i0001", 2, ("wip/design/*",)))
         self.commit_parent()
@@ -89,7 +89,7 @@ class BoardTest(PhaseHarness):
         self.scene()
         for t in self.board()["tickets"]:
             self.assertEqual(t["scattered"], [], t["ticket"])
-        # 正常な場面でも、写りは複数あるし状態も食い違う（作業ツリーはブランチを
+        # 正常な場面でも、写りは複数あるし状態も食い違う（ワークツリーはブランチを
         # 切った時点の写しを持つ）。数や状態の違いを食い違いに数えない。
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
@@ -174,7 +174,7 @@ def _portable(value, root: str):
     if isinstance(value, list):
         return [_portable(v, root) for v in value]
     if isinstance(value, str):
-        # 作業ツリーの根は normcase 済み（Windows では小文字）で出るので、綴りを問わず置き換える。
+        # ワークツリーの根は normcase 済み（Windows では小文字）で出るので、綴りを問わず置き換える。
         # ccnavi は根を行き着く先まで解いた綴りで出す（macOS の /var → /private/var）。
         # 解いた綴りを先に置き換える。後にすると、中に含まれる元の綴りだけが先に
         # 置き換わって `/private<root>` が残る。

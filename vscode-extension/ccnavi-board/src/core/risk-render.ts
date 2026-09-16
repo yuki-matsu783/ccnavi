@@ -38,7 +38,7 @@ export const KIND_LABELS: Readonly<Record<(typeof KINDS)[number], { readonly lab
   lines_over: { label: "差分の行数がしきい値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
   files_over: { label: "変えたファイル数がしきい値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
   deleted_over: { label: "消したファイル数がしきい値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
-  glob: { label: "glob にヒットしたファイルが 1 つあるごとに加点", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
+  glob: { label: "glob にヒットしたファイルが 1 つあるごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
   script: { label: "スクリプトが出した点を加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。スクリプトが出した点を加点し、失敗や読めない出力なら points を加点）" },
   judge: { label: "サブエージェントの答えが yes だったら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
 };

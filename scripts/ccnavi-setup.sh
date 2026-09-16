@@ -60,7 +60,7 @@ set -eu
 
 SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーの有無で見て、足りないものだけを足す。
-# `git.detectWorktrees` は、.claude/worktrees/ の中の作業ツリーをソース管理の
+# `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
 # ビューに出す（README「worktreeをVSCODEで見えるようにする」）。
 VSCODE_REL=".vscode/settings.json"
 VSCODE_KEYS='{"git.detectWorktrees": true}'
@@ -256,7 +256,7 @@ claude_dir=$(dirname "$settings")
 # 突き合わせないと、配布元と配布先が同じかどうかを判定できない。
 #
 # 名指しが無ければ、このスクリプトの置き場の 1 つ上を配布元にする。scripts/ の
-# 下に居るという 1 点だけに寄りかかる。作業ツリーから打てばその作業ツリーの
+# 下に居るという 1 点だけに寄りかかる。ワークツリーから打てばそのワークツリーの
 # dist/ が配布元になり、配布物と、そこに居る自分の変更が食い違わない。
 source_root=""
 if [ "$deploy_off" = yes ]; then

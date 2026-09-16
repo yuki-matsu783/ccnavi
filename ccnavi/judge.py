@@ -237,7 +237,7 @@ def decide_before(
             reason = phase.gate_reason(closed, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
-    # 承認済みチケットの索引。作業ツリーへの書き込みでは、プロジェクトの食い違いの点検と
+    # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
     # 1 度だけ読んで両方に渡す（設計 §9）。main への書き込みとシェルでは読まない。
     index = None
@@ -250,7 +250,7 @@ def decide_before(
         copies, _ = approval.scan(conf, root)
         index = approval.by_id(copies)
 
-    # 作業ツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
+    # ワークツリーの切り元と承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
     if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
         mismatch = project_mismatch(conf, root, target, record.subject, index)
@@ -578,7 +578,7 @@ def project_mismatch(
     full: str,
     index: dict[str, ticket_mod.Ticket] | None = None,
 ) -> str:
-    """作業ツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
+    """ワークツリーの切り元と、そこに結び付く承認済みチケットの `project:` が違えば、その理由の文。
 
     範囲の宣言ではなく取り違えなので、ルールより先に見る（REQ-MLT-12）。ルールが
     allow と言っていても通さない。子は親から継ぐ。判定はエージェントの申告を見ない。
@@ -664,7 +664,7 @@ def ticket_verdict(
         copies, _ = approval.scan(conf, root)
         index = approval.by_id(copies)
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
-    # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切った作業ツリーは案内では
+    # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切ったワークツリーは案内では
     # 「効いている」と言われながら判定では権限モード任せに落ちる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:

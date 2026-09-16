@@ -63,9 +63,9 @@ export function approveArgs(
 
 /**
  * `ccnavi-review.sh accept <N>`。sh がレビューのスレッドを取ってきて、未解決のまま進める
- * ことを人が受け入れる。sh は実行した場所を親の作業ツリーとして exe に渡すので、
- * 先に親の作業ツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
- * 切った作業ツリーには届かないので、sh はワークスペースルートから綴る。
+ * ことを人が受け入れる。sh は実行した場所を親のワークツリーとして exe に渡すので、
+ * 先に親のワークツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
+ * 切ったワークツリーには届かないので、sh はワークスペースルートから綴る。
  */
 export function acceptCommand(root: string, parentTree: string, phase: number): string {
   const script = shellQuote(`${toPosixPath(root)}/.ccnavi/scripts/ccnavi-review.sh`);
@@ -74,7 +74,7 @@ export function acceptCommand(root: string, parentTree: string, phase: number): 
 
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
- * 絶対パスで組む。ターミナルは使い回すので、前に accept が親の作業ツリーへ cd していても届く。
+ * 絶対パスで組む。ターミナルは使い回すので、前に accept が親のワークツリーへ cd していても届く。
  */
 export function pushApprovedCommand(root: string): string {
   return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;

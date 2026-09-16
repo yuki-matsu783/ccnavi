@@ -223,7 +223,7 @@ function renderCard(card: Card): string {
 }
 
 /**
- * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、作業ツリーなし（閉じたチケットは除く）、
+ * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、ワークツリーなし（閉じたチケットは除く）、
  * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち）、本物が決まらない写り。
  * 出す札が無ければ行ごと出さない。
  */
@@ -236,7 +236,7 @@ function renderBadges(card: Card): string {
     badges.push(badge("gate", "ゲート閉"));
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
-    badges.push(badge("worktree none", "作業ツリーなし"));
+    badges.push(badge("worktree none", "ワークツリーなし"));
   }
   for (const mark of card.marks) {
     if (mark === "requested") {
@@ -258,7 +258,7 @@ function renderBadges(card: Card): string {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、作業ツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、ワークツリー、
  * マーカー（依頼済は札のほう）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
  */
 function renderFacts(card: Card): string {
@@ -268,7 +268,7 @@ function renderFacts(card: Card): string {
   }
   facts.push(fact("review", `人レビュー${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
   if (card.worktreeExists) {
-    facts.push(fact("worktree", `作業ツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
+    facts.push(fact("worktree", `ワークツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
   }
   for (const mark of card.marks) {
     if (mark !== "requested") {
@@ -297,7 +297,7 @@ function riskText(card: Card): string {
   return card.riskPoints === null ? `リスク ${card.riskLevel}` : `リスク ${card.riskLevel}（${card.riskPoints} 点）`;
 }
 
-/** 作業ツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
+/** ワークツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
 function worktreeName(path: string): string {
   const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
   return name === "" ? "あり" : name;

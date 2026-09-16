@@ -56,7 +56,7 @@ CODE_TICKET_SCOPE = "DENY_TICKET_SCOPE"
 # チケットが `ask` と書いた場所。ルールの `ask` と同じく、人が 1 度見る場所。
 CODE_TICKET_ASK = "TICKET_ASK"
 
-# 作業ツリーの切り元と、チケットが承認されたプロジェクトが食い違っている。
+# ワークツリーの切り元と、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
@@ -369,7 +369,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     """セッションの頭で渡す、直接作業とチケット作業の使い分け。
 
     チケット制御が効いているワークスペースで、モデルが「この作業にチケットは要るか」を
-    自分で決められるようにする。判定はこの線引きを担保しない。チケットの無い作業ツリーと
+    自分で決められるようにする。判定はこの線引きを担保しない。チケットの無いワークツリーと
     main 直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
 
     phases.yml と risks.yml は解決後のパスで示す。無ければその括弧を省く。人が既定と
@@ -414,7 +414,7 @@ def approved(tickets, revisions: set[str], root: str) -> str:
         title = f": {t.title}" if t.title else ""
         lines.append(f"- {t.ticket}{title}（{where}）")
     lines.append(
-        "後工程を進める。子は作業ツリー .claude/worktrees/<識別子> を親のブランチから切り、"
+        "後工程を進める。子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
         f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start <識別子>' で着手する。"
     )
     return "\n".join(lines)

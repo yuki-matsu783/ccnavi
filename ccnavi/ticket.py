@@ -240,9 +240,9 @@ class Ticket:
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
     # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
-    # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、作業ツリーの中なら
+    # 置いた場所で、`scan` が入れる（`wip/<名前>/tickets/` ならその名前、ワークツリーの中なら
     # その切り元、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に並ぶので、
-    # 継ぐ段は無い。判定は行き先の作業ツリーの切り元と突き合わせる。
+    # 継ぐ段は無い。判定は行き先のワークツリーの切り元と突き合わせる。
     project: str = ""
     # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
     # 置き場と違えば承認しない（approval.project_problems）。`scan` を通さずに読んだとき
@@ -267,7 +267,7 @@ class Ticket:
     # 読んだままの frontmatter。承認済みチケットを作るときに使う。
     raw: dict = field(default_factory=dict)
     body: str = ""
-    # 見つけた場所。提案なら状態と作業ツリー、承認済みチケットなら承認の記録から。
+    # 見つけた場所。提案なら状態とワークツリー、承認済みチケットなら承認の記録から。
     state: str = ""
     tree: str = ""
     tree_root: str = ""
@@ -321,7 +321,7 @@ class Ticket:
         return [e.glob or e.regex for e in self.entries if e.decision == decision]
 
     def decide(self, rel: str) -> str:
-        """このチケットが、作業ツリーのルートからの相対パスをどう扱うか。
+        """このチケットが、ワークツリーのルートからの相対パスをどう扱うか。
 
         強いタイプから見る。どこにも当たらなければ OUTSIDE で、それは範囲外。
         書いていない場所は範囲外、が子のファイルだけ読んで範囲が分かる条件。
@@ -618,7 +618,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """ツリーのルートからの相対パスが、チケットの置き場の下にあるか。
 
     置き場は提案の置き場（`CCNAVI_TICKETS`）と承認済みチケットの置き場（`CCNAVI_APPROVED`）。
-    ここはチケットの範囲の外でも咎めない。咎めると、親が自分の作業ツリーに次の子を
+    ここはチケットの範囲の外でも咎めない。咎めると、親が自分のワークツリーに次の子を
     提案する道と、承認がブランチに乗る道が塞がる。
 
     外すのは実行前の判定・実行後の監視・サブエージェント終了時の検査の 3 か所で、
@@ -640,10 +640,10 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
-    """main と全作業ツリーの提案を集める。状態と置き場を添える。
+    """main と全ワークツリーの提案を集める。状態と置き場を添える。
 
     プロジェクト向けの提案はワークスペースルートの `wip/<project>/tickets/` にある。
-    作業ツリーの側には無い（プロジェクトのブランチには wip/ が無い）。
+    ワークツリーの側には無い（プロジェクトのブランチには wip/ が無い）。
     同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
@@ -653,7 +653,7 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
 def scan_all(
     root: str, tickets_rel: str, projects_dir: str = ""
 ) -> tuple[list[Ticket], list[Problem]]:
-    """main と全作業ツリーの提案を、重複を畳まずに集める。
+    """main と全ワークツリーの提案を、重複を畳まずに集める。
 
     ボード（`--explain --json`）が「どのツリーに写っているか」を見せるために使う。
     判定と承認は `scan` の畳んだ側を読む。
@@ -722,7 +722,7 @@ def scan_all(
 def fold(hits: list[Ticket]) -> list[Ticket]:
     """同じ識別子の写りを、権威のあるツリーで畳む。
 
-    子の作業ツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
+    子のワークツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
     写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
     あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
     なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
@@ -749,7 +749,7 @@ def dedupe(found: list[Ticket]) -> list[Ticket]:
 
 
 def locate(root: str, tickets_rel: str, tree_root: str, ticket_id: str) -> tuple[str, str]:
-    """この作業ツリーで、この識別子の提案がどの状態にあるか。無ければ空文字 2 つ。"""
+    """このワークツリーで、この識別子の提案がどの状態にあるか。無ければ空文字 2 つ。"""
     base = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
     for state in STATES:
         path = os.path.join(base, state, ticket_id + ".md")
@@ -894,7 +894,7 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
                     Problem(
                         SEVERITY_ERROR,
                         name,
-                        f"{where} の範囲 `{glob}` が絶対パス。作業ツリーのルートからの相対で書く",
+                        f"{where} の範囲 `{glob}` が絶対パス。ワークツリーのルートからの相対で書く",
                     )
                 )
                 continue

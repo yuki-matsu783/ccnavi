@@ -21,7 +21,7 @@ import unittest
 
 from tests import ROOT
 
-# 組み立ての出力、依存の置き場、他の作業ツリーは見ない。ccnavi が書いた sh ではない。
+# 組み立ての出力、依存の置き場、他のワークツリーは見ない。ccnavi が書いた sh ではない。
 SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "worktrees", "projects"}
 
 NAME_THEN_WIDE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*(?=[^\x00-\x7f])")

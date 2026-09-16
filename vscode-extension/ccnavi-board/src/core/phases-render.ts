@@ -95,7 +95,7 @@ ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="bloc
     <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellcheck="false">
     <span class="hint">行を押すと開く</span>
   </div>
-  <details class="help"><summary>この画面の説明</summary><p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p></details>
+  <details class="help"><summary>この画面の説明</summary><p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p></details>
   <ul class="list" id="phases"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
@@ -267,7 +267,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
         captioned("レビュー", reviewSelect, "", "review"),
         captioned("範囲", h("div", { class: "inline" }, [
           scopeSelect,
-          phase.inherit ? null : listField(phase, "scope", "f-scope-globs", "src/*, tests/*（作業ツリーのルートからの相対。子チケットの範囲はこの中に収める）"),
+          phase.inherit ? null : listField(phase, "scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの範囲はこの中に収める）"),
         ]), "", "scope"),
         captioned("成果物", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に存在し、git に追跡されているべきもの）"), "", "deliverables"),
         more,

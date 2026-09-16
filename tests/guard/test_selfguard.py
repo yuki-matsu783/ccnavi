@@ -92,10 +92,10 @@ class SelfGuardTest(unittest.TestCase):
         return path
 
     def worktree(self, name="w1"):
-        """本物の作業ツリーを `.claude/worktrees/<名前>` に作る。
+        """本物のワークツリーを `.claude/worktrees/<名前>` に作る。
 
         git に作らせる。守る側は `.git` ファイルと main の登録の相互参照が
-        両向きに揃ったものだけを作業ツリーと呼ぶので、手でディレクトリを
+        両向きに揃ったものだけをワークツリーと呼ぶので、手でディレクトリを
         置いただけでは対象にならない。
         """
         path = os.path.join(self.repo, ".claude", "worktrees", name)
@@ -103,7 +103,7 @@ class SelfGuardTest(unittest.TestCase):
         return path
 
     def copy_in(self, work, *parts):
-        """作業ツリー側の設定の綴り。"""
+        """ワークツリー側の設定の綴り。"""
         return os.path.join(work, ".claude", *parts)
 
     def run_hook(
@@ -271,9 +271,9 @@ class SelfGuardTest(unittest.TestCase):
         self.assertTrue(os.path.exists(local), "人が置くこともあるファイルを消さない")
         self.assertIn("settings.local.json", result.stdout)
 
-    # 作業ツリー側の設定
+    # ワークツリー側の設定
 
-    def test_作業ツリーの中の設定ファイルも戻る(self):
+    def test_ワークツリーの中の設定ファイルも戻る(self):
         # その場では誰も読まないファイルだが、統合すれば main の hook の
         # 登録になる。止める側も気づく側も無い道なので、ここで戻す。
         work = self.worktree()
@@ -287,7 +287,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("restored", result.stdout)
         self.assertIn("統合すれば", result.stdout)
 
-    def test_作業ツリーの中のルールファイルも戻る(self):
+    def test_ワークツリーの中のルールファイルも戻る(self):
         work = self.worktree()
         copy = os.path.join(work, ".ccnavi", "common", "rules.yml")
         self.run_hook("PreToolUse")
@@ -297,7 +297,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(copy)), RULES)
 
-    def test_作業ツリーでないディレクトリは守らない(self):
+    def test_ワークツリーでないディレクトリは守らない(self):
         # `.claude/worktrees/` の下に在るだけのディレクトリ。参考実装の写しを
         # 置いた形がこれで、守りに行くと人のファイルを勝手に戻すことになる。
         fake = os.path.join(self.repo, ".claude", "worktrees", "not-a-tree")
@@ -310,7 +310,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(copy)), {"changed": True})
 
-    def test_消された作業ツリー側の設定は実行前に戻る(self):
+    def test_消されたワークツリー側の設定は実行前に戻る(self):
         work = self.worktree()
         copy = self.copy_in(work, "settings.json")
         self.run_hook("PreToolUse")
@@ -320,10 +320,10 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(copy)), SETTINGS)
 
-    def test_控えが無ければ作業ツリーの側の_git_から戻る(self):
+    def test_控えが無ければワークツリーの側の_git_から戻る(self):
         # 控えを取る前に書き換えられた回。main の git は
-        # `.claude/worktrees/` を無視しているので、作業ツリー側の設定のコミット済みの内容を
-        # 持っているのは、その作業ツリー自身の git のほうになる。
+        # `.claude/worktrees/` を無視しているので、ワークツリー側の設定のコミット済みの内容を
+        # 持っているのは、そのワークツリー自身の git のほうになる。
         work = self.worktree()
         copy = self.copy_in(work, "settings.json")
         write(copy, "{}\n")
@@ -332,8 +332,8 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertEqual(json.loads(read(copy)), SETTINGS)
 
-    def test_作業ツリー側の設定の控えは作業ツリーごとに分かれる(self):
-        # 取り違えると、片方の作業ツリーの内容がもう片方に書き戻される。
+    def test_ワークツリー側の設定の控えはワークツリーごとに分かれる(self):
+        # 取り違えると、片方のワークツリーの内容がもう片方に書き戻される。
         one = self.copy_in(self.worktree("w1"), "settings.json")
         two = self.copy_in(self.worktree("w2"), "settings.json")
         write(one, json.dumps({"env": {"A": "1"}}))
@@ -347,11 +347,12 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(one)), {"env": {"A": "1"}})
         self.assertEqual(json.loads(read(two)), {"env": {"B": "2"}})
 
-    def test_プロジェクトの層は自分のgitから戻し作業ツリー側の向きも切り元で決まる(self):
+    def test_プロジェクトの層は自分のgitから戻しワークツリー側の向きも切り元で決まる(self):
         # プロジェクトは自分の git を持つ。戻す先を聞く相手はワークスペースの git では
-        # なくそのプロジェクトで、作業ツリー側の設定が入るのもそのプロジェクトから切った
-        # 作業ツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
-        # 切り元から切った作業ツリー側の設定は test_config_union_guard.py がブラックボックスで見る。
+        # なくそのプロジェクトで、ワークツリー側の設定が入るのもそのプロジェクトから切った
+        # ワークツリーのほう。ワークスペースから切った w1 の中に `projects/lib/...` の綴りは無い。
+        # 切り元から切ったワークツリー側の設定は test_config_union_guard.py が
+        # ブラックボックスで見る。
         self.worktree()
         projects = os.path.join(self.repo, "projects")
         home = os.path.join(projects, "lib")
@@ -370,9 +371,9 @@ class SelfGuardTest(unittest.TestCase):
             self.own_copies((".ccnavi", "common", "rules.yml")),
         )
 
-    def test_root_の外を指すルールファイルには作業ツリー側が無い(self):
-        # 置き場がワークスペースルートの外にあるなら、作業ツリーの中に対応する
-        # 作業ツリー側には無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
+    def test_root_の外を指すルールファイルにはワークツリー側が無い(self):
+        # 置き場がワークスペースルートの外にあるなら、ワークツリーの中に対応する
+        # ワークツリー側には無い。無い場所を守りに行っても、報告に死んだ 1 行が増えるだけ。
         self.worktree()
         outside = os.path.join(os.path.dirname(self.repo), "elsewhere", "rules.yml")
 
@@ -381,7 +382,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual([t.label for t in found if t.copy], self.own_copies())
 
     def own_copies(self, *rels):
-        """作業ツリー w1 の中の作業ツリー側の設定の綴り。root からの相対で、並ぶ順のまま。
+        """ワークツリー w1 の中のワークツリー側の設定の綴り。root からの相対で、並ぶ順のまま。
 
         ワークスペースから切ったツリーには、ワークスペースが追跡しているもの
         だけが入る。設定ファイル 2 つは必ず入り、残りは渡した層のうち root の

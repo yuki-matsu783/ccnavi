@@ -11,9 +11,9 @@
 
 lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空）。
 
-`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、作業ツリー、記録と控えの
-`logs/`）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切った作業ツリーに
-作業ツリー側の設定ができ、設計 §11.6 が名指しした穴（作業ツリー側の設定が書けて戻らない）を
+`.gitignore` は実物に合わせて 3 つだけ無視する（`projects/`、ワークツリー、記録と控えの
+`logs/`）。共通層の 3 本と自身の層は追跡するので、ワークスペースから切ったワークツリーに
+ワークツリー側の設定ができ、設計 §11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
 
 実装はまだ無い。このテストは実装フェーズが緑にする。ここでは import 時に落ちない
@@ -295,8 +295,8 @@ def ticket_text(
 KEEP = ("src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md")
 
 # ワークスペースの git が無視するもの。実物の .gitignore と同じ 3 つだけ。
-# `/.ccnavi/` を丸ごと無視すると共通層の 3 本が追跡されず、作業ツリー側の設定ができない。
-# それができないと、設計 §11.6 が名指しした穴（共通層の作業ツリー側の設定が書けて
+# `/.ccnavi/` を丸ごと無視すると共通層の 3 本が追跡されず、ワークツリー側の設定ができない。
+# それができないと、設計 §11.6 が名指しした穴（共通層のワークツリー側の設定が書けて
 # 戻らない）を一度も踏めない。
 GITIGNORE = "/projects/\n/.claude/worktrees/\n/logs/\n"
 
@@ -361,7 +361,7 @@ class ConfigUnionHarness(unittest.TestCase):
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risks.yml")
         # 承認済みチケットとマーカーは、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
-        # （設計 §9.2）。ここの土台は親の作業ツリーを作らないので、提案があったツリーに落ちる。
+        # （設計 §9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに落ちる。
         self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
         self.state = os.path.join(self.ws, "logs", "state")
         self.log = os.path.join(self.ws, "logs", "log.jsonl")
@@ -549,7 +549,7 @@ class WriteUnionTest(ConfigUnionHarness):
         )
 
     def test_own_layer_applies_to_workspace_trees(self):
-        """§11.4: 自身の層はワークスペースルートと、そこから切った作業ツリーに効く。"""
+        """§11.4: 自身の層はワークスペースルートと、そこから切ったワークツリーに効く。"""
         denied = self.hook("Write", self.lib, file_path=os.path.join(self.ws, "generated", "x.py"))
         self.assert_denied(denied, "self:generated")
         record = self.last_record()
@@ -569,7 +569,7 @@ class WriteUnionTest(ConfigUnionHarness):
         )
 
     def test_project_layer_applies_to_a_worktree_cut_from_it(self):
-        """§11.4: プロジェクトから切った作業ツリーには、共通層 + そのプロジェクトの層。"""
+        """§11.4: プロジェクトから切ったワークツリーには、共通層 + そのプロジェクトの層。"""
         tree = self.worktree(self.lib, "i0007")
         denied = self.hook("Write", self.ws, file_path=os.path.join(tree, "schema", "x.sql"))
         self.assert_denied(denied, "lib:schema")
@@ -958,7 +958,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
     """実行後の監視も「共通層 + そのツリーの層」の和（§11.7）。
 
     行き先の層 1 本のままの実装では、共通層の deny の場所が保護領域に数えられない。
-    プロジェクトのツリー（共通層）と、ワークスペースの作業ツリー（自身の層）の両方で見る。
+    プロジェクトのツリー（共通層）と、ワークスペースのワークツリー（自身の層）の両方で見る。
     """
 
     def start_turn(self, cwd):
@@ -993,7 +993,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertIn("tree: lib", after.stderr)
 
     def test_a_workspace_worktree_is_watched_with_the_own_layer(self):
-        """§11.7: ワークスペースから切った作業ツリーには、共通層 + 自身の層。"""
+        """§11.7: ワークスペースから切ったワークツリーには、共通層 + 自身の層。"""
         tree = self.worktree(self.ws, "w1")
         self.start_turn(tree)
         write(os.path.join(tree, "generated", "keep.py"), "dirty\n")
@@ -1006,7 +1006,7 @@ class PostMonitoringUnionTest(ConfigUnionHarness):
         self.assertEqual(self.last_record()["tree"], "w1")
 
     def test_a_workspace_worktree_is_watched_with_the_common_layer(self):
-        """§11.7: 同じ作業ツリーで、共通層の deny の場所も見る。"""
+        """§11.7: 同じワークツリーで、共通層の deny の場所も見る。"""
         tree = self.worktree(self.ws, "w2")
         self.start_turn(tree)
         write(os.path.join(tree, ".env"), "SECRET=1\n")

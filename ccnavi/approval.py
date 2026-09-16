@@ -92,13 +92,13 @@ def load_copy(path: str) -> ticket_mod.Ticket | None:
     ticket.source_tree = str(meta.get("source_tree") or "")
     ticket.source_path = str(meta.get("source_path") or "")
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
-    # 提案を写したか）とは別物で、子の作業ツリーの checkout では食い違う。
+    # 提案を写したか）とは別物で、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
     return ticket
 
 
 def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
-    """承認済みチケットを持ちうるツリー全部。ワークスペース、プロジェクト、作業ツリー。"""
+    """承認済みチケットを持ちうるツリー全部。ワークスペース、プロジェクト、ワークツリー。"""
     return [
         tree.main_tree(root),
         *tree.projects(conf.projects),
@@ -111,7 +111,7 @@ def scan_all(
 ) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """全ツリーの承認済みチケットを、重複を畳まずに集める。
 
-    承認済みチケットは親チケットのブランチに乗るので、そこから切った子の作業ツリーにも
+    承認済みチケットは親チケットのブランチに乗るので、そこから切った子のワークツリーにも
     同じものが checkout されている。畳まない側は、ボードが「どこに写っているか」を
     見せるために使う。
     """
@@ -132,10 +132,10 @@ def scan(
     """判定と承認が読む承認済みチケット。権威のあるツリーの側だけを残す。
 
     権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
-    落とす。子の作業ツリーに checkout されているのは切った時点の版なので、親のツリーで
+    落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
     閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」に倒すと、閉じたチケットが
     開いたものとして復活する。権威のツリーがその識別子を開閉どちらでも持っていない
-    ときだけ、見つかった側を残す（親の作業ツリーを作る前に承認した分を落とさないため）。
+    ときだけ、見つかった側を残す（親のワークツリーを作る前に承認した分を落とさないため）。
     """
     found, notes = scan_all(conf, root, closed)
     other, _ = scan_all(conf, root, not closed)
@@ -160,13 +160,13 @@ def home_dir(
 ) -> str:
     """この識別子の承認済みチケットを置くツリーの置き場。
 
-    書く先も読む先も 1 つに決めるためのもの。子の作業ツリーにも checkout されるが、
+    書く先も読む先も 1 つに決めるためのもの。子のワークツリーにも checkout されるが、
     そこへ書くと同じ識別子の承認済みチケットが 2 通りになる。
 
     探す順は、すでに持っているツリー（親のツリー → ワークスペースかプロジェクトの
     ルート → その他）、親のツリー、fallback_root（提案があったツリー）、
     ワークスペースルート。すでに在る側を先に見るのは、マーカーと記録を承認済みチケットと
-    同じ場所に置くため。親の作業ツリーは承認のあとに作られることがあり、そこを
+    同じ場所に置くため。親のワークツリーは承認のあとに作られることがあり、そこを
     先に見ると、承認済みチケットとマーカーが別のツリーに分かれる。
     """
     home = parent or ticket_id
@@ -1003,7 +1003,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     """
     return (
         f"■ プロジェクト: {t.project or '(ワークスペース)'}"
-        f"  作業ツリー: {t.tree or '(main)'}  提案: {t.path}"
+        f"  ワークツリー: {t.tree or '(main)'}  提案: {t.path}"
     )
 
 

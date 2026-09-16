@@ -188,7 +188,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
     // ずれたときに、この画面で保存したルールが判定に効かなくなる。答えは git プロジェクトルートの版で、
-    // 作業ツリーの中の版は指さない（設計 §11.2）。
+    // ワークツリーの中の版は指さない（設計 §11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);

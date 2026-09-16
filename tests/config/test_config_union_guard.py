@@ -2,7 +2,7 @@
 
 selfguard のコアに、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
 Write / Edit の拒否、シェルからの書き込みの拒否、控えと復元の 3 つとも、今 rules.yml に
-掛けているものをそのまま掛ける。切り元から切った作業ツリー側の設定も対象。
+掛けているものをそのまま掛ける。切り元から切ったワークツリー側の設定も対象。
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
@@ -113,11 +113,11 @@ class RestoreTest(GuardHarness):
                 self.assertIn("restored", result.stdout, self.said(result, name))
 
     def test_copies_in_a_worktree_cut_from_a_project_are_restored(self):
-        """§11.6: 切り元のプロジェクトから切った作業ツリー側の設定も対象。"""
+        """§11.6: 切り元のプロジェクトから切ったワークツリー側の設定も対象。"""
         tree = self.worktree(self.lib, "w1")
         copy = layer_path(tree, "rules")
         self.assertTrue(
-            os.path.exists(copy), "lib の .ccnavi/ は追跡されているので作業ツリー側の設定がある"
+            os.path.exists(copy), "lib の .ccnavi/ は追跡されているのでワークツリー側の設定がある"
         )
 
         before, after, result = self.break_and_restore(copy)
@@ -126,16 +126,16 @@ class RestoreTest(GuardHarness):
         self.assertIn("統合すれば", result.stdout, self.said(result))
 
     def test_copies_in_a_worktree_cut_from_the_workspace_are_restored(self):
-        """§11.6: ワークスペースから切った作業ツリー側の、自身の層の設定も対象。"""
+        """§11.6: ワークスペースから切ったワークツリー側の、自身の層の設定も対象。"""
         tree = self.worktree(self.ws, "w2")
         copy = layer_path(tree, "phases")
         before, after, result = self.break_and_restore(copy, broken="version: 1\nphases: {}\n")
         self.assertEqual(after, before, self.said(result))
 
     def test_copies_of_the_common_layer_in_a_worktree_are_restored(self):
-        """§11.6: ワークスペースから切った作業ツリー側の、共通層の設定も対象（既存の穴）。
+        """§11.6: ワークスペースから切ったワークツリー側の、共通層の設定も対象（既存の穴）。
 
-        共通層の 3 本はワークスペースの git が追跡しているので、作業ツリー側の設定もできる。
+        共通層の 3 本はワークスペースの git が追跡しているので、ワークツリー側の設定もできる。
         今はそこがルールの allow `worktrees` に当たって書けてしまい、戻りもしない。
         """
         tree = self.worktree(self.ws, "w3")
@@ -143,7 +143,7 @@ class RestoreTest(GuardHarness):
             with self.subTest(name=name):
                 copy = os.path.join(tree, ".ccnavi", "common", name)
                 self.assertTrue(
-                    os.path.exists(copy), "共通層は追跡されているので作業ツリー側の設定がある"
+                    os.path.exists(copy), "共通層は追跡されているのでワークツリー側の設定がある"
                 )
                 broken = "version: 1\ndeny: []\n" if name == "rules.yml" else "version: 1\n"
                 before, after, result = self.break_and_restore(copy, broken=broken)
@@ -352,7 +352,7 @@ class DenyTest(GuardHarness):
                 self.assert_denied(result, "builtin-guard-common-layer")
 
     def test_common_layer_copies_in_a_worktree_are_denied(self):
-        """§11.6: ワークスペースから切った作業ツリー側の共通層も止まる。
+        """§11.6: ワークスペースから切ったワークツリー側の共通層も止まる。
 
         統合すればそのまま main の設定になる。
         """
@@ -365,7 +365,7 @@ class DenyTest(GuardHarness):
     def test_common_layer_deny_names_only_those_files(self):
         """§11.6: 同じ名前の別のファイルは止めない。
 
-        当てるのはワークスペースルートと、そこから切った作業ツリーの下の同じ相対だけ。
+        当てるのはワークスペースルートと、そこから切ったワークツリーの下の同じ相対だけ。
         """
         for path in (
             os.path.join(self.ws, "src", "rules.yml"),
@@ -395,7 +395,7 @@ class DenyTest(GuardHarness):
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
-        """§11.6: 作業ツリーの `.ccnavi/` に切り元に無いファイルがあれば --lint warn。"""
+        """§11.6: ワークツリーの `.ccnavi/` に切り元に無いファイルがあれば --lint warn。"""
         tree = self.worktree(self.lib, "w1")
         write(os.path.join(tree, HOME, "scripts", "new.sh"), "echo new\n")
 

@@ -1,6 +1,6 @@
 """並行するチケット（REQ-TKT）の受入テスト。道具を外から叩いて応答だけを見る。
 
-本物の git リポジトリと作業ツリーを一時ディレクトリに作る。親 1 本と子 2 本を
+本物の git リポジトリとワークツリーを一時ディレクトリに作る。親 1 本と子 2 本を
 フェーズ 1 つで通す（requirements.md の受け入れ条件 9）。
 
 見るのは 6 つ。
@@ -189,7 +189,7 @@ class TicketTest(unittest.TestCase):
     def approve(self, answer="y"):
         """承認して、写しを親のブランチに乗せる。
 
-        写しは親のツリーに置かれ、コミットして初めて子の作業ツリーへ渡る。
+        写しは親のツリーに置かれ、コミットして初めて子のワークツリーへ渡る。
         本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
         """
         result = self.ccnavi("--approve", stdin=answer + "\n")
@@ -199,7 +199,7 @@ class TicketTest(unittest.TestCase):
         return result
 
     def family(self, review=(True, False)):
-        """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子の作業ツリーを作って着手する。"""
+        """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子のワークツリーを作って着手する。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",), review=review[0])
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",), review=review[1])
@@ -259,7 +259,7 @@ class TicketTest(unittest.TestCase):
     def test_scope_with_uppercase_still_matches(self):
         """大文字を含む範囲が、書いた綴りのまま当たること。
 
-        作業ツリーのルートからの相対パスを normcase した綴りから作っていたので、
+        ワークツリーのルートからの相対パスを normcase した綴りから作っていたので、
         大文字小文字を区別しない機械では `README.md` が `readme.md` になり、
         `README.md` と書いた範囲に永久に当たらなかった。`Dockerfile` や
         `src/Components/*` も同じ。実物の GitLab で流れを通したときに出た。
@@ -313,17 +313,17 @@ class TicketTest(unittest.TestCase):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
     def test_no_worktree_means_no_ticket(self):
-        """作業ツリーが無い子は効かない。"""
+        """ワークツリーが無い子は効かない。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.assertEqual(self.approve().returncode, 0)
         result = self.ccnavi("ticket", "start", "i0001-01")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("作業ツリー", result.stderr)
+        self.assertIn("ワークツリー", result.stderr)
 
     @unittest.skipUnless(os.path.normcase("A") == "a", "大文字小文字を区別する機械")
     def test_worktree_name_case_does_not_drop_the_ticket(self):
-        """区別しない機械で綴り違いに切った作業ツリーでも、判定は承認済みチケットで行う。
+        """区別しない機械で綴り違いに切ったワークツリーでも、判定は承認済みチケットで行う。
 
         案内（SubagentStart）は綴りの違いを吸収するのに判定だけ厳密だと、
         「効いている」と言われながら権限モード任せに落ちる（敵対的レビューで実測）。
@@ -633,7 +633,7 @@ class TicketTest(unittest.TestCase):
     def test_gate_guides_sh_from_workspace_root(self):
         """ゲートと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
 
-        `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切った作業ツリーでは
+        `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切ったワークツリーでは
         相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
         """
         self.family()
@@ -933,9 +933,9 @@ class TicketTest(unittest.TestCase):
         self.assertIn("src/a/*", text)
 
     def test_subagent_start_says_nothing_outside_the_family(self):
-        """渡すのは cwd の作業ツリーに関わる子だけ。
+        """渡すのは cwd のワークツリーに関わる子だけ。
 
-        別のセッションが main や無関係な作業ツリーで調査を委譲したとき、無関係な子の
+        別のセッションが main や無関係なワークツリーで調査を委譲したとき、無関係な子の
         範囲を案内すると、調査役が自分の居場所を迷う。
         """
         self.family()
@@ -943,7 +943,7 @@ class TicketTest(unittest.TestCase):
             result = self.hook("SubagentStart", "", cwd, agent_id="sub-r")
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(self.reason(result), "", cwd)
-        # 子の作業ツリーからは、その子だけ。
+        # 子のワークツリーからは、その子だけ。
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
         text = self.reason(self.hook("SubagentStart", "", child, agent_id="sub-1"))
         self.assertIn("i0001-01", text)

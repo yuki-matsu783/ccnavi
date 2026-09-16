@@ -1,25 +1,25 @@
-"""作業ツリー（git worktree）の特定。判定の鍵はファイルの行き先。
+"""ワークツリー（git worktree）の特定。判定の鍵はファイルの行き先。
 
 ## なぜ行き先で決めるか
 
 サブエージェントは親と作業ディレクトリを共有することがある。そこから子の
-作業ツリーへ絶対パスで書いた呼び出しを `cwd` で判定すると、親のチケットで
+ワークツリーへ絶対パスで書いた呼び出しを `cwd` で判定すると、親のチケットで
 判定されてしまう。行き先で決めれば、誰が書いてもその場所のチケットで判定され、
 サブエージェントの起動の仕方が判定に影響しない（REQ-TKT-01）。
 
 参考にした運用はここを `cwd` で決めていて、そのために並列実施を発効できずにいた。
 「隔離はされるが統制は効かない」という穴の実体がこれ。
 
-## 作業ツリーの確かめ方
+## ワークツリーの確かめ方
 
-`.claude/worktrees/<名前>/` の下にあるだけでは作業ツリーと呼ばない。
+`.claude/worktrees/<名前>/` の下にあるだけではワークツリーと呼ばない。
 `.git` ファイルの `gitdir:` が main の `.git/worktrees/<名前>` を指し、そこの
 `gitdir` ファイルが候補を指し返す、という相互参照が成り立つものだけを数える。
-片方向だけだと、同じ名前のただのディレクトリを作業ツリーと読み違える。
+片方向だけだと、同じ名前のただのディレクトリをワークツリーと読み違える。
 
 ## 最長一致
 
-作業ツリーは main の中にあるので、短い側（main）に先に畳むと、
+ワークツリーは main の中にあるので、短い側（main）に先に畳むと、
 `.claude/worktrees/x/src/a` が main の `.claude/worktrees/x/src/a` として判定され、
 x のチケットが効かなくなる。候補のうち最も長く一致したものを採る。
 """
@@ -29,7 +29,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# 作業ツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
+# ワークツリーの置き場。CLAUDE.md の運用と対になる。ワークスペースルートの中に置くのは、
 # セッションの道具と権限がそこまで届くようにするため。
 WORKTREES_DIR = os.path.join(".claude", "worktrees")
 
@@ -37,7 +37,7 @@ WORKTREES_DIR = os.path.join(".claude", "worktrees")
 MAIN = ""
 
 # ツリーの種類（設計 §11.3）。ワークスペースルート、プロジェクト（`projects/` の直下にある別の
-# リポジトリ）、作業ツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
+# リポジトリ）、ワークツリー。プロジェクトはワークスペースの git には入らず、自分の git を持つ。
 KIND_MAIN = "main"
 KIND_PROJECT = "project"
 KIND_WORKTREE = "worktree"
@@ -48,8 +48,8 @@ class Tree:
     """ツリー 1 つ。name が空ならワークスペースルート。
 
     project は、このツリーがどのプロジェクトのものか。ワークスペースなら空、
-    プロジェクトならその名前、作業ツリーなら切り元のプロジェクトの名前
-    （ワークスペースから切った作業ツリーなら空）。
+    プロジェクトならその名前、ワークツリーなら切り元のプロジェクトの名前
+    （ワークスペースから切ったワークツリーなら空）。
     """
 
     name: str
@@ -88,7 +88,7 @@ def projects(projects_dir: str) -> list[Tree]:
 
 
 def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
-    """main の下にある、本物の作業ツリーの一覧。切り元はワークスペースでもプロジェクトでもよい。
+    """main の下にある、本物のワークツリーの一覧。切り元はワークスペースでもプロジェクトでもよい。
 
     読むのはファイルシステムだけで、git は起こさない。実行前の判定の中で
     呼ばれるので、外部プロセスを起こす場所にはできない。
@@ -113,7 +113,7 @@ def worktrees(root: str, projects_dir: str = "") -> list[Tree]:
 
 
 def owner_of(candidate: str, owners: list[Tree]) -> Tree | None:
-    """この作業ツリーの切り元。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
+    """このワークツリーの切り元。ワークスペースかプロジェクトのどれかで、相互参照が成り立つもの。"""
     for owner in owners:
         if is_worktree_of(owner.root, candidate):
             return owner
@@ -121,7 +121,7 @@ def owner_of(candidate: str, owners: list[Tree]) -> Tree | None:
 
 
 def all_trees(root: str, projects_dir: str = "") -> list[Tree]:
-    """ワークスペースルート、プロジェクト、作業ツリーの順。"""
+    """ワークスペースルート、プロジェクト、ワークツリーの順。"""
     return [main_tree(root), *projects(projects_dir), *worktrees(root, projects_dir)]
 
 
@@ -131,7 +131,7 @@ def project_root(projects_dir: str, project: str) -> str:
 
 
 def is_worktree_of(root: str, candidate: str) -> bool:
-    """candidate が root の作業ツリーであることを、相互参照で確かめる。"""
+    """candidate が root のワークツリーであることを、相互参照で確かめる。"""
     gitfile = os.path.join(candidate, ".git")
     if not os.path.isfile(gitfile):
         return False
@@ -162,7 +162,7 @@ def is_worktree_of(root: str, candidate: str) -> bool:
 def tree_of(root: str, full: str, projects_dir: str = "") -> Tree | None:
     """このパスが属するツリー。ワークスペースルートの外なら None。
 
-    候補はワークスペースルート、プロジェクト、作業ツリーの全部で、最長一致を採る。上限は
+    候補はワークスペースルート、プロジェクト、ワークツリーの全部で、最長一致を採る。上限は
     ワークスペースルートで、外に行き先があれば判定を持たない。
     """
     if not full:
@@ -192,12 +192,12 @@ def relative(tree: Tree, full: str) -> str:
 
 
 def worktree_path(root: str, name: str) -> str:
-    """この名前の作業ツリーが置かれるはずの場所。在るかどうかは見ない。"""
+    """この名前のワークツリーが置かれるはずの場所。在るかどうかは見ない。"""
     return os.path.join(root, WORKTREES_DIR, name)
 
 
 def exact_name(root: str, name: str) -> bool:
-    """この名前の作業ツリーが、綴りの大文字小文字までそのままで在るか。
+    """この名前のワークツリーが、綴りの大文字小文字までそのままで在るか。
 
     大文字小文字を区別しない機械では `I0001-02` というディレクトリが `i0001-02` として
     開けてしまう。名前が識別子だと言う以上、綴りまで同じであることを求める。
@@ -208,13 +208,13 @@ def exact_name(root: str, name: str) -> bool:
         return False
 
 
-# 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、作業ツリーの
+# 大文字小文字を区別しない機械かどうか。承認済みチケットの索引を引くときに、ワークツリーの
 # 名前の綴りが違っても同じ識別子として結び付けるのは、この機械だけ。
 CASE_INSENSITIVE = os.path.normcase("A") == "a"
 
 
 def lookup(index: dict, name: str):
-    """作業ツリーの名前で承認済みチケットを引く。区別しない機械では綴りの違いを許す。"""
+    """ワークツリーの名前で承認済みチケットを引く。区別しない機械では綴りの違いを許す。"""
     found = index.get(name)
     if found is not None or not CASE_INSENSITIVE:
         return found

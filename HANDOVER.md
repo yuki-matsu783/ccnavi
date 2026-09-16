@@ -48,12 +48,12 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
   `overlap` / `requires` は合成後に確かめる
 - 予約名 `common` / `self`（`casefold`）のプロジェクトは層として数えず、そこへの書き込みは共通層だけで判定する
 - `glob` はどの機械でも大文字小文字を区別せず、`regex` は区別を残す。組み込みの守りの綴りも区別しない。裸の `id` にコロンは書けない
-- 作業ツリーに結び付いた承認済みチケットの範囲は、ルールの判定と比べて強い側を採る（設計 §9.5）。ルールの `allow` も範囲の外では止まる
+- ワークツリーに結び付いた承認済みチケットの範囲は、ルールの判定と比べて強い側を採る（設計 §9.5）。ルールの `allow` も範囲の外では止まる
 - 記録の `source`、`--explain` の層ごとの全件、`--explain --json` の `layers[]`
 - 端末から打つ `--approve` は、承認の対象の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
 
 コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
-それらの作業ツリー側の設定（切り元基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
+それらのワークツリー側の設定（切り元基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
 `rm -rf .ccnavi` のように ccnavi ディレクトリごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
 共通層も ccnavi ディレクトリの下にあるので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
@@ -76,12 +76,12 @@ ccnavi/settings.py          環境変数と設定ファイルからの設定解�
 ccnavi/gitstate.py          作業ツリーで実際に何が変わったかを git から読む
 ccnavi/post.py              実行後の監視。検知・差し戻しの文・復元
 ccnavi/ticket.py            チケットの読み込みと、そこが宣言する作業範囲。親子の部分集合
-ccnavi/tree.py              作業ツリーの特定。判定の鍵はファイルの行き先
+ccnavi/tree.py              ワークツリーの特定。判定の鍵はファイルの行き先
 ccnavi/approval.py          承認済みチケット・フェーズのマーカー・子ごとの記録・承認の画面
 ccnavi/risk.py              実績で測るリスク。risks.yml・差分の計測・スクリプト・定性項目
 ccnavi/phase.py             フェーズの終わりとゲート。提案から承認済みチケットへの同期
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
-ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
+ccnavi/review.py            レビューの依頼と確認。ワークツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
 ccnavi/ops.py               チケットの状態を動かす ticket start / done / cancel / judge
 ccnavi/audit.py             1 行 1 件の追記記録
 ccnavi/lint.py              設定とルールの検証
@@ -165,9 +165,9 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 ```
 
 走り出しに、測った `sh` と `exe` の場所が出る。**`sh =` がワークスペースルート側を
-指していることを確かめること。** 作業ツリーの `.ccnavi/scripts` を指していたら、
+指していることを確かめること。** ワークツリーの `.ccnavi/scripts` を指していたら、
 そのツリーに checkout された写しを測っている。`.ccnavi/scripts/` は git が運ぶので
-どの作業ツリーにも写しがあるが、実際に効くのはワークスペース側の 1 本だけ。
+どのワークツリーにも写しがあるが、実際に効くのはワークスペース側の 1 本だけ。
 テストは実装（`ccnavi_workspace`）と同じ規則で `.claude/worktrees/` の下を候補から
 外して上へ歩くので、既定ではワークスペース側を向く。
 
@@ -188,7 +188,7 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
   `projects/<名前>/logs/` に出ていた
 - 根の探し方を `ccnavi-common.sh`（新設）に切り出した。`cwd` から上へ歩いて
   `.claude/scripts/` を持つディレクトリを探す。**`.claude/worktrees/` の下は候補から
-  外す。** `.claude/scripts/` は git が運ぶのでどの作業ツリーにも写しがあるが、
+  外す。** `.claude/scripts/` は git が運ぶのでどのワークツリーにも写しがあるが、
   承認済みチケットと `state/` は追跡外で運ばれない。根は運ばれないほうに合わせる
 - `worktree add` の行き先を検査するようにした。ワークスペースの `.claude/worktrees/` の
   外なら止め、`cwd` に合わせた正しい綴りを文面に出す。知らないオプションも止める
@@ -220,11 +220,11 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
    `[^\\/ \x00]+` が空白を除いているため、`projects/has space/.ccnavi/config/rules.yml` への
    Write もシェル書き込みも止まらない。同じ欠陥が `ticket.py:712` の `wip/<名前>/` にも
    ある。**エージェントが自分のルールを緩められる穴**
-3. **プロジェクトから切った作業ツリーの控えが作られない。** `selfguard.py:452` が
+3. **プロジェクトから切ったワークツリーの控えが作られない。** `selfguard.py:452` が
    `tree.worktrees(root)` を `projects_dir` 無しで呼ぶため空を返す
 4. **`--lint` の早期 return。** `lint.py:484-486` が、`projects/` があってもリポジトリが
    無ければ返るので、`.gitignore` の確認が行われない。clone する前が一番確かめたい時点
-5. **孤児の作業ツリー。** 切り元のプロジェクトを消すと、相互参照が切れて列挙から静かに
+5. **孤児のワークツリー。** 切り元のプロジェクトを消すと、相互参照が切れて列挙から静かに
    外れ、その中のパスがワークスペースルートとして判定される（`tree.py:133-159`）。
    ワークスペース向けの `allow` が孤児の中で効く。判定は変えず、`--lint` と `--explain` が
    名指しする方針で決まっている
@@ -339,7 +339,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 ### 未了: `ticket-rule-merge` の作業で見つかった別件
 
-- `--lint`（`lint._worktree_layers`）が、作業ツリーにある承認済みチケットと印を「統合されるまで効かない」と warn で言う。
+- `--lint`（`lint._worktree_layers`）が、ワークツリーにある承認済みチケットと印を「統合されるまで効かない」と warn で言う。
   承認済みチケットは `approval.scan` が全部のツリーから読むので効いている。承認済みチケットの置き場をこの点検から外す
 - 組み直し（`build.py` の置き換え）が `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
 - ワークスペースの `.git` の commit-graph の控えの一覧が、欠けた控えを指している。`git commit-graph write --reachable --split=replace` で直る
@@ -354,24 +354,24 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 設計書の付録 C が一覧で持っている。ここはそれに、踏んだときに何が起きたかと逃げ方を足したもの。
 測り直したときは両方を直す。
 
-- **作業ツリーが消せない（Windows）。`git worktree remove` が `Permission denied` で落ち、
+- **ワークツリーが消せない（Windows）。`git worktree remove` が `Permission denied` で落ち、
   `.venv` の 1 ファイルだけが入ったディレクトリが残る。** 原因は uv のハードリンクと Windows の
-  削除規則の組み合わせで、消そうとしている作業ツリーで**何も走っていなくても**起きる。
+  削除規則の組み合わせで、消そうとしているワークツリーで**何も走っていなくても**起きる。
   2026-09-11 に隔離した場所で再現させて確かめた（`fsutil hardlink list` と、掴む側 /
   消す側を分けた実験）。
   1. uv は wheel の中身をキャッシュから venv へハードリンクで置く。実体は 1 つで、
-     `_yaml.cp312-win_amd64.pyd` は main・全作業ツリー・uv のキャッシュで同じファイル
+     `_yaml.cp312-win_amd64.pyd` は main・全ワークツリー・uv のキャッシュで同じファイル
      （このプロジェクトで C 拡張を持つ依存は PyYAML だけなので、当たるのはこの 1 本）
   2. Windows は、実体が DLL として読み込まれている間、**どの名前も**消させない。
      rename は通る。Linux は mmap 中でも unlink できるので、ここは Windows だけの話
   3. 並行するセッションはターンの終わりに `test-py.sh` で数分テストを走らせ、
-     そこで PyYAML を読み込む。作業ツリーが数本あると、ほぼ常に誰かが掴んでいる
-  4. 掴まれている間に別の作業ツリーを消そうとすると、その 1 ファイルだけが残る
+     そこで PyYAML を読み込む。ワークツリーが数本あると、ほぼ常に誰かが掴んでいる
+  4. 掴まれている間に別のワークツリーを消そうとすると、その 1 ファイルだけが残る
   対処は入れた（`pyproject.toml` の `[tool.uv] link-mode = "copy"`。複製にすれば実体が
   分かれる）。ただし**既にある `.venv` はハードリンクのまま**なので、効くのは次に作る
-  ぶんから。いま在るものを切り替えるなら、テストが走っていないときに各作業ツリーの
+  ぶんから。いま在るものを切り替えるなら、テストが走っていないときに各ワークツリーの
   `.venv` を消して作り直す。
-  それでも「自分のテストが走っている間に自分の作業ツリーを消せない」は残る。落ちたら、
+  それでも「自分のテストが走っている間に自分のワークツリーを消せない」は残る。落ちたら、
   掴みが離れるのを待つか、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して
   `git worktree prune` する（rename は通るので、これは必ず成功する）。
   消す前に `sh .ccnavi/scripts/ccnavi-clean.sh <名前>` で生成物を消しておくと、pnpm の深い
