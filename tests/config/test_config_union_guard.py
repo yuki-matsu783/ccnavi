@@ -378,9 +378,8 @@ class DenyTest(GuardHarness):
         """§11.6: 共通層の 3 本へのシェルからの書き込みは組み込みで止まる。
 
         置き場は `.ccnavi/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
-        （`_PLACES` の `\\.ccnavi`）が当てる。以前は共通層を env で動かせたため、
-        動かした先の綴りを 1 本ずつ足していた（`common_shell_clause`）。ADR-0052 で
-        固定になり、その経路ごと消えた。
+        （`_PLACES` の `\\.ccnavi`）が当てる。動かした置き場は
+        `test_shell_writes_into_a_moved_common_layer_are_denied` が見る。
         """
         for command in (
             "echo x > .ccnavi/common/rules.yml",
@@ -393,6 +392,35 @@ class DenyTest(GuardHarness):
         # 名前の途中で当たったものは別のファイル。
         result = self.hook(
             "Bash", self.ws, guard="enable", command="echo x > myccnavi/common/rules.yml"
+        )
+        self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+
+    def test_shell_writes_into_a_moved_common_layer_are_denied(self):
+        """§11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
+
+        置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけで、
+        env は ADR-0052 で廃止した。それでも動かせる以上、守りは動かした先を追う
+        （`common_shell_clause`）。名指しのツールは `common_layer_regex` が同じ先を追うので、
+        こちらを外すと、同じファイルが `Write` では止まってシェルでは通る形になる。
+
+        末尾の 1 本が境界を見る。ここが無いと、`common_shell_clause` の
+        `(?:^|[^\\w.-])` と `_TERM` を丸ごと外しても緑のままになる。
+        """
+        policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
+        # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
+        # そのコマンドは設定ファイルに書かない。
+        for command in (
+            "echo x > policy/rules.yml",
+            "sed -i s/deny/allow/ policy/rules.yml",
+            "cp /tmp/x policy/rules.yml",
+            f"echo x > {policy.replace(os.sep, '/')}",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
+                self.assert_denied(result, "builtin-guard-setting-files")
+        # 名前の途中で当たったものは別のファイル。
+        result = self.hook(
+            "Bash", self.ws, guard="enable", rules=policy, command="echo x > otherpolicy/rules.yml"
         )
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
