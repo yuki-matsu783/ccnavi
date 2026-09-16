@@ -435,6 +435,7 @@ src/
     commands.ts       ターミナルに送るコマンド行（accept / wrapup）と、承認を子プロセスで打つ引数の並び
     locate.ts         実行ファイルの探索順
     share.ts          同じ答えを同時に取りに行く呼び出しを 1 つにまとめる（走っている間だけ分け合う）
+    fanout.ts         1 つの出来事を聞いている人たちに配る（1 人が投げても残りに配る）
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
 media/
   icon.svg            アクティビティバーのアイコン
@@ -449,7 +450,7 @@ test/
   risk/               リスク管理（risk-doc, risk-render）
   phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
   projects/           プロジェクト管理（projects, layer-render）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, share, appearance）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, share, fanout, appearance）
   */*.test.ts         HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜
 scripts/
@@ -469,15 +470,16 @@ VS Code の `onDid*` や `registerCommand` は、購読を外すための `Dispo
 | 登録先 | 置き場 | 例 |
 |---|---|---|
 | 拡張が生きている間ずっと（`vscode.workspace.*` / `vscode.window.*` / 自分で作った watcher） | `context.subscriptions` | `extension.ts` のコマンド、`sidebar.ts`、`ticket-control.ts` の watcher |
-| パネルが生きている間だけ | `PanelState` の配列。`panel.onDidDispose` でまとめて外す | 各パネルの `subs` と `fileWatchers`、`appearance.ts` の `followAppearance` |
+| パネルが生きている間だけ | `PanelState` の配列。`panel.onDidDispose` でまとめて外す | 各パネルの `subs`、rules / risk / phases の `fileWatchers`、projects の `watchers`、`appearance.ts` の `followAppearance` |
 | パネル自身・watcher 自身の出来事（`panel.onDidDispose` / `webview.onDidReceiveMessage` / `watcher.onDidChange`） | 持たない | 相手が dispose されれば購読も一緒に消える |
 
 **3 行目は「捨ててよい」であって「捨てなければならない」ではない。** 迷ったら持つ側に倒す。
 持ってはいけない場面は無い。
 
-`PanelState` が watcher を 2 つに分けている画面（rules / risk / phases）は、分かれていること自体が
-決まりの一部。`fileWatchers` は編集対象のパスが設定で変わるので再読込のたびに張り直し、`watchers`
-（チケットの置き場）は開いている間ずっと同じ。1 本にまとめると「古い方だけ落とす」が書けなくなる。
+`PanelState` が箱を 2 つに分けている画面（rules / risk / phases）は、分かれていること自体が決まりの
+一部。`fileWatchers`（編集対象と設定ファイルの監視）は対象のパスが設定で変わるので再読込のたびに
+張り直し、`subs`（チケットの置き場の購読）は開いている間ずっと同じ。1 つにまとめると「古い方だけ
+落とす」が書けなくなる。
 
 外部に配る API（`ticket-control.ts` の `onDidChangeTicketControl`、`tickets.ts` の
 `onTicketsChanged`）は `Disposable` を返す。返さないと、呼ぶ側が正しく書こうとしても外せない。
@@ -491,10 +493,27 @@ VS Code の `onDid*` や `registerCommand` は、購読を外すための `Dispo
 `tickets.ts` がワークスペースに 1 組だけ持つ。
 
 - `onTicketsChanged(folder, listener)` — 監視は 8 本を 1 組だけ張り、聞く画面が 1 つも無くなったら畳む
-- `loadBoardShared(root, setting)` — 走っている読みがあれば、その答えを待つ。1 つの変化で 4 画面が
-  同時に取りに行っても、子プロセスは 1 つ
+- `loadBoardShared(root, setting)` — 同じ世代の、走っている最中の読みがあれば、その答えを待つ。
+  1 つの変化で 4 画面が同時に取りに行っても、起きる子プロセスは 1 つ
 
-**答えが返った後は分け合わない。** 保存の直後のように新しい答えが要る場面は `loadBoard` を直に呼ぶ
-（書く前に始まった読みの答えを掴まないため）。画面が使い分ける形は、読む手を引数で渡す
-（`update(loadBoardShared)` / `refreshLock(current, loadBoardShared)`）。待ち時間で束ねるのは画面ごと
-（それぞれ別の仕事をする）で、`tickets.ts` は来た変化をそのまま配る。
+**分け合うのは「同じ世代の、走っている最中の読み」だけ。** 世代は変化が来るたびに 1 つ進む。
+
+- 変化の前に始まった読みには合流しない。書き換えの途中を見た答えを、確定後の画面が掴まないため
+- 答えが返った後も分け合わない。次に呼ぶ人は新しい答えを得る
+- 保存の直後のように新しい答えが要る場面は `loadBoard` を直に呼ぶ。この読みは分け合いに載らないので、
+  監視の読みと重なれば子プロセスは 2 つになる（古い答えを掴まないほうを採る）
+
+画面が使い分ける形は、読む手を引数で渡す（`update(loadBoardShared)` /
+`refreshLock(current, loadBoardShared)`）。読み直し（`again`）は分け合わない側に倒す。
+
+**待ち時間 `DEBOUNCE_MS` は `tickets.ts` の 1 つを 4 画面が使う。** 同じ変化で起きた読みが同じ拍に
+揃うから分け合える。画面ごとに違う値を持つと、共有は黙って効かなくなる（子が画面の数だけ立つ）。
+プロジェクト管理だけは見ている場所も待ち時間も違うので、自前の監視のまま（作業ツリーの登録だけは
+共有側と重なる）。
+
+配る仕組み（`core/fanout.ts`）と分け合う仕組み（`core/share.ts`）は `vscode` に依存しないので
+テストがある。1 画面が投げても残りに配ること、配っている途中に外れた画面には配らないこと、
+同じ関数を 2 回渡しても購読が 2 つになることを見ている。
+
+読みには期限がある（`ccnavi.ts` の `LOAD_TIMEOUT_MS`）。分け合う以上、1 本が返らないと待っている
+画面が全部止まるため、必ず切り上げる。
