@@ -403,8 +403,9 @@ class DenyTest(GuardHarness):
         （`common_shell_clause`）。名指しのツールは `common_layer_regex` が同じ先を追うので、
         こちらを外すと、同じファイルが `Write` では止まってシェルでは通る形になる。
 
-        末尾の 1 本が境界を見る。ここが無いと、`common_shell_clause` の
-        `(?:^|[^\\w.-])` と `_TERM` を丸ごと外しても緑のままになる。
+        末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は
+        前の境界（`(?:^|[^\\w.-])`）だけを、`policy/rules.yml.bak` は後ろの境界
+        （`_TERM`）だけを落とす。片方しか置かないと、落としたほうの変異が緑のまま通る。
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
@@ -418,11 +419,14 @@ class DenyTest(GuardHarness):
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
                 self.assert_denied(result, "builtin-guard-setting-files")
-        # 名前の途中で当たったものは別のファイル。
-        result = self.hook(
-            "Bash", self.ws, guard="enable", rules=policy, command="echo x > otherpolicy/rules.yml"
-        )
-        self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+        # 名前の途中で当たったものは別のファイル。前と後ろの両方を見る。
+        for command in (
+            "echo x > otherpolicy/rules.yml",
+            "echo x > policy/rules.yml.bak",
+        ):
+            with self.subTest(command=command):
+                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
+                self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """§11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""
