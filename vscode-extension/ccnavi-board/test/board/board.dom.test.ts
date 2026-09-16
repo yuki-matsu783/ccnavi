@@ -128,3 +128,34 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
     await page.close();
   }
 });
+
+test("CB-D44 「更新」を押すと非活性になり、回り記号と「更新中」に替わる。読み直した画面では活性に戻っている", async () => {
+  const page = await loadPage(renderBoard(buildBoard(fixture()), OPTIONS));
+  try {
+    const button = page.one<HTMLButtonElement>('.controls button[data-action="refresh"]');
+    assert.equal(button.disabled, false);
+    assert.equal(button.querySelector(".label")?.textContent, "更新");
+    page.click(button);
+    assert.deepEqual(page.posted.at(-1), { type: "refresh" });
+    assert.equal(button.disabled, true, "押した瞬間に非活性になる");
+    assert.ok(button.classList.contains("busy"), "回り記号が出る");
+    assert.equal(button.getAttribute("aria-busy"), "true");
+    assert.equal(button.querySelector(".label")?.textContent, "更新中");
+    // 非活性の間はもう 1 度押しても送らない
+    const sent = page.posted.length;
+    page.click(button);
+    assert.equal(page.posted.length, sent);
+  } finally {
+    await page.close();
+  }
+  // 拡張が読み直しを終えて HTML を作り直した後（同じ内容でも新しい画面）
+  const again = await loadPage(renderBoard(buildBoard(fixture()), OPTIONS));
+  try {
+    const button = again.one<HTMLButtonElement>('.controls button[data-action="refresh"]');
+    assert.equal(button.disabled, false);
+    assert.ok(!button.classList.contains("busy"));
+    assert.equal(button.querySelector(".label")?.textContent, "更新");
+  } finally {
+    await again.close();
+  }
+});

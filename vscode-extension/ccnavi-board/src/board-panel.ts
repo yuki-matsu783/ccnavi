@@ -19,9 +19,9 @@ import {
   type Launcher,
 } from "./core/commands.js";
 import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
-import { TICKET_CONTROL_ENV, ticketControlMismatch } from "./core/ticket-control.js";
+import { ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
-import { ticketControl } from "./ticket-control.js";
+import { requireTickets, ticketControl } from "./ticket-control.js";
 
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
@@ -88,7 +88,7 @@ export async function openBoard(project?: string): Promise<void> {
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、ccnavi ボードを表示できない");
     return;
   }
-  if (!ticketsEnabled()) {
+  if (!requireTickets("ボード")) {
     return;
   }
   if (state !== undefined) {
@@ -140,20 +140,6 @@ export function refreshBoard(): void {
     return;
   }
   void update();
-}
-
-/**
- * チケット制御が disable なら、その旨を伝えて偽を返す。コマンドパレットは `when` で隠れるが、
- * キーバインドや他の拡張からの呼び出しはそこを通らない。
- */
-function ticketsEnabled(): boolean {
-  if (ticketControl() === "enable") {
-    return true;
-  }
-  vscode.window.showInformationMessage(
-    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）。ルール管理だけが使える`,
-  );
-  return false;
 }
 
 function registerPanelHandlers(current: PanelState): void {

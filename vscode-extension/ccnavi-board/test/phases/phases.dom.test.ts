@@ -8,7 +8,7 @@ import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "res
 
 function html(overrides: Partial<PhasesPage> = {}): string {
   return renderPhasesPage(
-    { root: "/ws", phasesPath: ".ccnavi/config/phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock: { locked: false, reason: "", doing: [] }, ...overrides },
+    { root: "/ws", phasesPath: ".ccnavi/config/phases.yml", exists: true, model: readPhases(TEMPLATE_PHASES_TEXT).model, lock: { locked: false, reason: "", doing: [] }, ...overrides },
     { nonce: "n" },
   );
 }

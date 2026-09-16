@@ -59,6 +59,13 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
  */
 const APPROVE_TIMEOUT_MS = 60_000;
 
+/**
+ * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
+ * 押されたまま戻らず、以後の読み直しも黙って捨てられる（board-panel の loading が立ちっぱなしになる）。
+ * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て承認と同じ 60 秒。
+ */
+const EXPLAIN_TIMEOUT_MS = 60_000;
+
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つからない（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
 
@@ -145,6 +152,8 @@ interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
+  /** 期限で打ち切った（execFile が殺した）。標準エラーには何も残らないので、呼び手が文面を作る */
+  readonly killed: boolean;
 }
 
 function run(
@@ -181,6 +190,7 @@ function run(
           code,
           stdout,
           stderr: stderr.trim() || (error ? error.message : ""),
+          killed: (error as { killed?: unknown } | null)?.killed === true,
         });
       },
     );
@@ -192,9 +202,12 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   if (launcher === undefined) {
     return { ok: false, launcher, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--explain", "--json"]);
+  const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
-    return { ok: false, launcher, error: `ccnavi --explain --json が失敗した: ${ran.stderr}` };
+    const why = ran.killed
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒で返らないので打ち切った`
+      : ran.stderr;
+    return { ok: false, launcher, error: `ccnavi --explain --json が失敗した: ${why}` };
   }
   const parsed = parseBoardJson(ran.stdout);
   if (!parsed.ok) {
@@ -222,6 +235,12 @@ export async function runApprovePreview(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      ok: false,
+      error: `ccnavi --approve --preview --json を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。承認済みチケットは置かれていない`,
+    };
+  }
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
     // 読めない提案の行より後ろに出るので、1 行目だけでは届かない。
@@ -247,6 +266,17 @@ export async function runApproveYes(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
+  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（approval.py の for cand in batch）ので、
+  // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」に落ちるため、
+  // ここで拾わないと何が起きたのか伝わらない。
+  if (ran.killed) {
+    return {
+      ok: false,
+      error:
+        `ccnavi --approve --yes を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。` +
+        "一部だけ承認済みになっている可能性がある。ボードを更新して、何が承認されたかを確かめる",
+    };
+  }
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0

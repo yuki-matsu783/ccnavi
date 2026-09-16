@@ -16,7 +16,6 @@ function page(overrides: Partial<RiskPage> = {}): RiskPage {
     root: "/ws",
     riskPath: ".ccnavi/common/risks.yml",
     exists: true,
-    ticketControl: "enable",
     model: readRisk(RISK).model,
     lock: { locked: false, reason: "", doing: [] },
     ...overrides,
@@ -52,11 +51,6 @@ test("CB-T82 ファイルが無ければ組み込みだと言って作るボタ�
   const present = renderRiskPage(page(), { nonce: "n" });
   assert.doesNotMatch(present, /data-action="create"/);
   assert.match(present, /"exists":true/);
-});
-
-test("CB-T83 チケット制御が disable なら配点が効かないと言い、enable なら言わない", () => {
-  assert.match(renderRiskPage(page({ ticketControl: "disable" }), { nonce: "n" }), /チケット制御が <code>disable<\/code>/);
-  assert.doesNotMatch(renderRiskPage(page(), { nonce: "n" }), /CCNAVI_TICKET_CONTROL/);
 });
 
 test("CB-T84 保存できない理由と読み込みの苦情を出す", () => {

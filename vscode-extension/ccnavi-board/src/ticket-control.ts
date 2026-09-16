@@ -1,13 +1,14 @@
 /**
  * チケット制御の値をワークスペースから読み、VS Code の context key に写す。
- * サイドパネルの「チケット管理」の有無と、コマンドパレットの `when` がこの鍵を見る。
+ * サイドパネルの「チケット管理」「リスク管理」「フェーズ管理」の有無と、コマンドパレットの
+ * `when` がこの鍵を見る。画面を開く側は `requireTickets` でもう一度見る。
  * VS Code の API に触れるので単体テストの対象外。読み方は core/ticket-control.ts。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { ticketControlFrom, type TicketControl } from "./core/ticket-control.js";
+import { TICKET_CONTROL_ENV, ticketControlFrom, type TicketControl } from "./core/ticket-control.js";
 
 /** package.json の `when` と揃える */
 export const CONTEXT_KEY = "ccnaviBoard.ticketControl";
@@ -23,6 +24,23 @@ export function ticketControl(): TicketControl {
 
 export function onDidChangeTicketControl(listener: (value: TicketControl) => void): void {
   listeners.push(listener);
+}
+
+/**
+ * チケット制御が効いていれば真。disable なら理由を出して偽を返す。
+ *
+ * 一覧と `when` は disable の入口を隠すが、キーバインド・他の拡張・前に開いた画面の中の
+ * ボタンはそこを通らない。開く側でもう一度見て、隠れている画面が横から開かないようにする。
+ * `what` は開こうとしたものの名前（「ボード」「リスク管理画面」など）。
+ */
+export function requireTickets(what: string): boolean {
+  if (current === "enable") {
+    return true;
+  }
+  vscode.window.showInformationMessage(
+    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）ので、${what}は開けない。ルール管理とプロジェクト管理は使える`,
+  );
+  return false;
 }
 
 /** ワークスペースの設定ファイルから読み直す。ファイルが無ければ enable */
