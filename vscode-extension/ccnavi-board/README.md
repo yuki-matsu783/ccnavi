@@ -114,7 +114,7 @@ Claude Code に渡す。拡張はマーカーを置かず、実行ファイル�
 | 置き場が無い | 画面は帯を出さない。一覧が 0 件になり「プロジェクトはまだ無い…」が出るだけ。`git clone` が親のディレクトリを作るので、置き場が無いままでも clone はできる。手で作る手段は画面に持たない |
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
 | ルールの置き場 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（実行ファイルが `CCNAVI_PROJECT_HOME` を読んで解く。既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは層として数えないので、置き場もボタンも出ない |
-| ルールが無い | 行に「共通層からコピー」のボタンが出る。`.ccnavi/common/rules.yml`（`CCNAVI_RULES`）を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
+| ルールが無い | 行に「共通層からコピー」のボタンが出る。`.ccnavi/common/rules.yml` を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |
 | 自身の層 | 「ワークスペース本体」の枠に、自身の層のルール（既定 `.ccnavi/config/rules.yml`）の有無と「ルール管理」「共通層からコピー」が出る。無いのは正常なので warn の色にしない。「自身の層のフェーズの種類」の行はチケット制御が disable なら出ない |
 | `.claude/` を持つ | 行に warn として出す。拡張は消さない |
 | ルール管理 | そのプロジェクトのルール設定画面を開く（下の節）。ルールが無い行では押せない |
@@ -179,7 +179,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 ### リスク管理画面
 
-対象は共通層の配点（`.ccnavi/common/risks.yml`、`env.CCNAVI_RISK`。`settings.local.json` が勝つ）の 1 本。自身の層
+対象は共通層の配点（`.ccnavi/common/risks.yml`。置き場は固定）の 1 本。自身の層
 （`.ccnavi/config/risks.yml`）とプロジェクトの層（`projects/<名前>/.ccnavi/config/risks.yml`）も配点を持ち、判定は共通層と親の
 `project:` の層の和で行う（設計 §11.4.2）が、この画面ではそれらを開かない（設計 §11.11）。層の配点はエディタで直す。編集中の内容は一時ファイルに書いて `--lint --risk <パス>` で実行ファイルに渡す。保存の往復の間は欄を止める
 （その間の編集は保存後の再描画で消えるため）。`--lint` は設定全体を見るので、`rules.yml` などに error がある間は配点も保存できない。
@@ -211,7 +211,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 
 ### フェーズ管理画面
 
-対象は 3 種。共通層の種類（`.ccnavi/common/phases.yml`、`env.CCNAVI_PHASES`。`settings.local.json` が勝つ）、ワークスペース自身の層
+対象は 3 種。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、ワークスペース自身の層
 （既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層（既定 `projects/<名前>/.ccnavi/config/phases.yml`）。サイドパネルからは共通層を、
 プロジェクト管理画面の「ワークスペース本体」の枠と各行の「フェーズ管理」から層を開く。対象ごとに 1 パネルで並べて開ける。
 チケット制御が disable なら、どの入口も出ず、呼ばれても開かない。
@@ -297,7 +297,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 | `ccnaviBoard.bashPath` | Windows で使うシェル。空なら Git Bash |
 | `ccnaviBoard.samplesPath` | ルール設定画面が一括で流す見本。既定は `.ccnavi/common/rule-samples.yml`。相対ならワークスペースルートから |
 
-ルールファイルの場所は `.claude/settings.json` の `env.CCNAVI_RULES`、無ければ `.ccnavi/common/rules.yml`。
+ルールファイルの場所は `.ccnavi/common/rules.yml` 固定。
 プロジェクトの置き場は `env.CCNAVI_PROJECTS`、無ければ `projects`。自身の層とプロジェクトの層のルールファイルは
 拡張が組まず、`--explain --json` の `layers[]` のパスを使う（実行ファイルが `env.CCNAVI_PROJECT_HOME` を読んで解く。
 既定は git プロジェクトルートからの `.ccnavi/config/rules.yml`）。

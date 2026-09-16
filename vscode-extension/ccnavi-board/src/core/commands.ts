@@ -30,14 +30,6 @@ export function toPosixPath(filePath: string): string {
   return filePath.replace(/\\/g, "/");
 }
 
-function ccnaviInvocation(launcher: Launcher, root: string): string {
-  const rootArg = shellQuote(toPosixPath(root));
-  if (launcher.kind === "exe") {
-    return `${shellQuote(toPosixPath(launcher.path))} --root ${rootArg}`;
-  }
-  return `uv run python -m ccnavi --root ${rootArg}`;
-}
-
 /**
  * `--approve --preview --json [<識別子>...]`。一覧を見るだけで承認済みチケットは置かない（子プロセスの引数）。
  * 識別子を並べればその分だけが対象、空なら承認待ち全部が対象。ボードは絞り込みで見えている分を渡す。

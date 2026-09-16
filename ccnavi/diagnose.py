@@ -454,7 +454,7 @@ def layer_home(conf: settings.Settings, root: str, name: str) -> str:
 
 
 def layer_config(conf: settings.Settings, root: str, name: str, kind: str) -> str:
-    """その層の phases / risk の綴り。共通層は今までどおり `CCNAVI_PHASES` / `CCNAVI_RISK`。"""
+    """その層の phases / risk の綴り。共通層は `.ccnavi/common/` 固定で、設定が持つ既定そのもの。"""
     if name == ruleload.LAYER_COMMON:
         return conf.phases if kind == settings.KIND_PHASES else conf.risk
     return settings.layer_path(conf, layer_home(conf, root, name), kind, name)
