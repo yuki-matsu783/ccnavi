@@ -65,7 +65,7 @@ ${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount
   </div>
   <div class="controls">
 ${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
-    <button type="button" class="action" data-action="refresh">更新</button>
+    <button type="button" class="action" data-action="refresh"><span class="spin" aria-hidden="true"></span><span class="label">更新</span></button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
@@ -460,7 +460,12 @@ export const BUTTON_STYLE = `  button.action {
   button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
   button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
   button.action.small { min-height: 20px; padding: 0 8px; font-size: .9em; }
-  button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }`;
+  button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
+  /* 待っている間の回り記号。busy が付いたボタンにだけ出す。動きを減らす設定では回さず、出したままにする */
+  button.action .spin { display: none; width: .85em; height: .85em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+  button.action.busy .spin { display: inline-block; animation: ccnavi-spin .8s linear infinite; }
+  @keyframes ccnavi-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { button.action.busy .spin { animation: none; } }`;
 
 /**
  * 5 つの画面で同じ骨組み。本文・見出し上のツールバー（左にパス、右にボタン）・帯・注意・欄・脚注。
@@ -756,11 +761,23 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       if (event.key === "Enter" && !event.target.closest("button, a")) { event.preventDefault(); openCard(card); }
     });
   }
+  // 「更新」は押した瞬間に非活性にして回り記号を出す。活性に戻すのは拡張が読み直しを終えて
+  // HTML を作り直したとき（新しい画面のボタンは初めから活性）。読み直しが失敗しても画面は
+  // 差し替わるので、ここで戻す道は要らない。実行ファイルが返らない場合は期限（ccnavi.ts）が切る。
+  const refreshButton = document.querySelector('.controls button[data-action="refresh"]');
+  function setRefreshing() {
+    if (!refreshButton) { return; }
+    refreshButton.disabled = true;
+    refreshButton.classList.add("busy");
+    refreshButton.setAttribute("aria-busy", "true");
+    const label = refreshButton.querySelector(".label");
+    if (label) { label.textContent = "更新中"; }
+  }
   for (const button of document.querySelectorAll("button[data-action]")) {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       const action = button.getAttribute("data-action");
-      if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
+      if (action === "refresh") { setRefreshing(); vscode.postMessage({ type: "refresh" }); }
       else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() }); }
       else if (action === "approve-one") { vscode.postMessage({ type: "approve", tickets: [button.getAttribute("data-ticket") || ""], filtered: true }); }
       else if (action === "prompt-copy") { vscode.postMessage({ type: "promptCopy" }); }

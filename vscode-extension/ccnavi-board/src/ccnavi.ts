@@ -59,6 +59,13 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
  */
 const APPROVE_TIMEOUT_MS = 60_000;
 
+/**
+ * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
+ * 押されたまま戻らず、以後の読み直しも黙って捨てられる（board-panel の loading が立ちっぱなしになる）。
+ * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て承認と同じ 60 秒。
+ */
+const EXPLAIN_TIMEOUT_MS = 60_000;
+
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つからない（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
 
@@ -145,6 +152,8 @@ interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
+  /** 期限で打ち切った（execFile が殺した）。標準エラーには何も残らないので、呼び手が文面を作る */
+  readonly killed: boolean;
 }
 
 function run(
@@ -181,6 +190,7 @@ function run(
           code,
           stdout,
           stderr: stderr.trim() || (error ? error.message : ""),
+          killed: (error as { killed?: unknown } | null)?.killed === true,
         });
       },
     );
@@ -192,9 +202,12 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   if (launcher === undefined) {
     return { ok: false, launcher, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--explain", "--json"]);
+  const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
-    return { ok: false, launcher, error: `ccnavi --explain --json が失敗した: ${ran.stderr}` };
+    const why = ran.killed
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒で返らないので打ち切った`
+      : ran.stderr;
+    return { ok: false, launcher, error: `ccnavi --explain --json が失敗した: ${why}` };
   }
   const parsed = parseBoardJson(ran.stdout);
   if (!parsed.ok) {
