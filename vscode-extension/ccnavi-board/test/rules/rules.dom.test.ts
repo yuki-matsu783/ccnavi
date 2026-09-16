@@ -19,6 +19,7 @@ deny:
   - id: no-rm
     match: Bash
     glob: "*rm -rf*"
+    every: 4
     message: "消さない"
     additionalContext: "代わりに ccnavi-git.sh rm"
 ask:
@@ -239,6 +240,31 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     assert.ok(!page.one('.rule-section[data-section="ask"]').classList.contains("folded"));
     assert.equal(page.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▾");
     assert.ok(page.one('.rule[data-id="deps"]').classList.contains("open"));
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D0c 刻みは畳んだ行の札に出る。欄に打てば札も変わり、保存はその文字を送る", async () => {
+  const page = await loadPage(html());
+  try {
+    // 読んだ刻みは畳んだままでも見える。刻みが無い行は札を出さない（枠だけ置く）
+    assert.equal(page.one('.rule[data-id="no-rm"] .sum .sum-every').textContent, "4 回ごと");
+    assert.equal(page.one('.rule[data-id="git-push"] .sum .sum-every').textContent, "");
+    // 刻みだけを直す。欄は「コンテキストの追加」の中にあり、刻みがあれば最初から開いている
+    assert.ok(page.one('.rule[data-id="git-push"] details.more').hasAttribute("open") === false);
+    page.click(page.one('.rule[data-id="git-push"] .row-head'));
+    const every = page.one<HTMLInputElement>('.rule[data-id="git-push"] input.f-every');
+    assert.equal(every.value, "");
+    page.type(every, "3");
+    assert.equal(page.one('.rule[data-id="git-push"] .sum .sum-every').textContent, "3 回ごと");
+    // 読めない値も打てる。画面は直さず、そのまま送る（止めるのは保存前の --lint）
+    page.type(page.one('.rule[data-id="no-rm"] input.f-every'), "x");
+    page.click(page.one("#save"));
+    const save = page.posted.find((m) => m.type === "save") as unknown as {
+      sections: { deny: { id: string; every: string }[] };
+    };
+    assert.deepEqual(save.sections.deny.map((r) => [r.id, r.every]), [["git-push", "3"], ["no-rm", "x"]]);
   } finally {
     await page.close();
   }

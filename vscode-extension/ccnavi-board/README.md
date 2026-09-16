@@ -154,6 +154,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | タイプ | `deny` / `ask` / `allow` のどの並びに置くか |
 | パターン | `glob` / `regex`（左の選択が形式、右が値） |
 | 文面 | `message` |
+| 渡す回の刻み | `every`（空なら当たるたびに渡す。`5` なら 5 回に 1 度で、「初回だけ渡す文」はその最初の 1 回＝ 5 回目に届く） |
 | 渡す文 | `additionalContext` |
 | 渡すファイル | `additionalContextFile` |
 | 初回だけ渡す文 | `additionalContextOnce` |

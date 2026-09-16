@@ -101,7 +101,7 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
     additionalContextOnce: "",
     additionalContextFile: "",
     additionalContextOnceFile: "",
-    every: null,
+    every: "",
   };
   const out = doc.apply({ deny: [s.deny[0], fresh], ask: s.ask, allow: [] });
   assert.match(out, /- id: no-rm\n    match: Bash\n    glob: '\*rm -rf\*'\n    message: >-\n      消さない。退避する。/);
@@ -210,7 +210,7 @@ allow:
   assert.equal(readRules(cleared).model.sections.deny[0].additionalContextFile, "");
 });
 
-test("CB-T134 every（渡す回の刻み）を読む。読めない値は null にして、書き戻しでも触らない", () => {
+test("CB-T134 every（渡す回の刻み）は書かれたまま読む。触らなければ書き戻しでも変わらない", () => {
   const text = `version: 1
 deny: []
 ask: []
@@ -233,16 +233,54 @@ allow:
   const s = doc.model.sections;
   assert.deepEqual(
     s.allow.map((r) => r.every),
-    [5, null, null],
+    ["5", "x", ""],
   );
-  // 読めない値（every: x）は画面が黙って消さない。消すと --lint の苦情だけが宙に浮く。
+  // 読めない値（every: x）は画面が黙って直さない。直すと --lint の苦情だけが宙に浮く。
   assert.equal(doc.apply(s), text);
-  // 画面から来た並びも同じ。every を持たない古い画面の形でも、元の値は残る。
+  // 画面から来た並びも同じ。every を持たない古い画面の形は空として受け取る。
   const posted = asSections(JSON.parse(JSON.stringify({ ...s, allow: s.allow })));
   assert.notEqual(posted, undefined);
   assert.deepEqual(
     posted === undefined ? [] : posted.allow.map((r) => r.every),
-    [5, null, null],
+    ["5", "x", ""],
   );
   assert.equal(doc.apply(posted ?? s), text);
+});
+
+test("CB-T135 every は数に読めれば数で書き、読めなければ打ったまま、空なら欄ごと消す", () => {
+  const text = `version: 1
+deny: []
+ask: []
+allow:
+  - id: nudge
+    match: Write|Edit
+    glob: "*/src/*"
+    every: 5
+    additionalContextOnce: 決まりと突き合わせる
+  - id: plain
+    match: Read
+    glob: "*"
+`;
+  const doc = readRules(text);
+  const s = doc.model.sections;
+  // 刻みを直す・無かったところに足す。足す先は match の直後
+  const out = doc.apply({
+    deny: [],
+    ask: [],
+    allow: [{ ...s.allow[0], every: "3" }, { ...s.allow[1], every: "10" }],
+  });
+  assert.match(out, /glob: "\*\/src\/\*"\n    every: 3\n/);
+  assert.match(out, /- id: plain\n    match: Read\n    every: 10\n    glob: "\*"\n/);
+  assert.deepEqual(
+    readRules(out).model.sections.allow.map((r) => r.every),
+    ["3", "10"],
+  );
+  // 空にすれば欄ごと消える。値を空にして残すと「毎回渡す」に読めない欄が残る
+  const cleared = doc.apply({ deny: [], ask: [], allow: [{ ...s.allow[0], every: "" }, s.allow[1]] });
+  assert.doesNotMatch(cleared, /every/);
+  assert.equal(readRules(cleared).model.sections.allow[0].every, "");
+  // 読めない値は打ったまま書く（止めるのは保存前の --lint であって画面ではない）
+  const broken = doc.apply({ deny: [], ask: [], allow: [{ ...s.allow[0], every: "x" }, s.allow[1]] });
+  assert.match(broken, /every: x\n/);
+  assert.equal(readRules(broken).model.sections.allow[0].every, "x");
 });
