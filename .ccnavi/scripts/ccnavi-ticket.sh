@@ -28,7 +28,7 @@ usage() {
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|done|cancel> <識別子> [--reason <理由>]
 sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠>
 
-  start   todo/ -> doing/  作業ツリー .claude/worktrees/<識別子> が要る。着手の時刻と基準点を書く
+  start   todo/ -> doing/  ワークツリー .claude/worktrees/<識別子> が要る。着手の時刻と基準点を書く
   done    doing/ -> done/  完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
   cancel  todo/ か doing/ -> cancelled/  --reason が要る
   judge   定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）

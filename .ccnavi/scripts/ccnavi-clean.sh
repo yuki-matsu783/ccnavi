@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-clean — 作業ツリー 1 本の生成物を消す。`git worktree remove` の前に打つ。
+# ccnavi-clean — ワークツリー 1 本の生成物を消す。`git worktree remove` の前に打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
@@ -17,7 +17,7 @@
 # sh の rm は Windows の深い node_modules で粘りきれないことがあり、そのときは
 # 消し残しとして 1 で返る。
 #
-# 作業ツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
+# ワークツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
 # そこで作業している見込みが高い。git に登録の残っていない、消しきれなかったディレクトリ（.git が無い、
 # または .git が指す先が消えている）は確かめようが無いので、確かめずに進める。
 # 消すのは生成物だけなので、書きかけは残る。
@@ -37,7 +37,7 @@ sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
   --dry-run  消すものを並べるだけで、消さない
 
 消すもの: node_modules / .venv / __pycache__ / .pytest_cache と、package.json の隣の out
-未コミットの変更がある作業ツリーでは、何も消さずに止まる
+未コミットの変更があるワークツリーでは、何も消さずに止まる
 USAGE
 }
 
@@ -58,7 +58,7 @@ for arg in "$@"; do
 		;;
 	*)
 		if [ -n "$name" ]; then
-			printf 'ccnavi-clean: 作業ツリーは 1 回に 1 本だけ指定します（%s と %s）。\n' "$name" "$arg" >&2
+			printf 'ccnavi-clean: ワークツリーは 1 回に 1 本だけ指定します（%s と %s）。\n' "$name" "$arg" >&2
 			exit 2
 		fi
 		name="$arg"
@@ -85,7 +85,7 @@ root=$(ccnavi_workspace) || {
 
 target="$root/.claude/worktrees/$name"
 
-# 作業ツリーの置き場そのものがリンクなら、消す先が置き場の外にある。たどらない。
+# ワークツリーの置き場そのものがリンクなら、消す先が置き場の外にある。たどらない。
 if [ -L "$target" ]; then
 	printf 'ccnavi-clean: %s はリンクです。リンクの先は消しません。\n' "$target" >&2
 	exit 2
@@ -114,7 +114,7 @@ fi
 # 探すのは find、消すのは rm -rf。find は既定でリンクをたどらない。rm -rf はリンクを
 # 末尾の / 無しで渡せば、リンクそのものだけを消して先は残す。
 #
-#   clean_with_sh <作業ツリーの絶対パス>
+#   clean_with_sh <ワークツリーの絶対パス>
 #
 # 終了コード: 0 成功 / 1 消し残しか、名前が読めずに止めた
 clean_with_sh() {
@@ -122,7 +122,7 @@ clean_with_sh() {
 	cw_nl='
 '
 	# find の出力は行で読む。名前に改行があると行の切れ目を取り違え、名前の途中から
-	# 始まる行が作業ツリーの外（`../` で始まる綴り）を指しかねない。1 つでもあれば
+	# 始まる行がワークツリーの外（`../` で始まる綴り）を指しかねない。1 つでもあれば
 	# 何も消さない。消す対象の中（node_modules など）は丸ごと消すので見ない。
 	cw_odd=$(cd "$cw_top" && {
 		find . -name .git -prune \
@@ -226,7 +226,7 @@ $cw_targets
 EOF
 
 	if [ -n "$cw_failed" ]; then
-		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどの作業ツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（HANDOVER.md の「作業ツリーが消せない」）。\n' >&2
+		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（HANDOVER.md の「ワークツリーが消せない」）。\n' >&2
 		return 1
 	fi
 	return 0
