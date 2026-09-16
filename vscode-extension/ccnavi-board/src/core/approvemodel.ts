@@ -75,6 +75,25 @@ export interface ApprovePartial {
   readonly ticket: string;
   /** 止まった理由（実行ファイルの文面そのまま） */
   readonly reason: string;
+  /** 止まるまでに出た行（マーカーを消した、改版した）。端末なら標準出力に出ていたぶん */
+  readonly lines: readonly string[];
+}
+
+/**
+ * 途中で止まったことを人に伝える文。何が残っているかを言い切る。
+ * `placed` に止まった識別子自身が入るのは、書けたあとの後始末（マーカーを置く）で
+ * 落ちたとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
+ */
+export function partialMessage(partial: ApprovePartial): string {
+  const { placed, ticket, reason, lines } = partial;
+  const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
+  const what =
+    placed.length === 0
+      ? "承認済みチケットは 1 件も置かれていない"
+      : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っている。` +
+        "コミットと push は送っていない（送るのは承認できたときだけ）。ボードを更新して確かめる";
+  const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
+  return `ccnavi --approve --yes が${where}止まった: ${reason}。${what}${done}`;
 }
 
 export type ResultParse =
@@ -132,6 +151,7 @@ export function parseApproveResult(text: string): ResultParse {
         placed: list(raw.partial.placed).map(str),
         ticket: str(raw.partial.ticket),
         reason: str(raw.partial.reason),
+        lines: list(raw.partial.lines).map(str),
       },
     };
   }

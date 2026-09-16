@@ -734,6 +734,9 @@ def approve_yes(
                     "placed": applied.placed,
                     "ticket": applied.stopped_at,
                     "reason": applied.reason,
+                    # 止まるまでに出た行（マーカーを消した、改版した）。端末は stdout で見えるが、
+                    # 拡張はこの JSON しか見ないので、同じものを渡す。
+                    "lines": [line for line in lines.getvalue().splitlines() if line.strip()],
                 },
             }
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")

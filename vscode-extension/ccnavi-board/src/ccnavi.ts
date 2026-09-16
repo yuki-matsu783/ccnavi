@@ -20,6 +20,7 @@ import * as path from "node:path";
 import {
   parseApprovePreview,
   parseApproveResult,
+  partialMessage,
   type ApproveMismatch,
   type ApprovePreview,
   type ApproveResult,
@@ -303,14 +304,7 @@ export async function runApproveYes(
   // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで黙ると人は
   // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
   if ("partial" in parsed) {
-    const { placed, ticket, reason } = parsed.partial;
-    const where = ticket === "" ? "" : `${ticket} で`;
-    const what =
-      placed.length === 0
-        ? "承認済みチケットは 1 件も置かれていない"
-        : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っている。` +
-          "コミットと push は送っていない（送るのは承認できたときだけ）。ボードを更新して確かめる";
-    return { ok: false, error: `ccnavi --approve --yes が${where}止まった: ${reason}。${what}` };
+    return { ok: false, error: partialMessage(parsed.partial) };
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi --approve --yes の出力を読み取れない（${parsed.error}）` : said };

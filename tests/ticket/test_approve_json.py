@@ -522,6 +522,39 @@ class ApproveJsonTest(PhaseHarness):
         # 標準エラーには止まったところが出る。
         self.assertIn("i0001-01", result.stderr)
 
+    def test_partial_carries_the_progress_lines(self):
+        """止まるまでに出た行も渡す。端末だけが知っていて拡張が知らない状態を作らない。
+
+        レビュー済みのフェーズに子を 2 枚足し、2 枚目だけ書けなくする。1 枚目は置けるので
+        そのフェーズのマーカーが消え、その行が `lines` に入る。
+        """
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
+
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-03", child_text("i0001-03", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent("propose 02 03")
+        os.makedirs(os.path.join(self.approved, "i0001-03.md"))
+        result = self.yes(["i0001-02", "i0001-03"])
+        self.assertEqual(result.returncode, 1)
+        partial = json.loads(result.stdout)["partial"]
+        self.assertEqual(partial["placed"], ["i0001-02"])
+        self.assertEqual(partial["ticket"], "i0001-03")
+        self.assertTrue(
+            any("マーカー" in line for line in partial["lines"]),
+            partial["lines"],
+        )
+
     def test_yes_that_stops_before_placing_anything_says_so(self):
         """1 件目で止まったら placed は空。「一部だけ置かれた」と言わせない。"""
         self.pending_parent_and_child()
