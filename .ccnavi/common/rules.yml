@@ -160,9 +160,11 @@ allow:
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。
+  # コマンドの名前は `(?-i:...)` で囲む。`allow` は畳むと網が広がる側で、綴りを変えた
+  # 呼び出しまで通すと、言及の無いものを権限モードへ渡す安全網（UNDECLARED）が外れる。
   - id: prefer-read-grep
     match: Bash
-    regex: '^(\S*[\\/])?(cat|grep|egrep|fgrep|rg)(\.exe)?\s[^\x00]*$'
+    regex: '^(\S*[\\/])?(?-i:(cat|grep|egrep|fgrep|rg))(\.exe)?\s[^\x00]*$'
     additionalContextOnce: >-
       ファイルの中身は Read ツール、検索は Grep ツールのほうが向いています。
       行番号が付き、大きなファイルでも必要な範囲だけを読めて、パスが記録にも残ります。
@@ -172,7 +174,7 @@ allow:
   # ファイルを探すだけの find。止めずに通して、Glob ツールのほうを一度だけ勧める。
   - id: prefer-glob
     match: Bash
-    regex: '^(\S*[\\/])?find(\.exe)?\s[^\x00]*$'
+    regex: '^(\S*[\\/])?(?-i:find)(\.exe)?\s[^\x00]*$'
     additionalContextOnce: >-
       ファイルを名前で探すなら Glob ツールのほうが向いています。更新の新しい順に
       返るので読む順が決まり、パスが記録にも残ります。特別な要件（-newer や -size

@@ -195,6 +195,15 @@ ask:
     subject: "CURL https://example.com"
     why: 勧めるほうの文面も綴りを問わない。止める側だけ畳むと、案内が綴りで消える
   - tool: Bash
+    subject: "CAT /etc/hosts"
+    why: >-
+      allow のコマンド名は畳まない（`(?-i:...)`）。畳むと、綴りを変えた呼び出しが
+      allow に当たり、言及の無いものを権限モードへ渡す安全網（UNDECLARED）が外れる。
+      確認できる者が居ないモードでは、その拒否ごと消える
+  - tool: Bash
+    subject: "FIND /etc -name x"
+    why: 同上。小文字の find は allow（prefer-glob）だが、綴りを変えた形は当たらない
+  - tool: Bash
     subject: "echo curl is a tool"
     why: >-
       引数に出ただけの綴りには当たらない。どのルールも言及せず権限モードへ渡る。
