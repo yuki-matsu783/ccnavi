@@ -32,6 +32,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import io
 import json
@@ -329,9 +330,12 @@ def move_file(source: str, target: str) -> str:
     行き先に同じ名前が既に在れば動かさない。黙って上書きすると、閉じた側の記録
     （取り消しの欄など）が消える。同じ識別子が 2 つ在るのは `--lint` が名指しする。
 
-    同じファイルシステムの中なら rename で 1 手。またぐときは写して消す。消せなければ
-    写した側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で止まる
-    （`admit` と同じ）。Windows は開かれているファイルを消させないので、現実に起きる。
+    同じファイルシステムの中なら rename で 1 手。またぐとき（EXDEV）だけ写して消す。
+    消せなければ写した側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で
+    止まる（`admit` と同じ）。Windows は開かれているファイルを消させないので、現実に起きる。
+
+    写して消す側へ流すのは EXDEV に限る。rename が他の理由（元が無い、など）で失敗した
+    ときまで流すと、写せずに戻す手が、その間に別のプロセスが置いた行き先を消す。
     """
     if os.path.exists(target):
         return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
@@ -339,8 +343,9 @@ def move_file(source: str, target: str) -> str:
         os.makedirs(os.path.dirname(target), exist_ok=True)
         os.rename(source, target)
         return ""
-    except OSError:
-        pass  # 別のファイルシステムなど。写して消す側で理由を返す
+    except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            return f"チケットを動かせない ({source} → {target}: {exc})"
     try:
         shutil.copy2(source, target)
     except OSError as exc:
