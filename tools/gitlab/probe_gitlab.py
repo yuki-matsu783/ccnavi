@@ -278,7 +278,7 @@ def worktree(name: str, base: str) -> str:
 
 def propose(tree: str, name: str, **kw) -> str:
     return write(
-        os.path.join(tree, "wip", "tickets", "todo", name + ".md"), ticket_text(name, **kw)
+        os.path.join(tree, "wip", "proposals", "todo", name + ".md"), ticket_text(name, **kw)
     )
 
 
@@ -728,7 +728,7 @@ def main() -> int:
         )
         record(
             "未着手の子が cancelled/ へ動く",
-            os.path.exists(os.path.join(parent2, "wip", "tickets", "cancelled", "i0002-01.md")),
+            os.path.exists(os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01.md")),
         )
         record(
             "wrapup の note が MR にある",
