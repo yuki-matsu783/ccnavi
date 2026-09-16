@@ -23,7 +23,7 @@
 
 ## 書式
 
-`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
+`wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
@@ -241,8 +241,8 @@ class Ticket:
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
     # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
-    # 置いた場所で、`scan` が入れる（プロジェクトの `wip/tickets/` ならその名前、ワークツリー
-    # の中ならその元リポジトリ、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に
+    # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
+    # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
     # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
     project: str = ""
     # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
@@ -625,7 +625,7 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     外して開くのは提案の `todo/` だけ。`doing/` 以降は `guard_rules`、承認済みチケットは
     自己防衛の組み込みが deny で止め、ルールの deny はチケットより強い。
 
-    前置は `/` の境で切る（`wip/ticketsX/` は置き場ではない）。大文字小文字は範囲の照合と
+    前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
     呼ぶのは `is_unscoped` 1 本で、判定の側はそちらを通す。
@@ -695,9 +695,9 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
     """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場を添える。
 
-    置き場はどのツリーでも同じ相対（`wip/tickets/`）で、プロジェクト向けの提案はその
+    置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
     プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 §11.5、REQ-MLT-14）。
-    ワークスペースの `wip/<名前>/tickets/` は読まない。
+    ワークスペースの `wip/<名前>/proposals/` は読まない。
     同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
@@ -776,7 +776,7 @@ def scan_all(
 def fold(hits: list[Ticket]) -> list[Ticket]:
     """同じ識別子の写りを、権威のあるツリーで畳む。
 
-    子のワークツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
+    子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
     写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
     あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
     なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
@@ -813,7 +813,7 @@ def locate(root: str, tickets_rel: str, tree_root: str, ticket_id: str) -> tuple
 
 
 def _place(tickets_rel: str) -> str:
-    """置き場の綴りに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/tickets`）にも当たる。"""
+    """置き場の綴りに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/proposals`）にも当たる。"""
     parts = [re.escape(p) for p in tickets_rel.split("/") if p]
     optional = r"(?:[^\\/\s\x00]+[\\/])?"
     if len(parts) < 2:
@@ -851,7 +851,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     write_rule.compiled = re.compile(place, re.IGNORECASE)
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無い綴り
-    # （`mv x wip/tickets/done`）でも当てる。
+    # （`mv x wip/proposals/done`）でも当てる。
     states = "|".join(GUARDED_STATES)
     loose = _place(tickets_rel) + rf"[\\/]({states})([\\/]|\s|$)"
     # 写す動詞は行き先が最後の引数。置き場から外へ写す読み向きの cp は止めない。

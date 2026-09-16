@@ -26,14 +26,14 @@ import { requireTickets, ticketControl } from "./ticket-control.js";
 const DEBOUNCE_MS = 120;
 
 /**
- * 監視する場所。提案（ワークスペース、プロジェクト、全ワークツリーの `wip/tickets/`）、
+ * 監視する場所。提案（ワークスペース、プロジェクト、全ワークツリーの `wip/proposals/`）、
  * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、ワークツリーの登録。
  * glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [
-  "wip/**/tickets/**",
-  "projects/*/wip/**/tickets/**",
-  ".claude/worktrees/*/wip/**/tickets/**",
+  "wip/**/proposals/**",
+  "projects/*/wip/**/proposals/**",
+  ".claude/worktrees/*/wip/**/proposals/**",
   ".ccnavi/tickets/**",
   "projects/*/.ccnavi/tickets/**",
   ".claude/worktrees/*/.ccnavi/tickets/**",

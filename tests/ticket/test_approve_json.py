@@ -68,7 +68,7 @@ class ApproveJsonTest(PhaseHarness):
         # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
         # frontmatter の読めない提案。読めない提案の側に載る。
-        write(os.path.join(self.parent_tree, "wip", "tickets", "todo", "broken.md"), "---\n: :\n")
+        write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
         body = self.preview()
@@ -81,7 +81,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(parent["overflow"], [])
         self.assertEqual(child["parent"], "i0001")
         self.assertEqual(child["phase"], 1)
-        self.assertTrue(child["path"].replace("\\", "/").endswith("wip/tickets/todo/i0001-01.md"))
+        self.assertTrue(child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01.md"))
         self.assertEqual(child["overflow"], [])
         # 超えた項は文字列の並びで、種類の名前と「超えている」を含む。
         self.assertTrue(beyond["overflow"], beyond)
@@ -327,7 +327,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_refuses_when_only_the_markdown_body_of_a_child_changed(self):
         """2. 見せたあとで子の Markdown の本文だけを書き換えても、見せた指紋では承認しない。"""
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         shown = self.preview()
         self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
 
@@ -339,7 +339,7 @@ class ApproveJsonTest(PhaseHarness):
         ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに写る。
         """
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("rationale: r\n", "rationale: r\nnote: x\n", 1))
@@ -392,7 +392,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_nul_in_the_markdown_body_still_approves(self):
         """本文に生の NUL があっても、見せた指紋で承認できる（指紋は区切りの文字に頼らない）。"""
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
@@ -411,7 +411,7 @@ class ApproveJsonTest(PhaseHarness):
         （各部分が frontmatter から始まるため）ので、この確かめは振る舞いを固定するためのもの。
         """
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
@@ -486,7 +486,7 @@ class ApproveJsonTest(PhaseHarness):
         self._check_fixture("approve-preview.json", preview)
 
         # 承認の答えは親と子 1 枚の形で写す。超過のある子は提案を下げてから承認する。
-        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-02.md"))
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02.md"))
         self.commit_parent()
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

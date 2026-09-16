@@ -112,7 +112,7 @@ deny:
       承認済みチケットです。承認はユーザが VS Code のボード（端末なら
       'ccnavi --approve'）で行い、
       閉じるのは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh done <識別子>' です。
-      範囲を変えたいなら wip/tickets/todo/ に新しい提案を書いて承認を依頼してください。
+      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
 
   # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、ワークツリー側の設定は
   # 統合で main へ入る道を持つので、そちらも名前で止める。

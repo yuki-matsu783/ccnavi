@@ -220,12 +220,12 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
   const lost: TicketJson = {
     ...child,
     seen_in: [
-      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
-      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+      { tree: "", state: "todo", path: "/x/wip/proposals/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/proposals/todo/i0001-03.md" },
     ],
     scattered: [
-      { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
-      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+      { tree: "", state: "todo", path: "/x/wip/proposals/todo/i0001-03.md" },
+      { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/proposals/todo/i0001-03.md" },
     ],
   };
   const card = cardsOf(buildBoard({ ...base, tickets: [lost] })).get("i0001-03")!;

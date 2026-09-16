@@ -1359,7 +1359,7 @@ def revision_problems(
             # 残りの切り出し先は運び方で違う。MR があれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
             elsewhere = (
-                "残りは新しい親チケットの提案として wip/tickets/todo/ に書く"
+                "残りは新しい親チケットの提案として wip/proposals/todo/ に書く"
                 if phase.chat_only(root, conf, current.ticket)
                 else "残りは別 issue に切り出す（ccnavi-review.sh handoff）"
             )
@@ -1441,7 +1441,7 @@ def _reserved_project(t: ticket_mod.Ticket) -> list[rules.Problem]:
             t.ticket,
             f"`project: {t.project}` は層の名札に予約してある綴り（{reserved}）。"
             "その名前のプロジェクトは層として数えないので、このチケットの層が決まらない。"
-            "ワークスペース自身の提案は `wip/tickets/` に置く。プロジェクトの提案なら、"
+            "ワークスペース自身の提案は `wip/proposals/` に置く。プロジェクトの提案なら、"
             "そのプロジェクトの名前を変えてから置く",
         )
     ]

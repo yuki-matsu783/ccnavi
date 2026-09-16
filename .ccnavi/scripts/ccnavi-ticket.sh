@@ -9,7 +9,7 @@
 # judge は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は done で閉じられない。
 #
-# 状態は置き場（wip/tickets/{todo,doing,done,cancelled}/）で表す。動かすのはこの
+# 状態は置き場（wip/proposals/{todo,doing,done,cancelled}/）で表す。動かすのはこの
 # スクリプトだけで、直接ファイルを作ったり動かしたりするのは ccnavi が止める。
 # サブエージェントからの呼び出しも ccnavi が止める（agent_id が付いていたら拒む）。
 #

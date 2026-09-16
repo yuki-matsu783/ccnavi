@@ -343,6 +343,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
         )
         return problems
     root = root or os.getcwd()
+    problems.extend(_legacy_tickets(conf, root))
     if not _any_copies(conf, root) and not tree_has_tickets(root, conf.tickets):
         # 承認済みチケットも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
@@ -766,9 +767,9 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
 def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
 
-    提案の置き場はどのツリーでも同じ相対（`wip/tickets/`）で、プロジェクト向けはその
+    提案の置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けはその
     プロジェクトのツリーに置く（設計 §11.5、REQ-MLT-14）。ワークスペースの
-    `wip/<名前>/tickets/` は、名前が `projects/` に在っても在らなくても走査されない。走査
+    `wip/<名前>/proposals/` は、名前が `projects/` に在っても在らなくても走査されない。走査
     されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
     いちばん困るので名指しし、名前が在るなら正しい置き場を案内する。error にはしない。
     判定は動いている。
@@ -857,6 +858,71 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 )
             )
     return problems
+
+
+def _legacy_tickets(conf: settings.Settings, root: str) -> list[Problem]:
+    """旧の綴り（`wip/tickets/`）に取り残された提案を名指しする。
+
+    提案の置き場の既定を `wip/tickets` から `wip/proposals` に変えた（ADR-0054）。
+    旧の置き場に提案が残っていると、そこは走査されないので「承認待ちは無い」で通る。
+    黙って通る向きなので、ここで言う。
+
+    見るのは置き場の有無ではなく、**中に残っている提案**。置き場の有無だけで決めると、
+    新しい置き場を 1 つ作った時点で、旧の置き場に残った提案が永久に見えなくなる
+    （移し忘れがいちばん起きるのはこの形）。
+
+    数えないものが 2 つある。同じ綴りのファイルが新しい置き場にもあるもの（写し終えた分）と、
+    `done/` `cancelled/` に在って承認済みチケットが閉じているもの。後者は記録として
+    残っていても害が無い。閉じたことの権威は承認済みチケットの側で、フェーズの状態も
+    そちらから読む（`phase.phases_of`）。
+
+    綴りを設定で決めた人には言わない。`CCNAVI_TICKETS_PROPOSAL` を書いた人は自分の
+    綴りで動かしているので、それが旧の綴りでも既定の話は関係が無い。
+    """
+    if conf.tickets != settings.DEFAULT_TICKETS:
+        return []
+    closed, _ = approval.scan(conf, root, closed=True)
+    settled = {t.ticket for t in closed}
+    stale = []
+    for t in approval.trees(conf, root):
+        left = _left_behind(t.root, conf.tickets, settled)
+        if left:
+            stale.append(f"{t.name or '(main)'}（{', '.join(left)}）")
+    if not stale:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            "(ticket)",
+            f"提案の置き場の既定が `{settings.LEGACY_TICKETS}` から "
+            f"`{settings.DEFAULT_TICKETS}` に変わった。"
+            f"旧の置き場に残っていて走査されない提案がある: {'、'.join(stale)}。"
+            f"`{settings.DEFAULT_TICKETS}` の同じ状態の置き場へ移すか、"
+            f"`{settings.TICKETS_ENV}={settings.LEGACY_TICKETS}` を "
+            "`.claude/settings.json` の env に足すこと",
+        )
+    ]
+
+
+def _left_behind(tree_root: str, tickets_rel: str, settled: set[str]) -> list[str]:
+    """このツリーの旧の置き場に在って、いまの置き場から見えない提案の識別子。"""
+    old = os.path.join(tree_root, settings.LEGACY_TICKETS.replace("/", os.sep))
+    new = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
+    found = []
+    for state in ticket_mod.STATES:
+        try:
+            names = sorted(os.listdir(os.path.join(old, state)))
+        except OSError:
+            continue
+        for name in names:
+            if not name.endswith(".md"):
+                continue
+            if state in ticket_mod.CLOSED and name[:-3] in settled:
+                continue
+            if any(os.path.exists(os.path.join(new, s, name)) for s in ticket_mod.STATES):
+                continue
+            found.append(name[:-3])
+    return sorted(set(found))
 
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:

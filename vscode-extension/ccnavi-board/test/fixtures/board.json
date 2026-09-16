@@ -4,7 +4,7 @@
  "generated_at": "2026-09-13T13:50:22+0000",
  "settings": {
   "ticket_control": "enable",
-  "tickets": "wip/tickets",
+  "tickets": "wip/proposals",
   "approved": ".ccnavi/tickets",
   "projects": "<root>/projects"
  },
@@ -161,7 +161,7 @@
     "state": "todo",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/tickets/todo/i0001.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md"
    },
    "copy": {
     "status": "open",
@@ -183,17 +183,17 @@
     {
      "tree": "i0001",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001/wip/tickets/todo/i0001.md"
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md"
     },
     {
      "tree": "i0001-01",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-01/wip/tickets/todo/i0001.md"
+     "path": "<root>/.claude/worktrees/i0001-01/wip/proposals/todo/i0001.md"
     },
     {
      "tree": "i0001-02",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/todo/i0001.md"
+     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001.md"
     }
    ],
    "scattered": [],
@@ -216,7 +216,7 @@
     "state": "done",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/tickets/done/i0001-01.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/done/i0001-01.md"
    },
    "copy": {
     "status": "closed",
@@ -238,17 +238,17 @@
     {
      "tree": "i0001",
      "state": "done",
-     "path": "<root>/.claude/worktrees/i0001/wip/tickets/done/i0001-01.md"
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/done/i0001-01.md"
     },
     {
      "tree": "i0001-01",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-01/wip/tickets/todo/i0001-01.md"
+     "path": "<root>/.claude/worktrees/i0001-01/wip/proposals/todo/i0001-01.md"
     },
     {
      "tree": "i0001-02",
      "state": "done",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/done/i0001-01.md"
+     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/done/i0001-01.md"
     }
    ],
    "scattered": [],
@@ -280,7 +280,7 @@
     "state": "doing",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/tickets/doing/i0001-02.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/doing/i0001-02.md"
    },
    "copy": {
     "status": "open",
@@ -302,12 +302,12 @@
     {
      "tree": "i0001",
      "state": "doing",
-     "path": "<root>/.claude/worktrees/i0001/wip/tickets/doing/i0001-02.md"
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/doing/i0001-02.md"
     },
     {
      "tree": "i0001-02",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/todo/i0001-02.md"
+     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001-02.md"
     }
    ],
    "scattered": [],
@@ -330,7 +330,7 @@
     "state": "todo",
     "tree": "i0001",
     "tree_root": "<root>/.claude/worktrees/i0001",
-    "path": "<root>/.claude/worktrees/i0001/wip/tickets/todo/i0001-03.md"
+    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-03.md"
    },
    "copy": {
     "status": "none"
@@ -348,12 +348,12 @@
     {
      "tree": "i0001",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001/wip/tickets/todo/i0001-03.md"
+     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-03.md"
     },
     {
      "tree": "i0001-02",
      "state": "todo",
-     "path": "<root>/.claude/worktrees/i0001-02/wip/tickets/todo/i0001-03.md"
+     "path": "<root>/.claude/worktrees/i0001-02/wip/proposals/todo/i0001-03.md"
     }
    ],
    "scattered": [],

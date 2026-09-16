@@ -308,7 +308,7 @@ GUARDED = [
     ("sed -i s/a/b/ .claude/settings.json", SETTING_FILES),
     ("cp /tmp/rules.yml .ccnavi/common/rules.yml", SETTING_FILES),
     ("truncate -s 0 .claude/settings.json", SETTING_FILES),
-    ("mv wip/tickets/todo/a.md wip/tickets/doing/a.md", TICKET_STATE),
+    ("mv wip/proposals/todo/a.md wip/proposals/doing/a.md", TICKET_STATE),
     ("ccnavi --approve --yes x", APPROVAL),
     ("sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL),
     # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。

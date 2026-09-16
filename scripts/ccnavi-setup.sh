@@ -607,7 +607,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 if [ "$all" = yes ]; then
 	env_json=$(printf '%s' "$env_json" | jq '. + {
 		CCNAVI_STATE: "logs/state",
-		CCNAVI_TICKETS_PROPOSAL: "wip/tickets",
+		CCNAVI_TICKETS_PROPOSAL: "wip/proposals",
 		CCNAVI_TICKETS_APPROVED: ".ccnavi/tickets",
 		CCNAVI_PROJECT_HOME: ".ccnavi"
 	}')
