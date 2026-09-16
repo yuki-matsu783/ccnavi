@@ -208,7 +208,7 @@ test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () 
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   const html = renderBoard(buildBoard(empty), OPTIONS);
-  assert.ok(html.includes("チケットは無い"));
+  assert.ok(html.includes("チケット無し"));
   assert.equal((html.match(/class="empty"/g) ?? []).length, 4);
   assert.ok(html.includes('data-action="approve" disabled'));
 });

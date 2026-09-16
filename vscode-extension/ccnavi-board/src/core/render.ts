@@ -63,7 +63,7 @@ ${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button t
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
-${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットは無い</p>\n' : ""}<div class="board">
+${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケット無し</p>\n' : ""}<div class="board">
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
@@ -187,7 +187,7 @@ function renderProblems(problems: readonly string[]): string {
 function renderColumn(column: BoardColumn): string {
   const body =
     column.count === 0
-      ? '    <p class="empty">チケットは無い</p>'
+      ? '    <p class="empty">チケット無し</p>'
       : `    <ul class="cards">\n${column.cards.map(renderCard).join("\n")}\n    </ul>`;
   return `  <section class="column" data-state="${escapeHtml(column.state)}">
     <h2>
