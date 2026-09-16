@@ -253,7 +253,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, OPTIONS),
     renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, OPTIONS),
     renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, OPTIONS),
-    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), OPTIONS),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), OPTIONS),
   ];
   assert.match(PAGE_STYLE, /\.toolbar \{/);
   assert.match(PAGE_STYLE, /\.banner\.warn \{/);
@@ -272,7 +272,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, { ...OPTIONS, appearance: "claude-dark" }),
     renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
     renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
-    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), { ...OPTIONS, appearance: "claude-dark" }),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), { ...OPTIONS, appearance: "claude-dark" }),
   ];
   for (const html of themed) {
     assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));

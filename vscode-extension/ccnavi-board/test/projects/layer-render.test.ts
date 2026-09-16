@@ -30,7 +30,6 @@ function page(rows: readonly ProjectRow[], overrides: Partial<ProjectsPage> = {}
     ticketsEnabled: true,
     projectsDir: "/ws/projects",
     projectsRel: "projects",
-    projectsDirExists: true,
     ignored: true,
     lintError: "",
     dirProblems: [],

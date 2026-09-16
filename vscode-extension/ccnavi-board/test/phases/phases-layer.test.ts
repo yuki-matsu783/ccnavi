@@ -42,7 +42,6 @@ function projectsPage(rows: readonly ProjectRow[], overrides: Partial<ProjectsPa
     ticketsEnabled: true,
     projectsDir: "/ws/projects",
     projectsRel: "projects",
-    projectsDirExists: true,
     ignored: true,
     lintError: "",
     dirProblems: [],

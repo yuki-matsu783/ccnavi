@@ -258,7 +258,6 @@ export interface ProjectsPage {
   /** 置き場（絶対）。空なら置き場が無効（CCNAVI_PROJECTS が空） */
   readonly projectsDir: string;
   readonly projectsRel: string;
-  readonly projectsDirExists: boolean;
   readonly ignored: boolean;
   readonly lintError: string;
   readonly dirProblems: readonly LintProblem[];
@@ -280,7 +279,6 @@ export interface PageInput {
   readonly origins: Readonly<Record<string, string>>;
   readonly strays: readonly Stray[];
   readonly projectsRel: string;
-  readonly projectsDirExists: boolean;
   readonly ignored: boolean;
   /** プロジェクト名 → 層のルールファイルのルート相対（`layers[]` の path から）。層として数えられていなければ無い */
   readonly rulesRels: Readonly<Record<string, string>>;
@@ -319,7 +317,6 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
     ticketsEnabled: board.settings.ticket_control !== "disable",
     projectsDir: board.settings.projects,
     projectsRel: input.projectsRel,
-    projectsDirExists: input.projectsDirExists,
     ignored: input.ignored,
     lintError: input.lintError,
     dirProblems: input.lint === undefined ? [] : problemsOfProjectsDir(input.lint),

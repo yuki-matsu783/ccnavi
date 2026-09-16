@@ -51,7 +51,7 @@ ${renderBanners(page)}<section class="clone">
 </section>
 <section class="list">
   <h2>ワークスペース内のプロジェクト <span class="count">${page.rows.length}</span></h2>
-${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだ無い。上の欄から clone するか、既存のリポジトリを置き場の直下へ移す</p>' : renderList(page)}
+${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだ無い。上の欄から clone するか、既存のリポジトリを置き場（無ければ作る）の直下へ移す</p>' : renderList(page)}
 </section>
 ${renderStrays(page.strays)}<section class="workspace">
   <h2>ワークスペース本体</h2>
@@ -74,11 +74,6 @@ function renderBanners(page: ProjectsPage): string {
   if (page.projectsRel === "") {
     banners.push(`<div class="banner warn">置き場が無効（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われない</div>`);
     return `${banners.join("\n")}\n`;
-  }
-  if (!page.projectsDirExists) {
-    banners.push(
-      `<div class="banner"><code>${escapeHtml(page.projectsRel)}/</code> がまだ無い。<button type="button" class="action" data-action="create-dir">作成</button> clone すると git が作るので、無いままでも clone はできる</div>`,
-    );
   }
   if (!page.ignored) {
     banners.push(
@@ -302,7 +297,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       const target = button.getAttribute("data-name") || "";
       if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
       else if (action === "clone") { vscode.postMessage({ type: "clone", url: url.value, name: name.value }); }
-      else if (action === "create-dir") { vscode.postMessage({ type: "createDir" }); }
       else if (action === "fix-ignore") { vscode.postMessage({ type: "fixIgnore" }); }
       else if (action === "create-rules") { vscode.postMessage({ type: "createRules", name: target }); }
       else if (action === "open-rules") { vscode.postMessage({ type: "openRules", name: target }); }

@@ -11,7 +11,7 @@ function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
 }
 
 function page(rows: readonly ProjectRow[], overrides: Partial<ProjectsPage> = {}): ProjectsPage {
-  return { root: "/ws", generatedAt: "2026-09-13T00:00:00+0900", ticketsEnabled: true, projectsDir: "/ws/projects", projectsRel: "projects", projectsDirExists: true, ignored: false, lintError: "", dirProblems: [], rows, strays: [], workspaceWorktrees: [], existingNames: rows.map((r) => r.name), selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false, ...overrides };
+  return { root: "/ws", generatedAt: "2026-09-13T00:00:00+0900", ticketsEnabled: true, projectsDir: "/ws/projects", projectsRel: "projects", ignored: false, lintError: "", dirProblems: [], rows, strays: [], workspaceWorktrees: [], existingNames: rows.map((r) => r.name), selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false, ...overrides };
 }
 
 test("CB-D30 メニューは 1 つだけ開き、項目を押すと名前付きで送って閉じる。Esc でも閉じる", async () => {
