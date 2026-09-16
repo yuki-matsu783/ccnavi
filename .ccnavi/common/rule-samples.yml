@@ -151,7 +151,7 @@ deny:
     subject: "/repo/.claude/worktrees/x/.Claude/Settings.json"
     why: >-
       綴りを変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
-      組み込みの守りが畳んで止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
+      組み込みの守りが綴りの違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
   - tool: Bash
     subject: "GIT push origin main"
     why: >-
@@ -193,16 +193,7 @@ ask:
     why: パイプの後ろに立つ取得も拾う。コマンドの先頭なら当たる
   - tool: Bash
     subject: "CURL https://example.com"
-    why: 勧めるほうの文面も綴りを問わない。止める側だけ畳むと、案内が綴りで消える
-  - tool: Bash
-    subject: "CAT /etc/hosts"
-    why: >-
-      allow のコマンド名は畳まない（`(?-i:...)`）。畳むと、綴りを変えた呼び出しが
-      allow に当たり、言及の無いものを権限モードへ渡す安全網（UNDECLARED）が外れる。
-      確認できる者が居ないモードでは、その拒否ごと消える
-  - tool: Bash
-    subject: "FIND /etc -name x"
-    why: 同上。小文字の find は allow（prefer-glob）だが、綴りを変えた形は当たらない
+    why: 勧めるほうの文面も綴りを問わない。止める側だけ区別しないと、案内が綴りで消える
   - tool: Bash
     subject: "echo curl is a tool"
     why: >-
@@ -266,6 +257,15 @@ allow:
   - tool: Bash
     subject: "grep -n TODO ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
+  - tool: Bash
+    subject: "CAT /etc/hosts"
+    why: >-
+      コマンドの名前も区別しない（同じ綴りには同じ判定）。区別しない機械では `cat` そのものなので、
+      小文字なら通る呼び出しを綴りだけで別扱いにしない。代償として、区別する機械で `CAT` という
+      別の実行ファイルが在れば、この allow がそれにも掛かる（ADR-0051）
+  - tool: Bash
+    subject: "FIND /etc -name x"
+    why: 同上。prefer-glob も綴りを問わず当てる
   - tool: Bash
     subject: 'grep -n "git push" README.md'
     why: >-
