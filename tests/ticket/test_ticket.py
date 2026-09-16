@@ -860,6 +860,41 @@ class TicketTest(unittest.TestCase):
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
+    def test_check_does_not_mark_reviewed_when_a_child_cannot_move(self):
+        """レビュー待ちの子を done/ へ動かせなければ、レビュー済みのマーカーを置かない。
+
+        done/ に同じ識別子が既に在る形（動かした跡が残った）。マーカーを先に置くと、
+        子は review/ に残ったまま「レビュー済み」になり、check も --reviewed も通らず
+        取り出せなくなる。動かしてから置くので、直して打ち直せば通る。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        ok = self.request(fixture)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        stray = os.path.join(self.approved, "done", "i0001-01.md")
+        write(stray, "stray\n")
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", fixture
+        )
+        self.assertNotEqual(check.returncode, 0, check.stdout)
+        self.assertIn("行き先に既に在る", check.stderr)
+        marker = os.path.join(self.approved, "phases", "i0001", "1.reviewed")
+        self.assertFalse(os.path.exists(marker))
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+        self.assertTrue(os.path.exists(review))
+        with open(stray, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "stray\n")
+
+        os.remove(stray)
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", fixture
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertTrue(os.path.exists(marker))
+        self.assertFalse(os.path.exists(review))
+        self.assertTrue(os.path.exists(stray))
+
     def test_human_accepts_unresolved_but_not_changes_requested(self):
         self.family()
         self.close_phase()
@@ -973,6 +1008,27 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("todo/ にも在る", lint.stdout)
+
+    def test_a_ticket_in_two_homes_is_not_operated_on(self):
+        """同じ識別子が doing/ と done/ に在れば、どちらが本物か決まらないので止める。
+
+        動かした跡が両方に残った形。黙ってどちらかを選ぶと、閉じた記録を上書きするか、
+        閉じたはずのものが作業中として復活する。止めて、--lint が同じ 1 行で名指しする。
+        """
+        self.family()
+        os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
+        shutil.copy(
+            os.path.join(self.approved, "doing", "i0001-01.md"),
+            os.path.join(self.approved, "done", "i0001-01.md"),
+        )
+        done = self.ccnavi("ticket", "done", "i0001-01")
+        self.assertNotEqual(done.returncode, 0, done.stdout)
+        self.assertIn("i0001-01 が複数の場所にある", done.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")))
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotEqual(lint.returncode, 0, lint.stdout)
+        self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
 
     def test_new_child_in_ended_phase_clears_the_marks(self):
         self.family()
