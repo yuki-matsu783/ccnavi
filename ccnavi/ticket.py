@@ -903,8 +903,9 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
             # `src/Components/*` と `src/components/*` は同じ範囲として扱う。
             # 当てる側だけ区別すると、宣言した範囲に自分のファイルが入らない、が
             # 起きる。機械ごとに変えないのは、同じチケットがどの環境でも同じ場所で
-            # 止まるため。regex は書いた人が意図を持てるので、そこだけ区別を残す。
-            flags = 0 if regex else re.IGNORECASE
+            # 止まるため。`regex` も同じに畳む（ルールと揃える。rules._build）。
+            # 区別が要る `regex` は `(?-i:...)` で囲む。
+            flags = re.IGNORECASE
             try:
                 compiled = re.compile(expression, flags)
             except re.error as exc:
