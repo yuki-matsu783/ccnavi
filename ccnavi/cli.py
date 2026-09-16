@@ -384,6 +384,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
+    # この門は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
+    # 持つので、ここに dry-run は無い。読めない値は enable に倒れる。
+    conf.guard_unwatched = selfguard.resolve(
+        stderr,
+        "",
+        conf.guard_unwatched,
+        settings.GUARD_UNWATCHED_ENV,
+        selfguard.GATE_SETTINGS,
+    )
     log = audit.Log(conf.log)
     deadline = time.monotonic() + judge.DEADLINE_SECONDS
 

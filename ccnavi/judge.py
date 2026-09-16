@@ -39,10 +39,16 @@ DEADLINE_SECONDS = 3.0
 # 「下した判定を適用するか」、こちらは「そもそも誰が判断するか」を決める。
 #
 # ルールが言及していない呼び出しについて、ccnavi は判定を持たない。持っていない
-# 判定を ask として返すと、判断できるモードでも必ず人に止まり、auto モードが
-# 実質効かなくなる。だから返さず、Claude Code の権限モードに従う。
+# 判定を ask として返すと、判断できる相手が居るモードでも必ず人に止まる。だから
+# 返さず、Claude Code の権限モードに従う。
 # ルールに書いていないものは、ルールに書いていないものとして渡す。
-PERMISSION_JUDGED = ("auto",)
+#
+# 判断できる相手が居るモードは 4 つ。auto は classifier が読み、残りは Claude Code
+# 自身の権限の仕組み（settings.json の permissions と、モードごとの既定）が決める。
+# ccnavi がそこに確認を上乗せしても、判断する者が増えるわけではなく、同じ呼び出しで
+# 2 度聞かれるだけになる。ここに無い綴りは ask に倒す。名前が 1 つ増えたときに、
+# それが素通りではなく確認になるように。
+PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 
 # 人にも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
 # 通る」に化けるので、許可としない（REQ-PRE-08）。
@@ -419,7 +425,7 @@ def decide_before(
         # どのタイプも言及しなかった。ccnavi はこの呼び出しの判定を持たない。
         # 結末は Claude Code の権限モードが決める。
         record.code = reasons.CODE_UNCERTAIN if record.degraded else reasons.CODE_UNDECLARED
-        verdict = undeclared_verdict(payload.permission_mode, record.degraded)
+        verdict = undeclared_verdict(payload.permission_mode, record.degraded, conf.guard_unwatched)
         texts = [
             reasons.undeclared(
                 payload.tool_name, subject, conf.rules, record.degraded, verdict == rules.DENY
@@ -756,19 +762,27 @@ def ticket_verdict(
     )
 
 
-def undeclared_verdict(permission_mode: str, degraded: str) -> str:
+def undeclared_verdict(permission_mode: str, degraded: str, guard_unwatched: str = "") -> str:
     """どのタイプも言及しなかった呼び出しを、権限モードごとにどう扱うか。
 
     渡すのは「ルールが言及していない」ときだけ。読み切れなかったコマンド
     （degraded）は渡さない。ccnavi が読めなかったという事実は判定の結果に
     現れないので、渡すと「判断材料が足りない」ことが誰にも伝わらないまま
-    モードの既定に落ちる。読めなかったことを言えるのはここだけ。
+    モードの既定に落ちる。読めなかったことを言えるのはここだけ（REQ-PRE-04）。
 
     知らないモードは ask に倒す。名前が 1 つ増えたときに、それが素通りではなく
     確認になるように。設定漏れがガードの消失にならない側へ既定を置く。
+
+    確認できる者が居ないモードは、既定では通さない（REQ-PRE-08）。そこで ask を
+    返しても「誰も答えないまま通る」に化けるため。CCNAVI_GUARD_UNWATCHED を
+    disable にしたプロジェクトだけ、ここも渡す側になる。読み切れなかった
+    呼び出しは、その設定でも渡さない。渡す先が「確認しない」と決まっている以上、
+    読めなかったことを言える場所が他に無い。
     """
     if permission_mode in PERMISSION_NO_JUDGE:
-        return rules.DENY
+        if degraded or guard_unwatched != selfguard.DISABLE:
+            return rules.DENY
+        return HANDOVER
     if not degraded and permission_mode in PERMISSION_JUDGED:
         return HANDOVER
     return rules.ASK

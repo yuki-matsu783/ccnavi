@@ -48,6 +48,16 @@ GUARD_CORE_FILES_ENV = "CCNAVI_GUARD_CORE_FILES"
 # 守る手段（CLI から打つ形）ではなく守る対象で名乗る。切りたい人が何を切ることになるのかを、
 # 名前から読めるようにする。
 GUARD_TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
+# GUARD_UNWATCHED_ENV は、人にも classifier にも確認できないモード
+# （dontAsk・bypassPermissions）で、ルールがどこも言及しない呼び出しを止めるか。
+# enable（既定）/ disable の 2 値。
+#
+# enable なら通さない。そこで確認を返しても答える者が居ないので、通せば
+# 「誰も見ないまま通った」になる。disable なら判定を返さず、そのモードの
+# 取り決めに委ねる。ccnavi はルールに書かれたものだけを止める道具になる。
+#
+# この門に dry-run は無い。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
+GUARD_UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # BIN_ENV は ccnavi 自身の実行ファイル。判定器の実体なので、書き換えられると
 # ルールを 1 行も変えずに判定を差し替えられる。既定は持たない。置き場は
 # プロジェクトごとに違ううえ、間違った既定はそこに在る別のファイルを
@@ -285,6 +295,11 @@ class Settings:
     guard_ticket_approval: str = ""
     guard_ticket_approval_declared: str = ""
 
+    # guard_unwatched は、確認できる者が居ないモードで未宣言の呼び出しを止めるか。
+    # enable / disable の 2 つだけを取る。解決は cli が selfguard.resolve で行い、
+    # 読めない値は enable に倒れる。空は enable と同じに読む。
+    guard_unwatched: str = ""
+
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
     # 対象に入るのは、綴りを推測して守ると、そこに在る別のファイルを
     # 「ccnavi の実体」として扱うことになるため。
@@ -358,6 +373,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_core_files=os.environ.get(GUARD_CORE_FILES_ENV, ""),
         guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
+        guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,

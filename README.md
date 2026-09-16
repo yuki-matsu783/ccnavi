@@ -295,6 +295,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
+| `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。人にも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない）。「ルールが言及していない呼び出し」。この門に `dry-run` は無く、それ以外の値は `enable` として動いて `--lint` が言う |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh` と書く。これは振り分けの sh で、実行ファイルは sh の 1 つ上の `bin/<os>-<arch>/`、つまり `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
@@ -664,9 +665,9 @@ Claude Code の権限モードと `settings.json` の `permissions` が決める
 権限を配れることになる。
 
 `allow` を書くと消えるのは、**ccnavi 自身が出す確認と拒否**。言及の無い呼び出しは、
-`default` / `acceptEdits` / `plan` / 不明なモードでは ccnavi が確認を出し、
-`dontAsk` / `bypassPermissions` では通さない（次の節）。`allow` に当たればどちらも起きない。
-`auto` はもともと権限モードに渡すので変わらない。記録には `decision` が `allow` の行が残り、
+知らないモードでは ccnavi が確認を出し、`dontAsk` / `bypassPermissions` では通さない
+（次の節）。`allow` に当たればどちらも起きない。`auto` / `default` / `acceptEdits` / `plan`
+はもともと権限モードに渡すので変わらない。記録には `decision` が `allow` の行が残り、
 `additionalContext` を当てる先にもなる。
 
 作業ツリーに結び付いた承認済みチケットがあれば、その範囲の判定とも比べて強い側を採る。
@@ -684,11 +685,14 @@ ccnavi は判定を返さず、**Claude Code の権限モードに従う**。ル
 | `permission_mode` | 呼び出しはどうなるか | 記録の `decision` |
 |---|---|---|
 | `auto` | classifier が判断する | `handover` |
-| `default` / `acceptEdits` / `plan` / 不明 | 人に確認が出る | `ask` |
-| `dontAsk` / `bypassPermissions` | 通さない | `deny` |
+| `default` / `acceptEdits` / `plan` | Claude Code 自身の権限の仕組み（`settings.json` の `permissions` と、モードごとの既定）が決める | `handover` |
+| 不明なモード / モードが来ない | 人に確認が出る | `ask` |
+| `dontAsk` / `bypassPermissions` | 通さない。`CCNAVI_GUARD_UNWATCHED=disable` なら委ねる | `deny` |
 
-持っていない判定を ask として返すと、判断できるモードでも必ず人に止まり、auto モードが
-実質効かなくなる。持っていない判定を返さないことのほうが、ガードとして正しい（ADR-0009）。
+持っていない判定を ask として返すと、判断できる相手が居るモードでも必ず人に止まる。
+`default` では Claude Code 自身が書き込みとシェルに確認を出すので、ccnavi がそこに
+上乗せしても、判断する者が増えるわけではなく、同じ呼び出しで 2 度聞かれるだけになる。
+持っていない判定を返さないことのほうが、ガードとして正しい（ADR-0009、ADR-0049）。
 
 **渡した回も記録には残る。** `decision` が `handover` の行がそれで、人に聞いた
 回の `ask` とは混ざらない。ルールを足すべきかどうかは前者の数で決まり、ガードが
@@ -701,6 +705,12 @@ jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq 
 確認できる者が居ないモードだけは通さない。あそこで ask を返しても「誰も答えない
 まま通る」に化けるので、許可としない（REQ-PRE-08）。知らないモードの名前は
 確認に倒す。名前が 1 つ増えたときに、それが素通りではなく確認になるように。
+
+ここを開けるかどうかはプロジェクトが決める。`CCNAVI_GUARD_UNWATCHED=disable` と
+書いた層では、`dontAsk` と `bypassPermissions` でも判定を返さず、そのモードの
+取り決めに委ねる。ccnavi が止めるのはルールに書いたものだけになる、という選択で、
+`--lint` が「切れている」と warn で言う。読み切れなかった呼び出しは、この設定でも
+委ねない。
 
 読み切れなかったコマンド（`PARSE_UNCERTAIN`）は権限モードに委ねない。読めな
 かったという事実は判定の結果に現れず、委ねた先には伝わらないので、それを言える
@@ -1103,7 +1113,7 @@ docs/../.env
 だから共通層の `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
 `Grep` と `Glob` を含めていない。足しても止まるのは「守りたい場所を起点に指定した検索」だけで、
 ルートからの検索は素通りしたままになる。塞がらないものを足すと、止まっているつもりの範囲だけが
-広がる（[ADR-0049](docs/adr/0049-search-tools-and-ignore.md)）。
+広がる（[ADR-0050](docs/adr/0050-search-tools-and-ignore.md)）。
 
 守りは 3 層に分かれていて、ccnavi が持つのは 3 つ目だけ。
 

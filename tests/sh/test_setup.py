@@ -80,6 +80,7 @@ REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_RULES", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
 GUARD_ENV = ("CCNAVI_RESTORE_IF_DENY", "CCNAVI_GUARD_CORE_FILES")
 # チケットの承認の経路。enable か disable しか取らないので、モードには合わせない。
 TICKET_APPROVAL_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
+UNWATCHED_ENV = "CCNAVI_GUARD_UNWATCHED"
 # チケット制御を使うか（settings.py の TICKET_CONTROL_ENV）。プロジェクトが導入のときに決める。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
@@ -313,6 +314,16 @@ class WritesTheExpectedShape(SetupTest):
     def test_the_ticket_approval_gate_is_enable_under_an_enable_mode(self):
         self.run_setup("--mode", "enable")
         self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
+
+    def test_the_unwatched_gate_is_written_as_enable(self):
+        """確認できる者が居ないモードの門も、モードに合わせず enable で書く。
+
+        この門も enable か disable しか取らない。止めずに報告する段は
+        CCNAVI_MODE=dry-run が持つので、dry-run で導入したプロジェクトでも
+        ここは enable のまま書く。切るプロジェクトは自分で 1 行書き換える。
+        """
+        self.run_setup()
+        self.assertEqual(self.read_settings()["env"][UNWATCHED_ENV], "enable")
 
     def test_ticket_control_is_written_as_enable_by_default(self):
         """チケット制御は既定の enable でも常に書く。切るつまみを設定ファイルの中で

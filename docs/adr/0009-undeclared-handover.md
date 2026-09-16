@@ -17,8 +17,11 @@ ccnavi はその呼び出しについて判定を持たない。判定を返さ�
 | `permission_mode` | 結末 | 記録の `decision` |
 |---|---|---|
 | `auto` | classifier が判断する | `handover` |
-| `default` / `acceptEdits` / `plan` / 空 / 不明 | 人に確認が出る | `ask` |
-| `dontAsk` / `bypassPermissions` | 通さない（REQ-PRE-08） | `deny` |
+| `default` / `acceptEdits` / `plan` | Claude Code 自身の権限の仕組みが決める | `handover` |
+| 空 / 不明 | 人に確認が出る | `ask` |
+| `dontAsk` / `bypassPermissions` | 通さない（REQ-PRE-08）。設定で委ねる側にできる | `deny` |
+
+どのモードを委ねる側に置くか、確認できる者が居ないモードをどうするかは ADR-0049 で決めた。
 
 ルールが `ask` と書いた場所は権限モードによらず確認に出す。文面は「危険だから聞いている」
 とは書かない。言えないから委ねている。
