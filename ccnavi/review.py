@@ -334,7 +334,7 @@ def check(
     phase_no: int,
     result_path: str,
 ) -> int:
-    """依頼の後を見る。通ればマーカーを置いてゲートが開く。"""
+    """依頼の後を見る。通ればマーカーを置いて先へ進めるようになる。"""
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
@@ -399,7 +399,7 @@ def check(
         {"mr": result.mr.number, "accepted": []},
     ):
         return 1
-    stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。ゲートが開いた\n")
+    stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。先へ進める\n")
     return 0
 
 
@@ -548,7 +548,7 @@ def _reviewed_in_chat(
         return 1
     if approval.MARK_REQUESTED in ph.marks:
         # 依頼を出したあとに --chat で通すと、マージリクエストに付いた指摘を数えずに
-        # ゲートが開く。数える道（check）と、数えたうえで受け入れる道（accept）がある。
+        # 足止めが解ける。数える道（check）と、数えたうえで受け入れる道（accept）がある。
         stderr.write(
             f"ccnavi: フェーズ {ph.label} はマージリクエストに依頼済み。--chat では通せない。"
             f"'{review_sh} check --phase {ph.number}'（指摘が残っていれば "
@@ -1254,7 +1254,7 @@ def _result(stderr: TextIO, path: str) -> Result | None:
 
 
 def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
-    """依頼したのと同じマージリクエストの写しか。違うものでゲートを開けない。"""
+    """依頼したのと同じマージリクエストの写しか。違うもので先へ進めない。"""
     result = _result(stderr, path)
     if result is None:
         return None

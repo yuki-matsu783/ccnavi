@@ -337,7 +337,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・ゲート・"
+                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・レビューの足止め・"
                 "サブエージェントの制限は効かない",
             )
         )
@@ -853,7 +853,7 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     "(project)",
-                    f".ccnavi/scripts/{name} が無い。ゲートの中で通る形が無くなる",
+                    f".ccnavi/scripts/{name} が無い。レビュー待ちの中で通る形が無くなる",
                 )
             )
     return problems

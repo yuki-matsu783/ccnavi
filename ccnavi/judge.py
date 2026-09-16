@@ -64,7 +64,7 @@ HANDOVER = "(handover)"
 # 実行後の監視が作業ツリーの実物を見て捕まえる。
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# サブエージェントの起動ツール。ゲートが止める対象で、対象の文字列を持たないので
+# サブエージェントの起動ツール。レビューの足止めが止める対象で、対象の文字列を持たないので
 # 見出しだけを subject にする。
 AGENT_TOOL = "Agent"
 
@@ -226,15 +226,16 @@ def decide_before(
             notices + [reasons.subagent_forbidden(subject, runner, layer)],
         )
 
-    # ゲート。人間レビュー要のフェーズが終わっていてマーカーが無い間、サブエージェントの
-    # 起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。ルールより先に見る。
-    if conf.tickets_enabled and payload.tool_name in phase.GATED_TOOLS:
+    # レビューの足止め。人間レビュー要のフェーズが終わっていてマーカーが無い間、
+    # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
+    # ルールより先に見る。
+    if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
-        closed = phase.gate(root, conf, parent.ticket) if parent is not None else None
+        held = phase.held_phase(root, conf, parent.ticket) if parent is not None else None
         exempt = payload.tool_name == "Bash" and phase.exempt(subject, record.degraded)
-        if closed is not None and not exempt:
-            record.code, record.rules = phase.CODE_GATE, [reasons.TICKET_RULE]
-            reason = phase.gate_reason(closed, payload.tool_name, root)
+        if held is not None and not exempt:
+            record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
+            reason = phase.hold_reason(held, payload.tool_name, root)
             return refuse(stdout, mode, record, rules.DENY, notices + [reason])
 
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
@@ -493,7 +494,7 @@ def subject_of(payload: hookio.Input) -> str:
     if field is None:
         return ""
     if tool == AGENT_TOOL:
-        # 起動には対象の文字列が無い。ゲートが止める対象なので、見出しを subject に
+        # 起動には対象の文字列が無い。足止めが止める対象なので、見出しを subject に
         # して判定に入れる。
         return payload.field_value(field) or payload.field_value("prompt") or "(agent)"
     value = payload.field_value(field)

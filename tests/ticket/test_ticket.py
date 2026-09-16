@@ -9,7 +9,7 @@
    書いても、子のチケットで判定される
 2. 子が親の範囲を超えても承認はでき、超えた場所への書き込みは判定で止まること
 3. 状態の置き場への直接の作成と、サブエージェントからの状態の移動が止まること
-4. フェーズが終わるとゲートが閉じ、レビューが済むと開くこと
+4. フェーズが終わるとレビューで止まり、レビューが済むと開くこと
 5. 変更要求のレビューは人の端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
 """
@@ -591,7 +591,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn(head.strip(), copy)
         self.assertIn("started_at:", copy)
 
-    # ---- 4. フェーズとゲート
+    # ---- 4. フェーズとレビューの足止め
 
     def close_phase(self):
         for child in ("i0001-01", "i0001-02"):
@@ -608,16 +608,16 @@ class TicketTest(unittest.TestCase):
         self.assertIn("request", self.reason(said))
 
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         exempt = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             command="sh .ccnavi/scripts/ccnavi-git.sh status",
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt))
         # 次のフェーズの計画は通る。
         plan = self.hook(
             "PreToolUse",
@@ -625,13 +625,13 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             file_path=os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md"),
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(plan))
-        # main からの起動にはゲートが無い。
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(plan))
+        # main からの起動には足止めが無い。
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(elsewhere))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(elsewhere))
 
     def test_gate_guides_sh_from_workspace_root(self):
-        """ゲートと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
+        """足止めと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
 
         `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切ったワークツリーでは
         相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
@@ -644,23 +644,23 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(said))
 
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
         self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
 
-        # 案内どおりに打った形は、ゲートの例外に当たる。
+        # 案内どおりに打った形は、足止めの例外に当たる。
         guided = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
             command=f"{review_sh} request --phase 1 --body-file b.md",
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(guided), self.reason(guided))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(guided), self.reason(guided))
 
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
-        """ゲートが閉じている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
+        """レビューで止まっている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。
 
         免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ目印で
         渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に
@@ -669,7 +669,7 @@ class TicketTest(unittest.TestCase):
         self.family()
         self.close_phase()
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell), "レビューで止まっていない")
 
         exempt = self.hook(
             "PreToolUse",
@@ -677,7 +677,7 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             command='sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"',
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt), self.reason(exempt))
 
         # 判定の土台そのもの。shellread が読んだ文字列は 1 本のコマンドで、免除の形に当たる。
         reading = shellread.read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: a b"')
@@ -688,16 +688,16 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
 
     def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
-        """ゲートの中で通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
+        """足止めの中で通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
 
-        禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、ゲートが閉じている間に
+        禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、レビューで止まっている間に
         `env sh …ccnavi-review.sh` の形で何でも前に置けるようになる
         （wip/design/launcher-scripts.md §3.5.3、12 節 W4）。先頭の `sh` の形は今のまま通る。
         """
         self.family()
         self.close_phase()
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("DENY_PHASE_GATE", self.reason(shell), "ゲートが閉じていない")
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(shell), "レビューで止まっていない")
 
         exempt = self.hook(
             "PreToolUse",
@@ -705,7 +705,7 @@ class TicketTest(unittest.TestCase):
             self.parent_tree,
             command="sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
         )
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(exempt), self.reason(exempt))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt), self.reason(exempt))
 
         for command in (
             "env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
@@ -713,7 +713,7 @@ class TicketTest(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertIn("DENY_PHASE_GATE", self.reason(result), self.reason(result))
+                self.assertIn("DENY_PHASE_REVIEW", self.reason(result), self.reason(result))
 
     def test_phase_without_review_skips_the_gate(self):
         self.family(review=(False, False))
@@ -722,7 +722,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("省略", self.reason(said))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.skipped")))
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     # ---- レビュー（sh の代わりに、テストがリモートの写しを渡す）
 
@@ -834,7 +834,7 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("未解決", check.stderr)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
         data["threads"][0]["resolved"] = True
         write(fixture, json.dumps(data))
@@ -850,7 +850,7 @@ class TicketTest(unittest.TestCase):
         )
         self.assertEqual(check.returncode, 0, check.stderr)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     def test_human_accepts_unresolved_but_not_changes_requested(self):
         self.family()
@@ -1104,11 +1104,11 @@ class TicketTest(unittest.TestCase):
         refused = self.ccnavi("ticket", "cancel", "i0001", "--reason", "やめる")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("開いている子", refused.stderr)
-        # 子を閉じてもゲートが閉じている間は閉じない。
+        # 子を閉じてもレビューで止まっている間は閉じない。
         self.close_phase()
         refused = self.ccnavi("ticket", "done", "i0001")
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("ゲート", refused.stderr)
+        self.assertIn("レビュー準備中", refused.stderr)
 
     def test_moving_state_keeps_the_proposal_text(self):
         self.propose("i0001", allow=("src/*", "wip/*"))

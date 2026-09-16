@@ -350,9 +350,9 @@ def _find(
 def _parent_still_busy(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """親を閉じてよいか。開いている子や閉じたゲートがある間は閉じさせない。
+    """親を閉じてよいか。開いている子やレビュー待ちのフェーズがある間は閉じさせない。
 
-    親の承認済みチケットが閉じるとゲートの鍵（cwd から引く親）が消え、レビュー要の
+    親の承認済みチケットが閉じると足止めの鍵（cwd から引く親）が消え、レビュー要の
     フェーズが終わっていても誰も止めなくなる。
     """
     if found.is_child:
@@ -381,11 +381,10 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     ):
         return []
     problems: list[str] = []
-    closed = phase.gate(root, conf, parent_id)
-    if closed is not None:
+    held = phase.held_phase(root, conf, parent_id)
+    if held is not None:
         problems.append(
-            f"{parent_id} のフェーズ {closed.label} はレビュー待ち（ゲートが閉じている）。"
-            "レビューを済ませてから"
+            f"{parent_id} のフェーズ {held.label} は{held.review_label}。レビューを済ませてから"
         )
     closed_copies, _ = approval.scan(conf, root, closed=True)
     copy = approval.by_id(copies + closed_copies).get(parent_id)

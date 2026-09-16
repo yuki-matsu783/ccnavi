@@ -6,11 +6,11 @@
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
 3. 順序は承認で止まる（前が閉じてレビューが済むまで次の番号は承認されない、overlap は例外）
 4. 成果物が無ければフェーズの最後の子を閉じられない
-5. 延期したフェーズではゲートが閉じず、次の依頼に含まれる
+5. 延期したフェーズではレビューで止まらず、次の依頼に含まれる
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
 7. 親はフィードバック計画が承認されるまで閉じられない
 8. 残った指摘の切り出しの下書き
-9. このセッションで見るフェーズ（`review: chat`）のゲートと締め
+9. このセッションで見るフェーズ（`review: chat`）の足止めと締め
 
 範囲の上限（設計 wip/design/approve-carry.md §3・§4）は ScopeLimitTest が見る。
 """
@@ -580,7 +580,7 @@ class PhaseTest(PhaseHarness):
         said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("一緒に見る", self.reason(said))
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
         # 延期したフェーズには依頼できない。
         self.merge("i0001-01")
         fixture = self.remote()
@@ -598,7 +598,7 @@ class PhaseTest(PhaseHarness):
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         ok = self.request(fixture, 2)
         self.assertEqual(ok.returncode, 0, ok.stderr)
         self.assertIn("このレビューが含むフェーズ", self.last_request_body)
@@ -625,8 +625,8 @@ class PhaseTest(PhaseHarness):
         self.merge("i0001-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        # ボードの JSON は「依頼済みでゲートが閉じたまま」を review_waiting で言う。レビューが
-        # 済んでゲートが開けば false に戻り、依頼のマーカーは残る。
+        # ボードの JSON は「依頼済みで止まったまま」を review_waiting で言う。レビューが
+        # 済んで足止めが解ければ false に戻り、依頼のマーカーは残る。
         self.assertEqual(self.board_phase(1), (True, True, ["requested"]))
         self.assertEqual(self.check(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
@@ -682,9 +682,9 @@ class PhaseTest(PhaseHarness):
         write(fixture, json.dumps(data))
         self.assertNotEqual(self.check(fixture, 1).returncode, 0)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         # フィードバック計画: 実装フィードバック対応を 1 本。承認がレビューの合意になり、
-        # ゲートが開く。指摘は消えず、フィードバック作業フェーズの check が数える。
+        # 足止めが解ける。指摘は消えず、フィードバック作業フェーズの check が数える。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
             os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
@@ -694,7 +694,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
         self.assertIn("済んだ扱い", planned.stdout)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
         result = self.ccnavi("--explain")
         self.assertIn("フェーズ 2（実装フィードバック対応）", result.stdout)
         self.assertIn("段階: フィードバック対応中", result.stdout)
@@ -1002,9 +1002,9 @@ class ChatReviewTest(PhaseHarness):
         self.assertIn("--reviewed 1 --chat", said)
         self.assertNotIn("request --phase", said)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
-        # レビューが要るフェーズなので、ゲートは mr のときと同じに閉じる。
+        # レビューが要るフェーズなので、mr のときと同じに止まる。
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         self.assertIn("--reviewed 1 --chat", self.reason(spawn))
         # n と答えればマーカーは置かれない。
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="n\n")
@@ -1013,14 +1013,14 @@ class ChatReviewTest(PhaseHarness):
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
-        # y でマーカーが置かれ、ゲートが開く。写しも依頼の記録も要らない。
+        # y でマーカーが置かれ、足止めが解ける。写しも依頼の記録も要らない。
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertEqual(mark["by"], "chat")
         self.assertEqual(mark["tickets"], ["i0001-01"])
         opened = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
-        self.assertNotIn("DENY_PHASE_GATE", self.reason(opened))
+        self.assertNotIn("DENY_PHASE_REVIEW", self.reason(opened))
         # 2 度打っても通る（同じことを言うだけ）。
         again = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(again.returncode, 0, again.stderr)
@@ -1070,7 +1070,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertEqual(self.close_child("i0001-01").returncode, 0)
         self.commit_parent("close 01")
         self.merge("i0001-01")
-        # 延期したフェーズではゲートが閉じない。
+        # 延期したフェーズでは止まらない。
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/a*"], review=False))
         self.commit_parent()
@@ -1134,7 +1134,7 @@ class ChatReviewTest(PhaseHarness):
         )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("マージリクエスト", refused.stderr)
-        # ゲートも開かない。読めないことでレビューが消える道は作らない。
+        # 足止めも解けない。読めないことでレビューが消える道は作らない。
         payload = {
             "hook_event_name": "PreToolUse",
             "tool_name": "Agent",
@@ -1143,7 +1143,7 @@ class ChatReviewTest(PhaseHarness):
             "tool_input": {"description": "次の子"},
         }
         spawn = self.ccnavi("--mode", "enable", stdin=json.dumps(payload), phases=thin)
-        self.assertIn("DENY_PHASE_GATE", self.reason(spawn))
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     def test_a_feedback_phase_can_be_seen_in_the_session_too(self):
         """フィードバック対応も chat で回せる。人が見ない道にはなっていない。"""
@@ -1386,7 +1386,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("種類の上限では切り詰めていない", self.reason(result))
 
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
-        """7. 同じ状態で、Bash の実行前の判定（ゲートの経路）も例外で終わらない。"""
+        """7. 同じ状態で、Bash の実行前の判定（足止めの経路）も例外で終わらない。"""
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )

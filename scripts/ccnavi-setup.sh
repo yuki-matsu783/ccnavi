@@ -38,7 +38,7 @@
 # ときだけ 2 で断る。人が名指ししたものが無いのは、環境の誤りとして扱う。
 #
 # 置き場は 2 つに分けて固定する（ADR-0044）。CCNAVI_BIN_PATH が指すのは
-# .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh。ゲートの sh と同じ置き場）で、
+# .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh。代わりに通る sh と同じ置き場）で、
 # 実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に置く。sh は自分の 1 つ上の bin/ から、
 # hook が起動した機械に合うものを選ぶ。settings.json は Windows・WSL・Linux・macOS で
 # 同じものを開くので、1 行の command から機械ごとに違う実体を起動するには、そこで選ぶしかない。
@@ -47,7 +47,7 @@
 # CCNAVI_BIN_PATH が既定でない綴りなら書き換えず、名指しするだけにする。
 #
 # 配布先に既にあるものは触らない。入れ替えるのは `--force` を付けたときだけ。
-# ルールファイルもゲートの sh も、入れた先で直されている前提のもの。黙って上書き
+# ルールファイルも代わりに通る sh も、入れた先で直されている前提のもの。黙って上書き
 # すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配布元の形へ戻す。
 #
 # `disable` は受け付けない。監視される側が書けるファイルから監視を止める形に
@@ -98,8 +98,8 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # 起動時に落ちる。ccnavi-push-approved.sh はボードが承認のあと端末に送る 1 行の中身。
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
-# 追跡する側に置き、ゲートの sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
-# hook が起動するものだけが在ってゲートの sh が無い形を作らないため。
+# 追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
+# hook が起動するものだけが在って代わりに通る sh が無い形を作らないため。
 DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
@@ -146,7 +146,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
-.ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・ゲートの sh と振り分けの sh
+.ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場は、配布先の
 .gitignore に足す。
 USAGE
@@ -387,7 +387,7 @@ fi
 # 配るものを決める。配布先に既にあるものは触らない。入れ替えるのは --force の
 # ときだけで、そのときも配布元に在るものだけを動かす。
 #
-# 「配布元に無い」を黙って飛ばさない。ルールファイルやゲートの sh が欠けた
+# 「配布元に無い」を黙って飛ばさない。ルールファイルや代わりに通る sh が欠けた
 # 配布元から配ると、判定するものだけが入って何を止めるかが入らない。その形は
 # 最後の「まだ無いもの」にしか出ず、配った側の落ち度に見えない。
 deploy_new=""
@@ -695,7 +695,7 @@ other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --a
 # あり、丸ごと無視すると、そのプロジェクトが何を止めるかまで git から消える。
 #
 # 綴りは配った組み立ての置き場（`.ccnavi/bin/<os>-<arch>/`）だけ。振り分けの sh は
-# ゲートの sh と同じく追跡する側に置く。無視すると、clone した先に sh が届かず hook が
+# 代わりに通る sh と同じく追跡する側に置く。無視すると、clone した先に sh が届かず hook が
 # 起動しない。置き場は配った機械のぶんだけ足す。別の機械で打ち直せば、その機械のぶんが
 # 足される。
 IGNORE_HEADER="# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）"
@@ -1023,7 +1023,7 @@ if [ "$vscode_linked" = yes ]; then
 fi
 
 # 配る。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズの種類）→
-# ゲートの sh → 振り分けの sh。途中で落ちたときに、判定するものだけが在って
+# 代わりに通る sh → 振り分けの sh。途中で落ちたときに、判定するものだけが在って
 # 何を止めるかが無い、という形にしないため。
 if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
@@ -1138,7 +1138,7 @@ for name in $DEPLOY_SCRIPTS; do
 			why="ボードが承認のあと端末で走らせる、承認済みチケットのコミットと push"
 			;;
 		*)
-			why="ゲートの中で通る形"
+			why="足止めの中で通る形"
 			;;
 		esac
 		note_missing "${DEPLOY_SCRIPT_DIR}/${name}（${why}）"

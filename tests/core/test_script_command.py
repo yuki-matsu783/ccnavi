@@ -43,7 +43,7 @@ class ScriptCommandTest(unittest.TestCase):
         self.assertTrue(spelled.endswith("/.ccnavi/scripts/ccnavi-review.sh'"), spelled)
 
     def test_quoted_spelling_stays_exempt_and_forbidden(self):
-        """空白を含むルートでも、案内どおりに打った形がゲートの例外と禁止に当たること。
+        """空白を含むルートでも、案内どおりに打った形が足止めの例外と禁止に当たること。
 
         判定は hook と同じく shellread を通した文字列に当てる。引用の中の空白は
         区切りと別の目印になるので、`\\S*ccnavi-...` がパスを 1 語として読める。
@@ -67,10 +67,10 @@ class ScriptCommandTest(unittest.TestCase):
         self.assertTrue(spelled.endswith("/ws/.ccnavi/scripts/ccnavi-review.sh"), spelled)
 
     def test_spelling_stays_exempt_and_forbidden(self):
-        """案内どおりに打った形が、ゲートの例外にもサブエージェントの禁止にも当たること。
+        """案内どおりに打った形が、足止めの例外にもサブエージェントの禁止にも当たること。
 
         案内だけ絶対パスにして、判定が相対の綴りしか見ていなければ、案内どおり打った
-        レビューの依頼がゲートに止められる。
+        レビューの依頼が足止めに止められる。
         """
         with tempfile.TemporaryDirectory() as root:
             review = settings.script_command(root, "ccnavi-review.sh")

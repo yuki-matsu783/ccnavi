@@ -424,7 +424,7 @@ class SetupTest(unittest.TestCase):
     def make_source(self):
         """配布元のふり。実行ファイルと、共通層の rules / risk と、自身の層の phases。
 
-        ゲートの sh 3 本は起動して最初に共通部（ccnavi-common.sh）を読むので、配布元にも
+        代わりに通る sh 3 本は起動して最初に共通部（ccnavi-common.sh）を読むので、配布元にも
         それを置く。無いと「配布元に無くて配れないもの」として名指しされる。
         """
         src = tempfile.mkdtemp(prefix="ccnavi-union-source-")

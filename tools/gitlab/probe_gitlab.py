@@ -458,8 +458,8 @@ def main() -> int:
         said[:120].replace("\n", " "),
     )
     record(
-        "ゲートが Agent を止める",
-        "DENY_PHASE_GATE" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        "レビューの足止めが Agent を止める",
+        "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
     body = write(os.path.join(OUT, "request-1.md"), "見てほしい点\n\n- src/a と src/b を足した\n")
@@ -544,8 +544,8 @@ def main() -> int:
         checked.stderr.strip()[:200],
     )
     record(
-        "その間ゲートは閉じたまま",
-        "DENY_PHASE_GATE" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        "その間は止まったまま",
+        "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
     api(
@@ -609,8 +609,8 @@ def main() -> int:
         (checked.stdout + checked.stderr).strip()[:200],
     )
     record(
-        "ゲートが開く",
-        "DENY_PHASE_GATE" not in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        "足止めが解ける",
+        "DENY_PHASE_REVIEW" not in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
     memo = write(
