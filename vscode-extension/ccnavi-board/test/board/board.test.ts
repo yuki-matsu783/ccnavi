@@ -88,7 +88,15 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
     phases: base.parents[0].phases.map((p): PhaseJson => {
       const marks: Record<string, Record<string, unknown>> =
         p.number === 2 ? { requested: { at: "t" } } : {};
-      return { ...p, state: p.number === 2 ? "ended" : p.state, gate_closed: true, marks };
+      // 判定が出す形に揃える。ゲート閉はレビュー要を含み、レビュー待ちは依頼済の閉じたフェーズだけ
+      return {
+        ...p,
+        state: p.number === 2 ? "ended" : p.state,
+        gate_closed: true,
+        review_required: true,
+        review_waiting: p.number === 2,
+        marks,
+      };
     }),
   };
   const cards = cardsOf(buildBoard({ ...base, parents: [parent] }));
@@ -98,7 +106,7 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   assert.deepEqual(card.phases[0].actions, []);
   assert.deepEqual(card.phases[1].actions, [{ kind: "accept", parent: "i0001", phase: 2 }]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
-  // 人のレビュー待ちは「依頼済 かつ ゲート閉」。依頼していないフェーズ 1 は閉じていても待ちではない
+  // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
   // 子のカードには自分のフェーズのマーカーとゲートとレビュー待ちが写る。親は false
@@ -114,15 +122,47 @@ test("CB-T09b レビューが済んでゲートが開いたフェーズは、依
   const parent: ParentJson = {
     ...base.parents[0],
     phases: base.parents[0].phases.map((p): PhaseJson =>
-      p.number === 1 ? { ...p, marks: { requested: { at: "t" }, reviewed: { at: "t" } }, gate_closed: false } : p,
+      p.number === 1
+        ? {
+            ...p,
+            marks: { requested: { at: "t" }, reviewed: { at: "t" } },
+            review_required: true,
+            gate_closed: false,
+            review_waiting: false,
+          }
+        : p,
     ),
   };
   const cards = cardsOf(buildBoard({ ...base, parents: [parent] }));
   const card = cards.get("i0001")!;
+  // マーカーは残り、待ちだけが false になる。マーカーを削って「直す」形は取らない
   assert.deepEqual(card.phases[0].marks, ["requested", "reviewed"]);
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.deepEqual(card.phases[0].actions, []);
+  assert.deepEqual(cards.get("i0001-01")!.marks, ["requested", "reviewed"]);
   assert.equal(cards.get("i0001-01")!.reviewWaiting, false);
+});
+
+test("CB-T09c 親カードは、自分の番号のフェーズがレビュー待ちでも、札の元になる項目を持たない", () => {
+  const base = fixture();
+  const parent: ParentJson = {
+    ...base.parents[0],
+    phases: base.parents[0].phases.map((p): PhaseJson =>
+      p.number === 1
+        ? { ...p, marks: { requested: { at: "t" } }, review_required: true, gate_closed: true, review_waiting: true }
+        : p,
+    ),
+  };
+  // 親のチケットに phase が入っていても（判定は入れないが）、親は子の項目を写さない
+  const tickets = base.tickets.map((t) => (t.ticket === "i0001" ? { ...t, phase: 1 } : t));
+  const cards = cardsOf(buildBoard({ ...base, tickets, parents: [parent] }));
+  const card = cards.get("i0001")!;
+  assert.equal(card.reviewWaiting, false);
+  assert.equal(card.gateClosed, false);
+  assert.deepEqual(card.marks, []);
+  // フェーズ行と子のカードには写る
+  assert.equal(card.phases[0].reviewWaiting, true);
+  assert.equal(cards.get("i0001-01")!.reviewWaiting, true);
 });
 
 test("CB-T10 表示しているパスだけを開く", () => {

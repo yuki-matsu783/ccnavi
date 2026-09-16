@@ -200,11 +200,22 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
 
 test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビューが済んでゲートが開いた子には出さない", () => {
   const base = fixture();
+  // 判定が出す形に揃える。ゲート閉はレビュー要を含み、レビュー待ちは「依頼済 かつ ゲート閉」を判定が言う
   const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
     ...base,
     parents: base.parents.map((parent) => ({
       ...parent,
-      phases: parent.phases.map((p) => (p.number === 1 ? { ...p, marks, gate_closed: gateClosed } : p)),
+      phases: parent.phases.map((p) =>
+        p.number === 1
+          ? {
+              ...p,
+              marks,
+              review_required: true,
+              gate_closed: gateClosed,
+              review_waiting: gateClosed && "requested" in marks,
+            }
+          : p,
+      ),
     })),
   });
   // クローズ・レビュー済・ゲート開の子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
@@ -212,7 +223,7 @@ test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビュ
   const done = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false)), OPTIONS);
   assert.ok(!done.includes("レビュー依頼済"));
   assert.ok(done.includes('<span class="fact mark mark-reviewed">レビュー済</span>'));
-  assert.ok(done.includes('<span class="phase-status">終了 · レビュー済 · リスク: 0 (LOW)</span>'));
+  assert.ok(done.includes('<span class="phase-status">終了 · レビュー済 · レビュー要 · リスク: 0 (LOW)</span>'));
   // 依頼を出した後に同じフェーズへ子を足すなどでゲートが開いた間も、動くのはレビュアーではないので出さない
   const reopened = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, false)), OPTIONS);
   assert.ok(!reopened.includes("レビュー依頼済"));
@@ -220,7 +231,7 @@ test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビュ
   const waiting = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, true)), OPTIONS);
   assert.ok(waiting.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
   assert.ok(waiting.includes('<span class="badge gate">ゲート閉</span>'));
-  assert.ok(waiting.includes('<span class="phase-status">終了 · ゲート閉 · レビュー依頼済 · リスク: 0 (LOW)<button'));
+  assert.ok(waiting.includes('<span class="phase-status">終了 · ゲート閉 · レビュー依頼済 · レビュー要 · リスク: 0 (LOW)<button'));
   const stillClosed = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, true)), OPTIONS);
   assert.ok(stillClosed.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
   // 依頼を出していない子には、ゲートが閉じていても依頼済の札は出ない

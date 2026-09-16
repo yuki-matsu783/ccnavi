@@ -40,7 +40,7 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
-  /** 依頼を出したのにゲートが閉じたまま。人のレビュー待ち */
+  /** 依頼を出したのにゲートが閉じたまま（人のレビュー待ち）。JSON の `review_waiting` の写し */
   readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
   readonly riskLine: string;
@@ -213,7 +213,7 @@ function toCard(
     scattered: t.scattered,
     marks: isParent ? [] : marks,
     gateClosed: !isParent && (ownPhase?.gate_closed ?? false),
-    reviewWaiting: !isParent && ownPhase !== undefined && reviewWaiting(ownPhase),
+    reviewWaiting: !isParent && (ownPhase?.review_waiting ?? false),
     pendingApproval: pending.has(t.ticket),
     stage: ownParent && isParent ? ownParent.stage : "",
     wrapped: isParent && wrapped,
@@ -240,21 +240,13 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   return "todo";
 }
 
-/**
- * 依頼を出したのにゲートが閉じたまま（レビューが済んでいない）。ゲートの開閉は JSON が言うとおりで、
- * reviewed の有無をここで見直さない。子カードの札・フェーズ行の「レビュー依頼済」・受け入れの操作は
- * みなこれを読む。
- */
-function reviewWaiting(p: PhaseJson): boolean {
-  return p.gate_closed && "requested" in p.marks;
-}
-
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
-  const waiting = reviewWaiting(p);
   const actions: Action[] = [];
-  // 受け入れて進めるのは、人のレビュー待ちのとき。依頼を出していないフェーズは、先に親が request を打つ。
-  if (waiting) {
+  // 受け入れて進めるのは、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）のとき。待ちかどうかは
+  // 判定が `review_waiting` で言う。子カードの札・フェーズ行の「レビュー依頼済」・受け入れの操作はみな
+  // それを読み、ゲートとマーカーからここで組み直さない。
+  if (p.review_waiting) {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
   }
   return {
@@ -264,7 +256,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     state: p.state,
     marks,
     gateClosed: p.gate_closed,
-    reviewWaiting: waiting,
+    reviewWaiting: p.review_waiting,
     reviewRequired: p.review_required,
     riskLine: p.risk_line,
     tickets: p.tickets,

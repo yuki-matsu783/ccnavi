@@ -239,7 +239,7 @@ function renderBadges(card: Card): string {
     badges.push(badge("worktree none", "作業ツリーなし"));
   }
   // 依頼済の札は、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）の間だけ。
-  // 済んだかどうかは board.ts が JSON のゲートから決め、ここで reviewed を見て判定し直さない。
+  // 待ちかどうかは判定が JSON の `review_waiting` で言う。ここで reviewed やゲートを見て判定し直さない。
   if (card.reviewWaiting) {
     badges.push(badge("mark mark-requested", MARK_LABELS.requested));
   }
