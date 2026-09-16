@@ -64,9 +64,42 @@ export type PreviewParse =
   | { readonly ok: true; readonly value: ApprovePreview }
   | { readonly ok: false; readonly error: string };
 
+/**
+ * 途中で止まった承認（README「承認の JSON」の `partial`）。置いたものは戻らないので、
+ * どこまで置いたかをそのまま受け取って人に伝える。
+ */
+export interface ApprovePartial {
+  /** 承認済みチケットに入ったぶん（新規は置いた、改版は書き換えた） */
+  readonly placed: readonly string[];
+  /** 止まったところの識別子 */
+  readonly ticket: string;
+  /** 止まった理由（実行ファイルの文面そのまま） */
+  readonly reason: string;
+  /** 止まるまでに出た行（マーカーを消した、改版した）。端末なら標準出力に出ていたぶん */
+  readonly lines: readonly string[];
+}
+
+/**
+ * 途中で止まったことを人に伝える文。何が残っているかを言い切る。
+ * `placed` に止まった識別子自身が入るのは、書けたあとの後始末（マーカーを置く）で
+ * 落ちたとき。「i0001 で止まった…i0001 は入っている」と読めてしまうので、そこだけ言い方を変える。
+ */
+export function partialMessage(partial: ApprovePartial): string {
+  const { placed, ticket, reason, lines } = partial;
+  const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
+  const what =
+    placed.length === 0
+      ? "承認済みチケットは 1 件も置かれていない"
+      : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っている。` +
+        "コミットと push は送っていない（送るのは承認できたときだけ）。ボードを更新して確かめる";
+  const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
+  return `ccnavi --approve --yes が${where}止まった: ${reason}。${what}${done}`;
+}
+
 export type ResultParse =
   | { readonly ok: true; readonly value: ApproveResult }
   | { readonly ok: false; readonly mismatch: ApproveMismatch }
+  | { readonly ok: false; readonly partial: ApprovePartial }
   | { readonly ok: false; readonly error: string };
 
 export function parseApprovePreview(text: string): PreviewParse {
@@ -107,6 +140,18 @@ export function parseApproveResult(text: string): ResultParse {
         expected: list(raw.mismatch.expected).map(str),
         current: list(raw.mismatch.current).map(str),
         digest: { expected: str(digest.expected), current: str(digest.current) },
+      },
+    };
+  }
+  // 途中で止まった。置いたものは戻らないので、mismatch と同じく成功にはしない。
+  if (isRecord(raw.partial)) {
+    return {
+      ok: false,
+      partial: {
+        placed: list(raw.partial.placed).map(str),
+        ticket: str(raw.partial.ticket),
+        reason: str(raw.partial.reason),
+        lines: list(raw.partial.lines).map(str),
       },
     };
   }

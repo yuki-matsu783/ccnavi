@@ -607,6 +607,35 @@ class PhaseTest(PhaseHarness):
 
     # ---- 6. フィードバック計画
 
+    def test_a_failed_copy_does_not_clear_the_marks_of_a_reviewed_phase(self):
+        """置けなかったときに、済んでいるレビューを巻き戻さない。
+
+        承認済みチケットを置くのと、そのフェーズのマーカーを消すのは、置けたときだけ両方起きる。
+        置けなかったのにマーカーだけ消えると、子は 1 枚も増えていないのにレビュー準備中へ戻り、
+        サブエージェントの起動が止まる（DENY_PHASE_REVIEW）。人は何が起きたか分からない。
+        """
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
+        # 同じフェーズに子をもう 1 枚足すが、置き場に同じ名前のディレクトリを作って書けなくする。
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent("propose 02")
+        os.makedirs(os.path.join(self.approved, "i0001-02.md"))
+        refused = self.approve()
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("書けない", refused.stderr)
+        # 子は増えていない。だからマーカーも消えていない。
+        self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
+
     def test_feedback_plan_comes_after_the_last_review_and_only_once(self):
         self.family(plan=["design"])
         # 早すぎる改版は拒む。

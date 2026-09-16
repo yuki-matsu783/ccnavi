@@ -92,6 +92,36 @@ ${SCRIPT}
 }
 
 /**
+ * 読み直せなかったときの画面。ボードの中身は出せないが、承認のオーバーレイは同じように被せる。
+ * 承認した文は取り返しがつかないので、ボードが描けないことを理由に消さない（設計 §10）。
+ * 骨組みはボードと同じ STYLE と SCRIPT を使う。SCRIPT は列も絞り込みも無い DOM でも動くように
+ * 書いてある（無い要素には触らない）ので、ボードの本体が無くてもそのまま載る。
+ */
+export function renderErrorPage(error: string, options: RenderOptions): string {
+  const { nonce } = options;
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ccnavi ボード</title>
+<style nonce="${nonce}">
+${STYLE}
+</style>
+</head>
+${bodyTag(options.appearance)}
+<p class="board-empty">ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p>
+<pre class="load-error">${escapeHtml(error)}</pre>
+${renderApproval(options.approval)}<script nonce="${nonce}">
+${SCRIPT}
+</script>
+</body>
+</html>
+`;
+}
+
+/**
  * 承認のオーバーレイ。一覧の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
  * 「この N 件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
  */
@@ -535,6 +565,7 @@ ${BUTTON_STYLE}
   input:disabled, select:disabled, textarea:disabled { opacity: .6; }
   .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
   .foot.error { color: var(--vscode-editorError-foreground); }
+  pre.load-error { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 12px; }
   /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
      無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは効かない */
   button.action:hover:not(:disabled):not(:focus-visible) { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
@@ -914,10 +945,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       approve.textContent = "承認待ち " + n + " 件を承認";
       approve.disabled = n === 0;
     }
-    state.project = project;
-    state.parent = parent;
-    state.attention = attention;
-    save();
+    // 絞り込みの部品が無い画面（読み直せなかったときのエラー画面）では控えに触らない。
+    // 触ると、覚えていた絞り込みが「すべて」で上書きされる。
+    if (filter || parentFilter || attentionFilter) {
+      state.project = project;
+      state.parent = parent;
+      state.attention = attention;
+      save();
+    }
   }
   function select(element, value) {
     if (!element) { return; }
