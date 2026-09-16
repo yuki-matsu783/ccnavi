@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, ops, phase, settings, tree
+from . import approval, fsio, gitcmd, ops, phase, phasetypes, settings, tree
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -410,15 +410,21 @@ def reviewed(
     phase_no: int,
     accept_unresolved: bool,
     result_path: str,
+    chat: bool = False,
 ) -> int:
     """人が端末で打つ。未解決を見せてから y/N。変更要求は通せない。
 
     受け入れたスレッドの一覧は控えの置き場に書き出す。sh がそれを MR のコメントに写す。
+
+    `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。写しも依頼の記録も
+    要らない代わりに、種類が chat と宣言しているフェーズにしか当たらない。
     """
     found = _parent_phase(stderr, root, conf, cwd, phase_no)
     if found is None:
         return 1
     parent, ph = found
+    if chat:
+        return _reviewed_in_chat(stdin, stdout, stderr, conf, root, parent, ph, accept_unresolved)
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
@@ -491,6 +497,98 @@ def reviewed(
     stdout.write(
         f"OK: フェーズ {phase_no} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
     )
+    return 0
+
+
+def _reviewed_in_chat(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    parent: ticket_mod.Ticket,
+    ph: phase.Phase,
+    accept_unresolved: bool,
+) -> int:
+    """このセッションで見たフェーズを、人が端末で通す（設計 §9.8）。
+
+    ホストへ出ないので写しも依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
+    あること（`mr` と宣言したフェーズを安い経路で通させない）と、フェーズが終わって
+    いること、そして依頼が出ていないこと。依頼を出した先には指摘が付いているかもしれず、
+    それを数えずに通す道はここには置かない（数えるのは `check`、受け入れるのは `accept`）。
+    実績のリスクが高ければ MR を勧めるが、止めはしない（ADR-0051）。
+    """
+    if accept_unresolved:
+        stderr.write(
+            "ccnavi: --chat に未解決スレッドは無い（ホストへ出ていない）。"
+            "--accept-unresolved は外すこと\n"
+        )
+        return 1
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    if ph.review_kind != phasetypes.REVIEW_CHAT:
+        if ph.review_kind == phasetypes.REVIEW_MR:
+            stderr.write(
+                f"ccnavi: フェーズ {ph.label} はマージリクエストで見るフェーズ。"
+                "--chat では通せない。"
+                f"'{review_sh} request --phase {ph.number} --body-file <依頼文>' から\n"
+            )
+        else:
+            stderr.write(
+                f"ccnavi: フェーズ {ph.label} はレビューの要らないフェーズ。通すものが無い\n"
+            )
+        return 1
+    if not ph.ended:
+        stderr.write(
+            f"ccnavi: フェーズ {ph.label} はまだ終わっていない（開いている子がある）。"
+            "子を全部閉じてから\n"
+        )
+        return 1
+    if approval.MARK_REQUESTED in ph.marks:
+        # 依頼を出したあとに --chat で通すと、マージリクエストに付いた指摘を数えずに
+        # ゲートが開く。数える道（check）と、数えたうえで受け入れる道（accept）がある。
+        stderr.write(
+            f"ccnavi: フェーズ {ph.label} はマージリクエストに依頼済み。--chat では通せない。"
+            f"'{review_sh} check --phase {ph.number}'（指摘が残っていれば "
+            f"'{review_sh} accept {ph.number}'）から\n"
+        )
+        return 1
+    if approval.MARK_REVIEWED in ph.marks:
+        stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
+        return 0
+    stdout.write(f"フェーズ {ph.label}（親 {parent.ticket}）の子:\n")
+    for t in ph.tickets:
+        stdout.write(f"  - {t.ticket} {t.title}\n")
+    if ph.risk_line:
+        stdout.write(f"{ph.risk_line}\n")
+    if ph.risk_escalates:
+        stdout.write(
+            "実績のリスクが高い。マージリクエストで見ることを勧める"
+            "（このまま chat で通すこともできる）。\n"
+        )
+    stdout.write("このセッションで見たものとしてレビュー済みにしてよいなら y、やめるならそれ以外: ")
+    stdout.flush()
+    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
+        stderr.write("ccnavi: レビュー済みにしなかった\n")
+        return 1
+    data = {
+        "by": phasetypes.REVIEW_CHAT,
+        "tickets": [t.ticket for t in ph.tickets],
+        "accepted": [],
+    }
+    if ph.risk_escalates:
+        record = ph.risk or {}
+        data["risk"] = str(record.get("level") or "")
+        data["recommended"] = phasetypes.REVIEW_MR
+    if not _mark(
+        stderr,
+        approval.home_dir(conf, root, parent.ticket, ""),
+        parent.ticket,
+        ph.number,
+        approval.MARK_REVIEWED,
+        data,
+    ):
+        return 1
+    stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     return 0
 
 

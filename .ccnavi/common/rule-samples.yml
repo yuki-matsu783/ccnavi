@@ -148,6 +148,19 @@ deny:
     subject: "cp /tmp/x /repo/.claude/settings.local.json"
     why: 行き先に来た設定ファイル
   - tool: Write
+    subject: "/repo/.claude/worktrees/x/.Claude/Settings.json"
+    why: >-
+      綴りを変えても hook の登録。区別しない機械では同じファイルで、シェルから書く形は
+      組み込みの守りが綴りの違いを無視して止めている。`regex` のルールだけ区別すると、この 1 経路が抜ける
+  - tool: Bash
+    subject: "GIT push origin main"
+    why: >-
+      Windows では大文字でも同じコマンドが走る。綴りで判定が割れると、同じルールが
+      機械によって止めたり通したりする
+  - tool: Read
+    subject: "/repo/.claude/worktrees/x/.ENV"
+    why: 認証情報の場所も綴りを問わない
+  - tool: Write
     subject: "/repo/.ccnavi/scripts/ccnavi-git.sh"
     why: git の入口。書き換えれば git のルールがまとめて外れる
   - tool: Bash
@@ -178,6 +191,9 @@ ask:
   - tool: Bash
     subject: "cat /repo/urls.txt | wget -i -"
     why: パイプの後ろに立つ取得も拾う。コマンドの先頭なら当たる
+  - tool: Bash
+    subject: "CURL https://example.com"
+    why: 勧めるほうの文面も綴りを問わない。止める側だけ区別しないと、案内が綴りで消える
   - tool: Bash
     subject: "echo curl is a tool"
     why: >-
@@ -241,6 +257,15 @@ allow:
   - tool: Bash
     subject: "grep -n TODO ccnavi/cli.py"
     why: 読むだけ。prefer-read-grep が当てて通す
+  - tool: Bash
+    subject: "CAT /etc/hosts"
+    why: >-
+      コマンドの名前も区別しない（同じ綴りには同じ判定）。区別しない機械では `cat` そのものなので、
+      小文字なら通る呼び出しを綴りだけで別扱いにしない。代償として、区別する機械で `CAT` という
+      別の実行ファイルが在れば、この allow がそれにも掛かる（ADR-0051）
+  - tool: Bash
+    subject: "FIND /etc -name x"
+    why: 同上。prefer-glob も綴りを問わず当てる
   - tool: Bash
     subject: 'grep -n "git push" README.md'
     why: >-
