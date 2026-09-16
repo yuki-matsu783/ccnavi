@@ -141,7 +141,10 @@ _ALLOW: list[dict] = [
     {
         # 作業ツリーを変えようがない読み取り。既定に落ちている最中でも、
         # ここまで確認を出すと、本当に見てほしい 1 件がその中に埋もれる。
-        # Grep と Glob は書かない。判定が対象を取り出せないので当たらない。
+        # Grep と Glob は書かない。対象は取り出せる（探し始める場所のパス）が、
+        # それは探索の中身を代表しない。Read は 1 ファイルずつなので
+        # builtin-credentials が先に当たって止まるのに対し、Grep はその deny の
+        # match に無いので、ここで広く許すと credentials ごと素通りになる。
         "id": "builtin-read-anything",
         "match": "Read",
         "glob": "*",
