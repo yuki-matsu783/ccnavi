@@ -8,20 +8,20 @@ function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
   return new Map(board.columns.flatMap((c) => c.cards).map((card) => [card.id, card]));
 }
 
-test("CB-T05 列はチケットの置き場で、親のあとに子が並ぶ。取り消しは完了に入る", () => {
+test("CB-T05 列は置き場から引き、親のあとに子が並ぶ。レビュー待ちは作業中、取り消しは取り消しの列", () => {
   const board = buildBoard(fixture());
   assert.deepEqual(
     board.columns.map((c) => [c.state, c.cards.map((card) => card.id)]),
     [
       ["todo", ["i0001-03"]],
-      ["doing", ["i0001", "i0001-02"]],
-      ["review", ["i0001-04"]],
-      ["done", ["i0001-01", "i0001-05"]],
+      ["doing", ["i0001", "i0001-02", "i0001-04"]],
+      ["done", ["i0001-01"]],
+      ["cancelled", ["i0001-05"]],
     ],
   );
-  assert.deepEqual(board.columns.map((c) => c.label), ["承認待ち", "作業中", "レビュー待ち", "完了"]);
+  assert.deepEqual(board.columns.map((c) => c.label), ["未着手", "作業中", "完了", "取り消し"]);
   assert.equal(board.totalCount, 6);
-  // 残りは承認待ち・作業中・レビュー待ち
+  // 残りは未着手と作業中（レビュー待ちを含む）
   assert.equal(board.remainingCount, 4);
 });
 
@@ -51,17 +51,17 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.equal(waiting.worktreeExists, false);
   assert.equal(waiting.seenIn.length, 2);
 
-  // レビュー待ちは提案の側（wip/proposals/review/）にあり、承認済みチケットでもある
+  // レビュー待ちは提案の側（wip/proposals/review/）にあり、承認済みチケットでもある。列は作業中で、待ちは属性
   const review = cards.get("i0001-04")!;
-  assert.equal(review.column, "review");
+  assert.equal(review.column, "doing");
   assert.equal(review.proposalState, "review");
   assert.equal(review.copyStatus, "review");
   assert.match(review.openPath, /wip\/proposals\/review\/i0001-04\.md$/);
   assert.equal(review.cancelledAt, "");
 
-  // 取り消しは完了列に cancelled_at を持って入る。提案の側には無い
+  // 取り消しは approved/done/ に cancelled_at を持って入る。提案の側には無く、列は取り消し
   const cancelled = cards.get("i0001-05")!;
-  assert.equal(cancelled.column, "done");
+  assert.equal(cancelled.column, "cancelled");
   assert.equal(cancelled.proposalState, null);
   assert.equal(cancelled.copyStatus, "closed");
   assert.notEqual(cancelled.cancelledAt, "");
@@ -69,7 +69,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.match(cancelled.openPath, /\.ccnavi\/approved\/done\/i0001-05\.md$/);
 });
 
-test("CB-T07 提案が無ければ承認済みチケットの置き場が列。どちらにも無ければ不備として承認待ちに置く", () => {
+test("CB-T07 提案が無ければ承認済みチケットの置き場が列。どちらにも無ければ不備として未着手に置く", () => {
   const base = fixture();
   const doing: TicketJson = {
     ...base.tickets[1],
@@ -89,8 +89,9 @@ test("CB-T07 提案が無ければ承認済みチケットの置き場が列。�
   assert.equal(cards.get("i0001-09")!.column, "doing");
   assert.deepEqual(cards.get("i0001-09")!.issues, []);
   assert.equal(cards.get("i0001-09")!.openPath, "/x/.ccnavi/approved/doing/i0001-09.md");
-  assert.equal(cards.get("i0001-08")!.column, "done");
+  assert.equal(cards.get("i0001-08")!.column, "cancelled");
   assert.equal(cards.get("i0001-08")!.cancelledAt, "2026-01-01T00:00:00+0000");
+  assert.equal(cardsOf(buildBoard({ ...base, tickets: [{ ...closed, cancelled_at: "" }] })).get("i0001-08")!.column, "done");
   assert.equal(cards.get("i0001-07")!.column, "todo");
   assert.match(cards.get("i0001-07")!.issues[0], /提案が見つからない/);
   assert.equal(buildBoard(json).issueCount, 1);
@@ -323,7 +324,7 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
   assert.equal(cards.get("i0001-02")!.attention, false);
   assert.equal(cards.get("i0001-03")!.attention, true);
   assert.equal(cards.get("i0001-04")!.attention, false);
-  // 取り消した子はワークツリーが無いが、完了列なので要対応ではない
+  // 取り消した子はワークツリーが無いが、取り消しの列なので要対応ではない
   assert.equal(cards.get("i0001-05")!.attention, false);
   // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（札の「未承認」は出ない）でも要対応。
   // 落とすと「要対応だけ」の絞り込みで隠れ、承認の対象から外れる
@@ -332,11 +333,11 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
   assert.equal(revision.get("i0001")!.copyStatus, "open");
   assert.equal(revision.get("i0001")!.pendingApproval, true);
   assert.equal(revision.get("i0001")!.attention, true);
-  // ワークツリーが無いのが要対応なのは承認待ちと作業中だけ。レビュー待ちは畳んだ後でも普通
+  // ワークツリーが無いのが要対応なのは未着手と作業中（レビュー待ちを含む）。閉じたものと取り消しは違う
   const noTree: TicketJson = { ...base.tickets[4], worktree: { exists: false, path: "" } };
   const reviewNoTree = cardsOf(buildBoard({ ...base, tickets: [...base.tickets.slice(0, 4), noTree, base.tickets[5]] }));
-  assert.equal(reviewNoTree.get("i0001-04")!.column, "review");
-  assert.equal(reviewNoTree.get("i0001-04")!.attention, false);
+  assert.equal(reviewNoTree.get("i0001-04")!.column, "doing");
+  assert.equal(reviewNoTree.get("i0001-04")!.attention, true);
   const doingNoTree = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02" ? { ...t, worktree: { exists: false, path: "" } } : t)) }));
   assert.equal(doingNoTree.get("i0001-02")!.attention, true);
   // 人のレビュー待ちのフェーズがあれば、その子（レビュー待ち）も親（フェーズ行の要約）も要対応

@@ -69,8 +69,8 @@ test("CB-D42 「要対応だけ」で人が動く必要の無いカードが隠�
     assert.ok(page.one('.card[data-id="i0001-05"]').classList.contains("hidden"));
     assert.equal(page.one('.column[data-state="todo"] > h2 > .count').textContent, "1");
     assert.equal(page.one('.column[data-state="doing"] > h2 > .count').textContent, "0");
-    assert.equal(page.one('.column[data-state="review"] > h2 > .count').textContent, "0");
     assert.equal(page.one('.column[data-state="done"] > h2 > .count').textContent, "0");
+    assert.equal(page.one('.column[data-state="cancelled"] > h2 > .count').textContent, "0");
     assert.equal((page.state() as { attention: boolean }).attention, true);
     page.click(page.one('.controls button[data-action="approve"]'));
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: true });

@@ -8,10 +8,11 @@
 export const BOARD_VERSION = 1;
 
 /**
- * ボードの列。`todo` / `review` は提案の置き場（`wip/proposals/<状態>/`）そのもの。`doing` / `done` は
- * 承認済みチケットの置き場（`.ccnavi/approved/<状態>/`）から引いた列で、提案の側には無い（ADR-0055）
+ * ボードの列。置き場は 4 つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`、ADR-0055）だが、
+ * 列は 未着手（`todo/`）/ 作業中（`approved/doing/` と `review/`）/ 完了（`approved/done/`）/ 取り消し
+ * （`approved/done/` で `cancelled_at` を持つ）の 4 つ。レビュー待ちは列ではなくカードの属性で分かる
  */
-export type ProposalState = "todo" | "doing" | "review" | "done";
+export type ProposalState = "todo" | "doing" | "done" | "cancelled";
 /**
  * 承認済みチケットの今。`open` は `.ccnavi/approved/doing/`、`review` は `wip/proposals/review/`（承認済みのまま
  * 人のレビューを待つ）、`closed` は `.ccnavi/approved/done/`（取り消しも `cancelled_at` を持ってここ）、`none` は

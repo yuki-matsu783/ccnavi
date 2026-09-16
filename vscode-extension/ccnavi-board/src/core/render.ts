@@ -306,7 +306,7 @@ function renderBadges(card: Card): string {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、取り消し、人レビューの要否、ワークツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人レビューの要否、ワークツリー、
  * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
  * リスク（MEDIUM 以下）、base、プロジェクト。
  */
@@ -314,10 +314,6 @@ function renderFacts(card: Card): string {
   const facts: string[] = [];
   if (card.copyStatus !== "none") {
     facts.push(fact(`copy-${card.copyStatus}`, COPY_LABELS[card.copyStatus]));
-  }
-  // 取り消しは完了列に入る（ADR-0055）ので、閉じただけのものと見分ける。もう誰も動かないので札ではなく属性。理由は title に置く
-  if (card.cancelledAt !== "" || card.cancelReason !== "") {
-    facts.push(fact("cancelled", "取り消し", card.cancelReason));
   }
   facts.push(fact("review", `人レビュー${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
   if (card.worktreeExists) {
@@ -720,7 +716,6 @@ const STYLE = `${PAGE_STYLE}
   .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }
   .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .fact.copy-open::before, .fact.copy-review::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
-  .fact.cancelled { color: var(--vscode-editorWarning-foreground); }
   .fact.sha { font-family: var(--vscode-editor-font-family); }
   /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右が状態。
      状態は要約（.phase-brief）と全文（.phase-full）を両方持ち、フェーズ一覧の幅（カードの内寸）で
