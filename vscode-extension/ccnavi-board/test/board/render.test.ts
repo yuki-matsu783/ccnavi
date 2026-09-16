@@ -459,7 +459,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
 
 test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（未承認・ゲート閉・作業ツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
+  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・作業ツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
   assert.match(html, /data-id="i0001-03"[^>]*data-attention="1"/);
   assert.match(html, /data-id="i0001"[^>]*data-attention="0"/);
   assert.match(html, /data-id="i0001-01"[^>]*data-attention="0"/);

@@ -105,8 +105,10 @@ export interface Card {
   readonly mrUrl: string;
   readonly mrNumber: number | null;
   /**
-   * 人が動く必要があるか。札（未承認・ゲート閉・作業ツリーなし・レビュー待ち・HIGH 以上・本物が決まらない写り）と
-   * 不備、親ならフェーズ行の要約に出るもの、と同じ条件。「要対応だけ」の絞り込みが見る
+   * 人が動く必要があるか。「要対応だけ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
+   * 親の改版。札の「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
+   * ゲート閉、未着手・作業中なのに作業ツリーが無い、レビュー待ち、HIGH 以上、本物が決まらない写り、不備、
+   * 親ならフェーズ行の要約に出るもの（ゲート閉・レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
 }
@@ -207,9 +209,9 @@ function toCard(
   const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
   const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
   const attention =
-    t.copy.status === "none" ||
+    pending.has(t.ticket) ||
     gateClosed ||
-    (!t.worktree.exists && t.copy.status !== "closed") ||
+    (!t.worktree.exists && (column === "todo" || column === "doing")) ||
     reviewWaiting ||
     isHighRisk(riskLevel) ||
     t.scattered.length > 0 ||
@@ -303,10 +305,9 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
   }
-  // 依頼のマーカー `{head, mr, url, host, since}`（設計 §9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ
+  // 依頼のマーカー `{head, mr, url, host, since}`（設計 §9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。
+  // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
   const requested = p.marks.requested ?? {};
-  const reviewed = p.marks.reviewed ?? {};
-  const mrNumber = typeof requested.mr === "number" ? requested.mr : typeof reviewed.mr === "number" ? reviewed.mr : null;
   return {
     parent: parent.ticket,
     number: p.number,
@@ -320,7 +321,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     riskLine: p.risk_line,
     tickets: p.tickets,
     mrUrl: typeof requested.url === "string" ? requested.url : "",
-    mrNumber,
+    mrNumber: typeof requested.mr === "number" ? requested.mr : null,
     actions,
   };
 }

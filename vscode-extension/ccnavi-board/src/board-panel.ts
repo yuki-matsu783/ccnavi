@@ -320,8 +320,9 @@ function handleMessage(message: Message | undefined): void {
     case "reviewed": {
       // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、承認の文と同じ
       // オーバーレイ（コピー / 新しいセッションで開く）で渡す。check を打つのは文を受けたエージェント。
-      // 承認の最中（読み込み中・承認中）は被せない
-      if (current.approval !== undefined && current.approval.kind !== "error" && current.approval.kind !== "done" && current.approval.kind !== "prompt") {
+      // 承認のオーバーレイ（読み込み中・一覧・承認中・承認した文）の上には被せない。承認した文は取り返せないので、
+      // 渡し終えるか閉じるまで消さない。前の連絡（prompt）と読めなかった（error）は差し替えてよい
+      if (current.approval !== undefined && current.approval.kind !== "error" && current.approval.kind !== "prompt") {
         return;
       }
       const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
@@ -330,15 +331,33 @@ function handleMessage(message: Message | undefined): void {
         vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーかフェーズ ${message.phase} が無いので、レビュー済みの連絡を組めない`);
         return;
       }
+      // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ check の前提（依頼のマーカー）が無い
+      if (!chip.reviewWaiting) {
+        vscode.window.showWarningMessage(`親 ${message.parent} のフェーズ ${chip.label} は人のレビュー待ちではない。ボードを更新する`);
+        void update();
+        return;
+      }
       current.approval = {
         kind: "prompt",
         title: `フェーズ ${chip.label} のレビュー済みを連絡`,
         note: "レビューを終えたことを Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く。送るときは自分で Enter を押す。マーカーはエージェントが check を打って置く。",
-        prompt: reviewedPrompt(root, message.parent, message.phase, chip.label, tree, chip.mrUrl),
+        prompt: reviewedPrompt(realRoot(root), message.parent, message.phase, chip.label, tree, chip.mrUrl),
       };
       redraw(current);
       return;
     }
+  }
+}
+
+/**
+ * 文面に書くワークスペースルート。実行ファイルの案内（`settings.script_command`）は realpath で解いた綴りを出すので、
+ * 同じ綴りにする（macOS の /tmp → /private/tmp など）。解けなければ渡された綴りのまま
+ */
+function realRoot(root: string): string {
+  try {
+    return fs.realpathSync.native(root);
+  } catch {
+    return root;
   }
 }
 
@@ -354,7 +373,8 @@ function redraw(current: PanelState): void {
  * 読んでいる間も「読んでいる…」のオーバーレイを出し、二重に開かない。
  */
 async function openApproval(current: PanelState, only: readonly string[] = []): Promise<void> {
-  if (current.approval !== undefined && current.approval.kind !== "error" && current.approval.kind !== "done") {
+  // 承認の途中（読み込み中・一覧・承認中）は二重に開かない。読めなかった・承認した文・レビュー済みの連絡の上には開ける
+  if (current.approval !== undefined && current.approval.kind !== "error" && current.approval.kind !== "done" && current.approval.kind !== "prompt") {
     return;
   }
   current.approval = { kind: "loading" };

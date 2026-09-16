@@ -92,7 +92,7 @@ test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペース�
   );
 });
 
-test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と同じ規則。空白や記号があるときだけ引用する", () => {
+test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と同じ引用の規則。空白や記号があるときだけ引用する（root を解くのは呼び手）", () => {
   assert.equal(scriptCommand("/ws", "ccnavi-review.sh"), "sh /ws/.ccnavi/scripts/ccnavi-review.sh");
   assert.equal(scriptCommand("C:\\Users\\me\\ws\\", "ccnavi-review.sh"), "sh C:/Users/me/ws/.ccnavi/scripts/ccnavi-review.sh");
   assert.equal(scriptCommand("/my ws", "ccnavi-review.sh"), 'sh "/my ws/.ccnavi/scripts/ccnavi-review.sh"');
@@ -100,17 +100,24 @@ test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と�
   assert.equal(scriptCommand("/a$b", "x.sh"), `sh '/a$b/.ccnavi/scripts/x.sh'`);
 });
 
-test("CB-T19d レビュー済みの連絡の文は、親の作業ツリーで check を打つことと MR の URL を言い、マーカーは置かせない", () => {
+test("CB-T19d レビュー済みの連絡の文は、親が親の作業ツリーで check を単体で打つことと MR の URL を言い、マーカーは置かせない", () => {
   const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5");
   assert.ok(
     text.startsWith(
-      "[ccnavi] 利用者が親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親の作業ツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh check --phase 2' を打ち、",
+      "[ccnavi] 利用者が親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親（メインエージェント）が、親の作業ツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh check --phase 2' を打ち、",
     ),
     text,
   );
-  // 人の判断（--reviewed / accept）を代行させない
+  // ゲートの例外は sh …ccnavi-review.sh の形を単体で打ったときだけ（設計 §9.8）。cd と連結する形へ誘導しない。
+  // サブエージェントには常に禁止（§9.12）
+  assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
+  assert.ok(text.includes("サブエージェントには渡さない"));
+  assert.ok(!text.includes("&&"));
+  // 人の判断（--reviewed / accept）を代行させず、check が返す道を先取りしない
   assert.ok(!text.includes("--reviewed"));
   assert.ok(!text.includes("accept"));
+  assert.ok(!text.includes("依頼し直す"));
+  assert.ok(text.includes("check が一覧と次の道を返すので、それに従う"));
   // MR が無ければ行ごと省き、段階の表示名が無ければ番号で言う。Windows の区切りは / に寄せる
   const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "");
   assert.ok(!bare.includes("マージリクエスト:"));

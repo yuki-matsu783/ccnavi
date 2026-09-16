@@ -278,34 +278,51 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02"), undefined);
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 2)?.mrUrl, "u");
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 9), undefined);
-  // 依頼のマーカーが無くレビュー済みだけ残った形（wrapup が置く）でも、番号だけは写る。連絡のボタンは待ちでなければ出ない
+  // 依頼のマーカーが無くレビュー済みだけ残った形（wrapup が置く）では、リンクも番号も出さない（url が無い）。連絡のボタンは待ちでなければ出ない
   const base = fixture();
   const reviewedOnly: ParentJson = {
     ...base.parents[0],
     phases: base.parents[0].phases.map((p): PhaseJson => (p.number === 1 ? { ...p, marks: { reviewed: { mr: 7, accepted: [], at: "t" } } } : p)),
   };
   const quiet = cardsOf(buildBoard({ ...base, parents: [reviewedOnly] })).get("i0001")!;
-  assert.equal(quiet.phases[0].mrNumber, 7);
+  assert.equal(quiet.phases[0].mrNumber, null);
   assert.equal(quiet.phases[0].mrUrl, "");
   assert.equal(quiet.mrUrl, "");
   assert.deepEqual(quiet.phases[0].actions, []);
   assert.deepEqual(quiet.phases[1].actions, []);
 });
 
-test("CB-T132 要対応は札・不備・フェーズ行の要約と同じ条件で、判定はし直さない", () => {
-  // 見本: 親は順調、閉じた子とレビュー中の子は順調、未承認で作業ツリーの無い子だけが要対応
+test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約の条件で、判定はし直さない", () => {
+  // 見本: 親は順調、閉じた子とレビュー中の子は順調、承認待ちで作業ツリーの無い子だけが要対応
   const cards = cardsOf(buildBoard(fixture()));
   assert.equal(cards.get("i0001")!.attention, false);
   assert.equal(cards.get("i0001-01")!.attention, false);
   assert.equal(cards.get("i0001-02")!.attention, false);
   assert.equal(cards.get("i0001-03")!.attention, true);
+  // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（札の「未承認」は出ない）でも要対応。
+  // 落とすと「要対応だけ」の絞り込みで隠れ、承認の対象から外れる
+  const base = fixture();
+  const revision = cardsOf(buildBoard({ ...base, pending_approval: [...base.pending_approval, "i0001"] }));
+  assert.equal(revision.get("i0001")!.copyStatus, "open");
+  assert.equal(revision.get("i0001")!.pendingApproval, true);
+  assert.equal(revision.get("i0001")!.attention, true);
+  // 承認されずに取り消された提案は、未承認のまま作業ツリーも無いが、もう誰も動かないので要対応ではない
+  const dropped: TicketJson = {
+    ...base.tickets[3],
+    proposal: { ...base.tickets[3].proposal!, state: "cancelled" },
+    cancelled_at: "t",
+    cancel_reason: "やめた",
+  };
+  const cancelled = cardsOf(buildBoard({ ...base, tickets: [...base.tickets.slice(0, 3), dropped], pending_approval: [] }));
+  assert.equal(cancelled.get("i0001-03")!.column, "cancelled");
+  assert.equal(cancelled.get("i0001-03")!.copyStatus, "none");
+  assert.equal(cancelled.get("i0001-03")!.attention, false);
   // 人のレビュー待ちのフェーズがあれば、その子（ゲート閉）も親（フェーズ行の要約）も要対応
   const waiting = cardsOf(buildBoard(waitingWithMr("u")));
   assert.equal(waiting.get("i0001")!.attention, true);
   assert.equal(waiting.get("i0001-02")!.attention, true);
   assert.equal(waiting.get("i0001-01")!.attention, false);
   // HIGH 以上のリスクは要対応、MEDIUM は違う。不備（親が見つからない）も要対応
-  const base = fixture();
   const risky = (level: string): TicketJson => ({ ...base.tickets[1], risk: { points: 70, level } });
   const withRisk = (level: string) => cardsOf(buildBoard({ ...base, tickets: [base.tickets[0], risky(level), ...base.tickets.slice(2)] }));
   assert.equal(withRisk("HIGH").get("i0001-01")!.attention, true);

@@ -64,7 +64,7 @@ ${bodyTag(options.appearance)}
 ${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount} 件</span>\n` : ""}${board.issueCount > 0 ? `    <span class="issues warn">不備 ${board.issueCount} 件</span>\n` : ""}    <span class="counts">残り ${board.remainingCount} / 全 ${board.totalCount}</span>
   </div>
   <div class="controls">
-${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（未承認・ゲート閉・作業ツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
+${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・作業ツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
     <button type="button" class="action" data-action="refresh">更新</button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
