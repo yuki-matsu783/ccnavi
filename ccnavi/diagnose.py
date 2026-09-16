@@ -42,6 +42,7 @@ from . import (
     risk,
     ruleload,
     rules,
+    selfguard,
     settings,
     tree,
 )
@@ -582,8 +583,15 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
     stdout.write("    auto                          classifier が判断する\n")
-    stdout.write("    default / acceptEdits / plan  人に確認が出る\n")
-    stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
+    stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
+    stdout.write("    不明なモード                  人に確認が出る\n")
+    # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
+    if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
+        stdout.write(
+            f"    dontAsk / bypassPermissions   委ねる（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
+        )
+    else:
+        stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(

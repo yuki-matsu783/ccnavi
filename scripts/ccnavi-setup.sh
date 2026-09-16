@@ -622,10 +622,10 @@ shape=$(printf '%s' "$current" | jq -r '
 # 忘れると、この 2 つも dry-run のまま残る。--mode enable で打ち直すか、
 # 設定ファイルの 3 行を書き換えるまで、守りは弱いまま。
 #
-# チケットの承認の経路だけは、モードに合わせず enable で書く。ここは enable か
-# disable しか取らない。承認は通れば済んでしまい、済んだものは報告では戻らないので、
-# 「止めずに報告する」段を持てない。dry-run と書くと ccnavi の --lint が error に
-# するし、書いた人は止まらないつもりでいるのに実際は止まる。
+# 2 値の門は、モードに合わせず enable で書く。どちらも enable か disable しか取らず、
+# dry-run と書くと ccnavi の --lint が言う。承認の経路は、通れば済んでしまい、済んだものは
+# 報告では戻らないので「止めずに報告する」段を持てない。確認できる者が居ないモードの門は、
+# 止めずに報告する段を CCNAVI_MODE=dry-run が持つので、こちらには要らない。
 #
 # 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
 # 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を別の値の経由で
@@ -638,6 +638,7 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 	CCNAVI_RESTORE_IF_DENY: $mode,
 	CCNAVI_GUARD_CORE_FILES: $mode,
 	CCNAVI_GUARD_TICKET_APPROVAL: "enable",
+	CCNAVI_GUARD_UNWATCHED: "enable",
 	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
 # --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
