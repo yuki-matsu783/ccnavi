@@ -160,6 +160,28 @@ def fill_root(text: str, root: str) -> str:
     return text.replace(ROOT_PLACEHOLDER, root_glob(root))
 
 
+# every を書かなかったときの刻み。当たるたびが渡す回になる。
+EVERY_DEFAULT = 1
+
+
+def readable_every(written: object) -> int:
+    """書かれた `every` から読み取れる刻み。刻みとして読めない値なら 0。
+
+    読めるのは 1 以上の整数だけ。`0` と負は刻みにならず、`"5"` のような文字列は
+    YAML が数として読まなかった値（引用符を書いた）なので、こちらも読まない。
+    真偽値は `True == 1` で整数として通ってしまうので、先に外す。
+
+    読めなかったときに何をするかは呼ぶ側が決める。判定（_build）は 1 に倒して
+    毎回渡す側へ、--lint は error にして名指しする。同じ「読めるか」を 2 か所で
+    別々に書くと、黙って無視される値と咎められる値がずれる。
+    """
+    if written is None:
+        return EVERY_DEFAULT
+    if isinstance(written, bool) or not isinstance(written, int) or written < 1:
+        return 0
+    return written
+
+
 @dataclass
 class Problem:
     """ルールファイルへの苦情 1 件。直せるように名指しする。"""
@@ -214,6 +236,16 @@ class Rule:
     # ctxfile.MAX_CHARS で切り、切ったことを本文の末尾に添える。
     additional_context_file: str = ""
     additional_context_once_file: str = ""
+    # every は「渡す回」の刻み。当たった回数がこの倍数になった回だけが渡す回になり、
+    # additionalContext は渡す回のたび、additionalContextOnce は渡す回の最初の 1 回に
+    # 渡る（ctxfile.for_rules）。既定は 1 で、これは「当たるたびが渡す回」＝ every を
+    # 書かないときと同じ。書いていないときの場合分けをどこにも持たないための既定値。
+    every: int = 1
+    # every_written は書かれたままの値。読めない値（0・負・整数でない）でもルールは
+    # 組み上げ、every は 1（毎回渡す）に倒す。ここで弾いてルールごと捨てると、--lint の
+    # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。咎めるのは
+    # --lint の仕事で、そのために書かれた値をそのまま持つ。書いていなければ None。
+    every_written: object = None
     # decision はこのルールが置かれていたタイプ。当たったルールを 1 件だけ
     # 取り出しても、それがどの判定だったのかを言えるようにする。
     decision: str = ""
@@ -245,6 +277,11 @@ class Rule:
             self.additional_context_once,
             self.additional_context_file,
             self.additional_context_once_file,
+            # 刻みだけが違う 2 件は別の定義。同じ文を違う頻度で渡すルールを、
+            # 層をまたいで片方に潰さない。比べるのは読み取ったあとの刻みで、
+            # 書かれたままの値ではない（`5` と `"5"` は同じ刻みではない。後者は
+            # 読めない値として 1 に倒れるので、そこで分かれる）。
+            self.every,
             self.decision,
         )
 
@@ -388,6 +425,8 @@ def _build(
         additional_context_once=str(raw.get("additionalContextOnce") or ""),
         additional_context_file=str(raw.get("additionalContextFile") or ""),
         additional_context_once_file=str(raw.get("additionalContextOnceFile") or ""),
+        every=readable_every(raw.get("every")) or EVERY_DEFAULT,
+        every_written=raw.get("every"),
         decision=section,
         root=root,
     )

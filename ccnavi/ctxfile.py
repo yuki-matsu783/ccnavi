@@ -2,8 +2,8 @@
 
 文（`additionalContext`）と、ファイルの本文（`additionalContextFile`）と、
 1 度だけ渡す文（`additionalContextOnce` / `additionalContextOnceFile`）の 3 つを
-ここで並べる。once の控えも持つ。文脈はセッションと、サブエージェントなら
-その 1 回の起動で分ける。
+ここで並べる。どの回に渡すかを刻む `every` と、その数えの控えもここが持つ。
+文脈はセッションと、サブエージェントならその 1 回の起動で分ける。
 
 `additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に
 続けて）ファイルの本文をモデルへ渡す。長い案内を rules.yml に抱えず、既にある md を
@@ -95,50 +95,66 @@ def for_rules(
 ) -> str:
     """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
 
-    `additionalContext` は当たるたびに渡す。`additionalContextOnce` は、この文脈で
-    初めて当たったときだけ渡す。両方あれば初回は並べて、2 回目からは前者だけ。
-    文脈はセッションと、サブエージェントならその 1 回の起動（agent_id）で分ける。
-    サブエージェントは親の文脈を持たないので、親で渡した文は子にも 1 度渡す。
+    渡るかどうかは「渡す回」で決まる。`every: N` はその刻みで、当たった回数が N の
+    倍数になった回だけが渡す回になる。`every` を書かなければ刻みは 1 で、当たるたびが
+    渡す回。2 つの文はどちらもその渡す回を基準に読む。
+
+    | 欄 | いつ渡るか | `every: 5` のとき |
+    |---|---|---|
+    | `additionalContext` | 渡す回のたび | 5・10・15…回目 |
+    | `additionalContextOnce` | 渡す回の最初の 1 回 | 5 回目だけ |
+
+    両方あれば最初の渡す回は並べて、次の渡す回からは前者だけ。文脈はセッションと、
+    サブエージェントならその 1 回の起動（agent_id）で分ける。サブエージェントは親の
+    文脈を持たないので、親で渡した文は子にも 1 度渡す。
 
     `additionalContextFile` / `additionalContextOnceFile` は、文に続けてファイルの本文を
     渡す。探す先は `bases` の順（行き先のワークツリー、プロジェクト、ルート）で、最初に
-    在ったものを読む。無ければ文だけ。once の記憶は文とファイルで分けず、ルール 1 件で
-    1 度と数える。
+    在ったものを読む。無ければ文だけ。数えは文とファイルで分けず、ルール 1 件で 1 回と
+    数える。
 
-    控えを置く場所が無いとき（`--state ""`）は once の文も毎回渡す。覚えられないなら
-    黙るのではなく言うほうに倒す。届かない文は書いていないのと同じになるから。
+    控えを置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
+    なら黙るのではなく言うほうに倒す。届かない文は書いていないのと同じになるから。
     """
     parts: list[str] = []
-    remembered: set[str] | None = None
+    counted: dict[str, int] | None = None
     for rule in group:
-        # 文の `{root}` は、止めたときの文面と同じくワークスペースルートの実パスにする。
-        every = _with_file(
-            stderr,
-            bases or [],
-            rules.fill_root(rule.additional_context, rule.root),
-            rule.additional_context_file,
-        )
-        if every:
-            parts.append(every)
-        if not rule.additional_context_once and not rule.additional_context_once_file:
-            continue
-        if state_dir:
-            if remembered is None:
-                remembered = _load_once(stderr, state_dir, payload)
+        has_once = bool(rule.additional_context_once or rule.additional_context_once_file)
+        # 数えを控えに残すのは、刻みを持つルールと once を持つルールだけ。ほかは
+        # どのみち毎回渡すので、数えても判定 1 回ぶんの書き込みが増えるだけになる。
+        if state_dir and (rule.every > 1 or has_once):
+            if counted is None:
+                counted = _load_once(stderr, state_dir, payload)
             key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
-            if key in remembered:
-                continue
-            remembered.add(key)
-        once = _with_file(
-            stderr,
-            bases or [],
-            rules.fill_root(rule.additional_context_once, rule.root),
-            rule.additional_context_once_file,
-        )
-        if once:
-            parts.append(once)
-    if remembered is not None:
-        _save_once(stderr, state_dir, payload, remembered)
+            hits = counted.get(key, 0) + 1
+            counted[key] = hits
+            # 渡す回は刻みの倍数になった回。その最初は刻みの回そのものなので、
+            # 「once を渡したか」を別の欄で覚えなくてよい。欄を 2 つ持つと、
+            # 片方だけ古い控えが生まれる。
+            delivering, first = hits % rule.every == 0, hits == rule.every
+        else:
+            delivering, first = True, True
+        if delivering:
+            # 文の `{root}` は、止めたときの文面と同じくワークスペースルートの実パスにする。
+            text = _with_file(
+                stderr,
+                bases or [],
+                rules.fill_root(rule.additional_context, rule.root),
+                rule.additional_context_file,
+            )
+            if text:
+                parts.append(text)
+        if has_once and first:
+            once = _with_file(
+                stderr,
+                bases or [],
+                rules.fill_root(rule.additional_context_once, rule.root),
+                rule.additional_context_once_file,
+            )
+            if once:
+                parts.append(once)
+    if counted is not None:
+        _save_once(stderr, state_dir, payload, counted)
     return "\n\n".join(parts)
 
 
@@ -170,26 +186,43 @@ def _once_path(state_dir: str, session: str, agent_id: str) -> str:
     return os.path.join(state_dir, f"once-{session_part}-{agent_part}.json")
 
 
-def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> set[str]:
+def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[str, int]:
+    """この文脈で、どのルールが何回当たったか。読めなければ空（＝まだ 1 回も）。
+
+    `given` は「鍵 → 回数」。古い版の ccnavi が書いた形（鍵の並び）は「1 回当たった」
+    として読む。`every` を書かないルールでは 1 回でも「once は渡した」になるので、
+    古い控えを引き継いだセッションの見え方は今までと変わらない。読めない形は
+    覚えていない側に倒れ、渡す回の数え直しが 0 から始まる。
+    """
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: 1 度だけ渡す文の控えを読めない: {failed}\n")
-        return set()
+            stderr.write(f"ccnavi: 渡した回の控えを読めない: {failed}\n")
+        return {}
     given = data.get("given") if isinstance(data, dict) else None
-    return {s for s in given if isinstance(s, str)} if isinstance(given, list) else set()
+    if isinstance(given, list):
+        return {s: 1 for s in given if isinstance(s, str)}
+    if not isinstance(given, dict):
+        return {}
+    return {k: n for k, n in given.items() if isinstance(k, str) and isinstance(n, int)}
 
 
-def _save_once(stderr: TextIO, state_dir: str, payload: hookio.Input, given: set[str]) -> None:
+def _save_once(
+    stderr: TextIO, state_dir: str, payload: hookio.Input, given: dict[str, int]
+) -> None:
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
-    failed = fsio.write_json(path, {"given": sorted(given)})
+    failed = fsio.write_json(path, {"given": dict(sorted(given.items()))})
     if failed:
-        stderr.write(f"ccnavi: 1 度だけ渡す文の控えを書けない: {failed}\n")
+        stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
 
 
 def forget(state_dir: str, session: str) -> None:
-    """このセッションの「1 度だけ渡す文」の記憶を全部捨てる。古いセッションの分も掃く。"""
+    """このセッションの数え（渡した回）を全部捨てる。古いセッションの分も掃く。
+
+    捨てると「1 度だけ渡す文」はまた渡り、`every` の刻みも 0 から数え直しになる。
+    どちらも「この文脈で何回目か」を見ているので、文脈が変われば一緒に忘れる。
+    """
     if not state_dir or not os.path.isdir(state_dir):
         return
     mine = os.path.basename(_once_path(state_dir, session, "")).rsplit("-", 1)[0] + "-"
