@@ -76,8 +76,8 @@ ${bodyTag(options.appearance)}
 </header>
 <p id="lock" class="lock${page.lock.locked ? "" : " hidden"}">${escapeHtml(page.lock.reason)}</p>
 ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="block">
-  <h2>段階の閾値 <span class="count">点がこの値以上になると段階が上がる。HIGH 以上でゲートが閉じる</span></h2>
-  <details class="help"><summary>この欄の説明</summary><p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上でフェーズのゲートが閉じ</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p></details>
+  <h2>段階の閾値 <span class="count">点がこの値以上になると段階が上がる。HIGH 以上はレビューが済むまで止まる</span></h2>
+  <details class="help"><summary>この欄の説明</summary><p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上はレビューが済むまでフェーズが止まり</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p></details>
   <div class="levels" id="levels"></div>
 </section>
 <section class="block">

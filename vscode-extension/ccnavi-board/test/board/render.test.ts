@@ -161,13 +161,13 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   assert.ok(html.includes('vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() })'), "識別子と絞り込みの有無を送る");
 });
 
-test("CB-T13c フェーズ行の要約は札と同じ条件（ゲート閉・レビュー依頼済・HIGH 以上）だけ。マーカーの経過と MEDIUM 以下のリスクは全文にだけ出る", () => {
+test("CB-T13c フェーズ行の要約は札と同じ条件（レビュー準備中／レビュー待ち・HIGH 以上）だけ。マーカーの経過と MEDIUM 以下のリスクは全文にだけ出る", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
     phases: base.parents[0].phases.map((p): PhaseJson => {
       if (p.number === 1) {
-        // 依頼して済んだレビューと HIGH のリスク。要約はリスクだけ（依頼済はゲートが開けば出ない）、
+        // 依頼して済んだレビューと HIGH のリスク。要約はリスクだけ（足止めが解ければ段の名前は出ない）、
         // 全文には点と理由とマーカーが残る
         return {
           ...p,
@@ -177,14 +177,14 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（ゲート閉・レ
           risk_line: "リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）",
         };
       }
-      // 依頼済みでゲートが閉じたまま（判定は review_waiting で言う）。要約にゲート閉とレビュー依頼済、
+      // 依頼済みで止まったまま（判定は review_waiting で言う）。要約に「レビュー待ち」と
       // 受け入れボタンが並ぶ
       return { ...p, state: "ended", gate_closed: true, review_waiting: true, marks: { requested: { at: "t" } } };
     }),
   };
   const html = renderBoard(buildBoard({ ...base, parents: [parent] }), OPTIONS);
   assert.ok(html.includes('<span class="phase-brief" aria-hidden="true">リスク HIGH</span><span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 &gt; 300）</span>'));
-  assert.ok(html.includes('<span class="phase-brief" aria-hidden="true">ゲート閉 · レビュー依頼済</span><span class="phase-full">終了 · ゲート閉 · レビュー依頼済 · レビュー要</span><button type="button" class="action" data-action="accept"'));
+  assert.ok(html.includes('<span class="phase-brief" aria-hidden="true">レビュー待ち</span><span class="phase-full">終了 · レビュー待ち · レビュー依頼済 · レビュー要</span><button type="button" class="action" data-action="accept"'));
   // MEDIUM は要約に出ない
   const medium: ParentJson = {
     ...parent,
@@ -192,13 +192,13 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（ゲート閉・レ
   };
   const html2 = renderBoard(buildBoard({ ...base, parents: [medium] }), OPTIONS);
   assert.ok(html2.includes('<span class="phase-brief" aria-hidden="true"></span><span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 25 (MEDIUM)</span>'));
-  // 依頼を出していないゲート閉は「ゲート閉」だけ。受け入れボタンも出ない
+  // 依頼を出していないフェーズは「レビュー準備中」。受け入れボタンも出ない
   const unasked: ParentJson = {
     ...parent,
     phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {}, review_waiting: false } : p)),
   };
   const html3 = renderBoard(buildBoard({ ...base, parents: [unasked] }), OPTIONS);
-  assert.ok(html3.includes('<span class="phase-brief" aria-hidden="true">ゲート閉</span><span class="phase-full">終了 · ゲート閉 · レビュー要</span></span>'));
+  assert.ok(html3.includes('<span class="phase-brief" aria-hidden="true">レビュー準備中</span><span class="phase-full">終了 · レビュー準備中 · レビュー要</span></span>'));
   // 狭いとき全文は画面の外に置くだけで、読み上げには残す。要約は見た目だけ
   assert.match(html, /\.phase-full \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
   assert.doesNotMatch(html, /\.phase-full \{ display: none/);
@@ -237,24 +237,24 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(html.includes('class="phases"'));
   // 親のフェーズは 1 段階 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
   // 順調に終わった段階（LOW のリスク）も、レビューが要るだけの進行中の段階も、要約は空。
-  // ゲート開・マーカーなし・レビュー不要は普通の状態なので書かない
+  // 止めていない・マーカーなし・レビュー不要は普通の状態なので書かない
   assert.ok(html.includes('<li class="phase phase-ended" title="終了 · リスク: 0 (LOW)"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">1（調査）</span><span class="phase-tickets">i0001-01</span></span><span class="phase-status"><span class="phase-brief" aria-hidden="true"></span><span class="phase-full">終了 · リスク: 0 (LOW)</span></span></li>'));
   assert.ok(html.includes('<span class="phase-status"><span class="phase-brief" aria-hidden="true"></span><span class="phase-full">進行中 · レビュー要</span></span>'));
-  assert.ok(!html.includes("ゲート開"));
+  assert.ok(!html.includes("止めていない"));
   assert.ok(!html.includes("マーカーなし"));
   assert.doesNotMatch(html, /class="phase-(brief|full)">[^<]*レビュー不要/);
-  // ゲート閉のフェーズ行は段階名も右の状態も赤
-  assert.match(html, /\.phase\.gate-closed \.phase-label, \.phase\.gate-closed \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
-  // ゲート閉の左線は承認待ちの左線より後に書き、勝つ
-  assert.ok(html.indexOf(".card.pending { border-left") < html.indexOf(".card.gate-closed { border-left"));
+  // 止めているフェーズ行は段階名も右の状態も赤
+  assert.match(html, /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
+  // 止めているカードの左線は承認待ちの左線より後に書き、勝つ
+  assert.ok(html.indexOf(".card.pending { border-left") < html.indexOf(".card.review-hold { border-left"));
   // 締める（wrapup）のボタンは出さない
   assert.ok(!html.includes('data-action="wrapup"'));
   assert.ok(!html.includes("締める"));
 });
 
-test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビューが済んでゲートが開いた子には出さない", () => {
+test("CB-T13a 止めている間だけ段の名前を札に出す。レビューが済んで足止めが解けた子には出さない", () => {
   const base = fixture();
-  // 判定が出す形に揃える。ゲート閉はレビュー要を含み、レビュー待ちは「依頼済 かつ ゲート閉」を判定が言う
+  // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済 かつ 止まっている」を判定が言う
   const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
     ...base,
     parents: base.parents.map((parent) => ({
@@ -272,30 +272,30 @@ test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビュ
       ),
     })),
   });
-  const badge = '<span class="badge mark mark-requested">レビュー依頼済</span>';
+  const holdBadge = (text: string) => `<span class="badge hold">${text}</span>`;
   const briefWith = (text: string) => `<span class="phase-brief" aria-hidden="true">${text}</span>`;
-  // クローズ・レビュー済・ゲート開の子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
+  // クローズ・レビュー済・足止めなしの子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
   // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済 · レビュー済」が残る
   const done = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false)), OPTIONS);
-  assert.ok(!done.includes(badge));
+  assert.ok(!done.includes('class="badge hold"'));
   assert.ok(done.includes('<span class="fact mark mark-reviewed">レビュー済</span>'));
   assert.ok(done.includes(briefWith("") + '<span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 0 (LOW)</span>'));
   assert.doesNotMatch(done, /class="phase-brief"[^>]*>[^<]*レビュー依頼済/);
-  // 依頼済のマーカーだけでゲートが開いている（判定が待ちと言わない）子にも、札と要約は出ない
+  // 依頼済のマーカーだけで足止めが解けている（判定が待ちと言わない）子にも、札と要約は出ない
   const reopened = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, false)), OPTIONS);
-  assert.ok(!reopened.includes(badge));
+  assert.ok(!reopened.includes('class="badge hold"'));
   assert.doesNotMatch(reopened, /class="phase-brief"[^>]*>[^<]*レビュー依頼済/);
-  // 依頼を出したのにゲートが閉じたままの子には札が出て、親のフェーズ行の要約にも出る。reviewed の有無では分岐しない
+  // 依頼を出したのに止まったままの子には札が出て、親のフェーズ行の要約にも出る。reviewed の有無では分岐しない
   const waiting = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, true)), OPTIONS);
-  assert.ok(waiting.includes(badge));
-  assert.ok(waiting.includes('<span class="badge gate">ゲート閉</span>'));
-  assert.ok(waiting.includes(briefWith("ゲート閉 · レビュー依頼済") + '<span class="phase-full">終了 · ゲート閉 · レビュー依頼済 · レビュー要 · リスク: 0 (LOW)</span><button'));
+  assert.ok(waiting.includes(holdBadge("レビュー待ち")));
+  assert.ok(waiting.includes(briefWith("レビュー待ち") + '<span class="phase-full">終了 · レビュー待ち · レビュー依頼済 · レビュー要 · リスク: 0 (LOW)</span><button'));
   const stillClosed = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, true)), OPTIONS);
-  assert.ok(stillClosed.includes(badge));
-  // 依頼を出していない子には、ゲートが閉じていても依頼済の札は出ない
+  assert.ok(stillClosed.includes(holdBadge("レビュー待ち")));
+  // 依頼を出していない子の札は「レビュー準備中」で、依頼済とは出ない
   const notRequested = renderBoard(buildBoard(withMarks({}, true)), OPTIONS);
   assert.ok(!notRequested.includes("レビュー依頼済"));
-  assert.ok(notRequested.includes(briefWith("ゲート閉")));
+  assert.ok(notRequested.includes(holdBadge("レビュー準備中")));
+  assert.ok(notRequested.includes(briefWith("レビュー準備中")));
 });
 
 test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {
@@ -459,7 +459,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
 
 test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
+  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
   assert.match(html, /data-id="i0001-03"[^>]*data-attention="1"/);
   assert.match(html, /data-id="i0001"[^>]*data-attention="0"/);
   assert.match(html, /data-id="i0001-01"[^>]*data-attention="0"/);
