@@ -41,6 +41,8 @@ export interface PhaseChip {
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
   readonly reviewRequired: boolean;
+  /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
+  readonly riskLevel: string;
   readonly riskLine: string;
   readonly tickets: readonly string[];
   readonly actions: readonly Action[];
@@ -251,6 +253,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     marks,
     gateClosed: p.gate_closed,
     reviewRequired: p.review_required,
+    riskLevel: typeof p.risk?.level === "string" ? p.risk.level : "",
     riskLine: p.risk_line,
     tickets: p.tickets,
     actions,
