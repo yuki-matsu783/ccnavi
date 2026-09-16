@@ -439,7 +439,7 @@ def approve(
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
         return 1
-    code = _apply(stdout, stderr, root, conf, gathered.batch, now())
+    code = _apply(stdout, stderr, root, conf, gathered.batch, now()).code
     if code == 0 and gathered.rejected:
         # 承認の対象の一部が落ちたときは、通ったぶんを置いてから失敗で終わる。置いたので
         # 繰り返してよく、落ちたものは上で名指ししてある。成功で終わると、
@@ -723,9 +723,23 @@ def approve_yes(
         return 1
 
     lines = io.StringIO()
-    code = _apply(lines, stderr, root, conf, gathered.batch, now())
-    if code != 0:
-        return code
+    applied = _apply(lines, stderr, root, conf, gathered.batch, now())
+    if applied.code != 0:
+        # 途中で止まった。置いたものはそのまま残るので、どこまで置いたかを返す。黙って失敗を
+        # 返すと、人は「何も起きていない」と読む（README「承認の JSON」の `partial`）。
+        if as_json:
+            body = {
+                "version": APPROVE_VERSION,
+                "partial": {
+                    "placed": applied.placed,
+                    "ticket": applied.stopped_at,
+                    "reason": applied.reason,
+                },
+            }
+            stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+        else:
+            stdout.write(lines.getvalue())
+        return applied.code
     tickets = [c.ticket for c in gathered.batch]
     revisions = {c.ticket.ticket for c in gathered.batch if c.is_revision}
     prompt = _approved_text(tickets, revisions, root)
@@ -948,6 +962,20 @@ def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
     return t.project
 
 
+@dataclass
+class Applied:
+    """承認済みチケットを置いた結果。途中で止まったときに、どこまで置いたかを呼び手へ返す。
+
+    置いたものは戻さない（戻す途中でまた落ちる）。代わりに、どこで止まって何が置かれたかを
+    そのまま返し、拡張が人に伝える（README「承認の JSON」の `partial`）。
+    """
+
+    code: int
+    placed: list[str]
+    stopped_at: str = ""
+    reason: str = ""
+
+
 def _apply(
     stdout: TextIO,
     stderr: TextIO,
@@ -955,10 +983,11 @@ def _apply(
     conf: settings.Settings,
     batch: list[Candidate],
     stamp: str,
-) -> int:
+) -> Applied:
     """承認された対象を承認済みチケットに落とす。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
     from . import phase
 
+    placed: list[str] = []
     for cand in batch:
         t = cand.ticket
         if cand.is_revision and cand.current is not None:
@@ -966,7 +995,8 @@ def _apply(
             failed = revise_copy(where, cand.current, t, stamp, cand.plans_feedback)
             if failed:
                 stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-                return 1
+                return Applied(1, placed, t.ticket, failed)
+            placed.append(t.ticket)
             what = "フィードバック計画" if cand.plans_feedback else "全体計画"
             stdout.write(f"  {t.ticket} の{what}を改版した\n")
             if cand.plans_feedback:
@@ -974,7 +1004,7 @@ def _apply(
                 failed = phase.settle_last_review(where, t, stamp)
                 if failed:
                     stderr.write(f"ccnavi: {t.ticket}: マーカーを置けない: {failed}\n")
-                    return 1
+                    return Applied(1, placed, t.ticket, f"マーカーを置けない: {failed}")
                 stdout.write(
                     "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
                     "フィードバック作業フェーズの check が数える\n"
@@ -998,10 +1028,11 @@ def _apply(
         failed = write_copy(where, t, t.tree, stamp)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-            return 1
+            return Applied(1, placed, t.ticket, failed)
+        placed.append(t.ticket)
 
     stdout.write(f"\n承認した。{conf.approved} に承認済みチケットを置いた。\n")
-    return 0
+    return Applied(0, placed)
 
 
 def _origin_line(t: ticket_mod.Ticket) -> str:

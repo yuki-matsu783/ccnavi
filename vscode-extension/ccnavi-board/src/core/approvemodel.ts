@@ -64,9 +64,23 @@ export type PreviewParse =
   | { readonly ok: true; readonly value: ApprovePreview }
   | { readonly ok: false; readonly error: string };
 
+/**
+ * 途中で止まった承認（README「承認の JSON」の `partial`）。置いたものは戻らないので、
+ * どこまで置いたかをそのまま受け取って人に伝える。
+ */
+export interface ApprovePartial {
+  /** 承認済みチケットに入ったぶん（新規は置いた、改版は書き換えた） */
+  readonly placed: readonly string[];
+  /** 止まったところの識別子 */
+  readonly ticket: string;
+  /** 止まった理由（実行ファイルの文面そのまま） */
+  readonly reason: string;
+}
+
 export type ResultParse =
   | { readonly ok: true; readonly value: ApproveResult }
   | { readonly ok: false; readonly mismatch: ApproveMismatch }
+  | { readonly ok: false; readonly partial: ApprovePartial }
   | { readonly ok: false; readonly error: string };
 
 export function parseApprovePreview(text: string): PreviewParse {
@@ -107,6 +121,17 @@ export function parseApproveResult(text: string): ResultParse {
         expected: list(raw.mismatch.expected).map(str),
         current: list(raw.mismatch.current).map(str),
         digest: { expected: str(digest.expected), current: str(digest.current) },
+      },
+    };
+  }
+  // 途中で止まった。置いたものは戻らないので、mismatch と同じく成功にはしない。
+  if (isRecord(raw.partial)) {
+    return {
+      ok: false,
+      partial: {
+        placed: list(raw.partial.placed).map(str),
+        ticket: str(raw.partial.ticket),
+        reason: str(raw.partial.reason),
       },
     };
   }

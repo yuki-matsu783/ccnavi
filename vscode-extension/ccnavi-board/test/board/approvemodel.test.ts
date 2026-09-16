@@ -81,3 +81,24 @@ test("CB-T106 版が違う・JSON でない答えは読まない", () => {
   assert.ok(!broken.ok);
   assert.ok("error" in broken);
 });
+
+test("CB-T107 途中で止まった承認を読む（置いたぶんを拾い、成功にはしない）", () => {
+  const stopped = parseApproveResult(
+    JSON.stringify({
+      version: APPROVE_VERSION,
+      partial: { placed: ["i0001"], ticket: "i0001-01", reason: "書けない (…)" },
+    }),
+  );
+  assert.ok(!stopped.ok, "置いたぶんがあっても成功にはしない");
+  assert.ok("partial" in stopped);
+  if ("partial" in stopped) {
+    assert.deepEqual(stopped.partial.placed, ["i0001"]);
+    assert.equal(stopped.partial.ticket, "i0001-01");
+    assert.ok(stopped.partial.reason.includes("書けない"));
+  }
+  // 1 件も置かれなかった形
+  const none = parseApproveResult(
+    JSON.stringify({ version: APPROVE_VERSION, partial: { placed: [], ticket: "i0001", reason: "書けない" } }),
+  );
+  assert.ok(!none.ok && "partial" in none && none.partial.placed.length === 0);
+});
