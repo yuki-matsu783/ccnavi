@@ -160,6 +160,8 @@ allow:
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。
+  # コマンドの名前も区別しない（同じ綴りには同じ判定。ADR-0051）。区別しない機械では
+  # `CAT` は `cat` そのもので、小文字なら通る呼び出しを綴りだけで別扱いにしない。
   - id: prefer-read-grep
     match: Bash
     regex: '^(\S*[\\/])?(cat|grep|egrep|fgrep|rg)(\.exe)?\s[^\x00]*$'

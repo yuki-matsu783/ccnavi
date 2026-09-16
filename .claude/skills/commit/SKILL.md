@@ -90,7 +90,7 @@ prefix が変わるか、扱っている主題が別なら別コミットに分�
 `.env` / `.env.*` / `*.pem` / `*.key` / `*.p12` / `*.pfx` / `*.ppk` / `credentials.json` / `service-account*.json` / `id_rsa` / `id_ed25519` / `id_ecdsa` / `.aws/credentials` / `.netrc` / `secrets.yml` / `secrets.yaml`
 
 **開発環境の副産物**
-`.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` (Git Bash のクラッシュダンプ) / `.claude/settings.local.json`
+`.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `scratchpad/` (下書きと使い捨ての置き場) / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` (Git Bash のクラッシュダンプ) / `.claude/settings.local.json`
 
 **このリポジトリ固有の生成物**
 `dist/` (ビルド成果物。実行ファイルの置き場) / `build/` (PyInstaller の作業場所) /

@@ -20,7 +20,7 @@
       research:
         kind: work            # work | feedback
         title: 調査
-        review: none          # none | mr
+        review: none          # none | chat | mr
         scope: ["wip/research/*"]   # 子の範囲の上限。inherit なら親の範囲
         deliverables: ["wip/research/summary.md"]
         overlap: [design]     # 並行してよい種類（対称）
@@ -48,8 +48,23 @@ KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
 REVIEW_NONE = "none"
+# chat は、このセッションで人が差分を見る。ホストへは出ない。ゲートを開けるのは
+# 端末から打つ `ccnavi --reviewed <N> --chat` で、エージェントには打てない
+# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 §9.8）。
+REVIEW_CHAT = "chat"
 REVIEW_MR = "mr"
-REVIEWS = (REVIEW_NONE, REVIEW_MR)
+REVIEWS = (REVIEW_NONE, REVIEW_CHAT, REVIEW_MR)
+
+# 見る場所の強さ。厳しい側を採るときに使う（none < chat < mr）。
+REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_CHAT: 1, REVIEW_MR: 2}
+
+
+def stricter(a: str, b: str) -> str:
+    """見る場所の厳しい側。どちらかが知らない綴りなら mr に倒す。"""
+    if a not in REVIEW_RANK or b not in REVIEW_RANK:
+        return REVIEW_MR
+    return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
+
 
 # 種類の範囲が「親の範囲そのまま」であることを言う綴り。
 INHERIT = "inherit"
@@ -302,11 +317,14 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, f"`review` は {' か '.join(REVIEWS)}"))
         return None, problems
     pt.review = review
-    if kind == KIND_FEEDBACK and review != REVIEW_MR:
-        # フィードバック対応の結果を人が見ない道は作らない。
+    if kind == KIND_FEEDBACK and review == REVIEW_NONE:
+        # フィードバック対応の結果を人が見ない道は作らない。見る場所は chat でも mr でもよい。
         problems.append(
             Problem(
-                SEVERITY_ERROR, ident, "フィードバック対応の種類は `review: mr` でなければならない"
+                SEVERITY_ERROR,
+                ident,
+                f"フィードバック対応の種類に `review: {REVIEW_NONE}` は書けない"
+                f"（`{REVIEW_CHAT}` か `{REVIEW_MR}`）",
             )
         )
         return None, problems

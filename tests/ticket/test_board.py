@@ -131,6 +131,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(phases[1]["state"], "ended")
         self.assertEqual(phases[1]["type"], "research")
         self.assertFalse(phases[1]["gate_closed"])
+        self.assertFalse(phases[1]["review_waiting"])
         self.assertEqual(phases[2]["state"], "active")
         self.assertEqual(phases[2]["tickets"], ["i0001-02"])
         self.assertEqual(phases[2]["states"], {"i0001-02": "doing"})

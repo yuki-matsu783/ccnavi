@@ -97,27 +97,54 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
         for line in scored:
             stdout.write(line + "\n")
     if code == 0 and not found.is_child:
-        # 親を閉じた。マージに進んでよいの合図（Draft を外す）は、まだなら親が出す。
-        # マージそのものは人。
-        if approval.read_parent_mark(
-            approval.home_dir(conf, root, found.ticket, ""),
-            found.ticket,
-            approval.PARENT_MARK_READY,
-        ):
-            stdout.write("Draft は外してある。マージは利用者が行う\n")
-        else:
-            from .review import WIP_ROOT
-
-            git_sh = settings.script_command(root, "ccnavi-git.sh")
-            review_sh = settings.script_command(root, "ccnavi-review.sh")
-            stdout.write(
-                f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
-                f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
-                f"push してから '{review_sh} ready' で Draft を外す"
-                "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
-                "マージは利用者が squash で行う\n"
-            )
+        _close_parent(stdout, stderr, root, conf, found)
     return code
+
+
+def _close_parent(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> None:
+    """親を閉じたあとの記録と案内。
+
+    記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
+    統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
+    締めた事実の残る先がここしか無い（設計 §9.8）。
+
+    案内は運び方で分かれる。MR があるなら Draft を外す合図まで、無いなら統合先へ戻す
+    ところまで。ccnavi はどちらでもマージしない。
+    """
+    from .review import WIP_ROOT
+
+    where = approval.home_dir(conf, root, found.ticket, "")
+    venues = phase.review_venues(root, conf, found.ticket)
+    failed = approval.write_parent_mark(
+        where,
+        found.ticket,
+        approval.PARENT_MARK_CLOSED,
+        {"reviews": {str(n): venues[n] for n in sorted(venues)}},
+    )
+    if failed:
+        stderr.write(f"ccnavi: 締めた記録を書けない: {failed}\n")
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    if phase.chat_only(root, conf, found.ticket, venues):
+        stdout.write(
+            f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
+            f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、統合先のブランチへ戻す。"
+            "このチケットにはマージリクエストで見るフェーズが無いので、"
+            "Draft を外す手順は無い。途中の作業は既定のブランチに残さない\n"
+        )
+        return
+    if approval.read_parent_mark(where, found.ticket, approval.PARENT_MARK_READY):
+        stdout.write("Draft は外してある。マージは利用者が行う\n")
+        return
+    review_sh = settings.script_command(root, "ccnavi-review.sh")
+    stdout.write(
+        f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
+        f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
+        f"push してから '{review_sh} ready' で Draft を外す"
+        "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
+        "マージは利用者が squash で行う\n"
+    )
 
 
 def cancel(

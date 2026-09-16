@@ -16,7 +16,8 @@
 判定はルールの判定とチケットの判定の厳しい側を採る（設計 §1）。チケットが足すのは
 「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
 ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
-例外はチケットの置き場（`is_ticket_place`）で、次の提案を書く道を残すために範囲を当てない。
+例外は 2 つ（`is_unscoped`）。チケットの置き場は、次の提案を書く道を残すために範囲を当てない。
+下書きの置き場（`scratchpad/`）は、git が追跡しないので範囲を当てない。
 子は親の部分集合で、親子は厳しい側が勝つ。どう書いてもチケットが無いときより
 緩くはならない。
 
@@ -621,15 +622,13 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     ここはチケットの範囲の外でも咎めない。咎めると、親が自分のワークツリーに次の子を
     提案する道と、承認がブランチに乗る道が塞がる。
 
-    外すのは実行前の判定・実行後の監視・サブエージェント終了時の検査の 3 か所で、
-    どれもこの 1 つを通す。外し方が場所ごとに違うと、実行前に通った書き込みが
-    実行後やサブエージェントの終わりに差し戻される。
-
     外して開くのは提案の `todo/` だけ。`doing/` 以降は `guard_rules`、承認済みチケットは
     自己防衛の組み込みが deny で止め、ルールの deny はチケットより強い。
 
     前置は `/` の境で切る（`wip/ticketsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
+
+    呼ぶのは `is_unscoped` 1 本で、判定の側はそちらを通す。
     """
     here = _fold(rel.replace("\\", "/"))
     for place in (tickets_rel, approved_rel):
@@ -637,6 +636,60 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
         if base and here.startswith(base + "/"):
             return True
     return False
+
+
+# 下書きと使い捨ての置き場。ツリーのルートの直下 1 段で、名前は固定。設定で動かさない。
+# 動かせると、その値を実際のソースの置き場（`src` など）に向けるだけで、承認した範囲を
+# 迂回して書ける場所ができる。除外してよい理由が「git が追跡しない」ことにある以上、
+# 追跡から外しているワークスペースの `.gitignore` の 1 行と同じ綴りに固定するほうが筋が通る。
+SCRATCH = "scratchpad"
+
+
+def is_scratch_place(rel: str) -> bool:
+    """ツリーのルートからの相対パスが、下書きの置き場の下にあるか。
+
+    `scratchpad/` は `.gitignore` が追跡から外す置き場で、下書き・再現用のスクリプト・調べた
+    出力を置く（CLAUDE.md「下書きと使い捨ての置き場」）。チケットの範囲の外でも咎めない。
+    咎めると、範囲を宣言したワークツリーほど手元に何も置けなくなり、承認が要る作業だけが
+    下書きの場所を失う。開けても範囲は広がらない。ここに書いたものは git が追跡しないので、
+    統合先のブランチには 1 バイトも乗らない。
+
+    **綴りの大文字小文字は区別する。範囲の照合（`_fold`）とは逆にしてある。** 外してよい
+    理由が「追跡されない」ことにあり、追跡から外しているのは `.gitignore` の `/scratchpad/` で、
+    その照合は Linux では区別するため。区別せずに外すと、Linux の `SCRATCHPAD/` が「追跡される
+    のに範囲を当てない場所」になり、承認した範囲の外の変更が統合先へ乗る道ができる。
+    区別する側に倒せば、どの機械でも除外は追跡から外れる範囲より狭いままで、狭いぶんは
+    範囲の判定が止めるだけで済む。
+
+    ルートの直下 1 段だけを見る。`docs/scratchpad/` は普通の作業対象で、`.gitignore` も外さない
+    （`/scratchpad/` の先頭の `/` はツリーのルートに掛かる）。`scratchpad` という名前の
+    ファイルも置き場ではない（末尾の `/` はディレクトリにしか当たらない）。
+    `scratchpadX/` も置き場ではない。
+    """
+    return rel.replace("\\", "/").startswith(SCRATCH + "/")
+
+
+def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
+    """チケットの範囲を当てない場所か。**実行前の判定（`judge`）だけが使う。**
+
+    実行前は、これから書かれる 1 つのパスを見る。下書きの置き場を外すのはここだけで
+    足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
+
+    実行後の監視（`post`）とサブエージェント終了時の検査（`phase.scope_findings`）は
+    下書きの置き場を外さず、`is_ticket_place` だけを通す。外し方を揃えないのは、
+    **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
+    （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、
+    追跡から外れている `scratchpad/` はそこに 1 本も現れない。つまり正しく設定された
+    リポジトリでは、外しても外さなくても同じ答えになる。
+
+    答えが変わるのは `scratchpad/` が追跡されているとき、すなわち外してよい根拠
+    （追跡されないので統合先のブランチへ乗らない）が既に崩れているときだけ。
+    そこで外すと、根拠が崩れたことを知らせる唯一の経路を自分で塞ぐことになる。
+    だから外さない。実行前に通ったものが実行後に咎められる形は残るが、咎められる
+    のは「そのリポジトリで `scratchpad/` が追跡されている」ときだけで、それは本当に
+    知らせるべきことになる。
+    """
+    return is_ticket_place(rel, tickets_rel, approved_rel) or is_scratch_place(rel)
 
 
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
@@ -903,8 +956,9 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
             # `src/Components/*` と `src/components/*` は同じ範囲として扱う。
             # 当てる側だけ区別すると、宣言した範囲に自分のファイルが入らない、が
             # 起きる。機械ごとに変えないのは、同じチケットがどの環境でも同じ場所で
-            # 止まるため。regex は書いた人が意図を持てるので、そこだけ区別を残す。
-            flags = 0 if regex else re.IGNORECASE
+            # 止まるため。`regex` も同じに扱う（ルールと揃える。rules._build）。
+            # 区別が要る `regex` は `(?-i:...)` で囲む。
+            flags = re.IGNORECASE
             try:
                 compiled = re.compile(expression, flags)
             except re.error as exc:

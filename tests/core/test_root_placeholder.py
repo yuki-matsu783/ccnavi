@@ -130,12 +130,13 @@ class RootPlaceholderTest(unittest.TestCase):
     def test_glob_form_and_spelling_of_the_root(self):
         out = self.judge("Write", os.path.join(self.root, "wip", "a.md"))
         self.assertIn("wip", out.get("permissionDecisionReason", ""))
-        # 綴りを変えても行き着く先で当たる。`..` と、区別しない機械では大文字小文字。
+        # 綴りを変えても行き着く先で当たる。`..` と、大文字小文字。
         detour = os.path.join(self.root, "docs", "..", "README.md")
         self.assertEqual(self.judge("Write", detour).get("permissionDecision"), "deny")
-        if os.path.normcase("A") == "a":
-            swapped = os.path.join(self.root.swapcase(), "README.md")
-            self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")
+        # ワークスペースルートの綴りも、どの機械でも区別せずに当てる。区別する機械では
+        # 別の場所を指す綴りだが、それでも止める側に倒す（`{root}` を機械で変えない）。
+        swapped = os.path.join(self.root.swapcase(), "README.md")
+        self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")
 
     def test_message_names_the_root(self):
         """止めたときにモデルへ渡す文面の `{root}` も、ワークスペースルートの実パスになる。

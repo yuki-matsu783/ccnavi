@@ -312,6 +312,11 @@ class ScopeGuard:
         if ticket is None:
             return None
         rel = tree.relative(t, full)
+        # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
+        # 見ているのは `git status`（`--ignored` を付けない）が挙げた変更なので、
+        # 追跡から外れている `scratchpad/` はそもそもこの経路に現れない。現れたということは
+        # そのツリーの git が `scratchpad/` を追跡しているということで、外してよい根拠
+        # （追跡されないので統合先へ乗らない）が崩れている。そこは黙らせずに言う。
         if ticket_mod.is_ticket_place(rel, self.tickets, self.approved):
             return None
         parent = self.copies.get(ticket.parent) if ticket.is_child else None
