@@ -93,7 +93,7 @@ deny が止める。承認できたら同じオーバーレイが「承認した
 | 一覧 | `--explain --json` の `trees` からプロジェクト（`kind: project`）を 1 件 1 枚のカードで並べる。項目は幅に合わせて段数が変わり、横スクロールは出ない。名前・パス・origin（`git remote get-url origin` をローカルで読む）・層のルール（既定 `.ccnavi/config/rules.yml`）の有無・作業ツリー・チケット数（作業中の数）・`--lint --json` の苦情（`(projects/<名前>)` のもの）・操作 |
 | clone | URL と名前を入れて「clone」。名前は URL の末尾から埋まり、直せる。`git clone -- <url> projects/<名前>` を「ccnavi」ターミナルにワークスペースルートで送る。認証の対話はターミナルで。`projects/<名前>/.git` が現れると一覧が読み直される |
 | clone を止める条件 | URL が https / ssh / `git@host:path` のどの形でもない、資格情報（`user:token@`）が入っている、名前が英数字と `. _ -` 以外を含む（先頭は英数字）、既存のツリー名と衝突する（大文字小文字だけ違う名前も）、同じリポジトリを既に clone している（origin を scheme・ユーザ・ポート・`.git` を落とした `host/path` で比べる）、clone 先が既にあって空でない |
-| 置き場が無い | 上部に警告が出る。「作成」で `projects/` を作る。clone すれば git が作るので、無くても clone はできる |
+| 置き場が無い | 画面は帯を出さない。一覧が 0 件になり「プロジェクトはまだ無い…」が出るだけ。`git clone` が親のディレクトリを作るので、置き場が無いままでも clone はできる。手で作る手段は画面に持たない |
 | `.gitignore` に無い | 上部に警告が出る。「.gitignore に追加」で `/projects/` の行を足す。コミットは人が行う |
 | ルールの置き場 | 拡張は組まない。`--explain --json` の `layers[]` が出すパス（実行ファイルが `CCNAVI_PROJECT_HOME` を読んで解く。既定 `projects/<名前>/.ccnavi/config/rules.yml`）を使う。予約名（`common` / `self`、大文字小文字を問わない）のプロジェクトは層として数えないので、置き場もボタンも出ない |
 | ルールが無い | 行に「共通層からコピー」のボタンが出る。`.ccnavi/common/rules.yml`（`CCNAVI_RULES`）を層のルールファイルに写す。先頭に出どころのコメントを足し、文面の `sh .ccnavi/scripts/` は `sh {root}/.ccnavi/scripts/` に置き換える。既にあれば上書きしない。コミットは人が行う。写した行は共通層に足して当たり、全欄が同じ行は重複として捨てられる（`--lint` の info） |

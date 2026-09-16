@@ -63,7 +63,7 @@ ${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button t
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
-${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケットは無い</p>\n' : ""}<div class="board">
+${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-empty">チケット無し</p>\n' : ""}<div class="board">
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
@@ -132,7 +132,7 @@ function renderApprovalBody(preview: ApprovePreview, approving: boolean, notice:
       : `<button type="button" class="action primary" data-action="approve-confirm" data-tickets="${escapeHtml(tickets)}"${approving ? " disabled" : ""}>${approving ? "承認中…" : `この ${count} 件を承認する`}</button>`;
   return `<h2 id="approval-title">Ticket 承認リクエスト: ${count} 件</h2>
 ${notice ? `<p class="approval-note warn">${escapeHtml(notice)}</p>\n` : ""}${
-    count === 0 ? '<p class="approval-note">承認待ちのチケットは無い</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>場所</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
+    count === 0 ? '<p class="approval-note">承認待ちのチケット無し</p>\n' : `<table class="approval-batch"><thead><tr><th>識別子</th><th>題</th><th>場所</th></tr></thead><tbody>\n${rows}\n</tbody></table>\n`
   }<pre class="approval-text">${escapeHtml(preview.text)}</pre>
 ${rejected}${problems}<div class="approval-actions">
 ${confirm}<button type="button" class="action" data-action="approve-cancel"${approving ? " disabled" : ""}>やめる</button>
@@ -187,7 +187,7 @@ function renderProblems(problems: readonly string[]): string {
 function renderColumn(column: BoardColumn): string {
   const body =
     column.count === 0
-      ? '    <p class="empty">チケットは無い</p>'
+      ? '    <p class="empty">チケット無し</p>'
       : `    <ul class="cards">\n${column.cards.map(renderCard).join("\n")}\n    </ul>`;
   return `  <section class="column" data-state="${escapeHtml(column.state)}">
     <h2>

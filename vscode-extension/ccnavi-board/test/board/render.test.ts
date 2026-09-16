@@ -57,7 +57,9 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
     ...OPTIONS,
     approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
   });
-  assert.ok(empty.includes("承認待ちのチケットは無い"));
+  assert.ok(empty.includes('<p class="approval-note">承認待ちのチケット無し</p>'));
+  // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
+  assert.ok(empty.includes("承認待ちのチケットは無い。"));
   assert.ok(!empty.includes('data-action="approve-confirm"'));
   const approving = renderBoard(buildBoard(fixture()), { ...OPTIONS, approval: { kind: "approving", preview } });
   assert.ok(approving.includes('data-approval="approving"'));
@@ -208,7 +210,7 @@ test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () 
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", () => {
   const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
   const html = renderBoard(buildBoard(empty), OPTIONS);
-  assert.ok(html.includes("チケットは無い"));
+  assert.ok(html.includes("チケット無し"));
   assert.equal((html.match(/class="empty"/g) ?? []).length, 4);
   assert.ok(html.includes('data-action="approve" disabled'));
 });
@@ -253,7 +255,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, OPTIONS),
     renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, OPTIONS),
     renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, OPTIONS),
-    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), OPTIONS),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), OPTIONS),
   ];
   assert.match(PAGE_STYLE, /\.toolbar \{/);
   assert.match(PAGE_STYLE, /\.banner\.warn \{/);
@@ -272,7 +274,7 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     renderRulesPage({ root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock }, { ...OPTIONS, appearance: "claude-dark" }),
     renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, ticketControl: "enable", model: readRisk(BUILTIN_RISK_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
     renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, ticketControl: "enable", model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, { ...OPTIONS, appearance: "claude-dark" }),
-    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", projectsDirExists: true, ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), { ...OPTIONS, appearance: "claude-dark" }),
+    renderProjectsPage(buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false }), { ...OPTIONS, appearance: "claude-dark" }),
   ];
   for (const html of themed) {
     assert.ok(html.includes('\n<body class="ccnavi-claude-dark">\n'));

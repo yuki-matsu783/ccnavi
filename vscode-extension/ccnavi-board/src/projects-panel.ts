@@ -51,7 +51,6 @@ const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 type Message =
   | { readonly type: "refresh" }
   | { readonly type: "clone"; readonly url: string; readonly name: string }
-  | { readonly type: "createDir" }
   | { readonly type: "fixIgnore" }
   | { readonly type: "createRules"; readonly name: string }
   | { readonly type: "createSelfRules" }
@@ -162,7 +161,6 @@ async function gather(root: string): Promise<Gathered> {
       origins,
       strays,
       projectsRel,
-      projectsDirExists: projectsDir !== "" && isDir(projectsDir),
       ignored: gitignoreHasProjects(readText(path.join(root, ".gitignore")), projectsRel),
       rulesRels,
       rulesExists,
@@ -340,9 +338,6 @@ async function handleMessage(current: PanelState, message: Message | undefined):
     case "clone":
       clone(current, page, message.url, message.name);
       return;
-    case "createDir":
-      createDir(current, page);
-      return;
     case "fixIgnore":
       fixIgnore(current, page);
       return;
@@ -419,21 +414,6 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   );
 }
 
-function createDir(current: PanelState, page: ProjectsPage): void {
-  if (page.projectsDir === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、作る先が無い");
-    return;
-  }
-  try {
-    fs.mkdirSync(page.projectsDir, { recursive: true });
-  } catch (error) {
-    fail(current, `${page.projectsRel}/ を作れない: ${(error as Error).message}`);
-    return;
-  }
-  info(current, `${page.projectsRel}/ を作った`);
-  void update();
-}
-
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
     fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、足す行が無い");
@@ -506,7 +486,6 @@ function asMessage(message: unknown): Message | undefined {
   const named = typeof m.name === "string" ? m.name : undefined;
   switch (m.type) {
     case "refresh":
-    case "createDir":
     case "fixIgnore":
     case "createSelfRules":
     case "openSelfRules":

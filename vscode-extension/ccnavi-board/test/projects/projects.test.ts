@@ -163,7 +163,6 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
     origins: { app: "https://gitlab.example.com/g/app.git", lib: "" },
     strays: [],
     projectsRel: "projects",
-    projectsDirExists: true,
     ignored: false,
     rulesRels: { app: "projects/app/.ccnavi/config/rules.yml", lib: "projects/lib/.ccnavi/config/rules.yml" },
     rulesExists: { app: true },
