@@ -1436,6 +1436,37 @@ class ScopeLimitTest(PhaseHarness):
         self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
         self.assertIn("limit: parent i0001", self.reason(beyond_parent))
 
+    def test_regex_child_ignores_case_like_the_glob_child(self):
+        """14. regex の子: 範囲の綴りは glob の子と同じく大文字小文字を区別しない。
+
+        範囲は人が宣言する意図なので、`regex` で書いても同じ場所を指す（設計 §9.3）。
+        区別が要るなら `(?-i:...)` で囲む。
+        """
+        tree = self.approved_child(
+            scoped_child_text("i0001-01", "i0001", 1, regex=("^wip/research/",))
+        )
+        inside = self.write_to(tree, "wip/Research/x.md")
+        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
+    def test_regex_child_can_keep_the_distinction_with_an_inline_flag(self):
+        """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた綴りのとおりに当たる。
+
+        ルールの側（tests/config/test_config_union_holes.py）と同じ逃げ道が、
+        チケットの範囲でも書けることを見る。
+        """
+        tree = self.approved_child(
+            scoped_child_text("i0001-01", "i0001", 1, regex=("^wip/(?-i:research)/",))
+        )
+        inside = self.write_to(tree, "wip/research/x.md")
+        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
+        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
+
+        # 種類の上限（glob）には当たる綴りだが、子の範囲が区別するので止まる。
+        outside = self.write_to(tree, "wip/Research/x.md")
+        self.assertEqual(self.decision(outside), "deny", outside.stdout)
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
     def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
         """15. 実行後の監視: Bash が種類の上限の外に書くと POST_TICKET_SCOPE。"""
         tree = self.approved_child(
