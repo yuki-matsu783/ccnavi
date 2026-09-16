@@ -113,7 +113,7 @@ test("CB-T09 依頼済みで止まったフェーズに accept、締めた親に
   // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
-  // 子のカードには自分のフェーズのマーカーと足止めとレビュー待ちが写る。親は false
+  // 子のカードには自分のフェーズのマーカーと、止まっているかとレビュー待ちが写る。親は false
   assert.equal(cards.get("i0001-02")!.gateClosed, true);
   assert.deepEqual(cards.get("i0001-02")!.marks, ["requested"]);
   assert.equal(cards.get("i0001-02")!.reviewWaiting, true);
@@ -121,7 +121,7 @@ test("CB-T09 依頼済みで止まったフェーズに accept、締めた親に
   assert.equal(card.reviewWaiting, false);
 });
 
-test("CB-T09b レビューが済んで足止めが解けたフェーズは、依頼済のマーカーが残っていてもレビュー待ちではない", () => {
+test("CB-T09b レビューが済んで止まらなくなったフェーズは、依頼済のマーカーが残っていてもレビュー待ちではない", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],

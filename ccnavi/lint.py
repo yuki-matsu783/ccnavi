@@ -337,7 +337,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・レビューの足止め・"
+                f"{settings.TICKET_CONTROL_ENV}=disable。チケットの範囲・フェーズのレビュー待ち・"
                 "サブエージェントの制限は効かない",
             )
         )

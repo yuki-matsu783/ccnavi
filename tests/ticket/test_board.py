@@ -5,7 +5,7 @@ VS Code のボード拡張が読む形を、判定と同じ関数で組んでい
 
 1. 提案・承認済みチケット・マーカー・ワークツリーの有無が、識別子ごとに 1 件にまとまって出る
 2. 承認待ち（承認済みチケットの無い提案）が `pending_approval` に出る
-3. 親のフェーズとレビューの足止めが `parents` に出る
+3. 親のフェーズとレビュー待ちが `parents` に出る
 4. チケット制御が disable なら、空のボードと理由を返す
 
 拡張側のフィクスチャ（vscode-extension/ccnavi-board/test/fixtures/board.json）と

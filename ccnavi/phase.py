@@ -1,4 +1,6 @@
-"""フェーズとレビューの足止め。子チケットのまとまりが終わったときに何をするかと、進もうとしたら止めること。
+"""フェーズの終わりと HITL ポイント（Human In The Loop。人の手が入るところ）。
+
+子チケットのまとまりが終わったときに何をするかと、人を待たずに進もうとしたら止めること。
 
 ## フェーズの終わり
 
@@ -6,12 +8,13 @@
 そのフェーズは終わり。`cancelled/` だけのフェーズは終わりではない（何も成果が無い）。
 
 終わりの扱いは、`done/` の子に `human_review.required: true` が 1 枚でもあるかで分かれる。
-あればレビュー待ちで足止めし、レビュー済みのマーカーが置かれるまでサブエージェントの起動とシェルを止める。
+あれば HITL ポイントに来たということで、レビュー済みのマーカーが置かれるまで
+サブエージェントの起動とシェルを止める。
 無ければ省略のマーカーを置いて進ませる。
 
-## 足止めの鍵は cwd
+## 止めるときの鍵は cwd
 
-書き込みは行き先で結ぶが、起動とシェルには行き先が無い。足止めは呼び出しの `cwd` が
+書き込みは行き先で結ぶが、起動とシェルには行き先が無い。止めるかどうかは呼び出しの `cwd` が
 どの親のワークツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
 サブエージェントの書き込みは行き先で止まるので、致命傷にならない。
 
@@ -32,7 +35,7 @@ from typing import TextIO
 from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, tree
 from . import ticket as ticket_mod
 
-# 足止めの中でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
+# 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
 # コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
 # 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
@@ -51,7 +54,7 @@ _FORBIDDEN_COMMAND = re.compile(
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
 SHELL_TOOLS = ("Bash", "PowerShell")
 
-# 足止めが止めるツール。
+# レビューが済むまで止めるツール。
 HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 
 # ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
@@ -84,7 +87,7 @@ def commands(subject: str) -> list[str]:
 
 
 def exempt(subject: str, degraded: str) -> bool:
-    """足止めの中でも通してよいか。読み切れなかったコマンドは通さない。"""
+    """止めている間でも通してよいか。読み切れなかったコマンドは通さない。"""
     if degraded:
         return False
     parts = commands(subject)
@@ -311,7 +314,7 @@ class Phase:
 
     @property
     def gate_closed(self) -> bool:
-        """レビューが済むまで足止めしているか。
+        """レビューが済むまで止めているか。
 
         欄の名前は JSON の綴り（`gate_closed`）に合わせてある。人に見せる名前は
         `review_label` が出す「レビュー準備中」「レビュー待ち」で、この綴りは
@@ -321,9 +324,9 @@ class Phase:
 
     @property
     def review_waiting(self) -> bool:
-        """依頼を出したのに足止めが続いている。人のレビュー待ち。
+        """依頼を出したのにまだ止まっている。人のレビュー待ち。
 
-        ボードはこれを写すだけで、足止めとマーカーから組み直さない。依頼していない
+        ボードはこれを写すだけで、止まっているかとマーカーから組み直さない。依頼していない
         フェーズは止まっていても待ちではなく（レビュー準備中）、先に親が request を打つ。
 
         これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは依頼を出さない
@@ -510,7 +513,7 @@ def phases_of(
 
 
 def held_phase(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
-    """レビューが済むまで足止めしているフェーズ。無ければ None。"""
+    """レビューが済むまで止めているフェーズ。無ければ None。"""
     for phase in phases_of(root, conf, parent_id):
         if phase.gate_closed:
             return phase

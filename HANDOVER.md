@@ -27,7 +27,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
 `SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
-自己防衛、チケット制御（提案・承認・承認済みチケット・フェーズ・レビューの足止め・レビュー・実績のリスク）、
+自己防衛、チケット制御（提案・承認・承認済みチケット・フェーズ・HITL ポイント・レビュー・実績のリスク）、
 複数のリポジトリ、診断（`--test` `--test-samples` `--explain` `--lint` とその JSON）、
 VS Code 拡張（ボード・ルール設定・リスク管理・プロジェクト管理）。dry-run で自分自身に
 仕掛けてある。
@@ -80,7 +80,7 @@ ccnavi/ticket.py            チケットの読み込みと、そこが宣言す�
 ccnavi/tree.py              ワークツリーの特定。判定の鍵はファイルの行き先
 ccnavi/approval.py          承認済みチケット・フェーズのマーカー・子ごとの記録・承認の画面
 ccnavi/risk.py              実績で測るリスク。risks.yml・差分の計測・スクリプト・定性項目
-ccnavi/phase.py             フェーズの終わりとレビューの足止め。提案から承認済みチケットへの同期
+ccnavi/phase.py             フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
 ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
 ccnavi/ops.py               チケットの状態を動かす ticket start / done / cancel / judge
@@ -295,7 +295,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 - `SubagentStart` の `additionalContext` がサブエージェントに届くか。届かなければ、
   サブエージェント内の最初の `PreToolUse` で渡す形に変える（設計 §9.12）
 - `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`。判定は行き先で
-  決まるので止め方は変わらないが、足止めは cwd で親を引くので、そこが割れる
+  決まるので止め方は変わらないが、止めるかどうかは cwd で親を引くので、そこが割れる
 - GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
   書いただけ。GitLab の変更要求（`request_changes`）だけは CE に無い機能で、EE でしか当てられない
 - `.ccnavi/scripts/` への Write は `guard-scripts` と組み込みの `builtin-guard-project-home` が止める。sh 3 本はこのリポジトリで作ったので

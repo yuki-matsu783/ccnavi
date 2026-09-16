@@ -1138,7 +1138,7 @@ for name in $DEPLOY_SCRIPTS; do
 			why="ボードが承認のあと端末で走らせる、承認済みチケットのコミットと push"
 			;;
 		*)
-			why="足止めの中で通る形"
+			why="止めている間に通る形"
 			;;
 		esac
 		note_missing "${DEPLOY_SCRIPT_DIR}/${name}（${why}）"

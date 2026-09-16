@@ -591,7 +591,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn(head.strip(), copy)
         self.assertIn("started_at:", copy)
 
-    # ---- 4. フェーズとレビューの足止め
+    # ---- 4. フェーズの終わりと HITL ポイント
 
     def close_phase(self):
         for child in ("i0001-01", "i0001-02"):
@@ -626,12 +626,12 @@ class TicketTest(unittest.TestCase):
             file_path=os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-03.md"),
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(plan))
-        # main からの起動には足止めが無い。
+        # main からの起動は止まらない。
         elsewhere = self.hook("PreToolUse", "Agent", self.root, description="別の話")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(elsewhere))
 
     def test_gate_guides_sh_from_workspace_root(self):
-        """足止めと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
+        """止めたときと終わりの知らせは sh をワークスペースルートから案内し、その綴りは通ること。
 
         `.ccnavi/scripts/` はワークスペースにしか無い。プロジェクトから切ったワークツリーでは
         相対の `sh .ccnavi/scripts/...` が届かないので、案内は絶対パスで出す。
@@ -649,7 +649,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
 
-        # 案内どおりに打った形は、足止めの例外に当たる。
+        # 案内どおりに打った形は、止めている間の例外に当たる。
         guided = self.hook(
             "PreToolUse",
             "Bash",
@@ -688,7 +688,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(phase_mod.exempt(joined.text, joined.reason))
 
     def test_gate_does_not_exempt_the_command_run_inside_a_runner(self):
-        """足止めの中で通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
+        """止めている間に通す形は、実行役のコマンドの中で実行されるコマンドには当てない。
 
         禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、レビューで止まっている間に
         `env sh …ccnavi-review.sh` の形で何でも前に置けるようになる

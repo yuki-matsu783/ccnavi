@@ -594,7 +594,7 @@ class SubstTest(unittest.TestCase):
                 self.assertFalse(result.degraded, result.reason)
                 self.assertNotRegex(result.text, r"(^|\x00)git push")
 
-    def test_足止めの免除はコマンドが全部ラッパースクリプトのときだけ(self):
+    def test_止めている間の免除はコマンドが全部ラッパースクリプトのときだけ(self):
         substituted = read('sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(cat f)"')
         self.assertFalse(
             phase.exempt(substituted.text, substituted.reason),

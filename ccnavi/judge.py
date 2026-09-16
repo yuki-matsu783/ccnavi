@@ -64,7 +64,7 @@ HANDOVER = "(handover)"
 # 実行後の監視が作業ツリーの実物を見て捕まえる。
 SCOPE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# サブエージェントの起動ツール。レビューの足止めが止める対象で、対象の文字列を持たないので
+# サブエージェントの起動ツール。レビューが済むまで止める対象で、対象の文字列を持たないので
 # 見出しだけを subject にする。
 AGENT_TOOL = "Agent"
 
@@ -226,7 +226,7 @@ def decide_before(
             notices + [reasons.subagent_forbidden(subject, runner, layer)],
         )
 
-    # レビューの足止め。人間レビュー要のフェーズが終わっていてマーカーが無い間、
+    # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
     # サブエージェントの起動と、例外の 3 本以外のシェル実行を止める（REQ-TKT-15）。
     # ルールより先に見る。
     if conf.tickets_enabled and payload.tool_name in phase.HELD_TOOLS:
@@ -494,7 +494,7 @@ def subject_of(payload: hookio.Input) -> str:
     if field is None:
         return ""
     if tool == AGENT_TOOL:
-        # 起動には対象の文字列が無い。足止めが止める対象なので、見出しを subject に
+        # 起動には対象の文字列が無い。レビューが済むまで止める対象なので、見出しを subject に
         # して判定に入れる。
         return payload.field_value(field) or payload.field_value("prompt") or "(agent)"
     value = payload.field_value(field)

@@ -167,7 +167,7 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（レビュー準備
     ...base.parents[0],
     phases: base.parents[0].phases.map((p): PhaseJson => {
       if (p.number === 1) {
-        // 依頼して済んだレビューと HIGH のリスク。要約はリスクだけ（足止めが解ければ段の名前は出ない）、
+        // 依頼して済んだレビューと HIGH のリスク。要約はリスクだけ（止まらなくなれば段の名前は出ない）、
         // 全文には点と理由とマーカーが残る
         return {
           ...p,
@@ -252,7 +252,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(!html.includes("締める"));
 });
 
-test("CB-T13a 止めている間だけ段の名前を札に出す。レビューが済んで足止めが解けた子には出さない", () => {
+test("CB-T13a 止めている間だけ段の名前を札に出す。レビューが済んで止まらなくなった子には出さない", () => {
   const base = fixture();
   // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済 かつ 止まっている」を判定が言う
   const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
@@ -274,14 +274,14 @@ test("CB-T13a 止めている間だけ段の名前を札に出す。レビュー
   });
   const holdBadge = (text: string) => `<span class="badge hold">${text}</span>`;
   const briefWith = (text: string) => `<span class="phase-brief" aria-hidden="true">${text}</span>`;
-  // クローズ・レビュー済・足止めなしの子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
+  // クローズ・レビュー済・止まっていない子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
   // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済 · レビュー済」が残る
   const done = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false)), OPTIONS);
   assert.ok(!done.includes('class="badge hold"'));
   assert.ok(done.includes('<span class="fact mark mark-reviewed">レビュー済</span>'));
   assert.ok(done.includes(briefWith("") + '<span class="phase-full">終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 0 (LOW)</span>'));
   assert.doesNotMatch(done, /class="phase-brief"[^>]*>[^<]*レビュー依頼済/);
-  // 依頼済のマーカーだけで足止めが解けている（判定が待ちと言わない）子にも、札と要約は出ない
+  // 依頼済のマーカーだけで止まっていない（判定が待ちと言わない）子にも、札と要約は出ない
   const reopened = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, false)), OPTIONS);
   assert.ok(!reopened.includes('class="badge hold"'));
   assert.doesNotMatch(reopened, /class="phase-brief"[^>]*>[^<]*レビュー依頼済/);

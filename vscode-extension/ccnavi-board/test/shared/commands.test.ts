@@ -108,7 +108,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
     ),
     text,
   );
-  // 足止めの例外は sh …ccnavi-review.sh の形を単体で打ったときだけ（設計 §9.8）。cd と連結する形へ誘導しない。
+  // 止めている間の例外は sh …ccnavi-review.sh の形を単体で打ったときだけ（設計 §9.8）。cd と連結する形へ誘導しない。
   // サブエージェントには常に禁止（§9.12）
   assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
   assert.ok(text.includes("サブエージェントには渡さない"));

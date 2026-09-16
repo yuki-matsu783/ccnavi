@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・レビューの足止め・
+ * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・レビュー待ち・
  * ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
@@ -300,7 +300,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const actions: Action[] = [];
   // 受け入れて進めるのは、人のレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
   // 判定が `review_waiting` で言う。子カードの札・フェーズ行の「レビュー依頼済」・受け入れの操作はみな
-  // それを読み、足止めとマーカーからここで組み直さない。
+  // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });

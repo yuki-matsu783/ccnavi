@@ -548,7 +548,7 @@ def _reviewed_in_chat(
         return 1
     if approval.MARK_REQUESTED in ph.marks:
         # 依頼を出したあとに --chat で通すと、マージリクエストに付いた指摘を数えずに
-        # 足止めが解ける。数える道（check）と、数えたうえで受け入れる道（accept）がある。
+        # 止まっていたのが解ける。数える道（check）と、数えたうえで受け入れる道（accept）がある。
         stderr.write(
             f"ccnavi: フェーズ {ph.label} はマージリクエストに依頼済み。--chat では通せない。"
             f"'{review_sh} check --phase {ph.number}'（指摘が残っていれば "

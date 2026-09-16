@@ -458,7 +458,7 @@ def main() -> int:
         said[:120].replace("\n", " "),
     )
     record(
-        "レビューの足止めが Agent を止める",
+        "レビュー待ちが Agent を止める",
         "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
@@ -609,7 +609,7 @@ def main() -> int:
         (checked.stdout + checked.stderr).strip()[:200],
     )
     record(
-        "足止めが解ける",
+        "止まっていたのが解ける",
         "DENY_PHASE_REVIEW" not in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 

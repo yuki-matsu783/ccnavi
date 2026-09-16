@@ -10,7 +10,7 @@
 6. フィードバック計画は最後のレビューの後に 1 回だけ、空でも証跡になる
 7. 親はフィードバック計画が承認されるまで閉じられない
 8. 残った指摘の切り出しの下書き
-9. このセッションで見るフェーズ（`review: chat`）の足止めと締め
+9. このセッションで見るフェーズ（`review: chat`）の止め方と締め
 
 範囲の上限（設計 wip/design/approve-carry.md §3・§4）は ScopeLimitTest が見る。
 """
@@ -626,7 +626,7 @@ class PhaseTest(PhaseHarness):
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
         # ボードの JSON は「依頼済みで止まったまま」を review_waiting で言う。レビューが
-        # 済んで足止めが解ければ false に戻り、依頼のマーカーは残る。
+        # 済んで止まらなくなれば false に戻り、依頼のマーカーは残る。
         self.assertEqual(self.board_phase(1), (True, True, ["requested"]))
         self.assertEqual(self.check(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
@@ -684,7 +684,7 @@ class PhaseTest(PhaseHarness):
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         # フィードバック計画: 実装フィードバック対応を 1 本。承認がレビューの合意になり、
-        # 足止めが解ける。指摘は消えず、フィードバック作業フェーズの check が数える。
+        # 止まっていたのが解ける。指摘は消えず、フィードバック作業フェーズの check が数える。
         self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
         write(
             os.path.join(self.parent_tree, "wip", "tickets", "doing", "i0001.md"),
@@ -1013,7 +1013,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
-        # y でマーカーが置かれ、足止めが解ける。写しも依頼の記録も要らない。
+        # y でマーカーが置かれ、止まっていたのが解ける。写しも依頼の記録も要らない。
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         mark = read_json(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
@@ -1134,7 +1134,7 @@ class ChatReviewTest(PhaseHarness):
         )
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("マージリクエスト", refused.stderr)
-        # 足止めも解けない。読めないことでレビューが消える道は作らない。
+        # 止まったままになる。読めないことでレビューが消える道は作らない。
         payload = {
             "hook_event_name": "PreToolUse",
             "tool_name": "Agent",
@@ -1386,7 +1386,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("種類の上限では切り詰めていない", self.reason(result))
 
     def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
-        """7. 同じ状態で、Bash の実行前の判定（足止めの経路）も例外で終わらない。"""
+        """7. 同じ状態で、Bash の実行前の判定（止めるかどうかの経路）も例外で終わらない。"""
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )

@@ -373,7 +373,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
     のたびに届くので、後から必要な場所で改めて届くものを頭では言わない。名指しするのは、
     レビューの sh の綴りが段階に来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
-    人がどこで見るか（`review` の `mr` / `chat`）がそのフェーズの足止め（`phase.py`）、
+    人がどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の綴りが
     承認のときの検査（`approval.py`）、後工程の進め方が承認済みチケットが置かれたとき
     （`approved`）。
