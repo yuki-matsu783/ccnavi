@@ -1,6 +1,6 @@
 // 生成物を名指しで消す。`pnpm run clean` で呼ぶ。
 //
-// 作業ツリーを `git worktree remove` する前に走らせる。pnpm の node_modules は
+// ワークツリーを `git worktree remove` する前に走らせる。pnpm の node_modules は
 // `.pnpm/` の下が深く（Windows の 260 文字を超える）、symlink も含むので、
 // git の削除が途中で止まって、消しきれなかったディレクトリが残ることがある。先にここで消しておく。
 //

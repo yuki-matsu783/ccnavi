@@ -245,7 +245,10 @@ def mr_draft(parent: ticket_mod.Ticket) -> str:
     lines = [f"Draft: {title}", ""]
     if parent.issue:
         lines += [f"Closes #{parent.issue}", ""]
-    lines += [f"チケット `{parent.ticket}`。作業ツリーは `.claude/worktrees/{parent.ticket}`。", ""]
+    lines += [
+        f"チケット `{parent.ticket}`。ワークツリーは `.claude/worktrees/{parent.ticket}`。",
+        "",
+    ]
     if parent.rationale.strip():
         lines += ["## なぜやるか", "", parent.rationale.strip(), ""]
     if parent.body.strip():
@@ -991,9 +994,9 @@ WIP_ROOT = "wip"
 
 
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
-    """作業ツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
+    """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しとマーカーはこの作業ツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
+    写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
@@ -1010,14 +1013,14 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
 
 
 def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[str]:
-    """マージに進む前に作業ツリーの側で満たしていること。root は文面の sh の綴りに使う。
+    """マージに進む前にワークツリーの側で満たしていること。root は文面の sh の綴りに使う。
 
     途中の作業の置き場が追跡から消えていること、未コミットが無いこと、push 済みであること。
     人がマージするときに見るのはリモートの HEAD なので、手元にだけあるものは無いのと同じ。
     """
     problems: list[str] = []
     if not os.path.isdir(tree_root):
-        return [f"親の作業ツリーが無い ({tree_root})"]
+        return [f"親のワークツリーが無い ({tree_root})"]
     wip = WIP_ROOT
     rc, tracked = _git(tree_root, ["ls-files", "--", wip])
     if rc == 0 and tracked.strip():
@@ -1028,7 +1031,7 @@ def _merge_problems(tree_root: str, conf: settings.Settings, root: str) -> list[
             f"'{settings.script_command(root, 'ccnavi-git.sh')} rm -r {wip}' で消してコミットする"
         )
     if _dirty(tree_root, conf):
-        problems.append("親の作業ツリーに未コミットの変更がある")
+        problems.append("親のワークツリーに未コミットの変更がある")
     branch = _branch(tree_root)
     if not branch:
         problems.append("親ブランチの名前を読めない")
@@ -1052,7 +1055,7 @@ def _parent_any(
         found = tree.lookup(approval.by_id(closed), t.name)
         if found is not None and not found.is_child:
             return found
-    stderr.write("ccnavi: ここは親チケットの作業ツリーではない（cwd から親を引けない）\n")
+    stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
     return None
 
 
@@ -1152,7 +1155,7 @@ def _parent(
 ) -> ticket_mod.Ticket | None:
     parent = phase.parent_for_cwd(root, conf, cwd)
     if parent is None:
-        stderr.write("ccnavi: ここは親チケットの作業ツリーではない（cwd から親を引けない）\n")
+        stderr.write("ccnavi: ここは親チケットのワークツリーではない（cwd から親を引けない）\n")
     return parent
 
 
@@ -1209,15 +1212,15 @@ def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data
 
 
 def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str]:
-    """依頼の前提のうち、作業ツリーの中で分かるもの。"""
+    """依頼の前提のうち、ワークツリーの中で分かるもの。"""
     unmet: list[str] = []
     if not ph.ended:
         unmet.append("フェーズが終わっていない（todo/ か doing/ に子が残っている）")
     for child in ph.tickets:
         if ph.states.get(child.ticket) != ticket_mod.DONE:
             continue
-        # 子のブランチは識別子と同じ名前。作業ツリーではなくブランチを引くので、
-        # 作業ツリーを消しても検査から外れない。引けなければ前提の未充足。
+        # 子のブランチは識別子と同じ名前。ワークツリーではなくブランチを引くので、
+        # ワークツリーを消しても検査から外れない。引けなければ前提の未充足。
         rc, sha = _git(tree_root, ["rev-parse", "--verify", f"{child.ticket}^{{commit}}"])
         if rc != 0 or not sha.strip():
             unmet.append(f"子 {child.ticket} のブランチを確かめられない（消えている）")
@@ -1225,10 +1228,10 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
         rc, _ = _git(tree_root, ["merge-base", "--is-ancestor", sha.strip(), "HEAD"])
         if rc != 0:
             unmet.append(f"子 {child.ticket} のブランチが親に取り込まれていない")
-    # 未追跡は数えない。依頼文そのものを作業ツリーに置く形が普通にあり、それが
+    # 未追跡は数えない。依頼文そのものをワークツリーに置く形が普通にあり、それが
     # 前提を落とすと依頼文を書く場所が無くなる。未追跡はマージリクエストに載らない。
     if _dirty(tree_root, conf):
-        unmet.append("親の作業ツリーに未コミットの変更がある")
+        unmet.append("親のワークツリーに未コミットの変更がある")
     branch = _branch(tree_root)
     if not branch:
         unmet.append("親ブランチの名前を読めない")

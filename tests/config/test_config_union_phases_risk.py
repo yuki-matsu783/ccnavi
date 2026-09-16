@@ -170,7 +170,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
     def test_scope_stays_relative_to_the_worktree(self):
-        """§11.4.1: `scope` は作業ツリーのルートからの相対のまま。
+        """§11.4.1: `scope` はワークツリーのルートからの相対のまま。
 
         種類の超過は承認を拒まず、承認画面の「判定で止まるもの」に出る（設計 approve-carry
         §3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
@@ -227,7 +227,7 @@ class RiskUnionTest(ConfigUnionHarness):
         return [p for p in self.problems(severity, where=where) if "risk" in p["where"]]
 
     def one_child(self):
-        """lib の親と子を承認し、子の作業ツリーを lib から切って着手する。"""
+        """lib の親と子を承認し、子のワークツリーを lib から切って着手する。"""
         scope = ("src/*", "schema/*", "wip/*")
         self.propose(
             "i0001",

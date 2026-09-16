@@ -11,7 +11,7 @@
 4. チケットが効かない場面と、ルールより先に見る点検
 5. 診断の出力
 
-ルールは作業ツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
+ルールはワークツリーを `*/.claude/worktrees/*` で丸ごと指す 1 本を、表の列ごとに置き換える。
 
 チケットの範囲は子 `i0001-01` のもの。
 
@@ -19,7 +19,7 @@
     ask:   src/ask/*
     deny:  src/deny/*
 
-範囲の外には `docs/` を使う。チケットの無い行は、main から切った別の作業ツリー `free` に書く。
+範囲の外には `docs/` を使う。チケットの無い行は、main から切った別のワークツリー `free` に書く。
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ NOTE = "ルールの additionalContext。判定を決めた側に関わらず載
 
 WORKTREES = "*/.claude/worktrees/*"
 
-# チケットの判定の列。子の作業ツリーのルートからの相対パス。
+# チケットの判定の列。子のワークツリーのルートからの相対パス。
 TICKET_DENY = "src/deny/x.py"
 TICKET_ASK = "src/ask/x.py"
 TICKET_ALLOW = "src/ok/x.py"
@@ -50,7 +50,7 @@ APPROVAL_NOTE = (
     "ルールの deny はこの範囲の中でも止まる"
 )
 EXPLAIN_NOTE = (
-    "作業ツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。範囲の外は止まる"
+    "ワークツリーに結び付いたチケットの範囲は、ルールの allow / ask より強い。範囲の外は止まる"
 )
 
 # ルールが何も言わない列に置くルール。Write には当たらない。
@@ -61,7 +61,7 @@ SILENT = {
 
 
 def rules_with(section: str) -> dict:
-    """作業ツリーを丸ごと指すルールを、指定のタイプに 1 本だけ置く。"""
+    """ワークツリーを丸ごと指すルールを、指定のタイプに 1 本だけ置く。"""
     body = {"version": 1, "deny": list(SILENT["deny"])}
     entry = {
         "id": f"rule-{section}",
@@ -133,7 +133,7 @@ def section_of(text: str, head: str) -> str:
 
 
 class Workspace(unittest.TestCase):
-    """本物の git リポジトリに、承認済みの親 1 本と子 1 本と、チケットの無い作業ツリーを置く。"""
+    """本物の git リポジトリに、承認済みの親 1 本と子 1 本と、チケットの無いワークツリーを置く。"""
 
     # 提案と承認済みチケットの置き場。ツリーのルートからの相対で、道具にもそのまま渡す。
     # 子クラスで綴りを変え、置き場を決め打ちしていないことを確かめる。
@@ -271,7 +271,7 @@ class Workspace(unittest.TestCase):
         return result
 
     def family(self, parent=None, child=None):
-        """親と子を提案して承認し、子の作業ツリーを親のブランチから切って着手する。"""
+        """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
         self.propose(
             "i0001-01",
@@ -293,7 +293,7 @@ class Workspace(unittest.TestCase):
 class PreToolUseTable(Workspace):
     """実行前の判定。"""
 
-    # (チケットの列の名前, 書き込み先の作業ツリーを選ぶ鍵, 相対パス)
+    # (チケットの列の名前, 書き込み先のワークツリーを選ぶ鍵, 相対パス)
     COLUMNS = (
         ("deny", "child", TICKET_DENY),
         ("ask", "child", TICKET_ASK),
@@ -412,7 +412,7 @@ class PreToolUseTable(Workspace):
 
 
 class PostToolUseTable(Workspace):
-    """実行後の監視。作業ツリーでシェルが書いたあと。"""
+    """実行後の監視。ワークツリーでシェルが書いたあと。"""
 
     # (ルールのタイプ, チケットの列, 相対パスの接頭, 報告のコード。None は報告しない)
     CASES = (
@@ -432,7 +432,7 @@ class PostToolUseTable(Workspace):
         ("silent", "allow", "src/ok", None),
     )
 
-    # チケットの無い作業ツリー。ルールだけで決まる。
+    # チケットの無いワークツリー。ルールだけで決まる。
     NO_TICKET = (
         ("deny", "POST_VIOLATION"),
         ("ask", "POST_VIOLATION"),
@@ -469,7 +469,7 @@ class PostToolUseTable(Workspace):
 
 
 class TicketPlaces(Workspace):
-    """チケットの置き場は範囲の外でも咎めない。ルールは作業ツリーを allow で開ける。"""
+    """チケットの置き場は範囲の外でも咎めない。ルールはワークツリーを allow で開ける。"""
 
     def setUp(self):
         super().setUp()
@@ -552,7 +552,7 @@ class ScratchPlace(Workspace):
     外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `scratchpad/` が
     現れるのは追跡されているときだけで、それは根拠が崩れている証拠になる。
 
-    ルールは作業ツリーを allow で開ける。
+    ルールはワークツリーを allow で開ける。
     """
 
     # (相対パス, 外すか, なぜ)。素の `scratchpad` は別の 1 本で見る。1 つのツリーに
@@ -628,7 +628,7 @@ class ScratchPlace(Workspace):
 class Boundaries(Workspace):
     """チケットが効かない場面と、ルールより先に見る点検。
 
-    ルールは作業ツリーを allow で開ける。
+    ルールはワークツリーを allow で開ける。
     """
 
     def test_parent_and_child_strictest_wins_under_rule_allow(self):

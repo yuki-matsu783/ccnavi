@@ -1,7 +1,7 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・ゲート・作業ツリーは
+ * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・ゲート・ワークツリーは
  * カードのバッジで出す。ゲートの開閉や承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
@@ -107,7 +107,7 @@ export interface Card {
   /**
    * 人が動く必要があるか。「要対応だけ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
    * 親の改版。札の「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
-   * ゲート閉、未着手・作業中なのに作業ツリーが無い、レビュー待ち、HIGH 以上、本物が決まらない写り、不備、
+   * ゲート閉、未着手・作業中なのにワークツリーが無い、レビュー待ち、HIGH 以上、本物が決まらない写り、不備、
    * 親ならフェーズ行の要約に出るもの（ゲート閉・レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
@@ -338,7 +338,7 @@ export function isKnownPath(board: Board, filePath: string): boolean {
   );
 }
 
-/** 親の識別子から、その親の作業ツリーのパス。承認の sh はそこで打つ */
+/** 親の識別子から、その親のワークツリーのパス。承認の sh はそこで打つ */
 export function parentTreeOf(board: Board, parent: string): string | undefined {
   const card = parentCardOf(board, parent);
   return card !== undefined && card.worktreeExists ? card.worktreePath : undefined;

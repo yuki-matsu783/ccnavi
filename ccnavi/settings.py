@@ -146,7 +146,7 @@ _SPECIAL_IN_DOUBLE_QUOTES = re.compile(r'["\\$`!]')
 def script_command(root: str, name: str) -> str:
     """文面で案内する `.ccnavi/scripts/` の sh の綴り。ワークスペースルートから書く。
 
-    スクリプトはワークスペースにしか無く、プロジェクトから切った作業ツリーでは相対の
+    スクリプトはワークスペースにしか無く、プロジェクトから切ったワークツリーでは相対の
     `sh .ccnavi/scripts/...` が届かない。綴りはルールの `{root}`（rules.root_glob）と揃え、
     区切りは `/` に寄せる（Git Bash は `C:/...` を読める）。
 

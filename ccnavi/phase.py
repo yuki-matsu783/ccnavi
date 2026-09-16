@@ -12,7 +12,7 @@
 ## ゲートの鍵は cwd
 
 書き込みは行き先で結ぶが、起動とシェルには行き先が無い。ゲートは呼び出しの `cwd` が
-どの親の作業ツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
+どの親のワークツリーにあるかで親を引く。`cd` 1 回で外れる鍵だが、外れた先で起動した
 サブエージェントの書き込みは行き先で止まるので、致命傷にならない。
 
 ## 提案から承認済みチケットへ写すもの
@@ -473,7 +473,7 @@ def phases_of(
         phase.tickets.append(t)
         state, _ = _proposal(root, conf, t)
         phase.states[t.ticket] = state
-    # マーカーと記録は親のツリーに置く。子の作業ツリーにも写しは checkout されるが、
+    # マーカーと記録は親のツリーに置く。子のワークツリーにも写しは checkout されるが、
     # マーカーを子の側に書くと、同じフェーズのマーカーが複数のツリーに散る。
     where = approval.home_dir(conf, root, parent_id, "")
     for phase in by_number.values():
@@ -496,11 +496,11 @@ def gate(root: str, conf: settings.Settings, parent_id: str) -> Phase | None:
 
 
 def parent_for_cwd(root: str, conf: settings.Settings, cwd: str) -> ticket_mod.Ticket | None:
-    """cwd が親の作業ツリーの中なら、その親の承認済みチケット。"""
+    """cwd が親のワークツリーの中なら、その親の承認済みチケット。"""
     t = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
         return None
-    # 権威のある側を読む。承認は親の作業ツリーを作る前にも打てるので、そのときの
+    # 権威のある側を読む。承認は親のワークツリーを作る前にも打てるので、そのときの
     # 承認済みチケットは提案があったツリー（プロジェクトのルート）に在る。
     open_copies, _ = approval.scan(conf, root)
     found = tree.lookup(approval.by_id(open_copies), t.name)
@@ -844,7 +844,7 @@ _OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
 
 @dataclass
 class ScopeVerdict:
-    """子の作業ツリーの 1 つのパスについて、範囲の上限を合わせた判定。
+    """子のワークツリーの 1 つのパスについて、範囲の上限を合わせた判定。
 
     上限は子自身・親・フェーズの種類の 3 つで、厳しい側が勝つ。どれが外へ出したかを
     持つのは、文面でその上限を名指しするため。名指しが無いと、承認で見た範囲の中なのに
@@ -932,7 +932,7 @@ def unread_type(
     `types` は `load_types` が返したもの（None を含む）。phases.yml がどの層にも無いのは
     番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに種類が
     引けない（壊れた・種類を消した）ときだけ返す。そのとき判定は種類では切り詰めない。
-    deny に倒すと、人が phases.yml を直している間、全部の子の作業ツリーで書き込みが止まる。
+    deny に倒すと、人が phases.yml を直している間、全部の子のワークツリーで書き込みが止まる。
     """
     item = plan_item(child, parent)
     if item is None or parent is None:
@@ -946,7 +946,7 @@ def unread_type(
 def scope_findings(
     root: str, conf: settings.Settings, child: ticket_mod.Ticket, parent: ticket_mod.Ticket | None
 ) -> tuple[list[tuple[str, ScopeVerdict]], str]:
-    """子の作業ツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
+    """子のワークツリーに残っている範囲外の変更と、その判定。2 つめは読めなかった理由。
 
     見るのは `base_sha..HEAD` のコミット済みの差分と、未コミットの変更の両方。
     未コミットだけ見る検査では、範囲外を書いてコミットしたものが映らない。
@@ -954,7 +954,7 @@ def scope_findings(
     """
     worktree = tree.worktree_path(root, child.ticket)
     if not os.path.isdir(worktree):
-        return [], "作業ツリーが無い"
+        return [], "ワークツリーが無い"
     # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用して 8 進に
     # 逃がすので、そのまま当てると範囲の中の日本語のファイルが必ず範囲外になる。
     paths: set[str] = set()
@@ -967,7 +967,7 @@ def scope_findings(
         worktree, ["status", "--porcelain", "-z", "--untracked-files=all", "--no-renames"]
     )
     if rc != 0:
-        return [], "作業ツリーの状態を読めない"
+        return [], "ワークツリーの状態を読めない"
     for entry in out.split("\0"):
         if len(entry) > 3 and entry[2] == " ":
             paths.add(entry[3:])

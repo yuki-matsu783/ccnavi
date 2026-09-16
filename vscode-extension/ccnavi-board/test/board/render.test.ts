@@ -208,12 +208,12 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   // 人が動く状態は枠付きの札
   assert.ok(html.includes('<span class="badge copy copy-none">未承認</span>'));
-  assert.ok(html.includes('<span class="badge worktree none">作業ツリーなし</span>'));
-  // 属性は枠無しの fact。承認済・レビューの要否・作業ツリーの名前・base
+  assert.ok(html.includes('<span class="badge worktree none">ワークツリーなし</span>'));
+  // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
   assert.ok(html.includes('<span class="fact copy-open">承認済</span>'));
   assert.ok(html.includes('<span class="fact copy-closed">クローズ</span>'));
   assert.ok(/<span class="fact review" title="[^"]*">人レビュー要<\/span>/.test(html));
-  assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
+  assert.ok(/<span class="fact worktree" title="[^"]*">ワークツリー i0001<\/span>/.test(html));
   assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
   assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
   // 属性は列からはみ出さない
@@ -231,7 +231,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
-  // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
+  // 写りは子のワークツリーに普通に入るので、正常な場面ではバッジを出さない
   assert.ok(!html.includes("複数の場所にある"));
   assert.ok(html.includes('<span class="where">子 · 親 i0001 / フェーズ 2</span>'));
   assert.ok(html.includes('class="phases"'));
@@ -459,7 +459,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
 
 test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
-  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・作業ツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
+  assert.ok(html.includes('<label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>'));
   assert.match(html, /data-id="i0001-03"[^>]*data-attention="1"/);
   assert.match(html, /data-id="i0001"[^>]*data-attention="0"/);
   assert.match(html, /data-id="i0001-01"[^>]*data-attention="0"/);

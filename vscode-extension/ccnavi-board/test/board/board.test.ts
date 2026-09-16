@@ -23,7 +23,7 @@ test("CB-T05 列は提案の置き場で、親のあとに子が並ぶ", () => {
   assert.equal(board.remainingCount, 3);
 });
 
-test("CB-T06 カードに承認済みチケット・作業ツリー・マーカー・承認待ちが載る", () => {
+test("CB-T06 カードに承認済みチケット・ワークツリー・マーカー・承認待ちが載る", () => {
   const cards = cardsOf(buildBoard(fixture()));
   const parent = cards.get("i0001")!;
   assert.equal(parent.isParent, true);
@@ -198,7 +198,7 @@ test("CB-T11b 親の絞り込みの候補は親だけを識別子順に並べる
   assert.equal(cardsOf(board).get("i0000-01")!.family, "i0000");
 });
 
-test("CB-T11 親の作業ツリーを引ける", () => {
+test("CB-T11 親のワークツリーを引ける", () => {
   const board = buildBoard(fixture());
   assert.match(parentTreeOf(board, "i0001") ?? "", /worktrees\/i0001$/);
   assert.equal(parentTreeOf(board, "i0001-01"), undefined);
@@ -208,7 +208,7 @@ test("CB-T11 親の作業ツリーを引ける", () => {
 test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り自体は数えない", () => {
   const base = fixture();
   const cards = cardsOf(buildBoard(base));
-  // 正常な場面。親と兄弟の作業ツリーに写っていても、状態が食い違っていても、
+  // 正常な場面。親と兄弟のワークツリーに写っていても、状態が食い違っていても、
   // 実行ファイルが「本物は決まっている」と言うので散在ではない。
   for (const id of ["i0001", "i0001-01", "i0001-02", "i0001-03"]) {
     assert.deepEqual(cards.get(id)!.scattered, [], id);
@@ -293,7 +293,7 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
 });
 
 test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約の条件で、判定はし直さない", () => {
-  // 見本: 親は順調、閉じた子とレビュー中の子は順調、承認待ちで作業ツリーの無い子だけが要対応
+  // 見本: 親は順調、閉じた子とレビュー中の子は順調、承認待ちでワークツリーの無い子だけが要対応
   const cards = cardsOf(buildBoard(fixture()));
   assert.equal(cards.get("i0001")!.attention, false);
   assert.equal(cards.get("i0001-01")!.attention, false);
@@ -306,7 +306,7 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
   assert.equal(revision.get("i0001")!.copyStatus, "open");
   assert.equal(revision.get("i0001")!.pendingApproval, true);
   assert.equal(revision.get("i0001")!.attention, true);
-  // 承認されずに取り消された提案は、未承認のまま作業ツリーも無いが、もう誰も動かないので要対応ではない
+  // 承認されずに取り消された提案は、未承認のままワークツリーも無いが、もう誰も動かないので要対応ではない
   const dropped: TicketJson = {
     ...base.tickets[3],
     proposal: { ...base.tickets[3].proposal!, state: "cancelled" },

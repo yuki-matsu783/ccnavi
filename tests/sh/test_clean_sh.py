@@ -1,7 +1,7 @@
 """ccnavi-clean.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から叩く。
 
 確かめるのは 3 つ。決まった名前の生成物だけが消えること。`.claude/worktrees/` の直下の
-名前以外は受け付けないこと。未コミットの変更がある作業ツリーでは何も消さないこと。
+名前以外は受け付けないこと。未コミットの変更があるワークツリーでは何も消さないこと。
 
 同じ検査を 2 回回す。node で消す側と、node が無いときに sh で消す側。node が無い状態は、
 sh に渡す PATH から node のあるディレクトリを外して作る。
@@ -282,7 +282,7 @@ class CleanWithoutNodeTest(CleanCases, unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "Windows は名前に改行を入れられない")
     def test_stops_on_a_name_with_a_newline(self):
-        # 行で読むと `../other/node_modules` が現れる名前。隣の作業ツリーを消させない。
+        # 行で読むと `../other/node_modules` が現れる名前。隣のワークツリーを消させない。
         other = os.path.join(self.worktrees, "other", "node_modules", "keep.js")
         write(other)
         top = self.make_shell("shell")

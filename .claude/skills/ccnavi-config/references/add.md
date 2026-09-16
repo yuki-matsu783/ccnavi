@@ -12,8 +12,8 @@
    閉じるときの重さなら risk。2 本にまたがるなら別々の下書きにする
 3. **今の本物を読む。** 同じことを言うルールや種類が既に無いか。足すより直すほうが
    よいことが多い
-4. **下書きを作業ツリーの `scratchpad/` に書く。** 本物の全文を写して、そこに足す。断片だけだと
-   lint に掛けられない。作業ツリーが無ければセッションの scratchpad に置く
+4. **下書きをワークツリーの `scratchpad/` に書く。** 本物の全文を写して、そこに足す。断片だけだと
+   lint に掛けられない。ワークツリーが無ければセッションの scratchpad に置く
 5. **検証する。** lint と、rules なら見本。通るまで直す（[check.md](check.md) の手順）
 6. **利用者に渡す。** 何をなぜ変えるか、得るもの、失うもの、下書きの場所、差分。
    置くのは利用者
@@ -101,7 +101,7 @@ phases:
     title: 調査                 # id と title はどちらも一意
     review: none                # none | mr。既定であって上限ではない（計画の項で mr に強められる）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
-    deliverables: ["wip/research/summary.md"]   # 閉じる前に親の作業ツリーに在って追跡されているべきもの
+    deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
   implement:
     kind: work
@@ -128,7 +128,7 @@ phases:
   ただし実績のリスクが HIGH 以上なら宣言に関わらずゲートが閉じる（risks.yml の側）
 - `scope` は子 ⊆ 種類 ⊆ 親の真ん中。広く書けば子が何でも宣言できる。rules.yml の deny が
   止める場所（`.claude/hooks/*` など）を scope に入れても deny が勝つので、入れる意味は無い。
-  glob は作業ツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
+  glob はワークツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
 - `deliverables` は「在って追跡されている」ことだけ見る。中身は見ない。閉じるときに無ければ
   最後の子を閉じられないので、必ず作れる名前にする
 - `overlap` は対称に効く。`acceptance: overlap: [implement]` と書けば implement 側にも効く。
@@ -142,7 +142,7 @@ phases:
 
 ## risks.yml
 
-子を `ticket done` で閉じるとき、その子の作業ツリーで `base_sha..HEAD` の差分を数え、点を
+子を `ticket done` で閉じるとき、その子のワークツリーで `base_sha..HEAD` の差分を数え、点を
 付ける。フェーズの点は子の最大値。**HIGH 以上なら宣言に関わらずレビューが要る扱いになり、
 ゲートが閉じる。** 実績が小さくても宣言のレビュー要を下げることはしない。
 
@@ -163,8 +163,8 @@ factors:
 | 当て方 | 何を数えるか | 決めるときに考えること |
 |---|---|---|
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が閾値を**超えた**ら加点 | 閾値はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
-| `glob` | 当たったファイル**ごと**に加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。作業ツリーのルートからの相対。`**` が使える |
-| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子の作業ツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
+| `glob` | 当たったファイル**ごと**に加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`**` が使える |
+| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh judge <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。段階の名前は増やせない（知らない名前は warn）。

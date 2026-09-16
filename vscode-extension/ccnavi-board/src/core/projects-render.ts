@@ -55,7 +55,7 @@ ${page.rows.length === 0 ? '  <p class="empty">プロジェクトはまだ無い
 </section>
 ${renderStrays(page.strays)}<section class="workspace">
   <h2>ワークスペース本体</h2>
-  <p class="hint"><span class="mono">${escapeHtml(page.root)}</span>（作業ツリー ${page.workspaceWorktrees.length} 件${page.workspaceWorktrees.length > 0 ? `: ${escapeHtml(page.workspaceWorktrees.join(", "))}` : ""}）</p>
+  <p class="hint"><span class="mono">${escapeHtml(page.root)}</span>（ワークツリー ${page.workspaceWorktrees.length} 件${page.workspaceWorktrees.length > 0 ? `: ${escapeHtml(page.workspaceWorktrees.join(", "))}` : ""}）</p>
 ${renderSelfRules(page)}</section>
 <footer class="foot">最終更新 ${escapeHtml(page.generatedAt)}（${escapeHtml(page.root)}）</footer>
 <script nonce="${nonce}">
@@ -148,7 +148,7 @@ function renderProject(row: ProjectRow, ticketsEnabled: boolean): string {
       <dl class="fields">
           <div class="field"><dt>origin</dt><dd>${origin}</dd></div>
           <div class="field"><dt>ルール</dt><dd>${rules}</dd></div>
-          <div class="field"><dt>作業ツリー</dt><dd>${worktrees}</dd></div>${tickets}
+          <div class="field"><dt>ワークツリー</dt><dd>${worktrees}</dd></div>${tickets}
           <div class="field wide"><dt>検証</dt><dd>${lint}</dd></div>
       </dl>
       <div class="ops">

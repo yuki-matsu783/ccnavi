@@ -355,7 +355,7 @@ class PushApprovedTest(Workspace):
     def test_a_symlink_under_worktrees_is_not_followed(self):
         """8. `.claude/worktrees/` の下のシンボリックリンクは辿らない。標準エラーに言う。
 
-        リンク先はワークスペースの外のリポジトリ。本物の作業ツリーは運ぶ。
+        リンク先はワークスペースの外のリポジトリ。本物のワークツリーは運ぶ。
         """
         outside = os.path.join(self._tmp.name, "outside")
         outside_remote = self.repository(outside, "work")
@@ -403,7 +403,7 @@ class PushApprovedTest(Workspace):
         """`projects/` そのものがシンボリックリンクなら、その下のリポジトリにコミットしない。
 
         リンク先の中の 1 件ずつはリンクではないので、置き場の段で確かめないと辿ってしまう。
-        飛ばしたことは標準エラーに言う。本物の作業ツリーは運ぶ。
+        飛ばしたことは標準エラーに言う。本物のワークツリーは運ぶ。
         """
         app, remote = self.outside_repository("elsewhere-projects")
         before = self.head(app)
@@ -432,7 +432,7 @@ class PushApprovedTest(Workspace):
         """`CCNAVI_PROJECTS=/` は末尾の `/` を落とすと空になり、ルートの直下を全部数えることになる。
 
         既定の `projects` に戻すので、ルートの直下に置いた別のリポジトリは運ばない。
-        本物の作業ツリーは運ぶ。
+        本物のワークツリーは運ぶ。
         """
         app = os.path.join(self.ws, "stray")
         remote = self.repository(app, "work")

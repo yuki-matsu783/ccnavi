@@ -27,8 +27,8 @@ import { ticketControl } from "./ticket-control.js";
 const DEBOUNCE_MS = 120;
 
 /**
- * 監視する場所。提案（ワークスペース、プロジェクト、全作業ツリーの `wip/tickets/`）、
- * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、作業ツリーの登録。
+ * 監視する場所。提案（ワークスペース、プロジェクト、全ワークツリーの `wip/tickets/`）、
+ * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、ワークツリーの登録。
  * glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [
@@ -311,7 +311,7 @@ function handleMessage(message: Message | undefined): void {
     case "accept": {
       const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
       if (tree === undefined) {
-        vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーが無いので accept を送れない`);
+        vscode.window.showWarningMessage(`親 ${message.parent} のワークツリーが無いので accept を送れない`);
         return;
       }
       runInTerminal(root, acceptCommand(root, tree, message.phase));
@@ -328,7 +328,7 @@ function handleMessage(message: Message | undefined): void {
       const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
       const chip = current.board ? phaseChipOf(current.board, message.parent, message.phase) : undefined;
       if (tree === undefined || chip === undefined) {
-        vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーかフェーズ ${message.phase} が無いので、レビュー済みの連絡を組めない`);
+        vscode.window.showWarningMessage(`親 ${message.parent} のワークツリーかフェーズ ${message.phase} が無いので、レビュー済みの連絡を組めない`);
         return;
       }
       // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ check の前提（依頼のマーカー）が無い

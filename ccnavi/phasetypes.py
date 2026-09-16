@@ -3,7 +3,7 @@
 ## 種類は人が持つ
 
 エージェントが種類を書けると、レビュー不要の種類を作ってから使える。だから置き場は
-ルールの `guard-ccnavi-config` の内側で、作業ツリー側の設定も含めてエージェントの Write は
+ルールの `guard-ccnavi-config` の内側で、ワークツリー側の設定も含めてエージェントの Write は
 止まる。組み込みの既定は持たない。
 既定を組み込むと、意図せずレビューの要否が決まる。ファイルが無ければ、フェーズは
 番号だけの今までの挙動で、親の `plan` も読めない。
@@ -114,7 +114,7 @@ class PhaseType:
         )
 
     def decide(self, rel: str) -> str:
-        """この種類の範囲が、作業ツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
+        """この種類の範囲が、ワークツリーのルートからの相対パスをどう扱うか。inherit なら常に中。"""
         if self.scope is None:
             return rules.ALLOW
         for entry in self.scope:
@@ -354,7 +354,9 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
     for glob in pt.deliverables:
         if ".." in glob or os.path.isabs(glob):
             problems.append(
-                Problem(SEVERITY_ERROR, ident, f"`deliverables` の `{glob}` は作業ツリーの中で書く")
+                Problem(
+                    SEVERITY_ERROR, ident, f"`deliverables` の `{glob}` はワークツリーの中で書く"
+                )
             )
             return None, problems
     if ident in pt.overlap or ident in pt.requires:
@@ -376,7 +378,7 @@ def _globs(ident: str, key: str, raw: list) -> tuple[list[ticket_mod.Entry], lis
         glob = item.strip()
         if ".." in glob or "~" in glob or "$" in glob or os.path.isabs(glob):
             problems.append(
-                Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` の `{glob}` は作業ツリーの中で書く")
+                Problem(SEVERITY_ERROR, ident, f"`{key}[{i}]` の `{glob}` はワークツリーの中で書く")
             )
             continue
         glob = glob.replace("\\", "/").strip("/")

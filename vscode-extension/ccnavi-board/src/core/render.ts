@@ -64,7 +64,7 @@ ${bodyTag(options.appearance)}
 ${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount} 件</span>\n` : ""}${board.issueCount > 0 ? `    <span class="issues warn">不備 ${board.issueCount} 件</span>\n` : ""}    <span class="counts">残り ${board.remainingCount} / 全 ${board.totalCount}</span>
   </div>
   <div class="controls">
-${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・作業ツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
+${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
     <button type="button" class="action" data-action="refresh">更新</button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
@@ -234,7 +234,7 @@ function renderCard(card: Card): string {
 }
 
 /**
- * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、作業ツリーなし（閉じたチケットは除く）、
+ * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、ワークツリーなし（閉じたチケットは除く）、
  * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち。ゲートが閉じている間だけ）、本物が決まらない写り。
  * 出す札が無ければ行ごと出さない。
  */
@@ -247,7 +247,7 @@ function renderBadges(card: Card): string {
     badges.push(badge("gate", "ゲート閉"));
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
-    badges.push(badge("worktree none", "作業ツリーなし"));
+    badges.push(badge("worktree none", "ワークツリーなし"));
   }
   // 依頼済の札は、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）の間だけ。
   // 待ちかどうかは判定が JSON の `review_waiting` で言う。ここで reviewed やゲートを見て判定し直さない。
@@ -269,7 +269,7 @@ function renderBadges(card: Card): string {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、作業ツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、ワークツリー、
  * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
  * リスク（MEDIUM 以下）、base、プロジェクト。
  */
@@ -280,7 +280,7 @@ function renderFacts(card: Card): string {
   }
   facts.push(fact("review", `人レビュー${card.reviewRequired ? "要" : "不要"}`, card.reviewReason));
   if (card.worktreeExists) {
-    facts.push(fact("worktree", `作業ツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
+    facts.push(fact("worktree", `ワークツリー ${worktreeName(card.worktreePath)}`, card.worktreePath));
   }
   for (const mark of card.marks) {
     if (mark !== "requested") {
@@ -312,7 +312,7 @@ function riskText(card: Card): string {
   return card.riskPoints === null ? `リスク ${card.riskLevel}` : `リスク ${card.riskLevel}（${card.riskPoints} 点）`;
 }
 
-/** 作業ツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
+/** ワークツリーの置き場の末尾（`.claude/worktrees/<名前>` の名前）。読めなければ「あり」 */
 function worktreeName(path: string): string {
   const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
   return name === "" ? "あり" : name;

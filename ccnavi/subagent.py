@@ -1,6 +1,6 @@
 """サブエージェントの始まりと終わり。
 
-始まりには、cwd の作業ツリーに関わる開いている子の一覧を渡す。終わりには、
+始まりには、cwd のワークツリーに関わる開いている子の一覧を渡す。終わりには、
 範囲外の変更が残っていれば 1 回だけ差し戻す。差し戻しを無視して終わったことは
 親に言う。どちらも止められないイベントなので、判定はしない。
 """
@@ -35,14 +35,14 @@ def at_start(
     payload: hookio.Input,
     record: audit.Record,
 ) -> int:
-    """サブエージェントが始まったとき。cwd の作業ツリーに関わる、開いている子の一覧を渡す。
+    """サブエージェントが始まったとき。cwd のワークツリーに関わる、開いている子の一覧を渡す。
 
     止められないイベントなので判定はしない。判定はファイルの行き先で決まるので、
     ここで渡す文は案内でしかない。親のプロンプトに書き忘れがあっても、
     サブエージェントが自分のツリーと範囲を知れるようにする。
 
-    渡すのは cwd で決める。親の作業ツリーならその親の開いている子、子の作業ツリーなら
-    その子自身。main と、チケットの無い作業ツリーからの起動には何も渡さない。
+    渡すのは cwd で決める。親のワークツリーならその親の開いている子、子のワークツリーなら
+    その子自身。main と、チケットの無いワークツリーからの起動には何も渡さない。
     全部の子を渡すと、別のセッションが main で調査を委譲したときにも無関係な
     子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
     """
@@ -66,13 +66,13 @@ def at_start(
     done = {t.ticket for t in closed}
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
-        "書き込みは行き先の作業ツリーのチケットで判定される。"
+        "書き込みは行き先のワークツリーのチケットで判定される。"
     ]
     parents = approval.by_id(copies)
     types = phase.load_types(conf, root, bound.project) or {}
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
-        state = "作業ツリーあり" if os.path.isdir(where) else "作業ツリー無し（効かない）"
+        state = "ワークツリーあり" if os.path.isdir(where) else "ワークツリー無し（効かない）"
         waiting = [p for p in t.predecessors if p not in done]
         label = str(t.phase)
         hint = ""
@@ -107,7 +107,7 @@ def at_stop(
 ) -> int:
     """サブエージェントが終わろうとしたとき。範囲外の変更が残っていれば 1 回だけ差し戻す。
 
-    見るのは、cwd が子の作業ツリーならその子、親の作業ツリーならその親の開いている
+    見るのは、cwd が子のワークツリーならその子、親のワークツリーならその親の開いている
     子の全部。`base_sha..HEAD` のコミット済みの差分と未コミットの両方を見る。
     範囲は実行前の判定と同じく親の範囲と種類の上限で切り詰め、子の範囲の中でも
     上限の外なら、どの上限かをパスの後ろに添える。
@@ -126,7 +126,7 @@ def at_stop(
     for child in targets:
         outside, unreadable = phase.scope_findings(root, conf, child, index.get(child.parent))
         if unreadable:
-            stderr.write(f"ccnavi: {child.ticket} の作業ツリーを読めない: {unreadable}\n")
+            stderr.write(f"ccnavi: {child.ticket} のワークツリーを読めない: {unreadable}\n")
             continue
         for rel, found in outside:
             findings.append((child, rel, found))
@@ -178,7 +178,7 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
     fsio.remove(_bounce_path(state_dir, agent_id))
     return (
         f"[ccnavi] {post.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
-        "差し戻されたまま終わっています。合流する前に、その子の作業ツリーの範囲外の"
+        "差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の"
         "変更を確かめてください。"
     )
 

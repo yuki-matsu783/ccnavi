@@ -63,9 +63,9 @@ export function approveArgs(
 
 /**
  * `ccnavi-review.sh accept <N>`。sh がレビューのスレッドを取ってきて、未解決のまま進める
- * ことを人が受け入れる。sh は実行した場所を親の作業ツリーとして exe に渡すので、
- * 先に親の作業ツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
- * 切った作業ツリーには届かないので、sh はワークスペースルートから綴る。
+ * ことを人が受け入れる。sh は実行した場所を親のワークツリーとして exe に渡すので、
+ * 先に親のワークツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
+ * 切ったワークツリーには届かないので、sh はワークスペースルートから綴る。
  */
 export function acceptCommand(root: string, parentTree: string, phase: number): string {
   const script = shellQuote(`${toPosixPath(root)}/.ccnavi/scripts/ccnavi-review.sh`);
@@ -95,7 +95,7 @@ export function scriptCommand(root: string, name: string): string {
 /**
  * 人がレビューを終えたことを Claude Code に伝える文。ボードの「レビュー済み連絡」が組み、
  * 承認の文と同じ 2 ボタン（コピー / 新しいセッションで開く）で渡す。判定は動かさず、マーカーも置かない。
- * `check` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親の作業ツリーで打つ。
+ * `check` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
  * そこはゲートが閉じているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
  * （設計 §9.8。`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される（§9.12）。文はその 2 つを言う。
  * 未解決が残っていれば `check` が一覧と次の道（解決してもらう・同じフェーズに子を足す・人が accept を打つ）を
@@ -115,7 +115,7 @@ export function reviewedPrompt(
   }
   const tree = toPosixPath(parentTree);
   lines.push(
-    `親（メインエージェント）が、親の作業ツリー ${tree} で '${scriptCommand(root, "ccnavi-review.sh")} check --phase ${phase}' を打ち、` +
+    `親（メインエージェント）が、親のワークツリー ${tree} で '${scriptCommand(root, "ccnavi-review.sh")} check --phase ${phase}' を打ち、` +
       "レビュー済みのマーカーを置く。ゲートが閉じている間はこの形の 1 本だけが通るので、cd や他のコマンドと連結せず、" +
       `単体の Bash で打つ（cwd が ${tree} でなければ、先に cd だけを別の Bash で打つ）。サブエージェントには渡さない。` +
       "未解決の指摘が残っていれば check が一覧と次の道を返すので、それに従う。" +
@@ -126,7 +126,7 @@ export function reviewedPrompt(
 
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
- * 絶対パスで組む。ターミナルは使い回すので、前に accept が親の作業ツリーへ cd していても届く。
+ * 絶対パスで組む。ターミナルは使い回すので、前に accept が親のワークツリーへ cd していても届く。
  */
 export function pushApprovedCommand(root: string): string {
   return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;

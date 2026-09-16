@@ -1,6 +1,6 @@
 // ccnavi-clean の本体。ccnavi-clean.sh から呼ぶ。単体では打たない。
 //
-//   node ccnavi-clean.js <作業ツリーの絶対パス> [--dry-run]
+//   node ccnavi-clean.js <ワークツリーの絶対パス> [--dry-run]
 //
 // 名前の検査と未コミットの変更の確認は sh が済ませている。ここがするのは、決まった
 // 名前の生成物を探して消すことだけ。
@@ -20,7 +20,7 @@ const BESIDE_PACKAGE_JSON = new Set(["out"]);
 // 中へ降りない。git の管理領域。
 const SKIP = new Set([".git"]);
 
-// 作業ツリーの置き場の直下か。sh が組み立てた値だが、ここでも確かめる。
+// ワークツリーの置き場の直下か。sh が組み立てた値だが、ここでも確かめる。
 // 取り違えたときに消す範囲が広がる向きの誤りなので、二重にしておく。
 function isWorktree(top) {
   const parent = path.dirname(top);
@@ -98,8 +98,8 @@ function main(argv) {
   if (failed.length > 0) {
     console.error(
       "ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）は" +
-        "どの作業ツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で" +
-        " .claude/worktrees/ の外へ出してください（HANDOVER.md の「作業ツリーが消せない」）。",
+        "どのワークツリーからも消せません。テストが終わるのを待って打ち直すか、ディレクトリごと mv で" +
+        " .claude/worktrees/ の外へ出してください（HANDOVER.md の「ワークツリーが消せない」）。",
     );
     return 1;
   }

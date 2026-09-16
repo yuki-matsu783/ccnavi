@@ -93,7 +93,7 @@ export type NameCheck = { readonly ok: true; readonly name: string } | { readonl
 
 /**
  * 名前を検査する。名前はツリーの名前、`wip/<名前>/tickets/`、`logs/<名前>/`、frontmatter の
- * `project:` にそのまま使われるので ASCII に絞る。既存のツリー名（プロジェクト・作業ツリー）と
+ * `project:` にそのまま使われるので ASCII に絞る。既存のツリー名（プロジェクト・ワークツリー）と
  * 大文字小文字だけ違う名前も衝突扱い（Windows では同じディレクトリになる）。
  */
 export function checkName(raw: string, existing: readonly string[]): NameCheck {
@@ -144,7 +144,7 @@ export interface Stray {
   readonly reason: string;
 }
 
-/** 歩かないディレクトリ。作業ツリーは trees に既にあり、依存の置き場は深くて遅い */
+/** 歩かないディレクトリ。ワークツリーは trees に既にあり、依存の置き場は深くて遅い */
 export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", ".venv", ".claude"]);
 
 /** 置き場の中は 1 段深く歩き、2 段目に置かれた clone を「置き場の 2 段目以下」として拾う */
@@ -159,7 +159,7 @@ export interface StrayInput {
   readonly projectsRel: string;
   /** ルートからの相対（空はルート自身）を受けて、そこにあるものを返す。読めなければ空 */
   readonly list: (rel: string) => readonly DirEntry[];
-  /** trees にあるルート相対パス。既にプロジェクトか作業ツリーなので拾わない */
+  /** trees にあるルート相対パス。既にプロジェクトかワークツリーなので拾わない */
   readonly knownRels: ReadonlySet<string>;
 }
 

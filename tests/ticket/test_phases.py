@@ -197,7 +197,7 @@ class PhaseHarness(unittest.TestCase):
     def approve(self):
         """承認して、写しを親のブランチに乗せる。
 
-        写しは親のツリーに置かれるので、コミットするまで作業ツリーは汚れたまま。
+        写しは親のツリーに置かれるので、コミットするまでワークツリーは汚れたまま。
         本番で `ccnavi-approve.sh` がやることを、テストでも同じ順で踏む。
         """
         result = self.ccnavi("--approve", stdin="y\n")
@@ -211,7 +211,7 @@ class PhaseHarness(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", message)
 
     def run_child(self, name, files=()):
-        """子の作業ツリーを作って着手し、ファイルを置いてコミットし、閉じる。"""
+        """子のワークツリーを作って着手し、ファイルを置いてコミットし、閉じる。"""
         tree = self.worktree(name, "i0001")
         started = self.ccnavi("ticket", "start", name)
         self.assertEqual(started.returncode, 0, started.stderr)
@@ -1211,7 +1211,7 @@ class ScopeLimitTest(PhaseHarness):
     """
 
     def approved_child(self, text, name="i0001-01", plan=("research", "design")):
-        """親を承認し、子を提案して承認し、子の作業ツリーを作って着手する。作業ツリーを返す。"""
+        """親を承認し、子を提案して承認し、子のワークツリーを作って着手する。ワークツリーを返す。"""
         self.family(plan=plan)
         self.propose(name, text)
         self.commit_parent("propose child")

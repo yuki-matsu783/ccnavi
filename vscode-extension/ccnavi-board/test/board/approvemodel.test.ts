@@ -32,7 +32,7 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.ok(preview.batch[2].overflow[0].includes("超えている"));
   assert.ok(preview.text.startsWith("Ticket 承認リクエスト: 3 件"));
   assert.ok(preview.text.includes("判定で止まるもの"));
-  // 本文の指紋。承認するときに --digest で返す。値は作業ツリーの絶対パスに依るので、
+  // 本文の指紋。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
   // フィクスチャでは伏せてある。
   assert.equal(preview.digest, "<digest>");
   // 対象にしないのは形の壊れた子（計画に無い番号）だけ。

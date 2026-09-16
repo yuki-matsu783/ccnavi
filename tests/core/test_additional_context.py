@@ -22,7 +22,7 @@ import unittest
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-NOTE = "作業ツリーの中だけで直すこと。main には触らない。"
+NOTE = "ワークツリーの中だけで直すこと。main には触らない。"
 
 
 def rule(name: str, match: str, message: str = "文面", **extra) -> dict:
@@ -287,8 +287,8 @@ class AdditionalContextTest(unittest.TestCase):
     def test_file_in_the_worktree_wins_over_the_root(self):
         write(os.path.join(self.root, "docs", "guide.md"), "ルートの案内")
         wt = os.path.join(self.root, ".claude", "worktrees", "feat")
-        write(os.path.join(wt, "docs", "guide.md"), "作業ツリーの案内")
-        # 本物の作業ツリーと見なされるには、.git ファイルと登録簿の相互参照が要る。
+        write(os.path.join(wt, "docs", "guide.md"), "ワークツリーの案内")
+        # 本物のワークツリーと見なされるには、.git ファイルと登録簿の相互参照が要る。
         gitdir = os.path.join(self.root, ".git", "worktrees", "feat")
         write(os.path.join(wt, ".git"), f"gitdir: {gitdir}\n")
         write(os.path.join(gitdir, "gitdir"), os.path.join(wt, ".git") + "\n")
@@ -297,7 +297,7 @@ class AdditionalContextTest(unittest.TestCase):
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContextFile="docs/guide.md")],
         )
         inside = self.judge(path, "Write", os.path.join(wt, "src", "a.py"))
-        self.assertEqual(inside.get("additionalContext"), "作業ツリーの案内")
+        self.assertEqual(inside.get("additionalContext"), "ワークツリーの案内")
         outside = self.judge(path, "Write", os.path.join(self.root, "src", "a.py"))
         self.assertEqual(outside.get("additionalContext"), "ルートの案内")
 
