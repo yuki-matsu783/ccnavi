@@ -224,7 +224,7 @@ function renderCard(card: Card): string {
 
 /**
  * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、作業ツリーなし（閉じたチケットは除く）、
- * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち）、本物が決まらない写り。
+ * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち。ゲートが閉じている間だけ）、本物が決まらない写り。
  * 出す札が無ければ行ごと出さない。
  */
 function renderBadges(card: Card): string {
@@ -238,10 +238,10 @@ function renderBadges(card: Card): string {
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(badge("worktree none", "作業ツリーなし"));
   }
-  for (const mark of card.marks) {
-    if (mark === "requested") {
-      badges.push(badge("mark mark-requested", MARK_LABELS.requested));
-    }
+  // 依頼済の札は、依頼が生きている間（ゲートが閉じたまま）だけ。レビューが済んでゲートが開いた
+  // カードには出さない。済んだかどうかは JSON のゲートが言うことで、ここで reviewed を見て判定し直さない。
+  if (card.gateClosed && card.marks.includes("requested")) {
+    badges.push(badge("mark mark-requested", MARK_LABELS.requested));
   }
   if (card.riskLevel === "HIGH" || card.riskLevel === "CRITICAL") {
     badges.push(badge(`risk risk-${card.riskLevel.toLowerCase()}`, riskText(card)));

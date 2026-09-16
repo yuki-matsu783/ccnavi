@@ -198,6 +198,30 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(!html.includes("締める"));
 });
 
+test("CB-T13a 依頼済の札はゲートが閉じている間だけ。レビューが済んでゲートが開いた子には出さない", () => {
+  const base = fixture();
+  const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
+    ...base,
+    parents: base.parents.map((parent) => ({
+      ...parent,
+      phases: parent.phases.map((p) => (p.number === 1 ? { ...p, marks, gate_closed: gateClosed } : p)),
+    })),
+  });
+  // クローズ・レビュー済・ゲート開の子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る
+  const done = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false)), OPTIONS);
+  assert.ok(!done.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
+  assert.ok(done.includes('<span class="fact mark mark-reviewed">レビュー済</span>'));
+  // 依頼を出したのにゲートが閉じたままの子には札が出る。reviewed の有無では分岐しない
+  const waiting = renderBoard(buildBoard(withMarks({ requested: { at: "t" } }, true)), OPTIONS);
+  assert.ok(waiting.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
+  assert.ok(waiting.includes('<span class="badge gate">ゲート閉</span>'));
+  const stillClosed = renderBoard(buildBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, true)), OPTIONS);
+  assert.ok(stillClosed.includes('<span class="badge mark mark-requested">レビュー依頼済</span>'));
+  // 依頼を出していない子には、ゲートが閉じていても依頼済の札は出ない
+  const notRequested = renderBoard(buildBoard(withMarks({}, true)), OPTIONS);
+  assert.ok(!notRequested.includes("レビュー依頼済"));
+});
+
 test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", () => {
   const html = renderBoard(buildBoard(fixture()), OPTIONS);
   assert.ok(html.includes('id="parent-filter"'));
