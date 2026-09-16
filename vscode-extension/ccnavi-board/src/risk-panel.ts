@@ -116,7 +116,7 @@ export async function openRisk(): Promise<void> {
   void refreshLock(current);
 }
 
-/** 共通層の置き場は `.ccnavi/common/` 固定。env でも上書き設定ファイルでも動かない（i0054） */
+/** 共通層の置き場は `.ccnavi/common/` 固定。env でも上書き設定ファイルでも動かない（ADR-0052） */
 function riskRelOf(_root: string): string {
   return DEFAULT_RISK;
 }

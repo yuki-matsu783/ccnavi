@@ -183,7 +183,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    // 共通層の置き場は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（i0054）。
+    // 共通層の置き場は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {

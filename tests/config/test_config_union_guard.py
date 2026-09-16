@@ -379,7 +379,7 @@ class DenyTest(GuardHarness):
 
         置き場は `.ccnavi/common/` に固定なので、ccnavi ディレクトリを丸ごと拾う 1 本
         （`_PLACES` の `\\.ccnavi`）が当てる。以前は共通層を env で動かせたため、
-        動かした先の綴りを 1 本ずつ足していた（`common_shell_clause`）。i0054 で
+        動かした先の綴りを 1 本ずつ足していた（`common_shell_clause`）。ADR-0052 で
         固定になり、その経路ごと消えた。
         """
         for command in (

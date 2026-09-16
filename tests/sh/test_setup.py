@@ -269,7 +269,7 @@ class WritesTheExpectedShape(SetupTest):
         self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
 
     def test_does_not_write_the_common_layer_paths(self):
-        """i0054: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
+        """ADR-0052: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
 
         既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
         そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。

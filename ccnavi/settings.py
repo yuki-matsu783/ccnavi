@@ -28,7 +28,7 @@ from typing import NamedTuple
 #
 # 共通層の 3 本（ルール・フェーズの種類・リスクの配点）はここに無い。置き場は
 # `.ccnavi/common/` に固定で、env では動かない。3 層のうち共通層だけが別の決まり方を
-# していた非対称を無くしたもの（i0054）。診断のためにここを動かす道は `--rules` /
+# していた非対称を無くしたもの（ADR-0052）。診断のためにここを動かす道は `--rules` /
 # `--phases` / `--risk` のフラグが持つ。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
@@ -109,7 +109,7 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
 # ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
 # 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
-# hook は引数を渡さずに起動するから、判定の入口はここから動かない（i0054）。
+# hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
 DEFAULT_LOG = os.path.join("logs", "log.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
@@ -386,7 +386,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
     #
     # 共通層の 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
     # 動かず、既定の `.ccnavi/common/` のまま。動かせるのはフラグだけで、そちらは
-    # cli._override が重ねる（i0054）。
+    # cli._override が重ねる（ADR-0052）。
     overrides = (
         ("projects", PROJECTS_ENV, _log_or_none, True),
         ("project_home", PROJECT_HOME_ENV, _relative, False),
