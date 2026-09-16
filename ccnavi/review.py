@@ -203,7 +203,7 @@ def prepare(
         body = ""
     if not body.strip():
         unmet.append("依頼文が空")
-    already = _already_requested(tree_root, ph, phase_no)
+    already = _already_requested(tree_root, conf, ph, phase_no)
     if already:
         unmet.append(already)
     if ph.deferred:
@@ -278,7 +278,7 @@ def requested(
         return 1
     parent, ph = found
     tree_root = tree.worktree_path(root, parent.ticket)
-    already = _already_requested(tree_root, ph, phase_no)
+    already = _already_requested(tree_root, conf, ph, phase_no)
     if already:
         stderr.write(f"ccnavi: {already}\n")
         return 1
@@ -344,7 +344,7 @@ def check(
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    moved = _moved_since_request(tree_root, requested_mark)
+    moved = _moved_since_request(tree_root, conf, requested_mark)
     if moved:
         stderr.write(
             f"ccnavi: {moved}。人が見たものと今の HEAD が違う。{_redo_request(root, phase_no)}\n"
@@ -440,7 +440,7 @@ def reviewed(
         )
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
-    moved = _moved_since_request(tree_root, requested_mark)
+    moved = _moved_since_request(tree_root, conf, requested_mark)
     if moved:
         stderr.write(f"ccnavi: {moved}。{_redo_request(root, phase_no)}\n")
         return 1
@@ -993,6 +993,31 @@ def _wrapup_drafts(
 WIP_ROOT = "wip"
 
 
+def _approved_rel(conf: settings.Settings) -> str:
+    """ccnavi 自身の置き場（ツリーのルートからの相対）。末尾の `/` は付けない。"""
+    return (conf.approved or settings.DEFAULT_APPROVED).strip("/")
+
+
+def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tuple[list[str], str]:
+    """`ref..HEAD` の差分のうち、ccnavi 自身の置き場の外にあるパス。2 つめは読めなかった理由。
+
+    NUL 区切りで読む理由は phase.scope_findings と同じ。既定の出力は非 ASCII を
+    引用して 8 進に逃がすので、そのまま当てると日本語のファイルが置き場の外か中かで
+    読み違える。`--no-renames` を付けるのは、改名を 1 行にまとめられると移動元が消え、
+    置き場の外から中へ動かしたファイルが「置き場の中だけ」に見えるため。
+    """
+    rc, out = _git(tree_root, ["diff", "--name-only", "--no-renames", "-z", f"{ref}..HEAD"])
+    if rc != 0:
+        return [], f"{ref[:12]} からの差分を読めない"
+    skip = _approved_rel(conf)
+    changed = []
+    for path in out.split("\0"):
+        path = path.strip().replace("\\", "/")
+        if path and not path.startswith(skip + "/"):
+            changed.append(path)
+    return changed, ""
+
+
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
@@ -1004,7 +1029,7 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     rc, status = _git(tree_root, ["status", "--porcelain", "--untracked-files=no"])
     if rc != 0:
         return True
-    skip = (conf.approved or settings.DEFAULT_APPROVED).strip("/")
+    skip = _approved_rel(conf)
     for line in status.splitlines():
         path = line[3:].strip().replace("\\", "/")
         if path and not path.startswith(skip + "/"):
@@ -1301,11 +1326,21 @@ def _branch(tree_root: str) -> str:
     return out.strip() if rc == 0 else ""
 
 
-def _moved_since_request(tree_root: str, requested_mark: dict) -> str:
-    """依頼の後に親の HEAD が動いたか。動いていれば、その説明。
+def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark: dict) -> str:
+    """依頼の後に、人が見るものが動いたか。動いていれば、その説明。
 
     人が見たのは依頼時の HEAD。その後に積んだコミットは誰も見ていないので、
     それを「レビュー済み」に含めない。
+
+    ただし ccnavi 自身の置き場（`.ccnavi/tickets/`）だけを変えたコミットは、動いたと数えない。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 §9.2）。
+    数えると「依頼 → マーカー → コミット」の順のせいで依頼の直後に必ず自分の足を踏み、
+    承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
+    待っている間の承認も依頼を壊す。未コミットの側は `_dirty` が同じ理由で外しており、
+    基準をそこに揃える。人がレビューで見るものは 1 バイトも変わらない。
+
+    push の判定も同じ基準で見る。置き場だけが手元に残っていても、リモートにあるものと
+    人が見るものは同じ。
     """
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     head = head.strip()
@@ -1313,22 +1348,34 @@ def _moved_since_request(tree_root: str, requested_mark: dict) -> str:
         return "親の HEAD を読めない"
     recorded = str(requested_mark.get("head") or "")
     if recorded and head != recorded:
-        return f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
+        moved = f"依頼の後に親の HEAD が動いている（依頼時 {recorded[:12]}、いま {head[:12]}）"
+        changed, failed = _outside_approved(tree_root, conf, recorded)
+        # 差分を読めない（依頼時のコミットが消えているなど）なら、動いた側に倒す。
+        if failed or changed:
+            return moved
     branch = _branch(tree_root)
     rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"]) if branch else (1, "")
-    if rc != 0 or ahead.strip():
+    if rc != 0:
         return "親ブランチの HEAD が push されていない"
+    if ahead.strip():
+        changed, failed = _outside_approved(tree_root, conf, f"origin/{branch}")
+        if failed or changed:
+            return "親ブランチの HEAD が push されていない"
     return ""
 
 
-def _already_requested(tree_root: str, ph: phase.Phase, phase_no: int) -> str:
+def _already_requested(
+    tree_root: str, conf: settings.Settings, ph: phase.Phase, phase_no: int
+) -> str:
     """依頼済みで、出し直せないならその説明。未依頼か、出し直せるなら空。
 
     出し直せるのは、依頼の後に親の HEAD が動き、まだレビュー済みになっていないときだけ。
     そのとき check は「人が見たものと今の HEAD が違う」で止まるので、ここも止めると
     エージェントの打てる手が無くなる。出し直しても緩むものは無い。check は新しい HEAD との
     一致を求め直し、未解決の指摘は付いた時刻で絞らないので、前の依頼への指摘も数え続ける。
-    HEAD が依頼時のままなら、同じ依頼を二重に投稿するだけなので止める。
+    HEAD が依頼時のままなら、同じ依頼を二重に投稿するだけなので止める。動いたかどうかは
+    check と同じ基準で見る（`_moved_since_request`）。ccnavi 自身の置き場だけが動いた形では
+    check が止まらないので、ここで出し直させると依頼のコメントが増えるだけになる。
 
     レビュー済みは依頼の有無より先に見る。`wrapup` は依頼していないフェーズにも
     レビュー済みを置くので、依頼の記録が無いことを先に見ると、人が締めたフェーズに
@@ -1342,7 +1389,9 @@ def _already_requested(tree_root: str, ph: phase.Phase, phase_no: int) -> str:
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     recorded = str(mark.get("head") or "")
     if rc == 0 and recorded and head.strip() != recorded:
-        return ""
+        changed, failed = _outside_approved(tree_root, conf, recorded)
+        if failed or changed:
+            return ""
     return f"フェーズ {phase_no} は依頼済み（HEAD は依頼時のまま）"
 
 
