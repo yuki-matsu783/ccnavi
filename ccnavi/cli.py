@@ -137,7 +137,7 @@ terminal with
 
     ccnavi --reviewed N --chat --cwd <parent worktree>
 
-which only applies to phases the plan declared as `chat`.
+which only applies to phases whose type declared `chat`.
 
 A human closes a parent early ("good enough for now") with
 

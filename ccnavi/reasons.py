@@ -384,7 +384,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
         "- チケット作業: 大きな修正（設計に触れる、複数の段階になる、人のレビューが要る）は、",
         f"  {conf.tickets}/ に提案を書いて承認を受け、フェーズ{phases}と",
         f"  リスクの配点{risk}に従って進める。フェーズの種類の `review` が",
-        "  mr なら issue と MR を作り、chat ならこのセッションで利用者に見てもらう。",
+        "  mr なら issue とマージリクエストを作り、chat ならこのセッションで利用者に見てもらう。",
         f"  操作は {settings.script_command(root, 'ccnavi-ticket.sh')} と "
         f"{settings.script_command(root, 'ccnavi-review.sh')} を通す。",
         "どちらで進めるか迷ったら、利用者に聞く。",

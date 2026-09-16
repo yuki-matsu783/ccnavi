@@ -174,9 +174,9 @@ class Phase:
     owner: ticket_mod.Ticket | None = None
     # 子ごとの実績のリスク（閉じるときに数えた記録）。子の識別子 → 記録。
     risks: dict[str, dict] = field(default_factory=dict)
-    # 延期を引き受けた前のフェーズが、種類として宣言している「見る場所」。宣言が無ければ
-    # None が入る。引き受けた側は厳しい側で見る（`review_kind`）。組むのは `phases_of`。
-    covered_reviews: list[str | None] = field(default_factory=list)
+    # 延期を引き受けた前のフェーズが、種類として宣言している「見る場所」。引き受けた側は
+    # 厳しい側で見る（`review_kind`）。組むのは `phases_of`。
+    covered_reviews: list[str] = field(default_factory=list)
 
     @property
     def risk(self) -> dict | None:
@@ -270,7 +270,8 @@ class Phase:
 
         場所を言う者が 1 人も居なければ（計画が無い、種類が読めない）今までどおりで、
         子が「人が見る」と言うか実績が高ければ `mr`。緩い側に倒すと、種類のファイルが
-        読めないときにレビューの行き先が消える。
+        読めないときにレビューの行き先が消える。延期を引き受けている番号は、覆っている分の
+        宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、ここには落ちない。
 
         延期したフェーズは自分では見る場所を持たず、次に見るフェーズが引き受ける。
         """
@@ -398,6 +399,13 @@ def sync(stderr: TextIO, root: str, conf: settings.Settings) -> list[ticket_mod.
     return remaining
 
 
+def _covered_review(phase: Phase | None) -> str:
+    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 §9.8）。"""
+    if phase is None or phase.declared_review is None:
+        return phasetypes.REVIEW_MR
+    return phase.declared_review
+
+
 def phases_of(
     root: str,
     conf: settings.Settings,
@@ -428,10 +436,12 @@ def phases_of(
         # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
         # `review_kind`。ここで渡さないと、chat の計画に mr の延期が混ざったときに
         # 引き受けた側が chat のままになり、宣言した mr が消える。
+        #
+        # 覆っている分の宣言が読めない番号は `mr` に倒す。延期できるのはレビューのある
+        # 種類だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
+        # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
         for phase in by_number.values():
-            phase.covered_reviews = [
-                by_number[c].declared_review for c in phase.covers if c in by_number
-            ]
+            phase.covered_reviews = [_covered_review(by_number.get(c)) for c in phase.covers]
     # 閉じた承認済みチケットは、提案がどこにあろうと閉じたまま。提案はエージェントが書ける
     # 場所にあるので、消す・同じ識別子を todo/ に書く、でフェーズを開き直せては
     # いけない。閉じたことの権威は承認済みチケットの側。
