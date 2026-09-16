@@ -11,7 +11,8 @@
  * 色は VS Code のテーマ変数だけを使う。文字列は全部実体参照にする。
  */
 import type { Lock } from "./lock.js";
-import { BUTTON_STYLE, escapeHtml } from "./render.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
+import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 import { BUILTIN_LEVELS, KINDS, LEVEL_NAMES, type RiskModel } from "./risk-doc.js";
 
 export interface RiskPage {
@@ -28,16 +29,18 @@ export interface RiskPage {
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 /** 当て方の説明。select の札と、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<(typeof KINDS)[number], { readonly label: string; readonly placeholder: string }>> = {
-  lines_over: { label: "差分の行数が超えたら", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
-  files_over: { label: "ファイル数が超えたら", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
-  deleted_over: { label: "消したファイル数が超えたら", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
-  glob: { label: "当たったファイルごとに", placeholder: ".github/**（作業ツリーのルートからの相対。当たるごとに points を加点、max で上限）" },
-  script: { label: "スクリプトが出す点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。失敗は points を加点）" },
-  judge: { label: "サブエージェントの判定", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
+  lines_over: { label: "差分の行数がしきい値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
+  files_over: { label: "変えたファイル数がしきい値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
+  deleted_over: { label: "消したファイル数がしきい値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
+  glob: { label: "glob にヒットしたファイルが 1 つあるごとに加点", placeholder: ".github/**（作業ツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
+  script: { label: "スクリプトが出した点を加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。スクリプトが出した点を加点し、失敗や読めない出力なら points を加点）" },
+  judge: { label: "サブエージェントの答えが yes だったら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
 };
 
 export function renderRiskPage(page: RiskPage, options: RenderOptions): string {
@@ -60,8 +63,8 @@ export function renderRiskPage(page: RiskPage, options: RenderOptions): string {
 ${STYLE}
 </style>
 </head>
-<body>
-${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${bodyTag(options.appearance)}
+${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.riskPath)}</span>
@@ -75,15 +78,19 @@ ${renderTicketControlBanner(page.ticketControl)}<div id="changed" class="banner 
 </header>
 <p id="lock" class="lock${page.lock.locked ? "" : " hidden"}">${escapeHtml(page.lock.reason)}</p>
 ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="block">
-  <h2>段階の閾値</h2>
-  <p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上でフェーズのゲートが閉じ</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p>
+  <h2>段階の閾値 <span class="count">点がこの値以上になると段階が上がる。HIGH 以上でゲートが閉じる</span></h2>
+  <details class="help"><summary>この欄の説明</summary><p class="hint">点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上でフェーズのゲートが閉じ</strong>、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（${LEVEL_NAMES.map((n) => `${n} ${BUILTIN_LEVELS[n]}`).join(" / ")}）。</p></details>
   <div class="levels" id="levels"></div>
 </section>
 <section class="block">
   <h2>項目 <span class="count" id="factor-count">0</span>
     <button type="button" class="action small" data-action="add">＋ 項目を追加</button></h2>
-  <p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> の失敗と読めない出力は重い側に倒れて points がそのまま加点され、<code>judge</code> は判定が揃うまで子を閉じられない。</p>
-  <ul class="factors" id="factors"></ul>
+  <div class="find">
+    <input id="find" type="search" placeholder="id・当て方・値・文面で絞り込む" spellcheck="false">
+    <span class="hint">行を押すと開く</span>
+  </div>
+  <details class="help"><summary>この欄の説明</summary><p class="hint">子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。<code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられない。</p></details>
+  <ul class="list" id="factors"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
 <script nonce="${nonce}" type="application/json" id="page">${embedded}</script>
@@ -99,14 +106,14 @@ function renderTicketControlBanner(ticketControl: string): string {
   if (ticketControl !== "disable") {
     return "";
   }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効かない</div>\n`;
+  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。配点は子チケットを閉じるときにしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderMissing(page: RiskPage): string {
   if (page.exists) {
     return "";
   }
-  return `<div class="banner missing"><span>${escapeHtml(page.riskPath)} が無い。実行ファイルは組み込みの配点で数えている（画面の値はその組み込み）。直すにはまずファイルを作る。</span><button type="button" class="action primary" data-action="create">組み込みの配点でファイルを作る</button></div>\n`;
+  return `<div class="banner missing"><span>${escapeHtml(page.riskPath)} が無い。実行ファイルは組み込みの配点で数えている（画面の値はその組み込みの配点）。直すにはまずファイルを作る。</span><button type="button" class="action primary" data-action="create">組み込みの配点でファイルを作る</button></div>\n`;
 }
 
 function renderProblems(problems: readonly string[]): string {
@@ -117,88 +124,44 @@ function renderProblems(problems: readonly string[]): string {
   return `<ul class="problems">\n${items}\n</ul>\n`;
 }
 
-const STYLE = `  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 12px;
-    background: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-  }
-  code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
-  .hidden { display: none !important; }
-  .banner {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-panel-border);
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  }
-  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
-  .banner.missing { border-color: var(--vscode-editorInfo-foreground); }
-  .banner.missing > span { flex: 1 1 320px; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 8px; }
-  .summary { display: flex; gap: 12px; align-items: center; }
-  .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
-  .dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-  .lock {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
-  }
-  .problems {
-    margin: 0 0 12px; padding: 8px 8px 8px 24px;
-    border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
-    color: var(--vscode-editorWarning-foreground);
-  }
-  .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
-  .empty { color: var(--vscode-descriptionForeground); }
-${BUTTON_STYLE}
+const STYLE = `${PAGE_STYLE}
   button.action.small { margin-left: auto; }
-  input[type=text], select {
-    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
-    padding: 3px 6px; font: inherit;
-  }
-  input[type=text]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
-  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
-  input:disabled, select:disabled { opacity: .6; }
   .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-  .block h2 { margin: 0 0 8px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
-  .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
-  .levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: flex-end; }
-  /* 欄名は欄の上に小さく常に出す。placeholder は説明で、入れると消えてよい。 */
-  .field { display: flex; flex-direction: column; gap: 1px; }
-  .field > .cap { font-size: .78em; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); }
-  .field > input, .field > select { width: 100%; box-sizing: border-box; margin: 0; }
-  .field.w-level input { width: 90px; }
-  .level-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
-  .level-name.medium { color: var(--vscode-editorWarning-foreground); }
-  .level-name.high, .level-name.critical { color: var(--vscode-editorError-foreground); }
-  .factors { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .factor {
-    border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
-    background: var(--vscode-editorWidget-background);
-  }
-  .factor-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 6px; }
-  .factor-row:last-child { margin-bottom: 0; }
-  .factor-row .grow { flex: 1 1 260px; }
-  .factor-row .field.w-id { width: 170px; }
-  .factor-row .field.w-num { width: 90px; }
-  .factor-row .field.w-kind { width: 230px; }
-  .factor-row .buttons { margin-left: auto; display: flex; gap: 4px; }
-  .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; }
-  .foot.error { color: var(--vscode-editorError-foreground); }`;
+  .block h2 { display: flex; gap: 8px; align-items: center; }
+  .levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+  .levels .field { display: flex; flex-direction: row; gap: 6px; align-items: center; }
+  .levels .field > .cap { text-align: left; }
+  .levels .field > input { width: 90px; }
+${LIST_STYLE}
+  /* 1 行 = 開閉、id、points、当て方と値と文面 */
+  .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px minmax(0, 1fr); }
+  .sum .sum-points { text-align: right; font-variant-numeric: tabular-nums; }
+  .field > select.f-kind { max-width: 300px; }
+`;
 
 // 中のスクリプトはテンプレート文字列に埋めるので、バッククォートと \${ を使わない。
 const SCRIPT = `  const vscode = acquireVsCodeApi();
   const page = JSON.parse(document.getElementById("page").textContent);
   const LEVELS = ["medium", "high", "critical"];
   const NUMERIC = ["lines_over", "files_over", "deleted_over"];
+  const KINDS_KEYS = page.kinds.map((k) => k.kind).join(" / ");
   const form = page.form;
   let lock = page.lock;
   let dirty = false;
   let busy = false;
   let seq = 0;
   const keys = new Map();
+  // 開いている項目の鍵。既定は全部畳む。Webview の state には id で控え、再読込のあとも同じ項目が開く。
+  const opened = new Set();
+  const savedOpen = new Set((vscode.getState() || {}).open || []);
+  function persistOpen() {
+    const ids = [];
+    for (const key of opened) {
+      const factor = factorByKey(key);
+      if (factor && factor.id !== "") { ids.push(factor.id); }
+    }
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { open: ids }));
+  }
 
   function h(tag, attrs, children) {
     const el = document.createElement(tag);
@@ -230,9 +193,31 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     input.addEventListener("input", () => { target[name] = input.value; markDirty(); });
     return input;
   }
-  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
-  function captioned(name, control, className) {
-    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  // 欄名は日本語で欄の左に出す。YAML のキー名は欄名の title（ツールチップ）に載せる。
+  function captioned(name, control, className, key) {
+    const cap = h("span", { class: "cap", text: name });
+    if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
+    return h("div", { class: "field " + (className || "") }, [cap, control]);
+  }
+  // 要約の行に出す、当て方と値をつないだ文。読んで意味が通る語順にする
+  function describe(factor) {
+    const v = factor.value;
+    const code = (t) => h("code", { text: t });
+    const dim = (t) => h("span", { class: "dim", text: t });
+    if (v === "") { return [dim("（" + valueLabel(factor.kind) + " 未設定）")]; }
+    if (factor.kind === "lines_over") { return [dim("差分が "), code(v), dim(" 行を超えたら加点")]; }
+    if (factor.kind === "files_over") { return [dim("変えたファイルが "), code(v), dim(" 件を超えたら加点")]; }
+    if (factor.kind === "deleted_over") { return [dim("消したファイルが "), code(v), dim(" 件を超えたら加点")]; }
+    if (factor.kind === "glob") { return [code(v), dim(" にヒットしたファイルが 1 つあるごとに加点" + (factor.max !== "" ? "（上限 " + factor.max + " 点）" : ""))]; }
+    if (factor.kind === "script") { return [dim("スクリプト "), code(v), dim(" が出した点を加点（測れなければ " + (factor.points === "" ? "points" : factor.points + " 点") + "）")]; }
+    return [dim("問い「"), code(v), dim("」に yes だったら加点")];
+  }
+  // 値の欄の名前。当て方で意味が変わる
+  function valueLabel(kind) {
+    if (kind === "glob") { return "glob"; }
+    if (kind === "script") { return "スクリプト"; }
+    if (kind === "judge") { return "問い"; }
+    return "しきい値";
   }
   function kindInfo(kind) {
     for (const k of page.kinds) { if (k.kind === kind) { return k; } }
@@ -244,8 +229,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     for (const name of LEVELS) {
       const input = field(form.levels, name, "f-level", "既定 " + page.builtinLevels[name]);
       input.setAttribute("inputmode", "numeric");
-      box.appendChild(captioned(name, input, "w-level"));
-      box.appendChild(h("span", { class: "level-name " + name, text: name.toUpperCase() + " 以上" }));
+      input.setAttribute("title", name.toUpperCase() + " 以上になる点");
+      box.appendChild(captioned(name.toUpperCase(), input, "", "levels." + name));
     }
   }
   function renderFactor(factor) {
@@ -261,26 +246,64 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       markDirty();
       renderAll();
     });
-    const points = field(factor, "points", "f-points", "25");
+    const points = field(factor, "points", "f-points num", "25");
     points.setAttribute("inputmode", "numeric");
     const value = field(factor, "value", "f-value", info.placeholder);
     if (NUMERIC.indexOf(factor.kind) >= 0) { value.setAttribute("inputmode", "numeric"); }
-    const rows = [
-      h("div", { class: "factor-row" }, [
-        captioned("id", field(factor, "id", "f-id", "big-diff"), "w-id"),
-        captioned("points", points, "w-num"),
-        captioned("当て方", kindSelect, "w-kind"),
+    const twist = h("button", { type: "button", class: "twist", title: "この項目を開く／畳む" });
+    const sum = h("span", { class: "sum" });
+    const head = h("div", { class: "row-head" }, [twist, sum]);
+    const li = h("li", { class: "row factor", "data-key": key }, [
+      head,
+      h("div", { class: "row-body" }, [
+        captioned("id", field(factor, "id", "f-id narrow", "big-diff"), "", "id"),
+        captioned("点", points, "", "points"),
+        captioned("当て方", kindSelect, "", KINDS_KEYS),
+        captioned(valueLabel(factor.kind), factor.kind === "glob"
+          ? h("div", { class: "inline" }, [value, h("span", { class: "cap", text: "上限", title: "YAML のキー: max" }), field(factor, "max", "f-max num", "上限。空なら上限なし")])
+          : value, "", factor.kind),
+        captioned("文面", field(factor, "message", "f-message", "加点の理由として依頼文と閉じたときの出力に出る短い文。空なら id をそのまま使う"), "", "message"),
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
-      h("div", { class: "factor-row" }, [
-        captioned(factor.kind, value, "grow"),
-        factor.kind === "glob" ? captioned("max", field(factor, "max", "f-max", "上限。空なら青天井"), "w-num") : null,
-      ]),
-      h("div", { class: "factor-row" }, [
-        captioned("message", field(factor, "message", "f-message", "加点した理由として依頼文と閉じたときの出力に出る短い文。空なら id"), "grow"),
-      ]),
-    ];
-    return h("li", { class: "factor", "data-key": key }, rows);
+    ]);
+    function fillSummary() {
+      sum.textContent = "";
+      sum.appendChild(h("span", { class: "sum-id" + (factor.id === "" ? " dim" : ""), text: factor.id === "" ? "（id 未設定）" : factor.id }));
+      sum.appendChild(h("span", { class: "sum-points" + (factor.points === "" ? " dim" : ""), text: factor.points === "" ? "—" : factor.points + " 点", title: "points" }));
+      sum.appendChild(h("span", { class: "clip", title: kindInfo(factor.kind).label + (factor.value === "" ? "" : ": " + factor.value) }, describe(factor).concat([
+        factor.message === "" ? null : h("span", { class: "sum-note", text: factor.message }),
+      ])));
+      // 画面に出ている語（当て方の札と要約の文）でも、キーの綴り（lines_over など）でも当たる
+      li.setAttribute("data-find", (factor.id + " " + factor.kind + " " + kindInfo(factor.kind).label + " " + sum.textContent).toLowerCase());
+    }
+    head.addEventListener("click", () => {
+      if (window.getSelection && String(window.getSelection()) !== "") { return; }
+      setOpen(li, !li.classList.contains("open"), true);
+    });
+    li.addEventListener("input", () => { fillSummary(); applyFind(); });
+    fillSummary();
+    setOpen(li, opened.has(key), false);
+    return li;
+  }
+  // 行を開く／畳む。persist が真なら控えも書く（利用者の操作だけ。描画のやり直しでは書かない）。
+  function setOpen(li, on, persist) {
+    const key = li.getAttribute("data-key");
+    if (persist) { if (on) { opened.add(key); } else { opened.delete(key); } }
+    li.classList.toggle("open", on);
+    const twist = li.querySelector(".row-head > .twist");
+    twist.textContent = on ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", on ? "true" : "false");
+    if (persist) { persistOpen(); }
+  }
+  // 絞り込み。要約に含む文字で行を隠すだけで、項目の中身と並びには触らない。開いている行は隠さない。
+  function applyFind() {
+    const q = document.getElementById("find").value.trim().toLowerCase();
+    for (const li of document.querySelectorAll("#factors .factor")) {
+      li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
+    }
+    const shown = document.querySelectorAll("#factors .factor:not(.hidden-by-find)").length;
+    const kept = document.querySelectorAll("#factors .factor.hidden-by-find.open").length;
+    document.getElementById("factor-count").textContent = q === "" ? String(form.factors.length) : shown + " / " + form.factors.length + (kept > 0 ? "（開いたまま " + kept + "）" : "");
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
@@ -302,6 +325,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function renderAll() {
     renderLevels();
+    // 前に開いていた項目は id で覚えている。最初の描画でだけ鍵に写す。
+    if (savedOpen.size > 0) {
+      for (const factor of form.factors) { if (savedOpen.has(factor.id)) { opened.add(keyOf(factor)); } }
+      savedOpen.clear();
+    }
     const list = document.getElementById("factors");
     list.textContent = "";
     for (const factor of form.factors) { list.appendChild(renderFactor(factor)); }
@@ -309,6 +337,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     document.getElementById("factor-count").textContent = String(form.factors.length);
     const add = document.querySelector("button[data-action=add]");
     if (add) { add.disabled = !page.exists; }
+    applyFind();
   }
   function markDirty() {
     dirty = true;
@@ -342,7 +371,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add() {
-    form.factors = form.factors.concat([{ origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" }]);
+    const factor = { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" };
+    form.factors = form.factors.concat([factor]);
+    // 足した項目は開いて出す。畳んだままでは何を足したか分からない。
+    opened.add(keyOf(factor));
     markDirty();
     renderAll();
     const items = document.querySelectorAll("#factors .factor");
@@ -358,7 +390,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
-    for (const el of document.querySelectorAll("#levels input, #factors input, #factors select, #factors button, button[data-action=add]")) { el.disabled = on || !page.exists; }
+    for (const el of document.querySelectorAll("#levels input, #factors .row-body input, #factors .row-body select, #factors .row-body button, button[data-action=add]")) { el.disabled = on || !page.exists; }
     updateSave();
     if (text) { status(text, false); }
   }
@@ -378,5 +410,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
   });
+  document.getElementById("find").addEventListener("input", applyFind);
   renderAll();
-  updateSave();`;
+  updateSave();
+${APPEARANCE_SCRIPT}`;

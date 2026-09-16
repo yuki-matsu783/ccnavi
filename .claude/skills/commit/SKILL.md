@@ -45,8 +45,12 @@ Python のファイルが変わっているなら、すべて通してからコ�
 ```sh
 uv run --with ruff ruff format --check .
 uv run --with ruff ruff check .
-uv run python -m unittest discover -s tests -t .
+uv run python -m unittest discover -s tests/<グループ> -t .
 ```
+
+テストは主題ごとのグループに分かれている。**どのグループを回すかは、変えたファイルを
+[references/test-groups.md](references/test-groups.md) の表に当てて決める。** 表に当たらない変更や、
+統合先へ戻す前・MR に出す前は全件（`discover -s tests -t .`）を回す。
 
 worktree で作業しているときは、そのツリーの中でこれを実行する (`cd .claude/worktrees/<名前>` してから)。
 `pyproject.toml` はツリーごとに持つので、混ぜて実行しない。

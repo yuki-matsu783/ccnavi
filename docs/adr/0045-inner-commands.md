@@ -110,7 +110,8 @@ ask に落ちる形は人に確認されるが、読み切れる形は判定を�
 - 失ったもの: 一覧に無い実行役のコマンド（`script -c`、`watch`、`parallel`、`busybox sh`、`ssh host <cmd>`、`perl -e`、`python -c`）は
   取り出さない。先頭に固定したルールは今までどおり外れる。一覧に足すには ccnavi を組み立て直す
 - 失ったもの: 一覧に無い、値を取るオプションは値をコマンドと読み、層がずれる。ずれた層は当たらないだけで、緩くはならない
-- 失ったもの: 変数・alias・関数（`$SUDO rm …`）には届かない。`shellread` の既知の限界のまま
+- 失ったもの: 変数の値・alias・関数には届かない。`shellread` の既知の限界のまま（コマンド名に変数を置いた
+  `$SUDO rm …` は、ADR-0047 で止めるようにした）
 - 失ったもの: 実行役のコマンドの後ろに書いた、利用者の deny や ask に当たるコマンドが止まるようになる。普通の作業 27 形
   （`time uv run pytest`、`timeout 60 pnpm test`、`bash -lc 'uv run ruff check .'`、`. .venv/bin/activate && uv run pytest` など）では
   新しく当たったものは 0 だったが、今まで通っていた形が止まりうる。その deny はもともとそのコマンドを止めるために書かれたもの

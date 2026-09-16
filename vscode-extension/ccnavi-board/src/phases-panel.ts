@@ -25,6 +25,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { WATCH_PATTERNS } from "./board-panel.js";
+import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { envFromSettingsJson } from "./core/hooks.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
@@ -159,6 +160,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     // 編集の途中を持つので、タブを裏に回しても捨てない。
     retainContextWhenHidden: true,
   });
+  followAppearance(panel);
   const current: PanelState = {
     target,
     panel,
@@ -396,7 +398,7 @@ function show(current: PanelState): void {
       layer: current.target.kind !== "common",
       notices: loaded.notices,
     },
-    { nonce: crypto.randomBytes(16).toString("base64") },
+    { nonce: crypto.randomBytes(16).toString("base64"), appearance: readAppearance() },
   );
 }
 
@@ -565,11 +567,11 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルが読み込み後に外部で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルが読み込み後に外部で作られている。再読込してから編集し直す（上書きしない）");
+    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）");
     return;
   }
 

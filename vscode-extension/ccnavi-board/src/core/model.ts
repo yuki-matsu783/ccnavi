@@ -1,7 +1,7 @@
 /**
  * `ccnavi --explain --json` が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
  * 形の定義は ccnavi の README「ボードの JSON」。同じ例が test/fixtures/board.json にあり、
- * Python 側のテスト（tests/test_board.py）が同じ例で形を確かめる。
+ * Python 側のテスト（tests/ticket/test_board.py）が同じ例で形を確かめる。
  */
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */

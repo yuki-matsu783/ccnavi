@@ -116,11 +116,24 @@ def report(
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
     )
+    # 確認できる者が居ないモードの門。2 値しか取らないので、受け皿も分ける。
+    unwatched_said = io.StringIO()
+    guard_unwatched = selfguard.resolve(
+        unwatched_said,
+        "",
+        conf.guard_unwatched,
+        settings.GUARD_UNWATCHED_ENV,
+        selfguard.GATE_SETTINGS,
+    )
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
     problems += [
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
         for line in said.getvalue().splitlines()
+    ]
+    problems += [
+        Problem(SEVERITY_WARN, "(unwatched)", line.removeprefix("ccnavi: "))
+        for line in unwatched_said.getvalue().splitlines()
     ]
     # この門に dry-run は無い。書いた人は「止めずに報告する」つもりでいるのに、
     # 実際は enable と同じに止める。設定ファイルを読んだだけでは、その食い違いが
@@ -149,6 +162,18 @@ def report(
                 f"{settings.TICKET_CONTROL_ENV}={declared}。"
                 f"{' か '.join(selfguard.GATE_SETTINGS)} しか取らない。"
                 f"今は {selfguard.ENABLE} として動いている",
+            )
+        )
+    # 切ってあること自体は設定として正しい。それでも言うのは、切れている状態が
+    # 外から見て「ルールが揃っている状態」と区別が付かないため。
+    if guard_unwatched == selfguard.DISABLE:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(unwatched)",
+                f"{settings.GUARD_UNWATCHED_ENV}=disable。"
+                f"{' と '.join(judge.PERMISSION_NO_JUDGE)} では、"
+                "ルールがどこも言及しない呼び出しを止めない",
             )
         )
     if conf.tickets_enabled and guard_ticket_approval == selfguard.DISABLE:
@@ -190,6 +215,7 @@ def report(
     stdout.write(f"  ルール: {conf.rules}\n")
     stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
     stdout.write(f"  コアファイルを守る: {guard_core_files}\n")
+    stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
     if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
@@ -517,9 +543,15 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
             continue
         if view.missing:
             continue
-        for c in _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True):
+        from_file = _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True)
+        for c in from_file:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
+        # `survey` は層のファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
+        # 読んで言ったものは数えない。数えると同じ苦情が 2 度並び、件数も水増しされる。
+        told = {(c.severity, c.rule, c.detail) for c in from_file}
         for c in view.problems:
+            if (c.severity, c.rule, c.detail) in told:
+                continue
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
     return problems
 
@@ -634,11 +666,14 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                     f"`{settings.LAYER_SELF}` はワークスペース自身の層）。このプロジェクトは"
                     f"層として数えていない（id の `{p.name}:` がどちらの層の話か決まらない。"
                     "綴りの大文字小文字は問わない）。ここに置いた宣言は 1 件も効いておらず、"
-                    "このプロジェクトへの Write / Edit は共通層だけで判定している。"
+                    "このプロジェクトを行き先にするパスを持つツール（Read / Grep / Glob / Write / "
+                    "Edit / NotebookEdit）は共通層だけで判定している。"
                     "別の名前に変える",
                 )
             )
         if os.path.isdir(os.path.join(p.root, ".claude")):
+            # 文面の先頭「.claude/ を持つ」は VS Code 拡張（vscode-extension/ccnavi-board の
+            # projects-render.ts）が同じ事象の説明と重ねないために見ている。変えるならそちらも直す
             problems.append(
                 Problem(
                     SEVERITY_WARN,

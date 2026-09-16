@@ -27,7 +27,8 @@
 
 文面は `deny` と `ask` では必須。止めるなら代わりの手段を、聞くなら何を見て
 判断すればよいかを、ルール自身が言わなければならない。`allow` では要らない。
-通した呼び出しには誰にも何も返らないので、書いても届く先が無い。
+通した呼び出しに返るのは `additionalContext` だけで、止めも聞きもしないので、
+言うべき代わりの手段が無い。
 
 ## 強さ
 
@@ -39,6 +40,12 @@ Claude Code の権限モードに従う（判定は cli.py）。
 強い側を先に見るのは、緩める側のルールを 1 行足しただけで守りが消える形を
 作らないため。`allow` は「まだ何も言われていない場所」に許可を置くもので、
 `deny` の穴を開ける道具ではない。
+
+`allow` に当たっても、Claude Code へ「許可」は返さない。判定を返すのは `deny` と
+`ask` のときだけで（judge.refuse）、`allow` は記録に残して終わる。効き目は、
+ccnavi 自身の確認（言及が無いときの `ask`）と拒否（`dontAsk` / `bypassPermissions`）を
+起こさないことと、`additionalContext` を当てる先になること。Claude Code 側の権限の
+扱いはルールファイルからは変えられない。
 
 ## 綴りの大文字小文字
 
@@ -67,7 +74,8 @@ import yaml
 
 from .globmatch import translate
 
-# このビルドが読めるルールファイルの書式の版。
+# このビルドが読めるルールファイルの書式の版。`deny` `ask` `allow` の 3 タイプで、探すものは
+# `glob`（fnmatch の glob）か `regex`。
 VERSION = 1
 
 # 深刻度。ガードを壊すものと、弱めるだけのものを分ける。
@@ -339,7 +347,10 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             Problem(
                 SEVERITY_ERROR,
                 "",
-                f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）",
+                f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
+                f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、探すものは `glob` か `regex`。"
+                "`glob` は fnmatch の glob で文字列全体に当たるので、"
+                "部分一致が要るなら前後に `*` を書く",
             )
         )
 

@@ -12,7 +12,8 @@
  */
 import type { Lock } from "./lock.js";
 import { PHASE_KINDS, REVIEWS, type PhasesModel } from "./phases-doc.js";
-import { BUTTON_STYLE, escapeHtml } from "./render.js";
+import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
+import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
 
 export interface PhasesPage {
   readonly root: string;
@@ -35,17 +36,19 @@ export interface PhasesPage {
 
 export interface RenderOptions {
   readonly nonce: string;
+  /** 見た目。無ければ VS Code のテーマに従う */
+  readonly appearance?: Appearance;
 }
 
 /** 区分の説明。select の札 */
 export const KIND_LABELS: Readonly<Record<(typeof PHASE_KINDS)[number], string>> = {
-  work: "work（全体計画 plan: に置く）",
-  feedback: "feedback（フィードバック計画 feedback: に置く。review は mr 固定）",
+  work: "work（全体計画 plan: に並べる種類）",
+  feedback: "feedback（フィードバック計画 feedback: に並べる種類。レビューは mr 固定）",
 };
 
 /** レビューの既定の説明。select の札 */
 export const REVIEW_LABELS: Readonly<Record<(typeof REVIEWS)[number], string>> = {
-  none: "none（レビューを求めない既定。上限ではなく、実績のリスクが HIGH 以上なら要る）",
+  none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上なら要る）",
   mr: "mr（マージリクエストのレビューを受ける）",
 };
 
@@ -71,8 +74,8 @@ export function renderPhasesPage(page: PhasesPage, options: RenderOptions): stri
 ${STYLE}
 </style>
 </head>
-<body>
-${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外部で変更された。画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
+${bodyTag(options.appearance)}
+${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? [])}<div id="changed" class="banner warn hidden">ファイルが外で変更されたので、画面の内容は古い。<button type="button" class="action" data-action="reload">再読込</button></div>
 <header class="toolbar">
   <div class="summary">
     <span class="path" title="${escapeHtml(page.root)}">${escapeHtml(page.phasesPath)}</span>
@@ -88,8 +91,12 @@ ${renderTicketControlBanner(page.ticketControl)}${renderNotices(page.notices ?? 
 ${renderProblems(page.model.problems)}${renderMissing(page)}<section class="block">
   <h2>フェーズの種類 <span class="count" id="phase-count">0</span>
     <button type="button" class="action small" data-action="add">＋ 種類を追加</button></h2>
-  <p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に在って追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p>
-  <ul class="phases" id="phases"></ul>
+  <div class="find">
+    <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellcheck="false">
+    <span class="hint">行を押すと開く</span>
+  </div>
+  <details class="help"><summary>この画面の説明</summary><p class="hint">親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code> は子チケットの範囲の上限（作業ツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。<code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は <code>,</code> で区切る。</p></details>
+  <ul class="list" id="phases"></ul>
 </section>
 <footer class="foot"><span id="status"></span></footer>
 <script nonce="${nonce}" type="application/json" id="page">${embedded}</script>
@@ -105,7 +112,7 @@ function renderTicketControlBanner(ticketControl: string): string {
   if (ticketControl !== "disable") {
     return "";
   }
-  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効かない</div>\n`;
+  return `<div class="banner warn">このワークスペースはチケット制御が <code>disable</code>（<code>CCNAVI_TICKET_CONTROL</code>）。フェーズの種類は親チケットの計画と子の範囲にしか使われないので、いまは何にも効いていない</div>\n`;
 }
 
 function renderNotices(notices: readonly string[]): string {
@@ -130,76 +137,18 @@ function renderProblems(problems: readonly string[]): string {
   return `<ul class="problems">\n${items}\n</ul>\n`;
 }
 
-const STYLE = `  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 12px;
-    background: var(--vscode-editor-background);
-    color: var(--vscode-editor-foreground);
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-  }
-  code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
-  .hidden { display: none !important; }
-  .banner {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-panel-border);
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  }
-  .banner.warn { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
-  .banner.missing { border-color: var(--vscode-editorInfo-foreground); }
-  .banner.missing > span { flex: 1 1 320px; }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 8px; }
-  .summary { display: flex; gap: 12px; align-items: center; }
-  .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
-  .dirty { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
-  .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-  .lock {
-    margin: 0 0 10px; padding: 6px 10px; border-radius: 4px;
-    border: 1px solid var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground);
-  }
-  .problems {
-    margin: 0 0 12px; padding: 8px 8px 8px 24px;
-    border: 1px solid var(--vscode-editorWarning-foreground); border-radius: 4px;
-    color: var(--vscode-editorWarning-foreground);
-  }
-  .hint { margin: 0 0 10px; color: var(--vscode-descriptionForeground); font-size: .92em; }
-  .empty { color: var(--vscode-descriptionForeground); }
-${BUTTON_STYLE}
+const STYLE = `${PAGE_STYLE}
   button.action.small { margin-left: auto; }
-  input[type=text], select {
-    background: var(--vscode-input-background); color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius: 2px;
-    padding: 3px 6px; font: inherit;
-  }
-  input[type=text]:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); }
-  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
-  input:disabled, select:disabled { opacity: .6; }
   input.duplicate { border-color: var(--vscode-editorError-foreground); }
   .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
-  .block h2 { margin: 0 0 8px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
-  .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
-  /* 欄名は欄の上に小さく常に出す。placeholder は説明で、入れると消えてよい。 */
-  .field { display: flex; flex-direction: column; gap: 1px; }
-  .field > .cap { font-size: .78em; color: var(--vscode-descriptionForeground); font-family: var(--vscode-editor-font-family); }
-  .field > input, .field > select { width: 100%; box-sizing: border-box; margin: 0; }
-  .phases { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .phase {
-    border: 1px solid var(--vscode-panel-border); border-radius: 5px; padding: 8px;
-    background: var(--vscode-editorWidget-background);
-  }
-  .phase.feedback { border-left: 3px solid var(--vscode-editorInfo-foreground); }
-  .phase-row { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: flex-end; margin-bottom: 6px; }
-  .phase-row:last-child { margin-bottom: 0; }
-  .phase-row .grow { flex: 1 1 260px; }
-  .phase-row .field.w-id { width: 170px; }
-  .phase-row .field.w-title { width: 200px; }
-  .phase-row .field.w-kind { width: 300px; }
-  .phase-row .field.w-review { width: 300px; }
-  .phase-row .field.w-scope { width: 220px; }
-  .phase-row .field.w-agent { width: 170px; }
-  .phase-row .buttons { margin-left: auto; display: flex; gap: 4px; }
-  .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; }
-  .foot.error { color: var(--vscode-editorError-foreground); }`;
+  .block h2 { display: flex; gap: 8px; align-items: center; }
+${LIST_STYLE}
+  /* 1 行 = 開閉、id、title、kind、review、scope */
+  .phase .row-head { grid-template-columns: 18px minmax(110px, 160px) minmax(90px, 160px) max-content max-content minmax(0, 1fr); }
+  .sum .tag.work { color: var(--vscode-descriptionForeground); }
+  .sum .tag.feedback { color: var(--vscode-editorInfo-foreground); }
+  .field > select.f-kind, .field > select.f-review { max-width: 420px; }
+`;
 
 // 中のスクリプトはテンプレート文字列に埋めるので、バッククォートと \${ を使わない。
 const SCRIPT = `  const vscode = acquireVsCodeApi();
@@ -211,6 +160,19 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   let dupShown = false;
   let seq = 0;
   const keys = new Map();
+  // 開いている種類の鍵。既定は全部畳む。Webview の state には id で控え、再読込のあとも同じ種類が開く。
+  const opened = new Set();
+  // 「関係と案内」の開閉。最初は値の有無で決め、以後は利用者の操作を鍵で覚える。
+  const moreOpen = new Map();
+  const savedOpen = new Set((vscode.getState() || {}).open || []);
+  function persistOpen() {
+    const ids = [];
+    for (const key of opened) {
+      const phase = phaseByKey(key);
+      if (phase && phase.id !== "") { ids.push(phase.id); }
+    }
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { open: ids }));
+  }
 
   function h(tag, attrs, children) {
     const el = document.createElement(tag);
@@ -253,9 +215,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function splitList(text) {
     return text.split(",").map((s) => s.trim()).filter((s) => s !== "");
   }
-  // 欄名を欄の上に小さく出す。placeholder は説明なので、入れると消えてよい。
-  function captioned(name, control, className) {
-    return h("div", { class: "field " + (className || "") }, [h("span", { class: "cap", text: name }), control]);
+  // 欄名は日本語で欄の左に出す。YAML のキー名は欄名の title（ツールチップ）に載せる。
+  function captioned(name, control, className, key) {
+    const cap = h("span", { class: "cap", text: name });
+    if (key) { cap.setAttribute("title", "YAML のキー: " + key); }
+    return h("div", { class: "field " + (className || "") }, [cap, control]);
   }
   function selectField(target, name, choices, className, onChange) {
     const select = h("select", { class: className }, choices.map((c) => option(c.value, c.label, c.value === target[name])));
@@ -263,9 +227,12 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     select.addEventListener("change", () => { target[name] = select.value; markDirty(); if (onChange) { onChange(); } });
     return select;
   }
+  function hasRelations(phase) {
+    return phase.overlap.length > 0 || phase.requires.length > 0 || phase.agent !== "" || phase.when !== "";
+  }
   function renderPhase(phase) {
     const key = keyOf(phase);
-    const idInput = field(phase, "id", "f-id", "implement（英数字で始まり、英数字と . _ - だけ）");
+    const idInput = field(phase, "id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）");
     idInput.addEventListener("input", () => updateSave());
     const kindSelect = selectField(phase, "kind", page.kinds, "f-kind", () => renderAll());
     const reviewSelect = selectField(phase, "review", page.reviews, "f-review");
@@ -275,29 +242,78 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     ]);
     scopeSelect.disabled = !page.editable;
     scopeSelect.addEventListener("change", () => { phase.inherit = scopeSelect.value === "inherit"; markDirty(); renderAll(); });
-    const rows = [
-      h("div", { class: "phase-row" }, [
-        captioned("id", idInput, "w-id"),
-        captioned("title", field(phase, "title", "f-title", "実装とテスト（空なら id）"), "w-title"),
-        captioned("kind", kindSelect, "w-kind"),
-        captioned("review", reviewSelect, "w-review"),
+    // 関係と案内の 4 欄は出番が少ないので見出し 1 行に畳む。値がある種類だけ最初から開く。
+    const moreSummary = h("summary", {});
+    const more = h("details", { class: "more" }, [
+      moreSummary,
+      h("div", { class: "sub" }, [
+        captioned("並行できる種類", listField(phase, "overlap", "f-overlap", "並行してよい種類の id"), "", "overlap"),
+        captioned("一緒に要る種類", listField(phase, "requires", "f-requires", "計画に置くなら一緒に要る種類の id"), "", "requires"),
+        captioned("エージェント", field(phase, "agent", "f-agent narrow", "案内に出すサブエージェントの名前"), "", "agent"),
+        captioned("置く目安", field(phase, "when", "f-when", "この種類を計画に置く目安。案内にだけ使う"), "", "when"),
+      ]),
+    ]);
+    if (moreOpen.has(key) ? moreOpen.get(key) : hasRelations(phase)) { more.setAttribute("open", ""); }
+    more.addEventListener("toggle", () => moreOpen.set(key, more.open));
+    const twist = h("button", { type: "button", class: "twist", title: "この種類を開く／畳む" });
+    const sum = h("span", { class: "sum" });
+    const head = h("div", { class: "row-head" }, [twist, sum]);
+    const li = h("li", { class: "row phase " + phase.kind, "data-key": key }, [
+      head,
+      h("div", { class: "row-body" }, [
+        captioned("id", idInput, "", "id"),
+        captioned("題", field(phase, "title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）"), "", "title"),
+        captioned("区分", kindSelect, "", "kind"),
+        captioned("レビュー", reviewSelect, "", "review"),
+        captioned("範囲", h("div", { class: "inline" }, [
+          scopeSelect,
+          phase.inherit ? null : listField(phase, "scope", "f-scope-globs", "src/*, tests/*（作業ツリーのルートからの相対。子チケットの範囲はこの中に収める）"),
+        ]), "", "scope"),
+        captioned("成果物", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に存在し、git に追跡されているべきもの）"), "", "deliverables"),
+        more,
         h("span", { class: "buttons" }, [upButton(key), downButton(key), deleteButton(key)]),
       ]),
-      h("div", { class: "phase-row" }, [
-        captioned("scope", scopeSelect, "w-scope"),
-        phase.inherit ? null : captioned("scope の glob", listField(phase, "scope", "f-scope-globs", "src/*, tests/*（作業ツリーのルートからの相対。子の範囲はこの中に収まる）"), "grow"),
-      ]),
-      h("div", { class: "phase-row" }, [
-        captioned("deliverables", listField(phase, "deliverables", "f-deliverables", "wip/design/*.md（閉じる前に在って追跡されているべきもの）"), "grow"),
-        captioned("overlap", listField(phase, "overlap", "f-overlap", "並行してよい種類の id"), "grow"),
-        captioned("requires", listField(phase, "requires", "f-requires", "計画に置くなら一緒に要る種類の id"), "grow"),
-      ]),
-      h("div", { class: "phase-row" }, [
-        captioned("agent", field(phase, "agent", "f-agent", "案内に出すサブエージェント名"), "w-agent"),
-        captioned("when", field(phase, "when", "f-when", "この種類を計画に置く目安。案内にだけ使う"), "grow"),
-      ]),
-    ];
-    return h("li", { class: "phase " + phase.kind, "data-key": key }, rows);
+    ]);
+    function fillSummary() {
+      sum.textContent = "";
+      sum.appendChild(h("span", { class: "sum-id" + (phase.id === "" ? " dim" : ""), text: phase.id === "" ? "（id 未設定）" : phase.id }));
+      sum.appendChild(h("span", { class: "clip", text: phase.title === "" ? "" : phase.title, title: phase.title }));
+      sum.appendChild(h("span", { class: "tag " + phase.kind, text: phase.kind }));
+      sum.appendChild(h("span", { class: "dim", text: "レビュー " + phase.review, title: "review" }));
+      sum.appendChild(h("span", { class: "clip dim mono", text: phase.inherit ? "inherit" : phase.scope.length === 0 ? "（scope 未設定）" : phase.scope.join(", "), title: phase.inherit ? "親の範囲そのまま" : phase.scope.join(", ") }));
+      li.setAttribute("data-find", (phase.id + " " + phase.title + " " + phase.scope.join(" ") + " " + phase.deliverables.join(" ") + " " + phase.when).toLowerCase());
+      moreSummary.textContent = "";
+      moreSummary.appendChild(h("b", { text: "関係と案内" }));
+      moreSummary.appendChild(document.createTextNode(hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に要る種類・エージェント・置く目安"));
+    }
+    head.addEventListener("click", () => {
+      if (window.getSelection && String(window.getSelection()) !== "") { return; }
+      setOpen(li, !li.classList.contains("open"), true);
+    });
+    li.addEventListener("input", () => { fillSummary(); applyFind(); });
+    fillSummary();
+    setOpen(li, opened.has(key), false);
+    return li;
+  }
+  // 行を開く／畳む。persist が真なら控えも書く（利用者の操作だけ。描画のやり直しでは書かない）。
+  function setOpen(li, on, persist) {
+    const key = li.getAttribute("data-key");
+    if (persist) { if (on) { opened.add(key); } else { opened.delete(key); } }
+    li.classList.toggle("open", on);
+    const twist = li.querySelector(".row-head > .twist");
+    twist.textContent = on ? "▾" : "▸";
+    twist.setAttribute("aria-expanded", on ? "true" : "false");
+    if (persist) { persistOpen(); }
+  }
+  // 絞り込み。要約に含む文字で行を隠すだけで、種類の中身と並びには触らない。開いている行は隠さない。
+  function applyFind() {
+    const q = document.getElementById("find").value.trim().toLowerCase();
+    for (const li of document.querySelectorAll("#phases .phase")) {
+      li.classList.toggle("hidden-by-find", q !== "" && (li.getAttribute("data-find") || "").indexOf(q) < 0);
+    }
+    const shown = document.querySelectorAll("#phases .phase:not(.hidden-by-find)").length;
+    const kept = document.querySelectorAll("#phases .phase.hidden-by-find.open").length;
+    document.getElementById("phase-count").textContent = q === "" ? String(form.phases.length) : shown + " / " + form.phases.length + (kept > 0 ? "（開いたまま " + kept + "）" : "");
   }
   function upButton(key) {
     const b = h("button", { type: "button", class: "action small", text: "↑", title: "上へ" });
@@ -318,13 +334,19 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     return b;
   }
   function renderAll() {
+    // 前に開いていた種類は id で覚えている。最初の描画でだけ鍵に写す。
+    if (savedOpen.size > 0) {
+      for (const phase of form.phases) { if (savedOpen.has(phase.id)) { opened.add(keyOf(phase)); } }
+      savedOpen.clear();
+    }
     const list = document.getElementById("phases");
     list.textContent = "";
     for (const phase of form.phases) { list.appendChild(renderPhase(phase)); }
-    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : page.editable ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
+    if (form.phases.length === 0) { list.appendChild(h("li", { class: "empty", text: page.exists ? "種類が無い。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足す" : page.editable ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる" : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す" })); }
     document.getElementById("phase-count").textContent = String(form.phases.length);
     const add = document.querySelector("button[data-action=add]");
     if (add) { add.disabled = !page.editable; }
+    applyFind();
     updateSave();
   }
   function markDirty() {
@@ -379,7 +401,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   }
   function add() {
     // 既定は inherit。scope: [] （何も書けない）の種類を、glob を埋め忘れただけで作らないため。
-    form.phases = form.phases.concat([{ origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], agent: "", when: "" }]);
+    const phase = { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], agent: "", when: "" };
+    form.phases = form.phases.concat([phase]);
+    // 足した種類は開いて出す。畳んだままでは何を足したか分からない。
+    opened.add(keyOf(phase));
     markDirty();
     renderAll();
     const items = document.querySelectorAll("#phases .phase");
@@ -395,7 +420,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function setBusy(on, text) {
     busy = on;
     for (const b of document.querySelectorAll("button[data-action=reload], button[data-action=create]")) { b.disabled = on; }
-    for (const el of document.querySelectorAll("#phases input, #phases select, #phases button, button[data-action=add]")) { el.disabled = on || !page.editable; }
+    for (const el of document.querySelectorAll("#phases .row-body input, #phases .row-body select, #phases .row-body button, button[data-action=add]")) { el.disabled = on || !page.editable; }
     updateSave();
     if (text) { status(text, false); }
   }
@@ -415,4 +440,6 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     else if (m.type === "lock") { lock = m.lock; updateSave(); }
     else if (m.type === "changed") { document.getElementById("changed").classList.remove("hidden"); }
   });
-  renderAll();`;
+  document.getElementById("find").addEventListener("input", applyFind);
+  renderAll();
+${APPEARANCE_SCRIPT}`;

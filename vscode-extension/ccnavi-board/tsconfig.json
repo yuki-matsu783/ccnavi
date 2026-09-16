@@ -11,5 +11,5 @@
     "declaration": false,
     "resolveJsonModule": false
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }

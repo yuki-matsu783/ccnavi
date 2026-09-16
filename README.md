@@ -294,6 +294,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
+| `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。人にも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない）。「ルールが言及していない呼び出し」。この門に `dry-run` は無く、それ以外の値は `enable` として動いて `--lint` が言う |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh` と書く。これは振り分けの sh で、実行ファイルは sh の 1 つ上の `bin/<os>-<arch>/`、つまり `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/tickets`。そのツリーの git が追跡する |
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
@@ -487,8 +488,8 @@ ccnavi ディレクトリの名前（`.ccnavi`）は `CCNAVI_PROJECT_HOME` の�
 
 | ツール | 当たる層 |
 |---|---|
-| `Write` / `Edit` / `NotebookEdit` | 共通層 + **行き先の 1 層**。行き先がプロジェクトの中ならその層、ワークスペースのツリー（ワークスペースルートと、そこから切った作業ツリー）なら自身の層 |
-| `Bash` | 共通層 + 自身の層 + **全プロジェクトの層**。どこに `cwd` があっても、`cd` を挟んでも同じ判定になる |
+| パスを持つツール: `Read` / `Grep` / `Glob` / `Write` / `Edit` / `NotebookEdit` | 共通層 + **行き先の 1 層**。行き先がプロジェクトの中ならその層、ワークスペースのツリー（ワークスペースルートと、そこから切った作業ツリー）なら自身の層。`Grep` と `Glob` が探す場所を省いたときは `cwd` が行き先 |
+| パスを持たないツール: `Bash` / `PowerShell` / `WebFetch` / `Skill` / `Agent` | 共通層 + 自身の層 + **全プロジェクトの層**。どのプロジェクトの呼び出しかを決められないので、どこに `cwd` があっても、`cd` を挟んでも同じ判定になる。ある層の `allow` は他のプロジェクトの作業にも効く |
 
 順は 共通層 → 自身の層 → プロジェクトの層（名前順）で、`deny` `ask` `allow` の順は変わらない。
 
@@ -505,7 +506,7 @@ ccnavi ディレクトリの名前（`.ccnavi`）は `CCNAVI_PROJECT_HOME` の�
   フェーズの種類とリスクの配点は両方効かせられないので、そちらは `--lint` が error にして、その層を空として扱う
 
 できないことが 3 つある。プロジェクトの層で共通層の `ask` を `allow` に緩めること（和は足すだけで、`ask` は `allow` より先に当たる）。
-共通層の `allow` をプロジェクトごとに外すこと（全プロジェクトに効く）。他のプロジェクトの層を書き込み系の判定に足すこと
+共通層の `allow` をプロジェクトごとに外すこと（全プロジェクトに効く）。他のプロジェクトの層をパスを持つツールの判定に足すこと
 （「A のルールを B にも」は共通層へ上げる）。
 
 ccnavi ディレクトリの下（既定なら `.ccnavi/`。共通層の既定の置き場 `.ccnavi/common/` もここに入る）は、ルールに 1 行も書かなくても書き込みが止まる。設定 3 本も、配点が呼ぶスクリプトも判定の中身
@@ -591,12 +592,25 @@ allow:
 |---|---|
 | `deny` | 止まる |
 | `ask` | 人に確認が出る（`RULE_ASK`） |
-| `allow` | 通る |
+| `allow` | ccnavi は何も返さない。その先は Claude Code の権限モードが決める |
 | どこにも当たらない | Claude Code の権限モードに従う（`UNDECLARED`） |
 
 1 件でも `deny` に当たれば拒否で、弱いタイプは見に行かない。同じタイプに複数
 当たったら全部の文面を返す。どれか 1 つを選ぶと、選ばれなかったルールの
 言い分は誰にも届かない。
+
+**`allow` は Claude Code に「許可」を返すのではない。** ccnavi が判定（`permissionDecision`）を
+返すのは `deny` と `ask` のときだけで、`allow` のときは何も返さずに終わる（ルールに
+`additionalContext` があれば、それだけを添える）。`allow` に当たった呼び出しも、その先は
+Claude Code の権限モードと `settings.json` の `permissions` が決める。ルールファイルに `allow` を
+1 行足しても、Claude Code 側の確認は飛ばせない。飛ばせる形にすると、ルールを 1 行足すだけで
+権限を配れることになる。
+
+`allow` を書くと消えるのは、**ccnavi 自身が出す確認と拒否**。言及の無い呼び出しは、
+知らないモードでは ccnavi が確認を出し、`dontAsk` / `bypassPermissions` では通さない
+（次の節）。`allow` に当たればどちらも起きない。`auto` / `default` / `acceptEdits` / `plan`
+はもともと権限モードに渡すので変わらない。記録には `decision` が `allow` の行が残り、
+`additionalContext` を当てる先にもなる。
 
 作業ツリーに結び付いた承認済みチケットがあれば、その範囲の判定とも比べて強い側を採る。
 ルールの `allow` に当たっても、範囲の外なら止まる（「判定の鍵はファイルの行き先」）。
@@ -613,11 +627,14 @@ ccnavi は判定を返さず、**Claude Code の権限モードに従う**。ル
 | `permission_mode` | 呼び出しはどうなるか | 記録の `decision` |
 |---|---|---|
 | `auto` | classifier が判断する | `handover` |
-| `default` / `acceptEdits` / `plan` / 不明 | 人に確認が出る | `ask` |
-| `dontAsk` / `bypassPermissions` | 通さない | `deny` |
+| `default` / `acceptEdits` / `plan` | Claude Code 自身の権限の仕組み（`settings.json` の `permissions` と、モードごとの既定）が決める | `handover` |
+| 不明なモード / モードが来ない | 人に確認が出る | `ask` |
+| `dontAsk` / `bypassPermissions` | 通さない。`CCNAVI_GUARD_UNWATCHED=disable` なら委ねる | `deny` |
 
-持っていない判定を ask として返すと、判断できるモードでも必ず人に止まり、auto モードが
-実質効かなくなる。持っていない判定を返さないことのほうが、ガードとして正しい（ADR-0009）。
+持っていない判定を ask として返すと、判断できる相手が居るモードでも必ず人に止まる。
+`default` では Claude Code 自身が書き込みとシェルに確認を出すので、ccnavi がそこに
+上乗せしても、判断する者が増えるわけではなく、同じ呼び出しで 2 度聞かれるだけになる。
+持っていない判定を返さないことのほうが、ガードとして正しい（ADR-0009、ADR-0049）。
 
 **渡した回も記録には残る。** `decision` が `handover` の行がそれで、人に聞いた
 回の `ask` とは混ざらない。ルールを足すべきかどうかは前者の数で決まり、ガードが
@@ -630,6 +647,12 @@ jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq 
 確認できる者が居ないモードだけは通さない。あそこで ask を返しても「誰も答えない
 まま通る」に化けるので、許可としない（REQ-PRE-08）。知らないモードの名前は
 確認に倒す。名前が 1 つ増えたときに、それが素通りではなく確認になるように。
+
+ここを開けるかどうかはプロジェクトが決める。`CCNAVI_GUARD_UNWATCHED=disable` と
+書いた層では、`dontAsk` と `bypassPermissions` でも判定を返さず、そのモードの
+取り決めに委ねる。ccnavi が止めるのはルールに書いたものだけになる、という選択で、
+`--lint` が「切れている」と warn で言う。読み切れなかった呼び出しは、この設定でも
+委ねない。
 
 読み切れなかったコマンド（`PARSE_UNCERTAIN`）は権限モードに委ねない。読めな
 かったという事実は判定の結果に現れず、委ねた先には伝わらないので、それを言える
@@ -756,15 +779,15 @@ cat <(git push)                   # 止まる。プロセス置換の中も実�
 if true; then git push; fi        # 止まる。予約語の後ろはコマンドの先頭
 ```
 
-シェルが実行する中身は、書いた場所によらず独立したコマンドとして読む。二重引用の中の `$( )` と
-バッククォート、プロセス置換 `<( )` `>( )`、区切りを引用しないヒアドキュメント（`<<EOF`）の本文の
-`$( )` とバッククォートがこれにあたる。中身は外側のコマンドの後ろにつながれ、外側の置換のあった場所には
+シェルが実行する中身は、書いた場所によらず独立したコマンドとして読む。二重引用の中の `$( )`、
+プロセス置換 `<( )` `>( )`、区切りを引用しないヒアドキュメント（`<<EOF`）の本文の `$( )` がこれにあたる
+（バッククォートは読まずに止める。下の「書き直しを求める形は止めて案内する」）。中身は外側のコマンドの後ろにつながれ、外側の置換のあった場所には
 `$` が 1 文字残る。`grep -n "$(git push)" f` は `grep -n $ f` と `git push` の 2 本として読まれるので、
 grep の allow は後ろの `git push` まで通さない。外側は割れないので、`find $(pwd) -name x -delete` の
 `-delete` は find と同じコマンドとして見える。
 
 同じ理由で、引用の外の改行はコマンドの区切りになり、2 行目のコマンドは 1 行目の引数として読まれない。
-`#` がコメントになるのは語の始まりだけで、`a#b` や `$#` の `#` は文字。`if` `then` `do` `coproc` `{` などの
+`#` がコメントになるのは語の始まりだけで、`a#b` や `$#` の `#` は文字。`if` `then` `do` `{` などの
 予約語はコマンドの位置にあればそれだけで 1 本になり、後ろの語がコマンドの先頭になる。
 
 引用が 1 語につないだ空白は、コマンドと引数の間の空白としては読まれない。
@@ -786,13 +809,14 @@ grep の allow は後ろの `git push` まで通さない。外側は割れな�
 
 ### 文字として書きたいとき
 
-二重引用の中の `$( )` とバッククォートは、書いた側が文字のつもりでも、シェルは実行する。だから止まる。
+二重引用の中の `$( )` とバッククォートは、書いた側が文字のつもりでも、シェルは実行する。だから止まる
+（バッククォートは中身に依らず止まる）。
 引用の中から切り出したコマンドにだけルールが当たったときは、返る文面にそのことと回避策が添えられ、
 記録と `--test` に `quoted`（そのルールの id）が出る。文字として渡す道は必ず残してある。
 
 | 書きたいもの | 止まる書き方 | 通る書き方 |
 |---|---|---|
-| 本文にバッククォートを含む issue や PR | ``gh issue create --body "use `git push` here"`` | `` \` `` で書く、単一引用で包む、`--body-file <ファイル>` |
+| 本文にバッククォートを含む issue や PR | ``gh issue create --body "use `git push` here"``（`DENY_BACKQUOTE`） | 単一引用で包む、`` \` `` で書く、`--body-file <ファイル>` |
 | 複数行のコミットメッセージ | `commit -m "$(cat <<'EOF' … EOF)"`（heredoc のルール） | 本文を Write で置いて `commit -F <ファイル>`、改行を含む `-m "…"` |
 | git の値を使うコマンド | `cd "$(git rev-parse --show-toplevel)"` | ラッパースクリプトで値を出して読み、次のコマンドにその値を書く |
 | 今の場所を渡す検索 | `grep -rn foo "$(pwd)"`（allow から外れて確認になる） | 値をそのまま書く |
@@ -819,13 +843,10 @@ grep の allow は後ろの `git push` まで通さない。外側は割れな�
 |---|---|
 | 文字列をコードとして実行する呼び出し | `bash -c`、`sh -c`、`eval`、`xargs`、`find -exec` |
 | 引用やヒアドキュメントが閉じていない | `echo "git push` |
-| 置換が閉じていない | ``echo `git push``、`echo $(git push` |
-| シェルによって読みが割れる置換、深すぎる入れ子 | `echo "$(case a in a) git push;; esac)"`、16 段を超える `$( )` |
+| 置換が閉じていない | `echo $(git push` |
 
-置換の中身が 1 つでも読み切れなければ、コマンド全体が縮退する。`$( )` の中の `case` は、bash 3.2 が
-`)` を置換の終わりと読んで構文エラーにし、zsh は実行する。どちらかに決めて読むと片方で素通りに
-なりうるので、`case` という語が現れたら縮退させる。コマンドの先頭ではない語（`"$(echo just in case)"`）
-でも縮退するのは、許容した誤検知（[ccnavi.md](ccnavi.md) §12.2）。
+置換の中身が 1 つでも読み切れなければ、コマンド全体が縮退する。シェルによって読みが割れる形と
+バッククォートは、縮退ではなく止めて書き直しを案内する（下の「書き直しを求める形は止めて案内する」）。
 
 引用でコマンド名を割った `"git" push` や `g"it" push` は縮退しない。
 シェルと同じ字句規則で語を組み直すので、本来の push としてそのまま止まる。
@@ -835,7 +856,14 @@ perl や python は縮退の対象に入れていない。
 禁止語に触れる文書を直すときの普通の書き方で、
 ここを諦めると直したい誤検知がそのまま残る。
 
-### ブレース展開は語を並べて書く
+### 書き直しを求める形は止めて案内する
+
+書き直す道が必ずあって、読み分けると規則が増えるか、読み違えると素通りに倒れる形がある。ccnavi はこれを
+読み解かず、ルールより先に形ごとの理由コードで止め、書き直し方を返す（[ADR-0047](docs/adr/0047-rewrite-forms.md)）。
+止めるのは、書き直した結果がその場で読める形に収まるものだけ。`sh -c`・`eval`・`xargs`・`find -exec` は
+書き直し先がファイルになり中身が見えなくなるので、止めずに縮退と「実行役のコマンド」の読みで扱う。
+
+#### ブレース展開は語を並べて書く
 
 引用の外の `{a,b}` や `{1..3}` は、シェルが実行する前に複数の語に広げる。`{git,push,origin,main}` は
 1 語に見えるが、bash は `git push origin main` を実行する。ccnavi はこれを展開して読まず、見つけたら
@@ -855,6 +883,45 @@ perl や python は縮退の対象に入れていない。
 `HEAD@{1}` のように、カンマも範囲も無いブレースも止まらない。代入の右辺（`x={a,b}`）、case のパターン
 （`case $x in {a,b})`）、`[[ $f == *.{jpg,png} ]]` はシェルが広げないが止まる。許容した誤検知で
 （[ccnavi.md](ccnavi.md) §12.2）、引用するか、パターンを `a|b)` や `*.jpg || … *.png` のように書けば通る。
+
+#### コマンド名はそのまま書く
+
+変数・置換・グロブをコマンド名に置くと、どのプログラムが走るかが綴りに無く、どのルールも当たらない。
+`c=git; $c push origin main` は raw-git をすり抜けて push を実行する。コード `DENY_COMMAND_NAME_EXPANSION` で止める。
+前に置いた代入とリダイレクト（`FOO=1 >/dev/null $c`、`{fd}>/dev/null $c`）の後ろも、実行役のコマンドの中
+（`env $c`・`sudo $c`・`sh $SCRIPT`）も見る。`sh -c "$c"` と `eval "$(…)"` の文字列の中は見ず、これまでどおり
+読み切れないものとして確認に落とす。
+
+| 止まる書き方 | 通る書き方 |
+|---|---|
+| `c=git; $c status` | `git status` |
+| `G="sh .ccnavi/scripts/ccnavi-git.sh"; $G add f` | `sh .ccnavi/scripts/ccnavi-git.sh add f` |
+| `sh $S/run.sh` | `sh /tmp/work/run.sh`（パスをそのまま書く） |
+| `/usr/bin/gi? status` | `/usr/bin/git status` |
+
+引数の位置の変数とグロブ（`echo $HOME`、`ls *.py`、`cd $S`、`timeout $T make`）、`[ -f x ]`、`case $x in` は止まらない。
+
+#### バッククォートは `$( )` か単一引用で書く
+
+バッククォートは二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。ccnavi は中身を読まず、
+コード `DENY_BACKQUOTE` で止める。コマンド置換なら `$( )` で書く。文字として渡したいなら（issue や PR の本文の
+Markdown など）、単一引用で包むか、`` \` `` と書くか、`--body-file <ファイル>` で渡す。単一引用の中、`` \` ``、
+引用付きヒアドキュメントの本文、コメントのバッククォートは止まらない。
+
+#### シェルで読みが割れる形は素直な形で書く
+
+コード `DENY_AMBIGUOUS_FORM` で止める。どれも bash と zsh で読みが割れるか、作業で使わない形。
+
+| 止まる形 | 書き直し方 |
+|---|---|
+| `$( )` の中の `case`（`"$(case $x in a) echo 1;; esac)"`） | if/elif で書く。`$( )` の外で分岐する |
+| `$((cmd) \| x)` | `$( (cmd) \| x )` と空白を入れる |
+| 16 段を超える `$( )` の入れ子 | 内側を先に打ち、出た値を次のコマンドに書く |
+| コマンドの位置の `coproc` | `&` で裏に回す |
+| コマンドの位置の `select` | `for` で回す |
+
+`$( )` の中の、コマンドの先頭ではない `case` の語（`"$(echo just in case)"`）でも止まる。許容した誤検知
+（[ccnavi.md](ccnavi.md) §12.2）。
 
 ### 実行役のコマンドが中で実行するコマンドにも当てる
 
@@ -897,8 +964,8 @@ ssh host rm -f .ccnavi/common/rules.yml         # 外さない。ssh は一覧�
   中で何が実行されるかを見たい。閉じない引用と閉じないヒアドキュメントでは外さない
 - 一覧は ccnavi の組み込みで、`rules.yml` からは足せない。足せるようにすると消すこともでき、守りの根拠を
   守られる側に置くことになる。一覧に無いもの（`ssh host <cmd>`・`python -c`・`perl -e`・`script -c`・`watch`・
-  `busybox sh` など）は外さないので、先頭に固定したルールはこれまでどおり外れる。変数・alias・関数
-  （`$SUDO rm …`）にも届かない
+  `busybox sh` など）は外さないので、先頭に固定したルールはこれまでどおり外れる。変数の値・alias・関数
+  にも届かない（コマンド名に変数を置いた `$SUDO rm …` は、上の「コマンド名はそのまま書く」で止まる）
 
 当てる先は止める側だけにする。
 
@@ -978,6 +1045,61 @@ docs/../.env
 
 相対パスは payload の `cwd` から決まる。まだ存在しないファイルへの書き込みは
 解けないので、絶対パスにして `..` を畳むところまでで止める。
+
+## 探すツールが読むファイルは、ルールに届かない
+
+`Grep` と `Glob` の対象は**探し始める場所**のパスで、そこから降りて読まれたファイルは
+判定に届かない。`Grep(path=<git プロジェクトルート>)` は `.env` や `secrets/` の中身を返しうるが、
+当たるルールは起点の `<git プロジェクトルート>` にしか当たらない。
+
+だから共通層の `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
+`Grep` と `Glob` を含めていない。足しても当たるのは起点のパスだけで、ルートからの検索は素通りした
+ままになる。塞がらないものを足すと、止まっているつもりの範囲だけが広がる
+（[ADR-0050](docs/adr/0050-search-tools-and-ignore.md)）。
+
+**`Grep` と `Glob` は ccnavi が受け持たない。** 守りは 3 層に分かれていて、探すツールが読む
+ファイルを見るのは上の 2 つ。
+
+| 層 | 何を止めるか |
+|---|---|
+| `.gitignore`（ripgrep が読む） | `Grep` が起点から降りていく途中で出会うファイル |
+| `.claude/settings.json` の `permissions.deny` の `Read(...)` | ファイル 1 つ 1 つ。`Grep` のファイル読み取りにも効く |
+| ccnavi のルール | `Read` `Write` `Edit` `NotebookEdit` `Bash`。`Grep` と `Glob` は受け持たない |
+
+`projects/foo/.env` が foo の `.gitignore` に入っている場合の噛み合い方。
+
+| 呼び方 | ccnavi のルール | `.gitignore` | `Read()` の `deny` |
+|---|---|---|---|
+| `Grep(path=<git プロジェクトルート>)` | 当たらない | **弾く** | **弾く** |
+| `Grep(path=.../foo/.env)` | 当たらない | 当たらない | **弾く** |
+| `Read(.../foo/.env)` | **止める** | 当たらない | **弾く** |
+| `Bash: cat .../foo/.env` | **止める** | 当たらない | 当たらない |
+
+2 行目は `Read()` の `deny` が唯一の守りになる。`permissions.deny` を持たない配布先では、
+ignore されたファイルを名指しした `Grep` は通る。
+
+### `.gitignore` を当てにしてよい範囲
+
+ripgrep の既定の挙動で、ccnavi の側では変えられない。ルールを書くときに当てにしてよい範囲は
+ここまで。
+
+- **起点そのものに指定されたパスには当たらない。** ignore されたディレクトリやファイルを `path` に
+  渡すと、その中は読まれる
+- **`.git` が無いディレクトリでは `.gitignore` を読まない**（ripgrep の `--require-git`）。clone
+  していない置き場、git 化していない `projects/<名前>/` が該当する
+- **降りた先に `.git` があれば、そこから下はそのリポジトリの `.gitignore` が効く。** ワークスペース
+  ルートが git 管理下でなくても、中のプロジェクトの `.gitignore` は効く。`.git` がファイル
+  （作業ツリーの gitdir ポインタ）でも同じ
+- **隠しファイルは弾かれない。** ドットで始まるファイルやディレクトリも、ignore されていなければ
+  `Grep` が読む。素の `rg` の既定とは違うので、「ドット始まりだから隠れている」と数えない
+- **`Read` ツールには最初から関係しない。** こちらは `credentials` ルールと `Read()` の `deny` が止める
+
+`.ignore`・`.rgignore`・`.git/info/exclude`・git のグローバルな除外（`core.excludesFile`、既定では
+`~/.config/git/ignore`）も ripgrep は読む。どれも弾く側に働くので、守りが薄くなる方向には出ない。
+
+ワークスペースルートが git 管理下で、`.gitignore` に `/projects/` があるときは、ルートからの
+`Grep` は `projects/` へ降りない。プロジェクトのコードを探すときは `cd projects/<名前>` してから
+呼ぶ（起点に指定した場所には ignore が当たらないので、中へ入れる）。
 
 ## 動作モード
 
@@ -1766,7 +1888,8 @@ Claude Code から来たモードで、`handover` の行と合わせて読む。
 切り替えたときに何件が戻るのかが分かる。
 
 コマンドを読み切れずに生の文字列で判定した回は、判定を下したうえで `degraded` が付く。
-`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution` の 4 つ。
+`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote` の 5 つ。
+後ろの 2 つは書き直しを求める形として止めた回に付く（コードは `DENY_AMBIGUOUS_FORM` と `DENY_BACKQUOTE`）。
 止めたもののうち、どれだけが読み切れないまま出た判定かを後から数えられる。
 
 止めた・聞いたルールのうち、引用の中から切り出したコマンドにだけ当たったものは `quoted` に id が並ぶ
@@ -1899,7 +2022,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 終了コードで見分けられるように。
 
 実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json` にあり、
-`tests/test_test_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を
+`tests/core/test_test_json.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を
 付けてそのテストを走らせ、例を書き直す）。
 
 `--test --json` の最上位。
@@ -2110,7 +2233,7 @@ ccnavi --explain --json
 
 最上位は 1 つのオブジェクト。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに
 版の違いを伝える。実例は `vscode-extension/ccnavi-board/test/fixtures/board.json` にあり、
-`tests/test_board.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けて
+`tests/ticket/test_board.py` が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けて
 そのテストを走らせ、例を書き直す）。
 
 | 鍵 | 何 |
@@ -2158,7 +2281,7 @@ ccnavi --approve --yes <識別子,…> --digest <値> --json [<絞り>...]    # 
 
 VS Code の拡張が、承認をターミナルではなくボードのオーバーレイで行うための 2 本。承認の対象を組むのは
 `--approve` と同じ関数で、`--explain --json` の `pending_approval` と答えが割れない。実例は
-`vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` ほかにあり、`tests/test_approve_json.py`
+`vscode-extension/ccnavi-board/test/fixtures/approve-preview.json` ほかにあり、`tests/ticket/test_approve_json.py`
 が同じ例で形を確かめる（形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
 `version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
 

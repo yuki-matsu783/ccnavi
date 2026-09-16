@@ -42,6 +42,7 @@ from . import (
     risk,
     ruleload,
     rules,
+    selfguard,
     settings,
     tree,
 )
@@ -243,7 +244,9 @@ def _rules_hit(
         return []
 
     by_id = {}
-    for view in ruleload.survey(stderr, conf, root):
+    # 判定（`judge.decide_before`）が同じ共通層を読み、苦情を先に書いている。ここでも書くと
+    # 同じ行が 2 度出るので、読み直しの苦情は捨てる。層の苦情は `survey` が書かずに持つ。
+    for view in ruleload.survey(io.StringIO(), conf, root):
         by_id.update({rule.id: rule for rule in view.rule_set.all() if rule.id})
 
     hits = []
@@ -331,9 +334,17 @@ def run_samples(stderr: TextIO, conf: settings.Settings, root: str, path: str) -
     呼び出しは通るので期待は満たしているが、通した理由が「allow に当たった」では
     ない。ルールを書いても当たらない場所なので、食い違いとは別に数えて必ず見せる。
     """
+    # 見本ごとに判定するので、共通層の苦情は見本の数だけ書かれる。行き先で読む層は見本ごとに
+    # 違うので、まとめて捨てずに、まだ書いていない行だけを書く。
+    said: set[str] = set()
     results = []
     for sample in load_samples(path, root):
-        out = try_one(stderr, conf, root, sample["tool"], sample["resolved_subject"])
+        heard = io.StringIO()
+        out = try_one(heard, conf, root, sample["tool"], sample["resolved_subject"])
+        for line in heard.getvalue().splitlines(keepends=True):
+            if line not in said:
+                said.add(line)
+                stderr.write(line)
         want = sample["expected"]
         got = out["verdict"] if out["known"] else audit.SKIP
         skipped = want == rules.ALLOW and got == audit.SKIP
@@ -546,7 +557,8 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     source = builtin.SOURCE if views[0].unreadable else conf.rules
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
     stdout.write(
-        "  書き込み系は 共通層 + 行き先の層、Bash は全部の層の和で判定する（設計 §11.4）\n"
+        "  パスを持つツールは 共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
+        "（設計 §11.4）\n"
     )
 
     for view in views:
@@ -571,8 +583,15 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
     stdout.write("    auto                          classifier が判断する\n")
-    stdout.write("    default / acceptEdits / plan  人に確認が出る\n")
-    stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
+    stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
+    stdout.write("    不明なモード                  人に確認が出る\n")
+    # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
+    if (conf.guard_unwatched or "").strip().lower() == selfguard.DISABLE:
+        stdout.write(
+            f"    dontAsk / bypassPermissions   委ねる（{settings.GUARD_UNWATCHED_ENV}=disable）\n"
+        )
+    else:
+        stdout.write("    dontAsk / bypassPermissions   確認できる者が居ないので通さない\n")
 
     stdout.write("\n■ チケットの作業範囲（承認済みチケット）\n")
     stdout.write(
