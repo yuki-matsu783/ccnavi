@@ -73,7 +73,7 @@ EVENTS = (
     "SubagentStart",
     "SubagentStop",
 )
-REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_RULES", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
+REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
 # 書かなければ enable で動くので、dry-run で導入したときにここだけ本気で動くと、
 # 様子を見ている人の手元でファイルが勝手に戻る。
@@ -266,20 +266,20 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_MODE"], "enable")
-        self.assertEqual(env["CCNAVI_RULES"], ".ccnavi/common/rules.yml")
         self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
 
     def test_does_not_write_the_common_layer_paths(self):
         """i0054: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
 
         既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
-        そこを直せば置き場が動くと読める。実装フェーズ（i0054-02）が緑にする。
+        そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。
         """
-        self.run_setup("--mode", "enable")
-        env = self.read_settings()["env"]
-        for name in ("CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"):
-            with self.subTest(name=name):
-                self.assertNotIn(name, env)
+        for args in (("--mode", "enable"), ("--mode", "enable", "--all")):
+            self.run_setup(*args, "--force")
+            env = self.read_settings()["env"]
+            for name in ("CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"):
+                with self.subTest(args=args, name=name):
+                    self.assertNotIn(name, env)
 
     def test_bin_path_points_at_the_launcher(self):
         """指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
@@ -364,7 +364,7 @@ class WritesTheExpectedShape(SetupTest):
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/tickets")
         self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/tickets")
-        self.assertEqual(env["CCNAVI_PHASES"], ".ccnavi/common/phases.yml")
+        self.assertEqual(env["CCNAVI_STATE"], "logs/state")
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 
     def test_says_what_is_still_missing(self):

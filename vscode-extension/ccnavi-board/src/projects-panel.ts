@@ -460,8 +460,8 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
     fail(current, `${targetRel} は既にあるので、上書きしない`);
     return;
   }
-  const settingsText = readText(path.join(root, ".claude", "settings.json"));
-  const sourceRel = (settingsText !== undefined && envFromSettingsJson(settingsText, "CCNAVI_RULES")) || DEFAULT_RULES;
+  // 共通層の置き場は `.ccnavi/common/` 固定。env では動かない（i0054）。
+  const sourceRel = DEFAULT_RULES;
   const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {
     fail(current, `ワークスペースのルール ${sourceRel} を読めない`);

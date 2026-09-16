@@ -2,7 +2,7 @@
  * リスク管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象は共通層の配点（`.ccnavi/common/risks.yml`、`CCNAVI_RISK`）の 1 本だけ。自身の層とプロジェクトの層も
+ * 対象は共通層の配点（`.ccnavi/common/risks.yml`。置き場は固定）の 1 本だけ。自身の層とプロジェクトの層も
  * 配点を持ち、判定は共通層と親の `project:` の層の和で行う（設計 §11.4.2）が、この画面ではそれらを開かない
  * （設計 §11.11）。パネルは 1 つ。
  *
@@ -116,15 +116,8 @@ export async function openRisk(): Promise<void> {
   void refreshLock(current);
 }
 
-/** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。実行ファイルが読む env の重なりと同じ */
-function riskRelOf(root: string): string {
-  for (const name of ["settings.local.json", "settings.json"]) {
-    const settingsText = readText(path.join(root, ".claude", name));
-    const found = settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_RISK");
-    if (found !== "") {
-      return found;
-    }
-  }
+/** 共通層の置き場は `.ccnavi/common/` 固定。env でも上書き設定ファイルでも動かない（i0054） */
+function riskRelOf(_root: string): string {
   return DEFAULT_RISK;
 }
 

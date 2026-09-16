@@ -12,7 +12,7 @@
 
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
-    共通層の 3 本                       CCNAVI_RULES / CCNAVI_PHASES / CCNAVI_RISK
+    共通層の 3 本                       <root>/.ccnavi/common/{rules,phases,risks}.yml
     自身の層の 3 本                     <root>/.ccnavi/config/{rules,phases,risks}.yml
     プロジェクトの層の 3 本             projects/<名前>/.ccnavi/config/{rules,phases,risks}.yml
 
@@ -397,9 +397,14 @@ def common_layer_files(conf: settings.Settings) -> tuple[str, ...]:
 def common_shell_clause(root: str, path: str) -> str:
     """共通層の 1 本を、シェルの書き込みに当てる形に直す。
 
-    既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`CCNAVI_RULES` などは
-    任意の場所を指せる。そこを名前で拾えないと、
-    共通層を動かしたワークスペースでは `echo x > <その場所>` が通る。
+    既定の置き場（`.ccnavi/common/`）は _PLACES が持っているが、`--rules` / `--phases` /
+    `--risk` のフラグは任意の場所を指せる。そこを名前で拾えないと、共通層を動かした
+    ワークスペースでは `echo x > <その場所>` が通る。名指しのツール
+    （`common_layer_regex`）は動かした先を追うので、片方だけ外すと、同じファイルが
+    Write では止まってシェルでは通る形になる。
+
+    i0054 で env（`CCNAVI_RULES` など）は廃止したが、フラグは診断のために残した。
+    置き場が完全には固定されていないので、この節も残す。
 
     ワークスペースルートの下ならその相対、外なら書かれた綴りと行き着く先の両方で当てる。
     綴りの前には名前の途中でないことを求める。`rules.yml` を直下に置いたワークスペースで、
