@@ -275,7 +275,7 @@ class WritesTheExpectedShape(SetupTest):
         そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。
         """
         for args in (("--mode", "enable"), ("--mode", "enable", "--all")):
-            self.run_setup(*args, "--force")
+            self.run_setup(*args)
             env = self.read_settings()["env"]
             for name in ("CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"):
                 with self.subTest(args=args, name=name):
