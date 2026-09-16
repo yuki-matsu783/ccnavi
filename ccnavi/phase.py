@@ -308,6 +308,20 @@ class Phase:
     def gate_closed(self) -> bool:
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
 
+    @property
+    def review_waiting(self) -> bool:
+        """依頼を出したのにゲートが閉じたまま。人のレビュー待ち。
+
+        ボードはこれを写すだけで、ゲートとマーカーから組み直さない。依頼していない
+        フェーズは閉じていても待ちではなく、先に親が request を打つ。
+
+        これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは依頼を出さない
+        ので常に False。ボードの「受け入れ」（未解決スレッドを受け入れて進む）がこの欄に
+        繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
+        このセッションで見る待ちは `review_kind` と `gate_closed` で読む（設計 §9.8）。
+        """
+        return self.gate_closed and approval.MARK_REQUESTED in self.marks
+
 
 def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。

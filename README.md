@@ -2298,7 +2298,7 @@ ccnavi --explain --json
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `wrapup` / `ready` / `closed_record` | 親のマーカー `wrapup.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
-| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` は人がどこで見るか（`none` / `chat` / `mr`）。`gate_closed` は判定が使うのと同じ値 |
+| `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` は人がどこで見るか（`none` / `chat` / `mr`）。`gate_closed` は判定が使うのと同じ値。`review_waiting` は依頼を出したのにゲートが閉じたまま（人のレビュー待ち）で、ボードはこれを写すだけで組み直さない。これはマージリクエストの話で、`chat` のフェーズは依頼を出さないので常に `false`。このセッションで見る待ちは `review_kind` と `gate_closed` で読む |
 
 ## 承認の JSON
 

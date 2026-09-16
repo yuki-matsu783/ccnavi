@@ -936,6 +936,7 @@ def _phase_record(ph: phase.Phase) -> dict:
         "review_required": ph.review_required,
         "review_kind": ph.review_kind,
         "gate_closed": ph.gate_closed,
+        "review_waiting": ph.review_waiting,
         "deferred": ph.deferred,
         "review_at": ph.review_at,
         "covers": list(ph.covers),
