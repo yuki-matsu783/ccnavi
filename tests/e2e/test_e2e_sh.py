@@ -200,7 +200,7 @@ class WorkspaceTest(unittest.TestCase):
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(hooks, name))
         shutil.copytree(DIST, os.path.join(ws, "dist", "ccnavi"))
-        os.makedirs(os.path.join(ws, ".ccnavi", "tickets"), exist_ok=True)
+        os.makedirs(os.path.join(ws, ".ccnavi", "approved", "doing"), exist_ok=True)
         write(os.path.join(ws, ".gitignore"), "/logs/\n/projects/\n/dist/\n/.claude/worktrees/\n")
         git(ws, "add", ".gitignore", ".ccnavi/scripts", ".claude/hooks")
         git(ws, "commit", "-q", "-m", "tools")
@@ -326,7 +326,7 @@ class PushGuardTest(WorkspaceTest):
     """子チケットのワークツリーからは送らない（設計 4.1）。"""
 
     def test_a_child_worktree_cut_from_a_project_cannot_push(self):
-        ticket = os.path.join(self.ws, ".ccnavi", "tickets", "wp1.md")
+        ticket = os.path.join(self.ws, ".ccnavi", "approved", "doing", "wp1.md")
         write(ticket, "---\nversion: 1\nticket: wp1\nparent: oya\n---\n本文\n")
         self.addCleanup(lambda: os.path.exists(ticket) and os.remove(ticket))
         bare = os.path.join(self.tmp, "origin.git")

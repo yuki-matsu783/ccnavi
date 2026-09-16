@@ -16,9 +16,11 @@
 #            → `ccnavi review requested` がマーカーを置く
 #            人はレビューを MR で行うので、入れ物が無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
-#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置く
-#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せてマーカーを置く
-#            → 受け入れた一覧をここがコメントに写す
+#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置き、
+#            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす
+#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、受け入れて
+#            進むか、続きの子チケットを .ccnavi/approved/doing/ に起こすかを選ばせる
+#            → 受け入れた一覧（か、起こした子）をここがコメントに写す
 #
 # リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
@@ -36,7 +38,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <
   request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿してマーカーを置く
   check    --phase <N>                         依頼より後の未解決スレッドが無ければマーカーを置く
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
-  accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
+  accept   <N>                                 未解決の扱いを選ぶ。受け入れて進むか、続きの子チケットを起こす（人が端末で打つ）
   handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
   ready                                        閉じられて wip を片付け push 済みなら Draft を外す（マージに進んでよいの合図。マージは人が squash で）
   wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す

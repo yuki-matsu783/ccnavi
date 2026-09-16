@@ -294,7 +294,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。人にも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない）。「ルールが言及していない呼び出し」。この門に `dry-run` は無く、それ以外の値は `enable` として動いて `--lint` が言う |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh` と書く。これは振り分けの sh で、実行ファイルは sh の 1 つ上の `bin/<os>-<arch>/`、つまり `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
 | `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/proposals`。そのツリーの git が追跡する。既定は以前 `wip/tickets` だった（承認済みチケットの置き場と名前が同じで読み分けられなかったため）。旧の置き場だけが残っているツリーは提案が走査されないので、`--lint` が warn で名指しする。ディレクトリを改名するか、この env に `wip/tickets` と書けば実行ファイルは元のまま動く。ただし VS Code 拡張が提案の変化を見る場所は既定の綴りで固定してあり、この env を読まない。旧の綴りのままにすると、ボードは開いた時点の中身は正しく出すが、以後の提案の増減で自動更新されず、手で「更新」を押すことになる |
-| `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/tickets`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
+| `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/approved`（ccnavi ディレクトリの下。以前の `.ccnavi/tickets` に残ったものは `--lint` が名指しする）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
 | `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する |
@@ -1376,28 +1376,43 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 
 ### 置き場と状態
 
-提案は `wip/proposals/<状態>/<識別子>.md`（`CCNAVI_TICKETS_PROPOSAL`）。状態は置き場が表す。
+チケットは 1 本のファイルで、2 つの置き場を行き来する（ADR-0055）。提案の置き場は
+`wip/proposals/<状態>/<識別子>.md`（`CCNAVI_TICKETS_PROPOSAL`）、承認済みチケットの置き場は
+`.ccnavi/approved/<状態>/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`）。状態は置き場が表す。
+
+```
+  wip/proposals/todo ──人が承認──→ .ccnavi/approved/doing
+                                          │
+                              エージェントが done（レビュー要）
+                                          ▼
+  wip/proposals/review ──人がレビュー──→ .ccnavi/approved/done
+                                          ▲
+                              エージェントが done（レビュー不要）／cancel
+```
 
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
-| `todo/` | 未着手 | 親が書く。作成と編集は自由 |
-| `doing/` | 作業中 | `sh .ccnavi/scripts/ccnavi-ticket.sh start <識別子>` |
-| `done/` | 完了 | `sh .ccnavi/scripts/ccnavi-ticket.sh done <識別子>` |
-| `cancelled/` | 取り消し | `sh .ccnavi/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>` |
+| `wip/proposals/todo/` | 承認待ち | 親が書く。作成と編集は自由 |
+| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi --approve`（人）、ボード。続きの子を人が起こすときも直にここ |
+| `wip/proposals/review/` | 作業が終わり、人のレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh done <識別子>`（フェーズがレビュー要のとき） |
+| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh check` / `accept`、`ccnavi --reviewed`、`wrapup`（人）。レビュー不要の `done` と `cancel --reason` |
 
-`doing/` `done/` `cancelled/` への直接の作成・移動は、Write でもシェルでも、誰がやっても止まる
-（`builtin-ticket-state`）。動かせるのはスクリプトだけで、スクリプトはサブエージェントには
+`.ccnavi/approved/` へ動かすのは人、`wip/proposals/` へ動かすのはエージェント。場所が「次に
+動くのは誰か」を言う。`review/` への直接の作成・移動は、Write でもシェルでも、誰がやっても止まる
+（`builtin-ticket-state`）。`.ccnavi/approved/` は ccnavi ディレクトリの守りが止める。
+動かせるのはスクリプトだけで、スクリプトはサブエージェントには
 打てない（`DENY_SUBAGENT_TICKET_OP`）。同じ理由で push もサブエージェントには打てず、
 子チケットのワークツリーからは git のラッパースクリプトが拒む。合流と push と閉じるのは親の仕事。
 
-`start` は着手の時刻と基準点（そのワークツリーの HEAD）を書く。`done` は完了の時刻を書き、
-承認済みチケットは次の hook が `closed/` へ動かす。ワークツリーの削除は親のマージ手順に任せる。
+`start` は置き場を動かさず、`doing/` の承認済みチケットに着手の時刻と基準点（そのワークツリーの
+HEAD）を書く。`done` は完了の時刻を書き、その子を閉じたときのフェーズがレビュー要（延期を含む）なら
+`review/` へ、不要なら `done/` へ動かす。`cancel` は `doing/` から `done/` へ動かし、取り消しの
+時刻と理由を書く（未承認の提案は消せばよい）。ワークツリーの削除は親のマージ手順に任せる。
 順序は「子の成果をマージ → done → ワークツリーを消す」。
 
-状態を持つ場所は、この置き場のほかに承認済みチケット（無し / 開 / 閉）とフェーズのマーカー
-（`pending` `skipped` `requested` `reviewed`）の 2 つがあり、動かす者と条件が層ごとに違う。
-3 層の遷移と、再開のように人の手でしか動かない向きは [ccnavi.md](ccnavi.md) の §9.6 にまとめてある。
-再開するときは提案を `done/` から出し、承認済みチケットを `closed/` から戻す。承認済みチケットだけ戻しても次の hook がまた閉じる。
+状態を持つ場所は、この置き場のほかにフェーズのマーカー（`pending` `skipped` `requested`
+`reviewed`）があり、動かす者と条件が違う。遷移と、再開のように人の手でしか動かない向きは
+[ccnavi.md](ccnavi.md) の §9.6 にまとめてある。再開するときは人が `done/` から `doing/` へ戻す。
 
 ### 書式
 
@@ -1446,8 +1461,9 @@ base_sha: ""
 
 ### 効くのは承認したものだけ
 
-判定が読むのは `.ccnavi/tickets/` の承認済みチケットであって、`wip/proposals/` の提案ではない。
-どちらも親チケットのツリーに置かれ、そのツリーの git が追跡する。
+判定が読むのは `.ccnavi/approved/doing/` の承認済みチケットであって、`wip/proposals/todo/` の
+提案ではない。承認は提案をそこへ動かす。どちらも親チケットのツリーに置かれ、そのツリーの git が追跡する。
+承認のあとに同じ識別子の提案を `todo/` に書いても、範囲は効かない（親の計画の改版だけが承認の対象に入る）。
 
 ```sh
 ccnavi --approve
@@ -1481,7 +1497,7 @@ Enter まで送る（y/N は無い）。A が承認して B の機械で作業�
 という流れはこの push で成り立つ。承認しても push しなければ、B の機械では
 「承認されなかったこと」になる。
 
-- 置き場は `CCNAVI_TICKETS_APPROVED`（既定 `.ccnavi/tickets`）を読む。ワークスペース、
+- 置き場は `CCNAVI_TICKETS_APPROVED`（既定 `.ccnavi/approved`）を読む。ワークスペース、
   `projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場だけをパスで限って
   コミットし、そのブランチへ push する
 - シンボリックリンクは辿らない。`projects` と `.claude/worktrees` そのものか、その下の 1 件が
@@ -1569,8 +1585,8 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 `limit: parent i0001: src/*, tests/*` の形で 1 行載る。`phases.yml` があるのにその番号の種類を
 引けないときは、親でだけ切り詰め、種類で切り詰めていないことを notice で言う。
 
-提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/tickets/`）の下は、範囲の外として扱わない。
-次の提案を書く道を塞がないため。状態の置き場（`doing/` など）と承認済みチケットは組み込みの deny が止める。
+提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）の下は、範囲の外として扱わない。
+次の提案を書く道を塞がないため。状態の置き場（`review/`）と承認済みチケットは組み込みの deny が止める。
 
 下書きの置き場（ワークツリーのルートの直下の `scratchpad/`）も、**実行前の判定だけは**範囲の外として扱わない。塞ぐと、
 範囲を宣言したワークツリーほど手元に何も置けなくなり、承認が要る作業だけが下書きの場所を失う。外すのは
@@ -1601,8 +1617,8 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 フェーズの終わりは、人の手が入るところ（HITL ポイント。Human In The Loop）の 1 つ。
 人の手は範囲の承認・レビュー・未解決の受け入れの 3 か所に寄せてある。
 
-同じ親の同じ `phase` の子が全部 `done/` か `cancelled/` に動き、見つからない子も無く、
-`done/` に 1 枚以上あれば、そのフェーズは終わり。`cancelled/` だけのフェーズは終わらない。
+同じ親の同じ `phase` の子が `doing/` に 1 枚も無く、`review/`（レビュー待ち）か `done/` に
+1 枚以上あれば、そのフェーズは終わり。取り消しだけのフェーズは終わらない。
 
 終わったときに何が起きるかは、**そのフェーズを人がどこで見るか**で分かれる。場所は 3 つ
 （`none` / `chat` / `mr`）で、次の厳しい側が勝つ（`none` < `chat` < `mr`）。
@@ -1611,7 +1627,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 - 親の計画の項の `mr`（種類が `none` でも `mr` にする）
 - 延期した番号の分を引き受けているなら、その分の宣言
 
-`done/` の子の `human_review.required: true` と、実績のリスクが HIGH 以上（「実績のリスク」）は、
+閉じた子の `human_review.required: true` と、実績のリスクが HIGH 以上（「実績のリスク」）は、
 **要るとだけ言って場所は言わない**。宣言が `none` のフェーズを `chat` に上げるだけで、
 宣言された `mr` が `chat` に落ちることはない。
 
@@ -1620,6 +1636,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 | 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えて利用者を待て | 合流して利用者に差分を見てもらい、ターンを終えて待て | レビューを省略して次のフェーズへ進める |
 | HITL ポイント | 来る。レビュー済みのマーカーまで止まる | 来る。レビュー済みのマーカーまで止まる | 来ない。省略のマーカーを残す |
 | 先へ進める者 | `ccnavi-review.sh check` / `accept` | 人が端末で `ccnavi --reviewed <N> --chat` | — |
+| `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | 同じ | `done` の時点で `done/` へ |
 
 `chat` はこのセッションで人が差分を見る進め方。ホストへ出ないので、マージリクエストも
 `GITHUB_TOKEN` / `GITLAB_TOKEN` も要らず、`.ccnavi/scripts/` の sh は動かない。先へ進める
@@ -1732,7 +1749,7 @@ sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 
 依頼の後に親の HEAD が動いたら、レビュー済みになる前なら `request` を打ち直せる。依頼文を
 投稿し直し、マーカーの HEAD を今のものに書き換える。HEAD が依頼時のままなら「依頼済み」で止まる。
-**動いたと数えるのは、ccnavi 自身の置き場（`.ccnavi/tickets/`）の外が変わったときだけ。** マーカーは
+**動いたと数えるのは、ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）の外が変わったときだけ。** マーカーは
 そこに置かれ、親のブランチにコミットして運ぶものなので、数えると依頼の直後に必ず HEAD が 1 つ進んで
 自分の足を踏む。人がレビューで見るものは変わらない。未コミットの側も同じ理由で前提から外してある。
 依頼の前提の「push 済み」も同じ基準で、置き場だけが手元に残っている形では止まらない
@@ -1746,15 +1763,25 @@ sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 から写し、下書き（Draft）で作る。題から Draft を外してマージするのは人の手に残る。
 
 `check` は今そこに残っている未解決スレッドを数える。無く、変更要求のレビューも無ければ
-レビュー済みのマーカーを置き、止まっていたのが解ける。未解決が残るなら一覧を返す。
+レビュー済みのマーカーを置き、そのフェーズ（延期を引き受けた分を含む）の `review/` の子を
+`.ccnavi/approved/done/` へ動かし、止まっていたのが解ける。未解決が残るなら一覧を返す。
 
-未解決を残したまま進める判断は人が端末で打つ。受け入れたスレッドは
-`phases/<親>/accepted.json` に控える。マーカーとは別の場所に置くのは、マーカーが上書きも一括の消去も
-されるため。人が 1 度言った「これは承知で進める」は、取り消されるまで残す。
+未解決の扱いは人が端末で選ぶ（`accept <N>`）。選べるのは 2 つ。
+
+- **`a` 受け入れて進む。** 受け入れたスレッドは `phases/<親>/accepted.json` に控え、レビュー済みの
+  マーカーを置き、`review/` の子を `done/` へ動かす。マーカーとは別の場所に控えるのは、マーカーが
+  上書きも一括の消去もされるため。人が 1 度言った「これは承知で進める」は、取り消されるまで残す
+- **`f` 続きの子チケットを起こす。** 見た子を `done/` へ動かし、同じフェーズの番号で
+  `.ccnavi/approved/doing/<親>-<次の連番>.md` を直に置く。範囲は見た子の範囲の和、本文に
+  指摘を写す。人が選んだことが承認なので、提案と承認の往復は要らない。フェーズは開き直り、
+  マーカーは消える（子を足して承認したときと同じ）。指摘は受け入れない（次の `check` がまた数える）
 
 ```sh
 ccnavi --reviewed 2 --accept-unresolved --cwd .claude/worktrees/i0050
 ```
+
+このセッションで見るフェーズ（`--reviewed <N> --chat`）も、レビュー済みにしたあとに指摘を 1 行ずつ
+打てば、同じ形で続きの子を起こす（何も打たなければ起こさない）。
 
 変更要求（changes requested）のレビューが立っている間は、この道でも通らない。
 解くのはレビュアーの approve / dismiss だけ。
@@ -1767,8 +1794,8 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 | sh の動き | 実行ファイルの段 |
 |---|---|
 | `request` | `review prepare`（前提を確かめ、マーカー付きの本文を控えの置き場に書き出す）→ sh が投稿 → `review requested`（マーカーを置く） |
-| `check` | sh がスレッドとレビューを取ってくる → `review check`（判定してマーカーを置く） |
-| `accept N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せてマーカーを置く）→ 受け入れた一覧を sh がコメントに写す |
+| `check` | sh がスレッドとレビューを取ってくる → `review check`（判定してマーカーを置き、`review/` の子を `done/` へ動かす） |
+| `accept N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せ、受け入れて進むか続きの子を起こすかを選ばせる）→ 受け入れた一覧か起こした子を sh がコメントに写す |
 | （`chat` のフェーズ） | sh は動かない。人が端末で `ccnavi --reviewed <N> --chat --cwd <親のワークツリー>` を打つ。依頼も写しも無い |
 | `note` | sh が投稿する。実行ファイルは関わらない |
 | `handoff --body-file <題と本文>` | 残った指摘を別の issue に切り出す。`review handoff`（局面を確かめ、残ったスレッドの URL を添えた下書きを書く）→ sh が issue を作り、マージリクエストに引き継ぎの note を残す |
@@ -1983,7 +2010,7 @@ jq -r 'select(.unwrapped) | .rules[]' logs/log.jsonl | sort | uniq -c
 jq -r 'select(.decision == "deny") | .source' logs/log.jsonl | sort | uniq -c
 ```
 
-チケットの子ごとの記録（`.ccnavi/tickets/phases/<親>/<子>.risk.json` と `.judge.json`）にも、
+チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも、
 加点した項目・判定した項目ごとに `source` が入る。フェーズのマーカーのうち種類を根拠に置くもの
 （依頼済み・省略など）には、その種類の層が入る。
 
@@ -2212,7 +2239,7 @@ error 2 件、warn 2 件、info 0 件
 | error | 親が計画を持つのに `phases.yml` が読めない、`phases.yml` / `risks.yml` 自身の誤り |
 | error | 承認済みチケットが読めない |
 | warn | 未承認の提案がある |
-| warn | `predecessors` が閉じていないのに `doing/` にある子 |
+| warn | `predecessors` が閉じていないのに着手している子 |
 | warn | チケットの無いワークツリー、識別子と名前の一致しないワークツリー |
 | warn | ワークツリー側に置かれた承認済みチケット（読まれない） |
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が効かない） |
@@ -2319,8 +2346,8 @@ ccnavi --explain --json
 | 鍵 | 何 |
 |---|---|
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
-| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー）で見つけた提案。無ければ `null` |
-| `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open` / `closed` |
+| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null` |
+| `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`） |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物のワークツリーか（設計 §9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、親の提案が写っているのが普通 |

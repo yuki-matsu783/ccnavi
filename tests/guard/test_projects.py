@@ -43,7 +43,7 @@ WS_RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.ccnavi/tickets/*",
+            "glob": "*/.ccnavi/approved/*",
             "message": "guard settings. ask the user.",
         },
     ],
@@ -168,16 +168,16 @@ class ProjectsTest(unittest.TestCase):
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
         self.lib = self.project("lib", LIB_RULES)
-        # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
+        # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる
         # （設計 §9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに落ちる。
-        self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
+        self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "log.jsonl")
 
     def approved_path(self, *parts):
         """承認済みチケットの置き場の下のパス。どのツリーに落ちたかを探す。"""
         for where in (self.ws, self.lib, self.app):
-            path = os.path.join(where, ".ccnavi", "tickets", *parts)
+            path = os.path.join(where, ".ccnavi", "approved", *parts)
             if os.path.exists(path):
                 return path
         return os.path.join(self.approved, *parts)
@@ -212,7 +212,7 @@ class ProjectsTest(unittest.TestCase):
                 "--projects",
                 self.projects if projects is None else projects,
                 "--approved",
-                ".ccnavi/tickets",
+                ".ccnavi/approved",
                 "--state",
                 self.state,
                 "--log",
@@ -332,7 +332,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("built-in defaults", self.reason(passed))
 
         # 共通層の deny は壊れた層の上でも効いたまま。
-        guarded = os.path.join(self.app, ".ccnavi", "tickets", "x")
+        guarded = os.path.join(self.app, ".ccnavi", "approved", "x")
         denied = self.hook("Write", self.ws, file_path=guarded)
         self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
         self.assertIn("guard-approved", self.reason(denied))
@@ -408,7 +408,7 @@ class ProjectsTest(unittest.TestCase):
         # 継ぐ段は無いが、承認済みチケットには残る
         # （親の承認済みチケットを引けないとき judge が子の承認済みチケットを見る）
         for name in ("i0007", "i0007-01"):
-            with open(self.approved_path(name + ".md"), encoding="utf-8") as f:
+            with open(self.approved_path("doing", name + ".md"), encoding="utf-8") as f:
                 self.assertIn("project: lib", f.read())
 
     def test_a_declaration_that_disagrees_with_the_place_is_not_approved(self):
@@ -420,7 +420,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("置き場（ワークスペース）と違う", result.stderr)
         self.assertIn("wip/proposals/ に置く", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007.md")))
 
     def test_a_child_placed_apart_from_its_parent_is_not_approved(self):
         write(
@@ -436,8 +436,8 @@ class ProjectsTest(unittest.TestCase):
         # 1 で終わる（REQ-MLT-31）。
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("子は親と同じ置き場に置く", result.stderr)
-        self.assertTrue(os.path.exists(self.approved_path("i0007.md")))
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "i0007-01.md")))
+        self.assertTrue(os.path.exists(self.approved_path("doing", "i0007.md")))
+        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0007-01.md")))
 
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、
@@ -454,14 +454,13 @@ class ProjectsTest(unittest.TestCase):
         self.assertNotIn("の中に提案がある", approved.stderr)
         self.assertIn("■ プロジェクト: lib", approved.stdout)
 
-        os.makedirs(os.path.join(tree, "wip", "proposals", "done"))
-        os.replace(
-            os.path.join(tree, "wip", "proposals", "todo", "i0010.md"),
-            os.path.join(tree, "wip", "proposals", "done", "i0010.md"),
-        )
-        after = self.hook("Bash", self.ws, event="PostToolUse", command="true")
-        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
-        closed = os.path.join(tree, ".ccnavi", "tickets", "closed", "i0010.md")
+        # 承認で todo/ から動き、着手と完了はそのツリーの置き場の中で動く。
+        self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
+        started = self.ccnavi("ticket", "start", "i0010")
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        done = self.ccnavi("ticket", "done", "i0010")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        closed = os.path.join(tree, ".ccnavi", "approved", "done", "i0010.md")
         self.assertTrue(os.path.exists(closed), closed)
 
     def test_lint_names_a_ticket_place_that_is_not_scanned(self):
@@ -494,22 +493,22 @@ class ProjectsTest(unittest.TestCase):
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
         self.assertEqual(board["tickets"], [])
 
-    def test_the_copys_proposal_is_found_through_the_recorded_path(self):
+    def test_a_project_ticket_moves_inside_its_own_tree(self):
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
             ticket_text("i0007", allow=("src/*",)),
         )
         self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
-        # 提案を done/ へ動かすと、承認済みチケットが閉じる。置き場を project から組み直すのではなく
-        # 承認のときに記録した道から引くので、どの置き場でも見つかる
-        os.makedirs(os.path.join(self.lib, "wip", "proposals", "done"))
-        os.replace(
-            os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
-            os.path.join(self.lib, "wip", "proposals", "done", "i0007.md"),
+        # 承認はプロジェクトの todo/ からプロジェクトの doing/ へ動かす。取り消すと done/ へ。
+        # 置き場はプロジェクトの git が持つ（設計 §11.5）。
+        lib_approved = os.path.join(self.lib, ".ccnavi", "approved")
+        self.assertFalse(
+            os.path.exists(os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"))
         )
-        after = self.hook("Bash", self.ws, event="PostToolUse", command="true")
-        self.assertEqual(after.returncode, 0, after.stdout + after.stderr)
-        self.assertTrue(os.path.exists(self.approved_path("closed", "i0007.md")))
+        self.assertTrue(os.path.exists(os.path.join(lib_approved, "doing", "i0007.md")))
+        cancelled = self.ccnavi("ticket", "cancel", "i0007", "--reason", "やめる")
+        self.assertEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
+        self.assertTrue(os.path.exists(os.path.join(lib_approved, "done", "i0007.md")))
 
     # ---- 5. 実行後の監視はツリーごと
 
