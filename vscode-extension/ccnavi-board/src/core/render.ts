@@ -20,7 +20,12 @@ export type ApprovalOverlay =
    * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
    * `carried` は承認済みチケットを運ぶ sh を端末に送ったか。送ったときだけ、そう言う
    */
-  | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean };
+  | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }
+  /**
+   * 承認以外で Claude Code に渡す文（レビュー済みの連絡）。承認したときと同じ 2 ボタンで渡す。
+   * 判定は動かしていないので、置かれたものは何も無い
+   */
+  | { readonly kind: "prompt"; readonly title: string; readonly note: string; readonly prompt: string };
 
 export interface RenderOptions {
   readonly nonce: string;
@@ -59,7 +64,8 @@ ${bodyTag(options.appearance)}
 ${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount} 件</span>\n` : ""}${board.issueCount > 0 ? `    <span class="issues warn">不備 ${board.issueCount} 件</span>\n` : ""}    <span class="counts">残り ${board.remainingCount} / 全 ${board.totalCount}</span>
   </div>
   <div class="controls">
-${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <button type="button" class="action" data-action="refresh">更新</button>
+${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
+    <button type="button" class="action" data-action="refresh">更新</button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
@@ -95,6 +101,11 @@ export function renderApproval(overlay: ApprovalOverlay | undefined): string {
       case "done":
         return `<h2 id="approval-title">${overlay.count} 件を承認した</h2>
 ${overlay.carried === true ? `<p class="approval-note">承認済みチケットのコミットと push を端末に送った。</p>\n` : ""}<p class="approval-note">Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く。送るときは自分で Enter を押す。</p>
+<pre class="approval-text">${escapeHtml(overlay.prompt)}</pre>
+<div class="approval-actions"><button type="button" class="action primary" data-action="prompt-copy">コピー</button><button type="button" class="action" data-action="prompt-open">新しいセッションで開く</button><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
+      case "prompt":
+        return `<h2 id="approval-title">${escapeHtml(overlay.title)}</h2>
+<p class="approval-note">${escapeHtml(overlay.note)}</p>
 <pre class="approval-text">${escapeHtml(overlay.prompt)}</pre>
 <div class="approval-actions"><button type="button" class="action primary" data-action="prompt-copy">コピー</button><button type="button" class="action" data-action="prompt-open">新しいセッションで開く</button><button type="button" class="action" data-action="approve-cancel">閉じる</button></div>`;
     }
@@ -217,7 +228,7 @@ function renderCard(card: Card): string {
   const actions = renderActions(card.actions, card.id);
   const stage = card.stage ? `\n        <div class="stage">${escapeHtml(card.stage)}</div>` : "";
   const where = card.isParent ? "親" : `子 · 親 ${card.parent} / フェーズ ${card.phase ?? "?"}`;
-  return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" data-family="${escapeHtml(card.family)}" tabindex="0">
+  return `      <li class="${classes.join(" ")}" data-id="${escapeHtml(card.id)}" data-path="${escapeHtml(card.openPath)}" data-project="${escapeHtml(card.project)}" data-family="${escapeHtml(card.family)}" data-attention="${card.attention ? "1" : "0"}" tabindex="0">
         <div class="card-head"><span class="num">${escapeHtml(card.id)}</span><span class="title">${escapeHtml(card.title)}</span><span class="where">${escapeHtml(where)}</span></div>${stage}${badges}${facts}${phases}${issues}${actions}
       </li>`;
 }
@@ -276,6 +287,9 @@ function renderFacts(card: Card): string {
       facts.push(fact(`mark mark-${mark}`, MARK_LABELS[mark] ?? mark));
     }
   }
+  if (card.mrUrl !== "") {
+    facts.push(mrLink(card.mrUrl, card.mrNumber, "マージリクエストを開く"));
+  }
   if (card.ready) {
     facts.push(fact("ready", "Draft 解除済"));
   }
@@ -302,6 +316,18 @@ function riskText(card: Card): string {
 function worktreeName(path: string): string {
   const name = path.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
   return name === "" ? "あり" : name;
+}
+
+/**
+ * マージリクエストへのリンク。中身は依頼のマーカーが持つ URL で、http(s) 以外は開かせない
+ * （`javascript:` などが混じっても文字として出すだけ）。Webview の外部リンクは VS Code が既定のブラウザで開く。
+ */
+function mrLink(url: string, number: number | null, title: string): string {
+  const text = number === null ? "MR" : `MR #${number}`;
+  if (!/^https?:\/\//i.test(url)) {
+    return fact("mr", text, url);
+  }
+  return `<a class="fact mr mr-link" href="${escapeHtml(url)}" title="${escapeHtml(title)}">${escapeHtml(text)}</a>`;
 }
 
 function badge(kind: string, text: string, title = ""): string {
@@ -332,7 +358,9 @@ function renderPhases(phases: readonly PhaseChip[]): string {
       const brief = phaseStatusBrief(p);
       const tickets = p.tickets.length > 0 ? `<span class="phase-tickets">${escapeHtml(p.tickets.join(", "))}</span>` : "";
       const actions = p.actions.map((a) => renderActionButton(a, `${p.parent}:${p.number}`)).join("");
-      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}" title="${escapeHtml(full)}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status"><span class="phase-brief" aria-hidden="true">${escapeHtml(brief)}</span><span class="phase-full">${escapeHtml(full)}</span>${actions}</span></li>`;
+      // 依頼の投稿へのリンク。依頼のマーカーがある段階だけ（レビューが済んだ後も経緯として残す）
+      const mr = p.mrUrl !== "" ? mrLink(p.mrUrl, p.mrNumber, `フェーズ ${p.label} のレビューの依頼を開く`) : "";
+      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}" title="${escapeHtml(full)}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status"><span class="phase-brief" aria-hidden="true">${escapeHtml(brief)}</span><span class="phase-full">${escapeHtml(full)}</span>${mr}${actions}</span></li>`;
     })
     .join("\n");
   return `\n        <ul class="phases">\n${rows}\n        </ul>`;
@@ -397,6 +425,10 @@ function renderActionButton(action: Action, id: string): string {
       return `<button type="button" class="action" data-action="approve-one" data-ticket="${escapeHtml(id)}" title="このチケットだけを承認する（ccnavi --approve ${escapeHtml(id)}）。まとめて承認するなら上部のボタン">この 1 件を承認</button>`;
     case "accept":
       return `<button type="button" class="action" data-action="accept" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）">受け入れ</button>`;
+    case "reviewed":
+      // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、コピー / 新しいセッションで開く で渡す。
+      // check を打ってマーカーを置くのは、その文を受けたエージェント
+      return `<button type="button" class="action" data-action="reviewed" data-parent="${escapeHtml(action.parent)}" data-phase="${action.phase}" title="レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh check --phase ${action.phase} を打つ）">レビュー済み連絡</button>`;
   }
 }
 
@@ -563,6 +595,11 @@ const STYLE = `${PAGE_STYLE}
   .toolbar { padding-bottom: 12px; }
   .summary .counts { color: var(--vscode-descriptionForeground); }
   .filter { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
+  .filter.attention { gap: 4px; cursor: pointer; }
+  .filter.attention input { margin: 0; cursor: pointer; }
+  a.mr-link { color: var(--vscode-textLink-foreground); text-decoration: none; }
+  a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: var(--vscode-textLink-activeForeground); }
+  .phase-status a.mr-link { margin-left: 6px; }
   .board-empty { padding: 4px; color: var(--vscode-descriptionForeground); }
   /* 列は空きに合わせて伸び縮みする。1 列 220px を割るところまで狭まったら横スクロールに逃がす。
      右端の取っ手をドラッグした列は幅が px で固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
@@ -704,17 +741,19 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   function visiblePending() {
     return [...document.querySelectorAll(".card.pending:not(.hidden)")].map((card) => card.getAttribute("data-id") || "");
   }
-  function open(card) {
+  // 名前は window.open と被らないようにする（最上位の function は window に付き、リンクの遷移が呼ぶ window.open を潰す）
+  function openCard(card) {
     const filePath = card.getAttribute("data-path");
     if (filePath) { vscode.postMessage({ type: "open", filePath: filePath }); }
   }
+  // ボタンとリンク（マージリクエスト）の上では提案を開かない
   for (const card of document.querySelectorAll(".card")) {
     card.addEventListener("click", (event) => {
-      if (event.target.closest("button")) { return; }
-      open(card);
+      if (event.target.closest("button, a")) { return; }
+      openCard(card);
     });
     card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.target.closest("button")) { event.preventDefault(); open(card); }
+      if (event.key === "Enter" && !event.target.closest("button, a")) { event.preventDefault(); openCard(card); }
     });
   }
   for (const button of document.querySelectorAll("button[data-action]")) {
@@ -733,6 +772,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       else if (action === "approve-cancel") { vscode.postMessage({ type: "approveCancel" }); }
       else if (action === "accept") {
         vscode.postMessage({ type: "accept", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) });
+      }
+      else if (action === "reviewed") {
+        vscode.postMessage({ type: "reviewed", parent: button.getAttribute("data-parent"), phase: Number(button.getAttribute("data-phase")) });
       }
     });
   }
@@ -754,10 +796,11 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
   const state = {
     project: typeof saved.project === "string" ? saved.project : "*",
     parent: typeof saved.parent === "string" ? saved.parent : "*",
+    attention: saved.attention === true,
     folded: Array.isArray(saved.folded) ? saved.folded.filter((f) => typeof f === "string") : [],
     widths: Object.fromEntries(Object.entries(savedWidths).filter(([, w]) => typeof w === "number" && w > 0)),
   };
-  function save() { vscode.setState({ project: state.project, parent: state.parent, folded: state.folded, widths: state.widths }); }
+  function save() { vscode.setState({ project: state.project, parent: state.parent, attention: state.attention, folded: state.folded, widths: state.widths }); }
 
   function setFolded(column, folded) {
     column.classList.toggle("folded", folded);
@@ -818,20 +861,23 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     });
   }
 
-  // 絞り込みはプロジェクトと親の両方を満たすカードだけを出す。覚えていた値が候補に無ければ
-  //（その親が消えた等）「すべて」のまま。
+  // 絞り込みはプロジェクトと親と「要対応だけ」の全部を満たすカードだけを出す。覚えていた値が候補に無ければ
+  //（その親が消えた等）「すべて」のまま。要対応かどうかは組み立て（board.ts）が data-attention に書き、ここでは読むだけ。
   const filter = document.getElementById("project-filter");
   const parentFilter = document.getElementById("parent-filter");
+  const attentionFilter = document.getElementById("attention-filter");
   function applyFilter() {
     const project = filter ? filter.value : "*";
     const parent = parentFilter ? parentFilter.value : "*";
+    const attention = attentionFilter ? attentionFilter.checked : false;
     for (const card of document.querySelectorAll(".card")) {
       const ownProject = card.getAttribute("data-project") || "";
       const ownFamily = card.getAttribute("data-family") || "";
-      const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent);
+      const hidden = (project !== "*" && ownProject !== project) || (parent !== "*" && ownFamily !== parent)
+        || (attention && card.getAttribute("data-attention") !== "1");
       card.classList.toggle("hidden", hidden);
     }
-    document.body.classList.toggle("filtering", project !== "*" || parent !== "*");
+    document.body.classList.toggle("filtering", project !== "*" || parent !== "*" || attention);
     // 列の件数は絞り込み後に見えているカードの数にする。上部の集計（残り・全・不備・承認待ち）は
     // 絞り込みに関係なくボード全体の数のまま。
     for (const column of document.querySelectorAll(".column")) {
@@ -847,6 +893,7 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     }
     state.project = project;
     state.parent = parent;
+    state.attention = attention;
     save();
   }
   function select(element, value) {
@@ -854,9 +901,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     if ([...element.options].some((o) => o.value === value)) { element.value = value; applyFilter(); }
   }
   function selectProject(value) { select(filter, value); }
-  for (const element of [filter, parentFilter]) {
+  for (const element of [filter, parentFilter, attentionFilter]) {
     if (element) { element.addEventListener("change", applyFilter); }
   }
+  if (attentionFilter) { attentionFilter.checked = state.attention; }
   selectProject(state.project);
   select(parentFilter, state.parent);
   applyFilter();

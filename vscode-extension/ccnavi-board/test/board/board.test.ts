@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildBoard, isKnownPath, parentTreeOf, type Card } from "../../src/core/board.js";
+import { buildBoard, isKnownPath, parentCardOf, parentTreeOf, phaseChipOf, type Card } from "../../src/core/board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 
@@ -104,7 +104,11 @@ test("CB-T09 依頼済みでゲートが閉じたフェーズに accept、締め
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
   assert.deepEqual(card.phases[0].actions, []);
-  assert.deepEqual(card.phases[1].actions, [{ kind: "accept", parent: "i0001", phase: 2 }]);
+  // 受け入れと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
+  assert.deepEqual(card.phases[1].actions, [
+    { kind: "accept", parent: "i0001", phase: 2 },
+    { kind: "reviewed", parent: "i0001", phase: 2 },
+  ]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
   // 人のレビュー待ちは JSON の review_waiting の写し。依頼していないフェーズ 1 は閉じていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
@@ -231,4 +235,99 @@ test("CB-T117 散在は実行ファイルの答えをそのまま載せ、写り
   );
   // 写り自体は残す。開いたファイルからカードを引き当てるのに使う。
   assert.equal(card.seenIn.length, 2);
+});
+
+/** フェーズ 2 を「依頼済みでゲートが閉じたまま（人のレビュー待ち）」にし、依頼のマーカーに MR を持たせる */
+function waitingWithMr(url: string): BoardJson {
+  const base = fixture();
+  const parent: ParentJson = {
+    ...base.parents[0],
+    phases: base.parents[0].phases.map((p): PhaseJson =>
+      p.number === 2
+        ? {
+            ...p,
+            state: "ended",
+            gate_closed: true,
+            review_required: true,
+            review_waiting: true,
+            marks: { requested: { head: "abc", mr: 18, url, host: "github", since: "t", at: "t" } },
+          }
+        : p,
+    ),
+  };
+  return { ...base, parents: [parent] };
+}
+
+test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」も付き、依頼のマーカーの MR がフェーズ行と親カードに写る", () => {
+  const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
+  const card = cards.get("i0001")!;
+  assert.deepEqual(card.phases[1].actions, [
+    { kind: "accept", parent: "i0001", phase: 2 },
+    { kind: "reviewed", parent: "i0001", phase: 2 },
+  ]);
+  // フェーズ行は依頼の投稿を指す。親カードは断片を落としてマージリクエスト自体を指す。子カードには持たせない
+  assert.equal(card.phases[1].mrUrl, "https://example.com/o/r/pull/18#issuecomment-5");
+  assert.equal(card.phases[1].mrNumber, 18);
+  assert.equal(card.phases[0].mrUrl, "");
+  assert.equal(card.phases[0].mrNumber, null);
+  assert.equal(card.mrUrl, "https://example.com/o/r/pull/18");
+  assert.equal(card.mrNumber, 18);
+  assert.equal(cards.get("i0001-02")!.mrUrl, "");
+  // 引く道具。承認と受け入れが使う parentTreeOf と同じ場所を見る
+  assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001")?.id, "i0001");
+  assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02"), undefined);
+  assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 2)?.mrUrl, "u");
+  assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 9), undefined);
+  // 依頼のマーカーが無くレビュー済みだけ残った形（wrapup が置く）では、リンクも番号も出さない（url が無い）。連絡のボタンは待ちでなければ出ない
+  const base = fixture();
+  const reviewedOnly: ParentJson = {
+    ...base.parents[0],
+    phases: base.parents[0].phases.map((p): PhaseJson => (p.number === 1 ? { ...p, marks: { reviewed: { mr: 7, accepted: [], at: "t" } } } : p)),
+  };
+  const quiet = cardsOf(buildBoard({ ...base, parents: [reviewedOnly] })).get("i0001")!;
+  assert.equal(quiet.phases[0].mrNumber, null);
+  assert.equal(quiet.phases[0].mrUrl, "");
+  assert.equal(quiet.mrUrl, "");
+  assert.deepEqual(quiet.phases[0].actions, []);
+  assert.deepEqual(quiet.phases[1].actions, []);
+});
+
+test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約の条件で、判定はし直さない", () => {
+  // 見本: 親は順調、閉じた子とレビュー中の子は順調、承認待ちでワークツリーの無い子だけが要対応
+  const cards = cardsOf(buildBoard(fixture()));
+  assert.equal(cards.get("i0001")!.attention, false);
+  assert.equal(cards.get("i0001-01")!.attention, false);
+  assert.equal(cards.get("i0001-02")!.attention, false);
+  assert.equal(cards.get("i0001-03")!.attention, true);
+  // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（札の「未承認」は出ない）でも要対応。
+  // 落とすと「要対応だけ」の絞り込みで隠れ、承認の対象から外れる
+  const base = fixture();
+  const revision = cardsOf(buildBoard({ ...base, pending_approval: [...base.pending_approval, "i0001"] }));
+  assert.equal(revision.get("i0001")!.copyStatus, "open");
+  assert.equal(revision.get("i0001")!.pendingApproval, true);
+  assert.equal(revision.get("i0001")!.attention, true);
+  // 承認されずに取り消された提案は、未承認のままワークツリーも無いが、もう誰も動かないので要対応ではない
+  const dropped: TicketJson = {
+    ...base.tickets[3],
+    proposal: { ...base.tickets[3].proposal!, state: "cancelled" },
+    cancelled_at: "t",
+    cancel_reason: "やめた",
+  };
+  const cancelled = cardsOf(buildBoard({ ...base, tickets: [...base.tickets.slice(0, 3), dropped], pending_approval: [] }));
+  assert.equal(cancelled.get("i0001-03")!.column, "cancelled");
+  assert.equal(cancelled.get("i0001-03")!.copyStatus, "none");
+  assert.equal(cancelled.get("i0001-03")!.attention, false);
+  // 人のレビュー待ちのフェーズがあれば、その子（ゲート閉）も親（フェーズ行の要約）も要対応
+  const waiting = cardsOf(buildBoard(waitingWithMr("u")));
+  assert.equal(waiting.get("i0001")!.attention, true);
+  assert.equal(waiting.get("i0001-02")!.attention, true);
+  assert.equal(waiting.get("i0001-01")!.attention, false);
+  // HIGH 以上のリスクは要対応、MEDIUM は違う。不備（親が見つからない）も要対応
+  const risky = (level: string): TicketJson => ({ ...base.tickets[1], risk: { points: 70, level } });
+  const withRisk = (level: string) => cardsOf(buildBoard({ ...base, tickets: [base.tickets[0], risky(level), ...base.tickets.slice(2)] }));
+  assert.equal(withRisk("HIGH").get("i0001-01")!.attention, true);
+  assert.equal(withRisk("CRITICAL").get("i0001-01")!.attention, true);
+  assert.equal(withRisk("MEDIUM").get("i0001-01")!.attention, false);
+  const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01", parent: "i0002" };
+  assert.equal(cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] })).get("i0002-01")!.attention, true);
 });
