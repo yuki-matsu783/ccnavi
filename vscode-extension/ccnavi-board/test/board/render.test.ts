@@ -173,10 +173,16 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(/<span class="fact worktree" title="[^"]*">作業ツリー i0001<\/span>/.test(html));
   assert.ok(/<span class="fact sha" title="[0-9a-f]+">base [0-9a-f]{7}<\/span>/.test(html));
   assert.ok(html.includes('<span class="fact risk risk-low">リスク LOW（0 点）</span>'));
-  // 属性は列からはみ出さず、フェーズ行の右側は折り返す
+  // 属性は列からはみ出さない
   assert.match(html, /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
-  assert.match(html, /\.phase-status \{ text-align: right; overflow-wrap: anywhere; max-width: 55%; justify-self: end; \}/);
-  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) minmax\(0, auto\);/);
+  // フェーズ行は狭いカードでは 2 段（丸と段階名、その下に状態）。右に auto の列を置くと状態の
+  // 1 行分の幅が行を占め、段階名の列が 0 になって消えるので、3 列は広いカードだけ
+  assert.match(html, /\.card \{[^}]*container-type: inline-size;/);
+  assert.match(html, /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\); column-gap: 6px; row-gap: 1px;/);
+  assert.match(html, /\.phase-name \{ grid-column: 2; grid-row: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
+  assert.match(html, /\.phase-status \{ grid-column: 2; grid-row: 2; min-width: 0; overflow-wrap: anywhere; \}/);
+  assert.match(html, /@container \(min-width: 480px\) \{\n\s*\.phase \{ grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\); \}\n\s*\.phase-status \{ grid-column: 3; grid-row: 1; text-align: right; justify-self: end; \}/);
+  assert.doesNotMatch(html, /minmax\(0, auto\)/);
   assert.ok(!html.includes('class="badge copy copy-open"'));
   assert.ok(!html.includes('class="badge review"'));
   // 写りは子の作業ツリーに普通に入るので、正常な場面ではバッジを出さない
