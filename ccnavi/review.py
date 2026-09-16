@@ -1289,11 +1289,29 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     branch = _branch(tree_root)
     if not branch:
         unmet.append("親ブランチの名前を読めない")
-    else:
-        rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"])
-        if rc != 0 or ahead.strip():
-            unmet.append("親ブランチの HEAD が push されていない")
+    elif _unpushed(tree_root, conf, branch):
+        unmet.append("親ブランチの HEAD が push されていない")
     return unmet
+
+
+def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
+    """人が見るものが、まだリモートに届いていないか。
+
+    ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。人がレビューで
+    見るのはコードで、置き場を運ぶのは `ccnavi-push-approved.sh` の仕事（push が落ちても
+    コミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
+    `check` の側（`_moved_since_request`）と同じ基準。
+
+    `ready` の前提（`_merge_problems`）はこれを使わない。あちらは人がリモートを見て
+    マージするところで、マーカーも本当に届いていないと他の機械へ渡らない。
+    """
+    rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"])
+    if rc != 0:
+        return True
+    if not ahead.strip():
+        return False
+    changed, failed = _outside_approved(tree_root, conf, f"origin/{branch}")
+    return bool(failed or changed)
 
 
 def _result(stderr: TextIO, path: str) -> Result | None:
@@ -1389,13 +1407,8 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
         if failed or changed:
             return moved
     branch = _branch(tree_root)
-    rc, ahead = _git(tree_root, ["rev-list", f"origin/{branch}..HEAD"]) if branch else (1, "")
-    if rc != 0:
+    if not branch or _unpushed(tree_root, conf, branch):
         return "親ブランチの HEAD が push されていない"
-    if ahead.strip():
-        changed, failed = _outside_approved(tree_root, conf, f"origin/{branch}")
-        if failed or changed:
-            return "親ブランチの HEAD が push されていない"
     return ""
 
 
