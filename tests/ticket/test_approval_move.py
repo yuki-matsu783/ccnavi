@@ -7,6 +7,8 @@ ADR-0055 で、承認済みチケットは 1 本のファイルとして doing/ 
 1. 同じファイルシステムの中では rename で動き、中身が変わらない
 2. またぐとき（rename が通らない）は写して消す。消せなければ写した側を消して戻す
 3. 行き先に同じ名前が既に在れば動かさず、どちらにも触らない
+4. rename が EXDEV 以外で失敗したとき（元が無い、など）は写して消す側へ流さない。流すと、
+   写せずに戻す手が、その間に別のプロセスが置いた行き先を消す
 """
 
 from __future__ import annotations
@@ -77,6 +79,22 @@ class MoveFileTest(unittest.TestCase):
         self.assertIn("行き先に既に在る", failed)
         self.assertEqual(self.read(self.source), TEXT)
         self.assertEqual(self.read(self.target), "older\n")
+
+    def test_does_not_remove_a_target_another_process_placed(self):
+        # 2 つのプロセスが同じ移動を打った形。先に通った側が rename で行き先を置き、
+        # 後の側の rename は元が無くて失敗する。ここで写して消す側へ流すと、写せずに
+        # 戻す手が、先に通った側の行き先を消して、どちらにも無くなる。
+        def rename(src, dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, "w", encoding="utf-8") as f:
+                f.write(TEXT)
+            os.remove(src)
+            raise FileNotFoundError(errno.ENOENT, "no such file", src)
+
+        with mock.patch("os.rename", side_effect=rename):
+            failed = approval.move_file(self.source, self.target)
+        self.assertIn("no such file", failed)
+        self.assertEqual(self.read(self.target), TEXT)
 
 
 if __name__ == "__main__":

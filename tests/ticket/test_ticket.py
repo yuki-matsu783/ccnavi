@@ -860,6 +860,41 @@ class TicketTest(unittest.TestCase):
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
+    def test_check_does_not_mark_reviewed_when_a_child_cannot_move(self):
+        """レビュー待ちの子を done/ へ動かせなければ、レビュー済みのマーカーを置かない。
+
+        done/ に同じ識別子が既に在る形（動かした跡が残った）。マーカーを先に置くと、
+        子は review/ に残ったまま「レビュー済み」になり、check も --reviewed も通らず
+        取り出せなくなる。動かしてから置くので、直して打ち直せば通る。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        ok = self.request(fixture)
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+        stray = os.path.join(self.approved, "done", "i0001-01.md")
+        write(stray, "stray\n")
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", fixture
+        )
+        self.assertNotEqual(check.returncode, 0, check.stdout)
+        self.assertIn("行き先に既に在る", check.stderr)
+        marker = os.path.join(self.approved, "phases", "i0001", "1.reviewed")
+        self.assertFalse(os.path.exists(marker))
+        review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+        self.assertTrue(os.path.exists(review))
+        with open(stray, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "stray\n")
+
+        os.remove(stray)
+        check = self.ccnavi(
+            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", fixture
+        )
+        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertTrue(os.path.exists(marker))
+        self.assertFalse(os.path.exists(review))
+        self.assertTrue(os.path.exists(stray))
+
     def test_human_accepts_unresolved_but_not_changes_requested(self):
         self.family()
         self.close_phase()

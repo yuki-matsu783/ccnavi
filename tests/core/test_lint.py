@@ -318,6 +318,8 @@ class LintTest(unittest.TestCase):
         self.assertEqual(counts(result.stdout)[0], 1)
 
     def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
+        # review/ は提案の走査に入るので、これは前からの振る舞い。doing と done の側を
+        # 足したときに、数え方を変えてこちらが黙らないことを固定する。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "doing"),
             "i0001.md",
