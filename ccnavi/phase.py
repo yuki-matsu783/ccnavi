@@ -957,14 +957,41 @@ def scope_findings(
         return [], "ワークツリーが無い"
     # NUL 区切りで読む。既定の出力は非 ASCII と空白を含むパスを引用して 8 進に
     # 逃がすので、そのまま当てると範囲の中の日本語のファイルが必ず範囲外になる。
+    #
+    # `--no-renames` と `--ignore-submodules` は、差分から行が消える道を塞ぐ。改名を
+    # 1 行にまとめられると移動元が消え、範囲外のファイルを範囲の中へ改名したものが
+    # 素通りする。`.gitmodules` の `ignore = all` は submodule の進みを丸ごと消す
+    # （`.gitmodules` は追跡されるので、外から届く）。
+    #
+    # status だけ `dirty` なのは、submodule の中の汚れは親のコミットに乗らないから。
+    # 乗るのはポインタの移動で、`dirty` はそれを見せる。`none` にすると、submodule の
+    # 中に置かれた生成物まで範囲外として報告することになる。
     paths: set[str] = set()
     if child.base_sha:
-        rc, out = _git(worktree, ["diff", "--name-only", "-z", f"{child.base_sha}..HEAD"])
+        rc, out = _git(
+            worktree,
+            [
+                "diff",
+                "--name-only",
+                "--no-renames",
+                "--ignore-submodules=none",
+                "-z",
+                f"{child.base_sha}..HEAD",
+            ],
+        )
         if rc != 0:
             return [], "基準点からの差分を読めない"
         paths.update(p for p in out.split("\0") if p)
     rc, out = _git(
-        worktree, ["status", "--porcelain", "-z", "--untracked-files=all", "--no-renames"]
+        worktree,
+        [
+            "status",
+            "--porcelain",
+            "-z",
+            "--untracked-files=all",
+            "--no-renames",
+            "--ignore-submodules=dirty",
+        ],
     )
     if rc != 0:
         return [], "ワークツリーの状態を読めない"
