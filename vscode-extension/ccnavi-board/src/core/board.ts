@@ -28,10 +28,14 @@ export const COLUMNS: readonly ColumnDef[] = [
   { state: "cancelled", label: "取り消し" },
 ];
 
-/** 人が押せる操作。ターミナルへ送るコマンドの種類 */
+/**
+ * 人が押せる操作。承認と受け入れは実行ファイルか端末へ、レビュー済みの連絡は Claude Code に渡す文を組む
+ * （判定は動かさない。`check` を打つのはその文を受けたエージェント）。
+ */
 export type Action =
   | { readonly kind: "approve" }
-  | { readonly kind: "accept"; readonly parent: string; readonly phase: number };
+  | { readonly kind: "accept"; readonly parent: string; readonly phase: number }
+  | { readonly kind: "reviewed"; readonly parent: string; readonly phase: number };
 
 export interface PhaseChip {
   readonly parent: string;
@@ -47,6 +51,10 @@ export interface PhaseChip {
   readonly riskLevel: string;
   readonly riskLine: string;
   readonly tickets: readonly string[];
+  /** 依頼のマーカーが持つマージリクエストの URL（依頼の投稿を指す）。無ければ空 */
+  readonly mrUrl: string;
+  /** 依頼のマーカーが持つマージリクエストの番号。無ければ null */
+  readonly mrNumber: number | null;
   readonly actions: readonly Action[];
 }
 
@@ -93,6 +101,14 @@ export interface Card {
   readonly actions: readonly Action[];
   /** 読み手が気づくべき食い違い */
   readonly issues: readonly string[];
+  /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
+  readonly mrUrl: string;
+  readonly mrNumber: number | null;
+  /**
+   * 人が動く必要があるか。札（未承認・ゲート閉・作業ツリーなし・レビュー待ち・HIGH 以上・本物が決まらない写り）と
+   * 不備、親ならフェーズ行の要約に出るもの、と同じ条件。「要対応だけ」の絞り込みが見る
+   */
+  readonly attention: boolean;
 }
 
 export interface BoardColumn extends ColumnDef {
@@ -180,12 +196,25 @@ function toCard(
       : undefined;
   const marks = ownPhase ? Object.keys(ownPhase.marks).sort() : [];
   const phases = isParent && ownParent ? ownParent.phases.map((p) => toChip(ownParent, p)) : [];
+  const mr = isParent ? mrOf(phases) : { url: "", number: null };
 
   const actions: Action[] = [];
   if (pending.has(t.ticket)) {
     actions.push({ kind: "approve" });
   }
   const wrapped = ownParent?.wrapup !== null && ownParent?.wrapup !== undefined;
+  const riskLevel = typeof t.risk?.level === "string" ? t.risk.level : "";
+  const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
+  const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
+  const attention =
+    t.copy.status === "none" ||
+    gateClosed ||
+    (!t.worktree.exists && t.copy.status !== "closed") ||
+    reviewWaiting ||
+    isHighRisk(riskLevel) ||
+    t.scattered.length > 0 ||
+    issues.length > 0 ||
+    phases.some((p) => p.gateClosed || p.reviewWaiting || isHighRisk(p.riskLevel));
 
   return {
     id: t.ticket,
@@ -209,13 +238,13 @@ function toCard(
     startedAt: t.started_at,
     completedAt: t.completed_at,
     cancelReason: t.cancel_reason,
-    riskLevel: typeof t.risk?.level === "string" ? t.risk.level : "",
+    riskLevel,
     riskPoints: typeof t.risk?.points === "number" ? t.risk.points : null,
     seenIn: t.seen_in,
     scattered: t.scattered,
     marks: isParent ? [] : marks,
-    gateClosed: !isParent && (ownPhase?.gate_closed ?? false),
-    reviewWaiting: !isParent && (ownPhase?.review_waiting ?? false),
+    gateClosed,
+    reviewWaiting,
     pendingApproval: pending.has(t.ticket),
     stage: ownParent && isParent ? ownParent.stage : "",
     wrapped: isParent && wrapped,
@@ -223,7 +252,29 @@ function toCard(
     phases,
     actions,
     issues,
+    mrUrl: mr.url,
+    mrNumber: mr.number,
+    attention,
   };
+}
+
+function isHighRisk(level: string): boolean {
+  return level === "HIGH" || level === "CRITICAL";
+}
+
+/**
+ * 親カードに出すマージリクエスト。依頼のマーカーの URL は依頼の投稿（`#issuecomment-…`）を指すので、
+ * 断片を落としてマージリクエスト自体にする。マージリクエストは親ブランチに 1 本なので、
+ * 番号の大きいフェーズの依頼を採る（同じ番号のはず。違えば新しいほうが本物）。
+ */
+function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | null } {
+  for (let i = phases.length - 1; i >= 0; i -= 1) {
+    const p = phases[i];
+    if (p.mrUrl !== "") {
+      return { url: p.mrUrl.replace(/#.*$/, ""), number: p.mrNumber };
+    }
+  }
+  return { url: "", number: null };
 }
 
 /**
@@ -250,7 +301,12 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   // それを読み、ゲートとマーカーからここで組み直さない。
   if (p.review_waiting) {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
+    actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
   }
+  // 依頼のマーカー `{head, mr, url, host, since}`（設計 §9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ
+  const requested = p.marks.requested ?? {};
+  const reviewed = p.marks.reviewed ?? {};
+  const mrNumber = typeof requested.mr === "number" ? requested.mr : typeof reviewed.mr === "number" ? reviewed.mr : null;
   return {
     parent: parent.ticket,
     number: p.number,
@@ -263,6 +319,8 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     riskLevel: typeof p.risk?.level === "string" ? p.risk.level : "",
     riskLine: p.risk_line,
     tickets: p.tickets,
+    mrUrl: typeof requested.url === "string" ? requested.url : "",
+    mrNumber,
     actions,
   };
 }
@@ -281,12 +339,23 @@ export function isKnownPath(board: Board, filePath: string): boolean {
 
 /** 親の識別子から、その親の作業ツリーのパス。承認の sh はそこで打つ */
 export function parentTreeOf(board: Board, parent: string): string | undefined {
+  const card = parentCardOf(board, parent);
+  return card !== undefined && card.worktreeExists ? card.worktreePath : undefined;
+}
+
+/** 親の識別子から、その親のカード。無ければ undefined */
+export function parentCardOf(board: Board, parent: string): Card | undefined {
   for (const column of board.columns) {
     for (const card of column.cards) {
       if (card.id === parent && card.isParent) {
-        return card.worktreeExists ? card.worktreePath : undefined;
+        return card;
       }
     }
   }
   return undefined;
+}
+
+/** 親の識別子とフェーズの番号から、そのフェーズ行。無ければ undefined */
+export function phaseChipOf(board: Board, parent: string, phase: number): PhaseChip | undefined {
+  return parentCardOf(board, parent)?.phases.find((p) => p.number === phase);
 }

@@ -73,6 +73,51 @@ export function acceptCommand(root: string, parentTree: string, phase: number): 
 }
 
 /**
+ * 文面で案内する `.ccnavi/scripts/` の sh の綴り。実行ファイルの `settings.script_command` と同じ規則で、
+ * ワークスペースルートから `/` 区切りで書き、空白やシェルの記号を含むときだけ引用する。引用しないと
+ * sh が単語に割り、ゲートの例外（`\S*ccnavi-...`）にも当たらない。まず `"..."`、`"` の中でも意味を持つ
+ * 文字があるときだけ単引用符に落とす。
+ */
+export function scriptCommand(root: string, name: string): string {
+  const base = toPosixPath(root).replace(/\/+$/, "");
+  const script = `${base}/.ccnavi/scripts/${name}`;
+  if (/^[^\s'"\\$`!*?\[\]{}()<>|&;#~]+$/.test(script)) {
+    return `sh ${script}`;
+  }
+  if (!/["\\$`!]/.test(script)) {
+    return `sh "${script}"`;
+  }
+  return `sh ${shellQuote(script)}`;
+}
+
+/**
+ * 人がレビューを終えたことを Claude Code に伝える文。ボードの「レビュー済み連絡」が組み、
+ * 承認の文と同じ 2 ボタン（コピー / 新しいセッションで開く）で渡す。判定は動かさず、マーカーも置かない。
+ * `check` を打ってマーカーを置くのは、この文を受けたエージェント（親の作業ツリーで）。
+ * 未解決が残っていれば `check` が一覧と次の道を返すので、文はそれに従うことだけを言う。
+ */
+export function reviewedPrompt(
+  root: string,
+  parent: string,
+  phase: number,
+  label: string,
+  parentTree: string,
+  mrUrl: string,
+): string {
+  const lines = [`[ccnavi] 利用者が親 ${parent} のフェーズ ${label || String(phase)} のレビューを終えた。`];
+  if (mrUrl !== "") {
+    lines.push(`- マージリクエスト: ${mrUrl}`);
+  }
+  lines.push(
+    `親の作業ツリー ${toPosixPath(parentTree)} で '${scriptCommand(root, "ccnavi-review.sh")} check --phase ${phase}' を打ち、` +
+      "レビュー済みのマーカーを置く。未解決の指摘が残っていれば check が一覧と次の道を返すので、それに従う" +
+      "（同じフェーズに子を切って対応し、親ブランチへ合流して push してから依頼し直す）。" +
+      "マーカーが置かれてゲートが開いたら、次のフェーズへ進む。",
+  );
+  return lines.join("\n");
+}
+
+/**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
  * 絶対パスで組む。ターミナルは使い回すので、前に accept が親の作業ツリーへ cd していても届く。
  */

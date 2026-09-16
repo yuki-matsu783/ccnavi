@@ -10,11 +10,12 @@ import * as vscode from "vscode";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
-import { buildBoard, isKnownPath, parentTreeOf, type Board } from "./core/board.js";
+import { buildBoard, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
 import {
   acceptCommand,
   PUSH_APPROVED_SCRIPT,
   pushApprovedCommand,
+  reviewedPrompt,
   type Launcher,
 } from "./core/commands.js";
 import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
@@ -49,7 +50,8 @@ type Message =
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
-  | { readonly type: "accept"; readonly parent: string; readonly phase: number };
+  | { readonly type: "accept"; readonly parent: string; readonly phase: number }
+  | { readonly type: "reviewed"; readonly parent: string; readonly phase: number };
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -315,6 +317,28 @@ function handleMessage(message: Message | undefined): void {
       runInTerminal(root, acceptCommand(root, tree, message.phase));
       return;
     }
+    case "reviewed": {
+      // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、承認の文と同じ
+      // オーバーレイ（コピー / 新しいセッションで開く）で渡す。check を打つのは文を受けたエージェント。
+      // 承認の最中（読み込み中・承認中）は被せない
+      if (current.approval !== undefined && current.approval.kind !== "error" && current.approval.kind !== "done" && current.approval.kind !== "prompt") {
+        return;
+      }
+      const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
+      const chip = current.board ? phaseChipOf(current.board, message.parent, message.phase) : undefined;
+      if (tree === undefined || chip === undefined) {
+        vscode.window.showWarningMessage(`親 ${message.parent} の作業ツリーかフェーズ ${message.phase} が無いので、レビュー済みの連絡を組めない`);
+        return;
+      }
+      current.approval = {
+        kind: "prompt",
+        title: `フェーズ ${chip.label} のレビュー済みを連絡`,
+        note: "レビューを終えたことを Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く。送るときは自分で Enter を押す。マーカーはエージェントが check を打って置く。",
+        prompt: reviewedPrompt(root, message.parent, message.phase, chip.label, tree, chip.mrUrl),
+      };
+      redraw(current);
+      return;
+    }
   }
 }
 
@@ -445,15 +469,16 @@ function isFile(filePath: string): boolean {
  * 渡したらオーバーレイを閉じる。
  */
 async function handOverPrompt(current: PanelState, how: "promptCopy" | "promptOpen"): Promise<void> {
-  if (current.approval?.kind !== "done") {
+  if (current.approval?.kind !== "done" && current.approval?.kind !== "prompt") {
     return;
   }
+  const what = current.approval.kind === "done" ? "承認の文" : "レビュー済みの連絡の文";
   const prompt = current.approval.prompt;
   current.approval = undefined;
   redraw(current);
   if (how === "promptCopy") {
     await vscode.env.clipboard.writeText(prompt);
-    vscode.window.setStatusBarMessage("承認の文をクリップボードに入れた。Claude Code に貼って送る", 5000);
+    vscode.window.setStatusBarMessage(`${what}をクリップボードに入れた。Claude Code に貼って送る`, 5000);
   } else {
     await vscode.env.openExternal(vscode.Uri.parse(`vscode://anthropic.claude-code/open?prompt=${encodeURIComponent(prompt)}`));
   }
@@ -529,8 +554,9 @@ function asMessage(message: unknown): Message | undefined {
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
     case "accept":
+    case "reviewed":
       return typeof m.parent === "string" && typeof m.phase === "number" && Number.isInteger(m.phase)
-        ? { type: "accept", parent: m.parent, phase: m.phase }
+        ? { type: m.type, parent: m.parent, phase: m.phase }
         : undefined;
     default:
       return undefined;
