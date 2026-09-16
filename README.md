@@ -738,6 +738,35 @@ jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq 
 名前をそのまま突き合わせるので、`Bash` のルールが `PowerShell` に及ぶことはない。
 及ぼしたければ `Bash|PowerShell` と並べる。
 
+**`Grep` と `Glob` は、場所を守るルールに足しても守りにならない。** 当たるのは探し始める
+場所のパスだけで、そこから降りて読まれたファイルは判定に届かない
+（[ADR-0050](docs/adr/0050-search-tools-and-ignore.md)）。`credentials` のようなルールに
+`|Grep` を足すと、`.env` を名指しした検索は止まるが、ルートからの検索は素通りしたままになる。
+この形は `--lint` が warn で言う。
+
+```yaml
+# 守りにならない。ルートからの検索が素通りする
+- id: credentials
+  match: Bash|Read|Write|Edit|Grep      # ← --lint が warn
+  regex: '...'
+```
+
+**「どこを起点に探すか」を縛るなら、`Grep` と `Glob` だけで書く。** これは正しく効く。
+ただし `*/logs/*` は末尾に続きを要求するので、**ディレクトリそのものを起点にした呼び出しに
+当たらない**。当てたいなら両方書くか、`regex` にする。
+
+```yaml
+# ディレクトリ自身にも当たる 2 通り
+- id: no-search-logs
+  match: Grep|Glob
+  regex: '[\\/]logs([\\/]|$)'        # logs も logs/sub も当たる
+
+- id: no-search-logs-glob
+  match: Grep|Glob
+  glob: "*/logs"                        # これだけだと logs/sub に当たらないので
+                                        # "*/logs/*" のルールも別に要る
+```
+
 `glob` の意味は標準ライブラリの `fnmatch` そのまま。`*` が任意の文字列、
 `?` が 1 文字、`[abc]` が文字クラス。
 
