@@ -200,7 +200,7 @@ class GlobCaseTest(ConfigUnionHarness):
         """§11.4: `regex` の deny も、どの機械でも大文字小文字を区別せずに当たる。
 
         区別すると、`Write` の経路だけが綴り違いで外れる。同じ場所へシェルから書く形は
-        組み込みの守り（selfguard._folded）が畳んで止めているので、経路で答えが割れる。
+        組み込みの守り（selfguard._folded）が綴りの違いを無視して止めるので、経路で答えが割れる。
         """
         self.assertFalse(os.path.exists(os.path.join(self.ws, "token")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
