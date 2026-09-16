@@ -1149,6 +1149,83 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
 
+    def commit_markers(self, push=True):
+        """ccnavi 自身の置き場だけをコミットする。ccnavi-push-approved.sh と同じ範囲。"""
+        git(self.parent_tree, "add", "--", ".ccnavi/tickets")
+        git(
+            self.parent_tree,
+            "commit",
+            "--quiet",
+            "-m",
+            "ccnavi: 承認済みチケットを更新",
+            "--",
+            ".ccnavi/tickets",
+        )
+        if push:
+            git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def test_check_passes_when_only_the_markers_moved(self):
+        """マーカーだけをコミットしても check が止まらないこと。
+
+        依頼のマーカーは親のブランチにコミットして運ぶ前提のもので、「依頼 → マーカー →
+        コミット」の順のせいで依頼の直後に必ず HEAD が 1 つ進む。人がレビューで見るものは
+        変わっていないので、ここで止めると自分の足を踏む。未コミットの側は同じ理由で
+        前提から外してある。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
+        recorded = read_json(mark)["head"]
+        self.commit_markers()
+        self.assertNotEqual(git(self.parent_tree, "rev-parse", "HEAD").strip(), recorded)
+        check = self.check(fixture)
+        self.assertEqual(check.returncode, 0, check.stderr)
+        self.assertTrue(os.path.exists(os.path.join(os.path.dirname(mark), "1.reviewed")))
+
+    def test_check_passes_when_only_the_markers_are_unpushed(self):
+        """マーカーだけが手元に残っている形でも止まらないこと。
+
+        リモートにあるものと人が見るものは同じ。置き場の外が 1 つでも手元に残っていれば、
+        従来どおり push を求める。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        self.commit_markers(push=False)
+        self.assertEqual(self.check(fixture).returncode, 0)
+
+    def test_request_refuses_when_only_the_markers_moved(self):
+        """マーカーだけが動いた形では、依頼を出し直させないこと。
+
+        check が止まらないので、出し直しても依頼のコメントが増えるだけになる。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        self.commit_markers()
+        again = self.request(fixture)
+        self.assertNotEqual(again.returncode, 0)
+        self.assertIn("依頼済み", again.stderr)
+        self.assertEqual(len(read_json(fixture)["comments"]), 1)
+
+    def test_check_refuses_when_code_rides_with_the_markers(self):
+        """マーカーと一緒に本物の変更が乗っていれば、従来どおり止まること。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "マーカーと一緒に")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        check = self.check(fixture)
+        self.assertNotEqual(check.returncode, 0)
+        self.assertIn("HEAD が動いている", check.stderr)
+
     def test_request_again_after_head_moved(self):
         """依頼の後に HEAD が動いたら、request で依頼を出し直せること（#36）。
 
