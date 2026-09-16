@@ -642,7 +642,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 state = "終了"
             else:
                 state = "進行中"
-            gate = "ゲート閉" if ph.gate_closed else "ゲート開"
+            hold = ph.review_label if ph.gate_closed else "止めていない"
             review = {
                 phasetypes.REVIEW_MR: " / レビューはマージリクエストで",
                 phasetypes.REVIEW_CHAT: " / レビューはこのセッションで",
@@ -656,7 +656,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 if ph.risk_escalates:
                     review += "（実績でレビュー要）"
             stdout.write(
-                f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {gate}{review}\n"
+                f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"
             )
     return 0
 
@@ -665,7 +665,7 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
     """`--explain` が言うことのうち、チケットに関わる部分を機械可読で出す。
 
     読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・マーカーを自分で解釈せず、ここが
-    出した形をそのまま並べる。「ゲートが閉じているか」「承認待ちは何か」の答えを
+    出した形をそのまま並べる。「レビューで止まっているか」「承認待ちは何か」の答えを
     2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
     ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 §3 P11）。
     """

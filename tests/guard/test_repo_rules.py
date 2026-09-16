@@ -371,7 +371,7 @@ class RunnerTest(LauncherJudgeTest):
             "source .venv/bin/activate": set(),
             ". .venv/bin/activate && uv run pytest": set(),
             "bash -lc 'uv run ruff check .'": set(),
-            # ゲートの sh 3 形。承認のスクリプトは元の形から止まっている。
+            # 代わりに通る sh 3 形。承認のスクリプトは元の形から止まっている。
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
             "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
             "sh .ccnavi/scripts/ccnavi-approve.sh": {APPROVAL},
