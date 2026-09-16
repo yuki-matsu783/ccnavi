@@ -463,6 +463,8 @@ export const BUTTON_STYLE = `  button.action {
   button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
   /* 待っている間の回り記号。busy が付いたボタンにだけ出す。動きを減らす設定では回さず、出したままにする */
   button.action .spin { display: none; width: .85em; height: .85em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+  /* 非活性の .5 のままだと、見せたい回り記号が一番薄くなる。opacity は子で戻せない（親でまとめて掛かる）ので、busy の間だけボタンごと濃くする。押せない見た目は残る */
+  button.action.busy:disabled { opacity: .8; }
   button.action.busy .spin { display: inline-block; animation: ccnavi-spin .8s linear infinite; }
   @keyframes ccnavi-spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { button.action.busy .spin { animation: none; } }`;
