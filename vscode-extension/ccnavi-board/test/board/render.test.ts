@@ -339,8 +339,8 @@ test("CB-T118 本物が決まらない写りだけをバッジにし、場所を
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-03")!;
   const where = [
-    { tree: "", state: "todo", path: "/x/wip/tickets/todo/i0001-03.md" },
-    { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/tickets/todo/i0001-03.md" },
+    { tree: "", state: "todo", path: "/x/wip/proposals/todo/i0001-03.md" },
+    { tree: "i0001-02", state: "todo", path: "/x/w/i0001-02/wip/proposals/todo/i0001-03.md" },
   ];
   const homeless: TicketJson = { ...child, seen_in: where, scattered: where };
   const html = renderBoard(buildBoard({ ...base, tickets: [homeless] }), OPTIONS);

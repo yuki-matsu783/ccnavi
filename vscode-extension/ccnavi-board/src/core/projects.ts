@@ -92,7 +92,7 @@ export const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export type NameCheck = { readonly ok: true; readonly name: string } | { readonly ok: false; readonly error: string };
 
 /**
- * 名前を検査する。名前はツリーの名前、`wip/<名前>/tickets/`、`logs/<名前>/`、frontmatter の
+ * 名前を検査する。名前はツリーの名前、`wip/<名前>/proposals/`、`logs/<名前>/`、frontmatter の
  * `project:` にそのまま使われるので ASCII に絞る。既存のツリー名（プロジェクト・ワークツリー）と
  * 大文字小文字だけ違う名前も衝突扱い（Windows では同じディレクトリになる）。
  */
