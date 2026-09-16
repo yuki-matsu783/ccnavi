@@ -1255,6 +1255,33 @@ class TicketTest(unittest.TestCase):
         got = self.request(fixture)
         self.assertEqual(got.returncode, 0, got.stderr)
 
+    def test_request_passes_when_only_the_markers_are_unpushed(self):
+        """置き場だけが手元に残っている形で、依頼が止まらないこと。
+
+        `ccnavi-push-approved.sh` は push が落ちてもコミットを残す。そこで止めると、
+        人の承認が落ちたせいで、まだ 1 度も依頼していないフェーズの依頼まで止まる。
+        置き場の外が 1 つでも残っていれば、従来どおり push を求める。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        write(os.path.join(self.approved, "unrelated.md"), "承認が落ちた形\n")
+        git(self.parent_tree, "add", "--", ".ccnavi/tickets")
+        git(self.parent_tree, "commit", "--quiet", "-m", "ccnavi: 承認済みチケットを更新")
+        self.assertEqual(self.request(fixture).returncode, 0)
+
+    def test_request_refuses_when_the_code_is_unpushed(self):
+        """置き場の外が手元に残っていれば、依頼は止まること。"""
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "送っていない変更")
+        got = self.request(fixture)
+        self.assertNotEqual(got.returncode, 0)
+        self.assertIn("push されていない", got.stderr)
+
     def test_check_passes_when_only_the_markers_moved(self):
         """マーカーだけをコミットしても check が止まらないこと。
 
