@@ -230,8 +230,9 @@ def decide_at_start(
             root, conf.rules, conf.bin, ruleload.layer_files(conf, root), conf.projects
         ),
     )
-    # 「1 度だけ渡す文」の記憶はここで捨てる。このイベントは起動だけでなく再開と
-    # compact の後にも来るので、モデルの文脈が新しくなるたびに文も改めて届く。
+    # 渡した回の数えはここで捨てる。このイベントは起動だけでなく再開と compact の後にも
+    # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
+    # 刻みも 0 から数え直しになる。
     ctxfile.forget(conf.state, payload.session_id)
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
