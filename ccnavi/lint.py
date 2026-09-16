@@ -1169,6 +1169,8 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                 )
             )
 
+    problems.extend(_every_problems(rule, name))
+
     # once の文は文脈ごとに 1 度しか積まれないので、広さは咎めない。
     if (rule.additional_context or rule.additional_context_file) and rule.decision == rules.ALLOW:
         why = _broad(rule)
@@ -1182,6 +1184,44 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                 )
             )
     return problems
+
+
+def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
+    """`every`（渡す回の刻み）の値と、刻んだ先に渡すものがあるか。
+
+    読めない値は error。判定は 1（毎回渡す）に倒して通すので、黙っていると書いた人は
+    刻んだつもりのまま毎回渡ることになる。`every: 1` は既定値を明示しただけなので
+    何も言わない。
+    """
+    if rule.every_written is None:
+        return []
+    if not rules.readable_every(rule.every_written):
+        return [
+            Problem(
+                SEVERITY_ERROR,
+                name,
+                f"every の {rule.every_written!r} は刻みとして読めない。"
+                "1 以上の整数で書く。このまま置くと刻まず毎回渡る",
+            )
+        ]
+    # 刻むのは渡す回で、渡すものが無ければ刻んでも何も起きない。文が無くても
+    # 本文（...File）は渡るので、4 つのどれか 1 つでもあれば咎めない。
+    if not (
+        rule.additional_context
+        or rule.additional_context_file
+        or rule.additional_context_once
+        or rule.additional_context_once_file
+    ):
+        return [
+            Problem(
+                SEVERITY_WARN,
+                name,
+                "every があるのに渡すものが無い。刻んでも何も渡らない。"
+                "additionalContext（または additionalContextOnce・…File）を書くか、"
+                "every を消す",
+            )
+        ]
+    return []
 
 
 def _broad(rule: rules.Rule) -> str:

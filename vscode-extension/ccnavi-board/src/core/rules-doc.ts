@@ -30,6 +30,14 @@ export interface RuleForm {
   readonly additionalContextFile: string;
   /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
   readonly additionalContextOnceFile: string;
+  /**
+   * 渡す回の刻み（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
+   * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ
+   * null。刻みとして読めない値（`0`・`-1`・`"x"`）も null で受け取り、書き戻しでは
+   * 元の値をそのまま残す。読めない値を画面が黙って消すと、`ccnavi --lint` が
+   * 名指ししている対象が消えて、苦情の出どころが分からなくなる
+   */
+  readonly every: number | null;
 }
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
@@ -101,7 +109,16 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     additionalContextOnce: scalarText(map, "additionalContextOnce"),
     additionalContextFile: scalarText(map, "additionalContextFile"),
     additionalContextOnceFile: scalarText(map, "additionalContextOnceFile"),
+    every: everyOf(map.get("every")),
   };
+}
+
+/** 刻みとして読める値なら、その刻み。読めない値と書いていないときは null */
+function everyOf(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+    return null;
+  }
+  return value;
 }
 
 function scalarText(map: YAMLMap, key: string): string {
@@ -273,6 +290,24 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   if (form.additionalContextOnceFile !== "" || node.has("additionalContextOnceFile")) {
     setText(doc, node, "additionalContextOnceFile", form.additionalContextOnceFile, Scalar.PLAIN, "additionalContextOnce");
   }
+  // every はまだ画面に欄が無いので、読めた刻みをそのまま書き戻すだけ。読めなかった値は
+  // form が null で持ち、元のノードに書かれたまま残る（消すと lint の苦情だけが宙に浮く）。
+  if (form.every !== null) {
+    setEvery(doc, node, form.every);
+  }
+}
+
+/** 数の欄（`every`）。元と同じ値なら触らない。欄が無ければ match の直後に足す */
+function setEvery(doc: Document, node: YAMLMap, value: number): void {
+  const current = node.get("every", true);
+  if (current instanceof Scalar) {
+    if (current.value !== value) {
+      current.value = value;
+    }
+    return;
+  }
+  const at = node.items.findIndex((p) => String((p.key as Scalar).value) === "match");
+  node.items.splice(at >= 0 ? at + 1 : node.items.length, 0, doc.createPair("every", value));
 }
 
 function setText(
@@ -361,5 +396,6 @@ function asForm(raw: unknown): RuleForm | undefined {
     additionalContextOnce: text(r.additionalContextOnce),
     additionalContextFile: text(r.additionalContextFile),
     additionalContextOnceFile: text(r.additionalContextOnceFile),
+    every: everyOf(r.every),
   };
 }

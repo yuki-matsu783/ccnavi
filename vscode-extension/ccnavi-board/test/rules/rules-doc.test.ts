@@ -101,6 +101,7 @@ test("CB-T45 新しいルールは引用符付きの glob と折り返しの mes
     additionalContextOnce: "",
     additionalContextFile: "",
     additionalContextOnceFile: "",
+    every: null,
   };
   const out = doc.apply({ deny: [s.deny[0], fresh], ask: s.ask, allow: [] });
   assert.match(out, /- id: no-rm\n    match: Bash\n    glob: '\*rm -rf\*'\n    message: >-\n      消さない。退避する。/);
@@ -207,4 +208,41 @@ allow:
   // 空にすれば欄は残るが値は空
   const cleared = doc.apply({ deny: [{ ...s.deny[0], additionalContextFile: "" }], ask: [], allow: s.allow });
   assert.equal(readRules(cleared).model.sections.deny[0].additionalContextFile, "");
+});
+
+test("CB-T134 every（渡す回の刻み）を読む。読めない値は null にして、書き戻しでも触らない", () => {
+  const text = `version: 1
+deny: []
+ask: []
+allow:
+  - id: nudge
+    match: Write|Edit
+    glob: "*/src/*"
+    every: 5
+    additionalContextOnce: 決まりと突き合わせる
+  - id: broken
+    match: Write
+    glob: "*/lib/*"
+    every: x
+    additionalContext: 刻めていない
+  - id: plain
+    match: Read
+    glob: "*"
+`;
+  const doc = readRules(text);
+  const s = doc.model.sections;
+  assert.deepEqual(
+    s.allow.map((r) => r.every),
+    [5, null, null],
+  );
+  // 読めない値（every: x）は画面が黙って消さない。消すと --lint の苦情だけが宙に浮く。
+  assert.equal(doc.apply(s), text);
+  // 画面から来た並びも同じ。every を持たない古い画面の形でも、元の値は残る。
+  const posted = asSections(JSON.parse(JSON.stringify({ ...s, allow: s.allow })));
+  assert.notEqual(posted, undefined);
+  assert.deepEqual(
+    posted === undefined ? [] : posted.allow.map((r) => r.every),
+    [5, null, null],
+  );
+  assert.equal(doc.apply(posted ?? s), text);
 });

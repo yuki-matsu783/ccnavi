@@ -592,7 +592,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add(section) {
-    const rule = { origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "" };
+    // every（渡す回の刻み）はこの画面に欄が無い。足すルールは刻み無し（毎回渡す）で始める。
+    const rule = { origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "", every: null };
     sections[section] = sections[section].concat([rule]);
     // 足したルールは開いて出す。畳んだままでは何を足したか分からない。
     opened.add(keyOf(rule));
