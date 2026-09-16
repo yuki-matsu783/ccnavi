@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
-import { renderBoard } from "../../src/core/render.js";
+import { renderBoard, renderErrorPage } from "../../src/core/render.js";
 import { fixture } from "../helpers/fixture.js";
 import { loadPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
@@ -157,5 +157,23 @@ test("CB-D44 「更新」を押すと非活性になり、回り記号と「更�
     assert.equal(button.querySelector(".label")?.textContent, "更新");
   } finally {
     await again.close();
+  }
+});
+
+test("CB-D45 読み直せなかった画面でも、承認のオーバーレイのボタンが効く。覚えていた絞り込みは上書きしない", async () => {
+  const saved = { project: "alpha", parent: "i0001", attention: true, folded: ["done"], widths: {} };
+  const page = await loadPage(
+    renderErrorPage("読めない", { ...OPTIONS, approval: { kind: "done", count: 1, prompt: "文" } }),
+    saved,
+  );
+  try {
+    page.click(page.one('button[data-action="prompt-copy"]'));
+    assert.deepEqual(page.posted.at(-1), { type: "promptCopy" });
+    page.click(page.one('button[data-action="approve-cancel"]'));
+    assert.deepEqual(page.posted.at(-1), { type: "approveCancel" });
+    // 絞り込みの部品が無い画面なので、覚えていた値に触らない
+    assert.deepEqual(page.state(), saved);
+  } finally {
+    await page.close();
   }
 });

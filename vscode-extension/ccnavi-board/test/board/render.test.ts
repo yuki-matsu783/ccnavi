@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
 import { buildBoard } from "../../src/core/board.js";
-import { PAGE_STYLE, escapeHtml, renderBoard } from "../../src/core/render.js";
+import { PAGE_STYLE, escapeHtml, renderBoard, renderErrorPage } from "../../src/core/render.js";
 import { renderRulesPage } from "../../src/core/rules-render.js";
 import { readRules } from "../../src/core/rules-doc.js";
 import { renderRiskPage } from "../../src/core/risk-render.js";
@@ -466,4 +466,28 @@ test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要�
   assert.ok(html.includes('(attention && card.getAttribute("data-attention") !== "1")'));
   // 絞り込み中の扱い（filtering）に入るので、承認は見えている承認待ちだけを送る
   assert.ok(html.includes('document.body.classList.toggle("filtering", project !== "*" || parent !== "*" || attention)'));
+});
+
+test("CB-T133 読み直せなかった画面にも承認のオーバーレイが載り、閉じる手立て（スクリプト）が付いてくる", () => {
+  const plain = renderErrorPage("ccnavi --explain --json が失敗した: 60 秒で返らないので打ち切った", OPTIONS);
+  assert.ok(plain.includes("ボードを読み直せなかった"));
+  assert.ok(plain.includes("60 秒で返らないので打ち切った"));
+  // STYLE には .approval-backdrop の規則が入っているので、要素のほうで見る
+  assert.ok(!plain.includes('<div class="approval-backdrop"'), "オーバーレイが無ければ被せない");
+
+  const withApproval = renderErrorPage("読めない", {
+    ...OPTIONS,
+    approval: { kind: "done", count: 2, prompt: "i0001-03 を承認した" },
+  });
+  assert.ok(withApproval.includes("2 件を承認した"));
+  assert.ok(withApproval.includes("i0001-03 を承認した"));
+  assert.ok(withApproval.includes('data-action="prompt-copy"'), "コピーのボタンが出る");
+  // ボタンを押せるように、ボードと同じ骨組み（style と script）が載っている
+  assert.ok(withApproval.includes(`<script nonce="${OPTIONS.nonce}">`));
+  assert.ok(withApproval.includes(`<style nonce="${OPTIONS.nonce}">`));
+  // 実体参照。承認の文に何が入っていても画面を壊さない
+  const escaped = renderErrorPage("<b>", { ...OPTIONS, approval: { kind: "error", error: "<script>" } });
+  assert.ok(!escaped.includes("<script>ale"));
+  assert.ok(escaped.includes("&lt;b&gt;"));
+  assert.ok(escaped.includes("&lt;script&gt;"));
 });
