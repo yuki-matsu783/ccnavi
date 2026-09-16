@@ -298,6 +298,56 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("旧の置き場に残っていて", result.stdout)
 
+    def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
+        # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
+        # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
+        # 閉じた側との重複だけが通る。
+        for state in ("doing", "done"):
+            write(
+                os.path.join(self.root, ".ccnavi", "approved", state),
+                "i0001.md",
+                COPY.format(name="i0001"),
+            )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001 が複数の場所にある", result.stdout)
+        self.assertIn("(main):doing", result.stdout)
+        self.assertIn("(main):done", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 1)
+
+    def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+        write(
+            os.path.join(self.root, "wip", "proposals", "review"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001 が複数の場所にある", result.stdout)
+        self.assertIn("(main):review", result.stdout)
+
+    def test_doneに1つだけ在るのは咎めない(self):
+        # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても黙ったまま。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("複数の場所にある", result.stdout)
+
     def test_綴りを設定で旧いままにしている人には言わない(self):
         # 置き場を自分で決めた人は、その綴りで動かしている。既定の話は関係が無い。
         proposal(self.root, "wip/tickets", "todo", "i0001")

@@ -974,6 +974,27 @@ class TicketTest(unittest.TestCase):
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("todo/ にも在る", lint.stdout)
 
+    def test_a_ticket_in_two_homes_is_not_operated_on(self):
+        """同じ識別子が doing/ と done/ に在れば、どちらが本物か決まらないので止める。
+
+        動かした跡が両方に残った形。黙ってどちらかを選ぶと、閉じた記録を上書きするか、
+        閉じたはずのものが作業中として復活する。止めて、--lint が同じ 1 行で名指しする。
+        """
+        self.family()
+        os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
+        shutil.copy(
+            os.path.join(self.approved, "doing", "i0001-01.md"),
+            os.path.join(self.approved, "done", "i0001-01.md"),
+        )
+        done = self.ccnavi("ticket", "done", "i0001-01")
+        self.assertNotEqual(done.returncode, 0, done.stdout)
+        self.assertIn("i0001-01 が複数の場所にある", done.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")))
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotEqual(lint.returncode, 0, lint.stdout)
+        self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
+
     def test_new_child_in_ended_phase_clears_the_marks(self):
         self.family()
         self.close_phase()
