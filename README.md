@@ -1145,23 +1145,59 @@ ignore されたファイルを名指しした `Grep` は通る。
 
 ### `Read()` の `deny` が Bash に及ぶ範囲
 
-`Read(...)` の `deny` は `Read` ツールだけのものではない。Claude Code 2.1.273 で確かめた結果。
+`Read(...)` の `deny` は `Read` ツールだけのものではない。境目は公式の文書
+（[Configure permissions](https://code.claude.com/docs/en/permissions)）にあり、`Read` と `Edit` の
+`deny` は、組み込みのファイルツールと、Claude Code が Bash の中で見分けるファイルのコマンド
+（`cat` `head` `tail` `sed` `tee` など）と、リダイレクトの行き先に及ぶ。ファイルを名指ししない
+コマンドや、自分でファイルを開くスクリプトには及ばない。
 
-| Bash のコマンド | 結果 |
+**この境目はバージョンで動く。** 実際に動いた。`deny` に `Read(./private/**)` だけを置き、
+`private/notes.txt` と `src/app.js` を用意して測った結果。
+
+| Bash のコマンド | 2.1.273（実測） |
 |---|---|
-| `cat .env` | **拒否**。ファイルが存在しなくても、コマンドの文字列の段階で止まる |
-| `grep SECRET .env` | **拒否**。名指ししているため |
-| `> .env`（リダイレクト先） | **拒否**。`Read()` の `deny` がリダイレクトの行き先にも及ぶ |
-| `grep -rn <語> .` | **通る**。ファイルを名指ししていない |
+| `cat private/notes.txt` | **拒否** |
+| `grep hello private/notes.txt` | **拒否**（名指ししている） |
+| `> private/x`（リダイレクト先） | **拒否** |
+| `cd src && grep -r hello .` | **拒否**（`cd` の後のパスを静的に解けないため） |
+| `grep -r hello src/` | 通る |
+| `grep -r hello .` | **通る。`private/notes.txt` の中身が返る** |
+| `grep -r --exclude-dir=private hello .` | 通る |
 
-公式の文書（[Configure permissions](https://code.claude.com/docs/en/permissions)）が境目を
-こう書いている。`Read` と `Edit` の `deny` は、組み込みのファイルツールと、Claude Code が Bash の
-中で見分けるファイルのコマンド（`cat` `head` `tail` `sed` `tee` など）と、リダイレクトの行き先に
-及ぶ。ファイルを名指ししないコマンドや、自分でファイルを開くスクリプトには及ばない。
+最後の 2 行が肝心で、**deny 対象を含むディレクトリへの `grep -r` は止まらない**。名指しの読み取りは
+止まるのに、再帰検索は素通りする。
 
-**この挙動はバージョンに依る。** 2.1.257 で Bash の読み取りコマンドへ適用が始まり、2.1.259 で
-範囲が広がって行きすぎ、2.1.260 で一部が戻された。守りの前提として数えるなら、自分の版で
-確かめ直す（上の表は 2.1.273 での記録）。
+変遷はこう。
+
+| 版 | 何が起きたか |
+|---|---|
+| 2.1.246（2026-08-25） | `< file` のリダイレクトと `tac`・`egrep` などの読み取りコマンドへ適用 |
+| 2.1.257 | Bash の読み取りコマンドへの適用（reader-command ルール） |
+| 2.1.259（2026-09-02） | オプション値（`-f.env` など）・`git grep` の operand・`cd DIR && cat FILE` に広げ、**deny 対象を含むディレクトリへの `grep -r` も確認を求めるように** |
+| 2.1.260 | 2.1.259 の一部を revert |
+| 2.1.273（実測） | `grep -r .` は再び通り、deny 対象の中身が返る。`cd` を挟んだ形だけは止まったまま |
+
+**守りの前提として数えるなら、自分の版で測り直す。** 上の再現は
+`claude -p "... grep -r hello ." --settings <deny を書いた json>` を版ごとに走らせれば取れる。
+
+### `Read()` の `deny` を書くときの注意
+
+- **`deny` はどのモードでも効く。** `bypassPermissions` でも `--dangerously-skip-permissions` でも
+  外れない。逆に `allow` は `bypassPermissions` では効果が無い
+- **PreToolUse の hook が `allow` を返しても `deny` は覆せない。** ccnavi の `allow` が Claude Code へ
+  許可を返さないのと同じ向きで、ccnavi から緩める道は無い
+- **`Read(.env)` は `Read(**/.env)` と同じ意味**で、任意の深さの `.env` に当たる。`Read(./secrets/**)`
+  のような 1 セグメントのディレクトリ指定も、`deny` では任意の深さに当たる。深い階層に `.env` が
+  1 つあるだけで、ルートからの `grep -r` が版によっては止まる
+- **ユーザー設定（`~/.claude/settings.json`）の相対パスは `~/.claude` に張り付く。** そこに
+  `Read(/secrets/**)` と書くと `~/.claude/secrets/**` を指す。全プロジェクトに効かせたいなら
+  `//` から始まる絶対パスか `~/` から書く
+- **`--exclude-dir` は当てにしない。** 2.1.259 では `--exclude-dir=private` を付けても止まった
+  （除外オプションまでは解釈されない）。止まる版では回避にならない
+- **スクリプト経由は止まらない。** `python -c "open('.env')"` のように自分でファイルを開く
+  プロセスには `deny` が及ばない（公式の文書の記載。ここは未検証）。OS の段で塞ぐなら
+  `sandbox` を足す。ただし組み込みの Bash の sandbox が動くのは macOS・Linux・WSL2 で、
+  Windows ネイティブでは使えない
 
 ### `.gitignore` を当てにしてよい範囲
 
