@@ -141,7 +141,8 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
   assert.doesNotMatch(off, /フェーズ管理/);
   assert.doesNotMatch(off, /チケット管理/);
   // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる
-  const card = off.slice(off.indexOf('<li class="project'), off.indexOf("    </li>"));
+  const start = off.indexOf('<li class="project');
+  const card = off.slice(start, off.indexOf("    </li>", start));
   for (const action of ["open-rules", "fetch", "pull"]) {
     assert.match(card, new RegExp(`data-action="${action}" data-name="lib"`), action);
   }

@@ -359,7 +359,8 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       // 画面のボタンは disable なら描かれないが、古い画面が開いたままの間は押せる。
       // 開く側でも見るので、ここは画面の中に理由を出すためだけに見る。
       if (ticketControl() !== "enable") {
-        fail(current, "このワークスペースはチケット制御が無効（CCNAVI_TICKET_CONTROL=disable）");
+        const what = message.type === "openBoard" ? "チケット管理" : "フェーズ管理";
+        fail(current, `${what}は開けない。このワークスペースはチケット制御が無効（CCNAVI_TICKET_CONTROL=disable）。一覧が古いので「更新」を押す`);
         return;
       }
       if (message.type === "openBoard") {
