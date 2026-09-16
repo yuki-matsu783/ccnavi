@@ -846,10 +846,10 @@ def scope_findings(
     outside = []
     for rel in sorted(paths):
         rel = rel.replace("\\", "/")
-        # 外すのはチケットの置き場だけ。下書きの置き場（`tmp/`）はここでは外さない。
+        # 外すのはチケットの置き場だけ。下書きの置き場（`scratchpad/`）はここでは外さない。
         # 見ているのは `base_sha..HEAD` の差分（追跡ファイルだけ）と `git status`
-        # （`--ignored` を付けない）で、追跡から外れている `tmp/` はどちらにも現れない。
-        # 現れたということはそのツリーの git が `tmp/` を追跡しているということで、
+        # （`--ignored` を付けない）で、追跡から外れている `scratchpad/` はどちらにも現れない。
+        # 現れたということはそのツリーの git が `scratchpad/` を追跡しているということで、
         # 外してよい根拠（追跡されないので統合先へ乗らない）が崩れている。範囲外のものが
         # コミットに乗って統合先へ行く道を見ているのはここだけなので、そこは黙らせない。
         if ticket_mod.is_ticket_place(rel, conf.tickets, conf.approved):

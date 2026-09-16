@@ -636,11 +636,11 @@ def _layer_home(conf: settings.Settings, root: str, name: str) -> str:
 def _scratch(conf: settings.Settings, root: str) -> list[Problem]:
     """下書きの置き場が、そのリポジトリの git に追跡されていないか（REQ-TKT-44）。
 
-    実行前の判定はチケットの範囲を `tmp/` に当てない（`ticket.is_scratch_place`）。外して
+    実行前の判定はチケットの範囲を `scratchpad/` に当てない（`ticket.is_scratch_place`）。外して
     よい根拠は「git が追跡しないので統合先のブランチに乗らない」ことの 1 つだけ。
 
     **この警告は穴を塞ぐものではない。** 根拠が崩れた場合は、実行後の監視と
-    サブエージェント終了時の検査が `tmp/` の変更を範囲外として報告する（`is_unscoped` の
+    サブエージェント終了時の検査が `scratchpad/` の変更を範囲外として報告する（`is_unscoped` の
     説明）。ここが言うのは、その報告が出はじめる前に人が気づけるようにするため。
 
     問うのは 2 つ。**追跡されているファイルが既にあるか**（`git ls-files`）と、これから

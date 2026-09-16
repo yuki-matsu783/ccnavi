@@ -545,24 +545,24 @@ class TicketPlacesElsewhere(TicketPlaces):
 
 
 class ScratchPlace(Workspace):
-    """下書きの置き場（`tmp/`）を、実行前の判定だけが範囲の外でも咎めない。
+    """下書きの置き場（`scratchpad/`）を、実行前の判定だけが範囲の外でも咎めない。
 
     外してよい根拠は「そのツリーの git が追跡しないので統合先へ乗らない」ことの 1 つだけ。
     だから外すのは実行前の 1 か所に限り、実行後の監視とサブエージェント終了時の検査は
-    外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `tmp/` が
+    外さない。あの 2 つの入力（`git status` と `base_sha..HEAD` の差分）に `scratchpad/` が
     現れるのは追跡されているときだけで、それは根拠が崩れている証拠になる。
 
     ルールは作業ツリーを allow で開ける。
     """
 
-    # (相対パス, 外すか, なぜ)。素の `tmp` は別の 1 本で見る。1 つのツリーに
+    # (相対パス, 外すか, なぜ)。素の `scratchpad` は別の 1 本で見る。1 つのツリーに
     # ディレクトリとファイルの両方は置けないので、この表には入れられない。
     CASES = (
-        ("tmp/draft.yml", True, "下書きの置き場そのもの"),
-        ("tmp/staging/rules.yml", True, "その下も置き場"),
-        ("tmpX/a.md", False, "前置に続けただけの場所は置き場ではない"),
-        ("docs/tmp/a.md", False, "ルートの直下 1 段だけ。`.gitignore` も外さない"),
-        ("TMP/a.md", False, "綴りは区別する。Linux の `TMP/` は追跡される"),
+        ("scratchpad/draft.yml", True, "下書きの置き場そのもの"),
+        ("scratchpad/staging/rules.yml", True, "その下も置き場"),
+        ("scratchpadX/a.md", False, "前置に続けただけの場所は置き場ではない"),
+        ("docs/scratchpad/a.md", False, "ルートの直下 1 段だけ。`.gitignore` も外さない"),
+        ("SCRATCHPAD/a.md", False, "綴りは区別する。Linux の `SCRATCHPAD/` は追跡される"),
     )
 
     def setUp(self):
@@ -579,33 +579,33 @@ class ScratchPlace(Workspace):
                 self.assertEqual(self.decision(result), want, self.reason(result))
                 self.assertEqual(self.last_record().get("code", ""), code, self.reason(result))
 
-    def test_a_file_named_tmp_is_not_the_place(self):
-        # `.gitignore` の `/tmp/` は末尾の `/` でディレクトリにしか当たらない。
+    def test_a_file_named_scratchpad_is_not_the_place(self):
+        # `.gitignore` の `/scratchpad/` は末尾の `/` でディレクトリにしか当たらない。
         # 同じ名前のファイルは追跡されるので、範囲も当てる。
-        result = self.write_hook(self.child, "tmp")
+        result = self.write_hook(self.child, "scratchpad")
         self.assertEqual(self.decision(result), "deny", self.reason(result))
         self.assertEqual(self.last_record().get("code", ""), "DENY_TICKET_SCOPE")
 
     def test_post_tool_use_reports_a_tracked_scratch_place(self):
         """実行後の監視は下書きの置き場を外さない。
 
-        この土台の `.gitignore` は `tmp/` を無視しないので、ここに置いたものは
+        この土台の `.gitignore` は `scratchpad/` を無視しないので、ここに置いたものは
         追跡される。追跡されるということは、外してよい根拠（統合先へ乗らない）が
         崩れているということなので、黙らせずに言う。追跡から外れているリポジトリでは
         そもそも `git status` に現れないので、この報告は出ない。
         """
-        result = self.after_shell(self.child, "tmp/draft.yml", session="s-tracked")
+        result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-tracked")
         self.assertIn("POST_TICKET_SCOPE", result.stderr)
-        self.assertIn("tmp/draft.yml", result.stderr)
+        self.assertIn("scratchpad/draft.yml", result.stderr)
 
     def test_post_tool_use_says_nothing_when_the_scratch_place_is_ignored(self):
         """追跡から外れていれば、下書きは 1 件も報告されない。機能が成り立つ側。"""
-        write(os.path.join(self.child, ".gitignore"), "/tmp/\n")
-        result = self.after_shell(self.child, "tmp/draft.yml", session="s-ignored")
+        write(os.path.join(self.child, ".gitignore"), "/scratchpad/\n")
+        result = self.after_shell(self.child, "scratchpad/draft.yml", session="s-ignored")
         self.assertNotIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
 
     def test_subagent_stop_reports_a_tracked_scratch_place(self):
-        rel = "tmp/draft.yml"
+        rel = "scratchpad/draft.yml"
         write(os.path.join(self.child, *rel.split("/")), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-3")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
@@ -616,12 +616,12 @@ class ScratchPlace(Workspace):
         """追跡から外れていれば、下書きは検査の入力にそもそも現れない。
 
         `.gitignore` 自体はこの子の範囲（`src/*`）の外なので、それは報告に出る。
-        見るのは `tmp/` が出ないことのほう。
+        見るのは `scratchpad/` が出ないことのほう。
         """
-        write(os.path.join(self.child, ".gitignore"), "/tmp/\n")
-        write(os.path.join(self.child, "tmp", "draft.yml"), "x\n")
+        write(os.path.join(self.child, ".gitignore"), "/scratchpad/\n")
+        write(os.path.join(self.child, "scratchpad", "draft.yml"), "x\n")
         result = self.hook("SubagentStop", "", self.child, agent_id="sub-4")
-        self.assertNotIn("tmp/draft.yml", result.stderr, result.stderr)
+        self.assertNotIn("scratchpad/draft.yml", result.stderr, result.stderr)
         self.assertIn(".gitignore", result.stderr)
 
 
