@@ -32,7 +32,7 @@ deny:
     why: .claude/ の下も worktrees/ 以外は main では触らない
   - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
-    why: worktree の中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
+    why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
   - tool: Edit
     subject: "/repo/.claude/worktrees/x/.claude/settings.local.json"
     why: 個人の上書きも同じ。permissions を足せる
@@ -198,7 +198,7 @@ ask:
   - tool: Bash
     subject: "cd /repo/.claude/worktrees/git-wrapper && ls"
     why: >-
-      パスの中の git は raw-git に当たらない。当たると worktree の出入りが丸ごと止まる。
+      パスの中の git は raw-git に当たらない。当たるとワークツリーの出入りが丸ごと止まる。
       cd と ls を allow に書いてはいないので、権限モードへ渡る
   - tool: Bash
     subject: "sed -n 1,20p /repo/logs/git-20260907-000000-1.log"
