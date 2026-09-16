@@ -1104,6 +1104,61 @@ docs/../.env
 相対パスは payload の `cwd` から決まる。まだ存在しないファイルへの書き込みは
 解けないので、絶対パスにして `..` を畳むところまでで止める。
 
+## 探すツールが読むファイルは、ルールに届かない
+
+`Grep` と `Glob` の対象は**探し始める場所**のパスで、そこから降りて読まれたファイルは
+判定に届かない。`Grep(path=<git プロジェクトルート>)` は `.env` や `secrets/` の中身を返しうるが、
+当たるルールは起点の `<git プロジェクトルート>` にしか当たらない。
+
+だから共通層の `credentials` ルールの `match` は `Bash|Read|Write|Edit|NotebookEdit` で、
+`Grep` と `Glob` を含めていない。足しても当たるのは起点のパスだけで、ルートからの検索は素通りした
+ままになる。塞がらないものを足すと、止まっているつもりの範囲だけが広がる
+（[ADR-0050](docs/adr/0050-search-tools-and-ignore.md)）。
+
+**`Grep` と `Glob` は ccnavi が受け持たない。** 守りは 3 層に分かれていて、探すツールが読む
+ファイルを見るのは上の 2 つ。
+
+| 層 | 何を止めるか |
+|---|---|
+| `.gitignore`（ripgrep が読む） | `Grep` が起点から降りていく途中で出会うファイル |
+| `.claude/settings.json` の `permissions.deny` の `Read(...)` | ファイル 1 つ 1 つ。`Grep` のファイル読み取りにも効く |
+| ccnavi のルール | `Read` `Write` `Edit` `NotebookEdit` `Bash`。`Grep` と `Glob` は受け持たない |
+
+`projects/foo/.env` が foo の `.gitignore` に入っている場合の噛み合い方。
+
+| 呼び方 | ccnavi のルール | `.gitignore` | `Read()` の `deny` |
+|---|---|---|---|
+| `Grep(path=<git プロジェクトルート>)` | 当たらない | **弾く** | **弾く** |
+| `Grep(path=.../foo/.env)` | 当たらない | 当たらない | **弾く** |
+| `Read(.../foo/.env)` | **止める** | 当たらない | **弾く** |
+| `Bash: cat .../foo/.env` | **止める** | 当たらない | 当たらない |
+
+2 行目は `Read()` の `deny` が唯一の守りになる。`permissions.deny` を持たない配布先では、
+ignore されたファイルを名指しした `Grep` は通る。
+
+### `.gitignore` を当てにしてよい範囲
+
+ripgrep の既定の挙動で、ccnavi の側では変えられない。ルールを書くときに当てにしてよい範囲は
+ここまで。
+
+- **起点そのものに指定されたパスには当たらない。** ignore されたディレクトリやファイルを `path` に
+  渡すと、その中は読まれる
+- **`.git` が無いディレクトリでは `.gitignore` を読まない**（ripgrep の `--require-git`）。clone
+  していない置き場、git 化していない `projects/<名前>/` が該当する
+- **降りた先に `.git` があれば、そこから下はそのリポジトリの `.gitignore` が効く。** ワークスペース
+  ルートが git 管理下でなくても、中のプロジェクトの `.gitignore` は効く。`.git` がファイル
+  （作業ツリーの gitdir ポインタ）でも同じ
+- **隠しファイルは弾かれない。** ドットで始まるファイルやディレクトリも、ignore されていなければ
+  `Grep` が読む。素の `rg` の既定とは違うので、「ドット始まりだから隠れている」と数えない
+- **`Read` ツールには最初から関係しない。** こちらは `credentials` ルールと `Read()` の `deny` が止める
+
+`.ignore`・`.rgignore`・`.git/info/exclude`・git のグローバルな除外（`core.excludesFile`、既定では
+`~/.config/git/ignore`）も ripgrep は読む。どれも弾く側に働くので、守りが薄くなる方向には出ない。
+
+ワークスペースルートが git 管理下で、`.gitignore` に `/projects/` があるときは、ルートからの
+`Grep` は `projects/` へ降りない。プロジェクトのコードを探すときは `cd projects/<名前>` してから
+呼ぶ（起点に指定した場所には ignore が当たらないので、中へ入れる）。
+
 ## 動作モード
 
 | 値 | 挙動 |
