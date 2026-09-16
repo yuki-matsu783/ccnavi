@@ -243,6 +243,12 @@ async function update(): Promise<void> {
   }
 }
 
+/**
+ * ボードを描き直す。`webview.html` の差し替えは中身が同じ文字列だと何も起こらないが、
+ * ここは毎回ちがう nonce を埋めるので必ず作り直される。「更新」を押して非活性にしたボタンが
+ * 活性に戻るのはこの作り直しなので、nonce を固定したり HTML をキャッシュしたりすると
+ * 「中身が変わらない読み直し」でボタンが「更新中」のまま固まる。
+ */
 function show(current: PanelState, board: Board): void {
   current.board = board;
   current.panel.webview.html = renderBoard(board, {

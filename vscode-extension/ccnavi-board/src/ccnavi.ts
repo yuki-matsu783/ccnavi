@@ -274,7 +274,8 @@ export async function runApproveYes(
       ok: false,
       error:
         `ccnavi --approve --yes を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。` +
-        "一部だけ承認済みになっている可能性がある。ボードを更新して、何が承認されたかを確かめる",
+        "一部だけ承認済みになっている可能性がある。承認済みチケットのコミットと push は送っていない" +
+        "（送るのは承認できたときだけ）。ボードを更新して、何が承認されたかを確かめる",
     };
   }
   const parsed = parseApproveResult(ran.stdout);
