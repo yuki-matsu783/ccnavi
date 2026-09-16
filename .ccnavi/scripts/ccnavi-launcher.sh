@@ -1,6 +1,6 @@
 #!/bin/sh
 # ccnavi-launcher — hook が起動する 1 本。CCNAVI_BIN_PATH はここを指す。1 つ上の bin/ に
-# 並ぶ機械ごとの組み立てから、この機械で動くものを選んで起動する（ADR-0044）。
+# 並ぶ機械ごとの組み立てから、この機械で動くものを選んで起動する。
 #
 #   .ccnavi/scripts/ccnavi-launcher.sh      ← これ
 #   .ccnavi/bin/darwin-arm64/ccnavi
@@ -16,9 +16,6 @@
 #
 # 代償は、ツール呼び出しのたびに sh の起動と uname 1 回ぶんが乗ること。uname は
 # 1 回で OS と CPU の両方を取る。
-#
-# 自分の隣（.ccnavi/scripts/<os>-<arch>/）は探さない。そこは配る場所ではなく、探すと
-# 自己保護の綴りが当たらない置き場から実体を起動する道ができる。
 #
 # bin_dir は `..` を含むまま使い、正規化しない。`${here%/*}` で切る形は here が `.` や
 # 1 段の名前のときに壊れる。シンボリックリンクは解かない。
