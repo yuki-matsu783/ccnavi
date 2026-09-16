@@ -235,6 +235,12 @@ export async function runApprovePreview(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      ok: false,
+      error: `ccnavi --approve --preview --json を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。承認済みチケットは置かれていない`,
+    };
+  }
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
     // 読めない提案の行より後ろに出るので、1 行目だけでは届かない。
@@ -260,6 +266,17 @@ export async function runApproveYes(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
+  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（approval.py の for cand in batch）ので、
+  // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」に落ちるため、
+  // ここで拾わないと何が起きたのか伝わらない。
+  if (ran.killed) {
+    return {
+      ok: false,
+      error:
+        `ccnavi --approve --yes を ${APPROVE_TIMEOUT_MS / 1000} 秒で打ち切った。` +
+        "一部だけ承認済みになっている可能性がある。ボードを更新して、何が承認されたかを確かめる",
+    };
+  }
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0
