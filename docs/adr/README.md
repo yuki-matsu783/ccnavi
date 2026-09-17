@@ -64,6 +64,7 @@
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
 | [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
+| [0058](0058-check-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は組み込みの allow が渡す |
 
 ### 実行後の監視と自己防衛
 
