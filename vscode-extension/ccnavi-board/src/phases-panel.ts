@@ -28,7 +28,6 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { WATCH_PATTERNS } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
@@ -36,6 +35,8 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
 import { escapeHtml } from "./core/render.js";
+import type { PhasesTarget } from "./core/screens.js";
+import { WATCH_PATTERNS } from "./core/watch.js";
 import { requireTickets } from "./ticket-control.js";
 
 const DEBOUNCE_MS = 120;
@@ -48,12 +49,6 @@ const LAYER_HEADER = [
   "# 共通層と同じ id を書くなら中身も同じにする。違えば --lint が error を出し、この層は空として扱われる。",
   "",
 ].join("\n");
-
-/** 画面が直す種類のファイル。共通層、自身の層、プロジェクト 1 つの層 */
-export type PhasesTarget =
-  | { readonly kind: "common" }
-  | { readonly kind: "self" }
-  | { readonly kind: "project"; readonly name: string };
 
 type Message =
   | { readonly type: "reload"; readonly dirty: boolean }

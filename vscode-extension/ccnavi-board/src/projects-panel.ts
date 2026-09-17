@@ -16,7 +16,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { openBoard } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
@@ -38,9 +37,8 @@ import {
 } from "./core/projects.js";
 import { renderProjectsPage } from "./core/projects-render.js";
 import { escapeHtml } from "./core/render.js";
+import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
-import { openPhases } from "./phases-panel.js";
-import { openRules } from "./rules-panel.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
 
@@ -347,10 +345,10 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       createSelfRules(current, page);
       return;
     case "openRules":
-      await openRules(message.name === "" ? { kind: "workspace" } : { kind: "project", name: message.name });
+      await screens().rules(message.name === "" ? { kind: "workspace" } : { kind: "project", name: message.name });
       return;
     case "openSelfRules":
-      await openRules({ kind: "self" });
+      await screens().rules({ kind: "self" });
       return;
     case "openPhases":
     case "openSelfPhases":
@@ -363,10 +361,10 @@ async function handleMessage(current: PanelState, message: Message | undefined):
         return;
       }
       if (message.type === "openBoard") {
-        await openBoard(message.name);
+        await screens().board(message.name);
         return;
       }
-      await openPhases(message.type === "openSelfPhases" ? { kind: "self" } : { kind: "project", name: message.name });
+      await screens().phases(message.type === "openSelfPhases" ? { kind: "self" } : { kind: "project", name: message.name });
       return;
     case "fetch":
     case "pull": {

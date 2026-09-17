@@ -19,27 +19,12 @@ import {
 } from "./core/commands.js";
 import { renderBoard, renderErrorPage, type ApprovalOverlay } from "./core/render.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
+import { WATCH_PATTERNS } from "./core/watch.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
-
-/**
- * 監視する場所。提案（ワークスペース、プロジェクト、全ワークツリーの `wip/proposals/`）、
- * 承認済みチケットとマーカー（同じツリーの `.ccnavi/approved/`。`doing/` `done/` `phases/`）、ワークツリーの登録。
- * glob は OS によらず "/" 区切り。
- */
-export const WATCH_PATTERNS = [
-  "wip/**/proposals/**",
-  "projects/*/wip/**/proposals/**",
-  ".claude/worktrees/*/wip/**/proposals/**",
-  ".ccnavi/approved/**",
-  "projects/*/.ccnavi/approved/**",
-  ".claude/worktrees/*/.ccnavi/approved/**",
-  ".git/worktrees/*",
-  "projects/*/.git/worktrees/*",
-] as const;
 
 type Message =
   | { readonly type: "open"; readonly filePath: string }
