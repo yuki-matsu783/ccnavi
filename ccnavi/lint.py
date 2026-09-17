@@ -355,7 +355,11 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     copies, notes = approval.scan(conf, root)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
-    closed, _ = approval.scan(conf, root, closed=True)
+    # 閉じた承認済みチケットの苦情も拾う。判定は閉じたものを読まないが、読めないファイルが
+    # 置き場に残っていること自体は書いた人の思い違いで、黙ると他の機械へそのまま届く。
+    closed, notes = approval.scan(conf, root, closed=True)
+    for note in notes:
+        problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
     review, notes = approval.scan_review(conf, root)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))

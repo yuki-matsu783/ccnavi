@@ -97,9 +97,9 @@ def _load_dir(directory: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
         if not name.endswith(".md"):
             continue
         path = os.path.join(directory, name)
-        ticket = load_copy(path)
+        ticket, reason = load_copy(path)
         if ticket is None:
-            notes.append(f"承認済みチケット {path} を読めない")
+            notes.append(f"承認済みチケット {path} を読めない（{reason}）")
             continue
         if ticket.ticket != name[:-3]:
             notes.append(f"承認済みチケット {path} の識別子 {ticket.ticket} がファイル名と違う")
@@ -117,20 +117,26 @@ def state_of(directory: str, ticket: ticket_mod.Ticket) -> str:
     return name
 
 
-def load_copy(path: str) -> ticket_mod.Ticket | None:
+def load_copy(path: str) -> tuple[ticket_mod.Ticket | None, str]:
+    """承認済みチケットを 1 本読む。2 つめは読めなかった理由。
+
+    理由を返すのは、読めない承認済みチケットを `--lint` が名指しするため。
+    「読めない」だけでは、BOM のような目に見えない原因に手が届かない。
+    """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
-        return None
+        detail = problems[0].detail if problems else "チケットとして読めない"
+        return None, detail
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
     if not isinstance(meta, dict):
-        return None
+        return None, f"`{ticket_mod.APPROVAL_KEY}` の欄が無い。承認を通っていない"
     ticket.approved_at = str(meta.get("approved_at") or "")
     ticket.source_tree = str(meta.get("source_tree") or "")
     ticket.source_path = str(meta.get("source_path") or "")
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案を写したか）とは別物で、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
-    return ticket
+    return ticket, ""
 
 
 def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
