@@ -1,5 +1,5 @@
 /**
- * ルールを保存してよいか。作業中のチケット（提案が `doing`）が 1 件でもあれば保存しない。
+ * ルールを保存してよいか。作業中のチケット（承認済みチケットが `doing/` にあり、着手済み）が 1 件でもあれば保存しない。
  *
  * hook はツール呼び出しのたびにルールを読み直すので、セッションが動いている最中に
  * 保存すると次の呼び出しから効く。途中で判定が変わるのを避けるため、着手済みの
@@ -19,10 +19,12 @@ export interface Lock {
 /**
  * ワークスペースのルールは、どのツリーの doing でも保存を止める（Bash の和に効くため）。
  * プロジェクトのルール（`project` を渡す）は、そのプロジェクトの doing だけを見る。
+ * 作業中は「承認済みチケットが開いていて（`copy.status` が `open`）、着手済み（`started_at` がある）」。
+ * 承認しただけで着手していないものは、まだセッションが動いていないので数えない（ADR-0055 の前と同じ線）。
  */
 export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const doing = board.tickets
-    .filter((t) => t.proposal !== null && t.proposal.state === "doing")
+    .filter((t) => t.copy.status === "open" && t.started_at !== "")
     .filter((t) => project === undefined || t.project === project)
     .map((t) => t.ticket);
   if (doing.length === 0) {

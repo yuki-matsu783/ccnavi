@@ -8,8 +8,24 @@ test("CB-T01 フィクスチャ（実行ファイルの出力）を読める", (
   assert.equal(board.version, BOARD_VERSION);
   assert.deepEqual(
     board.tickets.map((t) => t.ticket),
-    ["i0001", "i0001-01", "i0001-02", "i0001-03"],
+    ["i0001", "i0001-01", "i0001-02", "i0001-03", "i0001-04", "i0001-05"],
   );
+  assert.equal(board.settings.approved, ".ccnavi/approved");
+  const by = new Map(board.tickets.map((t) => [t.ticket, t]));
+  // 提案の側にあるのは承認待ちとレビュー待ちだけ。承認済みチケットの側は proposal が null
+  assert.deepEqual(
+    board.tickets.map((t) => [t.ticket, t.proposal?.state ?? null, t.copy.status]),
+    [
+      ["i0001", null, "open"],
+      ["i0001-01", null, "closed"],
+      ["i0001-02", null, "open"],
+      ["i0001-03", "todo", "none"],
+      ["i0001-04", "review", "review"],
+      ["i0001-05", null, "closed"],
+    ],
+  );
+  assert.notEqual(by.get("i0001-05")!.cancelled_at, "");
+  assert.deepEqual(board.parents[0].phases[1].states, { "i0001-02": "doing", "i0001-04": "review", "i0001-05": "cancelled" });
   assert.deepEqual(board.pending_approval, ["i0001-03"]);
   assert.equal(board.parents.length, 1);
   assert.equal(board.parents[0].phases.length, 2);
@@ -56,7 +72,11 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
   const parsed = parseBoardJson(
     JSON.stringify({
       version: BOARD_VERSION,
-      tickets: [{ ticket: "x", copy: { status: "weird" }, proposal: { state: "nope" } }],
+      tickets: [
+        { ticket: "x", copy: { status: "weird" }, proposal: { state: "nope" } },
+        // 旧の置き場の状態（doing / done / cancelled）は提案の状態としては読まない（ADR-0055）
+        { ticket: "y", copy: { status: "review" }, proposal: { state: "doing" } },
+      ],
       parents: [{ ticket: "x", phases: [{ number: 1, marks: { requested: "not an object" } }] }],
     }),
   );
@@ -65,6 +85,8 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
     const t = parsed.board.tickets[0];
     assert.equal(t.copy.status, "none");
     assert.equal(t.proposal, null);
+    assert.equal(parsed.board.tickets[1].copy.status, "review");
+    assert.equal(parsed.board.tickets[1].proposal, null);
     assert.equal(t.human_review.required, false);
     assert.deepEqual(t.seen_in, []);
     const p = parsed.board.parents[0].phases[0];

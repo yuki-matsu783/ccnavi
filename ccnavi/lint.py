@@ -356,8 +356,11 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
     closed, _ = approval.scan(conf, root, closed=True)
+    review, notes = approval.scan_review(conf, root)
+    for note in notes:
+        problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
     index = approval.by_id(copies)
-    done = {t.ticket for t in closed}
+    done = {t.ticket for t in closed + review}
 
     proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
     problems.extend(complaints)
@@ -425,42 +428,80 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _proposal_problems(proposals: list, index: dict, done: set[str], resolve) -> list[Problem]:
-    """提案の側。未承認、承認で落ちるもの、先行が閉じていない doing、同じ識別子の重複。"""
+    """提案の側。承認待ち、承認で落ちるもの、先行が閉じていない着手済み、同じ識別子の重複。
+
+    `todo/` に在るものは全部承認待ち。同じ識別子がどこかの置き場（作業中・レビュー待ち・
+    閉じた）に在れば、親の改版でない限り書き損じなので名指しする。
+    """
     problems: list[Problem] = []
     # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
         pool.setdefault(t.ticket, t)
     seen: dict[str, list[str]] = {}
+    for t in index.values():
+        state = t.state or ticket_mod.DOING
+        seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{state}")
     for t in proposals:
         seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{t.state}")
-        if t.ticket not in index and t.ticket not in done and t.state != ticket_mod.CANCELLED:
+        if t.state != ticket_mod.TODO:
+            continue
+        if t.ticket in index:
+            current = index[t.ticket]
+            if not t.is_child and t.has_plan and approval._plan_differs(t, current):
+                continue  # 親の改版。承認待ちに入る
             problems.append(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket} は未承認（{t.tree or '(main)'} の {t.state}/）。"
-                    "'ccnavi --approve' を通すまで範囲は効かない",
+                    f"{t.ticket} は承認済み（{current.tree or '(main)'} の "
+                    f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る。"
+                    "計画の改版でなければ todo/ の側を消す",
                 )
             )
-        if t.state not in ticket_mod.CLOSED:
-            # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-            # 範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
-            complaints, overflow = approval.validate(t, pool, resolve(approval.project_of(t, pool)))
-            for p in complaints + overflow:
-                problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
-        if t.state == ticket_mod.DOING:
+            continue
+        if t.ticket in done:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"{t.ticket} は閉じたかレビュー待ちなのに todo/ にも在る。"
+                    "承認の対象にならない。再開は人が承認済みチケットを戻す",
+                )
+            )
+            continue
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"{t.ticket} は承認待ち（{t.tree or '(main)'} の todo/）。"
+                "'ccnavi --approve' を通すまで範囲は効かない",
+            )
+        )
+        # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
+        # 範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
+        complaints, overflow = approval.validate(t, pool, resolve(approval.project_of(t, pool)))
+        for p in complaints + overflow:
+            problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
+    for t in index.values():
+        if t.started_at:
             waiting = [p for p in t.predecessors if p not in done]
             if waiting:
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
                         "(ticket)",
-                        f"{t.ticket} は先行 {', '.join(waiting)} が閉じていないのに doing/ にある",
+                        f"{t.ticket} は先行 {', '.join(waiting)} が閉じていないのに着手している",
                     )
                 )
     for ticket_id, places in seen.items():
-        if len(places) > 1:
+        distinct = sorted(set(places))
+        if len(distinct) > 1 and not any(p.endswith(":todo") for p in distinct):
+            where = ", ".join(distinct)
+            problems.append(
+                Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
+            )
+        elif len(places) > 1 and len(distinct) < len(places):
             where = ", ".join(places)
             problems.append(
                 Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
@@ -861,65 +902,99 @@ def _ticket_hooks(root: str) -> list[Problem]:
 
 
 def _legacy_tickets(conf: settings.Settings, root: str) -> list[Problem]:
-    """旧の綴り（`wip/tickets/`）に取り残された提案を名指しする。
+    """旧の置き場に取り残されたチケットを名指しする（ADR-0054、ADR-0055）。
 
-    提案の置き場の既定を `wip/tickets` から `wip/proposals` に変えた（ADR-0054）。
-    旧の置き場に提案が残っていると、そこは走査されないので「承認待ちは無い」で通る。
-    黙って通る向きなので、ここで言う。
+    旧の置き場は 3 つ。提案の `wip/tickets/`（ADR-0054 まで）、承認済みチケットの
+    `.ccnavi/tickets/`（直下と `closed/`。ADR-0055 まで）、いまの提案の置き場の
+    `doing/` `done/` `cancelled/`（ADR-0055 まで）。どれも走査されないので、残っていると
+    「承認待ちは無い」「開いているチケットは無い」で通る。黙って通る向きなので、ここで言う。
 
-    見るのは置き場の有無ではなく、**中に残っている提案**。置き場の有無だけで決めると、
-    新しい置き場を 1 つ作った時点で、旧の置き場に残った提案が永久に見えなくなる
+    見るのは置き場の有無ではなく、**中に残っているチケット**。置き場の有無だけで決めると、
+    新しい置き場を 1 つ作った時点で、旧の置き場に残ったものが永久に見えなくなる
     （移し忘れがいちばん起きるのはこの形）。
 
-    数えないものが 2 つある。同じ綴りのファイルが新しい置き場にもあるもの（写し終えた分）と、
-    `done/` `cancelled/` に在って承認済みチケットが閉じているもの。後者は記録として
-    残っていても害が無い。閉じたことの権威は承認済みチケットの側で、フェーズの状態も
-    そちらから読む（`phase.phases_of`）。
+    数えないのは、同じ識別子がいまの置き場のどこか（`todo/` `review/` `doing/` `done/`）に
+    在るもの。写し終えた分か、閉じたことの記録として残っているだけの分で、害が無い。
 
-    綴りを設定で決めた人には言わない。`CCNAVI_TICKETS_PROPOSAL` を書いた人は自分の
-    綴りで動かしているので、それが旧の綴りでも既定の話は関係が無い。
+    綴りを設定で決めた人には、その置き場の旧の綴りは言わない。自分の綴りで動かしている
+    ので、既定の話は関係が無い。
     """
-    if conf.tickets != settings.DEFAULT_TICKETS:
-        return []
-    closed, _ = approval.scan(conf, root, closed=True)
-    settled = {t.ticket for t in closed}
+    known = {t.ticket for t in approval._everything(conf, root)}
+    proposals, _ = ticket_mod.scan_all(root, conf.tickets, conf.projects)
+    known |= {t.ticket for t in proposals}
+    problems: list[Problem] = []
+    if conf.tickets == settings.DEFAULT_TICKETS:
+        stale = _stale_by_tree(conf, root, settings.LEGACY_TICKETS, ticket_mod.LEGACY_STATES, known)
+        if stale:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"提案の置き場の既定が `{settings.LEGACY_TICKETS}` から "
+                    f"`{settings.DEFAULT_TICKETS}` に変わった。"
+                    f"旧の置き場に残っていて走査されないチケットがある: {'、'.join(stale)}。"
+                    f"承認待ちなら `{settings.DEFAULT_TICKETS}/todo/` へ移し、済んだものは消す"
+                    f"（`{settings.TICKETS_ENV}={settings.LEGACY_TICKETS}` を "
+                    "`.claude/settings.json` の env に足せば旧の綴りのまま動くが、"
+                    "状態の置き場は今の形（todo / review）で読む）",
+                )
+            )
+    old_states = tuple(s for s in ticket_mod.LEGACY_STATES if s not in ticket_mod.STATES)
+    stale = _stale_by_tree(conf, root, conf.tickets, old_states, known)
+    if stale:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(ticket)",
+                f"提案の置き場の状態は `todo` と `review` の 2 つになった（ADR-0055）。"
+                f"旧の状態の置き場（{' / '.join(old_states)}）に残っていて走査されないチケットが"
+                f"ある: {'、'.join(stale)}。閉じたものは消し、途中のものは人が承認済みチケットの"
+                f"置き場（{conf.approved}/doing/）へ戻す",
+            )
+        )
+    if conf.approved == settings.DEFAULT_APPROVED:
+        stale = _stale_by_tree(
+            conf, root, settings.LEGACY_APPROVED, ("", approval.LEGACY_CLOSED_DIR), known
+        )
+        if stale:
+            problems.append(
+                Problem(
+                    SEVERITY_WARN,
+                    "(ticket)",
+                    f"承認済みチケットの置き場の既定が `{settings.LEGACY_APPROVED}` から "
+                    f"`{settings.DEFAULT_APPROVED}` に変わった（ADR-0055）。"
+                    f"旧の置き場に残っていて読まれない承認済みチケットがある: {'、'.join(stale)}。"
+                    f"開いていたものは `{settings.DEFAULT_APPROVED}/doing/` へ、閉じたものは "
+                    f"`{settings.DEFAULT_APPROVED}/done/` へ、`phases/` はそのまま "
+                    f"`{settings.DEFAULT_APPROVED}/phases/` へ移す（git mv）",
+                )
+            )
+    return problems
+
+
+def _stale_by_tree(
+    conf: settings.Settings, root: str, place_rel: str, states: tuple, known: set[str]
+) -> list[str]:
+    """ツリーごとに、旧の置き場に在っていまの置き場から見えない識別子を並べる。"""
     stale = []
     for t in approval.trees(conf, root):
-        left = _left_behind(t.root, conf.tickets, settled)
+        left = _left_behind(t.root, place_rel, states, known)
         if left:
             stale.append(f"{t.name or '(main)'}（{', '.join(left)}）")
-    if not stale:
-        return []
-    return [
-        Problem(
-            SEVERITY_WARN,
-            "(ticket)",
-            f"提案の置き場の既定が `{settings.LEGACY_TICKETS}` から "
-            f"`{settings.DEFAULT_TICKETS}` に変わった。"
-            f"旧の置き場に残っていて走査されない提案がある: {'、'.join(stale)}。"
-            f"`{settings.DEFAULT_TICKETS}` の同じ状態の置き場へ移すか、"
-            f"`{settings.TICKETS_ENV}={settings.LEGACY_TICKETS}` を "
-            "`.claude/settings.json` の env に足すこと",
-        )
-    ]
+    return stale
 
 
-def _left_behind(tree_root: str, tickets_rel: str, settled: set[str]) -> list[str]:
-    """このツリーの旧の置き場に在って、いまの置き場から見えない提案の識別子。"""
-    old = os.path.join(tree_root, settings.LEGACY_TICKETS.replace("/", os.sep))
-    new = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
+def _left_behind(tree_root: str, place_rel: str, states: tuple, known: set[str]) -> list[str]:
+    """このツリーの旧の置き場に在って、いまの置き場から見えないチケットの識別子。"""
+    old = os.path.join(tree_root, place_rel.replace("/", os.sep))
     found = []
-    for state in ticket_mod.STATES:
+    for state in states:
         try:
-            names = sorted(os.listdir(os.path.join(old, state)))
+            names = sorted(os.listdir(os.path.join(old, state) if state else old))
         except OSError:
             continue
         for name in names:
-            if not name.endswith(".md"):
-                continue
-            if state in ticket_mod.CLOSED and name[:-3] in settled:
-                continue
-            if any(os.path.exists(os.path.join(new, s, name)) for s in ticket_mod.STATES):
+            if not name.endswith(".md") or name[:-3] in known:
                 continue
             found.append(name[:-3])
     return sorted(set(found))

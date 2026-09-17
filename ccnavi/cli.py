@@ -64,7 +64,7 @@ workspace's own layer; the common layer keeps using --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
 
-To list the tickets, their approved copies, the phase marks and the gates
+To list the tickets, their places, the phase marks and the review holds
 in a machine-readable form (the VS Code board extension reads this), run
 
     ccnavi --explain --json
@@ -87,10 +87,10 @@ To review the pending tickets and approve the work areas they declare, run
     ccnavi --approve i0002 i0002-01        (only these, e.g. from a filtered board;
                                             ids go last, after every flag)
 
-It scans wip/proposals/ in every worktree, shows what each ticket makes writable
-and whether it needs a human review, then keeps an approved copy under
-.ccnavi/tickets/. Only the copies are consulted when judging calls, so
-editing a ticket never widens the area on its own. Ids only narrow the batch:
+It scans wip/proposals/todo/ in every worktree, shows what each ticket makes
+writable and whether it needs a human review, then moves the approved ticket to
+.ccnavi/approved/doing/. Only that place is consulted when judging calls, so
+writing a proposal never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.
 
@@ -110,6 +110,9 @@ The parent agent moves tickets between states and asks for reviews through the
 scripts in .ccnavi/scripts/, which call
 
     ccnavi ticket start|done|cancel <id> [--reason <why>]
+        (start writes the base point into .ccnavi/approved/doing/<id>.md; done moves
+         it to wip/proposals/review/ when the phase is reviewed, else to
+         .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
     ccnavi ticket judge <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>

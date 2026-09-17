@@ -466,8 +466,9 @@ push)
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
-	# 見分けるのは承認済みチケット（main の `.ccnavi/tickets/<名前>.md`）に
-	# `parent:` があるかだけ。承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
+	# 見分けるのは承認済みチケット（main の `.ccnavi/approved/{doing,done}/<名前>.md` と
+	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
+	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
 	# プロジェクトでも置き場はワークスペース（設計 §11.2）なので、git の
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
@@ -484,11 +485,16 @@ push)
 			/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
 			# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
 			# env を書いていないワークスペースで、この検査が黙って飛ぶ。
-			*) push_copies="$push_root/${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}" ;;
+			*) push_copies="$push_root/${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" ;;
 			esac
-			# 閉じた承認済みチケット（closed/）も見る。子を閉じたあと、親が合流して片付けるまでの間も
-			# そのツリーは子のもので、送ってよくなるわけではない。
-			for push_copy in "$push_copies/$push_name.md" "$push_copies/closed/$push_name.md"; do
+			case "${CCNAVI_TICKETS_PROPOSAL:-}" in
+			/* | [A-Za-z]:*) push_proposals="$CCNAVI_TICKETS_PROPOSAL" ;;
+			*) push_proposals="$push_root/${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}" ;;
+			esac
+			# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
+			# 合流して片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
+			for push_copy in "$push_copies/doing/$push_name.md" "$push_copies/done/$push_name.md" \
+				"$push_proposals/review/$push_name.md"; do
 				if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
 					push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
 					reject "$push_name は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を合流してから、親のワークツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"

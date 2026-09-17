@@ -30,7 +30,7 @@
 - **プロジェクトの作業は、プロジェクトに入ってから始める。** `cd projects/<名前>` してから
   `ccnavi-git.sh` を打つ。git の操作はそのリポジトリに対して行われる
 - **プロジェクトのリポジトリに入るのは、設定 3 本（`.ccnavi/config/` の `rules.yml`・`phases.yml`・`risks.yml`）と、
-  そのプロジェクト向けの提案（`wip/proposals/`）・承認済みチケット・フェーズのマーカー（`.ccnavi/tickets/`）。**
+  そのプロジェクト向けの提案（`wip/proposals/`）・承認済みチケット・フェーズのマーカー（`.ccnavi/approved/`）。**
   承認とフェーズの進みは親チケットのブランチに乗って他の機械へ届き、clone すれば続きができる（設計 §9.2、REQ-MLT-14）。
   記録と控え（`logs/`）はワークスペース側で、git には入れない
 - **チケットは `project:` を持つ。** 値は `projects/` の名前で、決めるのは人の承認。
@@ -113,7 +113,7 @@
 - 直接 `<統合先>` に戻した場合は、統合が済んでから `ccnavi-git.sh worktree remove <パス>` と
   `ccnavi-git.sh branch -d <名前>` で片付ける
 - MR に出した場合は、マージを待たず、`ready` で Draft を外した直後にワークツリーを片付ける。
-  順は「`ready` → マーカー `.ccnavi/tickets/phases/<親>/ready.json` をコミットして push →
+  順は「`ready` → マーカー `.ccnavi/approved/phases/<親>/ready.json` をコミットして push →
   `ccnavi-clean.sh` → `worktree remove`」。`ready` が置くマーカーは push の後に書かれるので、
   コミットせずにワークツリーを消すとマーカーが消える。親に取り込んで閉じた子のワークツリーも、
   このときに外す（前提の検査は子のブランチを引くので、ワークツリーが無くても外れない）
@@ -130,8 +130,8 @@
 
 | 何 | 場所 |
 |---|---|
-| 提案 | そのツリーの `wip/proposals/<状態>/`。プロジェクト向けは `projects/<名前>/wip/proposals/<状態>/`（そのプロジェクトの git が持つ） |
-| 承認済みチケット、フェーズのマーカー、子の記録（`.risk.json` など） | 親チケットのツリーの `.ccnavi/tickets/`。プロジェクト向けは `projects/<名前>/.ccnavi/tickets/`（そのプロジェクトの git が持ち、親のブランチに乗って他の機械へ届く） |
+| 提案（承認待ち `todo/`、レビュー待ち `review/`） | そのツリーの `wip/proposals/<状態>/`。プロジェクト向けは `projects/<名前>/wip/proposals/<状態>/`（そのプロジェクトの git が持つ） |
+| 承認済みチケット（作業中 `doing/`、閉じた `done/`）、フェーズのマーカー、子の記録（`.risk.json` など） | 親チケットのツリーの `.ccnavi/approved/`。プロジェクト向けは `projects/<名前>/.ccnavi/approved/`（そのプロジェクトの git が持ち、親のブランチに乗って他の機械へ届く） |
 | git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` |
 | 判定の記録と控え | ワークスペースの `logs/log.jsonl` と `logs/state/` |
 | ワークツリー | ワークスペースの `.claude/worktrees/<名前>` |
@@ -141,7 +141,13 @@
 
 **プロジェクトのリポジトリに入るのは、提案・承認済みチケットとマーカー・プロジェクトの設定の 3 行。** 記録と控え（`logs/`）と
 ワークツリーはワークスペース側で、git には入れない。別の機械で続きをするのに要るもの（依頼時の HEAD、リスクの点、受け入れた指摘、
-Draft を外した印）は全部 `.ccnavi/tickets/phases/<親>/` にあり、clone で届く。
+Draft を外した印）は全部 `.ccnavi/approved/phases/<親>/` にあり、clone で届く。
+
+チケットは 1 本のファイルで、`wip/proposals/todo/`（承認待ち）→ `.ccnavi/approved/doing/`（人が承認）→
+`wip/proposals/review/`（`ticket done`。レビュー要のとき）→ `.ccnavi/approved/done/`（人がレビュー）と
+動く（ADR-0055）。`.ccnavi/approved/` へ動かすのは人、`wip/proposals/` へ動かすのはエージェント
+（`ccnavi-ticket.sh` 経由）。レビューで残った指摘は、人が `accept` で「受け入れて進む」か
+「続きの子チケットを `doing/` に起こす」かを選ぶ。
 
 ラッパースクリプトが返す記録の綴りは、cwd から開ける形で出る。そのまま `sed -n` などで開けばよい。
 

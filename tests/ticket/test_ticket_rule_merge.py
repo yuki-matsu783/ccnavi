@@ -138,7 +138,7 @@ class Workspace(unittest.TestCase):
     # 提案と承認済みチケットの置き場。ツリーのルートからの相対で、道具にもそのまま渡す。
     # 子クラスで綴りを変え、置き場を決め打ちしていないことを確かめる。
     TICKETS = "wip/proposals"
-    APPROVED = ".ccnavi/tickets"
+    APPROVED = ".ccnavi/approved"
 
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-merge-")
@@ -492,13 +492,13 @@ class TicketPlaces(Workspace):
                 self.assertEqual(self.last_record().get("code", ""), code, self.reason(result))
 
     def test_state_directories_stay_with_the_builtin_guard(self):
-        result = self.write_hook(self.child, f"{self.TICKETS}/doing/i0009.md")
+        result = self.write_hook(self.child, f"{self.TICKETS}/review/i0009.md")
         self.assertEqual(self.decision(result), "deny")
         self.assertIn("builtin-ticket-state", self.reason(result))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_approved_tickets_stay_with_the_builtin_guard(self):
-        result = self.write_hook(self.child, f"{self.APPROVED}/i0009.md", core="enable")
+        result = self.write_hook(self.child, f"{self.APPROVED}/doing/i0009.md", core="enable")
         self.assertEqual(self.decision(result), "deny", self.reason(result))
         self.assertIn("builtin-guard-project-home", self.reason(result))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(result))

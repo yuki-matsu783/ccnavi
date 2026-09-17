@@ -60,13 +60,13 @@ class BoardTest(PhaseHarness):
         self.assertEqual(sorted(by_id), ["i0001", "i0001-01", "i0001-02", "i0001-03"])
 
         closed = by_id["i0001-01"]
-        self.assertEqual(closed["proposal"]["state"], "done")
+        self.assertIsNone(closed["proposal"])
         self.assertEqual(closed["copy"]["status"], "closed")
         self.assertTrue(closed["worktree"]["exists"])
         self.assertTrue(closed["completed_at"])
 
         doing = by_id["i0001-02"]
-        self.assertEqual(doing["proposal"]["state"], "doing")
+        self.assertIsNone(doing["proposal"])
         self.assertEqual(doing["copy"]["status"], "open")
         self.assertTrue(doing["worktree"]["exists"])
         self.assertTrue(doing["worktree"]["path"].endswith("i0001-02"))
@@ -90,11 +90,12 @@ class BoardTest(PhaseHarness):
         for t in self.board()["tickets"]:
             self.assertEqual(t["scattered"], [], t["ticket"])
         # 正常な場面でも、写りは複数あるし状態も食い違う（ワークツリーはブランチを
-        # 切った時点の写しを持つ）。数や状態の違いを食い違いに数えない。
+        # 切った時点の写しを持つ。承認済みチケットの置き場に在るものも写る）。
+        # 数や状態の違いを食い違いに数えない。
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(len(by_id["i0001-01"]["seen_in"]), 3)
         self.assertEqual(
-            sorted({s["state"] for s in by_id["i0001-01"]["seen_in"]}), ["done", "todo"]
+            sorted({s["state"] for s in by_id["i0001-01"]["seen_in"]}), ["doing", "done"]
         )
 
     def test_scattered_lists_every_copy_when_the_home_tree_holds_none(self):
@@ -150,7 +151,7 @@ class BoardTest(PhaseHarness):
         # 承認済みチケットの置き場を空文字で指しても切れない。既定の置き場で有効のまま。
         board = self.board("--approved", "")
         self.assertEqual(board["settings"]["ticket_control"], "enable")
-        self.assertTrue(board["settings"]["approved"].endswith("tickets"))
+        self.assertTrue(board["settings"]["approved"].endswith("approved"))
 
     def test_shape_matches_the_extension_fixture(self):
         self.scene()

@@ -287,10 +287,7 @@ def decide_after(
     # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
-    # 提案の状態を承認済みチケットへ写す。閉じた子の承認済みチケットはここで closed/ へ動く。
-    # 範囲は実行前の判定と同じ経路で解く。
-    if conf.tickets_enabled:
-        phase.sync(stderr, root, conf)
+    # 範囲は実行前の判定と同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
     scope = scope_guard(conf, root)
 
     text = post.check(

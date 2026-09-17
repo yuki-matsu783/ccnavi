@@ -3,19 +3,18 @@ import assert from "node:assert/strict";
 import { lockFromBoard, lockFromError } from "../../src/core/lock.js";
 import { fixture } from "../helpers/fixture.js";
 
-test("CB-T34 提案が doing のチケットがあれば保存できない", () => {
+test("CB-T34 着手済みのチケット（approved/doing/ にあり started_at を持つ）があれば保存できない", () => {
   const lock = lockFromBoard(fixture());
   assert.equal(lock.locked, true);
+  // 親 i0001 は doing/ にあるが着手していない。レビュー待ち・閉じた子・取り消した子も数えない
   assert.deepEqual(lock.doing, ["i0001-02"]);
   assert.match(lock.reason, /i0001-02/);
 });
 
-test("CB-T35 doing が無ければ保存できる。todo や done は数えない", () => {
+test("CB-T35 着手済みが無ければ保存できる。承認待ち・未着手・レビュー待ち・完了は数えない", () => {
   const board = fixture();
   const tickets = board.tickets.map((t) =>
-    t.proposal === null || t.proposal.state !== "doing"
-      ? t
-      : { ...t, proposal: { ...t.proposal, state: "done" as const } },
+    t.ticket === "i0001-02" ? { ...t, started_at: "" } : t,
   );
   const lock = lockFromBoard({ ...board, tickets });
   assert.equal(lock.locked, false);

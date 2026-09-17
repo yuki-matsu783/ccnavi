@@ -385,8 +385,9 @@ def check(
             )
         else:
             stderr.write(
-                "解決してもらって再実行するか、同じフェーズに子を足してやり直すか、利用者が端末で "
-                f"'{review_sh} accept {phase_no}' を打つ\n"
+                "解決してもらって再実行するか、利用者が端末で "
+                f"'{review_sh} accept {phase_no}' を打って、受け入れて進むか"
+                "続きの子チケットを起こすかを選ぶ\n"
             )
         return 1
     assert result.mr is not None
@@ -399,8 +400,68 @@ def check(
         {"mr": result.mr.number, "accepted": []},
     ):
         return 1
+    if not _settle_children(stdout, stderr, root, conf, parent, ph):
+        return 1
     stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。先へ進める\n")
     return 0
+
+
+def _settle_children(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    ph: phase.Phase,
+) -> bool:
+    """レビューが済んだフェーズ（延期を引き受けた分を含む）のレビュー待ちの子を `done/` へ動かす。
+
+    人が見たことの記録はマーカーで、場所の移動はその写し（ADR-0055）。動かせなければ言って False。
+    """
+    moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
+    if failed:
+        stderr.write(f"ccnavi: {failed}\n")
+        return False
+    if moved:
+        stdout.write(
+            f"レビュー待ちの子を {conf.approved}/{ticket_mod.DONE}/ へ動かした: "
+            f"{', '.join(moved)}\n"
+        )
+    return True
+
+
+# accept の選び方。受け入れて進むか、続きの子を起こすか。
+ACCEPT_KEEP = "a"
+ACCEPT_FOLLOWUP = "f"
+
+
+def _followup_from_choice(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    parent: ticket_mod.Ticket,
+    ph: phase.Phase,
+    items: list[str],
+    stamp: str,
+) -> str | None:
+    """人が選んだ続きの子を `doing/` に起こし、識別子を返す。起こせなければ None。"""
+    children = [t for t in ph.tickets if ph.states.get(t.ticket) in ticket_mod.FINISHED]
+    ident, failed = approval.followup(conf, root, parent, ph.number, children, items, stamp)
+    if failed:
+        stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
+        return None
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    stdout.write(
+        f"続きの子チケット {ident} を {conf.approved}/{ticket_mod.DOING}/ に起こした"
+        f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
+        "フェーズは開き直り、マーカーは消えた。\n"
+        f"次はエージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
+        f"{parent.ticket}' でワークツリーを切り、'{ticket_sh} start {ident}' で着手する\n"
+    )
+    return ident
 
 
 def reviewed(
@@ -462,29 +523,63 @@ def reviewed(
     )
     for t in unresolved:
         stdout.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
-    stdout.write("これらを残したまま次のフェーズへ進めてよいなら y、やめるならそれ以外: ")
+    stdout.write(
+        "残った指摘の扱いを選ぶ。\n"
+        f"  {ACCEPT_KEEP}  受け入れて次のフェーズへ進む（受け入れた記録が残る）\n"
+        f"  {ACCEPT_FOLLOWUP}  続きの子チケットを {conf.approved}/{ticket_mod.DOING}/ に起こして"
+        "応える（このフェーズは開き直る）\n"
+        "それ以外: やめる\n"
+        "選択: "
+    )
     stdout.flush()
-    if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
+    choice = fsio.read_line(stdin).strip().lower()
+    if choice not in (ACCEPT_KEEP, ACCEPT_FOLLOWUP, "y", "yes"):
         stderr.write("ccnavi: 受け入れなかった\n")
         return 1
-    accepted = [t.url or t.id for t in unresolved]
     assert result.mr is not None
+    stamp = approval.now()
+    home = approval.home_dir(conf, root, parent.ticket, "")
+    if choice == ACCEPT_FOLLOWUP:
+        # 続きの子で応える。指摘は受け入れない（次の check がまた数える）。見た子は閉じ、
+        # 新しい子が同じ番号に入るのでフェーズは開き直る。レビュー済みのマーカーは置かない。
+        if not _settle_children(stdout, stderr, root, conf, parent, ph):
+            return 1
+        items = [f"{t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in unresolved]
+        ident = _followup_from_choice(stdin, stdout, stderr, root, conf, parent, ph, items, stamp)
+        if ident is None:
+            return 1
+        if conf.state:
+            path = os.path.join(
+                conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no)
+            )
+            note = (
+                MARKER_ACCEPT
+                + f"\n未解決の指摘は続きの子チケット `{ident}` で応える:\n"
+                + "\n".join(f"- {a}" for a in items)
+                + "\n"
+            )
+            failed = fsio.write_text(path, note, newline="\n")
+            if failed:
+                stderr.write(f"ccnavi: 記録を書き出せない ({failed})\n")
+        stdout.write(f"OK: フェーズ {phase_no} は続きの子 {ident} で応える\n")
+        return 0
+    accepted = [t.url or t.id for t in unresolved]
     # マーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
-    failed = approval.remember_accepted(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
-    )
+    failed = approval.remember_accepted(home, parent.ticket, accepted)
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1
     if not _mark(
         stderr,
-        approval.home_dir(conf, root, parent.ticket, ""),
+        home,
         parent.ticket,
         phase_no,
         approval.MARK_REVIEWED,
         {"mr": result.mr.number, "accepted": accepted},
     ):
+        return 1
+    if not _settle_children(stdout, stderr, root, conf, parent, ph):
         return 1
     if accepted and conf.state:
         path = os.path.join(conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no))
@@ -591,8 +686,27 @@ def _reviewed_in_chat(
         data,
     ):
         return 1
+    if not _settle_children(stdout, stderr, root, conf, parent, ph):
+        return 1
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
-    return 0
+    # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘は人が打つ。
+    stdout.write(
+        "残した指摘があれば、続きの子チケットを起こす。指摘を 1 行ずつ入れ、空行で終える"
+        "（何も入れなければ起こさない）:\n"
+    )
+    stdout.flush()
+    items: list[str] = []
+    while True:
+        line = fsio.read_line(stdin)
+        if not line.strip():
+            break
+        items.append(line.strip())
+    if not items:
+        return 0
+    ident = _followup_from_choice(
+        stdin, stdout, stderr, root, conf, parent, ph, items, approval.now()
+    )
+    return 0 if ident is not None else 1
 
 
 def handoff(
@@ -767,7 +881,10 @@ def wrapup(
         return 1
     phases = phase.phases_of(root, conf, parent.ticket)
     doing = [
-        t.ticket for ph in phases for t in ph.tickets if ph.states.get(t.ticket) == ticket_mod.DOING
+        t.ticket
+        for ph in phases
+        for t in ph.tickets
+        if ph.states.get(t.ticket) == ticket_mod.DOING and t.started_at
     ]
     if doing:
         stderr.write(
@@ -851,13 +968,16 @@ def _leftovers(
     approved_dir: str, parent: ticket_mod.Ticket, phases: list[phase.Phase], result: Result
 ) -> Leftovers:
     not_ended = [ph for ph in phases if not ph.ended]
+
+    def untouched(t: ticket_mod.Ticket, ph: phase.Phase) -> bool:
+        # 承認されたが着手していない子。`doing/` に在って着手の欄が空。
+        return ph.states.get(t.ticket) == ticket_mod.DOING and not t.started_at
+
     return Leftovers(
-        todo=[t for ph in phases for t in ph.tickets if ph.states.get(t.ticket) == ticket_mod.TODO],
+        todo=[t for ph in phases for t in ph.tickets if untouched(t, ph)],
         not_ended=not_ended,
         untouched=[
-            ph
-            for ph in not_ended
-            if not ph.tickets or all(ph.states.get(t.ticket) == ticket_mod.TODO for t in ph.tickets)
+            ph for ph in not_ended if not ph.tickets or all(untouched(t, ph) for t in ph.tickets)
         ],
         unreviewed=[ph for ph in phases if ph.ended and not phase.reviewed_or_skipped(ph)],
         unplanned=parent.has_plan and parent.feedback is None,
@@ -935,6 +1055,8 @@ def _settle(
                 {"by": "wrapup", "at": stamp, "mr": mr_number, "accepted": []},
             ):
                 return None
+            if not _settle_children(stdout, stderr, root, conf, parent, ph):
+                return None
             settled.append(ph.number)
     return cancelled, skipped, settled
 
@@ -998,6 +1120,19 @@ def _approved_rel(conf: settings.Settings) -> str:
     return (conf.approved or settings.DEFAULT_APPROVED).strip("/")
 
 
+def _own_places(conf: settings.Settings) -> tuple[str, ...]:
+    """ccnavi 自身が動かす置き場。承認済みチケットと提案の 2 つ（ADR-0055）。
+
+    チケットは 2 つの置き場を行き来するので、片方だけを外すと `done` の移動
+    （`doing/` → `review/`）が「人が見るものが動いた」に数えられる。
+    """
+    return (_approved_rel(conf), (conf.tickets or settings.DEFAULT_TICKETS).strip("/"))
+
+
+def _is_own_place(conf: settings.Settings, path: str) -> bool:
+    return any(path.startswith(place + "/") for place in _own_places(conf))
+
+
 # 依頼のマーカーに記録された HEAD。git の revision として使う前に、この形であることを求める。
 _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 
@@ -1034,10 +1169,9 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
     )
     if rc != 0:
         return [], f"{ref[:12]} からの差分を読めない"
-    skip = _approved_rel(conf)
     changed = []
     for path in out.split("\0"):
-        if path and not path.startswith(skip + "/"):
+        if path and not _is_own_place(conf, path):
             changed.append(path)
     return changed, ""
 
@@ -1055,13 +1189,12 @@ def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     )
     if rc != 0:
         return True
-    skip = _approved_rel(conf)
     # `-z` で読む。既定の出力は非 ASCII を引用して 8 進に逃がすので、置き場の中の
     # 日本語のファイルが置き場の外に見え、「未コミットがある」で依頼が止まる。
     # `--no-renames` は、改名のときに出る 2 つめの綴り（移動元）が XY を持たない形で
     # 混ざるのを避けるため。phase.scope_findings と同じ読み方。
     for entry in status.split("\0"):
-        if len(entry) > 3 and entry[2] == " " and not entry[3:].startswith(skip + "/"):
+        if len(entry) > 3 and entry[2] == " " and not _is_own_place(conf, entry[3:]):
             return True
     return False
 
@@ -1269,9 +1402,9 @@ def _unmet(tree_root: str, conf: settings.Settings, ph: phase.Phase) -> list[str
     """依頼の前提のうち、ワークツリーの中で分かるもの。"""
     unmet: list[str] = []
     if not ph.ended:
-        unmet.append("フェーズが終わっていない（todo/ か doing/ に子が残っている）")
+        unmet.append("フェーズが終わっていない（doing/ に子が残っている）")
     for child in ph.tickets:
-        if ph.states.get(child.ticket) != ticket_mod.DONE:
+        if ph.states.get(child.ticket) not in (ticket_mod.REVIEW, ticket_mod.DONE):
             continue
         # 子のブランチは識別子と同じ名前。ワークツリーではなくブランチを引くので、
         # ワークツリーを消しても検査から外れない。引けなければ前提の未充足。
@@ -1379,7 +1512,8 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
     人が見たのは依頼時の HEAD。その後に積んだコミットは誰も見ていないので、
     それを「レビュー済み」に含めない。
 
-    ただし ccnavi 自身の置き場（`.ccnavi/tickets/`）だけを変えたコミットは、動いたと数えない。
+    ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
+    コミットは、動いたと数えない。
     依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 §9.2）。
     数えると「依頼 → マーカー → コミット」の順のせいで依頼の直後に必ず自分の足を踏み、
     承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを

@@ -3,9 +3,9 @@
 #
 #   sh .ccnavi/scripts/ccnavi-approve.sh [<識別子>...]
 #
-# 承認そのものは ccnavi の `--approve`。承認済みチケットは親チケットのツリーの
-# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/tickets）に置かれる。そこはプロジェクトの git が
-# 追跡していて、コミットして push するまで他の機械には届かない（設計 §9.2）。
+# 承認そのものは ccnavi の `--approve`。承認された提案は todo/ から親チケットのツリーの
+# $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）の doing/ へ動く（ADR-0055）。そこは
+# プロジェクトの git が追跡していて、コミットして push するまで他の機械には届かない（設計 §9.2）。
 # A が承認して B の機械で作業する流れは、この push で成り立つ。
 #
 # 識別子を並べると、その分だけを承認の対象にする（`--approve <識別子>...`）。同じ親の
