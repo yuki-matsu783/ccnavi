@@ -435,7 +435,7 @@ HTML を文字列で見る単体テスト（`*.test.ts`）と、画面に埋め�
 
 ```
 src/
-  extension.ts        コマンド登録とサイドパネルの登録（vscode に依存する）
+  extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
   sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口。チケット制御が disable なら 3 つ（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
   board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
@@ -465,6 +465,8 @@ src/
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）
     commands.ts       ターミナルに送るコマンド行（accept / wrapup）と、承認を子プロセスで打つ引数の並び
+    screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
+    watch.ts          4 つの画面が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
 media/
@@ -480,7 +482,7 @@ test/
   risk/               リスク管理（risk-doc, risk-render）
   phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
   projects/           プロジェクト管理（projects, layer-render）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens）
   */*.test.ts         HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜
 scripts/
@@ -489,3 +491,7 @@ scripts/
 ```
 
 `core/` は `vscode` を import しない。ここだけを `node --test` で試す。
+
+画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
+ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
+帳面に入口を載せるのは `extension.ts` だけで、載せ方を見るのはそこ 1 か所。
