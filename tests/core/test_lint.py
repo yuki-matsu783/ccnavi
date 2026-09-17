@@ -350,6 +350,52 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("複数の場所にある", result.stdout)
 
+    def test_BOMの付いた提案はerrorでBOMを名指しする(self):
+        # BOM は目に見えないので、`---` と書いたのに弾かれたように見える。
+        # 文面が原因を言わないと、書いた人はエディタで見えているものを疑えない。
+        write(
+            os.path.join(self.root, "wip", "proposals", "todo"),
+            "i0001.md",
+            "\ufeff" + TICKET.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("BOM (U+FEFF)", result.stdout)
+        self.assertIn("i0001.md", result.stdout)
+
+    def test_BOMの付いた承認済みチケットはdoneに在ってもerrorになる(self):
+        # 判定は閉じた承認済みチケットを読まないが、読めないファイルが置き場に残っている
+        # こと自体は書いた人の思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
+        # そのまま届く。閉じた側の苦情を捨てると、届いた先でも黙ったままになる。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "i0001.md",
+            "\ufeff" + COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("を読めない", result.stdout)
+        self.assertIn("BOM (U+FEFF)", result.stdout)
+
+    def test_承認を通っていない承認済みチケットは欄の名前で名指しする(self):
+        # `ccnavi_approved` を持たないファイルも「読めない」側に落ちる。BOM と同じ文面に
+        # 混ぜると、人が手で置いたものなのか壊れているのかが読み分けられない。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            TICKET.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("ccnavi_approved", result.stdout)
+        self.assertNotIn("BOM (U+FEFF)", result.stdout)
+
     def test_綴りを設定で旧いままにしている人には言わない(self):
         # 置き場を自分で決めた人は、その綴りで動かしている。既定の話は関係が無い。
         proposal(self.root, "wip/tickets", "todo", "i0001")

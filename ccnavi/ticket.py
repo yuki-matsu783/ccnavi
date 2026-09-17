@@ -74,6 +74,10 @@ from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 # frontmatter の囲い。
 FENCE = "---"
 
+# BOM (U+FEFF)。`str.strip()` は空白と見なさないので、付いていると先頭の `---` が
+# `---` と一致しない。目に見えないので、弾くときは原因を名指しする（_frontmatter）。
+BOM = "\ufeff"
+
 # このビルドが読めるチケット書式の版。
 VERSION = 1
 
@@ -1027,7 +1031,17 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
 def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
-        return None, "", [Problem(SEVERITY_ERROR, "(file)", f"先頭が `{FENCE}` で始まっていない")]
+        # 通す側には倒さない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
+        # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う姿で通る。弾いたまま、
+        # 目に見えない原因だけを名指しする。
+        if lines and lines[0].lstrip(BOM).strip() == FENCE:
+            detail = (
+                f"先頭に BOM (U+FEFF) が付いていて `{FENCE}` で始まっていない。"
+                "BOM 無しの UTF-8 で保存し直す"
+            )
+        else:
+            detail = f"先頭が `{FENCE}` で始まっていない"
+        return None, "", [Problem(SEVERITY_ERROR, "(file)", detail)]
     for i in range(1, len(lines)):
         if lines[i].strip() == FENCE:
             head = "\n".join(lines[1:i])
