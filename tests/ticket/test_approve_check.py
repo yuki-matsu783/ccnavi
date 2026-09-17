@@ -10,7 +10,8 @@
 4. 承認待ちに無い識別子を指定すれば 1（絞りは `--approve` と同じ意味）
 5. 範囲の超過だけなら 0。承認は止まらないので通るが、書けないことは行に添える
 6. `--json` は `--preview --json` と同じ形に `check` を足したもので、終了コードも同じ
-7. `todo/` に提案を書くと、確認の案内が 1 つの文脈で 1 度だけ届く
+7. `todo/` に提案を書くと、確認の案内が 1 つの文脈で 1 度だけ届く。止まりが外れるのは
+   その置き場の中だけで、ほかの場所は権限モードごとの倒し方が変わらない
 """
 
 from __future__ import annotations
@@ -22,6 +23,13 @@ from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import write
 
 APPROVE_VERSION = 1
+
+
+def decision(result):
+    """応答に載った判定。判定を返していなければ None（ccnavi は止めていない）。"""
+    if not result.stdout.strip():
+        return None
+    return json.loads(result.stdout).get("hookSpecificOutput", {}).get("permissionDecision")
 
 
 class ApproveCheckTest(PhaseHarness):
@@ -117,23 +125,35 @@ class ApproveCheckTest(PhaseHarness):
         self.assertEqual(body["check"], {"ok": True, "reason": "ok"})
 
     def test_json_says_why_it_failed(self):
+        """読めない提案しか無ければ、承認待ちが 1 件も無いのと同じ（そこで落ちる）。"""
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
         result = self.check("--json")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         body = json.loads(result.stdout)
-        self.assertFalse(body["check"]["ok"])
+        self.assertEqual(body["check"], {"ok": False, "reason": "nothing-pending"})
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
 
-    def test_broken_proposal_alongside_a_sound_one_fails_the_check(self):
+    def test_a_broken_proposal_elsewhere_does_not_fail_a_sound_one(self):
+        """読めない提案は終了コードを動かさない。`--approve` もそこでは落ちないから。
+
+        走査は絞る前の全ツリーを見るので、ここで落とすと、他のセッションの書きかけ 1 本で
+        「確かめでは 1、承認は 0」になる。黙らせもしない（自分が書いた 1 本かもしれない）。
+        """
         self.propose("i0001", parent_text("i0001", ["research"]))
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
         result = self.check()
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("読めない提案がある", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("読めなかったもの", result.stdout)
+        self.assertIn("broken.md", result.stdout)
+        self.assertIn("承認を依頼してよい", result.stdout)
+        # 同じ状態で本物の承認も通る。確かめと承認の答えが割れないことが要点。
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
     def test_check_needs_preview(self):
         """`--check` は `--preview` に相乗りする。単独ではエージェントが打てない。"""
@@ -157,6 +177,37 @@ class ApproveCheckTest(PhaseHarness):
         self.assertIn("--approve --preview --check", self.reason(first))
         again = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0003.md")
         self.assertNotIn("--approve --preview --check", self.reason(again))
+
+    def test_the_widening_is_limited_to_the_proposal_place(self):
+        """組み込みの allow が外す止まりは `todo/` の中だけ。ほかの場所は今までどおり。
+
+        allow に置いたので `todo/` は「ccnavi が言及する場所」になり、どのタイプも言及
+        しないときの倒し方（judge.undeclared_verdict）を通らなくなる。確認できる者が
+        居ないモード（dontAsk / bypassPermissions）と知らないモードでは、そこが止まる側
+        だったので、通るようになるのがこの組み込みの代償（ADR-0058）。**代償がここから
+        広がっていないことを杭で打つ。** 同じツリーの、どのルールも言及しない場所は
+        今までどおり止まる。
+
+        この道具は `CCNAVI_` の環境変数を落として動かすので、`CCNAVI_GUARD_UNWATCHED` は
+        既定の enable（いちばん厳しい側）。`todo/` の外が止まることがその証拠で、
+        その設定でも `todo/` の中は通る、が代償の正確な姿になる。
+        """
+        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
+        other = os.path.join(self.parent_tree, "src", "keep.py")
+        for mode, outside in (
+            ("bypassPermissions", "deny"),
+            ("dontAsk", "deny"),
+            ("unknownMode", "ask"),
+        ):
+            with self.subTest(permission_mode=mode):
+                inside = self.hook(
+                    "PreToolUse", "Write", self.parent_tree, permission_mode=mode, file_path=todo
+                )
+                self.assertIsNone(decision(inside), inside.stdout)
+                beyond = self.hook(
+                    "PreToolUse", "Write", self.parent_tree, permission_mode=mode, file_path=other
+                )
+                self.assertEqual(decision(beyond), outside, beyond.stdout)
 
     def test_the_notice_does_not_reach_other_places(self):
         other = os.path.join(self.parent_tree, "src", "keep.py")
