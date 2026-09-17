@@ -194,7 +194,9 @@ def bin_command(bin_path: str) -> str:
     if not bin_path:
         return "ccnavi"
     path = bin_path.replace("\\", "/")
-    return f"sh {_quoted(path)}" if path.endswith(".sh") else _quoted(path)
+    # 綴りの大小は区別しない。Windows と macOS の既定のファイルシステムでは `LAUNCHER.SH` も
+    # 同じシェルのスクリプトで、区別すると `sh` の付かない打てない綴りを案内することになる。
+    return f"sh {_quoted(path)}" if path.lower().endswith(".sh") else _quoted(path)
 
 
 # ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。

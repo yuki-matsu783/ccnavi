@@ -102,10 +102,15 @@ wrote is in a state that can be approved:
 It places nothing and needs no terminal. Exit 0 means every named ticket (or
 every pending one, when no id is given) goes into the batch as it stands, so
 the user can be asked. Exit 1 means it does not: an id that is not pending, no
-pending ticket at all, a proposal the approval drops, or a proposal that cannot
-be read. The reasons are printed per ticket. Scope that exceeds the parent or
-the phase type does not fail the check (approval does not drop it either); it is
-shown on the ticket's line, because writes there stay blocked after approval.
+pending ticket at all, or a proposal the approval drops. The reasons are printed
+per ticket.
+
+Two things do not fail the check, because --approve does not drop them either:
+scope that exceeds the parent or the phase type (writes there stay blocked after
+approval), and a proposal that cannot be read (the scan covers every worktree,
+before the ids narrow it, so another session's draft would fail it). Both are
+printed. Having nothing pending is the one place where the two differ: --approve
+calls that a success with nothing to do, the check calls it a failed check.
 
 The VS Code board extension approves from an overlay instead of the terminal:
 

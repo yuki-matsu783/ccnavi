@@ -858,7 +858,6 @@ CHECK_OK = "ok"
 CHECK_REFUSED = "refused"
 CHECK_NOTHING = "nothing-pending"
 CHECK_REJECTED = "rejected"
-CHECK_BROKEN = "broken"
 
 
 @dataclass
@@ -895,11 +894,15 @@ def check(
     - 承認待ちが 1 件も無い。承認を頼む前の確認としては失敗で、
       提案の置き場を間違えた回がここに出る
     - 承認の対象にしない提案がある（`rejected`）
-    - 読めない提案がある（`broken`）
 
-    範囲の超過（`overflow`）では落とさない。承認は止まらず、判定が切り詰めるだけなので、
-    承認の可否としては通る。承認しても書けない場所が残るのは伝える値打ちがあるから、
-    その行に添えて見せる。
+    落とさないものが 2 つある。どちらも `--approve` が落とさないもので、ここで落とすと
+    「確かめでは 1、承認は 0」という食い違いになる。
+
+    - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
+      書けない場所が残るのは伝える値打ちがあるから、その行に添えて見せる
+    - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
+      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。黙らせはせず、
+      件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
     """
     gathered = gather(stderr, conf, root, only)
     verdict = _verdict(gathered, conf.tickets)
@@ -941,7 +944,20 @@ def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
     lines.append("\n")
     for name, mark, notes in sorted(rows):
         lines.append(f"  {name.ljust(width)}  {mark}\n")
-        lines += [f"      - {note}\n" for note in notes]
+        lines += [_note_line(note) for note in notes]
+
+    # 読めない提案は終了コードを動かさない。`--approve` も、承認待ちが 1 件も無いとき以外は
+    # それで止まらない（`approve`）ので、ここで落とすと「確かめでは 1、承認は 0」になる。
+    # 走査は全ツリーを見る（絞る前）ので、他のセッションの書きかけ 1 本で、自分の提案が
+    # 通るのに「直せ」と言われることになり、確かめる習慣のほうが先に壊れる。
+    # 黙らせはしない。自分が書いた 1 本かもしれないので、件数と綴りを本文にも出す。
+    if gathered.problems:
+        lines.append(
+            f"\n読めなかったものが {len(gathered.problems)} 件ある"
+            "（提案か承認済みチケット。提案なら承認の対象に入らない）。\n"
+        )
+        lines += [_note_line(problem) for problem in gathered.problems]
+        lines.append("      自分が書いたものが混じっていないか見ること。\n")
 
     if gathered.rejected:
         reason = CHECK_REJECTED
@@ -949,17 +965,18 @@ def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
             f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
             "提案を直してから、利用者に承認を依頼すること。\n"
         )
-    elif gathered.broken:
-        reason = CHECK_BROKEN
-        tail = (
-            "\n読めない提案がある（苦情は標準エラーに出した）。"
-            "直してから、利用者に承認を依頼すること。\n"
-        )
     else:
         reason = CHECK_OK
         tail = f"\n{len(gathered.batch)} 件とも承認の対象に入る。利用者に承認を依頼してよい。\n"
     lines.append(tail)
     return Verdict(reason == CHECK_OK, reason, "".join(lines))
+
+
+def _note_line(note: str) -> str:
+    """行の下に添える 1 件。改行を含む苦情（ルールの `message` は複数行を書ける）は、
+    2 行目からも同じだけ下げる。下げないと、次の行が新しい段落に見える。"""
+    head, *rest = note.splitlines() or [""]
+    return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
 def approval_digest(text: str, batch: list[Candidate]) -> str:
