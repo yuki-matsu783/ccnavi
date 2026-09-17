@@ -381,7 +381,11 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
                 )
             )
 
-    problems.extend(_proposal_problems(proposals, index, closed, done, resolve))
+    # ツリーの名前から、そのツリーがどのリポジトリのものかを引く表。ワークスペースなら空、
+    # プロジェクトならその名前で、ワークツリーは元リポジトリのほうに付く（tree.Tree）。
+    # チケットは自分の置かれたツリーの名前しか持たないので、ここで作って渡す。
+    repo_of = {t.name or "(main)": t.project for t in tree.all_trees(root, conf.projects)}
+    problems.extend(_proposal_problems(proposals, index, closed, done, resolve, repo_of))
 
     worktrees = tree.worktrees(root, conf.projects)
     problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
@@ -432,7 +436,12 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _proposal_problems(
-    proposals: list, index: dict, closed: list, done: set[str], resolve
+    proposals: list,
+    index: dict,
+    closed: list,
+    done: set[str],
+    resolve,
+    repo_of: dict[str, str],
 ) -> list[Problem]:
     """提案の側。承認待ち、承認で落ちるもの、先行が閉じていない着手済み、同じ識別子の重複。
 
@@ -443,21 +452,39 @@ def _proposal_problems(
     レビュー待ちと閉じたの 3 つを横断して数えないと、`doing/` と `done/` に同じ識別子が
     在る形（動かす途中で止まった跡）を CI が見逃し、状態の操作が「複数の場所にある」で
     止まって初めて知ることになる。
+
+    **同じリポジトリの中ではツリーごとに数える。** 承認済みチケットは git に入れて運ぶので、
+    切ったワークツリーの数だけ写しができる。しかもワークツリーはそれぞれ別のコミットを指すので、
+    古いほうで `doing`・新しいほうで `done` になるのも普通の形。ツリーをまたいだ食い違いまで
+    咎めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、`--lint` が
+    常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
+
+    **リポジトリをまたいだら、状態が何であれ咎める。** プロジェクトは自分の git を持つので
+    （設計 §11）、そこに同じ識別子が在るのは写しではなく別物の衝突。識別子は人が選ぶ短い
+    連番で、プロジェクトが独立に振ればぶつかる。コミットの遅れでは説明が付かないから、
+    ツリーごとの免除を当ててはいけない。
     """
     problems: list[Problem] = []
     # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
     pool = dict(index)
     for t in proposals:
         pool.setdefault(t.ticket, t)
-    seen: dict[str, list[str]] = {}
+
+    # ツリーと状態は分けて持つ。同じ識別子が別のツリーに在るのは普通で（承認済みチケットは
+    # git に入れて運ぶので、切ったワークツリーの数だけ写しができる）、しかもワークツリーは
+    # それぞれ別のコミットを指すから、古いほうが doing・新しいほうが done になるのも普通。
+    # 咎めるのは 1 つのツリーの中で 2 つの状態に在る形だけ。
+    def place(t, state: str) -> tuple[str, str, str]:
+        at = t.tree or "(main)"
+        return (repo_of.get(at, at), at, state)
+
+    seen: dict[str, list[tuple[str, str, str]]] = {}
     for t in index.values():
-        state = t.state or ticket_mod.DOING
-        seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{state}")
+        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DOING))
     for t in closed:
-        state = t.state or ticket_mod.DONE
-        seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{state}")
+        seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DONE))
     for t in proposals:
-        seen.setdefault(t.ticket, []).append(f"{t.tree or '(main)'}:{t.state}")
+        seen.setdefault(t.ticket, []).append(place(t, t.state))
         if t.state != ticket_mod.TODO:
             continue
         if t.ticket in index:
@@ -509,14 +536,39 @@ def _proposal_problems(
                     )
                 )
     for ticket_id, places in seen.items():
-        distinct = sorted(set(places))
-        if len(distinct) > 1 and not any(p.endswith(":todo") for p in distinct):
-            where = ", ".join(distinct)
-            problems.append(
-                Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
+        # 別のリポジトリに同じ識別子が在るのは、写しではなく**別物の衝突**。識別子は人が
+        # 選ぶ短い連番なので、プロジェクトが独立に振れば普通にぶつかる。コミットの遅れでは
+        # 説明できないので、状態が何であれ咎める。
+        repos = sorted({repo for repo, _, _ in places})
+        if len(repos) > 1:
+            where = ", ".join(
+                # ツリーの名前がリポジトリの名前と同じなら（プロジェクトの元ツリー）、
+                # 2 度書かない。切ったワークツリーなら「どのリポジトリのどのツリーか」を出す。
+                f"{repo or '(ワークスペース)'}:{state}"
+                if at == repo
+                else f"{repo or '(ワークスペース)'}/{at}:{state}"
+                for repo, at, state in sorted(places)
             )
-        elif len(places) > 1 and len(distinct) < len(places):
-            where = ", ".join(places)
+            problems.append(
+                Problem(
+                    SEVERITY_ERROR,
+                    "(ticket)",
+                    f"{ticket_id} が複数のリポジトリにある: {where}。"
+                    "識別子はリポジトリごとに一意にする",
+                )
+            )
+            continue
+        for at in sorted({where for _, where, _ in places}):
+            states = [state for _, where, state in places if where == at]
+            distinct = sorted(set(states))
+            # `todo/` に在るのは親の改版の途中なので、承認済みチケットと並んでいてよい。
+            if len(distinct) > 1 and ticket_mod.TODO not in distinct:
+                found = distinct
+            elif len(states) > 1 and len(distinct) < len(states):
+                found = states
+            else:
+                continue
+            where = ", ".join(f"{at}:{state}" for state in found)
             problems.append(
                 Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
             )
