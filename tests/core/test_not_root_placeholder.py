@@ -127,12 +127,36 @@ class NotRootExpansionTest(unittest.TestCase):
                 # 同じルートで「外」も見て、式が本当に展開されていることを縛る。
                 self.assert_outside(root, stem + r"-fork\x.md", r"D:\elsewhere\x.md")
 
-    def test_root_that_is_only_a_separator_is_refused(self):
-        """`rstrip` の結果が空になるルートでは「外」が定義できない。設計 §2.0。"""
+    def test_root_that_normalizes_to_nothing_is_refused(self):
+        """正規化した結果が空になるルートでは「外」が定義できない。設計 §2.0。
+
+        `/` の意味が機械で違うので、綴りではなく**正規化の結果**で場合分けする。
+        POSIX では `realpath('/')` が `/` で、`rstrip` すると空になる（拒否が正しい）。
+        Windows では `C:\\` を返すので `C:` が残り、それは正しく展開できる
+        ルートなので拒否してはいけない。
+
+        綴りだけを見て「`/` なら拒否」と書くと、Windows でだけ落ちるテストになる。
+        """
         for root in ("\\", "/"):
-            with self.subTest(root=root):
+            with self.subTest(root=root, real=rules.real_root(root)):
                 _, problems = rules.load(self.path, root)
-                self.assertTrue(problems, "空になるルートは苦情になるべき")
+                if rules.real_root(root):
+                    self.assertEqual([str(p) for p in problems], [], "正規化できるルートは通るべき")
+                else:
+                    self.assertTrue(problems, "空になるルートは苦情になるべき")
+
+    def test_the_root_itself_is_inside(self):
+        """対象がルートそのものなら「中」。敵対的レビューで見つかった欠陥の回帰テスト。
+
+        最内に `\\Z` を混ぜると、ルートを最後までなぞり切った位置で「外」に落ちる。
+        `Glob` を `path` 省略で呼ぶと対象が cwd（＝ルート）になるので、
+        いちばん普通の呼び出しが「外」に化ける。
+
+        各段の `\\Z` は「ルートより上」を拾うためのもので、最内とは意味が違う。
+        """
+        root = r"C:\Users\u\Desktop\git\ccnavi"
+        self.assert_inside(root, root, root + "\\", root + "/")
+        self.assert_outside(root, r"C:\Users\u\Desktop\git", root + "-fork")
 
     # --- 観点 4・5: 綴りの揺れ ---
 
@@ -308,6 +332,35 @@ class NotRootLimitTest(unittest.TestCase):
         for path_to_write in (r"C:\anywhere\x.md", r"D:\somewhere\else\y.txt"):
             self.assertTrue(pattern.search(path_to_write), "match の全部に当たるべき")
 
+    def test_ask_falls_closed_like_deny(self):
+        """組み立てられない `ask` も `match` の全部に当たる。設計 §4.3。
+
+        設計は deny / ask / allow の 3 つを決めているが、テストは deny と allow しか
+        見ていなかった（敵対的レビューの指摘）。確認は戻せるので、ask は deny と同じ向き。
+        """
+        path = rules_file(
+            self.dir.name,
+            {"id": "outside-workspace", "match": "Write|Edit", "regex": NOT_ROOT},
+            section="ask",
+        )
+        rule_set, problems = rules.load(path, self.long_root(600))
+        self.assertTrue(problems)
+        self.assertTrue(rule_set.ask, "ask が捨てられている")
+        self.assertTrue(rule_set.ask[0].compiled.search(r"C:\anywhere\x.md"))
+
+    def test_the_written_message_survives_a_failure(self):
+        """組み立てに失敗しても、人が書いた文面は消えない。
+
+        敵対的レビューで見つかった契約違反の回帰テスト。`--explain` と記録は
+        書いた綴りを出す約束で、それは glob / regex だけでなく文面にも掛かる。
+        止められた側へ返す説明は別の欄に持つ。
+        """
+        path = rules_file(self.dir.name, outside_rule(message="人が書いた本当の文面"))
+        rule_set, _ = rules.load(path, self.long_root(600))
+        rule = rule_set.deny[0]
+        self.assertEqual(rule.message, "人が書いた本当の文面")
+        self.assertIn("組み立てられない", rule.spoken_message())
+
     def test_allow_falls_the_other_way(self):
         """組み立てられない `allow` は、どれにも当たらない。設計 §4.3。
 
@@ -353,6 +406,18 @@ class NotRootWritingTest(unittest.TestCase):
             "message": "ワークスペースの外です。",
         }
         self.assertIn("error", self.problems_for(rule))
+
+    def test_a_quantifier_right_after_the_placeholder_is_an_error(self):
+        """直後の量化子は error。敵対的レビューで見つかった欠陥の回帰テスト。
+
+        `^{!root}?` と書けるままにすると、展開結果ごと省略できる式になり、
+        「外だけを止める」はずの deny が**ワークスペースの中への書き込みまで**止める。
+        warn では本番の rules.yml に入ってしまう。
+        """
+        for suffix in ("?", "*", "+", "{0}", "{0,0}", "{2,}"):
+            with self.subTest(suffix=suffix):
+                said = self.problems_for(outside_rule(NOT_ROOT + suffix))
+                self.assertIn("error", said, f"`{suffix}` が通ってしまう")
 
     def test_a_structural_suffix_is_only_a_warning(self):
         """`^{!root}[\\\\/]foo` は壊れてはいないが、まず勘違い。設計 §3.3。
