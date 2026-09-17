@@ -1030,6 +1030,66 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(lint.returncode, 0, lint.stdout)
         self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
 
+    # 閉じた承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
+    CLOSED = (
+        "---\n"
+        "version: 1\n"
+        "ticket: i0002\n"
+        "title: t\n"
+        'ccnavi_approved: {approved_at: "2026-01-01T00:00:00Z", source_tree: "", source_path: p}\n'
+        "allow:\n"
+        '- {glob: "src/*", match: "Write|Edit"}\n'
+        "---\n"
+    )
+
+    def commit(self, message):
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "--quiet", "-m", message)
+
+    def test_a_closed_ticket_carried_into_worktrees_is_not_two_homes(self):
+        """閉じた承認済みチケットが複数のツリーに在るのは、咎める形ではない。
+
+        承認済みチケットは git に入れて運ぶので（設計 §9.2）、コミットしたあとに
+        ワークツリーを切れば、その数だけ写しができる。これを「複数の場所にある」で
+        止めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、
+        `--lint` が常に非ゼロで終わる。
+        """
+        write(os.path.join(self.root, ".ccnavi", "approved", "done", "i0002.md"), self.CLOSED)
+        self.commit("close i0002")
+        self.worktree("carry-a", "main")
+        self.worktree("carry-b", "main")
+
+        lint = self.ccnavi("--lint", "--mode", "enable")
+
+        self.assertNotIn("i0002 が複数の場所にある", lint.stdout)
+
+    def test_worktrees_at_different_commits_are_not_two_homes(self):
+        """古いツリーで doing、新しいツリーで done になるのも普通の形。
+
+        ワークツリーはそれぞれ別のコミットを指す。閉じる前に切ったツリーは
+        `doing/` のまま止まっているので、ツリーをまたいだ状態の食い違いは
+        「動かす途中で止まった跡」の証拠にならない。
+        """
+        approved = os.path.join(self.root, ".ccnavi", "approved")
+        write(os.path.join(approved, "doing", "i0002.md"), self.CLOSED)
+        self.commit("start i0002")
+        # 閉じる前に切る。このツリーは i0002 を doing/ に持ったまま止まる。
+        stale = self.worktree("older", "main")
+        os.makedirs(os.path.join(approved, "done"), exist_ok=True)
+        shutil.move(
+            os.path.join(approved, "doing", "i0002.md"),
+            os.path.join(approved, "done", "i0002.md"),
+        )
+        self.commit("close i0002")
+
+        left = os.path.join(stale, ".ccnavi", "approved", "doing", "i0002.md")
+        self.assertTrue(os.path.exists(left), "切ったツリーに doing/ の写しが残っていない")
+        self.assertTrue(os.path.exists(os.path.join(approved, "done", "i0002.md")))
+
+        lint = self.ccnavi("--lint", "--mode", "enable")
+
+        self.assertNotIn("i0002 が複数の場所にある", lint.stdout)
+
     def test_new_child_in_ended_phase_clears_the_marks(self):
         self.family()
         self.close_phase()
