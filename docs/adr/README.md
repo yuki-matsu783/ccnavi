@@ -62,7 +62,8 @@
 | [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの守りは、ルールに足さず 3 層に分ける |
 | [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
-| [0055](0055-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
+| [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
+| [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
 
 ### 実行後の監視と自己防衛
 
