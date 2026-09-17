@@ -94,6 +94,19 @@ writing a proposal never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.
 
+Before asking the user to approve, the agent checks that the proposal it just
+wrote is in a state that can be approved:
+
+    ccnavi --approve --preview --check [--json] [<id>...]
+
+It places nothing and needs no terminal. Exit 0 means every named ticket (or
+every pending one, when no id is given) goes into the batch as it stands, so
+the user can be asked. Exit 1 means it does not: an id that is not pending, no
+pending ticket at all, a proposal the approval drops, or a proposal that cannot
+be read. The reasons are printed per ticket. Scope that exceeds the parent or
+the phase type does not fail the check (approval does not drop it either); it is
+shown on the ticket's line, because writes there stay blocked after approval.
+
 The VS Code board extension approves from an overlay instead of the terminal:
 
     ccnavi --approve --preview --json [<id>...]  (show the batch; places nothing)
@@ -220,6 +233,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 承認の対象の一覧を見るだけ（承認済みチケットを置かない）。
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
+    # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。承認済みチケットは置かず、
+    # 通るかどうかを終了コードで返す。エージェントが人に承認を頼む前に打つ。
+    parser.add_argument("--check", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
@@ -347,6 +363,17 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
+        # 確かめるだけの枝は `--preview` に相乗りする。単独で打てる形にすると、組み込みの
+        # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--approve`
+        # だけなので、エージェントが打てないものを案内することになる。
+        if args.check and not args.preview:
+            stderr.write("ccnavi: --check は --approve --preview と一緒に使う\n")
+            return EXIT_ERROR
+        # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
+        # 通るかどうかを終了コードで返すところ（REQ-APV-13）。
+        if args.check:
+            code = approval.check(stdout, stderr, conf, root, args.json, list(args.command))
+            return EXIT_OK if code == 0 else EXIT_ERROR
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
         # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:

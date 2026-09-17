@@ -175,6 +175,9 @@ def decide_before(
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
+        # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える。止めない（文だけ）。
+        # 後ろに足すので、当たったルールの先頭は人が書いたルールのままになる。
+        rule_set.allow.extend(ticket_mod.propose_rules(conf.tickets, conf.bin))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:

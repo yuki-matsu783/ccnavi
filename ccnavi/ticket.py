@@ -898,6 +898,48 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     return [write_rule, shell_rule]
 
 
+def propose_rules(tickets_rel: str, bin_path: str = "") -> list[rules.Rule]:
+    """提案を書いたときに、承認を頼む前の確認を 1 度だけ伝えるルール。組み込み（REQ-APV-14）。
+
+    止めない。`todo/` への作成と編集は自由（`guard_rules` の文面がそう言っている）で、
+    ここで足すのは文だけ。承認できない提案のまま人に承認を頼むと、落ちたことを知るのが
+    端末に座った人になり、往復が 1 回増える。確かめる手立て（`--approve --preview --check`）
+    は在るので、書いた直後に、要る場所で言う。
+
+    `additionalContextOnce` なので、1 つの文脈（セッション、サブエージェントなら 1 回の起動）で
+    最初の 1 回だけ渡る。2 本目からは黙る。提案を 1 本書くたびに同じ文を積むと、
+    長いセッションではそれだけでコンテキストを食う。
+
+    **allow に置くので、`todo/` への書き込みは「ccnavi が言及する場所」になる。**
+    ルールファイルが `todo/` に何も言っていないワークスペースでは、いままで
+    「どのタイプも言及しない」に落ちていた（確認できる者が居ないモードでは止まっていた）。
+    そこが通るようになるのは、この組み込みが足す唯一の緩みで、提案を書けなければ
+    チケット制御そのものが始まらないので、そちら側へ倒している。判定を返すわけでは
+    ないことも効いていて、allow は「ccnavi は止めない」であり、結末は Claude Code の
+    権限モードが決める。
+    """
+    place = rf"(^|[\\/]){_place(tickets_rel)}[\\/]{TODO}[\\/]"
+    rule = rules.Rule(
+        id=PROPOSE_RULE_ID,
+        match="|".join(WRITE_TOOLS),
+        regex=place,
+        decision=rules.ALLOW,
+        additional_context_once=(
+            f"チケットの提案を書きました（{tickets_rel}/todo/ は承認待ちの置き場で、"
+            "ここに書くだけでは判定に 1 ミリも効きません）。"
+            "利用者に承認を依頼する前に "
+            f"'{settings.bin_command(bin_path)} --approve --preview --check <識別子>' を"
+            "打ち、承認できる状態かを確かめてください。承認済みチケットは置きません。"
+            "0 で返れば依頼してよく、1 なら理由が出ます"
+            "（親が承認されていない、計画に無いフェーズ、範囲の書き損じ、読めない提案）。"
+            "直してから依頼してください。識別子を省くと承認待ち全部を見ます。"
+        ),
+    )
+    # 大文字小文字を区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
+    rule.compiled = re.compile(place, re.IGNORECASE)
+    return [rule]
+
+
 def set_fields(text: str, fields: dict[str, str]) -> str:
     """提案の frontmatter の、スクリプトが書く欄だけを行単位で書き換える。
 
@@ -959,6 +1001,8 @@ def _yaml_scalar(value: str) -> str:
 
 
 STATE_RULE_ID = "builtin-ticket-state"
+# 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
+PROPOSE_RULE_ID = "builtin-ticket-propose"
 
 
 def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:

@@ -832,7 +832,13 @@ def preview(
             stdout.write(gathered.note + "\n\n")
         stdout.write(gathered.text + "\n")
         return 0
-    body = {
+    stdout.write(json.dumps(_preview_body(root, gathered), ensure_ascii=False) + "\n")
+    return 0
+
+
+def _preview_body(root: str, gathered: Gathered) -> dict:
+    """`--preview --json` が返す本体。`--check --json` も同じものに答えを足して返す。"""
+    return {
         "version": APPROVE_VERSION,
         "root": root,
         "generated_at": now(),
@@ -845,8 +851,115 @@ def preview(
         ],
         "problems": gathered.problems,
     }
-    stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-    return 0
+
+
+# `--check` が返す理由。JSON の `check.reason` に出る。
+CHECK_OK = "ok"
+CHECK_REFUSED = "refused"
+CHECK_NOTHING = "nothing-pending"
+CHECK_REJECTED = "rejected"
+CHECK_BROKEN = "broken"
+
+
+@dataclass
+class Verdict:
+    """`--check` の答え。通るかどうかと、その理由の名前と、端末に出す本文。"""
+
+    ok: bool
+    reason: str
+    text: str
+
+
+def check(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    as_json: bool,
+    only: list[str] | None = None,
+) -> int:
+    """`--approve --preview --check`。いま `--approve` を打てば通るかを、置かずに返す。
+
+    エージェントが提案を書いたあと、人に承認を頼む前に自分で確かめるための枝
+    （REQ-APV-13）。置かないところも端末を求めないところも `--preview` と同じで、
+    違うのは「通るかどうか」を終了コードと本文で言うこと。
+
+    答えを `--preview` 自身に持たせない理由。読む側（VS Code のボード拡張）は 0 以外を
+    失敗として扱うので、承認の対象にしない提案が 1 件あるだけで一覧を出せなくなる。
+    見せる枝と確かめる枝を分け、判定そのものは `gather` の 1 か所に置く。
+
+    通る = 指定したもの（指定が無ければ承認待ち全部）が、そのまま承認の対象に入る。
+    次のどれかがあれば通らない。
+
+    - 絞りが通らない（承認待ちに無い識別子、親の改版を外した子）
+    - 承認待ちが 1 件も無い。承認を頼む前の確認としては失敗で、
+      提案の置き場を間違えた回がここに出る
+    - 承認の対象にしない提案がある（`rejected`）
+    - 読めない提案がある（`broken`）
+
+    範囲の超過（`overflow`）では落とさない。承認は止まらず、判定が切り詰めるだけなので、
+    承認の可否としては通る。承認しても書けない場所が残るのは伝える値打ちがあるから、
+    その行に添えて見せる。
+    """
+    gathered = gather(stderr, conf, root, only)
+    verdict = _verdict(gathered, conf.tickets)
+    if as_json:
+        body = _preview_body(root, gathered)
+        body["check"] = {"ok": verdict.ok, "reason": verdict.reason}
+        stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+    else:
+        stdout.write(verdict.text)
+    return 0 if verdict.ok else 1
+
+
+def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
+    """`--check` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
+    head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
+    if gathered.refused:
+        return Verdict(False, CHECK_REFUSED, head + "\n" + gathered.refused + "\n")
+    if gathered.nothing_pending:
+        text = (
+            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置く"
+            "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
+        )
+        return Verdict(False, CHECK_NOTHING, head + text)
+
+    lines = [head]
+    if gathered.note:
+        lines.append("\n" + gathered.note + "\n")
+    names = [c.ticket.ticket for c in gathered.batch] + [t.ticket for t, _ in gathered.rejected]
+    width = max((len(name) for name in names), default=0)
+    rows: list[tuple[str, str, list[str]]] = []
+    # 苦情の綴りから識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
+    # 同じものが出ている）。残すのは重さと中身。
+    for cand in gathered.batch:
+        notes = [f"{p.severity}: {p.detail}" for p in cand.complaints]
+        notes += [f"承認しても書けない: {p.detail}" for p in cand.overflow]
+        rows.append((cand.ticket.ticket, "通る", notes))
+    for t, complaints in gathered.rejected:
+        rows.append((t.ticket, "落ちる", [f"{p.severity}: {p.detail}" for p in complaints]))
+    lines.append("\n")
+    for name, mark, notes in sorted(rows):
+        lines.append(f"  {name.ljust(width)}  {mark}\n")
+        lines += [f"      - {note}\n" for note in notes]
+
+    if gathered.rejected:
+        reason = CHECK_REJECTED
+        tail = (
+            f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
+            "提案を直してから、利用者に承認を依頼すること。\n"
+        )
+    elif gathered.broken:
+        reason = CHECK_BROKEN
+        tail = (
+            "\n読めない提案がある（苦情は標準エラーに出した）。"
+            "直してから、利用者に承認を依頼すること。\n"
+        )
+    else:
+        reason = CHECK_OK
+        tail = f"\n{len(gathered.batch)} 件とも承認の対象に入る。利用者に承認を依頼してよい。\n"
+    lines.append(tail)
+    return Verdict(reason == CHECK_OK, reason, "".join(lines))
 
 
 def approval_digest(text: str, batch: list[Candidate]) -> str:
