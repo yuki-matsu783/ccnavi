@@ -213,8 +213,11 @@ ${LIST_STYLE}
   .rule-section.folded .list { display: none; }
   /* 絞り込み中は畳んだタイプの中も見せる（矢印は applyFind が合わせる） */
   .finding .rule-section.folded .list { display: block; }
-  /* 1 行 = 開閉、id、match、パターンと文面、コンテキストの有無 */
-  .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) 14px; }
+  /* 1 行 = 開閉、id、match、パターンと文面、渡す回の刻み、コンテキストの有無 */
+  .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) max-content 14px; }
+  /* 刻みの札。刻みが無い行でも空の枠を置く（置かないと右端の●が 1 列ずれる） */
+  .sum .sum-every { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+  .field > input.f-every { max-width: 110px; }
   .rule.hit .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
   select.f-section { max-width: 120px; }
   /* 押すと札が出る欄。欄そのものは普通のテキスト入力で、手でも書ける。 */
@@ -392,8 +395,9 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     pick.addEventListener("click", () => vscode.postMessage({ type: "pickFile", key: key, field: name }));
     return captioned(label, h("div", { class: "with-button" }, [input, pick]), "", name);
   }
+  // 刻み（every）も数える。刻みだけを持つルールでも「コンテキストの追加」が開いて出るように。
   function hasContext(rule) {
-    return rule.additionalContext !== "" || rule.additionalContextOnce !== "" || rule.additionalContextFile !== "" || rule.additionalContextOnceFile !== "";
+    return rule.additionalContext !== "" || rule.additionalContextOnce !== "" || rule.additionalContextFile !== "" || rule.additionalContextOnceFile !== "" || rule.every !== "";
   }
   function renderRule(section, rule) {
     const key = keyOf(rule);
@@ -421,6 +425,10 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     const more = h("details", { class: "more" }, [
       moreSummary,
       h("div", { class: "sub" }, [
+        // 刻みは渡す文の前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
+        // type は text（number ではない）。数でない値を空にしてしまうと、読めない値を
+        // 見せて直させるという欄の目的が消える。
+        captioned("渡す回の刻み", field(rule, "every", "f-every", "5（空なら毎回渡す）"), "", "every"),
         captioned("渡す文", area(rule, "additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト"), "", "additionalContext"),
         fileField(rule, key, "渡すファイル", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）"),
         captioned("初回だけ渡す文", area(rule, "additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト"), "", "additionalContextOnce"),
@@ -462,10 +470,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
           : h("code", { text: rule.pattern }),
         shown === "" ? null : h("span", { class: "sum-note", text: excerpt(shown, 60) }),
       ]));
+      // 刻みは畳んだままでも見える。見えないと「毎回渡る」と思ったまま渡す文を直すことになる。
+      sum.appendChild(rule.every === ""
+        ? h("span", { class: "sum-every" })
+        : h("span", { class: "tag sum-every", text: rule.every + " 回ごと", title: "渡す回の刻み（every）: " + rule.every }));
       sum.appendChild(h("span", { class: "sum-flag" + (hasContext(rule) ? " on" : ""), title: hasContext(rule) ? "コンテキストの追加あり" : "" }));
       moreSummary.textContent = "";
       moreSummary.appendChild(h("b", { text: "コンテキストの追加" }));
-      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイル"));
+      moreSummary.appendChild(document.createTextNode(hasContext(rule) ? "（設定あり）" : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイルと、渡す回の刻み"));
       li.setAttribute("data-find", (rule.id + " " + rule.match + " " + rule.pattern + " " + rule.message + " " + rule.additionalContext + " " + rule.additionalContextOnce).toLowerCase());
     }
     head.addEventListener("click", () => {
@@ -592,7 +604,8 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
     renderAll();
   }
   function add(section) {
-    const rule = { origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "" };
+    // every（渡す回の刻み）は空で始める。空は「刻み無し」＝ 当たるたびに渡す。
+    const rule = { origin: null, id: "", match: "", kind: "glob", pattern: "", message: "", additionalContext: "", additionalContextOnce: "", additionalContextFile: "", additionalContextOnceFile: "", every: "" };
     sections[section] = sections[section].concat([rule]);
     // 足したルールは開いて出す。畳んだままでは何を足したか分からない。
     opened.add(keyOf(rule));

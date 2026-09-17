@@ -1,0 +1,17 @@
+{
+ "points": 25,
+ "level": "MEDIUM",
+ "hits": [
+  {
+   "id": "big-diff",
+   "points": 25,
+   "detail": "行数が多い（356 行 > 300）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "4eb7c9de6266f9a86edb71a51682a35bab9bf163",
+ "base": "6b0c2dfc67d05578b03af70ce28765fd124129db",
+ "at": "2026-09-16T20:33:58+0900",
+ "summary": "2 ファイル、+356 -0 行、消したファイル 0"
+}

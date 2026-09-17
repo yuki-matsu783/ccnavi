@@ -30,6 +30,17 @@ export interface RuleForm {
   readonly additionalContextFile: string;
   /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
   readonly additionalContextOnceFile: string;
+  /**
+   * 渡す回の刻み（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
+   * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
+   *
+   * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
+   * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
+   * 刻みを外す操作も、読めない値を画面から直す道も書けない。読めない値は書いたまま
+   * 書き戻し、咎めるのは保存前の `ccnavi --lint`。画面が黙って直すと、lint が名指し
+   * している対象が消えて苦情の出どころが分からなくなる
+   */
+  readonly every: string;
 }
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
@@ -101,7 +112,18 @@ function formOf(section: Section, index: number, map: YAMLMap): RuleForm {
     additionalContextOnce: scalarText(map, "additionalContextOnce"),
     additionalContextFile: scalarText(map, "additionalContextFile"),
     additionalContextOnceFile: scalarText(map, "additionalContextOnceFile"),
+    every: scalarText(map, "every"),
   };
+}
+
+/** 刻みとして読める文字なら、その刻み。読めない文字と空なら null（咎めるのは lint） */
+function everyOf(written: string): number | null {
+  const text = written.trim();
+  if (!/^\d+$/.test(text)) {
+    return null;
+  }
+  const value = Number(text);
+  return value >= 1 ? value : null;
 }
 
 function scalarText(map: YAMLMap, key: string): string {
@@ -273,6 +295,35 @@ function writeFields(doc: Document, node: YAMLMap, form: RuleForm): void {
   if (form.additionalContextOnceFile !== "" || node.has("additionalContextOnceFile")) {
     setText(doc, node, "additionalContextOnceFile", form.additionalContextOnceFile, Scalar.PLAIN, "additionalContextOnce");
   }
+  setEvery(doc, node, form.every);
+}
+
+/**
+ * 刻みの欄（`every`）。書かれたままの文字を受け取り、1 以上の整数に読めれば数として、
+ * 読めなければ打った文字のまま書く（止めるのは保存前の `--lint`）。空なら欄ごと消す。
+ * 元に書いてある文字と同じなら何もしない。`every: "5"` のような書き方を画面が黙って
+ * 直さないためで、直してしまうと lint の error が操作で消える。欄が無ければ match の直後に足す。
+ */
+function setEvery(doc: Document, node: YAMLMap, written: string): void {
+  if (written === scalarText(node, "every")) {
+    return;
+  }
+  if (written === "") {
+    node.delete("every");
+    return;
+  }
+  const value: string | number = everyOf(written) ?? written;
+  const current = node.get("every", true);
+  if (current instanceof Scalar) {
+    current.value = value;
+    // 数に直したときだけ書き方も数のもの（引用符無し）に戻す。文字のままなら元の書き方を残す。
+    if (typeof value === "number") {
+      current.type = Scalar.PLAIN;
+    }
+    return;
+  }
+  const at = node.items.findIndex((p) => String((p.key as Scalar).value) === "match");
+  node.items.splice(at >= 0 ? at + 1 : node.items.length, 0, doc.createPair("every", value));
 }
 
 function setText(
@@ -361,5 +412,6 @@ function asForm(raw: unknown): RuleForm | undefined {
     additionalContextOnce: text(r.additionalContextOnce),
     additionalContextFile: text(r.additionalContextFile),
     additionalContextOnceFile: text(r.additionalContextOnceFile),
+    every: text(r.every),
   };
 }

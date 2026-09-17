@@ -86,7 +86,7 @@ class UnreadableStateTest(unittest.TestCase):
         # 覚えている控えを用意する。
         ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
         before = fsio.read_json(self.path)[0]
-        self.assertEqual(before, {"given": ["note"]})
+        self.assertEqual(before, {"given": {"note": 1}})
 
         # 読めない状態にして、もう一度通す。
         with mock.patch.object(
@@ -104,7 +104,7 @@ class UnreadableStateTest(unittest.TestCase):
         """無いのは普通の状態。ここは今までどおり書く。"""
         self.assertFalse(os.path.exists(self.path))
         ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
-        self.assertEqual(fsio.read_json(self.path)[0], {"given": ["note"]})
+        self.assertEqual(fsio.read_json(self.path)[0], {"given": {"note": 1}})
 
 
 if __name__ == "__main__":
