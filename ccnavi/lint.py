@@ -355,11 +355,13 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     copies, notes = approval.scan(conf, root)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
-    # 閉じた承認済みチケットの苦情も拾う。判定は閉じたものを読まないが、読めないファイルが
-    # 置き場に残っていること自体は書いた人の思い違いで、黙ると他の機械へそのまま届く。
+    # 閉じた承認済みチケットの苦情も拾う。ただし warn で。判定は閉じたものを読まないので、
+    # ここに読めないファイルが在ってもガードは動いたまま――冒頭の原則でいう「意図した防御が
+    # 効いていない」側で、CI を落とす理由が無い（`done/` には人が README を置くこともある）。
+    # 黙ると他の機械へそのまま届くので、言わない側にも倒さない。
     closed, notes = approval.scan(conf, root, closed=True)
     for note in notes:
-        problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))
+        problems.append(Problem(SEVERITY_WARN, "(ticket)", note))
     review, notes = approval.scan_review(conf, root)
     for note in notes:
         problems.append(Problem(SEVERITY_ERROR, "(ticket)", note))

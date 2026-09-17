@@ -382,6 +382,14 @@ def load(path: str) -> tuple[Ticket | None, list[Problem]]:
         return None, []
     except OSError as exc:
         return None, [Problem(SEVERITY_ERROR, path, f"チケットを読めない ({exc})")]
+    except UnicodeDecodeError as exc:
+        # `UnicodeDecodeError` は `ValueError` の側で、`OSError` では捕まらない。
+        # 素通しすると判定の経路（judge → approval.scan → ここ）が落ちる。フックが落ちると
+        # 止めるはずの呼び出しがそのまま通るので、読めないことは不備として返す。
+        return (
+            None,
+            [Problem(SEVERITY_ERROR, path, f"チケットを UTF-8 として読めない ({exc})")],
+        )
     ticket, problems = parse(text)
     if ticket is not None:
         ticket.path = os.path.realpath(path)
@@ -1031,9 +1039,10 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
 def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
-        # 通す側には倒さない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
-        # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う姿で通る。弾いたまま、
-        # 目に見えない原因だけを名指しする。
+        # 通す側には倒さない。`strip()` が落とすのは前後の空白で、BOM (U+FEFF) はそこに
+        # 入らない（だから先頭の空白は通り、BOM は通らない）。読み飛ばす側に倒すと、同じ
+        # ファイルが書き手の道具ごとに違う姿で通る。弾いたまま、目に見えない原因だけを
+        # 名指しする。
         if lines and lines[0].lstrip(BOM).strip() == FENCE:
             detail = (
                 f"先頭に BOM (U+FEFF) が付いていて `{FENCE}` で始まっていない。"

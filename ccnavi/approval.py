@@ -125,8 +125,13 @@ def load_copy(path: str) -> tuple[ticket_mod.Ticket | None, str]:
     """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
-        detail = problems[0].detail if problems else "チケットとして読めない"
-        return None, detail
+        # 先頭ではなく最初の error を採る。読み進めるうちに警告が先に積まれることがあり
+        # （親のチケットに子だけの欄がある等）、先頭を採ると、読めなかった理由と無関係な
+        # 文面が「読めない理由」として出る。
+        fatal = next((p for p in problems if p.severity == rules.SEVERITY_ERROR), None)
+        if fatal is not None:
+            return None, fatal.detail
+        return None, problems[0].detail if problems else "チケットとして読めない"
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
     if not isinstance(meta, dict):
         return None, f"`{ticket_mod.APPROVAL_KEY}` の欄が無い。承認を通っていない"

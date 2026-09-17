@@ -365,7 +365,7 @@ class LintTest(unittest.TestCase):
         self.assertIn("BOM (U+FEFF)", result.stdout)
         self.assertIn("i0001.md", result.stdout)
 
-    def test_BOMの付いた承認済みチケットはdoneに在ってもerrorになる(self):
+    def test_BOMの付いた承認済みチケットはdoneに在ってもwarnで名指しする(self):
         # 判定は閉じた承認済みチケットを読まないが、読めないファイルが置き場に残っている
         # こと自体は書いた人の思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
         # そのまま届く。閉じた側の苦情を捨てると、届いた先でも黙ったままになる。
@@ -377,9 +377,68 @@ class LintTest(unittest.TestCase):
 
         result = lint(self.root, rules_file(self.root, SOUND))
 
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        # warn であって error ではない。`done/` はガードが読まない置き場なので、ここの
+        # 読めないファイルは判定を止めない（深刻度の原則は lint.py 冒頭）。
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 0)
+        self.assertIn("warn", result.stdout)
         self.assertIn("を読めない", result.stdout)
         self.assertIn("BOM (U+FEFF)", result.stdout)
+
+    def test_doneに置いた普通のマークダウンはCIを落とさない(self):
+        # `done/` は人が README を置くこともある置き場。チケットとして読めないだけの
+        # ファイルで CI が毎回赤くなると、本当の error まで読み飛ばされる。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "README.md",
+            "このディレクトリには、承認が終わって閉じたチケットが入ります。\n",
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 0)
+        self.assertIn("README.md", result.stdout)
+
+    def test_doingの読めない承認済みチケットはerrorのまま(self):
+        # `doing/` は判定が読む置き場。読めないとそのチケットの範囲が見えなくなり、
+        # 守っているつもりの範囲が守られない。こちらは error で CI を落とす。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            "\ufeff" + COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(counts(result.stdout)[0], 1)
+        self.assertIn("BOM (U+FEFF)", result.stdout)
+
+    def test_UTF8でないチケットは判定を落とさずerrorで名指しする(self):
+        # `UnicodeDecodeError` は `OSError` では捕まらない。素通しすると judge の経路が
+        # 落ち、PreToolUse のフックが落ちると止めるはずの呼び出しがそのまま通る。
+        path = os.path.join(self.root, "wip", "proposals", "todo", "i0001.md")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(TICKET.format(name="i0001").encode("utf-16"))
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotIn("Traceback", result.stdout + result.stderr)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("UTF-8 として読めない", result.stdout)
+
+    def test_読めない理由は先頭の警告ではなく最初のerror(self):
+        # 読み進めるうちに警告が先に積まれることがある（親のチケットに子だけの欄がある等）。
+        # 先頭を採ると、読めなかった理由と無関係な文面が「読めない理由」として出る。
+        broken = COPY.format(name="i0001").replace("allow:", "predecessors: not-a-list\nallow:")
+        write(os.path.join(self.root, ".ccnavi", "approved", "doing"), "i0001.md", broken)
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertIn("`predecessors` は並びで書く", result.stdout)
+        self.assertNotIn("子だけの欄", result.stdout)
 
     def test_承認を通っていない承認済みチケットは欄の名前で名指しする(self):
         # `ccnavi_approved` を持たないファイルも「読めない」側に落ちる。BOM と同じ文面に
