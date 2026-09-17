@@ -298,6 +298,104 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("旧の置き場に残っていて", result.stdout)
 
+    def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
+        # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
+        # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
+        # 閉じた側との重複だけが通る。
+        for state in ("doing", "done"):
+            write(
+                os.path.join(self.root, ".ccnavi", "approved", state),
+                "i0001.md",
+                COPY.format(name="i0001"),
+            )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001 が複数の場所にある", result.stdout)
+        self.assertIn("(main):doing", result.stdout)
+        self.assertIn("(main):done", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 1)
+
+    def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
+        # review/ は提案の走査に入るので、これは前からの振る舞い。doing と done の側を
+        # 足したときに、数え方を変えてこちらが黙らないことを固定する。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+        write(
+            os.path.join(self.root, "wip", "proposals", "review"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001 が複数の場所にある", result.stdout)
+        self.assertIn("(main):review", result.stdout)
+
+    def test_doneに1つだけ在るのは咎めない(self):
+        # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても黙ったまま。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("複数の場所にある", result.stdout)
+
+    def test_BOMの付いた提案はerrorでBOMを名指しする(self):
+        # BOM は目に見えないので、`---` と書いたのに弾かれたように見える。
+        # 文面が原因を言わないと、書いた人はエディタで見えているものを疑えない。
+        write(
+            os.path.join(self.root, "wip", "proposals", "todo"),
+            "i0001.md",
+            "\ufeff" + TICKET.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("BOM (U+FEFF)", result.stdout)
+        self.assertIn("i0001.md", result.stdout)
+
+    def test_BOMの付いた承認済みチケットはdoneに在ってもerrorになる(self):
+        # 判定は閉じた承認済みチケットを読まないが、読めないファイルが置き場に残っている
+        # こと自体は書いた人の思い違いで、承認済みチケットは親のブランチに乗って他の機械へ
+        # そのまま届く。閉じた側の苦情を捨てると、届いた先でも黙ったままになる。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "i0001.md",
+            "\ufeff" + COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("を読めない", result.stdout)
+        self.assertIn("BOM (U+FEFF)", result.stdout)
+
+    def test_承認を通っていない承認済みチケットは欄の名前で名指しする(self):
+        # `ccnavi_approved` を持たないファイルも「読めない」側に落ちる。BOM と同じ文面に
+        # 混ぜると、人が手で置いたものなのか壊れているのかが読み分けられない。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            TICKET.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("ccnavi_approved", result.stdout)
+        self.assertNotIn("BOM (U+FEFF)", result.stdout)
+
     def test_綴りを設定で旧いままにしている人には言わない(self):
         # 置き場を自分で決めた人は、その綴りで動かしている。既定の話は関係が無い。
         proposal(self.root, "wip/tickets", "todo", "i0001")

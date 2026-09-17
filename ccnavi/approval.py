@@ -32,6 +32,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import io
 import json
@@ -96,9 +97,9 @@ def _load_dir(directory: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
         if not name.endswith(".md"):
             continue
         path = os.path.join(directory, name)
-        ticket = load_copy(path)
+        ticket, reason = load_copy(path)
         if ticket is None:
-            notes.append(f"承認済みチケット {path} を読めない")
+            notes.append(f"承認済みチケット {path} を読めない（{reason}）")
             continue
         if ticket.ticket != name[:-3]:
             notes.append(f"承認済みチケット {path} の識別子 {ticket.ticket} がファイル名と違う")
@@ -116,20 +117,26 @@ def state_of(directory: str, ticket: ticket_mod.Ticket) -> str:
     return name
 
 
-def load_copy(path: str) -> ticket_mod.Ticket | None:
+def load_copy(path: str) -> tuple[ticket_mod.Ticket | None, str]:
+    """承認済みチケットを 1 本読む。2 つめは読めなかった理由。
+
+    理由を返すのは、読めない承認済みチケットを `--lint` が名指しするため。
+    「読めない」だけでは、BOM のような目に見えない原因に手が届かない。
+    """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
-        return None
+        detail = problems[0].detail if problems else "チケットとして読めない"
+        return None, detail
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
     if not isinstance(meta, dict):
-        return None
+        return None, f"`{ticket_mod.APPROVAL_KEY}` の欄が無い。承認を通っていない"
     ticket.approved_at = str(meta.get("approved_at") or "")
     ticket.source_tree = str(meta.get("source_tree") or "")
     ticket.source_path = str(meta.get("source_path") or "")
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案を写したか）とは別物で、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
-    return ticket
+    return ticket, ""
 
 
 def trees(conf: settings.Settings, root: str) -> list[tree.Tree]:
@@ -324,11 +331,36 @@ def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: st
 
 
 def move_file(source: str, target: str) -> str:
-    """チケットを置き場から置き場へ動かす。動かせなかった理由を返す。"""
+    """チケットを置き場から置き場へ動かす。動かせなかった理由を返す。
+
+    行き先に同じ名前が既に在れば動かさない。黙って上書きすると、閉じた側の記録
+    （取り消しの欄など）が消える。同じ識別子が 2 つ在るのは `--lint` が名指しする。
+
+    同じファイルシステムの中なら rename で 1 手。またぐとき（EXDEV）だけ写して消す。
+    消せなければ写した側を消して戻す。両方に残ると、以後どの操作も「複数の場所にある」で
+    止まる（`admit` と同じ）。Windows は開かれているファイルを消させないので、現実に起きる。
+
+    写して消す側へ流すのは EXDEV に限る。rename が他の理由（元が無い、など）で失敗した
+    ときまで流すと、写せずに戻す手が、その間に別のプロセスが置いた行き先を消す。
+    """
+    if os.path.exists(target):
+        return f"チケットを動かせない ({source} → {target}: 行き先に既に在る)"
     try:
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        shutil.move(source, target)
+        os.rename(source, target)
+        return ""
     except OSError as exc:
+        if exc.errno != errno.EXDEV:
+            return f"チケットを動かせない ({source} → {target}: {exc})"
+    try:
+        shutil.copy2(source, target)
+    except OSError as exc:
+        fsio.remove(target)
+        return f"チケットを動かせない ({source} → {target}: {exc})"
+    try:
+        os.remove(source)
+    except OSError as exc:
+        fsio.remove(target)
         return f"チケットを動かせない ({source} → {target}: {exc})"
     return ""
 
@@ -548,7 +580,9 @@ def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str
         return ""
     path = accepted_path(approved_dir, parent)
     keep = sorted(accepted_threads(approved_dir, parent) | {str(t) for t in threads if str(t)})
-    failed = fsio.write_json(path, {"threads": keep, "at": now()}, indent=1)
+    # 読んで、足して、書き戻す形。同じファイルの `_write_known` と同じく、
+    # 途中を見せない書き方で置く。
+    failed = fsio.write_json_atomic(path, {"threads": keep, "at": now()}, indent=1)
     return f"{path} ({failed})" if failed else ""
 
 
@@ -1007,7 +1041,7 @@ def _known(path: str) -> dict[str, str] | None:
 
 
 def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
-    failed = fsio.write_json(path, {"known": dict(sorted(known.items()))})
+    failed = fsio.write_json_atomic(path, {"known": dict(sorted(known.items()))})
     if failed:
         stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
 
