@@ -23,7 +23,7 @@
 
 ## 書式
 
-`wip/tickets/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
+`wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
@@ -48,7 +48,15 @@
     base_sha: ""
     ---
 
-状態は frontmatter ではなく置き場（`todo` `doing` `done` `cancelled`）が表す。
+状態は frontmatter ではなく置き場が表す（ADR-0055）。チケットは 1 本のファイルで、
+提案の置き場（`wip/proposals/`）と承認済みチケットの置き場（`.ccnavi/approved/`）を
+行き来する。人が動かす向きは承認済みの側へ、エージェントが動かす向きは提案の側へ。
+
+    wip/proposals/todo      承認待ち。エージェントが書く
+    .ccnavi/approved/doing  承認済み。判定が範囲を読むのはここだけ
+    wip/proposals/review    作業が終わり、人のレビューを待つ
+    .ccnavi/approved/done   閉じた（取り消しは cancelled_at を持ってここに入る）
+
 `ls` で見え、コミットに残り、閉じたつもりが起きない。
 """
 
@@ -69,16 +77,27 @@ FENCE = "---"
 # このビルドが読めるチケット書式の版。
 VERSION = 1
 
-# 状態。置き場の名前そのもの。
+# 状態。置き場の名前そのもの（ADR-0055）。
+# 提案の置き場（`wip/proposals/`）に並ぶのは todo と review。
 TODO = "todo"
+REVIEW = "review"
+# 承認済みチケットの置き場（`.ccnavi/approved/`）に並ぶのは doing と done。
 DOING = "doing"
 DONE = "done"
+# 取り消しは置き場ではなく欄。`done/` に在って `cancelled_at` を持つものをこう呼ぶ。
 CANCELLED = "cancelled"
-STATES = (TODO, DOING, DONE, CANCELLED)
-# 閉じた状態。承認済みチケットが closed/ へ動く。
+# 提案の置き場を走査する状態。承認済みチケットの置き場は approval.py が読む。
+STATES = (TODO, REVIEW)
+PROPOSAL_STATES = STATES
+APPROVED_STATES = (DOING, DONE)
+# 閉じた状態。
 CLOSED = (DONE, CANCELLED)
+# 終わった状態。フェーズの終わりはこれで数える（レビュー待ちも作業としては終わっている）。
+FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
-GUARDED_STATES = (DOING, DONE, CANCELLED)
+GUARDED_STATES = (REVIEW,)
+# 旧の置き場の状態（ADR-0054 まで）。`--lint` が残りを名指しするときにだけ使う。
+LEGACY_STATES = ("todo", "doing", "done", "cancelled")
 
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
@@ -95,8 +114,14 @@ _FORBIDDEN = (("..", "`..`"), ("~", "`~`"), ("$", "`$`"))
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
 
-# スクリプトだけが書く欄。人もエージェントも書かない。hook はこの 3 つ（と
-# 取り消しの 2 つ）だけを提案から承認済みチケットへ写す。
+
+def child_pattern() -> re.Pattern:
+    """子の識別子の形（`<親>-<2 桁連番>`）。承認の側が次の連番を数えるのに使う。"""
+    return _CHILD
+
+
+# スクリプトだけが書く欄。人もエージェントも書かない。承認済みチケットの側で
+# 行単位に書き換える（`set_fields`）。
 SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "cancel_reason")
 
 # 承認済みチケットにだけある欄。承認の記録。
@@ -241,8 +266,8 @@ class Ticket:
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
     # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
-    # 置いた場所で、`scan` が入れる（プロジェクトの `wip/tickets/` ならその名前、ワークツリー
-    # の中ならその元リポジトリ、ワークスペースの `wip/tickets/` なら空）。親も子も同じ置き場に
+    # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
+    # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
     # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
     project: str = ""
     # declared_project は frontmatter に人が書いた `project:`。宣言ではなく照合に使う。
@@ -622,10 +647,10 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     ここはチケットの範囲の外でも咎めない。咎めると、親が自分のワークツリーに次の子を
     提案する道と、承認がブランチに乗る道が塞がる。
 
-    外して開くのは提案の `todo/` だけ。`doing/` 以降は `guard_rules`、承認済みチケットは
+    外して開くのは提案の `todo/` だけ。`review/` は `guard_rules`、承認済みチケットは
     自己防衛の組み込みが deny で止め、ルールの deny はチケットより強い。
 
-    前置は `/` の境で切る（`wip/ticketsX/` は置き場ではない）。大文字小文字は範囲の照合と
+    前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
     呼ぶのは `is_unscoped` 1 本で、判定の側はそちらを通す。
@@ -695,9 +720,11 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Ticket], list[Problem]]:
     """ワークスペース・プロジェクト・全ワークツリーの提案を集める。状態と置き場を添える。
 
-    置き場はどのツリーでも同じ相対（`wip/tickets/`）で、プロジェクト向けの提案はその
+    集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
+    承認済みチケットが動いてきたもので、`ccnavi_approved` を持つ（approval.scan_review）。
+    置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
     プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 §11.5、REQ-MLT-14）。
-    ワークスペースの `wip/<名前>/tickets/` は読まない。
+    ワークスペースの `wip/<名前>/proposals/` は読まない。
     同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
     """
     found, problems = scan_all(root, tickets_rel, projects_dir)
@@ -776,7 +803,7 @@ def scan_all(
 def fold(hits: list[Ticket]) -> list[Ticket]:
     """同じ識別子の写りを、権威のあるツリーで畳む。
 
-    子のワークツリーは親のブランチから切るので、親の `wip/tickets/` がそのまま
+    子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
     写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
     あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
     なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
@@ -813,7 +840,7 @@ def locate(root: str, tickets_rel: str, tree_root: str, ticket_id: str) -> tuple
 
 
 def _place(tickets_rel: str) -> str:
-    """置き場の綴りに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/tickets`）にも当たる。"""
+    """置き場の綴りに当たる式。プロジェクトの名前を挟んだ形（`wip/<name>/proposals`）にも当たる。"""
     parts = [re.escape(p) for p in tickets_rel.split("/") if p]
     optional = r"(?:[^\\/\s\x00]+[\\/])?"
     if len(parts) < 2:
@@ -834,9 +861,8 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     """
     place = state_dir_regex(tickets_rel)
     message = (
-        "チケットの状態は置き場（doing/ done/ cancelled/）で表し、動かすのは "
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start|done|cancel <識別子>' "
-        "だけです。"
+        "チケットの状態は置き場で表します。review/（レビュー待ち）へ動かすのは "
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} done <識別子>' だけです。"
         "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
     )
     write_rule = rules.Rule(
@@ -851,7 +877,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     write_rule.compiled = re.compile(place, re.IGNORECASE)
     # シェルの側は前の区切りを求めない。コマンドの引数は空白で区切られていて、
     # 書き込む動詞の式が引数までを覆う。行き先は末尾の `/` が無い綴り
-    # （`mv x wip/tickets/done`）でも当てる。
+    # （`mv x wip/proposals/done`）でも当てる。
     states = "|".join(GUARDED_STATES)
     loose = _place(tickets_rel) + rf"[\\/]({states})([\\/]|\s|$)"
     # 写す動詞は行き先が最後の引数。置き場から外へ写す読み向きの cp は止めない。
@@ -890,6 +916,35 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
         lines.insert(end, f"{key}: {_yaml_scalar(value)}")
         end += 1
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def insert_front(text: str, key: str, value) -> str:
+    """frontmatter の閉じの `---` の前に、欄を 1 つ足す。人の書いた行は保つ。
+
+    承認のときに `ccnavi_approved` を足すのに使う。読み直して書き出す（render）と、
+    人が書いたコメントや `|` のブロックが消える。同じ鍵の行が既にあれば消してから足す
+    （最上位の鍵だけ。字下げされた行はその欄の続きとして一緒に消す）。
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FENCE:
+        return text
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == FENCE), None)
+    if end is None:
+        return text
+    kept = [lines[0]]
+    skipping = False
+    for line in lines[1:end]:
+        if line.startswith((" ", "\t", "-")) and skipping:
+            continue
+        skipping = line.split(":", 1)[0].strip() == key and not line.startswith((" ", "\t"))
+        if not skipping:
+            kept.append(line)
+    dumped = yaml.safe_dump(
+        {key: value}, allow_unicode=True, sort_keys=False, default_flow_style=False
+    ).rstrip("\n")
+    kept.extend(dumped.splitlines())
+    kept.extend(lines[end:])
+    return "\n".join(kept) + ("\n" if text.endswith("\n") else "")
 
 
 def _yaml_scalar(value: str) -> str:

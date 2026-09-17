@@ -51,6 +51,33 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     return write(directory, "rules.yml", json.dumps(body, indent=2))
 
 
+# 提案 1 枚の最小の中身。置き場の話だけを見るので、範囲は 1 項でよい。
+TICKET = """---
+version: 1
+ticket: {name}
+title: t
+allow:
+- {{glob: "src/*", match: "Write|Edit"}}
+---
+"""
+# 承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
+COPY = """---
+version: 1
+ticket: {name}
+title: t
+ccnavi_approved: {{approved_at: "2026-01-01T00:00:00Z", source_tree: "", source_path: p}}
+allow:
+- {{glob: "src/*", match: "Write|Edit"}}
+---
+"""
+
+
+def proposal(root: str, place: str, state: str, name: str) -> str:
+    """提案を 1 枚置く。`place` は置き場の相対（`wip/tickets` / `wip/proposals`）。"""
+    directory = os.path.join(root, *place.split("/"), state)
+    return write(directory, name + ".md", TICKET.format(name=name))
+
+
 def ccnavi(root: str, *args: str, env: dict | None = None) -> subprocess.CompletedProcess:
     """道具を 1 回動かす。
 
@@ -208,6 +235,138 @@ class LintTest(unittest.TestCase):
         self.assertIn("チケット制御: disable", result.stdout)
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 0)
+
+    def test_旧い置き場に提案が残っていたらwarnで名指しする(self):
+        # 提案の置き場の既定を wip/tickets から wip/proposals に変えた（ADR-0054）。
+        # 旧の置き場に残った提案は走査されないまま「承認待ちは無い」で通る。
+        # 黙って通る向きなので、検証がここで言う。
+        proposal(self.root, "wip/tickets", "todo", "i0001")
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("wip/tickets", result.stdout)
+        self.assertIn("wip/proposals", result.stdout)
+        self.assertIn("i0001", result.stdout)
+        self.assertIn("CCNAVI_TICKETS_PROPOSAL", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 0)
+
+    def test_新しい置き場が在っても旧い置き場の残りは名指しする(self):
+        # 置き場の有無だけで決めると、新しい置き場を 1 つ作った時点で旧の残りが
+        # 見えなくなる。移し忘れがいちばん起きるのはこの形（部分移行）。
+        proposal(self.root, "wip/tickets", "doing", "i0001")
+        proposal(self.root, "wip/proposals", "todo", "i0002")
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001", result.stdout)
+
+    def test_移し終えていれば言わない(self):
+        # 移し終えた人に、移し終えたことを毎回言わない。空の置き場が残っていても同じ。
+        os.makedirs(os.path.join(self.root, "wip", "tickets", "todo"))
+        proposal(self.root, "wip/proposals", "todo", "i0001")
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("旧の置き場に残っていて", result.stdout)
+
+    def test_同じ綴りが新しい置き場にもあれば言わない(self):
+        # 写し終えた分。新しい側が走査されるので、旧に残った写しは害が無い。
+        proposal(self.root, "wip/tickets", "todo", "i0001")
+        proposal(self.root, "wip/proposals", "todo", "i0001")
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("旧の置き場に残っていて", result.stdout)
+
+    def test_閉じた承認済みチケットの記録は数えない(self):
+        # done/ cancelled/ に在っても、承認済みチケットが閉じていれば記録として
+        # 残っているだけ。閉じたことの権威は承認済みチケットの側にある。
+        # 数えると、履歴を残した人に毎回同じ 1 行が出て、他の報告ごと読まれなくなる。
+        proposal(self.root, "wip/tickets", "done", "i0001")
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("旧の置き場に残っていて", result.stdout)
+
+    def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
+        # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
+        # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
+        # 閉じた側との重複だけが通る。
+        for state in ("doing", "done"):
+            write(
+                os.path.join(self.root, ".ccnavi", "approved", state),
+                "i0001.md",
+                COPY.format(name="i0001"),
+            )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001 が複数の場所にある", result.stdout)
+        self.assertIn("(main):doing", result.stdout)
+        self.assertIn("(main):done", result.stdout)
+        self.assertEqual(counts(result.stdout)[0], 1)
+
+    def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
+        # review/ は提案の走査に入るので、これは前からの振る舞い。doing と done の側を
+        # 足したときに、数え方を変えてこちらが黙らないことを固定する。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+        write(
+            os.path.join(self.root, "wip", "proposals", "review"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001 が複数の場所にある", result.stdout)
+        self.assertIn("(main):review", result.stdout)
+
+    def test_doneに1つだけ在るのは咎めない(self):
+        # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても黙ったまま。
+        write(
+            os.path.join(self.root, ".ccnavi", "approved", "done"),
+            "i0001.md",
+            COPY.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("複数の場所にある", result.stdout)
+
+    def test_綴りを設定で旧いままにしている人には言わない(self):
+        # 置き場を自分で決めた人は、その綴りで動かしている。既定の話は関係が無い。
+        proposal(self.root, "wip/tickets", "todo", "i0001")
+
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            "--tickets",
+            "wip/tickets",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("旧の置き場に残っていて", result.stdout)
 
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))

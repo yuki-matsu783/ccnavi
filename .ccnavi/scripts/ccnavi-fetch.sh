@@ -5,7 +5,7 @@
 #
 # 承認済みチケットとマーカーは親チケットのブランチに乗り、A の機械から push されて届く
 # （設計 §9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに範囲が
-# 効かない、レビュー済みなのにゲートが閉じたまま、という形になる。
+# 効かない、レビュー済みなのに止まったまま、という形になる。
 #
 # 進めるのは fast-forward だけ。マージも rebase もしない。作業ツリーに未コミットの
 # 変更があるツリーは触らない。そこに居るのは人か別のセッションの書きかけで、
@@ -22,7 +22,7 @@ set -u
 # 共通部分。ワークスペースルートの探し方はここにある（設計 §11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/tickets}"
+approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
 projects="${CCNAVI_PROJECTS:-projects}"
 
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。

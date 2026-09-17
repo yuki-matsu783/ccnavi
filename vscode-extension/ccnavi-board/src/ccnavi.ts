@@ -20,6 +20,7 @@ import * as path from "node:path";
 import {
   parseApprovePreview,
   parseApproveResult,
+  partialMessage,
   type ApproveMismatch,
   type ApprovePreview,
   type ApproveResult,
@@ -58,6 +59,26 @@ const MAX_OUTPUT = 32 * 1024 * 1024;
  * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て 60 秒。
  */
 const APPROVE_TIMEOUT_MS = 60_000;
+
+/**
+ * ボードの読み直し（`--explain --json`）に付ける期限（ミリ秒）。返らないと画面の「更新」が
+ * 押されたまま戻らず、以後の読み直しも黙って捨てられる（board-panel の loading が立ちっぱなしになる）。
+ * 走査は数百ミリ秒で終わるが、遅い機械と大きなリポジトリを見て承認と同じ 60 秒。
+ */
+const EXPLAIN_TIMEOUT_MS = 60_000;
+
+/**
+ * 診断の 4 本（`--test` / `--test-samples` / `--lint` / `--lint --json`）に付ける期限（ミリ秒）。
+ * この 4 本を待つ間、ルール設定・リスク管理・フェーズ管理の画面はボタンを非活性にし、返事が
+ * 届いたときにしか活性へ戻さない。ボードと違って HTML の総取り替えも監視の読み直しも無いので、
+ * 返らないと画面を閉じるまで戻れない（編集中の内容は消える）。値はボードと承認に揃えて 60 秒。
+ */
+const DIAGNOSE_TIMEOUT_MS = 60_000;
+
+/** 期限で打ち切ったときの文面。標準エラーには何も残らないので、呼び手の代わりにここで組む */
+function cutOff(what: string, ms: number): string {
+  return `${what} を ${ms / 1000} 秒で打ち切った`;
+}
 
 const NOT_FOUND =
   "ccnavi の実行ファイルが見つからない（設定 ccnaviBoard.binPath、.claude/settings.json の CCNAVI_BIN_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.sh が起動する .ccnavi/bin/<os>-<arch>/ccnavi、ccnavi/__main__.py のどれも無い）。設定 ccnaviBoard.binPath で指せる";
@@ -145,6 +166,8 @@ interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
+  /** 期限で打ち切った（execFile が殺した）。標準エラーには何も残らないので、呼び手が文面を作る */
+  readonly killed: boolean;
 }
 
 function run(
@@ -181,6 +204,7 @@ function run(
           code,
           stdout,
           stderr: stderr.trim() || (error ? error.message : ""),
+          killed: (error as { killed?: unknown } | null)?.killed === true,
         });
       },
     );
@@ -192,9 +216,12 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   if (launcher === undefined) {
     return { ok: false, launcher, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--explain", "--json"]);
+  const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
-    return { ok: false, launcher, error: `ccnavi --explain --json が失敗した: ${ran.stderr}` };
+    const why = ran.killed
+      ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒で返らないので打ち切った`
+      : ran.stderr;
+    return { ok: false, launcher, error: `ccnavi --explain --json が失敗した: ${why}` };
   }
   const parsed = parseBoardJson(ran.stdout);
   if (!parsed.ok) {
@@ -222,6 +249,12 @@ export async function runApprovePreview(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      ok: false,
+      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。承認済みチケットは置かれていない`,
+    };
+  }
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
     // 読めない提案の行より後ろに出るので、1 行目だけでは届かない。
@@ -247,6 +280,18 @@ export async function runApproveYes(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
+  // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（approval.py の for cand in batch）ので、
+  // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」に落ちるため、
+  // ここで拾わないと何が起きたのか伝わらない。
+  if (ran.killed) {
+    return {
+      ok: false,
+      error:
+        `${cutOff("ccnavi --approve --yes", APPROVE_TIMEOUT_MS)}。` +
+        "一部だけ承認済みになっている可能性がある。承認済みチケットのコミットと push は送っていない" +
+        "（送るのは承認できたときだけ）。ボードを更新して、何が承認されたかを確かめる",
+    };
+  }
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0
@@ -255,6 +300,11 @@ export async function runApproveYes(
   }
   if ("mismatch" in parsed) {
     return parsed;
+  }
+  // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで黙ると人は
+  // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
+  if ("partial" in parsed) {
+    return { ok: false, error: partialMessage(parsed.partial) };
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi --approve --yes の出力を読み取れない（${parsed.error}）` : said };
@@ -279,7 +329,10 @@ export async function runTest(
     tool,
     subject,
     "--json",
-  ]);
+  ], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --test --json", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi --test --json が失敗した: ${ran.stderr}` };
   }
@@ -304,7 +357,10 @@ export async function runSamples(
     "--test-samples",
     samplesPath,
     "--json",
-  ]);
+  ], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --test-samples --json", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi --test-samples --json が失敗した: ${ran.stderr}` };
   }
@@ -322,7 +378,10 @@ export async function runLint(
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"]);
+  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --lint", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code < 0 || ran.code > 1) {
     return { ok: false, error: `ccnavi --lint が失敗した: ${ran.stderr}` };
   }
@@ -344,7 +403,10 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--lint", "--json"]);
+  const ran = await run(launcher, root, ["--lint", "--json"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --lint --json", DIAGNOSE_TIMEOUT_MS) };
+  }
   if (ran.code < 0 || ran.code > 1) {
     return { ok: false, error: `ccnavi --lint --json が失敗した: ${firstLine(ran.stderr)}` };
   }

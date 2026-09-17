@@ -2,7 +2,7 @@
  * フェーズ管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
- * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`、`CCNAVI_PHASES`）、
+ * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
  * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。対象ごとに 1 パネルで、並べて開ける。
  * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
@@ -31,7 +31,6 @@ import * as vscode from "vscode";
 import { WATCH_PATTERNS } from "./board-panel.js";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
-import { envFromSettingsJson } from "./core/hooks.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
@@ -185,24 +184,13 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
   void refreshLock(current);
 }
 
-/** `.claude/settings.local.json` が先、無ければ `.claude/settings.json`。実行ファイルが読む env の重なりと同じ */
-function phasesRelOf(root: string): string {
-  for (const name of ["settings.local.json", "settings.json"]) {
-    const settingsText = readText(path.join(root, ".claude", name));
-    const found = settingsText === undefined ? "" : envFromSettingsJson(settingsText, "CCNAVI_PHASES");
-    if (found !== "") {
-      return found;
-    }
-  }
-  return DEFAULT_PHASES;
-}
-
 async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesRel: string;
   let phasesPath: string;
   const notices: string[] = [];
   if (target.kind === "common") {
-    phasesRel = phasesRelOf(root);
+    // 共通層の置き場は `.ccnavi/common/` 固定（ADR-0052）。
+    phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
@@ -250,14 +238,6 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   const parsed = readPhases(text);
   const doc = exists ? parsed : { apply: parsed.apply, model: { ...parsed.model, problems: [] } };
   return { text, exists, mtimeMs, doc, phasesPath, phasesRel, notices };
-}
-
-function readText(filePath: string): string | undefined {
-  try {
-    return fs.readFileSync(filePath, "utf8");
-  } catch {
-    return undefined;
-  }
 }
 
 function resolveIn(root: string, filePath: string): string {

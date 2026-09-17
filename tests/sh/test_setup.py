@@ -73,7 +73,7 @@ EVENTS = (
     "SubagentStart",
     "SubagentStop",
 )
-REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_RULES", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
+REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_LOG", "CCNAVI_BIN_PATH")
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
 # 書かなければ enable で動くので、dry-run で導入したときにここだけ本気で動くと、
 # 様子を見ている人の手元でファイルが勝手に戻る。
@@ -86,7 +86,7 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものがずれる。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
-# --deploy が配るゲートの sh。拒否の文面が案内する「代わりに通る形」で、
+# --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側に逃げ道がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
@@ -100,7 +100,7 @@ RULES_PARTS = (".ccnavi", "common", "rules.yml")
 RISK_PARTS = (".ccnavi", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
 # 置き場は 2 つに分けて固定する（設計 launcher-scripts §1）。hook が起動する振り分けの sh は
-# ゲートの sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
+# 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
 LAUNCHER_NAME = "ccnavi-launcher.sh"
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
@@ -266,8 +266,20 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup("--mode", "enable")
         env = self.read_settings()["env"]
         self.assertEqual(env["CCNAVI_MODE"], "enable")
-        self.assertEqual(env["CCNAVI_RULES"], ".ccnavi/common/rules.yml")
         self.assertEqual(env["CCNAVI_LOG"], "logs/log.jsonl")
+
+    def test_does_not_write_the_common_layer_paths(self):
+        """ADR-0052: 共通層の 3 本は `.ccnavi/common/` 固定なので、env には書かない。
+
+        既定と同じ値を書いても動きは変わらないが、読まれない語が設定に残ると、
+        そこを直せば置き場が動くと読める。`--all` の一覧にも書かない。
+        """
+        for args in (("--mode", "enable"), ("--mode", "enable", "--all")):
+            self.run_setup(*args)
+            env = self.read_settings()["env"]
+            for name in ("CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"):
+                with self.subTest(args=args, name=name):
+                    self.assertNotIn(name, env)
 
     def test_bin_path_points_at_the_launcher(self):
         """指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
@@ -350,15 +362,15 @@ class WritesTheExpectedShape(SetupTest):
         """--all は、既定と同じ値のつまみも設定ファイルに並べる。"""
         self.run_setup("--all")
         env = self.read_settings()["env"]
-        self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/tickets")
-        self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/tickets")
-        self.assertEqual(env["CCNAVI_PHASES"], ".ccnavi/common/phases.yml")
+        self.assertEqual(env["CCNAVI_TICKETS_PROPOSAL"], "wip/proposals")
+        self.assertEqual(env["CCNAVI_TICKETS_APPROVED"], ".ccnavi/approved")
+        self.assertEqual(env["CCNAVI_STATE"], "logs/state")
         self.assertEqual(env["CCNAVI_PROJECT_HOME"], ".ccnavi")
 
     def test_says_what_is_still_missing(self):
         """登録しただけでは動かないので、人が置くものを挙げる（S12）。
 
-        振り分けの sh はゲートの sh と同じ並びに出る。
+        振り分けの sh は代わりに通る sh と同じ並びに出る。
         """
         result = self.run_setup()
         missing = section(result.stdout, "まだ無いもの")
@@ -762,7 +774,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 ) as f:
                     f.write(f"# {name}\n")
             if launcher:
-                # 振り分けの sh は本物を写し、ゲートの sh と同じ置き場に置く。配布先で
+                # 振り分けの sh は本物を写し、代わりに通る sh と同じ置き場に置く。配布先で
                 # 中身が同じであることを見るため。モードは落として置く。配布元の置き方に
                 # 依らず、配った先で実行ビットが付くことを見るため。
                 shutil.copy(LAUNCHER, os.path.join(src, *LAUNCHER_PARTS))
@@ -812,7 +824,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         return os.path.join(self.dir, *parts)
 
     def test_writes_the_settings_and_copies_the_parts_in_one_run(self):
-        """1 回で、設定を書き、実行ファイル・ルール・ゲートの sh を配る。"""
+        """1 回で、設定を書き、実行ファイル・ルール・代わりに通る sh を配る。"""
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1209,7 +1221,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
     def test_adds_only_the_place_of_the_build(self):
         """足すのは /.ccnavi/bin/<built>/ の 1 行だけ（S5）。
 
-        振り分けの sh はゲートの sh と同じく追跡する側に置く。無視すると、clone した先に
+        振り分けの sh は代わりに通る sh と同じく追跡する側に置く。無視すると、clone した先に
         sh が届かず hook が起動しない。置き場ごと（.ccnavi/ や .ccnavi/bin/）も無視しない。
         同じ .ccnavi/ の下にある rules.yml まで git から消え、そのプロジェクトが何を
         止めるかが渡らなくなる。

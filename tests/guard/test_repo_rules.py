@@ -308,7 +308,7 @@ GUARDED = [
     ("sed -i s/a/b/ .claude/settings.json", SETTING_FILES),
     ("cp /tmp/rules.yml .ccnavi/common/rules.yml", SETTING_FILES),
     ("truncate -s 0 .claude/settings.json", SETTING_FILES),
-    ("mv wip/tickets/todo/a.md wip/tickets/doing/a.md", TICKET_STATE),
+    ("mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md", TICKET_STATE),
     ("ccnavi --approve --yes x", APPROVAL),
     ("sh .ccnavi/scripts/ccnavi-approve.sh", APPROVAL),
     # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
@@ -371,7 +371,7 @@ class RunnerTest(LauncherJudgeTest):
             "source .venv/bin/activate": set(),
             ". .venv/bin/activate && uv run pytest": set(),
             "bash -lc 'uv run ruff check .'": set(),
-            # ゲートの sh 3 形。承認のスクリプトは元の形から止まっている。
+            # 代わりに通る sh 3 形。承認のスクリプトは元の形から止まっている。
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
             "sh .ccnavi/scripts/ccnavi-review.sh request --phase 1 --body-file x.md": set(),
             "sh .ccnavi/scripts/ccnavi-approve.sh": {APPROVAL},

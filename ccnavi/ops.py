@@ -3,9 +3,11 @@
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
 サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
 
-やることは置き場を動かして欄を書くことだけ。ワークツリーの削除は親のマージ手順に
-任せる。順序は「子の成果をマージ → done → ワークツリーを消す」で、done の前に
-ワークツリーを消すと base_sha の検査ができなくなる。
+やることは置き場を動かして欄を書くことだけ（ADR-0055）。`start` は置き場を動かさず
+`doing/` の欄を書く。`done` は `doing/` から `wip/proposals/review/`（レビュー要）か
+`.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
+ワークツリーの削除は親のマージ手順に任せる。順序は「子の成果をマージ → done →
+ワークツリーを消す」で、done の前にワークツリーを消すと base_sha の検査ができなくなる。
 """
 
 from __future__ import annotations
@@ -23,34 +25,35 @@ TIMEOUT_SECONDS = 5.0
 def start(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
-    """todo/ → doing/。着手の時刻と基準点を書く。"""
+    """`doing/` の承認済みチケットに、着手の時刻と基準点を書く。置き場は動かない。"""
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
-    if found.state != ticket_mod.TODO:
-        stderr.write(f"ccnavi: {ticket_id} は未着手ではない（いまは {found.state}/）\n")
-        return 1
-    # 承認の無いチケットは着手させない。承認済みチケットが無ければ範囲は効かず、フェーズにも
-    # 数えられないので、着手した子が「無いもの」として進んでしまう。
-    open_copies, _ = approval.scan(conf, root)
-    if found.ticket not in approval.by_id(open_copies):
+    if found.state != ticket_mod.DOING:
         stderr.write(
-            f"ccnavi: {ticket_id} は承認されていない（承認済みチケットが無い）。"
-            "先に利用者が 'ccnavi --approve' を通すこと\n"
+            f"ccnavi: {ticket_id} は承認済みの作業中ではない（いまは {found.state}/）。"
+            + (
+                "先に利用者が 'ccnavi --approve' を通すこと"
+                if found.state == ticket_mod.TODO
+                else ""
+            )
+            + "\n"
         )
+        return 1
+    if found.started_at:
+        stderr.write(f"ccnavi: {ticket_id} は着手済み（{found.started_at}）\n")
         return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
     # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
-    copy = approval.by_id(open_copies)[found.ticket]
-    owner = tree.project_root(conf.projects, copy.project) or root
+    owner = tree.project_root(conf.projects, found.project) or root
     worktree = tree.worktree_path(root, ticket_id)
     if not tree.is_worktree_of(owner, worktree) or not tree.exact_name(root, ticket_id):
-        where = f"projects/{copy.project} の中で " if copy.project else ""
+        where = f"projects/{found.project} の中で " if found.project else ""
         stderr.write(
             f"ccnavi: {ticket_id} のワークツリー {worktree} が無いか、"
             "元リポジトリが承認済みチケットの project"
-            f"（{copy.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
+            f"（{found.project or 'ワークスペース'}）と違う（綴りは大文字小文字まで同じで）。"
             f"先に {where}'{settings.script_command(root, 'ccnavi-git.sh')} "
             f'worktree add "{worktree}" '
             f"-b {ticket_id}' で作ること\n"
@@ -61,25 +64,30 @@ def start(
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
     fields = {"started_at": approval.now(), "base_sha": sha}
-    return _move(
-        stdout,
-        stderr,
-        root,
-        conf,
-        found,
-        ticket_mod.DOING,
-        fields,
-        f"着手 {fields['started_at']} / 基準点 {sha[:12]}",
+    failed = approval.update_fields(found.path, fields)
+    if failed:
+        stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
+        return 1
+    stdout.write(
+        f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
+        f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
+    return 0
 
 
 def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str) -> int:
-    """doing/ → done/。完了の時刻を書く。承認済みチケットは次の hook が closed/ へ動かす。"""
+    """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。"""
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
     if found.state != ticket_mod.DOING:
         stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
+        return 1
+    if not found.started_at:
+        stderr.write(
+            f"ccnavi: {ticket_id} は未着手。先に "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start {ticket_id}' を通す\n"
+        )
         return 1
     if _parent_still_busy(stderr, root, conf, found):
         return 1
@@ -90,15 +98,32 @@ def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, tic
     if scored is None:
         return 1
     fields = {"completed_at": approval.now()}
-    code = _move(
-        stdout, stderr, root, conf, found, ticket_mod.DONE, fields, f"完了 {fields['completed_at']}"
-    )
+    state = ticket_mod.REVIEW if _needs_review(root, conf, found) else ticket_mod.DONE
+    code = _move(stdout, stderr, root, conf, found, state, fields, f"完了 {fields['completed_at']}")
     if code == 0 and scored:
         for line in scored:
             stdout.write(line + "\n")
     if code == 0 and not found.is_child:
         _close_parent(stdout, stderr, root, conf, found)
     return code
+
+
+def _needs_review(root: str, conf: settings.Settings, found: ticket_mod.Ticket) -> bool:
+    """この子を閉じたとき、人が見る対象になるか（設計 §9.8）。親は見ない。
+
+    フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
+    レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、人が見るまでは
+    見られていない。実績のリスクは `_score_child` が記録した直後なので、ここで数え直すと
+    宣言に関わらず上がった分も入る。
+    """
+    if not found.is_child or found.phase is None:
+        return False
+    for ph in phase.phases_of(root, conf, found.parent):
+        if ph.number != found.phase:
+            continue
+        ph.states[found.ticket] = ticket_mod.DONE
+        return ph.deferred or ph.review_required
+    return found.review_required
 
 
 def _close_parent(
@@ -150,15 +175,21 @@ def _close_parent(
 def cancel(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str, reason: str
 ) -> int:
-    """todo/ か doing/ → cancelled/。理由が要る。"""
+    """`doing/` → `done/`。取り消しの時刻と理由を書く。理由が要る。"""
     if not reason.strip():
         stderr.write("ccnavi: 取り消しには --reason <理由> が要る\n")
         return 1
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
         return 1
-    if found.state not in (ticket_mod.TODO, ticket_mod.DOING):
-        stderr.write(f"ccnavi: {ticket_id} は未着手でも作業中でもない（いまは {found.state}/）\n")
+    if found.state == ticket_mod.TODO:
+        stderr.write(
+            f"ccnavi: {ticket_id} は未承認の提案（todo/）。取り消しの記録は要らないので、"
+            "ファイルを消せばよい\n"
+        )
+        return 1
+    if found.state != ticket_mod.DOING:
+        stderr.write(f"ccnavi: {ticket_id} は作業中ではない（いまは {found.state}/）\n")
         return 1
     if _parent_still_busy(stderr, root, conf, found):
         return 1
@@ -169,7 +200,7 @@ def cancel(
         root,
         conf,
         found,
-        ticket_mod.CANCELLED,
+        ticket_mod.DONE,
         fields,
         f"取り消し: {reason.strip()}",
     )
@@ -330,15 +361,32 @@ def _score_child(
 def _find(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> ticket_mod.Ticket | None:
+    """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
+
+    権威のあるツリーの側だけを読む（approval.scan / ticket.scan の畳み）。それでも
+    2 つ以上残れば、どれが本物か決まらないので止める。
+    """
+    hits: list[ticket_mod.Ticket] = []
+    copies, notes = approval.scan(conf, root)
+    hits += [t for t in copies if t.ticket == ticket_id]
+    review, more = approval.scan_review(conf, root)
+    hits += [t for t in review if t.ticket == ticket_id]
+    closed, _ = approval.scan(conf, root, closed=True)
+    hits += [t for t in closed if t.ticket == ticket_id]
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
-    hits = [t for t in proposals if t.ticket == ticket_id]
+    # `todo/` は承認の前の姿。承認済みチケット（作業中・レビュー待ち・閉じた）が在れば、同じ
+    # 識別子の `todo/` は改版の候補か書き損じで、状態の操作の相手ではない（`--lint` が言う）。
+    if not hits:
+        hits += [t for t in proposals if t.ticket == ticket_id and t.state == ticket_mod.TODO]
     if not hits:
         stderr.write(
-            f"ccnavi: 提案 {ticket_id} が見つからない"
-            f"（{conf.tickets}/ の下を全ワークツリーで探した）\n"
+            f"ccnavi: チケット {ticket_id} が見つからない"
+            f"（{conf.approved}/ と {conf.tickets}/ の下を全ツリーで探した）\n"
         )
         for p in problems:
             stderr.write(f"  {p}\n")
+        for note in notes + more:
+            stderr.write(f"  {note}\n")
         return None
     if len(hits) > 1:
         places = ", ".join(f"{t.tree or '(main)'}:{t.state}" for t in hits)
@@ -350,9 +398,9 @@ def _find(
 def _parent_still_busy(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """親を閉じてよいか。開いている子や閉じたゲートがある間は閉じさせない。
+    """親を閉じてよいか。開いている子やレビュー待ちのフェーズがある間は閉じさせない。
 
-    親の承認済みチケットが閉じるとゲートの鍵（cwd から引く親）が消え、レビュー要の
+    親の承認済みチケットが閉じると止めるときの鍵（cwd から引く親）が消え、レビュー要の
     フェーズが終わっていても誰も止めなくなる。
     """
     if found.is_child:
@@ -381,11 +429,10 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     ):
         return []
     problems: list[str] = []
-    closed = phase.gate(root, conf, parent_id)
-    if closed is not None:
+    held = phase.held_phase(root, conf, parent_id)
+    if held is not None:
         problems.append(
-            f"{parent_id} のフェーズ {closed.label} はレビュー待ち（ゲートが閉じている）。"
-            "レビューを済ませてから"
+            f"{parent_id} のフェーズ {held.label} は{held.review_label}。レビューを済ませてから"
         )
     closed_copies, _ = approval.scan(conf, root, closed=True)
     copy = approval.by_id(copies + closed_copies).get(parent_id)
@@ -430,8 +477,7 @@ def _deliverables_missing(
         others = [
             t.ticket
             for t in ph.tickets
-            if t.ticket != found.ticket
-            and ph.states.get(t.ticket) in (ticket_mod.TODO, ticket_mod.DOING)
+            if t.ticket != found.ticket and ph.states.get(t.ticket) == ticket_mod.DOING
         ]
         if others:
             return False
@@ -467,43 +513,27 @@ def _move(
     fields: dict[str, str],
     said: str,
 ) -> int:
-    base = os.path.dirname(os.path.dirname(found.path))
-    target = os.path.join(base, state, found.ticket + ".md")
-    try:
-        with open(found.path, encoding="utf-8") as f:
-            original = f.read()
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        # 提案は人も読む。読み直して書き出さず、欄の行だけを書き換える。
-        with open(target, "w", encoding="utf-8") as f:
-            f.write(ticket_mod.set_fields(original, fields))
-    except OSError as exc:
-        stderr.write(f"ccnavi: {found.ticket} を {state}/ へ動かせない ({exc})\n")
+    """`doing/` の承認済みチケットに欄を書き、`review/` か `done/` へ動かす。"""
+    failed = approval.update_fields(found.path, fields)
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket} に欄を書けない: {failed}\n")
         return 1
-    try:
-        os.remove(found.path)
-    except OSError as exc:
-        # 両方に残すと、以後どの操作も「複数の場所にある」で止まる。書いた側を消して戻す。
-        try:
-            os.remove(target)
-            stderr.write(f"ccnavi: {found.path} を消せない ({exc})。元の置き場のままにした\n")
-        except OSError:
-            stderr.write(
-                f"ccnavi: {found.ticket} が {found.state}/ と {state}/ の両方に残った ({exc})。"
-                f"人が {found.state}/ の側を消すこと\n"
-            )
+    where = os.path.dirname(os.path.dirname(found.path))
+    if state == ticket_mod.REVIEW:
+        failed = approval.to_review(where, found.tree_root, conf.tickets, found.ticket)
+        place = f"{conf.tickets}/{ticket_mod.REVIEW}/"
+    else:
+        failed = approval.close_copy(where, found.ticket)
+        place = f"{conf.approved}/{ticket_mod.DONE}/"
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket}: {failed}\n")
         return 1
-    # 承認済みチケットがあれば、欄をすぐ写す。次の hook でも写るが、ここで写しておくと
-    # スクリプトの直後に走る検査が古い基準点を見ない。
-    copies, _ = approval.scan(conf, root)
-    copy = approval.by_id(copies).get(found.ticket)
-    if copy is not None:
-        where = approval.dir_of(conf, copy)
-        if state in ticket_mod.CLOSED:
-            approval.update_copy(where, copy, fields)
-            approval.close_copy(where, found.ticket)
-        else:
-            approval.update_copy(where, copy, fields)
-    stdout.write(f"OK: {found.ticket} を {state}/ へ動かした（{said}）\n")
+    stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
+    if state == ticket_mod.REVIEW:
+        stdout.write(
+            "人のレビューを待つ。レビューが済むと利用者の操作（check / accept / --reviewed）で "
+            f"{conf.approved}/{ticket_mod.DONE}/ へ動く\n"
+        )
     return 0
 
 

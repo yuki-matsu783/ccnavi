@@ -53,7 +53,7 @@ COMMON_RULES = {
         {
             "id": "guard-approved",
             "match": "Write|Edit|NotebookEdit",
-            "glob": "*/.ccnavi/tickets/*",
+            "glob": "*/.ccnavi/approved/*",
             "message": "guard settings. ask the user.",
         },
     ],
@@ -360,9 +360,9 @@ class ConfigUnionHarness(unittest.TestCase):
         self.rules = os.path.join(common, "rules.yml")
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risks.yml")
-        # 承認済みチケットとマーカーは、そのチケットの親のツリーの `.ccnavi/tickets/` に置かれる
+        # 承認済みチケットとマーカーは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる
         # （設計 §9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに落ちる。
-        self.approved = os.path.join(self.ws, ".ccnavi", "tickets")
+        self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "logs", "state")
         self.log = os.path.join(self.ws, "logs", "log.jsonl")
 
@@ -385,21 +385,21 @@ class ConfigUnionHarness(unittest.TestCase):
         return path
 
     def propose(self, name, text, project=""):
-        """提案を置く。プロジェクト向けはそのプロジェクトの `wip/tickets/`（設計 §11.5）。"""
+        """提案を置く。プロジェクト向けはそのプロジェクトの `wip/proposals/`（設計 §11.5）。"""
         base = os.path.join(self.projects, project) if project else self.ws
-        return write(os.path.join(base, "wip", "tickets", "todo", name + ".md"), text)
+        return write(os.path.join(base, "wip", "proposals", "todo", name + ".md"), text)
 
     def approved_dir_of(self, project=""):
         """このプロジェクトの承認済みチケットの置き場。"""
         base = os.path.join(self.projects, project) if project else self.ws
-        return os.path.join(base, ".ccnavi", "tickets")
+        return os.path.join(base, ".ccnavi", "approved")
 
     def approved_path(self, *parts, project=""):
         """承認済みチケットの置き場の下のパス。プロジェクトを渡さなければ、在る側を探す。"""
         if project:
             return os.path.join(self.approved_dir_of(project), *parts)
         for where in (self.ws, self.lib, self.app):
-            path = os.path.join(where, ".ccnavi", "tickets", *parts)
+            path = os.path.join(where, ".ccnavi", "approved", *parts)
             if os.path.exists(path):
                 return path
         return os.path.join(self.approved, *parts)
@@ -407,12 +407,12 @@ class ConfigUnionHarness(unittest.TestCase):
     def approved_copy(self, name, project=""):
         """承認済みチケットのパス。プロジェクトを渡さなければ、在る側を探す。"""
         if project:
-            return os.path.join(self.approved_dir_of(project), name + ".md")
+            return os.path.join(self.approved_dir_of(project), "doing", name + ".md")
         for where in (self.ws, self.lib, self.app):
-            path = os.path.join(where, ".ccnavi", "tickets", name + ".md")
+            path = os.path.join(where, ".ccnavi", "approved", "doing", name + ".md")
             if os.path.exists(path):
                 return path
-        return os.path.join(self.approved, name + ".md")
+        return os.path.join(self.approved, "doing", name + ".md")
 
     # ---- 起動
 
@@ -433,7 +433,7 @@ class ConfigUnionHarness(unittest.TestCase):
                 "--projects",
                 self.projects if projects is None else projects,
                 "--approved",
-                ".ccnavi/tickets",
+                ".ccnavi/approved",
                 "--state",
                 self.state,
                 "--log",
@@ -613,7 +613,7 @@ class WriteUnionTest(ConfigUnionHarness):
         common = self.hook(
             "NotebookEdit",
             self.ws,
-            notebook_path=os.path.join(self.lib, ".ccnavi", "tickets", "a.ipynb"),
+            notebook_path=os.path.join(self.lib, ".ccnavi", "approved", "a.ipynb"),
         )
         self.assert_denied(common, "guard-approved")
 

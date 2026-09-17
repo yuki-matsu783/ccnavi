@@ -50,7 +50,7 @@ class ApproveJsonTest(PhaseHarness):
         )
 
     def copy_exists(self, name):
-        return os.path.exists(os.path.join(self.approved, name + ".md"))
+        return os.path.exists(os.path.join(self.approved, "doing", name + ".md"))
 
     def pending_parent_and_child(self):
         """親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
@@ -68,7 +68,7 @@ class ApproveJsonTest(PhaseHarness):
         # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
         # frontmatter の読めない提案。読めない提案の側に載る。
-        write(os.path.join(self.parent_tree, "wip", "tickets", "todo", "broken.md"), "---\n: :\n")
+        write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
         body = self.preview()
@@ -81,7 +81,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(parent["overflow"], [])
         self.assertEqual(child["parent"], "i0001")
         self.assertEqual(child["phase"], 1)
-        self.assertTrue(child["path"].replace("\\", "/").endswith("wip/tickets/todo/i0001-01.md"))
+        self.assertTrue(child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01.md"))
         self.assertEqual(child["overflow"], [])
         # 超えた項は文字列の並びで、種類の名前と「超えている」を含む。
         self.assertTrue(beyond["overflow"], beyond)
@@ -327,7 +327,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_yes_refuses_when_only_the_markdown_body_of_a_child_changed(self):
         """2. 見せたあとで子の Markdown の本文だけを書き換えても、見せた指紋では承認しない。"""
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         shown = self.preview()
         self.assert_refused_after_edit(child, "---\n\n本文\n", "---\n\n書き換えた本文\n", shown)
 
@@ -339,7 +339,7 @@ class ApproveJsonTest(PhaseHarness):
         ccnavi の知らない欄（`note:`）は画面に出ないが、そのまま承認済みチケットに写る。
         """
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("rationale: r\n", "rationale: r\nnote: x\n", 1))
@@ -371,12 +371,12 @@ class ApproveJsonTest(PhaseHarness):
         書く計画だけを変える。
         """
         path, shown = self.pending_revision()
-        with open(os.path.join(self.approved, "i0001.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             before = f.read()
         self.assert_refused_after_edit(
             path, "  - acceptance\n", "  - design\n", shown, tickets=["i0001"]
         )
-        with open(os.path.join(self.approved, "i0001.md"), encoding="utf-8") as f:
+        with open(os.path.join(self.approved, "doing", "i0001.md"), encoding="utf-8") as f:
             self.assertEqual(f.read(), before)
 
     def test_yes_refuses_when_the_copy_under_revision_changed(self):
@@ -386,13 +386,13 @@ class ApproveJsonTest(PhaseHarness):
         （`revise_copy`）。提案の frontmatter をそのまま指紋に入れる実装では、この書き換えを見逃す。
         """
         path, shown = self.pending_revision()
-        copy = os.path.join(self.approved, "i0001.md")
+        copy = os.path.join(self.approved, "doing", "i0001.md")
         self.assert_refused_after_edit(copy, "---\n", "---\nnote: x\n", shown, tickets=["i0001"])
 
     def test_nul_in_the_markdown_body_still_approves(self):
         """本文に生の NUL があっても、見せた指紋で承認できる（指紋は区切りの文字に頼らない）。"""
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
@@ -411,7 +411,7 @@ class ApproveJsonTest(PhaseHarness):
         （各部分が frontmatter から始まるため）ので、この確かめは振る舞いを固定するためのもの。
         """
         self.pending_parent_and_child()
-        child = os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-01.md")
+        child = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01.md")
         with open(child, encoding="utf-8") as f:
             text = f.read()
         write(child, text.replace("---\n\n本文\n", "---\n\n前\x00後\n", 1))
@@ -486,7 +486,7 @@ class ApproveJsonTest(PhaseHarness):
         self._check_fixture("approve-preview.json", preview)
 
         # 承認の答えは親と子 1 枚の形で写す。超過のある子は提案を下げてから承認する。
-        os.remove(os.path.join(self.parent_tree, "wip", "tickets", "todo", "i0001-02.md"))
+        os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02.md"))
         self.commit_parent()
         result = self.yes(["i0001", "i0001-01"])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -498,6 +498,73 @@ class ApproveJsonTest(PhaseHarness):
         result = self.yes(["i0001-09"])
         self.assertEqual(result.returncode, 1)
         self._check_fixture("approve-mismatch.json", json.loads(result.stdout))
+
+    def test_yes_that_stops_partway_says_what_it_placed(self):
+        """途中で書けなくなっても、置いたぶんを黙って捨てない（README「承認の JSON」の partial）。
+
+        置き場に同じ名前のディレクトリを作って、子の承認済みチケットだけ書けなくする。
+        束は親 → 子の順なので、親は置かれたあとに止まる。
+        フィクスチャには入れない。理由の文面に OS の言い分（「ディレクトリです」など）が
+        混じるので、機械によって変わる。
+        """
+        self.pending_parent_and_child()
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-01.md"))
+        result = self.yes(["i0001", "i0001-01"])
+        self.assertEqual(result.returncode, 1)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["version"], APPROVE_VERSION)
+        self.assertEqual(body["partial"]["placed"], ["i0001"])
+        self.assertEqual(body["partial"]["ticket"], "i0001-01")
+        self.assertIn("書けない", body["partial"]["reason"])
+        self.assertNotIn("approved", body)
+        # 置いたものは戻さない。親は承認済みチケットに入ったまま。
+        self.assertTrue(self.copy_exists("i0001"))
+        # 標準エラーには止まったところが出る。
+        self.assertIn("i0001-01", result.stderr)
+
+    def test_partial_carries_the_progress_lines(self):
+        """止まるまでに出た行も渡す。端末だけが知っていて拡張が知らない状態を作らない。
+
+        レビュー済みのフェーズに子を 2 枚足し、2 枚目だけ書けなくする。1 枚目は置けるので
+        そのフェーズのマーカーが消え、その行が `lines` に入る。
+        """
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
+
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
+        self.propose("i0001-03", child_text("i0001-03", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent("propose 02 03")
+        os.makedirs(os.path.join(self.approved, "doing", "i0001-03.md"))
+        result = self.yes(["i0001-02", "i0001-03"])
+        self.assertEqual(result.returncode, 1)
+        partial = json.loads(result.stdout)["partial"]
+        self.assertEqual(partial["placed"], ["i0001-02"])
+        self.assertEqual(partial["ticket"], "i0001-03")
+        self.assertTrue(
+            any("マーカー" in line for line in partial["lines"]),
+            partial["lines"],
+        )
+
+    def test_yes_that_stops_before_placing_anything_says_so(self):
+        """1 件目で止まったら placed は空。「一部だけ置かれた」と言わせない。"""
+        self.pending_parent_and_child()
+        os.makedirs(os.path.join(self.approved, "doing", "i0001.md"))
+        result = self.yes(["i0001", "i0001-01"])
+        self.assertEqual(result.returncode, 1)
+        body = json.loads(result.stdout)
+        self.assertEqual(body["partial"]["placed"], [])
+        self.assertEqual(body["partial"]["ticket"], "i0001")
+        self.assertFalse(self.copy_exists("i0001-01"))
 
     def _fixture(self, name):
         with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:

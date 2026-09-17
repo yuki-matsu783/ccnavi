@@ -1,8 +1,10 @@
 /**
  * 実行ファイルの JSON を、列とカードを持つボードに組み立てる。VS Code の API には依存しない。
  *
- * 列は提案の置き場（todo / doing / done / cancelled）。承認済みチケット・マーカー・ゲート・ワークツリーは
- * カードのバッジで出す。ゲートの開閉や承認待ちの判断はここでやり直さない。JSON が
+ * 列は 未着手 / 作業中 / 完了 / 取り消し。置き場（ADR-0055）との対応は、未着手 = `wip/proposals/todo/`、
+ * 作業中 = `.ccnavi/approved/doing/` と `wip/proposals/review/`（レビュー待ちも作業中の列。待ちはカードの属性で言う）、
+ * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ `done/` で `cancelled_at` を持つもの。承認済みチケット・マーカー・
+ * レビュー待ち・ワークツリーはカードのバッジで出す。止まっているかや承認待ちの判断はここでやり直さない。JSON が
  * 言ったことを並べるだけで、判定と同じ答えを 2 か所で出さない。
  */
 import type {
@@ -11,6 +13,7 @@ import type {
   ParentJson,
   PhaseJson,
   ProposalState,
+  ProposalJson,
   SeenInJson,
   TicketJson,
 } from "./model.js";
@@ -44,7 +47,7 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   readonly marks: readonly string[];
   readonly gateClosed: boolean;
-  /** 依頼を出したのにゲートが閉じたまま（人のレビュー待ち）。JSON の `review_waiting` の写し */
+  /** 依頼を出したのに止まったまま（人のレビュー待ち）。JSON の `review_waiting` の写し */
   readonly reviewWaiting: boolean;
   readonly reviewRequired: boolean;
   /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
@@ -66,7 +69,8 @@ export interface Card {
   readonly project: string;
   readonly isParent: boolean;
   readonly column: ProposalState;
-  readonly proposalState: ProposalState | null;
+  /** 提案の置き場（todo / review）。承認済みチケットの側にあれば null */
+  readonly proposalState: ProposalJson["state"] | null;
   readonly proposalTree: string;
   /** 絞り込みの単位。親なら自分、子なら親の識別子 */
   readonly family: string;
@@ -81,6 +85,8 @@ export interface Card {
   readonly baseSha: string;
   readonly startedAt: string;
   readonly completedAt: string;
+  /** 取り消した時刻。空でなければ取り消しの列 */
+  readonly cancelledAt: string;
   readonly cancelReason: string;
   readonly riskLevel: string;
   readonly riskPoints: number | null;
@@ -107,8 +113,8 @@ export interface Card {
   /**
    * 人が動く必要があるか。「要対応だけ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
    * 親の改版。札の「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
-   * ゲート閉、未着手・作業中なのにワークツリーが無い、レビュー待ち、HIGH 以上、本物が決まらない写り、不備、
-   * 親ならフェーズ行の要約に出るもの（ゲート閉・レビュー待ち・HIGH 以上）
+   * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらない写り、不備、
+   * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
 }
@@ -239,6 +245,7 @@ function toCard(
     baseSha: t.base_sha,
     startedAt: t.started_at,
     completedAt: t.completed_at,
+    cancelledAt: t.cancelled_at,
     cancelReason: t.cancel_reason,
     riskLevel,
     riskPoints: typeof t.risk?.points === "number" ? t.risk.points : null,
@@ -280,16 +287,19 @@ function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | nul
 }
 
 /**
- * 列は提案の置き場。提案が無い（承認済みチケットだけがある）ときは承認済みチケットから推す。
- * 閉じた承認済みチケットは done、取り消しの時刻があれば cancelled。開いている承認済みチケットなのに提案が無いのは
- * 食い違いなので、todo に置いたうえで不備として言う。
+ * 列は置き場から引く。提案の側にあれば `todo/` は未着手、`review/` は作業中（レビュー待ちは属性で言う）。
+ * 無ければ承認済みチケットから。閉じた承認済みチケット（`done/`）は取り消しの時刻があれば cancelled、無ければ done。
+ * 開いている承認済みチケット（`doing/`）は doing。どちらにも無いのは食い違いなので、todo に置いたうえで不備として言う。
  */
 function columnOf(t: TicketJson, issues: string[]): ProposalState {
   if (t.proposal !== null) {
-    return t.proposal.state;
+    return t.proposal.state === "review" ? "doing" : "todo";
   }
   if (t.copy.status === "closed") {
     return t.cancelled_at !== "" ? "cancelled" : "done";
+  }
+  if (t.copy.status === "open") {
+    return "doing";
   }
   issues.push("提案が見つからない（承認済みチケットだけがある）");
   return "todo";
@@ -298,9 +308,9 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
 function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
   const actions: Action[] = [];
-  // 受け入れて進めるのは、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）のとき。待ちかどうかは
+  // 受け入れて進めるのは、人のレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
   // 判定が `review_waiting` で言う。子カードの札・フェーズ行の「レビュー依頼済」・受け入れの操作はみな
-  // それを読み、ゲートとマーカーからここで組み直さない。
+  // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });

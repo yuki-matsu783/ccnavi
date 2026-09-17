@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
-import { renderBoard } from "../../src/core/render.js";
+import { renderBoard, renderErrorPage } from "../../src/core/render.js";
 import { fixture } from "../helpers/fixture.js";
 import { loadPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
@@ -65,8 +65,12 @@ test("CB-D42 「要対応だけ」で人が動く必要の無いカードが隠�
     assert.ok(page.one('.card[data-id="i0001-01"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001-02"]').classList.contains("hidden"));
     assert.ok(!page.one('.card[data-id="i0001-03"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-04"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001-05"]').classList.contains("hidden"));
     assert.equal(page.one('.column[data-state="todo"] > h2 > .count').textContent, "1");
+    assert.equal(page.one('.column[data-state="doing"] > h2 > .count').textContent, "0");
     assert.equal(page.one('.column[data-state="done"] > h2 > .count').textContent, "0");
+    assert.equal(page.one('.column[data-state="cancelled"] > h2 > .count').textContent, "0");
     assert.equal((page.state() as { attention: boolean }).attention, true);
     page.click(page.one('.controls button[data-action="approve"]'));
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: true });
@@ -117,13 +121,62 @@ test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提�
     });
     page.click(page.one('.card[data-id="i0001"] a.mr-link'));
     assert.equal(page.posted.length, before, "リンクを押しても open を送らない");
-    // 要対応の絞り込みで、レビュー待ちの親とゲート閉の子は残る
+    // 要対応の絞り込みで、レビュー待ちの親と子は残る
     const box = page.one<HTMLInputElement>("#attention-filter");
     box.checked = true;
     page.change(box);
     assert.ok(!page.one('.card[data-id="i0001"]').classList.contains("hidden"));
     assert.ok(!page.one('.card[data-id="i0001-02"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001-01"]').classList.contains("hidden"));
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D44 「更新」を押すと非活性になり、回り記号と「更新中」に替わる。読み直した画面では活性に戻っている", async () => {
+  const page = await loadPage(renderBoard(buildBoard(fixture()), OPTIONS));
+  try {
+    const button = page.one<HTMLButtonElement>('.controls button[data-action="refresh"]');
+    assert.equal(button.disabled, false);
+    assert.equal(button.querySelector(".label")?.textContent, "更新");
+    page.click(button);
+    assert.deepEqual(page.posted.at(-1), { type: "refresh" });
+    assert.equal(button.disabled, true, "押した瞬間に非活性になる");
+    assert.ok(button.classList.contains("busy"), "回り記号が出る");
+    assert.equal(button.getAttribute("aria-busy"), "true");
+    assert.equal(button.querySelector(".label")?.textContent, "更新中");
+    // 非活性の間はもう 1 度押しても送らない
+    const sent = page.posted.length;
+    page.click(button);
+    assert.equal(page.posted.length, sent);
+  } finally {
+    await page.close();
+  }
+  // 拡張が読み直しを終えて HTML を作り直した後（同じ内容でも新しい画面）
+  const again = await loadPage(renderBoard(buildBoard(fixture()), OPTIONS));
+  try {
+    const button = again.one<HTMLButtonElement>('.controls button[data-action="refresh"]');
+    assert.equal(button.disabled, false);
+    assert.ok(!button.classList.contains("busy"));
+    assert.equal(button.querySelector(".label")?.textContent, "更新");
+  } finally {
+    await again.close();
+  }
+});
+
+test("CB-D45 読み直せなかった画面でも、承認のオーバーレイのボタンが効く。覚えていた絞り込みは上書きしない", async () => {
+  const saved = { project: "alpha", parent: "i0001", attention: true, folded: ["done"], widths: {} };
+  const page = await loadPage(
+    renderErrorPage("読めない", { ...OPTIONS, approval: { kind: "done", count: 1, prompt: "文" } }),
+    saved,
+  );
+  try {
+    page.click(page.one('button[data-action="prompt-copy"]'));
+    assert.deepEqual(page.posted.at(-1), { type: "promptCopy" });
+    page.click(page.one('button[data-action="approve-cancel"]'));
+    assert.deepEqual(page.posted.at(-1), { type: "approveCancel" });
+    // 絞り込みの部品が無い画面なので、覚えていた値に触らない
+    assert.deepEqual(page.state(), saved);
   } finally {
     await page.close();
   }

@@ -9,8 +9,11 @@
 # judge は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
 # サブエージェント、記録するのは親。判定が揃うまで、その子は done で閉じられない。
 #
-# 状態は置き場（wip/tickets/{todo,doing,done,cancelled}/）で表す。動かすのはこの
-# スクリプトだけで、直接ファイルを作ったり動かしたりするのは ccnavi が止める。
+# 状態は置き場で表す（ADR-0055）。承認待ちは wip/proposals/todo/、承認済みの作業中は
+# .ccnavi/approved/doing/、レビュー待ちは wip/proposals/review/、閉じたものは
+# .ccnavi/approved/done/。人が動かす向きは .ccnavi/approved/ へ、エージェントが動かす向きは
+# wip/proposals/ へ。エージェントの側を動かすのはこのスクリプトだけで、直接ファイルを
+# 作ったり動かしたりするのは ccnavi が止める。
 # サブエージェントからの呼び出しも ccnavi が止める（agent_id が付いていたら拒む）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
@@ -28,13 +31,18 @@ usage() {
 sh .ccnavi/scripts/ccnavi-ticket.sh <start|done|cancel> <識別子> [--reason <理由>]
 sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠>
 
-  start   todo/ -> doing/  ワークツリー .claude/worktrees/<識別子> が要る。着手の時刻と基準点を書く
-  done    doing/ -> done/  完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
-  cancel  todo/ か doing/ -> cancelled/  --reason が要る
+  start   .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
+          ワークツリー .claude/worktrees/<識別子> が要る。置き場は動かない
+  done    doing/ -> wip/proposals/review/（フェーズがレビュー要）か .ccnavi/approved/done/（不要）。
+          完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
+  cancel  doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
   judge   定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
 
+  レビュー待ち（review/）から done/ へ動かすのは人（ccnavi-review.sh check / accept、
+  ccnavi --reviewed）。
+
   提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の
-  .ccnavi/common/phases.yml（CCNAVI_PHASES）、自身の層の .ccnavi/config/phases.yml、
+  .ccnavi/common/phases.yml、自身の層の .ccnavi/config/phases.yml、
   プロジェクトは projects/<名前>/.ccnavi/config/phases.yml。どの層にも無ければ
   フェーズは番号だけになる
 USAGE

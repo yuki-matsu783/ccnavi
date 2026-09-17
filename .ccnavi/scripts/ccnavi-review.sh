@@ -16,9 +16,11 @@
 #            → `ccnavi review requested` がマーカーを置く
 #            人はレビューを MR で行うので、入れ物が無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
-#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置く
-#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せてマーカーを置く
-#            → 受け入れた一覧をここがコメントに写す
+#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置き、
+#            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす
+#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、受け入れて
+#            進むか、続きの子チケットを .ccnavi/approved/doing/ に起こすかを選ばせる
+#            → 受け入れた一覧（か、起こした子）をここがコメントに写す
 #
 # リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
@@ -36,7 +38,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <
   request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿してマーカーを置く
   check    --phase <N>                         依頼より後の未解決スレッドが無ければマーカーを置く
   note     --body-file <本文>                  判断の記録を MR のコメントに写す
-  accept   <N>                                 未解決を残したまま進める判断（人が端末で打つ）
+  accept   <N>                                 未解決の扱いを選ぶ。受け入れて進むか、続きの子チケットを起こす（人が端末で打つ）
   handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
   ready                                        閉じられて wip を片付け push 済みなら Draft を外す（マージに進んでよいの合図。マージは人が squash で）
   wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
@@ -239,6 +241,17 @@ api() {
 
 api_failed() {
 	printf 'ccnavi-review: %s への %s %s が失敗した:\n%s\n' "$host" "$1" "$2" "$3" >&2
+	# GraphQL を塞いでいる実行環境がある（Claude Code のセッションは REST だけ通す）。
+	# GitHub ではスレッドの解決状態（threads）と Draft 外し（undraft）が GraphQL でしか
+	# 扱えないので、そこだけが 403 で止まる。curl の経路は -f が本文を捨てるため、
+	# 画面に残るのは番号だけになり、認証の失敗と見分けが付かない。詰まったその場で
+	# 逃げ道を名指しする。綴りは transport を選ぶところの案内と揃える。
+	case "$2" in
+	graphql)
+		printf 'ccnavi-review: %s\n' \
+			"GraphQL が塞がれている環境では check / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review check --phase <N> --result <json>' を打ってください。写しの形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+		;;
+	esac
 }
 
 # pages <path> — 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。

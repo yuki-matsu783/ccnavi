@@ -48,7 +48,7 @@ KIND_FEEDBACK = "feedback"
 KINDS = (KIND_WORK, KIND_FEEDBACK)
 
 REVIEW_NONE = "none"
-# chat は、このセッションで人が差分を見る。ホストへは出ない。ゲートを開けるのは
+# chat は、このセッションで人が差分を見る。ホストへは出ない。先へ進めるのは
 # 端末から打つ `ccnavi --reviewed <N> --chat` で、エージェントには打てない
 # （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 §9.8）。
 REVIEW_CHAT = "chat"
@@ -142,8 +142,9 @@ def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, lis
         return None, []
     except (OSError, ValueError) as exc:
         # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
-        # ファイルとして苦情付きで返す。上げると、判定（実行前・ゲート・実行後の監視）が
-        # 例外で落ち、読めない種類を「種類では切り詰めない」として扱う道に届かない。
+        # ファイルとして苦情付きで返す。上げると、判定（実行前・レビューで止めるところ・
+        # 実行後の監視）が例外で落ち、読めない種類を「種類では切り詰めない」として扱う道に
+        # 届かない。
         return None, [Problem(SEVERITY_ERROR, "(phases)", f"{path} を読めない ({exc})")]
     return parse(text, path, refs)
 

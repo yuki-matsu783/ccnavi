@@ -118,20 +118,28 @@ def for_rules(
     """
     parts: list[str] = []
     counted: dict[str, int] | None = None
+    consulted = False
     for rule in group:
         has_once = bool(rule.additional_context_once or rule.additional_context_once_file)
         # 数えを控えに残すのは、刻みを持つルールと once を持つルールだけ。ほかは
         # どのみち毎回渡すので、数えても判定 1 回ぶんの書き込みが増えるだけになる。
         if state_dir and (rule.every > 1 or has_once):
-            if counted is None:
+            if not consulted:
                 counted = _load_once(stderr, state_dir, payload)
-            key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
-            hits = counted.get(key, 0) + 1
-            counted[key] = hits
-            # 渡す回は刻みの倍数になった回。その最初は刻みの回そのものなので、
-            # 「once を渡したか」を別の欄で覚えなくてよい。欄を 2 つ持つと、
-            # 片方だけ古い控えが生まれる。
-            delivering, first = hits % rule.every == 0, hits == rule.every
+                consulted = True
+            if counted is None:
+                # 読めなかったときは、覚えていないものとして渡し、書き戻さない。
+                # `--state ""` と同じ「覚えられないなら言う」側だが、上書きだけは
+                # しない。ここで書くと、読めなかっただけの控えを空で潰すことになる。
+                delivering, first = True, True
+            else:
+                key = rule.id or f"{rule.match} {rule.glob or rule.regex}"
+                hits = counted.get(key, 0) + 1
+                counted[key] = hits
+                # 渡す回は刻みの倍数になった回。その最初は刻みの回そのものなので、
+                # 「once を渡したか」を別の欄で覚えなくてよい。欄を 2 つ持つと、
+                # 片方だけ古い控えが生まれる。
+                delivering, first = hits % rule.every == 0, hits == rule.every
         else:
             delivering, first = True, True
         if delivering:
@@ -186,19 +194,24 @@ def _once_path(state_dir: str, session: str, agent_id: str) -> str:
     return os.path.join(state_dir, f"once-{session_part}-{agent_part}.json")
 
 
-def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[str, int]:
-    """この文脈で、どのルールが何回当たったか。読めなければ空（＝まだ 1 回も）。
+def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[str, int] | None:
+    """この文脈で、どのルールが何回当たったか。まだ無ければ空、**読めなければ None**。
 
     `given` は「鍵 → 回数」。古い版の ccnavi が書いた形（鍵の並び）は「1 回当たった」
     として読む。`every` を書かないルールでは 1 回でも「once は渡した」になるので、
-    古い控えを引き継いだセッションの見え方は今までと変わらない。読めない形は
-    覚えていない側に倒れ、渡す回の数え直しが 0 から始まる。
+    古い控えを引き継いだセッションの見え方は今までと変わらない。
+
+    「まだ無い」と「読めない」を分けて返すのは、呼ぶ側が上書きしてよいかを
+    決められるようにするため。同じ扱いにすると、読めなかった回に「まだ 1 回も
+    当たっていない」ものとして書き戻し、覚えていたぶんを消してしまう。
+    読めないのは控えが在るときにしか起きないので、消す先はいつも中身のある控えになる。
     """
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
     data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: 渡した回の控えを読めない: {failed}\n")
+            return None
         return {}
     given = data.get("given") if isinstance(data, dict) else None
     if isinstance(given, list):
@@ -212,7 +225,10 @@ def _save_once(
     stderr: TextIO, state_dir: str, payload: hookio.Input, given: dict[str, int]
 ) -> None:
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
-    failed = fsio.write_json(path, {"given": dict(sorted(given.items()))})
+    # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
+    # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
+    # 倒れる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
+    failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
         stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
 

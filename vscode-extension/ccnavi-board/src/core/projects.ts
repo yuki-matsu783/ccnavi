@@ -92,7 +92,7 @@ export const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 export type NameCheck = { readonly ok: true; readonly name: string } | { readonly ok: false; readonly error: string };
 
 /**
- * 名前を検査する。名前はツリーの名前、`wip/<名前>/tickets/`、`logs/<名前>/`、frontmatter の
+ * 名前を検査する。名前はツリーの名前、`wip/<名前>/proposals/`、`logs/<名前>/`、frontmatter の
  * `project:` にそのまま使われるので ASCII に絞る。既存のツリー名（プロジェクト・ワークツリー）と
  * 大文字小文字だけ違う名前も衝突扱い（Windows では同じディレクトリになる）。
  */
@@ -247,6 +247,7 @@ export interface ProjectRow {
   readonly originKey: string;
   readonly worktrees: readonly string[];
   readonly tickets: number;
+  /** 作業中（ボードの作業中の列と同じ。`.ccnavi/approved/doing/` にあるものと、レビュー待ち `wip/proposals/review/`） */
   readonly doing: number;
   readonly problems: readonly LintProblem[];
 }
@@ -307,7 +308,7 @@ export function buildProjectsPage(input: PageInput): ProjectsPage {
         originKey: remoteKeyOf(origin),
         worktrees: trees.filter((w) => w.kind === "worktree" && w.project === t.name).map((w) => w.name),
         tickets: own.length,
-        doing: own.filter((k) => k.proposal !== null && k.proposal.state === "doing").length,
+        doing: own.filter((k) => (k.proposal === null && k.copy.status === "open") || k.proposal?.state === "review").length,
         problems: input.lint === undefined ? [] : problemsOfProject(input.lint, t.name),
       };
     });

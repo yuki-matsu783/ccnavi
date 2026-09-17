@@ -2,7 +2,7 @@
 
 設計 wip/design/approve-carry.md §1 と §6.3。確かめるのは次のとおり。
 
-17. 置き場（`.ccnavi/tickets`）の変更だけをコミットし、同じツリーの他の未コミットは運ばない
+17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットは運ばない
 18. 運ぶものが無ければ 0 で `運ぶ承認済みチケットは無い。`
 19. `main` の上のツリーはコミットして push しない（0、標準エラーに綴り）
 20. push が落ちると 1、コミットは残る
@@ -36,7 +36,7 @@ GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 PUSH_SCRIPTS = ("ccnavi-push-approved.sh", "ccnavi-common.sh")
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-approve.sh")
-APPROVED = ".ccnavi/tickets"
+APPROVED = ".ccnavi/approved/doing"
 MESSAGE = "ccnavi: 承認済みチケットを更新"
 NOTHING = "運ぶ承認済みチケットは無い。"
 
@@ -46,8 +46,8 @@ STUB = """#!/bin/sh
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
 [ "${STUB_EXIT:-0}" = 0 ] || exit "$STUB_EXIT"
 [ -n "${STUB_TREE:-}" ] || exit 0
-mkdir -p "$STUB_TREE/.ccnavi/tickets"
-printf 'approved\\n' > "$STUB_TREE/.ccnavi/tickets/i0001.md"
+mkdir -p "$STUB_TREE/.ccnavi/approved/doing"
+printf 'approved\\n' > "$STUB_TREE/.ccnavi/approved/doing/i0001.md"
 """
 
 
@@ -304,7 +304,7 @@ class PushApprovedTest(Workspace):
     def test_carries_the_place_named_by_ccnavi_approved(self):
         """12. `CCNAVI_TICKETS_APPROVED` を既定と違う綴りにすると、その置き場を運ぶ。
 
-        既定の置き場（`.ccnavi/tickets`）は運ばない。環境変数の名前は `ccnavi/settings.py` の
+        既定の置き場（`.ccnavi/approved`）は運ばない。環境変数の名前は `ccnavi/settings.py` の
         `APPROVED_ENV` と同じ（チケット approve-carry-05 の 6）。
         """
         other = "approved/tickets"

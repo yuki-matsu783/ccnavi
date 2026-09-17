@@ -8,7 +8,6 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, readAppearance } from "./appearance.js";
-import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
 import {
@@ -18,7 +17,7 @@ import {
   reviewedPrompt,
   type Launcher,
 } from "./core/commands.js";
-import { escapeHtml, renderBoard, type ApprovalOverlay } from "./core/render.js";
+import { renderBoard, renderErrorPage, type ApprovalOverlay } from "./core/render.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { runInTerminal } from "./terminal.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
@@ -27,17 +26,17 @@ import { requireTickets, ticketControl } from "./ticket-control.js";
 const DEBOUNCE_MS = 120;
 
 /**
- * 監視する場所。提案（ワークスペース、プロジェクト、全ワークツリーの `wip/tickets/`）、
- * 承認済みチケットとマーカー（同じツリーの `.ccnavi/tickets/`）、ワークツリーの登録。
+ * 監視する場所。提案（ワークスペース、プロジェクト、全ワークツリーの `wip/proposals/`）、
+ * 承認済みチケットとマーカー（同じツリーの `.ccnavi/approved/`。`doing/` `done/` `phases/`）、ワークツリーの登録。
  * glob は OS によらず "/" 区切り。
  */
 export const WATCH_PATTERNS = [
-  "wip/**/tickets/**",
-  "projects/*/wip/**/tickets/**",
-  ".claude/worktrees/*/wip/**/tickets/**",
-  ".ccnavi/tickets/**",
-  "projects/*/.ccnavi/tickets/**",
-  ".claude/worktrees/*/.ccnavi/tickets/**",
+  "wip/**/proposals/**",
+  "projects/*/wip/**/proposals/**",
+  ".claude/worktrees/*/wip/**/proposals/**",
+  ".ccnavi/approved/**",
+  "projects/*/.ccnavi/approved/**",
+  ".claude/worktrees/*/.ccnavi/approved/**",
   ".git/worktrees/*",
   "projects/*/.git/worktrees/*",
 ] as const;
@@ -59,6 +58,8 @@ interface PanelState {
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   board?: Board;
+  /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
+  error?: string;
   launcher?: Launcher;
   /** 読み直しの最中か。最中にもう 1 回頼まれたら、終わってからもう 1 回だけ走らせる */
   loading: boolean;
@@ -215,8 +216,10 @@ async function update(): Promise<void> {
     current.launcher = result.launcher;
     if (!result.ok) {
       // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
+      // 承認のオーバーレイは載せ替えて残す。承認した文は取り返しがつかないので、
+      // ボードが描けないことを理由に消さない。
       current.board = undefined;
-      current.panel.webview.html = renderError(result.error);
+      showError(current, result.error);
       return;
     }
     show(current, buildBoard(result.board));
@@ -229,8 +232,15 @@ async function update(): Promise<void> {
   }
 }
 
+/**
+ * ボードを描き直す。`webview.html` の差し替えは中身が同じ文字列だと何も起こらないが、
+ * ここは毎回ちがう nonce を埋めるので必ず作り直される。「更新」を押して非活性にしたボタンが
+ * 活性に戻るのはこの作り直しなので、nonce を固定したり HTML をキャッシュしたりすると
+ * 「中身が変わらない読み直し」でボタンが「更新中」のまま固まる。
+ */
 function show(current: PanelState, board: Board): void {
   current.board = board;
+  current.error = undefined;
   current.panel.webview.html = renderBoard(board, {
     nonce: crypto.randomBytes(16).toString("base64"),
     approval: current.approval,
@@ -243,8 +253,14 @@ function show(current: PanelState, board: Board): void {
   }
 }
 
-function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ボード</title></head>${bodyTag(readAppearance())}<p>ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+/** 読み直せなかったことを見せる。承認のオーバーレイがあれば、ボードのときと同じように被せる */
+function showError(current: PanelState, error: string): void {
+  current.error = error;
+  current.panel.webview.html = renderErrorPage(error, {
+    nonce: crypto.randomBytes(16).toString("base64"),
+    approval: current.approval,
+    appearance: readAppearance(),
+  });
 }
 
 function handleMessage(message: Message | undefined): void {
@@ -347,10 +363,17 @@ function realRoot(root: string): string {
   }
 }
 
-/** いまの状態でボードを描き直す（オーバーレイの出し入れ） */
+/**
+ * いまの状態で描き直す（オーバーレイの出し入れ）。読み直せていないときはエラー画面のほうに
+ * 載せ替える。ボードが無いことを理由にここで捨てると、承認した文が人に届かない。
+ */
 function redraw(current: PanelState): void {
   if (current.board !== undefined) {
     show(current, current.board);
+    return;
+  }
+  if (current.error !== undefined) {
+    showError(current, current.error);
   }
 }
 

@@ -278,7 +278,7 @@ def worktree(name: str, base: str) -> str:
 
 def propose(tree: str, name: str, **kw) -> str:
     return write(
-        os.path.join(tree, "wip", "tickets", "todo", name + ".md"), ticket_text(name, **kw)
+        os.path.join(tree, "wip", "proposals", "todo", name + ".md"), ticket_text(name, **kw)
     )
 
 
@@ -458,8 +458,8 @@ def main() -> int:
         said[:120].replace("\n", " "),
     )
     record(
-        "ゲートが Agent を止める",
-        "DENY_PHASE_GATE" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        "レビュー待ちが Agent を止める",
+        "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
     body = write(os.path.join(OUT, "request-1.md"), "見てほしい点\n\n- src/a と src/b を足した\n")
@@ -544,8 +544,8 @@ def main() -> int:
         checked.stderr.strip()[:200],
     )
     record(
-        "その間ゲートは閉じたまま",
-        "DENY_PHASE_GATE" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        "その間は止まったまま",
+        "DENY_PHASE_REVIEW" in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
     api(
@@ -609,8 +609,8 @@ def main() -> int:
         (checked.stdout + checked.stderr).strip()[:200],
     )
     record(
-        "ゲートが開く",
-        "DENY_PHASE_GATE" not in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
+        "止まっていたのが解ける",
+        "DENY_PHASE_REVIEW" not in hook("PreToolUse", "Agent", parent_tree, description="次の子"),
     )
 
     memo = write(
@@ -728,7 +728,7 @@ def main() -> int:
         )
         record(
             "未着手の子が cancelled/ へ動く",
-            os.path.exists(os.path.join(parent2, "wip", "tickets", "cancelled", "i0002-01.md")),
+            os.path.exists(os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01.md")),
         )
         record(
             "wrapup の note が MR にある",

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { APPROVE_VERSION, parseApprovePreview, parseApproveResult } from "../../src/core/approvemodel.js";
+import { APPROVE_VERSION, parseApprovePreview, parseApproveResult, partialMessage } from "../../src/core/approvemodel.js";
 
 /** Python 側のテスト（tests/ticket/test_approve_json.py）が書き出した、実行ファイルの出力そのもの */
 function fixtureText(name: string): string {
@@ -80,4 +80,54 @@ test("CB-T106 版が違う・JSON でない答えは読まない", () => {
   const broken = parseApproveResult("承認した。\n");
   assert.ok(!broken.ok);
   assert.ok("error" in broken);
+});
+
+test("CB-T107 途中で止まった承認を読む（置いたぶんを拾い、成功にはしない）", () => {
+  const stopped = parseApproveResult(
+    JSON.stringify({
+      version: APPROVE_VERSION,
+      partial: { placed: ["i0001"], ticket: "i0001-01", reason: "書けない (…)", lines: ["  i0001 のフェーズ 1 のマーカーを消した"] },
+    }),
+  );
+  assert.ok(!stopped.ok, "置いたぶんがあっても成功にはしない");
+  assert.ok("partial" in stopped);
+  if ("partial" in stopped) {
+    assert.deepEqual(stopped.partial.placed, ["i0001"]);
+    assert.equal(stopped.partial.ticket, "i0001-01");
+    assert.ok(stopped.partial.reason.includes("書けない"));
+    assert.deepEqual(stopped.partial.lines, ["  i0001 のフェーズ 1 のマーカーを消した"]);
+  }
+  // 1 件も置かれなかった形
+  const none = parseApproveResult(
+    JSON.stringify({ version: APPROVE_VERSION, partial: { placed: [], ticket: "i0001", reason: "書けない", lines: [] } }),
+  );
+  assert.ok(!none.ok && "partial" in none && none.partial.placed.length === 0);
+});
+
+test("CB-T108 途中で止まったことを伝える文（置いた件数・後始末で止まった場合・進捗の行）", () => {
+  const stopped = partialMessage({
+    placed: ["i0001"],
+    ticket: "i0001-01",
+    reason: "書けない (…)",
+    lines: ["  i0001 のフェーズ 1 のマーカーを消した"],
+  });
+  assert.ok(stopped.includes("i0001-01 で止まった"));
+  assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っている"));
+  assert.ok(stopped.includes("コミットと push は送っていない"));
+  assert.ok(stopped.includes("マーカーを消した"), "端末に出ていた行も渡す");
+
+  // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
+  const none = partialMessage({ placed: [], ticket: "i0001", reason: "書けない", lines: [] });
+  assert.ok(none.includes("1 件も置かれていない"));
+  assert.ok(!none.includes("入っている"));
+
+  // 書けたあとの後始末（マーカーを置く）で落ちたときは、言い方を変える
+  const after = partialMessage({
+    placed: ["i0001"],
+    ticket: "i0001",
+    reason: "マーカーを置けない: 書けない",
+    lines: [],
+  });
+  assert.ok(after.includes("i0001 の後始末で止まった"));
+  assert.ok(!after.includes("i0001 で止まった"));
 });

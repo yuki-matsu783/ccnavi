@@ -183,7 +183,8 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    rulesRel = env("CCNAVI_RULES") || DEFAULT_RULES;
+    // 共通層の置き場は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
+    rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと

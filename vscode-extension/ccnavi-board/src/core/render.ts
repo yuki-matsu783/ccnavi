@@ -35,7 +35,7 @@ export interface RenderOptions {
   readonly appearance?: Appearance;
 }
 
-const COPY_LABELS = { none: "未承認", open: "承認済", closed: "クローズ" } as const;
+const COPY_LABELS = { none: "未承認", open: "承認済", review: "レビュー待ち", closed: "クローズ" } as const;
 const MARK_LABELS: Readonly<Record<string, string>> = {
   pending: "終了を通知",
   skipped: "レビュー省略",
@@ -43,6 +43,16 @@ const MARK_LABELS: Readonly<Record<string, string>> = {
   reviewed: "レビュー済",
 };
 const PHASE_STATE_LABELS = { planned: "未計画", active: "進行中", ended: "終了" } as const;
+
+/**
+ * レビューが済むまで止めている間の呼び名。依頼を出す前はエージェントの番（合流・push・依頼）で
+ * 「レビュー準備中」、出した後は人の番で「レビュー待ち」。実行ファイルの `phase.review_label` と
+ * 同じ分け方で、判定した 2 つの真偽値（`gate_closed` / `review_waiting`）を言い換えるだけ。
+ * ここで marks や reviewed を見て組み直さない（ADR-0035）。
+ */
+function holdLabel(x: { readonly gateClosed: boolean; readonly reviewWaiting: boolean }): string {
+  return x.reviewWaiting ? "レビュー待ち" : "レビュー準備中";
+}
 
 export function renderBoard(board: Board, options: RenderOptions): string {
   const { nonce } = options;
@@ -64,8 +74,8 @@ ${bodyTag(options.appearance)}
 ${approveCount > 0 ? `    <span class="pending warn">承認待ち ${approveCount} 件</span>\n` : ""}${board.issueCount > 0 ? `    <span class="issues warn">不備 ${board.issueCount} 件</span>\n` : ""}    <span class="counts">残り ${board.remainingCount} / 全 ${board.totalCount}</span>
   </div>
   <div class="controls">
-${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・ゲート閉・ワークツリーなし・人のレビュー待ち・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
-    <button type="button" class="action" data-action="refresh">更新</button>
+${renderFilter(board.projects)}${renderParentFilter(board.parents)}    <label class="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）"><input type="checkbox" id="attention-filter"> 要対応だけ</label>
+    <button type="button" class="action" data-action="refresh"><span class="spin" aria-hidden="true"></span><span class="label">更新</span></button>
     <button type="button" class="action primary" data-action="approve"${approveCount === 0 ? " disabled" : ""}>承認待ち ${approveCount} 件を承認</button>
   </div>
 </header>
@@ -73,6 +83,36 @@ ${renderProblems(board.problems)}${board.totalCount === 0 ? '<p class="board-emp
 ${board.columns.map(renderColumn).join("\n")}
 </div>
 <footer class="foot">取得 ${escapeHtml(board.generatedAt)} / ${escapeHtml(board.root)}</footer>
+${renderApproval(options.approval)}<script nonce="${nonce}">
+${SCRIPT}
+</script>
+</body>
+</html>
+`;
+}
+
+/**
+ * 読み直せなかったときの画面。ボードの中身は出せないが、承認のオーバーレイは同じように被せる。
+ * 承認した文は取り返しがつかないので、ボードが描けないことを理由に消さない（設計 §10）。
+ * 骨組みはボードと同じ STYLE と SCRIPT を使う。SCRIPT は列も絞り込みも無い DOM でも動くように
+ * 書いてある（無い要素には触らない）ので、ボードの本体が無くてもそのまま載る。
+ */
+export function renderErrorPage(error: string, options: RenderOptions): string {
+  const { nonce } = options;
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ccnavi ボード</title>
+<style nonce="${nonce}">
+${STYLE}
+</style>
+</head>
+${bodyTag(options.appearance)}
+<p class="board-empty">ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p>
+<pre class="load-error">${escapeHtml(error)}</pre>
 ${renderApproval(options.approval)}<script nonce="${nonce}">
 ${SCRIPT}
 </script>
@@ -216,7 +256,7 @@ function renderCard(card: Card): string {
     classes.push("has-issue");
   }
   if (card.gateClosed) {
-    classes.push("gate-closed");
+    classes.push("review-hold");
   }
   if (card.pendingApproval) {
     classes.push("pending");
@@ -234,8 +274,8 @@ function renderCard(card: Card): string {
 }
 
 /**
- * 枠付きの札は、人が動く必要がある状態だけ。未承認、ゲート閉、ワークツリーなし（閉じたチケットは除く）、
- * 実績のリスクが HIGH 以上、レビュー依頼済（人のレビュー待ち。ゲートが閉じている間だけ）、本物が決まらない写り。
+ * 枠付きの札は、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
+ * ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、本物が決まらない写り。
  * 出す札が無ければ行ごと出さない。
  */
 function renderBadges(card: Card): string {
@@ -243,16 +283,13 @@ function renderBadges(card: Card): string {
   if (card.copyStatus === "none") {
     badges.push(badge("copy copy-none", COPY_LABELS.none));
   }
+  // 止めている間の 1 枚。依頼の前後で名前が変わるだけで、札は増えない。どちらの段かは
+  // 判定が JSON の `review_waiting` で言う。ここで reviewed やマーカーを見て組み直さない。
   if (card.gateClosed) {
-    badges.push(badge("gate", "ゲート閉"));
+    badges.push(badge("hold", holdLabel(card)));
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(badge("worktree none", "ワークツリーなし"));
-  }
-  // 依頼済の札は、人のレビュー待ち（依頼を出したのにゲートが閉じたまま）の間だけ。
-  // 待ちかどうかは判定が JSON の `review_waiting` で言う。ここで reviewed やゲートを見て判定し直さない。
-  if (card.reviewWaiting) {
-    badges.push(badge("mark mark-requested", MARK_LABELS.requested));
   }
   if (card.riskLevel === "HIGH" || card.riskLevel === "CRITICAL") {
     badges.push(badge(`risk risk-${card.riskLevel.toLowerCase()}`, riskText(card)));
@@ -269,7 +306,7 @@ function renderBadges(card: Card): string {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／クローズ、人レビューの要否、ワークツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人レビューの要否、ワークツリー、
  * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
  * リスク（MEDIUM 以下）、base、プロジェクト。
  */
@@ -343,13 +380,13 @@ function fact(kind: string, text: string, title = ""): string {
 /**
  * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階（終了は塗り、進行中は青、未計画は空）。
  * 右の状態は 2 通り書いておき、どちらを見せるかは CSS（.phases）が幅で決める。
- * - 要約（狭い列）: 人が動くべきことだけ。ゲート閉、人のレビュー待ち（JSON の `review_waiting`）の
- *   レビュー依頼済、HIGH 以上のリスク。順調な段階は空。JSON が言ったことを並べるだけで、レビューの
- *   要否や済みをここで判定し直さない。項目はカードの札（renderBadges）と同じ
+ * - 要約（狭い列）: 人が動くべきことだけ。レビュー準備中／レビュー待ち（どちらかは JSON の
+ *   `review_waiting`）、HIGH 以上のリスク。順調な段階は空。JSON が言ったことを並べるだけで、
+ *   レビューの要否や済みをここで判定し直さない。項目はカードの札（renderBadges）と同じ
  * - 全文（広げたとき）: 段階の状態、マーカー、レビューの要否、リスクの点と理由
  * 要約は見た目だけのもの（aria-hidden）で、全文は狭いときも読み上げには渡す。狭いままマウスで
  * 読むときのために、全文を行のツールチップにも置く。
- * ゲートが開いている、マーカーが無い、レビューが要らない、は普通の状態なのでどちらにも書かない。
+ * 止めていない、マーカーが無い、レビューが要らない、は普通の状態なのでどちらにも書かない。
  */
 function renderPhases(phases: readonly PhaseChip[]): string {
   const rows = phases
@@ -360,17 +397,17 @@ function renderPhases(phases: readonly PhaseChip[]): string {
       const actions = p.actions.map((a) => renderActionButton(a, `${p.parent}:${p.number}`)).join("");
       // 依頼の投稿へのリンク。依頼のマーカーがある段階だけ（レビューが済んだ後も経緯として残す）
       const mr = p.mrUrl !== "" ? mrLink(p.mrUrl, p.mrNumber, `フェーズ ${p.label} のレビューの依頼を開く`) : "";
-      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " gate-closed" : ""}" title="${escapeHtml(full)}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status"><span class="phase-brief" aria-hidden="true">${escapeHtml(brief)}</span><span class="phase-full">${escapeHtml(full)}</span>${mr}${actions}</span></li>`;
+      return `          <li class="phase phase-${escapeHtml(p.state)}${p.gateClosed ? " review-hold" : ""}" title="${escapeHtml(full)}"><span class="phase-dot" aria-hidden="true"></span><span class="phase-name"><span class="phase-label">${escapeHtml(p.label)}</span>${tickets}</span><span class="phase-status"><span class="phase-brief" aria-hidden="true">${escapeHtml(brief)}</span><span class="phase-full">${escapeHtml(full)}</span>${mr}${actions}</span></li>`;
     })
     .join("\n");
   return `\n        <ul class="phases">\n${rows}\n        </ul>`;
 }
 
-/** フェーズ行の状態の全文。`終了 · レビュー依頼済 · レビュー要 · リスク: 25 (MEDIUM) — …` */
+/** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済 · レビュー要 · リスク: 25 (MEDIUM) — …` */
 function phaseStatusFull(p: PhaseChip): string {
   const notes: string[] = [];
   if (p.gateClosed) {
-    notes.push("ゲート閉");
+    notes.push(holdLabel(p));
   }
   for (const m of p.marks) {
     notes.push(MARK_LABELS[m] ?? m);
@@ -386,16 +423,13 @@ function phaseStatusFull(p: PhaseChip): string {
 
 /**
  * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードの札と同じ。
- * マーカーは積み重なる（依頼済のあとにレビュー済が付く）ので、依頼済は人のレビュー待ちの間だけ出す。
- * 待ちかどうかは判定が `review_waiting` で言い、ここでゲートとマーカーから組み直さない。
+ * 止めている間は段の名前を 1 つだけ出す。どちらの段かは判定が `review_waiting` で言い、
+ * ここでマーカーから組み直さない。
  */
 function phaseStatusBrief(p: PhaseChip): string {
   const notes: string[] = [];
   if (p.gateClosed) {
-    notes.push("ゲート閉");
-  }
-  if (p.reviewWaiting) {
-    notes.push(MARK_LABELS.requested);
+    notes.push(holdLabel(p));
   }
   if (p.riskLevel === "HIGH" || p.riskLevel === "CRITICAL") {
     notes.push(`リスク ${p.riskLevel}`);
@@ -460,7 +494,14 @@ export const BUTTON_STYLE = `  button.action {
   button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
   button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
   button.action.small { min-height: 20px; padding: 0 8px; font-size: .9em; }
-  button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }`;
+  button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
+  /* 待っている間の回り記号。busy が付いたボタンにだけ出す。動きを減らす設定では回さず、出したままにする */
+  button.action .spin { display: none; width: .85em; height: .85em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+  /* 非活性の .5 のままだと、見せたい回り記号が一番薄くなる。opacity は子で戻せない（親でまとめて掛かる）ので、busy の間だけボタンごと濃くする。押せない見た目は残る */
+  button.action.busy:disabled { opacity: .8; }
+  button.action.busy .spin { display: inline-block; animation: ccnavi-spin .8s linear infinite; }
+  @keyframes ccnavi-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { button.action.busy .spin { animation: none; } }`;
 
 /**
  * 5 つの画面で同じ骨組み。本文・見出し上のツールバー（左にパス、右にボタン）・帯・注意・欄・脚注。
@@ -524,6 +565,7 @@ ${BUTTON_STYLE}
   input:disabled, select:disabled, textarea:disabled { opacity: .6; }
   .foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
   .foot.error { color: var(--vscode-editorError-foreground); }
+  pre.load-error { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 12px; }
   /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
      無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは効かない */
   button.action:hover:not(:disabled):not(:focus-visible) { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
@@ -654,7 +696,7 @@ const STYLE = `${PAGE_STYLE}
   .card:hover::after { content: ""; position: absolute; inset: 0; border-radius: 5px; pointer-events: none; border: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
   .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
   .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
-  .card.gate-closed { border-left: 3px solid var(--vscode-editorError-foreground); }
+  .card.review-hold { border-left: 3px solid var(--vscode-editorError-foreground); }
   .card.hidden { display: none; }
   .card-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
   .num { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -668,12 +710,12 @@ const STYLE = `${PAGE_STYLE}
     border: 1px solid currentColor; color: var(--vscode-descriptionForeground);
   }
   .badge.copy-none { color: var(--vscode-charts-blue); }
-  .badge.gate, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); }
+  .badge.hold, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); }
   .badge.mark-requested { color: var(--vscode-charts-yellow); }
   .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
   .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }
   .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  .fact.copy-open::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
+  .fact.copy-open::before, .fact.copy-review::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
   .fact.sha { font-family: var(--vscode-editor-font-family); }
   /* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右が状態。
      状態は要約（.phase-brief）と全文（.phase-full）を両方持ち、フェーズ一覧の幅（カードの内寸）で
@@ -697,7 +739,7 @@ const STYLE = `${PAGE_STYLE}
     .phase-full { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
   }
   .phase-active .phase-status { color: var(--vscode-charts-blue); }
-  .phase.gate-closed .phase-label, .phase.gate-closed .phase-status { color: var(--vscode-editorError-foreground); }
+  .phase.review-hold .phase-label, .phase.review-hold .phase-status { color: var(--vscode-editorError-foreground); }
   .phase button.action { margin-left: 6px; min-height: 20px; padding: 0 8px; font-size: .95em; }
   .issues {
     list-style: none; margin: 6px 0 0; padding: 0;
@@ -756,11 +798,23 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       if (event.key === "Enter" && !event.target.closest("button, a")) { event.preventDefault(); openCard(card); }
     });
   }
+  // 「更新」は押した瞬間に非活性にして回り記号を出す。活性に戻すのは拡張が読み直しを終えて
+  // HTML を作り直したとき（新しい画面のボタンは初めから活性）。読み直しが失敗しても画面は
+  // 差し替わるので、ここで戻す道は要らない。実行ファイルが返らない場合は期限（ccnavi.ts）が切る。
+  const refreshButton = document.querySelector('.controls button[data-action="refresh"]');
+  function setRefreshing() {
+    if (!refreshButton) { return; }
+    refreshButton.disabled = true;
+    refreshButton.classList.add("busy");
+    refreshButton.setAttribute("aria-busy", "true");
+    const label = refreshButton.querySelector(".label");
+    if (label) { label.textContent = "更新中"; }
+  }
   for (const button of document.querySelectorAll("button[data-action]")) {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       const action = button.getAttribute("data-action");
-      if (action === "refresh") { vscode.postMessage({ type: "refresh" }); }
+      if (action === "refresh") { setRefreshing(); vscode.postMessage({ type: "refresh" }); }
       else if (action === "approve") { vscode.postMessage({ type: "approve", tickets: visiblePending(), filtered: filtering() }); }
       else if (action === "approve-one") { vscode.postMessage({ type: "approve", tickets: [button.getAttribute("data-ticket") || ""], filtered: true }); }
       else if (action === "prompt-copy") { vscode.postMessage({ type: "promptCopy" }); }
@@ -891,10 +945,14 @@ const SCRIPT = `  const vscode = acquireVsCodeApi();
       approve.textContent = "承認待ち " + n + " 件を承認";
       approve.disabled = n === 0;
     }
-    state.project = project;
-    state.parent = parent;
-    state.attention = attention;
-    save();
+    // 絞り込みの部品が無い画面（読み直せなかったときのエラー画面）では控えに触らない。
+    // 触ると、覚えていた絞り込みが「すべて」で上書きされる。
+    if (filter || parentFilter || attentionFilter) {
+      state.project = project;
+      state.parent = parent;
+      state.attention = attention;
+      save();
+    }
   }
   function select(element, value) {
     if (!element) { return; }

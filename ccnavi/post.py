@@ -686,7 +686,7 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
 def _save_turn(stderr: TextIO, state_dir: str, session: str, baseline: set[str]) -> None:
     if not state_dir:
         return
-    failed = fsio.write_json(
+    failed = fsio.write_json_atomic(
         _turn_path(state_dir, session), {"baseline": sorted(baseline)[:SEEN_LIMIT]}
     )
     if failed:
@@ -720,6 +720,8 @@ def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> 
     """
     if not state_dir:
         return
-    failed = fsio.write_json(_seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]})
+    failed = fsio.write_json_atomic(
+        _seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]}
+    )
     if failed:
         stderr.write(f"ccnavi: 実行後の監視の控えを書けない: {failed}\n")
