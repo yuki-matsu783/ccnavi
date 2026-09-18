@@ -372,6 +372,17 @@ def decide_before(
     # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）に合流させる。
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
+    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ口から渡す。
+    if conf.tickets_enabled:
+        told = "\n\n".join(
+            p
+            for p in (
+                told,
+                ticket_mod.propose_notice(stderr, conf, root, payload, record.subject),
+            )
+            if p
+        )
     if told:
         context = "\n\n".join(p for p in (told, context) if p)
 

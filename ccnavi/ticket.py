@@ -65,10 +65,11 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from typing import TextIO
 
 import yaml
 
-from . import globmatch, rules, selfguard, settings, tree
+from . import ctxfile, globmatch, hookio, rules, selfguard, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -903,6 +904,81 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     return [write_rule, shell_rule]
 
 
+def propose_notice(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    subject: str,
+) -> str:
+    """提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。空なら渡さない。
+
+    承認できない提案のまま人に承認を頼むと、落ちたことを知るのが端末に座った人になり、
+    往復が 1 回増える。確かめる手立て（`--approve --preview --verify`）は在るので、
+    書いた直後に、要る場所で言う。
+
+    **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
+    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形も
+    試したが、次の 3 つを一緒に引き受けることになるのでやめた。
+
+    - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの倒し方
+      （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
+      知らない綴りのモードを ask に倒す既定も、そこだけ外れる（REQ-PRE-08）
+    - 判定は強いタイプから見て最初に当たった段で決まるので、**提案の置き場に `deny` か
+      `ask` を書いているワークスペースには文が届かない。** 承認の流れをいちばん
+      気にしているところにだけ届かない、という向きになる
+    - 組み込みで持つのは、ガード自身を守るものと取り返しの付かない操作だけ（設計 P4）。
+      助言はそのどちらでもない
+
+    渡るのは書き込みの**前**（PreToolUse）で、止まった回にも届く。文面を「書きました」と
+    過去形にしないのはそのため。書けたかどうかは、この文を渡す時点では決まっていない。
+
+    1 つの文脈（セッション、サブエージェントなら 1 回の起動）で最初の 1 回だけ渡る。
+    数えは `ctxfile` の控えを、ルールと同じ形で使う（この 1 本は表に入れないので、
+    判定には一切現れない）。2 本目からは黙る。提案を 1 本書くたびに同じ文を積むと、
+    長いセッションではそれだけでコンテキストを食う。
+    """
+    if payload.tool_name not in WRITE_TOOLS or not subject:
+        return ""
+    if not _propose_place(conf.tickets, root).search(subject):
+        return ""
+    return ctxfile.for_rules(stderr, conf.state, payload, [_propose_rule(conf.tickets, conf.bin)])
+
+
+def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
+    """承認待ちの置き場に当たる式。**ワークスペースの中に限る。**
+
+    `guard_rules` は前を問わない形（`(^|[\\/])`）で当てるが、あれは deny なので、余分に
+    当たるぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で当てると、ワークスペースの
+    外に `wip/proposals/todo/` という並びを掘っただけの場所でも「提案を書いた」と読む。
+    ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下（設計 §11)
+    なので、ルートで留めれば正しい置き場は全部入り、外は入らない。
+
+    大文字小文字は区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
+    """
+    place = rf"^{rules.root_pattern(root)}[\\/][^\x00]*{_place(tickets_rel)}[\\/]{TODO}[\\/]"
+    return re.compile(place, re.IGNORECASE)
+
+
+def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
+    """文と、数えの鍵になる id を運ぶ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
+    return rules.Rule(
+        id=PROPOSE_RULE_ID,
+        additional_context_once=(
+            f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
+            "ここに書いただけでは判定に 1 ミリも効きません）。"
+            "利用者に承認を依頼する前に、"
+            f"'{settings.bin_command(bin_path)} --approve --preview --verify <識別子>' で"
+            "承認できる状態かを確かめてください。承認済みチケットは置きません。"
+            "終了コードが答えです。0 なら依頼してよく、3 なら承認の対象に入らない理由が出ます"
+            "（親が承認されていない、計画に無いフェーズ、順序、承認待ちに無い識別子）。"
+            "直してから依頼してください。1 は打ち方か設定の誤りで、提案の問題ではありません。"
+            "**識別子には、いま書いたものを渡してください。** 省くと承認待ち全部が対象になり、"
+            "書いた提案の frontmatter が壊れていても（承認待ちに並ばないので）気づけません。"
+        ),
+    )
+
+
 def set_fields(text: str, fields: dict[str, str]) -> str:
     """提案の frontmatter の、スクリプトが書く欄だけを行単位で書き換える。
 
@@ -964,6 +1040,8 @@ def _yaml_scalar(value: str) -> str:
 
 
 STATE_RULE_ID = "builtin-ticket-state"
+# 提案を書いた回に、承認を頼む前の確認を伝えるルールの id。
+PROPOSE_RULE_ID = "builtin-ticket-propose"
 
 
 def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
