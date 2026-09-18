@@ -97,6 +97,7 @@
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
+| [0058](0058-approval-is-the-place.md) | 承認の権威は置き場。記録の欄は必須にせず、承認の検査を判定でも当てる |
 
 ### 複数のリポジトリと VS Code 拡張
 
