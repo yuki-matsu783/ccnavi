@@ -381,11 +381,26 @@ class LintTest(unittest.TestCase):
         self.assertIn("を読めない", result.stdout)
         self.assertIn("BOM (U+FEFF)", result.stdout)
 
-    def test_承認を通っていない承認済みチケットは欄の名前で名指しする(self):
-        # `ccnavi_approved` を持たないファイルも「読めない」側に落ちる。BOM と同じ文面に
-        # 混ぜると、人が手で置いたものなのか壊れているのかが読み分けられない。
+    def test_承認の記録が無くても承認済みの置き場なら読む(self):
+        # 承認の権威は置き場（ADR-0058）。`.ccnavi/approved/` は組み込みの守りが
+        # エージェントの書き込みを止めるので、`ccnavi_approved` が無くても承認済みとして
+        # 読む。端末もボードも無い人が、置き場を動かすだけで承認できる道。
         write(
             os.path.join(self.root, ".ccnavi", "approved", "doing"),
+            "i0001.md",
+            TICKET.format(name="i0001"),
+        )
+
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotIn("ccnavi_approved", result.stdout)
+        self.assertNotIn("を読めない", result.stdout)
+
+    def test_レビュー待ちの置き場では承認の記録を求める(self):
+        # `wip/proposals/review/` はエージェントが書ける側にある。守りが組み込みの deny
+        # 1 枚しか無いので、そこは欄を second layer として残す（ADR-0058）。
+        write(
+            os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",
             TICKET.format(name="i0001"),
         )

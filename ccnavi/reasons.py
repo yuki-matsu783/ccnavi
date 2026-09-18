@@ -57,6 +57,12 @@ CODE_TICKET_ASK = "TICKET_ASK"
 # ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 
+# 承認済みチケット自体が信じられない（親が引けない、置き場と `project:` が違う、など）。
+# 範囲の外に書いたのではないので、CODE_TICKET_SCOPE とは分ける。受け取った側の次の一手も
+# 違う。範囲外なら範囲の中で済ませる道があるが、こちらは人がチケットを直すまで
+# どこにも書けない（ADR-0058）。
+CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
+
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
 TICKET_RULE = "(ticket-scope)"

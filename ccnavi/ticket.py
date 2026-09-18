@@ -302,10 +302,15 @@ class Ticket:
     tree: str = ""
     tree_root: str = ""
     path: str = ""
-    # 承認済みチケットにだけある。
+    # 承認済みチケットにだけある。`ccnavi_approved` を持たない（人が置き場を動かしただけの）
+    # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 §9.2）。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
+    # blocked は「このチケットは読めるが信じられない」理由。空でなければ判定は範囲を
+    # 当てずに止める（phase.scope_verdict）。承認のときにしか当たらなかった構造の検査を、
+    # 判定の側でも当てるために置く（ADR-0058）。
+    blocked: str = ""
 
     @property
     def is_child(self) -> bool:

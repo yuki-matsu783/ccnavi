@@ -338,7 +338,17 @@ class ScopeGuard:
             "The ticket was approved with that overflow shown as a warning; writes there stay "
             "blocked. "
         )
-        if found.limit == phase.LIMIT_TYPE and found.type is not None:
+        if found.limit == phase.LIMIT_BLOCKED:
+            # 範囲の外に出たのではなく、チケット自体が信じられない（ADR-0058）。範囲を
+            # 見せても直しようが無いので、引っかかった検査を名指しする。
+            message = (
+                f"The approved ticket {ticket.ticket} for worktree {t.name} does not hold "
+                f"together ({ticket.blocked}), so its work area is not in effect and every "
+                "change here is reported. Nothing you write can fix this: the user has to "
+                "repair the approved ticket or where it sits. Tell them the problem above and "
+                "ask them to run 'ccnavi --lint', which names every ticket in this state."
+            )
+        elif found.limit == phase.LIMIT_TYPE and found.type is not None:
             message = (
                 inside + f"outside what phase type {found.type.title} ({found.type.id}) allows "
                 f"({', '.join(found.type.scope_globs)}). "

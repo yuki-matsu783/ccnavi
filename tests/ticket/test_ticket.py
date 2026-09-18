@@ -3,7 +3,7 @@
 本物の git リポジトリとワークツリーを一時ディレクトリに作る。親 1 本と子 2 本を
 フェーズ 1 つで通す（requirements.md の受け入れ条件 9）。
 
-見るのは 6 つ。
+見るのは 7 つ。
 
 1. 判定の鍵がファイルの行き先であること。親の cwd から子のツリーへ絶対パスで
    書いても、子のチケットで判定される
@@ -12,6 +12,8 @@
 4. フェーズが終わるとレビューで止まり、レビューが済むと開くこと
 5. 変更要求のレビューは人の端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
+7. 置き場を動かすだけで承認になること、承認のときにしか当たらなかった構造の検査が
+   判定の側でも当たること（ADR-0058）
 """
 
 from __future__ import annotations
@@ -454,6 +456,92 @@ class TicketTest(unittest.TestCase):
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
+
+    # ---- 2b. 置き場を動かすだけの承認（ADR-0058）
+
+    def hand_move(self, name, text=""):
+        """人が GitHub の画面でやることと同じ。提案を承認済みの置き場へ動かすだけ。
+
+        `ccnavi_approved` は足さない。端末もボードも無い人には足す手段が無い。
+        """
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md")
+        with open(source, encoding="utf-8") as f:
+            moved = text or f.read()
+        os.remove(source)
+        write(os.path.join(self.approved, "doing", name + ".md"), moved)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "move " + name)
+
+    def test_moving_the_file_alone_approves_it(self):
+        # 承認の権威は置き場。`.ccnavi/approved/` は組み込みの守りがエージェントの
+        # 書き込みを止めるので、そこに在ること自体が人の合意になる。
+        self.propose("i0001", allow=("src/*",))
+        self.hand_move("i0001")
+
+        inside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        self.assertNotIn("DENY_TICKET", self.reason(inside), self.reason(inside))
+
+        # 範囲は効いている。外は今までどおり止まる。
+        outside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "docs", "x.md"),
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    def test_a_child_moved_without_its_parent_cannot_write_anywhere(self):
+        # 親を動かさずに子だけ動かすと、子の範囲をどの親で切り詰めるかが決まらない。
+        # 承認ならそこで落ちる。置き場を動かすだけの運びでは判定が止める。
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+        child = self.worktree("i0001-01", "i0001")
+
+        # 子が自分の範囲だと言っている場所でも通さない。
+        result = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "a", "x.py")
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("i0001", reason)
+        self.assertNotIn("DENY_TICKET_SCOPE", reason)
+
+    def test_a_moved_ticket_whose_project_does_not_match_its_place_cannot_write(self):
+        # `project:` は宣言ではなく照合（ADR-0038）。承認が突き合わせていた食い違いを、
+        # 置き場を動かすだけの運びでは判定が突き合わせる。
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read().replace("ticket: i0001\n", "ticket: i0001\nproject: nowhere\n")
+        self.hand_move("i0001", text)
+
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("nowhere", reason)
+
+    def test_lint_names_a_blocked_ticket_before_a_write_hits_it(self):
+        # 止まる場所は書き込みのときで、そこで初めて知るのは遅い。承認の画面が
+        # 無い運びでは、`--lint` がその代わりになる。
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+
+        result = self.ccnavi("--lint")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001-01", result.stdout)
+        self.assertIn("親 i0001 が承認されていない", result.stdout)
 
     def test_parent_and_child_strictest_wins(self):
         self.propose("i0001", allow=("src/a/*",), ask=("src/b/*",))

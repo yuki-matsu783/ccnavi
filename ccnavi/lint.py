@@ -307,6 +307,47 @@ def _phases(conf: settings.Settings) -> list[Problem]:
     return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
 
 
+def _copy_problems(
+    root: str,
+    conf: settings.Settings,
+    copies: list[ticket_mod.Ticket],
+    index: dict[str, ticket_mod.Ticket],
+    closed: list[ticket_mod.Ticket],
+) -> list[Problem]:
+    """作業中の承認済みチケットを検査する（ADR-0058）。
+
+    置き場を動かして承認する運びでは `--approve` を通らないので、承認のときにしか
+    当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
+    止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
+
+    `blocked` は判定が止める理由なので error。フェーズの順序と計画の形は判定では
+    止めない（ADR-0024 が Write はフェーズのゲートを通すと決めている）ので warn。
+    範囲の超過は承認でも止めないが判定では止まるので、提案のときと同じく warn。
+    """
+    from . import phase as phase_mod
+
+    problems: list[Problem] = []
+    pool = dict(index)
+    for t in closed:
+        pool.setdefault(t.ticket, t)
+    resolve = _types_resolver(conf, root)
+    for t in copies:
+        if t.blocked:
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
+            continue
+        types = resolve(approval.project_of(t, pool))
+        complaints, overflow = approval.validate(t, pool, types)
+        for p in complaints + overflow:
+            problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
+        parent = pool.get(t.parent) if t.is_child else None
+        if parent is not None:
+            for p in phase_mod.order_problems(root, conf, t, parent, types):
+                # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
+                # 記録で、いま止める根拠にはならない。
+                problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
+    return problems
+
+
 def _types_resolver(conf: settings.Settings, root: str):
     """`project:` から、そのチケットに効く種類を引く（設計 §11.4.1）。
 
@@ -368,6 +409,8 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
 
     proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
     problems.extend(complaints)
+
+    problems.extend(_copy_problems(root, conf, copies, index, closed))
 
     resolve = _types_resolver(conf, root)
     for t in copies:
