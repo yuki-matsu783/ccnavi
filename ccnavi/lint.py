@@ -498,10 +498,6 @@ def _proposal_problems(
     ツリーごとの免除を当ててはいけない。
     """
     problems: list[Problem] = []
-    # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
-    pool = dict(index)
-    for t in proposals:
-        pool.setdefault(t.ticket, t)
 
     # ツリーと状態は分けて持つ。同じ識別子が別のツリーに在るのは普通で（承認済みチケットは
     # git に入れて運ぶので、切ったワークツリーの数だけ写しができる）、しかもワークツリーは
