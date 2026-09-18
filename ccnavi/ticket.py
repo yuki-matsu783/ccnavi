@@ -65,10 +65,11 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
+from typing import TextIO
 
 import yaml
 
-from . import globmatch, rules, selfguard, settings, tree
+from . import ctxfile, globmatch, hookio, rules, selfguard, settings, tree
 from .rules import SEVERITY_ERROR, SEVERITY_WARN, Problem
 
 # frontmatter の囲い。
@@ -898,56 +899,76 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     return [write_rule, shell_rule]
 
 
-def propose_rules(tickets_rel: str, bin_path: str = "") -> list[rules.Rule]:
-    """提案を書いたときに、承認を頼む前の確認を 1 度だけ伝えるルール。組み込み（REQ-APV-14）。
+def propose_notice(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    subject: str,
+) -> str:
+    """提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。空なら渡さない。
 
-    止めない。`todo/` への作成と編集は自由（`guard_rules` の文面がそう言っている）で、
-    ここで足すのは文だけ。承認できない提案のまま人に承認を頼むと、落ちたことを知るのが
-    端末に座った人になり、往復が 1 回増える。確かめる手立て（`--approve --preview --check`）
-    は在るので、書いた直後に、要る場所で言う。
+    承認できない提案のまま人に承認を頼むと、落ちたことを知るのが端末に座った人になり、
+    往復が 1 回増える。確かめる手立て（`--approve --preview --verify`）は在るので、
+    書いた直後に、要る場所で言う。
 
-    `additionalContextOnce` なので、1 つの文脈（セッション、サブエージェントなら 1 回の起動）で
-    最初の 1 回だけ渡る。2 本目からは黙る。提案を 1 本書くたびに同じ文を積むと、
+    **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
+    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形も
+    試したが、次の 3 つを同時に引き受けることになってやめた。
+
+    - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの倒し方
+      （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
+      知らない綴りのモードを ask に倒す既定も、そこだけ外れる（REQ-PRE-08）
+    - 判定は強いタイプから見て最初に当たった段で決まるので、**提案の置き場に `deny` か
+      `ask` を書いているワークスペースには文が届かない。** 承認の流れをいちばん
+      気にしているところにだけ届かない、という向きになる
+    - 組み込みで持つのは、ガード自身を守るものと取り返しの付かない操作だけ（設計 P4）。
+      助言はそのどちらでもない
+
+    1 つの文脈（セッション、サブエージェントなら 1 回の起動）で最初の 1 回だけ渡る。
+    数えは `ctxfile` の控えを、ルールと同じ形で使う（この 1 本は表に入れないので、
+    判定には一切現れない）。2 本目からは黙る。提案を 1 本書くたびに同じ文を積むと、
     長いセッションではそれだけでコンテキストを食う。
-
-    **allow に置くので、`todo/` への書き込みは「ccnavi が言及する場所」になる。**
-    ルールファイルが `todo/` に何も言っていないワークスペースでは、いままで
-    「どのタイプも言及しない」に落ちていた。そこは権限モードで倒し方が変わる場所
-    （`judge.undeclared_verdict`）で、外れる止まりは 2 つある。
-
-    - 確認できる者が居ないモード（`dontAsk` / `bypassPermissions`）の deny
-    - 知らない綴りのモードを ask に倒す既定（設定漏れがガードの消失にならない側の倒し方）
-
-    どちらもここでは通る側になる。これがこの組み込みが足す唯一の緩みで、提案を書けなければ
-    チケット制御そのものが始まらないので、そちら側へ倒している。緩むのは `todo/` の中だけで、
-    同じツリーの他の場所は今までどおり（`tests/ticket/test_approve_check.py` が杭を打つ）。
-    判定を返すわけではないことも効いていて、allow は「ccnavi は止めない」であり、
-    止めないと決めた先の結末は Claude Code の権限モードが決める。
-
-    人が書いた `deny` と `ask` は動かない。判定は強いタイプから見て最初に当たった段で
-    決まる（`judge.decide_before`）ので、ルールファイルが `todo/` を止めているなら
-    そちらが先に当たる。
     """
-    place = rf"(^|[\\/]){_place(tickets_rel)}[\\/]{TODO}[\\/]"
-    rule = rules.Rule(
+    if payload.tool_name not in WRITE_TOOLS or not subject:
+        return ""
+    if not _propose_place(conf.tickets, root).search(subject):
+        return ""
+    return ctxfile.for_rules(stderr, conf.state, payload, [_propose_rule(conf.tickets, conf.bin)])
+
+
+def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
+    """承認待ちの置き場に当たる式。**ワークスペースの中に限る。**
+
+    `guard_rules` は前を問わない形（`(^|[\\/])`）で当てるが、あれは deny なので、余分に
+    当たるぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で当てると、ワークスペースの
+    外に `wip/proposals/todo/` という並びを掘っただけの場所でも「提案を書いた」と読む。
+    ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下（設計 §11)
+    なので、ルートで留めれば正しい置き場は全部入り、外は入らない。
+
+    大文字小文字は区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
+    """
+    place = rf"^{rules.root_pattern(root)}[\\/][^\x00]*{_place(tickets_rel)}[\\/]{TODO}[\\/]"
+    return re.compile(place, re.IGNORECASE)
+
+
+def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
+    """文と、数えの鍵になる id を運ぶ入れ物。表には入れない（`propose_notice` だけが持つ）。"""
+    return rules.Rule(
         id=PROPOSE_RULE_ID,
-        match="|".join(WRITE_TOOLS),
-        regex=place,
-        decision=rules.ALLOW,
         additional_context_once=(
             f"チケットの提案を書きました（{tickets_rel}/todo/ は承認待ちの置き場で、"
             "ここに書くだけでは判定に 1 ミリも効きません）。"
             "利用者に承認を依頼する前に "
-            f"'{settings.bin_command(bin_path)} --approve --preview --check <識別子>' を"
+            f"'{settings.bin_command(bin_path)} --approve --preview --verify <識別子>' を"
             "打ち、承認できる状態かを確かめてください。承認済みチケットは置きません。"
-            "0 で返れば依頼してよく、1 なら理由が出ます"
-            "（親が承認されていない、計画に無いフェーズ、範囲の書き損じ、読めない提案）。"
-            "直してから依頼してください。識別子を省くと承認待ち全部を見ます。"
+            "0 なら依頼してよく、3 なら承認の対象に入らない理由が出ます"
+            "（親が承認されていない、計画に無いフェーズ、順序、承認待ちに無い識別子）。"
+            "直してから依頼してください。1 は打ち方か設定の誤りで、提案の問題ではありません。"
+            "**識別子は自分が書いたものを渡してください。** 省くと承認待ち全部を見るので、"
+            "書いた提案が読めていない（frontmatter が壊れている）ときに気づけません。"
         ),
     )
-    # 大文字小文字を区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。
-    rule.compiled = re.compile(place, re.IGNORECASE)
-    return [rule]
 
 
 def set_fields(text: str, fields: dict[str, str]) -> str:

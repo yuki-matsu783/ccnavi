@@ -175,9 +175,6 @@ def decide_before(
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
     if conf.tickets_enabled:
         rule_set.deny.extend(ticket_mod.guard_rules(conf.tickets, root))
-        # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える。止めない（文だけ）。
-        # 後ろに足すので、当たったルールの先頭は人が書いたルールのままになる。
-        rule_set.allow.extend(ticket_mod.propose_rules(conf.tickets, conf.bin))
         # 人の判断の経路（承認・レビュー済みの受け入れ・状態とレビューの操作）を、
         # 実行ファイルを直接打つ形で通さない。スクリプト 2 本の中身がこれ。
         if conf.guard_ticket_approval != selfguard.DISABLE:
@@ -374,6 +371,17 @@ def decide_before(
     # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）に合流させる。
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
+    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ口から渡す。
+    if conf.tickets_enabled:
+        told = "\n\n".join(
+            p
+            for p in (
+                told,
+                ticket_mod.propose_notice(stderr, conf, root, payload, record.subject),
+            )
+            if p
+        )
     if told:
         context = "\n\n".join(p for p in (told, context) if p)
 
