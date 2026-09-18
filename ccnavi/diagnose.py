@@ -889,6 +889,10 @@ def _ticket_record(
             if proposal is not None
             else None
         ),
+        # blocked は「読めるが信じられない」理由（ADR-0058）。判定はこのチケットの
+        # ワークツリーへの書き込みを全部止めるので、ボードが素の open として見せると、
+        # 止まっていること自体が人に届かない。
+        "blocked": (open_index[ticket_id].blocked if ticket_id in open_index else ""),
         "copy": (
             {
                 "status": status,

@@ -541,7 +541,72 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("--lint")
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("i0001-01", result.stdout)
-        self.assertIn("親 i0001 が承認されていない", result.stdout)
+        self.assertIn("親 i0001 の承認済みチケットが作業中に無い", result.stdout)
+
+    def close_parent_by_hand(self, name="i0001"):
+        """親の承認済みチケットを `doing/` から `done/` へ手で動かす。
+
+        道具は開いた子がある親を閉じさせない（`ops.close_problems`）ので、この形は
+        置き場を手で動かしたときにしか作れない。GitHub の画面で閉じるのがそれにあたる。
+        """
+        os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
+        os.replace(
+            os.path.join(self.approved, "doing", name + ".md"),
+            os.path.join(self.approved, "done", name + ".md"),
+        )
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "close " + name)
+
+    def test_a_child_whose_parent_is_closed_is_blocked_not_unclipped(self):
+        """親が閉じた子は、親の範囲で切り詰められないので止める。
+
+        判定が `parent` を引く索引は作業中のものだけ。親を閉じると引けなくなり、
+        `scope_verdict` は子の宣言だけで範囲を決める。印を付ける側だけが閉じた親も
+        引ける池を使っていたので、印は付かず範囲も切り詰められない、という抜けが
+        あった。親を引けない子は止める側へ倒す（ADR-0058）。
+        """
+        # 子は親（src/*）に無い範囲を宣言する。承認は警告で通す。
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.assertEqual(self.approve().returncode, 0)
+        child = self.worktree("i0001-01", "i0001")
+        self.close_parent_by_hand()
+
+        result = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "docs", "x.md")
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("i0001", reason)
+
+    def test_the_board_shows_that_a_blocked_ticket_is_stopped(self):
+        """印の付いたチケットが、ボードの JSON にもその旨で出ること。
+
+        判定と `--lint` にしか伝わらないと、ボードしか見ない人には書き込みが全部
+        止まっていることが見えず、`status` は素の `open` のままになる。あわせて
+        「印が付いていないのに親を引けない子」が居ないこと（池が割れていないこと）も
+        同じ出力から確かめる。池が割れると、その子は自分の宣言だけで範囲が決まる。
+        """
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.assertEqual(self.approve().returncode, 0)
+        self.worktree("i0001-01", "i0001")
+        self.close_parent_by_hand()
+
+        result = self.ccnavi("--explain", "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = {t["ticket"]: t for t in json.loads(result.stdout)["tickets"]}
+        self.assertIn("i0001", records["i0001-01"]["blocked"])
+
+        open_ids = {k for k, v in records.items() if v.get("copy", {}).get("status") == "open"}
+        for name in open_ids:
+            record = records[name]
+            if record["parent"] and not record["blocked"]:
+                self.assertIn(
+                    record["parent"],
+                    open_ids,
+                    f"{name} は印が付いていないのに親を引けない",
+                )
 
     def test_parent_and_child_strictest_wins(self):
         self.propose("i0001", allow=("src/a/*",), ask=("src/b/*",))

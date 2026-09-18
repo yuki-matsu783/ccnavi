@@ -11,6 +11,12 @@
 承認済みチケットは `.ccnavi/approved/` に置く。ccnavi ディレクトリの下なので、組み込みの
 守りがエージェントの書き込みを止める。
 
+**権威はこの置き場で、`ccnavi_approved` の欄ではない（ADR-0058）。** 欄は承認の記録で、
+持たないチケットも承認済みとして読む。そこに置けたのは書ける権限を持つ人だけだから。
+だから提案を手で `doing/` へ動かすことが、端末とボードに続く 3 つめの承認の経路になる。
+その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
+`blocking_problems` が判定の側で当てる。
+
 ## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
 
 承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。写しを置いて
@@ -217,11 +223,10 @@ def scan(
     当たらなかった構造の検査を、判定の側でも当てるため（ADR-0058）。
     """
     found, notes = scan_all(conf, root, closed)
-    everything = _everything(conf, root)
-    kept = _authoritative(found, everything)
+    kept = _authoritative(found, _everything(conf, root))
     if not closed:
         # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
-        mark_blocked(conf, kept, everything)
+        mark_blocked(conf, kept)
     return kept, notes
 
 
@@ -1827,7 +1832,9 @@ def validate(
     return problems, distinct
 
 
-def child_problems(t: ticket_mod.Ticket, parent: ticket_mod.Ticket | None) -> list[rules.Problem]:
+def child_problems(
+    t: ticket_mod.Ticket, parent: ticket_mod.Ticket | None, missing: str = ""
+) -> list[rules.Problem]:
     """子と親の構造の検査。承認（`validate`）と判定（`blocking_problems`）が同じ答えを引く。
 
     どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認でも判定でも
@@ -1838,7 +1845,11 @@ def child_problems(t: ticket_mod.Ticket, parent: ticket_mod.Ticket | None) -> li
     正しい。判定は注記を添えて親の範囲で切り詰める（`judge.ticket_verdict`）。
     """
     if parent is None:
-        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} が承認されていない")]
+        # 文面だけは呼び手が差し替える。承認のときは「まだ承認されていない」しか起きないが、
+        # 判定のときは「承認されたが閉じた」も同じ穴に落ちる。検査は同じで、読む人の
+        # 次の一手が違うだけなので、分けるのは言葉だけにする。
+        detail = missing or f"親 {t.parent} が承認されていない"
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, detail)]
     if parent.is_child:
         return [
             rules.Problem(
@@ -1868,51 +1879,38 @@ def blocking_problems(
 
     ここに入れないもの。
     - 計画の形（`plan_problems`）。範囲には効かないので `--lint` が言う
-    - フェーズの順序（`phase.order_problems`）。Write はフェーズのゲートを通す決まり
-      （ADR-0024）で、判定で止めるとその決定と食い違う。`--lint` が言う
+    - フェーズの順序（`phase.order_problems`）。順序が狂っていても、その子の範囲を
+      どの親で切り詰めるかは決まる。線を引いているのはここで、ADR-0024 ではない
+      （あちらは `held_phase` が `Agent` とシェルを止める話で、この検査とは別の仕組み）。
+      止めると、レビュー待ちの間その子が一切書けなくなり、ゲートが Write を通す形とは
+      結果が離れる。`--lint` が warn で言う
     - 範囲の超過。判定が親と種類の上限で切り詰めるので、止める理由が無い
     """
     problems = list(project_problems(t, pool, conf))
     if t.is_child:
-        problems.extend(child_problems(t, pool.get(t.parent)))
+        missing = f"親 {t.parent} の承認済みチケットが作業中に無い（未承認か、閉じている）"
+        problems.extend(child_problems(t, pool.get(t.parent), missing))
     return [p for p in problems if p.severity == rules.SEVERITY_ERROR]
 
 
-def _parent_pool(everything: list[ticket_mod.Ticket]) -> dict[str, ticket_mod.Ticket]:
-    """親を引くための池。開いた写しを先に、無ければレビュー待ち・閉じた写しを。
-
-    閉じた親を引けるようにするのは、親を閉じたあとも子が開いたまま残る形があるから
-    （人が置き場を動かして親を閉じた直後など）。引けないと「親が承認されていない」に
-    倒れ、正当な子まで止まる。同じ識別子が複数のツリーにあるときは、権威のツリー
-    （親の名前のツリー）の側を先に入れる。子のワークツリーに残った古い写しで計画を
-    読むと、閉じたあとに開いた版が復活する。
-    """
-    order = {
-        ticket_mod.DOING: 0,
-        ticket_mod.REVIEW: 1,
-        ticket_mod.DONE: 2,
-        ticket_mod.CANCELLED: 3,
-    }
-    ranked = sorted(
-        everything,
-        key=lambda t: (order.get(t.state, 9), t.tree != (t.parent or t.ticket)),
-    )
-    pool: dict[str, ticket_mod.Ticket] = {}
-    for t in ranked:
-        pool.setdefault(t.ticket, t)
-    return pool
-
-
-def mark_blocked(
-    conf: settings.Settings, kept: list[ticket_mod.Ticket], everything: list[ticket_mod.Ticket]
-) -> None:
+def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
     """判定が読む承認済みチケットに、信じられない理由の印を付ける（ADR-0058）。
 
     印を読むのは `phase.scope_verdict` で、実行前の判定・実行後の監視・サブエージェント
     終了時の検査の 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
     呼ぶと、同じ書き込みが実行前は通って実行後に咎められるから。
+
+    **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
+    別の池で引くと、ここでは親が見つかって印が付かないのに、判定の側では見つからず
+    `parent=None` のまま子の宣言だけで範囲が決まる。閉じた親やレビュー待ちの親まで
+    引ける池にしたときに実際にそうなった。親の範囲で切り詰められないのに通る形は、
+    承認していない範囲に書ける道そのものなので、引けないなら止める側へ倒す。
+
+    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
+    開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは
+    人なので、その子を止めるのが人の意思に沿う。
     """
-    pool = _parent_pool(everything)
+    pool = by_id(kept)
     for t in kept:
         problems = blocking_problems(conf, t, pool)
         t.blocked = problems[0].detail if problems else ""

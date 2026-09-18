@@ -164,6 +164,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "blocked": "",
    "copy": {
     "status": "open",
     "approved_at": "2026-09-13T13:50:21+0000",
@@ -198,6 +199,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "blocked": "",
    "copy": {
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
@@ -241,6 +243,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "blocked": "",
    "copy": {
     "status": "open",
     "approved_at": "2026-09-13T13:50:22+0000",
@@ -280,6 +283,7 @@
     "tree_root": "<root>/.claude/worktrees/i0001",
     "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-03.md"
    },
+   "blocked": "",
    "copy": {
     "status": "none"
    },
@@ -326,6 +330,7 @@
     "tree_root": "<root>/.claude/worktrees/i0001",
     "path": "<root>/.claude/worktrees/i0001/wip/proposals/review/i0001-04.md"
    },
+   "blocked": "",
    "copy": {
     "status": "review",
     "approved_at": "2026-09-13T13:50:22+0000",
@@ -380,6 +385,7 @@
     "reason": "t"
    },
    "proposal": null,
+   "blocked": "",
    "copy": {
     "status": "closed",
     "approved_at": "2026-09-13T13:50:22+0000",
