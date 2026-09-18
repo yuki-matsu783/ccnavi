@@ -1,23 +1,25 @@
-"""`--approve --preview --check`（承認を頼む前の確認）の受入テスト。
+"""`--approve --preview --verify`（承認を頼む前の確認）の受入テスト。
 
 エージェントが提案を書いたあと、人に承認を依頼する前に自分で確かめる枝
-（REQ-APV-13）と、書いた回にそれを伝える組み込みのルール（REQ-APV-14）。
-見るのは 7 つ。
+（REQ-APV-13）と、書いた回にそれを伝える組み込みの案内（REQ-APV-14）。
+見るのは 8 つ。
 
-1. 承認できる状態なら 0 で返り、識別子ごとに「通る」と出る。承認済みチケットは置かない
-2. 承認の対象にしない提案があれば 1 で返り、その理由が本文に出る
-3. 承認待ちが無ければ 1。提案の置き場を間違えた回がここに出る
-4. 承認待ちに無い識別子を指定すれば 1（絞りは `--approve` と同じ意味）
+1. 承認できる状態なら 0（はい）で返り、識別子ごとに「通る」と出る。置かない
+2. 承認の対象にしない提案があれば 3（いいえ）で返り、その理由が本文に出る
+3. 承認待ちが無ければ 3。提案の置き場を間違えた回がここに出る
+4. 承認待ちに無い識別子を指定すれば 3（絞りは `--approve` と同じ意味）
 5. 範囲の超過だけなら 0。承認は止まらないので通るが、書けないことは行に添える
-6. `--json` は `--preview --json` と同じ形に `check` を足したもので、終了コードも同じ
-7. `todo/` に提案を書くと、確認の案内が 1 つの文脈で 1 度だけ届く。止まりが外れるのは
-   その置き場の中だけで、ほかの場所は権限モードごとの倒し方が変わらない
+6. `--json` は `--preview --json` と同じ形に `verify` を足したもの。使い方の誤りは 1
+7. `todo/` に提案を書くと、確認の案内が 1 つの文脈で 1 度だけ届く。案内は判定の表に
+   足さないので、どの権限モードでも判定は変わらない
+8. `--lint` が同じ提案について同じことを言う（承認と同じ関数を通す）
 """
 
 from __future__ import annotations
 
 import json
 import os
+import tempfile
 
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import write
@@ -32,9 +34,22 @@ def decision(result):
     return json.loads(result.stdout).get("hookSpecificOutput", {}).get("permissionDecision")
 
 
-class ApproveCheckTest(PhaseHarness):
-    def check(self, *extra):
-        return self.ccnavi("--approve", "--preview", "--check", *extra)
+def context(result):
+    """モデルへ渡した文。判定とは別の欄で、止めた回にも通した回にも載る。"""
+    if not result.stdout.strip():
+        return ""
+    return json.loads(result.stdout).get("hookSpecificOutput", {}).get("additionalContext") or ""
+
+
+# 答えの終了コード。0 = はい、3 = いいえ。1 は使い方と設定の誤りで、答えではない。
+ANSWER_NO = 3
+
+
+class ApproveVerifyTest(PhaseHarness):
+    def verify(self, *extra):
+        """`--approve --preview --verify`。ハーネスの `check`（review check）とは別物なので、
+        名前を分ける（同じ名前で上書きすると、レビュー絡みのテストを足した回に黙って入れ替わる）。"""
+        return self.ccnavi("--approve", "--preview", "--verify", *extra)
 
     # ---- 1. 通る
 
@@ -43,7 +58,7 @@ class ApproveCheckTest(PhaseHarness):
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
         self.commit_parent()
 
-        result = self.check()
+        result = self.verify()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("i0001", result.stdout)
         self.assertIn("通る", result.stdout)
@@ -58,7 +73,7 @@ class ApproveCheckTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
 
-        result = self.check("i0001")
+        result = self.verify("i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("指定の 1 件", result.stdout)
 
@@ -70,8 +85,8 @@ class ApproveCheckTest(PhaseHarness):
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
         self.commit_parent()
 
-        result = self.check()
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.verify()
+        self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         self.assertIn("i0001-05", result.stdout)
         self.assertIn("落ちる", result.stdout)
         self.assertIn("計画に無い", result.stdout)
@@ -82,8 +97,8 @@ class ApproveCheckTest(PhaseHarness):
     # ---- 3. 承認待ちが無い
 
     def test_nothing_pending_is_a_failed_check(self):
-        result = self.check()
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.verify()
+        self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         self.assertIn("承認待ちのチケットは無い", result.stdout)
         self.assertIn("todo/", result.stdout)
 
@@ -93,8 +108,8 @@ class ApproveCheckTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
 
-        result = self.check("i0002")
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.verify("i0002")
+        self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         self.assertIn("承認待ちに無い", result.stdout)
 
     # ---- 5. 範囲の超過は落とさない
@@ -105,7 +120,7 @@ class ApproveCheckTest(PhaseHarness):
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/design/*",)))
         self.commit_parent()
 
-        result = self.check()
+        result = self.verify()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認しても書けない", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
@@ -116,23 +131,23 @@ class ApproveCheckTest(PhaseHarness):
         self.propose("i0001", parent_text("i0001", ["research"]))
         self.commit_parent()
 
-        result = self.check("--json")
+        result = self.verify("--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         body = json.loads(result.stdout)
         self.assertEqual(body["version"], APPROVE_VERSION)
         self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001"])
         self.assertTrue(body["digest"])
-        self.assertEqual(body["check"], {"ok": True, "reason": "ok"})
+        self.assertEqual(body["verify"], {"ok": True, "reason": "ok"})
 
     def test_json_says_why_it_failed(self):
         """読めない提案しか無ければ、承認待ちが 1 件も無いのと同じ（そこで落ちる）。"""
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
-        result = self.check("--json")
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.verify("--json")
+        self.assertEqual(result.returncode, ANSWER_NO, result.stdout + result.stderr)
         body = json.loads(result.stdout)
-        self.assertEqual(body["check"], {"ok": False, "reason": "nothing-pending"})
+        self.assertEqual(body["verify"], {"ok": False, "reason": "nothing-pending"})
         self.assertTrue(any("broken.md" in p for p in body["problems"]))
 
     def test_a_broken_proposal_elsewhere_does_not_fail_a_sound_one(self):
@@ -145,7 +160,7 @@ class ApproveCheckTest(PhaseHarness):
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
         self.commit_parent()
 
-        result = self.check()
+        result = self.verify()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("読めなかったもの", result.stdout)
         self.assertIn("broken.md", result.stdout)
@@ -155,46 +170,69 @@ class ApproveCheckTest(PhaseHarness):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
-    def test_check_needs_preview(self):
-        """`--check` は `--preview` に相乗りする。単独ではエージェントが打てない。"""
-        result = self.ccnavi("--approve", "--check")
-        self.assertNotEqual(result.returncode, 0)
+    def test_verify_needs_preview(self):
+        """`--verify` は `--preview` に相乗りする。単独ではエージェントが打てない。
+
+        使い方の誤りは 1。答えの「いいえ」（3）とは分ける。読む側が取り違えると、
+        直すものが無いのに提案を直しに行く。
+        """
+        result = self.ccnavi("--approve", "--verify")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotEqual(result.returncode, ANSWER_NO)
         self.assertIn("--preview", result.stderr)
+
+    # ---- 8. --lint が同じことを言う
+
+    def test_lint_says_what_the_verify_says(self):
+        """承認で落ちるものを数える経路は 1 本（`approval.candidates`）。
+
+        以前は `--lint` だけが `approval.validate` を当てていて、順序で落ちる子・計画に
+        無い番号・`project:` の食い違い・改版の検査に無言だった。同じ事実を数える経路が
+        2 本あると、片方が黙って弱くなる。`--lint` は severity の体系で終わるので、
+        承認で落ちる提案（error）があれば非ゼロで終わる。
+        """
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        # 計画に無い番号の子。承認の対象にしない側に載る。
+        self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))
+        self.commit_parent()
+
+        verified = self.verify()
+        self.assertEqual(verified.returncode, ANSWER_NO, verified.stdout)
+        self.assertIn("計画に無い", verified.stdout)
+
+        lint = self.ccnavi("--lint")
+        self.assertNotEqual(lint.returncode, 0, lint.stdout + lint.stderr)
+        said = lint.stdout + lint.stderr
+        self.assertIn("i0001-05: ", said)
+        self.assertIn("計画に無い", said)
 
     # ---- 7. 書いた回に案内が届く
 
     def test_writing_a_proposal_tells_the_agent_to_check_first(self):
         target = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         first = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
-        self.assertIn("--approve --preview --check", self.reason(first))
-        self.assertIn("承認を依頼する前に", self.reason(first))
-        # 止めない。文だけを足す。
-        self.assertNotIn("permissionDecision", first.stdout)
+        self.assertIn("--approve --preview --verify", context(first))
+        self.assertIn("承認を依頼する前に", context(first))
 
     def test_the_notice_comes_once_per_context(self):
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo")
         first = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0002.md")
-        self.assertIn("--approve --preview --check", self.reason(first))
+        self.assertIn("--approve --preview --verify", context(first))
         again = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo + "/i0003.md")
-        self.assertNotIn("--approve --preview --check", self.reason(again))
+        self.assertNotIn("--approve --preview --verify", context(again))
 
-    def test_the_widening_is_limited_to_the_proposal_place(self):
-        """組み込みの allow が外す止まりは `todo/` の中だけ。ほかの場所は今までどおり。
+    def test_the_notice_changes_no_verdict(self):
+        """案内は判定の表に足さない。だから `todo/` の扱いは、案内を入れる前と同じ。
 
-        allow に置いたので `todo/` は「ccnavi が言及する場所」になり、どのタイプも言及
-        しないときの倒し方（judge.undeclared_verdict）を通らなくなる。確認できる者が
-        居ないモード（dontAsk / bypassPermissions）と知らないモードでは、そこが止まる側
-        だったので、通るようになるのがこの組み込みの代償（ADR-0058）。**代償がここから
-        広がっていないことを杭で打つ。** 同じツリーの、どのルールも言及しない場所は
-        今までどおり止まる。
-
-        この道具は `CCNAVI_` の環境変数を落として動かすので、`CCNAVI_GUARD_UNWATCHED` は
-        既定の enable（いちばん厳しい側）。`todo/` の外が止まることがその証拠で、
-        その設定でも `todo/` の中は通る、が代償の正確な姿になる。
+        表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
+        どのタイプも言及しないときの倒し方（judge.undeclared_verdict）を通らなくなる。
+        確認できる者が居ないモードの deny も、知らない綴りのモードを ask に倒す既定も、
+        そこだけ外れていた（ADR-0058）。**同じ場所とどのルールも言及しない場所が、
+        どの権限モードでも同じ判定になること**を杭にする。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")
         other = os.path.join(self.parent_tree, "src", "keep.py")
-        for mode, outside in (
+        for mode, verdict in (
             ("bypassPermissions", "deny"),
             ("dontAsk", "deny"),
             ("unknownMode", "ask"),
@@ -203,13 +241,27 @@ class ApproveCheckTest(PhaseHarness):
                 inside = self.hook(
                     "PreToolUse", "Write", self.parent_tree, permission_mode=mode, file_path=todo
                 )
-                self.assertIsNone(decision(inside), inside.stdout)
                 beyond = self.hook(
                     "PreToolUse", "Write", self.parent_tree, permission_mode=mode, file_path=other
                 )
-                self.assertEqual(decision(beyond), outside, beyond.stdout)
+                self.assertEqual(decision(inside), verdict, inside.stdout)
+                self.assertEqual(decision(beyond), verdict, beyond.stdout)
+                # 止めた回にも文は届く（判定とは別の欄）。1 つの文脈で 1 度だけなので、
+                # 最初の 1 回だけを見る。
+                if mode == "bypassPermissions":
+                    self.assertIn("--approve --preview --verify", context(inside))
+
+    def test_the_notice_stays_inside_the_workspace(self):
+        """ワークスペースの外に同じ並びを掘っても、提案を書いたことにはしない。
+
+        当てる式はワークスペースルートで留めてある。ツリー（ワークツリー・プロジェクト）は
+        どれもルートの下なので、正しい置き場は全部入り、外は入らない。
+        """
+        elsewhere = os.path.join(tempfile.gettempdir(), "wip", "proposals", "todo", "evil.sh")
+        result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=elsewhere)
+        self.assertNotIn("--approve --preview --verify", context(result))
 
     def test_the_notice_does_not_reach_other_places(self):
         other = os.path.join(self.parent_tree, "src", "keep.py")
         result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=other)
-        self.assertNotIn("--approve --preview --check", self.reason(result))
+        self.assertNotIn("--approve --preview --verify", context(result))
