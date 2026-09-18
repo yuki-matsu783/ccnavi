@@ -1571,13 +1571,22 @@ fast-forward だけで、未コミットの変更があるツリーやリモー�
 終わったフェーズに子を足して承認すると、そのフェーズのマーカー 4 種（`pending` `requested`
 `reviewed` `skipped`）は全部消える。
 
-承認する場所は 2 つある。端末で `--approve` を打つと一覧を見せて y/N を取る。VS Code の
+承認する場所は 3 つある。端末で `--approve` を打つと一覧を見せて y/N を取る。VS Code の
 拡張（ボード）は、一覧を `--approve --preview --json` で読んでオーバーレイに出し、人が押したら
 `--approve --yes <識別子,…> --digest <値> --json` を子プロセスで打つ。形は「承認の JSON」にある。
 `--yes` は端末を求めない代わりに、見せた一覧と今の一覧が同じで、見せた中身の指紋が今の中身と
 合うことを求め、違えば何も置かない。承認が 1 件以上通れば、ボードは続けて
 `ccnavi-push-approved.sh` を端末へ送る（上の段落）。
 ボードが絞り込んでいるときは、その絞りを `--preview` と `--yes` の両方に同じように渡す。
+
+3 つめは、提案のファイルを `.ccnavi/approved/doing/` へ動かすこと（ADR-0058）。端末もボードも
+無い人——手元に ccnavi を置けず、GitHub の画面でファイルを動かすことしかできない人——のための
+経路で、`ccnavi_approved` の欄は要らない。承認の証拠はその置き場にエージェントが書けないこと
+そのもので、動かせたのは書ける権限を持つ人だけになる。承認の画面を通らないぶん、承認のときにしか
+当たらなかった構造の検査（親が引けない、親自身が子、番号が親の計画に無い、`project:` が置き場と
+違う、予約名）は判定の側が当てる。引っかかったチケットは範囲を当てる前に止まり、理由のコードは
+`DENY_TICKET_BLOCKED`。どのチケットが止まっているかは `ccnavi --lint` と、ボードの JSON の
+`blocked` が言う。
 エージェントが Bash や PowerShell で `--yes` を打つ道は、組み込みの deny
 （`builtin-guard-ticket-approval`）が塞ぐ。一覧を見るだけの `--preview` は通す。
 
@@ -2391,6 +2400,7 @@ ccnavi --explain --json
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
 | `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null` |
 | `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`） |
+| `blocked` | 空でなければ「読めるが信じられない」理由（ADR-0058）。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物のワークツリーか（設計 §9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、親の提案が写っているのが普通 |
