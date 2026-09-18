@@ -213,6 +213,7 @@ class ApproveVerifyTest(PhaseHarness):
 
         「計画に無い番号」は寄せる前からの error なので、それだけを見るテストでは、
         配線を旧に戻しても気づけない。この枝が新しく言えるようになった 1 件で杭を打つ。
+        重さは warn（`rules.KIND_NOT_YET`）で、承認の側は落としたままであることも見る。
         """
         self.propose("i0001", parent_text("i0001", ["research", "design"]))
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
@@ -226,11 +227,16 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertEqual(verified.returncode, ANSWER_NO, verified.stdout)
         self.assertIn("が閉じるまで承認しない", verified.stdout)
 
+        # `--lint` は同じことを言うが、重さは warn。前が閉じれば同じ提案が通るので、
+        # 書いた側に直すものが無い。ここを error にすると、編集と関わりのない提案 1 本で
+        # 設定画面の保存（phases-panel.ts は --lint の終了コードを見る）も CI も止まる。
         lint = self.ccnavi("--lint")
         said = lint.stdout + lint.stderr
-        self.assertNotEqual(lint.returncode, 0, said)
         self.assertIn("i0001-02: ", said)
         self.assertIn("が閉じるまで承認しない", said)
+        self.assertIn("warn: (ticket): i0001-02: ", said)
+        self.assertNotIn("error: (ticket): i0001-02: ", said)
+        self.assertEqual(lint.returncode, 0, said)
 
     # ---- 7. 書いた回に案内が届く
 

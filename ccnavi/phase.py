@@ -716,6 +716,10 @@ def order_problems(
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
 
+    ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
+    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの印を見て
+    warn に落とす（`lint._approval_problems`）。
+
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
     増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
     フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
@@ -759,6 +763,7 @@ def order_problems(
                     child.ticket,
                     f"{child.phase} 番目の子は、{phase.label} が閉じるまで承認しない（{state}）。"
                     "作業が終わるまで次の計画は立てない",
+                    rules.KIND_NOT_YET,
                 )
             )
             break
@@ -768,6 +773,7 @@ def order_problems(
                     rules.SEVERITY_ERROR,
                     child.ticket,
                     f"{child.phase} 番目の子は、{phase.label} のレビューが済むまで承認しない",
+                    rules.KIND_NOT_YET,
                 )
             )
             break

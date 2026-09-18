@@ -452,6 +452,13 @@ def _approval_problems(
     黙って弱くなる。`--approve --preview --verify` と同じ答えをここでも言う。
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
+
+    **「まだ承認できない」だけは warn に落とす。** 前のフェーズが閉じていない子
+    （`rules.KIND_NOT_YET`）は、書いた側に直すものが無く、前が閉じれば同じ提案が通る。
+    `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
+    保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
+    編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは落とす
+    （`approval.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
     """
     pending, revisions = approval.waiting(proposals, copies, closed, review)
     if not pending and not revisions:
@@ -460,11 +467,17 @@ def _approval_problems(
     problems: list[Problem] = []
     for cand in batch:
         for p in cand.complaints + cand.overflow:
-            problems.append(Problem(p.severity, "(ticket)", f"{cand.ticket.ticket}: {p.detail}"))
+            problems.append(_said(cand.ticket.ticket, p))
     for t, complaints in rejected:
         for p in complaints:
-            problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
+            problems.append(_said(t.ticket, p))
     return problems
+
+
+def _said(ticket: str, problem) -> Problem:
+    """承認の苦情 1 件を、`--lint` の言い方に直す。「まだ承認できない」は warn へ落とす。"""
+    severity = SEVERITY_WARN if problem.kind == rules.KIND_NOT_YET else problem.severity
+    return Problem(severity, "(ticket)", f"{ticket}: {problem.detail}")
 
 
 def _proposal_problems(
