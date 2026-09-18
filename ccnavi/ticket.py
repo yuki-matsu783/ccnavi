@@ -925,6 +925,9 @@ def propose_notice(
     - 組み込みで持つのは、ガード自身を守るものと取り返しの付かない操作だけ（設計 P4）。
       助言はそのどちらでもない
 
+    渡るのは書き込みの**前**（PreToolUse）で、止まった回にも届く。文面を「書きました」と
+    過去形にしないのはそのため。書けたかどうかは、この文を渡す時点では決まっていない。
+
     1 つの文脈（セッション、サブエージェントなら 1 回の起動）で最初の 1 回だけ渡る。
     数えは `ctxfile` の控えを、ルールと同じ形で使う（この 1 本は表に入れないので、
     判定には一切現れない）。2 本目からは黙る。提案を 1 本書くたびに同じ文を積むと、
@@ -957,7 +960,7 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
     return rules.Rule(
         id=PROPOSE_RULE_ID,
         additional_context_once=(
-            f"チケットの提案を書きました（{tickets_rel}/todo/ は承認待ちの置き場で、"
+            f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
             "ここに書いただけでは判定に 1 ミリも効きません）。"
             "利用者に承認を依頼する前に、"
             f"'{settings.bin_command(bin_path)} --approve --preview --verify <識別子>' で"

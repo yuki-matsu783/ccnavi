@@ -207,6 +207,31 @@ class ApproveVerifyTest(PhaseHarness):
         self.assertIn("i0001-05: ", said)
         self.assertIn("計画に無い", said)
 
+    def test_lint_says_the_order_problem_too(self):
+        """順序で落ちる子。**寄せる前の `--lint` が無言だったのはここ**（`validate` だけを
+        当てていたので、フェーズの順序を見ていなかった）。
+
+        「計画に無い番号」は寄せる前からの error なので、それだけを見るテストでは、
+        配線を旧に戻しても気づけない。この枝が新しく言えるようになった 1 件で杭を打つ。
+        """
+        self.propose("i0001", parent_text("i0001", ["research", "design"]))
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ("wip/research/*",), False))
+        self.commit_parent()
+        self.approve()
+        # フェーズ 1 が閉じていないのに、フェーズ 2 の子を先回りして書く。
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ("wip/design/*",)))
+        self.commit_parent()
+
+        verified = self.verify()
+        self.assertEqual(verified.returncode, ANSWER_NO, verified.stdout)
+        self.assertIn("が閉じるまで承認しない", verified.stdout)
+
+        lint = self.ccnavi("--lint")
+        said = lint.stdout + lint.stderr
+        self.assertNotEqual(lint.returncode, 0, said)
+        self.assertIn("i0001-02: ", said)
+        self.assertIn("が閉じるまで承認しない", said)
+
     # ---- 7. 書いた回に案内が届く
 
     def test_writing_a_proposal_tells_the_agent_to_check_first(self):
