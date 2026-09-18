@@ -32,7 +32,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, tree
+from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, shellread, tree
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -71,7 +71,18 @@ HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 # 前のコマンドの `--approve` を免除する。
 # 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
-_NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*--preview\b)"
+#
+# **免除の理由になるのは、単独の語として立った `--preview` だけ。** 前は生の空白（`--approve` の
+# 後ろに必ず 1 つある）、後ろは空白か区切りか行末。これを見ないと、別のフラグの**値**に書いた
+# `--preview` で免除が成立する。`ccnavi --approve --reason=--preview` は、argparse が
+# `--reason` の値として食うので `--preview` は立たず、実行ファイルは本物の `--approve` を
+# 走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこでズレていた。
+# `=` を挟む形だけでなく、`--preview=x` や `x--preview` のように語にくっついた形も免除しない。
+# 語の切れ目は生の空白だけで数える。語の中の目印（引用がつないだ空白）は数えない。
+# 数えると、引用の中に書いた `"a --preview"` が単独の語に見えて免除が戻る。
+_PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
+_PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
+_NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
     rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
     r"|\b(ticket|review)\s+"
@@ -705,6 +716,10 @@ def order_problems(
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
 
+    ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
+    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの印を見て
+    warn に落とす（`lint._approval_problems`）。
+
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
     増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
     フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
@@ -748,6 +763,7 @@ def order_problems(
                     child.ticket,
                     f"{child.phase} 番目の子は、{phase.label} が閉じるまで承認しない（{state}）。"
                     "作業が終わるまで次の計画は立てない",
+                    rules.KIND_NOT_YET,
                 )
             )
             break
@@ -757,6 +773,7 @@ def order_problems(
                     rules.SEVERITY_ERROR,
                     child.ticket,
                     f"{child.phase} 番目の子は、{phase.label} のレビューが済むまで承認しない",
+                    rules.KIND_NOT_YET,
                 )
             )
             break

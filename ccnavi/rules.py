@@ -115,10 +115,50 @@ _BACKREFERENCE = re.compile(r"\\[1-9]")
 # ワークスペースルートを指す合言葉。glob と regex の中で使え、読み込み時にその実パスに置き換わる。
 ROOT_PLACEHOLDER = "{root}"
 
+# 「ワークスペースルートの外」を指す合言葉。`regex` にだけ書け、`^` の直後に 1 回だけ。
+# 読み込み時に、先読みを使わない入れ子の式へ展開する（not_root_pattern、設計 i0061 §2）。
+NOT_ROOT_PLACEHOLDER = "{!root}"
+
+# 展開の最内と、各段の「ここで文字列が終わる」に置く綴り。`$` ではなく `\Z` なのは、
+# `$` が末尾の改行の直前にも当たるため。言いたいのは「終わる」であって「行末」ではない。
+_NOT_ROOT_END = r"\Z"
+
+# ルートがこの長さ以上なら展開しない。Python 3.12（再帰の上限 1000）では、この形の
+# 入れ子は 493 字で `re.compile` が `RecursionError` になる（tests/core/bench_not_root.py）。
+# 半分以下で止めるのは、Python の版が変わって上限が動いたときに黙って壊れないため。
+# Windows の MAX_PATH は 260 なので、256 字のルートはその時点で実用にならない。
+#
+# **組み立てが落ちる長さは、展開の形で変わる。** 1 文字あたりの入れ子の段数を変えたら、
+# bench_not_root.py を回して測り直すこと（設計 i0061 §4.1）。
+MAX_ROOT_LEN = 256
+
+# 生成できなかった `deny` / `ask` に持たせる式。どの文字列にも当たるので、そのルールが
+# 見るツールの呼び出しは全部止まる。守りが消えるより止まるほうがよい、という向きへ
+# 倒すために使う（設計 i0061 §4.3）。
+_MATCH_EVERYTHING = "^"
+
+# 生成した式に現れてはいけない書き方。`_unsupported` は繰り返しを見ないので、そこへ
+# 掛け直すだけでは「繰り返しを含まない」ことを確かめられない（設計 i0061 §2.5）。
+#
+# `?` は入れていない。生成した式は捕獲しないグループ `(?:` を使うので、`?` を量化子と
+# 数えると式自身の構造に当たってしまう。ルートの文字は `re.escape` を通るため、
+# `*` と `+` がルートの名前に含まれていても `\*` `\+` になり、この式には当たらない。
+_GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
+
+# `{!root}` の直後に続けてよい書き始め。生成した式が読み終える位置はパスの区切りとは
+# 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える
+# （設計 i0061 §3.3）。
+_SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
+
 # 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、層を添えた形と見分けが付かない。
 # 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §11.4）。
 ID_SEPARATOR = ":"
+
+# 苦情の出どころ（`Problem.kind`）。「いまは通らないが、書いた側に直すものは無い」もの。
+# 前のフェーズが閉じていない子がこれで、閉じれば同じ提案がそのまま通る。承認は落とすが、
+# 全体を見る `--lint` は warn に落とす（提案 1 本で設定画面の保存と CI が止まらないように）。
+KIND_NOT_YET = "not-yet"
 
 # 組み込みの守りの名前の頭。ルールファイルからは書けない（読み込まずに error）。
 # 以前は同じ id で書いたルールがあると組み込みを足さなかったので、何にも当たらない 1 本を
@@ -145,6 +185,59 @@ def root_glob(root: str) -> str:
     区切りは `/` に寄せ、翻訳の側が両方に当てる。
     """
     return os.path.realpath(root).replace("\\", "/").rstrip("/")
+
+
+def real_root(root: str) -> str:
+    """ルートを、展開に使える形に正規化する。
+
+    `os.path.realpath` で解き、**末尾の区切りを落とす**。落とさないと、最後の区切りを
+    「同じ」の側で消費した直後に最内へ落ち、ルート直下の普通のファイル名が「外」に
+    化ける。Windows では `os.path.realpath('/')` が `C:\\` を返すので、ドライブ直下を
+    ワークスペースにした環境は必ずここを踏む（設計 i0061 §2.0）。
+
+    `root_pattern` / `root_glob` も同じ 2 手を踏んでいる。`{!root}` だけ違う扱いにしない。
+    """
+    return os.path.realpath(root).rstrip("\\/")
+
+
+def _differs(ch: str) -> str:
+    """その 1 文字と一致しない文字に当たる文字クラス。区切りは両方の書き方を除く。"""
+    return r"[^\\/]" if ch in "\\/" else "[^" + re.escape(ch) + "]"
+
+
+def _same(ch: str) -> str:
+    """その 1 文字に当たる式。区切りは `\\` と `/` のどちらにも当たるようにする。"""
+    return r"[\\/]" if ch in "\\/" else re.escape(ch)
+
+
+def not_root_pattern(root: str) -> str:
+    """「ワークスペースルートで始まらない」を、先読みを使わずに書いた式。
+
+    ルートを 1 文字ずつ「ここで終わる（ルートより上）／ここが違う／ここは同じ」の
+    入れ子に分解する。最内はルートを全部なぞり切った先で、そこに区切りでない 1 文字が
+    続けば `…/ccnavi-fork/x` のような別のディレクトリなので「外」と数える。
+
+        ^(?:\\Z|[^c]|c(?:\\Z|[^:]|:(?:\\Z|[^\\\\/]|[\\\\/](?:…))))
+
+    **繰り返しを 1 つも含まない。** 各段の選択肢は最初の 1 文字でほぼ排他なので、
+    戻る余地がほとんど無い（設計 i0061 §2.5）。判定は 1 回 3.5 マイクロ秒で、
+    ルートの長さに比例して伸びるだけ。
+
+    列挙型（前置きを 1 文字ずつ伸ばして並べる形）を採らないのは、式の長さが
+    ルートの長さの 2 乗で伸びるため。436 字のルートで 141,365 字・組み立て 481 ms に
+    なり、判定の期限（3 秒）に達してしまう（設計 i0061 §2.7）。
+
+    引数には `real_root` で正規化したパスを渡す。`^` は呼ぶ側が書く。
+    """
+    # 最内に `\Z` を置いてはいけない。ここは「ルートを最後までなぞり切った」位置なので、
+    # そこで文字列が終わるなら対象はルート**そのもの**で、中と数えるのが正しい。
+    # `\Z` を混ぜると、`Glob` を `path` 省略で呼んだとき（対象が cwd = ルートになる）
+    # のような、いちばん普通の呼び出しが「外」と誤判定される。
+    # 各段の `\Z` は「ルートより上」を拾うためのもので、こことは意味が違う。
+    body = _differs("/")
+    for ch in reversed(root):
+        body = "(?:" + _NOT_ROOT_END + "|" + _differs(ch) + "|" + _same(ch) + body + ")"
+    return body
 
 
 def fill_root(text: str, root: str) -> str:
@@ -189,6 +282,10 @@ class Problem:
     severity: str
     rule: str
     detail: str
+    # 苦情の出どころ。既定は空で、どこから来たかを問わない苦情。`KIND_NOT_YET` は
+    # 「いまは通らないが、書いた側に直すものは無い」を表す（フェーズの順序がこれ）。
+    # 読み手によって重さを変えたいのはここだけなので、種類は 1 つしか無い。
+    kind: str = ""
 
     def __str__(self) -> str:
         return f"{self.severity}: {self.rule or '(file)'}: {self.detail}"
@@ -254,11 +351,21 @@ class Rule:
     # 報告と --explain は書いた綴りを出す（glob / regex と同じ扱い）。
     root: str = ""
 
+    # degraded_message は、ルールが書かれたとおりに組み立てられず、守りを消さないために
+    # 別の形で効かせているときに、止められた側へ返す文面。`{!root}` を展開できなかった
+    # `deny` / `ask` がこれにあたる（_ungeneratable）。書いた文面（message）を上書きすると
+    # 書いた人の言葉が消え、`--explain` と記録にも出なくなるので、別の欄に持つ。
+    degraded_message: str = ""
+
     compiled: re.Pattern | None = None
 
     def spoken_message(self) -> str:
-        """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。"""
-        return fill_root(self.message, self.root)
+        """モデルへ渡す文面。`{root}` をワークスペースルートの実パスにしたもの。
+
+        組み立てに失敗して別の形で効かせているときは、書いた文面ではそれを説明できない
+        （「外への書き込みです」としか言わない）ので、そちらを先に返す。
+        """
+        return fill_root(self.degraded_message or self.message, self.root)
 
     def key(self) -> tuple:
         """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §11.4、§11.8）。
@@ -398,17 +505,31 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
             continue
         for i, raw in enumerate(raw_section):
             rule, problem = _build(raw, name, i, root, builtin)
+            # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
+            # これで、「報告する」と「守りを消さない」を両立させる唯一の道（設計 i0061 §4.4）。
+            # 捨てるだけにすると、生成に失敗した deny が黙って消えて素通りになる。
             if problem is not None:
                 problems.append(problem)
-                continue
-            rule_set.section(name).append(rule)
+            if rule is not None:
+                rule_set.section(name).append(rule)
 
     return rule_set, problems
 
 
 def _build(
     raw: object, section: str, index: int, root: str = "", builtin: bool = False
-) -> tuple[Rule, None] | tuple[None, Problem]:
+) -> tuple[Rule | None, Problem | None]:
+    """ルール 1 件を組み立てる。返るのは (ルール, 苦情) で、どちらも無いことがありうる。
+
+    3 通りある。
+
+    - `(rule, None)`   組み立てられた
+    - `(None, problem)` 受け付けられない。判定に使わない（REQ-RUL-08）
+    - `(rule, problem)` 苦情はあるが判定には使う。`{!root}` を組み立てられなかった
+      `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側に倒れる。
+      捨てると「ワークスペースの外の全部」が素通りになるので、報告だけでは足りない
+      （REQ-RUL-10、設計 i0061 §4.3）
+    """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
         return None, Problem(SEVERITY_ERROR, where, "ルールがキーと値の並びではない")
@@ -469,6 +590,33 @@ def _build(
         return None, Problem(
             SEVERITY_ERROR, name, f"`{ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る"
         )
+
+    # `{!root}` は `regex` 専用。`glob` は fnmatch に翻訳されるので、入れ子の選択肢を持つ
+    # 展開結果を埋める場所が無い（設計 i0061 §3.1）。
+    if NOT_ROOT_PLACEHOLDER in rule.glob:
+        return None, Problem(
+            SEVERITY_ERROR,
+            name,
+            f"`{NOT_ROOT_PLACEHOLDER}` は `glob` には書けない。"
+            f"`regex: '^{NOT_ROOT_PLACEHOLDER}'` と書くこと",
+        )
+
+    note: Problem | None = None
+    uses_not_root = NOT_ROOT_PLACEHOLDER in rule.regex
+    if uses_not_root:
+        misplaced = _not_root_placement(rule.regex)
+        if misplaced:
+            return None, Problem(SEVERITY_ERROR, name, misplaced)
+        if not root:
+            return None, Problem(
+                SEVERITY_ERROR,
+                name,
+                f"`{NOT_ROOT_PLACEHOLDER}` を使うにはワークスペースルートが要る",
+            )
+        suffix = _not_root_suffix(rule.regex)
+        if suffix:
+            note = Problem(SEVERITY_WARN, name, suffix)
+
     if rule.regex:
         unsupported = _unsupported(rule.regex)
         if unsupported:
@@ -476,6 +624,11 @@ def _build(
         expression = (
             rule.regex.replace(ROOT_PLACEHOLDER, root_pattern(root)) if uses_root else rule.regex
         )
+        if uses_not_root:
+            expanded, refused = _expand_not_root(expression, root)
+            if refused:
+                return _ungeneratable(rule, section, name, refused)
+            expression = expanded
     else:
         glob = rule.glob.replace(ROOT_PLACEHOLDER, root_glob(root)) if uses_root else rule.glob
         expression = translate(glob)
@@ -492,8 +645,121 @@ def _build(
         rule.compiled = re.compile(expression, flags)
     except re.error as exc:
         return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
+    except RecursionError:
+        # `re` の組み立ては入れ子を再帰で読む。捕まえないとプロセスごと落ち、
+        # hook の異常終了は呼び出しを素通りさせる入口になる（設計 i0061 §4.2）。
+        # shellread が同じ形で `RecursionError` を安全側に倒しているのに倣う。
+        if uses_not_root:
+            return _ungeneratable(rule, section, name, "入れ子が深すぎて組み立てられない")
+        return None, Problem(SEVERITY_ERROR, name, "入れ子が深すぎて組み立てられない")
 
-    return rule, None
+    return rule, note
+
+
+def _not_root_placement(expression: str) -> str:
+    """`{!root}` の置き場所への苦情。無ければ空。
+
+    置けるのは `^` の直後だけで、1 つの式に 1 回。展開されるのは
+    「先頭から、外だと確定するところまで」を読み進める式なので、前に何かを置いても
+    意味を持たない（設計 i0061 §3.2）。
+    """
+    if expression.count(NOT_ROOT_PLACEHOLDER) > 1:
+        return f"`{NOT_ROOT_PLACEHOLDER}` は 1 つの式に 1 回だけ書ける"
+    if not expression.startswith("^" + NOT_ROOT_PLACEHOLDER):
+        return (
+            f"`{NOT_ROOT_PLACEHOLDER}` は `^` の直後にしか書けない。"
+            "展開されるのは「先頭から、外だと確定するところまで」を読み進める式で、"
+            "前に何かを置くと意味を持たない"
+        )
+    # 直後の量化子は error。`?` や `{0}` を付けると展開結果ごと省略できるようになり、
+    # 「外だけを止める」はずのルールが**どの対象にも当たる**式に化ける。
+    # ワークスペースの中への書き込みまで止まるので、warn では済ませない。
+    rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
+    if rest[:1] in ("?", "*", "+", "{"):
+        return (
+            f"`{NOT_ROOT_PLACEHOLDER}` の直後に量化子（`{rest[:1]}`）は書けない。"
+            "展開結果ごと省略したり繰り返したりできてしまい、"
+            "「外だけを止める」はずの式がどの対象にも当たるようになる"
+        )
+    return ""
+
+
+def _not_root_suffix(expression: str) -> str:
+    """`{!root}` の後ろに続く式への苦情（warn）。無ければ空。
+
+    続けてよいかどうかは意味の問題で、機械には判定できない。展開結果が食い終わる
+    位置がパスの区切りである保証は無いので、区切りを前提にした綴り
+    （`^{!root}[\\\\/]foo`）は壊れてはいないが、まず書いた人の勘違い。
+    止めるほどではないので warn（設計 i0061 §3.3）。
+    """
+    rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
+    if not rest or _SKIPS_ANYWHERE.match(rest):
+        return ""
+    return (
+        f"`{NOT_ROOT_PLACEHOLDER}` の直後に `{rest[:16]}` が続いている。"
+        "展開結果が読み終える位置はパスの区切りとは限らないので、区切りを前提にした"
+        "綴りは意図どおりに動かない。任意の位置から続けるなら `.*` で受けること"
+    )
+
+
+def _expand_not_root(expression: str, root: str) -> tuple[str, str]:
+    """`{!root}` を展開した式を返す。組み立てられなければ (元の式, 理由)。"""
+    real = real_root(root)
+    if not real:
+        return expression, "ワークスペースルートが区切りだけで、「外」を決められない"
+    if len(real) >= MAX_ROOT_LEN:
+        return expression, (
+            f"ワークスペースルートが長すぎて `{NOT_ROOT_PLACEHOLDER}` を組み立てられない"
+            f"（{len(real)} 字 / 上限 {MAX_ROOT_LEN - 1} 字）"
+        )
+    generated = not_root_pattern(real)
+    # 生成した部分が契約（繰り返しも先読みも含まない）を守っているかを自分で見る。
+    # 見るのは `not_root_pattern` が作った部分だけで、書いた人が後ろに続けた式は含めない。
+    # `.*` のような繰り返しをそこに書くのは許している（設計 §3.3）ので、
+    # 全体に掛けると正しい書き方まで弾く。
+    #
+    # いまの `not_root_pattern` は `re.escape` で組み立てるので、この検査は通常は発火しない。
+    # 将来ここを書き換えたときに黙って契約が破れるのを防ぐための置き石で、
+    # 外から叩いて発火させることはできない。
+    if _GENERATED_QUANTIFIER.search(generated) or _unsupported(generated):
+        return expression, "展開した式が契約を守っていない（組み立ての不具合）"
+    return expression.replace(NOT_ROOT_PLACEHOLDER, generated), ""
+
+
+def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Rule | None, Problem]:
+    """`{!root}` を組み立てられなかったときの倒れ方（設計 i0061 §4.3）。
+
+    強い側に倒す。`deny` と `ask` は `match` の全部に当てて止め、`allow` は
+    どれにも当てない。`allow` を当たる扱いにすると ccnavi が黙る範囲が広がるので、
+    そこだけ逆になる。
+
+    **これは `{!root}` の生成失敗に限った扱い。** 正規表現の書き損じなど既存の
+    壊れ方は今までどおり REQ-RUL-08 の「報告して捨てる」のまま。ここだけ特別なのは、
+    守られなくなる範囲が「ワークスペースの外の全部」に広がるから。
+
+    ## 設計から変えた 2 点（実装フェーズの判断。文書に反映すること）
+
+    - **記録に `root-too-long` の欄は足さない**（設計 §4.6 を取り消す）。`audit` の
+      `REASON_*` は「判定に至らなかった理由」で、ここは判定に至っている（deny する）。
+      記録には `deny` と当たったルールの id が既に残り、なぜ止めたかはこの文面が言う。
+      新しい名前を足すと、判定に至らなかったものと同じ欄に別の意味が混ざる
+    - **SessionStart では何も言わない**（設計 §6.1 を「何もしない」に決めた）。
+      256 字のルートは Windows の MAX_PATH の外で実用にならず、踏む人はまずいない。
+      踏んだときはこの文面が理由と直し方を言う。めったに起きないことのために
+      SessionStart を毎回重くしない
+    """
+    problem = Problem(SEVERITY_ERROR, name, detail)
+    if section == ALLOW:
+        return None, problem
+    rule.compiled = re.compile(_MATCH_EVERYTHING)
+    # 書いた文面（message）は残す。`--explain` と記録が書いた綴りを出す約束は、
+    # glob / regex だけでなく文面にも掛かる（Rule の message のコメント）。
+    rule.degraded_message = (
+        f"{detail}。守りが消えるのを避けるため、ルール '{rule.id or name}' が見るツール"
+        f"（{rule.match}）を止めています。ワークスペースをもっと浅い場所へ移すか、"
+        "利用者に、このルールが書かれているルールファイルから外してもらってください。"
+    )
+    return rule, problem
 
 
 def _unsupported(expression: str) -> str:

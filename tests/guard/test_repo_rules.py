@@ -171,6 +171,35 @@ class RepoRulesTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
 
+    def test_語にくっついた_preview_は承認の免除にならない(self):
+        """免除の理由になるのは、単独の語として立った `--preview` だけ。
+
+        別のフラグの**値**に書いた `--preview` で免除が成立していた。argparse は
+        `--reason=--preview` を値として食うので `--preview` は立たず、実行ファイルは
+        本物の `--approve` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
+        そこでズレる（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
+        """
+        for subject in [
+            "ccnavi --approve --reason=--preview",
+            "ccnavi --approve --digest=--preview",
+            "ccnavi --approve --preview=x",
+            "ccnavi --approve x--preview",
+            "uv run python -m ccnavi --approve --reason=--preview i0001",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+
+    def test_確かめる枝は今までどおり免除の側(self):
+        """`--approve --preview --verify` は免除の側。締めたことで巻き添えにしない。"""
+        for subject in [
+            "ccnavi --approve --preview --verify",
+            "ccnavi --approve --preview --verify i0001",
+            "ccnavi --approve --preview --verify --json i0001",
+        ]:
+            with self.subTest(subject=subject):
+                body = judge("Bash", subject)
+                self.assertNotIn("builtin-guard-ticket-approval", hit(body), body["rules"])
+
     def test_設定の場所の名前は語の中の目印でも終わる(self):
         # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
         # 数えないと、分ける前に止まっていた綴りが通るようになる。

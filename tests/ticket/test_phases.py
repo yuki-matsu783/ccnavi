@@ -173,7 +173,7 @@ class PhaseHarness(unittest.TestCase):
             env=environment,
         )
 
-    def hook(self, event, tool, cwd, mode="enable", agent_id="", **tool_input):
+    def hook(self, event, tool, cwd, mode="enable", agent_id="", permission_mode="", **tool_input):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -183,6 +183,10 @@ class PhaseHarness(unittest.TestCase):
         }
         if agent_id:
             payload["agent_id"] = agent_id
+        # Claude Code 側の権限モード。どのルールも言及しない呼び出しの結末がこれで変わる
+        # （judge.undeclared_verdict）ので、そこを見るテストだけが渡す。
+        if permission_mode:
+            payload["permission_mode"] = permission_mode
         return self.ccnavi("--mode", mode, stdin=json.dumps(payload))
 
     def reason(self, result):

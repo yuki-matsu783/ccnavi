@@ -61,6 +61,7 @@
 | [0049](0049-unwatched-gate.md) | 未宣言の呼び出しは判断できる相手が居るモード全部に委ね、確認できない側は設定で選ぶ |
 | [0050](0050-search-tools-and-ignore.md) | 探すツールが読むファイルの守りは、ルールに足さず 3 層に分ける |
 | [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
+| [0058](0058-not-root-placeholder.md) | ワークスペースの外は、先読みではなく展開で書く |
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
 | [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
@@ -97,6 +98,7 @@
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
 | [0058](0058-approval-is-the-place.md) | 承認の権威は置き場。記録の欄は必須にせず、承認の検査を判定でも当てる |
+| [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 
 ### 複数のリポジトリと VS Code 拡張
 

@@ -47,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import fsio, phasetypes, rules, settings, tree
+from . import fsio, modes, phasetypes, rules, settings, tree
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -830,7 +830,7 @@ def gather(
     if not pending and not revisions:
         return Gathered([], [], texts, {}, types, True, broken, "", note)
 
-    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved)
+    batch, rejected, pool = candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
@@ -860,7 +860,13 @@ def preview(
             stdout.write(gathered.note + "\n\n")
         stdout.write(gathered.text + "\n")
         return 0
-    body = {
+    stdout.write(json.dumps(_preview_body(root, gathered), ensure_ascii=False) + "\n")
+    return 0
+
+
+def _preview_body(root: str, gathered: Gathered) -> dict:
+    """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
+    return {
         "version": APPROVE_VERSION,
         "root": root,
         "generated_at": now(),
@@ -873,8 +879,148 @@ def preview(
         ],
         "problems": gathered.problems,
     }
-    stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-    return 0
+
+
+# `--verify` が返す理由。JSON の `verify.reason` に出る。
+VERIFY_OK = "ok"
+VERIFY_REFUSED = "refused"
+VERIFY_NOTHING = "nothing-pending"
+VERIFY_REJECTED = "rejected"
+
+
+@dataclass
+class Verdict:
+    """`--verify` の答え。通るかどうかと、その理由の名前と、端末に出す本文。"""
+
+    ok: bool
+    reason: str
+    text: str
+
+
+def verify(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    as_json: bool,
+    only: list[str] | None = None,
+) -> int:
+    """`--approve --preview --verify`。いま `--approve` を打てば通るかを、置かずに返す。
+
+    エージェントが提案を書いたあと、人に承認を頼む前に自分で確かめるための枝
+    （REQ-APV-13）。置かないところも端末を求めないところも `--preview` と同じで、
+    違うのは「通るかどうか」を終了コードと本文で言うこと。
+
+    答えを `--preview` 自身に持たせない理由。読む側（VS Code のボード拡張）は 0 以外を
+    失敗として扱うので、承認の対象にしない提案が 1 件あるだけで一覧を出せなくなる。
+    見せる枝と確かめる枝を分け、判定そのものは `gather` の 1 か所に置く。
+
+    通る = 指定したもの（指定が無ければ承認待ち全部）が、そのまま承認の対象に入る。
+    次のどれかがあれば通らない。
+
+    - 絞りが通らない（承認待ちに無い識別子、親の改版を外した子）
+    - 承認待ちが 1 件も無い。承認を頼む前の確認としては失敗で、
+      提案の置き場を間違えた回がここに出る
+    - 承認の対象にしない提案がある（`rejected`）
+
+    落とさないものが 2 つある。どちらも `--approve` が落とさないもので、ここで落とすと
+    「確かめは『いいえ』なのに承認は通る」という食い違いになる。
+
+    - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
+      書けない場所が残るのは伝える値打ちがあるから、その行に添えて見せる
+    - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
+      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。黙らせはせず、
+      件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
+
+    返すのは「はい」（0）か「いいえ」（`modes.EXIT_ANSWER_NO`）。使い方と設定の誤りで返す
+    1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が落ちる回が読む側から
+    区別できず、直すものが無いのに提案を直しに行くことになる。
+    """
+    gathered = gather(stderr, conf, root, only)
+    verdict = _verdict(gathered, conf.tickets)
+    if as_json:
+        body = _preview_body(root, gathered)
+        body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
+        stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+    else:
+        stdout.write(verdict.text)
+    return modes.EXIT_OK if verdict.ok else modes.EXIT_ANSWER_NO
+
+
+def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
+    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
+    head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
+    # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
+    # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
+    # そこで黙ると、置いたばかりの人に「todo/ に置け」とだけ言うことになる。
+    unreadable = _unreadable(gathered)
+    if gathered.refused:
+        return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
+    if gathered.nothing_pending:
+        text = (
+            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置く"
+            "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
+        )
+        return Verdict(False, VERIFY_NOTHING, head + text + unreadable)
+
+    lines = [head]
+    if gathered.note:
+        lines.append("\n" + gathered.note + "\n")
+    names = [c.ticket.ticket for c in gathered.batch] + [t.ticket for t, _ in gathered.rejected]
+    width = max((len(name) for name in names), default=0)
+    rows: list[tuple[str, str, list[str]]] = []
+    # 苦情の綴りから識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
+    # 同じものが出ている）。残すのは重さと中身。
+    for cand in gathered.batch:
+        notes = [f"{p.severity}: {p.detail}" for p in cand.complaints]
+        notes += [f"承認しても書けない: {p.detail}" for p in cand.overflow]
+        rows.append((cand.ticket.ticket, "通る", notes))
+    for t, complaints in gathered.rejected:
+        rows.append((t.ticket, "落ちる", [f"{p.severity}: {p.detail}" for p in complaints]))
+    lines.append("\n")
+    for name, mark, notes in sorted(rows):
+        lines.append(f"  {name.ljust(width)}  {mark}\n")
+        lines += [_note_line(note) for note in notes]
+
+    lines.append(unreadable)
+
+    if gathered.rejected:
+        reason = VERIFY_REJECTED
+        tail = (
+            f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
+            "提案を直してから、利用者に承認を依頼すること。\n"
+        )
+    else:
+        reason = VERIFY_OK
+        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。利用者に承認を依頼してよい。\n"
+    lines.append(tail)
+    return Verdict(reason == VERIFY_OK, reason, "".join(lines))
+
+
+def _unreadable(gathered: Gathered) -> str:
+    """読めなかったものを名指しする段。落ちた枝でも通った枝でも同じものを出す。
+
+    終了コードは動かさない。`--approve` も、承認待ちが 1 件も無いとき以外はこれで
+    止まらないので、ここで落とすと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
+    全ツリーを見るから、他のセッションの書きかけ 1 本で自分の提案が止まることにもなる。
+    黙らせもしない。自分が書いた 1 本かもしれないので、件数と綴りを本文に出す。
+    """
+    if not gathered.problems:
+        return ""
+    lines = [
+        f"\n読めなかったファイルが {len(gathered.problems)} 件ある"
+        "（提案か承認済みチケット。提案なら承認待ちに並ばない）。\n"
+    ]
+    lines += [_note_line(problem) for problem in gathered.problems]
+    lines.append("        いま書いた提案が混じっていないか確かめること。\n")
+    return "".join(lines)
+
+
+def _note_line(note: str) -> str:
+    """行の下に添える 1 件。改行を含む苦情（ルールの `message` は複数行を書ける）は、
+    2 行目からも同じだけ下げる。下げないと、次の行が新しい段落に見える。"""
+    head, *rest = note.splitlines() or [""]
+    return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
 def approval_digest(text: str, batch: list[Candidate]) -> str:
@@ -1157,14 +1303,19 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
-def _candidates(
+def candidates(
     root: str,
     conf: settings.Settings,
     pending: list[ticket_mod.Ticket],
     revisions: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
-    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。"""
+    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。
+
+    承認（`approve`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
+    ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が黙って弱くなる
+    （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に無言だった）。
+    """
     from . import phase
 
     open_index = by_id(approved)
