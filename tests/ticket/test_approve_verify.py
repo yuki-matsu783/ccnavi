@@ -162,7 +162,7 @@ class ApproveVerifyTest(PhaseHarness):
 
         result = self.verify()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("読めなかったもの", result.stdout)
+        self.assertIn("読めなかったファイル", result.stdout)
         self.assertIn("broken.md", result.stdout)
         self.assertIn("承認を依頼してよい", result.stdout)
         # 同じ状態で本物の承認も通る。確かめと承認の答えが割れないことが要点。
@@ -227,7 +227,7 @@ class ApproveVerifyTest(PhaseHarness):
         表に allow を 1 本足す形も試したが、`todo/` が「ccnavi が言及する場所」になり、
         どのタイプも言及しないときの倒し方（judge.undeclared_verdict）を通らなくなる。
         確認できる者が居ないモードの deny も、知らない綴りのモードを ask に倒す既定も、
-        そこだけ外れていた（ADR-0058）。**同じ場所とどのルールも言及しない場所が、
+        そこだけ外れていた（ADR-0059）。**同じ場所とどのルールも言及しない場所が、
         どの権限モードでも同じ判定になること**を杭にする。文は届いたままであることも見る。
         """
         todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0002.md")

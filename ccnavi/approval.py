@@ -896,7 +896,7 @@ def verify(
     - 承認の対象にしない提案がある（`rejected`）
 
     落とさないものが 2 つある。どちらも `--approve` が落とさないもので、ここで落とすと
-    「確かめでは いいえ、承認は 通る」という食い違いになる。
+    「確かめは『いいえ』なのに承認は通る」という食い違いになる。
 
     - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
       書けない場所が残るのは伝える値打ちがあるから、その行に添えて見せる
@@ -964,7 +964,7 @@ def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
         )
     else:
         reason = VERIFY_OK
-        tail = f"\n{len(gathered.batch)} 件とも承認の対象に入る。利用者に承認を依頼してよい。\n"
+        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。利用者に承認を依頼してよい。\n"
     lines.append(tail)
     return Verdict(reason == VERIFY_OK, reason, "".join(lines))
 
@@ -980,11 +980,11 @@ def _unreadable(gathered: Gathered) -> str:
     if not gathered.problems:
         return ""
     lines = [
-        f"\n読めなかったものが {len(gathered.problems)} 件ある"
-        "（提案か承認済みチケット。提案なら承認待ちにも並ばない）。\n"
+        f"\n読めなかったファイルが {len(gathered.problems)} 件ある"
+        "（提案か承認済みチケット。提案なら承認待ちに並ばない）。\n"
     ]
     lines += [_note_line(problem) for problem in gathered.problems]
-    lines.append("        自分が書いたものが混じっていないか見ること。\n")
+    lines.append("        いま書いた提案が混じっていないか確かめること。\n")
     return "".join(lines)
 
 
