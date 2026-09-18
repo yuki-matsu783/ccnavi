@@ -154,7 +154,8 @@ class ApproveVerifyTest(PhaseHarness):
         """読めない提案は終了コードを動かさない。`--approve` もそこでは落ちないから。
 
         走査は絞る前の全ツリーを見るので、ここで落とすと、他のセッションの書きかけ 1 本で
-        「確かめでは 1、承認は 0」になる。黙らせもしない（自分が書いた 1 本かもしれない）。
+        「確かめは『いいえ』なのに承認は通る」になる。黙らせもしない
+        （自分が書いた 1 本かもしれない）。
         """
         self.propose("i0001", parent_text("i0001", ["research"]))
         write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
