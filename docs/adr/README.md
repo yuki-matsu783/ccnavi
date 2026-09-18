@@ -64,7 +64,6 @@
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
 | [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
-| [0058](0058-check-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は組み込みの allow が渡す |
 
 ### 実行後の監視と自己防衛
 
@@ -97,6 +96,7 @@
 | [0053](0053-review-hold-naming.md) | 止めている状態は「ゲート」ではなく「レビュー準備中」「レビュー待ち」と呼ぶ |
 | [0054](0054-proposal-place-name.md) | 提案の置き場の既定を `wip/proposals` にする |
 | [0055](0055-ticket-moves-between-two-homes.md) | チケットは 2 つの置き場を行き来する 1 本のファイルにする |
+| [0058](0058-check-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 
 ### 複数のリポジトリと VS Code 拡張
 
