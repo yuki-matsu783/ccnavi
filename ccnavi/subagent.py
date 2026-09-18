@@ -163,6 +163,8 @@ def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
     添えないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
     戻せと言われても戻し先が分からない。
     """
+    if found.limit == phase.LIMIT_BLOCKED:
+        return f"（チケットが信じられない: {child.blocked}）"
     if found.limit == phase.LIMIT_TYPE and found.type is not None:
         return f"（種類 {found.type.title} の上限の外）"
     if found.limit == phase.LIMIT_PARENT:

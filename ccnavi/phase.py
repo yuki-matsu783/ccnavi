@@ -869,6 +869,8 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
 LIMIT_TICKET = "ticket"
 LIMIT_PARENT = "parent"
 LIMIT_TYPE = "type"
+# チケット自体が信じられない（`Ticket.blocked`）。範囲を当てる前に止める（ADR-0058）。
+LIMIT_BLOCKED = "blocked"
 
 # 範囲の外として止める判定。
 _OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
@@ -909,7 +911,13 @@ def scope_verdict(
     順は 子 → 親 → 種類。厳しい側が勝つので順は判定を変えないが、`limit` は最初に
     外へ出した上限を名指しする。種類の上限は allow か外しか言わない。子が ask と書いた
     場所が種類の中なら ask のまま。
+
+    その前に `blocked` を見る。承認のときにしか当たらなかった構造の検査に引っかかった
+    チケットは、範囲を当てても意味が無い（親が引けない子は、どの範囲で切り詰めるかが
+    決まらない）。範囲の中でも外でも止める（ADR-0058）。
     """
+    if child.blocked:
+        return ScopeVerdict(rules.DENY, LIMIT_BLOCKED, pt)
     verdict = child.decide(rel)
     limit = LIMIT_TICKET if verdict in _OUTSIDE else ""
     if parent is not None:

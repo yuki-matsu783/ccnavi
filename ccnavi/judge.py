@@ -347,15 +347,16 @@ def decide_before(
     # チケットが効くのは人が承認したあとだけで、承認画面が「ルールの allow も範囲の外では
     # 止まる」と言う。
     ticket_reason = ""
+    ticket_code = ""
     if verdict != rules.DENY:
         rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
-        ticket_decision, text, ticket_notice = ticket_verdict(
+        ticket_decision, text, ticket_notice, code = ticket_verdict(
             conf, root, payload.tool_name, record.subject, index, rule_hit
         )
         if ticket_notice:
             notices.append(ticket_notice)
         if STRENGTH[ticket_decision] > STRENGTH[verdict]:
-            verdict, ticket_reason = ticket_decision, text
+            verdict, ticket_reason, ticket_code = ticket_decision, text, code
             if ticket_reason:
                 # 判定を下したのは層を持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
@@ -419,7 +420,7 @@ def decide_before(
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
         # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
         texts = [ticket_reason]
-        record.code = reasons.CODE_TICKET_SCOPE
+        record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
         texts = [
             reasons.reason_for(
@@ -642,8 +643,11 @@ def ticket_verdict(
     full: str,
     index: dict[str, ticket_mod.Ticket] | None = None,
     rule_hit: tuple[str, str] | None = None,
-) -> tuple[str, str, str]:
-    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文と、注記。
+) -> tuple[str, str, str, str]:
+    """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
+
+    コードは空のことが多い。記録に残す綴りを呼び手が決められないとき（範囲の外ではなく
+    チケット自体が信じられないとき、ADR-0058）だけ、ここが名乗る。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
     同じ識別子の承認済みチケットで判定する。main の直下ならチケットは無く、ルールだけで判定する。
@@ -669,10 +673,10 @@ def ticket_verdict(
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
-        return "", "", ""
+        return "", "", "", ""
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
-        return "", "", ""
+        return "", "", "", ""
     if index is None:
         copies, _ = approval.scan(conf, root)
         index = approval.by_id(copies)
@@ -681,10 +685,10 @@ def ticket_verdict(
     # 「効いている」と言われながら判定では権限モード任せに落ちる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
-        return "", "", ""
+        return "", "", "", ""
     rel = tree.relative(t, full)
     if ticket_mod.is_unscoped(rel, conf.tickets, conf.approved):
-        return "", "", ""
+        return "", "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
     # phases.yml を開かない。
@@ -702,7 +706,29 @@ def ticket_verdict(
             )
     found = phase.scope_verdict(ticket, parent, pt, rel)
     if found.verdict == rules.ALLOW:
-        return rules.ALLOW, "", notice
+        return rules.ALLOW, "", notice, ""
+
+    if found.limit == phase.LIMIT_BLOCKED:
+        # 範囲の外に書いたのではなく、チケット自体が信じられない。範囲を見せても
+        # 直しようが無いので、代わりに引っかかった検査を名指しする（ADR-0058）。
+        return (
+            rules.DENY,
+            "\n".join(
+                [
+                    f"[ccnavi] {reasons.CODE_TICKET_BLOCKED} (source: {ticket.path})",
+                    f"subject: {full}",
+                    f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
+                    f"problem: {ticket.blocked}",
+                    "The approved ticket for this worktree does not hold together, so its work "
+                    "area is not in effect and every write here is blocked. Nothing you write "
+                    "can fix this: the user has to repair the approved ticket or where it sits. "
+                    "Tell them the problem line above and ask them to run 'ccnavi --lint', "
+                    "which names every ticket in this state.",
+                ]
+            ),
+            notice,
+            reasons.CODE_TICKET_BLOCKED,
+        )
 
     area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
     source = ticket.path
@@ -738,6 +764,7 @@ def ticket_verdict(
                 ]
             ),
             notice,
+            "",
         )
     # 上限ごとに次の一手が違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
@@ -772,6 +799,7 @@ def ticket_verdict(
         rules.DENY,
         "\n".join([f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})", *head, body]),
         notice,
+        "",
     )
 
 
