@@ -94,23 +94,24 @@ writing a proposal never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.
 
-Before asking the user to approve, the agent checks that the proposal it just
+Before asking the user to approve, the agent verifies that the proposal it just
 wrote is in a state that can be approved:
 
-    ccnavi --approve --preview --check [--json] [<id>...]
+    ccnavi --approve --preview --verify [--json] [<id>...]
 
-It places nothing and needs no terminal. Exit 0 means every named ticket (or
-every pending one, when no id is given) goes into the batch as it stands, so
-the user can be asked. Exit 1 means it does not: an id that is not pending, no
-pending ticket at all, or a proposal the approval drops. The reasons are printed
-per ticket.
+It places nothing and needs no terminal. Exit 0 is yes: every named ticket (or
+every pending one, when no id is given) goes into the batch as it stands, so the
+user can be asked. Exit 3 is no: an id that is not pending, no pending ticket at
+all, or a proposal the approval drops. The reasons are printed per ticket. Exit
+1 stays what it is everywhere else - a usage or settings error, not an answer -
+so a wrong spelling is never read as a proposal to fix.
 
-Two things do not fail the check, because --approve does not drop them either:
-scope that exceeds the parent or the phase type (writes there stay blocked after
-approval), and a proposal that cannot be read (the scan covers every worktree,
-before the ids narrow it, so another session's draft would fail it). Both are
-printed. Having nothing pending is the one place where the two differ: --approve
-calls that a success with nothing to do, the check calls it a failed check.
+Two things are not a no, because --approve does not drop them either: scope that
+exceeds the parent or the phase type (writes there stay blocked after approval),
+and a proposal that cannot be read (the scan covers every worktree, before the
+ids narrow it, so another session's draft would answer no). Both are printed.
+Having nothing pending is the one place where the two differ: --approve calls
+that a success with nothing to do, the verify calls it a no.
 
 The VS Code board extension approves from an overlay instead of the terminal:
 
@@ -240,7 +241,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--preview", action="store_true")
     # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。承認済みチケットは置かず、
     # 通るかどうかを終了コードで返す。エージェントが人に承認を頼む前に打つ。
-    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--verify", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
@@ -371,14 +372,14 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         # 確かめるだけの枝は `--preview` に相乗りする。単独で打てる形にすると、組み込みの
         # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--approve`
         # だけなので、エージェントが打てないものを案内することになる。
-        if args.check and not args.preview:
-            stderr.write("ccnavi: --check は --approve --preview と一緒に使う\n")
+        if args.verify and not args.preview:
+            stderr.write("ccnavi: --verify は --approve --preview と一緒に使う\n")
             return EXIT_ERROR
         # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
-        # 通るかどうかを終了コードで返すところ（REQ-APV-13）。
-        if args.check:
-            code = approval.check(stdout, stderr, conf, root, args.json, list(args.command))
-            return EXIT_OK if code == 0 else EXIT_ERROR
+        # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
+        # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
+        if args.verify:
+            return approval.verify(stdout, stderr, conf, root, args.json, list(args.command))
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
         # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:
