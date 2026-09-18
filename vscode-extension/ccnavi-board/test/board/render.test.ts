@@ -500,3 +500,17 @@ test("CB-T133 読み直せなかった画面にも承認のオーバーレイが
   assert.ok(escaped.includes("&lt;b&gt;"));
   assert.ok(escaped.includes("&lt;script&gt;"));
 });
+
+test("CB-T141 止まっているカードに「書き込み停止中」の札が出て、理由が tooltip と不備の行に載る", () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
+  const reason = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
+  const stopped: TicketJson = { ...child, blocked: reason };
+  const html = renderBoard(buildBoard({ ...base, tickets: [stopped] }), OPTIONS);
+
+  assert.match(html, /<span class="badge blocked" title="[^"]*作業中に無い[^"]*">書き込み停止中<\/span>/);
+  assert.match(html, /<li>書き込みが止まっている: [^<]*作業中に無い[^<]*<\/li>/);
+  // 止まっていないカードには出さない。
+  const clean = renderBoard(buildBoard(base), OPTIONS);
+  assert.equal(clean.includes("書き込み停止中"), false);
+});

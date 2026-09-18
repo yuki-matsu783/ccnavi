@@ -354,3 +354,31 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
   const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01", parent: "i0002" };
   assert.equal(cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] })).get("i0002-01")!.attention, true);
 });
+
+test("CB-T138 止まっているチケットは、不備の行に理由が出て注意を要する扱いになる", () => {
+  // 判定はこのチケットのワークツリーへの書き込みを全部止めるが、`copy.status` は `open` の
+  // ままなので、列からも承認済みの札からも分からない（ADR-0058）。
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
+  const stopped: TicketJson = { ...child, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" };
+  const parent = base.tickets.find((t) => t.ticket === "i0001")!;
+  const card = cardsOf(buildBoard({ ...base, tickets: [parent, stopped] })).get("i0001-02")!;
+
+  assert.equal(card.blocked, stopped.blocked);
+  assert.deepEqual(card.issues, [`書き込みが止まっている: ${stopped.blocked}`]);
+  assert.equal(card.attention, true);
+  // 列は今までどおり。止まっているのは書き込みであって、置き場は動いていない。
+  assert.equal(card.column, "doing");
+  assert.equal(card.copyStatus, "open");
+});
+
+test("CB-T139 止まっていないチケットは今までどおり、不備も注意も増えない", () => {
+  const cards = cardsOf(buildBoard(fixture()));
+  for (const card of cards.values()) {
+    assert.equal(card.blocked, "");
+    assert.equal(
+      card.issues.some((i) => i.startsWith("書き込みが止まっている")),
+      false,
+    );
+  }
+});

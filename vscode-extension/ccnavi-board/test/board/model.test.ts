@@ -97,3 +97,19 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
     assert.equal(p.review_waiting, false);
   }
 });
+
+test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出力でも落ちない", () => {
+  // 欄が無いのは、この欄より前の実行ファイルの出力。空なら止まっていないと読む。
+  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
+  const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
+  tickets[0].blocked = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
+  delete tickets[1].blocked;
+
+  const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  assert.match(parsed.board.tickets[0].blocked, /作業中に無い/);
+  assert.equal(parsed.board.tickets[1].blocked, "");
+});

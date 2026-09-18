@@ -107,6 +107,11 @@ export interface Card {
   readonly actions: readonly Action[];
   /** 読み手が気づくべき食い違い */
   readonly issues: readonly string[];
+  /**
+   * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（ADR-0058）。
+   * `copyStatus` は `open` のままなので、列や承認済みの札からは分からない。
+   */
+  readonly blocked: string;
   /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
   readonly mrUrl: string;
   readonly mrNumber: number | null;
@@ -191,6 +196,11 @@ function toCard(
   pending: ReadonlySet<string>,
 ): Card {
   const issues: string[] = [];
+  // 止まっていることは不備として挙げる。札は一目で分かる短い言葉しか出せないので、
+  // 理由の全文はここに置く（`attention` もこれで立つ）。
+  if (t.blocked !== "") {
+    issues.push(`書き込みが止まっている: ${t.blocked}`);
+  }
   const isParent = t.parent === "";
   const column = columnOf(t, issues);
   if (!isParent && !ids.has(t.parent)) {
@@ -261,6 +271,7 @@ function toCard(
     phases,
     actions,
     issues,
+    blocked: t.blocked,
     mrUrl: mr.url,
     mrNumber: mr.number,
     attention,
