@@ -242,26 +242,24 @@ function showError(current: PanelState, error: string): void {
 
 /**
  * いま見せるものを画面に渡す。どう渡るか（送る・入れ物ごと・作り直し中で持ち越し）は
- * `screenHost` が決める。ここが持つのは「1 度きりの絞り込みをいつ消すか」だけ。
+ * `screenHost` が決めて返す。ここが持つのは「1 度きりの絞り込みをいつ消すか」だけ。
  */
 function send(current: PanelState, data: BoardData): void {
   const filter = current.filter;
-  if (current.host.live) {
-    current.host.send(data);
-    // 届いたときだけ消す。届かないまま消すと「このプロジェクトで絞って開く」が二度と渡らない
-    if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
-      current.filter = undefined;
-    }
+  // 入れ物ごと入れ直す道になったときだけ、絞り込みを埋めたほうが使われる
+  const delivery = current.host.send(data, withFilter(data, filter));
+  if (delivery === "rebuilt") {
+    current.filter = undefined;
     return;
   }
-  if (current.host.reloading) {
+  if (delivery === "deferred") {
     // 作り直している最中。組み上がったら `ready` が届くので、そこで渡し直す（絞り込みも持ち越す）
-    current.host.send(data);
     return;
   }
-  // 入れ物ごと入れ直す道。1 度きりの絞り込みは HTML に埋めて渡す（postMessage は届かない）
-  current.host.send(withFilter(data, filter));
-  current.filter = undefined;
+  // 届いたときだけ消す。届かないまま消すと「このプロジェクトで絞って開く」が二度と渡らない
+  if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
+    current.filter = undefined;
+  }
 }
 
 /** 開いた直後に選ぶ絞り込み。入れ物に埋めて渡すときだけ使う */
@@ -307,6 +305,9 @@ function handleMessage(message: BoardMessage | undefined): void {
       // 作り直している間に見送った更新（send）も、絞り込みも、ここで届く
       current.host.ready();
       redraw(current);
+      // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
+      // `followAppearance` がそのとき送ったものは、捨てられた画面に落ちている
+      current.host.post({ type: "appearance", value: readAppearance() } satisfies ToBoard);
       return;
     case "refresh":
       void update();
@@ -596,6 +597,24 @@ async function showTicketPreview(filePath: string): Promise<void> {
   }
 }
 
+/**
+ * 形を確かめる操作の一覧。**`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。**
+ * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
+ * 足し忘れると、画面のボタンは押せるのに、届いたものが黙って捨てられる。
+ */
+const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
+  ready: true,
+  refresh: true,
+  open: true,
+  approve: true,
+  approveConfirm: true,
+  approveCancel: true,
+  promptCopy: true,
+  promptOpen: true,
+  accept: true,
+  reviewed: true,
+};
+
 function asMessage(message: unknown): BoardMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
@@ -608,6 +627,9 @@ function asMessage(message: unknown): BoardMessage | undefined {
     tickets?: unknown;
     filtered?: unknown;
   };
+  if (typeof m.type !== "string" || !(m.type in KNOWN)) {
+    return undefined;
+  }
   switch (m.type) {
     case "ready":
     case "refresh":

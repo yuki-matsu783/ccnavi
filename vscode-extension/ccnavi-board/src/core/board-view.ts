@@ -11,6 +11,7 @@
 import type { ApprovePreview } from "./approvemodel.js";
 import type { Appearance } from "./appearance.js";
 import type { Board } from "./board.js";
+import type { DataMessage } from "./screen-host.js";
 
 /**
  * 承認のオーバーレイの状態。拡張ホストが持ち、見せるたびに渡す。画面の中に持たないのは、
@@ -56,9 +57,9 @@ export type BoardData =
       readonly filter?: string;
     };
 
-/** 拡張ホスト → 画面 */
+/** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ） */
 export type ToBoard =
-  | { readonly type: "data"; readonly data: BoardData }
+  | DataMessage<BoardData>
   /** プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき */
   | { readonly type: "filter"; readonly project: string }
   | { readonly type: "appearance"; readonly value: Appearance };

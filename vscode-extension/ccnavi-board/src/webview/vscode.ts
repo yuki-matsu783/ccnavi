@@ -23,9 +23,12 @@ const api = acquireVsCodeApi();
 
 /**
  * 画面の契約で型を付けた送り口を作る。画面は自分の契約に無いものを送れない
- * （`post({ type: "打ち間違い" })` は型で止まる）
+ * （`post({ type: "打ち間違い" })` は型で止まる）。
+ *
+ * 既定を `never` にしてあるので、**型を渡し忘れた `poster()` は何も送れない**（呼ぶ側で型が合わない）。
+ * 既定を `ScreenMessage` にすると「`type` さえあれば何でも通る」送り口が黙って出来てしまう。
  */
-export function poster<M extends ScreenMessage>(): (message: M) => void {
+export function poster<M extends ScreenMessage = never>(): (message: M) => void {
   return (message) => api.postMessage(message);
 }
 
