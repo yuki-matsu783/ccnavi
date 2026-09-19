@@ -12,7 +12,7 @@
 | `guard` | 判定とルール（受入テスト、自己保護、運用のルール、フォールバック、実行後の監視、プロジェクト） | 約 60 秒 |
 | `config` | 設定の層の合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
-| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・運ぶ sh・ランチャー・clean） | 約 80 秒 |
+| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・運ぶ sh・取ってくる sh・ランチャー・clean） | 約 80 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から叩く。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
@@ -36,6 +36,7 @@ uv run python -m unittest discover -s tests -t .         # 全件
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-fetch.sh` | `sh` |
 | `.claude/hooks/test-py.sh` | `e2e` |
 | `tests/fixtures/` | `guard` `ticket` |
 | `vscode-extension/` | `ticket`（`core` の `test_test_json` も例を読む） |
@@ -45,7 +46,6 @@ uv run python -m unittest discover -s tests -t .         # 全件
 表に入れていないのはそのため。変えたら手で動かして確かめる。
 
 - `.claude/hooks/lint-py.sh`（`guard` の `test_fallback` がパスを文字列として使うだけで、実行しない）
-- `.ccnavi/scripts/ccnavi-fetch.sh`（テストから一度も呼ばれない）
 
 **全件を回すとき。**
 
