@@ -17,30 +17,23 @@ import {
   reviewedPrompt,
   type Launcher,
 } from "./core/commands.js";
-import { renderBoard, renderErrorPage, type ApprovalOverlay } from "./core/render.js";
+import type { ApprovalOverlay, BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
+import { renderBoardPage } from "./core/render.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { runInTerminal } from "./terminal.js";
+import { webviewScript } from "./webview-script.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
 
-type Message =
-  | { readonly type: "open"; readonly filePath: string }
-  | { readonly type: "refresh" }
-  | { readonly type: "approve"; readonly tickets: readonly string[]; readonly filtered: boolean }
-  | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
-  | { readonly type: "approveCancel" }
-  | { readonly type: "promptCopy" }
-  | { readonly type: "promptOpen" }
-  | { readonly type: "accept"; readonly parent: string; readonly phase: number }
-  | { readonly type: "reviewed"; readonly parent: string; readonly phase: number };
-
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   watchers: vscode.FileSystemWatcher[];
+  /** 1 枚目の HTML を入れたか。入れた後は、表に出ている間は postMessage で中身だけ渡す */
+  htmlSet: boolean;
   timer?: NodeJS.Timeout;
   board?: Board;
   /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
@@ -97,6 +90,14 @@ export async function openBoard(project?: string): Promise<void> {
     vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
   }
 
+  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  try {
+    webviewScript("board.js");
+  } catch (error) {
+    vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel("ccnaviBoard", "ccnavi ボード", vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -108,6 +109,7 @@ export async function openBoard(project?: string): Promise<void> {
     panel,
     folder,
     watchers: [],
+    htmlSet: false,
     loading: false,
     again: false,
     wasVisible: panel.visible,
@@ -218,43 +220,70 @@ async function update(): Promise<void> {
 }
 
 /**
- * ボードを描き直す。`webview.html` の差し替えは中身が同じ文字列だと何も起こらないが、
- * ここは毎回ちがう nonce を埋めるので必ず作り直される。「更新」を押して非活性にしたボタンが
- * 活性に戻るのはこの作り直しなので、nonce を固定したり HTML をキャッシュしたりすると
- * 「中身が変わらない読み直し」でボタンが「更新中」のまま固まる。
+ * ボードを見せる。中身を渡すのは `send`。
  */
 function show(current: PanelState, board: Board): void {
   current.board = board;
   current.error = undefined;
-  current.panel.webview.html = renderBoard(board, {
-    nonce: crypto.randomBytes(16).toString("base64"),
-    approval: current.approval,
-    appearance: readAppearance(),
-  });
-  if (current.filter !== undefined) {
-    // HTML の差し替えの後に届く。Webview の中のスクリプトが select を合わせる。
-    void current.panel.webview.postMessage({ type: "filter", project: current.filter });
-    current.filter = undefined;
-  }
+  send(current, { kind: "board", board, approval: current.approval });
 }
 
 /** 読み直せなかったことを見せる。承認のオーバーレイがあれば、ボードのときと同じように被せる */
 function showError(current: PanelState, error: string): void {
   current.error = error;
-  current.panel.webview.html = renderErrorPage(error, {
-    nonce: crypto.randomBytes(16).toString("base64"),
-    approval: current.approval,
-    appearance: readAppearance(),
-  });
+  send(current, { kind: "error", error, approval: current.approval });
 }
 
-function handleMessage(message: Message | undefined): void {
+/**
+ * いま見せるものを画面に渡す。
+ *
+ * 1 枚目は HTML ごと入れる。2 枚目からは、表に出ている間は `postMessage` で中身だけ渡し、
+ * React に要るところだけ描き直させる。HTML を入れ直すと画面が作り直されるので、開いている
+ * オーバーレイの焦点も、畳んだ列も、途中のスクロールも飛ぶ。
+ *
+ * 裏に回っている間は別で、HTML を入れ直す。`retainContextWhenHidden` が偽なので画面は捨てられていて、
+ * postMessage は誰にも届かない。表に戻ったとき VS Code はここで入れた HTML から作り直すので、
+ * 入れておけば戻った瞬間に新しい中身が出る。nonce は毎回変わるので、中身が同じでも作り直される。
+ */
+function send(current: PanelState, data: BoardData): void {
+  const filter = current.filter;
+  current.filter = undefined;
+  if (current.htmlSet && current.panel.visible) {
+    const message: ToBoard = { type: "data", data };
+    void current.panel.webview.postMessage(message);
+    if (filter !== undefined) {
+      const pick: ToBoard = { type: "filter", project: filter };
+      void current.panel.webview.postMessage(pick);
+    }
+    return;
+  }
+  // 1 枚目の絞り込みは HTML に埋めて渡す。postMessage は画面が組み上がる前に出すと届かない
+  current.panel.webview.html = renderBoardPage(withFilter(data, filter), {
+    nonce: crypto.randomBytes(16).toString("base64"),
+    script: webviewScript("board.js"),
+    appearance: readAppearance(),
+  });
+  current.htmlSet = true;
+}
+
+function withFilter(data: BoardData, filter: string | undefined): BoardData {
+  if (filter === undefined) {
+    return data;
+  }
+  return data.kind === "board" ? { ...data, filter } : { ...data, filter };
+}
+
+function handleMessage(message: BoardMessage | undefined): void {
   const current = state;
   if (message === undefined || current === undefined) {
     return;
   }
   const root = current.folder.uri.fsPath;
   switch (message.type) {
+    case "ready":
+      // 裏から表へ戻って作り直された画面。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す
+      redraw(current);
+      return;
     case "refresh":
       void update();
       return;
@@ -536,7 +565,7 @@ async function showTicketPreview(filePath: string): Promise<void> {
   }
 }
 
-function asMessage(message: unknown): Message | undefined {
+function asMessage(message: unknown): BoardMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
@@ -549,6 +578,7 @@ function asMessage(message: unknown): Message | undefined {
     filtered?: unknown;
   };
   switch (m.type) {
+    case "ready":
     case "refresh":
     case "approveCancel":
     case "promptCopy":

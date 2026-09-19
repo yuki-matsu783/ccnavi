@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  // 入口から辿れるものだけを見る。core は拡張ホストと分け合っていて、Node の API を使う
+  // ファイル（commands.ts など）もある。画面が読むのは import で辿れるぶんだけ
+  "include": ["src/webview/**/*.ts", "src/webview/**/*.tsx"]
+}
