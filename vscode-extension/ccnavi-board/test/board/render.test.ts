@@ -506,7 +506,9 @@ test("CB-T141 止まっているカードに「書き込み停止中」の札が
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const reason = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";
   const stopped: TicketJson = { ...child, blocked: reason };
-  const html = renderBoard(buildBoard({ ...base, tickets: [stopped] }), OPTIONS);
+  // 親も渡す。外すと「親が見つからない」不備も同時に出て、見たい不備が 1 つに絞れない。
+  const parent = base.tickets.find((t) => t.ticket === "i0001")!;
+  const html = renderBoard(buildBoard({ ...base, tickets: [parent, stopped] }), OPTIONS);
 
   assert.match(html, /<span class="badge blocked" title="[^"]*作業中に無い[^"]*">書き込み停止中<\/span>/);
   assert.match(html, /<li>書き込みが止まっている: [^<]*作業中に無い[^<]*<\/li>/);
