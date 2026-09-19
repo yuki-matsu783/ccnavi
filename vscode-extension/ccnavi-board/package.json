@@ -122,13 +122,13 @@
   "scripts": {
     "compile": "node scripts/clean-out.js && tsc -p . && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node scripts/bundle.js",
     "test": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/**/*.test.js\"",
-    "test:board": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/board/*.test.js\"",
+    "test:board": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/board/*.test.js\"",
     "test:rules": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/rules/*.test.js\"",
     "test:risk": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/risk/*.test.js\"",
     "test:phases": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/phases/*.test.js\"",
     "test:projects": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/projects/*.test.js\"",
-    "test:shared": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/shared/*.test.js\"",
-    "test:dom": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/**/*.dom.test.js\"",
+    "test:shared": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/shared/*.test.js\"",
+    "test:dom": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/**/*.dom.test.js\"",
     "package": "sh scripts/package.sh",
     "clean": "node scripts/clean.js"
   },
