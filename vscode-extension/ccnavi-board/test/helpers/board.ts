@@ -14,6 +14,7 @@ import { buildBoard } from "../../src/core/board.js";
 import type { ApprovalOverlay, BoardData } from "../../src/core/board-view.js";
 import type { BoardJson } from "../../src/core/model.js";
 import { renderBoardPage, type RenderOptions } from "../../src/core/render.js";
+import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
 import { loadPage, type DomPage } from "./dom.js";
 import { fixture } from "./fixture.js";
 
@@ -52,4 +53,14 @@ export async function openBoard(
   extra: { readonly approval?: ApprovalOverlay; readonly filter?: string; readonly state?: unknown } = {},
 ): Promise<DomPage> {
   return openPage({ kind: "board", board: buildBoard(json), approval: extra.approval, filter: extra.filter }, extra.state);
+}
+
+/** 承認画面の見本（`--approve --preview --json` の出力そのもの）。Python 側の tests/ticket/test_approve_json.py が書き出す */
+export function approvePreview(): ApprovePreview {
+  const text = fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
+  const parsed = parseApprovePreview(text);
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+  return parsed.value;
 }

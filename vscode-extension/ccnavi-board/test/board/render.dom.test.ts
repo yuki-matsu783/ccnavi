@@ -6,25 +6,13 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
 import { buildBoard } from "../../src/core/board.js";
 import { escapeHtml } from "../../src/core/render.js";
 import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
-import { NONCE, boardPage, openBoard, openPage } from "../helpers/board.js";
+import { NONCE, approvePreview, boardPage, openBoard, openPage } from "../helpers/board.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
-
-function approvePreview(): ApprovePreview {
-  const text = fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
-  const parsed = parseApprovePreview(text);
-  if (!parsed.ok) {
-    throw new Error(parsed.error);
-  }
-  return parsed.value;
-}
 
 /** 見本のボードの HTML。CSS と nonce を文字列で見るときに使う */
 function html(): string {
@@ -50,6 +38,10 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     const confirm = page.one('button[data-action="approve-confirm"]');
     assert.equal(confirm.getAttribute("data-tickets"), "i0001,i0001-01,i0001-02");
     assert.equal(confirm.textContent, "この 3 件を承認する");
+    // 見せた識別子をそのまま送る（属性に持たせるだけでなく、押したときの中身も見る）
+    page.click(confirm);
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "approveConfirm", tickets: ["i0001", "i0001-01", "i0001-02"] });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     const body = text(page, "pre.approval-text");
     assert.ok(body.startsWith("Ticket 承認リクエスト"));
@@ -175,6 +167,8 @@ test("CB-T12 4 列と件数と承認ボタンを出す", async () => {
     assert.equal(page.all(".column").length, 4);
     assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
     assert.equal(text(page, ".summary .pending"), "承認待ち 1 件");
+    // 色が付くのは warn を持つものだけ（.summary .warn）
+    assert.ok(page.one(".summary .pending").classList.contains("warn"));
     // 0 件のものは見出しに出さない
     assert.equal(page.all(".summary .issues").length, 0);
     const approve = page.one<HTMLButtonElement>('.controls button[data-action="approve"]');
@@ -203,10 +197,15 @@ test("CB-T12b 列ごとに畳むボタンを出す", async () => {
 test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固定幅に縛られない", async () => {
   const page = await openBoard();
   try {
-    for (const column of page.all(".column")) {
-      const visible = column.querySelectorAll(".card:not(.hidden)").length;
-      assert.equal(column.querySelector(":scope > h2 > .count")?.textContent, String(visible), column.getAttribute("data-state") ?? "");
-    }
+    const counts = (): string[] => page.all(".column").map((column) => column.querySelector(":scope > h2 > .count")?.textContent ?? "");
+    const visible = (): string[] =>
+      page.all(".column").map((column) => String(column.querySelectorAll(".card:not(.hidden)").length));
+    assert.deepEqual(counts(), visible());
+    // 絞り込んだ後も、見えているカードの数。全件のままにすると合わなくなる
+    page.click(page.one("#attention-filter"));
+    await page.settle();
+    assert.deepEqual(counts(), visible());
+    assert.notDeepEqual(counts(), ["1", "3", "1", "1"], "絞る前の数のままではない");
   } finally {
     await page.close();
   }
@@ -217,12 +216,18 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
 test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、その識別子を送る。上部の集計は絞らない", async () => {
   const page = await openBoard();
   try {
-    // 上部の集計は絞り込みに関わらずボード全体の数
     assert.equal(text(page, ".summary .pending"), "承認待ち 1 件");
+    assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
     // 識別子と「絞り込み中か」を別々に送る。空の並びを「全部」に読ませない
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-03"], filtered: false });
+    // 絞り込んでも上部の集計はボード全体の数のまま（変わるのはボタンの数だけ）
+    page.click(page.one("#attention-filter"));
+    await page.settle();
+    assert.equal(text(page, ".summary .pending"), "承認待ち 1 件");
+    assert.equal(text(page, ".summary .counts"), "残り 4 / 全 6");
+    assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').textContent, "承認待ち 1 件を承認");
   } finally {
     await page.close();
   }
@@ -308,9 +313,10 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
     assert.equal(page.all(".fact.cancelled").length, 0);
     // 取り消した子にはワークツリーが無いが、閉じているので「ワークツリーなし」の札は出ない
     assert.equal(page.all(".badge.worktree.none").length, 1);
-    assert.ok(page.one(".fact.review").getAttribute("title") !== "");
     assert.equal(text(page, ".fact.review"), "人レビュー要");
+    assert.ok((page.one(".fact.review").getAttribute("title") ?? "").length > 0, "レビューの要否は理由を tooltip に持つ");
     assert.equal(text(page, ".fact.worktree:not(.none)"), "ワークツリー i0001");
+    assert.match(page.one(".fact.worktree:not(.none)").getAttribute("title") ?? "", /i0001/);
     assert.match(text(page, ".fact.sha"), /^base [0-9a-f]{7}$/);
     assert.match(page.one(".fact.sha").getAttribute("title") ?? "", /^[0-9a-f]+$/);
     assert.ok(texts(page, ".fact.risk.risk-low").includes("リスク LOW（0 点）"));

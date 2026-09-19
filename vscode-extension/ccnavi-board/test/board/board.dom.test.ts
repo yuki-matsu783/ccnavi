@@ -8,8 +8,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
 import { fixture } from "../helpers/fixture.js";
-import { openBoard, openPage } from "../helpers/board.js";
-import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
+import { approvePreview, openBoard, openPage } from "../helpers/board.js";
+import type { Element, Event, HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { DomPage } from "../helpers/dom.js";
 
 test("CB-D40 列の見出しを押すと畳み、state に列名が入る。読み直しても畳んだまま", async () => {
   const page = await openBoard();
@@ -214,23 +215,169 @@ test("CB-D47 裏から表に戻って作り直された画面は、いまの中�
   }
 });
 
-test("CB-D48 プロジェクトの絞り込みは、拡張ホストからの指定でも効く。候補に無ければ「すべて」のまま", async () => {
-  const json = { ...fixture(), projects: ["lib", "app"] };
+test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定でも効き、覚える。候補に無ければ今の絞りを外さない", async () => {
+  const base = fixture();
+  // lib のカードを 1 枚足す。絞ったときに他が隠れることを見る
+  const mine = { ...base.tickets[0], ticket: "i0002", title: "lib の親", project: "lib" };
+  const json = { ...base, projects: ["lib", "app"], tickets: [...base.tickets, mine] };
   const page = await openBoard(json, { filter: "lib" });
   try {
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "lib");
     assert.ok(page.document.body.classList.contains("filtering"));
+    // 指定されたプロジェクトのカードだけが残る
+    assert.ok(!page.one('.card[data-id="i0002"]').classList.contains("hidden"));
+    assert.ok(page.one('.card[data-id="i0001"]').classList.contains("hidden"));
+    // 人が触らなくても覚える。裏に回って作り直されたときに絞りが戻ってしまわないように
+    assert.equal((page.state() as { project: string }).project, "lib");
     await page.send({ type: "filter", project: "app" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
+    assert.equal((page.state() as { project: string }).project, "app");
+    // 候補に無い名前では何も動かさない（いまの絞りを外さない）
     await page.send({ type: "filter", project: "無い名前" });
-    assert.equal(page.one<HTMLInputElement>("#project-filter").value, "*");
-    assert.ok(!page.document.body.classList.contains("filtering"));
+    assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
+    assert.equal((page.state() as { project: string }).project, "app");
     // ワークスペース本体（空）も候補。覚え直しても「すべて」に落ちない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");
     assert.equal((page.state() as { project: string }).project, "");
     assert.ok(page.document.body.classList.contains("filtering"));
+    page.change(page.one("#project-filter"), "*");
+    await page.settle();
+    assert.ok(!page.document.body.classList.contains("filtering"));
+  } finally {
+    await page.close();
+  }
+  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース本体」も効かせない
+  // （解除する手立てが画面に無いまま「絞り込み中」になってしまう）
+  const without = await openBoard(fixture(), { state: { project: "" } });
+  try {
+    assert.equal(without.all("#project-filter").length, 0);
+    assert.ok(!without.document.body.classList.contains("filtering"));
+  } finally {
+    await without.close();
+  }
+});
+
+test("CB-D49 承認のオーバーレイは Esc で閉じる。承認している最中は閉じない", async () => {
+  const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "文" } });
+  try {
+    page.key("Escape");
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "approveCancel" });
+    // 他のキーでは閉じない
+    const sent = page.posted.length;
+    page.key("a");
+    await page.settle();
+    assert.equal(page.posted.length, sent);
+  } finally {
+    await page.close();
+  }
+  // 承認している最中は取り返しがつかないので、Esc を受けない
+  const approving = await openBoard(fixture(), {
+    approval: { kind: "approving", preview: approvePreview() },
+  });
+  try {
+    const sent = approving.posted.length;
+    approving.key("Escape");
+    await approving.settle();
+    assert.equal(approving.posted.length, sent);
+  } finally {
+    await approving.close();
+  }
+  // オーバーレイが無ければ、Esc は何も起こさない
+  const plain = await openBoard();
+  try {
+    const sent = plain.posted.length;
+    plain.key("Escape");
+    await plain.settle();
+    assert.equal(plain.posted.length, sent);
+  } finally {
+    await plain.close();
+  }
+});
+
+test("CB-D50 カードは Enter でも開く。ボタンやリンクの上では開かない", async () => {
+  const page = await openBoard();
+  try {
+    page.key("Enter", page.one('.card[data-id="i0001-01"]'));
+    await page.settle();
+    assert.equal(page.posted.at(-1)?.type, "open");
+    const sent = page.posted.length;
+    // カードの中のボタンの上で押しても、提案は開かない
+    page.key("Enter", page.one('button[data-action="approve-one"]'));
+    await page.settle();
+    assert.equal(page.posted.length, sent);
+    // 他のキーでは開かない
+    page.key("a", page.one('.card[data-id="i0001-01"]'));
+    await page.settle();
+    assert.equal(page.posted.length, sent);
+  } finally {
+    await page.close();
+  }
+});
+
+/** 取っ手を押して動かして離す。動かす量を渡さなければ、押して離すだけ */
+function drag(page: DomPage, handle: Element, to?: number): void {
+  const window = page.window as unknown as { PointerEvent: new (type: string, init: Record<string, unknown>) => Event };
+  const event = (type: string, clientX: number): Event => new window.PointerEvent(type, { bubbles: true, button: 0, clientX, pointerId: 1 });
+
+  handle.dispatchEvent(event("pointerdown", 0));
+  if (to !== undefined) {
+    handle.dispatchEvent(event("pointermove", to));
+  }
+  handle.dispatchEvent(event("pointerup", to ?? 0));
+}
+
+test("CB-D51 列の幅は取っ手のドラッグで決まって覚え、押しただけでは決まらない。ダブルクリックで戻る", async () => {
+  const page = await openBoard();
+  try {
+    const column = (): Element => page.one('.column[data-state="done"]');
+    const handle = page.one('.resizer[data-resize="done"]');
+    // 押して離すだけ（動かしていない）なら、幅は決めない。押しただけで窓幅への追従が切れると困る
+    drag(page, handle);
+    await page.settle();
+    assert.ok(!column().classList.contains("sized"));
+    assert.deepEqual((page.state() as { widths?: Record<string, number> }).widths ?? {}, {});
+    // ドラッグしたら px で固定し、覚える
+    drag(page, handle, 320);
+    await page.settle();
+    assert.ok(column().classList.contains("sized"));
+    assert.equal((column() as unknown as { style: { width: string } }).style.width, "320px");
+    assert.deepEqual((page.state() as { widths: Record<string, number> }).widths, { done: 320 });
+    // ダブルクリックで元の伸び縮みに戻る
+    const Plain = (page.window as unknown as { Event: new (type: string, init: unknown) => Event }).Event;
+    page.one('.resizer[data-resize="done"]').dispatchEvent(new Plain("dblclick", { bubbles: true }));
+    await page.settle();
+    assert.ok(!column().classList.contains("sized"));
+    assert.equal((column() as unknown as { style: { width: string } }).style.width, "");
+    assert.deepEqual((page.state() as { widths: Record<string, number> }).widths, {});
+  } finally {
+    await page.close();
+  }
+  // 覚えていた幅は、読み直した画面でも効く
+  const again = await openBoard(fixture(), { state: { widths: { done: 280 } } });
+  try {
+    const column = again.one('.column[data-state="done"]');
+    assert.ok(column.classList.contains("sized"));
+    assert.equal((column as unknown as { style: { width: string } }).style.width, "280px");
+  } finally {
+    await again.close();
+  }
+});
+
+test("CB-D52 ドラッグの途中で列が消えても、掴んだままの印を残さない", async () => {
+  const page = await openBoard();
+  try {
+    const window = page.window as unknown as { PointerEvent: new (type: string, init: Record<string, unknown>) => Event };
+    page.one('.resizer[data-resize="done"]').dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, pointerId: 1 }));
+    await page.settle();
+    assert.ok(page.document.body.classList.contains("resizing"));
+    // 読み直せずエラーの画面に替わると列ごと消え、pointerup を受ける相手が居なくなる。
+    // 印が残ると、カーソルが col-resize のまま文字も選べなくなる
+    await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
+    assert.equal(page.all(".column").length, 0);
+    assert.ok(!page.document.body.classList.contains("resizing"));
   } finally {
     await page.close();
   }
