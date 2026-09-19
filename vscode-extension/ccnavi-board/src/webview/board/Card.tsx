@@ -5,7 +5,7 @@
 import type { JSX } from "react";
 
 import type { Action, Card, PhaseChip } from "../../core/board.js";
-import { post } from "../vscode.js";
+import { post } from "./post.js";
 import {
   COPY_LABELS,
   MARK_LABELS,

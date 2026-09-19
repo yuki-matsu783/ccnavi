@@ -8,7 +8,7 @@ import { useEffect, useRef, type JSX } from "react";
 
 import type { ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
-import { post } from "../vscode.js";
+import { post } from "./post.js";
 
 export function Approval({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element {
   const box = useRef<HTMLElement>(null);

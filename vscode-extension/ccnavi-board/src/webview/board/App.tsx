@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
-import { post } from "../vscode.js";
+import { post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
 import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
