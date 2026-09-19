@@ -19,6 +19,7 @@ import {
 } from "./core/commands.js";
 import type { ApprovalOverlay, BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
+import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { runInTerminal } from "./terminal.js";
@@ -32,13 +33,8 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   watchers: vscode.FileSystemWatcher[];
-  /** 1 枚目の HTML を入れたか。入れた後は、表に出ている間は postMessage で中身だけ渡す */
-  htmlSet: boolean;
-  /**
-   * 画面が組み上がって（`ready` が届いて）postMessage を受け取れる状態か。
-   * HTML を入れた直後と裏に回った後は偽。作り直している最中に送ったものは誰にも届かない
-   */
-  mounted: boolean;
+  /** 画面に中身を渡す段取り（`core/screen-host.ts`）。いつ送れるかはここが持つ */
+  readonly host: ScreenHost<BoardData>;
   timer?: NodeJS.Timeout;
   board?: Board;
   /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
@@ -114,8 +110,7 @@ export async function openBoard(project?: string): Promise<void> {
     panel,
     folder,
     watchers: [],
-    htmlSet: false,
-    mounted: false,
+    host: boardHost(panel),
     loading: false,
     again: false,
     wasVisible: panel.visible,
@@ -149,7 +144,7 @@ function registerPanelHandlers(current: PanelState): void {
     if (!panel.visible) {
       // `retainContextWhenHidden` は偽なので、裏に回った画面は捨てられる。表に戻ると
       // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
-      current.mounted = false;
+      current.host.hidden();
     }
     if (becameVisible) {
       void update();
@@ -246,49 +241,58 @@ function showError(current: PanelState, error: string): void {
 }
 
 /**
- * いま見せるものを画面に渡す。
- *
- * 1 枚目は HTML ごと入れる。2 枚目からは、表に出ている間は `postMessage` で中身だけ渡し、
- * React に要るところだけ描き直させる。HTML を入れ直すと画面が作り直されるので、開いている
- * オーバーレイの焦点も、畳んだ列も、途中のスクロールも飛ぶ。
- *
- * 裏に回っている間は別で、HTML を入れ直す。`retainContextWhenHidden` が偽なので画面は捨てられていて、
- * postMessage は誰にも届かない。表に戻ったとき VS Code はここで入れた HTML から作り直すので、
- * 入れておけば戻った瞬間に新しい中身が出る。nonce は毎回変わるので、中身が同じでも作り直される。
+ * いま見せるものを画面に渡す。どう渡るか（送る・入れ物ごと・作り直し中で持ち越し）は
+ * `screenHost` が決める。ここが持つのは「1 度きりの絞り込みをいつ消すか」だけ。
  */
 function send(current: PanelState, data: BoardData): void {
-  if (current.htmlSet && current.panel.visible) {
-    // 作り直している最中は送らない。受け口（画面の message のリスナ）はまだ無く、送っても落ちる。
-    // 組み上がったら `ready` が届き、そこで渡し直す
-    if (!current.mounted) {
-      return;
-    }
-    const message: ToBoard = { type: "data", data };
-    void current.panel.webview.postMessage(message);
-    if (current.filter !== undefined) {
-      const pick: ToBoard = { type: "filter", project: current.filter };
-      void current.panel.webview.postMessage(pick);
+  const filter = current.filter;
+  if (current.host.live) {
+    current.host.send(data);
+    // 届いたときだけ消す。届かないまま消すと「このプロジェクトで絞って開く」が二度と渡らない
+    if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
       current.filter = undefined;
     }
     return;
   }
-  // 1 枚目と、裏に回っている間。絞り込みは HTML に埋めて渡す（postMessage は届かない）
-  current.panel.webview.html = renderBoardPage(withFilter(data, current.filter), {
-    nonce: crypto.randomBytes(16).toString("base64"),
-    script: webviewScript("board.js"),
-    appearance: readAppearance(),
-  });
+  if (current.host.reloading) {
+    // 作り直している最中。組み上がったら `ready` が届くので、そこで渡し直す（絞り込みも持ち越す）
+    current.host.send(data);
+    return;
+  }
+  // 入れ物ごと入れ直す道。1 度きりの絞り込みは HTML に埋めて渡す（postMessage は届かない）
+  current.host.send(withFilter(data, filter));
   current.filter = undefined;
-  current.htmlSet = true;
-  current.mounted = false;
+}
+
+/** 開いた直後に選ぶ絞り込み。入れ物に埋めて渡すときだけ使う */
+function withFilter(data: BoardData, filter: string | undefined): BoardData {
+  return filter === undefined ? data : { ...data, filter };
 }
 
 /**
- * 開いた直後に選ぶ絞り込み。**届く経路で渡すまで消さない。** 消してから送ると、
- * 作り直している最中の画面に落ちたときに二度と渡らず、「このプロジェクトで絞って開く」が効かない
+ * ボードの画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
+ * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
  */
-function withFilter(data: BoardData, filter: string | undefined): BoardData {
-  return filter === undefined ? data : { ...data, filter };
+function boardHost(panel: vscode.WebviewPanel): ScreenHost<BoardData> {
+  return screenHost<BoardData>(
+    {
+      get visible(): boolean {
+        return panel.visible;
+      },
+      html(text: string): void {
+        panel.webview.html = text;
+      },
+      post(message: unknown): void {
+        void panel.webview.postMessage(message);
+      },
+    },
+    (data) =>
+      renderBoardPage(data, {
+        nonce: crypto.randomBytes(16).toString("base64"),
+        script: webviewScript("board.js"),
+        appearance: readAppearance(),
+      }),
+  );
 }
 
 function handleMessage(message: BoardMessage | undefined): void {
@@ -300,8 +304,8 @@ function handleMessage(message: BoardMessage | undefined): void {
   switch (message.type) {
     case "ready":
       // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
-      // 作り直している間に見送った更新（send）も、ここで届く
-      current.mounted = true;
+      // 作り直している間に見送った更新（send）も、絞り込みも、ここで届く
+      current.host.ready();
       redraw(current);
       return;
     case "refresh":
@@ -380,6 +384,13 @@ function handleMessage(message: BoardMessage | undefined): void {
         prompt: reviewedPrompt(realRoot(root), message.parent, message.phase, chip.label, tree, chip.mrUrl),
       };
       redraw(current);
+      return;
+    }
+    default: {
+      // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
+      // 画面のボタンだけ足して受け側を忘れる、を止める
+      const unhandled: never = message;
+      void unhandled;
       return;
     }
   }
