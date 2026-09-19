@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
-import { PAGE_STYLE } from "../../src/core/render.js";
+import { PAGE_STYLE } from "../../src/core/styles.js";
 import { renderRulesPage } from "../../src/core/rules-render.js";
 import { readRules } from "../../src/core/rules-doc.js";
 import { renderRiskPage } from "../../src/core/risk-render.js";

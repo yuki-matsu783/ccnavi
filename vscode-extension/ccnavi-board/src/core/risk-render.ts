@@ -12,7 +12,8 @@
  */
 import type { Lock } from "./lock.js";
 import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
-import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
+import { LIST_STYLE, PAGE_STYLE } from "./styles.js";
+import { escapeHtml } from "./html.js";
 import { BUILTIN_LEVELS, KINDS, LEVEL_NAMES, type RiskModel } from "./risk-doc.js";
 
 export interface RiskPage {

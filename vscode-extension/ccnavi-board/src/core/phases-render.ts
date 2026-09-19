@@ -13,7 +13,8 @@
 import type { Lock } from "./lock.js";
 import { PHASE_KINDS, REVIEWS, type PhasesModel } from "./phases-doc.js";
 import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
-import { LIST_STYLE, PAGE_STYLE, escapeHtml } from "./render.js";
+import { LIST_STYLE, PAGE_STYLE } from "./styles.js";
+import { escapeHtml } from "./html.js";
 
 export interface PhasesPage {
   readonly root: string;

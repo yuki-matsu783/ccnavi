@@ -8,7 +8,8 @@
 import type { LintProblem } from "./lintmodel.js";
 import type { ProjectRow, ProjectsPage, Stray } from "./projects.js";
 import { APPEARANCE_SCRIPT, type Appearance, bodyTag } from "./appearance.js";
-import { PAGE_STYLE, escapeHtml } from "./render.js";
+import { PAGE_STYLE } from "./styles.js";
+import { escapeHtml } from "./html.js";
 
 export interface RenderOptions {
   readonly nonce: string;

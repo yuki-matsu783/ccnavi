@@ -36,7 +36,7 @@ import {
   type ProjectsPage,
 } from "./core/projects.js";
 import { renderProjectsPage } from "./core/projects-render.js";
-import { escapeHtml } from "./core/render.js";
+import { escapeHtml } from "./core/html.js";
 import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";

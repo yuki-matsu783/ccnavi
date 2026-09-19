@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
-import { escapeHtml } from "../../src/core/render.js";
+import { escapeHtml } from "../../src/core/html.js";
 import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 import { NONCE, approvePreview, boardPage, openBoard, openPage } from "../helpers/board.js";
