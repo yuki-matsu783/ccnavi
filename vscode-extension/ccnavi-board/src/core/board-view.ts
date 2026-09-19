@@ -42,7 +42,11 @@ export type BoardData =
       readonly kind: "board";
       readonly board: Board;
       readonly approval?: ApprovalOverlay;
-      /** 開いた直後に選ぶプロジェクトの絞り込み。プロジェクト管理画面からの導線でだけ入る */
+      /**
+       * 開いた直後に選ぶプロジェクトの絞り込み。プロジェクト管理画面からの導線でだけ入る。
+       * 入るのは 1 枚目の HTML に埋めるときだけで、`ToBoard` の `data` では渡さない
+       * （画面が組み上がった後は `filter` のメッセージで渡す）
+       */
       readonly filter?: string;
     }
   | {

@@ -34,6 +34,11 @@ interface PanelState {
   watchers: vscode.FileSystemWatcher[];
   /** 1 枚目の HTML を入れたか。入れた後は、表に出ている間は postMessage で中身だけ渡す */
   htmlSet: boolean;
+  /**
+   * 画面が組み上がって（`ready` が届いて）postMessage を受け取れる状態か。
+   * HTML を入れた直後と裏に回った後は偽。作り直している最中に送ったものは誰にも届かない
+   */
+  mounted: boolean;
   timer?: NodeJS.Timeout;
   board?: Board;
   /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
@@ -110,6 +115,7 @@ export async function openBoard(project?: string): Promise<void> {
     folder,
     watchers: [],
     htmlSet: false,
+    mounted: false,
     loading: false,
     again: false,
     wasVisible: panel.visible,
@@ -140,6 +146,11 @@ function registerPanelHandlers(current: PanelState): void {
   panel.onDidChangeViewState(() => {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
+    if (!panel.visible) {
+      // `retainContextWhenHidden` は偽なので、裏に回った画面は捨てられる。表に戻ると
+      // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
+      current.mounted = false;
+    }
     if (becameVisible) {
       void update();
     }
@@ -246,31 +257,38 @@ function showError(current: PanelState, error: string): void {
  * 入れておけば戻った瞬間に新しい中身が出る。nonce は毎回変わるので、中身が同じでも作り直される。
  */
 function send(current: PanelState, data: BoardData): void {
-  const filter = current.filter;
-  current.filter = undefined;
   if (current.htmlSet && current.panel.visible) {
+    // 作り直している最中は送らない。受け口（画面の message のリスナ）はまだ無く、送っても落ちる。
+    // 組み上がったら `ready` が届き、そこで渡し直す
+    if (!current.mounted) {
+      return;
+    }
     const message: ToBoard = { type: "data", data };
     void current.panel.webview.postMessage(message);
-    if (filter !== undefined) {
-      const pick: ToBoard = { type: "filter", project: filter };
+    if (current.filter !== undefined) {
+      const pick: ToBoard = { type: "filter", project: current.filter };
       void current.panel.webview.postMessage(pick);
+      current.filter = undefined;
     }
     return;
   }
-  // 1 枚目の絞り込みは HTML に埋めて渡す。postMessage は画面が組み上がる前に出すと届かない
-  current.panel.webview.html = renderBoardPage(withFilter(data, filter), {
+  // 1 枚目と、裏に回っている間。絞り込みは HTML に埋めて渡す（postMessage は届かない）
+  current.panel.webview.html = renderBoardPage(withFilter(data, current.filter), {
     nonce: crypto.randomBytes(16).toString("base64"),
     script: webviewScript("board.js"),
     appearance: readAppearance(),
   });
+  current.filter = undefined;
   current.htmlSet = true;
+  current.mounted = false;
 }
 
+/**
+ * 開いた直後に選ぶ絞り込み。**届く経路で渡すまで消さない。** 消してから送ると、
+ * 作り直している最中の画面に落ちたときに二度と渡らず、「このプロジェクトで絞って開く」が効かない
+ */
 function withFilter(data: BoardData, filter: string | undefined): BoardData {
-  if (filter === undefined) {
-    return data;
-  }
-  return data.kind === "board" ? { ...data, filter } : { ...data, filter };
+  return filter === undefined ? data : { ...data, filter };
 }
 
 function handleMessage(message: BoardMessage | undefined): void {
@@ -281,7 +299,9 @@ function handleMessage(message: BoardMessage | undefined): void {
   const root = current.folder.uri.fsPath;
   switch (message.type) {
     case "ready":
-      // 裏から表へ戻って作り直された画面。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す
+      // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
+      // 作り直している間に見送った更新（send）も、ここで届く
+      current.mounted = true;
       redraw(current);
       return;
     case "refresh":

@@ -16,31 +16,50 @@ import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSS の min-width と同じ値 */
 const MIN_WIDTH = 220;
 
+/**
+ * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース本体」（空）と各プロジェクト。
+ * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ効かせない
+ * （欄が無いまま「絞り込み中」になると、人には解除する手立てが無い）
+ */
+function projectOptions(board: Board | undefined): readonly string[] {
+  return board === undefined || board.projects.length === 0 ? [EMPTY.project] : [EMPTY.project, "", ...board.projects];
+}
+
 export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const [data, setData] = useState<BoardData>(initial);
   const [view, setView] = useState<ViewState>(() => {
     const saved = loadState();
-    // プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき。候補に無ければ効かない（描くときに落とす）
-    return initial.filter === undefined ? saved : { ...saved, project: initial.filter };
+    // プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき。候補に無ければ触らない
+    const asked = initial.filter;
+    const board = initial.kind === "board" ? initial.board : undefined;
+    return asked !== undefined && projectOptions(board).includes(asked) ? { ...saved, project: asked } : saved;
   });
   // 「更新」は押した瞬間に非活性にして回り記号を出す。活性に戻すのは、拡張ホストが読み直しを終えて
   // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す道は要らない。
   // 実行ファイルが返らない場合は期限（ccnavi.ts）が切る。
   const [refreshing, setRefreshing] = useState(false);
 
+  const board = data.kind === "board" ? data.board : undefined;
+  // 受け口（メッセージ）はいまのボードを知らないので、描くたびに写しておく
+  const boardRef = useRef<Board | undefined>(board);
+  boardRef.current = board;
+
   useEffect(() => {
+    /** 拡張ホストが指す絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない） */
+    const pickProject = (value: string): void => {
+      if (!projectOptions(boardRef.current).includes(value)) {
+        return;
+      }
+      setView((now) => ({ ...now, project: value }));
+    };
     const onMessage = (event: MessageEvent): void => {
       const message = (event.data ?? {}) as Partial<ToBoard>;
       if (message.type === "data" && message.data !== undefined) {
+        // 中身だけ。開いた直後の絞り込みは 1 枚目の HTML に埋まっていて、2 枚目からは filter で届く
         setData(message.data);
         setRefreshing(false);
-        if (message.data.filter !== undefined) {
-          const project = message.data.filter;
-          setView((now) => ({ ...now, project }));
-        }
       } else if (message.type === "filter" && typeof message.project === "string") {
-        const project = message.project;
-        setView((now) => ({ ...now, project }));
+        pickProject(message.project);
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -52,11 +71,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  const board = data.kind === "board" ? data.board : undefined;
-  // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値。
-  // プロジェクトの候補は「すべて」（*）とワークスペース本体（空）と、実行ファイルが並べたプロジェクト
-  const projects = board === undefined ? [] : [EMPTY.project, "", ...board.projects];
-  const project = projects.includes(view.project) ? view.project : EMPTY.project;
+  // 覚えていた値が候補に無ければ（その親が消えた等）「すべて」のまま。覚え直すのも、落とした後の値
+  const project = projectOptions(board).includes(view.project) ? view.project : EMPTY.project;
   const parent = board !== undefined && board.parents.some((p) => p.id === view.parent) ? view.parent : EMPTY.parent;
   // 読み直せなかった画面には絞り込みの部品が無い。覚えていた値が効いたままにすると、
   // 出すものが無いのに「絞り込み中」になる
@@ -69,14 +85,18 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   }, [filtering]);
 
   /**
-   * 人が触ったので覚え直す。落とした後の値（候補に無い絞り込みは「すべて」）で書く。
-   * 読み直せなかった画面には絞り込みの部品が無いので、そこからは呼ばない。
+   * 覚える。落とした後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
+   * ここで正規化される。人が触ったときだけでなく、拡張ホストから絞り込みを渡されたときも通る。
+   *
+   * 読み直せなかった画面（絞り込みの部品が無い）では書かない。書くと、覚えていた絞り込みが
+   * 既定で上書きされる。
    */
-  const commit = (change: Partial<ViewState>): void => {
-    const next: ViewState = { ...view, project, parent, attention, ...change };
-    setView(next);
-    saveState(next);
-  };
+  useEffect(() => {
+    if (board === undefined) {
+      return;
+    }
+    saveState({ project, parent, attention, folded: view.folded, widths: view.widths });
+  }, [board === undefined, project, parent, attention, view.folded, view.widths]);
 
   const hiddenOf = (card: Card): boolean =>
     (project !== EMPTY.project && card.project !== project) ||
@@ -109,7 +129,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               {board.projects.length > 0 ? (
                 <label className="filter">
                   プロジェクト
-                  <select id="project-filter" value={project} onChange={(event) => commit({ project: event.target.value })}>
+                  <select id="project-filter" value={project} onChange={(event) => setView((now) => ({ ...now, project: event.target.value }))}>
                     <option value="*">すべて</option>
                     <option value="">ワークスペース本体</option>
                     {board.projects.map((p) => (
@@ -123,7 +143,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               {board.parents.length > 0 ? (
                 <label className="filter">
                   親
-                  <select id="parent-filter" value={parent} onChange={(event) => commit({ parent: event.target.value })}>
+                  <select id="parent-filter" value={parent} onChange={(event) => setView((now) => ({ ...now, parent: event.target.value }))}>
                     <option value="*">すべて</option>
                     {board.parents.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -134,7 +154,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 </label>
               ) : null}
               <label className="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
-                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => commit({ attention: event.target.checked })} /> 要対応だけ
+                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応だけ
               </label>
               <button
                 type="button"
@@ -178,17 +198,22 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 folded={view.folded.includes(column.state)}
                 width={view.widths[column.state]}
                 onFold={(folded) =>
-                  commit({ folded: folded ? [...view.folded, column.state] : view.folded.filter((f) => f !== column.state) })
+                  setView((now) => ({
+                    ...now,
+                    folded: folded ? [...now.folded, column.state] : now.folded.filter((f) => f !== column.state),
+                  }))
                 }
-                onWidth={(width) => {
-                  const widths = { ...view.widths };
-                  if (width === undefined) {
-                    delete widths[column.state];
-                  } else {
-                    widths[column.state] = width;
-                  }
-                  commit({ widths });
-                }}
+                onWidth={(width) =>
+                  setView((now) => {
+                    const widths = { ...now.widths };
+                    if (width === undefined) {
+                      delete widths[column.state];
+                    } else {
+                      widths[column.state] = width;
+                    }
+                    return { ...now, widths };
+                  })
+                }
               />
             ))}
           </div>
@@ -230,6 +255,9 @@ function Column({
 }): JSX.Element {
   const section = useRef<HTMLElement>(null);
   const visible = column.cards.filter((card) => !hiddenOf(card)).length;
+  // ドラッグの最中に列が消えたら（読み直せずエラーの画面に替わる）`pointerup` を受ける相手が居なくなり、
+  // 後片付けが走らない。body に付けた印を残すと、カーソルが変わったまま文字も選べなくなる
+  useEffect(() => () => document.body.classList.remove("resizing"), []);
   const classes = ["column"];
   if (width !== undefined) {
     classes.push("sized");
@@ -252,11 +280,15 @@ function Column({
     const startX = event.clientX;
     const startWidth = element.getBoundingClientRect().width;
     let last = Math.max(MIN_WIDTH, Math.round(startWidth));
+    // 動かさずに押して離しただけなら、幅は決めない。押しただけで px に固定されると、
+    // その列は窓の幅に追従しなくなる
+    let dragged = false;
     element.classList.add("resizing");
     document.body.classList.add("resizing");
     handle.setPointerCapture(event.pointerId);
     const move = (moved: PointerEvent): void => {
       last = Math.max(MIN_WIDTH, Math.round(startWidth + moved.clientX - startX));
+      dragged = true;
       element.classList.add("sized");
       element.style.width = `${last}px`;
     };
@@ -266,7 +298,9 @@ function Column({
       handle.removeEventListener("pointercancel", finish);
       element.classList.remove("resizing");
       document.body.classList.remove("resizing");
-      onWidth(last);
+      if (dragged) {
+        onWidth(last);
+      }
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", finish);
