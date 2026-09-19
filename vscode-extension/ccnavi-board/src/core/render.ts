@@ -275,7 +275,8 @@ function renderCard(card: Card): string {
 
 /**
  * 枠付きの札は、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
- * ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、本物が決まらない写り。
+ * 書き込み停止中、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
+ * 本物が決まらない写り。
  * 出す札が無ければ行ごと出さない。
  */
 function renderBadges(card: Card): string {
@@ -287,6 +288,12 @@ function renderBadges(card: Card): string {
   // 判定が JSON の `review_waiting` で言う。ここで reviewed やマーカーを見て組み直さない。
   if (card.gateClosed) {
     badges.push(badge("hold", holdLabel(card)));
+  }
+  // 承認済みチケット自体が信じられない（ADR-0058）。判定はそのワークツリーへの書き込みを
+  // 全部止めるので、`copy-open` の札だけだと「動いている」と読めてしまう。理由の全文は
+  // 不備の行に出る（`board.cardOf`）ので、ここは一目で分かる短い言葉に留める。
+  if (card.blocked !== "") {
+    badges.push(badge("blocked", "書き込み停止中", card.blocked));
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(badge("worktree none", "ワークツリーなし"));
@@ -711,6 +718,7 @@ const STYLE = `${PAGE_STYLE}
   }
   .badge.copy-none { color: var(--vscode-charts-blue); }
   .badge.hold, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); }
+  .badge.blocked { color: var(--vscode-editorError-foreground); font-weight: 600; }
   .badge.mark-requested { color: var(--vscode-charts-yellow); }
   .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
   .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }

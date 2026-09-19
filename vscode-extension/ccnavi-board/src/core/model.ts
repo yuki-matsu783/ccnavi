@@ -66,6 +66,12 @@ export interface TicketJson {
   readonly predecessors: readonly string[];
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
+  /**
+   * 空でなければ「読めるが信じられない」理由（ADR-0058）。判定はこのチケットの
+   * ワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`copy.status` は
+   * `open` のままなので、止まっていることはこの欄でしか分からない。
+   */
+  readonly blocked: string;
   readonly copy: CopyJson;
   readonly worktree: WorktreeJson;
   readonly started_at: string;
@@ -236,6 +242,7 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     predecessors: list(raw.predecessors).map(str),
     human_review: { required: raw !== undefined && review.required === true, reason: str(review.reason) },
     proposal: isRecord(raw.proposal) ? proposal(raw.proposal) : null,
+    blocked: str(raw.blocked),
     copy: {
       status: status === "open" || status === "review" || status === "closed" ? status : "none",
       approved_at: str(copy.approved_at),

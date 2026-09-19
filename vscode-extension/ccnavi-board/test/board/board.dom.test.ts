@@ -53,6 +53,24 @@ test("CB-D41 親で絞り込むと他の家族のカードが隠れ、列の件�
   }
 });
 
+test("CB-D46 書き込みが止まっているカードは「要対応だけ」でも残る", async () => {
+  // 印は不備として積まれ、`attention` が立つ（board.ts）。素の版では i0001-02 は隠れる
+  // （CB-D42）ので、印を付けたときだけ残ることが確かめられる。
+  const base = fixture();
+  const stopped = base.tickets.map((t) =>
+    t.ticket === "i0001-02" ? { ...t, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" } : t,
+  );
+  const page = await loadPage(renderBoard(buildBoard({ ...base, tickets: stopped }), OPTIONS));
+  try {
+    const box = page.one<HTMLInputElement>("#attention-filter");
+    box.checked = true;
+    page.change(box);
+    assert.ok(!page.one('.card[data-id="i0001-02"]').classList.contains("hidden"));
+    assert.match(page.one('.card[data-id="i0001-02"]').textContent ?? "", /書き込み停止中/);
+  } finally {
+    await page.close();
+  }
+});
 test("CB-D42 「要対応だけ」で人が動く必要の無いカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
   const page = await loadPage(renderBoard(buildBoard(fixture()), OPTIONS));
   try {
