@@ -1561,7 +1561,10 @@ Enter まで送る（y/N は無い）。A が承認して B の機械で作業�
 
 B の側はセッションの頭に `.ccnavi/scripts/ccnavi-fetch.sh` が取ってくる。進めるのは
 fast-forward だけで、未コミットの変更があるツリーやリモートと分岐したツリーは触らず、
-理由を 1 行で言う。
+理由を 1 行で言う。取ってくるのは 2 つで、そのツリーがチェックアウトしているブランチと、
+リポジトリごとのデフォルトブランチ（`origin/HEAD` が指すもの。ワークツリーの起点になる。
+ADR-0060）。後者はチェックアウトされていなくても進めるので、ワークスペースルートが
+`main` 以外に居ても `main` が揃う。
 
 順序は「承認 → 承認済みチケットをコミット → 子のワークツリーを作る → `start`」。コミットの前に
 ワークツリーを作ると、その子には範囲が効かない（そのブランチに乗っていないため）。
@@ -2615,7 +2618,7 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `.ccnavi/scripts/ccnavi-review.sh` | レビューの依頼と確認。親だけが呼ぶ。本体は `ccnavi review` |
 | `.ccnavi/scripts/ccnavi-approve.sh` | 承認し、`ccnavi-push-approved.sh` で運ぶ。人が端末で打つ。本体は `ccnavi --approve` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。人が打つ（エージェントからは止まる）。端末の `ccnavi-approve.sh` とボードの承認のあとに呼ばれる |
-| `.ccnavi/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチを取ってきて承認済みチケットを新しくする。進めるのは fast-forward だけ |
+| `.ccnavi/scripts/ccnavi-fetch.sh` | セッションの頭で親ブランチと、ワークツリーの起点になるデフォルトブランチを取ってくる。進めるのは fast-forward だけ（ADR-0060） |
 | `.ccnavi/scripts/ccnavi-clean.sh` / `ccnavi-clean.js` | ワークツリー 1 本の生成物（node_modules・.venv など）を消す。`worktree remove` の前に打つ。node が無ければ sh で同じものを消す。配らない |
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
