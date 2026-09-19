@@ -2,40 +2,85 @@
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
   "description": "ccnavi のチケット（提案・承認済みチケット・マーカー・ワークツリー）をカンバンで表示し、承認内容をオーバーレイで見せて人の承認を受け付け、承認の文とレビュー済みの連絡を Claude Code に渡す。ルールと hook を画面で眺め、ルールを直し、判定を試す。実績で測るリスクの配点とフェーズの種類を画面で直す。projects/ のプロジェクトを一覧し、clone をターミナルへ送る",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "publisher": "local",
   "private": true,
   "license": "MIT",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Visualization"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization"
+  ],
   "main": "./out/extension.js",
   "activationEvents": [],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
-        { "id": "ccnavi", "title": "ccnavi", "icon": "media/icon.svg" }
+        {
+          "id": "ccnavi",
+          "title": "ccnavi",
+          "icon": "media/icon.svg"
+        }
       ]
     },
     "views": {
       "ccnavi": [
-        { "id": "ccnaviBoard.entries", "name": "画面", "icon": "media/icon.svg" }
+        {
+          "id": "ccnaviBoard.entries",
+          "name": "画面",
+          "icon": "media/icon.svg"
+        }
       ]
     },
     "commands": [
-      { "command": "ccnaviBoard.open", "title": "ccnavi ボード: ボードを開く" },
-      { "command": "ccnaviBoard.refresh", "title": "ccnavi ボード: ボードを更新" },
-      { "command": "ccnaviBoard.openRules", "title": "ccnavi ボード: ルール設定画面を開く" },
-      { "command": "ccnaviBoard.openProjects", "title": "ccnavi ボード: プロジェクト管理を開く" },
-      { "command": "ccnaviBoard.openRisk", "title": "ccnavi ボード: リスク管理画面を開く" },
-      { "command": "ccnaviBoard.openPhases", "title": "ccnavi ボード: フェーズ管理画面を開く" },
-      { "command": "ccnaviBoard.appearance", "title": "ccnavi ボード: 見た目を切り替える" }
+      {
+        "command": "ccnaviBoard.open",
+        "title": "ccnavi ボード: ボードを開く"
+      },
+      {
+        "command": "ccnaviBoard.refresh",
+        "title": "ccnavi ボード: ボードを更新"
+      },
+      {
+        "command": "ccnaviBoard.openRules",
+        "title": "ccnavi ボード: ルール設定画面を開く"
+      },
+      {
+        "command": "ccnaviBoard.openProjects",
+        "title": "ccnavi ボード: プロジェクト管理を開く"
+      },
+      {
+        "command": "ccnaviBoard.openRisk",
+        "title": "ccnavi ボード: リスク管理画面を開く"
+      },
+      {
+        "command": "ccnaviBoard.openPhases",
+        "title": "ccnavi ボード: フェーズ管理画面を開く"
+      },
+      {
+        "command": "ccnaviBoard.appearance",
+        "title": "ccnavi ボード: 見た目を切り替える"
+      }
     ],
     "menus": {
       "commandPalette": [
-        { "command": "ccnaviBoard.open", "when": "ccnaviBoard.ticketControl == 'enable'" },
-        { "command": "ccnaviBoard.refresh", "when": "ccnaviBoard.ticketControl == 'enable'" },
-        { "command": "ccnaviBoard.openRisk", "when": "ccnaviBoard.ticketControl == 'enable'" },
-        { "command": "ccnaviBoard.openPhases", "when": "ccnaviBoard.ticketControl == 'enable'" }
+        {
+          "command": "ccnaviBoard.open",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.refresh",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.openRisk",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        },
+        {
+          "command": "ccnaviBoard.openPhases",
+          "when": "ccnaviBoard.ticketControl == 'enable'"
+        }
       ]
     },
     "configuration": {
@@ -58,8 +103,16 @@
         },
         "ccnaviBoard.appearance": {
           "type": "string",
-          "enum": ["vscode", "claude-light", "claude-dark"],
-          "enumDescriptions": ["VS Code のテーマに従う", "Claude の配色（ライト）", "Claude の配色（ダーク）"],
+          "enum": [
+            "vscode",
+            "claude-light",
+            "claude-dark"
+          ],
+          "enumDescriptions": [
+            "VS Code のテーマに従う",
+            "Claude の配色（ライト）",
+            "Claude の配色（ダーク）"
+          ],
           "default": "vscode",
           "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換える（ハイコントラストのテーマでは効かない）。サイドパネルの「見た目」からも切り替えられ、開いている画面にはその場で効く。"
         }
@@ -67,15 +120,15 @@
     }
   },
   "scripts": {
-    "compile": "node scripts/clean-out.js && tsc -p . && node scripts/bundle.js",
-    "test": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/**/*.test.js\"",
-    "test:board": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/board/*.test.js\"",
-    "test:rules": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/rules/*.test.js\"",
-    "test:risk": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/risk/*.test.js\"",
-    "test:phases": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/phases/*.test.js\"",
-    "test:projects": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/projects/*.test.js\"",
-    "test:shared": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/shared/*.test.js\"",
-    "test:dom": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node --test \"out/test/**/*.dom.test.js\"",
+    "compile": "node scripts/clean-out.js && tsc -p . && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node scripts/bundle.js",
+    "test": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/**/*.test.js\"",
+    "test:board": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/board/*.test.js\"",
+    "test:rules": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/rules/*.test.js\"",
+    "test:risk": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/risk/*.test.js\"",
+    "test:phases": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/phases/*.test.js\"",
+    "test:projects": "node scripts/clean-out.js && tsc -p tsconfig.test.json && node scripts/bundle-webview.js && node --test \"out/test/projects/*.test.js\"",
+    "test:shared": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/shared/*.test.js\"",
+    "test:dom": "node scripts/clean-out.js && tsc -p tsconfig.test.json && tsc -p tsconfig.webview.json && node scripts/bundle-webview.js && node --test \"out/test/**/*.dom.test.js\"",
     "package": "sh scripts/package.sh",
     "clean": "node scripts/clean.js"
   },
@@ -84,10 +137,14 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.25.0",
     "happy-dom": "^20.14.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "typescript": "^5.9.0"
   }
 }

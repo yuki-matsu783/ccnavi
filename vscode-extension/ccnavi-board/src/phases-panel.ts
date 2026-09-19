@@ -34,7 +34,7 @@ import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
-import { escapeHtml } from "./core/render.js";
+import { escapeHtml } from "./core/html.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { requireTickets } from "./ticket-control.js";

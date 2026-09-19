@@ -23,7 +23,7 @@ import * as vscode from "vscode";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint } from "./ccnavi.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { escapeHtml } from "./core/render.js";
+import { escapeHtml } from "./core/html.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument, type RiskForm } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
 import { WATCH_PATTERNS } from "./core/watch.js";

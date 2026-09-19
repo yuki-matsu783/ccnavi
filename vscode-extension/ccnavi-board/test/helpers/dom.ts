@@ -34,6 +34,8 @@ export interface DomPage {
   change(element: Element, value?: string): void;
   /** 要素を押す（click イベント） */
   click(element: Element): void;
+  /** キーを押す（keydown を流す）。要素を渡さなければ document に流す（画面ぜんたいで受けるもの） */
+  key(name: string, element?: Element): void;
   /** セレクタで 1 つ取る。無ければ落とす */
   one<T extends Element = HTMLElement>(selector: string): T;
   /** セレクタで全部取る */
@@ -98,9 +100,18 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
   // 本物の Webview では script のあとに DOMContentLoaded と load が流れる。待って初期化する書き方にも備える
   document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   window.dispatchEvent(new window.Event("load"));
+  // 画面が React のとき、押した直後には描き直されない。React のスケジューラは happy-dom の
+  // VM に MessageChannel が無いと setImmediate / setTimeout に落ち、どちらも
+  // `waitUntilComplete` は追わない（happy-dom が数えるのは自分が張ったタイマーと取得だけ）。
+  // 待ちを 1 回で切ると、機械が混んでいるときに「まだ描き直していない DOM」を見て落ちる。
+  // check 相（setImmediate）と timers 相（setTimeout）の両方を何度か空にしてから見る。
   const settle = async (): Promise<void> => {
+    for (let round = 0; round < 4; round += 1) {
+      await window.happyDOM.waitUntilComplete();
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
     await window.happyDOM.waitUntilComplete();
-    await new Promise((resolve) => setTimeout(resolve, 0));
     raise();
   };
   raise();
@@ -128,6 +139,11 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
     },
     click(element) {
       (element as HTMLElement).click();
+      raise();
+    },
+    key(name, element) {
+      const target = element ?? (document as unknown as Element);
+      target.dispatchEvent(new window.KeyboardEvent("keydown", { key: name, bubbles: true }));
       raise();
     },
     one<T extends Element = HTMLElement>(selector: string): T {

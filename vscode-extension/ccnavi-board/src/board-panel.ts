@@ -17,30 +17,24 @@ import {
   reviewedPrompt,
   type Launcher,
 } from "./core/commands.js";
-import { renderBoard, renderErrorPage, type ApprovalOverlay } from "./core/render.js";
+import type { ApprovalOverlay, BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
+import { renderBoardPage } from "./core/render.js";
+import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { runInTerminal } from "./terminal.js";
+import { webviewScript } from "./webview-script.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
 
-type Message =
-  | { readonly type: "open"; readonly filePath: string }
-  | { readonly type: "refresh" }
-  | { readonly type: "approve"; readonly tickets: readonly string[]; readonly filtered: boolean }
-  | { readonly type: "approveConfirm"; readonly tickets: readonly string[] }
-  | { readonly type: "approveCancel" }
-  | { readonly type: "promptCopy" }
-  | { readonly type: "promptOpen" }
-  | { readonly type: "accept"; readonly parent: string; readonly phase: number }
-  | { readonly type: "reviewed"; readonly parent: string; readonly phase: number };
-
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   watchers: vscode.FileSystemWatcher[];
+  /** 画面に中身を渡す段取り（`core/screen-host.ts`）。いつ送れるかはここが持つ */
+  readonly host: ScreenHost<BoardData>;
   timer?: NodeJS.Timeout;
   board?: Board;
   /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
@@ -97,6 +91,14 @@ export async function openBoard(project?: string): Promise<void> {
     vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
   }
 
+  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  try {
+    webviewScript("board.js");
+  } catch (error) {
+    vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel("ccnaviBoard", "ccnavi ボード", vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -108,6 +110,7 @@ export async function openBoard(project?: string): Promise<void> {
     panel,
     folder,
     watchers: [],
+    host: boardHost(panel),
     loading: false,
     again: false,
     wasVisible: panel.visible,
@@ -138,6 +141,11 @@ function registerPanelHandlers(current: PanelState): void {
   panel.onDidChangeViewState(() => {
     const becameVisible = panel.visible && !current.wasVisible;
     current.wasVisible = panel.visible;
+    if (!panel.visible) {
+      // `retainContextWhenHidden` は偽なので、裏に回った画面は捨てられる。表に戻ると
+      // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
+      current.host.hidden();
+    }
     if (becameVisible) {
       void update();
     }
@@ -218,43 +226,89 @@ async function update(): Promise<void> {
 }
 
 /**
- * ボードを描き直す。`webview.html` の差し替えは中身が同じ文字列だと何も起こらないが、
- * ここは毎回ちがう nonce を埋めるので必ず作り直される。「更新」を押して非活性にしたボタンが
- * 活性に戻るのはこの作り直しなので、nonce を固定したり HTML をキャッシュしたりすると
- * 「中身が変わらない読み直し」でボタンが「更新中」のまま固まる。
+ * ボードを見せる。中身を渡すのは `send`。
  */
 function show(current: PanelState, board: Board): void {
   current.board = board;
   current.error = undefined;
-  current.panel.webview.html = renderBoard(board, {
-    nonce: crypto.randomBytes(16).toString("base64"),
-    approval: current.approval,
-    appearance: readAppearance(),
-  });
-  if (current.filter !== undefined) {
-    // HTML の差し替えの後に届く。Webview の中のスクリプトが select を合わせる。
-    void current.panel.webview.postMessage({ type: "filter", project: current.filter });
-    current.filter = undefined;
-  }
+  send(current, { kind: "board", board, approval: current.approval });
 }
 
 /** 読み直せなかったことを見せる。承認のオーバーレイがあれば、ボードのときと同じように被せる */
 function showError(current: PanelState, error: string): void {
   current.error = error;
-  current.panel.webview.html = renderErrorPage(error, {
-    nonce: crypto.randomBytes(16).toString("base64"),
-    approval: current.approval,
-    appearance: readAppearance(),
-  });
+  send(current, { kind: "error", error, approval: current.approval });
 }
 
-function handleMessage(message: Message | undefined): void {
+/**
+ * いま見せるものを画面に渡す。どう渡るか（送る・入れ物ごと・作り直し中で持ち越し）は
+ * `screenHost` が決めて返す。ここが持つのは「1 度きりの絞り込みをいつ消すか」だけ。
+ */
+function send(current: PanelState, data: BoardData): void {
+  const filter = current.filter;
+  // 入れ物ごと入れ直す道になったときだけ、絞り込みを埋めたほうが使われる
+  const delivery = current.host.send(data, withFilter(data, filter));
+  if (delivery === "rebuilt") {
+    current.filter = undefined;
+    return;
+  }
+  if (delivery === "deferred") {
+    // 作り直している最中。組み上がったら `ready` が届くので、そこで渡し直す（絞り込みも持ち越す）
+    return;
+  }
+  // 届いたときだけ消す。届かないまま消すと「このプロジェクトで絞って開く」が二度と渡らない
+  if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
+    current.filter = undefined;
+  }
+}
+
+/** 開いた直後に選ぶ絞り込み。入れ物に埋めて渡すときだけ使う */
+function withFilter(data: BoardData, filter: string | undefined): BoardData {
+  return filter === undefined ? data : { ...data, filter };
+}
+
+/**
+ * ボードの画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
+ * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
+ */
+function boardHost(panel: vscode.WebviewPanel): ScreenHost<BoardData> {
+  return screenHost<BoardData>(
+    {
+      get visible(): boolean {
+        return panel.visible;
+      },
+      html(text: string): void {
+        panel.webview.html = text;
+      },
+      post(message: unknown): void {
+        void panel.webview.postMessage(message);
+      },
+    },
+    (data) =>
+      renderBoardPage(data, {
+        nonce: crypto.randomBytes(16).toString("base64"),
+        script: webviewScript("board.js"),
+        appearance: readAppearance(),
+      }),
+  );
+}
+
+function handleMessage(message: BoardMessage | undefined): void {
   const current = state;
   if (message === undefined || current === undefined) {
     return;
   }
   const root = current.folder.uri.fsPath;
   switch (message.type) {
+    case "ready":
+      // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
+      // 作り直している間に見送った更新（send）も、絞り込みも、ここで届く
+      current.host.ready();
+      redraw(current);
+      // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
+      // `followAppearance` がそのとき送ったものは、捨てられた画面に落ちている
+      current.host.post({ type: "appearance", value: readAppearance() } satisfies ToBoard);
+      return;
     case "refresh":
       void update();
       return;
@@ -331,6 +385,13 @@ function handleMessage(message: Message | undefined): void {
         prompt: reviewedPrompt(realRoot(root), message.parent, message.phase, chip.label, tree, chip.mrUrl),
       };
       redraw(current);
+      return;
+    }
+    default: {
+      // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
+      // 画面のボタンだけ足して受け側を忘れる、を止める
+      const unhandled: never = message;
+      void unhandled;
       return;
     }
   }
@@ -536,7 +597,25 @@ async function showTicketPreview(filePath: string): Promise<void> {
   }
 }
 
-function asMessage(message: unknown): Message | undefined {
+/**
+ * 形を確かめる操作の一覧。**`BoardMessage` に足したのにここへ足していなければ、型が合わなくなる。**
+ * `handleMessage` の網羅検査（`never`）は処理の書き忘れしか止めないので、入口の側でも同じことをする。
+ * 足し忘れると、画面のボタンは押せるのに、届いたものが黙って捨てられる。
+ */
+const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
+  ready: true,
+  refresh: true,
+  open: true,
+  approve: true,
+  approveConfirm: true,
+  approveCancel: true,
+  promptCopy: true,
+  promptOpen: true,
+  accept: true,
+  reviewed: true,
+};
+
+function asMessage(message: unknown): BoardMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
@@ -548,7 +627,11 @@ function asMessage(message: unknown): Message | undefined {
     tickets?: unknown;
     filtered?: unknown;
   };
+  if (typeof m.type !== "string" || !(m.type in KNOWN)) {
+    return undefined;
+  }
   switch (m.type) {
+    case "ready":
     case "refresh":
     case "approveCancel":
     case "promptCopy":

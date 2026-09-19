@@ -23,7 +23,7 @@ import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./c
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { escapeHtml } from "./core/render.js";
+import { escapeHtml } from "./core/html.js";
 import { asSections, readRules, type RuleForm, type RulesDocument, type Section } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 import type { RulesTarget } from "./core/screens.js";
