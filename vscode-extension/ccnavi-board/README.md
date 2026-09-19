@@ -309,8 +309,8 @@ YAML として読めないファイルは画面から直せない（エディタ
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm run compile   # tsc -p . で out/ に出し、esbuild で out/extension.js に束ねる
-pnpm test          # tsc のあと node --test "out/test/**/*.test.js"（全部）
+pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/board.js と out/extension.js に束ねる
+pnpm test          # tsc と画面の束ねのあと node --test "out/test/**/*.test.js"（全部）
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
 pnpm run package   # scripts/package.sh: install → compile → test → vsce package
@@ -329,15 +329,23 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 `node --test` にはディレクトリではなくグロブ（`out/test/**/*.test.js`）を渡す。
 
 テストは画面の領域ごとのディレクトリに分けてあり、一部を直したときはその領域だけを流せる。
-HTML を文字列で見る単体テスト（`*.test.ts`）と、画面に埋めたスクリプトを happy-dom で実際に動かす
-テスト（`*.dom.test.ts`）を同じディレクトリに置く。happy-dom で動かないものが出たときだけ jsdom を足す
+組み立てと HTML の文字列を見る単体テスト（`*.test.ts`）と、画面を happy-dom で実際に動かす
+テスト（`*.dom.test.ts`）を同じディレクトリに置く。ボードの画面は React なので、何を描くかも
+動かして見る（`board/render.dom.test.ts`）。React は押した直後には描き直さないので、操作のあとは
+`await page.settle()` を挟んでから見る。happy-dom で動かないものが出たときだけ jsdom を足す
 （いまは無い）。`pnpm test` と `pnpm run compile` は tsc の出力（`out/src` と `out/test`）を先に消す（tsc は消さないので、
 置き場を動かした古いテストが残る）。esbuild が束ねた `out/extension.js` は消さないので、package の compile → test の順でも入口は残る。
-出荷物の型検査は `tsconfig.json`（src だけ）で、テストは `tsconfig.test.json`（`skipLibCheck` で依存の `.d.ts` の検査を飛ばす。happy-dom の型定義が `@types/node` 22 と噛み合わないため）。
+出荷物の型検査は `tsconfig.json`（`src/webview` を除く。lib は DOM 無し、拾う型は node と vscode だけ）と
+`tsconfig.webview.json`（`src/webview` だけ。lib に DOM、JSX は `react-jsx`、`noEmit`。JS を出すのは esbuild のほう）の
+2 本に分かれている。画面に DOM の型を、拡張ホストに Node の型を、それぞれ片方だけ持たせるため。
+テストは `tsconfig.test.json`（`skipLibCheck` で依存の `.d.ts` の検査を飛ばす。happy-dom の型定義が `@types/node` 22 と噛み合わないため）。
 
-実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom を足してある。vsix には `node_modules/` を入れず、
+実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom と react / react-dom を足してある
+（画面は束ねて配るので、実行時の依存にはしない）。vsix には `node_modules/` を入れず、
 `scripts/bundle.js`（esbuild）が本体ごと `out/extension.js` に束ねる。テストは束ねる前の
-`out/src/` を使う。
+`out/src/` と、画面だけは束ねた `out/webview/board.js` を使う（配るものと同じ画面を動かすため）。
+`out/webview/` は vsix に入る。拡張が起動時に読んで `<script nonce>` に流し込むので、
+Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけで済む。
 
 生成物を消すときは `pnpm run clean`（`scripts/clean.js`）。消すのは `node_modules/` と `out/` の
 2 つだけで、引数は取らない。`rm -rf` は ccnavi のルール（`recursive-delete`）が止めるので使わない。
@@ -369,6 +377,7 @@ HTML を文字列で見る単体テスト（`*.test.ts`）と、画面に埋め�
 | 3 | 自動更新 | ボードを開いたまま、別のターミナルで `sh .ccnavi/scripts/ccnavi-ticket.sh done <子>` | コマンドを打たなくてもカードの属性が「レビュー待ち」になる（レビュー不要なら完了へ動く） |
 | 3b | 更新の手応え | ボードの「更新」を押す | 押した瞬間にボタンが非活性になり、回り記号が回って「更新中」になる。読み直しが終わると「更新」に戻って押せる。畳んだ列・絞り込みは残る |
 | 3c | 更新できない | 返らない実行ファイルを設定 `ccnaviBoard.binPath` に指して「更新」を押す。用意するのは**その OS が直接起動できる形**（`#!/bin/sh` と `sleep 999` を書いて実行ビットを立てた sh）。シェルを介さず起動するので、実行ビットとシェバンが無いと 60 秒待たずに即エラーになる。**Windows ネイティブでは試せない**（シェルを介さないので `.sh` も `.cmd` も直接は起動できない。Windows で確かめるときは WSL 側の VS Code で行う）。**名前を `ccnavi-launcher.sh` にしない**（振り分けの sh として読み飛ばされ、本物の実行ファイルで成功してしまう） | 60 秒はボタンが「更新中」のまま（待っている間に別のタブへ移って戻ると webview が作り直され、活性の「更新」に戻る）。そのあと「ccnavi --explain --json が失敗した: 60 秒で返らないので打ち切った」のエラー画面に替わる。更新ボタンごと消えるので、やり直しはコマンドパレットの「ボードを更新」 |
+| 3d | 画面が作り直されない（React） | ボードを縦にスクロールし、列を 1 つ畳んでから、別のターミナルで提案を 1 枚足す（監視が読み直す） | カードは増えるが、スクロール位置も畳んだ列もそのまま。開発者ツール（`Developer: Toggle Developer Tools`）の Console に CSP の拒否（`Refused to execute inline script`）が出ていない |
 | 4 | 承認 | 未承認の提案を置き、「承認待ち 1 件を承認」を押す | ボードの上にオーバーレイが出て、識別子の表と承認画面の本文が並ぶ。「この 1 件を承認する」でオーバーレイが画面の中央のまま「1 件を承認した」に替わり、カードが承認済になる。「コピー」でクリップボードに承認の文が入ってオーバーレイが閉じる。「新しいセッションで開く」で Claude Code の新しいタブに文が埋まる。右下の通知は出ない |
 | 4b | 一覧が変わった | オーバーレイを出したまま、別のターミナルで `wip/proposals/todo/` に提案をもう 1 枚置き、「この 1 件を承認する」 | 承認済みチケットは置かれず、オーバーレイが「見せた一覧と今の一覧が違った」の注意付きで 2 件に読み直される |
 | 4c | やめる | オーバーレイで「やめる」か Esc | 何も置かれず閉じる |
@@ -438,7 +447,7 @@ src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
   sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口。チケット制御が disable なら 3 つ（vscode に依存する）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に写す。変化を監視する（vscode に依存する）
-  board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け（vscode に依存する）
+  board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）
   rules-panel.ts      ルール設定画面の Webview パネル（ワークスペース / プロジェクトの対象ごとに 1 つ）。判定・検証・保存の受け付け（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
@@ -446,13 +455,15 @@ src/
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json / --approve --preview --json / --approve --yes … --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
+  webview-script.ts   束ねた画面（out/webview/board.js）を読む。拡張が <script nonce> に流し込む
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
     approvemodel.ts   承認の JSON の形（--approve --preview --json / --approve --yes … --json）と読み取り
     testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情の抜き出し
     board.ts          列とカードへの組み立て、操作の有無
-    render.ts         ボードの HTML（外部資源なし、テーマ変数だけ）と、承認のオーバーレイ
+    board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）
+    render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）と、5 画面で共通の CSS。中身は画面（React）が作る
     rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
     risk-render.ts    リスク管理画面の HTML と、その中で動くスクリプト
@@ -469,6 +480,14 @@ src/
     watch.ts          4 つの画面が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルの答えとの突き合わせ
+  webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
+    vscode.ts         acquireVsCodeApi の窓口（postMessage と state）
+    board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
+    board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
+    board/Card.tsx    カード 1 枚（札・属性・フェーズ行・不備・操作）
+    board/Approval.tsx 承認のオーバーレイ（一覧・本文・対象外・渡す文）
+    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅）の読み書き
+    board/text.ts     カードとフェーズ行に出す言葉
 media/
   icon.svg            アクティビティバーのアイコン
 test/
@@ -477,20 +496,27 @@ test/
   fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。tests/ticket/test_approve_json.py が書き出す
   helpers/fixture.ts  board.json を読む
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を控える
-  board/              ボード（board, render, model, approvemodel）
+  helpers/board.ts    ボード画面（React）を束ねたものごと happy-dom で開く
+  board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
   rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
   risk/               リスク管理（risk-doc, risk-render）
   phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
   projects/           プロジェクト管理（projects, layer-render）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens）
-  */*.test.ts         HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style）
+  */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。ボードは画面が React なので、描くものも動かして見る（render.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
+  bundle-webview.js   esbuild で画面（React）を out/webview/board.js に束ねる
   package.sh          vsix の組み立て
 ```
 
 `core/` は `vscode` を import しない。ここだけを `node --test` で試す。
+
+`webview/` は反対に、DOM だけを触って `vscode` も `node` も import しない。拡張ホストと分け合うのは
+`core/` のうち import で辿れるぶん（`board.ts`・`board-view.ts` など、判定も I/O もしないもの）だけ。
+ボードの画面は React で、拡張ホストは中身（`BoardData`）を渡すだけで DOM を組み立てない。
+残り 4 画面は今も拡張ホストが HTML を文字列で組む（ADR-0060）。
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
