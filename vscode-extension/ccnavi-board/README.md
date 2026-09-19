@@ -508,7 +508,7 @@ test/
   risk/               リスク管理（risk-doc, risk-render）
   phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
   projects/           プロジェクト管理（projects, layer-render）
-  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style）
+  shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。ボードは画面が React なので、描くものも動かして見る（render.dom）
 scripts/
@@ -528,12 +528,23 @@ scripts/
 
 | 足すもの | 触る場所 |
 |---|---|
-| カードに出す項目 | `core/model.ts`（実行ファイルとの契約）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/Card.tsx`（見せ方）→ `core/board-style.ts`（CSS） |
-| 人が押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `asMessage`（形の確認）と `handleMessage`（処理）。処理を書き忘れると `handleMessage` の `default` で型が合わなくなる |
-| 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き） |
+| カードに出す項目 | `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `core/board-style.ts`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`render.dom.test.ts`） |
+| 人が押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも網羅を型で縛ってある） |
+| 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**2 画面目を React にするときは、`core/screen-host.ts` と `webviewScript` と `poster<M>()` がそのまま使える。**
-画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・`ready` を受けて渡し直す数行だけ。
+**2 画面目を React にするとき、使い回せるもの。** `webviewScript`（名前で読む）、`poster<M>()`、
+`core/styles.ts`、テストの土台（`test/helpers/dom.ts`）。画面ごとに要るのは、契約（`*-view.ts`）・
+入れ物を組む関数・画面の CSS・`ready` を受けて渡し直す数行・テストの入口（`test/helpers/board.ts` に相当するもの）。
+
+**そのままでは使えないもの。**
+
+- `core/screen-host.ts` は `retainContextWhenHidden` が**偽**の画面のためのもの。ルール設定・リスク管理・
+  フェーズ管理は編集の途中を持つので真にしてあり、裏にいる間に入れ物ごと入れ直すと打ちかけの内容が消える。
+  これらを移すときは、保持する画面の段取り（裏でも `postMessage` を通し、入れ直さない）を足すか、
+  編集の途中を Webview の state に逃がして偽に変えるかの判断が要る
+- `scripts/bundle-webview.js` は入口と出口がボードの 1 本に決め打ち。画面を足すなら束ねる指定も足す
+- `pnpm run test:rules` などは `tsc -p tsconfig.webview.json` を回していない（回すのは board / shared / dom）。
+  React にした画面のぶんは足す
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
