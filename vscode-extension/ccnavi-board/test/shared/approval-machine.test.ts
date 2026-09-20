@@ -98,6 +98,50 @@ function toApproving(step: Step, tickets: readonly string[] = ["i0001"], only: r
   return step(toPreview(step, tickets, only), { kind: "confirm", tickets }).state;
 }
 
+/**
+ * 名前で状態を作る。**見張りの確かめは「守る状態を全部」回す。**
+ * 1 つの状態でしか押さないと、見張りから状態を 1 つ抜いた（消すのではなく弱めた）ときに素通しする
+ */
+function named(step: Step, kind: string): ApprovalState {
+  switch (kind) {
+    case "closed":
+      return CLOSED;
+    case "loading":
+      return toLoading(step);
+    case "preview":
+      return toPreview(step);
+    case "approving":
+      return toApproving(step);
+    case "done":
+      return toDone(step);
+    case "error":
+      return { overlay: { kind: "error", error: "読めない" }, only: [] };
+    case "prompt":
+      return toPrompt(step);
+    default:
+      throw new Error(`知らない状態: ${kind}`);
+  }
+}
+
+/** 名前で作った状態が、狙ったものになっているか（作り方が壊れていたら、確かめは何も見ていない） */
+function assertNamed(step: Step, kinds_: readonly string[]): void {
+  for (const kind of kinds_) {
+    const state = named(step, kind);
+    assert.equal(state.overlay?.kind ?? "closed", kind, `${kind} の状態を作れていない`);
+  }
+}
+
+function toPrompt(step: Step): ApprovalState {
+  return step(CLOSED, {
+    kind: "reviewed",
+    parent: "i0001",
+    phase: 1,
+    tree: "/w/.claude/worktrees/i0001",
+    chip: chipOf(),
+    root: "/w",
+  }).state;
+}
+
 function toDone(step: Step): ApprovalState {
   return step(toApproving(step), {
     kind: "approved",
@@ -130,6 +174,11 @@ const GUARDS: readonly Guard[] = [
       assert.equal(after.state.overlay?.kind, "approving");
       assert.equal(after.redraw, false);
       assert.deepEqual(kinds(after.effects), []);
+      // 逆向きも見る。ここを「どの状態でも閉じない」に広げられたら、閉じる道が消える
+      assertNamed(step, ["loading", "preview", "done", "error", "prompt"]);
+      for (const kind of ["loading", "preview", "done", "error", "prompt"]) {
+        assert.deepEqual(step(named(step, kind), { kind: "cancel" }).state, CLOSED, kind);
+      }
     },
   },
   {
@@ -137,10 +186,18 @@ const GUARDS: readonly Guard[] = [
     find: 'if (state.overlay?.kind !== "preview" || tickets.length === 0) {',
     into: "if (tickets.length === 0) {",
     check(step) {
-      const done = toDone(step);
-      const after = step(done, { kind: "confirm", tickets: ["i0001"] });
-      assert.equal(after.state.overlay?.kind, "done");
+      // `approving` は `preview` を持っているので、見張りを弱めても投げずに 2 本目が出る。
+      // そのぶん、落ちるのが確かめのほうになる
+      const approving = toApproving(step);
+      const after = step(approving, { kind: "confirm", tickets: ["i0001"] });
+      assert.equal(after.state, approving, "承認中に押し直しても、打つのは 1 本きり");
       assert.deepEqual(kinds(after.effects), []);
+      // 残りの状態も全部。1 つだけ見ると、そこ以外を見張りから抜かれたときに素通しする
+      assertNamed(step, ["closed", "loading", "done", "error", "prompt"]);
+      for (const kind of ["closed", "loading", "done", "error", "prompt"]) {
+        const state = named(step, kind);
+        assert.deepEqual(kinds(step(state, { kind: "confirm", tickets: ["i0001"] }).effects), [], kind);
+      }
     },
   },
   {
@@ -148,10 +205,14 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind === "loading" || kind === "preview" || kind === "approving") {',
     into: "if (false) {",
     check(step) {
-      const preview = toPreview(step);
-      const after = step(preview, { kind: "approve", tickets: [], filtered: false, pending: [] });
-      assert.equal(after.state, preview, "状態ごとそのまま（作り直さない）");
-      assert.deepEqual(kinds(after.effects), []);
+      // **3 つとも回す。** 1 つだけ見ると、見張りからその 1 つ以外を抜かれたときに素通しする
+      assertNamed(step, ["loading", "preview", "approving"]);
+      for (const kind of ["loading", "preview", "approving"]) {
+        const state = named(step, kind);
+        const after = step(state, { kind: "approve", tickets: [], filtered: false, pending: [] });
+        assert.equal(after.state, state, `${kind}: 状態ごとそのまま（作り直さない）`);
+        assert.deepEqual(kinds(after.effects), [], kind);
+      }
     },
   },
   {
@@ -159,9 +220,14 @@ const GUARDS: readonly Guard[] = [
     find: 'if (state.overlay?.kind !== "loading") {',
     into: "if (false) {",
     check(step) {
-      const after = step(CLOSED, { kind: "previewed", result: { ok: true, value: previewOf(["i0001"]) } });
-      assert.equal(after.state.overlay, undefined, "閉じたあとに返ってきた一覧で開き直さない");
-      assert.deepEqual(kinds(after.effects), []);
+      // `approving` は `recheck` を持たない形で回す（食い違いの読み直し中ではない）
+      assertNamed(step, ["closed", "preview", "approving", "done", "error", "prompt"]);
+      for (const kind of ["closed", "preview", "approving", "done", "error", "prompt"]) {
+        const state = named(step, kind);
+        const after = step(state, { kind: "previewed", result: { ok: true, value: previewOf(["i0001"]) } });
+        assert.equal(after.state, state, `${kind}: 頼んでいない一覧で開き直さない`);
+        assert.deepEqual(kinds(after.effects), [], kind);
+      }
     },
   },
   {
@@ -169,10 +235,15 @@ const GUARDS: readonly Guard[] = [
     find: 'if (overlay?.kind !== "done" && overlay?.kind !== "prompt") {',
     into: "if (false) {",
     check(step) {
-      const loading = toLoading(step);
-      const after = step(loading, { kind: "handOver", how: "promptCopy" });
-      assert.equal(after.state.overlay?.kind, "loading");
-      assert.deepEqual(kinds(after.effects), []);
+      // **閉じている状態は最後。** 見張りを外すと、そこは無い持ち物を読んで投げるので、
+      // 先に置くと変異テストが「確かめが落ちた」ではなく「投げた」を見ることになる
+      assertNamed(step, ["loading", "preview", "approving", "error", "closed"]);
+      for (const kind of ["loading", "preview", "approving", "error", "closed"]) {
+        const state = named(step, kind);
+        const after = step(state, { kind: "handOver", how: "promptCopy" });
+        assert.equal(after.state, state, kind);
+        assert.deepEqual(kinds(after.effects), [], kind);
+      }
     },
   },
   {
@@ -180,17 +251,20 @@ const GUARDS: readonly Guard[] = [
     find: 'if (kind !== undefined && kind !== "error" && kind !== "prompt") {',
     into: "if (false) {",
     check(step) {
-      const done = toDone(step);
-      const after = step(done, {
-        kind: "reviewed",
-        parent: "i0001",
-        phase: 1,
-        tree: "/w/.claude/worktrees/i0001",
-        chip: chipOf(),
-        root: "/w",
-      });
-      assert.equal(after.state.overlay?.kind, "done", "承認の文は、渡し終えるか閉じるまで消さない");
-      assert.deepEqual(kinds(after.effects), []);
+      assertNamed(step, ["loading", "preview", "approving", "done"]);
+      for (const kind of ["loading", "preview", "approving", "done"]) {
+        const state = named(step, kind);
+        const after = step(state, {
+          kind: "reviewed",
+          parent: "i0001",
+          phase: 1,
+          tree: "/w/.claude/worktrees/i0001",
+          chip: chipOf(),
+          root: "/w",
+        });
+        assert.equal(after.state, state, `${kind}: 承認のオーバーレイの上には被せない`);
+        assert.deepEqual(kinds(after.effects), [], kind);
+      }
     },
   },
   {
@@ -198,14 +272,16 @@ const GUARDS: readonly Guard[] = [
     find: "if (!input.tickets.every((id) => pending.has(id))) {",
     into: "if (false) {",
     check(step) {
-      const after = step(CLOSED, {
-        kind: "approve",
-        tickets: ["i0001"],
-        filtered: true,
-        pending: ["i0002"],
-      });
-      assert.equal(after.state.overlay, undefined, "古いボードの識別子では開かない");
-      assert.deepEqual(kinds(after.effects), ["warn", "refresh"]);
+      // 1 件でも欠けたら止める（削って進まない）
+      for (const [tickets, pending] of [
+        [["i0001"], ["i0002"]],
+        [["i0001", "i0002"], ["i0001"]],
+        [["i0001"], []],
+      ] as const) {
+        const after = step(CLOSED, { kind: "approve", tickets, filtered: true, pending });
+        assert.equal(after.state.overlay, undefined, `${tickets.join(",")}: 古いボードの識別子では開かない`);
+        assert.deepEqual(kinds(after.effects), ["warn", "refresh"], tickets.join(","));
+      }
     },
   },
 ];
@@ -273,7 +349,11 @@ test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送�
     carrier: false,
   });
   assert.deepEqual(noScript.state.overlay, { kind: "done", count: 1, prompt: "文", carried: false });
-  assert.deepEqual(kinds(noScript.effects), ["carryMissing"]);
+  assert.deepEqual(kinds(noScript.effects), ["warn"], "端末には送らず、何をすればよいかを言う");
+  assert.match(
+    noScript.effects[0]?.kind === "warn" ? noScript.effects[0].text : "",
+    /ccnavi-push-approved\.sh が無いので/,
+  );
 
   const zero = approvalStep(approving, {
     kind: "approved",
@@ -421,6 +501,8 @@ test("CB-T179 「やめる」は閉じる。承認の結果は、どの状態で
   const closed = approvalStep(preview, { kind: "cancel" });
   assert.deepEqual(closed.state, CLOSED);
   assert.equal(closed.redraw, true);
+  // 閉じているところへ届いても、変わっていないので描き直さない
+  assert.equal(approvalStep(CLOSED, { kind: "cancel" }).redraw, false);
 
   // 承認の結果だけは見張らない。承認済みチケットは既に置かれていることがあり、捨てると人に届かない
   const late = approvalStep(CLOSED, {
@@ -473,9 +555,12 @@ test("CB-T181 見張りを 1 つ消すと、それを確かめるテストが落
     const at = source.split(guard.find).length - 1;
     assert.equal(at, 1, `変異させる 1 行が見つからない（${guard.what}）。ソースを直したら find も直す`);
     const mutated = load(source.replace(guard.find, guard.into));
+    // **`assert.AssertionError` に限る。** 無い持ち物を読んだ `TypeError` で偶然「落ちた」ことに
+    // しない（確かめる状態は、見張りを外しても投げない側を選んである）
     assert.throws(
       () => guard.check(mutated.approvalStep),
-      `見張りを消しても確かめが通った: ${guard.what}。確かめが緩い`,
+      assert.AssertionError,
+      `見張りを消しても確かめが通った（か、確かめの外で投げた）: ${guard.what}`,
     );
   }
 });

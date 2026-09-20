@@ -456,12 +456,6 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
     case "carry":
       runInTerminal(root, pushApprovedCommand(root));
       return;
-    // その sh が無い。送って `No such file` を見せるより、何をすればよいかが先に分かる
-    case "carryMissing":
-      void vscode.window.showWarningMessage(
-        `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、導入スクリプト（scripts/ccnavi-setup.sh）で配る`,
-      );
-      return;
     case "copy":
       await vscode.env.clipboard.writeText(effect.prompt);
       vscode.window.setStatusBarMessage(`${effect.what}をクリップボードに入れた。Claude Code に貼って送る`, 5000);

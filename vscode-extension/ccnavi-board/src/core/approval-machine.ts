@@ -46,9 +46,9 @@
  * 見張りを 1 つ消したらテストが落ちることまで見る**ので、見張りを足したらそちらにも足す。
  */
 import type { ApprovalOverlay } from "./board-view.js";
-import type { ApproveOutcome, ApprovePreview } from "./approvemodel.js";
+import type { ApproveOutcome, PreviewParse } from "./approvemodel.js";
 import type { PhaseChip } from "./board.js";
-import { reviewedPrompt } from "./commands.js";
+import { PUSH_APPROVED_SCRIPT, reviewedPrompt } from "./commands.js";
 
 /**
  * 承認のオーバーレイの持ち物。`overlay` が画面へ渡るぶんで、残りは拡張ホストの中だけの控え。
@@ -68,18 +68,18 @@ export interface ApprovalState {
   /**
    * 食い違い（`mismatch`）で一覧を読み直している最中。見せている `overlay` は `approving` のままで、
    * 返ってきた一覧にこの `notice` を添えて `preview` に切り替える。
-   * `dropped` は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）
+   * `dropped` は、絞りが通らなかったので絞りを外して読み直したか（外したあとは、もう外さない）。
+   *
+   * **不変条件: これがあるとき `overlay` は必ず `approving`。** 置くのは `answered` の食い違いの枝
+   * 1 か所だけで、そこは `overlay` を持ち越す。`approving` の間は閉じられないので、外れるのは
+   * 一覧が返って `preview` か `error` に差し替わるときだけ。**型では持っていない**ので、
+   * `recheck` を置く枝を増やすならここを読み直すこと
    */
   readonly recheck?: { readonly notice: string; readonly dropped: boolean };
 }
 
 /** 閉じている状態 */
 export const CLOSED: ApprovalState = { only: [] };
-
-/** 一覧が返ってきた形（`ccnavi.ts` の `RunResult<ApprovePreview>` をそのまま渡せる） */
-export type PreviewOutcome =
-  | { readonly ok: true; readonly value: ApprovePreview }
-  | { readonly ok: false; readonly error: string };
 
 /** 人が押したことと、外から返ってきたこと。どちらも「入力」として同じ口から入れる */
 export type ApprovalInput =
@@ -95,7 +95,7 @@ export type ApprovalInput =
       readonly pending: readonly string[];
     }
   /** 一覧（`--approve --preview --json`）が返った */
-  | { readonly kind: "previewed"; readonly result: PreviewOutcome }
+  | { readonly kind: "previewed"; readonly result: PreviewParse }
   /** 「この N 件を承認する」を押した */
   | { readonly kind: "confirm"; readonly tickets: readonly string[] }
   /**
@@ -133,8 +133,6 @@ export type ApprovalEffect =
     }
   /** 承認済みチケットを運ぶ sh を端末に送る */
   | { readonly kind: "carry" }
-  /** その sh が無いので、置かれた承認済みチケットがまだコミットされていないことを人に言う */
-  | { readonly kind: "carryMissing" }
   /** 文をクリップボードに入れる。`what` は何の文かの呼び名（伝える文面に出す） */
   | { readonly kind: "copy"; readonly prompt: string; readonly what: string }
   /** 文を埋めて新しいセッションで開く */
@@ -151,7 +149,7 @@ export interface ApprovalStep {
   readonly effects: readonly ApprovalEffect[];
 }
 
-/** 何も起きなかった（受けない入力）。状態も画面もそのまま */
+/** 状態も画面もそのまま。受けない入力のほか、**人に言うだけ**（`warn` / `refresh`）のときも使う */
 function stay(state: ApprovalState, ...effects: ApprovalEffect[]): ApprovalStep {
   return { state, redraw: false, effects };
 }
@@ -214,7 +212,7 @@ function opened(
 }
 
 /** 一覧が返った。頼んだのが「開く」なのか「食い違いの読み直し」なのかで行き先が変わる */
-function previewed(state: ApprovalState, result: PreviewOutcome): ApprovalStep {
+function previewed(state: ApprovalState, result: PreviewParse): ApprovalStep {
   const recheck = state.recheck;
   if (recheck !== undefined) {
     // 絞りが通らない（その識別子がもう承認待ちに無い、親の改版が承認待ちに入った）ときだけ絞りを
@@ -269,8 +267,20 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const count = outcome.value.approved.length;
     // 運ぶ 1 行は、文を渡すのを待たずに端末へ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
+    // 運ぶ sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
     const effects: ApprovalEffect[] =
-      count === 0 ? [] : [carried ? { kind: "carry" } : { kind: "carryMissing" }];
+      count === 0
+        ? []
+        : carried
+          ? [{ kind: "carry" }]
+          : [
+              {
+                kind: "warn",
+                text:
+                  `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、` +
+                  "導入スクリプト（scripts/ccnavi-setup.sh）で配る",
+              },
+            ];
     return move(
       state,
       { overlay: { kind: "done", count, prompt: outcome.value.prompt, carried }, only: [] },
