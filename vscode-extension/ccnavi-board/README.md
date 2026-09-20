@@ -577,11 +577,23 @@ test/
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理・リスク管理・フェーズ管理）は、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom）
+  shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へ束ねる。画面は src/webview/<名前>/main.tsx があるものを見つける（表で持たない）
   package.sh          vsix の組み立て
 ```
+
+**テストの ID。** 名前の頭に付ける `CB-T…` / `CB-D…` は「落ちたテストを名指しする」ためのもので、
+README やチケットの記録から参照する。
+
+| 何 | 決まり |
+|---|---|
+| どちらを使うか | `CB-D` は happy-dom で動かすもの（`*.dom.test.ts`）、`CB-T` はそれ以外 |
+| 番号の採り方 | **最後尾の次を採る。** グループごとの並びや空き番号に差し込まない。画面ごとに別のファイルで採ると、同じ番号を 2 つ付けやすい（issue #88） |
+| 枝番 | `CB-T19b` は、既にある ID に後から足した確認。番号は同じでよく、枝番まで込みで一意にする |
+| 守り方 | `test/shared/test-ids.test.ts`（CB-T163 / CB-T164）が、重複と「ID の無いテスト」を見つける。手で数えるなら `grep -rhoE 'test\("CB-[TD][0-9]+[a-z]*' test --include=*.ts \| sed 's/test("//' \| sort \| uniq -d`（**枝番まで数える**。`[a-z]*` を落とすと `CB-T19b` が `CB-T19` に化けて、重複していないものが重複に見える） |
+| 振り直すとき | 後から付けたほうを最後尾の次へ動かす。参照（README・`.ccnavi/approved/` の記録）も追う |
 
 `core/` は `vscode` を import しない。ここだけを `node --test` で試す。
 
