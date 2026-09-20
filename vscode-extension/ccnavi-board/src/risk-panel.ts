@@ -2,6 +2,12 @@
  * リスク管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
+ * 画面は React（`src/webview/risk/`）で、ここが渡すのは「いま何を見せるか」（`RiskData`）だけ。
+ * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存や作成が通った）。
+ * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
+ *
  * 対象は共通層の配点（`.ccnavi/common/risks.yml`。置き場は固定）の 1 本だけ。自身の層とプロジェクトの層も
  * 配点を持ち、判定は共通層と親の `project:` の層の和で行う（設計 §11.4.2）が、この画面ではそれらを開かない
  * （設計 §11.11）。パネルは 1 つ。
@@ -23,22 +29,20 @@ import * as vscode from "vscode";
 import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint } from "./ccnavi.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { escapeHtml } from "./core/html.js";
-import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument, type RiskForm } from "./core/risk-doc.js";
+import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
+import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.js";
+import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { requireTickets } from "./ticket-control.js";
+import { webviewScript } from "./webview-script.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
+/** 束ねた画面。綴りの約束は `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
+const SCRIPT_NAME = "risk.js";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
-
-type Message =
-  | { readonly type: "reload"; readonly dirty: boolean }
-  | { readonly type: "openFile" }
-  | { readonly type: "create" }
-  | { readonly type: "save"; readonly form: RiskForm };
 
 interface Loaded {
   /** ファイルの本文。無ければ組み込みの配点の本文 */
@@ -56,6 +60,7 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
+  readonly host: ScreenHost<RiskData>;
   /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読込のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   /** チケットの置き場の監視。開いている間ずっと同じ */
@@ -63,6 +68,8 @@ interface PanelState {
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
   loaded?: Loaded;
+  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
+  error?: string;
   lock: Lock;
   wroteAt: number;
 }
@@ -97,6 +104,14 @@ export async function openRisk(): Promise<void> {
     return;
   }
 
+  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  try {
+    webviewScript(SCRIPT_NAME);
+  } catch (error) {
+    vscode.window.showErrorMessage(`リスク管理画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel("ccnaviRisk", "ccnavi リスク管理", vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -109,6 +124,7 @@ export async function openRisk(): Promise<void> {
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-risk-")),
+    host: riskHost(panel),
     fileWatchers: [],
     watchers: [],
     loaded,
@@ -239,7 +255,7 @@ function scheduleChanged(current: PanelState): void {
   current.timer = setTimeout(() => {
     current.timer = undefined;
     if (alive(current)) {
-      void current.panel.webview.postMessage({ type: "changed" });
+      current.host.post({ type: "changed" } satisfies ToRisk);
     }
   }, DEBOUNCE_MS);
 }
@@ -265,33 +281,45 @@ async function refreshLock(current: PanelState): Promise<Lock> {
   const lock = result.ok ? lockFromBoard(result.board) : lockFromError(result.error);
   if (alive(current)) {
     current.lock = lock;
-    void current.panel.webview.postMessage({ type: "lock", lock });
+    current.host.post({ type: "lock", lock } satisfies ToRisk);
   }
   return lock;
 }
 
+/**
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ */
 function show(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
   }
-  current.panel.webview.html = renderRiskPage(
-    {
+  current.error = undefined;
+  current.host.send({
+    kind: "page",
+    page: {
       root: current.folder.uri.fsPath,
       riskPath: loaded.riskRel,
       exists: loaded.exists,
       model: loaded.doc.model,
       lock: current.lock,
     },
-    { nonce: crypto.randomBytes(16).toString("base64"), appearance: readAppearance() },
-  );
+  });
+}
+
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+function showError(current: PanelState, error: string): void {
+  current.loaded = undefined;
+  current.error = error;
+  current.host.send({ kind: "error", error });
 }
 
 function reload(current: PanelState): void {
   try {
     current.loaded = readPage(current.folder.uri.fsPath);
   } catch (error) {
-    current.panel.webview.html = renderError((error as Error).message);
+    showError(current, (error as Error).message);
     return;
   }
   show(current);
@@ -299,16 +327,65 @@ function reload(current: PanelState): void {
   void refreshLock(current);
 }
 
-function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi リスク管理</title></head><body><p>リスク管理画面を読み直せなかった。直してから「ccnavi ボード: リスク管理画面を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+/**
+ * いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたもの（`deferred`）は、画面が
+ * 組み上がった（`ready`）ところでここから渡る。
+ */
+function redraw(current: PanelState): void {
+  if (current.loaded !== undefined) {
+    show(current);
+    return;
+  }
+  if (current.error !== undefined) {
+    showError(current, current.error);
+  }
 }
 
+/**
+ * リスク管理の画面に渡す口。VS Code のパネルを `retainedHost` の形に合わせる。
+ * **入れ物は 1 度しか入らない**ので、`visible` は読まれない（保持する画面は裏でも生きている）。
+ */
+function riskHost(panel: vscode.WebviewPanel): ScreenHost<RiskData> {
+  return retainedHost<RiskData>(
+    {
+      get visible(): boolean {
+        return panel.visible;
+      },
+      html(text: string): void {
+        panel.webview.html = text;
+      },
+      post(message: unknown): void {
+        void panel.webview.postMessage(message);
+      },
+    },
+    (data) =>
+      renderRiskPage(data, {
+        nonce: crypto.randomBytes(16).toString("base64"),
+        script: webviewScript(SCRIPT_NAME),
+        appearance: readAppearance(),
+      }),
+  );
+}
+
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
-  void current.panel.webview.postMessage({ type: "failed", message });
+  current.host.post({ type: "failed", message } satisfies ToRisk);
 }
 
-async function handleMessage(current: PanelState, message: Message | undefined): Promise<void> {
-  if (message === undefined || !alive(current) || current.loaded === undefined) {
+async function handleMessage(current: PanelState, message: RiskMessage | undefined): Promise<void> {
+  if (message === undefined || !alive(current)) {
+    return;
+  }
+  if (message.type === "ready") {
+    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る
+    current.host.ready();
+    redraw(current);
+    current.host.post({ type: "appearance", value: readAppearance() } satisfies ToRisk);
+    return;
+  }
+  // 読み直せていない画面では、配点に当たる操作はどれも行き先が無い（「再読込」は
+  // 押せるが、その道は `reload` が読み直しからやり直す）
+  if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
   switch (message.type) {
@@ -327,6 +404,9 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     }
     case "openFile": {
+      if (current.loaded === undefined) {
+        return;
+      }
       const target = current.loaded.riskPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
@@ -441,7 +521,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   vscode.window.showInformationMessage(`${loaded.riskRel} に保存した（${tail}）`);
 }
 
-function asMessage(message: unknown): Message | undefined {
+function asMessage(message: unknown): RiskMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
@@ -449,6 +529,7 @@ function asMessage(message: unknown): Message | undefined {
   switch (m.type) {
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
+    case "ready":
     case "openFile":
     case "create":
       return { type: m.type };
