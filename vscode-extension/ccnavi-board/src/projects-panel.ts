@@ -2,6 +2,10 @@
  * プロジェクト管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API と子プロセスに触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
+ * 画面は React（`src/webview/projects/`）で、ここが渡すのは「いま何を見せるか」（`ProjectsData`）だけ。
+ * 渡し方（送る・入れ物ごと・作り直し中で見送る）は `core/screen-host.ts` が決める。この画面は
+ * `retainContextWhenHidden` が偽なので、そのまま当たる（打ちかけの clone の欄は Webview の state にある）。
+ *
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、層のルールファイル・
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
@@ -17,7 +21,6 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, readAppearance } from "./appearance.js";
-import { bodyTag } from "./core/appearance.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import {
@@ -36,37 +39,30 @@ import {
   type ProjectsPage,
 } from "./core/projects.js";
 import { renderProjectsPage } from "./core/projects-render.js";
-import { escapeHtml } from "./core/html.js";
+import type { ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
+import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
+import { webviewScript } from "./webview-script.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-
-type Message =
-  | { readonly type: "refresh" }
-  | { readonly type: "clone"; readonly url: string; readonly name: string }
-  | { readonly type: "fixIgnore" }
-  | { readonly type: "createRules"; readonly name: string }
-  | { readonly type: "createSelfRules" }
-  | { readonly type: "openRules"; readonly name: string }
-  | { readonly type: "openSelfRules" }
-  | { readonly type: "openPhases"; readonly name: string }
-  | { readonly type: "openSelfPhases" }
-  | { readonly type: "openBoard"; readonly name: string }
-  | { readonly type: "fetch"; readonly name: string }
-  | { readonly type: "pull"; readonly name: string };
+/** 束ねた画面。`scripts/bundle-webview.js` の SCREENS の名前 */
+const SCRIPT_NAME = "projects.js";
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
+  readonly host: ScreenHost<ProjectsData>;
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   page?: ProjectsPage;
   loading: boolean;
   again: boolean;
+  /** 直前に見た表裏。表へ戻ったら読み直す（裏にいる間の変化は監視が拾っても渡せていない） */
+  wasVisible: boolean;
 }
 
 let state: PanelState | undefined;
@@ -94,6 +90,14 @@ export async function openProjects(): Promise<void> {
     return;
   }
 
+  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  try {
+    webviewScript(SCRIPT_NAME);
+  } catch (error) {
+    vscode.window.showErrorMessage(`プロジェクト管理を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel("ccnaviProjects", "ccnavi プロジェクト管理", vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -101,7 +105,7 @@ export async function openProjects(): Promise<void> {
     retainContextWhenHidden: false,
   });
   followAppearance(panel);
-  const current: PanelState = { panel, folder, watchers: [], loading: false, again: false };
+  const current: PanelState = { panel, folder, host: projectsHost(panel), watchers: [], loading: false, again: false, wasVisible: panel.visible };
   state = current;
   registerPanelHandlers(current, first.page.projectsRel, first.page.selfRulesRel);
   show(current, first.page);
@@ -217,6 +221,19 @@ function registerPanelHandlers(current: PanelState, projectsRel: string, selfRul
     void handleMessage(current, asMessage(message));
   });
 
+  panel.onDidChangeViewState(() => {
+    const becameVisible = panel.visible && !current.wasVisible;
+    current.wasVisible = panel.visible;
+    if (!panel.visible) {
+      // `retainContextWhenHidden` は偽なので、裏に回った画面は捨てられる。表に戻ると
+      // ここで入れてある HTML から作り直され、組み上がったら `ready` が届く
+      current.host.hidden();
+    }
+    if (becameVisible) {
+      void update();
+    }
+  });
+
   panel.onDidDispose(() => {
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
@@ -287,7 +304,7 @@ async function update(): Promise<void> {
     }
     if (!result.ok) {
       current.page = undefined;
-      current.panel.webview.html = renderError(result.error);
+      current.host.send({ kind: "error", error: result.error });
       return;
     }
     show(current, result.page);
@@ -302,25 +319,63 @@ async function update(): Promise<void> {
 
 function show(current: PanelState, page: ProjectsPage): void {
   current.page = page;
-  current.panel.webview.html = renderProjectsPage(page, { nonce: crypto.randomBytes(16).toString("base64"), appearance: readAppearance() });
+  current.host.send({ kind: "page", page });
 }
 
-function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi プロジェクト管理</title></head>${bodyTag(readAppearance())}<p>プロジェクトの一覧を読み直せなかった。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+/**
+ * プロジェクト管理の画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
+ * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
+ */
+function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
+  return screenHost<ProjectsData>(
+    {
+      get visible(): boolean {
+        return panel.visible;
+      },
+      html(text: string): void {
+        panel.webview.html = text;
+      },
+      post(message: unknown): void {
+        void panel.webview.postMessage(message);
+      },
+    },
+    (data) =>
+      renderProjectsPage(data, {
+        nonce: crypto.randomBytes(16).toString("base64"),
+        script: webviewScript(SCRIPT_NAME),
+        appearance: readAppearance(),
+      }),
+  );
 }
 
+/**
+ * 操作の結果の一言。生きている画面にしか届かない（作り直している最中と裏にいる間は落ちる）。
+ * その場で言うだけのものなので、持ち越さずに捨てる。
+ */
 function fail(current: PanelState, message: string): void {
-  void current.panel.webview.postMessage({ type: "failed", message });
+  current.host.post({ type: "failed", message } satisfies ToProjects);
 }
 
 function info(current: PanelState, message: string, type: "info" | "cloned" = "info"): void {
-  void current.panel.webview.postMessage({ type, message });
+  current.host.post({ type, message } satisfies ToProjects);
 }
 
 // ---- 操作
 
-async function handleMessage(current: PanelState, message: Message | undefined): Promise<void> {
+async function handleMessage(current: PanelState, message: ProjectsMessage | undefined): Promise<void> {
   if (message === undefined || state !== current) {
+    return;
+  }
+  if (message.type === "ready") {
+    // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
+    // 作り直している間に見送った更新（send）も、ここで届く
+    current.host.ready();
+    if (current.page !== undefined) {
+      current.host.send({ kind: "page", page: current.page });
+    }
+    // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
+    // `followAppearance` がそのとき送ったものは、捨てられた画面に落ちている
+    current.host.post({ type: "appearance", value: readAppearance() } satisfies ToProjects);
     return;
   }
   const page = current.page;
@@ -478,13 +533,14 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
   void update();
 }
 
-function asMessage(message: unknown): Message | undefined {
+function asMessage(message: unknown): ProjectsMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
   const m = message as { type?: unknown; url?: unknown; name?: unknown };
   const named = typeof m.name === "string" ? m.name : undefined;
   switch (m.type) {
+    case "ready":
     case "refresh":
     case "fixIgnore":
     case "createSelfRules":

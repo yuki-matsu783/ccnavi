@@ -72,6 +72,19 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
       throw new Error(`画面のスクリプトが例外を投げた（${taken.length} 件）: ${taken[0].message}`, { cause: taken[0] });
     }
   };
+  /**
+   * 欄に値を入れる。React は制御された欄の `value` を自分の追跡器で差し替えるので、
+   * そのまま代入すると「値は変わっていない」と見なされて onChange が呼ばれない。
+   * 追跡器は要素の側に載るので、大元（プロトタイプ）の setter を通して入れる。
+   */
+  const setValue = (element: Element, value: string): void => {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element) as object, "value");
+    if (typeof descriptor?.set === "function") {
+      descriptor.set.call(element, value);
+      return;
+    }
+    (element as unknown as { value: string }).value = value;
+  };
   let state: unknown = initialState;
   (window as unknown as { acquireVsCodeApi: () => unknown }).acquireVsCodeApi = () => ({
     // 画面の中の配列やオブジェクトは happy-dom 側の realm のもので、strict な deepEqual が
@@ -126,13 +139,13 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
       await settle();
     },
     type(element, value) {
-      (element as unknown as { value: string }).value = value;
+      setValue(element, value);
       element.dispatchEvent(new window.Event("input", { bubbles: true }));
       raise();
     },
     change(element, value) {
       if (value !== undefined) {
-        (element as unknown as { value: string }).value = value;
+        setValue(element, value);
       }
       element.dispatchEvent(new window.Event("change", { bubbles: true }));
       raise();

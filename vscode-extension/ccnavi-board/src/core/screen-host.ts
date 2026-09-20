@@ -71,6 +71,18 @@ export interface DataMessage<D> {
 }
 
 /**
+ * 最初の中身を HTML の `<script type="application/json">` に埋める形にする。
+ * `</script>` や `<!--` が中身に現れても HTML を閉じないよう、`<` を `\u003c` にする
+ * （JSON としては同じ文字列で、JSON.parse が元に戻す）。
+ *
+ * 実体参照にはしない。`<script type="application/json">` の中身は実体参照を解かないので、
+ * `&amp;` と書くと画面には `&amp;` のまま届く。画面ごとの契約はこれを自分の型で包んで出す。
+ */
+export function embedJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+/**
  * `render` は入れ物の HTML を組む。呼ぶたびに nonce を変えること。同じ文字列を `webview.html` に
  * 入れても VS Code は何もしないので、作り直したいときに作り直せなくなる。
  */

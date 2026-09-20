@@ -35,10 +35,16 @@ const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 // ターンの終わりの hook は、これを差し戻しに数えず人へ言う。
 const NOT_READY = 3;
 
-// 画面（React）の束ねたものを読むテストの入口。これを辿るグループだけ、
-// tsconfig.webview.json の型の検査と esbuild の束ねが要る。画面を足して別の入口から
-// 読ませるなら、その入口もここに挙げる。
-const BUNDLE_ENTRIES = [path.join(TEST_DIR, "helpers", "board.ts")];
+// 画面（React）の束ねたものを読むテストの入口と、その画面のソースの置き場。これを辿る
+// グループだけ、tsconfig.webview.json の型の検査と esbuild の束ねが要る。画面を足して別の
+// 入口から読ませるなら、その入口と置き場もここに挙げる。
+//
+// 置き場を持たせてあるのは、画面を 1 つ直したときに他の画面のテストまで回さないため。
+// どの画面にも属さないもの（src/webview/vscode.ts のような共通の部品）は全部に効くと見る。
+const BUNDLE_ENTRIES = [
+  { entry: path.join(TEST_DIR, "helpers", "board.ts"), screen: "src/webview/board/" },
+  { entry: path.join(TEST_DIR, "helpers", "projects.ts"), screen: "src/webview/projects/" },
+];
 
 /** test/ の下のディレクトリ名。増やしても直すところは無い。 */
 function groupNames() {
@@ -140,10 +146,17 @@ function closures() {
   return map;
 }
 
-/** 束ねた画面を読むグループ（BUNDLE_ENTRIES を辿るもの）。 */
-function webviewGroups(map) {
+/**
+ * 束ねた画面を読むグループ（BUNDLE_ENTRIES の入口を辿るもの）。
+ *
+ * `rel`（触ったファイル）を渡すと、その画面の入口を辿るグループだけに絞る。どの画面の
+ * 置き場にも入っていなければ、共通の部品として全部の入口を見る。
+ */
+function webviewGroups(map, rel) {
+  const matched = rel === undefined ? [] : BUNDLE_ENTRIES.filter((e) => rel.startsWith(e.screen));
+  const wanted = matched.length === 0 ? BUNDLE_ENTRIES : matched;
   return [...map.entries()]
-    .filter(([, files]) => BUNDLE_ENTRIES.some((entry) => files.has(entry)))
+    .filter(([, files]) => wanted.some((e) => files.has(e.entry)))
     .map(([group]) => group);
 }
 
@@ -207,7 +220,7 @@ function callFor(rel, map) {
   // 辿れないので、束ねたものを読むグループを足す。辿れたぶん（テストが画面のファイルを
   // 直に import している場合）は落とさずに和を取る。
   if (rel.startsWith("src/webview/")) {
-    return { groups: [...new Set([...groups, ...webviewGroups(map)])].sort(), compile: true };
+    return { groups: [...new Set([...groups, ...webviewGroups(map, rel)])].sort(), compile: true };
   }
 
   return { groups, compile: true };
