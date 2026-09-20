@@ -92,7 +92,7 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * 自身の層は同じオプションに名札 `self` で渡す。実行ファイルは層の名前で差し替えを引き、
  * `self` を名乗るプロジェクトは層として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ効き、
- * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0063）。
+ * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
  * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =

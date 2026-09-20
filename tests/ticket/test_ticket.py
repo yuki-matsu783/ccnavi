@@ -117,7 +117,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0063）。
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")

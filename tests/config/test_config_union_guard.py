@@ -398,7 +398,7 @@ class DenyTest(GuardHarness):
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、当たったルールの id を返す。
 
-        hook の payload では共通層を動かせない（`--rules` は診断でだけ効く。ADR-0063）。
+        hook の payload では共通層を動かせない（`--rules` は診断でだけ効く。ADR-0067）。
         試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を守りが
         追うかどうかは、こちらで見る（REQ-DIA-03）。
         """
@@ -413,7 +413,7 @@ class DenyTest(GuardHarness):
         """§11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
 
         置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけで、
-        env は ADR-0052 で廃止し、診断の外は ADR-0063 で閉じた。それでも動かせる以上、
+        env は ADR-0052 で廃止し、診断の外は ADR-0067 で閉じた。それでも動かせる以上、
         守りは動かした先を追う（`common_shell_clause`）。名指しのツールは
         `common_layer_regex` が同じ先を追うので、こちらを外すと、同じファイルが
         `Write` では止まってシェルでは通る形になる。

@@ -192,7 +192,7 @@ class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 
 
 class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
-    """診断の外では、フラグも共通層を動かさない（ADR-0063、issue #65）。
+    """診断の外では、フラグも共通層を動かさない（ADR-0067、issue #65）。
 
     `--project-rules-file` / `--project-phases-file` と揃える。効くのは `--lint` /
     `--test` / `--test-samples` / `--explain` だけで、hook からの判定と

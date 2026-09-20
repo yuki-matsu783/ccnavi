@@ -79,7 +79,7 @@ class PostToolUseTest(unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0063）。
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
         self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")

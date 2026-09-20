@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 共通層の 3 本の既定の綴り。ハーネスはここへ設定を置き、`--rules` / `--phases` /
 # `--risk` は渡さない。3 つは診断（`--lint` / `--test` / `--explain`）でだけ効くので、
-# hook の判定とチケット・レビューの副命令には届かない（ADR-0063）。
+# hook の判定とチケット・レビューの副命令には届かない（ADR-0067）。
 #
 # 綴りは実行ファイルから引く。テスト側にもう 1 つ綴りを持つと、既定が動いたときに
 # 2 つが黙ってずれる。既定の綴りそのものは tests/config/test_common_layer_place.py が
@@ -41,7 +41,7 @@ def fixture_workspace(name: str = "rules.yml") -> str:
     """`tests/fixtures/<name>` を共通層のルールに据えたワークスペースルート。
 
     受入テストは `--rules` で見本のルールを指していたが、あれは診断でだけ効く
-    （ADR-0063）。`--root` にここを渡して、共通層の既定の置き場から読ませる。
+    （ADR-0067）。`--root` にここを渡して、共通層の既定の置き場から読ませる。
 
     リポジトリ自身をルートにしていたのをやめる利点もある。走った機械の
     `.ccnavi/common/rules.yml` が判定に混ざらない。

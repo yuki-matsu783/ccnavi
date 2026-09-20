@@ -211,7 +211,7 @@ DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）で�
 # 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
 # `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
 # 実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
-# 本物の置き場に「リスク 0」で閉じられた（ADR-0063）。
+# 本物の置き場に「リスク 0」で閉じられた（ADR-0067）。
 #
 # 正しい 1 本が先に在ることに頼らず、2 本目が在ること自体を断る。落として先へ進むのでは
 # なく止めるのは、この 2 つに「2 度渡す」正しい使い方が無いから。診断の 5 本と違って、
@@ -240,7 +240,7 @@ def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
 
     フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
     `phases.yml` / `risks.yml` で判定と採点が走る。届く経路は `.ccnavi/scripts/` の
-    sh で、受け取った引数を実行ファイルへ素通しする（ADR-0063）。
+    sh で、受け取った引数を実行ファイルへ素通しする（ADR-0067）。
     """
     for flag, name, absent in COMMON_LAYER_OVERRIDES:
         if getattr(args, name) == absent:
@@ -354,7 +354,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     # 層のルール・フェーズの種類・リスクの配点の差し替えは診断の経路でだけ効く。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
-    # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0063）。
+    # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
     diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain

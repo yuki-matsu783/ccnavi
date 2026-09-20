@@ -50,7 +50,7 @@ def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
     """ルールファイルを 1 枚書いて綴りを返す。
 
     置くのは共通層の既定の場所。hook として叩く側は `--rules` を渡せない
-    （診断でだけ効く。ADR-0063）ので、ワークスペースルートの下の既定の綴りに要る。
+    （診断でだけ効く。ADR-0067）ので、ワークスペースルートの下の既定の綴りに要る。
     直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
     """
     return write(

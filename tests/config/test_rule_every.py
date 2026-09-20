@@ -60,7 +60,7 @@ class EveryTest(unittest.TestCase):
         """共通層の既定の場所にルールを 1 本置く。
 
         `--rules` では渡さない。あれは診断でだけ効き、hook の判定には届かない
-        （ADR-0063）。
+        （ADR-0067）。
         """
         body = {
             "version": 1,

@@ -421,7 +421,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
         共通層の 3 本は `--rules` / `--phases` / `--risk` で渡さない。この 3 つは
         診断（`--lint` / `--test` / `--explain`）でだけ効き、hook の判定とチケットの
-        副命令では落ちる（ADR-0063）。土台は `--root` の下の既定の置き場
+        副命令では落ちる（ADR-0067）。土台は `--root` の下の既定の置き場
         （`.ccnavi/common/`）に置くので、渡す必要も無い。差し替えたいテストは
         `self.rules` / `self.phases` / `self.risk` に書けばよい。
         """

@@ -49,7 +49,7 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     if allow:
         body["allow"] = [ALLOWED]
     # 置くのは共通層の既定の場所。検証は `--rules` で指せるが、同じファイルを hook の
-    # 判定にも掛けるテストがあり、そちらには届かない（ADR-0063）。
+    # 判定にも掛けるテストがあり、そちらには届かない（ADR-0067）。
     return write(directory, common_relpath("rules"), json.dumps(body, indent=2))
 
 
