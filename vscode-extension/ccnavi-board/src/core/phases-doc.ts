@@ -16,15 +16,13 @@
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
+import { PHASE_KINDS, REVIEWS, type PhaseForm, type PhaseKind, type PhasesForm, type PhasesModel, type Review } from "./phases-view.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
-/** 種類の区分。ccnavi の phasetypes.KINDS と同じ並び */
-export const PHASE_KINDS = ["work", "feedback"] as const;
-export type PhaseKind = (typeof PHASE_KINDS)[number];
-
-/** レビューの既定。phasetypes.REVIEWS と同じ並び */
-export const REVIEWS = ["none", "mr"] as const;
-export type Review = (typeof REVIEWS)[number];
+/**
+ * 種類の形（`PHASE_KINDS`・`PhaseForm`・`PhasesForm` など）は画面との契約（`phases-view.ts`）にある。
+ * ここに置くと、画面がそこから `yaml` を辿って束ねたものに解析器が丸ごと入る。
+ */
 
 /** 実行ファイルが読む版（phasetypes.VERSION） */
 export const PHASES_VERSION = 1;
@@ -93,38 +91,6 @@ phases:
     review: mr
     scope: inherit
 `;
-
-/** 画面で編集する種類 1 件。`origin` は読み込んだときの位置で、新しい種類は null */
-export interface PhaseForm {
-  readonly origin: number | null;
-  /** 対応表のキー。識別子として使える文字かは lint が言う */
-  readonly id: string;
-  /** 表示名。空なら欄を書かない（実行ファイルは id を使う） */
-  readonly title: string;
-  readonly kind: PhaseKind;
-  readonly review: Review;
-  /** 真なら `scope: inherit`（親の範囲そのまま）。偽なら `scope` の glob の並び */
-  readonly inherit: boolean;
-  /** 子の範囲の上限。inherit なら使わない */
-  readonly scope: readonly string[];
-  readonly deliverables: readonly string[];
-  readonly overlap: readonly string[];
-  readonly requires: readonly string[];
-  /** 案内にだけ使う。空なら欄を書かない */
-  readonly agent: string;
-  readonly when: string;
-}
-
-export interface PhasesForm {
-  readonly phases: readonly PhaseForm[];
-}
-
-export interface PhasesModel {
-  readonly version: number | null;
-  readonly form: PhasesForm;
-  /** 読み込み時の苦情。形が読めなかった場所。あっても他は出す */
-  readonly problems: readonly string[];
-}
 
 export interface PhasesDocument {
   readonly model: PhasesModel;

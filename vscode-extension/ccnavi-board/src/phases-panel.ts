@@ -2,6 +2,11 @@
  * フェーズ管理画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
+ * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
+ * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存や作成が通った）。
+ *
  * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
  * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。対象ごとに 1 パネルで、並べて開ける。
@@ -32,15 +37,19 @@ import { followAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument, type PhasesForm } from "./core/phases-doc.js";
+import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
-import { escapeHtml } from "./core/html.js";
+import type { PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
+import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { requireTickets } from "./ticket-control.js";
+import { webviewScript } from "./webview-script.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
+/** 束ねた画面。綴りの約束は `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
+const SCRIPT_NAME = "phases.js";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 /** 層のファイルを最初の保存で作るときに、先頭へ置く説明 */
@@ -49,12 +58,6 @@ const LAYER_HEADER = [
   "# 共通層と同じ id を書くなら中身も同じにする。違えば --lint が error を出し、この層は空として扱われる。",
   "",
 ].join("\n");
-
-type Message =
-  | { readonly type: "reload"; readonly dirty: boolean }
-  | { readonly type: "openFile" }
-  | { readonly type: "create" }
-  | { readonly type: "save"; readonly form: PhasesForm };
 
 interface Loaded {
   /** ファイルの本文。無ければ空 */
@@ -75,6 +78,7 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
+  readonly host: ScreenHost<PhasesData>;
   /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読込のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   /** チケットの置き場の監視。開いている間ずっと同じ */
@@ -82,7 +86,11 @@ interface PanelState {
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
   loaded?: Loaded;
+  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
+  error?: string;
   lock: Lock;
+  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  changedPending: boolean;
   wroteAt: number;
 }
 
@@ -154,6 +162,14 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     opening.delete(key);
   }
 
+  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  try {
+    webviewScript(SCRIPT_NAME);
+  } catch (error) {
+    vscode.window.showErrorMessage(`フェーズ管理画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel("ccnaviPhases", titleOf(target), vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -167,10 +183,12 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-phases-")),
+    host: phasesHost(panel),
     fileWatchers: [],
     watchers: [],
     loaded,
     lock: lockFromError("まだ確認していない"),
+    changedPending: false,
     wroteAt: 0,
   };
   panels.set(key, current);
@@ -245,6 +263,21 @@ function registerPanelHandlers(current: PanelState): void {
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asMessage(message));
+  });
+
+  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
+  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
+  panel.onDidChangeViewState(() => {
+    if (!panel.visible || !alive(current)) {
+      return;
+    }
+    current.host.post({ type: "lock", lock: current.lock } satisfies ToPhases);
+    if (current.changedPending) {
+      current.changedPending = true;
+      current.host.post({ type: "changed" } satisfies ToPhases);
+    }
   });
 
   panel.onDidDispose(() => {
@@ -331,7 +364,7 @@ function scheduleChanged(current: PanelState): void {
   current.timer = setTimeout(() => {
     current.timer = undefined;
     if (alive(current)) {
-      void current.panel.webview.postMessage({ type: "changed" });
+      current.host.post({ type: "changed" } satisfies ToPhases);
     }
   }, DEBOUNCE_MS);
 }
@@ -359,18 +392,26 @@ async function refreshLock(current: PanelState): Promise<Lock> {
   const lock = result.ok ? lockFromBoard(result.board, projectOf(current.target)) : lockFromError(result.error);
   if (alive(current)) {
     current.lock = lock;
-    void current.panel.webview.postMessage({ type: "lock", lock });
+    current.host.post({ type: "lock", lock } satisfies ToPhases);
   }
   return lock;
 }
 
+/**
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
+ */
 function show(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
   }
-  current.panel.webview.html = renderPhasesPage(
-    {
+  current.error = undefined;
+  // 読み直したので、「外で変わった」はもう今のことではない
+  current.changedPending = false;
+  current.host.send({
+    kind: "page",
+    page: {
       root: current.folder.uri.fsPath,
       phasesPath: loaded.phasesRel,
       exists: loaded.exists,
@@ -379,7 +420,55 @@ function show(current: PanelState): void {
       layer: current.target.kind !== "common",
       notices: loaded.notices,
     },
-    { nonce: crypto.randomBytes(16).toString("base64"), appearance: readAppearance() },
+  });
+}
+
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+function showError(current: PanelState, error: string): void {
+  current.loaded = undefined;
+  current.error = error;
+  current.host.send({ kind: "error", error });
+}
+
+/**
+ * いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたもの（`deferred`）は、画面が
+ * 組み上がった（`ready`）ところでここから渡る。
+ */
+function redraw(current: PanelState): void {
+  if (current.loaded !== undefined) {
+    show(current);
+    return;
+  }
+  if (current.error !== undefined) {
+    showError(current, current.error);
+  }
+}
+
+/**
+ * フェーズ管理の画面に渡す口。VS Code のパネルを `retainedHost` の形に合わせる。
+ * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
+ * 型では止まらないので、ここで見て言う。
+ */
+function phasesHost(panel: vscode.WebviewPanel): ScreenHost<PhasesData> {
+  if (panel.options.retainContextWhenHidden !== true) {
+    console.error(`フェーズ管理の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）。偽のままだと、裏に回った画面へ送り続けて中身が古いまま止まる`);
+  }
+  return retainedHost<PhasesData>(
+    {
+      html(text: string): void {
+        panel.webview.html = text;
+      },
+      post(message: unknown): void {
+        void panel.webview.postMessage(message);
+      },
+    },
+    (data) =>
+      renderPhasesPage(data, {
+        nonce: crypto.randomBytes(16).toString("base64"),
+        script: webviewScript(SCRIPT_NAME),
+        appearance: readAppearance(),
+      }),
   );
 }
 
@@ -389,7 +478,7 @@ async function reload(current: PanelState): Promise<void> {
     loaded = await readPage(current.folder.uri.fsPath, current.target);
   } catch (error) {
     if (alive(current)) {
-      current.panel.webview.html = renderError((error as Error).message);
+      showError(current, (error as Error).message);
     }
     return;
   }
@@ -402,16 +491,42 @@ async function reload(current: PanelState): Promise<void> {
   void refreshLock(current);
 }
 
-function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi フェーズ管理</title></head><body><p>フェーズ管理画面を読み直せなかった。直してから「ccnavi ボード: フェーズ管理画面を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+/**
+ * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
+ *
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
+ * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
+ */
+function stale(current: PanelState, loaded: Loaded): boolean {
+  if (current.loaded === loaded) {
+    return false;
+  }
+  fail(current, `読み直したので、この保存は捨てた。いまの${"種類"}で編集し直す`);
+  return true;
 }
 
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
-  void current.panel.webview.postMessage({ type: "failed", message });
+  current.host.post({ type: "failed", message } satisfies ToPhases);
 }
 
-async function handleMessage(current: PanelState, message: Message | undefined): Promise<void> {
-  if (message === undefined || !alive(current) || current.loaded === undefined) {
+async function handleMessage(current: PanelState, message: PhasesMessage | undefined): Promise<void> {
+  if (message === undefined || !alive(current)) {
+    return;
+  }
+  if (message.type === "ready") {
+    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す道
+    // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
+    current.host.ready();
+    redraw(current);
+    current.host.post({ type: "appearance", value: readAppearance() } satisfies ToPhases);
+    return;
+  }
+  // 読み直せていない画面では、種類に当たる操作はどれも行き先が無い（「再読込」は
+  // 押せるが、その道は `reload` が読み直しからやり直す）
+  if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
   switch (message.type) {
@@ -423,6 +538,8 @@ async function handleMessage(current: PanelState, message: Message | undefined):
           "読み直す",
         );
         if (choice !== "読み直す") {
+          // 画面は「再読込」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
+          current.host.post({ type: "cancelled" } satisfies ToPhases);
           return;
         }
       }
@@ -430,6 +547,9 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     }
     case "openFile": {
+      if (current.loaded === undefined) {
+        return;
+      }
       const target = current.loaded.phasesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
@@ -473,6 +593,9 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   await reload(current);
+  if (!alive(current)) {
+    return;
+  }
   vscode.window.showInformationMessage(
     `${loaded.phasesRel} を雛形で作った。scope の綴りをこのプロジェクトの置き場に直す。コミットは人が行う`,
   );
@@ -518,6 +641,9 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   if (!alive(current)) {
     return;
   }
+  if (stale(current, loaded)) {
+    return;
+  }
   if (!lint.ok) {
     fail(current, lint.error);
     return;
@@ -531,6 +657,9 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   // 2. 作業中のチケットが無いこと。押した時点で取り直す。
   const lock = await refreshLock(current);
   if (!alive(current)) {
+    return;
+  }
+  if (stale(current, loaded)) {
     return;
   }
   if (lock.locked) {
@@ -574,7 +703,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   vscode.window.showInformationMessage(`${loaded.phasesRel} に保存した（${tail}）`);
 }
 
-function asMessage(message: unknown): Message | undefined {
+function asMessage(message: unknown): PhasesMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
@@ -582,6 +711,7 @@ function asMessage(message: unknown): Message | undefined {
   switch (m.type) {
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
+    case "ready":
     case "openFile":
     case "create":
       return { type: m.type };

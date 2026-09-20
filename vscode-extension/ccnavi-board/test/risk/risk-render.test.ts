@@ -1,7 +1,11 @@
+/**
+ * リスク管理画面の入れ物（HTML）。中身は画面（React）が作るので、ここで見るのは
+ * 守り（CSP）・埋め込む中身・束ねた画面の流し込みだけ。描くものは risk.dom.test.ts。
+ */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BUILTIN_RISK_TEXT, KINDS, readRisk } from "../../src/core/risk-doc.js";
-import { KIND_LABELS, renderRiskPage, type RiskPage } from "../../src/core/risk-render.js";
+import { readRisk } from "../../src/core/risk-doc.js";
+import { NONCE, page, riskHtml, riskScript } from "../helpers/risk.js";
 
 const RISK = `version: 1
 factors:
@@ -11,85 +15,46 @@ factors:
     message: "<b>CI</b> に触った"
 `;
 
-function page(overrides: Partial<RiskPage> = {}): RiskPage {
-  return {
-    root: "/ws",
-    riskPath: ".ccnavi/common/risks.yml",
-    exists: true,
-    model: readRisk(RISK).model,
-    lock: { locked: false, reason: "", doing: [] },
-    ...overrides,
-  };
+function html(): string {
+  return riskHtml({ kind: "page", page: page({ model: readRisk(RISK).model }) }, { nonce: "N0NCE" });
+}
+
+/** 束ねた画面を除いた入れ物。外を読んでいないことは、拡張が書いたところだけを見て確かめる */
+function shell(rendered: string): string {
+  return rendered.split(riskScript()).join("（束ねた画面）");
 }
 
 test("CB-T80 リスク管理画面は外部資源を読まず、nonce で自分のスタイルとスクリプトだけを許す", () => {
-  const html = renderRiskPage(page(), { nonce: "N0NCE" });
-  assert.match(html, /default-src 'none'/);
-  assert.match(html, /style-src 'nonce-N0NCE'; script-src 'nonce-N0NCE'/);
-  assert.doesNotMatch(html, /https?:\/\//);
-  assert.match(html, /<script nonce="N0NCE" type="application\/json" id="page">/);
-  assert.match(html, /<title>ccnavi リスク管理<\/title>/);
+  const rendered = html();
+  assert.match(rendered, /default-src 'none'/);
+  assert.match(rendered, /style-src 'nonce-N0NCE'; script-src 'nonce-N0NCE'/);
+  // 外の資源を指す口が無い（束ねた画面の中の文字列は、読みに行く綴りではないので除く）
+  assert.doesNotMatch(shell(rendered), /https?:\/\//);
+  assert.doesNotMatch(shell(rendered), /<(?:script|img|iframe)[^>]*\ssrc=|<link\s/);
+  assert.match(rendered, /<script type="application\/json" id="ccnavi-risk-data">/);
+  assert.match(rendered, /<title>ccnavi リスク管理<\/title>/);
 });
 
-test("CB-T81 埋め込む配点は JSON で、文面の < は実体にして script を閉じさせない", () => {
-  const html = renderRiskPage(page(), { nonce: "n" });
-  assert.match(html, /\\u003cb>CI\\u003c\/b>/);
-  assert.doesNotMatch(html, /<b>CI<\/b>/);
-  // 当て方の一覧と組み込みの閾値も埋め込む
-  for (const kind of KINDS) {
-    assert.match(html, new RegExp(`"kind":"${kind}","label":"${KIND_LABELS[kind].label}"`));
-  }
-  assert.match(html, /"builtinLevels":\{"medium":20,"high":40,"critical":70\}/);
+test("CB-T81 埋め込む中身は JSON で、文面の < は実体にして script を閉じさせない", () => {
+  const rendered = html();
+  assert.match(rendered, /\\u003cb>CI\\u003c\/b>/);
+  assert.doesNotMatch(rendered, /<b>CI<\/b>/);
+  // 当て方の札も組み込みの閾値も埋め込まない。画面が契約（risk-view）から持つ
+  assert.doesNotMatch(rendered, /"builtinLevels"/);
+  assert.match(rendered, /"exists":true/);
 });
 
-test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", () => {
-  const missing = renderRiskPage(page({ exists: false, model: readRisk(BUILTIN_RISK_TEXT).model }), { nonce: "n" });
-  assert.match(missing, /\.ccnavi\/common\/risks\.yml が無い。実行ファイルは組み込みの配点で数えている/);
-  assert.match(missing, /data-action="create"/);
-  assert.match(missing, /data-action="open-risk" disabled/);
-  assert.match(missing, /"exists":false/);
-  const present = renderRiskPage(page(), { nonce: "n" });
-  assert.doesNotMatch(present, /data-action="create"/);
-  assert.match(present, /"exists":true/);
+// 画面のスクリプトは束ねた 1 本を流し込む（ファイルとしては読ませない）。
+// 中身の型は tsconfig.webview.json が見るので、ここで見るのは入れ方だけ。
+test("CB-T85 束ねた画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
+  const rendered = riskHtml({ kind: "page", page: page() });
+  assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${riskScript()}\n</script>`));
+  assert.match(rendered, /<div id="root"><\/div>/);
+  assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T84 保存できない理由と読み込みの苦情を出す", () => {
-  const locked = renderRiskPage(
-    page({ lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } }),
-    { nonce: "n" },
-  );
-  assert.match(locked, /<p id="lock" class="lock">作業中のチケットがある（i0001-02）<\/p>/);
-  const open = renderRiskPage(page(), { nonce: "n" });
-  assert.match(open, /<p id="lock" class="lock hidden"><\/p>/);
-  const broken = renderRiskPage(page({ model: readRisk("version: 1\nfactors: nope\n").model }), { nonce: "n" });
-  assert.match(broken, /<ul class="problems">/);
-  assert.match(broken, /factors が並びではない/);
-});
-
-// 画面の中のスクリプトは文字列なので、tsc は見ない。壊れても画面が黙って動かなくなるだけ。
-test("CB-T85 画面に埋める script は構文として通る", () => {
-  const html = renderRiskPage(page(), { nonce: "n" });
-  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
-  assert.doesNotThrow(() => new Function(body));
-});
-
-test("CB-T122 項目の一覧は 1 件 1 行で既定は畳み、開いた行を id で state に控える", () => {
-  const html = renderRiskPage(page(), { nonce: "n" });
-  assert.match(html, /<ul class="list" id="factors"><\/ul>/);
-  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
-  assert.match(body, /class: "row-head"/);
-  assert.match(body, /if \(factor && factor\.id !== ""\) \{ ids\.push\(factor\.id\); \}/);
-  assert.match(body, /savedOpen\.has\(factor\.id\)/);
-  assert.match(html, /<input id="find" type="search"/);
-  // 閾値の飾りの札は出さない
-  assert.doesNotMatch(body, /level-name/);
-});
-
-test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が変わり、YAML のキー名は title に載せる", () => {
-  const html = renderRiskPage(page(), { nonce: "n" });
-  const body = html.split('<script nonce="n">')[1].split("</script>")[0];
-  assert.match(body, /captioned\("点", points, "", "points"\)/);
-  assert.match(body, /captioned\("文面", [^\n]*"message"\)/);
-  assert.match(body, /function valueLabel\(kind\) \{[\s\S]*?"しきい値"/);
-  assert.match(body, /captioned\(name\.toUpperCase\(\), input, "", "levels\." \+ name\)/);
+test("CB-T155 読み直せなかったときは一覧の代わりに理由を渡す", () => {
+  const rendered = riskHtml({ kind: "error", error: "配点のファイルを読めない" });
+  assert.match(rendered, /"kind":"error"/);
+  assert.match(rendered, /配点のファイルを読めない/);
 });

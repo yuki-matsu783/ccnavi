@@ -1,7 +1,7 @@
 /** 画面に中身を渡す段取り。どの状態で何が飛ぶか（拡張ホスト側。VS Code は要らない） */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { screenHost, type Surface } from "../../src/core/screen-host.js";
+import { retainedHost, screenHost, type Surface } from "../../src/core/screen-host.js";
 
 interface Spy extends Surface {
   visible: boolean;
@@ -149,4 +149,62 @@ test("CB-T150 教えてもらえなくても、表裏が変わっていれば気
   assert.equal(host.live, false, "戻ってきた画面は作り直されている");
   assert.equal(host.send("い"), "deferred");
   assert.deepEqual(spy.posted, []);
+});
+
+// ---- 保持する画面（retainContextWhenHidden: true）。裏でも生きているので段取りが変わる
+
+test("CB-T151 保持する画面は入れ物を 1 度しか入れない。2 枚目からは中身だけ送る", () => {
+  const spy = surface();
+  const host = retainedHost<string>(spy, (data) => `<html>${data}</html>`);
+  assert.equal(host.send("あ"), "rebuilt");
+  assert.deepEqual(spy.pages, ["<html>あ</html>"]);
+  // 組み上がるまでは受け口が無い。入れ直しもしない（読み込んでいるものを捨てない）
+  assert.equal(host.live, false);
+  assert.equal(host.send("い"), "deferred");
+  assert.deepEqual(spy.pages, ["<html>あ</html>"]);
+  host.ready();
+  assert.equal(host.live, true);
+  assert.equal(host.send("い"), "posted");
+  assert.deepEqual(spy.pages, ["<html>あ</html>"], "入れ直すと打ちかけの編集が消える");
+  assert.deepEqual(spy.posted, [{ type: "data", data: "い" }]);
+});
+
+test("CB-T152 保持する画面は裏に回っても入れ直さず、裏にいる間も送れる", () => {
+  const spy = surface();
+  const host = retainedHost<string>(spy, (data) => data);
+  host.send("あ");
+  host.ready();
+  // 裏へ。VS Code は画面を捨てないので、送ったものは届く
+  spy.visible = false;
+  host.hidden();
+  assert.equal(host.live, true);
+  assert.equal(host.send("い"), "posted", "入れ直すと、裏で打ちかけていた編集が消える");
+  assert.deepEqual(spy.pages, ["あ"]);
+  assert.deepEqual(spy.posted, [{ type: "data", data: "い" }]);
+  // 1 度きりのメッセージ（lock・changed）も裏のまま届く
+  assert.equal(host.post({ type: "lock" }), true);
+  spy.visible = true;
+  assert.equal(host.send("う"), "posted", "表に戻っても作り直されていないので、そのまま送れる");
+  assert.deepEqual(spy.pages, ["あ"]);
+});
+
+test("CB-T153 保持する画面でも、1 枚目が組み上がるまでは 1 度きりのメッセージを送らない", () => {
+  const spy = surface();
+  const host = retainedHost<string>(spy, (data) => data);
+  assert.equal(host.post({ type: "lock" }), false, "まだ 1 枚も入れていない");
+  host.send("あ");
+  assert.equal(host.post({ type: "lock" }), false, "読み込んでいる最中。送っても落ちる");
+  host.ready();
+  assert.equal(host.post({ type: "lock" }), true);
+  assert.deepEqual(spy.posted, [{ type: "lock" }]);
+});
+
+test("CB-T154 保持する画面も、入れ物に埋めて渡すものは 1 枚目にだけ使う", () => {
+  const spy = surface();
+  const host = retainedHost<string>(spy, (data) => `<html>${data}</html>`);
+  assert.equal(host.send("素", "埋めた"), "rebuilt");
+  assert.deepEqual(spy.pages, ["<html>埋めた</html>"]);
+  host.ready();
+  assert.equal(host.send("素", "埋めた"), "posted");
+  assert.deepEqual(spy.posted, [{ type: "data", data: "素" }]);
 });
