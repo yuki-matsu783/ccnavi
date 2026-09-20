@@ -1007,6 +1007,28 @@ phases:
 """
 
 
+class WrapperFlagsComeOnceTest(PhaseHarness):
+    """sh が計算して渡す綴り（`--root` / `--cwd`）は 2 度渡せない（ADR-0063、issue #65）。
+
+    `ccnavi-review.sh` は `"$bin" --root "$root" --cwd "$here" "$@"` の形で呼ぶ。
+    どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。後ろに
+    1 本足すと argparse が後勝ちで読むので、2 本目が在ること自体を断る。
+    """
+
+    def test_a_second_cwd_is_refused(self):
+        refused = self.ccnavi("--cwd", self.parent_tree, "--cwd", self.root, "--explain", "--json")
+
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("--cwd は 1 度しか渡せない", refused.stderr)
+
+    def test_one_of_each_still_goes_through(self):
+        """1 本ずつなら通る。断る側だけを見ると、全部断る実装でも緑になる。"""
+        passed = self.ccnavi("--cwd", self.parent_tree, "--explain", "--json")
+
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        self.assertTrue(json.loads(passed.stdout))
+
+
 class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
     """`ticket` の副命令に `--phases` を足しても、種類は共通層のまま（ADR-0063、issue #65）。
 

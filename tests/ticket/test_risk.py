@@ -293,6 +293,36 @@ class RiskTest(PhaseHarness):
         self.assertIn("--risk は診断", closed.stderr)
         self.assertEqual(25, self.record()["points"])
 
+    def test_a_second_root_on_ticket_done_is_refused(self):
+        """`ticket done <子> --root <偽>` は断る。issue #65 の敵対的レビューで出た形。
+
+        sh は自分の `--root` を先に置き、エージェントの引数を後ろに繋ぐ
+        （`exec "$bin" --root "$root" ticket "$@"`）。argparse は後勝ちなので、後ろに
+        1 本足すと sh が渡した本物を上書きできた。`--root` からは共通層の 3 本も
+        `projects` も `approved` も導かれるので、`--risk` を使わずに同じ差し替えができる。
+        実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子が
+        「リスク 0」で**本物の置き場に**閉じられた。
+
+        ここでは偽のルートの中身を作り込まない。2 本目が在ること自体を断るので、
+        中身に関わらず同じところで止まる。
+        """
+        tree = self.one_child(review=False)
+        write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "big")
+
+        refused = self.ccnavi("ticket", "done", "i0001-01", "--root", os.path.join(self.root, "x"))
+
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("--root は 1 度しか渡せない", refused.stderr)
+        # 止まったことを、結末の側でも見る。閉じても記録を残してもいない。
+        doing = os.path.join(self.approved, "doing", "i0001-01.md")
+        self.assertTrue(os.path.exists(doing), "doing/ から動いた")
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "phases", "i0001", "i0001-01.risk.json")),
+            "採点の記録が残った",
+        )
+
     # ---- 6. lint と組み込みへの退避
 
     def test_lint_reports_a_broken_definition_and_builtin_takes_over(self):

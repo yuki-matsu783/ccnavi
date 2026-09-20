@@ -68,6 +68,10 @@ workspace's own layer; the common layer uses --phases):
 The common layer's own three files are moved by --rules, --phases and --risk.
 They are on the same gate: diagnosis only, dropped everywhere else.
 
+--root and --cwd say where this run is happening. The wrapper scripts in
+.ccnavi/scripts/ work them out and pass them, so they are accepted once only;
+a second one is refused rather than taken as an override.
+
 To list the tickets, their places, the phase marks and the review holds
 in a machine-readable form (the VS Code board extension reads this), run
 
@@ -199,6 +203,36 @@ COMMON_LAYER_OVERRIDES = (
 )
 # 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
 DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
+# `.ccnavi/scripts/` の sh が自分で計算して渡す綴りと、渡されなかったときの値。
+# どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。
+#
+# sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐ
+# （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
+# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
+# `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
+# 実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
+# 本物の置き場に「リスク 0」で閉じられた（ADR-0063）。
+#
+# 正しい 1 本が先に在ることに頼らず、2 本目が在ること自体を断る。落として先へ進むのでは
+# なく止めるのは、この 2 つに「2 度渡す」正しい使い方が無いから。診断の 5 本と違って、
+# 効く経路の話ではない。
+WRAPPER_FLAGS = (("--root", "root", None), ("--cwd", "cwd", ""))
+
+
+def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
+    """sh が渡す綴りが 2 度来ていないかを見て、1 本に均す。2 度来ていたら False。
+
+    数えるのは argparse に任せる（`action="append"`）。argv を自分で数えると、
+    別のオプションの**値**に書いた `--root` という語まで数えてしまう
+    （`ccnavi ... --reason --root` は `--reason` の値であって、渡した `--root` ではない）。
+    """
+    for flag, name, absent in WRAPPER_FLAGS:
+        given = getattr(args, name)
+        if given is not None and len(given) > 1:
+            stderr.write(f"ccnavi: {flag} は 1 度しか渡せない（{len(given)} 度渡された）\n")
+            return False
+        setattr(args, name, given[-1] if given else absent)
+    return True
 
 
 def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
@@ -251,7 +285,8 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
-    parser.add_argument("--root", default=None)
+    # 綴りは sh が計算して渡す。2 度来ていないかを見るので、束ねて受ける（WRAPPER_FLAGS）。
+    parser.add_argument("--root", action="append", default=None)
     parser.add_argument("--mode", default="")
     parser.add_argument("--rules", default="")
     parser.add_argument("--log", default=None)
@@ -296,7 +331,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--project-phases-file", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
-    parser.add_argument("--cwd", default="")
+    parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
@@ -310,6 +345,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     if args.help:
         stderr.write(USAGE)
+        return EXIT_ERROR
+    if not _one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
