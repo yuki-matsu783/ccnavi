@@ -1,43 +1,44 @@
 """`ccnavi/` の import の向きを、テストで守る。
 
-パッケージは平屋で、段はディレクトリにも命名にも現れない。向きは慣習だけで
-保たれていて、逆流しても誰も言わない。ここに段の順序を 1 か所だけ書き、
-その順序と食い違う import を名指しする。
+`ccnavi/` は 1 つのディレクトリにモジュールが並ぶだけで、読む順はディレクトリにも
+命名にも現れない。向きは慣習だけで保たれていて、逆流しても誰も言わない。ここに
+読む順を 1 か所だけ書き、その順と食い違う import を名指しする。
 
-「層」と呼ばないのは、このリポジトリでは層が設定の 3 層（共通層・自身の層・
-プロジェクトの層）を指すため。ここで言う段はモジュールの読む順で、別のもの。
+「層」ではなく「段」と呼ぶのは、このリポジトリでは層が設定の 3 層（共通層・
+自身の層・プロジェクトの層）を指すため。ここで言う段はモジュールを読む順で、
+別のもの。
 
 読むのは `ccnavi/*.py` の import 文だけ。実行ファイルは起動しないので速い。
 
-**関数の中の import も数える。** 循環は、頭の import を関数の中へ下ろすと
-消えたように見える。`ast.walk` で全部拾うので、下ろしても隠れない。
+**関数の中の import も数える。** 循環は、先頭の import を関数の中へ移すと
+消えたように見える。`ast.walk` ですべて拾うので、移しても隠れない。
 
 見るのは 5 つ。
 
-1. どのモジュールも段をちょうど 1 つ持つ。1 本足したら、どの段かを決めさせる
-2. パッケージは平屋のまま。サブパッケージができると、2〜4 の目が届かなくなる
-3. import の行き先は、同じ段か下の段。上を向いた 1 本を名指しする
-4. 循環は `KNOWN_KNOTS` に書いた 2 組だけ。**多くても少なくても落とす。**
-   ほどけたら一覧から消す、が要るようにしてある。消し忘れた一覧は、
-   次に同じ場所が絡まったときに何も言わなくなる
-5. 行き先を import 文から隠す綴りを使っていない
+1. どのモジュールも段をちょうど 1 つ持つ。モジュールを足したら、どの段かを決めさせる
+2. `ccnavi/` の下にサブパッケージを作らない。作ると 1・3・4 の検査の対象から外れる
+3. import の行き先は、同じ段か下の段。上を向いた import を名指しする
+4. 循環は `KNOWN_KNOTS` に書いた 2 組だけ。**増えても減っても落とす。**
+   解消したら一覧から消す、が要るようにしてある。消し忘れた一覧は、次に同じ
+   場所で循環ができたときに何も言わなくなる
+5. import の行き先が、import 文に残らない書き方をしていない
 
-段の中での import は自由にしてある。段は「どちらが先に読めるか」の順序で、
-同じ段の中の結び付きは 4 番目が見る。**同じ段どうしの事故（たとえば判定が
-チケットを動かし始める形）は、この番犬では止まらない。**
+同じ段どうしの import は止めない。段は「どちらを先に読めるか」の順序であって、
+同じ段の中の結び付きは 4 が見る。**同じ段どうしの事故（たとえば判定がチケットを
+動かし始める形）は、このテストでは止まらない。**
 
-**5 番目が要るのは、上の 4 つが import 文しか読まないから。**
+**5 が要るのは、1 から 4 が import 文しか読まないから。**
 `importlib.import_module("ccnavi.judge")` と、ドットの無い `import ccnavi` に
-続く `ccnavi.judge.…` は、行き先が import 文に残らないので 1 本も見つからない。
+続く `ccnavi.judge.…` は、行き先が import 文に残らないので 1 つも見つからない。
 どちらも `ccnavi/` では 1 度も使っていないので、綴りごと止めるほうが安い。
-**証明ではない。** `getattr` や `exec` で組み立てれば、いまでも隠せる。
-そこまで塞ぐには import を実行時に捕まえるしかなく、この速さを手放すことになる。
+**すり抜けられないわけではない。** `getattr` や `exec` で組み立てれば、いまでも
+隠せる。そこまで塞ぐには import を実行時に捕まえるしかなく、この速さを手放す。
 
-`main.py`（PyInstaller の入口）は `ccnavi/` の外なのでここには入らない。
+`main.py`（PyInstaller の入口）は `ccnavi/` の外なので、ここには入らない。
 中身は `__main__.py` と同じ 2 行で、`tests/core/test_entry.py` が見ている。
 
 `core` はいつも回るので（`.claude/skills/commit/references/test-groups.md`）、
-`ccnavi/*.py` を触ったコミットでは必ずここも走る。
+`ccnavi/*.py` を変えたコミットでは必ずここも走る。
 """
 
 from __future__ import annotations
@@ -61,7 +62,7 @@ PACKAGE = os.path.join(ROOT, "ccnavi")
 TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "base",
-        "素材。同じパッケージのどのモジュールも読まない",
+        "同じパッケージのどのモジュールも読まない",
         frozenset(
             {
                 "__init__",
@@ -79,7 +80,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     ),
     (
         "read",
-        "素材だけで足りる読み手。git とルールと動作モード",
+        "最下段だけを読む。git の状態・ルール・動作モード",
         frozenset({"gitstate", "modes", "rules"}),
     ),
     (
@@ -87,7 +88,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         "作業ツリーとチケットの、いまの形を読む",
         frozenset({"builtin", "ctxfile", "risk", "selfguard", "ticket"}),
     ),
-    ("compose", "設定を読んで、判定の材料に畳む", frozenset({"phasetypes", "ruleload"})),
+    ("compose", "層ごとの設定を読んで、判定の材料に組む", frozenset({"phasetypes", "ruleload"})),
     (
         "work",
         "承認済みチケットとフェーズと、それに添える文面",
@@ -109,13 +110,13 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
 #
 # - approval ↔ phase
 #   承認済みチケットの走査（approval）と、フェーズの状態（phase）が互いを直に読む。
-#   これが主の輪。文面（reasons）は approval から読まれて phase を読むので、
-#   顔ぶれとしては同じ組に入る
+#   これが循環の中心。文面（reasons）は approval から読まれて phase を読むので、
+#   同じ組に入る
 # - ops ↔ review
 #   `ops` が `review` の置き場の綴りを関数の中で引き、`review` が
 #   `ops.close_problems` と `ops.cancel` を呼ぶ
 #
-# 組は「絡まっている顔ぶれ」で持つ。輪の向きや本数は見ない。
+# 組は「どのモジュールが入っているか」で持つ。循環の向きや本数は見ない。
 KNOWN_KNOTS: frozenset[tuple[str, ...]] = frozenset(
     {
         ("approval", "phase", "reasons"),
@@ -134,7 +135,7 @@ def modules() -> list[str]:
 
 
 def subpackages() -> list[str]:
-    """`ccnavi/` の下のディレクトリ。平屋の前提が崩れていないかを見る。"""
+    """`ccnavi/` の下のディレクトリ。モジュールが 1 つのディレクトリに並んでいるかを見る。"""
     return sorted(
         name
         for name in os.listdir(PACKAGE)
@@ -155,8 +156,8 @@ def imports_of(module: str, known: set[str]) -> set[str]:
         from . import approval, audit      from .modes import EXIT_OK
         from ccnavi import settings        from ccnavi.modes import EXIT_OK
 
-    後ろの 2 つは `main.py` が使っている形。パッケージの中で同じ癖で書かれても
-    落ちないように、相対と同じに数える。
+    後ろの 2 つは `main.py` が使っている形。パッケージの中で同じ書き方をされても
+    見落とさないように、相対と同じに数える。
     """
     found: set[str] = set()
     for node in ast.walk(parse(module)):
@@ -212,7 +213,7 @@ def graph() -> dict[str, set[str]]:
 
 
 def knots(edges: dict[str, set[str]]) -> set[tuple[str, ...]]:
-    """互いに行き来できるモジュールの組（2 本以上のもの）。
+    """互いに行き来できるモジュールの組（2 つ以上のもの）。
 
     数十本しかないので、行ける先を広げきってから、行きと帰りの両方があるものを
     集める。速い代わりに読みにくい手（Tarjan / Kosaraju）は要らない。
@@ -268,13 +269,13 @@ class ModuleTiersTest(unittest.TestCase):
         self.assertEqual([], phantom, "TIERS が、置かれていないモジュールを挙げている")
 
     def test_the_package_stays_flat(self):
-        """パッケージは平屋のまま。"""
+        """`ccnavi/` の下にサブパッケージを作らない。"""
         self.assertEqual(
             [],
             subpackages(),
-            "`ccnavi/` にサブパッケージができている。この番犬は `ccnavi/*.py` しか"
+            "`ccnavi/` にサブパッケージができている。このテストは `ccnavi/*.py` しか"
             "見ないので、中のモジュールは段を持たないまま素通りする。TIERS を"
-            "入れ子に直すか、平屋に戻す",
+            "入れ子に直すか、モジュールを `ccnavi/` の直下に戻す",
         )
 
     def test_no_module_imports_a_higher_tier(self):
@@ -301,17 +302,18 @@ class ModuleTiersTest(unittest.TestCase):
         self.assertEqual(
             [],
             fresh,
-            "KNOWN_KNOTS に無い循環がある。新しくできたか、既知の輪の顔ぶれが"
-            "変わったか。片方向に直す（関数の中へ import を下ろすのは隠すだけで、"
-            "ここは同じに数える）",
+            "KNOWN_KNOTS に無い循環がある。新しくできたか、既知の循環に入る"
+            "モジュールが変わったか。片方向に直す（関数の中へ import を移すのは"
+            "隠すだけで、ここは同じに数える）",
         )
 
         gone = sorted(" ↔ ".join(group) for group in KNOWN_KNOTS - found)
         self.assertEqual(
             [],
             gone,
-            "KNOWN_KNOTS に書いた循環が見つからない。ほどけたか、顔ぶれが変わったか。"
-            "一覧を直す（残すと、次に同じ場所が絡まったときに何も言わなくなる）",
+            "KNOWN_KNOTS に書いた循環が見つからない。解消したか、入るモジュールが"
+            "変わったか。一覧を直す（残すと、次に同じ場所で循環ができたときに"
+            "何も言わなくなる）",
         )
 
     def test_no_module_hides_where_it_is_going(self):
@@ -320,8 +322,8 @@ class ModuleTiersTest(unittest.TestCase):
         self.assertEqual(
             [],
             hidden,
-            "import の行き先が import 文に残らない書き方をしている。上の 4 つは"
-            "この形を 1 本も見つけられないので、綴りのほうを止める。どうしても"
+            "import の行き先が import 文に残らない書き方をしている。1 から 4 は"
+            "この形を 1 つも見つけられないので、綴りのほうを止める。どうしても"
             "要るなら、なぜ要るかを添えてここに例外を書く",
         )
 
