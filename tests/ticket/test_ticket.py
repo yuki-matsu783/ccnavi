@@ -840,6 +840,19 @@ class TicketTest(unittest.TestCase):
         self.assertIn("i0001-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
         self.assertIn("--approve", refused.stderr)
 
+    def test_a_child_without_any_parent_at_all_is_named(self):
+        """親の提案がどこにも無い子は、親が無いと言って止めること。
+
+        人が子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
+        引いたときの「無い」をここで言わないと、ワークツリーの検査まで進んで別の話になる。
+        """
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+        self.worktree("i0001-01", "main")
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 が見つからない", refused.stderr)
+
     # ---- 4. フェーズの終わりと HITL ポイント
 
     def close_phase(self):

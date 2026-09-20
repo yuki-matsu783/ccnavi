@@ -446,7 +446,9 @@ def _parent_not_started(
         )
         return True
     if parent.state != ticket_mod.DOING:
-        stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。閉じた親に子は足さない\n")
+        # 置き場だけを言う。`review/` に親が居るのは壊れたデータのときだけだが、そこで
+        # 「閉じた」と言うと、文面が事実と違う。
+        stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。子を足す相手ではない\n")
         return True
     if not parent.started_at:
         stderr.write(
