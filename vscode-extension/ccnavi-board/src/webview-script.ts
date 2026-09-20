@@ -1,5 +1,5 @@
 /**
- * 束ねた画面のスクリプト（`out/webview/board.js`）を読む。拡張が `<script nonce>` に流し込む。
+ * 束ねた画面のスクリプト（`out/webview/<名前>.js`）を読む。拡張が `<script nonce>` に流し込む。
  *
  * ファイルとして Webview に読ませないのは、`localResourceRoots` を空のままにして
  * 「外部資源に依存しない 1 枚の HTML」を保つため。読むのは 1 度だけで、あとは覚えておく。

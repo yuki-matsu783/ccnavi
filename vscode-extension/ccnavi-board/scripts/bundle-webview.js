@@ -1,4 +1,4 @@
-// 画面（React）を 1 本に束ねる。`pnpm run compile` と `pnpm test` が呼ぶ。
+// 画面（React）を、画面ごとに 1 本へ束ねる。`pnpm run compile` と `pnpm test` が呼ぶ。
 //
 // 出来上がりは拡張が読んで `<script nonce>` に流し込む（core/render.ts）。ファイルとして
 // 読ませないので、Webview の localResourceRoots は空のままでよく、CSP も nonce だけで済む。
@@ -10,10 +10,22 @@ const esbuild = require("esbuild");
 
 const here = path.resolve(__dirname, "..");
 
+// 画面の一覧（名前 → 入口）。画面を足すときはここに 1 行足す。
+//
+// 名前は出来上がりの綴り（`out/webview/<名前>.js`）で、読む側（`src/webview-script.ts` の
+// `webviewScript(name)`）は名前を取るので、画面が増えても読む側は直さなくてよい。
+// 束ねるのは領域ごとのテスト（`test:rules` など）でも全部で、型を見るのも
+// `tsconfig.webview.json`（`src/webview` 全部）で全部。束ねるものと型を見るものは揃えてある。
+const SCREENS = {
+  board: path.join("src", "webview", "board", "main.tsx"),
+};
+
 esbuild
   .build({
-    entryPoints: [path.join(here, "src", "webview", "board", "main.tsx")],
-    outfile: path.join(here, "out", "webview", "board.js"),
+    // `{ in, out }` の形で渡すと、出口は `outdir` の下の `<out>.js` になる。
+    // 分割（splitting）はしないので、画面どうしは何も共有せず 1 本ずつで完結する
+    entryPoints: Object.entries(SCREENS).map(([name, entry]) => ({ in: path.join(here, entry), out: name })),
+    outdir: path.join(here, "out", "webview"),
     bundle: true,
     platform: "browser",
     // Webview は VS Code に入っている Chromium。ES2022 で足りる
