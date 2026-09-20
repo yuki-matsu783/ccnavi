@@ -81,7 +81,7 @@ export type BoardMessage =
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-board-data";
 
-/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（5 画面で同じ） */
+/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
 export function embedData(data: BoardData): string {
   return embedJson(data);
 }

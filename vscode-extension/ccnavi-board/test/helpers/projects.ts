@@ -3,7 +3,8 @@
  *
  * 画面は束ねた 1 本（`out/webview/projects.js`）で、拡張はそれを `<script nonce>` に流し込む。
  * ここでも同じ 1 本を流し込むので、テストが見るのは配るものと同じ画面になる。
- * 束ねるのは `pnpm test` の中の `scripts/bundle-webview.js`（この入口は `BUNDLE_ENTRIES` に挙げてある）。
+ * 束ねるのは `pnpm test` の中の `scripts/bundle-webview.js`。この入口の綴り（`test/helpers/<画面の名前>.ts`）が
+ * 約束で、`scripts/test-groups.js` はそれを辿って「この画面を読むグループ」を決める。
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */
@@ -11,8 +12,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { LintProblem } from "../../src/core/lintmodel.js";
-import type { ProjectRow, ProjectsPage } from "../../src/core/projects.js";
-import type { ProjectsData } from "../../src/core/projects-view.js";
+import type { ProjectRow, ProjectsData, ProjectsPage } from "../../src/core/projects-view.js";
 import { renderProjectsPage, type RenderOptions } from "../../src/core/projects-render.js";
 import { loadPage, type DomPage } from "./dom.js";
 
