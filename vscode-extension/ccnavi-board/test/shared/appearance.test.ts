@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { appearanceClass, bodyTag, parseAppearance } from "../../src/core/appearance.js";
+import { appearanceClass, bodyTag, parseAppearance, sendAppearance } from "../../src/core/appearance.js";
+import { retainedHost, screenHost, type Surface } from "../../src/core/screen-host.js";
 import { WEBVIEW_SRC } from "../helpers/bundle.js";
 
 /** Claude の配色そのもの。画面の側の CSS にある（拡張が持つのは body のクラスだけ） */
@@ -49,4 +50,68 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   for (const [fg, bg] of pairs) {
     assert.ok(contrast(fg, bg) >= 4.5, `${fg} on ${bg} = ${contrast(fg, bg).toFixed(2)}`);
   }
+});
+
+/** 段取りの下に置く Webview の代わり。何が飛んだかだけを見る */
+function surface(visible = true): Surface & { visible: boolean; readonly pages: string[]; readonly posted: unknown[] } {
+  const pages: string[] = [];
+  const posted: unknown[] = [];
+  return {
+    visible,
+    pages,
+    posted,
+    html(text) {
+      pages.push(text);
+    },
+    post(message) {
+      posted.push(message);
+    },
+  };
+}
+
+test("CB-T182 見た目は画面に中身を渡す段取りを通る。組み上がっていない画面と捨てられた画面には送らない", () => {
+  const spy = surface();
+  const host = screenHost<string>(spy, (data) => data);
+
+  // 1 枚も入れていない。入れ物を入れる道はまだ通っていないので送り先が無い
+  assert.equal(sendAppearance(host, "claude-dark"), false);
+  assert.deepEqual(spy.posted, []);
+
+  // 入れ物は入ったが、まだ組み上がっていない（受け口が無い）
+  host.send("あ");
+  assert.equal(sendAppearance(host, "claude-dark"), false);
+  assert.deepEqual(spy.posted, [], "落ちるものを送ると、送ったつもりの切り替えが残る");
+
+  // 組み上がった
+  host.ready();
+  assert.equal(sendAppearance(host, "claude-dark"), true);
+  assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
+
+  // 裏へ。画面は捨てられているので送らない。表に戻すと入れ物から作り直され、
+  // 組み上がった（`ready`）ところで呼ぶ側が送り直す
+  spy.visible = false;
+  host.hidden();
+  assert.equal(sendAppearance(host, "vscode"), false);
+  assert.deepEqual(spy.posted, [{ type: "appearance", value: "claude-dark" }]);
+});
+
+test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んでいる間だけ落ちる", () => {
+  const spy = surface();
+  const host = retainedHost<string>(spy, (data) => data);
+
+  host.send("あ");
+  // 入れ物を入れてから組み上がるまでは受け口が無い
+  assert.equal(sendAppearance(host, "claude-light"), false);
+  host.ready();
+  assert.equal(sendAppearance(host, "claude-light"), true);
+
+  // 保持する画面は裏に回っても捨てられない。表裏を見ないので送れる
+  // （届くかどうかは VS Code 次第なので、表に戻ったところで呼ぶ側が送り直す）
+  host.hidden();
+  assert.equal(sendAppearance(host, "vscode"), true);
+  assert.deepEqual(spy.posted, [
+    { type: "appearance", value: "claude-light" },
+    { type: "appearance", value: "vscode" },
+  ]);
+  assert.deepEqual(spy.pages, ["あ"], "入れ直すと画面が作り直され、打ちかけの編集が飛ぶ");
 });

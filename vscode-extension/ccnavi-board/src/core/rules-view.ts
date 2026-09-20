@@ -14,7 +14,7 @@
  * だけ**（人が「再読込」を押した、保存が通って中身が入れ替わった）。ファイルが外で変わっただけの
  * ときは `changed` の帯を出し、捨てるかどうかは人が決める。
  */
-import type { Appearance } from "./appearance.js";
+import type { AppearanceMessage } from "./appearance.js";
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
@@ -139,7 +139,7 @@ export type ToRules =
   | { readonly type: "cancelled" }
   /** 選んだファイルの綴り。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }
-  | { readonly type: "appearance"; readonly value: Appearance };
+  | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（rules-panel の `asMessage`）が形を確かめてから使う */
 export type RulesMessage =

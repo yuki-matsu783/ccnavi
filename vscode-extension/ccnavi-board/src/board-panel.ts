@@ -7,7 +7,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { followAppearance, readAppearance } from "./appearance.js";
+import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
 import {
@@ -115,7 +115,6 @@ export async function openBoard(project?: string): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
-  followAppearance(panel);
   const current: PanelState = {
     panel,
     folder,
@@ -129,6 +128,7 @@ export async function openBoard(project?: string): Promise<void> {
     approval: CLOSED,
   };
   state = current;
+  followAppearance(panel, current.host);
   registerPanelHandlers(current);
   show(current, buildBoard(first.board));
 }
@@ -318,8 +318,8 @@ function handleMessage(message: BoardMessage | undefined): void {
       current.host.ready();
       redraw(current);
       // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-      // `followAppearance` がそのとき送ったものは、捨てられた画面に落ちている
-      current.host.post({ type: "appearance", value: readAppearance() } satisfies ToBoard);
+      // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
+      postAppearance(current.host);
       return;
     case "refresh":
       void update();

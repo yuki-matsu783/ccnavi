@@ -26,7 +26,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { followAppearance, readAppearance } from "./appearance.js";
+import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLint } from "./ccnavi.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./core/risk-doc.js";
@@ -122,7 +122,6 @@ export async function openRisk(): Promise<void> {
     // 編集の途中を持つので、タブを裏に回しても捨てない。
     retainContextWhenHidden: true,
   });
-  followAppearance(panel);
   const current: PanelState = {
     panel,
     folder,
@@ -136,6 +135,7 @@ export async function openRisk(): Promise<void> {
     wroteAt: 0,
   };
   state = current;
+  followAppearance(panel, current.host);
   registerPanelHandlers(current);
   show(current);
   void refreshLock(current);
@@ -179,11 +179,14 @@ function registerPanelHandlers(current: PanelState): void {
   // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
   // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
+  // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない（issue #87）。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
     }
     current.host.post({ type: "lock", lock: current.lock } satisfies ToRisk);
+    postAppearance(current.host);
     if (current.changedPending) {
       current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToRisk);
@@ -421,7 +424,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
     current.host.ready();
     redraw(current);
-    current.host.post({ type: "appearance", value: readAppearance() } satisfies ToRisk);
+    postAppearance(current.host);
     return;
   }
   // 読み直せていない画面では、配点に当たる操作はどれも行き先が無い（「再読込」は

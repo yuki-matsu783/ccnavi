@@ -42,3 +42,26 @@ export interface AppearanceMessage {
   readonly type: "appearance";
   readonly value: Appearance;
 }
+
+/**
+ * 見た目の送り先。画面に中身を渡す段取り（`ScreenHost`）の `post` だけを使う形。
+ * `ScreenHost<D>` はそのまま渡せる（`post` は `unknown` を取り、`boolean` を返す）。
+ */
+export interface AppearanceSink {
+  /** 生きている画面にだけ届く。届いたら真、落ちるので送らなかったら偽 */
+  post(message: AppearanceMessage): boolean;
+}
+
+/**
+ * 見た目を画面へ送る。**段取りを通す**ので、組み上がっていない画面と捨てられた画面には送らない
+ * （偽が返る）。落ちたぶんを持ち越す必要は無い。どちらの道でも、後からいまの値が渡るため。
+ *
+ * - 入れ物ごと入れ直す道（`rebuilt`）では、組む側が `appearance` を HTML に埋める（`bodyTag`）
+ * - 画面が組み上がった（`ready`）ところで、呼ぶ側が送り直す
+ *
+ * 直に `webview.postMessage` を叩くと、この 2 つのどちらも通らない画面へ送ることになり、
+ * 「送ったつもりで落ちている」が段取りの外に残る（issue #87）。
+ */
+export function sendAppearance(sink: AppearanceSink, value: Appearance): boolean {
+  return sink.post({ type: "appearance", value });
+}

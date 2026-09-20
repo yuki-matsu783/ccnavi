@@ -12,7 +12,7 @@
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
  * 入れ物は 1 度しか入らない（ADR-0062）。中身が届くのは、画面の編集を捨ててよいときだけ。
  */
-import type { Appearance } from "./appearance.js";
+import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
@@ -109,7 +109,7 @@ export type ToPhases =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  | { readonly type: "appearance"; readonly value: Appearance };
+  | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（phases-panel の `asMessage`）が形を確かめてから使う */
 export type PhasesMessage =

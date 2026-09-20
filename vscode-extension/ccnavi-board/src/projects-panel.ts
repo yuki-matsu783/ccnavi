@@ -20,7 +20,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { followAppearance, readAppearance } from "./appearance.js";
+import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runLintJson } from "./ccnavi.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import {
@@ -110,9 +110,9 @@ export async function openProjects(): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
-  followAppearance(panel);
   const current: PanelState = { panel, folder, host: projectsHost(panel), watchers: [], loading: false, again: false, wasVisible: panel.visible };
   state = current;
+  followAppearance(panel, current.host);
   registerPanelHandlers(current, first.page.projectsRel, first.page.selfRulesRel);
   show(current, first.page);
 }
@@ -403,8 +403,8 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     current.host.ready();
     redraw(current);
     // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
-    // `followAppearance` がそのとき送ったものは、捨てられた画面に落ちている
-    current.host.post({ type: "appearance", value: readAppearance() } satisfies ToProjects);
+    // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
+    postAppearance(current.host);
     return;
   }
   // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す道がこれしかない
