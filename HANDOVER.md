@@ -467,6 +467,18 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 スクリプトだが、リポジトリの `settings.json` には登録していない。回すなら利用者ごとの
 `settings.local.json` で `Stop` に足す（ADR-0036）。
 
+拡張のぶんも同じ形で 2 本ある（ADR-0061、2026-09-20。issue #89）。`PostToolUse` の
+`mark-ext.sh` が拡張のファイルを触ったことを `<セッション>.ext-files` に書き残し、`Stop` の
+`test-ext.sh` が関わるグループだけを回す（`vscode-extension/ccnavi-board/scripts/test-groups.js`
+がテストの `import` を辿って決める）。どちらも `settings.json` には登録していない。回すなら
+`settings.local.json` で `PostToolUse`（`Write|Edit`）と `Stop` に足す。**登録しないと 1 本も
+回らない。** 拡張を触っていないターンは何もしないので伸びない。触ったターンで 3〜8 秒
+（全部で 9.5〜11.5 秒）。
+
+**これで気づけるのは「同じ機械で 1 回回して落ちること」だけ。** issue #89 が挙げた中心の懸念
+（混み具合で結果が変わる失敗）には効かない。そこに効くのは CI（道 1）か、同じテストを繰り返す
+枝で、どちらも入れていない。ADR-0061 の「得たもの・失ったもの」に書いてある。
+
 検査もテストも、通らないと exit 2 で差し戻される。うるさければ hooks から外す。
 
 Stop の差し戻しには上限がある。3 回で打ち切って止まらせる。回数はセッションごとに
@@ -478,6 +490,9 @@ Stop の差し戻しには上限がある。3 回で打ち切って止まらせ�
 どのツリーをテストするかも、そのターンで触ったものだけに絞ってある。どこを触ったかは
 `PostToolUse` の `lint-py.sh` が `<セッション>.trees` に書き残し、`Stop` の `test-py.sh` が
 それを読む。ツリーは編集したファイルからいちばん近い `pyproject.toml` を上に辿って決める。
+拡張の側も同じで、`test-ext.sh` は触ったファイルの綴りから `vscode-extension/ccnavi-board` を
+切り出すので、ワークツリーの中を直せばそのワークツリーが検査される。回数のファイルは
+`<セッション>.ext-retries` で、`test-py.sh` とは別に数える。
 
 実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
 動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。

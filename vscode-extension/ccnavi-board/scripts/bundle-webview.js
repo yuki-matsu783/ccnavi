@@ -1,16 +1,19 @@
-// 画面（React）を、画面ごとに 1 本へ束ねる。`pnpm run compile` と `pnpm test` が呼ぶ。
+// 画面（React）を、画面ごとに 1 本へ束ねる。`pnpm run compile` と、画面を読むテストを回すとき
+// （`scripts/test-groups.js`）に呼ばれる。
 //
 // 出来上がりは拡張が読んで `<script nonce>` に流し込む（core/render.ts）。ファイルとして
 // 読ませないので、Webview の localResourceRoots は空のままでよく、CSP も nonce だけで済む。
 // tsc は型を見るだけ（tsconfig.webview.json は noEmit）で、JS を出すのは esbuild のほう。
+//
+// 古い束ねを消すのはここではなく scripts/clean-out.js。あちらが out/webview ごと消してから
+// ここが作り直す順で、束ねる前に消す形にはしない（esbuild が落ちたときに、動いていた画面まで
+// 消えたまま残るため）。
 "use strict";
 
-const fs = require("node:fs");
 const path = require("node:path");
 const esbuild = require("esbuild");
 
 const here = path.resolve(__dirname, "..");
-const outdir = path.join(here, "out", "webview");
 
 // 画面の一覧（名前 → 入口）。画面を足すときはここに 1 行足す。
 //
@@ -22,15 +25,6 @@ const SCREENS = {
   board: path.join("src", "webview", "board", "main.tsx"),
 };
 
-if (Object.keys(SCREENS).length === 0) {
-  console.error("画面が 1 つも無い（SCREENS が空。out/webview を空にして拡張が動かなくなる）");
-  process.exit(1);
-}
-
-// 束ね直す前に置き場ごと消す。名前を変えたり画面をやめたりしたときに古い 1 本が残ると、
-// 拡張はそれを読めてしまう（消す側と作り直す側を同じ場所に置いて、片方だけ走る形を作らない）。
-fs.rmSync(outdir, { recursive: true, force: true, maxRetries: 3 });
-
 esbuild
   .build({
     // `{ in, out }` の形で渡すと、出口は `outdir` の下の `<out>.js` になる。
@@ -38,7 +32,7 @@ esbuild
     // localResourceRoots を空のままにする方針と両立しないため。代わりに React 一式が
     // 画面ごとに重複する（1 画面あたり 200KB 強）
     entryPoints: Object.entries(SCREENS).map(([name, entry]) => ({ in: path.join(here, entry), out: name })),
-    outdir,
+    outdir: path.join(here, "out", "webview"),
     bundle: true,
     platform: "browser",
     // Webview は VS Code に入っている Chromium。ES2022 で足りる
