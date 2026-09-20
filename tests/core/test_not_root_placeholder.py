@@ -43,20 +43,20 @@ def absolute(path: str) -> str:
     r"""`C:\...` と書いたパスを、いまの機械で絶対パスになる綴りに直す。
 
     展開はルートを 1 文字ずつ写すだけなので、区切りが `\` でも中身は変わらない。
-    変わるのは**絶対かどうか**で、`rules.real_root` が通す `os.path.realpath` は
-    相対のパスに cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
-    `<cwd>/C:\Users\...` に化け、「中」のはずのパスが全部「外」になり、長さの境界も
-    cwd のぶんだけずれる。設計 §2.3 の表は Windows の綴りのままにして、頭だけを機械に
+    変わるのは**絶対かどうか**で、`rules.real_root` が呼ぶ `os.path.realpath` は、
+    相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
+    `<cwd>/C:\Users\...` に化けて、「中」のはずのパスが全部「外」になり、長さの境界も
+    cwd のぶんだけずれる。設計 §2.3 の表は Windows の綴りのまま残して、頭だけを機械に
     合わせる（CLAUDE.md「実行環境」: 4 つのどれでも動くように書く）。
 
     `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
     展開した式は `\` と `/` のどちらも区切りとして当てるので、そこは直さなくてよい。
 
     `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の綴りにするのは、
-    「別々の 2 つのドライブは互いに外」を後から足したときに、黙って同じ絶対パスに
-    潰れないようにするため。**POSIX では絶対パスがどれも `/` で始まるので、
-    最外段（ルートの 1 文字目）の「違う」だけは試されない。** そこを縛るのは
-    Windows で回したときの `D:` で、Linux だけで回していると見えない。
+    「別々の 2 つのドライブは互いに外」を後から足したときに、黙って同じ絶対パスへ
+    潰れないようにするため。**POSIX の絶対パスはどれも `/` で始まるので、最外段
+    （ルートの 1 文字目）の「違う」だけは、ここでは試せない。** その段を縛れるのは
+    Windows で回したときの `D:` だけで、Linux だけで回していると穴に気づけない。
     """
     if os.name == "nt":
         return path
@@ -126,10 +126,10 @@ class NotRootExpansionTest(unittest.TestCase):
         self.assert_outside(
             root,
             absolute(r"C:\Users\u\Desktop\git\other\x.md"),  # 途中で違う
-            absolute(r"C:\Users\u\DesktopXgit\ccnavi\x.md"),  # 区切りの位置に別の字
+            absolute(r"C:\Users\u\DesktopXgit\ccnavi\x.md"),  # 区切りの位置に別の字が来る
             absolute(r"C:\Users\u\Desktop"),  # ルートより上
-            absolute(r"C:\Users\u\Desk"),  # ルートより上（要素の途中で終わる）
-            root[:-1],  # 同上。最後の 1 字だけ足りない
+            absolute(r"C:\Users\u\Desk"),  # ルートより上。名前の途中で終わる
+            root[:-1],  # 同上。ルートの最後の 1 字が足りない
             absolute(r"C:\Users\u\Desktop\git\ccnavi-fork\x.md"),  # 前置きが一致して続く
             absolute(r"D:\ccnavi\x.md"),  # 別のドライブ
         )
@@ -153,8 +153,8 @@ class NotRootExpansionTest(unittest.TestCase):
         ccnavi = absolute(r"C:\Users\u\Desktop\git\ccnavi")
         roots = [ccnavi + "\\", ccnavi + "/"]
         if os.name == "nt":
-            # ドライブ直下。POSIX の `/` は正規化すると空になり、拒否が正しいので
-            # ここでは見ない（test_root_that_normalizes_to_nothing_is_refused の側）。
+            # ドライブ直下。POSIX の `/` は正規化すると空になり、拒否するのが正しいので
+            # ここでは見ない。そちらは test_root_that_normalizes_to_nothing_is_refused が見る。
             roots += ["C:\\", "C:/"]
         for root in roots:
             with self.subTest(root=root):
