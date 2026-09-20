@@ -226,6 +226,16 @@ class RiskUnionTest(ConfigUnionHarness):
         where = self.project_where(layer) if layer else ""
         return [p for p in self.problems(severity, where=where) if "risk" in p["where"]]
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def one_child(self):
         """lib の親と子を承認し、子のワークツリーを lib から切って着手する。"""
         scope = ("src/*", "schema/*", "wip/*")
@@ -242,6 +252,7 @@ class RiskUnionTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.parent_tree = self.worktree(self.lib, "i0001")
+        self.start_parent()
         tree = self.worktree(self.lib, "i0001-01")
         started = self.ccnavi("ticket", "start", "i0001-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)

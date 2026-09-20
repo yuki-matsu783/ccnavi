@@ -8,6 +8,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cardSelector, openProjects, page, problem, projectsHtml, row } from "../helpers/projects.js";
+import { flatStyle } from "../helpers/bundle.js";
 import type { HTMLDetailsElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 要素の文字。前後の空白は落とす */
@@ -243,9 +244,9 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   }
 
   // メニューの項目は HC で枠が出る書き方（contrastBorder の変数）。押せない項目は点線
-  const html = projectsHtml({ kind: "page", page: page([row()]) });
-  assert.match(html, /\.menu > \.menu-items > button\.action \{ justify-content: flex-start; border-color: var\(--vscode-contrastBorder, transparent\);/);
-  assert.match(html, /\.menu > \.menu-items > button\.action:disabled \{ border-style: dashed; \}/);
+  const css = flatStyle(projectsHtml({ kind: "page", page: page([row()]) }));
+  assert.match(css, /\.menu > \.menu-items > button\.action \{ justify-content: flex-start; border-color: var\(--vscode-contrastBorder, transparent\);/);
+  assert.match(css, /\.menu > \.menu-items > button\.action:disabled \{ border-style: dashed; \}/);
 
   // .gitignore が済んでいれば lint の指摘はそのまま出る
   const fine = await openProjects([row()], { dirProblems: [problem("warn", "projects/ がワークスペースの git で無視されていない", "(projects)")] });

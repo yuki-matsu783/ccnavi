@@ -214,8 +214,19 @@ class PhaseHarness(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", message)
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def run_child(self, name, files=()):
         """子のワークツリーを作って着手し、ファイルを置いてコミットし、閉じる。"""
+        self.start_parent()
         tree = self.worktree(name, "i0001")
         started = self.ccnavi("ticket", "start", name)
         self.assertEqual(started.returncode, 0, started.stderr)
@@ -673,7 +684,7 @@ class PhaseTest(PhaseHarness):
         self.assertEqual(self.check(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
         # 親はまだ閉じられない。
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        self.start_parent()
         refused = self.close_child("i0001")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("フィードバック計画がまだ", refused.stderr)
@@ -720,7 +731,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         # フィードバック計画: 実装フィードバック対応を 1 本。承認がレビューの合意になり、
         # 止まっていたのが解ける。指摘は消えず、フィードバック作業フェーズの check が数える。
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        self.start_parent()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=["implement-feedback"]))
         planned = self.approve()
         self.assertEqual(planned.returncode, 0, planned.stdout + planned.stderr)
@@ -803,7 +814,7 @@ class PhaseTest(PhaseHarness):
         # フィードバック計画が無い間も外せない。
         refused = self.ready(fixture)
         self.assertIn("フィードバック計画", refused.stderr)
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        self.start_parent()
         self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
         self.assertEqual(self.approve().returncode, 0)
         # 閉じられる状態になったが、wip/ が追跡されたままなら外せない。
@@ -861,7 +872,7 @@ class PhaseTest(PhaseHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
         self.commit_parent("propose 02")
         self.assertEqual(self.approve().returncode, 0)
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        self.start_parent()
         data = read_json(fixture)
         data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
         write(fixture, json.dumps(data))
@@ -1068,7 +1079,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
 
 
 class ChatReviewTest(PhaseHarness):
-    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0051）。"""
+    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0065）。"""
 
     def chat_phase(self, plan=("chores", "design")):
         """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
@@ -1271,7 +1282,7 @@ class ChatReviewTest(PhaseHarness):
             0,
         )
         # フィードバック計画を承認して、2 番目（フィードバック対応）を回す。
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        self.start_parent()
         self.propose("i0001", parent_text("i0001", ["chores"], feedback=["chores-feedback"]))
         self.assertEqual(self.approve().returncode, 0)
         # 親を着手にすると、次の hook が承認済みチケットへ started_at を写す。写した跡を
@@ -1300,7 +1311,7 @@ class ChatReviewTest(PhaseHarness):
         passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         # フィードバック計画（対応が無くても空で）を承認してから親を閉じる。
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        self.start_parent()
         self.propose("i0001", parent_text("i0001", ["chores"], feedback=[]))
         self.assertEqual(self.approve().returncode, 0)
         closed = self.ccnavi("ticket", "done", "i0001")

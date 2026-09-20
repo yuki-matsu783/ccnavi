@@ -95,7 +95,8 @@ Claude Code に渡す。拡張はマーカーを置かず、実行ファイル�
 暖色の濃い地 `#262624`）に置き換える。意味の色（error の赤、warning の黄、成功の緑）も地に合わせた色に置き換える
 （ライトのテーマからダークを選んでも読めるように）。青系の強調（承認待ち・進行中・焦点）は橙に寄せる。文字の色は
 地に対して 4.5:1 以上で、テストがコントラスト比を数える。実装は body のクラスの下でテーマ変数を上書きするだけなので、
-部品の CSS はテーマ変数を読むまま変わらない（`src/core/appearance.ts`）。ハイコントラストのテーマでは Claude の配色を
+部品の CSS はテーマ変数を読むまま変わらない（配色は `src/webview/styles/appearance.css`、
+切り替えは `src/core/appearance.ts` と `src/webview/appearance.ts`）。ハイコントラストのテーマでは Claude の配色を
 効かせない（純黒・純白の地と焦点の色を置き換えると HC の意図が壊れる）。設定を書く先は、いま値が定義されている置き場
 （フォルダ → ワークスペース → 利用者）。
 
@@ -123,7 +124,7 @@ Claude Code に渡す。拡張はマーカーを置かず、実行ファイル�
 | fetch / pull | 行末の「git ▾」から。`git fetch` / `git pull` を `projects/<名前>` でターミナルへ送る。未コミットの有無は見ない。衝突すれば git が止める |
 | プロジェクトとして認識されない git リポジトリ | ワークスペース直下を深さ 2 まで歩き（`node_modules` `.venv` `.claude` `.git` の中は歩かない）、`.git` を持つのに trees に無いディレクトリを別枠に出す。置き場の外にあるか、置き場の 2 段目以下にあるか。表示だけで操作は無い |
 | 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/*`、`.ccnavi/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
-| 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`ProjectsData`）だけ。読み直しても入れ物（HTML）を入れ直さないので、打ちかけの clone の欄もスクロール位置も開いたメニューも飛ばない。入れ直すのは 1 枚目と、裏に回っている間だけ（`core/screen-host.ts`、ADR-0060）。一覧から消えた行のメニューは閉じる |
+| 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`ProjectsData`）だけ。読み直しても入れ物（HTML）を入れ直さないので、打ちかけの clone の欄もスクロール位置も開いたメニューも飛ばない。入れ直すのは 1 枚目と、裏に回っている間だけ（`core/screen-host.ts`、ADR-0064）。一覧から消えた行のメニューは閉じる |
 | 読み直せなかった | 一覧の代わりに文面を出す。**渡せなかったぶんは画面が組み上がった（`ready`）ところで渡し直す**（`redraw`）。ここを落とすと、入れてある HTML の古い一覧が出たまま失敗が人に届かない。古い画面が残っている間の「更新」は、一覧が無くても通す |
 | 操作の一言（clone の欄の下） | 失敗（赤）は**次の一覧が届いたら消す**。一覧が新しくなった後も「プロジェクト X が一覧に無い」が残ると、人はいまも失敗していると読む。案内（「clone を送った」など）は残す。clone の直後は `.git` の出現で必ず読み直しが走るので、ここで消すと案内が一瞬で消える（文字列で組んでいた頃がそれだった） |
 
@@ -343,9 +344,11 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 コンパイルも 2 回走った**（`test:rules` + `test:risk` で 9.4 秒。いまは 4.9 秒）。
 
 束ねは、画面の型を見ないときでも必ず回す。`clean-out.js` が `out/webview` を消すので、
-作り直さないと、束ねたものを読む側（`webview-script.ts`、board のテスト）が落ちる。
+作り直さないと、束ねたものを読む側（`webview-asset.ts`、board のテスト）が落ちる。
+束ねるのはスクリプト（`<名前>.js`）と CSS（`<名前>.css`）の 2 本で、CSS だけは小さくしない
+（開発者ツールで読める形のまま出す。ADR-0066）。
 
-どのグループがどのファイルを読むかは、テストの `import` を辿って数える。辿れないものだけ
+どのグループがどのファイルを読むかは、テストの `import`（CSS は `@import`）を辿って数える。辿れないものだけ
 綴りで決める（`test-groups.js` の先頭にまとめてある。固定データ `test/fixtures/` は全部、
 画面 `src/webview/` は辿れたぶんと束ねたものを読むグループ、組み立ての土台
 `package.json`・`tsconfig*.json`・`scripts/`・`pnpm-lock.yaml` は全部、読み物 `*.md` と絵
@@ -447,6 +450,8 @@ Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけ
 | 22 | 未保存の再読込 | 何か変えてから「再読込」 | 「捨てて読み直す？」の確認。「読み直す」で編集が消える |
 | 23 | ファイルを選ぶ | 「渡すファイル」（additionalContextFile）の「選ぶ…」でワークスペース内の md を選ぶ。もう一度押して外のファイルを選ぶ | 欄にルート相対のパス（`/` 区切り）が入り、保存ボタンが押せるようになる。外のファイルは「ワークスペースの外は指せない」の通知で欄が変わらない |
 | 24 | ツールを選ぶ | 「ツール」（match）の欄を押して札を出し、`Write` にチェック、`Bash` を外す。次に欄へ直接ツール名を縦棒でつないで打つ。最後に欄の外を押す | 札で選ぶと欄の文字が変わり、手で打つと札のチェックがそれを追う。外を押すか Esc で札が閉じる |
+| 24b | 裏に回しても編集が消えない（React） | ルールを 1 つ開いて文面を打ちかけ、別のタブに移ってから戻る。裏にいる間に別のターミナルで `rules.yml` を触る | 打ちかけの値も開いた行も、開いていたタブ（ルール／判定を試す／hook）もそのまま。「外で変更された」の帯が出ている（裏にいる間に届いたもの）。開発者ツールの Console に CSP の拒否（`Refused to execute inline script`）が出ていない |
+| 24c | 判定の往復で編集が消えない | 何か打ちかけたまま「判定を試す」で判定し、結果が出たあとルールのタブへ戻る | 打ちかけの値はそのまま。判定の間は「判定」「サンプルを一括で判定」「再読込」「保存」が押せない |
 | 25 | プロジェクト管理が開く | サイドパネルの「プロジェクト管理」 | `projects/` の各プロジェクトが表に並び、origin・ルールの有無・ワークツリー・チケット数・検証が出る。`projects/` が `.gitignore` に無ければ上部に警告とボタン |
 | 25b | 読み直しで飛ばない | URL の欄に打ちかけたまま、別のターミナルで `projects/` の下に何か clone する（または `.gitignore` を触る） | 一覧だけが増え、打ちかけの URL も名前もそのまま。一覧を下までスクロールしてから同じことをしても位置が戻らない |
 | 25c | 裏に回して戻す | プロジェクト管理のタブを裏に回し、その間に `projects/` を変えてから表に戻す | 表に戻った時点の一覧が出る（裏にいる間に入れ物を入れ直してあり、組み上がったところで渡し直す）。打ちかけの clone の欄も残る |
@@ -492,7 +497,7 @@ src/
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json / --approve --preview --json / --approve --yes … --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
-  webview-script.ts   束ねた画面（out/webview/<名前>.js）を読む。拡張が <script nonce> に流し込む
+  webview-asset.ts    束ねた画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
     approvemodel.ts   承認の JSON の形（--approve --preview --json / --approve --yes … --json）と読み取り
@@ -502,24 +507,19 @@ src/
     board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）
     screen-host.ts    画面に中身を渡す段取り（送る / 入れ物ごと / 作り直し中で持ち越し）。VS Code に触れないので単体で試せる
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
-    styles.ts         5 画面で共通の CSS（ページの骨組み・ボタン・一覧）
-    board-style.ts    ボード画面の CSS。部品（webview/board/）を足したらここに足す
-    html.ts           HTML を文字列で組む 1 画面（ルール設定）のための逃がし（escapeHtml）
-    rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
+    rules-view.ts     ルール設定の拡張ホストと画面の契約（ルールの形 SECTIONS / RuleForm / RulesModel、見せる形 RulesPage / RulesData、押した操作 RulesMessage）
+    rules-render.ts   ルール設定の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
     risk-view.ts      リスク管理の拡張ホストと画面の契約（配点の形 RiskForm、見せる形 RiskPage / RiskData、押した操作 RiskMessage）
     risk-render.ts    リスク管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    risk-style.ts     リスク管理画面の CSS。部品（webview/risk/）を足したらここに足す
     risk-doc.ts       risks.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（種類の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    phases-style.ts   フェーズ管理画面の CSS。部品（webview/phases/）を足したらここに足す
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）と、無いときに書く雛形の本文
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、プロジェクトになっていない .git の探索、.gitignore と雛形の加工、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    projects-style.ts プロジェクト管理画面の CSS。部品（webview/projects/）を足したらここに足す
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）
     commands.ts       ターミナルに送るコマンド行（accept / wrapup）と、承認を子プロセスで打つ引数の並び
@@ -530,7 +530,15 @@ src/
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
-    appearance.ts     見た目の切り替え（body のクラスの付け替え）。文字列で組む画面の APPEARANCE_SCRIPT と同じこと
+    appearance.ts     見た目の切り替え（body のクラスの付け替え）。5 画面で 1 本
+    styles/page.css   5 画面で共通の骨組み（本文・ツールバー・帯・欄・脚注）。button.css と appearance.css を @import する
+    styles/button.css 5 画面で同じボタン（button.action）
+    styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）
+    styles/list.css   設定 3 画面の一覧（行・開閉・欄名）
+    board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ
+    board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
+    board/Card.css    Card.tsx の CSS（カード 1 枚）
+    board/Approval.css Approval.tsx の CSS（承認のオーバーレイ）
     board/post.ts     ボードの送り口。契約に無いものは型で止まる
     board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
     board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
@@ -538,6 +546,10 @@ src/
     board/Approval.tsx 承認のオーバーレイ（一覧・本文・対象外・渡す文）
     board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
+    projects/style.css   プロジェクト管理画面の CSS の入口
+    projects/App.css     App.tsx の CSS（節・clone の欄・一覧の入れ物）
+    projects/Project.css Project.tsx の CSS（カード 1 枚・札・検証）
+    projects/Menu.css    Menu.tsx の CSS（行末のメニュー）
     projects/post.ts  プロジェクト管理の送り口。契約に無いものは型で止まる
     projects/main.tsx プロジェクト管理画面の入口。埋め込みの JSON を読んでマウントする
     projects/App.tsx  ツールバー・帯・clone の欄・一覧・認識されない git・ワークスペース本体と、拡張ホストからのメッセージの受け
@@ -545,18 +557,36 @@ src/
     projects/Menu.tsx 行末のメニュー（開いているのは画面ぜんたいで 1 つだけ）
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
     projects/text.ts  カードに出す言葉（層の設定の置き場、重ねない苦情）
+    risk/style.css    リスク管理画面の CSS の入口
+    risk/App.css      App.tsx の CSS（しきい値の枠）
+    risk/Factor.css   Factor.tsx の CSS（配点 1 件の行）
     risk/post.ts      リスク管理の送り口。契約に無いものは型で止まる
     risk/main.tsx     リスク管理画面の入口。埋め込みの JSON を読んでマウントする
     risk/App.tsx      帯・ツールバー・段階の閾値・項目の一覧と、拡張ホストからのメッセージの受け
     risk/Factor.tsx   項目 1 件の行（要約と、開いたときの欄）
     risk/state.ts     編集中の配点（行ごとの鍵）と、開いている行（id で控える）の読み書き
     risk/text.ts      要約の文・欄の名前・絞り込みが当てる文字列
+    phases/style.css  フェーズ管理画面の CSS の入口
+    phases/App.css    App.tsx の CSS（枠と見出し）
+    phases/Phase.css  Phase.tsx の CSS（種類 1 件の行）
     phases/post.ts    フェーズ管理の送り口。契約に無いものは型で止まる
     phases/main.tsx   フェーズ管理画面の入口。埋め込みの JSON を読んでマウントする
     phases/App.tsx    注意の帯・ツールバー・種類の一覧と、拡張ホストからのメッセージの受け
     phases/Phase.tsx  種類 1 件の行（要約と、開いたときの欄。並びの欄は , 区切り）
     phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で控える）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
+    rules/style.css   ルール設定画面の CSS の入口
+    rules/App.css     App.tsx の CSS（タブ・節・判定の欄・2 つの面が共有する表）
+    rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの札）
+    rules/Judge.css   Judge.tsx の CSS（判定の結果）
+    rules/post.ts     ルール設定の送り口。契約に無いものは型で止まる
+    rules/main.tsx    ルール設定画面の入口。埋め込みの JSON を読んでマウントする
+    rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
+    rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの札と、ファイルを選ぶ欄）
+    rules/Judge.tsx   判定の結果とサンプルの一括判定の表。ここは判定せず、実行ファイルの答えを読むだけ
+    rules/Hooks.tsx   hook の一覧（表示するだけで書き換えない）
+    rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で控える）・開いているタブ
+    rules/text.ts     要約の文・絞り込みが当てる文字列・件数の出し方
 media/
   icon.svg            アクティビティバーのアイコン
 test/
@@ -569,14 +599,15 @@ test/
   helpers/projects.ts プロジェクト管理画面（React）を束ねたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）を束ねたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）を束ねたものごと happy-dom で開く
+  helpers/rules.ts    ルール設定画面（React）を束ねたものごと happy-dom で開く
   board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
-  rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
+  rules/              ルール設定（rules-doc, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
-  projects/           プロジェクト管理（projects, layer-render と、画面を動かす projects.dom）
+  projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理・リスク管理・フェーズ管理）は、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom）
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。5 画面とも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom）
   shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
@@ -599,31 +630,37 @@ README やチケットの記録から参照する。
 
 `webview/` は反対に、DOM だけを触って `vscode` も `node` も import しない。拡張ホストと分け合うのは
 `core/` のうち import で辿れるぶん（`board.ts`・`board-view.ts` など、判定も I/O もしないもの）だけ。
-ボード・プロジェクト管理・リスク管理・フェーズ管理の画面は React で、拡張ホストは中身（`BoardData` /
-`ProjectsData` / `RiskData` / `PhasesData`）を渡すだけで DOM を組み立てない。残る 1 画面（ルール設定）は
-今も拡張ホストが HTML を文字列で組む（ADR-0060、ADR-0062）。
+**5 画面とも React で**、拡張ホストは中身（`BoardData` / `ProjectsData` / `RiskData` / `PhasesData` /
+`RulesData`）を渡すだけで DOM を組み立てない（ADR-0064、ADR-0062）。文字列で HTML を組む画面は
+1 つも残っていないので、そのための逃がし（`escapeHtml`・`APPEARANCE_SCRIPT`）も無い。
 
 **ボードに機能を足すときに触る場所。**
 
 | 足すもの | 触る場所 |
 |---|---|
-| カードに出す項目 | `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `core/board-style.ts`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`render.dom.test.ts`） |
+| カードに出す項目 | `core/model.ts`（実行ファイルとの契約。JSON を増やすなら Python 側の `tests/ticket/test_board.py` が書き出す見本 `test/fixtures/board.json` も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `webview/board/Card.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`render.dom.test.ts`） |
 | 人が押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも網羅を型で縛ってある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**次の画面を React にするとき、使い回せるもの。** `webviewScript`（名前で読む）、`poster<M>()`、
-`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、`core/styles.ts`、`webview/vscode.ts`・
-`webview/initial.ts`・`webview/appearance.ts`、テストの土台（`test/helpers/dom.ts`）。
-画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS・`ready` を受けて渡し直す数行・
-テストの入口（`test/helpers/board.ts`・`projects.ts` に相当するもの）。プロジェクト管理を 2 画面目に
-選んだのは、ボードと同じ `retainContextWhenHidden: false` で、`screen-host.ts` がそのまま当たるから。
+**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は向こうが付ける）、`poster<M>()`、
+`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、`webview/styles/`（`page.css`・`list.css`）、
+`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、テストの土台（`test/helpers/dom.ts`・
+`test/helpers/bundle.ts`）。画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・
+画面の CSS（`webview/<名前>/style.css` と部品ごとの CSS）・`ready` を受けて渡し直す数行・
+テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts` の `reactPages` に 1 行
+（足し忘れは CB-T127 が「reactPages に無い画面がある」で止める。ほかの検査は画面をディスクから拾う）。
+
+**実行ファイルへの往復がある画面（ルール設定）も、やり取りの形は同じ。** 画面は編集中の中身を
+付けて頼み（`judge` / `samples`）、拡張ホストが実行ファイルの答えをそのまま返す（`judged` / `sampled`）。
+画面は判定の理屈を持たない（ADR-0035）。VS Code のダイアログが要る欄（`pickFile` → `picked`）も同じで、
+**行を名指しする鍵は画面が渡し、拡張ホストはそのまま返す**（鍵は画面の中だけのもので、拡張ホストは読まない）。
 
 **画面を 1 つ足すときに触る場所。**
 
 | 足すもの | 触る場所 |
 |---|---|
-| 束ねと回り方 | **どちらも直さない。** 綴りの約束で決まる: 画面は `src/webview/<名前>/main.tsx`、束ねた出口は `out/webview/<名前>.js`、テストの入口は `test/helpers/<名前>.ts`、グループは `test/<名前>/`。`bundle-webview.js` と `test-groups.js` が同じ見つけ方でディスクから拾う（表を持つと、画面を足したときに黙って古くなる） |
-| 回すものの決まり方 | 触ったファイルが**どの画面の束ねに入るか**を import の閉包で見る（置き場の綴りでは決めない。画面をまたぐ import が 1 本入っただけで、直したのに回らない側に外れるため）。どの画面にも入らないもの（`webview/vscode.ts` など）は全画面に効くと見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
+| 束ねと回り方 | **どちらも直さない。** 綴りの約束で決まる: 画面は `src/webview/<名前>/main.tsx`、束ねた出口は `out/webview/<名前>.js`、CSS は `src/webview/<名前>/style.css` → `out/webview/<名前>.css`、テストの入口は `test/helpers/<名前>.ts`、グループは `test/<名前>/`。`bundle-webview.js` と `test-groups.js` が同じ見つけ方でディスクから拾う（表を持つと、画面を足したときに黙って古くなる） |
+| 回すものの決まり方 | 触ったファイルが**どの画面の束ねに入るか**を閉包で見る（スクリプトは `main.tsx` から `import`、CSS は `style.css` から `@import`。置き場の綴りでは決めない。画面をまたぐ import が 1 本入っただけで、直したのに回らない側に外れるため）。どの画面にも入らないもの（`webview/vscode.ts`・`webview/styles/` など）は全画面に効くと見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
 | 契約に置く型 | 画面に渡す形（`ProjectsPage` のような）は契約の側（`*-view.ts`）に置く。`core/` の判定のファイルに置いたままだと、Webview がそこから `node:path` を読むファイル（`commands.ts` など）を辿って型検査が落ちる |
 
 **段取りは 2 系統ある。パネルの `retainContextWhenHidden` と対で選ぶ**（ADR-0062）。
@@ -631,7 +668,7 @@ README やチケットの記録から参照する。
 | パネル | 作るもの | 裏に回ったとき |
 |---|---|---|
 | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost(surface, render)` | 画面は捨てられる。入れ物ごと入れ直す |
-| `retainContextWhenHidden: true`（リスク管理・フェーズ管理。ルール設定も移すときはこちら） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
+| `retainContextWhenHidden: true`（ルール設定・リスク管理・フェーズ管理） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
 
 返る形（`ScreenHost<D>`）は同じで、以降の呼び方（`send` / `post` / `ready` / `hidden`）も画面の側も
 変わらない。**取り違えても型では止まらない。** 保持する画面に `screenHost` を当てると、裏にいる間の

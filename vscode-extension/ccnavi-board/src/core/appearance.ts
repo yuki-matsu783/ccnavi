@@ -5,6 +5,9 @@
  *
  * ハイコントラストのテーマでは `--vscode-contrastBorder` などが定義されていて、それを使う枠や点線は
  * Claude の配色を選んでもそのまま効く。
+ *
+ * 配色そのもの（変数の上書き）は画面の側の `src/webview/styles/appearance.css` にあり、ここが持つのは
+ * 設定の値・body に付けるクラス・送るメッセージの形だけ。付け替えるのは `src/webview/appearance.ts`。
  */
 
 export const APPEARANCES = ["vscode", "claude-light", "claude-dark"] as const;
@@ -39,51 +42,3 @@ export interface AppearanceMessage {
   readonly type: "appearance";
   readonly value: Appearance;
 }
-
-/**
- * Claude の配色。VS Code のテーマ変数を body のクラスの下で上書きする。
- *
- * 意味の色（error / warning / charts の緑と黄）は、地の色に合わせてライトとダークの両方で置き換える。
- * ライトのテーマからダークを選んだとき（またはその逆）にテーマの意味の色が地と合わなくなるため。
- * 青系の強調（charts-blue / editorInfo / focusBorder）だけ橙に寄せる。文字の色はすべて地に対して 4.5:1 以上。
- * ハイコントラストのテーマ（body に vscode-high-contrast* が付く）では効かせない。純黒・純白の地と焦点の色を
- * 置き換えると HC の意図が壊れるため。
- */
-export const APPEARANCE_STYLE = `  body.ccnavi-claude-dark:not(.vscode-high-contrast):not(.vscode-high-contrast-light) {
-    --vscode-editor-background: #262624; --vscode-editor-foreground: #E8E6DF; --vscode-foreground: #E8E6DF; --vscode-descriptionForeground: #A8A69E;
-    --vscode-panel-border: #3E3D39; --vscode-widget-border: #4A4844; --vscode-editorWidget-background: #30302E; --vscode-editorWidget-border: #4A4844;
-    --vscode-list-hoverBackground: #35342F; --vscode-focusBorder: #D97757;
-    --vscode-button-background: #D97757; --vscode-button-foreground: #1F1E1D; --vscode-button-hoverBackground: #E38A6C;
-    --vscode-button-secondaryBackground: #3A3936; --vscode-button-secondaryForeground: #E8E6DF; --vscode-button-secondaryHoverBackground: #45443F; --vscode-button-border: rgba(255, 255, 255, .06);
-    --vscode-input-background: #1F1E1D; --vscode-input-foreground: #E8E6DF; --vscode-input-border: #4A4844;
-    --vscode-dropdown-background: #1F1E1D; --vscode-dropdown-foreground: #E8E6DF; --vscode-dropdown-border: #4A4844;
-    --vscode-textCodeBlock-background: #1F1E1D; --vscode-charts-blue: #D97757; --vscode-editorInfo-foreground: #D97757;
-    --vscode-editorWarning-foreground: #E0B75A; --vscode-editorError-foreground: #F2707A; --vscode-charts-green: #7BC275; --vscode-charts-yellow: #E0B75A;
-  }
-  body.ccnavi-claude-light:not(.vscode-high-contrast):not(.vscode-high-contrast-light) {
-    --vscode-editor-background: #FAF9F5; --vscode-editor-foreground: #141413; --vscode-foreground: #141413; --vscode-descriptionForeground: #6B6A64;
-    --vscode-panel-border: #E0DED4; --vscode-widget-border: #D5D3C9; --vscode-editorWidget-background: #F0EEE6; --vscode-editorWidget-border: #D5D3C9;
-    --vscode-list-hoverBackground: #EBE9E0; --vscode-focusBorder: #D97757;
-    --vscode-button-background: #B0532F; --vscode-button-foreground: #ffffff; --vscode-button-hoverBackground: #9A4728;
-    --vscode-button-secondaryBackground: #EDEBE3; --vscode-button-secondaryForeground: #141413; --vscode-button-secondaryHoverBackground: #E3E1D7; --vscode-button-border: rgba(0, 0, 0, .08);
-    --vscode-input-background: #FFFFFF; --vscode-input-foreground: #141413; --vscode-input-border: #D5D3C9;
-    --vscode-dropdown-background: #FFFFFF; --vscode-dropdown-foreground: #141413; --vscode-dropdown-border: #D5D3C9;
-    --vscode-textCodeBlock-background: #F0EEE6; --vscode-charts-blue: #B0532F; --vscode-editorInfo-foreground: #B0532F;
-    --vscode-editorWarning-foreground: #7F5500; --vscode-editorError-foreground: #B3261E; --vscode-charts-green: #366D24; --vscode-charts-yellow: #7F5500;
-  }`;
-
-/**
- * 画面の中のスクリプトに埋める、切り替えの受け口。拡張が `{ type: "appearance", value }` を送ると
- * body のクラスだけを付け替える。HTML を作り直さないので、編集中の内容は消えない。
- * テンプレート文字列に埋めるので、バッククォートと \${ を使わない。
- */
-export const APPEARANCE_SCRIPT = `  function applyAppearance(value) {
-    for (const name of Array.from(document.body.classList)) {
-      if (name.indexOf("ccnavi-claude-") === 0) { document.body.classList.remove(name); }
-    }
-    if (value === "claude-light" || value === "claude-dark") { document.body.classList.add("ccnavi-" + value); }
-  }
-  window.addEventListener("message", (event) => {
-    const data = event.data || {};
-    if (data.type === "appearance") { applyAppearance(data.value); }
-  });`;

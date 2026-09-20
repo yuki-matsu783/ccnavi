@@ -8,34 +8,17 @@
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import { readRisk } from "../../src/core/risk-doc.js";
 import { renderRiskPage, type RenderOptions } from "../../src/core/risk-render.js";
 import type { RiskData, RiskPage } from "../../src/core/risk-view.js";
+import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-const SCRIPT_PATH = path.join(__dirname, "..", "..", "webview", "risk.js");
-
-let cached: string | undefined;
-
-/** 束ねた画面。無ければ何を通せばよいかを言う（テストだけ先に走らせたときに出る） */
-export function riskScript(): string {
-  if (cached === undefined) {
-    if (!fs.existsSync(SCRIPT_PATH)) {
-      throw new Error(`画面が束ねられていない: ${SCRIPT_PATH}（node scripts/bundle-webview.js を通す）`);
-    }
-    cached = fs.readFileSync(SCRIPT_PATH, "utf8");
-  }
-  return cached;
-}
-
 /** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
 export function riskHtml(data: RiskData, options: Partial<RenderOptions> = {}): string {
-  return renderRiskPage(data, { nonce: NONCE, script: riskScript(), ...options });
+  return renderRiskPage(data, { nonce: NONCE, script: screenScript("risk"), style: screenStyle("risk"), ...options });
 }
 
 /** 見本の配点。4 つの当て方が 1 件ずつ */

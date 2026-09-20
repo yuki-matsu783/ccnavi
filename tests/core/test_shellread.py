@@ -523,6 +523,252 @@ def marked(text):
 
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+class MovedTest(unittest.TestCase):
+    """`cd` で移った先から見た綴り（ADR-0066、issue #61）。
+
+    `read(src).moved` は、`cd` の行き先を引数に継ぎ足したコマンドを SEP でつないだもの。
+    綴りの変わったコマンドだけが並ぶ。書かれた綴り（`text`）は動かさない。
+    """
+
+    def moved(self, src):
+        result = read(src)
+        moved = getattr(result, "moved", None)
+        self.assertIsNotNone(moved, "Reading に moved の欄が無い")
+        self.assertFalse(result.degraded, f"read({src!r}) が {result.reason} で諦めた")
+        if not moved:
+            return []
+        word_sep = WORD_SEP or "\x01"
+        return [command.replace(word_sep, " ") for command in moved.split(SEP)]
+
+    def assert_moved(self, cases):
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertIn(show(want), [show(c) for c in self.moved(src)])
+
+    def test_守られた場所へ入ってから書く形(self):
+        # issue #61 の表。どれも綴りからディレクトリの名前が消える形。
+        rules = ".ccnavi/common/rules.yml"
+        self.assert_moved(
+            {
+                "cd .ccnavi/common && echo x > rules.yml": f"echo .ccnavi/common/x > {rules}",
+                "cd .ccnavi && echo x > common/rules.yml": f"echo .ccnavi/x > {rules}",
+                "cd .ccnavi/common; echo x > rules.yml": f"echo .ccnavi/common/x > {rules}",
+                "(cd .ccnavi/common && echo x > rules.yml)": f"echo .ccnavi/common/x > {rules}",
+                "cd .claude && echo x > settings.json": "echo .claude/x > .claude/settings.json",
+                "cd .claude/hooks && echo x > lint-py.sh": (
+                    "echo .claude/hooks/x > .claude/hooks/lint-py.sh"
+                ),
+                # 名前に拡張子が無くても同じ。`rm -rf hooks` は hook を丸ごと消す形。
+                "cd .claude && rm -rf hooks": "rm -rf .claude/hooks",
+                "cd .claude && cp /tmp/x settings.json": "cp /tmp/x .claude/settings.json",
+                # 移るのを 2 回に分けても同じ。
+                "cd .ccnavi && cd common && rm rules.yml": f"rm {rules}",
+            }
+        )
+
+    def test_書かれた綴りは動かさない(self):
+        # ここが要。ルールは綴りに固定して書かれているので、書かれた側に継ぎ足すと
+        # いま当たっているものが外れる（サブエージェントの禁止の `…ccnavi-ticket.sh start`、
+        # コマンドの頭に固定した組み込みの守り）。
+        cases = {
+            "cd .claude && echo x > settings.json": "cd .claude" + SEP + "echo x > settings.json",
+            "cd .ccnavi && rm -rf common": "cd .ccnavi" + SEP + "rm -rf common",
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(show(read(src).text), show(want))
+
+    def test_コマンドの位置の語には継ぎ足さない(self):
+        # `rm` が `.ccnavi/rm` になると `(^|\x00)rm` が当たらなくなる。
+        for command in self.moved("cd .ccnavi && rm -rf common"):
+            self.assertTrue(command.startswith("rm "), f"名前に継ぎ足した: {command!r}")
+
+    def test_移っていないコマンドは並べない(self):
+        for src in [
+            "echo x > .ccnavi/common/rules.yml",
+            "ls -la",
+            "rm -rf /tmp/x",
+            # `cd` 自身は書き込みではないので、当てる先に並べても止めるものが無い。
+            "cd .claude",
+            "cd .ccnavi && cd common",
+            # 絶対パスの引数は継ぎ足す先が無い。
+            "cd .ccnavi && rm /tmp/x",
+            # オプションにも継ぎ足さない。
+            "cd .ccnavi && rm -rf /tmp/x",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src), [])
+
+    def test_上に戻る綴りは畳む(self):
+        self.assert_moved(
+            {
+                "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh": (
+                    "echo .claude/worktrees/w/x > .claude/scripts/ccnavi-git.sh"
+                ),
+                "cd a/b && rm ./x": "rm a/b/x",
+                # 起点より上に出る `..` は畳まずに残す。
+                "cd a && rm ../../x": "rm ../x",
+                # 絶対パスはそのまま。そこから先の行き先になる。
+                "cd /tmp && rm x": "rm /tmp/x",
+                # 末尾の区切りは残す（名前がそこで終わる形に当てる守りのため）。
+                "cd .claude && rm -rf hooks/": "rm -rf .claude/hooks/",
+            }
+        )
+
+    def test_リダイレクトの行き先は名前の前でも継ぎ足す(self):
+        # `> settings.json` だけで hook の登録は空になる。コマンドの位置より前に
+        # 書いたリダイレクトも、コマンドが無い形も、行き先はパス（敵対的レビュー）。
+        self.assert_moved(
+            {
+                "cd .claude && > settings.json": "> .claude/settings.json",
+                "cd .claude && >settings.json cat /tmp/x": "> .claude/settings.json cat /tmp/x",
+                "cd .claude && echo x >> settings.json": (
+                    "echo .claude/x >> .claude/settings.json"
+                ),
+            }
+        )
+
+    def test_値にパスを取る語は値だけ継ぎ足す(self):
+        # `dd` は守りが名指ししている動詞。`of=x` は代入の形をしているが引数。
+        self.assert_moved(
+            {
+                "cd .claude && dd if=/tmp/x of=settings.json": (
+                    "dd if=/tmp/x of=.claude/settings.json"
+                ),
+            }
+        )
+
+    def test_fd_の番号には継ぎ足さない(self):
+        # `2>&1` の `1` はファイルではない。継ぎ足すと `.ccnavi/1` になり、
+        # 守りの綴りが引数に現れる。
+        self.assertEqual(self.moved("cd .ccnavi && rm ../a 2>&1"), ["rm a 2 >& 1"])
+
+    def test_置換の中で移った先も並べる(self):
+        # 中身は別の読みだが、中身の中で移った先は中身に届く（敵対的レビュー）。
+        self.assert_moved(
+            {
+                'echo "$(cd .claude && echo x > settings.json)"': (
+                    "echo .claude/x > .claude/settings.json"
+                ),
+                "x=$(cd .claude && rm settings.json)": "rm .claude/settings.json",
+            }
+        )
+
+    def test_組み込みの_cd_も_cd(self):
+        self.assert_moved(
+            {
+                "builtin cd .claude && rm settings.json": "rm .claude/settings.json",
+                "command cd .claude && rm settings.json": "rm .claude/settings.json",
+            }
+        )
+
+    def test_実行役のコマンドの中で実行されるコマンドにも継ぎ足す(self):
+        # 名前がどの語に立つかは `_peel` と同じ読み方で出す。名前には継ぎ足さない。
+        self.assert_moved(
+            {
+                "cd .claude && env rm settings.json": "env rm .claude/settings.json",
+                "cd .claude && sudo -u me rm settings.json": (
+                    "sudo -u me rm .claude/settings.json"
+                ),
+                "cd .claude && timeout 5 rm settings.json": "timeout 5 rm .claude/settings.json",
+                "cd .claude && nohup cp /tmp/x settings.json": (
+                    "nohup cp /tmp/x .claude/settings.json"
+                ),
+                # 中で実行されるコマンドが無い形でも、リダイレクトの行き先は継ぎ足す。
+                "cd .claude && exec > settings.json": "exec > .claude/settings.json",
+            }
+        )
+
+    def test_実行役のコマンドが移す先も読む(self):
+        # `env -C` と `sudo --chdir` は、その 1 本だけ居場所を移す。`cd` と同じ穴。
+        self.assert_moved(
+            {
+                "env -C .claude rm settings.json": "env -C .claude rm .claude/settings.json",
+                "sudo --chdir=.claude rm settings.json": (
+                    "sudo --chdir=.claude rm .claude/settings.json"
+                ),
+                "cd docs && env -C ../.claude rm settings.json": (
+                    "env -C ../.claude rm .claude/settings.json"
+                ),
+            }
+        )
+        # 読めない行き先なら、その 1 本には継ぎ足さない。
+        self.assertEqual(self.moved("env -C $X rm settings.json"), [])
+
+    def test_サブシェルは行き先を出入りで戻す(self):
+        self.assertEqual(self.moved("cd a && (cd b && ls c) && ls d"), ["ls a/b/c", "ls a/d"])
+
+    def test_左がサブシェルになる区切りでは移らない(self):
+        # `cd .claude &` も `cd .claude |` も、移るのはサブシェルのほう。後ろは
+        # 元の場所のまま。継ぎ足すと、無関係な書き込みを止めることになる。
+        for src in [
+            "cd .claude & echo x > settings.json",
+            "cd .claude | echo x > settings.json",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src), [])
+        # 並びの頭で居た場所までは戻る。
+        self.assertEqual(self.moved("cd .claude && cd docs | rm ../x"), ["rm x"])
+
+    def test_case_の枝は読まない(self):
+        # `case` の `)` はサブシェルの閉じと同じ綴りで来るので、枝の出入りが読めない。
+        # 読むと、枝の中の `cd` が枝の外の書き込みに継ぎ足される（誤検知）。
+        for src in [
+            "(case x in x) cd .claude;; esac); echo x > settings.json",
+            "case x in x) cd .claude;; esac; echo x > settings.json",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src), [])
+
+    def test_行き先を読めない形では継ぎ足さないだけ(self):
+        # 縮退させない。縮退は生の文字列に落ちるので、`cd - && rm -f <守られた場所>` の
+        # ように、書かれた綴りで**今は止まっている**形が止まらなくなる（敵対的レビュー）。
+        for src in [
+            "cd - && rm x",
+            "cd && rm x",
+            "cd $HOME && rm x",
+            'cd "$(git rev-parse --show-toplevel)" && rm x',
+            "cd ~/work && rm x",
+            "cd .cc* && rm x",
+            "cd --foo && rm x",
+            "pushd .claude && rm settings.json",
+            "popd && rm x",
+            "cd a b && rm x",
+            "(cd - && rm x)",
+        ]:
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertFalse(result.degraded, f"縮退した: {src!r} {result.reason}")
+                self.assertEqual(result.moved, "", f"読めない行き先を読んだ: {src!r}")
+
+    def test_読めない行き先の前で移った先は残る(self):
+        self.assertEqual(
+            self.moved("cd .claude && rm settings.json && cd - && rm x"),
+            ["rm .claude/settings.json"],
+        )
+
+    def test_絶対パスへ移れば読めない行き先の後でも読める(self):
+        self.assertEqual(self.moved("cd - && cd /tmp && rm x"), ["rm /tmp/x"])
+
+    def test_居場所の長さと語数には上限がある(self):
+        # `cd a` を並べると居場所の綴りが伸びる。畳み直す値段が長さに比例するので、
+        # 上限が無いと全体が二乗になり、判定の期限（judge の 3 秒）の外で時間を使える
+        # （敵対的レビュー）。
+        chain = "cd a " + "&& cd a " * 4000 + "&& rm x"
+        started = time.monotonic()
+        result = read(chain)
+        spent = time.monotonic() - started
+
+        self.assertLess(spent, 1.0, f"{spent:.2f} 秒かかった")
+        self.assertLess(len(result.moved), 100_000, "当てる先が大きくなりすぎる")
+        # 上限を越えたら継ぎ足さない。読み自体は今までどおり。
+        self.assertFalse(result.degraded)
+
+    def test_語数の上限を越えたら継ぎ足さない(self):
+        many = "cd a && " + " && ".join(f"rm x{i}" for i in range(shellread.MOVED_WORDS))
+        self.assertLess(len(self.moved(many)), shellread.MOVED_WORDS)
+
+
 class SubstTest(unittest.TestCase):
     """引用の有無によらず、shell が実行する中身を独立したコマンドとして読む
     （wip/design/shellread-subst.md §4.1 と §4.2）。改行、プロセス置換、語の途中の `#`、

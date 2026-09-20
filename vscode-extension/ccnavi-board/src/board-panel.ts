@@ -23,9 +23,11 @@ import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { runInTerminal } from "./terminal.js";
-import { webviewScript } from "./webview-script.js";
+import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
+/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+const SCREEN = "board";
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
 
@@ -91,9 +93,10 @@ export async function openBoard(project?: string): Promise<void> {
     vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
   }
 
-  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
-    webviewScript("board.js");
+    webviewScript(SCREEN);
+    webviewStyle(SCREEN);
   } catch (error) {
     vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${error instanceof Error ? error.message : String(error)}`);
     return;
@@ -287,7 +290,8 @@ function boardHost(panel: vscode.WebviewPanel): ScreenHost<BoardData> {
     (data) =>
       renderBoardPage(data, {
         nonce: crypto.randomBytes(16).toString("base64"),
-        script: webviewScript("board.js"),
+        script: webviewScript(SCREEN),
+        style: webviewStyle(SCREEN),
         appearance: readAppearance(),
       }),
   );

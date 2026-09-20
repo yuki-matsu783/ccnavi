@@ -2,6 +2,12 @@
  * ルール設定画面の Webview パネル。生成・更新・破棄、ファイル監視、Webview からの操作の受け付け。
  * VS Code の API に触れるので単体テストの対象外。README の手動確認の手順で確かめる。
  *
+ * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
+ * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
+ * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存が通った）。
+ * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
+ *
  * 対象は 3 種（設計 §11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
  * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。対象ごとに 1 パネルで、並べて開ける。
@@ -23,33 +29,23 @@ import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./c
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { escapeHtml } from "./core/html.js";
-import { asSections, readRules, type RuleForm, type RulesDocument, type Section } from "./core/rules-doc.js";
+import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
+import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
+import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
+/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+const SCREEN = "rules";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
-type Sections = Readonly<Record<Section, readonly RuleForm[]>>;
-
-type Message =
-  | { readonly type: "reload"; readonly dirty: boolean }
-  | { readonly type: "openFile"; readonly which: "rules" | "samples" }
-  | { readonly type: "save"; readonly sections: Sections }
-  | { readonly type: "judge"; readonly sections: Sections; readonly tool: string; readonly subject: string }
-  | { readonly type: "samples"; readonly sections: Sections }
-  | { readonly type: "pickFile"; readonly key: string; readonly field: FileField };
-
-/** ファイル選択ダイアログで埋める欄 */
-type FileField = "additionalContextFile" | "additionalContextOnceFile";
-
 interface Loaded {
-  readonly text: string;
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
@@ -69,11 +65,19 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
+  readonly host: ScreenHost<RulesData>;
+  /** 編集対象と設定ファイルの監視。対象のパスが変わるので、再読込のたびに張り直す */
+  fileWatchers: vscode.FileSystemWatcher[];
+  /** チケットの置き場の監視。開いている間ずっと同じ */
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   lockTimer?: NodeJS.Timeout;
   loaded?: Loaded;
+  /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
+  error?: string;
   lock: Lock;
+  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  changedPending: boolean;
   wroteAt: number;
 }
 
@@ -146,6 +150,15 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     opening.delete(key);
   }
 
+  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  try {
+    webviewScript(SCREEN);
+    webviewStyle(SCREEN);
+  } catch (error) {
+    vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    return;
+  }
+
   const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -159,9 +172,12 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-rules-")),
+    host: rulesHost(panel),
+    fileWatchers: [],
     watchers: [],
     loaded,
     lock: lockFromError("まだ確認していない"),
+    changedPending: false,
     wroteAt: 0,
   };
   panels.set(key, current);
@@ -218,7 +234,6 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   ];
   const samplesRel = samplesSetting();
   return {
-    text,
     mtimeMs,
     doc: readRules(text),
     rulesPath,
@@ -252,15 +267,30 @@ function registerPanelHandlers(current: PanelState): void {
     void handleMessage(current, asMessage(message));
   });
 
+  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
+  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
+  panel.onDidChangeViewState(() => {
+    if (!panel.visible || !alive(current)) {
+      return;
+    }
+    current.host.post({ type: "lock", lock: current.lock } satisfies ToRules);
+    if (current.changedPending) {
+      current.host.post({ type: "changed" } satisfies ToRules);
+    }
+  });
+
   panel.onDidDispose(() => {
     for (const timer of [current.timer, current.lockTimer]) {
       if (timer !== undefined) {
         clearTimeout(timer);
       }
     }
-    for (const watcher of current.watchers) {
+    for (const watcher of [...current.fileWatchers, ...current.watchers]) {
       watcher.dispose();
     }
+    current.fileWatchers = [];
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
@@ -272,16 +302,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
-  // ルールファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
-  const rulesRel = current.loaded?.rulesRel ?? DEFAULT_RULES;
-  for (const pattern of [toGlob(rulesRel), ".claude/settings.json", ".claude/settings.local.json"]) {
-    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
-    const changed = () => scheduleChanged(current);
-    watcher.onDidCreate(changed);
-    watcher.onDidChange(changed);
-    watcher.onDidDelete(changed);
-    current.watchers.push(watcher);
-  }
+  watchFiles(current);
   // チケットが動いたら、保存できるかを取り直す。
   for (const pattern of WATCH_PATTERNS) {
     const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, pattern));
@@ -290,6 +311,26 @@ function registerPanelHandlers(current: PanelState): void {
     watcher.onDidChange(moved);
     watcher.onDidDelete(moved);
     current.watchers.push(watcher);
+  }
+}
+
+/**
+ * ルールファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * 対象のパスは層の置き場で変わるので、再読込のたびに張り直す。
+ */
+function watchFiles(current: PanelState): void {
+  for (const watcher of current.fileWatchers) {
+    watcher.dispose();
+  }
+  current.fileWatchers = [];
+  const rulesRel = current.loaded?.rulesRel ?? DEFAULT_RULES;
+  for (const pattern of [toGlob(rulesRel), ".claude/settings.json", ".claude/settings.local.json"]) {
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(current.folder, pattern));
+    const changed = () => scheduleChanged(current);
+    watcher.onDidCreate(changed);
+    watcher.onDidChange(changed);
+    watcher.onDidDelete(changed);
+    current.fileWatchers.push(watcher);
   }
 }
 
@@ -311,7 +352,8 @@ function scheduleChanged(current: PanelState): void {
   current.timer = setTimeout(() => {
     current.timer = undefined;
     if (alive(current)) {
-      void current.panel.webview.postMessage({ type: "changed" });
+      current.changedPending = true;
+      current.host.post({ type: "changed" } satisfies ToRules);
     }
   }, DEBOUNCE_MS);
 }
@@ -337,18 +379,26 @@ async function refreshLock(current: PanelState): Promise<Lock> {
   const lock = result.ok ? lockFromBoard(result.board, projectOf(current.target)) : lockFromError(result.error);
   if (alive(current)) {
     current.lock = lock;
-    void current.panel.webview.postMessage({ type: "lock", lock });
+    current.host.post({ type: "lock", lock } satisfies ToRules);
   }
   return lock;
 }
 
+/**
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
+ */
 function show(current: PanelState): void {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
   }
-  current.panel.webview.html = renderRulesPage(
-    {
+  current.error = undefined;
+  // 読み直したので、「外で変わった」はもう今のことではない
+  current.changedPending = false;
+  current.host.send({
+    kind: "page",
+    page: {
       root: current.folder.uri.fsPath,
       rulesPath: loaded.rulesRel,
       mode: loaded.mode,
@@ -359,8 +409,14 @@ function show(current: PanelState): void {
       lock: current.lock,
       notices: loaded.notices,
     },
-    { nonce: crypto.randomBytes(16).toString("base64"), appearance: readAppearance() },
-  );
+  });
+}
+
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+function showError(current: PanelState, error: string): void {
+  current.loaded = undefined;
+  current.error = error;
+  current.host.send({ kind: "error", error });
 }
 
 async function reload(current: PanelState): Promise<void> {
@@ -369,7 +425,7 @@ async function reload(current: PanelState): Promise<void> {
     loaded = await readPage(current.folder.uri.fsPath, current.target);
   } catch (error) {
     if (alive(current)) {
-      current.panel.webview.html = renderError((error as Error).message);
+      showError(current, (error as Error).message);
     }
     return;
   }
@@ -378,15 +434,72 @@ async function reload(current: PanelState): Promise<void> {
   }
   current.loaded = loaded;
   show(current);
+  watchFiles(current);
   void refreshLock(current);
 }
 
-function renderError(error: string): string {
-  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none';"><title>ccnavi ルール設定</title></head><body><p>ルール設定画面を読み直せなかった。直してから「ccnavi ボード: ルール設定画面を開く」を実行し直す。</p><pre>${escapeHtml(error)}</pre></body></html>`;
+/**
+ * いまの状態で渡し直す。1 枚目を読み込んでいる間に見送られたもの（`deferred`）は、画面が
+ * 組み上がった（`ready`）ところでここから渡る。
+ */
+function redraw(current: PanelState): void {
+  if (current.loaded !== undefined) {
+    show(current);
+    return;
+  }
+  if (current.error !== undefined) {
+    showError(current, current.error);
+  }
 }
 
+/**
+ * ルール設定の画面に渡す口。VS Code のパネルを `retainedHost` の形に合わせる。
+ * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
+ * 型では止まらないので、ここで見て言う。
+ */
+function rulesHost(panel: vscode.WebviewPanel): ScreenHost<RulesData> {
+  if (panel.options.retainContextWhenHidden !== true) {
+    console.error(`ルール設定の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）。偽のままだと、裏に回った画面へ送り続けて中身が古いまま止まる`);
+  }
+  return retainedHost<RulesData>(
+    {
+      html(text: string): void {
+        panel.webview.html = text;
+      },
+      post(message: unknown): void {
+        void panel.webview.postMessage(message);
+      },
+    },
+    (data) =>
+      renderRulesPage(data, {
+        nonce: crypto.randomBytes(16).toString("base64"),
+        script: webviewScript(SCREEN),
+        style: webviewStyle(SCREEN),
+        appearance: readAppearance(),
+      }),
+  );
+}
+
+/**
+ * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は捨てるもの。
+ *
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
+ * ファイルに入る。** 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
+ * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
+ */
+function stale(current: PanelState, loaded: Loaded, what: string): boolean {
+  if (current.loaded === loaded) {
+    return false;
+  }
+  fail(current, `読み直したので、${what}は捨てた。いまのルールでやり直す`);
+  return true;
+}
+
+/** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
-  void current.panel.webview.postMessage({ type: "failed", message });
+  current.host.post({ type: "failed", message } satisfies ToRules);
 }
 
 /** 編集中の内容を一時ファイルに書き、実行ファイルへ渡す差し替えを返す */
@@ -411,8 +524,22 @@ function overrideFor(target: RulesTarget, tmp: string): RulesOverride {
   }
 }
 
-async function handleMessage(current: PanelState, message: Message | undefined): Promise<void> {
-  if (message === undefined || !alive(current) || current.loaded === undefined) {
+async function handleMessage(current: PanelState, message: RulesMessage | undefined): Promise<void> {
+  if (message === undefined || !alive(current)) {
+    return;
+  }
+  if (message.type === "ready") {
+    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す道
+    // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
+    current.host.ready();
+    redraw(current);
+    current.host.post({ type: "appearance", value: readAppearance() } satisfies ToRules);
+    return;
+  }
+  // 読み直せていない画面では、ルールに当たる操作はどれも行き先が無い（「再読込」は
+  // 押せるが、その道は `reload` が読み直しからやり直す）
+  if (current.loaded === undefined && message.type !== "reload") {
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -425,6 +552,11 @@ async function handleMessage(current: PanelState, message: Message | undefined):
           "読み直す",
         );
         if (choice !== "読み直す") {
+          // 画面は「再読込」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
+          // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
+          if (alive(current)) {
+            current.host.post({ type: "cancelled" } satisfies ToRules);
+          }
           return;
         }
       }
@@ -432,6 +564,9 @@ async function handleMessage(current: PanelState, message: Message | undefined):
       return;
     }
     case "openFile": {
+      if (current.loaded === undefined) {
+        return;
+      }
       const target = message.which === "rules" ? current.loaded.rulesPath : current.loaded.samplesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
@@ -451,7 +586,7 @@ async function handleMessage(current: PanelState, message: Message | undefined):
         title: `${message.field}: モデルへ渡すファイル`,
       });
       const chosen = picked?.[0];
-      if (chosen === undefined) {
+      if (chosen === undefined || !alive(current)) {
         return;
       }
       const rel = path.relative(root, chosen.fsPath);
@@ -459,15 +594,19 @@ async function handleMessage(current: PanelState, message: Message | undefined):
         void vscode.window.showWarningMessage(`ワークスペースの外のファイルは指定できない: ${chosen.fsPath}`);
         return;
       }
-      void current.panel.webview.postMessage({
+      current.host.post({
         type: "picked",
         key: message.key,
         field: message.field,
         path: rel.split(path.sep).join("/"),
-      });
+      } satisfies ToRules);
       return;
     }
     case "judge": {
+      const loaded = current.loaded;
+      if (loaded === undefined) {
+        return;
+      }
       let rules: RulesOverride;
       try {
         rules = stage(current, message.sections);
@@ -476,21 +615,21 @@ async function handleMessage(current: PanelState, message: Message | undefined):
         return;
       }
       const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
-      if (!alive(current)) {
+      if (!alive(current) || stale(current, loaded, "この判定")) {
         return;
       }
       if (!result.ok) {
         fail(current, result.error);
         return;
       }
-      void current.panel.webview.postMessage({
-        type: "judged",
-        result: result.value,
-        hooks: hooksFor(current.loaded.hooks, message.tool),
-      });
+      current.host.post({ type: "judged", result: result.value, hooks: hooksFor(loaded.hooks, message.tool) } satisfies ToRules);
       return;
     }
     case "samples": {
+      const loaded = current.loaded;
+      if (loaded === undefined) {
+        return;
+      }
       let rules: RulesOverride;
       try {
         rules = stage(current, message.sections);
@@ -498,15 +637,15 @@ async function handleMessage(current: PanelState, message: Message | undefined):
         fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
         return;
       }
-      const result = await runSamples(root, binSetting(), rules, current.loaded.samplesPath);
-      if (!alive(current)) {
+      const result = await runSamples(root, binSetting(), rules, loaded.samplesPath);
+      if (!alive(current) || stale(current, loaded, "このサンプルの判定")) {
         return;
       }
       if (!result.ok) {
         fail(current, result.error);
         return;
       }
-      void current.panel.webview.postMessage({ type: "sampled", result: result.value });
+      current.host.post({ type: "sampled", result: result.value } satisfies ToRules);
       return;
     }
     case "save": {
@@ -535,7 +674,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
 
   // 1. 検証。error が 1 件でもあれば保存しない。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
-  if (!alive(current)) {
+  if (!alive(current) || stale(current, loaded, "この保存")) {
     return;
   }
   if (!lint.ok) {
@@ -543,13 +682,14 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     return;
   }
   if (!lint.value.ok) {
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report}`);
+    // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
+    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
 
   // 2. 作業中のチケットが無いこと。押した時点で取り直す。
   const lock = await refreshLock(current);
-  if (!alive(current)) {
+  if (!alive(current) || stale(current, loaded, "この保存")) {
     return;
   }
   if (lock.locked) {
@@ -574,6 +714,8 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.rulesPath, text, "utf8");
   } catch (error) {
+    // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
+    current.wroteAt = 0;
     fail(current, `ルールファイルに書けない: ${(error as Error).message}`);
     return;
   }
@@ -582,12 +724,14 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   vscode.window.showInformationMessage(`${loaded.rulesRel} に保存した（${tail}）`);
 }
 
-function asMessage(message: unknown): Message | undefined {
+function asMessage(message: unknown): RulesMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
   const m = message as { type?: unknown; dirty?: unknown; which?: unknown; sections?: unknown; tool?: unknown; subject?: unknown; key?: unknown; field?: unknown };
   switch (m.type) {
+    case "ready":
+      return { type: "ready" };
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
     case "pickFile":
@@ -607,7 +751,11 @@ function asMessage(message: unknown): Message | undefined {
     }
     case "judge": {
       const sections = asSections(m.sections);
-      if (sections === undefined || typeof m.tool !== "string" || typeof m.subject !== "string") {
+      if (sections === undefined || typeof m.subject !== "string") {
+        return undefined;
+      }
+      // 画面の選択肢は KNOWN_TOOLS だけ。それ以外の名前で実行ファイルを起こさない
+      if (typeof m.tool !== "string" || !(KNOWN_TOOLS as readonly string[]).includes(m.tool)) {
         return undefined;
       }
       return { type: "judge", sections, tool: m.tool, subject: m.subject };

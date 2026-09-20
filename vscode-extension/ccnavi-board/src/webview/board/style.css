@@ -1,0 +1,13 @@
+/*
+ * ボード画面の CSS。**画面（React）と同じ置き場にあり、部品 1 つに CSS 1 本**（`Card.tsx` なら
+ * `Card.css`）。ここはその束ねで、`@import` を並べるだけ。部品を足したら、同じ名前の CSS を足して
+ * ここに 1 行足す。
+ *
+ * 束ねるのは `scripts/bundle-webview.js`（出口は `out/webview/board.css`）。拡張ホストはそれを読んで
+ * `<style nonce>` に流し込む（`src/core/render.ts`）。Webview の CSP が nonce を持つ `<style>` しか
+ * 通さないので、挿すのは入れ物を組む側のまま。画面へ nonce は渡さない（ADR-0066）。
+ */
+@import "../styles/page.css";
+@import "./App.css";
+@import "./Card.css";
+@import "./Approval.css";

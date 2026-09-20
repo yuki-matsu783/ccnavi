@@ -1,0 +1,19 @@
+/*
+ * プロジェクト管理画面の骨組み（`App.tsx`）。節、要約、clone の欄と結果、一覧の入れ物、
+ * ワークスペース自身のルールと、置き場の外に居るリポジトリ。1 件のカードは `Project.css`。
+ */
+section { margin-bottom: 18px; }
+.summary { font-weight: 600; }
+.summary .path { font-weight: 400; }
+.ok { color: var(--vscode-charts-green); }
+.warn-text { color: var(--vscode-editorWarning-foreground); }
+.clone-form input[type=text] { width: 100%; }
+.clone-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.clone-form label { display: flex; flex-direction: column; gap: 2px; font-size: .9em; color: var(--vscode-descriptionForeground); }
+.clone-form label.grow { flex: 1 1 320px; }
+.clone-form label:not(.grow) { flex: 0 1 200px; }
+.status { margin: 8px 0 0; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
+.status.failed { border-color: var(--vscode-editorError-foreground); color: var(--vscode-editorError-foreground); }
+.projects { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.self-rules { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; overflow-wrap: anywhere; }
+.stray-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

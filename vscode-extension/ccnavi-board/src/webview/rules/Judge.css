@@ -1,0 +1,16 @@
+/*
+ * 判定の結果（`Judge.tsx`）。1 回ぶんの結果の枠と、サンプルを一括で判定したときの数。
+ * 表そのものの見た目は `App.css`（hook の一覧と共有する）。
+ */
+.result { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
+.verdict { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; }
+.verdict.deny { color: var(--vscode-editorError-foreground); }
+.verdict.ask { color: var(--vscode-editorWarning-foreground); }
+.verdict.allow { color: var(--vscode-charts-green); }
+.verdict.skip, .verdict.none { color: var(--vscode-descriptionForeground); }
+.kv { margin: 4px 0; display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; }
+.kv dt { color: var(--vscode-descriptionForeground); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+pre.response { margin: 4px 0 0; padding: 6px 8px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--vscode-textCodeBlock-background); border-radius: 4px; }
+.counts { display: flex; gap: 14px; margin-bottom: 6px; }
+.counts .ng { color: var(--vscode-editorError-foreground); font-weight: 600; }

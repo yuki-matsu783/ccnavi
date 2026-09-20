@@ -9,17 +9,20 @@
  * **この入れ物は 1 度しか入らない**（`retainedHost`、ADR-0062）。画面は編集の途中を持つので、
  * 入れ直すと打ちかけの内容が消える。2 枚目からは拡張ホストが `postMessage` で渡す（risk-panel）。
  *
- * CSS は画面の側の持ち物（`risk-style.ts`。5 画面共通のぶんは `styles.ts`）で、ここは
- * それを `<style nonce>` に流し込むだけ。
+ * CSS も画面の側の持ち物で、部品と同じ置き場にある（`src/webview/risk/*.css`。5 画面共通のぶんは
+ * `src/webview/styles/`）。それを束ねた 1 本（`out/webview/risk.css`）を、ここが `<style nonce>` に
+ * 流し込む。挿すのがここなのは、Webview の CSP が nonce を持つ `<style>` しか通さず、nonce を作るのが
+ * 入れ物を組む側だから（ADR-0066）。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
-import { RISK_STYLE } from "./risk-style.js";
 import { DATA_ID, embedData, type RiskData } from "./risk-view.js";
 
 export interface RenderOptions {
   readonly nonce: string;
   /** 束ねた画面のスクリプト（`out/webview/risk.js` の中身）。拡張は起動時に 1 度読む */
   readonly script: string;
+  /** 束ねた画面の CSS（`out/webview/risk.css` の中身）。拡張は起動時に 1 度読む */
+  readonly style: string;
   /** 見た目。無ければ VS Code のテーマに従う */
   readonly appearance?: Appearance;
 }
@@ -35,7 +38,7 @@ export function renderRiskPage(data: RiskData, options: RenderOptions): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ccnavi リスク管理</title>
 <style nonce="${nonce}">
-${RISK_STYLE}
+${options.style}
 </style>
 </head>
 ${bodyTag(options.appearance)}

@@ -7,34 +7,17 @@
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import { renderPhasesPage, type RenderOptions } from "../../src/core/phases-render.js";
 import type { PhasesData, PhasesPage } from "../../src/core/phases-view.js";
+import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-const SCRIPT_PATH = path.join(__dirname, "..", "..", "webview", "phases.js");
-
-let cached: string | undefined;
-
-/** 束ねた画面。無ければ何を通せばよいかを言う（テストだけ先に走らせたときに出る） */
-export function phasesScript(): string {
-  if (cached === undefined) {
-    if (!fs.existsSync(SCRIPT_PATH)) {
-      throw new Error(`画面が束ねられていない: ${SCRIPT_PATH}（node scripts/bundle-webview.js を通す）`);
-    }
-    cached = fs.readFileSync(SCRIPT_PATH, "utf8");
-  }
-  return cached;
-}
-
 /** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
 export function phasesHtml(data: PhasesData, options: Partial<RenderOptions> = {}): string {
-  return renderPhasesPage(data, { nonce: NONCE, script: phasesScript(), ...options });
+  return renderPhasesPage(data, { nonce: NONCE, script: screenScript("phases"), style: screenStyle("phases"), ...options });
 }
 
 /** 見本の中身（雛形の 5 種類）。差し替えたいところだけ渡す */

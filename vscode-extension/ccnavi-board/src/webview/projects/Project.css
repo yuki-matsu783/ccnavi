@@ -1,0 +1,29 @@
+/*
+ * プロジェクト 1 件のカード（`Project.tsx`）。見出しと札、項目の格子、行末のボタンの帯、
+ * 設定の検証の一覧。メニューそのものは `Menu.css`。
+ */
+.project {
+  border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px;
+  background: var(--vscode-editorWidget-background);
+}
+.project.has-problem { border-left: 3px solid var(--vscode-editorWarning-foreground); }
+.project-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 6px; }
+.project-head .name { font-weight: 600; font-size: 1.05em; overflow-wrap: anywhere; }
+.project-head .rel { overflow-wrap: anywhere; }
+.project-head .flags { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+/* 項目は 1 つ 240px を目安に、幅に合わせて段数が変わる。検証は長くなるので常に 1 段まるごと使う */
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 16px; margin: 0; }
+.field { min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field dt { font-size: .85em; color: var(--vscode-descriptionForeground); }
+.field dd { margin: 0; overflow-wrap: anywhere; }
+.field dd button.action { vertical-align: middle; }
+.ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
+.badge { font-size: .82em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--vscode-panel-border); white-space: nowrap; }
+.badge.doing { color: var(--vscode-charts-yellow); border-color: var(--vscode-charts-yellow); }
+.badge.warn { color: var(--vscode-editorWarning-foreground); border-color: var(--vscode-editorWarning-foreground); }
+.badge.error { color: var(--vscode-editorError-foreground); border-color: var(--vscode-editorError-foreground); }
+.lint { list-style: none; margin: 0; padding: 0; font-size: .88em; }
+.lint li { overflow-wrap: anywhere; }
+.lint li.warn { color: var(--vscode-editorWarning-foreground); }
+.lint li.error { color: var(--vscode-editorError-foreground); }

@@ -562,6 +562,8 @@ def screen(
     3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
     コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
+    `cd` で移った先から見た綴り（`shellread.Reading.moved`）も、実行役のコマンドの名前を
+    `shellread.MOVED` にしてここに並ぶ。どちらも止める側のルールにだけ当てる。
 
     4 つめは、書き直しを求める形の（形, 綴り）の並び（shellread.Reading.rewrites）。Bash 以外は空。
     """
@@ -578,6 +580,14 @@ def screen(
                 strict=True,
             )
         )
+    # `cd` で移った先から見た綴りも、中で実行されるコマンドと同じ並びに足す（ADR-0066）。
+    # 書かれた綴りの当たり方は動かさず、当てる先を足すだけにする。止める側のルールにしか
+    # 当たらないので、`cd` を読み違えても、当たるはずのものが当たらなくなることはない。
+    inner += [
+        (shellread.MOVED, command, False)
+        for command in reading.moved.split(shellread.SEP)
+        if command
+    ]
     if reading.degraded:
         record.degraded = reading.reason
         return subject, subject, inner, reading.rewrites

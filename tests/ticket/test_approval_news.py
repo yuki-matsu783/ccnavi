@@ -80,7 +80,25 @@ class ApprovalNewsTest(PhaseHarness):
         first = self.prompt()
         self.assertIn(prompt, first)
         self.assertIn("i0001-01", first)
+        # 子より先に親を着手する順も、この 1 度の文で伝える（REQ-TKT-48）。
+        self.assertIn("start <親>", first)
         self.assertEqual(self.prompt(), "")
+
+    def test_a_batch_without_a_new_parent_does_not_ask_for_the_parent_start(self):
+        """子だけの回では、親の `start` を勧めないこと。
+
+        勧めた綴りは、親が着手済みなら「着手済み」で終わる。案内どおりに打って終了コード 1 を
+        受け取る文は、案内ではなく誤りの元になる。子より先に親を着手する順そのものは、
+        子の行の「親が未着手だと止まる」で残る。
+        """
+        self.parent_only()
+        self.next_child()
+        self.approve_yes(["i0001", "i0001-01"])
+        self.prompt()  # 1 回目の文はここで受け取っておく
+        self.next_child("i0001-02")
+        news = self.approve_yes(["i0001-02"])
+        self.assertNotIn("start <親>", news)
+        self.assertIn("親が未着手だと止まる", news)
 
     # ---- 2. PreToolUse でも 1 度
 

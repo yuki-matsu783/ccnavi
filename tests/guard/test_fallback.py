@@ -153,6 +153,12 @@ class FallbackTest(unittest.TestCase):
             "cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
             "echo {} > .claude/settings.json",
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
+            # `cd` で入ってから書く形（issue #61、ADR-0066）。行き先の綴りから場所の
+            # 名前が消えるので、移った先から見た綴りにも当てないと素通りする。
+            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .claude && echo x > settings.json",
+            "cd .claude/hooks && echo x > lint-py.sh",
+            "cd .claude && rm -rf hooks",
         ]:
             with self.subTest(command=command):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))

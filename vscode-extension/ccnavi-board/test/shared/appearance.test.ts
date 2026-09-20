@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { APPEARANCE_SCRIPT, APPEARANCE_STYLE, appearanceClass, bodyTag, parseAppearance } from "../../src/core/appearance.js";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { appearanceClass, bodyTag, parseAppearance } from "../../src/core/appearance.js";
+import { WEBVIEW_SRC } from "../helpers/bundle.js";
+
+/** Claude の配色そのもの。画面の側の CSS にある（拡張が持つのは body のクラスだけ） */
+const APPEARANCE_STYLE = fs.readFileSync(path.join(WEBVIEW_SRC, "styles", "appearance.css"), "utf8");
 
 /** WCAG の相対輝度によるコントラスト比 */
 function contrast(a: string, b: string): number {
@@ -43,7 +49,4 @@ test("CB-T129 body のクラスは Claude の配色のときだけ付き、CSS �
   for (const [fg, bg] of pairs) {
     assert.ok(contrast(fg, bg) >= 4.5, `${fg} on ${bg} = ${contrast(fg, bg).toFixed(2)}`);
   }
-  // 画面のスクリプトはテンプレートに埋めるので、バッククォートと ${ を含まない
-  assert.doesNotMatch(APPEARANCE_SCRIPT, /`|\$\{/);
-  assert.doesNotThrow(() => new Function(APPEARANCE_SCRIPT));
 });

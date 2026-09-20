@@ -269,6 +269,16 @@ class Workspace(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
         return result
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def family(self, parent=None, child=None):
         """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
@@ -281,6 +291,7 @@ class Workspace(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.approve()
+        self.start_parent()
         self.worktree("i0001-01", "i0001")
         started = self.ccnavi("ticket", "start", "i0001-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)

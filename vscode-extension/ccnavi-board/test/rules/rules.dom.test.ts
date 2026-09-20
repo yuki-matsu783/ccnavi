@@ -1,292 +1,532 @@
 /**
- * ルール設定画面のスクリプトを happy-dom で動かす。行の開閉・絞り込み・札・判定の展開など、
- * HTML の文字列を見るだけでは分からない振る舞いを確かめる。
+ * ルール設定画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
+ *
+ * 判定は実行ファイルの仕事なので、その結果（`judged` / `sampled`）は拡張ホストから届いたものとして送る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseHooks } from "../../src/core/hooks.js";
 import { readRules } from "../../src/core/rules-doc.js";
-import { renderRulesPage } from "../../src/core/rules-render.js";
-import { loadPage } from "../helpers/dom.js";
+import { KNOWN_TOOLS, type Sections } from "../../src/core/rules-view.js";
+import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
+import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
+import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-const RULES = `version: 1
-deny:
-  - id: git-push
-    match: Bash
-    glob: "*git push*"
-    message: "push は人が行う"
-  - id: no-rm
-    match: Bash
-    glob: "*rm -rf*"
-    every: 4
-    message: "消さない"
-    additionalContext: "代わりに ccnavi-git.sh rm"
-ask:
-  - id: deps
-    match: Write|Edit
-    regex: "pyproject\\\\.toml"
-    additionalContextOnce: "依存が変わる"
-allow: []
-`;
+/** 直前に送った保存の中身 */
+function savedSections(dom: DomPage): Sections {
+  const saves = dom.posted.filter((message) => message.type === "save");
+  assert.ok(saves.length > 0, "保存を送っていない");
+  return saves[saves.length - 1].sections as Sections;
+}
 
-function html(): string {
-  return renderRulesPage(
-    {
-      root: "/ws",
-      rulesPath: ".ccnavi/common/rules.yml",
-      mode: "enable",
-      model: readRules(RULES).model,
-      hooks: parseHooks(JSON.stringify({ hooks: {} }), "settings"),
-      hookFiles: { settings: true, settingsLocal: false },
-      samplesPath: ".ccnavi/common/rule-samples.yml",
-      lock: { locked: false, reason: "", doing: [] },
-    },
-    { nonce: "n" },
-  );
+function hit(section: string, id: string, kind = "glob"): RuleHitJson {
+  return { section, id, kind, written: "*", pattern: ".*", source: "file" };
+}
+
+/** 実行ファイルが返した判定。拡張ホストが `judged` で渡す形 */
+function judged(rules: readonly RuleHitJson[]): { type: string; result: TestJson; hooks: [] } {
+  const result: TestJson = {
+    version: 1,
+    root: "/ws",
+    rules_path: ".ccnavi/common/rules.yml",
+    known: true,
+    tool: "Bash",
+    subject: "x",
+    resolved: "x",
+    verdict: "deny",
+    code: "",
+    reason: "",
+    degraded: "",
+    fallback: "",
+    rules,
+    response: "",
+  };
+  return { type: "judged", result, hooks: [] };
 }
 
 test("CB-D01 既定は全部畳む。行の見出しを押すと開き、開いた行の id が state に入る。もう一度押すと畳む", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    assert.equal(page.all(".rule").length, 3);
-    assert.equal(page.all(".rule.open").length, 0);
-    const head = page.one('.rule[data-id="no-rm"] .row-head');
-    page.click(head);
-    assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"));
-    assert.deepEqual((page.state() as { open: string[] }).open, ["no-rm"]);
+    assert.equal(dom.all(".rule").length, 3);
+    assert.equal(dom.all(".rule.open").length, 0);
+    dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
+    await dom.settle();
+    assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["no-rm"]);
     // 開いた行の欄には値が入っている
-    assert.equal(page.one<HTMLInputElement>('.rule[data-id="no-rm"] input.f-id').value, "no-rm");
-    page.click(head);
-    assert.ok(!page.one('.rule[data-id="no-rm"]').classList.contains("open"));
-    assert.deepEqual((page.state() as { open: string[] }).open, []);
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("no-rm")} input.f-id`).value, "no-rm");
+    dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
+    await dom.settle();
+    assert.ok(!dom.one(rowSelector("no-rm")).classList.contains("open"));
+    assert.deepEqual((dom.state() as { open: string[] }).open, []);
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D08 id を打っている途中は控えを書き直さず、確定（change）したときに新しい id で控える", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.click(page.one('.rule[data-id="git-push"] .row-head'));
-    assert.deepEqual((page.state() as { open: string[] }).open, ["git-push"]);
-    const id = page.one('.rule[data-id="git-push"] input.f-id');
-    page.type(id, "git-pu");
-    assert.deepEqual((page.state() as { open: string[] }).open, ["git-push"], "打っている途中は前の id のまま");
-    page.type(id, "git-push-2");
-    page.change(id);
-    assert.deepEqual((page.state() as { open: string[] }).open, ["git-push-2"]);
-    assert.equal(page.one('.rule[data-id="git-push-2"] .sum .sum-id').textContent, "git-push-2");
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push"]);
+    dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "git-pu");
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push"], "打っている途中は前の id のまま");
+    dom.type(dom.one(`${rowSelector("git-pu")} input.f-id`), "git-push-2");
+    await dom.settle();
+    dom.change(dom.one(`${rowSelector("git-push-2")} input.f-id`));
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push-2"]);
+    assert.equal(dom.one(`${rowSelector("git-push-2")} .sum .sum-id`).textContent, "git-push-2");
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D09 土台は画面のスクリプトの例外を握りつぶさない。非同期の例外も拾い、1 度投げたら消す", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.one("#find").addEventListener("input", () => {
+    dom.one("#find").addEventListener("input", () => {
       throw new Error("わざと");
     }, { once: true });
-    assert.throws(() => page.type(page.one("#find"), "x"), /わざと/);
-    assert.equal(page.errors.length, 0, "投げたら消える");
-    page.one("#find").addEventListener("input", async () => {
+    assert.throws(() => dom.type(dom.one("#find"), "x"), /わざと/);
+    assert.equal(dom.errors.length, 0, "投げたら消える");
+    dom.one("#find").addEventListener("input", async () => {
       await Promise.resolve();
       throw new Error("あとで");
     });
-    page.type(page.one("#find"), "y");
-    await assert.rejects(page.settle(), /あとで/);
+    dom.type(dom.one("#find"), "y");
+    await assert.rejects(dom.settle(), /あとで/);
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D0a 絞り込み中にタイプを畳んでも矢印は開いた向きのまま。足したルールのタイプは開く", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.type(page.one("#find"), "git");
-    page.click(page.one('button[data-action="fold-section"][data-section="deny"]'));
-    assert.ok(page.one('.rule-section[data-section="deny"]').classList.contains("folded"));
-    assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
-    page.type(page.one("#find"), "");
-    assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▸");
-    page.click(page.one('button[data-action="fold-section"][data-section="allow"]'));
-    page.click(page.one('button[data-action="add"][data-section="allow"]'));
-    assert.ok(!page.one('.rule-section[data-section="allow"]').classList.contains("folded"));
-    assert.equal(page.one('.rule-section[data-section="allow"] h2 > .twist').textContent, "▾");
+    dom.type(dom.one("#find"), "git");
+    await dom.settle();
+    dom.click(dom.one('button[data-action="fold-section"][data-section="deny"]'));
+    await dom.settle();
+    assert.ok(dom.one('.rule-section[data-section="deny"]').classList.contains("folded"));
+    assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
+    dom.type(dom.one("#find"), "");
+    await dom.settle();
+    assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▸");
+    dom.click(dom.one('button[data-action="fold-section"][data-section="allow"]'));
+    await dom.settle();
+    dom.click(dom.one('button[data-action="add"][data-section="allow"]'));
+    await dom.settle();
+    assert.ok(!dom.one('.rule-section[data-section="allow"]').classList.contains("folded"));
+    assert.equal(dom.one('.rule-section[data-section="allow"] h2 > .twist').textContent, "▾");
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D0b 見た目のメッセージで body のクラスが付け替わり、開いている行と入力は消えない", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.click(page.one('.rule[data-id="git-push"] .row-head'));
-    page.type(page.one('.rule[data-id="git-push"] input.f-id'), "git-push-x");
-    await page.send({ type: "appearance", value: "claude-light" });
-    assert.deepEqual(Array.from(page.document.body.classList), ["ccnavi-claude-light"]);
-    await page.send({ type: "appearance", value: "claude-dark" });
-    assert.deepEqual(Array.from(page.document.body.classList), ["ccnavi-claude-dark"]);
-    await page.send({ type: "appearance", value: "vscode" });
-    assert.deepEqual(Array.from(page.document.body.classList), []);
-    assert.ok(page.one('.rule[data-id="git-push-x"]').classList.contains("open"));
-    assert.equal(page.one<HTMLInputElement>('.rule[data-id="git-push-x"] input.f-id').value, "git-push-x");
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "git-push-x");
+    await dom.settle();
+    await dom.send({ type: "appearance", value: "claude-light" });
+    assert.deepEqual(Array.from(dom.document.body.classList), ["ccnavi-claude-light"]);
+    await dom.send({ type: "appearance", value: "claude-dark" });
+    assert.deepEqual(Array.from(dom.document.body.classList), ["ccnavi-claude-dark"]);
+    await dom.send({ type: "appearance", value: "vscode" });
+    assert.deepEqual(Array.from(dom.document.body.classList), []);
+    assert.ok(dom.one(rowSelector("git-push-x")).classList.contains("open"));
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("git-push-x")} input.f-id`).value, "git-push-x");
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D02 state に控えた id の行は、読み直したあとも開いている", async () => {
-  const page = await loadPage(html(), { open: ["deps"], tab: "rules" });
+  const dom = await openRules({}, { open: ["deps"], tab: "rules" });
   try {
-    assert.ok(page.one('.rule[data-id="deps"]').classList.contains("open"));
-    assert.equal(page.all(".rule.open").length, 1);
+    assert.ok(dom.one(rowSelector("deps")).classList.contains("open"));
+    assert.equal(dom.all(".rule.open").length, 1);
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D03 コンテキストの欄は値があるルールだけ最初から開き、利用者が閉じれば描き直しても閉じたまま", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    assert.ok(!page.one('.rule[data-id="git-push"] details.more').hasAttribute("open"));
-    assert.ok(page.one('.rule[data-id="no-rm"] details.more').hasAttribute("open"));
-    assert.ok(page.one('.rule[data-id="deps"] details.more').hasAttribute("open"));
+    assert.ok(!dom.one(`${rowSelector("git-push")} details.more`).hasAttribute("open"));
+    assert.ok(dom.one(`${rowSelector("no-rm")} details.more`).hasAttribute("open"));
+    assert.ok(dom.one(`${rowSelector("deps")} details.more`).hasAttribute("open"));
     // 閉じてから、形式を変えて描き直す
-    const more = page.one('.rule[data-id="no-rm"] details.more');
+    const more = dom.one(`${rowSelector("no-rm")} details.more`);
     more.removeAttribute("open");
-    more.dispatchEvent(new page.window.Event("toggle"));
-    page.click(page.one('.rule[data-id="no-rm"] .row-head'));
-    page.change(page.one('.rule[data-id="no-rm"] select.f-kind'), "regex");
-    assert.ok(!page.one('.rule[data-id="no-rm"] details.more').hasAttribute("open"));
-    assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"), "描き直しても開いたまま");
+    more.dispatchEvent(new dom.window.Event("toggle"));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
+    await dom.settle();
+    dom.change(dom.one(`${rowSelector("no-rm")} select.f-kind`), "regex");
+    await dom.settle();
+    assert.ok(!dom.one(`${rowSelector("no-rm")} details.more`).hasAttribute("open"));
+    assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"), "描き直しても開いたまま");
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D04 絞り込みは一致しない行を隠し、開いている行は隠さず、件数は一致した数、畳んだタイプの矢印は開いた向き", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.click(page.one('.rule[data-id="deps"] .row-head'));
-    page.click(page.one('button[data-action="fold-section"][data-section="deny"]'));
-    assert.ok(page.one('.rule-section[data-section="deny"]').classList.contains("folded"));
-    page.type(page.one("#find"), "rm -rf");
-    const hidden = page.all(".rule").map((r) => `${r.getAttribute("data-id")}:${r.classList.contains("hidden-by-find")}`);
+    dom.click(dom.one(`${rowSelector("deps")} .row-head`));
+    await dom.settle();
+    dom.click(dom.one('button[data-action="fold-section"][data-section="deny"]'));
+    await dom.settle();
+    assert.ok(dom.one('.rule-section[data-section="deny"]').classList.contains("folded"));
+    dom.type(dom.one("#find"), "rm -rf");
+    await dom.settle();
+    const hidden = dom.all(".rule").map((rule) => `${rule.getAttribute("data-id")}:${rule.classList.contains("hidden-by-find")}`);
     assert.deepEqual(hidden, ["git-push:true", "no-rm:false", "deps:true"]);
     // 開いている deps は hidden-by-find でも表示は消えない（CSS の :not(.open)）
-    assert.ok(page.one("#tab-rules").classList.contains("finding"));
-    assert.equal(page.one('[data-count="deny"]').textContent, "1 / 2");
-    assert.equal(page.one('[data-count="ask"]').textContent, "0 / 1（開いたまま 1）");
-    assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
+    assert.ok(dom.one("#tab-rules").classList.contains("finding"));
+    assert.equal(dom.one('[data-count="deny"]').textContent, "1 / 2");
+    assert.equal(dom.one('[data-count="ask"]').textContent, "0 / 1（開いたまま 1）");
+    assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▾");
     // 空に戻すと元どおり
-    page.type(page.one("#find"), "");
-    assert.equal(page.all(".rule.hidden-by-find").length, 0);
-    assert.equal(page.one('[data-count="deny"]').textContent, "2");
-    assert.equal(page.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▸");
+    dom.type(dom.one("#find"), "");
+    await dom.settle();
+    assert.equal(dom.all(".rule.hidden-by-find").length, 0);
+    assert.equal(dom.one('[data-count="deny"]').textContent, "2");
+    assert.equal(dom.one('.rule-section[data-section="deny"] h2 > .twist').textContent, "▸");
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D05 ツールの札で選ぶと、欄と行の要約が同じ操作の中で新しい値になる", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.click(page.one('.rule[data-id="no-rm"] .row-head'));
-    const input = page.one<HTMLInputElement>('.rule[data-id="no-rm"] input.f-match');
-    input.dispatchEvent(new page.window.Event("focus"));
-    assert.ok(page.one('.rule[data-id="no-rm"] .picker').classList.contains("open"));
-    const box = page.one<HTMLInputElement>('.rule[data-id="no-rm"] .picker input[value="Write"]');
-    box.checked = true;
-    box.dispatchEvent(new page.window.Event("input", { bubbles: true }));
-    box.dispatchEvent(new page.window.Event("change", { bubbles: true }));
-    assert.equal(input.value, "Bash|Write");
-    assert.equal(page.one('.rule[data-id="no-rm"] .sum .mono').textContent, "Bash|Write");
-    assert.ok(!page.one<HTMLButtonElement>("#save").disabled, "編集したので保存できる");
+    dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("no-rm")} input.f-match`));
+    await dom.settle();
+    assert.ok(dom.one(`${rowSelector("no-rm")} .picker`).classList.contains("open"));
+    // 知らない名前は札に出ないが、欄に書いてあれば札として並ぶ
+    assert.deepEqual(
+      dom.all(`${rowSelector("no-rm")} .picker input[type=checkbox]`).map((box) => box.getAttribute("value")),
+      [...KNOWN_TOOLS],
+    );
+    dom.click(dom.one(`${rowSelector("no-rm")} .picker input[value="Write"]`));
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("no-rm")} input.f-match`).value, "Bash|Write");
+    assert.equal(dom.one(`${rowSelector("no-rm")} .sum .mono`).textContent, "Bash|Write");
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled, "編集したので保存できる");
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D06 判定で当たった行はその場で開くが state には入らず、次の判定で畳まれる", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    const judged = (id: string) => ({
-      type: "judged",
-      result: { known: true, verdict: "deny", code: "", tool: "Bash", subject: "x", rules: [{ section: "deny", id, kind: "glob", written: "*", pattern: ".*", source: "file" }], response: "" },
-      hooks: [],
-    });
-    await page.send(judged("git-push"));
-    assert.ok(page.one('.rule[data-id="git-push"]').classList.contains("open"));
-    assert.ok(page.one('.rule[data-id="git-push"]').classList.contains("hit"));
-    assert.deepEqual(((page.state() as { open?: string[] }) ?? {}).open ?? [], []);
-    assert.equal((page.state() as { tab: string }).tab, "judge");
-    await page.send(judged("no-rm"));
-    assert.ok(!page.one('.rule[data-id="git-push"]').classList.contains("open"));
-    assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"));
+    await dom.send(judged([hit("deny", "git-push")]));
+    assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
+    assert.ok(dom.one(rowSelector("git-push")).classList.contains("hit"));
+    assert.deepEqual(((dom.state() as { open?: string[] }) ?? {}).open ?? [], []);
+    assert.equal((dom.state() as { tab: string }).tab, "judge");
+    assert.ok(dom.one("#tab-judge").classList.contains("active"));
+    await dom.send(judged([hit("deny", "no-rm")]));
+    assert.ok(!dom.one(rowSelector("git-push")).classList.contains("open"));
+    assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
     // 絞り込み中に 2 件当たっても、両方開き、件数は一致した行だけを数える
-    page.type(page.one("#find"), "pyproject");
-    await page.send({ ...judged("git-push"), result: { ...judged("git-push").result, rules: [judged("git-push").result.rules[0], judged("no-rm").result.rules[0]] } });
-    assert.ok(page.one('.rule[data-id="git-push"]').classList.contains("open"));
-    assert.ok(page.one('.rule[data-id="no-rm"]').classList.contains("open"));
-    assert.equal(page.one('[data-count="deny"]').textContent, "0 / 2（開いたまま 2）");
-    assert.equal(page.one('[data-count="ask"]').textContent, "1 / 1");
+    dom.type(dom.one("#find"), "pyproject");
+    await dom.settle();
+    await dom.send(judged([hit("deny", "git-push"), hit("deny", "no-rm")]));
+    assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
+    assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
+    assert.equal(dom.one('[data-count="deny"]').textContent, "0 / 2（開いたまま 2）");
+    assert.equal(dom.one('[data-count="ask"]').textContent, "1 / 1");
     // 畳んだタイプの中のルールが当たれば、タイプが開いて矢印もそれに合う
-    page.type(page.one("#find"), "");
-    page.click(page.one('button[data-action="fold-section"][data-section="ask"]'));
-    assert.equal(page.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▸");
-    await page.send({ ...judged("deps"), result: { ...judged("deps").result, rules: [{ section: "ask", id: "deps", kind: "regex", written: "x", pattern: "x", source: "file" }] } });
-    assert.ok(!page.one('.rule-section[data-section="ask"]').classList.contains("folded"));
-    assert.equal(page.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▾");
-    assert.ok(page.one('.rule[data-id="deps"]').classList.contains("open"));
+    dom.type(dom.one("#find"), "");
+    await dom.settle();
+    dom.click(dom.one('button[data-action="fold-section"][data-section="ask"]'));
+    await dom.settle();
+    assert.equal(dom.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▸");
+    await dom.send(judged([hit("ask", "deps", "regex")]));
+    assert.ok(!dom.one('.rule-section[data-section="ask"]').classList.contains("folded"));
+    assert.equal(dom.one('.rule-section[data-section="ask"] h2 > .twist').textContent, "▾");
+    assert.ok(dom.one(rowSelector("deps")).classList.contains("open"));
+    // ヒットしたルールの表と、返すメッセージ・hook の見出しも出る
+    assert.deepEqual(dom.all("#judge-result h3").map((head) => head.textContent), ["ヒットしたルール", "返すメッセージ", "このツールで実行される hook"]);
+    assert.equal(dom.all("#judge-result table tbody tr").length, 1);
+    assert.match(dom.one("#judge-result").textContent ?? "", /実行される hook は無い/);
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D0c 刻みは畳んだ行の札に出る。欄に打てば札も変わり、保存はその文字を送る", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
     // 読んだ刻みは畳んだままでも見える。刻みが無い行は札を出さない（枠だけ置く）
-    assert.equal(page.one('.rule[data-id="no-rm"] .sum .sum-every').textContent, "4 回ごと");
-    assert.equal(page.one('.rule[data-id="git-push"] .sum .sum-every').textContent, "");
+    assert.equal(dom.one(`${rowSelector("no-rm")} .sum .sum-every`).textContent, "4 回ごと");
+    assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "");
     // 刻みだけを直す。欄は「コンテキストの追加」の中にあり、刻みがあれば最初から開いている
-    assert.ok(page.one('.rule[data-id="git-push"] details.more').hasAttribute("open") === false);
-    page.click(page.one('.rule[data-id="git-push"] .row-head'));
-    const every = page.one<HTMLInputElement>('.rule[data-id="git-push"] input.f-every');
-    assert.equal(every.value, "");
-    page.type(every, "3");
-    assert.equal(page.one('.rule[data-id="git-push"] .sum .sum-every').textContent, "3 回ごと");
+    assert.ok(!dom.one(`${rowSelector("git-push")} details.more`).hasAttribute("open"));
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("git-push")} input.f-every`).value, "");
+    dom.type(dom.one(`${rowSelector("git-push")} input.f-every`), "3");
+    await dom.settle();
+    assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "3 回ごと");
     // 読めない値も打てる。画面は直さず、そのまま送る（止めるのは保存前の --lint）
-    page.type(page.one('.rule[data-id="no-rm"] input.f-every'), "x");
-    page.click(page.one("#save"));
-    const save = page.posted.find((m) => m.type === "save") as unknown as {
-      sections: { deny: { id: string; every: string }[] };
-    };
-    assert.deepEqual(save.sections.deny.map((r) => [r.id, r.every]), [["git-push", "3"], ["no-rm", "x"]]);
+    dom.type(dom.one(`${rowSelector("no-rm")} input.f-every`), "x");
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.deepEqual(savedSections(dom).deny.map((rule) => [rule.id, rule.every]), [["git-push", "3"], ["no-rm", "x"]]);
   } finally {
-    await page.close();
+    await dom.close();
   }
 });
 
 test("CB-D07 足したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の並びを送る", async () => {
-  const page = await loadPage(html());
+  const dom = await openRules();
   try {
-    page.click(page.one('button[data-action="add"][data-section="allow"]'));
-    const added = page.one('[data-list="allow"] .rule');
+    dom.click(dom.one('button[data-action="add"][data-section="allow"]'));
+    await dom.settle();
+    const added = dom.one('[data-list="allow"] .rule');
     assert.ok(added.classList.contains("open"));
-    assert.equal(page.document.activeElement, page.one('[data-list="allow"] .rule input.f-id'));
-    page.type(page.one('[data-list="allow"] .rule input.f-id'), "new-one");
-    page.change(page.one('[data-list="allow"] .rule select.f-section'), "ask");
-    assert.equal(page.all('[data-list="allow"] .rule').length, 0);
-    const moved = page.one('.rule[data-id="new-one"]');
+    assert.equal(dom.document.activeElement, dom.one('[data-list="allow"] .rule input.f-id'));
+    dom.type(dom.one('[data-list="allow"] .rule input.f-id'), "new-one");
+    await dom.settle();
+    dom.change(dom.one('[data-list="allow"] .rule select.f-section'), "ask");
+    await dom.settle();
+    assert.equal(dom.all('[data-list="allow"] .rule').length, 0);
+    const moved = dom.one(rowSelector("new-one"));
     assert.ok(moved.closest('[data-list="ask"]') !== null);
     assert.ok(moved.classList.contains("open"));
-    page.click(page.one("#save"));
-    const save = page.posted.find((m) => m.type === "save") as unknown as { sections: { ask: { id: string }[] } };
-    assert.deepEqual(save.sections.ask.map((r) => r.id), ["deps", "new-one"]);
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.deepEqual(savedSections(dom).ask.map((rule) => rule.id), ["deps", "new-one"]);
   } finally {
-    await page.close();
+    await dom.close();
+  }
+});
+
+test("CB-D69 「渡すファイル」で選んだ綴りは、拡張ホストが名指しした行の欄にだけ入る", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("git-push")} .f-context-file + button`));
+    await dom.settle();
+    const asked = dom.posted.filter((message) => message.type === "pickFile");
+    assert.equal(asked.length, 1);
+    assert.equal(asked[0].field, "additionalContextFile");
+    await dom.send({ type: "picked", key: asked[0].key, field: "additionalContextFile", path: "docs/note.md" });
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("git-push")} input.f-context-file`).value, "docs/note.md");
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("no-rm")} input.f-context-file`).value, "");
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled, "欄が埋まったので保存できる");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D70 再読込は押した時点でボタンを止め、やめたら戻る。中身が届けば編集は捨てて入れ替わる", async () => {
+  const dom = await openRules();
+  try {
+    dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "打ちかけ");
+    await dom.settle();
+    assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
+    dom.click(dom.one('.controls button[data-action="reload"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [true]);
+    assert.ok(dom.one<HTMLButtonElement>('.controls button[data-action="reload"]').disabled);
+    await dom.send({ type: "cancelled" });
+    assert.ok(!dom.one<HTMLButtonElement>('.controls button[data-action="reload"]').disabled);
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("打ちかけ")} input.f-id`).value, "打ちかけ");
+    // 中身が届いたら編集は捨てる
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    assert.equal(dom.all(rowSelector("打ちかけ")).length, 0);
+    assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "未保存が消えたので保存は押せない");
+    assert.ok(dom.one("#dirty").classList.contains("hidden"));
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の一言は届いたときに出る", async () => {
+  const dom = await openRules();
+  try {
+    assert.ok(dom.one("#changed").classList.contains("hidden"));
+    await dom.send({ type: "changed" });
+    assert.ok(!dom.one("#changed").classList.contains("hidden"));
+    await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
+    assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "錠が掛かっていれば保存は押せない");
+    await dom.send({ type: "failed", message: "--lint が error を報告した" });
+    assert.equal(dom.one("#status").textContent, "--lint が error を報告した");
+    assert.ok(dom.one("#status").closest(".foot")?.classList.contains("error"));
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D72 読み直せなかった画面から中身が届いたあとも、id の確定で開いた行を控える", async () => {
+  const dom = await openPage({ kind: "error", error: "ルールファイルを読めない" });
+  try {
+    assert.match(dom.one(".load-error").textContent ?? "", /ルールファイルを読めない/);
+    dom.click(dom.one('button[data-action="reload"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [false]);
+    assert.ok(dom.one<HTMLButtonElement>('button[data-action="reload"]').disabled, "押した時点で止める");
+    // 中身が届いて一覧が出る。控えの受け口（id の確定）は、ここで張られていないと二度と張られない
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    dom.click(dom.one(`${rowSelector("deps")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("deps")} input.f-id`), "deps-2");
+    await dom.settle();
+    dom.change(dom.one(`${rowSelector("deps-2")} input.f-id`));
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["deps-2"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T50 dry-run のときは止めないことを言い、enable と未設定（実行ファイルは enable と扱う）なら言わない", async () => {
+  const banners = async (mode: string): Promise<string[]> => {
+    const dom = await openRules({ mode });
+    try {
+      return dom.all(".banner.warn:not(.hidden)").map((banner) => banner.textContent ?? "");
+    } finally {
+      await dom.close();
+    }
+  };
+  assert.match((await banners("dry-run")).join("\n"), /CCNAVI_MODE.*dry-run/);
+  assert.deepEqual(await banners(""), []);
+  assert.deepEqual(await banners("enable"), []);
+});
+
+test("CB-T51 保存できない理由と読み込みの苦情を出す", async () => {
+  const locked = await openRules({ lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
+  try {
+    assert.equal(locked.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
+    assert.ok(!locked.one("#lock").classList.contains("hidden"));
+  } finally {
+    await locked.close();
+  }
+  const open = await openRules();
+  try {
+    assert.ok(open.one("#lock").classList.contains("hidden"));
+    assert.equal(open.all(".problems").length, 0);
+  } finally {
+    await open.close();
+  }
+  const broken = await openRules({ model: readRules("version: 1\ndeny: nope\n").model });
+  try {
+    assert.equal(broken.all(".problems li").length, 1);
+  } finally {
+    await broken.close();
+  }
+});
+
+test("CB-T52 settings.json が無ければ hook の表にそう書く", async () => {
+  const dom = await openRules({ hooks: [], hookFiles: { settings: false, settingsLocal: false } });
+  try {
+    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json が無い/);
+    assert.equal(dom.all("#tab-hooks table").length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T69 タイプごとに畳むボタンを出す", async () => {
+  const dom = await openRules();
+  try {
+    for (const section of ["deny", "ask", "allow"]) {
+      assert.equal(dom.all(`button[data-action="fold-section"][data-section="${section}"]`).length, 1);
+      assert.equal(dom.one(`.rule-section[data-section="${section}"] .section-name`).textContent, section);
+    }
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T71 match の候補と判定の試し打ちは、権限ルールの名前（括弧の中を除いたもの）で並ぶ", async () => {
+  // 判定が対象を取り出せるツールだけ。WebSearch は取り出せないので載せない。
+  assert.deepEqual([...KNOWN_TOOLS], [
+    "Bash", "PowerShell", "Read", "Grep", "Glob", "Edit", "Write", "NotebookEdit", "Skill", "Agent", "WebFetch",
+  ]);
+  const dom = await openRules();
+  try {
+    assert.deepEqual(dom.all("#tool option").map((option) => option.textContent), [...KNOWN_TOOLS]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T112 ルール設定画面は注意を上部に出し、無ければ出さない", async () => {
+  const dom = await openRules({ rulesPath: "projects/lib/.ccnavi/config/rules.yml", notices: ["実行ファイルはこのファイルを読めない: <理由>"] });
+  try {
+    const warned = dom.all(".banner.warn:not(.hidden)").map((banner) => banner.textContent ?? "");
+    assert.deepEqual(warned, ["実行ファイルはこのファイルを読めない: <理由>"]);
+    assert.equal(dom.all(".banner.warn script").length, 0, "文面から要素は生えない");
+    assert.equal(dom.one(".toolbar .path").textContent, "projects/lib/.ccnavi/config/rules.yml");
+  } finally {
+    await dom.close();
+  }
+  const quiet = await openRules();
+  try {
+    assert.deepEqual(quiet.all(".banner.warn:not(.hidden)"), []);
+  } finally {
+    await quiet.close();
+  }
+});
+
+test("CB-T120 一覧は 1 件 1 行で既定は畳み、絞り込み欄を持ち、開いた行を id で state に控える", async () => {
+  const dom = await openRules();
+  try {
+    assert.equal(dom.all("#find").length, 1);
+    assert.equal(dom.all('[data-list="deny"] .rule').length, 2);
+    assert.equal(dom.all(".rule > .row-head").length, 3);
+    assert.equal(dom.all(".rule > .row-body").length, 3, "本体は畳んでいても DOM にある（見せるかは CSS）");
+    assert.equal(dom.all(".rule.open").length, 0);
+    dom.click(dom.one(`${rowSelector("deps")} .row-head`));
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["deps"]);
+    // id が空の行は開いていても控えられない（次に開き直す手がかりが無い）
+    dom.click(dom.one('button[data-action="add"][data-section="deny"]'));
+    await dom.settle();
+    const added = dom.all('[data-list="deny"] .rule').slice(-1)[0];
+    assert.ok(added.classList.contains("open"));
+    dom.click(added.querySelector(".row-head")!);
+    await dom.settle();
+    dom.click(dom.all('[data-list="deny"] .rule').slice(-1)[0].querySelector(".row-head")!);
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["deps"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載せる", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    const caps = new Map(dom.all(`${rowSelector("git-push")} .field > .cap`).map((cap) => [cap.textContent ?? "", cap.getAttribute("title")]));
+    assert.equal(caps.get("ツール"), "YAML のキー: match");
+    assert.equal(caps.get("文面"), "YAML のキー: message");
+    assert.equal(caps.get("渡す文"), "YAML のキー: additionalContext");
+    assert.equal(caps.get("初回だけ渡すファイル"), "YAML のキー: additionalContextOnceFile");
+    assert.equal(caps.get("渡す回の刻み"), "YAML のキー: every");
+    assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), "--test の subject");
+  } finally {
+    await dom.close();
   }
 });
