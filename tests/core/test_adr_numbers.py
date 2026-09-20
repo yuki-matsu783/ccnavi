@@ -30,7 +30,10 @@ ADR_DIR = os.path.join(ROOT, "docs", "adr")
 # `0064-extension-board-in-react.md` → 0064。README.md は番号を持たないので外れる。
 FILE_NAME = re.compile(r"^(\d{4})-.+\.md$")
 
-# 題の 1 行目。`# ADR-0064: ボードの画面を React にし、…`
+# 題の 1 行目。`# ADR-0001: 言語を Go から Python に移す` の形。
+#
+# 例に 0001 を使うのは、この行自体が「その番号を引いている箇所」として
+# 数えられるため。README の「引かれている数」は grep で数え直せる形にしてある。
 TITLE = re.compile(r"^# ADR-(\d{4}): \S")
 
 # 一覧の 1 行。`| [0064](0064-extension-board-in-react.md) | ボードの画面を… |`
