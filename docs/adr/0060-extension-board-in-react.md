@@ -63,8 +63,10 @@ happy-dom で動かすテスト（`*.dom.test.ts`）を書いたところだけ�
 |---|---|
 | 2 画面目 | プロジェクト管理を移した（issue #85）。`retainContextWhenHidden` が偽でボードと同じ前提なので、`core/screen-host.ts` はそのまま当たった。あわせて束ねを画面の一覧から回す形にし（issue #83）、使い回すぶん（`embedJson`・`webview/initial.ts`・`webview/appearance.ts`）を 1 か所に寄せた。画面に渡す形（`ProjectsPage`）は契約の側（`core/projects-view.ts`）へ移した。判定のファイルに置いたままだと、Webview がそこから `node:path` を読むファイルを辿って型検査が落ちるため |
 
-残り 3 画面（ルール設定・リスク管理・フェーズ管理）は `retainContextWhenHidden` が真で、
-保持する画面の段取りを決めてからになる（issue #82）。
+| 3 画面目 | リスク管理を移した（issue #86 の前半）。`retainContextWhenHidden` が真の画面なので、先に保持する画面の段取りを決めた（ADR-0062、issue #82）。配点の形（`KINDS`・`FactorForm` など）は読み書き（`risk-doc.ts`）から契約（`core/risk-view.ts`）へ移した。画面がそこから `yaml` を辿ると、束ねたものに YAML の解析器が丸ごと入るため |
+
+残り 2 画面（ルール設定・フェーズ管理）も `retainContextWhenHidden` が真で、同じ `retainedHost` で移せる
+（issue #84、#86 の後半）。
 
 ## 採らなかった案
 

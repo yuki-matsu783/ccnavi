@@ -198,6 +198,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | チケット制御が disable | 画面が開かない（入口も出ない）。開いたままのときは何もしない |
 | 欄名 | 日本語で、`risks.yml` のキー名は欄名にマウスを重ねると出る。id = `id`、点 = `points`、当て方 = `lines_over` / `files_over` / `deleted_over` / `glob` / `script` / `judge`、しきい値・glob・スクリプト・問い = 当て方の値、上限 = `max`、文面 = `message`、MEDIUM / HIGH / CRITICAL = `levels` の各段 |
 | 監視 | 配点のファイル（絶対パスでも）、`.claude/settings.json`、`.claude/settings.local.json`、チケットの置き場。外で変われば「外で変わった」、チケットが動けば保存の可否を取り直す。再読込で配点のパスが変わっていれば監視も張り直す |
+| 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`RiskData`）だけ。入れ物（HTML）は開いたときに 1 度入るだけで、入れ直さない（`retainContextWhenHidden` が真の画面。`core/screen-host.ts` の `retainedHost`、ADR-0062）。**中身が届くのは編集を捨ててよいときだけ**で、人が「再読込」を押したときと、保存・作成が通ったとき。外で変わっただけのときは帯が出るだけで、打ちかけの欄も開いた行も残る |
 
 守っていること。
 
@@ -462,6 +463,7 @@ Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけ
 | 36 | コメントが残る | 項目を 1 つ上へ動かし、points を変えて保存し、`git diff` を見る | 動かした項目と変えた行だけが差分。先頭の説明と末尾の例のコメントは残っている |
 | 37 | 無ければ作る | `risks.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「組み込みの配点でファイルを作る」。欄は押せない。押すとファイルが出来て、帯が消えて編集できる |
 | 38 | 作業中は保存できない | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
+| 38b | 裏に回しても編集が消えない（React） | 項目を 1 つ開いて points を打ちかけ、別のタブに移ってから戻る。裏にいる間に別のターミナルで `risks.yml` を触る | 打ちかけの値も開いた行もそのまま。「外で変更された」の帯が出ている（裏にいる間に届いたもの）。開発者ツールの Console に CSP の拒否（`Refused to execute inline script`）が出ていない |
 | 39 | フェーズ管理画面が開く | サイドパネルの「フェーズ管理」 | 種類 7 件（このリポジトリの `phases.yml`）。`implement-feedback` の scope が inherit で、feedback の 2 件に左端の色。上部の path が `.ccnavi/common/phases.yml` |
 | 40 | lint で止まる | `implement-feedback` の review を none にして「保存」。次に戻して `implement` の requires に `nothing` を書いて「保存」 | どちらも下部に `--lint` の error（`review: mr` でなければならない / `nothing` という種類は無い）が出て保存されない |
 | 41 | id の重なり | `design` の id を `research` に変える | id の欄が赤くなり、下部に「id が重なっている」。保存ボタンが押せない。戻すと消える |
@@ -499,10 +501,12 @@ src/
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
     styles.ts         5 画面で共通の CSS（ページの骨組み・ボタン・一覧）
     board-style.ts    ボード画面の CSS。部品（webview/board/）を足したらここに足す
-    html.ts           HTML を文字列で組む 3 画面（ルール設定・リスク管理・フェーズ管理）のための逃がし（escapeHtml）
+    html.ts           HTML を文字列で組む 2 画面（ルール設定・フェーズ管理）のための逃がし（escapeHtml）
     rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
-    risk-render.ts    リスク管理画面の HTML と、その中で動くスクリプト
+    risk-view.ts      リスク管理の拡張ホストと画面の契約（配点の形 RiskForm、見せる形 RiskPage / RiskData、押した操作 RiskMessage）
+    risk-render.ts    リスク管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
+    risk-style.ts     リスク管理画面の CSS。部品（webview/risk/）を足したらここに足す
     risk-doc.ts       risks.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
     phases-render.ts  フェーズ管理画面の HTML と、その中で動くスクリプト
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）と、無いときに書く雛形の本文
@@ -536,6 +540,12 @@ src/
     projects/Menu.tsx 行末のメニュー（開いているのは画面ぜんたいで 1 つだけ）
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
     projects/text.ts  カードに出す言葉（層の設定の置き場、重ねない苦情）
+    risk/post.ts      リスク管理の送り口。契約に無いものは型で止まる
+    risk/main.tsx     リスク管理画面の入口。埋め込みの JSON を読んでマウントする
+    risk/App.tsx      帯・ツールバー・段階の閾値・項目の一覧と、拡張ホストからのメッセージの受け
+    risk/Factor.tsx   項目 1 件の行（要約と、開いたときの欄）
+    risk/state.ts     編集中の配点（行ごとの鍵）と、開いている行（id で控える）の読み書き
+    risk/text.ts      要約の文・欄の名前・絞り込みが当てる文字列
 media/
   icon.svg            アクティビティバーのアイコン
 test/
@@ -546,14 +556,15 @@ test/
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を控える
   helpers/board.ts    ボード画面（React）を束ねたものごと happy-dom で開く
   helpers/projects.ts プロジェクト管理画面（React）を束ねたものごと happy-dom で開く
+  helpers/risk.ts     リスク管理画面（React）を束ねたものごと happy-dom で開く
   board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
   rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
-  risk/               リスク管理（risk-doc, risk-render）
+  risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
   projects/           プロジェクト管理（projects, layer-render と、画面を動かす projects.dom）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理）は、描くものも動かして見る（render.dom, projects.dom）
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理・リスク管理）は、描くものも動かして見る（render.dom, projects.dom, risk.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へ束ねる。画面は src/webview/<名前>/main.tsx があるものを見つける（表で持たない）
@@ -564,9 +575,9 @@ scripts/
 
 `webview/` は反対に、DOM だけを触って `vscode` も `node` も import しない。拡張ホストと分け合うのは
 `core/` のうち import で辿れるぶん（`board.ts`・`board-view.ts` など、判定も I/O もしないもの）だけ。
-ボードとプロジェクト管理の画面は React で、拡張ホストは中身（`BoardData` / `ProjectsData`）を渡すだけで
-DOM を組み立てない。残り 3 画面（ルール設定・リスク管理・フェーズ管理）は今も拡張ホストが HTML を
-文字列で組む（ADR-0060）。
+ボード・プロジェクト管理・リスク管理の画面は React で、拡張ホストは中身（`BoardData` / `ProjectsData` /
+`RiskData`）を渡すだけで DOM を組み立てない。残り 2 画面（ルール設定・フェーズ管理）は今も拡張ホストが
+HTML を文字列で組む（ADR-0060、ADR-0062）。
 
 **ボードに機能を足すときに触る場所。**
 
