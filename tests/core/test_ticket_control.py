@@ -54,7 +54,7 @@ class TicketControlTest(unittest.TestCase):
         self.assertNotIn("dry-run", text)
 
     def test_後から届くものは頭では言わない(self):
-        # レビューの sh はフェーズの段階と ready の手順で、設定ファイルの綴りは承認の
+        # レビューの sh はフェーズの終わりと ready の手順で、設定ファイルの綴りは承認の
         # ときの検査で名指しされる。頭で渡す文はそのぶん短くしてある。
         text = self.context(self.start("--mode", "enable"))
 
