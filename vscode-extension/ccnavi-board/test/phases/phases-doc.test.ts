@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhaseForm } from "../../src/core/phases-doc.js";
+import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import type { PhaseForm } from "../../src/core/phases-view.js";
 
 /** このリポジトリの phases.yml と同じ形。コメントの置き場と flow の並びを持つ */
 const SAMPLE = `# フェーズの種類。人が持つ設定で、エージェントは書き換えない。

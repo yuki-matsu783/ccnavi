@@ -1,39 +1,51 @@
+/**
+ * 層（自身の層・プロジェクト）の種類。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
+ * 画面の側は React なので happy-dom で動かして見る。
+ */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readPhases } from "../../src/core/phases-doc.js";
-import { renderPhasesPage, type PhasesPage } from "../../src/core/phases-render.js";
+import type { PhasesPage } from "../../src/core/phases-view.js";
+import { openPhases } from "../helpers/phases.js";
+import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-function phasesPage(overrides: Partial<PhasesPage> = {}): PhasesPage {
-  return {
-    root: "/ws",
-    phasesPath: ".ccnavi/config/phases.yml",
-    exists: false,
-    model: { version: null, form: { phases: [] }, problems: [] },
-    lock: { locked: false, reason: "", doing: [] },
-    ...overrides,
-  };
-}
+const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { phases: [] }, problems: [] } };
 
-function embedded(html: string): { exists: boolean; editable: boolean } {
-  const found = /<script nonce="n" type="application\/json" id="page">(.*?)<\/script>/s.exec(html);
-  assert.ok(found !== null);
-  return JSON.parse(found[1]);
-}
+test("CB-T114 層の種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
+  const layer = await openPhases({ ...MISSING, layer: true, notices: ["読めない <理由>"] });
+  try {
+    assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られる/);
+    assert.equal(layer.all('button[data-action="create"]').length, 0, "層に雛形は置かない");
+    // 文面はそのまま出る（React が文字として入れるので、実体参照に化けない）
+    assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
+    assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
+    // 無い層でも種類を足して保存できる
+    assert.ok(!layer.one<HTMLButtonElement>('button[data-action="add"]').disabled);
+    assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られる/);
+    layer.click(layer.one('button[data-action="add"]'));
+    await layer.settle();
+    assert.ok(!layer.one<HTMLInputElement>(".phase input.f-id").disabled);
+  } finally {
+    await layer.close();
+  }
 
-test("CB-T114 層の種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる。注意は実体参照で出す", () => {
-  const layer = renderPhasesPage(phasesPage({ layer: true, notices: ["読めない <理由>"] }), { nonce: "n" });
-  assert.ok(layer.includes('class="banner missing"'));
-  assert.ok(layer.includes("最初の保存でファイルが作られる"));
-  assert.ok(!layer.includes('data-action="create"'));
-  assert.ok(!layer.includes("雛形でファイルを作る</button>"));
-  assert.deepEqual(embedded(layer), { ...embedded(layer), exists: false, editable: true });
-  assert.ok(layer.includes('<div class="banner warn">読めない &lt;理由&gt;</div>'));
-
-  // 共通層は今までどおり雛形を作るまで触れない。注意が無ければ帯を足さない（「外で変わった」の帯は hidden で常にある）
-  const common = renderPhasesPage(phasesPage({ phasesPath: ".ccnavi/common/phases.yml" }), { nonce: "n" });
-  assert.ok(common.includes('data-action="create">雛形でファイルを作る</button>'));
-  assert.equal(embedded(common).editable, false);
-  assert.ok(!common.includes('<div class="banner warn">'));
+  // 共通層は今までどおり雛形を作るまで触れない。注意が無ければ帯を足さない
+  const common = await openPhases({ ...MISSING, phasesPath: ".ccnavi/common/phases.yml" });
+  try {
+    assert.match(common.one(".banner.missing").textContent, /種類を使うにはまずファイルを作る/);
+    assert.equal(common.one('button[data-action="create"]').textContent, "雛形でファイルを作る");
+    assert.ok(common.one<HTMLButtonElement>('button[data-action="add"]').disabled);
+    assert.match(common.one("#phases .empty").textContent, /上の「雛形でファイルを作る」で作ってから直す/);
+    assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
+    common.click(common.one('button[data-action="create"]'));
+    await common.settle();
+    assert.deepEqual(
+      common.posted.filter((message) => message.type !== "ready"),
+      [{ type: "create" }],
+    );
+  } finally {
+    await common.close();
+  }
 });
 
 test("CB-T116 無いファイル（空の本文）に種類を足して書き戻すと、version と種類を持つ読めるファイルになる", () => {
