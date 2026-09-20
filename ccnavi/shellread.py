@@ -191,7 +191,7 @@ _TAKES_CODE_FLAG = {
 #
 # 守りもルールも、当てる先は語の綴り。`cd` で入ってから書くと、行き先の綴りから
 # ディレクトリの名前が消えるので当たらない（`cd .claude && echo x > settings.json`）。
-# だから `cd` の行き先を読んで、後ろのコマンドの引数の綴りに継ぎ足す（ADR-0067）。
+# だから `cd` の行き先を読んで、後ろのコマンドの引数の綴りに継ぎ足す（ADR-0069）。
 #
 # 継ぎ足した綴りは text には入れず、当てる先として足すだけ（Reading.moved）。書かれた
 # 綴りを動かすと、コマンドの頭に名前を固定して書かれたルールが外れて、いま止まって
@@ -381,7 +381,7 @@ class Reading:
     unwrapped: str = ""
     # `cd` で移った先から見たコマンド。SEP でつないだもの。綴りの変わったコマンドだけが並ぶ。
     # text には足さない。継ぎ足した綴りで当たる形を増やすだけにして、いま当たっている形を
-    # 動かさないため（ADR-0067）。呼び手は中で実行されるコマンドの層と同じに扱い、
+    # 動かさないため（ADR-0069）。呼び手は中で実行されるコマンドの層と同じに扱い、
     # 止める側のルール（deny と ask）にだけ当てる。degraded のときは空。
     moved: str = ""
     # 層ごとの、その層を実行する実行役のコマンドの名前。unwrapped と同じ並び。
@@ -929,7 +929,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         # `$'…\'…'` のように 2 つの読みが割れる形。読み切れないものとして扱う。
         return Reading(degraded=True, reason=REASON_UNTERMINATED, rewrites=rewrites), []
 
-    # `cd` が移った先から見た綴りを別に組む（ADR-0067）。元のトークン列は動かさない。
+    # `cd` が移った先から見た綴りを別に組む（ADR-0069）。元のトークン列は動かさない。
     moved_tokens = _resolve_cd(tokens)
 
     commands = _split_commands(tokens)
