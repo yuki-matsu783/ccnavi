@@ -62,7 +62,7 @@ for id in "$@"; do
 	esac
 done
 
-# main の根。ワークツリーの中から呼ばれても、ツリーの一覧は main の側から数える。
+# ワークスペースルート。ワークツリーの中から呼ばれても、ツリーの一覧はワークスペースルートの側から数える。
 root=$(ccnavi_workspace) || {
 	printf 'ccnavi-approve: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2

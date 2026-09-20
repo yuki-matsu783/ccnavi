@@ -67,7 +67,7 @@ pnpm test                                             # 統合先へ戻す前・
 
 `.claude/hooks/lint-py.sh` (PostToolUse) と `.claude/hooks/test-py.sh` (Stop)、拡張のぶんの
 `mark-ext.sh` (PostToolUse) と `test-ext.sh` (Stop) が登録されていれば編集のたびとターンの
-終わりに同じ検査が走るが、hook が無効な環境でも落ちないよう、
+終わりに同じ検査が走るが、hook が無効な環境で検査が抜けないよう、
 コミット前に明示的に実行してよい。実行ファイル (PyInstaller) はここでは作り直さない。
 ビルドが必要なときは `uv run --with pyinstaller python build.py` を手で回す。
 
@@ -88,7 +88,7 @@ pnpm test                                             # 統合先へ戻す前・
 | `style` | 意味に影響しない整形 |
 | `revert` | 取り消し |
 
-要件書と仕様書はどちらも `docs` だが、**外から観測できる約束 (`requirements.md`) と実装の理屈 (`ccnavi.md`) は別の主題**なので、
+要件書と設計書はどちらも `docs` だが、**外から観測できる約束 (`requirements.md`) と実装の理屈 (`ccnavi.md`) は別の主題**なので、
 同時に変えたときは分けることを検討する。
 
 prefix が変わるか、扱っている主題が別なら別コミットに分ける。**説明が 1 行に収まらないと感じたら、それはコミットを分ける合図**。

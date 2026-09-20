@@ -7,25 +7,25 @@
 # glob は fnmatch と同じ意味で、文字列全体に当たる。部分一致が欲しければ
 # 前後に `*` を自分で書く。語の切れ目は入らないので、右側だけなら
 # `*sed *` のように空白を書いて守る。左側の切れ目は glob では書けない。
-# `*git push*` は `legit push` にも当たる。左記を避けたい場合は regex を使う。
+# `*git push*` は `legit push` にも当たる。これを避けたい場合は regex を使う。
 version: 1
 
 deny:
-  # フックスクリプト の場所
+  # hook の場所
   - id: guard-hooks
     match: Write|Edit
     glob: "*/.claude/hooks/*"
     message: >-
       hook 本体です。エージェントの判断で書き換えず、理由を
-      伝えてユーザに変更を依頼ください。
+      伝えて利用者に変更を依頼してください。
 
-  # ラッパースクリプト の場所
+  # ラッパースクリプトの場所
   - id: guard-scripts
     match: Write|Edit
     glob: "*/.ccnavi/scripts/*"
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
-      エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼ください。
+      エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼してください。
 
   # ccnavi の設定（ルール・フェーズの種類・リスクの配点）
   - id: guard-ccnavi-config
@@ -33,7 +33,7 @@ deny:
     regex: '[\\/]\.ccnavi[\\/]common[\\/](rules|phases|risks)\.yml$'
     message: >-
       ccnavi の設定（ルール・フェーズの種類・リスクの配点）です。エージェントの判断で
-      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼ください
+      書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えて利用者に依頼してください
       （/ccnavi-config）
 
   # チェックアウトしたブランチでは編集しない。`.claude/worktrees/` だけが編集可能。
@@ -44,7 +44,7 @@ deny:
     message: >-
       チェックアウトしたブランチ直下では編集しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add
       .claude/worktrees/<名前> -b <名前>' でワークツリーを切り、その中で編集して、
-      ff-only で main に戻してください。
+      ff-only で統合先に戻してください。
 
   # PowerShell はまとめて止め、Bash に寄せる。
   - id: no-powershell
@@ -87,12 +87,12 @@ deny:
       再帰的な強制削除です。消す対象を 1 つずつ名指しするか、git の管理下なら
       'ccnavi-git.sh rm <パス>' を使ってください。git が中身を持っているので戻せます。
 
-  # find の-delete と -fprintf は消す・書くができるので止める。
+  # find の -delete と -fprintf は消すことも書くこともできるので止める。
   - id: find-writes
     match: Bash
     regex: '(^|\x00)(\S*[\\/])?find(\.exe)?\s[^\x00]*\s-(delete|fprintf|fls|fprint)\b'
     message: >-
-      探すにはGlob ツール、または -delete を外した find にしてください。
+      探すだけなら Glob ツールを使うか、-delete を外した find にしてください。
 
   # ヒアドキュメントによるファイルの書き込みは止める。Write / Edit ツールで書くのが正しい。
   - id: heredoc
@@ -109,19 +109,19 @@ deny:
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/approved/*"
     message: >-
-      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
-      'ccnavi --approve'）で行い、
+      承認済みチケットです。承認は利用者が VS Code のボード（端末なら
+      'ccnavi --approve'）で行います。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh done <識別子>' で
-      レビュー待ち（wip/proposals/review/）へ動かします。
+      レビュー待ち（wip/proposals/review/）へ動かしてください。
       範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
 
-  # hook の登録と個人の上書き。main の側は main-tree が先に当たるが、ワークツリー側の設定は
-  # 統合で main へ入る道を持つので、そちらも名前で止める。
+  # hook の登録と個人の上書き。ワークスペースルートの側は main-tree が先に当たるが、
+  # ワークツリー側の設定は統合で統合先へ入る道を持つので、そちらも名前で止める。
   - id: guard-settings
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
     message: >-
-      hook の登録そのものです。ワークツリー側の設定も統合で main の設定になります。
+      hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。
       エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼ください。
 
 ask:
@@ -148,7 +148,7 @@ ask:
       あとから辿れます。
 
 allow:
-  # 書き込みを許すのはワークツリーの中だけ。main の側は deny の main-tree が止める。
+  # 書き込みを許すのはワークツリーの中だけ。ワークスペースルートの側は deny の main-tree が止める。
   # ワークツリーの中でも hook・スクリプト・settings.json などは deny が先に当たる。
   - id: worktrees
     match: Write|Edit

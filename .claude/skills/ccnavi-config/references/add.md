@@ -8,7 +8,7 @@
 
 1. **何を変えたいかを 1 行にする。** 「`git push --force` を止める」「調査フェーズを足す」
    「CI に触ったら重くする」。この 1 行が、あとで利用者に渡す文の先頭になる
-2. **どのファイルかを決める。** 止める・聞く・通すなら rules。作業の段階と範囲なら phases。
+2. **どのファイルかを決める。** 止める・聞く・通すなら rules。作業のフェーズと範囲なら phases。
    閉じるときの重さなら risk。2 本にまたがるなら別々の下書きにする
 3. **今の本物を読む。** 同じことを言うルールや種類が既に無いか。足すより直すほうが
    よいことが多い
@@ -148,7 +148,7 @@ phases:
 
 ```yaml
 version: 1
-levels: {medium: 20, high: 40, critical: 70}   # 段階の名前は 4 つで固定。閾値だけ動かす
+levels: {medium: 20, high: 40, critical: 70}   # 等級の名前は 4 つで固定。閾値だけ動かす
 factors:
   - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
@@ -167,7 +167,7 @@ factors:
 | `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh judge <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
-`levels` は `medium <= high <= critical`。段階の名前は増やせない（知らない名前は warn）。
+`levels` は `medium <= high <= critical`。等級の名前は増やせない（知らない名前は warn）。
 `points` と `max` は 0 以上の整数。`id` は英数と `._-`。
 
 **閾値は宣言を裏切るために在る。** 「軽い」と宣言した作業が大きくなったときにレビューへ
