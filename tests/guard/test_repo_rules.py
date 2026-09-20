@@ -451,6 +451,75 @@ class RunnerTest(LauncherJudgeTest):
 
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+class MovedJudgeTest(LauncherJudgeTest):
+    """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0066、issue #61）。"""
+
+    def test_守られた場所へ入ってから書く形は止まる(self):
+        # issue #61 の表。どれも綴りからディレクトリの名前が消えて素通りしていた。
+        for subject in [
+            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .ccnavi && echo x > common/rules.yml",
+            "cd .ccnavi/common; echo x > rules.yml",
+            "(cd .ccnavi/common && echo x > rules.yml)",
+            "cd .claude && echo x > settings.json",
+            "cd .claude/hooks && echo x > lint-py.sh",
+            "cd .claude && rm -rf hooks",
+            "cd .claude && cp /tmp/x settings.json",
+            "cd .ccnavi && sed -i s/deny/allow/ common/rules.yml",
+            "cd .ccnavi/scripts && mv ccnavi-git.sh /tmp/x",
+            # 元から止まっていた形（行き先の綴りに名前が残る）も、そのまま止まる。
+            "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, SETTING_FILES)
+
+    def test_文面は移った先から見た綴りを示す(self):
+        body = self.judge("cd .claude && echo x > settings.json")
+
+        self.assertIn("`cd` で移った先から見ると", body["response"])
+        self.assertIn(".claude/settings.json", body["response"])
+
+    def test_移った先から見た綴りに_allow_は当てない(self):
+        # 中で実行されるコマンドと同じ線引き（W3）。当てると、`cd` を 1 つ挟むだけで
+        # 読み取りの allow が付いて通る形ができる。
+        body = self.judge("cd .ccnavi && cat common/rules.yml")
+
+        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
+        self.assertNotEqual(body["verdict"], "allow", body["response"])
+
+    def test_書かれた綴りの当たり方は変わらない(self):
+        # `cd` した先で打つラッパースクリプトは、今までどおり allow に当たる。
+        # 書かれた綴りに継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
+        for subject in [
+            "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
+            "sh .ccnavi/scripts/ccnavi-git.sh status",
+        ]:
+            with self.subTest(subject=subject):
+                body = self.judge(subject)
+                self.assertEqual(body["verdict"], "allow", body["response"])
+                self.assertIn("ccnavi-git", hit(body), body["rules"])
+
+    def test_普通の作業では止める側に当たるルールが増えない(self):
+        # W6 と同じ形。`cd` を挟んだだけの普通の作業が、確認や拒否に回らないこと。
+        for subject in [
+            "cd projects/lib && pnpm test",
+            "cd docs && cat adr/README.md",
+            "cd .claude/worktrees/w && uv run python -m unittest",
+            "cd /tmp && rm -f x.log",
+            "cd .. && ls",
+        ]:
+            with self.subTest(subject=subject):
+                self.assertEqual(blocking(self.judge(subject)), set(), subject)
+
+    def test_行き先を読めない_cd_のあとは読み切れないものとして扱う(self):
+        # 相対パスがどこに落ちるか決まらない。allow は当たらず、確認に落ちる（ADR-0011）。
+        body = self.judge("cd - && cat README.md")
+
+        self.assertEqual(body["verdict"], "ask", body["response"])
+        self.assertEqual(body["degraded"], shellread.REASON_CHDIR, body["response"])
+        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
+
+
 class SubstRepoRulesTest(unittest.TestCase):
     """コマンド置換・改行・プロセス置換を読んだあとの判定。
 

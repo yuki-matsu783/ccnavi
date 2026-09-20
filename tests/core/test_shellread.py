@@ -523,6 +523,149 @@ def marked(text):
 
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+class MovedTest(unittest.TestCase):
+    """`cd` で移った先から見た綴り（ADR-0066、issue #61）。
+
+    `read(src).moved` は、`cd` の行き先を引数に継ぎ足したコマンドを SEP でつないだもの。
+    綴りの変わったコマンドだけが並ぶ。書かれた綴り（`text`）は動かさない。
+    """
+
+    def moved(self, src):
+        result = read(src)
+        moved = getattr(result, "moved", None)
+        self.assertIsNotNone(moved, "Reading に moved の欄が無い")
+        self.assertFalse(result.degraded, f"read({src!r}) が {result.reason} で諦めた")
+        if not moved:
+            return []
+        word_sep = WORD_SEP or "\x01"
+        return [command.replace(word_sep, " ") for command in moved.split(SEP)]
+
+    def test_守られた場所へ入ってから書く形(self):
+        # issue #61 の表。どれも綴りからディレクトリの名前が消える形。
+        rules = ".ccnavi/common/rules.yml"
+        cases = {
+            "cd .ccnavi/common && echo x > rules.yml": f"echo .ccnavi/common/x > {rules}",
+            "cd .ccnavi && echo x > common/rules.yml": f"echo .ccnavi/x > {rules}",
+            "cd .ccnavi/common; echo x > rules.yml": f"echo .ccnavi/common/x > {rules}",
+            "(cd .ccnavi/common && echo x > rules.yml)": f"echo .ccnavi/common/x > {rules}",
+            "cd .claude && echo x > settings.json": "echo .claude/x > .claude/settings.json",
+            "cd .claude/hooks && echo x > lint-py.sh": (
+                "echo .claude/hooks/x > .claude/hooks/lint-py.sh"
+            ),
+            # 名前に拡張子が無くても同じ。`rm -rf hooks` は hook を丸ごと消す形。
+            "cd .claude && rm -rf hooks": "rm -rf .claude/hooks",
+            "cd .claude && cp /tmp/x settings.json": "cp /tmp/x .claude/settings.json",
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertIn(show(want), [show(c) for c in self.moved(src)])
+
+    def test_書かれた綴りは動かさない(self):
+        # ここが要。ルールは綴りに固定して書かれているので、書かれた側に継ぎ足すと
+        # いま当たっているものが外れる（サブエージェントの禁止の `…ccnavi-ticket.sh start`、
+        # コマンドの頭に固定した組み込みの守り）。
+        cases = {
+            "cd .claude && echo x > settings.json": "cd .claude" + SEP + "echo x > settings.json",
+            "cd .ccnavi && rm -rf common": "cd .ccnavi" + SEP + "rm -rf common",
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertEqual(show(read(src).text), show(want))
+
+    def test_コマンドの位置の語には継ぎ足さない(self):
+        # `rm` が `.ccnavi/rm` になると `(^|\x00)rm` が当たらなくなる。
+        for command in self.moved("cd .ccnavi && rm -rf common"):
+            self.assertTrue(command.startswith("rm "), f"名前に継ぎ足した: {command!r}")
+
+    def test_移っていないコマンドは並べない(self):
+        for src in [
+            "echo x > .ccnavi/common/rules.yml",
+            "ls -la",
+            "rm -rf /tmp/x",
+            # `cd` の行き先そのものは書かれた綴りのままなので、変わったことにならない。
+            "cd .claude",
+            # 絶対パスの引数は継ぎ足す先が無い。
+            "cd .ccnavi && rm /tmp/x",
+            # オプションと代入も継ぎ足さない。
+            "cd .ccnavi && rm -rf /tmp/x",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src), [])
+
+    def test_上に戻る綴りは畳む(self):
+        cases = {
+            "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh": (
+                "echo .claude/worktrees/w/x > .claude/scripts/ccnavi-git.sh"
+            ),
+            "cd a/b && rm ./x": "rm a/b/x",
+            # 起点より上に出る `..` は畳まずに残す。
+            "cd a && rm ../../x": "rm ../x",
+            # 絶対パスはそのまま。そこから先の行き先になる。
+            "cd /tmp && rm x": "rm /tmp/x",
+            # 末尾の区切りは残す（名前がそこで終わる形に当てる守りのため）。
+            "cd .claude && rm -rf hooks/": "rm -rf .claude/hooks/",
+        }
+        for src, want in cases.items():
+            with self.subTest(src=src):
+                self.assertIn(show(want), [show(c) for c in self.moved(src)])
+
+    def test_サブシェルは行き先を出入りで戻す(self):
+        self.assertEqual(
+            self.moved("cd a && (cd b && ls c) && ls d"),
+            ["cd a/b", "ls a/b/c", "ls a/d"],
+        )
+
+    def test_fd_の番号には継ぎ足さない(self):
+        # `2>&1` の `1` はファイルではない。継ぎ足すと `.ccnavi/1` になり、
+        # 守りの綴りが引数に現れる。
+        self.assertEqual(self.moved("cd .ccnavi && rm ../a 2>&1"), ["rm a 2 >& 1"])
+
+    def test_継ぎ足さない形(self):
+        # 実行役のコマンドは、中で実行されるコマンドの名前がどの語に立つかが
+        # オプションの読み方で決まる。取り違えて名前に継ぎ足すと、そこだけ守りが消える。
+        for src in [
+            "cd .ccnavi && env rm common/rules.yml",
+            "cd .ccnavi && sudo -u me rm common/rules.yml",
+            "cd .ccnavi && timeout 5 rm common/rules.yml",
+            # `for` の直後の 1 本は変数名と調べる値。
+            "cd .ccnavi && for f in common; do :; done",
+        ]:
+            with self.subTest(src=src):
+                self.assertEqual(self.moved(src), [])
+
+    def test_行き先を読めない形は縮退する(self):
+        # 読めない行き先のあとで実行される相対パスは、どこに落ちるか決まらない。
+        for src in [
+            "cd - && rm x",
+            "cd && rm x",
+            "cd $HOME && rm x",
+            'cd "$(git rev-parse --show-toplevel)" && rm x',
+            "cd ~/work && rm x",
+            "cd .cc* && rm x",
+            "cd --foo && rm x",
+            "pushd .claude && rm settings.json",
+            "popd && rm x",
+            "cd a b && rm x",
+            # サブシェルの中で読めなくなった形も、そのまま縮退させる。
+            "(cd - && rm x)",
+        ]:
+            with self.subTest(src=src):
+                result = read(src)
+                self.assertTrue(result.degraded, f"読めない行き先を読んだ: {src!r}")
+                self.assertEqual(result.reason, shellread.REASON_CHDIR)
+
+    def test_読めない行き先でも後ろで何も実行しなければ縮退しない(self):
+        # 読みが変わらないものについて人に聞く意味が無い。
+        for src in ["cd -", "ls && cd -", "cd $HOME", "pushd .claude"]:
+            with self.subTest(src=src):
+                self.assertFalse(read(src).degraded, f"縮退した: {src!r}")
+
+    def test_絶対パスへ移れば読めない行き先の後でも読める(self):
+        result = read("cd - && cd /tmp && rm x")
+        self.assertFalse(result.degraded, f"縮退した: {result.reason}")
+        self.assertEqual([c for c in result.moved.split(SEP) if c], ["rm /tmp/x"])
+
+
 class SubstTest(unittest.TestCase):
     """引用の有無によらず、shell が実行する中身を独立したコマンドとして読む
     （wip/design/shellread-subst.md §4.1 と §4.2）。改行、プロセス置換、語の途中の `#`、
