@@ -9,7 +9,7 @@
  * 片方だけが持てるものを置くと束ねられなくなる。
  */
 import type { ApprovePreview } from "./approvemodel.js";
-import type { Appearance } from "./appearance.js";
+import type { AppearanceMessage } from "./appearance.js";
 import type { Board } from "./board.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
@@ -63,7 +63,7 @@ export type ToBoard =
   | DataMessage<BoardData>
   /** プロジェクト管理画面から「このプロジェクトで絞って開く」で来たとき */
   | { readonly type: "filter"; readonly project: string }
-  | { readonly type: "appearance"; readonly value: Appearance };
+  | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（board-panel の `asMessage`）が形を確かめてから使う */
 export type BoardMessage =

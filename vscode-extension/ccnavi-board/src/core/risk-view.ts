@@ -14,7 +14,7 @@
  * だけ**（人が「再読込」を押した、保存や作成が通って中身が入れ替わった）。ファイルが外で
  * 変わっただけのときは `changed` の帯を出し、捨てるかどうかは人が決める。
  */
-import type { Appearance } from "./appearance.js";
+import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
@@ -103,7 +103,7 @@ export type ToRisk =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  | { readonly type: "appearance"; readonly value: Appearance };
+  | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（risk-panel の `asMessage`）が形を確かめてから使う */
 export type RiskMessage =

@@ -8,7 +8,7 @@
  * この形を保つために、ここには VS Code の API も DOM も入れない。両側から import されるので、
  * 片方だけが持てるものを置くと束ねられなくなる。
  */
-import type { Appearance } from "./appearance.js";
+import type { AppearanceMessage } from "./appearance.js";
 import type { LintProblem } from "./lintmodel.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
@@ -83,7 +83,7 @@ export type ToProjects =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "info"; readonly message: string }
   | { readonly type: "cloned"; readonly message: string }
-  | { readonly type: "appearance"; readonly value: Appearance };
+  | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（projects-panel の `asMessage`）が形を確かめてから使う */
 export type ProjectsMessage =
