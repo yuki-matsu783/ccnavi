@@ -208,7 +208,7 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
   }
 });
 
-test("CB-D64 関係と案内は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+test("CB-D67 関係と案内は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p2")} .row-head`));
@@ -224,7 +224,7 @@ test("CB-D64 関係と案内は、最後の値を消しても畳まれない（�
   }
 });
 
-test("CB-D65 往復の間は帯の再読込も止め、再読込を押した時点で欄を止める", async () => {
+test("CB-D68 往復の間は帯の再読込も止め、再読込を押した時点で欄を止める", async () => {
   const dom = await openPhases();
   try {
     await dom.send({ type: "changed" });

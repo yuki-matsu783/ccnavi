@@ -82,7 +82,7 @@ test("CB-T106 版が違う・JSON でない答えは読まない", () => {
   assert.ok("error" in broken);
 });
 
-test("CB-T107 途中で止まった承認を読む（置いたぶんを拾い、成功にはしない）", () => {
+test("CB-T158 途中で止まった承認を読む（置いたぶんを拾い、成功にはしない）", () => {
   const stopped = parseApproveResult(
     JSON.stringify({
       version: APPROVE_VERSION,
@@ -104,7 +104,7 @@ test("CB-T107 途中で止まった承認を読む（置いたぶんを拾い、
   assert.ok(!none.ok && "partial" in none && none.partial.placed.length === 0);
 });
 
-test("CB-T108 途中で止まったことを伝える文（置いた件数・後始末で止まった場合・進捗の行）", () => {
+test("CB-T159 途中で止まったことを伝える文（置いた件数・後始末で止まった場合・進捗の行）", () => {
   const stopped = partialMessage({
     placed: ["i0001"],
     ticket: "i0001-01",
