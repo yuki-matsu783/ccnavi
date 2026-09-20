@@ -124,7 +124,9 @@ class ExtTestPlanTest(unittest.TestCase):
         # 「直したのに回らない」側に外れる。閉包で見ているので外れない。
         with copied_board() as root:
             crossing = os.path.join(root, "src", "webview", "projects", "App.tsx")
-            write(crossing, 'import "../board/state.js";\n', mode="a")
+            # 行頭から始まるように改行を先に置く。行の途中に付くと runner の正規表現に
+            # 当たらず、穴が空いていても通ってしまう（偽陰性）
+            write(crossing, '\nimport "../board/state.js";\n', mode="a")
             got = plan("src/webview/board/state.ts", root=root)
         self.assertIn("board", got["groups"])
         self.assertIn("projects", got["groups"], "projects の束ねにも入るので、projects も回る")
@@ -145,6 +147,21 @@ class ExtTestPlanTest(unittest.TestCase):
             got = plan("src/webview/fakescreen/main.tsx", root=root)
         self.assertIn("fakescreen", got["groups"])
         self.assertTrue(got["webview"])
+
+    def test_a_webview_file_always_gets_its_types_checked(self):
+        # 画面のファイルは tsconfig.json が exclude するので、tsconfig.test.json では型を見ない。
+        # esbuild も型を見ない。ここで webview が落ちると、「型の検査だけ通しました」と出るのに
+        # 何も見ていないターンができる。画面の約束を満たさない置き方でも必ず見る。
+        with copied_board() as root:
+            parts = os.path.join(root, "src", "webview", "parts")
+            os.makedirs(parts)
+            write(os.path.join(parts, "main.tsx"), "export const x = 1;\n")
+            got = plan("src/webview/parts/main.tsx", root=root)
+        self.assertTrue(got["webview"])
+        self.assertTrue(got["compile"])
+        # どの画面が読むか決められないので、束ねを読むグループは全部回す（多い側へ外す）
+        for group in ("board", "projects"):
+            self.assertIn(group, got["groups"])
 
     def test_every_screen_on_disk_has_a_group_and_a_test_helper(self):
         # 綴りの約束（画面 `src/webview/<名前>/main.tsx` ↔ グループ `test/<名前>/` と
