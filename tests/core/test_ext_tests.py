@@ -84,6 +84,22 @@ class ExtTestPlanTest(unittest.TestCase):
         self.assertIn("board", got["groups"])
         self.assertTrue(got["webview"])
 
+    def test_one_screen_does_not_call_the_other_screens_group(self):
+        # 画面が 2 つ以上あるとき、1 つ直しただけで全部の画面のテストを回さない。
+        # 画面ごとの置き場を runner が知っている（BUNDLE_ENTRIES の screen）。
+        self.assertNotIn("projects", plan("src/webview/board/App.tsx")["groups"])
+        got = plan("src/webview/projects/App.tsx")
+        self.assertIn("projects", got["groups"])
+        self.assertNotIn("board", got["groups"])
+        self.assertTrue(got["webview"])
+
+    def test_a_part_shared_by_every_screen_calls_them_all(self):
+        # どの画面にも属さない部品（acquireVsCodeApi の窓口など）は、全部の画面に効く。
+        got = plan("src/webview/vscode.ts")
+        for group in ("board", "projects"):
+            self.assertIn(group, got["groups"])
+        self.assertTrue(got["webview"])
+
     def test_the_shared_helper_calls_every_group(self):
         # どのグループも読む部品。触ったら全部回る。
         self.assertEqual(groups_on_disk(), plan("test/helpers/dom.ts")["groups"])
