@@ -237,6 +237,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 | 層が読めない | 実行ファイルがその層のファイルを読めず空として扱っているとき、上部にその理由が出る |
 | チケット制御が disable | 画面が開かない（入口も出ない。対象がどれでも同じ）。開いたままのときは何もしない |
 | 監視 | 種類のファイル（絶対パスでも）、`.claude/settings.json`、`.claude/settings.local.json`、チケットの置き場。外で変われば「外で変わった」、チケットが動けば保存の可否を取り直す。再読込で種類のパスが変わっていれば監視も張り直す |
+| 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`PhasesData`）だけ。リスク管理と同じで、入れ物（HTML）は開いたときに 1 度入るだけ（`retainedHost`、ADR-0062）。中身が届くのは編集を捨ててよいときだけで、外で変わっただけのときは帯が出る。並びの欄（scope・成果物・関係）は打っている途中の文字を欄が持つので、`,` の直後もそのまま打てる |
 
 守っていること。
 
@@ -469,6 +470,7 @@ Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけ
 | 41 | id の重なり | `design` の id を `research` に変える | id の欄が赤くなり、下部に「id が重なっている」。保存ボタンが押せない。戻すと消える |
 | 42 | コメントが残る | `acceptance` を 1 つ上へ動かし、`docs` の scope に `wip/docs/*` を足して保存し、`git diff` を見る | 動かした 2 つの種類のブロックと、変えた `scope` の行だけが差分。先頭の説明は残っている。`overlap: [implement]` のような裸の並びはそのまま。空白だけの行は出ない |
 | 42b | 語を囲む | `docs` の id を `yes` に変えて保存し、`git diff` を見る | `"yes":` と引用符付きで書かれる。`ccnavi --lint` は error 0 件のまま。戻すと引用符も消える |
+| 42c | 裏に回しても編集が消えない（React） | 種類を 1 つ開いて題を打ちかけ、別のタブに移ってから戻る。裏にいる間に別のターミナルで `phases.yml` を触る | 打ちかけの値も開いた行もそのまま。「外で変更された」の帯が出ている。開発者ツールの Console に CSP の拒否が出ていない |
 | 43 | 無ければ作る | `phases.yml` を一時的に名前を変えて画面を開く | 「無い」の帯と「雛形でファイルを作る」。欄は無く、一覧には「ファイルが無い。…作ってから直す」、追加も押せない。押すとファイルが出来て、帯が消えて種類 5 件が編集できる |
 | 44 | 作業中は保存できない | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`done` にすると押せる |
 | 44b | 自身の層のフェーズ管理 | プロジェクト管理画面の「ワークスペース本体」の「フェーズ管理」。`docs` の title を共通層にある別の種類の title と同じにして「保存」 | タブの題が「ccnavi フェーズ管理: 自身の層」、上部の path が `.ccnavi/config/phases.yml`。保存は `--lint` の error（表示名が層をまたいで重なる）で止まる。戻して別の変更なら保存でき、`ccnavi --explain` の phases の表に `self` の層で出る |
@@ -501,14 +503,16 @@ src/
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
     styles.ts         5 画面で共通の CSS（ページの骨組み・ボタン・一覧）
     board-style.ts    ボード画面の CSS。部品（webview/board/）を足したらここに足す
-    html.ts           HTML を文字列で組む 2 画面（ルール設定・フェーズ管理）のための逃がし（escapeHtml）
+    html.ts           HTML を文字列で組む 1 画面（ルール設定）のための逃がし（escapeHtml）
     rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
     risk-view.ts      リスク管理の拡張ホストと画面の契約（配点の形 RiskForm、見せる形 RiskPage / RiskData、押した操作 RiskMessage）
     risk-render.ts    リスク管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     risk-style.ts     リスク管理画面の CSS。部品（webview/risk/）を足したらここに足す
     risk-doc.ts       risks.yml の読み書き（同じくコメントを残す）と、組み込みの配点の本文
-    phases-render.ts  フェーズ管理画面の HTML と、その中で動くスクリプト
+    phases-view.ts    フェーズ管理の拡張ホストと画面の契約（種類の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
+    phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
+    phases-style.ts   フェーズ管理画面の CSS。部品（webview/phases/）を足したらここに足す
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）と、無いときに書く雛形の本文
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、プロジェクトになっていない .git の探索、.gitignore と雛形の加工、画面の中身の組み立て
@@ -546,6 +550,12 @@ src/
     risk/Factor.tsx   項目 1 件の行（要約と、開いたときの欄）
     risk/state.ts     編集中の配点（行ごとの鍵）と、開いている行（id で控える）の読み書き
     risk/text.ts      要約の文・欄の名前・絞り込みが当てる文字列
+    phases/post.ts    フェーズ管理の送り口。契約に無いものは型で止まる
+    phases/main.tsx   フェーズ管理画面の入口。埋め込みの JSON を読んでマウントする
+    phases/App.tsx    注意の帯・ツールバー・種類の一覧と、拡張ホストからのメッセージの受け
+    phases/Phase.tsx  種類 1 件の行（要約と、開いたときの欄。並びの欄は , 区切り）
+    phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で控える）・id の重なり
+    phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
 media/
   icon.svg            アクティビティバーのアイコン
 test/
@@ -557,14 +567,15 @@ test/
   helpers/board.ts    ボード画面（React）を束ねたものごと happy-dom で開く
   helpers/projects.ts プロジェクト管理画面（React）を束ねたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）を束ねたものごと happy-dom で開く
+  helpers/phases.ts   フェーズ管理画面（React）を束ねたものごと happy-dom で開く
   board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
   rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
-  phases/             フェーズ管理（phases-doc, phases-render, phases-layer）
+  phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
   projects/           プロジェクト管理（projects, layer-render と、画面を動かす projects.dom）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理・リスク管理）は、描くものも動かして見る（render.dom, projects.dom, risk.dom）
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理・リスク管理・フェーズ管理）は、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へ束ねる。画面は src/webview/<名前>/main.tsx があるものを見つける（表で持たない）
@@ -575,9 +586,9 @@ scripts/
 
 `webview/` は反対に、DOM だけを触って `vscode` も `node` も import しない。拡張ホストと分け合うのは
 `core/` のうち import で辿れるぶん（`board.ts`・`board-view.ts` など、判定も I/O もしないもの）だけ。
-ボード・プロジェクト管理・リスク管理の画面は React で、拡張ホストは中身（`BoardData` / `ProjectsData` /
-`RiskData`）を渡すだけで DOM を組み立てない。残り 2 画面（ルール設定・フェーズ管理）は今も拡張ホストが
-HTML を文字列で組む（ADR-0060、ADR-0062）。
+ボード・プロジェクト管理・リスク管理・フェーズ管理の画面は React で、拡張ホストは中身（`BoardData` /
+`ProjectsData` / `RiskData` / `PhasesData`）を渡すだけで DOM を組み立てない。残る 1 画面（ルール設定）は
+今も拡張ホストが HTML を文字列で組む（ADR-0060、ADR-0062）。
 
 **ボードに機能を足すときに触る場所。**
 

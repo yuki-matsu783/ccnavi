@@ -65,8 +65,9 @@ happy-dom で動かすテスト（`*.dom.test.ts`）を書いたところだけ�
 
 | 3 画面目 | リスク管理を移した（issue #86 の前半）。`retainContextWhenHidden` が真の画面なので、先に保持する画面の段取りを決めた（ADR-0062、issue #82）。配点の形（`KINDS`・`FactorForm` など）は読み書き（`risk-doc.ts`）から契約（`core/risk-view.ts`）へ移した。画面がそこから `yaml` を辿ると、束ねたものに YAML の解析器が丸ごと入るため |
 
-残り 2 画面（ルール設定・フェーズ管理）も `retainContextWhenHidden` が真で、同じ `retainedHost` で移せる
-（issue #84、#86 の後半）。
+| 4 画面目 | フェーズ管理を移した（issue #86 の後半）。リスク管理と作りが同じなので、型を当て直す作業になった。違いは 3 つ: 層（自身の層・プロジェクト）はファイルが無くても編集できる（`editable`）、id の重なりだけは画面が保存を止める、並びの欄（`scope` など）は `,` 区切りの文字を欄が持つ（並びに直したものを欄へ戻すと、区切りの直後が打てない） |
+
+残る 1 画面（ルール設定）も `retainContextWhenHidden` が真で、同じ `retainedHost` で移せる（issue #84）。
 
 ## 採らなかった案
 
