@@ -35,16 +35,29 @@ const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 // ターンの終わりの hook は、これを差し戻しに数えず人へ言う。
 const NOT_READY = 3;
 
-// 画面（React）の束ねたものを読むテストの入口と、その画面のソースの置き場。これを辿る
-// グループだけ、tsconfig.webview.json の型の検査と esbuild の束ねが要る。画面を足して別の
-// 入口から読ませるなら、その入口と置き場もここに挙げる。
+// 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では辿れないので、
+// 画面とテストの結び付きだけは綴りの約束で決める。**表では持たない**（表は、画面を足したときに
+// 黙って古くなる。このファイルがグループの表を持たないのと同じ理由）。
 //
-// 置き場を持たせてあるのは、画面を 1 つ直したときに他の画面のテストまで回さないため。
-// どの画面にも属さないもの（src/webview/vscode.ts のような共通の部品）は全部に効くと見る。
-const BUNDLE_ENTRIES = [
-  { entry: path.join(TEST_DIR, "helpers", "board.ts"), screen: "src/webview/board/" },
-  { entry: path.join(TEST_DIR, "helpers", "projects.ts"), screen: "src/webview/projects/" },
-];
+//   画面      `src/webview/<名前>/main.tsx` があるもの（`scripts/bundle-webview.js` と同じ見つけ方）
+//   テスト    `test/helpers/<名前>.ts`（束ねたものを読む入口）と、同じ名前のグループ `test/<名前>/`
+//
+// これを辿るグループだけ、tsconfig.webview.json の型の検査と esbuild の束ねが要る。
+const WEBVIEW_DIR = path.join(ROOT, "src", "webview");
+
+/** 画面の一覧。`{ name, entry, helper }` を名前順で返す */
+function screens() {
+  return fs
+    .readdirSync(WEBVIEW_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      name: entry.name,
+      entry: path.join(WEBVIEW_DIR, entry.name, "main.tsx"),
+      helper: path.join(TEST_DIR, "helpers", `${entry.name}.ts`),
+    }))
+    .filter((screen) => fs.existsSync(screen.entry))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+}
 
 /** test/ の下のディレクトリ名。増やしても直すところは無い。 */
 function groupNames() {
@@ -123,13 +136,10 @@ function byName(a, b) {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }
 
-/** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
-function closureOf(group) {
-  const dir = path.join(TEST_DIR, group);
+/** 起点から import で辿り着くファイル全部（起点自身も含む）。 */
+function closureFrom(roots) {
   const seen = new Set();
-  // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
-  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが黙って回らない。
-  const stack = filesUnder(dir, (name) => name.endsWith(".ts") || name.endsWith(".tsx"));
+  const stack = [...roots];
   while (stack.length > 0) {
     const file = stack.pop();
     if (seen.has(file)) continue;
@@ -137,6 +147,13 @@ function closureOf(group) {
     for (const next of importsOf(file)) stack.push(next);
   }
   return seen;
+}
+
+/** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
+function closureOf(group) {
+  // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
+  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが黙って回らない。
+  return closureFrom(filesUnder(path.join(TEST_DIR, group), (name) => name.endsWith(".ts") || name.endsWith(".tsx")));
 }
 
 /** グループ名 -> そのグループが読むファイルの集合。 */
@@ -147,17 +164,31 @@ function closures() {
 }
 
 /**
- * 束ねた画面を読むグループ（BUNDLE_ENTRIES の入口を辿るもの）。
+ * 束ねた画面を読むグループ。
  *
- * `rel`（触ったファイル）を渡すと、その画面の入口を辿るグループだけに絞る。どの画面の
- * 置き場にも入っていなければ、共通の部品として全部の入口を見る。
+ * `rel`（触ったファイル）を渡すと、**その画面の束ねに入るファイルか** を閉包で見て絞る。
+ * 置き場の綴り（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
+ * 1 本でも入ると、直したのに回らない側（回すものが減る側）に外れるため。
+ *
+ * どの画面の閉包にも入らないもの（`src/webview/vscode.ts` のような共通の部品）は全部に効くと見る。
  */
 function webviewGroups(map, rel) {
-  const matched = rel === undefined ? [] : BUNDLE_ENTRIES.filter((e) => rel.startsWith(e.screen));
-  const wanted = matched.length === 0 ? BUNDLE_ENTRIES : matched;
-  return [...map.entries()]
-    .filter(([, files]) => wanted.some((e) => files.has(e.entry)))
-    .map(([group]) => group);
+  const all = screens();
+  const absolute = rel === undefined ? undefined : path.join(ROOT, rel);
+  const matched = absolute === undefined ? [] : all.filter((screen) => closureFrom([screen.entry]).has(absolute));
+  const wanted = matched.length === 0 ? all : matched;
+  const groups = new Set();
+  for (const screen of wanted) {
+    // その画面の束ねを読むテストを持つグループ
+    for (const [group, files] of map) {
+      if (files.has(screen.helper)) groups.add(group);
+    }
+    // 画面と同じ名前のグループは、テストの入口の綴りが約束と違っても必ず回す。
+    // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
+    // その画面のテストだけが黙って回らなくなる
+    if (map.has(screen.name)) groups.add(screen.name);
+  }
+  return [...groups].sort();
 }
 
 /**

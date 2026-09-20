@@ -4,25 +4,38 @@
 // 読ませないので、Webview の localResourceRoots は空のままでよく、CSP も nonce だけで済む。
 // tsc は型を見るだけ（tsconfig.webview.json は noEmit）で、JS を出すのは esbuild のほう。
 //
-// **画面を足すときは SCREENS に 1 行足す。** 読む側（`src/webview-script.ts` の `webviewScript(name)`）は
-// 名前を取るので直すところは無い。出口は `out/webview/<名前>.js` で、`scripts/clean-out.js` は
-// `out/webview` をまとめて消すのでそのままでよい。
+// **画面の一覧は表で持たない。** `src/webview/<名前>/main.tsx` があるものが画面で、出口は
+// `out/webview/<名前>.js`。読む側（`src/webview-script.ts` の `webviewScript(name)`）は名前を取るので、
+// 画面を足しても直すところは無い。表にすると、画面を足したときに黙って古くなる
+// （`scripts/test-groups.js` が同じ見つけ方をする。片方だけ直す、が起きないように）。
 "use strict";
 
+const fs = require("node:fs");
 const path = require("node:path");
 const esbuild = require("esbuild");
 
 const here = path.resolve(__dirname, "..");
+const WEBVIEW_DIR = path.join(here, "src", "webview");
 
-/** 名前 → 入口。名前は `webviewScript("<名前>.js")` と `out/webview/<名前>.js` の綴りになる */
-const SCREENS = [
-  { name: "board", entry: ["src", "webview", "board", "main.tsx"] },
-  { name: "projects", entry: ["src", "webview", "projects", "main.tsx"] },
-];
+/** 画面の一覧。`{ name, entry }` を名前順で返す */
+function screens() {
+  return fs
+    .readdirSync(WEBVIEW_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({ name: entry.name, entry: path.join(WEBVIEW_DIR, entry.name, "main.tsx") }))
+    .filter((screen) => fs.existsSync(screen.entry))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+}
+
+const found = screens();
+if (found.length === 0) {
+  console.error(`画面が 1 つも見つかりません: ${WEBVIEW_DIR}/<名前>/main.tsx`);
+  process.exit(1);
+}
 
 esbuild
   .build({
-    entryPoints: SCREENS.map((screen) => ({ in: path.join(here, ...screen.entry), out: screen.name })),
+    entryPoints: found.map((screen) => ({ in: screen.entry, out: screen.name })),
     outdir: path.join(here, "out", "webview"),
     bundle: true,
     platform: "browser",
