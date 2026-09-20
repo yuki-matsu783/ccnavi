@@ -49,7 +49,7 @@ import { webviewScript } from "./webview-script.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-/** 束ねた画面。`scripts/bundle-webview.js` の SCREENS の名前 */
+/** 束ねた画面。綴りの約束は `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
 const SCRIPT_NAME = "projects.js";
 
 interface PanelState {
@@ -81,6 +81,9 @@ export async function openProjects(): Promise<void> {
     return;
   }
   if (state !== undefined) {
+    // `reveal` の前に表へ出たことにする。立てずに出すと、下の `update()` と
+    // `onDidChangeViewState` の `becameVisible` からの `update()` で、実行ファイルを 2 度起こす
+    state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
     void update();
     return;
