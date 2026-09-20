@@ -31,7 +31,7 @@ deny が止める。承認できたら同じオーバーレイが「承認した
 同じ文は hook が次の UserPromptSubmit / PreToolUse でモデルに 1 度渡すので、進行中のセッションに
 何か打てば後工程に入れる。
 
-**この画面の遷移は `core/approval-machine.ts` が 1 か所で持つ**（ADR-0067）。「この状態ではこれを
+**この画面の遷移は `core/approval-machine.ts` が 1 か所で持つ**（ADR-0068）。「この状態ではこれを
 受けない」の見張り 7 つは**そのファイルの頭の表**にあり（ここには写さない。写すと黙って古くなる）、
 `board-panel.ts` は入力を入れて返ってきた「やること」を行うだけ。VS Code に触れないので単体で
 試せる（CB-T169〜181。確かめは守る状態を全部回し、**CB-T181 は変異テストで、見張りを 1 つ消したら
@@ -513,7 +513,7 @@ src/
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情の抜き出し
     board.ts          列とカードへの組み立て、操作の有無
     board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）
-    approval-machine.ts 承認のオーバーレイの遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）。外へ出る仕事は返すだけで、行うのは board-panel。VS Code に触れないので単体で試せる（ADR-0067）
+    approval-machine.ts 承認のオーバーレイの遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）。外へ出る仕事は返すだけで、行うのは board-panel。VS Code に触れないので単体で試せる（ADR-0068）
     screen-host.ts    画面に中身を渡す段取り（送る / 入れ物ごと / 作り直し中で持ち越し）。VS Code に触れないので単体で試せる
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
     rules-view.ts     ルール設定の拡張ホストと画面の契約（ルールの形 SECTIONS / RuleForm / RulesModel、見せる形 RulesPage / RulesData、押した操作 RulesMessage）

@@ -39,6 +39,34 @@ _QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 _LOOKAROUND = ("(?=", "(?!", "(?<=", "(?<!")
 
 
+def absolute(path: str) -> str:
+    r"""`C:\...` と書いたパスを、いまの機械で絶対パスになる綴りに直す。
+
+    展開はルートを 1 文字ずつ写すだけなので、区切りが `\` でも中身は変わらない。
+    変わるのは**絶対かどうか**で、`rules.real_root` が呼ぶ `os.path.realpath` は、
+    相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
+    `<cwd>/C:\Users\...` に化けて、「中」のはずのパスが全部「外」になり、長さの境界も
+    cwd のぶんだけずれる。設計 §2.3 の表は Windows の綴りのまま残して、頭だけを機械に
+    合わせる（CLAUDE.md「実行環境」: 4 つのどれでも動くように書く）。
+
+    `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
+    展開した式は `\` と `/` のどちらも区切りとして当てるので、そこは直さなくてよい。
+
+    `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の綴りにするのは、
+    「別々の 2 つのドライブは互いに外」を後から足したときに、黙って同じ絶対パスへ
+    潰れないようにするため。**POSIX の絶対パスはどれも `/` で始まるので、最外段
+    （ルートの 1 文字目）の「違う」だけは、ここでは試せない。** その段を縛れるのは
+    Windows で回したときの `D:` だけで、Linux だけで回していると穴に気づけない。
+    """
+    if os.name == "nt":
+        return path
+    drive, colon, rest = path.partition(":")
+    if colon == "" or len(drive) != 1:
+        return path
+    head = "/" if drive.upper() == "C" else f"/drive-{drive.lower()}/"
+    return head + (rest[1:] if rest[:1] in ("\\", "/") else rest)
+
+
 def write(path: str, text: str) -> str:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -94,19 +122,22 @@ class NotRootExpansionTest(unittest.TestCase):
     # --- 観点 1: 設計 §2.3 の表 ---
 
     def test_the_table_of_what_counts_as_outside(self):
-        root = r"C:\Users\u\Desktop\git\ccnavi"
+        root = absolute(r"C:\Users\u\Desktop\git\ccnavi")
         self.assert_outside(
             root,
-            r"C:\Users\u\Desktop\git\other\x.md",  # 途中で違う
-            r"C:\Users\u\Desktop",  # ルートより上
-            r"C:\Users\u\Desktop\git\ccnavi-fork\x.md",  # 前置きが一致して続く
-            r"D:\ccnavi\x.md",  # 別のドライブ
+            absolute(r"C:\Users\u\Desktop\git\other\x.md"),  # 途中で違う
+            absolute(r"C:\Users\u\DesktopXgit\ccnavi\x.md"),  # 区切りの位置に別の字が来る
+            absolute(r"C:\Users\u\Desktop"),  # ルートより上
+            absolute(r"C:\Users\u\Desk"),  # ルートより上。名前の途中で終わる
+            root[:-1],  # 同上。ルートの最後の 1 字が足りない
+            absolute(r"C:\Users\u\Desktop\git\ccnavi-fork\x.md"),  # 前置きが一致して続く
+            absolute(r"D:\ccnavi\x.md"),  # 別のドライブ
         )
         self.assert_inside(
             root,
             root + r"\README.md",
             root + r"\.claude\worktrees\x\scratchpad\draft.yml",
-            "C:/Users/u/Desktop/git/ccnavi/README.md",  # 区切りの綴りが違う
+            absolute("C:/Users/u/Desktop/git/ccnavi/README.md"),  # 区切りの綴りが違う
             root.lower() + r"\readme.md",  # 大文字小文字が違う
         )
 
@@ -119,13 +150,19 @@ class NotRootExpansionTest(unittest.TestCase):
         ドライブ直下をワークスペースにした環境は必ずここを踏む。
         既存の `rules.root_pattern` は同じ `rstrip` を既に持っている。
         """
-        for root in (r"C:\Users\u\Desktop\git\ccnavi" + "\\", "C:\\", "C:/"):
+        ccnavi = absolute(r"C:\Users\u\Desktop\git\ccnavi")
+        roots = [ccnavi + "\\", ccnavi + "/"]
+        if os.name == "nt":
+            # ドライブ直下。POSIX の `/` は正規化すると空になり、拒否するのが正しいので
+            # ここでは見ない。そちらは test_root_that_normalizes_to_nothing_is_refused が見る。
+            roots += ["C:\\", "C:/"]
+        for root in roots:
             with self.subTest(root=root):
                 stem = root.rstrip("\\/")
                 self.assert_inside(root, stem + r"\README.md", stem + r"\sub\x.md")
                 # 「中」だけを見ると、何にも当たらない実装でも通ってしまう。
                 # 同じルートで「外」も見て、式が本当に展開されていることを縛る。
-                self.assert_outside(root, stem + r"-fork\x.md", r"D:\elsewhere\x.md")
+                self.assert_outside(root, stem + r"-fork\x.md", absolute(r"D:\elsewhere\x.md"))
 
     def test_root_that_normalizes_to_nothing_is_refused(self):
         """正規化した結果が空になるルートでは「外」が定義できない。設計 §2.0。
@@ -154,24 +191,24 @@ class NotRootExpansionTest(unittest.TestCase):
 
         各段の `\\Z` は「ルートより上」を拾うためのもので、最内とは意味が違う。
         """
-        root = r"C:\Users\u\Desktop\git\ccnavi"
+        root = absolute(r"C:\Users\u\Desktop\git\ccnavi")
         self.assert_inside(root, root, root + "\\", root + "/")
-        self.assert_outside(root, r"C:\Users\u\Desktop\git", root + "-fork")
+        self.assert_outside(root, absolute(r"C:\Users\u\Desktop\git"), root + "-fork")
 
     # --- 観点 4・5: 綴りの揺れ ---
 
     def test_mixed_separators_and_regex_metacharacters_in_the_root(self):
-        self.assert_inside(r"C:\Users/u\Desktop", r"C:\Users\u\Desktop\x.md")
-        meta = r"C:\Users\u\a+b(c)[d].e\ccnavi"
+        self.assert_inside(absolute(r"C:\Users/u\Desktop"), absolute(r"C:\Users\u\Desktop\x.md"))
+        meta = absolute(r"C:\Users\u\a+b(c)[d].e\ccnavi")
         self.assert_inside(meta, meta + r"\x.md")
-        self.assert_outside(meta, r"C:\Users\u\aXb(c)[d].e\ccnavi\x.md")
+        self.assert_outside(meta, absolute(r"C:\Users\u\aXb(c)[d].e\ccnavi\x.md"))
 
     # --- 観点 6: 大文字小文字と、既知の例外 ---
 
     def test_case_folding_counts_as_inside(self):
-        root = r"C:\Users\taniyama\ccnavi"
+        root = absolute(r"C:\Users\taniyama\ccnavi")
         self.assert_inside(root, root.swapcase() + r"\x.md")
-        self.assert_outside(root, r"C:\Users\taniyama\ccnaviX\x.md")
+        self.assert_outside(root, absolute(r"C:\Users\taniyama\ccnaviX\x.md"))
 
     def test_turkish_dotted_i_is_a_known_exception(self):
         """`re.IGNORECASE` は `İ`/`ı` を `I`/`i` と同一視する。設計 §2.4。
@@ -179,7 +216,7 @@ class NotRootExpansionTest(unittest.TestCase):
         ファイルシステムは同一視しないので、本当は別の場所だが「中」と数える。
         意図した挙動として固定する。直すなら設計 §2.4 から変えること。
         """
-        root = r"C:\Users\taniyama\ccnavi"
+        root = absolute(r"C:\Users\taniyama\ccnavi")
         self.assert_inside(
             root,
             root.replace("i", "\u0130") + r"\x.md",  # İ
@@ -192,11 +229,11 @@ class NotRootExpansionTest(unittest.TestCase):
 
     def test_other_scripts_are_still_outside(self):
         """トルコ語の I 系以外は、綴りが違えばきちんと「外」になる。"""
-        root = r"C:\Users\u\ccnavi"
+        root = absolute(r"C:\Users\u\ccnavi")
         self.assert_outside(
             root,
-            r"C:\Users\u\ｃcnavi\x.md",  # 全角
-            r"C:\Users\u\ccnavß\x.md",
+            absolute(r"C:\Users\u\ｃcnavi\x.md"),  # 全角
+            absolute(r"C:\Users\u\ccnavß\x.md"),
         )
 
     # --- 観点 7: 展開結果が契約を守る ---
@@ -207,11 +244,11 @@ class NotRootExpansionTest(unittest.TestCase):
         `_unsupported` は繰り返しを見ないので、そこに掛け直すだけでは
         この性質を確かめられない。だからここで直接見る。
         """
-        root = r"C:\Users\u\Desktop\git\ccnavi"
+        root = absolute(r"C:\Users\u\Desktop\git\ccnavi")
         compiled = self.compiled(root)
         # 先に「本当に展開されている」ことを縛る。何にも当たらない式なら、
         # 繰り返しも先読みも含まないのは当たり前で、この検査は無意味になる。
-        self.assertTrue(compiled.search(r"D:\elsewhere\x.md"))
+        self.assertTrue(compiled.search(absolute(r"D:\elsewhere\x.md")))
         pattern = compiled.pattern
         self.assertIsNone(_QUANTIFIER.search(pattern), f"繰り返しが混ざっている: {pattern[:200]}")
         for literal in _LOOKAROUND:
@@ -223,7 +260,7 @@ class NotRootExpansionTest(unittest.TestCase):
         既存の `{root}` と同じ扱い（rules.py の `_build` のコメント）。
         `--explain` と報告が 475 字の展開結果を出すと、人には読めない。
         """
-        rule_set, _ = rules.load(self.path, r"C:\Users\u\ccnavi")
+        rule_set, _ = rules.load(self.path, absolute(r"C:\Users\u\ccnavi"))
         rule = rule_set.deny[0]
         self.assertEqual(rule.regex, NOT_ROOT)
         self.assertNotIn("{!root}", rule.compiled.pattern)
@@ -235,12 +272,12 @@ class NotRootExpansionTest(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         path = rules_file(directory.name, outside_rule(NOT_ROOT + r".*\.py$"))
-        root = r"C:\Users\u\ccnavi"
+        root = absolute(r"C:\Users\u\ccnavi")
         rule_set, problems = rules.load(path, root)
         self.assertEqual([str(p) for p in problems], [])
         pattern = rule_set.deny[0].compiled
-        self.assertTrue(pattern.search(r"C:\other\a.py"))
-        self.assertFalse(pattern.search(r"C:\other\a.md"))
+        self.assertTrue(pattern.search(absolute(r"C:\other\a.py")))
+        self.assertFalse(pattern.search(absolute(r"C:\other\a.md")))
         self.assertFalse(pattern.search(root + r"\a.py"))
 
     # --- 観点 15: 層 ---
@@ -251,9 +288,9 @@ class NotRootExpansionTest(unittest.TestCase):
         層ごとにルートが変わると、プロジェクトの層に書いた 1 行が
         別の場所を指すことになる。
         """
-        root = r"C:\Users\u\ccnavi"
+        root = absolute(r"C:\Users\u\ccnavi")
         first_compiled = self.compiled(root)
-        self.assertTrue(first_compiled.search(r"D:\elsewhere\x.md"), "展開されていない")
+        self.assertTrue(first_compiled.search(absolute(r"D:\elsewhere\x.md")), "展開されていない")
         first = first_compiled.pattern
         elsewhere = tempfile.TemporaryDirectory()
         self.addCleanup(elsewhere.cleanup)
@@ -276,7 +313,7 @@ class NotRootLimitTest(unittest.TestCase):
         測りたい境界からずれる（設計 §2.0）。
         """
         body = ("d" * 9 + "\\") * (length // 10 + 2)
-        root = ("C:\\" + body)[:length]
+        root = (absolute("C:\\") + body)[:length]
         if root.endswith(("\\", "/")):
             root = root[:-1] + "d"
         return root
@@ -335,7 +372,7 @@ class NotRootLimitTest(unittest.TestCase):
         self.assertTrue(rule_set.deny, "deny が捨てられている（素通りになる）")
         pattern = rule_set.deny[0].compiled
         self.assertIsNotNone(pattern)
-        for path_to_write in (r"C:\anywhere\x.md", r"D:\somewhere\else\y.txt"):
+        for path_to_write in (absolute(r"C:\anywhere\x.md"), absolute(r"D:\somewhere\else\y.txt")):
             self.assertTrue(pattern.search(path_to_write), "match の全部に当たるべき")
 
     def test_ask_falls_closed_like_deny(self):
@@ -352,7 +389,7 @@ class NotRootLimitTest(unittest.TestCase):
         rule_set, problems = rules.load(path, self.long_root(600))
         self.assertTrue(problems)
         self.assertTrue(rule_set.ask, "ask が捨てられている")
-        self.assertTrue(rule_set.ask[0].compiled.search(r"C:\anywhere\x.md"))
+        self.assertTrue(rule_set.ask[0].compiled.search(absolute(r"C:\anywhere\x.md")))
 
     def test_the_written_message_survives_a_failure(self):
         """組み立てに失敗しても、人が書いた文面は消えない。
@@ -379,7 +416,9 @@ class NotRootLimitTest(unittest.TestCase):
         )
         rule_set, problems = rules.load(path, self.long_root(600))
         self.assertTrue(problems)
-        matched = [r for r in rule_set.allow if r.compiled and r.compiled.search(r"C:\x\y.md")]
+        matched = [
+            r for r in rule_set.allow if r.compiled and r.compiled.search(absolute(r"C:\x\y.md"))
+        ]
         self.assertEqual(matched, [], "allow は当たらない側に倒すべき")
 
 
