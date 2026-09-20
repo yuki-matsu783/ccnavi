@@ -38,7 +38,7 @@ uv run python -m unittest discover -s tests -t .         # 全件
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-fetch.sh` | `sh` |
 | `.claude/hooks/test-py.sh` | `e2e` |
-| `.claude/hooks/mark-ext.sh`・`vscode-extension/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
+| `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`vscode-extension/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `vscode-extension/` | `ticket`（`core` の `test_test_json` も例を読む） |
 | ドキュメントだけ（`*.md`・`docs/`） | 回さない |
@@ -47,9 +47,10 @@ uv run python -m unittest discover -s tests -t .         # 全件
 表に入れていないのはそのため。変えたら手で動かして確かめる。
 
 - `.claude/hooks/lint-py.sh`（`guard` の `test_fallback` がパスを文字列として使うだけで、実行しない）
-- `.claude/hooks/test-ext.sh`（`core` の `test_ext_tests` が回すのは `mark-ext.sh` と
-  `scripts/test-groups.js --plan` まで。差し戻しの回数と、落ちたテストの差し戻しそのものは
-  実際に落ちるテストが要るので、変えたら手で確かめる。`test-py.sh` の同じ仕掛けも同じ）
+- `.claude/hooks/test-py.sh`（`e2e` は sh の外形だけ。差し戻しの回数と、落ちたテストを
+  差し戻すところは回らない。変えたら手で確かめる。`test-ext.sh` のほうは
+  `core` の `test_ext_tests` が控えの入口を渡して、終了コードの読み方・差し戻しの回数・
+  綴りの扱いまで見る）
 
 **全件を回すとき。**
 
@@ -71,7 +72,7 @@ uv run python -m unittest discover -s tests -t .         # 全件
 cd vscode-extension/ccnavi-board
 pnpm test:plan src/core/rules-doc.ts   # 何を回すかだけ見る
 pnpm test:for src/core/rules-doc.ts    # 回す
-pnpm test                              # 全部（203 本。約 11 秒）
+pnpm test                              # 全部（203 本。9.5〜11.5 秒）
 ```
 
 グループをいくつ選んでもコンパイルは 1 回なので、変えたファイルは 1 回でまとめて渡す
