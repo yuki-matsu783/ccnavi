@@ -405,6 +405,26 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_cd_で入ってから書く形も止まる(self):
+        # issue #61。守りは綴りに当てるので、`cd` で入ると行き先から名前が消える。
+        # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。
+        for command in [
+            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .ccnavi && echo x > common/rules.yml",
+            "cd .claude && echo x > settings.json",
+            "cd .claude/hooks && echo x > lint-py.sh",
+            "cd logs && rm log.jsonl",
+        ]:
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+                self.assertIn("deny", result.stdout, command)
+                self.assertIn("builtin-guard-setting-files", result.stdout, command)
+
+    def test_cd_で入っても読むだけなら通る(self):
+        result = self.run_hook("PreToolUse", command="cd .ccnavi/common && cat rules.yml")
+
+        self.assertNotIn("deny", result.stdout)
+
     def test_設定ファイルを読むだけなら通る(self):
         # 場所の名前が出たかどうかでは止めない。ここは読むほうが普通の場所で、
         # 名前で止めると、いちばんガードを直したいときにいちばん強く効く。
