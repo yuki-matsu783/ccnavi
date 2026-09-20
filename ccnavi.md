@@ -689,7 +689,7 @@ subject: env rm -f .ccnavi/common/rules.yml
 
 守りもルールも、当てる先は語の綴り。`cd` で入ってから書くと、行き先の綴りからディレクトリの名前が消えるので
 当たらない（`cd .claude && echo x > settings.json`）。及ぶ先は ccnavi ディレクトリの下だけでなく、コアファイルの
-`.claude/settings.json` と `.claude/hooks/` にも及ぶ（issue #61、ADR-0066）。
+`.claude/settings.json` と `.claude/hooks/` にも及ぶ（issue #61、ADR-0068）。
 
 **組み方（`shellread`）。** `read()` は、`cd` の行き先を継ぎ足したコマンドを `Reading.moved` に `\x00` でつないで返す。
 綴りの変わったコマンドと、そこから 1 枚ずつ外した層（§6.3.1）が並ぶ。`judge.screen` がそれを中で実行される

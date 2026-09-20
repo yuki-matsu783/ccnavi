@@ -524,7 +524,7 @@ def marked(text):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedTest(unittest.TestCase):
-    """`cd` で移った先から見た綴り（ADR-0066、issue #61）。
+    """`cd` で移った先から見た綴り（ADR-0068、issue #61）。
 
     `read(src).moved` は、`cd` の行き先を引数に継ぎ足したコマンドを SEP でつないだもの。
     綴りの変わったコマンドだけが並ぶ。書かれた綴り（`text`）は動かさない。
