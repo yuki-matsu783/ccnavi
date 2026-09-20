@@ -15,7 +15,14 @@ import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state
 export function App({ initial }: { readonly initial: ProjectsData }): JSX.Element {
   const [data, setData] = useState<ProjectsData>(initial);
   const [clone, setClone] = useState<CloneState>(loadClone);
-  /** 直前の操作の一言。生きている画面にしか届かないので、持ち越さない（拡張ホストも覚えない） */
+  /**
+   * 直前の操作の一言。生きている画面にしか届かないので、持ち越さない（拡張ホストも覚えない）。
+   *
+   * 消える条件は 2 つ。**失敗（`failed`）は次の一覧が届いたら消す。** 一覧が新しくなった後も
+   * 「プロジェクト X が一覧に無い」が赤く残ると、人はいまも失敗していると読む。
+   * 案内（`info`）は残す。clone を送った直後は `.git` の出現で必ず読み直しが走るので、
+   * ここで消すと案内が一瞬で消える（移行前がそれだった）
+   */
   const [status, setStatus] = useState<CloneStatus | undefined>(undefined);
   const [openMenu, setOpenMenu] = useState<string | undefined>(undefined);
 
@@ -37,6 +44,8 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         // 戻ってきたときに押していないメニューが開いた状態で出る
         const rows = message.data.kind === "page" ? message.data.page.rows : [];
         setOpenMenu((now) => (now !== undefined && !rows.some((r) => now.startsWith(`${r.name}:`)) ? undefined : now));
+        // 一覧が新しくなったので、それを見て言った失敗はもう今のことではない
+        setStatus((now) => (now?.kind === "failed" ? undefined : now));
       } else if (message.type === "failed") {
         setStatus({ kind: "failed", message: String(message.message ?? "") });
       } else if (message.type === "info") {

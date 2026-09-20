@@ -113,6 +113,27 @@ test("CB-D33 開いていたメニューは、その行が一覧から消えた�
   }
 });
 
+test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は残る", async () => {
+  const dom = await openProjects();
+  try {
+    const status = () => text(dom.one("#status"));
+    const failed = () => dom.one("#status").className.includes("failed");
+    await dom.send({ type: "failed", message: "プロジェクト lib が一覧に無い。更新してから押し直す" });
+    assert.match(status(), /一覧に無い/);
+    assert.ok(failed());
+    // 一覧が新しくなったら、それを見て言った失敗はもう今のことではない
+    await dom.send({ type: "data", data: { kind: "page", page: page([row()]) } });
+    assert.equal(status(), "");
+    assert.ok(!failed());
+    // 案内は残す。clone は .git の出現で必ず読み直しが走るので、ここで消すと一瞬で消える
+    await dom.send({ type: "cloned", message: "clone をターミナルに送った" });
+    await dom.send({ type: "data", data: { kind: "page", page: page([row(), row({ name: "app", rel: "projects/app" })]) } });
+    assert.equal(status(), "clone をターミナルに送った");
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠に出す", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/rules.yml" }),
