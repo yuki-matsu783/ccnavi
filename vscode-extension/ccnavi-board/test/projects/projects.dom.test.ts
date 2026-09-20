@@ -90,6 +90,29 @@ test("CB-D32 中身は postMessage で入れ替わり、読み直せなければ
   }
 });
 
+test("CB-D33 開いていたメニューは、その行が一覧から消えたら閉じる", async () => {
+  const dom = await openProjects([row(), row({ name: "app", rel: "projects/app" })]);
+  try {
+    const summary = (name: string) => dom.one(`${cardSelector(name)} details.menu summary`);
+    dom.click(summary("lib"));
+    await dom.settle();
+    assert.ok(dom.one<HTMLDetailsElement>(`${cardSelector("lib")} details.menu`).open);
+    // lib が消えて app だけになる。app のメニューは開かない
+    await dom.send({ type: "data", data: { kind: "page", page: page([row({ name: "app", rel: "projects/app" })]) } });
+    assert.ok(!dom.one<HTMLDetailsElement>(`${cardSelector("app")} details.menu`).open);
+    // 同じ名前で戻ってきても、押していないメニューは閉じたまま
+    await dom.send({ type: "data", data: { kind: "page", page: page([row(), row({ name: "app", rel: "projects/app" })]) } });
+    assert.ok(!dom.one<HTMLDetailsElement>(`${cardSelector("lib")} details.menu`).open);
+    // 残っている行のメニューは、読み直しても開いたまま（打ちかけと同じ扱い）
+    dom.click(summary("app"));
+    await dom.settle();
+    await dom.send({ type: "data", data: { kind: "page", page: page([row(), row({ name: "app", rel: "projects/app" })]) } });
+    assert.ok(dom.one<HTMLDetailsElement>(`${cardSelector("app")} details.menu`).open);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠に出す", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/rules.yml" }),

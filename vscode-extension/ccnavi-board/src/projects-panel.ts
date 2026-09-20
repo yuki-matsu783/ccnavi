@@ -59,6 +59,8 @@ interface PanelState {
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   page?: ProjectsPage;
+  /** 読み直せなかった理由。`page` と排他で、どちらかは必ず入っている */
+  error?: string;
   loading: boolean;
   again: boolean;
   /** 直前に見た表裏。表へ戻ったら読み直す（裏にいる間の変化は監視が拾っても渡せていない） */
@@ -303,8 +305,7 @@ async function update(): Promise<void> {
       return;
     }
     if (!result.ok) {
-      current.page = undefined;
-      current.host.send({ kind: "error", error: result.error });
+      showError(current, result.error);
       return;
     }
     show(current, result.page);
@@ -319,7 +320,32 @@ async function update(): Promise<void> {
 
 function show(current: PanelState, page: ProjectsPage): void {
   current.page = page;
+  current.error = undefined;
   current.host.send({ kind: "page", page });
+}
+
+/** 読み直せなかったことを見せる。理由は覚えておく（渡せなかったときに `ready` で渡し直すため） */
+function showError(current: PanelState, error: string): void {
+  current.page = undefined;
+  current.error = error;
+  current.host.send({ kind: "error", error });
+}
+
+/**
+ * いまの状態で描き直す。`send` が `deferred`（作り直し中）を返して捨てられたものは、
+ * 画面が組み上がった（`ready`）ところでここから渡し直す。
+ *
+ * **読み直せなかったことも渡し直す。** ここで落とすと、入れてある HTML（古い一覧）が出たまま
+ * 失敗が人に届かず、`page` が無いので以後のボタンも効かない。
+ */
+function redraw(current: PanelState): void {
+  if (current.page !== undefined) {
+    show(current, current.page);
+    return;
+  }
+  if (current.error !== undefined) {
+    showError(current, current.error);
+  }
 }
 
 /**
@@ -370,12 +396,15 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // 画面が組み上がった。入れてある HTML は少し古いことがあるので、いまの中身を渡し直す。
     // 作り直している間に見送った更新（send）も、ここで届く
     current.host.ready();
-    if (current.page !== undefined) {
-      current.host.send({ kind: "page", page: current.page });
-    }
+    redraw(current);
     // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
     // `followAppearance` がそのとき送ったものは、捨てられた画面に落ちている
     current.host.post({ type: "appearance", value: readAppearance() } satisfies ToProjects);
+    return;
+  }
+  // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す道がこれしかない
+  if (message.type === "refresh") {
+    void update();
     return;
   }
   const page = current.page;
@@ -384,9 +413,6 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
   }
   const root = current.folder.uri.fsPath;
   switch (message.type) {
-    case "refresh":
-      void update();
-      return;
     case "clone":
       clone(current, page, message.url, message.name);
       return;

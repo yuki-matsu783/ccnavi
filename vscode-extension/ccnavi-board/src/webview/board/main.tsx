@@ -10,6 +10,6 @@ import { App } from "./App.js";
 
 const root = document.getElementById("root");
 if (root !== null) {
-  const initial = readInitial<BoardData>(DATA_ID, (detail) => ({ kind: "error", error: `${detail}（拡張の不具合）。ボードを開き直す。` }));
+  const initial = readInitial<BoardData>(DATA_ID, "ボード", (error) => ({ kind: "error", error }));
   createRoot(root).render(<App initial={initial} />);
 }

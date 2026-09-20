@@ -6,8 +6,7 @@
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
-import type { ProjectsPage, Stray } from "../../core/projects-view.js";
-import type { CloneStatus, ProjectsData, ToProjects } from "../../core/projects-view.js";
+import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
@@ -34,6 +33,10 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       const message = (event.data ?? {}) as Partial<ToProjects>;
       if (message.type === "data" && message.data !== undefined) {
         setData(message.data);
+        // 開いていたメニューの持ち主が一覧から消えていたら閉じる。残すと、同じ名前で
+        // 戻ってきたときに押していないメニューが開いた状態で出る
+        const rows = message.data.kind === "page" ? message.data.page.rows : [];
+        setOpenMenu((now) => (now !== undefined && !rows.some((r) => now.startsWith(`${r.name}:`)) ? undefined : now));
       } else if (message.type === "failed") {
         setStatus({ kind: "failed", message: String(message.message ?? "") });
       } else if (message.type === "info") {
