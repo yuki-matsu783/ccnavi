@@ -31,6 +31,10 @@ const TEST_DIR = path.join(ROOT, "test");
 // fixtures は実行時に名前で開く固定データ。
 const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 
+// 「環境が足りないので回せなかった」の終了コード。テストが落ちた（1）とは分ける。
+// ターンの終わりの hook は、これを差し戻しに数えず人へ言う。
+const NOT_READY = 3;
+
 // 画面（React）の束ねたものを読むテストの入口。これを辿るグループだけ、
 // tsconfig.webview.json の型の検査と esbuild の束ねが要る。画面を足して別の入口から
 // 読ませるなら、その入口もここに挙げる。
@@ -58,14 +62,24 @@ function resolveImport(from, spec) {
   if (base.endsWith(".js")) {
     candidates.push(base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx");
   }
-  candidates.push(base, base + ".ts", base + ".tsx", path.join(base, "index.ts"));
+  candidates.push(
+    base,
+    base + ".ts",
+    base + ".tsx",
+    path.join(base, "index.ts"),
+    path.join(base, "index.tsx"),
+  );
   for (const candidate of candidates) {
     if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   }
   return null;
 }
 
-const IMPORT = /(?:^|\s)(?:import|export)[^;]*?from\s*"([^"]+)"/g;
+// `from "..."` と、`from` の無い副作用だけの `import "..."` の両方を拾う。引用符は
+// どちらでもよい（このリポジトリは二重引用符で揃えているが、揃っていることを
+// 見張るものが無いので、片方だけ拾うと黙って取りこぼす）。
+const IMPORT = /(?:^|\s)(?:import|export)\b[^;]*?from\s*["']([^"']+)["']/g;
+const SIDE_EFFECT_IMPORT = /(?:^|\s)import\s*["']([^"']+)["']/g;
 
 /** 1 ファイルが読むもの（相対 import だけ）。 */
 function importsOf(file) {
@@ -76,21 +90,40 @@ function importsOf(file) {
     return [];
   }
   const found = [];
-  for (const match of text.matchAll(IMPORT)) {
-    const resolved = resolveImport(file, match[1]);
-    if (resolved) found.push(resolved);
+  for (const pattern of [IMPORT, SIDE_EFFECT_IMPORT]) {
+    for (const match of text.matchAll(pattern)) {
+      const resolved = resolveImport(file, match[1]);
+      if (resolved) found.push(resolved);
+    }
   }
   return found;
+}
+
+/** ディレクトリの下の、条件に合うファイル全部（下の段も見る）。 */
+function filesUnder(dir, accept) {
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort(byName)) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...filesUnder(full, accept));
+    } else if (accept(entry.name)) {
+      found.push(full);
+    }
+  }
+  return found;
+}
+
+function byName(a, b) {
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }
 
 /** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
 function closureOf(group) {
   const dir = path.join(TEST_DIR, group);
   const seen = new Set();
-  const stack = fs
-    .readdirSync(dir)
-    .filter((name) => name.endsWith(".ts"))
-    .map((name) => path.join(dir, name));
+  // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
+  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが黙って回らない。
+  const stack = filesUnder(dir, (name) => name.endsWith(".ts") || name.endsWith(".tsx"));
   while (stack.length > 0) {
     const file = stack.pop();
     if (seen.has(file)) continue;
@@ -124,10 +157,16 @@ function relativeToExtension(given) {
   const slashed = given.replace(/\\/g, "/");
   const marker = "vscode-extension/ccnavi-board/";
   const at = slashed.lastIndexOf(marker);
-  if (at >= 0) return slashed.slice(at + marker.length);
-  if (path.isAbsolute(slashed)) return null;
+  const inside = at >= 0 ? slashed.slice(at + marker.length) : slashed;
+  if (at < 0 && path.isAbsolute(slashed)) return null;
+  // `./src/x.ts` や `src/../src/x.ts` を `src/x.ts` に直す。直さないまま
+  // `startsWith("src/webview/")` のような綴りの比較に渡すと、`./` が付いただけで
+  // 別のファイルとして扱われ、回すものが減る側に外れる。
+  const normalized = path.posix.normalize(inside);
+  if (normalized.startsWith("../")) return null;
+  if (at >= 0) return normalized;
   // 拡張のディレクトリから打たれた相対パス。実在するものだけ受ける。
-  return fs.existsSync(path.join(ROOT, slashed)) ? slashed : null;
+  return fs.existsSync(path.join(ROOT, normalized)) ? normalized : null;
 }
 
 /**
@@ -161,12 +200,16 @@ function callFor(rel, map) {
   // 固定データは import ではなく実行時に名前で開くので、辿れない。全部に効くと見る。
   if (rel.startsWith("test/fixtures/")) return { groups: all, compile: true };
 
-  // 画面（React）は esbuild が束ね、テストは束ねたものを読む。import では辿れないので、
-  // 束ねたものを読むグループに効くと見る。
-  if (rel.startsWith("src/webview/")) return { groups: webviewGroups(map), compile: true };
-
   const absolute = path.join(ROOT, rel);
   const groups = all.filter((group) => map.get(group).has(absolute));
+
+  // 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では
+  // 辿れないので、束ねたものを読むグループを足す。辿れたぶん（テストが画面のファイルを
+  // 直に import している場合）は落とさずに和を取る。
+  if (rel.startsWith("src/webview/")) {
+    return { groups: [...new Set([...groups, ...webviewGroups(map)])].sort(), compile: true };
+  }
+
   return { groups, compile: true };
 }
 
@@ -223,10 +266,10 @@ function testFiles(groups, domOnly) {
   for (const group of groups) {
     const dir = path.join(ROOT, "out", "test", group);
     if (!fs.existsSync(dir)) continue;
-    for (const name of fs.readdirSync(dir).sort()) {
-      if (!name.endsWith(".test.js")) continue;
-      if (domOnly && !name.endsWith(".dom.test.js")) continue;
-      files.push(path.join("out", "test", group, name));
+    // 下の段も見る。closureOf と同じ理由で、1 段しか見ないと黙って回らない。
+    for (const full of filesUnder(dir, (name) => name.endsWith(".test.js"))) {
+      if (domOnly && !full.endsWith(".dom.test.js")) continue;
+      files.push(path.relative(ROOT, full));
     }
   }
   return files;
@@ -267,7 +310,9 @@ function main(argv) {
   if (!fs.existsSync(tsc)) {
     console.error("ccnavi-board: node_modules が無いのでテストを回せません。");
     console.error("vscode-extension/ccnavi-board で 'pnpm install --frozen-lockfile' を通してください。");
-    return 1;
+    // 3 は「環境が足りない」で、テストが落ちたのではない。hook はこれを差し戻しに
+    // 数えない（落ちてもいないテストを直せと言われることになるため）。
+    return NOT_READY;
   }
 
   let code = run(process.execPath, [path.join("scripts", "clean-out.js")]);
@@ -279,9 +324,13 @@ function main(argv) {
   if (plan.webview) {
     code = run(process.execPath, [tsc, "-p", "tsconfig.webview.json"]);
     if (code !== 0) return code;
-    code = run(process.execPath, [path.join("scripts", "bundle-webview.js")]);
-    if (code !== 0) return code;
   }
+
+  // 束ねるのは、型を見ないときでも必ず。`clean-out.js` が `out/webview` を消すので、
+  // ここで作り直さないと、束ねたものを読む側（拡張の webview-script.ts、board の
+  // テスト）が「画面が束ねられていない」で落ちる。esbuild は 0.1 秒ほど。
+  code = run(process.execPath, [path.join("scripts", "bundle-webview.js")]);
+  if (code !== 0) return code;
 
   if (plan.groups.length === 0) {
     console.log("ccnavi-board: 型の検査だけ通しました（テストが読まないファイルの変更）");
@@ -294,7 +343,11 @@ function main(argv) {
     return 0;
   }
   console.log(`ccnavi-board: ${plan.groups.join(" ")}（${files.length} ファイル）`);
-  return run(process.execPath, ["--test", ...files]);
+  // spec レポータにするのは、落ちたものが末尾にまとまるから。node は端末でないときは
+  // 既定で TAP を出し、そこでは `not ok` が落ちたファイルの位置に出る。ターンの終わりの
+  // hook がモデルへ渡せるのは末尾 40 行だけなので、TAP だと「落ちた」とだけ伝わって
+  // 何が落ちたかが入らない。
+  return run(process.execPath, ["--test", "--test-reporter=spec", ...files]);
 }
 
 process.exit(main(process.argv.slice(2)));
