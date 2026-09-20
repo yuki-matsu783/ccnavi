@@ -309,7 +309,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/board.js と out/extension.js に束ねる
+pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/<名前>.js と out/extension.js に束ねる
 pnpm test          # 全部（203 本。9.5〜11.5 秒）
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
@@ -368,7 +368,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom と react / react-dom を足してある
 （画面は束ねて配るので、実行時の依存にはしない）。vsix には `node_modules/` を入れず、
 `scripts/bundle.js`（esbuild）が本体ごと `out/extension.js` に束ねる。テストは束ねる前の
-`out/src/` と、画面だけは束ねた `out/webview/board.js` を使う（配るものと同じ画面を動かすため）。
+`out/src/` と、画面だけは束ねた `out/webview/<名前>.js` を使う（配るものと同じ画面を動かすため）。
 `out/webview/` は vsix に入る。拡張が起動時に読んで `<script nonce>` に流し込むので、
 Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけで済む。
 
@@ -481,7 +481,7 @@ src/
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json / --approve --preview --json / --approve --yes … --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
-  webview-script.ts   束ねた画面（out/webview/board.js）を読む。拡張が <script nonce> に流し込む
+  webview-script.ts   束ねた画面（out/webview/<名前>.js）を読む。拡張が <script nonce> に流し込む
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
     approvemodel.ts   承認の JSON の形（--approve --preview --json / --approve --yes … --json）と読み取り
@@ -538,7 +538,7 @@ test/
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。ボードは画面が React なので、描くものも動かして見る（render.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
-  bundle-webview.js   esbuild で画面（React）を out/webview/board.js に束ねる
+  bundle-webview.js   esbuild で画面（React）を out/webview/<名前>.js に束ねる。画面の一覧（名前 → 入口）は先頭の SCREENS
   package.sh          vsix の組み立て
 ```
 
@@ -558,7 +558,8 @@ scripts/
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
 **2 画面目を React にするとき、使い回せるもの。** `webviewScript`（名前で読む）、`poster<M>()`、
-`core/styles.ts`、テストの土台（`test/helpers/dom.ts`）。画面ごとに要るのは、契約（`*-view.ts`）・
+`core/styles.ts`、テストの土台（`test/helpers/dom.ts`）、束ねる指定（`scripts/bundle-webview.js` の
+`SCREENS` に「名前 → 入口」を 1 行足す）。画面ごとに要るのは、契約（`*-view.ts`）・
 入れ物を組む関数・画面の CSS・`ready` を受けて渡し直す数行・テストの入口（`test/helpers/board.ts` に相当するもの）。
 
 **そのままでは使えないもの。**
@@ -567,10 +568,9 @@ scripts/
   フェーズ管理は編集の途中を持つので真にしてあり、裏にいる間に入れ物ごと入れ直すと打ちかけの内容が消える。
   これらを移すときは、保持する画面の段取り（裏でも `postMessage` を通し、入れ直さない）を足すか、
   編集の途中を Webview の state に逃がして偽に変えるかの判断が要る
-- `scripts/bundle-webview.js` は入口と出口がボードの 1 本に決め打ち。画面を足すなら束ねる指定も足す
 - 画面の型の検査（`tsc -p tsconfig.webview.json`）と束ねが要るかは、選んだグループが
   `test/helpers/board.ts`（束ねたものを読む入口）を辿るかで決まる。画面を足して別の入口から
-  読ませるなら、`scripts/test-groups.js` の `BOARD_HELPER` にその入口も挙げる
+  読ませるなら、`scripts/test-groups.js` の `BUNDLE_ENTRIES` にその入口も挙げる
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
