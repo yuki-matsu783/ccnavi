@@ -54,7 +54,7 @@ test("CB-T70 束ねた画面を nonce 付きの script に流し込み、資源�
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 
-test("CB-T158 読み直せなかったときは一覧の代わりに理由を渡す", () => {
+test("CB-T165 読み直せなかったときは一覧の代わりに理由を渡す", () => {
   const rendered = rulesHtml({ kind: "error", error: "ルールファイルを読めない" });
   assert.match(rendered, /"kind":"error"/);
   assert.match(rendered, /ルールファイルを読めない/);

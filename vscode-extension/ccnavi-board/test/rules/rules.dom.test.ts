@@ -317,7 +317,7 @@ test("CB-D07 足したルールは開いて焦点が id に来る。タイプを
   }
 });
 
-test("CB-D0d 「渡すファイル」で選んだ綴りは、拡張ホストが名指しで返した行の欄にだけ入る", async () => {
+test("CB-D69 「渡すファイル」で選んだ綴りは、拡張ホストが名指しで返した行の欄にだけ入る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -336,7 +336,7 @@ test("CB-D0d 「渡すファイル」で選んだ綴りは、拡張ホストが�
   }
 });
 
-test("CB-D0e 再読込は押した時点でボタンを止め、やめたら戻る。中身が届けば編集は捨てて入れ替わる", async () => {
+test("CB-D70 再読込は押した時点でボタンを止め、やめたら戻る。中身が届けば編集は捨てて入れ替わる", async () => {
   const dom = await openRules();
   try {
     dom.type(dom.one(`${rowSelector("git-push")} input.f-id`), "打ちかけ");
@@ -359,7 +359,7 @@ test("CB-D0e 再読込は押した時点でボタンを止め、やめたら戻�
   }
 });
 
-test("CB-D0f ファイルが外で変わったら帯を出す。錠と操作の一言は届いたところで出る", async () => {
+test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の一言は届いたところで出る", async () => {
   const dom = await openRules();
   try {
     assert.ok(dom.one("#changed").classList.contains("hidden"));
