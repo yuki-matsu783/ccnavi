@@ -310,7 +310,7 @@ YAML として読めないファイルは画面から直せない（エディタ
 ```sh
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/board.js と out/extension.js に束ねる
-pnpm test          # 全部（203 本。約 11 秒）
+pnpm test          # 全部（203 本。9.5〜11.5 秒）
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
 pnpm test:for src/core/rules-doc.ts   # 触ったファイルが関わる領域だけ
@@ -330,16 +330,25 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 テストの入口は `scripts/test-groups.js` の 1 本で、`pnpm test` とその仲間は全部ここへ渡す
 （ADR-0061）。回すグループを決め、`clean-out` → `tsc -p tsconfig.test.json` →（要るときだけ
-画面の型の検査と束ね）→ `node --test <出来上がったファイル>` の順に進む。**いくつグループを
-選んでもコンパイルは 1 回。** `tsc` は `src/` と `test/` を全部見るので約 6 秒かかり、テストの実行は
-全部でも約 5 秒。グループごとに工程を並べていたときは、2 グループ回すとコンパイルが 2 回走って
-全部回すより遅かった。
+画面の型の検査）→ 画面の束ね → `node --test <出来上がったファイル>` の順に進む。**いくつグループを
+選んでもコンパイルは 1 回。** `tsc -p tsconfig.test.json` は `src/` と `test/` を全部見るので、
+グループを絞ってもコンパイルは安くならない（3〜4 秒）。安くなるのは実行のほう（全部で約 4.6 秒）と、
+画面の型検査を省けるぶん（1.5 秒）。**グループごとに工程を並べていたときは、2 グループ回すと
+コンパイルも 2 回走った**（`test:rules` + `test:risk` で 9.4 秒。いまは 4.9 秒）。
 
-どのグループがどのファイルを読むかは表で持たず、テストの `import` を辿って数える。
-辿れないものは 3 つだけ綴りで決める（固定データ `test/fixtures/` は全部、画面 `src/webview/` は
-束ねたものを読むグループ、組み立ての土台 `package.json`・`tsconfig*.json`・`scripts/` は全部）。
-読み物（`*.md`）と絵（`media/`）は何も回さない。テストが 1 つも読まないファイルは `tsc` だけ通す。
-`test/<グループ>/` を増やしても、`package.json` に行を足すだけで直すところは無い。
+束ねは、画面の型を見ないときでも必ず回す。`clean-out.js` が `out/webview` を消すので、
+作り直さないと、束ねたものを読む側（`webview-script.ts`、board のテスト）が落ちる。
+
+どのグループがどのファイルを読むかは、テストの `import` を辿って数える。辿れないものだけ
+綴りで決める（`test-groups.js` の先頭にまとめてある。固定データ `test/fixtures/` は全部、
+画面 `src/webview/` は辿れたぶんと束ねたものを読むグループ、組み立ての土台
+`package.json`・`tsconfig*.json`・`scripts/`・`pnpm-lock.yaml` は全部、読み物 `*.md` と絵
+`media/` は何も回さない、`out/`・`node_modules/` は数えない）。**ここは表なので古くなる。**
+テストが 1 つも読まないファイルは `tsc` だけ通す。`test/<グループ>/` を増やすときに直すのは
+`package.json` の行 1 本だけで、対応の表を書き足す必要は無い。
+
+`test/shared/` は 5 画面を比べるので束ねた画面を読む。つまり `shared` を含む計画には必ず画面の
+型検査と束ねが付き、`src/core/` の大半は `shared` を含む。絞って浮くのは 1 ターン 2.5〜4.5 秒。
 
 ワークスペース側の hook（`.claude/hooks/mark-ext.sh` と `test-ext.sh`）は `pnpm test:for` と
 同じ道を通る。拡張のファイルを触ったターンの終わりに、関わるグループだけが回る。

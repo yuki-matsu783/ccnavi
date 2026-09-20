@@ -156,15 +156,21 @@ Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`Pos
 `.claude/hooks/mark-ext.sh` が、拡張のファイルを触ったら `logs/session/<セッション>.ext-files` に
 書き残し、`Stop` の `.claude/hooks/test-ext.sh` がターンの終わりに 1 回回す。**回すのは触った
 ファイルが関わるグループだけ**で、決めるのは `vscode-extension/ccnavi-board/scripts/test-groups.js`
-（テストの `import` を辿るので、表を持たない）。拡張を触っていないターンは何もしないので、
+（テストの `import` を辿る。辿れない 6 つだけが綴りの表）。拡張を触っていないターンは何もしないので、
 文書だけのターンや Python だけのターンは伸びない。触ったターンで伸びるのは 3〜8 秒
-（全部回すと 11 秒）。差し戻しは 3 回までで、回数は `test-py.sh` と別に数える。
+（全部回すと 9.5〜11.5 秒）。差し戻しは 3 回までで、回数は `test-py.sh` と別に数える。
+
+**この 2 本で気づけるのは「同じ機械で 1 回回して落ちること」だけ。** 混み具合で結果が変わる失敗
+（issue #89 が挙げた、React の描き直しを待つテスト）には効かない。そこに効くのは CI か、
+同じテストを繰り返す仕掛けで、どちらも無い。また、Bash で変えたもの（`sed -i`、`merge` で
+入ってきた変更）には印が付かないので回らない。
+
 これも `.claude/settings.json` には登録していないので、回すなら `settings.local.json` で
-`PostToolUse`（`Write|Edit|NotebookEdit`）と `Stop` に足す。
+`PostToolUse`（`Write|Edit`）と `Stop` に足す。**登録しないと 1 本も回らない。**
 
 ```json
 "PostToolUse": [
-  { "matcher": "Write|Edit|NotebookEdit",
+  { "matcher": "Write|Edit",
     "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/mark-ext.sh\"", "timeout": 10 }] }
 ],
 "Stop": [

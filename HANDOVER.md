@@ -471,8 +471,13 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 `mark-ext.sh` が拡張のファイルを触ったことを `<セッション>.ext-files` に書き残し、`Stop` の
 `test-ext.sh` が関わるグループだけを回す（`vscode-extension/ccnavi-board/scripts/test-groups.js`
 がテストの `import` を辿って決める）。どちらも `settings.json` には登録していない。回すなら
-`settings.local.json` で `PostToolUse`（`Write|Edit|NotebookEdit`）と `Stop` に足す。
-拡張を触っていないターンは何もしないので伸びない。触ったターンで 3〜8 秒（全部で 11 秒）。
+`settings.local.json` で `PostToolUse`（`Write|Edit`）と `Stop` に足す。**登録しないと 1 本も
+回らない。** 拡張を触っていないターンは何もしないので伸びない。触ったターンで 3〜8 秒
+（全部で 9.5〜11.5 秒）。
+
+**これで気づけるのは「同じ機械で 1 回回して落ちること」だけ。** issue #89 が挙げた中心の懸念
+（混み具合で結果が変わる失敗）には効かない。そこに効くのは CI（道 1）か、同じテストを繰り返す
+枝で、どちらも入れていない。ADR-0061 の「得たもの・失ったもの」に書いてある。
 
 検査もテストも、通らないと exit 2 で差し戻される。うるさければ hooks から外す。
 
