@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readRules } from "../../src/core/rules-doc.js";
-import { NONCE, page, rulesHtml, rulesScript } from "../helpers/rules.js";
+import { NONCE, page, rulesHtml } from "../helpers/rules.js";
+import { screenScript } from "../helpers/bundle.js";
 
 const RULES = `version: 1
 deny:
@@ -22,7 +23,7 @@ function html(): string {
 
 /** 束ねた画面を除いた入れ物。外を読んでいないことは、拡張が書いたところだけを見て確かめる */
 function shell(rendered: string): string {
-  return rendered.split(rulesScript()).join("（束ねた画面）");
+  return rendered.split(screenScript("rules")).join("（束ねた画面）");
 }
 
 test("CB-T48 ルール設定画面は外部資源を読まず、nonce で自分のスタイルとスクリプトだけを許す", () => {
@@ -49,7 +50,7 @@ test("CB-T49 埋め込む中身は JSON で、文面の < は実体にして scr
 // 中身の型は tsconfig.webview.json が見るので、ここで見るのは入れ方だけ。
 test("CB-T70 束ねた画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
   const rendered = rulesHtml({ kind: "page", page: page() });
-  assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${rulesScript()}\n</script>`));
+  assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${screenScript("rules")}\n</script>`));
   assert.match(rendered, /<div id="root"><\/div>/);
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });

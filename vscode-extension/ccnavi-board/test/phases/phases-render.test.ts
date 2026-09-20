@@ -4,11 +4,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NONCE, page, phasesHtml, phasesScript } from "../helpers/phases.js";
+import { NONCE, page, phasesHtml } from "../helpers/phases.js";
+import { screenScript } from "../helpers/bundle.js";
 
 /** 束ねた画面を除いた入れ物。外を読んでいないことは、拡張が書いたところだけを見て確かめる */
 function shell(rendered: string): string {
-  return rendered.split(phasesScript()).join("（束ねた画面）");
+  return rendered.split(screenScript("phases")).join("（束ねた画面）");
 }
 
 test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSON で埋め込む", () => {
@@ -29,7 +30,7 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
 
 test("CB-T121 束ねた画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
   const rendered = phasesHtml({ kind: "page", page: page() });
-  assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${phasesScript()}\n</script>`));
+  assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${screenScript("phases")}\n</script>`));
   assert.match(rendered, /<div id="root"><\/div>/);
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });

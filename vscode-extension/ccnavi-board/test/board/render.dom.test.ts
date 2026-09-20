@@ -2,7 +2,8 @@
  * ボード画面が何を描くか。React の画面を happy-dom で動かし、出来上がった DOM を見る。
  * 操作の続き（畳む・絞り込み・承認の送り先）は board.dom.test.ts。
  *
- * CSS は画面の中に文字列で入っているので、規則そのものを見たいところは HTML を見る。
+ * CSS は束ねた 1 本が `<style nonce>` に入っているので、規則そのものを見たいところは
+ * `flatStyle()`（1 行に潰した CSS）を見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -10,12 +11,18 @@ import { buildBoard } from "../../src/core/board.js";
 import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 import { NONCE, approvePreview, boardPage, openBoard, openPage } from "../helpers/board.js";
+import { flatStyle } from "../helpers/bundle.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement } from "happy-dom" with { "resolution-mode": "import" };
 
-/** 見本のボードの HTML。CSS と nonce を文字列で見るときに使う */
+/** 見本のボードの HTML。nonce を文字列で見るときに使う */
 function html(): string {
   return boardPage({ kind: "board", board: buildBoard(fixture()) });
+}
+
+/** 見本のボードの CSS（1 行に潰したもの）。規則そのものを見るときに使う */
+function css(): string {
+  return flatStyle(html());
 }
 
 function text(page: DomPage, selector: string): string {
@@ -209,7 +216,7 @@ test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固
     await page.close();
   }
   // ドラッグで付けたインラインの width より畳んだ状態を優先する
-  assert.match(html(), /\.column\.folded \{[^}]*width: auto !important/);
+  assert.match(css(), /\.column\.folded \{[^}]*width: auto !important/);
 });
 
 test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、その識別子を送る。上部の集計は絞らない", async () => {
@@ -292,8 +299,8 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（レビュー準備
     await page3.close();
   }
   // 狭いとき全文は画面の外に置くだけで、読み上げには残す。要約は見た目だけ
-  assert.match(html(), /\.phase-full \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
-  assert.doesNotMatch(html(), /\.phase-full \{ display: none/);
+  assert.match(css(), /\.phase-full \{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset\(50%\); white-space: nowrap; \}/);
+  assert.doesNotMatch(css(), /\.phase-full \{ display: none/);
 });
 
 test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人が動く状態だけで、属性は枠無しの行に出す", async () => {
@@ -345,22 +352,22 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
     await page.close();
   }
   // 属性は列からはみ出さない
-  assert.match(html(), /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
+  assert.match(css(), /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
   // フェーズ行は 1 段階 1 行。右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が
   // 0 になって消えるので、状態の列は 55% で止める。幅を測るのはフェーズ一覧自身
-  assert.match(html(), /\.phases \{[^}]*container-type: inline-size; \}/);
-  assert.match(html(), /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
-  assert.match(html(), /\.phase-name \{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
-  assert.doesNotMatch(html(), /\.phase \{[^}]*minmax\(0, auto\)/);
+  assert.match(css(), /\.phases \{[^}]*container-type: inline-size; \}/);
+  assert.match(css(), /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
+  assert.match(css(), /\.phase-name \{ min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
+  assert.doesNotMatch(css(), /\.phase \{[^}]*minmax\(0, auto\)/);
   // 狭いときは要約だけを見せ、480px 以上で全文に替わる
-  const wide = html().match(/@container \(min-width: 480px\) \{[^@]*?\n  \}/);
+  const wide = css().match(/@container \(min-width: 480px\) \{[^@]*?\} \}/);
   assert.ok(wide, "@container の塊がある");
   assert.match(wide[0], /\.phase-brief \{ display: none; \}/);
   assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
   // 止めているフェーズ行は段階名も右の状態も赤
-  assert.match(html(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
+  assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
   // 止めているカードの左線は承認待ちの左線より後に書き、勝つ
-  assert.ok(html().indexOf(".card.pending { border-left") < html().indexOf(".card.review-hold { border-left"));
+  assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
 
 test("CB-T13a 止めている間だけ段の名前を札に出す。レビューが済んで止まらなくなった子には出さない", async () => {

@@ -1,0 +1,8 @@
+/*
+ * 配点 1 件の行（`Factor.tsx`）。行の見出しの列と、点の桁揃え。
+ * 行・開閉・欄名の骨組みは設定 3 画面で同じ `../styles/list.css` が持つ。
+ */
+/* 1 行 = 開閉、id、points、当て方と値と文面 */
+.factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px minmax(0, 1fr); }
+.sum .sum-points { text-align: right; font-variant-numeric: tabular-nums; }
+.field > select.f-kind { max-width: 300px; }

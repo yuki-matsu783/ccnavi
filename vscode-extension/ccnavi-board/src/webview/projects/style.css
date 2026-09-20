@@ -1,0 +1,12 @@
+/*
+ * プロジェクト管理画面の CSS。**画面（React）と同じ置き場にあり、部品 1 つに CSS 1 本**
+ * （`Project.tsx` なら `Project.css`）。ここはその束ねで、`@import` を並べるだけ。部品を足したら、
+ * 同じ名前の CSS を足してここに 1 行足す。
+ *
+ * 束ねるのは `scripts/bundle-webview.js`（出口は `out/webview/projects.css`）。拡張ホストはそれを読んで
+ * `<style nonce>` に流し込む（`src/core/projects-render.ts`）。ADR-0066。
+ */
+@import "../styles/page.css";
+@import "./App.css";
+@import "./Project.css";
+@import "./Menu.css";

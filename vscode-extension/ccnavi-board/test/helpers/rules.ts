@@ -7,35 +7,18 @@
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import { parseHooks } from "../../src/core/hooks.js";
 import { readRules } from "../../src/core/rules-doc.js";
 import { renderRulesPage, type RenderOptions } from "../../src/core/rules-render.js";
 import type { RulesData, RulesPage } from "../../src/core/rules-view.js";
+import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-const SCRIPT_PATH = path.join(__dirname, "..", "..", "webview", "rules.js");
-
-let cached: string | undefined;
-
-/** 束ねた画面。無ければ何を通せばよいかを言う（テストだけ先に走らせたときに出る） */
-export function rulesScript(): string {
-  if (cached === undefined) {
-    if (!fs.existsSync(SCRIPT_PATH)) {
-      throw new Error(`画面が束ねられていない: ${SCRIPT_PATH}（node scripts/bundle-webview.js を通す）`);
-    }
-    cached = fs.readFileSync(SCRIPT_PATH, "utf8");
-  }
-  return cached;
-}
-
 /** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
 export function rulesHtml(data: RulesData, options: Partial<RenderOptions> = {}): string {
-  return renderRulesPage(data, { nonce: NONCE, script: rulesScript(), ...options });
+  return renderRulesPage(data, { nonce: NONCE, script: screenScript("rules"), style: screenStyle("rules"), ...options });
 }
 
 /** 見本のルール。deny 2 件（1 件は刻みと渡す文を持つ）と、初回だけ渡す文を持つ ask 1 件 */
