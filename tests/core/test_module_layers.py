@@ -1,28 +1,43 @@
-"""`ccnavi/` の依存の向きを、テストで守る。
+"""`ccnavi/` の import の向きを、テストで守る。
 
-パッケージは 33 モジュールの平屋で、層はディレクトリにも命名にも現れない。
-向きは慣習だけで保たれていて、逆流しても誰も言わない。ここに層の順序を
-1 か所だけ書き、その順序と食い違う import を名指しする。
+パッケージは平屋で、段はディレクトリにも命名にも現れない。向きは慣習だけで
+保たれていて、逆流しても誰も言わない。ここに段の順序を 1 か所だけ書き、
+その順序と食い違う import を名指しする。
+
+「層」と呼ばないのは、このリポジトリでは層が設定の 3 層（共通層・自身の層・
+プロジェクトの層）を指すため。ここで言う段はモジュールの読む順で、別のもの。
 
 読むのは `ccnavi/*.py` の import 文だけ。実行ファイルは起動しないので速い。
 
 **関数の中の import も数える。** 循環は、頭の import を関数の中へ下ろすと
-消えたように見える（`ops.py` の `from .review import WIP_ROOT` がそれ）。
-`ast.walk` で全部拾うので、下ろしても隠れない。
+消えたように見える。`ast.walk` で全部拾うので、下ろしても隠れない。
 
-見るのは 3 つ。
+見るのは 5 つ。
 
-1. どのモジュールも層をちょうど 1 つ持つ。1 本足したら、どの層かを決めさせる
-2. import の行き先は、同じ層か下の層。上を向いた 1 本を名指しする
-3. 循環は `KNOWN_KNOTS` に書いた 2 組だけ。**多くても少なくても落とす。**
+1. どのモジュールも段をちょうど 1 つ持つ。1 本足したら、どの段かを決めさせる
+2. パッケージは平屋のまま。サブパッケージができると、2〜4 の目が届かなくなる
+3. import の行き先は、同じ段か下の段。上を向いた 1 本を名指しする
+4. 循環は `KNOWN_KNOTS` に書いた 2 組だけ。**多くても少なくても落とす。**
    ほどけたら一覧から消す、が要るようにしてある。消し忘れた一覧は、
    次に同じ場所が絡まったときに何も言わなくなる
+5. 行き先を import 文から隠す綴りを使っていない
 
-層の中での import は自由にしてある。層は「どちらが先に読めるか」の順序で、
-同じ層の中の結び付きは 3 番目が見る。
+段の中での import は自由にしてある。段は「どちらが先に読めるか」の順序で、
+同じ段の中の結び付きは 4 番目が見る。**同じ段どうしの事故（たとえば判定が
+チケットを動かし始める形）は、この番犬では止まらない。**
+
+**5 番目が要るのは、上の 4 つが import 文しか読まないから。**
+`importlib.import_module("ccnavi.judge")` と、ドットの無い `import ccnavi` に
+続く `ccnavi.judge.…` は、行き先が import 文に残らないので 1 本も見つからない。
+どちらも `ccnavi/` では 1 度も使っていないので、綴りごと止めるほうが安い。
+**証明ではない。** `getattr` や `exec` で組み立てれば、いまでも隠せる。
+そこまで塞ぐには import を実行時に捕まえるしかなく、この速さを手放すことになる。
 
 `main.py`（PyInstaller の入口）は `ccnavi/` の外なのでここには入らない。
 中身は `__main__.py` と同じ 2 行で、`tests/core/test_entry.py` が見ている。
+
+`core` はいつも回るので（`.claude/skills/commit/references/test-groups.md`）、
+`ccnavi/*.py` を触ったコミットでは必ずここも走る。
 """
 
 from __future__ import annotations
@@ -35,15 +50,18 @@ from tests import ROOT
 
 PACKAGE = os.path.join(ROOT, "ccnavi")
 
-# 層は下から上へ。下の層は上の層を知らない。
+# 段は下から上へ。下の段は上の段を知らない。
 #
-# いまの形をそのまま写したもので、設計として先に引いた線ではない。効くのは
-# 「ここから先は崩さない」という向きで、層をまたぐ付け替えをするときは、
-# この表を先に直してから動かす（直さずに通ったなら、それは逆流していない）。
-LAYERS: tuple[tuple[str, str, frozenset[str]], ...] = (
+# **いまの依存の深さを写したもので、意味で先に引いた線ではない。** 設計書の章立て
+# （ルール・実行前・実行後・チケット）で切ると双方向の辺が残って段にならないので、
+# 深さで切ってある。注記はその段に何が居るかの説明であって、そこへ置く根拠ではない。
+#
+# 段をまたぐ付け替えをするなら、この表を先に直してから動かす。直さずに通ったなら、
+# それは逆流していない。表を動かすときは、なぜその向きが正しいかをコミットに書く。
+TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "base",
-        "素材。副作用の無い部品と、素の入出力",
+        "素材。同じパッケージのどのモジュールも読まない",
         frozenset(
             {
                 "__init__",
@@ -59,32 +77,45 @@ LAYERS: tuple[tuple[str, str, frozenset[str]], ...] = (
             }
         ),
     ),
-    ("read", "読み手。設定・git・ルールを読む", frozenset({"gitstate", "modes", "rules"})),
+    (
+        "read",
+        "素材だけで足りる読み手。git とルールと動作モード",
+        frozenset({"gitstate", "modes", "rules"}),
+    ),
     (
         "state",
-        "状態。作業ツリーとチケットの、いまの形",
+        "作業ツリーとチケットの、いまの形を読む",
         frozenset({"builtin", "ctxfile", "risk", "selfguard", "ticket"}),
     ),
-    ("layer", "層。3 層の和を組む", frozenset({"phasetypes", "ruleload"})),
-    ("work", "承認とフェーズと、それに添える文面", frozenset({"approval", "phase", "reasons"})),
-    ("decide", "判定と、チケット・レビューの操作", frozenset({"judge", "ops", "post", "review"})),
+    ("compose", "設定を読んで、判定の材料に畳む", frozenset({"phasetypes", "ruleload"})),
+    (
+        "work",
+        "承認済みチケットとフェーズと、それに添える文面",
+        frozenset({"approval", "phase", "reasons"}),
+    ),
+    (
+        "decide",
+        "判定と、チケット・レビューを動かす操作",
+        frozenset({"judge", "ops", "post", "review"}),
+    ),
     (
         "entry",
-        "入口と診断。ここを import するものは無い",
+        "入口と診断。下の段からは読まれない",
         frozenset({"cli", "diagnose", "events", "lint", "subagent", "__main__"}),
     ),
 )
 
-# 残っている循環。ほどく提案は出したうえで、いまは既知として通す。
+# 残っている循環。いまは既知として通す。
 #
-# - approval → reasons → phase → approval
-#   承認済みチケットの走査（approval）と、フェーズの状態（phase）が互いを読む。
-#   文面（reasons）が phase を読むので、輪は 3 本で閉じる
+# - approval ↔ phase
+#   承認済みチケットの走査（approval）と、フェーズの状態（phase）が互いを直に読む。
+#   これが主の輪。文面（reasons）は approval から読まれて phase を読むので、
+#   顔ぶれとしては同じ組に入る
 # - ops ↔ review
 #   `ops` が `review` の置き場の綴りを関数の中で引き、`review` が
 #   `ops.close_problems` と `ops.cancel` を呼ぶ
 #
-# 組は「名前を並べたもの」で持つ。輪の向きではなく、絡まっている顔ぶれを見る。
+# 組は「絡まっている顔ぶれ」で持つ。輪の向きや本数は見ない。
 KNOWN_KNOTS: frozenset[tuple[str, ...]] = frozenset(
     {
         ("approval", "phase", "reasons"),
@@ -92,9 +123,9 @@ KNOWN_KNOTS: frozenset[tuple[str, ...]] = frozenset(
     }
 )
 
-LAYER_ORDER = {name: i for i, (name, _, _) in enumerate(LAYERS)}
-LAYER_OF = {mod: name for name, _, mods in LAYERS for mod in mods}
-LAYER_NOTE = {name: note for name, note, _ in LAYERS}
+TIER_ORDER = {name: i for i, (name, _, _) in enumerate(TIERS)}
+TIER_OF = {mod: name for name, _, mods in TIERS for mod in mods}
+TIER_MEANING = " / ".join(f"{name}: {note}" for name, note, _ in TIERS)
 
 
 def modules() -> list[str]:
@@ -102,23 +133,39 @@ def modules() -> list[str]:
     return sorted(f[:-3] for f in os.listdir(PACKAGE) if f.endswith(".py"))
 
 
+def subpackages() -> list[str]:
+    """`ccnavi/` の下のディレクトリ。平屋の前提が崩れていないかを見る。"""
+    return sorted(
+        name
+        for name in os.listdir(PACKAGE)
+        if name != "__pycache__" and os.path.isdir(os.path.join(PACKAGE, name))
+    )
+
+
+def parse(module: str) -> ast.Module:
+    with open(os.path.join(PACKAGE, module + ".py"), encoding="utf-8") as f:
+        return ast.parse(f.read())
+
+
 def imports_of(module: str, known: set[str]) -> set[str]:
     """そのモジュールが import している、同じパッケージのモジュール。
 
-    頭のものも関数の中のものも同じに数える。`from . import a, b` と
-    `from .a import x` と `from ccnavi.a import x` の 3 通りを拾う。
-    """
-    with open(os.path.join(PACKAGE, module + ".py"), encoding="utf-8") as f:
-        tree = ast.parse(f.read())
+    頭のものも関数の中のものも同じに数える。拾うのは 4 通り。
 
+        from . import approval, audit      from .modes import EXIT_OK
+        from ccnavi import settings        from ccnavi.modes import EXIT_OK
+
+    後ろの 2 つは `main.py` が使っている形。パッケージの中で同じ癖で書かれても
+    落ちないように、相対と同じに数える。
+    """
     found: set[str] = set()
-    for node in ast.walk(tree):
+    for node in ast.walk(parse(module)):
         if isinstance(node, ast.ImportFrom):
-            if node.level == 1 and node.module is None:
-                # from . import approval, audit, ...
+            if (node.level == 1 and node.module is None) or (
+                not node.level and node.module == "ccnavi"
+            ):
                 found |= {alias.name for alias in node.names}
             elif node.level == 1 and node.module:
-                # from .modes import EXIT_OK
                 found.add(node.module.split(".")[0])
             elif not node.level and node.module and node.module.startswith("ccnavi."):
                 found.add(node.module.split(".")[1])
@@ -129,6 +176,36 @@ def imports_of(module: str, known: set[str]) -> set[str]:
     return found & known
 
 
+def hiding_in(module: str) -> list[str]:
+    """そのモジュールで使われている、行き先を import 文から隠す綴り。
+
+    - `import ccnavi`（ドット無し）。`import ccnavi.judge` と違い、行き先が
+      import 文に出ない。使うときは `ccnavi.judge.…` という属性の参照になる
+    - `importlib` / `__import__` / `sys.modules`。行き先が文字列になる
+    """
+    found: list[str] = []
+    for node in ast.walk(parse(module)):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "ccnavi":
+                    found.append(f"{module}.py:{node.lineno} import ccnavi")
+                elif alias.name.split(".")[0] == "importlib":
+                    found.append(f"{module}.py:{node.lineno} import importlib")
+        elif isinstance(node, ast.ImportFrom):
+            if node.module and node.module.split(".")[0] == "importlib":
+                found.append(f"{module}.py:{node.lineno} from importlib import ...")
+        elif isinstance(node, ast.Name) and node.id == "__import__":
+            found.append(f"{module}.py:{node.lineno} __import__")
+        elif (
+            isinstance(node, ast.Attribute)
+            and node.attr == "modules"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "sys"
+        ):
+            found.append(f"{module}.py:{node.lineno} sys.modules")
+    return found
+
+
 def graph() -> dict[str, set[str]]:
     known = set(modules())
     return {mod: imports_of(mod, known) for mod in sorted(known)}
@@ -137,89 +214,83 @@ def graph() -> dict[str, set[str]]:
 def knots(edges: dict[str, set[str]]) -> set[tuple[str, ...]]:
     """互いに行き来できるモジュールの組（2 本以上のもの）。
 
-    Tarjan は再帰が深くなるので、素直に 2 度の深さ優先で求める（Kosaraju）。
-    モジュールは数十本なので、速さは問題にならない。
+    数十本しかないので、行ける先を広げきってから、行きと帰りの両方があるものを
+    集める。速い代わりに読みにくい手（Tarjan / Kosaraju）は要らない。
     """
-    order: list[str] = []
-    seen: set[str] = set()
+    reach = {mod: set(targets) for mod, targets in edges.items()}
+    growing = True
+    while growing:
+        growing = False
+        for mod in reach:
+            wider = set(reach[mod])
+            for target in reach[mod]:
+                wider |= reach.get(target, set())
+            if wider != reach[mod]:
+                reach[mod] = wider
+                growing = True
 
-    def walk(start: str, nexts: dict[str, set[str]], out: list[str]) -> None:
-        # 再帰にしないのは、深さではなく、落ちたときに読める形を選んだため。
-        stack = [(start, iter(sorted(nexts.get(start, ()))))]
-        seen.add(start)
-        while stack:
-            node, rest = stack[-1]
-            following = next(rest, None)
-            if following is None:
-                stack.pop()
-                out.append(node)
-            elif following not in seen:
-                seen.add(following)
-                stack.append((following, iter(sorted(nexts.get(following, ())))))
-
-    for mod in sorted(edges):
-        if mod not in seen:
-            walk(mod, edges, order)
-
-    backward: dict[str, set[str]] = {mod: set() for mod in edges}
-    for mod, targets in edges.items():
-        for target in targets:
-            backward[target].add(mod)
-
-    seen = set()
     groups: set[tuple[str, ...]] = set()
-    for mod in reversed(order):
-        if mod in seen:
-            continue
-        group: list[str] = []
-        walk(mod, backward, group)
+    for mod in edges:
+        group = tuple(
+            sorted(
+                other
+                for other in edges
+                if other == mod or (other in reach[mod] and mod in reach[other])
+            )
+        )
         if len(group) > 1:
-            groups.add(tuple(sorted(group)))
+            groups.add(group)
     return groups
 
 
-class ModuleLayersTest(unittest.TestCase):
+class ModuleTiersTest(unittest.TestCase):
     def setUp(self):
         self.modules = modules()
         # 綴りが変わったことに気づかずに「逆流なし」と言わないため。
         self.assertGreater(len(self.modules), 20, f"モジュールを数えられていない（{PACKAGE}）")
         self.edges = graph()
 
-    def test_every_module_sits_in_exactly_one_layer(self):
-        """どのモジュールも層をちょうど 1 つ持つ。"""
-        placed = [mod for name, _, mods in LAYERS for mod in sorted(mods)]
+    def test_every_module_sits_in_exactly_one_tier(self):
+        """どのモジュールも段をちょうど 1 つ持つ。"""
+        placed = [mod for _, _, mods in TIERS for mod in sorted(mods)]
         twice = sorted({mod for mod in placed if placed.count(mod) > 1})
-        self.assertEqual([], twice, "同じモジュールが 2 つの層にある（LAYERS）")
+        self.assertEqual([], twice, "同じモジュールが 2 つの段にある（TIERS）")
 
-        missing = [mod for mod in self.modules if mod not in LAYER_OF]
+        missing = [mod for mod in self.modules if mod not in TIER_OF]
         self.assertEqual(
             [],
             missing,
-            "層の決まっていないモジュールがある。LAYERS に足す。層の意味は "
-            + " / ".join(f"{name}: {note}" for name, note, _ in LAYERS),
+            "段の決まっていないモジュールがある。TIERS に足す。置き場は「import して"
+            f"いる先のうち一番高い段」と同じか、その 1 つ上。段の意味は {TIER_MEANING}",
         )
 
-        phantom = sorted(set(LAYER_OF) - set(self.modules))
-        self.assertEqual([], phantom, "LAYERS が、置かれていないモジュールを挙げている")
+        phantom = sorted(set(TIER_OF) - set(self.modules))
+        self.assertEqual([], phantom, "TIERS が、置かれていないモジュールを挙げている")
 
-    def test_no_module_imports_a_higher_layer(self):
-        """import の行き先は、同じ層か下の層。"""
-        upward: list[str] = []
-        for mod in sorted(self.edges):
-            here = LAYER_OF.get(mod)
-            if here is None:
-                continue  # 層が無いことは 1 つ目のテストが言う
-            for target in sorted(self.edges[mod]):
-                there = LAYER_OF.get(target)
-                if there is None:
-                    continue
-                if LAYER_ORDER[there] > LAYER_ORDER[here]:
-                    upward.append(f"{mod}({here}) -> {target}({there})")
+    def test_the_package_stays_flat(self):
+        """パッケージは平屋のまま。"""
+        self.assertEqual(
+            [],
+            subpackages(),
+            "`ccnavi/` にサブパッケージができている。この番犬は `ccnavi/*.py` しか"
+            "見ないので、中のモジュールは段を持たないまま素通りする。TIERS を"
+            "入れ子に直すか、平屋に戻す",
+        )
+
+    def test_no_module_imports_a_higher_tier(self):
+        """import の行き先は、同じ段か下の段。"""
+        upward = [
+            f"{mod}({TIER_OF[mod]}) -> {target}({TIER_OF[target]})"
+            for mod in sorted(self.edges)
+            if mod in TIER_OF
+            for target in sorted(self.edges[mod])
+            if target in TIER_OF and TIER_ORDER[TIER_OF[target]] > TIER_ORDER[TIER_OF[mod]]
+        ]
         self.assertEqual(
             [],
             upward,
-            "下の層が上の層を import している。呼ぶ側から材料を渡すか、"
-            "共通の部分を下の層へ出す。層そのものを組み替えるなら LAYERS を先に直す",
+            "下の段が上の段を import している。呼ぶ側から材料を渡すか、共通の部分を"
+            "下の段へ出す。段そのものを組み替えるなら TIERS を先に直す",
         )
 
     def test_only_the_known_knots_are_cyclic(self):
@@ -230,16 +301,28 @@ class ModuleLayersTest(unittest.TestCase):
         self.assertEqual(
             [],
             fresh,
-            "新しい循環ができている。片方向に直す（関数の中へ import を下ろすのは"
-            "隠すだけで、ここは同じに数える）",
+            "KNOWN_KNOTS に無い循環がある。新しくできたか、既知の輪の顔ぶれが"
+            "変わったか。片方向に直す（関数の中へ import を下ろすのは隠すだけで、"
+            "ここは同じに数える）",
         )
 
         gone = sorted(" ↔ ".join(group) for group in KNOWN_KNOTS - found)
         self.assertEqual(
             [],
             gone,
-            "既知の循環がほどけている。KNOWN_KNOTS から消す（残すと、次に同じ場所が"
-            "絡まったときに何も言わなくなる）",
+            "KNOWN_KNOTS に書いた循環が見つからない。ほどけたか、顔ぶれが変わったか。"
+            "一覧を直す（残すと、次に同じ場所が絡まったときに何も言わなくなる）",
+        )
+
+    def test_no_module_hides_where_it_is_going(self):
+        """行き先を import 文から隠す綴りを使わない。"""
+        hidden = [spell for mod in self.modules for spell in hiding_in(mod)]
+        self.assertEqual(
+            [],
+            hidden,
+            "import の行き先が import 文に残らない書き方をしている。上の 4 つは"
+            "この形を 1 本も見つけられないので、綴りのほうを止める。どうしても"
+            "要るなら、なぜ要るかを添えてここに例外を書く",
         )
 
 
