@@ -577,7 +577,7 @@ DOM を組み立てない。残り 3 画面（ルール設定・リスク管理�
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
 **次の画面を React にするとき、使い回せるもの。** `webviewScript`（名前で読む）、`poster<M>()`、
-`core/screen-host.ts`（`screenHost` と `embedJson`）、`core/styles.ts`、`webview/vscode.ts`・
+`core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、`core/styles.ts`、`webview/vscode.ts`・
 `webview/initial.ts`・`webview/appearance.ts`、テストの土台（`test/helpers/dom.ts`）。
 画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS・`ready` を受けて渡し直す数行・
 テストの入口（`test/helpers/board.ts`・`projects.ts` に相当するもの）。プロジェクト管理を 2 画面目に
@@ -591,12 +591,21 @@ DOM を組み立てない。残り 3 画面（ルール設定・リスク管理�
 | 回すものの決まり方 | 触ったファイルが**どの画面の束ねに入るか**を import の閉包で見る（置き場の綴りでは決めない。画面をまたぐ import が 1 本入っただけで、直したのに回らない側に外れるため）。どの画面にも入らないもの（`webview/vscode.ts` など）は全画面に効くと見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
 | 契約に置く型 | 画面に渡す形（`ProjectsPage` のような）は契約の側（`*-view.ts`）に置く。`core/` の判定のファイルに置いたままだと、Webview がそこから `node:path` を読むファイル（`commands.ts` など）を辿って型検査が落ちる |
 
-**そのままでは使えないもの。**
+**段取りは 2 系統ある。パネルの `retainContextWhenHidden` と対で選ぶ**（ADR-0062）。
 
-- `core/screen-host.ts` は `retainContextWhenHidden` が**偽**の画面のためのもの。ルール設定・リスク管理・
-  フェーズ管理は編集の途中を持つので真にしてあり、裏にいる間に入れ物ごと入れ直すと打ちかけの内容が消える。
-  これらを移すときは、保持する画面の段取り（裏でも `postMessage` を通し、入れ直さない）を足すか、
-  編集の途中を Webview の state に逃がして偽に変えるかの判断が要る
+| パネル | 作るもの | 裏に回ったとき |
+|---|---|---|
+| `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost(surface, render)` | 画面は捨てられる。入れ物ごと入れ直す |
+| `retainContextWhenHidden: true`（ルール設定・リスク管理・フェーズ管理） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
+
+返る形（`ScreenHost<D>`）は同じで、以降の呼び方（`send` / `post` / `ready` / `hidden`）も画面の側も
+変わらない。**取り違えても型では止まらない。** 保持する画面に `screenHost` を当てると、裏にいる間の
+入れ直しで打ちかけの内容が消える。保持しない画面に `retainedHost` を当てると、捨てられた画面へ
+送り続けて中身が古いまま止まる。
+
+保持する画面に中身（`data`）を渡すのは、**画面の編集を捨ててよいときだけ**（人が「再読込」を押した、
+保存や作成が通って中身が入れ替わった）。監視がファイルの変化に気づいても渡さず、帯（`changed`）を
+出して人に決めさせる。
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
