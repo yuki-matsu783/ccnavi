@@ -235,7 +235,12 @@ def ran_by(runner: str, inner: str) -> str:
 
     元の形（`env rm -f …`）だけを見た読み手には、ルールのどこが当たったのかが分からない。
     ルールは `rm` について書かれていて、`env` については何も言っていないので。
+
+    `cd` で移った先から見た綴りに当たったときも同じで、書いた綴り（`rm settings.json`）には
+    当たったルールの名前が出てこない。どこへ書こうとしているかを綴りで示す。
     """
+    if runner == shellread.MOVED:
+        return f"`cd` で移った先から見ると `{_one_line(inner)}` で、そこに当たりました。"
     return f"`{_one_line(runner)}` が実行する `{_one_line(inner)}` に当たりました。"
 
 

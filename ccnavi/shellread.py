@@ -60,6 +60,10 @@ from dataclasses import dataclass, field
 #
 # 実際のコマンドラインはこの文字を運べないので、入力の側がこれを騙ることはできない。
 # read() が入力から取り除いて、その前提を保つ。
+# `cd` で移った先から見たコマンドの層に付ける、実行役のコマンドの名前。
+# 実行役のコマンドの一覧（_RUNNERS）に `cd` は無いので、この名前は重ならない。
+MOVED = "cd"
+
 SEP = "\x00"
 WORD_SEP = "\x01"
 
@@ -86,6 +90,9 @@ REASON_UNTERMINATED_SUBST = "unterminated-substitution"
 REASON_AMBIGUOUS_SUBST = "ambiguous-substitution"
 # バッククォート。中のエスケープの規則を持たず、見つけたところで読むのをやめる。
 REASON_BACKQUOTE = "backquote"
+# `cd` の行き先が読めない（引数なし・`cd -`・変数やグロブを含む綴り・`pushd`）。
+# 後ろの相対パスがどこに落ちるか決まらないので、そこから先は読めない。
+REASON_CHDIR = "unreadable-chdir"
 
 # ---- 書き直しを求める形
 #
@@ -182,6 +189,30 @@ _TAKES_CODE_FLAG = {
     "su": ("-c",),
     "find": ("-exec", "-execdir", "-ok", "-okdir"),
 }
+
+# ---- `cd` が移った先
+#
+# 守りもルールも、当てる先は語の綴り。`cd` で入ってから書くと、行き先の綴りから
+# ディレクトリの名前が消えるので当たらない（`cd .claude && echo x > settings.json`）。
+# だから `cd` の行き先を読んで、後ろのコマンドの引数の綴りに継ぎ足す（ADR-0066）。
+#
+# 継ぎ足すのは引数だけで、コマンドの位置の語には足さない。止める側のルールの多くは
+# 名前をコマンドの頭に固定して書かれており（`(^|\x00)(mv|rm|tee|…)`）、名前に継ぎ足すと
+# その固定が外れて、守りが増えるどころか消える。
+
+# 行き先を綴りに持たないもの。読めない行き先として扱う。
+_PUSHD = frozenset({"pushd", "popd"})
+
+# `cd` のオプション。どれも値を取らない。
+_CD_OPTIONS = frozenset({"-L", "-P", "-e", "-@"})
+
+# 綴りの中にあると、行き先が実行するときまで決まらない文字。変数と置換（走査が `$` 1 文字に
+# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。先頭の `~` は別に見る。
+_PATH_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
+
+# 絶対パス。継ぎ足さずにそのまま使う。Windows のドライブ文字も絶対。
+_ABSOLUTE = re.compile(r"[\\/]|[A-Za-z]:[\\/]")
+
 
 # ---- 中で実行されるコマンド
 #
@@ -326,6 +357,11 @@ class Reading:
     # ような形こそ、中で何が実行されるかを見たい。閉じない引用と閉じない
     # ヒアドキュメントのように、走査か shlex が止まった形では作らない。
     unwrapped: str = ""
+    # `cd` で移った先から見たコマンド。SEP でつないだもの。綴りの変わったコマンドだけが並ぶ。
+    # text には足さない。継ぎ足した綴りで当たる形を増やすだけにして、いま当たっている形を
+    # 動かさないため（ADR-0066）。呼び手は中で実行されるコマンドの層と同じに扱い、
+    # 止める側のルール（deny と ask）にだけ当てる。degraded のときは空。
+    moved: str = ""
     # 層ごとの、その層を実行する実行役のコマンドの名前。unwrapped と同じ並び。
     # 文面で「`env` が実行する `rm x`」と言うために持つ。
     runners: list[str] = field(default_factory=list)
@@ -871,6 +907,10 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
         # `$'…\'…'` のように 2 つの読みが割れる形。読み切れないものとして扱う。
         return Reading(degraded=True, reason=REASON_UNTERMINATED, rewrites=rewrites), []
 
+    # `cd` が移った先から見た綴りを別に組む（ADR-0066）。元のトークン列は動かさない。
+    # 読めない行き先があれば moved は空で、理由が返る。
+    moved_tokens, chdir = _resolve_cd(tokens)
+
     commands = _split_commands(tokens)
     # `for select in` と `case coproc in` の語は変数名と調べる値で、予約語ではない。
     previous: list[str] = []
@@ -901,6 +941,11 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     if why:
         return Reading(degraded=True, reason=why, rewrites=rewrites), runnable
 
+    if chdir:
+        # 行き先の読めない `cd` のあとで何かが実行される。そこから後ろの相対パスが
+        # どこに落ちるか決まらないので、生の文字列に落とす（ADR-0011）。
+        return Reading(degraded=True, reason=chdir, rewrites=rewrites), runnable
+
     # 中身は外側の後ろにつなぐ。置換のあった位置で挟むと外側のコマンドが 2 本に割れ、
     # `find $(pwd) -name x -delete` の -delete が find と別のコマンドに見える。
     # 後ろに置けば、`[^\x00]*` で「同じコマンドの中」を見るルールが外側を丸ごと見られ、
@@ -918,6 +963,11 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     reading = Reading(
         text=SEP.join(t for t in texts if t),
         bare=SEP.join(t for t in bares if t),
+        moved=(
+            _render(_moved(commands, _split_commands(moved_tokens)))
+            if moved_tokens is not tokens
+            else ""
+        ),
         rewrites=rewrites,
     )
     return reading, runnable
@@ -1004,6 +1054,198 @@ def _split_commands(tokens: list[str]) -> list[list[str]]:
     if current:
         commands.append(current)
     return commands
+
+
+def _resolve_cd(tokens: list[str]) -> tuple[list[str], str]:
+    """`cd` の行き先を、後ろのコマンドの引数の綴りに継ぎ足したトークン列を返す。
+
+    2 つめは読めなかった理由。行き先の読めない `cd` のあとでコマンドが実行されるなら、
+    元のトークン列をそのまま返して理由を付ける。呼び手はそれで縮退する（ADR-0011）。
+    そこで止めずに読み進めると、`cd -` の後ろの相対パスを、居ない場所のものとして
+    判定することになる。
+
+    サブシェル `( )` は行き先を出入りで戻す。`case` の `)` も同じトークンで来るが、
+    そちらは重ねた行き先が無いところで閉じるので、何も戻さない。
+    """
+    out: list[str] = []
+    segment: list[str] = []
+    here: str | None = ""
+    stack: list[str | None] = []
+    ran_while_unknown = False
+    for token in tokens:
+        if token not in _OPERATORS:
+            segment.append(token)
+            continue
+        here, ran = _chdir(segment, here, out)
+        ran_while_unknown = ran_while_unknown or ran
+        segment = []
+        if token == "(":
+            stack.append(here)
+        elif token == ")" and stack:
+            here = stack.pop()
+        out.append(token)
+    here, ran = _chdir(segment, here, out)
+    if ran_while_unknown or ran:
+        return tokens, REASON_CHDIR
+    # 継ぎ足すものが無ければ元のリストをそのまま返す。呼び手はそれを見て、
+    # 移った先の組み立て（コマンドへの割り直しと組み直し）を丸ごと飛ばす。
+    # `cd` を含まないコマンドがほとんどなので、ここが毎回の値段になる。
+    return (out if out != tokens else tokens), ""
+
+
+def _moved(commands: list[list[str]], resolved: list[list[str]]) -> list[list[str]]:
+    """移った先から見た綴りが、書かれた綴りと変わったコマンドだけ。
+
+    語の数は変わらないので並びは 1 対 1 で対応する。対応しなければ何も返さない。
+    継ぎ足した綴りは当てる先を増やすためのもので、数が合わないまま並べると、
+    どのコマンドのことを言っているのか分からない文面になる。
+    """
+    if len(commands) != len(resolved):
+        return []
+    return [after for before, after in zip(commands, resolved, strict=True) if before != after]
+
+
+def _chdir(segment: list[str], here: str | None, out: list[str]) -> tuple[str | None, bool]:
+    """コマンド 1 本を、行き先を継ぎ足した形で out に足す。
+
+    返すのは、次のコマンドが居る場所（読めなければ None）と、行き先が読めないまま
+    コマンドが実行されたか。
+    """
+    if not segment:
+        return here, False
+    # 予約語はそれだけで 1 本に切られる語なので、後ろがコマンドの先頭になる
+    # （`then rm x`）。`for` `case` `select` の後ろの 1 本は変数名と調べる値で、
+    # パスではない。
+    i = 0
+    while i < len(segment) and segment[i] in _RESERVED:
+        out.append(segment[i])
+        if segment[i] in _TAKES_A_WORD:
+            out.extend(segment[i + 1 :])
+            return here, False
+        i += 1
+    rest = segment[i:]
+    if not rest:
+        return here, False
+
+    k = _name_index(rest)
+    name = _base(rest[k]) if k < len(rest) else ""
+    if name == "cd":
+        at = _destination(rest, k)
+        if at < 0:
+            out.extend(rest)
+            return None, False
+        if _ABSOLUTE.match(rest[at]):
+            # 行き先が絶対パスなら、いま居る場所が読めなくても、そこから先は読める。
+            moved: str | None = _normal(rest[at])
+        else:
+            moved = _under(here, rest[at]) if here is not None else None
+        out.extend(rest if moved is None else rest[:at] + [moved] + rest[at + 1 :])
+        return moved, False
+    if name in _PUSHD:
+        out.extend(rest)
+        return None, False
+    if here is None:
+        # 行き先を読めないまま、何かが実行される。
+        out.extend(rest)
+        return here, True
+    if not here or name in _RUNNERS or _classify([rest]):
+        # 移っていない（継ぎ足すものが無い）。または、中で実行されるコマンドの名前が
+        # どの語に立つかがオプションの読み方で決まるもの（`env` `sudo` `timeout`）と、
+        # 文字列をコードとして実行するもの（`sh -c` `eval` `xargs`）。どちらも
+        # 継ぎ足す先を取り違えると名前に付くので、この 1 本には継ぎ足さない。
+        # 後者は _classify がこの読み全体を縮退させるので、判定は生の文字列で下る。
+        out.extend(rest)
+        return here, False
+    out.extend(_with_here(rest, k, here))
+    return here, False
+
+
+def _with_here(rest: list[str], k: int, here: str) -> list[str]:
+    """コマンド 1 本の引数に、いま居る場所を継ぎ足す。
+
+    継ぎ足さないのは、コマンドの位置までの語（代入とリダイレクト）、コマンドの名前、
+    オプション、代入、絶対パス、そして `2>&1` のようにファイルではない fd の番号。
+    """
+    out = rest[: k + 1]
+    j = k + 1
+    while j < len(rest):
+        width = _redirect_width(rest, j)
+        if not width:
+            out.append(_under(here, rest[j]))
+            j += 1
+            continue
+        # リダイレクトは `fd? 演算子 行き先` の塊。パスなのは行き先だけで、
+        # `>&` `<&` のように `&` で閉じる演算子の後ろは fd の番号。
+        end = min(j + width, len(rest))
+        target = j + width - 1
+        for m in range(j, end):
+            takes_path = m == target and not rest[target - 1].endswith("&")
+            out.append(_under(here, rest[m]) if takes_path else rest[m])
+        j = end
+    return out
+
+
+def _destination(rest: list[str], k: int) -> int:
+    """`cd` の行き先の語の位置。読み切れなければ -1。
+
+    読み切れないのは、引数なし（`$HOME` へ移る）、`cd -`（直前の場所）、`cd old new`
+    （綴りの置き換え）、先頭の `~`、変数・置換・グロブを含む綴り。
+    """
+    where: list[int] = []
+    j = k + 1
+    while j < len(rest):
+        width = _redirect_width(rest, j)
+        if width:
+            j += width
+            continue
+        where.append(j)
+        j += 1
+    i = 0
+    while i < len(where) and rest[where[i]] in _CD_OPTIONS:
+        i += 1
+    if i < len(where) and rest[where[i]] == "--":
+        i += 1
+    where = where[i:]
+    if len(where) != 1:
+        return -1
+    target = rest[where[0]]
+    # `-`（直前の場所）と、一覧に無いオプション。先頭の `~` は利用者の家で、
+    # 綴りから決まらない。変数・置換・グロブも同じ。
+    if not target or target.startswith(("-", "~")) or _PATH_EXPANDS.search(target):
+        return -1
+    return where[0]
+
+
+def _under(here: str | None, word: str) -> str:
+    """いま居る場所から見た綴りを、読みの起点から見た綴りに直す。
+
+    起点は、元のコマンドが打たれた場所。絶対パスとオプションと代入はそのまま返す。
+    """
+    if here is None or not here or not word:
+        return word
+    if _ABSOLUTE.match(word) or word.startswith("-") or _ASSIGNMENT_WORD.match(word):
+        return word
+    return _normal(here + "/" + word)
+
+
+def _normal(path: str) -> str:
+    """`.` と `..` を畳む。区切りはどちらの綴りも受け、`/` で返す。
+
+    先頭の区切り（絶対パス）と末尾の区切り（ディレクトリと書いた形）は残す。末尾を
+    落とすと、名前がそこで終わる形に当てる守り（`_END`）の当たり方が変わる。
+    起点より上に出る `..` は畳まずに残す。
+    """
+    parts: list[str] = []
+    for part in re.split(r"[\\/]", path):
+        if part in ("", "."):
+            continue
+        if part == ".." and parts and parts[-1] != "..":
+            parts.pop()
+            continue
+        parts.append(part)
+    lead = "/" if path[:1] in ("/", "\\") else ""
+    tail = "/" if path[-1:] in ("/", "\\") and parts else ""
+    return (lead + "/".join(parts) or lead or ".") + tail
 
 
 def _classify(commands: list[list[str]]) -> str:
@@ -1093,16 +1335,21 @@ def _expanded_names(commands: list[list[str]]) -> list[str]:
 
 def _command_name(command: list[str]) -> str:
     """コマンドの位置の語。前に置いた代入とリダイレクト（`FOO=1 >/dev/null cmd`）を飛ばす。"""
+    i = _name_index(command)
+    return command[i] if i < len(command) else ""
+
+
+def _name_index(command: list[str]) -> int:
+    """コマンドの位置の語が何番目か。無ければ語の数。"""
     i = 0
     while i < len(command):
         if _ASSIGNMENT_WORD.match(command[i]):
             i += 1
             continue
-        width = _redirect_width(command, i)
-        if not width:
-            return command[i]
-        i += width
-    return ""
+        if not _redirect_width(command, i):
+            return i
+        i += _redirect_width(command, i)
+    return len(command)
 
 
 def _redirect_width(command: list[str], i: int) -> int:
