@@ -2,8 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readPhases } from "../../src/core/phases-doc.js";
 import { renderPhasesPage, type PhasesPage } from "../../src/core/phases-render.js";
-import type { ProjectRow, ProjectsPage } from "../../src/core/projects.js";
-import { renderProjectsPage } from "../../src/core/projects-render.js";
 
 function phasesPage(overrides: Partial<PhasesPage> = {}): PhasesPage {
   return {
@@ -12,44 +10,6 @@ function phasesPage(overrides: Partial<PhasesPage> = {}): PhasesPage {
     exists: false,
     model: { version: null, form: { phases: [] }, problems: [] },
     lock: { locked: false, reason: "", doing: [] },
-    ...overrides,
-  };
-}
-
-function row(overrides: Partial<ProjectRow> = {}): ProjectRow {
-  return {
-    name: "lib",
-    root: "/ws/projects/lib",
-    rel: "projects/lib",
-    rulesRel: "projects/lib/.ccnavi/config/rules.yml",
-    rulesExists: true,
-    hasClaudeDir: false,
-    origin: "",
-    originKey: "",
-    worktrees: [],
-    tickets: 0,
-    doing: 0,
-    problems: [],
-    ...overrides,
-  };
-}
-
-function projectsPage(rows: readonly ProjectRow[], overrides: Partial<ProjectsPage> = {}): ProjectsPage {
-  return {
-    root: "/ws",
-    generatedAt: "2026-09-13T00:00:00+0900",
-    ticketsEnabled: true,
-    projectsDir: "/ws/projects",
-    projectsRel: "projects",
-    ignored: true,
-    lintError: "",
-    dirProblems: [],
-    rows,
-    strays: [],
-    workspaceWorktrees: [],
-    existingNames: rows.map((r) => r.name),
-    selfRulesRel: ".ccnavi/config/rules.yml",
-    selfRulesExists: true,
     ...overrides,
   };
 }
@@ -74,20 +34,6 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   assert.ok(common.includes('data-action="create">雛形でファイルを作る</button>'));
   assert.equal(embedded(common).editable, false);
   assert.ok(!common.includes('<div class="banner warn">'));
-});
-
-test("CB-T115 プロジェクト管理画面はカードと本体の枠からフェーズ管理を開ける。層の無いプロジェクトでは押せない", () => {
-  const html = renderProjectsPage(
-    projectsPage([row(), row({ name: "Self", rel: "projects/Self", rulesRel: "", rulesExists: false })]),
-    { nonce: "n" },
-  );
-  const cards = html.split('<li class="project').slice(1).map((c) => c.slice(0, c.indexOf("</li>")));
-  const [lib, reserved] = cards;
-  assert.match(lib, /data-action="open-phases" data-name="lib" title=/);
-  assert.match(reserved, /data-action="open-phases" data-name="Self" disabled /);
-  const workspace = html.slice(html.indexOf('<section class="workspace">'), html.indexOf("<footer"));
-  assert.match(workspace, /自身の層のフェーズの種類<\/span> <button type="button" class="action small" data-action="open-self-phases"/);
-  assert.match(html, /action === "open-self-phases"\) \{ vscode\.postMessage\(\{ type: "openSelfPhases" \}\)/);
 });
 
 test("CB-T116 無いファイル（空の本文）に種類を足して書き戻すと、version と種類を持つ読めるファイルになる", () => {

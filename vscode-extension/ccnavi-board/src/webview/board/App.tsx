@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
+import { applyAppearance } from "../appearance.js";
 import { post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
@@ -335,19 +336,4 @@ function Column({
       <div className="resizer" data-resize={column.state} title="ドラッグで幅を変える／ダブルクリックで戻す" onPointerDown={onPointerDown} onDoubleClick={() => onWidth(undefined)} />
     </section>
   );
-}
-
-/**
- * 見た目の切り替え。拡張ホストが `{ type: "appearance", value }` を送ると body のクラスだけを付け替える。
- * 中身は作り直さないので、開いているオーバーレイも絞り込みも消えない。
- */
-export function applyAppearance(value: unknown): void {
-  for (const name of Array.from(document.body.classList)) {
-    if (name.startsWith("ccnavi-claude-")) {
-      document.body.classList.remove(name);
-    }
-  }
-  if (value === "claude-light" || value === "claude-dark") {
-    document.body.classList.add(`ccnavi-${value}`);
-  }
 }

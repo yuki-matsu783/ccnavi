@@ -35,10 +35,29 @@ const NOT_GROUPS = new Set(["helpers", "fixtures"]);
 // ターンの終わりの hook は、これを差し戻しに数えず人へ言う。
 const NOT_READY = 3;
 
-// 画面（React）の束ねたものを読むテストの入口。これを辿るグループだけ、
-// tsconfig.webview.json の型の検査と esbuild の束ねが要る。画面を足して別の入口から
-// 読ませるなら、その入口もここに挙げる。
-const BUNDLE_ENTRIES = [path.join(TEST_DIR, "helpers", "board.ts")];
+// 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では辿れないので、
+// 画面とテストの結び付きだけは綴りの約束で決める。**表では持たない**（表は、画面を足したときに
+// 黙って古くなる。このファイルがグループの表を持たないのと同じ理由）。
+//
+//   画面      `src/webview/<名前>/main.tsx` があるもの（`scripts/bundle-webview.js` と同じ見つけ方）
+//   テスト    `test/helpers/<名前>.ts`（束ねたものを読む入口）と、同じ名前のグループ `test/<名前>/`
+//
+// これを辿るグループだけ、tsconfig.webview.json の型の検査と esbuild の束ねが要る。
+const WEBVIEW_DIR = path.join(ROOT, "src", "webview");
+
+/** 画面の一覧。`{ name, entry, helper }` を名前順で返す */
+function screens() {
+  return fs
+    .readdirSync(WEBVIEW_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      name: entry.name,
+      entry: path.join(WEBVIEW_DIR, entry.name, "main.tsx"),
+      helper: path.join(TEST_DIR, "helpers", `${entry.name}.ts`),
+    }))
+    .filter((screen) => fs.existsSync(screen.entry))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+}
 
 /** test/ の下のディレクトリ名。増やしても直すところは無い。 */
 function groupNames() {
@@ -117,13 +136,10 @@ function byName(a, b) {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }
 
-/** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
-function closureOf(group) {
-  const dir = path.join(TEST_DIR, group);
+/** 起点から import で辿り着くファイル全部（起点自身も含む）。 */
+function closureFrom(roots) {
   const seen = new Set();
-  // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
-  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが黙って回らない。
-  const stack = filesUnder(dir, (name) => name.endsWith(".ts") || name.endsWith(".tsx"));
+  const stack = [...roots];
   while (stack.length > 0) {
     const file = stack.pop();
     if (seen.has(file)) continue;
@@ -133,6 +149,25 @@ function closureOf(group) {
   return seen;
 }
 
+// 画面の束ねに入るファイル。触ったパス 1 つごとに取り直すと、画面の数だけ全体を歩き直す。
+const screenFileCache = new Map();
+
+/** 画面の束ねに入るファイル全部（入口から import で辿れるもの）。1 度取ったら覚えておく。 */
+function screenFiles(screen) {
+  const found = screenFileCache.get(screen.entry);
+  if (found !== undefined) return found;
+  const files = closureFrom([screen.entry]);
+  screenFileCache.set(screen.entry, files);
+  return files;
+}
+
+/** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
+function closureOf(group) {
+  // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
+  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが黙って回らない。
+  return closureFrom(filesUnder(path.join(TEST_DIR, group), (name) => name.endsWith(".ts") || name.endsWith(".tsx")));
+}
+
 /** グループ名 -> そのグループが読むファイルの集合。 */
 function closures() {
   const map = new Map();
@@ -140,11 +175,43 @@ function closures() {
   return map;
 }
 
-/** 束ねた画面を読むグループ（BUNDLE_ENTRIES を辿るもの）。 */
-function webviewGroups(map) {
-  return [...map.entries()]
-    .filter(([, files]) => BUNDLE_ENTRIES.some((entry) => files.has(entry)))
-    .map(([group]) => group);
+/**
+ * 束ねた画面を読むグループ。
+ *
+ * `rel`（触ったファイル）を渡すと、**その画面の束ねに入るファイルか** を閉包で見て絞る。
+ * 置き場の綴り（`src/webview/<名前>/` で始まるか）では決めない。画面をまたぐ import が
+ * 1 本でも入ると、直したのに回らない側（回すものが減る側）に外れるため。
+ *
+ * どの画面の閉包にも入らないもの（`src/webview/vscode.ts` のような共通の部品）は全部に効くと見る。
+ */
+function webviewGroups(map, rel) {
+  const all = screens();
+  const absolute = rel === undefined ? undefined : path.join(ROOT, rel);
+  const matched = absolute === undefined ? [] : all.filter((screen) => screenFiles(screen).has(absolute));
+  const wanted = matched.length === 0 ? all : matched;
+  const groups = groupsFor(wanted, map);
+  // 絞った先にグループが 1 つも無い（グループも入口も無い置き方をされている）。どれが読むか
+  // 決められないので、束ねを読むグループを全部返す。決められないときは多い側へ外す
+  if (groups.length === 0 && wanted !== all) {
+    return groupsFor(all, map);
+  }
+  return groups;
+}
+
+/** 画面の並びを、それを読むグループの並びにする。 */
+function groupsFor(wanted, map) {
+  const groups = new Set();
+  for (const screen of wanted) {
+    // その画面の束ねを読むテストを持つグループ
+    for (const [group, files] of map) {
+      if (files.has(screen.helper)) groups.add(group);
+    }
+    // 画面と同じ名前のグループは、テストの入口の綴りが約束と違っても必ず回す。
+    // ここが無いと、画面を足して `test/helpers/<名前>.ts` を作り忘れたときに、
+    // その画面のテストだけが黙って回らなくなる
+    if (map.has(screen.name)) groups.add(screen.name);
+  }
+  return [...groups].sort();
 }
 
 /**
@@ -176,13 +243,13 @@ function relativeToExtension(given) {
  * 何も読まないが `tsc` は見るファイル（拡張ホスト側の panel など）。
  */
 function callFor(rel, map) {
-  if (rel === null) return { groups: [], compile: false };
+  if (rel === null) return { groups: [], compile: false, webview: false };
 
   // 読み物と絵。コンパイルもテストも要らない。
-  if (rel.endsWith(".md") || rel.startsWith("media/")) return { groups: [], compile: false };
+  if (rel.endsWith(".md") || rel.startsWith("media/")) return { groups: [], compile: false, webview: false };
   // 生成物と依存の置き場。触ったと数えない。
   if (rel.startsWith("out/") || rel.startsWith("node_modules/")) {
-    return { groups: [], compile: false };
+    return { groups: [], compile: false, webview: false };
   }
 
   const all = [...map.keys()];
@@ -194,11 +261,11 @@ function callFor(rel, map) {
     /^tsconfig[^/]*\.json$/.test(rel) ||
     rel.startsWith("scripts/")
   ) {
-    return { groups: all, compile: true };
+    return { groups: all, compile: true, webview: false };
   }
 
   // 固定データは import ではなく実行時に名前で開くので、辿れない。全部に効くと見る。
-  if (rel.startsWith("test/fixtures/")) return { groups: all, compile: true };
+  if (rel.startsWith("test/fixtures/")) return { groups: all, compile: true, webview: false };
 
   const absolute = path.join(ROOT, rel);
   const groups = all.filter((group) => map.get(group).has(absolute));
@@ -206,11 +273,14 @@ function callFor(rel, map) {
   // 画面（React）は esbuild が束ね、テストは束ねたものを読む。その道は import では
   // 辿れないので、束ねたものを読むグループを足す。辿れたぶん（テストが画面のファイルを
   // 直に import している場合）は落とさずに和を取る。
+  // 画面のファイルは `tsconfig.json` が exclude するので、`tsconfig.test.json` では型を見ない。
+  // esbuild も型を見ない。回すグループが 0 本でも、画面の型の検査だけは必ず通す
+  // （通さないと「型の検査だけ通しました」と出るのに何も見ていないターンができる）
   if (rel.startsWith("src/webview/")) {
-    return { groups: [...new Set([...groups, ...webviewGroups(map)])].sort(), compile: true };
+    return { groups: [...new Set([...groups, ...webviewGroups(map, rel)])].sort(), compile: true, webview: true };
   }
 
-  return { groups, compile: true };
+  return { groups, compile: true, webview: false };
 }
 
 /** 触ったパスの一覧から、回すものを決める。 */
@@ -218,12 +288,14 @@ function planFor(paths) {
   const map = closures();
   const groups = new Set();
   let compile = false;
+  let webview = false;
   for (const given of paths) {
     const call = callFor(relativeToExtension(given), map);
     if (call.compile) compile = true;
+    if (call.webview) webview = true;
     for (const group of call.groups) groups.add(group);
   }
-  return finish([...groups].sort(), compile, map);
+  return finish([...groups].sort(), compile, map, webview);
 }
 
 function planForGroups(names) {
@@ -234,15 +306,16 @@ function planForGroups(names) {
     console.error(`知らないグループ: ${unknown.join(" ")}（ある: ${[...known].join(" ")}）`);
     process.exit(2);
   }
-  return finish([...new Set(names)].sort(), true, map);
+  return finish([...new Set(names)].sort(), true, map, false);
 }
 
-function finish(groups, compile, map) {
+function finish(groups, compile, map, webview) {
   const needsWebview = webviewGroups(map);
   return {
     groups,
     compile: compile || groups.length > 0,
-    webview: groups.some((group) => needsWebview.includes(group)),
+    // 触ったものが画面なら（`webview`）、回すグループが無くても型は見る
+    webview: webview || groups.some((group) => needsWebview.includes(group)),
   };
 }
 

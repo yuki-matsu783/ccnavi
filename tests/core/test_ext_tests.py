@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 import subprocess
@@ -44,13 +45,17 @@ def groups_on_disk():
     return sorted(found)
 
 
-def plan(*paths):
-    """`--plan` の 1 行を読み、辞書にする。"""
+# `--plan` が読むもの。写しを作って試すときはこれだけあればよい（node_modules も out も読まない）。
+PLAN_INPUTS = ("scripts", "src", "test", "package.json", "tsconfig.test.json")
+
+
+def plan(*paths, root=BOARD):
+    """`--plan` の 1 行を読み、辞書にする。`root` を渡すとその写しの runner を回す。"""
     result = subprocess.run(
-        [NODE, RUNNER, "--plan", "--for", *paths],
+        [NODE, os.path.join(root, "scripts", "test-groups.js"), "--plan", "--for", *paths],
         capture_output=True,
         text=True,
-        cwd=BOARD,
+        cwd=root,
         check=True,
     )
     fields = dict(part.split("=", 1) for part in result.stdout.split())
@@ -59,6 +64,27 @@ def plan(*paths):
         "compile": fields["compile"] == "yes",
         "webview": fields["webview"] == "yes",
     }
+
+
+def write(path, text, mode="w"):
+    with open(path, mode, encoding="utf-8") as handle:
+        handle.write(text)
+
+
+@contextlib.contextmanager
+def copied_board():
+    """`--plan` が読むものだけを写した拡張のルート。中で好きに壊してよい。"""
+    with tempfile.TemporaryDirectory() as temp:
+        root = os.path.join(temp, "board")
+        os.makedirs(root)
+        for name in PLAN_INPUTS:
+            source = os.path.join(BOARD, name)
+            target = os.path.join(root, name)
+            if os.path.isdir(source):
+                shutil.copytree(source, target)
+            else:
+                shutil.copy2(source, target)
+        yield root
 
 
 @unittest.skipIf(NODE is None, "node が無い")
@@ -82,6 +108,82 @@ class ExtTestPlanTest(unittest.TestCase):
         # 辿れないので、束ねたものを読むグループが挙がり、束ねる工程も入る。
         got = plan("src/webview/board/App.tsx")
         self.assertIn("board", got["groups"])
+        self.assertTrue(got["webview"])
+
+    def test_one_screen_does_not_call_the_other_screens_group(self):
+        # 画面が 2 つ以上あるとき、1 つ直しただけで全部の画面のテストを回さない。
+        # 画面ごとの置き場を runner が知っている（BUNDLE_ENTRIES の screen）。
+        self.assertNotIn("projects", plan("src/webview/board/App.tsx")["groups"])
+        got = plan("src/webview/projects/App.tsx")
+        self.assertIn("projects", got["groups"])
+        self.assertNotIn("board", got["groups"])
+        self.assertTrue(got["webview"])
+
+    def test_an_import_across_screens_still_calls_the_other_screens_group(self):
+        # 置き場の綴りだけで絞ると、画面をまたぐ import が 1 本入っただけで
+        # 「直したのに回らない」側に外れる。閉包で見ているので外れない。
+        with copied_board() as root:
+            crossing = os.path.join(root, "src", "webview", "projects", "App.tsx")
+            # 行頭から始まるように改行を先に置く。行の途中に付くと runner の正規表現に
+            # 当たらず、穴が空いていても通ってしまう（偽陰性）
+            write(crossing, '\nimport "../board/state.js";\n', mode="a")
+            got = plan("src/webview/board/state.ts", root=root)
+        self.assertIn("board", got["groups"])
+        self.assertIn("projects", got["groups"], "projects の束ねにも入るので、projects も回る")
+
+    def test_a_new_screen_calls_its_own_group_even_without_a_test_helper(self):
+        # 画面を足して `test/helpers/<名前>.ts` を作り忘れても、同じ名前のグループは回す。
+        # ここが無いと、その画面のテストだけが黙って回らない（pnpm test でしか気づけない）。
+        with copied_board() as root:
+            screen = os.path.join(root, "src", "webview", "fakescreen")
+            group = os.path.join(root, "test", "fakescreen")
+            os.makedirs(screen)
+            os.makedirs(group)
+            write(os.path.join(screen, "main.tsx"), "export const x = 1;\n")
+            write(
+                os.path.join(group, "fake.test.ts"),
+                'import { test } from "node:test";\ntest("f", () => {});\n',
+            )
+            got = plan("src/webview/fakescreen/main.tsx", root=root)
+        self.assertIn("fakescreen", got["groups"])
+        self.assertTrue(got["webview"])
+
+    def test_a_webview_file_always_gets_its_types_checked(self):
+        # 画面のファイルは tsconfig.json が exclude するので、tsconfig.test.json では型を見ない。
+        # esbuild も型を見ない。ここで webview が落ちると、「型の検査だけ通しました」と出るのに
+        # 何も見ていないターンができる。画面の約束を満たさない置き方でも必ず見る。
+        with copied_board() as root:
+            parts = os.path.join(root, "src", "webview", "parts")
+            os.makedirs(parts)
+            write(os.path.join(parts, "main.tsx"), "export const x = 1;\n")
+            got = plan("src/webview/parts/main.tsx", root=root)
+        self.assertTrue(got["webview"])
+        self.assertTrue(got["compile"])
+        # どの画面が読むか決められないので、束ねを読むグループは全部回す（多い側へ外す）
+        for group in ("board", "projects"):
+            self.assertIn(group, got["groups"])
+
+    def test_every_screen_on_disk_has_a_group_and_a_test_helper(self):
+        # 綴りの約束（画面 `src/webview/<名前>/main.tsx` ↔ グループ `test/<名前>/` と
+        # 入口 `test/helpers/<名前>.ts`）が守られていること。破ると絞り込みが粗くなる。
+        webview = os.path.join(BOARD, "src", "webview")
+        names = sorted(
+            name
+            for name in os.listdir(webview)
+            if os.path.isfile(os.path.join(webview, name, "main.tsx"))
+        )
+        self.assertTrue(names, "画面が 1 つも見つからない")
+        for name in names:
+            with self.subTest(screen=name):
+                self.assertIn(name, groups_on_disk())
+                helper = os.path.join(BOARD, "test", "helpers", f"{name}.ts")
+                self.assertTrue(os.path.isfile(helper), helper)
+
+    def test_a_part_shared_by_every_screen_calls_them_all(self):
+        # どの画面にも属さない部品（acquireVsCodeApi の窓口など）は、全部の画面に効く。
+        got = plan("src/webview/vscode.ts")
+        for group in ("board", "projects"):
+            self.assertIn(group, got["groups"])
         self.assertTrue(got["webview"])
 
     def test_the_shared_helper_calls_every_group(self):

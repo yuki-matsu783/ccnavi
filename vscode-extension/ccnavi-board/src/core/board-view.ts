@@ -11,7 +11,7 @@
 import type { ApprovePreview } from "./approvemodel.js";
 import type { Appearance } from "./appearance.js";
 import type { Board } from "./board.js";
-import type { DataMessage } from "./screen-host.js";
+import { embedJson, type DataMessage } from "./screen-host.js";
 
 /**
  * 承認のオーバーレイの状態。拡張ホストが持ち、見せるたびに渡す。画面の中に持たないのは、
@@ -81,12 +81,7 @@ export type BoardMessage =
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-board-data";
 
-/**
- * 最初の中身を HTML に埋める形にする。`</script>` や `<!--` が中身に現れても HTML を閉じないよう、
- * `<` を `<` にする（JSON としては同じ文字列で、JSON.parse が元に戻す）。
- * 実体参照にはしない。`<script type="application/json">` の中身は実体参照を解かないので、
- * `&amp;` と書くと画面には `&amp;` のまま届く。
- */
+/** 最初の中身を HTML に埋める形にする。埋め方は `screen-host.ts` が持つ（React の画面で同じ） */
 export function embedData(data: BoardData): string {
-  return JSON.stringify(data).replace(/</g, "\\u003c");
+  return embedJson(data);
 }
