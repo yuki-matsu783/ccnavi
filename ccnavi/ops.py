@@ -137,7 +137,7 @@ def _close_parent(
     統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
     締めた事実の残る先がここしか無い（設計 §9.8）。
 
-    案内は運び方で分かれる。MR があるなら Draft を外す合図まで、無いなら統合先へ戻す
+    案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、無いなら統合先へ戻す
     ところまで。ccnavi はどちらでもマージしない。
     """
     from .review import WIP_ROOT
@@ -169,7 +169,7 @@ def _close_parent(
         f"次は、この移動をコミットし、`{WIP_ROOT}/` を消して"
         f"（'{git_sh} rm -r {WIP_ROOT}'）コミットし、"
         f"push してから '{review_sh} ready' で Draft を外す"
-        "（マージに進んでよいの合図）。途中の作業は既定のブランチに残さない。"
+        "（「マージに進んでよい」の合図）。途中の作業は既定のブランチに残さない。"
         "マージは利用者が squash で行う\n"
     )
 
@@ -384,7 +384,7 @@ def _places(
 
 def _where(hits: list[ticket_mod.Ticket]) -> str:
     """複数の置き場に在るときに、その在り処を並べた文言。"""
-    return ", ".join(f"{t.tree or '(main)'}:{t.state}" for t in hits)
+    return ", ".join(f"{t.tree or '(ワークスペースルート)'}:{t.state}" for t in hits)
 
 
 def _find(
@@ -414,13 +414,13 @@ def _find(
 def _parent_not_started(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """子を着手してよいか。親が作業中で着手済みでなければ止める（設計 §9.6、REQ-TKT-48）。
+    """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 §9.6、REQ-TKT-48）。
 
     親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
     ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる瞬間
     （最初の子の着手）で止めれば、いちばん早い場所で言える。
 
-    親は別の置き場に在ることもある（未承認、閉じた）。どれも子を着手してよい状態では
+    親は別の置き場に在ることもある（未承認、閉じた）。どれも子に着手してよい状態では
     ないので、そのまま置き場を名指しして止める。
     """
     if not found.is_child:
@@ -452,7 +452,7 @@ def _parent_not_started(
         return True
     if not parent.started_at:
         stderr.write(
-            head + f"が未着手（{parent.state}/）。子より先に親を着手すること。\n"
+            head + f"が未着手（{parent.state}/）。子より先に親に着手すること。\n"
             f"  '{ticket_sh} start {found.parent}'\n"
         )
         return True

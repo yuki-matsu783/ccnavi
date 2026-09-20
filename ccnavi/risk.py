@@ -10,7 +10,7 @@
 
 ## 点が何をするか
 
-段階の名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。閾値は `levels` で動かす。
+等級の名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。閾値は `levels` で動かす。
 `HIGH` 以上なら、種類が `review: none` でも子が `required: false` でも、そのフェーズは
 人間レビューが要る扱いになり、レビューが済むまで止まる。実績で宣言を厳しい側にだけ上書きする。
 実績が小さくても、宣言のレビュー要を下げることはしない。
@@ -62,7 +62,7 @@ LEVEL_MEDIUM = "MEDIUM"
 LEVEL_HIGH = "HIGH"
 LEVEL_CRITICAL = "CRITICAL"
 LEVELS = (LEVEL_LOW, LEVEL_MEDIUM, LEVEL_HIGH, LEVEL_CRITICAL)
-# レビューを要る扱いに上書きする段階。
+# レビューが要る扱いに上書きする等級。
 ESCALATE_FROM = (LEVEL_HIGH, LEVEL_CRITICAL)
 
 DEFAULT_LEVELS = {"medium": 20, "high": 40, "critical": 70}
@@ -190,7 +190,7 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
 def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
     """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みへは落とさない。
 
-    共通層が有るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 §11.2）。
+    共通層が在るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 §11.2）。
     壊れた層は空として扱い、苦情だけを返す。
     """
     if not path:
@@ -248,7 +248,7 @@ def parse(
         unknown = sorted(set(raw_levels) - {"medium", "high", "critical", "low"})
         for name in unknown:
             problems.append(
-                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らない段階。名前は固定")
+                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らない等級。名前は固定")
             )
     if not ordered(levels):
         problems.append(

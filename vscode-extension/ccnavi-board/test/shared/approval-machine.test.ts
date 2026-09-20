@@ -444,7 +444,7 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   assert.equal(after.redraw, true);
   assert.deepEqual(after.effects, [], "マーカーは置かない。文を組むだけ");
   const overlay = after.state.overlay;
-  assert.equal(overlay?.kind === "prompt" ? overlay.title : "", "フェーズ 1 設計 のレビュー済みを連絡");
+  assert.equal(overlay?.kind === "prompt" ? overlay.title : "", "フェーズ 1 設計 のレビュー済み連絡");
   assert.match(
     overlay?.kind === "prompt" ? overlay.prompt : "",
     /ccnavi-review\.sh check --phase 1'/,

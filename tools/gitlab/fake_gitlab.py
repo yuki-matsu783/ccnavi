@@ -233,7 +233,7 @@ class Handler(BaseHTTPRequestHandler):
             note = {
                 "id": next_id(state),
                 "body": data.get("body", ""),
-                # MR 上のスレッドは、差分の位置が無くても解決できる。
+                # マージリクエスト上のスレッドは、差分の位置が無くても解決できる。
                 "resolvable": True,
                 "resolved": False,
                 "created_at": now(),

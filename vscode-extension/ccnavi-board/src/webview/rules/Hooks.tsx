@@ -22,7 +22,7 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
             <code>.claude/settings.local.json</code>
           </>
         )}{" "}
-        の hooks。ユーザー個別の設定（<code>~/.claude/settings.json</code>）は対象外。
+        の hooks。利用者ごとの設定（<code>~/.claude/settings.json</code>）は対象外。
       </p>
       <Table hooks={hooks} files={files} />
     </>

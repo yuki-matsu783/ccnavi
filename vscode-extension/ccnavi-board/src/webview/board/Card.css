@@ -40,12 +40,12 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .fact { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .fact.copy-open::before, .fact.copy-review::before, .fact.copy-closed::before, .fact.mark-reviewed::before { content: "✓ "; }
 .fact.sha { font-family: var(--vscode-editor-font-family); }
-/* 親のフェーズ一覧。1 段階 1 行。左の丸が段階で、右が状態。
+/* 親のフェーズ一覧。1 フェーズ 1 行。左の丸がフェーズで、右が状態。
    状態は要約（.phase-brief）と全文（.phase-full）を両方持ち、フェーズ一覧の幅（カードの内寸）で
    どちらを見せるかを決める。480px 未満（1920px の画面で 4 列のときも含む）は要約だけを見せ、
    他の列を畳むかドラッグで広げて 480px 以上になると全文に替わる。狭いとき全文は display: none
    ではなく画面の外に置き、読み上げには残す。行の title にもあるので、マウスでも読める。
-   右の列を auto にすると状態の 1 行分の幅が行を占め、段階名の列が 0 になって省略記号ごと
+   右の列を auto にすると状態の 1 行分の幅が行を占め、フェーズ名の列が 0 になって省略記号ごと
    消えるので、状態の列は 55% で止める */
 .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: .85em; display: flex; flex-direction: column; gap: 3px; container-type: inline-size; }
 .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) fit-content(55%); gap: 6px; align-items: baseline; color: var(--vscode-descriptionForeground); }

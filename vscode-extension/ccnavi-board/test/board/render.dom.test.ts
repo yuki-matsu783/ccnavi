@@ -464,7 +464,7 @@ test("CB-T15 問題とプロジェクトの絞り込みを出す", async () => {
   const page = await openBoard({ ...fixture(), problems: ["承認済みチケット x を読めない"], projects: ["lib", "app"] });
   try {
     assert.deepEqual(texts(page, ".problems li"), ["承認済みチケット x を読めない"]);
-    assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース本体", "lib", "app"]);
+    assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース自身", "lib", "app"]);
   } finally {
     await page.close();
   }
@@ -580,11 +580,11 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
 
 test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注意・文と、承認と同じコピー・新しいセッションで開く・閉じる", async () => {
   const page = await openBoard(fixture(), {
-    approval: { kind: "prompt", title: "フェーズ 2 のレビュー済みを連絡", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
+    approval: { kind: "prompt", title: "フェーズ 2 のレビュー済み連絡", note: "注意 <i>", prompt: "[ccnavi] レビューを終えた <b>" },
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "prompt");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 のレビュー済みを連絡");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 のレビュー済み連絡");
     assert.equal(text(page, ".approval-note"), "注意 <i>");
     assert.equal(text(page, "pre.approval-text"), "[ccnavi] レビューを終えた <b>");
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);

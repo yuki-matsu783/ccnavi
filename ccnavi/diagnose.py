@@ -629,7 +629,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     for parent in [t for t in copies if not t.is_child]:
         where = phase.stage(root, conf, parent)
         if where:
-            stdout.write(f"  {parent.ticket} の段階: {where}\n")
+            stdout.write(f"  {parent.ticket} の局面: {where}\n")
         where = approval.home_dir(conf, root, parent.ticket, "")
         wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP)
         if wrapped:
@@ -755,7 +755,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
             )
         )
 
-    # 親ごとの段階とフェーズ。承認済みチケットのある親だけ。承認前の親はフェーズを持たない。
+    # 親ごとの局面とフェーズ。承認済みチケットのある親だけ。承認前の親はフェーズを持たない。
     for parent in sorted(open_copies + closed_copies, key=lambda x: x.ticket):
         if parent.is_child:
             continue
@@ -962,7 +962,7 @@ def _phase_record(ph: phase.Phase) -> dict:
 def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
-    """親 1 件。段階、計画、親のマーカー、フェーズの並び。"""
+    """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
     where = approval.home_dir(conf, root, parent.ticket, "")
     return {
         "ticket": parent.ticket,

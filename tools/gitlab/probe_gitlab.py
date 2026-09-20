@@ -531,7 +531,7 @@ def main() -> int:
         tag="discussion-create",
     )
     record(
-        "レビュアーが討論を立てる（位置なし、resolvable）",
+        "レビュアーがスレッドを立てる（位置なし、resolvable）",
         status == 201 and bool(disc.get("notes", [{}])[0].get("resolvable")),
     )
     disc_id = disc.get("id", "")
@@ -574,7 +574,7 @@ def main() -> int:
         {"resolved": True},
         tag="discussion-resolve",
     )
-    record("レビュアーが討論を解決する", status == 200)
+    record("レビュアーがスレッドを解決する", status == 200)
     if ee:
         fetched = sh(REVIEW_SH, parent_tree, "fetch")
         write(os.path.join(OUT, "fetch-3-changes-requested.json"), fetched.stdout)
@@ -643,7 +643,7 @@ def main() -> int:
     )
     checked = sh(REVIEW_SH, parent_tree, "check", "--phase", "1")
     record(
-        "受け入れ済みの討論は check で数えない",
+        "受け入れ済みのスレッドは check で数えない",
         checked.returncode == 0,
         checked.stderr.strip()[:200],
     )

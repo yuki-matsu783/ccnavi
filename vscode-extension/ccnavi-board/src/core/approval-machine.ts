@@ -106,7 +106,7 @@ export type ApprovalInput =
   /** 「やめる」「閉じる」を押した（画面の Esc も同じ） */
   | { readonly kind: "cancel" }
   /**
-   * 「レビュー済みを連絡」を押した。`tree` は親のワークツリー、`chip` はそのフェーズ。
+   * 「レビュー済み連絡」を押した。`tree` は親のワークツリー、`chip` はそのフェーズ。
    * どちらもボードから引くので、無いことがある（古いボード）。`root` は文面に書くワークスペースルート
    */
   | {
@@ -304,7 +304,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
 }
 
 /**
- * 「レビュー済みを連絡」。マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、
+ * 「レビュー済み連絡」。マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、
  * 承認の文と同じ 2 ボタンで渡す。`check` を打つのは文を受けたエージェント
  */
 function reviewed(
@@ -345,7 +345,7 @@ function reviewed(
   return move(state, {
     overlay: {
       kind: "prompt",
-      title: `フェーズ ${chip.label} のレビュー済みを連絡`,
+      title: `フェーズ ${chip.label} のレビュー済み連絡`,
       note:
         "レビューを終えたことを Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、" +
         "新しいセッションで開く。送るときは自分で Enter を押す。マーカーはエージェントが check を打って置く。",

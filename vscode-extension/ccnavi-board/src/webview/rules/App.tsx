@@ -442,7 +442,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                   data-action="fold-section"
                   data-section={section}
                   aria-expanded={shownAsOpen}
-                  title="このタイプを折りたたむ／開く"
+                  title="このタイプを開く／畳む"
                   onClick={() => fold(section)}
                 >
                   {shownAsOpen ? "▾" : "▸"}

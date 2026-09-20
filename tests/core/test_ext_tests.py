@@ -435,7 +435,7 @@ class TestExtHookTest(unittest.TestCase):
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode)
         self.assertIsNone(args)
-        self.assertIn("テストの入口がない", result.stderr)
+        self.assertIn("テストの入口が無い", result.stderr)
 
 
 if __name__ == "__main__":

@@ -64,9 +64,9 @@ ACCEPT_FILE = "review-accept-{parent}-{phase}.md"
 MR_FILE = "review-mr-{parent}.md"
 # 残った指摘を別の issue に切り出すときの下書き。sh がこれで issue を作る。
 HANDOFF_FILE = "review-handoff-{parent}.md"
-# Draft を外すときに MR へ残す note。sh が Draft を外してから投稿する。
+# Draft を外すときにマージリクエストへ残す note。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"
-# 人が締めたときの、残りを写す issue の下書きと、MR へ残す note。
+# 人が締めたときの、残りを写す issue の下書きと、マージリクエストへ残す note。
 WRAPUP_ISSUE_FILE = "review-wrapup-issue-{parent}.md"
 WRAPUP_NOTE_FILE = "review-wrapup-note-{parent}.md"
 MARKER_READY = "<!-- ccnavi:ready -->"
@@ -256,7 +256,7 @@ def mr_draft(parent: ticket_mod.Ticket) -> str:
     lines += [
         "---",
         "",
-        "フェーズが終わるたびに ccnavi がレビューの依頼をこの MR に投稿する。",
+        "フェーズが終わるたびに ccnavi がレビューの依頼をこのマージリクエストに投稿する。",
         "未解決のスレッドが残っている間、次のフェーズへは進めない。",
         "",
     ]
@@ -483,7 +483,7 @@ def reviewed(
 ) -> int:
     """人が端末で打つ。未解決を見せてから y/N。変更要求は通せない。
 
-    受け入れたスレッドの一覧は控えの置き場に書き出す。sh がそれを MR のコメントに写す。
+    受け入れたスレッドの一覧は控えの置き場に書き出す。sh がそれをマージリクエストのコメントに写す。
 
     `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。写しも依頼の記録も
     要らない代わりに、種類が chat と宣言しているフェーズにしか当たらない。
@@ -619,7 +619,7 @@ def _reviewed_in_chat(
     あること（`mr` と宣言したフェーズを安い経路で通させない）と、フェーズが終わって
     いること、そして依頼が出ていないこと。依頼を出した先には指摘が付いているかもしれず、
     それを数えずに通す道はここには置かない（数えるのは `check`、受け入れるのは `accept`）。
-    実績のリスクが高ければ MR を勧めるが、止めはしない（ADR-0065）。
+    実績のリスクが高ければマージリクエストを勧めるが、止めはしない（ADR-0065）。
     """
     if accept_unresolved:
         stderr.write(
@@ -861,7 +861,7 @@ def wrapup(
 
     Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
     途中の作業の置き場を消して push する。それが済んだことを `ready` が確かめて外す。
-    外す道を 1 本にしておくと、外れた MR は必ず「片付いて push 済み」になる。
+    外す道を 1 本にしておくと、外れたマージリクエストは必ず「片付いて push 済み」になる。
 
     作業中の子がいる間は打てない。締めるのは、手が止まっているときだけ。
     """
@@ -1077,7 +1077,7 @@ def _wrapup_drafts(
     skipped: list[int],
     accepted: list[str],
 ) -> str:
-    """残りを写す issue の下書きと、MR へ残す note の下書きを書く。書けなければ理由。"""
+    """残りを写す issue の下書きと、マージリクエストへ残す note の下書き。書けなければ理由。"""
     assert result.mr is not None
     # 1 行目が題、空行のあとが本文。
     issue = [f"{parent.title} の残り", ""]

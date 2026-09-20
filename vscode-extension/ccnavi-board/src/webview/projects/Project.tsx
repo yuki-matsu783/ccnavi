@@ -102,7 +102,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
             title={`このプロジェクトの ${row.rulesRel === "" ? "層のルール" : row.rulesRel} を編集し、判定を試す`}
             onClick={() => send({ type: "openRules", name: row.name })}
           >
-            ルール管理
+            ルール設定
           </button>
           {/* フェーズの種類は親チケットの計画と子の範囲にしか読まれない。チケット制御が disable の間は
               何も動かさないので、開く側（phases-panel）と揃えて入口を出さない */}

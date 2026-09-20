@@ -152,7 +152,7 @@ const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 
 export const REASON_OUTSIDE = "projects/ の外にある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
-export const REASON_TOO_DEEP = "projects/ の 2 階層目より深くにある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
+export const REASON_TOO_DEEP = "projects/ の直下ではなく、その下の階層にある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
 
 export interface StrayInput {
   /** 置き場のルートからの相対（"/" 区切り）。空なら置き場が無効 */

@@ -585,7 +585,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 止めずに報告する段を CCNAVI_MODE=dry-run が持つので、こちらには要らない。
 #
 # 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
-# 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を別の値の経由で
+# 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を別の値を経由して
 # 書き込めてしまう。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
@@ -1030,7 +1030,7 @@ if [ "$deploy_work" = yes ]; then
 	case "$bin_verdict" in
 	copy | replace)
 		copy_tree "$source_root/$DEPLOY_BIN_DIR" "$root/$build_dir_rel"
-		# 実行の許しを付け直す。cp は元のモードを umask で削って写すので、
+		# 実行ビットを付け直す。cp は元のモードを umask で削って写すので、
 		# 配布元の側の置き方によってはここが落ちる。落ちていると hook は
 		# 「実行ファイルが無い」ではなく「起動できない」で黙って死ぬ。
 		for spelling in "$root/$build_dir_rel/ccnavi" "$root/$build_dir_rel/ccnavi.exe"; do

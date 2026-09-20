@@ -170,7 +170,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
     assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
 
     const workspace = dom.one("section.workspace");
-    assert.match(text(workspace), /自身の層のルール なし \.ccnavi\/config\/rules\.yml 共通層からコピー ルール管理/);
+    assert.match(text(workspace), /自身の層のルール なし \.ccnavi\/config\/rules\.yml 共通層からコピー ルール設定/);
     assert.equal(dom.all('button[data-action="create-self-rules"]').length, 1);
     assert.ok(dom.one('button[data-action="open-self-rules"]').hasAttribute("disabled"));
   } finally {
