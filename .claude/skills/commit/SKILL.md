@@ -55,8 +55,19 @@ uv run python -m unittest discover -s tests/<グループ> -t .
 worktree で作業しているときは、そのツリーの中でこれを実行する (`cd .claude/worktrees/<名前>` してから)。
 `pyproject.toml` はツリーごとに持つので、混ぜて実行しない。
 
-`.claude/hooks/lint-py.sh` (PostToolUse) と `.claude/hooks/test-py.sh` (Stop) が登録されていれば
-編集のたびとターンの終わりに同じ検査が走るが、hook が無効な環境でも落ちないよう、
+拡張 (`vscode-extension/ccnavi-board`) のファイルが変わっているなら、そのぶんも通す。
+変えたファイルを渡せば、関わるグループだけが回る（いくつ選んでもコンパイルは 1 回）。
+
+```sh
+cd vscode-extension/ccnavi-board
+pnpm install --frozen-lockfile                        # node_modules が無いときだけ
+pnpm test:for src/core/rules-doc.ts src/webview/board/App.tsx
+pnpm test                                             # 統合先へ戻す前・MR に出す前
+```
+
+`.claude/hooks/lint-py.sh` (PostToolUse) と `.claude/hooks/test-py.sh` (Stop)、拡張のぶんの
+`mark-ext.sh` (PostToolUse) と `test-ext.sh` (Stop) が登録されていれば編集のたびとターンの
+終わりに同じ検査が走るが、hook が無効な環境でも落ちないよう、
 コミット前に明示的に実行してよい。実行ファイル (PyInstaller) はここでは作り直さない。
 ビルドが必要なときは `uv run --with pyinstaller python build.py` を手で回す。
 
