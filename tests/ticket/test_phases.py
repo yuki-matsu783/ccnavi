@@ -1008,7 +1008,7 @@ phases:
 
 
 class ChatReviewTest(PhaseHarness):
-    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0051）。"""
+    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0065）。"""
 
     def chat_phase(self, plan=("chores", "design")):
         """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
