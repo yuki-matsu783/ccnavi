@@ -6,6 +6,22 @@
  */
 import type { JSX, ReactNode } from "react";
 
+/** カード 1 枚が持つメニューの種類 */
+export const MENU_KINDS = ["open", "git"] as const;
+export type MenuKind = (typeof MENU_KINDS)[number];
+
+/**
+ * 画面の中で一意なメニューの名前。
+ *
+ * **組み立ても読み取りも、この関数と `MENU_KINDS` を通す。** プロジェクトの名前は置き場の
+ * ディレクトリ名そのままで、画面の clone の欄が通す綴り（英数字と `. _ -`）とは限らない。
+ * 人が `projects/app:staging/` を置けば `:` が名前に入る。前方一致で持ち主を探すと、
+ * `app` が `app:staging` のメニューを自分のものだと言い出す
+ */
+export function menuId(name: string, kind: MenuKind): string {
+  return `${name}:${kind}`;
+}
+
 export interface MenuProps {
   /** 画面の中で一意な名前。App が「いま開いているのはどれか」をこれで持つ */
   readonly id: string;

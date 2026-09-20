@@ -111,6 +111,24 @@ test("CB-D33 開いていたメニューは、その行が一覧から消えた�
   } finally {
     await dom.close();
   }
+
+  // 名前は置き場のディレクトリ名そのままで、clone の欄が通す綴りとは限らない。
+  // `a` が `a:x` のメニューを自分のものだと言い出さないこと（前方一致だと言い出す）
+  const colon = await openProjects([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]);
+  try {
+    colon.click(colon.one(`${cardSelector("a:x")} details.menu summary`));
+    await colon.settle();
+    assert.ok(colon.one<HTMLDetailsElement>(`${cardSelector("a:x")} details.menu`).open);
+    // a:x が消えて a だけになる。戻ってきたとき、押していないメニューが開いていてはいけない
+    await colon.send({ type: "data", data: { kind: "page", page: page([row({ name: "a", rel: "projects/a" })]) } });
+    await colon.send({
+      type: "data",
+      data: { kind: "page", page: page([row({ name: "a", rel: "projects/a" }), row({ name: "a:x", rel: "projects/a:x" })]) },
+    });
+    assert.ok(!colon.one<HTMLDetailsElement>(`${cardSelector("a:x")} details.menu`).open);
+  } finally {
+    await colon.close();
+  }
 });
 
 test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は残る", async () => {

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
 import { applyAppearance } from "../appearance.js";
+import { MENU_KINDS, menuId } from "./Menu.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
@@ -41,9 +42,12 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       if (message.type === "data" && message.data !== undefined) {
         setData(message.data);
         // 開いていたメニューの持ち主が一覧から消えていたら閉じる。残すと、同じ名前で
-        // 戻ってきたときに押していないメニューが開いた状態で出る
+        // 戻ってきたときに押していないメニューが開いた状態で出る。
+        // 一致は `menuId` が組んだ綴りそのもので見る（前方一致だと、`:` を含む名前の
+        // メニューを、その接頭辞になっている別のプロジェクトが自分のものだと言い出す）
         const rows = message.data.kind === "page" ? message.data.page.rows : [];
-        setOpenMenu((now) => (now !== undefined && !rows.some((r) => now.startsWith(`${r.name}:`)) ? undefined : now));
+        const alive = new Set(rows.flatMap((r) => MENU_KINDS.map((kind) => menuId(r.name, kind))));
+        setOpenMenu((now) => (now !== undefined && !alive.has(now) ? undefined : now));
         // 一覧が新しくなったので、それを見て言った失敗はもう今のことではない
         setStatus((now) => (now?.kind === "failed" ? undefined : now));
       } else if (message.type === "failed") {

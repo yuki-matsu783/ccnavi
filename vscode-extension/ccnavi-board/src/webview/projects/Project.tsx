@@ -8,7 +8,7 @@ import type { JSX } from "react";
 
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { ProjectRow } from "../../core/projects-view.js";
-import { Menu } from "./Menu.js";
+import { Menu, menuId } from "./Menu.js";
 import { post } from "./post.js";
 import { problemsOf } from "./text.js";
 
@@ -92,7 +92,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
         </div>
       </dl>
       <div className="ops">
-        <Menu id={`${row.name}:open`} label="開く ▾" open={openMenu === `${row.name}:open`} onOpen={onOpenMenu}>
+        <Menu id={menuId(row.name, "open")} label="開く ▾" open={openMenu === menuId(row.name, "open")} onOpen={onOpenMenu}>
           <button
             type="button"
             className="action"
@@ -132,7 +132,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
             </button>
           )}
         </Menu>
-        <Menu id={`${row.name}:git`} label="git ▾" open={openMenu === `${row.name}:git`} onOpen={onOpenMenu}>
+        <Menu id={menuId(row.name, "git")} label="git ▾" open={openMenu === menuId(row.name, "git")} onOpen={onOpenMenu}>
           <button
             type="button"
             className="action"
