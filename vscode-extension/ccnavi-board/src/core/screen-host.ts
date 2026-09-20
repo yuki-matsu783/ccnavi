@@ -187,7 +187,8 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  *   保持する画面は裏でも live」と言う）。見て倒すと、裏にいる間の `lock` や `changed` の知らせが落ちる。
  *   **ただし VS Code の文書は同じ型定義の中で食い違っている**（`retainContextWhenHidden` の側は
  *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても壊れないよう、呼ぶ側は
- *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）を送り直す（risk-panel / phases-panel）
+ *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）と見た目（`appearance`）を送り直す
+ *   （rules-panel / risk-panel / phases-panel。issue #87）
  * - **`hidden()` は何もしない。** 教えてもらっても、捨てられていないので倒すものが無い
  *
  * 残る `deferred` は 1 枚目だけ。入れ物を入れてから画面が組み上がる（`ready`）までの間は、
