@@ -152,6 +152,27 @@ Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`Pos
 `test-py.sh` はそれを読んで、触ったツリーだけをテストする。ワークツリーの中を直せば
 そのワークツリーが検査され、触っていないツリーの書きかけで差し戻されることもない。
 
+拡張（`vscode-extension/ccnavi-board`）のテストも同じ形で回す（ADR-0061）。`PostToolUse` の
+`.claude/hooks/mark-ext.sh` が、拡張のファイルを触ったら `logs/session/<セッション>.ext-files` に
+書き残し、`Stop` の `.claude/hooks/test-ext.sh` がターンの終わりに 1 回回す。**回すのは触った
+ファイルが関わるグループだけ**で、決めるのは `vscode-extension/ccnavi-board/scripts/test-groups.js`
+（テストの `import` を辿るので、表を持たない）。拡張を触っていないターンは何もしないので、
+文書だけのターンや Python だけのターンは伸びない。触ったターンで伸びるのは 3〜8 秒
+（全部回すと 11 秒）。差し戻しは 3 回までで、回数は `test-py.sh` と別に数える。
+これも `.claude/settings.json` には登録していないので、回すなら `settings.local.json` で
+`PostToolUse`（`Write|Edit|NotebookEdit`）と `Stop` に足す。
+
+```json
+"PostToolUse": [
+  { "matcher": "Write|Edit|NotebookEdit",
+    "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/mark-ext.sh\"", "timeout": 10 }] }
+],
+"Stop": [
+  { "matcher": "",
+    "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/test-ext.sh\"", "timeout": 180 }] }
+]
+```
+
 実行ファイルはどちらの hook でも作り直さない。PyInstaller が 11 秒かかるので、
 動かして確かめるときに手で `uv run --with pyinstaller python build.py` を回す。
 
@@ -2611,6 +2632,8 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `ccnavi/platformtag.py` | 機械の語（`<os>-<arch>`）。組み立ての目印と、振り分けの sh が起動する実体の探し方 |
 | `scripts/ccnavi-setup.sh` | 対象プロジェクトに設定を書き、実行ファイルとルールとスクリプトを配る |
 | `.claude/hooks/lint-py.sh` / `test-py.sh` | このリポジトリ自身の開発用 hook。整形と検査、ターンの終わりのテスト |
+| `.claude/hooks/mark-ext.sh` / `test-ext.sh` | 同じく拡張のぶん。触ったことの書き残しと、ターンの終わりに関わるグループだけ回すテスト |
+| `vscode-extension/ccnavi-board/scripts/test-groups.js` | 拡張のテストの入口。触ったファイルから回すグループを決め、コンパイルは 1 回で済ませる |
 | `.claude/skills/ccnavi-config/` / `commit/` | 設定 3 本を足す・確かめるスキルと、コミットの手順 |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | hook が起動する振り分けの sh（モード 100755）。原本と配布先で同じ綴り。1 つ上の `bin/<os>-<arch>/` から、この機械の実行ファイルを選ぶ。無ければ 127 |
 | `.ccnavi/scripts/ccnavi-git.sh` | 安全な git だけを通し、出力を抑えて結果だけ返すラッパースクリプト |
