@@ -43,6 +43,8 @@ def start(
     if found.started_at:
         stderr.write(f"ccnavi: {ticket_id} は着手済み（{found.started_at}）\n")
         return 1
+    if _parent_not_started(stderr, root, conf, found):
+        return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
     # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
@@ -358,13 +360,12 @@ def _score_child(
     return lines
 
 
-def _find(
-    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
-) -> ticket_mod.Ticket | None:
-    """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
+def _places(
+    root: str, conf: settings.Settings, ticket_id: str
+) -> tuple[list[ticket_mod.Ticket], list[str], list[ticket_mod.Problem]]:
+    """この識別子のチケットが在る置き場を全部引く。読めなかった理由と提案の不備も返す。
 
-    権威のあるツリーの側だけを読む（approval.scan / ticket.scan の畳み）。それでも
-    2 つ以上残れば、どれが本物か決まらないので止める。
+    権威のあるツリーの側だけを読む（approval.scan / ticket.scan の畳み）。
     """
     hits: list[ticket_mod.Ticket] = []
     copies, notes = approval.scan(conf, root)
@@ -378,6 +379,22 @@ def _find(
     # 識別子の `todo/` は改版の候補か書き損じで、状態の操作の相手ではない（`--lint` が言う）。
     if not hits:
         hits += [t for t in proposals if t.ticket == ticket_id and t.state == ticket_mod.TODO]
+    return hits, notes + more, problems
+
+
+def _where(hits: list[ticket_mod.Ticket]) -> str:
+    """複数の置き場に在るときに、その在り処を並べた文言。"""
+    return ", ".join(f"{t.tree or '(main)'}:{t.state}" for t in hits)
+
+
+def _find(
+    stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> ticket_mod.Ticket | None:
+    """この識別子のチケットを、どの置き場に在っても 1 つ引く。`state` に置き場が入る。
+
+    2 つ以上残れば、どれが本物か決まらないので止める。
+    """
+    hits, notes, problems = _places(root, conf, ticket_id)
     if not hits:
         stderr.write(
             f"ccnavi: チケット {ticket_id} が見つからない"
@@ -385,14 +402,59 @@ def _find(
         )
         for p in problems:
             stderr.write(f"  {p}\n")
-        for note in notes + more:
+        for note in notes:
             stderr.write(f"  {note}\n")
         return None
     if len(hits) > 1:
-        places = ", ".join(f"{t.tree or '(main)'}:{t.state}" for t in hits)
-        stderr.write(f"ccnavi: {ticket_id} が複数の場所にある: {places}。1 つにしてから\n")
+        stderr.write(f"ccnavi: {ticket_id} が複数の場所にある: {_where(hits)}。1 つにしてから\n")
         return None
     return hits[0]
+
+
+def _parent_not_started(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """子を着手してよいか。親が作業中で着手済みでなければ止める（設計 §9.6、REQ-TKT-48）。
+
+    親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
+    ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる瞬間
+    （最初の子の着手）で止めれば、いちばん早い場所で言える。
+
+    親は別の置き場に在ることもある（未承認、閉じた）。どれも子を着手してよい状態では
+    ないので、そのまま置き場を名指しして止める。
+    """
+    if not found.is_child:
+        return False
+    hits, notes, _ = _places(root, conf, found.parent)
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    head = f"ccnavi: {found.ticket} の親 {found.parent} "
+    if not hits:
+        stderr.write(
+            head + f"が見つからない（{conf.approved}/ と {conf.tickets}/ を全ツリーで探した）\n"
+        )
+        for note in notes:
+            stderr.write(f"  {note}\n")
+        return True
+    if len(hits) > 1:
+        stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つにしてから\n")
+        return True
+    parent = hits[0]
+    if parent.state == ticket_mod.TODO:
+        stderr.write(
+            head + "がまだ承認されていない（todo/）。先に利用者が 'ccnavi --approve' を通し、"
+            f"'{ticket_sh} start {found.parent}' で着手すること\n"
+        )
+        return True
+    if parent.state != ticket_mod.DOING:
+        stderr.write(head + f"は作業中ではない（いまは {parent.state}/）。閉じた親に子は足さない\n")
+        return True
+    if not parent.started_at:
+        stderr.write(
+            head + f"が未着手（{parent.state}/）。子より先に親を着手すること。\n"
+            f"  '{ticket_sh} start {found.parent}'\n"
+        )
+        return True
+    return False
 
 
 def _parent_still_busy(

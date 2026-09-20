@@ -425,8 +425,12 @@ def approved(tickets, revisions: set[str], root: str) -> str:
             where = "親"
         title = f": {t.title}" if t.title else ""
         lines.append(f"- {t.ticket}{title}（{where}）")
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     lines.append(
-        "後工程を進める。子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start <識別子>' で着手する。"
+        # 子の着手は親の着手を前提にする（設計 §9.6、REQ-TKT-48）。順をここで言わないと、
+        # 最初の子の着手で止まってから読むことになる。
+        f"後工程を進める。親は自分のワークツリーで '{ticket_sh} start <親>' を先に打つ。"
+        "子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
+        f"'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
     )
     return "\n".join(lines)

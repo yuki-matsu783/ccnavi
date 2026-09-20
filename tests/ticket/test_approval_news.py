@@ -80,6 +80,8 @@ class ApprovalNewsTest(PhaseHarness):
         first = self.prompt()
         self.assertIn(prompt, first)
         self.assertIn("i0001-01", first)
+        # 子より先に親を着手する順も、この 1 度の文で伝える（REQ-TKT-48）。
+        self.assertIn("start <親>", first)
         self.assertEqual(self.prompt(), "")
 
     # ---- 2. PreToolUse でも 1 度

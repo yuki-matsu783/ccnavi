@@ -200,6 +200,16 @@ class TicketTest(unittest.TestCase):
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
         return result
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def family(self, review=(True, False)):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子のワークツリーを作って着手する。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -209,6 +219,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.start_parent()
         for child in ("i0001-01", "i0001-02"):
             self.worktree(child, "i0001")
             started = self.ccnavi("ticket", "start", child)
@@ -319,6 +330,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
         result = self.ccnavi("ticket", "start", "i0001-01")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ワークツリー", result.stderr)
@@ -373,6 +385,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.start_parent()
         child = self.worktree("i0001-01", "i0001")
         started = self.ccnavi("ticket", "start", "i0001-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
@@ -751,6 +764,81 @@ class TicketTest(unittest.TestCase):
         head = git(os.path.join(self.root, ".claude", "worktrees", "i0001-01"), "rev-parse", "HEAD")
         self.assertIn(head.strip(), copy)
         self.assertIn("started_at:", copy)
+
+    # ---- 3b. 子の着手は親の着手のあと
+
+    def family_without_starting(self):
+        """親 1 本と子 1 本を承認して、子のワークツリーだけ作る（どちらも未着手）。"""
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return self.worktree("i0001-01", "i0001")
+
+    def test_a_child_does_not_start_before_its_parent(self):
+        """親が未着手のまま子を着手できないこと。案内は親の `start`（REQ-TKT-48）。
+
+        飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。止める場所を
+        最初の子の着手に置けば、親の作業が実際に始まる瞬間に言える。
+        """
+        self.family_without_starting()
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 が未着手", refused.stderr)
+        # 案内の sh はワークスペースルートからの絶対パス。子のワークツリーから打てる綴り。
+        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        self.assertIn(f"{ticket_sh} start i0001", refused.stderr)
+        self.assertNotIn("sh .ccnavi/scripts/", refused.stderr)
+        # 止まった回は、子の着手の欄を書かない。
+        with open(os.path.join(self.approved, "doing", "i0001-01.md"), encoding="utf-8") as f:
+            self.assertIn('started_at: ""', f.read())
+
+        # 親を着手すれば、案内のとおりに通る。2 枚目からは何も増えない。
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        started = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "next")
+        self.assertEqual(self.approve().returncode, 0)
+        self.worktree("i0001-02", "i0001")
+        second = self.ccnavi("ticket", "start", "i0001-02")
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+
+    def test_a_closed_parent_does_not_take_a_new_child(self):
+        """閉じた親の下では子を着手できず、親の置き場を名指しすること。
+
+        `doing/` から出た親は判定にも効かない（REQ-TKT-12）。そこに子を足すのは未着手とは
+        別の異常なので、親の `start` は案内せず、いまの置き場を出す。
+        """
+        self.family_without_starting()
+        closed = os.path.join(self.approved, "done")
+        os.makedirs(closed, exist_ok=True)
+        # 人が手で閉じた形（置き場を動かすのは人。ADR-0055）。
+        os.replace(
+            os.path.join(self.approved, "doing", "i0001.md"), os.path.join(closed, "i0001.md")
+        )
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 は作業中ではない（いまは done/）", refused.stderr)
+
+    def test_a_parent_that_is_still_a_proposal_asks_for_approval_first(self):
+        """親が承認前なら、案内は承認から始めること。
+
+        人が子だけ置き場を動かすと起きる（ADR-0058 の運び。承認画面なら落ちる）。`start` は
+        `doing/` の承認済みチケットにしか効かないので、`todo/` の親にそのまま `start` を
+        勧めると、案内のとおりに打っても通らない。
+        """
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+        self.worktree("i0001-01", "i0001")
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
+        self.assertIn("--approve", refused.stderr)
 
     # ---- 4. フェーズの終わりと HITL ポイント
 
@@ -1519,9 +1607,6 @@ class TicketTest(unittest.TestCase):
 
     def test_parent_cannot_close_while_children_are_open(self):
         self.family()
-        refused = self.ccnavi("ticket", "start", "i0001")
-        # 親のツリーは作ってあるので start は通る。
-        self.assertEqual(refused.returncode, 0, refused.stderr)
         refused = self.ccnavi("ticket", "done", "i0001")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("開いている子", refused.stderr)
@@ -2019,6 +2104,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
         self.worktree("i0001-01", "i0001")
         self.assertEqual(self.ccnavi("ticket", "start", "i0001-01").returncode, 0)
         self.assertEqual(self.ccnavi("ticket", "done", "i0001-01").returncode, 0)
