@@ -511,13 +511,53 @@ class MovedJudgeTest(LauncherJudgeTest):
             with self.subTest(subject=subject):
                 self.assertEqual(blocking(self.judge(subject)), set(), subject)
 
-    def test_行き先を読めない_cd_のあとは読み切れないものとして扱う(self):
-        # 相対パスがどこに落ちるか決まらない。allow は当たらず、確認に落ちる（ADR-0011）。
+    def test_行き先を読めない_cd_は読みを変えない(self):
+        # 縮退させない。縮退は生の文字列に落ちるので、コマンドの頭に固定して書かれた
+        # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
+        # 止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
+        for subject in [
+            'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
+            "cd - && cp /tmp/x .ccnavi/common/rules.yml",
+            "pushd .claude && mv .ccnavi/common/rules.yml /tmp/x",
+        ]:
+            with self.subTest(subject=subject):
+                body = self.assert_denied_by(subject, SETTING_FILES)
+                self.assertEqual(body["degraded"], "", body["response"])
+
+    def test_読めない行き先のあとは継ぎ足さないだけ(self):
+        # 読み自体は変わらない。読み切れなかった扱い（PARSE_UNCERTAIN）にはしない。
         body = self.judge("cd - && cat README.md")
 
-        self.assertEqual(body["verdict"], "ask", body["response"])
-        self.assertEqual(body["degraded"], shellread.REASON_CHDIR, body["response"])
-        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
+        self.assertEqual(body["degraded"], "", body["response"])
+        self.assertEqual(body["code"], "UNDECLARED", body["response"])
+
+    def test_置換の中で移った先も止める(self):
+        self.assert_denied_by('echo "$(cd .claude && rm settings.json)"', SETTING_FILES)
+
+    def test_リダイレクトだけの書き込みも止める(self):
+        # `> settings.json` は hook の登録を空にする。
+        self.assert_denied_by("cd .claude && > settings.json", SETTING_FILES)
+
+    def test_実行役のコマンド越しと_env_C_も止める(self):
+        for subject in [
+            "cd .claude && env rm settings.json",
+            "cd .claude && sudo -u me rm settings.json",
+            "cd .claude && dd if=/tmp/x of=settings.json",
+            "builtin cd .claude && rm settings.json",
+            "env -C .claude rm settings.json",
+            "sudo --chdir=.ccnavi/common rm rules.yml",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, SETTING_FILES)
+
+    def test_左がサブシェルになる区切りでは移らない(self):
+        # `cd .claude &` の後ろは元の場所のまま。止めると誤検知になる。
+        for subject in [
+            "cd .claude & echo x > settings.json",
+            "cd .claude | echo x > settings.json",
+        ]:
+            with self.subTest(subject=subject):
+                self.assertEqual(blocking(self.judge(subject)), set(), subject)
 
 
 class SubstRepoRulesTest(unittest.TestCase):
