@@ -2074,7 +2074,8 @@ Claude Code から来たモードで、`handover` の行と合わせて読む。
 切り替えたときに何件が戻るのかが分かる。
 
 コマンドを読み切れずに生の文字列で判定した回は、判定を下したうえで `degraded` が付く。
-`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote` の 5 つ。
+`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote`、
+`unreadable-chdir` の 6 つ。
 後ろの 2 つは書き直しを求める形として止めた回に付く（コードは `DENY_AMBIGUOUS_FORM` と `DENY_BACKQUOTE`）。
 止めたもののうち、どれだけが読み切れないまま出た判定かを後から数えられる。
 
@@ -2083,7 +2084,7 @@ Claude Code から来たモードで、`handover` の行と合わせて読む。
 直すのは文面の案内か、よく書かれる形のほう。
 
 実行役のコマンド（`env`・`sudo`・`sh -c` など）が中で実行するコマンドでルールに当たった回は、`unwrapped` に
-そのコマンドが入る。複数なら `\x00` でつなぐ。元の形で当たった回は空で、欄ごと落ちる。数えれば、実行役のコマンド
+そのコマンドが入る。`cd` で移った先から見た綴りで当たった回も同じ欄に入る（実行役のコマンドの名前は `cd`）。複数なら `\x00` でつなぐ。元の形で当たった回は空で、欄ごと落ちる。数えれば、実行役のコマンド
 越しに止めた件数が分かる（「実行役のコマンドが中で実行するコマンドにも当てる」）。
 
 ```sh
