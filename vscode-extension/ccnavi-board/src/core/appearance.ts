@@ -71,19 +71,3 @@ export const APPEARANCE_STYLE = `  body.ccnavi-claude-dark:not(.vscode-high-cont
     --vscode-textCodeBlock-background: #F0EEE6; --vscode-charts-blue: #B0532F; --vscode-editorInfo-foreground: #B0532F;
     --vscode-editorWarning-foreground: #7F5500; --vscode-editorError-foreground: #B3261E; --vscode-charts-green: #366D24; --vscode-charts-yellow: #7F5500;
   }`;
-
-/**
- * 画面の中のスクリプトに埋める、切り替えの受け口。拡張が `{ type: "appearance", value }` を送ると
- * body のクラスだけを付け替える。HTML を作り直さないので、編集中の内容は消えない。
- * テンプレート文字列に埋めるので、バッククォートと \${ を使わない。
- */
-export const APPEARANCE_SCRIPT = `  function applyAppearance(value) {
-    for (const name of Array.from(document.body.classList)) {
-      if (name.indexOf("ccnavi-claude-") === 0) { document.body.classList.remove(name); }
-    }
-    if (value === "claude-light" || value === "claude-dark") { document.body.classList.add("ccnavi-" + value); }
-  }
-  window.addEventListener("message", (event) => {
-    const data = event.data || {};
-    if (data.type === "appearance") { applyAppearance(data.value); }
-  });`;

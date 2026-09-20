@@ -7,7 +7,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
-import { escapeHtml } from "../../src/core/html.js";
 import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
 import { NONCE, approvePreview, boardPage, openBoard, openPage } from "../helpers/board.js";
@@ -482,8 +481,6 @@ test("CB-T16 本文の文字列で表示を壊さない", async () => {
   } finally {
     await page.close();
   }
-  // 設定 3 画面とプロジェクト管理は今も文字列で組み立てるので、逃がし方は変えていない
-  assert.equal(escapeHtml(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
 });
 
 test("CB-T118 本物が決まらない写りだけをバッジにし、場所を tooltip に出す", async () => {

@@ -10,53 +10,20 @@
  */
 import { isMap, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
 
-export const SECTIONS = ["deny", "ask", "allow"] as const;
-export type Section = (typeof SECTIONS)[number];
-export type PatternKind = "glob" | "regex";
+import { SECTIONS, type PatternKind, type RuleForm, type RulesModel, type Section, type Sections } from "./rules-view.js";
 
-/** 画面で編集する 1 件。`origin` は読み込んだときの位置で、新しいルールは null */
-export interface RuleForm {
-  readonly origin: { readonly section: Section; readonly index: number } | null;
-  readonly id: string;
-  readonly match: string;
-  readonly kind: PatternKind;
-  readonly pattern: string;
-  readonly message: string;
-  /** 当たったときにモデルへ渡す文（`additionalContext`）。無ければ空 */
-  readonly additionalContext: string;
-  /** 1 つの文脈で最初に当たったときだけ渡す文（`additionalContextOnce`）。無ければ空 */
-  readonly additionalContextOnce: string;
-  /** 文に続けて本文を渡すファイル（`additionalContextFile`）。ルートからの相対パス。無ければ空 */
-  readonly additionalContextFile: string;
-  /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
-  readonly additionalContextOnceFile: string;
-  /**
-   * 渡す回の刻み（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
-   * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
-   *
-   * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
-   * 「刻み無し」なのか「刻みとして読めない値（`0`・`-1`・`x`）だった」のかを区別できず、
-   * 刻みを外す操作も、読めない値を画面から直す道も書けない。読めない値は書いたまま
-   * 書き戻し、咎めるのは保存前の `ccnavi --lint`。画面が黙って直すと、lint が名指し
-   * している対象が消えて苦情の出どころが分からなくなる
-   */
-  readonly every: string;
-}
+/**
+ * ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）は画面との契約（`rules-view.ts`）にある。
+ * ここに置くと、画面がそこから `yaml` を辿って束ねたものに解析器が丸ごと入る。
+ */
 
 /** ブロック（`>-` / `|-`）で書かれうる文の欄。変えていなければ元の折り返しのまま戻す */
 const BLOCK_KEYS = ["message", "additionalContext", "additionalContextOnce"] as const;
 
-export interface RulesModel {
-  readonly version: number | null;
-  readonly sections: Readonly<Record<Section, readonly RuleForm[]>>;
-  /** 読み込み時の苦情。ルールの形が読めなかった場所。あっても他は出す */
-  readonly problems: readonly string[];
-}
-
 export interface RulesDocument {
   readonly model: RulesModel;
   /** 編集した並びで書き戻す。元のノードを使い回してコメントを残す */
-  readonly apply: (sections: Readonly<Record<Section, readonly RuleForm[]>>) => string;
+  readonly apply: (sections: Sections) => string;
 }
 
 export function readRules(text: string): RulesDocument {
@@ -142,11 +109,7 @@ interface BlockKeep {
   readonly raw: string;
 }
 
-function applyTo(
-  doc: Document,
-  text: string,
-  edited: Readonly<Record<Section, readonly RuleForm[]>>,
-): string {
+function applyTo(doc: Document, text: string, edited: Sections): string {
   // 元のノードを先に全部拾っておく。タイプをまたいで移すので、並びを書き換える前に取る。
   const originals = {} as Record<Section, YAMLMap[]>;
   const keeps: BlockKeep[] = [];
@@ -354,7 +317,7 @@ function setText(
 }
 
 /** 画面が送ってきた並びを、形だけ確かめて受け取る */
-export function asSections(raw: unknown): Readonly<Record<Section, readonly RuleForm[]>> | undefined {
+export function asSections(raw: unknown): Sections | undefined {
   if (typeof raw !== "object" || raw === null) {
     return undefined;
   }
