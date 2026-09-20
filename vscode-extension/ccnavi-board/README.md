@@ -334,12 +334,20 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 動かして見る（`board/render.dom.test.ts`）。React は押した直後には描き直さないので、操作のあとは
 `await page.settle()` を挟んでから見る。happy-dom で動かないものが出たときだけ jsdom を足す
 （いまは無い）。`pnpm test` と `pnpm run compile` は tsc の出力（`out/src` と `out/test`）を先に消す（tsc は消さないので、
-置き場を動かした古いテストが残る）。esbuild が束ねた `out/extension.js` は消さないので、package の compile → test の順でも入口は残る。
+置き場を動かした古いテストが残る）。束ねた画面（`out/webview`）を消すのは `scripts/bundle-webview.js` のほうで、
+束ね直す直前にまとめて消す（消す側と作り直す側を同じ場所に置く。画面を束ねない `test:rules` などが消しっぱなしにすると、
+そのあと F5 で起動した拡張が画面を読めなくなる）。esbuild が束ねた `out/extension.js` はどちらも消さないので、package の compile → test の順でも入口は残る。
 出荷物の型検査は `tsconfig.json`（`src/webview` を除く。lib は DOM 無し、拾う型は node と vscode だけ）と
 `tsconfig.webview.json`（`src/webview` だけ。lib に DOM、JSX は `react-jsx`、`noEmit`。JS を出すのは esbuild のほう）の
 2 本に分かれている。画面に DOM の型を、拡張ホストに Node の型を、それぞれ片方だけ持たせるため。
-画面の型検査（`tsconfig.webview.json`）は `pnpm test` と領域ごとの `test:*` の全部が回す。束ねるのが
-どの領域でも画面全部なので、型を見るほうも揃えてある（esbuild は型を落とすので、束ねるだけでは型エラーが通る）。
+画面の型検査（`tsconfig.webview.json`）と画面の束ねを回すのは、束ねた画面を読む領域だけ（`test:board` /
+`test:shared` / `test:dom`。読むのは `test/helpers/board.ts` を import するテスト）。`test:rules` / `test:risk` /
+`test:phases` / `test:projects` は画面を読まないので、どちらも回さない（1 領域あたり 1.5 秒ほど速い）。
+その領域の画面を React にしたら、`tsc -p tsconfig.webview.json` と `node scripts/bundle-webview.js` を
+その `test:*` にも足す。足し忘れると、esbuild は型を落とすので `.tsx` の型エラーがその領域だけでは通ってしまう
+（`pnpm test` と `pnpm run compile`、`pnpm run package` は回すので、出荷前には必ず捕まる）。
+なお `tsconfig.webview.json` は `src/webview` を 1 本で見るので、足したあとは**その領域だけの型検査にはならない**
+（他の画面の `.tsx` の型エラーでも落ちる）。領域ごとに分けたいなら tsconfig を画面ごとに割る必要がある。
 テストは `tsconfig.test.json`（`skipLibCheck` で依存の `.d.ts` の検査を飛ばす。happy-dom の型定義が `@types/node` 22 と噛み合わないため）。
 
 実行時の依存は `yaml`（コメントを残して書き戻すため）の 1 つ。開発時の依存に happy-dom と react / react-dom を足してある
@@ -515,7 +523,8 @@ test/
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。ボードは画面が React なので、描くものも動かして見る（render.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
-  bundle-webview.js   esbuild で画面（React）を out/webview/<名前>.js に束ねる。画面の一覧（名前 → 入口）は先頭の SCREENS
+  bundle-webview.js   esbuild で画面（React）を out/webview/<名前>.js に束ねる。画面の一覧（名前 → 入口）は先頭の SCREENS。
+                      束ね直す前に out/webview をまとめて消す
   package.sh          vsix の組み立て
 ```
 
@@ -545,6 +554,8 @@ scripts/
   フェーズ管理は編集の途中を持つので真にしてあり、裏にいる間に入れ物ごと入れ直すと打ちかけの内容が消える。
   これらを移すときは、保持する画面の段取り（裏でも `postMessage` を通し、入れ直さない）を足すか、
   編集の途中を Webview の state に逃がして偽に変えるかの判断が要る
+- `pnpm run test:rules` などは画面を読まないので `tsc -p tsconfig.webview.json` も `node scripts/bundle-webview.js` も
+  回していない。その領域を React にしたら両方足す（上の「組み立てと導入」に詳しい）
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。

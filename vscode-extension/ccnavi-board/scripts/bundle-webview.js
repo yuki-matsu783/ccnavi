@@ -5,27 +5,40 @@
 // tsc は型を見るだけ（tsconfig.webview.json は noEmit）で、JS を出すのは esbuild のほう。
 "use strict";
 
+const fs = require("node:fs");
 const path = require("node:path");
 const esbuild = require("esbuild");
 
 const here = path.resolve(__dirname, "..");
+const outdir = path.join(here, "out", "webview");
 
 // 画面の一覧（名前 → 入口）。画面を足すときはここに 1 行足す。
 //
-// 名前は出来上がりの綴り（`out/webview/<名前>.js`）で、読む側（`src/webview-script.ts` の
-// `webviewScript(name)`）は名前を取るので、画面が増えても読む側は直さなくてよい。
-// 束ねるのは領域ごとのテスト（`test:rules` など）でも全部で、型を見るのも
-// `tsconfig.webview.json`（`src/webview` 全部）で全部。束ねるものと型を見るものは揃えてある。
+// 名前は出来上がりの綴り（`out/webview/<名前>.js`）。読む側（`src/webview-script.ts` の
+// `webviewScript`）に渡すのは**拡張子まで込みの `<名前>.js`** で、ここのキーそのものではない
+// （`board-panel.ts` は `webviewScript("board.js")` と書く）。読む側は名前で引くので、
+// 画面が増えても読む側は直さなくてよい。
 const SCREENS = {
   board: path.join("src", "webview", "board", "main.tsx"),
 };
 
+if (Object.keys(SCREENS).length === 0) {
+  console.error("画面が 1 つも無い（SCREENS が空。out/webview を空にして拡張が動かなくなる）");
+  process.exit(1);
+}
+
+// 束ね直す前に置き場ごと消す。名前を変えたり画面をやめたりしたときに古い 1 本が残ると、
+// 拡張はそれを読めてしまう（消す側と作り直す側を同じ場所に置いて、片方だけ走る形を作らない）。
+fs.rmSync(outdir, { recursive: true, force: true, maxRetries: 3 });
+
 esbuild
   .build({
     // `{ in, out }` の形で渡すと、出口は `outdir` の下の `<out>.js` になる。
-    // 分割（splitting）はしないので、画面どうしは何も共有せず 1 本ずつで完結する
+    // 分割（splitting）はしない。chunk をファイルとして Webview に読ませることになり、
+    // localResourceRoots を空のままにする方針と両立しないため。代わりに React 一式が
+    // 画面ごとに重複する（1 画面あたり 200KB 強）
     entryPoints: Object.entries(SCREENS).map(([name, entry]) => ({ in: path.join(here, entry), out: name })),
-    outdir: path.join(here, "out", "webview"),
+    outdir,
     bundle: true,
     platform: "browser",
     // Webview は VS Code に入っている Chromium。ES2022 で足りる
