@@ -24,7 +24,8 @@ export type ApprovalOverlay =
   | { readonly kind: "error"; readonly error: string }
   /**
    * 承認できた。Claude Code に渡す文と、コピー / 新しいセッションで開く を出す。
-   * `carried` は承認済みチケットを運ぶ sh を端末に送ったか。送ったときだけ、そう言う
+   * `carried` は承認済みチケットを運ぶ sh を端末に**送ることにしたか**（その sh が置いてあるか）。
+   * 送るのは拡張ホストで、送れたかまでは見ていない。真のときだけ、そう言う
    */
   | { readonly kind: "done"; readonly count: number; readonly prompt: string; readonly carried?: boolean }
   /**
