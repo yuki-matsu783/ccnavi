@@ -84,7 +84,7 @@ lib の子（共通層の big-diff 25 + lib の schema 30 = 55、lib の critica
 飛ばして閉じられる。**
 
 - `cli.py` は `diagnosing` を `_override` より前で決め、`_drop_outside_diagnosis` が
-  3 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `_override` と揃える
+  5 本を「渡されなかった」値に戻す。渡されたかどうかの読み方は `_override` と揃える
   （`--rules ""` は指定と数えず、`--risk ""` は数える）
 - テストのハーネスは 3 本をフラグで渡すのをやめ、`--root` の下の既定の置き場
   （`.ccnavi/common/{rules,phases,risks}.yml`）に置く。綴りは `tests.common_path` が
@@ -122,7 +122,7 @@ deny（`builtin-guard-ticket-approval`）が止めているものの、あれは
 **テストのハーネスは、既定の置き場を使えば何も失わない。** ハーネスはもともと自分の
 一時ディレクトリを `--root` に渡している。設定をその下の既定の綴りに置けば、フラグは
 要らない。むしろ受入テストは、これまでリポジトリ自身をワークスペースルートにして
-動いていたので、走った機械の `.ccnavi/common/rules.yml` が判定に混ざらなくなる。
+動いていた。今回の変更で、走った機械の `.ccnavi/common/rules.yml` が判定に混ざらなくなる。
 
 ## 得たもの・失ったもの
 
