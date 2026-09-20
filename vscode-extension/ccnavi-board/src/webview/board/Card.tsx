@@ -183,7 +183,7 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
                 {phaseStatusBrief(p)}
               </span>
               <span className="phase-full">{full}</span>
-              {/* 依頼の投稿へのリンク。依頼のマーカーがある段階だけ（レビューが済んだ後も経緯として残す） */}
+              {/* 依頼の投稿へのリンク。依頼のマーカーがあるときだけ（レビューが済んだ後も経緯として残す） */}
               {p.mrUrl !== "" ? <MrLink url={p.mrUrl} number={p.mrNumber} title={`フェーズ ${p.label} のレビューの依頼を開く`} /> : null}
               {p.actions.map((action, i) => (
                 <ActionButton key={i} action={action} id={`${p.parent}:${p.number}`} />

@@ -277,7 +277,7 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
     assert.ok(!/自身の層のフェーズの種類/.test(body));
     assert.ok(!/フェーズ管理/.test(body));
     assert.ok(!/チケット管理/.test(body));
-    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる
+    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール設定だけになる
     for (const action of ["open-rules", "fetch", "pull"]) {
       assert.equal(off.all(`${cardSelector("lib")} button[data-action="${action}"][data-name="lib"]`).length, 1, action);
     }

@@ -38,7 +38,7 @@ export function requireTickets(what: string): boolean {
     return true;
   }
   vscode.window.showInformationMessage(
-    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）ので、${what}は開けない。ルール管理とプロジェクト管理は使える`,
+    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）ので、${what}は開けない。ルール設定とプロジェクト管理は使える`,
   );
   return false;
 }

@@ -53,7 +53,7 @@ deny:
     message: >-
       PowerShell は使いません。同じことを Bash ツールで打ってください。
       ファイルを読む・書く・探すなら Read / Write / Edit / Grep / Glob ツールを使ってください。 
-      PowerShell でしか実行できないことはユーザに実行を依頼してください。     
+      PowerShell でしか実行できないことは利用者に実行を依頼してください。     
 
   # 生の git はまとめて止め、入口を .ccnavi/scripts/ccnavi-git.sh の 1 本に寄せる。
   # 止める理由は 2 つ。
@@ -122,7 +122,7 @@ deny:
     regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
     message: >-
       hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。
-      エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼ください。
+      エージェントの判断で書き換えず、理由を伝えて利用者に変更を依頼してください。
 
 ask:
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。

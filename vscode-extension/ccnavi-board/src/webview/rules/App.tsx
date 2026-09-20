@@ -82,7 +82,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
-  /** ファイルが外で変わった。捨てて読み直すかは人が決める */
+  /** ファイルが外で変わった。破棄して読み直すかは人が決める */
   const [changed, setChanged] = useState(false);
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<TabName>(() => loadTab());

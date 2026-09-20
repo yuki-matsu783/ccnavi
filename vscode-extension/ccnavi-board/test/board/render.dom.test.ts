@@ -332,8 +332,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
     // 写りは子のワークツリーに普通に入るので、正常な場面ではバッジを出さない
     assert.equal(page.all(".badge.seen").length, 0);
     assert.ok(texts(page, ".card .where").includes("子 · 親 i0001 / フェーズ 2"));
-    // 親のフェーズは 1 段階 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
-    // 順調に終わった段階（LOW のリスク）も、レビューが要るだけの進行中の段階も、要約は空。
+    // 親のフェーズは 1 フェーズ 1 行。状態は要約と全文を持ち、全文は行の title にも置く。
+    // 順調に終わったフェーズ（LOW のリスク）も、レビューが要るだけの進行中の段階も、要約は空。
     const rows = page.all(".card.parent .phase");
     assert.equal(rows[0].getAttribute("class"), "phase phase-ended");
     assert.equal(rows[0].getAttribute("title"), "終了 · リスク: 0 (LOW)");
@@ -353,7 +353,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   }
   // 属性は列からはみ出さない
   assert.match(css(), /\.fact \{ white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; \}/);
-  // フェーズ行は 1 段階 1 行。右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が
+  // フェーズ行は 1 フェーズ 1 行。右に auto の列を置くと状態の 1 行分の幅が行を占め、段階名の列が
   // 0 になって消えるので、状態の列は 55% で止める。幅を測るのはフェーズ一覧自身
   assert.match(css(), /\.phases \{[^}]*container-type: inline-size; \}/);
   assert.match(css(), /\.phase \{ display: grid; grid-template-columns: 12px minmax\(0, 1fr\) fit-content\(55%\);/);
@@ -364,7 +364,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(wide, "@container の塊がある");
   assert.match(wide[0], /\.phase-brief \{ display: none; \}/);
   assert.match(wide[0], /\.phase-full \{ position: static;[^}]*clip-path: none;/);
-  // 止めているフェーズ行は段階名も右の状態も赤
+  // 止めているフェーズ行はフェーズ名も右の状態も赤
   assert.match(css(), /\.phase\.review-hold \.phase-label, \.phase\.review-hold \.phase-status \{ color: var\(--vscode-editorError-foreground\); \}/);
   // 止めているカードの左線は承認待ちの左線より後に書き、勝つ
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
@@ -507,7 +507,7 @@ test("CB-T118 本物が決まらない写りだけをバッジにし、場所を
   }
 });
 
-/** フェーズ 2 を人のレビュー待ちにし、依頼のマーカーに MR を持たせる */
+/** フェーズ 2 を人のレビュー待ちにし、依頼のマーカーにマージリクエストを持たせる */
 function waitingWithMr(url: string) {
   const base = fixture();
   const parent: ParentJson = {
@@ -528,7 +528,7 @@ function waitingWithMr(url: string) {
   return { ...base, parents: [parent] };
 }
 
-test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードに MR へのリンクを出す。http(s) 以外はリンクにしない", async () => {
+test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードにマージリクエストへのリンクを出す。http(s) 以外はリンクにしない", async () => {
   const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
   try {
     // 受け入れの隣に連絡のボタン。マーカーを置く操作ではないと title で言う

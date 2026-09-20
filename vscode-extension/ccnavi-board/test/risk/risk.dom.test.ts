@@ -170,7 +170,7 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
       caps.map((cap) => cap.getAttribute("title")),
       ["YAML のキー: id", "YAML のキー: points", "YAML のキー: lines_over / files_over / deleted_over / glob / script / judge", "YAML のキー: lines_over", "YAML のキー: message"],
     );
-    // 閾値は段階の名前を欄名にし、飾りの札は出さない
+    // 閾値は等級の名前を欄名にし、飾りの札は出さない
     assert.deepEqual(
       dom.all("#levels > .field > .cap").map((cap) => cap.textContent),
       ["MEDIUM", "HIGH", "CRITICAL"],
