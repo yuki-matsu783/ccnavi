@@ -8,12 +8,11 @@ env を渡しても共通層は既定の置き場のままになる。
 確かめるテストが自分の一時ディレクトリを指せなくなる（`ConfigUnionHarness`）。
 hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。
 
-ただしフラグは診断の経路に限られておらず、`ticket` / `review` の副命令でも効く
-（ADR-0052 の「決定」の末尾）。ここで見るのは env が効かないことだけで、
-フラグの効く範囲は別の話。
+フラグの効く範囲は ADR-0067 が診断の経路に限った。ここで見るのは env が効かないことと、
+その門が効いていることの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
 
-起動は `ConfigUnionHarness.ccnavi` を使わない。あちらは毎回 3 本ともフラグで渡すので、
-env が効くかどうかを見られない。ここでは 3 本のフラグを渡さずに起動する。
+起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
+読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
 
 実装は入っている（ADR-0052）。ここが赤くなったら、env を読む経路が戻ったということ。
 """
@@ -66,8 +65,6 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
             [
                 "--root",
                 self.ws,
-                "--projects",
-                self.projects,
                 "--approved",
                 ".ccnavi/tickets",
                 "--state",

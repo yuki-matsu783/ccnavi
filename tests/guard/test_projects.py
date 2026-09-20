@@ -201,15 +201,20 @@ class ProjectsTest(unittest.TestCase):
         git(owner, "worktree", "add", "--quiet", path, "-b", name)
         return path
 
-    def ccnavi(self, *args, stdin="", projects=None):
+    def ccnavi(self, *args, stdin="", env=None):
+        """実行ファイルを 1 回起動する。
+
+        `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ効く
+        （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
+        数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
+        """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
+        environment.update(env or {})
         return run_ccnavi(
             [
                 "--root",
                 self.ws,
-                "--projects",
-                self.projects if projects is None else projects,
                 "--approved",
                 ".ccnavi/approved",
                 "--state",
@@ -229,7 +234,7 @@ class ProjectsTest(unittest.TestCase):
             env=environment,
         )
 
-    def hook(self, tool, cwd, projects=None, event="PreToolUse", **tool_input):
+    def hook(self, tool, cwd, env=None, event="PreToolUse", **tool_input):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -237,7 +242,7 @@ class ProjectsTest(unittest.TestCase):
             "session_id": "s1",
             "tool_input": tool_input,
         }
-        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), projects=projects)
+        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload), env=env)
 
     def system_message(self, result):
         if not result.stdout.strip():
@@ -581,15 +586,16 @@ class ProjectsTest(unittest.TestCase):
     # ---- 7. projects/ を数えない設定では前と同じ
 
     def test_without_a_projects_dir_everything_is_judged_by_the_workspace_rules(self):
+        no_projects = {"CCNAVI_PROJECTS": ""}
         passed = self.hook(
-            "Write", self.ws, projects="", file_path=os.path.join(self.app, "schema", "x.sql")
+            "Write", self.ws, env=no_projects, file_path=os.path.join(self.app, "schema", "x.sql")
         )
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
         record = self.last_record()
         self.assertNotIn("project", record)
 
-        passed = self.hook("Bash", self.app, projects="", command="psql")
+        passed = self.hook("Bash", self.app, env=no_projects, command="psql")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
 

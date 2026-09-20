@@ -416,14 +416,17 @@ class ConfigUnionHarness(unittest.TestCase):
 
     # ---- 起動
 
-    def ccnavi(self, *args, stdin="", projects=None, env=None, guard="disable"):
+    def ccnavi(self, *args, stdin="", env=None, guard="disable"):
         """実行ファイルを 1 回起動する。
 
-        共通層の 3 本は `--rules` / `--phases` / `--risk` で渡さない。この 3 つは
-        診断（`--lint` / `--test` / `--explain`）でだけ効き、hook の判定とチケットの
-        副命令では落ちる（ADR-0067）。土台は `--root` の下の既定の置き場
-        （`.ccnavi/common/`）に置くので、渡す必要も無い。差し替えたいテストは
-        `self.rules` / `self.phases` / `self.risk` に書けばよい。
+        層の置き場はフラグで渡さない。共通層の 3 本（`--rules` / `--phases` / `--risk`）も、
+        層を探す先の 2 本（`--projects` / `--project-home`）も、診断（`--lint` / `--test` /
+        `--explain`）でだけ効き、hook の判定とチケットの副命令では落ちる（ADR-0067）。
+        土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
+
+        差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
+        「`projects/` を数えない」を言いたいテストは `env={"CCNAVI_PROJECTS": ""}`
+        を渡す。人が `settings.json` に書く経路がそれで、フラグではない。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -432,8 +435,6 @@ class ConfigUnionHarness(unittest.TestCase):
             [
                 "--root",
                 self.ws,
-                "--projects",
-                self.projects if projects is None else projects,
                 "--approved",
                 ".ccnavi/approved",
                 "--state",
@@ -455,7 +456,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
     def hook(self, tool, cwd, *, event="PreToolUse", session="s1", **kw):
         """hook の payload を 1 件渡す。kw のうち起動の引数は取り出し、残りは tool_input。"""
-        options = {k: kw.pop(k) for k in ("projects", "env", "guard") if k in kw}
+        options = {k: kw.pop(k) for k in ("env", "guard") if k in kw}
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -1058,8 +1059,9 @@ class WiringTest(ConfigUnionHarness):
         # 自身の層だけを消す。共通層も同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
         shutil.rmtree(os.path.join(self.ws, HOME, "config"))
 
+        no_projects = {"CCNAVI_PROJECTS": ""}
         allowed = self.hook(
-            "Write", self.ws, projects="", file_path=os.path.join(self.ws, "src", "a.py")
+            "Write", self.ws, env=no_projects, file_path=os.path.join(self.ws, "src", "a.py")
         )
         self.assert_not_denied(allowed)
         record = self.last_record()
@@ -1068,10 +1070,12 @@ class WiringTest(ConfigUnionHarness):
         self.assertNotIn("fallback", record)
         self.assertNotIn("project", record)
 
-        denied = self.hook("Write", self.ws, projects="", file_path=os.path.join(self.ws, ".env"))
+        denied = self.hook(
+            "Write", self.ws, env=no_projects, file_path=os.path.join(self.ws, ".env")
+        )
         self.assert_denied(denied, "credentials")
         self.assertEqual(self.last_record()["rules"], ["credentials"])
-        self.assert_not_denied(self.hook("Bash", self.ws, projects="", command="psql"))
+        self.assert_not_denied(self.hook("Bash", self.ws, env=no_projects, command="psql"))
 
 
 class ExplainTest(ConfigUnionHarness):

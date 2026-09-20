@@ -65,8 +65,9 @@ workspace's own layer; the common layer uses --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
 
-The common layer's own three files are moved by --rules, --phases and --risk.
-They are on the same gate: diagnosis only, dropped everywhere else.
+The common layer's own three files are moved by --rules, --phases and --risk,
+and where the layers are looked for by --projects and --project-home. All five
+are on the same gate: diagnosis only, dropped everywhere else.
 
 --root and --cwd say where this run is happening. The wrapper scripts in
 .ccnavi/scripts/ work them out and pass them, so they are accepted once only;
@@ -192,14 +193,23 @@ OVERRIDES = (
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
-# 共通層（ルール・フェーズの種類・リスクの配点）の置き場を動かすフラグと、
-# 「渡されなかった」ときの値。`--project-rules-file` と同じで診断の経路でだけ効く。
-# 3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES と同じ読み方で決めるため
-# （`--rules ""` は指定と数えず、`--risk ""` は数える）。
-COMMON_LAYER_OVERRIDES = (
+# 層の置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
+# 同じで診断の経路でだけ効く。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
+# RELATIVE_OVERRIDES と同じ読み方で決めるため（`--rules ""` は指定と数えず、
+# `--risk ""` は数える）。
+#
+# 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
+# **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
+# 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
+# プロジェクトの層がまるごと消える。実測では `ticket done <子> --project-home .nothere`
+# で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
+# 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
+LAYER_OVERRIDES = (
     ("--rules", "rules", ""),
     ("--phases", "phases", None),
     ("--risk", "risk", None),
+    ("--projects", "projects", None),
+    ("--project-home", "project_home", ""),
 )
 # 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
 DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
@@ -223,8 +233,8 @@ def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
     """sh が渡す綴りが 2 度来ていないかを見て、1 本に均す。2 度来ていたら False。
 
     数えるのは argparse に任せる（`action="append"`）。argv を自分で数えると、
-    別のオプションの**値**に書いた `--root` という語まで数えてしまう
-    （`ccnavi ... --reason --root` は `--reason` の値であって、渡した `--root` ではない）。
+    オプションの位置に立っていない `--root` という語まで数えてしまう
+    （`--reason=--root` のように別のオプションの値として書かれた形）。
     """
     for flag, name, absent in WRAPPER_FLAGS:
         given = getattr(args, name)
@@ -236,13 +246,13 @@ def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
 
 
 def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
-    """診断の外で渡された共通層の差し替えを、標準エラーに出して落とす。
+    """診断の外で渡された層の置き場の差し替えを、標準エラーに出して落とす。
 
     フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
-    `phases.yml` / `risks.yml` で判定と採点が走る。届く経路は `.ccnavi/scripts/` の
-    sh で、受け取った引数を実行ファイルへ素通しする（ADR-0067）。
+    `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへ素通しする（ADR-0067）。
     """
-    for flag, name, absent in COMMON_LAYER_OVERRIDES:
+    for flag, name, absent in LAYER_OVERRIDES:
         if getattr(args, name) == absent:
             continue
         stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
@@ -352,7 +362,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
 
-    # 層のルール・フェーズの種類・リスクの配点の差し替えは診断の経路でだけ効く。
+    # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ効く。
     # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
     # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を

@@ -458,5 +458,49 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(mark.get("source"), "lib", mark)
 
 
+class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
+    """層を探す先を動かすフラグも、診断の外では効かない（ADR-0067、issue #65）。
+
+    `--projects` と `--project-home` は、共通層の中身を差し替えるのと結果が同じ。
+    外すとプロジェクトの層がまるごと消えるので、その層が足していた配点も
+    フェーズの種類も落ちる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数を素通しするので、
+    この形はエージェントが Bash で打てる。
+
+    土台の子は共通層の `big-diff`（25）と lib の `schema`（30）で 55 点、
+    lib の critical は 50 なので CRITICAL。`review: mr` のフェーズなので
+    レビュー待ちへ動く。lib の層が消えると 25 点の MEDIUM になり、
+    レビューを飛ばして閉じられる。
+    """
+
+    def assert_the_lib_layer_still_counted(self, closed):
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        record = self.record()
+        self.assertEqual(record["points"], 55, "lib の層が落ちた")
+        self.assertIn("schema", {h["id"] for h in record["hits"]})
+        self.assertIn("(CRITICAL)", closed.stdout)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.lib, "wip", "proposals", "review", "i0001-01.md")),
+            "レビュー待ちへ動いていない",
+        )
+
+    def test_a_project_home_flag_on_ticket_done_does_not_drop_the_layer(self):
+        tree = self.one_child()
+        self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--project-home", ".nothere")
+
+        self.assertIn("--project-home は診断", closed.stderr, "落としたことを言っていない")
+        self.assert_the_lib_layer_still_counted(closed)
+
+    def test_a_projects_flag_on_ticket_done_does_not_drop_the_layer(self):
+        tree = self.one_child()
+        self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--projects", os.path.join(self.ws, "x"))
+
+        self.assertIn("--projects は診断", closed.stderr, "落としたことを言っていない")
+        self.assert_the_lib_layer_still_counted(closed)
+
+
 if __name__ == "__main__":
     unittest.main()
