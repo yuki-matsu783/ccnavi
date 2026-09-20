@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -79,7 +79,8 @@ class PostToolUseTest(unittest.TestCase):
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        self.rules = os.path.join(self.repo, "rules.yml")
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0063）。
+        self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
@@ -116,8 +117,6 @@ class PostToolUseTest(unittest.TestCase):
             [
                 "--root",
                 self.repo,
-                "--rules",
-                self.rules,
                 "--state",
                 self.state,
                 "--log",
@@ -451,8 +450,7 @@ class PostToolUseTest(unittest.TestCase):
         outside = tempfile.mkdtemp(prefix="ccnavi-plain-")
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
         self.repo = outside
-        write(os.path.join(outside, "rules.yml"), json.dumps(RULES))
-        self.rules = os.path.join(outside, "rules.yml")
+        self.rules = write(common_path(outside, "rules"), json.dumps(RULES))
         self.state = os.path.join(outside, "state")
         self.log = os.path.join(outside, "log.jsonl")
 

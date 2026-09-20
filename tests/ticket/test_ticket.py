@@ -28,7 +28,7 @@ import unittest
 
 from ccnavi import phase as phase_mod
 from ccnavi import settings, shellread
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -117,7 +117,8 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0063）。
+        self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
@@ -138,8 +139,6 @@ class TicketTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--rules",
-                self.rules,
                 "--approved",
                 ".ccnavi/approved",
                 "--state",

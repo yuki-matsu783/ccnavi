@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_relpath
 from tests.inproc import run_ccnavi
 
 # 不備の無いルール 1 件。ここに 1 つずつ壊した欄を足して試す。
@@ -48,7 +48,9 @@ def rules_file(directory: str, *rules, version: int = 1, allow: bool = True) -> 
     body: dict = {"version": version, "deny": list(rules)}
     if allow:
         body["allow"] = [ALLOWED]
-    return write(directory, "rules.yml", json.dumps(body, indent=2))
+    # 置くのは共通層の既定の場所。検証は `--rules` で指せるが、同じファイルを hook の
+    # 判定にも掛けるテストがあり、そちらには届かない（ADR-0063）。
+    return write(directory, common_relpath("rules"), json.dumps(body, indent=2))
 
 
 # 提案 1 枚の最小の中身。置き場の話だけを見るので、範囲は 1 項でよい。
@@ -598,7 +600,7 @@ class LintTest(unittest.TestCase):
             }
         )
         decided = run_ccnavi(
-            ["--root", self.root, "--rules", path] + ["--mode", "enable", "--log", ""],
+            ["--root", self.root, "--mode", "enable", "--log", ""],
             input=payload,
             cwd=ROOT,
             env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},

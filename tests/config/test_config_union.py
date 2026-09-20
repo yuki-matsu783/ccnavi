@@ -416,7 +416,15 @@ class ConfigUnionHarness(unittest.TestCase):
 
     # ---- 起動
 
-    def ccnavi(self, *args, stdin="", projects=None, rules=None, env=None, guard="disable"):
+    def ccnavi(self, *args, stdin="", projects=None, env=None, guard="disable"):
+        """実行ファイルを 1 回起動する。
+
+        共通層の 3 本は `--rules` / `--phases` / `--risk` で渡さない。この 3 つは
+        診断（`--lint` / `--test` / `--explain`）でだけ効き、hook の判定とチケットの
+        副命令では落ちる（ADR-0063）。土台は `--root` の下の既定の置き場
+        （`.ccnavi/common/`）に置くので、渡す必要も無い。差し替えたいテストは
+        `self.rules` / `self.phases` / `self.risk` に書けばよい。
+        """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
@@ -424,12 +432,6 @@ class ConfigUnionHarness(unittest.TestCase):
             [
                 "--root",
                 self.ws,
-                "--rules",
-                rules or self.rules,
-                "--phases",
-                self.phases,
-                "--risk",
-                self.risk,
                 "--projects",
                 self.projects if projects is None else projects,
                 "--approved",
@@ -453,7 +455,7 @@ class ConfigUnionHarness(unittest.TestCase):
 
     def hook(self, tool, cwd, *, event="PreToolUse", session="s1", **kw):
         """hook の payload を 1 件渡す。kw のうち起動の引数は取り出し、残りは tool_input。"""
-        options = {k: kw.pop(k) for k in ("projects", "rules", "env", "guard") if k in kw}
+        options = {k: kw.pop(k) for k in ("projects", "env", "guard") if k in kw}
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
@@ -911,11 +913,9 @@ class LayerFailureTest(ConfigUnionHarness):
 
     def test_broken_common_layer_falls_back_to_builtin_as_before(self):
         """§11.2 / REQ-PRE-06: 共通層自身が読めないときは今どおり組み込みの既定。層は足さない。"""
-        broken = write(os.path.join(self.ws, "broken.yml"), BROKEN)
+        write(self.rules, BROKEN)
 
-        passed = self.hook(
-            "Write", self.ws, rules=broken, file_path=os.path.join(self.lib, "schema", "x.sql")
-        )
+        passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
         self.assert_not_denied(passed)
         record = self.last_record()
         self.assertEqual(record.get("fallback"), "builtin-rules")
@@ -933,13 +933,10 @@ class ProblemsSaidOnceTest(ConfigUnionHarness):
     SILENT = {"id": "silent", "match": "Bash", "glob": "*nothing matches*"}
 
     def test_hooks_say_a_common_layer_problem_once(self):
-        common = write(
-            os.path.join(self.ws, "silent-rules.yml"),
-            json.dumps({"version": 1, "deny": [self.SILENT]}),
-        )
+        write(self.rules, json.dumps({"version": 1, "deny": [self.SILENT]}))
         for event in ("UserPromptSubmit", "Stop"):
             with self.subTest(event=event):
-                done = self.hook("", self.ws, event=event, rules=common)
+                done = self.hook("", self.ws, event=event)
                 self.assertEqual(done.stderr.count("deny:silent"), 1, done.stderr)
 
     def test_lint_counts_a_layer_problem_once(self):

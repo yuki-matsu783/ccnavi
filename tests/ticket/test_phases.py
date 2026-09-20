@@ -23,6 +23,7 @@ import shutil
 import tempfile
 import unittest
 
+from tests import common_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, RULES, git, read_json, write
 
@@ -129,8 +130,11 @@ class PhaseHarness(unittest.TestCase):
         write(os.path.join(self.root, ".gitignore"), ".claude/\n")
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
-        self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
-        self.phases = write(os.path.join(self.root, "phases.yml"), PHASES)
+        # 共通層は `--root` の下の既定の置き場に置く。`--rules` / `--phases` は診断
+        # （`--lint` / `--test` / `--explain`）でだけ効くので、hook の判定と `--reviewed`
+        # には渡せない（ADR-0063）。差し替えたいテストはこのファイルに書き直す。
+        self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
+        self.phases = write(common_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
@@ -143,19 +147,15 @@ class PhaseHarness(unittest.TestCase):
         git(self.root, "worktree", "add", "--quiet", path, "-b", name, base)
         return path
 
-    def ccnavi(self, *args, stdin="", phases=None):
+    def ccnavi(self, *args, stdin=""):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         return run_ccnavi(
             [
                 "--root",
                 self.root,
-                "--rules",
-                self.rules,
                 "--approved",
                 ".ccnavi/approved",
-                "--phases",
-                phases or self.phases,
                 "--state",
                 self.state,
                 "--log",
@@ -1007,6 +1007,44 @@ phases:
 """
 
 
+class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
+    """`ticket` の副命令に `--phases` を足しても、種類は共通層のまま（ADR-0063、issue #65）。
+
+    `.ccnavi/scripts/ccnavi-ticket.sh` が引数を素通しするので、この形はエージェントが
+    Bash で打てる。通していた頃は、`review: mr` の種類を `review: none` と名乗る
+    ファイルに差し替えて、レビュー待ちを飛ばせた。
+    """
+
+    def test_a_phases_flag_on_ticket_done_does_not_drop_the_review(self):
+        # 同じ `design` を `review: none` と名乗るファイル。
+        loose = write(
+            os.path.join(self.root, "loose.yml"),
+            "version: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n"
+            '    review: none\n    scope: ["wip/design/*"]\n',
+        )
+        self.family(plan=["design"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--phases", loose)
+
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.assertIn("--phases は診断", closed.stderr, "落としたことを言っていない")
+        # `review: mr` のまま。閉じた先はレビュー待ちで、`.ccnavi/approved/done/` ではない。
+        self.assertTrue(
+            os.path.exists(
+                os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
+            ),
+            "レビュー待ちへ動いていない（渡した種類で判定された）",
+        )
+        self.assertFalse(
+            os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")),
+            "レビューを飛ばして閉じた",
+        )
+
+
 class ChatReviewTest(PhaseHarness):
     """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0051）。"""
 
@@ -1186,10 +1224,8 @@ class ChatReviewTest(PhaseHarness):
         self.commit_parent("close 02")
         self.merge("i0001-02")
         # 承認のあとで種類が読めなくなる（人が phases.yml を触っている最中、層の切り替え）。
-        thin = write(os.path.join(self.root, "phases-thin.yml"), "version: 1\nphases: {}\n")
-        refused = self.ccnavi(
-            "--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n", phases=thin
-        )
+        write(self.phases, "version: 1\nphases: {}\n")
+        refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "2", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("マージリクエスト", refused.stderr)
         # 止まったままになる。読めないことでレビューが消える道は作らない。
@@ -1200,7 +1236,7 @@ class ChatReviewTest(PhaseHarness):
             "session_id": "s1",
             "tool_input": {"description": "次の子"},
         }
-        spawn = self.ccnavi("--mode", "enable", stdin=json.dumps(payload), phases=thin)
+        spawn = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
 
     def test_a_feedback_phase_can_be_seen_in_the_session_too(self):
@@ -1372,7 +1408,7 @@ class ScopeLimitTest(PhaseHarness):
         """11. どの層にも phases.yml が無ければ種類では切り詰めない（番号だけの挙動）。"""
         from tests.ticket.test_ticket import ticket_text
 
-        self.phases = os.path.join(self.root, "no-phases.yml")
+        os.remove(self.phases)
         self.propose("i0001", ticket_text("i0001", allow=("src/*", "wip/*")))
         self.propose(
             "i0001-01", ticket_text("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
@@ -1460,7 +1496,7 @@ class ScopeLimitTest(PhaseHarness):
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
         )
-        self.phases = os.path.join(self.root, "no-phases.yml")
+        os.remove(self.phases)
         self.assertFalse(os.path.exists(self.phases))
         for rel in ("wip/research/note.md", "src/a/x.py"):
             with self.subTest(rel):

@@ -28,7 +28,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 WS_RULES = {
@@ -164,7 +164,8 @@ class ProjectsTest(unittest.TestCase):
         git(self.ws, "add", "-A")
         git(self.ws, "commit", "--quiet", "-m", "init")
 
-        self.rules = write(os.path.join(self.ws, "rules.yml"), json.dumps(WS_RULES))
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0063）。
+        self.rules = write(common_path(self.ws, "rules"), json.dumps(WS_RULES))
         self.projects = os.path.join(self.ws, "projects")
         self.app = self.project("app", APP_RULES)
         self.lib = self.project("lib", LIB_RULES)
@@ -207,8 +208,6 @@ class ProjectsTest(unittest.TestCase):
             [
                 "--root",
                 self.ws,
-                "--rules",
-                self.rules,
                 "--projects",
                 self.projects if projects is None else projects,
                 "--approved",

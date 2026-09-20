@@ -55,14 +55,18 @@ shape documented in README.md ("lint の JSON"); the VS Code extension reads it.
 
 To try or lint one project's rules before saving them, hand the edited file in
 by the project's name (this flag is for --test, --test-samples, --lint and
---explain only; a hook invocation ignores it):
+--explain only; anything else - a hook invocation, a ticket or review
+subcommand - drops it and says so on stderr):
 
     ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
 
 The phase types of one layer are handed in the same way (self is the
-workspace's own layer; the common layer keeps using --phases):
+workspace's own layer; the common layer uses --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
+
+The common layer's own three files are moved by --rules, --phases and --risk.
+They are on the same gate: diagnosis only, dropped everywhere else.
 
 To list the tickets, their places, the phase marks and the review holds
 in a machine-readable form (the VS Code board extension reads this), run
@@ -184,6 +188,31 @@ OVERRIDES = (
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
+# 共通層（ルール・フェーズの種類・リスクの配点）の置き場を動かすフラグと、
+# 「渡されなかった」ときの値。`--project-rules-file` と同じで診断の経路でだけ効く。
+# 3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES と同じ読み方で決めるため
+# （`--rules ""` は指定と数えず、`--risk ""` は数える）。
+COMMON_LAYER_OVERRIDES = (
+    ("--rules", "rules", ""),
+    ("--phases", "phases", None),
+    ("--risk", "risk", None),
+)
+# 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
+DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
+
+
+def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
+    """診断の外で渡された共通層の差し替えを、標準エラーに出して落とす。
+
+    フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
+    `phases.yml` / `risks.yml` で判定と採点が走る。届く経路は `.ccnavi/scripts/` の
+    sh で、受け取った引数を実行ファイルへ素通しする（ADR-0063）。
+    """
+    for flag, name, absent in COMMON_LAYER_OVERRIDES:
+        if getattr(args, name) == absent:
+            continue
+        stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
+        setattr(args, name, absent)
 
 
 def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
@@ -286,6 +315,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
 
+    # 層のルール・フェーズの種類・リスクの配点の差し替えは診断の経路でだけ効く。
+    # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
+    # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0063）。
+    # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
+    # 指しても実運用に漏れない。
+    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    if not diagnosing:
+        _drop_outside_diagnosis(stderr, args)
+
     _override(conf, args)
     # フラグは設定ファイルより強い。書かれた綴りのほうも、そこに合わせて差し替える。
     if args.guard_ticket_approval:
@@ -311,9 +349,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
-    # 層のルールと種類の差し替えは診断の経路でだけ効く。hook からの判定にも
-    # 差し替えの手段を残すと、設定を保存せずに緩める道になるので、そこでは無視する。
-    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
     for flag, value, swaps in (
         ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
         ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
@@ -321,7 +357,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not value:
             continue
         if not diagnosing:
-            stderr.write(f"ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n")
+            stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
             continue
         name, sep, path = value.partition("=")
         if not sep or not name or not path:

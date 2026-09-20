@@ -27,7 +27,7 @@ import tempfile
 import unittest
 
 from ccnavi import rules
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # 「ワークスペースルートの外」。設計 §3.2 の、置ける唯一の形。
@@ -47,9 +47,14 @@ def write(path: str, text: str) -> str:
 
 
 def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
-    """ルールファイルを 1 枚書いて綴りを返す。"""
+    """ルールファイルを 1 枚書いて綴りを返す。
+
+    置くのは共通層の既定の場所。hook として叩く側は `--rules` を渡せない
+    （診断でだけ効く。ADR-0063）ので、ワークスペースルートの下の既定の綴りに要る。
+    直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
+    """
     return write(
-        os.path.join(directory, "rules.yml"),
+        common_path(directory, "rules"),
         json.dumps({"version": 1, section: list(rule)}),
     )
 
@@ -461,8 +466,6 @@ class NotRootJudgeTest(unittest.TestCase):
                 self.root,
                 "--mode",
                 mode,
-                "--rules",
-                self.rules,
                 "--log",
                 "",
                 "--state",

@@ -134,8 +134,6 @@ class SelfGuardTest(unittest.TestCase):
             [
                 "--root",
                 self.repo,
-                "--rules",
-                self.rules,
                 "--state",
                 self.state,
                 "--log",

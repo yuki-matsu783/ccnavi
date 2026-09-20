@@ -17,6 +17,7 @@ import os
 import unittest
 
 from ccnavi import risk
+from tests import common_path
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, read_json, write
 
@@ -69,16 +70,15 @@ class RiskTest(PhaseHarness):
 
     def setUp(self):
         super().setUp()
-        self.risk = write(os.path.join(self.root, "risks.yml"), RISK)
+        # 配点と種類は共通層の既定の置き場へ。`--risk` / `--phases` は診断でだけ効き、
+        # `ticket` の副命令には届かない（ADR-0063）。差し替えるテストはこの綴りに書き直す。
+        self.risk = write(common_path(self.root, "risk"), RISK)
         # 範囲の上限が無く、レビュー不要の種類。宣言では「レビュー不要」な作業を実績で上書きする。
-        self.phases = write(
-            os.path.join(self.root, "phases-risk.yml"),
+        write(
+            self.phases,
             "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n"
             "    review: none\n    scope: inherit\n",
         )
-
-    def ccnavi(self, *args, stdin="", phases=None, risk_file=None):
-        return super().ccnavi("--risk", risk_file or self.risk, *args, stdin=stdin, phases=phases)
 
     def one_child(self, review=False):
         scope = ("src/*", "wip/*", ".github/*")
@@ -172,15 +172,15 @@ class RiskTest(PhaseHarness):
             'printf \'{"points": 30, "message": "%s"}\' "$CCNAVI_TICKET"\n',
         )
         self.assertTrue(os.path.exists(script))
-        risk_file = write(
-            os.path.join(self.root, "risk2.yml"),
+        write(
+            self.risk,
             "version: 1\nfactors:\n"
             "  - {id: counted, points: 5, script: .ccnavi/common/scripts/count.sh,"
             " message: 数えた}\n"
             "  - {id: broken, points: 45, script: .ccnavi/common/scripts/none.sh, message: 無い}\n",
         )
         self.one_child()
-        closed = self.ccnavi("ticket", "done", "i0001-01", risk_file=risk_file)
+        closed = self.ccnavi("ticket", "done", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         record = self.record()
         self.assertEqual(75, record["points"])
@@ -193,14 +193,14 @@ class RiskTest(PhaseHarness):
     # ---- 4. 定性
 
     def test_judge_factor_blocks_done_until_recorded(self):
-        risk_file = write(
-            os.path.join(self.root, "risk3.yml"),
+        write(
+            self.risk,
             "version: 1\nlevels: {high: 30}\nfactors:\n"
             "  - {id: untested, points: 30, judge: テストの無い振る舞いの変更を含むか,"
             " message: テスト無し}\n",
         )
         tree = self.one_child()
-        refused = self.ccnavi("ticket", "done", "i0001-01", risk_file=risk_file)
+        refused = self.ccnavi("ticket", "done", "i0001-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("untested", refused.stderr)
         self.assertIn("judge", refused.stderr)
@@ -217,18 +217,15 @@ class RiskTest(PhaseHarness):
             "yes",
             "--reason",
             "テストが無い",
-            risk_file=risk_file,
         )
         self.assertEqual(judged.returncode, 0, judged.stderr)
-        wrong = self.ccnavi(
-            "ticket", "judge", "i0001-01", "nope", "yes", "--reason", "x", risk_file=risk_file
-        )
+        wrong = self.ccnavi("ticket", "judge", "i0001-01", "nope", "yes", "--reason", "x")
         self.assertNotEqual(wrong.returncode, 0)
         # HEAD が動いたら判定は古い。
         write(os.path.join(tree, "src", "later.py"), "1\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "later")
-        stale = self.ccnavi("ticket", "done", "i0001-01", risk_file=risk_file)
+        stale = self.ccnavi("ticket", "done", "i0001-01")
         self.assertNotEqual(stale.returncode, 0)
         self.assertIn("untested", stale.stderr)
         judged = self.ccnavi(
@@ -239,10 +236,9 @@ class RiskTest(PhaseHarness):
             "no",
             "--reason",
             "テストを足した",
-            risk_file=risk_file,
         )
         self.assertEqual(judged.returncode, 0, judged.stderr)
-        closed = self.ccnavi("ticket", "done", "i0001-01", risk_file=risk_file)
+        closed = self.ccnavi("ticket", "done", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertEqual(0, self.record()["points"])
         # サブエージェントは judge を打てない。
@@ -260,14 +256,51 @@ class RiskTest(PhaseHarness):
         denied = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(denied))
 
+    # ---- 5. 副命令に配点を渡しても効かない（ADR-0063）
+
+    def test_a_risk_flag_on_ticket_done_does_not_change_the_score(self):
+        """`ticket done <子> --risk <別の配点>` は採点を差し替えない。issue #65。
+
+        sh のラッパー（`.ccnavi/scripts/ccnavi-ticket.sh`）が受け取った引数を素通しするので、
+        この形はエージェントが Bash で打てる。通していた頃は、重い変更を軽い配点で
+        閉じられた。
+        """
+        cheap = write(
+            os.path.join(self.root, "cheap.yml"),
+            "version: 1\nlevels: {medium: 20, high: 40, critical: 70}\nfactors: []\n",
+        )
+        tree = self.one_child(review=False)
+        write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "big")
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--risk", cheap)
+
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.assertIn("--risk は診断", closed.stderr, "落としたことを言っていない")
+        self.assertEqual(25, self.record()["points"], "渡した配点で採点された")
+
+    def test_an_empty_risk_flag_on_ticket_done_is_dropped_too(self):
+        """`--risk ""` も同じ。空は「配点を持たない」の意味で通っていた（issue #65）。"""
+        tree = self.one_child(review=False)
+        write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "big")
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--risk", "")
+
+        self.assertEqual(closed.returncode, 0, closed.stderr)
+        self.assertIn("--risk は診断", closed.stderr)
+        self.assertEqual(25, self.record()["points"])
+
     # ---- 6. lint と組み込みへの退避
 
     def test_lint_reports_a_broken_definition_and_builtin_takes_over(self):
-        broken = write(os.path.join(self.root, "broken.yml"), "version: 1\nfactors: 3\n")
-        linted = self.ccnavi("--lint", risk_file=broken)
+        write(self.risk, "version: 1\nfactors: 3\n")
+        linted = self.ccnavi("--lint")
         self.assertIn("(risk)", linted.stdout + linted.stderr)
         self.one_child()
-        closed = self.ccnavi("ticket", "done", "i0001-01", risk_file=broken)
+        closed = self.ccnavi("ticket", "done", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("組み込みの配点", closed.stderr)
         self.assertIn(risk.BUILTIN, closed.stdout)

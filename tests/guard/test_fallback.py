@@ -11,15 +11,18 @@ import os
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # YAML として壊れている。閉じていない並び 1 つ。書き損じの典型。
 BROKEN = "version: 2\ndeny: [\n  - id: x\n"
 
 
-def run(rules_path, payload, log="", env=None):
-    """道具を 1 回動かす。ルールファイルの場所を呼び出しごとに変えられる。
+def run(root, payload, log="", env=None):
+    """道具を 1 回動かす。ワークスペースルートを呼び出しごとに変えられる。
+
+    ルールは `--rules` では渡さない。あれは診断でだけ効き、hook の判定には
+    届かない（ADR-0063）。読めないルールは `--root` の下の共通層に置く。
 
     コアファイルの控えと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     切らないと、作業ツリーで消した設定ファイルや、ccnavi ディレクトリの名前を動かした先へ
@@ -31,8 +34,8 @@ def run(rules_path, payload, log="", env=None):
     environment.update(env or {})
     return run_ccnavi(
         [
-            "--rules",
-            rules_path,
+            "--root",
+            root,
             "--log",
             log,
             "--mode",
@@ -64,10 +67,17 @@ class FallbackTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.broken = os.path.join(self.directory.name, "rules.yml")
+        # 共通層のルールが読めないワークスペース。
+        self.root = self.directory.name
+        self.broken = common_path(self.root, "rules")
+        os.makedirs(os.path.dirname(self.broken), exist_ok=True)
         with open(self.broken, "w", encoding="utf-8") as f:
             f.write(BROKEN)
-        self.missing = os.path.join(self.directory.name, "not-there.yml")
+        # ルールファイルがそもそも無いワークスペース。読めない理由が違うだけで、
+        # 落ちる先は同じ既定。
+        empty = tempfile.TemporaryDirectory()
+        self.addCleanup(empty.cleanup)
+        self.without_rules = empty.name
 
     def test_壊れたルールでもセッションは死なない(self):
         # ここが要件の核。拒否側へ倒すと、壊れたファイルを直すための呼び出しまで
@@ -76,9 +86,9 @@ class FallbackTest(unittest.TestCase):
         #
         # 既定にはプロジェクトの allow が無いので、無害な呼び出しも権限モードへの委譲に
         # なる。人が答えれば進むので、道は塞がっていない。塞がるのは deny だけ。
-        for rules_path in (self.broken, self.missing):
-            with self.subTest(rules=os.path.basename(rules_path)):
-                result = run(rules_path, pre_tool_use("Bash", "command", "cat README.md"))
+        for root, why in ((self.root, "broken"), (self.without_rules, "missing")):
+            with self.subTest(rules=why):
+                result = run(root, pre_tool_use("Bash", "command", "cat README.md"))
                 self.assertEqual(result.returncode, 0, f"無害な呼び出しを止めた: {result.stderr!r}")
                 self.assertNotEqual(
                     out_of(self, result).get("permissionDecision"),
@@ -89,7 +99,7 @@ class FallbackTest(unittest.TestCase):
     def test_既定に落ちたことは呼び出しごとに伝える(self):
         # 黙って落ちると、ガードが立っているように見えて実際は何も見ていない
         # 状態が続く。止まっているより悪い。止まっていれば誰かが気づく。
-        out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", "cat README.md")))
+        out = out_of(self, run(self.root, pre_tool_use("Bash", "command", "cat README.md")))
         said = out.get("permissionDecisionReason", "") + out.get("additionalContext", "")
 
         self.assertIn("built-in defaults", said)
@@ -98,7 +108,7 @@ class FallbackTest(unittest.TestCase):
     def test_既定でも読み取りは通る(self):
         # いちばん数が多く、作業ツリーを変えようがない。ここまで確認を出すと、
         # 本当に見てほしい 1 件がその中に埋もれる。
-        result = run(self.broken, pre_tool_use("Read", "file_path", "README.md"))
+        result = run(self.root, pre_tool_use("Read", "file_path", "README.md"))
 
         self.assertNotIn("permissionDecision", out_of(self, result))
 
@@ -106,7 +116,7 @@ class FallbackTest(unittest.TestCase):
         # 落ちた先が素通しでは、壊すだけでガードを外せることになる。
         for command in ["rm -rf /tmp/x", "git push origin main", "git reset --hard HEAD~1"]:
             with self.subTest(command=command):
-                out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
+                out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定は設定の修復を妨げない(self):
@@ -117,9 +127,7 @@ class FallbackTest(unittest.TestCase):
         # あいだにガードの設定を書き換える操作なので、人が 1 度見る側に置く。
         for tool in ("Read", "Write", "Edit"):
             with self.subTest(tool=tool):
-                result = run(
-                    self.broken, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml")
-                )
+                result = run(self.root, pre_tool_use(tool, "file_path", ".ccnavi/common/rules.yml"))
                 self.assertNotEqual(
                     out_of(self, result).get("permissionDecision"),
                     "deny",
@@ -131,7 +139,7 @@ class FallbackTest(unittest.TestCase):
         # 緩んだ既定に落ちる、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
-            run(self.broken, pre_tool_use("Bash", "command", "echo x > .ccnavi/common/rules.yml")),
+            run(self.root, pre_tool_use("Bash", "command", "echo x > .ccnavi/common/rules.yml")),
         )
 
         self.assertEqual(out.get("permissionDecision"), "deny")
@@ -147,7 +155,7 @@ class FallbackTest(unittest.TestCase):
             "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
         ]:
             with self.subTest(command=command):
-                out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
+                out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
@@ -165,7 +173,7 @@ class FallbackTest(unittest.TestCase):
             with self.subTest(command=command):
                 out = out_of(
                     self,
-                    run(self.broken, pre_tool_use("Bash", "command", command), env=env),
+                    run(self.root, pre_tool_use("Bash", "command", command), env=env),
                 )
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
                 self.assertIn("builtin-guard-config-via-bash", out["permissionDecisionReason"])
@@ -181,13 +189,13 @@ class FallbackTest(unittest.TestCase):
             "grep -n conflict .ccnavi/common/rules.yml",
         ]:
             with self.subTest(command=command):
-                out = out_of(self, run(self.broken, pre_tool_use("Bash", "command", command)))
+                out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertNotEqual(out.get("permissionDecision"), "deny", f"止めた: {command!r}")
 
     def test_既定に落ちたことは記録に残る(self):
         # ガードが落ちたまま何回動いたかは、これでしか数えられない。
         log = os.path.join(self.directory.name, "log.jsonl")
-        run(self.broken, pre_tool_use("Bash", "command", "cat README.md"), log=log)
+        run(self.root, pre_tool_use("Bash", "command", "cat README.md"), log=log)
         with open(log, encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]
 

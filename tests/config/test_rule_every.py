@@ -29,7 +29,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 EVERY = "ここまでに 5 件の編集があった。ルールと突き合わせること。"
@@ -56,7 +56,12 @@ class EveryTest(unittest.TestCase):
         self.last: subprocess.CompletedProcess | None = None
         self.addCleanup(self.dir.cleanup)
 
-    def rules(self, *allow: dict, name: str = "rules.yml") -> str:
+    def rules(self, *allow: dict) -> str:
+        """共通層の既定の場所にルールを 1 本置く。
+
+        `--rules` では渡さない。あれは診断でだけ効き、hook の判定には届かない
+        （ADR-0063）。
+        """
         body = {
             "version": 1,
             "deny": [
@@ -64,18 +69,16 @@ class EveryTest(unittest.TestCase):
             ],
             "allow": list(allow),
         }
-        return write(os.path.join(self.root, name), json.dumps(body))
+        return write(common_path(self.root, "rules"), json.dumps(body))
 
     def run_ccnavi(
-        self, rules_path: str, *args: str, payload: str = "", state: str | None = None
+        self, *args: str, payload: str = "", state: str | None = None
     ) -> subprocess.CompletedProcess:
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         return run_ccnavi(
             [
                 "--root",
                 self.root,
-                "--rules",
-                rules_path,
                 "--log",
                 "",
                 "--state",
@@ -91,7 +94,6 @@ class EveryTest(unittest.TestCase):
 
     def hit(
         self,
-        rules_path: str,
         *,
         session: str = "s1",
         agent: str = "",
@@ -108,7 +110,7 @@ class EveryTest(unittest.TestCase):
                 "tool_input": {"file_path": os.path.join(self.root, "src", "a.py")},
             }
         )
-        done = self.run_ccnavi(rules_path, "--mode", "enable", payload=payload, state=state)
+        done = self.run_ccnavi("--mode", "enable", payload=payload, state=state)
         self.last = done
         self.assertEqual(done.returncode, 0, done.stderr)
         if not done.stdout.strip():
@@ -118,8 +120,8 @@ class EveryTest(unittest.TestCase):
         except (ValueError, KeyError) as exc:
             self.fail(f"標準出力が期待した JSON ではない: {exc}\nstdout: {done.stdout!r}")
 
-    def hits(self, rules_path: str, times: int, **kw) -> list[str]:
-        return [self.hit(rules_path, **kw) for _ in range(times)]
+    def hits(self, times: int, **kw) -> list[str]:
+        return [self.hit(**kw) for _ in range(times)]
 
     def saved(self) -> str:
         """控えに残った本文を全部つないだもの。何も残っていなければ空。"""
@@ -138,13 +140,13 @@ class EveryTest(unittest.TestCase):
 
     def test_every_delivers_on_the_multiples_only(self):
         """`every: 5` は 5 回目と 10 回目に渡し、その間は渡さない。"""
-        path = self.rules(rule("src", additionalContext=EVERY, every=5))
-        self.assertEqual(self.hits(path, 10), ["", "", "", "", EVERY, "", "", "", "", EVERY])
+        self.rules(rule("src", additionalContext=EVERY, every=5))
+        self.assertEqual(self.hits(10), ["", "", "", "", EVERY, "", "", "", "", EVERY])
 
     def test_once_comes_on_the_first_delivering_hit_and_not_again(self):
         """`additionalContextOnce` は渡す回の最初の 1 回（5 回目）だけ。10 回目には出ない。"""
-        path = self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=5))
-        got = self.hits(path, 10)
+        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=5))
+        got = self.hits(10)
         self.assertEqual(got[:4], ["", "", "", ""])
         self.assertEqual(got[4], f"{EVERY}\n\n{ONCE}")
         self.assertEqual(got[5:9], ["", "", "", ""])
@@ -152,30 +154,27 @@ class EveryTest(unittest.TestCase):
 
     def test_rules_without_every_keep_the_old_timing(self):
         """`every` を書かないルールは今までどおり。毎回渡し、`Once` は 1 回目。"""
-        path = self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE))
-        self.assertEqual(self.hits(path, 3), [f"{EVERY}\n\n{ONCE}", EVERY, EVERY])
+        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE))
+        self.assertEqual(self.hits(3), [f"{EVERY}\n\n{ONCE}", EVERY, EVERY])
 
     def test_every_one_is_the_same_as_no_every(self):
         """`every: 1` と `every` 無しは同じ結果になる。"""
-        one = self.rules(
-            rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=1),
-            name="one.yml",
-        )
-        plain = self.rules(
-            rule("src", additionalContext=EVERY, additionalContextOnce=ONCE), name="plain.yml"
-        )
-        self.assertEqual(self.hits(one, 3, session="one"), self.hits(plain, 3, session="plain"))
+        # 2 本を同じ場所に置くので、先に片方を回してから置き換える。
+        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=1))
+        one = self.hits(3, session="one")
+        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE))
+        self.assertEqual(one, self.hits(3, session="plain"))
 
     def test_once_alone_with_every_speaks_once_at_the_nth(self):
         """`additionalContextOnce` だけを持つ `every: 5` は、5 回目に 1 度だけ渡す。"""
-        path = self.rules(rule("src", additionalContextOnce=ONCE, every=5))
-        self.assertEqual(self.hits(path, 10), ["", "", "", "", ONCE, "", "", "", "", ""])
+        self.rules(rule("src", additionalContextOnce=ONCE, every=5))
+        self.assertEqual(self.hits(10), ["", "", "", "", ONCE, "", "", "", "", ""])
 
     def test_file_bodies_follow_the_field_they_belong_to(self):
         """`additionalContextFile` は `additionalContext` に、`OnceFile` は `Once` に従う。"""
         write(os.path.join(self.root, "docs", "every.md"), "渡す回のたびの本文")
         write(os.path.join(self.root, "docs", "once.md"), "最初の渡す回だけの本文")
-        path = self.rules(
+        self.rules(
             rule(
                 "src",
                 additionalContext=EVERY,
@@ -185,7 +184,7 @@ class EveryTest(unittest.TestCase):
                 every=5,
             )
         )
-        got = self.hits(path, 10)
+        got = self.hits(10)
         self.assertEqual(
             got[4], f"{EVERY}\n\n渡す回のたびの本文\n\n{ONCE}\n\n最初の渡す回だけの本文"
         )
@@ -196,33 +195,33 @@ class EveryTest(unittest.TestCase):
 
     def test_the_count_is_split_by_session_and_agent(self):
         """数えはセッションと `agent_id` で分かれる。サブエージェントは自分の数えを持つ。"""
-        path = self.rules(rule("src", additionalContextOnce=ONCE, every=3))
-        self.assertEqual(self.hits(path, 3, session="s1"), ["", "", ONCE])
+        self.rules(rule("src", additionalContextOnce=ONCE, every=3))
+        self.assertEqual(self.hits(3, session="s1"), ["", "", ONCE])
         # 別のセッションは 0 から数える。
-        self.assertEqual(self.hits(path, 2, session="s2"), ["", ""])
+        self.assertEqual(self.hits(2, session="s2"), ["", ""])
         # 同じセッションのサブエージェントも自分の数えを持つ。
-        self.assertEqual(self.hits(path, 3, session="s1", agent="a1"), ["", "", ONCE])
+        self.assertEqual(self.hits(3, session="s1", agent="a1"), ["", "", ONCE])
         # 子の 3 回は親の数えを進めていない（親の 4 回目は渡す回ではない）。
-        self.assertEqual(self.hit(path, session="s1"), "")
+        self.assertEqual(self.hit(session="s1"), "")
 
     def test_an_old_array_state_file_still_reads(self):
         """古い形（配列）の控えを読んでも落ちず、渡した控えとして読む。"""
         write(os.path.join(self.state, "once-s1-main.json"), json.dumps({"given": ["src"]}))
-        path = self.rules(rule("src", additionalContextOnce=ONCE))
-        self.assertEqual(self.hit(path, session="s1"), "")
+        self.rules(rule("src", additionalContextOnce=ONCE))
+        self.assertEqual(self.hit(session="s1"), "")
         self.assertNotIn("控えを読めない", (self.last.stderr if self.last else ""))
         # 控えの無いセッションには今までどおり渡る。
-        self.assertEqual(self.hit(path, session="s2"), ONCE)
+        self.assertEqual(self.hit(session="s2"), ONCE)
 
     def test_no_state_dir_delivers_every_time(self):
         """`--state ""` のときは数えを覚えられないので、渡す回を刻まず毎回渡す。"""
-        path = self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=5))
-        self.assertEqual(self.hits(path, 3, state=""), [f"{EVERY}\n\n{ONCE}"] * 3)
+        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=5))
+        self.assertEqual(self.hits(3, state=""), [f"{EVERY}\n\n{ONCE}"] * 3)
 
     def test_rules_with_neither_every_nor_once_leave_no_count(self):
         """`every` も `Once` も持たないルールは、控えに数えを書かない。"""
-        path = self.rules(rule("plain", additionalContext=EVERY))
-        self.assertEqual(self.hits(path, 3), [EVERY] * 3)
+        self.rules(rule("plain", additionalContext=EVERY))
+        self.assertEqual(self.hits(3), [EVERY] * 3)
         self.assertNotIn("plain", self.saved())
 
 
