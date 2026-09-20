@@ -101,6 +101,8 @@ export type ToRisk =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
+  /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
+  | { readonly type: "cancelled" }
   | { readonly type: "appearance"; readonly value: Appearance };
 
 /** 画面 → 拡張ホスト。受け側（risk-panel の `asMessage`）が形を確かめてから使う */

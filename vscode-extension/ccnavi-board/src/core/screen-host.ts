@@ -53,11 +53,20 @@ export interface Surface {
   post(message: unknown): void;
 }
 
+/**
+ * 保持する画面（`retainedHost`）が使う口。**表裏（`visible`）は要らない。** 裏でも生きていて、
+ * 読まないものを実装させると、写して作った次の画面に死んだゲッターが付いて回る
+ */
+export type RetainedSurface = Omit<Surface, "visible">;
+
 /** 渡し方。`send` が返す */
 export type Delivery = "posted" | "deferred" | "rebuilt";
 
 export interface ScreenHost<D> {
-  /** いま `postMessage` が届く（1 枚入っていて、表に出ていて、組み上がっている） */
+  /**
+   * いま `postMessage` が届く。`screenHost` は「1 枚入っていて、表に出ていて、組み上がっている」、
+   * `retainedHost` は「1 枚入っていて、組み上がっている」（表裏は見ない）
+   */
   readonly live: boolean;
   /**
    * いま見せるものを渡す。
@@ -71,8 +80,9 @@ export interface ScreenHost<D> {
   /** 画面から `ready` が届いた。呼んだ側は、続けて中身を渡し直す */
   ready(): void;
   /**
-   * 裏に回った（`onDidChangeViewState`）。画面は捨てられているので、組み上がっていない側に倒す。
-   * 行って戻るまでこの段取りが 1 度も呼ばれないと自分では気づけないので、ここで教えてもらう
+   * 裏に回った（`onDidChangeViewState`）。`screenHost` は画面が捨てられているので、組み上がって
+   * いない側に倒す（行って戻るまでこの段取りが 1 度も呼ばれないと自分では気づけないので、ここで
+   * 教えてもらう）。`retainedHost` は画面が生きているので何もしない
    */
   hidden(): void;
 }
@@ -173,8 +183,11 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  *
  * - **入れ物（HTML）は 1 度しか入れない。** 入れ直すと画面は作り直され、人が打ちかけていた
  *   内容が消える。2 枚目からは必ず `postMessage`（`posted`）で渡す
- * - **表裏を見ない。** 裏でも `postMessage` は届く。見て倒すと、裏にいる間の `lock` や
- *   `changed` の知らせが落ちる
+ * - **表裏を見ない。** 裏でも `postMessage` は届く（`postMessage` の文書が「live な画面には届く。
+ *   保持する画面は裏でも live」と言う）。見て倒すと、裏にいる間の `lock` や `changed` の知らせが落ちる。
+ *   **ただし VS Code の文書は同じ型定義の中で食い違っている**（`retainContextWhenHidden` の側は
+ *   「裏に回った画面にはメッセージを送れない」と言う）。どちらが正しくても壊れないよう、呼ぶ側は
+ *   表に戻ったときに、いま出すべき知らせ（`lock`・`changed`）を送り直す（risk-panel / phases-panel）
  * - **`hidden()` は何もしない。** 教えてもらっても、捨てられていないので倒すものが無い
  *
  * 残る `deferred` は 1 枚目だけ。入れ物を入れてから画面が組み上がる（`ready`）までの間は、
@@ -184,7 +197,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  * 監視がファイルの変化に気づいても勝手に渡さない（`{type:"changed"}` の帯を出して人に決めさせる）。
  * 渡すのは、人が「再読込」を押したときと、保存・作成が通って中身が入れ替わったとき。
  */
-export function retainedHost<D>(surface: Surface, render: (data: D) => string): ScreenHost<D> {
+export function retainedHost<D>(surface: RetainedSurface, render: (data: D) => string): ScreenHost<D> {
   let htmlSet = false;
   let mounted = false;
 

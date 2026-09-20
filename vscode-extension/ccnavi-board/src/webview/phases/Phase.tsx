@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { KIND_LABELS, PHASE_KINDS, REVIEWS, REVIEW_LABELS, type PhaseForm, type PhaseKind, type Review } from "../../core/phases-view.js";
-import { hasRelations, relationsNote, scopeText, scopeTitle, splitList } from "./text.js";
+import { relationsNote, scopeText, scopeTitle, splitList } from "./text.js";
 
 export interface PhaseProps {
   /** 画面の中だけの鍵（`state.ts`）。行を名指しするために `data-key` へ出す */
@@ -16,8 +16,11 @@ export interface PhaseProps {
   readonly find: string;
   readonly hidden: boolean;
   readonly open: boolean;
-  /** 「関係と案内」を開いているか。未指定なら値の有無で決める */
-  readonly moreOpen?: boolean;
+  /**
+   * 「関係と案内」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
+   * 人の開閉で動く）。ここで値の有無から決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
+   */
+  readonly moreOpen: boolean;
   /** id が他の種類と重なっている。保存は止まる */
   readonly duplicate: boolean;
   /** 欄を触れるか。保存の往復の間と、共通層でファイルが無い間は触れない */
@@ -138,7 +141,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         </Captioned>
         <details
           className="more"
-          open={props.moreOpen ?? hasRelations(phase)}
+          open={props.moreOpen}
           onToggle={(event) => props.onToggleMore((event.currentTarget as HTMLDetailsElement).open)}
         >
           <summary>
@@ -180,8 +183,11 @@ export function Phase(props: PhaseProps): JSX.Element {
  * 並びの欄。1 つの欄に `,` 区切りで出し、打つたびに並びへ戻す。
  *
  * **打っている途中の文字は欄が持つ。** 並びに直したものをそのまま欄へ戻すと、`a, ` と打った
- * ところで `a` に縮む（区切りの直後が打てない）。外から中身が入れ替わったとき（再読込・保存）は、
- * 並びが打っている途中のものと違うので、そこで欄を入れ直す。
+ * ところで `a` に縮む（区切りの直後が打てない）。
+ *
+ * 外から中身が入れ替わったとき（再読込・保存）は、行の鍵が配り直されてこの部品ごと作り直されるので、
+ * 欄は新しい値で始まる。下の `useEffect` はその道を通らない保険で、鍵を保つ書き方に変えたときに
+ * 欄が古いまま残らないように置いてある。
  */
 function ListInput({
   value,

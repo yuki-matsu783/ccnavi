@@ -71,6 +71,8 @@ interface PanelState {
   /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
+  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  changedPending: boolean;
   wroteAt: number;
 }
 
@@ -129,6 +131,7 @@ export async function openRisk(): Promise<void> {
     watchers: [],
     loaded,
     lock: lockFromError("まだ確認していない"),
+    changedPending: false,
     wroteAt: 0,
   };
   state = current;
@@ -169,6 +172,21 @@ function registerPanelHandlers(current: PanelState): void {
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asMessage(message));
+  });
+
+  // 保持する画面は裏でも生きている（`postMessage` は届く）が、VS Code の文書は同じ型定義の中で
+  // 食い違っている（`retainContextWhenHidden` の側は「裏の画面には送れない」と言う）。
+  // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
+  // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
+  panel.onDidChangeViewState(() => {
+    if (!panel.visible || !alive(current)) {
+      return;
+    }
+    current.host.post({ type: "lock", lock: current.lock } satisfies ToRisk);
+    if (current.changedPending) {
+      current.changedPending = true;
+      current.host.post({ type: "changed" } satisfies ToRisk);
+    }
   });
 
   panel.onDidDispose(() => {
@@ -296,6 +314,8 @@ function show(current: PanelState): void {
     return;
   }
   current.error = undefined;
+  // 読み直したので、「外で変わった」はもう今のことではない
+  current.changedPending = false;
   current.host.send({
     kind: "page",
     page: {
@@ -343,14 +363,16 @@ function redraw(current: PanelState): void {
 
 /**
  * リスク管理の画面に渡す口。VS Code のパネルを `retainedHost` の形に合わせる。
- * **入れ物は 1 度しか入らない**ので、`visible` は読まれない（保持する画面は裏でも生きている）。
+ * **入れ物は 1 度しか入らない**ので、表裏は渡さない（保持する画面は裏でも生きている）。
+ * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
+ * 型では止まらないので、ここで見て言う。
  */
 function riskHost(panel: vscode.WebviewPanel): ScreenHost<RiskData> {
+  if (panel.options.retainContextWhenHidden !== true) {
+    console.error(`リスク管理の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）。偽のままだと、裏に回った画面へ送り続けて中身が古いまま止まる`);
+  }
   return retainedHost<RiskData>(
     {
-      get visible(): boolean {
-        return panel.visible;
-      },
       html(text: string): void {
         panel.webview.html = text;
       },
@@ -367,6 +389,21 @@ function riskHost(panel: vscode.WebviewPanel): ScreenHost<RiskData> {
   );
 }
 
+/**
+ * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
+ *
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
+ * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
+ */
+function stale(current: PanelState, loaded: Loaded): boolean {
+  if (current.loaded === loaded) {
+    return false;
+  }
+  fail(current, `読み直したので、この保存は捨てた。いまの${"配点"}で編集し直す`);
+  return true;
+}
+
 /** 操作の結果の一言。1 枚目を読み込んでいる間だけ落ちる（裏に回っていても届く） */
 function fail(current: PanelState, message: string): void {
   current.host.post({ type: "failed", message } satisfies ToRisk);
@@ -377,7 +414,9 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     return;
   }
   if (message.type === "ready") {
-    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る
+    // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
+    // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す道
+    // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
     current.host.ready();
     redraw(current);
     current.host.post({ type: "appearance", value: readAppearance() } satisfies ToRisk);
@@ -397,6 +436,8 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
           "読み直す",
         );
         if (choice !== "読み直す") {
+          // 画面は「再読込」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
+          current.host.post({ type: "cancelled" } satisfies ToRisk);
           return;
         }
       }
@@ -475,6 +516,9 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   if (!alive(current)) {
     return;
   }
+  if (stale(current, loaded)) {
+    return;
+  }
   if (!lint.ok) {
     fail(current, lint.error);
     return;
@@ -488,6 +532,9 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   // 2. 作業中のチケットが無いこと。押した時点で取り直す。
   const lock = await refreshLock(current);
   if (!alive(current)) {
+    return;
+  }
+  if (stale(current, loaded)) {
     return;
   }
   if (lock.locked) {

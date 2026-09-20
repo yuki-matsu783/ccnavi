@@ -1,7 +1,8 @@
 /**
  * リスク管理画面の入口。最初の中身は HTML に埋まっている（`<script type="application/json">`）。
- * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は入れ直されない（ADR-0062）ので、
- * ここが走るのはパネルを開いた 1 度だけ。
+ * 2 枚目からは拡張ホストが postMessage で渡す。入れ物は拡張ホストからは入れ直されない（ADR-0062）
+ * ので、ここが走るのはパネルを開いたとき。VS Code が画面を作り直す道（`Developer: Reload Webviews`、
+ * 別ウィンドウへ移す）では同じ HTML からもう 1 度走るが、`ready` を送れば今の中身が届く。
  */
 import { createRoot } from "react-dom/client";
 

@@ -18,7 +18,7 @@ import { editable as canEdit, type PhaseForm, type PhasesData, type PhasesPage, 
 import { applyAppearance } from "../appearance.js";
 import { Phase } from "./Phase.js";
 import { post } from "./post.js";
-import { countText, duplicateNote, emptyNote, findText } from "./text.js";
+import { countText, duplicateNote, emptyNote, findText, hasRelations } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -35,7 +35,10 @@ interface Editing {
   readonly draft: Draft;
   /** 開いている行の鍵 */
   readonly open: ReadonlySet<string>;
-  /** 「関係と案内」を人が開閉した行。触っていない行は値の有無で決まる */
+  /**
+   * 「関係と案内」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとは人の開閉で動く。**
+   * 描くたびに値の有無で決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
+   */
   readonly more: ReadonlyMap<string, boolean>;
 }
 
@@ -46,7 +49,8 @@ function pageOf(data: PhasesData): PhasesPage | undefined {
 function editingOf(data: PhasesData, nextKey: () => string): Editing {
   const page = pageOf(data);
   const draft = page === undefined ? EMPTY_DRAFT : draftOf(page.model.form, nextKey);
-  return { draft, open: openedFromIds(draft, loadOpen()), more: new Map() };
+  const more = new Map(draft.rows.map((row) => [row.key, hasRelations(row.phase)]));
+  return { draft, open: openedFromIds(draft, loadOpen()), more };
 }
 
 export function App({ initial }: { readonly initial: PhasesData }): JSX.Element {
@@ -85,6 +89,10 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         setLock(message.lock);
       } else if (message.type === "changed") {
         setChanged(true);
+      } else if (message.type === "cancelled") {
+        // 「破棄して読み直す？」をやめた。止めた欄を戻す
+        setBusy(false);
+        setStatus(undefined);
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -104,11 +112,27 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setFocusKey(undefined);
   }, [focusKey]);
 
+  /**
+   * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
+   * ことがあり（層の置き場を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
+   */
+  const reload = (): void => {
+    setBusy(true);
+    setStatus(undefined);
+    post({ type: "reload", dirty });
+  };
+
   if (data.kind === "error") {
     return (
       <>
-        <p className="empty">フェーズ管理画面を読み直せなかった。原因を直してから「ccnavi ボード: フェーズ管理画面を開く」を実行し直す。</p>
+        <p className="empty">
+          フェーズ管理画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: フェーズ管理画面を開く」を実行する。開いたままでは前面に出るだけ）。
+        </p>
         <pre className="load-error">{data.error}</pre>
+        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+          再読込
+        </button>
       </>
     );
   }
@@ -161,6 +185,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
     editDraft({ rows: [...draft.rows, row] }, new Set([...open, row.key]));
+    // 足した種類は関係も案内も空なので、「関係と案内」は畳んで出す
+    setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
   };
 
@@ -183,7 +209,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルが外で変更されたので、画面の内容は古い。
-        <button type="button" className="action" data-action="reload" onClick={() => post({ type: "reload", dirty })}>
+        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
           再読込
         </button>
       </div>
@@ -200,7 +226,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" disabled={page?.exists !== true} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty })}>
+          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
             再読込
           </button>
           <button
@@ -267,7 +293,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               find={row.find}
               hidden={row.hidden}
               open={open.has(row.key)}
-              moreOpen={more.get(row.key)}
+              moreOpen={more.get(row.key) === true}
               duplicate={dup.has(row.phase.id.trim())}
               disabled={busy || !editable}
               onToggle={() => toggle(row.key)}

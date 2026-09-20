@@ -84,6 +84,10 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         setLock(message.lock);
       } else if (message.type === "changed") {
         setChanged(true);
+      } else if (message.type === "cancelled") {
+        // 「破棄して読み直す？」をやめた。止めた欄を戻す
+        setBusy(false);
+        setStatus(undefined);
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -104,11 +108,27 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     setFocusKey(undefined);
   }, [focusKey]);
 
+  /**
+   * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
+   * ことがあり（層の置き場を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
+   */
+  const reload = (): void => {
+    setBusy(true);
+    setStatus(undefined);
+    post({ type: "reload", dirty });
+  };
+
   if (data.kind === "error") {
     return (
       <>
-        <p className="empty">リスク管理画面を読み直せなかった。原因を直してから「ccnavi ボード: リスク管理画面を開く」を実行し直す。</p>
+        <p className="empty">
+          リスク管理画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: リスク管理画面を開く」を実行する。開いたままでは前面に出るだけ）。
+        </p>
         <pre className="load-error">{data.error}</pre>
+        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+          再読込
+        </button>
       </>
     );
   }
@@ -168,7 +188,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     <>
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルが外で変更されたので、画面の内容は古い。
-        <button type="button" className="action" data-action="reload" onClick={() => post({ type: "reload", dirty })}>
+        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
           再読込
         </button>
       </div>
@@ -185,7 +205,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <button type="button" className="action" data-action="open-risk" disabled={!exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty })}>
+          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
             再読込
           </button>
           <button
