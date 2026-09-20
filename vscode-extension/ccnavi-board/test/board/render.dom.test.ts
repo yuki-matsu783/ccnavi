@@ -610,7 +610,7 @@ test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要�
   }
 });
 
-test("CB-T133 読み直せなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
+test("CB-T162 読み直せなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
   const plain = await openPage({ kind: "error", error: "ccnavi --explain --json が失敗した: 60 秒で返らないので打ち切った" });
   try {
     assert.ok(text(plain, ".board-empty").includes("ボードを読み直せなかった"));
