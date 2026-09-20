@@ -55,14 +55,23 @@ shape documented in README.md ("lint の JSON"); the VS Code extension reads it.
 
 To try or lint one project's rules before saving them, hand the edited file in
 by the project's name (this flag is for --test, --test-samples, --lint and
---explain only; a hook invocation ignores it):
+--explain only; anything else - a hook invocation, a ticket or review
+subcommand - drops it and says so on stderr):
 
     ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
 
 The phase types of one layer are handed in the same way (self is the
-workspace's own layer; the common layer keeps using --phases):
+workspace's own layer; the common layer uses --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
+
+The common layer's own three files are moved by --rules, --phases and --risk,
+and where the layers are looked for by --projects and --project-home. All five
+are on the same gate: diagnosis only, dropped everywhere else.
+
+--root and --cwd say where this run is happening. The wrapper scripts in
+.ccnavi/scripts/ work them out and pass them, so they are accepted once only;
+a second one is refused rather than taken as an override.
 
 To list the tickets, their places, the phase marks and the review holds
 in a machine-readable form (the VS Code board extension reads this), run
@@ -184,6 +193,70 @@ OVERRIDES = (
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
+# 層の置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
+# 同じで診断の経路でだけ効く。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
+# RELATIVE_OVERRIDES と同じ読み方で決めるため（`--rules ""` は指定と数えず、
+# `--risk ""` は数える）。
+#
+# 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
+# **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
+# 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
+# プロジェクトの層がまるごと消える。実測では `ticket done <子> --project-home .nothere`
+# で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
+# 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
+LAYER_OVERRIDES = (
+    ("--rules", "rules", ""),
+    ("--phases", "phases", None),
+    ("--risk", "risk", None),
+    ("--projects", "projects", None),
+    ("--project-home", "project_home", ""),
+)
+# 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
+DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
+# `.ccnavi/scripts/` の sh が自分で計算して渡す綴りと、渡されなかったときの値。
+# どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。
+#
+# sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐ
+# （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
+# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
+# `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
+# 実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
+# 本物の置き場に「リスク 0」で閉じられた（ADR-0067）。
+#
+# 正しい 1 本が先に在ることに頼らず、2 本目が在ること自体を断る。落として先へ進むのでは
+# なく止めるのは、この 2 つに「2 度渡す」正しい使い方が無いから。診断の 5 本と違って、
+# 効く経路の話ではない。
+WRAPPER_FLAGS = (("--root", "root", None), ("--cwd", "cwd", ""))
+
+
+def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
+    """sh が渡す綴りが 2 度来ていないかを見て、1 本に均す。2 度来ていたら False。
+
+    数えるのは argparse に任せる（`action="append"`）。argv を自分で数えると、
+    オプションの位置に立っていない `--root` という語まで数えてしまう
+    （`--reason=--root` のように別のオプションの値として書かれた形）。
+    """
+    for flag, name, absent in WRAPPER_FLAGS:
+        given = getattr(args, name)
+        if given is not None and len(given) > 1:
+            stderr.write(f"ccnavi: {flag} は 1 度しか渡せない（{len(given)} 度渡された）\n")
+            return False
+        setattr(args, name, given[-1] if given else absent)
+    return True
+
+
+def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
+    """診断の外で渡された層の置き場の差し替えを、標準エラーに出して落とす。
+
+    フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
+    `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへ素通しする（ADR-0067）。
+    """
+    for flag, name, absent in LAYER_OVERRIDES:
+        if getattr(args, name) == absent:
+            continue
+        stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
+        setattr(args, name, absent)
 
 
 def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
@@ -222,7 +295,8 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
-    parser.add_argument("--root", default=None)
+    # 綴りは sh が計算して渡す。2 度来ていないかを見るので、束ねて受ける（WRAPPER_FLAGS）。
+    parser.add_argument("--root", action="append", default=None)
     parser.add_argument("--mode", default="")
     parser.add_argument("--rules", default="")
     parser.add_argument("--log", default=None)
@@ -267,7 +341,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--project-phases-file", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
-    parser.add_argument("--cwd", default="")
+    parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
@@ -282,9 +356,20 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         stderr.write(USAGE)
         return EXIT_ERROR
+    if not _one_wrapper_flag_each(stderr, args):
+        return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
+
+    # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ効く。
+    # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
+    # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
+    # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
+    # 指しても実運用に漏れない。
+    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    if not diagnosing:
+        _drop_outside_diagnosis(stderr, args)
 
     _override(conf, args)
     # フラグは設定ファイルより強い。書かれた綴りのほうも、そこに合わせて差し替える。
@@ -311,9 +396,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
-    # 層のルールと種類の差し替えは診断の経路でだけ効く。hook からの判定にも
-    # 差し替えの手段を残すと、設定を保存せずに緩める道になるので、そこでは無視する。
-    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
     for flag, value, swaps in (
         ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
         ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
@@ -321,7 +404,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not value:
             continue
         if not diagnosing:
-            stderr.write(f"ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n")
+            stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
             continue
         name, sep, path = value.partition("=")
         if not sep or not name or not path:

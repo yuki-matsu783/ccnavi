@@ -13,7 +13,7 @@ import tempfile
 import unittest
 
 from ccnavi import rules
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 # このリポジトリの rules.yml と同じ形。先読みを使わずに 1 段目で場合分けする。
@@ -34,8 +34,9 @@ class RootPlaceholderTest(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.root = os.path.realpath(self.dir.name)
         self.addCleanup(self.dir.cleanup)
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
         self.rules = write(
-            os.path.join(self.root, "rules.yml"),
+            common_path(self.root, "rules"),
             json.dumps(
                 {
                     "version": 1,
@@ -77,8 +78,6 @@ class RootPlaceholderTest(unittest.TestCase):
                 self.root,
                 "--mode",
                 "enable",
-                "--rules",
-                self.rules,
                 "--log",
                 "",
                 "--state",

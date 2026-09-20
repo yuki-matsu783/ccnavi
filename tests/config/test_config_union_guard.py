@@ -395,19 +395,35 @@ class DenyTest(GuardHarness):
         )
         self.assertNotIn("builtin-guard-setting-files", self.reason(result))
 
+    def judged(self, command, *flags, guard="enable"):
+        """`--test --json` で 1 本判定し、当たったルールの id を返す。
+
+        hook の payload では共通層を動かせない（`--rules` は診断でだけ効く。ADR-0067）。
+        試験は判定そのものを実運用と同じ関数に通す経路なので、動かした先を守りが
+        追うかどうかは、こちらで見る（REQ-DIA-03）。
+        """
+        done = self.ccnavi(*flags, "--test", "--json", "Bash", command, guard=guard)
+        try:
+            body = json.loads(done.stdout)
+        except ValueError as exc:
+            self.fail(f"--test --json が読めない: {exc}\n{done.stdout}\n{done.stderr}")
+        return [hit["id"] for hit in body.get("rules", [])]
+
     def test_shell_writes_into_a_moved_common_layer_are_denied(self):
         """§11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
 
         置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけで、
-        env は ADR-0052 で廃止した。それでも動かせる以上、守りは動かした先を追う
-        （`common_shell_clause`）。名指しのツールは `common_layer_regex` が同じ先を追うので、
-        こちらを外すと、同じファイルが `Write` では止まってシェルでは通る形になる。
+        env は ADR-0052 で廃止し、診断の外は ADR-0067 で閉じた。それでも動かせる以上、
+        守りは動かした先を追う（`common_shell_clause`）。名指しのツールは
+        `common_layer_regex` が同じ先を追うので、こちらを外すと、同じファイルが
+        `Write` では止まってシェルでは通る形になる。
 
         末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は
         前の境界（`(?:^|[^\\w.-])`）だけを、`policy/rules.yml.bak` は後ろの境界
         （`_TERM`）だけを落とす。片方しか置かないと、落としたほうの変異が緑のまま通る。
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
+        moved = ("--rules", policy)
         # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
         # そのコマンドは設定ファイルに書かない。
         for command in (
@@ -417,16 +433,14 @@ class DenyTest(GuardHarness):
             f"echo x > {policy.replace(os.sep, '/')}",
         ):
             with self.subTest(command=command):
-                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
-                self.assert_denied(result, "builtin-guard-setting-files")
+                self.assertIn("builtin-guard-setting-files", self.judged(command, *moved))
         # 名前の途中で当たったものは別のファイル。前と後ろの両方を見る。
         for command in (
             "echo x > otherpolicy/rules.yml",
             "echo x > policy/rules.yml.bak",
         ):
             with self.subTest(command=command):
-                result = self.hook("Bash", self.ws, guard="enable", rules=policy, command=command)
-                self.assertNotIn("builtin-guard-setting-files", self.reason(result))
+                self.assertNotIn("builtin-guard-setting-files", self.judged(command, *moved))
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """§11.6: ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""

@@ -31,7 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 NOTE = "ルールの additionalContext。判定を決めた側に関わらず載る。"
@@ -150,7 +150,8 @@ class Workspace(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(SILENT))
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
+        self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "log.jsonl")
         self.parent_tree = self.worktree("i0001", "main")
@@ -174,8 +175,6 @@ class Workspace(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--rules",
-                self.rules,
                 "--tickets",
                 self.TICKETS,
                 "--approved",

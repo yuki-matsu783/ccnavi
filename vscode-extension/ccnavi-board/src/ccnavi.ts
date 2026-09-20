@@ -92,7 +92,9 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
  * 自身の層は同じオプションに名札 `self` で渡す。実行ファイルは層の名前で差し替えを引き、
  * `self` を名乗るプロジェクトは層として数えないので取り違えない。
- * どれも診断でだけ効き、hook からの判定には届かない。
+ * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ効き、
+ * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
+ * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =
   | { readonly kind: "workspace"; readonly path: string }

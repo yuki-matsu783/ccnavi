@@ -14,9 +14,7 @@ import subprocess
 import sys
 import unittest
 
-from tests import ROOT
-
-RULES = os.path.join(ROOT, "tests", "fixtures", "rules.yml")
+from tests import ROOT, fixture_workspace
 
 
 def spawn(*args, payload=""):
@@ -29,7 +27,7 @@ def spawn(*args, payload=""):
     environment.pop("PYTHONIOENCODING", None)
     environment.pop("PYTHONUTF8", None)
     return subprocess.run(
-        [sys.executable, "-m", "ccnavi", "--rules", RULES, "--log", "", *args],
+        [sys.executable, "-m", "ccnavi", "--root", fixture_workspace(), "--log", "", *args],
         input=payload.encode("utf-8"),
         capture_output=True,
         cwd=ROOT,

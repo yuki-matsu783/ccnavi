@@ -134,7 +134,7 @@ uv run --with pyinstaller python build.py          # 実行ファイルの組み
 
 ```sh
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}' \
-  | uv run python -m ccnavi --rules tests/fixtures/rules.yml --mode enable
+  | uv run python -m ccnavi --mode enable
 ```
 
 Python のファイルを編集するたびに `.claude/hooks/lint-py.sh`（`PostToolUse` の
@@ -324,7 +324,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/approved`（ccnavi ディレクトリの下。以前の `.ccnavi/tickets` に残ったものは `--lint` が名指しする）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
-| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する |
+| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。この env が動かす ccnavi ディレクトリの名前を差し替える `--project-home` も同じ門に載る。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、落としたことを標準エラーに出す |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
@@ -2393,8 +2393,18 @@ ccnavi --lint --json --project-rules-file lib=/tmp/edited.yml
 `<パス>` を読む。`--rules` がワークスペースのルールを差し替えるのと同じことを、
 プロジェクト 1 つに対して行う。VS Code の拡張が、編集中のプロジェクトのルールを保存する前に
 判定と検証に掛けるためのオプションで、`--test` / `--test-samples` / `--lint` / `--explain` でだけ効く。
-hook からの判定に渡しても無視する（標準エラーにその旨を出す）。保存していないルールが
-実運用の判定に効く道を作らないため。守る対象（コアファイル）も差し替えを見ず、本来の場所を守る。
+診断の外（hook からの判定、`ticket` / `review` の副命令）に渡しても無視する（標準エラーにその旨を出す）。
+保存していないルールが実運用の判定に効く道を作らないため。守る対象（コアファイル）も差し替えを見ず、
+本来の場所を守る。
+
+**この門は、層の置き場を動かす残りのフラグにも同じように掛かる**（ADR-0067）。共通層の中身の
+`--rules` / `--phases` / `--risk` と、層を探す先の `--projects` / `--project-home`。7 本とも
+「診断でだけ効く」で揃っていて、落とすときの文面も同じ。層を探す先も載せるのは、外せば
+その層の配点も種類も消えて、中身を差し替えるのと結果が同じになるから。
+
+`--root` と `--cwd` は別で、**1 度しか渡せない。** どちらも「いまどこで動いているか」で、
+`.ccnavi/scripts/` の sh が自分で計算して渡す。sh は自分のぶんを先に置いてエージェントの
+引数を後ろに繋ぐので、後ろに 1 本足すと後勝ちで上書きできた。2 本目が在ったら止める。
 
 層のフェーズの種類も同じ形で差し替えられる。
 
@@ -2405,8 +2415,8 @@ ccnavi --lint --json --project-phases-file lib=/tmp/phases.yml
 
 `--project-phases-file <名前>=<パス>` は、その名前の層（`self` は自身の層）のフェーズの種類のファイルの代わりに
 `<パス>` を読み、共通層の種類と合成して確かめる（同じ `id` で中身が違う、表示名が層をまたいで重なる、
-`overlap` / `requires` の指す先）。共通層の種類は今までどおり `--phases` で差し替える。効く経路と守る対象の扱いは
-`--project-rules-file` と同じ。VS Code の拡張のフェーズ管理画面が、編集中の層の種類を保存する前に検証するために渡す。
+`overlap` / `requires` の指す先）。共通層の種類は `--phases` で差し替える。効く経路と守る対象の扱いは
+5 本とも同じ。VS Code の拡張のフェーズ管理画面が、編集中の層の種類を保存する前に検証するために渡す。
 配点（risk）の層には差し替えがまだ無い。
 
 ## ボードの JSON
