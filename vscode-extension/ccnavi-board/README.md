@@ -125,6 +125,7 @@ Claude Code に渡す。拡張はマーカーを置かず、実行ファイル�
 | 監視 | `projects/*/.git`、その `config`、`worktrees/*`、`projects/*/.ccnavi/config/*`、`.ccnavi/config/*`、`.gitignore`、`.claude/settings.json`。300 ミリ秒静まったら読み直す。origin も読み直しのたびに読む |
 | 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`ProjectsData`）だけ。読み直しても入れ物（HTML）を入れ直さないので、打ちかけの clone の欄もスクロール位置も開いたメニューも飛ばない。入れ直すのは 1 枚目と、裏に回っている間だけ（`core/screen-host.ts`、ADR-0060）。一覧から消えた行のメニューは閉じる |
 | 読み直せなかった | 一覧の代わりに文面を出す。**渡せなかったぶんは画面が組み上がった（`ready`）ところで渡し直す**（`redraw`）。ここを落とすと、入れてある HTML の古い一覧が出たまま失敗が人に届かない。古い画面が残っている間の「更新」は、一覧が無くても通す |
+| 操作の一言（clone の欄の下） | 失敗（赤）は**次の一覧が届いたら消す**。一覧が新しくなった後も「プロジェクト X が一覧に無い」が残ると、人はいまも失敗していると読む。案内（「clone を送った」など）は残す。clone の直後は `.git` の出現で必ず読み直しが走るので、ここで消すと案内が一瞬で消える（文字列で組んでいた頃がそれだった） |
 
 入れていないもの。プロジェクトを外す操作（ワークツリーと承認済みチケットが残ったままディレクトリだけ消してしまう事故につながる。消したいならエクスプローラで消す）、
 clone のオプション欄（ブランチ、`--depth`、submodule。要るならターミナルで打つ）、ブランチと未コミットの表示（VS Code の Git 表示で見る）。
@@ -555,7 +556,7 @@ test/
   */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理）は、描くものも動かして見る（render.dom, projects.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
-  bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へ束ねる（足すときは SCREENS に 1 行）
+  bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へ束ねる。画面は src/webview/<名前>/main.tsx があるものを見つける（表で持たない）
   package.sh          vsix の組み立て
 ```
 
@@ -586,8 +587,8 @@ DOM を組み立てない。残り 3 画面（ルール設定・リスク管理�
 
 | 足すもの | 触る場所 |
 |---|---|
-| 束ね | `scripts/bundle-webview.js` の `SCREENS` に `{ name, entry }` を 1 行。読む側（`webviewScript(name)`）は直さない |
-| テストの回り方 | `scripts/test-groups.js` の `BUNDLE_ENTRIES` に `{ entry, screen }` を 1 行。入口を挙げたグループだけ `tsc -p tsconfig.webview.json` と束ねが走り、画面のソースを触ったときにその画面のグループだけが回る |
+| 束ねと回り方 | **どちらも直さない。** 綴りの約束で決まる: 画面は `src/webview/<名前>/main.tsx`、束ねた出口は `out/webview/<名前>.js`、テストの入口は `test/helpers/<名前>.ts`、グループは `test/<名前>/`。`bundle-webview.js` と `test-groups.js` が同じ見つけ方でディスクから拾う（表を持つと、画面を足したときに黙って古くなる） |
+| 回すものの決まり方 | 触ったファイルが**どの画面の束ねに入るか**を import の閉包で見る（置き場の綴りでは決めない。画面をまたぐ import が 1 本入っただけで、直したのに回らない側に外れるため）。どの画面にも入らないもの（`webview/vscode.ts` など）は全画面に効くと見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
 | 契約に置く型 | 画面に渡す形（`ProjectsPage` のような）は契約の側（`*-view.ts`）に置く。`core/` の判定のファイルに置いたままだと、Webview がそこから `node:path` を読むファイル（`commands.ts` など）を辿って型検査が落ちる |
 
 **そのままでは使えないもの。**
