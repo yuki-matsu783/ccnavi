@@ -310,9 +310,11 @@ YAML として読めないファイルは画面から直せない（エディタ
 ```sh
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/board.js と out/extension.js に束ねる
-pnpm test          # tsc と画面の束ねのあと node --test "out/test/**/*.test.js"（全部）
+pnpm test          # 全部（203 本。9.5〜11.5 秒）
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
+pnpm test:for src/core/rules-doc.ts   # 触ったファイルが関わる領域だけ
+pnpm test:plan src/core/rules-doc.ts  # 何を回すかだけ出す（走らせない）
 pnpm run package   # scripts/package.sh: install → compile → test → vsce package
 ```
 
@@ -326,7 +328,30 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 入れたあと、開いているウィンドウは再読み込み（`Developer: Reload Window`）で新しい版になる。
 
-`node --test` にはディレクトリではなくグロブ（`out/test/**/*.test.js`）を渡す。
+テストの入口は `scripts/test-groups.js` の 1 本で、`pnpm test` とその仲間は全部ここへ渡す
+（ADR-0061）。回すグループを決め、`clean-out` → `tsc -p tsconfig.test.json` →（要るときだけ
+画面の型の検査）→ 画面の束ね → `node --test <出来上がったファイル>` の順に進む。**いくつグループを
+選んでもコンパイルは 1 回。** `tsc -p tsconfig.test.json` は `src/` と `test/` を全部見るので、
+グループを絞ってもコンパイルは安くならない（3〜4 秒）。安くなるのは実行のほう（全部で約 4.6 秒）と、
+画面の型検査を省けるぶん（1.5 秒）。**グループごとに工程を並べていたときは、2 グループ回すと
+コンパイルも 2 回走った**（`test:rules` + `test:risk` で 9.4 秒。いまは 4.9 秒）。
+
+束ねは、画面の型を見ないときでも必ず回す。`clean-out.js` が `out/webview` を消すので、
+作り直さないと、束ねたものを読む側（`webview-script.ts`、board のテスト）が落ちる。
+
+どのグループがどのファイルを読むかは、テストの `import` を辿って数える。辿れないものだけ
+綴りで決める（`test-groups.js` の先頭にまとめてある。固定データ `test/fixtures/` は全部、
+画面 `src/webview/` は辿れたぶんと束ねたものを読むグループ、組み立ての土台
+`package.json`・`tsconfig*.json`・`scripts/`・`pnpm-lock.yaml` は全部、読み物 `*.md` と絵
+`media/` は何も回さない、`out/`・`node_modules/` は数えない）。**ここは表なので古くなる。**
+テストが 1 つも読まないファイルは `tsc` だけ通す。`test/<グループ>/` を増やすときに直すのは
+`package.json` の行 1 本だけで、対応の表を書き足す必要は無い。
+
+`test/shared/` は 5 画面を比べるので束ねた画面を読む。つまり `shared` を含む計画には必ず画面の
+型検査と束ねが付き、`src/core/` の大半は `shared` を含む。絞って浮くのは 1 ターン 2.5〜4.5 秒。
+
+ワークスペース側の hook（`.claude/hooks/mark-ext.sh` と `test-ext.sh`）は `pnpm test:for` と
+同じ道を通る。拡張のファイルを触ったターンの終わりに、関わるグループだけが回る。
 
 テストは画面の領域ごとのディレクトリに分けてあり、一部を直したときはその領域だけを流せる。
 組み立てと HTML の文字列を見る単体テスト（`*.test.ts`）と、画面を happy-dom で実際に動かす
@@ -543,8 +568,9 @@ scripts/
   これらを移すときは、保持する画面の段取り（裏でも `postMessage` を通し、入れ直さない）を足すか、
   編集の途中を Webview の state に逃がして偽に変えるかの判断が要る
 - `scripts/bundle-webview.js` は入口と出口がボードの 1 本に決め打ち。画面を足すなら束ねる指定も足す
-- `pnpm run test:rules` などは `tsc -p tsconfig.webview.json` を回していない（回すのは board / shared / dom）。
-  React にした画面のぶんは足す
+- 画面の型の検査（`tsc -p tsconfig.webview.json`）と束ねが要るかは、選んだグループが
+  `test/helpers/board.ts`（束ねたものを読む入口）を辿るかで決まる。画面を足して別の入口から
+  読ませるなら、`scripts/test-groups.js` の `BOARD_HELPER` にその入口も挙げる
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
