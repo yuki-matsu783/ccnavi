@@ -1,6 +1,6 @@
 /**
  * 5 つの画面が同じ骨組みの CSS を 1 か所から持っていること。
- * React に移した 2 画面（ボード・プロジェクト管理）は中身を画面の中で組むが、
+ * React に移した 3 画面（ボード・プロジェクト管理・リスク管理）は中身を画面の中で組むが、
  * CSS と body は拡張が入れるので同じに見る。
  */
 import { test } from "node:test";
@@ -9,19 +9,18 @@ import { buildBoard } from "../../src/core/board.js";
 import { PAGE_STYLE } from "../../src/core/styles.js";
 import { renderRulesPage } from "../../src/core/rules-render.js";
 import { readRules } from "../../src/core/rules-doc.js";
-import { renderRiskPage } from "../../src/core/risk-render.js";
-import { readRisk, BUILTIN_RISK_TEXT } from "../../src/core/risk-doc.js";
 import { renderPhasesPage } from "../../src/core/phases-render.js";
 import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import { buildProjectsPage } from "../../src/core/projects.js";
 import { fixture } from "../helpers/fixture.js";
 import { NONCE, boardPage } from "../helpers/board.js";
 import { projectsHtml } from "../helpers/projects.js";
+import { page as riskPage, riskHtml } from "../helpers/risk.js";
 
 const OPTIONS = { nonce: NONCE };
 const lock = { locked: false, reason: "", doing: [] };
 
-/** まだ文字列で中身を組む 3 画面（ルール設定・リスク管理・フェーズ管理） */
+/** まだ文字列で中身を組む 2 画面（ルール設定・フェーズ管理） */
 function others(appearance?: "claude-dark"): string[] {
   const options = appearance === undefined ? OPTIONS : { ...OPTIONS, appearance };
   return [
@@ -29,16 +28,19 @@ function others(appearance?: "claude-dark"): string[] {
       { root: "/ws", rulesPath: "r.yml", mode: "enable", model: readRules("deny: []\n").model, hooks: [], hookFiles: { settings: true, settingsLocal: false }, samplesPath: "s.yml", lock },
       options,
     ),
-    renderRiskPage({ root: "/ws", riskPath: "risks.yml", exists: true, model: readRisk(BUILTIN_RISK_TEXT).model, lock }, options),
     renderPhasesPage({ root: "/ws", phasesPath: "phases.yml", exists: true, model: readPhases(TEMPLATE_PHASES_TEXT).model, lock }, options),
   ];
 }
 
-/** React に移した 2 画面。中身は画面が組み、CSS と body だけを拡張が入れる */
+/** React に移した 3 画面。中身は画面が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): string[] {
   const options = appearance === undefined ? {} : { appearance };
   const page = buildProjectsPage({ board: fixture(), lint: undefined, lintError: "", origins: {}, strays: [], projectsRel: "projects", ignored: true, rulesRels: {}, rulesExists: {}, hasClaudeDir: {}, selfRulesRel: ".ccnavi/config/rules.yml", selfRulesExists: false });
-  return [boardPage({ kind: "board", board: buildBoard(fixture()) }, options), projectsHtml({ kind: "page", page }, options)];
+  return [
+    boardPage({ kind: "board", board: buildBoard(fixture()) }, options),
+    projectsHtml({ kind: "page", page }, options),
+    riskHtml({ kind: "page", page: riskPage() }, options),
+  ];
 }
 
 function board(appearance?: "claude-dark"): string {
@@ -57,8 +59,8 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
     assert.ok(html.includes("\n<body>\n"));
     assert.ok(html.includes("body.ccnavi-claude-light:not("));
   }
-  // 切り替えの受け口。文字列で組む 3 画面は埋め込みのスクリプト、React の 2 画面は画面の中
-  // （ボードは CB-T142、プロジェクト管理は CB-D32 が動かして見る）
+  // 切り替えの受け口。文字列で組む 2 画面は埋め込みのスクリプト、React の 3 画面は画面の中
+  // （ボードは CB-T142、プロジェクト管理は CB-D32、リスク管理は CB-D57 が動かして見る）
   for (const html of others()) {
     assert.ok(html.includes('if (data.type === "appearance") { applyAppearance(data.value); }'));
   }
