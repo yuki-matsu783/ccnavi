@@ -64,8 +64,11 @@ happy-dom で動かすテスト（`*.dom.test.ts`）を書いたところだけ�
 | 2 画面目 | プロジェクト管理を移した（issue #85）。`retainContextWhenHidden` が偽でボードと同じ前提なので、`core/screen-host.ts` はそのまま当たった。あわせて束ねを画面の一覧から回す形にし（issue #83）、使い回すぶん（`embedJson`・`webview/initial.ts`・`webview/appearance.ts`）を 1 か所に寄せた。画面に渡す形（`ProjectsPage`）は契約の側（`core/projects-view.ts`）へ移した。判定のファイルに置いたままだと、Webview がそこから `node:path` を読むファイルを辿って型検査が落ちるため |
 | 3 画面目 | リスク管理を移した（issue #86 の前半）。`retainContextWhenHidden` が真の画面なので、先に保持する画面の段取りを決めた（ADR-0062、issue #82）。配点の形（`KINDS`・`FactorForm` など）は読み書き（`risk-doc.ts`）から契約（`core/risk-view.ts`）へ移した。画面がそこから `yaml` を辿ると、束ねたものに YAML の解析器が丸ごと入るため |
 | 4 画面目 | フェーズ管理を移した（issue #86 の後半）。リスク管理と作りが同じなので、型を当て直す作業になった。違いは 3 つ: 層（自身の層・プロジェクト）はファイルが無くても編集できる（`editable`）、id の重なりだけは画面が保存を止める、並びの欄（`scope` など）は `,` 区切りの文字を欄が持つ（並びに直したものを欄へ戻すと、区切りの直後が打てない） |
+| 5 画面目 | ルール設定を移した（issue #84）。埋め込みの JS が 515 行と最大で、`retainContextWhenHidden` は真。リスク管理と同じ `retainedHost` がそのまま当たり、増えたのは「画面が判定を頼み、結果を受けて出す」往復（`judge` / `samples` → `judged` / `sampled`）と、ファイル選択の往復（`pickFile` → `picked`。行を名指しする鍵を画面が渡し、拡張ホストはそのまま返す）だけ。ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）は読み書き（`rules-doc.ts`）から契約（`core/rules-view.ts`）へ移した（リスク管理と同じ理由） |
 
-残る 1 画面（ルール設定）も `retainContextWhenHidden` が真で、同じ `retainedHost` で移せる（issue #84）。
+**5 画面とも React になった。** 文字列で HTML を組む画面が無くなったので、そのための逃がし
+（`core/html.ts` の `escapeHtml`、`core/appearance.ts` の `APPEARANCE_SCRIPT`）も外した。
+見た目の切り替えの受け口は `webview/appearance.ts` の 1 本だけになった。
 
 ## 採らなかった案
 

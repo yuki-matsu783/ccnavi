@@ -504,8 +504,9 @@ src/
     render.ts         ボードの入れ物の HTML（外部資源なし、テーマ変数だけ）。中身は画面（React）が作る
     styles.ts         5 画面で共通の CSS（ページの骨組み・ボタン・一覧）
     board-style.ts    ボード画面の CSS。部品（webview/board/）を足したらここに足す
-    html.ts           HTML を文字列で組む 1 画面（ルール設定）のための逃がし（escapeHtml）
-    rules-render.ts   ルール設定画面の HTML と、その中で動くスクリプト
+    rules-view.ts     ルール設定の拡張ホストと画面の契約（ルールの形 SECTIONS / RuleForm / RulesModel、見せる形 RulesPage / RulesData、押した操作 RulesMessage）
+    rules-render.ts   ルール設定の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
+    rules-style.ts    ルール設定画面の CSS。部品（webview/rules/）を足したらここに足す
     rules-doc.ts      rules.yml の読み書き（yaml の Document でコメントを残す）
     risk-view.ts      リスク管理の拡張ホストと画面の契約（配点の形 RiskForm、見せる形 RiskPage / RiskData、押した操作 RiskMessage）
     risk-render.ts    リスク管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
@@ -530,7 +531,7 @@ src/
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
     vscode.ts         acquireVsCodeApi の窓口。画面ごとの契約に依存しない（送り口は poster<M>() で作る）
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
-    appearance.ts     見た目の切り替え（body のクラスの付け替え）。文字列で組む画面の APPEARANCE_SCRIPT と同じこと
+    appearance.ts     見た目の切り替え（body のクラスの付け替え）。5 画面で 1 本
     board/post.ts     ボードの送り口。契約に無いものは型で止まる
     board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
     board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
@@ -557,6 +558,14 @@ src/
     phases/Phase.tsx  種類 1 件の行（要約と、開いたときの欄。並びの欄は , 区切り）
     phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で控える）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
+    rules/post.ts     ルール設定の送り口。契約に無いものは型で止まる
+    rules/main.tsx    ルール設定画面の入口。埋め込みの JSON を読んでマウントする
+    rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
+    rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの札と、ファイルを選ぶ欄）
+    rules/Judge.tsx   判定の結果とサンプルの一括判定の表。ここは判定せず、実行ファイルの答えを読むだけ
+    rules/Hooks.tsx   hook の一覧（表示するだけで書き換えない）
+    rules/state.ts    編集中のルール（行ごとの鍵）・開いている行（id で控える）・開いているタブ
+    rules/text.ts     要約の文・絞り込みが当てる文字列・件数の言い方
 media/
   icon.svg            アクティビティバーのアイコン
 test/
@@ -569,14 +578,15 @@ test/
   helpers/projects.ts プロジェクト管理画面（React）を束ねたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）を束ねたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）を束ねたものごと happy-dom で開く
+  helpers/rules.ts    ルール設定画面（React）を束ねたものごと happy-dom で開く
   board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
-  rules/              ルール設定（rules-doc, rules-render, hooks, testmodel）
+  rules/              ルール設定（rules-doc, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
-  projects/           プロジェクト管理（projects, layer-render と、画面を動かす projects.dom）
+  projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。React の画面（ボード・プロジェクト管理・リスク管理・フェーズ管理）は、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom）
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。5 画面とも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom）
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
   bundle-webview.js   esbuild で画面（React）を画面ごとに out/webview/<名前>.js へ束ねる。画面は src/webview/<名前>/main.tsx があるものを見つける（表で持たない）
@@ -587,9 +597,9 @@ scripts/
 
 `webview/` は反対に、DOM だけを触って `vscode` も `node` も import しない。拡張ホストと分け合うのは
 `core/` のうち import で辿れるぶん（`board.ts`・`board-view.ts` など、判定も I/O もしないもの）だけ。
-ボード・プロジェクト管理・リスク管理・フェーズ管理の画面は React で、拡張ホストは中身（`BoardData` /
-`ProjectsData` / `RiskData` / `PhasesData`）を渡すだけで DOM を組み立てない。残る 1 画面（ルール設定）は
-今も拡張ホストが HTML を文字列で組む（ADR-0060、ADR-0062）。
+**5 画面とも React で**、拡張ホストは中身（`BoardData` / `ProjectsData` / `RiskData` / `PhasesData` /
+`RulesData`）を渡すだけで DOM を組み立てない（ADR-0060、ADR-0062）。文字列で HTML を組む画面は
+1 つも残っていないので、そのための逃がし（`escapeHtml`・`APPEARANCE_SCRIPT`）も無い。
 
 **ボードに機能を足すときに触る場所。**
 
@@ -599,12 +609,16 @@ scripts/
 | 人が押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも網羅を型で縛ってある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**次の画面を React にするとき、使い回せるもの。** `webviewScript`（名前で読む）、`poster<M>()`、
+**画面を 1 つ足すとき、使い回せるもの。** `webviewScript`（名前で読む）、`poster<M>()`、
 `core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、`core/styles.ts`、`webview/vscode.ts`・
 `webview/initial.ts`・`webview/appearance.ts`、テストの土台（`test/helpers/dom.ts`）。
 画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面の CSS・`ready` を受けて渡し直す数行・
-テストの入口（`test/helpers/board.ts`・`projects.ts` に相当するもの）。プロジェクト管理を 2 画面目に
-選んだのは、ボードと同じ `retainContextWhenHidden: false` で、`screen-host.ts` がそのまま当たるから。
+テストの入口（`test/helpers/<名前>.ts`）。
+
+**実行ファイルに往復を頼む画面（ルール設定）も、渡すものは同じ。** 画面は編集中の中身を付けて
+頼み（`judge` / `samples`）、拡張ホストが実行ファイルの答えをそのまま返す（`judged` / `sampled`）。
+画面は判定の理屈を持たない（ADR-0035）。VS Code のダイアログが要る欄（`pickFile` → `picked`）も同じで、
+**行を名指しする鍵は画面が渡し、拡張ホストはそのまま返す**（鍵は画面の中だけのもので、拡張ホストは読まない）。
 
 **画面を 1 つ足すときに触る場所。**
 
@@ -619,7 +633,7 @@ scripts/
 | パネル | 作るもの | 裏に回ったとき |
 |---|---|---|
 | `retainContextWhenHidden: false`（ボード・プロジェクト管理） | `screenHost(surface, render)` | 画面は捨てられる。入れ物ごと入れ直す |
-| `retainContextWhenHidden: true`（リスク管理・フェーズ管理。ルール設定も移すときはこちら） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
+| `retainContextWhenHidden: true`（ルール設定・リスク管理・フェーズ管理） | `retainedHost(surface, render)` | 画面は生きている。何もしない |
 
 返る形（`ScreenHost<D>`）は同じで、以降の呼び方（`send` / `post` / `ready` / `hidden`）も画面の側も
 変わらない。**取り違えても型では止まらない。** 保持する画面に `screenHost` を当てると、裏にいる間の

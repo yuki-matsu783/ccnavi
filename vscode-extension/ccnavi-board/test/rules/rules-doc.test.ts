@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asSections, readRules, type RuleForm } from "../../src/core/rules-doc.js";
+import { asSections, readRules } from "../../src/core/rules-doc.js";
+import type { RuleForm } from "../../src/core/rules-view.js";
 
 const TEXT = `# 先頭の説明。消えてはいけない。
 #
