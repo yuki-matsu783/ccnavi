@@ -207,3 +207,45 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
     await dom.close();
   }
 });
+
+test("CB-D64 関係と案内は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+  const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p2")} .row-head`));
+    await dom.settle();
+    // 雛形の design は when を持つので開いている
+    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
+    dom.type(dom.one(`${rowSelector("p2")} input.f-when`), "");
+    await dom.settle();
+    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
+    assert.match(dom.one(`${rowSelector("p2")} details.more > summary`).textContent, /関係と案内（未設定）/);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D65 往復の間は帯の再読込も止め、再読込を押した時点で欄を止める", async () => {
+  const dom = await openPhases();
+  try {
+    await dom.send({ type: "changed" });
+    dom.click(dom.one(`${rowSelector("p1")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる");
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    for (const button of dom.all<HTMLButtonElement>('button[data-action="reload"]')) {
+      assert.ok(button.disabled, "保存の往復の間はどの再読込も押せない");
+    }
+    await dom.send({ type: "failed", message: "lint error" });
+    dom.click(dom.one('#changed button[data-action="reload"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: true }]);
+    // 層の置き場を実行ファイルに聞く間、欄は止まっている
+    assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
+    await dom.send({ type: "cancelled" });
+    assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
+  } finally {
+    await dom.close();
+  }
+});

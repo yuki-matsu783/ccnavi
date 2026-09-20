@@ -293,3 +293,49 @@ test("CB-D58 当て方の選択肢は 6 つで、キーの綴りと説明を並�
     await dom.close();
   }
 });
+
+test("CB-D64 往復の間は、帯の再読込も止める。やめたと返れば欄は戻る", async () => {
+  const dom = await openRisk();
+  try {
+    await dom.send({ type: "changed" });
+    dom.type(dom.one(`${rowSelector("f1")} input.f-points`), "30");
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    // 往復の間に帯の再読込を押せると、捨てたはずの編集が遅れて保存される
+    for (const button of dom.all<HTMLButtonElement>('button[data-action="reload"]')) {
+      assert.ok(button.disabled, "保存の往復の間はどの再読込も押せない");
+    }
+    await dom.send({ type: "failed", message: "lint error" });
+    assert.ok(!dom.one<HTMLButtonElement>('#changed button[data-action="reload"]').disabled);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D65 再読込を押した時点で欄を止め、人がやめたら戻す", async () => {
+  const dom = await openRisk();
+  try {
+    dom.click(dom.one('header button[data-action="reload"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: false }]);
+    // 止めていないと、読み直しを待つ間に打った内容が、届いた中身で黙って消える
+    assert.ok(dom.one<HTMLInputElement>(`${rowSelector("f1")} input.f-points`).disabled);
+    await dom.send({ type: "cancelled" });
+    assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("f1")} input.f-points`).disabled);
+    assert.equal(dom.one("#status").textContent, "");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D66 読み直せなかった画面からも、再読込を頼める", async () => {
+  const dom = await openPage({ kind: "error", error: "EACCES" });
+  try {
+    dom.click(dom.one('button[data-action="reload"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: false }]);
+  } finally {
+    await dom.close();
+  }
+});
