@@ -60,6 +60,16 @@ export interface ApproveMismatch {
   readonly digest: { readonly expected: string; readonly current: string };
 }
 
+/**
+ * `--approve --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は
+ * 文面にしてから `error` に入るので、ここには出てこない（`ccnavi.ts` の `runApproveYes`）。
+ * 承認のオーバーレイの遷移（`approval-machine.ts`）が入力として受けるので、契約の側に置く
+ */
+export type ApproveOutcome =
+  | { readonly ok: true; readonly value: ApproveResult }
+  | { readonly ok: false; readonly mismatch: ApproveMismatch }
+  | { readonly ok: false; readonly error: string };
+
 export type PreviewParse =
   | { readonly ok: true; readonly value: ApprovePreview }
   | { readonly ok: false; readonly error: string };
