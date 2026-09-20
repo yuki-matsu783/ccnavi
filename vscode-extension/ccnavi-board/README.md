@@ -310,9 +310,11 @@ YAML として読めないファイルは画面から直せない（エディタ
 ```sh
 pnpm install --frozen-lockfile
 pnpm run compile   # tsc -p .（拡張ホスト）と tsc -p tsconfig.webview.json（画面）で型を見て、esbuild で out/webview/board.js と out/extension.js に束ねる
-pnpm test          # tsc と画面の束ねのあと node --test "out/test/**/*.test.js"（全部）
+pnpm test          # 全部（203 本。約 11 秒）
 pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / shared
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
+pnpm test:for src/core/rules-doc.ts   # 触ったファイルが関わる領域だけ
+pnpm test:plan src/core/rules-doc.ts  # 何を回すかだけ出す（走らせない）
 pnpm run package   # scripts/package.sh: install → compile → test → vsce package
 ```
 
@@ -326,7 +328,21 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 
 入れたあと、開いているウィンドウは再読み込み（`Developer: Reload Window`）で新しい版になる。
 
-`node --test` にはディレクトリではなくグロブ（`out/test/**/*.test.js`）を渡す。
+テストの入口は `scripts/test-groups.js` の 1 本で、`pnpm test` とその仲間は全部ここへ渡す
+（ADR-0061）。回すグループを決め、`clean-out` → `tsc -p tsconfig.test.json` →（要るときだけ
+画面の型の検査と束ね）→ `node --test <出来上がったファイル>` の順に進む。**いくつグループを
+選んでもコンパイルは 1 回。** `tsc` は `src/` と `test/` を全部見るので約 6 秒かかり、テストの実行は
+全部でも約 5 秒。グループごとに工程を並べていたときは、2 グループ回すとコンパイルが 2 回走って
+全部回すより遅かった。
+
+どのグループがどのファイルを読むかは表で持たず、テストの `import` を辿って数える。
+辿れないものは 3 つだけ綴りで決める（固定データ `test/fixtures/` は全部、画面 `src/webview/` は
+束ねたものを読むグループ、組み立ての土台 `package.json`・`tsconfig*.json`・`scripts/` は全部）。
+読み物（`*.md`）と絵（`media/`）は何も回さない。テストが 1 つも読まないファイルは `tsc` だけ通す。
+`test/<グループ>/` を増やしても、`package.json` に行を足すだけで直すところは無い。
+
+ワークスペース側の hook（`.claude/hooks/mark-ext.sh` と `test-ext.sh`）は `pnpm test:for` と
+同じ道を通る。拡張のファイルを触ったターンの終わりに、関わるグループだけが回る。
 
 テストは画面の領域ごとのディレクトリに分けてあり、一部を直したときはその領域だけを流せる。
 組み立てと HTML の文字列を見る単体テスト（`*.test.ts`）と、画面を happy-dom で実際に動かす
@@ -543,8 +559,9 @@ scripts/
   これらを移すときは、保持する画面の段取り（裏でも `postMessage` を通し、入れ直さない）を足すか、
   編集の途中を Webview の state に逃がして偽に変えるかの判断が要る
 - `scripts/bundle-webview.js` は入口と出口がボードの 1 本に決め打ち。画面を足すなら束ねる指定も足す
-- `pnpm run test:rules` などは `tsc -p tsconfig.webview.json` を回していない（回すのは board / shared / dom）。
-  React にした画面のぶんは足す
+- 画面の型の検査（`tsc -p tsconfig.webview.json`）と束ねが要るかは、選んだグループが
+  `test/helpers/board.ts`（束ねたものを読む入口）を辿るかで決まる。画面を足して別の入口から
+  読ませるなら、`scripts/test-groups.js` の `BOARD_HELPER` にその入口も挙げる
 
 画面（`*-panel.ts`）どうしは互いを import しない。プロジェクト管理画面からチケット管理やルール設定を開く
 ような導線は、相手のパネルの関数を直に呼ばず `core/screens.ts` の帳面（`screens().board(...)`）を通す。
