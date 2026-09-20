@@ -5,7 +5,7 @@
  * ツールの欄（`match`）は押すと札が出る。`message` は deny だけの欄で、ask と allow に
  * 残っていれば「どこにも届かない」と言って消すボタンだけ出す。
  */
-import { useEffect, useRef, type JSX, type ReactNode } from "react";
+import type { JSX, ReactNode } from "react";
 
 import { KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
@@ -28,8 +28,6 @@ export interface RuleProps {
   readonly hit: boolean;
   /** ツールの札が開いているか。開くのは画面ぜんたいで 1 つだけ */
   readonly pickerOpen: boolean;
-  /** 足した直後の行。id の欄に焦点を移す */
-  readonly focus: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: RuleForm) => void;
   readonly onMoveSection: (to: Section) => void;
@@ -44,17 +42,9 @@ export interface RuleProps {
 
 export function Rule(props: RuleProps): JSX.Element {
   const { rule, section } = props;
-  const id = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (props.focus) {
-      id.current?.focus();
-    }
-  }, [props.focus]);
 
   const text = (name: TextKey, className: string, placeholder: string): JSX.Element => (
     <input
-      ref={name === "id" ? id : undefined}
       type="text"
       className={className}
       spellCheck={false}
@@ -245,7 +235,7 @@ function Picker({
 }
 
 /** 欄名を左に置く。YAML のキー名は欄名のツールチップに載せる */
-export function Captioned({ name, yamlKey, children }: { readonly name: string; readonly yamlKey?: string; readonly children: ReactNode }): JSX.Element {
+function Captioned({ name, yamlKey, children }: { readonly name: string; readonly yamlKey?: string; readonly children: ReactNode }): JSX.Element {
   return (
     <div className="field">
       <span className="cap" title={yamlKey === undefined ? undefined : `YAML のキー: ${yamlKey}`}>

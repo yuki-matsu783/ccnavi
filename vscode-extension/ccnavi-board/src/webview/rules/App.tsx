@@ -10,7 +10,7 @@
  * ときだけ（人が「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
  * 帯（`changed`）が出るだけ（ADR-0062）。移行前に HTML ごと入れ直していたのと同じ見え方になる。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
@@ -108,9 +108,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   useLayoutEffect(() => {
     latest.current = editing;
   });
-  const list = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const element = list.current;
+  /**
+   * 受け口は一覧そのものに張る。`useEffect` で 1 度だけ張ると、**読み直せなかった画面
+   * （`kind: "error"`）から始まったときは一覧がまだ無く、あとで中身が届いても張られない。**
+   * ref のコールバックなら、一覧が出た時点で張り、消えた時点で外れる。
+   */
+  const list = useCallback((element: HTMLElement | null): (() => void) | undefined => {
     if (element === null) {
       return undefined;
     }
@@ -218,20 +221,39 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setFolded((now) => new Set([...now].filter((section) => !unfold.has(section))));
   };
 
+  // 足した行の id へ焦点を移す。移したら忘れる（同じ行を描き直すたびに焦点を奪わない）
+  useEffect(() => {
+    if (focusKey === undefined) {
+      return;
+    }
+    document.querySelector<HTMLInputElement>(`.rule[data-key="${focusKey}"] input.f-id`)?.focus();
+    setFocusKey(undefined);
+  }, [focusKey]);
+
   const showTab = (name: TabName): void => {
     setTab(name);
     saveTab(name);
   };
 
   const pick = (key: string, field: FileField, path: string): void => {
-    setEditing((now) => {
-      const found = findRow(now.draft, key);
-      if (found === undefined) {
-        return now;
-      }
-      return { ...now, draft: replace(now.draft, found.section, key, { ...found.row.rule, [field]: path }) };
-    });
+    // ダイアログを開いている間に行を消せる。行が無ければ欄も「未保存」も動かさない
+    const found = findRow(latest.current.draft, key);
+    if (found === undefined) {
+      return;
+    }
+    setEditing((now) => ({ ...now, draft: replace(now.draft, found.section, key, { ...found.row.rule, [field]: path }) }));
     setDirty(true);
+  };
+
+  /**
+   * 読み直しを頼む。**押した時点でボタンを止める。** 拡張ホストは実行ファイルに聞いてから中身を
+   * 返すことがあり（層の置き場を解く）、その間に押し直せると往復が重なる。人が
+   * 「破棄して読み直す？」をやめたときは `cancelled` が返り、ボタンが戻る。
+   */
+  const reload = (): void => {
+    setBusy(true);
+    setStatus(undefined);
+    post({ type: "reload", dirty });
   };
 
   if (data.kind === "error") {
@@ -241,7 +263,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           ルール設定画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: ルール設定画面を開く」を実行する。開いたままでは前面に出るだけ）。
         </p>
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
           再読込
         </button>
       </>
@@ -311,12 +333,6 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   const fold = (section: Section): void => {
     setFolded(folded.has(section) ? without(folded, section) : new Set([...folded, section]));
-  };
-
-  const reload = (): void => {
-    setBusy(true);
-    setStatus(undefined);
-    post({ type: "reload", dirty });
   };
 
   const judge = (): void => {
@@ -451,7 +467,6 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
                     open={isOpen(row.key)}
                     hit={row.rule.id !== "" && hits.has(row.rule.id)}
                     pickerOpen={pickerKey === row.key}
-                    focus={focusKey === row.key}
                     moreOpen={moreOpen.get(row.key) ?? hasContext(row.rule)}
                     onToggle={() => toggle(row.key)}
                     onChange={(rule) => editRule(section, row.key, rule)}

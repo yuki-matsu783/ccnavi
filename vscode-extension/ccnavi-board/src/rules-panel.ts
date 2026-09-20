@@ -31,7 +31,7 @@ import { projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
-import type { RulesData, RulesMessage, Sections, ToRules } from "./core/rules-view.js";
+import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -46,7 +46,6 @@ const SCRIPT_NAME = "rules.js";
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
-  readonly text: string;
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
@@ -234,7 +233,6 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   ];
   const samplesRel = samplesSetting();
   return {
-    text,
     mtimeMs,
     doc: readRules(text),
     rulesPath,
@@ -482,17 +480,18 @@ function rulesHost(panel: vscode.WebviewPanel): ScreenHost<RulesData> {
 }
 
 /**
- * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
+ * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は捨てるもの。
  *
  * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
- * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
+ * ファイルに入る。** 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
+ * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
  */
-function stale(current: PanelState, loaded: Loaded): boolean {
+function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "読み直したので、この保存は捨てた。いまのルールで編集し直す");
+  fail(current, `読み直したので、${what}は捨てた。いまのルールでやり直す`);
   return true;
 }
 
@@ -551,8 +550,11 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
           "読み直す",
         );
         if (choice !== "読み直す") {
-          // 画面は「再読込」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる
-          current.host.post({ type: "cancelled" } satisfies ToRules);
+          // 画面は「再読込」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
+          // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
+          if (alive(current)) {
+            current.host.post({ type: "cancelled" } satisfies ToRules);
+          }
           return;
         }
       }
@@ -611,7 +613,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         return;
       }
       const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
-      if (!alive(current) || stale(current, loaded)) {
+      if (!alive(current) || stale(current, loaded, "この判定")) {
         return;
       }
       if (!result.ok) {
@@ -634,7 +636,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         return;
       }
       const result = await runSamples(root, binSetting(), rules, loaded.samplesPath);
-      if (!alive(current) || stale(current, loaded)) {
+      if (!alive(current) || stale(current, loaded, "このサンプルの判定")) {
         return;
       }
       if (!result.ok) {
@@ -670,7 +672,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
 
   // 1. 検証。error が 1 件でもあれば保存しない。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
-  if (!alive(current) || stale(current, loaded)) {
+  if (!alive(current) || stale(current, loaded, "この保存")) {
     return;
   }
   if (!lint.ok) {
@@ -685,7 +687,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
 
   // 2. 作業中のチケットが無いこと。押した時点で取り直す。
   const lock = await refreshLock(current);
-  if (!alive(current) || stale(current, loaded)) {
+  if (!alive(current) || stale(current, loaded, "この保存")) {
     return;
   }
   if (lock.locked) {
@@ -747,7 +749,11 @@ function asMessage(message: unknown): RulesMessage | undefined {
     }
     case "judge": {
       const sections = asSections(m.sections);
-      if (sections === undefined || typeof m.tool !== "string" || typeof m.subject !== "string") {
+      if (sections === undefined || typeof m.subject !== "string") {
+        return undefined;
+      }
+      // 画面の選択肢は KNOWN_TOOLS だけ。それ以外の名前で実行ファイルを起こさない
+      if (typeof m.tool !== "string" || !(KNOWN_TOOLS as readonly string[]).includes(m.tool)) {
         return undefined;
       }
       return { type: "judge", sections, tool: m.tool, subject: m.subject };

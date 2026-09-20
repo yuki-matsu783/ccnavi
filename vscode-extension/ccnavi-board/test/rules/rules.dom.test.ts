@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { readRules } from "../../src/core/rules-doc.js";
 import { KNOWN_TOOLS, type Sections } from "../../src/core/rules-view.js";
 import type { RuleHitJson, TestJson } from "../../src/core/testmodel.js";
-import { openRules, page, rowSelector } from "../helpers/rules.js";
+import { openPage, openRules, page, rowSelector } from "../helpers/rules.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -371,6 +371,28 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
     await dom.send({ type: "failed", message: "--lint が error を報告した" });
     assert.equal(dom.one("#status").textContent, "--lint が error を報告した");
     assert.ok(dom.one("#status").closest(".foot")?.classList.contains("error"));
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D72 読み直せなかった画面から中身が届いたあとも、id の確定で開いた行を控える", async () => {
+  const dom = await openPage({ kind: "error", error: "ルールファイルを読めない" });
+  try {
+    assert.match(dom.one(".load-error").textContent ?? "", /ルールファイルを読めない/);
+    dom.click(dom.one('button[data-action="reload"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "reload").map((message) => message.dirty), [false]);
+    assert.ok(dom.one<HTMLButtonElement>('button[data-action="reload"]').disabled, "押した時点で止める");
+    // 中身が届いて一覧が出る。控えの受け口（id の確定）は、ここで張られていないと二度と張られない
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    dom.click(dom.one(`${rowSelector("deps")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("deps")} input.f-id`), "deps-2");
+    await dom.settle();
+    dom.change(dom.one(`${rowSelector("deps-2")} input.f-id`));
+    await dom.settle();
+    assert.deepEqual((dom.state() as { open: string[] }).open, ["deps-2"]);
   } finally {
     await dom.close();
   }

@@ -11,7 +11,7 @@ import { SECTIONS } from "../../core/rules-view.js";
 import type { RuleHitJson, SamplesJson, TestJson } from "../../core/testmodel.js";
 
 /** 判定の札。空（判定の対象外）は薄い地の色で出す */
-export function Verdict({ verdict }: { readonly verdict: string }): JSX.Element {
+function Verdict({ verdict }: { readonly verdict: string }): JSX.Element {
   return <span className={`verdict ${verdict === "" ? "none" : verdict}`}>{verdict === "" ? "（判定の対象外）" : verdict}</span>;
 }
 

@@ -7,7 +7,7 @@
 import type { RuleForm, Section } from "../../core/rules-view.js";
 
 /** 1 行に縮める。空白を畳んで、長ければ後ろを落とす */
-export function excerpt(text: string, max: number): string {
+function excerpt(text: string, max: number): string {
   const one = text.replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max)}…` : one;
 }
