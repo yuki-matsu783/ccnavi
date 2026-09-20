@@ -41,7 +41,8 @@ uv run python -m unittest discover -s tests -t .         # 全件
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`vscode-extension/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `vscode-extension/` | `ticket`（`core` の `test_test_json` も例を読む） |
-| ドキュメントだけ（`*.md`・`docs/`） | 回さない |
+| `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
+| そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 **自動テストが無いもの。** 次は、どのグループを回しても、全件を回しても中身が確かめられない。
 表に入れていないのはそのため。変えたら手で動かして確かめる。
