@@ -4,14 +4,20 @@
 `ADR-00NN` がどちらの決定を指すか読めない。実際に 3 組（0051・0058・0060）が
 重なっていて、うち 1 枚は題に番号を書いていなかった。
 
-一覧（`docs/adr/README.md`）は人が手で書き足す形なので、枚を足したときに
-番号を取り違えても誰も言わない。**人の注意ではなくここで止める。**
-テストの ID に同じ番犬を置いた回（issue #88、`test/shared/test-ids.test.ts`）と
-同じ形で、見るのは 3 つ。
+一覧（`docs/adr/README.md`）は人が手で書き足す形なので、1 枚足したときに
+番号を取り違えても誰も言わない。テストの ID に同じ番犬を置いた回
+（issue #88、`test/shared/test-ids.test.ts`）と同じ形で、見るのは 3 つ。
 
 1. 番号が重複しない
 2. 題が `# ADR-<番号>:` で始まり、その番号がファイル名と合う
-3. 一覧が、置いてある枚を 1 回ずつ載せ、実体と食い違わない
+3. 一覧が、置いてある ADR を 1 回ずつ載せ、番号とリンク先が合っている
+   （**行に書いた題と、その枚の題が同じかは見ない**。既存の行は題を縮めてある）
+
+**止められるのは合流の後。** ADR を足しただけのコミットではこのテストは回らない
+（`.claude/skills/commit/references/test-groups.md` の「`docs/adr/` → `core`」で
+回るのは、その表を見てコミットしたときだけ。hook は未登録で、CI も無い）。
+重複はもともと並行して伸びた枝が合流したときに起きるので、**気づく場所が
+「合流して誰かが `core` を回したとき」に早まる**、という効き方になる。
 
 読むのは `docs/adr/` のファイルだけで、判定の実行ファイルには触らない。
 """
@@ -44,7 +50,7 @@ LINK = re.compile(r"\[(\d{4})\]\((\d{4}-[^)]+\.md)\)")
 
 
 def sheets() -> list[str]:
-    """`docs/adr/` に置いてある枚のファイル名。番号の順に並べる。"""
+    """`docs/adr/` に置いてある ADR のファイル名。番号の順に並べる。"""
     return sorted(f for f in os.listdir(ADR_DIR) if FILE_NAME.match(f))
 
 
@@ -78,7 +84,8 @@ class AdrNumbersTest(unittest.TestCase):
         """題は `# ADR-<番号>:` で始まり、番号はファイル名と合う。"""
         wrong: list[str] = []
         for name in self.sheets:
-            first = read(name).splitlines()[0] if read(name) else ""
+            lines = read(name).splitlines()
+            first = lines[0] if lines else ""
             found = TITLE.match(first)
             if found is None:
                 wrong.append(f"{name}: 題が `# ADR-<番号>: <題>` の形でない（{first[:40]}）")
@@ -87,18 +94,18 @@ class AdrNumbersTest(unittest.TestCase):
         self.assertEqual([], wrong)
 
     def test_index_lists_every_sheet_once(self):
-        """一覧は、置いてある枚を 1 回ずつ載せ、実体と食い違わない。"""
+        """一覧は、置いてある ADR を 1 回ずつ載せ、番号とリンク先が合っている。"""
         linked = LINK.findall(read("README.md"))
         listed = [target for _, target in linked]
 
         missing = [name for name in self.sheets if name not in set(listed)]
-        self.assertEqual([], missing, "一覧に無い枚がある（docs/adr/README.md）")
+        self.assertEqual([], missing, "一覧に無い ADR がある（docs/adr/README.md）")
 
         phantom = [target for target in listed if target not in set(self.sheets)]
-        self.assertEqual([], phantom, "一覧が指している枚が置かれていない")
+        self.assertEqual([], phantom, "一覧が指している ADR が置かれていない")
 
         twice = sorted(name for name, count in Counter(listed).items() if count > 1)
-        self.assertEqual([], twice, "一覧に 2 回載っている枚がある")
+        self.assertEqual([], twice, "一覧に 2 回載っている ADR がある")
 
         mismatched = [f"[{num}]({target})" for num, target in linked if not target.startswith(num)]
         self.assertEqual([], mismatched, "一覧の番号とリンク先の番号が違う")
