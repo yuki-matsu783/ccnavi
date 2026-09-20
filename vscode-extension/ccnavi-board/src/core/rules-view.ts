@@ -26,7 +26,7 @@ export const SECTIONS = ["deny", "ask", "allow"] as const;
 export type Section = (typeof SECTIONS)[number];
 export type PatternKind = "glob" | "regex";
 
-/** タイプの読み。画面の見出しに出す */
+/** タイプの言い換え。画面の見出しで `deny` などの綴りに添える */
 export const SECTION_LABELS: Readonly<Record<Section, string>> = {
   deny: "拒否する",
   ask: "人に確認する",
@@ -125,7 +125,7 @@ export type RulesData =
  *
  * `judged` と `sampled` は実行ファイルに聞いた判定の結果、`failed` は操作の結果をその場で言う
  * 一言、`lock` は保存してよいかの取り直し、`changed` はファイルが外で変わったという帯、
- * `picked` はファイル選択ダイアログで選ばれた綴り。どれも画面の編集には触らない
+ * `picked` はダイアログで選んだファイルの綴り。どれも画面の編集には触らない
  * （`picked` は名指しした 1 欄だけを埋める）。
  */
 export type ToRules =
@@ -137,7 +137,7 @@ export type ToRules =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  /** 選ばれたファイル。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
+  /** 選んだファイルの綴り。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }
   | { readonly type: "appearance"; readonly value: Appearance };
 

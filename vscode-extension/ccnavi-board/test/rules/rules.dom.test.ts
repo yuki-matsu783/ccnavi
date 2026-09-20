@@ -1,7 +1,7 @@
 /**
  * ルール設定画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。
  *
- * 判定はしない画面なので、判定の結果（`judged` / `sampled`）は拡張ホストから届いた体で送る。
+ * 判定は実行ファイルの仕事なので、その結果（`judged` / `sampled`）は拡張ホストから届いたものとして送る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,7 +23,7 @@ function hit(section: string, id: string, kind = "glob"): RuleHitJson {
   return { section, id, kind, written: "*", pattern: ".*", source: "file" };
 }
 
-/** 実行ファイルが返した体の判定。拡張ホストが `judged` で渡す形 */
+/** 実行ファイルが返した判定。拡張ホストが `judged` で渡す形 */
 function judged(rules: readonly RuleHitJson[]): { type: string; result: TestJson; hooks: [] } {
   const result: TestJson = {
     version: 1,
@@ -317,7 +317,7 @@ test("CB-D07 足したルールは開いて焦点が id に来る。タイプを
   }
 });
 
-test("CB-D69 「渡すファイル」で選んだ綴りは、拡張ホストが名指しで返した行の欄にだけ入る", async () => {
+test("CB-D69 「渡すファイル」で選んだ綴りは、拡張ホストが名指しした行の欄にだけ入る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -359,7 +359,7 @@ test("CB-D70 再読込は押した時点でボタンを止め、やめたら戻�
   }
 });
 
-test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の一言は届いたところで出る", async () => {
+test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の一言は届いたときに出る", async () => {
   const dom = await openRules();
   try {
     assert.ok(dom.one("#changed").classList.contains("hidden"));

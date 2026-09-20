@@ -1,5 +1,5 @@
 /**
- * ルール設定画面に出す言葉。行の要約、絞り込みが当てる文字列、件数の言い方。
+ * ルール設定画面に出す言葉。行の要約、絞り込みが当てる文字列、件数の出し方。
  *
  * 判定はしない（当たる・当たらないは実行ファイルの `--test` が言う）。ここが作るのは
  * 「このルールは何を止めるか」を畳んだままでも読める形に縮めた文だけ。
@@ -17,7 +17,7 @@ export function summaryId(rule: RuleForm): string {
   return rule.id === "" ? "（id 未設定）" : rule.id;
 }
 
-/** 要約のツール。空は「どのツールにも当たる」 */
+/** 要約のツール。空は「全ツール」＝ どのツールにも当たる */
 export function summaryMatch(rule: RuleForm): string {
   return rule.match === "" ? "（全ツール）" : rule.match;
 }
@@ -51,15 +51,15 @@ export function contextSummary(rule: RuleForm): string {
     : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイルと、渡す回の刻み";
 }
 
-/** ask と allow に message が残っているときの言い分。lint が error にする */
+/** ask と allow に message が残っているときに出す断り。lint が error にする */
 export function staleMessage(section: Section): string {
   const where = section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない";
   return `${section} の message は${where}ので lint が error にする。モデルに渡すプロンプトは「渡す文」（additionalContext）に移す: `;
 }
 
 /**
- * 絞り込みが当てる文字列。**画面に出ている語でも、書いてある値そのものでも当たる。**
- * 要約に出ない文（渡す文の全文）も含める（移行前と同じ）。
+ * 絞り込みが当てる文字列。当てるのは**書いてある値そのもの**（id・ツール・パターン・文面・
+ * 渡す文）で、要約に出ない全文にも当たる（移行前と同じ）。
  */
 export function findText(rule: RuleForm): string {
   return `${rule.id} ${rule.match} ${rule.pattern} ${rule.message} ${rule.additionalContext} ${rule.additionalContextOnce}`.toLowerCase();

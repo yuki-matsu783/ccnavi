@@ -101,8 +101,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   /**
    * id を打っている途中は控えを書き直さない（打ちかけの id が控えに入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
-   * ここは素の DOM の口で受ける。最新の中身は commit のたびに写す（`useLayoutEffect` は
-   * 描き直しと同じ順で走るので、確定が届いたときには今の編集が入っている）。
+   * ここは素の DOM の口で受ける。いまの編集は描き直しのたびに `latest` へ写す
+   * （`useLayoutEffect` は描き直しと同じ順番で走るので、確定が届いた時点では今の編集が入っている）。
    */
   const latest = useRef<Editing>(editing);
   useLayoutEffect(() => {

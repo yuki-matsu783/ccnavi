@@ -10,8 +10,9 @@ import { useEffect, useRef, type JSX, type ReactNode } from "react";
 import { KNOWN_TOOLS, SECTIONS, type FileField, type PatternKind, type RuleForm, type Section } from "../../core/rules-view.js";
 import { contextSummary, hasContext, staleMessage, summaryId, summaryMatch, summaryNote } from "./text.js";
 
-/** 文の欄（textarea）。ブロックで書かれうるので幅いっぱいに広げる */
+/** 1 行の欄（input）で受ける値 */
 type TextKey = "id" | "match" | "pattern" | "every" | "additionalContextFile" | "additionalContextOnceFile";
+/** 文の欄（textarea）で受ける値。ブロック（`>-`）で書かれることがあるので折り返せる欄にする */
 type AreaKey = "message" | "additionalContext" | "additionalContextOnce";
 
 export interface RuleProps {

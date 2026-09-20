@@ -15,7 +15,7 @@ export function Verdict({ verdict }: { readonly verdict: string }): JSX.Element 
   return <span className={`verdict ${verdict === "" ? "none" : verdict}`}>{verdict === "" ? "（判定の対象外）" : verdict}</span>;
 }
 
-/** 値のある行だけ出す定義リスト */
+/** 値のある組だけ出す定義リスト（`dl`） */
 function Pairs({ pairs }: { readonly pairs: readonly (readonly [string, string])[] }): JSX.Element {
   return (
     <dl className="kv">
