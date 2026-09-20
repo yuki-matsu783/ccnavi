@@ -40,10 +40,8 @@ import { webviewScript, webviewStyle } from "./webview-asset.js";
 const DEBOUNCE_MS = 120;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
-/** 束ねた画面。綴りの約束は `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
-const SCRIPT_NAME = "rules.js";
-/** 束ねた画面の CSS。綴りの約束は `src/webview/<名前>/style.css` → `out/webview/<名前>.css` */
-const STYLE_NAME = "rules.css";
+/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+const SCREEN = "rules";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
@@ -154,8 +152,8 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
 
   // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
-    webviewScript(SCRIPT_NAME);
-    webviewStyle(STYLE_NAME);
+    webviewScript(SCREEN);
+    webviewStyle(SCREEN);
   } catch (error) {
     vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
     return;
@@ -476,8 +474,8 @@ function rulesHost(panel: vscode.WebviewPanel): ScreenHost<RulesData> {
     (data) =>
       renderRulesPage(data, {
         nonce: crypto.randomBytes(16).toString("base64"),
-        script: webviewScript(SCRIPT_NAME),
-        style: webviewStyle(STYLE_NAME),
+        script: webviewScript(SCREEN),
+        style: webviewStyle(SCREEN),
         appearance: readAppearance(),
       }),
   );

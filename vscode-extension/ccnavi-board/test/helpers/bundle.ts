@@ -55,3 +55,16 @@ export function flatStyle(html: string): string {
   }
   return found[1].replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\s*\n\s*/g, " ").trim();
 }
+
+/**
+ * 画面の名前。`src/webview/<名前>/main.tsx` があるものが画面で、`scripts/bundle-webview.js` と
+ * `scripts/test-groups.js` が同じ見つけ方をする。**テストも表で持たない**（表にすると、
+ * 画面を足したときに黙って検査から漏れる）。
+ */
+export function screenNames(): string[] {
+  return fs
+    .readdirSync(WEBVIEW_SRC, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(WEBVIEW_SRC, entry.name, "main.tsx")))
+    .map((entry) => entry.name)
+    .sort();
+}

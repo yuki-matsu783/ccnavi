@@ -36,7 +36,10 @@
 }
 .row.open .row-body { display: grid; }
 .row-body .buttons { grid-column: 1 / -1; display: flex; gap: 4px; justify-content: flex-end; padding-top: 4px; }
-.row-body .buttons button { margin-left: 0; }
+/* 行末のボタンは右端に詰める。`button.action.small` の `margin-left: auto`（見出しの「＋ 追加」向け）を
+   打ち消すためのもので、**`.action` まで書いて詳細度で勝たせる**。同じ詳細度だと、どちらが先に
+   束ねられたかで見た目が変わる（CSS の `@import` は先頭に集まるので、並びは入口の 1 行で動く） */
+.row-body .buttons button.action { margin-left: 0; }
 .row-body .wide { grid-column: 1 / -1; }
 .row-body textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }
 .field { display: contents; }

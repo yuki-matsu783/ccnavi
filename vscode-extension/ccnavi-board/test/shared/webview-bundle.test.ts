@@ -15,16 +15,15 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { screenScript, screenStyle } from "../helpers/bundle.js";
-
-/** 画面の名前。足したら、ここに 1 行足す（束ねの出口の綴りがそのまま名前） */
-const SCREENS = ["board", "projects", "risk", "phases", "rules"] as const;
+import { screenNames, screenScript, screenStyle } from "../helpers/bundle.js";
 
 /** 外へ出る口。名前で見るだけなので、綴りを変えて呼ぶ道までは塞げない */
 const OUTSIDE = [/\bfetch\s*\(/, /XMLHttpRequest/, /\bWebSocket\b/, /sendBeacon/, /\bimportScripts\b/, /EventSource/, /new\s+Image\s*\(/];
 
 test("CB-T157 束ねた画面は、外へ出る呼び出しを持たない", () => {
-  for (const name of SCREENS) {
+  const names = screenNames();
+  assert.ok(names.length >= 5, `画面を数えられていない（${names.join(" ")}）`);
+  for (const name of names) {
     const script = screenScript(name);
     for (const pattern of OUTSIDE) {
       assert.doesNotMatch(script, pattern, `${name} の画面が ${String(pattern)} を持っている`);
@@ -33,7 +32,7 @@ test("CB-T157 束ねた画面は、外へ出る呼び出しを持たない", () 
 });
 
 test("CB-T167 束ねた CSS は、外の資源を読まない（url() と残った @import が無い）", () => {
-  for (const name of SCREENS) {
+  for (const name of screenNames()) {
     const style = screenStyle(name);
     // 画像やフォントを読む口。VS Code のテーマ変数（var(--vscode-*)）だけで組む方針
     assert.doesNotMatch(style, /url\s*\(/, `${name} の CSS が url() を持っている`);

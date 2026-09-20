@@ -348,7 +348,7 @@ code --install-extension dist/ccnavi-board-<version>.vsix --force   # --force �
 束ねるのはスクリプト（`<名前>.js`）と CSS（`<名前>.css`）の 2 本で、CSS だけは小さくしない
 （開発者ツールで読める形のまま出す。ADR-0066）。
 
-どのグループがどのファイルを読むかは、テストの `import` を辿って数える。辿れないものだけ
+どのグループがどのファイルを読むかは、テストの `import`（CSS は `@import`）を辿って数える。辿れないものだけ
 綴りで決める（`test-groups.js` の先頭にまとめてある。固定データ `test/fixtures/` は全部、
 画面 `src/webview/` は辿れたぶんと束ねたものを読むグループ、組み立ての土台
 `package.json`・`tsconfig*.json`・`scripts/`・`pnpm-lock.yaml` は全部、読み物 `*.md` と絵
@@ -497,7 +497,7 @@ src/
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json / --approve --preview --json / --approve --yes … --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
-  webview-asset.ts    束ねた画面（out/webview/<名前>.js）と CSS（同 .css）を読む。拡張が <script nonce> と <style nonce> に流し込む
+  webview-asset.ts    束ねた画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
     approvemodel.ts   承認の JSON の形（--approve --preview --json / --approve --yes … --json）と読み取り
@@ -642,12 +642,13 @@ README やチケットの記録から参照する。
 | 人が押せる操作 | `core/board-view.ts` の `BoardMessage` → 画面のボタン → `board-panel.ts` の `KNOWN`（形の確認の一覧）と `asMessage`（形の確認）と `handleMessage`（処理）。`KNOWN` か処理を書き忘れると型が合わなくなる（どちらも網羅を型で縛ってある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（名前で読む）、`poster<M>()`、
+**画面を 1 つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は向こうが付ける）、`poster<M>()`、
 `core/screen-host.ts`（`screenHost` / `retainedHost` と `embedJson`）、`webview/styles/`（`page.css`・`list.css`）、
 `webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、テストの土台（`test/helpers/dom.ts`・
 `test/helpers/bundle.ts`）。画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・
 画面の CSS（`webview/<名前>/style.css` と部品ごとの CSS）・`ready` を受けて渡し直す数行・
-テストの入口（`test/helpers/<名前>.ts`）。
+テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts` の `reactPages` に 1 行
+（足し忘れは CB-T127 が「reactPages に無い画面がある」で止める。ほかの検査は画面をディスクから拾う）。
 
 **実行ファイルへの往復がある画面（ルール設定）も、やり取りの形は同じ。** 画面は編集中の中身を
 付けて頼み（`judge` / `samples`）、拡張ホストが実行ファイルの答えをそのまま返す（`judged` / `sampled`）。
@@ -659,7 +660,7 @@ README やチケットの記録から参照する。
 | 足すもの | 触る場所 |
 |---|---|
 | 束ねと回り方 | **どちらも直さない。** 綴りの約束で決まる: 画面は `src/webview/<名前>/main.tsx`、束ねた出口は `out/webview/<名前>.js`、CSS は `src/webview/<名前>/style.css` → `out/webview/<名前>.css`、テストの入口は `test/helpers/<名前>.ts`、グループは `test/<名前>/`。`bundle-webview.js` と `test-groups.js` が同じ見つけ方でディスクから拾う（表を持つと、画面を足したときに黙って古くなる） |
-| 回すものの決まり方 | 触ったファイルが**どの画面の束ねに入るか**を import の閉包で見る（置き場の綴りでは決めない。画面をまたぐ import が 1 本入っただけで、直したのに回らない側に外れるため）。どの画面にも入らないもの（`webview/vscode.ts` など）は全画面に効くと見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
+| 回すものの決まり方 | 触ったファイルが**どの画面の束ねに入るか**を閉包で見る（スクリプトは `main.tsx` から `import`、CSS は `style.css` から `@import`。置き場の綴りでは決めない。画面をまたぐ import が 1 本入っただけで、直したのに回らない側に外れるため）。どの画面にも入らないもの（`webview/vscode.ts`・`webview/styles/` など）は全画面に効くと見る。画面と同じ名前のグループは、`test/helpers/<名前>.ts` を作り忘れても必ず回る |
 | 契約に置く型 | 画面に渡す形（`ProjectsPage` のような）は契約の側（`*-view.ts`）に置く。`core/` の判定のファイルに置いたままだと、Webview がそこから `node:path` を読むファイル（`commands.ts` など）を辿って型検査が落ちる |
 
 **段取りは 2 系統ある。パネルの `retainContextWhenHidden` と対で選ぶ**（ADR-0062）。

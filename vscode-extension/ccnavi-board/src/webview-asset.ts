@@ -18,9 +18,6 @@ const cache = new Map<string, string>();
 /**
  * 束ねたものは `out/webview/` にある。走っているのが束ねた `out/extension.js`（`__dirname` は `out/`）でも、
  * tsc が出した `out/src/webview-asset.js`（`__dirname` は `out/src/`）でも読めるように、両方を見る。
- *
- * `name` は拡張子まで込みのファイル名（`"board.js"`・`"board.css"`）。画面の名前（`src/webview/<名前>/` の
- * `board`）ではないので、画面を足したときは拡張子を落とさない。
  */
 function asset(name: string): string {
   const found = cache.get(name);
@@ -40,12 +37,15 @@ function asset(name: string): string {
   throw new Error(`画面の束ねが見つからない: ${name}（拡張のビルドが揃っていない。pnpm run compile を通す）`);
 }
 
-/** 束ねた画面のスクリプト。`name` は `"board.js"` のように拡張子まで込み */
+/**
+ * 束ねた画面のスクリプト。渡すのは**画面の名前**（`"board"`。`src/webview/<名前>/` の `board`）で、
+ * 拡張子はここが付ける。名前だけを受けるので、`.js` と `.css` を取り違える道が無い
+ */
 export function webviewScript(name: string): string {
-  return asset(name);
+  return asset(`${name}.js`);
 }
 
-/** 束ねた画面の CSS。`name` は `"board.css"` のように拡張子まで込み */
+/** 束ねた画面の CSS。渡すのは画面の名前（`"board"`） */
 export function webviewStyle(name: string): string {
-  return asset(name);
+  return asset(`${name}.css`);
 }

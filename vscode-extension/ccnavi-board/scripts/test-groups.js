@@ -40,6 +40,7 @@ const NOT_READY = 3;
 // 黙って古くなる。このファイルがグループの表を持たないのと同じ理由）。
 //
 //   画面      `src/webview/<名前>/main.tsx` があるもの（`scripts/bundle-webview.js` と同じ見つけ方）
+//   CSS       同じ置き場の `src/webview/<名前>/style.css`（部品の CSS を `@import` で束ねる入口）
 //   テスト    `test/helpers/<名前>.ts`（束ねたものを読む入口）と、同じ名前のグループ `test/<名前>/`
 //
 // これを辿るグループだけ、tsconfig.webview.json の型の検査と esbuild の束ねが要る。
@@ -53,6 +54,7 @@ function screens() {
     .map((entry) => ({
       name: entry.name,
       entry: path.join(WEBVIEW_DIR, entry.name, "main.tsx"),
+      style: path.join(WEBVIEW_DIR, entry.name, "style.css"),
       helper: path.join(TEST_DIR, "helpers", `${entry.name}.ts`),
     }))
     .filter((screen) => fs.existsSync(screen.entry))
@@ -81,6 +83,10 @@ function resolveImport(from, spec) {
   if (base.endsWith(".js")) {
     candidates.push(base.slice(0, -3) + ".ts", base.slice(0, -3) + ".tsx");
   }
+  // CSS は綴りのまま（`@import "./Card.css"`）。拡張子を落とした形は書かない
+  if (base.endsWith(".css")) {
+    candidates.push(base);
+  }
   candidates.push(
     base,
     base + ".ts",
@@ -99,6 +105,8 @@ function resolveImport(from, spec) {
 // 見張るものが無いので、片方だけ拾うと黙って取りこぼす）。
 const IMPORT = /(?:^|\s)(?:import|export)\b[^;]*?from\s*["']([^"']+)["']/g;
 const SIDE_EFFECT_IMPORT = /(?:^|\s)import\s*["']([^"']+)["']/g;
+// CSS の `@import "./Card.css";`。画面の CSS は、これだけで束ねに入る
+const CSS_IMPORT = /@import\s*["']([^"']+)["']/g;
 
 /** 1 ファイルが読むもの（相対 import だけ）。 */
 function importsOf(file) {
@@ -109,7 +117,7 @@ function importsOf(file) {
     return [];
   }
   const found = [];
-  for (const pattern of [IMPORT, SIDE_EFFECT_IMPORT]) {
+  for (const pattern of [IMPORT, SIDE_EFFECT_IMPORT, CSS_IMPORT]) {
     for (const match of text.matchAll(pattern)) {
       const resolved = resolveImport(file, match[1]);
       if (resolved) found.push(resolved);
@@ -152,11 +160,17 @@ function closureFrom(roots) {
 // 画面の束ねに入るファイル。触ったパス 1 つごとに取り直すと、画面の数だけ全体を歩き直す。
 const screenFileCache = new Map();
 
-/** 画面の束ねに入るファイル全部（入口から import で辿れるもの）。1 度取ったら覚えておく。 */
+/**
+ * 画面の束ねに入るファイル全部（2 つの入口から辿れるもの）。1 度取ったら覚えておく。
+ *
+ * 入口は 2 つある。画面（`main.tsx` から `import` で辿る）と、CSS（`style.css` から `@import` で辿る）。
+ * CSS は画面のスクリプトから import しないので（挿すのは拡張ホスト）、`main.tsx` だけを起点にすると
+ * `.css` はどの画面の閉包にも入らず、1 本触るたびに全部のグループが回ることになる。
+ */
 function screenFiles(screen) {
   const found = screenFileCache.get(screen.entry);
   if (found !== undefined) return found;
-  const files = closureFrom([screen.entry]);
+  const files = closureFrom([screen.entry, screen.style]);
   screenFileCache.set(screen.entry, files);
   return files;
 }
@@ -400,7 +414,7 @@ function main(argv) {
   }
 
   // 束ねるのは、型を見ないときでも必ず。`clean-out.js` が `out/webview` を消すので、
-  // ここで作り直さないと、束ねたものを読む側（拡張の webview-script.ts、board の
+  // ここで作り直さないと、束ねたものを読む側（拡張の webview-asset.ts、board の
   // テスト）が「画面が束ねられていない」で落ちる。esbuild は 0.1 秒ほど。
   code = run(process.execPath, [path.join("scripts", "bundle-webview.js")]);
   if (code !== 0) return code;

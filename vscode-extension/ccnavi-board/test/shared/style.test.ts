@@ -14,7 +14,7 @@ import * as path from "node:path";
 import { buildBoard } from "../../src/core/board.js";
 import { buildProjectsPage } from "../../src/core/projects.js";
 import { fixture } from "../helpers/fixture.js";
-import { screenStyle, WEBVIEW_SRC } from "../helpers/bundle.js";
+import { flatStyle, screenNames, screenStyle, WEBVIEW_SRC } from "../helpers/bundle.js";
 import { boardPage } from "../helpers/board.js";
 import { projectsHtml } from "../helpers/projects.js";
 import { page as riskPage, riskHtml } from "../helpers/risk.js";
@@ -78,21 +78,28 @@ function reachable(entries: string[]): Set<string> {
  * `@import` を並べるだけの入口（`style.css`）は当てるものを持たないので undefined
  */
 function firstSelector(file: string): string | undefined {
-  const text = fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
-  const found = text.split("\n").find((line) => line.trim().endsWith("{"));
-  return found?.trim().replace(/\s*\{$/, "");
+  const text = fs
+    .readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/@import[^;]*;/g, "");
+  // 最初の `{` の手前が、最初に当てる選択子。1 行で書いたファイル（`.a { x: 1; }`）も同じに読む
+  const found = /([^{}]+)\{/.exec(text);
+  return found === null ? undefined : found[1].trim().replace(/\s*\n\s*/g, " ");
 }
 
 test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・欄・脚注）を 1 か所から持つ", () => {
+  // 画面を足したら、その 1 枚を reactPages に足す（足さないと、ここから下の検査に入らない）
+  assert.deepEqual(reactPages().map(([name]) => name).sort(), screenNames(), "reactPages に無い画面がある");
   for (const [name, html] of reactPages()) {
     // 拡張が入れるのは、束ねた 1 本（`out/webview/<名前>.css`）そのもの
     assert.ok(html.includes(screenStyle(name)), name);
-    const style = screenStyle(name);
-    assert.match(style, /^\.toolbar \{$/m);
-    assert.match(style, /^\.banner\.warn \{$/m);
-    assert.match(style, /^input\[type=text\],\ninput\[type=search\],\ntextarea,\nselect \{$/m);
+    // 規則は 1 行に潰して見る（esbuild の並べ方が変わっても、当てるものと宣言が同じなら通す）
+    const style = flatStyle(html);
+    assert.match(style, /\.toolbar \{ display: flex;/);
+    assert.match(style, /\.banner\.warn \{ border-color:/);
+    assert.match(style, /input\[type=text\], input\[type=search\], textarea, select \{ background:/);
     // 骨組みの定義は 1 度だけ（画面ごとの写しを残さない）
-    assert.equal((style.match(/^\.toolbar \{\n  display: flex;/gm) ?? []).length, 1);
+    assert.equal((style.match(/\.toolbar \{ display: flex;/g) ?? []).length, 1);
     // 見た目を指定しなければ素の body。Claude の配色の CSS は常に持つ
     assert.ok(html.includes("\n<body>\n"));
     assert.ok(style.includes("body.ccnavi-claude-light:not("));
@@ -105,22 +112,25 @@ test("CB-T127 5 つの画面は同じ骨組みの CSS（ツールバー・帯・
 });
 
 test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使い、他のテーマでは効かない書き方になっている", () => {
-  const html = board();
+  const html = flatStyle(board());
   // 一覧（設定 3 画面）の開いた行の縁は styles/list.css にあるので、ルール設定画面で見る
-  const rules = rulesOnly();
-  assert.match(rules, /\.row\.open > \.row-head,\n\.row\.open > \.row-body \{\n  box-shadow: inset 3px 0 0 var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\);\n\}/);
-  assert.match(html, /button\.action:disabled \{\n  border-color: var\(--vscode-contrastBorder, transparent\);\n  border-style: dashed;\n\}/);
+  const rules = flatStyle(rulesOnly());
+  assert.match(rules, /\.row\.open > \.row-head, \.row\.open > \.row-body \{ box-shadow: inset 3px 0 0 var\(--vscode-contrastActiveBorder, var\(--vscode-focusBorder\)\); \}/);
+  assert.match(html, /button\.action:disabled \{ border-color: var\(--vscode-contrastBorder, transparent\); border-style: dashed; \}/);
   // カードのホバーの点線は疑似要素で、他のテーマでは透明。焦点の輪（outline の実線）には触らない
   assert.match(html, /\.card:hover::after \{[^}]*border: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
-  assert.match(html, /\.card:hover,\n\.card:focus \{\n  outline: 1px solid var\(--vscode-focusBorder\);/);
-  assert.doesNotMatch(html, /\.card:hover \{\n  outline/);
+  assert.match(html, /\.card:hover, \.card:focus \{ outline: 1px solid var\(--vscode-focusBorder\);/);
+  assert.doesNotMatch(html, /\.card:hover \{ outline/);
   // ホバーの点線はボタンの焦点の輪を消さない。行の見出しにも点線
-  assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{\n  outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
-  assert.match(rules, /\.row-head:hover \{\n  background: var\(--vscode-list-hoverBackground\);\n  outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
+  assert.match(html, /button\.action:hover:not\(:disabled\):not\(:focus-visible\) \{ outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
+  assert.match(rules, /\.row-head:hover \{ background: var\(--vscode-list-hoverBackground\); outline: 1px dashed var\(--vscode-contrastActiveBorder, transparent\);/);
+  // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で勝たせてあるので、
+  // 束ねの並び（@import の順）が変わっても入れ替わらない
+  assert.match(rules, /\.row-body \.buttons button\.action \{ margin-left: 0; \}/);
 });
 
 test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ずその束ねに入る", () => {
-  const names = reactPages().map(([name]) => name);
+  const names = screenNames();
   const entries = names.map((name) => path.join(WEBVIEW_SRC, name, "style.css"));
   for (const entry of entries) {
     assert.ok(fs.existsSync(entry), `画面の CSS の入口が無い: ${entry}`);
@@ -132,12 +142,29 @@ test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ず�
     .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
   assert.deepEqual(orphans, [], "どの画面の束ねにも入らない CSS がある。画面の style.css に @import を足す");
   // 綴りだけでなく、束ねた 1 本に中身が入っていることも見る
+  const skipped: string[] = [];
   for (const name of names) {
-    const style = screenStyle(name);
+    const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
     for (const file of reachable([path.join(WEBVIEW_SRC, name, "style.css")])) {
       const selector = firstSelector(file);
-      if (selector === undefined) continue; // `@import` を並べるだけの入口
+      if (selector === undefined) {
+        // `@import` を並べるだけの入口。それ以外が来たら、当てるものを持たない CSS を置いている
+        assert.equal(path.basename(file), "style.css", `当てるものが 1 つも無い CSS: ${file}`);
+        skipped.push(file);
+        continue;
+      }
       assert.ok(style.includes(`${selector} {`), `${name} の束ねに ${path.basename(file)} の ${selector} が入っていない`);
     }
   }
+  assert.equal(skipped.length, names.length, "入口（style.css）以外が中身の検査から外れている");
+});
+
+test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を消したら CSS も消す）", () => {
+  // 大文字で始まる CSS は部品のもの（`Card.css` は `Card.tsx`）。共通の骨組み（`styles/page.css`）と
+  // 画面の入口（`style.css`）は小文字で始まるので、この決まりから外れる
+  const missing = cssFiles()
+    .filter((file) => /^[A-Z]/.test(path.basename(file)))
+    .filter((file) => !fs.existsSync(file.replace(/\.css$/, ".tsx")))
+    .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
+  assert.deepEqual(missing, [], "部品が無いのに CSS だけ残っている。CSS と style.css の @import を消す");
 });
