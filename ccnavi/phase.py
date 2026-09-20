@@ -315,7 +315,7 @@ class Phase:
         for covered in declared[1:]:
             where = phasetypes.stricter(where, covered)
         # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。MR を
-        # 勧めるのは文の側の仕事で、強制はしない（ADR-0051）。
+        # 勧めるのは文の側の仕事で、強制はしない（ADR-0065）。
         if needed and where == phasetypes.REVIEW_NONE:
             where = phasetypes.REVIEW_CHAT
         return where

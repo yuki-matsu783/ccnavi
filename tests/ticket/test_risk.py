@@ -141,7 +141,7 @@ class RiskTest(PhaseHarness):
     def test_escalated_phase_is_seen_in_the_session_and_only_recommends_a_merge_request(self):
         """実績は「要る」としか言わない。宣言が none のフェーズは chat に上がり、MR は勧めるだけ。
 
-        強制しないのは ADR-0051。勧めたのに chat で通したことはマーカーに残る。
+        強制しないのは ADR-0065。勧めたのに chat で通したことはマーカーに残る。
         """
         tree = self.one_child(review=False)
         write(os.path.join(tree, "src", "a.py"), "\n".join(str(i) for i in range(20)) + "\n")
