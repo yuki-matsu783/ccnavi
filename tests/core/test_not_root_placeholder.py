@@ -51,14 +51,20 @@ def absolute(path: str) -> str:
 
     `\` は POSIX でも普通の 1 文字として残る（`realpath` が切るのは `/` だけ）。
     展開した式は `\` と `/` のどちらも区切りとして当てるので、そこは直さなくてよい。
-    別のドライブ（`D:`）には当たるものが無いので、「1 文字目から違う絶対パス」で代える。
+
+    `C:` 以外のドライブ（`D:`）は `/drive-d/` に替える。ドライブごとに別の綴りにするのは、
+    「別々の 2 つのドライブは互いに外」を後から足したときに、黙って同じ絶対パスに
+    潰れないようにするため。**POSIX では絶対パスがどれも `/` で始まるので、
+    最外段（ルートの 1 文字目）の「違う」だけは試されない。** そこを縛るのは
+    Windows で回したときの `D:` で、Linux だけで回していると見えない。
     """
     if os.name == "nt":
         return path
     drive, colon, rest = path.partition(":")
     if colon == "" or len(drive) != 1:
         return path
-    return ("/" if drive in "Cc" else "/other-drive/") + rest.lstrip("\\/")
+    head = "/" if drive.upper() == "C" else f"/drive-{drive.lower()}/"
+    return head + (rest[1:] if rest[:1] in ("\\", "/") else rest)
 
 
 def write(path: str, text: str) -> str:
@@ -120,7 +126,10 @@ class NotRootExpansionTest(unittest.TestCase):
         self.assert_outside(
             root,
             absolute(r"C:\Users\u\Desktop\git\other\x.md"),  # 途中で違う
+            absolute(r"C:\Users\u\DesktopXgit\ccnavi\x.md"),  # 区切りの位置に別の字
             absolute(r"C:\Users\u\Desktop"),  # ルートより上
+            absolute(r"C:\Users\u\Desk"),  # ルートより上（要素の途中で終わる）
+            root[:-1],  # 同上。最後の 1 字だけ足りない
             absolute(r"C:\Users\u\Desktop\git\ccnavi-fork\x.md"),  # 前置きが一致して続く
             absolute(r"D:\ccnavi\x.md"),  # 別のドライブ
         )
