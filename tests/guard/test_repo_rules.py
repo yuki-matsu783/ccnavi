@@ -452,7 +452,7 @@ class RunnerTest(LauncherJudgeTest):
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
 class MovedJudgeTest(LauncherJudgeTest):
-    """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0066、issue #61）。"""
+    """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0067、issue #61）。"""
 
     def test_守られた場所へ入ってから書く形は止まる(self):
         # issue #61 の表。どれも綴りからディレクトリの名前が消えて素通りしていた。
