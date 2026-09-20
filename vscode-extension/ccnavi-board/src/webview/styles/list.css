@@ -1,0 +1,63 @@
+/*
+ * 設定 3 画面（ルール設定・リスク管理・フェーズ管理）の一覧。1 件 1 行で、押した行だけ下に欄が開く。
+ * 行の見出し（.row-head）の列の幅は画面ごとに決める。欄名は欄の左に置き、欄と欄名は親の格子に並ぶ
+ * （.field は display: contents）。出番の少ない欄は details.more に畳み、値があるときだけ開いて出す。
+ */
+.list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
+.list:empty { display: none; }
+.row { border-top: 1px solid var(--vscode-panel-border); }
+.row:first-child { border-top: 0; }
+.row:first-child > .row-head { border-radius: 4px 4px 0 0; }
+.row:last-child > .row-body, .row:last-child:not(.open) > .row-head { border-radius: 0 0 4px 4px; }
+/* 絞り込みで隠す。開いている行は打っている途中で消えないよう隠さない */
+.row.hidden-by-find:not(.open) { display: none; }
+.row-head { display: grid; gap: 10px; align-items: center; padding: 5px 8px; cursor: pointer; }
+.row-head:hover { background: var(--vscode-list-hoverBackground); outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); outline-offset: -1px; }
+.row.open .row-head { background: var(--vscode-editorWidget-background); }
+/* 開いている行は左に縁を付ける。HC は contrastActiveBorder、他は focusBorder */
+.row.open > .row-head, .row.open > .row-body { box-shadow: inset 3px 0 0 var(--vscode-contrastActiveBorder, var(--vscode-focusBorder)); }
+.row.open > .row-body { border-top: 1px dashed var(--vscode-contrastBorder, transparent); }
+.twist {
+  background: none; border: none; color: var(--vscode-descriptionForeground);
+  font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
+}
+.sum { display: contents; }
+.sum .sum-id { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum .dim { color: var(--vscode-descriptionForeground); }
+.sum .mono { font-family: var(--vscode-editor-font-family); font-size: .92em; }
+.sum .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sum .sum-note { color: var(--vscode-descriptionForeground); margin-left: 10px; }
+.sum .sum-flag { width: 8px; height: 8px; border-radius: 50%; justify-self: center; }
+.sum .sum-flag.on { background: var(--vscode-charts-blue); }
+.sum .tag { font-size: .85em; padding: 0 7px; border-radius: 999px; border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); justify-self: start; }
+.row-body {
+  display: none; padding: 4px 10px 10px 36px; gap: 6px 12px; align-items: center;
+  grid-template-columns: 150px minmax(0, 1fr); background: var(--vscode-editorWidget-background);
+}
+.row.open .row-body { display: grid; }
+.row-body .buttons { grid-column: 1 / -1; display: flex; gap: 4px; justify-content: flex-end; padding-top: 4px; }
+/* 行末のボタンは右端に詰める。`button.action.small` の `margin-left: auto`（見出しの「＋ 追加」向け）を
+   打ち消すためのもので、**`.action` まで書いて詳細度で勝たせる**。同じ詳細度だと、どちらが先に
+   束ねられたかで見た目が変わる（CSS の `@import` は先頭に集まるので、並びは入口の 1 行で動く） */
+.row-body .buttons button.action { margin-left: 0; }
+.row-body .wide { grid-column: 1 / -1; }
+.row-body textarea { width: 100%; min-height: 2.6em; resize: vertical; font-family: inherit; }
+.field { display: contents; }
+.field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: .95em; }
+.field > input, .field > select, .field > textarea, .field > .inline, .field > .picker, .field > .with-button { width: 100%; box-sizing: border-box; margin: 0; min-width: 0; }
+.field > input.narrow, .field > select.narrow { max-width: 260px; }
+.field > input.num { max-width: 90px; }
+.inline { display: flex; gap: 6px; align-items: center; }
+.inline > input { flex: 1; min-width: 120px; }
+.inline > input.num { flex: 0 0 90px; min-width: 0; }
+.inline > .cap { color: var(--vscode-descriptionForeground); }
+details.more { grid-column: 1 / -1; }
+details.more > summary { cursor: pointer; color: var(--vscode-descriptionForeground); list-style: none; padding: 2px 0; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: "▸ "; }
+details.more[open] > summary::before { content: "▾ "; }
+details.more > summary b { font-weight: 500; color: var(--vscode-editor-foreground); }
+details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 12px; align-items: center; padding-top: 4px; }
+.find { display: flex; gap: 12px; align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
+.find input { width: 320px; max-width: 100%; }
+.find .hint { margin: 0; }

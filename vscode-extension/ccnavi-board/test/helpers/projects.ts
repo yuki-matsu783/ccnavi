@@ -8,34 +8,17 @@
  *
  * React は押した直後には描き直さない。操作のあとは `await page.settle()` を挟んでから見る。
  */
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import type { LintProblem } from "../../src/core/lintmodel.js";
 import type { ProjectRow, ProjectsData, ProjectsPage } from "../../src/core/projects-view.js";
 import { renderProjectsPage, type RenderOptions } from "../../src/core/projects-render.js";
+import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-const SCRIPT_PATH = path.join(__dirname, "..", "..", "webview", "projects.js");
-
-let cached: string | undefined;
-
-/** 束ねた画面。無ければ何を通せばよいかを言う（テストだけ先に走らせたときに出る） */
-export function projectsScript(): string {
-  if (cached === undefined) {
-    if (!fs.existsSync(SCRIPT_PATH)) {
-      throw new Error(`画面が束ねられていない: ${SCRIPT_PATH}（node scripts/bundle-webview.js を通す）`);
-    }
-    cached = fs.readFileSync(SCRIPT_PATH, "utf8");
-  }
-  return cached;
-}
-
 /** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
 export function projectsHtml(data: ProjectsData, options: Partial<RenderOptions> = {}): string {
-  return renderProjectsPage(data, { nonce: NONCE, script: projectsScript(), ...options });
+  return renderProjectsPage(data, { nonce: NONCE, script: screenScript("projects"), style: screenStyle("projects"), ...options });
 }
 
 /** 見本の 1 行。差し替えたいところだけ渡す */

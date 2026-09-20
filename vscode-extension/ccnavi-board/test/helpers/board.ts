@@ -15,29 +15,15 @@ import type { ApprovalOverlay, BoardData } from "../../src/core/board-view.js";
 import type { BoardJson } from "../../src/core/model.js";
 import { renderBoardPage, type RenderOptions } from "../../src/core/render.js";
 import { parseApprovePreview, type ApprovePreview } from "../../src/core/approvemodel.js";
+import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage } from "./dom.js";
 import { fixture } from "./fixture.js";
 
 export const NONCE = "TEST-NONCE-123";
 
-const SCRIPT_PATH = path.join(__dirname, "..", "..", "webview", "board.js");
-
-let cached: string | undefined;
-
-/** 束ねた画面。無ければ何を通せばよいかを言う（テストだけ先に走らせたときに出る） */
-export function boardScript(): string {
-  if (cached === undefined) {
-    if (!fs.existsSync(SCRIPT_PATH)) {
-      throw new Error(`画面が束ねられていない: ${SCRIPT_PATH}（node scripts/bundle-webview.js を通す）`);
-    }
-    cached = fs.readFileSync(SCRIPT_PATH, "utf8");
-  }
-  return cached;
-}
-
 /** 画面の HTML。CSS や nonce のように、文字列のまま見たいものはこれを見る */
 export function boardPage(data: BoardData, options: Partial<RenderOptions> = {}): string {
-  return renderBoardPage(data, { nonce: NONCE, script: boardScript(), ...options });
+  return renderBoardPage(data, { nonce: NONCE, script: screenScript("board"), style: screenStyle("board"), ...options });
 }
 
 /** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */

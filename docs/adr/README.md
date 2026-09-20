@@ -140,6 +140,7 @@
 | [0038](0038-project-from-location.md) | チケットのプロジェクトは提案を置いた場所で決める |
 | [0064](0064-extension-board-in-react.md) | ボードの画面を React にし、拡張ホストは中身だけを渡す |
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
+| [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む |
 
 ### 開発と文書
 

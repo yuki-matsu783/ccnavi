@@ -45,12 +45,12 @@ import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
-import { webviewScript } from "./webview-script.js";
+import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
-/** 束ねた画面。綴りの約束は `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js` */
-const SCRIPT_NAME = "projects.js";
+/** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
+const SCREEN = "projects";
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -95,9 +95,10 @@ export async function openProjects(): Promise<void> {
     return;
   }
 
-  // 画面は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
+  // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
-    webviewScript(SCRIPT_NAME);
+    webviewScript(SCREEN);
+    webviewStyle(SCREEN);
   } catch (error) {
     vscode.window.showErrorMessage(`プロジェクト管理を表示できない: ${error instanceof Error ? error.message : String(error)}`);
     return;
@@ -371,7 +372,8 @@ function projectsHost(panel: vscode.WebviewPanel): ScreenHost<ProjectsData> {
     (data) =>
       renderProjectsPage(data, {
         nonce: crypto.randomBytes(16).toString("base64"),
-        script: webviewScript(SCRIPT_NAME),
+        script: webviewScript(SCREEN),
+        style: webviewStyle(SCREEN),
         appearance: readAppearance(),
       }),
   );

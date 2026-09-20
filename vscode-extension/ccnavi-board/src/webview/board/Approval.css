@@ -1,0 +1,31 @@
+/*
+ * 承認のオーバーレイ（`Approval.tsx`）。画面を覆う幕と、その上の 1 枚。
+ */
+.approval-backdrop {
+  position: fixed; inset: 0; z-index: 10;
+  background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.approval {
+  width: min(920px, 100%); max-height: 100%; overflow: auto; box-sizing: border-box;
+  padding: 14px 16px; border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+.approval h2 { margin: 0 0 8px; font-size: 1.1em; }
+.approval h3 { margin: 12px 0 4px; font-size: .95em; color: var(--vscode-descriptionForeground); }
+.approval-batch { border-collapse: collapse; width: 100%; font-size: .9em; margin-bottom: 8px; }
+.approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
+.approval-id { font-family: var(--vscode-editor-font-family); }
+.approval-text {
+  margin: 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
+  background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: 4px;
+}
+.approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: .88em; color: var(--vscode-editorWarning-foreground); }
+.approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
+.approval-note { margin: 4px 0 8px; }
+.approval-note.warn { color: var(--vscode-editorWarning-foreground); }
+.approval-note.error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
+.approval-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
