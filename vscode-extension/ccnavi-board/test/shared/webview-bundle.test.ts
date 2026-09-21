@@ -54,10 +54,14 @@ test("CB-T167 束ねた CSS は、外の資源を読まない（url() と残っ�
  * これは**外から来た部品の版が上がったときに気づくための検査**で、いまの版がそうだという
  * 確認ではない。増えたら、その部品が何をしているかを見てから通す。
  *
- * `dangerouslySetInnerHTML` は見ない。react-dom が属性の対応表に綴りを持っているだけで、
- * 5 画面とも当たってしまう（使っているかどうかは、この綴りでは分からない）。
+ * 見るのは `style` 属性を立てるやり方だけ。`el.style.cssText = …` は**通る**（Chromium で実測。
+ * CSSOM なので属性の禁止に当たらない）ので、ここでは見ない。`dangerouslySetInnerHTML` も見ない。
+ * react-dom が属性の対応表に綴りを持っているだけで、5 画面とも当たってしまう。
+ *
+ * 属性名を実行時に組み立てる書き方（`el.setAttribute(name, value)`）は、綴りでは捕まらない。
+ * 名前で見るだけの検査で、そこまでは塞げない。
  */
-const CSP_BLOCKED = [/setAttribute\(\s*["']style["']/, /\.cssText\s*=/];
+const CSP_BLOCKED = [/setAttribute\(\s*["']style["']/];
 
 test("CB-T190 束ねた画面は、CSP に止められるやり方でスタイルを当てない", () => {
   for (const name of screenNames()) {

@@ -10,7 +10,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { openGraph, openPhases, page } from "../helpers/phases.js";
+import { openGraph, openPhases } from "../helpers/phases.js";
 import { readPhases } from "../../src/core/phases-doc.js";
 
 /** 2 つの種類が requires で結ばれ、1 つは独り。線は 1 本 */
@@ -63,7 +63,9 @@ test("CB-D74 図の下の一言は、この絵が描いていないものを言�
     const note = dom.one(".graph-note").textContent ?? "";
     assert.match(note, /3 種類・2 本/);
     assert.match(note, /線に向きは無い/);
-    assert.match(note, /他の層の種類を指す requires \/ overlap は線にならない/);
+    assert.match(note, /このファイルに無い種類を指す requires \/ overlap は線にならない/);
+    // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）
+    assert.doesNotMatch(note, /他の層の種類を指す/);
     // 良し悪しは言わない（ADR-0035）
     assert.doesNotMatch(note, /循環|不正|エラー|直して/);
   } finally {
@@ -109,12 +111,17 @@ test("CB-D76 一覧と図はタブで切り替わり、見ていたほうは控�
   }
 });
 
-test("CB-D77 摘まんで動かした位置は控えに入り、phases.yml には渡らない", async () => {
+test("CB-D77 控えてある位置で点が置かれ、図を触っても phases.yml には渡らない", async () => {
   const dom = await openGraph({ model: model(LINKED) }, { spots: { implement: { x: 40, y: 80 } } });
   try {
     // 控えてある位置で置かれる（React Flow は CSSOM で transform を当てるので、style に出る）
-    const node = dom.all('.react-flow__node[data-id="implement"]')[0] as unknown as { style: { transform: string } };
-    assert.match(node.style.transform, /translate\(40px,\s*80px\)/);
+    const node = dom.all('.react-flow__node[data-id="implement"]')[0];
+    assert.match((node as unknown as { style: { transform: string } }).style.transform, /translate\(40px,\s*80px\)/);
+
+    // **掴んで離す仕草そのものは、ここでは試せない。** d3-drag は happy-dom の下で待ちが
+    // 終わらず、テストが固まる（実測）。仕草は README の手動確認 42e が見る。
+    // 仕草が呼ぶ中身（`withSpot` / `keepSpots`）は CB-T191 が単体で試す。
+
     // 図を触っても保存には渡らない（座標は人が持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
@@ -123,12 +130,24 @@ test("CB-D77 摘まんで動かした位置は控えに入り、phases.yml に�
 });
 
 test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", async () => {
-  const empty = page({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n") });
-  const dom = await openGraph({ model: empty.model });
+  const dom = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n") });
   try {
     assert.equal(dom.all(".react-flow__node").length, 1);
+    // 空の id が無いときは、その行を出さない
     assert.doesNotMatch(dom.one(".graph-note").textContent ?? "", /id が空/);
   } finally {
     await dom.close();
+  }
+
+  // 一覧で種類を足すと id が空の行が 1 つできる。図はその数を言う
+  const added = await openPhases();
+  try {
+    added.click(added.one('[data-action="add"]'));
+    await added.settle();
+    added.click(added.one('[data-action="show-graph"]'));
+    await added.settle();
+    assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は出ない（1 件）/);
+  } finally {
+    await added.close();
   }
 });
