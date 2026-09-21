@@ -1217,8 +1217,8 @@ class ChatReviewTest(PhaseHarness):
     def test_the_approval_screen_says_where_each_phase_is_seen(self):
         """承認の時点で、どのフェーズをどこで見るかが人に見える。"""
         result = self.family(plan=["chores", "design"])
-        self.assertIn("レビュー要（このセッションで）", result.stdout)
-        self.assertIn("レビュー要（マージリクエスト）", result.stdout)
+        self.assertIn("レビュー要: このセッションで", result.stdout)
+        self.assertIn("レビュー要: マージリクエスト", result.stdout)
 
     def test_chat_and_accept_unresolved_together_are_refused(self):
         """chat に未解決スレッドは無い。取り違えを黙って通さない。"""

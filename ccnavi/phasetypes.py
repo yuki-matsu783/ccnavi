@@ -418,7 +418,7 @@ def scope_problems(child: ticket_mod.Ticket, pt: PhaseType) -> list[Problem]:
                 Problem(
                     SEVERITY_WARN,
                     child.ticket,
-                    f"`{entry.glob}` は種類 {pt.title}（{pt.id}）の範囲 "
+                    f"`{entry.glob}` は種類 {pt.title} / {pt.id} の範囲 "
                     f"{', '.join(pt.scope_globs)} を超えている",
                 )
             )

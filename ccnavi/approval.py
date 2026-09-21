@@ -1485,8 +1485,8 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     見て承認する。
     """
     return (
-        f"■ プロジェクト: {t.project or '(ワークスペース)'}"
-        f"  ワークツリー: {t.tree or '(main)'}  提案: {t.path}"
+        f"■ プロジェクト: {t.project or 'ワークスペース'}"
+        f"  ワークツリー: {t.tree or 'main'}  提案: {t.path}"
     )
 
 
@@ -1509,7 +1509,7 @@ def screen(
         t = cand.ticket
         cand_types = cand.types if cand.types is not None else types
         if cand.is_revision and cand.current is not None:
-            lines += ["", f"== {t.ticket}: {t.title}（親の改版）"]
+            lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
             lines += _plan_diff_lines(cand.current, t, cand_types)
             for note in cand.notes:
                 lines.append(f"    {note}")
@@ -1519,27 +1519,29 @@ def screen(
             "",
             f"== {t.ticket}: {t.title}"
             + (
-                f"（親 {t.parent}、フェーズ {_phase_label(t, pool, cand_types)}）"
+                f"  親 {t.parent} / フェーズ {_phase_label(t, pool, cand_types)}"
                 if t.is_child
-                else "（親）"
+                else "  親チケット"
             ),
         ]
         if t.is_child:
             # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
-            lines.append("■ この子が書ける範囲（親の範囲を絞ったもの。新しく開く場所は無い）")
+            lines.append("■ この子が書ける範囲")
+            lines.append("    親の範囲を絞ったもの。新しく開く場所は無い")
             head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
-                else "(承認済みチケットが無い)"
+                else "承認済みチケットが無い"
             )
             lines.append(f"    {head}")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
-                lines.append(f"    種類（{bound.title}）の範囲: " + ", ".join(bound.scope_globs))
+                lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
-            lines.append("■ このチケットが書ける範囲（ここに無い場所は全部止まる）")
+            lines.append("■ このチケットが書ける範囲")
+            lines.append("    ここに無い場所は全部止まる")
             # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
@@ -1553,26 +1555,26 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            lines.append("■ 範囲にあるのに、判定で止まる場所（承認しても書けない）")
+            lines.append("■ 範囲にあるのに、判定で止まる場所")
+            lines.append("    承認しても書けない")
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
-            lines.append(
-                f"■ 人間レビュー: {state}"
-                + (f"（理由: {t.review_reason}）" if t.review_reason else "")
-            )
+            lines.append(f"■ 人間レビュー: {state}")
+            if t.review_reason:
+                lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
                 lines.append(f"■ 先に終わっている必要がある子: {', '.join(t.predecessors)}")
         elif t.has_plan:
-            lines.append("■ 全体計画（承認するとこの並びに合意したことになる）")
+            lines.append("■ 全体計画")
+            lines.append("    承認すると、この並びに合意したことになる")
             lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
-                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or [
-                    "    （対応なし）"
-                ]
+                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
         if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: #{t.issue}（マージリクエストの本文で Closes に使う）")
+            lines.append(f"■ 課題: #{t.issue}")
+            lines.append("    マージリクエストの本文で Closes に使う")
         if t.rationale.strip():
             lines.append("■ エージェントが書いた理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
@@ -1594,13 +1596,13 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
         if item.deferred:
             review = "レビューは次と一緒に"
         elif item.review == ticket_mod.PLAN_REVIEW_MR:
-            review = "レビュー要（計画で強めた）"
+            review = "レビュー要: 計画で強めた"
         elif pt is not None:
             review = {
-                phasetypes.REVIEW_MR: "レビュー要（マージリクエスト）",
-                phasetypes.REVIEW_CHAT: "レビュー要（このセッションで）",
+                phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
+                phasetypes.REVIEW_CHAT: "レビュー要: このセッションで",
             }.get(pt.review, "レビュー不要")
-        lines.append(f"    {n}. {title}（{item.type}）" + (f"  {review}" if review else ""))
+        lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
     return lines
 
 
@@ -1618,7 +1620,7 @@ def _plan_diff_lines(
         lines.append("■ フィードバック計画")
         start = len(revised.plan) + 1
         lines += _plan_lines(revised.feedback or [], start, types) or [
-            "    （対応なし。見たうえで対応しないという記録になる）"
+            "    対応なし。見たうえで対応しない、という記録になる"
         ]
     return lines
 

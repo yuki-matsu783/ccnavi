@@ -32,11 +32,11 @@
    "tree": "i0001",
    "path": "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02.md",
    "overflow": [
-    "`wip/design/*` は種類 調査（research）の範囲 wip/research/* を超えている"
+    "`wip/design/*` は種類 調査 / research の範囲 wip/research/* を超えている"
    ]
   }
  ],
- "text": "チケットの承認リクエスト: 3 件\n\n== i0001: 親（親）\n■ このチケットが書ける範囲（ここに無い場所は全部止まる）\n    ルールの allow で開けてある場所も、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画（承認するとこの並びに合意したことになる）\n    1. 調査（research）  レビュー不要\n    2. 設計（design）  レビュー要（マージリクエスト）\n■ エージェントが書いた理由\n    r\n■ プロジェクト: (ワークスペース)  ワークツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md\n\n== i0001-01: 子 i0001-01（親 i0001、フェーズ 1: 調査）\n■ この子が書ける範囲（親の範囲を絞ったもの。新しく開く場所は無い）\n    親の範囲: src/*, wip/*, tests/*\n    種類（調査）の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要（理由: t）\n■ エージェントが書いた理由\n    r\n■ プロジェクト: (ワークスペース)  ワークツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01.md\n\n== i0001-02: 子 i0001-02（親 i0001、フェーズ 1: 調査）\n■ この子が書ける範囲（親の範囲を絞ったもの。新しく開く場所は無い）\n    親の範囲: src/*, wip/*, tests/*\n    種類（調査）の範囲: wip/research/*\n    allow: wip/design/*\n■ 範囲にあるのに、判定で止まる場所（承認しても書けない）\n    `wip/design/*` は種類 調査（research）の範囲 wip/research/* を超えている\n■ 人間レビュー: 要（理由: t）\n■ エージェントが書いた理由\n    r\n■ プロジェクト: (ワークスペース)  ワークツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02.md",
+ "text": "チケットの承認リクエスト: 3 件\n\n== i0001: 親  親チケット\n■ このチケットが書ける範囲\n    ここに無い場所は全部止まる\n    ルールの allow で開けてある場所も、この範囲の外では止まる。ルールの deny はこの範囲の中でも止まる\n    allow: src/*, wip/*, tests/*\n■ 全体計画\n    承認すると、この並びに合意したことになる\n    1. 調査 / research  レビュー不要\n    2. 設計 / design  レビュー要: マージリクエスト\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/proposals/todo/i0001.md\n\n== i0001-01: 子 i0001-01  親 i0001 / フェーズ 1: 調査\n■ この子が書ける範囲\n    親の範囲を絞ったもの。新しく開く場所は無い\n    親の範囲: src/*, wip/*, tests/*\n    種類「調査」の範囲: wip/research/*\n    allow: wip/research/*\n■ 人間レビュー: 不要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01.md\n\n== i0001-02: 子 i0001-02  親 i0001 / フェーズ 1: 調査\n■ この子が書ける範囲\n    親の範囲を絞ったもの。新しく開く場所は無い\n    親の範囲: src/*, wip/*, tests/*\n    種類「調査」の範囲: wip/research/*\n    allow: wip/design/*\n■ 範囲にあるのに、判定で止まる場所\n    承認しても書けない\n    `wip/design/*` は種類 調査 / research の範囲 wip/research/* を超えている\n■ 人間レビュー: 要\n    理由: t\n■ エージェントが書いた理由\n    r\n■ プロジェクト: ワークスペース  ワークツリー: i0001  提案: <root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-02.md",
  "digest": "<digest>",
  "rejected": [
   {
