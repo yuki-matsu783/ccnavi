@@ -5,3 +5,11 @@ button.action.small { margin-left: auto; }
 input.duplicate { border-color: var(--vscode-editorError-foreground); }
 .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
 .block h2 { display: flex; gap: 8px; align-items: center; }
+
+/*
+ * 一覧と図の切り替え。見出しの「＋ 種類を追加」を右へ寄せる `margin-left: auto` は
+ * `button.action.small` に付いているので、タブの中では打ち消す（打ち消さないと 2 つが離れる）。
+ */
+.tabs { display: flex; gap: 4px; margin: 6px 0; }
+.tabs button.action.small { margin-left: 0; }
+.tabs button.action.small.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-contrastActiveBorder, var(--vscode-focusBorder)); }

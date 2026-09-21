@@ -5,8 +5,15 @@
  *
  * 束ねるのは `scripts/bundle-webview.js`（出口は `out/webview/phases.css`）。拡張ホストはそれを読んで
  * `<style nonce>` に流し込む（`src/core/phases-render.ts`）。ADR-0066。
+ *
+ * **先頭の 1 行だけが外の綴り**（`@xyflow/react`。図が要る CSS で、node_modules から来る）。
+ * これは部品の CSS ではないので「同じ名前の部品がある」（CB-T168）の決まりの外にある。
+ * 色は `--xy-*` の変数で出来ていて、`Graph.css` が `--vscode-*` に置き換える。先に読ませるのは
+ * そのため（あとから来る `Graph.css` が勝つ）。ADR-0070。
  */
+@import "@xyflow/react/dist/style.css";
 @import "../styles/page.css";
 @import "../styles/list.css";
 @import "./App.css";
+@import "./Graph.css";
 @import "./Phase.css";

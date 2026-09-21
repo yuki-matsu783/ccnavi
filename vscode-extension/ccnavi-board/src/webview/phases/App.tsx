@@ -14,12 +14,14 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
+import { graphOf } from "../../core/phases-graph.js";
 import { editable as canEdit, type PhaseForm, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
+import { Graph } from "./Graph.js";
 import { Phase } from "./Phase.js";
 import { post } from "./post.js";
-import { countText, duplicateNote, emptyNote, findText, hasRelations } from "./text.js";
-import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
+import { countText, duplicateNote, emptyNote, findText, graphNote, hasRelations } from "./text.js";
+import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, openedFromIds, saveOpen, saveView, type Draft, type View } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
@@ -65,6 +67,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [changed, setChanged] = useState(false);
   const [find, setFind] = useState("");
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
+  const [view, setView] = useState<View>(() => loadView());
 
   const { draft, open, more } = editing;
   const page = pageOf(data);
@@ -182,6 +185,29 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     editDraft({ rows: draft.rows.filter((row) => row.key !== key) });
   };
 
+  const showView = (next: View): void => {
+    setView(next);
+    saveView(next);
+  };
+
+  /**
+   * 図の点を押した。一覧へ戻し、その id の行を開いて焦点を移す。
+   * 同じ id が 2 つあるときは先に出てきたほう（図に出ているのがそれ）。
+   */
+  const pick = (id: string): void => {
+    const row = draft.rows.find((item) => item.phase.id.trim() === id);
+    showView("list");
+    setFind("");
+    if (row === undefined) {
+      return;
+    }
+    const next = new Set(open);
+    next.add(row.key);
+    setEditing((now) => ({ ...now, open: next }));
+    saveOpen(draft, next);
+    setFocusKey(row.key);
+  };
+
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
     editDraft({ rows: [...draft.rows, row] }, new Set([...open, row.key]));
@@ -198,6 +224,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   });
   const shown = rows.filter((row) => !row.hidden).length;
   const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
+  const graph = graphOf(formOf(draft));
   const shownStatus: Status | undefined = dup.size > 0 ? { text: duplicateNote(dup), error: true } : status;
 
   return (
@@ -270,10 +297,20 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             ＋ 種類を追加
           </button>
         </h2>
-        <div className="find">
-          <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
-          <span className="hint">行を押すと開く</span>
+        <div className="tabs" role="tablist">
+          <button type="button" className={view === "list" ? "action small on" : "action small"} role="tab" aria-selected={view === "list"} data-action="show-list" onClick={() => showView("list")}>
+            一覧
+          </button>
+          <button type="button" className={view === "graph" ? "action small on" : "action small"} role="tab" aria-selected={view === "graph"} data-action="show-graph" onClick={() => showView("graph")}>
+            図
+          </button>
         </div>
+        {view === "list" && (
+          <div className="find">
+            <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+            <span className="hint">行を押すと開く</span>
+          </div>
+        )}
         <details className="help">
           <summary>この画面の説明</summary>
           <p className="hint">
@@ -284,7 +321,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <code>,</code> で区切る。
           </p>
         </details>
-        <ul className="list" id="phases">
+        {view === "graph" && (
+          <>
+            <Graph graph={graph} onPick={pick} />
+            <p className="graph-note">{graphNote(graph)}</p>
+          </>
+        )}
+        <ul className={view === "list" ? "list" : "list hidden"} id="phases">
           {rows.map((row) => (
             <Phase
               key={row.key}

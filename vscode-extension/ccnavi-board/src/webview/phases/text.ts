@@ -3,6 +3,7 @@
  *
  * 種類の意味は判定しない（ADR-0035）。ここが作るのは並べて読めるようにした文だけ。
  */
+import type { PhasesGraph } from "../../core/phases-graph.js";
 import type { PhaseForm } from "../../core/phases-view.js";
 
 /** 関係と案内（overlap / requires / agent / when）に何か入っているか */
@@ -53,6 +54,21 @@ export function countText(total: number, query: string, shown: number, kept: num
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
   return `id が重なっている（${names.join(", ")}）。1 つにするまで保存できない`;
+}
+
+/**
+ * 図の下に出す一言。**この絵が何を描いていないか**を言う。
+ *
+ * 言うのは 3 つ。線に向きが無いこと（`requires` は一緒に置く条件で、順序ではない）、
+ * このファイルの種類しか出ないこと（他の層への参照は線にならない）、id の無い種類は出ないこと。
+ * どれも「この絵の読み方」で、種類ごとの良し悪しは言わない（ADR-0035）。
+ */
+export function graphNote(graph: PhasesGraph): string {
+  const parts = [`${graph.nodes.length} 種類・${graph.edges.length} 本`, "線に向きは無い（requires は一緒に置く条件で、順序ではない。順序は親チケットの plan: が持つ）", "このファイルの種類だけを描く。他の層の種類を指す requires / overlap は線にならない"];
+  if (graph.unnamed > 0) {
+    parts.push(`id が空の種類は出ない（${graph.unnamed} 件）`);
+  }
+  return parts.join("。 ");
 }
 
 /** 種類が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */
