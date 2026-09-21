@@ -77,10 +77,10 @@ test("CB-D73 説明の付く見出しは次の行をツールチップに畳み�
     const heads = page.all(".approval-head");
     const labels = heads.map((head) => head.textContent);
     // 説明のある見出しだけが畳まれる。「エージェントが書いた理由」の下は本文なので畳まない。
-    assert.ok(labels.includes("■ このチケットが書ける範囲"), labels.join(" / "));
+    assert.ok(labels.includes("■ このチケットで書ける範囲"), labels.join(" / "));
     assert.ok(labels.includes("■ 範囲にあるのに、判定で止まる場所"), labels.join(" / "));
     assert.ok(!labels.includes("■ エージェントが書いた理由"), labels.join(" / "));
-    const scope = heads.find((head) => head.textContent === "■ このチケットが書ける範囲");
+    const scope = heads.find((head) => head.textContent === "■ このチケットで書ける範囲");
     assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で書ける場所/);
     // 畳んだ説明は目には出さないが、読み上げに渡すので DOM には残る。
     const hints = texts(page, ".approval-hint").join(" ");

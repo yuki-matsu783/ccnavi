@@ -1528,9 +1528,9 @@ def screen(
             # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
-            lines.append("■ この子が書ける範囲")
+            lines.append("■ この子チケットで書ける範囲")
             lines.append(
-                "    子は親の範囲の中だけで動く。下に並ぶのは親から絞った結果で、"
+                "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
                 "親に無い場所がここで新しく開くことはない"
             )
             head = "親の範囲: " + (
@@ -1543,9 +1543,9 @@ def screen(
             if bound is not None and not bound.inherits_scope:
                 lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
-            lines.append("■ このチケットが書ける範囲")
+            lines.append("■ このチケットで書ける範囲")
             lines.append(
-                "    下に並ぶ場所だけが、このチケットで書けるようになる。"
+                "    下に並ぶ場所にだけ、このチケットで書き込めるようになる。"
                 "allow は無確認で書ける場所、ask は確認を挟んで書ける場所、"
                 "deny はこのチケットでも書けない場所"
             )
@@ -1599,7 +1599,7 @@ def screen(
         if warnings:
             lines.append("■ 書いてあるが、判定に効かない記述")
             lines.append(
-                "    提案に書いてあっても、判定はこれを読まない。承認しても効き目は変わらない"
+                "    提案に書いてあっても、判定はこれを読まない。承認しても、書ける場所は変わらない"
             )
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
