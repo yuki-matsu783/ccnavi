@@ -49,7 +49,78 @@ export interface DomPage {
 
 const CSP = /<meta http-equiv="Content-Security-Policy"[^>]*>/;
 
-export async function loadPage(html: string, initialState?: unknown): Promise<DomPage> {
+/** 画面を読ませるときの細工。いまは測定の偽物だけ */
+export interface LoadOptions {
+  /**
+   * 要素の大きさを測れるようにする（`measure: true`）。**図の画面だけが要る。**
+   *
+   * happy-dom は `ResizeObserver` の殻を持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
+   * React Flow は点の大きさを `ResizeObserver` の報せで知り、測れていない点を `visibility: hidden` の
+   * まま置き、**線を 1 本も描かない**。落ちないので、細工をしないと「空の絵」を見て緑になる。
+   *
+   * ここで偽るのは大きさだけで、**置き場所は偽らない**（線の経路の正しさはここでは見られない。
+   * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の `SIZES`。
+   */
+  readonly measure?: boolean;
+}
+
+/** 偽る大きさ。外枠は広め、点は `Graph.css` の `.react-flow__node-phase` と同じ幅 */
+const SIZES: readonly [string, number, number][] = [
+  [".react-flow__node", 170, 60],
+  [".react-flow", 800, 480],
+  [".graph", 800, 480],
+];
+
+function sizeOf(element: { matches?: (selector: string) => boolean }): [number, number] | undefined {
+  if (typeof element.matches !== "function") {
+    return undefined;
+  }
+  for (const [selector, width, height] of SIZES) {
+    // `.react-flow__node` は `.react-flow` の下にあるので、細かいほうから見る
+    if (element.matches(`${selector}, ${selector} *`)) {
+      return [width, height];
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 大きさを測れるようにする。**画面のスクリプトを走らせる前に入れる**（React Flow は
+ * マウントの最中に `ResizeObserver` を張るので、あとから入れても間に合わない）。
+ */
+function fakeMeasure(window: Window): void {
+  const w = window as unknown as { Element: { prototype: object }; HTMLElement: { prototype: object }; ResizeObserver?: unknown };
+  const define = (target: object, name: string, get: (self: { matches?: (selector: string) => boolean }) => unknown): void => {
+    Object.defineProperty(target, name, {
+      configurable: true,
+      get(this: { matches?: (selector: string) => boolean }) {
+        return get(this);
+      },
+    });
+  };
+  define(w.HTMLElement.prototype, "offsetWidth", (self) => sizeOf(self)?.[0] ?? 0);
+  define(w.HTMLElement.prototype, "offsetHeight", (self) => sizeOf(self)?.[1] ?? 0);
+  (w.Element.prototype as { getBoundingClientRect: () => unknown }).getBoundingClientRect = function (this: { matches?: (selector: string) => boolean }) {
+    const [width, height] = sizeOf(this) ?? [0, 0];
+    return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height, toJSON: () => ({}) };
+  };
+  // 観測を始めたら 1 度だけ報せる。本物のように大きさが変わることは無いので、繰り返さない
+  w.ResizeObserver = class {
+    private readonly callback: (entries: { target: unknown; contentRect: unknown }[]) => void;
+    constructor(callback: (entries: { target: unknown; contentRect: unknown }[]) => void) {
+      this.callback = callback;
+    }
+    observe(target: { matches?: (selector: string) => boolean }): void {
+      const [width, height] = sizeOf(target) ?? [0, 0];
+      // 同期で呼ぶと React のマウントの最中に state を触ることになる。次の順番で呼ぶ
+      setTimeout(() => this.callback([{ target, contentRect: { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height } }]), 0);
+    }
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+
+export async function loadPage(html: string, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
   const { Window } = await happyDom;
   const window = new Window({ url: "vscode-webview://ccnavi/" });
   const posted: Posted[] = [];
@@ -102,6 +173,9 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
     .replace(/^\s*<!DOCTYPE html>\s*<html[^>]*>/i, "")
     .replace(/<\/html>\s*$/i, "");
   const document = window.document;
+  if (options.measure === true) {
+    fakeMeasure(window);
+  }
   document.documentElement.innerHTML = inner;
   await window.happyDOM.waitUntilComplete();
   for (const script of Array.from(document.querySelectorAll("script"))) {

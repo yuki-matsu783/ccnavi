@@ -11,7 +11,7 @@ import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import { renderPhasesPage, type RenderOptions } from "../../src/core/phases-render.js";
 import type { PhasesData, PhasesPage } from "../../src/core/phases-view.js";
 import { screenScript, screenStyle } from "./bundle.js";
-import { loadPage, type DomPage } from "./dom.js";
+import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
@@ -33,8 +33,8 @@ export function page(overrides: Partial<PhasesPage> = {}): PhasesPage {
 }
 
 /** HTML を happy-dom に読ませ、React がマウントし終わるまで待つ */
-export async function openPage(data: PhasesData, initialState?: unknown): Promise<DomPage> {
-  const dom = await loadPage(phasesHtml(data), initialState);
+export async function openPage(data: PhasesData, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
+  const dom = await loadPage(phasesHtml(data), initialState, options);
   await dom.settle();
   return dom;
 }
@@ -42,6 +42,16 @@ export async function openPage(data: PhasesData, initialState?: unknown): Promis
 /** 見本の種類を開く。差し替えたいところだけ渡す */
 export async function openPhases(overrides: Partial<PhasesPage> = {}, initialState?: unknown): Promise<DomPage> {
   return openPage({ kind: "page", page: page(overrides) }, initialState);
+}
+
+/**
+ * 図を出した状態で開く。**大きさを測れるようにして読ませる**（`measure`）。
+ * これをしないと React Flow は点を隠したまま線を 1 本も描かず、空の絵で緑になる。
+ */
+export async function openGraph(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<DomPage> {
+  const dom = await openPage({ kind: "page", page: page(overrides) }, { ...(initialState as object), view: "graph" }, { measure: true });
+  await dom.settle();
+  return dom;
 }
 
 /** 種類 1 行の中の要素。`li.phase[data-key=…]` の下だけを見る */

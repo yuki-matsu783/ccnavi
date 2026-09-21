@@ -1,0 +1,134 @@
+/**
+ * フェーズ管理画面の図を、束ねた 1 本のまま動かす。
+ *
+ * **大きさの偽物が要る**（`openGraph` が渡す `measure`）。happy-dom の `ResizeObserver` は
+ * 何もしないので、細工をしないと React Flow は点を隠したまま線を 1 本も描かず、
+ * 「空の絵」を見て緑になる。だから最初に「線が本当に描かれていること」を見る。
+ *
+ * ここで見ないもの: 線の経路と、パン・ズーム（大きさを偽っているので、座標の正しさは見られない）。
+ * それは README の手動確認に回す。
+ */
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { openGraph, openPhases, page } from "../helpers/phases.js";
+import { readPhases } from "../../src/core/phases-doc.js";
+
+/** 2 つの種類が requires で結ばれ、1 つは独り。線は 1 本 */
+const LINKED = `version: 1
+phases:
+  acceptance:
+    kind: work
+    title: 受入テスト作成
+    review: mr
+    overlap: [implement]
+  implement:
+    kind: work
+    title: 実装とテスト
+    review: mr
+    requires: [acceptance]
+  docs:
+    kind: work
+    title: 文書
+    review: mr
+    requires: [外の層の種類]
+`;
+
+function model(text: string) {
+  return readPhases(text).model;
+}
+
+test("CB-D73 図は点と線を描く（線が 0 本なら、それは描けていないということ）", async () => {
+  const dom = await openGraph({ model: model(LINKED) });
+  try {
+    assert.equal(dom.all(".react-flow__node").length, 3, "点が 3 つ出ていない");
+    // acceptance と implement は overlap と requires の両方で結ばれるので 2 本。
+    // docs の requires は行き先がこのファイルに無いので線にならない
+    assert.equal(dom.all(".react-flow__edge").length, 2, "線が描けていない（測定の偽物が効いていない）");
+    assert.equal(dom.all(".react-flow__edge.rel-requires").length, 1);
+    assert.equal(dom.all(".react-flow__edge.rel-overlap").length, 1);
+    // 点は隠れていない（測れていない点は visibility: hidden で置かれる）
+    for (const node of dom.all(".react-flow__node")) {
+      assert.notEqual((node as unknown as { style: { visibility: string } }).style.visibility, "hidden", "測れていない点がある");
+    }
+    // 矢印は付けない（向きが無い）
+    assert.equal(dom.all(".react-flow__arrowhead, marker").length, 0, "線に矢印が付いている");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D74 図の下の一言は、この絵が描いていないものを言う", async () => {
+  const dom = await openGraph({ model: model(LINKED) });
+  try {
+    const note = dom.one(".graph-note").textContent ?? "";
+    assert.match(note, /3 種類・2 本/);
+    assert.match(note, /線に向きは無い/);
+    assert.match(note, /他の層の種類を指す requires \/ overlap は線にならない/);
+    // 良し悪しは言わない（ADR-0035）
+    assert.doesNotMatch(note, /循環|不正|エラー|直して/);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D75 点を押すと一覧へ戻り、その種類の行が開く", async () => {
+  const dom = await openGraph({ model: model(LINKED) });
+  try {
+    assert.ok(dom.one("#phases").className.includes("hidden"), "図を出しているのに一覧が出ている");
+    const node = dom.all('.react-flow__node[data-id="implement"]')[0];
+    assert.ok(node !== undefined, "implement の点が無い");
+    dom.click(node);
+    await dom.settle();
+    // 一覧に戻り、その行が開いている
+    assert.ok(!dom.one("#phases").className.includes("hidden"), "一覧に戻っていない");
+    assert.deepEqual((dom.state() as { open?: string[] }).open, ["implement"]);
+    assert.equal((dom.state() as { view?: string }).view, "list");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D76 一覧と図はタブで切り替わり、見ていたほうは控えに残る", async () => {
+  const dom = await openPhases();
+  try {
+    // 既定は一覧
+    assert.ok(!dom.one("#phases").className.includes("hidden"));
+    assert.equal(dom.all("#phase-graph").length, 0);
+    dom.click(dom.one('[data-action="show-graph"]'));
+    await dom.settle();
+    assert.equal((dom.state() as { view?: string }).view, "graph");
+    assert.ok(dom.one("#phases").className.includes("hidden"), "図にしたのに一覧が出ている");
+    // 絞り込みは一覧のものなので、図では出さない
+    assert.equal(dom.all("#find").length, 0);
+    dom.click(dom.one('[data-action="show-list"]'));
+    await dom.settle();
+    assert.equal((dom.state() as { view?: string }).view, "list");
+    assert.equal(dom.all("#find").length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D77 摘まんで動かした位置は控えに入り、phases.yml には渡らない", async () => {
+  const dom = await openGraph({ model: model(LINKED) }, { spots: { implement: { x: 40, y: 80 } } });
+  try {
+    // 控えてある位置で置かれる（React Flow は CSSOM で transform を当てるので、style に出る）
+    const node = dom.all('.react-flow__node[data-id="implement"]')[0] as unknown as { style: { transform: string } };
+    assert.match(node.style.transform, /translate\(40px,\s*80px\)/);
+    // 図を触っても保存には渡らない（座標は人が持つ設定に入れない）
+    assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", async () => {
+  const empty = page({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n") });
+  const dom = await openGraph({ model: empty.model });
+  try {
+    assert.equal(dom.all(".react-flow__node").length, 1);
+    assert.doesNotMatch(dom.one(".graph-note").textContent ?? "", /id が空/);
+  } finally {
+    await dom.close();
+  }
+});

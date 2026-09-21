@@ -54,10 +54,27 @@ function cssFiles(dir: string = WEBVIEW_SRC): string[] {
   });
 }
 
-/** `@import "./x.css";` の行き先 */
+/**
+ * `@import` の行き先。`"./x.css"` はそのファイルからの相対で、`"@xyflow/react/dist/style.css"` の
+ * ように `.` で始まらないものは node_modules から解く（esbuild が束ねるときと同じ解き方）。
+ *
+ * 外から来る CSS を入れているのは図の 1 本だけ（ADR-0070）。ここで解けないと、このテストは
+ * 落ちるのではなく **`readFileSync` の ENOENT で転ぶ**ので、行き先を間違えたのか置き忘れたのかが
+ * 読めなくなる。解けない綴りは名指しで落とす。
+ */
 function importsOf(file: string): string[] {
   const text = fs.readFileSync(file, "utf8");
-  return [...text.matchAll(/@import\s+"([^"]+)"/g)].map((match) => path.resolve(path.dirname(file), match[1]));
+  return [...text.matchAll(/@import\s+"([^"]+)"/g)].map((match) => {
+    const spec = match[1];
+    if (spec.startsWith(".") || path.isAbsolute(spec)) {
+      return path.resolve(path.dirname(file), spec);
+    }
+    try {
+      return require.resolve(spec, { paths: [path.dirname(file)] });
+    } catch {
+      assert.fail(`@import の行き先が解けない: ${spec}（${file}）`);
+    }
+  });
 }
 
 /** 束ねに入る CSS 全部（入口から `@import` で辿れるもの。入口自身も含む） */
