@@ -31,12 +31,18 @@ type PhaseNode = Node<PhaseData, "phase">;
 
 /**
  * 点の見た目。`Handle` は線の端を留めるためだけに置き、目には見せない（`Graph.css`）。
- * 左右に 1 つずつ置くのは React Flow が端を要るからで、向きの意味は無い。
+ * React Flow が端を要るから置くのであって、**上下左右に意味は無い**。
+ *
+ * 端を 4 つ置くのは、**`requires` と `overlap` を別の辺に留めるため**。同じ 2 つの種類が
+ * 両方の関係を持つことがあり（このリポジトリの設定の `acceptance` と `implement` がそれで、
+ * 雛形も同じ組）、同じ端どうしを結ぶと 2 本がぴったり重なって、破線が実線の下に隠れる。
+ * `requires` は左右、`overlap` は上下に留める。
  */
 function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
   return (
     <div className="phase-node" data-kind={data.kind} title={`${KIND_LABELS[data.kind as "work"] ?? data.kind}\n${REVIEW_LABELS[data.review as "mr"] ?? data.review}`}>
-      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <Handle id="l" type="target" position={Position.Left} isConnectable={false} />
+      <Handle id="t" type="target" position={Position.Top} isConnectable={false} />
       <span className="phase-node-id">{id}</span>
       {data.title !== "" && <span className="phase-node-title">{data.title}</span>}
       <span className="phase-node-tags">
@@ -47,7 +53,8 @@ function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
           {data.review}
         </span>
       </span>
-      <Handle type="source" position={Position.Right} isConnectable={false} />
+      <Handle id="r" type="source" position={Position.Right} isConnectable={false} />
+      <Handle id="b" type="source" position={Position.Bottom} isConnectable={false} />
     </div>
   );
 }
@@ -67,15 +74,26 @@ function nodesOf(graph: PhasesGraph, spots: Spots): PhaseNode[] {
   });
 }
 
+/**
+ * 線を React Flow に渡す形にする。
+ *
+ * **留める端を関係ごとに分ける**（`requires` は左右、`overlap` は上下）。同じ端どうしにすると、
+ * 両方の関係を持つ組で 2 本がぴったり重なり、破線が実線の下に隠れてラベルも読めなくなる
+ * （`PhaseNodeView` の頭）。曲線にして離す手もあるが、曲線は外へ大きく振れてラベルが迷子になる
+ * （実際の設定で確かめた）。端を分けるほうが、経路もラベルの位置も読める。
+ */
 function edgesOf(graph: PhasesGraph): Edge[] {
   return graph.edges.map((edge) => ({
     id: edge.id,
     source: edge.a,
     target: edge.b,
+    sourceHandle: edge.relation === "overlap" ? "b" : "r",
+    targetHandle: edge.relation === "overlap" ? "t" : "l",
     type: "straight" as const,
     className: `rel-${edge.relation}`,
-    // 向きが無いので、端の印は付けない
-    label: edge.relation === "overlap" ? "並行" : "同席",
+    // 向きが無いので、端の印は付けない。**線に札も付けない**（同じ組の 2 本は midpoint が
+    // 近く、札どうしが重なって片方が読めなくなる。実際の設定で確かめた）。
+    // 実線と破線の読み方は、図の下の一言が言う（`text.ts` の `graphNote`）
   }));
 }
 
