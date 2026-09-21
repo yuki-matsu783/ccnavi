@@ -284,7 +284,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           className="action small"
           data-action="open-self-rules"
           disabled={!page.selfRulesExists}
-          title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足して当たるルールを編集し、判定を試す"
+          title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試す"
           onClick={() => post({ type: "openSelfRules" })}
         >
           ルール設定

@@ -4,11 +4,12 @@
  *
  * 状態は拡張ホストが持っていて、ここは渡されたものを見せるだけ。ボタンを押したら拡張ホストへ返す。
  */
-import { useEffect, useRef, type JSX } from "react";
+import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import type { ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
 import { post } from "./post.js";
+import { approvalBody } from "./text.js";
 
 export function Approval({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element {
   const box = useRef<HTMLElement>(null);
@@ -104,11 +105,9 @@ function Body({
   const tickets = preview.batch.map((b) => b.ticket);
   return (
     <>
-      <h2 id="approval-title">Ticket 承認リクエスト: {count} 件</h2>
+      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットは無い" : `承認待ちのチケット ${count} 件`}</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
-      {count === 0 ? (
-        <p className="approval-note">承認待ちのチケット無し</p>
-      ) : (
+      {count === 0 ? null : (
         <table className="approval-batch">
           <thead>
             <tr>
@@ -128,10 +127,10 @@ function Body({
           </tbody>
         </table>
       )}
-      <pre className="approval-text">{preview.text}</pre>
+      <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>
-          <h3>承認の対象にしない</h3>
+          <h3>承認の対象にしない提案</h3>
           <ul className="approval-rejected">
             {preview.rejected.map((r) => (
               <li key={r.ticket}>
@@ -146,7 +145,7 @@ function Body({
       ) : null}
       {preview.problems.length > 0 ? (
         <>
-          <h3>読めない提案・承認済みチケット</h3>
+          <h3>読めなかった提案と承認済みチケット</h3>
           <ul className="approval-problems">
             {preview.problems.map((p, i) => (
               <li key={i}>{p}</li>
@@ -170,6 +169,34 @@ function Body({
         <Cancel label="やめる" disabled={approving} />
       </div>
     </>
+  );
+}
+
+/**
+ * 承認画面の本文。実行ファイルが組んだ文字列を行のまま出し、**説明の付く見出しだけ**その次の行を
+ * ツールチップに畳む（`approvalBody`）。畳んだ説明は目には出さないが、読み上げと選択には残す。
+ * 畳めるかどうかを決めるのは見出しの綴りだけで、画面は中身を解釈しない。
+ */
+function BodyText({ text }: { readonly text: string }): JSX.Element {
+  const lines = approvalBody(text);
+  // 末尾に改行を足さない。実行ファイルが組んだ文字列と同じものが選択とコピーで取れるようにする。
+  const br = (i: number): string => (i === lines.length - 1 ? "" : "\n");
+  return (
+    <pre className="approval-text">
+      {lines.map((body, i) =>
+        body.note === "" ? (
+          <Fragment key={i}>{body.line + br(i)}</Fragment>
+        ) : (
+          <Fragment key={i}>
+            <span className="approval-head" title={body.note}>
+              {body.line}
+            </span>
+            <span className="approval-hint">{` ${body.note}`}</span>
+            {br(i)}
+          </Fragment>
+        ),
+      )}
+    </pre>
   );
 }
 

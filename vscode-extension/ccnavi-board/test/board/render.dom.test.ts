@@ -39,7 +39,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "preview");
     // 種類の範囲を超える子（i0001-02）は承認を止めないので一覧に載り、超過は本文の見出しに出る。
-    assert.equal(text(page, "#approval-title"), "Ticket 承認リクエスト: 3 件");
+    assert.equal(text(page, "#approval-title"), "承認待ちのチケット 3 件");
     assert.deepEqual(texts(page, ".approval-batch td.approval-id"), ["i0001", "i0001-01", "i0001-02"]);
     const confirm = page.one('button[data-action="approve-confirm"]');
     assert.equal(confirm.getAttribute("data-tickets"), "i0001,i0001-01,i0001-02");
@@ -50,11 +50,11 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.deepEqual(page.posted.at(-1), { type: "approveConfirm", tickets: ["i0001", "i0001-01", "i0001-02"] });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     const body = text(page, "pre.approval-text");
-    assert.ok(body.startsWith("Ticket 承認リクエスト"));
-    assert.ok(body.includes("判定で止まるもの"));
+    assert.ok(body.startsWith("チケットの承認リクエスト"));
+    assert.ok(body.includes("編集対象としているが"));
     assert.ok(body.includes("超えている"));
     // 対象にしないのは形の壊れた子（計画に無い番号）。
-    assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない"]);
+    assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画に無い"));
     assert.equal(page.all(".approval-problems").length, 0);
@@ -71,13 +71,35 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   }
 });
 
+test("CB-D73 説明の付く見出しは次の行をツールチップに畳み、知らない見出しは畳まない", async () => {
+  const page = await openBoard(fixture(), { approval: { kind: "preview", preview: approvePreview() } });
+  try {
+    const heads = page.all(".approval-head");
+    const labels = heads.map((head) => head.textContent);
+    // 説明のある見出しだけが畳まれる。「エージェントが書いた理由」の下は本文なので畳まない。
+    assert.ok(labels.includes("■ このチケットで編集可能な範囲"), labels.join(" / "));
+    assert.ok(labels.includes("■ チケットで編集対象としているが、書き込めない場所"), labels.join(" / "));
+    assert.ok(!labels.includes("■ エージェントが書いた理由"), labels.join(" / "));
+    const scope = heads.find((head) => head.textContent === "■ このチケットで編集可能な範囲");
+    assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で編集できる場所/);
+    // 畳んだ説明は目には出さないが、読み上げに渡すので DOM には残る。
+    const hints = texts(page, ".approval-hint").join(" ");
+    assert.ok(hints.includes("allow は無確認で編集できる場所"), hints);
+    // 本文そのものは削らない。理由の中身は見出しの下にそのまま出る。
+    const body = text(page, "pre.approval-text");
+    assert.ok(body.includes("■ エージェントが書いた理由"), body);
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", async () => {
   const preview = approvePreview();
   const empty = await openBoard(fixture(), {
     approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
   });
   try {
-    assert.ok(texts(empty, ".approval-note").includes("承認待ちのチケット無し"));
+    assert.equal(text(empty, "#approval-title"), "承認待ちのチケットは無い");
     // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
     assert.equal(text(empty, "pre.approval-text"), "承認待ちのチケットは無い。");
     assert.equal(empty.all('button[data-action="approve-confirm"]').length, 0);
@@ -319,7 +341,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
     assert.equal(page.all(".fact.cancelled").length, 0);
     // 取り消した子にはワークツリーが無いが、閉じているので「ワークツリーなし」の札は出ない
     assert.equal(page.all(".badge.worktree.none").length, 1);
-    assert.equal(text(page, ".fact.review"), "人レビュー要");
+    assert.equal(text(page, ".fact.review"), "人間レビュー要");
     assert.ok((page.one(".fact.review").getAttribute("title") ?? "").length > 0, "レビューの要否は理由を tooltip に持つ");
     assert.equal(text(page, ".fact.worktree:not(.none)"), "ワークツリー i0001");
     assert.match(page.one(".fact.worktree:not(.none)").getAttribute("title") ?? "", /i0001/);
@@ -452,7 +474,7 @@ test("CB-T13b 親の絞り込みを出し、カードに家族を付ける", asy
 test("CB-T14 0 件のときは空の表示と無効な承認ボタン", async () => {
   const page = await openBoard({ ...fixture(), tickets: [], parents: [], pending_approval: [] });
   try {
-    assert.equal(text(page, ".board-empty"), "チケット無し");
+    assert.equal(text(page, ".board-empty"), "チケットなし");
     assert.equal(page.all(".column .empty").length, 4);
     assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').disabled, true);
   } finally {

@@ -138,7 +138,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["fallback"] = record.fallback or ""
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
-    # 引用の中から切り出したコマンドにだけ当たったルールの id。記録と同じく、
+    # 引用の中から切り出したコマンドにだけヒットしたルールの id。記録と同じく、
     # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の並びを、
     # この場合が無い呼び出しで変えないため。
     if record.quoted:
@@ -164,7 +164,7 @@ def test(
     if not out["known"]:
         stdout.write(f"verdict: (判定に入らない)\ntool: {tool}\n")
         stdout.write(
-            f"note: {tool} は判定が対象を取り出せないツール。ルールを書いても当たらず、"
+            f"note: {tool} は判定が対象を取り出せないツール。ルールを書いてもヒットせず、"
             "呼び出しはそのまま通る\n"
         )
         return 0
@@ -187,7 +187,7 @@ def test(
         stdout.write(f"fallback: {out['fallback']}（組み込みの既定で判定した）\n")
 
     if not out["rules"]:
-        stdout.write("rules: (どのルールにも当たらなかった)\n")
+        stdout.write("rules: (どのルールにもヒットしなかった)\n")
     else:
         stdout.write("rules:\n")
         for hit in out["rules"]:
@@ -199,7 +199,8 @@ def test(
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
     if out.get("quoted"):
         stdout.write(
-            f"quoted: {', '.join(out['quoted'])}（引用の中から切り出したコマンドにだけ当たった）\n"
+            f"quoted: {', '.join(out['quoted'])}"
+            "（引用の中から切り出したコマンドにだけヒットした）\n"
         )
 
     if not out["response"]:
@@ -413,7 +414,7 @@ def test_samples(
         stdout.write(f"  なぜ deny/ask/allow に置いたか: {r['why']}\n")
         hit = ", ".join(f"{h['section']}:{h['id']}" for h in r["rules"] if h["source"] == "file")
         if hit:
-            stdout.write(f"  当たったルール: {hit}\n")
+            stdout.write(f"  ヒットしたルール: {hit}\n")
         stdout.write("\n")
     for r in body["samples"]:
         if not r["skipped"]:

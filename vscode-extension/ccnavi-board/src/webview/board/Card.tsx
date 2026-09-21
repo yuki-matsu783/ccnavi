@@ -122,7 +122,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人レビューの要否、ワークツリー、
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人間レビューの要否、ワークツリー、
  * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
  * リスク（MEDIUM 以下）、base、プロジェクト。
  */
@@ -131,7 +131,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
   if (card.copyStatus !== "none") {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }
-  facts.push(<Fact key="review" kind="review" text={`人レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
   if (card.worktreeExists) {
     facts.push(<Fact key="worktree" kind="worktree" text={`ワークツリー ${worktreeName(card.worktreePath)}`} title={card.worktreePath} />);
   }
