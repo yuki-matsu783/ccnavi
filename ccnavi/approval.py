@@ -1562,10 +1562,10 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            lines.append("■ 範囲に書いてあるのに、判定で止まる場所")
+            lines.append("■ チケットで編集対象としているが、書き込めない場所")
             lines.append(
                 "    親の範囲かフェーズの種類の上限を超えている。"
-                "承認は止めないが、書こうとすると判定が止める"
+                "承認は可能だが、編集しようとすると判定が止める"
             )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
@@ -1574,7 +1574,10 @@ def screen(
             if t.review_reason:
                 lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
-                lines.append(f"■ 先に閉じる子: {', '.join(t.predecessors)}")
+                lines.append(f"■ 依存している他チケット: {', '.join(t.predecessors)}")
+                lines.append(
+                    "    先に閉じておく。閉じないまま着手しても止まらないが、--lint が warn を出す"
+                )
         elif t.has_plan:
             lines.append("■ 全体計画")
             lines.append(

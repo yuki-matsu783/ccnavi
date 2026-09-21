@@ -92,12 +92,12 @@ export function isHttpUrl(url: string): boolean {
 const EXPLAINED_HEADS = new Set([
   "■ このチケットで書き込み可能な範囲",
   "■ この子チケットで書き込み可能な範囲",
-  "■ 範囲に書いてあるのに、判定で止まる場所",
+  "■ チケットで編集対象としているが、書き込めない場所",
   "■ 全体計画",
   "■ 判定に効かない記述",
 ]);
 
-const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #"];
+const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 依存している他チケット: "];
 
 /** 承認画面の本文の 1 行と、その行に畳んだ説明 */
 export interface BodyLine {

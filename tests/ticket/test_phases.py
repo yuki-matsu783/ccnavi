@@ -325,9 +325,9 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
         # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
-        # 「判定で止まる場所」として出る（設計 approve-carry §3.2）。n で何も適用しない
+        # 「編集対象としているが」として出る（設計 approve-carry §3.2）。n で何も適用しない
         whole = self.ccnavi("--approve", stdin="n\n")
-        self.assertIn("判定で止まる場所", whole.stdout)
+        self.assertIn("編集対象としているが", whole.stdout)
         self.assertIn("超えている", whole.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
         # 改版を外して子だけ並べても、旧計画で通してはいけない
@@ -446,7 +446,7 @@ class PhaseTest(PhaseHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
-        self.assertIn("判定で止まる場所", approved.stdout)
+        self.assertIn("編集対象としているが", approved.stdout)
         self.assertIn("超えている", approved.stdout)
         self.assertIn("調査", approved.stdout)
         self.assertNotIn("i0001-01 は承認の対象にしない", approved.stderr)
@@ -1326,7 +1326,7 @@ class ChatReviewTest(PhaseHarness):
 class ScopeLimitTest(PhaseHarness):
     """範囲の上限（設計 wip/design/approve-carry.md §3・§4、§6.1〜§6.2）。
 
-    承認は範囲の超過を拒まず「判定で止まる場所」として見せる。判定は子 → 親 → 種類の
+    承認は範囲の超過を拒まず「編集対象としているが」として見せる。判定は子 → 親 → 種類の
     厳しい側で切り詰め、外へ出した上限を `limit:` 行で名指しする。
     親の範囲は既定で `src/*`, `wip/*`, `tests/*`、フェーズ 1 の種類 research は `wip/research/*`。
     """
@@ -1361,7 +1361,7 @@ class ScopeLimitTest(PhaseHarness):
     # ---- 6.1 承認
 
     def test_regex_child_is_approved_and_shown_as_stopped_by_the_judge(self):
-        """4. regex の子は承認でき、「判定で止まる場所」に出る。"""
+        """4. regex の子は承認でき、「編集対象としているが」に出る。"""
         self.family(plan=["research", "design"])
         self.propose(
             "i0001-01",
@@ -1371,8 +1371,8 @@ class ScopeLimitTest(PhaseHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
-        self.assertIn("判定で止まる場所", approved.stdout)
-        self.assertIn("regex", approved.stdout.split("判定で止まる場所", 1)[1])
+        self.assertIn("編集対象としているが", approved.stdout)
+        self.assertIn("regex", approved.stdout.split("編集対象としているが", 1)[1])
         self.assertNotIn("承認の対象にしない", approved.stderr)
 
     # ---- 6.2 判定

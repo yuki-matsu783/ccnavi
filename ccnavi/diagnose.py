@@ -199,7 +199,8 @@ def test(
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
     if out.get("quoted"):
         stdout.write(
-            f"quoted: {', '.join(out['quoted'])}（引用の中から切り出したコマンドにだけヒットした）\n"
+            f"quoted: {', '.join(out['quoted'])}"
+            "（引用の中から切り出したコマンドにだけヒットした）\n"
         )
 
     if not out["response"]:

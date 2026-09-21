@@ -151,7 +151,9 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout)
         warned = [line for line in done.stdout.splitlines() if "additionalContext" in line]
         self.assertEqual(len(warned), 2, done.stdout)
-        self.assertTrue(any("everything" in w and "何にでもヒットする" in w for w in warned), warned)
+        self.assertTrue(
+            any("everything" in w and "何にでもヒットする" in w for w in warned), warned
+        )
         self.assertTrue(any("many" in w and "選択肢が 3 つ以上" in w for w in warned), warned)
 
     def test_once_delivers_the_text_only_the_first_time_per_context(self):

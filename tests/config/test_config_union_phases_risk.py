@@ -172,7 +172,7 @@ class PhaseUnionTest(ConfigUnionHarness):
     def test_scope_stays_relative_to_the_worktree(self):
         """§11.4.1: `scope` はワークツリーのルートからの相対のまま。
 
-        種類の超過は承認を拒まず、承認画面の「判定で止まる場所」に出る（設計 approve-carry
+        種類の超過は承認を拒まず、承認画面の「編集対象としているが」に出る（設計 approve-carry
         §3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
         """
         self.propose(
@@ -192,7 +192,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.assertIn("判定で止まる場所", approved.stdout)
+        self.assertIn("編集対象としているが", approved.stdout)
         self.assertIn("`docs/*` は種類", approved.stdout)
         self.assertNotIn("`src/a/*` は種類", approved.stdout)
         self.assertTrue(os.path.exists(self.approved_copy("i0001-01")))

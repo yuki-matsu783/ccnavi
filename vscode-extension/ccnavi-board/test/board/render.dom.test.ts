@@ -51,7 +51,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     const body = text(page, "pre.approval-text");
     assert.ok(body.startsWith("チケットの承認リクエスト"));
-    assert.ok(body.includes("判定で止まる場所"));
+    assert.ok(body.includes("編集対象としているが"));
     assert.ok(body.includes("超えている"));
     // 対象にしないのは形の壊れた子（計画に無い番号）。
     assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない提案"]);
@@ -78,7 +78,7 @@ test("CB-D73 説明の付く見出しは次の行をツールチップに畳み�
     const labels = heads.map((head) => head.textContent);
     // 説明のある見出しだけが畳まれる。「エージェントが書いた理由」の下は本文なので畳まない。
     assert.ok(labels.includes("■ このチケットで書き込み可能な範囲"), labels.join(" / "));
-    assert.ok(labels.includes("■ 範囲に書いてあるのに、判定で止まる場所"), labels.join(" / "));
+    assert.ok(labels.includes("■ チケットで編集対象としているが、書き込めない場所"), labels.join(" / "));
     assert.ok(!labels.includes("■ エージェントが書いた理由"), labels.join(" / "));
     const scope = heads.find((head) => head.textContent === "■ このチケットで書き込み可能な範囲");
     assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で書き込める場所/);
