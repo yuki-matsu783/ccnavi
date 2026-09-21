@@ -146,10 +146,11 @@ export type Spots = Record<string, { readonly x: number; readonly y: number }>;
 /**
  * 摘まんで動かした先を控えに入れる。px は丸める（控えを読みやすく保つ）。
  *
- * **掴んで離す仕草そのものは自動で試せない**（d3-drag は happy-dom の下で待ちが終わらず、
- * DOM のテストが固まる。実測）。仕草は README の手動確認 42e が見る。せめて、仕草が呼ぶ
- * 中身はここに置いて単体で試せるようにする。`state.ts` ではなくここに置いてあるのは、
- * `state.ts` が `acquireVsCodeApi` を読み、node のテストから import できないため。
+ * ここ（`core/`）に置いてあるのは、`state.ts` が `acquireVsCodeApi` を読み、node のテストから
+ * import できないため。単体で試せる形にしておく（CB-T191）。
+ *
+ * 掴んで離す仕草そのものは **jsdom** で通す（CB-D80）。happy-dom では d3-drag の待ちが
+ * 終わらずテストが固まる（`test/helpers/jsdom.ts` の頭）。
  */
 export function withSpot(spots: Spots, id: string, x: number, y: number): Spots {
   return { ...spots, [id]: { x: Math.round(x), y: Math.round(y) } };
