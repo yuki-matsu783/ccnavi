@@ -2,7 +2,7 @@
  * ルール 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * ツールの欄（`match`）は押すと札が出る。`message` は deny だけの欄で、ask と allow に
+ * ツールの欄（`match`）は押すと選択肢が出る。`message` は deny だけの欄で、ask と allow に
  * 残っていれば「どこにも届かない」と言って消すボタンだけ出す。
  */
 import type { JSX, ReactNode } from "react";
@@ -26,7 +26,7 @@ export interface RuleProps {
   readonly open: boolean;
   /** 直前の判定で当たった行。畳んだままでも分かるように縁を付ける */
   readonly hit: boolean;
-  /** ツールの札が開いているか。開くのは画面ぜんたいで 1 つだけ */
+  /** ツールの選択肢が開いているか。開くのは画面ぜんたいで 1 つだけ */
   readonly pickerOpen: boolean;
   readonly onToggle: () => void;
   readonly onChange: (next: RuleForm) => void;
@@ -196,9 +196,9 @@ export function Rule(props: RuleProps): JSX.Element {
 }
 
 /**
- * ツールの札。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
+ * ツールの選択肢。`match` はツール名を `|` で並べたもので、判定は名前をそのまま突き合わせるので
  * 打ち間違えると黙って当たらなくなる。書かせずに選ばせる。**ファイルに書いてある知らない名前
- * （MCP のツールなど）も、消さずにそのまま札にして出す**（開いただけで消えたように見えないように）。
+ * （MCP のツールなど）も、消さずにそのまま選択肢にして出す**（開いただけで消えたように見えないように）。
  */
 function Picker({
   rule,

@@ -57,7 +57,7 @@ export function phaseStatusFull(p: PhaseChip): string {
 }
 
 /**
- * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードの札と同じ。
+ * フェーズ行の状態の要約。人が動くべきことだけで、無ければ空。項目はカードのバッジと同じ。
  * 止めている間は段の名前を 1 つだけ出す。
  */
 export function phaseStatusBrief(p: PhaseChip): string {
@@ -71,7 +71,7 @@ export function phaseStatusBrief(p: PhaseChip): string {
   return notes.join(" · ");
 }
 
-/** マージリクエストの札の文字。番号が読めなければ「MR」だけ */
+/** マージリクエストのバッジの文字。番号が読めなければ「MR」だけ */
 export function mrText(number: number | null): string {
   return number === null ? "MR" : `MR #${number}`;
 }

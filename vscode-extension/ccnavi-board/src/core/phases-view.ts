@@ -58,13 +58,13 @@ export interface PhasesModel {
   readonly problems: readonly string[];
 }
 
-/** 区分の説明。select の札 */
+/** 区分の説明。select のラベル */
 export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
   work: "work（全体計画 plan: に並べる種類）",
   feedback: "feedback（フィードバック計画 feedback: に並べる種類。レビューは mr 固定）",
 };
 
-/** レビューの既定の説明。select の札 */
+/** レビューの既定の説明。select のラベル */
 export const REVIEW_LABELS: Readonly<Record<Review, string>> = {
   none: "none（既定。レビューを求めない。ただし実績のリスクが HIGH 以上なら要る）",
   mr: "mr（マージリクエストのレビューを受ける）",

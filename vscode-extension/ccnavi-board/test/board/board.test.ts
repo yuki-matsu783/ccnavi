@@ -171,7 +171,7 @@ test("CB-T09b レビューが済んで止まらなくなったフェーズは、
   assert.equal(cards.get("i0001-01")!.reviewWaiting, false);
 });
 
-test("CB-T09c 親カードは、自分の番号のフェーズがレビュー待ちでも、札の元になる項目を持たない", () => {
+test("CB-T09c 親カードは、自分の番号のフェーズがレビュー待ちでも、バッジの元になる項目を持たない", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -316,7 +316,7 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   assert.deepEqual(quiet.phases[1].actions, []);
 });
 
-test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約の条件で、判定はし直さない", () => {
+test("CB-T132 要対応は承認待ち・バッジ・不備・フェーズ行の要約の条件で、判定はし直さない", () => {
   // 見本: 親は順調、閉じた子・作業中の子・レビュー待ちの子・取り消した子は順調、承認待ちでワークツリーの無い子だけが要対応
   const cards = cardsOf(buildBoard(fixture()));
   assert.equal(cards.get("i0001")!.attention, false);
@@ -326,7 +326,7 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
   assert.equal(cards.get("i0001-04")!.attention, false);
   // 取り消した子はワークツリーが無いが、取り消しの列なので要対応ではない
   assert.equal(cards.get("i0001-05")!.attention, false);
-  // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（札の「未承認」は出ない）でも要対応。
+  // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（バッジの「未承認」は出ない）でも要対応。
   // 落とすと「要対応だけ」の絞り込みで隠れ、承認の対象から外れる
   const base = fixture();
   const revision = cardsOf(buildBoard({ ...base, pending_approval: [...base.pending_approval, "i0001"] }));
@@ -357,7 +357,7 @@ test("CB-T132 要対応は承認待ち・札・不備・フェーズ行の要約
 
 test("CB-T138 止まっているチケットは、不備の行に理由が出て注意を要する扱いになる", () => {
   // 判定はこのチケットのワークツリーへの書き込みを全部止めるが、`copy.status` は `open` の
-  // ままなので、列からも承認済みの札からも分からない（ADR-0058）。
+  // ままなので、列からも承認済みのバッジからも分からない（ADR-0058）。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const stopped: TicketJson = { ...child, blocked: "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）" };

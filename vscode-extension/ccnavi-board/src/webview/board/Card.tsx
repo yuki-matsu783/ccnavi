@@ -1,5 +1,5 @@
 /**
- * 1 枚のカード。札（人が動く必要がある状態）・属性の行・親のフェーズ一覧・不備・操作。
+ * 1 枚のカード。バッジ（人が動く必要がある状態）・属性の行・親のフェーズ一覧・不備・操作。
  * 何を出すかは組み立て（core/board.ts）が決めた値のとおりで、ここで判定し直さない。
  */
 import type { JSX } from "react";
@@ -88,16 +88,16 @@ export function CardItem({ card, hidden }: { readonly card: Card; readonly hidde
 }
 
 /**
- * 枠付きの札は、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
+ * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
  * 書き込み停止中、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
- * 本物が決まらない写り。出す札が無ければ行ごと出さない。
+ * 本物が決まらない写り。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   const badges: JSX.Element[] = [];
   if (card.copyStatus === "none") {
     badges.push(<Badge key="copy" kind="copy copy-none" text={COPY_LABELS.none} />);
   }
-  // 止めている間の 1 枚。依頼の前後で名前が変わるだけで、札は増えない。どちらの段かは
+  // 止めている間の 1 枚。依頼の前後で名前が変わるだけで、バッジは増えない。どちらの段かは
   // 判定が JSON の `review_waiting` で言う。ここで marks や reviewed を見て組み直さない。
   if (card.gateClosed) {
     badges.push(<Badge key="hold" kind="hold" text={holdLabel(card)} />);
@@ -123,7 +123,7 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 
 /**
  * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人レビューの要否、ワークツリー、
- * マーカー（依頼済はレビュー待ちの間だけ札に出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
+ * マーカー（依頼済はレビュー待ちの間だけバッジに出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
  * リスク（MEDIUM 以下）、base、プロジェクト。
  */
 function Facts({ card }: { readonly card: Card }): JSX.Element {
