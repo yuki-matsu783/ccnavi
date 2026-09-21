@@ -51,7 +51,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     const body = text(page, "pre.approval-text");
     assert.ok(body.startsWith("チケットの承認リクエスト"));
-    assert.ok(body.includes("判定で止まるもの"));
+    assert.ok(body.includes("判定で止まる場所"));
     assert.ok(body.includes("超えている"));
     // 対象にしないのは形の壊れた子（計画に無い番号）。
     assert.deepEqual(texts(page, ".approval h3"), ["承認の対象にしない提案"]);

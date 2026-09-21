@@ -1498,7 +1498,7 @@ def screen(
     """承認を求める画面を組む。
 
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
-    「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
+    「子が書ける範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
     種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
@@ -1528,8 +1528,8 @@ def screen(
             # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
-            lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
-            head = "親 " + (
+            lines.append("■ この子が書ける範囲（親の範囲を絞ったもの。新しく開く場所は無い）")
+            head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
                 else "(承認済みチケットが無い)"
@@ -1537,9 +1537,9 @@ def screen(
             lines.append(f"    {head}")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
-                lines.append(f"    種類 {bound.title}: " + ", ".join(bound.scope_globs))
+                lines.append(f"    種類（{bound.title}）の範囲: " + ", ".join(bound.scope_globs))
         else:
-            lines.append("■ このチケットで書き込みが許される領域（これ以外はすべて止まる）")
+            lines.append("■ このチケットが書ける範囲（ここに無い場所は全部止まる）")
             # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
@@ -1553,17 +1553,18 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            lines.append("■ 範囲のうち、判定で止まるもの（承認しても書けない）")
+            lines.append("■ 範囲にあるのに、判定で止まる場所（承認しても書けない）")
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
             lines.append(
-                f"■ 人間レビュー: {state}" + (f"（{t.review_reason}）" if t.review_reason else "")
+                f"■ 人間レビュー: {state}"
+                + (f"（理由: {t.review_reason}）" if t.review_reason else "")
             )
             if t.predecessors:
-                lines.append(f"■ 先行: {', '.join(t.predecessors)}")
+                lines.append(f"■ 先に終わっている必要がある子: {', '.join(t.predecessors)}")
         elif t.has_plan:
-            lines.append("■ 全体計画（この並びに合意する）")
+            lines.append("■ 全体計画（承認するとこの並びに合意したことになる）")
             lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
@@ -1573,12 +1574,12 @@ def screen(
         if not t.is_child and t.issue is not None:
             lines.append(f"■ 課題: #{t.issue}（マージリクエストの本文で Closes に使う）")
         if t.rationale.strip():
-            lines.append("■ 理由（エージェントの記述）")
+            lines.append("■ エージェントが書いた理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
         lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
-            lines.append("■ 記述のうち、判定に効かないもの")
+            lines.append("■ 書いてあるが、判定に効かない記述")
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
 

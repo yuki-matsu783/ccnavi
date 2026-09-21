@@ -92,7 +92,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertIn("チケットの承認リクエスト: 3 件", body["text"])
         self.assertIn("== i0001-01", body["text"])
         self.assertIn("== i0001-02", body["text"])
-        self.assertIn("判定で止まるもの", body["text"])
+        self.assertIn("判定で止まる場所", body["text"])
         # rejected[] に残るのは形の壊れた子だけ。
         self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05"])
         self.assertTrue(any("計画に無い" in p for p in body["rejected"][0]["problems"]))
@@ -112,7 +112,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01"])
         self.assertEqual(body["batch"][1]["overflow"], [])
         self.assertEqual(body["rejected"], [])
-        self.assertNotIn("判定で止まるもの", body["text"])
+        self.assertNotIn("判定で止まる場所", body["text"])
 
     # ---- 2. 承認待ちが無い
 
