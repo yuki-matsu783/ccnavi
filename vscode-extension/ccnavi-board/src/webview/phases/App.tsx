@@ -11,7 +11,7 @@
  * **id の重なりだけは画面で止める。** 同じ id が 2 つあると実行ファイルは後ろで黙って上書きする。
  * 止めるのはここだけで、書式の検証は保存のときに実行ファイル（`--lint`）へ渡す（ADR-0035）。
  */
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { graphOf } from "../../core/phases-graph.js";
@@ -224,7 +224,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   });
   const shown = rows.filter((row) => !row.hidden).length;
   const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
-  const graph = graphOf(formOf(draft));
+  /**
+   * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
+   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。摘まんでいる
+   * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
+   */
+  const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
   const shownStatus: Status | undefined = dup.size > 0 ? { text: duplicateNote(dup), error: true } : status;
 
   return (

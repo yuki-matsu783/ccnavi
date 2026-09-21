@@ -16,9 +16,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Background, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
-import type { PhasesGraph } from "../../core/phases-graph.js";
+import { keepSpots, withSpot, type PhasesGraph, type Spots } from "../../core/phases-graph.js";
 import { KIND_LABELS, REVIEW_LABELS } from "../../core/phases-view.js";
-import { loadSpots, saveSpots, type Spots } from "./state.js";
+import { loadSpots, saveSpots } from "./state.js";
 
 /** 点 1 つが持つ中身。React Flow の `data` に載る */
 interface PhaseData extends Record<string, unknown> {
@@ -84,6 +84,21 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
   const nodes = useMemo(() => nodesOf(graph, spots), [graph, spots]);
   const edges = useMemo(() => edgesOf(graph), [graph]);
 
+  /**
+   * 控えの書き込みは、**state を更新する関数の中でやらない**。更新関数は呼ばれる回数を
+   * 約束しない（StrictMode や並行描画で 2 度呼ばれる）ので、そこに外への書き込みを置くと
+   * 二重に書く。`spots` が変わったあとに 1 度だけ書く。
+   */
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      // 読み込んだ直後は、読んだものをそのまま書き戻すだけになるので書かない
+      first.current = false;
+      return;
+    }
+    saveSpots(spots);
+  }, [spots]);
+
   // 図に出なくなった種類の控えは落とす（id を打ち替えるたびに溜まるため）
   const known = useRef<string>("");
   useEffect(() => {
@@ -92,27 +107,11 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
       return;
     }
     known.current = ids;
-    setSpots((now) => {
-      const next: Spots = {};
-      for (const node of graph.nodes) {
-        if (now[node.id] !== undefined) {
-          next[node.id] = now[node.id];
-        }
-      }
-      if (Object.keys(next).length === Object.keys(now).length) {
-        return now;
-      }
-      saveSpots(next);
-      return next;
-    });
+    setSpots((now) => keepSpots(now, graph.nodes.map((node) => node.id)));
   }, [graph]);
 
   const onDragStop = useCallback((_event: unknown, node: PhaseNode) => {
-    setSpots((now) => {
-      const next = { ...now, [node.id]: { x: Math.round(node.position.x), y: Math.round(node.position.y) } };
-      saveSpots(next);
-      return next;
-    });
+    setSpots((now) => withSpot(now, node.id, node.position.x, node.position.y));
   }, []);
 
   if (graph.nodes.length === 0) {

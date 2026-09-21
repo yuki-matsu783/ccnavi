@@ -6,18 +6,19 @@
  * `overlap` は定義からして対称。順序を持つのは親チケットの `plan:` の並びのほうで、
  * このファイルには順序の情報が無い（ccnavi.md の種類の表）。矢印を描くと、無い制約を描くことになる。
  *
- * **判定はしない（ADR-0035）。** 循環・到達不能・孤立を、ここは見つけない。実行ファイルも
- * 見ていない（`phasetypes.py` が見るのは自己参照だけ）。画面が言えば、実行ファイルが出さない
- * 答えを画面が出すことになる。ここが組むのは「ファイルに書いてあるものを並べ直した形」だけ。
+ * **判定はしない（ADR-0035）。** 循環も、到達不能も、孤立も、ここは見つけない。
+ * 行き先がこのファイルに無い参照は**黙って線にしないだけ**で、なぜ無いのかは言わない。
+ * 綴り違いなのか他の層の種類なのかを決めるのは実行ファイルで、`phasetypes.py` の
+ * `reference_problems` が合成した集合で確かめ、無ければ error を出す。画面がその手前で
+ * 別の答えを出すと、2 か所が違うことを言う。
  *
  * **このファイルの中しか見えない。** 層をまたぐ参照（プロジェクトの種類が共通層の種類を挙げる）は、
- * 画面には解けない。画面が受け取るのはその層 1 本だけだから。解こうとすると層の合成を
- * 拡張が作り直すことになる。ここは行き先がこのファイルに無い参照を**黙って線にしない**。
- * 「無い」とは言わない。言うのは画面の帯の一言（`text.ts` の `graphNote`）で、種類ごとには言わない。
+ * 画面には解けない。受け取るのがその層 1 本だけだから。解こうとすると層の合成を拡張が作り直すことになる。
  *
- * **置き場所は id から決まる。** 保存のたびに `model` が丸ごと届き直す（ADR-0062）ので、
- * 数え上げの順や前の絵に依らない置き方にしておかないと、1 つ直すたびに全体が組み替わる。
- * ここは「同じ id の集合なら同じ絵」になる。人が摘まんで動かしたぶんは画面が覚える（`state.ts`）。
+ * **置き場所は id だけで決まる。線は見ない。** 保存のたびに `model` が丸ごと届き直す（ADR-0062）ので、
+ * 関係を 1 本直すたびに絵が組み替わると、この画面が唯一やらせる作業（関係を直しながら確かめる）と
+ * 正面からぶつかる。**繋がっている種類を近くに寄せることはしない**。寄せると、線を 1 本足しただけで
+ * 触っていない点まで動く。近くに置きたいときは人が摘まんで動かし、そのぶんは画面が覚える（`state.ts`）。
  */
 import type { PhaseKind, PhasesForm, Review } from "./phases-view.js";
 
@@ -49,10 +50,10 @@ export interface PhasesGraph {
   readonly unnamed: number;
 }
 
-/** 点の間隔。CSS の `.phase-node` の大きさと合わせる */
+/** 点の間隔。CSS の `.react-flow__node-phase` の大きさと合わせる */
 const COLUMN = 210;
 const ROW = 120;
-/** 1 行に並べる数。繋がった組も、独りの種類も、これで折り返す */
+/** 1 行に並べる数 */
 const WRAP = 4;
 
 /** 前後の空白を落とした id。画面の他の場所（重なりの検査）と同じ読み方 */
@@ -61,16 +62,28 @@ function idOf(phase: { readonly id: string }): string {
 }
 
 /**
- * 線を組む。行き先がこのファイルに無いものは落とす（層をまたぐ参照かもしれないので、
- * 無いとは言わない）。同じ組は 1 本にする（`a` が `b` を、`b` が `a` を挙げていても 1 本）。
+ * 線の名前。**繋げた 1 本の文字列にしない。**
+ *
+ * id はハイフンを含められる（`phasetypes.py` の `_ID` は `[A-Za-z0-9._-]`）ので、
+ * `関係:a--b` の形にすると `x` と `y--z` の組と、`x--y` と `z` の組が同じ文字列になり、
+ * 重複除去で**片方が黙って消える**。区切りを跨げない形（JSON の配列）にする。
+ * これは React Flow に渡す線の名前でもあるので、一意でないと描くほうでも 1 本になる。
  */
-function edgesOf(form: PhasesForm, known: ReadonlySet<string>): GraphEdge[] {
+function edgeId(relation: Relation, a: string, b: string): string {
+  return JSON.stringify([relation, a, b]);
+}
+
+/**
+ * 線を組む。行き先がこのファイルに無いものは落とす。同じ組は 1 本にする
+ * （`a` が `b` を、`b` が `a` を挙げていても 1 本）。
+ *
+ * 辿るのは**先に出てきた種類だけ**（`kept`）。同じ id が 2 つあるとき、点は先のほうを出すので、
+ * 後ろの重複から線を作ると、出ている点の欄に無い関係が描かれることになる。
+ */
+function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlySet<string>): GraphEdge[] {
   const seen = new Map<string, GraphEdge>();
-  for (const phase of form.phases) {
+  for (const phase of kept) {
     const from = idOf(phase);
-    if (!known.has(from)) {
-      continue;
-    }
     for (const relation of ["requires", "overlap"] as const) {
       for (const raw of phase[relation]) {
         const to = raw.trim();
@@ -79,7 +92,7 @@ function edgesOf(form: PhasesForm, known: ReadonlySet<string>): GraphEdge[] {
           continue;
         }
         const [a, b] = from < to ? [from, to] : [to, from];
-        const id = `${relation}:${a}--${b}`;
+        const id = edgeId(relation, a, b);
         if (!seen.has(id)) {
           seen.set(id, { id, a, b, relation });
         }
@@ -87,39 +100,6 @@ function edgesOf(form: PhasesForm, known: ReadonlySet<string>): GraphEdge[] {
     }
   }
   return Array.from(seen.values()).sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
-}
-
-/**
- * 繋がっている組に分ける。線の種類は問わない（`requires` でも `overlap` でも、
- * 一緒に読むものは近くに置く）。組の中は id の順、組そのものは「大きい順・先頭の id の順」。
- * どちらも id だけで決まるので、同じ設定なら同じ並びになる。
- */
-function groupsOf(ids: readonly string[], edges: readonly GraphEdge[]): string[][] {
-  const near = new Map<string, string[]>(ids.map((id) => [id, []]));
-  for (const edge of edges) {
-    near.get(edge.a)?.push(edge.b);
-    near.get(edge.b)?.push(edge.a);
-  }
-  const seen = new Set<string>();
-  const groups: string[][] = [];
-  for (const start of ids) {
-    if (seen.has(start)) {
-      continue;
-    }
-    const group: string[] = [];
-    const stack = [start];
-    while (stack.length > 0) {
-      const id = stack.pop() as string;
-      if (seen.has(id)) {
-        continue;
-      }
-      seen.add(id);
-      group.push(id);
-      stack.push(...(near.get(id) ?? []));
-    }
-    groups.push(group.sort());
-  }
-  return groups.sort((x, y) => y.length - x.length || (x[0] < y[0] ? -1 : 1));
 }
 
 /**
@@ -140,28 +120,48 @@ export function graphOf(form: PhasesForm): PhasesGraph {
     }
   }
   const ids = Array.from(first.keys()).sort();
-  const edges = edgesOf(form, new Set(ids));
-  const groups = groupsOf(ids, edges);
+  const kept = ids.map((id) => first.get(id) as PhasesForm["phases"][number]);
+  const edges = edgesOf(kept, new Set(ids));
 
-  // 繋がった組を先に、独りの種類はまとめて後ろへ。どちらも WRAP で折り返す
-  const linked = groups.filter((group) => group.length > 1);
-  const alone = groups.filter((group) => group.length === 1).map((group) => group[0]);
-  const place = new Map<string, { x: number; y: number }>();
-  let row = 0;
-  for (const group of linked) {
-    group.forEach((id, index) => {
-      place.set(id, { x: (index % WRAP) * COLUMN, y: (row + Math.floor(index / WRAP)) * ROW });
-    });
-    row += Math.ceil(group.length / WRAP);
-  }
-  alone.forEach((id, index) => {
-    place.set(id, { x: (index % WRAP) * COLUMN, y: (row + Math.floor(index / WRAP)) * ROW });
-  });
-
-  const nodes = ids.map((id) => {
+  // 置き場所は id の順の格子。線は見ない（頭のコメント）
+  const nodes = ids.map((id, index) => {
     const phase = first.get(id) as PhasesForm["phases"][number];
-    const at = place.get(id) ?? { x: 0, y: 0 };
-    return { id, title: phase.title.trim(), kind: phase.kind, review: phase.review, x: at.x, y: at.y };
+    return {
+      id,
+      title: phase.title.trim(),
+      kind: phase.kind,
+      review: phase.review,
+      x: (index % WRAP) * COLUMN,
+      y: Math.floor(index / WRAP) * ROW,
+    };
   });
   return { nodes, edges, unnamed };
+}
+
+// ---- 人が摘まんで動かした位置（画面の控え。`phases.yml` には書かない）
+
+/** 点の置き場所の控え。鍵は種類の id */
+export type Spots = Record<string, { readonly x: number; readonly y: number }>;
+
+/**
+ * 摘まんで動かした先を控えに入れる。px は丸める（控えを読みやすく保つ）。
+ *
+ * **掴んで離す仕草そのものは自動で試せない**（d3-drag は happy-dom の下で待ちが終わらず、
+ * DOM のテストが固まる。実測）。仕草は README の手動確認 42e が見る。せめて、仕草が呼ぶ
+ * 中身はここに置いて単体で試せるようにする。`state.ts` ではなくここに置いてあるのは、
+ * `state.ts` が `acquireVsCodeApi` を読み、node のテストから import できないため。
+ */
+export function withSpot(spots: Spots, id: string, x: number, y: number): Spots {
+  return { ...spots, [id]: { x: Math.round(x), y: Math.round(y) } };
+}
+
+/** 図に出ている種類の控えだけを残す。変わらなければ元のものをそのまま返す（描き直しを起こさない） */
+export function keepSpots(spots: Spots, ids: readonly string[]): Spots {
+  const next: Spots = {};
+  for (const id of ids) {
+    if (spots[id] !== undefined) {
+      next[id] = spots[id];
+    }
+  }
+  return Object.keys(next).length === Object.keys(spots).length ? spots : next;
 }

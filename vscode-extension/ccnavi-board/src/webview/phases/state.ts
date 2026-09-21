@@ -90,8 +90,12 @@ export type View = "list" | "graph";
 /**
  * 人が摘まんで動かした点の位置。**`phases.yml` には書かない**（人が持つ設定に座標は入れない）。
  * 控えるのは Webview の state で、鍵は種類の id。id を打ち替えれば控えは捨てられる（`Graph.tsx`）。
+ *
+ * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。
+ * ここ（`state.ts`）は `acquireVsCodeApi` を読むので、node のテストからは import できない。
  */
-export type Spots = Record<string, { readonly x: number; readonly y: number }>;
+export type { Spots } from "../../core/phases-graph.js";
+import type { Spots } from "../../core/phases-graph.js";
 
 /** いま見ているほう。控えが無いか、綴りが違えば一覧 */
 export function loadView(): View {
@@ -120,3 +124,4 @@ export function loadSpots(): Spots {
 export function saveSpots(spots: Spots): void {
   setState({ ...((getState() ?? {}) as object), spots });
 }
+

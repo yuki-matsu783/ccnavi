@@ -121,6 +121,15 @@
   fill: var(--vscode-descriptionForeground);
 }
 
+/*
+ * React Flow の表示（attribution）。消すには上流が購読を求めているので残す。
+ * ここの色だけは変数ではなく直書き（`#999`）なので、テーマの変数に寄せる。
+ * 高コントラストの明るいテーマでは #999 のコントラスト比が 3:1 に届かない。
+ */
+.graph .react-flow__attribution a {
+  color: var(--vscode-textLink-foreground);
+}
+
 /* 図の下に出す一言 */
 .graph-note {
   margin: 4px 0 0;
