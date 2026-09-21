@@ -12,6 +12,7 @@ import { renderPhasesPage, type RenderOptions } from "../../src/core/phases-rend
 import type { PhasesData, PhasesPage } from "../../src/core/phases-view.js";
 import { screenScript, screenStyle } from "./bundle.js";
 import { loadPage, type DomPage, type LoadOptions } from "./dom.js";
+import { loadPageJsdom, type JsdomPage } from "./jsdom.js";
 
 export const NONCE = "TEST-NONCE-123";
 
@@ -57,4 +58,12 @@ export async function openGraph(overrides: Partial<PhasesPage> = {}, initialStat
 /** 種類 1 行の中の要素。`li.phase[data-key=…]` の下だけを見る */
 export function rowSelector(key: string): string {
   return `.phase[data-key="${key}"]`;
+}
+
+/**
+ * 図を出した状態で、**jsdom で**開く。掴んで離す仕草だけがここを通る
+ * （happy-dom では d3-drag の待ちが終わらず固まる。`test/helpers/jsdom.ts` の頭）。
+ */
+export async function openGraphJsdom(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<JsdomPage> {
+  return loadPageJsdom(phasesHtml({ kind: "page", page: page(overrides) }), { ...(initialState as object), view: "graph" });
 }

@@ -10,7 +10,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { openGraph, openPhases } from "../helpers/phases.js";
+import { openGraph, openGraphJsdom, openPhases } from "../helpers/phases.js";
 import { readPhases } from "../../src/core/phases-doc.js";
 
 /** 2 つの種類が requires で結ばれ、1 つは独り。線は 1 本 */
@@ -119,16 +119,40 @@ test("CB-D77 控えてある位置で点が置かれ、図を触っても phases
     const node = dom.all('.react-flow__node[data-id="implement"]')[0];
     assert.match((node as unknown as { style: { transform: string } }).style.transform, /translate\(40px,\s*80px\)/);
 
-    // **掴んで離す仕草そのものは、ここでは試せない。** d3-drag は happy-dom の下で待ちが
-    // 終わらず、テストが固まる（実測）。仕草は README の手動確認 42e が見る。
-    // 仕草が呼ぶ中身（`withSpot` / `keepSpots`）は CB-T191 が単体で試す。
-
     // 図を触っても保存には渡らない（座標は人が持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
     await dom.close();
   }
 });
+
+test("CB-D80 点を掴んで離すと、その位置が控えに入る（jsdom）", async () => {
+  // **この 1 本だけ jsdom で走る。** happy-dom では d3-drag の待ちが終わらず固まる
+  // （`test/helpers/jsdom.ts` の頭）。控えに入る道（onNodeDragStop → withSpot → saveSpots）は
+  // ここでしか通らない
+  const dom = await loadDrag();
+  try {
+    const node = dom.one('.react-flow__node[data-id="implement"]');
+    const before = (node as unknown as { style: { transform: string } }).style.transform;
+    await dom.drag(node, 60, 40);
+    const after = (node as unknown as { style: { transform: string } }).style.transform;
+    assert.notEqual(after, before, "掴んで離しても点が動いていない");
+
+    const spots = (dom.state() as { spots?: Record<string, { x: number; y: number }> }).spots ?? {};
+    assert.deepEqual(Object.keys(spots), ["implement"], "動かした種類の控えが無い");
+    assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "控えが数でない");
+    // 動いた先は図の倍率で決まるので、値そのものは約束しない
+
+    // 摘まんでも保存には渡らない（座標は人が持つ設定に入れない）
+    assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
+  } finally {
+    dom.close();
+  }
+});
+
+function loadDrag(): ReturnType<typeof openGraphJsdom> {
+  return openGraphJsdom({ model: model(LINKED) });
+}
 
 test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", async () => {
   const dom = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n") });
