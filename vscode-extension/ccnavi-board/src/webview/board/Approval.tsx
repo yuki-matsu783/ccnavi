@@ -4,11 +4,12 @@
  *
  * 状態は拡張ホストが持っていて、ここは渡されたものを見せるだけ。ボタンを押したら拡張ホストへ返す。
  */
-import { useEffect, useRef, type JSX } from "react";
+import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import type { ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
 import { post } from "./post.js";
+import { approvalBody } from "./text.js";
 
 export function Approval({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element {
   const box = useRef<HTMLElement>(null);
@@ -126,7 +127,7 @@ function Body({
           </tbody>
         </table>
       )}
-      <pre className="approval-text">{preview.text}</pre>
+      <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>
           <h3>承認の対象にしない提案</h3>
@@ -168,6 +169,34 @@ function Body({
         <Cancel label="やめる" disabled={approving} />
       </div>
     </>
+  );
+}
+
+/**
+ * 承認画面の本文。実行ファイルが組んだ文字列を行のまま出し、**説明の付く見出しだけ**その次の行を
+ * ツールチップに畳む（`approvalBody`）。畳んだ説明は目には出さないが、読み上げと選択には残す。
+ * 畳めるかどうかを決めるのは見出しの綴りだけで、画面は中身を解釈しない。
+ */
+function BodyText({ text }: { readonly text: string }): JSX.Element {
+  const lines = approvalBody(text);
+  // 末尾に改行を足さない。実行ファイルが組んだ文字列と同じものが選択とコピーで取れるようにする。
+  const br = (i: number): string => (i === lines.length - 1 ? "" : "\n");
+  return (
+    <pre className="approval-text">
+      {lines.map((body, i) =>
+        body.note === "" ? (
+          <Fragment key={i}>{body.line + br(i)}</Fragment>
+        ) : (
+          <Fragment key={i}>
+            <span className="approval-head" title={body.note}>
+              {body.line}
+            </span>
+            <span className="approval-hint">{` ${body.note}`}</span>
+            {br(i)}
+          </Fragment>
+        ),
+      )}
+    </pre>
   );
 }
 

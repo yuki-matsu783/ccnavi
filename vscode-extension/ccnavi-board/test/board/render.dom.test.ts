@@ -71,6 +71,28 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
   }
 });
 
+test("CB-D73 説明の付く見出しは次の行をツールチップに畳み、知らない見出しは畳まない", async () => {
+  const page = await openBoard(fixture(), { approval: { kind: "preview", preview: approvePreview() } });
+  try {
+    const heads = page.all(".approval-head");
+    const labels = heads.map((head) => head.textContent);
+    // 説明のある見出しだけが畳まれる。「エージェントが書いた理由」の下は本文なので畳まない。
+    assert.ok(labels.includes("■ このチケットが書ける範囲"), labels.join(" / "));
+    assert.ok(labels.includes("■ 範囲にあるのに、判定で止まる場所"), labels.join(" / "));
+    assert.ok(!labels.includes("■ エージェントが書いた理由"), labels.join(" / "));
+    const scope = heads.find((head) => head.textContent === "■ このチケットが書ける範囲");
+    assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で書ける場所/);
+    // 畳んだ説明は目には出さないが、読み上げに渡すので DOM には残る。
+    const hints = texts(page, ".approval-hint").join(" ");
+    assert.ok(hints.includes("allow は無確認で書ける場所"), hints);
+    // 本文そのものは削らない。理由の中身は見出しの下にそのまま出る。
+    const body = text(page, "pre.approval-text");
+    assert.ok(body.includes("■ エージェントが書いた理由"), body);
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中はボタンを押せず、食い違いの注意を出す", async () => {
   const preview = approvePreview();
   const empty = await openBoard(fixture(), {

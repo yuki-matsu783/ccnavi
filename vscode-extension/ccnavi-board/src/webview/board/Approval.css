@@ -19,9 +19,17 @@
 .approval-batch th, .approval-batch td { text-align: left; padding: 2px 8px 2px 0; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
 .approval-id { font-family: var(--vscode-editor-font-family); }
 .approval-text {
+  position: relative;
   margin: 0; padding: 8px; max-height: 50vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
   font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size);
   background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: 4px;
+}
+/* 説明を畳んだ見出し。ホバーで出ることを点線で知らせる */
+.approval-head { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+/* 畳んだ説明。目には出さず、読み上げと選択には残す */
+.approval-hint {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 .approval-rejected, .approval-problems { margin: 0; padding-left: 18px; font-size: .88em; color: var(--vscode-editorWarning-foreground); }
 .approval-rejected li, .approval-problems li { overflow-wrap: anywhere; }
