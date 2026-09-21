@@ -77,7 +77,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
     approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
   });
   try {
-    assert.ok(texts(empty, ".approval-note").includes("承認待ちのチケットは無い"));
+    assert.equal(text(empty, "#approval-title"), "承認待ちのチケットは無い");
     // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
     assert.equal(text(empty, "pre.approval-text"), "承認待ちのチケットは無い。");
     assert.equal(empty.all('button[data-action="approve-confirm"]').length, 0);
