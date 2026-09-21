@@ -1398,7 +1398,7 @@ def _rules(path: str, root: str = "", home: str = "", layer: bool = False) -> li
         elif rule.id in seen:
             problems.append(
                 Problem(
-                    SEVERITY_WARN, name, "id が重複している。記録からどちらが当たったか辿れない"
+                    SEVERITY_WARN, name, "id が重複している。記録からどちらがヒットしたか辿れない"
                 )
             )
         seen.add(rule.id)
@@ -1479,7 +1479,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                     SEVERITY_WARN,
                     name,
                     f"広い allow に additionalContext がある（{why}）。"
-                    "当たるたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
+                    "ヒットするたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
                 )
             )
     return problems
@@ -1536,7 +1536,7 @@ def _broad(rule: rules.Rule) -> str:
        コマンドに同じ文を添えることになる
     """
     if rule.compiled is not None and rule.compiled.search("x"):
-        return "何にでも当たる"
+        return "何にでもヒットする"
     if _alternatives(rule.regex) >= 3:
         return "選択肢が 3 つ以上"
     return ""

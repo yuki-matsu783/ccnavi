@@ -7,7 +7,7 @@
    両方が届くことは Claude Code 2.1 で実測した
 3. dry-run でも文は届く（判定の代わりの文に続く）
 4. 書いていないルールでは鍵ごと出ない
-5. `--lint` は広い allow（何にでも当たる、選択肢が 3 つ以上）に書いた文を warn にし、
+5. `--lint` は広い allow（何にでもヒットする、選択肢が 3 つ以上）に書いた文を warn にし、
    狭い allow には何も言わない。`--test` は理由と文の両方を見せる
 """
 
@@ -151,7 +151,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout)
         warned = [line for line in done.stdout.splitlines() if "additionalContext" in line]
         self.assertEqual(len(warned), 2, done.stdout)
-        self.assertTrue(any("everything" in w and "何にでも当たる" in w for w in warned), warned)
+        self.assertTrue(any("everything" in w and "何にでもヒットする" in w for w in warned), warned)
         self.assertTrue(any("many" in w and "選択肢が 3 つ以上" in w for w in warned), warned)
 
     def test_once_delivers_the_text_only_the_first_time_per_context(self):
