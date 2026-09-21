@@ -3,6 +3,7 @@
  *
  * 種類の意味は判定しない（ADR-0035）。ここが作るのは並べて読めるようにした文だけ。
  */
+import type { PhasesGraph } from "../../core/phases-graph.js";
 import type { PhaseForm } from "../../core/phases-view.js";
 
 /** 関係と案内（overlap / requires / agent / when）に何か入っているか */
@@ -53,6 +54,28 @@ export function countText(total: number, query: string, shown: number, kept: num
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
   return `id が重なっている（${names.join(", ")}）。1 つにするまで保存できない`;
+}
+
+/**
+ * 図の下に出す一言。**この絵が何を描いていないか**を言う。
+ *
+ * 言うのは 4 つ。実線と破線の読み方、線に向きが無いこと（`requires` は一緒に置く条件で、
+ * 順序ではない）、このファイルに無い種類を指す参照は線にならないこと、id の無い種類は出ないこと。
+ *
+ * **読み方をここで言うのは、線にラベルを付けないから。** 同じ組が両方の関係を持つとラベルどうしが
+ * 重なって片方が読めない（`Graph.tsx` の `edgesOf`）。
+ *
+ * **線が落ちた理由は言わない。** 綴り違いかもしれないし、他の層の種類かもしれない。
+ * 決めるのは実行ファイルで、`phasetypes.py` の `reference_problems` が合成した集合で
+ * 確かめ、無ければ error を出す。画面がその手前で「他の層だ」と言うと、保存したときに
+ * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にならない」までしか言わない。
+ */
+export function graphNote(graph: PhasesGraph): string {
+  const parts = [`${graph.nodes.length} 種類・${graph.edges.length} 本`, "実線は requires（一緒に置く）、破線は overlap（並行してよい）", "線に向きは無い（requires は一緒に置く条件で、順序ではない。順序は親チケットの plan: が持つ）", "このファイルに無い種類を指す requires / overlap は線にならない（綴り違いか、他の層の種類か。どちらかは保存のときの検証が言う）"];
+  if (graph.unnamed > 0) {
+    parts.push(`id が空の種類は出ない（${graph.unnamed} 件）`);
+  }
+  return parts.join("。 ");
 }
 
 /** 種類が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */

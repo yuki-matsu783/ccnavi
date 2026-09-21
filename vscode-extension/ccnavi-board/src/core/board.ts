@@ -109,7 +109,7 @@ export interface Card {
   readonly issues: readonly string[];
   /**
    * 空でなければ、そのワークツリーへの書き込みが全部止まっている理由（ADR-0058）。
-   * `copyStatus` は `open` のままなので、列や承認済みの札からは分からない。
+   * `copyStatus` は `open` のままなので、列や承認済みのバッジからは分からない。
    */
   readonly blocked: string;
   /** 親だけ。フェーズの依頼のマーカーから引いたマージリクエストの URL（依頼の投稿ではなくマージリクエスト自体）。無ければ空 */
@@ -117,7 +117,7 @@ export interface Card {
   readonly mrNumber: number | null;
   /**
    * 人が動く必要があるか。「要対応だけ」の絞り込みが見る。条件は、承認待ち（`pending_approval`。新規の未承認と
-   * 親の改版。札の「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
+   * 親の改版。バッジの「未承認」は承認済みチケットの有無なので、改版を落とし取り消しを拾う。ここは承認待ちで見る）、
    * レビュー準備中／レビュー待ち、未着手・作業中なのにワークツリーが無い、HIGH 以上、本物が決まらない写り、不備、
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
@@ -196,7 +196,7 @@ function toCard(
   pending: ReadonlySet<string>,
 ): Card {
   const issues: string[] = [];
-  // 止まっていることは不備として挙げる。札は一目で分かる短い言葉しか出せないので、
+  // 止まっていることは不備として挙げる。バッジは一目で分かる短い言葉しか出せないので、
   // 理由の全文はここに置く（`attention` もこれで立つ）。
   if (t.blocked !== "") {
     issues.push(`書き込みが止まっている: ${t.blocked}`);
@@ -320,7 +320,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
   const actions: Action[] = [];
   // 受け入れて進めるのは、人のレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
-  // 判定が `review_waiting` で言う。子カードの札・フェーズ行の「レビュー依頼済」・受け入れの操作はみな
+  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済」・受け入れの操作はみな
   // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
     actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });

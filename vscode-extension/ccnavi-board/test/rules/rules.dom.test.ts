@@ -206,7 +206,7 @@ test("CB-D04 絞り込みは一致しない行を隠し、開いている行は�
   }
 });
 
-test("CB-D05 ツールの札で選ぶと、欄と行の要約が同じ操作の中で新しい値になる", async () => {
+test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操作の中で新しい値になる", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("no-rm")} .row-head`));
@@ -214,7 +214,7 @@ test("CB-D05 ツールの札で選ぶと、欄と行の要約が同じ操作の�
     dom.click(dom.one(`${rowSelector("no-rm")} input.f-match`));
     await dom.settle();
     assert.ok(dom.one(`${rowSelector("no-rm")} .picker`).classList.contains("open"));
-    // 知らない名前は札に出ないが、欄に書いてあれば札として並ぶ
+    // 知らない名前は選択肢に出ないが、欄に書いてあれば選択肢として並ぶ
     assert.deepEqual(
       dom.all(`${rowSelector("no-rm")} .picker input[type=checkbox]`).map((box) => box.getAttribute("value")),
       [...KNOWN_TOOLS],
@@ -268,10 +268,10 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
   }
 });
 
-test("CB-D0c 刻みは畳んだ行の札に出る。欄に打てば札も変わり、保存はその文字を送る", async () => {
+test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッジも変わり、保存はその文字を送る", async () => {
   const dom = await openRules();
   try {
-    // 読んだ刻みは畳んだままでも見える。刻みが無い行は札を出さない（枠だけ置く）
+    // 読んだ刻みは畳んだままでも見える。刻みが無い行はバッジを出さない（枠だけ置く）
     assert.equal(dom.one(`${rowSelector("no-rm")} .sum .sum-every`).textContent, "4 回ごと");
     assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "");
     // 刻みだけを直す。欄は「コンテキストの追加」の中にあり、刻みがあれば最初から開いている

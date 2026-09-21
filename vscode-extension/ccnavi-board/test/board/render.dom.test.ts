@@ -261,7 +261,7 @@ test("CB-T12d 承認ボタンは見えている承認待ちの数を出し、そ
   }
 });
 
-test("CB-T13c フェーズ行の要約は札と同じ条件（レビュー準備中／レビュー待ち・HIGH 以上）だけ。マーカーの経過と MEDIUM 以下のリスクは全文にだけ出る", async () => {
+test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー準備中／レビュー待ち・HIGH 以上）だけ。マーカーの経過と MEDIUM 以下のリスクは全文にだけ出る", async () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
@@ -325,10 +325,10 @@ test("CB-T13c フェーズ行の要約は札と同じ条件（レビュー準備
   assert.doesNotMatch(css(), /\.phase-full \{ display: none/);
 });
 
-test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人が動く状態だけで、属性は枠無しの行に出す", async () => {
+test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジは人が動く状態だけで、属性は枠無しの行に出す", async () => {
   const page = await openBoard();
   try {
-    // 人が動く状態は枠付きの札
+    // 人が動く状態は枠付きのバッジ
     assert.equal(text(page, ".badge.copy.copy-none"), "未承認");
     assert.equal(text(page, ".badge.worktree.none"), "ワークツリーなし");
     // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
@@ -339,7 +339,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
     // 取り消しは列で分かるので、カードには重ねて書かない
     assert.equal(page.all('.column[data-state="cancelled"] .card[data-id="i0001-05"]').length, 1);
     assert.equal(page.all(".fact.cancelled").length, 0);
-    // 取り消した子にはワークツリーが無いが、閉じているので「ワークツリーなし」の札は出ない
+    // 取り消した子にはワークツリーが無いが、閉じているので「ワークツリーなし」のバッジは出ない
     assert.equal(page.all(".badge.worktree.none").length, 1);
     assert.equal(text(page, ".fact.review"), "人間レビュー要");
     assert.ok((page.one(".fact.review").getAttribute("title") ?? "").length > 0, "レビューの要否は理由を tooltip に持つ");
@@ -348,7 +348,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
     assert.match(text(page, ".fact.sha"), /^base [0-9a-f]{7}$/);
     assert.match(page.one(".fact.sha").getAttribute("title") ?? "", /^[0-9a-f]+$/);
     assert.ok(texts(page, ".fact.risk.risk-low").includes("リスク LOW（0 点）"));
-    // 承認済みとレビューの要否は札にしない
+    // 承認済みとレビューの要否はバッジにしない
     assert.equal(page.all(".badge.copy.copy-open").length, 0);
     assert.equal(page.all(".badge.review").length, 0);
     // 写りは子のワークツリーに普通に入るので、正常な場面ではバッジを出さない
@@ -392,7 +392,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。札は人�
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
 
-test("CB-T13a 止めている間だけ段の名前を札に出す。レビューが済んで止まらなくなった子には出さない", async () => {
+test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビューが済んで止まらなくなった子には出さない", async () => {
   const base = fixture();
   // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済 かつ 止まっている」を判定が言う
   const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
@@ -409,7 +409,7 @@ test("CB-T13a 止めている間だけ段の名前を札に出す。レビュー
   const brief = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-brief")?.textContent ?? "";
   const full = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-full")?.textContent ?? "";
 
-  // クローズ・レビュー済・止まっていない子（完了列の i0001-01）。札は出さず、レビュー済は枠無しの行に出る。
+  // クローズ・レビュー済・止まっていない子（完了列の i0001-01）。バッジは出さず、レビュー済は枠無しの行に出る。
   // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済 · レビュー済」が残る
   const done = await openBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false));
   try {
@@ -420,7 +420,7 @@ test("CB-T13a 止めている間だけ段の名前を札に出す。レビュー
   } finally {
     await done.close();
   }
-  // 依頼済のマーカーだけで止まっていない（判定が待ちと言わない）子にも、札と要約は出ない
+  // 依頼済のマーカーだけで止まっていない（判定が待ちと言わない）子にも、バッジと要約は出ない
   const reopened = await openBoard(withMarks({ requested: { at: "t" } }, false));
   try {
     assert.equal(reopened.all(".badge.hold").length, 0);
@@ -428,7 +428,7 @@ test("CB-T13a 止めている間だけ段の名前を札に出す。レビュー
   } finally {
     await reopened.close();
   }
-  // 依頼を出したのに止まったままの子には札が出て、親のフェーズ行の要約にも出る。reviewed の有無では分岐しない
+  // 依頼を出したのに止まったままの子にはバッジが出て、親のフェーズ行の要約にも出る。reviewed の有無では分岐しない
   const waiting = await openBoard(withMarks({ requested: { at: "t" } }, true));
   try {
     assert.ok(texts(waiting, ".badge.hold").includes("レビュー待ち"));
@@ -443,7 +443,7 @@ test("CB-T13a 止めている間だけ段の名前を札に出す。レビュー
   } finally {
     await stillClosed.close();
   }
-  // 依頼を出していない子の札は「レビュー準備中」で、依頼済とは出ない
+  // 依頼を出していない子のバッジは「レビュー準備中」で、依頼済とは出ない
   const notRequested = await openBoard(withMarks({}, true));
   try {
     assert.ok(texts(notRequested, ".badge.hold").includes("レビュー準備中"));
@@ -676,7 +676,7 @@ test("CB-T162 読み直せなかった画面にも承認のオーバーレイが
   }
 });
 
-test("CB-T141 止まっているカードに「書き込み停止中」の札が出て、理由が tooltip と不備の行に載る", async () => {
+test("CB-T141 止まっているカードに「書き込み停止中」のバッジが出て、理由が tooltip と不備の行に載る", async () => {
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
   const reason = "親 i0001 の承認済みチケットが作業中に無い（未承認か、閉じている）";

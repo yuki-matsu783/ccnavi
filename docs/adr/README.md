@@ -147,6 +147,7 @@
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
 | [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む |
 | [0068](0068-approval-overlay-state-machine.md) | 承認のオーバーレイの遷移を 1 か所に集め、単体で試せるようにする |
+| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、外から来る部品を 1 つだけ入れる |
 
 ### 開発と文書
 

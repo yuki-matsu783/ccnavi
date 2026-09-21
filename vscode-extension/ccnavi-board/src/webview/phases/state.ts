@@ -81,3 +81,47 @@ export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {
 export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlySet<string> {
   return new Set(draft.rows.filter((row) => row.phase.id !== "" && ids.has(row.phase.id)).map((row) => row.key));
 }
+
+// ---- 図（`Graph.tsx`）が控えるもの
+
+/** 一覧と図の、いま見ているほう */
+export type View = "list" | "graph";
+
+/**
+ * 人がドラッグで動かした点の位置。**`phases.yml` には書かない**（人が持つ設定に座標は入れない）。
+ * 控えるのは Webview の state で、鍵は種類の id。id を打ち替えれば控えは捨てられる（`Graph.tsx`）。
+ *
+ * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。
+ * ここ（`state.ts`）は `acquireVsCodeApi` を読むので、node のテストからは import できない。
+ */
+export type { Spots } from "../../core/phases-graph.js";
+import type { Spots } from "../../core/phases-graph.js";
+
+/** いま見ているほう。控えが無いか、綴りが違えば一覧 */
+export function loadView(): View {
+  const saved = (getState() ?? {}) as { view?: unknown };
+  return saved.view === "graph" ? "graph" : "list";
+}
+
+export function saveView(view: View): void {
+  setState({ ...((getState() ?? {}) as object), view });
+}
+
+/** 控えてある点の位置。数でない値は落とす（前の版の控えが混ざっても図が壊れないように） */
+export function loadSpots(): Spots {
+  const saved = (getState() ?? {}) as { spots?: unknown };
+  const raw = typeof saved.spots === "object" && saved.spots !== null ? (saved.spots as Record<string, unknown>) : {};
+  const spots: Spots = {};
+  for (const [id, value] of Object.entries(raw)) {
+    const spot = value as { x?: unknown; y?: unknown };
+    if (typeof spot?.x === "number" && typeof spot?.y === "number" && Number.isFinite(spot.x) && Number.isFinite(spot.y)) {
+      spots[id] = { x: spot.x, y: spot.y };
+    }
+  }
+  return spots;
+}
+
+export function saveSpots(spots: Spots): void {
+  setState({ ...((getState() ?? {}) as object), spots });
+}
+

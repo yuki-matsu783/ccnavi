@@ -1,0 +1,138 @@
+/*
+ * フェーズの関係の図（`Graph.tsx`）。
+ *
+ * React Flow の CSS（`@xyflow/react/dist/style.css`。束ねの入口 `style.css` が `@import` する）は
+ * 色を `--xy-*-default` の変数で持っている。**打ち消すのではなく、変数を置き換える。**
+ * 置き換え先は VS Code のテーマ変数（`--vscode-*`）で、画面の他のところと同じ出どころになる。
+ * `!important` も、部品ごとの上書きも要らない。
+ *
+ * 高コントラストのテーマでは、縁を `--vscode-contrastBorder` に寄せる（他のテーマでは既定へ倒れる）。
+ * この書き方は `styles/` の共通のぶんと揃えてある（CB-T130）。
+ */
+
+.graph {
+  height: 60vh;
+  min-height: 320px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+/* React Flow の色を、画面の他のところと同じ出どころに差し替える */
+.graph .react-flow {
+  --xy-background-color-default: var(--vscode-editor-background);
+  --xy-background-pattern-dots-color-default: var(--vscode-panel-border);
+  --xy-edge-stroke-default: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground));
+  --xy-edge-stroke-selected-default: var(--vscode-focusBorder);
+  --xy-edge-stroke-width-default: 1.5;
+  --xy-edge-label-background-color-default: var(--vscode-editor-background);
+  --xy-edge-label-color-default: var(--vscode-descriptionForeground);
+  --xy-node-background-color-default: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --xy-node-color-default: var(--vscode-foreground);
+  --xy-node-border-default: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  --xy-node-border-radius-default: 3px;
+  --xy-node-boxshadow-hover-default: 0 0 0 1px var(--vscode-focusBorder);
+  --xy-node-boxshadow-selected-default: 0 0 0 1px var(--vscode-focusBorder);
+  --xy-handle-background-color-default: transparent;
+  --xy-handle-border-color-default: transparent;
+  --xy-attribution-background-color-default: transparent;
+  --xy-selection-background-color-default: var(--vscode-list-hoverBackground);
+  --xy-selection-border-default: 1px dotted var(--vscode-focusBorder);
+}
+
+/* 点。React Flow の既定の枠は使わず、この中で組む */
+.graph .react-flow__node-phase {
+  width: 170px;
+  font-size: var(--vscode-font-size);
+}
+
+.phase-node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  border-radius: 3px;
+  color: var(--vscode-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.phase-node:hover {
+  background: var(--vscode-list-hoverBackground);
+  outline: 1px dashed var(--vscode-contrastActiveBorder, transparent);
+}
+
+.phase-node-id {
+  font-family: var(--vscode-editor-font-family);
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.phase-node-title {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+.phase-node-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.phase-node-tags .tag {
+  padding: 0 4px;
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  border-radius: 2px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.8em;
+}
+
+/* feedback の種類と、レビューを求める種類は、縁で見分ける（色だけに頼らない） */
+.phase-node[data-kind="feedback"] {
+  border-style: dashed;
+}
+
+.phase-node-tags .tag[data-review="mr"] {
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-focusBorder);
+}
+
+/* 線の端。React Flow は端が要るが、向きの意味は無いので見せない */
+.graph .react-flow__handle {
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+}
+
+/* 線。requires は実線、overlap は破線。どちらも矢印は付けない（向きが無い） */
+.graph .react-flow__edge.rel-overlap .react-flow__edge-path {
+  stroke-dasharray: 4 3;
+}
+
+.graph .react-flow__edge-text {
+  font-size: 9px;
+  fill: var(--vscode-descriptionForeground);
+}
+
+/*
+ * React Flow の表示（attribution）。消すには上流が購読を求めているので残す。
+ * ここの色だけは変数ではなく直書き（`#999`）なので、テーマの変数に寄せる。
+ * 高コントラストの明るいテーマでは #999 のコントラスト比が 3:1 に届かない。
+ */
+.graph .react-flow__attribution a {
+  color: var(--vscode-textLink-foreground);
+}
+
+/* 図の下に出す一言 */
+.graph-note {
+  margin: 4px 0 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}

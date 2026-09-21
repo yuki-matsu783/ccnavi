@@ -90,7 +90,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [sampled, setSampled] = useState<SamplesJson | undefined>(undefined);
   const [tool, setTool] = useState<string>(KNOWN_TOOLS[0]);
   const [subject, setSubject] = useState("");
-  /** 札が開いている行。開くのは画面ぜんたいで 1 つだけ */
+  /** 選択肢が開いている行。開くのは画面ぜんたいで 1 つだけ */
   const [pickerKey, setPickerKey] = useState<string | undefined>(undefined);
   /** 足した直後の行。id の欄に焦点を移したら忘れる */
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
@@ -179,7 +179,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextKey]);
 
-  // 札は、その欄と札の外を押したとき、または Esc で閉じる
+  // 選択肢は、その欄と選択肢の外を押したとき、または Esc で閉じる
   useEffect(() => {
     const onDown = (event: Event): void => {
       const target = event.target as HTMLElement | null;

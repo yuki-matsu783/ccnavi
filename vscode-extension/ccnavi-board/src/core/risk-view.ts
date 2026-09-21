@@ -58,7 +58,7 @@ export interface RiskModel {
   readonly problems: readonly string[];
 }
 
-/** 当て方の説明。select の札と、値の欄の placeholder */
+/** 当て方の説明。select のラベルと、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; readonly placeholder: string }>> = {
   lines_over: { label: "差分の行数が閾値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
   files_over: { label: "変えたファイル数が閾値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },

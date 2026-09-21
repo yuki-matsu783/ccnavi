@@ -1,5 +1,5 @@
 /*
- * カード 1 枚（`Card.tsx`）。見出し・札・事実・親のフェーズ一覧・不備・行末のボタン。
+ * カード 1 枚（`Card.tsx`）。見出し・バッジ・事実・親のフェーズ一覧・不備・行末のボタン。
  */
 a.mr-link { color: var(--vscode-textLink-foreground); text-decoration: none; }
 a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: var(--vscode-textLink-activeForeground); }
@@ -25,7 +25,7 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .title { overflow-wrap: anywhere; }
 .where { margin-left: auto; font-size: .85em; color: var(--vscode-descriptionForeground); white-space: nowrap; }
 .stage { margin-top: 2px; font-size: .9em; color: var(--vscode-descriptionForeground); }
-/* 札は人が動く必要がある状態だけ。属性は枠無しの薄い文字で 1 行に並べる */
+/* バッジは人が動く必要がある状態だけ。属性は枠無しの薄い文字で 1 行に並べる */
 .badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .badge {
   font-size: .82em; padding: 0 6px; border-radius: 999px;
