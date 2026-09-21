@@ -61,7 +61,7 @@ export function rowSelector(key: string): string {
 }
 
 /**
- * 図を出した状態で、**jsdom で**開く。掴んで離す仕草だけがここを通る
+ * 図を出した状態で、**jsdom で**開く。ドラッグだけがここを通る
  * （happy-dom では d3-drag の待ちが終わらず固まる。`test/helpers/jsdom.ts` の頭）。
  */
 export async function openGraphJsdom(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<JsdomPage> {

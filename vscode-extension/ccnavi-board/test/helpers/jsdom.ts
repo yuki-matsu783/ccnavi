@@ -1,9 +1,9 @@
 /**
  * happy-dom で動かないものを走らせる逃げ道（`dom.ts` の方針）。**いま逃がしているのは 1 つだけ**で、
- * 図の点を掴んで離す仕草（`onNodeDragStop`）。
+ * 図の点のドラッグ（`onNodeDragStop`）だけ。
  *
  * happy-dom では、d3-drag が張る待ちが終わらず**テストが固まる**（実測。90 秒で打ち切り）。
- * jsdom では同じ仕草がそのまま通る。逆に jsdom は起動が重いので、**ここへ来るのは happy-dom で
+ * jsdom では同じ操作がそのまま通る。逆に jsdom は起動が重いので、**ここへ来るのは happy-dom で
  * 走らないものだけ**にする。普段の画面のテストは `dom.ts` のまま。
  *
  * jsdom にも無いものが 2 つあるので、ここで埋める。
@@ -39,7 +39,7 @@ export interface JsdomPage {
   /** セレクタで全部取る */
   all(selector: string): Element[];
   /**
-   * 要素を掴んで離す（`dx`・`dy` は画面の px）。d3-drag は mousedown を要素で、
+   * 要素をドラッグする（`dx`・`dy` は画面の px）。d3-drag は mousedown を要素で、
    * mousemove と mouseup を window で受けるので、そのとおりに流す。
    * **動いた先の座標は約束しない**（図の倍率で決まる）
    */
@@ -148,7 +148,7 @@ export async function loadPageJsdom(html: string, initialState?: unknown): Promi
     },
     async drag(element, dx, dy) {
       element.dispatchEvent(mouse("mousedown", 10, 10));
-      // d3-drag は動きを見てから掴む。1 回では「押しただけ」になることがあるので 2 回流す
+      // d3-drag は動きを見てから掴みにかかる。1 回では「押しただけ」になることがあるので 2 回流す
       window.dispatchEvent(mouse("mousemove", 10 + Math.round(dx / 2), 10 + Math.round(dy / 2)));
       window.dispatchEvent(mouse("mousemove", 10 + dx, 10 + dy));
       window.dispatchEvent(mouse("mouseup", 10 + dx, 10 + dy));

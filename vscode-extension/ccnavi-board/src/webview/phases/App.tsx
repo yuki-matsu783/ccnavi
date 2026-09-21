@@ -226,7 +226,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
   /**
    * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
-   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。摘まんでいる
+   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている
    * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
    */
   const graph = useMemo(() => graphOf(formOf(draft)), [draft]);

@@ -88,7 +88,7 @@ export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlyS
 export type View = "list" | "graph";
 
 /**
- * 人が摘まんで動かした点の位置。**`phases.yml` には書かない**（人が持つ設定に座標は入れない）。
+ * 人がドラッグで動かした点の位置。**`phases.yml` には書かない**（人が持つ設定に座標は入れない）。
  * 控えるのは Webview の state で、鍵は種類の id。id を打ち替えれば控えは捨てられる（`Graph.tsx`）。
  *
  * 形と、形を動かす純関数（`withSpot` / `keepSpots`）は `core/phases-graph.ts` にある。

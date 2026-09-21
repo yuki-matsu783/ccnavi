@@ -143,7 +143,7 @@ test("CB-D80 点を掴んで離すと、その位置が控えに入る（jsdom�
     assert.ok(Number.isFinite(spots.implement.x) && Number.isFinite(spots.implement.y), "控えが数でない");
     // 動いた先は図の倍率で決まるので、値そのものは約束しない
 
-    // 摘まんでも保存には渡らない（座標は人が持つ設定に入れない）
+    // ドラッグしても保存には渡らない（座標は人が持つ設定に入れない）
     assert.deepEqual(dom.posted.filter((message) => message.type === "save"), []);
   } finally {
     dom.close();
@@ -188,8 +188,8 @@ test("CB-D79 同じ組が requires と overlap の両方を持つとき、2 本�
     const b = dashed.getAttribute("d") ?? "";
     assert.ok(a !== "" && b !== "", "線の経路が空");
     assert.notEqual(a, b, "requires と overlap が同じ経路で描かれている（破線が実線の下に隠れる）");
-    // 線に札は付けない（同じ組の 2 本は札が重なって読めない）。読み方は下の一言が言う
-    assert.equal(dom.all(".react-flow__edge-text").length, 0, "線に札が付いている");
+    // 線にラベルは付けない（同じ組の 2 本はラベルが重なって読めない）。読み方は下の一言が言う
+    assert.equal(dom.all(".react-flow__edge-text").length, 0, "線にラベルが付いている");
   } finally {
     await dom.close();
   }

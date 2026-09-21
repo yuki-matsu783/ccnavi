@@ -8,7 +8,7 @@
  * happy-dom は innerHTML で入れた script を実行しないので、CSP の meta を外したうえで
  * 本文を入れ、JSON でない script だけを順に window.eval で走らせる。
  * happy-dom で動かないものだけ jsdom に逃がす方針（`test/helpers/jsdom.ts`）。
- * いま逃がしているのは、図の点を掴んで離す仕草だけ。
+ * いま逃がしているのは、図の点のドラッグだけ。
  */
 import type { Document, Element, HTMLElement, Window } from "happy-dom" with { "resolution-mode": "import" };
 

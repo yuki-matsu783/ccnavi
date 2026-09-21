@@ -18,7 +18,7 @@
  * **置き場所は id だけで決まる。線は見ない。** 保存のたびに `model` が丸ごと届き直す（ADR-0062）ので、
  * 関係を 1 本直すたびに絵が組み替わると、この画面が唯一やらせる作業（関係を直しながら確かめる）と
  * 正面からぶつかる。**繋がっている種類を近くに寄せることはしない**。寄せると、線を 1 本足しただけで
- * 触っていない点まで動く。近くに置きたいときは人が摘まんで動かし、そのぶんは画面が覚える（`state.ts`）。
+ * 触っていない点まで動く。近くに置きたいときは人がドラッグで動かし、そのぶんは画面が覚える（`state.ts`）。
  */
 import type { PhaseKind, PhasesForm, Review } from "./phases-view.js";
 
@@ -138,18 +138,18 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   return { nodes, edges, unnamed };
 }
 
-// ---- 人が摘まんで動かした位置（画面の控え。`phases.yml` には書かない）
+// ---- 人がドラッグで動かした位置（画面の控え。`phases.yml` には書かない）
 
 /** 点の置き場所の控え。鍵は種類の id */
 export type Spots = Record<string, { readonly x: number; readonly y: number }>;
 
 /**
- * 摘まんで動かした先を控えに入れる。px は丸める（控えを読みやすく保つ）。
+ * ドラッグで動かした先を控えに入れる。px は丸める（控えを読みやすく保つ）。
  *
  * ここ（`core/`）に置いてあるのは、`state.ts` が `acquireVsCodeApi` を読み、node のテストから
  * import できないため。単体で試せる形にしておく（CB-T191）。
  *
- * 掴んで離す仕草そのものは **jsdom** で通す（CB-D80）。happy-dom では d3-drag の待ちが
+ * ドラッグそのものは **jsdom** で通す（CB-D80）。happy-dom では d3-drag の待ちが
  * 終わらずテストが固まる（`test/helpers/jsdom.ts` の頭）。
  */
 export function withSpot(spots: Spots, id: string, x: number, y: number): Spots {
