@@ -1,7 +1,7 @@
 /**
  * 項目 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
  *
- * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`captioned`）。
+ * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * 値の欄は当て方で名前も placeholder も変わり、上限（`max`）は glob のときだけ出る。
  */
 import type { JSX, ReactNode } from "react";

@@ -18,7 +18,7 @@ CI、入れたばかりのプロジェクト――で不備を見つける手段
 ## 設計からの読み替え
 
 ccnavi.md 付録 D.2「診断コマンド」の `--lint` と D.4「設定lintの検証項目」は、
-config.yaml という 1 枚の設定ファイルに、ツールの許可・保護対象ディレクトリ・
+config.yaml という 1 枚の設定ファイルに、ツールの許可・保護領域・
 禁止コマンドがまとめて書かれている前提で書かれている。現在の形はそうではない。
 設定は `.claude/settings.json` の env が運ぶ環境変数、防御の中身はルールファイルで、
 パスの列挙という考え方そのものが無い。そこで D.4 の 9 項目を次のように読み替えた。
@@ -30,7 +30,7 @@ config.yaml という 1 枚の設定ファイルに、ツールの許可・保�
 | 1,2,4 禁止値・`..`・絶対パス | 該当する列挙が無い。代わりに版番号と必須欄 | error |
 | 5 max_* が既定より緩くないか | 呼び出しを止めないモードと読めない値 | warn |
 | 8 重複していないか | id の欠落と重複 | warn |
-| 7,9 保護対象・immutable の漏れ | どのツールにも当たらない match | warn |
+| 7,9 保護領域・immutable の漏れ | どのツールにも当たらない match | warn |
 
 読み替えても変わらないのは、CI で走らせて error だけを落とす対象にするという
 D.4 の使い方のほうで、終了コードはそれに合わせてある。
@@ -433,7 +433,9 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     # ツリーの名前から、そのツリーがどのリポジトリのものかを引く表。ワークスペースなら空、
     # プロジェクトならその名前で、ワークツリーは元リポジトリのほうに付く（tree.Tree）。
     # チケットは自分の置かれたツリーの名前しか持たないので、ここで作って渡す。
-    repo_of = {t.name or "(main)": t.project for t in tree.all_trees(root, conf.projects)}
+    repo_of = {
+        t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
+    }
     problems.extend(_proposal_problems(proposals, index, closed, done, repo_of))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
@@ -448,7 +450,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{stray} はワークツリーでも main でもないのに .claude/ を持つ。"
+                f"{stray} はワークツリーでもワークスペースルートでもないのに .claude/ を持つ。"
                 "cd 1 回で別のワークスペースルートに見える",
             )
         )
@@ -566,7 +568,7 @@ def _proposal_problems(
     # それぞれ別のコミットを指すから、古いほうが doing・新しいほうが done になるのも普通。
     # 咎めるのは 1 つのツリーの中で 2 つの状態に在る形だけ。
     def place(t, state: str) -> tuple[str, str, str]:
-        at = t.tree or "(main)"
+        at = t.tree or "(ワークスペースルート)"
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
@@ -586,7 +588,7 @@ def _proposal_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket} は承認済み（{current.tree or '(main)'} の "
+                    f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る。"
                     "計画の改版でなければ todo/ の側を消す",
                 )
@@ -606,7 +608,7 @@ def _proposal_problems(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{t.ticket} は承認待ち（{t.tree or '(main)'} の todo/）。"
+                f"{t.ticket} は承認待ち（{t.tree or '(ワークスペースルート)'} の todo/）。"
                 "'ccnavi --approve' を通すまで範囲は効かない",
             )
         )
@@ -1132,7 +1134,7 @@ def _stale_by_tree(
     for t in approval.trees(conf, root):
         left = _left_behind(t.root, place_rel, states, known)
         if left:
-            stale.append(f"{t.name or '(main)'}（{', '.join(left)}）")
+            stale.append(f"{t.name or '(ワークスペースルート)'}（{', '.join(left)}）")
     return stale
 
 
@@ -1153,7 +1155,7 @@ def _left_behind(tree_root: str, place_rel: str, states: tuple, known: set[str])
 
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:
-    """main かワークツリーのどこかに提案の置き場があるか。"""
+    """ワークスペースルートかワークツリーのどこかに提案の置き場があるか。"""
     for t in [tree.main_tree(root), *tree.worktrees(root)]:
         if os.path.isdir(os.path.join(t.root, tickets_rel.replace("/", os.sep))):
             return True
@@ -1161,7 +1163,8 @@ def tree_has_tickets(root: str, tickets_rel: str) -> bool:
 
 
 def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
-    """リポジトリの中で `.claude/` を持つ、ワークツリーでも main でもないディレクトリ。
+    """リポジトリの中で `.claude/` を持つ、ワークツリーでもワークスペースルートでもない
+    ディレクトリ。
 
     浅くしか見ない。2 段まで。深く歩くと大きなリポジトリで検証が待たされる。
     """

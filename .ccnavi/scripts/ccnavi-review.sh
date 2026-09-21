@@ -12,9 +12,9 @@
 # だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。
 #
 #   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
-#            下書きを書き出す → ここが（無ければ）MR を下書きで作り、依頼を投稿する
+#            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
 #            → `ccnavi review requested` がマーカーを置く
-#            人はレビューを MR で行うので、入れ物が無いことで止めない。題から Draft を
+#            人はレビューをマージリクエストで行うので、入れ物が無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
 #   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす
@@ -33,14 +33,14 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|fetch> [--phase <N>] [--body-file <path>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|handoff|ready|wrapup|fetch|origin> [--phase <N>] [--body-file <path>]
 
-  request  --phase <N> --body-file <依頼文>   前提を確かめ、MR が無ければ作り、依頼を投稿してマーカーを置く
+  request  --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
   check    --phase <N>                         依頼より後の未解決スレッドが無ければマーカーを置く
-  note     --body-file <本文>                  判断の記録を MR のコメントに写す
+  note     --body-file <本文>                  判断の記録をマージリクエストのコメントに写す
   accept   <N>                                 未解決の扱いを選ぶ。受け入れて進むか、続きの子チケットを起こす（人が端末で打つ）
-  handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、MR に引き継ぎの note を残す
-  ready                                        閉じられて wip を片付け push 済みなら Draft を外す（マージに進んでよいの合図。マージは人が squash で）
+  handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、マージリクエストに引き継ぎの note を残す
+  ready                                        閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
   wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                        リモートから取ってきた写し（JSON）を標準出力へ
   origin                                       origin をどう読んだか（ホスト・scheme・API の綴り）
@@ -452,8 +452,8 @@ trap 'rm -f "$result"' EXIT
 case "$sub" in
 origin)
 	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見る出口。
-	# URL に埋まった資格情報は伏せる。ここの出力はエージェントの文脈と記録に残る。
-	shown=$(printf '%s' "$origin" | sed -E 's#^([a-z]+://)[^/@]+@#\1<伏せた>@#')
+	# URL に埋まった資格情報は伏せる（`ccnavi_mask_url` が作る `origin_shown`）。
+	# ここの出力はエージェントの文脈と記録に残る。
 	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
 		"$origin_shown" "$kind" "$scheme" "$host" "$path" "$api_base" "$branch" "$transport"
 	;;

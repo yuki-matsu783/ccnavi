@@ -70,7 +70,7 @@ CODE_PREEXISTING = "POST_PREEXISTING"
 # 引数に現れないのでここでしか捕まらない。
 CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 
-# 範囲外の変更を咎めているのは、ルールファイルの中のルールではなく承認台帳。
+# 範囲外の変更を咎めているのは、ルールファイルの中のルールではなく承認済みチケット。
 # 出所にこの名前を添えて、ルールファイルを探しても見つからないことを示す。
 TICKET_SCOPE_RULE = "(ticket-scope)"
 

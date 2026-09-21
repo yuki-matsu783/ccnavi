@@ -315,8 +315,8 @@ class LintTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("i0001 が複数の場所にある", result.stdout)
-        self.assertIn("(main):doing", result.stdout)
-        self.assertIn("(main):done", result.stdout)
+        self.assertIn("(ワークスペースルート):doing", result.stdout)
+        self.assertIn("(ワークスペースルート):done", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 1)
 
     def test_同じ識別子がdoingとreviewの両方に在ればerrorになる(self):
@@ -337,7 +337,7 @@ class LintTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("i0001 が複数の場所にある", result.stdout)
-        self.assertIn("(main):review", result.stdout)
+        self.assertIn("(ワークスペースルート):review", result.stdout)
 
     def test_doneに1つだけ在るのは咎めない(self):
         # 閉じた記録が 1 つ在るだけの、いちばん普通の形。数え方を変えても黙ったまま。
@@ -400,7 +400,7 @@ class LintTest(unittest.TestCase):
 
     def test_レビュー待ちの置き場では承認の記録を求める(self):
         # `wip/proposals/review/` はエージェントが書ける側にある。守りが組み込みの deny
-        # 1 枚しか無いので、そこは欄を second layer として残す（ADR-0058）。
+        # 1 枚しか無いので、そこは `ccnavi_approved` の欄を 2 枚目の守りとして残す（ADR-0058）。
         write(
             os.path.join(self.root, "wip", "proposals", "review"),
             "i0001.md",

@@ -1,5 +1,5 @@
 /**
- * リスク管理画面の本体。段階の閾値と、加点する項目の一覧。
+ * リスク管理画面の本体。等級の閾値と、加点する項目の一覧。
  *
  * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、人が触って決めるもの
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
@@ -55,7 +55,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
   const [lock, setLock] = useState<Lock>(() => pageOf(initial)?.lock ?? NO_LOCK);
-  /** ファイルが外で変わった。捨てて読み直すかは人が決める */
+  /** ファイルが外で変わった。破棄して読み直すかは人が決める */
   const [changed, setChanged] = useState(false);
   const [find, setFind] = useState("");
   /** 足した直後の行。id の欄に焦点を移したら忘れる */
@@ -254,13 +254,13 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          段階の閾値 <span className="count">点がこの値以上になると段階が上がる。HIGH 以上はレビューが済むまで止まる</span>
+          等級の閾値 <span className="count">点がこの値以上になると等級が上がる。HIGH 以上はレビューが済むまで止まる</span>
         </h2>
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            点がその値以上になると段階が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上はレビューが済むまでフェーズが止まり</strong>
-            、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその段階は組み込みの値（
+            点がその値以上になると等級が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上はレビューが済むまでフェーズが止まり</strong>
+            、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその等級は組み込みの値（
             {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）。
           </p>
         </details>
@@ -299,7 +299,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で段階が決まり、フェーズの点は子の最大値。
+            子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計で等級が決まり、フェーズの点は子の最大値。
             <code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられない。
           </p>
         </details>

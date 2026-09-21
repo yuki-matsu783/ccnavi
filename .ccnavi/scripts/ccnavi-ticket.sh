@@ -17,7 +17,7 @@
 # サブエージェントからの呼び出しも ccnavi が止める（agent_id が付いていたら拒む）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
-# 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → main の dist/ccnavi/ccnavi →
+# 探す順は、環境変数 CCNAVI_BIN_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
 # ソースツリーの `python -m ccnavi`。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
 

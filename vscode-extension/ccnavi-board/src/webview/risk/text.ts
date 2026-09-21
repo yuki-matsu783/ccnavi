@@ -26,7 +26,7 @@ export function valueLabel(kind: FactorKind): string {
   if (kind === "judge") {
     return "問い";
   }
-  return "しきい値";
+  return "閾値";
 }
 
 /** 要約の行に出す、当て方と値をつないだ文。読んで意味が通る語順にする */

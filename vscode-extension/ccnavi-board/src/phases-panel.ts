@@ -507,7 +507,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, `読み直したので、この保存は捨てた。いまの${"種類"}で編集し直す`);
+  fail(current, "読み直したので、この保存は捨てた。いまの種類で編集し直す");
   return true;
 }
 
