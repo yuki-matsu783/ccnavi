@@ -1504,7 +1504,7 @@ def screen(
     種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
     画面の側で 1 つに決めない。
     """
-    lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
+    lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
     for cand in batch:
         t = cand.ticket
         cand_types = cand.types if cand.types is not None else types

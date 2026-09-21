@@ -104,10 +104,10 @@ function Body({
   const tickets = preview.batch.map((b) => b.ticket);
   return (
     <>
-      <h2 id="approval-title">Ticket 承認リクエスト: {count} 件</h2>
+      <h2 id="approval-title">承認待ちのチケット {count} 件</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       {count === 0 ? (
-        <p className="approval-note">承認待ちのチケット無し</p>
+        <p className="approval-note">承認待ちのチケットは無い</p>
       ) : (
         <table className="approval-batch">
           <thead>
@@ -131,7 +131,7 @@ function Body({
       <pre className="approval-text">{preview.text}</pre>
       {preview.rejected.length > 0 ? (
         <>
-          <h3>承認の対象にしない</h3>
+          <h3>承認の対象にしない提案</h3>
           <ul className="approval-rejected">
             {preview.rejected.map((r) => (
               <li key={r.ticket}>
@@ -146,7 +146,7 @@ function Body({
       ) : null}
       {preview.problems.length > 0 ? (
         <>
-          <h3>読めない提案・承認済みチケット</h3>
+          <h3>読めなかった提案と承認済みチケット</h3>
           <ul className="approval-problems">
             {preview.problems.map((p, i) => (
               <li key={i}>{p}</li>

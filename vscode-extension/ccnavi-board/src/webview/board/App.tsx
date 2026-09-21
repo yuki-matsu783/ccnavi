@@ -189,7 +189,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               ))}
             </ul>
           ) : null}
-          {board.totalCount === 0 ? <p className="board-empty">チケット無し</p> : null}
+          {board.totalCount === 0 ? <p className="board-empty">チケットなし</p> : null}
           <div className="board">
             {board.columns.map((column) => (
               <Column
@@ -325,7 +325,7 @@ function Column({
         <span className="count">{visible}</span>
       </h2>
       {column.cards.length === 0 ? (
-        <p className="empty">チケット無し</p>
+        <p className="empty">チケットなし</p>
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (

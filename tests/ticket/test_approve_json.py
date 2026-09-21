@@ -89,7 +89,7 @@ class ApproveJsonTest(PhaseHarness):
         self.assertTrue(
             any("超えている" in p and "調査" in p for p in beyond["overflow"]), beyond["overflow"]
         )
-        self.assertIn("Ticket 承認リクエスト: 3 件", body["text"])
+        self.assertIn("チケットの承認リクエスト: 3 件", body["text"])
         self.assertIn("== i0001-01", body["text"])
         self.assertIn("== i0001-02", body["text"])
         self.assertIn("判定で止まるもの", body["text"])
