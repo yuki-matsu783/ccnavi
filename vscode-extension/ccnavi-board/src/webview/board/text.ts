@@ -80,3 +80,49 @@ export function mrText(number: number | null): string {
 export function isHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }
+
+/**
+ * 承認画面の本文で、見出しの次の 1 行に説明が付く見出し。実行ファイルが置く文面と同じ綴り
+ * （`ccnavi/approval.py` の `screen`）。番号が付く「課題」だけ前方一致で見る。
+ *
+ * **畳むのはこの並びに載っている見出しの次の行だけ。** 知らない見出しなら何もしない。
+ * 向こうの文面が変わったときに、本文の中身が黙って隠れるより、畳まれないほうが軽いため
+ * （「エージェントが書いた理由」の本文を隠してはいけない）。
+ */
+const EXPLAINED_HEADS = new Set([
+  "■ このチケットで編集可能な範囲",
+  "■ この子チケットで編集可能な範囲",
+  "■ チケットで編集対象としているが、書き込めない場所",
+  "■ 全体計画",
+  "■ 判定に効かない記述",
+]);
+
+const EXPLAINED_HEAD_PREFIXES = ["■ 課題: #", "■ 依存している他チケット: "];
+
+/** 承認画面の本文の 1 行と、その行に畳んだ説明 */
+export interface BodyLine {
+  readonly line: string;
+  /** 見出しに畳んだ説明。畳んでいなければ空 */
+  readonly note: string;
+}
+
+/**
+ * 本文を行に切り、説明の付く見出しには次の行を畳んで返す。端末には両方の行がそのまま出るが、
+ * 画面では説明を見出しのツールチップに寄せて、本文を短く保つ。
+ */
+export function approvalBody(text: string): BodyLine[] {
+  const lines = text.split("\n");
+  const out: BodyLine[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const next = lines[i + 1] ?? "";
+    const explained = EXPLAINED_HEADS.has(line) || EXPLAINED_HEAD_PREFIXES.some((head) => line.startsWith(head));
+    if (explained && next.startsWith("    ")) {
+      out.push({ line, note: next.trim() });
+      i += 1;
+      continue;
+    }
+    out.push({ line, note: "" });
+  }
+  return out;
+}

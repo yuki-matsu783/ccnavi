@@ -18,7 +18,7 @@ export interface ApproveBatchEntry {
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
-  /** 範囲のうち、判定で止まるもの（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
+  /** チケットで編集対象としているが、書き込めない場所（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
   readonly overflow: readonly string[];
 }
 

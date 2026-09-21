@@ -357,7 +357,7 @@ class TicketTest(unittest.TestCase):
     # ---- 2. 子は親の部分集合
 
     def test_child_beyond_parent_is_approved_with_a_warning(self):
-        """親の範囲を超える子も承認できる。超えた項は承認画面の「判定で止まるもの」に出る。
+        """親の範囲を超える子も承認できる。超えた項は承認画面の「編集対象としているが」に出る。
 
         判定は親の範囲で切り詰めるので、承認で止める理由が無い（設計 approve-carry §3.1）。
         超えた項は承認しても書けないことを、承認する人がその場で読めるようにする。
@@ -367,7 +367,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("判定で止まるもの", result.stdout)
+        self.assertIn("編集対象としているが", result.stdout)
         self.assertIn("`docs/*` は親 i0001 の範囲を超えている", result.stdout)
         self.assertNotIn("承認の対象にしない", result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
@@ -417,7 +417,7 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("--approve", "i0001", "i0001-01", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
-        self.assertNotIn("i0002", result.stdout.split("Ticket 承認リクエスト")[1])
+        self.assertNotIn("i0002", result.stdout.split("チケットの承認リクエスト")[1])
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))

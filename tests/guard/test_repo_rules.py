@@ -437,7 +437,7 @@ class RunnerTest(LauncherJudgeTest):
                 quote = "[`'\"]?"
                 line = (
                     f"{quote}{re.escape(runner)}{quote} が実行する "
-                    f"{quote}{re.escape(layer)}{quote} に当たりました"
+                    f"{quote}{re.escape(layer)}{quote} にヒットしました"
                 )
                 self.assertRegex(body["response"], line)
 

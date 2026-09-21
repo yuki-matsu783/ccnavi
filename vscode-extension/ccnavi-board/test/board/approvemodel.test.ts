@@ -30,8 +30,8 @@ test("CB-T104 承認の preview を読む（一覧・範囲の超過・本文・
   assert.deepEqual(preview.batch[1].overflow, []);
   assert.equal(preview.batch[2].overflow.length, 1);
   assert.ok(preview.batch[2].overflow[0].includes("超えている"));
-  assert.ok(preview.text.startsWith("Ticket 承認リクエスト: 3 件"));
-  assert.ok(preview.text.includes("判定で止まるもの"));
+  assert.ok(preview.text.startsWith("チケットの承認リクエスト: 3 件"));
+  assert.ok(preview.text.includes("編集対象としているが"));
   // 本文の指紋。承認するときに --digest で返す。値はワークツリーの絶対パスに依るので、
   // フィクスチャでは伏せてある。
   assert.equal(preview.digest, "<digest>");

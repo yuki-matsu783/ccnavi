@@ -491,7 +491,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
                 f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、探すものは `glob` か `regex`。"
-                "`glob` は fnmatch の glob で文字列全体に当たるので、"
+                "`glob` は fnmatch の glob で文字列全体にヒットするので、"
                 "部分一致が要るなら前後に `*` を書く",
             )
         )
@@ -575,7 +575,7 @@ def _build(
             SEVERITY_ERROR, name, "文面が無い。ルールは代わりに何をすべきかを言わなければならない"
         )
     if not rule.match:
-        return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにも当たらない")
+        return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")
     if not rule.glob and not rule.regex:
         return None, Problem(SEVERITY_ERROR, name, "glob も regex も無い")
     if rule.glob and rule.regex:
@@ -679,7 +679,7 @@ def _not_root_placement(expression: str) -> str:
         return (
             f"`{NOT_ROOT_PLACEHOLDER}` の直後に量化子（`{rest[:1]}`）は書けない。"
             "展開結果ごと省略したり繰り返したりできてしまい、"
-            "「外だけを止める」はずの式がどの対象にも当たるようになる"
+            "「外だけを止める」はずの式がどの対象にもヒットするようになる"
         )
     return ""
 

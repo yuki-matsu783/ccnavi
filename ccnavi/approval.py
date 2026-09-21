@@ -1485,8 +1485,8 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     見て承認する。
     """
     return (
-        f"■ プロジェクト: {t.project or '(ワークスペース)'}"
-        f"  ワークツリー: {t.tree or '(ワークスペースルート)'}  提案: {t.path}"
+        f"■ プロジェクト: {t.project or 'ワークスペース'}"
+        f"  ワークツリー: {t.tree or 'ワークスペースルート'}  提案: {t.path}"
     )
 
 
@@ -1498,18 +1498,18 @@ def screen(
     """承認を求める画面を組む。
 
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
-    「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
+    「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
     種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
     画面の側で 1 つに決めない。
     """
-    lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
+    lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
     for cand in batch:
         t = cand.ticket
         cand_types = cand.types if cand.types is not None else types
         if cand.is_revision and cand.current is not None:
-            lines += ["", f"== {t.ticket}: {t.title}（親の改版）"]
+            lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
             lines += _plan_diff_lines(cand.current, t, cand_types)
             for note in cand.notes:
                 lines.append(f"    {note}")
@@ -1519,27 +1519,36 @@ def screen(
             "",
             f"== {t.ticket}: {t.title}"
             + (
-                f"（親 {t.parent}、フェーズ {_phase_label(t, pool, cand_types)}）"
+                f"  親 {t.parent} / フェーズ {_phase_label(t, pool, cand_types)}"
                 if t.is_child
-                else "（親）"
+                else "  親チケット"
             ),
         ]
         if t.is_child:
             # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
-            lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
-            head = "親 " + (
+            lines.append("■ この子チケットで編集可能な範囲")
+            lines.append(
+                "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
+                "親に無い場所がここで新しく開くことはない"
+            )
+            head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
-                else "(承認済みチケットが無い)"
+                else "親がまだ承認されていない"
             )
             lines.append(f"    {head}")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
-                lines.append(f"    種類 {bound.title}: " + ", ".join(bound.scope_globs))
+                lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
-            lines.append("■ このチケットで書き込みが許される領域（これ以外はすべて止まる）")
+            lines.append("■ このチケットで編集可能な範囲")
+            lines.append(
+                "    下に並ぶ場所にだけ、このチケットで編集できるようになる。"
+                "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
+                "deny はこのチケットでも編集できない場所"
+            )
             # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
@@ -1553,32 +1562,53 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            lines.append("■ 範囲のうち、判定で止まるもの（承認しても書けない）")
+            # **「編集対象」と「書き込めない」は意図して分けてある。** 前半はチケットが宣言した側、
+            # 後半は実際の書き込みが止まる側の話で、どちらか一方の語に揃えると、宣言と実行の
+            # どちらを指しているのかが読めなくなる。ほかの見出しが「編集」で揃っているのを見て、
+            # ここも揃えたくなるが、揃えない。
+            lines.append("■ チケットで編集対象としているが、書き込めない場所")
+            lines.append(
+                "    親の範囲かフェーズの種類の上限を超えている。"
+                "承認は可能だが、編集しようとすると判定が止める"
+            )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
-            lines.append(
-                f"■ 人間レビュー: {state}" + (f"（{t.review_reason}）" if t.review_reason else "")
-            )
+            lines.append(f"■ 人間レビュー: {state}")
+            if t.review_reason:
+                lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
-                lines.append(f"■ 先行: {', '.join(t.predecessors)}")
+                lines.append(f"■ 依存している他チケット: {', '.join(t.predecessors)}")
+                lines.append(
+                    "    先に閉じておく。閉じないまま着手しても止まらないが、--lint が warn を出す"
+                )
         elif t.has_plan:
-            lines.append("■ 全体計画（この並びに合意する）")
+            lines.append("■ 全体計画")
+            lines.append(
+                "    承認すると、この並びで進めることに合意したことになる。"
+                "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
+            )
             lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
-                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or [
-                    "    （対応なし）"
-                ]
+                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
         if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: #{t.issue}（マージリクエストの本文で Closes に使う）")
+            lines.append(f"■ 課題: #{t.issue}")
+            lines.append(
+                "    この親のマージリクエストの本文に Closes として書く番号。"
+                "マージされると、この課題も閉じる"
+            )
         if t.rationale.strip():
-            lines.append("■ 理由（エージェントの記述）")
+            lines.append("■ エージェントが書いた理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
         lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
-            lines.append("■ 記述のうち、判定に効かないもの")
+            lines.append("■ 判定に効かない記述")
+            lines.append(
+                "    提案に書いてあっても、判定はこれを読まない。"
+                "承認しても、編集できる場所は変わらない"
+            )
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
 
@@ -1593,13 +1623,13 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
         if item.deferred:
             review = "レビューは次と一緒に"
         elif item.review == ticket_mod.PLAN_REVIEW_MR:
-            review = "レビュー要（計画で強めた）"
+            review = "レビュー要: 計画で強めた"
         elif pt is not None:
             review = {
-                phasetypes.REVIEW_MR: "レビュー要（マージリクエスト）",
-                phasetypes.REVIEW_CHAT: "レビュー要（このセッションで）",
+                phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
+                phasetypes.REVIEW_CHAT: "レビュー要: このセッションで",
             }.get(pt.review, "レビュー不要")
-        lines.append(f"    {n}. {title}（{item.type}）" + (f"  {review}" if review else ""))
+        lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
     return lines
 
 
@@ -1617,7 +1647,7 @@ def _plan_diff_lines(
         lines.append("■ フィードバック計画")
         start = len(revised.plan) + 1
         lines += _plan_lines(revised.feedback or [], start, types) or [
-            "    （対応なし。見たうえで対応しないという記録になる）"
+            "    対応なし。見たうえで対応しない、という記録になる"
         ]
     return lines
 

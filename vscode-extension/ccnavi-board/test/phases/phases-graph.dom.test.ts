@@ -37,7 +37,7 @@ function model(text: string) {
   return readPhases(text).model;
 }
 
-test("CB-D73 図は点と線を描く（線が 0 本なら、それは描けていないということ）", async () => {
+test("CB-D81 図は点と線を描く（線が 0 本なら、それは描けていないということ）", async () => {
   const dom = await openGraph({ model: model(LINKED) });
   try {
     assert.equal(dom.all(".react-flow__node").length, 3, "点が 3 つ出ていない");
