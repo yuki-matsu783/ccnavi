@@ -1,6 +1,6 @@
 """フェーズの種類と計画（REQ-TKT-26〜35、設計 §9.7）の受入テスト。
 
-見るのは 8 つ。
+見るのは 9 つ。
 
 1. 種類の定義の検証（識別子と表示名の一意、フィードバック対応は mr 固定、参照先の有無）
 2. 全体計画の承認と、計画に合わない子の拒否（kind、無い番号）。範囲の上限の超過は拒まず見せる
@@ -412,7 +412,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("research", text)
         self.assertIn("defer", text)
         result = self.ccnavi("--explain")
-        self.assertIn("段階: 作業中（1（調査））", result.stdout)
+        self.assertIn("局面: 作業中（1（調査））", result.stdout)
         self.assertIn("フェーズ 2（設計）: 未計画", result.stdout)
         self.assertIn("レビューは 3 と一緒に", result.stdout)
 
@@ -740,7 +740,7 @@ class PhaseTest(PhaseHarness):
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(spawn))
         result = self.ccnavi("--explain")
         self.assertIn("フェーズ 2（実装フィードバック対応）", result.stdout)
-        self.assertIn("段階: フィードバック対応中", result.stdout)
+        self.assertIn("局面: フィードバック対応中", result.stdout)
         # 2 番目の子（範囲は親の範囲そのまま）。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["src/*"]))
         self.commit_parent("propose 02")

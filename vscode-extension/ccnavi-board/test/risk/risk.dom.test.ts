@@ -43,7 +43,7 @@ test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では�
     assert.ok(dom.one(rowSelector("f2")).classList.contains("open"));
     assert.equal(dom.all(`${rowSelector("f2")} input.f-max`).length, 0);
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("f2")} input.f-value`).value, "");
-    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "（しきい値 未設定）CI に触った");
+    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "（閾値 未設定）CI に触った");
     dom.type(dom.one(`${rowSelector("f2")} input.f-value`), "10");
     await dom.settle();
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変えたファイルが 10 件を超えたら加点CI に触った");
@@ -164,13 +164,13 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
     const caps = dom.all(`${rowSelector("f1")} .row-body > .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "点", "当て方", "しきい値", "文面"],
+      ["id", "点", "当て方", "閾値", "文面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
       ["YAML のキー: id", "YAML のキー: points", "YAML のキー: lines_over / files_over / deleted_over / glob / script / judge", "YAML のキー: lines_over", "YAML のキー: message"],
     );
-    // 閾値は段階の名前を欄名にし、飾りの札は出さない
+    // 閾値は等級の名前を欄名にし、飾りの札は出さない
     assert.deepEqual(
       dom.all("#levels > .field > .cap").map((cap) => cap.textContent),
       ["MEDIUM", "HIGH", "CRITICAL"],
@@ -287,7 +287,7 @@ test("CB-D58 当て方の選択肢は 6 つで、キーの綴りと説明を並�
       Array.from(select.options).map((option) => option.value),
       ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"],
     );
-    assert.equal(select.options[0].textContent, "lines_over（差分の行数がしきい値を超えたら加点）");
+    assert.equal(select.options[0].textContent, "lines_over（差分の行数が閾値を超えたら加点）");
     assert.equal(select.value, "lines_over");
   } finally {
     await dom.close();

@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース本体。
+ * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース自身。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、人が触って決めるもの
  * （clone の欄、どのメニューを開いているか、直前の操作の一言）だけ。clone も書き込みも画面はしない。
@@ -120,7 +120,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             title="共通層のルール（どのツリーにも効く。既定 .ccnavi/common/rules.yml）を編集し、判定を試す"
             onClick={() => post({ type: "openRules", name: "" })}
           >
-            ルール管理
+            ルール設定
           </button>
           {page.ticketsEnabled && (
             <button type="button" className="action" data-action="open-board" data-name="*" onClick={() => post({ type: "openBoard", name: "*" })}>
@@ -195,7 +195,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       <Strays strays={page.strays} />
       <section className="workspace">
-        <h2>ワークスペース本体</h2>
+        <h2>ワークスペース自身</h2>
         <p className="hint">
           <span className="mono">{page.root}</span>（ワークツリー {page.workspaceWorktrees.length} 件
           {page.workspaceWorktrees.length > 0 && `: ${page.workspaceWorktrees.join(", ")}`}）
@@ -218,7 +218,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
   if (page.lintError !== "") {
     banners.push(
       <div key="lint-error" className="banner warn">
-        検証結果を取得できなかったので、プロジェクトごとの検証結果は出せない。{page.lintError}
+        検証結果を取得できなかったので、プロジェクトごとの結果は出せない。{page.lintError}
       </div>,
     );
   }
@@ -287,7 +287,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試す"
           onClick={() => post({ type: "openSelfRules" })}
         >
-          ルール管理
+          ルール設定
         </button>
       </div>
       {page.ticketsEnabled && (
@@ -319,7 +319,7 @@ function Strays({ strays }: { readonly strays: readonly Stray[] }): JSX.Element 
         プロジェクトとして認識されない git リポジトリ <span className="count">{strays.length}</span>
       </h2>
       <p className="hint">
-        ワークスペース直下から 2 階層までを探して見つかったもの（node_modules、.venv、.claude の中は探さない）。プロジェクトとして扱うには <code>projects/</code>{" "}
+        ワークスペース直下から 2 階層まで（`projects/` の中だけ 3 階層まで）を探して見つかったもの（node_modules、.venv、.claude の中は探さない）。プロジェクトとして扱うには <code>projects/</code>{" "}
         の直下へ移す。この画面からは操作できない。
       </p>
       <ul className="stray-list">

@@ -30,7 +30,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 （レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`check` / `accept` / `--reviewed --chat` /
 `wrapup`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
 `wip/proposals/` へ動かすのはエージェント。`accept` は「受け入れて進む」か「続きの子を
-`doing/` に直に起こす」かを人に選ばせる。旧の置き場（`.ccnavi/tickets/`、`wip/proposals/{doing,done,cancelled}/`）の
+`doing/` に直に起こす」かを人に選ばせる。以前の置き場（`.ccnavi/tickets/`、`wip/proposals/{doing,done,cancelled}/`）の
 残りは `--lint` が名指しする。既存のワークスペースは `.ccnavi/tickets` を `.ccnavi/approved` に
 （`closed/` は `done/` に）`git mv` すれば続きができる。
 
@@ -75,9 +75,9 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
 
 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える件）は別の issue で決める。
 
-**VS Code 拡張はルールとフェーズの種類で層に追従した。** ルール設定画面とフェーズ管理画面は `--explain --json` の `layers[]` から置き場を取り、
-プロジェクト管理画面から自身の層とプロジェクトの層を開く。
-層の種類は実行ファイルの `--project-phases-file <名前>=<パス>`（診断だけ）で共通層と合成して検証してから保存する。リスク管理画面は今も共通層の 1 本だけを開く（設計 §11.11）。
+**VS Code 拡張はルールとフェーズの種類で層に追従した。** ルール設定画面とフェーズ管理画面は `--explain --json` の `layers[]` から置き場を取る。
+自身の層とプロジェクトの層はプロジェクト管理画面から開く。
+フェーズの種類は実行ファイルの `--project-phases-file <名前>=<パス>`（診断だけ）で共通層と合成して検証してから保存する。リスク管理画面は今も共通層の 1 本だけを開く（設計 §11.11）。
 
 ```
 main.py                     配布物の入口。PyInstaller が渡すスクリプト
@@ -159,8 +159,8 @@ uv run --with pyinstaller python build.py
 
 ### 入った: sh がモード B で動くようになった（`sh-ws-root`）
 
-**配布先に入っている。** 写す作業は済んだ。`.claude/scripts/`（`ccnavi-common.sh` を
-新設）、`.claude/hooks/test-py.sh`、`.claude/ccnavi/rules.yml`、`scripts/ccnavi-setup.sh`。
+**配布先に入っている。** 写す作業は済んだ。`.ccnavi/scripts/`（`ccnavi-common.sh` を
+新設）、`.claude/hooks/test-py.sh`、`.ccnavi/common/rules.yml`、`scripts/ccnavi-setup.sh`。
 
 **次に同じ形の作業をする人へ。** これらは `deny` の対象でエージェントが書けない
 （`judge.py:246-247`「チケットはルールが何も言わなかったときだけ見る。ルールのほうが
@@ -201,15 +201,15 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
   作って失敗し、子チケットの push ガードが黙って効かなくなり、記録が
   `projects/<名前>/logs/` に出ていた
 - 根の探し方を `ccnavi-common.sh`（新設）に切り出した。`cwd` から上へ歩いて
-  `.claude/scripts/` を持つディレクトリを探す。**`.claude/worktrees/` の下は候補から
-  外す。** `.claude/scripts/` は git が運ぶのでどのワークツリーにも写しがあるが、
+  `.ccnavi/scripts/` を持つディレクトリを探す。**`.claude/worktrees/` の下は候補から
+  外す。** `.ccnavi/scripts/` は git が運ぶのでどのワークツリーにも写しがあるが、
   承認済みチケットと `state/` は追跡外で運ばれない。根は運ばれないほうに合わせる
 - `worktree add` の行き先を検査するようにした。ワークスペースの `.claude/worktrees/` の
   外なら止め、`cwd` に合わせた正しい綴りを文面に出す。知らないオプションも止める
 - `origin` の伏せ字を `ccnavi_mask_url` に集約し、生の URL を文面に入れる綴りを
-  1 つも残していない（上の (1)(2) はこれで塞がった）
+  1 つも残していない（下に挙げた資格情報の漏れ 2 件はこれで塞がった）
 - `test-py.sh` の存在チェックを `[ -d "$target/tests" ]` にした
-- `rules.yml` の拒否の文面 3 か所を `{root}/.claude/scripts/...` にした
+- `rules.yml` の拒否の文面 3 か所を `{root}/.ccnavi/scripts/...` にした
 - `ccnavi-setup.sh` の配布と点検の一覧に `ccnavi-common.sh` を足した
 
 ### 未了: 要求表と設計書への反映
@@ -351,7 +351,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 ### 未了: `ticket-rule-merge` の作業で見つかった別件
 
-- `--lint`（`lint._worktree_layers`）が、ワークツリーにある承認済みチケットと印を「統合されるまで効かない」と warn で言う。
+- `--lint`（`lint._worktree_layers`）が、ワークツリーにある承認済みチケットとマーカーを「統合されるまで効かない」と warn で言う。
   承認済みチケットは `approval.scan` が全部のツリーから読むので効いている。承認済みチケットの置き場をこの点検から外す
 - 組み直し（`build.py` の置き換え）が `PermissionError` で落ちると、`dist/ccnavi.target` が書かれない
 - ワークスペースの `.git` の commit-graph の控えの一覧が、欠けた控えを指している。`git commit-graph write --reachable --split=replace` で直る
@@ -360,7 +360,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   コマンドへ埋め込んでおり、bash は `\` をエスケープとして落とすので、そのコマンドは設定ファイルに書かない。
   ガードの判定は正しく、テストの綴りを直す（`tests.config.test_config_union_guard` の同種の 1 件は、ADR-0052 で
   既定の置き場を見るテストに差し替えたので絶対パスを使わなくなった）
-- シェルの守りは `cd` でディレクトリへ入ってからの書き込みに当たらない（issue #61）。`.claude/settings.json` と
+- シェルの守りは `cd` でディレクトリへ入ってからの書き込みに当たらない（issue #61）。この穴は `.claude/settings.json` と
   `.claude/hooks/` にも及ぶ。実行後の監視は拾うので素通りではないが、実行前の門は綴りで避けられる
 
 ## 実測で分かった落とし穴
@@ -375,7 +375,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   2026-09-11 に隔離した場所で再現させて確かめた（`fsutil hardlink list` と、掴む側 /
   消す側を分けた実験）。
   1. uv は wheel の中身をキャッシュから venv へハードリンクで置く。実体は 1 つで、
-     `_yaml.cp312-win_amd64.pyd` は main・全ワークツリー・uv のキャッシュで同じファイル
+     `_yaml.cp312-win_amd64.pyd` はワークスペースルート・全ワークツリー・uv のキャッシュで同じファイル
      （このプロジェクトで C 拡張を持つ依存は PyYAML だけなので、当たるのはこの 1 本）
   2. Windows は、実体が DLL として読み込まれている間、**どの名前も**消させない。
      rename は通る。Linux は mmap 中でも unlink できるので、ここは Windows だけの話
@@ -451,7 +451,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら Git Credential Manager に保存しておく |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tools/gitlab/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
-| 未解決の一覧で、位置の無い討論が ` :0 ` と出る | 直していない。読めるので後回し |
+| 未解決の一覧で、位置の無いスレッドが ` :0 ` と出る | 直していない。読めるので後回し |
 
 ## セッション中に自分自身へ仕掛けたもの
 

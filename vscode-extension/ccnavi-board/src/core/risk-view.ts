@@ -24,7 +24,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
-/** 段階の名前は固定。閾値だけ動かす。LOW は閾値を持たない */
+/** 等級の名前は固定。閾値だけ動かす。LOW は閾値を持たない */
 export const LEVEL_NAMES = ["medium", "high", "critical"] as const;
 export type LevelName = (typeof LEVEL_NAMES)[number];
 
@@ -46,7 +46,7 @@ export interface FactorForm {
 }
 
 export interface RiskForm {
-  /** 閾値。空ならその段階は組み込みの値（欄を書かない） */
+  /** 閾値。空ならその等級は組み込みの値（欄を書かない） */
   readonly levels: Readonly<Record<LevelName, string>>;
   readonly factors: readonly FactorForm[];
 }
@@ -60,9 +60,9 @@ export interface RiskModel {
 
 /** 当て方の説明。select の札と、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; readonly placeholder: string }>> = {
-  lines_over: { label: "差分の行数がしきい値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
-  files_over: { label: "変えたファイル数がしきい値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
-  deleted_over: { label: "消したファイル数がしきい値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
+  lines_over: { label: "差分の行数が閾値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
+  files_over: { label: "変えたファイル数が閾値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
+  deleted_over: { label: "消したファイル数が閾値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
   glob: { label: "glob にヒットしたファイルが 1 つあるごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
   script: { label: "スクリプトが出した点を加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。スクリプトが出した点を加点し、失敗や読めない出力なら points を加点）" },
   judge: { label: "サブエージェントの答えが yes だったら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },

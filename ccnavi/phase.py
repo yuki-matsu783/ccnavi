@@ -208,7 +208,7 @@ class Phase:
 
     @property
     def risk_escalates(self) -> bool:
-        """実績のリスクが、宣言に関わらずレビューを要る扱いにする段階か。"""
+        """実績のリスクが、宣言に関わらずレビューが要る扱いにする等級か。"""
         record = self.risk
         return record is not None and str(record.get("level") or "") in risk.ESCALATE_FROM
 
@@ -314,7 +314,7 @@ class Phase:
         where = declared[0]
         for covered in declared[1:]:
             where = phasetypes.stricter(where, covered)
-        # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。MR を
+        # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。マージリクエストを
         # 勧めるのは文の側の仕事で、強制はしない（ADR-0065）。
         if needed and where == phasetypes.REVIEW_NONE:
             where = phasetypes.REVIEW_CHAT
@@ -405,7 +405,7 @@ def layer_types(
     言うと、層の話を読みに来た人が同じ文を 2 度読むことになる。
 
     無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
-    組み込みへは落とさない。共通層が有るのに落とすと、共通層の種類が消える。
+    組み込みへは落とさない。共通層が在るのに落とすと、共通層の種類が消える。
     """
     common, notes = common_types(conf)
     if common is None and notes:
@@ -813,7 +813,7 @@ def chat_only(
 ) -> bool:
     """マージリクエストに出さない運び方か。フェーズが 1 つも無ければ False。
 
-    1 つでも `mr` で見るフェーズがあれば、その親には MR が在る（レビューの依頼が作る）
+    1 つでも `mr` で見るフェーズがあれば、その親にはマージリクエストが在る（レビューの依頼が作る）
     ので、締めも Draft を外す道に乗る。`venues` は数え直しを省くための持ち込み。
     """
     if venues is None:
@@ -843,7 +843,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの段階にいるか（設計 §9.7）。計画が無ければ空文字。"""
+    """親がいまどの局面にいるか（設計 §9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)

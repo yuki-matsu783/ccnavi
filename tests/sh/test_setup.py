@@ -1356,10 +1356,10 @@ class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
 
 
 class WritesTheVscodeSettings(SetupTest):
-    """VS Code へ渡す設定。README「worktreeをVSCODEで見えるようにする」と対になる。
+    """VS Code へ渡す設定。README「ワークツリーを VS Code から見えるようにする」と対になる。
 
     ccnavi は作業を .claude/worktrees/ の中でさせる。この 1 行が無いと、
-    エディタからは main の作業ツリーしか見えないまま作業が進む。
+    エディタからはワークスペースルートのブランチしか見えないまま作業が進む。
     """
 
     def test_creates_the_file_when_it_is_not_there(self):

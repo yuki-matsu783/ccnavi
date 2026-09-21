@@ -170,7 +170,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
     assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
 
     const workspace = dom.one("section.workspace");
-    assert.match(text(workspace), /自身の層のルール なし \.ccnavi\/config\/rules\.yml 共通層からコピー ルール管理/);
+    assert.match(text(workspace), /自身の層のルール なし \.ccnavi\/config\/rules\.yml 共通層からコピー ルール設定/);
     assert.equal(dom.all('button[data-action="create-self-rules"]').length, 1);
     assert.ok(dom.one('button[data-action="open-self-rules"]').hasAttribute("disabled"));
   } finally {
@@ -277,7 +277,7 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
     assert.ok(!/自身の層のフェーズの種類/.test(body));
     assert.ok(!/フェーズ管理/.test(body));
     assert.ok(!/チケット管理/.test(body));
-    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール管理だけになる
+    // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール設定だけになる
     for (const action of ["open-rules", "fetch", "pull"]) {
       assert.equal(off.all(`${cardSelector("lib")} button[data-action="${action}"][data-name="lib"]`).length, 1, action);
     }

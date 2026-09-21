@@ -57,7 +57,7 @@
     wip/proposals/review    作業が終わり、人のレビューを待つ
     .ccnavi/approved/done   閉じた（取り消しは cancelled_at を持ってここに入る）
 
-`ls` で見え、コミットに残り、閉じたつもりが起きない。
+`ls` で見え、コミットに残り、閉じたつもりの食い違いが起きない。
 """
 
 from __future__ import annotations
@@ -744,7 +744,7 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
 def scan_all(
     root: str, tickets_rel: str, projects_dir: str = ""
 ) -> tuple[list[Ticket], list[Problem]]:
-    """main と全ワークツリーの提案を、重複を畳まずに集める。
+    """ワークスペースルートと全ワークツリーの提案を、重複を畳まずに集める。
 
     ボード（`--explain --json`）が「どのツリーに写っているか」を見せるために使う。
     判定と承認は `scan` の畳んだ側を読む。

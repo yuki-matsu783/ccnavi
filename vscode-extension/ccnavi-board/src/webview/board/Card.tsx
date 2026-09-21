@@ -162,7 +162,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
 }
 
 /**
- * 親カードのフェーズ一覧。1 段階 1 行で、左の丸が段階。右の状態は要約（狭い列）と全文（広げたとき）を
+ * 親カードのフェーズ一覧。1 フェーズ 1 行で、左の丸がフェーズ。右の状態は要約（狭い列）と全文（広げたとき）を
  * 両方持ち、どちらを見せるかは CSS が幅で決める。要約は見た目だけのもの（aria-hidden）で、
  * 全文は狭いときも読み上げには渡す。狭いままマウスで読むときのために、全文は行の tooltip にも置く。
  */
@@ -183,7 +183,7 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
                 {phaseStatusBrief(p)}
               </span>
               <span className="phase-full">{full}</span>
-              {/* 依頼の投稿へのリンク。依頼のマーカーがある段階だけ（レビューが済んだ後も経緯として残す） */}
+              {/* 依頼の投稿へのリンク。依頼のマーカーがあるときだけ（レビューが済んだ後も経緯として残す） */}
               {p.mrUrl !== "" ? <MrLink url={p.mrUrl} number={p.mrNumber} title={`フェーズ ${p.label} のレビューの依頼を開く`} /> : null}
               {p.actions.map((action, i) => (
                 <ActionButton key={i} action={action} id={`${p.parent}:${p.number}`} />

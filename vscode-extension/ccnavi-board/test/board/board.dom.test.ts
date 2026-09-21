@@ -120,7 +120,7 @@ test("CB-D42 「要対応だけ」で人が動く必要の無いカードが隠�
   }
 });
 
-test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提案は開かない。MR のリンクの上でも提案は開かない", async () => {
+test("CB-D43 「レビュー済み連絡」は親とフェーズを送り、提案は開かない。マージリクエストのリンクの上でも提案は開かない", async () => {
   const base = fixture();
   const parent = {
     ...base.parents[0],
@@ -236,7 +236,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース本体（空）も候補。覚え直しても「すべて」に落ちない
+    // ワークスペース自身（空）も候補。覚え直しても「すべて」に落ちない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");
@@ -248,7 +248,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
   } finally {
     await page.close();
   }
-  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース本体」も効かせない
+  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース自身」も効かせない
   // （解除する手立てが画面に無いまま「絞り込み中」になってしまう）
   const without = await openBoard(fixture(), { state: { project: "" } });
   try {

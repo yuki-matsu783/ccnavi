@@ -18,7 +18,7 @@ import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
 const MIN_WIDTH = 220;
 
 /**
- * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース本体」（空）と各プロジェクト。
+ * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース自身ス本体」（空）と各プロジェクト。
  * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ効かせない
  * （欄が無いまま「絞り込み中」になると、人には解除する手立てが無い）
  */
@@ -113,7 +113,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     <>
       {board === undefined ? (
         <>
-          <p className="board-empty">ボードを読み直せなかった。直してから「ccnavi ボード: ボードを更新」を実行する。</p>
+          <p className="board-empty">ボードを読み直せなかった。原因を直してから「ccnavi ボード: ボードを更新」を実行する。</p>
           <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         </>
       ) : (
@@ -132,7 +132,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   プロジェクト
                   <select id="project-filter" value={project} onChange={(event) => setView((now) => ({ ...now, project: event.target.value }))}>
                     <option value="*">すべて</option>
-                    <option value="">ワークスペース本体</option>
+                    <option value="">ワークスペース自身</option>
                     {board.projects.map((p) => (
                       <option key={p} value={p}>
                         {p}

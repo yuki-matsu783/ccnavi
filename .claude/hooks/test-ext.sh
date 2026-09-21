@@ -76,7 +76,7 @@ notready=""
 while IFS= read -r root; do
 	[ -n "$root" ] || continue
 	if [ ! -f "$root/scripts/test-groups.js" ]; then
-		printf 'ccnavi: %s にテストの入口がないので回していません。\n' "$root" >&2
+		printf 'ccnavi: %s にテストの入口が無いので回していません。\n' "$root" >&2
 		continue
 	fi
 	# そのツリーのファイルだけを渡す。2 つのワークツリーを触ったターンでは、

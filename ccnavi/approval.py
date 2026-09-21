@@ -192,7 +192,7 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
 
     ここに在るのは承認済みチケットが `done` で動いてきたもの。`ccnavi_approved` を持たない
     ファイルは読まない。この置き場はエージェントが書ける側にあり、守りは組み込みの
-    deny 1 枚なので、欄を second layer として残す（ADR-0058）。
+    deny 1 枚なので、欄を 2 枚目の守りとして残す（ADR-0058）。
     """
     found: list[ticket_mod.Ticket] = []
     notes: list[str] = []
@@ -529,7 +529,7 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
 
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
-#   ready.json   Draft を外した（外してよいと確かめた）。マージに進んでよいの合図
+#   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
 #   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
 #   closed.json  親を閉じた（`ticket done <親>`）。どのフェーズをどこで見たかを残す
 #
@@ -1486,7 +1486,7 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     """
     return (
         f"■ プロジェクト: {t.project or 'ワークスペース'}"
-        f"  ワークツリー: {t.tree or 'main'}  提案: {t.path}"
+        f"  ワークツリー: {t.tree or 'ワークスペースルート'}  提案: {t.path}"
     )
 
 
@@ -1826,7 +1826,7 @@ def revision_problems(
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
     if revised.feedback != current.feedback:
         if current.feedback is not None:
-            # 残りの切り出し先は運び方で違う。MR があれば issue に切り出せるが、
+            # 残りの切り出し先は運び方で違う。マージリクエストがあれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
             elsewhere = (
                 "残りは新しい親チケットの提案として wip/proposals/todo/ に書く"
@@ -2067,8 +2067,8 @@ def blocking_problems(
     - フェーズの順序（`phase.order_problems`）。順序が狂っていても、その子の範囲を
       どの親で切り詰めるかは決まる。線を引いているのはここで、ADR-0024 ではない
       （あちらは `held_phase` が `Agent` とシェルを止める話で、この検査とは別の仕組み）。
-      止めると、レビュー待ちの間その子が一切書けなくなり、ゲートが Write を通す形とは
-      結果が離れる。`--lint` が warn で言う
+      止めると、レビュー待ちの間その子が一切書けなくなり、レビュー待ちでも Write を通す形
+      とは結果が離れる。`--lint` が warn で言う
     - 範囲の超過。判定が親と種類の上限で切り詰めるので、止める理由が無い
     """
     problems = list(project_problems(t, pool, conf))

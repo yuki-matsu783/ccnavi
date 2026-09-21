@@ -9,7 +9,7 @@
 | グループ | 主題 | 時間 |
 |---|---|---|
 | `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方など） | 約 5 秒 |
-| `guard` | 判定とルール（受入テスト、自己保護、運用のルール、フォールバック、実行後の監視、プロジェクト） | 約 60 秒 |
+| `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後の監視、プロジェクト） | 約 60 秒 |
 | `config` | 設定の層の合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
 | `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・運ぶ sh・取ってくる sh・ランチャー・clean） | 約 80 秒 |
@@ -67,7 +67,7 @@ uv run python -m unittest discover -s tests -t .         # 全件
 ## 拡張（`vscode-extension/ccnavi-board`）のグループ
 
 拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / shared）。
-**こちらは表を引かない。** 変えたファイルを渡せば、関わるグループを数えて回る（ADR-0061）。
+**こちらは表を引かない。** 変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
 
 ```sh
 cd vscode-extension/ccnavi-board

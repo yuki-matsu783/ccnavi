@@ -83,10 +83,10 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   通信      fetch  pull  (--force / --prune は不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
-                   子チケットのワークツリーからは送れない。親が合流してから親のツリーで送る)
+                   子チケットのワークツリーからは送れない。親が取り込んでから親のツリーで送る)
 
 通さないもの (代わりの手段):
-  reset clean   git stash push -u で退避する。消さない
+  reset clean   sh .ccnavi/scripts/ccnavi-git.sh stash push -u で退避する。消さない
                 ブランチをリモートに合わせるなら checkout -B <ブランチ> <リモート>/<ブランチ>
                 (外れるコミットの変更が行き先に入っていることを確かめてから)
   rebase cherry-pick revert am apply bisect  履歴を書き換えない
@@ -466,7 +466,7 @@ push)
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
 	# ツリーで親が送る。子が自分のブランチをリモートへ置くと、レビューの外に
 	# ある枝ができ、人が見た HEAD と合流した HEAD が食い違う道になる。
-	# 見分けるのは承認済みチケット（main の `.ccnavi/approved/{doing,done}/<名前>.md` と
+	# 見分けるのは承認済みチケット（ワークスペースルートの `.ccnavi/approved/{doing,done}/<名前>.md` と
 	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
 	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
@@ -492,12 +492,12 @@ push)
 			*) push_proposals="$push_root/${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}" ;;
 			esac
 			# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
-			# 合流して片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
+			# 取り込んで片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
 			for push_copy in "$push_copies/doing/$push_name.md" "$push_copies/done/$push_name.md" \
 				"$push_proposals/review/$push_name.md"; do
 				if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
 					push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
-					reject "$push_name は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を合流してから、親のワークツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
+					reject "$push_name は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を取り込んでから、親のワークツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
 				fi
 			done
 			;;
