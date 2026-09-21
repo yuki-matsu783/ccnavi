@@ -62,6 +62,7 @@ test("CB-D74 図の下の一言は、この絵が描いていないものを言�
   try {
     const note = dom.one(".graph-note").textContent ?? "";
     assert.match(note, /3 種類・2 本/);
+    assert.match(note, /実線は requires（一緒に置く）、破線は overlap（並行してよい）/);
     assert.match(note, /線に向きは無い/);
     assert.match(note, /このファイルに無い種類を指す requires \/ overlap は線にならない/);
     // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）
@@ -149,5 +150,23 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
     assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は出ない（1 件）/);
   } finally {
     await added.close();
+  }
+});
+
+test("CB-D79 同じ組が requires と overlap の両方を持つとき、2 本が重ならない", async () => {
+  // このリポジトリの設定（acceptance と implement）と雛形が、まさにこの形。
+  // どちらも直線にすると破線が実線の下に隠れ、overlap が 1 本も見えなくなる
+  const dom = await openGraph({ model: model(LINKED) });
+  try {
+    const solid = dom.one(".react-flow__edge.rel-requires path.react-flow__edge-path");
+    const dashed = dom.one(".react-flow__edge.rel-overlap path.react-flow__edge-path");
+    const a = solid.getAttribute("d") ?? "";
+    const b = dashed.getAttribute("d") ?? "";
+    assert.ok(a !== "" && b !== "", "線の経路が空");
+    assert.notEqual(a, b, "requires と overlap が同じ経路で描かれている（破線が実線の下に隠れる）");
+    // 線に札は付けない（同じ組の 2 本は札が重なって読めない）。読み方は下の一言が言う
+    assert.equal(dom.all(".react-flow__edge-text").length, 0, "線に札が付いている");
+  } finally {
+    await dom.close();
   }
 });
