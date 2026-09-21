@@ -1529,7 +1529,10 @@ def screen(
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
             lines.append("■ この子が書ける範囲")
-            lines.append("    親の範囲を絞ったもの。新しく開く場所は無い")
+            lines.append(
+                "    子は親の範囲の中だけで動く。下に並ぶのは親から絞った結果で、"
+                "親に無い場所がここで新しく開くことはない"
+            )
             head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
@@ -1541,7 +1544,11 @@ def screen(
                 lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
             lines.append("■ このチケットが書ける範囲")
-            lines.append("    ここに無い場所は全部止まる")
+            lines.append(
+                "    下に並ぶ場所だけが、このチケットで書けるようになる。"
+                "allow は無確認で書ける場所、ask は確認を挟んで書ける場所、"
+                "deny はこのチケットでも書けない場所"
+            )
             # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
@@ -1556,7 +1563,10 @@ def screen(
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
             lines.append("■ 範囲にあるのに、判定で止まる場所")
-            lines.append("    承認しても書けない")
+            lines.append(
+                "    範囲に書いてあるが、親の範囲かフェーズの種類の上限を超えている。"
+                "承認は止めないが、書こうとすると判定が止める"
+            )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
@@ -1567,14 +1577,20 @@ def screen(
                 lines.append(f"■ 先に終わっている必要がある子: {', '.join(t.predecessors)}")
         elif t.has_plan:
             lines.append("■ 全体計画")
-            lines.append("    承認すると、この並びに合意したことになる")
+            lines.append(
+                "    承認すると、この並びで進めることに合意したことになる。"
+                "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
+            )
             lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
         if not t.is_child and t.issue is not None:
             lines.append(f"■ 課題: #{t.issue}")
-            lines.append("    マージリクエストの本文で Closes に使う")
+            lines.append(
+                "    この親のマージリクエストの本文に Closes として書く番号。"
+                "マージされると、この課題も閉じる"
+            )
         if t.rationale.strip():
             lines.append("■ エージェントが書いた理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
@@ -1582,6 +1598,9 @@ def screen(
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
             lines.append("■ 書いてあるが、判定に効かない記述")
+            lines.append(
+                "    提案に書いてあっても、判定はこれを読まない。承認しても効き目は変わらない"
+            )
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
 
