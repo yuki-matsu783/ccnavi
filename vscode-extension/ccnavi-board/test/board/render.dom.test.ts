@@ -77,14 +77,14 @@ test("CB-D73 説明の付く見出しは次の行をツールチップに畳み�
     const heads = page.all(".approval-head");
     const labels = heads.map((head) => head.textContent);
     // 説明のある見出しだけが畳まれる。「エージェントが書いた理由」の下は本文なので畳まない。
-    assert.ok(labels.includes("■ このチケットで書ける範囲"), labels.join(" / "));
-    assert.ok(labels.includes("■ 範囲にあるのに、判定で止まる場所"), labels.join(" / "));
+    assert.ok(labels.includes("■ このチケットで書き込み可能な範囲"), labels.join(" / "));
+    assert.ok(labels.includes("■ 範囲に書いてあるのに、判定で止まる場所"), labels.join(" / "));
     assert.ok(!labels.includes("■ エージェントが書いた理由"), labels.join(" / "));
-    const scope = heads.find((head) => head.textContent === "■ このチケットで書ける範囲");
-    assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で書ける場所/);
+    const scope = heads.find((head) => head.textContent === "■ このチケットで書き込み可能な範囲");
+    assert.match(scope?.getAttribute("title") ?? "", /allow は無確認で書き込める場所/);
     // 畳んだ説明は目には出さないが、読み上げに渡すので DOM には残る。
     const hints = texts(page, ".approval-hint").join(" ");
-    assert.ok(hints.includes("allow は無確認で書ける場所"), hints);
+    assert.ok(hints.includes("allow は無確認で書き込める場所"), hints);
     // 本文そのものは削らない。理由の中身は見出しの下にそのまま出る。
     const body = text(page, "pre.approval-text");
     assert.ok(body.includes("■ エージェントが書いた理由"), body);

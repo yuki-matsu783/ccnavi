@@ -717,7 +717,7 @@ class Boundaries(Workspace):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_child_approval_screen_gets_no_new_note(self):
-        """子の画面の「この子チケットで書ける範囲」には注記を添えない。注記は親の画面だけ。"""
+        """子の画面の「この子チケットで書き込み可能な範囲」には注記を添えない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.ccnavi("--approve", "--preview")
@@ -744,8 +744,8 @@ class Diagnostics(Workspace):
         self.propose("i0001", allow=("src/*",))
         result = self.ccnavi("--approve", "--preview")
         self.assertEqual(result.returncode, 0, result.stderr)
-        # 見出し「このチケットで書ける範囲」の節の中に出る。
-        parent = section_of(result.stdout, "■ このチケットで書ける範囲")
+        # 見出し「このチケットで書き込み可能な範囲」の節の中に出る。
+        parent = section_of(result.stdout, "■ このチケットで書き込み可能な範囲")
         self.assertIn(APPROVAL_NOTE, parent, result.stdout)
 
     def test_explain_says_the_ticket_is_stronger_than_rule_allow(self):

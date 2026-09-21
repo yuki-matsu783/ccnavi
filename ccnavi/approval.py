@@ -1498,7 +1498,7 @@ def screen(
     """承認を求める画面を組む。
 
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
-    「子が書ける範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
+    「子が書き込み可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
     種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
@@ -1528,7 +1528,7 @@ def screen(
             # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
-            lines.append("■ この子チケットで書ける範囲")
+            lines.append("■ この子チケットで書き込み可能な範囲")
             lines.append(
                 "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
                 "親に無い場所がここで新しく開くことはない"
@@ -1536,18 +1536,18 @@ def screen(
             head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
-                else "承認済みチケットが無い"
+                else "親がまだ承認されていない"
             )
             lines.append(f"    {head}")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
                 lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
-            lines.append("■ このチケットで書ける範囲")
+            lines.append("■ このチケットで書き込み可能な範囲")
             lines.append(
                 "    下に並ぶ場所にだけ、このチケットで書き込めるようになる。"
-                "allow は無確認で書ける場所、ask は確認を挟んで書ける場所、"
-                "deny はこのチケットでも書けない場所"
+                "allow は無確認で書き込める場所、ask は確認を挟んで書き込める場所、"
+                "deny はこのチケットでも書き込めない場所"
             )
             # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
@@ -1562,9 +1562,9 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            lines.append("■ 範囲にあるのに、判定で止まる場所")
+            lines.append("■ 範囲に書いてあるのに、判定で止まる場所")
             lines.append(
-                "    範囲に書いてあるが、親の範囲かフェーズの種類の上限を超えている。"
+                "    親の範囲かフェーズの種類の上限を超えている。"
                 "承認は止めないが、書こうとすると判定が止める"
             )
             lines += [f"    {p.detail}" for p in cand.overflow]
@@ -1574,7 +1574,7 @@ def screen(
             if t.review_reason:
                 lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
-                lines.append(f"■ 先に終わっている必要がある子: {', '.join(t.predecessors)}")
+                lines.append(f"■ 先に閉じる子: {', '.join(t.predecessors)}")
         elif t.has_plan:
             lines.append("■ 全体計画")
             lines.append(
@@ -1597,9 +1597,10 @@ def screen(
         lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
-            lines.append("■ 書いてあるが、判定に効かない記述")
+            lines.append("■ 判定に効かない記述")
             lines.append(
-                "    提案に書いてあっても、判定はこれを読まない。承認しても、書ける場所は変わらない"
+                "    提案に書いてあっても、判定はこれを読まない。"
+                "承認しても、書き込める場所は変わらない"
             )
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
