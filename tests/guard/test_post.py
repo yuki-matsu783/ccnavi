@@ -41,6 +41,14 @@ RULES = {
             "glob": "*/.ccnavi/approved/*",
             "message": "approved tickets are moved by the user.",
         },
+        {
+            # 提案の置き場。`ticket done` はここへチケットを動かすので、移動の
+            # 両側が保護領域に入る。片側だけを守ると、外れ方を見たことにならない。
+            "id": "proposals",
+            "match": "Write|Edit",
+            "glob": "*/wip/proposals/*",
+            "message": "proposals are moved by the scripts.",
+        },
     ],
     # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
     # （post._restorable）。文面は書かない――ask に message を書くと lint が error。
@@ -83,25 +91,12 @@ def write(path, text):
         f.write(text)
 
 
-class PostToolUseTest(unittest.TestCase):
-    """保護領域を持つリポジトリを 1 つ作り、それを汚しながら見る。"""
+class Harness:
+    """payload を 1 回渡して、返ってきたものだけを読む。リポジトリは各 setUp が作る。
 
-    def setUp(self):
-        self.repo = tempfile.mkdtemp(prefix="ccnavi-post-")
-        self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
-
-        git(self.repo, "init", "--quiet")
-        write(os.path.join(self.repo, "protected", "keep.txt"), "committed\n")
-        write(os.path.join(self.repo, "watched", "deps.txt"), "committed\n")
-        write(os.path.join(self.repo, "src", "app.py"), "print(1)\n")
-        git(self.repo, "add", "-A")
-        git(self.repo, "commit", "--quiet", "-m", "init")
-
-        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
-        self.rules = common_path(self.repo, "rules")
-        write(self.rules, json.dumps(RULES))
-        self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "log.jsonl")
+    2 つのテストが同じ渡し方をするので、渡し方は 1 か所に持つ。分けて書くと、
+    片方だけがフラグの増減に追いつかなくなる。
+    """
 
     def run_hook(
         self,
@@ -152,6 +147,27 @@ class PostToolUseTest(unittest.TestCase):
             cwd=ROOT,
             env=environment,
         )
+
+
+class PostToolUseTest(Harness, unittest.TestCase):
+    """保護領域を持つリポジトリを 1 つ作り、それを汚しながら見る。"""
+
+    def setUp(self):
+        self.repo = tempfile.mkdtemp(prefix="ccnavi-post-")
+        self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
+
+        git(self.repo, "init", "--quiet")
+        write(os.path.join(self.repo, "protected", "keep.txt"), "committed\n")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "committed\n")
+        write(os.path.join(self.repo, "src", "app.py"), "print(1)\n")
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "--quiet", "-m", "init")
+
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
+        self.rules = common_path(self.repo, "rules")
+        write(self.rules, json.dumps(RULES))
+        self.state = os.path.join(self.repo, "state")
+        self.log = os.path.join(self.repo, "log.jsonl")
 
     def dirty(self, text="changed by a build\n"):
         write(os.path.join(self.repo, "protected", "keep.txt"), text)
@@ -670,6 +686,238 @@ class PostToolUseTest(unittest.TestCase):
         self.assertIn("protected/keep.txt", result.stderr)
         self.assertIn("watched/deps.txt", result.stderr)
         self.assertIn("restored 1", self.records()[-1]["detail"])
+
+
+TICKET = """---
+id: i0001
+title: "something"
+allow:
+  - match: Write|Edit
+    glob: "src/*"
+---
+body
+"""
+
+# 着手済みの版。`ticket start` が書いたあと、人がコミットして親のブランチに乗った姿。
+STARTED = TICKET.replace(
+    "---\nbody", 'started_at: "2026-09-21T00:00:00Z"\nbase_sha: "1111111111111111"\n---\nbody'
+)
+
+DOING = ".ccnavi/approved/doing/i0001.md"
+
+
+def ticket_repo(committed=True, text=TICKET):
+    """承認済みチケットを 1 本持つリポジトリ。`committed` が偽ならコミットを作らない。"""
+    repo = tempfile.mkdtemp(prefix="ccnavi-place-")
+    git(repo, "init", "--quiet")
+    write(os.path.join(repo, *DOING.split("/")), text)
+    write(os.path.join(repo, "src", "app.py"), "print(1)\n")
+    if committed:
+        git(repo, "add", "-A")
+        git(repo, "commit", "--quiet", "-m", "init")
+    write(common_path(repo, "rules"), json.dumps(RULES))
+    return repo
+
+
+class TicketPlaceTest(Harness, unittest.TestCase):
+    """チケットの置き場の変更を、誰が書いたかではなく何が変わったかで見分ける。
+
+    ここは ccnavi の副命令（`ticket start` / `done`、`review request` / `check` / `ready`）が
+    書く場所で、同時にプロジェクトが `deny` と宣言した場所でもある。外さないと、自分の
+    手順を自分で違反として報告し、戻す設定では自分で戻して手順が進まなくなる。外しすぎると、
+    承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる道ができる。
+    """
+
+    def setUp(self):
+        self.repo = ticket_repo()
+        self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
+        self.state = os.path.join(self.repo, "state")
+        self.log = os.path.join(self.repo, "log.jsonl")
+        # 基準を取る。以降に現れたものが、この呼び出しの結果として見られる。
+        self.run_hook(command="ls")
+
+    def use(self, repo):
+        """別のリポジトリに差し替えて、そこで基準を取り直す。"""
+        self.repo = repo
+        self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
+        self.state = os.path.join(repo, "state")
+        self.log = os.path.join(repo, "log.jsonl")
+        self.run_hook(command="ls")
+
+    def path(self, rel):
+        return os.path.join(self.repo, *rel.split("/"))
+
+    def said(self, result):
+        return f"{result.stdout}{result.stderr}"
+
+    def ran_script(self, restore="disable"):
+        return self.run_hook(
+            restore=restore, command="sh .ccnavi/scripts/ccnavi-ticket.sh start i0001"
+        )
+
+    # 外れるもの
+
+    def test_スクリプトが書く欄だけの変更は言わず戻しもしない(self):
+        started = TICKET.replace("---\nbody", 'started_at: "2026-09-22T00:00:00Z"\n---\nbody')
+        write(self.path(DOING), started)
+
+        result = self.ran_script(restore="enable")
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+        self.assertEqual(self.said(result), "")
+        with open(self.path(DOING), encoding="utf-8") as f:
+            self.assertIn("started_at", f.read(), "戻されると着手の時刻が消え、手順が進まない")
+
+    def test_マーカーの設置は言わず戻しもしない(self):
+        marker = ".ccnavi/approved/phases/i0001/1.requested"
+        write(self.path(marker), '{"mr": 1}\n')
+
+        result = self.ran_script(restore="enable")
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+        self.assertTrue(os.path.exists(self.path(marker)), "退避されるとレビューの依頼が消える")
+
+    def test_レビュー待ちへの移動は言わない(self):
+        # `ticket done`。`doing/` から消えて、同じ姿が `review/` に現れる。
+        os.remove(self.path(DOING))
+        write(
+            self.path("wip/proposals/review/i0001.md"),
+            TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody'),
+        )
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+
+    # 外れないもの
+
+    def test_範囲を広げる編集は言う(self):
+        write(self.path(DOING), TICKET.replace('glob: "src/*"', 'glob: "*"'))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertIn(DOING, result.stderr.replace(os.sep, "/"))
+
+    def test_承認済みチケットを消すだけなら言う(self):
+        # 承認済みチケットの無いワークツリーは範囲を持たない。消すことは範囲を外すこと。
+        os.remove(self.path(DOING))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_承認待ちへ逃がす移動は言う(self):
+        # 行き先が `review/` でも閉じた置き場でもない。`doing/` から出しただけ。
+        os.remove(self.path(DOING))
+        write(self.path("wip/proposals/todo/i0001.md"), TICKET)
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_承認済みチケットを新しく置いたら言う(self):
+        write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET.replace("i0001", "i0002"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_着手済みのチケットを閉じて動かしても言わない(self):
+        # `ticket done`。着手の欄はコミット済みの版と同じまま、完了の時刻だけが足される。
+        self.use(ticket_repo(text=STARTED))
+        os.remove(self.path(DOING))
+        write(
+            self.path("wip/proposals/review/i0001.md"),
+            STARTED.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody'),
+        )
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+
+    def test_基準点の書き換えは言う(self):
+        # `base_sha` はサブエージェント終了時の検査と実績リスクの基準点。書き換えられると
+        # コミット済みの範囲外の変更が検査から消えるので、姿から落としてはいけない。
+        self.use(ticket_repo(text=STARTED))
+        write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_着手の時刻の書き換えは言う(self):
+        self.use(ticket_repo(text=STARTED))
+        write(self.path(DOING), STARTED.replace("2026-09-21", "2026-09-20"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_承認待ちからレビュー待ちへの移動は言う(self):
+        # 人の承認を通っていない提案を、レビュー待ちに見せる形。移動の元は
+        # 作業中かレビュー待ちに限る。
+        write(self.path("wip/proposals/todo/i0009.md"), TICKET.replace("i0001", "i0009"))
+        git(self.repo, "add", "--", "wip/proposals/todo/i0009.md")
+        git(self.repo, "commit", "--quiet", "-m", "propose")
+        self.run_hook(command="ls")
+        os.remove(self.path("wip/proposals/todo/i0009.md"))
+        write(self.path("wip/proposals/review/i0009.md"), TICKET.replace("i0001", "i0009"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_同じ姿が2つ動くときは移動として外さない(self):
+        # 正規の移動 1 件に、同じ姿のチケットのただの削除が相乗りできてはいけない。
+        # 姿が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
+        write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
+        git(self.repo, "add", "--", ".ccnavi/approved/doing/i0002.md")
+        git(self.repo, "commit", "--quiet", "-m", "twin")
+        self.run_hook(command="ls")
+        os.remove(self.path(DOING))
+        write(
+            self.path("wip/proposals/review/i0001.md"),
+            TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody'),
+        )
+        os.remove(self.path(".ccnavi/approved/doing/i0002.md"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertIn("i0002", result.stderr)
+
+    def test_行き先に同じ姿が2つあるときも外さない(self):
+        # 正規の移動に、行き先へ直接置いた偽物が相乗りする形。
+        self.run_hook(command="ls")
+        os.remove(self.path(DOING))
+        moved = TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody')
+        write(self.path("wip/proposals/review/i0001.md"), moved)
+        write(self.path("wip/proposals/review/i0001-copy.md"), moved)
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_コミット済みの版を読めなければ言う(self):
+        # HEAD が無いリポジトリ。突き合わせる相手が読めないので、外す側には倒さない。
+        # 読めていれば外れるはずのマーカーで見る。外れたら、突き合わせを飛ばしたということ。
+        self.use(ticket_repo(committed=False))
+        write(self.path(".ccnavi/approved/phases/i0001/1.requested"), '{"mr": 1}\n')
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
 
 
 if __name__ == "__main__":
