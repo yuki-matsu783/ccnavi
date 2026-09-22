@@ -499,7 +499,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    problems.extend(_proposal_problems(proposals, index, closed, done, repo_of))
+    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -596,6 +596,7 @@ def _said(ticket: str, problem) -> Problem:
 
 def _proposal_problems(
     proposals: list,
+    copies: list,
     index: dict,
     closed: list,
     done: set[str],
@@ -635,12 +636,20 @@ def _proposal_problems(
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
-    for t in index.values():
+    # 写りそのものも識別子ごとに持つ。どれが本物か決まるかの判断は `ticket.collisions` が
+    # 決め、ボードの `scattered` と状態の操作が止まる条件に揃える（同じ答えを 2 か所で
+    # 出さない）。数えるのは `index`（識別子ごとに 1 つ）ではなく全部。同じ識別子が 2 つ
+    # 残っているのがまさに言いたい形なので、引き当ての表で数えると自分で畳んでしまう。
+    held: dict[str, list] = {}
+    for t in copies:
         seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DOING))
+        held.setdefault(t.ticket, []).append(t)
     for t in closed:
         seen.setdefault(t.ticket, []).append(place(t, t.state or ticket_mod.DONE))
+        held.setdefault(t.ticket, []).append(t)
     for t in proposals:
         seen.setdefault(t.ticket, []).append(place(t, t.state))
+        held.setdefault(t.ticket, []).append(t)
         if t.state != ticket_mod.TODO:
             continue
         if t.ticket in index:
@@ -709,20 +718,19 @@ def _proposal_problems(
                 )
             )
             continue
-        for at in sorted({where for _, where, _ in places}):
-            states = [state for _, where, state in places if where == at]
-            distinct = sorted(set(states))
-            # `todo/` に在るのは親の改版の途中なので、承認済みチケットと並んでいてよい。
-            if len(distinct) > 1 and ticket_mod.TODO not in distinct:
-                found = distinct
-            elif len(states) > 1 and len(distinct) < len(states):
-                found = states
-            else:
-                continue
-            where = ", ".join(f"{at}:{state}" for state in found)
-            problems.append(
-                Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
-            )
+        # 権威のツリーで畳んで 2 つ以上残る形（状態の操作が止まる）と、その中で 2 つの
+        # 置き場に在る形（動かす途中で止まった跡）。`todo/` に在るのは親の改版の途中なので
+        # 咎めない。ツリーをまたいだ写りは畳めば 1 つに決まるので、ここには出てこない。
+        caught = ticket_mod.collisions(held[ticket_id])
+        if not caught:
+            continue
+        where = ", ".join(
+            f"{t.tree or '(ワークスペースルート)'}:{t.state}"
+            for t in sorted(caught, key=lambda t: (t.tree, t.state))
+        )
+        problems.append(
+            Problem(SEVERITY_ERROR, "(ticket)", f"{ticket_id} が複数の場所にある: {where}")
+        )
     return problems
 
 
