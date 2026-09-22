@@ -698,14 +698,19 @@ allow:
 body
 """
 
+# 着手済みの版。`ticket start` が書いたあと、人がコミットして親のブランチに乗った姿。
+STARTED = TICKET.replace(
+    "---\nbody", 'started_at: "2026-09-21T00:00:00Z"\nbase_sha: "1111111111111111"\n---\nbody'
+)
+
 DOING = ".ccnavi/approved/doing/i0001.md"
 
 
-def ticket_repo(committed=True):
+def ticket_repo(committed=True, text=TICKET):
     """承認済みチケットを 1 本持つリポジトリ。`committed` が偽ならコミットを作らない。"""
     repo = tempfile.mkdtemp(prefix="ccnavi-place-")
     git(repo, "init", "--quiet")
-    write(os.path.join(repo, *DOING.split("/")), TICKET)
+    write(os.path.join(repo, *DOING.split("/")), text)
     write(os.path.join(repo, "src", "app.py"), "print(1)\n")
     if committed:
         git(repo, "add", "-A")
@@ -729,6 +734,14 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
         # 基準を取る。以降に現れたものが、この呼び出しの結果として見られる。
+        self.run_hook(command="ls")
+
+    def use(self, repo):
+        """別のリポジトリに差し替えて、そこで基準を取り直す。"""
+        self.repo = repo
+        self.addCleanup(shutil.rmtree, repo, ignore_errors=True)
+        self.state = os.path.join(repo, "state")
+        self.log = os.path.join(repo, "log.jsonl")
         self.run_hook(command="ls")
 
     def path(self, rel):
@@ -814,14 +827,91 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
 
+    def test_着手済みのチケットを閉じて動かしても言わない(self):
+        # `ticket done`。着手の欄はコミット済みの版と同じまま、完了の時刻だけが足される。
+        self.use(ticket_repo(text=STARTED))
+        os.remove(self.path(DOING))
+        write(
+            self.path("wip/proposals/review/i0001.md"),
+            STARTED.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody'),
+        )
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 0, self.said(result))
+
+    def test_基準点の書き換えは言う(self):
+        # `base_sha` はサブエージェント終了時の検査と実績リスクの基準点。書き換えられると
+        # コミット済みの範囲外の変更が検査から消えるので、姿から落としてはいけない。
+        self.use(ticket_repo(text=STARTED))
+        write(self.path(DOING), STARTED.replace("1111111111111111", "2222222222222222"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_着手の時刻の書き換えは言う(self):
+        self.use(ticket_repo(text=STARTED))
+        write(self.path(DOING), STARTED.replace("2026-09-21", "2026-09-20"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_承認待ちからレビュー待ちへの移動は言う(self):
+        # 人の承認を通っていない提案を、レビュー待ちに見せる形。移動の元は
+        # 作業中かレビュー待ちに限る。
+        write(self.path("wip/proposals/todo/i0009.md"), TICKET.replace("i0001", "i0009"))
+        git(self.repo, "add", "--", "wip/proposals/todo/i0009.md")
+        git(self.repo, "commit", "--quiet", "-m", "propose")
+        self.run_hook(command="ls")
+        os.remove(self.path("wip/proposals/todo/i0009.md"))
+        write(self.path("wip/proposals/review/i0009.md"), TICKET.replace("i0001", "i0009"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
+    def test_同じ姿が2つ動くときは移動として外さない(self):
+        # 正規の移動 1 件に、同じ姿のチケットのただの削除が相乗りできてはいけない。
+        # 姿が同じなら識別子も同じなので、揃うのは普通の手順では起きない。
+        write(self.path(".ccnavi/approved/doing/i0002.md"), TICKET)
+        git(self.repo, "add", "--", ".ccnavi/approved/doing/i0002.md")
+        git(self.repo, "commit", "--quiet", "-m", "twin")
+        self.run_hook(command="ls")
+        os.remove(self.path(DOING))
+        write(
+            self.path("wip/proposals/review/i0001.md"),
+            TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody'),
+        )
+        os.remove(self.path(".ccnavi/approved/doing/i0002.md"))
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertIn("i0002", result.stderr)
+
+    def test_行き先に同じ姿が2つあるときも外さない(self):
+        # 正規の移動に、行き先へ直接置いた偽物が相乗りする形。
+        self.run_hook(command="ls")
+        os.remove(self.path(DOING))
+        moved = TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody')
+        write(self.path("wip/proposals/review/i0001.md"), moved)
+        write(self.path("wip/proposals/review/i0001-copy.md"), moved)
+
+        result = self.ran_script()
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("POST_VIOLATION", result.stderr)
+
     def test_コミット済みの版を読めなければ言う(self):
         # HEAD が無いリポジトリ。突き合わせる相手が読めないので、外す側には倒さない。
         # 読めていれば外れるはずのマーカーで見る。外れたら、突き合わせを飛ばしたということ。
-        self.repo = ticket_repo(committed=False)
-        self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
-        self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "log.jsonl")
-        self.run_hook(command="ls")
+        self.use(ticket_repo(committed=False))
         write(self.path(".ccnavi/approved/phases/i0001/1.requested"), '{"mr": 1}\n')
 
         result = self.ran_script()

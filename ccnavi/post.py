@@ -679,41 +679,56 @@ def _script_writes(
         return set()
 
     out: set[str] = set()
-    gone: dict[str, list[gitstate.Change]] = {}
-    arrived: dict[str, list[gitstate.Change]] = {}
+    # 消えた側と現れた側。組になったときだけ外す（`done` と `cancel` の移動）。
+    gone: list[tuple[gitstate.Change, str, tuple[str, ...]]] = []
+    arrived: list[tuple[gitstate.Change, str]] = []
     for change, rel in here:
-        before, readable = _shape_before(top, change.path)
+        before, readable = gitstate.committed_text(top, change.path)
         if not readable:
+            # 読めないものは外さない。読めないことは「変わっていない」ではない。
             continue
-        now = _shape_now(change.full)
-        if before == now:
-            # 同じ姿。どちらも範囲を宣言していない（マーカー）か、
-            # スクリプトが書く欄だけが変わったか。
+        now = fsio.read_text(change.full, errors="replace")
+        # 落としてよいのは、コミット済みの版がまだ持っていない欄だけ。副命令はどれも
+        # 1 度しか書かないので、既に値がある欄が変わったのなら副命令の仕業ではない
+        # （`ticket.script_fields_set`）。
+        drop = _droppable(before)
+        if _shape(before, drop) == _shape(now, drop):
+            # 同じ姿。どちらも範囲を宣言していない（マーカー・記録）か、
+            # まだ無かったスクリプトの欄が足されただけか。
             out.add(change.full)
-        elif now is None:
-            gone.setdefault(before or "", []).append(change)
-        elif before is None and ticket_mod.lands_in_finished_state(rel, tickets_rel, approved_rel):
-            arrived.setdefault(now, []).append(change)
-    for shape, left in gone.items():
-        landed = arrived.get(shape)
-        if shape and landed:
-            out.update(c.full for c in left)
-            out.update(c.full for c in landed)
+        elif now is None or _shape(now, drop) is None:
+            if before is not None and ticket_mod.leaves_open_state(rel, tickets_rel, approved_rel):
+                gone.append((change, before, drop))
+        elif _shape(before, drop) is None and ticket_mod.lands_in_finished_state(
+            rel, tickets_rel, approved_rel
+        ):
+            arrived.append((change, now))
+    for change, before, drop in gone:
+        # 行き先の姿は、消えた側の落とす欄で見る。`done` が足す `completed_at` は
+        # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
+        shape = _shape(before, drop)
+        landed = [c for c, now in arrived if _shape(now, drop) == shape]
+        leaving = [c for c, other, _ in gone if _shape(other, drop) == shape]
+        # **組は 1 対 1 のときだけ外す。** どちらかの側に同じ姿が 2 つ以上あると、
+        # どれがどれの行き先なのかを内容からは決められない。正規の移動 1 件に、
+        # 同じ姿のチケットのただの削除や、行き先に直接置いた偽物が相乗りする。
+        # 同じ姿ということは識別子まで同じということなので、揃うのは普通の手順では
+        # 起きない。曖昧なら全部報告する側に倒す。
+        if len(landed) == 1 and len(leaving) == 1:
+            out.add(change.full)
+            out.add(landed[0].full)
     return out
 
 
-def _shape_before(top: str, path: str) -> tuple[str | None, bool]:
-    """コミット済みの版の姿と、読めたかどうか。HEAD に無ければ `(None, True)`。"""
-    text, readable = gitstate.committed_text(top, path)
-    if not readable:
-        return None, False
-    return (ticket_mod.script_shape(text) if text is not None else None), True
+def _droppable(before: str | None) -> tuple[str, ...]:
+    """姿から落としてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。"""
+    held = ticket_mod.script_fields_set(before) if before is not None else ()
+    return tuple(f for f in ticket_mod.SCRIPT_FIELDS if f not in held)
 
 
-def _shape_now(full: str) -> str | None:
-    """作業ツリーの側の姿。消えている・読めない・チケットでないなら None。"""
-    text = fsio.read_text(full, errors="replace")
-    return ticket_mod.script_shape(text) if text is not None else None
+def _shape(text: str | None, drop: tuple[str, ...]) -> str | None:
+    """その版の姿。無い・読めない・チケットでないなら None。"""
+    return ticket_mod.script_shape(text, drop) if text is not None else None
 
 
 def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
