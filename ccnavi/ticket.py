@@ -101,8 +101,6 @@ CLOSED = (DONE, CANCELLED)
 FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (REVIEW,)
-# 旧の置き場の状態（ADR-0054 まで）。`--lint` が残りを名指しするときにだけ使う。
-LEGACY_STATES = ("todo", "doing", "done", "cancelled")
 
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")

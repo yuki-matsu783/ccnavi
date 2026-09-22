@@ -54,8 +54,6 @@ from . import ticket as ticket_mod
 DOING_DIR = ticket_mod.DOING
 DONE_DIR = ticket_mod.DONE
 PHASES_DIR = "phases"
-# 旧の置き場（ADR-0055 まで）。開いたものは直下、閉じたものはここ。`--lint` だけが見る。
-LEGACY_CLOSED_DIR = "closed"
 
 # フェーズのマーカーの種類。
 MARK_REQUESTED = "requested"
