@@ -105,6 +105,7 @@ def check(
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
+    places: tuple[str, str] = ("", ""),
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -118,6 +119,9 @@ def check(
 
     watched は見るツリー。ワークスペースルートと、この呼び出しが触ったツリー
     （設計 §11.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
+
+    places はチケットの置き場（提案と承認済みチケット）。そこに現れた変更のうち、
+    ccnavi の副命令が書いたと内容から読めるものを外す（`_script_writes`）。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
@@ -141,8 +145,8 @@ def check(
 
     found = [
         f
-        for w, _, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
+        for w, top, changes in read
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
     ]
     if not found:
         # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
@@ -355,8 +359,8 @@ def at_stop(
 
     found = [
         f
-        for w, _, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
+        for w, top, changes in read
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
         if f.key() not in baseline
     ]
     # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
@@ -586,11 +590,18 @@ def _findings(
     source: str,
     scope: ScopeGuard | None,
     where: tree.Tree | None = None,
+    top: str = "",
+    places: tuple[str, str] = ("", ""),
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
     ccnavi 自身が書く場所は先に落とす。落とさないと、記録を 1 行足すたびに
     自分がその記録を違反として報告し、その報告がまた記録を 1 行増やす。
+
+    チケットの置き場に現れた変更も、ccnavi の副命令が書いたと内容から読めるぶんだけ
+    落とす（`_script_writes`）。落とさないと、`ticket start` が着手の時刻を書くたび、
+    `review request` がマーカーを置くたびに、ccnavi 自身の書き込みが
+    「エージェントによる書き換え」として報告され、戻す設定では戻されて手順が進まない。
 
     ルールの deny と ask に当たった変更は、範囲の外でもルールの側で報告する。
     範囲を広げても済まない場所だから。ここで範囲の側の文面を返すと、
@@ -602,22 +613,107 @@ def _findings(
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
     name = where.name if where is not None else ""
-    top = where.root if where is not None else ""
+    tree_root = where.root if where is not None else ""
+    script = _script_writes(changes, places, top, where)
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
             continue
+        if change.full in script:
+            continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
-            found.append(Finding(change, group, source, CODE_VIOLATION, name, top))
+            found.append(Finding(change, group, source, CODE_VIOLATION, name, tree_root))
             continue
         if scope is None:
             continue
         hit = scope.finding(change.full)
         if hit is not None:
             rule, place = hit
-            found.append(Finding(change, [rule], place, CODE_TICKET_SCOPE, name, top))
+            found.append(Finding(change, [rule], place, CODE_TICKET_SCOPE, name, tree_root))
     return found
+
+
+def _script_writes(
+    changes: list[gitstate.Change],
+    places: tuple[str, str],
+    top: str,
+    where: tree.Tree | None,
+) -> set[str]:
+    """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
+
+    `ticket start` / `done` / `cancel` と `review request` / `check` / `ready` は、
+    承認済みチケットとマーカーを書く。書いた先は `deny` と宣言された場所なので、外さないと
+    自分の手順を自分で違反として報告し、戻す設定では自分で戻す。
+
+    **誰が書いたかは記録せず、何が変わったかで答える。** 台帳はワークスペース側にあって
+    git に入らないので、承認とマーカーが親のブランチに乗って届いた先（別の機械の clone）では
+    1 件も残っていない。台帳で見ると、その機械でだけ報告が出る。内容で見れば同じ答えになる。
+
+    外すのは 3 つ。
+
+    * どちらの版も範囲を宣言していないもの（マーカー、`.risk.json`、閉じの記録）
+    * スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
+    * `done` と `cancel` の移動。同じ姿のチケットが `doing/` から消えて、レビュー待ちか
+      閉じた置き場に現れた組。片側だけなら外さない
+
+    外さないもの——範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済み
+    チケット、消えただけのチケット——は今までどおり報告する。承認済みチケットの
+    frontmatter はそのワークツリーの作業範囲そのもので、ここが黙ると、引数に現れない
+    書き込み（シェル、ビルド、スクリプトが内部で開くファイル）で自分の範囲を広げる道ができる。
+
+    読めなかったものは外さない。git を起こせない、期限に達した、ファイルを読めない——
+    どれも「変わっていない」ではない。倒す向きを間違えると、git を数秒止めるだけで
+    除外が通る。
+    """
+    tickets_rel, approved_rel = places
+    if where is None or not top or not (tickets_rel or approved_rel):
+        return set()
+    here = [
+        (change, rel)
+        for change in changes
+        for rel in [tree.relative(where, change.full)]
+        if ticket_mod.is_ticket_place(rel, tickets_rel, approved_rel)
+    ]
+    if not here:
+        return set()
+
+    out: set[str] = set()
+    gone: dict[str, list[gitstate.Change]] = {}
+    arrived: dict[str, list[gitstate.Change]] = {}
+    for change, rel in here:
+        before, readable = _shape_before(top, change.path)
+        if not readable:
+            continue
+        now = _shape_now(change.full)
+        if before == now:
+            # 同じ姿。どちらも範囲を宣言していない（マーカー）か、
+            # スクリプトが書く欄だけが変わったか。
+            out.add(change.full)
+        elif now is None:
+            gone.setdefault(before or "", []).append(change)
+        elif before is None and ticket_mod.lands_in_finished_state(rel, tickets_rel, approved_rel):
+            arrived.setdefault(now, []).append(change)
+    for shape, left in gone.items():
+        landed = arrived.get(shape)
+        if shape and landed:
+            out.update(c.full for c in left)
+            out.update(c.full for c in landed)
+    return out
+
+
+def _shape_before(top: str, path: str) -> tuple[str | None, bool]:
+    """コミット済みの版の姿と、読めたかどうか。HEAD に無ければ `(None, True)`。"""
+    text, readable = gitstate.committed_text(top, path)
+    if not readable:
+        return None, False
+    return (ticket_mod.script_shape(text) if text is not None else None), True
+
+
+def _shape_now(full: str) -> str | None:
+    """作業ツリーの側の姿。消えている・読めない・チケットでないなら None。"""
+    text = fsio.read_text(full, errors="replace")
+    return ticket_mod.script_shape(text) if text is not None else None
 
 
 def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
@@ -831,6 +927,7 @@ def at_prompt(
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
+    places: tuple[str, str] = ("", ""),
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
 
@@ -853,8 +950,8 @@ def at_prompt(
 
     found = [
         f
-        for w, _, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
+        for w, top, changes in read
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
     ]
     # ツリーごとの HEAD も控える。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。

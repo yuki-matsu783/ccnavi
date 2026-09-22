@@ -112,6 +112,7 @@
 | [0021](0021-selfguard.md) | コアファイルはルールの外で守る |
 | [0071](0071-restore-only-what-deny-declares.md) | 報告するのは deny と ask と範囲外、戻すのは deny だけ |
 | [0072](0072-turn-report-sees-commits.md) | コミットに入った変更を見るのは、ターンの終わりの報告だけ |
+| [0073](0073-post-monitor-tells-its-own-writes-by-shape.md) | 実行後の監視は、自分の副命令の書き込みを姿で見分ける |
 
 ### チケット制御
 

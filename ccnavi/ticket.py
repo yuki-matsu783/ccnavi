@@ -664,13 +664,33 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     同じく、どの機械でも区別しない。
 
     呼ぶのは `is_unscoped` 1 本で、判定の側はそちらを通す。
+
+    **実行後の監視から呼ぶときは、後ろに組み込みは控えていない。** 組み込みを足すのは
+    `judge` だけで、実行後のルール集合には入らない。あちらは外したぶんを内容で見る
+    （`script_shape`、`post._script_writes`）。
     """
-    here = _fold(rel.replace("\\", "/"))
-    for place in (tickets_rel, approved_rel):
-        base = _fold(place.replace("\\", "/").strip("/"))
-        if base and here.startswith(base + "/"):
-            return True
-    return False
+    return any(_under(rel, place) for place in (tickets_rel, approved_rel))
+
+
+def _under(rel: str, place_rel: str) -> bool:
+    """ツリーのルートからの相対パスが、その置き場の下にあるか。
+
+    前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
+    同じく、どの機械でも区別しない。
+    """
+    base = _fold(place_rel.replace("\\", "/").strip("/"))
+    return bool(base) and _fold(rel.replace("\\", "/")).startswith(base + "/")
+
+
+def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
+    """`done` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
+
+    実行後の監視が、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
+    行き先をこの 2 つに絞るのは、`doing/` から出したチケットを `todo/` に置き直す形が
+    「承認済みチケットを消す」のと同じ効き目を持つから。承認済みチケットが 1 本も無い
+    ワークツリーは範囲を持たず、範囲を持たないツリーはチケットの側から何も言われない。
+    """
+    return _under(rel, f"{tickets_rel}/{REVIEW}") or _under(rel, f"{approved_rel}/{DONE}")
 
 
 # 下書きと使い捨ての置き場。ツリーのルートの直下 1 段で、名前は固定。設定で動かさない。
@@ -1001,6 +1021,44 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
         lines.insert(end, f"{key}: {_yaml_scalar(value)}")
         end += 1
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def script_shape(text: str) -> str | None:
+    """frontmatter を持つチケットなら、スクリプトが書く欄を落とした姿を返す。無ければ None。
+
+    実行後の監視が「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
+    答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
+    ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
+    clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。
+
+    落とすのは `SCRIPT_FIELDS` の行と、その欄の値として続く字下げの行だけ。範囲
+    （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
+    そこが 1 文字でも変われば別の姿になり、監視は今までどおり報告する。
+
+    切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
+    落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。
+
+    frontmatter を持たないもの（マーカー、`.risk.json`、閉じの記録）は None。範囲を
+    宣言しないので、正規の設置と偽の設置を内容からは見分けられない。**そこは外れる。**
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FENCE:
+        return None
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == FENCE), None)
+    if end is None:
+        return None
+    kept, dropping = [], False
+    for i, line in enumerate(lines):
+        if not 1 <= i < end:
+            kept.append(line)
+            continue
+        indented = line.startswith((" ", "\t"))
+        if dropping and indented:
+            continue
+        dropping = not indented and line.split(":", 1)[0].strip() in SCRIPT_FIELDS
+        if not dropping:
+            kept.append(line)
+    return "\n".join(kept)
 
 
 def insert_front(text: str, key: str, value) -> str:

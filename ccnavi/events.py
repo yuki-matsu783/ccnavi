@@ -164,7 +164,16 @@ def decide_at_prompt(
     モデルは後工程に入れない。
     """
     watched, scope = watch_context(stderr, conf, root, record)
-    post.at_prompt(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
+    post.at_prompt(
+        stderr,
+        conf.state,
+        (conf.state, conf.log),
+        watched,
+        scope,
+        payload,
+        record,
+        (conf.tickets, conf.approved),
+    )
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
@@ -310,6 +319,11 @@ def decide_after(
         scope=scope,
         payload=payload,
         record=record,
+        # チケットの置き場。そこに現れた変更のうち、ccnavi の副命令が書いたと内容から
+        # 読めるものを外す。チケット制御を切ったワークスペースでも渡すのは、
+        # `_committed_findings` が置き場を外すのと同じ理由。判定の有無で、外れたり
+        # 外れなかったりさせない。
+        places=(conf.tickets, conf.approved),
     )
     # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
