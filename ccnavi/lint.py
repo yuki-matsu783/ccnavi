@@ -190,8 +190,8 @@ def report(
     # `problems` に入らないと `--json` を読む側（CI と VS Code の拡張）からは
     # 「揃っている」と見える。切ってあること自体は設定として正しく、それでも言う
     # 理由は上の 2 つと同じ（外から見て、守られている状態と区別が付かない）。
-    problems.extend(_gate(guard_core_files, settings.GUARD_CORE_FILES_ENV, _CORE_FILES_VOICE))
-    problems.extend(_gate(restore_if_deny, settings.RESTORE_IF_DENY_ENV, _RESTORE_VOICE))
+    problems.extend(_gate(settings.GUARD_CORE_FILES_ENV, guard_core_files, mode, _CORE_FILES_VOICE))
+    problems.extend(_gate(settings.RESTORE_IF_DENY_ENV, restore_if_deny, mode, _RESTORE_VOICE))
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
@@ -219,8 +219,8 @@ def report(
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
-    stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
-    stdout.write(f"  コアファイルを守る: {guard_core_files}\n")
+    stdout.write(f"  deny の場所を戻す: {_shown(restore_if_deny, mode)}\n")
+    stdout.write(f"  コアファイルを守る: {_shown(guard_core_files, mode)}\n")
     stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
     if conf.tickets_enabled:
@@ -259,10 +259,39 @@ _RESTORE_VOICE = {
 }
 
 
-def _gate(value: str, name: str, voices: dict[str, str]) -> list[Problem]:
-    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。"""
-    said = voices.get(value)
-    return [Problem(SEVERITY_WARN, "(restore)", f"{name}={value}。{said}")] if said else []
+def _shown(declared: str, mode: str) -> str:
+    """人向けの本文に出す値。モードに畳まれて変わるなら、そのことも書く。
+
+    書かれた値だけを出すと、`CCNAVI_MODE=dry-run` のもとで `enable` と出る。
+    読んだ人は守られていると思い、実行時は戻らない。
+    """
+    effective = modes.effective_setting(mode, declared)
+    if effective == declared:
+        return declared
+    return f"{declared}（{settings.MODE_ENV}={mode} なので実際は {effective}）"
+
+
+def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[Problem]:
+    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。
+
+    見るのは `CCNAVI_MODE` を掛けたあとの値（`modes.effective_setting`）。書かれた値だけを
+    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
+    なる。実行時はモードに畳まれて戻さないので、それはこの面がいちばん言うべき
+    「切れているのに揃って見える」そのものになる。
+
+    倒れた先が書かれた値と違うときは、そのことも言う。言わないと、直す先が
+    その門なのか `CCNAVI_MODE` なのかが読めない。
+    """
+    effective = modes.effective_setting(mode, declared)
+    said = voices.get(effective)
+    if not said:
+        return []
+    how = (
+        f"{name}={declared}"
+        if effective == declared
+        else f"{name}={declared} だが {settings.MODE_ENV}={mode} なので実際は {effective}"
+    )
+    return [Problem(SEVERITY_WARN, "(restore)", f"{how}。{said}")]
 
 
 def check(

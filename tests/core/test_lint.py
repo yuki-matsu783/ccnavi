@@ -622,8 +622,13 @@ class LintTest(unittest.TestCase):
         result = lint(self.root, rules_file(self.root, SOUND), mode="dry-run")
 
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(counts(result.stdout), (0, 1))
-        self.assertIn("warn:", result.stdout)
+        errors, warns = counts(result.stdout)
+        self.assertEqual(errors, 0)
+        self.assertIn("dry-run なので判定しても呼び出しに手を出さない", result.stdout)
+        # 戻す働きの 2 つは、書かれた値が enable でもモードに畳まれて dry-run になる。
+        # 実効値で見るので、そのぶんも言う（門の名前と、畳まれたことの両方）。
+        self.assertEqual(warns, 3, result.stdout)
+        self.assertIn("CCNAVI_MODE=dry-run なので実際は dry-run", result.stdout)
 
     def test_モードとして読めない値はwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="blocking")
