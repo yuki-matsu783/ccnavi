@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 from typing import TextIO
 
 from . import approval, fsio, gitcmd, phase, risk, settings, tree
@@ -604,12 +603,3 @@ def _move(
 def _head(worktree: str) -> str:
     rc, out = gitcmd.output(worktree, ["rev-parse", "HEAD"], TIMEOUT_SECONDS)
     return out.strip() if rc == 0 else ""
-
-
-def worktree_exists(root: str, ticket_id: str) -> bool:
-    return tree.is_worktree_of(root, tree.worktree_path(root, ticket_id))
-
-
-def remove_tree(path: str) -> None:
-    """テストの片付け用。判定の経路では使わない。"""
-    shutil.rmtree(path, ignore_errors=True)

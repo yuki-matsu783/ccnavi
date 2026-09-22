@@ -110,6 +110,8 @@
 | [0019](0019-restore-three-values.md) | 戻す働きは 3 値にし、新しく現れたファイルは消さず退避する |
 | [0020](0020-preexisting.md) | 前から在った変更は差し戻さない |
 | [0021](0021-selfguard.md) | コアファイルはルールの外で守る |
+| [0071](0071-restore-only-what-deny-declares.md) | 報告するのは deny と ask と範囲外、戻すのは deny だけ |
+| [0072](0072-turn-report-sees-commits.md) | コミットに入った変更を見るのは、ターンの終わりの報告だけ |
 
 ### チケット制御
 

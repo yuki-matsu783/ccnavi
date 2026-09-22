@@ -161,13 +161,21 @@ class TicketTest(unittest.TestCase):
         )
 
     def hook(
-        self, event, tool, cwd, mode="enable", agent_id="", guard_ticket_approval="", **tool_input
+        self,
+        event,
+        tool,
+        cwd,
+        mode="enable",
+        agent_id="",
+        guard_ticket_approval="",
+        session="s1",
+        **tool_input,
     ):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
             "cwd": cwd,
-            "session_id": "s1",
+            "session_id": session,
             "tool_input": tool_input,
         }
         if agent_id:
@@ -1447,6 +1455,42 @@ class TicketTest(unittest.TestCase):
         # 親の cwd からは、開いている子の全部を見る。
         from_parent = self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-2")
         self.assertEqual(from_parent.returncode, 2)
+
+    def test_subagent_stop_bounces_each_worktree_when_no_agent_id_is_given(self):
+        """`agent_id` が来ない payload でも、別の子で作業する相手を巻き込まない。
+
+        以前は印の綴りが `unknown` 1 つで、最初の 1 体が差し戻されたあと、
+        同じ置き場を見るサブエージェントが誰も差し戻されなくなった。しかも
+        `agent_id` を持たない印は `ignored_bounce` が消せないので、消えなかった。
+        """
+        self.family()
+        first_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        second_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-02")
+        write(os.path.join(first_tree, "src", "b", "stray.py"), "x\n")
+        write(os.path.join(second_tree, "docs", "stray.md"), "x\n")
+
+        first = self.hook("SubagentStop", "", first_tree)
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        second = self.hook("SubagentStop", "", second_tree)
+
+        self.assertEqual(second.returncode, 2, "別の子の相手まで通さない")
+        self.assertIn("POST_TICKET_SCOPE", second.stderr)
+
+    def test_subagent_stop_bounces_again_in_the_next_session(self):
+        """印はセッションで分ける。控えの置き場はワークスペースに 1 つしか無い。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        write(os.path.join(child, "src", "b", "stray.py"), "x\n")
+
+        first = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s1")
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        same = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s1")
+        self.assertEqual(same.returncode, 0, "同じセッションの同じ相手は 1 度だけ")
+
+        later = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s2")
+
+        self.assertEqual(later.returncode, 2, "別のセッションの印で通さない")
+        self.assertIn("POST_TICKET_SCOPE", later.stderr)
 
     def test_subagent_start_lists_open_children(self):
         self.family()

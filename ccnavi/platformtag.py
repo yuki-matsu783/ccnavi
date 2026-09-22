@@ -5,8 +5,13 @@ PyInstaller の実行ファイルは、組み立てた機械の OS と CPU で�
 hook が起動するのは `.ccnavi/scripts/ccnavi-launcher.sh` に置いた振り分けの sh で、sh が
 自分の機械の語を読んで、自分の隣ではなく `../bin/` の合うディレクトリへ渡す（ADR-0044）。
 
-語は 3 か所で揃える。ここ、scripts/ccnavi-setup.sh の host_target、
-.ccnavi/scripts/ccnavi-launcher.sh。どれかだけ変えると、配った場所と探す場所がずれる。
+語は 4 か所で揃える。ここ、scripts/ccnavi-setup.sh の host_target、
+.ccnavi/scripts/ccnavi-launcher.sh、VS Code 拡張の src/core/locate.ts の hostTarget。
+どれかだけ変えると、配った場所と探す場所がずれる。
+
+突き合わせているのは sh とここの 2 つだけ（tests/sh/test_launcher.py）。setup.sh と
+拡張の語は、どのテストも比べていない。未知の OS と CPU の扱いは既に割れていて、
+ここは読めた値をそのまま使い、sh は `unknown` に倒す。
 """
 
 from __future__ import annotations

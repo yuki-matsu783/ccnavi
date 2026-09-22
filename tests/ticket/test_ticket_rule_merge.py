@@ -167,7 +167,7 @@ class Workspace(unittest.TestCase):
         git(self.root, "worktree", "add", "--quiet", path, "-b", name, base)
         return path
 
-    def ccnavi(self, *args, stdin="", env=None, core="disable"):
+    def ccnavi(self, *args, stdin="", env=None, core="disable", restore="disable"):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
@@ -186,7 +186,7 @@ class Workspace(unittest.TestCase):
                 "--guard-core-files",
                 core,
                 "--restore-if-deny",
-                "disable",
+                restore,
                 "--guard-ticket-approval",
                 "disable",
                 *args,
@@ -207,6 +207,7 @@ class Workspace(unittest.TestCase):
         session="s1",
         env=None,
         core="disable",
+        restore="disable",
         **tool_input,
     ):
         payload = {
@@ -218,7 +219,9 @@ class Workspace(unittest.TestCase):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        return self.ccnavi("--mode", mode, stdin=json.dumps(payload), env=env, core=core)
+        return self.ccnavi(
+            "--mode", mode, stdin=json.dumps(payload), env=env, core=core, restore=restore
+        )
 
     def write_hook(self, tree, rel, **kw):
         """Write の実行前の判定。"""
@@ -529,6 +532,34 @@ class TicketPlaces(Workspace):
                 else:
                     self.assertIn(code, result.stderr)
                     self.assertIn(rel, result.stderr)
+
+    def test_post_tool_use_reports_a_scope_finding_without_restoring_it(self):
+        """範囲外は報告するが戻さない。戻す根拠はルールの `deny` だけ（post._restorable）。
+
+        咎めているのはルールファイルに無いルール（`(ticket-scope)`）で、
+        `CCNAVI_RESTORE_IF_DENY` が言う「`deny` と宣言した場所」ではない。
+        """
+        rel = "docs/b.md"
+        full = os.path.join(self.child, *rel.split("/"))
+        self.hook("PostToolUse", "Bash", self.child, session="keep", command="ls")
+        write(full, "generated\n")
+
+        result = self.hook(
+            "PostToolUse",
+            "Bash",
+            self.child,
+            session="keep",
+            command="python gen.py",
+            restore="enable",
+        )
+
+        self.assertIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
+        self.assertIn(rel, result.stderr)
+        self.assertNotIn("restored: ccnavi", result.stderr)
+        self.assertNotIn("moved this file to", result.stderr)
+        self.assertTrue(os.path.exists(full), "範囲外のファイルを動かさない")
+        # 手順だけだと「自分で消せ」としか読めない。戻さなかった理由を添える。
+        self.assertIn("not-restored:", result.stderr)
 
     def test_subagent_stop_leaves_the_proposals_alone(self):
         # 自分の提案も、他のチケットの提案も。

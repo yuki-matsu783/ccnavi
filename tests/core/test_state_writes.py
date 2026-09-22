@@ -62,7 +62,9 @@ class WiringTest(unittest.TestCase):
         self._assert_atomic(lambda: post._save_seen(self.err, self.state, "s1", {"a"}))
 
     def test_post_turn_state(self):
-        self._assert_atomic(lambda: post._save_turn(self.err, self.state, "s1", {"a"}))
+        self._assert_atomic(
+            lambda: post._save_turn(self.err, self.state, "s1", {"a"}, {"/tmp/tree": "abc123"})
+        )
 
     def test_approval_known_state(self):
         path = os.path.join(self.state, "approved-s1.json")

@@ -127,6 +127,16 @@ def check(
     if not read:
         return ""
 
+    # ターンの基準を持たないツリーを初めて見たら、その場で控える。ターンの途中で
+    # 切られたワークツリーがこれにあたる（`at_prompt` のときには無いので基準が無く、
+    # 基準が無いツリーのコミットはターンの終わりに数えられない）。ワークツリーを
+    # 切ってから手を付けるのがこのリポジトリの手順なので、切ったターンがまるごと
+    # その穴に入っていた。触った時点から先は数えられるようにする。
+    #
+    # 触られないまま終わったツリーには、ここでも基準が付かない。そちらは
+    # ターンの終わりが「数えていない」と言う（`_uncounted_line`）。
+    _note_new_trees(stderr, state_dir, payload.session_id, read)
+
     seen, first_time = _load_seen(stderr, state_dir, payload.session_id)
 
     found = [
@@ -150,14 +160,15 @@ def check(
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
+    # 戻すのは `deny` と宣言された場所だけ（`_restorable`）。報告する対象より狭い。
     # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.effective_setting）ので、
     # ここで enforcing を見る必要はない。掛ける場所を 1 か所に寄せてあるのは、
     # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
     # 戻すのはそのツリーの git で。鍵はツリー付きにして、別のツリーの同じ相対パスと
     # 混ざらないようにする。
-    if fresh and restore == selfguard.ENABLE:
+    if restore == selfguard.ENABLE:
         for w, top, _ in read:
-            here = [f for f in fresh if f.tree_name == w.tree.name]
+            here = [f for f in fresh if f.tree_name == w.tree.name and _restorable(f)]
             if not here:
                 continue
             done = _restore(stderr, top, state_dir, [f.change for f in here])
@@ -167,7 +178,9 @@ def check(
     # 戻しを切った形と見分けが付かない。予行として置いた設定が「戻しは要らない」
     # という結論に読み替えられるし、対象がルールファイル次第で動くこの面では、
     # 何が戻るのかを本番の前に見せることがそのまま安全の余裕になる。
-    would_restore = bool(fresh) and restore == selfguard.DRY_RUN
+    # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
+    # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
+    would = {f.key() for f in fresh if _restorable(f)} if restore == selfguard.DRY_RUN else set()
 
     _save_seen(
         stderr,
@@ -191,8 +204,8 @@ def check(
         notes.append(f"known {len(known)}")
     if restored:
         notes.append(f"restored {len(restored)}")
-    elif would_restore:
-        notes.append(f"{selfguard.ACTION_WOULD} {len(fresh)}")
+    elif would:
+        notes.append(f"{selfguard.ACTION_WOULD} {len(would)}")
     record.detail = "; ".join(notes)
 
     if fresh:
@@ -202,7 +215,17 @@ def check(
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
-    blocks = [_violation(f, payload, restored.get(f.key()), would_restore) for f in fresh]
+    gated = restore in (selfguard.ENABLE, selfguard.DRY_RUN)
+    blocks = [
+        _violation(
+            f,
+            payload,
+            restored.get(f.key()),
+            f.key() in would,
+            not_restored=gated and not _restorable(f),
+        )
+        for f in fresh
+    ]
     blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
         return ""
@@ -216,6 +239,85 @@ def check(
     return "\n\n".join(shown)
 
 
+def _note_new_trees(
+    stderr: TextIO,
+    state_dir: str,
+    session: str,
+    read: list[tuple[Watched, str, list[gitstate.Change]]],
+) -> None:
+    """ターンの基準にまだ居ないツリーの HEAD を控える。居るツリーには触らない。
+
+    書き直すのは、控えに無いツリーが 1 本でもあるときだけ。呼び出しのたびに
+    控えを書き直すと、ツールを打つ数だけ書き込みが増える。ターンの基準そのもの
+    （`baseline`）は動かさない。あれは「ターンの始まりに何が汚れていたか」で、
+    あとから足すと、このターンで現れた汚れを前から在ったことにしてしまう。
+    """
+    baseline, known, heads = _load_turn(stderr, state_dir, session)
+    if not known:
+        # ターンの始まりを見ていない。基準そのものが無いので、ここで HEAD だけを
+        # 置くと「基準はあるが baseline が空」に化ける。何もしない。
+        return
+    fresh_heads = {}
+    for _, top, _ in read:
+        if not top or top in heads:
+            continue
+        sha = gitstate.head(top)
+        if sha:
+            fresh_heads[top] = sha
+    if fresh_heads:
+        _save_turn(stderr, state_dir, session, baseline, {**heads, **fresh_heads})
+
+
+def _committed_findings(
+    stderr: TextIO,
+    read: list[tuple[Watched, str, list[gitstate.Change]]],
+    heads: dict[str, str],
+    mine: tuple[str, ...],
+    scope: ScopeGuard | None,
+    places: tuple[str, str],
+) -> tuple[list[Finding], list[str]]:
+    """このターンでコミットに入った、保護領域の変更。
+
+    見るのは、ターンの始まりに控えた HEAD からの差分（`gitstate.committed`）。
+    控えを持たないツリー（ターンの途中で現れた、HEAD を読めなかった）は飛ばす。
+    数えていない期間を、数えたことにしない。
+
+    チケットの置き場は外す。承認は人が提案を `.ccnavi/approved/` へ動かして
+    コミットする運びで（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
+    外さないと、人が承認するたびに、その操作が違反としてターンの報告に並ぶ。
+    置き場の綴りは `places` で受け取る。チケット制御を切ったワークスペースでも
+    承認のコミットは在りうるので、`scope` の有無で外れたり外れなかったりさせない。
+
+    2 つめに返すのは、数えなかったツリーの名前。**黙って飛ばさない。** 基準が
+    無いのは、ターンの途中で切られたツリー（プロンプトのときに無かった）か、
+    そのとき HEAD を読めなかったツリーで、どちらも「変わっていない」ではない。
+    ワークツリーを切ってから手を付けるのがこのリポジトリの手順なので、切った
+    ターンのコミットはここに落ちる。落ちたことを言わないと、見ていない期間が
+    「何も起きなかった」と同じ見た目になる。
+    """
+    out: list[Finding] = []
+    uncounted: list[str] = []
+    tickets, approved = places
+    for w, top, _ in read:
+        base = heads.get(top)
+        if not base:
+            uncounted.append(w.tree.name or ".")
+            continue
+        changes, unreadable = gitstate.committed(top, base)
+        if unreadable:
+            stderr.write(
+                f"ccnavi: コミット済みの差分を読めない（{w.tree.name or '.'}）: {unreadable}\n"
+            )
+            uncounted.append(w.tree.name or ".")
+            continue
+        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree):
+            rel = tree.relative(w.tree, finding.change.full)
+            if ticket_mod.is_ticket_place(rel, tickets, approved):
+                continue
+            out.append(finding)
+    return out, uncounted
+
+
 def at_stop(
     stderr: TextIO,
     state_dir: str,
@@ -224,6 +326,7 @@ def at_stop(
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
+    places: tuple[str, str] = ("", ""),
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -238,7 +341,7 @@ def at_stop(
     戻しもしない。ここで報告するのは、実行後の監視が戻さなかった、あるいは
     戻す設定になっていなかった変更で、どうするかは人が決める。
     """
-    baseline, known_baseline = _load_turn(stderr, state_dir, payload.session_id)
+    baseline, known_baseline, heads = _load_turn(stderr, state_dir, payload.session_id)
     if not known_baseline:
         # ターンの始まりを見ていない。ここで今そこに在るものを全部並べると、
         # 利用者の書きかけも他のセッションが置いたものも、このターンの成果として
@@ -256,9 +359,20 @@ def at_stop(
         for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
         if f.key() not in baseline
     ]
-    if not found:
+    # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
+    # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
+    # 同じ見た目になる（呼び出しごとの監視も同じ穴を持つが、そちらは戻しに関わるので
+    # 断面を変えない。人が 1 度で見るのはこの報告）。
+    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places)
+    found += committed
+    if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
         return ""
+    if not found:
+        # 違反は無いが、数えていないツリーがある。そのことだけを言う。
+        record.decision, record.enforced = audit.ALLOW, True
+        record.detail = f"uncounted {len(uncounted)}"
+        return _uncounted_line(uncounted)
 
     record.decision, record.enforced = audit.DENY, True
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
@@ -268,13 +382,35 @@ def at_stop(
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
         where = f"{finding.tree_name}: " if finding.tree_name else ""
+        undo = gitstate.undo(finding.change)
+        how = (
+            f"戻すなら {undo}"
+            if undo
+            else "コミットに入っている（履歴は書き換えない。取り込む前に確かめる）"
+        )
         lines.append(
             f"  {where}{finding.change.path}（{finding.change.kind}）"
-            f" ルール {rule.id or '(id 無し)'} / 戻すなら {gitstate.undo(finding.change)}"
+            f" ルール {rule.id or '(id 無し)'} / {how}"
         )
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
+    if uncounted:
+        lines.append(_uncounted_line(uncounted))
+        record.detail = f"uncounted {len(uncounted)}"
     return "\n".join(lines)
+
+
+def _uncounted_line(uncounted: list[str]) -> str:
+    """コミット済みを数えなかったツリーを言う 1 行。
+
+    数えていないことを黙ると、そのツリーで何も起きなかったのと見分けが付かない。
+    """
+    return (
+        f"[ccnavi] コミットに入ったぶんを数えていないツリーが {len(uncounted)} 本あります"
+        f"（{', '.join(sorted(set(uncounted))[:REPORT_LIMIT])}）。"
+        "ターンの始まりに基準（HEAD）を取れていません。ターンの途中で切ったワークツリーが"
+        "これにあたります。そのツリーのコミットは 'git log' で確かめてください。"
+    )
 
 
 @dataclass
@@ -498,6 +634,35 @@ def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
     return rule_set.deny + rule_set.ask
 
 
+def _restorable(finding: Finding) -> bool:
+    """この 1 件を git から戻してよいか。`deny` と宣言された場所だけ。
+
+    報告する対象（`_guarding` の `deny` + `ask` と、チケットの範囲外）より狭くしてある。
+    3 つは、宣言が言っていることが違う。
+
+    * `deny` は「書くな」。書かれたものを戻すのは、その宣言のとおりにすること
+    * `ask` は「人が 1 度見る場所」。見た結果が「よい」であることもあるので、
+      戻すと、人が確認に「はい」と答えた編集をあとから無かったことにする
+    * チケットの範囲外は、ルールファイルが何も言っていない場所。戻す根拠が
+      ルールに無いうえ、咎めているルール（`TICKET_SCOPE_RULE`）は出所を示すための
+      作りもので、`decision` を持たない
+
+    報告は 3 つとも出したままにする。戻さないことと、黙ることは別（`_guarding`）。
+    設定の名前（`CCNAVI_RESTORE_IF_DENY`）が言うとおりの対象がここになる。
+
+    戻さなかった 1 件は控えに入る（`check`）。戻していないのでファイルは汚れたままで、
+    `git status` は次の呼び出しでも同じ 1 件を返す。毎回言えば、同じ汚れについて
+    同じ文が呼び出しの数だけ積まれる。だから呼び出しごとの報告はセッションで 1 度だけで、
+    その後はターンの終わりの報告（`at_stop`）が人に見せる。戻した 1 件だけが控えに
+    入らないのは、戻したあとに同じ場所が汚れたらそれは新しい出来事だから。
+    """
+    if finding.change.kind == gitstate.KIND_COMMITTED:
+        # コミット済みは戻す手順を持たない（`gitstate.KIND_COMMITTED`）。
+        # ここに来るのはターンの終わりの報告だけだが、戻す側に混ざらないよう明示する。
+        return False
+    return any(rule.decision == rules.DENY for rule in finding.group)
+
+
 def _guards_writes(rule: rules.Rule, path: str) -> bool:
     """このルールがこのパスへの書き込みを禁じているか。
 
@@ -509,7 +674,11 @@ def _guards_writes(rule: rules.Rule, path: str) -> bool:
 
 
 def _violation(
-    finding: Finding, payload: hookio.Input, moved: str | None, would_restore: bool = False
+    finding: Finding,
+    payload: hookio.Input,
+    moved: str | None,
+    would_restore: bool = False,
+    not_restored: bool = False,
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -520,6 +689,11 @@ def _violation(
     would_restore は、戻しが予行のとき。戻す手順はそのまま載せる。今回は
     誰も戻していないので、手順を落とすと戻す手立てが 1 つも書かれていない
     報告になる。そのうえで、本番なら ccnavi が戻していたことを添える。
+
+    not_restored は、戻す働きは効いているのに、この 1 件が戻す対象ではない
+    とき（`ask` と、承認済みチケットの範囲外。`_restorable`）。手順だけを渡すと、
+    受け取ったエージェントには「自分で戻せ」としか読めない。`ask` のルールは
+    文面を持てない（lint が禁じる）ので、ここで言わないと誰も言わない。
     """
     change, group = finding.change, finding.group
     lines = [
@@ -530,6 +704,17 @@ def _violation(
     ]
     if moved is None:
         lines.append(f"undo: {gitstate.undo(change)}")
+        if not_restored:
+            lines.append(
+                "not-restored: "
+                + (
+                    "the ticket's work area is not a rule-file `deny`"
+                    if finding.code == CODE_TICKET_SCOPE
+                    else "this place is declared `ask`, not `deny`"
+                )
+                + ", so ccnavi left the change as it is. A person decides whether it stays: "
+                "say what wrote it instead of undoing it yourself."
+            )
         if would_restore:
             lines.append(
                 f"{selfguard.ACTION_WOULD}: ccnavi did not touch this path. With "
@@ -659,6 +844,11 @@ def at_prompt(
     """
     read = _read_all(stderr, watched, record)
     if not read:
+        # 基準を取れなかった。前のターンの控えが残っていると、そこに入っている
+        # HEAD を「このターンの始まり」として読むことになり、前のターンの
+        # コミットをこのターンの成果として並べる。基準の側は「言い落とす」に
+        # 倒れるのに、HEAD の側だけ「言い過ぎる」に倒れるので、消しておく。
+        fsio.remove(_turn_path(state_dir, payload.session_id))
         return
 
     found = [
@@ -666,14 +856,23 @@ def at_prompt(
         for w, _, changes in read
         for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree)
     ]
-    _save_turn(stderr, state_dir, payload.session_id, {f.key() for f in found})
+    # ツリーごとの HEAD も控える。ターンの終わりに「このターンでコミットに
+    # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。
+    heads = {top: gitstate.head(top) for _, top, _ in read if top}
+    _save_turn(
+        stderr,
+        state_dir,
+        payload.session_id,
+        {f.key() for f in found},
+        {top: sha for top, sha in heads.items() if sha},
+    )
     record.decision, record.enforced = audit.ALLOW, True
     if found:
         record.detail = f"turn baseline {len(found)}"
 
 
-def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
-    """このターンの基準を返す。2 つめの値は、基準を持っているかどうか。
+def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, dict]:
+    """このターンの基準を返す。2 つめの値は、基準を持っているかどうか。3 つめは各ツリーの HEAD。
 
     持っていないなら、ターンの始まりを見ていない。登録されていないか、
     そのイベントで読めなかったか。そこで「全部このターンの成果」として
@@ -681,23 +880,35 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     見えていない期間を、見えたことにしない。
     """
     if not state_dir:
-        return set(), False
+        return set(), False, {}
     data, failed = fsio.read_json(_turn_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: ターンの基準を読めない: {failed}\n")
-        return set(), False
+        return set(), False, {}
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
-        return set(), False
-    return {s for s in base if isinstance(s, str)}, True
+        return set(), False, {}
+    heads = data.get("heads") if isinstance(data, dict) else None
+    if not isinstance(heads, dict):
+        # 古い控え（HEAD を持たない版）でも基準としては読める。コミットのぶんだけ
+        # 言えないが、ターンの始まりを見ていないことにするより害が小さい。
+        heads = {}
+    return (
+        {s for s in base if isinstance(s, str)},
+        True,
+        {k: v for k, v in heads.items() if isinstance(k, str) and isinstance(v, str)},
+    )
 
 
-def _save_turn(stderr: TextIO, state_dir: str, session: str, baseline: set[str]) -> None:
+def _save_turn(
+    stderr: TextIO, state_dir: str, session: str, baseline: set[str], heads: dict[str, str]
+) -> None:
     if not state_dir:
         return
     failed = fsio.write_json_atomic(
-        _turn_path(state_dir, session), {"baseline": sorted(baseline)[:SEEN_LIMIT]}
+        _turn_path(state_dir, session),
+        {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
         stderr.write(f"ccnavi: ターンの基準を書けない: {failed}\n")

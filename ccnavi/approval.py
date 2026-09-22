@@ -258,11 +258,6 @@ def _authoritative(
     return kept
 
 
-def dir_of(conf: settings.Settings, ticket: ticket_mod.Ticket) -> str:
-    """この承認済みチケットが見つかったツリーの置き場。書き戻す先。"""
-    return settings.approved_dir(conf, ticket.tree_root)
-
-
 def home_dir(
     conf: settings.Settings, root: str, ticket_id: str, parent: str, fallback_root: str = ""
 ) -> str:
@@ -329,11 +324,6 @@ def admit(approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approv
         fsio.remove(target)
         return f"提案を todo/ から動かせない ({exc})"
     return ""
-
-
-def update_copy(approved_dir: str, ticket: ticket_mod.Ticket, fields: dict) -> str:
-    """作業中の承認済みチケットの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
-    return update_fields(copy_path(approved_dir, ticket.ticket), fields)
 
 
 def update_fields(path: str, fields: dict) -> str:

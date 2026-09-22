@@ -37,6 +37,31 @@ def slashed(path: str) -> str:
     return path.replace("\\", "/")
 
 
+def full_path(path: str, cwd: str) -> str:
+    """ファイルのパスを、行き着く先が 1 つに決まる綴りに直す。
+
+    来たままの文字列に当てると、同じ場所を別の綴りで書くだけでルールを外せる。
+    相対パスは呼び出し側の作業ディレクトリ次第で意味が変わるし、`..` を挟めば
+    `secrets/` を通らない綴りで `secrets/` の中に届く。シンボリックリンクなら
+    名前を 1 つ増やすだけで済む。守る対象は名前ではなく場所なので、
+    場所まで解いてから当てる。
+
+    解けなかったときも、絶対パスにして `..` を畳むところまではやる。
+    まだ存在しないファイルへの書き込みがこれにあたる。
+
+    実行前の判定（judge）と実行後の監視（gitstate）が同じ綴りに直す。別々に持つと、
+    同じ場所が 2 通りの綴りで当たり、実行前に通った書き込みが実行後に咎められる。
+    """
+    if not path:
+        return ""
+    base = cwd or os.getcwd()
+    joined = os.path.join(base, os.path.expanduser(path))
+    try:
+        return os.path.realpath(joined)
+    except OSError:
+        return os.path.normpath(os.path.abspath(joined))
+
+
 def safe_name(text: str, limit: int | None = 64) -> str:
     """識別子から作る、置き場の名前。limit が None なら切り詰めない。"""
     return _UNSAFE.sub("_", text)[:limit]

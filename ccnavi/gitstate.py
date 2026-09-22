@@ -36,12 +36,18 @@ import os
 import shutil
 from dataclasses import dataclass
 
-from . import gitcmd
+from . import fsio, gitcmd
 
 # 変更の種類。元に戻す手順がこの 3 つで割れるので、この 3 つにしてある。
 KIND_NEW = "new"  # 無かったものが現れた
 KIND_CHANGED = "changed"  # 中身が変わった
 KIND_GONE = "gone"  # 追跡されていたものが消えた
+
+# 4 つめは戻す手順を持たない。ターンの間にコミットに入ったもので、`git status` には
+# もう出ない。戻すには revert か履歴の書き換えが要り、どちらもラッパースクリプトが
+# 拒む（人の判断で行う操作なので、ここから手順として案内もしない）。
+# 報告のためだけに在る種類で、自動復元（post._restorable）の対象にはしない。
+KIND_COMMITTED = "committed"
 
 # git に与える時間。実行前の判定に張る期限より短くしてある。
 # 大きなリポジトリでは status も待たされるが、待たせるくらいなら何も言わない。
@@ -137,6 +143,72 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
     return [c for c in (_parse(top, entry) for entry in done.out.split("\0")) if c], ""
 
 
+def head(top: str, timeout: float = TIMEOUT_SECONDS) -> str:
+    """いまの HEAD。読めなければ空文字。
+
+    ターンの始まりに控えて、終わりに「このターンで何がコミットに入ったか」を
+    数えるための基準にする（post.at_prompt / post.at_stop）。
+    """
+    if not top:
+        return ""
+    done = gitcmd.run(top, ["rev-parse", "HEAD"], timeout)
+    return done.out.strip() if done.ok else ""
+
+
+def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]:
+    """`base..HEAD` でコミットに入ったパス。読めなければ理由を返す。
+
+    未コミットしか見ない `read` の穴を、ターンの終わりだけ埋める。保護領域を
+    汚してからコミットすると `git status` から消えるので、`read` だけでは
+    「何も起きなかった」と同じ見た目になる。
+
+    数えるのは**このツリーが積んだコミットだけ**（`--first-parent --no-merges`）。
+    二点の差分（`base..HEAD`）にすると、統合先を取り込んだマージが持ち込んだ
+    コミットまで「このターンでコミットに入った」ことになる。ワークツリーを切って
+    作業し、`merge <統合先>` で取り込んでから戻すのがこのリポジトリの手順なので、
+    それを打つたびに、人が統合先で直した保護領域が毎回報告に並ぶ。
+
+    `--no-renames` と `--ignore-submodules=none` は phase.scope_findings と同じ理由。
+    改名を 1 行にまとめられると移動元が消え、submodule の進みは `.gitmodules` の
+    `ignore = all` で丸ごと消える。どちらも差分から行が消える道になる。
+    """
+    if not top or not base:
+        return [], REASON_NO_WORKTREE if not top else ""
+    done = gitcmd.run(
+        top,
+        [
+            "log",
+            "--first-parent",
+            "--no-merges",
+            "--format=",
+            "--name-only",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "-z",
+            f"{base}..HEAD",
+        ],
+        timeout,
+    )
+    if done.missing:
+        return [], REASON_NO_GIT
+    if done.timed_out:
+        return [], REASON_TIMEOUT
+    if not done.ok:
+        return [], REASON_FAILED
+    # 同じパスが複数のコミットに現れるので畳む。報告は「何が変わったか」で、
+    # 何回変わったかではない。並びは git が返した順のまま。
+    seen: set[str] = set()
+    changes = []
+    for path in done.out.split("\0"):
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        changes.append(
+            Change(kind=KIND_COMMITTED, path=path, full=_full(top, path), status="", staged=True)
+        )
+    return changes, ""
+
+
 def _parse(top: str, entry: str) -> Change | None:
     # "XY path" の形。X は索引側、Y は作業ツリー側の状態。
     if len(entry) < 4 or entry[2] != " ":
@@ -165,14 +237,10 @@ def _parse(top: str, entry: str) -> Change | None:
 def _full(top: str, path: str) -> str:
     """git の綴りを、行き着く先が 1 つに決まる絶対パスに直す。
 
-    judge.full_path と同じことを、同じ理由でやっている。消えたファイルは
-    解けないので、絶対パスにして `..` を畳むところまでで止める。
+    実行前の判定と同じ関数（`fsio.full_path`）を通す。同じ場所が 2 通りの綴りで
+    当たると、実行前に通った書き込みが実行後に咎められる（あるいはその逆）。
     """
-    joined = os.path.join(top, path)
-    try:
-        return os.path.realpath(joined)
-    except OSError:
-        return os.path.normpath(os.path.abspath(joined))
+    return fsio.full_path(path, top)
 
 
 def undo(change: Change) -> str:
@@ -181,6 +249,11 @@ def undo(change: Change) -> str:
     1 件に 1 つだけ返す。数えられる手順でないと、受け取った側は自分で
     組み立て直すことになり、そこで対象が増えたり減ったりする。
     """
+    if change.kind == KIND_COMMITTED:
+        # コミット済みには 1 つに決まる手順が無い。空を返し、呼ぶ側が
+        # 「戻す手順」の行そのものを落とす。間違った手順を 1 行書くより、
+        # 書かないほうがよい（revert も reset もラッパースクリプトが拒む）。
+        return ""
     quoted = f'"{change.path}"'
     if change.kind != KIND_NEW:
         return f"git restore --staged --worktree -- {quoted}"
