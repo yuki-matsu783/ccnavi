@@ -144,6 +144,19 @@ test("CB-T130 ハイコントラスト向けの縁は contrast の変数を使�
   // 行末のボタンは、見出しの「＋ 追加」向けの margin-left: auto を打ち消す。詳細度で勝たせてあるので、
   // 束ねの並び（@import の順）が変わっても入れ替わらない
   assert.match(rules, /\.row-body \.buttons button\.action \{ margin-left: 0; \}/);
+  // 動いたカードの輪も contrast の変数を使い、他のテーマでは緑のまま。左の縁（不備・承認待ち・
+  // レビュー待ち）は上書きしない（別の channel）
+  assert.match(html, /\.card\.moved \{ box-shadow: 0 0 0 1px var\(--vscode-contrastActiveBorder, var\(--vscode-charts-green\)\);/);
+  assert.doesNotMatch(html, /\.card\.moved \{[^}]*border-left/);
+});
+
+test("CB-T193 動いたカードの印は、光らせない設定を尊び、色だけに頼らない", () => {
+  const html = flatStyle(board());
+  // 光るのは既定のときだけ。`prefers-reduced-motion` では輪だけが残る（`styles/button.css` の
+  // 回り記号と同じ書き方）。ここを落とすと、動きを嫌う人に 2 秒の脈動が出る
+  assert.match(html, /@media \(prefers-reduced-motion: reduce\) \{ \.card\.moved \{ animation: none; \} \}/);
+  // どこからどこへ動いたかは帯の文で言う（色が見分けられなくても読める）。中身は Card.tsx の movedLabel
+  assert.match(html, /\.moved-mark \{[^}]*color: var\(--vscode-charts-green\);/);
 });
 
 test("CB-T166 画面ごとに CSS の入口があり、置いた CSS は必ずその束ねに入る", () => {

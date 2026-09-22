@@ -7,6 +7,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
+import type { Moved } from "../../src/core/board-moved.js";
+import type { BoardData } from "../../src/core/board-view.js";
 import { fixture } from "../helpers/fixture.js";
 import { approvePreview, openBoard, openPage } from "../helpers/board.js";
 import type { Element, Event, HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
@@ -383,30 +385,18 @@ test("CB-D52 ドラッグの途中で列が消えても、掴んだままの印�
   }
 });
 
-/** 見本のボード。`ticket` を承認済み（`doing/` の列）にした 1 枚を返す */
-function approved(ticket: string): ReturnType<typeof fixture> {
-  const base = fixture();
-  // 承認は提案を `wip/proposals/todo/` から `.ccnavi/approved/doing/` へ動かす。JSON では
-  // 提案が消えて承認済みチケットが開いた形になる（`columnOf`）。見本の中の開いた 1 枚を借りる
-  const open = base.tickets.find((t) => t.ticket === "i0001-02");
-  if (open === undefined) {
-    throw new Error("見本に開いた承認済みチケットが無い");
-  }
-  return {
-    ...base,
-    tickets: base.tickets.map((t) => (t.ticket === ticket ? { ...t, proposal: null, copy: open.copy } : t)),
-    pending_approval: base.pending_approval.filter((id) => id !== ticket),
-  };
+/** 前の読み直しから動いたカード。数えるのは拡張ホストで、画面には `moved` として渡る */
+function data(moved?: readonly Moved[]): BoardData {
+  return { kind: "board", board: buildBoard(fixture()), moved };
 }
 
-test("CB-D82 承認などで列が変わったカードに印が出る。開いた直後は出ず、オーバーレイの出し入れでは消えない", async () => {
+test("CB-D82 渡された分にだけ印を出す。渡されなければ出さない", async () => {
   const page = await openBoard();
   try {
-    // 1 枚目は比べる相手が無い。全部が光ると「動いた」の意味が無くなる
+    // 開いた直後は拡張ホストが何も渡さない（比べる相手が無い）。全部が光ると「動いた」の意味が無くなる
     assert.deepEqual(page.all(".card.moved"), []);
 
-    // 承認された（未着手 → 作業中）。動いたカードにだけ印が出る
-    await page.send({ type: "data", data: { kind: "board", board: buildBoard(approved("i0001-03")) } });
+    await page.send({ type: "data", data: data([{ id: "i0001-03", from: "todo", to: "doing" }]) });
     assert.deepEqual(
       page.all(".card.moved").map((card) => card.getAttribute("data-id")),
       ["i0001-03"],
@@ -415,26 +405,21 @@ test("CB-D82 承認などで列が変わったカードに印が出る。開い�
     assert.equal(card.getAttribute("data-moved"), "todo-doing");
     assert.equal(card.querySelector(".moved-mark")?.textContent, "未着手 → 作業中");
 
-    // 承認の文のオーバーレイを閉じると、同じボードが渡り直る。**そこで印が消えない**
-    // （承認の直後はオーバーレイがボードを覆っていて、動く瞬間そのものを人が見られない）
+    // 承認の文のオーバーレイを出し入れしても、拡張ホストが同じ分を渡し続ける限り印は消えない
     await page.send({
       type: "data",
-      data: { kind: "board", board: buildBoard(approved("i0001-03")), approval: { kind: "done", count: 1, prompt: "文" } },
+      data: { ...data([{ id: "i0001-03", from: "todo", to: "doing" }]), approval: { kind: "done", count: 1, prompt: "文" } },
     });
     assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
-    await page.send({ type: "data", data: { kind: "board", board: buildBoard(approved("i0001-03")) } });
-    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
 
-    // 読み直せなかった画面を挟んでも、最後に読めたボードと比べる（印を作り直さない）
+    // 別のカードが動いたと渡されたら、印はそちらに移る
+    await page.send({ type: "data", data: data([{ id: "i0001-02", from: "doing", to: "done" }]) });
+    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-02"]);
+
+    // 何も渡されなければ印は出ない（読み直せなかった画面を挟んだ後も同じ）
     await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
-    assert.deepEqual(page.all(".card"), [], "エラーの画面には列もカードも無い");
-    await page.send({ type: "data", data: { kind: "board", board: buildBoard(approved("i0001-03")) } });
-    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
-
-    // 次に何かが動いたら、前の印は消えて新しい動きに入れ替わる
-    await page.send({ type: "data", data: { kind: "board", board: buildBoard(fixture()) } });
-    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
-    assert.equal(page.one('.card[data-id="i0001-03"]').querySelector(".moved-mark")?.textContent, "作業中 → 未着手");
+    await page.send({ type: "data", data: data() });
+    assert.deepEqual(page.all(".card.moved"), []);
   } finally {
     await page.close();
   }
@@ -443,14 +428,11 @@ test("CB-D82 承認などで列が変わったカードに印が出る。開い�
 test("CB-D82b 新しく出たカードは「新しく出た」と言う", async () => {
   const page = await openBoard();
   try {
-    const base = fixture();
-    const first = base.tickets[0];
-    const json = { ...base, tickets: [...base.tickets, { ...first, ticket: "i0002", title: "後から出た親" }] };
-    await page.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
-    const card = page.one('.card[data-id="i0002"]');
+    await page.send({ type: "data", data: data([{ id: "i0001-03", to: "todo" }]) });
+    const card = page.one('.card[data-id="i0001-03"]');
     assert.ok(card.classList.contains("moved"));
-    assert.equal(card.getAttribute("data-moved"), "none-doing");
-    assert.equal(card.querySelector(".moved-mark")?.textContent, "新しく出た（作業中）");
+    assert.equal(card.getAttribute("data-moved"), "none-todo");
+    assert.equal(card.querySelector(".moved-mark")?.textContent, "新しく出た（未着手）");
   } finally {
     await page.close();
   }

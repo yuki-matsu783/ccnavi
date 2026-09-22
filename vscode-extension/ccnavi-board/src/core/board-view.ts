@@ -11,6 +11,7 @@
 import type { ApprovePreview } from "./approvemodel.js";
 import type { AppearanceMessage } from "./appearance.js";
 import type { Board } from "./board.js";
+import type { Moved } from "./board-moved.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
 /**
@@ -44,6 +45,11 @@ export type BoardData =
       readonly kind: "board";
       readonly board: Board;
       readonly approval?: ApprovalOverlay;
+      /**
+       * 前の読み直しから動いたカード（`board-moved.ts`）。**決めるのも覚えるのも拡張ホスト**で、
+       * オーバーレイと同じ理由（画面は裏に回ると捨てられる）。画面は渡された分に印を出すだけ
+       */
+      readonly moved?: readonly Moved[];
       /**
        * 開いた直後に選ぶプロジェクトの絞り込み。プロジェクト管理画面からの導線でだけ入る。
        * 入るのは 1 枚目の HTML に埋めるときだけで、`ToBoard` の `data` では渡さない

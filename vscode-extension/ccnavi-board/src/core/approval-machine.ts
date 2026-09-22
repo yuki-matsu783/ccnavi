@@ -149,7 +149,7 @@ export interface ApprovalStep {
   readonly effects: readonly ApprovalEffect[];
 }
 
-/** 状態も画面もそのまま。受けない入力のほか、**人に言うだけ**（`warn` / `refresh`）のときも使う */
+/** 状態も画面もそのまま。受けない入力のほか、**画面を変えずに済ませる**（`warn` / `refresh`）ときも使う */
 function stay(state: ApprovalState, ...effects: ApprovalEffect[]): ApprovalStep {
   return { state, redraw: false, effects };
 }
@@ -267,22 +267,29 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const count = outcome.value.approved.length;
     // 運ぶ 1 行は、文を渡すのを待たずに端末へ出す。承認と同じ時点で出しておく
     const carried = count > 0 && carrier;
-    // 運ぶ sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
-    const carry: ApprovalEffect = carried
-      ? { kind: "carry" }
-      : {
-          kind: "warn",
-          text:
-            `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、` +
-            "導入スクリプト（scripts/ccnavi-setup.sh）で配る",
-        };
-    // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は提案を
-    // `wip/proposals/todo/` から `.ccnavi/approved/doing/` へ動かすので、ふつうは監視が拾って
-    // 読み直る。拾えない置き方（`CCNAVI_TICKETS_PROPOSAL` が既定と違う、`files.watcherExclude` を
-    // 足した、監視の効かないファイルシステム）では、承認したのに画面が変わらないままになる。
+    // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
+    // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
+    // 読み直る。拾えないのは、その置き場が監視の綴りと違うとき（`CCNAVI_TICKETS_APPROVED` が
+    // 既定と違う。監視の綴りは `core/watch.ts` に固定してあり、この env を読まない）、
+    // `files.watcherExclude` でそこを外したとき、監視の効かないファイルシステムのとき。
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回に畳む（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。**1 件も置かれていないなら読み直さない**（何も動いていない）。
-    const effects: ApprovalEffect[] = count === 0 ? [] : [carry, { kind: "refresh" }];
+    //
+    // 運ぶ sh が無ければ送らずに言う。送って `No such file` を見せるより、何をすればよいかが先に分かる
+    const effects: ApprovalEffect[] =
+      count === 0
+        ? []
+        : [
+            carried
+              ? { kind: "carry" }
+              : {
+                  kind: "warn",
+                  text:
+                    `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、` +
+                    "導入スクリプト（scripts/ccnavi-setup.sh）で配る",
+                },
+            { kind: "refresh" },
+          ];
     return move(
       state,
       { overlay: { kind: "done", count, prompt: outcome.value.prompt, carried }, only: [] },

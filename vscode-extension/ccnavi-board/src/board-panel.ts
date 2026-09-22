@@ -10,6 +10,7 @@ import * as vscode from "vscode";
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
+import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
   acceptCommand,
   PUSH_APPROVED_SCRIPT,
@@ -59,6 +60,12 @@ interface PanelState {
    * 遷移の規則は `core/approval-machine.ts` が持ち、ここは持ち直すだけ
    */
   approval: ApprovalState;
+  /**
+   * 前の読み直しから動いたカード。**画面ではなくここが持つ。** 画面は裏に回ると捨てられ、
+   * 表に戻ると作り直されるので（`retainContextWhenHidden` は偽）、そちらに持たせると
+   * 承認の文を渡してボードに戻った瞬間に印が消える。決めるのは `core/board-moved.ts`
+   */
+  moved: MovedState;
 }
 
 let state: PanelState | undefined;
@@ -126,6 +133,7 @@ export async function openBoard(project?: string): Promise<void> {
     launcher: first.launcher,
     filter: project,
     approval: CLOSED,
+    moved: NOTHING_MOVED,
   };
   state = current;
   followAppearance(panel, current.host);
@@ -238,11 +246,16 @@ async function update(): Promise<void> {
 
 /**
  * ボードを見せる。中身を渡すのは `send`。
+ *
+ * **読めたボードはここを必ず通る**ので、動いたカードもここで数え直す。同じボードを渡し直すだけの
+ * 描き直し（オーバーレイの出し入れ）でも通るが、列が動いていなければ `movedStep` が前の印を
+ * そのまま返すので、承認の文を閉じた拍子に印が消えることはない。
  */
 function show(current: PanelState, board: Board): void {
+  current.moved = movedStep(current.moved, board);
   current.board = board;
   current.error = undefined;
-  send(current, { kind: "board", board, approval: current.approval.overlay });
+  send(current, { kind: "board", board, approval: current.approval.overlay, moved: current.moved.moved });
 }
 
 /** 読み直せなかったことを見せる。承認のオーバーレイがあれば、ボードのときと同じように被せる */
