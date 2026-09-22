@@ -183,6 +183,68 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_GUARD_UNWATCHED=disable", result.stdout)
         self.assertIn("確認できる者が居ないモードで守る: disable", result.stdout)
 
+    def test_戻す働きを切ったらwarnで言う(self):
+        # 人向けの本文には値が 1 行ずつ出るが、`problems` に入らないと
+        # `--json` を読む CI と拡張からは「揃っている」と見える。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            env={"CCNAVI_GUARD_CORE_FILES": "disable", "CCNAVI_RESTORE_IF_DENY": "disable"},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CCNAVI_GUARD_CORE_FILES=disable", result.stdout)
+        self.assertIn("CCNAVI_RESTORE_IF_DENY=disable", result.stdout)
+
+    def test_戻す働きの予行もwarnで言う(self):
+        # 予行は導入の途中では正しい状態だが、外から見ると守られている状態と
+        # 区別が付かない。モードの dry-run に warn を出すのと同じ理由。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            env={"CCNAVI_GUARD_CORE_FILES": "dry-run", "CCNAVI_RESTORE_IF_DENY": "dry-run"},
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("CCNAVI_GUARD_CORE_FILES=dry-run", result.stdout)
+        self.assertIn("CCNAVI_RESTORE_IF_DENY=dry-run", result.stdout)
+
+    def test_切った門はJSONのproblemsにも出る(self):
+        # 読み手は CI と VS Code の拡張。人向けの本文しか持たない苦情は、
+        # そこからは無いのと同じ。
+        result = ccnavi(
+            self.root,
+            "--lint",
+            "--json",
+            "--rules",
+            rules_file(self.root, SOUND),
+            "--mode",
+            "enable",
+            env={"CCNAVI_GUARD_CORE_FILES": "disable", "CCNAVI_RESTORE_IF_DENY": "disable"},
+        )
+
+        payload = json.loads(result.stdout)
+        details = [p["detail"] for p in payload["problems"]]
+        self.assertEqual(payload["errors"], 0, details)
+        self.assertEqual(payload["warns"], 2, details)
+        self.assertTrue(any("CCNAVI_GUARD_CORE_FILES=disable" in d for d in details), details)
+        self.assertTrue(any("CCNAVI_RESTORE_IF_DENY=disable" in d for d in details), details)
+
+    def test_戻す働きが既定なら何も言わない(self):
+        result = lint(self.root, rules_file(self.root, SOUND))
+
+        self.assertNotIn("CCNAVI_GUARD_CORE_FILES", result.stdout)
+        self.assertNotIn("CCNAVI_RESTORE_IF_DENY", result.stdout)
+        self.assertIn("error 0 件、warn 0 件", result.stdout)
+
     def test_確認できない側の門は既定でenableと出る(self):
         result = lint(self.root, rules_file(self.root, SOUND))
 

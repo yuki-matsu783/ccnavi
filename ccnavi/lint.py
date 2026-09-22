@@ -186,6 +186,12 @@ def report(
                 "承認・レビュー済みの受け入れ・状態の移動を行える",
             )
         )
+    # 戻す働きの 2 つも同じ扱いにする。人向けの本文には値が 1 行ずつ出ているが、
+    # `problems` に入らないと `--json` を読む側（CI と VS Code の拡張）からは
+    # 「揃っている」と見える。切ってあること自体は設定として正しく、それでも言う
+    # 理由は上の 2 つと同じ（外から見て、守られている状態と区別が付かない）。
+    problems.extend(_gate(guard_core_files, settings.GUARD_CORE_FILES_ENV, _CORE_FILES_VOICE))
+    problems.extend(_gate(restore_if_deny, settings.RESTORE_IF_DENY_ENV, _RESTORE_VOICE))
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
@@ -229,6 +235,34 @@ def report(
 
     stdout.write(f"error {errors} 件、warn {warns} 件、info {infos} 件\n")
     return EXIT_ERROR if errors else EXIT_OK
+
+
+# 戻す働きの 2 つが、切られている・予行になっているときに言うこと。
+# 3 値（enable / dry-run / disable）を取る門なので、止めない 2 つの値それぞれに文がある。
+_CORE_FILES_VOICE = {
+    selfguard.DISABLE: (
+        "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
+        "プロジェクトの層の 3 本）を控えず、書き換えられても戻さない。"
+        "実行前に足していた組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の 3 本）も"
+        "足さないので、ワークツリー側の層の設定はルールファイルが名指ししていなければ書ける"
+    ),
+    selfguard.DRY_RUN: (
+        "ccnavi 自身の設定ファイルが書き換えられても戻さない（戻すはずだったと言うだけ）。"
+        "実行前の deny は足したままなので、止める側は効いている"
+    ),
+}
+_RESTORE_VOICE = {
+    selfguard.DISABLE: "`deny` と宣言した場所が副作用で変わっても戻さない",
+    selfguard.DRY_RUN: (
+        "`deny` と宣言した場所が副作用で変わっても戻さない（戻すはずだったと言うだけ）"
+    ),
+}
+
+
+def _gate(value: str, name: str, voices: dict[str, str]) -> list[Problem]:
+    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。"""
+    said = voices.get(value)
+    return [Problem(SEVERITY_WARN, "(restore)", f"{name}={value}。{said}")] if said else []
 
 
 def check(
