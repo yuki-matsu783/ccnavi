@@ -1999,8 +1999,8 @@ factors:
 
 ### 参考にした運用
 
-`参考/issue-mr-ticket-workflow` の運用層（`ticket.sh` / `worktree.sh` / `boundary.sh`）から
-抜いて改めた。何を採り何を採らなかったかは [ADR-0025](docs/adr/0025-reference-workflow.md)。
+運用層は `参考/issue-mr-ticket-workflow`（`ticket.sh` / `worktree.sh` / `boundary.sh`）を
+もとにしている。何を採り何を採らなかったかは [ADR-0025](docs/adr/0025-reference-workflow.md)。
 
 ## ルールファイルが読めないとき
 

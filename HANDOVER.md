@@ -44,7 +44,7 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 `projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
 
 **共通層の置き場は固定（ADR-0052）。** `.ccnavi/common/{rules,phases,risks}.yml` から動かせない。
-`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` は廃止した。診断のために別の場所を指すのは
+`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` は効かない。診断のために別の場所を指すのは
 `--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する。
 
 **設定と記録の置き場（ADR-0042）。** 共通層の 3 本と見本 `rule-samples.yml` は `.ccnavi/common/`、
@@ -186,7 +186,7 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 写す前の版を測りたいときは `CCNAVI_SH_DIR=<場所>` で出どころを差し替える。
 
 `tests/e2e/test_e2e_sh.py` は実 git と実行ファイルの写しを使うが、20 件が 8 秒ほどで終わるので
-既定で走る（以前は `CCNAVI_E2E` が無ければ skip していた）。組み立て済みの実行ファイルが無ければ
+既定で走る。組み立て済みの実行ファイルが無ければ
 skip する。試すのは組み立て済みの実行ファイルなので、`ccnavi/` を直したら組み立て直してから回す。
 **モード B（`projects/` を使う形）に触ったら回すこと。**
 
@@ -212,7 +212,7 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
 
 ### 未了: 要求表と設計書への反映
 
-`ccnavi.md` §11（旧 §25）と `requirements.md` の REQ-MLT 表に、上の振る舞いを**書いていない**。
+`ccnavi.md` §11 と `requirements.md` の REQ-MLT 表に、上の振る舞いを**書いていない**。
 進行中の `config-union` が §11 を構造ごと改版するため、先に足すと解き直しになる。
 **実装が入っているのに要求表に無い期間ができている。** `config-union` が統合先に
 入ったら足すこと。
@@ -314,8 +314,6 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
 
-- （ADR-0055 で解消）`ticket start` / `done` は `doing/` の承認済みチケットにしか効かない。未承認の提案は
-  `todo/` から動かない。`--approve` の対象は `todo/` だけ
 - 人が子を再開しても、そのフェーズの `reviewed` は残る。再び `done` にしても止まらず、
   告知も出ない。再開の手順に「マーカーも消す」を入れるか、承認済みチケットを戻したときに機構が消すかは決めていない
 
