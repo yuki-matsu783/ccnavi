@@ -1,9 +1,13 @@
 /**
- * アクティビティバーの ccnavi から開くサイドパネル。入口は 6 つで、どれも Webview パネルを開く。
+ * アクティビティバーの ccnavi から開くサイドパネル。並ぶのは画面の入口 5 つで、どれも Webview パネルを開く。
  * 「チケット管理」「リスク管理」「フェーズ管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
  * disable のワークスペースでは出さない。配点は子チケットを閉じるときに、フェーズの種類は親の
  * 計画と子の範囲にしか読まれないので、disable の間はどちらも何も動かさない。効かない設定の
  * 入口を残すと、直したのに効いていない、という読み違いの元になる。
+ *
+ * 見た目の切り替えは並びに混ぜず、パネルのタイトルバーの歯車に置く（`package.json` の `view/title`）。
+ * 押すと画面が開く行と、押すと設定が変わる行が 1 列に並ぶと、押す前に何が起きるか読めない。
+ * 今どれを選んでいるかは、行の代わりにビューの見出しの横（`view.description`）に出す。
  * VS Code の API に触れるので単体テストの対象外。
  */
 import * as vscode from "vscode";
@@ -57,13 +61,6 @@ const ENTRIES: readonly Entry[] = [
     icon: "checklist",
     needsTickets: true,
   },
-  {
-    label: "見た目",
-    description: "配色の切り替え（VS Code のテーマ / Claude ライト / Claude ダーク）",
-    command: "ccnaviBoard.appearance",
-    icon: "color-mode",
-    needsTickets: false,
-  },
 ];
 
 class EntryProvider implements vscode.TreeDataProvider<Entry> {
@@ -78,10 +75,6 @@ class EntryProvider implements vscode.TreeDataProvider<Entry> {
     const item = new vscode.TreeItem(entry.label, vscode.TreeItemCollapsibleState.None);
     // 並びは名前だけにして、説明はマウスを重ねたときに出す（横に並べると狭いパネルで切れて読めない）
     item.tooltip = entry.description;
-    // 見た目だけは今の値を横に出す。何が選ばれているかは開かなくても分かるほうがよい
-    if (entry.command === "ccnaviBoard.appearance") {
-      item.description = APPEARANCE_LABELS[readAppearance()];
-    }
     item.iconPath = new vscode.ThemeIcon(entry.icon);
     item.command = { command: entry.command, title: entry.label };
     return item;
@@ -95,9 +88,14 @@ class EntryProvider implements vscode.TreeDataProvider<Entry> {
 
 export function registerSidebar(context: vscode.ExtensionContext): void {
   const provider = new EntryProvider();
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider("ccnaviBoard.entries", provider),
-  );
+  // 見出しの横に今の見た目を出すので、provider を登録するだけでなくビューを持つ
+  const view = vscode.window.createTreeView("ccnaviBoard.entries", { treeDataProvider: provider });
+  view.description = APPEARANCE_LABELS[readAppearance()];
+  context.subscriptions.push(view);
   onDidChangeTicketControl(() => provider.refresh());
-  context.subscriptions.push(onDidChangeAppearance(() => provider.refresh()));
+  context.subscriptions.push(
+    onDidChangeAppearance((appearance) => {
+      view.description = APPEARANCE_LABELS[appearance];
+    }),
+  );
 }

@@ -60,10 +60,18 @@
       },
       {
         "command": "ccnaviBoard.appearance",
-        "title": "ccnavi ボード: 見た目を切り替える"
+        "title": "ccnavi ボード: 見た目を切り替える",
+        "icon": "$(color-mode)"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "ccnaviBoard.appearance",
+          "when": "view == ccnaviBoard.entries",
+          "group": "navigation"
+        }
+      ],
       "commandPalette": [
         {
           "command": "ccnaviBoard.open",
@@ -114,7 +122,7 @@
             "Claude の配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換える（ハイコントラストのテーマでは効かない）。サイドパネルの「見た目」からも切り替えられ、開いている画面にはその場で効く。"
+          "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換える（ハイコントラストのテーマでは効かない）。サイドパネルのタイトルバーの歯車からも切り替えられ（今の値は見出しの横に出る）、開いている画面にはその場で効く。"
         }
       }
     }
