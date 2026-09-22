@@ -43,6 +43,12 @@ KIND_NEW = "new"  # 無かったものが現れた
 KIND_CHANGED = "changed"  # 中身が変わった
 KIND_GONE = "gone"  # 追跡されていたものが消えた
 
+# 4 つめは戻す手順を持たない。ターンの間にコミットに入ったもので、`git status` には
+# もう出ない。戻すには revert か履歴の書き換えが要り、どちらもラッパースクリプトが
+# 拒む（人の判断で行う操作なので、ここから手順として案内もしない）。
+# 報告のためだけに在る種類で、自動復元（post._restorable）の対象にはしない。
+KIND_COMMITTED = "committed"
+
 # git に与える時間。実行前の判定に張る期限より短くしてある。
 # 大きなリポジトリでは status も待たされるが、待たせるくらいなら何も言わない。
 TIMEOUT_SECONDS = 2.0
@@ -137,6 +143,57 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
     return [c for c in (_parse(top, entry) for entry in done.out.split("\0")) if c], ""
 
 
+def head(top: str, timeout: float = TIMEOUT_SECONDS) -> str:
+    """いまの HEAD。読めなければ空文字。
+
+    ターンの始まりに控えて、終わりに「このターンで何がコミットに入ったか」を
+    数えるための基準にする（post.at_prompt / post.at_stop）。
+    """
+    if not top:
+        return ""
+    done = gitcmd.run(top, ["rev-parse", "HEAD"], timeout)
+    return done.out.strip() if done.ok else ""
+
+
+def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]:
+    """`base..HEAD` でコミットに入ったパス。読めなければ理由を返す。
+
+    未コミットしか見ない `read` の穴を、ターンの終わりだけ埋める。保護領域を
+    汚してからコミットすると `git status` から消えるので、`read` だけでは
+    「何も起きなかった」と同じ見た目になる。
+
+    `--no-renames` と `--ignore-submodules=none` は phase.scope_findings と同じ理由。
+    改名を 1 行にまとめられると移動元が消え、submodule の進みは `.gitmodules` の
+    `ignore = all` で丸ごと消える。どちらも差分から行が消える道になる。
+    """
+    if not top or not base:
+        return [], REASON_NO_WORKTREE if not top else ""
+    done = gitcmd.run(
+        top,
+        [
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "-z",
+            f"{base}..HEAD",
+        ],
+        timeout,
+    )
+    if done.missing:
+        return [], REASON_NO_GIT
+    if done.timed_out:
+        return [], REASON_TIMEOUT
+    if not done.ok:
+        return [], REASON_FAILED
+    changes = [
+        Change(kind=KIND_COMMITTED, path=path, full=_full(top, path), status="", staged=True)
+        for path in done.out.split("\0")
+        if path
+    ]
+    return changes, ""
+
+
 def _parse(top: str, entry: str) -> Change | None:
     # "XY path" の形。X は索引側、Y は作業ツリー側の状態。
     if len(entry) < 4 or entry[2] != " ":
@@ -181,6 +238,11 @@ def undo(change: Change) -> str:
     1 件に 1 つだけ返す。数えられる手順でないと、受け取った側は自分で
     組み立て直すことになり、そこで対象が増えたり減ったりする。
     """
+    if change.kind == KIND_COMMITTED:
+        # コミット済みには 1 つに決まる手順が無い。空を返し、呼ぶ側が
+        # 「戻す手順」の行そのものを落とす。間違った手順を 1 行書くより、
+        # 書かないほうがよい（revert も reset もラッパースクリプトが拒む）。
+        return ""
     quoted = f'"{change.path}"'
     if change.kind != KIND_NEW:
         return f"git restore --staged --worktree -- {quoted}"

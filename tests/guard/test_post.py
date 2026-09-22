@@ -33,6 +33,14 @@ RULES = {
             "glob": "*git push*",
             "message": "git push is not run by the agent.",
         },
+        {
+            # 承認済みチケットの置き場。人が承認してコミットする場所でもあるので、
+            # コミット済みのぶんは報告から外れる（post._committed_findings）。
+            "id": "approved",
+            "match": "Write|Edit",
+            "glob": "*/.ccnavi/approved/*",
+            "message": "approved tickets are moved by the user.",
+        },
     ],
     # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
     # （post._restorable）。文面は書かない――ask に message を書くと lint が error。
@@ -517,6 +525,51 @@ class PostToolUseTest(unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertNotIn("would-restore", result.stderr)
         self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
+
+    # コミットに入った変更
+
+    def test_ターンの終わりはコミットに入った変更も言う(self):
+        # `git status` はコミットを見せない。ここを足さないと、保護領域を汚して
+        # からコミットした回が「何も起きなかった」と同じ見た目になる。
+        self.run_hook(event="UserPromptSubmit")
+        self.dirty()
+        git(self.repo, "add", "--", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "汚してからコミットする")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertTrue(result.stdout, "コミットに入った変更が報告されていない")
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertIn("committed", message)
+        # 戻す手順は書かない。履歴は書き換えないので、案内できる 1 つが無い。
+        self.assertNotIn("git restore", message)
+        self.assertIn("コミットに入っている", message)
+
+    def test_ターンが始まる前のコミットは言わない(self):
+        # 前のターンや他のセッションが積んだコミットを、このターンの成果として
+        # 並べない。基準はターンの始まりに控えた HEAD。
+        self.dirty()
+        git(self.repo, "add", "--", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "前のターンのコミット")
+        self.run_hook(event="UserPromptSubmit")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+
+    def test_承認のコミットはターンの報告に並べない(self):
+        # 承認は人が提案を .ccnavi/approved/ へ動かしてコミットする運び。
+        # そこは deny でもあるので、外さないと承認のたびに違反として並ぶ。
+        self.run_hook(event="UserPromptSubmit")
+        write(os.path.join(self.repo, ".ccnavi", "approved", "doing", "i0001.md"), "x\n")
+        git(self.repo, "add", "--", ".ccnavi/approved/doing/i0001.md")
+        git(self.repo, "commit", "--quiet", "-m", "承認済みチケットを運ぶ")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "", result.stdout)
 
     def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
         # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
