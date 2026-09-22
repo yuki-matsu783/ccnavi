@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
+import { movedCards, placementOf, samePlacement, type Moved, type Placement } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { applyAppearance } from "../appearance.js";
 import { post } from "./post.js";
@@ -39,11 +40,37 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 次の中身を渡したとき。読み直しが失敗しても中身は届く（エラーの画面になる）ので、ここで戻す道は要らない。
   // 実行ファイルが返らない場合は期限（ccnavi.ts）が切る。
   const [refreshing, setRefreshing] = useState(false);
+  // 前の読み直しから動いたカード（`core/board-moved.ts`）。時間では消さず、次に何かが動くまで残す
+  const [moved, setMoved] = useState<readonly Moved[]>([]);
+  const placement = useRef<Placement | undefined>(undefined);
 
   const board = data.kind === "board" ? data.board : undefined;
   // 受け口（メッセージ）はいまのボードを知らないので、描くたびに写しておく
   const boardRef = useRef<Board | undefined>(board);
   boardRef.current = board;
+
+  /**
+   * 届いたボードを前のものと比べ、列が変わったカードを覚える。
+   *
+   * **列が動いていなければ触らない。** ボードは列が同じままでも渡り直す（承認のオーバーレイの
+   * 出し入れ、「更新」で何も変わらなかったとき）。そこで作り直すと、承認の文を閉じた瞬間に
+   * 印が消える（閉じると同じボードが渡り直る）。読み直せなかった画面（`board` が無い）でも
+   * 触らない。次に読めたときに、最後に読めたボードと比べる。
+   *
+   * 1 枚目（開いた直後）は比べる相手が無いので、何にも印を付けない。
+   */
+  useEffect(() => {
+    if (board === undefined) {
+      return;
+    }
+    const next = placementOf(board);
+    const before = placement.current;
+    if (before !== undefined && samePlacement(before, next)) {
+      return;
+    }
+    placement.current = next;
+    setMoved(before === undefined ? [] : movedCards(before, next));
+  }, [board]);
 
   useEffect(() => {
     /** 拡張ホストが指す絞り込み。候補に無ければ何もしない（いまの絞り込みを外さない） */
@@ -98,6 +125,9 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
     saveState({ project, parent, attention, folded: view.folded, widths: view.widths });
   }, [board === undefined, project, parent, attention, view.folded, view.widths]);
+
+  const movedIndex = new Map(moved.map((m) => [m.id, m]));
+  const movedOf = (card: Card): Moved | undefined => movedIndex.get(card.id);
 
   const hiddenOf = (card: Card): boolean =>
     (project !== EMPTY.project && card.project !== project) ||
@@ -196,6 +226,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 key={column.state}
                 column={column}
                 hiddenOf={hiddenOf}
+                movedOf={movedOf}
                 folded={view.folded.includes(column.state)}
                 width={view.widths[column.state]}
                 onFold={(folded) =>
@@ -242,6 +273,7 @@ function Footer({ board }: { readonly board: Board }): JSX.Element {
 function Column({
   column,
   hiddenOf,
+  movedOf,
   folded,
   width,
   onFold,
@@ -249,6 +281,7 @@ function Column({
 }: {
   readonly column: BoardColumn;
   readonly hiddenOf: (card: Card) => boolean;
+  readonly movedOf: (card: Card) => Moved | undefined;
   readonly folded: boolean;
   readonly width: number | undefined;
   readonly onFold: (folded: boolean) => void;
@@ -329,7 +362,7 @@ function Column({
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (
-            <CardItem key={card.id} card={card} hidden={hiddenOf(card)} />
+            <CardItem key={card.id} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
           ))}
         </ul>
       )}

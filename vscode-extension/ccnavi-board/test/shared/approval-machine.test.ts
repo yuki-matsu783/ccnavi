@@ -332,7 +332,7 @@ test("CB-T172 「この N 件を承認する」は、見せた指紋と絞りを
   assert.deepEqual(approvalStep(preview, { kind: "confirm", tickets: [] }).effects, []);
 });
 
-test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送る。無ければ言う。0 件なら送らない", () => {
+test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送り、ボードを読み直す。sh が無ければ言う。0 件なら何もしない", () => {
   const approving = toApproving(approvalStep);
   const done = approvalStep(approving, {
     kind: "approved",
@@ -340,7 +340,7 @@ test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送�
     carrier: true,
   });
   assert.deepEqual(done.state.overlay, { kind: "done", count: 1, prompt: "文", carried: true });
-  assert.deepEqual(kinds(done.effects), ["carry"]);
+  assert.deepEqual(kinds(done.effects), ["carry", "refresh"], "監視だけに頼らず、承認の側からも読み直す");
   assert.deepEqual(done.state.only, [], "承認できたら絞りは畳む");
 
   const noScript = approvalStep(approving, {
@@ -349,7 +349,7 @@ test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送�
     carrier: false,
   });
   assert.deepEqual(noScript.state.overlay, { kind: "done", count: 1, prompt: "文", carried: false });
-  assert.deepEqual(kinds(noScript.effects), ["warn"], "端末には送らず、何をすればよいかを言う");
+  assert.deepEqual(kinds(noScript.effects), ["warn", "refresh"], "端末には送らず、何をすればよいかを言う");
   assert.match(
     noScript.effects[0]?.kind === "warn" ? noScript.effects[0].text : "",
     /ccnavi-push-approved\.sh が無いので/,
@@ -361,7 +361,7 @@ test("CB-T173 承認できたら渡す文を見せ、運ぶ sh を端末に送�
     carrier: true,
   });
   assert.deepEqual(zero.state.overlay, { kind: "done", count: 0, prompt: "文", carried: false });
-  assert.deepEqual(kinds(zero.effects), [], "1 件も置かれていないなら運ばない");
+  assert.deepEqual(kinds(zero.effects), [], "1 件も置かれていないなら、運びも読み直しもしない");
 });
 
 test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返った一覧に理由を添える", () => {

@@ -19,6 +19,19 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
 .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
 .card.review-hold { border-left: 3px solid var(--vscode-editorError-foreground); }
+/* 前の読み直しから列が変わった（承認された・着手された・閉じた）カードと、新しく現れたカード。
+   **時間では消さない。** 承認の直後は渡す文のオーバーレイがボードを覆っていて、動く瞬間そのものを
+   人が見られないので、次に何かが動くまで印を残す（`core/board-moved.ts`）。
+   左の縁は不備・承認待ち・レビュー待ちが使っているので、こちらは輪（box-shadow）で出して上書きしない。
+   色だけに頼らず、どこからどこへ動いたかは帯（`.moved-mark`）の文で言う */
+.card.moved { box-shadow: 0 0 0 1px var(--vscode-charts-green); animation: ccnavi-moved 1.1s ease-out 2; }
+@keyframes ccnavi-moved {
+  0% { box-shadow: 0 0 0 1px var(--vscode-charts-green); }
+  35% { box-shadow: 0 0 0 4px var(--vscode-charts-green); }
+  100% { box-shadow: 0 0 0 1px var(--vscode-charts-green); }
+}
+@media (prefers-reduced-motion: reduce) { .card.moved { animation: none; } }
+.moved-mark { margin-top: 4px; font-size: .82em; font-weight: 600; color: var(--vscode-charts-green); }
 .card.hidden { display: none; }
 .card-head { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .num { font-weight: 600; font-variant-numeric: tabular-nums; }

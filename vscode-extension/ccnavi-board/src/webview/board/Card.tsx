@@ -5,6 +5,7 @@
 import type { JSX } from "react";
 
 import type { Action, Card, PhaseChip } from "../../core/board.js";
+import type { Moved } from "../../core/board-moved.js";
 import { post } from "./post.js";
 import {
   COPY_LABELS,
@@ -12,6 +13,7 @@ import {
   holdLabel,
   isHighRisk,
   isHttpUrl,
+  movedLabel,
   mrText,
   phaseStatusBrief,
   phaseStatusFull,
@@ -19,7 +21,11 @@ import {
   worktreeName,
 } from "./text.js";
 
-export function CardItem({ card, hidden }: { readonly card: Card; readonly hidden: boolean }): JSX.Element {
+/**
+ * `moved` は、前の読み直しからこのカードが動いたこと（`core/board-moved.ts`）。動いていなければ
+ * 渡らない。何が動いたかを決めるのは画面（`App.tsx`）で、ここは受け取った分に印を出すだけ。
+ */
+export function CardItem({ card, hidden, moved }: { readonly card: Card; readonly hidden: boolean; readonly moved?: Moved }): JSX.Element {
   const classes = ["card", card.isParent ? "parent" : "child"];
   if (card.issues.length > 0) {
     classes.push("has-issue");
@@ -29,6 +35,9 @@ export function CardItem({ card, hidden }: { readonly card: Card; readonly hidde
   }
   if (card.pendingApproval) {
     classes.push("pending");
+  }
+  if (moved !== undefined) {
+    classes.push("moved");
   }
   if (hidden) {
     classes.push("hidden");
@@ -51,6 +60,7 @@ export function CardItem({ card, hidden }: { readonly card: Card; readonly hidde
       data-project={card.project}
       data-family={card.family}
       data-attention={card.attention ? "1" : "0"}
+      data-moved={moved === undefined ? undefined : `${moved.from ?? "none"}-${moved.to}`}
       tabIndex={0}
       onClick={(event) => open(event.target)}
       onKeyDown={(event) => {
@@ -65,6 +75,11 @@ export function CardItem({ card, hidden }: { readonly card: Card; readonly hidde
         <span className="title">{card.title}</span>
         <span className="where">{where}</span>
       </div>
+      {moved !== undefined ? (
+        <div className="moved-mark" title="前の読み直しから動いた。次に何かが動くまで残る">
+          {movedLabel(moved)}
+        </div>
+      ) : null}
       {card.stage !== "" ? <div className="stage">{card.stage}</div> : null}
       <Badges card={card} />
       <Facts card={card} />

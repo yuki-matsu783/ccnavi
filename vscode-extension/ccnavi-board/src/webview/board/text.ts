@@ -2,7 +2,8 @@
  * カードとフェーズ行に出す言葉。判定は実行ファイルがやっていて、ここは JSON が言ったことを
  * 言い換えるだけ。マーカーや済みから状態を組み直さない（ADR-0035）。
  */
-import type { Card, PhaseChip } from "../../core/board.js";
+import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
+import type { Moved } from "../../core/board-moved.js";
 
 export const COPY_LABELS = { none: "未承認", open: "承認済", review: "レビュー待ち", closed: "クローズ" } as const;
 
@@ -14,6 +15,18 @@ export const MARK_LABELS: Readonly<Record<string, string>> = {
 };
 
 export const PHASE_STATE_LABELS = { planned: "未計画", active: "進行中", ended: "終了" } as const;
+
+/** 列の呼び名。列の並びと同じ 1 か所（`core/board.ts` の `COLUMNS`）から引く */
+const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));
+
+/**
+ * 前の読み直しから動いたカードに出す帯の言葉。「未着手 → 作業中」。
+ * 前には無くて新しく現れたカードは、どこから来たとも言えないので「新しく出た」。
+ */
+export function movedLabel(moved: Moved): string {
+  const to = COLUMN_LABELS[moved.to] ?? moved.to;
+  return moved.from === undefined ? `新しく出た（${to}）` : `${COLUMN_LABELS[moved.from] ?? moved.from} → ${to}`;
+}
 
 /**
  * レビューが済むまで止めている間の呼び名。依頼を出す前はエージェントの番（合流・push・依頼）で
