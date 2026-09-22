@@ -526,7 +526,7 @@ src/
     testmodel.ts      試験の JSON の形（--test --json / --test-samples --json）と読み取り
     lintmodel.ts      lint の JSON の形（--lint --json）と読み取り、プロジェクトごとの苦情の抜き出し
     board.ts          列とカードへの組み立て、操作の有無
-    board-moved.ts    前の読み直しから列が変わったカードと、新しく現れたカード（いまの状態 ＋ 読めたボード → 次の状態）。持ち直すのは board-panel。VS Code に触れないので単体で試せる（ADR-0073）
+    board-moved.ts    前の読み直しから列が変わったカードと、新しく現れたカード（いまの状態 ＋ 読めたボード → 次の状態）。持ち直すのは board-panel。VS Code に触れないので単体で試せる（ADR-0074）
     board-view.ts     ボードの拡張ホストと画面の契約（見せる中身 BoardData、押した操作 BoardMessage、承認のオーバーレイの状態）
     approval-machine.ts 承認のオーバーレイの遷移（いまの状態 ＋ 入力 → 次の状態 ＋ やること）。外へ出る仕事は返すだけで、行うのは board-panel。VS Code に触れないので単体で試せる（ADR-0068）
     screen-host.ts    画面に中身を渡す段取り（送る / 入れ物ごと / 作り直し中で持ち越し）。VS Code に触れないので単体で試せる
