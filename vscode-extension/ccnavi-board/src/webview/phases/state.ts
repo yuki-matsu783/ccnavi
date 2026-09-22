@@ -107,7 +107,7 @@ export function saveView(view: View): void {
   setState({ ...((getState() ?? {}) as object), view });
 }
 
-/** 控えてある点の位置。数でない値は落とす（前の版の控えが混ざっても図が壊れないように） */
+/** 控えてある点の位置。Webview の state は型を持たず、値はそのまま SVG の座標になるので、数でない値はここで落とす */
 export function loadSpots(): Spots {
   const saved = (getState() ?? {}) as { spots?: unknown };
   const raw = typeof saved.spots === "object" && saved.spots !== null ? (saved.spots as Record<string, unknown>) : {};
