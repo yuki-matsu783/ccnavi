@@ -98,22 +98,77 @@ class BoardTest(PhaseHarness):
             sorted({s["state"] for s in by_id["i0001-01"]["seen_in"]}), ["doing", "done"]
         )
 
-    def test_scattered_lists_every_copy_when_the_home_tree_holds_none(self):
-        """権威のツリーに無ければ、どれが本物か決まらない。候補を全部出す。"""
-        self.scene()
-        home = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-03.md")
-        with open(home, encoding="utf-8") as f:
+    def move(self, ticket_id, source_tree, target_tree, state="todo"):
+        """提案を 1 つ、ツリーからツリーへ手で動かす。権威のツリーを作り変えるため。"""
+        source = os.path.join(source_tree, "wip", "proposals", state, ticket_id + ".md")
+        with open(source, encoding="utf-8") as f:
             text = f.read()
-        os.remove(home)
-        write(os.path.join(self.root, "wip", "proposals", "todo", "i0001-03.md"), text)
+        os.remove(source)
+        return write(os.path.join(target_tree, "wip", "proposals", state, ticket_id + ".md"), text)
+
+    def test_scattered_is_empty_when_the_home_tree_is_gone_but_the_origin_holds_one(self):
+        """親のツリーが無ければ元ツリーが権威。畳んだだけの形を散在に数えない。
+
+        親のワークツリーは合流したら畳む。そこを落ち先の無いまま数えると、片付けた
+        家族のカードが全部「複数の場所にある」になり、状態の操作も止まる。
+        """
+        self.scene()
+        self.move("i0001-03", self.parent_tree, self.root)
+
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(by_id["i0001-03"]["scattered"], [])
+        # 写り自体は残る。決まらなさだけを scattered が言う。
+        self.assertEqual(
+            [(s["tree"], s["state"]) for s in by_id["i0001-03"]["seen_in"]],
+            [("", "todo"), ("i0001-02", "todo")],
+        )
+
+    def test_scattered_lists_every_copy_when_no_authoritative_tree_holds_one(self):
+        """親のツリーにも元ツリーにも無ければ、どれが本物か決まらない。候補を全部出す。"""
+        self.scene()
+        elsewhere = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        self.move("i0001-03", self.parent_tree, elsewhere)
 
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(
-            [(s["tree"], s["state"]) for s in by_id["i0001-03"]["scattered"]],
-            [("", "todo"), ("i0001-02", "todo")],
+            sorted((s["tree"], s["state"]) for s in by_id["i0001-03"]["scattered"]),
+            [("i0001-01", "todo"), ("i0001-02", "todo")],
         )
         # 巻き込まれていない識別子は空のまま。
         self.assertEqual(by_id["i0001-02"]["scattered"], [])
+
+    def test_scattered_says_the_same_tree_holding_two_places(self):
+        """動かす途中で止まった跡は、権威のツリーの中でも言う（`--lint` と同じ数え方）。"""
+        self.scene()
+        doing = os.path.join(self.approved, "doing", "i0001-02.md")
+        with open(doing, encoding="utf-8") as f:
+            text = f.read()
+        write(os.path.join(self.approved, "done", "i0001-02.md"), text)
+
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        self.assertEqual(
+            sorted((s["tree"], s["state"]) for s in by_id["i0001-02"]["scattered"]),
+            [("i0001", "doing"), ("i0001", "done")],
+        )
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn("i0001-02 が複数の場所にある", lint.stdout)
+
+    def test_a_ticket_waiting_for_review_is_not_scattered(self):
+        """`review/` は提案の置き場でもあり承認済みチケットでもある。同じ実体を 2 つと数えない。"""
+        self.scene()
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        review = [t for t in self.board()["tickets"] if t["copy"]["status"] == "review"]
+        self.assertEqual([t["ticket"] for t in review], [])
+        self.assertEqual(self.close_child("i0001-02").returncode, 0)
+
+        by_id = {t["ticket"]: t for t in self.board()["tickets"]}
+        waiting = by_id["i0001-02"]
+        self.assertEqual(waiting["copy"]["status"], "review")
+        self.assertEqual(waiting["scattered"], [])
+        # 同じファイルを 2 つの走査が拾っても、写りは 1 ツリーに 1 つ。
+        self.assertEqual(
+            len({(s["tree"], s["state"]) for s in waiting["seen_in"]}), len(waiting["seen_in"])
+        )
 
     def test_pending_approval_lists_proposals_without_a_copy(self):
         self.scene()

@@ -7,6 +7,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
+import type { Moved } from "../../src/core/board-moved.js";
+import type { BoardData } from "../../src/core/board-view.js";
 import { fixture } from "../helpers/fixture.js";
 import { approvePreview, openBoard, openPage } from "../helpers/board.js";
 import type { Element, Event, HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
@@ -378,6 +380,59 @@ test("CB-D52 ドラッグの途中で列が消えても、掴んだままの印�
     await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
     assert.equal(page.all(".column").length, 0);
     assert.ok(!page.document.body.classList.contains("resizing"));
+  } finally {
+    await page.close();
+  }
+});
+
+/** 前の読み直しから動いたカード。数えるのは拡張ホストで、画面には `moved` として渡る */
+function data(moved?: readonly Moved[]): BoardData {
+  return { kind: "board", board: buildBoard(fixture()), moved };
+}
+
+test("CB-D82 渡された分にだけ印を出す。渡されなければ出さない", async () => {
+  const page = await openBoard();
+  try {
+    // 開いた直後は拡張ホストが何も渡さない（比べる相手が無い）。全部が光ると「動いた」の意味が無くなる
+    assert.deepEqual(page.all(".card.moved"), []);
+
+    await page.send({ type: "data", data: data([{ id: "i0001-03", from: "todo", to: "doing" }]) });
+    assert.deepEqual(
+      page.all(".card.moved").map((card) => card.getAttribute("data-id")),
+      ["i0001-03"],
+    );
+    const card = page.one('.card[data-id="i0001-03"]');
+    assert.equal(card.getAttribute("data-moved"), "todo-doing");
+    assert.equal(card.querySelector(".moved-mark")?.textContent, "未着手 → 作業中");
+
+    // 承認の文のオーバーレイを出し入れしても、拡張ホストが同じ分を渡し続ける限り印は消えない
+    await page.send({
+      type: "data",
+      data: { ...data([{ id: "i0001-03", from: "todo", to: "doing" }]), approval: { kind: "done", count: 1, prompt: "文" } },
+    });
+    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-03"]);
+
+    // 別のカードが動いたと渡されたら、印はそちらに移る
+    await page.send({ type: "data", data: data([{ id: "i0001-02", from: "doing", to: "done" }]) });
+    assert.deepEqual(page.all(".card.moved").map((c) => c.getAttribute("data-id")), ["i0001-02"]);
+
+    // 何も渡されなければ印は出ない（読み直せなかった画面を挟んだ後も同じ）
+    await page.send({ type: "data", data: { kind: "error", error: "読めない" } });
+    await page.send({ type: "data", data: data() });
+    assert.deepEqual(page.all(".card.moved"), []);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-D82b 新しく出たカードは「新しく出た」と言う", async () => {
+  const page = await openBoard();
+  try {
+    await page.send({ type: "data", data: data([{ id: "i0001-03", to: "todo" }]) });
+    const card = page.one('.card[data-id="i0001-03"]');
+    assert.ok(card.classList.contains("moved"));
+    assert.equal(card.getAttribute("data-moved"), "none-todo");
+    assert.equal(card.querySelector(".moved-mark")?.textContent, "新しく出た（未着手）");
   } finally {
     await page.close();
   }

@@ -294,7 +294,6 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         </h2>
         <div className="find">
           <input id="find" type="search" placeholder="id・当て方・値・文面で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
-          <span className="hint">行を押すと開く</span>
         </div>
         <details className="help">
           <summary>この欄の説明</summary>

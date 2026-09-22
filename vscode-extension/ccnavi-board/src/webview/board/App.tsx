@@ -1,12 +1,14 @@
 /**
  * ボード画面の本体。列とカード、絞り込み、承認のオーバーレイ。
  *
- * 見せる中身は拡張ホストが渡す（`BoardData`）。画面が自分で持つのは、人が触って決めるもの
- * （絞り込み・畳んだ列・列の幅・「更新」を押したか）だけ。判定はしない。
+ * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いたカードの印も、
+ * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、人が触って
+ * 決めるもの（絞り込み・畳んだ列・列の幅・「更新」を押したか）だけ。判定はしない。
  */
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
+import type { Moved } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { applyAppearance } from "../appearance.js";
 import { post } from "./post.js";
@@ -98,6 +100,10 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
     saveState({ project, parent, attention, folded: view.folded, widths: view.widths });
   }, [board === undefined, project, parent, attention, view.folded, view.widths]);
+
+  // 前の読み直しから動いたカード。数えるのは拡張ホスト（`core/board-moved.ts`）で、画面は出すだけ
+  const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
+  const movedOf = (card: Card): Moved | undefined => moved.get(card.id);
 
   const hiddenOf = (card: Card): boolean =>
     (project !== EMPTY.project && card.project !== project) ||
@@ -196,6 +202,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 key={column.state}
                 column={column}
                 hiddenOf={hiddenOf}
+                movedOf={movedOf}
                 folded={view.folded.includes(column.state)}
                 width={view.widths[column.state]}
                 onFold={(folded) =>
@@ -242,6 +249,7 @@ function Footer({ board }: { readonly board: Board }): JSX.Element {
 function Column({
   column,
   hiddenOf,
+  movedOf,
   folded,
   width,
   onFold,
@@ -249,6 +257,7 @@ function Column({
 }: {
   readonly column: BoardColumn;
   readonly hiddenOf: (card: Card) => boolean;
+  readonly movedOf: (card: Card) => Moved | undefined;
   readonly folded: boolean;
   readonly width: number | undefined;
   readonly onFold: (folded: boolean) => void;
@@ -329,7 +338,7 @@ function Column({
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (
-            <CardItem key={card.id} card={card} hidden={hiddenOf(card)} />
+            <CardItem key={card.id} card={card} hidden={hiddenOf(card)} moved={movedOf(card)} />
           ))}
         </ul>
       )}
