@@ -602,6 +602,25 @@ class PostToolUseTest(unittest.TestCase):
 
         self.assertEqual(result.stdout, "", "取り込んだぶんを自分のターンの成果にしない")
 
+    def test_ターンの途中で切ったツリーも触った時点から数える(self):
+        # ワークツリーを切ってから手を付けるのがこのリポジトリの手順。切ったターンが
+        # まるごと数えられないと、その手順を踏むほど穴が大きくなる。
+        self.run_hook(event="UserPromptSubmit")
+        later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
+        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+        # 切ったあとの 1 回で基準が付く（この呼び出しの行き先がそのツリー）。
+        self.run_hook(tool="Write", file_path=os.path.join(later, "src", "app.py"))
+        write(os.path.join(later, "protected", "keep.txt"), "切ったあとに汚してコミット\n")
+        git(later, "add", "--", "protected/keep.txt")
+        git(later, "commit", "--quiet", "-m", "切ったあとのコミット")
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertIn("wt1", message)
+        self.assertNotIn("数えていないツリー", message, "基準が付いたツリーは数える")
+
     def test_基準を持たないツリーは数えていないと言う(self):
         # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
         # 持たない。黙って飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。

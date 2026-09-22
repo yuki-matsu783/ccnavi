@@ -127,6 +127,16 @@ def check(
     if not read:
         return ""
 
+    # ターンの基準を持たないツリーを初めて見たら、その場で控える。ターンの途中で
+    # 切られたワークツリーがこれにあたる（`at_prompt` のときには無いので基準が無く、
+    # 基準が無いツリーのコミットはターンの終わりに数えられない）。ワークツリーを
+    # 切ってから手を付けるのがこのリポジトリの手順なので、切ったターンがまるごと
+    # その穴に入っていた。触った時点から先は数えられるようにする。
+    #
+    # 触られないまま終わったツリーには、ここでも基準が付かない。そちらは
+    # ターンの終わりが「数えていない」と言う（`_uncounted_line`）。
+    _note_new_trees(stderr, state_dir, payload.session_id, read)
+
     seen, first_time = _load_seen(stderr, state_dir, payload.session_id)
 
     found = [
@@ -227,6 +237,35 @@ def check(
             "Run 'git status' to see the rest before you undo anything."
         )
     return "\n\n".join(shown)
+
+
+def _note_new_trees(
+    stderr: TextIO,
+    state_dir: str,
+    session: str,
+    read: list[tuple[Watched, str, list[gitstate.Change]]],
+) -> None:
+    """ターンの基準にまだ居ないツリーの HEAD を控える。居るツリーには触らない。
+
+    書き直すのは、控えに無いツリーが 1 本でもあるときだけ。呼び出しのたびに
+    控えを書き直すと、ツールを打つ数だけ書き込みが増える。ターンの基準そのもの
+    （`baseline`）は動かさない。あれは「ターンの始まりに何が汚れていたか」で、
+    あとから足すと、このターンで現れた汚れを前から在ったことにしてしまう。
+    """
+    baseline, known, heads = _load_turn(stderr, state_dir, session)
+    if not known:
+        # ターンの始まりを見ていない。基準そのものが無いので、ここで HEAD だけを
+        # 置くと「基準はあるが baseline が空」に化ける。何もしない。
+        return
+    fresh_heads = {}
+    for _, top, _ in read:
+        if not top or top in heads:
+            continue
+        sha = gitstate.head(top)
+        if sha:
+            fresh_heads[top] = sha
+    if fresh_heads:
+        _save_turn(stderr, state_dir, session, baseline, {**heads, **fresh_heads})
 
 
 def _committed_findings(
