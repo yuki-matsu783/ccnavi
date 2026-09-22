@@ -8,8 +8,14 @@
  * プロジェクトになっていない `.git` の探し方だけ。
  */
 import { shellQuote, toPosixPath } from "./commands.js";
-import { problemsOfProject, problemsOfProjectsDir, type LintJson, type LintProblem } from "./lintmodel.js";
+import { problemsOfProject, problemsOfProjectsDir, type LintJson } from "./lintmodel.js";
 import type { BoardJson } from "./model.js";
+import type { ProjectRow, ProjectsPage, Stray } from "./projects-view.js";
+
+// 画面に渡す形（`ProjectRow` / `ProjectsPage` / `Stray`）は契約の側（`projects-view.ts`）が持つ。
+// Webview は Node の API を持たないので、そこから `commands.ts` を辿らせないため。
+// 呼び手はここから読めるままにしておく。
+export type { ProjectRow, ProjectsPage, Stray };
 
 // ---- clone の入力
 
@@ -138,12 +144,6 @@ export interface DirEntry {
   readonly isDir: boolean;
 }
 
-export interface Stray {
-  /** ワークスペースルートからの相対、"/" 区切り */
-  readonly path: string;
-  readonly reason: string;
-}
-
 /** 歩かないディレクトリ。ワークツリーは trees に既にあり、依存の置き場は深くて遅い */
 export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", ".venv", ".claude"]);
 
@@ -152,7 +152,7 @@ const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 
 export const REASON_OUTSIDE = "projects/ の外にある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
-export const REASON_TOO_DEEP = "projects/ の 2 階層目より深くにある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
+export const REASON_TOO_DEEP = "projects/ の直下ではなく、その下の階層にある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
 
 export interface StrayInput {
   /** 置き場のルートからの相対（"/" 区切り）。空なら置き場が無効 */
@@ -224,7 +224,7 @@ export function gitignoreWithProjects(text: string | undefined, projectsRel: str
 export function rewriteRulesForProject(text: string, sourceRel: string, layer: string, date: string): string {
   const header = [
     `# ${layer} のルール。共通層の ${sourceRel} を ${date} に写した（ccnavi ボード）。`,
-    "# このファイルは共通層に足して当たる（上書きはしない）。共通層と全欄が同じ行は重複として捨てられ、--lint が info で言う。",
+    "# このファイルは共通層に足してヒットする（上書きはしない）。共通層と全欄が同じ行は重複として捨てられ、--lint が info で言う。",
     "# 文面の sh の綴りは {root}/.ccnavi/scripts/... に置き換えてある（{root} はワークスペースルートに展開される）。",
     "# 置き換えた行は共通層の行と中身が違う扱いになり、両方効く（--lint が warn で言う）。要らない行は消す。",
     "",
@@ -233,44 +233,6 @@ export function rewriteRulesForProject(text: string, sourceRel: string, layer: s
 }
 
 // ---- 画面の中身
-
-export interface ProjectRow {
-  readonly name: string;
-  readonly root: string;
-  /** ルートからの相対、"/" 区切り */
-  readonly rel: string;
-  /** プロジェクトの層のルールファイル。ルートからの相対、"/" 区切り。層として数えられていない（予約名）なら空 */
-  readonly rulesRel: string;
-  readonly rulesExists: boolean;
-  readonly hasClaudeDir: boolean;
-  readonly origin: string;
-  readonly originKey: string;
-  readonly worktrees: readonly string[];
-  readonly tickets: number;
-  /** 作業中（ボードの作業中の列と同じ。`.ccnavi/approved/doing/` にあるものと、レビュー待ち `wip/proposals/review/`） */
-  readonly doing: number;
-  readonly problems: readonly LintProblem[];
-}
-
-export interface ProjectsPage {
-  readonly root: string;
-  readonly generatedAt: string;
-  readonly ticketsEnabled: boolean;
-  /** 置き場（絶対）。空なら置き場が無効（CCNAVI_PROJECTS が空） */
-  readonly projectsDir: string;
-  readonly projectsRel: string;
-  readonly ignored: boolean;
-  readonly lintError: string;
-  readonly dirProblems: readonly LintProblem[];
-  readonly rows: readonly ProjectRow[];
-  readonly strays: readonly Stray[];
-  readonly workspaceWorktrees: readonly string[];
-  /** 自身の層のルールファイル。ルートからの相対、"/" 区切り */
-  readonly selfRulesRel: string;
-  readonly selfRulesExists: boolean;
-  /** 名前の衝突を見る既存のツリー名（ワークスペース自身の空は除く） */
-  readonly existingNames: readonly string[];
-}
 
 export interface PageInput {
   readonly board: BoardJson;

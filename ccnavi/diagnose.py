@@ -138,7 +138,7 @@ def try_one(stderr: TextIO, conf: settings.Settings, root: str, tool: str, subje
     out["fallback"] = record.fallback or ""
     out["rules"] = _rules_hit(stderr, conf, root, record)
     out["response"] = _response_text(captured.getvalue())
-    # 引用の中から切り出したコマンドにだけ当たったルールの id。記録と同じく、
+    # 引用の中から切り出したコマンドにだけヒットしたルールの id。記録と同じく、
     # 空なら鍵ごと出さない。読み手（VS Code 拡張）の知っている鍵の並びを、
     # この場合が無い呼び出しで変えないため。
     if record.quoted:
@@ -164,7 +164,7 @@ def test(
     if not out["known"]:
         stdout.write(f"verdict: (判定に入らない)\ntool: {tool}\n")
         stdout.write(
-            f"note: {tool} は判定が対象を取り出せないツール。ルールを書いても当たらず、"
+            f"note: {tool} は判定が対象を取り出せないツール。ルールを書いてもヒットせず、"
             "呼び出しはそのまま通る\n"
         )
         return 0
@@ -187,7 +187,7 @@ def test(
         stdout.write(f"fallback: {out['fallback']}（組み込みの既定で判定した）\n")
 
     if not out["rules"]:
-        stdout.write("rules: (どのルールにも当たらなかった)\n")
+        stdout.write("rules: (どのルールにもヒットしなかった)\n")
     else:
         stdout.write("rules:\n")
         for hit in out["rules"]:
@@ -199,7 +199,8 @@ def test(
             stdout.write(f"    -> {hit['pattern'] or '(組み立て失敗)'}\n")
     if out.get("quoted"):
         stdout.write(
-            f"quoted: {', '.join(out['quoted'])}（引用の中から切り出したコマンドにだけ当たった）\n"
+            f"quoted: {', '.join(out['quoted'])}"
+            "（引用の中から切り出したコマンドにだけヒットした）\n"
         )
 
     if not out["response"]:
@@ -413,7 +414,7 @@ def test_samples(
         stdout.write(f"  なぜ deny/ask/allow に置いたか: {r['why']}\n")
         hit = ", ".join(f"{h['section']}:{h['id']}" for h in r["rules"] if h["source"] == "file")
         if hit:
-            stdout.write(f"  当たったルール: {hit}\n")
+            stdout.write(f"  ヒットしたルール: {hit}\n")
         stdout.write("\n")
     for r in body["samples"]:
         if not r["skipped"]:
@@ -629,7 +630,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     for parent in [t for t in copies if not t.is_child]:
         where = phase.stage(root, conf, parent)
         if where:
-            stdout.write(f"  {parent.ticket} の段階: {where}\n")
+            stdout.write(f"  {parent.ticket} の局面: {where}\n")
         where = approval.home_dir(conf, root, parent.ticket, "")
         wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP)
         if wrapped:
@@ -755,7 +756,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
             )
         )
 
-    # 親ごとの段階とフェーズ。承認済みチケットのある親だけ。承認前の親はフェーズを持たない。
+    # 親ごとの局面とフェーズ。承認済みチケットのある親だけ。承認前の親はフェーズを持たない。
     for parent in sorted(open_copies + closed_copies, key=lambda x: x.ticket):
         if parent.is_child:
             continue
@@ -889,6 +890,10 @@ def _ticket_record(
             if proposal is not None
             else None
         ),
+        # blocked は「読めるが信じられない」理由（ADR-0058）。判定はこのチケットの
+        # ワークツリーへの書き込みを全部止めるので、ボードが素の open として見せると、
+        # 止まっていること自体が人に届かない。
+        "blocked": (open_index[ticket_id].blocked if ticket_id in open_index else ""),
         "copy": (
             {
                 "status": status,
@@ -958,7 +963,7 @@ def _phase_record(ph: phase.Phase) -> dict:
 def _parent_record(
     conf: settings.Settings, root: str, parent: ticket_mod.Ticket, closed_index: dict
 ) -> dict:
-    """親 1 件。段階、計画、親のマーカー、フェーズの並び。"""
+    """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
     where = approval.home_dir(conf, root, parent.ticket, "")
     return {
         "ticket": parent.ticket,

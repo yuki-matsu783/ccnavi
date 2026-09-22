@@ -42,8 +42,8 @@ def at_start(
     サブエージェントが自分のツリーと範囲を知れるようにする。
 
     渡すのは cwd で決める。親のワークツリーならその親の開いている子、子のワークツリーなら
-    その子自身。main と、チケットの無いワークツリーからの起動には何も渡さない。
-    全部の子を渡すと、別のセッションが main で調査を委譲したときにも無関係な
+    その子自身。ワークスペースルートと、チケットの無いワークツリーからの起動には何も渡さない。
+    全部の子を渡すと、別のセッションがワークスペースルートで調査を委譲したときにも無関係な
     子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
@@ -146,9 +146,11 @@ def at_stop(
         lines.append(f"  {child.ticket}: {rel}{_limit_note(child, found)}  範囲は {area}")
     text = "\n".join(lines)
 
-    already = _bounced(conf.state, payload.agent_id)
+    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前に落とす。
+    who = payload.agent_id or (t.name if t is not None else "")
+    already = _bounced(conf.state, payload.session_id, who)
     if mode == modes.ENABLE and not already:
-        _remember_bounce(stderr, conf.state, payload.agent_id)
+        _remember_bounce(stderr, conf.state, payload.session_id, who)
         record.enforced = True
         stderr.write(text + "\n")
         return EXIT_BLOCK
@@ -163,6 +165,8 @@ def _limit_note(child: ticket_mod.Ticket, found: phase.ScopeVerdict) -> str:
     添えないと、承認で見た範囲の中を書いたのに差し戻された理由が読めず、範囲の中へ
     戻せと言われても戻し先が分からない。
     """
+    if found.limit == phase.LIMIT_BLOCKED:
+        return f"（チケットが信じられない: {child.blocked}）"
     if found.limit == phase.LIMIT_TYPE and found.type is not None:
         return f"（種類 {found.type.title} の上限の外）"
     if found.limit == phase.LIMIT_PARENT:
@@ -175,9 +179,9 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
     if payload.tool_name != judge.AGENT_TOOL:
         return ""
     agent_id = str(payload.tool_response.get("agentId") or "")
-    if not agent_id or not _bounced(state_dir, agent_id):
+    if not agent_id or not _bounced(state_dir, payload.session_id, agent_id):
         return ""
-    fsio.remove(_bounce_path(state_dir, agent_id))
+    fsio.remove(_bounce_path(state_dir, payload.session_id, agent_id))
     return (
         f"[ccnavi] {post.CODE_TICKET_SCOPE}: サブエージェント {agent_id} は範囲外の変更を"
         "差し戻されたまま終わっています。合流する前に、その子のワークツリーの範囲外の"
@@ -185,18 +189,32 @@ def ignored_bounce(state_dir: str, payload: hookio.Input) -> str:
     )
 
 
-def _bounce_path(state_dir: str, agent_id: str) -> str:
-    safe = fsio.safe_name(agent_id) or "unknown"
-    return os.path.join(state_dir, f"subagent-{safe}.bounced")
+def _bounce_path(state_dir: str, session: str, who: str) -> str:
+    """差し戻しの印の置き場。セッションと、その中で相手を見分ける鍵で分ける。
+
+    セッションを鍵に入れるのは、控えの置き場がワークスペースに 1 つしか無いから。
+    入れないと、別のセッションが置いた印を読んで、一度も差し戻していない相手を
+    「差し戻し済み」として通す。印が消えるのは、親の PostToolUse が `agentId` を
+    持って通ったときだけなので、残った 1 つは次の日のセッションまで効く。
+
+    `who` は `agent_id`。持たない payload では、そのワークツリーの名前に落とす。
+    1 つの綴り（`unknown`）に全員を寄せると、最初の 1 体が差し戻されたあと、
+    同じ置き場を見る他のサブエージェントが誰も差し戻されなくなる。しかも
+    `agent_id` を持たない相手の印は `ignored_bounce` が消せないので、消えない。
+    ツリーの名前なら、少なくとも別の子で作業する相手は巻き込まない。
+    """
+    where = fsio.safe_name(session) or "unknown"
+    safe = fsio.safe_name(who) or "unknown"
+    return os.path.join(state_dir, f"subagent-{where}-{safe}.bounced")
 
 
-def _bounced(state_dir: str, agent_id: str) -> bool:
-    return bool(state_dir) and os.path.exists(_bounce_path(state_dir, agent_id))
+def _bounced(state_dir: str, session: str, who: str) -> bool:
+    return bool(state_dir) and os.path.exists(_bounce_path(state_dir, session, who))
 
 
-def _remember_bounce(stderr: TextIO, state_dir: str, agent_id: str) -> None:
+def _remember_bounce(stderr: TextIO, state_dir: str, session: str, who: str) -> None:
     if not state_dir:
         return
-    failed = fsio.write_text(_bounce_path(state_dir, agent_id), fsio.stamp())
+    failed = fsio.write_text(_bounce_path(state_dir, session, who), fsio.stamp())
     if failed:
         stderr.write(f"ccnavi: 差し戻しの回数を書けない: {failed}\n")

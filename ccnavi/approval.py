@@ -11,6 +11,12 @@
 承認済みチケットは `.ccnavi/approved/` に置く。ccnavi ディレクトリの下なので、組み込みの
 守りがエージェントの書き込みを止める。
 
+**権威はこの置き場で、`ccnavi_approved` の欄ではない（ADR-0058）。** 欄は承認の記録で、
+持たないチケットも承認済みとして読む。そこに置けたのは書ける権限を持つ人だけだから。
+だから提案を手で `doing/` へ動かすことが、端末とボードに続く 3 つめの承認の経路になる。
+その経路は承認の画面を通らないので、承認のときにしか当たらなかった構造の検査は
+`blocking_problems` が判定の側で当てる。
+
 ## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
 
 承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。写しを置いて
@@ -41,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import fsio, phasetypes, rules, settings, tree
+from . import fsio, modes, phasetypes, rules, settings, tree
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -85,7 +91,9 @@ def copies(approved_dir: str, closed: bool = False) -> tuple[list[ticket_mod.Tic
     return _load_dir(directory)
 
 
-def _load_dir(directory: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
+def _load_dir(
+    directory: str, require_record: bool = False
+) -> tuple[list[ticket_mod.Ticket], list[str]]:
     try:
         names = sorted(os.listdir(directory))
     except FileNotFoundError:
@@ -97,7 +105,7 @@ def _load_dir(directory: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
         if not name.endswith(".md"):
             continue
         path = os.path.join(directory, name)
-        ticket, reason = load_copy(path)
+        ticket, reason = load_copy(path, require_record)
         if ticket is None:
             notes.append(f"承認済みチケット {path} を読めない（{reason}）")
             continue
@@ -117,22 +125,33 @@ def state_of(directory: str, ticket: ticket_mod.Ticket) -> str:
     return name
 
 
-def load_copy(path: str) -> tuple[ticket_mod.Ticket | None, str]:
+def load_copy(path: str, require_record: bool = False) -> tuple[ticket_mod.Ticket | None, str]:
     """承認済みチケットを 1 本読む。2 つめは読めなかった理由。
 
     理由を返すのは、読めない承認済みチケットを `--lint` が名指しするため。
     「読めない」だけでは、BOM のような目に見えない原因に手が届かない。
+
+    `require_record` は `ccnavi_approved` の欄を必須にするか。`.ccnavi/approved/` は
+    組み込みの守りがエージェントの書き込みを止めるので、置き場だけで承認と言える
+    （ADR-0058）。`wip/proposals/review/` はエージェントが書ける側にあるので、そこは
+    欄を求め続ける（`review_all`）。守りが 1 枚しか無い置き場で欄まで外すと、
+    組み込みの deny をすり抜けて置かれたファイルが承認済みとして読まれる。
     """
     ticket, problems = ticket_mod.load(path)
     if ticket is None:
         detail = problems[0].detail if problems else "チケットとして読めない"
         return None, detail
+    # `ccnavi_approved` は承認の記録であって、承認そのものではない（ADR-0058）。権威は
+    # 置き場で、`.ccnavi/approved/` は組み込みの守りがエージェントの書き込みを止める。
+    # 欄を必須にすると、端末もボードも無い人が置き場を動かして承認する道が塞がる。
+    # 欄が無いぶんの検査（親子・計画・置き場）は `blocking_problems` が判定の側で当てる。
     meta = ticket.raw.get(ticket_mod.APPROVAL_KEY)
-    if not isinstance(meta, dict):
+    if require_record and not isinstance(meta, dict):
         return None, f"`{ticket_mod.APPROVAL_KEY}` の欄が無い。承認を通っていない"
-    ticket.approved_at = str(meta.get("approved_at") or "")
-    ticket.source_tree = str(meta.get("source_tree") or "")
-    ticket.source_path = str(meta.get("source_path") or "")
+    if isinstance(meta, dict):
+        ticket.approved_at = str(meta.get("approved_at") or "")
+        ticket.source_tree = str(meta.get("source_tree") or "")
+        ticket.source_path = str(meta.get("source_path") or "")
     # tree は「どのツリーで見つけたか」。scan_all が入れ直す。source_tree（どのツリーの
     # 提案を写したか）とは別物で、子のワークツリーの checkout では食い違う。
     ticket.tree = ticket.source_tree
@@ -162,7 +181,7 @@ def scan_all(
     for t in trees(conf, root):
         got, complaints = copies(settings.approved_dir(conf, t.root), closed)
         for c in got:
-            c.tree, c.tree_root = t.name, t.root
+            c.tree, c.tree_root, c.project = t.name, t.root, t.project
         found.extend(got)
         notes.extend(complaints)
     return found, notes
@@ -172,15 +191,17 @@ def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Tick
     """全ツリーのレビュー待ち（提案の置き場の `review/`）を、重複を畳まずに集める。
 
     ここに在るのは承認済みチケットが `done` で動いてきたもの。`ccnavi_approved` を持たない
-    ファイルは読まない（人が手で置いたものは承認を通っていない）。
+    ファイルは読まない。この置き場はエージェントが書ける側にあり、守りは組み込みの
+    deny 1 枚なので、欄を 2 枚目の守りとして残す（ADR-0058）。
     """
     found: list[ticket_mod.Ticket] = []
     notes: list[str] = []
     for t in trees(conf, root):
         directory = os.path.join(t.root, conf.tickets.replace("/", os.sep), ticket_mod.REVIEW)
-        got, complaints = _load_dir(directory)
+        got, complaints = _load_dir(directory, require_record=True)
         for c in got:
             c.tree, c.tree_root, c.state = t.name, t.root, ticket_mod.REVIEW
+            c.project = t.project
         found.extend(got)
         notes.extend(complaints)
     return found, notes
@@ -197,9 +218,16 @@ def scan(
     開いたものとして復活する。権威のツリーがその識別子をどの置き場（作業中・レビュー待ち・
     閉じた）にも持っていないときだけ、見つかった側を残す（親のワークツリーを作る前に
     承認した分を落とさないため）。
+
+    返す前に `mark_blocked` が「信じられない理由」の印を付ける。承認のときにしか
+    当たらなかった構造の検査を、判定の側でも当てるため（ADR-0058）。
     """
     found, notes = scan_all(conf, root, closed)
-    return _authoritative(found, _everything(conf, root)), notes
+    kept = _authoritative(found, _everything(conf, root))
+    if not closed:
+        # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
+        mark_blocked(conf, kept)
+    return kept, notes
 
 
 def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
@@ -228,11 +256,6 @@ def _authoritative(
         home = hits[0].parent or hits[0].ticket
         kept.extend(hits if ticket_id not in at_home else [t for t in hits if t.tree == home])
     return kept
-
-
-def dir_of(conf: settings.Settings, ticket: ticket_mod.Ticket) -> str:
-    """この承認済みチケットが見つかったツリーの置き場。書き戻す先。"""
-    return settings.approved_dir(conf, ticket.tree_root)
 
 
 def home_dir(
@@ -301,11 +324,6 @@ def admit(approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approv
         fsio.remove(target)
         return f"提案を todo/ から動かせない ({exc})"
     return ""
-
-
-def update_copy(approved_dir: str, ticket: ticket_mod.Ticket, fields: dict) -> str:
-    """作業中の承認済みチケットの、スクリプトが書く欄だけを更新する。範囲には触らない。"""
-    return update_fields(copy_path(approved_dir, ticket.ticket), fields)
 
 
 def update_fields(path: str, fields: dict) -> str:
@@ -501,7 +519,7 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
 
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
-#   ready.json   Draft を外した（外してよいと確かめた）。マージに進んでよいの合図
+#   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
 #   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
 #   closed.json  親を閉じた（`ticket done <親>`）。どのフェーズをどこで見たかを残す
 #
@@ -802,7 +820,7 @@ def gather(
     if not pending and not revisions:
         return Gathered([], [], texts, {}, types, True, broken, "", note)
 
-    batch, rejected, pool = _candidates(root, conf, pending, revisions, approved)
+    batch, rejected, pool = candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
@@ -832,7 +850,13 @@ def preview(
             stdout.write(gathered.note + "\n\n")
         stdout.write(gathered.text + "\n")
         return 0
-    body = {
+    stdout.write(json.dumps(_preview_body(root, gathered), ensure_ascii=False) + "\n")
+    return 0
+
+
+def _preview_body(root: str, gathered: Gathered) -> dict:
+    """`--preview --json` が返す本体。`--verify --json` も同じものに答えを足して返す。"""
+    return {
         "version": APPROVE_VERSION,
         "root": root,
         "generated_at": now(),
@@ -845,8 +869,148 @@ def preview(
         ],
         "problems": gathered.problems,
     }
-    stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
-    return 0
+
+
+# `--verify` が返す理由。JSON の `verify.reason` に出る。
+VERIFY_OK = "ok"
+VERIFY_REFUSED = "refused"
+VERIFY_NOTHING = "nothing-pending"
+VERIFY_REJECTED = "rejected"
+
+
+@dataclass
+class Verdict:
+    """`--verify` の答え。通るかどうかと、その理由の名前と、端末に出す本文。"""
+
+    ok: bool
+    reason: str
+    text: str
+
+
+def verify(
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    as_json: bool,
+    only: list[str] | None = None,
+) -> int:
+    """`--approve --preview --verify`。いま `--approve` を打てば通るかを、置かずに返す。
+
+    エージェントが提案を書いたあと、人に承認を頼む前に自分で確かめるための枝
+    （REQ-APV-13）。置かないところも端末を求めないところも `--preview` と同じで、
+    違うのは「通るかどうか」を終了コードと本文で言うこと。
+
+    答えを `--preview` 自身に持たせない理由。読む側（VS Code のボード拡張）は 0 以外を
+    失敗として扱うので、承認の対象にしない提案が 1 件あるだけで一覧を出せなくなる。
+    見せる枝と確かめる枝を分け、判定そのものは `gather` の 1 か所に置く。
+
+    通る = 指定したもの（指定が無ければ承認待ち全部）が、そのまま承認の対象に入る。
+    次のどれかがあれば通らない。
+
+    - 絞りが通らない（承認待ちに無い識別子、親の改版を外した子）
+    - 承認待ちが 1 件も無い。承認を頼む前の確認としては失敗で、
+      提案の置き場を間違えた回がここに出る
+    - 承認の対象にしない提案がある（`rejected`）
+
+    落とさないものが 2 つある。どちらも `--approve` が落とさないもので、ここで落とすと
+    「確かめは『いいえ』なのに承認は通る」という食い違いになる。
+
+    - 範囲の超過（`overflow`）。承認は止まらず、判定が切り詰めるだけ。承認しても
+      書けない場所が残るのは伝える値打ちがあるから、その行に添えて見せる
+    - 読めない提案（`problems`）。走査は絞る前の全ツリーを見るので、他のセッションの
+      書きかけ 1 本で、自分の提案が通るのに「直せ」と言われることになる。黙らせはせず、
+      件数と綴りを本文に出す（自分が書いた 1 本かもしれないので）
+
+    返すのは「はい」（0）か「いいえ」（`modes.EXIT_ANSWER_NO`）。使い方と設定の誤りで返す
+    1 とは分ける。同じ値にすると、打ち方を間違えた回と提案が落ちる回が読む側から
+    区別できず、直すものが無いのに提案を直しに行くことになる。
+    """
+    gathered = gather(stderr, conf, root, only)
+    verdict = _verdict(gathered, conf.tickets)
+    if as_json:
+        body = _preview_body(root, gathered)
+        body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
+        stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+    else:
+        stdout.write(verdict.text)
+    return modes.EXIT_OK if verdict.ok else modes.EXIT_ANSWER_NO
+
+
+def _verdict(gathered: Gathered, tickets_rel: str) -> Verdict:
+    """`--verify` の答えを組む。判定は `gather` が済ませてあり、ここは読み替えるだけ。"""
+    head = "承認の可否（確かめるだけ。承認済みチケットは置かない）\n"
+    # 読めなかったものは、落ちた枝でも必ず出す。むしろこの 2 つ（絞りが通らない・承認待ちが
+    # 1 件も無い）が「読めないのは自分が書いた 1 本」である見込みのいちばん高い枝で、
+    # そこで黙ると、置いたばかりの人に「todo/ に置け」とだけ言うことになる。
+    unreadable = _unreadable(gathered)
+    if gathered.refused:
+        return Verdict(False, VERIFY_REFUSED, head + "\n" + gathered.refused + "\n" + unreadable)
+    if gathered.nothing_pending:
+        text = (
+            f"\n承認待ちのチケットは無い。提案は {tickets_rel}/todo/ に置く"
+            "（承認済みの識別子と同じ名前で置いても承認待ちにはならない）。\n"
+        )
+        return Verdict(False, VERIFY_NOTHING, head + text + unreadable)
+
+    lines = [head]
+    if gathered.note:
+        lines.append("\n" + gathered.note + "\n")
+    names = [c.ticket.ticket for c in gathered.batch] + [t.ticket for t, _ in gathered.rejected]
+    width = max((len(name) for name in names), default=0)
+    rows: list[tuple[str, str, list[str]]] = []
+    # 苦情の綴りから識別子を落とす（`Problem.__str__` は名指しのために持つが、行の頭に
+    # 同じものが出ている）。残すのは重さと中身。
+    for cand in gathered.batch:
+        notes = [f"{p.severity}: {p.detail}" for p in cand.complaints]
+        notes += [f"承認しても書けない: {p.detail}" for p in cand.overflow]
+        rows.append((cand.ticket.ticket, "通る", notes))
+    for t, complaints in gathered.rejected:
+        rows.append((t.ticket, "落ちる", [f"{p.severity}: {p.detail}" for p in complaints]))
+    lines.append("\n")
+    for name, mark, notes in sorted(rows):
+        lines.append(f"  {name.ljust(width)}  {mark}\n")
+        lines += [_note_line(note) for note in notes]
+
+    lines.append(unreadable)
+
+    if gathered.rejected:
+        reason = VERIFY_REJECTED
+        tail = (
+            f"\n{len(gathered.rejected)} 件が承認の対象にならない。"
+            "提案を直してから、利用者に承認を依頼すること。\n"
+        )
+    else:
+        reason = VERIFY_OK
+        tail = f"\n{len(gathered.batch)} 件が承認の対象に入る。利用者に承認を依頼してよい。\n"
+    lines.append(tail)
+    return Verdict(reason == VERIFY_OK, reason, "".join(lines))
+
+
+def _unreadable(gathered: Gathered) -> str:
+    """読めなかったものを名指しする段。落ちた枝でも通った枝でも同じものを出す。
+
+    終了コードは動かさない。`--approve` も、承認待ちが 1 件も無いとき以外はこれで
+    止まらないので、ここで落とすと「確かめは『いいえ』なのに承認は通る」になる。走査は絞る前の
+    全ツリーを見るから、他のセッションの書きかけ 1 本で自分の提案が止まることにもなる。
+    黙らせもしない。自分が書いた 1 本かもしれないので、件数と綴りを本文に出す。
+    """
+    if not gathered.problems:
+        return ""
+    lines = [
+        f"\n読めなかったファイルが {len(gathered.problems)} 件ある"
+        "（提案か承認済みチケット。提案なら承認待ちに並ばない）。\n"
+    ]
+    lines += [_note_line(problem) for problem in gathered.problems]
+    lines.append("        いま書いた提案が混じっていないか確かめること。\n")
+    return "".join(lines)
+
+
+def _note_line(note: str) -> str:
+    """行の下に添える 1 件。改行を含む苦情（ルールの `message` は複数行を書ける）は、
+    2 行目からも同じだけ下げる。下げないと、次の行が新しい段落に見える。"""
+    head, *rest = note.splitlines() or [""]
+    return "".join([f"      - {head}\n"] + [f"        {line}\n" for line in rest])
 
 
 def approval_digest(text: str, batch: list[Candidate]) -> str:
@@ -1129,14 +1293,19 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
-def _candidates(
+def candidates(
     root: str,
     conf: settings.Settings,
     pending: list[ticket_mod.Ticket],
     revisions: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
 ) -> tuple[list[Candidate], list[tuple[ticket_mod.Ticket, list[rules.Problem]]], dict]:
-    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。"""
+    """承認の対象に入れるものと、落とすものに分ける。3 つめは親子を引くための池。
+
+    承認（`approve`）・見せる（`preview`）・確かめる（`verify`）に加えて、`--lint` も
+    ここを通る。承認で落ちるものを数える経路が 2 本あると、片方が黙って弱くなる
+    （実際に `--lint` は `validate` だけを当てていて、順序で落ちる子に無言だった）。
+    """
     from . import phase
 
     open_index = by_id(approved)
@@ -1306,8 +1475,8 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
     見て承認する。
     """
     return (
-        f"■ プロジェクト: {t.project or '(ワークスペース)'}"
-        f"  ワークツリー: {t.tree or '(main)'}  提案: {t.path}"
+        f"■ プロジェクト: {t.project or 'ワークスペース'}"
+        f"  ワークツリー: {t.tree or 'ワークスペースルート'}  提案: {t.path}"
     )
 
 
@@ -1319,18 +1488,18 @@ def screen(
     """承認を求める画面を組む。
 
     frontmatter の全文は見せない。人に見せるのは「何が新たに書けるようになるか」
-    「子は親からどれだけ絞ったか」「人間レビューの要否」「リスク」「計画」。
+    「子が編集可能な範囲（親をどこまで絞ったか）」「人間レビューの要否」「リスク」「計画」。
     新たに書けるようになる領域を最初に置く（REQ-APV-01）。
 
     種類は候補が持っているものを使う。承認の対象の中でもチケットごとに層が違いうるので、
     画面の側で 1 つに決めない。
     """
-    lines = [f"Ticket 承認リクエスト: {len(batch)} 件"]
+    lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
     for cand in batch:
         t = cand.ticket
         cand_types = cand.types if cand.types is not None else types
         if cand.is_revision and cand.current is not None:
-            lines += ["", f"== {t.ticket}: {t.title}（親の改版）"]
+            lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
             lines += _plan_diff_lines(cand.current, t, cand_types)
             for note in cand.notes:
                 lines.append(f"    {note}")
@@ -1340,27 +1509,36 @@ def screen(
             "",
             f"== {t.ticket}: {t.title}"
             + (
-                f"（親 {t.parent}、フェーズ {_phase_label(t, pool, cand_types)}）"
+                f"  親 {t.parent} / フェーズ {_phase_label(t, pool, cand_types)}"
                 if t.is_child
-                else "（親）"
+                else "  親チケット"
             ),
         ]
         if t.is_child:
             # 親は一緒に承認の対象に入っていることが普通。承認済みチケットだけを引くと
             # 「承認済みチケットが無い」になる。
             parent = pool.get(t.parent)
-            lines.append("■ 親からどれだけ絞ったか（新たに書けるようになる領域は無い）")
-            head = "親 " + (
+            lines.append("■ この子チケットで編集可能な範囲")
+            lines.append(
+                "    子の範囲は親の範囲の中に収まる。下に並ぶのは親から絞った結果で、"
+                "親に無い場所がここで新しく開くことはない"
+            )
+            head = "親の範囲: " + (
                 ", ".join(parent.paths(rules.ALLOW) + parent.paths(rules.ASK))
                 if parent
-                else "(承認済みチケットが無い)"
+                else "親がまだ承認されていない"
             )
             lines.append(f"    {head}")
             bound = _type_of(t, pool, cand_types)
             if bound is not None and not bound.inherits_scope:
-                lines.append(f"    種類 {bound.title}: " + ", ".join(bound.scope_globs))
+                lines.append(f"    種類「{bound.title}」の範囲: " + ", ".join(bound.scope_globs))
         else:
-            lines.append("■ このチケットで書き込みが許される領域（これ以外はすべて止まる）")
+            lines.append("■ このチケットで編集可能な範囲")
+            lines.append(
+                "    下に並ぶ場所にだけ、このチケットで編集できるようになる。"
+                "allow は無確認で編集できる場所、ask は確認を挟んで編集できる場所、"
+                "deny はこのチケットでも編集できない場所"
+            )
             # チケットの範囲はルールの allow より強い（設計 §7）。承認する人は「ルールで
             # 開けてあるから範囲の外でも書ける」と読み違えやすいので、承認の前に言う。
             lines.append(
@@ -1374,32 +1552,53 @@ def screen(
         if cand.overflow:
             # 範囲のすぐ下に置く。承認は止めないが、判定では止まる。判定に効かない記述の
             # 注意と混ぜると、承認すれば書けると読み違える。
-            lines.append("■ 範囲のうち、判定で止まるもの（承認しても書けない）")
+            # **「編集対象」と「書き込めない」は意図して分けてある。** 前半はチケットが宣言した側、
+            # 後半は実際の書き込みが止まる側の話で、どちらか一方の語に揃えると、宣言と実行の
+            # どちらを指しているのかが読めなくなる。ほかの見出しが「編集」で揃っているのを見て、
+            # ここも揃えたくなるが、揃えない。
+            lines.append("■ チケットで編集対象としているが、書き込めない場所")
+            lines.append(
+                "    親の範囲かフェーズの種類の上限を超えている。"
+                "承認は可能だが、編集しようとすると判定が止める"
+            )
             lines += [f"    {p.detail}" for p in cand.overflow]
         if t.is_child:
             state = "要" if t.review_required else "不要"
-            lines.append(
-                f"■ 人間レビュー: {state}" + (f"（{t.review_reason}）" if t.review_reason else "")
-            )
+            lines.append(f"■ 人間レビュー: {state}")
+            if t.review_reason:
+                lines.append(f"    理由: {t.review_reason}")
             if t.predecessors:
-                lines.append(f"■ 先行: {', '.join(t.predecessors)}")
+                lines.append(f"■ 依存している他チケット: {', '.join(t.predecessors)}")
+                lines.append(
+                    "    先に閉じておく。閉じないまま着手しても止まらないが、--lint が warn を出す"
+                )
         elif t.has_plan:
-            lines.append("■ 全体計画（この並びに合意する）")
+            lines.append("■ 全体計画")
+            lines.append(
+                "    承認すると、この並びで進めることに合意したことになる。"
+                "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
+            )
             lines += _plan_lines(t.plan, 1, cand_types)
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
-                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or [
-                    "    （対応なし）"
-                ]
+                lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
         if not t.is_child and t.issue is not None:
-            lines.append(f"■ 課題: #{t.issue}（マージリクエストの本文で Closes に使う）")
+            lines.append(f"■ 課題: #{t.issue}")
+            lines.append(
+                "    この親のマージリクエストの本文に Closes として書く番号。"
+                "マージされると、この課題も閉じる"
+            )
         if t.rationale.strip():
-            lines.append("■ 理由（エージェントの記述）")
+            lines.append("■ エージェントが書いた理由")
             lines += [f"    {line}" for line in t.rationale.strip().splitlines()]
         lines.append(_origin_line(t))
         warnings = [p for p in cand.complaints if p.severity == rules.SEVERITY_WARN]
         if warnings:
-            lines.append("■ 記述のうち、判定に効かないもの")
+            lines.append("■ 判定に効かない記述")
+            lines.append(
+                "    提案に書いてあっても、判定はこれを読まない。"
+                "承認しても、編集できる場所は変わらない"
+            )
             lines += [f"    {p.detail}" for p in warnings]
     return "\n".join(lines)
 
@@ -1414,13 +1613,13 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
         if item.deferred:
             review = "レビューは次と一緒に"
         elif item.review == ticket_mod.PLAN_REVIEW_MR:
-            review = "レビュー要（計画で強めた）"
+            review = "レビュー要: 計画で強めた"
         elif pt is not None:
             review = {
-                phasetypes.REVIEW_MR: "レビュー要（マージリクエスト）",
-                phasetypes.REVIEW_CHAT: "レビュー要（このセッションで）",
+                phasetypes.REVIEW_MR: "レビュー要: マージリクエスト",
+                phasetypes.REVIEW_CHAT: "レビュー要: このセッションで",
             }.get(pt.review, "レビュー不要")
-        lines.append(f"    {n}. {title}（{item.type}）" + (f"  {review}" if review else ""))
+        lines.append(f"    {n}. {title} / {item.type}" + (f"  {review}" if review else ""))
     return lines
 
 
@@ -1438,7 +1637,7 @@ def _plan_diff_lines(
         lines.append("■ フィードバック計画")
         start = len(revised.plan) + 1
         lines += _plan_lines(revised.feedback or [], start, types) or [
-            "    （対応なし。見たうえで対応しないという記録になる）"
+            "    対応なし。見たうえで対応しない、という記録になる"
         ]
     return lines
 
@@ -1617,7 +1816,7 @@ def revision_problems(
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
     if revised.feedback != current.feedback:
         if current.feedback is not None:
-            # 残りの切り出し先は運び方で違う。MR があれば issue に切り出せるが、
+            # 残りの切り出し先は運び方で違う。マージリクエストがあれば issue に切り出せるが、
             # chat で回した親はホストに何も無いので、新しい親チケットの提案にする。
             elsewhere = (
                 "残りは新しい親チケットの提案として wip/proposals/todo/ に書く"
@@ -1766,39 +1965,27 @@ def validate(
 
     返すのは 2 つの並び。1 つめはチケットの形の苦情で、error があれば承認しない。
     2 つめは範囲の超過（親の範囲・種類の上限を超えた項、regex の項）で、承認は止めない。
-    判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。形の検査は判定では
-    補えない（親が無い子は、どの範囲で切り詰めるかが決まらない）ので残す。
+    判定が親と種類の上限で切り詰めるので、承認で止める理由が無い。
+
+    形の検査を error に残すのは、**まとめて 1 度で見せて直させるため**。判定の側も同じ
+    検査を当てる（`blocking_problems`、ADR-0058）ので「判定では補えない」わけではないが、
+    判定に任せると、承認の画面では通って、あとで書き込みが止まってから気づくことになる。
+    承認は人がまとめて見て決める場所なので、そこで落ちるものはそこで言う。
     """
     problems: list[rules.Problem] = []
     overflow: list[rules.Problem] = []
     if not t.is_child:
         return plan_problems(t, types), overflow
     parent = pool.get(t.parent)
-    if parent is None:
-        problems.append(
-            rules.Problem(rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} が承認されていない")
-        )
-        return problems, overflow
-    if parent.is_child:
-        problems.append(
-            rules.Problem(
-                rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
-            )
-        )
+    problems.extend(child_problems(t, parent))
+    if parent is None or parent.is_child:
         return problems, overflow
     overflow.extend(ticket_mod.subset_problems(t, parent))
+    if problems:
+        # 番号が親の計画に無い。種類を引けないので、ここから先は見ても意味が無い。
+        return problems, overflow
     if parent.has_plan and t.phase is not None:
         item = parent.item_at(t.phase)
-        if item is None:
-            problems.append(
-                rules.Problem(
-                    rules.SEVERITY_ERROR,
-                    t.ticket,
-                    f"{t.phase} 番目のフェーズは親 {parent.ticket} の計画に無い"
-                    f"（計画は {len(parent.numbered())} 番目まで）",
-                )
-            )
-            return problems, overflow
         pt = (types or {}).get(item.type)
         if pt is None:
             problems.append(
@@ -1818,6 +2005,90 @@ def validate(
             seen.add(p.detail)
             distinct.append(p)
     return problems, distinct
+
+
+def child_problems(
+    t: ticket_mod.Ticket, parent: ticket_mod.Ticket | None, missing: str = ""
+) -> list[rules.Problem]:
+    """子と親の構造の検査。承認（`validate`）と判定（`blocking_problems`）が同じ答えを引く。
+
+    どれも「子の範囲をどの親で切り詰めるか」が決まらない形なので、承認でも判定でも
+    通さない。1 か所に置くのは、置き場を動かして承認する運び（ADR-0058）で判定の側の
+    検査だけが古くなると、承認を通ったチケットと通らないチケットで答えが割れるから。
+
+    「種類の定義が読めない」はここに入れない。壊れているのは設定で、チケットの形は
+    正しい。判定は注記を添えて親の範囲で切り詰める（`judge.ticket_verdict`）。
+    """
+    if parent is None:
+        # 文面だけは呼び手が差し替える。承認のときは「まだ承認されていない」しか起きないが、
+        # 判定のときは「承認されたが閉じた」も同じ穴に落ちる。検査は同じで、読む人の
+        # 次の一手が違うだけなので、分けるのは言葉だけにする。
+        detail = missing or f"親 {t.parent} が承認されていない"
+        return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, detail)]
+    if parent.is_child:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR, t.ticket, f"親 {t.parent} 自身が子。深さは 2 段まで"
+            )
+        ]
+    if parent.has_plan and t.phase is not None and parent.item_at(t.phase) is None:
+        return [
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                t.ticket,
+                f"{t.phase} 番目のフェーズは親 {parent.ticket} の計画に無い"
+                f"（計画は {len(parent.numbered())} 番目まで）",
+            )
+        ]
+    return []
+
+
+def blocking_problems(
+    conf: settings.Settings, t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]
+) -> list[rules.Problem]:
+    """判定がこの承認済みチケットを信じられない理由。空なら信じてよい（ADR-0058）。
+
+    承認のときにしか当たらなかった検査のうち、当たらないと「範囲をどこで切り詰めるか」が
+    決まらないものだけを置く。置き場を動かして承認する運びは `--approve` を通らないので、
+    同じ検査を判定の側でも当てる。当たれば範囲は効かず、その場所は止まる。
+
+    ここに入れないもの。
+    - 計画の形（`plan_problems`）。範囲には効かないので `--lint` が言う
+    - フェーズの順序（`phase.order_problems`）。順序が狂っていても、その子の範囲を
+      どの親で切り詰めるかは決まる。線を引いているのはここで、ADR-0024 ではない
+      （あちらは `held_phase` が `Agent` とシェルを止める話で、この検査とは別の仕組み）。
+      止めると、レビュー待ちの間その子が一切書けなくなり、レビュー待ちでも Write を通す形
+      とは結果が離れる。`--lint` が warn で言う
+    - 範囲の超過。判定が親と種類の上限で切り詰めるので、止める理由が無い
+    """
+    problems = list(project_problems(t, pool, conf))
+    if t.is_child:
+        missing = f"親 {t.parent} の承認済みチケットが作業中に無い（未承認か、閉じている）"
+        problems.extend(child_problems(t, pool.get(t.parent), missing))
+    return [p for p in problems if p.severity == rules.SEVERITY_ERROR]
+
+
+def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None:
+    """判定が読む承認済みチケットに、信じられない理由の印を付ける（ADR-0058）。
+
+    印を読むのは `phase.scope_verdict` で、実行前の判定・実行後の監視・サブエージェント
+    終了時の検査の 3 か所が同じ答えを引く。1 か所で付けるのは、3 か所が別々に検査を
+    呼ぶと、同じ書き込みが実行前は通って実行後に咎められるから。
+
+    **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
+    別の池で引くと、ここでは親が見つかって印が付かないのに、判定の側では見つからず
+    `parent=None` のまま子の宣言だけで範囲が決まる。閉じた親やレビュー待ちの親まで
+    引ける池にしたときに実際にそうなった。親の範囲で切り詰められないのに通る形は、
+    承認していない範囲に書ける道そのものなので、引けないなら止める側へ倒す。
+
+    親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
+    開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは
+    人なので、その子を止めるのが人の意思に沿う。
+    """
+    pool = by_id(kept)
+    for t in kept:
+        problems = blocking_problems(conf, t, pool)
+        t.blocked = problems[0].detail if problems else ""
 
 
 def _write(path: str, text: str) -> str:

@@ -11,26 +11,21 @@
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
 
+import { KINDS, LEVEL_NAMES, type FactorForm, type FactorKind, type LevelName, type RiskForm, type RiskModel } from "./risk-view.js";
 import { yaml11Ambiguous } from "./yaml11.js";
 
-/** 当て方。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
-export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
-export type FactorKind = (typeof KINDS)[number];
-
-/** 段階の名前は固定。閾値だけ動かす。LOW は閾値を持たない */
-export const LEVEL_NAMES = ["medium", "high", "critical"] as const;
-export type LevelName = (typeof LEVEL_NAMES)[number];
+/**
+ * 配点の形（`KINDS`・`FactorForm`・`RiskForm` など）は画面との契約（`risk-view.ts`）にある。
+ * ここに置くと、画面がそこから `yaml` を辿って束ねたものに解析器が丸ごと入る。
+ */
 
 /** 実行ファイルが読む版（risk.VERSION） */
 export const RISK_VERSION = 1;
 
-/** 組み込みの配点（risk.builtin と同じ値）。ファイルが無いときに画面が見せ、作るときに書き出す */
-export const BUILTIN_LEVELS: Readonly<Record<LevelName, number>> = { medium: 20, high: 40, critical: 70 };
-
 export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を閉じるときに、その子の差分（base_sha..HEAD）で数える。
 #
-# 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューを
-# 要る扱いにするためのもの。段階の名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
+# 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューが
+# 要る扱いにするためのもの。等級の名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
 # HIGH 以上はレビューが済むまでフェーズを止める。閾値は levels で動かす。
 #
 # 項目は 3 系統。1 件につき当て方を 1 つだけ書く。
@@ -67,33 +62,6 @@ factors:
     deleted_over: 3
     message: 消したファイルが多い
 `;
-
-/** 画面で編集する項目 1 件。`origin` は読み込んだときの位置で、新しい項目は null */
-export interface FactorForm {
-  readonly origin: number | null;
-  readonly id: string;
-  /** 加点。整数のはずだが欄の文字のまま持つ。整数でなければそのまま書いて lint が言う */
-  readonly points: string;
-  readonly kind: FactorKind;
-  /** 当て方の値。lines_over 等なら閾値、glob ならパターン、script ならパス、judge なら問い */
-  readonly value: string;
-  /** glob の上限。空なら青天井（欄を書かない） */
-  readonly max: string;
-  readonly message: string;
-}
-
-export interface RiskForm {
-  /** 閾値。空ならその段階は組み込みの値（欄を書かない） */
-  readonly levels: Readonly<Record<LevelName, string>>;
-  readonly factors: readonly FactorForm[];
-}
-
-export interface RiskModel {
-  readonly version: number | null;
-  readonly form: RiskForm;
-  /** 読み込み時の苦情。形が読めなかった場所。あっても他は出す */
-  readonly problems: readonly string[];
-}
 
 export interface RiskDocument {
   readonly model: RiskModel;

@@ -39,6 +39,8 @@ STATE_ENV = "CCNAVI_STATE"
 #
 # RESTORE_IF_DENY_ENV は、ルールが `deny` と宣言した場所を戻す。対象は
 # ルールファイル次第で動くので、プロジェクトが書いたぶんだけ広がる。
+# 戻すのは `deny` だけで、`ask` と承認済みチケットの範囲外は報告に留める
+# （post._restorable）。実行後の監視が見る範囲（post._guarding）より狭い。
 # GUARD_CORE_FILES_ENV は、ccnavi 自身を成り立たせている設定ファイルを
 # 戻す。対象は組み込みで固定されていて、ルールファイルには書かない。
 #
@@ -169,12 +171,34 @@ def script_command(root: str, name: str) -> str:
     まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符に落とす。
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
-    path = f"{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}"
+    return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
+
+
+def _quoted(path: str) -> str:
+    """文面に置くパスの綴り。引用が要るときだけ引用する（引用の決め方は script_command）。"""
     if _BARE_PATH.fullmatch(path):
-        return f"sh {path}"
+        return path
     if not _SPECIAL_IN_DOUBLE_QUOTES.search(path):
-        return f'sh "{path}"'
-    return f"sh {shlex.quote(path)}"
+        return f'"{path}"'
+    return shlex.quote(path)
+
+
+def bin_command(bin_path: str) -> str:
+    """文面で案内する ccnavi 自身の綴り。設定（CCNAVI_BIN_PATH）が指すものを打てる形にする。
+
+    案内した綴りをそのまま打てないと、案内は「そういうものが在るらしい」で終わる。
+    hook が起動しているのと同じものを名乗るのが、いちばん確かめようがある。
+
+    設定が無ければ `ccnavi`。PATH に置いた人はそれで打てるし、置いていない人には
+    綴りを尋ねる手掛かりになる。`.sh` は `sh` を頭に付ける（起動役はシェルの
+    スクリプト。ccnavi-launcher.sh がこれにあたる）。
+    """
+    if not bin_path:
+        return "ccnavi"
+    path = bin_path.replace("\\", "/")
+    # 綴りの大小は区別しない。Windows と macOS の既定のファイルシステムでは `LAUNCHER.SH` も
+    # 同じシェルのスクリプトで、区別すると `sh` の付かない打てない綴りを案内することになる。
+    return f"sh {_quoted(path)}" if path.lower().endswith(".sh") else _quoted(path)
 
 
 # ccnavi ディレクトリの下の固定の綴り。層はこの形でしか置けない。

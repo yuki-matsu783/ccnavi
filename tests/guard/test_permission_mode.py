@@ -12,10 +12,10 @@ import os
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, fixture_workspace
 from tests.inproc import run_ccnavi
 
-RULES = os.path.join(ROOT, "tests", "fixtures", "rules-undeclared.yml")
+FIXTURE = "rules-undeclared.yml"
 
 # どのルールも言及しない呼び出し。allow にも deny にも ask にも当たらない。
 UNDECLARED_COMMAND = "docker run --rm alpine"
@@ -43,7 +43,7 @@ def run(permission_mode, command=UNDECLARED_COMMAND, mode="enable", guard_unwatc
     with tempfile.TemporaryDirectory(prefix="ccnavi-mode-") as directory:
         log = os.path.join(directory, "log.jsonl")
         result = run_ccnavi(
-            ["--rules", RULES, "--mode", mode, "--log", log],
+            ["--root", fixture_workspace(FIXTURE), "--mode", mode, "--log", log],
             input=payload,
             cwd=ROOT,
             env=environment,

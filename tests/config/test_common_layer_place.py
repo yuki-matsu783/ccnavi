@@ -8,12 +8,11 @@ env を渡しても共通層は既定の置き場のままになる。
 確かめるテストが自分の一時ディレクトリを指せなくなる（`ConfigUnionHarness`）。
 hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。
 
-ただしフラグは診断の経路に限られておらず、`ticket` / `review` の副命令でも効く
-（ADR-0052 の「決定」の末尾）。ここで見るのは env が効かないことだけで、
-フラグの効く範囲は別の話。
+フラグの効く範囲は ADR-0067 が診断の経路に限った。ここで見るのは env が効かないことと、
+その門が効いていることの 2 つ（`FlagsAreDiagnosisOnlyTest`）。
 
-起動は `ConfigUnionHarness.ccnavi` を使わない。あちらは毎回 3 本ともフラグで渡すので、
-env が効くかどうかを見られない。ここでは 3 本のフラグを渡さずに起動する。
+起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
+読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
 
 実装は入っている（ADR-0052）。ここが赤くなったら、env を読む経路が戻ったということ。
 """
@@ -66,8 +65,6 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
             [
                 "--root",
                 self.ws,
-                "--projects",
-                self.projects,
                 "--approved",
                 ".ccnavi/tickets",
                 "--state",
@@ -88,8 +85,8 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
             env=environment,
         )
 
-    def decide(self, tool, *, env=None, guard="disable", **tool_input):
-        """hook の payload を 1 件渡して判定させる。フラグは 3 本とも渡さない。"""
+    def decide(self, tool, *, env=None, guard="disable", flags=(), **tool_input):
+        """hook の payload を 1 件渡して判定させる。フラグは既定で 3 本とも渡さない。"""
         payload = {
             "hook_event_name": "PreToolUse",
             "tool_name": tool,
@@ -97,7 +94,9 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
             "session_id": "s1",
             "tool_input": tool_input,
         }
-        return self.bare("--mode", "enable", env=env, guard=guard, stdin=json.dumps(payload))
+        return self.bare(
+            "--mode", "enable", env=env, guard=guard, flags=flags, stdin=json.dumps(payload)
+        )
 
     def layers(self, **options):
         """`--explain --json` の layers[]。"""
@@ -187,6 +186,80 @@ class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
             flags=("--rules", self.other_rules),
         )
         self.assertEqual(layer["rules"]["path"], self.other_rules)
+
+
+class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
+    """診断の外では、フラグも共通層を動かさない（ADR-0067、issue #65）。
+
+    `--project-rules-file` / `--project-phases-file` と揃える。効くのは `--lint` /
+    `--test` / `--test-samples` / `--explain` だけで、hook からの判定と
+    `ticket` / `review` の副命令では落ちる。落としたことは標準エラーに出す。
+
+    上の `FlagsStillMoveTheCommonLayerTest` と対で読む。あちらは診断では効くことを、
+    ここは診断の外では効かないことを見る。片方だけだと、フラグを消しても
+    フラグを素通しにしても緑のままになる。
+    """
+
+    def target(self):
+        """`OTHER_RULES` の `only-in-the-other-file` が当たる対象。"""
+        return os.path.join(self.ws, "src", "a.py")
+
+    def test_the_rules_flag_is_dropped_when_judging(self):
+        """`--rules` を渡した hook の判定は、渡したファイルの deny を読まない。"""
+        result = self.decide("Read", flags=("--rules", self.other_rules), file_path=self.target())
+
+        self.assertNotIn("only-in-the-other-file", self.reason(result))
+        self.assertIn("--rules は診断", result.stderr)
+
+    def test_each_of_the_three_flags_says_it_was_dropped(self):
+        """3 本とも、落としたことを標準エラーで名指しする。"""
+        for flag, path in (
+            ("--rules", self.other_rules),
+            ("--phases", self.other_phases),
+            ("--risk", self.other_risk),
+        ):
+            with self.subTest(flag=flag):
+                result = self.decide("Read", flags=(flag, path), file_path=self.target())
+                self.assertIn(f"{flag} は診断", result.stderr)
+
+    def test_the_wording_is_the_one_the_project_file_flags_use(self):
+        """文面は `--project-rules-file` と同じ。門が 2 つあるように読ませない。"""
+        one = self.decide("Read", flags=("--rules", self.other_rules), file_path=self.target())
+        other = self.decide(
+            "Read",
+            flags=("--project-rules-file", f"lib={self.other_rules}"),
+            file_path=self.target(),
+        )
+
+        self.assertEqual(
+            one.stderr.replace("--rules", "FLAG"),
+            other.stderr.replace("--project-rules-file", "FLAG"),
+        )
+
+    def test_an_empty_risk_flag_is_dropped_and_said(self):
+        """`--risk ""` は「渡した」と数える。空は「配点を持たない」の意味だった。"""
+        result = self.decide("Read", flags=("--risk", ""), file_path=self.target())
+
+        self.assertIn("--risk は診断", result.stderr)
+
+    def test_an_empty_rules_flag_says_nothing(self):
+        """`--rules ""` は渡していないのと同じ。`_override` の読み方に揃える。
+
+        揃えないと、渡していないフラグについて苦情が出る。`--rules` の既定は
+        空文字なので、その 1 本だけ毎回言うことになる。
+        """
+        result = self.decide("Read", flags=("--rules", ""), file_path=self.target())
+
+        self.assertNotIn("--rules", result.stderr)
+
+    def test_the_flags_still_work_for_the_diagnosis_that_judges(self):
+        """判定を通す診断（`--test`）では効く。落とす先を間違えていないことの裏。"""
+        done = self.bare(
+            "--test", "Read", self.target(), "--json", flags=("--rules", self.other_rules)
+        )
+        body = json.loads(done.stdout)
+
+        self.assertEqual([hit["id"] for hit in body["rules"]], ["only-in-the-other-file"])
 
 
 class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):

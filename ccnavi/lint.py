@@ -18,7 +18,7 @@ CI、入れたばかりのプロジェクト――で不備を見つける手段
 ## 設計からの読み替え
 
 ccnavi.md 付録 D.2「診断コマンド」の `--lint` と D.4「設定lintの検証項目」は、
-config.yaml という 1 枚の設定ファイルに、ツールの許可・保護対象ディレクトリ・
+config.yaml という 1 枚の設定ファイルに、ツールの許可・保護領域・
 禁止コマンドがまとめて書かれている前提で書かれている。現在の形はそうではない。
 設定は `.claude/settings.json` の env が運ぶ環境変数、防御の中身はルールファイルで、
 パスの列挙という考え方そのものが無い。そこで D.4 の 9 項目を次のように読み替えた。
@@ -30,7 +30,7 @@ config.yaml という 1 枚の設定ファイルに、ツールの許可・保�
 | 1,2,4 禁止値・`..`・絶対パス | 該当する列挙が無い。代わりに版番号と必須欄 | error |
 | 5 max_* が既定より緩くないか | 呼び出しを止めないモードと読めない値 | warn |
 | 8 重複していないか | id の欠落と重複 | warn |
-| 7,9 保護対象・immutable の漏れ | どのツールにも当たらない match | warn |
+| 7,9 保護領域・immutable の漏れ | どのツールにも当たらない match | warn |
 
 読み替えても変わらないのは、CI で走らせて error だけを落とす対象にするという
 D.4 の使い方のほうで、終了コードはそれに合わせてある。
@@ -186,6 +186,12 @@ def report(
                 "承認・レビュー済みの受け入れ・状態の移動を行える",
             )
         )
+    # 戻す働きの 2 つも同じ扱いにする。人向けの本文には値が 1 行ずつ出ているが、
+    # `problems` に入らないと `--json` を読む側（CI と VS Code の拡張）からは
+    # 「揃っている」と見える。切ってあること自体は設定として正しく、それでも言う
+    # 理由は上の 2 つと同じ（外から見て、守られている状態と区別が付かない）。
+    problems.extend(_gate(settings.GUARD_CORE_FILES_ENV, guard_core_files, mode, _CORE_FILES_VOICE))
+    problems.extend(_gate(settings.RESTORE_IF_DENY_ENV, restore_if_deny, mode, _RESTORE_VOICE))
 
     errors = sum(1 for p in problems if p.severity == SEVERITY_ERROR)
     warns = sum(1 for p in problems if p.severity == SEVERITY_WARN)
@@ -213,8 +219,8 @@ def report(
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
-    stdout.write(f"  deny の場所を戻す: {restore_if_deny}\n")
-    stdout.write(f"  コアファイルを守る: {guard_core_files}\n")
+    stdout.write(f"  deny の場所を戻す: {_shown(restore_if_deny, mode)}\n")
+    stdout.write(f"  コアファイルを守る: {_shown(guard_core_files, mode)}\n")
     stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
     stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
     if conf.tickets_enabled:
@@ -229,6 +235,63 @@ def report(
 
     stdout.write(f"error {errors} 件、warn {warns} 件、info {infos} 件\n")
     return EXIT_ERROR if errors else EXIT_OK
+
+
+# 戻す働きの 2 つが、切られている・予行になっているときに言うこと。
+# 3 値（enable / dry-run / disable）を取る門なので、止めない 2 つの値それぞれに文がある。
+_CORE_FILES_VOICE = {
+    selfguard.DISABLE: (
+        "ccnavi 自身の設定ファイル（.claude/settings*.json と、共通層・自身の層・"
+        "プロジェクトの層の 3 本）を控えず、書き換えられても戻さない。"
+        "実行前に足していた組み込みの deny（実行ファイル・ccnavi ディレクトリ・共通層の 3 本）も"
+        "足さないので、ワークツリー側の層の設定はルールファイルが名指ししていなければ書ける"
+    ),
+    selfguard.DRY_RUN: (
+        "ccnavi 自身の設定ファイルが書き換えられても戻さない（戻すはずだったと言うだけ）。"
+        "実行前の deny は足したままなので、止める側は効いている"
+    ),
+}
+_RESTORE_VOICE = {
+    selfguard.DISABLE: "`deny` と宣言した場所が副作用で変わっても戻さない",
+    selfguard.DRY_RUN: (
+        "`deny` と宣言した場所が副作用で変わっても戻さない（戻すはずだったと言うだけ）"
+    ),
+}
+
+
+def _shown(declared: str, mode: str) -> str:
+    """人向けの本文に出す値。モードに畳まれて変わるなら、そのことも書く。
+
+    書かれた値だけを出すと、`CCNAVI_MODE=dry-run` のもとで `enable` と出る。
+    読んだ人は守られていると思い、実行時は戻らない。
+    """
+    effective = modes.effective_setting(mode, declared)
+    if effective == declared:
+        return declared
+    return f"{declared}（{settings.MODE_ENV}={mode} なので実際は {effective}）"
+
+
+def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[Problem]:
+    """守る働きを持つ門が、止めない値になっていることを言う。enable なら何も言わない。
+
+    見るのは `CCNAVI_MODE` を掛けたあとの値（`modes.effective_setting`）。書かれた値だけを
+    見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
+    なる。実行時はモードに畳まれて戻さないので、それはこの面がいちばん言うべき
+    「切れているのに揃って見える」そのものになる。
+
+    倒れた先が書かれた値と違うときは、そのことも言う。言わないと、直す先が
+    その門なのか `CCNAVI_MODE` なのかが読めない。
+    """
+    effective = modes.effective_setting(mode, declared)
+    said = voices.get(effective)
+    if not said:
+        return []
+    how = (
+        f"{name}={declared}"
+        if effective == declared
+        else f"{name}={declared} だが {settings.MODE_ENV}={mode} なので実際は {effective}"
+    )
+    return [Problem(SEVERITY_WARN, "(restore)", f"{how}。{said}")]
 
 
 def check(
@@ -307,6 +370,53 @@ def _phases(conf: settings.Settings) -> list[Problem]:
     return [Problem(p.severity, "(phases)", f"{p.rule}: {p.detail}") for p in notes]
 
 
+def _copy_problems(
+    root: str,
+    conf: settings.Settings,
+    copies: list[ticket_mod.Ticket],
+    index: dict[str, ticket_mod.Ticket],
+    closed: list[ticket_mod.Ticket],
+) -> list[Problem]:
+    """作業中の承認済みチケットを検査する（ADR-0058）。
+
+    置き場を動かして承認する運びでは `--approve` を通らないので、承認のときにしか
+    当たらなかった検査が誰にも当たらない。判定は `blocked` の分だけを止めるが、
+    止まる場所は書き込みのときで、そこで初めて知るのは遅い。ここで全部言う。
+
+    severity は 3 通りに分かれる。
+
+    - `blocked` は判定が止める理由なので error
+    - フェーズの順序は warn。狂っていても範囲の決まり方には効かず、判定も止めない
+      （`approval.blocking_problems`）。承認のときは error だが、承認済みのものに当てるのは
+      「その順で始めた」という記録で、いま止める根拠にはならない
+    - 計画の形と、種類の定義が読めないことは `validate` が付けた severity のまま（error）。
+      判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
+      承認した分の壊れを CI で止める。範囲の超過だけは `validate` も warn
+    """
+    from . import phase as phase_mod
+
+    problems: list[Problem] = []
+    pool = dict(index)
+    for t in closed:
+        pool.setdefault(t.ticket, t)
+    resolve = _types_resolver(conf, root)
+    for t in copies:
+        if t.blocked:
+            problems.append(Problem(SEVERITY_ERROR, "(ticket)", f"{t.ticket}: {t.blocked}"))
+            continue
+        types = resolve(approval.project_of(t, pool))
+        complaints, overflow = approval.validate(t, pool, types)
+        for p in complaints + overflow:
+            problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
+        parent = pool.get(t.parent) if t.is_child else None
+        if parent is not None:
+            for p in phase_mod.order_problems(root, conf, t, parent, types):
+                # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
+                # 記録で、いま止める根拠にはならない。
+                problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
+    return problems
+
+
 def _types_resolver(conf: settings.Settings, root: str):
     """`project:` から、そのチケットに効く種類を引く（設計 §11.4.1）。
 
@@ -369,6 +479,8 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     proposals, complaints = ticket_mod.scan(root, conf.tickets, conf.projects)
     problems.extend(complaints)
 
+    problems.extend(_copy_problems(root, conf, copies, index, closed))
+
     resolve = _types_resolver(conf, root)
     for t in copies:
         if not t.is_child and t.has_plan and resolve(t.project) is None:
@@ -384,8 +496,11 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     # ツリーの名前から、そのツリーがどのリポジトリのものかを引く表。ワークスペースなら空、
     # プロジェクトならその名前で、ワークツリーは元リポジトリのほうに付く（tree.Tree）。
     # チケットは自分の置かれたツリーの名前しか持たないので、ここで作って渡す。
-    repo_of = {t.name or "(main)": t.project for t in tree.all_trees(root, conf.projects)}
-    problems.extend(_proposal_problems(proposals, index, closed, done, resolve, repo_of))
+    repo_of = {
+        t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
+    }
+    problems.extend(_proposal_problems(proposals, index, closed, done, repo_of))
+    problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
     problems.extend(_worktree_problems(root, conf, worktrees, index, copies))
@@ -398,7 +513,7 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{stray} はワークツリーでも main でもないのに .claude/ を持つ。"
+                f"{stray} はワークツリーでもワークスペースルートでもないのに .claude/ を持つ。"
                 "cd 1 回で別のワークスペースルートに見える",
             )
         )
@@ -435,15 +550,60 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     ]
 
 
+def _approval_problems(
+    root: str,
+    conf: settings.Settings,
+    proposals: list,
+    copies: list,
+    closed: list,
+    review: list,
+) -> list[Problem]:
+    """承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
+
+    **承認と同じ関数を通す**（`approval.candidates`）。以前はここだけが `approval.validate`
+    を当てていて、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・`project:`
+    の食い違い・改版の検査を見ていなかった。同じ事実を数える経路が 2 本あると、片方が
+    黙って弱くなる。`--approve --preview --verify` と同じ答えをここでも言う。
+
+    範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
+
+    **「まだ承認できない」だけは warn に落とす。** 前のフェーズが閉じていない子
+    （`rules.KIND_NOT_YET`）は、書いた側に直すものが無く、前が閉じれば同じ提案が通る。
+    `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
+    保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
+    編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは落とす
+    （`approval.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
+    """
+    pending, revisions = approval.waiting(proposals, copies, closed, review)
+    if not pending and not revisions:
+        return []
+    batch, rejected, _pool = approval.candidates(root, conf, pending, revisions, copies)
+    problems: list[Problem] = []
+    for cand in batch:
+        for p in cand.complaints + cand.overflow:
+            problems.append(_said(cand.ticket.ticket, p))
+    for t, complaints in rejected:
+        for p in complaints:
+            problems.append(_said(t.ticket, p))
+    return problems
+
+
+def _said(ticket: str, problem) -> Problem:
+    """承認の苦情 1 件を、`--lint` の言い方に直す。「まだ承認できない」は warn へ落とす。"""
+    severity = SEVERITY_WARN if problem.kind == rules.KIND_NOT_YET else problem.severity
+    return Problem(severity, "(ticket)", f"{ticket}: {problem.detail}")
+
+
 def _proposal_problems(
     proposals: list,
     index: dict,
     closed: list,
     done: set[str],
-    resolve,
     repo_of: dict[str, str],
 ) -> list[Problem]:
-    """提案の側。承認待ち、承認で落ちるもの、先行が閉じていない着手済み、同じ識別子の重複。
+    """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
+
+    承認で落ちるものは `_approval_problems` が言う（承認と同じ関数を通す）。
 
     `todo/` に在るものは全部承認待ち。同じ識別子がどこかの置き場（作業中・レビュー待ち・
     閉じた）に在れば、親の改版でない限り書き損じなので名指しする。
@@ -465,17 +625,13 @@ def _proposal_problems(
     ツリーごとの免除を当ててはいけない。
     """
     problems: list[Problem] = []
-    # 提案と承認済みチケットを合わせた池。親子の制約は、親が一緒に提案されている形も含めて見る。
-    pool = dict(index)
-    for t in proposals:
-        pool.setdefault(t.ticket, t)
 
     # ツリーと状態は分けて持つ。同じ識別子が別のツリーに在るのは普通で（承認済みチケットは
     # git に入れて運ぶので、切ったワークツリーの数だけ写しができる）、しかもワークツリーは
     # それぞれ別のコミットを指すから、古いほうが doing・新しいほうが done になるのも普通。
     # 咎めるのは 1 つのツリーの中で 2 つの状態に在る形だけ。
     def place(t, state: str) -> tuple[str, str, str]:
-        at = t.tree or "(main)"
+        at = t.tree or "(ワークスペースルート)"
         return (repo_of.get(at, at), at, state)
 
     seen: dict[str, list[tuple[str, str, str]]] = {}
@@ -495,7 +651,7 @@ def _proposal_problems(
                 Problem(
                     SEVERITY_WARN,
                     "(ticket)",
-                    f"{t.ticket} は承認済み（{current.tree or '(main)'} の "
+                    f"{t.ticket} は承認済み（{current.tree or '(ワークスペースルート)'} の "
                     f"{current.state or ticket_mod.DOING}/）なのに todo/ にも在る。"
                     "計画の改版でなければ todo/ の側を消す",
                 )
@@ -515,15 +671,10 @@ def _proposal_problems(
             Problem(
                 SEVERITY_WARN,
                 "(ticket)",
-                f"{t.ticket} は承認待ち（{t.tree or '(main)'} の todo/）。"
+                f"{t.ticket} は承認待ち（{t.tree or '(ワークスペースルート)'} の todo/）。"
                 "'ccnavi --approve' を通すまで範囲は効かない",
             )
         )
-        # 承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
-        # 範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
-        complaints, overflow = approval.validate(t, pool, resolve(approval.project_of(t, pool)))
-        for p in complaints + overflow:
-            problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
     for t in index.values():
         if t.started_at:
             waiting = [p for p in t.predecessors if p not in done]
@@ -1046,7 +1197,7 @@ def _stale_by_tree(
     for t in approval.trees(conf, root):
         left = _left_behind(t.root, place_rel, states, known)
         if left:
-            stale.append(f"{t.name or '(main)'}（{', '.join(left)}）")
+            stale.append(f"{t.name or '(ワークスペースルート)'}（{', '.join(left)}）")
     return stale
 
 
@@ -1067,7 +1218,7 @@ def _left_behind(tree_root: str, place_rel: str, states: tuple, known: set[str])
 
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:
-    """main かワークツリーのどこかに提案の置き場があるか。"""
+    """ワークスペースルートかワークツリーのどこかに提案の置き場があるか。"""
     for t in [tree.main_tree(root), *tree.worktrees(root)]:
         if os.path.isdir(os.path.join(t.root, tickets_rel.replace("/", os.sep))):
             return True
@@ -1075,7 +1226,8 @@ def tree_has_tickets(root: str, tickets_rel: str) -> bool:
 
 
 def _stray_claude_dirs(root: str, worktree_names: set[str]) -> list[str]:
-    """リポジトリの中で `.claude/` を持つ、ワークツリーでも main でもないディレクトリ。
+    """リポジトリの中で `.claude/` を持つ、ワークツリーでもワークスペースルートでもない
+    ディレクトリ。
 
     浅くしか見ない。2 段まで。深く歩くと大きなリポジトリで検証が待たされる。
     """
@@ -1312,7 +1464,7 @@ def _rules(path: str, root: str = "", home: str = "", layer: bool = False) -> li
         elif rule.id in seen:
             problems.append(
                 Problem(
-                    SEVERITY_WARN, name, "id が重複している。記録からどちらが当たったか辿れない"
+                    SEVERITY_WARN, name, "id が重複している。記録からどちらがヒットしたか辿れない"
                 )
             )
         seen.add(rule.id)
@@ -1393,7 +1545,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                     SEVERITY_WARN,
                     name,
                     f"広い allow に additionalContext がある（{why}）。"
-                    "当たるたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
+                    "ヒットするたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
                 )
             )
     return problems
@@ -1450,7 +1602,7 @@ def _broad(rule: rules.Rule) -> str:
        コマンドに同じ文を添えることになる
     """
     if rule.compiled is not None and rule.compiled.search("x"):
-        return "何にでも当たる"
+        return "何にでもヒットする"
     if _alternatives(rule.regex) >= 3:
         return "選択肢が 3 つ以上"
     return ""

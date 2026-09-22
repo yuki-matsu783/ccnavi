@@ -171,6 +171,35 @@ class RepoRulesTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
 
+    def test_語にくっついた_preview_は承認の免除にならない(self):
+        """免除の理由になるのは、単独の語として立った `--preview` だけ。
+
+        別のフラグの**値**に書いた `--preview` で免除が成立していた。argparse は
+        `--reason=--preview` を値として食うので `--preview` は立たず、実行ファイルは
+        本物の `--approve` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
+        そこでズレる（端末さえ取れれば、エージェントが自分で承認を置けることになる）。
+        """
+        for subject in [
+            "ccnavi --approve --reason=--preview",
+            "ccnavi --approve --digest=--preview",
+            "ccnavi --approve --preview=x",
+            "ccnavi --approve x--preview",
+            "uv run python -m ccnavi --approve --reason=--preview i0001",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_verdict(subject, "deny", "builtin-guard-ticket-approval")
+
+    def test_確かめる枝は今までどおり免除の側(self):
+        """`--approve --preview --verify` は免除の側。締めたことで巻き添えにしない。"""
+        for subject in [
+            "ccnavi --approve --preview --verify",
+            "ccnavi --approve --preview --verify i0001",
+            "ccnavi --approve --preview --verify --json i0001",
+        ]:
+            with self.subTest(subject=subject):
+                body = judge("Bash", subject)
+                self.assertNotIn("builtin-guard-ticket-approval", hit(body), body["rules"])
+
     def test_設定の場所の名前は語の中の目印でも終わる(self):
         # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
         # 数えないと、分ける前に止まっていた綴りが通るようになる。
@@ -408,7 +437,7 @@ class RunnerTest(LauncherJudgeTest):
                 quote = "[`'\"]?"
                 line = (
                     f"{quote}{re.escape(runner)}{quote} が実行する "
-                    f"{quote}{re.escape(layer)}{quote} に当たりました"
+                    f"{quote}{re.escape(layer)}{quote} にヒットしました"
                 )
                 self.assertRegex(body["response"], line)
 
@@ -422,6 +451,115 @@ class RunnerTest(LauncherJudgeTest):
 
 
 @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
+class MovedJudgeTest(LauncherJudgeTest):
+    """`cd` で移った先から見た綴りに、止める側のルールを当てる（ADR-0069、issue #61）。"""
+
+    def test_守られた場所へ入ってから書く形は止まる(self):
+        # issue #61 の表。どれも綴りからディレクトリの名前が消えて素通りしていた。
+        for subject in [
+            "cd .ccnavi/common && echo x > rules.yml",
+            "cd .ccnavi && echo x > common/rules.yml",
+            "cd .ccnavi/common; echo x > rules.yml",
+            "(cd .ccnavi/common && echo x > rules.yml)",
+            "cd .claude && echo x > settings.json",
+            "cd .claude/hooks && echo x > lint-py.sh",
+            "cd .claude && rm -rf hooks",
+            "cd .claude && cp /tmp/x settings.json",
+            "cd .ccnavi && sed -i s/deny/allow/ common/rules.yml",
+            "cd .ccnavi/scripts && mv ccnavi-git.sh /tmp/x",
+            # 元から止まっていた形（行き先の綴りに名前が残る）も、そのまま止まる。
+            "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, SETTING_FILES)
+
+    def test_文面は移った先から見た綴りを示す(self):
+        body = self.judge("cd .claude && echo x > settings.json")
+
+        self.assertIn("`cd` で移った先から見ると", body["response"])
+        self.assertIn(".claude/settings.json", body["response"])
+
+    def test_移った先から見た綴りに_allow_は当てない(self):
+        # 中で実行されるコマンドと同じ線引き（W3）。当てると、`cd` を 1 つ挟むだけで
+        # 読み取りの allow が付いて通る形ができる。
+        body = self.judge("cd .ccnavi && cat common/rules.yml")
+
+        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
+        self.assertNotEqual(body["verdict"], "allow", body["response"])
+
+    def test_書かれた綴りの当たり方は変わらない(self):
+        # `cd` した先で打つラッパースクリプトは、今までどおり allow に当たる。
+        # 書かれた綴りに継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
+        for subject in [
+            "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
+            "sh .ccnavi/scripts/ccnavi-git.sh status",
+        ]:
+            with self.subTest(subject=subject):
+                body = self.judge(subject)
+                self.assertEqual(body["verdict"], "allow", body["response"])
+                self.assertIn("ccnavi-git", hit(body), body["rules"])
+
+    def test_普通の作業では止める側に当たるルールが増えない(self):
+        # W6 と同じ形。`cd` を挟んだだけの普通の作業が、確認や拒否に回らないこと。
+        for subject in [
+            "cd projects/lib && pnpm test",
+            "cd docs && cat adr/README.md",
+            "cd .claude/worktrees/w && uv run python -m unittest",
+            "cd /tmp && rm -f x.log",
+            "cd .. && ls",
+        ]:
+            with self.subTest(subject=subject):
+                self.assertEqual(blocking(self.judge(subject)), set(), subject)
+
+    def test_行き先を読めない_cd_は読みを変えない(self):
+        # 縮退させない。縮退は生の文字列に落ちるので、コマンドの頭に固定して書かれた
+        # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
+        # 止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
+        for subject in [
+            'cd "$(pwd)" && rm -f /repo/.ccnavi/common/rules.yml',
+            "cd - && cp /tmp/x .ccnavi/common/rules.yml",
+            "pushd .claude && mv .ccnavi/common/rules.yml /tmp/x",
+        ]:
+            with self.subTest(subject=subject):
+                body = self.assert_denied_by(subject, SETTING_FILES)
+                self.assertEqual(body["degraded"], "", body["response"])
+
+    def test_読めない行き先のあとは継ぎ足さないだけ(self):
+        # 読み自体は変わらない。読み切れなかった扱い（PARSE_UNCERTAIN）にはしない。
+        body = self.judge("cd - && cat README.md")
+
+        self.assertEqual(body["degraded"], "", body["response"])
+        self.assertEqual(body["code"], "UNDECLARED", body["response"])
+
+    def test_置換の中で移った先も止める(self):
+        self.assert_denied_by('echo "$(cd .claude && rm settings.json)"', SETTING_FILES)
+
+    def test_リダイレクトだけの書き込みも止める(self):
+        # `> settings.json` は hook の登録を空にする。
+        self.assert_denied_by("cd .claude && > settings.json", SETTING_FILES)
+
+    def test_実行役のコマンド越しと_env_C_も止める(self):
+        for subject in [
+            "cd .claude && env rm settings.json",
+            "cd .claude && sudo -u me rm settings.json",
+            "cd .claude && dd if=/tmp/x of=settings.json",
+            "builtin cd .claude && rm settings.json",
+            "env -C .claude rm settings.json",
+            "sudo --chdir=.ccnavi/common rm rules.yml",
+        ]:
+            with self.subTest(subject=subject):
+                self.assert_denied_by(subject, SETTING_FILES)
+
+    def test_左がサブシェルになる区切りでは移らない(self):
+        # `cd .claude &` の後ろは元の場所のまま。止めると誤検知になる。
+        for subject in [
+            "cd .claude & echo x > settings.json",
+            "cd .claude | echo x > settings.json",
+        ]:
+            with self.subTest(subject=subject):
+                self.assertEqual(blocking(self.judge(subject)), set(), subject)
+
+
 class SubstRepoRulesTest(unittest.TestCase):
     """コマンド置換・改行・プロセス置換を読んだあとの判定。
 

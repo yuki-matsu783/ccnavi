@@ -9,10 +9,10 @@
 | グループ | 主題 | 時間 |
 |---|---|---|
 | `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・`build.py` の形・sh の書き方など） | 約 5 秒 |
-| `guard` | 判定とルール（受入テスト、自己保護、運用のルール、フォールバック、実行後の監視、プロジェクト） | 約 60 秒 |
+| `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後の監視、プロジェクト） | 約 60 秒 |
 | `config` | 設定の層の合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク | 約 140 秒 |
-| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・運ぶ sh・ランチャー・clean） | 約 80 秒 |
+| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・運ぶ sh・取ってくる sh・ランチャー・clean） | 約 80 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から叩く。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
@@ -36,16 +36,22 @@ uv run python -m unittest discover -s tests -t .         # 全件
 | `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-push-approved.sh`・`ccnavi-clean.sh`・`ccnavi-clean.js` | `sh` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-fetch.sh` | `sh` |
 | `.claude/hooks/test-py.sh` | `e2e` |
+| `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`vscode-extension/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `vscode-extension/` | `ticket`（`core` の `test_test_json` も例を読む） |
-| ドキュメントだけ（`*.md`・`docs/`） | 回さない |
+| `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
+| そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 **自動テストが無いもの。** 次は、どのグループを回しても、全件を回しても中身が確かめられない。
 表に入れていないのはそのため。変えたら手で動かして確かめる。
 
 - `.claude/hooks/lint-py.sh`（`guard` の `test_fallback` がパスを文字列として使うだけで、実行しない）
-- `.ccnavi/scripts/ccnavi-fetch.sh`（テストから一度も呼ばれない）
+- `.claude/hooks/test-py.sh`（`e2e` は sh の外形だけ。差し戻しの回数と、落ちたテストを
+  差し戻すところは回らない。変えたら手で確かめる。`test-ext.sh` のほうは
+  `core` の `test_ext_tests` が控えの入口を渡して、終了コードの読み方・差し戻しの回数・
+  綴りの扱いまで見る）
 
 **全件を回すとき。**
 
@@ -57,6 +63,21 @@ uv run python -m unittest discover -s tests -t .         # 全件
 
 `ccnavi/*.py` を変えたとき `e2e` は足さない。e2e が試すのはソースではなく組み立て済みの実行ファイルで、
 組み立て直さないと変更が届かないため。組み立て直したなら足す。
+
+## 拡張（`vscode-extension/ccnavi-board`）のグループ
+
+拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / shared）。
+**こちらは表を引かない。** 変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
+
+```sh
+cd vscode-extension/ccnavi-board
+pnpm test:plan src/core/rules-doc.ts   # 何を回すかだけ見る
+pnpm test:for src/core/rules-doc.ts    # 回す
+pnpm test                              # 全部（203 本。9.5〜11.5 秒）
+```
+
+グループをいくつ選んでもコンパイルは 1 回なので、変えたファイルは 1 回でまとめて渡す
+（`pnpm test:for a.ts b.ts`）。`pnpm test:rules` を 2 回打つより速い。
 
 ## 表を直すとき
 

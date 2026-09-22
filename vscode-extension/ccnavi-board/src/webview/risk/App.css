@@ -1,0 +1,10 @@
+/*
+ * リスク管理画面の骨組み（`App.tsx`）。閾値の枠と、その中の欄。1 件の行は `Factor.css`。
+ */
+button.action.small { margin-left: auto; }
+.block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
+.block h2 { display: flex; gap: 8px; align-items: center; }
+.levels { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+.levels .field { display: flex; flex-direction: row; gap: 6px; align-items: center; }
+.levels .field > .cap { text-align: left; }
+.levels .field > input { width: 90px; }

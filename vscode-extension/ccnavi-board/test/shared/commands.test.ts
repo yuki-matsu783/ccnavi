@@ -100,7 +100,7 @@ test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と�
   assert.equal(scriptCommand("/a$b", "x.sh"), `sh '/a$b/.ccnavi/scripts/x.sh'`);
 });
 
-test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリーで check を単体で打つことと MR の URL を言い、マーカーは置かせない", () => {
+test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリーで check を単体で打つこととマージリクエストの URL を言い、マーカーは置かせない", () => {
   const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5");
   assert.ok(
     text.startsWith(
@@ -118,7 +118,7 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(!text.includes("accept"));
   assert.ok(!text.includes("依頼し直す"));
   assert.ok(text.includes("check が一覧と次の道を返すので、それに従う"));
-  // MR が無ければ行ごと省き、段階の表示名が無ければ番号で言う。Windows の区切りは / に寄せる
+  // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / に寄せる
   const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "");
   assert.ok(!bare.includes("マージリクエスト:"));
   assert.ok(bare.includes("フェーズ 3 のレビューを終えた"));

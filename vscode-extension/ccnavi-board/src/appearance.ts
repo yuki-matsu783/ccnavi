@@ -5,7 +5,7 @@
  */
 import * as vscode from "vscode";
 
-import { APPEARANCE_LABELS, APPEARANCES, type Appearance, type AppearanceMessage, parseAppearance } from "./core/appearance.js";
+import { APPEARANCE_LABELS, APPEARANCES, type Appearance, type AppearanceSink, parseAppearance, sendAppearance } from "./core/appearance.js";
 
 const KEY = "appearance";
 
@@ -23,27 +23,32 @@ export function onDidChangeAppearance(listener: (appearance: Appearance) => void
 }
 
 /**
- * 開いている Webview に今の見た目を送る。パネルを作ったときに購読し、閉じたら外す。
- * 裏に回っている間は postMessage が届かない（retainContextWhenHidden が偽の画面は HTML ごと捨てられ、
- * 再表示で作り直される）ので、見えるようになったときにも今の値を送り直す。
+ * いまの見た目を画面へ送る。**画面に中身を渡す段取り（`ScreenHost`）を通す。**
+ * 届いたら真、組み上がっていない画面と捨てられた画面には送らないので偽。
+ *
+ * 落ちたぶんは持ち越さない。入れ物ごと入れ直す道では組む側が HTML に埋め（`bodyTag`）、
+ * 画面が組み上がったところで呼ぶ側が送り直すので、どちらの道でもいまの値が後から渡る。
  */
-export function followAppearance(panel: vscode.WebviewPanel): void {
-  const send = (appearance: Appearance): void => {
-    const message: AppearanceMessage = { type: "appearance", value: appearance };
-    void panel.webview.postMessage(message);
-  };
-  const subs = [
-    onDidChangeAppearance(send),
-    panel.onDidChangeViewState((event) => {
-      if (event.webviewPanel.visible) {
-        send(readAppearance());
-      }
-    }),
-  ];
+export function postAppearance(host: AppearanceSink): boolean {
+  return sendAppearance(host, readAppearance());
+}
+
+/**
+ * 設定が変わったら、開いている画面に送る。パネルを作ったときに購読し、閉じたら外す。
+ *
+ * **送り先は段取り（`ScreenHost`）で、`panel.webview.postMessage` は叩かない**（issue #87）。
+ * 表に戻ったときの送り直しもここでは持たない。保持しない画面（ボード・プロジェクト管理）は
+ * 表に戻ると入れ物から作り直され、`ready` で呼ぶ側が送り直す。保持する画面（ルール設定・
+ * リスク管理・フェーズ管理）は、裏にいる間の `lock` と `changed` を送り直すのと同じところで
+ * 一緒に送り直す（ADR-0062）。**送り直す場所は画面の種類ごとに 1 か所**で、ここが別に持つと
+ * 同じことを 2 か所でやることになる。
+ */
+export function followAppearance(panel: vscode.WebviewPanel, host: AppearanceSink): void {
+  const sub = onDidChangeAppearance((appearance) => {
+    sendAppearance(host, appearance);
+  });
   panel.onDidDispose(() => {
-    for (const sub of subs) {
-      sub.dispose();
-    }
+    sub.dispose();
   });
 }
 

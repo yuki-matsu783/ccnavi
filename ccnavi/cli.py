@@ -55,14 +55,23 @@ shape documented in README.md ("lint の JSON"); the VS Code extension reads it.
 
 To try or lint one project's rules before saving them, hand the edited file in
 by the project's name (this flag is for --test, --test-samples, --lint and
---explain only; a hook invocation ignores it):
+--explain only; anything else - a hook invocation, a ticket or review
+subcommand - drops it and says so on stderr):
 
     ccnavi --test Write projects/lib/src/a.py --project-rules-file lib=/tmp/rules.yml
 
 The phase types of one layer are handed in the same way (self is the
-workspace's own layer; the common layer keeps using --phases):
+workspace's own layer; the common layer uses --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
+
+The common layer's own three files are moved by --rules, --phases and --risk,
+and where the layers are looked for by --projects and --project-home. All five
+are on the same gate: diagnosis only, dropped everywhere else.
+
+--root and --cwd say where this run is happening. The wrapper scripts in
+.ccnavi/scripts/ work them out and pass them, so they are accepted once only;
+a second one is refused rather than taken as an override.
 
 To list the tickets, their places, the phase marks and the review holds
 in a machine-readable form (the VS Code board extension reads this), run
@@ -93,6 +102,25 @@ writable and whether it needs a human review, then moves the approved ticket to
 writing a proposal never widens the area on its own. Ids only narrow the batch:
 an id that is not pending, or a child listed without its pending parent or
 its parent's pending revision, approves nothing.
+
+Before asking the user to approve, the agent verifies that the proposal it just
+wrote is in a state that can be approved:
+
+    ccnavi --approve --preview --verify [--json] [<id>...]
+
+It places nothing and needs no terminal. Exit 0 is yes: every named ticket (or
+every pending one, when no id is given) goes into the batch as it stands, so the
+user can be asked. Exit 3 is no: an id that is not pending, no pending ticket at
+all, or a proposal the approval drops. The reasons are printed per ticket. Exit
+1 stays what it is everywhere else - a usage or settings error, not an answer -
+so a wrong spelling is never read as a proposal to fix.
+
+Two things are not a no, because --approve does not drop them either: scope that
+exceeds the parent or the phase type (writes there stay blocked after approval),
+and a proposal that cannot be read (the scan covers every worktree, before the
+ids narrow it, so another session's draft would answer no). Both are printed.
+Having nothing pending is the one place where the two differ: --approve calls
+that a success with nothing to do, the verify calls it a no.
 
 The VS Code board extension approves from an overlay instead of the terminal:
 
@@ -165,6 +193,70 @@ OVERRIDES = (
 )
 # 作業ツリーのルートからの相対で書く欄。区切りを "/" に揃え、前後の "/" を落とす。
 RELATIVE_OVERRIDES = ("tickets", "project_home")
+# 層の置き場を動かすフラグと、「渡されなかった」ときの値。`--project-rules-file` と
+# 同じで診断の経路でだけ効く。3 つめの欄が既定なのは、渡されたかどうかを OVERRIDES /
+# RELATIVE_OVERRIDES と同じ読み方で決めるため（`--rules ""` は指定と数えず、
+# `--risk ""` は数える）。
+#
+# 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
+# **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
+# 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
+# プロジェクトの層がまるごと消える。実測では `ticket done <子> --project-home .nothere`
+# で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
+# 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
+LAYER_OVERRIDES = (
+    ("--rules", "rules", ""),
+    ("--phases", "phases", None),
+    ("--risk", "risk", None),
+    ("--projects", "projects", None),
+    ("--project-home", "project_home", ""),
+)
+# 落としたときの文面。5 本のフラグで同じものを使う。門が 2 つあるように読ませない。
+DIAGNOSIS_ONLY = "ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n"
+# `.ccnavi/scripts/` の sh が自分で計算して渡す綴りと、渡されなかったときの値。
+# どちらも「いまどこで動いているか」で、エージェントが名乗るものではない。
+#
+# sh は自分のぶんを先に置き、エージェントの引数を後ろに繋ぐ
+# （`exec "$bin" --root "$root" ticket "$@"`）。argparse は同じオプションを後勝ちで読むので、
+# 後ろに 1 本足すだけで sh が渡した本物を上書きできた。`--root` は共通層の 3 本も
+# `projects` も `approved` もそこから導かれる（`settings.load`）ので、1 本で全部動く。
+# 実測では、本物のツリーへシンボリックリンクを張った偽のルートを渡すと、子チケットが
+# 本物の置き場に「リスク 0」で閉じられた（ADR-0067）。
+#
+# 正しい 1 本が先に在ることに頼らず、2 本目が在ること自体を断る。落として先へ進むのでは
+# なく止めるのは、この 2 つに「2 度渡す」正しい使い方が無いから。診断の 5 本と違って、
+# 効く経路の話ではない。
+WRAPPER_FLAGS = (("--root", "root", None), ("--cwd", "cwd", ""))
+
+
+def _one_wrapper_flag_each(stderr: TextIO, args: argparse.Namespace) -> bool:
+    """sh が渡す綴りが 2 度来ていないかを見て、1 本に均す。2 度来ていたら False。
+
+    数えるのは argparse に任せる（`action="append"`）。argv を自分で数えると、
+    オプションの位置に立っていない `--root` という語まで数えてしまう
+    （`--reason=--root` のように別のオプションの値として書かれた形）。
+    """
+    for flag, name, absent in WRAPPER_FLAGS:
+        given = getattr(args, name)
+        if given is not None and len(given) > 1:
+            stderr.write(f"ccnavi: {flag} は 1 度しか渡せない（{len(given)} 度渡された）\n")
+            return False
+        setattr(args, name, given[-1] if given else absent)
+    return True
+
+
+def _drop_outside_diagnosis(stderr: TextIO, args: argparse.Namespace) -> None:
+    """診断の外で渡された層の置き場の差し替えを、標準エラーに出して落とす。
+
+    フラグは設定ファイルより強いので、落とさないと保存していない `rules.yml` /
+    `phases.yml` / `risks.yml` で判定と採点が走り、層そのものも外せる。届く経路は
+    `.ccnavi/scripts/` の sh で、受け取った引数を実行ファイルへ素通しする（ADR-0067）。
+    """
+    for flag, name, absent in LAYER_OVERRIDES:
+        if getattr(args, name) == absent:
+            continue
+        stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
+        setattr(args, name, absent)
 
 
 def _override(conf: settings.Settings, args: argparse.Namespace) -> None:
@@ -203,7 +295,8 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
-    parser.add_argument("--root", default=None)
+    # 綴りは sh が計算して渡す。2 度来ていないかを見るので、束ねて受ける（WRAPPER_FLAGS）。
+    parser.add_argument("--root", action="append", default=None)
     parser.add_argument("--mode", default="")
     parser.add_argument("--rules", default="")
     parser.add_argument("--log", default=None)
@@ -220,6 +313,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 承認の対象の一覧を見るだけ（承認済みチケットを置かない）。
     # VS Code の拡張がオーバーレイに出すために打つ。
     parser.add_argument("--preview", action="store_true")
+    # 承認できる状態かを確かめるだけ（`--preview` と一緒に使う）。承認済みチケットは置かず、
+    # 通るかどうかを終了コードで返す。エージェントが人に承認を頼む前に打つ。
+    parser.add_argument("--verify", action="store_true")
     # 見せた一覧の識別子（カンマ区切り）。拡張のオーバーレイで人が押した承認。端末は要らない。
     parser.add_argument("--yes", default="")
     # 見せた承認画面の本文と承認済みチケットに写る中身の指紋（preview の `digest`）。
@@ -245,7 +341,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--project-phases-file", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
-    parser.add_argument("--cwd", default="")
+    parser.add_argument("--cwd", action="append", default=None)
     parser.add_argument("--phase", type=int, default=None)
     parser.add_argument("--body-file", default="")
     parser.add_argument("--reason", default="")
@@ -260,9 +356,20 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         stderr.write(USAGE)
         return EXIT_ERROR
+    if not _one_wrapper_flag_each(stderr, args):
+        return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
     conf, problems = settings.load(root)
+
+    # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ効く。
+    # hook からの判定にも、チケットとレビューの副命令にも差し替えの手段を残すと、
+    # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
+    # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
+    # 指しても実運用に漏れない。
+    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    if not diagnosing:
+        _drop_outside_diagnosis(stderr, args)
 
     _override(conf, args)
     # フラグは設定ファイルより強い。書かれた綴りのほうも、そこに合わせて差し替える。
@@ -289,9 +396,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
-    # 層のルールと種類の差し替えは診断の経路でだけ効く。hook からの判定にも
-    # 差し替えの手段を残すと、設定を保存せずに緩める道になるので、そこでは無視する。
-    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
     for flag, value, swaps in (
         ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
         ("--project-phases-file", args.project_phases_file, conf.project_phases_files),
@@ -299,7 +404,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if not value:
             continue
         if not diagnosing:
-            stderr.write(f"ccnavi: {flag} は診断（--test / --lint / --explain）でだけ効く\n")
+            stderr.write(DIAGNOSIS_ONLY.format(flag=flag))
             continue
         name, sep, path = value.partition("=")
         if not sep or not name or not path:
@@ -347,6 +452,17 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         if args.preview and args.yes:
             stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
             return EXIT_ERROR
+        # 確かめるだけの枝は `--preview` に相乗りする。単独で打てる形にすると、組み込みの
+        # deny（phase.ticket_approval_rule）が免除するのは `--preview` の付いた `--approve`
+        # だけなので、エージェントが打てないものを案内することになる。
+        if args.verify and not args.preview:
+            stderr.write("ccnavi: --verify は --approve --preview と一緒に使う\n")
+            return EXIT_ERROR
+        # 承認できる状態かを確かめるだけ。置かないのは `--preview` と同じで、違うのは
+        # 通るかどうかを終了コードで返すところ（REQ-APV-13）。答えは 0（はい）と
+        # 3（いいえ）で、使い方と設定の誤りの 1 とは分ける。
+        if args.verify:
+            return approval.verify(stdout, stderr, conf, root, args.json, list(args.command))
         # 見るだけの経路。承認済みチケットを置かないので端末の壁は要らない。後ろに並べた語は
         # `--approve` と同じで、承認の対象に入れる識別子（ボードの絞り込みで見えている分）。
         if args.preview:

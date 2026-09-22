@@ -21,7 +21,7 @@ ccnavi --lint --log "" --state ""
 |---|---|---|
 | `(rules)` / ルール id | 読めない、版が違う、`deny` が空、文面・match・glob を欠く、glob と regex の両方、`ask` `allow` に `message`、組めない正規表現、`additionalContextFile` が上に出る | `allow` が空、id 無し・重複、当てる対象の無いツール、広い allow に文、指すファイルが無い・長い |
 | `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が mr でない、id / title の重複、overlap / requires の先が無い、scope が外に出る | 自分を overlap / requires に挙げている |
-| `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、当て方が 0 か 2 つ、script の置き場が外、glob が組めない | 知らない段階名 |
+| `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、当て方が 0 か 2 つ、script の置き場が外、glob が組めない | 知らない等級名 |
 | `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親があるのに phases が読めない | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
 下書きを見るときは `--rules` `--phases` `--risk` で差し替える。3 本は互いに読み合うので
@@ -58,7 +58,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --log "" --state "" --appr
 **守られているかも見本で見る。** rules.yml と phases.yml と risks.yml、承認済みチケットの
 置き場、settings.json への Write / Edit を deny の見本に置いて回す。ワークスペースルート
 直下と、**実在するワークツリーの名前**での設定の両方。ワークツリー側の設定は、ブランチを
-統合すればそのまま main の設定になる道を持つ。このリポジトリでは `guard-ccnavi-config` と
+統合すればそのまま統合先の設定になる道を持つ。このリポジトリでは `guard-ccnavi-config` と
 `guard-settings` が両方を止める。出るのはルールの判定だけで、組み込みの守り
 （settings.json と rules.yml を実行後に戻す働き）は `--test` には出ない。allow に見えた
 ものは「ルールでは止めていない」ということなので、そのまま報告する。

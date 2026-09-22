@@ -1,0 +1,35 @@
+/*
+ * ルール設定画面の骨組み（`App.tsx`）。タブと面、タイプごとの節、判定を試す欄、そして 2 つの面が
+ * 共有する表（サンプルの一括判定と hook の一覧）。1 件の行は `Rule.css`、判定の結果は `Judge.css`。
+ */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 10px; }
+.tab {
+  background: none; border: none; border-bottom: 2px solid transparent; color: var(--vscode-descriptionForeground);
+  padding: 6px 12px; cursor: pointer; font: inherit;
+}
+.tab.active { color: var(--vscode-editor-foreground); border-bottom-color: var(--vscode-focusBorder); }
+.pane { display: none; }
+.pane.active { display: block; }
+button.action.small { margin-left: auto; }
+.rule-section { margin-bottom: 14px; }
+.rule-section h2 { margin: 0 0 4px; font-size: 1em; display: flex; gap: 8px; align-items: center; }
+.section-name { font-weight: 700; padding: 0 8px; border-radius: 999px; border: 1px solid currentColor; font-size: .85em; font-family: var(--vscode-editor-font-family); }
+.section-name.deny { color: var(--vscode-editorError-foreground); }
+.section-name.ask { color: var(--vscode-editorWarning-foreground); }
+.section-name.allow { color: var(--vscode-charts-green); }
+.section-label, .count { color: var(--vscode-descriptionForeground); font-weight: 400; }
+.rule-section.folded .list { display: none; }
+/* 絞り込み中は畳んだタイプの中も見せる（矢印も開いた向きにする） */
+.finding .rule-section.folded .list { display: block; }
+.judge-form { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 10px; }
+.judge-form label { display: flex; gap: 6px; align-items: center; color: var(--vscode-descriptionForeground); }
+.judge-form .grow { flex: 1 1 320px; }
+.judge-form .grow input { flex: 1; }
+table { border-collapse: collapse; width: 100%; font-size: .95em; }
+th, td { text-align: left; padding: 3px 8px; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: top; }
+th { color: var(--vscode-descriptionForeground); font-weight: 600; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.cmd { overflow-wrap: anywhere; }
+tr.ng td { color: var(--vscode-editorError-foreground); }
+tr.skipped td { color: var(--vscode-editorWarning-foreground); }
+.samples-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

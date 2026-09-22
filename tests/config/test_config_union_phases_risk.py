@@ -172,7 +172,7 @@ class PhaseUnionTest(ConfigUnionHarness):
     def test_scope_stays_relative_to_the_worktree(self):
         """§11.4.1: `scope` はワークツリーのルートからの相対のまま。
 
-        種類の超過は承認を拒まず、承認画面の「判定で止まるもの」に出る（設計 approve-carry
+        種類の超過は承認を拒まず、承認画面の「編集対象としているが」に出る（設計 approve-carry
         §3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
         """
         self.propose(
@@ -192,7 +192,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         )
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.assertIn("判定で止まるもの", approved.stdout)
+        self.assertIn("編集対象としているが", approved.stdout)
         self.assertIn("`docs/*` は種類", approved.stdout)
         self.assertNotIn("`src/a/*` は種類", approved.stdout)
         self.assertTrue(os.path.exists(self.approved_copy("i0001-01")))
@@ -226,6 +226,16 @@ class RiskUnionTest(ConfigUnionHarness):
         where = self.project_where(layer) if layer else ""
         return [p for p in self.problems(severity, where=where) if "risk" in p["where"]]
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def one_child(self):
         """lib の親と子を承認し、子のワークツリーを lib から切って着手する。"""
         scope = ("src/*", "schema/*", "wip/*")
@@ -242,6 +252,7 @@ class RiskUnionTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
         self.parent_tree = self.worktree(self.lib, "i0001")
+        self.start_parent()
         tree = self.worktree(self.lib, "i0001-01")
         started = self.ccnavi("ticket", "start", "i0001-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
@@ -445,6 +456,50 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("省略", self.reason(said))
         mark = json.loads(read(self.approved_path("phases", "i0001", "1.skipped")))
         self.assertEqual(mark.get("source"), "lib", mark)
+
+
+class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
+    """層を探す先を動かすフラグも、診断の外では効かない（ADR-0067、issue #65）。
+
+    `--projects` と `--project-home` は、共通層の中身を差し替えるのと結果が同じ。
+    外すとプロジェクトの層がまるごと消えるので、その層が足していた配点も
+    フェーズの種類も落ちる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数を素通しするので、
+    この形はエージェントが Bash で打てる。
+
+    土台の子は共通層の `big-diff`（25）と lib の `schema`（30）で 55 点、
+    lib の critical は 50 なので CRITICAL。`review: mr` のフェーズなので
+    レビュー待ちへ動く。lib の層が消えると 25 点の MEDIUM になり、
+    レビューを飛ばして閉じられる。
+    """
+
+    def assert_the_lib_layer_still_counted(self, closed):
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        record = self.record()
+        self.assertEqual(record["points"], 55, "lib の層が落ちた")
+        self.assertIn("schema", {h["id"] for h in record["hits"]})
+        self.assertIn("(CRITICAL)", closed.stdout)
+        self.assertTrue(
+            os.path.exists(os.path.join(self.lib, "wip", "proposals", "review", "i0001-01.md")),
+            "レビュー待ちへ動いていない",
+        )
+
+    def test_a_project_home_flag_on_ticket_done_does_not_drop_the_layer(self):
+        tree = self.one_child()
+        self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--project-home", ".nothere")
+
+        self.assertIn("--project-home は診断", closed.stderr, "落としたことを言っていない")
+        self.assert_the_lib_layer_still_counted(closed)
+
+    def test_a_projects_flag_on_ticket_done_does_not_drop_the_layer(self):
+        tree = self.one_child()
+        self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
+
+        closed = self.ccnavi("ticket", "done", "i0001-01", "--projects", os.path.join(self.ws, "x"))
+
+        self.assertIn("--projects は診断", closed.stderr, "落としたことを言っていない")
+        self.assert_the_lib_layer_still_counted(closed)
 
 
 if __name__ == "__main__":

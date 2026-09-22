@@ -31,7 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 NOTE = "ルールの additionalContext。判定を決めた側に関わらず載る。"
@@ -150,7 +150,8 @@ class Workspace(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(SILENT))
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
+        self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
         self.log = os.path.join(self.root, "log.jsonl")
         self.parent_tree = self.worktree("i0001", "main")
@@ -166,7 +167,7 @@ class Workspace(unittest.TestCase):
         git(self.root, "worktree", "add", "--quiet", path, "-b", name, base)
         return path
 
-    def ccnavi(self, *args, stdin="", env=None, core="disable"):
+    def ccnavi(self, *args, stdin="", env=None, core="disable", restore="disable"):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
         environment.update(env or {})
@@ -174,8 +175,6 @@ class Workspace(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--rules",
-                self.rules,
                 "--tickets",
                 self.TICKETS,
                 "--approved",
@@ -187,7 +186,7 @@ class Workspace(unittest.TestCase):
                 "--guard-core-files",
                 core,
                 "--restore-if-deny",
-                "disable",
+                restore,
                 "--guard-ticket-approval",
                 "disable",
                 *args,
@@ -208,6 +207,7 @@ class Workspace(unittest.TestCase):
         session="s1",
         env=None,
         core="disable",
+        restore="disable",
         **tool_input,
     ):
         payload = {
@@ -219,7 +219,9 @@ class Workspace(unittest.TestCase):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        return self.ccnavi("--mode", mode, stdin=json.dumps(payload), env=env, core=core)
+        return self.ccnavi(
+            "--mode", mode, stdin=json.dumps(payload), env=env, core=core, restore=restore
+        )
 
     def write_hook(self, tree, rel, **kw):
         """Write の実行前の判定。"""
@@ -270,6 +272,16 @@ class Workspace(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
         return result
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def family(self, parent=None, child=None):
         """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
@@ -282,6 +294,7 @@ class Workspace(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.approve()
+        self.start_parent()
         self.worktree("i0001-01", "i0001")
         started = self.ccnavi("ticket", "start", "i0001-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
@@ -520,6 +533,34 @@ class TicketPlaces(Workspace):
                     self.assertIn(code, result.stderr)
                     self.assertIn(rel, result.stderr)
 
+    def test_post_tool_use_reports_a_scope_finding_without_restoring_it(self):
+        """範囲外は報告するが戻さない。戻す根拠はルールの `deny` だけ（post._restorable）。
+
+        咎めているのはルールファイルに無いルール（`(ticket-scope)`）で、
+        `CCNAVI_RESTORE_IF_DENY` が言う「`deny` と宣言した場所」ではない。
+        """
+        rel = "docs/b.md"
+        full = os.path.join(self.child, *rel.split("/"))
+        self.hook("PostToolUse", "Bash", self.child, session="keep", command="ls")
+        write(full, "generated\n")
+
+        result = self.hook(
+            "PostToolUse",
+            "Bash",
+            self.child,
+            session="keep",
+            command="python gen.py",
+            restore="enable",
+        )
+
+        self.assertIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
+        self.assertIn(rel, result.stderr)
+        self.assertNotIn("restored: ccnavi", result.stderr)
+        self.assertNotIn("moved this file to", result.stderr)
+        self.assertTrue(os.path.exists(full), "範囲外のファイルを動かさない")
+        # 手順だけだと「自分で消せ」としか読めない。戻さなかった理由を添える。
+        self.assertIn("not-restored:", result.stderr)
+
     def test_subagent_stop_leaves_the_proposals_alone(self):
         # 自分の提案も、他のチケットの提案も。
         for name in ("i0001-01", "i0009"):
@@ -707,7 +748,7 @@ class Boundaries(Workspace):
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
 
     def test_child_approval_screen_gets_no_new_note(self):
-        """子の画面の「親からどれだけ絞ったか」には注記を添えない。注記は親の画面だけ。"""
+        """子の画面の「この子チケットで編集可能な範囲」には注記を添えない。注記は親の画面だけ。"""
         self.propose("i0001", allow=("src/*",))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         result = self.ccnavi("--approve", "--preview")
@@ -734,8 +775,8 @@ class Diagnostics(Workspace):
         self.propose("i0001", allow=("src/*",))
         result = self.ccnavi("--approve", "--preview")
         self.assertEqual(result.returncode, 0, result.stderr)
-        # 見出し「このチケットで書き込みが許される領域」の節の中に出る。
-        parent = section_of(result.stdout, "■ このチケットで書き込みが許される領域")
+        # 見出し「このチケットで編集可能な範囲」の節の中に出る。
+        parent = section_of(result.stdout, "■ このチケットで編集可能な範囲")
         self.assertIn(APPROVAL_NOTE, parent, result.stdout)
 
     def test_explain_says_the_ticket_is_stronger_than_rule_allow(self):

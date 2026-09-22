@@ -32,7 +32,7 @@ import re
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, tree
+from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, shellread, tree
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -71,7 +71,18 @@ HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 # 前のコマンドの `--approve` を免除する。
 # 語の中の目印（引用がつないだ空白）もまたがない。またぐと、引数の値に書いた
 # `ccnavi --approve x "a --preview"` の `--preview` が免除の理由になる。
-_NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*--preview\b)"
+#
+# **免除の理由になるのは、単独の語として立った `--preview` だけ。** 前は生の空白（`--approve` の
+# 後ろに必ず 1 つある）、後ろは空白か区切りか行末。これを見ないと、別のフラグの**値**に書いた
+# `--preview` で免除が成立する。`ccnavi --approve --reason=--preview` は、argparse が
+# `--reason` の値として食うので `--preview` は立たず、実行ファイルは本物の `--approve` を
+# 走らせる。hook が見る文字列と、実行ファイルが走らせる枝がそこでズレていた。
+# `=` を挟む形だけでなく、`--preview=x` や `x--preview` のように語にくっついた形も免除しない。
+# 語の切れ目は生の空白だけで数える。語の中の目印（引用がつないだ空白）は数えない。
+# 数えると、引用の中に書いた `"a --preview"` が単独の語に見えて免除が戻る。
+_PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
+_PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
+_NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
     rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
     r"|\b(ticket|review)\s+"
@@ -197,7 +208,7 @@ class Phase:
 
     @property
     def risk_escalates(self) -> bool:
-        """実績のリスクが、宣言に関わらずレビューを要る扱いにする段階か。"""
+        """実績のリスクが、宣言に関わらずレビューが要る扱いにする等級か。"""
         record = self.risk
         return record is not None and str(record.get("level") or "") in risk.ESCALATE_FROM
 
@@ -303,8 +314,8 @@ class Phase:
         where = declared[0]
         for covered in declared[1:]:
             where = phasetypes.stricter(where, covered)
-        # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。MR を
-        # 勧めるのは文の側の仕事で、強制はしない（ADR-0051）。
+        # 「要る」としか言われていないフェーズは、いちばん安い見る場所まで上げる。マージリクエストを
+        # 勧めるのは文の側の仕事で、強制はしない（ADR-0065）。
         if needed and where == phasetypes.REVIEW_NONE:
             where = phasetypes.REVIEW_CHAT
         return where
@@ -394,7 +405,7 @@ def layer_types(
     言うと、層の話を読みに来た人が同じ文を 2 度読むことになる。
 
     無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
-    組み込みへは落とさない。共通層が有るのに落とすと、共通層の種類が消える。
+    組み込みへは落とさない。共通層が在るのに落とすと、共通層の種類が消える。
     """
     common, notes = common_types(conf)
     if common is None and notes:
@@ -705,6 +716,10 @@ def order_problems(
 
     `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
 
+    ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
+    前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの印を見て
+    warn に落とす（`lint._approval_problems`）。
+
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
     増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
     フェーズとして読む。読まないと、前のフェーズに足す子と、そのフェーズが済んだ前提の
@@ -748,6 +763,7 @@ def order_problems(
                     child.ticket,
                     f"{child.phase} 番目の子は、{phase.label} が閉じるまで承認しない（{state}）。"
                     "作業が終わるまで次の計画は立てない",
+                    rules.KIND_NOT_YET,
                 )
             )
             break
@@ -757,6 +773,7 @@ def order_problems(
                     rules.SEVERITY_ERROR,
                     child.ticket,
                     f"{child.phase} 番目の子は、{phase.label} のレビューが済むまで承認しない",
+                    rules.KIND_NOT_YET,
                 )
             )
             break
@@ -796,7 +813,7 @@ def chat_only(
 ) -> bool:
     """マージリクエストに出さない運び方か。フェーズが 1 つも無ければ False。
 
-    1 つでも `mr` で見るフェーズがあれば、その親には MR が在る（レビューの依頼が作る）
+    1 つでも `mr` で見るフェーズがあれば、その親にはマージリクエストが在る（レビューの依頼が作る）
     ので、締めも Draft を外す道に乗る。`venues` は数え直しを省くための持ち込み。
     """
     if venues is None:
@@ -826,7 +843,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの段階にいるか（設計 §9.7）。計画が無ければ空文字。"""
+    """親がいまどの局面にいるか（設計 §9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
@@ -852,6 +869,8 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
 LIMIT_TICKET = "ticket"
 LIMIT_PARENT = "parent"
 LIMIT_TYPE = "type"
+# チケット自体が信じられない（`Ticket.blocked`）。範囲を当てる前に止める（ADR-0058）。
+LIMIT_BLOCKED = "blocked"
 
 # 範囲の外として止める判定。
 _OUTSIDE = (ticket_mod.OUTSIDE, rules.DENY)
@@ -892,7 +911,13 @@ def scope_verdict(
     順は 子 → 親 → 種類。厳しい側が勝つので順は判定を変えないが、`limit` は最初に
     外へ出した上限を名指しする。種類の上限は allow か外しか言わない。子が ask と書いた
     場所が種類の中なら ask のまま。
+
+    その前に `blocked` を見る。承認のときにしか当たらなかった構造の検査に引っかかった
+    チケットは、範囲を当てても意味が無い（親が引けない子は、どの範囲で切り詰めるかが
+    決まらない）。範囲の中でも外でも止める（ADR-0058）。
     """
+    if child.blocked:
+        return ScopeVerdict(rules.DENY, LIMIT_BLOCKED, pt)
     verdict = child.decide(rel)
     limit = LIMIT_TICKET if verdict in _OUTSIDE else ""
     if parent is not None:

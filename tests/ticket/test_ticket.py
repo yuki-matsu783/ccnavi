@@ -3,7 +3,7 @@
 本物の git リポジトリとワークツリーを一時ディレクトリに作る。親 1 本と子 2 本を
 フェーズ 1 つで通す（requirements.md の受け入れ条件 9）。
 
-見るのは 6 つ。
+見るのは 7 つ。
 
 1. 判定の鍵がファイルの行き先であること。親の cwd から子のツリーへ絶対パスで
    書いても、子のチケットで判定される
@@ -12,6 +12,8 @@
 4. フェーズが終わるとレビューで止まり、レビューが済むと開くこと
 5. 変更要求のレビューは人の端末からも通せないこと
 6. 基準点より後にコミットされた範囲外の変更を、サブエージェントの終了で差し戻すこと
+7. 置き場を動かすだけで承認になること、承認のときにしか当たらなかった構造の検査が
+   判定の側でも当たること（ADR-0058）
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ import unittest
 
 from ccnavi import phase as phase_mod
 from ccnavi import settings, shellread
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -115,7 +117,8 @@ class TicketTest(unittest.TestCase):
         git(self.root, "add", "-A")
         git(self.root, "commit", "--quiet", "-m", "init")
 
-        self.rules = write(os.path.join(self.root, "rules.yml"), json.dumps(RULES))
+        # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
+        self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
         # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
@@ -136,8 +139,6 @@ class TicketTest(unittest.TestCase):
             [
                 "--root",
                 self.root,
-                "--rules",
-                self.rules,
                 "--approved",
                 ".ccnavi/approved",
                 "--state",
@@ -160,13 +161,21 @@ class TicketTest(unittest.TestCase):
         )
 
     def hook(
-        self, event, tool, cwd, mode="enable", agent_id="", guard_ticket_approval="", **tool_input
+        self,
+        event,
+        tool,
+        cwd,
+        mode="enable",
+        agent_id="",
+        guard_ticket_approval="",
+        session="s1",
+        **tool_input,
     ):
         payload = {
             "hook_event_name": event,
             "tool_name": tool,
             "cwd": cwd,
-            "session_id": "s1",
+            "session_id": session,
             "tool_input": tool_input,
         }
         if agent_id:
@@ -198,6 +207,16 @@ class TicketTest(unittest.TestCase):
             git(self.parent_tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
         return result
 
+    def start_parent(self, name="i0001"):
+        """親を着手する（済んでいれば何もしない）。
+
+        子の着手は親が着手済みであることを前提にする（REQ-TKT-48）。親を飛ばしたまま
+        子を進められたころの手順をそのまま残すと、最初の子の着手で止まる。
+        """
+        started = self.ccnavi("ticket", "start", name)
+        if started.returncode != 0:
+            self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
+
     def family(self, review=(True, False)):
         """親 1 本と子 2 本をフェーズ 1 で提案し、承認して、子のワークツリーを作って着手する。"""
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -207,6 +226,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.start_parent()
         for child in ("i0001-01", "i0001-02"):
             self.worktree(child, "i0001")
             started = self.ccnavi("ticket", "start", child)
@@ -317,6 +337,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001", allow=("src/*", "wip/*"))
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
         result = self.ccnavi("ticket", "start", "i0001-01")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ワークツリー", result.stderr)
@@ -344,7 +365,7 @@ class TicketTest(unittest.TestCase):
     # ---- 2. 子は親の部分集合
 
     def test_child_beyond_parent_is_approved_with_a_warning(self):
-        """親の範囲を超える子も承認できる。超えた項は承認画面の「判定で止まるもの」に出る。
+        """親の範囲を超える子も承認できる。超えた項は承認画面の「編集対象としているが」に出る。
 
         判定は親の範囲で切り詰めるので、承認で止める理由が無い（設計 approve-carry §3.1）。
         超えた項は承認しても書けないことを、承認する人がその場で読めるようにする。
@@ -354,7 +375,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("判定で止まるもの", result.stdout)
+        self.assertIn("編集対象としているが", result.stdout)
         self.assertIn("`docs/*` は親 i0001 の範囲を超えている", result.stdout)
         self.assertNotIn("承認の対象にしない", result.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
@@ -371,6 +392,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        self.start_parent()
         child = self.worktree("i0001-01", "i0001")
         started = self.ccnavi("ticket", "start", "i0001-01")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
@@ -403,7 +425,7 @@ class TicketTest(unittest.TestCase):
         result = self.ccnavi("--approve", "i0001", "i0001-01", stdin="y\n")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認待ち 3 件のうち、指定の 2 件", result.stdout)
-        self.assertNotIn("i0002", result.stdout.split("Ticket 承認リクエスト")[1])
+        self.assertNotIn("i0002", result.stdout.split("チケットの承認リクエスト")[1])
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0002.md")))
@@ -454,6 +476,157 @@ class TicketTest(unittest.TestCase):
             "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "b", "x.py")
         )
         self.assertIn("DENY_TICKET_SCOPE", self.reason(result))
+
+    # ---- 2b. 置き場を動かすだけの承認（ADR-0058）
+
+    def hand_move(self, name, text=""):
+        """人が GitHub の画面でやることと同じ。提案を承認済みの置き場へ動かすだけ。
+
+        `ccnavi_approved` は足さない。端末もボードも無い人には足す手段が無い。
+        """
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", name + ".md")
+        with open(source, encoding="utf-8") as f:
+            moved = text or f.read()
+        os.remove(source)
+        write(os.path.join(self.approved, "doing", name + ".md"), moved)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "move " + name)
+
+    def test_moving_the_file_alone_approves_it(self):
+        # 承認の権威は置き場。`.ccnavi/approved/` は組み込みの守りがエージェントの
+        # 書き込みを止めるので、そこに在ること自体が人の合意になる。
+        self.propose("i0001", allow=("src/*",))
+        self.hand_move("i0001")
+
+        inside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        self.assertNotIn("DENY_TICKET", self.reason(inside), self.reason(inside))
+
+        # 範囲は効いている。外は今までどおり止まる。
+        outside = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "docs", "x.md"),
+        )
+        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
+
+    def test_a_child_moved_without_its_parent_cannot_write_anywhere(self):
+        # 親を動かさずに子だけ動かすと、子の範囲をどの親で切り詰めるかが決まらない。
+        # 承認ならそこで落ちる。置き場を動かすだけの運びでは判定が止める。
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+        child = self.worktree("i0001-01", "i0001")
+
+        # 子が自分の範囲だと言っている場所でも通さない。
+        result = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "src", "a", "x.py")
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("i0001", reason)
+        self.assertNotIn("DENY_TICKET_SCOPE", reason)
+
+    def test_a_moved_ticket_whose_project_does_not_match_its_place_cannot_write(self):
+        # `project:` は宣言ではなく照合（ADR-0038）。承認が突き合わせていた食い違いを、
+        # 置き場を動かすだけの運びでは判定が突き合わせる。
+        self.propose("i0001", allow=("src/*",))
+        source = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001.md")
+        with open(source, encoding="utf-8") as f:
+            text = f.read().replace("ticket: i0001\n", "ticket: i0001\nproject: nowhere\n")
+        self.hand_move("i0001", text)
+
+        result = self.hook(
+            "PreToolUse",
+            "Write",
+            self.parent_tree,
+            file_path=os.path.join(self.parent_tree, "src", "x.py"),
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("nowhere", reason)
+
+    def test_lint_names_a_blocked_ticket_before_a_write_hits_it(self):
+        # 止まる場所は書き込みのときで、そこで初めて知るのは遅い。承認の画面が
+        # 無い運びでは、`--lint` がその代わりになる。
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+
+        result = self.ccnavi("--lint")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("i0001-01", result.stdout)
+        self.assertIn("親 i0001 の承認済みチケットが作業中に無い", result.stdout)
+
+    def close_parent_by_hand(self, name="i0001"):
+        """親の承認済みチケットを `doing/` から `done/` へ手で動かす。
+
+        道具は開いた子がある親を閉じさせない（`ops.close_problems`）ので、この形は
+        置き場を手で動かしたときにしか作れない。GitHub の画面で閉じるのがそれにあたる。
+        """
+        os.makedirs(os.path.join(self.approved, "done"), exist_ok=True)
+        os.replace(
+            os.path.join(self.approved, "doing", name + ".md"),
+            os.path.join(self.approved, "done", name + ".md"),
+        )
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "close " + name)
+
+    def test_a_child_whose_parent_is_closed_is_blocked_not_unclipped(self):
+        """親が閉じた子は、親の範囲で切り詰められないので止める。
+
+        判定が `parent` を引く索引は作業中のものだけ。親を閉じると引けなくなり、
+        `scope_verdict` は子の宣言だけで範囲を決める。印を付ける側だけが閉じた親も
+        引ける池を使っていたので、印は付かず範囲も切り詰められない、という抜けが
+        あった。親を引けない子は止める側へ倒す（ADR-0058）。
+        """
+        # 子は親（src/*）に無い範囲を宣言する。承認は警告で通す。
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.assertEqual(self.approve().returncode, 0)
+        child = self.worktree("i0001-01", "i0001")
+        self.close_parent_by_hand()
+
+        result = self.hook(
+            "PreToolUse", "Write", child, file_path=os.path.join(child, "docs", "x.md")
+        )
+        reason = self.reason(result)
+        self.assertIn("DENY_TICKET_BLOCKED", reason)
+        self.assertIn("i0001", reason)
+
+    def test_the_board_shows_that_a_blocked_ticket_is_stopped(self):
+        """印の付いたチケットが、ボードの JSON にもその旨で出ること。
+
+        判定と `--lint` にしか伝わらないと、ボードしか見ない人には書き込みが全部
+        止まっていることが見えず、`status` は素の `open` のままになる。あわせて
+        「印が付いていないのに親を引けない子」が居ないこと（池が割れていないこと）も
+        同じ出力から確かめる。池が割れると、その子は自分の宣言だけで範囲が決まる。
+        """
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("docs/*",))
+        self.assertEqual(self.approve().returncode, 0)
+        self.worktree("i0001-01", "i0001")
+        self.close_parent_by_hand()
+
+        result = self.ccnavi("--explain", "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = {t["ticket"]: t for t in json.loads(result.stdout)["tickets"]}
+        self.assertIn("i0001", records["i0001-01"]["blocked"])
+
+        open_ids = {k for k, v in records.items() if v.get("copy", {}).get("status") == "open"}
+        for name in open_ids:
+            record = records[name]
+            if record["parent"] and not record["blocked"]:
+                self.assertIn(
+                    record["parent"],
+                    open_ids,
+                    f"{name} は印が付いていないのに親を引けない",
+                )
 
     def test_parent_and_child_strictest_wins(self):
         self.propose("i0001", allow=("src/a/*",), ask=("src/b/*",))
@@ -598,6 +771,94 @@ class TicketTest(unittest.TestCase):
         head = git(os.path.join(self.root, ".claude", "worktrees", "i0001-01"), "rev-parse", "HEAD")
         self.assertIn(head.strip(), copy)
         self.assertIn("started_at:", copy)
+
+    # ---- 3b. 子の着手は親の着手のあと
+
+    def family_without_starting(self):
+        """親 1 本と子 1 本を承認して、子のワークツリーだけ作る（どちらも未着手）。"""
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
+        result = self.approve()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return self.worktree("i0001-01", "i0001")
+
+    def test_a_child_does_not_start_before_its_parent(self):
+        """親が未着手のまま子を着手できないこと。案内は親の `start`（REQ-TKT-48）。
+
+        飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。止める場所を
+        最初の子の着手に置けば、親の作業が実際に始まる瞬間に言える。
+        """
+        self.family_without_starting()
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 が未着手", refused.stderr)
+        # 案内の sh はワークスペースルートからの絶対パス。子のワークツリーから打てる綴り。
+        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        self.assertIn(f"{ticket_sh} start i0001", refused.stderr)
+        self.assertNotIn("sh .ccnavi/scripts/", refused.stderr)
+        # 止まった回は、子の着手の欄を書かない。
+        with open(os.path.join(self.approved, "doing", "i0001-01.md"), encoding="utf-8") as f:
+            self.assertIn('started_at: ""', f.read())
+
+        # 親を着手すれば、案内のとおりに通る。2 枚目からは何も増えない。
+        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
+        started = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "next")
+        self.assertEqual(self.approve().returncode, 0)
+        self.worktree("i0001-02", "i0001")
+        second = self.ccnavi("ticket", "start", "i0001-02")
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+
+    def test_a_closed_parent_does_not_take_a_new_child(self):
+        """閉じた親の下では子を着手できず、親の置き場を名指しすること。
+
+        `doing/` から出た親は判定にも効かない（REQ-TKT-12）。そこに子を足すのは未着手とは
+        別の異常なので、親の `start` は案内せず、いまの置き場を出す。
+        """
+        self.family_without_starting()
+        closed = os.path.join(self.approved, "done")
+        os.makedirs(closed, exist_ok=True)
+        # 人が手で閉じた形（置き場を動かすのは人。ADR-0055）。
+        os.replace(
+            os.path.join(self.approved, "doing", "i0001.md"), os.path.join(closed, "i0001.md")
+        )
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 は作業中ではない（いまは done/）", refused.stderr)
+
+    def test_a_parent_that_is_still_a_proposal_asks_for_approval_first(self):
+        """親が承認前なら、案内は承認から始めること。
+
+        人が子だけ置き場を動かすと起きる（ADR-0058 の運び。承認画面なら落ちる）。`start` は
+        `doing/` の承認済みチケットにしか効かないので、`todo/` の親にそのまま `start` を
+        勧めると、案内のとおりに打っても通らない。
+        """
+        self.propose("i0001", allow=("src/*", "wip/*"))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+        self.worktree("i0001-01", "i0001")
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 がまだ承認されていない（todo/）", refused.stderr)
+        self.assertIn("--approve", refused.stderr)
+
+    def test_a_child_without_any_parent_at_all_is_named(self):
+        """親の提案がどこにも無い子は、親が無いと言って止めること。
+
+        人が子だけ置き場へ動かし、親を書き忘れた形。`_find` は子を引けるので、親の側を
+        引いたときの「無い」をここで言わないと、ワークツリーの検査まで進んで別の話になる。
+        """
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.hand_move("i0001-01")
+        self.worktree("i0001-01", "main")
+        refused = self.ccnavi("ticket", "start", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("i0001-01 の親 i0001 が見つからない", refused.stderr)
 
     # ---- 4. フェーズの終わりと HITL ポイント
 
@@ -1195,6 +1456,42 @@ class TicketTest(unittest.TestCase):
         from_parent = self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-2")
         self.assertEqual(from_parent.returncode, 2)
 
+    def test_subagent_stop_bounces_each_worktree_when_no_agent_id_is_given(self):
+        """`agent_id` が来ない payload でも、別の子で作業する相手を巻き込まない。
+
+        以前は印の綴りが `unknown` 1 つで、最初の 1 体が差し戻されたあと、
+        同じ置き場を見るサブエージェントが誰も差し戻されなくなった。しかも
+        `agent_id` を持たない印は `ignored_bounce` が消せないので、消えなかった。
+        """
+        self.family()
+        first_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        second_tree = os.path.join(self.root, ".claude", "worktrees", "i0001-02")
+        write(os.path.join(first_tree, "src", "b", "stray.py"), "x\n")
+        write(os.path.join(second_tree, "docs", "stray.md"), "x\n")
+
+        first = self.hook("SubagentStop", "", first_tree)
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        second = self.hook("SubagentStop", "", second_tree)
+
+        self.assertEqual(second.returncode, 2, "別の子の相手まで通さない")
+        self.assertIn("POST_TICKET_SCOPE", second.stderr)
+
+    def test_subagent_stop_bounces_again_in_the_next_session(self):
+        """印はセッションで分ける。控えの置き場はワークスペースに 1 つしか無い。"""
+        self.family()
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
+        write(os.path.join(child, "src", "b", "stray.py"), "x\n")
+
+        first = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s1")
+        self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+        same = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s1")
+        self.assertEqual(same.returncode, 0, "同じセッションの同じ相手は 1 度だけ")
+
+        later = self.hook("SubagentStop", "", child, agent_id="sub-1", session="s2")
+
+        self.assertEqual(later.returncode, 2, "別のセッションの印で通さない")
+        self.assertIn("POST_TICKET_SCOPE", later.stderr)
+
     def test_subagent_start_lists_open_children(self):
         self.family()
         result = self.hook("SubagentStart", "", self.parent_tree, agent_id="sub-1")
@@ -1366,9 +1663,6 @@ class TicketTest(unittest.TestCase):
 
     def test_parent_cannot_close_while_children_are_open(self):
         self.family()
-        refused = self.ccnavi("ticket", "start", "i0001")
-        # 親のツリーは作ってあるので start は通る。
-        self.assertEqual(refused.returncode, 0, refused.stderr)
         refused = self.ccnavi("ticket", "done", "i0001")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("開いている子", refused.stderr)
@@ -1866,6 +2160,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
         self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
         self.worktree("i0001-01", "i0001")
         self.assertEqual(self.ccnavi("ticket", "start", "i0001-01").returncode, 0)
         self.assertEqual(self.ccnavi("ticket", "done", "i0001-01").returncode, 0)

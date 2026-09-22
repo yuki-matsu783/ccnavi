@@ -45,7 +45,7 @@ test("CB-T21 .exe は綴りに無くても試す", () => {
   );
 });
 
-test("CB-T117 E1 振り分けの sh を指していれば、../bin/ のこの機械向けの実体を起動する", () => {
+test("CB-T160 E1 振り分けの sh を指していれば、../bin/ のこの機械向けの実体を起動する", () => {
   assert.deepEqual(
     locate(
       input(
@@ -94,7 +94,7 @@ test("CB-T117 E1 振り分けの sh を指していれば、../bin/ のこの機
   );
 });
 
-test("CB-T118 E2 振り分けの sh そのものは返さない。実体が無ければ次の候補へ進む", () => {
+test("CB-T161 E2 振り分けの sh そのものは返さない。実体が無ければ次の候補へ進む", () => {
   // Windows では sh を直接起動できない。
   const sh = "/ws/.ccnavi/scripts/ccnavi-launcher.sh";
   assert.equal(locate(input([sh], { settingsEnvBin: ".ccnavi/scripts/ccnavi-launcher.sh" })), undefined);

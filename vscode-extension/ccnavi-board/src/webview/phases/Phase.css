@@ -1,0 +1,9 @@
+/*
+ * フェーズの種類 1 件の行（`Phase.tsx`）。行の見出しの列と、種類のバッジ。
+ * 行・開閉・欄名の骨組みは設定 3 画面で同じ `../styles/list.css` が持つ。
+ */
+/* 1 行 = 開閉、id、title、kind、review、scope */
+.phase .row-head { grid-template-columns: 18px minmax(110px, 160px) minmax(90px, 160px) max-content max-content minmax(0, 1fr); }
+.sum .tag.work { color: var(--vscode-descriptionForeground); }
+.sum .tag.feedback { color: var(--vscode-editorInfo-foreground); }
+.field > select.f-kind, .field > select.f-review { max-width: 420px; }

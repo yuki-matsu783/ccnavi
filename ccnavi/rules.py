@@ -155,6 +155,11 @@ _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 # 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §11.4）。
 ID_SEPARATOR = ":"
 
+# 苦情の出どころ（`Problem.kind`）。「いまは通らないが、書いた側に直すものは無い」もの。
+# 前のフェーズが閉じていない子がこれで、閉じれば同じ提案がそのまま通る。承認は落とすが、
+# 全体を見る `--lint` は warn に落とす（提案 1 本で設定画面の保存と CI が止まらないように）。
+KIND_NOT_YET = "not-yet"
+
 # 組み込みの守りの名前の頭。ルールファイルからは書けない（読み込まずに error）。
 # 以前は同じ id で書いたルールがあると組み込みを足さなかったので、何にも当たらない 1 本を
 # その名前で書くだけで守りが黙って消えた。ルールファイルの記述に依らず足すのが組み込みの
@@ -277,6 +282,10 @@ class Problem:
     severity: str
     rule: str
     detail: str
+    # 苦情の出どころ。既定は空で、どこから来たかを問わない苦情。`KIND_NOT_YET` は
+    # 「いまは通らないが、書いた側に直すものは無い」を表す（フェーズの順序がこれ）。
+    # 読み手によって重さを変えたいのはここだけなので、種類は 1 つしか無い。
+    kind: str = ""
 
     def __str__(self) -> str:
         return f"{self.severity}: {self.rule or '(file)'}: {self.detail}"
@@ -482,7 +491,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
                 "",
                 f"ルール書式の版 {rule_set.version} は扱えない（このビルドが読むのは {VERSION}）。"
                 f"書式は `{'` `'.join(SECTIONS)}` の 3 タイプで、探すものは `glob` か `regex`。"
-                "`glob` は fnmatch の glob で文字列全体に当たるので、"
+                "`glob` は fnmatch の glob で文字列全体にヒットするので、"
                 "部分一致が要るなら前後に `*` を書く",
             )
         )
@@ -566,7 +575,7 @@ def _build(
             SEVERITY_ERROR, name, "文面が無い。ルールは代わりに何をすべきかを言わなければならない"
         )
     if not rule.match:
-        return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにも当たらない")
+        return None, Problem(SEVERITY_ERROR, name, "match が無い。どのツールにもヒットしない")
     if not rule.glob and not rule.regex:
         return None, Problem(SEVERITY_ERROR, name, "glob も regex も無い")
     if rule.glob and rule.regex:
@@ -670,7 +679,7 @@ def _not_root_placement(expression: str) -> str:
         return (
             f"`{NOT_ROOT_PLACEHOLDER}` の直後に量化子（`{rest[:1]}`）は書けない。"
             "展開結果ごと省略したり繰り返したりできてしまい、"
-            "「外だけを止める」はずの式がどの対象にも当たるようになる"
+            "「外だけを止める」はずの式がどの対象にもヒットするようになる"
         )
     return ""
 

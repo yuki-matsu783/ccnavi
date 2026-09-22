@@ -13,10 +13,8 @@ import tempfile
 import unittest
 
 from ccnavi import shellread
-from tests import ROOT
+from tests import ROOT, common_path, fixture_workspace
 from tests.inproc import run_ccnavi
-
-RULES = os.path.join(ROOT, "tests", "fixtures", "rules.yml")
 
 
 def run(mode="enable", payload="", log=""):
@@ -32,7 +30,7 @@ def run(mode="enable", payload="", log=""):
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
 
-    args = ["--rules", RULES, "--mode", mode]
+    args = ["--root", fixture_workspace(), "--mode", mode]
     args += ["--log", log] if log else ["--log", ""]
 
     return run_ccnavi(args, input=payload, cwd=ROOT, env=environment)
@@ -115,7 +113,7 @@ class VerdictTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_MODE"] = "disable"
         result = run_ccnavi(
-            ["--rules", RULES, "--log", ""],
+            ["--root", fixture_workspace(), "--log", ""],
             input=pre_tool_use("Bash", "command", "git push origin main"),
             cwd=ROOT,
             env=environment,
@@ -147,7 +145,11 @@ class ReasonTest(unittest.TestCase):
         self.assertIn("git push origin main", got[0], "何に当たったのかが無い")
         self.assertIn("DENY_COMMAND_PATTERN", got[0], "理由コードが無い")
         self.assertIn("rule: git-push", got[0], "どのルールが言っているのかが無い")
-        self.assertNotIn(RULES, got[0], "ルールファイルの綴りは要らない（id で辿れる）")
+        self.assertNotIn(
+            common_path(fixture_workspace(), "rules"),
+            got[0],
+            "ルールファイルの綴りは要らない（id で辿れる）",
+        )
 
     def test_ファイルの理由は行き着く先を対象として名指しする(self):
         # 当てたのは来たままの綴りではなく解いた先なので、対象もそちらを言う。

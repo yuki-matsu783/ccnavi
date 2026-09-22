@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 from collections.abc import Callable
 from typing import TextIO
@@ -16,6 +15,7 @@ from . import (
     audit,
     builtin,
     ctxfile,
+    fsio,
     hookio,
     modes,
     phase,
@@ -240,7 +240,7 @@ def decide_before(
 
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
-    # 1 度だけ読んで両方に渡す（設計 §9）。main への書き込みとシェルでは読まない。
+    # 1 度だけ読んで両方に渡す（設計 §9）。ワークスペースルートへの書き込みとシェルでは読まない。
     index = None
     if (
         conf.tickets_enabled
@@ -347,15 +347,16 @@ def decide_before(
     # チケットが効くのは人が承認したあとだけで、承認画面が「ルールの allow も範囲の外では
     # 止まる」と言う。
     ticket_reason = ""
+    ticket_code = ""
     if verdict != rules.DENY:
         rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
-        ticket_decision, text, ticket_notice = ticket_verdict(
+        ticket_decision, text, ticket_notice, code = ticket_verdict(
             conf, root, payload.tool_name, record.subject, index, rule_hit
         )
         if ticket_notice:
             notices.append(ticket_notice)
         if STRENGTH[ticket_decision] > STRENGTH[verdict]:
-            verdict, ticket_reason = ticket_decision, text
+            verdict, ticket_reason, ticket_code = ticket_decision, text, code
             if ticket_reason:
                 # 判定を下したのは層を持たないチケット。狭められたルールの id は後ろに残し、
                 # 「ルールは通したのにチケットが止めた」回を記録から数えられるようにする。
@@ -371,6 +372,17 @@ def decide_before(
     # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と
     # 同じ経路（additionalContext）に合流させる。
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    # 提案を書いた回に、承認を頼む前の確認を 1 度だけ伝える文（REQ-APV-14）。判定には
+    # 足さない（`ticket_mod.propose_notice` の説明）ので、同じ口から渡す。
+    if conf.tickets_enabled:
+        told = "\n\n".join(
+            p
+            for p in (
+                told,
+                ticket_mod.propose_notice(stderr, conf, root, payload, record.subject),
+            )
+            if p
+        )
     if told:
         context = "\n\n".join(p for p in (told, context) if p)
 
@@ -408,7 +420,7 @@ def decide_before(
         # チケットが止めた。範囲の外かチケットの deny で、ルールは何も言わないか、
         # allow / ask に当たっている（そのときは文面がルールの id を名指しする）。
         texts = [ticket_reason]
-        record.code = reasons.CODE_TICKET_SCOPE
+        record.code = ticket_code or reasons.CODE_TICKET_SCOPE
     elif verdict == rules.ASK and not ticket_reason:
         texts = [
             reasons.reason_for(
@@ -503,30 +515,8 @@ def subject_of(payload: hookio.Input) -> str:
     if tool in SEARCH_TOOLS:
         value = value or "."
     if tool in PATH_TOOLS:
-        return full_path(value, payload.cwd)
+        return fsio.full_path(value, payload.cwd)
     return value
-
-
-def full_path(path: str, cwd: str) -> str:
-    """ファイルのパスを、行き着く先が 1 つに決まる綴りに直す。
-
-    来たままの文字列に当てると、同じ場所を別の綴りで書くだけでルールを外せる。
-    相対パスは呼び出し側の作業ディレクトリ次第で意味が変わるし、`..` を挟めば
-    `secrets/` を通らない綴りで `secrets/` の中に届く。シンボリックリンクなら
-    名前を 1 つ増やすだけで済む。守る対象は名前ではなく場所なので、
-    場所まで解いてから当てる。
-
-    解けなかったときも、絶対パスにして `..` を畳むところまではやる。
-    まだ存在しないファイルへの書き込みがこれにあたる。
-    """
-    if not path:
-        return ""
-    base = cwd or os.getcwd()
-    joined = os.path.join(base, os.path.expanduser(path))
-    try:
-        return os.path.realpath(joined)
-    except OSError:
-        return os.path.normpath(os.path.abspath(joined))
 
 
 def screen(
@@ -550,6 +540,8 @@ def screen(
     3 つめは、実行役のコマンド（`env` `sudo` `sh -c` など）が中で実行するコマンドの並び。
     1 つずつが（実行役のコマンドの名前, 中で実行されるコマンド, 引用の中から切り出した
     コマンドの層か）。読み切れないコマンドでもトークンに割れる限り返る。Bash 以外は空。
+    `cd` で移った先から見た綴り（`shellread.Reading.moved`）も、実行役のコマンドの名前を
+    `shellread.MOVED` にしてここに並ぶ。どちらも止める側のルールにだけ当てる。
 
     4 つめは、書き直しを求める形の（形, 綴り）の並び（shellread.Reading.rewrites）。Bash 以外は空。
     """
@@ -566,6 +558,14 @@ def screen(
                 strict=True,
             )
         )
+    # `cd` で移った先から見た綴りも、中で実行されるコマンドと同じ並びに足す（ADR-0069）。
+    # 書かれた綴りの当たり方は動かさず、当てる先を足すだけにする。止める側のルールにしか
+    # 当たらないので、`cd` を読み違えても、当たるはずのものが当たらなくなることはない。
+    inner += [
+        (shellread.MOVED, command, False)
+        for command in reading.moved.split(shellread.SEP)
+        if command
+    ]
     if reading.degraded:
         record.degraded = reading.reason
         return subject, subject, inner, reading.rewrites
@@ -631,11 +631,14 @@ def ticket_verdict(
     full: str,
     index: dict[str, ticket_mod.Ticket] | None = None,
     rule_hit: tuple[str, str] | None = None,
-) -> tuple[str, str, str]:
-    """チケットが承認された範囲について何を言うかを返す。判定と、その理由の文と、注記。
+) -> tuple[str, str, str, str]:
+    """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
+
+    コードは空のことが多い。記録に残す綴りを呼び手が決められないとき（範囲の外ではなく
+    チケット自体が信じられないとき、ADR-0058）だけ、ここが名乗る。
 
     鍵はファイルの行き先。解いた先が `.claude/worktrees/<名前>/` の中なら、その名前と
-    同じ識別子の承認済みチケットで判定する。main の直下ならチケットは無く、ルールだけで判定する。
+    同じ識別子の承認済みチケットで判定する。ワークスペースルートの直下ならチケットは無く、ルールだけで判定する。
     呼び出し元の cwd も agent_id も使わない（REQ-TKT-01）。
 
     範囲の中は allow、範囲の `ask` は ask、範囲の外とチケットの `deny` は deny。
@@ -658,10 +661,10 @@ def ticket_verdict(
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
-        return "", "", ""
+        return "", "", "", ""
     t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
-        return "", "", ""
+        return "", "", "", ""
     if index is None:
         copies, _ = approval.scan(conf, root)
         index = approval.by_id(copies)
@@ -670,10 +673,10 @@ def ticket_verdict(
     # 「効いている」と言われながら判定では権限モード任せに落ちる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
-        return "", "", ""
+        return "", "", "", ""
     rel = tree.relative(t, full)
     if ticket_mod.is_unscoped(rel, conf.tickets, conf.approved):
-        return "", "", ""
+        return "", "", "", ""
     parent = index.get(ticket.parent) if ticket.is_child else None
     # 種類を読むのは、親が計画を持ち子の番号が計画に在るときだけ。番号だけの親では
     # phases.yml を開かない。
@@ -691,7 +694,29 @@ def ticket_verdict(
             )
     found = phase.scope_verdict(ticket, parent, pt, rel)
     if found.verdict == rules.ALLOW:
-        return rules.ALLOW, "", notice
+        return rules.ALLOW, "", notice, ""
+
+    if found.limit == phase.LIMIT_BLOCKED:
+        # 範囲の外に書いたのではなく、チケット自体が信じられない。範囲を見せても
+        # 直しようが無いので、代わりに引っかかった検査を名指しする（ADR-0058）。
+        return (
+            rules.DENY,
+            "\n".join(
+                [
+                    f"[ccnavi] {reasons.CODE_TICKET_BLOCKED} (source: {ticket.path})",
+                    f"subject: {full}",
+                    f"ticket: {ticket.ticket} ({ticket.title}), worktree {t.name}",
+                    f"problem: {ticket.blocked}",
+                    "The approved ticket for this worktree does not hold together, so its work "
+                    "area is not in effect and every write here is blocked. Nothing you write "
+                    "can fix this: the user has to repair the approved ticket or where it sits. "
+                    "Tell them the problem line above and ask them to run 'ccnavi --lint', "
+                    "which names every ticket in this state.",
+                ]
+            ),
+            notice,
+            reasons.CODE_TICKET_BLOCKED,
+        )
 
     area = ", ".join(ticket.paths(rules.ALLOW) + ticket.paths(rules.ASK)) or "(空)"
     source = ticket.path
@@ -727,6 +752,7 @@ def ticket_verdict(
                 ]
             ),
             notice,
+            "",
         )
     # 上限ごとに次の一手が違う。子の範囲の外なら提案し直し、親や種類の上限の外なら、
     # 範囲を広げても通らない（承認で超過を見せたうえで止めている）。
@@ -761,6 +787,7 @@ def ticket_verdict(
         rules.DENY,
         "\n".join([f"[ccnavi] {reasons.CODE_TICKET_SCOPE} (source: {source})", *head, body]),
         notice,
+        "",
     )
 
 

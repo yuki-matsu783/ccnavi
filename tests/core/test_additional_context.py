@@ -7,7 +7,7 @@
    両方が届くことは Claude Code 2.1 で実測した
 3. dry-run でも文は届く（判定の代わりの文に続く）
 4. 書いていないルールでは鍵ごと出ない
-5. `--lint` は広い allow（何にでも当たる、選択肢が 3 つ以上）に書いた文を warn にし、
+5. `--lint` は広い allow（何にでもヒットする、選択肢が 3 つ以上）に書いた文を warn にし、
    狭い allow には何も言わない。`--test` は理由と文の両方を見せる
 """
 
@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 NOTE = "ワークツリーの中だけで直すこと。main には触らない。"
@@ -44,18 +44,16 @@ class AdditionalContextTest(unittest.TestCase):
 
     def rules(self, **sections) -> str:
         body = {"version": 1, **sections}
-        return write(os.path.join(self.root, "rules.yml"), json.dumps(body))
+        # 置くのは共通層の既定の場所。`--rules` は診断でだけ効き、hook の判定には
+        # 届かない（ADR-0067）。
+        return write(common_path(self.root, "rules"), json.dumps(body))
 
-    def run_ccnavi(
-        self, rules_path: str, *args: str, payload: str = ""
-    ) -> subprocess.CompletedProcess:
+    def run_ccnavi(self, *args: str, payload: str = "") -> subprocess.CompletedProcess:
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         return run_ccnavi(
             [
                 "--root",
                 self.root,
-                "--rules",
-                rules_path,
                 "--log",
                 "",
                 "--state",
@@ -69,7 +67,7 @@ class AdditionalContextTest(unittest.TestCase):
             env=environment,
         )
 
-    def judge(self, rules_path: str, tool: str, subject: str, mode: str = "enable") -> dict:
+    def judge(self, tool: str, subject: str, mode: str = "enable") -> dict:
         field = "command" if tool == "Bash" else "file_path"
         payload = json.dumps(
             {
@@ -79,7 +77,7 @@ class AdditionalContextTest(unittest.TestCase):
                 "tool_input": {field: subject},
             }
         )
-        done = self.run_ccnavi(rules_path, "--mode", mode, payload=payload)
+        done = self.run_ccnavi("--mode", mode, payload=payload)
         if not done.stdout.strip():
             return {}
         try:
@@ -88,16 +86,16 @@ class AdditionalContextTest(unittest.TestCase):
             self.fail(f"標準出力が期待した JSON ではない: {exc}\nstdout: {done.stdout!r}")
 
     def test_allow_carries_the_text_as_additional_context(self):
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContext=NOTE)],
         )
-        out = self.judge(path, "Write", os.path.join(self.root, "src", "a.py"))
+        out = self.judge("Write", os.path.join(self.root, "src", "a.py"))
         self.assertNotIn("permissionDecision", out)
         self.assertEqual(out.get("additionalContext"), NOTE)
 
     def test_deny_and_ask_carry_reason_and_context_together(self):
-        path = self.rules(
+        self.rules(
             deny=[
                 rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
             ],
@@ -108,38 +106,38 @@ class AdditionalContextTest(unittest.TestCase):
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
-        denied = self.judge(path, "Bash", "git push origin main")
+        denied = self.judge("Bash", "git push origin main")
         self.assertEqual(denied.get("permissionDecision"), "deny")
         self.assertIn("push は人が行う", denied["permissionDecisionReason"])
         self.assertEqual(denied.get("additionalContext"), NOTE)
 
-        asked = self.judge(path, "Write", os.path.join(self.root, "migrations", "001.sql"))
+        asked = self.judge("Write", os.path.join(self.root, "migrations", "001.sql"))
         self.assertEqual(asked.get("permissionDecision"), "ask")
         self.assertIn("移行は人が見る", asked["permissionDecisionReason"])
         self.assertEqual(asked.get("additionalContext"), NOTE)
 
     def test_dry_run_still_delivers_the_text(self):
-        path = self.rules(
+        self.rules(
             deny=[
                 rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
             ],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
-        out = self.judge(path, "Bash", "git push origin main", mode="dry-run")
+        out = self.judge("Bash", "git push origin main", mode="dry-run")
         self.assertNotIn("permissionDecision", out)
         self.assertIn("would have stopped", out["additionalContext"])
         self.assertIn(NOTE, out["additionalContext"])
 
     def test_rules_without_the_field_add_nothing(self):
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", "push は人が行う", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*")],
         )
-        self.assertNotIn("additionalContext", self.judge(path, "Bash", "git push"))
-        self.assertEqual(self.judge(path, "Write", os.path.join(self.root, "src", "a.py")), {})
+        self.assertNotIn("additionalContext", self.judge("Bash", "git push"))
+        self.assertEqual(self.judge("Write", os.path.join(self.root, "src", "a.py")), {})
 
     def test_lint_warns_on_broad_allow_only(self):
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[
                 rule("everything", "Read", "", glob="*", additionalContext=NOTE),
@@ -149,16 +147,18 @@ class AdditionalContextTest(unittest.TestCase):
                 rule("class", "Bash", "", regex=r"^[a|b|c]x\b", additionalContext=NOTE),
             ],
         )
-        done = self.run_ccnavi(path, "--lint", "--mode", "enable")
+        done = self.run_ccnavi("--lint", "--mode", "enable")
         self.assertEqual(done.returncode, 0, done.stdout)
         warned = [line for line in done.stdout.splitlines() if "additionalContext" in line]
         self.assertEqual(len(warned), 2, done.stdout)
-        self.assertTrue(any("everything" in w and "何にでも当たる" in w for w in warned), warned)
+        self.assertTrue(
+            any("everything" in w and "何にでもヒットする" in w for w in warned), warned
+        )
         self.assertTrue(any("many" in w and "選択肢が 3 つ以上" in w for w in warned), warned)
 
     def test_once_delivers_the_text_only_the_first_time_per_context(self):
         state = os.path.join(self.root, "state")
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContextOnce=NOTE)],
         )
@@ -175,7 +175,7 @@ class AdditionalContextTest(unittest.TestCase):
                     "tool_input": {"file_path": target},
                 }
             )
-            done = self.run_ccnavi(path, "--mode", "enable", "--state", state, payload=payload)
+            done = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
             self.assertEqual(done.returncode, 0, done.stderr)
             if not done.stdout.strip():
                 return {}
@@ -192,16 +192,16 @@ class AdditionalContextTest(unittest.TestCase):
         hit("s1", event="SessionStart")
         self.assertEqual(hit("s1").get("additionalContext"), NOTE)
         # 控えの置き場が無ければ毎回届く。
-        self.assertEqual(self.judge(path, "Write", target).get("additionalContext"), NOTE)
-        self.assertEqual(self.judge(path, "Write", target).get("additionalContext"), NOTE)
+        self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
+        self.assertEqual(self.judge("Write", target).get("additionalContext"), NOTE)
         # 試験は控えを消費しない。
-        self.run_ccnavi(path, "--state", state, "--test", "Write", target)
+        self.run_ccnavi("--state", state, "--test", "Write", target)
         self.assertEqual(hit("s3").get("additionalContext"), NOTE)
 
     def test_both_texts_join_the_first_time_and_only_the_short_one_after(self):
         state = os.path.join(self.root, "state")
         always = "src は自由に直してよい。"
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[
                 rule(
@@ -226,7 +226,7 @@ class AdditionalContextTest(unittest.TestCase):
         )
 
         def hit() -> str:
-            done = self.run_ccnavi(path, "--mode", "enable", "--state", state, payload=payload)
+            done = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
             return json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
 
         self.assertEqual(hit(), f"{always}\n\n{NOTE}")
@@ -234,17 +234,17 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(hit(), always)
 
     def test_test_shows_reason_and_context(self):
-        path = self.rules(
+        self.rules(
             deny=[
                 rule("push", "Bash", "push は人が行う", glob="*git push*", additionalContext=NOTE)
             ],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContext=NOTE)],
         )
-        done = self.run_ccnavi(path, "--test", "Bash", "git push", "--json")
+        done = self.run_ccnavi("--test", "Bash", "git push", "--json")
         body = json.loads(done.stdout)
         self.assertIn("push は人が行う", body["response"])
         self.assertIn(NOTE, body["response"])
-        allowed = self.run_ccnavi(path, "--test", "Write", os.path.join(self.root, "src", "a.py"))
+        allowed = self.run_ccnavi("--test", "Write", os.path.join(self.root, "src", "a.py"))
         self.assertIn("verdict: allow", allowed.stdout)
         self.assertIn(NOTE, allowed.stdout)
 
@@ -253,7 +253,7 @@ class AdditionalContextTest(unittest.TestCase):
 
         write(os.path.join(self.root, "docs", "guide.md"), "# 決まり\n\nテストは tests/ に置く。\n")
         write(os.path.join(self.root, "docs", "long.md"), "あ" * (ctxfile.MAX_CHARS + 50))
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[
                 rule(
@@ -268,20 +268,18 @@ class AdditionalContextTest(unittest.TestCase):
                 rule("none", "Write", "", glob="*/etc/*", additionalContextFile="docs/none.md"),
             ],
         )
-        got = self.judge(path, "Write", os.path.join(self.root, "src", "a.py"))
+        got = self.judge("Write", os.path.join(self.root, "src", "a.py"))
         self.assertEqual(
             got.get("additionalContext"), f"{NOTE}\n\n# 決まり\n\nテストは tests/ に置く。"
         )
-        cut = self.judge(path, "Write", os.path.join(self.root, "docs", "x.md"))[
-            "additionalContext"
-        ]
+        cut = self.judge("Write", os.path.join(self.root, "docs", "x.md"))["additionalContext"]
         self.assertTrue(cut.startswith("あ" * ctxfile.MAX_CHARS + "\n\n(ccnavi: docs/long.md は"))
         self.assertNotIn("あ" * (ctxfile.MAX_CHARS + 1), cut)
         self.assertIn("続きはこのファイルを読む", cut)
         # 無いファイルは何も足さない。
-        self.assertEqual(self.judge(path, "Write", os.path.join(self.root, "etc", "a")), {})
+        self.assertEqual(self.judge("Write", os.path.join(self.root, "etc", "a")), {})
         # 試験にも本文が出る。
-        shown = self.run_ccnavi(path, "--test", "Write", os.path.join(self.root, "src", "a.py"))
+        shown = self.run_ccnavi("--test", "Write", os.path.join(self.root, "src", "a.py"))
         self.assertIn("テストは tests/ に置く。", shown.stdout)
 
     def test_file_in_the_worktree_wins_over_the_root(self):
@@ -292,13 +290,13 @@ class AdditionalContextTest(unittest.TestCase):
         gitdir = os.path.join(self.root, ".git", "worktrees", "feat")
         write(os.path.join(wt, ".git"), f"gitdir: {gitdir}\n")
         write(os.path.join(gitdir, "gitdir"), os.path.join(wt, ".git") + "\n")
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[rule("src", "Write", "", glob="*/src/*", additionalContextFile="docs/guide.md")],
         )
-        inside = self.judge(path, "Write", os.path.join(wt, "src", "a.py"))
+        inside = self.judge("Write", os.path.join(wt, "src", "a.py"))
         self.assertEqual(inside.get("additionalContext"), "ワークツリーの案内")
-        outside = self.judge(path, "Write", os.path.join(self.root, "src", "a.py"))
+        outside = self.judge("Write", os.path.join(self.root, "src", "a.py"))
         self.assertEqual(outside.get("additionalContext"), "ルートの案内")
 
     def test_once_file_is_delivered_once_and_lint_checks_the_path(self):
@@ -307,7 +305,7 @@ class AdditionalContextTest(unittest.TestCase):
         state = os.path.join(self.root, "state")
         write(os.path.join(self.root, "docs", "once.md"), "最初に 1 度だけ")
         write(os.path.join(self.root, "docs", "long.md"), "い" * (ctxfile.MAX_CHARS + 1))
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[
                 rule("src", "Write", "", glob="*/src/*", additionalContextOnceFile="docs/once.md"),
@@ -327,12 +325,12 @@ class AdditionalContextTest(unittest.TestCase):
                 "tool_input": {"file_path": target},
             }
         )
-        first = self.run_ccnavi(path, "--mode", "enable", "--state", state, payload=payload)
+        first = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
         self.assertIn("最初に 1 度だけ", first.stdout)
-        second = self.run_ccnavi(path, "--mode", "enable", "--state", state, payload=payload)
+        second = self.run_ccnavi("--mode", "enable", "--state", state, payload=payload)
         self.assertEqual(second.stdout.strip(), "")
 
-        lint = self.run_ccnavi(path, "--lint")
+        lint = self.run_ccnavi("--lint")
         self.assertIn("warn: gone: additionalContextFile の docs/gone.md が無い", lint.stdout)
         self.assertIn(
             f"warn: long: additionalContextFile の docs/long.md は {ctxfile.MAX_CHARS} 文字",
@@ -342,7 +340,7 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertIn("error: abs: additionalContextOnceFile の /etc/passwd: 絶対パス", lint.stdout)
         self.assertNotIn("src:", lint.stdout)
         # 外を指す欄は実行時も読まない。
-        self.assertEqual(self.judge(path, "Write", os.path.join(self.root, "c", "a")), {})
+        self.assertEqual(self.judge("Write", os.path.join(self.root, "c", "a")), {})
 
 
 if __name__ == "__main__":

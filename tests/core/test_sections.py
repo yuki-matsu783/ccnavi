@@ -20,7 +20,7 @@ import os
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 
@@ -49,9 +49,11 @@ class SectionsTest(unittest.TestCase):
         話に付き合わずに済む。
         """
         body = {"version": 1, **sections}
-        return write(os.path.join(self.root, "rules.yml"), json.dumps(body))
+        # 置くのは共通層の既定の場所。`--rules` は診断でだけ効き、hook の判定には
+        # 届かない（ADR-0067）。
+        return write(common_path(self.root, "rules"), json.dumps(body))
 
-    def judge(self, rules_path: str, tool: str, subject: str) -> dict:
+    def judge(self, tool: str, subject: str) -> dict:
         field = "command" if tool == "Bash" else "file_path"
         payload = json.dumps(
             {
@@ -68,8 +70,6 @@ class SectionsTest(unittest.TestCase):
                 self.root,
                 "--mode",
                 "enable",
-                "--rules",
-                rules_path,
                 "--log",
                 "",
                 "--state",
@@ -91,38 +91,38 @@ class SectionsTest(unittest.TestCase):
     def test_どのルールも言及しなければ確認になる(self):
         # 既定が許可ではなく確認であること。allow を書き切るまで、
         # 言及されていない呼び出しは人が見る側に落ちる。
-        path = self.rules(deny=[rule("push", "Bash", "*git push*")])
+        self.rules(deny=[rule("push", "Bash", "*git push*")])
 
-        out = self.judge(path, "Bash", "ls -la")
+        out = self.judge("Bash", "ls -la")
 
         self.assertEqual(out.get("permissionDecision"), "ask")
         self.assertIn("UNDECLARED", out["permissionDecisionReason"])
 
     def test_未言及の文は危険の表明ではないと言う(self):
         # ADR-0009。危険だと書くと、受け取った側は存在しない危険を探しに行く。
-        path = self.rules(deny=[rule("push", "Bash", "*git push*")])
+        self.rules(deny=[rule("push", "Bash", "*git push*")])
 
-        reason = self.judge(path, "Bash", "ls -la")["permissionDecisionReason"]
+        reason = self.judge("Bash", "ls -la")["permissionDecisionReason"]
 
         self.assertIn("not a warning about the call itself", reason)
         # 繰り返しを止める先はルールの側。そこを言わないと同じ問いが出続ける。
         self.assertIn("allow section", reason)
 
     def test_allow_に当たれば通る(self):
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("ls", "Bash", "*ls *", message="")],
         )
 
-        self.assertNotIn("permissionDecision", self.judge(path, "Bash", "ls -la"))
+        self.assertNotIn("permissionDecision", self.judge("Bash", "ls -la"))
 
     def test_ルールが置いた確認は未言及と区別して返る(self):
-        path = self.rules(
+        self.rules(
             ask=[rule("migrations", "Write", "*/migrations/*", message="人が中身を見ます")],
             allow=[rule("anything", "Write", "*", message="")],
         )
 
-        out = self.judge(path, "Write", os.path.join(self.root, "migrations", "0001.sql"))
+        out = self.judge("Write", os.path.join(self.root, "migrations", "0001.sql"))
 
         self.assertEqual(out.get("permissionDecision"), "ask")
         self.assertIn("RULE_ASK", out["permissionDecisionReason"])
@@ -130,51 +130,51 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("人が中身を見ます", out["permissionDecisionReason"])
 
     def test_deny_が明示的_ask_より強い(self):
-        path = self.rules(
+        self.rules(
             deny=[rule("secrets", "Write", "*/secrets/*", message="止めます")],
             ask=[rule("everything", "Write", "*", message="聞きます")],
         )
 
-        out = self.judge(path, "Write", os.path.join(self.root, "secrets", "x.txt"))
+        out = self.judge("Write", os.path.join(self.root, "secrets", "x.txt"))
 
         self.assertEqual(out.get("permissionDecision"), "deny")
         self.assertIn("止めます", out["permissionDecisionReason"])
         self.assertNotIn("聞きます", out["permissionDecisionReason"])
 
     def test_明示的_ask_が_allow_より強い(self):
-        path = self.rules(
+        self.rules(
             ask=[rule("migrations", "Write", "*/migrations/*", message="聞きます")],
             allow=[rule("anything", "Write", "*", message="")],
         )
 
-        out = self.judge(path, "Write", os.path.join(self.root, "migrations", "0001.sql"))
+        out = self.judge("Write", os.path.join(self.root, "migrations", "0001.sql"))
 
         self.assertEqual(out.get("permissionDecision"), "ask")
 
     def test_タイプをまたいで当たっても強いほうだけを返す(self):
         # 弱い側の文面まで返すと、拒否された呼び出しに「確認すれば通る」と
         # 読める文が並ぶ。次の一手が 2 つに割れる。
-        path = self.rules(
+        self.rules(
             deny=[rule("a", "Bash", "*git push*", message="拒否の文面")],
             ask=[rule("b", "Bash", "*git *", message="確認の文面")],
             allow=[rule("c", "Bash", "*", message="")],
         )
 
-        reason = self.judge(path, "Bash", "git push origin main")["permissionDecisionReason"]
+        reason = self.judge("Bash", "git push origin main")["permissionDecisionReason"]
 
         self.assertIn("拒否の文面", reason)
         self.assertNotIn("確認の文面", reason)
 
     def test_同じタイプで複数当たれば全部返す(self):
         # どれか 1 つを選ぶと、選ばれなかったルールの言い分は誰にも届かない。
-        path = self.rules(
+        self.rules(
             deny=[
                 rule("a", "Bash", "*git push*", message="1 つ目"),
                 rule("b", "Bash", "* origin *", message="2 つ目"),
             ]
         )
 
-        reason = self.judge(path, "Bash", "git push origin main")["permissionDecisionReason"]
+        reason = self.judge("Bash", "git push origin main")["permissionDecisionReason"]
 
         self.assertIn("1 つ目", reason)
         self.assertIn("2 つ目", reason)
@@ -182,21 +182,21 @@ class SectionsTest(unittest.TestCase):
     def test_読み切れないコマンドは拒否ではなく確認になる(self):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
         # 設計 §6.3 の PARSE_UNCERTAIN は人に確認を出す。
-        path = self.rules(
+        self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],
         )
 
-        out = self.judge(path, "Bash", "cat <<'EOF'\nhello\n")
+        out = self.judge("Bash", "cat <<'EOF'\nhello\n")
 
         self.assertEqual(out.get("permissionDecision"), "ask")
         self.assertIn("PARSE_UNCERTAIN", out["permissionDecisionReason"])
 
     def test_実行される部分が無いコマンドは何も返さない(self):
         # コメントだけの行。何も走らないものについて人に聞く意味は無い。
-        path = self.rules(deny=[rule("push", "Bash", "*git push*")])
+        self.rules(deny=[rule("push", "Bash", "*git push*")])
 
-        self.assertEqual(self.judge(path, "Bash", "# git push origin main"), {})
+        self.assertEqual(self.judge("Bash", "# git push origin main"), {})
 
 
 if __name__ == "__main__":

@@ -57,6 +57,12 @@ CODE_TICKET_ASK = "TICKET_ASK"
 # ワークツリーの元リポジトリと、チケットが承認されたプロジェクトが食い違っている。
 CODE_TICKET_PROJECT = "DENY_TICKET_PROJECT_MISMATCH"
 
+# 承認済みチケット自体が信じられない（親が引けない、置き場と `project:` が違う、など）。
+# 範囲の外に書いたのではないので、CODE_TICKET_SCOPE とは分ける。受け取った側の次の一手も
+# 違う。範囲外なら範囲の中で済ませる道があるが、こちらは人がチケットを直すまで
+# どこにも書けない（ADR-0058）。
+CODE_TICKET_BLOCKED = "DENY_TICKET_BLOCKED"
+
 # 範囲外で止めたことを記録に残すときのルール名。対応するルールがルールファイルに
 # 無いので、括弧付きにして、ファイルの中を探しても見つからないことを見た目で示す。
 TICKET_RULE = "(ticket-scope)"
@@ -229,8 +235,13 @@ def ran_by(runner: str, inner: str) -> str:
 
     元の形（`env rm -f …`）だけを見た読み手には、ルールのどこが当たったのかが分からない。
     ルールは `rm` について書かれていて、`env` については何も言っていないので。
+
+    `cd` で移った先から見た綴りに当たったときも同じで、書いた綴り（`rm settings.json`）には
+    当たったルールの名前が出てこない。どこへ書こうとしているかを綴りで示す。
     """
-    return f"`{_one_line(runner)}` が実行する `{_one_line(inner)}` に当たりました。"
+    if runner == shellread.MOVED:
+        return f"`cd` で移った先から見ると `{_one_line(inner)}` で、そこにヒットしました。"
+    return f"`{_one_line(runner)}` が実行する `{_one_line(inner)}` にヒットしました。"
 
 
 def _one_line(text: str) -> str:
@@ -368,11 +379,11 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
 
     チケット制御が効いているワークスペースで、モデルが「この作業にチケットは要るか」を
     自分で決められるようにする。判定はこの線引きを担保しない。チケットの無いワークツリーと
-    main 直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
+    ワークスペースルート直下は全体ルールだけで判定されるので、直接作業はそのまま通る。
 
     言うのは線引きと入口だけにする。この文はセッションの開始（起動・再開・compact・clear）
     のたびに届くので、後から必要な場所で改めて届くものを頭では言わない。名指しするのは、
-    レビューの sh の綴りが段階に来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
+    レビューの sh の綴りがフェーズの終わりに来たとき（`phase.py`）と `ready` の手順（`ops.py`）、
     人がどこで見るか（`review` の `mr` / `chat`）がそのフェーズを止めるとき（`phase.py`）、
     フェーズの種類の在りかが `ccnavi-ticket.sh` の使い方（`--help`）、リスクの配点の綴りが
     承認のときの検査（`approval.py`）、後工程の進め方が承認済みチケットが置かれたとき
@@ -385,7 +396,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     lines = [
         "[ccnavi] このワークスペースはチケット制御を使っている。作業の進め方は 2 つ。",
         "- 直接作業（調査・小さな修正）: チケットを起こさずそのまま進める。判定は全体ルールだけ。",
-        "- チケット作業（設計に触れる・複数の段階になる・人のレビューが要る）: "
+        "- チケット作業（設計に触れる・複数のフェーズに分かれる・人のレビューが要る）: "
         f"{conf.tickets}/todo/ に提案を書いて承認を受ける。"
         f"承認されると {conf.approved}/doing/ へ動く。"
         f"以後の操作は {ticket_sh} を通す（使い方は --help）。",
@@ -393,7 +404,7 @@ def ways_of_working(conf: settings.Settings, root: str, mode: str) -> str:
     ]
     if mode == DRY_RUN:
         lines.append(
-            f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny に当たっても止まらない。"
+            f"（現状: {settings.MODE_ENV}={DRY_RUN}。deny にヒットしても止まらない。"
             "通ったことを許可と読まず、出た案内に次から従う）"
         )
     return "\n".join(lines)
@@ -419,8 +430,18 @@ def approved(tickets, revisions: set[str], root: str) -> str:
             where = "親"
         title = f": {t.title}" if t.title else ""
         lines.append(f"- {t.ticket}{title}（{where}）")
-    lines.append(
-        "後工程を進める。子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} start <識別子>' で着手する。"
-    )
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    # 子の着手は親の着手を前提にする（設計 §9.6、REQ-TKT-48）。順をここで言わないと、
+    # 最初の子の着手で止まってから読むことになる。ただし勧めるのは、この回に承認された
+    # 親が居るときだけ。改版と子だけの回で `start <親>` を勧めると、親は着手済みなので
+    # 案内どおりに打つと「着手済み」で終わる。
+    guide = "後工程を進める。"
+    if any(not t.is_child and t.ticket not in revisions for t in tickets):
+        guide += f"親は自分のワークツリーで '{ticket_sh} start <親>' を先に打つ。"
+    if any(t.is_child for t in tickets):
+        guide += (
+            "子はワークツリー .claude/worktrees/<識別子> を親のブランチから切り、"
+            f"'{ticket_sh} start <識別子>' で着手する（親が未着手だと止まる）。"
+        )
+    lines.append(guide)
     return "\n".join(lines)

@@ -7,7 +7,8 @@
  *
  * happy-dom は innerHTML で入れた script を実行しないので、CSP の meta を外したうえで
  * 本文を入れ、JSON でない script だけを順に window.eval で走らせる。
- * happy-dom で動かないもの（今のところ無い）だけ jsdom に逃がす方針。
+ * happy-dom で動かないものだけ jsdom に逃がす方針（`test/helpers/jsdom.ts`）。
+ * いま逃がしているのは、図の点のドラッグだけ。
  */
 import type { Document, Element, HTMLElement, Window } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -34,6 +35,8 @@ export interface DomPage {
   change(element: Element, value?: string): void;
   /** 要素を押す（click イベント） */
   click(element: Element): void;
+  /** キーを押す（keydown を流す）。要素を渡さなければ document に流す（画面ぜんたいで受けるもの） */
+  key(name: string, element?: Element): void;
   /** セレクタで 1 つ取る。無ければ落とす */
   one<T extends Element = HTMLElement>(selector: string): T;
   /** セレクタで全部取る */
@@ -47,7 +50,78 @@ export interface DomPage {
 
 const CSP = /<meta http-equiv="Content-Security-Policy"[^>]*>/;
 
-export async function loadPage(html: string, initialState?: unknown): Promise<DomPage> {
+/** 画面を読ませるときの細工。いまは測定の偽物だけ */
+export interface LoadOptions {
+  /**
+   * 要素の大きさを測れるようにする（`measure: true`）。**図の画面だけが要る。**
+   *
+   * happy-dom は `ResizeObserver` の殻を持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
+   * React Flow は点の大きさを `ResizeObserver` の報せで知り、測れていない点を `visibility: hidden` の
+   * まま置き、**線を 1 本も描かない**。落ちないので、細工をしないと「空の絵」を見て緑になる。
+   *
+   * ここで偽るのは大きさだけで、**置き場所は偽らない**（線の経路の正しさはここでは見られない。
+   * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の `SIZES`。
+   */
+  readonly measure?: boolean;
+}
+
+/** 偽る大きさ。外枠は広め、点は `Graph.css` の `.react-flow__node-phase` と同じ幅 */
+const SIZES: readonly [string, number, number][] = [
+  [".react-flow__node", 170, 60],
+  [".react-flow", 800, 480],
+  [".graph", 800, 480],
+];
+
+function sizeOf(element: { matches?: (selector: string) => boolean }): [number, number] | undefined {
+  if (typeof element.matches !== "function") {
+    return undefined;
+  }
+  for (const [selector, width, height] of SIZES) {
+    // `.react-flow__node` は `.react-flow` の下にあるので、細かいほうから見る
+    if (element.matches(`${selector}, ${selector} *`)) {
+      return [width, height];
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 大きさを測れるようにする。**画面のスクリプトを走らせる前に入れる**（React Flow は
+ * マウントの最中に `ResizeObserver` を張るので、あとから入れても間に合わない）。
+ */
+function fakeMeasure(window: Window): void {
+  const w = window as unknown as { Element: { prototype: object }; HTMLElement: { prototype: object }; ResizeObserver?: unknown };
+  const define = (target: object, name: string, get: (self: { matches?: (selector: string) => boolean }) => unknown): void => {
+    Object.defineProperty(target, name, {
+      configurable: true,
+      get(this: { matches?: (selector: string) => boolean }) {
+        return get(this);
+      },
+    });
+  };
+  define(w.HTMLElement.prototype, "offsetWidth", (self) => sizeOf(self)?.[0] ?? 0);
+  define(w.HTMLElement.prototype, "offsetHeight", (self) => sizeOf(self)?.[1] ?? 0);
+  (w.Element.prototype as { getBoundingClientRect: () => unknown }).getBoundingClientRect = function (this: { matches?: (selector: string) => boolean }) {
+    const [width, height] = sizeOf(this) ?? [0, 0];
+    return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height, toJSON: () => ({}) };
+  };
+  // 観測を始めたら 1 度だけ報せる。本物のように大きさが変わることは無いので、繰り返さない
+  w.ResizeObserver = class {
+    private readonly callback: (entries: { target: unknown; contentRect: unknown }[]) => void;
+    constructor(callback: (entries: { target: unknown; contentRect: unknown }[]) => void) {
+      this.callback = callback;
+    }
+    observe(target: { matches?: (selector: string) => boolean }): void {
+      const [width, height] = sizeOf(target) ?? [0, 0];
+      // 同期で呼ぶと React のマウントの最中に state を触ることになる。次の順番で呼ぶ
+      setTimeout(() => this.callback([{ target, contentRect: { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height } }]), 0);
+    }
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+
+export async function loadPage(html: string, initialState?: unknown, options: LoadOptions = {}): Promise<DomPage> {
   const { Window } = await happyDom;
   const window = new Window({ url: "vscode-webview://ccnavi/" });
   const posted: Posted[] = [];
@@ -70,6 +144,19 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
       throw new Error(`画面のスクリプトが例外を投げた（${taken.length} 件）: ${taken[0].message}`, { cause: taken[0] });
     }
   };
+  /**
+   * 欄に値を入れる。React は制御された欄の `value` を自分の追跡器で差し替えるので、
+   * そのまま代入すると「値は変わっていない」と見なされて onChange が呼ばれない。
+   * 追跡器は要素の側に載るので、大元（プロトタイプ）の setter を通して入れる。
+   */
+  const setValue = (element: Element, value: string): void => {
+    const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element) as object, "value");
+    if (typeof descriptor?.set === "function") {
+      descriptor.set.call(element, value);
+      return;
+    }
+    (element as unknown as { value: string }).value = value;
+  };
   let state: unknown = initialState;
   (window as unknown as { acquireVsCodeApi: () => unknown }).acquireVsCodeApi = () => ({
     // 画面の中の配列やオブジェクトは happy-dom 側の realm のもので、strict な deepEqual が
@@ -87,6 +174,9 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
     .replace(/^\s*<!DOCTYPE html>\s*<html[^>]*>/i, "")
     .replace(/<\/html>\s*$/i, "");
   const document = window.document;
+  if (options.measure === true) {
+    fakeMeasure(window);
+  }
   document.documentElement.innerHTML = inner;
   await window.happyDOM.waitUntilComplete();
   for (const script of Array.from(document.querySelectorAll("script"))) {
@@ -98,9 +188,18 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
   // 本物の Webview では script のあとに DOMContentLoaded と load が流れる。待って初期化する書き方にも備える
   document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   window.dispatchEvent(new window.Event("load"));
+  // 画面が React のとき、押した直後には描き直されない。React のスケジューラは happy-dom の
+  // VM に MessageChannel が無いと setImmediate / setTimeout に落ち、どちらも
+  // `waitUntilComplete` は追わない（happy-dom が数えるのは自分が張ったタイマーと取得だけ）。
+  // 待ちを 1 回で切ると、機械が混んでいるときに「まだ描き直していない DOM」を見て落ちる。
+  // check 相（setImmediate）と timers 相（setTimeout）の両方を何度か空にしてから見る。
   const settle = async (): Promise<void> => {
+    for (let round = 0; round < 4; round += 1) {
+      await window.happyDOM.waitUntilComplete();
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
     await window.happyDOM.waitUntilComplete();
-    await new Promise((resolve) => setTimeout(resolve, 0));
     raise();
   };
   raise();
@@ -115,19 +214,24 @@ export async function loadPage(html: string, initialState?: unknown): Promise<Do
       await settle();
     },
     type(element, value) {
-      (element as unknown as { value: string }).value = value;
+      setValue(element, value);
       element.dispatchEvent(new window.Event("input", { bubbles: true }));
       raise();
     },
     change(element, value) {
       if (value !== undefined) {
-        (element as unknown as { value: string }).value = value;
+        setValue(element, value);
       }
       element.dispatchEvent(new window.Event("change", { bubbles: true }));
       raise();
     },
     click(element) {
       (element as HTMLElement).click();
+      raise();
+    },
+    key(name, element) {
+      const target = element ?? (document as unknown as Element);
+      target.dispatchEvent(new window.KeyboardEvent("keydown", { key: name, bubbles: true }));
       raise();
     },
     one<T extends Element = HTMLElement>(selector: string): T {

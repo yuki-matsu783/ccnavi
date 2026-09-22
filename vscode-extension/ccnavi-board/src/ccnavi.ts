@@ -22,6 +22,7 @@ import {
   parseApproveResult,
   partialMessage,
   type ApproveMismatch,
+  type ApproveOutcome,
   type ApprovePreview,
   type ApproveResult,
 } from "./core/approvemodel.js";
@@ -91,7 +92,9 @@ const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] a
  * プロジェクト 1 つのルールは `--project-rules-file <名前>=<パス>` で（README「lint の JSON」）。
  * 自身の層は同じオプションに名札 `self` で渡す。実行ファイルは層の名前で差し替えを引き、
  * `self` を名乗るプロジェクトは層として数えないので取り違えない。
- * どれも診断でだけ効き、hook からの判定には届かない。
+ * どれも診断（`--lint` / `--test` / `--test-samples` / `--explain`）でだけ効き、
+ * hook からの判定にもチケットとレビューの副命令にも届かない（ADR-0067）。
+ * 拡張がこれらを足すのは `--lint` と `--test` だけなので、そこは変わらない。
  */
 export type RulesOverride =
   | { readonly kind: "workspace"; readonly path: string }
@@ -230,10 +233,8 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   return { ok: true, launcher, board: parsed.board };
 }
 
-export type ApproveOutcome =
-  | { readonly ok: true; readonly value: ApproveResult }
-  | { readonly ok: false; readonly mismatch: ApproveMismatch }
-  | { readonly ok: false; readonly error: string };
+/** 承認の答え。形は契約の側（`core/approvemodel.ts`）が持つ */
+export type { ApproveOutcome };
 
 /**
  * 承認待ちの一覧を見る（`--approve --preview --json`）。承認済みチケットは置かれない。

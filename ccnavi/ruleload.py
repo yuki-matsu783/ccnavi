@@ -19,7 +19,7 @@
 
 ファイルが無い層は空。不備ではないので、記録にも `--lint` にも出さない。壊れている
 層も空として扱うが、そちらは記録の `fallback` に層の名前を残し、`--lint` が error で
-言う。組み込みの既定へは落とさない。共通層が有るのに組み込みへ落とすと、共通層の
+言う。組み込みの既定へは落とさない。共通層が在るのに組み込みへ落とすと、共通層の
 deny が消える側に倒れる。共通層自身が読めないときだけ、今までどおり組み込みへ落ち、
 そのとき層は足さない（REQ-PRE-06）。
 """
@@ -34,7 +34,7 @@ from . import audit, builtin, hookio, rules, settings, tree
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 
 # 層の名前。共通層と自身の層は固定で、プロジェクトの層はその名前を名乗る。
-# 実体は settings が持つ（phase / risk も同じ綴りを要るが、そこは ruleload を
+# 実体は settings が持つ（phase / risk も同じ綴りが要るが、そこは ruleload を
 # import できない）。ここは読み手のための別名。予約の判断は settings に寄せてある
 # （`settings.is_reserved_layer_name`）。
 LAYER_COMMON = settings.LAYER_COMMON

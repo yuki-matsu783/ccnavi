@@ -4,6 +4,9 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "lib": ["ES2022"],
+    // 自動で拾う型は 2 つだけ。拾うままにすると、画面（React）の DOM の型が
+    // 拡張ホスト側（DOM の無い lib）にも混ざって落ちる
+    "types": ["node", "vscode"],
     "outDir": "out",
     "rootDir": ".",
     "strict": true,
@@ -11,5 +14,7 @@
     "declaration": false,
     "resolveJsonModule": false
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  // Webview（React）は束ねて画面に流す別物。DOM の型が要るので tsconfig.webview.json で見る
+  "exclude": ["src/webview"]
 }

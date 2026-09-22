@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -33,6 +33,23 @@ RULES = {
             "glob": "*git push*",
             "message": "git push is not run by the agent.",
         },
+        {
+            # 承認済みチケットの置き場。人が承認してコミットする場所でもあるので、
+            # コミット済みのぶんは報告から外れる（post._committed_findings）。
+            "id": "approved",
+            "match": "Write|Edit",
+            "glob": "*/.ccnavi/approved/*",
+            "message": "approved tickets are moved by the user.",
+        },
+    ],
+    # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
+    # （post._restorable）。文面は書かない――ask に message を書くと lint が error。
+    "ask": [
+        {
+            "id": "watched",
+            "match": "Write|Edit",
+            "glob": "*/watched/*",
+        }
     ],
     # 実行後の監視を見るテストなので、実行前の判定で確認を出させない。
     # 出すと、監視が何を言ったかを見たいテストが ask の話になる。
@@ -75,11 +92,13 @@ class PostToolUseTest(unittest.TestCase):
 
         git(self.repo, "init", "--quiet")
         write(os.path.join(self.repo, "protected", "keep.txt"), "committed\n")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "committed\n")
         write(os.path.join(self.repo, "src", "app.py"), "print(1)\n")
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
 
-        self.rules = os.path.join(self.repo, "rules.yml")
+        # 共通層は既定の置き場へ。`--rules` は診断でだけ効く（ADR-0067）。
+        self.rules = common_path(self.repo, "rules")
         write(self.rules, json.dumps(RULES))
         self.state = os.path.join(self.repo, "state")
         self.log = os.path.join(self.repo, "log.jsonl")
@@ -116,8 +135,6 @@ class PostToolUseTest(unittest.TestCase):
             [
                 "--root",
                 self.repo,
-                "--rules",
-                self.rules,
                 "--state",
                 self.state,
                 "--log",
@@ -451,8 +468,7 @@ class PostToolUseTest(unittest.TestCase):
         outside = tempfile.mkdtemp(prefix="ccnavi-plain-")
         self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
         self.repo = outside
-        write(os.path.join(outside, "rules.yml"), json.dumps(RULES))
-        self.rules = os.path.join(outside, "rules.yml")
+        self.rules = write(common_path(outside, "rules"), json.dumps(RULES))
         self.state = os.path.join(outside, "state")
         self.log = os.path.join(outside, "log.jsonl")
 
@@ -476,6 +492,184 @@ class PostToolUseTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stderr, "")
+
+    # 戻す対象は deny だけ
+
+    def test_askと宣言した場所は報告するが戻さない(self):
+        # `ask` は「人が 1 度見る場所」の宣言で、「書くな」ではない。戻すと、
+        # 人が確認に「はい」と答えた編集をあとから無かったことにする。
+        self.run_hook(command="ls")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
+
+        result = self.run_hook(restore="enable", command="python build.py")
+
+        with open(os.path.join(self.repo, "watched", "deps.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n", "ask の場所は戻さない")
+        self.assertIn("POST_VIOLATION", result.stderr, "戻さなくても報告はする")
+        self.assertIn("watched/deps.txt", result.stderr)
+        self.assertNotIn("restored: ccnavi", result.stderr)
+        # 戻していないので、戻す手順は載せたままにする。
+        self.assertIn('git restore --staged --worktree -- "watched/deps.txt"', result.stderr)
+        # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由を添える。
+        self.assertIn("not-restored:", result.stderr)
+        self.assertIn("`ask`, not `deny`", result.stderr)
+
+    def test_askと宣言した場所は予行でも戻すはずだったと言わない(self):
+        # 本番で戻さないものについて「enable なら戻していた」と言うと、
+        # 設定を上げたときに起きることを読み違えさせる。
+        self.run_hook(command="ls")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
+
+        result = self.run_hook(restore="dry-run", command="python build.py")
+
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertNotIn("would-restore", result.stderr)
+        self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
+
+    # コミットに入った変更
+
+    def test_ターンの終わりはコミットに入った変更も言う(self):
+        # `git status` はコミットを見せない。ここを足さないと、保護領域を汚して
+        # からコミットした回が「何も起きなかった」と同じ見た目になる。
+        self.run_hook(event="UserPromptSubmit")
+        self.dirty()
+        git(self.repo, "add", "--", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "汚してからコミットする")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertTrue(result.stdout, "コミットに入った変更が報告されていない")
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertIn("committed", message)
+        # 戻す手順は書かない。履歴は書き換えないので、案内できる 1 つが無い。
+        self.assertNotIn("git restore", message)
+        self.assertIn("コミットに入っている", message)
+
+    def test_ターンが始まる前のコミットは言わない(self):
+        # 前のターンや他のセッションが積んだコミットを、このターンの成果として
+        # 並べない。基準はターンの始まりに控えた HEAD。
+        #
+        # 「何も出ない」だけを見ると、コミットを一切見ない実装でも通ってしまう。
+        # 同じターンで 1 件だけ積んで、そちらは出ることも一緒に見る。
+        self.dirty()
+        git(self.repo, "add", "--", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "前のターンのコミット")
+        self.run_hook(event="UserPromptSubmit")
+        write(os.path.join(self.repo, "protected", "later.txt"), "このターンのコミット\n")
+        git(self.repo, "add", "--", "protected/later.txt")
+        git(self.repo, "commit", "--quiet", "-m", "このターンのコミット")
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/later.txt", message)
+        self.assertNotIn("protected/keep.txt", message, "前のターンのコミットは並べない")
+
+    def test_承認のコミットはターンの報告に並べない(self):
+        # 承認は人が提案を .ccnavi/approved/ へ動かしてコミットする運び。
+        # そこは deny でもあるので、外さないと承認のたびに違反として並ぶ。
+        self.run_hook(event="UserPromptSubmit")
+        write(os.path.join(self.repo, ".ccnavi", "approved", "doing", "i0001.md"), "x\n")
+        self.dirty()
+        git(self.repo, "add", "--", ".ccnavi/approved/doing/i0001.md", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "承認済みチケットと、保護領域の変更")
+
+        result = self.run_hook(event="Stop")
+
+        # 同じコミットに載っていても、外れるのは置き場のほうだけ。
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertNotIn(".ccnavi/approved", message)
+
+    def test_統合先を取り込んだマージの持ち込みは並べない(self):
+        # ワークツリーを切って作業し、`merge <統合先>` で取り込んでから戻すのが
+        # このリポジトリの手順。二点の差分で数えると、人が統合先で直した保護領域が
+        # 打つたびに並ぶ。数えるのはこのツリーが積んだコミットだけ。
+        git(self.repo, "checkout", "--quiet", "-b", "feature")
+        self.run_hook(event="UserPromptSubmit")
+        write(os.path.join(self.repo, "src", "app.py"), "print(2)\n")
+        git(self.repo, "add", "--", "src/app.py")
+        git(self.repo, "commit", "--quiet", "-m", "自分の作業")
+        git(self.repo, "checkout", "--quiet", "master")
+        self.dirty("人が統合先で直した\n")
+        git(self.repo, "add", "--", "protected/keep.txt")
+        git(self.repo, "commit", "--quiet", "-m", "統合先の変更")
+        git(self.repo, "checkout", "--quiet", "feature")
+        git(self.repo, "merge", "--quiet", "--no-edit", "master")
+
+        result = self.run_hook(event="Stop")
+
+        self.assertEqual(result.stdout, "", "取り込んだぶんを自分のターンの成果にしない")
+
+    def test_ターンの途中で切ったツリーも触った時点から数える(self):
+        # ワークツリーを切ってから手を付けるのがこのリポジトリの手順。切ったターンが
+        # まるごと数えられないと、その手順を踏むほど穴が大きくなる。
+        self.run_hook(event="UserPromptSubmit")
+        later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
+        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+        # 切ったあとの 1 回で基準が付く（この呼び出しの行き先がそのツリー）。
+        self.run_hook(tool="Write", file_path=os.path.join(later, "src", "app.py"))
+        write(os.path.join(later, "protected", "keep.txt"), "切ったあとに汚してコミット\n")
+        git(later, "add", "--", "protected/keep.txt")
+        git(later, "commit", "--quiet", "-m", "切ったあとのコミット")
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("protected/keep.txt", message)
+        self.assertIn("wt1", message)
+        self.assertNotIn("数えていないツリー", message, "基準が付いたツリーは数える")
+
+    def test_基準を持たないツリーは数えていないと言う(self):
+        # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
+        # 持たない。黙って飛ばすと、そのツリーで何も起きなかったのと見分けが付かない。
+        self.run_hook(event="UserPromptSubmit")
+        later = os.path.join(self.repo, ".claude", "worktrees", "wt1")
+        git(self.repo, "worktree", "add", "--quiet", "-b", "wt1", later)
+
+        result = self.run_hook(event="Stop")
+
+        message = json.loads(result.stdout)["systemMessage"]
+        self.assertIn("数えていないツリー", message)
+        self.assertIn("wt1", message)
+        self.assertIn("uncounted", self.records()[-1].get("detail", ""))
+
+    def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
+        # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
+        # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
+        # 人が見るのはターンの終わりの報告（Stop）。
+        # 控え（セッション）とターンの基準の両方を、汚す前に置く。
+        self.run_hook(command="ls")
+        self.run_hook(event="UserPromptSubmit")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "first\n")
+        first = self.run_hook(restore="enable", command="python build.py")
+        self.assertIn("watched/deps.txt", first.stderr)
+
+        write(os.path.join(self.repo, "watched", "deps.txt"), "second and different\n")
+        again = self.run_hook(restore="enable", command="python build.py")
+
+        self.assertEqual(again.stderr, "", "同じ汚れを呼び出しごとには言わない")
+        self.assertIn("known", self.records()[-1].get("detail", ""))
+        # ターンの終わりには出る。人はここで「結局どこが変わったのか」を 1 度で見る。
+        stop = self.run_hook(event="Stop", restore="enable")
+        self.assertIn("watched/deps.txt", json.loads(stop.stdout)["systemMessage"])
+
+    def test_denyとaskが同じ回に出たらdenyだけ戻る(self):
+        self.run_hook(command="ls")
+        self.dirty()
+        write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
+
+        result = self.run_hook(restore="enable", command="python build.py")
+
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "committed\n", "deny の場所は戻る")
+        with open(os.path.join(self.repo, "watched", "deps.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n", "ask の場所は残る")
+        # 報告はどちらも出る。数えるのは戻した 1 件だけ。
+        self.assertIn("protected/keep.txt", result.stderr)
+        self.assertIn("watched/deps.txt", result.stderr)
+        self.assertIn("restored 1", self.records()[-1]["detail"])
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ export interface ApproveBatchEntry {
   readonly revision: boolean;
   readonly tree: string;
   readonly path: string;
-  /** 範囲のうち、判定で止まるもの（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
+  /** チケットで編集対象としているが、書き込めない場所（親の範囲・種類の上限を超えた項）。承認は止めない。無ければ空 */
   readonly overflow: readonly string[];
 }
 
@@ -59,6 +59,16 @@ export interface ApproveMismatch {
   /** 見せた指紋（渡した値）と今の指紋 */
   readonly digest: { readonly expected: string; readonly current: string };
 }
+
+/**
+ * `--approve --yes` の答えを、呼ぶ側が読む形にしたもの。`partial`（途中で止まった）は
+ * 文面にしてから `error` に入るので、ここには出てこない（`ccnavi.ts` の `runApproveYes`）。
+ * 承認のオーバーレイの遷移（`approval-machine.ts`）が入力として受けるので、契約の側に置く
+ */
+export type ApproveOutcome =
+  | { readonly ok: true; readonly value: ApproveResult }
+  | { readonly ok: false; readonly mismatch: ApproveMismatch }
+  | { readonly ok: false; readonly error: string };
 
 export type PreviewParse =
   | { readonly ok: true; readonly value: ApprovePreview }
