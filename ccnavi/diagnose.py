@@ -847,11 +847,17 @@ def _where(t: ticket_mod.Ticket) -> dict:
 
 
 def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
-    """同じファイルを 2 度読んだぶんを畳む。並びは見つけた順で、先に来たほうを残す。"""
+    """同じツリーで同じファイルを 2 度読んだぶんを畳む。並びは見つけた順で、先を残す。
+
+    鍵にツリーを入れるのは、畳むのを「1 つの走査の重なり」に限るため。2 つのツリーが
+    同じ実体を指す形（`projects/<名前>` がワークスペース自身への symlink など）は
+    写りが 2 つ在るのと同じで、判定の側（`approval._authoritative`）も畳まない。
+    ここだけ畳むと、板が黙っているのに操作が止まる。
+    """
     kept: list[ticket_mod.Ticket] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     for t in found:
-        key = os.path.normcase(os.path.abspath(t.path))
+        key = (t.tree, os.path.normcase(os.path.abspath(t.path)))
         if key in seen:
             continue
         seen.add(key)

@@ -820,19 +820,31 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
     そのプロジェクト）の側を採る。ワークツリーは畳めば消えるが、元ツリーは消えない。
     親のワークツリーを作る前と、合流して畳んだ後がこの形で、ここで落ち先を決めないと、
-    片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。元ツリーを
-    採るのは、そこが合流先だから。まだ合流していないワークツリーの側が新しいことは
-    あるが、親のツリーが在る間はそちらが勝つので、食い違うのは畳んだ後だけ。
+    片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
+
+    **ただし、元ツリーより先の置き場に在る写しが 1 つでもあれば採らない。** 元ツリーを
+    権威にしてよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
+    していないワークツリーで先に進んだ写し（親のツリーで閉じ、子のツリーが取り込んだ形）
+    があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
+    記録を別の差分で書き直す。決めずに残し、人に合流させる。
 
     どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
     決まらない（検証が「複数の場所にある」と言う状態）。
+
+    リポジトリをまたいだ衝突は畳まない。識別子は人が選ぶ短い連番なので、プロジェクトが
+    独立に振ればぶつかる（設計 §11）。それは写しではなく別物なので、どちらかを権威に
+    すると、もう片方が黙って消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
+    if len({t.project for t in hits}) > 1:
+        return hits
     home = hits[0].parent or hits[0].ticket
     at_home = [t for t in hits if t.tree == home]
     if at_home:
         return at_home
     at_origin = [t for t in hits if t.tree == origin_tree(t)]
-    return at_origin if at_origin else hits
+    if not at_origin or behind(at_origin, hits):
+        return hits
+    return at_origin
 
 
 def origin_tree(t: Ticket) -> str:
@@ -842,6 +854,24 @@ def origin_tree(t: Ticket) -> str:
     から切ったものなら空）。`tree.Tree.name` と同じ綴りで並ぶ。
     """
     return t.project or tree.MAIN
+
+
+def progress(state: str) -> int:
+    """置き場の進み具合。`todo` < `doing` < `review` < `done`。空は `doing` として読む。
+
+    承認済みチケットの写しは置き場を持たないことがある（`state` が空）。判定と同じく
+    作業中として数える。
+    """
+    order = (TODO, DOING, REVIEW, DONE)
+    state = state or DOING
+    if state == CANCELLED:
+        state = DONE  # 取り消しも閉じた側。置き場は `done/`
+    return order.index(state) if state in order else 0
+
+
+def behind(some: list[Ticket], hits: list[Ticket]) -> bool:
+    """`some` より先の置き場に在る写しが `hits` にあるか。"""
+    return max(progress(t.state) for t in hits) > max(progress(t.state) for t in some)
 
 
 def collided_states(states: list[str]) -> list[str]:
@@ -862,20 +892,15 @@ def collided_states(states: list[str]) -> list[str]:
 def collisions(hits: list[Ticket]) -> list[Ticket]:
     """どれが本物か決まらない写りの全部。決まっていれば空。
 
-    見るのは 2 つ。畳んでも 2 つ以上残る形（親のツリーも元ツリーも持っていない。
-    状態の操作が「複数の場所にある」で止まる）と、1 つのツリーの中で 2 つの置き場に
-    在る形（`--lint` が ERROR で言う）。写りがあること自体は普通なので、ツリーを
-    またいだ数や状態の食い違いは数えない。
+    畳んで 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
+    状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
+    同じ条件（`lint._proposal_problems` も同じ関数を通る）。写りがあること自体は
+    普通なので、畳んで 1 つに決まる写りは数えない。
     """
     folded = fold(hits)
-    if len(folded) > 1:
+    if len(folded) > 1 and collided_states([t.state for t in folded]):
         return folded
-    caught: list[Ticket] = []
-    for at in sorted({t.tree for t in hits}):
-        here = [t for t in hits if t.tree == at]
-        if collided_states([t.state for t in here]):
-            caught.extend(here)
-    return caught
+    return []
 
 
 def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:

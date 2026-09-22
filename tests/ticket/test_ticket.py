@@ -1306,8 +1306,45 @@ class TicketTest(unittest.TestCase):
 
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("複数の場所にある", done.stderr)
+        # 権威が元ツリーなので、置き場の移動も元ツリーに書かれる（ADR-0073 の代償）。
+        moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-02.md")
+        self.assertTrue(os.path.exists(moved), moved)
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertNotIn("複数の場所にある", lint.stdout)
+
+    def test_a_copy_ahead_of_the_origin_stops_the_operations(self):
+        """元ツリーより先の置き場に在る写しがあれば、元ツリーを権威にしない。
+
+        親のツリーで閉じ、子のツリーだけがそれを取り込み、元ツリーは 1 つ手前で
+        止まっている形。ここで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
+        記録を別の差分で書き直す。決めずに止めて、人に合流させる。
+        """
+        self.family()
+        closed = self.ccnavi("ticket", "done", "i0001-02")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "close i0001-02")
+        # 子のツリーは閉じたところまで取り込み、元ツリーは 1 つ手前で止まる。
+        git(
+            os.path.join(self.root, ".claude", "worktrees", "i0001-02"),
+            "merge",
+            "--quiet",
+            "--no-edit",
+            "i0001",
+        )
+        git(self.root, "merge", "--quiet", "--no-edit", "i0001~1")
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+
+        again = self.ccnavi("ticket", "done", "i0001-02")
+
+        self.assertNotEqual(again.returncode, 0, again.stdout)
+        self.assertIn("i0001-02 が複数の場所にある", again.stderr)
+        self.assertIn("i0001-02:done", again.stderr)
+        # 次の一手まで言う。写しはどれも追跡されたファイルなので、「1 つにしてから」
+        # だけでは受け取った側にできることが読めない。
+        self.assertIn("合流", again.stderr)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn("i0001-02 が複数の場所にある", lint.stdout)
 
     # 閉じた承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
     CLOSED = (

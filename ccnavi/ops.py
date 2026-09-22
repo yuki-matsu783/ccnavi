@@ -386,6 +386,25 @@ def _where(hits: list[ticket_mod.Ticket]) -> str:
     return ", ".join(f"{t.tree or '(ワークスペースルート)'}:{t.state}" for t in hits)
 
 
+def _undecided(stderr: TextIO, head: str, hits: list[ticket_mod.Ticket]) -> None:
+    """どれが本物か決まらないときの文面。次の一手まで書く。
+
+    「1 つにしてから」だけだと、写しはどれも追跡されたファイルなので、受け取った側に
+    できることが読めない。権威の決まり方（親のツリー → 元ツリー）と、この場面で
+    それが決まらない理由を名指しする。
+    """
+    home = hits[0].parent or hits[0].ticket
+    stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つに決まるまで動かさない\n")
+    stderr.write(
+        f"  本物は、親 {home} のワークツリーの写し。無ければ元ツリー"
+        "（ワークスペースルート、プロジェクトのチケットならそのプロジェクト）の写し\n"
+    )
+    stderr.write(
+        "  どちらにも無いか、元ツリーより先の置き場に在る写しがあると決まらない。"
+        "先に進んだ側を合流させるか、残ったワークツリーを畳んでから打ち直すこと\n"
+    )
+
+
 def _find(
     stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> ticket_mod.Ticket | None:
@@ -405,7 +424,7 @@ def _find(
             stderr.write(f"  {note}\n")
         return None
     if len(hits) > 1:
-        stderr.write(f"ccnavi: {ticket_id} が複数の場所にある: {_where(hits)}。1 つにしてから\n")
+        _undecided(stderr, f"ccnavi: {ticket_id} ", hits)
         return None
     return hits[0]
 
@@ -435,7 +454,7 @@ def _parent_not_started(
             stderr.write(f"  {note}\n")
         return True
     if len(hits) > 1:
-        stderr.write(head + f"が複数の場所にある: {_where(hits)}。1 つにしてから\n")
+        _undecided(stderr, head, hits)
         return True
     parent = hits[0]
     if parent.state == ticket_mod.TODO:
