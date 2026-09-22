@@ -19,8 +19,8 @@
 
 ## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
 
-承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。写しを置いて
-提案を残す形はやめた。エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
+承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。
+エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
 （レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、人がレビューを済ませると
 `review/` から `done/` へ動く。人が動かす向きは `.ccnavi/approved/` へ、エージェントが
 動かす向きは `wip/proposals/` へ。
@@ -647,8 +647,8 @@ def now() -> str:
 class Candidate:
     """承認の対象の 1 件。新規の提案か、親の改版か。
 
-    リスクの点はここに無い。宣言の広さで数える点はやめた。点は子を閉じるときに
-    実績（差分）で数える（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
+    リスクの点はここに無い。点は子を閉じるときに実績（差分）で数え、宣言の広さでは
+    数えない（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
     """
 
     ticket: ticket_mod.Ticket
