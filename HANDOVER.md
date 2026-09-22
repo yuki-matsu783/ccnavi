@@ -30,9 +30,7 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 （レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`check` / `accept` / `--reviewed --chat` /
 `wrapup`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
 `wip/proposals/` へ動かすのはエージェント。`accept` は「受け入れて進む」か「続きの子を
-`doing/` に直に起こす」かを人に選ばせる。以前の置き場（`.ccnavi/tickets/`、`wip/proposals/{doing,done,cancelled}/`）の
-残りは `--lint` が名指しする。既存のワークスペースは `.ccnavi/tickets` を `.ccnavi/approved` に
-（`closed/` は `done/` に）`git mv` すれば続きができる。
+`doing/` に直に起こす」かを人に選ばせる。
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
 `SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
