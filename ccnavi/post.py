@@ -205,7 +205,17 @@ def check(
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
-    blocks = [_violation(f, payload, restored.get(f.key()), f.key() in would) for f in fresh]
+    gated = restore in (selfguard.ENABLE, selfguard.DRY_RUN)
+    blocks = [
+        _violation(
+            f,
+            payload,
+            restored.get(f.key()),
+            f.key() in would,
+            not_restored=gated and not _restorable(f),
+        )
+        for f in fresh
+    ]
     blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
         return ""
@@ -516,6 +526,12 @@ def _restorable(finding: Finding) -> bool:
 
     報告は 3 つとも出したままにする。戻さないことと、黙ることは別（`_guarding`）。
     設定の名前（`CCNAVI_RESTORE_IF_DENY`）が言うとおりの対象がここになる。
+
+    戻さなかった 1 件は控えに入る（`check`）。戻していないのでファイルは汚れたままで、
+    `git status` は次の呼び出しでも同じ 1 件を返す。毎回言えば、同じ汚れについて
+    同じ文が呼び出しの数だけ積まれる。だから呼び出しごとの報告はセッションで 1 度だけで、
+    その後はターンの終わりの報告（`at_stop`）が人に見せる。戻した 1 件だけが控えに
+    入らないのは、戻したあとに同じ場所が汚れたらそれは新しい出来事だから。
     """
     return any(rule.decision == rules.DENY for rule in finding.group)
 
@@ -531,7 +547,11 @@ def _guards_writes(rule: rules.Rule, path: str) -> bool:
 
 
 def _violation(
-    finding: Finding, payload: hookio.Input, moved: str | None, would_restore: bool = False
+    finding: Finding,
+    payload: hookio.Input,
+    moved: str | None,
+    would_restore: bool = False,
+    not_restored: bool = False,
 ) -> str:
     """1 件を、それだけで読んで成立する差し戻しの文に組む。
 
@@ -542,6 +562,11 @@ def _violation(
     would_restore は、戻しが予行のとき。戻す手順はそのまま載せる。今回は
     誰も戻していないので、手順を落とすと戻す手立てが 1 つも書かれていない
     報告になる。そのうえで、本番なら ccnavi が戻していたことを添える。
+
+    not_restored は、戻す働きは効いているのに、この 1 件が戻す対象ではない
+    とき（`ask` と、承認済みチケットの範囲外。`_restorable`）。手順だけを渡すと、
+    受け取ったエージェントには「自分で戻せ」としか読めない。`ask` のルールは
+    文面を持てない（lint が禁じる）ので、ここで言わないと誰も言わない。
     """
     change, group = finding.change, finding.group
     lines = [
@@ -552,6 +577,17 @@ def _violation(
     ]
     if moved is None:
         lines.append(f"undo: {gitstate.undo(change)}")
+        if not_restored:
+            lines.append(
+                "not-restored: "
+                + (
+                    "the ticket's work area is not a rule-file `deny`"
+                    if finding.code == CODE_TICKET_SCOPE
+                    else "this place is declared `ask`, not `deny`"
+                )
+                + ", so ccnavi left the change as it is. A person decides whether it stays: "
+                "say what wrote it instead of undoing it yourself."
+            )
         if would_restore:
             lines.append(
                 f"{selfguard.ACTION_WOULD}: ccnavi did not touch this path. With "

@@ -499,9 +499,12 @@ class PostToolUseTest(unittest.TestCase):
             self.assertEqual(f.read(), "changed by a build\n", "ask の場所は戻さない")
         self.assertIn("POST_VIOLATION", result.stderr, "戻さなくても報告はする")
         self.assertIn("watched/deps.txt", result.stderr)
-        self.assertNotIn("restored:", result.stderr)
+        self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
         self.assertIn('git restore --staged --worktree -- "watched/deps.txt"', result.stderr)
+        # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由を添える。
+        self.assertIn("not-restored:", result.stderr)
+        self.assertIn("`ask`, not `deny`", result.stderr)
 
     def test_askと宣言した場所は予行でも戻すはずだったと言わない(self):
         # 本番で戻さないものについて「enable なら戻していた」と言うと、
@@ -514,6 +517,26 @@ class PostToolUseTest(unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
         self.assertNotIn("would-restore", result.stderr)
         self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
+
+    def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
+        # 戻していないのでファイルは汚れたまま。呼び出しごとに言えば同じ文が
+        # 呼び出しの数だけ積まれるので、報告はセッションで 1 度きりにする。
+        # 人が見るのはターンの終わりの報告（Stop）。
+        # 控え（セッション）とターンの基準の両方を、汚す前に置く。
+        self.run_hook(command="ls")
+        self.run_hook(event="UserPromptSubmit")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "first\n")
+        first = self.run_hook(restore="enable", command="python build.py")
+        self.assertIn("watched/deps.txt", first.stderr)
+
+        write(os.path.join(self.repo, "watched", "deps.txt"), "second and different\n")
+        again = self.run_hook(restore="enable", command="python build.py")
+
+        self.assertEqual(again.stderr, "", "同じ汚れを呼び出しごとには言わない")
+        self.assertIn("known", self.records()[-1].get("detail", ""))
+        # ターンの終わりには出る。人はここで「結局どこが変わったのか」を 1 度で見る。
+        stop = self.run_hook(event="Stop", restore="enable")
+        self.assertIn("watched/deps.txt", json.loads(stop.stdout)["systemMessage"])
 
     def test_denyとaskが同じ回に出たらdenyだけ戻る(self):
         self.run_hook(command="ls")
