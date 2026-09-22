@@ -8,7 +8,7 @@
  *
  * **中身（`data`）が届いたら、編集中のルールはその中身で置き換える。** 届くのは編集を捨ててよい
  * ときだけ（人が「再読込」を押した、保存が通った）で、ファイルが外で変わっただけのときは
- * 帯（`changed`）が出るだけ（ADR-0062）。移行前に HTML ごと入れ直していたのと同じ見え方になる。
+ * 帯（`changed`）が出るだけ（ADR-0062）。
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
@@ -307,7 +307,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     editDraft({ ...draft, [section]: rows });
   };
 
-  /** タイプを移す。移した先の末尾に置く（移行前と同じ） */
+  /** タイプを移す。移した先の末尾に置く */
   const moveSection = (from: Section, key: string, to: Section): void => {
     if (from === to) {
       return;

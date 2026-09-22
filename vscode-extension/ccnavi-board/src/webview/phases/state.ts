@@ -6,7 +6,7 @@
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id は人が打つもので、
  * 空にも重複にもなるので鍵には使えない（この画面は重複を保存前に止める）。
  *
- * 開いている行の控えは Webview の state（`{ open: [id, …] }`）。移行前と同じ形にしてある。
+ * 開いている行の控えは Webview の state（`{ open: [id, …] }`）。
  */
 import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
 import { getState, setState } from "../vscode.js";
@@ -21,7 +21,7 @@ export interface Draft {
   readonly rows: readonly Row[];
 }
 
-/** 鍵を配る。1 枚の画面の中で数え上げる（`p1`、`p2`、…。移行前の綴りと同じ） */
+/** 鍵を配る。1 枚の画面の中で数え上げる（`p1`、`p2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
