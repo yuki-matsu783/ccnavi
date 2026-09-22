@@ -890,8 +890,12 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 ### 7.4 ターンの基準と人への報告
 
-`UserPromptSubmit` で、そのとき保護領域にある変更を `state/<セッション>.turn.json` に控える。
-`Stop` で、その基準に無い違反だけを `systemMessage` で人へ報告し、戻す手順を 1 件ずつ添える。
+`UserPromptSubmit` で、そのとき保護領域にある変更と、ツリーごとの HEAD を
+`state/<セッション>.turn.json` に控える。`Stop` で、その基準に無い違反だけを `systemMessage` で
+人へ報告し、戻す手順を 1 件ずつ添える。**控えた HEAD からの差分も見る。** `git status` は
+コミットを見せないので、保護領域を汚してからコミットすると呼び出しごとの監視からは消える。
+コミットに入ったぶんは戻す手順を持たない（履歴は書き換えない）ので、その 1 行だけ文面が変わる。
+チケットの置き場は外す。承認は人がそこへ動かしてコミットする運びで、外さないと承認のたびに並ぶ。
 戻さない。`enable` と `dry-run` で同じように報告する（`disable` はイベントそのものが走らず、
 記録に `mode-disabled` が残る）。基準が無ければ黙り、記録に `no-turn-baseline` を残す
 （REQ-PST-06、REQ-PST-07）。
