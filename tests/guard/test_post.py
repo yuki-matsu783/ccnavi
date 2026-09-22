@@ -34,6 +34,15 @@ RULES = {
             "message": "git push is not run by the agent.",
         },
     ],
+    # `ask` も保護領域（post._guarding）。報告はされるが、戻す対象ではない
+    # （post._restorable）。文面は書かない――ask に message を書くと lint が error。
+    "ask": [
+        {
+            "id": "watched",
+            "match": "Write|Edit",
+            "glob": "*/watched/*",
+        }
+    ],
     # 実行後の監視を見るテストなので、実行前の判定で確認を出させない。
     # 出すと、監視が何を言ったかを見たいテストが ask の話になる。
     "allow": [
@@ -75,6 +84,7 @@ class PostToolUseTest(unittest.TestCase):
 
         git(self.repo, "init", "--quiet")
         write(os.path.join(self.repo, "protected", "keep.txt"), "committed\n")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "committed\n")
         write(os.path.join(self.repo, "src", "app.py"), "print(1)\n")
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "init")
@@ -474,6 +484,52 @@ class PostToolUseTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stderr, "")
+
+    # 戻す対象は deny だけ
+
+    def test_askと宣言した場所は報告するが戻さない(self):
+        # `ask` は「人が 1 度見る場所」の宣言で、「書くな」ではない。戻すと、
+        # 人が確認に「はい」と答えた編集をあとから無かったことにする。
+        self.run_hook(command="ls")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
+
+        result = self.run_hook(restore="enable", command="python build.py")
+
+        with open(os.path.join(self.repo, "watched", "deps.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n", "ask の場所は戻さない")
+        self.assertIn("POST_VIOLATION", result.stderr, "戻さなくても報告はする")
+        self.assertIn("watched/deps.txt", result.stderr)
+        self.assertNotIn("restored:", result.stderr)
+        # 戻していないので、戻す手順は載せたままにする。
+        self.assertIn('git restore --staged --worktree -- "watched/deps.txt"', result.stderr)
+
+    def test_askと宣言した場所は予行でも戻すはずだったと言わない(self):
+        # 本番で戻さないものについて「enable なら戻していた」と言うと、
+        # 設定を上げたときに起きることを読み違えさせる。
+        self.run_hook(command="ls")
+        write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
+
+        result = self.run_hook(restore="dry-run", command="python build.py")
+
+        self.assertIn("POST_VIOLATION", result.stderr)
+        self.assertNotIn("would-restore", result.stderr)
+        self.assertNotIn("would-restore", self.records()[-1].get("detail", ""))
+
+    def test_denyとaskが同じ回に出たらdenyだけ戻る(self):
+        self.run_hook(command="ls")
+        self.dirty()
+        write(os.path.join(self.repo, "watched", "deps.txt"), "changed by a build\n")
+
+        result = self.run_hook(restore="enable", command="python build.py")
+
+        with open(os.path.join(self.repo, "protected", "keep.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "committed\n", "deny の場所は戻る")
+        with open(os.path.join(self.repo, "watched", "deps.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "changed by a build\n", "ask の場所は残る")
+        # 報告はどちらも出る。数えるのは戻した 1 件だけ。
+        self.assertIn("protected/keep.txt", result.stderr)
+        self.assertIn("watched/deps.txt", result.stderr)
+        self.assertIn("restored 1", self.records()[-1]["detail"])
 
 
 if __name__ == "__main__":

@@ -150,14 +150,15 @@ def check(
     carried, fresh = (fresh, []) if first_time else ([], fresh)
 
     restored: dict[str, str] = {}
+    # 戻すのは `deny` と宣言された場所だけ（`_restorable`）。報告する対象より狭い。
     # restore には CCNAVI_MODE を掛けたあとの値が来る（cli.effective_setting）ので、
     # ここで enforcing を見る必要はない。掛ける場所を 1 か所に寄せてあるのは、
     # 2 つの設定が別々にモードを解釈して食い違うのを防ぐため。
     # 戻すのはそのツリーの git で。鍵はツリー付きにして、別のツリーの同じ相対パスと
     # 混ざらないようにする。
-    if fresh and restore == selfguard.ENABLE:
+    if restore == selfguard.ENABLE:
         for w, top, _ in read:
-            here = [f for f in fresh if f.tree_name == w.tree.name]
+            here = [f for f in fresh if f.tree_name == w.tree.name and _restorable(f)]
             if not here:
                 continue
             done = _restore(stderr, top, state_dir, [f.change for f in here])
@@ -167,7 +168,9 @@ def check(
     # 戻しを切った形と見分けが付かない。予行として置いた設定が「戻しは要らない」
     # という結論に読み替えられるし、対象がルールファイル次第で動くこの面では、
     # 何が戻るのかを本番の前に見せることがそのまま安全の余裕になる。
-    would_restore = bool(fresh) and restore == selfguard.DRY_RUN
+    # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
+    # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
+    would = {f.key() for f in fresh if _restorable(f)} if restore == selfguard.DRY_RUN else set()
 
     _save_seen(
         stderr,
@@ -191,8 +194,8 @@ def check(
         notes.append(f"known {len(known)}")
     if restored:
         notes.append(f"restored {len(restored)}")
-    elif would_restore:
-        notes.append(f"{selfguard.ACTION_WOULD} {len(fresh)}")
+    elif would:
+        notes.append(f"{selfguard.ACTION_WOULD} {len(would)}")
     record.detail = "; ".join(notes)
 
     if fresh:
@@ -202,7 +205,7 @@ def check(
         # 直前の実行についての判定ではない。
         record.decision, record.enforced = audit.ALLOW, True
 
-    blocks = [_violation(f, payload, restored.get(f.key()), would_restore) for f in fresh]
+    blocks = [_violation(f, payload, restored.get(f.key()), f.key() in would) for f in fresh]
     blocks += [_preexisting(f) for f in carried[:REPORT_LIMIT]]
     if not blocks:
         return ""
@@ -496,6 +499,25 @@ def _guarding(rule_set: rules.RuleSet) -> list[rules.Rule]:
     同じ場所に当たる `allow` があっても、強いほうが勝つ。当てる順は実行前の判定と同じ。
     """
     return rule_set.deny + rule_set.ask
+
+
+def _restorable(finding: Finding) -> bool:
+    """この 1 件を git から戻してよいか。`deny` と宣言された場所だけ。
+
+    報告する対象（`_guarding` の `deny` + `ask` と、チケットの範囲外）より狭くしてある。
+    3 つは、宣言が言っていることが違う。
+
+    * `deny` は「書くな」。書かれたものを戻すのは、その宣言のとおりにすること
+    * `ask` は「人が 1 度見る場所」。見た結果が「よい」であることもあるので、
+      戻すと、人が確認に「はい」と答えた編集をあとから無かったことにする
+    * チケットの範囲外は、ルールファイルが何も言っていない場所。戻す根拠が
+      ルールに無いうえ、咎めているルール（`TICKET_SCOPE_RULE`）は出所を示すための
+      作りもので、`decision` を持たない
+
+    報告は 3 つとも出したままにする。戻さないことと、黙ることは別（`_guarding`）。
+    設定の名前（`CCNAVI_RESTORE_IF_DENY`）が言うとおりの対象がここになる。
+    """
+    return any(rule.decision == rules.DENY for rule in finding.group)
 
 
 def _guards_writes(rule: rules.Rule, path: str) -> bool:
