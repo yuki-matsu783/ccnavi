@@ -109,7 +109,7 @@ export async function openBoard(project?: string): Promise<void> {
     return;
   }
 
-  const panel = vscode.window.createWebviewPanel("ccnaviBoard", "ccnavi ボード", vscode.ViewColumn.One, {
+  const panel = vscode.window.createWebviewPanel("ccnaviBoard", "ccnavi チケット管理", vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
