@@ -422,7 +422,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-rules" className={`pane${tab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
           <input id="find" type="search" placeholder="id・ツール・パターン・文面で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
-          <span className="hint">判定は強い順に deny &gt; ask &gt; allow。行を押すと開く</span>
+          <span className="hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {
           const rows = draft[section].map((row) => {

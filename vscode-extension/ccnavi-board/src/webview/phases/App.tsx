@@ -313,7 +313,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {view === "list" && (
           <div className="find">
             <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
-            <span className="hint">行を押すと開く</span>
           </div>
         )}
         <details className="help">
