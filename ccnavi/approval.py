@@ -215,9 +215,10 @@ def scan(
     権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
     落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
     閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」に倒すと、閉じたチケットが
-    開いたものとして復活する。権威のツリーがその識別子をどの置き場（作業中・レビュー待ち・
-    閉じた）にも持っていないときだけ、見つかった側を残す（親のワークツリーを作る前に
-    承認した分を落とさないため）。
+    開いたものとして復活する。親のツリーがその識別子をどの置き場（作業中・レビュー待ち・
+    閉じた）にも持っていなければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
+    そのプロジェクト）の側を採り、そこにも無いときだけ見つかった側を全部残す
+    （`ticket.fold` と同じ順）。
 
     返す前に `mark_blocked` が「信じられない理由」の印を付ける。承認のときにしか
     当たらなかった構造の検査を、判定の側でも当てるため（ADR-0058）。
@@ -248,13 +249,22 @@ def _authoritative(
     found: list[ticket_mod.Ticket], everything: list[ticket_mod.Ticket]
 ) -> list[ticket_mod.Ticket]:
     at_home = {t.ticket for t in everything if t.tree == (t.parent or t.ticket)}
+    # 親のツリーが無いとき（作る前と、合流して畳んだ後）は元ツリーが権威。ワークツリーは
+    # 畳めば消えるが、元ツリー（ワークスペースルート。プロジェクトのチケットならその
+    # プロジェクト）は消えない。`ticket.fold` と同じ順で決める。
+    at_origin = {t.ticket for t in everything if t.tree == ticket_mod.origin_tree(t)}
     by_id: dict[str, list[ticket_mod.Ticket]] = {}
     for t in found:
         by_id.setdefault(t.ticket, []).append(t)
     kept: list[ticket_mod.Ticket] = []
     for ticket_id, hits in by_id.items():
         home = hits[0].parent or hits[0].ticket
-        kept.extend(hits if ticket_id not in at_home else [t for t in hits if t.tree == home])
+        if ticket_id in at_home:
+            kept.extend(t for t in hits if t.tree == home)
+        elif ticket_id in at_origin:
+            kept.extend(t for t in hits if t.tree == ticket_mod.origin_tree(t))
+        else:
+            kept.extend(hits)
     return kept
 
 

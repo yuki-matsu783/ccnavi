@@ -1291,6 +1291,24 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(lint.returncode, 0, lint.stdout)
         self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
 
+    def test_folding_the_parent_worktree_does_not_stop_the_operations(self):
+        """親のワークツリーを畳んでも操作は通る。元ツリーの写しが権威になる。
+
+        承認済みチケットは親のブランチに乗り、合流すると元ツリーにも写る。親のツリーが
+        消えたあとに落ち先を決めないと、残った子のツリーの写しと並んで「どれが本物か
+        決まらない」になり、片付けただけの家族の `start` / `done` が全部止まる。
+        """
+        self.family()
+        git(self.root, "merge", "--quiet", "--no-edit", "i0001")
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+
+        done = self.ccnavi("ticket", "done", "i0001-02")
+
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("複数の場所にある", done.stderr)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotIn("複数の場所にある", lint.stdout)
+
     # 閉じた承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
     CLOSED = (
         "---\n"

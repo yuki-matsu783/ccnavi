@@ -710,7 +710,9 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     proposals = ticket_mod.dedupe(everything)
     # 写りの一覧（`seen_in` / `scattered`）は、承認済みチケットの置き場に在るものも数える。
     # チケットは 1 本のファイルで、どの置き場に在っても子のワークツリーに写る（ADR-0055）。
-    everything = everything + approval._everything(conf, root)
+    # `review/` は提案の置き場でもあり承認済みチケットでもあるので、2 つの走査が同じ
+    # ファイルを拾う。同じ実体を 2 つと数えると「複数の場所にある」になるので、パスで畳む。
+    everything = _one_per_file(everything + approval._everything(conf, root))
     open_copies, notes = approval.scan(conf, root)
     problems.extend(notes)
     closed_copies, notes = approval.scan(conf, root, closed=True)
@@ -731,15 +733,13 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     closed_index = approval.by_id(closed_copies)
     # 同じ識別子が写っている場所の全部。権威の側は proposal に、残りは seen_in に出す。
     # 写りがあること自体は普通（子のワークツリーは親のブランチから切る）なので、数は
-    # 食い違いを意味しない。権威のツリーで畳んで 2 つ以上残る＝どれが本物か決まらない
-    # ぶんだけを scattered に出す。--lint が ERROR で言うのと同じ条件で、読む側に
-    # 畳み直させない（同じ答えを 2 か所で出さない）。
+    # 食い違いを意味しない。どれが本物か決まらないぶんだけを scattered に出す。数え方は
+    # `ticket.collisions` に置いてあり、--lint と同じ関数を通る（同じ答えを 2 か所で出さない）。
     grouped = ticket_mod.by_ticket(everything)
     seen = {tid: [_where(t) for t in hits] for tid, hits in grouped.items()}
-    scattered: dict[str, list[dict]] = {}
-    for tid, hits in grouped.items():
-        folded = ticket_mod.fold(hits)
-        scattered[tid] = [_where(t) for t in folded] if len(folded) > 1 else []
+    scattered = {
+        tid: [_where(t) for t in ticket_mod.collisions(hits)] for tid, hits in grouped.items()
+    }
 
     for ticket_id in sorted(set(proposal_index) | set(open_index) | set(closed_index)):
         payload["tickets"].append(
@@ -844,6 +844,19 @@ def _factor_record(layer: str, factor) -> dict:
 def _where(t: ticket_mod.Ticket) -> dict:
     """写りが 1 つ。どのツリーの、どの置き場の、どのファイルか。"""
     return {"tree": t.tree, "state": t.state, "path": t.path}
+
+
+def _one_per_file(found: list[ticket_mod.Ticket]) -> list[ticket_mod.Ticket]:
+    """同じファイルを 2 度読んだぶんを畳む。並びは見つけた順で、先に来たほうを残す。"""
+    kept: list[ticket_mod.Ticket] = []
+    seen: set[str] = set()
+    for t in found:
+        key = os.path.normcase(os.path.abspath(t.path))
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(t)
+    return kept
 
 
 def _ticket_record(

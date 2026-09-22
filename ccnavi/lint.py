@@ -711,13 +711,10 @@ def _proposal_problems(
             continue
         for at in sorted({where for _, where, _ in places}):
             states = [state for _, where, state in places if where == at]
-            distinct = sorted(set(states))
+            # 数え方はボードの `scattered` と同じ関数で決める（`ticket.collided_states`）。
             # `todo/` に在るのは親の改版の途中なので、承認済みチケットと並んでいてよい。
-            if len(distinct) > 1 and ticket_mod.TODO not in distinct:
-                found = distinct
-            elif len(states) > 1 and len(distinct) < len(states):
-                found = states
-            else:
+            found = ticket_mod.collided_states(states)
+            if not found:
                 continue
             where = ", ".join(f"{at}:{state}" for state in found)
             problems.append(

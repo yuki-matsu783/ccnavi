@@ -815,12 +815,67 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
     写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
-    あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
-    なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
+    あればそれが本物で、残りは写し。
+
+    親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
+    そのプロジェクト）の側を採る。ワークツリーは畳めば消えるが、元ツリーは消えない。
+    親のワークツリーを作る前と、合流して畳んだ後がこの形で、ここで落ち先を決めないと、
+    片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。元ツリーを
+    採るのは、そこが合流先だから。まだ合流していないワークツリーの側が新しいことは
+    あるが、親のツリーが在る間はそちらが勝つので、食い違うのは畳んだ後だけ。
+
+    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
+    決まらない（検証が「複数の場所にある」と言う状態）。
     """
     home = hits[0].parent or hits[0].ticket
     at_home = [t for t in hits if t.tree == home]
-    return at_home if at_home else hits
+    if at_home:
+        return at_home
+    at_origin = [t for t in hits if t.tree == origin_tree(t)]
+    return at_origin if at_origin else hits
+
+
+def origin_tree(t: Ticket) -> str:
+    """このチケットの元ツリーの名前。ワークスペースなら空、プロジェクトならその名前。
+
+    ワークツリーの名前は識別子だが、元ツリーの名前はプロジェクトの名前（ワークスペース
+    から切ったものなら空）。`tree.Tree.name` と同じ綴りで並ぶ。
+    """
+    return t.project or tree.MAIN
+
+
+def collided_states(states: list[str]) -> list[str]:
+    """1 つのツリーの中で、どれが本物か決まらない置き場の並び。決まっていれば空。
+
+    同じ識別子が 2 つの置き場に在るのは、動かす途中で止まった跡（写せたが消せなかった）。
+    ただし `todo/` は親の改版の途中なので、承認済みチケットと並んでいてよい。
+    `--lint` の ERROR と、ボードの `scattered` が同じ数え方をするためにここに置く。
+    """
+    distinct = sorted(set(states))
+    if len(distinct) > 1 and TODO not in distinct:
+        return distinct
+    if len(states) > 1 and len(distinct) < len(states):
+        return states
+    return []
+
+
+def collisions(hits: list[Ticket]) -> list[Ticket]:
+    """どれが本物か決まらない写りの全部。決まっていれば空。
+
+    見るのは 2 つ。畳んでも 2 つ以上残る形（親のツリーも元ツリーも持っていない。
+    状態の操作が「複数の場所にある」で止まる）と、1 つのツリーの中で 2 つの置き場に
+    在る形（`--lint` が ERROR で言う）。写りがあること自体は普通なので、ツリーを
+    またいだ数や状態の食い違いは数えない。
+    """
+    folded = fold(hits)
+    if len(folded) > 1:
+        return folded
+    caught: list[Ticket] = []
+    for at in sorted({t.tree for t in hits}):
+        here = [t for t in hits if t.tree == at]
+        if collided_states([t.state for t in here]):
+            caught.extend(here)
+    return caught
 
 
 def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
