@@ -235,7 +235,8 @@ def _committed_findings(
     heads: dict[str, str],
     mine: tuple[str, ...],
     scope: ScopeGuard | None,
-) -> list[Finding]:
+    places: tuple[str, str],
+) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
     見るのは、ターンの始まりに控えた HEAD からの差分（`gitstate.committed`）。
@@ -245,24 +246,37 @@ def _committed_findings(
     チケットの置き場は外す。承認は人が提案を `.ccnavi/approved/` へ動かして
     コミットする運びで（`ccnavi-push-approved.sh`）、その置き場は `deny` でもある。
     外さないと、人が承認するたびに、その操作が違反としてターンの報告に並ぶ。
+    置き場の綴りは `places` で受け取る。チケット制御を切ったワークスペースでも
+    承認のコミットは在りうるので、`scope` の有無で外れたり外れなかったりさせない。
+
+    2 つめに返すのは、数えなかったツリーの名前。**黙って飛ばさない。** 基準が
+    無いのは、ターンの途中で切られたツリー（プロンプトのときに無かった）か、
+    そのとき HEAD を読めなかったツリーで、どちらも「変わっていない」ではない。
+    ワークツリーを切ってから手を付けるのがこのリポジトリの手順なので、切った
+    ターンのコミットはここに落ちる。落ちたことを言わないと、見ていない期間が
+    「何も起きなかった」と同じ見た目になる。
     """
     out: list[Finding] = []
+    uncounted: list[str] = []
+    tickets, approved = places
     for w, top, _ in read:
         base = heads.get(top)
         if not base:
+            uncounted.append(w.tree.name or ".")
             continue
         changes, unreadable = gitstate.committed(top, base)
         if unreadable:
             stderr.write(
                 f"ccnavi: コミット済みの差分を読めない（{w.tree.name or '.'}）: {unreadable}\n"
             )
+            uncounted.append(w.tree.name or ".")
             continue
         for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree):
             rel = tree.relative(w.tree, finding.change.full)
-            if scope is not None and ticket_mod.is_ticket_place(rel, scope.tickets, scope.approved):
+            if ticket_mod.is_ticket_place(rel, tickets, approved):
                 continue
             out.append(finding)
-    return out
+    return out, uncounted
 
 
 def at_stop(
@@ -273,6 +287,7 @@ def at_stop(
     scope: ScopeGuard | None,
     payload: hookio.Input,
     record: audit.Record,
+    places: tuple[str, str] = ("", ""),
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -309,10 +324,16 @@ def at_stop(
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
     # 同じ見た目になる（呼び出しごとの監視も同じ穴を持つが、そちらは戻しに関わるので
     # 断面を変えない。人が 1 度で見るのはこの報告）。
-    found += _committed_findings(stderr, read, heads, mine, scope)
-    if not found:
+    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places)
+    found += committed
+    if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
         return ""
+    if not found:
+        # 違反は無いが、数えていないツリーがある。そのことだけを言う。
+        record.decision, record.enforced = audit.ALLOW, True
+        record.detail = f"uncounted {len(uncounted)}"
+        return _uncounted_line(uncounted)
 
     record.decision, record.enforced = audit.DENY, True
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
@@ -334,7 +355,23 @@ def at_stop(
         )
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
+    if uncounted:
+        lines.append(_uncounted_line(uncounted))
+        record.detail = f"uncounted {len(uncounted)}"
     return "\n".join(lines)
+
+
+def _uncounted_line(uncounted: list[str]) -> str:
+    """コミット済みを数えなかったツリーを言う 1 行。
+
+    数えていないことを黙ると、そのツリーで何も起きなかったのと見分けが付かない。
+    """
+    return (
+        f"[ccnavi] コミットに入ったぶんを数えていないツリーが {len(uncounted)} 本あります"
+        f"（{', '.join(sorted(set(uncounted))[:REPORT_LIMIT])}）。"
+        "ターンの始まりに基準（HEAD）を取れていません。ターンの途中で切ったワークツリーが"
+        "これにあたります。そのツリーのコミットは 'git log' で確かめてください。"
+    )
 
 
 @dataclass
@@ -768,6 +805,11 @@ def at_prompt(
     """
     read = _read_all(stderr, watched, record)
     if not read:
+        # 基準を取れなかった。前のターンの控えが残っていると、そこに入っている
+        # HEAD を「このターンの始まり」として読むことになり、前のターンの
+        # コミットをこのターンの成果として並べる。基準の側は「言い落とす」に
+        # 倒れるのに、HEAD の側だけ「言い過ぎる」に倒れるので、消しておく。
+        fsio.remove(_turn_path(state_dir, payload.session_id))
         return
 
     found = [

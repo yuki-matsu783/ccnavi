@@ -193,7 +193,16 @@ def decide_at_stop(
     起きているか」を見るためのモードなので、ここが黙ると見る手立てが減る。
     """
     watched, scope = watch_context(stderr, conf, root, record)
-    text = post.at_stop(stderr, conf.state, (conf.state, conf.log), watched, scope, payload, record)
+    text = post.at_stop(
+        stderr,
+        conf.state,
+        (conf.state, conf.log),
+        watched,
+        scope,
+        payload,
+        record,
+        (conf.tickets, conf.approved),
+    )
     if text:
         hookio.write_system_message(stdout, text)
     return EXIT_OK

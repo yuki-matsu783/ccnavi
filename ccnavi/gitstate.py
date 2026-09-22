@@ -162,6 +162,12 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     汚してからコミットすると `git status` から消えるので、`read` だけでは
     「何も起きなかった」と同じ見た目になる。
 
+    数えるのは**このツリーが積んだコミットだけ**（`--first-parent --no-merges`）。
+    二点の差分（`base..HEAD`）にすると、統合先を取り込んだマージが持ち込んだ
+    コミットまで「このターンでコミットに入った」ことになる。ワークツリーを切って
+    作業し、`merge <統合先>` で取り込んでから戻すのがこのリポジトリの手順なので、
+    それを打つたびに、人が統合先で直した保護領域が毎回報告に並ぶ。
+
     `--no-renames` と `--ignore-submodules=none` は phase.scope_findings と同じ理由。
     改名を 1 行にまとめられると移動元が消え、submodule の進みは `.gitmodules` の
     `ignore = all` で丸ごと消える。どちらも差分から行が消える道になる。
@@ -171,7 +177,10 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
     done = gitcmd.run(
         top,
         [
-            "diff",
+            "log",
+            "--first-parent",
+            "--no-merges",
+            "--format=",
             "--name-only",
             "--no-renames",
             "--ignore-submodules=none",
@@ -186,11 +195,17 @@ def committed(top: str, base: str, timeout: float = TIMEOUT_SECONDS) -> tuple[li
         return [], REASON_TIMEOUT
     if not done.ok:
         return [], REASON_FAILED
-    changes = [
-        Change(kind=KIND_COMMITTED, path=path, full=_full(top, path), status="", staged=True)
-        for path in done.out.split("\0")
-        if path
-    ]
+    # 同じパスが複数のコミットに現れるので畳む。報告は「何が変わったか」で、
+    # 何回変わったかではない。並びは git が返した順のまま。
+    seen: set[str] = set()
+    changes = []
+    for path in done.out.split("\0"):
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        changes.append(
+            Change(kind=KIND_COMMITTED, path=path, full=_full(top, path), status="", staged=True)
+        )
     return changes, ""
 
 
