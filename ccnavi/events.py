@@ -17,6 +17,7 @@ from . import (
     audit,
     builtin,
     ctxfile,
+    fsio,
     hookio,
     judge,
     modes,
@@ -262,7 +263,7 @@ def _written(payload: hookio.Input, record: audit.Record) -> str:
     """この呼び出しが名指しのツールで書いた先の、解決済みのパス。書かないツールなら空。"""
     if payload.tool_name not in selfguard.REPAIR_TOOLS or not record.subject:
         return ""
-    return judge.full_path(record.subject, payload.cwd)
+    return fsio.full_path(record.subject, payload.cwd)
 
 
 def decide_after(

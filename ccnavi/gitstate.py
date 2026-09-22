@@ -36,7 +36,7 @@ import os
 import shutil
 from dataclasses import dataclass
 
-from . import gitcmd
+from . import fsio, gitcmd
 
 # 変更の種類。元に戻す手順がこの 3 つで割れるので、この 3 つにしてある。
 KIND_NEW = "new"  # 無かったものが現れた
@@ -237,14 +237,10 @@ def _parse(top: str, entry: str) -> Change | None:
 def _full(top: str, path: str) -> str:
     """git の綴りを、行き着く先が 1 つに決まる絶対パスに直す。
 
-    judge.full_path と同じことを、同じ理由でやっている。消えたファイルは
-    解けないので、絶対パスにして `..` を畳むところまでで止める。
+    実行前の判定と同じ関数（`fsio.full_path`）を通す。同じ場所が 2 通りの綴りで
+    当たると、実行前に通った書き込みが実行後に咎められる（あるいはその逆）。
     """
-    joined = os.path.join(top, path)
-    try:
-        return os.path.realpath(joined)
-    except OSError:
-        return os.path.normpath(os.path.abspath(joined))
+    return fsio.full_path(path, top)
 
 
 def undo(change: Change) -> str:

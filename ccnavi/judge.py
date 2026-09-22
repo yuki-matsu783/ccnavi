@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 from collections.abc import Callable
 from typing import TextIO
@@ -16,6 +15,7 @@ from . import (
     audit,
     builtin,
     ctxfile,
+    fsio,
     hookio,
     modes,
     phase,
@@ -515,30 +515,8 @@ def subject_of(payload: hookio.Input) -> str:
     if tool in SEARCH_TOOLS:
         value = value or "."
     if tool in PATH_TOOLS:
-        return full_path(value, payload.cwd)
+        return fsio.full_path(value, payload.cwd)
     return value
-
-
-def full_path(path: str, cwd: str) -> str:
-    """ファイルのパスを、行き着く先が 1 つに決まる綴りに直す。
-
-    来たままの文字列に当てると、同じ場所を別の綴りで書くだけでルールを外せる。
-    相対パスは呼び出し側の作業ディレクトリ次第で意味が変わるし、`..` を挟めば
-    `secrets/` を通らない綴りで `secrets/` の中に届く。シンボリックリンクなら
-    名前を 1 つ増やすだけで済む。守る対象は名前ではなく場所なので、
-    場所まで解いてから当てる。
-
-    解けなかったときも、絶対パスにして `..` を畳むところまではやる。
-    まだ存在しないファイルへの書き込みがこれにあたる。
-    """
-    if not path:
-        return ""
-    base = cwd or os.getcwd()
-    joined = os.path.join(base, os.path.expanduser(path))
-    try:
-        return os.path.realpath(joined)
-    except OSError:
-        return os.path.normpath(os.path.abspath(joined))
 
 
 def screen(
