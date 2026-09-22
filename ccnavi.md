@@ -901,7 +901,9 @@ Bash は cwd）。ツリーごとに `git status --porcelain -z --untracked-file
 
 ### 7.5 自動復元
 
-`CCNAVI_RESTORE_IF_DENY` が `enable`（既定）のとき、新しく現れた違反だけを戻す。中身が変わった・
+`CCNAVI_RESTORE_IF_DENY` が `enable`（既定）のとき、新しく現れた違反のうち、ルールが `deny` と
+宣言した場所のものだけを戻す。`ask` と承認済みチケットの範囲外は、報告はするが戻さない。
+報告する範囲（`post._guarding`）より、戻す範囲（`post._restorable`）のほうが狭い。中身が変わった・
 消えたものは `git restore --staged --worktree`、現れたものは消さずに
 `state/aside/<日時>/<path>` へ退避して退避先を報告に載せる（索引にあれば先に `git rm --cached`）。
 `dry-run` は戻さず、報告に `would-restore` の行を足す。`disable` は戻さず、その行も出さない
