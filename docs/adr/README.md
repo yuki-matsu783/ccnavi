@@ -137,6 +137,7 @@
 | [0058](0058-approval-is-the-place.md) | 承認の権威は置き場。記録の欄は必須にせず、承認の検査を判定でも当てる |
 | [0059](0059-verify-before-asking-for-approval.md) | 承認できるかはエージェントが先に確かめ、その案内は判定に触れずに渡す |
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
+| [0073](0073-origin-tree-is-the-fallback-home.md) | 権威のツリーが無ければ元ツリーを採る |
 
 ### 複数のリポジトリと VS Code 拡張
 
