@@ -555,9 +555,11 @@ class TicketPlaces(Workspace):
 
         self.assertIn("POST_TICKET_SCOPE", result.stderr, result.stderr)
         self.assertIn(rel, result.stderr)
-        self.assertNotIn("restored:", result.stderr)
+        self.assertNotIn("restored: ccnavi", result.stderr)
         self.assertNotIn("moved this file to", result.stderr)
         self.assertTrue(os.path.exists(full), "範囲外のファイルを動かさない")
+        # 手順だけだと「自分で消せ」としか読めない。戻さなかった理由を添える。
+        self.assertIn("not-restored:", result.stderr)
 
     def test_subagent_stop_leaves_the_proposals_alone(self):
         # 自分の提案も、他のチケットの提案も。
