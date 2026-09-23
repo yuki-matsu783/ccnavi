@@ -97,15 +97,6 @@ export async function openRisk(): Promise<void> {
     return;
   }
 
-  const root = folder.uri.fsPath;
-  let loaded: Loaded;
-  try {
-    loaded = readPage(root);
-  } catch (error) {
-    vscode.window.showErrorMessage(`リスク管理画面を表示できない: ${(error as Error).message}`);
-    return;
-  }
-
   // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
@@ -129,7 +120,6 @@ export async function openRisk(): Promise<void> {
     host: riskHost(panel),
     fileWatchers: [],
     watchers: [],
-    loaded,
     lock: lockFromError("まだ確認していない"),
     changedPending: false,
     wroteAt: 0,
@@ -137,8 +127,9 @@ export async function openRisk(): Promise<void> {
   state = current;
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
-  show(current);
-  void refreshLock(current);
+  // 読むのはタブを作ってから。読めなかったときもタブは閉じず、中にエラーを出す（`showError`）。
+  // 読むのはファイル 1 本で待たないので、ほかの画面のような「読み込み中」は挟まない
+  reload(current);
 }
 
 function readPage(root: string): Loaded {

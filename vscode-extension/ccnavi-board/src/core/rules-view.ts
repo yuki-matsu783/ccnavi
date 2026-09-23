@@ -115,10 +115,14 @@ export interface RulesPage {
 /**
  * 画面に見せる中身。読み直せなかったときはルールの代わりに文面を渡す（`kind: "error"`）。
  * 他の 4 画面と同じ形で、画面はどちらでも 1 枚を描く。
+ *
+ * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは種類ごとに 1 枚）。
+ * `title` は切り替え先の名前。読み終えたら `page` か `error` が続けて届く
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
-  | { readonly kind: "error"; readonly error: string };
+  | { readonly kind: "error"; readonly error: string }
+  | { readonly kind: "loading"; readonly title: string };
 
 /**
  * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
@@ -146,6 +150,11 @@ export type RulesMessage =
   /** 画面が組み上がった。拡張ホストはここで中身を渡し直す */
   | { readonly type: "ready" }
   | { readonly type: "reload"; readonly dirty: boolean }
+  /**
+   * 未保存の変更の有無が変わった。拡張ホストは覚えておき、別の対象へ切り替えるときに
+   * 「破棄して切り替える？」を聞くかを決める
+   */
+  | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile"; readonly which: "rules" | "samples" }
   | { readonly type: "save"; readonly sections: Sections }
   /** 編集中の内容で 1 件だけ判定する。保存は要らない */

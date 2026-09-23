@@ -109,10 +109,14 @@ export function editable(page: PhasesPage): boolean {
 
 // ---- やり取り
 
-/** 画面に見せる中身。読み直せなかったときは種類の代わりに文面を渡す */
+/**
+ * 画面に見せる中身。読み直せなかったときは種類の代わりに文面を渡す。
+ * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（ルール設定と同じ）
+ */
 export type PhasesData =
   | { readonly kind: "page"; readonly page: PhasesPage }
-  | { readonly kind: "error"; readonly error: string };
+  | { readonly kind: "error"; readonly error: string }
+  | { readonly kind: "loading"; readonly title: string };
 
 /** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める */
 export type ToPhases =
@@ -129,6 +133,8 @@ export type PhasesMessage =
   /** 画面が組み上がった。拡張ホストはここで中身を渡し直す */
   | { readonly type: "ready" }
   | { readonly type: "reload"; readonly dirty: boolean }
+  /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
+  | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "create" }
   | { readonly type: "save"; readonly form: PhasesForm };

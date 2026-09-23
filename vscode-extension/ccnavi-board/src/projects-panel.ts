@@ -39,6 +39,7 @@ import {
   type ProjectsPage,
 } from "./core/projects.js";
 import { renderProjectsPage } from "./core/projects-render.js";
+import { showLoading } from "./loading.js";
 import type { ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { screens } from "./core/screens.js";
@@ -51,6 +52,7 @@ const DEBOUNCE_MS = 300;
 const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "projects";
+const TITLE = "ccnavi プロジェクト管理";
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -89,12 +91,6 @@ export async function openProjects(): Promise<void> {
     return;
   }
 
-  const first = await gather(folder.uri.fsPath);
-  if (!first.ok) {
-    vscode.window.showErrorMessage(`プロジェクト管理を表示できない: ${first.error}`);
-    return;
-  }
-
   // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
@@ -104,17 +100,21 @@ export async function openProjects(): Promise<void> {
     return;
   }
 
-  const panel = vscode.window.createWebviewPanel("ccnaviProjects", "ccnavi プロジェクト管理", vscode.ViewColumn.One, {
+  // タブは読む前に作る。実行ファイルの答えを待ってから作ると、押しても何も起きないように見え、
+  // 押し直した分だけタブが増える（`state` を先に立てるので、2 度目の押下は上の `reveal` に入る）。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`update` の `showError`）
+  const panel = vscode.window.createWebviewPanel("ccnaviProjects", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
+  showLoading(panel, TITLE, SCREEN);
   const current: PanelState = { panel, folder, host: projectsHost(panel), watchers: [], loading: false, again: false, wasVisible: panel.visible };
   state = current;
   followAppearance(panel, current.host);
-  registerPanelHandlers(current, first.page.projectsRel, first.page.selfRulesRel);
-  show(current, first.page);
+  registerPanelHandlers(current);
+  void update();
 }
 
 // ---- 読み取り
@@ -220,8 +220,8 @@ function resolveIn(root: string, filePath: string): string {
 
 // ---- パネル
 
-function registerPanelHandlers(current: PanelState, projectsRel: string, selfRulesRel: string): void {
-  const { panel, folder } = current;
+function registerPanelHandlers(current: PanelState): void {
+  const { panel } = current;
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asMessage(message));
@@ -253,7 +253,17 @@ function registerPanelHandlers(current: PanelState, projectsRel: string, selfRul
       state = undefined;
     }
   });
+}
 
+/**
+ * 監視を張る。置き場の綴りは実行ファイルの答えから取るので、最初に読めたときに 1 度だけ張る
+ * （読めないまま開いたタブは、「更新」で読めたところで張る）。
+ */
+function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: string): void {
+  if (current.watchers.length > 0) {
+    return;
+  }
+  const { folder } = current;
   // clone の完了（`.git` の出現）、層のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
   // 層の綴り（ccnavi ディレクトリの下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 §11.2）。
   // 自身の層のパスが取れない（壊れた JSON）なら、層の監視は張らない。
@@ -312,6 +322,7 @@ async function update(): Promise<void> {
       showError(current, result.error);
       return;
     }
+    watchProjects(current, result.page.projectsRel, result.page.selfRulesRel);
     show(current, result.page);
   } finally {
     current.loading = false;
