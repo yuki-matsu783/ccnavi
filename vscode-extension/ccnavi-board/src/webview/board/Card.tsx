@@ -268,10 +268,10 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="decide"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`未解決のレビューを受け入れて進む（ccnavi-review.sh decide ${action.phase}）`}
+          title={`残った指摘の行き先を 1 件ずつ決める（対応しない・このフェーズで直す・issue に回す）`}
           onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
         >
-          受け入れ
+          決める
         </button>
       );
     case "reviewed":

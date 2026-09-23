@@ -128,7 +128,7 @@ test("CB-T09 依頼済みで止まったフェーズに decide、締めた親に
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
   assert.deepEqual(card.phases[0].actions, []);
-  // 受け入れと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
+  // 残った指摘を決めるボタンと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
   assert.deepEqual(card.phases[1].actions, [
     { kind: "decide", parent: "i0001", phase: 2 },
     { kind: "reviewed", parent: "i0001", phase: 2 },
@@ -297,7 +297,7 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   assert.equal(card.mrUrl, "https://example.com/o/r/pull/18");
   assert.equal(card.mrNumber, 18);
   assert.equal(cards.get("i0001-02")!.mrUrl, "");
-  // 引く道具。承認と受け入れが使う parentTreeOf と同じ場所を見る
+  // 引く道具。承認と残った指摘を決めるボタンが使う parentTreeOf と同じ場所を見る
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001")?.id, "i0001");
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02"), undefined);
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 2)?.mrUrl, "u");

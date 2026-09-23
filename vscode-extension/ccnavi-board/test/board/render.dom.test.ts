@@ -341,7 +341,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
         };
       }
       // 依頼済みで止まったまま（判定は review_waiting で言う）。要約に「レビュー待ち」と
-      // 受け入れボタンが並ぶ
+      // 残った指摘を決めるボタンが並ぶ
       return { ...p, state: "ended", gate_closed: true, review_waiting: true, marks: { requested: { at: "t" } } };
     }),
   };
@@ -369,7 +369,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   } finally {
     await page2.close();
   }
-  // 依頼を出していないフェーズは「レビュー準備中」。受け入れボタンも出ない
+  // 依頼を出していないフェーズは「レビュー準備中」。残った指摘を決めるボタンも出ない
   const unasked: ParentJson = {
     ...parent,
     phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {}, review_waiting: false } : p)),
@@ -616,7 +616,7 @@ function waitingWithMr(url: string) {
 test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードにマージリクエストへのリンクを出す。http(s) 以外はリンクにしない", async () => {
   const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
   try {
-    // 受け入れの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
+    // 残った指摘を決めるボタンの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
     const decide = page.one('button[data-action="decide"]');
     assert.equal(decide.getAttribute("data-parent"), "i0001");
     assert.equal(decide.getAttribute("data-phase"), "2");
