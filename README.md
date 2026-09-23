@@ -333,7 +333,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
 | `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。この env が動かす ccnavi ディレクトリの名前を差し替える `--project-home` も同じ門に載る。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、落としたことを標準エラーに出す |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も、実行ファイルをどう呼んでいても同じ理由コードで止める（表示・検索の道具だけのコマンドは除く。ADR-0079）。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も、実行ファイルをどう呼んでいても同じ理由コードで止める（表示・検索の道具だけのコマンドは除く。ADR-0080）。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
@@ -1842,6 +1842,29 @@ feedback:                              # フィードバック計画。レビュ
 **順序は承認で止まる。** N 番目の子は、N-1 番目までが全部閉じてレビュー（延期でなければ）が
 済むまで承認されない。`overlap` に挙げた組だけ例外。フェーズには必ず子が 1 本以上あり、
 親は計画・合流・依頼だけをして、作業はしない。
+
+**DAG で待たせる。** ファイルの頭に `order: dag` を書き、種類に `after:`（先に閉じてレビューが
+済んでいるべき種類）を書くと、全体計画はワークフローになる。N 番目は、種類の祖先に当たる前の
+番号だけを待ち、辺で繋がっていない種類は並行して進む。人が見る場所は今までどおり種類の
+`review` で決まるので、合流の種類を `review: mr` にすれば、並行した枝をそこでまとめて見られる。
+
+```yaml
+version: 1
+order: dag                 # 合成に入る層が全部 dag と書いたときだけ効く
+phases:
+  design:     {title: 設計, review: mr}
+  acceptance: {title: 受入テスト作成, review: none, after: [design]}
+  implement:  {title: 実装とテスト, review: none, after: [design]}   # acceptance と並行
+  docs:       {title: 文書, review: mr, after: [acceptance, implement]}   # 合流点で人が見る
+```
+
+- 待ち方は全体計画の承認のときに計算され、親の承認済みチケットの `workflow:` に写る。
+  あとで `phases.yml` を直しても進行中の親には効かない。効かせるには同じ計画で改版を出す
+- 承認は、`after` の循環、後ろの項が前の項の祖先になる並び、最後の項が他の全部を待たない計画
+  （終端が 2 つ以上）を拒む。承認の画面は各番号の待ちを出す。**辺の書き漏れは並行として通る**ので、
+  そこで確かめる
+- フィードバック計画はいつも一直線。レビュー待ちで止めるのは親ごとなので、どれかの枝が
+  レビューを待つ間は、別の枝にも新しい子を起こせない
 
 **改版**は「承認済みチケットは動かない」の唯一の例外で、変えられるのは `plan` と `feedback` だけ。
 `plan` は子がまだ承認されていない番号の項に限る。`feedback` の承認後は新しいフィードバック

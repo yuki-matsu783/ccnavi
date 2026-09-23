@@ -21,7 +21,7 @@ function previewJson(extra: Record<string, unknown> = {}): string {
   });
 }
 
-test("CB-T199 残った指摘の一覧を読む。版・指紋が合わなければ読まない", () => {
+test("CB-T206 残った指摘の一覧を読む。版・指紋が合わなければ読まない", () => {
   const parsed = parseDecidePreview(previewJson());
   assert.ok(parsed.ok);
   assert.equal(parsed.ok && parsed.value.threads[0].key, "u1");
@@ -31,7 +31,7 @@ test("CB-T199 残った指摘の一覧を読む。版・指紋が合わなけれ
   assert.equal(parseDecidePreview("not json").ok, false);
 });
 
-test("CB-T200 置いた答えを読む。食い違いは mismatch、ok が真でなければ置けたと読まない", () => {
+test("CB-T207 置いた答えを読む。食い違いは mismatch、ok が真でなければ置けたと読まない", () => {
   const ok = parseDecideResult(
     JSON.stringify({ version: 1, ok: true, parent: "i0001", phase: 2, reviewed: false, followup: "i0001-03", prompt: "文", issue_url: "", warning: "" }),
   );
@@ -44,7 +44,7 @@ test("CB-T200 置いた答えを読む。食い違いは mismatch、ok が真で
   assert.ok(!unknown.ok && "error" in unknown);
 });
 
-test("CB-T201 行き先は見せた指摘の全部に 1 つずつ。知らない行き先と、回せない issue は通さない", () => {
+test("CB-T208 行き先は見せた指摘の全部に 1 つずつ。知らない行き先と、回せない issue は通さない", () => {
   const preview = parseDecidePreview(previewJson());
   assert.ok(preview.ok);
   if (!preview.ok) return;

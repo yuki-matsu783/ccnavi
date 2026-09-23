@@ -25,6 +25,7 @@ import {
 } from "./core/approval-machine.js";
 import type { BoardData, BoardMessage, ToBoard } from "./core/board-view.js";
 import { renderBoardPage } from "./core/render.js";
+import { showLoading } from "./loading.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -36,6 +37,7 @@ import { requireTickets, ticketControl } from "./ticket-control.js";
 const SCREEN = "board";
 /** ファイルの変化を束ねる待ち時間（ミリ秒）。参考にした拡張と同じ */
 const DEBOUNCE_MS = 120;
+const TITLE = "ccnavi チケット管理";
 
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
@@ -52,6 +54,8 @@ interface PanelState {
   loading: boolean;
   again: boolean;
   wasVisible: boolean;
+  /** 設定ファイルの読みと実行ファイルの答えの食い違いを確かめたか。確かめるのは最初に読めた 1 度だけ */
+  checked: boolean;
   /** 次に描いたときに選ぶ絞り込み。1 度使ったら消す（以後は Webview の state が覚える） */
   filter?: string;
   /**
@@ -94,18 +98,6 @@ export async function openBoard(project?: string): Promise<void> {
     return;
   }
 
-  // 開く前に 1 度読む。実行ファイルが無い・JSON が読めないなら、ボードを開かずに伝える。
-  const first = await loadBoard(folder.uri.fsPath, binSetting());
-  if (!first.ok) {
-    vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${first.error}`);
-    return;
-  }
-  // 設定ファイルの読みと実行ファイルの答えが食い違えば言う。判定は実行ファイルの側で動いている。
-  const mismatch = ticketControlMismatch(ticketControl(), first.board.settings.ticket_control);
-  if (mismatch) {
-    vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
-  }
-
   // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
   try {
     webviewScript(SCREEN);
@@ -115,12 +107,16 @@ export async function openBoard(project?: string): Promise<void> {
     return;
   }
 
-  const panel = vscode.window.createWebviewPanel("ccnaviBoard", "ccnavi チケット管理", vscode.ViewColumn.One, {
+  // タブは読む前に作る。実行ファイルの答えを待ってから作ると、押しても何も起きないように見え、
+  // 押し直した分だけタブが増える（`state` を先に立てるので、2 度目の押下は下の `reveal` に入る）。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`update` の `showError`）
+  const panel = vscode.window.createWebviewPanel("ccnaviBoard", TITLE, vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
+  showLoading(panel, TITLE, SCREEN);
   const current: PanelState = {
     panel,
     folder,
@@ -129,7 +125,7 @@ export async function openBoard(project?: string): Promise<void> {
     loading: false,
     again: false,
     wasVisible: panel.visible,
-    launcher: first.launcher,
+    checked: false,
     filter: project,
     approval: CLOSED,
     moved: NOTHING_MOVED,
@@ -137,7 +133,7 @@ export async function openBoard(project?: string): Promise<void> {
   state = current;
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
-  show(current, buildBoard(first.board));
+  void update();
 }
 
 /** `ccnaviBoard.refresh` の本体 */
@@ -225,6 +221,14 @@ async function update(): Promise<void> {
       return;
     }
     current.launcher = result.launcher;
+    if (result.ok && !current.checked) {
+      current.checked = true;
+      // 設定ファイルの読みと実行ファイルの答えが食い違えば言う。判定は実行ファイルの側で動いている。
+      const mismatch = ticketControlMismatch(ticketControl(), result.board.settings.ticket_control);
+      if (mismatch) {
+        vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
+      }
+    }
     if (!result.ok) {
       // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
       // 承認のオーバーレイは載せ替えて残す。承認した文は取り返しがつかないので、

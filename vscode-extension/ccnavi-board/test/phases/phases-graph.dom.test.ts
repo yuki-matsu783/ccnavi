@@ -63,8 +63,10 @@ test("CB-D74 図の下の一言は、この絵が描いていないものを言�
     const note = dom.one(".graph-note").textContent ?? "";
     assert.match(note, /3 種類・2 本/);
     assert.match(note, /実線は requires（一緒に置く）、破線は overlap（並行してよい）/);
-    assert.match(note, /線に向きは無い/);
-    assert.match(note, /このファイルに無い種類を指す requires \/ overlap は線にならない/);
+    assert.match(note, /どちらも向きは無い/);
+    assert.match(note, /矢印は after/);
+    assert.match(note, /「人が見る」は種類の宣言/);
+    assert.match(note, /このファイルに無い種類を指す線は出ない/);
     // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）
     assert.doesNotMatch(note, /他の層の種類を指す/);
     // 良し悪しは言わない（ADR-0035）

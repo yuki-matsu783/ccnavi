@@ -6,14 +6,14 @@
 import type { PhasesGraph } from "../../core/phases-graph.js";
 import type { PhaseForm } from "../../core/phases-view.js";
 
-/** 関係と案内（overlap / requires / agent / when）に何か入っているか */
+/** 関係と案内（overlap / requires / after / agent / when）に何か入っているか */
 export function hasRelations(phase: PhaseForm): boolean {
-  return phase.overlap.length > 0 || phase.requires.length > 0 || phase.agent !== "" || phase.when !== "";
+  return phase.overlap.length > 0 || phase.requires.length > 0 || phase.after.length > 0 || phase.agent !== "" || phase.when !== "";
 }
 
 /** 「関係と案内」の見出しに添える一言 */
 export function relationsNote(phase: PhaseForm): string {
-  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に要る種類・エージェント・置く目安";
+  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に要る種類・待つ種類・エージェント・置く目安";
 }
 
 /** 要約に出す範囲。inherit ならその綴り、glob が無ければ未設定と言う */
@@ -59,8 +59,9 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
 /**
  * 図の下に出す一言。**この絵が何を描いていないか**を言う。
  *
- * 言うのは 4 つ。実線と破線の読み方、線に向きが無いこと（`requires` は一緒に置く条件で、
- * 順序ではない）、このファイルに無い種類を指す参照は線にならないこと、id の無い種類は出ないこと。
+ * 言うのは、線の読み方（向きを持つのは `after` だけ）、「人が見る」が種類の宣言であること、
+ * このファイルに無い種類を指す参照は線にならないこと（他の層の `after` も描かない）、
+ * 判定が使う待ち方は承認のときに決まること、id の無い種類は出ないこと。
  *
  * **読み方をここで言うのは、線にラベルを付けないから。** 同じ組が両方の関係を持つとラベルどうしが
  * 重なって片方が読めない（`Graph.tsx` の `edgesOf`）。
@@ -71,7 +72,16 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にならない」までしか言わない。
  */
 export function graphNote(graph: PhasesGraph): string {
-  const parts = [`${graph.nodes.length} 種類・${graph.edges.length} 本`, "実線は requires（一緒に置く）、破線は overlap（並行してよい）", "線に向きは無い（requires は一緒に置く条件で、順序ではない。順序は親チケットの plan: が持つ）", "このファイルに無い種類を指す requires / overlap は線にならない（綴り違いか、他の層の種類か。どちらかは保存のときの検証が言う）"];
+  const parts = [
+    `${graph.nodes.length} 種類・${graph.edges.length} 本`,
+    "実線は requires（一緒に置く）、破線は overlap（並行してよい）で、どちらも向きは無い",
+    graph.order === "dag"
+      ? "矢印は after（待たれる側 → 待つ側）。辺で繋がっていない種類は並行して進む。列は after の深さ"
+      : "矢印は after。待ち方が sequential なので、after は判定に効かない（全体計画は一直線）",
+    "「人が見る」は種類の宣言（review）。計画の延期や実績のリスクで実際に見る場所は変わる",
+    "このファイルに無い種類を指す線は出ない（綴り違いか、他の層の種類か。どちらかは保存のときの検証が言う）。他の層の after は描かないので、その種類は根に見える",
+    "判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる",
+  ];
   if (graph.unnamed > 0) {
     parts.push(`id が空の種類は出ない（${graph.unnamed} 件）`);
   }

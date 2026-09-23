@@ -111,11 +111,11 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に要る種類", "エージェント", "置く目安"],
+      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に要る種類", "待つ種類", "エージェント", "置く目安"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
-      ["id", "title", "kind", "review", "scope", "deliverables", "overlap", "requires", "agent", "when"].map((key) => `YAML のキー: ${key}`),
+      ["id", "title", "kind", "review", "scope", "deliverables", "overlap", "requires", "after", "agent", "when"].map((key) => `YAML のキー: ${key}`),
     );
   } finally {
     await dom.close();
@@ -245,6 +245,34 @@ test("CB-D68 往復の間は帯の再読込も止め、再読込を押した時�
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
     await dom.send({ type: "cancelled" });
     assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホストへ伝え、切り替え中は「読み込み中」を出して中身が届けば描き直す", async () => {
+  const dom = await openPhases();
+  try {
+    assert.deepEqual(dom.posted, [{ type: "ready" }], "開いた時点の「変更なし」は送らない");
+    dom.click(dom.one(`${rowSelector("p1")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる");
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる2");
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
+    await dom.send({ type: "data", data: { kind: "loading", title: "ccnavi フェーズ管理: web" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "ccnavi フェーズ管理: webを読み込んでいる…");
+    assert.equal(dom.all(rowSelector("p1")).length, 0);
+    assert.deepEqual(
+      dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
+      [true, false],
+      "編集を捨てたことも伝える",
+    );
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    assert.equal(dom.all("#ccnavi-loading").length, 0);
+    // 行の鍵は画面の中で数え続けるので、描き直した行は別の鍵になる
+    assert.ok(dom.all(".phase").length > 0);
   } finally {
     await dom.close();
   }

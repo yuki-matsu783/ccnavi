@@ -257,6 +257,55 @@ class PlanItem:
         )
 
 
+WORKFLOW_KEY = "workflow"
+WORKFLOW_SEQUENTIAL = "sequential"
+WORKFLOW_DAG = "dag"
+
+
+@dataclass
+class Workflow:
+    """全体計画の待ち方の写し。`--approve` が計算して親の承認済みチケットに書く（設計 §9.7）。
+
+    `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
+    判定はこの写しだけを読み、`phases.yml` を読み直さない。
+    """
+
+    order: str = WORKFLOW_SEQUENTIAL
+    waits: dict[int, list[int]] = field(default_factory=dict)
+    review_at: dict[int, int] = field(default_factory=dict)
+
+    def as_raw(self) -> dict:
+        return {
+            "order": self.order,
+            "waits": {n: list(w) for n, w in sorted(self.waits.items())},
+            "review_at": dict(sorted(self.review_at.items())),
+        }
+
+
+def _workflow(name: str, raw) -> tuple[Workflow | None, list[Problem]]:
+    bad = [Problem(SEVERITY_ERROR, name, f"`{WORKFLOW_KEY}` の形が読めない")]
+    if not isinstance(raw, dict):
+        return None, bad
+    order = _text(raw.get("order")).strip()
+    waits_raw = raw.get("waits") or {}
+    review_raw = raw.get("review_at") or {}
+    if order not in (WORKFLOW_SEQUENTIAL, WORKFLOW_DAG):
+        return None, bad
+    if not isinstance(waits_raw, dict) or not isinstance(review_raw, dict):
+        return None, bad
+    wf = Workflow(order=order)
+    try:
+        for k, v in waits_raw.items():
+            if not isinstance(v, list):
+                return None, bad
+            wf.waits[int(k)] = sorted(int(x) for x in v)
+        for k, v in review_raw.items():
+            wf.review_at[int(k)] = int(v)
+    except (TypeError, ValueError):
+        return None, bad
+    return wf, []
+
+
 @dataclass
 class Ticket:
     """チケット 1 本ぶん。提案としても承認済みチケットとしても同じ形。"""
@@ -282,6 +331,8 @@ class Ticket:
     # 「見たうえで対応なし」。設計 §9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
+    # workflow は全体計画の待ち方の写し。親の承認済みチケットだけが持ち、書くのは `--approve`。
+    workflow: Workflow | None = None
     review_required: bool = True
     review_reason: str = ""
     title: str = ""
@@ -330,11 +381,20 @@ class Ticket:
                 return item
         return None
 
-    def review_at(self, number: int) -> int | None:
-        """この番号のフェーズのレビューが行われる番号。延期なら次にレビューがある番号。
+    def in_plan(self, number: int) -> bool:
+        return 1 <= number <= len(self.plan)
 
-        延期の連鎖の先が無ければ None（計画が壊れている）。
+    def review_at(self, number: int) -> int | None:
+        """この番号のフェーズのレビューが行われる番号。延期なら引き受ける番号。
+
+        全体計画の番号は写し（`workflow`）で読む。フィードバック計画は一直線で、次にレビューが
+        ある番号。延期の先が無ければ None（計画が壊れている）。
         """
+        item = self.item_at(number)
+        if self.workflow is not None and self.in_plan(number) and item is not None:
+            if not item.deferred:
+                return number
+            return self.workflow.review_at.get(number)
         items = self.numbered()
         for n, item in items:
             if n >= number and not item.deferred:
@@ -343,6 +403,8 @@ class Ticket:
 
     def covered_by(self, number: int) -> list[int]:
         """この番号のレビューが含む、それより前の延期したフェーズの番号。"""
+        if self.workflow is not None and self.in_plan(number):
+            return sorted(n for n, at in self.workflow.review_at.items() if at == number)
         found = []
         for n, item in self.numbered():
             if n >= number:
@@ -496,6 +558,14 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
             ticket.plan = items
         else:
             ticket.feedback = items
+
+    raw_workflow = front.get(WORKFLOW_KEY)
+    if raw_workflow is not None and not ticket.is_child:
+        workflow, bad = _workflow(name, raw_workflow)
+        problems.extend(bad)
+        if workflow is None:
+            return True
+        ticket.workflow = workflow
 
     raw_issue = front.get("issue")
     if raw_issue is not None:
@@ -833,6 +903,8 @@ def scan_all(
                     continue
                 ticket.state, ticket.tree, ticket.tree_root = state, t.name, t.root
                 ticket.project = place_project
+                # 待ち方の写しは `--approve` だけが書く。提案に書かれていても読まない。
+                ticket.workflow = None
                 if place_project and not ticket.declared_project:
                     # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
                     # （親が閉じた）子の承認済みチケットの

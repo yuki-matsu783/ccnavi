@@ -126,6 +126,7 @@
 | [0024](0024-parallel-tickets.md) | 並行するチケットの骨子：行き先で結ぶ、子は親の部分集合、状態は置き場 |
 | [0025](0025-reference-workflow.md) | 参考にした運用から採ったもの、採らなかったもの |
 | [0026](0026-phase-types.md) | フェーズに種類を与え、親が計画を持つ |
+| [0078](0078-phase-workflow-as-dag.md) | フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く |
 | [0027](0027-risk-by-result.md) | リスクは宣言ではなく実績で測る |
 | [0028](0028-exe-boundary.md) | 実行ファイルの境界は自分のディレクトリの中 |
 | [0029](0029-approval-path.md) | チケットの承認の経路を守る |
@@ -143,9 +144,9 @@
 | [0060](0060-default-branch-at-session-start.md) | ワークツリーの起点になるデフォルトブランチは、セッションの頭で進める |
 | [0073](0073-origin-tree-is-the-fallback-home.md) | 権威のツリーが無ければ元ツリーを採る |
 | [0076](0076-drop-the-legacy-place-notice.md) | 旧の置き場への移行案内を畳む |
-| [0078](0078-subcommand-names-say-what-they-do.md) | 副命令の名前は動きを言い、人の判断はフラグで受ける |
-| [0079](0079-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
-| [0080](0080-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
+| [0079](0079-subcommand-names-say-what-they-do.md) | 副命令の名前は動きを言い、人の判断はフラグで受ける |
+| [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
+| [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 
 ### 複数のリポジトリと VS Code 拡張
 

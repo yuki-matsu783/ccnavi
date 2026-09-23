@@ -715,7 +715,7 @@ test("CB-T179 「やめる」は閉じる。承認の結果は、どの状態で
   assert.equal(late.state.overlay?.kind, "done");
 });
 
-test("CB-T195 「決める」で残った指摘を読み、返ったら見せる。頼んだフェーズと違う答えでは開かない", () => {
+test("CB-T202 「決める」で残った指摘を読み、返ったら見せる。頼んだフェーズと違う答えでは開かない", () => {
   const opened = approvalStep(CLOSED, { kind: "decide", parent: "i0001", phase: 1, tree: TREE, chip: chipOf() });
   assert.equal(opened.state.overlay?.kind, "decideLoading");
   assert.deepEqual(opened.effects, [{ kind: "loadDecide", tree: TREE, phase: 1 }]);
@@ -734,7 +734,7 @@ test("CB-T195 「決める」で残った指摘を読み、返ったら見せる
   assert.deepEqual(kinds(stale.effects), ["warn"]);
 });
 
-test("CB-T196 「この行き先で決める」は、選んだ行き先と見せた指紋をそのまま渡す", () => {
+test("CB-T203 「この行き先で決める」は、選んだ行き先と見せた指紋をそのまま渡す", () => {
   const shown = toDecidePreview(approvalStep);
   const after = approvalStep(shown, { kind: "decideConfirm", choices: { u1: "keep", u2: "fix" } });
   assert.equal(after.state.overlay?.kind, "deciding");
@@ -743,7 +743,7 @@ test("CB-T196 「この行き先で決める」は、選んだ行き先と見せ
   ]);
 });
 
-test("CB-T197 置けたら渡す文を見せて読み直す。投稿の警告は言う。食い違いは読み直して見せ直す。失敗は見せる", () => {
+test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は言う。食い違いは読み直して見せ直す。失敗は見せる", () => {
   const deciding = toDeciding(approvalStep);
   const done = approvalStep(deciding, {
     kind: "decided",

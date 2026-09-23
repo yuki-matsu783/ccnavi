@@ -13,11 +13,11 @@ import type { PhaseForm, PhasesForm } from "../../src/core/phases-view.js";
 
 /** 種類 1 つ。要るところだけ渡す */
 function phase(id: string, overrides: Partial<PhaseForm> = {}): PhaseForm {
-  return { origin: null, id, title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], agent: "", when: "", ...overrides };
+  return { origin: null, id, title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "", ...overrides };
 }
 
 function form(...phases: PhaseForm[]): PhasesForm {
-  return { phases };
+  return { order: "sequential", phases };
 }
 
 /** 線を `関係 a b` の組で取る（名前そのものは読む形を約束しない） */
@@ -53,7 +53,7 @@ test("CB-T186 図は判定をしない（循環も、行き先の無い参照も
   assert.equal(graph.edges.length, 3);
   assert.equal(graph.nodes.length, 3);
   // 図の形に「循環」「不正」を名指しする欄は無い
-  assert.deepEqual(Object.keys(graph).sort(), ["edges", "nodes", "unnamed"]);
+  assert.deepEqual(Object.keys(graph).sort(), ["edges", "nodes", "order", "unnamed"]);
 
   // このファイルに無い種類への参照は、黙って線にならない（綴り違いか他の層かは、画面は言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["外の種類"] }))), []);
@@ -131,4 +131,40 @@ test("CB-T191 控えは、動かした点を丸めて入れ、図から消えた
   const same = { a: { x: 1, y: 2 } };
   assert.equal(keepSpots(same, ["a", "b"]), same);
   assert.equal(keepSpots(same, ["a"]), same);
+});
+
+test("CB-T195 after だけが向きを持つ。待たれる側から待つ側へ 1 本", () => {
+  const f = form(phase("design"), phase("implement", { after: ["design"], requires: ["design"] }));
+  assert.deepEqual(edges(f), [
+    ["after", "design", "implement"],
+    ["requires", "design", "implement"],
+  ]);
+  // 行き先の無い after と自分自身への after は線にしない（判定は実行ファイル）
+  assert.deepEqual(edges(form(phase("a", { after: ["外の種類", "a"] }))), []);
+});
+
+test("CB-T196 dag なら after の深さで列を分け、sequential なら id の格子のまま", () => {
+  const phases = [
+    phase("design"),
+    phase("acceptance", { after: ["design"] }),
+    phase("implement", { after: ["design"] }),
+    phase("docs", { after: ["acceptance", "implement"] }),
+  ];
+  const dag = spots({ order: "dag", phases });
+  assert.equal(dag.design, "0,0");
+  assert.equal(dag.acceptance, "210,0");
+  assert.equal(dag.implement, "210,120");
+  assert.equal(dag.docs, "420,0");
+  // sequential は after を置き場所に使わない（判定にも効かない）
+  assert.deepEqual(spots(form(...phases)), spots(form(...phases.map((p) => ({ ...p, after: [] })))));
+  // requires / overlap を足しても dag の列は変わらない
+  const linked = phases.map((p) => (p.id === "docs" ? { ...p, requires: ["design"], overlap: ["design"] } : p));
+  assert.deepEqual(spots({ order: "dag", phases: linked }), dag);
+});
+
+test("CB-T197 dag で after が循環しても止まらず、並べ方も切り替えない（循環を言うのは実行ファイル）", () => {
+  const graph = graphOf({ order: "dag", phases: [phase("a", { after: ["b"] }), phase("b", { after: ["a"] })] });
+  assert.equal(graph.nodes.length, 2);
+  assert.equal(graph.order, "dag");
+  assert.deepEqual(Object.keys(graph).sort(), ["edges", "nodes", "order", "unnamed"]);
 });

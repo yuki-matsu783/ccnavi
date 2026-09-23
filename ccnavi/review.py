@@ -367,7 +367,9 @@ def confirm(
         return 1
     unresolved = _unresolved(
         result.threads,
-        approval.accepted_threads(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket),
+        approval.accepted_threads(
+            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+        ),
     )
     if unresolved:
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
@@ -558,7 +560,9 @@ def _decision(
         return None
     unresolved = _unresolved(
         result.threads,
-        approval.accepted_threads(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket),
+        approval.accepted_threads(
+            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+        ),
     )
     can_issue = parent.has_plan and parent.feedback is not None
     return Decision(parent, ph, result, unresolved, can_issue)
@@ -772,7 +776,7 @@ def apply_decision(
     # 受け入れはマーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
     if accepted:
-        failed = approval.remember_accepted(home, parent.ticket, accepted)
+        failed = approval.remember_accepted(home, parent.ticket, accepted, ph.number)
         if failed:
             stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
             return None

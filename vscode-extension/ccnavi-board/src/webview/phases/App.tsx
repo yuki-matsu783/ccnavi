@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { graphOf } from "../../core/phases-graph.js";
-import { editable as canEdit, type PhaseForm, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
+import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Graph } from "./Graph.js";
 import { Phase } from "./Phase.js";
@@ -26,7 +26,7 @@ import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, ope
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
-const EMPTY_DRAFT: Draft = { rows: [] };
+const EMPTY_DRAFT: Draft = { order: "sequential", rows: [] };
 
 interface Status {
   readonly text: string;
@@ -120,17 +120,48 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
    * ことがあり（層の置き場を解く）、その間に打った内容は、届いた中身で黙って消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
+  /**
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
+   * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
+   */
+  const sentDirty = useRef(false);
+  useEffect(() => {
+    if (sentDirty.current !== dirty) {
+      sentDirty.current = dirty;
+      post({ type: "dirty", dirty });
+    }
+  }, [dirty]);
+
   const reload = (): void => {
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
 
+  /**
+   * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
+   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている
+   * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
+   *
+   * **読み込み中とエラーの早めの return より前に置く。** 後ろに置くと、中身から読み込み中・エラーへ
+   * 移ったときにフックの数が変わって React が落ちる
+   */
+  const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
+
+  if (data.kind === "loading") {
+    return (
+      <p className="empty" id="ccnavi-loading">
+        {data.title}を読み込んでいる…
+      </p>
+    );
+  }
+
   if (data.kind === "error") {
     return (
       <>
         <p className="empty">
-          フェーズ管理画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: フェーズ管理画面を開く」を実行する。開いたままでは前面に出るだけ）。
+          フェーズ管理画面を読み直せなかった。原因を直してから「再読込」を押す（同じ対象を開き直しても前面に出るだけ。別の対象を開けば、このタブの中身がその対象に替わる）。
         </p>
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
@@ -150,7 +181,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const editRow = (key: string, phase: PhaseForm): void => {
-    editDraft({ rows: draft.rows.map((row) => (row.key === key ? { ...row, phase } : row)) });
+    editDraft({ ...draft, rows: draft.rows.map((row) => (row.key === key ? { ...row, phase } : row)) });
   };
 
   const toggle = (key: string): void => {
@@ -178,11 +209,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     const moved = rows[from];
     rows[from] = rows[to];
     rows[to] = moved;
-    editDraft({ rows });
+    editDraft({ ...draft, rows });
   };
 
   const remove = (key: string): void => {
-    editDraft({ rows: draft.rows.filter((row) => row.key !== key) });
+    editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
   };
 
   const showView = (next: View): void => {
@@ -210,7 +241,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
-    editDraft({ rows: [...draft.rows, row] }, new Set([...open, row.key]));
+    editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     // 足した種類は関係も案内も空なので、「関係と案内」は畳んで出す
     setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
@@ -224,12 +255,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   });
   const shown = rows.filter((row) => !row.hidden).length;
   const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
-  /**
-   * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
-   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている
-   * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
-   */
-  const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
   const shownStatus: Status | undefined = dup.size > 0 ? { text: duplicateNote(dup), error: true } : status;
 
   return (
@@ -310,6 +335,22 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             図
           </button>
         </div>
+        <label className="order">
+          全体計画の待ち方{" "}
+          <select
+            id="f-order"
+            data-yaml-key="order"
+            value={draft.order}
+            disabled={busy || !editable}
+            onChange={(event) => editDraft({ ...draft, order: event.target.value as PhaseOrder })}
+          >
+            {ORDERS.map((order) => (
+              <option key={order} value={order}>
+                {ORDER_LABELS[order]}
+              </option>
+            ))}
+          </select>
+        </label>
         {view === "list" && (
           <div className="find">
             <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
@@ -321,7 +362,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは{" "}
             <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。
-            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は{" "}
+            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
+            辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は{" "}
             <code>,</code> で区切る。
           </p>
         </details>

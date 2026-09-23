@@ -87,7 +87,7 @@ function decidePreview(canIssue: boolean): DecidePreview {
   };
 }
 
-test("CB-T198 残った指摘は 1 件ずつ行き先を選び、全部に選ぶまで決められない。選んだ行き先を鍵ごとに送る", async () => {
+test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶまで決められない。選んだ行き先を鍵ごとに送る", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
   });

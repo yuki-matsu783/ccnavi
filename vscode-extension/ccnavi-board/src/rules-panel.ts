@@ -10,7 +10,8 @@
  *
  * 対象は 3 種（設計 §11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
  * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
- * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。対象ごとに 1 パネルで、並べて開ける。
+ * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
+ * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  *
  * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、ワークスペースなら `--rules`、
@@ -33,6 +34,7 @@ import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
+import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -46,6 +48,8 @@ const SCREEN = "rules";
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
+  /** 読んだ対象。往復の間に切り替わったかを `stale` が見る */
+  readonly target: RulesTarget;
   readonly mtimeMs: number;
   readonly doc: RulesDocument;
   readonly rulesPath: string;
@@ -61,7 +65,8 @@ interface Loaded {
 }
 
 interface PanelState {
-  readonly target: RulesTarget;
+  /** いま見せている対象。別の対象を開くと入れ替わる（タブは 1 枚） */
+  target: RulesTarget;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly tmpDir: string;
@@ -79,22 +84,22 @@ interface PanelState {
   /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
   changedPending: boolean;
   wroteAt: number;
+  /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
+  dirty: boolean;
+  /**
+   * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら捨てる。
+   * 層の置き場を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
+   */
+  seq: number;
+  /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
+  asking: boolean;
 }
 
-/** 対象ごとのパネル。鍵はワークスペースが空、自身の層が `self`、プロジェクトは `project/<名前>` */
-const panels = new Map<string, PanelState>();
-/** 開いている途中の鍵。層の置き場を実行ファイルに聞く間に、同じ対象をもう 1 枚開かない */
-const opening = new Set<string>();
+/** 開いているパネル。種類ごとに 1 枚 */
+let state: PanelState | undefined;
 
-function keyOf(target: RulesTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "";
-    case "self":
-      return "self";
-    case "project":
-      return `project/${target.name}`;
-  }
+function sameTarget(a: RulesTarget, b: RulesTarget): boolean {
+  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
 /** 保存を止めるチケットを絞るプロジェクト。共通層と自身の層は絞らない（どちらも全ツリーの Bash に効く） */
@@ -128,26 +133,12 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できない");
     return;
   }
-  const key = keyOf(target);
-  const existing = panels.get(key);
-  if (existing !== undefined) {
-    existing.panel.reveal(existing.panel.viewColumn);
+  if (state !== undefined) {
+    state.panel.reveal(state.panel.viewColumn);
+    if (!sameTarget(state.target, target)) {
+      await switchTarget(state, target);
+    }
     return;
-  }
-  if (opening.has(key)) {
-    return;
-  }
-
-  const root = folder.uri.fsPath;
-  let loaded: Loaded;
-  opening.add(key);
-  try {
-    loaded = await readPage(root, target);
-  } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${(error as Error).message}`);
-    return;
-  } finally {
-    opening.delete(key);
   }
 
   // 画面と CSS は束ねたものを読んで流し込む。無ければ開かずに言う（パネルだけ出しても白いまま）
@@ -159,6 +150,9 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     return;
   }
 
+  // タブは読む前に作る。層の置き場を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // `state` を先に立てるので、読んでいる間に押し直しても上の `reveal` に入る。
+  // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
     enableScripts: true,
     enableForms: false,
@@ -166,6 +160,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     // 編集の途中を持つので、タブを裏に回しても捨てない。
     retainContextWhenHidden: true,
   });
+  showLoading(panel, titleOf(target), SCREEN);
   const current: PanelState = {
     target,
     panel,
@@ -174,16 +169,63 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     host: rulesHost(panel),
     fileWatchers: [],
     watchers: [],
-    loaded,
     lock: lockFromError("まだ確認していない"),
     changedPending: false,
     wroteAt: 0,
+    dirty: false,
+    seq: 0,
+    asking: false,
   };
-  panels.set(key, current);
+  state = current;
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
-  show(current);
-  void refreshLock(current);
+  await reload(current);
+}
+
+/**
+ * 開いているタブの対象を入れ替える。未保存の変更があれば、破棄して切り替えるかを先に聞く。
+ * やめたら何もしない（タブは前面に出たまま、前の対象と編集が残る）。
+ *
+ * 読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない（`loaded` を空にする）。
+ * 前の対象の保存が往復の途中なら、`stale` が捨てる。
+ */
+async function switchTarget(current: PanelState, target: RulesTarget): Promise<void> {
+  if (current.dirty) {
+    // 問いを出している間に別の対象を開かれたら、前面に出すだけにする（問いは先に出したものに答えてもらう）
+    if (current.asking) {
+      return;
+    }
+    current.asking = true;
+    const choice = await vscode.window.showWarningMessage(
+      `未保存の変更がある。破棄して「${titleOf(target)}」に切り替える？`,
+      { modal: true },
+      "切り替える",
+    );
+    current.asking = false;
+    // 問いを出している間にパネルを閉じられる。切り替え先が同じになっていることもある（2 度押した）
+    if (choice !== "切り替える" || !alive(current) || sameTarget(current.target, target)) {
+      return;
+    }
+  }
+  current.target = target;
+  current.panel.title = titleOf(target);
+  current.loaded = undefined;
+  current.error = undefined;
+  current.dirty = false;
+  current.changedPending = false;
+  current.lock = lockFromError("まだ確認していない");
+  // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
+  // 前の対象の変化を「外で変わった」と拾い続けない
+  if (current.timer !== undefined) {
+    clearTimeout(current.timer);
+    current.timer = undefined;
+  }
+  for (const watcher of current.fileWatchers) {
+    watcher.dispose();
+  }
+  current.fileWatchers = [];
+  current.host.send({ kind: "loading", title: titleOf(target) });
+  await reload(current);
 }
 
 async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
@@ -234,6 +276,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   ];
   const samplesRel = samplesSetting();
   return {
+    target,
     mtimeMs,
     doc: readRules(text),
     rulesPath,
@@ -261,7 +304,6 @@ function resolveIn(root: string, filePath: string): string {
 
 function registerPanelHandlers(current: PanelState): void {
   const { panel, folder } = current;
-  const key = keyOf(current.target);
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
     void handleMessage(current, asMessage(message));
@@ -300,8 +342,8 @@ function registerPanelHandlers(current: PanelState): void {
     } catch {
       // 一時ファイルの片付けに失敗しても画面の仕事には関係ない
     }
-    if (panels.get(key) === current) {
-      panels.delete(key);
+    if (state === current) {
+      state = undefined;
     }
   });
 
@@ -342,7 +384,7 @@ function toGlob(rel: string): string {
 }
 
 function alive(current: PanelState): boolean {
-  return panels.get(keyOf(current.target)) === current;
+  return state === current;
 }
 
 function scheduleChanged(current: PanelState): void {
@@ -423,16 +465,19 @@ function showError(current: PanelState, error: string): void {
 }
 
 async function reload(current: PanelState): Promise<void> {
+  current.seq += 1;
+  const seq = current.seq;
   let loaded: Loaded;
   try {
     loaded = await readPage(current.folder.uri.fsPath, current.target);
   } catch (error) {
-    if (alive(current)) {
+    if (alive(current) && current.seq === seq) {
       showError(current, (error as Error).message);
     }
     return;
   }
-  if (!alive(current)) {
+  // 読んでいる間に別の対象へ切り替わった（または読み直しが重なった）なら、後から来たほうに任せる
+  if (!alive(current) || current.seq !== seq) {
     return;
   }
   current.loaded = loaded;
@@ -452,7 +497,10 @@ function redraw(current: PanelState): void {
   }
   if (current.error !== undefined) {
     showError(current, current.error);
+    return;
   }
+  // 切り替え先を読んでいる最中
+  current.host.send({ kind: "loading", title: titleOf(current.target) });
 }
 
 /**
@@ -496,6 +544,10 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   if (current.loaded === loaded) {
     return false;
   }
+  // 往復の間に別の対象へ切り替わった。捨てるのは同じだが、切り替え先の画面に前の対象の話を出さない
+  if (!sameTarget(loaded.target, current.target)) {
+    return true;
+  }
   fail(current, `読み直したので、${what}は捨てた。いまのルールでやり直す`);
   return true;
 }
@@ -531,7 +583,13 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
   if (message === undefined || !alive(current)) {
     return;
   }
+  if (message.type === "dirty") {
+    current.dirty = message.dirty;
+    return;
+  }
   if (message.type === "ready") {
+    // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
+    current.dirty = false;
     // 画面が組み上がった。1 枚目を読み込んでいる間に見送った中身は、ここで渡る。
     // 見送るものが無くても渡し直す（同じ中身がもう 1 度届く）。VS Code が画面を作り直す道
     // （`Developer: Reload Webviews`）では、入れてある HTML の中身が古いことがあるため
@@ -737,6 +795,8 @@ function asMessage(message: unknown): RulesMessage | undefined {
       return { type: "ready" };
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
+    case "dirty":
+      return typeof m.dirty === "boolean" ? { type: "dirty", dirty: m.dirty } : undefined;
     case "pickFile":
       if (typeof m.key !== "string" || (m.field !== "additionalContextFile" && m.field !== "additionalContextOnceFile")) {
         return undefined;
