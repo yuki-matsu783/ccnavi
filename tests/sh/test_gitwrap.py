@@ -344,6 +344,41 @@ class PassTest(GitWrapperTest):
                 )
                 self.assertEqual(0, landed.returncode, landed.stderr)
 
+    def test_push_is_rejected_when_the_child_ticket_lives_in_the_parent_tree(self):
+        """子の承認済みチケットは親のワークツリーに置かれる（approval.home_dir）。そこも見る。
+
+        ワークスペースルートには何も無く、親のツリーにだけ子の承認済みチケットがある形。
+        """
+        bare = self.make_bare()
+        git(self.dir, "remote", "add", "origin", bare)
+        trees = {}
+        for name in ("i0001", "i0001-01"):
+            path = os.path.join(self.dir, ".claude", "worktrees", name)
+            git(self.dir, "worktree", "add", "-q", path, "-b", name)
+            trees[name] = path
+        doing = os.path.join(trees["i0001"], ".ccnavi", "approved", "doing")
+        os.makedirs(doing)
+        with open(os.path.join(doing, "i0001.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001\n---\n")
+        with open(os.path.join(doing, "i0001-01.md"), "w", encoding="utf-8") as f:
+            f.write("---\nversion: 1\nticket: i0001-01\nparent: i0001\nphase: 1\n---\n")
+
+        def push_from(name):
+            return subprocess.run(
+                [SHELL, SCRIPT, "push", "-u", "origin", name],
+                cwd=trees[name],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+        child = push_from("i0001-01")
+        self.assertEqual(2, child.returncode, child.stdout + child.stderr)
+        self.assertIn("子チケット", child.stderr)
+        parent = push_from("i0001")
+        self.assertEqual(0, parent.returncode, parent.stdout + parent.stderr)
+
     def test_checkout_moves_between_branches(self):
         result = self.run_wrapper("checkout", "-b", "topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
