@@ -1538,6 +1538,15 @@ Linux の `SCRATCHPAD/` が「追跡されるのに範囲を当てない場所�
 ファイルシステムは `CCNAVI-Approve.SH` でも同じ sh を開くので、区別すると綴りを変えるだけで通る。
 `comment` / `fetch` / `origin` は sh だけの仕事なので当てていない。
 
+実行ファイルの端末要求を切る形も、同じ理由コードで止める。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と
+`--guard-ticket-approval` で端末要求を外す（テストと CI のため）が、エージェントのコマンド行でそれを置く理由は無い。
+実行ファイルを呼ぶ綴り（`uv run -m ccnavi`、`python -m ccnavi.__main__`、名前を変えた写し）は追い切れないので、
+呼び方ではなく切る形そのものを見る。切れなければ、端末を持たないエージェントは実行ファイルの側で止まる。
+見るのは生の文字列で、変数は代入の形（`X=`・`env X=`・`export X=`・`${X:=…}`・`read X`・`printf -v X`・
+PowerShell の `$env:X =`・`SetEnvironmentVariable`・`Set-Item env:X`）、フラグは `enable` 以外の値を渡す形。
+`bash -c '…'` や `$( … )` の中に書いた形も数える。この綴りそのものを `grep` で探すコマンドにも当たるが、
+それは Grep ツールで済む（ADR-0079）。
+
 どちらも実行役のコマンド越しに打った形を、中で実行されるコマンドで止める（§6.3.1）。承認のルールの正規表現は
 実行ファイルの綴りを先頭に固定したままで、`env sh <sh> --approve --yes x`、`sudo -u me sh -c '<sh> …'`、`source <sh> …`、
 `find … -exec <sh> … ;` は層の `<sh> --approve --yes x` に当たる。実行ファイルの綴りには `selfguard.binary_clause`（§8.2）が入るので、
@@ -2481,7 +2490,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `DENY_TICKET_SCOPE` / `TICKET_ASK` | チケットの範囲の外 / 範囲の `ask` |
 | `DENY_TICKET_BLOCKED` | 承認済みチケット自体が信じられない。範囲を当てる前に止める（親が引けない、番号が親の計画に無い、`project:` が置き場と違う、など。§9.4、ADR-0058） |
 | `DENY_TICKET_PROJECT_MISMATCH` | 行き先のプロジェクトと承認済みチケットの `project:` が違う |
-| `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む（§9.5） |
+| `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（§9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（§9.10、ADR-0077） |
