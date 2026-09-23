@@ -1075,7 +1075,7 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
         return f"{where}（{phase.label}）"
     if parent.feedback is None:
         return "フィードバック計画待ち"
-    return "閉じられる" if not in_feedback else "閉じられる（フィードバック対応済み）"
+    return "クローズ可" if not in_feedback else "クローズ可（フィードバック対応済み）"
 
 
 # 範囲の外へ出した上限の名前（ScopeVerdict.limit）。
