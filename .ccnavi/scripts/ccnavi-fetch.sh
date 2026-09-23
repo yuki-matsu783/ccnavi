@@ -25,6 +25,16 @@
 # 出力はモデルに届く。何も動かなかったときは黙る。毎回同じ行を返すと、
 # セッションの頭の文脈がそれで埋まる。
 #
+# **取ってこられなかったときは、モデルが自分で確かめられる材料を返す。** git の通信が
+# 許されず、ホストには MCP のツールでしか届かない環境（Claude Code on the web の設定しだい）が
+# ある。hook からは MCP を呼べないので、確かめる対象（伏せた origin・ブランチ・手元の SHA）を
+# 並べ、比べ方と、遅れを見つけたときにしてよいこと・いけないことを添える。承認済みチケットを
+# ホストから取ってきて書く道は案内しない。そこを動かすのは人で、ガードが止める。
+#
+# **待たせない。** 認証を尋ねる画面を出させず（GIT_TERMINAL_PROMPT・GCM_INTERACTIVE）、
+# fetch 1 回に見張りを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
+# 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
+#
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
 set -u
@@ -37,6 +47,59 @@ projects="${CCNAVI_PROJECTS:-projects}"
 
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0
+
+# 認証を尋ねない。hook には端末が無く、尋ねれば落ちるか、画面を開いて誰かが閉じるまで待つ。
+GIT_TERMINAL_PROMPT=0
+GCM_INTERACTIVE=never
+export GIT_TERMINAL_PROMPT GCM_INTERACTIVE
+
+limit="${CCNAVI_FETCH_TIMEOUT:-15}"
+case "$limit" in
+'' | *[!0-9]*) limit=15 ;;
+esac
+
+# 周をまたいで覚えておくもの。周はパイプの中（サブシェル）で回るので、変数では渡らない。
+#   failed   落ちた origin の綴り。同じ origin には取りに行かない
+#   targets  モデルに確かめてもらう対象。1 行 1 件
+scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
+trap 'rm -rf "$scratch"' EXIT
+: >"$scratch/failed"
+: >"$scratch/targets"
+
+# origin へ 1 本取りに行く。取れたら 0。
+#
+# 見張りの sh が limit 秒で fetch を切る。見張りの出力は捨てる。出力をつないだまま残すと、
+# 見張りの sleep が終わるまで報せの `$( )` が閉じない。
+ccnavi_fetch_git() {
+	ccnavi_fg_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
+	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/failed"; then
+		return 2
+	fi
+	git -C "$1" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
+		fetch --quiet origin "$2" </dev/null >/dev/null 2>&1 &
+	ccnavi_fg_pid=$!
+	(
+		sleep "$limit"
+		kill "$ccnavi_fg_pid"
+	) </dev/null >/dev/null 2>&1 &
+	ccnavi_fg_dog=$!
+	ccnavi_fg_rc=0
+	wait "$ccnavi_fg_pid" 2>/dev/null || ccnavi_fg_rc=$?
+	kill "$ccnavi_fg_dog" 2>/dev/null || :
+	if [ "$ccnavi_fg_rc" -ne 0 ]; then
+		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
+		return 1
+	fi
+	return 0
+}
+
+# モデルに確かめてもらう対象を 1 件足す。<名前> <ツリー> <ref> <説明>
+ccnavi_fetch_target() {
+	ccnavi_ft_url=$(git -C "$2" remote get-url origin 2>/dev/null || :)
+	ccnavi_ft_sha=$(git -C "$2" rev-parse --verify --quiet "$3" 2>/dev/null || :)
+	printf '  %s: origin=%s ブランチ=%s 手元=%s\n' "$1" "$(ccnavi_mask_url "$ccnavi_ft_url")" \
+		"$4" "${ccnavi_ft_sha:-（手元に無い）}" >>"$scratch/targets"
+}
 
 # 報せを組み立てる `$( )` の中に `case` は書けない（macOS の bash 3.2 が `)` を読み違える。
 # tests/core/test_sh_portability.py）。`case` の要るものはここで関数にしておく。
@@ -128,10 +191,19 @@ report=$(
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 
 		name=$(basename "$tree")
-		git -C "$tree" fetch --quiet origin "$branch" 2>/dev/null || {
+		ccnavi_fetch_git "$tree" "$branch"
+		case $? in
+		0) ;;
+		1)
 			printf '%s: リモートを取ってこられなかった。手元の版で判定する\n' "$name"
+			ccnavi_fetch_target "$name" "$tree" HEAD "$branch"
 			continue
-		}
+			;;
+		*)
+			ccnavi_fetch_target "$name" "$tree" HEAD "$branch"
+			continue
+			;;
+		esac
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
@@ -163,11 +235,20 @@ report=$(
 			continue
 		fi
 
-		git -C "$repo" fetch --quiet origin "$default" 2>/dev/null || {
+		ccnavi_fetch_git "$repo" "$default"
+		case $? in
+		0) ;;
+		1)
 			printf '%s: ワークツリーの起点になる %s を取ってこられなかった。手元の版から切ることになる\n' \
 				"$name" "$default"
+			ccnavi_fetch_target "$name" "$repo" "refs/heads/$default" "${default}（ワークツリーの起点）"
 			continue
-		}
+			;;
+		*)
+			ccnavi_fetch_target "$name" "$repo" "refs/heads/$default" "${default}（ワークツリーの起点）"
+			continue
+			;;
+		esac
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
 		if [ -z "$old" ]; then
@@ -214,4 +295,10 @@ report=$(
 [ -n "$report" ] || exit 0
 printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに乗って届き、ワークツリーの起点はデフォルトブランチになる。セッションの頭で取ってきた結果:\n'
 printf '%s\n' "$report"
+[ -s "$scratch/targets" ] || exit 0
+printf '%s\n' "[ccnavi] git でリモートに届かなかった（オフラインか、git の通信が許されていない環境）。上のものは手元の版で判定する。"
+printf '%s\n' "ホストに MCP などのツールで届くなら、手元が遅れていないかを確かめられる。次の各ブランチの先頭のコミットをホストから取り、手元の SHA と比べる:"
+cat "$scratch/targets"
+printf '%s\n' "違っていたら、どのブランチが遅れているかを利用者に伝え、git が届く場所でワークスペースを pull してもらう。"
+printf '%s\n' "遅れを埋めるために承認済みチケットやマーカー（.ccnavi/approved/）をホストから取ってきて書かない。そこを動かすのは人で、ガードが止める。"
 exit 0
