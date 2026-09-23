@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import unittest
 
 from ccnavi import risk
@@ -38,6 +39,20 @@ class DefinitionTest(unittest.TestCase):
         self.assertEqual([], problems)
         self.assertEqual(risk.BUILTIN, definition.source)
         self.assertEqual(4, len(definition.factors))
+
+    def test_undecodable_file_is_a_complaint_not_an_exception(self):
+        """UTF-8 として読めない定義は、共通層なら組み込みへ、層なら空へ落ちて苦情を返す。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "risks.yml")
+            with open(path, "wb") as f:
+                f.write(RISK.encode("utf-8").replace("行数".encode(), b"\xff\xfe\x80"))
+            definition, problems = risk.load(path)
+            self.assertEqual(risk.BUILTIN, definition.source)
+            self.assertTrue(definition.fallback)
+            self.assertTrue(problems)
+            layer, problems = risk.load_layer(path, risk.SCRIPT_HOMES)
+            self.assertIsNone(layer)
+            self.assertTrue(problems)
 
     def test_definition_is_validated(self):
         cases = {
