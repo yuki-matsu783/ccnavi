@@ -5,13 +5,21 @@ import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
 import { openPage, openPhases, page, rowSelector } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
-import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
+import type { HTMLButtonElement, HTMLInputElement, HTMLOptionElement } from "happy-dom" with { "resolution-mode": "import" };
 
 /** 直前に送った保存の中身 */
 function savedForm(dom: DomPage): PhasesForm {
   const saves = dom.posted.filter((message) => message.type === "save");
   assert.ok(saves.length > 0, "保存を送っていない");
   return saves[saves.length - 1].form as PhasesForm;
+}
+
+/** 関係の欄の選択肢を押す（mousedown。押すたびに 1 件ずつ付け外しする） */
+function pick(dom: DomPage, field: string, id: string): void {
+  const option = dom.one(`${field} select.id-select option[value="${id}"]`);
+  const view = option.ownerDocument.defaultView;
+  assert.ok(view !== null);
+  option.dispatchEvent(new view.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 }
 
 test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。ほかの種類との関係・補足は値がある種類だけ開く", async () => {
@@ -279,16 +287,16 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自分の id は候補に出ない。並びはファイルの順に揃う", async () => {
+test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自分の id は候補に出ない。並びはファイルの順に揃う", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p4")} .row-head`));
     await dom.settle();
     const values = (field: string, only?: "checked"): string[] =>
       dom
-        .all<HTMLInputElement>(`${rowSelector("p4")} ${field} .id-option input`)
-        .filter((input) => only === undefined || input.checked)
-        .map((input) => input.value);
+        .all<HTMLOptionElement>(`${rowSelector("p4")} ${field} select.id-select option`)
+        .filter((option) => only === undefined || option.selected)
+        .map((option) => option.value);
     // 雛形の implement。自分（implement）は候補に出ない
     assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
     assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
@@ -296,14 +304,14 @@ test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自
     assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
     assert.deepEqual(values(".f-after", "checked"), ["acceptance"]);
     // 後から付けても、並びはファイルの順に揃う（YAML に余計な差分を出さない）
-    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
+    pick(dom, `${rowSelector("p4")} .f-after`, "design");
     await dom.settle();
     assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
-    dom.click(dom.one(`${rowSelector("p4")} .f-requires .id-option input[value="research"]`));
+    pick(dom, `${rowSelector("p4")} .f-requires`, "research");
     await dom.settle();
     // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
-    assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p4")} .f-overlap .id-option input[value="design"]`).disabled);
-    assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p4")} .f-overlap .id-option input[value="implement-feedback"]`).disabled);
+    assert.ok(dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="design"]`).disabled);
+    assert.ok(!dom.one<HTMLOptionElement>(`${rowSelector("p4")} .f-overlap option[value="implement-feedback"]`).disabled);
     // 共通層ではほかの層を指せないので、id を打つ欄は出さない
     assert.equal(dom.all(`${rowSelector("p4")} input.id-extra`).length, 0);
     dom.click(dom.one("#save"));
@@ -324,8 +332,8 @@ test("CB-D87 層の画面では、候補に無い id を打って足せる。自
     dom.click(dom.one(`${rowSelector("p3")} .row-head`));
     await dom.settle();
     // 前後の空白は落として読み、空は出さない。自分自身は外せるように印を付けて出す
-    const checked = dom.all<HTMLInputElement>(`${rowSelector("p3")} .f-overlap .id-option input`).filter((input) => input.checked);
-    assert.deepEqual(checked.map((input) => input.value), ["design", "acceptance"]);
+    const checked = dom.all<HTMLOptionElement>(`${rowSelector("p3")} .f-overlap option`).filter((option) => option.selected);
+    assert.deepEqual(checked.map((option) => option.value), ["design", "acceptance"]);
     assert.ok(dom.one(`${rowSelector("p3")} .f-overlap .id-option.foreign`).textContent?.includes("acceptance"));
     dom.type(dom.one(`${rowSelector("p3")} .f-requires input.id-extra`), "外の種類, acceptance");
     await dom.settle();
@@ -333,7 +341,7 @@ test("CB-D87 層の画面では、候補に無い id を打って足せる。自
     await dom.settle();
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-requires input.id-extra`).value, "");
     assert.ok(dom.one(`${rowSelector("p3")} .f-requires .id-option.foreign`).textContent?.includes("外の種類"));
-    dom.click(dom.one(`${rowSelector("p3")} .f-overlap .id-option input[value="acceptance"]`));
+    pick(dom, `${rowSelector("p3")} .f-overlap`, "acceptance");
     await dom.settle();
     dom.click(dom.one("#save"));
     await dom.settle();

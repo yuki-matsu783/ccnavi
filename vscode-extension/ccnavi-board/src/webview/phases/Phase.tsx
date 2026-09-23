@@ -4,7 +4,7 @@
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
  * 出番の少ない 5 欄（ほかの種類との関係と補足）は見出し 1 行に畳み、値がある種類だけ最初から開く。
  *
- * 関係の 3 欄（overlap / requires / after）は、このファイルのほかの種類の id をチェックで選ぶ
+ * 関係の 3 欄（overlap / requires / after）は、このファイルのほかの種類の id を複数選択のセレクトボックスで選ぶ
  * （`IdPicker`）。自分の id は候補に出さない。`after` の候補は work の種類だけ（feedback の種類は
  * 待つ先にできず、feedback の種類は `after` を持てない。`phasetypes.py`）。同じ id を `after` と
  * `overlap` の両方には挙げられない（同じく error）ので、片方で選んだ id はもう片方で選べなくする。
@@ -272,13 +272,16 @@ function ListInput({
 }
 
 /**
- * 関係の欄。ほかの種類の id をチェックで選ぶ。
+ * 関係の欄。ほかの種類の id を複数選択のセレクトボックスで選ぶ。
+ *
+ * 押すだけで 1 件ずつ付け外しする（`mousedown` で素の動きを止める）。素の複数選択は Ctrl / Shift なしで
+ * 押すとほかの選択が外れ、気付かずに関係を消しやすい。キー操作は素のまま `change` で受ける。
  *
  * 候補は呼ぶ側が決める（自分と空を除いた、このファイルの種類）。**候補に無い値も消さずに出す**
  * （ほかの層の種類・綴り違い・自分自身）。外せば並びから消える。値は前後の空白を落として読む
  * （実行ファイルも落として解く）。空の値は出さない。
  *
- * 並びは候補の順（ファイルの並び）に揃え、候補に無い値はその後ろに元の順で置く。チェックを
+ * 並びは候補の順（ファイルの並び）に揃え、候補に無い値はその後ろに元の順で置く。選択を
  * 付け外しするたびに並びが入れ替わって差分が出る、ということをしない。
  *
  * 候補に無い id を打つ欄は `typed` のときだけ出す（層の画面）。打った文字は Enter か、欄を離れたときに
@@ -337,18 +340,47 @@ function IdPicker({
     }
     setExtra("");
   };
+  const choose = (select: HTMLSelectElement): void => {
+    onChange(ordered(new Set(Array.from(select.selectedOptions, (option) => option.value))));
+  };
   return (
     <div className={`ids ${className}`} title={title} role="group" aria-label={label}>
-      {options.map((id) => {
-        const note = id === self ? "自分自身を挙げている（外す）" : !known.has(id) ? "このファイルに無い id（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類（外す）" : undefined;
-        const locked = blocked.has(id) && !picked.has(id);
-        return (
-          <label key={id} className={note !== undefined ? "id-option foreign" : "id-option"} title={locked ? blockedNote : note}>
-            <input type="checkbox" value={id} checked={picked.has(id)} disabled={disabled || locked} onChange={(event) => toggle(id, event.target.checked)} />
-            {id}
-          </label>
-        );
-      })}
+      {options.length > 0 && (
+        <select
+          multiple
+          className="id-select"
+          aria-label={label}
+          size={Math.min(Math.max(options.length, 2), 6)}
+          value={chosen}
+          disabled={disabled}
+          onChange={(event) => choose(event.currentTarget)}
+        >
+          {options.map((id) => {
+            const note = id === self ? "自分自身を挙げている（外す）" : !known.has(id) ? "このファイルに無い id（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類（外す）" : undefined;
+            const locked = blocked.has(id) && !picked.has(id);
+            return (
+              <option
+                key={id}
+                value={id}
+                className={note !== undefined ? "id-option foreign" : "id-option"}
+                title={locked ? blockedNote : (note ?? "押すと選ぶ／外す")}
+                disabled={locked}
+                onMouseDown={(event) => {
+                  // 押すだけで 1 件ずつ付け外しする。素の複数選択は Ctrl なしで押すとほかの選択が外れる
+                  event.preventDefault();
+                  if (disabled || locked) {
+                    return;
+                  }
+                  (event.currentTarget.parentElement as HTMLSelectElement | null)?.focus();
+                  toggle(id, !picked.has(id));
+                }}
+              >
+                {id}
+              </option>
+            );
+          })}
+        </select>
+      )}
       {options.length === 0 && <span className="dim">選べる種類が無い</span>}
       {typed && (
         <input
