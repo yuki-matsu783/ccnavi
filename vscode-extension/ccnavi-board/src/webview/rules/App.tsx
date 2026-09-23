@@ -99,6 +99,19 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const page = pageOf(data);
 
   /**
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
+   * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
+   */
+  const sentDirty = useRef(false);
+  useEffect(() => {
+    if (sentDirty.current !== dirty) {
+      sentDirty.current = dirty;
+      post({ type: "dirty", dirty });
+    }
+  }, [dirty]);
+
+  /**
    * id を打っている途中は控えを書き直さない（打ちかけの id が控えに入る）。書くのは欄を
    * 確定した（native の `change`）ときだけ。React の `onChange` は打つたびに呼ばれるので、
    * ここは素の DOM の口で受ける。いまの編集は描き直しのたびに `latest` へ写す
@@ -142,6 +155,11 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         setStatus(undefined);
         setChanged(false);
         setLock(pageOf(next)?.lock ?? NO_LOCK);
+        if (next.kind === "loading") {
+          // 別の対象へ切り替わった。前の対象のルールで出した判定を、いまのルールの結果として残さない
+          setJudged(undefined);
+          setSampled(undefined);
+        }
       } else if (message.type === "judged") {
         const result = message.result as Judged["result"];
         setBusy(false);
@@ -256,11 +274,19 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     post({ type: "reload", dirty });
   };
 
+  if (data.kind === "loading") {
+    return (
+      <p className="empty" id="ccnavi-loading">
+        {data.title}を読み込んでいる…
+      </p>
+    );
+  }
+
   if (data.kind === "error") {
     return (
       <>
         <p className="empty">
-          ルール設定画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: ルール設定画面を開く」を実行する。開いたままでは前面に出るだけ）。
+          ルール設定画面を読み直せなかった。原因を直してから「再読込」を押す（同じ対象を開き直しても前面に出るだけ。別の対象を開けば、このタブの中身がその対象に替わる）。
         </p>
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>

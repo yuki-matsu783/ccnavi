@@ -249,3 +249,31 @@ test("CB-D68 往復の間は帯の再読込も止め、再読込を押した時�
     await dom.close();
   }
 });
+
+test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホストへ伝え、切り替え中は「読み込み中」を出して中身が届けば描き直す", async () => {
+  const dom = await openPhases();
+  try {
+    assert.deepEqual(dom.posted, [{ type: "ready" }], "開いた時点の「変更なし」は送らない");
+    dom.click(dom.one(`${rowSelector("p1")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる");
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる2");
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
+    await dom.send({ type: "data", data: { kind: "loading", title: "ccnavi フェーズ管理: web" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "ccnavi フェーズ管理: webを読み込んでいる…");
+    assert.equal(dom.all(rowSelector("p1")).length, 0);
+    assert.deepEqual(
+      dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
+      [true, false],
+      "編集を捨てたことも伝える",
+    );
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    assert.equal(dom.all("#ccnavi-loading").length, 0);
+    // 行の鍵は画面の中で数え続けるので、描き直した行は別の鍵になる
+    assert.ok(dom.all(".phase").length > 0);
+  } finally {
+    await dom.close();
+  }
+});

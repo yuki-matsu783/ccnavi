@@ -120,17 +120,48 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
    * ことがあり（層の置き場を解く）、その間に打った内容は、届いた中身で黙って消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
+  /**
+   * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
+   * このタブの中身が入れ替わるので、拡張ホストはこれを見て「破棄して切り替える？」を聞く。
+   * 送るのは変わったときだけ（最初の「変更なし」は拡張ホストも同じ前提で始まるので送らない）
+   */
+  const sentDirty = useRef(false);
+  useEffect(() => {
+    if (sentDirty.current !== dirty) {
+      sentDirty.current = dirty;
+      post({ type: "dirty", dirty });
+    }
+  }, [dirty]);
+
   const reload = (): void => {
     setBusy(true);
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
 
+  /**
+   * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
+   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている
+   * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
+   *
+   * **読み込み中とエラーの早めの return より前に置く。** 後ろに置くと、中身から読み込み中・エラーへ
+   * 移ったときにフックの数が変わって React が落ちる
+   */
+  const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
+
+  if (data.kind === "loading") {
+    return (
+      <p className="empty" id="ccnavi-loading">
+        {data.title}を読み込んでいる…
+      </p>
+    );
+  }
+
   if (data.kind === "error") {
     return (
       <>
         <p className="empty">
-          フェーズ管理画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: フェーズ管理画面を開く」を実行する。開いたままでは前面に出るだけ）。
+          フェーズ管理画面を読み直せなかった。原因を直してから「再読込」を押す（同じ対象を開き直しても前面に出るだけ。別の対象を開けば、このタブの中身がその対象に替わる）。
         </p>
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
@@ -224,12 +255,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   });
   const shown = rows.filter((row) => !row.hidden).length;
   const kept = rows.filter((row) => row.hidden && open.has(row.key)).length;
-  /**
-   * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
-   * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている
-   * 最中に絞り込みや「外で変わった」の報せが届くと、掴んだ点が掴む前の位置へ戻る。
-   */
-  const graph = useMemo(() => graphOf(formOf(draft)), [draft]);
   const shownStatus: Status | undefined = dup.size > 0 ? { text: duplicateNote(dup), error: true } : status;
 
   return (
