@@ -85,8 +85,8 @@ phases:
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    after: [research]
-    when: 振る舞いが変わるとき。設計と並行してよく、実装より先に書く
+    after: [design]
+    when: 振る舞いが変わるとき。設計のあと、実装より先に書く
 
   implement:
     kind: work
@@ -94,7 +94,7 @@ phases:
     review: mr
     scope: ["src/*", "tests/*"]
     requires: [acceptance]
-    after: [design, acceptance]
+    after: [acceptance]
 
   implement-feedback:
     kind: feedback

@@ -294,12 +294,11 @@ test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自
     assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
     // after の候補は work の種類だけ。feedback の種類は待つ先にできない
     assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
+    assert.deepEqual(values(".f-after", "checked"), ["acceptance"]);
+    // 後から付けても、並びはファイルの順に揃う（YAML に余計な差分を出さない）
+    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
+    await dom.settle();
     assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
-    // 付け外ししても、並びはファイルの順のまま（YAML に余計な差分を出さない）
-    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
-    await dom.settle();
-    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
-    await dom.settle();
     dom.click(dom.one(`${rowSelector("p4")} .f-requires .id-option input[value="research"]`));
     await dom.settle();
     // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
