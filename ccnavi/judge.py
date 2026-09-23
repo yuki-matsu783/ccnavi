@@ -26,6 +26,7 @@ from . import (
     settings,
     shellread,
     tree,
+    wrapguard,
 )
 from . import ticket as ticket_mod
 from .modes import EXIT_OK
@@ -201,6 +202,52 @@ def decide_before(
         else ""
     )
     notices = [text for text in (guard, fallback) if text]
+
+    # 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼ぶ形は、ルールより
+    # 先に止める。`CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、sh の中の子の push
+    # の検査を外す。hook は settings.json の env で起動するので、この代入の影響を受けない
+    # （ADR-0077）。読むのは元のコマンド。`cd` を追うには区切りの残った形が要る。
+    if payload.tool_name == "Bash" and (
+        modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
+    ):
+        script, names = wrapguard.check_env(record.subject, record.degraded)
+        if names:
+            record.code, record.rules = wrapguard.CODE_ENV, [wrapguard.ENV_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        wrapguard.CODE_ENV, subject, wrapguard.env_message(script, names)
+                    )
+                ],
+            )
+
+    # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
+    # 持つが、止める場所は hook に置き、sh は 2 重目にする（ADR-0077）。
+    if conf.tickets_enabled and payload.tool_name == "Bash":
+        name, parent, _ = wrapguard.check_child_push(
+            conf, root, payload.cwd, record.subject, record.degraded
+        )
+        if name:
+            record.code, record.rules = wrapguard.CODE_CHILD_PUSH, [wrapguard.CHILD_PUSH_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        wrapguard.CODE_CHILD_PUSH,
+                        subject,
+                        wrapguard.child_push_message(name, parent),
+                    )
+                ],
+            )
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
     # 閉じるのは親だけ（REQ-TKT-10）。ルールより先に見る。ルールが allow と

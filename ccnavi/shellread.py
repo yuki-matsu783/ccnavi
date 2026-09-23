@@ -904,6 +904,26 @@ def read(src: str) -> Reading:
     return reading
 
 
+def placed(src: str) -> list[tuple[list[str], str | None]]:
+    """外側のコマンド 1 本ずつの（語の並び, そのコマンドが居る場所）。
+
+    居る場所は `cd` を追った先で、読みの起点（打たれた場所）から見た綴り。起点そのものは
+    空文字、読めなくなったら None（§6.3.2 と同じ追い方）。置換の中身は並べない。
+    読み切れない形（走査か shlex が止まる）なら空のリストを返す。呼び手は read() の
+    degraded を先に見て、そちらで扱う。
+    """
+    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
+    src = src.replace("\\\r\n", "").replace("\\\n", "")
+    try:
+        outer, _, _, _ = _scan(src)
+        tokens = _tokenize(outer)
+    except (_Unreadable, ValueError):
+        return []
+    places: list[tuple[list[str], str | None]] = []
+    _resolve_cd(tokens, places)
+    return places
+
+
 def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     """読みと、層を作る先のコマンドの並びを返す。
 
@@ -1077,7 +1097,9 @@ def _split_commands(tokens: list[str]) -> list[list[str]]:
     return commands
 
 
-def _resolve_cd(tokens: list[str]) -> list[str]:
+def _resolve_cd(
+    tokens: list[str], places: list[tuple[list[str], str | None]] | None = None
+) -> list[str]:
     """`cd` の行き先を、後ろのコマンドの引数の綴りに継ぎ足したトークン列を返す。
 
     継ぎ足すものが無ければ、元のリストをそのまま返す（呼び手はそれを見て、移った先の
@@ -1087,6 +1109,9 @@ def _resolve_cd(tokens: list[str]) -> list[str]:
     区切りで居場所の続き方が変わる。サブシェル `( )` は出入りで戻し、`|` `|&` `&` の
     左はサブシェルなので、そこで移っても右と後ろには効かない。`case` の枝の `)` は
     サブシェルの閉じではないので、`case` から `esac` までは読まない（取りこぼす側）。
+
+    places を渡すと、コマンド 1 本ずつの（語の並び, そのコマンドが居る場所）を足していく。
+    居る場所は読みの起点から見た綴りで、起点そのものは空文字、読めなければ None。
     """
     out: list[str] = []
     segment: list[str] = []
@@ -1100,7 +1125,7 @@ def _resolve_cd(tokens: list[str]) -> list[str]:
         if token not in _OPERATORS:
             segment.append(token)
             continue
-        here, in_case = _flush(segment, here, out, in_case, budget)
+        here, in_case = _flush(segment, here, out, in_case, budget, places)
         segment = []
         out.append(token)
         if in_case:
@@ -1115,18 +1140,25 @@ def _resolve_cd(tokens: list[str]) -> list[str]:
             start = here
         else:
             start = here
-    _flush(segment, here, out, in_case, budget)
+    _flush(segment, here, out, in_case, budget, places)
     return out if out != tokens else tokens
 
 
 def _flush(
-    segment: list[str], here: str | None, out: list[str], in_case: int, budget: list[int]
+    segment: list[str],
+    here: str | None,
+    out: list[str],
+    in_case: int,
+    budget: list[int],
+    places: list[tuple[list[str], str | None]] | None = None,
 ) -> tuple[str | None, int]:
     """コマンド 1 本を out に足し、次のコマンドが居る場所と `case` の深さを返す。"""
     if segment[:1] == ["case"]:
         in_case += 1
     elif segment[:1] == ["esac"] and in_case:
         in_case -= 1
+    if places is not None and segment:
+        places.append((list(segment), None if in_case else here))
     return _chdir(segment, None if in_case else here, out, budget), in_case
 
 
