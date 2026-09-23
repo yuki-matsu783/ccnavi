@@ -22,6 +22,11 @@ code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
 .small { font-size: .85em; }
 .dim { color: var(--vscode-descriptionForeground); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 0 4px 10px; }
+/* ツールバー（保存などのボタン）と脚注（保存の結果・エラー）は、本文をスクロールしても画面の上下に
+   残す。どちらも #root の直下にあり、本文と同じ入れ物の中で貼り付く。本文が裏を通るので背景を塗る。
+   z-index は列の取っ手（1）より上、承認のオーバーレイ（10）とツアー（1000）より下 */
+.toolbar, .foot { position: sticky; z-index: 4; background: var(--vscode-editor-background); }
+.toolbar { top: 0; padding-top: 6px; }
 .summary { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
 .summary .warn { color: var(--vscode-editorWarning-foreground); font-weight: 600; }
 .path { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
@@ -63,7 +68,7 @@ input[type=text], input[type=search], textarea, select {
 input[type=text]:focus, input[type=search]:focus, textarea:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
 select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border-color: var(--vscode-dropdown-border); }
 input:disabled, select:disabled, textarea:disabled { opacity: .6; }
-.foot { margin-top: 12px; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
+.foot { bottom: 0; margin-top: 12px; padding: 4px 0; font-size: .85em; color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
 .foot.error { color: var(--vscode-editorError-foreground); }
 pre.load-error { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 12px; }
 /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
