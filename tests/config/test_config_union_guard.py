@@ -497,6 +497,9 @@ class SetupTest(unittest.TestCase):
             "ccnavi-common.sh",
             "ccnavi-push-approved.sh",
             "ccnavi-approve.sh",
+            "ccnavi-fetch.sh",
+            "ccnavi-clean.sh",
+            "ccnavi-clean.js",
         ):
             write(os.path.join(src, ".ccnavi", "scripts", name), f"# {name}\n")
         return src

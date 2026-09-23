@@ -14,6 +14,7 @@
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
 #   --no-vscode              .vscode/settings.json には触らない
+#   --no-fetch               セッションの頭の取り込み（ccnavi-fetch.sh）を hook に登録しない
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
 # env は触らない。ccnavi と関係のない hook や設定はそのまま残す。
@@ -71,6 +72,13 @@ HOOK_TIMEOUT=10
 # 7 つすべてに登録する。1 つ欠けると、そのイベントでしかできない仕事が黙って
 # 落ちる。何が落ちるかは README「設定」の表にある。
 EVENTS="SessionStart UserPromptSubmit PreToolUse PostToolUse Stop SubagentStart SubagentStop"
+# セッションの頭に、承認済みチケットとマーカー（親ブランチに乗って届く）と、ワークツリーの
+# 起点になるデフォルトブランチを取ってくる sh。本体とは別の 1 行で SessionStart に登録する。
+# 取ってこないと、別の機械で承認したものが効かず、古い main から枝を切る（ADR-0060）。
+# 通信するので、要らないプロジェクトは --no-fetch で外す。上限は sh の中の見張り（1 回 15 秒）が
+# 重なっても収まる長さ。
+FETCH_COMMAND='sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
+FETCH_TIMEOUT=60
 
 DEFAULT_MODE="dry-run"
 # CCNAVI_BIN_PATH に書く綴り。hook が起動する振り分けの sh。固定。
@@ -99,10 +107,13 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
 # ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
 # 配らないと案内どおりに打っても届かない。
+# ccnavi-fetch.sh はセッションの頭に走る取り込み（FETCH_COMMAND）。
+# ccnavi-clean.sh と ccnavi-clean.js は、ワークツリーを畳む前に生成物を消す 1 本。Windows では
+# node_modules などが残ると worktree remove が途中で止まる。js が本体で、sh は node を探して渡す。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # 追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
 # hook が起動するものだけが在って代わりに通る sh が無い形を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-fetch.sh ccnavi-clean.sh ccnavi-clean.js ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -119,6 +130,7 @@ all=no
 force=no
 check=no
 vscode=yes
+fetch=yes
 target=""
 # 配布元。名指しされたかどうかを分けて持つ。既定で埋めただけの配布元が使えない
 # のは「組み立てていない」で済むが、人が名指ししたものが使えないのは誤り。
@@ -145,6 +157,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
   --no-vscode               .vscode/settings.json には触らない
+  --no-fetch                セッションの頭の取り込み（ccnavi-fetch.sh）を hook に登録しない。
+                            取り込みは通信する。1 台だけで使い、リモートに合わせる必要が無いとき
 
 CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・設定 3 本（.ccnavi/common/rules.yml、
@@ -198,6 +212,10 @@ while [ "$#" -gt 0 ]; do
 		;;
 	--no-vscode)
 		vscode=no
+		shift
+		;;
+	--no-fetch)
+		fetch=no
 		shift
 		;;
 	-h | --help | help)
@@ -643,11 +661,15 @@ forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length 
 #
 # そこで 3 つに分ける。同じ綴りで在る（exact）、ccnavi らしき別の綴りが在る
 # （other）、無い（none）。足すのは none だけ。other は足さずに人へ見せる。
+# セッションの頭の取り込み（ccnavi-fetch.sh）は本体ではないので、other に数えない。数えると、
+# 取り込みだけが登録された設定で、本体の SessionStart が「別の綴りが在る」として足されない。
+# 取り込みのほうは、綴りを問わず ccnavi-fetch を含む command が在れば登録済みとする（fetching）。
 # 綴りはプロジェクトごとに違うので、どちらが正しいかをここで決められない。
 # 黙って足すと判定が 2 回走り、黙って飛ばすとそのイベントが落ちたままになる。
 REGISTERED='def commands($ev): [ (.hooks[$ev] // [])[] | (.hooks // [])[] | .command // "" ];
 	def exact($ev; $cmd): [ commands($ev)[] | select(. == $cmd) ] | length > 0;
-	def looks($ev): [ commands($ev)[] | ascii_downcase
+	def fetching($ev): [ commands($ev)[] | select(test("ccnavi-fetch")) ] | length > 0;
+	def looks($ev): [ commands($ev)[] | ascii_downcase | select(test("ccnavi-fetch") | not)
 		| select(test("(^|[^a-z0-9])ccnavi([^a-z0-9]|$)")) ] | length > 0;'
 
 missing_env=$(printf '%s' "$current" | jq -r --argjson env "$env_json" '
@@ -689,6 +711,13 @@ other_hooks=$(printf '%s' "$current" | jq -r --argjson events "$events_json" --a
 	| select((\$root | exact(\$ev; \$cmd)) | not)
 	| select(\$root | looks(\$ev)) | \$ev
 ")
+missing_fetch=""
+if [ "$fetch" = yes ]; then
+	missing_fetch=$(printf '%s' "$current" | jq -r "
+		$REGISTERED
+		if fetching(\"SessionStart\") then empty else \"SessionStart（.ccnavi/scripts/ccnavi-fetch.sh。セッションの頭の取り込み）\" end
+	")
+fi
 
 # 配った実行ファイルを git に入れない。配布先は git で持ち回るのが普通なので、
 # .gitignore に無いと、次のコミットで実行ファイルと _internal がまるごと履歴に
@@ -790,6 +819,10 @@ report() {
 		printf '%s hook:\n' "$2"
 		printf '%s\n' "$missing_hooks" | sed 's/^/  /'
 	fi
+	if [ -n "$missing_fetch" ]; then
+		printf '%s hook（取り込み。要らなければ --no-fetch）:\n' "$4"
+		printf '%s\n' "$missing_fetch" | sed 's/^/  /'
+	fi
 	if [ -n "$replacing_env" ]; then
 		printf '%s env:\n' "$3"
 		printf '%s\n' "$replacing_env" | sed 's/^/  /'
@@ -817,7 +850,7 @@ report() {
 }
 
 report_missing() {
-	report '足りない' 'ccnavi が登録されていない' '置き換える'
+	report '足りない' 'ccnavi が登録されていない' '置き換える' '登録されていない'
 }
 
 # 配布物の報告。env と同じく、配る前と後で言葉を変える。
@@ -867,7 +900,7 @@ report_deploy_plan() {
 # ここを不足の 2 つだけで決めると、CCNAVI_MODE=disable が書かれた設定に
 # --check を打って「揃っています」と言うことになる。
 settled=yes
-if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] ||
+if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
 	[ -n "$replacing_env" ] || [ -n "$differing_env" ] || [ -n "$other_hooks" ] ||
 	[ -n "$missing_vscode" ] || [ -n "$differing_vscode" ] || [ -n "$vscode_blocked" ]; then
 	settled=no
@@ -903,7 +936,8 @@ fi
 # 手を動かすものがあるか。値が違うだけで名指しされていないもの、別の綴りの
 # 登録は、このスクリプトが触らないので数えない。ただし黙って終わらせない。
 settings_work=no
-if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$replacing_env" ]; then
+if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
+	[ -n "$replacing_env" ]; then
 	settings_work=yes
 fi
 vscode_work=no
@@ -981,7 +1015,10 @@ if [ "$settings_work" = yes ]; then
 		--argjson events "$events_json" \
 		--argjson forced "$forced_json" \
 		--arg cmd "$HOOK_COMMAND" \
-		--argjson timeout "$HOOK_TIMEOUT" "
+		--argjson timeout "$HOOK_TIMEOUT" \
+		--arg fetch "$fetch" \
+		--arg fetch_cmd "$FETCH_COMMAND" \
+		--argjson fetch_timeout "$FETCH_TIMEOUT" "
 		$REGISTERED
 		(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
 		| .env = (\$env + (.env // {}) + \$overrides)
@@ -994,6 +1031,12 @@ if [ "$settings_work" = yes ]; then
 			}])
 			end
 		)
+		| if \$fetch == \"yes\" and (fetching(\"SessionStart\") | not) then
+			.hooks.SessionStart = ((.hooks.SessionStart // []) + [{
+				matcher: \"\",
+				hooks: [{type: \"command\", command: \$fetch_cmd, timeout: \$fetch_timeout}]
+			}])
+		else . end
 	")
 	write_json "$settings" "$updated"
 	settings_backed_up=$backed_up
@@ -1011,7 +1054,7 @@ if [ "$vscode_work" = yes ]; then
 	vscode_linked=$linked
 fi
 
-report '足した' 'ccnavi を登録した' '置き換えた'
+report '足した' 'ccnavi を登録した' '置き換えた' '登録した'
 if [ "$settings_backed_up" = yes ]; then
 	printf '書き換える前の内容は %s.bak にあります（控えは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
 fi
@@ -1142,6 +1185,12 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-approve.sh)
 			why="端末で承認する形"
+			;;
+		ccnavi-fetch.sh)
+			why="セッションの頭の取り込み"
+			;;
+		ccnavi-clean.sh | ccnavi-clean.js)
+			why="ワークツリーを畳む前に生成物を消す"
 			;;
 		*)
 			why="止めている間に通る形"

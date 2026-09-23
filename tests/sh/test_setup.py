@@ -86,6 +86,8 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # hook に登録される 1 行。README「設定」の見本と対になる。綴りが変わると、
 # ccnavi 自身が守る対象（CCNAVI_BIN_PATH）と実際に起動するものがずれる。
 HOOK_COMMAND = '"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}"'
+# セッションの頭の取り込み。本体とは別の 1 行で SessionStart にだけ登録する（ADR-0060）。
+FETCH_COMMAND = 'sh "${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh"'
 # --deploy が配る代わりに通る sh。拒否の文面が案内する「代わりに通る形」で、
 # 無いと止められた側に逃げ道がない。
 GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
@@ -98,6 +100,9 @@ DEPLOY_SCRIPTS = (
     "ccnavi-common.sh",
     "ccnavi-push-approved.sh",
     "ccnavi-approve.sh",
+    "ccnavi-fetch.sh",
+    "ccnavi-clean.sh",
+    "ccnavi-clean.js",
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本（設計 §11.9）。リスクの配点は共通層、
@@ -260,11 +265,50 @@ class WritesTheExpectedShape(SetupTest):
         self.run_setup()
         data = self.read_settings()
         for event in EVENTS:
-            hooks = self.hooks_of(data, event)
+            hooks = [h for h in self.hooks_of(data, event) if h["command"] != FETCH_COMMAND]
             self.assertEqual(len(hooks), 1, f"{event} の hook が 1 つでない")
             self.assertEqual(hooks[0]["command"], HOOK_COMMAND, f"{event} の command")
             self.assertEqual(hooks[0]["type"], "command", f"{event} の type")
             self.assertEqual(hooks[0]["timeout"], 10, f"{event} の timeout")
+
+    def test_registers_the_fetch_at_session_start_only(self):
+        """取り込みは SessionStart に 1 つだけ。他のイベントには載せない。"""
+        self.run_setup()
+        data = self.read_settings()
+        for event in EVENTS:
+            fetches = [h for h in self.hooks_of(data, event) if h["command"] == FETCH_COMMAND]
+            self.assertEqual(len(fetches), 1 if event == "SessionStart" else 0, event)
+        fetch = [h for h in self.hooks_of(data, "SessionStart") if h["command"] == FETCH_COMMAND]
+        self.assertEqual(fetch[0]["timeout"], 60)
+        # 打ち直しても増えない。
+        self.run_setup()
+        again = self.hooks_of(self.read_settings(), "SessionStart")
+        self.assertEqual(2, len(again), again)
+
+    def test_no_fetch_leaves_the_fetch_out_and_check_agrees(self):
+        self.run_setup("--no-fetch")
+        commands = [h["command"] for h in self.hooks_of(self.read_settings(), "SessionStart")]
+        self.assertEqual([HOOK_COMMAND], commands)
+        checked = self.run_setup("--no-fetch", "--check")
+        self.assertNotIn("取り込み", checked.stdout)
+
+    def test_a_fetch_registered_first_does_not_hide_the_main_hook(self):
+        """取り込みだけが先に在っても、本体の SessionStart を「別の綴り」と取り違えない。"""
+        self.write_settings(
+            {
+                "hooks": {
+                    "SessionStart": [
+                        {
+                            "matcher": "",
+                            "hooks": [{"type": "command", "command": FETCH_COMMAND}],
+                        }
+                    ]
+                }
+            }
+        )
+        self.run_setup()
+        commands = [h["command"] for h in self.hooks_of(self.read_settings(), "SessionStart")]
+        self.assertEqual([FETCH_COMMAND, HOOK_COMMAND], commands)
 
     def test_writes_the_paths_ccnavi_reads(self):
         """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。"""
