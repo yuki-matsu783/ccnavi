@@ -183,8 +183,10 @@
 
 .graph .phase-group-arrow line {
   stroke: var(--vscode-descriptionForeground);
-  stroke-width: 2;
-  stroke-dasharray: 6 4;
+  stroke-width: 2.5;
+  /* 点線にして overlap の破線（4 3）と見分ける */
+  stroke-dasharray: 0.5 5;
+  stroke-linecap: round;
 }
 
 .graph .phase-group-arrow marker path {
@@ -238,6 +240,21 @@
   height: 12px;
   border: 1px dashed var(--vscode-panel-border);
   border-radius: 3px;
+}
+
+.legend-box[data-kind="feedback"] {
+  border-color: var(--vscode-editorInfo-foreground, var(--vscode-panel-border));
+}
+
+/* 枠の間の「レビュー後」の矢印の見本。図の .phase-group-arrow と同じ点線 */
+.legend-line.review line {
+  stroke-width: 2.5;
+  stroke-dasharray: 0.5 5;
+  stroke-linecap: round;
+}
+
+.legend-line.review path {
+  fill: var(--vscode-descriptionForeground);
 }
 
 /* 図の下に出す注意。当てはまるときだけ出る */

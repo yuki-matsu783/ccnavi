@@ -4,7 +4,7 @@
  * 種類の意味は判定しない（ADR-0035）。ここが作るのは並べて読めるようにした文だけ。
  */
 import type { PhasesGraph } from "../../core/phases-graph.js";
-import type { PhaseForm } from "../../core/phases-view.js";
+import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
 
 /** ほかの種類との関係と補足（overlap / requires / after / agent / when）に何か入っているか */
 export function hasRelations(phase: PhaseForm): boolean {
@@ -66,13 +66,23 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  * 確かめ、無ければ error を出す。画面がその手前で「他の層だ」と言うと、保存したときに
  * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にしていない」までしか言わない。
  */
-export function graphNotices(graph: PhasesGraph): readonly string[] {
+export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolean): readonly string[] {
   const out: string[] = [];
-  if (graph.order === "sequential" && graph.edges.some((edge) => edge.relation === "after")) {
-    out.push("待ち方が sequential なので、矢印（after）は判定に効かない。全体計画は plan: に並べた順に一つずつ進む");
+  // after を 1 つでも書いていれば言う（線にならない、ほかの層を指す after も効かないのは同じ）
+  const hasAfter = form.phases.some((phase) => phase.after.some((id) => id.trim() !== ""));
+  if (form.order === "sequential" && hasAfter) {
+    out.push("待ち方が sequential なので、after は判定に効かない。全体計画は plan: に並べた順に一つずつ進む");
+  }
+  // 層の dag は、合成に入るほかの層が全部 dag のときだけ効く（`phasetypes.py` の `merged_order`）
+  if (layer && form.order === "dag") {
+    out.push("層を合わせたとき、ほかの層のどれかが sequential なら、判定は sequential で待つ（このファイルの after は効かない）");
   }
   if (graph.dropped > 0) {
-    out.push(`このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（綴り違いか、ほかの層の種類。どちらかは保存のときの検証が言う）`);
+    out.push(
+      layer
+        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（ほかの層の種類を指しているならそのままでよい。綴り違いなら保存のときの検証が言う）。ほかの層の種類を待つ種類は、図では根に見える`
+        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（綴り違いなら保存のときの検証が言う）`,
+    );
   }
   if (graph.unnamed > 0) {
     out.push(`id が空の種類は図に出ない（${graph.unnamed} 件）`);

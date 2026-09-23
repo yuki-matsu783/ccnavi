@@ -152,15 +152,19 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   const kept = ids.map((id) => first.get(id) as PhasesForm["phases"][number]);
   const known = new Set(ids);
   const edges = edgesOf(kept, known);
-  let dropped = 0;
+  // 同じ種類が同じ関係で同じ id を 2 度挙げても 1 件（線と同じまとめ方）。関係が違えば別に数える
+  const missing = new Set<string>();
   for (const phase of kept) {
-    for (const raw of [...phase.overlap, ...phase.requires, ...phase.after]) {
-      const to = raw.trim();
-      if (to !== "" && to !== idOf(phase) && !known.has(to)) {
-        dropped += 1;
+    for (const relation of ["overlap", "requires", "after"] as const) {
+      for (const raw of phase[relation]) {
+        const to = raw.trim();
+        if (to !== "" && to !== idOf(phase) && !known.has(to)) {
+          missing.add(JSON.stringify([idOf(phase), relation, to]));
+        }
       }
     }
   }
+  const dropped = missing.size;
 
   // 置き場所（頭のコメント）。sequential は id の順の格子、dag は after の深さの列
   const works = ids.filter((id) => first.get(id)?.kind !== "feedback");

@@ -29,6 +29,16 @@ const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
 const EMPTY_DRAFT: Draft = { order: "sequential", rows: [] };
 
+/** 案内を始める前の画面の様子（`beforeTour`） */
+interface TourSnapshot {
+  readonly view: View;
+  readonly find: string;
+  readonly open: ReadonlySet<string>;
+  readonly more: ReadonlyMap<string, boolean>;
+  /** 始めたときの中身。案内の間に読み直されたら、開いていた行の鍵は古いので戻さない */
+  readonly data: PhasesData;
+}
+
 interface Status {
   readonly text: string;
   readonly error: boolean;
@@ -73,9 +83,14 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [touring, setTouring] = useState(false);
   /** 拡張ホストが初回の案内を頼んだが、中身がまだ無くて出せていない */
   const [tourPending, setTourPending] = useState(false);
-  /** 案内を始める前の一覧と図。終わったら戻す */
-  const viewBeforeTour = useRef<View>(view);
   const [helpOpen, setHelpOpen] = useState(false);
+  /**
+   * 案内を始める前の画面の様子。案内は一覧と図を切り替え、見本の行と関係の欄を開き、絞り込みを外すので、
+   * 閉じたらこれに戻す。**案内の間の一覧と図の切り替えは控え（`saveView`）に書かない**（途中でタブを
+   * 閉じたときに、次から図で開く、ということを起こさない）。
+   */
+  const beforeTour = useRef<TourSnapshot | undefined>(undefined);
+
 
   const { draft, open, more } = editing;
   const page = pageOf(data);
@@ -153,10 +168,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   useEffect(() => {
     if (tourPending && data.kind === "page") {
       setTourPending(false);
-      viewBeforeTour.current = view;
-      setTouring(true);
+      if (!touring) {
+        beforeTour.current = { view, find, open: editing.open, more: editing.more, data };
+        setTouring(true);
+      }
     }
-  }, [tourPending, data.kind, view]);
+  }, [tourPending, data, view, find, editing, touring]);
 
   /**
    * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
@@ -258,62 +275,71 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setFocusKey(row.key);
   };
 
-  /**
-   * 種類を足す。**図を見ていても一覧へ移す。** 足した種類は id が空で図に出ないので、図のままだと
-   * 押しても何も変わらないように見える。絞り込みも外す（id が空の行は絞り込みに当たらず隠れる）。
-   */
   const startTour = (): void => {
-    viewBeforeTour.current = view;
+    beforeTour.current = { view, find, open, more, data };
     setHelpOpen(false);
     setTouring(true);
   };
 
-  /** 案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストに伝え、次からは初回の案内を出さない */
+  /** 案内を閉じた（最後まで見ても、途中でやめても）。前の様子に戻し、拡張ホストに伝える（次からは初回の案内を出さない） */
   const endTour = (): void => {
     setTouring(false);
-    showView(viewBeforeTour.current);
+    const was = beforeTour.current;
+    if (was !== undefined) {
+      setView(was.view);
+      setFind(was.find);
+      if (was.data === data) {
+        setEditing((now) => ({ ...now, open: was.open, more: was.more }));
+      }
+    }
+    beforeTour.current = undefined;
     post({ type: "tourDone" });
   };
 
-  /** 案内で行を指すための下ごしらえ。関係（overlap / requires / after）を持つ最初の行（無ければ最初の行）を開き、関係の欄も開く */
-  const linked = (phase: PhaseForm): boolean => phase.overlap.length + phase.requires.length + phase.after.length > 0;
-  const openSample = (): string | undefined => {
-    const row = draft.rows.find((item) => linked(item.phase) && item.phase.id.trim() !== "") ?? draft.rows[0];
-    if (row === undefined) {
-      return undefined;
+  /** 案内の間の一覧と図の切り替え。控えには書かない */
+  const peekView = (next: View): void => setView(next);
+
+  /** 案内で指す見本の行。関係（overlap / requires / after）を持つ最初の行、無ければ最初の行 */
+  const sample = draft.rows.find((item) => item.phase.id.trim() !== "" && item.phase.overlap.length + item.phase.requires.length + item.phase.after.length > 0) ?? draft.rows[0];
+
+  /** 見本の行とその関係の欄を開く。絞り込みで隠れないよう外す（閉じたら戻す） */
+  const openSample = (): void => {
+    if (sample === undefined) {
+      return;
     }
     setFind("");
-    setEditing((now) => ({ ...now, open: new Set([...now.open, row.key]), more: new Map(now.more).set(row.key, true) }));
-    return row.key;
+    setEditing((now) => ({ ...now, open: new Set([...now.open, sample.key]), more: new Map(now.more).set(sample.key, true) }));
   };
-  const sampleKey = (draft.rows.find((item) => linked(item.phase) && item.phase.id.trim() !== "") ?? draft.rows[0])?.key;
 
   const tourSteps: readonly TourStep[] = [
     {
       target: "#phases",
       title: "フェーズの種類",
-      body: "親チケットの計画（plan:）に並べる工程の型。行を押すと欄が開き、「＋ 種類を追加」で増やせる。",
-      before: () => showView("list"),
+      body: "工程の型。作業（work）の種類は親チケットの計画 plan: に、フィードバック対応（feedback）の種類はレビューのあとの feedback: に並べる。行を押すと欄が開き、「＋ 種類を追加」で増やせる。",
+      before: () => peekView("list"),
     },
     {
-      target: sampleKey === undefined ? "#phases" : `.phase[data-key="${sampleKey}"] details.more`,
+      target: sample === undefined ? "#phases" : `.phase[data-key="${sample.key}"] details.more`,
       title: "ほかの種類との関係",
-      body: "並行できる種類・一緒に必要な種類・先に済ませる種類を、チェックで選ぶ。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になる。",
+      body:
+        sample === undefined
+          ? "種類を足して行を開くと「ほかの種類との関係」の欄があり、並行できる種類・一緒に必要な種類・先に済ませる種類をチェックで選べる。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になる。"
+          : "並行できる種類・一緒に必要な種類・先に済ませる種類を、チェックで選ぶ。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になる。",
       before: () => {
-        showView("list");
+        peekView("list");
         openSample();
       },
     },
     {
       target: "#f-order",
       title: "全体計画の待ち方",
-      body: "sequential は plan: に並べた順に一つずつ進む。dag は after でつないだ種類だけを待ち、つながっていない種類は並行して進む。",
+      body: "sequential は plan: に並べた順に一つずつ進む。dag は after でつないだ種類だけを待ち、つながっていない種類は並行して進む。層のどれかが sequential なら、判定は sequential で待つ。",
     },
     {
       target: "#phase-graph",
       title: "図",
       body: "矢印が after の流れ、実線が一緒に必要、破線が並行できる関係。作業（work）とフィードバック対応（feedback）は枠で分かれ、枠の間の矢印はレビュー後の順を表す。点を押すと一覧のその行へ移る。",
-      before: () => showView("graph"),
+      before: () => peekView("graph"),
     },
     {
       target: "#save",
@@ -324,10 +350,14 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       target: '[data-action="help"]',
       title: "ヘルプ",
       body: "細かい説明はここから開く。この案内も、ここからもう一度見られる。",
-      before: () => showView(viewBeforeTour.current),
+      before: () => peekView(beforeTour.current?.view ?? view),
     },
   ];
 
+  /**
+   * 種類を足す。**図を見ていても一覧へ移す。** 足した種類は id が空で図に出ないので、図のままだと
+   * 押しても何も変わらないように見える。絞り込みも外す（id が空の行は絞り込みに当たらず隠れる）。
+   */
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
@@ -431,6 +461,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             data-action="help"
             title="この画面の説明と案内"
             aria-expanded={helpOpen}
+            aria-controls="help"
             onClick={() => setHelpOpen(!helpOpen)}
           >
             ？ ヘルプ
@@ -488,7 +519,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <>
             <Graph graph={graph} onPick={pick} />
             <Legend />
-            {graphNotices(graph).map((notice) => (
+            {graphNotices(graph, formOf(draft), page?.layer === true).map((notice) => (
               <p key={notice} className="graph-note">
                 {notice}
               </p>

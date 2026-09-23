@@ -267,8 +267,12 @@ export function Legend(): JSX.Element {
         {line("rel-overlap", false)}並行できる（overlap）
       </li>
       <li>
-        <span className="legend-box" aria-hidden="true" />
-        区分（work / feedback）。枠の間の矢印はレビュー後の順
+        <span className="legend-box" data-kind="work" aria-hidden="true" />
+        <span className="legend-box" data-kind="feedback" aria-hidden="true" />
+        区分の枠（作業 / フィードバック対応）
+      </li>
+      <li>
+        {line("review", true)}レビュー後（枠の間）
       </li>
     </ul>
   );

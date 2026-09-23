@@ -64,7 +64,8 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     assert.match(legend, /先に済ませる（after）/);
     assert.match(legend, /一緒に必要（requires）/);
     assert.match(legend, /並行できる（overlap）/);
-    assert.match(legend, /枠の間の矢印はレビュー後の順/);
+    assert.match(legend, /区分の枠（作業 \/ フィードバック対応）/);
+    assert.match(legend, /レビュー後（枠の間）/);
     // docs の requires はこのファイルに無い種類を指すので、線にしていないと件数で言う
     const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
     assert.deepEqual(notes.length, 1);
@@ -83,7 +84,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
   // sequential なのに after がある。矢印が判定に効かないことを言う
   const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
   try {
-    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、矢印（after）は判定に効かない/);
+    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効かない/);
   } finally {
     await seq.close();
   }

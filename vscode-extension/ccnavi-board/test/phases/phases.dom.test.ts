@@ -375,32 +375,65 @@ test("CB-D86 図を見ているときに種類を足すと、一覧へ移って�
   }
 });
 
-test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。図に移った表示は元に戻る", async () => {
-  const dom = await openPhases();
+test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは控えに書かない", async () => {
+  const dom = await openPhases({}, { view: "graph" });
   try {
+    assert.ok(dom.one("#phases").classList.contains("hidden"), "図で始まっていない");
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.ok(!dom.one("#phases").classList.contains("hidden"), "1 段目で一覧に切り替わっていない");
     const titles = [dom.one("#tour-title").textContent];
     for (let i = 0; i < 5; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
       titles.push(dom.one("#tour-title").textContent);
-      if (titles[titles.length - 1] === "図") {
-        // 図の段では図に切り替わっている
-        assert.ok(dom.one("#phases").classList.contains("hidden"));
+      if (i === 0) {
+        // 関係の段で、関係を持つ行（design）と、その関係の欄が開いている
+        assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
       }
     }
     assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ"]);
-    // 関係の段で、関係の欄を持つ行と、その関係の欄が開いている
-    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
-    assert.equal(dom.one('[data-action="tour-next"]').textContent, "終わる");
+    // 途中の一覧と図の切り替えは控えに書かない（途中でタブを閉じても、次は元の図で開く）
+    assert.equal((dom.state() as { view?: string }).view, "graph");
+    // 最後の段は「完了」だけ（同じ働きのボタンを 2 つ並べない）
+    assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");
+    assert.equal(dom.all('[data-action="tour-skip"]').length, 0);
     dom.click(dom.one('[data-action="tour-next"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
-    assert.ok(!dom.one("#phases").classList.contains("hidden"), "案内の前の一覧に戻っていない");
+    assert.ok(dom.one("#phases").classList.contains("hidden"), "案内の前の図に戻っていない");
+    // 案内が開いた見本の行も閉じる
+    assert.equal(dom.all(".phase.open").length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡り、焦点は「次へ」から始まる。閉じたら絞り込みも戻る", async () => {
+  const dom = await openPhases();
+  try {
+    dom.type(dom.one("#find"), "設計");
+    await dom.settle();
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+    // 2 段目：スキップ・戻る・次へ
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
+    dom.key("Tab");
+    await dom.settle();
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-skip"]'), "Tab が吹き出しの外へ出た");
+    dom.document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    await dom.settle();
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
+    // 見本の行を出すために外した絞り込みは、閉じたら戻る
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "設計");
   } finally {
     await dom.close();
   }
@@ -438,6 +471,8 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出し、そこ�
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
+    // ヘルプから始めた案内も、やめたら tourDone を返す
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
   } finally {
     await dom.close();
   }

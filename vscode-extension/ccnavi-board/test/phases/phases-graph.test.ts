@@ -168,3 +168,17 @@ test("CB-T197 dag で after が循環しても止まらず、並べ方も切り�
   assert.equal(graph.order, "dag");
   assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 });
+
+test("CB-T211 線にしなかった参照は、同じ種類・同じ関係・同じ id を 1 件に数え、自分自身と空と id の無い行は数えない", () => {
+  const graph = graphOf(
+    form(
+      phase("a", { requires: ["ghost", " ghost ", ""], overlap: ["ghost", "a"], after: ["b"] }),
+      phase("b", { after: ["外"] }),
+      phase("", { requires: ["ghost"] }),
+      // 同じ id の 2 つ目は図に出ないので、その参照も数えない
+      phase("b", { requires: ["ghost2"] }),
+    ),
+  );
+  // a の requires の ghost（2 度書いて 1 件）、a の overlap の ghost（関係が違うので別に 1 件）、b の after の 外
+  assert.equal(graph.dropped, 3);
+});

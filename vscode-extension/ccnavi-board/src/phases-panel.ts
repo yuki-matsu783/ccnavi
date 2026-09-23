@@ -35,7 +35,6 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { markTourSeen, tourSeen } from "./tour.js";
 import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
@@ -47,6 +46,7 @@ import { showLoading } from "./loading.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { requireTickets } from "./ticket-control.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
