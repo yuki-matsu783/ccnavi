@@ -204,15 +204,6 @@ class EveryTest(unittest.TestCase):
         # 子の 3 回は親の数えを進めていない（親の 4 回目は渡す回ではない）。
         self.assertEqual(self.hit(session="s1"), "")
 
-    def test_an_old_array_state_file_still_reads(self):
-        """古い形（配列）の控えを読んでも落ちず、渡した控えとして読む。"""
-        write(os.path.join(self.state, "once-s1-main.json"), json.dumps({"given": ["src"]}))
-        self.rules(rule("src", additionalContextOnce=ONCE))
-        self.assertEqual(self.hit(session="s1"), "")
-        self.assertNotIn("控えを読めない", (self.last.stderr if self.last else ""))
-        # 控えの無いセッションには今までどおり渡る。
-        self.assertEqual(self.hit(session="s2"), ONCE)
-
     def test_no_state_dir_delivers_every_time(self):
         """`--state ""` のときは数えを覚えられないので、渡す回を刻まず毎回渡す。"""
         self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=5))

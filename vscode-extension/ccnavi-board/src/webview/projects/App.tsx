@@ -22,7 +22,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
    * 消える条件は 2 つ。**失敗（`failed`）は次の一覧が届いたら消す。** 一覧が新しくなった後も
    * 「プロジェクト X が一覧に無い」が赤く残ると、人はいまも失敗していると読む。
    * 案内（`info`）は残す。clone を送った直後は `.git` の出現で必ず読み直しが走るので、
-   * ここで消すと案内が一瞬で消える（移行前がそれだった）
+   * ここで消すと案内が一瞬で消える
    */
   const [status, setStatus] = useState<CloneStatus | undefined>(undefined);
   const [openMenu, setOpenMenu] = useState<string | undefined>(undefined);

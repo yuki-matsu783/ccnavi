@@ -200,9 +200,7 @@ def _once_path(state_dir: str, session: str, agent_id: str) -> str:
 def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[str, int] | None:
     """この文脈で、どのルールが何回当たったか。まだ無ければ空、**読めなければ None**。
 
-    `given` は「鍵 → 回数」。古い版の ccnavi が書いた形（鍵の並び）は「1 回当たった」
-    として読む。`every` を書かないルールでは 1 回でも「once は渡した」になるので、
-    古い控えを引き継いだセッションの見え方は今までと変わらない。
+    `given` は「鍵 → 回数」。
 
     「まだ無い」と「読めない」を分けて返すのは、呼ぶ側が上書きしてよいかを
     決められるようにするため。同じ扱いにすると、読めなかった回に「まだ 1 回も
@@ -217,8 +215,6 @@ def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[st
             return None
         return {}
     given = data.get("given") if isinstance(data, dict) else None
-    if isinstance(given, list):
-        return {s: 1 for s in given if isinstance(s, str)}
     if not isinstance(given, dict):
         return {}
     return {k: n for k, n in given.items() if isinstance(k, str) and isinstance(n, int)}

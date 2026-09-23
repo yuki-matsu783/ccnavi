@@ -320,8 +320,8 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。人にも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない）。「ルールが言及していない呼び出し」。この門に `dry-run` は無く、それ以外の値は `enable` として動いて `--lint` が言う |
 | `CCNAVI_BIN_PATH` | hook が起動する ccnavi 自身。指定すると守る対象に入る。既定は無い（導入スクリプトは `.ccnavi/scripts/ccnavi-launcher.sh` と書く。これは振り分けの sh で、実行ファイルは sh の 1 つ上の `bin/<os>-<arch>/`、つまり `.ccnavi/bin/<os>-<arch>/` に入る。「実行ファイルとルールを配る」）。拡張子は書かない。Windows で PyInstaller が付ける `.exe` は ccnavi が補うので、拡張子なしの 1 行が 3 つの環境すべてで当たる |
-| `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/proposals`。そのツリーの git が追跡する。既定は以前 `wip/tickets` だった（承認済みチケットの置き場と名前が同じで読み分けられなかったため）。旧の置き場だけが残っているツリーは提案が走査されないので、`--lint` が warn で名指しする。ディレクトリを改名するか、この env に `wip/tickets` と書けば実行ファイルは元のまま動く。ただし VS Code 拡張が提案の変化を見る場所は既定の綴りで固定してあり、この env を読まない。旧の綴りのままにすると、ボードは開いた時点の中身は正しく出すが、以後の提案の増減で自動更新されず、手で「更新」を押すことになる |
-| `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/approved`（ccnavi ディレクトリの下。以前の `.ccnavi/tickets` に残ったものは `--lint` が名指しする）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
+| `CCNAVI_TICKETS_PROPOSAL` | チケットの提案の置き場。各ツリーのルートからの相対。既定は `wip/proposals`。そのツリーの git が追跡する。ただし VS Code 拡張が提案の変化を見る場所は既定の綴りで固定してあり、この env を読まない。既定から動かすと、ボードは開いた時点の中身は正しく出すが、以後の提案の増減で自動更新されず、手で「更新」を押すことになる（承認済みチケットの置き場は別に見ているので、承認は反映される） |
+| `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/approved`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL` の仕事。空で書いてあれば `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
 | `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。この env が動かす ccnavi ディレクトリの名前を差し替える `--project-home` も同じ門に載る。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、落としたことを標準エラーに出す |
@@ -1203,6 +1203,11 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。ルー�
 どれかを含むルールが、そのまま「この場所に書かせない」の宣言になる。
 宣言を 2 か所に分けると必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
 
+例外は ccnavi 自身の書き込み。記録と控えの置き場は最初から外れ、チケットの置き場
+（提案と承認済みチケット）は、`ticket start` / `done` や `review request` / `ready` が書いたと
+**内容から読めるぶんだけ**外れる（ADR-0075）。スクリプトだけが書く欄以外が変わっていれば、
+つまり作業範囲や親やフェーズが変わっていれば、今までどおり報告する。
+
 ```
 [ccnavi] POST_VIOLATION (rule: guard-config)
 path: .ccnavi/common/probe.json (?? / new)
@@ -1999,8 +2004,8 @@ factors:
 
 ### 参考にした運用
 
-`参考/issue-mr-ticket-workflow` の運用層（`ticket.sh` / `worktree.sh` / `boundary.sh`）から
-抜いて改めた。何を採り何を採らなかったかは [ADR-0025](docs/adr/0025-reference-workflow.md)。
+運用層は `参考/issue-mr-ticket-workflow`（`ticket.sh` / `worktree.sh` / `boundary.sh`）を
+もとにしている。何を採り何を採らなかったかは [ADR-0025](docs/adr/0025-reference-workflow.md)。
 
 ## ルールファイルが読めないとき
 
@@ -2454,13 +2459,13 @@ ccnavi --explain --json
 | 鍵 | 何 |
 |---|---|
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
-| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null` |
+| `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null` |
 | `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`） |
 | `blocked` | 空でなければ「読めるが信じられない」理由（ADR-0058）。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`。`.claude/worktrees/<識別子>` が本物のワークツリーか（設計 §9.5 の相互参照） |
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、親の提案が写っているのが普通 |
-| `scattered[]` | どれが本物か決まらない写りの全部。`{tree, state, path}`。権威のツリー（親のツリー。親自身なら自分のツリー）で畳んで 2 つ以上残ったときだけ入り、決まっていれば空。`--lint` が ERROR で「複数の場所にある」と言うのと同じ条件。写りがあること自体は普通なので `seen_in` の数は食い違いを意味しない |
+| `scattered[]` | どれが本物か決まらない写りの全部。`{tree, state, path}`。決まっていれば空。権威のツリー（親のツリー → 元ツリーの順。ADR-0073）で畳んで 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR で言う条件と同じ（同じ関数を通る）。写りがあること自体は普通なので `seen_in` の数は食い違いを意味しない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 
 `parents[]` の 1 件。

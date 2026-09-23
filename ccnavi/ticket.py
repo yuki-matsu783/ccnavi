@@ -7,7 +7,7 @@
 止められた側が止め方を書き換えられる仕組みは、止めていない。
 
 判定が使うのは承認済みチケット（approval.py）だけ。作業ツリーの提案は、人に見せて
-承認を求めるためのもので、承認されるまで判定には 1 ミリも効かない。承認されたあとに
+承認を求めるためのもので、承認されるまで判定には効かない。承認されたあとに
 提案を書き換えても、効いているのは承認済みチケットの側なので範囲は広がらない。
 
 ## 絞ることしかできない
@@ -101,8 +101,6 @@ CLOSED = (DONE, CANCELLED)
 FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (REVIEW,)
-# 旧の置き場の状態（ADR-0054 まで）。`--lint` が残りを名指しするときにだけ使う。
-LEGACY_STATES = ("todo", "doing", "done", "cancelled")
 
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
@@ -653,7 +651,8 @@ def combine(child: str, parent: str) -> str:
 def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     """ツリーのルートからの相対パスが、チケットの置き場の下にあるか。
 
-    置き場は提案の置き場（`CCNAVI_TICKETS`）と承認済みチケットの置き場（`CCNAVI_APPROVED`）。
+    置き場は提案の置き場（`CCNAVI_TICKETS_PROPOSAL`）と承認済みチケットの置き場
+    （`CCNAVI_TICKETS_APPROVED`）。
     ここはチケットの範囲の外でも咎めない。咎めると、親が自分のワークツリーに次の子を
     提案する道と、承認がブランチに乗る道が塞がる。
 
@@ -663,14 +662,46 @@ def is_ticket_place(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
     同じく、どの機械でも区別しない。
 
-    呼ぶのは `is_unscoped` 1 本で、判定の側はそちらを通す。
+    実行前の判定は `is_unscoped` を通ってここへ来る。実行後の監視とサブエージェント終了時の
+    検査は直に呼ぶ（`post._script_writes` / `post._committed_findings` / `post.ScopeGuard.finding`、
+    `phase.scope_findings`）。
+
+    **実行後の監視から呼ぶときは、後ろに組み込みは控えていない。** 組み込みを足すのは
+    `judge` だけで、実行後のルール集合には入らない。だから呼び出しごとの監視は、置き場を
+    そのまま外さずに、内容で外すぶんを決める（`script_shape`、`post._script_writes`）。
     """
-    here = _fold(rel.replace("\\", "/"))
-    for place in (tickets_rel, approved_rel):
-        base = _fold(place.replace("\\", "/").strip("/"))
-        if base and here.startswith(base + "/"):
-            return True
-    return False
+    return any(_under(rel, place) for place in (tickets_rel, approved_rel))
+
+
+def _under(rel: str, place_rel: str) -> bool:
+    """ツリーのルートからの相対パスが、その置き場の下にあるか。
+
+    前置は `/` の境で切る（`wip/proposalsX/` は置き場ではない）。大文字小文字は範囲の照合と
+    同じく、どの機械でも区別しない。
+    """
+    base = _fold(place_rel.replace("\\", "/").strip("/"))
+    return bool(base) and _fold(rel.replace("\\", "/")).startswith(base + "/")
+
+
+def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
+    """チケットが `done` / `cancel` / 人のレビューで出ていく元（作業中とレビュー待ち）か。
+
+    移動の組を数えるとき、消えた側がここに居たことを求める。求めないと、承認待ちの提案
+    （`todo/`）を `review/` に置き直す形——人の承認を通っていないものを、レビュー待ちに
+    見せる形——が移動として外れる。
+    """
+    return _under(rel, f"{approved_rel}/{DOING}") or _under(rel, f"{tickets_rel}/{REVIEW}")
+
+
+def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
+    """`done` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
+
+    実行後の監視が、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
+    行き先をこの 2 つに絞るのは、`doing/` から出したチケットを `todo/` に置き直す形が
+    「承認済みチケットを消す」のと同じ効き目を持つから。承認済みチケットが 1 本も無い
+    ワークツリーは範囲を持たず、範囲を持たないツリーはチケットの側から何も言われない。
+    """
+    return _under(rel, f"{tickets_rel}/{REVIEW}") or _under(rel, f"{approved_rel}/{DONE}")
 
 
 # 下書きと使い捨ての置き場。ツリーのルートの直下 1 段で、名前は固定。設定で動かさない。
@@ -711,7 +742,8 @@ def is_unscoped(rel: str, tickets_rel: str, approved_rel: str) -> bool:
     足りる。ここで通せば下書きは書けるので、これが機能の全部になる。
 
     実行後の監視（`post`）とサブエージェント終了時の検査（`phase.scope_findings`）は
-    下書きの置き場を外さず、`is_ticket_place` だけを通す。外し方を揃えないのは、
+    下書きの置き場を外さない。チケットの置き場の外し方も同じではなく、呼び出しごとの監視は
+    内容で決める（`post._script_writes`）。外し方を揃えないのは、
     **揃える意味がその 2 か所には無い**から。どちらも入力は `git status`
     （`--ignored` を付けない）と `base_sha..HEAD` の差分（追跡ファイルだけ）で、
     追跡から外れている `scratchpad/` はそこに 1 本も現れない。つまり正しく設定された
@@ -815,12 +847,92 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
 
     子のワークツリーは親のブランチから切るので、親の `wip/proposals/` がそのまま
     写っている。権威は親のツリー（親自身なら自分のツリー）の側。そこに 1 つ
-    あればそれが本物で、残りは写し。そこに無いときは全部残る。残りが 2 つ以上に
-    なったら、どれが本物か決まらない（検証が「複数の場所にある」と言う状態）。
+    あればそれが本物で、残りは写し。
+
+    親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
+    そのプロジェクト）の側を採る。ワークツリーは畳めば消えるが、元ツリーは消えない。
+    親のワークツリーを作る前と、合流して畳んだ後がこの形で、ここで落ち先を決めないと、
+    片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
+
+    **ただし、元ツリーより先の置き場に在る写しが 1 つでもあれば採らない。** 元ツリーを
+    権威にしてよい根拠は「他の写しは合流の結果で、同じか手前の状態」であって、合流
+    していないワークツリーで先に進んだ写し（親のツリーで閉じ、子のツリーが取り込んだ形）
+    があるときは成り立たない。そこで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
+    記録を別の差分で書き直す。決めずに残し、人に合流させる。
+
+    どちらも持っていなければ全部残る。残りが 2 つ以上になったら、どれが本物か
+    決まらない（検証が「複数の場所にある」と言う状態）。
+
+    リポジトリをまたいだ衝突は畳まない。識別子は人が選ぶ短い連番なので、プロジェクトが
+    独立に振ればぶつかる（設計 §11）。それは写しではなく別物なので、どちらかを権威に
+    すると、もう片方が黙って消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
+    if len({t.project for t in hits}) > 1:
+        return hits
     home = hits[0].parent or hits[0].ticket
     at_home = [t for t in hits if t.tree == home]
-    return at_home if at_home else hits
+    if at_home:
+        return at_home
+    at_origin = [t for t in hits if t.tree == origin_tree(t)]
+    if not at_origin or behind(at_origin, hits):
+        return hits
+    return at_origin
+
+
+def origin_tree(t: Ticket) -> str:
+    """このチケットの元ツリーの名前。ワークスペースなら空、プロジェクトならその名前。
+
+    ワークツリーの名前は識別子だが、元ツリーの名前はプロジェクトの名前（ワークスペース
+    から切ったものなら空）。`tree.Tree.name` と同じ綴りで並ぶ。
+    """
+    return t.project or tree.MAIN
+
+
+def progress(state: str) -> int:
+    """置き場の進み具合。`todo` < `doing` < `review` < `done`。空は `doing` として読む。
+
+    承認済みチケットの写しは置き場を持たないことがある（`state` が空）。判定と同じく
+    作業中として数える。
+    """
+    order = (TODO, DOING, REVIEW, DONE)
+    state = state or DOING
+    if state == CANCELLED:
+        state = DONE  # 取り消しも閉じた側。置き場は `done/`
+    return order.index(state) if state in order else 0
+
+
+def behind(some: list[Ticket], hits: list[Ticket]) -> bool:
+    """`some` より先の置き場に在る写しが `hits` にあるか。"""
+    return max(progress(t.state) for t in hits) > max(progress(t.state) for t in some)
+
+
+def collided_states(states: list[str]) -> list[str]:
+    """1 つのツリーの中で、どれが本物か決まらない置き場の並び。決まっていれば空。
+
+    同じ識別子が 2 つの置き場に在るのは、動かす途中で止まった跡（写せたが消せなかった）。
+    ただし `todo/` は親の改版の途中なので、承認済みチケットと並んでいてよい。
+    `--lint` の ERROR と、ボードの `scattered` が同じ数え方をするためにここに置く。
+    """
+    distinct = sorted(set(states))
+    if len(distinct) > 1 and TODO not in distinct:
+        return distinct
+    if len(states) > 1 and len(distinct) < len(states):
+        return states
+    return []
+
+
+def collisions(hits: list[Ticket]) -> list[Ticket]:
+    """どれが本物か決まらない写りの全部。決まっていれば空。
+
+    畳んで 2 つ以上残り、かつその残りが `collided_states` に当たるときだけ入る。
+    状態の操作が「複数の場所にある」で止まるのと、`--lint` が ERROR で言うのと、
+    同じ条件（`lint._proposal_problems` も同じ関数を通る）。写りがあること自体は
+    普通なので、畳んで 1 つに決まる写りは数えない。
+    """
+    folded = fold(hits)
+    if len(folded) > 1 and collided_states([t.state for t in folded]):
+        return folded
+    return []
 
 
 def by_ticket(found: list[Ticket]) -> dict[str, list[Ticket]]:
@@ -918,8 +1030,8 @@ def propose_notice(
     書いた直後に、要る場所で言う。
 
     **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
-    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形も
-    試したが、次の 3 つを一緒に引き受けることになるのでやめた。
+    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形は
+    採らない。次の 3 つを一緒に引き受けることになるため。
 
     - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの倒し方
       （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
@@ -966,7 +1078,7 @@ def _propose_rule(tickets_rel: str, bin_path: str) -> rules.Rule:
         id=PROPOSE_RULE_ID,
         additional_context_once=(
             f"チケットの提案を書こうとしています（{tickets_rel}/todo/ は承認待ちの置き場で、"
-            "ここに書いただけでは判定に 1 ミリも効きません）。"
+            "ここに書いただけでは判定には効きません）。"
             "利用者に承認を依頼する前に、"
             f"'{settings.bin_command(bin_path)} --approve --preview --verify <識別子>' で"
             "承認できる状態かを確かめてください。承認済みチケットは置きません。"
@@ -1001,6 +1113,75 @@ def set_fields(text: str, fields: dict[str, str]) -> str:
         lines.insert(end, f"{key}: {_yaml_scalar(value)}")
         end += 1
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def script_fields_set(text: str) -> tuple[str, ...]:
+    """その版が既に値を持っている、スクリプトの欄。
+
+    姿を突き合わせる側が「落としてよい欄」を決めるのに使う（`post._script_writes`）。
+    **落としてよいのは、コミット済みの版がまだ持っていない欄だけ。** 副命令はどれも
+    1 度しか書かない（`ops.start` は着手済みを拒む）ので、既に値がある欄が変わったのなら、
+    それは副命令の仕業ではない。
+
+    とくに `base_sha` は、サブエージェント終了時の検査（`phase.scope_findings` の
+    `base_sha..HEAD`）と実績リスク（`risk.measure`）の基準点。ここを書き換えられると、
+    コミット済みの範囲外の変更が検査から消える。落とす欄を「いつでも」にすると、その
+    書き換えが実行後の監視からも消える。
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FENCE:
+        return ()
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == FENCE), None)
+    if end is None:
+        return ()
+    held = []
+    for line in lines[1:end]:
+        if line.startswith((" ", "\t")) or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if key.strip() in SCRIPT_FIELDS and value.strip():
+            held.append(key.strip())
+    return tuple(held)
+
+
+def script_shape(text: str, drop: tuple[str, ...] = SCRIPT_FIELDS) -> str | None:
+    """frontmatter を持つチケットなら、`drop` の欄を落とした姿を返す。無ければ None。
+
+    実行後の監視が「この変更は ccnavi の副命令が書いたぶんか」を、台帳ではなく内容で
+    答えるのに使う（`post._script_writes`）。台帳を持たないのは、承認とマーカーが親の
+    ブランチに乗って別の機械へ届くため。台帳はワークスペース側にあって git に入らないので、
+    clone した続きでは 1 件も残っていない。内容で見るなら、どの機械でも同じ答えになる。
+
+    落とすのは `drop` に挙げた欄の行と、その欄の値として続く字下げの行だけ。`drop` は
+    `SCRIPT_FIELDS` の部分集合で、決めるのは呼ぶ側（`script_fields_set` を引いて、
+    コミット済みの版がまだ持っていない欄だけを渡す）。範囲
+    （`allow` / `ask` / `deny`）も `parent` も `project` も `phase` も本文も残るので、
+    そこが 1 文字でも変われば別の姿になり、監視は今までどおり報告する。
+
+    切り出し方は `set_fields` と揃える。あちらが行単位で書き換えるので、こちらも行単位で
+    落とす。揃えないと、スクリプトが書いた直後の姿が「スクリプトが書いていない形」に見える。
+
+    frontmatter を持たないもの（マーカー、`.risk.json`、閉じの記録）は None。範囲を
+    宣言しないので、正規の設置と偽の設置を内容からは見分けられない。**そこは外れる。**
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FENCE:
+        return None
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == FENCE), None)
+    if end is None:
+        return None
+    kept, dropping = [], False
+    for i, line in enumerate(lines):
+        if not 1 <= i < end:
+            kept.append(line)
+            continue
+        indented = line.startswith((" ", "\t"))
+        if dropping and indented:
+            continue
+        dropping = not indented and line.split(":", 1)[0].strip() in drop
+        if not dropping:
+            kept.append(line)
+    return "\n".join(kept)
 
 
 def insert_front(text: str, key: str, value) -> str:

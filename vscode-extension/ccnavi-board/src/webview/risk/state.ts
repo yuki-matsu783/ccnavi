@@ -5,9 +5,8 @@
  * 並べ替えの間、React が同じ行を同じ行として描き直せるように）。id は人が打つもので、
  * 空にも重複にもなるので鍵には使えない。鍵は画面の中だけのもので、拡張ホストへは渡さない。
  *
- * 開いている項目の控えは Webview の state（`{ open: [id, …] }`）。移行前と同じ形にしてある。
- * 入れ替えたときに、開いていた行が畳まれないように。**控えるのは id** で、鍵は画面を
- * 作り直すと変わるため。id が空の行は控えられない（移行前と同じ）。
+ * 開いている項目の控えは Webview の state（`{ open: [id, …] }`）。**控えるのは id** で、
+ * 鍵は画面を作り直すと変わるため。id が空の行は控えられない。
  */
 import type { FactorForm, LevelName, RiskForm } from "../../core/risk-view.js";
 import { getState, setState } from "../vscode.js";
@@ -23,7 +22,7 @@ export interface Draft {
   readonly rows: readonly Row[];
 }
 
-/** 鍵を配る。1 枚の画面の中で数え上げる（`f1`、`f2`、…。移行前の綴りと同じ） */
+/** 鍵を配る。1 枚の画面の中で数え上げる（`f1`、`f2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {
@@ -42,7 +41,7 @@ export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }
 
-/** 新しい項目。当て方の既定は移行前と同じ `lines_over` */
+/** 新しい項目。当て方の既定は `lines_over` */
 export function emptyFactor(): FactorForm {
   return { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" };
 }

@@ -304,6 +304,34 @@ def restore_committed(top: str, path: str, timeout: float = TIMEOUT_SECONDS) -> 
     return _git(top, ["restore", "--staged", "--worktree", "--", path], timeout)
 
 
+def committed_text(
+    top: str, path: str, timeout: float = TIMEOUT_SECONDS
+) -> tuple[str | None, bool]:
+    """HEAD に入っているその 1 本の中身と、読めたかどうか。
+
+    返すのは `(中身, 読めた)`。HEAD にその綴りが無ければ `(None, True)`——「無い」は
+    読めた答えなので、読めなかったことにしない。git を起こせない・期限に達した・
+    HEAD そのものが無いときは `(None, False)`。
+
+    **呼ぶ側は「読めなかった」を「変わっていない」に倒してはいけない。** ここを倒すと、
+    git を 2 秒止めるだけで、突き合わせの上に建てた除外が全部通る。
+
+    無いことの確かめに `ls-tree` をもう 1 回起こすのは、`show` の失敗が「HEAD に無い」
+    なのか「HEAD が無い」なのかを、文面を読まずに分けるため。git の文面は言語設定で
+    変わるので、そこで分けると機械によって答えが変わる。起こす回数が増えるのは、
+    新しく現れたファイルがチケットの置き場にあった回だけ。
+    """
+    done = gitcmd.run(top, ["show", f"HEAD:{path}"], timeout)
+    if done.ok:
+        return done.out, True
+    if done.failure:
+        return None, False
+    listed = gitcmd.run(top, ["ls-tree", "-z", "HEAD", "--", path], timeout)
+    if not listed.ok:
+        return None, False
+    return (None, True) if not listed.out.strip("\0").strip() else (None, False)
+
+
 def _git(top: str, args: list[str], timeout: float) -> str:
     done = gitcmd.run(top, args, timeout)
     if done.failure:

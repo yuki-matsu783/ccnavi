@@ -89,11 +89,11 @@ def common_path(root: str, kind: str) -> str:
 def fixture_workspace(name: str = "rules.yml") -> str:
     """`tests/fixtures/<name>` を共通層のルールに据えたワークスペースルート。
 
-    受入テストは `--rules` で見本のルールを指していたが、あれは診断でだけ効く
-    （ADR-0067）。`--root` にここを渡して、共通層の既定の置き場から読ませる。
+    `--rules` は診断でだけ効く（ADR-0067）ので、見本のルールを指すのには使わない。
+    `--root` にここを渡して、共通層の既定の置き場から読ませる。
 
-    リポジトリ自身をルートにしていたのをやめる利点もある。走った機械の
-    `.ccnavi/common/rules.yml` が判定に混ざらない。
+    リポジトリ自身をルートにしないので、走った機械の `.ccnavi/common/rules.yml` が
+    判定に混ざらない。
 
     組むのは見本ごとにプロセスで 1 度。中身は読むだけなので使い回してよい。
     """

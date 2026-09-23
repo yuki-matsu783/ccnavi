@@ -75,7 +75,7 @@ allow:
 
 
 def proposal(root: str, place: str, state: str, name: str) -> str:
-    """提案を 1 枚置く。`place` は置き場の相対（`wip/tickets` / `wip/proposals`）。"""
+    """提案を 1 枚置く。`place` は置き場の相対（`wip/proposals`）。"""
     directory = os.path.join(root, *place.split("/"), state)
     return write(directory, name + ".md", TICKET.format(name=name))
 
@@ -300,68 +300,6 @@ class LintTest(unittest.TestCase):
         self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
         self.assertEqual(counts(result.stdout)[0], 0)
 
-    def test_旧い置き場に提案が残っていたらwarnで名指しする(self):
-        # 提案の置き場の既定を wip/tickets から wip/proposals に変えた（ADR-0054）。
-        # 旧の置き場に残った提案は走査されないまま「承認待ちは無い」で通る。
-        # 黙って通る向きなので、検証がここで言う。
-        proposal(self.root, "wip/tickets", "todo", "i0001")
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("wip/tickets", result.stdout)
-        self.assertIn("wip/proposals", result.stdout)
-        self.assertIn("i0001", result.stdout)
-        self.assertIn("CCNAVI_TICKETS_PROPOSAL", result.stdout)
-        self.assertEqual(counts(result.stdout)[0], 0)
-
-    def test_新しい置き場が在っても旧い置き場の残りは名指しする(self):
-        # 置き場の有無だけで決めると、新しい置き場を 1 つ作った時点で旧の残りが
-        # 見えなくなる。移し忘れがいちばん起きるのはこの形（部分移行）。
-        proposal(self.root, "wip/tickets", "doing", "i0001")
-        proposal(self.root, "wip/proposals", "todo", "i0002")
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("i0001", result.stdout)
-
-    def test_移し終えていれば言わない(self):
-        # 移し終えた人に、移し終えたことを毎回言わない。空の置き場が残っていても同じ。
-        os.makedirs(os.path.join(self.root, "wip", "tickets", "todo"))
-        proposal(self.root, "wip/proposals", "todo", "i0001")
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("旧の置き場に残っていて", result.stdout)
-
-    def test_同じ綴りが新しい置き場にもあれば言わない(self):
-        # 写し終えた分。新しい側が走査されるので、旧に残った写しは害が無い。
-        proposal(self.root, "wip/tickets", "todo", "i0001")
-        proposal(self.root, "wip/proposals", "todo", "i0001")
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("旧の置き場に残っていて", result.stdout)
-
-    def test_閉じた承認済みチケットの記録は数えない(self):
-        # done/ cancelled/ に在っても、承認済みチケットが閉じていれば記録として
-        # 残っているだけ。閉じたことの権威は承認済みチケットの側にある。
-        # 数えると、履歴を残した人に毎回同じ 1 行が出て、他の報告ごと読まれなくなる。
-        proposal(self.root, "wip/tickets", "done", "i0001")
-        write(
-            os.path.join(self.root, ".ccnavi", "approved", "done"),
-            "i0001.md",
-            COPY.format(name="i0001"),
-        )
-
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("旧の置き場に残っていて", result.stdout)
-
     def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
         # 動かす途中で止まった跡（写せたが消せなかった）。状態の操作は「複数の場所にある」で
         # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
@@ -474,24 +412,6 @@ class LintTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ccnavi_approved", result.stdout)
         self.assertNotIn("BOM (U+FEFF)", result.stdout)
-
-    def test_綴りを設定で旧いままにしている人には言わない(self):
-        # 置き場を自分で決めた人は、その綴りで動かしている。既定の話は関係が無い。
-        proposal(self.root, "wip/tickets", "todo", "i0001")
-
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            "--tickets",
-            "wip/tickets",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("旧の置き場に残っていて", result.stdout)
 
     def test_版が違うルールはerrorになる(self):
         result = lint(self.root, rules_file(self.root, SOUND, version=99))

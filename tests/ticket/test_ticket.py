@@ -27,7 +27,7 @@ import tempfile
 import unittest
 
 from ccnavi import phase as phase_mod
-from ccnavi import settings, shellread
+from ccnavi import settings, shellread, ticket
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -1291,6 +1291,61 @@ class TicketTest(unittest.TestCase):
         self.assertNotEqual(lint.returncode, 0, lint.stdout)
         self.assertIn("i0001-01 が複数の場所にある", lint.stdout)
 
+    def test_folding_the_parent_worktree_does_not_stop_the_operations(self):
+        """親のワークツリーを畳んでも操作は通る。元ツリーの写しが権威になる。
+
+        承認済みチケットは親のブランチに乗り、合流すると元ツリーにも写る。親のツリーが
+        消えたあとに落ち先を決めないと、残った子のツリーの写しと並んで「どれが本物か
+        決まらない」になり、片付けただけの家族の `start` / `done` が全部止まる。
+        """
+        self.family()
+        git(self.root, "merge", "--quiet", "--no-edit", "i0001")
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+
+        done = self.ccnavi("ticket", "done", "i0001-02")
+
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("複数の場所にある", done.stderr)
+        # 権威が元ツリーなので、置き場の移動も元ツリーに書かれる（ADR-0073 の代償）。
+        moved = os.path.join(self.root, ".ccnavi", "approved", "done", "i0001-02.md")
+        self.assertTrue(os.path.exists(moved), moved)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertNotIn("複数の場所にある", lint.stdout)
+
+    def test_a_copy_ahead_of_the_origin_stops_the_operations(self):
+        """元ツリーより先の置き場に在る写しがあれば、元ツリーを権威にしない。
+
+        親のツリーで閉じ、子のツリーだけがそれを取り込み、元ツリーは 1 つ手前で
+        止まっている形。ここで元ツリーを採ると、閉じた子をもう一度閉じ、リスクの
+        記録を別の差分で書き直す。決めずに止めて、人に合流させる。
+        """
+        self.family()
+        closed = self.ccnavi("ticket", "done", "i0001-02")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "close i0001-02")
+        # 子のツリーは閉じたところまで取り込み、元ツリーは 1 つ手前で止まる。
+        git(
+            os.path.join(self.root, ".claude", "worktrees", "i0001-02"),
+            "merge",
+            "--quiet",
+            "--no-edit",
+            "i0001",
+        )
+        git(self.root, "merge", "--quiet", "--no-edit", "i0001~1")
+        git(self.root, "worktree", "remove", "--force", self.parent_tree)
+
+        again = self.ccnavi("ticket", "done", "i0001-02")
+
+        self.assertNotEqual(again.returncode, 0, again.stdout)
+        self.assertIn("i0001-02 が複数の場所にある", again.stderr)
+        self.assertIn("i0001-02:done", again.stderr)
+        # 次の一手まで言う。写しはどれも追跡されたファイルなので、「1 つにしてから」
+        # だけでは受け取った側にできることが読めない。
+        self.assertIn("合流", again.stderr)
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertIn("i0001-02 が複数の場所にある", lint.stdout)
+
     # 閉じた承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
     CLOSED = (
         "---\n"
@@ -2392,6 +2447,54 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("i0001-01", result.stdout)
         self.assertIn("フェーズ 1", result.stdout)
+
+
+class ScriptShapeTest(unittest.TestCase):
+    """`script_shape` は、スクリプトが書く欄だけを落とす（`post._script_writes` の土台）。"""
+
+    body = '---\nid: i0001\nallow:\n  - match: Write|Edit\n    glob: "src/*"\n---\n本文\n'
+
+    def started(self, extra: str) -> str:
+        return self.body.replace("---\n本文", extra + "---\n本文")
+
+    def test_スクリプトの欄を足しても姿は変わらない(self):
+        after = self.started('started_at: "2026-09-22T00:00:00Z"\nbase_sha: "abc"\n')
+
+        self.assertEqual(
+            ticket.script_shape(after),
+            ticket.script_shape(self.body),
+            "着手の時刻と基準点は ccnavi が書く欄なので、姿に出てはいけない",
+        )
+
+    def test_スクリプトの欄の続きの行も落ちる(self):
+        after = self.started("cancel_reason: |\n  複数行の\n  理由\n")
+
+        self.assertEqual(ticket.script_shape(after), ticket.script_shape(self.body))
+
+    def test_範囲が変われば別の姿になる(self):
+        wider = self.body.replace('glob: "src/*"', 'glob: "*"')
+
+        self.assertNotEqual(ticket.script_shape(wider), ticket.script_shape(self.body))
+
+    def test_本文が変われば別の姿になる(self):
+        self.assertNotEqual(
+            ticket.script_shape(self.body.replace("本文", "別の本文")),
+            ticket.script_shape(self.body),
+        )
+
+    def test_同じ綴りの欄でも字下げされていれば落とさない(self):
+        # 範囲の中に `started_at:` と書いても、欄ではないので姿に残る。
+        nested = self.body.replace('    glob: "src/*"', '    glob: "src/*"\n    started_at: "x"')
+
+        self.assertNotEqual(ticket.script_shape(nested), ticket.script_shape(self.body))
+
+    def test_前置きが無いものは姿を持たない(self):
+        # マーカーと記録がこれ。範囲を宣言しないので、内容からは見分けられない。
+        self.assertIsNone(ticket.script_shape('{"phase": 1}\n'))
+        self.assertIsNone(ticket.script_shape(""))
+
+    def test_閉じの無い前置きは姿を持たない(self):
+        self.assertIsNone(ticket.script_shape("---\nid: i0001\n本文\n"))
 
 
 if __name__ == "__main__":

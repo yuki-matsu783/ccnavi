@@ -132,6 +132,30 @@ class CrossRepositoryTest(unittest.TestCase):
         self.assertIn("lib:done", result.stdout)
         self.assertNotEqual(result.returncode, 0, result.stdout)
 
+    def test_a_copy_in_another_projects_worktree_is_still_an_error(self):
+        """衝突した片方がワークツリーの側にあっても、畳んで黙らせない。
+
+        承認済みチケットは親のブランチに乗るので、プロジェクトのチケットは合流するまで
+        親のワークツリーにしか無い。ワークツリーの名前は識別子と同じなので、ここで
+        「権威のツリー」の規則を当てると、もう片方のプロジェクトの実体が黙って消え、
+        「複数のリポジトリにある」も出なくなる。別物は畳まない。
+        """
+        self.project("app", "doing")
+        lib = self.project("lib", "doing")
+        # lib の側は、親のワークツリーにだけ在る形にする（合流前）。
+        os.remove(os.path.join(lib, ".ccnavi", "approved", "doing", "i0001.md"))
+        git(lib, "add", "-A")
+        git(lib, "commit", "--quiet", "-m", "not merged yet")
+        worktree = os.path.join(self.ws, ".claude", "worktrees", "i0001")
+        git(lib, "worktree", "add", "--quiet", worktree, "-b", "i0001", "HEAD~1")
+
+        result = self.lint()
+
+        self.assertIn("i0001 が複数のリポジトリにある", result.stdout)
+        self.assertIn("app:doing", result.stdout)
+        self.assertIn("lib/i0001:doing", result.stdout)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+
     def test_one_project_alone_is_not_an_error(self):
         """1 つのプロジェクトに 1 枚在るだけの、いちばん普通の形。"""
         self.project("app", "done")

@@ -412,8 +412,8 @@ class DenyTest(GuardHarness):
     def test_shell_writes_into_a_moved_common_layer_are_denied(self):
         """§11.6: 共通層が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。
 
-        置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけで、
-        env は ADR-0052 で廃止し、診断の外は ADR-0067 で閉じた。それでも動かせる以上、
+        置き場を動かせるのは診断のためのフラグ（`--rules` / `--phases` / `--risk`）だけ
+        （env は効かない。ADR-0052、ADR-0067）。それでも動かせる以上、
         守りは動かした先を追う（`common_shell_clause`）。名指しのツールは
         `common_layer_regex` が同じ先を追うので、こちらを外すと、同じファイルが
         `Write` では止まってシェルでは通る形になる。

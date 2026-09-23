@@ -122,11 +122,6 @@ DEFAULT_STATE = os.path.join("logs", "state")
 # ガードの設定を畳んである場所ではなく、目に入る場所に出しておく。
 # 区切りは "/" で持つ。作業ツリーのルートに継ぎ足すときに os の区切りへ直す。
 DEFAULT_TICKETS = "wip/proposals"
-# 旧の綴り。既定は `wip/tickets` だった。名前が承認済みチケットの置き場（`.ccnavi/tickets`）と
-# 同じで、どちらの「tickets」なのかが読めなかったので分けた。設定に綴りを書いていないツリーに
-# 旧の置き場だけが残っていると、提案が走査されないまま「承認待ちは無い」で通るので、
-# `--lint` がその形を名指しする（lint._legacy_tickets）。判定はこの値を使わない。
-LEGACY_TICKETS = "wip/tickets"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
@@ -134,10 +129,6 @@ LEGACY_TICKETS = "wip/tickets"
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
 DEFAULT_APPROVED = ".ccnavi/approved"
-# 旧の綴り。既定は `.ccnavi/tickets` で、開いた承認済みチケットは直下、閉じたものは
-# `closed/` に置いていた。残っていると走査されないので `--lint` が名指しする
-# （lint._legacy_tickets）。判定はこの値を使わない。
-LEGACY_APPROVED = ".ccnavi/tickets"
 # フェーズの種類は人が持つ設定なので、承認済みチケットと同じ保護の内側に置く。
 DEFAULT_PHASES = os.path.join(".ccnavi", "common", "phases.yml")
 # リスクの配点も人が持つ設定。エージェントが配点を書けると、自分のリスクを自分で決められる。

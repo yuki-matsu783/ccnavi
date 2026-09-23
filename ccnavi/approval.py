@@ -19,8 +19,8 @@
 
 ## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
 
-承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。写しを置いて
-提案を残す形はやめた。エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
+承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。
+エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
 （レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、人がレビューを済ませると
 `review/` から `done/` へ動く。人が動かす向きは `.ccnavi/approved/` へ、エージェントが
 動かす向きは `wip/proposals/` へ。
@@ -54,8 +54,6 @@ from . import ticket as ticket_mod
 DOING_DIR = ticket_mod.DOING
 DONE_DIR = ticket_mod.DONE
 PHASES_DIR = "phases"
-# 旧の置き場（ADR-0055 まで）。開いたものは直下、閉じたものはここ。`--lint` だけが見る。
-LEGACY_CLOSED_DIR = "closed"
 
 # フェーズのマーカーの種類。
 MARK_REQUESTED = "requested"
@@ -215,9 +213,10 @@ def scan(
     権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
     落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
     閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」に倒すと、閉じたチケットが
-    開いたものとして復活する。権威のツリーがその識別子をどの置き場（作業中・レビュー待ち・
-    閉じた）にも持っていないときだけ、見つかった側を残す（親のワークツリーを作る前に
-    承認した分を落とさないため）。
+    開いたものとして復活する。親のツリーがその識別子をどの置き場（作業中・レビュー待ち・
+    閉じた）にも持っていなければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
+    そのプロジェクト）の側を採り、そこにも無いときと、元ツリーより先の置き場に在る写しが
+    あるときだけ、見つかった側を全部残す（`ticket.fold` と同じ順・同じ条件）。
 
     返す前に `mark_blocked` が「信じられない理由」の印を付ける。承認のときにしか
     当たらなかった構造の検査を、判定の側でも当てるため（ADR-0058）。
@@ -248,14 +247,41 @@ def _authoritative(
     found: list[ticket_mod.Ticket], everything: list[ticket_mod.Ticket]
 ) -> list[ticket_mod.Ticket]:
     at_home = {t.ticket for t in everything if t.tree == (t.parent or t.ticket)}
-    by_id: dict[str, list[ticket_mod.Ticket]] = {}
-    for t in found:
-        by_id.setdefault(t.ticket, []).append(t)
+    seen = _by_id(everything)
+    # 親のツリーが無いとき（作る前と、合流して畳んだ後）は元ツリーが権威。ワークツリーは
+    # 畳めば消えるが、元ツリー（ワークスペースルート。プロジェクトのチケットならその
+    # プロジェクト）は消えない。ただし元ツリーより先の置き場に在る写しがあれば採らない
+    # （合流していない側が新しい形）。`ticket.fold` と同じ順・同じ条件で決める。
+    at_origin = {ticket_id for ticket_id, hits in seen.items() if _origin_is_current(hits)}
+    # リポジトリをまたいだ衝突は畳まない（`ticket.fold` と同じ）。別物なので、権威を
+    # 決めるとどちらかが黙って消え、`--lint` の「複数のリポジトリにある」も出なくなる。
+    crossing = {ticket_id for ticket_id, hits in seen.items() if len({t.project for t in hits}) > 1}
     kept: list[ticket_mod.Ticket] = []
-    for ticket_id, hits in by_id.items():
+    for ticket_id, hits in _by_id(found).items():
         home = hits[0].parent or hits[0].ticket
-        kept.extend(hits if ticket_id not in at_home else [t for t in hits if t.tree == home])
+        if ticket_id in crossing:
+            kept.extend(hits)
+        elif ticket_id in at_home:
+            kept.extend(t for t in hits if t.tree == home)
+        elif ticket_id in at_origin:
+            kept.extend(t for t in hits if t.tree == ticket_mod.origin_tree(t))
+        else:
+            kept.extend(hits)
     return kept
+
+
+def _origin_is_current(hits: list[ticket_mod.Ticket]) -> bool:
+    """元ツリーがその識別子を持ち、かつ先へ進んだ写しが他に無いか（`ticket.fold` と同じ）。"""
+    origin = [t for t in hits if t.tree == ticket_mod.origin_tree(t)]
+    return bool(origin) and not ticket_mod.behind(origin, hits)
+
+
+def _by_id(found: list[ticket_mod.Ticket]) -> dict[str, list[ticket_mod.Ticket]]:
+    """識別子ごとの写りの全部。並びは見つけた順。"""
+    grouped: dict[str, list[ticket_mod.Ticket]] = {}
+    for t in found:
+        grouped.setdefault(t.ticket, []).append(t)
+    return grouped
 
 
 def home_dir(
@@ -621,8 +647,8 @@ def now() -> str:
 class Candidate:
     """承認の対象の 1 件。新規の提案か、親の改版か。
 
-    リスクの点はここに無い。宣言の広さで数える点はやめた。点は子を閉じるときに
-    実績（差分）で数える（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
+    リスクの点はここに無い。点は子を閉じるときに実績（差分）で数え、宣言の広さでは
+    数えない（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
     """
 
     ticket: ticket_mod.Ticket
@@ -2077,8 +2103,8 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
 
     **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
     別の池で引くと、ここでは親が見つかって印が付かないのに、判定の側では見つからず
-    `parent=None` のまま子の宣言だけで範囲が決まる。閉じた親やレビュー待ちの親まで
-    引ける池にしたときに実際にそうなった。親の範囲で切り詰められないのに通る形は、
+    `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
+    引ける池にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
     承認していない範囲に書ける道そのものなので、引けないなら止める側へ倒す。
 
     親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
