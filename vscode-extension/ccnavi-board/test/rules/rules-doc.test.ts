@@ -76,6 +76,17 @@ test("CB-T43 欄を変えても、他のルールのコメントと折り返し�
   assert.equal(again.allow[0].message, "見るだけ。書かない");
 });
 
+test("CB-T194 PyYAML が別の型に読む語は引用符で囲む（id: on は True、id: no は空の id に読まれる）", () => {
+  const doc = readRules(TEXT);
+  const s = doc.model.sections;
+  const fresh: RuleForm = { ...s.deny[1], origin: null, id: "no", message: "新しい" };
+  const out = doc.apply({ deny: [{ ...s.deny[0], id: "on" }, fresh], ask: s.ask, allow: s.allow });
+  assert.match(out, /  - id: "on"\n/);
+  assert.match(out, /  - id: "no"\n/);
+  assert.match(out, /  - id: inspection\n/);
+  assert.deepEqual(forms(out).deny.map((r) => r.id), ["on", "no"]);
+});
+
 test("CB-T44 タイプを移すとコメントごと動き、glob と regex は片方だけ残る", () => {
   const doc = readRules(TEXT);
   const s = doc.model.sections;
