@@ -672,7 +672,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   vscode.window.showInformationMessage(
-    `${loaded.phasesRel} を雛形で作った。scope の綴りをこのプロジェクトの置き場に直す。コミットは人が行う`,
+    `${loaded.phasesRel} を雛形から作成しました。修正してコミットを行ってください。`,
   );
 }
 
