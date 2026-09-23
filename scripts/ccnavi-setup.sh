@@ -97,10 +97,12 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi-common.sh は 3 本が `.` で読む共通部分。配らないと、配った先で 3 本とも
 # 起動時に落ちる。ccnavi-push-approved.sh はボードが承認のあと端末に送る 1 行の中身。
 # 配らないと、配った先のボードは承認済みチケットをコミットして push できない。
+# ccnavi-approve.sh は端末で承認する 1 本。承認の案内（phase.py）がこの綴りを出すので、
+# 配らないと案内どおりに打っても届かない。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
 # 追跡する側に置き、代わりに通る sh と同じ手順で配る。配る順でも最後に置く。途中で落ちたときに、
 # hook が起動するものだけが在って代わりに通る sh が無い形を作らないため。
-DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-launcher.sh"
+DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common.sh ccnavi-push-approved.sh ccnavi-approve.sh ccnavi-launcher.sh"
 LAUNCHER_NAME="ccnavi-launcher.sh"
 
 mode="$DEFAULT_MODE"
@@ -1137,6 +1139,9 @@ for name in $DEPLOY_SCRIPTS; do
 			;;
 		ccnavi-push-approved.sh)
 			why="ボードが承認のあと端末で走らせる、承認済みチケットのコミットと push"
+			;;
+		ccnavi-approve.sh)
+			why="端末で承認する形"
 			;;
 		*)
 			why="止めている間に通る形"

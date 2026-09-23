@@ -93,7 +93,12 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 # 承認済みチケットを運ぶ sh（ccnavi-push-approved.sh）も配る。ボードは承認のあとこれを
 # 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry §1.5）。
-DEPLOY_SCRIPTS = (*GATE_SCRIPTS, "ccnavi-common.sh", "ccnavi-push-approved.sh")
+DEPLOY_SCRIPTS = (
+    *GATE_SCRIPTS,
+    "ccnavi-common.sh",
+    "ccnavi-push-approved.sh",
+    "ccnavi-approve.sh",
+)
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
 # --deploy が配る残りの設定 2 本（設計 §11.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
