@@ -93,12 +93,21 @@ ccnavi_fetch_git() {
 	return 0
 }
 
-# モデルに確かめてもらう対象を 1 件足す。<名前> <ツリー> <ref> <説明>
-ccnavi_fetch_target() {
-	ccnavi_ft_url=$(git -C "$2" remote get-url origin 2>/dev/null || :)
-	ccnavi_ft_sha=$(git -C "$2" rev-parse --verify --quiet "$3" 2>/dev/null || :)
-	printf '  %s: origin=%s ブランチ=%s 手元=%s\n' "$1" "$(ccnavi_mask_url "$ccnavi_ft_url")" \
-		"$4" "${ccnavi_ft_sha:-（手元に無い）}" >>"$scratch/targets"
+# 取りに行き、取れなければ確かめてもらう対象に足す。取れたら 0。
+#   <名前> <ツリー> <ブランチ> <手元の ref> <対象の説明> <落ちたときの 1 行>
+#
+# 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ origin の 2 件目は
+# 取りに行かずに対象へ足すだけ。分け方に case が要るので、報せの `$( )` の外に置く。
+ccnavi_fetch_or_note() {
+	ccnavi_fetch_git "$2" "$3"
+	ccnavi_fn_rc=$?
+	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
+	[ "$ccnavi_fn_rc" -eq 1 ] && printf '%s\n' "$6"
+	ccnavi_fn_url=$(git -C "$2" remote get-url origin 2>/dev/null || :)
+	ccnavi_fn_sha=$(git -C "$2" rev-parse --verify --quiet "$4" 2>/dev/null || :)
+	printf '  %s: origin=%s ブランチ=%s 手元=%s\n' "$1" "$(ccnavi_mask_url "$ccnavi_fn_url")" \
+		"$5" "${ccnavi_fn_sha:-（手元に無い）}" >>"$scratch/targets"
+	return 1
 }
 
 # 報せを組み立てる `$( )` の中に `case` は書けない（macOS の bash 3.2 が `)` を読み違える。
@@ -191,19 +200,8 @@ report=$(
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 
 		name=$(basename "$tree")
-		ccnavi_fetch_git "$tree" "$branch"
-		case $? in
-		0) ;;
-		1)
-			printf '%s: リモートを取ってこられなかった。手元の版で判定する\n' "$name"
-			ccnavi_fetch_target "$name" "$tree" HEAD "$branch"
-			continue
-			;;
-		*)
-			ccnavi_fetch_target "$name" "$tree" HEAD "$branch"
-			continue
-			;;
-		esac
+		ccnavi_fetch_or_note "$name" "$tree" "$branch" HEAD "$branch" \
+			"${name}: リモートを取ってこられなかった。手元の版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
@@ -235,20 +233,10 @@ report=$(
 			continue
 		fi
 
-		ccnavi_fetch_git "$repo" "$default"
-		case $? in
-		0) ;;
-		1)
-			printf '%s: ワークツリーの起点になる %s を取ってこられなかった。手元の版から切ることになる\n' \
-				"$name" "$default"
-			ccnavi_fetch_target "$name" "$repo" "refs/heads/$default" "${default}（ワークツリーの起点）"
+		ccnavi_fetch_or_note "$name" "$repo" "$default" "refs/heads/$default" \
+			"${default}（ワークツリーの起点）" \
+			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" ||
 			continue
-			;;
-		*)
-			ccnavi_fetch_target "$name" "$repo" "refs/heads/$default" "${default}（ワークツリーの起点）"
-			continue
-			;;
-		esac
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
 		if [ -z "$old" ]; then
