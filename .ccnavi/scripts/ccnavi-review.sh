@@ -84,20 +84,14 @@ root=$(ccnavi_workspace) ||
 here="$(pwd -W 2>/dev/null || pwd)"
 state="$root/${CCNAVI_STATE:-logs/state}"
 
-# ---- 実行ファイル。設定に書かれた綴りを優先し、無ければ既定の置き場、それも無ければソース。
+# ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
-case "${CCNAVI_BIN_PATH:-}" in
-/* | [A-Za-z]:*) bin="$CCNAVI_BIN_PATH" ;;
-*) bin="$root/${CCNAVI_BIN_PATH:-dist/ccnavi/ccnavi}" ;;
-esac
-if [ -x "$bin" ]; then
+if bin=$(ccnavi_bin "$root"); then
 	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
-elif [ -x "$bin.exe" ]; then
-	ccnavi() { "$bin.exe" --root "$root" --cwd "$here" "$@"; }
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail "ccnavi の実行ファイルが無い ($bin)。build.py で組み立ててください。" 2
+	fail "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
 # ---- リモート。origin の URL でホストを見分ける。

@@ -247,12 +247,20 @@ class UnwrappedTest(unittest.TestCase):
         cases = {
             # 代入
             "FOO=1 rm x": ["rm x"],
+            # 足し込みと配列の要素も代入。bash は残りをコマンドとして実行する
+            "a+=1 rm x": ["rm x"],
+            "a[1]=x rm x": ["rm x"],
+            "a=1 b+=2 rm x": ["rm x"],
             # 区切りの前の道筋や拡張子が付いた名前
             "/usr/bin/git push": ["git push"],
             "git.exe status": ["git status"],
             # 実行役のコマンドと、飛ばすオプション・値・位置引数
             "env rm x": ["rm x"],
             "env FOO=1 BAR=2 rm x": ["rm x"],
+            # env と sudo は `=` を含む引数を綴りを問わず代入に数える
+            "env a+=1 rm x": ["rm x"],
+            "env a.b=1 rm x": ["rm x"],
+            "sudo a+=1 rm x": ["rm x"],
             "env -u HOME rm x": ["rm x"],
             "env --unset HOME rm x": ["rm x"],
             "env -C /tmp rm x": ["rm x"],

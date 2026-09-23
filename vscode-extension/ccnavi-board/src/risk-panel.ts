@@ -188,7 +188,6 @@ function registerPanelHandlers(current: PanelState): void {
     current.host.post({ type: "lock", lock: current.lock } satisfies ToRisk);
     postAppearance(current.host);
     if (current.changedPending) {
-      current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToRisk);
     }
   });
@@ -277,6 +276,7 @@ function scheduleChanged(current: PanelState): void {
   current.timer = setTimeout(() => {
     current.timer = undefined;
     if (alive(current)) {
+      current.changedPending = true;
       current.host.post({ type: "changed" } satisfies ToRisk);
     }
   }, DEBOUNCE_MS);

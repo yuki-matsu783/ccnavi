@@ -11,6 +11,7 @@
 import { isMap, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document } from "yaml";
 
 import { SECTIONS, type PatternKind, type RuleForm, type RulesModel, type Section, type Sections } from "./rules-view.js";
+import { yaml11Ambiguous } from "./yaml11.js";
 
 /**
  * ルールの形（`SECTIONS`・`RuleForm`・`RulesModel`）は画面との契約（`rules-view.ts`）にある。
@@ -300,13 +301,18 @@ function setText(
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符・折り返し）は元のまま。値が変わっても書き方まで変えない。
+    // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
+    // `id: on` は "True" に、`id: no` は空の id に読まれる。
     if (current.value !== value) {
       current.value = value;
+      if (current.type === Scalar.PLAIN && yaml11Ambiguous(value)) {
+        current.type = Scalar.QUOTE_DOUBLE;
+      }
     }
     return;
   }
   const scalar = doc.createNode(value) as Scalar;
-  scalar.type = style;
+  scalar.type = style === Scalar.PLAIN && yaml11Ambiguous(value) ? Scalar.QUOTE_DOUBLE : style;
   const pair = doc.createPair(key, scalar);
   const at = after === undefined ? -1 : node.items.findIndex((p) => String((p.key as Scalar).value) === after);
   if (at >= 0) {

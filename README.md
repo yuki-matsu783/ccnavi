@@ -225,6 +225,8 @@ hook には実行ファイルだけを登録すればよい。
 落ち着き、既にある値と、ccnavi と関係のない hook はそのまま残る。書かずに揃っていない
 ところだけを見たいときは `--check`、既定を持つつまみも並べたいときは `--all` を付ける。
 同じ 1 回で `.vscode/settings.json` も見る（次の節）。触ってほしくないときは `--no-vscode`。
+セッションの頭の取り込み（`ccnavi-fetch.sh`）も `SessionStart` に別の 1 行で登録する。取り込みは
+通信するので、1 台だけで使いリモートに合わせる必要が無ければ `--no-fetch` で外す。
 
 既にある値は置き換えない。値が違えば、変えずに並べて見せる。置き換えるのは
 `--mode` か `--ticket-control` を名指しして `--force` を付けたときだけで、
@@ -255,6 +257,9 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
     "SessionStart": [
       { "matcher": "", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+      ]},
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "sh \"${CLAUDE_PROJECT_DIR}/.ccnavi/scripts/ccnavi-fetch.sh\"", "timeout": 60 }
       ]}
     ],
     "UserPromptSubmit": [
@@ -293,6 +298,9 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 `SubagentStop` も同じ形で足す）。payload が自分でイベント名を名乗るので、
 どれを走らせるかは ccnavi が選ぶ。
 `matcher` は絞らない。絞ると、そこに書かなかったツールで hook 自体が起動しなくなる。
+`SessionStart` の 2 本目は実行ファイルではなく取り込みの sh（`ccnavi-fetch.sh`）。承認済みチケットと
+マーカー（親ブランチに乗って届く）と、ワークツリーの起点になるデフォルトブランチを fast-forward で
+取ってくる（ADR-0060）。登録しないと、別の機械で承認したものが効かず、古い `main` から枝を切る。
 
 | イベント | ここで何をするか | 登録しないと |
 |---|---|---|
@@ -397,7 +405,7 @@ env が振り分けの sh を指していれば、sh と同じ順で `.ccnavi/bi
 | `.ccnavi/common/rules.yml` | 同じ綴り |
 | `.ccnavi/common/risks.yml` | 同じ綴り |
 | `.ccnavi/config/phases.yml` | 同じ綴り |
-| `.ccnavi/scripts/ccnavi-{ticket,review,git,common}.sh` | 同じ綴り |
+| `.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,approve,fetch,clean}.sh`、`ccnavi-clean.js` | 同じ綴り |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じ綴り。配ったあと実行ビットを付ける |
 
 ルールと配点のひな形は共通層（`.ccnavi/common/`）へ、フェーズの種類のひな形はワークスペース自身の層
@@ -1598,6 +1606,14 @@ fast-forward だけで、未コミットの変更があるツリーやリモー�
 リポジトリごとのデフォルトブランチ（`origin/HEAD` が指すもの。ワークツリーの起点になる。
 ADR-0060）。後者はチェックアウトされていなくても進めるので、ワークスペースルートが
 `main` 以外に居ても `main` が揃う。
+
+git でリモートに届かないときも止めず、手元の版で判定する。認証を尋ねる画面は出さず
+（`GIT_TERMINAL_PROMPT=0`・`GCM_INTERACTIVE=never`）、fetch 1 回を `CCNAVI_FETCH_TIMEOUT` 秒
+（既定 15）で切り、一度落ちた origin には同じ回でもう取りに行かない。hook の上限（60 秒）に
+当たると、報せごと捨てられるため。
+認証で落ちたとき（401・403、資格情報が無い、公開鍵が通らない）は、そう 1 行添える。尋ねないので
+落ち続けるが、人が端末で一度 `git fetch origin`（承認の sh でもよい）を打って認証を済ませれば、
+保存された資格情報で次のセッションから通る。見分けは git の文言に頼るので、`LC_ALL=C` で揃えて見る。
 
 順序は「承認 → 承認済みチケットをコミット → 子のワークツリーを作る → `start`」。コミットの前に
 ワークツリーを作ると、その子には範囲が効かない（そのブランチに乗っていないため）。

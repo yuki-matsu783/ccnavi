@@ -79,18 +79,12 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-# 実行ファイル。設定に書かれた綴りを優先し、無ければ既定の置き場、それも無ければソース。
-case "${CCNAVI_BIN_PATH:-}" in
-/* | [A-Za-z]:*) bin="$CCNAVI_BIN_PATH" ;;
-*) bin="$root/${CCNAVI_BIN_PATH:-dist/ccnavi/ccnavi}" ;;
-esac
-if [ -x "$bin" ]; then
+# 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+if bin=$(ccnavi_bin "$root"); then
 	exec "$bin" --root "$root" ticket "$@"
-elif [ -x "$bin.exe" ]; then
-	exec "$bin.exe" --root "$root" ticket "$@"
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	cd "$root"
 	exec uv run python -m ccnavi --root "$root" ticket "$@"
 fi
-printf 'ccnavi-ticket: ccnavi の実行ファイルが無い (%s)。build.py で組み立ててください。\n' "$bin" >&2
+printf 'ccnavi-ticket: ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。\n' >&2
 exit 2

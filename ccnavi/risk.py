@@ -175,7 +175,9 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
             text = f.read()
     except FileNotFoundError:
         return builtin(), []
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
+        # UTF-8 として読めない（UnicodeDecodeError は ValueError の側）ものも、壊れた
+        # ファイルとして苦情付きで返す。phasetypes.load と同じ扱い。
         fallen = builtin()
         fallen.fallback = f"{path} を読めない ({exc})"
         return fallen, [Problem(SEVERITY_ERROR, "(risk)", fallen.fallback)]
@@ -200,7 +202,7 @@ def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | N
             text = f.read()
     except FileNotFoundError:
         return None, []
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         return None, [Problem(SEVERITY_ERROR, "(risk)", f"{path} を読めない ({exc})")]
     return parse(text, path, script_homes)
 

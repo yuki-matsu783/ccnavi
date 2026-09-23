@@ -7,11 +7,12 @@
 # 同じディレクトリを指す。**この読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない**（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 4 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 5 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で綴りが違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
 #   ccnavi_workspace           ワークスペースルートの絶対パス
+#   ccnavi_bin <ワークスペースルート>  起動する実行ファイルのパス
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 
@@ -125,6 +126,37 @@ ccnavi_workspace() {
 		[ "$ccnavi_ws_up" = "$ccnavi_ws_here" ] && return 1
 		ccnavi_ws_here="$ccnavi_ws_up"
 	done
+}
+
+# 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
+#
+# 人が端末から打つ場面では settings.json の env が効かないので、CCNAVI_BIN_PATH が
+# 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
+# hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
+# .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
+# 「実行ファイルが無い」で止まる。
+#
+# それぞれ `.exe` を付けた綴りも見る（Windows の組み立て）。
+ccnavi_bin() {
+	case "${CCNAVI_BIN_PATH:-}" in
+	'')
+		ccnavi_bin_try "$1/dist/ccnavi/ccnavi" && return 0
+		[ -d "$1/.ccnavi/bin" ] || return 1
+		ccnavi_bin_try "$1/.ccnavi/scripts/ccnavi-launcher.sh"
+		;;
+	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_BIN_PATH" ;;
+	*) ccnavi_bin_try "$1/$CCNAVI_BIN_PATH" ;;
+	esac
+}
+
+ccnavi_bin_try() {
+	if [ -x "$1" ]; then
+		printf '%s\n' "$1"
+	elif [ -x "$1.exe" ]; then
+		printf '%s\n' "$1.exe"
+	else
+		return 1
+	fi
 }
 
 # そのディレクトリが属するプロジェクトの名前。ワークスペース自身なら空を返す。

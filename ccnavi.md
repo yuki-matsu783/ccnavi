@@ -208,7 +208,7 @@ payload が JSON でない・オブジェクトでない・`hook_event_name` が
 | `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_LOG` / `CCNAVI_BIN_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` で既定を持つつまみも並べる |
 | `.claude/settings.json` の `hooks` | 7 つのイベントに実行ファイルを登録する。既に別の綴りで登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true`。`--no-vscode` で触らない |
-| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,launcher}.sh`。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
+| 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 3 本のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,approve,fetch,clean,launcher}.sh` と `ccnavi-clean.js`。取り込み（`ccnavi-fetch.sh`）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは触らず、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも落ちていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない） |
 | 配布先の `.gitignore` | 配った機械の置き場 `/.ccnavi/bin/<os>-<arch>/` の 1 行（配布先が git のリポジトリで、配るときだけ）。振り分けの sh は代わりに通る sh と同じく追跡する側に置き、無視しない |
 
 **置き場は 2 つに分けて固定する（ADR-0044）。**
@@ -1130,7 +1130,8 @@ A がレビューする、という流れが成り立たない。B の機械に�
 B の側はセッションの頭に `ccnavi-fetch.sh` が fast-forward で取り込む。同じ sh が、
 ワークツリーの起点になるデフォルトブランチ（`origin/HEAD` が指すもの）も、チェックアウト
 されていなければ `update-ref` で進める。起点が古いと、そこから伸びる枝も古い枝から伸び、
-承認済みチケットを古い版で判定することになるため（ADR-0060）。
+承認済みチケットを古い版で判定することになるため（ADR-0060）。git でリモートに届かないときは
+手元の版で判定を続ける。fetch は 1 回ずつ見張りで切り、hook の上限に当たらないようにする。
 
 代償は 3 つ。**承認は push するまで効かない**（オフラインでは他の機械に届かない）。**承認の記録が
 リポジトリの履歴に残る**ので、消しても過去のコミットから復元できる。**ccnavi が入っていない機械の

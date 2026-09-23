@@ -18,10 +18,14 @@
 
 from __future__ import annotations
 
+import http.server
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 
 from tests import ROOT
@@ -111,9 +115,10 @@ class FetchTest(unittest.TestCase):
         git(pusher, "push", "-q", "origin", branch)
         return self.sha(pusher, "HEAD")
 
-    def fetch(self, cwd=None):
+    def fetch(self, cwd=None, **extra):
         script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.update(extra)
         return subprocess.run(
             [SHELL, script],
             cwd=cwd or self.ws,
@@ -241,6 +246,61 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(1, len(self.lines(done)), done.stdout)
         self.assertIn("承認済みチケットとマーカー", done.stdout)
         self.assertNotIn("起点", self.lines(done)[0])
+
+    # ---- 届かないとき
+
+    def test_unreachable_origin_is_tried_once(self):
+        """git が届かなくても止めない。同じ origin には 1 度しか取りに行かず、1 行だけ言う。"""
+        self.leave_main()
+        git(self.ws, "branch", "-q", "--set-upstream-to", "origin/main")
+        missing = posix(os.path.join(self._tmp.name, "nowhere.git"))
+        git(self.ws, "remote", "set-url", "origin", "file://user:secret@" + missing.lstrip("/"))
+        done = self.fetch()
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
+        self.assertNotIn("secret", done.stdout)
+        # 届かないだけで、認証の話ではない。
+        self.assertNotIn("認証", done.stdout)
+
+    def test_an_authentication_failure_says_so(self):
+        """401 を返すリモート。尋ねずに落ち、認証で落ちたことと、人がすることを言う。"""
+
+        class Unauthorized(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(401)
+                self.send_header("WWW-Authenticate", 'Basic realm="ccnavi"')
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), Unauthorized)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        url = f"http://127.0.0.1:{server.server_address[1]}/o/r.git"
+        git(self.ws, "remote", "set-url", "origin", url)
+        self.leave_main()
+        done = self.fetch(LANG="ja_JP.UTF-8", LC_ALL="ja_JP.UTF-8")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
+        self.assertIn("認証で落ちた", done.stdout)
+        self.assertIn("git fetch origin", done.stdout)
+
+    def test_a_hanging_remote_is_cut_off(self):
+        """応答しないリモートは CCNAVI_FETCH_TIMEOUT 秒で切る。hook の上限まで待たない。"""
+        helpers = os.path.join(self._tmp.name, "bin")
+        helper = write(os.path.join(helpers, "git-remote-slow"), "#!/bin/sh\nsleep 60\n")
+        os.chmod(helper, os.stat(helper).st_mode | stat.S_IXUSR)
+        git(self.ws, "remote", "set-url", "origin", "slow::x")
+        path = os.pathsep.join([helpers, os.environ.get("PATH", "")])
+        started = time.monotonic()
+        done = self.fetch(PATH=path, CCNAVI_FETCH_TIMEOUT="2")
+        self.assertLess(time.monotonic() - started, 20, "見張りが切っていない")
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("取ってこられなかった", done.stdout)
+        self.assertEqual("", done.stderr.strip())
 
     # ---- 黙るとき
 

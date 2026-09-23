@@ -25,6 +25,16 @@
 # 出力はモデルに届く。何も動かなかったときは黙る。毎回同じ行を返すと、
 # セッションの頭の文脈がそれで埋まる。
 #
+# **待たせない。** 認証を尋ねる画面を出させず（GIT_TERMINAL_PROMPT・GCM_INTERACTIVE）、
+# fetch 1 回に見張りを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
+# 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
+#
+# **認証で落ちたときは、そう言う。** 尋ねないので、資格情報が無いか切れていると毎回落ちる。
+# オフラインと同じ 1 行では、人は理由を調べることになる。認証は人が端末で打つ git（承認の
+# sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
+# git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
+# 「取ってこられなかった」に戻るだけ。
+#
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
 set -u
@@ -37,6 +47,69 @@ projects="${CCNAVI_PROJECTS:-projects}"
 
 # 見つからなければ黙って終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0
+
+# 認証を尋ねない。hook には端末が無く、尋ねれば落ちるか、画面を開いて誰かが閉じるまで待つ。
+GIT_TERMINAL_PROMPT=0
+GCM_INTERACTIVE=never
+export GIT_TERMINAL_PROMPT GCM_INTERACTIVE
+
+limit="${CCNAVI_FETCH_TIMEOUT:-15}"
+case "$limit" in
+'' | *[!0-9]*) limit=15 ;;
+esac
+
+# 落ちた origin の綴り。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
+# 回るので、変数では渡らない。
+scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
+trap 'rm -rf "$scratch"' EXIT
+: >"$scratch/failed"
+
+# 認証で落ちたときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
+auth_failed='Authentication failed|could not read (Username|Password)|terminal prompts disabled'
+auth_failed="$auth_failed"'|Invalid username or password|HTTP Basic: Access denied'
+auth_failed="$auth_failed"'|Permission denied \(publickey|returned error: 40[13]'
+
+# origin へ 1 本取りに行く。取れたら 0、落ちたら 1、認証で落ちたら 3。取りに行かなかったら 2。
+#
+# 見張りの sh が limit 秒で fetch を切る。見張りの出力は捨てる。出力をつないだまま残すと、
+# 見張りの sleep が終わるまで報せの `$( )` が閉じない。
+ccnavi_fetch_git() {
+	ccnavi_fg_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
+	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/failed"; then
+		return 2
+	fi
+	LC_ALL=C git -C "$1" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
+		fetch --quiet origin "$2" </dev/null >/dev/null 2>"$scratch/err" &
+	ccnavi_fg_pid=$!
+	(
+		sleep "$limit"
+		kill "$ccnavi_fg_pid"
+	) </dev/null >/dev/null 2>&1 &
+	ccnavi_fg_dog=$!
+	ccnavi_fg_rc=0
+	wait "$ccnavi_fg_pid" 2>/dev/null || ccnavi_fg_rc=$?
+	kill "$ccnavi_fg_dog" 2>/dev/null || :
+	if [ "$ccnavi_fg_rc" -ne 0 ]; then
+		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
+		grep -qiE "$auth_failed" "$scratch/err" 2>/dev/null && return 3
+		return 1
+	fi
+	return 0
+}
+
+# 取りに行く。取れたら 0。<ツリー> <ブランチ> <落ちたときの 1 行>
+#
+# 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ origin の 2 件目は
+# 取りに行かずに黙って飛ばす。分け方に要る判定を、報せの `$( )` の外に置くための関数。
+ccnavi_fetch_or_note() {
+	ccnavi_fetch_git "$1" "$2"
+	ccnavi_fn_rc=$?
+	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
+	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
+	printf '%s\n' "$3"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は認証を尋ねない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
+	return 1
+}
 
 # 報せを組み立てる `$( )` の中に `case` は書けない（macOS の bash 3.2 が `)` を読み違える。
 # tests/core/test_sh_portability.py）。`case` の要るものはここで関数にしておく。
@@ -128,10 +201,8 @@ report=$(
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 
 		name=$(basename "$tree")
-		git -C "$tree" fetch --quiet origin "$branch" 2>/dev/null || {
-			printf '%s: リモートを取ってこられなかった。手元の版で判定する\n' "$name"
-			continue
-		}
+		ccnavi_fetch_or_note "$tree" "$branch" \
+			"${name}: リモートを取ってこられなかった。手元の版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
 
@@ -163,11 +234,9 @@ report=$(
 			continue
 		fi
 
-		git -C "$repo" fetch --quiet origin "$default" 2>/dev/null || {
-			printf '%s: ワークツリーの起点になる %s を取ってこられなかった。手元の版から切ることになる\n' \
-				"$name" "$default"
+		ccnavi_fetch_or_note "$repo" "$default" \
+			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" ||
 			continue
-		}
 
 		old=$(git -C "$repo" rev-parse --verify --quiet "refs/heads/$default" 2>/dev/null || :)
 		if [ -z "$old" ]; then
