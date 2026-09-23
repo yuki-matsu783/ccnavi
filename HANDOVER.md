@@ -29,8 +29,8 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 `wip/proposals/todo/` → 承認で `.ccnavi/approved/doing/` → `ticket finish` で `wip/proposals/review/`
 （レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`confirm` / `decide` / `--reviewed --chat` /
 `close-early`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
-`wip/proposals/` へ動かすのはエージェント。`decide` は「受け入れて進む」か「続きの子を
-`doing/` に直に起こす」かを人に選ばせる。
+`wip/proposals/` へ動かすのはエージェント。`decide` は残った指摘ごとに「対応しない」「このフェーズで
+直す（続きの子を `doing/` に直に起こす）」「issue に回す」を人に選ばせる。ボードの「決める」でも端末でも同じ。
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
 `SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
@@ -212,7 +212,7 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
 ### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
 
 usage の `confirm` の説明が「依頼より後の未解決スレッドが無ければ」のままで、いまの挙動
-（時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `to-issue` `ready`
+（時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `ready`
 `close-early` `origin` が無い。文面だけの修正だが、`.ccnavi/scripts/` は `deny` なので
 人が直すか、`staging` 種別のフェーズを持つチケットで写す版を作る。
 

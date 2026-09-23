@@ -145,6 +145,7 @@
 | [0076](0076-drop-the-legacy-place-notice.md) | 旧の置き場への移行案内を畳む |
 | [0078](0078-subcommand-names-say-what-they-do.md) | 副命令の名前は動きを言い、人の判断はフラグで受ける |
 | [0079](0079-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
+| [0080](0080-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 
 ### 複数のリポジトリと VS Code 拡張
 
