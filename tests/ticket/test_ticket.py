@@ -1333,6 +1333,10 @@ class TicketTest(unittest.TestCase):
 
     def test_decide_yes_without_a_fix_marks_the_phase_reviewed(self):
         fixture = self.two_threads()
+        # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない issue を
+        # sh が投稿する
+        stale = os.path.join(self.state, "review-issue-i0001-1.md")
+        write(stale, "前の回の題\n\n前の回の本文\n")
         digest = json.loads(self.decide(fixture, "--preview", "--json").stdout)["digest"]
         choices = json.dumps({"u1": "keep", "u2": "keep"})
         done = self.decide(fixture, "--yes", choices, "--digest", digest, "--json")
@@ -1341,6 +1345,7 @@ class TicketTest(unittest.TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         )
+        self.assertFalse(os.path.exists(stale))
         self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_decide_yes_refuses_what_was_not_shown(self):
@@ -1823,6 +1828,21 @@ class TicketTest(unittest.TestCase):
             "env sh .ccnavi/scripts/ccnavi-review.sh decide 1 --choices j --digest d",
             "/tmp/x --reviewed 1 --accept-unresolved --yes j --digest d --json",
             "./copy --yes i0001 --approve --digest d",
+            # 敵対的レビューで抜けた形。読み取り用の道具に似た名前、文字列を実行する道具、
+            # 引数のリスト、変数に入れた副命令、分け書き
+            "/tmp/cat.bin --reviewed 1 --accept-unresolved --yes j --digest d",
+            "awk 'BEGIN{system(\"ccnavi --approve --yes a --digest X\")}'",
+            "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
+            "--digest Y\")}'",
+            "perl -e 'system(\"ccnavi --reviewed 3 --accept-unresolved --yes X --digest Y\")'",
+            'python3 -c "import ccnavi.cli as c; '
+            "c.run(0, 0, 0, ['--reviewed', '1', '--yes', '{}'])\"",
+            "S=decide; sh .ccnavi/scripts/ccnavi-review.sh $S 1 --choices x --digest y",
+            "cp .ccnavi/scripts/ccnavi-review.sh /tmp/r.sh; "
+            "sh /tmp/r.sh decide 1 --choices x --digest y",
+            "/tmp/cc --y\"\"es --appr''ove",
+            # コミットの文面でも、コマンド置換の中は実行される
+            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(/tmp/cc --approve --yes x)"',
         ):
             result = self.hook(
                 "PreToolUse",
@@ -1837,6 +1857,11 @@ class TicketTest(unittest.TestCase):
             "sh .ccnavi/scripts/ccnavi-review.sh decide 1 --preview",
             "sh .ccnavi/scripts/ccnavi-review.sh decide 1",
             "apt-get install --yes git",
+            "grep -n -- '--approve --yes' README.md",
+            "echo ccnavi --approve --yes x",
+            # コミットの文面は実行されない
+            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: --approve --yes の説明"',
+            "sh .ccnavi/scripts/ccnavi-git.sh commit -m 'CCNAVI_GUARD_TICKET_APPROVAL=x を止める'",
         ):
             result = self.hook(
                 "PreToolUse",
@@ -1873,6 +1898,17 @@ class TicketTest(unittest.TestCase):
                 "[Environment]::SetEnvironmentVariable('CCNAVI_GUARD_TICKET_APPROVAL','x')",
             ),
             ("PowerShell", "Set-Item env:CCNAVI_GUARD_TICKET_APPROVAL disable"),
+            # 敵対的レビューで抜けた形。引用と分け書き、言語の中からの設定、名前の参照
+            ("Bash", '/tmp/cc "--guard-ticket-approval" disable --approve'),
+            ("Bash", "/tmp/cc --guard-ticket-''approval disable --approve"),
+            (
+                "Bash",
+                "python3 -c \"import os;os.environ['CCNAVI_GUARD_TICKET_APPROVAL']='disable'\"",
+            ),
+            ("Bash", "declare -n R=CCNAVI_GUARD_TICKET_APPROVAL; R=disable"),
+            ("PowerShell", '${env:CCNAVI_GUARD_TICKET_APPROVAL} = "disable"'),
+            ("PowerShell", "New-Item -Path Env: -Name CCNAVI_GUARD_TICKET_APPROVAL -Value disable"),
+            ("PowerShell", '$psi.EnvironmentVariables["CCNAVI_GUARD_TICKET_APPROVAL"]="disable"'),
         ):
             result = self.hook(
                 "PreToolUse",
@@ -1886,7 +1922,9 @@ class TicketTest(unittest.TestCase):
         # 読むだけの形と、守る側の値は止めない。
         for command in (
             "echo $CCNAVI_GUARD_TICKET_APPROVAL",
+            "echo ${CCNAVI_GUARD_TICKET_APPROVAL}",
             "grep -rn CCNAVI_GUARD_TICKET_APPROVAL ccnavi",
+            "grep -n -- '--guard-ticket-approval disable' README.md",
             "uv run -m ccnavi --guard-ticket-approval enable --lint",
         ):
             result = self.hook(

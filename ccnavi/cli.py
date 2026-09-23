@@ -582,9 +582,10 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
             return True
     except (AttributeError, ValueError):
         pass
+    # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
+    # 人の判断を自分で出す道を教えることになる。切り方は README の設定の表にある。
     stderr.write(
-        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない"
-        f"（{settings.GUARD_TICKET_APPROVAL_ENV}=disable で切れる）\n"
+        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。利用者に端末で打ってもらう\n"
     )
     return False
 

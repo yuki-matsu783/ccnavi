@@ -226,14 +226,15 @@ def decide_before(
                 ],
             )
 
-    # 人の判断の経路の端末要求を、コマンド行で切る形は止める。実行ファイルを呼ぶ綴りは
-    # 追い切れないので、呼び方ではなく切る形で見る（phase.turns_off_guard）。
+    # 人の判断の経路のうち、hook のほかに守りが無い形（端末要求を切る形、ボードの経路の形）は
+    # 止める。実行ファイルを呼ぶ綴りは追い切れないので、呼び方ではなく綴りの組で見る
+    # （phase.human_path_form）。
     if (
         conf.tickets_enabled
         and conf.guard_ticket_approval != selfguard.DISABLE
         and payload.tool_name in phase.SHELL_TOOLS
     ):
-        found = phase.turns_off_guard(record.subject)
+        kind, found = phase.human_path_form(record.subject)
         if found:
             record.code = phase.CODE_TICKET_APPROVAL
             record.rules = [phase.TICKET_APPROVAL_RULE_ID]
@@ -245,7 +246,11 @@ def decide_before(
                 notices
                 + [
                     reasons.builtin_refusal(
-                        phase.CODE_TICKET_APPROVAL, subject, phase.guard_off_message(found)
+                        phase.CODE_TICKET_APPROVAL,
+                        subject,
+                        phase.guard_off_message(found)
+                        if kind == "guard-off"
+                        else phase.board_form_message(found),
                     )
                 ],
             )

@@ -115,32 +115,135 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 
 
-# 人の判断の経路の端末要求を、エージェントのコマンド行で切る形。実行ファイルは
-# `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で端末要求を外す
-# （テストと CI のため）。
-# 実行ファイルを呼ぶ綴りは追い切れない（`uv run -m ccnavi`、名前を変えた写し）ので、呼び方では
-# なく切る形そのもので止める。切れなければ、端末を持たないエージェントは実行ファイルの側で止まる。
+# 人の判断の経路のうち、hook のほかに守りが無い形。組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）で、
+# 実行ファイルの呼び方によらず止める（ADR-0079、ADR-0080）。
 #
-# 見るのは生の文字列。`bash -c '…'` や `$( … )` の中に書いた形も同じに数える。変数は代入の形
-# （`X=`・`env X=`・`export X=`・PowerShell の `$env:X =`）、フラグは `enable` 以外の値を
-# 渡す形。この綴りそのものを grep で探すコマンドも当たるが、それは Grep ツールで済む。
+# 1. 端末要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で
+#    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
+#    側で止まる
+# 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の守りになる。
+#    `--approve` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組
+#
+# 実行ファイルを呼ぶ綴りは追い切れない（`uv run -m ccnavi`、名前を変えた写し、`awk` の `system()`、
+# `python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、**コマンド行の生の文字列の
+# 全体**から、引用符と `\` を落としてから綴りを探す（`--y""es`・`"--yes"`・`--x\=y` を同じに読む）。
+# 外すのは、並んだコマンドが全部、表示・検索・閲覧の道具（名前の完全一致）のときだけ。
+# 外す道具を並べ損ねても、倒れるのは止める側。
 _GUARD_NAME = "CCNAVI_GUARD_TICKET_APPROVAL"
-_GUARD_OFF = re.compile(
-    rf"(?<![$\w]){_GUARD_NAME}\s*\+?="
-    rf"|\$\{{{_GUARD_NAME}:?="
-    rf"|SetEnvironmentVariable\s*\(\s*['\"]{_GUARD_NAME}"
-    rf"|\b(?:Set-Item|New-Item|si|ni)\b[^\n;]*env:[\\/]?{_GUARD_NAME}"
-    r"|(?:\bread|\bmapfile|\breadarray|\bprintf\s[^\n;&|]*-v)\b[^\n;&|]*"
-    rf"\b{_GUARD_NAME}\b"
-    r"|--guard-ticket-approval(?:\s*=\s*|\s+)(?!['\"]?enable(?![\w-]))",
+# 変数を読むだけの形（`$X`・`${X}`・`$env:X`・`${env:X}`）。後ろに代入が続けば読むだけではない。
+_GUARD_READ = re.compile(
+    rf"\$\{{(?:env:)?{_GUARD_NAME}\}}(?!\s*[:+]?=)"
+    rf"|\$(?:env:)?{_GUARD_NAME}(?![A-Za-z0-9_}}])(?!\s*[:+]?=)",
     re.IGNORECASE,
 )
+_GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", re.IGNORECASE)
+_GUARD_FLAG = re.compile(
+    r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
+)
+_BOARD_FORMS = (
+    re.compile(r"(?<![\w-])--(?:approve|reviewed)(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
+)
+_DECIDE_FORMS = (
+    re.compile(r"(?<![\w-])--choices(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--digest(?![\w-])", re.IGNORECASE),
+)
+# 表示・検索・閲覧だけをする道具。コマンドを実行する口か変数に書く口を持つもの（`sed` の `e`、
+# `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
+_READERS = frozenset(
+    {"echo", "grep", "egrep", "fgrep", "rg", "cat", "less", "more", "head", "tail", "wc"}
+)
+_SEGMENT = re.compile(r"[;&|\n]+")
+_ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
+
+
+def _dequoted(subject: str) -> str:
+    """引用符とバックスラッシュを落とした綴り。分け書き（`--y""es`）と引用を同じに読む。"""
+    return re.sub(
+        r"['\"`\\]", "", subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
+    )
+
+
+def _only_readers(text: str) -> bool:
+    """並んだコマンドが全部、表示・検索・閲覧の道具か。"""
+    for segment in _SEGMENT.split(text):
+        words = segment.split()
+        # 前置きの代入（`X=… cmd`）は飛ばす。代入そのものは別に見る
+        while words and _ASSIGNMENT_WORD.match(words[0]):
+            words = words[1:]
+        if not words:
+            continue
+        name = words[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if name.endswith(".exe"):
+            name = name[:-4]
+        if name not in _READERS:
+            return False
+    return True
+
+
+def _commit_messages(subject: str) -> list[str]:
+    """コミットの文面（`git commit` / `ccnavi-git.sh commit` の `-m` / `--message` の値）。
+
+    文面は実行されないので、綴りを探す対象から外す。値の中にコマンド置換があれば実行されるので
+    外さない。読み切れないコマンド行なら空（外さない側に倒す）。
+    """
+    found: list[str] = []
+    for words, _ in shellread.placed(subject):
+        names = [w.replace("\\", "/").rsplit("/", 1)[-1] for w in words]
+        if "commit" not in words or not ({"git", "ccnavi-git.sh"} & set(names)):
+            continue
+        for i, word in enumerate(words):
+            if word in ("-m", "--message") and i + 1 < len(words):
+                value = words[i + 1]
+            elif word.startswith("--message="):
+                value = word.partition("=")[2]
+            elif word.startswith("-m") and len(word) > 2 and not word.startswith("--"):
+                value = word[2:]
+            else:
+                continue
+            if "$(" not in value and "`" not in value:
+                found.append(value)
+    return found
+
+
+def human_path_form(subject: str) -> tuple[str, str]:
+    """hook のほかに守りが無い人の判断の形があれば（種類, 見つけた綴り）。無ければ空の組。
+
+    種類は `guard-off`（端末要求を切る）か `board`（ボードの経路）。
+    """
+    text = _dequoted(subject)
+    for message in _commit_messages(subject):
+        text = text.replace(_dequoted(message), " ", 1)
+    if _only_readers(text):
+        return "", ""
+    unread = _GUARD_READ.sub("", text)
+    mention = _GUARD_MENTION.search(unread)
+    if mention:
+        return "guard-off", mention.group(0)
+    flag = _GUARD_FLAG.search(text)
+    if flag:
+        return "guard-off", flag.group(0).strip()
+    for pair in (_BOARD_FORMS, _DECIDE_FORMS):
+        found = [rx.search(text) for rx in pair]
+        if all(found):
+            return "board", " … ".join(m.group(0) for m in found if m)
+    return "", ""
 
 
 def turns_off_guard(subject: str) -> str:
-    """人の判断の経路の端末要求を切る形があれば、その綴り。無ければ空。"""
-    match = _GUARD_OFF.search(subject)
-    return match.group(0).strip() if match else ""
+    """端末要求を切る形があれば、その綴り。無ければ空。"""
+    kind, found = human_path_form(subject)
+    return found if kind == "guard-off" else ""
+
+
+def board_form_message(found: str) -> str:
+    """ボードの経路の形で止めた文。"""
+    return (
+        f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
+        "オーバーレイで押したものを拡張が打つためのもので、端末の確かめが無いぶん、エージェントが"
+        "打つ道はここで止めます。承認と残った指摘の行き先は、利用者がボードか端末で決めます。"
+        "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
+    )
 
 
 def guard_off_message(found: str) -> str:
@@ -165,10 +268,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
     合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
 
-    残った指摘の行き先をボードで押した形（`ccnavi-review.sh decide <N> --choices … --digest …`）も
-    止める。sh が中で実行ファイルを `--yes` 付きで呼ぶので、実行ファイルの形の deny は届かない。
-    `decide <N>`（端末で選ぶ）と `--preview`（一覧を見るだけ）は止めない。前者は実行ファイルが
-    端末を求め、後者は何も置かない。
+    ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
+    ここではなく `human_path_form` が止める。実行ファイルの綴りに頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
@@ -176,19 +277,6 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
-    decide = (
-        r"(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-review\.sh\s+decide\b"
-        r"[^\x00]*\s--(choices|digest)\b"
-    )
-    # ボードの経路（`--yes`）は端末を求めないので、実行ファイルの綴りで見分ける形だけに頼ると、
-    # 名前を変えた写しで抜ける。`--approve` / `--reviewed` と `--yes` が同じコマンドに並ぶ形は、
-    # 何を呼んでいても止める。表示・検索・閲覧の道具の引数に書いた形（`echo …`・`grep …`・
-    # `git log --grep …`）は走らないので外す。外す道具を並べ損ねても、倒れるのは止める側。
-    readers = r"(?:\S*[\\/])?(?:echo|printf|grep|egrep|fgrep|rg|git|sed|awk|cat|less|head|tail)\b"
-    board = (
-        rf"(^|\x00|[;&|]\s*)(&\s*)?(?!{readers})\S+\s(?:[^\x00]*\s)?"
-        r"(--(approve|reviewed)\b[^\x00]*\s--yes\b|--yes\b[^\x00]*\s--(approve|reviewed)\b)"
-    )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
     # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
@@ -196,7 +284,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
     expression = (
         rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
-        rf"|{script}|{decide}|{board}"
+        rf"|{script}"
     )
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
