@@ -397,7 +397,7 @@ env が振り分けの sh を指していれば、sh と同じ順で `.ccnavi/bi
 | `.ccnavi/common/rules.yml` | 同じ綴り |
 | `.ccnavi/common/risks.yml` | 同じ綴り |
 | `.ccnavi/config/phases.yml` | 同じ綴り |
-| `.ccnavi/scripts/ccnavi-{ticket,review,git,common}.sh` | 同じ綴り |
+| `.ccnavi/scripts/ccnavi-{ticket,review,git,common,push-approved,approve}.sh` | 同じ綴り |
 | `.ccnavi/scripts/ccnavi-launcher.sh` | 同じ綴り。配ったあと実行ビットを付ける |
 
 ルールと配点のひな形は共通層（`.ccnavi/common/`）へ、フェーズの種類のひな形はワークスペース自身の層
