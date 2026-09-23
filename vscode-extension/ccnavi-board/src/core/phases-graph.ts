@@ -1,10 +1,10 @@
 /**
  * フェーズ管理画面の図。種類の並び（`PhasesForm`）から、点と線と置き場所を組む純関数。
  *
- * **線に向きは無い。** `requires` は「計画にこの種類を置くなら一緒に置くべき種類」で、
+ * **向きを持つのは `after` の線だけ（ADR-0078）。** `after` は `order: dag` のときの依存で、
+ * 待たれる側 → 待つ側に矢印を描く。`requires` は「計画にこの種類を置くなら一緒に置くべき種類」で、
  * 実行ファイル（`approval.py`）が見るのは `plan:` に入っているかどうかだけ。前後は見ない。
- * `overlap` は定義からして対称。順序を持つのは親チケットの `plan:` の並びのほうで、
- * このファイルには順序の情報が無い（ccnavi.md の種類の表）。矢印を描くと、無い制約を描くことになる。
+ * `overlap` は定義からして対称。この 2 つに矢印を描くと、無い制約を描くことになる（ADR-0070）。
  *
  * **判定はしない（ADR-0035）。** 循環も、到達不能も、孤立も、ここは見つけない。
  * 行き先がこのファイルに無い参照は**黙って線にしないだけ**で、なぜ無いのかは言わない。
@@ -15,12 +15,16 @@
  * **このファイルの中しか見えない。** 層をまたぐ参照（プロジェクトの種類が共通層の種類を挙げる）は、
  * 画面には解けない。受け取るのがその層 1 本だけだから。解こうとすると層の合成を拡張が作り直すことになる。
  *
- * **置き場所は id だけで決まる。線は見ない。** 保存のたびに `model` が丸ごと届き直す（ADR-0062）ので、
- * 関係を 1 本直すたびに絵が組み替わると、この画面が唯一やらせる作業（関係を直しながら確かめる）と
- * 正面からぶつかる。**繋がっている種類を近くに寄せることはしない**。寄せると、線を 1 本足しただけで
- * 触っていない点まで動く。近くに置きたいときは人がドラッグで動かし、そのぶんは画面が覚える（`state.ts`）。
+ * **置き場所は id と `after` だけで決まる。** `order: sequential` なら id の順の格子。`order: dag` なら
+ * `after` の深さ（根からの最長の段数）で列を分け、列の中は id の順。`requires` / `overlap` は置き場所に
+ * 効かない。保存のたびに `model` が丸ごと届き直す（ADR-0062）ので、線を 1 本直すたびに絵が組み替わると
+ * 関係を直しながら確かめる作業とぶつかる。それを `after` についてだけ受け入れる（深さで並べないと、
+ * 合流と分岐が交差した線に埋もれる）。人がドラッグで置いた点は動かない（`state.ts`）。
+ *
+ * **循環は見つけたと言わない。** 深さを辿る途中で同じ点に戻ったら、そこで打ち切るだけ。並べ方も
+ * 切り替えない。循環の error は実行ファイル（`phasetypes.cycle_problems`）が出す。
  */
-import type { PhaseKind, PhasesForm, Review } from "./phases-view.js";
+import type { PhaseKind, PhaseOrder, PhasesForm, Review } from "./phases-view.js";
 
 /** 点 1 つ。`x` と `y` は図の座標で、`phases.yml` には書かない（人が持つ設定に座標は入れない） */
 export interface GraphNode {
@@ -32,10 +36,10 @@ export interface GraphNode {
   readonly y: number;
 }
 
-/** 線の種類。`requires` は一緒に置く、`overlap` は並行してよい。どちらも向きは無い */
-export type Relation = "requires" | "overlap";
+/** 線の種類。`requires` は一緒に置く、`overlap` は並行してよい（どちらも向きは無い）。`after` は待つ（向きがある） */
+export type Relation = "requires" | "overlap" | "after";
 
-/** 線 1 本。`a` と `b` は辞書順で、同じ組を 2 度描かない */
+/** 線 1 本。向きの無い線は `a` と `b` が辞書順で、同じ組を 2 度描かない。`after` は `a` が待たれる側、`b` が待つ側 */
 export interface GraphEdge {
   readonly id: string;
   readonly a: string;
@@ -44,6 +48,7 @@ export interface GraphEdge {
 }
 
 export interface PhasesGraph {
+  readonly order: PhaseOrder;
   readonly nodes: readonly GraphNode[];
   readonly edges: readonly GraphEdge[];
   /** 図に出せなかった種類の数（id が空で、指すことも指されることもできない） */
@@ -84,6 +89,16 @@ function edgesOf(kept: readonly PhasesForm["phases"][number][], known: ReadonlyS
   const seen = new Map<string, GraphEdge>();
   for (const phase of kept) {
     const from = idOf(phase);
+    for (const raw of phase.after) {
+      const to = raw.trim();
+      if (!known.has(to) || to === from) {
+        continue;
+      }
+      const id = edgeId("after", to, from);
+      if (!seen.has(id)) {
+        seen.set(id, { id, a: to, b: from, relation: "after" });
+      }
+    }
     for (const relation of ["requires", "overlap"] as const) {
       for (const raw of phase[relation]) {
         const to = raw.trim();
@@ -123,19 +138,54 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   const kept = ids.map((id) => first.get(id) as PhasesForm["phases"][number]);
   const edges = edgesOf(kept, new Set(ids));
 
-  // 置き場所は id の順の格子。線は見ない（頭のコメント）
-  const nodes = ids.map((id, index) => {
+  // 置き場所（頭のコメント）。sequential は id の順の格子、dag は after の深さの列
+  const spot = form.order === "dag" ? byDepth(first, ids) : byGrid(ids);
+  const nodes = ids.map((id) => {
     const phase = first.get(id) as PhasesForm["phases"][number];
-    return {
-      id,
-      title: phase.title.trim(),
-      kind: phase.kind,
-      review: phase.review,
-      x: (index % WRAP) * COLUMN,
-      y: Math.floor(index / WRAP) * ROW,
-    };
+    const at = spot.get(id) as { x: number; y: number };
+    return { id, title: phase.title.trim(), kind: phase.kind, review: phase.review, x: at.x, y: at.y };
   });
-  return { nodes, edges, unnamed };
+  return { order: form.order, nodes, edges, unnamed };
+}
+
+function byGrid(ids: readonly string[]): Map<string, { x: number; y: number }> {
+  return new Map(ids.map((id, index) => [id, { x: (index % WRAP) * COLUMN, y: Math.floor(index / WRAP) * ROW }]));
+}
+
+/**
+ * `after` の深さ（根からの最長の段数）で列に分ける。列の中は id の順。
+ * 辿る途中で同じ点に戻ったら、その先は数えない（循環を言わずに打ち切る）。
+ */
+function byDepth(first: ReadonlyMap<string, PhasesForm["phases"][number]>, ids: readonly string[]): Map<string, { x: number; y: number }> {
+  const depth = new Map<string, number>();
+  const visiting = new Set<string>();
+  const depthOf = (id: string): number => {
+    const known = depth.get(id);
+    if (known !== undefined) {
+      return known;
+    }
+    visiting.add(id);
+    let d = 0;
+    for (const raw of first.get(id)?.after ?? []) {
+      const to = raw.trim();
+      if (to === id || !first.has(to) || visiting.has(to)) {
+        continue;
+      }
+      d = Math.max(d, depthOf(to) + 1);
+    }
+    visiting.delete(id);
+    depth.set(id, d);
+    return d;
+  };
+  const rows = new Map<number, number>();
+  const out = new Map<string, { x: number; y: number }>();
+  for (const id of ids) {
+    const d = depthOf(id);
+    const row = rows.get(d) ?? 0;
+    rows.set(d, row + 1);
+    out.set(id, { x: d * COLUMN, y: row * ROW });
+  }
+  return out;
 }
 
 // ---- 人がドラッグで動かした位置（画面の控え。`phases.yml` には書かない）

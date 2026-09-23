@@ -45,6 +45,7 @@ from . import (
     selfguard,
     settings,
     tree,
+    workflow,
 )
 from . import ticket as ticket_mod
 
@@ -658,6 +659,9 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
                 review += f" / {ph.risk_line}"
                 if ph.risk_escalates:
                     review += "（実績でレビュー要）"
+            if phase.is_dag(parent) and parent.in_plan(ph.number):
+                waits = workflow.waits_of(parent, ph.number, None)
+                review += f" / 待つ: {', '.join(map(str, waits))}" if waits else " / 何も待たない"
             stdout.write(
                 f"  {parent.ticket} フェーズ {ph.label}: {state} / {marks} / {hold}{review}\n"
             )
@@ -720,7 +724,13 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
     review_copies, notes = approval.scan_review(conf, root)
     problems.extend(notes)
 
-    pending, revisions = approval.waiting(proposals, open_copies, closed_copies, review_copies)
+    pending, revisions = approval.waiting(
+        proposals,
+        open_copies,
+        closed_copies,
+        review_copies,
+        approval.types_resolver(conf, root, open_copies),
+    )
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )

@@ -8,7 +8,7 @@
  *
  * 開いている行の控えは Webview の state（`{ open: [id, …] }`）。
  */
-import type { PhaseForm, PhasesForm } from "../../core/phases-view.js";
+import type { PhaseForm, PhaseOrder, PhasesForm } from "../../core/phases-view.js";
 import { getState, setState } from "../vscode.js";
 
 /** 行 1 つ。`key` は画面の中だけの鍵で、拡張ホストへは渡さない */
@@ -18,6 +18,7 @@ export interface Row {
 }
 
 export interface Draft {
+  readonly order: PhaseOrder;
   readonly rows: readonly Row[];
 }
 
@@ -31,12 +32,12 @@ export function keyer(): () => string {
 }
 
 export function draftOf(form: PhasesForm, nextKey: () => string): Draft {
-  return { rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
+  return { order: form.order, rows: form.phases.map((phase) => ({ key: nextKey(), phase })) };
 }
 
 /** 拡張ホストへ返す形に戻す。鍵は落とす */
 export function formOf(draft: Draft): PhasesForm {
-  return { phases: draft.rows.map((row) => row.phase) };
+  return { order: draft.order, phases: draft.rows.map((row) => row.phase) };
 }
 
 /**
@@ -44,7 +45,7 @@ export function formOf(draft: Draft): PhasesForm {
  * レビューは mr（足した種類が黙ってレビュー無しにならないように）。
  */
 export function emptyPhase(): PhaseForm {
-  return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], agent: "", when: "" };
+  return { origin: null, id: "", title: "", kind: "work", review: "mr", inherit: true, scope: [], deliverables: [], overlap: [], requires: [], after: [], agent: "", when: "" };
 }
 
 /**

@@ -100,6 +100,18 @@
   border-color: var(--vscode-focusBorder);
 }
 
+/* 人が見る種類（HITL）。縁を太くし、札を添える。色だけに頼らない */
+.phase-node:not([data-review="none"]) {
+  border-width: 2px;
+  border-color: var(--vscode-focusBorder);
+}
+
+.phase-node-tags .tag.hitl {
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-focusBorder);
+  font-weight: 600;
+}
+
 /* 線の端。React Flow は端が要るが、向きの意味は無いので見せない */
 .graph .react-flow__handle {
   width: 1px;
@@ -111,9 +123,15 @@
   opacity: 0;
 }
 
-/* 線。requires は実線、overlap は破線。どちらも矢印は付けない（向きが無い） */
+/* 線。requires は実線、overlap は破線で、どちらも矢印は付けない（向きが無い）。
+   after は矢印付きで、太さと色で見分ける（待たれる側 → 待つ側） */
 .graph .react-flow__edge.rel-overlap .react-flow__edge-path {
   stroke-dasharray: 4 3;
+}
+
+.graph .react-flow__edge.rel-after .react-flow__edge-path {
+  stroke: var(--vscode-focusBorder);
+  stroke-width: 2;
 }
 
 .graph .react-flow__edge-text {

@@ -9,7 +9,7 @@ import type { PhasesPage } from "../../src/core/phases-view.js";
 import { openPhases } from "../helpers/phases.js";
 import type { HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 
-const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { phases: [] }, problems: [] } };
+const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, form: { order: "sequential", phases: [] }, problems: [] } };
 
 test("CB-T114 層の種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
   const layer = await openPhases({ ...MISSING, layer: true, notices: ["読めない <理由>"] });
@@ -50,6 +50,7 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
 
 test("CB-T116 無いファイル（空の本文）に種類を足して書き戻すと、version と種類を持つ読めるファイルになる", () => {
   const text = readPhases("").apply({
+    order: "sequential",
     phases: [
       {
         origin: null,
@@ -62,6 +63,7 @@ test("CB-T116 無いファイル（空の本文）に種類を足して書き戻
         deliverables: [],
         overlap: [],
         requires: [],
+        after: [],
         agent: "",
         when: "",
       },

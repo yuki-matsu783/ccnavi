@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { graphOf } from "../../core/phases-graph.js";
-import { editable as canEdit, type PhaseForm, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
+import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Graph } from "./Graph.js";
 import { Phase } from "./Phase.js";
@@ -26,7 +26,7 @@ import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, ope
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: Lock = { locked: true, reason: "", doing: [] };
 
-const EMPTY_DRAFT: Draft = { rows: [] };
+const EMPTY_DRAFT: Draft = { order: "sequential", rows: [] };
 
 interface Status {
   readonly text: string;
@@ -150,7 +150,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const editRow = (key: string, phase: PhaseForm): void => {
-    editDraft({ rows: draft.rows.map((row) => (row.key === key ? { ...row, phase } : row)) });
+    editDraft({ ...draft, rows: draft.rows.map((row) => (row.key === key ? { ...row, phase } : row)) });
   };
 
   const toggle = (key: string): void => {
@@ -178,11 +178,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     const moved = rows[from];
     rows[from] = rows[to];
     rows[to] = moved;
-    editDraft({ rows });
+    editDraft({ ...draft, rows });
   };
 
   const remove = (key: string): void => {
-    editDraft({ rows: draft.rows.filter((row) => row.key !== key) });
+    editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
   };
 
   const showView = (next: View): void => {
@@ -210,7 +210,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
-    editDraft({ rows: [...draft.rows, row] }, new Set([...open, row.key]));
+    editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
     // 足した種類は関係も案内も空なので、「関係と案内」は畳んで出す
     setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
@@ -310,6 +310,22 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             図
           </button>
         </div>
+        <label className="order">
+          全体計画の待ち方{" "}
+          <select
+            id="f-order"
+            data-yaml-key="order"
+            value={draft.order}
+            disabled={busy || !editable}
+            onChange={(event) => editDraft({ ...draft, order: event.target.value as PhaseOrder })}
+          >
+            {ORDERS.map((order) => (
+              <option key={order} value={order}>
+                {ORDER_LABELS[order]}
+              </option>
+            ))}
+          </select>
+        </label>
         {view === "list" && (
           <div className="find">
             <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
@@ -321,7 +337,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは{" "}
             <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。
-            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は{" "}
+            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
+            辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は{" "}
             <code>,</code> で区切る。
           </p>
         </details>

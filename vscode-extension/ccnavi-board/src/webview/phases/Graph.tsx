@@ -1,7 +1,9 @@
 /**
- * フェーズの種類の関係を図で見せる。点が種類、線が `requires` と `overlap`。
+ * フェーズの種類の関係を図で見せる。点が種類、線が `requires` と `overlap` と `after`。
  *
- * **線に矢印は付けない。** `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
+ * **矢印を付けるのは `after` だけ。** `requires` は「一緒に置くべき」で、順序ではない（`phases-graph.ts` の頭）。
+ * 見る場所が `none` でない種類は、点の縁を強めて「人が見る」を添える（種類の宣言。計画の延期や
+ * 実績のリスクで変わることは図の下の一言が言う）。
  * 図が判定をしないのも同じところに書いてある。ここは `graphOf` が組んだものを描くだけで、
  * 何が正しいかは言わない。
  *
@@ -14,7 +16,7 @@
  * `--vscode-*` で上書きする。直書きの色を打ち消す `!important` は要らない。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Background, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
+import { Background, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps, type NodeTypes } from "@xyflow/react";
 
 import { keepSpots, withSpot, type PhasesGraph, type Spots } from "../../core/phases-graph.js";
 import { KIND_LABELS, REVIEW_LABELS } from "../../core/phases-view.js";
@@ -40,7 +42,7 @@ type PhaseNode = Node<PhaseData, "phase">;
  */
 function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
   return (
-    <div className="phase-node" data-kind={data.kind} title={`${KIND_LABELS[data.kind as "work"] ?? data.kind}\n${REVIEW_LABELS[data.review as "mr"] ?? data.review}`}>
+    <div className="phase-node" data-kind={data.kind} data-review={data.review} title={`${KIND_LABELS[data.kind as "work"] ?? data.kind}\n${REVIEW_LABELS[data.review as "mr"] ?? data.review}`}>
       <Handle id="l" type="target" position={Position.Left} isConnectable={false} />
       <Handle id="t" type="target" position={Position.Top} isConnectable={false} />
       <span className="phase-node-id">{id}</span>
@@ -52,6 +54,7 @@ function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
         <span className="tag" data-review={data.review}>
           {data.review}
         </span>
+        {data.review !== "none" && <span className="tag hitl">人が見る</span>}
       </span>
       <Handle id="r" type="source" position={Position.Right} isConnectable={false} />
       <Handle id="b" type="source" position={Position.Bottom} isConnectable={false} />
@@ -84,6 +87,8 @@ function nodesOf(graph: PhasesGraph, spots: Spots): PhaseNode[] {
  */
 function edgesOf(graph: PhasesGraph): Edge[] {
   return graph.edges.map((edge) => ({
+    // `after` だけが向きを持つ。待たれる側（a）から待つ側（b）へ矢印を描く
+    ...(edge.relation === "after" ? { markerEnd: { type: MarkerType.ArrowClosed } } : {}),
     id: edge.id,
     source: edge.a,
     target: edge.b,

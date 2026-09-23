@@ -33,7 +33,7 @@ export interface PhaseProps {
 }
 
 type TextKey = "id" | "title" | "agent" | "when";
-type ListKey = "scope" | "deliverables" | "overlap" | "requires";
+type ListKey = "scope" | "deliverables" | "overlap" | "requires" | "after";
 
 export function Phase(props: PhaseProps): JSX.Element {
   const { phase, disabled } = props;
@@ -154,6 +154,9 @@ export function Phase(props: PhaseProps): JSX.Element {
             </Captioned>
             <Captioned name="一緒に要る種類" yamlKey="requires">
               {list("requires", "f-requires", "計画に置くなら一緒に要る種類の id")}
+            </Captioned>
+            <Captioned name="待つ種類" yamlKey="after">
+              {list("after", "f-after", "待ち方が dag のとき、先に閉じてレビューが済んでいるべき種類の id")}
             </Captioned>
             <Captioned name="エージェント" yamlKey="agent">
               {text("agent", "f-agent narrow", "案内に出すサブエージェントの名前")}

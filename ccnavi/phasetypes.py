@@ -16,6 +16,7 @@
 ## 書式
 
     version: 1
+    order: dag                # sequential（既定）| dag。全体計画の待ち方
     phases:
       research:
         kind: work            # work | feedback
@@ -25,6 +26,7 @@
         deliverables: ["wip/research/summary.md"]
         overlap: [design]     # 並行してよい種類（対称）
         requires: [design]    # 計画に置くなら一緒に要る種類
+        after: [design]       # order: dag のとき、先に閉じてレビューが済んでいるべき種類
         agent: explorer       # 案内にだけ使う
         when: 既存の振る舞いが分からないとき   # 案内にだけ使う
 """
@@ -66,6 +68,33 @@ def stricter(a: str, b: str) -> str:
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
 
 
+# 全体計画の待ち方（設計 §9.7、ADR-0078）。sequential は一直線、dag は種類の `after` を辺にする。
+ORDER_SEQUENTIAL = "sequential"
+ORDER_DAG = "dag"
+ORDERS = (ORDER_SEQUENTIAL, ORDER_DAG)
+
+
+class PhaseTypes(dict):
+    """種類の集合。id → 種類の辞書に、ファイルの頭の `order` を持たせたもの。"""
+
+    def __init__(self, *args, order: str = ORDER_SEQUENTIAL, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.order = order
+
+    def ancestors(self, ident: str) -> set[str]:
+        """`after` を推移的に辿った祖先の id。自分は含めない。循環していても止まる。"""
+        found: set[str] = set()
+        stack = list(self[ident].after) if ident in self else []
+        while stack:
+            name = stack.pop()
+            if name in found or name not in self:
+                continue
+            found.add(name)
+            stack.extend(self[name].after)
+        found.discard(ident)
+        return found
+
+
 # 種類の範囲が「親の範囲そのまま」であることを言う綴り。
 INHERIT = "inherit"
 
@@ -84,6 +113,7 @@ class PhaseType:
     deliverables: list[str] = field(default_factory=list)
     overlap: list[str] = field(default_factory=list)
     requires: list[str] = field(default_factory=list)
+    after: list[str] = field(default_factory=list)
     agent: str = ""
     when: str = ""
     # source はこの種類が書いてある層の名前（`common` / `self` / プロジェクト名）。
@@ -109,6 +139,7 @@ class PhaseType:
             tuple(self.deliverables),
             tuple(self.overlap),
             tuple(self.requires),
+            tuple(self.after),
             self.agent,
             self.when,
         )
@@ -127,10 +158,10 @@ class PhaseType:
         return other.id in self.overlap or self.id in other.overlap
 
 
-def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, list[Problem]]:
+def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]]:
     """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。
 
-    `refs` を False にすると `overlap` / `requires` が指す先の確認を飛ばす。層の
+    `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。層の
     ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 §11.4.1）、
     その相手はファイルの中に居ないので、1 本だけで確かめると必ず落ちる。確かめる
     のは合成したあと（`merge`）。
@@ -151,7 +182,7 @@ def load(path: str, refs: bool = True) -> tuple[dict[str, PhaseType] | None, lis
 
 def parse(
     text: str, where: str = "(phases)", refs: bool = True
-) -> tuple[dict[str, PhaseType] | None, list[Problem]]:
+) -> tuple[PhaseTypes | None, list[Problem]]:
     problems: list[Problem] = []
     try:
         data = yaml.safe_load(text)
@@ -170,8 +201,11 @@ def parse(
     raw = data.get("phases")
     if not isinstance(raw, dict) or not raw:
         return None, [Problem(SEVERITY_ERROR, where, "`phases` が辞書として無い")]
+    order = str(data.get("order") or ORDER_SEQUENTIAL).strip()
+    if order not in ORDERS:
+        return None, [Problem(SEVERITY_ERROR, where, f"`order` は {' か '.join(ORDERS)}")]
 
-    types: dict[str, PhaseType] = {}
+    types = PhaseTypes(order=order)
     titles: dict[str, str] = {}
     for key, body in raw.items():
         ident = str(key).strip()
@@ -211,13 +245,17 @@ def parse(
 
     if refs:
         problems.extend(reference_problems(types.values(), types))
+        problems.extend(cycle_problems(types))
+        problems.extend(conflict_problems(types))
     if any(p.severity == SEVERITY_ERROR for p in problems):
         return None, problems
     return types, problems
 
 
 def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
-    """`overlap` / `requires` が指す先が、その集合の中に居るか。
+    """`overlap` / `requires` / `after` が指す先が、その集合の中に居るか。
+
+    `after` の先は `kind: work` の種類でなければならない。
 
     見るのは `checked` の側だけで、居てよい先は `pool` 全部。層の種類が共通層の
     種類を指す形（設計 §11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
@@ -231,6 +269,76 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
                         SEVERITY_ERROR, pt.id, f"`{name}` という種類は無い（overlap / requires）"
                     )
                 )
+        for name in pt.after:
+            target = pool.get(name)
+            if target is None:
+                problems.append(
+                    Problem(SEVERITY_ERROR, pt.id, f"`{name}` という種類は無い（after）")
+                )
+            elif target.kind != KIND_WORK:
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        pt.id,
+                        f"`after` の `{name}` は kind `{target.kind}`。"
+                        f"指せるのは `{KIND_WORK}` だけ",
+                    )
+                )
+    return problems
+
+
+def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
+    """同じ組を `after`（待つ）と `overlap`（並行してよい）の両方に挙げていないか。
+
+    両方あると、待ち方の計算は `overlap` を採って待たず、書いた依存が黙って消える。
+    どちらのつもりかを人に決めさせる。
+    """
+    problems: list[Problem] = []
+    for pt in pool.values():
+        for name in pt.after:
+            other = pool.get(name)
+            if other is not None and pt.overlaps(other):
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        pt.id,
+                        f"`{name}` を after と overlap の両方に挙げている。"
+                        "待つか並行かを 1 つにする",
+                    )
+                )
+    return problems
+
+
+def cycle_problems(pool: dict[str, PhaseType]) -> list[Problem]:
+    """`after` の循環。循環のある集合は、祖先が決まらないので読まない。"""
+    problems: list[Problem] = []
+    state: dict[str, int] = {}  # 1 = 辿っている途中、2 = 済み
+    for start in sorted(pool):
+        if state.get(start):
+            continue
+        path: list[str] = []
+        stack: list[tuple[str, int]] = [(start, 0)]
+        while stack:
+            ident, i = stack.pop()
+            if i == 0:
+                state[ident] = 1
+                path.append(ident)
+            after = [a for a in pool[ident].after if a in pool]
+            if i < len(after):
+                stack.append((ident, i + 1))
+                nxt = after[i]
+                if state.get(nxt) == 1:
+                    loop = path[path.index(nxt) :] + [nxt]
+                    problems.append(
+                        Problem(
+                            SEVERITY_ERROR, nxt, f"`after` が循環している（{' → '.join(loop)}）"
+                        )
+                    )
+                elif not state.get(nxt):
+                    stack.append((nxt, 0))
+                continue
+            state[ident] = 2
+            path.pop()
     return problems
 
 
@@ -240,9 +348,17 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
         pt.source = layer
 
 
+def merged_order(*layers: PhaseTypes | None) -> str:
+    """層を合わせた `order`。ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（設計 §9.7）。"""
+    present = [getattr(t, "order", ORDER_SEQUENTIAL) for t in layers if t is not None]
+    if present and all(o == ORDER_DAG for o in present):
+        return ORDER_DAG
+    return ORDER_SEQUENTIAL
+
+
 def merge(
-    common: dict[str, PhaseType] | None, extra: dict[str, PhaseType] | None, layer: str
-) -> tuple[dict[str, PhaseType], list[Problem]]:
+    common: PhaseTypes | None, extra: PhaseTypes | None, layer: str
+) -> tuple[PhaseTypes, list[Problem]]:
     """共通層の種類に、行き先の層の種類を id ごとに足す（設計 §11.4.1）。
 
     足すだけで、後ろの層が前の層を上書きすることはない。同 `id` で全欄が一致する
@@ -252,10 +368,14 @@ def merge(
     error があるとき、その層は空として扱い、共通層の種類だけを返す。衝突した片方を
     黙って採ると、どちらの `review:` が効いているかを人が読めない。止まる側に倒す。
 
-    `overlap` / `requires` が指す先は合成後の集合で確かめる。層から共通層の種類を
+    `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。層から共通層の種類を
     指すのは正しい形なので、層 1 本の中では確かめられない。
+
+    `order` は、ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（`merged_order`）。
+    食い違いは warn。プロジェクトの層 1 本で緩む側へ切り替えられないようにする。
     """
-    base = dict(common or {})
+    order = merged_order(common, extra)
+    base = PhaseTypes(common or {}, order=order)
     problems: list[Problem] = []
     titles = {pt.title: ident for ident, pt in base.items()}
     added: dict[str, PhaseType] = {}
@@ -295,9 +415,20 @@ def merge(
             continue
         titles[pt.title] = ident
         added[ident] = pt
-    merged = dict(base)
+    if common is not None and extra is not None and common.order != extra.order:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                "(phases)",
+                f"`order` が層で食い違う（共通層 {common.order}、{layer} {extra.order}）。"
+                f"`{ORDER_SEQUENTIAL}` で待たせる",
+            )
+        )
+    merged = PhaseTypes(base, order=order)
     merged.update(added)
     problems.extend(reference_problems(added.values(), merged))
+    problems.extend(cycle_problems(merged))
+    problems.extend(conflict_problems(merged))
     if any(p.severity == SEVERITY_ERROR for p in problems):
         return base, problems
     return merged, problems
@@ -344,7 +475,7 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
         problems.append(Problem(SEVERITY_ERROR, ident, "`scope` は glob の並びか `inherit`"))
         return None, problems
 
-    for key in ("deliverables", "overlap", "requires"):
+    for key in ("deliverables", "overlap", "requires", "after"):
         raw = body.get(key)
         if raw is None:
             continue
@@ -362,6 +493,11 @@ def _one(ident: str, body: dict) -> tuple[PhaseType | None, list[Problem]]:
             return None, problems
     if ident in pt.overlap or ident in pt.requires:
         problems.append(Problem(SEVERITY_WARN, ident, "自分自身を overlap / requires に挙げている"))
+    if pt.after and kind != KIND_WORK:
+        problems.append(
+            Problem(SEVERITY_ERROR, ident, f"`after` を持てるのは kind `{KIND_WORK}` の種類だけ")
+        )
+        return None, problems
 
     pt.agent = str(body.get("agent") or "").strip()
     pt.when = str(body.get("when") or "").strip()
