@@ -18,9 +18,10 @@
 #            外してマージするのは人の手に残す。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす
-#   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、受け入れて
-#            進むか、続きの子チケットを .ccnavi/approved/doing/ に起こすかを選ばせる
-#            → 受け入れた一覧（か、起こした子）をここがコメントに写す
+#   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、指摘ごとに
+#            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
+#            → issue に回す分があればここが issue を作り、決めた内容をコメントに写す
+#            ボードは同じ道を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
 #
 # リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
 # GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
@@ -33,13 +34,12 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|to-issue|ready|close-early|fetch|origin> [--phase <N>] [--body-file <path>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|fetch|origin> [--phase <N>] [--body-file <path>]
 
   request      --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
-  decide       <N>                                未解決の扱いを選ぶ。受け入れて進むか、続きの子チケットを起こす（人が端末で打つ）
-  to-issue     --body-file <題と本文>             残った指摘を別の issue に切り出し、マージリクエストに引き継ぎのコメントを残す
+  decide       <N> [--preview]                    残った指摘の行き先を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
@@ -64,13 +64,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | confirm | comment | decide | to-issue | ready | close-early | fetch | origin) ;;
+request | confirm | comment | decide | ready | close-early | fetch | origin) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail "$sub は通しません。使えるのは request / confirm / comment / decide / to-issue / ready / close-early / fetch / origin です。" 2
+	fail "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin です。" 2
 	;;
 esac
 
@@ -426,6 +426,38 @@ create_issue() {
 	fi
 }
 
+# ---- 決めた行き先を投稿する。exe が控えの置き場に書いた下書きから、issue を作ってコメントを残す。
+#
+# 置いたあとの投稿なので、ここで失敗しても決めたことは戻さない。失敗は post_warning に言い、
+# 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子 = ブランチ名）。
+
+post_decision() {
+	issue_url=""
+	post_warning=""
+	number=$("$JQ" '.mr.number' "$result")
+	url=$("$JQ" -r '.mr.url' "$result")
+	issue_draft="$state/review-issue-$branch-$1.md"
+	noted="$state/review-decide-$branch-$1.md"
+	if [ -f "$issue_draft" ]; then
+		issue=$(create_issue "$issue_draft" || :)
+		if [ -n "$issue" ]; then
+			issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
+			issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
+			[ -f "$noted" ] && printf '\nissue に回した分: #%s %s\n' "$issue_no" "$issue_url" >>"$noted"
+			rm -f "$issue_draft"
+		else
+			post_warning="issue を作れなかった。下書きは $issue_draft にある"
+		fi
+	fi
+	if [ -f "$noted" ]; then
+		if comment "$number" "$url" "$noted" >/dev/null; then
+			rm -f "$noted"
+		else
+			post_warning="${post_warning:+${post_warning}。}マージリクエストにコメントを残せなかった。下書きは $noted にある"
+		fi
+	fi
+}
+
 # ---- 写し。exe に渡す JSON。
 
 fetch_all() {
@@ -508,47 +540,55 @@ comment)
 	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	;;
 decide)
+	# 残った指摘の行き先を、人が指摘ごとに決める。形は 3 つ。
+	#   decide <N>                                   端末で 1 件ずつ選ぶ（人が打つ）
+	#   decide <N> --preview                         見せる一覧を JSON で返す。何も置かない（ボードが読む）
+	#   decide <N> --choices <JSON> --digest <指紋>  ボードで人が押した選択を置く
+	# 最後の形は、エージェントが打つと組み込みの deny（builtin-guard-ticket-approval）が止める。
 	n="${1:-}"
 	[ -n "$n" ] || fail "decide には <N>（フェーズ番号）が要る。" 2
-	fetch_all >"$result"
-	ccnavi --reviewed "$n" --accept-unresolved --result "$result"
-	# 受け入れた一覧が書き出されていれば、コメントに写す。
-	for f in "$state"/review-decide-*-"$n".md; do
-		[ -f "$f" ] || continue
-		number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
-		url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
-		comment "$number" "$url" "$f" >/dev/null && rm -f "$f"
-	done
-	;;
-to-issue)
-	# 残った指摘を別の issue に切り出す。exe が段階を確かめて下書きを書き、ここが作る。
-	body=""
+	shift
+	preview=0
+	choices=""
+	digest=""
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
-		--body-file)
-			body="${2:-}"
+		--preview)
+			preview=1
+			shift
+			;;
+		--json) shift ;;
+		--choices)
+			choices="${2:-}"
 			shift 2
 			;;
-		*) shift ;;
+		--digest)
+			digest="${2:-}"
+			shift 2
+			;;
+		*) fail "decide は $1 を受けない。" 2 ;;
 		esac
 	done
-	[ -n "$body" ] && [ -f "$body" ] || fail "to-issue には --body-file <題と本文>（1 行目が題）が要る。" 2
 	fetch_all >"$result"
-	draft=$(ccnavi review to-issue --body-file "$body" --result "$result") || exit $?
-	issue=$(create_issue "$draft")
-	[ -z "$issue" ] && fail "issue を作れなかった。"
-	issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
-	issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
-	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
-	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
-	noted="$state/review-to-issue-note-$$.md"
-	{
-		printf '<!-- ccnavi:to-issue -->\n'
-		printf '残った指摘を #%s へ引き継ぐ: %s\n' "$issue_no" "$issue_url"
-	} >"$noted"
-	comment "$number" "$url" "$noted" >/dev/null
-	rm -f "$noted"
-	printf 'OK: #%s に引き継いだ（%s）。残りは利用者が decide で受け入れて閉じる\n' "$issue_no" "$issue_url"
+	if [ "$preview" -eq 1 ]; then
+		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
+		exit $?
+	fi
+	if [ -n "$choices" ]; then
+		# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
+		out=$(ccnavi --reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result") || {
+			printf '%s\n' "$out"
+			exit 1
+		}
+		post_decision "$n"
+		printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
+		exit 0
+	fi
+	ccnavi --reviewed "$n" --accept-unresolved --result "$result"
+	post_decision "$n"
+	[ -n "$issue_url" ] && printf 'issue に回した: %s\n' "$issue_url"
+	[ -n "$post_warning" ] && printf 'ccnavi-review: %s\n' "$post_warning" >&2
+	:
 	;;
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、

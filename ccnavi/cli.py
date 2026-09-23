@@ -145,7 +145,6 @@ scripts in .ccnavi/scripts/, which call
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
     ccnavi review confirm   --cwd <dir> --phase N --result <json>
-    ccnavi review to-issue  --cwd <dir> --body-file <path> --result <json>
     ccnavi review ready     --cwd <dir> --result <json>
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
@@ -499,7 +498,14 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     # チケットの状態とレビューの操作。payload を読まない。
     if args.command or args.reviewed is not None or args.close_early:
-        if args.reviewed is not None and not _from_terminal(stdin, conf, stderr, "--reviewed"):
+        # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
+        # `--yes` の守りは、見せた指摘の指紋の一致と、シェルから打つ形を止める組み込みの deny。
+        board = args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes)
+        if (
+            args.reviewed is not None
+            and not board
+            and not _from_terminal(stdin, conf, stderr, "--reviewed")
+        ):
             return EXIT_ERROR
         return operate(stdin, stdout, stderr, conf, root, args)
 
@@ -610,6 +616,30 @@ def operate(
             return EXIT_ERROR
         code = review.close_early(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
         return EXIT_OK if code == 0 else EXIT_ERROR
+    if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
+        if args.preview and args.yes:
+            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            return EXIT_ERROR
+        if not args.json or not args.result:
+            stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
+            return EXIT_ERROR
+        if args.preview:
+            code = review.decide_preview(
+                stdout, stderr, root, conf, cwd, args.reviewed, args.result
+            )
+        else:
+            code = review.decide_yes(
+                stdout,
+                stderr,
+                root,
+                conf,
+                cwd,
+                args.reviewed,
+                args.result,
+                args.yes,
+                args.digest,
+            )
+        return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
         code = review.reviewed(
             stdin,
@@ -659,13 +689,6 @@ def operate(
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
             code = review.confirm(stdout, stderr, root, conf, cwd, args.phase, args.result)
-    elif kind == "review" and verb == "to-issue":
-        if not args.body_file or not args.result:
-            stderr.write(
-                "ccnavi: review to-issue には --body-file <path> と --result <json> が要る\n"
-            )
-        else:
-            code = review.to_issue(stdout, stderr, root, conf, cwd, args.body_file, args.result)
     elif kind == "review" and verb == "ready":
         if not args.result:
             stderr.write("ccnavi: review ready には --result <json> が要る\n")

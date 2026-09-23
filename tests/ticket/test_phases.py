@@ -718,7 +718,7 @@ class PhaseTest(PhaseHarness):
         # 閉じられる。
         self.assertEqual(self.close_child("i0001").returncode, 0)
 
-    def test_feedback_work_phase_runs_and_to_issue_drafts_the_rest(self):
+    def test_feedback_work_phase_runs_and_decide_sends_the_rest_to_an_issue(self):
         self.family(plan=["design"])
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -764,28 +764,49 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("u/7#t0", refused.stderr)
         self.assertIn("道は 2 つ", refused.stderr)
-        self.assertIn("to-issue", refused.stderr)
+        self.assertIn("decide", refused.stderr)
         data = read_json(fixture)
         data["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "まだ"})
         write(fixture, json.dumps(data))
-        # 切り出しの下書き。
-        body = write(os.path.join(self.root, "handoff.md"), "残りの対応\n\n次の issue で。\n")
-        drafted = self.ccnavi(
+        # フィードバック計画が承認済みなので、人は残りを issue に回せる。
+        shown = self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "--body-file",
-            body,
-            "review",
-            "to-issue",
+            "--reviewed",
+            "2",
+            "--accept-unresolved",
+            "--preview",
+            "--json",
             "--result",
             fixture,
         )
-        self.assertEqual(drafted.returncode, 0, drafted.stderr)
-        with open(drafted.stdout.strip(), encoding="utf-8") as f:
+        self.assertEqual(shown.returncode, 0, shown.stderr)
+        preview = json.loads(shown.stdout)
+        self.assertTrue(preview["can_issue"])
+        choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
+        done = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "2",
+            "--accept-unresolved",
+            "--yes",
+            choices,
+            "--digest",
+            preview["digest"],
+            "--json",
+            "--result",
+            fixture,
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        answer = json.loads(done.stdout)
+        self.assertTrue(answer["reviewed"])
+        with open(answer["issue_draft"], encoding="utf-8") as f:
             text = f.read()
-        self.assertTrue(text.startswith("残りの対応\n\n"))
+        self.assertTrue(text.startswith("レビューで残った指摘（i0001 のフェーズ 2）\n\n"))
         self.assertIn("u/7#t1", text)
-        self.assertIn("i0001", text)
+        self.assertNotIn("u/7#t0", text)
+        self.assertEqual(self.confirm(fixture, 2).returncode, 0)
 
     # ---- 7. Draft を外す（ready）と、人が締める（close-early）
 

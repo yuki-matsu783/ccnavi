@@ -48,7 +48,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # ここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|to-issue|ready|close-early|push)\b"
+    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -86,7 +86,7 @@ _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
     rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
     r"|\b(ticket|review)\s+"
-    r"(start|finish|cancel|record-risk|prepare|requested|confirm|to-issue|ready)\b)"
+    r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
@@ -164,6 +164,11 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
 
     承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
     合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
+
+    残った指摘の行き先をボードで押した形（`ccnavi-review.sh decide <N> --choices … --digest …`）も
+    止める。sh が中で実行ファイルを `--yes` 付きで呼ぶので、実行ファイルの形の deny は届かない。
+    `decide <N>`（端末で選ぶ）と `--preview`（一覧を見るだけ）は止めない。前者は実行ファイルが
+    端末を求め、後者は何も置かない。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
@@ -171,12 +176,28 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
         names.append(clause)
     launcher = r"((uv\s+run\s+)?python[\w.]*\s+-m\s+ccnavi|(\S*[\\/])?(" + "|".join(names) + "))"
     script = r"(^|\x00|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(approve|push-approved)\.sh\b"
+    decide = (
+        r"(^|\x00|[;&|]\s*)((sh|bash)\s+)?\S*ccnavi-review\.sh\s+decide\b"
+        r"[^\x00]*\s--(choices|digest)\b"
+    )
+    # ボードの経路（`--yes`）は端末を求めないので、実行ファイルの綴りで見分ける形だけに頼ると、
+    # 名前を変えた写しで抜ける。`--approve` / `--reviewed` と `--yes` が同じコマンドに並ぶ形は、
+    # 何を呼んでいても止める。表示・検索・閲覧の道具の引数に書いた形（`echo …`・`grep …`・
+    # `git log --grep …`）は走らないので外す。外す道具を並べ損ねても、倒れるのは止める側。
+    readers = r"(?:\S*[\\/])?(?:echo|printf|grep|egrep|fgrep|rg|git|sed|awk|cat|less|head|tail)\b"
+    board = (
+        rf"(^|\x00|[;&|]\s*)(&\s*)?(?!{readers})\S+\s(?:[^\x00]*\s)?"
+        r"(--(approve|reviewed)\b[^\x00]*\s--yes\b|--yes\b[^\x00]*\s--(approve|reviewed)\b)"
+    )
     # 大文字小文字を区別しない。Windows と macOS の既定のファイルシステムは綴りの大小を
     # 区別しないので、`SH .ccnavi/scripts/CCNAVI-APPROVE.sh` や `CCNAVI.EXE --approve` でも
     # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
     # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
     # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
-    expression = rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
+    expression = (
+        rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
+        rf"|{script}|{decide}|{board}"
+    )
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
@@ -188,7 +209,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
             f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
-            "未解決の受け入れは利用者が端末で行います。承認済みチケットのコミットと push"
+            "残った指摘の行き先は利用者がボードか端末で決めます。承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"

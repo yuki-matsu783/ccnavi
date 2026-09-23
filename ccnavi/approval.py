@@ -1746,7 +1746,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
         if accepted:
-            notes.append("受け入れた分は別 issue に切り出したか（ccnavi-review.sh to-issue）")
+            notes.append("受け入れた分は別 issue に回したか（ccnavi-review.sh decide）")
     return notes
 
 
@@ -1873,7 +1873,7 @@ def revision_problems(
             elsewhere = (
                 "残りは新しい親チケットの提案として wip/proposals/todo/ に書く"
                 if phase.chat_only(root, conf, current.ticket)
-                else "残りは別 issue に切り出す（ccnavi-review.sh to-issue）"
+                else "残りは別 issue に回す（ccnavi-review.sh decide）"
             )
             problems.append(
                 rules.Problem(
