@@ -47,6 +47,7 @@ import { showLoading } from "./loading.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { requireTickets } from "./ticket-control.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
@@ -597,6 +598,15 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
+    // 初回だけ吹き出しの案内を頼む。画面は種類の中身が出てから始め、閉じたら `tourDone` を返す。
+    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    if (!tourSeen(SCREEN)) {
+      current.host.post({ type: "tour" } satisfies ToPhases);
+    }
+    return;
+  }
+  if (message.type === "tourDone") {
+    markTourSeen(SCREEN);
     return;
   }
   // 読み直せていない画面では、種類に当たる操作はどれも行き先が無い（「再読込」は
@@ -791,6 +801,7 @@ function asMessage(message: unknown): PhasesMessage | undefined {
     case "ready":
     case "openFile":
     case "create":
+    case "tourDone":
       return { type: m.type };
     case "save": {
       const form = asPhasesForm(m.form);

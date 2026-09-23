@@ -21,6 +21,11 @@
  * 関係を直しながら確かめる作業とぶつかる。それを `after` についてだけ受け入れる（深さで並べないと、
  * 合流と分岐が交差した線に埋もれる）。人がドラッグで置いた点は動かない（`state.ts`）。
  *
+ * **work と feedback は分けて置く。** work の種類は上の決まりで並べ、feedback の種類はその右に 1 列で
+ * 縦に並べる（`FEEDBACK_GAP` だけ離す）。feedback の種類は全体計画（`plan:`）には入らず、レビューの
+ * あとに `feedback:` へ並べる対応なので、図は区分ごとの枠と、枠の間の「レビュー後」の矢印でその順を見せる
+ * （`Graph.tsx`）。feedback の種類は `after` を持てない（`phasetypes.py`）ので、種類どうしの線では描けない。
+ *
  * **循環は見つけたと言わない。** 深さを辿る途中で同じ点に戻ったら、そこで打ち切るだけ。並べ方も
  * 切り替えない。循環の error は実行ファイル（`phasetypes.cycle_problems`）が出す。
  */
@@ -53,13 +58,22 @@ export interface PhasesGraph {
   readonly edges: readonly GraphEdge[];
   /** 図に出せなかった種類の数（id が空で、指すことも指されることもできない） */
   readonly unnamed: number;
+  /**
+   * 線にしなかった参照の数（このファイルに無い id を指す overlap / requires / after）。
+   * 綴り違いか他の層の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
+   */
+  readonly dropped: number;
 }
 
 /** 点の間隔。CSS の `.react-flow__node-phase` の大きさと合わせる */
-const COLUMN = 210;
-const ROW = 120;
+export const COLUMN = 210;
+export const ROW = 120;
+/** 点の幅。CSS の `.react-flow__node-phase` の width と同じ */
+export const NODE_WIDTH = 170;
 /** 1 行に並べる数 */
 const WRAP = 4;
+/** work の枠と feedback の枠の間の余白（`COLUMN` に足す） */
+export const FEEDBACK_GAP = 90;
 
 /** 前後の空白を落とした id。画面の他の場所（重なりの検査）と同じ読み方 */
 function idOf(phase: { readonly id: string }): string {
@@ -136,16 +150,34 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   }
   const ids = Array.from(first.keys()).sort();
   const kept = ids.map((id) => first.get(id) as PhasesForm["phases"][number]);
-  const edges = edgesOf(kept, new Set(ids));
+  const known = new Set(ids);
+  const edges = edgesOf(kept, known);
+  // 同じ種類が同じ関係で同じ id を 2 度挙げても 1 件（線と同じまとめ方）。関係が違えば別に数える
+  const missing = new Set<string>();
+  for (const phase of kept) {
+    for (const relation of ["overlap", "requires", "after"] as const) {
+      for (const raw of phase[relation]) {
+        const to = raw.trim();
+        if (to !== "" && to !== idOf(phase) && !known.has(to)) {
+          missing.add(JSON.stringify([idOf(phase), relation, to]));
+        }
+      }
+    }
+  }
+  const dropped = missing.size;
 
   // 置き場所（頭のコメント）。sequential は id の順の格子、dag は after の深さの列
-  const spot = form.order === "dag" ? byDepth(first, ids) : byGrid(ids);
+  const works = ids.filter((id) => first.get(id)?.kind !== "feedback");
+  const feedbacks = ids.filter((id) => first.get(id)?.kind === "feedback");
+  const spot = form.order === "dag" ? byDepth(first, works) : byGrid(works);
+  const right = works.length === 0 ? 0 : Math.max(...works.map((id) => (spot.get(id) as { x: number }).x)) + COLUMN + FEEDBACK_GAP;
+  feedbacks.forEach((id, index) => spot.set(id, { x: right, y: index * ROW }));
   const nodes = ids.map((id) => {
     const phase = first.get(id) as PhasesForm["phases"][number];
     const at = spot.get(id) as { x: number; y: number };
     return { id, title: phase.title.trim(), kind: phase.kind, review: phase.review, x: at.x, y: at.y };
   });
-  return { order: form.order, nodes, edges, unnamed };
+  return { order: form.order, nodes, edges, unnamed, dropped };
 }
 
 function byGrid(ids: readonly string[]): Map<string, { x: number; y: number }> {

@@ -1,7 +1,7 @@
 /** フェーズ管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。 */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readPhases } from "../../src/core/phases-doc.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
 import { openPage, openPhases, page, rowSelector } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
@@ -14,7 +14,7 @@ function savedForm(dom: DomPage): PhasesForm {
   return saves[saves.length - 1].form as PhasesForm;
 }
 
-test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。関係と案内は値がある種類だけ開く", async () => {
+test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。ほかの種類との関係・補足は値がある種類だけ開く", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".phase").length, 5);
@@ -64,7 +64,8 @@ test("CB-D22 絞り込みは title と scope にも当たり、開いている�
     await dom.settle();
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
-    assert.equal(dom.one("#phase-count").textContent, "1 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    // design は題で、acceptance は when（「設計と並行してよく」）で当たる
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));
@@ -111,7 +112,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に要る種類", "待つ種類", "エージェント", "置く目安"],
+      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -208,17 +209,17 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
   }
 });
 
-test("CB-D67 関係と案内は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+test("CB-D67 ほかの種類との関係・補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
-    dom.click(dom.one(`${rowSelector("p2")} .row-head`));
+    dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
-    // 雛形の design は when を持つので開いている
-    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
-    dom.type(dom.one(`${rowSelector("p2")} input.f-when`), "");
+    // 雛形の research は when だけを持つので開いている
+    assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
+    dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
-    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
-    assert.match(dom.one(`${rowSelector("p2")} details.more > summary`).textContent, /関係と案内（未設定）/);
+    assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
+    assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /ほかの種類との関係・補足（未設定）/);
   } finally {
     await dom.close();
   }
@@ -273,6 +274,205 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     assert.equal(dom.all("#ccnavi-loading").length, 0);
     // 行の鍵は画面の中で数え続けるので、描き直した行は別の鍵になる
     assert.ok(dom.all(".phase").length > 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自分の id は候補に出ない。並びはファイルの順に揃う", async () => {
+  const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
+    await dom.settle();
+    const values = (field: string, only?: "checked"): string[] =>
+      dom
+        .all<HTMLInputElement>(`${rowSelector("p4")} ${field} .id-option input`)
+        .filter((input) => only === undefined || input.checked)
+        .map((input) => input.value);
+    // 雛形の implement。自分（implement）は候補に出ない
+    assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
+    assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
+    // after の候補は work の種類だけ。feedback の種類は待つ先にできない
+    assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
+    assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
+    // 付け外ししても、並びはファイルの順のまま（YAML に余計な差分を出さない）
+    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("p4")} .f-requires .id-option input[value="research"]`));
+    await dom.settle();
+    // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
+    assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p4")} .f-overlap .id-option input[value="design"]`).disabled);
+    assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p4")} .f-overlap .id-option input[value="implement-feedback"]`).disabled);
+    // 共通層ではほかの層を指せないので、id を打つ欄は出さない
+    assert.equal(dom.all(`${rowSelector("p4")} input.id-extra`).length, 0);
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    const saved = savedForm(dom).phases[3];
+    assert.deepEqual(saved.after, ["design", "acceptance"]);
+    assert.deepEqual(saved.requires, ["research", "acceptance"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
+  const base = readPhases(TEMPLATE_PHASES_TEXT).model;
+  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
+  const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
+  try {
+    dom.click(dom.one(`${rowSelector("p3")} .row-head`));
+    await dom.settle();
+    // 前後の空白は落として読み、空は出さない。自分自身は外せるように印を付けて出す
+    const checked = dom.all<HTMLInputElement>(`${rowSelector("p3")} .f-overlap .id-option input`).filter((input) => input.checked);
+    assert.deepEqual(checked.map((input) => input.value), ["design", "acceptance"]);
+    assert.ok(dom.one(`${rowSelector("p3")} .f-overlap .id-option.foreign`).textContent?.includes("acceptance"));
+    dom.type(dom.one(`${rowSelector("p3")} .f-requires input.id-extra`), "外の種類, acceptance");
+    await dom.settle();
+    dom.key("Enter", dom.one(`${rowSelector("p3")} .f-requires input.id-extra`));
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-requires input.id-extra`).value, "");
+    assert.ok(dom.one(`${rowSelector("p3")} .f-requires .id-option.foreign`).textContent?.includes("外の種類"));
+    dom.click(dom.one(`${rowSelector("p3")} .f-overlap .id-option input[value="acceptance"]`));
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    const saved = savedForm(dom).phases[2];
+    assert.deepEqual(saved.overlap, ["design"]);
+    assert.deepEqual(saved.requires, ["外の種類"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D88 feedback の種類は先に済ませる種類を持てないと言い、欄を出さない", async () => {
+  const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p5")} .row-head`));
+    await dom.settle();
+    assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
+    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てない/);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D86 図を見ているときに種類を足すと、一覧へ移って足した行が見える", async () => {
+  const dom = await openPhases({}, { view: "graph" });
+  try {
+    assert.ok(dom.one("#phases").classList.contains("hidden"));
+    dom.click(dom.one('button[data-action="add"]'));
+    await dom.settle();
+    assert.ok(!dom.one("#phases").classList.contains("hidden"), "一覧へ移っていない");
+    const rows = dom.all(".phase");
+    const added = rows[rows.length - 1];
+    assert.ok(added.classList.contains("open"));
+    assert.ok(!added.classList.contains("hidden-by-find"));
+    assert.equal(dom.document.activeElement, added.querySelector("input.f-id"));
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。案内の前の様子（図・絞り込み・開いた行）に戻り、途中の切り替えは控えに書かない", async () => {
+  const dom = await openPhases({}, { view: "graph" });
+  try {
+    assert.ok(dom.one("#phases").classList.contains("hidden"), "図で始まっていない");
+    assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    assert.ok(!dom.one("#phases").classList.contains("hidden"), "1 段目で一覧に切り替わっていない");
+    const titles = [dom.one("#tour-title").textContent];
+    for (let i = 0; i < 5; i += 1) {
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+      titles.push(dom.one("#tour-title").textContent);
+      if (i === 0) {
+        // 関係の段で、関係を持つ行（design）と、その関係の欄が開いている
+        assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
+      }
+    }
+    assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ"]);
+    // 途中の一覧と図の切り替えは控えに書かない（途中でタブを閉じても、次は元の図で開く）
+    assert.equal((dom.state() as { view?: string }).view, "graph");
+    // 最後の段は「完了」だけ（同じ働きのボタンを 2 つ並べない）
+    assert.equal(dom.one('[data-action="tour-next"]').textContent, "完了");
+    assert.equal(dom.all('[data-action="tour-skip"]').length, 0);
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+    assert.ok(dom.one("#phases").classList.contains("hidden"), "案内の前の図に戻っていない");
+    // 案内が開いた見本の行も閉じる
+    assert.equal(dom.all(".phase.open").length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡り、焦点は「次へ」から始まる。閉じたら絞り込みも戻る", async () => {
+  const dom = await openPhases();
+  try {
+    dom.type(dom.one("#find"), "設計");
+    await dom.settle();
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+    // 2 段目：スキップ・戻る・次へ
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
+    dom.key("Tab");
+    await dom.settle();
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-skip"]'), "Tab が吹き出しの外へ出た");
+    dom.document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+    await dom.settle();
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
+    // 見本の行を出すために外した絞り込みは、閉じたら戻る
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>("#find").value, "設計");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
+  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中..." });
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 1);
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D92 細かい説明はヘルプを押したときだけ出し、そこから案内をもう一度見られる", async () => {
+  const dom = await openPhases();
+  try {
+    assert.equal(dom.all("#help").length, 0, "ヘルプを押すまで説明は出さない");
+    dom.click(dom.one('[data-action="help"]'));
+    await dom.settle();
+    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる/);
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    // ヘルプから始めた案内も、やめたら tourDone を返す
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
   } finally {
     await dom.close();
   }

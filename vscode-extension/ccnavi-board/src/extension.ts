@@ -9,8 +9,11 @@ import { openRisk } from "./risk-panel.js";
 import { openRules } from "./rules-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
+import { initTours } from "./tour.js";
 
 export function activate(context: vscode.ExtensionContext): void {
+  // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
+  initTours(context);
   // 画面の入口はここに集める。画面どうしは互いを import せず、この帳面を通して開き合う。
   registerScreens({
     board: openBoard,

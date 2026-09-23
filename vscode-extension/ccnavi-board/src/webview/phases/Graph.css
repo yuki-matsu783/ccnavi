@@ -22,9 +22,16 @@
 .graph .react-flow {
   --xy-background-color-default: var(--vscode-editor-background);
   --xy-background-pattern-dots-color-default: var(--vscode-panel-border);
-  --xy-edge-stroke-default: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground));
+  /* 線は背景の点に埋もれないよう、文字と同じ出どころで太めに引く（cc-wf-studio も --vscode-foreground の 2px） */
+  --xy-edge-stroke-default: var(--vscode-descriptionForeground);
   --xy-edge-stroke-selected-default: var(--vscode-focusBorder);
-  --xy-edge-stroke-width-default: 1.5;
+  --xy-edge-stroke-width-default: 2;
+  --xy-controls-button-background-color-default: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  --xy-controls-button-background-color-hover-default: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+  --xy-controls-button-color-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-color-hover-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-border-color-default: var(--vscode-panel-border);
+  --xy-controls-box-shadow-default: none;
   --xy-edge-label-background-color-default: var(--vscode-editor-background);
   --xy-edge-label-color-default: var(--vscode-descriptionForeground);
   --xy-node-background-color-default: var(--vscode-editorWidget-background, var(--vscode-editor-background));
@@ -131,7 +138,7 @@
 
 .graph .react-flow__edge.rel-after .react-flow__edge-path {
   stroke: var(--vscode-focusBorder);
-  stroke-width: 2;
+  stroke-width: 3;
 }
 
 .graph .react-flow__edge-text {
@@ -148,7 +155,109 @@
   color: var(--vscode-textLink-foreground);
 }
 
-/* 図の下に出す一言 */
+/* 区分の枠（work / feedback）。点より手前に重なるので、縁だけにして押す操作も通す */
+.graph .phase-group {
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1px dashed var(--vscode-panel-border);
+  border-radius: 6px;
+}
+
+.graph .phase-group[data-kind="feedback"] {
+  border-color: var(--vscode-editorInfo-foreground, var(--vscode-panel-border));
+}
+
+.graph .phase-group-label {
+  position: absolute;
+  top: 3px;
+  left: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/* 枠の間の「レビュー後」の矢印。区分の順で、種類どうしの関係ではない */
+.graph .phase-group-arrow {
+  pointer-events: none;
+}
+
+.graph .phase-group-arrow line {
+  stroke: var(--vscode-descriptionForeground);
+  stroke-width: 2.5;
+  /* 点線にして overlap の破線（4 3）と見分ける */
+  stroke-dasharray: 0.5 5;
+  stroke-linecap: round;
+}
+
+.graph .phase-group-arrow marker path {
+  fill: var(--vscode-descriptionForeground);
+}
+
+.graph .phase-group-arrow text {
+  fill: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+/* 図の下の凡例。線の見本は図の線と同じ色と形 */
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.graph-legend li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.legend-line line {
+  stroke: var(--vscode-descriptionForeground);
+  stroke-width: 2;
+}
+
+.legend-line.rel-overlap line {
+  stroke-dasharray: 4 3;
+}
+
+.legend-line.rel-after line {
+  stroke: var(--vscode-focusBorder);
+  stroke-width: 3;
+}
+
+.legend-line.rel-after path {
+  fill: var(--vscode-focusBorder);
+}
+
+.legend-box {
+  display: inline-block;
+  width: 22px;
+  height: 12px;
+  border: 1px dashed var(--vscode-panel-border);
+  border-radius: 3px;
+}
+
+.legend-box[data-kind="feedback"] {
+  border-color: var(--vscode-editorInfo-foreground, var(--vscode-panel-border));
+}
+
+/* 枠の間の「レビュー後」の矢印の見本。図の .phase-group-arrow と同じ点線 */
+.legend-line.review line {
+  stroke-width: 2.5;
+  stroke-dasharray: 0.5 5;
+  stroke-linecap: round;
+}
+
+.legend-line.review path {
+  fill: var(--vscode-descriptionForeground);
+}
+
+/* 図の下に出す注意。当てはまるときだけ出る */
 .graph-note {
   margin: 4px 0 0;
   color: var(--vscode-descriptionForeground);

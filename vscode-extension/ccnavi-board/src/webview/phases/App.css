@@ -13,3 +13,9 @@ input.duplicate { border-color: var(--vscode-editorError-foreground); }
 .tabs { display: flex; gap: 4px; margin: 6px 0; }
 .tabs button.action.small { margin-left: 0; }
 .tabs button.action.small.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-contrastActiveBorder, var(--vscode-focusBorder)); }
+.help-panel { margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--vscode-panel-border); border-radius: 3px; }
+.help-panel .hint:last-of-type { margin-bottom: 8px; }
+.help-panel button.action.small { margin-left: 0; }
+h2 button.action.small.on { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+/* 見出しのヘルプは「＋ 種類を追加」の隣に並べる（右へ寄せるのは先頭の「＋ 種類を追加」だけ） */
+h2 button.action.small[data-action="help"] { margin-left: 0; }

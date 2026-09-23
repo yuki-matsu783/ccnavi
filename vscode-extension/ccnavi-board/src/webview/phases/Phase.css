@@ -7,3 +7,10 @@
 .sum .tag.work { color: var(--vscode-descriptionForeground); }
 .sum .tag.feedback { color: var(--vscode-editorInfo-foreground); }
 .field > select.f-kind, .field > select.f-review { max-width: 420px; }
+/* 関係の欄（IdPicker）。ほかの種類の id をチェックで選び、候補に無い id は右の欄に打つ */
+.field > .ids { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; min-width: 0; }
+.ids .id-option { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; font-family: var(--vscode-editor-font-family); }
+.ids .id-option input { margin: 0; }
+.ids .id-option:has(input:disabled) { cursor: default; opacity: .6; }
+.ids .id-option.foreign { color: var(--vscode-descriptionForeground); font-style: italic; }
+.ids .id-extra { flex: 0 1 220px; min-width: 120px; }
