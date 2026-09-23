@@ -666,14 +666,14 @@ class TicketTest(unittest.TestCase):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
         parent = self.hook(
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
         )
         self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
 
@@ -727,7 +727,7 @@ class TicketTest(unittest.TestCase):
             "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
             "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
-            "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh done x",
+            "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish x",
             "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh request --phase 1'",
         ):
             with self.subTest(command=command):
@@ -747,7 +747,7 @@ class TicketTest(unittest.TestCase):
         レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる（ADR-0055）。
         """
         self.family()
-        result = self.ccnavi("ticket", "done", "i0001-01")
+        result = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(result.returncode, 0, result.stderr)
         review = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01.md")
         self.assertTrue(os.path.exists(review))
@@ -864,7 +864,7 @@ class TicketTest(unittest.TestCase):
 
     def close_phase(self):
         for child in ("i0001-01", "i0001-02"):
-            done = self.ccnavi("ticket", "done", child)
+            done = self.ccnavi("ticket", "finish", child)
             self.assertEqual(done.returncode, 0, done.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
@@ -915,7 +915,7 @@ class TicketTest(unittest.TestCase):
         shell = self.hook("PreToolUse", "Bash", self.parent_tree, command="ls")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(shell))
         self.assertIn(f"{review_sh} request --phase 1", self.reason(shell))
-        self.assertIn(f"{review_sh} check --phase 1", self.reason(shell))
+        self.assertIn(f"{review_sh} confirm --phase 1", self.reason(shell))
         self.assertNotIn("sh .ccnavi/scripts/", self.reason(shell))
 
         # 案内どおりに打った形は、止めている間の例外に当たる。
@@ -972,13 +972,13 @@ class TicketTest(unittest.TestCase):
             "PreToolUse",
             "Bash",
             self.parent_tree,
-            command="sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+            command="sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1",
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(exempt), self.reason(exempt))
 
         for command in (
-            "env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
-            "sudo sh .ccnavi/scripts/ccnavi-review.sh check --phase 1",
+            "env sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1",
+            "sudo sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1",
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
@@ -1096,7 +1096,7 @@ class TicketTest(unittest.TestCase):
             "--phase",
             "1",
             "review",
-            "check",
+            "confirm",
             "--result",
             fixture,
         )
@@ -1113,7 +1113,7 @@ class TicketTest(unittest.TestCase):
             "--phase",
             "1",
             "review",
-            "check",
+            "confirm",
             "--result",
             fixture,
         )
@@ -1136,7 +1136,7 @@ class TicketTest(unittest.TestCase):
         stray = os.path.join(self.approved, "done", "i0001-01.md")
         write(stray, "stray\n")
         check = self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", fixture
+            "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
         )
         self.assertNotEqual(check.returncode, 0, check.stdout)
         self.assertIn("行き先に既に在る", check.stderr)
@@ -1149,7 +1149,7 @@ class TicketTest(unittest.TestCase):
 
         os.remove(stray)
         check = self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", fixture
+            "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", fixture
         )
         self.assertEqual(check.returncode, 0, check.stderr)
         self.assertTrue(os.path.exists(marker))
@@ -1265,7 +1265,7 @@ class TicketTest(unittest.TestCase):
         """同じ識別子が todo/ にもあっても、状態の操作は doing/ の側を相手にする。"""
         self.family()
         self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
-        done = self.ccnavi("ticket", "done", "i0001-01")
+        done = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(done.returncode, 0, done.stderr)
         lint = self.ccnavi("--lint", "--mode", "enable")
         self.assertIn("todo/ にも在る", lint.stdout)
@@ -1282,7 +1282,7 @@ class TicketTest(unittest.TestCase):
             os.path.join(self.approved, "doing", "i0001-01.md"),
             os.path.join(self.approved, "done", "i0001-01.md"),
         )
-        done = self.ccnavi("ticket", "done", "i0001-01")
+        done = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(done.returncode, 0, done.stdout)
         self.assertIn("i0001-01 が複数の場所にある", done.stderr)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-01.md")))
@@ -1302,7 +1302,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "merge", "--quiet", "--no-edit", "i0001")
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
 
-        done = self.ccnavi("ticket", "done", "i0001-02")
+        done = self.ccnavi("ticket", "finish", "i0001-02")
 
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("複数の場所にある", done.stderr)
@@ -1320,7 +1320,7 @@ class TicketTest(unittest.TestCase):
         記録を別の差分で書き直す。決めずに止めて、人に合流させる。
         """
         self.family()
-        closed = self.ccnavi("ticket", "done", "i0001-02")
+        closed = self.ccnavi("ticket", "finish", "i0001-02")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "close i0001-02")
@@ -1335,7 +1335,7 @@ class TicketTest(unittest.TestCase):
         git(self.root, "merge", "--quiet", "--no-edit", "i0001~1")
         git(self.root, "worktree", "remove", "--force", self.parent_tree)
 
-        again = self.ccnavi("ticket", "done", "i0001-02")
+        again = self.ccnavi("ticket", "finish", "i0001-02")
 
         self.assertNotEqual(again.returncode, 0, again.stdout)
         self.assertIn("i0001-02 が複数の場所にある", again.stderr)
@@ -1580,7 +1580,7 @@ class TicketTest(unittest.TestCase):
             "ccnavi --approve",
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
-            "ls && ./ccnavi review check --phase 1",
+            "ls && ./ccnavi review confirm --phase 1",
             # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
             "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
             "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
@@ -1610,7 +1610,7 @@ class TicketTest(unittest.TestCase):
         for command in (
             "ccnavi --explain",
             "ccnavi --lint",
-            "sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+            "sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
             # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --approve --preview --json",
             "echo --approve --preview",
@@ -1710,7 +1710,7 @@ class TicketTest(unittest.TestCase):
             "PowerShell",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 
@@ -1718,7 +1718,7 @@ class TicketTest(unittest.TestCase):
 
     def test_parent_cannot_close_while_children_are_open(self):
         self.family()
-        refused = self.ccnavi("ticket", "done", "i0001")
+        refused = self.ccnavi("ticket", "finish", "i0001")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("開いている子", refused.stderr)
         refused = self.ccnavi("ticket", "cancel", "i0001", "--reason", "やめる")
@@ -1726,7 +1726,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("開いている子", refused.stderr)
         # 子を閉じてもレビューで止まっている間は閉じない。
         self.close_phase()
-        refused = self.ccnavi("ticket", "done", "i0001")
+        refused = self.ccnavi("ticket", "finish", "i0001")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("レビュー準備中", refused.stderr)
 
@@ -1763,7 +1763,7 @@ class TicketTest(unittest.TestCase):
             "--phase",
             "1",
             "review",
-            "check",
+            "confirm",
             "--result",
             fixture,
         )
@@ -2090,7 +2090,7 @@ class TicketTest(unittest.TestCase):
     def test_request_refuses_a_phase_settled_without_request(self):
         """依頼せずにレビュー済みになったフェーズへ、依頼を投稿しないこと。
 
-        `wrapup` は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを
+        `close-early` は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを
         先に見ていた版では、人が締めたフェーズに request が通り、MR に依頼が投稿された。
         """
         self.family()
@@ -2098,7 +2098,7 @@ class TicketTest(unittest.TestCase):
         fixture = self.remote()
         write(
             os.path.join(self.approved, "phases", "i0001", "1.reviewed"),
-            json.dumps({"by": "wrapup", "mr": 7, "accepted": []}),
+            json.dumps({"by": "close-early", "mr": 7, "accepted": []}),
         )
         refused = self.request(fixture)
         self.assertNotEqual(refused.returncode, 0)
@@ -2218,7 +2218,7 @@ class TicketTest(unittest.TestCase):
         self.start_parent()
         self.worktree("i0001-01", "i0001")
         self.assertEqual(self.ccnavi("ticket", "start", "i0001-01").returncode, 0)
-        self.assertEqual(self.ccnavi("ticket", "done", "i0001-01").returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01").returncode, 0)
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "done")
         self.remote(merge=("i0001-01",))
@@ -2244,7 +2244,7 @@ class TicketTest(unittest.TestCase):
 
     def check(self, fixture, phase="1"):
         return self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", phase, "review", "check", "--result", fixture
+            "--cwd", self.parent_tree, "--phase", phase, "review", "confirm", "--result", fixture
         )
 
     def test_only_the_latest_review_per_author_counts(self):
@@ -2266,7 +2266,7 @@ class TicketTest(unittest.TestCase):
             "--phase",
             "1",
             "review",
-            "check",
+            "confirm",
             "--result",
             fixture,
         )
@@ -2277,7 +2277,7 @@ class TicketTest(unittest.TestCase):
         self.family()
         self.close_phase()
         fixture = self.remote()
-        bare = self.ccnavi("--cwd", self.parent_tree, "--phase", "1", "review", "check")
+        bare = self.ccnavi("--cwd", self.parent_tree, "--phase", "1", "review", "confirm")
         self.assertNotEqual(bare.returncode, 0)
         self.assertIn("--result", bare.stderr)
         # 投稿の url が無い結果ではマーカーを置かない。
@@ -2305,7 +2305,7 @@ class TicketTest(unittest.TestCase):
             json.dumps({"host": "fixture", "mr": {"number": 8, "url": "https://example/mr/8"}}),
         )
         check = self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", "1", "review", "check", "--result", other
+            "--cwd", self.parent_tree, "--phase", "1", "review", "confirm", "--result", other
         )
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("違う", check.stderr)

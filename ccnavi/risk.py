@@ -21,7 +21,7 @@
 - 定量（スクリプト）: `script:` に書いた sh を exe が走らせ、点を受け取る。置ける場所は
   guard の内側だけ。エージェントが書ける場所のスクリプトを許すと、自分のリスクを自分で決められる
 - 定性（サブエージェント）: `judge:` に書いた問いを、親がサブエージェントに判断させ、
-  `ccnavi-ticket.sh judge` で yes / no を記録する。判定が揃うまで子は閉じられない
+  `ccnavi-ticket.sh record-risk` で yes / no を記録する。判定が揃うまで子は閉じられない
 
 測れなかった項目（スクリプトの失敗、読めない出力）は重い側に倒し、その項目の点を加える。
 「測れないから 0」にすると、壊れたスクリプトがリスクを消す。
@@ -791,7 +791,7 @@ def judge_prompt(
         "",
         "次の問いに、差分を読んで yes / no で答え、根拠を 1〜3 行で書く。",
         "判断するのはこの文書を渡されたサブエージェント。記録するのは親で、",
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} judge {child} <項目> yes|no "
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {child} <項目> yes|no "
         "--reason <根拠>' "
         "で 1 項目ずつ。",
         "",

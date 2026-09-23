@@ -314,7 +314,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
 
 /**
  * 「レビュー済み連絡」。マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、
- * 承認の文と同じ 2 ボタンで渡す。`check` を打つのは文を受けたエージェント
+ * 承認の文と同じ 2 ボタンで渡す。`confirm` を打つのは文を受けたエージェント
  */
 function reviewed(
   state: ApprovalState,
@@ -340,7 +340,7 @@ function reviewed(
       text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡を組めない`,
     });
   }
-  // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ check の前提（依頼のマーカー）が無い
+  // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い
   if (!chip.reviewWaiting) {
     return stay(
       state,
@@ -357,7 +357,7 @@ function reviewed(
       title: `フェーズ ${chip.label} のレビュー済み連絡`,
       note:
         "レビューを終えたことを Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、" +
-        "新しいセッションで開く。送るときは自分で Enter を押す。マーカーはエージェントが check を打って置く。",
+        "新しいセッションで開く。送るときは自分で Enter を押す。マーカーはエージェントが confirm を打って置く。",
       prompt: reviewedPrompt(input.root, parent, phase, chip.label, tree, chip.mrUrl),
     },
     only: state.only,

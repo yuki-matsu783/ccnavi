@@ -48,7 +48,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # ここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|done|cancel|judge|request|check|note|accept|handoff|ready|wrapup|push)\b"
+    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|to-issue|ready|close-early|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -84,9 +84,9 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
-    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
     r"|\b(ticket|review)\s+"
-    r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
+    r"(start|finish|cancel|record-risk|prepare|requested|confirm|to-issue|ready)\b)"
 )
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
@@ -539,7 +539,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         # 依頼は出してある。ここで動くのは人で、エージェントは待つほうに回る。
         todo = (
             "やること: 利用者のレビューを待ってください。レビューが終わったら "
-            f"'{review_sh} check --phase {n}' で確かめます。指摘が付いていたら、"
+            f"'{review_sh} confirm --phase {n}' で確かめます。指摘が付いていたら、"
             f"同じフェーズに子を足してやり直せます。{later}"
         )
     elif phase.review_in_chat:
@@ -555,7 +555,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             "やること: 子の成果を親ブランチへ合流して push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
+            f"利用者がレビューを終えたら '{review_sh} confirm --phase {n}' "
             f"で確かめます。{later}"
         )
     return "\n".join(
@@ -825,7 +825,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
     """フィードバック計画の承認で、全体計画の最後のレビューを済んだ扱いにする。
 
     人がレビューの結果を見たうえで対応を計画したので、その計画の承認がレビューの
-    合意になる。残った指摘は消えない。フィードバック作業フェーズの `check` が、
+    合意になる。残った指摘は消えない。フィードバック作業フェーズの `confirm` が、
     解決されていない指摘を全部数える。
     """
     if not parent.has_plan:
@@ -851,7 +851,9 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     if held is not None:
         return f"{held.review_label}（{held.label}）"
     if approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
+        approval.home_dir(conf, root, parent.ticket, ""),
+        parent.ticket,
+        approval.PARENT_MARK_CLOSE_EARLY,
     ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
         return "閉じられる（利用者が締めた）"

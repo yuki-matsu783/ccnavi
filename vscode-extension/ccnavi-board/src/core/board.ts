@@ -33,11 +33,11 @@ export const COLUMNS: readonly ColumnDef[] = [
 
 /**
  * 人が押せる操作。承認と受け入れは実行ファイルか端末へ、レビュー済みの連絡は Claude Code に渡す文を組む
- * （判定は動かさない。`check` を打つのはその文を受けたエージェント）。
+ * （判定は動かさない。`confirm` を打つのはその文を受けたエージェント）。
  */
 export type Action =
   | { readonly kind: "approve" }
-  | { readonly kind: "accept"; readonly parent: string; readonly phase: number }
+  | { readonly kind: "decide"; readonly parent: string; readonly phase: number }
   | { readonly kind: "reviewed"; readonly parent: string; readonly phase: number };
 
 export interface PhaseChip {
@@ -220,7 +220,7 @@ function toCard(
   if (pending.has(t.ticket)) {
     actions.push({ kind: "approve" });
   }
-  const wrapped = ownParent?.wrapup !== null && ownParent?.wrapup !== undefined;
+  const wrapped = ownParent?.close_early !== null && ownParent?.close_early !== undefined;
   const riskLevel = typeof t.risk?.level === "string" ? t.risk.level : "";
   const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
   const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
@@ -323,7 +323,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済」・受け入れの操作はみな
   // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
-    actions.push({ kind: "accept", parent: parent.ticket, phase: p.number });
+    actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
   }
   // 依頼のマーカー `{head, mr, url, host, since}`（設計 §9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。

@@ -42,7 +42,7 @@ RULES = {
             "message": "approved tickets are moved by the user.",
         },
         {
-            # 提案の置き場。`ticket done` はここへチケットを動かすので、移動の
+            # 提案の置き場。`ticket finish` はここへチケットを動かすので、移動の
             # 両側が保護領域に入る。片側だけを守ると、外れ方を見たことにならない。
             "id": "proposals",
             "match": "Write|Edit",
@@ -722,7 +722,7 @@ def ticket_repo(committed=True, text=TICKET):
 class TicketPlaceTest(Harness, unittest.TestCase):
     """チケットの置き場の変更を、誰が書いたかではなく何が変わったかで見分ける。
 
-    ここは ccnavi の副命令（`ticket start` / `done`、`review request` / `check` / `ready`）が
+    ここは ccnavi の副命令（`ticket start` / `done`、`review request` / `confirm` / `ready`）が
     書く場所で、同時にプロジェクトが `deny` と宣言した場所でもある。外さないと、自分の
     手順を自分で違反として報告し、戻す設定では自分で戻して手順が進まなくなる。外しすぎると、
     承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる道ができる。
@@ -778,7 +778,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertTrue(os.path.exists(self.path(marker)), "退避されるとレビューの依頼が消える")
 
     def test_レビュー待ちへの移動は言わない(self):
-        # `ticket done`。`doing/` から消えて、同じ姿が `review/` に現れる。
+        # `ticket finish`。`doing/` から消えて、同じ姿が `review/` に現れる。
         os.remove(self.path(DOING))
         write(
             self.path("wip/proposals/review/i0001.md"),
@@ -828,7 +828,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_着手済みのチケットを閉じて動かしても言わない(self):
-        # `ticket done`。着手の欄はコミット済みの版と同じまま、完了の時刻だけが足される。
+        # `ticket finish`。着手の欄はコミット済みの版と同じまま、完了の時刻だけが足される。
         self.use(ticket_repo(text=STARTED))
         os.remove(self.path(DOING))
         write(

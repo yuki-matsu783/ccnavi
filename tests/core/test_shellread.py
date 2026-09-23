@@ -855,12 +855,12 @@ class SubstTest(unittest.TestCase):
             "置換の中の cat まで免除した",
         )
         lines = read(
-            "sh .ccnavi/scripts/ccnavi-ticket.sh done x\nsh .ccnavi/scripts/ccnavi-git.sh status"
+            "sh .ccnavi/scripts/ccnavi-ticket.sh finish x\nsh .ccnavi/scripts/ccnavi-git.sh status"
         )
         self.assertTrue(phase.exempt(lines.text, lines.reason), show(lines.text))
 
     def test_置換の中の状態を動かすスクリプトもサブエージェントに許さない(self):
-        inner = read('echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh done x)"')
+        inner = read('echo "$(sh .ccnavi/scripts/ccnavi-ticket.sh finish x)"')
         self.assertTrue(phase.forbidden(inner.text), show(inner.text))
 
 

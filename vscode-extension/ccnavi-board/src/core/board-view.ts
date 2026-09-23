@@ -82,7 +82,7 @@ export type BoardMessage =
   | { readonly type: "approveCancel" }
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
-  | { readonly type: "accept"; readonly parent: string; readonly phase: number }
+  | { readonly type: "decide"; readonly parent: string; readonly phase: number }
   | { readonly type: "reviewed"; readonly parent: string; readonly phase: number };
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */

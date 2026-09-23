@@ -2,9 +2,9 @@
 # ccnavi-review — レビューの依頼と確認。親（メインエージェント）だけが呼ぶ。
 #
 #   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文>
-#   sh .ccnavi/scripts/ccnavi-review.sh check   --phase <N>
-#   sh .ccnavi/scripts/ccnavi-review.sh note    --body-file <本文>
-#   sh .ccnavi/scripts/ccnavi-review.sh accept  <N>          （人が端末で打つ）
+#   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
+#   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
+#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （人が端末で打つ）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた写しを見る）
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
@@ -16,9 +16,9 @@
 #            → `ccnavi review requested` がマーカーを置く
 #            人はレビューをマージリクエストで行うので、入れ物が無いことで止めない。題から Draft を
 #            外してマージするのは人の手に残す。
-#   check:   ここがスレッドとレビューを取ってくる → `ccnavi review check` が判定してマーカーを置き、
+#   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす
-#   accept:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、受け入れて
+#   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` が人に見せ、受け入れて
 #            進むか、続きの子チケットを .ccnavi/approved/doing/ に起こすかを選ばせる
 #            → 受け入れた一覧（か、起こした子）をここがコメントに写す
 #
@@ -33,17 +33,17 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|check|note|accept|handoff|ready|wrapup|fetch|origin> [--phase <N>] [--body-file <path>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|to-issue|ready|close-early|fetch|origin> [--phase <N>] [--body-file <path>]
 
-  request  --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
-  check    --phase <N>                         依頼より後の未解決スレッドが無ければマーカーを置く
-  note     --body-file <本文>                  判断の記録をマージリクエストのコメントに写す
-  accept   <N>                                 未解決の扱いを選ぶ。受け入れて進むか、続きの子チケットを起こす（人が端末で打つ）
-  handoff  --body-file <題と本文>              残った指摘を別の issue に切り出し、マージリクエストに引き継ぎの note を残す
-  ready                                        閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
-  wrapup   --reason <理由> [--no-issue]        まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
-  fetch                                        リモートから取ってきた写し（JSON）を標準出力へ
-  origin                                       origin をどう読んだか（ホスト・scheme・API の綴り）
+  request      --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
+  confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
+  comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
+  decide       <N>                                未解決の扱いを選ぶ。受け入れて進むか、続きの子チケットを起こす（人が端末で打つ）
+  to-issue     --body-file <題と本文>             残った指摘を別の issue に切り出し、マージリクエストに引き継ぎのコメントを残す
+  ready                                           閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
+  close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
+  fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
+  origin                                          origin をどう読んだか（ホスト・scheme・API の綴り）
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が要る。
 USAGE
@@ -64,13 +64,13 @@ fail() {
 sub="$1"
 shift
 case "$sub" in
-request | check | note | accept | handoff | ready | wrapup | fetch | origin) ;;
+request | confirm | comment | decide | to-issue | ready | close-early | fetch | origin) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail "$sub は通しません。使えるのは request / check / note / accept / handoff / ready / wrapup / fetch / origin です。" 2
+	fail "$sub は通しません。使えるのは request / confirm / comment / decide / to-issue / ready / close-early / fetch / origin です。" 2
 	;;
 esac
 
@@ -184,7 +184,7 @@ if [ -z "$transport" ]; then
 	elif [ -n "$CURL" ]; then
 		fail "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
 	else
-		fail "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review check --result <json>' を人が打つ形にしてください。" 2
+		fail "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' を人が打つ形にしてください。" 2
 	fi
 fi
 
@@ -243,7 +243,7 @@ api_failed() {
 	case "$2" in
 	graphql)
 		printf 'ccnavi-review: %s\n' \
-			"GraphQL が塞がれている環境では check / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review check --phase <N> --result <json>' を打ってください。写しの形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
+			"GraphQL が塞がれている環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。MCP などリモートを読める道具でスレッドとレビューを JSON にして 'ccnavi review confirm --phase <N> --result <json>' を打ってください。写しの形は fetch_all と同じ {host, mr, threads, reviews, fetched_at} です。Draft 外しはその道具の側で直接行ってください。" >&2
 		;;
 	esac
 }
@@ -405,7 +405,7 @@ undraft() {
 			return 0
 		fi
 		# squash も立てる。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
-		# （マージのときに人が選ぶ）ので、note に書くだけ。
+		# （マージのときに人が選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
 		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" | "$JQ" -r '.draft // .work_in_progress // false'
 	fi
@@ -455,9 +455,9 @@ fetch)
 	fetch_all
 	printf '\n'
 	;;
-check)
+confirm)
 	fetch_all >"$result"
-	ccnavi review check "$@" --result "$result"
+	ccnavi review confirm "$@" --result "$result"
 	;;
 request)
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
@@ -482,7 +482,7 @@ request)
 	# 段 3: マーカー。
 	ccnavi review requested "$@" --result "$result"
 	;;
-note)
+comment)
 	body=""
 	while [ "$#" -gt 0 ]; do
 		case "$1" in
@@ -493,34 +493,34 @@ note)
 		*) shift ;;
 		esac
 	done
-	[ -n "$body" ] && [ -f "$body" ] || fail "note には --body-file <本文> が要る。" 2
+	[ -n "$body" ] && [ -f "$body" ] || fail "comment には --body-file <本文> が要る。" 2
 	mr=$(find_mr)
 	[ -z "$mr" ] && fail "親ブランチ $branch に対応するマージリクエストが $host に無い。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	noted="$state/review-note-$$.md"
+	noted="$state/review-comment-$$.md"
 	{
-		printf '<!-- ccnavi:note -->\n'
+		printf '<!-- ccnavi:comment -->\n'
 		cat "$body"
 	} >"$noted"
 	posted=$(comment "$number" "$url" "$noted")
 	rm -f "$noted"
 	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	;;
-accept)
+decide)
 	n="${1:-}"
-	[ -n "$n" ] || fail "accept には <N>（フェーズ番号）が要る。" 2
+	[ -n "$n" ] || fail "decide には <N>（フェーズ番号）が要る。" 2
 	fetch_all >"$result"
 	ccnavi --reviewed "$n" --accept-unresolved --result "$result"
 	# 受け入れた一覧が書き出されていれば、コメントに写す。
-	for f in "$state"/review-accept-*-"$n".md; do
+	for f in "$state"/review-decide-*-"$n".md; do
 		[ -f "$f" ] || continue
 		number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 		url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 		comment "$number" "$url" "$f" >/dev/null && rm -f "$f"
 	done
 	;;
-handoff)
+to-issue)
 	# 残った指摘を別の issue に切り出す。exe が段階を確かめて下書きを書き、ここが作る。
 	body=""
 	while [ "$#" -gt 0 ]; do
@@ -532,27 +532,27 @@ handoff)
 		*) shift ;;
 		esac
 	done
-	[ -n "$body" ] && [ -f "$body" ] || fail "handoff には --body-file <題と本文>（1 行目が題）が要る。" 2
+	[ -n "$body" ] && [ -f "$body" ] || fail "to-issue には --body-file <題と本文>（1 行目が題）が要る。" 2
 	fetch_all >"$result"
-	draft=$(ccnavi review handoff --body-file "$body" --result "$result") || exit $?
+	draft=$(ccnavi review to-issue --body-file "$body" --result "$result") || exit $?
 	issue=$(create_issue "$draft")
 	[ -z "$issue" ] && fail "issue を作れなかった。"
 	issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
 	issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
-	noted="$state/review-handoff-note-$$.md"
+	noted="$state/review-to-issue-note-$$.md"
 	{
-		printf '<!-- ccnavi:handoff -->\n'
+		printf '<!-- ccnavi:to-issue -->\n'
 		printf '残った指摘を #%s へ引き継ぐ: %s\n' "$issue_no" "$issue_url"
 	} >"$noted"
 	comment "$number" "$url" "$noted" >/dev/null
 	rm -f "$noted"
-	printf 'OK: #%s に引き継いだ（%s）。残りは利用者が accept で受け入れて閉じる\n' "$issue_no" "$issue_url"
+	printf 'OK: #%s に引き継いだ（%s）。残りは利用者が decide で受け入れて閉じる\n' "$issue_no" "$issue_url"
 	;;
 ready)
-	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーと note の下書きを置き、
-	# ここが外して note を投稿する。マージは人。
+	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
+	# ここが外してコメントを投稿する。マージは人。
 	fetch_all >"$result"
 	noted=$(ccnavi review ready --result "$result") || exit $?
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
@@ -564,9 +564,9 @@ ready)
 	fi
 	printf 'OK: Draft を外した（%s）。マージは利用者が行う\n' "$url"
 	;;
-wrapup)
+close-early)
 	# 人が端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
-	# ここが残りを issue に写し、note を投稿する。Draft を外すのは、親が片付けて
+	# ここが残りを issue に写し、コメントを投稿する。Draft を外すのは、親が片付けて
 	# push したあとの ready（外す道は 1 本）。
 	reason=""
 	make_issue=1
@@ -583,13 +583,13 @@ wrapup)
 		*) shift ;;
 		esac
 	done
-	[ -n "$reason" ] || fail "wrapup には --reason <理由> が要る。" 2
+	[ -n "$reason" ] || fail "close-early には --reason <理由> が要る。" 2
 	fetch_all >"$result"
 	# exe は人に残りを見せて y/N を取るので、標準出力は端末のまま。下書きは控えの
 	# 置き場の決まった名前で拾う（親の識別子 = ブランチ名）。
-	ccnavi review wrapup --reason "$reason" --result "$result" || exit $?
-	issue_draft="$state/review-wrapup-issue-$branch.md"
-	noted="$state/review-wrapup-note-$branch.md"
+	ccnavi --close-early --reason "$reason" --result "$result" || exit $?
+	issue_draft="$state/review-close-early-issue-$branch.md"
+	noted="$state/review-close-early-note-$branch.md"
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then

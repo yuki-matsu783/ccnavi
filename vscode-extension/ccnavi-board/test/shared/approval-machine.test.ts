@@ -150,7 +150,7 @@ function toDone(step: Step): ApprovalState {
   }).state;
 }
 
-// --- 見張り。表の 1 行が 1 つの `check`。変異テストが同じ関数を使う ---
+// --- 見張り。表の 1 行が 1 つの `confirm`。変異テストが同じ関数を使う ---
 
 interface Guard {
   /** 何を守っているか */
@@ -447,7 +447,7 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   assert.equal(overlay?.kind === "prompt" ? overlay.title : "", "フェーズ 1 設計 のレビュー済み連絡");
   assert.match(
     overlay?.kind === "prompt" ? overlay.prompt : "",
-    /ccnavi-review\.sh check --phase 1'/,
+    /ccnavi-review\.sh confirm --phase 1'/,
     "打つのは親のワークツリーでの check 1 本",
   );
 

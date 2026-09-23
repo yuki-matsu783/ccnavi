@@ -238,7 +238,7 @@ class PhaseHarness(unittest.TestCase):
         return tree
 
     def close_child(self, name):
-        return self.ccnavi("ticket", "done", name)
+        return self.ccnavi("ticket", "finish", name)
 
     def merge(self, child):
         git(self.parent_tree, "merge", "--quiet", "--no-edit", child)
@@ -294,7 +294,14 @@ class PhaseHarness(unittest.TestCase):
 
     def check(self, fixture, phase):
         return self.ccnavi(
-            "--cwd", self.parent_tree, "--phase", str(phase), "review", "check", "--result", fixture
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            str(phase),
+            "review",
+            "confirm",
+            "--result",
+            fixture,
         )
 
     def board_phase(self, number, parent="i0001"):
@@ -711,7 +718,7 @@ class PhaseTest(PhaseHarness):
         # 閉じられる。
         self.assertEqual(self.close_child("i0001").returncode, 0)
 
-    def test_feedback_work_phase_runs_and_handoff_drafts_the_rest(self):
+    def test_feedback_work_phase_runs_and_to_issue_drafts_the_rest(self):
         self.family(plan=["design"])
         self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["wip/design/*"]))
         self.commit_parent()
@@ -757,14 +764,21 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("u/7#t0", refused.stderr)
         self.assertIn("道は 2 つ", refused.stderr)
-        self.assertIn("handoff", refused.stderr)
+        self.assertIn("to-issue", refused.stderr)
         data = read_json(fixture)
         data["threads"].append({"id": "t1", "resolved": False, "url": "u/7#t1", "body": "まだ"})
         write(fixture, json.dumps(data))
         # 切り出しの下書き。
         body = write(os.path.join(self.root, "handoff.md"), "残りの対応\n\n次の issue で。\n")
         drafted = self.ccnavi(
-            "--cwd", self.parent_tree, "--body-file", body, "review", "handoff", "--result", fixture
+            "--cwd",
+            self.parent_tree,
+            "--body-file",
+            body,
+            "review",
+            "to-issue",
+            "--result",
+            fixture,
         )
         self.assertEqual(drafted.returncode, 0, drafted.stderr)
         with open(drafted.stdout.strip(), encoding="utf-8") as f:
@@ -773,17 +787,16 @@ class PhaseTest(PhaseHarness):
         self.assertIn("u/7#t1", text)
         self.assertIn("i0001", text)
 
-    # ---- 7. Draft を外す（ready）と、人が締める（wrapup）
+    # ---- 7. Draft を外す（ready）と、人が締める（close-early）
 
     def ready(self, fixture):
         return self.ccnavi("--cwd", self.parent_tree, "review", "ready", "--result", fixture)
 
-    def wrapup(self, fixture, reason="ここまでで十分", answer="y"):
+    def close_early(self, fixture, reason="ここまでで十分", answer="y"):
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
-            "review",
-            "wrapup",
+            "--close-early",
             "--reason",
             reason,
             "--result",
@@ -802,7 +815,7 @@ class PhaseTest(PhaseHarness):
         refused = self.ready(fixture)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("Draft を外せない", refused.stderr)
-        self.assertIn("wrapup", refused.stderr)
+        self.assertIn("close-early", refused.stderr)
         self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
         self.assertEqual(self.close_child("i0001-01").returncode, 0)
         self.commit_parent("close 01")
@@ -823,7 +836,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("`wip/` に追跡されているファイル", refused.stderr)
         self.assertIn("rm -r wip", refused.stderr)
         # 親を閉じる。案内は「片付けて push して ready」。
-        closed = self.ccnavi("ticket", "done", "i0001")
+        closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("rm -r wip", closed.stdout)
         self.assertIn("squash", closed.stdout)
@@ -850,7 +863,7 @@ class PhaseTest(PhaseHarness):
         again = self.ready(fixture)
         self.assertEqual(again.returncode, 0, again.stderr)
 
-    def test_wrapup_closes_early_and_files_the_rest(self):
+    def test_close_early_closes_early_and_files_the_rest(self):
         """人が「キリの良いところ」と締める。残りは取り消し・省略・受け入れになり、issue に写る。"""
         self.family(plan=["research", "design", "acceptance", "implement"])
         self.propose(
@@ -861,7 +874,7 @@ class PhaseTest(PhaseHarness):
         self.run_child("i0001-01", [("wip/research/summary.md", "s\n")])
         # 作業中の子がいる間は締められない。
         fixture = self.remote()
-        refused = self.wrapup(fixture)
+        refused = self.close_early(fixture)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("作業中の子", refused.stderr)
         self.assertEqual(self.close_child("i0001-01").returncode, 0)
@@ -877,7 +890,7 @@ class PhaseTest(PhaseHarness):
         data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "気になる"}]
         write(fixture, json.dumps(data))
         # n なら何も変わらない。
-        declined = self.wrapup(fixture, answer="n")
+        declined = self.close_early(fixture, answer="n")
         self.assertNotEqual(declined.returncode, 0)
         self.assertIn("i0001-02", declined.stdout)
         self.assertIn("実装とテスト", declined.stdout)
@@ -885,7 +898,7 @@ class PhaseTest(PhaseHarness):
         self.assertIn("u/7#t0", declined.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
         # y で締める。
-        done = self.wrapup(fixture, reason="今期はここまで")
+        done = self.close_early(fixture, reason="今期はここまで")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("締めた", done.stdout)
         cancelled = os.path.join(self.approved, "done", "i0001-02.md")
@@ -893,12 +906,14 @@ class PhaseTest(PhaseHarness):
         with open(cancelled, encoding="utf-8") as f:
             self.assertIn("cancelled_at:", f.read())
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001-02.md")))
-        mark = read_json(os.path.join(self.approved, "phases", "i0001", "wrapup.json"))
+        mark = read_json(os.path.join(self.approved, "phases", "i0001", "close-early.json"))
         self.assertEqual(mark["reason"], "今期はここまで")
         self.assertEqual(mark["cancelled"], ["i0001-02"])
         self.assertEqual(sorted(mark["skipped"]), [2, 3, 4])
         self.assertEqual(mark["accepted"], ["u/7#t0"])
-        with open(os.path.join(self.state, "review-wrapup-issue-i0001.md"), encoding="utf-8") as f:
+        with open(
+            os.path.join(self.state, "review-close-early-issue-i0001.md"), encoding="utf-8"
+        ) as f:
             issue = f.read()
         self.assertTrue(issue.startswith("親 の残り\n\n"))
         self.assertIn("i0001-02", issue)
@@ -908,7 +923,7 @@ class PhaseTest(PhaseHarness):
         # 締めたので、フィードバック計画が無くても親を閉じられる。
         explained = self.ccnavi("--explain")
         self.assertIn("利用者が締めた", explained.stdout)
-        closed = self.ccnavi("ticket", "done", "i0001")
+        closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         # Draft はまだ外れていない。片付けて push してから ready で外す。
         self.assertFalse(
@@ -921,8 +936,8 @@ class PhaseTest(PhaseHarness):
         passed = self.ready(fixture)
         self.assertEqual(passed.returncode, 0, passed.stderr)
 
-    def test_wrapup_is_a_human_path(self):
-        """wrapup は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""
+    def test_close_early_is_a_human_path(self):
+        """close-early は端末を求める。サブエージェントと直接の exe 呼び出しは止まる。"""
         self.family(plan=["design"])
         fixture = self.remote()
         result = self.ccnavi(
@@ -930,8 +945,7 @@ class PhaseTest(PhaseHarness):
             "enable",
             "--cwd",
             self.parent_tree,
-            "review",
-            "wrapup",
+            "--close-early",
             "--reason",
             "r",
             "--result",
@@ -941,7 +955,7 @@ class PhaseTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("端末", result.stderr)
         for command in (
-            "sh .ccnavi/scripts/ccnavi-review.sh wrapup --reason x",
+            "sh .ccnavi/scripts/ccnavi-review.sh close-early --reason x",
             "sh .ccnavi/scripts/ccnavi-review.sh ready",
         ):
             payload = {
@@ -1061,7 +1075,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
         self.assertEqual(self.approve().returncode, 0)
         self.run_child("i0001-01", [("wip/design/plan.md", "d\n")])
 
-        closed = self.ccnavi("ticket", "done", "i0001-01", "--phases", loose)
+        closed = self.ccnavi("ticket", "finish", "i0001-01", "--phases", loose)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--phases は診断", closed.stderr, "落としたことを言っていない")
@@ -1184,7 +1198,7 @@ class ChatReviewTest(PhaseHarness):
         refused = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("依頼済み", refused.stderr)
-        self.assertIn("check --phase 1", refused.stderr)
+        self.assertIn("confirm --phase 1", refused.stderr)
         self.assertEqual(self.check(fixture, 1).returncode, 0)
 
     def test_a_chat_phase_that_covers_a_deferred_merge_request_phase_is_seen_in_the_merge_request(
@@ -1314,7 +1328,7 @@ class ChatReviewTest(PhaseHarness):
         self.start_parent()
         self.propose("i0001", parent_text("i0001", ["chores"], feedback=[]))
         self.assertEqual(self.approve().returncode, 0)
-        closed = self.ccnavi("ticket", "done", "i0001")
+        closed = self.ccnavi("ticket", "finish", "i0001")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("統合先", closed.stdout)
         self.assertNotIn("ready", closed.stdout)
@@ -1515,7 +1529,7 @@ class ScopeLimitTest(PhaseHarness):
         for command in (
             "ls",
             "echo x > src/a/x.py",
-            "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+            "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
         ):
             with self.subTest(command):
                 self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))

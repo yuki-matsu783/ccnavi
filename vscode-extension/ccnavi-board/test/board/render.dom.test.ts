@@ -289,7 +289,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
     assert.equal(rows[0].querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
     assert.equal(rows[1].querySelector(".phase-brief")?.textContent, "レビュー待ち");
     assert.equal(rows[1].querySelector(".phase-full")?.textContent, "終了 · レビュー待ち · レビュー依頼済 · レビュー要");
-    assert.equal(rows[1].querySelectorAll('button[data-action="accept"]').length, 1);
+    assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
   } finally {
     await page.close();
   }
@@ -368,8 +368,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     assert.ok(page.all(".phase-full").some((full) => full.textContent === "進行中 · レビュー要"));
     // 止めていない・マーカーなし・レビュー不要は普通の状態なので書かない
     assert.ok(!texts(page, ".phase-full").some((full) => full.includes("レビュー不要")));
-    // 締める（wrapup）のボタンは出さない
-    assert.equal(page.all('button[data-action="wrapup"]').length, 0);
+    // 締める（close-early）のボタンは出さない
+    assert.equal(page.all('button[data-action="close-early"]').length, 0);
   } finally {
     await page.close();
   }
@@ -554,21 +554,21 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
   const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
   try {
     // 受け入れの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
-    const accept = page.one('button[data-action="accept"]');
-    assert.equal(accept.getAttribute("data-parent"), "i0001");
-    assert.equal(accept.getAttribute("data-phase"), "2");
+    const decide = page.one('button[data-action="decide"]');
+    assert.equal(decide.getAttribute("data-parent"), "i0001");
+    assert.equal(decide.getAttribute("data-phase"), "2");
     const reviewed = page.one('button[data-action="reviewed"]');
     assert.equal(reviewed.textContent, "レビュー済み連絡");
     assert.equal(
       reviewed.getAttribute("title"),
-      "レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh check --phase 2 を打つ）",
+      "レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase 2 を打つ）",
     );
     page.click(reviewed);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
-    page.click(accept);
+    page.click(decide);
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "accept", parent: "i0001", phase: 2 });
+    assert.deepEqual(page.posted.at(-1), { type: "decide", parent: "i0001", phase: 2 });
     // フェーズ行は依頼の投稿へ、親カードはマージリクエスト自体へ
     const inPhase = page.one(".phase a.mr-link");
     assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");

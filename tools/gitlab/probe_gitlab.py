@@ -446,7 +446,7 @@ def main() -> int:
 
     for child in ("i0001-01", "i0001-02"):
         done = sh(TICKET_SH, parent_tree, "done", child)
-        record(f"ticket done {child}", done.returncode == 0, done.stderr.strip()[:200])
+        record(f"ticket finish {child}", done.returncode == 0, done.stderr.strip()[:200])
     commit_all(parent_tree, "done")
     for child in ("i0001-01", "i0001-02"):
         git(parent_tree, "merge", "--quiet", "--no-edit", child)
@@ -620,7 +620,7 @@ def main() -> int:
     record("note が投稿される", noted.returncode == 0, (noted.stdout + noted.stderr).strip()[:160])
     record(
         "note に ccnavi:note のマーカーがある",
-        has_marker(notes_of(pid, iid), "<!-- ccnavi:note -->"),
+        has_marker(notes_of(pid, iid), "<!-- ccnavi:comment -->"),
     )
 
     status, disc2 = api(
@@ -636,7 +636,7 @@ def main() -> int:
     record(
         "accept で未解決を受け入れる", accepted.returncode == 0 and "受け入れた" in accepted.stdout
     )
-    acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:accept -->")]
+    acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:decide -->")]
     record(
         "受け入れの note が MR に写る",
         bool(acc) and f"#note_{disc2_note}" in acc[-1].get("body", ""),
@@ -732,7 +732,7 @@ def main() -> int:
         )
         record(
             "wrapup の note が MR にある",
-            has_marker(notes_of(pid, mr2["iid"]), "<!-- ccnavi:wrapup -->"),
+            has_marker(notes_of(pid, mr2["iid"]), "<!-- ccnavi:close-early -->"),
         )
 
     # ---- 6. URL にトークンを埋めた origin でも読めて、出力に漏れない

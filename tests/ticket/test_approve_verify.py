@@ -47,7 +47,7 @@ ANSWER_NO = 3
 
 class ApproveVerifyTest(PhaseHarness):
     def verify(self, *extra):
-        """`--approve --preview --verify`。ハーネスの `check`（review check）とは別物なので、
+        """`--approve --preview --verify`。ハーネスの `confirm`（review confirm）とは別物なので、
         名前を分ける（同じ名前で上書きすると、レビュー絡みのテストを足した回に黙って入れ替わる）。"""
         return self.ccnavi("--approve", "--preview", "--verify", *extra)
 

@@ -2,7 +2,7 @@
 
 GitHub ではスレッドの解決状態（`threads`）と Draft 外し（`undraft`）が GraphQL でしか
 扱えない。GraphQL を塞ぐ実行環境があり（Claude Code のセッションは REST だけ通す）、
-そこでは `check` / `fetch` / `ready` だけが 403 で止まる。curl の経路は `-f` が本文を
+そこでは `confirm` / `fetch` / `ready` だけが 403 で止まる。curl の経路は `-f` が本文を
 捨てるので、画面に残るのは番号だけになり、認証の失敗と見分けが付かない。
 
 案内そのものは `api_failed` の `graphql` の枝が出す。本物の GitHub の GraphQL を
@@ -32,7 +32,7 @@ CURL = shutil.which("curl")
 
 # 案内が名指しするもの。どれが欠けても、読んだ人は次の一手に届かない。
 MUST_NAME = (
-    "ccnavi review check",
+    "ccnavi review confirm",
     "--result",
     "MCP",
     "fetch_all",
@@ -56,7 +56,7 @@ class TheHintIsInTheFailurePathTest(unittest.TestCase):
     """案内は `api_failed` に置く。"""
 
     def test_api_failed_has_a_graphql_branch(self):
-        """`check` の側ではなく `api_failed`。`fetch` と `ready` も同じ経路で詰まる。"""
+        """`confirm` の側ではなく `api_failed`。`fetch` と `ready` も同じ経路で詰まる。"""
         body = api_failed_body(script_text())
         self.assertIn('case "$2" in', body, "GraphQL のときだけ足す枝が無い")
         self.assertIn("graphql)", body)

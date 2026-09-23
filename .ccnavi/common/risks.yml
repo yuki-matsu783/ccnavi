@@ -10,7 +10,7 @@
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
 #                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
 #   定性（サブエージェント）: judge: <問い>。親がサブエージェントに判断させ、
-#                      'sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠>' で記録する。
+#                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
 # このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、--lint が言う。

@@ -12,7 +12,7 @@ import { loadBoard, runApprovePreview, runApproveYes } from "./ccnavi.js";
 import { buildBoard, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
-  acceptCommand,
+  decideCommand,
   PUSH_APPROVED_SCRIPT,
   pushApprovedCommand,
   type Launcher,
@@ -361,18 +361,18 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "promptOpen":
       dispatch(current, { kind: "handOver", how: message.type });
       return;
-    case "accept": {
+    case "decide": {
       const tree = current.board ? parentTreeOf(current.board, message.parent) : undefined;
       if (tree === undefined) {
-        vscode.window.showWarningMessage(`親 ${message.parent} のワークツリーが無いので accept を送れない`);
+        vscode.window.showWarningMessage(`親 ${message.parent} のワークツリーが無いので decide を送れない`);
         return;
       }
-      runInTerminal(root, acceptCommand(root, tree, message.phase));
+      runInTerminal(root, decideCommand(root, tree, message.phase));
       return;
     }
     case "reviewed":
       // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、承認の文と同じ
-      // オーバーレイ（コピー / 新しいセッションで開く）で渡す。check を打つのは文を受けたエージェント。
+      // オーバーレイ（コピー / 新しいセッションで開く）で渡す。confirm を打つのは文を受けたエージェント。
       // ボードから引くもの（親のワークツリー・フェーズ）を添えて渡し、被せてよいかは遷移の側が決める
       dispatch(current, {
         kind: "reviewed",
@@ -545,7 +545,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   approveCancel: true,
   promptCopy: true,
   promptOpen: true,
-  accept: true,
+  decide: true,
   reviewed: true,
 };
 
@@ -584,7 +584,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
         : undefined;
     case "open":
       return typeof m.filePath === "string" ? { type: "open", filePath: m.filePath } : undefined;
-    case "accept":
+    case "decide":
     case "reviewed":
       return typeof m.parent === "string" && typeof m.phase === "number" && Number.isInteger(m.phase)
         ? { type: m.type, parent: m.parent, phase: m.phase }
