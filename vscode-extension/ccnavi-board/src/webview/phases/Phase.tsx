@@ -11,7 +11,7 @@
  * 層（自身の層・プロジェクト）はほかの層の種類を指せるので、候補に無い id を打つ欄も出す。
  * 共通層はほかの層を指せない（照合は自分のファイルの中だけ）ので、その欄は出さない。
  */
-import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from "react";
 
 import { KIND_LABELS, PHASE_KINDS, REVIEWS, REVIEW_LABELS, type PhaseForm, type PhaseKind, type Review } from "../../core/phases-view.js";
 import { relationsNote, scopeText, scopeTitle, splitList } from "./text.js";
@@ -275,7 +275,10 @@ function ListInput({
  * 関係の欄。ほかの種類の id を複数選択のセレクトボックスで選ぶ。
  *
  * 押すだけで 1 件ずつ付け外しする（`mousedown` で素の動きを止める）。素の複数選択は Ctrl / Shift なしで
- * 押すとほかの選択が外れ、気付かずに関係を消しやすい。キー操作は素のまま `change` で受ける。
+ * 押すとほかの選択が外れ、気付かずに関係を消しやすい。**キー操作も同じ理由で素の動きを止める。** 素の
+ * 矢印キーは、動かした先の 1 件だけを選んだ状態に縮める（見て回るだけで関係が消える）。矢印・Home・End で
+ * 印（`active`）だけを動かし、Space か Enter で付け外しする。印は `aria-activedescendant` で読み上げに伝える。
+ * `change` はそれでも届いたとき（止めきれない操作）のために、届いた選択をそのまま受ける。
  *
  * 候補は呼ぶ側が決める（自分と空を除いた、このファイルの種類）。**候補に無い値も消さずに出す**
  * （ほかの層の種類・綴り違い・自分自身）。外せば並びから消える。値は前後の空白を落として読む
@@ -315,6 +318,8 @@ function IdPicker({
   readonly onChange: (next: readonly string[]) => void;
 }): JSX.Element {
   const [extra, setExtra] = useState("");
+  const [active, setActive] = useState(0);
+  const listId = useId();
   const chosen = Array.from(new Set(value.map((id) => id.trim()).filter((id) => id !== "")));
   const picked = new Set(chosen);
   const options = Array.from(new Set([...candidates, ...chosen]));
@@ -343,27 +348,48 @@ function IdPicker({
   const choose = (select: HTMLSelectElement): void => {
     onChange(ordered(new Set(Array.from(select.selectedOptions, (option) => option.value))));
   };
+  const isLocked = (id: string): boolean => blocked.has(id) && !picked.has(id);
+  // 候補が減ったときに印が外へはみ出さないよう、描くたびに収める
+  const current = Math.min(active, options.length - 1);
+  const onKeyDown = (event: KeyboardEvent<HTMLSelectElement>): void => {
+    if (event.key === "Tab" || event.nativeEvent.isComposing) {
+      return;
+    }
+    // Tab 以外は素の動きを止める（矢印も文字の頭出しも、選択を 1 件に縮める）
+    event.preventDefault();
+    const last = options.length - 1;
+    const moves: Record<string, number> = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: last, PageDown: current + 5, PageUp: current - 5 };
+    if (event.key in moves) {
+      setActive(Math.max(0, Math.min(last, moves[event.key])));
+    } else if ((event.key === " " || event.key === "Enter") && current >= 0 && !isLocked(options[current])) {
+      toggle(options[current], !picked.has(options[current]));
+    }
+  };
   return (
-    <div className={`ids ${className}`} title={title} role="group" aria-label={label}>
+    <div className={`ids ${className}`} title={title}>
       {options.length > 0 && (
         <select
           multiple
           className="id-select"
           aria-label={label}
-          size={Math.min(Math.max(options.length, 2), 6)}
+          aria-activedescendant={`${listId}-${current}`}
+          size={Math.min(options.length, 6)}
           value={chosen}
           disabled={disabled}
           onChange={(event) => choose(event.currentTarget)}
+          onKeyDown={onKeyDown}
         >
-          {options.map((id) => {
+          {options.map((id, index) => {
             const note = id === self ? "自分自身を挙げている（外す）" : !known.has(id) ? "このファイルに無い id（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類（外す）" : undefined;
-            const locked = blocked.has(id) && !picked.has(id);
+            const locked = isLocked(id);
+            const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (
               <option
                 key={id}
+                id={`${listId}-${index}`}
                 value={id}
-                className={note !== undefined ? "id-option foreign" : "id-option"}
-                title={locked ? blockedNote : (note ?? "押すと選ぶ／外す")}
+                className={`id-option${note !== undefined ? " foreign" : ""}${index === current ? " active" : ""}`}
+                title={tip === "" ? "押すか Space で選ぶ／外す" : tip}
                 disabled={locked}
                 onMouseDown={(event) => {
                   // 押すだけで 1 件ずつ付け外しする。素の複数選択は Ctrl なしで押すとほかの選択が外れる
@@ -372,6 +398,7 @@ function IdPicker({
                     return;
                   }
                   (event.currentTarget.parentElement as HTMLSelectElement | null)?.focus();
+                  setActive(index);
                   toggle(id, !picked.has(id));
                 }}
               >

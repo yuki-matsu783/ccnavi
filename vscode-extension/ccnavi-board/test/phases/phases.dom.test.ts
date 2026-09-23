@@ -324,6 +324,50 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
   }
 });
 
+test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外しする。change で届いた選択はそのまま受ける", async () => {
+  const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
+    await dom.settle();
+    const select = `${rowSelector("p4")} .f-requires select.id-select`;
+    const selected = (): string[] =>
+      dom
+        .all<HTMLOptionElement>(`${select} option`)
+        .filter((option) => option.selected)
+        .map((option) => option.value);
+    const active = (): string | null => dom.one(`${select} option.active`).getAttribute("value");
+    assert.deepEqual(selected(), ["acceptance"]);
+    assert.equal(active(), "research");
+    // 矢印は印を動かすだけで、選択を 1 件に縮めない
+    dom.key("ArrowDown", dom.one(select));
+    await dom.settle();
+    dom.key("ArrowDown", dom.one(select));
+    await dom.settle();
+    assert.equal(active(), "acceptance");
+    assert.deepEqual(selected(), ["acceptance"]);
+    dom.key("ArrowUp", dom.one(select));
+    await dom.settle();
+    dom.key(" ", dom.one(select));
+    await dom.settle();
+    assert.deepEqual(selected(), ["design", "acceptance"]);
+    dom.key("End", dom.one(select));
+    await dom.settle();
+    assert.equal(active(), "implement-feedback");
+    assert.equal(dom.one(select).getAttribute("aria-activedescendant"), dom.one(`${select} option.active`).id);
+    // 止めきれずに change が届いたときは、届いた選択を並びの順で受ける
+    for (const option of dom.all<HTMLOptionElement>(`${select} option`)) {
+      option.selected = option.value === "implement-feedback" || option.value === "research";
+    }
+    dom.change(dom.one(select));
+    await dom.settle();
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.deepEqual(savedForm(dom).phases[3].requires, ["research", "implement-feedback"]);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
   const base = readPhases(TEMPLATE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));

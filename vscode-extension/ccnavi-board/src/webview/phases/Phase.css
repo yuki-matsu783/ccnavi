@@ -12,5 +12,6 @@
 .ids .id-select { flex: 0 1 260px; min-width: 140px; padding: 2px 0; font-family: var(--vscode-editor-font-family); }
 .ids .id-option { padding: 1px 6px; cursor: pointer; }
 .ids .id-option:disabled { cursor: default; opacity: .6; }
+.ids .id-select:focus .id-option.active { outline: 1px dashed var(--vscode-focusBorder); outline-offset: -1px; }
 .ids .id-option.foreign { color: var(--vscode-descriptionForeground); font-style: italic; }
 .ids .id-extra { flex: 0 1 220px; min-width: 120px; }
