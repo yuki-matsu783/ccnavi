@@ -22,6 +22,20 @@ uv run python -m unittest discover -s tests -t .         # 全件
 
 複数のグループは 1 つずつ続けて回す（`discover -s` は 1 か所しか取らない）。
 
+**全件を打つときは `tools/run_tests.py` のほうが速い。** モジュールごとに別プロセスへ分けて
+同時に回す。回る中身は discover と同じで（`tests/core/test_run_tests.py` が突き合わせる）、
+分け方と並べ方だけが違う。この機械で 177 秒が 63 秒（4 コア）。
+
+```sh
+uv run python tools/run_tests.py                 # 全件
+uv run python tools/run_tests.py tests/ticket    # グループを名指し（複数書ける）
+uv run python tools/run_tests.py --plan          # 何をどの順で回すか出すだけ
+```
+
+落ちたら、そこで新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。
+**ターンの終わりの hook はこれを使わない。** あちらの `--failfast` は「最初に落ちた 1 件」が
+毎回同じになることに寄りかかっていて、同時に回すとそこがぶれる。
+
 ## 回すグループ
 
 **`core` はいつも回す。** そのうえで、変えたファイルを下の表に当てて、当たった行のグループを足す。

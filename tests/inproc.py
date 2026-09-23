@@ -12,7 +12,9 @@ subprocess.run と同じ形（引数の並び、input、env、cwd）を受け、
 返す。呼び手の assert は subprocess のときと同じ書き方で通る。
 
 - env は「その起動に見える環境そのもの」として扱う。subprocess.run(env=...) と同じで、
-  渡した辞書に無い変数は見えない
+  渡した辞書に無い変数は見えない。例外は走った機械の git の設定を締め出す分
+  （tests.GIT_ENV）で、これは空にしても残す。判定の中で起こす git がホストの
+  `~/.gitconfig` を読み直さないようにするため
 - cwd は起動中だけ移る。テストは並行して走らないので、戻し忘れが無ければ他に響かない
 - 判定の中で例外が出たら、そのまま伝える。プロセスなら終了コード 1 と traceback に
   なるところだが、テストでは例外として見えたほうが原因に近い
@@ -31,6 +33,7 @@ from collections.abc import Mapping, Sequence
 from unittest import mock
 
 from ccnavi import cli
+from tests import GIT_ENV
 
 
 def run_ccnavi(
@@ -47,7 +50,12 @@ def run_ccnavi(
     stderr = io.StringIO()
     with contextlib.ExitStack() as stack:
         if env is not None:
-            stack.enter_context(mock.patch.dict(os.environ, env, clear=True))
+            # 走った機械の git の設定を締め出す分（tests.GIT_ENV）は、環境を空にしても
+            # 残す。ccnavi は判定の中で git を起こす（ccnavi/gitcmd.py）ので、ここで
+            # 落とすと、この道だけがホストの `~/.gitconfig` を読み直す。
+            # 呼び手が同じ名前を渡したときは呼び手を優先する。塞ぎ方そのものを
+            # 試すテストが、塞ぎに上書きされないようにするため。
+            stack.enter_context(mock.patch.dict(os.environ, {**GIT_ENV, **env}, clear=True))
         if cwd:
             previous = os.getcwd()
             os.chdir(cwd)
