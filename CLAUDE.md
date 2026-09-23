@@ -150,9 +150,9 @@
 Draft を外した印）は全部 `.ccnavi/approved/phases/<親>/` にあり、clone で届く。
 
 チケットは 1 本のファイルで、`wip/proposals/todo/`（承認待ち）→ `.ccnavi/approved/doing/`（人が承認）→
-`wip/proposals/review/`（`ticket done`。レビュー要のとき）→ `.ccnavi/approved/done/`（人がレビュー）と
+`wip/proposals/review/`（`ticket finish`。レビュー要のとき）→ `.ccnavi/approved/done/`（人がレビュー）と
 動く（ADR-0055）。`.ccnavi/approved/` へ動かすのは人、`wip/proposals/` へ動かすのはエージェント
-（`ccnavi-ticket.sh` 経由）。レビューで残った指摘は、人が `accept` で「受け入れて進む」か
+（`ccnavi-ticket.sh` 経由）。レビューで残った指摘は、人が `decide` で「受け入れて進む」か
 「続きの子チケットを `doing/` に起こす」かを選ぶ。
 
 ラッパースクリプトが返す記録の綴りは、cwd から開ける形で出る。そのまま `sed -n` などで開けばよい。
