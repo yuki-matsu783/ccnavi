@@ -17,10 +17,11 @@ import type { Lock } from "../../core/lock.js";
 import { graphOf } from "../../core/phases-graph.js";
 import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKind, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
-import { Graph } from "./Graph.js";
+import { Graph, Legend } from "./Graph.js";
 import { Phase } from "./Phase.js";
+import { Tour, type TourStep } from "./Tour.js";
 import { post } from "./post.js";
-import { countText, duplicateNote, emptyNote, findText, graphNote, hasRelations } from "./text.js";
+import { countText, duplicateNote, emptyNote, findText, graphNotices, hasRelations } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, openedFromIds, saveOpen, saveView, type Draft, type View } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -68,6 +69,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [find, setFind] = useState("");
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
   const [view, setView] = useState<View>(() => loadView());
+  /** 吹き出しの案内を出しているか。拡張ホストの `tour`（初回）かヘルプのボタンで出る */
+  const [touring, setTouring] = useState(false);
+  /** 拡張ホストが初回の案内を頼んだが、中身がまだ無くて出せていない */
+  const [tourPending, setTourPending] = useState(false);
+  /** 案内を始める前の一覧と図。終わったら戻す */
+  const viewBeforeTour = useRef<View>(view);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const { draft, open, more } = editing;
   const page = pageOf(data);
@@ -96,6 +104,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         // 「破棄して読み直す？」をやめた。止めた欄を戻す
         setBusy(false);
         setStatus(undefined);
+      } else if (message.type === "tour") {
+        setTourPending(true);
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -138,6 +148,15 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
+
+  // 初回の案内は、種類の中身が出てから始める（読み込み中やエラーの画面には指す先が無い）
+  useEffect(() => {
+    if (tourPending && data.kind === "page") {
+      setTourPending(false);
+      viewBeforeTour.current = view;
+      setTouring(true);
+    }
+  }, [tourPending, data.kind, view]);
 
   /**
    * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
@@ -243,6 +262,72 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
    * 種類を足す。**図を見ていても一覧へ移す。** 足した種類は id が空で図に出ないので、図のままだと
    * 押しても何も変わらないように見える。絞り込みも外す（id が空の行は絞り込みに当たらず隠れる）。
    */
+  const startTour = (): void => {
+    viewBeforeTour.current = view;
+    setHelpOpen(false);
+    setTouring(true);
+  };
+
+  /** 案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストに伝え、次からは初回の案内を出さない */
+  const endTour = (): void => {
+    setTouring(false);
+    showView(viewBeforeTour.current);
+    post({ type: "tourDone" });
+  };
+
+  /** 案内で行を指すための下ごしらえ。関係（overlap / requires / after）を持つ最初の行（無ければ最初の行）を開き、関係の欄も開く */
+  const linked = (phase: PhaseForm): boolean => phase.overlap.length + phase.requires.length + phase.after.length > 0;
+  const openSample = (): string | undefined => {
+    const row = draft.rows.find((item) => linked(item.phase) && item.phase.id.trim() !== "") ?? draft.rows[0];
+    if (row === undefined) {
+      return undefined;
+    }
+    setFind("");
+    setEditing((now) => ({ ...now, open: new Set([...now.open, row.key]), more: new Map(now.more).set(row.key, true) }));
+    return row.key;
+  };
+  const sampleKey = (draft.rows.find((item) => linked(item.phase) && item.phase.id.trim() !== "") ?? draft.rows[0])?.key;
+
+  const tourSteps: readonly TourStep[] = [
+    {
+      target: "#phases",
+      title: "フェーズの種類",
+      body: "親チケットの計画（plan:）に並べる工程の型。行を押すと欄が開き、「＋ 種類を追加」で増やせる。",
+      before: () => showView("list"),
+    },
+    {
+      target: sampleKey === undefined ? "#phases" : `.phase[data-key="${sampleKey}"] details.more`,
+      title: "ほかの種類との関係",
+      body: "並行できる種類・一緒に必要な種類・先に済ませる種類を、チェックで選ぶ。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になる。",
+      before: () => {
+        showView("list");
+        openSample();
+      },
+    },
+    {
+      target: "#f-order",
+      title: "全体計画の待ち方",
+      body: "sequential は plan: に並べた順に一つずつ進む。dag は after でつないだ種類だけを待ち、つながっていない種類は並行して進む。",
+    },
+    {
+      target: "#phase-graph",
+      title: "図",
+      body: "矢印が after の流れ、実線が一緒に必要、破線が並行できる関係。作業（work）とフィードバック対応（feedback）は枠で分かれ、枠の間の矢印はレビュー後の順を表す。点を押すと一覧のその行へ移る。",
+      before: () => showView("graph"),
+    },
+    {
+      target: "#save",
+      title: "保存",
+      body: "保存すると実行ファイルが検証してから書き込む。通らなければ、下に理由が出る。",
+    },
+    {
+      target: '[data-action="help"]',
+      title: "ヘルプ",
+      body: "細かい説明はここから開く。この案内も、ここからもう一度見られる。",
+      before: () => showView(viewBeforeTour.current),
+    },
+  ];
+
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
@@ -340,6 +425,16 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action small" data-action="add" disabled={busy || !editable} onClick={add}>
             ＋ 種類を追加
           </button>
+          <button
+            type="button"
+            className={helpOpen ? "action small on" : "action small"}
+            data-action="help"
+            title="この画面の説明と案内"
+            aria-expanded={helpOpen}
+            onClick={() => setHelpOpen(!helpOpen)}
+          >
+            ？ ヘルプ
+          </button>
         </h2>
         <div className="tabs" role="tablist">
           <button type="button" className={view === "list" ? "action small on" : "action small"} role="tab" aria-selected={view === "list"} data-action="show-list" onClick={() => showView("list")}>
@@ -370,21 +465,34 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <input id="find" type="search" placeholder="id・title・scope・when で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
           </div>
         )}
-        <details className="help">
-          <summary>この画面の説明</summary>
-          <p className="hint">
+        {helpOpen && (
+          <div className="help-panel" id="help">
+            <p className="hint">
             親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは{" "}
             <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に必要な種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
             辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効かない。
             関係の欄はこのファイルのほかの種類から選ぶ（層の画面では、ほかの層の種類の id を打って足せる）。範囲と成果物は <code>,</code> で区切る。
-          </p>
-        </details>
+            </p>
+            <p className="hint">
+              図の「人が見る」は種類の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わる。判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる（層のどれかが{" "}
+              <code>sequential</code> なら <code>sequential</code>）。図はこのファイルの中だけを描くので、ほかの層の種類を指す関係は線にならない。
+            </p>
+            <button type="button" className="action small" data-action="tour" onClick={startTour}>
+              案内をもう一度見る
+            </button>
+          </div>
+        )}
         {view === "graph" && (
           <>
             <Graph graph={graph} onPick={pick} />
-            <p className="graph-note">{graphNote(graph)}</p>
+            <Legend />
+            {graphNotices(graph).map((notice) => (
+              <p key={notice} className="graph-note">
+                {notice}
+              </p>
+            ))}
           </>
         )}
         <ul className={view === "list" ? "list" : "list hidden"} id="phases">
@@ -411,6 +519,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           {draft.rows.length === 0 && <li className="empty">{emptyNote(page?.exists === true, editable)}</li>}
         </ul>
       </section>
+      {touring && <Tour steps={tourSteps} onClose={endTour} />}
       <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
         <span id="status">{shownStatus?.text ?? ""}</span>
       </footer>

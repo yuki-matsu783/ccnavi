@@ -57,36 +57,27 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
 }
 
 /**
- * 図の下に出す一言。**この絵が何を描いていないか**を言う。
- *
- * 言うのは、線の読み方（向きを持つのは `after` だけ）、「人が見る」が種類の宣言であること、
- * このファイルに無い種類を指す参照は線にならないこと（他の層の `after` も描かない）、
- * 判定が使う待ち方は承認のときに決まること、id の無い種類は出ないこと。
- *
- * **読み方をここで言うのは、線にラベルを付けないから。** 同じ組が両方の関係を持つとラベルどうしが
- * 重なって片方が読めない（`Graph.tsx` の `edgesOf`）。
+ * 図の下に出す注意。**当てはまるときだけ出す。** 線の読み方は凡例（`Graph.tsx` の `Legend`）が持ち、
+ * 細かい説明（「人が見る」の意味、待ち方が決まる時点）は札のツールチップとヘルプに置く。
+ * 毎回 6 文を並べていたときは、要る注意がほかの文に埋もれていた。
  *
  * **線が落ちた理由は言わない。** 綴り違いかもしれないし、他の層の種類かもしれない。
  * 決めるのは実行ファイルで、`phasetypes.py` の `reference_problems` が合成した集合で
  * 確かめ、無ければ error を出す。画面がその手前で「他の層だ」と言うと、保存したときに
- * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にならない」までしか言わない。
+ * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にしていない」までしか言わない。
  */
-export function graphNote(graph: PhasesGraph): string {
-  const parts = [
-    `${graph.nodes.length} 種類・${graph.edges.length} 本`,
-    "実線は requires（一緒に置く）、破線は overlap（並行してよい）で、どちらも向きは無い",
-    graph.order === "dag"
-      ? "矢印は after（待たれる側 → 待つ側）。辺で繋がっていない種類は並行して進む。列は after の深さ"
-      : "矢印は after。待ち方が sequential なので、after は判定に効かない（全体計画は一直線）",
-    "枠は区分で、左の作業（work）は全体計画 plan: に、右のフィードバック対応（feedback）はレビューのあと feedback: に並べる。枠の間の矢印はその順",
-    "「人が見る」は種類の宣言（review）。計画の延期や実績のリスクで実際に見る場所は変わる",
-    "このファイルに無い種類を指す線は出ない（綴り違いか、他の層の種類か。どちらかは保存のときの検証が言う）。他の層の after は描かないので、その種類は根に見える",
-    "判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる",
-  ];
-  if (graph.unnamed > 0) {
-    parts.push(`id が空の種類は出ない（${graph.unnamed} 件）`);
+export function graphNotices(graph: PhasesGraph): readonly string[] {
+  const out: string[] = [];
+  if (graph.order === "sequential" && graph.edges.some((edge) => edge.relation === "after")) {
+    out.push("待ち方が sequential なので、矢印（after）は判定に効かない。全体計画は plan: に並べた順に一つずつ進む");
   }
-  return parts.join("。 ");
+  if (graph.dropped > 0) {
+    out.push(`このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（綴り違いか、ほかの層の種類。どちらかは保存のときの検証が言う）`);
+  }
+  if (graph.unnamed > 0) {
+    out.push(`id が空の種類は図に出ない（${graph.unnamed} 件）`);
+  }
+  return out;
 }
 
 /** 種類が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */

@@ -126,6 +126,8 @@ export type ToPhases =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
+  /** この画面の案内をまだ見ていない（拡張ホストの `globalState`）。画面は吹き出しの案内を出す */
+  | { readonly type: "tour" }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（phases-panel の `asMessage`）が形を確かめてから使う */
@@ -137,7 +139,9 @@ export type PhasesMessage =
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "create" }
-  | { readonly type: "save"; readonly form: PhasesForm };
+  | { readonly type: "save"; readonly form: PhasesForm }
+  /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */
+  | { readonly type: "tourDone" };
 
 /** 最初の中身を埋める `<script type="application/json">` の id */
 export const DATA_ID = "ccnavi-phases-data";

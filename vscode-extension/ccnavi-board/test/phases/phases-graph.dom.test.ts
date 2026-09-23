@@ -57,22 +57,35 @@ test("CB-D81 図は点と線を描く（線が 0 本なら、それは描けて�
   }
 });
 
-test("CB-D74 図の下の一言は、この絵が描いていないものを言う", async () => {
+test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線が落ちた理由は断定しない", async () => {
   const dom = await openGraph({ model: model(LINKED) });
   try {
-    const note = dom.one(".graph-note").textContent ?? "";
-    assert.match(note, /3 種類・2 本/);
-    assert.match(note, /実線は requires（一緒に置く）、破線は overlap（並行してよい）/);
-    assert.match(note, /どちらも向きは無い/);
-    assert.match(note, /矢印は after/);
-    assert.match(note, /「人が見る」は種類の宣言/);
-    assert.match(note, /このファイルに無い種類を指す線は出ない/);
-    // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）
-    assert.doesNotMatch(note, /他の層の種類を指す/);
-    // 良し悪しは言わない（ADR-0035）
-    assert.doesNotMatch(note, /循環|不正|エラー|直して/);
+    const legend = dom.one(".graph-legend").textContent ?? "";
+    assert.match(legend, /先に済ませる（after）/);
+    assert.match(legend, /一緒に必要（requires）/);
+    assert.match(legend, /並行できる（overlap）/);
+    assert.match(legend, /枠の間の矢印はレビュー後の順/);
+    // docs の requires はこのファイルに無い種類を指すので、線にしていないと件数で言う
+    const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
+    assert.deepEqual(notes.length, 1);
+    assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていない/);
+    // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）。良し悪しも言わない
+    assert.doesNotMatch(notes[0], /他の層の種類を指す/);
+    assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
+    // sequential でも after が無ければ、効かないという注意は出さない
+    assert.doesNotMatch(notes.join(""), /sequential/);
+    // 「人が見る」の意味は札のツールチップにある
+    assert.match(dom.one(".tag.hitl").getAttribute("title") ?? "", /種類の宣言（review）/);
   } finally {
     await dom.close();
+  }
+
+  // sequential なのに after がある。矢印が判定に効かないことを言う
+  const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
+  try {
+    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、矢印（after）は判定に効かない/);
+  } finally {
+    await seq.close();
   }
 });
 
@@ -161,7 +174,7 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
   try {
     assert.equal(dom.all(".react-flow__node").length, 1);
     // 空の id が無いときは、その行を出さない
-    assert.doesNotMatch(dom.one(".graph-note").textContent ?? "", /id が空/);
+    assert.equal(dom.all(".graph-note").length, 0);
   } finally {
     await dom.close();
   }
@@ -173,7 +186,7 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
     await added.settle();
     added.click(added.one('[data-action="show-graph"]'));
     await added.settle();
-    assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は出ない（1 件）/);
+    assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は図に出ない（1 件）/);
   } finally {
     await added.close();
   }
@@ -210,7 +223,8 @@ test("CB-D89 雛形の図は after の矢印で流れを描き、work と feedba
     assert.match(dom.one('.phase-group[data-kind="work"]').textContent ?? "", /作業（plan:）/);
     assert.match(dom.one('.phase-group[data-kind="feedback"]').textContent ?? "", /フィードバック対応（feedback:）/);
     assert.match(dom.one(".phase-group-arrow").textContent ?? "", /レビュー後/);
-    assert.match(dom.one(".graph-note").textContent ?? "", /枠は区分/);
+    // 雛形は dag で、落ちた線も id の空の種類も無いので、注意は 1 つも出ない
+    assert.equal(dom.all(".graph-note").length, 0);
   } finally {
     await dom.close();
   }

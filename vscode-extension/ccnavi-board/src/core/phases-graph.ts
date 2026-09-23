@@ -58,6 +58,11 @@ export interface PhasesGraph {
   readonly edges: readonly GraphEdge[];
   /** 図に出せなかった種類の数（id が空で、指すことも指されることもできない） */
   readonly unnamed: number;
+  /**
+   * 線にしなかった参照の数（このファイルに無い id を指す overlap / requires / after）。
+   * 綴り違いか他の層の種類かは言わない（頭のコメント）。数だけを図の下の注意に出す
+   */
+  readonly dropped: number;
 }
 
 /** 点の間隔。CSS の `.react-flow__node-phase` の大きさと合わせる */
@@ -145,7 +150,17 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   }
   const ids = Array.from(first.keys()).sort();
   const kept = ids.map((id) => first.get(id) as PhasesForm["phases"][number]);
-  const edges = edgesOf(kept, new Set(ids));
+  const known = new Set(ids);
+  const edges = edgesOf(kept, known);
+  let dropped = 0;
+  for (const phase of kept) {
+    for (const raw of [...phase.overlap, ...phase.requires, ...phase.after]) {
+      const to = raw.trim();
+      if (to !== "" && to !== idOf(phase) && !known.has(to)) {
+        dropped += 1;
+      }
+    }
+  }
 
   // 置き場所（頭のコメント）。sequential は id の順の格子、dag は after の深さの列
   const works = ids.filter((id) => first.get(id)?.kind !== "feedback");
@@ -158,7 +173,7 @@ export function graphOf(form: PhasesForm): PhasesGraph {
     const at = spot.get(id) as { x: number; y: number };
     return { id, title: phase.title.trim(), kind: phase.kind, review: phase.review, x: at.x, y: at.y };
   });
-  return { order: form.order, nodes, edges, unnamed };
+  return { order: form.order, nodes, edges, unnamed, dropped };
 }
 
 function byGrid(ids: readonly string[]): Map<string, { x: number; y: number }> {

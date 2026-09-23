@@ -374,3 +374,71 @@ test("CB-D86 図を見ているときに種類を足すと、一覧へ移って�
     await dom.close();
   }
 });
+
+test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最後まで進めると閉じて tourDone を返す。図に移った表示は元に戻る", async () => {
+  const dom = await openPhases();
+  try {
+    assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    const titles = [dom.one("#tour-title").textContent];
+    for (let i = 0; i < 5; i += 1) {
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+      titles.push(dom.one("#tour-title").textContent);
+      if (titles[titles.length - 1] === "図") {
+        // 図の段では図に切り替わっている
+        assert.ok(dom.one("#phases").classList.contains("hidden"));
+      }
+    }
+    assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ"]);
+    // 関係の段で、関係の欄を持つ行と、その関係の欄が開いている
+    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
+    assert.equal(dom.one('[data-action="tour-next"]').textContent, "終わる");
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+    assert.ok(!dom.one("#phases").classList.contains("hidden"), "案内の前の一覧に戻っていない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
+  const dom = await openPage({ kind: "loading", title: "フェーズ管理" });
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 1);
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D92 細かい説明はヘルプを押したときだけ出し、そこから案内をもう一度見られる", async () => {
+  const dom = await openPhases();
+  try {
+    assert.equal(dom.all("#help").length, 0, "ヘルプを押すまで説明は出さない");
+    dom.click(dom.one('[data-action="help"]'));
+    await dom.settle();
+    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる/);
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");
+    assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
+    dom.click(dom.one('[data-action="tour-skip"]'));
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+  } finally {
+    await dom.close();
+  }
+});

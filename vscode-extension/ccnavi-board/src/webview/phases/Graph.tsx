@@ -60,7 +60,11 @@ function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
         <span className="tag" data-review={data.review}>
           {data.review}
         </span>
-        {data.review !== "none" && <span className="tag hitl">人が見る</span>}
+        {data.review !== "none" && (
+          <span className="tag hitl" title="種類の宣言（review）。計画の延期や実績のリスクで、実際に見る場所は変わる">
+            人が見る
+          </span>
+        )}
       </span>
     </div>
   );
@@ -218,7 +222,7 @@ function nodesOf(graph: PhasesGraph, spots: Spots): PhaseNode[] {
  * `after` は向きを持つ（待たれる側 a → 待つ側 b）。引き方の都合で出る点が b になったときは、
  * 矢印を始点の側に付ける（React Flow の印は始点では向きが反転するので、b を指す）。
  * 向きの無い線には端の印を付けない。**線にラベルも付けない**（同じ組の 2 本はラベルどうしが
- * 重なって片方が読めなくなる）。実線と破線の読み方は、図の下の一言が言う（`text.ts` の `graphNote`）。
+ * 重なって片方が読めなくなる）。線の読み方は図の下の凡例（`Legend`）が言う。
  */
 function edgesOf(graph: PhasesGraph, at: ReadonlyMap<string, { x: number; y: number }>): RelationEdge[] {
   return graph.edges.map((edge) => {
@@ -238,6 +242,36 @@ function edgesOf(graph: PhasesGraph, at: ReadonlyMap<string, { x: number; y: num
       className: `rel-${edge.relation}`,
     };
   });
+}
+
+/**
+ * 図の下の凡例。線の見本を並べる。**文で読み方を説明しない**（前は 6 文の一言で、要る注意が埋もれていた）。
+ * 色と線の形は `Graph.css` の `.rel-*` と同じものを使う。
+ */
+export function Legend(): JSX.Element {
+  const line = (className: string, arrow: boolean): JSX.Element => (
+    <svg className={`legend-line ${className}`} width="36" height="10" aria-hidden="true">
+      <line x1="2" y1="5" x2={arrow ? 28 : 34} y2="5" />
+      {arrow && <path d="M 27 1 L 34 5 L 27 9 z" />}
+    </svg>
+  );
+  return (
+    <ul className="graph-legend" aria-label="図の凡例">
+      <li>
+        {line("rel-after", true)}先に済ませる（after）
+      </li>
+      <li>
+        {line("rel-requires", false)}一緒に必要（requires）
+      </li>
+      <li>
+        {line("rel-overlap", false)}並行できる（overlap）
+      </li>
+      <li>
+        <span className="legend-box" aria-hidden="true" />
+        区分（work / feedback）。枠の間の矢印はレビュー後の順
+      </li>
+    </ul>
+  );
 }
 
 export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly onPick: (id: string) => void }): JSX.Element {

@@ -53,7 +53,7 @@ test("CB-T186 図は判定をしない（循環も、行き先の無い参照も
   assert.equal(graph.edges.length, 3);
   assert.equal(graph.nodes.length, 3);
   // 図の形に「循環」「不正」を名指しする欄は無い
-  assert.deepEqual(Object.keys(graph).sort(), ["edges", "nodes", "order", "unnamed"]);
+  assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 
   // このファイルに無い種類への参照は、黙って線にならない（綴り違いか他の層かは、画面は言わない）
   assert.deepEqual(edges(form(phase("a", { requires: ["外の種類"] }))), []);
@@ -166,5 +166,5 @@ test("CB-T197 dag で after が循環しても止まらず、並べ方も切り�
   const graph = graphOf({ order: "dag", phases: [phase("a", { after: ["b"] }), phase("b", { after: ["a"] })] });
   assert.equal(graph.nodes.length, 2);
   assert.equal(graph.order, "dag");
-  assert.deepEqual(Object.keys(graph).sort(), ["edges", "nodes", "order", "unnamed"]);
+  assert.deepEqual(Object.keys(graph).sort(), ["dropped", "edges", "nodes", "order", "unnamed"]);
 });

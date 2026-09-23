@@ -508,7 +508,8 @@ Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけ
 | 41 | id の重なり | `design` の id を `research` に変える | id の欄が赤くなり、下部に「id が重なっている」。保存ボタンが押せない。戻すと消える |
 | 42 | コメントが残る | `acceptance` を 1 つ上へ動かし、`docs` の scope に `wip/docs/*` を足して保存し、`git diff` を見る | 動かした 2 つの種類のブロックと、変えた `scope` の行だけが差分。先頭の説明は残っている。`overlap: [implement]` のような裸の並びはそのまま。空白だけの行は出ない |
 | 42b | 語を囲む | `docs` の id を `yes` に変えて保存し、`git diff` を見る | `"yes":` と引用符付きで書かれる。`ccnavi --lint` は error 0 件のまま。戻すと引用符も消える |
-| 42d | 図が描かれる | フェーズ管理画面で「図」のタブを押す | 種類が点で出て、`requires` は実線、`overlap` は破線で結ばれる（どちらも矢印は付かない）。`after` は太い矢印（待たれる側 → 待つ側）。`order: dag` なら点が after の深さで左から列に並ぶ。線は点と点の間の隙間を通る折れ線で、どの点も横切らない（同じ組の 2 本は少しずらして並ぶ）。work の種類は「作業（plan:）」の枠、feedback の種類はその右の「フィードバック対応（feedback:）」の枠に入り、枠の間に「レビュー後」の矢印が出る。右下に拡大・縮小・全体表示のボタンがある。review が none でない種類は縁が太く「人が見る」の札が付く。図の下に読み方の一言が出る。開発者ツールの Console に CSP の拒否が出ていない（点の位置と拡大縮小はインラインの style で当たるので、拒否されると図が動かない） |
+| 42d | 図が描かれる | フェーズ管理画面で「図」のタブを押す | 種類が点で出て、`requires` は実線、`overlap` は破線で結ばれる（どちらも矢印は付かない）。`after` は太い矢印（待たれる側 → 待つ側）。`order: dag` なら点が after の深さで左から列に並ぶ。線は点と点の間の隙間を通る折れ線で、どの点も横切らない（同じ組の 2 本は少しずらして並ぶ）。work の種類は「作業（plan:）」の枠、feedback の種類はその右の「フィードバック対応（feedback:）」の枠に入り、枠の間に「レビュー後」の矢印が出る。右下に拡大・縮小・全体表示のボタンがある。review が none でない種類は縁が太く「人が見る」の札が付く。図の下に線の見本付きの凡例が出る。注意は当てはまるときだけ出る（sequential なのに after がある、このファイルに無い種類を指す関係がある、id が空の種類がある）。開発者ツールの Console に CSP の拒否が出ていない（点の位置と拡大縮小はインラインの style で当たるので、拒否されると図が動かない） |
+| 42g | 初回だけ案内が出る | 拡張を入れて初めてフェーズ管理画面を開く。案内を最後まで進めるかスキップしてから、タブを閉じて開き直す | 初回は吹き出しの案内が出て、一覧・関係の欄・待ち方・図・保存・ヘルプを順に指す（Esc でもやめられる）。閉じると前の表示（一覧か図）に戻る。開き直すと案内は出ない。「？ ヘルプ」を押すと細かい説明と「案内をもう一度見る」が出る。見たかどうかは拡張の globalState に画面ごとに残る（最後まで見ずにタブを閉じたら残らず、次にまた出る） |
 | 42e | 図を触っても設定は動かない | 図で点をドラッグして動かし、別のタブに移って戻る。そのあと `git diff` を見る | 動かした位置は残っている。`phases.yml` に差分は出ない（座標は設定に書かない）。点を押すと一覧に戻り、その種類の行が開く |
 | 42f | 保存しても絵が飛ばない | 図を出したまま一覧で `when` を打ち替えて保存し、図に戻る | 点の位置が保存の前と同じ。種類を 1 つ足したときだけ、その点が増える |
 | 42c | 裏に回しても編集が消えない（React） | 種類を 1 つ開いて題を打ちかけ、別のタブに移ってから戻る。裏にいる間に別のターミナルで `phases.yml` を触る | 打ちかけの値も開いた行もそのまま。「外で変更された」の帯が出ている。開発者ツールの Console に CSP の拒否が出ていない |
@@ -530,6 +531,7 @@ src/
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通層・自身の層・プロジェクト）を切り替える）。検証・作成・保存の受け付け（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
+  tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-samples --json / --lint（--rules / --project-rules-file / --risk / --phases / --project-phases-file の差し替え）/ --lint --json / --approve --preview --json / --approve --yes … --json の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起こす（origin を読む。Node の子プロセス）
   webview-asset.ts    束ねた画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
@@ -553,6 +555,8 @@ src/
     phases-view.ts    フェーズ管理の拡張ホストと画面の契約（種類の形 PhasesForm、見せる形 PhasesPage / PhasesData、押した操作 PhasesMessage）
     phases-render.ts  フェーズ管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）と、無いときに書く雛形の本文
+    phases-graph.ts   フェーズの図の点・線・置き場所を種類の並びから組む。VS Code に触れないので単体で試せる
+    phases-route.ts   図の線の経路（点を横切らない折れ線）。VS Code に触れないので単体で試せる
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin の鍵、clone / fetch / pull の行、プロジェクトになっていない .git の探索、.gitignore と雛形の加工、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
@@ -608,9 +612,13 @@ src/
     phases/style.css  フェーズ管理画面の CSS の入口
     phases/App.css    App.tsx の CSS（枠と見出し）
     phases/Phase.css  Phase.tsx の CSS（種類 1 件の行）
+    phases/Graph.css  Graph.tsx の CSS（図・区分の枠・凡例）
+    phases/Tour.css   Tour.tsx の CSS（吹き出しの案内）
     phases/post.ts    フェーズ管理の送り口。契約に無いものは型で止まる
     phases/main.tsx   フェーズ管理画面の入口。埋め込みの JSON を読んでマウントする
     phases/App.tsx    注意の帯・ツールバー・種類の一覧と、拡張ホストからのメッセージの受け
+    phases/Graph.tsx  図（点・線・区分の枠・凡例）
+    phases/Tour.tsx   吹き出しの案内。画面ごとの初回（拡張ホストの tour）と、ヘルプの「案内をもう一度見る」で出る
     phases/Phase.tsx  種類 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り、関係はチェックで選ぶ）
     phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で控える）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉

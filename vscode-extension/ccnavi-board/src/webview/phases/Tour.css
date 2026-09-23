@@ -1,0 +1,41 @@
+/*
+ * 吹き出しの案内（`Tour.tsx`）。指す先の周りだけを明るく残し、ほかを暗くする。
+ * 暗くするのは指す先の枠の影（box-shadow）で、枠の外を覆う要素は作らない。
+ */
+.tour { position: fixed; inset: 0; z-index: 1000; }
+
+.tour-spot {
+  position: fixed;
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .5);
+  outline: 2px solid var(--vscode-focusBorder);
+  pointer-events: none;
+}
+
+.tour-shade { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); }
+
+.tour-bubble {
+  position: fixed;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  padding: 10px 12px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+
+.tour-bubble:focus { outline: none; }
+
+.tour-bubble.center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+.tour-bubble h3 { margin: 0 0 6px; font-size: 1.05em; }
+
+.tour-count { margin: 0 0 2px; color: var(--vscode-descriptionForeground); font-size: .85em; }
+
+.tour-body { margin: 0 0 10px; line-height: 1.6; }
+
+.tour-buttons { display: flex; gap: 6px; justify-content: flex-end; }
+
+.tour-buttons button.action.small { margin-left: 0; }
