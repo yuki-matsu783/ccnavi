@@ -512,7 +512,13 @@ def decision_digest(d: Decision) -> str:
     並べ、その全体の SHA-256。区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
     """
     assert d.result.mr is not None
-    parts = [d.parent.ticket, str(d.ph.number), str(d.result.mr.number), str(d.can_issue)]
+    parts = [
+        d.parent.ticket,
+        str(d.ph.number),
+        str(d.result.mr.number),
+        d.result.mr.url,
+        str(d.can_issue),
+    ]
     for t in d.unresolved:
         parts.extend([thread_key(t), t.path, str(t.line), t.body])
     lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
@@ -751,6 +757,18 @@ def apply_decision(
     picked = {c: [t for t in d.unresolved if choices.get(thread_key(t)) == c] for c in CHOICES}
     accepted = [thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
     fix = picked[CHOICE_FIX]
+    # issue に回す分は、控えの置き場に下書きを書いて sh に渡す。置き場が無ければ回せないので、
+    # 何も置く前に断る（受け入れだけが残り、issue は作られない、にしない）
+    if picked[CHOICE_ISSUE] and not conf.state:
+        stderr.write("ccnavi: 控えの置き場が空。issue に回す下書きを置けない\n")
+        return None
+    # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
+    # issue やコメントを sh が投稿する
+    if conf.state:
+        for name in (DECIDE_FILE, DECIDE_ISSUE_FILE):
+            stale = os.path.join(conf.state, name.format(parent=parent.ticket, phase=ph.number))
+            if os.path.exists(stale):
+                os.remove(stale)
     # 受け入れはマーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
     if accepted:

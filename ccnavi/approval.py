@@ -1746,7 +1746,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
         if accepted:
-            notes.append("受け入れた分は別 issue に回したか（ccnavi-review.sh decide）")
+            notes.append("別に追うものは issue に回したか（ccnavi-review.sh decide）")
     return notes
 
 

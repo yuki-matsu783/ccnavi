@@ -784,6 +784,26 @@ class PhaseTest(PhaseHarness):
         preview = json.loads(shown.stdout)
         self.assertTrue(preview["can_issue"])
         choices = json.dumps({"u/7#t0": "keep", "u/7#t1": "issue"})
+        # 控えの置き場が無ければ、issue に回す下書きを置けないので、何も置く前に断る
+        homeless = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--state",
+            "",
+            "--reviewed",
+            "2",
+            "--accept-unresolved",
+            "--yes",
+            choices,
+            "--digest",
+            preview["digest"],
+            "--json",
+            "--result",
+            fixture,
+        )
+        self.assertNotEqual(homeless.returncode, 0)
+        self.assertIn("控えの置き場が空", homeless.stderr)
+        self.assertNotEqual(self.confirm(fixture, 2).returncode, 0)
         done = self.ccnavi(
             "--cwd",
             self.parent_tree,

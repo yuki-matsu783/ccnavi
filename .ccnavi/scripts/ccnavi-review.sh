@@ -450,7 +450,9 @@ post_decision() {
 		fi
 	fi
 	if [ -f "$noted" ]; then
-		if comment "$number" "$url" "$noted" >/dev/null; then
+		# comment は api と jq のパイプで、終了コードは jq のもの。投稿の失敗は URL が空で見分ける
+		posted=$(comment "$number" "$url" "$noted" || :)
+		if [ -n "$(printf '%s' "$posted" | "$JQ" -r '.url // empty' 2>/dev/null)" ]; then
 			rm -f "$noted"
 		else
 			post_warning="${post_warning:+${post_warning}。}マージリクエストにコメントを残せなかった。下書きは $noted にある"
@@ -546,7 +548,11 @@ decide)
 	#   decide <N> --choices <JSON> --digest <指紋>  ボードで人が押した選択を置く
 	# 最後の形は、エージェントが打つと組み込みの deny（builtin-guard-ticket-approval）が止める。
 	n="${1:-}"
-	[ -n "$n" ] || fail "decide には <N>（フェーズ番号）が要る。" 2
+	case "$n" in
+	'' | *[!0-9]*) fail "decide には <N>（フェーズ番号）が要る。" 2 ;;
+	esac
+	# 下書きの名前は実行ファイルが整数で組む（`01` でも `1`）。揃えないと、書いた下書きを拾えない
+	n=$(printf '%s' "$n" | sed 's/^0*\([0-9]\)/\1/')
 	shift
 	preview=0
 	choices=""
@@ -558,17 +564,20 @@ decide)
 			shift
 			;;
 		--json) shift ;;
-		--choices)
-			choices="${2:-}"
-			shift 2
-			;;
-		--digest)
-			digest="${2:-}"
+		--choices | --digest)
+			[ "$#" -ge 2 ] || fail "decide の $1 には値が要る。" 2
+			if [ "$1" = --choices ]; then choices="$2"; else digest="$2"; fi
 			shift 2
 			;;
 		*) fail "decide は $1 を受けない。" 2 ;;
 		esac
 	done
+	if [ "$preview" -eq 1 ] && [ -n "$choices$digest" ]; then
+		fail "decide の --preview と --choices / --digest は一緒に使えない。" 2
+	fi
+	if [ -n "$choices" ] || [ -n "$digest" ]; then
+		[ -n "$choices" ] && [ -n "$digest" ] || fail "decide の --choices と --digest は組で渡す。" 2
+	fi
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
 		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
