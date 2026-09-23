@@ -1685,6 +1685,65 @@ class TicketTest(unittest.TestCase):
         result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --approve")
         self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
+    def test_turning_off_the_terminal_requirement_is_denied(self):
+        """端末要求を切る形は、実行ファイルをどう呼んでいても止める。
+
+        呼ぶ綴り（`uv run -m ccnavi`、名前を変えた写し）は追い切れない。切れなければ、端末を
+        持たないエージェントは実行ファイルの側で止まる。
+        """
+        self.family()
+        for tool, command in (
+            ("Bash", "CCNAVI_GUARD_TICKET_APPROVAL=disable uv run -m ccnavi --approve"),
+            (
+                "Bash",
+                "env CCNAVI_GUARD_TICKET_APPROVAL=disable python -m ccnavi.__main__ --reviewed 1",
+            ),
+            ("Bash", "export CCNAVI_GUARD_TICKET_APPROVAL=disable; /tmp/x --approve"),
+            ("Bash", "bash -c 'CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --approve'"),
+            ("Bash", ": ${CCNAVI_GUARD_TICKET_APPROVAL:=disable}; /tmp/x --approve"),
+            ("Bash", "read CCNAVI_GUARD_TICKET_APPROVAL <<< disable; /tmp/x --approve"),
+            ("Bash", "printf -v CCNAVI_GUARD_TICKET_APPROVAL disable"),
+            ("Bash", "/tmp/x --guard-ticket-approval disable --close-early --reason r"),
+            ("Bash", "/tmp/x --guard-ticket-approval=$v --approve"),
+            ("PowerShell", "$env:CCNAVI_GUARD_TICKET_APPROVAL = 'disable'; ccnavi.exe --approve"),
+            (
+                "PowerShell",
+                "[Environment]::SetEnvironmentVariable('CCNAVI_GUARD_TICKET_APPROVAL','x')",
+            ),
+            ("PowerShell", "Set-Item env:CCNAVI_GUARD_TICKET_APPROVAL disable"),
+        ):
+            result = self.hook(
+                "PreToolUse",
+                tool,
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+            self.assertIn("端末要求を切る形", self.reason(result), command)
+        # 読むだけの形と、守る側の値は止めない。
+        for command in (
+            "echo $CCNAVI_GUARD_TICKET_APPROVAL",
+            "grep -rn CCNAVI_GUARD_TICKET_APPROVAL ccnavi",
+            "uv run -m ccnavi --guard-ticket-approval enable --lint",
+        ):
+            result = self.hook(
+                "PreToolUse",
+                "Bash",
+                self.parent_tree,
+                command=command,
+                guard_ticket_approval="enable",
+            )
+            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
+        # 守りそのものを切っていれば当てない（テストと CI の設定）。
+        result = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command="CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --approve",
+        )
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+
     def test_approval_scripts_are_denied_in_any_letter_case(self):
         """9・10. 止める綴りは大文字小文字を区別しない。文面は人が確かめる前提を言わない。
 

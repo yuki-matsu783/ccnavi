@@ -226,6 +226,30 @@ def decide_before(
                 ],
             )
 
+    # 人の判断の経路の端末要求を、コマンド行で切る形は止める。実行ファイルを呼ぶ綴りは
+    # 追い切れないので、呼び方ではなく切る形で見る（phase.turns_off_guard）。
+    if (
+        conf.tickets_enabled
+        and conf.guard_ticket_approval != selfguard.DISABLE
+        and payload.tool_name in phase.SHELL_TOOLS
+    ):
+        found = phase.turns_off_guard(record.subject)
+        if found:
+            record.code = phase.CODE_TICKET_APPROVAL
+            record.rules = [phase.TICKET_APPROVAL_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        phase.CODE_TICKET_APPROVAL, subject, phase.guard_off_message(found)
+                    )
+                ],
+            )
+
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
     # 持つが、止める場所は hook に置き、sh は 2 重目にする（ADR-0077）。
     if conf.tickets_enabled and payload.tool_name == "Bash":

@@ -115,6 +115,45 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 
 
+# 人の判断の経路の端末要求を、エージェントのコマンド行で切る形。実行ファイルは
+# `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で端末要求を外す
+# （テストと CI のため）。
+# 実行ファイルを呼ぶ綴りは追い切れない（`uv run -m ccnavi`、名前を変えた写し）ので、呼び方では
+# なく切る形そのもので止める。切れなければ、端末を持たないエージェントは実行ファイルの側で止まる。
+#
+# 見るのは生の文字列。`bash -c '…'` や `$( … )` の中に書いた形も同じに数える。変数は代入の形
+# （`X=`・`env X=`・`export X=`・PowerShell の `$env:X =`）、フラグは `enable` 以外の値を
+# 渡す形。この綴りそのものを grep で探すコマンドも当たるが、それは Grep ツールで済む。
+_GUARD_NAME = "CCNAVI_GUARD_TICKET_APPROVAL"
+_GUARD_OFF = re.compile(
+    rf"(?<![$\w]){_GUARD_NAME}\s*\+?="
+    rf"|\$\{{{_GUARD_NAME}:?="
+    rf"|SetEnvironmentVariable\s*\(\s*['\"]{_GUARD_NAME}"
+    rf"|\b(?:Set-Item|New-Item|si|ni)\b[^\n;]*env:[\\/]?{_GUARD_NAME}"
+    r"|(?:\bread|\bmapfile|\breadarray|\bprintf\s[^\n;&|]*-v)\b[^\n;&|]*"
+    rf"\b{_GUARD_NAME}\b"
+    r"|--guard-ticket-approval(?:\s*=\s*|\s+)(?!['\"]?enable(?![\w-]))",
+    re.IGNORECASE,
+)
+
+
+def turns_off_guard(subject: str) -> str:
+    """人の判断の経路の端末要求を切る形があれば、その綴り。無ければ空。"""
+    match = _GUARD_OFF.search(subject)
+    return match.group(0).strip() if match else ""
+
+
+def guard_off_message(found: str) -> str:
+    """端末要求を切る形で止めた文。"""
+    return (
+        f"人の判断の経路（承認・レビュー済み・締め）の端末要求を切る形（{found}）を、"
+        "コマンド行に書いています。この変数とフラグは、テストや CI が端末を持たずに実行ファイルを"
+        "回すためのもので、エージェントが置くものではありません。承認・レビュー済み・締めは利用者が"
+        "端末かボードで行います。この綴りを探したいだけなら、シェルの grep ではなく Grep ツールを"
+        "使ってください。"
+    )
+
+
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
