@@ -47,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import fsio, modes, phasetypes, rules, settings, tree
+from . import fsio, modes, phasetypes, rules, settings, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -346,7 +346,13 @@ def home_dir(
     return settings.approved_dir(conf, fallback_root or tree.main_tree(root).root)
 
 
-def admit(approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approved_at: str) -> str:
+def admit(
+    approved_dir: str,
+    ticket: ticket_mod.Ticket,
+    source_tree: str,
+    approved_at: str,
+    wf: ticket_mod.Workflow | None = None,
+) -> str:
     """承認した提案を `doing/` へ動かす。動かせなかった理由を返す。動かせたら空文字。
 
     承認の記録（`ccnavi_approved`）を足して書き、元の提案を消す。消せなければ書いた側を
@@ -367,6 +373,8 @@ def admit(approved_dir: str, ticket: ticket_mod.Ticket, source_tree: str, approv
         return f"提案を読めない ({exc})"
     if ticket.project and not ticket.declared_project:
         text = ticket_mod.insert_front(text, "project", ticket.project)
+    if wf is not None:
+        text = ticket_mod.insert_front(text, ticket_mod.WORKFLOW_KEY, wf.as_raw())
     failed = _write(target, ticket_mod.insert_front(text, ticket_mod.APPROVAL_KEY, meta))
     if failed:
         return failed
@@ -629,15 +637,37 @@ def accepted_path(approved_dir: str, parent: str) -> str:
     return os.path.join(approved_dir, PHASES_DIR, parent, ACCEPTED_FILE)
 
 
-def accepted_threads(approved_dir: str, parent: str) -> set[str]:
-    """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。"""
+def accepted_threads(
+    approved_dir: str,
+    parent: str,
+    phase: int | None = None,
+    owner: ticket_mod.Ticket | None = None,
+) -> set[str]:
+    """この親で、人が「未解決のまま進める」と受け入れたスレッドの識別。
+
+    `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
+    受け入れはそのフェーズと、それを待つ番号（写しの `waits`）にだけ効く（設計 §9.8）。
+    並行した別の枝のレビューには効かない。番号を持たない受け入れ（`wrapup`）は親全体に効く。
+    """
     data = fsio.read_dict(accepted_path(approved_dir, parent))
     if not data:
         return set()
-    return {str(x) for x in data.get("threads") or [] if str(x)}
+    threads = {str(x) for x in data.get("threads") or [] if str(x)}
+    if phase is None or owner is None:
+        return threads
+    at = data.get("phases") if isinstance(data.get("phases"), dict) else {}
+    reach = {phase, *workflow.waits_of(owner, phase, None)}
+    kept = set()
+    for thread in threads:
+        where = at.get(thread)
+        if where is None or (isinstance(where, int) and where in reach):
+            kept.add(thread)
+    return kept
 
 
-def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str:
+def remember_accepted(
+    approved_dir: str, parent: str, threads: list[str], phase: int | None = None
+) -> str:
     """受け入れたスレッドを控えに足す。失敗したら、その説明を返す。
 
     フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
@@ -649,10 +679,19 @@ def remember_accepted(approved_dir: str, parent: str, threads: list[str]) -> str
     if not threads:
         return ""
     path = accepted_path(approved_dir, parent)
-    keep = sorted(accepted_threads(approved_dir, parent) | {str(t) for t in threads if str(t)})
+    data = fsio.read_dict(path) or {}
+    at = dict(data.get("phases")) if isinstance(data.get("phases"), dict) else {}
+    added = {str(t) for t in threads if str(t)}
+    keep = sorted(accepted_threads(approved_dir, parent) | added)
+    for thread in added:
+        if phase is None:
+            at.pop(thread, None)
+        else:
+            at.setdefault(thread, phase)
     # 読んで、足して、書き戻す形。同じファイルの `_write_known` と同じく、
     # 途中を見せない書き方で置く。
-    failed = fsio.write_json_atomic(path, {"threads": keep, "at": now()}, indent=1)
+    body = {"threads": keep, "phases": dict(sorted(at.items())), "at": now()}
+    failed = fsio.write_json_atomic(path, body, indent=1)
     return f"{path} ({failed})" if failed else ""
 
 
@@ -833,7 +872,9 @@ def gather(
     closed, _ = scan(conf, root, closed=True)
     review, _ = scan_review(conf, root)
 
-    pending, revisions = waiting(proposals, approved, closed, review)
+    pending, revisions = waiting(
+        proposals, approved, closed, review, types_resolver(conf, root, approved)
+    )
     broken = any(p.severity == rules.SEVERITY_ERROR for p in problems)
     texts = [str(p) for p in problems] + list(notes)
     note = ""
@@ -1095,9 +1136,12 @@ def _carried(cand: Candidate) -> str:
     """
     t = cand.ticket
     if cand.is_revision and cand.current is not None:
-        front, body = revised_front(cand.current, t), cand.current.body
+        front, body = revised_front(cand.current, t, cand.types), cand.current.body
     else:
         front, body = dict(t.raw), t.body
+        front.pop(ticket_mod.WORKFLOW_KEY, None)
+        if t.has_plan and not t.is_child:
+            front[ticket_mod.WORKFLOW_KEY] = workflow.compute(t, cand.types).as_raw()
     front.pop(ticket_mod.APPROVAL_KEY, None)
     return ticket_mod.render(replace(t, raw=front, body=body))
 
@@ -1463,7 +1507,7 @@ def _apply(
         t = cand.ticket
         if cand.is_revision and cand.current is not None:
             where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-            failed = revise_copy(where, cand.current, t, stamp, cand.plans_feedback)
+            failed = revise_copy(where, cand.current, t, stamp, cand.plans_feedback, cand.types)
             if failed:
                 stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
                 return Applied(1, placed, t.ticket, failed)
@@ -1493,7 +1537,8 @@ def _apply(
                 )
             continue
         where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
-        failed = admit(where, t, t.tree, stamp)
+        wf = workflow.compute(t, cand.types) if t.has_plan and not t.is_child else None
+        failed = admit(where, t, t.tree, stamp, wf)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return Applied(1, placed, t.ticket, failed)
@@ -1631,6 +1676,7 @@ def screen(
                 "前のフェーズが閉じるまで、次のフェーズの子は承認できない"
             )
             lines += _plan_lines(t.plan, 1, cand_types)
+            lines += _workflow_lines(t, workflow.compute(t, cand_types))
             if t.feedback is not None:
                 lines.append("■ フィードバック計画")
                 lines += _plan_lines(t.feedback, len(t.plan) + 1, cand_types) or ["    対応なし"]
@@ -1675,6 +1721,18 @@ def _plan_lines(items: list[ticket_mod.PlanItem], start: int, types: dict | None
     return lines
 
 
+def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
+    """`dag` の計画の待ち。辺の書き漏れを人が見つける場所（設計 §9.7）。"""
+    found = workflow.lines(t, wf)
+    if not found:
+        return []
+    return [
+        "■ 待ち方（phases.yml の after から。承認すると親に写し、"
+        "後から phases.yml を直しても変わらない）",
+        *("    " + x for x in found),
+    ]
+
+
 def _plan_diff_lines(
     current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None
 ) -> list[str]:
@@ -1685,6 +1743,16 @@ def _plan_diff_lines(
         lines += ["    " + x for x in _plan_lines(current.plan, 1, types)]
         lines.append("    改版:")
         lines += ["    " + x for x in _plan_lines(revised.plan, 1, types)]
+    fresh = workflow.compute(revised, types)
+    held = current.workflow
+    if held is None or held.as_raw() != fresh.as_raw():
+        lines.append("■ 待ち方の変更")
+        before = workflow.lines(current, held) if held is not None else []
+        after = workflow.lines(revised, fresh)
+        lines.append("    いま:")
+        lines += ["        " + x for x in before] or ["        一直線（前の番号を全部待つ）"]
+        lines.append("    改版:")
+        lines += ["        " + x for x in after] or ["        一直線（前の番号を全部待つ）"]
     if current.feedback != revised.feedback:
         lines.append("■ フィードバック計画")
         start = len(revised.plan) + 1
@@ -1712,12 +1780,16 @@ def waiting(
     approved: list[ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
     review: list[ticket_mod.Ticket] = (),
+    types_for=None,
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
     """いま `--approve` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
     承認待ちは `todo/` に在って、どの置き場（作業中・レビュー待ち・閉じた）にも同じ識別子が
     無いもの。閉じたものは対象外で、再開は人が承認済みチケットを戻す。
     改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
+    計画が同じでも、いまの種類で計算した待ち方が承認済みチケットの写しと違えば改版になる
+    （`phases.yml` を直した結果を進行中の親に効かせる道。設計 §9.7）。`types_for` は
+    チケットに効く種類を引く関数で、渡さなければ計画の違いだけを見る。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     """
     known = by_id(approved + closed + list(review))
@@ -1730,9 +1802,34 @@ def waiting(
         if t.ticket in open_index
         and not t.is_child
         and t.has_plan
-        and _plan_differs(t, open_index[t.ticket])
+        and (
+            _plan_differs(t, open_index[t.ticket])
+            or (types_for is not None and _workflow_differs(t, open_index[t.ticket], types_for))
+        )
     ]
     return pending, revisions
+
+
+def _workflow_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket, types_for) -> bool:
+    fresh = workflow.compute(proposal, types_for(proposal)).as_raw()
+    held = current.workflow.as_raw() if current.workflow is not None else None
+    return fresh != held
+
+
+def types_resolver(conf: settings.Settings, root: str, approved: list[ticket_mod.Ticket]):
+    """チケットに効く種類を引く関数。層ごとの読み込みは 1 プロジェクト 1 回。"""
+    from . import phase
+
+    pool = by_id(approved)
+    cache: dict[str, dict | None] = {}
+
+    def types_for(t: ticket_mod.Ticket) -> dict | None:
+        name = project_of(t, pool)
+        if name not in cache:
+            cache[name] = phase.load_types(conf, root, name)
+        return cache[name]
+
+    return types_for
 
 
 def _plan_differs(proposal: ticket_mod.Ticket, current: ticket_mod.Ticket) -> bool:
@@ -1804,7 +1901,10 @@ def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
                             f"`{item.type}` を置くなら `{need}` も {key} に要る（requires）",
                         )
                     )
-        # 延期の先は、レビューがある項でなければならない。
+        # 延期の先は、レビューがある項でなければならない。全体計画は待ち方（`workflow`）が
+        # 引き受け手を決めるので、そちらで見る。
+        if key == "plan":
+            continue
         for i, item in enumerate(items):
             if not item.deferred:
                 continue
@@ -1820,6 +1920,8 @@ def plan_problems(t: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
                         f"`{key}[{i}]` を延期した先の `{target.type}` にレビューが無い",
                     )
                 )
+    if not any(p.severity == rules.SEVERITY_ERROR for p in problems):
+        problems.extend(workflow.problems(t, types))
     return problems
 
 
@@ -1901,9 +2003,10 @@ def revise_copy(
     revised: ticket_mod.Ticket,
     stamp: str,
     feedback_planned: bool,
+    types: dict | None = None,
 ) -> str:
-    """承認済みチケットの計画を差し替える。範囲と承認の記録はそのまま。"""
-    front = revised_front(current, revised)
+    """承認済みチケットの計画と待ち方を差し替える。範囲と承認の記録はそのまま。"""
+    front = revised_front(current, revised, types)
     meta = dict(front.get(ticket_mod.APPROVAL_KEY) or {})
     meta["revised_at"] = stamp
     if feedback_planned:
@@ -1913,8 +2016,10 @@ def revise_copy(
     return _write(copy_path(approved_dir, current.ticket), ticket_mod.render(current))
 
 
-def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dict:
-    """改版で書く frontmatter。承認済みチケットの frontmatter の計画だけを差し替えた写し。
+def revised_front(
+    current: ticket_mod.Ticket, revised: ticket_mod.Ticket, types: dict | None = None
+) -> dict:
+    """改版で書く frontmatter。承認済みチケットの frontmatter の計画と待ち方を差し替えた写し。
 
     `current` は書き換えない。承認の指紋（`digest`）も同じものから組むので、見せた
     中身と書く中身がずれない。
@@ -1923,6 +2028,7 @@ def revised_front(current: ticket_mod.Ticket, revised: ticket_mod.Ticket) -> dic
     front["plan"] = [item.as_raw() for item in revised.plan]
     if revised.feedback is not None:
         front["feedback"] = [item.as_raw() for item in revised.feedback]
+    front[ticket_mod.WORKFLOW_KEY] = workflow.compute(revised, types).as_raw()
     return front
 
 

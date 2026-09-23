@@ -573,7 +573,9 @@ def _approval_problems(
     編集と関わりのない提案 1 本で、設定の保存も CI も止まる。承認そのものは落とす
     （`approval.candidates` の側は error のまま）ので、緩むのは報告の重さだけ。
     """
-    pending, revisions = approval.waiting(proposals, copies, closed, review)
+    pending, revisions = approval.waiting(
+        proposals, copies, closed, review, approval.types_resolver(conf, root, copies)
+    )
     if not pending and not revisions:
         return []
     batch, rejected, _pool = approval.candidates(root, conf, pending, revisions, copies)

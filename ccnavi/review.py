@@ -364,7 +364,9 @@ def check(
         return 1
     unresolved = _unresolved(
         result.threads,
-        approval.accepted_threads(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket),
+        approval.accepted_threads(
+            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+        ),
     )
     if unresolved:
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
@@ -521,7 +523,9 @@ def reviewed(
         return 1
     unresolved = _unresolved(
         result.threads,
-        approval.accepted_threads(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket),
+        approval.accepted_threads(
+            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+        ),
     )
     stdout.write(
         f"フェーズ {phase_no}（親 {parent.ticket}）の未解決スレッド: {len(unresolved)} 件\n"
@@ -571,7 +575,7 @@ def reviewed(
     accepted = [t.url or t.id for t in unresolved]
     # マーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
-    failed = approval.remember_accepted(home, parent.ticket, accepted)
+    failed = approval.remember_accepted(home, parent.ticket, accepted, phase_no)
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
         return 1

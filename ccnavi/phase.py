@@ -32,7 +32,18 @@ import re
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import approval, gitcmd, phasetypes, risk, rules, selfguard, settings, shellread, tree
+from . import (
+    approval,
+    gitcmd,
+    phasetypes,
+    risk,
+    rules,
+    selfguard,
+    settings,
+    shellread,
+    tree,
+    workflow,
+)
 from . import ticket as ticket_mod
 
 # 止めている間でも通す形。状態を動かす・レビューを頼む・合流して片付ける、の 3 本を、
@@ -688,11 +699,38 @@ def _next_hint(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> s
                 "承認を受けてください。"
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
+    if is_dag(parent):
+        # 並行して始められるものを全部挙げる。待ちが済んでいない番号は案内しない。
+        ready = [p for p in following if not p.tickets and waits_done(parent, phases, p.number)]
+        if not ready:
+            return "次に始められるフェーズは、待っているフェーズが済むまでありません。"
+        names = "、".join(p.label for p in ready)
+        hints = "".join(
+            f"（{p.label} の案内: {p.type.when}）"
+            for p in ready
+            if p.type is not None and p.type.when
+        )
+        return f"次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}"
     nxt = following[0]
     return (
         f"次は {nxt.label} の計画です。そのフェーズの子チケットを提案して承認を受けてください。"
         + (f"（種類の案内: {nxt.type.when}）" if nxt.type is not None and nxt.type.when else "")
     )
+
+
+def is_dag(parent: ticket_mod.Ticket) -> bool:
+    """親の待ち方の写しが `dag` か。"""
+    return parent.workflow is not None and parent.workflow.order == ticket_mod.WORKFLOW_DAG
+
+
+def waits_done(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> bool:
+    """N 番目が待つフェーズが、全部閉じてレビューが済んでいるか。"""
+    by_number = {p.number: p for p in phases}
+    for m in workflow.waits_of(parent, number, None):
+        phase = by_number.get(m)
+        if phase is None or not phase.ended or not reviewed_or_skipped(phase):
+            return False
+    return True
 
 
 def reviewed_or_skipped(phase: Phase) -> bool:
@@ -712,9 +750,10 @@ def order_problems(
     types: dict[str, phasetypes.PhaseType] | None,
     adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。前のフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
+    """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
 
-    `overlap` に挙げた組だけ、前のフェーズが開いていても通す。
+    待つ番号は親の待ち方の写し（`workflow`）が決める。一直線なら前の全部、`dag` なら
+    種類の祖先に当たる前の番号。`overlap` の組は写しを作るときに待ちから外してある。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
     前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの印を見て
@@ -730,7 +769,7 @@ def order_problems(
     mine = parent.item_at(child.phase)
     if mine is None:
         return []
-    my_type = (types or {}).get(mine.type)
+    waits = set(workflow.waits_of(parent, child.phase, types))
     reopened: dict[int, list[str]] = {}
     for t in adding or []:
         if t.phase is not None:
@@ -742,7 +781,7 @@ def order_problems(
     for phase in phases_of(root, conf, parent.ticket, parent):
         if phase.number >= child.phase:
             break
-        if phase.type is not None and my_type is not None and phase.type.overlaps(my_type):
+        if phase.number not in waits:
             continue
         ended = phase.ended and phase.number not in reopened
         if phase.number == settled and ended:
@@ -847,19 +886,35 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
-    held = held_phase(root, conf, parent.ticket)
-    if held is not None:
+    dag = is_dag(parent)
+    held_all = [p for p in phases if p.gate_closed]
+    if held_all and not dag:
+        held = held_all[0]
         return f"{held.review_label}（{held.label}）"
+    if held_all:
+        # 並行した枝が同時に止まっていることがある。呼び名ごとに番号を並べる。
+        groups: dict[str, list[str]] = {}
+        for p in held_all:
+            groups.setdefault(p.review_label, []).append(p.label)
+        return "、".join(f"{label}（{'、'.join(names)}）" for label, names in groups.items())
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
     ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
         return "閉じられる（利用者が締めた）"
     in_feedback = parent.feedback is not None and len(parent.feedback) > 0
-    for phase in phases:
-        if not phase.ended:
-            where = "フィードバック対応中" if phase.number > len(parent.plan) else "作業中"
-            return f"{where}（{phase.label}）"
+    open_phases = [p for p in phases if not p.ended]
+    if dag and open_phases and open_phases[0].number <= len(parent.plan):
+        # 子がまだ無く、待ちが済んでいないフェーズは作業中に数えない。
+        working = [
+            p
+            for p in open_phases
+            if p.number <= len(parent.plan) and (p.tickets or waits_done(parent, phases, p.number))
+        ]
+        return f"作業中（{'、'.join(p.label for p in working or open_phases[:1])}）"
+    for phase in open_phases:
+        where = "フィードバック対応中" if phase.number > len(parent.plan) else "作業中"
+        return f"{where}（{phase.label}）"
     if parent.feedback is None:
         return "フィードバック計画待ち"
     return "閉じられる" if not in_feedback else "閉じられる（フィードバック対応済み）"
