@@ -325,9 +325,13 @@ _XARGS_VALUE_OPTIONS = frozenset(
 # find の、後ろに書いたコマンドを実行する述語。`;` か `+` までがコマンド。
 _FIND_EXEC = frozenset(_TAKES_CODE_FLAG["find"])
 
-_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 # コマンド名を探すときに飛ばす代入。配列の要素（`a[1]=x`）と足し込み（`x+=1`）も代入。
+# シェルはこの形の語をコマンドの前に並べられ、残りをコマンドとして実行する。
 _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
+
+# `env` と `sudo` が代入として読む引数。どちらも `=` を含む引数を名前の綴りを問わず代入に
+# 数える（`env a+=1 rm x` は `a+` という変数を置いて rm を実行する）。シェルの代入より広い。
+_RUNNER_ASSIGNMENT = re.compile(r"[^=-][^=]*=")
 
 # コマンド名の中で、実行するときにシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
 # 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。`[` だけの test コマンドと `[[` は当たらない。
@@ -1558,9 +1562,9 @@ def _peel(command: list[str], rewrites: list[tuple[str, str]]) -> tuple[str, lis
         return " ".join(command[:k]), [rest] if rest else [], True
 
     # `FOO=1 rm x`。代入はコマンドではない。
-    if _ASSIGNMENT.match(head):
+    if _ASSIGNMENT_WORD.match(head):
         i = 0
-        while i < len(command) and _ASSIGNMENT.match(command[i]):
+        while i < len(command) and _ASSIGNMENT_WORD.match(command[i]):
             i += 1
         rest = command[i:]
         return head, [rest] if rest else [], True
@@ -1599,7 +1603,7 @@ def _runner_command(name: str, args: list[str]) -> list[list[str]]:
         if token == "--":
             i += 1
             break
-        if name in _TAKES_ASSIGNMENTS and _ASSIGNMENT.match(token):
+        if name in _TAKES_ASSIGNMENTS and _RUNNER_ASSIGNMENT.match(token):
             i += 1
             continue
         if not token.startswith("-") or token == "-":
@@ -1607,7 +1611,7 @@ def _runner_command(name: str, args: list[str]) -> list[list[str]]:
         if lookup and not token.startswith("--") and lookup & set(token[1:]):
             return []
         i += _option_width(token, args[i + 1 :], value_options)
-    while i < len(args) and name in _TAKES_ASSIGNMENTS and _ASSIGNMENT.match(args[i]):
+    while i < len(args) and name in _TAKES_ASSIGNMENTS and _RUNNER_ASSIGNMENT.match(args[i]):
         i += 1
     i += positionals
     rest = args[i:]
