@@ -222,7 +222,13 @@ def scan(
     当たらなかった構造の検査を、判定の側でも当てるため（ADR-0058）。
     """
     found, notes = scan_all(conf, root, closed)
-    kept = _authoritative(found, _everything(conf, root))
+    # 読んだ側を `_everything` に渡す。渡さないと、この同じ式の中でまったく同じ
+    # `scan_all` をもう 1 度呼ぶことになる（下記）。
+    if closed:
+        everything = _everything(conf, root, closed_all=found)
+    else:
+        everything = _everything(conf, root, open_all=found)
+    kept = _authoritative(found, everything)
     if not closed:
         # 判定が読むのは作業中の側だけ。閉じたものに印は要らない。
         mark_blocked(conf, kept)
@@ -232,14 +238,34 @@ def scan(
 def scan_review(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """レビュー待ちのチケット。権威のあるツリーの側だけを残す（`scan` と同じ規則）。"""
     found, notes = review_all(conf, root)
-    return _authoritative(found, _everything(conf, root)), notes
+    return _authoritative(found, _everything(conf, root, review=found)), notes
 
 
-def _everything(conf: settings.Settings, root: str) -> list[ticket_mod.Ticket]:
-    """作業中・レビュー待ち・閉じたの全部を、重複を畳まずに。権威のツリーを決めるために使う。"""
-    open_all, _ = scan_all(conf, root)
-    closed_all, _ = scan_all(conf, root, closed=True)
-    review, _ = review_all(conf, root)
+def _everything(
+    conf: settings.Settings,
+    root: str,
+    *,
+    open_all: list[ticket_mod.Ticket] | None = None,
+    closed_all: list[ticket_mod.Ticket] | None = None,
+    review: list[ticket_mod.Ticket] | None = None,
+) -> list[ticket_mod.Ticket]:
+    """作業中・レビュー待ち・閉じたの全部を、重複を畳まずに。権威のツリーを決めるために使う。
+
+    3 つは呼び手が持ち込める。**控えではなく、同じ呼び出しの中で今しがた読んだものを
+    渡してもらう仕組み。** `scan` は `scan_all` を呼んだ直後にここを呼ぶので、渡さないと
+    同じ引数の `scan_all` が 1 つの式の中で 2 回走る。置き場のチケットは 1 本ずつ
+    YAML として解析されるので、この重複はチケットの本数にそのまま比例する。
+
+    渡すのは「自分が読んだ側」だけで、残りはここで読む。読む範囲も読む順も変わらない。
+    控えを持たないので、判定の途中でファイルが動く経路（`ticket done` が親を締めた後、
+    `settle_review` が子を動かした後）でも、持ち込まなかった側は読み直される。
+    """
+    if open_all is None:
+        open_all, _ = scan_all(conf, root)
+    if closed_all is None:
+        closed_all, _ = scan_all(conf, root, closed=True)
+    if review is None:
+        review, _ = review_all(conf, root)
     return open_all + closed_all + review
 
 
