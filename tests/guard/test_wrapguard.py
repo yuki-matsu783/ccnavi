@@ -56,6 +56,17 @@ class EnvTest(unittest.TestCase):
             "sudo env CLAUDE_PROJECT_DIR=/x bash .ccnavi/scripts/ccnavi-review.sh check",
             "CCNAVI_NEW_THING=1 ../../../.ccnavi/scripts/ccnavi-git.sh status",
             "cd a && CCNAVI_BIN_PATH=f sh ../.ccnavi/scripts/ccnavi-approve.sh",
+            # 関数の定義の本体。頭（`f()`・`function f`）を名前と読み違えると見落とす。
+            "f() { CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
+            "f(){ CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
+            "function f { CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push; }; f",
+            # 環境を丸ごと空にする。settings.json の env が書き出した置き場も消える。
+            "env -i sh .ccnavi/scripts/ccnavi-git.sh push",
+            "env --ignore-environment sh .ccnavi/scripts/ccnavi-git.sh push",
+            # 値を取るオプションの後ろの代入。
+            "env -C /tmp CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push",
+            # ループの中では、後ろに書いた代入も次の回の呼び出しに届く。
+            "for i in 1 2; do sh .ccnavi/scripts/ccnavi-git.sh push; CCNAVI_X=1; done",
         ):
             with self.subTest(command=command):
                 self.assertTrue(self.names(command))
@@ -193,6 +204,12 @@ class ChildPushTest(unittest.TestCase):
         # 親のツリーへ移ってから打つ形は通す。
         reason = self.hook(self.trees["i0001-01"], "cd ../i0001 && " + " ".join(GIT + ["push"]))
         self.assertNotIn(wrapguard.CODE_CHILD_PUSH, reason)
+
+    def test_inside_a_function(self):
+        self.place("parent-doing")
+        command = "f() { " + " ".join(GIT + ["push"]) + "; }; f"
+        reason = self.hook(self.trees["i0001-01"], command)
+        self.assertIn(wrapguard.CODE_CHILD_PUSH, reason)
 
     def test_unreadable_cd_stops(self):
         reason = self.hook(self.root, 'cd "$X" && ' + " ".join(GIT + ["push"]))

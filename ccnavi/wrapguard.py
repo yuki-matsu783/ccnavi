@@ -53,6 +53,10 @@ _ALSO_BLOCKED = frozenset({"CLAUDE_PROJECT_DIR"})
 _DECLARES = frozenset({"export", "declare", "typeset", "readonly", "local", "unset"})
 _ASSIGNMENT = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(\[[^\]]*\])?\+?=")
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# `env -i` は環境を丸ごと空にする。settings.json の env が書き出した置き場も消え、sh は既定の
+# 置き場を見る。変数の名前は並ばないので、この綴りで数える。
+ENV_CLEARED = "env -i"
+_ENV_CLEARS = frozenset({"-i", "--ignore-environment", "-"})
 
 
 def blocked(name: str) -> bool:
@@ -78,7 +82,7 @@ def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
         return "", []
     names: list[str] = []
     for words, _ in places:
-        names.extend(n for n in _set_names(words) if blocked(n))
+        names.extend(n for n in _set_names(words) if n == ENV_CLEARED or blocked(n))
     return scripts[0][0], list(dict.fromkeys(names))
 
 
@@ -170,7 +174,7 @@ def _script_call(words: list[str]) -> tuple[str, list[str]] | None:
     `sh <sh>`・`bash <sh>`・`<sh>` の直接の実行・`. <sh>`、と、それを `env` `sudo` などの
     実行役のコマンド越しに呼ぶ形。`sh -c '…'` は読み切れない形として read() が縮退させる。
     """
-    words = _strip_reserved(words)
+    words = _strip_heads(words)
     depth = 0
     while words and depth <= shellread.UNWRAP_DEPTH:
         k = shellread._name_index(words)
@@ -207,7 +211,7 @@ def _is_script(word: str) -> bool:
 def _set_names(words: list[str]) -> list[str]:
     """コマンド 1 本が置く・外す変数の名前。実行役のコマンドの層も見る。"""
     names: list[str] = []
-    words = _strip_reserved(words)
+    words = _strip_heads(words)
     depth = 0
     while words and depth <= shellread.UNWRAP_DEPTH:
         k = shellread._name_index(words)
@@ -239,19 +243,22 @@ def _set_names(words: list[str]) -> list[str]:
 
 
 def _env_names(args: list[str]) -> list[str]:
-    """`env` が置く・外す変数。`-u X`・`--unset=X`・`X=…`。"""
+    """`env` が置く・外す変数。`-u X`・`--unset=X`・`X=…`。環境を空にする形は ENV_CLEARED。"""
     names: list[str] = []
     i = 0
     while i < len(args):
         arg = args[i]
-        if arg in ("-u", "--unset") and i + 1 < len(args):
-            names.append(args[i + 1])
+        if arg in ("-u", "--unset", "-C", "--chdir") and i + 1 < len(args):
+            if arg in ("-u", "--unset"):
+                names.append(args[i + 1])
             i += 2
             continue
         if arg.startswith("--unset="):
             names.append(arg.partition("=")[2])
         elif arg.startswith("-u") and len(arg) > 2:
             names.append(arg[2:])
+        elif arg in _ENV_CLEARS or (arg[:1] == "-" and arg[1:2] != "-" and "i" in arg[1:]):
+            names.append(ENV_CLEARED)
         elif _assigned(arg):
             names.append(_assigned(arg))
         elif not arg.startswith("-"):
@@ -265,12 +272,33 @@ def _assigned(word: str) -> str:
     return match.group(1) if match else ""
 
 
-def _strip_reserved(words: list[str]) -> list[str]:
+def _strip_heads(words: list[str]) -> list[str]:
+    """コマンドの位置より前に立つ語を落とす。予約語と、関数の定義の頭。
+
+    関数の定義（`f() { …; }`・`function f { …; }`）の本体は、定義の行では走らないが、同じ
+    コマンド行の後ろで呼べば走る。呼ばれるかは読みで決まらないので、本体は走るものとして数える。
+    頭を落とさないと、`f` をコマンドの名前と読み違え、本体の sh の呼び出しと代入を見落とす。
+    """
     i = 0
-    while i < len(words) and words[i] in shellread._RESERVED:
-        if words[i] in shellread._TAKES_A_WORD:
-            return []
-        i += 1
+    while i < len(words):
+        word = words[i]
+        if word == "function":
+            i += 2
+            if i < len(words) and words[i] == "()":
+                i += 1
+            continue
+        if word in shellread._RESERVED:
+            if word in shellread._TAKES_A_WORD:
+                return []
+            i += 1
+            continue
+        if i + 1 < len(words) and words[i + 1] == "()" and _NAME.fullmatch(word):
+            i += 2
+            continue
+        if word == "(":
+            i += 1
+            continue
+        break
     return words[i:]
 
 
@@ -281,7 +309,9 @@ def env_message(script: str, names: list[str]) -> str:
         f"保護済みの sh（{script}）を、sh の検査の材料を変える環境変数（{shown}）と"
         "同じコマンド行で呼んでいます。この変数は sh がワークスペースルート・承認済みチケットの"
         "置き場・実行ファイルを決めるのに使うので、書き換えると sh の検査が外れます。"
-        "変数を置かずに sh をそのまま打ってください。置き場が本当に違うなら、利用者に"
+        "コマンド行のどこに書いても数えます（ループや関数の中では、後ろに書いた代入も次の呼び出しに"
+        "届くため）。変数を置かずに、sh の呼び出しを別のコマンドに分けて打ってください。"
+        "置き場が本当に違うなら、利用者に"
         "settings.json の env を直してもらってください。出力の量と待ち時間の変数（"
         + ", ".join(sorted(PASS_THROUGH))
         + "）は置けます。"
