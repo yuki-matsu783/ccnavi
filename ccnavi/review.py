@@ -1,4 +1,4 @@
-"""レビューの依頼と確認。`ccnavi review prepare|requested|check` と `ccnavi --reviewed`。
+"""レビューの依頼と確認。`ccnavi review prepare|requested|confirm` と `ccnavi --reviewed`。
 
 ## exe が見るのは作業ツリーの中だけ
 
@@ -36,6 +36,9 @@ sh ならプロジェクトごとに直せる。
 
 from __future__ import annotations
 
+import hashlib
+import io
+import json
 import os
 import re
 import shutil
@@ -48,8 +51,8 @@ from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
 MARKER_REQUEST = "<!-- ccnavi:request "
-MARKER_NOTE = "<!-- ccnavi:note -->"
-MARKER_ACCEPT = "<!-- ccnavi:accept -->"
+MARKER_COMMENT = "<!-- ccnavi:comment -->"
+MARKER_DECIDE = "<!-- ccnavi:decide -->"
 MARKER_PREFIX = "<!-- ccnavi:"
 
 GITHUB_TOKEN = "GITHUB_TOKEN"
@@ -59,18 +62,18 @@ TIMEOUT_SECONDS = 15.0
 
 # 控えの置き場に書く、投稿待ちの本文の名前。sh がこれを投稿する。
 REQUEST_FILE = "review-request-{parent}-{phase}.md"
-ACCEPT_FILE = "review-accept-{parent}-{phase}.md"
+DECIDE_FILE = "review-decide-{parent}-{phase}.md"
+# 残った指摘のうち、人が issue に回すと選んだ分の下書き。sh がこれで issue を作る。
+DECIDE_ISSUE_FILE = "review-issue-{parent}-{phase}.md"
 # まだマージリクエストが無いときに、sh がこれで作る。
 MR_FILE = "review-mr-{parent}.md"
-# 残った指摘を別の issue に切り出すときの下書き。sh がこれで issue を作る。
-HANDOFF_FILE = "review-handoff-{parent}.md"
-# Draft を外すときにマージリクエストへ残す note。sh が Draft を外してから投稿する。
+# Draft を外すときにマージリクエストへ残すコメント。sh が Draft を外してから投稿する。
 READY_FILE = "review-ready-{parent}.md"
-# 人が締めたときの、残りを写す issue の下書きと、マージリクエストへ残す note。
-WRAPUP_ISSUE_FILE = "review-wrapup-issue-{parent}.md"
-WRAPUP_NOTE_FILE = "review-wrapup-note-{parent}.md"
+# 人が締めたときの、残りを写す issue の下書きと、マージリクエストへ残すコメント。
+CLOSE_EARLY_ISSUE_FILE = "review-close-early-issue-{parent}.md"
+CLOSE_EARLY_NOTE_FILE = "review-close-early-note-{parent}.md"
 MARKER_READY = "<!-- ccnavi:ready -->"
-MARKER_WRAPUP = "<!-- ccnavi:wrapup -->"
+MARKER_CLOSE_EARLY = "<!-- ccnavi:close-early -->"
 
 
 @dataclass
@@ -120,7 +123,7 @@ class MergeRequest:
 class Result:
     """sh が取ってきたリモートの写し。`--result <json>` で渡る。
 
-    形は 1 つ。`host` と `mr{number,url}` は常に要る。`check` と `--reviewed` は
+    形は 1 つ。`host` と `mr{number,url}` は常に要る。`confirm` と `--reviewed` は
     `threads[]` と `reviews[]`、`requested` は投稿の `url` と `created_at` を見る。
     """
 
@@ -325,7 +328,7 @@ def requested(
     return 0
 
 
-def check(
+def confirm(
     stdout: TextIO,
     stderr: TextIO,
     root: str,
@@ -356,7 +359,7 @@ def check(
     changes = [r for r in effective(result.reviews) if r.state.upper() == CHANGES_REQUESTED]
     if changes:
         stderr.write(
-            "ccnavi: 変更要求のレビューが立っている。--accept-unresolved でも通せない。"
+            "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
             "レビュアーの approve / dismiss を待つこと\n"
         )
         for r in changes:
@@ -379,17 +382,15 @@ def check(
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
-                f"  - '{review_sh} handoff --body-file <題と本文>' で"
-                "別の issue に切り出し、利用者が端末で "
-                f"'{review_sh} accept {phase_no}' を打って"
-                "残りを受け入れる\n"
+                f"  - 利用者が '{review_sh} decide {phase_no}'（ボードの「決める」）で"
+                "残りを受け入れるか、別の issue に回す\n"
                 "新しいフィードバック作業フェーズは足せません。\n"
             )
         else:
             stderr.write(
                 "解決してもらって再実行するか、利用者が端末で "
-                f"'{review_sh} accept {phase_no}' を打って、受け入れて進むか"
-                "続きの子チケットを起こすかを選ぶ\n"
+                f"'{review_sh} decide {phase_no}'（ボードの「決める」）で、指摘ごとに"
+                "受け入れて進むか、続きの子チケットで直すかを選ぶ\n"
             )
         return 1
     assert result.mr is not None
@@ -421,9 +422,9 @@ def _settle_children(
     人が見たことの記録はマーカーで、場所の移動はその写し（ADR-0055）。動かせなければ言って False。
 
     呼ぶ側はこれをレビュー済みのマーカーより先に呼ぶ。マーカーを先に置くと、動かせなかった
-    ときに「レビュー済みなのに子が `review/` に残る」形になり、`check` は「レビュー済み」で
+    ときに「レビュー済みなのに子が `review/` に残る」形になり、`confirm` は「レビュー済み」で
     拒み、`--reviewed --chat` も「すでにレビュー済み」で戻るので、取り出す操作が無くなる。
-    逆順なら、動いたのにマーカーが置けなくても、次の `check` が置き直す（動かす分は空）。
+    逆順なら、動いたのにマーカーが置けなくても、次の `confirm` が置き直す（動かす分は空）。
     """
     moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
     if failed:
@@ -437,9 +438,20 @@ def _settle_children(
     return True
 
 
-# accept の選び方。受け入れて進むか、続きの子を起こすか。
-ACCEPT_KEEP = "a"
-ACCEPT_FOLLOWUP = "f"
+# 残った指摘の行き先。人が指摘ごとに選ぶ（設計 §9.10）。
+CHOICE_KEEP = "keep"
+CHOICE_FIX = "fix"
+CHOICE_ISSUE = "issue"
+CHOICES = (CHOICE_KEEP, CHOICE_FIX, CHOICE_ISSUE)
+# ボードと取り交わす JSON の版。形を変えたら上げる（拡張の `decidemodel.ts` と揃える）。
+DECIDE_VERSION = 1
+# 端末で打つ 1 文字と、画面に出す呼び名。
+_CHOICE_KEYS = {"k": CHOICE_KEEP, "f": CHOICE_FIX, "i": CHOICE_ISSUE}
+CHOICE_LABELS = {
+    CHOICE_KEEP: "対応しない（受け入れて進む）",
+    CHOICE_FIX: "このフェーズで直す（続きの子チケットを起こす）",
+    CHOICE_ISSUE: "issue に回す（受け入れて、別の issue に切り出す）",
+}
 
 
 def _followup_from_choice(
@@ -459,16 +471,123 @@ def _followup_from_choice(
     if failed:
         stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
         return None
-    git_sh = settings.script_command(root, "ccnavi-git.sh")
-    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
     stdout.write(
         f"続きの子チケット {ident} を {conf.approved}/{ticket_mod.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
         "フェーズは開き直り、マーカーは消えた。\n"
-        f"次はエージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
-        f"{parent.ticket}' でワークツリーを切り、'{ticket_sh} start {ident}' で着手する\n"
+        f"次は{_followup_next(root, parent, ident)}\n"
     )
     return ident
+
+
+def _followup_next(root: str, parent: ticket_mod.Ticket, ident: str) -> str:
+    """続きの子を起こしたあと、エージェントが打つ 2 手。"""
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    return (
+        f"エージェントが '{git_sh} worktree add .claude/worktrees/{ident} -b {ident} "
+        f"{parent.ticket}' でワークツリーを切り、'{ticket_sh} start {ident}' で着手する"
+    )
+
+
+@dataclass
+class Decision:
+    """残った指摘を決める前の、見せる材料。preview と適用が同じものから組む。"""
+
+    parent: ticket_mod.Ticket
+    ph: phase.Phase
+    result: Result
+    unresolved: list[Thread]
+    # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 §9.11）。
+    can_issue: bool
+
+
+def thread_key(t: Thread) -> str:
+    """選択を結ぶ鍵。受け入れの控えと同じく、URL を先に使う。"""
+    return t.url or t.id
+
+
+def decision_digest(d: Decision) -> str:
+    """見せた指摘の指紋。見せてから押すまでに指摘が増えた・変わったら、適用を止める。
+
+    承認の指紋（`approval.approval_digest`）と同じ組み方。部分ごとの SHA-256 を件数と一緒に
+    並べ、その全体の SHA-256。区切りでつなぐと、本文に区切りを書いてつなぎ目をずらせる。
+    """
+    assert d.result.mr is not None
+    parts = [
+        d.parent.ticket,
+        str(d.ph.number),
+        str(d.result.mr.number),
+        d.result.mr.url,
+        str(d.can_issue),
+    ]
+    for t in d.unresolved:
+        parts.extend([thread_key(t), t.path, str(t.line), t.body])
+    lines = [str(len(parts))] + [hashlib.sha256(p.encode("utf-8")).hexdigest() for p in parts]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def _decision(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    result_path: str,
+) -> Decision | None:
+    """残った指摘を決められる状態かを確かめ、見せる材料を組む。決められなければ None。"""
+    found = _parent_phase(stderr, root, conf, cwd, phase_no)
+    if found is None:
+        return None
+    parent, ph = found
+    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
+    if requested_mark is None:
+        stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
+        return None
+    tree_root = tree.worktree_path(root, parent.ticket)
+    moved = _moved_since_request(tree_root, conf, requested_mark)
+    if moved:
+        stderr.write(f"ccnavi: {moved}。{_redo_request(root, phase_no)}\n")
+        return None
+    result = _matching(stderr, result_path, requested_mark)
+    if result is None:
+        return None
+    if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
+        stderr.write(
+            "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
+            "レビュアーの approve / dismiss を待つこと\n"
+        )
+        return None
+    unresolved = _unresolved(
+        result.threads,
+        approval.accepted_threads(
+            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
+        ),
+    )
+    can_issue = parent.has_plan and parent.feedback is not None
+    return Decision(parent, ph, result, unresolved, can_issue)
+
+
+def _decision_json(d: Decision) -> dict:
+    assert d.result.mr is not None
+    return {
+        "version": DECIDE_VERSION,
+        "parent": d.parent.ticket,
+        "phase": d.ph.number,
+        "mr": {"number": d.result.mr.number, "url": d.result.mr.url},
+        "can_issue": d.can_issue,
+        "threads": [
+            {
+                "key": thread_key(t),
+                "url": t.url,
+                "path": t.path,
+                "line": t.line,
+                "body": t.body,
+            }
+            for t in d.unresolved
+        ],
+        "digest": decision_digest(d),
+    }
 
 
 def reviewed(
@@ -483,128 +602,308 @@ def reviewed(
     result_path: str,
     chat: bool = False,
 ) -> int:
-    """人が端末で打つ。未解決を見せてから y/N。変更要求は通せない。
+    """人が端末で打つ。残った指摘を見せ、1 件ずつ行き先を選ばせる。変更要求は通せない。
 
-    受け入れたスレッドの一覧は控えの置き場に書き出す。sh がそれをマージリクエストのコメントに写す。
+    選んだ結果は `apply_decision` が置き、MR に写すコメントと issue の下書きを控えの置き場に
+    書き出す。sh がそれを投稿する。
 
     `chat` はこのセッションで見たフェーズ（`review: chat`）を通す枝。写しも依頼の記録も
     要らない代わりに、種類が chat と宣言しているフェーズにしか当たらない。
     """
-    found = _parent_phase(stderr, root, conf, cwd, phase_no)
-    if found is None:
-        return 1
-    parent, ph = found
     if chat:
+        found = _parent_phase(stderr, root, conf, cwd, phase_no)
+        if found is None:
+            return 1
+        parent, ph = found
         return _reviewed_in_chat(stdin, stdout, stderr, conf, root, parent, ph, accept_unresolved)
-    requested_mark = ph.marks.get(approval.MARK_REQUESTED)
-    if requested_mark is None:
-        stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
-        return 1
     if not accept_unresolved:
         stderr.write(
             "ccnavi: 未解決を受け入れるなら --accept-unresolved を付ける。"
             "受け入れないなら "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')} check' で足りる\n"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} confirm' で足りる\n"
         )
         return 1
-    tree_root = tree.worktree_path(root, parent.ticket)
-    moved = _moved_since_request(tree_root, conf, requested_mark)
-    if moved:
-        stderr.write(f"ccnavi: {moved}。{_redo_request(root, phase_no)}\n")
+    d = _decision(stderr, root, conf, cwd, phase_no, result_path)
+    if d is None:
         return 1
-    result = _matching(stderr, result_path, requested_mark)
-    if result is None:
+    stdout.write(
+        f"フェーズ {phase_no}（親 {d.parent.ticket}）の未解決スレッド: {len(d.unresolved)} 件\n"
+    )
+    keys = "k / f / i" if d.can_issue else "k / f"
+    stdout.write("残った指摘の行き先を 1 件ずつ選ぶ。それ以外を打つと、何もせずにやめる。\n")
+    for letter, choice in _CHOICE_KEYS.items():
+        if choice == CHOICE_ISSUE and not d.can_issue:
+            continue
+        stdout.write(f"  {letter}  {CHOICE_LABELS[choice]}\n")
+    if not d.can_issue:
+        stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあと）\n")
+    choices: dict[str, str] = {}
+    for i, t in enumerate(d.unresolved, 1):
+        stdout.write(f"[{i}/{len(d.unresolved)}] {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
+        stdout.write(f"選択（{keys}）: ")
+        stdout.flush()
+        picked = _CHOICE_KEYS.get(fsio.read_line(stdin).strip().lower(), "")
+        if not picked or (picked == CHOICE_ISSUE and not d.can_issue):
+            stderr.write("ccnavi: 決めなかった。何も置いていない\n")
+            return 1
+        choices[thread_key(t)] = picked
+    summary = apply_decision(stdout, stderr, root, conf, d, choices)
+    return 0 if summary is not None else 1
+
+
+def decide_preview(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    result_path: str,
+) -> int:
+    """残った指摘を見せるだけ（`--reviewed N --accept-unresolved --preview --json`）。何も置かない。
+
+    ボードのオーバーレイが読む。適用はこの `digest` を `--digest` で返したときだけ通る。
+    """
+    d = _decision(stderr, root, conf, cwd, phase_no, result_path)
+    if d is None:
         return 1
-    if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
-        stderr.write(
-            "ccnavi: 変更要求のレビューが立っている。端末からも通せない。"
-            "レビュアーの approve / dismiss を待つこと\n"
+    stdout.write(json.dumps(_decision_json(d), ensure_ascii=False) + "\n")
+    return 0
+
+
+def decide_yes(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    cwd: str,
+    phase_no: int,
+    result_path: str,
+    choices_text: str,
+    digest: str,
+) -> int:
+    """オーバーレイで人が押した選択を置く（`--yes <選択の JSON> --digest <指紋> --json`）。
+
+    端末の壁の代わりに、見せた指摘と今の指摘の指紋が一致することを求める。エージェントが
+    これをシェルで打つ形は、組み込みの deny（`phase.ticket_approval_rule`）が止める。
+    結果は JSON で返す。違えば何も置かず `mismatch` を返す。
+    """
+    if not digest.strip():
+        stderr.write("ccnavi: --yes には --digest（見せた指摘の指紋）が要る\n")
+        return 1
+    try:
+        raw = json.loads(choices_text)
+    except ValueError:
+        stderr.write("ccnavi: --yes の選択を JSON として読めない\n")
+        return 1
+    if not isinstance(raw, dict) or not all(
+        isinstance(k, str) and v in CHOICES for k, v in raw.items()
+    ):
+        stderr.write(f"ccnavi: --yes の選択は {{鍵: {' / '.join(CHOICES)}}} の形で渡す\n")
+        return 1
+    d = _decision(stderr, root, conf, cwd, phase_no, result_path)
+    if d is None:
+        return 1
+    current = decision_digest(d)
+    if digest.strip().lower() != current:
+        stdout.write(
+            json.dumps(
+                {
+                    "version": DECIDE_VERSION,
+                    "ok": False,
+                    "mismatch": True,
+                    "digest": {"expected": digest, "current": current},
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
         )
+        stderr.write("ccnavi: 見せた指摘と今の指摘が違う。何も置いていない\n")
         return 1
-    unresolved = _unresolved(
-        result.threads,
-        approval.accepted_threads(
-            approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, phase_no, parent
-        ),
-    )
-    stdout.write(
-        f"フェーズ {phase_no}（親 {parent.ticket}）の未解決スレッド: {len(unresolved)} 件\n"
-    )
-    for t in unresolved:
-        stdout.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
-    stdout.write(
-        "残った指摘の扱いを選ぶ。\n"
-        f"  {ACCEPT_KEEP}  受け入れて次のフェーズへ進む（受け入れた記録が残る）\n"
-        f"  {ACCEPT_FOLLOWUP}  続きの子チケットを {conf.approved}/{ticket_mod.DOING}/ に起こして"
-        "応える（このフェーズは開き直る）\n"
-        "それ以外: やめる\n"
-        "選択: "
-    )
-    stdout.flush()
-    choice = fsio.read_line(stdin).strip().lower()
-    if choice not in (ACCEPT_KEEP, ACCEPT_FOLLOWUP, "y", "yes"):
-        stderr.write("ccnavi: 受け入れなかった\n")
+    shown = {thread_key(t) for t in d.unresolved}
+    if set(raw) != shown:
+        stderr.write("ccnavi: 選択が見せた指摘と揃っていない（足りないか、余分がある）\n")
         return 1
-    assert result.mr is not None
+    if not d.can_issue and CHOICE_ISSUE in raw.values():
+        stderr.write("ccnavi: issue に回せるのは、フィードバック計画が承認されたあと\n")
+        return 1
+    notes = io.StringIO()
+    summary = apply_decision(notes, stderr, root, conf, d, raw)
+    if summary is None:
+        return 1
+    stdout.write(
+        json.dumps({"version": DECIDE_VERSION, "ok": True, **summary}, ensure_ascii=False) + "\n"
+    )
+    return 0
+
+
+def apply_decision(
+    stdout: TextIO,
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    d: Decision,
+    choices: dict[str, str],
+) -> dict | None:
+    """選んだ行き先を置く。端末とオーバーレイが同じここを通る。置けなければ None。
+
+    - 対応しない・issue に回す: 受け入れの控え（`accepted.json`）に足す。次の confirm は数えない
+    - このフェーズで直す: 続きの子を同じ番号で `doing/` に起こす。受け入れないので、次の
+      confirm がまた数える。1 件でもあればフェーズは開き直り、レビュー済みのマーカーは置かない
+    - どれも直さないなら、レビュー済みのマーカーを置く
+
+    MR に写すコメントと issue の下書きは控えの置き場に書き、sh が投稿する。
+    """
+    assert d.result.mr is not None
+    parent, ph = d.parent, d.ph
     stamp = approval.now()
     home = approval.home_dir(conf, root, parent.ticket, "")
-    if choice == ACCEPT_FOLLOWUP:
-        # 続きの子で応える。指摘は受け入れない（次の check がまた数える）。見た子は閉じ、
-        # 新しい子が同じ番号に入るのでフェーズは開き直る。レビュー済みのマーカーは置かない。
-        if not _settle_children(stdout, stderr, root, conf, parent, ph):
-            return 1
-        items = [f"{t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in unresolved]
-        ident = _followup_from_choice(stdin, stdout, stderr, root, conf, parent, ph, items, stamp)
-        if ident is None:
-            return 1
-        if conf.state:
-            path = os.path.join(
-                conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no)
-            )
-            note = (
-                MARKER_ACCEPT
-                + f"\n未解決の指摘は続きの子チケット `{ident}` で応える:\n"
-                + "\n".join(f"- {a}" for a in items)
-                + "\n"
-            )
-            failed = fsio.write_text(path, note, newline="\n")
-            if failed:
-                stderr.write(f"ccnavi: 記録を書き出せない ({failed})\n")
-        stdout.write(f"OK: フェーズ {phase_no} は続きの子 {ident} で応える\n")
-        return 0
-    accepted = [t.url or t.id for t in unresolved]
-    # マーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
+    picked = {c: [t for t in d.unresolved if choices.get(thread_key(t)) == c] for c in CHOICES}
+    accepted = [thread_key(t) for t in picked[CHOICE_KEEP] + picked[CHOICE_ISSUE]]
+    fix = picked[CHOICE_FIX]
+    # issue に回す分は、控えの置き場に下書きを書いて sh に渡す。置き場が無ければ回せないので、
+    # 何も置く前に断る（受け入れだけが残り、issue は作られない、にしない）
+    if picked[CHOICE_ISSUE] and not conf.state:
+        stderr.write("ccnavi: 控えの置き場が空。issue に回す下書きを置けない\n")
+        return None
+    # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
+    # issue やコメントを sh が投稿する
+    if conf.state:
+        for name in (DECIDE_FILE, DECIDE_ISSUE_FILE):
+            stale = os.path.join(conf.state, name.format(parent=parent.ticket, phase=ph.number))
+            if os.path.exists(stale):
+                os.remove(stale)
+    # 受け入れはマーカーより先に控えへ。マーカーは上書きも一括の消去もされるので、人が 1 度言った
     # 「これは承知で進める」はそちらに置かない。
-    failed = approval.remember_accepted(home, parent.ticket, accepted, phase_no)
-    if failed:
-        stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
-        return 1
+    if accepted:
+        failed = approval.remember_accepted(home, parent.ticket, accepted, ph.number)
+        if failed:
+            stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
+            return None
     if not _settle_children(stdout, stderr, root, conf, parent, ph):
-        return 1
-    if not _mark(
+        return None
+    followup = ""
+    if fix:
+        items = [_thread_line(t) for t in fix]
+        ident = _followup_from_choice(
+            io.StringIO(), stdout, stderr, root, conf, parent, ph, items, stamp
+        )
+        if ident is None:
+            return None
+        followup = ident
+    elif not _mark(
         stderr,
         home,
         parent.ticket,
-        phase_no,
+        ph.number,
         approval.MARK_REVIEWED,
-        {"mr": result.mr.number, "accepted": accepted},
+        {"mr": d.result.mr.number, "accepted": accepted},
     ):
-        return 1
-    if accepted and conf.state:
-        path = os.path.join(conf.state, ACCEPT_FILE.format(parent=parent.ticket, phase=phase_no))
-        note = (
-            MARKER_ACCEPT
-            + "\n未解決のまま次のフェーズへ進める:\n"
-            + "\n".join(f"- {a}" for a in accepted)
-            + "\n"
+        return None
+    issue_draft = ""
+    if picked[CHOICE_ISSUE] and conf.state:
+        issue_draft = _write_decide_issue(stderr, conf, d, picked[CHOICE_ISSUE])
+    if conf.state:
+        _write_decide_comment(stderr, conf, d, picked, followup)
+    if followup:
+        stdout.write(f"OK: フェーズ {ph.number} は続きの子 {followup} で応える\n")
+    else:
+        stdout.write(
+            f"OK: フェーズ {ph.number} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
         )
-        failed = fsio.write_text(path, note, newline="\n")
-        if failed:
-            stderr.write(f"ccnavi: 受け入れの記録を書き出せない ({failed})\n")
-    stdout.write(
-        f"OK: フェーズ {phase_no} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
+    return {
+        "parent": parent.ticket,
+        "phase": ph.number,
+        "reviewed": not followup,
+        "followup": followup,
+        "kept": [thread_key(t) for t in picked[CHOICE_KEEP]],
+        "fix": [thread_key(t) for t in fix],
+        "issue": [thread_key(t) for t in picked[CHOICE_ISSUE]],
+        "issue_draft": issue_draft,
+        "prompt": _decided_prompt(root, d, picked, followup),
+    }
+
+
+def _thread_line(t: Thread) -> str:
+    return f"{t.url} {t.path}:{t.line} {_first_line(t.body)}"
+
+
+def _write_decide_issue(
+    stderr: TextIO, conf: settings.Settings, d: Decision, threads: list[Thread]
+) -> str:
+    """issue に回す指摘の下書き。1 行目が題、空行のあとが本文。書けなければ空。"""
+    assert d.result.mr is not None
+    text = [
+        f"レビューで残った指摘（{d.parent.ticket} のフェーズ {d.ph.number}）",
+        "",
+        f"元のマージリクエスト: {d.result.mr.url}（チケット `{d.parent.ticket}`）",
+        "",
+        "## 引き継ぐ指摘",
+        "",
+        *[f"- {_thread_line(t)}" for t in threads],
+        "",
+    ]
+    path = os.path.join(
+        conf.state, DECIDE_ISSUE_FILE.format(parent=d.parent.ticket, phase=d.ph.number)
     )
-    return 0
+    failed = fsio.write_text(path, "\n".join(text), newline="\n")
+    if failed:
+        stderr.write(f"ccnavi: issue の下書きを書き出せない ({failed})\n")
+        return ""
+    return path
+
+
+def _write_decide_comment(
+    stderr: TextIO,
+    conf: settings.Settings,
+    d: Decision,
+    picked: dict[str, list[Thread]],
+    followup: str,
+) -> None:
+    """MR に写す、決めた内容のコメント。issue の綴りは sh が作ったあとに書き足す。"""
+    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の残った指摘の行き先:"]
+    if picked[CHOICE_KEEP]:
+        lines += [
+            "",
+            "対応しない（受け入れて進む）:",
+            *[f"- {thread_key(t)}" for t in picked[CHOICE_KEEP]],
+        ]
+    if picked[CHOICE_FIX]:
+        lines += [
+            "",
+            f"このフェーズで直す（続きの子チケット `{followup}`）:",
+            *[f"- {thread_key(t)}" for t in picked[CHOICE_FIX]],
+        ]
+    if picked[CHOICE_ISSUE]:
+        lines += ["", "issue に回す:", *[f"- {thread_key(t)}" for t in picked[CHOICE_ISSUE]]]
+    path = os.path.join(conf.state, DECIDE_FILE.format(parent=d.parent.ticket, phase=d.ph.number))
+    failed = fsio.write_text(path, "\n".join(lines) + "\n", newline="\n")
+    if failed:
+        stderr.write(f"ccnavi: 記録を書き出せない ({failed})\n")
+
+
+def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], followup: str) -> str:
+    """決めたことを Claude Code に渡す文。ボードがコピーか新しいセッションで渡す。"""
+    counts = "、".join(
+        f"{label} {len(picked[c])} 件"
+        for c, label in (
+            (CHOICE_KEEP, "対応しない"),
+            (CHOICE_FIX, "このフェーズで直す"),
+            (CHOICE_ISSUE, "issue に回す"),
+        )
+    )
+    head = (
+        f"[ccnavi] 利用者が親 {d.parent.ticket} のフェーズ {d.ph.number} で"
+        f"残った指摘の行き先を決めた（{counts}）。"
+    )
+    if followup:
+        items = "\n".join(f"- {_thread_line(t)}" for t in picked[CHOICE_FIX])
+        return (
+            f"{head}\n直す指摘は続きの子チケット {followup} に載せ、承認済みにしてある。"
+            f"{_followup_next(root, d.parent, followup)}。指摘:\n{items}\n"
+            "サブエージェントには渡さない。"
+        )
+    return f"{head}\nフェーズ {d.ph.number} はレビュー済みになった。次のフェーズへ進める。"
 
 
 def _reviewed_in_chat(
@@ -622,7 +921,7 @@ def _reviewed_in_chat(
     ホストへ出ないので写しも依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
     あること（`mr` と宣言したフェーズを安い経路で通させない）と、フェーズが終わって
     いること、そして依頼が出ていないこと。依頼を出した先には指摘が付いているかもしれず、
-    それを数えずに通す道はここには置かない（数えるのは `check`、受け入れるのは `accept`）。
+    それを数えずに通す道はここには置かない（数えるのは `confirm`、受け入れるのは `decide`）。
     実績のリスクが高ければマージリクエストを勧めるが、止めはしない（ADR-0065）。
     """
     if accept_unresolved:
@@ -652,11 +951,11 @@ def _reviewed_in_chat(
         return 1
     if approval.MARK_REQUESTED in ph.marks:
         # 依頼を出したあとに --chat で通すと、マージリクエストに付いた指摘を数えずに
-        # 止まっていたのが解ける。数える道（check）と、数えたうえで受け入れる道（accept）がある。
+        # 止まっていたのが解ける。数える道（confirm）と、数えたうえで受け入れる道（decide）がある。
         stderr.write(
             f"ccnavi: フェーズ {ph.label} はマージリクエストに依頼済み。--chat では通せない。"
-            f"'{review_sh} check --phase {ph.number}'（指摘が残っていれば "
-            f"'{review_sh} accept {ph.number}'）から\n"
+            f"'{review_sh} confirm --phase {ph.number}'（指摘が残っていれば "
+            f"'{review_sh} decide {ph.number}'）から\n"
         )
         return 1
     if approval.MARK_REVIEWED in ph.marks:
@@ -718,71 +1017,6 @@ def _reviewed_in_chat(
     return 0 if ident is not None else 1
 
 
-def handoff(
-    stdout: TextIO,
-    stderr: TextIO,
-    root: str,
-    conf: settings.Settings,
-    cwd: str,
-    body_file: str,
-    result_path: str,
-) -> int:
-    """残った指摘を別の issue に切り出す下書きを書き出す（設計 §9.11）。
-
-    作るのは sh。ここは、切り出してよい局面か（フィードバック計画が承認済み）を確かめ、
-    親が書いた題と本文に、写しの中の未解決スレッドの URL を添えて、控えの置き場に置く。
-    標準出力はその綴り。1 行目が題、空行のあとが本文。
-    """
-    parent = _parent(stderr, root, conf, cwd)
-    if parent is None:
-        return 1
-    if not parent.has_plan or parent.feedback is None:
-        stderr.write(
-            "ccnavi: 切り出せるのはフィードバック計画が承認されたあと。"
-            "それまでは同じフェーズに子を足して応える\n"
-        )
-        return 1
-    if not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。下書きを置く場所が無い\n")
-        return 1
-    body = _read_body(_resolve(cwd, body_file))
-    if body is None or not body.strip():
-        stderr.write(f"ccnavi: 題と本文を読めない ({body_file})。1 行目が題\n")
-        return 1
-    result = _result_with_mr(stderr, result_path)
-    if result is None:
-        return 1
-    accepted = approval.accepted_threads(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket
-    )
-    remaining = _unresolved(result.threads, accepted)
-    lines = body.rstrip("\n").splitlines()
-    title = lines[0].strip() if lines else ""
-    rest = "\n".join(lines[1:]).strip()
-    if not title:
-        stderr.write("ccnavi: 1 行目が題。空にしない\n")
-        return 1
-    text = [title, "", rest, ""] if rest else [title, ""]
-    text += [
-        f"元のマージリクエスト: {result.mr.url}（チケット `{parent.ticket}`）",
-        "",
-        "## 引き継ぐ指摘",
-        "",
-    ]
-    if remaining:
-        text += [f"- {t.url} {t.path}:{t.line} {_first_line(t.body)}" for t in remaining]
-    else:
-        text.append("（未解決のスレッドは残っていない）")
-    text.append("")
-    path = os.path.join(conf.state, HANDOFF_FILE.format(parent=parent.ticket))
-    failed = fsio.write_text(path, "\n".join(text), newline="\n")
-    if failed:
-        stderr.write(f"ccnavi: 下書きを書き出せない ({failed})\n")
-        return 1
-    stdout.write(path + "\n")
-    return 0
-
-
 def ready(
     stdout: TextIO,
     stderr: TextIO,
@@ -791,7 +1025,7 @@ def ready(
     cwd: str,
     result_path: str,
 ) -> int:
-    """Draft を外してよいかを確かめ、マーカーと note の下書きを置く。外すのは sh。
+    """Draft を外してよいかを確かめ、マーカーとコメントの下書きを置く。外すのは sh。
 
     条件は「親を閉じられる」と同じ（ops.close_problems）。閉じてよい状態と、
     マージに進んでよい状態は同じもの。親を閉じたあとでも打てる（閉じた承認済みチケットも引く）。
@@ -809,17 +1043,20 @@ def ready(
             stderr.write(f"  - {p}\n")
         stderr.write(
             "全部片付けてから打ち直す。まだ残るものを承知で締めるなら、利用者が端末で "
-            f"'{settings.script_command(root, 'ccnavi-review.sh')} wrapup --reason <理由>' を打つ\n"
+            f"'{settings.script_command(root, 'ccnavi-review.sh')} close-early --reason <理由>' "
+            "を打つ\n"
         )
         return 1
     result = _result_with_mr(stderr, result_path)
     if result is None:
         return 1
     if not conf.state:
-        stderr.write("ccnavi: 控えの置き場が空。note の下書きを置く場所が無い\n")
+        stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
         return 1
     wrapped = approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
+        approval.home_dir(conf, root, parent.ticket, ""),
+        parent.ticket,
+        approval.PARENT_MARK_CLOSE_EARLY,
     )
     text = [MARKER_READY, f"チケット `{parent.ticket}` の作業は終わり、Draft を外した。"]
     text.append(
@@ -845,7 +1082,7 @@ def ready(
     return 0
 
 
-def wrapup(
+def close_early(
     stdin: TextIO,
     stdout: TextIO,
     stderr: TextIO,
@@ -860,7 +1097,7 @@ def wrapup(
     残っているもの（未着手の子、子の無いフェーズ、終わっていないレビュー、
     未計画のフィードバック、未解決のスレッド）を全部見せてから y/N。y なら、
     未着手の子を取り消し、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
-    親のマーカー `wrapup.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
+    親のマーカー `close-early.json` を置く。残りは別の issue に写す下書きを書き、sh がそれで
     issue を作る。黙って消えるものは作らない。
 
     Draft を外すのはここではなく `ready`。締めたあとに親が状態の移動をコミットし、
@@ -870,7 +1107,7 @@ def wrapup(
     作業中の子がいる間は打てない。締めるのは、手が止まっているときだけ。
     """
     if not reason.strip():
-        stderr.write("ccnavi: wrapup には --reason <理由> が要る\n")
+        stderr.write("ccnavi: --close-early には --reason <理由> が要る\n")
         return 1
     parent = _parent(stderr, root, conf, cwd)
     if parent is None:
@@ -923,7 +1160,7 @@ def wrapup(
         stderr,
         approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
-        approval.PARENT_MARK_WRAPUP,
+        approval.PARENT_MARK_CLOSE_EARLY,
         {
             "reason": reason.strip(),
             "at": stamp,
@@ -935,7 +1172,9 @@ def wrapup(
         },
     ):
         return 1
-    failed = _wrapup_drafts(conf, parent, result, reason, stamp, left, cancelled, skipped, accepted)
+    failed = _close_early_drafts(
+        conf, parent, result, reason, stamp, left, cancelled, skipped, accepted
+    )
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
         return 1
@@ -943,7 +1182,7 @@ def wrapup(
     # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
         f"OK: {parent.ticket} を締めた。あとは親に、状態の移動をコミットし、"
-        f"'ticket done {parent.ticket}' で閉じ、`{WIP_ROOT}/` を消して push し、"
+        f"'ticket finish {parent.ticket}' で閉じ、`{WIP_ROOT}/` を消して push し、"
         "'ccnavi-review.sh ready' で Draft を外させる\n"
     )
     return 0
@@ -1034,7 +1273,7 @@ def _settle(
     """
     cancelled: list[str] = []
     for t in left.todo:
-        if ops.cancel(stdout, stderr, root, conf, t.ticket, f"wrapup: {reason.strip()}") != 0:
+        if ops.cancel(stdout, stderr, root, conf, t.ticket, f"close-early: {reason.strip()}") != 0:
             return None
         cancelled.append(t.ticket)
     skipped: list[int] = []
@@ -1050,7 +1289,7 @@ def _settle(
                 parent.ticket,
                 ph.number,
                 approval.MARK_SKIPPED,
-                {"by": "wrapup", "at": stamp},
+                {"by": "close-early", "at": stamp},
             ):
                 return None
             skipped.append(ph.number)
@@ -1063,14 +1302,14 @@ def _settle(
                 parent.ticket,
                 ph.number,
                 approval.MARK_REVIEWED,
-                {"by": "wrapup", "at": stamp, "mr": mr_number, "accepted": []},
+                {"by": "close-early", "at": stamp, "mr": mr_number, "accepted": []},
             ):
                 return None
             settled.append(ph.number)
     return cancelled, skipped, settled
 
 
-def _wrapup_drafts(
+def _close_early_drafts(
     conf: settings.Settings,
     parent: ticket_mod.Ticket,
     result: Result,
@@ -1081,7 +1320,7 @@ def _wrapup_drafts(
     skipped: list[int],
     accepted: list[str],
 ) -> str:
-    """残りを写す issue の下書きと、マージリクエストへ残す note の下書き。書けなければ理由。"""
+    """残りを写す issue の下書きと、マージリクエストへ残すコメント の下書き。書けなければ理由。"""
     assert result.mr is not None
     # 1 行目が題、空行のあとが本文。
     issue = [f"{parent.title} の残り", ""]
@@ -1102,12 +1341,12 @@ def _wrapup_drafts(
         "（未解決のスレッドは残っていない）"
     ]
     issue.append("")
-    issue_path = os.path.join(conf.state, WRAPUP_ISSUE_FILE.format(parent=parent.ticket))
+    issue_path = os.path.join(conf.state, CLOSE_EARLY_ISSUE_FILE.format(parent=parent.ticket))
     failed = _write_text(issue_path, "\n".join(issue))
     if failed:
         return failed
     note = [
-        MARKER_WRAPUP,
+        MARKER_CLOSE_EARLY,
         f"利用者が締めた（{stamp}）: {reason.strip()}",
         f"取り消した子: {', '.join(cancelled) or '無し'} / 省略したフェーズ: "
         f"{', '.join(str(n) for n in skipped) or '無し'} / 受け入れた指摘: {len(accepted)} 件",
@@ -1115,7 +1354,7 @@ def _wrapup_drafts(
         "マージは利用者が行う。",
         "",
     ]
-    note_path = os.path.join(conf.state, WRAPUP_NOTE_FILE.format(parent=parent.ticket))
+    note_path = os.path.join(conf.state, CLOSE_EARLY_NOTE_FILE.format(parent=parent.ticket))
     return _write_text(note_path, "\n".join(note))
 
 
@@ -1132,7 +1371,7 @@ def _approved_rel(conf: settings.Settings) -> str:
 def _own_places(conf: settings.Settings) -> tuple[str, ...]:
     """ccnavi 自身が動かす置き場。承認済みチケットと提案の 2 つ（ADR-0055）。
 
-    チケットは 2 つの置き場を行き来するので、片方だけを外すと `done` の移動
+    チケットは 2 つの置き場を行き来するので、片方だけを外すと `finish` の移動
     （`doing/` → `review/`）が「人が見るものが動いた」に数えられる。
     """
     return (_approved_rel(conf), (conf.tickets or settings.DEFAULT_TICKETS).strip("/"))
@@ -1442,7 +1681,7 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     ccnavi 自身の置き場だけが手元に残っている形は、届いていると数える。人がレビューで
     見るのはコードで、置き場を運ぶのは `ccnavi-push-approved.sh` の仕事（push が落ちても
     コミットは残す）。数えると、レビュー待ちの間に落ちた push が次の依頼を止める。
-    `check` の側（`_moved_since_request`）と同じ基準。
+    `confirm` の側（`_moved_since_request`）と同じ基準。
 
     `ready` の前提（`_merge_problems`）はこれを使わない。あちらは人がリモートを見て
     マージするところで、マーカーも本当に届いていないと他の機械へ渡らない。
@@ -1561,14 +1800,14 @@ def _already_requested(
     """依頼済みで、出し直せないならその説明。未依頼か、出し直せるなら空。
 
     出し直せるのは、依頼の後に親の HEAD が動き、まだレビュー済みになっていないときだけ。
-    そのとき check は「人が見たものと今の HEAD が違う」で止まるので、ここも止めると
-    エージェントの打てる手が無くなる。出し直しても緩むものは無い。check は新しい HEAD との
+    そのとき confirm は「人が見たものと今の HEAD が違う」で止まるので、ここも止めると
+    エージェントの打てる手が無くなる。出し直しても緩むものは無い。confirm は新しい HEAD との
     一致を求め直し、未解決の指摘は付いた時刻で絞らないので、前の依頼への指摘も数え続ける。
     HEAD が依頼時のままなら、同じ依頼を二重に投稿するだけなので止める。動いたかどうかは
-    check と同じ基準で見る（`_moved_since_request`）。ccnavi 自身の置き場だけが動いた形では
-    check が止まらないので、ここで出し直させると依頼のコメントが増えるだけになる。
+    confirm と同じ基準で見る（`_moved_since_request`）。ccnavi 自身の置き場だけが動いた形では
+    confirm が止まらないので、ここで出し直させると依頼のコメントが増えるだけになる。
 
-    レビュー済みは依頼の有無より先に見る。`wrapup` は依頼していないフェーズにも
+    レビュー済みは依頼の有無より先に見る。`close-early` は依頼していないフェーズにも
     レビュー済みを置くので、依頼の記録が無いことを先に見ると、人が締めたフェーズに
     依頼が投稿される。
     """

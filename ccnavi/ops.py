@@ -1,13 +1,13 @@
-"""チケットの状態を動かす操作。`ccnavi ticket start|done|cancel <識別子>`。
+"""チケットの状態を動かす操作。`ccnavi ticket start|finish|cancel <識別子>`。
 
 親が `.ccnavi/scripts/ccnavi-ticket.sh` から呼ぶ。スクリプトは薄く、ここが本体。
 サブエージェントからの呼び出しは cli.py が止める（`agent_id` が付いていたら拒む）。
 
 やることは置き場を動かして欄を書くことだけ（ADR-0055）。`start` は置き場を動かさず
-`doing/` の欄を書く。`done` は `doing/` から `wip/proposals/review/`（レビュー要）か
+`doing/` の欄を書く。`finish` は `doing/` から `wip/proposals/review/`（レビュー要）か
 `.ccnavi/approved/done/`（不要）へ、`cancel` は `doing/` から `done/` へ動かす。
-ワークツリーの削除は親のマージ手順に任せる。順序は「子の成果をマージ → done →
-ワークツリーを消す」で、done の前にワークツリーを消すと base_sha の検査ができなくなる。
+ワークツリーの削除は親のマージ手順に任せる。順序は「子の成果をマージ → finish →
+ワークツリーを消す」で、finish の前にワークツリーを消すと base_sha の検査ができなくなる。
 """
 
 from __future__ import annotations
@@ -76,7 +76,9 @@ def start(
     return 0
 
 
-def done(stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str) -> int:
+def finish(
+    stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
+) -> int:
     """`doing/` → `review/`（レビュー要）か `done/`（不要）。完了の時刻を書く。"""
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
@@ -207,7 +209,7 @@ def cancel(
     )
 
 
-def judge(
+def record_risk(
     stdout: TextIO,
     stderr: TextIO,
     root: str,
@@ -226,7 +228,7 @@ def judge(
         stderr.write("ccnavi: 判定は yes か no\n")
         return 1
     if not reason.strip():
-        stderr.write("ccnavi: judge には --reason <根拠> が要る\n")
+        stderr.write("ccnavi: record-risk には --reason <根拠> が要る\n")
         return 1
     found = _find(stderr, root, conf, ticket_id)
     if found is None:
@@ -332,7 +334,7 @@ def _score_child(
         stderr.write(
             f"ccnavi: {found.ticket} を閉じる前に、定性のリスク項目の判定が要る: {names}\n"
             "  問いと差分の要約を渡してサブエージェントに判断させ、報告を "
-            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} judge {found.ticket} "
+            f"'{settings.script_command(root, 'ccnavi-ticket.sh')} record-risk {found.ticket} "
             "<項目> yes|no "
             "--reason <根拠>' で記録してから閉じ直すこと\n"
         )
@@ -497,7 +499,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     """親を閉じられない理由の一覧。空なら閉じてよい。
 
     `review ready`（Draft を外す）も同じ条件を見る。閉じてよい状態と、マージに
-    進んでよい状態は同じもの。人が wrapup で締めていれば、開いている子以外は問わない。
+    進んでよい状態は同じもの。人が close-early で締めていれば、開いている子以外は問わない。
     人が締めたあとに残っているものは、締めたときに別の issue へ写してある。
     """
     copies, _ = approval.scan(conf, root)
@@ -507,7 +509,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
         ]
     if approval.read_parent_mark(
-        approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_WRAPUP
+        approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY
     ):
         return []
     problems: list[str] = []
@@ -613,7 +615,7 @@ def _move(
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_mod.REVIEW:
         stdout.write(
-            "人のレビューを待つ。レビューが済むと利用者の操作（check / accept / --reviewed）で "
+            "人のレビューを待つ。レビューが済むと利用者の操作（confirm / decide / --reviewed）で "
             f"{conf.approved}/{ticket_mod.DONE}/ へ動く\n"
         )
     return 0

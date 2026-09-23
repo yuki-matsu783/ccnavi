@@ -538,7 +538,7 @@ class ApproveJsonTest(PhaseHarness):
         self.merge("i0001-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
 
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))

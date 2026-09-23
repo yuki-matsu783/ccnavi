@@ -49,11 +49,11 @@ class EnvTest(unittest.TestCase):
         for command in (
             "CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push",
             "env CCNAVI_PROJECTS=/x sh .ccnavi/scripts/ccnavi-git.sh push",
-            "env -u CCNAVI_BIN_PATH sh .ccnavi/scripts/ccnavi-ticket.sh done a",
+            "env -u CCNAVI_BIN_PATH sh .ccnavi/scripts/ccnavi-ticket.sh finish a",
             "export CCNAVI_WORKSPACE=/x; sh .ccnavi/scripts/ccnavi-git.sh push",
-            "CCNAVI_STATE=/x; sh .ccnavi/scripts/ccnavi-review.sh check",
+            "CCNAVI_STATE=/x; sh .ccnavi/scripts/ccnavi-review.sh confirm",
             "unset CCNAVI_TICKETS_PROPOSAL && sh .ccnavi/scripts/ccnavi-git.sh push",
-            "sudo env CLAUDE_PROJECT_DIR=/x bash .ccnavi/scripts/ccnavi-review.sh check",
+            "sudo env CLAUDE_PROJECT_DIR=/x bash .ccnavi/scripts/ccnavi-review.sh confirm",
             "CCNAVI_NEW_THING=1 ../../../.ccnavi/scripts/ccnavi-git.sh status",
             "cd a && CCNAVI_BIN_PATH=f sh ../.ccnavi/scripts/ccnavi-approve.sh",
             # 関数の定義の本体。頭（`f()`・`function f`）を名前と読み違えると見落とす。

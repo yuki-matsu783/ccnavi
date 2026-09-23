@@ -445,9 +445,9 @@ def main() -> int:
     )
 
     for child in ("i0001-01", "i0001-02"):
-        done = sh(TICKET_SH, parent_tree, "done", child)
-        record(f"ticket done {child}", done.returncode == 0, done.stderr.strip()[:200])
-    commit_all(parent_tree, "done")
+        done = sh(TICKET_SH, parent_tree, "finish", child)
+        record(f"ticket finish {child}", done.returncode == 0, done.stderr.strip()[:200])
+    commit_all(parent_tree, "finish")
     for child in ("i0001-01", "i0001-02"):
         git(parent_tree, "merge", "--quiet", "--no-edit", child)
 
@@ -522,7 +522,7 @@ def main() -> int:
         fetched.stderr.strip()[:200],
     )
 
-    # ---- 3. レビュアーが指摘 → check → 変更要求（EE だけ）→ 解決と approve → check
+    # ---- 3. レビュアーが指摘 → confirm → 変更要求（EE だけ）→ 解決と approve → confirm
     status, disc = api(
         "POST",
         f"/projects/{pid}/merge_requests/{iid}/discussions",
@@ -537,9 +537,9 @@ def main() -> int:
     disc_id = disc.get("id", "")
     fetched = sh(REVIEW_SH, parent_tree, "fetch")
     write(os.path.join(OUT, "fetch-2-unresolved.json"), fetched.stdout)
-    checked = sh(REVIEW_SH, parent_tree, "check", "--phase", "1")
+    checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
     record(
-        "未解決があると check は止まる",
+        "未解決があると confirm は止まる",
         checked.returncode != 0 and "未解決" in checked.stderr,
         checked.stderr.strip()[:200],
     )
@@ -578,15 +578,15 @@ def main() -> int:
     if ee:
         fetched = sh(REVIEW_SH, parent_tree, "fetch")
         write(os.path.join(OUT, "fetch-3-changes-requested.json"), fetched.stdout)
-        checked = sh(REVIEW_SH, parent_tree, "check", "--phase", "1")
+        checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
         record(
-            "変更要求が立っていると check は止まる",
+            "変更要求が立っていると confirm は止まる",
             checked.returncode != 0 and "変更要求" in checked.stderr,
             checked.stderr.strip()[:200],
         )
-        accepted = sh(REVIEW_SH, parent_tree, "accept", "1", stdin="y\n")
+        accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
         record(
-            "変更要求は accept でも通らない",
+            "変更要求は decide でも通らない",
             accepted.returncode != 0 and "変更要求" in (accepted.stderr + accepted.stdout),
         )
     status, ap = api(
@@ -602,9 +602,9 @@ def main() -> int:
     say("approve 後の reviewers: " + json.dumps(reviewers, ensure_ascii=False)[:300])
     fetched = sh(REVIEW_SH, parent_tree, "fetch")
     write(os.path.join(OUT, "fetch-4-approved.json"), fetched.stdout)
-    checked = sh(REVIEW_SH, parent_tree, "check", "--phase", "1")
+    checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
     record(
-        "解決と approve の後は check が通る",
+        "解決と approve の後は confirm が通る",
         checked.returncode == 0,
         (checked.stdout + checked.stderr).strip()[:200],
     )
@@ -614,13 +614,15 @@ def main() -> int:
     )
 
     memo = write(
-        os.path.join(OUT, "note-1.md"), "チャットで「命名は次のフェーズで直す」と合意した。\n"
+        os.path.join(OUT, "comment-1.md"), "チャットで「命名は次のフェーズで直す」と合意した。\n"
     )
-    noted = sh(REVIEW_SH, parent_tree, "note", "--body-file", memo)
-    record("note が投稿される", noted.returncode == 0, (noted.stdout + noted.stderr).strip()[:160])
+    noted = sh(REVIEW_SH, parent_tree, "comment", "--body-file", memo)
     record(
-        "note に ccnavi:note のマーカーがある",
-        has_marker(notes_of(pid, iid), "<!-- ccnavi:note -->"),
+        "comment が投稿される", noted.returncode == 0, (noted.stdout + noted.stderr).strip()[:160]
+    )
+    record(
+        "comment に ccnavi:comment のマーカーがある",
+        has_marker(notes_of(pid, iid), "<!-- ccnavi:comment -->"),
     )
 
     status, disc2 = api(
@@ -631,19 +633,19 @@ def main() -> int:
         tag="discussion-create-2",
     )
     disc2_note = disc2.get("notes", [{}])[0].get("id", "")
-    accepted = sh(REVIEW_SH, parent_tree, "accept", "1", stdin="y\n")
-    say("accept:\n" + redact(accepted.stdout + accepted.stderr))
+    accepted = sh(REVIEW_SH, parent_tree, "decide", "1", stdin="y\n")
+    say("decide:\n" + redact(accepted.stdout + accepted.stderr))
     record(
-        "accept で未解決を受け入れる", accepted.returncode == 0 and "受け入れた" in accepted.stdout
+        "decide で未解決を受け入れる", accepted.returncode == 0 and "受け入れた" in accepted.stdout
     )
-    acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:accept -->")]
+    acc = [n for n in notes_of(pid, iid) if n.get("body", "").startswith("<!-- ccnavi:decide -->")]
     record(
         "受け入れの note が MR に写る",
         bool(acc) and f"#note_{disc2_note}" in acc[-1].get("body", ""),
     )
-    checked = sh(REVIEW_SH, parent_tree, "check", "--phase", "1")
+    checked = sh(REVIEW_SH, parent_tree, "confirm", "--phase", "1")
     record(
-        "受け入れ済みのスレッドは check で数えない",
+        "受け入れ済みのスレッドは confirm で数えない",
         checked.returncode == 0,
         checked.stderr.strip()[:200],
     )
@@ -656,7 +658,7 @@ def main() -> int:
         refused.stderr.strip()[:200],
     )
     record("親の start", sh(TICKET_SH, parent_tree, "start", "i0001").returncode == 0)
-    closed = sh(TICKET_SH, parent_tree, "done", "i0001")
+    closed = sh(TICKET_SH, parent_tree, "finish", "i0001")
     record("親の done", closed.returncode == 0, (closed.stdout + closed.stderr).strip()[:200])
     commit_all(parent_tree, "状態の移動")
     git(parent_tree, "rm", "-r", "-q", "wip")
@@ -679,7 +681,7 @@ def main() -> int:
     )
     record("ready の note が MR にある", has_marker(notes_of(pid, iid), "<!-- ccnavi:ready -->"))
 
-    # ---- 5. 別の親を人が締める（wrapup）
+    # ---- 5. 別の親を人が締める（close-early）
     parent2 = worktree("i0002", "main")
     propose(parent2, "i0002", allow=("src/*", "wip/*"), title="途中で締める親")
     propose(
@@ -711,14 +713,14 @@ def main() -> int:
             {"body": "残る指摘"},
             tag="discussion-create-3",
         )
-        wrapped = sh(REVIEW_SH, parent2, "wrapup", "--reason", "実測はここまで", stdin="y\n")
-        say("wrapup:\n" + redact(wrapped.stdout + wrapped.stderr))
-        record("wrapup が通る", wrapped.returncode == 0)
+        wrapped = sh(REVIEW_SH, parent2, "close-early", "--reason", "実測はここまで", stdin="y\n")
+        say("close-early:\n" + redact(wrapped.stdout + wrapped.stderr))
+        record("close-early が通る", wrapped.returncode == 0)
         _, issues = api(
             "GET",
             f"/projects/{pid}/issues?state=opened&order_by=created_at&sort=desc",
             ROOT_TOKEN,
-            tag="issues-after-wrapup",
+            tag="issues-after-close-early",
         )
         made = [
             i for i in (issues if isinstance(issues, list) else []) if "残り" in i.get("title", "")
@@ -731,8 +733,8 @@ def main() -> int:
             os.path.exists(os.path.join(parent2, "wip", "proposals", "cancelled", "i0002-01.md")),
         )
         record(
-            "wrapup の note が MR にある",
-            has_marker(notes_of(pid, mr2["iid"]), "<!-- ccnavi:wrapup -->"),
+            "close-early のコメントが MR にある",
+            has_marker(notes_of(pid, mr2["iid"]), "<!-- ccnavi:close-early -->"),
         )
 
     # ---- 6. URL にトークンを埋めた origin でも読めて、出力に漏れない

@@ -26,7 +26,21 @@ import {
   type ApprovePreview,
   type ApproveResult,
 } from "./core/approvemodel.js";
-import { approveArgs, previewArgs, type Launcher } from "./core/commands.js";
+import {
+  approveArgs,
+  decideArgs,
+  decidePreviewArgs,
+  previewArgs,
+  REVIEW_SCRIPT,
+  toPosixPath,
+  type Launcher,
+} from "./core/commands.js";
+import {
+  parseDecidePreview,
+  parseDecideResult,
+  type DecideOutcome,
+  type DecidePreview,
+} from "./core/decidemodel.js";
 import { parseLintJson, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
@@ -184,12 +198,17 @@ function run(
     launcher.kind === "exe"
       ? [launcher.path, common]
       : ["uv", ["run", "python", "-m", "ccnavi", ...common]];
+  return spawn(file, argv, root, timeout);
+}
+
+/** 子プロセスを 1 本走らせ、終了コード・出力・打ち切られたかを返す */
+function spawn(file: string, argv: readonly string[], cwd: string, timeout?: number): Promise<Ran> {
   return new Promise((resolve) => {
     execFile(
       file,
       argv,
       {
-        cwd: root,
+        cwd,
         maxBuffer: MAX_OUTPUT,
         windowsHide: true,
         ...(timeout === undefined ? {} : { timeout }),
@@ -309,6 +328,77 @@ export async function runApproveYes(
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi --approve --yes の出力を読み取れない（${parsed.error}）` : said };
+}
+
+/**
+ * 残った指摘の 2 本に付ける期限（ミリ秒）。sh がホストからスレッドを取ってくるので承認より長い。
+ * 置いている間オーバーレイは閉じられないので、返らないとパネルが戻らなくなる
+ */
+const DECIDE_TIMEOUT_MS = 120_000;
+
+/**
+ * 残った指摘と指紋を見る（`ccnavi-review.sh decide <N> --preview`）。何も置かない。
+ * ホストを読むのは sh（実行ファイルはネットワークに出ない）なので、実行ファイルではなく sh を走らせる。
+ * cwd は親のワークツリー（sh はそこを親として実行ファイルに渡す）
+ */
+export async function runDecidePreview(
+  root: string,
+  shell: string,
+  tree: string,
+  phase: number,
+): Promise<RunResult<DecidePreview>> {
+  const ran = await runScript(shell, root, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。何も置かれていない` };
+  }
+  if (ran.code !== 0) {
+    return { ok: false, error: `ccnavi-review.sh decide --preview が失敗した:\n${ran.stderr.trim()}` };
+  }
+  const parsed = parseDecidePreview(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/**
+ * 人が選んだ行き先を置く（`ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`）。
+ * 見せた指摘と今の指摘が違えば、実行ファイルは何も置かず `mismatch` を返す
+ */
+export async function runDecideYes(
+  root: string,
+  shell: string,
+  tree: string,
+  phase: number,
+  choices: Readonly<Record<string, string>>,
+  digest: string,
+): Promise<DecideOutcome> {
+  const ran = await runScript(shell, root, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS);
+  if (ran.killed) {
+    return {
+      ok: false,
+      error:
+        `${cutOff("ccnavi-review.sh decide", DECIDE_TIMEOUT_MS)}。` +
+        "置かれたかどうかは分からない。ボードを更新して、フェーズの状態を確かめる",
+    };
+  }
+  const parsed = parseDecideResult(ran.stdout.trim().split("\n").pop() ?? "");
+  if (parsed.ok || "mismatch" in parsed) {
+    return parsed;
+  }
+  const said = firstLine(ran.stderr) || firstLine(ran.stdout);
+  return { ok: false, error: said === "" ? `ccnavi-review.sh decide の出力を読み取れない（${parsed.error}）` : said };
+}
+
+/**
+ * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。綴りは `/` 区切りにする
+ * （Windows の Git Bash は `C:/…` を読める）
+ */
+function runScript(
+  shell: string,
+  root: string,
+  cwd: string,
+  args: readonly string[],
+  timeout: number,
+): Promise<Ran> {
+  return spawn(shell, [toPosixPath(path.join(root, REVIEW_SCRIPT)), ...args], cwd, timeout);
 }
 
 /** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */

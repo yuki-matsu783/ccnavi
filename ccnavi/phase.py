@@ -59,7 +59,7 @@ _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s
 # ここに持つ。
 _FORBIDDEN_COMMAND = re.compile(
     r"(^|[;&|]\s*)(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh\s+"
-    r"(start|done|cancel|judge|request|check|note|accept|handoff|ready|wrapup|push)\b"
+    r"(start|finish|cancel|record-risk|request|confirm|comment|decide|ready|close-early|push)\b"
 )
 
 # シェルとして扱うツール。PowerShell は shellread で読めないので生の文字列に当てる。
@@ -68,7 +68,7 @@ SHELL_TOOLS = ("Bash", "PowerShell")
 # レビューが済むまで止めるツール。
 HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 
-# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
+# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` `--close-early` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
 # `--approve --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は
@@ -95,9 +95,9 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
-    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
     r"|\b(ticket|review)\s+"
-    r"(start|done|cancel|judge|prepare|requested|check|handoff|ready|wrapup)\b)"
+    r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
 CODE_TICKET_APPROVAL = "DENY_TICKET_APPROVAL_CLI"
 TICKET_APPROVAL_RULE_ID = "builtin-guard-ticket-approval"
@@ -126,6 +126,148 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
     return any(_FORBIDDEN_COMMAND.search(c) for c in commands(subject) + commands(unwrapped))
 
 
+# 人の判断の経路のうち、hook のほかに守りが無い形。組み込みの deny（`DENY_TICKET_APPROVAL_CLI`）で、
+# 実行ファイルの呼び方によらず止める（ADR-0080、ADR-0081）。
+#
+# 1. 端末要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` で
+#    端末要求を外す（テストと CI のため）。切れなければ、端末を持たないエージェントは実行ファイルの
+#    側で止まる
+# 2. ボードの経路の形。`--yes`（承認と残った指摘）は端末を求めないので、ここが唯一の守りになる。
+#    `--approve` / `--reviewed` と `--yes` の組、sh の `--choices` と `--digest` の組
+#
+# 実行ファイルを呼ぶ綴りは追い切れない（`uv run -m ccnavi`、名前を変えた写し、`awk` の `system()`、
+# `python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、**コマンド行の生の文字列の
+# 全体**から、引用符と `\` を落としてから綴りを探す（`--y""es`・`"--yes"`・`--x\=y` を同じに読む）。
+# 外すのは、並んだコマンドが全部、表示・検索・閲覧の道具（名前の完全一致）のときだけ。
+# 外す道具を並べ損ねても、倒れるのは止める側。
+_GUARD_NAME = "CCNAVI_GUARD_TICKET_APPROVAL"
+# 変数を読むだけの形（`$X`・`${X}`・`$env:X`・`${env:X}`）。後ろに代入が続けば読むだけではない。
+_GUARD_READ = re.compile(
+    rf"\$\{{(?:env:)?{_GUARD_NAME}\}}(?!\s*[:+]?=)"
+    rf"|\$(?:env:)?{_GUARD_NAME}(?![A-Za-z0-9_}}])(?!\s*[:+]?=)",
+    re.IGNORECASE,
+)
+_GUARD_MENTION = re.compile(rf"(?<![A-Za-z0-9_]){_GUARD_NAME}(?![A-Za-z0-9_])", re.IGNORECASE)
+_GUARD_FLAG = re.compile(
+    r"--guard-ticket-approval(?:\s*=\s*|\s+)(?!enable(?![\w-]))", re.IGNORECASE
+)
+_BOARD_FORMS = (
+    re.compile(r"(?<![\w-])--(?:approve|reviewed)(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--yes(?![\w-])", re.IGNORECASE),
+)
+_DECIDE_FORMS = (
+    re.compile(r"(?<![\w-])--choices(?![\w-])", re.IGNORECASE),
+    re.compile(r"(?<![\w-])--digest(?![\w-])", re.IGNORECASE),
+)
+# 表示・検索・閲覧だけをする道具。コマンドを実行する口か変数に書く口を持つもの（`sed` の `e`、
+# `awk` の `system()`、`git` の別名、`xargs`、`find -exec`、`printf -v`）は入れない。
+_READERS = frozenset(
+    {"echo", "grep", "egrep", "fgrep", "rg", "cat", "less", "more", "head", "tail", "wc"}
+)
+_SEGMENT = re.compile(r"[;&|\n]+")
+_ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
+
+
+def _dequoted(subject: str) -> str:
+    """引用符とバックスラッシュを落とした綴り。分け書き（`--y""es`）と引用を同じに読む。"""
+    return re.sub(
+        r"['\"`\\]", "", subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
+    )
+
+
+def _only_readers(text: str) -> bool:
+    """並んだコマンドが全部、表示・検索・閲覧の道具か。"""
+    for segment in _SEGMENT.split(text):
+        words = segment.split()
+        # 前置きの代入（`X=… cmd`）は飛ばす。代入そのものは別に見る
+        while words and _ASSIGNMENT_WORD.match(words[0]):
+            words = words[1:]
+        if not words:
+            continue
+        name = words[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if name.endswith(".exe"):
+            name = name[:-4]
+        if name not in _READERS:
+            return False
+    return True
+
+
+def _commit_messages(subject: str) -> list[str]:
+    """コミットの文面（`git commit` / `ccnavi-git.sh commit` の `-m` / `--message` の値）。
+
+    文面は実行されないので、綴りを探す対象から外す。値の中にコマンド置換があれば実行されるので
+    外さない。読み切れないコマンド行なら空（外さない側に倒す）。
+    """
+    found: list[str] = []
+    for words, _ in shellread.placed(subject):
+        names = [w.replace("\\", "/").rsplit("/", 1)[-1] for w in words]
+        if "commit" not in words or not ({"git", "ccnavi-git.sh"} & set(names)):
+            continue
+        for i, word in enumerate(words):
+            if word in ("-m", "--message") and i + 1 < len(words):
+                value = words[i + 1]
+            elif word.startswith("--message="):
+                value = word.partition("=")[2]
+            elif word.startswith("-m") and len(word) > 2 and not word.startswith("--"):
+                value = word[2:]
+            else:
+                continue
+            if "$(" not in value and "`" not in value:
+                found.append(value)
+    return found
+
+
+def human_path_form(subject: str) -> tuple[str, str]:
+    """hook のほかに守りが無い人の判断の形があれば（種類, 見つけた綴り）。無ければ空の組。
+
+    種類は `guard-off`（端末要求を切る）か `board`（ボードの経路）。
+    """
+    text = _dequoted(subject)
+    for message in _commit_messages(subject):
+        text = text.replace(_dequoted(message), " ", 1)
+    if _only_readers(text):
+        return "", ""
+    unread = _GUARD_READ.sub("", text)
+    mention = _GUARD_MENTION.search(unread)
+    if mention:
+        return "guard-off", mention.group(0)
+    flag = _GUARD_FLAG.search(text)
+    if flag:
+        return "guard-off", flag.group(0).strip()
+    for pair in (_BOARD_FORMS, _DECIDE_FORMS):
+        found = [rx.search(text) for rx in pair]
+        if all(found):
+            return "board", " … ".join(m.group(0) for m in found if m)
+    return "", ""
+
+
+def turns_off_guard(subject: str) -> str:
+    """端末要求を切る形があれば、その綴り。無ければ空。"""
+    kind, found = human_path_form(subject)
+    return found if kind == "guard-off" else ""
+
+
+def board_form_message(found: str) -> str:
+    """ボードの経路の形で止めた文。"""
+    return (
+        f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
+        "オーバーレイで押したものを拡張が打つためのもので、端末の確かめが無いぶん、エージェントが"
+        "打つ道はここで止めます。承認と残った指摘の行き先は、利用者がボードか端末で決めます。"
+        "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
+    )
+
+
+def guard_off_message(found: str) -> str:
+    """端末要求を切る形で止めた文。"""
+    return (
+        f"人の判断の経路（承認・レビュー済み・締め）の端末要求を切る形（{found}）を、"
+        "コマンド行に書いています。この変数とフラグは、テストや CI が端末を持たずに実行ファイルを"
+        "回すためのもので、エージェントが置くものではありません。承認・レビュー済み・締めは利用者が"
+        "端末かボードで行います。この綴りを探したいだけなら、シェルの grep ではなく Grep ツールを"
+        "使ってください。"
+    )
+
+
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 
@@ -136,6 +278,9 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
 
     承認済みチケットを運ぶスクリプト（`ccnavi-push-approved.sh`）も止める。運ぶことは
     合意そのものではないが、push は外へ出す操作で、運ぶ時機を決めるのは人。
+
+    ボードの経路の形（`--yes` の組、sh の `--choices` と `--digest`）と、端末要求を切る形は、
+    ここではなく `human_path_form` が止める。実行ファイルの綴りに頼らず見るため。
     """
     names = [r"ccnavi(\.exe)?"]
     clause = selfguard.binary_clause(bin_path)
@@ -148,7 +293,10 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     # 同じものが走る。区別すると綴りを変えるだけで外せる。引数の形（_CLI_FORMS）まで
     # 広がるが、実行ファイルの引数は大小を区別するので、広がるのは止める側だけ
     # （`--PREVIEW` で免除の形になっても、実行ファイルがその引数を受け付けない）。
-    expression = rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}" rf"|{script}"
+    expression = (
+        rf"(?i)(^|\x00|[;&|]\s*)(&\s*)?{launcher}\s+[^\x00]*{_CLI_FORMS}"
+        rf"|{script}"
+    )
     rule = rules.Rule(
         id=TICKET_APPROVAL_RULE_ID,
         match="|".join(SHELL_TOOLS),
@@ -160,7 +308,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
             f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
-            "未解決の受け入れは利用者が端末で行います。承認済みチケットのコミットと push"
+            "残った指摘の行き先は利用者がボードか端末で決めます。承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
@@ -553,7 +701,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         # 依頼は出してある。ここで動くのは人で、エージェントは待つほうに回る。
         todo = (
             "やること: 利用者のレビューを待ってください。レビューが終わったら "
-            f"'{review_sh} check --phase {n}' で確かめます。指摘が付いていたら、"
+            f"'{review_sh} confirm --phase {n}' で確かめます。指摘が付いていたら、"
             f"同じフェーズに子を足してやり直せます。{later}"
         )
     elif phase.review_in_chat:
@@ -569,7 +717,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             "やること: 子の成果を親ブランチへ合流して push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文>' "
             "でレビューを頼み、ターンを終えて利用者を待ってください。"
-            f"利用者がレビューを終えたら '{review_sh} check --phase {n}' "
+            f"利用者がレビューを終えたら '{review_sh} confirm --phase {n}' "
             f"で確かめます。{later}"
         )
     return "\n".join(
@@ -872,7 +1020,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
     """フィードバック計画の承認で、全体計画の最後のレビューを済んだ扱いにする。
 
     人がレビューの結果を見たうえで対応を計画したので、その計画の承認がレビューの
-    合意になる。残った指摘は消えない。フィードバック作業フェーズの `check` が、
+    合意になる。残った指摘は消えない。フィードバック作業フェーズの `confirm` が、
     解決されていない指摘を全部数える。
     """
     if not parent.has_plan:
@@ -906,7 +1054,9 @@ def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
             groups.setdefault(p.review_label, []).append(p.label)
         return "、".join(f"{label}（{'、'.join(names)}）" for label, names in groups.items())
     if approval.read_parent_mark(
-        approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, approval.PARENT_MARK_WRAPUP
+        approval.home_dir(conf, root, parent.ticket, ""),
+        parent.ticket,
+        approval.PARENT_MARK_CLOSE_EARLY,
     ):
         # 人が締めた。残りは別の issue に写してあるので、閉じられる。
         return "閉じられる（利用者が締めた）"

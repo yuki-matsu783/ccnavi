@@ -754,7 +754,7 @@ def _under(rel: str, place_rel: str) -> bool:
 
 
 def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """チケットが `done` / `cancel` / 人のレビューで出ていく元（作業中とレビュー待ち）か。
+    """チケットが `finish` / `cancel` / 人のレビューで出ていく元（作業中とレビュー待ち）か。
 
     移動の組を数えるとき、消えた側がここに居たことを求める。求めないと、承認待ちの提案
     （`todo/`）を `review/` に置き直す形——人の承認を通っていないものを、レビュー待ちに
@@ -764,7 +764,7 @@ def leaves_open_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
 
 
 def lands_in_finished_state(rel: str, tickets_rel: str, approved_rel: str) -> bool:
-    """`done` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
+    """`finish` と `cancel` がチケットを動かす先（レビュー待ちと閉じた置き場）か。
 
     実行後の監視が、スクリプトの移動（`doing/` から出ていく）とただの削除を見分けるのに使う。
     行き先をこの 2 つに絞るのは、`doing/` から出したチケットを `todo/` に置き直す形が
@@ -1056,7 +1056,7 @@ def guard_rules(tickets_rel: str, root: str) -> list[rules.Rule]:
     place = state_dir_regex(tickets_rel)
     message = (
         "チケットの状態は置き場で表します。review/（レビュー待ち）へ動かすのは "
-        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} done <識別子>' だけです。"
+        f"'{settings.script_command(root, 'ccnavi-ticket.sh')} finish <識別子>' だけです。"
         "直接ファイルを作ったり動かしたりしないでください。todo/ への作成と編集は自由です。"
     )
     write_rule = rules.Rule(

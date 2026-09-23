@@ -276,7 +276,7 @@ class RiskUnionTest(ConfigUnionHarness):
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
 
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         record = self.record()
         self.assertEqual(record["points"], 55)
@@ -292,7 +292,7 @@ class RiskUnionTest(ConfigUnionHarness):
         tree = self.one_child()
         self.commit(tree, "src/a.py", "\n".join(str(i) for i in range(10)) + "\n")
 
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.assertEqual(self.record()["points"], 25)
         # 25 点は medium 20 以上、high 40 未満。
@@ -309,7 +309,7 @@ class RiskUnionTest(ConfigUnionHarness):
 
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.assertEqual([h["id"] for h in self.record()["hits"]], ["big-diff"])
         self.assertEqual(self.record()["points"], 25)
@@ -376,7 +376,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(self.risk_problems("error"), [])
 
         self.one_child()
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         by_id = {h["id"]: h for h in self.record()["hits"]}
         self.assertEqual(by_id["counted"]["points"], 30)
@@ -393,7 +393,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(self.risk_problems("error"), [])
 
         self.one_child()
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         by_id = {h["id"]: h for h in self.record()["hits"]}
         self.assertEqual(by_id["common-counted"]["points"], 7)
@@ -416,7 +416,7 @@ class RiskUnionTest(ConfigUnionHarness):
 
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         record = self.record()
         # 共通層の factors だけで点が付く。lib の schema は参加せず、levels も共通層のまま。
@@ -432,13 +432,15 @@ class RiskUnionTest(ConfigUnionHarness):
 
         tree = self.one_child()
         self.commit(tree, "src/a.py", "1\n")
-        refused = self.ccnavi("ticket", "done", "i0001-01")
+        refused = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(refused.returncode, 0, refused.stdout)
         for factor in ("outward", "untested"):
-            judged = self.ccnavi("ticket", "judge", "i0001-01", factor, "yes", "--reason", "そう")
+            judged = self.ccnavi(
+                "ticket", "record-risk", "i0001-01", factor, "yes", "--reason", "そう"
+            )
             self.assertEqual(judged.returncode, 0, judged.stdout + judged.stderr)
 
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         record = self.judge_record()
         self.assertEqual(sorted(record), ["outward", "untested"])
@@ -449,7 +451,7 @@ class RiskUnionTest(ConfigUnionHarness):
         """§11.9: 種類を根拠に置くマーカー（`review: none` の skipped）には、その種類の層。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "1\n")
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
 
         said = self.hook("Bash", self.parent_tree, event="PostToolUse", command="ls")
@@ -487,7 +489,7 @@ class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
 
-        closed = self.ccnavi("ticket", "done", "i0001-01", "--project-home", ".nothere")
+        closed = self.ccnavi("ticket", "finish", "i0001-01", "--project-home", ".nothere")
 
         self.assertIn("--project-home は診断", closed.stderr, "落としたことを言っていない")
         self.assert_the_lib_layer_still_counted(closed)
@@ -496,7 +498,9 @@ class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
 
-        closed = self.ccnavi("ticket", "done", "i0001-01", "--projects", os.path.join(self.ws, "x"))
+        closed = self.ccnavi(
+            "ticket", "finish", "i0001-01", "--projects", os.path.join(self.ws, "x")
+        )
 
         self.assertIn("--projects は診断", closed.stderr, "落としたことを言っていない")
         self.assert_the_lib_layer_still_counted(closed)

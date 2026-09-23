@@ -26,11 +26,11 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 ## いま動くもの
 
 **チケットは 2 つの置き場を行き来する 1 本のファイル（ADR-0055）。** 提案の
-`wip/proposals/todo/` → 承認で `.ccnavi/approved/doing/` → `ticket done` で `wip/proposals/review/`
-（レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`check` / `accept` / `--reviewed --chat` /
-`wrapup`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
-`wip/proposals/` へ動かすのはエージェント。`accept` は「受け入れて進む」か「続きの子を
-`doing/` に直に起こす」かを人に選ばせる。
+`wip/proposals/todo/` → 承認で `.ccnavi/approved/doing/` → `ticket finish` で `wip/proposals/review/`
+（レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`confirm` / `decide` / `--reviewed --chat` /
+`close-early`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
+`wip/proposals/` へ動かすのはエージェント。`decide` は残った指摘ごとに「対応しない」「このフェーズで
+直す（続きの子を `doing/` に直に起こす）」「issue に回す」を人に選ばせる。ボードの「決める」でも端末でも同じ。
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
 `SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
@@ -94,7 +94,7 @@ ccnavi/risk.py              実績で測るリスク。risks.yml・差分の計�
 ccnavi/phase.py             フェーズの終わりと HITL ポイント。置き場からフェーズの状態を組む
 ccnavi/phasetypes.py        フェーズの種類の定義（phases.yml）の読み込みと検証
 ccnavi/review.py            レビューの依頼と確認。作業ツリーの前提検査と、sh が渡す写し（JSON）の判定。ネットワークに出ない
-ccnavi/ops.py               チケットの状態を動かす ticket start / done / cancel / judge
+ccnavi/ops.py               チケットの状態を動かす ticket start / finish / cancel / record-risk
 ccnavi/audit.py             1 行 1 件の追記記録
 ccnavi/lint.py              設定とルールの検証
 ccnavi/diagnose.py          判定を実行せずに試す --test と --explain
@@ -145,7 +145,7 @@ uv run --with pyinstaller python build.py
   許可の区別）はチケットがあるので書ける形だが、まだ書いていない
 - 診断コマンド（REQ-DIA）のうち、記憶の消去（REQ-DIA-05）
 - 期限（REQ-CMN-08）はループの中で見ているだけで、実測していない
-- 並行するチケット（REQ-TKT）のうち、GitHub の実物に対する `request` と `check` は
+- 並行するチケット（REQ-TKT）のうち、GitHub の実物に対する `request` と `confirm` は
   実測していない。GitLab は実物（CE 18.5）で 1 周を確かめてある（下の「落とし穴」）。
   自動テストは sh の代わりに写し（`--result`）を渡す形で通す
 - REQ-TKT-35 の後半。`SubagentStart` は親の局面（作業中・レビュー待ちなど）を名指ししない。
@@ -211,9 +211,9 @@ skip する。試すのは組み立て済みの実行ファイルなので、`cc
    通るが、手で確かめるときに踏む
 ### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
 
-usage の `check` の説明が「依頼より後の未解決スレッドが無ければ」のままで、いまの挙動
-（時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `handoff` `ready`
-`wrapup` `origin` が無い。文面だけの修正だが、`.ccnavi/scripts/` は `deny` なので
+usage の `confirm` の説明が「依頼より後の未解決スレッドが無ければ」のままで、いまの挙動
+（時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `ready`
+`close-early` `origin` が無い。文面だけの修正だが、`.ccnavi/scripts/` は `deny` なので
 人が直すか、`staging` 種別のフェーズを持つチケットで写す版を作る。
 
 **複数のリポジトリ（REQ-MLT、設計 §11）で残っているもの。**
@@ -242,14 +242,14 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   サブエージェント内の最初の `PreToolUse` で渡す形に変える（設計 §9.12）
 - `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd`。判定は行き先で
   決まるので止め方は変わらないが、止めるかどうかは cwd で親を引くので、そこが割れる
-- GitHub の実物に `request` / `check` を当てる。GraphQL の `reviewThreads` は文書どおりに
+- GitHub の実物に `request` / `confirm` を当てる。GraphQL の `reviewThreads` は文書どおりに
   書いただけ。GitLab の変更要求（`request_changes`）だけは CE に無い機能で、EE でしか当てられない
 - `.ccnavi/scripts/` への Write は `guard-scripts` と組み込みの `builtin-guard-project-home` が止める。sh 3 本はこのリポジトリで作ったので
   入っているが、他のプロジェクトへは導入スクリプトが配る
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
 
-- 人が子を再開しても、そのフェーズの `reviewed` は残る。再び `done` にしても止まらず、
+- 人が子を再開しても、そのフェーズの `reviewed` は残る。再び `finish` にしても止まらず、
   告知も出ない。再開の手順に「マーカーも消す」を入れるか、承認済みチケットを戻したときに機構が消すかは決めていない
 
 **権限モードへの委譲がどれだけ出るかを実測する。** ここがいちばん未知。記録の `code` が

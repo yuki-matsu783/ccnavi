@@ -1,13 +1,13 @@
 #!/bin/sh
 # ccnavi-ticket — チケットの状態を動かす。親（メインエージェント）だけが呼ぶ。
 #
-#   sh .ccnavi/scripts/ccnavi-ticket.sh start  <識別子>
-#   sh .ccnavi/scripts/ccnavi-ticket.sh done   <識別子>
-#   sh .ccnavi/scripts/ccnavi-ticket.sh cancel <識別子> --reason <理由>
-#   sh .ccnavi/scripts/ccnavi-ticket.sh judge  <子> <項目> yes|no --reason <根拠>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh start       <識別子>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh finish      <識別子>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh cancel      <識別子> --reason <理由>
+#   sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 #
-# judge は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
-# サブエージェント、記録するのは親。判定が揃うまで、その子は done で閉じられない。
+# record-risk は、実績のリスクの定性項目（risks.yml の `judge:`）の判定を記録する。判断するのは
+# サブエージェント、記録するのは親。判定が揃うまで、その子は finish で閉じられない。
 #
 # 状態は置き場で表す（ADR-0055）。承認待ちは wip/proposals/todo/、承認済みの作業中は
 # .ccnavi/approved/doing/、レビュー待ちは wip/proposals/review/、閉じたものは
@@ -28,17 +28,17 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-ticket.sh <start|done|cancel> <識別子> [--reason <理由>]
-sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes|no --reason <根拠>
+sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel> <識別子> [--reason <理由>]
+sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 
-  start   .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
-          ワークツリー .claude/worktrees/<識別子> が要る。置き場は動かない
-  done    doing/ -> wip/proposals/review/（フェーズがレビュー要）か .ccnavi/approved/done/（不要）。
-          完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
-  cancel  doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
-  judge   定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
+  start        .ccnavi/approved/doing/ の承認済みチケットに着手の時刻と基準点を書く。
+               ワークツリー .claude/worktrees/<識別子> が要る。置き場は動かない
+  finish       doing/ -> wip/proposals/review/（フェーズがレビュー要）か .ccnavi/approved/done/（不要）。
+               完了の時刻を書く。子は実績のリスク（差分）を数えて記録する
+  cancel       doing/ -> .ccnavi/approved/done/  --reason が要る。未承認の提案（todo/）は消せばよい
+  record-risk  定性のリスク項目の判定を記録する（親が打つ。判断はサブエージェント）
 
-  レビュー待ち（review/）から done/ へ動かすのは人（ccnavi-review.sh check / accept、
+  レビュー待ち（review/）から done/ へ動かすのは人（ccnavi-review.sh confirm / decide、
   ccnavi --reviewed）。
 
   提案の plan に書くフェーズの種類は phases.yml を見る。置き場は共通層の
@@ -62,9 +62,9 @@ esac
 	exit 2
 }
 case "$1" in
-start | done | cancel | judge) ;;
+start | finish | cancel | record-risk) ;;
 *)
-	printf 'ccnavi-ticket: %s は通しません。使えるのは start / done / cancel / judge です。\n' "$1" >&2
+	printf 'ccnavi-ticket: %s は通しません。使えるのは start / finish / cancel / record-risk です。\n' "$1" >&2
 	exit 2
 	;;
 esac

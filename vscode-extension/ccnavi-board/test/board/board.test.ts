@@ -33,7 +33,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.equal(parent.worktreeExists, true);
   assert.match(parent.stage, /作業中/);
   assert.equal(parent.phases.length, 2);
-  // 締める（wrapup）は拡張からは出さない。端末で打つ
+  // 締める（close-early）は拡張からは出さない。端末で打つ
   assert.deepEqual(parent.actions, []);
   assert.equal(parent.family, "i0001");
 
@@ -104,11 +104,11 @@ test("CB-T08 親の無い子は不備", () => {
   assert.match(cards.get("i0002-01")!.issues[0], /親 i0002 が見つからない/);
 });
 
-test("CB-T09 依頼済みで止まったフェーズに accept、締めた親にはバッジだけ", () => {
+test("CB-T09 依頼済みで止まったフェーズに decide、締めた親にはバッジだけ", () => {
   const base = fixture();
   const parent: ParentJson = {
     ...base.parents[0],
-    wrapup: { reason: "ここまで", at: "t" },
+    close_early: { reason: "ここまで", at: "t" },
     phases: base.parents[0].phases.map((p): PhaseJson => {
       const marks: Record<string, Record<string, unknown>> =
         p.number === 2 ? { requested: { at: "t" } } : {};
@@ -128,9 +128,9 @@ test("CB-T09 依頼済みで止まったフェーズに accept、締めた親に
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
   assert.deepEqual(card.phases[0].actions, []);
-  // 受け入れと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
+  // 残った指摘を決めるボタンと、レビューを終えたことの連絡（マーカーは置かない）が並ぶ
   assert.deepEqual(card.phases[1].actions, [
-    { kind: "accept", parent: "i0001", phase: 2 },
+    { kind: "decide", parent: "i0001", phase: 2 },
     { kind: "reviewed", parent: "i0001", phase: 2 },
   ]);
   assert.deepEqual(card.phases[1].marks, ["requested"]);
@@ -286,7 +286,7 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   const cards = cardsOf(buildBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5")));
   const card = cards.get("i0001")!;
   assert.deepEqual(card.phases[1].actions, [
-    { kind: "accept", parent: "i0001", phase: 2 },
+    { kind: "decide", parent: "i0001", phase: 2 },
     { kind: "reviewed", parent: "i0001", phase: 2 },
   ]);
   // フェーズ行は依頼の投稿を指す。親カードは断片を落としてマージリクエスト自体を指す。子カードには持たせない
@@ -297,12 +297,12 @@ test("CB-T131 レビュー待ちのフェーズに「レビュー済み連絡」
   assert.equal(card.mrUrl, "https://example.com/o/r/pull/18");
   assert.equal(card.mrNumber, 18);
   assert.equal(cards.get("i0001-02")!.mrUrl, "");
-  // 引く道具。承認と受け入れが使う parentTreeOf と同じ場所を見る
+  // 引く道具。承認と残った指摘を決めるボタンが使う parentTreeOf と同じ場所を見る
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001")?.id, "i0001");
   assert.equal(parentCardOf(buildBoard(waitingWithMr("u")), "i0001-02"), undefined);
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 2)?.mrUrl, "u");
   assert.equal(phaseChipOf(buildBoard(waitingWithMr("u")), "i0001", 9), undefined);
-  // 依頼のマーカーが無くレビュー済みだけ残った形（wrapup が置く）では、リンクも番号も出さない（url が無い）。連絡のボタンは待ちでなければ出ない
+  // 依頼のマーカーが無くレビュー済みだけ残った形（close-early が置く）では、リンクも番号も出さない（url が無い）。連絡のボタンは待ちでなければ出ない
   const base = fixture();
   const reviewedOnly: ParentJson = {
     ...base.parents[0],

@@ -462,7 +462,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        done = self.ccnavi("ticket", "done", "i0010")
+        done = self.ccnavi("ticket", "finish", "i0010")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         closed = os.path.join(tree, ".ccnavi", "approved", "done", "i0010.md")
         self.assertTrue(os.path.exists(closed), closed)
