@@ -307,6 +307,12 @@ def subagent_forbidden(subject: str, runner: str = "", inner: str = "") -> str:
     )
 
 
+def builtin_refusal(code: str, subject: str, text: str) -> str:
+    """組み込みの判定で止めた文。ルールに当たったのではないので、ルールの id は名乗らない。"""
+    shown = " ".join(subject.split())[:SUBJECT_LIMIT]
+    return "\n".join([f"[ccnavi] {code}", f"subject: {shown}", text])
+
+
 def rewrite_rule(form: str) -> str:
     """書き直しを求める形で止めたときに、記録の `rules` に残す名前。"""
     return f"({form})"
