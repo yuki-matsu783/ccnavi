@@ -188,7 +188,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   if (data.kind === "loading") {
     return (
       <p className="empty" id="ccnavi-loading">
-        {data.title}を読み込んでいる…
+        {data.text}
       </p>
     );
   }
@@ -394,7 +394,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </div>
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
-        ファイルが外で変更されたので、画面の内容は古い。
+        ファイルの変更を検知しました。再読込してください。
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
           再読込
         </button>

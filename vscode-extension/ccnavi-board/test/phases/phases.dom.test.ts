@@ -262,8 +262,8 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる2");
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
-    await dom.send({ type: "data", data: { kind: "loading", title: "ccnavi フェーズ管理: web" } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "ccnavi フェーズ管理: webを読み込んでいる…");
+    await dom.send({ type: "data", data: { kind: "loading", text: "web のフェーズを読み込み中..." } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "web のフェーズを読み込み中...");
     assert.equal(dom.all(rowSelector("p1")).length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),

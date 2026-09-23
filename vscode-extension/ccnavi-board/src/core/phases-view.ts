@@ -116,7 +116,7 @@ export function editable(page: PhasesPage): boolean {
 export type PhasesData =
   | { readonly kind: "page"; readonly page: PhasesPage }
   | { readonly kind: "error"; readonly error: string }
-  | { readonly kind: "loading"; readonly title: string };
+  | { readonly kind: "loading"; readonly text: string };
 
 /** 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める */
 export type ToPhases =
