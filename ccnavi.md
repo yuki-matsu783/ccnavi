@@ -1031,8 +1031,10 @@ sh が起動する実体のほう（§4.6）。sh だけを守ると、実体を
 検査が外れる（`CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、存在しない置き場を見て子の push を通す）。
 この面が有効な間、保護済みの sh を呼ぶコマンド行で `CCNAVI_` で始まる変数と `CLAUDE_PROJECT_DIR` を置く・外す形を、
 ルールより先に止める。数えるのは前置きの代入、`env X=…` と `env -u X`、`export` `declare` `readonly` `local` `unset` の
-引数、素の代入（settings.json の env が書き出した変数は、代入だけで sh に届く）で、コマンド行のどこに書いても数える。
-実行役のコマンド越し（`sudo env X=… bash …`）も同じ。出力の量と待ち時間だけを変える 4 つ（`CCNAVI_GIT_MAX_LINES`・
+引数、素の代入（settings.json の env が書き出した変数は、代入だけで sh に届く）、環境を丸ごと空にする `env -i` で、
+コマンド行のどこに書いても数える（ループや関数の中では、後ろに書いた代入も次の呼び出しに届く）。実行役のコマンド越し
+（`sudo env X=… bash …`）と、関数の定義の本体（`f() { …; }`。呼ばれるかは読みで決まらないので、走るものとして数える）も
+同じ。子の push の検査も関数の本体を見る。出力の量と待ち時間だけを変える 4 つ（`CCNAVI_GIT_MAX_LINES`・
 `CCNAVI_GIT_FAIL_LINES`・`CCNAVI_GIT_KEEP_LOGS`・`CCNAVI_FETCH_TIMEOUT`）は通す。通すものを並べる形なので、sh が
 あとから読むようになった変数は止まる側に倒れる。読み切れない形（`sh -c "…"`）は allow が当たらず確認へ落ちるので、
 ここでは見ない。hook 自身は settings.json の env で起動するので、ここで見る代入の影響を受けない。
