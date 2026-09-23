@@ -534,6 +534,8 @@ test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載
 test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホストへ伝え、切り替え中は「読み込み中」を出して中身が届けば描き直す。前の対象の判定は残さない", async () => {
   const dom = await openRules();
   try {
+    // 入れ物に入れておいた「読み込み中」は、画面が組み上がると残らない
+    assert.equal(dom.all("#ccnavi-loading").length, 0);
     await dom.send(judged([hit("deny", "git-push")]));
     assert.equal(dom.all("#judge-result").length, 1);
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [], "開いた時点の「変更なし」は送らない");
@@ -543,8 +545,8 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
     // 別の対象へ切り替わった。前の対象の編集は捨てて、読み込み中を出す
-    await dom.send({ type: "data", data: { kind: "loading", title: "ccnavi ルール設定: web" } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "ccnavi ルール設定: webを読み込んでいる…");
+    await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中..." } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中...");
     assert.equal(dom.all(".rule").length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),

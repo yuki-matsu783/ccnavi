@@ -22,23 +22,36 @@ export interface LoadingOptions {
   readonly appearance?: Appearance;
 }
 
-/** 読み込み中の 1 枚。`title` は `<title>` と本文の両方に出す（HTML として逃がす） */
-export function renderLoadingPage(title: string, options: LoadingOptions): string {
+/** 読み込み中の一言。`what` は読むもの（「チケット」「web のルール」）。5 画面と切り替え中の表示で綴りを揃える */
+export function loadingText(what: string): string {
+  return `${what}を読み込み中...`;
+}
+
+/**
+ * 読み込み中の一言を段落にしたもの（HTML として逃がす）。この 1 枚の本文のほか、各画面の入れ物の
+ * `<div id="root">` にも入れる。入れ物を入れてから束ねた画面が組み上がるまでの間、白いままにしないため。
+ * 組み上がると React が中身を入れ替えるので、残らない
+ */
+export function loadingMarkup(what: string): string {
+  return `<p class="empty" id="ccnavi-loading">${escapeHtml(loadingText(what))}</p>`;
+}
+
+/** 読み込み中の 1 枚。`title` は `<title>` に、`what` は本文の一言に出す（どちらも HTML として逃がす） */
+export function renderLoadingPage(title: string, what: string, options: LoadingOptions): string {
   const { nonce } = options;
-  const text = escapeHtml(title);
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; style-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${text}</title>
+<title>${escapeHtml(title)}</title>
 <style nonce="${nonce}">
 ${options.style}
 </style>
 </head>
 ${bodyTag(options.appearance)}
-<p class="empty" id="ccnavi-loading">${text}を読み込んでいる…</p>
+${loadingMarkup(what)}
 </body>
 </html>
 `;

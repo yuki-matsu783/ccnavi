@@ -34,6 +34,7 @@ import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
+import { loadingText } from "./core/loading-render.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
@@ -118,6 +119,18 @@ function titleOf(target: RulesTarget): string {
   }
 }
 
+/** 読み込み中の一言で「何を」読んでいるか */
+function whatOf(target: RulesTarget): string {
+  switch (target.kind) {
+    case "workspace":
+      return "ルール";
+    case "self":
+      return "自身の層のルール";
+    case "project":
+      return `${target.name} のルール`;
+  }
+}
+
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
@@ -160,7 +173,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     // 編集の途中を持つので、タブを裏に回しても捨てない。
     retainContextWhenHidden: true,
   });
-  showLoading(panel, titleOf(target), SCREEN);
+  showLoading(panel, titleOf(target), SCREEN, whatOf(target));
   const current: PanelState = {
     target,
     panel,
@@ -224,7 +237,7 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
     watcher.dispose();
   }
   current.fileWatchers = [];
-  current.host.send({ kind: "loading", title: titleOf(target) });
+  current.host.send({ kind: "loading", text: loadingText(whatOf(target)) });
   await reload(current);
 }
 
@@ -500,7 +513,7 @@ function redraw(current: PanelState): void {
     return;
   }
   // 切り替え先を読んでいる最中
-  current.host.send({ kind: "loading", title: titleOf(current.target) });
+  current.host.send({ kind: "loading", text: loadingText(whatOf(current.target)) });
 }
 
 /**

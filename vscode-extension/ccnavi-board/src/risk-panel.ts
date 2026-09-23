@@ -34,6 +34,7 @@ import { renderRiskPage } from "./core/risk-render.js";
 import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import { showLoading } from "./loading.js";
 import { requireTickets } from "./ticket-control.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -113,6 +114,7 @@ export async function openRisk(): Promise<void> {
     // 編集の途中を持つので、タブを裏に回しても捨てない。
     retainContextWhenHidden: true,
   });
+  showLoading(panel, "ccnavi リスク管理", SCREEN, "リスク");
   const current: PanelState = {
     panel,
     folder,
@@ -128,7 +130,7 @@ export async function openRisk(): Promise<void> {
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
   // 読むのはタブを作ってから。読めなかったときもタブは閉じず、中にエラーを出す（`showError`）。
-  // 読むのはファイル 1 本で待たないので、ほかの画面のような「読み込み中」は挟まない
+  // 読むのはファイル 1 本ですぐ終わるが、束ねた画面が組み上がるまでの間はほかの画面と同じ一言を見せる
   reload(current);
 }
 
