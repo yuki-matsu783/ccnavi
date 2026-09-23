@@ -19,7 +19,7 @@ class TranslateTest(unittest.TestCase):
 
     def test_文字列全体に当たる(self):
         # 部分一致は自動で足さない。足すと「書いたものがそのまま当たる」が
-        # 崩れて、やめたはずの見えない層が戻ってくる。
+        # 崩れ、書いていない範囲にまでルールが当たる。
         self.assertTrue(self.hit("git push", "git push"))
         self.assertFalse(self.hit("git push", "cd /repo && git push"))
         self.assertTrue(self.hit("*git push*", "cd /repo && git push"))

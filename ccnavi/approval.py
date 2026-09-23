@@ -19,8 +19,8 @@
 
 ## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
 
-承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。写しを置いて
-提案を残す形はやめた。エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
+承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。
+エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
 （レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、人がレビューを済ませると
 `review/` から `done/` へ動く。人が動かす向きは `.ccnavi/approved/` へ、エージェントが
 動かす向きは `wip/proposals/` へ。
@@ -54,8 +54,6 @@ from . import ticket as ticket_mod
 DOING_DIR = ticket_mod.DOING
 DONE_DIR = ticket_mod.DONE
 PHASES_DIR = "phases"
-# 旧の置き場（ADR-0055 まで）。開いたものは直下、閉じたものはここ。`--lint` だけが見る。
-LEGACY_CLOSED_DIR = "closed"
 
 # フェーズのマーカーの種類。
 MARK_REQUESTED = "requested"
@@ -649,8 +647,8 @@ def now() -> str:
 class Candidate:
     """承認の対象の 1 件。新規の提案か、親の改版か。
 
-    リスクの点はここに無い。宣言の広さで数える点はやめた。点は子を閉じるときに
-    実績（差分）で数える（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
+    リスクの点はここに無い。点は子を閉じるときに実績（差分）で数え、宣言の広さでは
+    数えない（risk.py）。宣言の広さは、親が `human_review.reason` で言う。
     """
 
     ticket: ticket_mod.Ticket
@@ -2105,8 +2103,8 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
 
     **親を引く池は `kept` そのもの**（`by_id`）で、判定が `parent` を引く索引と同じ。
     別の池で引くと、ここでは親が見つかって印が付かないのに、判定の側では見つからず
-    `parent=None` のまま子の宣言だけで範囲が決まる。閉じた親やレビュー待ちの親まで
-    引ける池にしたときに実際にそうなった。親の範囲で切り詰められないのに通る形は、
+    `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
+    引ける池にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
     承認していない範囲に書ける道そのものなので、引けないなら止める側へ倒す。
 
     親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が

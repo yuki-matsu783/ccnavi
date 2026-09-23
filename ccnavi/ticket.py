@@ -101,8 +101,6 @@ CLOSED = (DONE, CANCELLED)
 FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
 GUARDED_STATES = (REVIEW,)
-# 旧の置き場の状態（ADR-0054 まで）。`--lint` が残りを名指しするときにだけ使う。
-LEGACY_STATES = ("todo", "doing", "done", "cancelled")
 
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
@@ -1032,8 +1030,8 @@ def propose_notice(
     書いた直後に、要る場所で言う。
 
     **判定には足さない。** これは文であって判定ではないので、ルールの表（`rule_set`）には
-    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形も
-    試したが、次の 3 つを一緒に引き受けることになるのでやめた。
+    入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形は
+    採らない。次の 3 つを一緒に引き受けることになるため。
 
     - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの倒し方
       （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、

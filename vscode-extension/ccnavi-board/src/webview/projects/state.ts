@@ -2,7 +2,6 @@
  * 画面が覚えておくもの。clone の欄に打ちかけた URL と名前、名前を人が触ったか。
  *
  * 置き場は Webview の state で、拡張が HTML を作り直しても（裏に回って作り直されても）残る。
- * 形は React にする前と同じにしてある。入れ替えたときに、打ちかけの URL が消えないように。
  */
 import { getState, setState } from "../vscode.js";
 

@@ -1,6 +1,6 @@
 # 引き継ぎ
 
-2026-09-12 時点の現状と次の一手。次に入る人が最初に読む想定。
+現状と次の一手。次に入る人が最初に読む想定。
 判断の理由と経緯はここには書かず、[docs/adr/](docs/adr/README.md) に 1 枚ずつ置いてある。
 
 ## この道具は何か
@@ -25,14 +25,12 @@ Claude Code の hook から呼ばれ、危ないツール呼び出しを止め�
 
 ## いま動くもの
 
-**チケットは 2 つの置き場を行き来する 1 本のファイル（ADR-0055、2026-09-16）。** 提案の
+**チケットは 2 つの置き場を行き来する 1 本のファイル（ADR-0055）。** 提案の
 `wip/proposals/todo/` → 承認で `.ccnavi/approved/doing/` → `ticket done` で `wip/proposals/review/`
 （レビュー要）か `.ccnavi/approved/done/`（不要）→ 人のレビュー（`check` / `accept` / `--reviewed --chat` /
 `wrapup`）で `.ccnavi/approved/done/`。写しは無い。`.ccnavi/approved/` へ動かすのは人、
 `wip/proposals/` へ動かすのはエージェント。`accept` は「受け入れて進む」か「続きの子を
-`doing/` に直に起こす」かを人に選ばせる。以前の置き場（`.ccnavi/tickets/`、`wip/proposals/{doing,done,cancelled}/`）の
-残りは `--lint` が名指しする。既存のワークスペースは `.ccnavi/tickets` を `.ccnavi/approved` に
-（`closed/` は `done/` に）`git mv` すれば続きができる。
+`doing/` に直に起こす」かを人に選ばせる。
 
 hook の 7 イベント（`SessionStart` `UserPromptSubmit` `PreToolUse` `PostToolUse` `Stop`
 `SubagentStart` `SubagentStop`）の全部。実行前のルール照合、実行後の監視、コアファイルの
@@ -46,7 +44,7 @@ VS Code 拡張（ボード・ルール設定・リスク管理・プロジェク
 `projects/<名前>/.ccnavi/config/` の 3 種（`.ccnavi` は `CCNAVI_PROJECT_HOME` の既定値）。
 
 **共通層の置き場は固定（ADR-0052）。** `.ccnavi/common/{rules,phases,risks}.yml` から動かせない。
-`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` は廃止した。診断のために別の場所を指すのは
+`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK` は効かない。診断のために別の場所を指すのは
 `--rules` / `--phases` / `--risk` のフラグだけで、hook は引数を渡さずに起動する。
 
 **設定と記録の置き場（ADR-0042）。** 共通層の 3 本と見本 `rule-samples.yml` は `.ccnavi/common/`、
@@ -67,7 +65,7 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
 - 端末から打つ `--approve` は、承認の対象の一部が落ちたら 1 で終わる。拡張が打つ `--approve --yes` は変えていない
 
 コアファイル（selfguard）は、hook の登録と実行ファイルに加えて、共通層の 3 本、自身の層の 3 本、各プロジェクトの層の 3 本、
-それらのワークツリー側の設定（元リポジトリ基準で列挙）まで広がった。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
+それらのワークツリー側の設定（元リポジトリ基準で列挙）を含む。ccnavi ディレクトリ（`.ccnavi/`）の下は組み込みの deny
 （`builtin-guard-project-home`）で名指しのツールから、`builtin-guard-setting-files` でシェルから止める。シェルの綴りは
 `rm -rf .ccnavi` のように ccnavi ディレクトリごと消す形も止める。`.ccnavi/scripts/` はコアに入れず、この deny と `CCNAVI_RESTORE_IF_DENY` に任せる。
 共通層も ccnavi ディレクトリの下にあるので、見本を含めて名指しのツールから止まる。シェルからは `logs/log.jsonl` と `logs/state` も止める
@@ -75,7 +73,7 @@ Claude Code 自身のもの（settings.json・hooks・skills・worktrees）だ�
 
 層が無いことを `--lint` が言うか（消す・古いコミットへ `checkout` するとプロジェクトの deny が痕跡なく消える件）は別の issue で決める。
 
-**VS Code 拡張はルールとフェーズの種類で層に追従した。** ルール設定画面とフェーズ管理画面は `--explain --json` の `layers[]` から置き場を取る。
+**VS Code 拡張はルールとフェーズの種類で層に追従する。** ルール設定画面とフェーズ管理画面は `--explain --json` の `layers[]` から置き場を取る。
 自身の層とプロジェクトの層はプロジェクト管理画面から開く。
 フェーズの種類は実行ファイルの `--project-phases-file <名前>=<パス>`（診断だけ）で共通層と合成して検証してから保存する。リスク管理画面は今も共通層の 1 本だけを開く（設計 §11.11）。
 
@@ -144,35 +142,18 @@ uv run --with pyinstaller python build.py
   記憶の対象外（ADR-0009）
 - 確認の記憶の事後無効化（REQ-PST-04）。無効にする記憶がまだ無い。REQ-PRE-07 と対
 - セッション開始時の提示（REQ-SES）。REQ-SES-02 / -03（却下された要求と想定範囲外の
-  許可の区別）はチケットが入ったので書ける形になったが、まだ書いていない
+  許可の区別）はチケットがあるので書ける形だが、まだ書いていない
 - 診断コマンド（REQ-DIA）のうち、記憶の消去（REQ-DIA-05）
 - 期限（REQ-CMN-08）はループの中で見ているだけで、実測していない
 - 並行するチケット（REQ-TKT）のうち、GitHub の実物に対する `request` と `check` は
-  実測していない。GitLab は実物（CE 18.5）で 1 周した（下の「落とし穴」）。
+  実測していない。GitLab は実物（CE 18.5）で 1 周を確かめてある（下の「落とし穴」）。
   自動テストは sh の代わりに写し（`--result`）を渡す形で通す
-- REQ-MLT-14 の後半（記録を `logs/<プロジェクト>/` へ寄せる）は `sh-ws-root` で入った。
-  要求表への反映だけが未了（下の「未了: 要求表と設計書への反映」）
 - REQ-TKT-35 の後半。`SubagentStart` は親の局面（作業中・レビュー待ちなど）を名指ししない。
   フェーズの番号と種類までは渡す。名指しするのは `--explain` とボードだけ
 
 ## 次にやること
 
-### 入った: sh がモード B で動くようになった（`sh-ws-root`）
-
-**配布先に入っている。** 写す作業は済んだ。`.ccnavi/scripts/`（`ccnavi-common.sh` を
-新設）、`.claude/hooks/test-py.sh`、`.ccnavi/common/rules.yml`、`scripts/ccnavi-setup.sh`。
-
-**次に同じ形の作業をする人へ。** これらは `deny` の対象でエージェントが書けない
-（`judge.py:246-247`「チケットはルールが何も言わなかったときだけ見る。ルールのほうが
-強い」）。ガードは緩めない。完成品を `wip/design/scripts/` に全文で置き、人が写し、
-人がコミットする形で通した。手順書（`COPY.md`）も同じ場所に置いた。フェーズの種類は
-`staging`（写す版の作成）を使う。写す順は `ccnavi-common.sh` が先。3 本が起動時に
-`.` で読むので、本体だけ先に写すと sh が全部動かなくなる。
-
-この一式は `wip/` ごとマージ前に消してある（`ready` が「途中の作業を既定のブランチに
-残さない」を求めるため）。中身は git の履歴に残っている。
-
-確かめ方。
+### 配布する sh を確かめる
 
 ```
 uv run python -m unittest tests.e2e.test_e2e_sh -v
@@ -188,95 +169,47 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 写す前の版を測りたいときは `CCNAVI_SH_DIR=<場所>` で出どころを差し替える。
 
 `tests/e2e/test_e2e_sh.py` は実 git と実行ファイルの写しを使うが、20 件が 8 秒ほどで終わるので
-既定で走る（以前は `CCNAVI_E2E` が無ければ skip していた）。組み立て済みの実行ファイルが無ければ
+既定で走る。組み立て済みの実行ファイルが無ければ
 skip する。試すのは組み立て済みの実行ファイルなので、`ccnavi/` を直したら組み立て直してから回す。
 **モード B（`projects/` を使う形）に触ったら回すこと。**
 
-写す版で直したもの。
+### 未了: Python 側の 4 件
 
-- **保護済み sh 3 本が、自分の根を git に聞いていた**（`--show-toplevel` /
-  `--git-common-dir`）。モード A では git のトップとワークスペースルートが一致するので
-  露見しなかったが、モード B では一致しない。結果、`ccnavi-ticket.sh` と
-  `ccnavi-review.sh` がプロジェクトの中で動かず、後者はプロジェクトに `.claude/` を
-  作って失敗し、子チケットの push ガードが黙って効かなくなり、記録が
-  `projects/<名前>/logs/` に出ていた
-- 根の探し方を `ccnavi-common.sh`（新設）に切り出した。`cwd` から上へ歩いて
-  `.ccnavi/scripts/` を持つディレクトリを探す。**`.claude/worktrees/` の下は候補から
-  外す。** `.ccnavi/scripts/` は git が運ぶのでどのワークツリーにも写しがあるが、
-  承認済みチケットと `state/` は追跡外で運ばれない。根は運ばれないほうに合わせる
-- `worktree add` の行き先を検査するようにした。ワークスペースの `.claude/worktrees/` の
-  外なら止め、`cwd` に合わせた正しい綴りを文面に出す。知らないオプションも止める
-- `origin` の伏せ字を `ccnavi_mask_url` に集約し、生の URL を文面に入れる綴りを
-  1 つも残していない（下に挙げた資格情報の漏れ 2 件はこれで塞がった）
-- `test-py.sh` の存在チェックを `[ -d "$target/tests" ]` にした
-- `rules.yml` の拒否の文面 3 か所を `{root}/.ccnavi/scripts/...` にした
-- `ccnavi-setup.sh` の配布と点検の一覧に `ccnavi-common.sh` を足した
+1. **空白を含むパスへの `>` の書き込みが、シェルの守りに当たらない。** シェルの読みは引用の中の
+   空白を語の中の目印（`\x01`）にするが、リダイレクトの行き先を拾う形（`selfguard._WRITE_VERBS` の
+   `>[>|&]* ?[^ \x00\x01]*`）がその目印で止まり、空白より後ろの `.ccnavi/...` まで届かない。
+   `echo x > "projects/has space/.ccnavi/config/rules.yml"` は `builtin-guard-setting-files` に当たらず、
+   ルールが何も言わなければ ask に落ちる。`tee` `cp` `mv` と、`cd` してからの相対の `>` は止まる。
+   名指しのツール（Write / Edit）は `builtin-guard-project-home` が止める。プロジェクト名に限らず、
+   ワークスペースルートの絶対パスに空白があれば、その絶対パスで書いた `>` も同じ形で読まれる
+2. **`--lint` が、まだリポジトリの無い `projects/` の無視を確かめない。** `lint._projects` は
+   `tree.projects()`（`.git` を持つディレクトリだけを数える）が空なら先に返るので、
+   `projects/` が在ってもワークスペースの git で無視されていないことを言わない。clone する前が
+   一番確かめたい時点
+3. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと、`tree.owner_of` の相互参照が
+   切れて列挙から静かに外れ、その中のパスがワークスペースルートとして判定される。プロジェクトの
+   `deny` が外れ、ワークスペース向けの `allow` が孤児の中で効く。判定は変えず、`--lint` と
+   `--explain` が名指しする方針で決まっているが、どちらもまだ言わない
+4. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い
+   `.ccnavi/scripts/` の綴りがある」を warn で言うようにする。いまは何も言わない
 
-### 未了: 要求表と設計書への反映
-
-`ccnavi.md` §11（旧 §25）と `requirements.md` の REQ-MLT 表に、上の振る舞いを**書いていない**。
-進行中の `config-union` が §11 を構造ごと改版するため、先に足すと解き直しになる。
-**実装が入っているのに要求表に無い期間ができている。** `config-union` が統合先に
-入ったら足すこと。
-
-`wip/design/sh-ws-root.md` の 2 節も、根の決め方を「最初に当たったもの」と書いたまま。
-実装は「`.claude/worktrees/` の下を外して最初に当たったもの」。上の説明が正。
-
-### 未了: Python 側の 6 件（`config-union` の後）
-
-2026-09-12 の監査で見つけたもの。`config-union` が同じ場所を作り直すので、それが
-統合先に入ってから出す。
-
-1. **識別子の接頭辞が消える。** `Record` を全ツリーで使い回すため、壊れたルールを持つ
-   プロジェクトが 1 つあると、それ以降のツリーが「組み込み」扱いになり `zzz:own` が
-   `own` になる（`ruleload.py:37`、`events.py:116`）。REQ-MLT-07 が壊れている
-2. **プロジェクト名に空白が入ると自己防衛が抜ける。** `selfguard.py:222` の
-   `[^\\/ \x00]+` が空白を除いているため、`projects/has space/.ccnavi/config/rules.yml` への
-   Write もシェル書き込みも止まらない。同じ欠陥が `ticket.py:712` の `wip/<名前>/` にも
-   ある。**エージェントが自分のルールを緩められる穴**
-3. **プロジェクトから切ったワークツリーの控えが作られない。** `selfguard.py:452` が
-   `tree.worktrees(root)` を `projects_dir` 無しで呼ぶため空を返す
-4. **`--lint` の早期 return。** `lint.py:484-486` が、`projects/` があってもリポジトリが
-   無ければ返るので、`.gitignore` の確認が行われない。clone する前が一番確かめたい時点
-5. **孤児のワークツリー。** 元リポジトリであるプロジェクトを消すと、相互参照が切れて列挙から静かに
-   外れ、その中のパスがワークスペースルートとして判定される（`tree.py:133-159`）。
-   ワークスペース向けの `allow` が孤児の中で効く。判定は変えず、`--lint` と `--explain` が
-   名指しする方針で決まっている
-6. **`message` の `{root}`。** `--lint` が「`message` に `{root}` の無い
-   `.ccnavi/scripts/` の綴りがある」を warn で言うようにする
-
-### 伝えること: `config-union` に残る見込みの穴
-
-上の 2 は `config-union` の範囲と重なるが、**あちらの計画には入っていない。**
-置き場を `projects/<名前>/.ccnavi/config/` に移しても、名前の区画の正規表現は同じなので
-穴がそのまま移植される。再現は次のとおり。
-
-```
-projects/has space/ を作り、.ccnavi/config/rules.yml への
-Write が deny にならないことを見る
-```
-
-### ccnavi 自身の設計の穴（2026-09-12 の作業で踏んだもの）
-
-どれも回避して進めたが、次に同じことをする人も同じ場所で止まる。
+### ccnavi 自身の設計の穴
 
 1. **保護済みファイルを直すチケットが行き止まりに入る。** 直す対象（`.ccnavi/scripts/`、
    `.claude/hooks/`、`rules.yml`）は `deny` なのでエージェントは書けない。完成品を
    `wip/design/scripts/` に置いて人が写す形にしたが、`implement` の種類の `scope` に
    `wip/design/*` が無く、承認が拒まれる。親の `allow` は改版で変えられない
    （変えられるのは `plan` と `feedback` だけ）。改版は同じ識別子の提案を `todo/` に書いて
-   承認を受ける（ADR-0055 で、着手後も `todo/` は書けるようになった）。
-   今回は `phases.yml` に `staging`（写す版の作成、`scope: [wip/design/*, tests/*]`）を
-   足して回避した。**`phases.yml` は人が持つ設定なので、エージェントは足せない。**
-   同じ形の作業が来たら、この種類を使うこと
+   承認を受ける（着手後も `todo/` は書ける）。
+   逃げ道は `phases.yml` の `staging`（写す版の作成、`scope: [wip/design/*, tests/*]`）で、
+   完成品を `wip/design/scripts/` に全文で置き、人が写してコミットする。写す順は
+   `ccnavi-common.sh` が先（3 本が起動時に `.` で読むので、本体だけ先に写すと sh が全部動かなくなる）。
+   **`phases.yml` は人が持つ設定なので、エージェントは足せない。**
 2. **シェルでフィクスチャを組み立てると `builtin-guard-setting-files` が反応する。**
    コマンドの文字列に `.ccnavi` が含まれるだけで当たるので、一時ディレクトリに
    検証用のワークスペースを作る `cp` も止まる。受入テストは Python の中で写すので
    通るが、手で確かめるときに踏む
 ### 未了: `ccnavi-review.sh` の usage が実際の挙動と違う（人が直す）
-
-敵対的レビューで見つかった 3 件のうち、資格情報の漏れ 2 件（`fail` が生の URL を出す、
-伏せ字が最初の `@` までしか消さない）は `sh-ws-root` で直した。残る 1 件。
 
 usage の `check` の説明が「依頼より後の未解決スレッドが無ければ」のままで、いまの挙動
 （時刻で絞らず未解決の全部を数える。ADR-0031）と違う。冒頭の一覧にも `handoff` `ready`
@@ -287,7 +220,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 - プロジェクトの数に対する `ms`。プロジェクト 5 本で期限の半分を超えるなら、ルールの読み込みに
   mtime の控えを足す
-- **Windows の `gitdir:` の綴りは実測済み**（2026-09-12、git 2.39.2、Git Bash と PowerShell）。
+- **Windows の `gitdir:` の綴り**（git 2.39.2、Git Bash と PowerShell で実測）。
   絶対パス、区切りは `/` のみ、ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
   呼び出し側のシェルや引数の区切りに依存しない。`ccnavi_project`（sh）と `tree.py` が
   この綴りを前提にしている
@@ -316,8 +249,6 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 
 **状態遷移（設計 §9.6）で、いまの挙動として書いてあるが、それでよいかを決めていないもの。**
 
-- （ADR-0055 で解消）`ticket start` / `done` は `doing/` の承認済みチケットにしか効かない。未承認の提案は
-  `todo/` から動かない。`--approve` の対象は `todo/` だけ
 - 人が子を再開しても、そのフェーズの `reviewed` は残る。再び `done` にしても止まらず、
   告知も出ない。再開の手順に「マーカーも消す」を入れるか、承認済みチケットを戻したときに機構が消すかは決めていない
 
@@ -349,7 +280,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 そのまま探すからで、記法を替えても消えていない。knowledge の同じ文書がグローバルオプションの
 飛ばし方を書いている。
 
-### 未了: `ticket-rule-merge` の作業で見つかった別件
+### 未了: 別件
 
 - `--lint`（`lint._worktree_layers`）が、ワークツリーにある承認済みチケットとマーカーを「統合されるまで効かない」と warn で言う。
   承認済みチケットは `approval.scan` が全部のツリーから読むので効いている。承認済みチケットの置き場をこの点検から外す
@@ -358,22 +289,17 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
 - 提案と承認済みチケットの書き込みが原子的でない。書いている途中で機械が落ちると、中身が NUL で埋まる
 - Windows で `tests.guard.test_fallback`（動かした置き場へのシェルの書き込み）が 1 件落ちる。テストが絶対パスを引用せずに
   コマンドへ埋め込んでおり、bash は `\` をエスケープとして落とすので、そのコマンドは設定ファイルに書かない。
-  ガードの判定は正しく、テストの綴りを直す（`tests.config.test_config_union_guard` の同種の 1 件は、ADR-0052 で
-  既定の置き場を見るテストに差し替えたので絶対パスを使わなくなった）
-- シェルの守りは `cd` でディレクトリへ入ってからの書き込みに当たらない（issue #61）。この穴は `.claude/settings.json` と
-  `.claude/hooks/` にも及ぶ。実行後の監視は拾うので素通りではないが、実行前の門は綴りで避けられる
+  ガードの判定は正しく、テストの綴りを直す
 
 ## 実測で分かった落とし穴
 
 次のセッションで同じところを踏まないように。Claude Code の振る舞いについて測った前提は
-設計書の付録 C が一覧で持っている。ここはそれに、踏んだときに何が起きたかと逃げ方を足したもの。
+設計書の付録 C が一覧で持っている。ここはそれに、踏むと何が起きるかと逃げ方を足したもの。
 測り直したときは両方を直す。
 
 - **ワークツリーが消せない（Windows）。`git worktree remove` が `Permission denied` で落ち、
   `.venv` の 1 ファイルだけが入ったディレクトリが残る。** 原因は uv のハードリンクと Windows の
   削除規則の組み合わせで、消そうとしているワークツリーで**何も走っていなくても**起きる。
-  2026-09-11 に隔離した場所で再現させて確かめた（`fsutil hardlink list` と、掴む側 /
-  消す側を分けた実験）。
   1. uv は wheel の中身をキャッシュから venv へハードリンクで置く。実体は 1 つで、
      `_yaml.cp312-win_amd64.pyd` はワークスペースルート・全ワークツリー・uv のキャッシュで同じファイル
      （このプロジェクトで C 拡張を持つ依存は PyYAML だけなので、当たるのはこの 1 本）
@@ -382,10 +308,9 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   3. 並行するセッションはターンの終わりに `test-py.sh` で数分テストを走らせ、
      そこで PyYAML を読み込む。ワークツリーが数本あると、ほぼ常に誰かが掴んでいる
   4. 掴まれている間に別のワークツリーを消そうとすると、その 1 ファイルだけが残る
-  対処は入れた（`pyproject.toml` の `[tool.uv] link-mode = "copy"`。複製にすれば実体が
-  分かれる）。ただし**既にある `.venv` はハードリンクのまま**なので、効くのは次に作る
-  ぶんから。いま在るものを切り替えるなら、テストが走っていないときに各ワークツリーの
-  `.venv` を消して作り直す。
+  `pyproject.toml` の `[tool.uv] link-mode = "copy"` で複製にしてあり、実体は分かれる。
+  ただし**ハードリンクで作った `.venv` はそのまま**なので、切り替えるならテストが
+  走っていないときに各ワークツリーの `.venv` を消して作り直す。
   それでも「自分のテストが走っている間に自分のワークツリーを消せない」は残る。落ちたら、
   掴みが離れるのを待つか、残ったディレクトリを `mv` で `.claude/worktrees/` の外へ出して
   `git worktree prune` する（rename は通るので、これは必ず成功する）。
@@ -410,7 +335,7 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   書いた `main.py` を root に置いて、それを渡している
 - **`shlex` は二重引用の中を 1 語として返し、語の途中の `#` からもコメントにし、改行を空白として読む。**
   そのままでは `grep -n "$(git push)" f` の中身、`a#b; cmd` の後ろ、2 行目のコマンドが読みに入らず、
-  allow が後ろまで通していた。だから `shellread.py` は shlex の前に原文を走査し（`_Scanner`）、
+  allow が後ろまで通してしまう。だから `shellread.py` は shlex の前に原文を走査し（`_Scanner`）、
   置換の中身・ヒアドキュメントの本文・コメント・改行を先に片付けてから、語の分割だけを shlex に任せる。
   引用の規則を走査と shlex の 2 か所で持つので、どちらかに手を入れたら `tests/core/test_shellread.py` の
   `SHELL_CASES`（bash 3.2 と zsh で実測した 65 形）を回す
@@ -439,18 +364,18 @@ usage の `check` の説明が「依頼より後の未解決スレッドが無�
   JSON を作る。** 本文はファイルで渡すこと。`jq` の実体は `C:\Program Files\jq\jq` で、
   パスに空白がある。`"$JQ"` と引用しないと割れる（本番の sh は全部引用済み）
 - **Docker Desktop を起動すると、`restart=unless-stopped` の GitLab が勝手に上がる。** 2GB の VM に
-  収まらず engine ごと落ち、`docker exec` も `docker ps` も 500 を返すようになった。GitLab CE には
-  4GB 要る。VM を 4GB にして `tools/gitlab/probe_gitlab.py` で 1 周した
+  収まらず engine ごと落ち、`docker exec` も `docker ps` も 500 を返す。GitLab CE には
+  4GB 要る（VM を 4GB にすれば `tools/gitlab/probe_gitlab.py` が 1 周する）
 
 GitLab の実物（CE 18.5.4）で分かったこと。
 
 | 分かったこと | どうしたか |
 |---|---|
 | 変更要求（`POST .../request_changes`）は CE の `lib/api` に無い。EE 限定 | 当てられない。sh の `requested_changes` の読みは EE の文書どおりのまま。CE では `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
-| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）で host にトークンが混ざり、`origin` の出力にそのまま出た | sh は利用者の情報を落とし、出力で伏せる。実行ファイルの `remote_kind` も読み飛ばす。`tests/core/test_review_origin.py` |
+| URL にトークンを埋めた origin（`http://oauth2:<token>@localhost:8929/...`）は host にトークンが混ざり、そのままでは `origin` の出力に出る | sh は利用者の情報を落とし、出力で伏せる。実行ファイルの `remote_kind` も読み飛ばす。`tests/core/test_review_origin.py` |
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を落とす（設定の注入を塞ぐため）ので、環境変数で credential helper を差し替えても効かず、`GIT_TERMINAL_PROMPT=0` で即失敗する | 認証は git の設定側に置く。probe はリポジトリの `credential.helper` を空文字で一度リセットしてから、トークンを返す helper を足す。実運用なら Git Credential Manager に保存しておく |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流し込んで作れる（`tools/gitlab/make_gitlab_tokens.rb`）。ブラウザも初期パスワードも要らない | GitLab 18 は組織（organization）とパスワードの強度を求める。root と reviewer の 2 人分を作る |
-| 起動直後は API の `PUT` が 30 秒を超えることがあった | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
+| 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ。sh の curl は無期限 |
 | 未解決の一覧で、位置の無いスレッドが ` :0 ` と出る | 直していない。読めるので後回し |
 
 ## セッション中に自分自身へ仕掛けたもの
@@ -467,7 +392,7 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 スクリプトだが、リポジトリの `settings.json` には登録していない。回すなら利用者ごとの
 `settings.local.json` で `Stop` に足す（ADR-0036）。
 
-拡張のぶんも同じ形で 2 本ある（ADR-0061、2026-09-20。issue #89）。`PostToolUse` の
+拡張のぶんも同じ形で 2 本ある（ADR-0061）。`PostToolUse` の
 `mark-ext.sh` が拡張のファイルを触ったことを `<セッション>.ext-files` に書き残し、`Stop` の
 `test-ext.sh` が関わるグループだけを回す（`vscode-extension/ccnavi-board/scripts/test-groups.js`
 がテストの `import` を辿って決める）。どちらも `settings.json` には登録していない。回すなら
@@ -475,8 +400,8 @@ GitLab の実物（CE 18.5.4）で分かったこと。
 回らない。** 拡張を触っていないターンは何もしないので伸びない。触ったターンで 3〜8 秒
 （全部で 9.5〜11.5 秒）。
 
-**これで気づけるのは「同じ機械で 1 回回して落ちること」だけ。** issue #89 が挙げた中心の懸念
-（混み具合で結果が変わる失敗）には効かない。そこに効くのは CI（道 1）か、同じテストを繰り返す
+**これで気づけるのは「同じ機械で 1 回回して落ちること」だけ。** 混み具合で結果が変わる失敗には
+効かない。そこに効くのは CI（道 1）か、同じテストを繰り返す
 枝で、どちらも入れていない。ADR-0061 の「得たもの・失ったもの」に書いてある。
 
 検査もテストも、通らないと exit 2 で差し戻される。うるさければ hooks から外す。

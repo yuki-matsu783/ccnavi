@@ -6,8 +6,8 @@
  * id は人が打つもので、空にも重複にもなるので鍵には使えない。鍵は画面の中だけのもので、
  * 拡張ホストへ渡すのは、ファイルを選ぶとき（`pickFile` → `picked`）に行を名指しするときだけ。
  *
- * 控えは Webview の state（`{ open: [id, …], tab }`）。移行前と同じ形にしてある。
- * **控えるのは id** で、鍵は画面を作り直すと変わるため。id が空の行は控えられない（移行前と同じ）。
+ * 控えは Webview の state（`{ open: [id, …], tab }`）。
+ * **控えるのは id** で、鍵は画面を作り直すと変わるため。id が空の行は控えられない。
  */
 import { SECTIONS, type RuleForm, type Section, type Sections } from "../../core/rules-view.js";
 import { getState, setState } from "../vscode.js";
@@ -22,7 +22,7 @@ export type Draft = Readonly<Record<Section, readonly Row[]>>;
 
 export const EMPTY_DRAFT: Draft = { deny: [], ask: [], allow: [] };
 
-/** 鍵を配る。1 枚の画面の中で数え上げる（`r1`、`r2`、…。移行前の綴りと同じ） */
+/** 鍵を配る。1 枚の画面の中で数え上げる（`r1`、`r2`、…） */
 export function keyer(): () => string {
   let seq = 0;
   return () => {

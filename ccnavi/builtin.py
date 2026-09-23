@@ -85,10 +85,9 @@ def _config_via_bash(regex: str) -> dict:
     return {
         "id": "builtin-guard-config-via-bash",
         "match": "Bash",
-        # 当てる形は selfguard と同じものを使う。以前はここに書き写しがあり、
-        # 「片方を直したらもう片方も」という注意書きが付いていた。既定が弱い
-        # ほうへずれると、ルールファイルを壊すことがそのまま緩めることになる。
-        # 注意書きで守るのをやめて、1 か所から取る。
+        # 当てる形は selfguard と同じものを 1 か所から取る（`guard_shell_regex`）。
+        # 書き写すと既定が弱いほうへずれ、ルールファイルを壊すことが
+        # そのまま緩めることになる。
         "regex": regex,
         "message": (
             "ccnavi is running on its built-in defaults because its rule file "

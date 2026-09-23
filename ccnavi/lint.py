@@ -453,7 +453,6 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
         )
         return problems
     root = root or os.getcwd()
-    problems.extend(_legacy_tickets(conf, root))
     if not _any_copies(conf, root) and not tree_has_tickets(root, conf.tickets):
         # 承認済みチケットも提案も無い状態は不備ではない。チケットによる制御は任意で、
         # 使っていないプロジェクトにここで苦情を返すと、その 1 行が常態になって
@@ -560,9 +559,9 @@ def _approval_problems(
 ) -> list[Problem]:
     """承認で落ちるものを、承認の前に名指しする。人が端末で初めて知るより早く。
 
-    **承認と同じ関数を通す**（`approval.candidates`）。以前はここだけが `approval.validate`
-    を当てていて、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・`project:`
-    の食い違い・改版の検査を見ていなかった。同じ事実を数える経路が 2 本あると、片方が
+    **承認と同じ関数を通す**（`approval.candidates`）。ここだけ `approval.validate` を
+    当てる形にすると、順序で落ちる子（前のフェーズが閉じていない）・計画に無い番号・
+    `project:` の食い違い・改版の検査が抜ける。同じ事実を数える経路が 2 本あると、片方が
     黙って弱くなる。`--approve --preview --verify` と同じ答えをここでも言う。
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
@@ -1124,105 +1123,6 @@ def _ticket_hooks(root: str) -> list[Problem]:
                 )
             )
     return problems
-
-
-def _legacy_tickets(conf: settings.Settings, root: str) -> list[Problem]:
-    """旧の置き場に取り残されたチケットを名指しする（ADR-0054、ADR-0055）。
-
-    旧の置き場は 3 つ。提案の `wip/tickets/`（ADR-0054 まで）、承認済みチケットの
-    `.ccnavi/tickets/`（直下と `closed/`。ADR-0055 まで）、いまの提案の置き場の
-    `doing/` `done/` `cancelled/`（ADR-0055 まで）。どれも走査されないので、残っていると
-    「承認待ちは無い」「開いているチケットは無い」で通る。黙って通る向きなので、ここで言う。
-
-    見るのは置き場の有無ではなく、**中に残っているチケット**。置き場の有無だけで決めると、
-    新しい置き場を 1 つ作った時点で、旧の置き場に残ったものが永久に見えなくなる
-    （移し忘れがいちばん起きるのはこの形）。
-
-    数えないのは、同じ識別子がいまの置き場のどこか（`todo/` `review/` `doing/` `done/`）に
-    在るもの。写し終えた分か、閉じたことの記録として残っているだけの分で、害が無い。
-
-    綴りを設定で決めた人には、その置き場の旧の綴りは言わない。自分の綴りで動かしている
-    ので、既定の話は関係が無い。
-    """
-    known = {t.ticket for t in approval._everything(conf, root)}
-    proposals, _ = ticket_mod.scan_all(root, conf.tickets, conf.projects)
-    known |= {t.ticket for t in proposals}
-    problems: list[Problem] = []
-    if conf.tickets == settings.DEFAULT_TICKETS:
-        stale = _stale_by_tree(conf, root, settings.LEGACY_TICKETS, ticket_mod.LEGACY_STATES, known)
-        if stale:
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    "(ticket)",
-                    f"提案の置き場の既定が `{settings.LEGACY_TICKETS}` から "
-                    f"`{settings.DEFAULT_TICKETS}` に変わった。"
-                    f"旧の置き場に残っていて走査されないチケットがある: {'、'.join(stale)}。"
-                    f"承認待ちなら `{settings.DEFAULT_TICKETS}/todo/` へ移し、済んだものは消す"
-                    f"（`{settings.TICKETS_ENV}={settings.LEGACY_TICKETS}` を "
-                    "`.claude/settings.json` の env に足せば旧の綴りのまま動くが、"
-                    "状態の置き場は今の形（todo / review）で読む）",
-                )
-            )
-    old_states = tuple(s for s in ticket_mod.LEGACY_STATES if s not in ticket_mod.STATES)
-    stale = _stale_by_tree(conf, root, conf.tickets, old_states, known)
-    if stale:
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                "(ticket)",
-                f"提案の置き場の状態は `todo` と `review` の 2 つになった（ADR-0055）。"
-                f"旧の状態の置き場（{' / '.join(old_states)}）に残っていて走査されないチケットが"
-                f"ある: {'、'.join(stale)}。閉じたものは消し、途中のものは人が承認済みチケットの"
-                f"置き場（{conf.approved}/doing/）へ戻す",
-            )
-        )
-    if conf.approved == settings.DEFAULT_APPROVED:
-        stale = _stale_by_tree(
-            conf, root, settings.LEGACY_APPROVED, ("", approval.LEGACY_CLOSED_DIR), known
-        )
-        if stale:
-            problems.append(
-                Problem(
-                    SEVERITY_WARN,
-                    "(ticket)",
-                    f"承認済みチケットの置き場の既定が `{settings.LEGACY_APPROVED}` から "
-                    f"`{settings.DEFAULT_APPROVED}` に変わった（ADR-0055）。"
-                    f"旧の置き場に残っていて読まれない承認済みチケットがある: {'、'.join(stale)}。"
-                    f"開いていたものは `{settings.DEFAULT_APPROVED}/doing/` へ、閉じたものは "
-                    f"`{settings.DEFAULT_APPROVED}/done/` へ、`phases/` はそのまま "
-                    f"`{settings.DEFAULT_APPROVED}/phases/` へ移す（git mv）",
-                )
-            )
-    return problems
-
-
-def _stale_by_tree(
-    conf: settings.Settings, root: str, place_rel: str, states: tuple, known: set[str]
-) -> list[str]:
-    """ツリーごとに、旧の置き場に在っていまの置き場から見えない識別子を並べる。"""
-    stale = []
-    for t in approval.trees(conf, root):
-        left = _left_behind(t.root, place_rel, states, known)
-        if left:
-            stale.append(f"{t.name or '(ワークスペースルート)'}（{', '.join(left)}）")
-    return stale
-
-
-def _left_behind(tree_root: str, place_rel: str, states: tuple, known: set[str]) -> list[str]:
-    """このツリーの旧の置き場に在って、いまの置き場から見えないチケットの識別子。"""
-    old = os.path.join(tree_root, place_rel.replace("/", os.sep))
-    found = []
-    for state in states:
-        try:
-            names = sorted(os.listdir(os.path.join(old, state) if state else old))
-        except OSError:
-            continue
-        for name in names:
-            if not name.endswith(".md") or name[:-3] in known:
-                continue
-            found.append(name[:-3])
-    return sorted(set(found))
 
 
 def tree_has_tickets(root: str, tickets_rel: str) -> bool:
