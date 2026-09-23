@@ -633,7 +633,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         if where:
             stdout.write(f"  {parent.ticket} の局面: {where}\n")
         where = approval.home_dir(conf, root, parent.ticket, "")
-        wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP)
+        wrapped = approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY)
         if wrapped:
             stdout.write(f"  {parent.ticket} は利用者が締めた: {wrapped.get('reason', '')}\n")
         if approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY):
@@ -1002,7 +1002,9 @@ def _parent_record(
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None
         ),
-        "wrapup": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_WRAPUP),
+        "close_early": approval.read_parent_mark(
+            where, parent.ticket, approval.PARENT_MARK_CLOSE_EARLY
+        ),
         "ready": approval.read_parent_mark(where, parent.ticket, approval.PARENT_MARK_READY),
         "closed_record": approval.read_parent_mark(
             where, parent.ticket, approval.PARENT_MARK_CLOSED

@@ -20,7 +20,7 @@
 ## チケットは 1 本のファイルで、写しを持たない（ADR-0055）
 
 承認は `wip/proposals/todo/` の提案を `.ccnavi/approved/doing/` へ動かす。
-エージェントが打つ `done` は `doing/` から `wip/proposals/review/`
+エージェントが打つ `finish` は `doing/` から `wip/proposals/review/`
 （レビュー要）か `.ccnavi/approved/done/`（不要）へ動かし、人がレビューを済ませると
 `review/` から `done/` へ動く。人が動かす向きは `.ccnavi/approved/` へ、エージェントが
 動かす向きは `wip/proposals/` へ。
@@ -188,7 +188,7 @@ def scan_all(
 def review_all(conf: settings.Settings, root: str) -> tuple[list[ticket_mod.Ticket], list[str]]:
     """全ツリーのレビュー待ち（提案の置き場の `review/`）を、重複を畳まずに集める。
 
-    ここに在るのは承認済みチケットが `done` で動いてきたもの。`ccnavi_approved` を持たない
+    ここに在るのは承認済みチケットが `finish` で動いてきたもの。`ccnavi_approved` を持たない
     ファイルは読まない。この置き場はエージェントが書ける側にあり、守りは組み込みの
     deny 1 枚なので、欄を 2 枚目の守りとして残す（ADR-0058）。
     """
@@ -257,7 +257,7 @@ def _everything(
     YAML として解析されるので、この重複はチケットの本数にそのまま比例する。
 
     渡すのは「自分が読んだ側」だけで、残りはここで読む。読む範囲も読む順も変わらない。
-    控えを持たないので、判定の途中でファイルが動く経路（`ticket done` が親を締めた後、
+    控えを持たないので、判定の途中でファイルが動く経路（`ticket finish` が親を締めた後、
     `settle_review` が子を動かした後）でも、持ち込まなかった側は読み直される。
     """
     if open_all is None:
@@ -448,8 +448,8 @@ def settle_review(
 ) -> tuple[list[str], str]:
     """この親の、この番号のフェーズのレビュー待ちの子を `done/` へ動かす。
 
-    人がレビューを済ませたときに呼ぶ（`check` / `accept` / `--reviewed --chat` / `wrapup` と、
-    フィードバック計画の承認）。返すのは動かした識別子と、動かせなかった理由。
+    人がレビューを済ませたときに呼ぶ（`confirm` / `decide` / `--reviewed --chat` /
+    `close-early` と、フィードバック計画の承認）。返すのは動かした識別子と、動かせなかった理由。
     """
     review, _ = scan_review(conf, root)
     moved: list[str] = []
@@ -580,13 +580,13 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
 
 # 親ごとのマーカー。フェーズの番号に付かないもの。
 #   ready.json   Draft を外した（外してよいと確かめた）。「マージに進んでよい」の合図
-#   wrapup.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
-#   closed.json  親を閉じた（`ticket done <親>`）。どのフェーズをどこで見たかを残す
+#   close-early.json  人が「キリの良いところまでやった」と締めた。残りは別の issue へ
+#   closed.json  親を閉じた（`ticket finish <親>`）。どのフェーズをどこで見たかを残す
 #
 # closed.json が要るのは、提案（wip/）が統合先へ戻す前に消えるから。マージリクエストを
 # 作らない運び方（全フェーズが `review: chat`）では、締めた事実の残る先がここしか無い。
 PARENT_MARK_READY = "ready"
-PARENT_MARK_WRAPUP = "wrapup"
+PARENT_MARK_CLOSE_EARLY = "close-early"
 PARENT_MARK_CLOSED = "closed"
 
 
@@ -647,7 +647,7 @@ def accepted_threads(
 
     `phase` を渡すと、その番号のレビューで受け入れ済みと数えてよいものだけを返す。
     受け入れはそのフェーズと、それを待つ番号（写しの `waits`）にだけ効く（設計 §9.8）。
-    並行した別の枝のレビューには効かない。番号を持たない受け入れ（`wrapup`）は親全体に効く。
+    並行した別の枝のレビューには効かない。番号を持たない受け入れ（`close-early`）は親全体に効く。
     """
     data = fsio.read_dict(accepted_path(approved_dir, parent))
     if not data:
@@ -672,7 +672,7 @@ def remember_accepted(
     """受け入れたスレッドを控えに足す。失敗したら、その説明を返す。
 
     フェーズのマーカーとは別の場所に置く。マーカーは 2 つの理由で消える。同じ番号のマーカーは
-    `check` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
+    `confirm` が通るたびに上書きされ、その番号に子が足されると `clear_marks` が
     丸ごと消す。どちらでも受け入れの記録が飛び、人がもう一度同じスレッドを
     受け入れることになる。人が 1 度言った「これは承知で進める」は、
     取り消されるまで残す。
@@ -687,7 +687,7 @@ def remember_accepted(
     keep = sorted(threads_before | added)
     for thread in added:
         if phase is None:
-            # 番号を持たない受け入れ（`wrapup`）は親全体に効く。
+            # 番号を持たない受け入れ（`close-early`）は親全体に効く。
             at.pop(thread, None)
         elif thread in at or thread not in threads_before:
             # 受け入れた番号を足していく。別の枝で受け入れ直した分も効かせる。
@@ -1552,7 +1552,7 @@ def _apply(
                     stdout.write(f"  レビュー待ちの子を閉じた: {', '.join(moved)}\n")
                 stdout.write(
                     "  全体計画の最後のレビューを済んだ扱いにした。残った指摘は"
-                    "フィードバック作業フェーズの check が数える\n"
+                    "フィードバック作業フェーズの confirm が数える\n"
                 )
             continue
         where = home_dir(conf, root, t.ticket, t.parent, t.tree_root)
@@ -1861,7 +1861,7 @@ def feedback_notes(root: str, conf: settings.Settings, parent: ticket_mod.Ticket
     if not parent.feedback:
         notes.append("対応なし。見たうえで対応しない、という記録になる")
         if accepted:
-            notes.append("受け入れた分は別 issue に切り出したか（ccnavi-review.sh handoff）")
+            notes.append("別に追うものは issue に回したか（ccnavi-review.sh decide）")
     return notes
 
 
@@ -2016,7 +2016,7 @@ def revision_problems(
             elsewhere = (
                 "残りは新しい親チケットの提案として wip/proposals/todo/ に書く"
                 if phase.chat_only(root, conf, current.ticket)
-                else "残りは別 issue に切り出す（ccnavi-review.sh handoff）"
+                else "残りは別 issue に回す（ccnavi-review.sh decide）"
             )
             problems.append(
                 rules.Problem(

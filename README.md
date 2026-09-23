@@ -333,7 +333,7 @@ shell に渡るので、環境変数はそこで展開される。代わりに�
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 §11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
 | `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前に付いて動かず、env でも動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。この env が動かす ccnavi ディレクトリの名前を差し替える `--project-home` も同じ門に載る。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、落としたことを標準エラーに出す |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` は標準入力が端末であることを求める。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も、実行ファイルをどう呼んでいても同じ理由コードで止める（表示・検索の道具だけのコマンドは除く。ADR-0080）。テストや、端末を持たない実行環境（CI など）で切る。`dry-run` は取らない（承認は通れば済んでしまうので、止めずに報告する段が無い）。書かれていたら `enable` に倒し、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
@@ -813,8 +813,9 @@ VS Code を使わないときは `--no-vscode` を付ける。
 チケットがどのワークツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
 （`vscode-extension/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
 並べるだけ。承認はボードのオーバーレイで一覧を見せ、人が押したら `--approve --yes` を子プロセスで
-打つ（形は下の「承認の JSON」）。`accept` はボタンから統合ターミナルへコマンドを送り、y/N は人が
-ターミナルで押す。`wrapup` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
+打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の「決める」で指摘ごとに行き先を
+選び、拡張が `ccnavi-review.sh decide` を子プロセスで打つ（形は下の「残った指摘の JSON」）。
+`close-early` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
 
 同じ拡張の「ルール設定画面」で、ルールファイルを画面で直し、保存する前に判定を試せる。
@@ -1062,7 +1063,7 @@ ssh host rm -f .ccnavi/common/rules.yml         # 外さない。ssh は一覧�
 中で実行されるコマンドは、止める側に足す当て先で、元の形の判定を消さない。だから外し方を読み違えても、当たるはずの
 ものが当たらないだけで、今より緩くはならない。`allow` に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では
 どのルールにも当たらず確認に落ちるが、中の `cat /etc/hosts` に読み取りの `allow` を当てると通るようになる。
-止めている間でも通す形も同じで、当てると `env sh .ccnavi/scripts/ccnavi-review.sh check --phase 1` のような、実行役のコマンドを
+止めている間でも通す形も同じで、当てると `env sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1` のような、実行役のコマンドを
 前に置いた形が、止めている間に通るようになる。
 
 代償として、実行役のコマンドの後ろに書いた、`deny` に当たるコマンドはこれから止まる（`time` や `nice` の後ろなど）。
@@ -1212,7 +1213,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。ルー�
 宣言を 2 か所に分けると必ず食い違い、食い違った側は誰にも気づかれないまま緩む。
 
 例外は ccnavi 自身の書き込み。記録と控えの置き場は最初から外れ、チケットの置き場
-（提案と承認済みチケット）は、`ticket start` / `done` や `review request` / `ready` が書いたと
+（提案と承認済みチケット）は、`ticket start` / `finish` や `review request` / `ready` が書いたと
 **内容から読めるぶんだけ**外れる（ADR-0075）。スクリプトだけが書く欄以外が変わっていれば、
 つまり作業範囲や親やフェーズが変わっていれば、今までどおり報告する。
 
@@ -1466,19 +1467,19 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 ```
   wip/proposals/todo ──人が承認──→ .ccnavi/approved/doing
                                           │
-                              エージェントが done（レビュー要）
+                              エージェントが finish（レビュー要）
                                           ▼
   wip/proposals/review ──人がレビュー──→ .ccnavi/approved/done
                                           ▲
-                              エージェントが done（レビュー不要）／cancel
+                              エージェントが finish（レビュー不要）／cancel
 ```
 
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
 | `wip/proposals/todo/` | 承認待ち | 親が書く。作成と編集は自由 |
 | `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `ccnavi --approve`（人）、ボード。続きの子を人が起こすときも直にここ |
-| `wip/proposals/review/` | 作業が終わり、人のレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh done <識別子>`（フェーズがレビュー要のとき） |
-| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh check` / `accept`、`ccnavi --reviewed`、`wrapup`（人）。レビュー不要の `done` と `cancel --reason` |
+| `wip/proposals/review/` | 作業が終わり、人のレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh finish <識別子>`（フェーズがレビュー要のとき） |
+| `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm` / `decide`、`ccnavi --reviewed`、`close-early`（人）。レビュー不要の `finish` と `cancel --reason` |
 
 `.ccnavi/approved/` へ動かすのは人、`wip/proposals/` へ動かすのはエージェント。場所が「次に
 動くのは誰か」を言う。`review/` への直接の作成・移動は、Write でもシェルでも、誰がやっても止まる
@@ -1488,10 +1489,10 @@ git は控えが無いときの代わりで、そのときだけ使う。実行�
 子チケットのワークツリーからは git のラッパースクリプトが拒む。合流と push と閉じるのは親の仕事。
 
 `start` は置き場を動かさず、`doing/` の承認済みチケットに着手の時刻と基準点（そのワークツリーの
-HEAD）を書く。`done` は完了の時刻を書き、その子を閉じたときのフェーズがレビュー要（延期を含む）なら
+HEAD）を書く。`finish` は完了の時刻を書き、その子を閉じたときのフェーズがレビュー要（延期を含む）なら
 `review/` へ、不要なら `done/` へ動かす。`cancel` は `doing/` から `done/` へ動かし、取り消しの
 時刻と理由を書く（未承認の提案は消せばよい）。ワークツリーの削除は親のマージ手順に任せる。
-順序は「子の成果をマージ → done → ワークツリーを消す」。
+順序は「子の成果をマージ → finish → ワークツリーを消す」。
 
 状態を持つ場所は、この置き場のほかにフェーズのマーカー（`pending` `skipped` `requested`
 `reviewed`）があり、動かす者と条件が違う。遷移と、再開のように人の手でしか動かない向きは
@@ -1660,8 +1661,8 @@ git でリモートに届かないときも止めず、手元の版で判定す�
 （`approved_at` と `revised_at`）が変わった承認済みチケットが「新しい承認」になる。人が「承認した」と
 打たなくても、モデルは後工程に入れる。拡張は承認のあと、同じ文をオーバーレイの 2 ボタン（コピー、
 新しいセッションで開く）から渡せる。人がレビューを終えたことは hook が知らないので、拡張のボードの
-「レビュー済み連絡」が「親のワークツリーで `ccnavi-review.sh check --phase <N>` を打て」の文を同じ 2 ボタンで渡す。
-マーカーを置くのは、その文を受けたエージェントが打つ `check`。
+「レビュー済み連絡」が「親のワークツリーで `ccnavi-review.sh confirm --phase <N>` を打て」の文を同じ 2 ボタンで渡す。
+マーカーを置くのは、その文を受けたエージェントが打つ `confirm`。
 
 ### 判定の鍵はファイルの行き先
 
@@ -1752,14 +1753,14 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 |---|---|---|---|
 | 返す文 | 合流と push を済ませ、`request` でレビューを頼み、ターンを終えて利用者を待て | 合流して利用者に差分を見てもらい、ターンを終えて待て | レビューを省略して次のフェーズへ進める |
 | HITL ポイント | 来る。レビュー済みのマーカーまで止まる | 来る。レビュー済みのマーカーまで止まる | 来ない。省略のマーカーを残す |
-| 先へ進める者 | `ccnavi-review.sh check` / `accept` | 人が端末で `ccnavi --reviewed <N> --chat` | — |
-| `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | 同じ | `done` の時点で `done/` へ |
+| 先へ進める者 | `ccnavi-review.sh confirm` / `decide` | 人が端末で `ccnavi --reviewed <N> --chat` | — |
+| `review/` の子 | レビュー済みで `.ccnavi/approved/done/` へ動く | 同じ | `finish` の時点で `done/` へ |
 
 `chat` はこのセッションで人が差分を見る進め方。ホストへ出ないので、マージリクエストも
 `GITHUB_TOKEN` / `GITLAB_TOKEN` も要らず、`.ccnavi/scripts/` の sh は動かない。先へ進める
 `--chat` は**種類が `chat` と宣言したフェーズにしか当たらない**。`mr` のフェーズをこの経路で
 通そうとすると断る。`request` を出したあとのフェーズも断る（付いた指摘を数えずに開けないため。
-そこからは `check` と `accept`）。逆向き（`chat` のフェーズを `request` でマージリクエストに
+そこからは `confirm` と `decide`）。逆向き（`chat` のフェーズを `request` でマージリクエストに
 出す）は通る。
 止めるのは緩める側だけで、実績のリスクが高いときに勧めるのがこの向き。勧めるだけで止めはせず、
 `chat` で通したことは `reviewed` のマーカーに残る。
@@ -1868,7 +1869,7 @@ phases:
 **改版**は「承認済みチケットは動かない」の唯一の例外で、変えられるのは `plan` と `feedback` だけ。
 `plan` は子がまだ承認されていない番号の項に限る。`feedback` の承認後は新しいフィードバック
 作業フェーズを足せない。承認済みのフィードバック作業フェーズの中で差し戻しを受けて子を
-足すのは何度でもできる。それでも残る指摘は `ccnavi-review.sh handoff` で別の issue に切り出す。
+足すのは何度でもできる。それでも残る指摘は、人が `decide` で「issue に回す」を選んで別の issue に切り出す。
 
 `--explain` と `SubagentStart` はフェーズを「3: 実装とテスト」のように番号と種類で示す。
 親の局面（作業中・レビュー待ち・フィードバック計画待ち・フィードバック対応中・閉じられる）を
@@ -1878,8 +1879,8 @@ phases:
 
 ```sh
 sh .ccnavi/scripts/ccnavi-review.sh request --phase 2 --body-file wip/tmp/request.md
-sh .ccnavi/scripts/ccnavi-review.sh check --phase 2
-sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
+sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 2
+sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 ```
 
 `request` は前提を全部確かめてから依頼コメントを投稿し、依頼の時点をマーカーに残す。前提は、
@@ -1896,29 +1897,36 @@ sh .ccnavi/scripts/ccnavi-review.sh note --body-file wip/tmp/decision.md
 （承認を運ぶ `ccnavi-push-approved.sh` は push が落ちてもコミットを残すので、そこで止めると
 人の承認の失敗が依頼を止める）。`ready` の前提だけは別で、置き場も含めて本当に送らせる。
 マーカーが他の機械へ渡るのはそこ。
-レビュー済みのフェーズ（`wrapup` で締めて、依頼をしていないものも含む）は「レビュー済み」で止まる。
+レビュー済みのフェーズ（`close-early` で締めて、依頼をしていないものも含む）は「レビュー済み」で止まる。
 
 **マージリクエストが無ければ作る。** 人はレビューをそこで行うので、入れ物が無いことで
 止めない。題・本文・`Closes #<番号>` は親チケットの `title` / `rationale` / 本文 / `issue`
 から写し、下書き（Draft）で作る。題から Draft を外してマージするのは人の手に残る。
 
-`check` は今そこに残っている未解決スレッドを数える。無く、変更要求のレビューも無ければ
+`confirm` は今そこに残っている未解決スレッドを数える。無く、変更要求のレビューも無ければ
 レビュー済みのマーカーを置き、そのフェーズ（延期を引き受けた分を含む）の `review/` の子を
 `.ccnavi/approved/done/` へ動かし、止まっていたのが解ける。未解決が残るなら一覧を返す。
 
-未解決の扱いは人が端末で選ぶ（`accept <N>`）。選べるのは 2 つ。
+残った指摘の行き先は人が決める（`decide`）。ボードのフェーズ行の「決める」で指摘を 1 件ずつ並べて
+選ぶか、端末で `ccnavi-review.sh decide <N>` を打って 1 件ずつ答える。行き先は 3 つ。
 
-- **`a` 受け入れて進む。** 受け入れたスレッドは `phases/<親>/accepted.json` に控え、レビュー済みの
-  マーカーを置き、`review/` の子を `done/` へ動かす。マーカーとは別の場所に控えるのは、マーカーが
-  上書きも一括の消去もされるため。人が 1 度言った「これは承知で進める」は、取り消されるまで残す
-- **`f` 続きの子チケットを起こす。** 見た子を `done/` へ動かし、同じフェーズの番号で
-  `.ccnavi/approved/doing/<親>-<次の連番>.md` を直に置く。範囲は見た子の範囲の和、本文に
-  指摘を写す。人が選んだことが承認なので、提案と承認の往復は要らない。フェーズは開き直り、
-  マーカーは消える（子を足して承認したときと同じ）。指摘は受け入れない（次の `check` がまた数える）
+- **対応しない（受け入れて進む）。** 受け入れたスレッドは `phases/<親>/accepted.json` に控え、次の
+  `confirm` から数えない。マーカーとは別の場所に控えるのは、マーカーが上書きも一括の消去もされるため。
+  人が 1 度言った「これは承知で進める」は、取り消されるまで残す
+- **このフェーズで直す。** 直す指摘を本文に写した続きの子チケットを、同じフェーズの番号で
+  `.ccnavi/approved/doing/<親>-<次の連番>.md` に直に置く。範囲は見た子の範囲の和。人が選んだことが
+  承認なので、提案と承認の往復は要らない。フェーズは開き直り、マーカーは消える（子を足して承認した
+  ときと同じ）。直す指摘は受け入れない（次の `confirm` がまた数える）
+- **issue に回す。** 受け入れたうえで、sh がその指摘を載せた issue を作る。選べるのはフィードバック
+  計画が承認されたあとだけ（それまでは同じフェーズに子を足して応える）
 
-```sh
-ccnavi --reviewed 2 --accept-unresolved --cwd .claude/worktrees/i0050
-```
+どれも直さなければ、レビュー済みのマーカーを置き、`review/` の子を `done/` へ動かす。1 件でも直すなら
+見た子を `done/` へ動かし、マーカーは置かない。決めた内容は sh がマージリクエストのコメントに写す
+（issue に回した分は、作った issue の綴りも添える）。
+
+ボードの経路は端末を求めない。代わりに、見せた指摘の指紋（`digest`）と今の指摘の指紋が一致することを
+実行ファイルが求め、エージェントがシェルから同じ形（`decide … --choices`、`--reviewed … --yes`）を
+打つ道は組み込みの deny が止める（承認の `--approve --yes` と同じ守り）。
 
 このセッションで見るフェーズ（`--reviewed <N> --chat`）も、レビュー済みにしたあとに指摘を 1 行ずつ
 打てば、同じ形で続きの子を起こす（何も打たなければ起こさない）。
@@ -1934,13 +1942,12 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 | sh の動き | 実行ファイルの段 |
 |---|---|
 | `request` | `review prepare`（前提を確かめ、マーカー付きの本文を控えの置き場に書き出す）→ sh が投稿 → `review requested`（マーカーを置く） |
-| `check` | sh がスレッドとレビューを取ってくる → `review check`（判定してマーカーを置き、`review/` の子を `done/` へ動かす） |
-| `accept N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せ、受け入れて進むか続きの子を起こすかを選ばせる）→ 受け入れた一覧か起こした子を sh がコメントに写す |
+| `confirm` | sh がスレッドとレビューを取ってくる → `review confirm`（判定してマーカーを置き、`review/` の子を `done/` へ動かす） |
+| `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せ、指摘ごとに行き先を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧と指紋）と `decide N --choices <JSON> --digest <指紋>`（`--yes <JSON> --digest <指紋> --json`）で同じ道を通る |
 | （`chat` のフェーズ） | sh は動かない。人が端末で `ccnavi --reviewed <N> --chat --cwd <親のワークツリー>` を打つ。依頼も写しも無い |
-| `note` | sh が投稿する。実行ファイルは関わらない |
-| `handoff --body-file <題と本文>` | 残った指摘を別の issue に切り出す。`review handoff`（局面を確かめ、残ったスレッドの URL を添えた下書きを書く）→ sh が issue を作り、マージリクエストに引き継ぎの note を残す |
-| `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` と note の下書きを置く）→ sh が Draft を外して note を投稿する。親が打つ。マージは人 |
-| `wrapup --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と締める。人が端末で打つ。`review wrapup`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に写し、note を投稿する。Draft は親が片付けてから `ready` で外す |
+| `comment` | sh が投稿する。実行ファイルは関わらない |
+| `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置く）→ sh が Draft を外してコメントを投稿する。親が打つ。マージは人 |
+| `close-early --reason <理由> [--no-issue]` | まだ残っているが「キリの良いところまでやった」と締める。人が端末で打つ。`--close-early`（残りを見せて y/N、未着手の子を取り消し、マーカーを置く）→ sh が残りを issue に写し、コメントを投稿する。Draft は親が片付けてから `ready` で外す |
 | `fetch` | 取ってきた写しを標準出力へ。デバッグ用 |
 | `origin` | origin をどう読んだか（ホスト・scheme・API の綴り・使う道具）。当たらないときの出口 |
 
@@ -1949,10 +1956,10 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 結果の組み立てに `jq` が要る。道具は起動時に絶対パスへ解いて固定するので、PATH の細工では
 差し替えられない。GitHub と GitLab は origin の URL で見分ける。
 
-`--result` を実行ファイルに直接渡せるのは人の手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。`requested` と `check` は
+`--result` を実行ファイルに直接渡せるのは人の手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）。`requested` と `confirm` は
 依頼のマーカーにあるホストとマージリクエストの番号が承認済みチケットと一致しなければ拒む。
 
-`check` は依頼したときの HEAD と今の HEAD が同じで、push 済みであることも求める。人が見たのは
+`confirm` は依頼したときの HEAD と今の HEAD が同じで、push 済みであることも求める。人が見たのは
 依頼時のものなので、その後に積んだコミットを「レビュー済み」に含めない。動いていれば、push して
 `request` で依頼を出し直す。変更要求は
 レビュアーごとに最新のレビューだけを数える。取り下げ（dismissed）は無い扱い。
@@ -1973,7 +1980,7 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 これらの操作は、エージェントが実行ファイルを直接打つものではない（`CCNAVI_GUARD_TICKET_APPROVAL`）。
 状態の移動とレビューはスクリプト 2 本を通し、承認と未解決の受け入れは利用者が端末で打つ。
 
-`note` はこのセッションで受けた承認や判断をマージリクエストの通常コメントに写す。ワークツリーの記録はマージで消えるので、
+`comment` はこのセッションで受けた承認や判断をマージリクエストの通常コメントに写す。ワークツリーの記録はマージで消えるので、
 経緯を残す場所はマージリクエストしか無い。
 
 **Draft を外すのは親、マージは人。** `ready` は、親を閉じられる状態（全フェーズが終わり、
@@ -1982,15 +1989,15 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 であることを求め、通れば Draft を外す。それが「マージに進んでよい」の合図で、マージするかどうかは
 人がマージリクエストで決める。取り込むのは squash で、途中のコミットとチケットの置き場は既定のブランチに残さない
 （GitLab ではマージリクエストに `squash` を立てる。GitHub はマージのときに人が選ぶ）。経緯を残す場所はマージリクエストと issue。
-順は「親を `done` で閉じる → `rm -r wip` をコミット → push → `ready` → マーカー `ready.json` をコミットして push →
+順は「親を `finish` で閉じる → `rm -r wip` をコミット → push → `ready` → マーカー `ready.json` をコミットして push →
 ワークツリーを片付ける」。`ready` が置くマーカーは push の後に書かれるので、コミットせずにワークツリーを消すとマーカーが消える。
 ワークツリーの片付けはマージを待たない。リモートのブランチはホストがマージのときに消し、ローカルのブランチは残る（squash で入るので `branch -d` が通らない）。
 
-**まだ残っているが締めたいとき**は、人が端末で `wrapup --reason <理由>` を打つ。作業中の子が
+**まだ残っているが締めたいとき**は、人が端末で `close-early --reason <理由>` を打つ。作業中の子が
 いる間は打てない。残っているもの（未着手の子、手を付けていないフェーズ、済んでいないレビュー、
 未計画のフィードバック、未解決のスレッド）を全部見せてから y/N を取り、y なら未着手の子を
-取り消し（理由は `wrapup: <理由>`）、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
-残りを新しい issue に写す。黙って消えるものは作らない。`phases/<親>/wrapup.json` が
+取り消し（理由は `close-early: <理由>`）、フェーズに省略とレビュー済みのマーカーを置き、未解決を受け入れ、
+残りを新しい issue に写す。黙って消えるものは作らない。`phases/<親>/close-early.json` が
 その証跡で、これがあれば親はフィードバック計画が無くても閉じられる。Draft を外すのはここではなく、
 親が閉じて片付けて push したあとの `ready`。外す道を 1 本にしておくと、外れたマージリクエストは必ず片付いている。
 
@@ -1998,7 +2005,7 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 
 計画のときに「軽い」と思った作業が、やってみたら大きな変更になることがある。宣言（種類の
 `review: none` や子の `required: false`）だけを信じると、その作業がレビューを通らずに進む。
-だからリスクは宣言ではなく実績で測る。子を `ticket done` で閉じるとき、その子のワークツリーで
+だからリスクは宣言ではなく実績で測る。子を `ticket finish` で閉じるとき、その子のワークツリーで
 `base_sha..HEAD` の差分を数えて点を付け、`phases/<親>/<子>.risk.json` に残す。フェーズの点は
 子の最大値。**HIGH 以上なら、宣言に関わらずそのフェーズは人間レビューが要る扱いになり、
 レビューが済むまで止まる。** 実績が小さくても宣言のレビュー要を下げることはしない。
@@ -2027,7 +2034,7 @@ factors:
 |---|---|---|
 | 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
 | 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通層。自身の層とプロジェクトの層はその層の `.ccnavi/scripts/` の下） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は**重い側に倒し**、その項目の点を加える |
-| 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`done` が問いと差分の要約を `state/risk-judge-<子>.md` に書くので、親がそれをサブエージェントに渡し、報告を `sh .ccnavi/scripts/ccnavi-ticket.sh judge <子> <項目> yes\|no --reason <根拠>` で記録する。判定は子の HEAD に結ぶので、HEAD が動けば取り直し |
+| 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`finish` が問いと差分の要約を `state/risk-judge-<子>.md` に書くので、親がそれをサブエージェントに渡し、報告を `sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason <根拠>` で記録する。判定は子の HEAD に結ぶので、HEAD が動けば取り直し |
 
 閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
 （「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に、点と加点した理由が出る。
@@ -2513,7 +2520,7 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 §9.7 の文） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
-| `wrapup` / `ready` / `closed_record` | 親のマーカー `wrapup.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
+| `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, review_kind, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_kind` は人がどこで見るか（`none` / `chat` / `mr`）。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを言う（欄の綴りは変えないが、人に見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（人のレビュー待ち）で、ボードはこれを写すだけで組み直さない。これはマージリクエストの話で、`chat` のフェーズは依頼を出さないので常に `false`。このセッションで見る待ちは `review_kind` と `gate_closed` で読む |
 
@@ -2591,6 +2598,41 @@ VS Code の拡張が、承認を端末ではなくボードのオーバーレイ
 `<絞り>` は「そのとき掛けていた絞り」。比べるのは「その絞りで今できる一覧」と「見た識別子」で、
 1 つの引数にまとめると検査が自分自身と比べる形になり、常に一致してしまう。絞り込みが無ければ
 `<絞り>` は空で、承認待ち全部と比べる。
+
+## 残った指摘の JSON
+
+ボードの「決める」が読み書きする形。拡張は sh（`ccnavi-review.sh decide`）を子プロセスで打ち、sh が
+取ってきた写しを実行ファイルに渡す。版は `version`（今は 1）で、承認の JSON と別に数える。
+
+`decide <N> --preview`（実行ファイルは `--reviewed N --accept-unresolved --preview --json`）は何も置かない。
+
+```json
+{"version": 1, "parent": "i0050", "phase": 2,
+ "mr": {"number": 7, "url": "https://…/merge_requests/7"},
+ "can_issue": false,
+ "threads": [{"key": "https://…#note_1", "url": "https://…#note_1", "path": "src/a.py", "line": 3, "body": "…"}],
+ "digest": "<64 桁の 16 進>"}
+```
+
+- `key` は選択を結ぶ鍵（URL か、無ければスレッドの id）。受け入れの控えにもこの綴りが入る
+- `can_issue` は issue に回せるか（フィードバック計画が承認されたあとだけ真）
+- `digest` は見せた指摘の指紋。親・フェーズ・マージリクエストの番号・`can_issue`・各指摘の鍵と場所と本文から組む
+
+`decide <N> --choices <JSON> --digest <指紋>`（実行ファイルは `--yes <JSON> --digest <指紋> --json`）は
+`{"<key>": "keep" | "fix" | "issue", …}` を受け、見せた指摘の全部に 1 つずつ付いていることを求める。
+
+```json
+{"version": 1, "ok": true, "parent": "i0050", "phase": 2,
+ "reviewed": false, "followup": "i0050-03",
+ "kept": ["…"], "fix": ["…"], "issue": [],
+ "issue_draft": "", "prompt": "[ccnavi] 利用者が…",
+ "issue_url": "", "warning": ""}
+```
+
+- `reviewed` はレビュー済みになったか（直す指摘が無ければ真）、`followup` は起こした続きの子
+- `issue_url` と `warning` は sh が足す。置いたあとの投稿（issue とコメント）で起きたことで、置いたことは戻さない
+- 見せた指摘と今の指摘が違えば、何も置かずに `{"version": 1, "ok": false, "mismatch": true, "digest": {"expected", "current"}}` を
+  返して 1 で終わる
 
 ## 生の git は止めてラッパースクリプトへ寄せる
 
@@ -2676,7 +2718,7 @@ push はラッパースクリプトが拒み、サブエージェントからの
 | `ccnavi/phase.py` | フェーズの終わりと HITL ポイント。提案から承認済みチケットへの同期 |
 | `ccnavi/phasetypes.py` | フェーズの種類の定義（`phases.yml`）の読み込みと検証 |
 | `ccnavi/review.py` | レビューの依頼と確認。作業ツリーの中の前提検査と、sh が渡す写し（JSON）の判定。ネットワークには出ない |
-| `ccnavi/ops.py` | チケットの状態を動かす `ticket start / done / cancel / judge`。閉じるときに実績のリスクを数える |
+| `ccnavi/ops.py` | チケットの状態を動かす `ticket start / finish / cancel / record-risk`。閉じるときに実績のリスクを数える |
 | `ccnavi/audit.py` | 1 行 1 件の追記記録 |
 | `ccnavi/lint.py` | 設定とルールの検証。判定を行わない |
 | `ccnavi/diagnose.py` | 判定を実行せずに試す `--test` と `--explain` |

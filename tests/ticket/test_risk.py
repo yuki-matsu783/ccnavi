@@ -195,7 +195,7 @@ class RiskTest(PhaseHarness):
             "  - {id: broken, points: 45, script: .ccnavi/common/scripts/none.sh, message: 無い}\n",
         )
         self.one_child()
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         record = self.record()
         self.assertEqual(75, record["points"])
@@ -215,7 +215,7 @@ class RiskTest(PhaseHarness):
             " message: テスト無し}\n",
         )
         tree = self.one_child()
-        refused = self.ccnavi("ticket", "done", "i0001-01")
+        refused = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("untested", refused.stderr)
         self.assertIn("judge", refused.stderr)
@@ -226,7 +226,7 @@ class RiskTest(PhaseHarness):
         # 親が記録する。yes で加点。
         judged = self.ccnavi(
             "ticket",
-            "judge",
+            "record-risk",
             "i0001-01",
             "untested",
             "yes",
@@ -234,18 +234,18 @@ class RiskTest(PhaseHarness):
             "テストが無い",
         )
         self.assertEqual(judged.returncode, 0, judged.stderr)
-        wrong = self.ccnavi("ticket", "judge", "i0001-01", "nope", "yes", "--reason", "x")
+        wrong = self.ccnavi("ticket", "record-risk", "i0001-01", "nope", "yes", "--reason", "x")
         self.assertNotEqual(wrong.returncode, 0)
         # HEAD が動いたら判定は古い。
         write(os.path.join(tree, "src", "later.py"), "1\n")
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "later")
-        stale = self.ccnavi("ticket", "done", "i0001-01")
+        stale = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertNotEqual(stale.returncode, 0)
         self.assertIn("untested", stale.stderr)
         judged = self.ccnavi(
             "ticket",
-            "judge",
+            "record-risk",
             "i0001-01",
             "untested",
             "no",
@@ -253,7 +253,7 @@ class RiskTest(PhaseHarness):
             "テストを足した",
         )
         self.assertEqual(judged.returncode, 0, judged.stderr)
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertEqual(0, self.record()["points"])
         # サブエージェントは judge を打てない。
@@ -264,7 +264,7 @@ class RiskTest(PhaseHarness):
             "session_id": "s1",
             "agent_id": "sub-1",
             "tool_input": {
-                "command": "sh .ccnavi/scripts/ccnavi-ticket.sh judge i0001-01 untested yes "
+                "command": "sh .ccnavi/scripts/ccnavi-ticket.sh record-risk i0001-01 untested yes "
                 "--reason x"
             },
         }
@@ -274,7 +274,7 @@ class RiskTest(PhaseHarness):
     # ---- 5. 副命令に配点を渡しても効かない（ADR-0067）
 
     def test_a_risk_flag_on_ticket_done_does_not_change_the_score(self):
-        """`ticket done <子> --risk <別の配点>` は採点を差し替えない。issue #65。
+        """`ticket finish <子> --risk <別の配点>` は採点を差し替えない。issue #65。
 
         sh のラッパー（`.ccnavi/scripts/ccnavi-ticket.sh`）が受け取った引数を素通しするので、
         この形はエージェントが Bash で打てる。通していた頃は、重い変更を軽い配点で
@@ -289,7 +289,7 @@ class RiskTest(PhaseHarness):
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
 
-        closed = self.ccnavi("ticket", "done", "i0001-01", "--risk", cheap)
+        closed = self.ccnavi("ticket", "finish", "i0001-01", "--risk", cheap)
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--risk は診断", closed.stderr, "落としたことを言っていない")
@@ -302,14 +302,14 @@ class RiskTest(PhaseHarness):
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
 
-        closed = self.ccnavi("ticket", "done", "i0001-01", "--risk", "")
+        closed = self.ccnavi("ticket", "finish", "i0001-01", "--risk", "")
 
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("--risk は診断", closed.stderr)
         self.assertEqual(25, self.record()["points"])
 
     def test_a_second_root_on_ticket_done_is_refused(self):
-        """`ticket done <子> --root <偽>` は断る。issue #65 の敵対的レビューで出た形。
+        """`ticket finish <子> --root <偽>` は断る。issue #65 の敵対的レビューで出た形。
 
         sh は自分の `--root` を先に置き、エージェントの引数を後ろに繋ぐ
         （`exec "$bin" --root "$root" ticket "$@"`）。argparse は後勝ちなので、後ろに
@@ -326,7 +326,9 @@ class RiskTest(PhaseHarness):
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "big")
 
-        refused = self.ccnavi("ticket", "done", "i0001-01", "--root", os.path.join(self.root, "x"))
+        refused = self.ccnavi(
+            "ticket", "finish", "i0001-01", "--root", os.path.join(self.root, "x")
+        )
 
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("--root は 1 度しか渡せない", refused.stderr)
@@ -345,7 +347,7 @@ class RiskTest(PhaseHarness):
         linted = self.ccnavi("--lint")
         self.assertIn("(risk)", linted.stdout + linted.stderr)
         self.one_child()
-        closed = self.ccnavi("ticket", "done", "i0001-01")
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stderr)
         self.assertIn("組み込みの配点", closed.stderr)
         self.assertIn(risk.BUILTIN, closed.stdout)

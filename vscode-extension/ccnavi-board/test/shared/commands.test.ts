@@ -2,8 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as commands from "../../src/core/commands.js";
 import {
-  acceptCommand,
   approveArgs,
+  decideArgs,
+  decidePreviewArgs,
   previewArgs,
   pushApprovedCommand,
   reviewedPrompt,
@@ -65,20 +66,20 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 accept は親のワークツリーで、ワークスペースルートから綴った sh を打つ", () => {
-  assert.equal(
-    acceptCommand("/ws", "/ws/.claude/worktrees/i0001", 2),
-    "cd '/ws/.claude/worktrees/i0001' && sh '/ws/.ccnavi/scripts/ccnavi-review.sh' accept 2",
-  );
-  // Windows の区切りと、単引用符を含むルート。
-  assert.equal(
-    acceptCommand("C:\\it's\\ws", "C:\\it's\\ws\\.claude\\worktrees\\i0001", 1),
-    `cd 'C:/it'\\''s/ws/.claude/worktrees/i0001' && sh 'C:/it'\\''s/ws/.ccnavi/scripts/ccnavi-review.sh' accept 1`,
-  );
+test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せた指紋で渡す", () => {
+  assert.deepEqual(decidePreviewArgs(2), ["decide", "2", "--preview"]);
+  assert.deepEqual(decideArgs(1, { u1: "keep", "https://x/y#z": "fix" }, "d0"), [
+    "decide",
+    "1",
+    "--choices",
+    '{"u1":"keep","https://x/y#z":"fix"}',
+    "--digest",
+    "d0",
+  ]);
 });
 
 test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペースルートからの絶対パスで送る", () => {
-  // 絶対パスなので、前に accept が親のワークツリーへ cd したターミナルでも届く。
+  // 絶対パスなので、前のコマンドが別の場所へ cd したターミナルでも届く。
   assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh'");
   // Windows の区切りは "/" に直す（Git Bash が読める形）。
   assert.equal(
@@ -100,11 +101,11 @@ test("CB-T19c 文面の sh の綴りは実行ファイルの script_command と�
   assert.equal(scriptCommand("/a$b", "x.sh"), `sh '/a$b/.ccnavi/scripts/x.sh'`);
 });
 
-test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリーで check を単体で打つこととマージリクエストの URL を言い、マーカーは置かせない", () => {
+test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリーで confirm を単体で打つこととマージリクエストの URL を言い、マーカーは置かせない", () => {
   const text = reviewedPrompt("/ws", "i0001", 2, "2（設計）", "/ws/.claude/worktrees/i0001", "https://example.com/pull/18#issuecomment-5");
   assert.ok(
     text.startsWith(
-      "[ccnavi] 利用者が親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh check --phase 2' を打ち、",
+      "[ccnavi] 利用者が親 i0001 のフェーズ 2（設計） のレビューを終えた。\n- マージリクエスト: https://example.com/pull/18#issuecomment-5\n親（メインエージェント）が、親のワークツリー /ws/.claude/worktrees/i0001 で 'sh /ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 2' を打ち、",
     ),
     text,
   );
@@ -113,14 +114,14 @@ test("CB-T19d レビュー済みの連絡の文は、親が親のワークツリ
   assert.ok(text.includes("cd や他のコマンドと連結せず、単体の Bash で打つ（cwd が /ws/.claude/worktrees/i0001 でなければ、先に cd だけを別の Bash で打つ）"));
   assert.ok(text.includes("サブエージェントには渡さない"));
   assert.ok(!text.includes("&&"));
-  // 人の判断（--reviewed / accept）を代行させず、check が返す道を先取りしない
+  // 人の判断（--reviewed / decide）を代行させず、confirm が返す道を先取りしない
   assert.ok(!text.includes("--reviewed"));
-  assert.ok(!text.includes("accept"));
+  assert.ok(!text.includes("decide"));
   assert.ok(!text.includes("依頼し直す"));
-  assert.ok(text.includes("check が一覧と次の道を返すので、それに従う"));
+  assert.ok(text.includes("confirm が一覧と次の道を返すので、それに従う"));
   // マージリクエストが無ければ行ごと省き、フェーズの表示名が無ければ番号で言う。Windows の区切りは / に寄せる
   const bare = reviewedPrompt("C:\\ws", "i0001", 3, "", "C:\\ws\\.claude\\worktrees\\i0001", "");
   assert.ok(!bare.includes("マージリクエスト:"));
   assert.ok(bare.includes("フェーズ 3 のレビューを終えた"));
-  assert.ok(bare.includes("親のワークツリー C:/ws/.claude/worktrees/i0001 で 'sh C:/ws/.ccnavi/scripts/ccnavi-review.sh check --phase 3'"));
+  assert.ok(bare.includes("親のワークツリー C:/ws/.claude/worktrees/i0001 で 'sh C:/ws/.ccnavi/scripts/ccnavi-review.sh confirm --phase 3'"));
 });

@@ -726,7 +726,7 @@ class Boundaries(Workspace):
             "Bash",
             self.parent_tree,
             agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh done i0001-01",
+            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01",
         )
         self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
 

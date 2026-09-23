@@ -9,6 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
 import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
+import type { DecidePreview } from "../../src/core/decidemodel.js";
 import { fixture } from "../helpers/fixture.js";
 import { NONCE, approvePreview, boardPage, openBoard, openPage } from "../helpers/board.js";
 import { flatStyle } from "../helpers/bundle.js";
@@ -68,6 +69,68 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.equal(spiked.all("pre.approval-text script").length, 0);
   } finally {
     await spiked.close();
+  }
+});
+
+function decidePreview(canIssue: boolean): DecidePreview {
+  return {
+    version: 1,
+    parent: "i0001",
+    phase: 2,
+    mr: { number: 7, url: "https://example.com/mr/7" },
+    can_issue: canIssue,
+    threads: [
+      { key: "u1", url: "u1", path: "src/a.py", line: 3, body: "命名を直す\n詳しく" },
+      { key: "u2", url: "u2", path: "", line: 0, body: "<b>テスト</b>" },
+    ],
+    digest: "a".repeat(64),
+  };
+}
+
+test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶまで決められない。選んだ行き先を鍵ごとに送る", async () => {
+  const page = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
+  });
+  try {
+    assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 に残った指摘 2 件の行き先");
+    assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
+    // issue に回せない局面では、その行き先を出さない
+    assert.equal(page.all('input[data-choice="issue"]').length, 0);
+    assert.equal(page.all('input[data-choice="keep"]').length, 2);
+    const confirm = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
+    assert.equal(confirm.disabled, true);
+    page.click(page.one('li[data-key="u1"] input[data-choice="keep"]'));
+    await page.settle();
+    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
+    page.click(page.one('li[data-key="u2"] input[data-choice="fix"]'));
+    await page.settle();
+    const ready = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
+    assert.equal(ready.disabled, false);
+    page.click(ready);
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "decideConfirm", choices: { u1: "keep", u2: "fix" } });
+  } finally {
+    await page.close();
+  }
+  const issued = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: decidePreview(true), tree: "/w" },
+  });
+  try {
+    assert.equal(issued.all('input[data-choice="issue"]').length, 2);
+  } finally {
+    await issued.close();
+  }
+  // 置いている最中は選べず、決められず、やめられない
+  const deciding = await openBoard(fixture(), {
+    approval: { kind: "deciding", preview: decidePreview(false), tree: "/w" },
+  });
+  try {
+    assert.equal(deciding.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
+    assert.equal(deciding.one<HTMLButtonElement>('button[data-action="approve-cancel"]').disabled, true);
+    assert.ok(deciding.all("input[type=radio]").every((r) => (r as unknown as { disabled: boolean }).disabled));
+  } finally {
+    await deciding.close();
   }
 });
 
@@ -278,7 +341,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
         };
       }
       // 依頼済みで止まったまま（判定は review_waiting で言う）。要約に「レビュー待ち」と
-      // 受け入れボタンが並ぶ
+      // 残った指摘を決めるボタンが並ぶ
       return { ...p, state: "ended", gate_closed: true, review_waiting: true, marks: { requested: { at: "t" } } };
     }),
   };
@@ -289,7 +352,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
     assert.equal(rows[0].querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
     assert.equal(rows[1].querySelector(".phase-brief")?.textContent, "レビュー待ち");
     assert.equal(rows[1].querySelector(".phase-full")?.textContent, "終了 · レビュー待ち · レビュー依頼済 · レビュー要");
-    assert.equal(rows[1].querySelectorAll('button[data-action="accept"]').length, 1);
+    assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
   } finally {
     await page.close();
   }
@@ -306,7 +369,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   } finally {
     await page2.close();
   }
-  // 依頼を出していないフェーズは「レビュー準備中」。受け入れボタンも出ない
+  // 依頼を出していないフェーズは「レビュー準備中」。残った指摘を決めるボタンも出ない
   const unasked: ParentJson = {
     ...parent,
     phases: parent.phases.map((p): PhaseJson => (p.number === 2 ? { ...p, marks: {}, review_waiting: false } : p)),
@@ -368,8 +431,8 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     assert.ok(page.all(".phase-full").some((full) => full.textContent === "進行中 · レビュー要"));
     // 止めていない・マーカーなし・レビュー不要は普通の状態なので書かない
     assert.ok(!texts(page, ".phase-full").some((full) => full.includes("レビュー不要")));
-    // 締める（wrapup）のボタンは出さない
-    assert.equal(page.all('button[data-action="wrapup"]').length, 0);
+    // 締める（close-early）のボタンは出さない
+    assert.equal(page.all('button[data-action="close-early"]').length, 0);
   } finally {
     await page.close();
   }
@@ -553,22 +616,22 @@ function waitingWithMr(url: string) {
 test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連絡」と依頼へのリンク、親カードにマージリクエストへのリンクを出す。http(s) 以外はリンクにしない", async () => {
   const page = await openBoard(waitingWithMr("https://example.com/o/r/pull/18#issuecomment-5"));
   try {
-    // 受け入れの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
-    const accept = page.one('button[data-action="accept"]');
-    assert.equal(accept.getAttribute("data-parent"), "i0001");
-    assert.equal(accept.getAttribute("data-phase"), "2");
+    // 残った指摘を決めるボタンの隣に連絡のボタン。マーカーを置く操作ではないと title で言う
+    const decide = page.one('button[data-action="decide"]');
+    assert.equal(decide.getAttribute("data-parent"), "i0001");
+    assert.equal(decide.getAttribute("data-phase"), "2");
     const reviewed = page.one('button[data-action="reviewed"]');
     assert.equal(reviewed.textContent, "レビュー済み連絡");
     assert.equal(
       reviewed.getAttribute("title"),
-      "レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh check --phase 2 を打つ）",
+      "レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase 2 を打つ）",
     );
     page.click(reviewed);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "reviewed", parent: "i0001", phase: 2 });
-    page.click(accept);
+    page.click(decide);
     await page.settle();
-    assert.deepEqual(page.posted.at(-1), { type: "accept", parent: "i0001", phase: 2 });
+    assert.deepEqual(page.posted.at(-1), { type: "decide", parent: "i0001", phase: 2 });
     // フェーズ行は依頼の投稿へ、親カードはマージリクエスト自体へ
     const inPhase = page.one(".phase a.mr-link");
     assert.equal(inPhase.getAttribute("href"), "https://example.com/o/r/pull/18#issuecomment-5");

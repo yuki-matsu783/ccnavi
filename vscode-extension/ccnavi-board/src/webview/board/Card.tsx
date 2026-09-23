@@ -260,23 +260,23 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           この 1 件を承認
         </button>
       );
-    case "accept":
+    case "decide":
       return (
         <button
           type="button"
           className="action"
-          data-action="accept"
+          data-action="decide"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`未解決のレビューを受け入れて進む（ccnavi-review.sh accept ${action.phase}）`}
-          onClick={() => post({ type: "accept", parent: action.parent, phase: action.phase })}
+          title={`残った指摘の行き先を 1 件ずつ決める（対応しない・このフェーズで直す・issue に回す）`}
+          onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
         >
-          受け入れ
+          決める
         </button>
       );
     case "reviewed":
       // マーカーは置かない。レビューを終えたことを Claude Code に伝える文を組み、コピー / 新しいセッションで開く で渡す。
-      // check を打ってマーカーを置くのは、その文を受けたエージェント
+      // confirm を打ってマーカーを置くのは、その文を受けたエージェント
       return (
         <button
           type="button"
@@ -284,7 +284,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="reviewed"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh check --phase ${action.phase} を打つ）`}
+          title={`レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を打つ）`}
           onClick={() => post({ type: "reviewed", parent: action.parent, phase: action.phase })}
         >
           レビュー済み連絡

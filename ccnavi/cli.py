@@ -137,15 +137,14 @@ copies (the same text the extension hands to Claude Code).
 The parent agent moves tickets between states and asks for reviews through the
 scripts in .ccnavi/scripts/, which call
 
-    ccnavi ticket start|done|cancel <id> [--reason <why>]
-        (start writes the base point into .ccnavi/approved/doing/<id>.md; done moves
+    ccnavi ticket start|finish|cancel <id> [--reason <why>]
+        (start writes the base point into .ccnavi/approved/doing/<id>.md; finish moves
          it to wip/proposals/review/ when the phase is reviewed, else to
          .ccnavi/approved/done/; cancel moves it to .ccnavi/approved/done/)
-    ccnavi ticket judge <child> <factor> yes|no --reason <why>   (qualitative risk)
+    ccnavi ticket record-risk <child> <factor> yes|no --reason <why>   (qualitative risk)
     ccnavi review prepare   --cwd <dir> --phase N --body-file <path>
     ccnavi review requested --cwd <dir> --phase N --result <json>
-    ccnavi review check     --cwd <dir> --phase N --result <json>
-    ccnavi review handoff   --cwd <dir> --body-file <path> --result <json>
+    ccnavi review confirm   --cwd <dir> --phase N --result <json>
     ccnavi review ready     --cwd <dir> --result <json>
 
 ccnavi never reaches the remote itself. The script fetches the merge request,
@@ -153,7 +152,7 @@ its threads and reviews, and hands them over as --result <json>.
 
 A human accepts unresolved review threads, from the parent worktree, with
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh accept N
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh decide N
 
 (the scripts live only in the workspace, so a worktree cut from a project
 cannot reach them by the relative path)
@@ -172,9 +171,9 @@ which only applies to phases whose type declared `chat`.
 
 A human closes a parent early ("good enough for now") with
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh wrapup --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-review.sh close-early --reason <why>
 
-which runs `ccnavi review wrapup --reason <why> --result <json>` and then
+which runs `ccnavi --close-early --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.
 """
 
@@ -201,7 +200,7 @@ RELATIVE_OVERRIDES = ("tickets", "project_home")
 # 前の 3 本は共通層の中身（ルール・フェーズの種類・リスクの配点）、後の 2 本は
 # **層を探す先**。`--projects` はプロジェクトの層の置き場、`--project-home` は
 # 各 git プロジェクトルートの下の ccnavi ディレクトリの名前で、どちらも外すと
-# プロジェクトの層がまるごと消える。実測では `ticket done <子> --project-home .nothere`
+# プロジェクトの層がまるごと消える。実測では `ticket finish <子> --project-home .nothere`
 # で、実績リスク 55 (CRITICAL) の子が 25 (MEDIUM) になり、レビュー待ちを飛ばして
 # 閉じた（ADR-0067）。中身を差し替えるのと結果が同じなので、同じ門に載せる。
 LAYER_OVERRIDES = (
@@ -294,7 +293,9 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
-    parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
+    # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
+    # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）を抜ける。
+    parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
     # 綴りは sh が計算して渡す。2 度来ていないかを見るので、束ねて受ける（WRAPPER_FLAGS）。
     parser.add_argument("--root", action="append", default=None)
     parser.add_argument("--mode", default="")
@@ -348,6 +349,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--reviewed", type=int, default=None)
     parser.add_argument("--accept-unresolved", action="store_true")
     parser.add_argument("--chat", action="store_true")
+    # 人が端末で打つ締め。`--approve` / `--reviewed` と同じく、人の判断はフラグで受ける。
+    parser.add_argument("--close-early", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
@@ -494,8 +497,15 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
-    if args.command or args.reviewed is not None:
-        if args.reviewed is not None and not _from_terminal(stdin, conf, stderr, "--reviewed"):
+    if args.command or args.reviewed is not None or args.close_early:
+        # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
+        # `--yes` の守りは、見せた指摘の指紋の一致と、シェルから打つ形を止める組み込みの deny。
+        board = args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes)
+        if (
+            args.reviewed is not None
+            and not board
+            and not _from_terminal(stdin, conf, stderr, "--reviewed")
+        ):
             return EXIT_ERROR
         return operate(stdin, stdout, stderr, conf, root, args)
 
@@ -560,8 +570,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
     """人の判断の経路が、端末の前の人から打たれているか。
 
-    `--approve` と `--reviewed` は人の合意そのもの。エージェントが Bash から打てば
-    その合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
+    `--approve` と `--reviewed` と `--close-early` は人の合意そのもの。エージェントが
+    Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
     """
@@ -572,9 +582,10 @@ def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag:
             return True
     except (AttributeError, ValueError):
         pass
+    # 切り方（CCNAVI_GUARD_TICKET_APPROVAL）は文面に書かない。読むのはエージェントで、書けば
+    # 人の判断を自分で出す道を教えることになる。切り方は README の設定の表にある。
     stderr.write(
-        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない"
-        f"（{settings.GUARD_TICKET_APPROVAL_ENV}=disable で切れる）\n"
+        f"ccnavi: {flag} は端末から打つもの。標準入力が端末ではない。利用者に端末で打ってもらう\n"
     )
     return False
 
@@ -589,14 +600,47 @@ def operate(
 ) -> int:
     """チケットの状態とレビューの操作を振り分ける。
 
-    `ticket start|done|cancel <識別子>` と `review prepare|requested|check`、それに
-    人が打つ `--reviewed`。どれも payload を読まず、判定も記録もしない。
+    `ticket start|finish|cancel <識別子>` と `review prepare|requested|confirm`、それに
+    人が打つ `--reviewed` と `--close-early`。どれも payload を読まず、判定も記録もしない。
     リモートの写しは `--result <json>` で受け取る。exe はネットワークに出ない。
     """
     if not conf.tickets_enabled:
         stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
         return EXIT_ERROR
     cwd = args.cwd or os.getcwd()
+    if args.close_early:
+        if not args.result:
+            stderr.write("ccnavi: --close-early には --reason <理由> と --result <json> が要る\n")
+            return EXIT_ERROR
+        # 人の判断。`--approve` / `--reviewed` と同じく端末を求める。
+        if not _from_terminal(stdin, conf, stderr, "--close-early"):
+            return EXIT_ERROR
+        code = review.close_early(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+    if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
+        if args.preview and args.yes:
+            stderr.write("ccnavi: --preview と --yes は同時に付けられない\n")
+            return EXIT_ERROR
+        if not args.json or not args.result:
+            stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
+            return EXIT_ERROR
+        if args.preview:
+            code = review.decide_preview(
+                stdout, stderr, root, conf, cwd, args.reviewed, args.result
+            )
+        else:
+            code = review.decide_yes(
+                stdout,
+                stderr,
+                root,
+                conf,
+                cwd,
+                args.reviewed,
+                args.result,
+                args.yes,
+                args.digest,
+            )
+        return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
         code = review.reviewed(
             stdin,
@@ -617,49 +661,40 @@ def operate(
     verb = words[1] if len(words) > 1 else ""
     target = words[2] if len(words) > 2 else ""
     code = 1
-    if kind == "ticket" and verb in ("start", "done", "cancel") and target:
+    if kind == "ticket" and verb in ("start", "finish", "cancel") and target:
         if verb == "start":
             code = ops.start(stdout, stderr, root, conf, target)
-        elif verb == "done":
-            code = ops.done(stdout, stderr, root, conf, target)
+        elif verb == "finish":
+            code = ops.finish(stdout, stderr, root, conf, target)
         else:
             code = ops.cancel(stdout, stderr, root, conf, target, args.reason)
-    elif kind == "ticket" and verb == "judge":
-        # ticket judge <子> <項目> yes|no --reason <根拠>
+    elif kind == "ticket" and verb == "record-risk":
+        # ticket record-risk <子> <項目> yes|no --reason <根拠>
         if len(words) < 5:
-            stderr.write("ccnavi: ticket judge には <子> <項目> yes|no と --reason <根拠> が要る\n")
+            stderr.write(
+                "ccnavi: ticket record-risk には <子> <項目> yes|no と --reason <根拠> が要る\n"
+            )
         else:
-            code = ops.judge(stdout, stderr, root, conf, words[2], words[3], words[4], args.reason)
+            code = ops.record_risk(
+                stdout, stderr, root, conf, words[2], words[3], words[4], args.reason
+            )
     elif kind == "review" and verb == "prepare":
         if args.phase is None or not args.body_file:
             stderr.write("ccnavi: review prepare には --phase <N> と --body-file <path> が要る\n")
         else:
             code = review.prepare(stdout, stderr, root, conf, cwd, args.phase, args.body_file)
-    elif kind == "review" and verb in ("requested", "check"):
+    elif kind == "review" and verb in ("requested", "confirm"):
         if args.phase is None or not args.result:
             stderr.write(f"ccnavi: review {verb} には --phase <N> と --result <json> が要る\n")
         elif verb == "requested":
             code = review.requested(stdout, stderr, root, conf, cwd, args.phase, args.result)
         else:
-            code = review.check(stdout, stderr, root, conf, cwd, args.phase, args.result)
-    elif kind == "review" and verb == "handoff":
-        if not args.body_file or not args.result:
-            stderr.write(
-                "ccnavi: review handoff には --body-file <path> と --result <json> が要る\n"
-            )
-        else:
-            code = review.handoff(stdout, stderr, root, conf, cwd, args.body_file, args.result)
+            code = review.confirm(stdout, stderr, root, conf, cwd, args.phase, args.result)
     elif kind == "review" and verb == "ready":
         if not args.result:
             stderr.write("ccnavi: review ready には --result <json> が要る\n")
         else:
             code = review.ready(stdout, stderr, root, conf, cwd, args.result)
-    elif kind == "review" and verb == "wrapup":
-        # 人の判断。--approve / --reviewed と同じく端末を求める。
-        if not args.result:
-            stderr.write("ccnavi: review wrapup には --reason <理由> と --result <json> が要る\n")
-        elif _from_terminal(stdin, conf, stderr, "review wrapup"):
-            code = review.wrapup(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
     else:
         stderr.write(USAGE)
     return EXIT_OK if code == 0 else EXIT_ERROR

@@ -642,7 +642,7 @@ def _script_writes(
 ) -> set[str]:
     """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
 
-    `ticket start` / `done` / `cancel` と `review request` / `check` / `ready` は、
+    `ticket start` / `finish` / `cancel` と `review request` / `confirm` / `ready` は、
     承認済みチケットとマーカーを書く。書いた先は `deny` と宣言された場所なので、外さないと
     自分の手順を自分で違反として報告し、戻す設定では自分で戻す。
 
@@ -654,7 +654,7 @@ def _script_writes(
 
     * どちらの版も範囲を宣言していないもの（マーカー、`.risk.json`、閉じの記録）
     * スクリプトだけが書く欄（`ticket.SCRIPT_FIELDS`）以外が 1 文字も変わっていないチケット
-    * `done` と `cancel` の移動。同じ姿のチケットが `doing/` から消えて、レビュー待ちか
+    * `finish` と `cancel` の移動。同じ姿のチケットが `doing/` から消えて、レビュー待ちか
       閉じた置き場に現れた組。片側だけなら外さない
 
     外さないもの——範囲や親やフェーズや本文が変わったチケット、新しく現れた承認済み
@@ -679,7 +679,7 @@ def _script_writes(
         return set()
 
     out: set[str] = set()
-    # 消えた側と現れた側。組になったときだけ外す（`done` と `cancel` の移動）。
+    # 消えた側と現れた側。組になったときだけ外す（`finish` と `cancel` の移動）。
     gone: list[tuple[gitstate.Change, str, tuple[str, ...]]] = []
     arrived: list[tuple[gitstate.Change, str]] = []
     for change, rel in here:
@@ -704,7 +704,7 @@ def _script_writes(
         ):
             arrived.append((change, now))
     for change, before, drop in gone:
-        # 行き先の姿は、消えた側の落とす欄で見る。`done` が足す `completed_at` は
+        # 行き先の姿は、消えた側の落とす欄で見る。`finish` が足す `completed_at` は
         # 消えた側がまだ持っていないので落ち、着手の時刻と基準点は両側に残る。
         shape = _shape(before, drop)
         landed = [c for c, now in arrived if _shape(now, drop) == shape]

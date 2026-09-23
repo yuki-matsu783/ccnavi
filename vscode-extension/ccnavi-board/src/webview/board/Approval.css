@@ -37,3 +37,12 @@
 .approval-note.warn { color: var(--vscode-editorWarning-foreground); }
 .approval-note.error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
 .approval-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+
+/* 残った指摘の行き先（`Decide.tsx`）。指摘 1 件ずつに場所・要旨・行き先の選択を並べる */
+.decide-threads { margin: 0; padding-left: 22px; }
+.decide-thread { padding: 6px 0; border-bottom: 1px solid var(--vscode-panel-border); }
+.decide-where { display: flex; gap: 8px; flex-wrap: wrap; font-size: .9em; }
+.decide-url { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+.decide-body { margin: 2px 0 4px; overflow-wrap: anywhere; }
+.decide-choices { display: flex; gap: 12px; flex-wrap: wrap; font-size: .9em; }
+.decide-choices label { display: inline-flex; gap: 4px; align-items: center; }
