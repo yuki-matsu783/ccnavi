@@ -21,6 +21,11 @@
  * 関係を直しながら確かめる作業とぶつかる。それを `after` についてだけ受け入れる（深さで並べないと、
  * 合流と分岐が交差した線に埋もれる）。人がドラッグで置いた点は動かない（`state.ts`）。
  *
+ * **work と feedback は分けて置く。** work の種類は上の決まりで並べ、feedback の種類はその右に 1 列で
+ * 縦に並べる（`FEEDBACK_GAP` だけ離す）。feedback の種類は全体計画（`plan:`）には入らず、レビューの
+ * あとに `feedback:` へ並べる対応なので、図は区分ごとの枠と、枠の間の「レビュー後」の矢印でその順を見せる
+ * （`Graph.tsx`）。feedback の種類は `after` を持てない（`phasetypes.py`）ので、種類どうしの線では描けない。
+ *
  * **循環は見つけたと言わない。** 深さを辿る途中で同じ点に戻ったら、そこで打ち切るだけ。並べ方も
  * 切り替えない。循環の error は実行ファイル（`phasetypes.cycle_problems`）が出す。
  */
@@ -62,6 +67,8 @@ export const ROW = 120;
 export const NODE_WIDTH = 170;
 /** 1 行に並べる数 */
 const WRAP = 4;
+/** work の枠と feedback の枠の間の余白（`COLUMN` に足す） */
+export const FEEDBACK_GAP = 90;
 
 /** 前後の空白を落とした id。画面の他の場所（重なりの検査）と同じ読み方 */
 function idOf(phase: { readonly id: string }): string {
@@ -141,7 +148,11 @@ export function graphOf(form: PhasesForm): PhasesGraph {
   const edges = edgesOf(kept, new Set(ids));
 
   // 置き場所（頭のコメント）。sequential は id の順の格子、dag は after の深さの列
-  const spot = form.order === "dag" ? byDepth(first, ids) : byGrid(ids);
+  const works = ids.filter((id) => first.get(id)?.kind !== "feedback");
+  const feedbacks = ids.filter((id) => first.get(id)?.kind === "feedback");
+  const spot = form.order === "dag" ? byDepth(first, works) : byGrid(works);
+  const right = works.length === 0 ? 0 : Math.max(...works.map((id) => (spot.get(id) as { x: number }).x)) + COLUMN + FEEDBACK_GAP;
+  feedbacks.forEach((id, index) => spot.set(id, { x: right, y: index * ROW }));
   const nodes = ids.map((id) => {
     const phase = first.get(id) as PhasesForm["phases"][number];
     const at = spot.get(id) as { x: number; y: number };

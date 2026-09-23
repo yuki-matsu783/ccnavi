@@ -13,7 +13,7 @@ export function hasRelations(phase: PhaseForm): boolean {
 
 /** 「ほかの種類との関係・補足」の見出しに添える一言 */
 export function relationsNote(phase: PhaseForm): string {
-  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行・一緒に必要・先に済ませる種類、担当エージェント、使う場面";
+  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に必要な種類・先に済ませる種類・案内するエージェント・使う場面";
 }
 
 /** 要約に出す範囲。inherit ならその綴り、glob が無ければ未設定と言う */
@@ -78,6 +78,7 @@ export function graphNote(graph: PhasesGraph): string {
     graph.order === "dag"
       ? "矢印は after（待たれる側 → 待つ側）。辺で繋がっていない種類は並行して進む。列は after の深さ"
       : "矢印は after。待ち方が sequential なので、after は判定に効かない（全体計画は一直線）",
+    "枠は区分で、左の作業（work）は全体計画 plan: に、右のフィードバック対応（feedback）はレビューのあと feedback: に並べる。枠の間の矢印はその順",
     "「人が見る」は種類の宣言（review）。計画の延期や実績のリスクで実際に見る場所は変わる",
     "このファイルに無い種類を指す線は出ない（綴り違いか、他の層の種類か。どちらかは保存のときの検証が言う）。他の層の after は描かないので、その種類は根に見える",
     "判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる",

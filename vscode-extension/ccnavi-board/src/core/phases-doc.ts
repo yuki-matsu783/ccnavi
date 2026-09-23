@@ -38,8 +38,13 @@ export type ListKey = (typeof LIST_KEYS)[number];
 const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "overlap", "requires", "after", "agent", "when"] as const;
 
 /**
- * ファイルが無いときに「作る」で書き出す雛形。README「フェーズの種類と計画」の例と同じ。
- * `scope` の綴りは例なので、作ったあとに画面でそのプロジェクトの置き場に直す。
+ * ファイルが無いときに「作る」で書き出す雛形。`scope` の綴りは例なので、作ったあとに画面で
+ * そのプロジェクトの置き場に直す。
+ *
+ * **待ち方は dag で、流れを `after` で書く**（調査 → 設計と受入テスト作成 → 実装とテスト）。
+ * 一直線（sequential）だと種類どうしの順序がファイルのどこにも無く、図に流れが出ない。
+ * 受入テストは実装より先に書く（`overlap` で実装と並行させない）。feedback の種類は
+ * `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
  */
 export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 §9.7）。人が持つ設定で、エージェントは書き換えない。
 #
@@ -50,8 +55,12 @@ export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 §9.7）�
 # \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。
 # このファイルが無ければ、フェーズは番号だけの挙動に戻る。
 #
+# \`order: dag\` なので、各項は \`after\` に挙げた種類（の祖先）だけを待ち、辺で繋がっていない
+# 種類は並行して進む。辺の書き漏れは並行として通るので、画面の図で確かめる。
+#
 # 下は雛形。scope の綴りはこのプロジェクトの置き場に合わせて直す。
 version: 1
+order: dag
 
 phases:
   research:
@@ -68,6 +77,7 @@ phases:
     review: mr
     scope: ["wip/design/*", "docs/*"]
     deliverables: ["wip/design/*.md"]
+    after: [research]
     when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
 
   acceptance:
@@ -75,8 +85,8 @@ phases:
     title: 受入テスト作成
     review: mr
     scope: ["tests/*"]
-    overlap: [implement]
-    when: 振る舞いが変わるとき。実装と並行してよい
+    after: [research]
+    when: 振る舞いが変わるとき。設計と並行してよく、実装より先に書く
 
   implement:
     kind: work
@@ -84,6 +94,7 @@ phases:
     review: mr
     scope: ["src/*", "tests/*"]
     requires: [acceptance]
+    after: [design, acceptance]
 
   implement-feedback:
     kind: feedback

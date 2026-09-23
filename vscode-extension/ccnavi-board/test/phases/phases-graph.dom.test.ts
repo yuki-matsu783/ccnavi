@@ -196,3 +196,22 @@ test("CB-D79 同じ組が requires と overlap の両方を持つとき、2 本�
     await dom.close();
   }
 });
+
+test("CB-D89 雛形の図は after の矢印で流れを描き、work と feedback を枠で分けて「レビュー後」の矢印で結ぶ", async () => {
+  // 雛形は dag で、調査 → 設計と受入テスト作成 → 実装とテスト。implement-feedback は feedback の枠
+  const dom = await openGraph();
+  try {
+    const after = dom.all(".react-flow__edge.rel-after path.react-flow__edge-path");
+    assert.equal(after.length, 4, "research→design、research→acceptance、design→implement、acceptance→implement");
+    for (const path of after) {
+      assert.ok(path.getAttribute("marker-end") !== null || path.getAttribute("marker-start") !== null, "after の線に矢印が無い");
+      assert.notEqual(path.getAttribute("d") ?? "", "", "線の経路が空");
+    }
+    assert.match(dom.one('.phase-group[data-kind="work"]').textContent ?? "", /作業（plan:）/);
+    assert.match(dom.one('.phase-group[data-kind="feedback"]').textContent ?? "", /フィードバック対応（feedback:）/);
+    assert.match(dom.one(".phase-group-arrow").textContent ?? "", /レビュー後/);
+    assert.match(dom.one(".graph-note").textContent ?? "", /枠は区分/);
+  } finally {
+    await dom.close();
+  }
+});

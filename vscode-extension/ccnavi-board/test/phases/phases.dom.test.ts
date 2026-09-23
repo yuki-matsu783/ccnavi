@@ -1,7 +1,7 @@
 /** フェーズ管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。 */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readPhases } from "../../src/core/phases-doc.js";
+import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
 import { openPage, openPhases, page, rowSelector } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
@@ -64,7 +64,8 @@ test("CB-D22 絞り込みは title と scope にも当たり、開いている�
     await dom.settle();
     dom.type(dom.one("#find"), "設計");
     await dom.settle();
-    assert.equal(dom.one("#phase-count").textContent, "1 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
+    // design は題で、acceptance は when（「設計と並行してよく」）で当たる
+    assert.equal(dom.one("#phase-count").textContent, "2 / 5（開いたまま 1）", "開いている research は一致しないので数えず、開いたままの数として添える");
     assert.ok(dom.one(rowSelector("p1")).classList.contains("hidden-by-find"));
     assert.ok(dom.one(rowSelector("p1")).classList.contains("open"));
     assert.ok(!dom.one(rowSelector("p2")).classList.contains("hidden-by-find"));
@@ -111,7 +112,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "担当エージェント", "使う場面"],
+      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -211,14 +212,14 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
 test("CB-D67 ほかの種類との関係・補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
-    dom.click(dom.one(`${rowSelector("p2")} .row-head`));
+    dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
-    // 雛形の design は when を持つので開いている
-    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
-    dom.type(dom.one(`${rowSelector("p2")} input.f-when`), "");
+    // 雛形の research は when だけを持つので開いている
+    assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
+    dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
-    assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
-    assert.match(dom.one(`${rowSelector("p2")} details.more > summary`).textContent, /ほかの種類との関係・補足（未設定）/);
+    assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
+    assert.match(dom.one(`${rowSelector("p1")} details.more > summary`).textContent, /ほかの種類との関係・補足（未設定）/);
   } finally {
     await dom.close();
   }
@@ -278,38 +279,80 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
   }
 });
 
-test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自分の id は候補に出ない。候補に無い id は打って足せる", async () => {
+test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自分の id は候補に出ない。並びはファイルの順に揃う", async () => {
   const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p4")} .row-head`));
+    await dom.settle();
+    const values = (field: string, only?: "checked"): string[] =>
+      dom
+        .all<HTMLInputElement>(`${rowSelector("p4")} ${field} .id-option input`)
+        .filter((input) => only === undefined || input.checked)
+        .map((input) => input.value);
+    // 雛形の implement。自分（implement）は候補に出ない
+    assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
+    assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
+    // after の候補は work の種類だけ。feedback の種類は待つ先にできない
+    assert.deepEqual(values(".f-after"), ["research", "design", "acceptance"]);
+    assert.deepEqual(values(".f-after", "checked"), ["design", "acceptance"]);
+    // 付け外ししても、並びはファイルの順のまま（YAML に余計な差分を出さない）
+    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("p4")} .f-after .id-option input[value="design"]`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("p4")} .f-requires .id-option input[value="research"]`));
+    await dom.settle();
+    // after に挙げた id は overlap で選べない（両方に挙げると検証が止める）
+    assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p4")} .f-overlap .id-option input[value="design"]`).disabled);
+    assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p4")} .f-overlap .id-option input[value="implement-feedback"]`).disabled);
+    // 共通層ではほかの層を指せないので、id を打つ欄は出さない
+    assert.equal(dom.all(`${rowSelector("p4")} input.id-extra`).length, 0);
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    const saved = savedForm(dom).phases[3];
+    assert.deepEqual(saved.after, ["design", "acceptance"]);
+    assert.deepEqual(saved.requires, ["research", "acceptance"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
+  const base = readPhases(TEMPLATE_PHASES_TEXT).model;
+  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
+  const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
   try {
     dom.click(dom.one(`${rowSelector("p3")} .row-head`));
     await dom.settle();
-    const options = (selector: string): string[] =>
-      dom.all<HTMLInputElement>(`${rowSelector("p3")} ${selector} .id-option input`).map((input) => input.value);
-    // 雛形の acceptance は overlap に implement を持つ。候補は自分（acceptance）を除いた 4 種類
-    assert.deepEqual(options(".f-overlap"), ["research", "design", "implement", "implement-feedback"]);
-    assert.deepEqual(
-      dom.all<HTMLInputElement>(`${rowSelector("p3")} .f-overlap .id-option input`).filter((input) => input.checked).map((input) => input.value),
-      ["implement"],
-    );
-    dom.click(dom.one(`${rowSelector("p3")} .f-requires .id-option input[value="design"]`));
+    // 前後の空白は落として読み、空は出さない。自分自身は外せるように印を付けて出す
+    const checked = dom.all<HTMLInputElement>(`${rowSelector("p3")} .f-overlap .id-option input`).filter((input) => input.checked);
+    assert.deepEqual(checked.map((input) => input.value), ["design", "acceptance"]);
+    assert.ok(dom.one(`${rowSelector("p3")} .f-overlap .id-option.foreign`).textContent?.includes("acceptance"));
+    dom.type(dom.one(`${rowSelector("p3")} .f-requires input.id-extra`), "外の種類, acceptance");
     await dom.settle();
-    dom.click(dom.one(`${rowSelector("p3")} .f-overlap .id-option input[value="implement"]`));
+    dom.key("Enter", dom.one(`${rowSelector("p3")} .f-requires input.id-extra`));
     await dom.settle();
-    // ほかの層の種類は打って Enter で足す。自分の id は足さない
-    const extra = dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-after input.id-extra`);
-    dom.type(extra, "外の種類, acceptance");
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-requires input.id-extra`).value, "");
+    assert.ok(dom.one(`${rowSelector("p3")} .f-requires .id-option.foreign`).textContent?.includes("外の種類"));
+    dom.click(dom.one(`${rowSelector("p3")} .f-overlap .id-option input[value="acceptance"]`));
     await dom.settle();
-    dom.key("Enter", dom.one(`${rowSelector("p3")} .f-after input.id-extra`));
-    await dom.settle();
-    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-after input.id-extra`).value, "");
-    assert.ok(dom.one(`${rowSelector("p3")} .f-after .id-option.foreign`).textContent?.includes("外の種類"));
     dom.click(dom.one("#save"));
     await dom.settle();
-    const saves = dom.posted.filter((message) => message.type === "save");
-    const saved = (saves[saves.length - 1].form as PhasesForm).phases[2];
-    assert.deepEqual(saved.overlap, []);
-    assert.deepEqual(saved.requires, ["design"]);
-    assert.deepEqual(saved.after, ["外の種類"]);
+    const saved = savedForm(dom).phases[2];
+    assert.deepEqual(saved.overlap, ["design"]);
+    assert.deepEqual(saved.requires, ["外の種類"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D88 feedback の種類は先に済ませる種類を持てないと言い、欄を出さない", async () => {
+  const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p5")} .row-head`));
+    await dom.settle();
+    assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
+    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てない/);
   } finally {
     await dom.close();
   }

@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { Lock } from "../../core/lock.js";
 import { graphOf } from "../../core/phases-graph.js";
-import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
+import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKind, type PhaseOrder, type PhasesData, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Graph } from "./Graph.js";
 import { Phase } from "./Phase.js";
@@ -254,7 +254,14 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const dup = duplicates(draft);
-  const ids = draft.rows.map((row) => row.phase.id.trim());
+  // 関係の欄の候補。同じ id が 2 つあるときは先に出てきたほう（図と同じ読み方）
+  const kinds = new Map<string, PhaseKind>();
+  for (const row of draft.rows) {
+    const id = row.phase.id.trim();
+    if (id !== "" && !kinds.has(id)) {
+      kinds.set(id, row.phase.kind);
+    }
+  }
   const query = find.trim().toLowerCase();
   const rows = draft.rows.map((row) => {
     const text = findText(row.phase);
@@ -369,9 +376,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは{" "}
             <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。
-            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
+            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に必要な種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
             辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効かない。
-            関係の欄はこのファイルのほかの種類から選ぶ（ほかの層の種類は id を打って足す）。範囲と成果物は <code>,</code> で区切る。
+            関係の欄はこのファイルのほかの種類から選ぶ（層の画面では、ほかの層の種類の id を打って足せる）。範囲と成果物は <code>,</code> で区切る。
           </p>
         </details>
         {view === "graph" && (
@@ -390,7 +397,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               hidden={row.hidden}
               open={open.has(row.key)}
               moreOpen={more.get(row.key) === true}
-              ids={ids}
+              kinds={kinds}
+              layer={page?.layer === true}
               duplicate={dup.has(row.phase.id.trim())}
               disabled={busy || !editable}
               onToggle={() => toggle(row.key)}

@@ -11,5 +11,6 @@
 .field > .ids { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; min-width: 0; }
 .ids .id-option { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; font-family: var(--vscode-editor-font-family); }
 .ids .id-option input { margin: 0; }
+.ids .id-option:has(input:disabled) { cursor: default; opacity: .6; }
 .ids .id-option.foreign { color: var(--vscode-descriptionForeground); font-style: italic; }
 .ids .id-extra { flex: 0 1 220px; min-width: 120px; }
