@@ -50,6 +50,7 @@
  * | 残った指摘を読むのは、人のレビュー待ちのフェーズだけ | 依頼していないフェーズで、実行ファイルの前提の誤りを人が読むことになる |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧に化ける |
+ * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
  *
  * これらは `test/shared/approval-machine.test.ts` が見る。**同じファイルの変異テストが、
  * 見張りを 1 つ消したらテストが落ちることまで見る**ので、見張りを足したらそちらにも足す。
@@ -381,6 +382,10 @@ function reviewed(
   if (kind !== undefined && kind !== "error" && kind !== "prompt") {
     return stay(state);
   }
+  // 決めた結果の文（取り返せない）の上にも被せない
+  if (keptPrompt(state)) {
+    return stay(state);
+  }
   const { parent, phase, tree, chip } = input;
   if (tree === undefined || chip === undefined) {
     return stay(state, {
@@ -437,6 +442,11 @@ function closable(state: ApprovalState): boolean {
   return kind !== "approving" && kind !== "deciding";
 }
 
+/** 取り返せない文（残った指摘を決めた結果）を見せているか */
+function keptPrompt(state: ApprovalState): boolean {
+  return state.overlay?.kind === "prompt" && state.overlay.keep === true;
+}
+
 /** 残った指摘を決める途中（読み込み中・一覧・置いている最中）か */
 function busyDeciding(state: ApprovalState): boolean {
   const kind = state.overlay?.kind;
@@ -457,7 +467,7 @@ function decideOpened(
   },
 ): ApprovalStep {
   const kind = state.overlay?.kind;
-  const coverable = kind === undefined || kind === "error" || kind === "prompt";
+  const coverable = kind === undefined || kind === "error" || (kind === "prompt" && !keptPrompt(state));
   if (!coverable) {
     return stay(state);
   }
@@ -551,6 +561,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
             "新しいセッションで開く。送るときは自分で Enter を押す。",
           prompt: value.prompt,
           what: "残った指摘を決めた文",
+          keep: true,
         },
         only: state.only,
       },

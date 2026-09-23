@@ -41,6 +41,11 @@ export type ApprovalOverlay =
       readonly prompt: string;
       /** 渡したときに人へ言う呼び名（「…をコピーした」）。無ければレビュー済みの連絡の文 */
       readonly what?: string;
+      /**
+       * 取り返せない文か（残った指摘を決めた結果。続きの子はもう置かれている）。真なら、
+       * 承認した文（`done`）と同じく、渡し終えるか閉じるまで別のオーバーレイを被せない
+       */
+      readonly keep?: boolean;
     }
   /**
    * 残った指摘を読み込んでいる（`ccnavi-review.sh decide <N> --preview`）。`tree` は親のワークツリーで、

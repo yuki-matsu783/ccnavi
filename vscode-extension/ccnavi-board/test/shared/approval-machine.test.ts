@@ -139,6 +139,8 @@ function named(step: Step, kind: string): ApprovalState {
       return toDecidePreview(step);
     case "deciding":
       return toDeciding(step);
+    case "decided":
+      return toDecided(step);
     default:
       throw new Error(`知らない状態: ${kind}`);
   }
@@ -176,6 +178,26 @@ function toDecidePreview(step: Step): ApprovalState {
 
 function toDeciding(step: Step): ApprovalState {
   return step(toDecidePreview(step), { kind: "decideConfirm", choices: { u1: "keep", u2: "fix" } }).state;
+}
+
+function toDecided(step: Step): ApprovalState {
+  const state = step(toDeciding(step), {
+    kind: "decided",
+    outcome: {
+      ok: true,
+      value: {
+        parent: "i0001",
+        phase: 1,
+        reviewed: false,
+        followup: "i0001-03",
+        prompt: "決めた文",
+        issue_url: "",
+        warning: "",
+      },
+    },
+  }).state;
+  // 名前で引くときは overlay.kind で確かめるので、ここでは prompt になっていることだけを見る
+  return state;
 }
 
 function toDone(step: Step): ApprovalState {
@@ -316,7 +338,7 @@ const GUARDS: readonly Guard[] = [
   },
   {
     what: "承認の途中・承認した文・決める途中には、残った指摘のオーバーレイを被せない",
-    find: 'const coverable = kind === undefined || kind === "error" || kind === "prompt";',
+    find: 'const coverable = kind === undefined || kind === "error" || (kind === "prompt" && !keptPrompt(state));',
     into: "const coverable = true;",
     check(step) {
       const kinds_ = ["loading", "preview", "approving", "done", "decideLoading", "decidePreview", "deciding"];
@@ -430,6 +452,38 @@ const GUARDS: readonly Guard[] = [
         assert.equal(after.state.overlay, undefined, `${tickets.join(",")}: 古いボードの識別子では開かない`);
         assert.deepEqual(kinds(after.effects), ["warn", "refresh"], tickets.join(","));
       }
+    },
+  },
+  {
+    what: "決めた結果の文の上に、レビュー済みの連絡を被せない",
+    find: "  if (keptPrompt(state)) {",
+    into: "  if (false) {",
+    check(step) {
+      const decided = toDecided(step);
+      assert.equal(decided.overlay?.kind, "prompt");
+      const after = step(decided, {
+        kind: "reviewed",
+        parent: "i0001",
+        phase: 1,
+        tree: TREE,
+        chip: chipOf(),
+        root: "/w",
+      });
+      assert.equal(after.state, decided);
+    },
+  },
+  {
+    what: "決めた結果の文の上に、次の「決める」を被せない",
+    find: 'const coverable = kind === undefined || kind === "error" || (kind === "prompt" && !keptPrompt(state));',
+    into: 'const coverable = kind === undefined || kind === "error" || kind === "prompt";',
+    check(step) {
+      const decided = toDecided(step);
+      const after = step(decided, { kind: "decide", parent: "i0001", phase: 1, tree: TREE, chip: chipOf() });
+      assert.equal(after.state, decided);
+      assert.deepEqual(kinds(after.effects), []);
+      // 連絡の文（keep でない prompt）の上には開ける。ここまで塞ぐと、決める道が消える
+      const prompt = toPrompt(step);
+      assert.equal(step(prompt, { kind: "decide", parent: "i0001", phase: 1, tree: TREE, chip: chipOf() }).state.overlay?.kind, "decideLoading");
     },
   },
 ];
@@ -724,7 +778,7 @@ test("CB-T180 見張りは全部効いている（表の 1 行ずつ）", () => 
   for (const guard of GUARDS) {
     guard.check(approvalStep);
   }
-  assert.equal(GUARDS.length, 14, "見張りを足したら GUARDS にも足す");
+  assert.equal(GUARDS.length, 16, "見張りを足したら GUARDS にも足す");
 });
 
 // --- 変異テスト ---
