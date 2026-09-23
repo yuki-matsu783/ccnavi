@@ -26,6 +26,10 @@ SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "worktrees", "pro
 
 NAME_THEN_WIDE = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*(?=[^\x00-\x7f])")
 CASE_IN_SUBSHELL = re.compile(r"\$\(\s*case\b")
+# 複数行にまたがる `$( )`。行末の `$(` で開き、`)` だけの行で閉じる形を見る。
+OPENS_SUBSHELL = re.compile(r"\$\(\s*$")
+CLOSES_SUBSHELL = re.compile(r"^\s*\)")
+CASE_LINE = re.compile(r"^\s*case\b")
 
 
 def shell_scripts():
@@ -67,6 +71,26 @@ class ShPortabilityTest(unittest.TestCase):
 
     def test_case_is_not_written_inside_command_substitution(self):
         self.assertEqual([], self.found(CASE_IN_SUBSHELL), "case 文で変数に入れてください")
+
+    def test_case_is_not_written_inside_a_multiline_command_substitution(self):
+        """`x=$(` から `)` までの間に `case` を書かない。1 行の検査では見えない形。
+
+        ループを丸ごと `$( )` で包んで報せを集める書き方で起きる。`case` の要るものは
+        `$( )` の外で関数にして、中からは呼ぶだけにする。
+        """
+        hits = []
+        for path in shell_scripts():
+            rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+            inside = False
+            for number, line in code_lines(path):
+                if not inside:
+                    inside = bool(OPENS_SUBSHELL.search(line))
+                    continue
+                if CLOSES_SUBSHELL.search(line) and not line.strip().rstrip(")").strip():
+                    inside = False
+                elif CASE_LINE.search(line):
+                    hits.append(f"{rel}:{number}: {line.strip()}")
+        self.assertEqual([], hits, "case は $( ) の外の関数に移してください")
 
     def test_sh_files_are_checked_out_with_lf(self):
         # Windows で core.autocrlf=true だと、取り出すときに CRLF になり、シバンが
