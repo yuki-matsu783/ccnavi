@@ -660,7 +660,8 @@ def accepted_threads(
     kept = set()
     for thread in threads:
         where = at.get(thread)
-        if where is None or (isinstance(where, int) and where in reach):
+        scoped = isinstance(where, list)
+        if not scoped or any(isinstance(n, int) and n in reach for n in where):
             kept.add(thread)
     return kept
 
@@ -682,12 +683,16 @@ def remember_accepted(
     data = fsio.read_dict(path) or {}
     at = dict(data.get("phases")) if isinstance(data.get("phases"), dict) else {}
     added = {str(t) for t in threads if str(t)}
-    keep = sorted(accepted_threads(approved_dir, parent) | added)
+    threads_before = accepted_threads(approved_dir, parent)
+    keep = sorted(threads_before | added)
     for thread in added:
         if phase is None:
+            # 番号を持たない受け入れ（`wrapup`）は親全体に効く。
             at.pop(thread, None)
-        else:
-            at.setdefault(thread, phase)
+        elif thread in at or thread not in threads_before:
+            # 受け入れた番号を足していく。別の枝で受け入れ直した分も効かせる。
+            known = [n for n in at.get(thread, []) if isinstance(n, int)]
+            at[thread] = sorted(set(known) | {phase})
     # 読んで、足して、書き戻す形。同じファイルの `_write_known` と同じく、
     # 途中を見せない書き方で置く。
     body = {"threads": keep, "phases": dict(sorted(at.items())), "at": now()}
@@ -1425,7 +1430,7 @@ def candidates(
     for t in sorted(revisions, key=lambda x: x.ticket):
         current = open_index[t.ticket]
         types = types_for(t)
-        complaints = revision_problems(root, conf, t, current, types)
+        complaints = _workflow_field(t) + revision_problems(root, conf, t, current, types)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -1447,6 +1452,7 @@ def candidates(
     ):
         types = types_for(t)
         complaints, overflow = validate(t, pool, types)
+        complaints += _workflow_field(t)
         complaints += project_problems(t, pool, conf)
         if t.is_child and not any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             parent = pool.get(t.parent)
@@ -1462,6 +1468,19 @@ def candidates(
         if t.is_child:
             added.setdefault(t.parent, []).append(t)
     return batch, rejected, pool
+
+
+def _workflow_field(t: ticket_mod.Ticket) -> list[rules.Problem]:
+    """提案に待ち方の写し（`workflow:`）が書いてあれば拒む。写しを書くのは `--approve` だけ。"""
+    if ticket_mod.WORKFLOW_KEY not in t.raw:
+        return []
+    return [
+        rules.Problem(
+            rules.SEVERITY_ERROR,
+            t.ticket,
+            f"`{ticket_mod.WORKFLOW_KEY}` は --approve が書く欄。提案には書かない",
+        )
+    ]
 
 
 def project_of(t: ticket_mod.Ticket, pool: dict[str, ticket_mod.Ticket]) -> str:
@@ -1727,8 +1746,7 @@ def _workflow_lines(t: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
     if not found:
         return []
     return [
-        "■ 待ち方（phases.yml の after から。承認すると親に写し、"
-        "後から phases.yml を直しても変わらない）",
+        "■ 待ち方（承認すると親に写し、後から phases.yml を直しても変わらない）",
         *("    " + x for x in found),
     ]
 
@@ -1967,6 +1985,29 @@ def revision_problems(
                     "番号がずれると子の phase が指す先が変わる",
                 )
             )
+    # 延期の引き受け手: 子がある番号までは変えない。引き受け手が前へ動くと、延期した作業を
+    # 済んだレビューが引き受けたことになり、誰にも見られずに終わる。
+    frozen = _last_phase_with_children(conf, root, current.ticket)
+    held = workflow.effective(current, types).review_at
+    fresh = workflow.compute(revised, types).review_at
+    moved = [
+        n
+        for n in sorted(set(held) | set(fresh))
+        if held.get(n) != fresh.get(n)
+        and (
+            n <= frozen
+            or any(at is not None and at <= frozen for at in (held.get(n), fresh.get(n)))
+        )
+    ]
+    if moved:
+        problems.append(
+            rules.Problem(
+                rules.SEVERITY_ERROR,
+                revised.ticket,
+                f"延期の引き受け手が変わる（{', '.join(map(str, moved))} 番目）。"
+                f"{frozen} 番目までは子が承認されているので、延期の行き先は変えられない",
+            )
+        )
     # フィードバック計画: 無い状態から 1 回だけ、全体計画の最後のレビューが済んでから。
     if revised.feedback != current.feedback:
         if current.feedback is not None:

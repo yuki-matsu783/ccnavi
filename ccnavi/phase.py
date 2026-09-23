@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TextIO
 
 from . import (
@@ -472,6 +472,9 @@ def phases_of(
         # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
+        if owner.workflow is None and owner.state == ticket_mod.TODO:
+            # 承認前の提案。延期の引き受け手を、承認で写すものと同じ計算で読む。
+            owner = replace(owner, workflow=workflow.compute(owner, types or None))
         for n, item in owner.numbered():
             by_number[n] = Phase(parent_id, n, item=item, type=types.get(item.type), owner=owner)
         # 延期を引き受けた側に、引き受けた分の「見る場所」を渡す。厳しい側を採るのは
@@ -700,8 +703,13 @@ def _next_hint(parent: ticket_mod.Ticket, phases: list[Phase], number: int) -> s
             )
         return "計画のフェーズは全部終わりました。親チケットを閉じられます。"
     if is_dag(parent):
-        # 並行して始められるものを全部挙げる。待ちが済んでいない番号は案内しない。
-        ready = [p for p in following if not p.tickets and waits_done(parent, phases, p.number)]
+        # 並行して始められるものを全部挙げる。番号が前でも、まだ子の無い枝は拾う。
+        # 待ちが済んでいない番号は案内しない。
+        ready = [
+            p
+            for p in phases
+            if parent.in_plan(p.number) and not p.tickets and waits_done(parent, phases, p.number)
+        ]
         if not ready:
             return "次に始められるフェーズは、待っているフェーズが済むまでありません。"
         names = "、".join(p.label for p in ready)

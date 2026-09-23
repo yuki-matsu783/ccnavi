@@ -246,6 +246,7 @@ def parse(
     if refs:
         problems.extend(reference_problems(types.values(), types))
         problems.extend(cycle_problems(types))
+        problems.extend(conflict_problems(types))
     if any(p.severity == SEVERITY_ERROR for p in problems):
         return None, problems
     return types, problems
@@ -281,6 +282,28 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
                         pt.id,
                         f"`after` の `{name}` は kind `{target.kind}`。"
                         f"指せるのは `{KIND_WORK}` だけ",
+                    )
+                )
+    return problems
+
+
+def conflict_problems(pool: dict[str, PhaseType]) -> list[Problem]:
+    """同じ組を `after`（待つ）と `overlap`（並行してよい）の両方に挙げていないか。
+
+    両方あると、待ち方の計算は `overlap` を採って待たず、書いた依存が黙って消える。
+    どちらのつもりかを人に決めさせる。
+    """
+    problems: list[Problem] = []
+    for pt in pool.values():
+        for name in pt.after:
+            other = pool.get(name)
+            if other is not None and pt.overlaps(other):
+                problems.append(
+                    Problem(
+                        SEVERITY_ERROR,
+                        pt.id,
+                        f"`{name}` を after と overlap の両方に挙げている。"
+                        "待つか並行かを 1 つにする",
                     )
                 )
     return problems
@@ -405,6 +428,7 @@ def merge(
     merged.update(added)
     problems.extend(reference_problems(added.values(), merged))
     problems.extend(cycle_problems(merged))
+    problems.extend(conflict_problems(merged))
     if any(p.severity == SEVERITY_ERROR for p in problems):
         return base, problems
     return merged, problems

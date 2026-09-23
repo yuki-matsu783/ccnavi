@@ -56,19 +56,32 @@ def compute(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflo
 def _defer_target(
     wf: ticket_mod.Workflow, parent: ticket_mod.Ticket, types: dict | None, n: int
 ) -> int | None:
-    """延期した n 番目を引き受ける番号。後ろの、n を待つ、延期していない最小の番号。
+    """延期した n 番目を引き受ける番号。
 
-    一直線では後ろの番号はみな n を待つので、次の延期していない番号になる。
+    一直線なら、次の延期していない番号。`dag` なら、後ろで n を待つ（写しの `waits` に n を
+    持つ）、延期していない最小の番号。待たない番号が引き受けると、延期した作業が閉じる前に
+    そのレビューが済んでしまう。
     """
     for m in range(n + 1, len(parent.plan) + 1):
         if parent.plan[m - 1].deferred:
             continue
-        if wf.order == ticket_mod.WORKFLOW_DAG and not _depends(
-            types, parent.plan[m - 1].type, parent.plan[n - 1].type
-        ):
+        if wf.order == ticket_mod.WORKFLOW_DAG and n not in wf.waits.get(m, []):
             continue
         return m
     return None
+
+
+def effective(parent: ticket_mod.Ticket, types: dict | None) -> ticket_mod.Workflow:
+    """判定に使う待ち方。承認済みの親は写しだけを読む。
+
+    写しを持たない承認済みの親は一直線で読み、いまの種類からは計算しない。種類から計算するのは、
+    まだ承認されていない提案（同じ承認で通る親と、改版の提案）だけ。
+    """
+    if parent.workflow is not None:
+        return parent.workflow
+    if parent.state == ticket_mod.TODO:
+        return compute(parent, types)
+    return compute(parent, None)
 
 
 def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list[int]:
@@ -77,8 +90,7 @@ def waits_of(parent: ticket_mod.Ticket, number: int, types: dict | None) -> list
     フィードバック計画は一直線で、前の番号を全部待つ（`overlap` の組は待たない）。
     """
     if parent.in_plan(number):
-        wf = parent.workflow or compute(parent, types)
-        return list(wf.waits.get(number, range(1, number)))
+        return list(effective(parent, types).waits.get(number, range(1, number)))
     item = parent.item_at(number)
     mine = (types or {}).get(item.type) if item is not None else None
     waits = []
@@ -112,8 +124,10 @@ def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
                             "先に要る（after）。後ろに置くと依存が消えて並行に通る",
                         )
                     )
+        # 終端は、実際の待ち（`overlap` で外れた組を除いたもの）で見る。
         last = items[-1]
-        loose = [item.type for item in items[:-1] if not _depends(types, last.type, item.type)]
+        waited = set(wf.waits.get(len(items), []))
+        loose = [item.type for m, item in enumerate(items[:-1], start=1) if m not in waited]
         if loose:
             found.append(
                 rules.Problem(
@@ -155,9 +169,14 @@ def problems(parent: ticket_mod.Ticket, types: dict | None) -> list[rules.Proble
 
 
 def lines(parent: ticket_mod.Ticket, wf: ticket_mod.Workflow) -> list[str]:
-    """人向けの待ちの一覧。承認画面と `--explain` に出す。"""
+    """人向けの待ちの一覧。承認画面と `--explain` に出す。一直線なら延期の引き受け手だけ。"""
     if wf.order != ticket_mod.WORKFLOW_DAG:
-        return []
+        defers = [
+            f"{n}: {parent.plan[n - 1].type} — レビューは {at} と一緒に"
+            for n, at in sorted(wf.review_at.items())
+            if parent.in_plan(n)
+        ]
+        return ["一直線（前の番号を全部待つ）", *defers] if defers else []
     out = []
     for n, item in enumerate(parent.plan, start=1):
         waits = wf.waits.get(n, [])
