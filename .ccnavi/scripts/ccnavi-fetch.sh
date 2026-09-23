@@ -25,12 +25,6 @@
 # 出力はモデルに届く。何も動かなかったときは黙る。毎回同じ行を返すと、
 # セッションの頭の文脈がそれで埋まる。
 #
-# **取ってこられなかったときは、モデルが自分で確かめられる材料を返す。** git の通信が
-# 許されず、ホストには MCP のツールでしか届かない環境（Claude Code on the web の設定しだい）が
-# ある。hook からは MCP を呼べないので、確かめる対象（伏せた origin・ブランチ・手元の SHA）を
-# 並べ、比べ方と、遅れを見つけたときにしてよいこと・いけないことを添える。承認済みチケットを
-# ホストから取ってきて書く道は案内しない。そこを動かすのは人で、ガードが止める。
-#
 # **待たせない。** 認証を尋ねる画面を出させず（GIT_TERMINAL_PROMPT・GCM_INTERACTIVE）、
 # fetch 1 回に見張りを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
 # 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
@@ -58,13 +52,11 @@ case "$limit" in
 '' | *[!0-9]*) limit=15 ;;
 esac
 
-# 周をまたいで覚えておくもの。周はパイプの中（サブシェル）で回るので、変数では渡らない。
-#   failed   落ちた origin の綴り。同じ origin には取りに行かない
-#   targets  モデルに確かめてもらう対象。1 行 1 件
+# 落ちた origin の綴り。同じ origin には取りに行かない。周はパイプの中（サブシェル）で
+# 回るので、変数では渡らない。
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
 trap 'rm -rf "$scratch"' EXIT
 : >"$scratch/failed"
-: >"$scratch/targets"
 
 # origin へ 1 本取りに行く。取れたら 0。
 #
@@ -93,20 +85,15 @@ ccnavi_fetch_git() {
 	return 0
 }
 
-# 取りに行き、取れなければ確かめてもらう対象に足す。取れたら 0。
-#   <名前> <ツリー> <ブランチ> <手元の ref> <対象の説明> <落ちたときの 1 行>
+# 取りに行く。取れたら 0。<ツリー> <ブランチ> <落ちたときの 1 行>
 #
 # 落ちたときの 1 行は、その origin で初めて落ちたときだけ出す。同じ origin の 2 件目は
-# 取りに行かずに対象へ足すだけ。分け方に case が要るので、報せの `$( )` の外に置く。
+# 取りに行かずに黙って飛ばす。分け方に要る判定を、報せの `$( )` の外に置くための関数。
 ccnavi_fetch_or_note() {
-	ccnavi_fetch_git "$2" "$3"
+	ccnavi_fetch_git "$1" "$2"
 	ccnavi_fn_rc=$?
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
-	[ "$ccnavi_fn_rc" -eq 1 ] && printf '%s\n' "$6"
-	ccnavi_fn_url=$(git -C "$2" remote get-url origin 2>/dev/null || :)
-	ccnavi_fn_sha=$(git -C "$2" rev-parse --verify --quiet "$4" 2>/dev/null || :)
-	printf '  %s: origin=%s ブランチ=%s 手元=%s\n' "$1" "$(ccnavi_mask_url "$ccnavi_fn_url")" \
-		"$5" "${ccnavi_fn_sha:-（手元に無い）}" >>"$scratch/targets"
+	[ "$ccnavi_fn_rc" -eq 1 ] && printf '%s\n' "$3"
 	return 1
 }
 
@@ -200,7 +187,7 @@ report=$(
 		git -C "$tree" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1 || continue
 
 		name=$(basename "$tree")
-		ccnavi_fetch_or_note "$name" "$tree" "$branch" HEAD "$branch" \
+		ccnavi_fetch_or_note "$tree" "$branch" \
 			"${name}: リモートを取ってこられなかった。手元の版で判定する" || continue
 		behind=$(git -C "$tree" rev-list --count "HEAD..@{u}" 2>/dev/null || echo 0)
 		[ "$behind" = "0" ] && continue
@@ -233,8 +220,7 @@ report=$(
 			continue
 		fi
 
-		ccnavi_fetch_or_note "$name" "$repo" "$default" "refs/heads/$default" \
-			"${default}（ワークツリーの起点）" \
+		ccnavi_fetch_or_note "$repo" "$default" \
 			"${name}: ワークツリーの起点になる ${default} を取ってこられなかった。手元の版から切ることになる" ||
 			continue
 
@@ -283,10 +269,4 @@ report=$(
 [ -n "$report" ] || exit 0
 printf '[ccnavi] 承認済みチケットとマーカーは親ブランチに乗って届き、ワークツリーの起点はデフォルトブランチになる。セッションの頭で取ってきた結果:\n'
 printf '%s\n' "$report"
-[ -s "$scratch/targets" ] || exit 0
-printf '%s\n' "[ccnavi] git でリモートに届かなかった（オフラインか、git の通信が許されていない環境）。上のものは手元の版で判定する。"
-printf '%s\n' "ホストに MCP などのツールで届くなら、手元が遅れていないかを確かめられる。次の各ブランチの先頭のコミットをホストから取り、手元の SHA と比べる:"
-cat "$scratch/targets"
-printf '%s\n' "違っていたら、どのブランチが遅れているかを利用者に伝え、git が届く場所でワークスペースを pull してもらう。"
-printf '%s\n' "遅れを埋めるために承認済みチケットやマーカー（.ccnavi/approved/）をホストから取ってきて書かない。そこを動かすのは人で、ガードが止める。"
 exit 0

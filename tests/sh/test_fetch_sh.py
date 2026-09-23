@@ -247,23 +247,15 @@ class FetchTest(unittest.TestCase):
 
     # ---- 届かないとき
 
-    def test_unreachable_origin_hands_the_model_what_to_compare(self):
-        """git が届かない環境。確かめる対象と、してよいこと・いけないことを返す。
-
-        同じ origin には 1 度しか取りに行かない。資格情報は伏せる。
-        """
+    def test_unreachable_origin_is_tried_once(self):
+        """git が届かなくても止めない。同じ origin には 1 度しか取りに行かず、1 行だけ言う。"""
         self.leave_main()
         git(self.ws, "branch", "-q", "--set-upstream-to", "origin/main")
-        head = self.sha(self.ws, "HEAD")
         missing = posix(os.path.join(self._tmp.name, "nowhere.git"))
         git(self.ws, "remote", "set-url", "origin", "file://user:secret@" + missing.lstrip("/"))
         done = self.fetch()
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
-        self.assertIn("ブランチ=claude/x 手元=" + head, done.stdout)
-        self.assertIn("ブランチ=main（ワークツリーの起点） 手元=" + head, done.stdout)
-        self.assertIn("MCP", done.stdout)
-        self.assertIn(".ccnavi/approved/", done.stdout)
         self.assertNotIn("secret", done.stdout)
 
     def test_a_hanging_remote_is_cut_off(self):
