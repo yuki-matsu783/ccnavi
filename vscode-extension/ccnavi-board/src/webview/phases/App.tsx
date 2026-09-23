@@ -38,7 +38,7 @@ interface Editing {
   /** 開いている行の鍵 */
   readonly open: ReadonlySet<string>;
   /**
-   * 「関係と案内」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとは人の開閉で動く。**
+   * 「ほかの種類との関係・補足」を開いているか。**行ごとに 1 度だけ値の有無で決め、あとは人の開閉で動く。**
    * 描くたびに値の有無で決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
    */
   readonly more: ReadonlyMap<string, boolean>;
@@ -239,15 +239,22 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setFocusKey(row.key);
   };
 
+  /**
+   * 種類を足す。**図を見ていても一覧へ移す。** 足した種類は id が空で図に出ないので、図のままだと
+   * 押しても何も変わらないように見える。絞り込みも外す（id が空の行は絞り込みに当たらず隠れる）。
+   */
   const add = (): void => {
     const row = { key: nextKey(), phase: emptyPhase() };
     editDraft({ ...draft, rows: [...draft.rows, row] }, new Set([...open, row.key]));
-    // 足した種類は関係も案内も空なので、「関係と案内」は畳んで出す
+    showView("list");
+    setFind("");
+    // 足した種類は関係も補足も空なので、「ほかの種類との関係・補足」は畳んで出す
     setEditing((now) => ({ ...now, more: new Map(now.more).set(row.key, false) }));
     setFocusKey(row.key);
   };
 
   const dup = duplicates(draft);
+  const ids = draft.rows.map((row) => row.phase.id.trim());
   const query = find.trim().toLowerCase();
   const rows = draft.rows.map((row) => {
     const text = findText(row.phase);
@@ -363,8 +370,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に要る種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
-            辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> は案内にだけ使う。並びの欄は{" "}
-            <code>,</code> で区切る。
+            辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効かない。
+            関係の欄はこのファイルのほかの種類から選ぶ（ほかの層の種類は id を打って足す）。範囲と成果物は <code>,</code> で区切る。
           </p>
         </details>
         {view === "graph" && (
@@ -383,6 +390,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               hidden={row.hidden}
               open={open.has(row.key)}
               moreOpen={more.get(row.key) === true}
+              ids={ids}
               duplicate={dup.has(row.phase.id.trim())}
               disabled={busy || !editable}
               onToggle={() => toggle(row.key)}

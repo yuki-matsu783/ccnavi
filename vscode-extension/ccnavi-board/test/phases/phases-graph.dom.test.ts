@@ -181,7 +181,7 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
 
 test("CB-D79 同じ組が requires と overlap の両方を持つとき、2 本が重ならない", async () => {
   // このリポジトリの設定（acceptance と implement）と雛形が、まさにこの形。
-  // どちらも直線にすると破線が実線の下に隠れ、overlap が 1 本も見えなくなる
+  // 同じ端どうしを結ぶと破線が実線の下に隠れ、overlap が 1 本も見えなくなる
   const dom = await openGraph({ model: model(LINKED) });
   try {
     const solid = dom.one(".react-flow__edge.rel-requires path.react-flow__edge-path");

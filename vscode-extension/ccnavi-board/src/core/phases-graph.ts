@@ -56,8 +56,10 @@ export interface PhasesGraph {
 }
 
 /** 点の間隔。CSS の `.react-flow__node-phase` の大きさと合わせる */
-const COLUMN = 210;
-const ROW = 120;
+export const COLUMN = 210;
+export const ROW = 120;
+/** 点の幅。CSS の `.react-flow__node-phase` の width と同じ */
+export const NODE_WIDTH = 170;
 /** 1 行に並べる数 */
 const WRAP = 4;
 

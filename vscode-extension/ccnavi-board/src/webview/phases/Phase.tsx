@@ -2,7 +2,10 @@
  * 種類 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 出番の少ない 4 欄（関係と案内）は見出し 1 行に畳み、値がある種類だけ最初から開く。
+ * 出番の少ない 5 欄（ほかの種類との関係と補足）は見出し 1 行に畳み、値がある種類だけ最初から開く。
+ *
+ * 関係の 3 欄（overlap / requires / after）は、このファイルのほかの種類の id をチェックで選ぶ
+ * （`IdPicker`）。自分の id は候補に出さない。ほかの層の種類を指すこともあるので、手で打つ欄も残す。
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
@@ -17,10 +20,12 @@ export interface PhaseProps {
   readonly hidden: boolean;
   readonly open: boolean;
   /**
-   * 「関係と案内」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
+   * 「ほかの種類との関係・補足」を開いているか。**決めるのは呼ぶ側**（行ごとに 1 度だけ値の有無で決め、あとは
    * 人の開閉で動く）。ここで値の有無から決め直すと、最後の値を消した瞬間に、打っている欄ごと畳まれる
    */
   readonly moreOpen: boolean;
+  /** このファイルの種類の id（並び順）。関係の欄の候補にする */
+  readonly ids: readonly string[];
   /** id が他の種類と重なっている。保存は止まる */
   readonly duplicate: boolean;
   /** 欄を触れるか。保存の往復の間と、共通層でファイルが無い間は触れない */
@@ -33,7 +38,8 @@ export interface PhaseProps {
 }
 
 type TextKey = "id" | "title" | "agent" | "when";
-type ListKey = "scope" | "deliverables" | "overlap" | "requires" | "after";
+type ListKey = "scope" | "deliverables";
+type IdsKey = "overlap" | "requires" | "after";
 
 export function Phase(props: PhaseProps): JSX.Element {
   const { phase, disabled } = props;
@@ -52,6 +58,18 @@ export function Phase(props: PhaseProps): JSX.Element {
     <ListInput
       className={className}
       placeholder={placeholder}
+      value={phase[name]}
+      disabled={disabled}
+      onChange={(next) => props.onChange({ ...phase, [name]: next })}
+    />
+  );
+
+  const ids = (name: IdsKey, className: string, title: string): JSX.Element => (
+    <IdPicker
+      className={className}
+      title={title}
+      self={phase.id.trim()}
+      candidates={props.ids}
       value={phase[name]}
       disabled={disabled}
       onChange={(next) => props.onChange({ ...phase, [name]: next })}
@@ -145,24 +163,24 @@ export function Phase(props: PhaseProps): JSX.Element {
           onToggle={(event) => props.onToggleMore((event.currentTarget as HTMLDetailsElement).open)}
         >
           <summary>
-            <b>関係と案内</b>
+            <b>ほかの種類との関係・補足</b>
             {relationsNote(phase)}
           </summary>
           <div className="sub">
             <Captioned name="並行できる種類" yamlKey="overlap">
-              {list("overlap", "f-overlap", "並行してよい種類の id")}
+              {ids("overlap", "f-overlap", "この種類と並行して進めてよい種類")}
             </Captioned>
-            <Captioned name="一緒に要る種類" yamlKey="requires">
-              {list("requires", "f-requires", "計画に置くなら一緒に要る種類の id")}
+            <Captioned name="一緒に必要な種類" yamlKey="requires">
+              {ids("requires", "f-requires", "計画にこの種類を入れるなら、一緒に入れる必要がある種類")}
             </Captioned>
-            <Captioned name="待つ種類" yamlKey="after">
-              {list("after", "f-after", "待ち方が dag のとき、先に閉じてレビューが済んでいるべき種類の id")}
+            <Captioned name="先に済ませる種類" yamlKey="after">
+              {ids("after", "f-after", "待ち方が dag のとき、この種類より先に閉じてレビューを終えておく種類")}
             </Captioned>
-            <Captioned name="エージェント" yamlKey="agent">
-              {text("agent", "f-agent narrow", "案内に出すサブエージェントの名前")}
+            <Captioned name="担当エージェント" yamlKey="agent">
+              {text("agent", "f-agent narrow", "サブエージェント名（案内に出す）")}
             </Captioned>
-            <Captioned name="置く目安" yamlKey="when">
-              {text("when", "f-when", "この種類を計画に置く目安。案内にだけ使う")}
+            <Captioned name="使う場面" yamlKey="when">
+              {text("when", "f-when", "計画にこの種類を入れる目安（エージェントへの案内にだけ使う）")}
             </Captioned>
           </div>
         </details>
@@ -228,6 +246,75 @@ function ListInput({
         onChange(splitList(event.target.value));
       }}
     />
+  );
+}
+
+/**
+ * 関係の欄。ほかの種類の id をチェックで選ぶ。
+ *
+ * 候補はこのファイルの種類の id から、自分と空を除いたもの。**候補に無い値も消さずに出す**
+ * （ほかの層の種類や綴り違い）。外せば並びから消える。候補に無い id は下の欄に打って Enter で足す
+ * （`,` 区切りで複数も可）。自分の id は打っても足さない。
+ */
+function IdPicker({
+  value,
+  self,
+  candidates,
+  className,
+  title,
+  disabled,
+  onChange,
+}: {
+  readonly value: readonly string[];
+  readonly self: string;
+  readonly candidates: readonly string[];
+  readonly className: string;
+  readonly title: string;
+  readonly disabled: boolean;
+  readonly onChange: (next: readonly string[]) => void;
+}): JSX.Element {
+  const [extra, setExtra] = useState("");
+  const known = new Set(candidates);
+  const options = Array.from(new Set([...candidates.filter((id) => id !== "" && id !== self), ...value]));
+  const toggle = (id: string, checked: boolean): void => {
+    onChange(checked ? [...value, id] : value.filter((item) => item !== id));
+  };
+  const addExtra = (): void => {
+    const added = splitList(extra).filter((id) => id !== self && !value.includes(id));
+    if (added.length > 0) {
+      onChange([...value, ...Array.from(new Set(added))]);
+    }
+    setExtra("");
+  };
+  return (
+    <div className={`ids ${className}`} title={title}>
+      {options.map((id) => {
+        const foreign = !known.has(id);
+        return (
+          <label key={id} className={foreign ? "id-option foreign" : "id-option"} title={foreign ? "このファイルに無い id（ほかの層の種類か、綴り違い）" : undefined}>
+            <input type="checkbox" value={id} checked={value.includes(id)} disabled={disabled} onChange={(event) => toggle(id, event.target.checked)} />
+            {id}
+          </label>
+        );
+      })}
+      {options.length === 0 && <span className="dim">選べる種類が無い</span>}
+      <input
+        type="text"
+        className="id-extra"
+        spellCheck={false}
+        placeholder="ほかの層の id を入力して Enter"
+        value={extra}
+        disabled={disabled}
+        onChange={(event) => setExtra(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            addExtra();
+          }
+        }}
+        onBlur={addExtra}
+      />
+    </div>
   );
 }
 

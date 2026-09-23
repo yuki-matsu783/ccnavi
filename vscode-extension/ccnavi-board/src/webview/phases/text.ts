@@ -6,14 +6,14 @@
 import type { PhasesGraph } from "../../core/phases-graph.js";
 import type { PhaseForm } from "../../core/phases-view.js";
 
-/** 関係と案内（overlap / requires / after / agent / when）に何か入っているか */
+/** ほかの種類との関係と補足（overlap / requires / after / agent / when）に何か入っているか */
 export function hasRelations(phase: PhaseForm): boolean {
   return phase.overlap.length > 0 || phase.requires.length > 0 || phase.after.length > 0 || phase.agent !== "" || phase.when !== "";
 }
 
-/** 「関係と案内」の見出しに添える一言 */
+/** 「ほかの種類との関係・補足」の見出しに添える一言 */
 export function relationsNote(phase: PhaseForm): string {
-  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行できる種類・一緒に要る種類・待つ種類・エージェント・置く目安";
+  return hasRelations(phase) ? "（設定あり）" : "（未設定）— 並行・一緒に必要・先に済ませる種類、担当エージェント、使う場面";
 }
 
 /** 要約に出す範囲。inherit ならその綴り、glob が無ければ未設定と言う */
@@ -37,7 +37,7 @@ export function splitList(text: string): readonly string[] {
     .filter((part) => part !== "");
 }
 
-/** 絞り込みが当てる文字列。id・題・範囲・成果物・置く目安に当たる */
+/** 絞り込みが当てる文字列。id・題・範囲・成果物・使う場面に当たる */
 export function findText(phase: PhaseForm): string {
   return `${phase.id} ${phase.title} ${phase.scope.join(" ")} ${phase.deliverables.join(" ")} ${phase.when}`.toLowerCase();
 }

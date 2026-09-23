@@ -14,7 +14,7 @@ function savedForm(dom: DomPage): PhasesForm {
   return saves[saves.length - 1].form as PhasesForm;
 }
 
-test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。関係と案内は値がある種類だけ開く", async () => {
+test("CB-D20 既定は畳み、行を押すと開いて state に id が入る。ほかの種類との関係・補足は値がある種類だけ開く", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all(".phase").length, 5);
@@ -111,7 +111,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に要る種類", "待つ種類", "エージェント", "置く目安"],
+      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "担当エージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -208,7 +208,7 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
   }
 });
 
-test("CB-D67 関係と案内は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
+test("CB-D67 ほかの種類との関係・補足は、最後の値を消しても畳まれない（打っている欄が消えない）", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p2")} .row-head`));
@@ -218,7 +218,7 @@ test("CB-D67 関係と案内は、最後の値を消しても畳まれない（�
     dom.type(dom.one(`${rowSelector("p2")} input.f-when`), "");
     await dom.settle();
     assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"), "値を消した拍子に、打っている欄ごと畳まない");
-    assert.match(dom.one(`${rowSelector("p2")} details.more > summary`).textContent, /関係と案内（未設定）/);
+    assert.match(dom.one(`${rowSelector("p2")} details.more > summary`).textContent, /ほかの種類との関係・補足（未設定）/);
   } finally {
     await dom.close();
   }
@@ -273,6 +273,60 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     assert.equal(dom.all("#ccnavi-loading").length, 0);
     // 行の鍵は画面の中で数え続けるので、描き直した行は別の鍵になる
     assert.ok(dom.all(".phase").length > 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D85 関係の欄はほかの種類の id をチェックで選べ、自分の id は候補に出ない。候補に無い id は打って足せる", async () => {
+  const dom = await openPhases();
+  try {
+    dom.click(dom.one(`${rowSelector("p3")} .row-head`));
+    await dom.settle();
+    const options = (selector: string): string[] =>
+      dom.all<HTMLInputElement>(`${rowSelector("p3")} ${selector} .id-option input`).map((input) => input.value);
+    // 雛形の acceptance は overlap に implement を持つ。候補は自分（acceptance）を除いた 4 種類
+    assert.deepEqual(options(".f-overlap"), ["research", "design", "implement", "implement-feedback"]);
+    assert.deepEqual(
+      dom.all<HTMLInputElement>(`${rowSelector("p3")} .f-overlap .id-option input`).filter((input) => input.checked).map((input) => input.value),
+      ["implement"],
+    );
+    dom.click(dom.one(`${rowSelector("p3")} .f-requires .id-option input[value="design"]`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("p3")} .f-overlap .id-option input[value="implement"]`));
+    await dom.settle();
+    // ほかの層の種類は打って Enter で足す。自分の id は足さない
+    const extra = dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-after input.id-extra`);
+    dom.type(extra, "外の種類, acceptance");
+    await dom.settle();
+    dom.key("Enter", dom.one(`${rowSelector("p3")} .f-after input.id-extra`));
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p3")} .f-after input.id-extra`).value, "");
+    assert.ok(dom.one(`${rowSelector("p3")} .f-after .id-option.foreign`).textContent?.includes("外の種類"));
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    const saves = dom.posted.filter((message) => message.type === "save");
+    const saved = (saves[saves.length - 1].form as PhasesForm).phases[2];
+    assert.deepEqual(saved.overlap, []);
+    assert.deepEqual(saved.requires, ["design"]);
+    assert.deepEqual(saved.after, ["外の種類"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D86 図を見ているときに種類を足すと、一覧へ移って足した行が見える", async () => {
+  const dom = await openPhases({}, { view: "graph" });
+  try {
+    assert.ok(dom.one("#phases").classList.contains("hidden"));
+    dom.click(dom.one('button[data-action="add"]'));
+    await dom.settle();
+    assert.ok(!dom.one("#phases").classList.contains("hidden"), "一覧へ移っていない");
+    const rows = dom.all(".phase");
+    const added = rows[rows.length - 1];
+    assert.ok(added.classList.contains("open"));
+    assert.ok(!added.classList.contains("hidden-by-find"));
+    assert.equal(dom.document.activeElement, added.querySelector("input.f-id"));
   } finally {
     await dom.close();
   }

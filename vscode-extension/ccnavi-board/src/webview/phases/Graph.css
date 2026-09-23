@@ -22,9 +22,16 @@
 .graph .react-flow {
   --xy-background-color-default: var(--vscode-editor-background);
   --xy-background-pattern-dots-color-default: var(--vscode-panel-border);
-  --xy-edge-stroke-default: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground));
+  /* 線は背景の点に埋もれないよう、文字と同じ出どころで太めに引く（cc-wf-studio も --vscode-foreground の 2px） */
+  --xy-edge-stroke-default: var(--vscode-descriptionForeground);
   --xy-edge-stroke-selected-default: var(--vscode-focusBorder);
-  --xy-edge-stroke-width-default: 1.5;
+  --xy-edge-stroke-width-default: 2;
+  --xy-controls-button-background-color-default: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  --xy-controls-button-background-color-hover-default: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+  --xy-controls-button-color-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-color-hover-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-border-color-default: var(--vscode-panel-border);
+  --xy-controls-box-shadow-default: none;
   --xy-edge-label-background-color-default: var(--vscode-editor-background);
   --xy-edge-label-color-default: var(--vscode-descriptionForeground);
   --xy-node-background-color-default: var(--vscode-editorWidget-background, var(--vscode-editor-background));
