@@ -29,6 +29,12 @@
 # fetch 1 回に見張りを付けて CCNAVI_FETCH_TIMEOUT 秒（既定 15）で切る。hook の上限（60 秒）に
 # 当たると、報せごと捨てられる。一度落ちた origin には、この回ではもう取りに行かない。
 #
+# **認証で落ちたときは、そう言う。** 尋ねないので、資格情報が無いか切れていると毎回落ちる。
+# オフラインと同じ 1 行では、人は理由を調べることになる。認証は人が端末で打つ git（承認の
+# sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
+# git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
+# 「取ってこられなかった」に戻るだけ。
+#
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
 set -u
@@ -58,7 +64,12 @@ scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-fetch) || exit 0
 trap 'rm -rf "$scratch"' EXIT
 : >"$scratch/failed"
 
-# origin へ 1 本取りに行く。取れたら 0。
+# 認証で落ちたときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
+auth_failed='Authentication failed|could not read (Username|Password)|terminal prompts disabled'
+auth_failed="$auth_failed"'|Invalid username or password|HTTP Basic: Access denied'
+auth_failed="$auth_failed"'|Permission denied \(publickey|returned error: 40[13]'
+
+# origin へ 1 本取りに行く。取れたら 0、落ちたら 1、認証で落ちたら 3。取りに行かなかったら 2。
 #
 # 見張りの sh が limit 秒で fetch を切る。見張りの出力は捨てる。出力をつないだまま残すと、
 # 見張りの sleep が終わるまで報せの `$( )` が閉じない。
@@ -67,8 +78,8 @@ ccnavi_fetch_git() {
 	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/failed"; then
 		return 2
 	fi
-	git -C "$1" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
-		fetch --quiet origin "$2" </dev/null >/dev/null 2>&1 &
+	LC_ALL=C git -C "$1" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=10 \
+		fetch --quiet origin "$2" </dev/null >/dev/null 2>"$scratch/err" &
 	ccnavi_fg_pid=$!
 	(
 		sleep "$limit"
@@ -80,6 +91,7 @@ ccnavi_fetch_git() {
 	kill "$ccnavi_fg_dog" 2>/dev/null || :
 	if [ "$ccnavi_fg_rc" -ne 0 ]; then
 		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
+		grep -qiE "$auth_failed" "$scratch/err" 2>/dev/null && return 3
 		return 1
 	fi
 	return 0
@@ -93,7 +105,9 @@ ccnavi_fetch_or_note() {
 	ccnavi_fetch_git "$1" "$2"
 	ccnavi_fn_rc=$?
 	[ "$ccnavi_fn_rc" -eq 0 ] && return 0
-	[ "$ccnavi_fn_rc" -eq 1 ] && printf '%s\n' "$3"
+	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
+	printf '%s\n' "$3"
+	[ "$ccnavi_fn_rc" -eq 3 ] && printf '%s\n' "  認証で落ちた（資格情報が無いか、切れているか、権限が無い）。hook は認証を尋ねない。利用者に端末で一度 'git fetch origin' を打って認証を済ませてもらえば、次のセッションから通る"
 	return 1
 }
 
