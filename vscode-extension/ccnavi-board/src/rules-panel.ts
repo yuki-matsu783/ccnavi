@@ -29,12 +29,12 @@ import { followAppearance, postAppearance, readAppearance } from "./appearance.j
 import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
+import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 import { KNOWN_TOOLS, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { loadingText } from "./core/loading-render.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
