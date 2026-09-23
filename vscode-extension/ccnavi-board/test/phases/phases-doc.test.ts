@@ -270,5 +270,12 @@ test("CB-T198 order と after を読み、書き戻す。sequential は元から
 test("CB-T199 知らない order は苦情にし、画面は sequential として出す", () => {
   const doc = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: graph\n"));
   assert.equal(doc.model.form.order, "sequential");
-  assert.ok(doc.model.problems.some((p) => p.includes("order `graph`")), doc.model.problems.join("\n"));
+  assert.ok(doc.model.problems.some((p) => p.includes("order が")), doc.model.problems.join("\n"));
+  // 並びで書かれた order は、保存で同じ鍵を 2 つにしない
+  const listed = readPhases(SAMPLE.replace("version: 1\n", "version: 1\norder: [dag]\n"));
+  const out = listed.apply({ ...listed.model.form, order: "dag" });
+  assert.equal(out.match(/^order:/gm)?.length, 1);
+  assert.match(out, /^order: dag$/m);
+  // 前後の空白は実行ファイルと同じに落として読む
+  assert.equal(readPhases(SAMPLE.replace("version: 1\n", 'version: 1\norder: " dag "\n')).model.form.order, "dag");
 });

@@ -114,13 +114,15 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`version ${String(version)} は実行ファイルが読めない（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になる`);
   }
 
-  const orderText = doc.get("order");
+  // 実行ファイルは前後の空白を落として読む（phasetypes.parse）。同じ読み方にする
+  const orderNode = doc.get("order", true);
   let order: PhaseOrder = "sequential";
-  if (orderText !== undefined && orderText !== null) {
-    if ((ORDERS as readonly string[]).includes(String(orderText))) {
-      order = String(orderText) as PhaseOrder;
+  if (orderNode !== undefined && orderNode !== null) {
+    const orderText = orderNode instanceof Scalar ? String(orderNode.value ?? "").trim() : "";
+    if ((ORDERS as readonly string[]).includes(orderText)) {
+      order = orderText as PhaseOrder;
     } else {
-      problems.push(`order \`${String(orderText)}\` は ${ORDERS.join(" か ")} ではない。実行ファイルは読めない。画面は sequential として出す`);
+      problems.push(`order が ${ORDERS.join(" か ")} ではない。実行ファイルは読めない。画面は sequential として出し、保存すると書き直す`);
     }
   }
 
@@ -277,9 +279,12 @@ function applyTo(doc: Document, edited: PhasesForm): string {
   if (edited.order === "dag" || top.has("order")) {
     const current = top.get("order", true);
     if (current instanceof Scalar) {
-      if (current.value !== edited.order) {
+      if (String(current.value ?? "").trim() !== edited.order) {
         current.value = edited.order;
       }
+    } else if (current !== undefined && current !== null) {
+      // 並びや対応表で書かれた欄は、同じ鍵を 2 つにせず、その場で置き換える
+      top.set("order", edited.order);
     } else {
       const at = top.items.findIndex((p) => isNode(p.key) && (p.key as Scalar).value === "version");
       top.items.splice(at + 1, 0, doc.createPair("order", edited.order));
