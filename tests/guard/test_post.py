@@ -722,7 +722,7 @@ def ticket_repo(committed=True, text=TICKET):
 class TicketPlaceTest(Harness, unittest.TestCase):
     """チケットの置き場の変更を、誰が書いたかではなく何が変わったかで見分ける。
 
-    ここは ccnavi の副命令（`ticket start` / `done`、`review request` / `confirm` / `ready`）が
+    ここは ccnavi の副命令（`ticket start` / `finish`、`review request` / `confirm` / `ready`）が
     書く場所で、同時にプロジェクトが `deny` と宣言した場所でもある。外さないと、自分の
     手順を自分で違反として報告し、戻す設定では自分で戻して手順が進まなくなる。外しすぎると、
     承認済みチケットが宣言する範囲を、引数に現れない書き込みで広げる道ができる。

@@ -1107,7 +1107,7 @@ dry-run のときは末尾に 1 行足す。足す文は「止まらない」で
 | 何 | 場所 | 誰が書く | git |
 |---|---|---|---|
 | 提案（親も子も） | `wip/proposals/<状態>/<識別子>.md`（`CCNAVI_TICKETS_PROPOSAL`、ツリーのルートからの相対）。状態は `todo`（承認待ち）と `review`（レビュー待ち）の 2 つの置き場。プロジェクト向けはそのプロジェクトの側に置く（§11） | `todo/` は親が書く。`review/` へ動かすのは `ccnavi-ticket.sh finish` だけ | それを持つリポジトリにコミット |
-| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`、ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi --approve`（人）と、人が `decide` で起こす続きの子。`done/` へは人のレビュー（`confirm` / `decide` / `--reviewed` / `close-early`）、レビュー不要の `done`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（§9.4） | 親のブランチにコミット |
+| 承認済みチケット | 親チケットのツリーの `.ccnavi/approved/<状態>/<識別子>.md`（`CCNAVI_TICKETS_APPROVED`、ツリーのルートからの相対）。状態は `doing`（作業中。判定が読むのはここだけ）と `done`（閉じた。取り消しは `cancelled_at` を持つ） | `doing/` へは `ccnavi --approve`（人）と、人が `decide` で起こす続きの子。`done/` へは人のレビュー（`confirm` / `decide` / `--reviewed` / `close-early`）、レビュー不要の `finish`、`cancel`。コミットと push は `ccnavi-push-approved.sh`（§9.4） | 親のブランチにコミット |
 | フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json`、受け入れた指摘の `accepted.json` | レビューのスクリプト、`ticket finish <親>`、人 | 親のブランチにコミット |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` | `ticket finish` / `ticket record-risk` | 親のブランチにコミット |
