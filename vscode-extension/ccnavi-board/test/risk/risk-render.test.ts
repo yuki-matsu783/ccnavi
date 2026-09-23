@@ -50,7 +50,7 @@ test("CB-T81 埋め込む中身は JSON で、文面の < は実体にして scr
 test("CB-T85 束ねた画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
   const rendered = riskHtml({ kind: "page", page: page() });
   assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${screenScript("risk")}\n</script>`));
-  assert.match(rendered, /<div id="root"><\/div>/);
+  assert.match(rendered, /<div id="root"><p class="empty" id="ccnavi-loading">リスクを読み込み中\.\.\.<\/p><\/div>/);
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 

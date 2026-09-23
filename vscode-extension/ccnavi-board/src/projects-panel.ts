@@ -109,7 +109,7 @@ export async function openProjects(): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
-  showLoading(panel, TITLE, SCREEN);
+  showLoading(panel, TITLE, SCREEN, "プロジェクト");
   const current: PanelState = { panel, folder, host: projectsHost(panel), watchers: [], loading: false, again: false, wasVisible: panel.visible };
   state = current;
   followAppearance(panel, current.host);

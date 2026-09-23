@@ -117,12 +117,12 @@ export interface RulesPage {
  * 他の 4 画面と同じ形で、画面はどちらでも 1 枚を描く。
  *
  * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは種類ごとに 1 枚）。
- * `title` は切り替え先の名前。読み終えたら `page` か `error` が続けて届く
+ * `text` は画面に出す一言（「web のルールを読み込み中...」）。読み終えたら `page` か `error` が続けて届く
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
   | { readonly kind: "error"; readonly error: string }
-  | { readonly kind: "loading"; readonly title: string };
+  | { readonly kind: "loading"; readonly text: string };
 
 /**
  * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。

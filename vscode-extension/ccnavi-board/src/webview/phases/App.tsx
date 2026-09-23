@@ -152,7 +152,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   if (data.kind === "loading") {
     return (
       <p className="empty" id="ccnavi-loading">
-        {data.title}を読み込んでいる…
+        {data.text}
       </p>
     );
   }

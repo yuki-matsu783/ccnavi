@@ -12,9 +12,9 @@ import { readAppearance } from "./appearance.js";
 import { renderLoadingPage } from "./core/loading-render.js";
 import { webviewStyle } from "./webview-asset.js";
 
-/** `screen` は画面の名前（`"board"`）。CSS はその画面の束ねを使う */
-export function showLoading(panel: vscode.WebviewPanel, title: string, screen: string): void {
-  panel.webview.html = renderLoadingPage(title, {
+/** `screen` は画面の名前（`"board"`）。CSS はその画面の束ねを使う。`what` は読むもの（「チケット」） */
+export function showLoading(panel: vscode.WebviewPanel, title: string, screen: string, what: string): void {
+  panel.webview.html = renderLoadingPage(title, what, {
     nonce: crypto.randomBytes(16).toString("base64"),
     style: webviewStyle(screen),
     appearance: readAppearance(),

@@ -116,7 +116,7 @@ export async function openBoard(project?: string): Promise<void> {
     localResourceRoots: [],
     retainContextWhenHidden: false,
   });
-  showLoading(panel, TITLE, SCREEN);
+  showLoading(panel, TITLE, SCREEN, "チケット");
   const current: PanelState = {
     panel,
     folder,

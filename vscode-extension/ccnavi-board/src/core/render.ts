@@ -13,6 +13,7 @@
  * 入れ物を組む側だから（ADR-0066）。
  */
 import { type Appearance, bodyTag } from "./appearance.js";
+import { loadingMarkup } from "./loading-render.js";
 import { DATA_ID, embedData, type BoardData } from "./board-view.js";
 
 export interface RenderOptions {
@@ -45,7 +46,7 @@ ${options.style}
 </style>
 </head>
 ${bodyTag(options.appearance)}
-<div id="root"></div>
+<div id="root">${loadingMarkup("チケット")}</div>
 <script type="application/json" id="${DATA_ID}">${embedData(data)}</script>
 <script nonce="${nonce}">
 ${options.script}
