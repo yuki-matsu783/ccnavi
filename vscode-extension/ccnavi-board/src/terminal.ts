@@ -1,8 +1,9 @@
 /**
- * decide と clone / fetch / pull、承認のあと承認済みチケットを運ぶ sh を送る統合ターミナル。
+ * clone / fetch / pull と、承認のあと承認済みチケットを運ぶ sh を送る統合ターミナル。
  * 「ccnavi」という名前の 1 本を使い回す。
- * 承認そのものはここを通らない（ボードのオーバーレイから子プロセスで打つ。ccnavi.ts）。
+ * 承認と残った指摘の行き先はここを通らない（ボードのオーバーレイから子プロセスで打つ。ccnavi.ts）。
  * Windows では Git Bash を使う（sh のスクリプトと `cd ... && ...` の形をそのまま通すため）。
+ * 子プロセスで sh を走らせるときも同じシェルを使う（`scriptShell`）。
  */
 import * as fs from "node:fs";
 import * as vscode from "vscode";
@@ -24,6 +25,14 @@ export function runInTerminal(root: string, command: string): void {
   }
   terminal.show(true);
   terminal.sendText(command, true);
+}
+
+/**
+ * 子プロセスで sh のスクリプトを走らせるシェル。Windows は統合ターミナルと同じ Git Bash、
+ * 他の OS は `sh`
+ */
+export function scriptShell(): string {
+  return shellPath() ?? "sh";
 }
 
 /** Windows だけシェルを指定する。他の OS は既定のシェル（sh が使える前提） */

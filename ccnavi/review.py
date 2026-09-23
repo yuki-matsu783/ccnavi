@@ -441,6 +441,8 @@ CHOICE_KEEP = "keep"
 CHOICE_FIX = "fix"
 CHOICE_ISSUE = "issue"
 CHOICES = (CHOICE_KEEP, CHOICE_FIX, CHOICE_ISSUE)
+# ボードと取り交わす JSON の版。形を変えたら上げる（拡張の `decidemodel.ts` と揃える）。
+DECIDE_VERSION = 1
 # 端末で打つ 1 文字と、画面に出す呼び名。
 _CHOICE_KEYS = {"k": CHOICE_KEEP, "f": CHOICE_FIX, "i": CHOICE_ISSUE}
 CHOICE_LABELS = {
@@ -559,6 +561,7 @@ def _decision(
 def _decision_json(d: Decision) -> dict:
     assert d.result.mr is not None
     return {
+        "version": DECIDE_VERSION,
         "parent": d.parent.ticket,
         "phase": d.ph.number,
         "mr": {"number": d.result.mr.number, "url": d.result.mr.url},
@@ -695,7 +698,12 @@ def decide_yes(
     if digest.strip().lower() != current:
         stdout.write(
             json.dumps(
-                {"ok": False, "mismatch": True, "digest": {"expected": digest, "current": current}},
+                {
+                    "version": DECIDE_VERSION,
+                    "ok": False,
+                    "mismatch": True,
+                    "digest": {"expected": digest, "current": current},
+                },
                 ensure_ascii=False,
             )
             + "\n"
@@ -713,7 +721,9 @@ def decide_yes(
     summary = apply_decision(notes, stderr, root, conf, d, raw)
     if summary is None:
         return 1
-    stdout.write(json.dumps({"ok": True, **summary}, ensure_ascii=False) + "\n")
+    stdout.write(
+        json.dumps({"version": DECIDE_VERSION, "ok": True, **summary}, ensure_ascii=False) + "\n"
+    )
     return 0
 
 

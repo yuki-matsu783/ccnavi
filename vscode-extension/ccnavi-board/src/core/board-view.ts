@@ -9,6 +9,7 @@
  * 片方だけが持てるものを置くと束ねられなくなる。
  */
 import type { ApprovePreview } from "./approvemodel.js";
+import type { DecidePreview } from "./decidemodel.js";
 import type { AppearanceMessage } from "./appearance.js";
 import type { Board } from "./board.js";
 import type { Moved } from "./board-moved.js";
@@ -33,7 +34,29 @@ export type ApprovalOverlay =
    * 承認以外で Claude Code に渡す文（レビュー済みの連絡）。承認したときと同じ 2 ボタンで渡す。
    * 判定は動かしていないので、置かれたものは何も無い
    */
-  | { readonly kind: "prompt"; readonly title: string; readonly note: string; readonly prompt: string };
+  | {
+      readonly kind: "prompt";
+      readonly title: string;
+      readonly note: string;
+      readonly prompt: string;
+      /** 渡したときに人へ言う呼び名（「…をコピーした」）。無ければレビュー済みの連絡の文 */
+      readonly what?: string;
+    }
+  /**
+   * 残った指摘を読み込んでいる（`ccnavi-review.sh decide <N> --preview`）。`tree` は親のワークツリーで、
+   * sh をそこで走らせる。`notice` は見せ直す理由（見せた指摘と今の指摘が違った）
+   */
+  | {
+      readonly kind: "decideLoading";
+      readonly parent: string;
+      readonly phase: number;
+      readonly tree: string;
+      readonly notice?: string;
+    }
+  /** 残った指摘を見せた。行き先を指摘ごとに選ぶ。押されるまで何も置かない */
+  | { readonly kind: "decidePreview"; readonly preview: DecidePreview; readonly tree: string; readonly notice?: string }
+  /** 選んだ行き先を置いている。**ここでは閉じない** */
+  | { readonly kind: "deciding"; readonly preview: DecidePreview; readonly tree: string };
 
 /**
  * 画面に見せる中身。読み直せなかったときはボードの代わりに文面を渡す（`kind: "error"`）。
@@ -83,6 +106,8 @@ export type BoardMessage =
   | { readonly type: "promptCopy" }
   | { readonly type: "promptOpen" }
   | { readonly type: "decide"; readonly parent: string; readonly phase: number }
+  /** 残った指摘の行き先を決めた。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
+  | { readonly type: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
   | { readonly type: "reviewed"; readonly parent: string; readonly phase: number };
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */

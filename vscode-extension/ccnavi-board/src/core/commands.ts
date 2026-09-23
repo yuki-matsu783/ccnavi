@@ -1,11 +1,11 @@
 /**
  * 人の判断をターミナルへ送るときのコマンド行と、承認を子プロセスで打つときの引数の並び。
  *
- * `decide` と `close-early` は端末（tty）から打つものと ccnavi が決めていて、拡張はここで組んだ
- * 1 行をターミナルに送り、y/N は人が押す。承認だけは違う。ボードのオーバーレイで人が押した
- * 承認を、拡張が子プロセスで `--approve --yes <識別子,…>` として打つ。端末の壁は無く、
- * 代わりに「見せた一覧と今の一覧が同じ」ことを実行ファイルが求める。エージェントが Bash で
- * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。
+ * 承認と残った指摘の行き先は、ボードのオーバーレイで人が押したものを、拡張が子プロセスで打つ
+ * （`--approve --yes <識別子,…>`、`ccnavi-review.sh decide <N> --choices …`）。端末の壁は無く、
+ * 代わりに「見せたものと今のものが同じ」ことを実行ファイルが指紋で求める。エージェントが Bash で
+ * 同じ形を打つ道は、実行ファイルの組み込みの deny が止める。`close-early` は端末（tty）から打つもので、
+ * ボードには置かない。
  *
  * 承認が通ったあと、承認済みチケットをコミットして push する sh（`ccnavi-push-approved.sh`）は
  * ターミナルに Enter まで送る。承認と同時に端末で走り、人は端末でその結果を見る。
@@ -53,15 +53,30 @@ export function approveArgs(
   return ["--approve", "--yes", tickets.join(","), "--digest", digest, "--json", ...only];
 }
 
+/** レビューの sh の、ワークスペースルートからの綴り */
+export const REVIEW_SCRIPT = ".ccnavi/scripts/ccnavi-review.sh";
+
 /**
- * `ccnavi-review.sh decide <N>`。sh がレビューのスレッドを取ってきて、未解決のまま進める
- * ことを人が受け入れる。sh は実行した場所を親のワークツリーとして exe に渡すので、
- * 先に親のワークツリーへ cd する。`.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから
- * 切ったワークツリーには届かないので、sh はワークスペースルートから綴る。
+ * `ccnavi-review.sh decide <N> --preview`。残った指摘と指紋を JSON で見る（何も置かない）。
+ * sh は実行した場所を親のワークツリーとして実行ファイルに渡すので、子プロセスの cwd を親のワークツリーにする。
+ * `.ccnavi/scripts/` はワークスペースにしか無く、プロジェクトから切ったワークツリーには届かないので、
+ * sh はワークスペースルートから綴る（呼ぶ側が `REVIEW_SCRIPT` を root に足す）
  */
-export function decideCommand(root: string, parentTree: string, phase: number): string {
-  const script = shellQuote(`${toPosixPath(root)}/.ccnavi/scripts/ccnavi-review.sh`);
-  return `cd ${shellQuote(toPosixPath(parentTree))} && sh ${script} decide ${phase}`;
+export function decidePreviewArgs(phase: number): readonly string[] {
+  return ["decide", String(phase), "--preview"];
+}
+
+/**
+ * `ccnavi-review.sh decide <N> --choices <JSON> --digest <指紋>`。人がオーバーレイで選んだ行き先を置く。
+ * 指紋は見せたときの preview の `digest`。見せたあとに指摘が変わっていれば、実行ファイルは何も置かない。
+ * エージェントがこの形を打つと、組み込みの deny（builtin-guard-ticket-approval）が止める
+ */
+export function decideArgs(
+  phase: number,
+  choices: Readonly<Record<string, string>>,
+  digest: string,
+): readonly string[] {
+  return ["decide", String(phase), "--choices", JSON.stringify(choices), "--digest", digest];
 }
 
 /**
@@ -90,7 +105,7 @@ export function scriptCommand(root: string, name: string): string {
  * `confirm` を打ってマーカーを置くのは、この文を受けた親（メインエージェント）で、親のワークツリーで打つ。
  * そこは止まっているので、通るのは `sh …ccnavi-review.sh …` の形を連結せずに単体で打ったときだけ
  * （設計 §9.8。`cd … && sh …` は止まる）。サブエージェントには同じ形が常に禁止される（§9.12）。文はその 2 つを言う。
- * 未解決が残っていれば `confirm` が一覧と次の道（解決してもらう・同じフェーズに子を足す・人が decide を打つ）を
+ * 未解決が残っていれば `confirm` が一覧と次の道（解決してもらう・同じフェーズに子を足す・人が decide で決める）を
  * 返すので、文はそれに従うことだけを言い、道を先取りしない。
  */
 export function reviewedPrompt(
@@ -118,7 +133,7 @@ export function reviewedPrompt(
 
 /**
  * `ccnavi-push-approved.sh`。承認済みチケットをコミットして push する。ワークスペースルートから打つ。
- * 絶対パスで組む。ターミナルは使い回すので、前に decide が親のワークツリーへ cd していても届く。
+ * 絶対パスで組む。ターミナルは使い回すので、前のコマンドが別の場所へ cd していても届く。
  */
 export function pushApprovedCommand(root: string): string {
   return `sh ${shellQuote(path.posix.join(toPosixPath(root), PUSH_APPROVED_SCRIPT))}`;

@@ -9,6 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard } from "../../src/core/board.js";
 import type { ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
+import type { DecidePreview } from "../../src/core/decidemodel.js";
 import { fixture } from "../helpers/fixture.js";
 import { NONCE, approvePreview, boardPage, openBoard, openPage } from "../helpers/board.js";
 import { flatStyle } from "../helpers/bundle.js";
@@ -68,6 +69,68 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.equal(spiked.all("pre.approval-text script").length, 0);
   } finally {
     await spiked.close();
+  }
+});
+
+function decidePreview(canIssue: boolean): DecidePreview {
+  return {
+    version: 1,
+    parent: "i0001",
+    phase: 2,
+    mr: { number: 7, url: "https://example.com/mr/7" },
+    can_issue: canIssue,
+    threads: [
+      { key: "u1", url: "u1", path: "src/a.py", line: 3, body: "命名を直す\n詳しく" },
+      { key: "u2", url: "u2", path: "", line: 0, body: "<b>テスト</b>" },
+    ],
+    digest: "a".repeat(64),
+  };
+}
+
+test("CB-T198 残った指摘は 1 件ずつ行き先を選び、全部に選ぶまで決められない。選んだ行き先を鍵ごとに送る", async () => {
+  const page = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: decidePreview(false), tree: "/w/.claude/worktrees/i0001" },
+  });
+  try {
+    assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 に残った指摘 2 件の行き先");
+    assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
+    // issue に回せない局面では、その行き先を出さない
+    assert.equal(page.all('input[data-choice="issue"]').length, 0);
+    assert.equal(page.all('input[data-choice="keep"]').length, 2);
+    const confirm = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
+    assert.equal(confirm.disabled, true);
+    page.click(page.one('li[data-key="u1"] input[data-choice="keep"]'));
+    await page.settle();
+    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
+    page.click(page.one('li[data-key="u2"] input[data-choice="fix"]'));
+    await page.settle();
+    const ready = page.one<HTMLButtonElement>('button[data-action="decide-confirm"]');
+    assert.equal(ready.disabled, false);
+    page.click(ready);
+    await page.settle();
+    assert.deepEqual(page.posted.at(-1), { type: "decideConfirm", choices: { u1: "keep", u2: "fix" } });
+  } finally {
+    await page.close();
+  }
+  const issued = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: decidePreview(true), tree: "/w" },
+  });
+  try {
+    assert.equal(issued.all('input[data-choice="issue"]').length, 2);
+  } finally {
+    await issued.close();
+  }
+  // 置いている最中は選べず、決められず、やめられない
+  const deciding = await openBoard(fixture(), {
+    approval: { kind: "deciding", preview: decidePreview(false), tree: "/w" },
+  });
+  try {
+    assert.equal(deciding.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
+    assert.equal(deciding.one<HTMLButtonElement>('button[data-action="approve-cancel"]').disabled, true);
+    assert.ok(deciding.all("input[type=radio]").every((r) => (r as unknown as { disabled: boolean }).disabled));
+  } finally {
+    await deciding.close();
   }
 });
 

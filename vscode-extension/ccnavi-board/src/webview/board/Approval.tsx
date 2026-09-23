@@ -8,6 +8,7 @@ import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import type { ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
+import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
 import { approvalBody } from "./text.js";
 
@@ -21,9 +22,9 @@ export function Approval({ overlay }: { readonly overlay: ApprovalOverlay }): JS
       first.focus();
     }
   }, [overlay.kind]);
-  // Esc でやめる。承認している最中は閉じない
+  // Esc でやめる。承認している最中と、行き先を置いている最中は閉じない
   useEffect(() => {
-    if (overlay.kind === "approving") {
+    if (overlay.kind === "approving" || overlay.kind === "deciding") {
       return undefined;
     }
     const onKey = (event: KeyboardEvent): void => {
@@ -89,6 +90,19 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
           <HandOver />
         </>
       );
+    case "decideLoading":
+      return (
+        <>
+          <p className="approval-note">フェーズ {overlay.phase} に残った指摘を読み込んでいる…</p>
+          <div className="approval-actions">
+            <Cancel label="やめる" />
+          </div>
+        </>
+      );
+    case "decidePreview":
+      return <DecideBody preview={overlay.preview} deciding={false} notice={overlay.notice} />;
+    case "deciding":
+      return <DecideBody preview={overlay.preview} deciding={true} notice={undefined} />;
   }
 }
 

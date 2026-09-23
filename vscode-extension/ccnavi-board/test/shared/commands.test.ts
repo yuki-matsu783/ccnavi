@@ -2,8 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as commands from "../../src/core/commands.js";
 import {
-  decideCommand,
   approveArgs,
+  decideArgs,
+  decidePreviewArgs,
   previewArgs,
   pushApprovedCommand,
   reviewedPrompt,
@@ -65,20 +66,20 @@ test("CB-T18c yes は見せた識別子と、そのときの絞りを分けて�
   ]);
 });
 
-test("CB-T19 decide は親のワークツリーで、ワークスペースルートから綴った sh を打つ", () => {
-  assert.equal(
-    decideCommand("/ws", "/ws/.claude/worktrees/i0001", 2),
-    "cd '/ws/.claude/worktrees/i0001' && sh '/ws/.ccnavi/scripts/ccnavi-review.sh' decide 2",
-  );
-  // Windows の区切りと、単引用符を含むルート。
-  assert.equal(
-    decideCommand("C:\\it's\\ws", "C:\\it's\\ws\\.claude\\worktrees\\i0001", 1),
-    `cd 'C:/it'\\''s/ws/.claude/worktrees/i0001' && sh 'C:/it'\\''s/ws/.ccnavi/scripts/ccnavi-review.sh' decide 1`,
-  );
+test("CB-T19 decide の引数。一覧は --preview、選んだ行き先は JSON と見せた指紋で渡す", () => {
+  assert.deepEqual(decidePreviewArgs(2), ["decide", "2", "--preview"]);
+  assert.deepEqual(decideArgs(1, { u1: "keep", "https://x/y#z": "fix" }, "d0"), [
+    "decide",
+    "1",
+    "--choices",
+    '{"u1":"keep","https://x/y#z":"fix"}',
+    "--digest",
+    "d0",
+  ]);
 });
 
 test("CB-T19b 承認済みチケットを運ぶ sh は、ワークスペースルートからの絶対パスで送る", () => {
-  // 絶対パスなので、前に decide が親のワークツリーへ cd したターミナルでも届く。
+  // 絶対パスなので、前のコマンドが別の場所へ cd したターミナルでも届く。
   assert.equal(pushApprovedCommand("/ws"), "sh '/ws/.ccnavi/scripts/ccnavi-push-approved.sh'");
   // Windows の区切りは "/" に直す（Git Bash が読める形）。
   assert.equal(
