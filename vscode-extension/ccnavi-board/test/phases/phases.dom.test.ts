@@ -440,7 +440,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
 });
 
 test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
-  const dom = await openPage({ kind: "loading", title: "フェーズ管理" });
+  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中..." });
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
