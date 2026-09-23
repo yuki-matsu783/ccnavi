@@ -57,7 +57,7 @@ SHELL_TOOLS = ("Bash", "PowerShell")
 # レビューが済むまで止めるツール。
 HELD_TOOLS = ("Agent", *SHELL_TOOLS)
 
-# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` と、
+# ccnavi 自身の実行ファイルを、人の判断の経路に使う形。`--approve` `--reviewed` `--close-early` と、
 # 状態とレビューのサブコマンド。スクリプト 2 本の中身がこれなので、スクリプトを
 # 経由せずに打てば止める。CCNAVI_GUARD_TICKET_APPROVAL で切れる。
 # `--approve --preview` は一覧を見るだけ（承認済みチケットを置かない）ので除く。ただし除外は

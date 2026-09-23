@@ -292,7 +292,7 @@ class PhaseHarness(unittest.TestCase):
             result,
         )
 
-    def check(self, fixture, phase):
+    def confirm(self, fixture, phase):
         return self.ccnavi(
             "--cwd",
             self.parent_tree,
@@ -655,7 +655,7 @@ class PhaseTest(PhaseHarness):
         self.merge("i0001-01")
         fixture = self.remote()
         self.assertEqual(self.request(fixture, 1).returncode, 0)
-        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
         # 同じフェーズに子をもう 1 枚足すが、置き場に同じ名前のディレクトリを作って書けなくする。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ["wip/design/*"]))
@@ -688,7 +688,7 @@ class PhaseTest(PhaseHarness):
         # ボードの JSON は「依頼済みで止まったまま」を review_waiting で言う。レビューが
         # 済んで止まらなくなれば false に戻り、依頼のマーカーは残る。
         self.assertEqual(self.board_phase(1), (True, True, ["requested"]))
-        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         self.assertEqual(self.board_phase(1), (False, False, ["requested", "reviewed"]))
         # 親はまだ閉じられない。
         self.start_parent()
@@ -733,7 +733,7 @@ class PhaseTest(PhaseHarness):
         data = read_json(fixture)
         data["threads"] = [{"id": "t0", "resolved": False, "url": "u/7#t0", "body": "直して"}]
         write(fixture, json.dumps(data))
-        self.assertNotEqual(self.check(fixture, 1).returncode, 0)
+        self.assertNotEqual(self.confirm(fixture, 1).returncode, 0)
         spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次")
         self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
         # フィードバック計画: 実装フィードバック対応を 1 本。承認がレビューの合意になり、
@@ -760,7 +760,7 @@ class PhaseTest(PhaseHarness):
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertEqual(self.request(fixture, 2).returncode, 0)
         # 前の指摘が残ったままなので、フィードバック作業フェーズの check も通らない。
-        refused = self.check(fixture, 2)
+        refused = self.confirm(fixture, 2)
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("u/7#t0", refused.stderr)
         self.assertIn("道は 2 つ", refused.stderr)
@@ -823,7 +823,7 @@ class PhaseTest(PhaseHarness):
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
         requested = self.request(fixture, 1)
         self.assertEqual(requested.returncode, 0, requested.stderr)
-        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
         # フィードバック計画が無い間も外せない。
         refused = self.ready(fixture)
         self.assertIn("フィードバック計画", refused.stderr)
@@ -1199,7 +1199,7 @@ class ChatReviewTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("依頼済み", refused.stderr)
         self.assertIn("confirm --phase 1", refused.stderr)
-        self.assertEqual(self.check(fixture, 1).returncode, 0)
+        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
 
     def test_a_chat_phase_that_covers_a_deferred_merge_request_phase_is_seen_in_the_merge_request(
         self,

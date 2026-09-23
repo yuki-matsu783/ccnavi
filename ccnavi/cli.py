@@ -294,7 +294,9 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     """1 回の起動を処理する。"""
-    parser = argparse.ArgumentParser(prog="ccnavi", add_help=False)
+    # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
+    # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）を抜ける。
+    parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
     # 綴りは sh が計算して渡す。2 度来ていないかを見るので、束ねて受ける（WRAPPER_FLAGS）。
     parser.add_argument("--root", action="append", default=None)
     parser.add_argument("--mode", default="")
@@ -562,8 +564,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
     """人の判断の経路が、端末の前の人から打たれているか。
 
-    `--approve` と `--reviewed` は人の合意そのもの。エージェントが Bash から打てば
-    その合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
+    `--approve` と `--reviewed` と `--close-early` は人の合意そのもの。エージェントが
+    Bash から打てばその合意を自分で出せる。標準入力が端末であることを求めるのが、この経路が
     hook の中や `echo y |` から来ていないことの、いちばん安い証拠になる。
     CCNAVI_GUARD_TICKET_APPROVAL=disable で切れる（テストと、端末を持たない実行環境のため）。
     """

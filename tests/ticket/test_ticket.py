@@ -18,6 +18,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -1296,7 +1298,7 @@ class TicketTest(unittest.TestCase):
 
         承認済みチケットは親のブランチに乗り、合流すると元ツリーにも写る。親のツリーが
         消えたあとに落ち先を決めないと、残った子のツリーの写しと並んで「どれが本物か
-        決まらない」になり、片付けただけの家族の `start` / `done` が全部止まる。
+        決まらない」になり、片付けただけの家族の `start` / `finish` が全部止まる。
         """
         self.family()
         git(self.root, "merge", "--quiet", "--no-edit", "i0001")
@@ -1574,6 +1576,25 @@ class TicketTest(unittest.TestCase):
 
     # ---- 7. 人の判断の経路
 
+    def test_cli_flags_take_no_abbreviation(self):
+        """人の判断のフラグは全部綴ったときだけ効く。
+
+        組み込みの deny は全部綴った形しか見ないので、前方一致で走ると `--close` や
+        `--review` がそこを抜ける。実行ファイルの側で受けないことを確かめる。
+        """
+        self.family()
+        for args in (
+            ("--close", "--reason", "x", "--result", "r.json"),
+            ("--review", "1", "--chat"),
+            ("--approv", "--yes", "i0001"),
+        ):
+            # argparse の断りは sys.stderr に直に出る（同じプロセスで動かすので、受け取りの外）。
+            refused = io.StringIO()
+            with contextlib.redirect_stderr(refused):
+                result = self.ccnavi(*args, stdin="y\n")
+            self.assertNotEqual(result.returncode, 0, args)
+            self.assertIn(f"unrecognized arguments: {args[0]}", refused.getvalue(), args)
+
     def test_cli_paths_are_denied_from_the_shell_unless_disabled(self):
         self.family()
         for command in (
@@ -1581,6 +1602,10 @@ class TicketTest(unittest.TestCase):
             "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
             "uv run python -m ccnavi ticket start i0001-01",
             "ls && ./ccnavi review confirm --phase 1",
+            "ccnavi --close-early --reason x --result r.json",
+            "ccnavi ticket finish i0001-01",
+            "ccnavi ticket record-risk i0001-01 untested yes --reason x",
+            "ccnavi review to-issue --body-file b.md --result r.json",
             # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
             "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
             "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
@@ -1846,7 +1871,7 @@ class TicketTest(unittest.TestCase):
         recorded = read_json(mark)["head"]
         self.commit_markers()
         self.assertNotEqual(git(self.parent_tree, "rev-parse", "HEAD").strip(), recorded)
-        check = self.check(fixture)
+        check = self.confirm(fixture)
         self.assertEqual(check.returncode, 0, check.stderr)
         self.assertTrue(os.path.exists(os.path.join(os.path.dirname(mark), "1.reviewed")))
 
@@ -1861,7 +1886,7 @@ class TicketTest(unittest.TestCase):
         fixture = self.remote()
         self.assertEqual(self.request(fixture).returncode, 0)
         self.commit_markers(push=False)
-        self.assertEqual(self.check(fixture).returncode, 0)
+        self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_request_refuses_when_only_the_markers_moved(self):
         """マーカーだけが動いた形では、依頼を出し直させないこと。
@@ -1888,7 +1913,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "マーカーと一緒に")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        check = self.check(fixture)
+        check = self.confirm(fixture)
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
 
@@ -1912,7 +1937,7 @@ class TicketTest(unittest.TestCase):
             data = read_json(mark)
             data["head"] = head
             write(mark, json.dumps(data))
-            check = self.check(fixture)
+            check = self.confirm(fixture)
             self.assertNotEqual(check.returncode, 0, f"head={head!r} で通った")
         data = read_json(mark)
         data["head"] = "HEAD"
@@ -1931,7 +1956,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "mv", "src/keep.py", ".ccnavi/approved/keep.py")
         git(self.parent_tree, "commit", "--quiet", "-m", "置き場へ移す")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        check = self.check(fixture)
+        check = self.confirm(fixture)
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
 
@@ -1971,7 +1996,7 @@ class TicketTest(unittest.TestCase):
         git(os.path.join(self.parent_tree, "sub"), "pull", "--quiet", "origin", "main")
         git(self.parent_tree, "commit", "--quiet", "-am", "submodule を進める")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        check = self.check(fixture)
+        check = self.confirm(fixture)
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
 
@@ -1990,7 +2015,7 @@ class TicketTest(unittest.TestCase):
         git(self.parent_tree, "add", "-A")
         git(self.parent_tree, "commit", "--quiet", "-m", "置き場に見える名前")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        self.assertNotEqual(self.check(fixture).returncode, 0)
+        self.assertNotEqual(self.confirm(fixture).returncode, 0)
 
     def test_the_human_path_reads_the_markers_the_same_way(self):
         """人が端末で打つ道（--reviewed）も check と同じ基準で見ること。"""
@@ -2058,7 +2083,7 @@ class TicketTest(unittest.TestCase):
         data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "直して"}]
         write(fixture, json.dumps(data))
 
-        moved = self.check(fixture)
+        moved = self.confirm(fixture)
         self.assertNotEqual(moved.returncode, 0)
         self.assertIn("HEAD が動いている", moved.stderr)
         self.assertIn("request --phase 1", moved.stderr)
@@ -2070,13 +2095,13 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(len(read_json(fixture)["comments"]), 2)
 
         # 前の依頼への指摘は、出し直しても数から消えない。
-        left = self.check(fixture)
+        left = self.confirm(fixture)
         self.assertNotEqual(left.returncode, 0)
         self.assertIn("未解決", left.stderr)
         data = read_json(fixture)
         data["threads"][0]["resolved"] = True
         write(fixture, json.dumps(data))
-        self.assertEqual(self.check(fixture).returncode, 0)
+        self.assertEqual(self.confirm(fixture).returncode, 0)
 
         # レビュー済みになったあとは、HEAD が動いても出し直さない。
         write(os.path.join(self.parent_tree, "src", "after.py"), "x\n")
@@ -2144,14 +2169,14 @@ class TicketTest(unittest.TestCase):
         write(fixture, json.dumps(data))
         mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
 
-        first = self.check(fixture)
+        first = self.confirm(fixture)
         self.assertNotEqual(first.returncode, 0)
         self.assertIn("未解決", first.stderr)
 
         # マーカーを消して依頼をやり直す（新しい子が承認された形）。指摘は残ったまま。
         os.remove(mark)
         self.assertEqual(self.request(fixture).returncode, 0)
-        again = self.check(fixture)
+        again = self.confirm(fixture)
         self.assertNotEqual(again.returncode, 0)
         self.assertIn("未解決", again.stderr)
 
@@ -2167,7 +2192,7 @@ class TicketTest(unittest.TestCase):
             stdin="y\n",
         )
         self.assertEqual(accepted.returncode, 0, accepted.stderr)
-        self.assertEqual(self.check(fixture).returncode, 0)
+        self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_the_acceptance_survives_a_later_check(self):
         """人が受け入れたスレッドは、あとから走った check で消えないこと。
@@ -2198,7 +2223,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("u1", read_json(kept)["threads"])
 
         # check が通るとマーカーは書き換わるが、控えは残る。
-        self.assertEqual(self.check(fixture).returncode, 0)
+        self.assertEqual(self.confirm(fixture).returncode, 0)
         self.assertIn("u1", read_json(kept)["threads"])
 
         # 依頼をやり直しても、受け入れた分は数えない。子を足したときの clear_marks と同じく、
@@ -2206,7 +2231,7 @@ class TicketTest(unittest.TestCase):
         for kind in ("requested", "reviewed"):
             os.remove(os.path.join(self.approved, "phases", "i0001", f"1.{kind}"))
         self.assertEqual(self.request(fixture).returncode, 0)
-        self.assertEqual(self.check(fixture).returncode, 0)
+        self.assertEqual(self.confirm(fixture).returncode, 0)
 
     def test_prepare_writes_a_merge_request_draft(self):
         """マージリクエストが無ければ sh が作れるように、下書きを書き出すこと。"""
@@ -2242,7 +2267,7 @@ class TicketTest(unittest.TestCase):
         self.assertIn("Closes #12", lines)
         self.assertIn("i0001", "\n".join(lines))
 
-    def check(self, fixture, phase="1"):
+    def confirm(self, fixture, phase="1"):
         return self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "review", "confirm", "--result", fixture
         )
