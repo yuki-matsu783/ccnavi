@@ -85,7 +85,6 @@ def report(
     flag: str,
     restore_if_deny_flag: str = "",
     guard_core_files_flag: str = "",
-    guard_ticket_approval: str = "",
     as_json: bool = False,
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
@@ -176,7 +175,7 @@ def report(
                 "ルールがどこも言及しない呼び出しを止めない",
             )
         )
-    if conf.tickets_enabled and guard_ticket_approval == selfguard.DISABLE:
+    if conf.tickets_enabled and conf.guard_ticket_approval == selfguard.DISABLE:
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -204,7 +203,7 @@ def report(
             "root": root,
             "rules": conf.rules,
             "mode": mode,
-            "ticket_control": conf.ticket_control or selfguard.ENABLE,
+            "ticket_control": conf.ticket_control,
             "projects": [t.name for t in tree.projects(conf.projects)],
             "problems": [
                 {"severity": p.severity, "where": p.rule, "detail": p.detail} for p in problems
@@ -222,9 +221,9 @@ def report(
     stdout.write(f"  deny の場所を戻す: {_shown(restore_if_deny, mode)}\n")
     stdout.write(f"  コアファイルを守る: {_shown(guard_core_files, mode)}\n")
     stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
-    stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
+    stdout.write(f"  チケット制御: {conf.ticket_control}\n")
     if conf.tickets_enabled:
-        stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
+        stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
     # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
@@ -343,7 +342,7 @@ def check(
     return problems
 
 
-def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
+def _risk(conf: settings.Settings, root: str) -> list[Problem]:
     """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
@@ -393,8 +392,6 @@ def _copy_problems(
       判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
       承認した分の壊れを CI で止める。範囲の超過だけは `validate` も warn
     """
-    from . import phase as phase_mod
-
     problems: list[Problem] = []
     pool = dict(index)
     for t in closed:
@@ -410,7 +407,7 @@ def _copy_problems(
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
         if parent is not None:
-            for p in phase_mod.order_problems(root, conf, t, parent, types):
+            for p in phase.order_problems(root, conf, t, parent, types):
                 # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
@@ -433,7 +430,7 @@ def _types_resolver(conf: settings.Settings, root: str):
     return resolve
 
 
-def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
+def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     """チケットと承認済みチケットとワークツリーが噛み合っているかを見る（REQ-TKT-25）。
 
     判定に効くのは承認済みチケットの側だけなので、ここで問うのは「効いている範囲は何か」と
@@ -1315,7 +1312,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
     return problems
 
 
-def _rules(path: str, root: str = "", home: str = "", layer: bool = False) -> list[Problem]:
+def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で

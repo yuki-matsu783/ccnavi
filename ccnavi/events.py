@@ -105,7 +105,7 @@ def watched_for(
     else:
         trees = [ws]
         where = record.subject if payload.tool_name in ruleload.PATH_TOOLS else payload.cwd
-        t = tree.tree_of(root, where, conf.projects) if where else None
+        t = tree.tree_of(root, where, conf.projects)
         if t is not None and t.root != ws.root:
             trees.append(t)
     loaded: dict[str, tuple[rules.RuleSet, str]] = {}
@@ -273,7 +273,7 @@ def decide_at_start(
 
 def _written(payload: hookio.Input, record: audit.Record) -> str:
     """この呼び出しが名指しのツールで書いた先の、解決済みのパス。書かないツールなら空。"""
-    if payload.tool_name not in selfguard.REPAIR_TOOLS or not record.subject:
+    if payload.tool_name not in selfguard.REPAIR_TOOLS:
         return ""
     return fsio.full_path(record.subject, payload.cwd)
 
@@ -304,7 +304,7 @@ def decide_after(
     # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
-    guard = judge.guard_setting_files(stderr, mode, conf, root, payload, record, restore)
+    guard = judge.guard_setting_files(mode, conf, root, payload, record, restore)
 
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:

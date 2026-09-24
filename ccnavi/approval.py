@@ -827,7 +827,6 @@ class Gathered:
     rejected: list[tuple[ticket_mod.Ticket, list[rules.Problem]]]
     problems: list[str]
     pool: dict
-    types: dict | None
     nothing_pending: bool
     broken: bool
     # 絞り込み（`only`）が通らなかった理由。空でなければ何も承認しない。
@@ -839,7 +838,7 @@ class Gathered:
     def text(self) -> str:
         if self.nothing_pending:
             return "承認待ちのチケットは無い。"
-        return screen(self.batch, self.pool, self.types)
+        return screen(self.batch, self.pool)
 
     @property
     def identifiers(self) -> list[str]:
@@ -863,10 +862,8 @@ def gather(
 
     フェーズの種類は承認の対象全体で 1 つに決まらない。どの層の種類が効くかは各チケットの
     `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
-    引いたものを `Candidate` が持ち歩く。`Gathered.types` は対象全体の種類を持たず、
-    いつも None。画面は候補が持つ種類を使う。
+    引いたものを `Candidate` が持ち歩く。画面は候補が持つ種類を使う。
     """
-    types = None
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -897,7 +894,7 @@ def gather(
             ]
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
-            return Gathered([], [], texts, {}, types, False, broken, "\n".join(lines))
+            return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
         # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らなければ
         # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
         skipped = {t.ticket for t in revisions if t.ticket not in wanted}
@@ -909,21 +906,21 @@ def gather(
             lines.append("何も承認しない。親も並べる")
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
-            return Gathered([], [], texts, {}, types, False, broken, "\n".join(lines))
+            return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
         waiting_count = len(pending) + len(revisions)
         pending = [t for t in pending if t.ticket in wanted]
         revisions = [t for t in revisions if t.ticket in wanted]
         note = f"承認待ち {waiting_count} 件のうち、指定の {len(wanted)} 件だけを承認の対象にする。"
 
     if not pending and not revisions:
-        return Gathered([], [], texts, {}, types, True, broken, "", note)
+        return Gathered([], [], texts, {}, True, broken, "", note)
 
     batch, rejected, pool = candidates(root, conf, pending, revisions, approved)
     for t, complaints in rejected:
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
-    return Gathered(batch, rejected, texts, pool, types, False, broken, "", note)
+    return Gathered(batch, rejected, texts, pool, False, broken, "", note)
 
 
 def preview(
@@ -1599,7 +1596,6 @@ def _origin_line(t: ticket_mod.Ticket) -> str:
 def screen(
     batch: list[Candidate],
     pool: dict[str, ticket_mod.Ticket],
-    types: dict | None = None,
 ) -> str:
     """承認を求める画面を組む。
 
@@ -1613,7 +1609,7 @@ def screen(
     lines = [f"チケットの承認リクエスト: {len(batch)} 件"]
     for cand in batch:
         t = cand.ticket
-        cand_types = cand.types if cand.types is not None else types
+        cand_types = cand.types
         if cand.is_revision and cand.current is not None:
             lines += ["", f"== {t.ticket}: {t.title}  親の改版"]
             lines += _plan_diff_lines(cand.current, t, cand_types)
@@ -1797,8 +1793,8 @@ def waiting(
     proposals: list[ticket_mod.Ticket],
     approved: list[ticket_mod.Ticket],
     closed: list[ticket_mod.Ticket],
-    review: list[ticket_mod.Ticket] = (),
-    types_for=None,
+    review: list[ticket_mod.Ticket],
+    types_for,
 ) -> tuple[list[ticket_mod.Ticket], list[ticket_mod.Ticket]]:
     """いま `--approve` で承認の対象に入るもの。新規の承認待ちと、親の改版。
 
@@ -1807,10 +1803,10 @@ def waiting(
     改版は、作業中の親の承認済みチケットがあり、`todo/` の提案の計画がそれと違うもの。
     計画が同じでも、いまの種類で計算した待ち方が承認済みチケットの写しと違えば改版になる
     （`phases.yml` を直した結果を進行中の親に効かせる道。設計 9.7）。`types_for` は
-    チケットに効く種類を引く関数で、渡さなければ計画の違いだけを見る。
+    チケットに効く種類を引く関数（`types_resolver`）。
     `--approve` と `--explain --json` が同じ答えを出すために、ここで 1 度だけ決める。
     """
-    known = by_id(approved + closed + list(review))
+    known = by_id(approved + closed + review)
     open_index = by_id(approved)
     todo = [t for t in proposals if t.state == ticket_mod.TODO]
     pending = [t for t in todo if t.ticket not in known]
@@ -1822,7 +1818,7 @@ def waiting(
         and t.has_plan
         and (
             _plan_differs(t, open_index[t.ticket])
-            or (types_for is not None and _workflow_differs(t, open_index[t.ticket], types_for))
+            or _workflow_differs(t, open_index[t.ticket], types_for)
         )
     ]
     return pending, revisions

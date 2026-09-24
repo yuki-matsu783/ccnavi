@@ -105,9 +105,6 @@ SEEN_LIMIT = 500
 # 対象の綴りを載せるときの長さの上限。
 SUBJECT_LIMIT = 200
 
-# 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
-# 区切り文字が混じった値でファイルを別の場所へ書かせない。
-
 
 def check(
     stderr: TextIO,
@@ -648,7 +645,7 @@ def _findings(
     mine: tuple[str, ...],
     source: str,
     scope: ScopeGuard | None,
-    where: tree.Tree | None = None,
+    where: tree.Tree,
     top: str = "",
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
@@ -672,8 +669,8 @@ def _findings(
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
-    name = where.name if where is not None else ""
-    tree_root = where.root if where is not None else ""
+    name = where.name
+    tree_root = where.root
     script = _script_writes(changes, places, top, where)
     found = []
     for change in changes:
@@ -703,7 +700,7 @@ def _script_writes(
     changes: list[gitstate.Change],
     places: tuple[str, str],
     top: str,
-    where: tree.Tree | None,
+    where: tree.Tree,
 ) -> set[str]:
     """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
 
@@ -732,7 +729,7 @@ def _script_writes(
     除外が通る。
     """
     tickets_rel, approved_rel = places
-    if where is None or not top or not (tickets_rel or approved_rel):
+    if not top or not (tickets_rel or approved_rel):
         return set()
     here = [
         (change, rel)
@@ -874,7 +871,7 @@ def _violation(
     change, group = finding.change, finding.group
     lines = [
         f"[ccnavi] {finding.code} ({_source(finding.source, group)})",
-        f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+        f"path: {change.path} ({change.status.strip()} / {change.kind})",
         f"tree: {finding.tree_name} ({finding.tree_root})" if finding.tree_name else "",
         f"after: {_call(payload)}",
     ]
@@ -919,7 +916,7 @@ def _preexisting(finding: Finding) -> str:
     return "\n".join(
         [
             f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
-            f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+            f"path: {change.path} ({change.status.strip()} / {change.kind})",
             "note: this was already in the working tree when ccnavi started watching this "
             "session, so the call that just ran did not cause it. Do not undo it and do not "
             "build on it: say what you found and let the user decide whose change it is.",
@@ -1067,7 +1064,7 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
         return set(), False, {}
-    heads = data.get("heads") if isinstance(data, dict) else None
+    heads = data.get("heads")
     if not isinstance(heads, dict):
         # 古い控え（HEAD を持たない版）でも基準としては読める。コミットのぶんだけ
         # 言えないが、ターンの始まりを見ていないことにするより害が小さい。

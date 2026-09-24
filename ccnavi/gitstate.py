@@ -145,7 +145,7 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
         return [], REASON_NO_GIT
     if done.timed_out:
         return [], REASON_TIMEOUT
-    if done.failure or done.code != 0:
+    if not done.ok:
         return [], REASON_FAILED
 
     return [c for c in (_parse(top, entry) for entry in done.out.split("\0")) if c], ""
