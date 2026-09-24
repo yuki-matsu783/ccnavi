@@ -80,7 +80,7 @@ pnpm test                                             # 統合先へ戻す前・
 | `refactor` | 挙動を変えないコード整理 |
 | `test` | `tests/*.py` / `tests/fixtures/` |
 | `docs` | `README.md` / `requirements.md` / `ccnavi.md` / `HANDOVER.md` |
-| `ai-asset` | `.claude/` 配下 (settings.json / hooks / skills / ccnavi のルール) と `CLAUDE.md`。エージェント向けの指示は docs ではなくこちら |
+| `ai-asset` | `.claude/` 配下 (settings.json / hooks / skills / ccnavi のルール) と `CLAUDE.md`・`docs/claude/`（CLAUDE.md から読ませる詳細）。エージェント向けの指示は docs ではなくこちら |
 | `chore` | `.gitignore` / 雑務 |
 | `build` | `pyproject.toml` / `uv.lock` |
 | `ci` | CI 設定 |

@@ -1,0 +1,19 @@
+# 実行環境と呼び名
+
+CLAUDE.md「実行環境」「呼び名」の詳細。sh やスクリプトを書くとき、文書の用語を確かめるときに読む。
+
+## 実行環境
+
+- Windows の Git Bash、Windows の WSL、Claude Code on the web (Linux)、macOS の 4 つ。どれでも動くように書く
+- macOS の `sh` は bash 3.2 で、`sed` などは BSD 版。変数のすぐ後ろに全角文字を続けるときは `${var}` と括る
+  （3.2 は全角の先頭バイトまで名前に読む）。`$( )` の中に `case` を書かない（3.2 は `)` を読み違える）。
+  どちらも `tests/core/test_sh_portability.py` が見る
+- 使える道具は `jq` 1.6、Node 22 (pnpm 10)、Python 3.12 (uv)、go。これ以外がある前提で書かない
+
+## 呼び名
+
+- **ワークスペースルート** = Claude Code を起動した場所（`CLAUDE_PROJECT_DIR`）
+- **git プロジェクトルート** = `.git` がある場所。ワークスペース自身、`projects/` の下の各プロジェクト、
+  ワークツリーのそれぞれが持つ
+- **統合先ブランチ** = 作業を合流させるブランチ
+
