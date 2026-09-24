@@ -259,7 +259,7 @@ def board_form_message(found: str) -> str:
     return (
         f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
         "オーバーレイで押したものを拡張が打つためのもので、端末の確かめが無いぶん、エージェントが"
-        "打つ道はここで止めます。承認と残った指摘の行き先は、利用者がボードか端末で決めます。"
+        "打つ道はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
         "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
@@ -315,7 +315,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
             f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
-            "残った指摘の行き先は利用者がボードか端末で決めます。承認済みチケットのコミットと push"
+            "残った指摘の対応方針は利用者がボードか端末で決めます。"
+            "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"

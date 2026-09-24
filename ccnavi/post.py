@@ -444,11 +444,15 @@ def at_stop(
         how = (
             f"戻すなら {undo}"
             if undo
-            else "コミットに入っている（履歴は書き換えない。取り込む前に確かめる）"
+            else (
+                f"{finding.change.path} はすでにコミット済みなので、"
+                "取り込む前に中身を確かめ、不要な変更なら取り消してください"
+            )
         )
+        kind = gitstate.KIND_LABELS.get(finding.change.kind, finding.change.kind)
         lines.append(
-            f"  {where}{finding.change.path}（{finding.change.kind}）"
-            f" ルール {rule.id or '(id 無し)'} / {how}"
+            f"  {where}{finding.change.path}（{kind}）"
+            f" 対象のルール: {rule.id or '(id 無し)'} / {how}"
         )
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
@@ -466,8 +470,9 @@ def _uncounted_line(uncounted: list[str]) -> str:
     return (
         f"[ccnavi] コミットに入ったぶんを数えていないツリーが {len(uncounted)} 本あります"
         f"（{', '.join(sorted(set(uncounted))[:REPORT_LIMIT])}）。"
-        "ターンの始まりに基準（HEAD）を取れていません。ターンの途中で切ったワークツリーが"
-        "これにあたります。そのツリーのコミットは 'git log' で確かめてください。"
+        "このターンの始まりの HEAD（比べる元の位置）を控えていないか、差分を読めなかったためです。"
+        "ターンの途中で切ったワークツリーを、一度も触らずに終えたときが典型です。"
+        "そのツリーのコミットは 'git log' で自分で確かめてください。"
     )
 
 

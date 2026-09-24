@@ -9,7 +9,7 @@ import { buildBoard } from "../../src/core/board.js";
 import { movedCards, movedStep, NOTHING_MOVED, placementOf, samePlacement, type Placement } from "../../src/core/board-moved.js";
 import { fixture } from "../helpers/fixture.js";
 
-test("CB-T192 列が変わったカードと新しく出たカードだけを出す。消えたカードは出さない", () => {
+test("CB-T192 列が変わったカードと新規起票のカードだけを出す。消えたカードは出さない", () => {
   // 見本のボードの置き場所。列は組み立て（board.ts）が決めたものをそのまま読む。
   // `assert.deepEqual` は `asserts actual is T` なので、変数に当てると以後の型が literal に狭まる。
   // 戻り値に直に当てて、`before` は `Placement` のままにする
@@ -106,12 +106,12 @@ test("CB-T192c 1 枚目は印を付けず、列が動かない読み直しでは
   ]);
 });
 
-test("CB-T192d カードが消えただけの読み直しも「変わった」と数える（戻ってきたら新しく出たと言える）", () => {
+test("CB-T192d カードが消えただけの読み直しも「変わった」と数える（戻ってきたら新規起票と言える）", () => {
   const board = buildBoard(fixture());
   const first = movedStep(NOTHING_MOVED, board);
 
   // 消えたカードには印を付けられないので `moved` は空。**それでも置き場所は更新する**。
-  // ここを「動いた分が 0 件なら据え置き」にすると、戻ってきたカードが「新しく出た」にならない
+  // ここを「動いた分が 0 件なら据え置き」にすると、戻ってきたカードが「新規起票」にならない
   const gone = movedStep(first, without(board, "i0001-03"));
   assert.deepEqual(gone.moved, []);
   assert.notEqual(gone, first, "置き場所が変わったので、同じ状態は返さない");

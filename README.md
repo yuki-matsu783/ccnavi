@@ -819,7 +819,7 @@ VS Code を使わないときは `--no-vscode` を付ける。
 チケットがどのワークツリーでどこまで進んでいるかは、VS Code の拡張「ccnavi ボード」
 （`vscode-extension/ccnavi-board/`）で見られる。拡張は `ccnavi --explain --json` の出力を
 並べるだけ。承認はボードのオーバーレイで一覧を見せ、人が押したら `--approve --yes` を子プロセスで
-打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の「決める」で指摘ごとに行き先を
+打つ（形は下の「承認の JSON」）。レビューで残った指摘は、フェーズ行の「決める」で指摘ごとに対応方針を
 選び、拡張が `ccnavi-review.sh decide` を子プロセスで打つ（形は下の「残った指摘の JSON」）。
 `close-early` はボードに置かず、端末で打つ。組み立て方と使い方はそこの README、
 出力の形は下の「ボードの JSON」。
@@ -1913,8 +1913,8 @@ sh .ccnavi/scripts/ccnavi-review.sh comment --body-file wip/tmp/decision.md
 レビュー済みのマーカーを置き、そのフェーズ（延期を引き受けた分を含む）の `review/` の子を
 `.ccnavi/approved/done/` へ動かし、止まっていたのが解ける。未解決が残るなら一覧を返す。
 
-残った指摘の行き先は人が決める（`decide`）。ボードのフェーズ行の「決める」で指摘を 1 件ずつ並べて
-選ぶか、端末で `ccnavi-review.sh decide <N>` を打って 1 件ずつ答える。行き先は 3 つ。
+残った指摘の対応方針は人が決める（`decide`）。ボードのフェーズ行の「決める」で指摘を 1 件ずつ並べて
+選ぶか、端末で `ccnavi-review.sh decide <N>` を打って 1 件ずつ答える。対応方針は 3 つ。
 
 - **対応しない（受け入れて進む）。** 受け入れたスレッドは `phases/<親>/accepted.json` に控え、次の
   `confirm` から数えない。マーカーとは別の場所に控えるのは、マーカーが上書きも一括の消去もされるため。
@@ -1949,7 +1949,7 @@ sh と実行ファイルの契約で、テストも同じ経路を通る。
 |---|---|
 | `request` | `review prepare`（前提を確かめ、マーカー付きの本文を控えの置き場に書き出す）→ sh が投稿 → `review requested`（マーカーを置く） |
 | `confirm` | sh がスレッドとレビューを取ってくる → `review confirm`（判定してマーカーを置き、`review/` の子を `done/` へ動かす） |
-| `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せ、指摘ごとに行き先を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧と指紋）と `decide N --choices <JSON> --digest <指紋>`（`--yes <JSON> --digest <指紋> --json`）で同じ道を通る |
+| `decide N` | sh が取ってくる → `--reviewed N --accept-unresolved`（人に見せ、指摘ごとに対応方針を選ばせる）→ issue に回す分があれば sh が issue を作り、決めた内容をコメントに写す。ボードは `decide N --preview`（`--preview --json`。一覧と指紋）と `decide N --choices <JSON> --digest <指紋>`（`--yes <JSON> --digest <指紋> --json`）で同じ道を通る |
 | （`chat` のフェーズ） | sh は動かない。人が端末で `ccnavi --reviewed <N> --chat --cwd <親のワークツリー>` を打つ。依頼も写しも無い |
 | `comment` | sh が投稿する。実行ファイルは関わらない |
 | `ready` | Draft を外す（「マージに進んでよい」の合図）。`review ready`（親を閉じられる状態かを確かめ、マーカー `phases/<親>/ready.json` とコメントの下書きを置く）→ sh が Draft を外してコメントを投稿する。親が打つ。マージは人 |
