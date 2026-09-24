@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, phase, risk, settings, tree
+from . import approval, configsync, fsio, gitcmd, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -64,6 +64,9 @@ def start(
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
+    synced = _sync_config(stderr, root, conf, found, worktree)
+    if synced is None:
+        return 1
     fields = {"started_at": approval.now(), "base_sha": sha}
     failed = approval.update_fields(found.path, fields)
     if failed:
@@ -73,7 +76,52 @@ def start(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
+    for line in synced:
+        stdout.write(line + "\n")
     return 0
+
+
+def _sync_config(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_mod.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 §11.12）。
+
+    返すのは着手の出力に足す行。写せなければ None（着手しない）。子は親のブランチに
+    乗るので比べない。ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。
+    """
+    if found.is_child or not found.project:
+        return []
+    copied, why = configsync.plan(conf, worktree)
+    if why:
+        stderr.write(f"ccnavi: {found.ticket} の設定を比べられない: {why}\n")
+        return None
+    if not copied:
+        return []
+    where = approval.home_dir(conf, root, found.ticket, "")
+    failed = configsync.apply(conf, worktree, where, found.ticket, copied)
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket} の設定を写せない: {failed}\n")
+        return None
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    lines = [
+        f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
+        "最初のレビューの依頼の頭に載る:"
+    ]
+    for c in copied:
+        line = f"  - {c.rel}（{'上書き' if c.existed else '新しく置いた'}）"
+        if c.lost:
+            line += "。消えた識別子: " + ", ".join(c.lost)
+        lines.append(line)
+    mark = approval.parent_mark_path(where, found.ticket, configsync.MARK)
+    lines.append(
+        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
+        f" '{git_sh} add' してコミットすること。印 {mark} も、それを持つツリーでコミットする"
+    )
+    return lines
 
 
 def finish(

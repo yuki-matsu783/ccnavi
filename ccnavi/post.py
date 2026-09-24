@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TextIO
 
@@ -106,6 +107,7 @@ def check(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
+    synced: Callable[[str], bool] | None = None,
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -146,7 +148,7 @@ def check(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
     if not found:
         # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
@@ -279,6 +281,7 @@ def _committed_findings(
     mine: tuple[str, ...],
     scope: ScopeGuard | None,
     places: tuple[str, str],
+    synced: Callable[[str], bool] | None = None,
 ) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
@@ -314,7 +317,7 @@ def _committed_findings(
             )
             uncounted.append(w.tree.name or ".")
             continue
-        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree):
+        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, synced=synced):
             rel = tree.relative(w.tree, finding.change.full)
             if ticket_mod.is_ticket_place(rel, tickets, approved):
                 continue
@@ -331,6 +334,7 @@ def at_stop(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
+    synced: Callable[[str], bool] | None = None,
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -360,14 +364,14 @@ def at_stop(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
         if f.key() not in baseline
     ]
     # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
     # 同じ見た目になる（呼び出しごとの監視も同じ穴を持つが、そちらは戻しに関わるので
     # 断面を変えない。人が 1 度で見るのはこの報告）。
-    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places)
+    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
     found += committed
     if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
@@ -592,6 +596,7 @@ def _findings(
     where: tree.Tree | None = None,
     top: str = "",
     places: tuple[str, str] = ("", ""),
+    synced: Callable[[str], bool] | None = None,
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
@@ -620,6 +625,10 @@ def _findings(
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
             continue
         if change.full in script:
+            continue
+        # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
+        # 内容と印で見分け、読めないものは外さない。
+        if synced is not None and synced(change.full):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
@@ -943,6 +952,7 @@ def at_prompt(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
+    synced: Callable[[str], bool] | None = None,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
 
@@ -966,7 +976,7 @@ def at_prompt(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
     # ツリーごとの HEAD も控える。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。

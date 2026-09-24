@@ -119,6 +119,7 @@ import os
 import re
 import shutil
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -917,6 +918,7 @@ def after(
     root: str,
     found: list[Target],
     written: str = "",
+    synced: Callable[[str], bool] | None = None,
 ) -> list[Outcome]:
     """実行後。控えと突き合わせて、変わっていれば戻す。
 
@@ -926,6 +928,11 @@ def after(
 
     written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
     パス。組み込みの既定に落ちている間の修復だけは戻さない（_left_as_repair）。
+
+    synced は、ワークツリー側の設定の変更が、着手のときに共通層でプロジェクトの層を
+    上書きしたものかを答える（`configsync.is_synced_write`）。そう読めるものは戻さない。
+    戻すと着手が写した中身が同じ呼び出しの中で消え、最初のレビューで知らせる印だけが残る。
+    ワークツリー側の設定に限るのは、上書きするのが親のワークツリーだけだから。
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -942,6 +949,9 @@ def after(
         now = _read(target.path)
 
         if saved is not None and now == saved:
+            continue
+
+        if synced is not None and target.copy and now is not None and synced(target.path):
             continue
 
         if _left_as_repair(target, written, saved, now):

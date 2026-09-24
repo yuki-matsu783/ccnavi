@@ -16,6 +16,7 @@ from . import (
     approval,
     audit,
     builtin,
+    configsync,
     ctxfile,
     fsio,
     hookio,
@@ -173,6 +174,7 @@ def decide_at_prompt(
         payload,
         record,
         (conf.tickets, conf.approved),
+        functools.partial(configsync.is_synced_write, conf, root),
     )
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
@@ -212,6 +214,7 @@ def decide_at_stop(
         payload,
         record,
         (conf.tickets, conf.approved),
+        functools.partial(configsync.is_synced_write, conf, root),
     )
     if text:
         hookio.write_system_message(stdout, text)
@@ -297,7 +300,10 @@ def decide_after(
     # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
     # 書いた先を渡すのは、組み込みの既定に落ちている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    restore = functools.partial(selfguard.after, written=_written(payload, record))
+    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と印で見分けて外す
+    # （設計 §11.12）。戻す側と、報告する側の両方で同じ答えを使う。
+    synced = functools.partial(configsync.is_synced_write, conf, root)
+    restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
     guard = judge.guard_setting_files(stderr, mode, conf, root, payload, record, restore)
 
     watched = watched_for(stderr, conf, root, record, payload)
@@ -324,6 +330,7 @@ def decide_after(
         # `_committed_findings` が置き場を外すのと同じ理由。判定の有無で、外れたり
         # 外れなかったりさせない。
         places=(conf.tickets, conf.approved),
+        synced=synced,
     )
     # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
