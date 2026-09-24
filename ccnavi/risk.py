@@ -48,7 +48,7 @@ import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import yaml
 
@@ -399,11 +399,15 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
     """共通層の配点に、行き先の層の配点を足す（設計 §11.4.2）。
 
     `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
-    中身が違えば error。`levels` は書かれた鍵だけが参加し、キーごとに小さいほうを
-    採る。どの層も書いていない鍵は既定（`DEFAULT_LEVELS`）。
+    中身が違えば両方を数え、後ろの層の項目を `<層>:<id>` と名乗らせる（warn）。
+    `levels` は書かれた鍵だけが参加し、キーごとに小さいほうを採る。どの層も書いて
+    いない鍵は既定（`DEFAULT_LEVELS`）。
 
-    error があるとき、その層は空として扱い、共通層だけを返す。点は小さくなる方向に
-    倒れうるので、`--lint` を error にして直すまで目に付く形にする。
+    同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる方向に倒れるから。
+    両方を数えれば、衝突は加点を増やす側にしか働かない（ルールの同 `id` と同じ扱い）。
+    裸の `id` にコロンは書けないので、名乗り直した `id` が他の項目と重なることは無い。
+
+    合成後の `levels` の順が崩れる error のときは、その層を空として扱い、共通層だけを返す。
     """
     problems: list[Problem] = []
     ids = {f.id for f in common.factors}
@@ -421,15 +425,17 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
             )
             continue
         if f.id in ids:
+            qualified = f"{layer}{ID_SEPARATOR}{f.id}"
             problems.append(
                 Problem(
-                    SEVERITY_ERROR,
+                    SEVERITY_WARN,
                     f.id,
-                    f"`{f.id}` が前の層と重複している。{layer} の層は空として扱う。"
-                    "同じ名前で違う配点があると、記録を読んだ人がどちらの話か決められない",
+                    f"`{f.id}` が前の層と同じ id で中身が違う。両方を数え、{layer} の側は"
+                    f" `{qualified}` と名乗る（記録と record-risk もこの名前）。"
+                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変える",
                 )
             )
-            continue
+            f = replace(f, id=qualified)
         ids.add(f.id)
         keys.add(f.key())
         added.append(f)
@@ -533,7 +539,7 @@ def layer_definition(
     merged, problems = merge(definition, extra, layer)
     if merged.dropped:
         merged.fallback = (
-            f"{', '.join(merged.dropped)} の配点が衝突している。この層は空として数える"
+            f"{', '.join(merged.dropped)} の配点の閾値が合成で逆転している。この層は空として数える"
         )
     return merged, list(notes) + problems
 
