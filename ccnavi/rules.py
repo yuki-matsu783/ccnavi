@@ -175,8 +175,7 @@ def root_pattern(root: str) -> str:
     `/` で考える。大文字小文字は式ごと区別せずに当てるので（_build）、ここでは機械を
     見ない。見ると `c:` と `C:` の扱いが機械で割れる。
     """
-    real = os.path.realpath(root).rstrip("\\/")
-    return "".join("[\\\\/]" if ch in "\\/" else re.escape(ch) for ch in real)
+    return "".join(_same(ch) for ch in real_root(root))
 
 
 def root_glob(root: str) -> str:

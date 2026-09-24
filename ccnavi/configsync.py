@@ -189,7 +189,7 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
     for c in copied:
         failed = _replace(c.target, c.content)
         if failed:
-            stuck = [w.rel for w in written if not _undo(w)]
+            stuck = [w.rel for w in written if not _restore(w.target, w.before)]
             if not _restore(path, previous):
                 stuck.append(path)
             if stuck:
@@ -407,8 +407,8 @@ def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[st
 
 def _expected(conf: settings.Settings, root: str, rel: str) -> bytes | None:
     """ツリーからの相対 rel に写るはずの、共通層の中身。対応するものが無ければ None。"""
+    home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     for kind, common in common_files(conf).items():
-        home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
         if rel == f"{home}/{settings.LAYER_CONFIG_DIR}/{settings.LAYER_FILE_NAMES[kind]}":
             raw = _read(common)
             return projected(conf, kind, raw) if raw is not None else None
@@ -553,20 +553,8 @@ def _replace(path: str, content: bytes) -> str:
     return ""
 
 
-def _undo(c: Copied) -> bool:
-    """写した 1 本を元へ戻す。戻せたか。"""
-    if c.before is None:
-        with contextlib.suppress(FileNotFoundError):
-            try:
-                os.remove(c.target)
-            except OSError:
-                return False
-        return True
-    return not _replace(c.target, c.before)
-
-
 def _restore(path: str, previous: bytes | None) -> bool:
-    """印を前の中身へ戻す。戻せたか。"""
+    """写した 1 本や印を前の中身へ戻す。前が無かったなら消す。戻せたか。"""
     if previous is None:
         with contextlib.suppress(FileNotFoundError):
             try:

@@ -218,9 +218,10 @@ _MOVES_TO = {"env": ("-C", "--chdir"), "sudo": ("-D", "--chdir")}
 # 左がサブシェルになる区切り。`cd a | b` と `cd a & b` の `cd` は、右にも後ろにも効かない。
 _FORKED = frozenset({"|", "|&", "&"})
 
-# 綴りの中にあると、行き先が実行するときまで決まらない文字。変数と置換（走査が `$` 1 文字に
-# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。先頭の `~` は別に見る。
-_PATH_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
+# 綴りの中にあると、実行するときまでシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
+# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。行き先の綴りとコマンド名の両方に使う。
+# 行き先では先頭の `~` を別に見る。コマンド名では `[` だけの test コマンドと `[[` は当たらない。
+_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
 
 # 絶対パス。継ぎ足さずにそのまま使う。Windows のドライブ文字も絶対。
 _ABSOLUTE = re.compile(r"[\\/]|[A-Za-z]:[\\/]")
@@ -332,10 +333,6 @@ _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
 # `env` と `sudo` が代入として読む引数。どちらも `=` を含む引数を名前の綴りを問わず代入に
 # 数える（`env a+=1 rm x` は `a+` という変数を置いて rm を実行する）。シェルの代入より広い。
 _RUNNER_ASSIGNMENT = re.compile(r"[^=-][^=]*=")
-
-# コマンド名の中で、実行するときにシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
-# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。`[` だけの test コマンドと `[[` は当たらない。
-_NAME_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
 
 # bash 4.1 以降の名前付き fd。`{fd}>/dev/null cmd` のリダイレクトの前に付く。
 _NAMED_FD = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
@@ -912,8 +909,7 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     読み切れない形（走査か shlex が止まる）なら空のリストを返す。呼び手は read() の
     degraded を先に見て、そちらで扱う。
     """
-    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
-    src = src.replace("\\\r\n", "").replace("\\\n", "")
+    src = _prepare(src)
     try:
         outer, _, _, _ = _scan(src)
         tokens = _tokenize(outer)
@@ -924,6 +920,19 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     return places
 
 
+def _prepare(src: str) -> str:
+    """走査の前の下ごしらえ。目印の文字を空白に戻し、行継続を消す。
+
+    改行の前のバックスラッシュはシェルの行継続で、2 文字とも消える。
+    2 行に割ったコマンドは 1 行で書いたのと同じ語の並びになる。
+    走査より先に消すのは、改行をコマンドの区切りに読ませないため。
+    シングルクォートの中では 2 文字とも文字通りなのでそこでは取りこぼすが、
+    誰も書かない綴りだし、変わるのは引数の文字列であってどのコマンドが走るかではない。
+    """
+    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
+    return src.replace("\\\r\n", "").replace("\\\n", "")
+
+
 def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     """読みと、層を作る先のコマンドの並びを返す。
 
@@ -932,13 +941,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     """
     if depth > _MAX_DEPTH:
         return _stopped(_Unreadable(REASON_AMBIGUOUS_SUBST, _TOO_DEEP)), []
-    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
-    # 改行の前のバックスラッシュはシェルの行継続で、2 文字とも消える。
-    # 2 行に割ったコマンドは 1 行で書いたのと同じ語の並びになる。
-    # 走査より先に消すのは、改行をコマンドの区切りに読ませないため。
-    # シングルクォートの中では 2 文字とも文字通りなのでそこでは取りこぼすが、
-    # 誰も書かない綴りだし、変わるのは引数の文字列であってどのコマンドが走るかではない。
-    src = src.replace("\\\r\n", "").replace("\\\n", "")
+    src = _prepare(src)
 
     try:
         outer, found, heads, braces = _scan(src)
@@ -1350,14 +1353,14 @@ def _destination(rest: list[str], k: int) -> int:
     if len(where) != 1:
         return -1
     target = rest[where[0]]
-    if not target or target.startswith(("-", "~")) or _PATH_EXPANDS.search(target):
+    if not target or target.startswith(("-", "~")) or _EXPANDS.search(target):
         return -1
     return where[0]
 
 
 def _target(here: str | None, word: str) -> str | None:
     """移る先を、読みの起点から見た綴りにする。決まらなければ None。"""
-    if _PATH_EXPANDS.search(word) or word.startswith("~"):
+    if _EXPANDS.search(word) or word.startswith("~"):
         return None
     if _ABSOLUTE.match(word):
         return _capped(_normal(word))
@@ -1487,7 +1490,7 @@ def _expanded_names(commands: list[list[str]]) -> list[str]:
         name = _command_name(command)
         if len(previous) == 1 and previous[0] in _TAKES_A_WORD:
             name = ""
-        if name and _NAME_EXPANDS.search(name) and name not in seen:
+        if name and _EXPANDS.search(name) and name not in seen:
             found.append(name)
             seen.update((name, _base(name)))
         previous = command
@@ -1757,7 +1760,7 @@ def _render(commands: list[list[str]]) -> str:
     リダイレクトではない。ここで両側に目印を置かないと、`grep -n "x>" f` が
     `x > f` と同じ形になり、書き込み先を見るルールが読み手に当たる。
     """
-    return SEP.join(" ".join(_join(token) for token in command) for command in commands if command)
+    return SEP.join(_render_command(command) for command in commands if command)
 
 
 def _join(token: str) -> str:

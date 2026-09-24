@@ -266,16 +266,7 @@ def _rules_hit(
                 }
             )
             continue
-        hits.append(
-            {
-                "id": name,
-                "source": "file",
-                "section": rule.decision,
-                "kind": "glob" if rule.glob else "regex",
-                "written": rule.glob or rule.regex,
-                "pattern": rule.compiled.pattern if rule.compiled else "",
-            }
-        )
+        hits.append({"id": name, "source": "file", "section": rule.decision, **_rule_form(rule)})
     return hits
 
 
@@ -491,9 +482,9 @@ def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str
     if not path or not os.path.isfile(path):
         return [], ""
     if name == ruleload.LAYER_COMMON:
-        definition, notes = risk.load(path)
+        definition, _ = risk.load(path)
         if definition.fallback:
-            return [], definition.fallback or "; ".join(str(n) for n in notes)
+            return [], definition.fallback
         return list(definition.factors), ""
     definition, notes = risk.load_layer(path, (settings.layer_script_home(conf),))
     if definition is None:
@@ -818,10 +809,17 @@ def _rule_record(rule: rules.Rule) -> dict:
         "section": rule.decision,
         "source": rule.source,
         "match": rule.match,
+        **_rule_form(rule),
+        "message": rule.message,
+    }
+
+
+def _rule_form(rule: rules.Rule) -> dict:
+    """ルールの書き方。書いた綴りと、翻訳後の式。"""
+    return {
         "kind": "glob" if rule.glob else "regex",
         "written": rule.glob or rule.regex,
         "pattern": rule.compiled.pattern if rule.compiled else "",
-        "message": rule.message,
     }
 
 
@@ -896,7 +894,7 @@ def _ticket_record(
         status = "closed"
     else:
         status = "none"
-    found = worktrees.get(ticket_id) or tree.lookup(worktrees, ticket_id)
+    found = tree.lookup(worktrees, ticket_id)
     record: dict = {
         "ticket": ticket_id,
         "parent": source.parent,
