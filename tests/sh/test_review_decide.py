@@ -76,6 +76,9 @@ def quote_arg(arg: str) -> str:
     Windows の Python は引用符を含む語を外側の引用符なしの `{\\"u1\\":...}` にするが、MSYS の
     sh はそれを 1 語として読めず、後ろの引数まで消える。ボードは Node から sh を起こすので、
     テストもその形で渡す。
+
+    渡す引数（sh のパス、番号、`--choices`、JSON、`d0`）は往復できることを確かめてある。
+    `'` や `*`、`\\\\` の連続と空白の組み合わせは、MSYS 側の癖で復元できない（Node 経由でも同じ）。
     """
     if arg and not any(c in arg for c in ' \t"'):
         return arg
@@ -207,6 +210,8 @@ class ReviewDecideShTest(unittest.TestCase):
             env=env,
             capture_output=True,
             text=True,
+            # sh は UTF-8 を出す。日本語 Windows の既定（cp932）で読むと警告の文が復号できない
+            encoding="utf-8",
             # Windows は MSYS の起動が遅く、1 回に 12〜24 秒かかる
             timeout=180 if WINDOWS else 60,
         )
