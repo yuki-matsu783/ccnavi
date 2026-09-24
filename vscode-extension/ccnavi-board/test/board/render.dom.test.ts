@@ -474,7 +474,7 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
 
-test("CB-T13c 提案が残っていて未着手の列にいる閉じたカードには、列との食い違いの手がかりとしてクローズとレビューの要否を出す", async () => {
+test("CB-T217 提案が残っていて未着手の列にいる閉じたカードには、列との食い違いの手がかりとしてクローズとレビューの要否を出す", async () => {
   const base = fixture();
   const proposal = { state: "todo", tree: "i0001", tree_root: "<root>/.claude/worktrees/i0001", path: "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01.md" };
   const page = await openBoard({
