@@ -1088,7 +1088,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
         self.assertIn("--cwd は 1 度しか渡せない", refused.stderr)
 
     def test_one_of_each_still_goes_through(self):
-        """1 本ずつなら通る。断る側だけを見ると、全部断る実装でも緑になる。"""
+        """1 本ずつなら通る。断る側だけを見ると、全部断る実装でもテストが通ってしまう。"""
         passed = self.ccnavi("--cwd", self.parent_tree, "--explain", "--json")
 
         self.assertEqual(passed.returncode, 0, passed.stderr)
