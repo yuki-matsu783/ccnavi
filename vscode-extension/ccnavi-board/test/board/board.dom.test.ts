@@ -425,14 +425,14 @@ test("CB-D82 渡された分にだけ印を出す。渡されなければ出さ�
   }
 });
 
-test("CB-D82b 新しく出たカードは「新しく出た」と言う", async () => {
+test("CB-D82b 新規起票のカードは「新規起票」と言う", async () => {
   const page = await openBoard();
   try {
     await page.send({ type: "data", data: data([{ id: "i0001-03", to: "todo" }]) });
     const card = page.one('.card[data-id="i0001-03"]');
     assert.ok(card.classList.contains("moved"));
     assert.equal(card.getAttribute("data-moved"), "none-todo");
-    assert.equal(card.querySelector(".moved-mark")?.textContent, "新しく出た（未着手）");
+    assert.equal(card.querySelector(".moved-mark")?.textContent, "新規起票（未着手）");
   } finally {
     await page.close();
   }
