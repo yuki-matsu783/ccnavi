@@ -22,44 +22,50 @@
 # ブランチ直下でこのスクリプトを打つと、その書き換えが未コミットの変更としてそこに残る。
 # CLAUDE.md の「ソースコード編集方法」に従うなら、版が上がる見込みがあるときは先に
 # ワークツリーを切り、その中でこのスクリプトを打つこと。
+#
+# 処理は全部 main 関数に入れ、最後の 1 行で呼ぶ。取り込みでこのスクリプト自身が書き換わる
+# ことがある。sh はファイルを読みながら実行するので、関数に入れず書き換わると、ずれた
+# 位置から読み続けて構文エラーになる。関数なら、実行の前に全体を読み終えている。
+# 書き換わったあとも、この回は読み込んだ版のまま最後まで走る。
 set -eu
 
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
-EXT_DIR="$ROOT/vscode-extension/ccnavi-board"
+main() {
+  ROOT=$(cd "$(dirname "$0")/.." && pwd)
+  EXT_DIR="$ROOT/vscode-extension/ccnavi-board"
 
-# ワークツリーでは .git がファイル、チェックアウトした本体では .git がディレクトリ。
-if [ -d "$ROOT/.git" ]; then
-  echo "== リモートの最新を取り込む =="
-  if git -C "$ROOT" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
-    if ! git -C "$ROOT" pull --ff-only; then
-      echo "fast-forward で取り込めませんでした。ブランチを揃えてからやり直してください" >&2
-      exit 1
+  # ワークツリーでは .git がファイル、チェックアウトした本体では .git がディレクトリ。
+  if [ -d "$ROOT/.git" ]; then
+    echo "== リモートの最新を取り込む =="
+    if git -C "$ROOT" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+      if ! git -C "$ROOT" pull --ff-only; then
+        echo "fast-forward で取り込めませんでした。ブランチを揃えてからやり直してください" >&2
+        exit 1
+      fi
+    else
+      echo "上流のブランチが無いので、取り込みは飛ばします"
     fi
-  else
-    echo "上流のブランチが無いので、取り込みは飛ばします"
+    echo ""
   fi
+
+  echo "== ccnavi (Python) を組み立てる =="
+  (cd "$ROOT" && uv run --with pyinstaller python build.py)
+
   echo ""
-fi
+  echo "== ccnavi-board (VS Code 拡張機能) を組み立てる =="
+  cd "$EXT_DIR"
 
-echo "== ccnavi (Python) を組み立てる =="
-(cd "$ROOT" && uv run --with pyinstaller python build.py)
+  pkg_version=$(node -p "require('./package.json').version")
 
-echo ""
-echo "== ccnavi-board (VS Code 拡張機能) を組み立てる =="
-cd "$EXT_DIR"
+  if command -v code >/dev/null 2>&1; then
+    installed_version=$(code --list-extensions --show-versions 2>/dev/null | grep -i '^local\.ccnavi-board@' | sed 's/.*@//')
+  else
+    installed_version=""
+    echo "code コマンドが無いので、インストール済みの版との比較は飛ばします"
+  fi
 
-pkg_version=$(node -p "require('./package.json').version")
-
-if command -v code >/dev/null 2>&1; then
-  installed_version=$(code --list-extensions --show-versions 2>/dev/null | grep -i '^local\.ccnavi-board@' | sed 's/.*@//')
-else
-  installed_version=""
-  echo "code コマンドが無いので、インストール済みの版との比較は飛ばします"
-fi
-
-# インストール済みの版が package.json の版以上なら、インストール済みの版のパッチを 1 つ上げた版を出す。
-# 上げる必要が無ければ何も出さない。
-next_version=$(node -e '
+  # インストール済みの版が package.json の版以上なら、インストール済みの版のパッチを 1 つ上げた版を出す。
+  # 上げる必要が無ければ何も出さない。
+  next_version=$(node -e '
 const parse = (v) => v.split(".").map((n) => parseInt(n, 10) || 0);
 const [pkg, installed] = process.argv.slice(1);
 if (!installed) process.exit(0);
@@ -71,27 +77,30 @@ if (cmp < 0) process.exit(0);
 console.log(i[0] + "." + i[1] + "." + ((i[2] || 0) + 1));
 ' "$pkg_version" "$installed_version")
 
-if [ -n "${next_version}" ]; then
-  echo "インストール済みの版（${installed_version}）が package.json の版（${pkg_version}）以上なので、${next_version} に上げます"
-  pnpm version "${next_version}" --no-git-tag-version
-  pkg_version="${next_version}"
-fi
+  if [ -n "${next_version}" ]; then
+    echo "インストール済みの版（${installed_version}）が package.json の版（${pkg_version}）以上なので、${next_version} に上げます"
+    pnpm version "${next_version}" --no-git-tag-version
+    pkg_version="${next_version}"
+  fi
 
-echo "版 ${pkg_version} を組み立てます"
-pnpm run package
+  echo "版 ${pkg_version} を組み立てます"
+  pnpm run package
 
-vsix="$ROOT/dist/ccnavi-board-${pkg_version}.vsix"
-if [ ! -f "$vsix" ]; then
-  echo "組み立てたはずの vsix が見当たりません: ${vsix}" >&2
-  exit 1
-fi
+  vsix="$ROOT/dist/ccnavi-board-${pkg_version}.vsix"
+  if [ ! -f "$vsix" ]; then
+    echo "組み立てたはずの vsix が見当たりません: ${vsix}" >&2
+    exit 1
+  fi
 
-if command -v code >/dev/null 2>&1; then
-  echo ""
-  echo "== 拡張機能を入れる =="
-  code --install-extension "$vsix"
-else
-  echo ""
-  echo "code コマンドが無いので、入れるのは飛ばします。入れるには:"
-  echo "  code --install-extension \"${vsix}\""
-fi
+  if command -v code >/dev/null 2>&1; then
+    echo ""
+    echo "== 拡張機能を入れる =="
+    code --install-extension "$vsix"
+  else
+    echo ""
+    echo "code コマンドが無いので、入れるのは飛ばします。入れるには:"
+    echo "  code --install-extension \"${vsix}\""
+  fi
+}
+
+main "$@"; exit $?
