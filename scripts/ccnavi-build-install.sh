@@ -11,10 +11,10 @@
 # ccnavi は build.py が組み立てと .ccnavi/bin/<os>-<arch>/ への設置を両方する
 # （scripts/../build.py 参照）。
 #
-# 拡張機能は、いま code にインストール済みの版が vscode-extension/ccnavi-board/package.json の
-# 版以上なら、インストール済みの版を基準にパッチ版を 1 つ上げてから組み立てる。package.json の
+# 拡張機能は、いま code にインストール済みバージョンが vscode-extension/ccnavi-board/package.json の
+# 版以上なら、インストール済みバージョンを基準にパッチ版を 1 つ上げてから組み立てる。package.json の
 # 版のほうが大きければ、そのまま組み立てる。同じ版のまま vsix を作っても、VS Code は
-# インストール済みの版と同じか古い版を「入れ直せない」として弾くので、インストール済みの版を超えさせる。
+# インストール済みバージョンと同じか古い版を「入れ直せない」として弾くので、インストール済みバージョンを超えさせる。
 # code コマンドは PATH を先に探し、無ければ VS Code の既定のインストール先を探す
 # （インストール時に「PATH へ追加」を外すと、端末からは code が見えない）。環境変数 CODE で
 # 場所を渡せばそれを使う。どこにも無い機械（VS Code の入っていない Linux など）では版の比較を
@@ -86,10 +86,10 @@ main() {
     installed_version=$("$code_cmd" --list-extensions --show-versions 2>/dev/null | grep -i '^local\.ccnavi-board@' | sed 's/.*@//')
   else
     installed_version=""
-    echo "code コマンドが見つからないので、インストール済みの版との比較は飛ばします（場所は CODE で渡せます）"
+    echo "code コマンドが見つからないので、インストール済みバージョンとの比較は飛ばします（場所は CODE で渡せます）"
   fi
 
-  # インストール済みの版が package.json の版以上なら、インストール済みの版のパッチを 1 つ上げた版を出す。
+  # インストール済みバージョンが package.json の版以上なら、インストール済みバージョンのパッチを 1 つ上げた版を出す。
   # 上げる必要が無ければ何も出さない。
   next_version=$(node -e '
 const parse = (v) => v.split(".").map((n) => parseInt(n, 10) || 0);
@@ -104,7 +104,7 @@ console.log(i[0] + "." + i[1] + "." + ((i[2] || 0) + 1));
 ' "$pkg_version" "$installed_version")
 
   if [ -n "${next_version}" ]; then
-    echo "インストール済みの版（${installed_version}）が package.json の版（${pkg_version}）以上なので、${next_version} に上げます"
+    echo "インストール済みバージョン（${installed_version}）が package.json の版（${pkg_version}）以上なので、${next_version} に上げます"
     pnpm version "${next_version}" --no-git-tag-version
     pkg_version="${next_version}"
   fi
