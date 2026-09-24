@@ -215,7 +215,7 @@ clone のオプション欄（ブランチ、`--depth`、submodule。要るな�
 | 保存 | 一時ファイルへ書いて `--lint --risk` を通し、error があれば保存しない。整数でない points や逆順の境目の点はここで止まる |
 | ファイルが無い | 組み込みの配点を読み取り専用で見せ、「組み込みの配点でファイルを作る」で同じ値のファイルを書き出す。値が同じなので数え方は変わらない。既にあれば上書きしない |
 | チケット制御が disable | 画面が開かない（入口も出ない）。開いたままのときは何もしない |
-| 欄名 | 日本語で、`risks.yml` のキー名は欄名にマウスを重ねると出る。id = `id`、点 = `points`、当て方 = `lines_over` / `files_over` / `deleted_over` / `glob` / `script` / `judge`、しきい値・glob・スクリプト・問い = 当て方の値、上限 = `max`、文面 = `message`、MEDIUM / HIGH / CRITICAL = `levels` の各リスクレベル |
+| 欄名 | 日本語で、`risks.yml` のキー名は欄名にマウスを重ねると出る。id = `id`、点 = `points`、当て方 = `lines_over` / `files_over` / `deleted_over` / `glob` / `script` / `judge`、基準・glob・スクリプト・問い = 当て方の値、上限 = `max`、文面 = `message`、MEDIUM / HIGH / CRITICAL = `levels` の各リスクレベル |
 | 監視 | 配点のファイル（絶対パスでも）、`.claude/settings.json`、`.claude/settings.local.json`、チケットの置き場。外で変われば「外で変わった」、チケットが動けば保存の可否を取り直す。再読込で配点のパスが変わっていれば監視も張り直す |
 | 読み直しの見え方 | 画面は React で、拡張ホストが渡すのは中身（`RiskData`）だけ。入れ物（HTML）は開いたときに 1 度入るだけで、入れ直さない（`retainContextWhenHidden` が真の画面。`core/screen-host.ts` の `retainedHost`、ADR-0062）。**中身が届くのは編集を捨ててよいときだけ**で、人が「再読込」を押したときと、保存・作成が通ったとき。外で変わっただけのときは帯が出るだけで、打ちかけの欄も開いた行も残る。絞り込みは読み直しのあとも残る |
 | 往復の間 | 「保存」「作る」「再読込」を押した時点で欄と 3 つのボタンを止める（帯の中の「再読込」も同じ）。止めないと、往復の間に打った内容が、返ってきた中身で黙って消える。人が「破棄して読み直す？」をやめたときは、拡張ホストがそう伝えて欄が戻る。往復の間に読み直されていたら、遅れて通った保存は捨てる（捨てたはずの編集をファイルに書かないため） |
@@ -611,7 +611,7 @@ src/
     projects/state.ts 画面が覚えるもの（clone の欄）の読み書き
     projects/text.ts  カードに出す言葉（層の設定の置き場、重ねない苦情）
     risk/style.css    リスク管理画面の CSS の入口
-    risk/App.css      App.tsx の CSS（しきい値の枠）
+    risk/App.css      App.tsx の CSS（境目の点の枠）
     risk/Factor.css   Factor.tsx の CSS（配点 1 件の行）
     risk/post.ts      リスク管理の送り口。契約に無いものは型で止まる
     risk/main.tsx     リスク管理画面の入口。埋め込みの JSON を読んでマウントする

@@ -1882,7 +1882,7 @@ JSON の欄名は
 | 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通層。層ごとの解決先は §11.4.2） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は重い側に倒し、その項目の点を加える |
 | 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`finish` が問いと差分の要約を `state/risk-judge-<子>.md` に書き、親がサブエージェントに渡し、報告を `ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録する。判定は子の HEAD に結び、HEAD が動けば取り直し。記録できるのは親だけ |
 
-点とリスクレベルと加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの
+点・リスクレベル・加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの
 依頼文の先頭に出る。
 
 ### 9.10 レビューの依頼と確認
