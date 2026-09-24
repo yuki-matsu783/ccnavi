@@ -95,7 +95,7 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
-    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--config-synced\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )

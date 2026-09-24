@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, phase, risk, settings, tree
+from . import approval, configsync, fsio, gitcmd, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -64,6 +64,9 @@ def start(
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
+    synced = _sync_config(stderr, root, conf, found, worktree)
+    if synced is None:
+        return 1
     fields = {"started_at": approval.now(), "base_sha": sha}
     failed = approval.update_fields(found.path, fields)
     if failed:
@@ -73,7 +76,67 @@ def start(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
+    for line in synced:
+        stdout.write(line + "\n")
     return 0
+
+
+def _sync_config(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_mod.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 §11.12）。
+
+    返すのは着手の出力に足す行。写せなければ None（着手しない）。子は親のブランチに
+    乗るので比べない。ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。
+    """
+    if found.is_child or not found.project:
+        return []
+    copied, why = configsync.plan(conf, root, worktree)
+    if why:
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {why}\n")
+        return None
+    if not copied:
+        return []
+    busy, why = configsync.dirty(worktree, copied)
+    if why or busy:
+        stderr.write(
+            f"ccnavi: {found.ticket} の設定を共通層から写せない: "
+            + (
+                why
+                or f"未コミットの変更がある（{', '.join(busy)}）。人の書きかけを踏まないので止める"
+            )
+            + "\n"
+        )
+        return None
+    where = approval.home_dir(conf, root, found.ticket, "")
+    failed = configsync.apply(where, found.ticket, copied)
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {failed}\n")
+        return None
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    lines = [
+        f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
+        "最初のレビューで知らせる（レビューが無ければ、親を閉じる前に利用者が端末で見る）:"
+    ]
+    for c in copied:
+        line = f"  - {c.rel}（{'上書き' if c.existed else '新しく置いた'}）"
+        if c.lost:
+            line += "。消えた識別子: " + ", ".join(c.lost)
+        if c.changed:
+            line += "。中身が変わった識別子: " + ", ".join(c.changed)
+        if c.unparsed:
+            line += "。上書き前を読めなかった"
+        lines.append(line)
+    mark = approval.parent_mark_path(where, found.ticket, configsync.MARK)
+    lines.append(
+        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
+        f" '{git_sh} add' してコミットすること。印 {mark} も、それを持つツリーでコミットする"
+    )
+    return lines
 
 
 def finish(
@@ -507,6 +570,16 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     if open_children:
         return [
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
+        ]
+    # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 §11.12）。
+    # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
+    # そこを通らないので、人が端末で見たことを残させる。締めた親でも問うので、
+    # この下の早い return より前に置く。
+    if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
+        return [
+            f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
+            "（レビューを通っていない）。閉じる前に、利用者に端末で "
+            f"'ccnavi --config-synced {parent_id}' を打って見てもらうこと"
         ]
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY

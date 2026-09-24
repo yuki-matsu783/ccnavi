@@ -154,6 +154,7 @@
 |---|---|
 | [0033](0033-projects.md) | 複数のリポジトリ：道具はワークスペース、設定はプロジェクト、Bash は和 |
 | [0035](0035-extension-no-judging.md) | VS Code 拡張は判定を自分で出さない |
+| [0084](0084-common-layer-is-distributed-to-projects.md) | 共通層は配る定義にし、親の着手でプロジェクトの層を上書きして最初のレビューで知らせる |
 | [0038](0038-project-from-location.md) | チケットのプロジェクトは提案を置いた場所で決める |
 | [0064](0064-extension-board-in-react.md) | ボードの画面を React にし、拡張ホストは中身だけを渡す |
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
