@@ -19,7 +19,7 @@ import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKi
 import { applyAppearance } from "../appearance.js";
 import { Graph, Legend } from "./Graph.js";
 import { Phase } from "./Phase.js";
-import { Tour, type TourStep } from "./Tour.js";
+import { Tour, type TourStep } from "../Tour.js";
 import { post } from "./post.js";
 import { countText, duplicateNote, emptyNote, findText, graphNotices, hasRelations } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, openedFromIds, saveOpen, saveView, type Draft, type View } from "./state.js";

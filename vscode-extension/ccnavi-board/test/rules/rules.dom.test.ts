@@ -562,3 +562,27 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.close();
   }
 });
+
+test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは控えに書かない", async () => {
+  const dom = await openRules({}, { tab: "hooks" });
+  try {
+    assert.ok(dom.one("#tab-hooks").classList.contains("active"));
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    const titles: string[] = [];
+    const tabs: string[] = [];
+    while (dom.all(".tour").length > 0) {
+      titles.push(dom.one("#tour-title").textContent ?? "");
+      tabs.push(dom.one(".pane.active").id);
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    assert.deepEqual(titles, ["3 つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
+    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-hooks", "tab-hooks"]);
+    assert.ok(dom.one("#tab-hooks").classList.contains("active"), "始める前のタブに戻っていない");
+    assert.equal((dom.state() as { tab?: string }).tab, "hooks");
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});

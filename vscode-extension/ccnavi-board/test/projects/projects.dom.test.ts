@@ -293,3 +293,39 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
     await off.close();
   }
 });
+
+test("CB-D98 プロジェクトが無い画面では、案内の間だけ見本の行を出し、閉じたら消して tourDone を返す", async () => {
+  const dom = await openProjects([]);
+  try {
+    assert.equal(dom.all("li.project").length, 0);
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯が無い");
+    assert.equal(dom.all('li.project[data-name="sample-app"]').length, 1);
+    const titles: string[] = [];
+    while (dom.all(".tour").length > 0) {
+      titles.push(dom.one("#tour-title").textContent ?? "");
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    assert.deepEqual(titles, ["clone する", "プロジェクト", "ワークスペース自身", "共通層のルール", "案内"]);
+    assert.equal(dom.all("li.project").length, 0, "閉じたのに見本が残った");
+    assert.equal(dom.all(".tour-sample").length, 0);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D99 プロジェクトがある画面では見本を出さず、「？ 案内」から案内を出せる", async () => {
+  const dom = await openProjects();
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "clone する");
+    assert.equal(dom.all(".tour-sample").length, 0);
+    assert.equal(dom.all("li.project").length, 1);
+  } finally {
+    await dom.close();
+  }
+});

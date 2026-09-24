@@ -339,3 +339,29 @@ test("CB-D66 読み直せなかった画面からも、再読込を頼める", a
     await dom.close();
   }
 });
+
+test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、閉じたら tourDone を返す。ファイルが無いときは作るボタンから始める", async () => {
+  const dom = await openRisk();
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    const titles: string[] = [];
+    while (dom.all(".tour").length > 0) {
+      titles.push(dom.one("#tour-title").textContent ?? "");
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    assert.deepEqual(titles, ["等級の閾値", "項目", "保存", "案内"]);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+  const missing = await openRisk({ exists: false });
+  try {
+    missing.click(missing.one('[data-action="tour"]'));
+    await missing.settle();
+    assert.equal(missing.one("#tour-title").textContent, "まずファイルを作る");
+  } finally {
+    await missing.close();
+  }
+});

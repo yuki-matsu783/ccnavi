@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { sampleBoard } from "../../src/core/tour-sample.js";
 import { buildBoard, isKnownPath, parentCardOf, parentTreeOf, phaseChipOf, type Card } from "../../src/core/board.js";
 import type { BoardJson, ParentJson, PhaseJson, TicketJson } from "../../src/core/model.js";
 import { fixture } from "../helpers/fixture.js";
@@ -381,4 +382,16 @@ test("CB-T139 止まっていないチケットは今までどおり、不備も
       false,
     );
   }
+});
+
+test("CB-T215 案内の見本のボードは、承認待ち・作業中・完了のカードを持ち、どれも見本と分かる題を持つ", () => {
+  const board = sampleBoard("/ws", "2026-01-01");
+  const byState = Object.fromEntries(board.columns.map((column) => [column.state, column.cards.map((card) => card.id)]));
+  assert.deepEqual(byState, { todo: ["sample-1"], doing: ["sample-2", "sample-2-02"], done: ["sample-2-01"], cancelled: [] });
+  assert.deepEqual(board.pendingApproval, ["sample-1"]);
+  assert.equal(board.root, "/ws");
+  const cards = board.columns.flatMap((column) => column.cards);
+  assert.ok(cards.every((card) => card.title.startsWith("（見本）")));
+  // 見本から開くファイルは無い（押しても何も開かない）。不備も出さない
+  assert.ok(cards.every((card) => card.openPath === "" && card.issues.length === 0));
 });

@@ -437,3 +437,79 @@ test("CB-D82b 新しく出たカードは「新しく出た」と言う", async 
     await page.close();
   }
 });
+
+/** 吹き出しの案内を最後まで進め、段の題を順に返す。閉じたあとの画面を見るのは呼ぶ側 */
+async function walkTour(dom: DomPage): Promise<string[]> {
+  const titles: string[] = [];
+  for (let i = 0; i < 20 && dom.all(".tour").length > 0; i += 1) {
+    titles.push(dom.one("#tour-title").textContent ?? "");
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+  }
+  return titles;
+}
+
+test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後まで進めると閉じて tourDone を返す。「？ 案内」からもう一度出せる", async () => {
+  const dom = await openBoard();
+  try {
+    assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    // チケットがあるボードでは見本を出さない
+    assert.equal(dom.all(".tour-sample").length, 0);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "カード", "承認", "更新", "案内"]);
+    assert.equal(dom.all(".tour").length, 0);
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "集計");
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 2);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D96 チケットが 1 枚も無いボードでは、案内の間だけ見本のカードを出し、閉じたら消す。見本は承認に送らない", async () => {
+  const empty = { ...fixture(), tickets: [], parents: [], pending_approval: [] };
+  const dom = await openBoard(empty);
+  try {
+    assert.equal(dom.all(".card").length, 0);
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour-sample").length, 1, "見本だと分かる帯が無い");
+    assert.ok(dom.all(".card").length > 0, "見本のカードが無い");
+    assert.ok(dom.all('.card[data-attention="1"]').length > 0);
+    // カードの段は見本のカードを指す（中ほどに出す文だけの吹き出しにならない）
+    while (dom.one("#tour-title").textContent !== "カード") {
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    assert.ok(!dom.one(".tour-bubble").classList.contains("center"));
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.all(".card").length, 0, "閉じたのに見本が残った");
+    assert.equal(dom.all(".tour-sample").length, 0);
+    assert.equal(dom.one(".board-empty").textContent, "チケットなし");
+    assert.equal(dom.posted.filter((message) => message.type === "approve").length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D97 承認のオーバーレイが出ている間に頼まれた案内は、オーバーレイが消えてから始める", async () => {
+  const json = fixture();
+  const dom = await openBoard(json, { approval: { kind: "loading" } });
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "オーバーレイの下を指す案内を出した");
+    await dom.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 1);
+  } finally {
+    await dom.close();
+  }
+});

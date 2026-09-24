@@ -143,6 +143,8 @@ export type ToRules =
   | { readonly type: "cancelled" }
   /** 選んだファイルの綴り。`key` は画面が渡した行の鍵で、拡張ホストはそのまま返す */
   | { readonly type: "picked"; readonly key: string; readonly field: FileField; readonly path: string }
+  /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
+  | { readonly type: "tour" }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（rules-panel の `asMessage`）が形を確かめてから使う */
@@ -161,7 +163,9 @@ export type RulesMessage =
   | { readonly type: "judge"; readonly sections: Sections; readonly tool: string; readonly subject: string }
   /** 編集中の内容でサンプルを一括で判定する */
   | { readonly type: "samples"; readonly sections: Sections }
-  | { readonly type: "pickFile"; readonly key: string; readonly field: FileField };
+  | { readonly type: "pickFile"; readonly key: string; readonly field: FileField }
+  /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
+  | { readonly type: "tourDone" };
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-rules-data";

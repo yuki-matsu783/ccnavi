@@ -1,18 +1,18 @@
 /**
- * 吹き出しで画面の部品を順に指す案内（ツアー）。
+ * 吹き出しで画面の部品を順に指す案内（ツアー）。5 つの画面が共通で使う。
  *
  * **出すのは画面ごとに初回だけ。** 見たかどうかは拡張ホストが `globalState` に持つ（`src/tour.ts`）。
  * 画面が組み上がったとき、見ていなければ拡張ホストが `tour` を送り、画面はここを出す。閉じたら
- * （最後まで見ても、途中でやめても）`tourDone` を返し、次からは出ない。ヘルプの「案内をもう一度見る」
- * からはいつでも出せる。
+ * （最後まで見ても、途中でやめても）`tourDone` を返し、次からは出ない。ツールバーの「？ 案内」
+ * （フェーズ管理画面はヘルプの「案内をもう一度見る」）からはいつでも出せる。
  *
  * 指す先は選択子で持つ。見つからない（種類が無くて行が無い、など）ときは、吹き出しを画面の中ほどに
  * 出して文だけを見せる。段ごとの `before` は、指す先を出すための下ごしらえ（一覧と図の切り替え、
  * 行を開く）。下ごしらえで描き直しが起きるので、測るのは次の刻みまで待つ。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } from "react";
 
-import { placeBubble, type Rect } from "../../core/tour-place.js";
+import { placeBubble, type Rect } from "../core/tour-place.js";
 
 export interface TourStep {
   /** 指す先。`document.querySelector` に渡す */
@@ -27,6 +27,56 @@ type Spot = Rect;
 
 /** 吹き出しの幅。狭い画面では画面の幅に合わせる（CSS の max-width） */
 const BUBBLE_WIDTH = 340;
+
+/**
+ * 案内を出すかどうかの持ち物。画面の `App` が 1 つ持つ。
+ *
+ * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。**指す先が出る（`ready`）まで待って始める。**
+ *   読み込み中やエラーの画面には指す先が無い
+ * - `start`: 「？ 案内」を押したとき。すぐ始める
+ * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
+ *
+ * `onStart` は始める直前に呼ぶ。案内が画面の様子（タブなど）を動かすなら、ここで控えを取る。
+ */
+export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; readonly onEnd: () => void }): {
+  readonly touring: boolean;
+  readonly request: () => void;
+  readonly start: () => void;
+  readonly end: () => void;
+} {
+  const [touring, setTouring] = useState(false);
+  const [pending, setPending] = useState(false);
+  // 受け口は描くたびに作り直さないので、呼ぶ先はいまのものを写しておく
+  const latest = useRef(hooks);
+  latest.current = hooks;
+  const touringRef = useRef(touring);
+  touringRef.current = touring;
+
+  const start = useCallback((): void => {
+    if (touringRef.current) {
+      return;
+    }
+    latest.current.onStart?.();
+    touringRef.current = true;
+    setTouring(true);
+  }, []);
+
+  useEffect(() => {
+    if (pending && ready) {
+      setPending(false);
+      start();
+    }
+  }, [pending, ready, start]);
+
+  const request = useCallback((): void => setPending(true), []);
+  const end = useCallback((): void => {
+    touringRef.current = false;
+    setTouring(false);
+    latest.current.onEnd();
+  }, []);
+  return { touring, request, start, end };
+}
+
 export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; readonly onClose: () => void }): JSX.Element {
   const [index, setIndex] = useState(0);
   const [spot, setSpot] = useState<Spot | undefined>(undefined);

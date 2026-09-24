@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import type { Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { applyAppearance } from "../appearance.js";
+import { Tour, useTour, type TourStep } from "../Tour.js";
 import { Captioned, Factor } from "./Factor.js";
 import { post } from "./post.js";
 import { countText, findText } from "./text.js";
@@ -64,6 +65,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const { draft, open } = editing;
   const page = pageOf(data);
   const exists = page?.exists === true;
+  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  const requestTour = tour.request;
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
@@ -88,6 +91,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         // 「破棄して読み直す？」をやめた。止めた欄を戻す
         setBusy(false);
         setStatus(undefined);
+      } else if (message.type === "tour") {
+        requestTour();
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -96,7 +101,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     // 組み上がったと伝える。拡張ホストはここで中身を渡し直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);
-  }, [nextKey]);
+  }, [nextKey, requestTour]);
 
   // 足した行の id へ焦点を移す。畳んだままでは何を足したか分からないので、行は開いて出してある
   useEffect(() => {
@@ -202,6 +207,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
+          <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
+            ？ 案内
+          </button>
           <button type="button" className="action" data-action="open-risk" disabled={!exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
@@ -321,9 +329,41 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           {draft.rows.length === 0 && <li className="empty">項目が無い。加点する項目が無ければ、どの子も LOW のまま閉じる</li>}
         </ul>
       </section>
+      {tour.touring && <Tour steps={exists ? TOUR_STEPS : [MISSING_STEP, ...TOUR_STEPS]} onClose={tour.end} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>
     </>
   );
 }
+
+/** ファイルが無いときだけ、案内の頭で作るボタンを指す（無いうちは欄が止まっていて直せない） */
+const MISSING_STEP: TourStep = {
+  target: '[data-action="create"]',
+  title: "まずファイルを作る",
+  body: "配点のファイルがまだ無い。実行ファイルは組み込みの配点で数えている。直すには、ここで組み込みの配点からファイルを作る。",
+};
+
+/** リスク管理画面の案内。画面の様子は動かさないので、閉じても戻すものは無い */
+const TOUR_STEPS: readonly TourStep[] = [
+  {
+    target: "#levels",
+    title: "等級の閾値",
+    body: "子チケットの点がこの値以上になると等級が上がる（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上はレビューが済むまでフェーズが止まる。空なら組み込みの値。",
+  },
+  {
+    target: "#factors",
+    title: "項目",
+    body: "子チケットを閉じるとき、その差分に当てて加点する項目。行を押すと欄が開き、当て方と点を直せる。「＋ 項目を追加」で足せる。点の合計で等級が決まり、フェーズの点は子の最大値。",
+  },
+  {
+    target: "#save",
+    title: "保存",
+    body: "保存すると実行ファイルが検証してから書き込む。通らなければ、下に理由が出る。",
+  },
+  {
+    target: '[data-action="tour"]',
+    title: "案内",
+    body: "この案内は、ここからもう一度見られる。",
+  },
+];

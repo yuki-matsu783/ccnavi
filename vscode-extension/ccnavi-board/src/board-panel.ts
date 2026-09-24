@@ -30,6 +30,7 @@ import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { requireTickets, ticketControl } from "./ticket-control.js";
 
@@ -336,6 +337,14 @@ function handleMessage(message: BoardMessage | undefined): void {
       // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
       // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
       postAppearance(current.host);
+      // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
+      // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+      if (!tourSeen(SCREEN)) {
+        current.host.post({ type: "tour" } satisfies ToBoard);
+      }
+      return;
+    case "tourDone":
+      markTourSeen(SCREEN);
       return;
     case "refresh":
       void update();
@@ -577,6 +586,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   decide: true,
   decideConfirm: true,
   reviewed: true,
+  tourDone: true,
 };
 
 function asMessage(message: unknown): BoardMessage | undefined {
@@ -598,6 +608,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
   switch (m.type) {
     case "ready":
     case "refresh":
+    case "tourDone":
     case "approveCancel":
     case "promptCopy":
     case "promptOpen":
