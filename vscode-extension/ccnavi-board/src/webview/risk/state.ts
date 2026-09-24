@@ -41,7 +41,7 @@ export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }
 
-/** 新しい項目。当て方の既定は `lines_over` */
+/** 新しい項目。加点条件の既定は `lines_over` */
 export function emptyFactor(): FactorForm {
   return { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" };
 }

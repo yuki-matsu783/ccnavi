@@ -21,7 +21,7 @@ export function riskHtml(data: RiskData, options: Partial<RenderOptions> = {}): 
   return renderRiskPage(data, { nonce: NONCE, script: screenScript("risk"), style: screenStyle("risk"), ...options });
 }
 
-/** 見本の配点。4 つの当て方が 1 件ずつ */
+/** 見本の配点。4 つの加点条件が 1 件ずつ */
 export const RISK = `version: 1
 factors:
   - id: big-diff
