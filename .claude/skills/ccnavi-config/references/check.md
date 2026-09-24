@@ -21,7 +21,7 @@ ccnavi --lint --log "" --state ""
 |---|---|---|
 | `(rules)` / ルール id | 読めない、版が違う、`deny` が空、文面・match・glob を欠く、glob と regex の両方、`ask` `allow` に `message`、組めない正規表現、`additionalContextFile` が上に出る | `allow` が空、id 無し・重複、当てる対象の無いツール、広い allow に文、指すファイルが無い・長い |
 | `(phases)` | 読めない、版が違う、`phases` が無い、kind / review の値、feedback が mr でない、id / title の重複、overlap / requires の先が無い、scope が外に出る | 自分を overlap / requires に挙げている |
-| `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、当て方が 0 か 2 つ、script の置き場が外、glob が組めない | 知らないリスクレベル名 |
+| `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、加点条件が 0 か 2 つ、script の置き場が外、glob が組めない | 知らないリスクレベル名 |
 | `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親があるのに phases が読めない | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
 下書きを見るときは `--rules` `--phases` `--risk` で差し替える。3 本は互いに読み合うので
