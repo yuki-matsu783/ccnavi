@@ -346,7 +346,7 @@ pnpm test:rules    # 領域だけ。board / rules / risk / phases / projects / s
 pnpm test:dom      # happy-dom で画面のスクリプトを動かすものだけ（*.dom.test.ts）
 pnpm test:for src/core/rules-doc.ts   # 触ったファイルが関わる領域だけ
 pnpm test:plan src/core/rules-doc.ts  # 何を回すかだけ出す（走らせない）
-pnpm run package   # scripts/package.sh: install → compile → test → vsce package
+pnpm run package   # scripts/package.sh: install → compile → vsce package（テストは回さない）
 ```
 
 `pnpm run package` は `dist/ccnavi-board-<version>.vsix`（リポジトリの `dist/`、gitignore 済み）に出す。
