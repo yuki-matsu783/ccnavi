@@ -994,10 +994,12 @@ def _parent_record(
 ) -> dict:
     """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
     where = approval.home_dir(conf, root, parent.ticket, "")
+    closed = parent.ticket in closed_index
     return {
         "ticket": parent.ticket,
-        "closed": parent.ticket in closed_index,
-        "stage": phase.stage(root, conf, parent),
+        "closed": closed,
+        # 閉じた親に「クローズ可」と言っても意味が無い。局面は動いている親だけが持つ。
+        "stage": "" if closed else phase.stage(root, conf, parent),
         "plan": [item.as_raw() for item in parent.plan],
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None
