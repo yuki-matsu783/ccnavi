@@ -20,7 +20,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 配点の形（画面と読み書きで分け合う）
 
-/** 当て方。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
+/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
@@ -38,7 +38,7 @@ export interface FactorForm {
   /** 加点。整数のはずだが欄の文字のまま持つ。整数でなければそのまま書いて lint が言う */
   readonly points: string;
   readonly kind: FactorKind;
-  /** 当て方の値。lines_over 等なら基準、glob ならパターン、script ならパス、judge なら問い */
+  /** 加点条件の値。lines_over 等なら基準、glob ならパターン、script ならパス、judge なら問い */
   readonly value: string;
   /** glob の上限。空なら青天井（欄を書かない） */
   readonly max: string;
@@ -58,7 +58,7 @@ export interface RiskModel {
   readonly problems: readonly string[];
 }
 
-/** 当て方の説明。select のラベルと、値の欄の placeholder */
+/** 加点条件の説明。select のラベルと、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; readonly placeholder: string }>> = {
   lines_over: { label: "変更した行数が基準を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
   files_over: { label: "変更したファイル数が基準を超えたら加点", placeholder: "10（変更したファイルの数がこれを超えたら加点）" },

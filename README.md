@@ -2213,7 +2213,7 @@ Claude Code の権限モードは、人が確認できるセッションを前�
   id              層        kind    title           review  scope
   design          自身の層  work    設計            mr      wip/design/*
 ■ risk（levels: medium 20 / high 40 / critical 70）
-  id              層        当て方              points  message
+  id              層        加点条件            points  message
   big-diff        共通層    lines_over 300      25      行数が多い
 ```
 

@@ -303,12 +303,12 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           </button>
         </h2>
         <div className="find">
-          <input id="find" type="search" placeholder="id・当て方・値・文面で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+          <input id="find" type="search" placeholder="id・加点条件・値・理由で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
         </div>
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点する。1 件につき当て方は 1 つ。
+            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点する。1 件につき加点条件は 1 つ。
             <code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられない。
           </p>
         </details>
@@ -356,7 +356,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#factors",
     title: "項目",
-    body: "子チケットを閉じるとき、その差分に当てて加点する項目。行を押すと欄が開き、当て方と点を直せる。「＋ 項目を追加」で足せる。",
+    body: "子チケットを閉じるとき、その差分に当てて加点する項目。行を押すと欄が開き、加点条件と点を直せる。「＋ 項目を追加」で足せる。",
   },
   {
     target: "#save",

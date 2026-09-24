@@ -29,7 +29,7 @@ factors:
   #   script: .ccnavi/common/risk/complexity.sh
 `;
 
-test("CB-T72 境目の点と項目を読む。当て方は 1 つで、値は欄の文字として持つ", () => {
+test("CB-T72 境目の点と項目を読む。加点条件は 1 つで、値は欄の文字として持つ", () => {
   const { model } = readRisk(TEXT);
   assert.equal(model.version, 1);
   assert.deepEqual(model.problems, []);
@@ -87,7 +87,7 @@ test("CB-T75 欄を変えても他の項目のコメントは残り、数は数�
   assert.equal(again.factors[2].message, "テスト無し");
 });
 
-test("CB-T76 当て方を変えると前の当て方の欄は消え、新しい項目は points の後ろに当て方を置く", () => {
+test("CB-T76 加点条件を変えると前の加点条件の欄は消え、新しい項目は points の後ろに加点条件を置く", () => {
   const doc = readRisk(TEXT);
   const f = doc.model.form;
   const changed: FactorForm = { ...f.factors[0], kind: "files_over", value: "10" };
@@ -132,9 +132,9 @@ test("CB-T78 version が無ければ苦情にして、保存で先頭に足す�
   const broken = readRisk("version: 1\nlevels: nope\nfactors:\n  - id: a\n    points: 1\n    lines_over: 1\n    glob: '*'\n  - not-a-map\n");
   assert.equal(broken.model.problems.length, 3);
   assert.match(broken.model.problems[0], /levels/);
-  assert.match(broken.model.problems[1], /当て方が 2 個/);
+  assert.match(broken.model.problems[1], /加点条件が 2 個/);
   assert.match(broken.model.problems[2], /2 件目/);
-  // 当て方が 2 つある項目は最初の 1 つで出し、保存すると他は消える
+  // 加点条件が 2 つある項目は最初の 1 つで出し、保存すると他は消える
   assert.equal(broken.model.form.factors.length, 1);
   assert.equal(broken.model.form.factors[0].kind, "lines_over");
   const out = broken.apply(broken.model.form);

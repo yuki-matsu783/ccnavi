@@ -320,7 +320,7 @@ def _factors(
                 Problem(
                     SEVERITY_ERROR,
                     ident,
-                    "当て方は 1 つ（" + " / ".join(KINDS) + "）を書く",
+                    "加点条件は 1 つ（" + " / ".join(KINDS) + "）を書く",
                 )
             )
             continue

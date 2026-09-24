@@ -14,7 +14,7 @@ function savedForm(dom: DomPage): RiskForm {
   return saves[saves.length - 1].form as RiskForm;
 }
 
-test("CB-D10 既定は畳み、行を押すと開いて state に id が入る。要約は当て方に応じた文になる", async () => {
+test("CB-D10 既定は畳み、行を押すと開いて state に id が入る。要約は加点条件に応じた文になる", async () => {
   const dom = await openRisk();
   try {
     assert.equal(dom.all(".factor.open").length, 0);
@@ -33,7 +33,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
   }
 });
 
-test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では上限の欄が消え、行は開いたまま", async () => {
+test("CB-D11 加点条件を変えると値は持ち越さず、glob 以外では上限の欄が消え、行は開いたまま", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
@@ -47,7 +47,7 @@ test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では�
     dom.type(dom.one(`${rowSelector("f2")} input.f-value`), "10");
     await dom.settle();
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変更したファイルが 10 件を超えると加点CI に触った");
-    // 保存に渡る形にも出る。当て方を変えても id と文面は持ち越す
+    // 保存に渡る形にも出る。加点条件を変えても id と理由は持ち越す
     dom.click(dom.one("#save"));
     await dom.settle();
     assert.deepEqual(savedForm(dom).factors[1], { origin: 1, id: "ci", points: "35", kind: "files_over", value: "10", max: "", message: "CI に触った" });
@@ -156,7 +156,7 @@ test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は�
   }
 });
 
-test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が変わり、YAML のキー名は title に載せる", async () => {
+test("CB-T126 項目の欄名は日本語で、値の欄は加点条件で名前が変わり、YAML のキー名は title に載せる", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
@@ -164,7 +164,7 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
     const caps = dom.all(`${rowSelector("f1")} .row-body > .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "点", "当て方", "基準", "文面"],
+      ["id", "点", "加点条件", "基準", "理由"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -181,7 +181,7 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
     await dom.settle();
     assert.deepEqual(
       dom.all(`${rowSelector("f2")} .row-body > .field > .cap`).map((cap) => cap.textContent),
-      ["id", "点", "当て方", "glob", "文面"],
+      ["id", "点", "加点条件", "glob", "理由"],
     );
     assert.equal(dom.one(`${rowSelector("f2")} .inline > .cap`).textContent, "上限");
   } finally {
@@ -277,7 +277,7 @@ test("CB-D57 見た目の切り替えは body のクラスだけを付け替え�
   }
 });
 
-test("CB-D58 当て方の選択肢は 6 つで、キーの綴りと説明を並べて出す", async () => {
+test("CB-D58 加点条件の選択肢は 6 つで、キーの綴りと説明を並べて出す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));

@@ -535,7 +535,7 @@ def _explain_risk(
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
-    stdout.write(f"  {'id':<16}{'層':<10}{'当て方':<20}{'points':<8}message\n")
+    stdout.write(f"  {'id':<16}{'層':<10}{'加点条件':<20}{'points':<8}message\n")
     for name, items, unreadable in tables:
         if unreadable:
             stdout.write(f"  {layer_label(name)}: 読めない: {unreadable}。この層は空として扱う\n")

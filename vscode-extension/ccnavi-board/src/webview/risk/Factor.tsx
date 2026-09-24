@@ -2,17 +2,17 @@
  * 項目 1 件の行。畳んだときは要約 1 行、開くと欄が出る。
  *
  * 欄名は日本語で欄の左に出し、YAML のキー名は欄名のツールチップに載せる（`Captioned`）。
- * 値の欄は当て方で名前も placeholder も変わり、上限（`max`）は glob のときだけ出る。
+ * 値の欄は加点条件で名前も placeholder も変わり、上限（`max`）は glob のときだけ出る。
  */
 import type { JSX, ReactNode } from "react";
 
 import { KINDS, KIND_LABELS, type FactorForm, type FactorKind } from "../../core/risk-view.js";
 import { describe, kindTitle, summaryId, summaryPoints, valueLabel } from "./text.js";
 
-/** 当て方の欄のツールチップに出すキーの一覧 */
+/** 加点条件の欄のツールチップに出すキーの一覧 */
 const KINDS_KEYS = KINDS.join(" / ");
 
-/** 数で答える当て方。欄に数字のキーボードを出す */
+/** 数で答える加点条件。欄に数字のキーボードを出す */
 const NUMERIC: readonly FactorKind[] = ["lines_over", "files_over", "deleted_over"];
 
 export interface FactorProps {
@@ -81,14 +81,14 @@ export function Factor(props: FactorProps): JSX.Element {
         <Captioned name="点" yamlKey="points">
           {text("points", "f-points num", "25", true)}
         </Captioned>
-        <Captioned name="当て方" yamlKey={KINDS_KEYS}>
+        <Captioned name="加点条件" yamlKey={KINDS_KEYS}>
           <select
             className="f-kind"
             value={factor.kind}
             disabled={disabled}
             onChange={(event) => {
               const kind = event.target.value as FactorKind;
-              // 値は当て方ごとに意味が違うので持ち越さない。max は glob だけの欄
+              // 値は加点条件ごとに意味が違うので持ち越さない。max は glob だけの欄
               props.onChange({ ...factor, kind, value: "", max: kind === "glob" ? factor.max : "" });
             }}
           >
@@ -112,7 +112,7 @@ export function Factor(props: FactorProps): JSX.Element {
             text("value", "f-value", KIND_LABELS[factor.kind].placeholder, NUMERIC.includes(factor.kind))
           )}
         </Captioned>
-        <Captioned name="文面" yamlKey="message">
+        <Captioned name="理由" yamlKey="message">
           {text("message", "f-message", "加点の理由として依頼文と閉じたときの出力に出る短い文。空なら id をそのまま使う")}
         </Captioned>
         <span className="buttons">

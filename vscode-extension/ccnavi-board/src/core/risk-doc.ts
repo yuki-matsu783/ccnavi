@@ -28,7 +28,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 # 要る扱いにするためのもの。リスクレベルの名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
 # HIGH 以上はレビューが済むまでフェーズを止める。境目の点は levels で動かす。
 #
-# 項目は 3 系統。1 件につき当て方を 1 つだけ書く。
+# 項目は 3 系統。1 件につき加点条件を 1 つだけ書く。
 #   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
 #   定量（スクリプト）: script: <.ccnavi/common/scripts/ の下>。cwd は子のワークツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
@@ -111,7 +111,7 @@ export function readRisk(text: string): RiskDocument {
         const present = KINDS.filter((k) => item.has(k));
         if (present.length > 1) {
           problems.push(
-            `factors の ${index + 1} 件目に当て方が ${present.length} 個ある（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消える`,
+            `factors の ${index + 1} 件目に加点条件が ${present.length} 個ある（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消える`,
           );
         }
         factors.push(formOf(index, item, present[0] ?? "lines_over"));
@@ -257,7 +257,7 @@ function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): voi
 function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   setValue(doc, node, "id", form.id, Scalar.PLAIN);
   setValue(doc, node, "points", numberish(form.points), Scalar.PLAIN, "id");
-  // 当て方は 1 つ。他の当て方の欄が残っていれば消す（残すと lint が「1 つを書く」と止める）。
+  // 加点条件は 1 つ。他の加点条件の欄が残っていれば消す（残すと lint が「1 つを書く」と止める）。
   for (const other of KINDS) {
     if (other !== form.kind && node.has(other)) {
       node.delete(other);
@@ -271,7 +271,7 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   } else {
     setValue(doc, node, form.kind, form.value, Scalar.PLAIN, "points");
   }
-  // max は glob の上限。glob 以外の当て方では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
+  // max は glob の上限。glob 以外の加点条件では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
   if (form.max === "" || form.kind !== "glob") {
     if (node.has("max")) {
       node.delete("max");

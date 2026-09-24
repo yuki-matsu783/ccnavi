@@ -2422,7 +2422,7 @@ git のラッパースクリプトの記録はワークスペースの `logs/<�
   design        self   work  設計          mr      wip/design/*, docs/*
   build         lib    work  ビルド        mr      src/*
 ■ risk（levels: medium 20 / high 40 / critical 70）
-  id            層     当て方            points  message
+  id            層     加点条件          points  message
   big-diff      共通   lines_over 300    25      行数が多い
   schema        lib    glob db/schema/*  30      スキーマに触った
 ```
