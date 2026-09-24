@@ -138,20 +138,28 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 
 /**
  * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人間レビューの要否、ワークツリー、
- * マーカー（依頼済はレビュー待ちの間だけバッジに出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
- * リスク（MEDIUM 以下）、base、プロジェクト。
+ * マーカー（終了と依頼済は出さない）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ *
+ * 列やバッジと同じことは重ねて書かない。完了・取り消しの列にいる閉じたカードには、クローズと人間レビューの要否を
+ * 出さない（閉じたことは列で分かり、レビューが済むかは省略／レビュー済で分かる）。提案が残っていて未着手・作業中の
+ * 列にいる閉じたカードには、列と食い違うことの手がかりとしてクローズを出す。
+ * 終了の印（pending）は、止まっている間はバッジの「レビュー準備中」が言い、済んだ後は経過でしかない。
+ * 依頼済はレビュー待ちのバッジが言う。どちらもフェーズ行の全文には残る。
  */
 function Facts({ card }: { readonly card: Card }): JSX.Element {
   const facts: JSX.Element[] = [];
-  if (card.copyStatus !== "none") {
+  const closedInColumn = card.copyStatus === "closed" && (card.column === "done" || card.column === "cancelled");
+  if (card.copyStatus !== "none" && !closedInColumn) {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }
-  facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  if (!closedInColumn) {
+    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  }
   if (card.worktreeExists) {
     facts.push(<Fact key="worktree" kind="worktree" text={`ワークツリー ${worktreeName(card.worktreePath)}`} title={card.worktreePath} />);
   }
   for (const mark of card.marks) {
-    if (mark !== "requested") {
+    if (mark !== "requested" && mark !== "pending") {
       facts.push(<Fact key={`mark-${mark}`} kind={`mark mark-${mark}`} text={MARK_LABELS[mark] ?? mark} />);
     }
   }

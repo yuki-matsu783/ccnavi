@@ -412,7 +412,12 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     assert.ok(texts(page, ".fact.copy-open").includes("承認済"));
     // レビュー待ちは列ではなく属性。カードは作業中の列にある
     assert.equal(text(page, '.column[data-state="doing"] .card[data-id="i0001-04"] .fact.copy-review'), "レビュー待ち");
-    assert.ok(texts(page, ".fact.copy-closed").includes("クローズ"));
+    // クローズは完了・取り消しの列で分かるので、カードには重ねて書かない。そこにいるカードにはレビューの要否も出さない
+    assert.equal(page.all(".fact.copy-closed").length, 0);
+    assert.equal(page.all('.column[data-state="done"] .card .fact.review').length, 0);
+    assert.equal(page.all('.column[data-state="cancelled"] .card .fact.review').length, 0);
+    // 実績のリスクは閉じたカードにも残る
+    assert.ok(texts(page, '.column[data-state="done"] .card[data-id="i0001-01"] .fact.risk').length > 0);
     // 取り消しは列で分かるので、カードには重ねて書かない
     assert.equal(page.all('.column[data-state="cancelled"] .card[data-id="i0001-05"]').length, 1);
     assert.equal(page.all(".fact.cancelled").length, 0);
@@ -469,6 +474,23 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
 
+test("CB-T217 提案が残っていて未着手の列にいる閉じたカードには、列との食い違いの手がかりとしてクローズとレビューの要否を出す", async () => {
+  const base = fixture();
+  const proposal = { state: "todo", tree: "i0001", tree_root: "<root>/.claude/worktrees/i0001", path: "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01.md" };
+  const page = await openBoard({
+    ...base,
+    tickets: base.tickets.map((t) => (t.ticket === "i0001-01" ? { ...t, proposal } : t)),
+  } as typeof base);
+  try {
+    const card = '.column[data-state="todo"] .card[data-id="i0001-01"]';
+    assert.equal(page.all(card).length, 1);
+    assert.equal(text(page, `${card} .fact.copy-closed`), "クローズ");
+    assert.equal(page.all(`${card} .fact.review`).length, 1);
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビューが済んで止まらなくなった子には出さない", async () => {
   const base = fixture();
   // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済 かつ 止まっている」を判定が言う
@@ -519,6 +541,22 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
     assert.ok(texts(stillClosed, ".badge.hold").includes("レビュー待ち"));
   } finally {
     await stillClosed.close();
+  }
+  // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
+  // 省略はレビュー済と同じく、閉じた後も人のレビューを通ったかの区別として残す
+  const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
+  try {
+    assert.equal(ended.all(".fact.mark-pending").length, 0);
+    assert.ok(texts(ended, ".badge.hold").includes("レビュー準備中"));
+  } finally {
+    await ended.close();
+  }
+  const skipped = await openBoard(withMarks({ pending: { at: "t" }, skipped: { at: "t" } }, false));
+  try {
+    assert.equal(skipped.all(".fact.mark-pending").length, 0);
+    assert.ok(texts(skipped, ".fact.mark.mark-skipped").includes("レビュー省略"));
+  } finally {
+    await skipped.close();
   }
   // 依頼を出していない子のバッジは「レビュー準備中」で、依頼済とは出ない
   const notRequested = await openBoard(withMarks({}, true));
