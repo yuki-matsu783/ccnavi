@@ -93,7 +93,7 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
     case "decideLoading":
       return (
         <>
-          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）の指摘を読み込んでいます…</p>
+          <p className="approval-note">フェーズ {overlay.phase} の未解決（Unresolved）の指摘を読み込み中…</p>
           <div className="approval-actions">
             <Cancel label="やめる" />
           </div>
