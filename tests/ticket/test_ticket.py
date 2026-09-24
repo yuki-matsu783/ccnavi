@@ -929,6 +929,33 @@ class TicketTest(unittest.TestCase):
         )
         self.assertNotIn("DENY_PHASE_REVIEW", self.reason(guided), self.reason(guided))
 
+    def test_gate_says_the_exempt_form_is_bare(self):
+        """止めたときと終わりの知らせは、案内の 1 本を単独で打つことまで言うこと。
+
+        案内どおりの 1 本でも、`cd … &&` や `| tail` を付けると止まる。それを言わないと、
+        案内に従ったつもりで止まり、案内と拒否が食い違って見える。
+        """
+        self.family()
+        self.close_phase()
+        review_sh = settings.script_command(self.root, "ccnavi-review.sh")
+        said = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.assertIn(phase_mod.EXEMPT_NOTE, self.reason(said))
+
+        guided = f"{review_sh} request --phase 1 --body-file b.md"
+        decorated = self.hook(
+            "PreToolUse",
+            "Bash",
+            self.parent_tree,
+            command=f"cd {self.parent_tree} && {guided} | tail -3",
+        )
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(decorated))
+        self.assertIn(phase_mod.EXEMPT_NOTE, self.reason(decorated))
+
+        # サブエージェントの起動にはシェルの綴りの話をしない。
+        spawn = self.hook("PreToolUse", "Agent", self.parent_tree, description="次の子")
+        self.assertIn("DENY_PHASE_REVIEW", self.reason(spawn))
+        self.assertNotIn(phase_mod.EXEMPT_NOTE, self.reason(spawn))
+
     @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
     def test_gate_exempts_wrapper_with_quoted_spaces(self):
         """レビューで止まっている間、引用に空白を含むラッパースクリプト呼び出しも免除されること。

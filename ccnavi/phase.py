@@ -50,6 +50,13 @@ from . import ticket as ticket_mod
 # コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
 # 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
+# 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
+# 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
+# 付け足した形で打って止まり、案内と拒否が食い違って見える。
+EXEMPT_NOTE = (
+    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を"
+    "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、その 1 本も止まります。"
+)
 
 # サブエージェントに許さない操作。状態を動かす形・レビューの形・リモートへ送る形を、
 # コマンドの位置で。読むだけの `cat` や `--help` は止めない。
@@ -727,6 +734,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"フェーズは終わっていて、{why}。"
             f"レビュー済みのマーカーが置かれるまで、{what}を止めます。",
             todo,
+            *([] if tool == "Agent" else [EXEMPT_NOTE]),
         ]
     )
 
@@ -785,7 +793,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 who += f"{phase.risk_line}。"
             hold_note = (
                 "指摘があれば同じフェーズに子を足せます。レビュー済みになるまで、"
-                "サブエージェントの起動とシェル実行は止まります。"
+                f"サブエージェントの起動とシェル実行は止まります。{EXEMPT_NOTE}"
             )
             if phase.review_in_chat:
                 # このセッションで人が見る。ホストへは出ないので push もしない。
