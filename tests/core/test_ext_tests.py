@@ -66,6 +66,11 @@ def plan(*paths, root=BOARD):
     }
 
 
+def slashed(path):
+    """区切りを `/` にそろえる。`mark-ext.sh` が印に書くのはこの形だけ。"""
+    return path.replace("\\", "/")
+
+
 def write(path, text, mode="w"):
     with open(path, mode, encoding="utf-8") as handle:
         handle.write(text)
@@ -330,8 +335,11 @@ class TestExtHookTest(unittest.TestCase):
         with open(os.path.join(board, "scripts", "test-groups.js"), "w", encoding="utf-8") as f:
             f.write(self.STUB)
         marker = os.path.join(workspace, "logs", "session", "s1.ext-files")
-        with open(marker, "w", encoding="utf-8") as f:
-            f.write(f"{os.path.join(board, *touched.split('/'))}\n")
+        # 実際の印は mark-ext.sh が `/` にそろえ、改行は LF で書く。Windows で
+        # `os.path.join` のまま・既定の改行で書くと、実運用では出ない形（バックスラッシュ、
+        # 行末の CR）を渡すことになり、hook が拡張を見つけられない、引数に CR が付く。
+        with open(marker, "w", encoding="utf-8", newline="\n") as f:
+            f.write(f"{slashed(os.path.join(board, *touched.split('/')))}\n")
         return workspace, board, marker
 
     def stop(self, workspace, rc=0, active=False, log=None):
@@ -361,7 +369,7 @@ class TestExtHookTest(unittest.TestCase):
         workspace, board, marker = self.workspace()
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(["--for", os.path.join(board, "src", "core", "board.ts")], args)
+        self.assertEqual(["--for", slashed(os.path.join(board, "src", "core", "board.ts"))], args)
         # 通ったら印を消す。次のターンで同じものを回し直さない。
         self.assertFalse(os.path.exists(marker))
 
@@ -371,14 +379,14 @@ class TestExtHookTest(unittest.TestCase):
         workspace, board, _ = self.workspace(tree="my dir")
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(["--for", os.path.join(board, "src", "core", "board.ts")], args)
+        self.assertEqual(["--for", slashed(os.path.join(board, "src", "core", "board.ts"))], args)
 
     def test_a_path_with_a_sed_delimiter_arrives_as_one_argument(self):
         # 絞り込みを sed の正規表現で書くと、`#` や `[` で構文エラーになって同じ穴が開く。
         workspace, board, _ = self.workspace(tree="a#b[c]")
         result, args = self.stop(workspace)
         self.assertEqual(0, result.returncode, result.stderr)
-        self.assertEqual(["--for", os.path.join(board, "src", "core", "board.ts")], args)
+        self.assertEqual(["--for", slashed(os.path.join(board, "src", "core", "board.ts"))], args)
 
     def test_a_failing_run_is_pushed_back_and_counted(self):
         workspace, _, marker = self.workspace()

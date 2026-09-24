@@ -21,11 +21,14 @@ const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUM
 
 /**
  * 前の読み直しから動いたカードに出す帯の言葉。「未着手 → 作業中」。
- * 前には無くて新しく現れたカードは、どこから来たとも言えないので「新規起票」。
+ * 前には無くて新しく現れたカードは、どこから来たとも言えないので「新規起票」だけ。
+ * 行き先は言わない。カードはもうその列に置かれていて、画面から読める。
  */
 export function movedLabel(moved: Moved): string {
-  const to = COLUMN_LABELS[moved.to] ?? moved.to;
-  return moved.from === undefined ? `新規起票（${to}）` : `${COLUMN_LABELS[moved.from] ?? moved.from} → ${to}`;
+  if (moved.from === undefined) {
+    return "新規起票";
+  }
+  return `${COLUMN_LABELS[moved.from] ?? moved.from} → ${COLUMN_LABELS[moved.to] ?? moved.to}`;
 }
 
 /**

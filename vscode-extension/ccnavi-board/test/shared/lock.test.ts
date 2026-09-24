@@ -24,5 +24,6 @@ test("CB-T35 着手済みが無ければ保存できる。承認待ち・未着�
 test("CB-T36 ボードが読めなければ閉じる側に倒す", () => {
   const lock = lockFromError("実行ファイルが無い");
   assert.equal(lock.locked, true);
-  assert.match(lock.reason, /確かめられない/);
+  // 読めなかった理由をそのまま載せる。何が読めなかったかを人が読める
+  assert.equal(lock.reason, "作業中のチケット: 実行ファイルが無い");
 });
