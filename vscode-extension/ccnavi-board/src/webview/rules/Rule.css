@@ -2,7 +2,7 @@
  * ルール 1 件の行（`Rule.tsx`）。行の見出しの列、ツールを選ぶ一覧、参照が切れた知らせ。
  * 行・開閉・欄名の骨組みは設定 3 画面で同じ `../styles/list.css` が持つ。
  */
-/* 1 行 = 開閉、id、match、パターンと文面、渡す回の刻み、コンテキストの有無 */
+/* 1 行 = 開閉、id、match、パターンとメッセージ、every、コンテキストの有無 */
 .rule .row-head { grid-template-columns: 18px minmax(110px, 170px) minmax(90px, 190px) minmax(0, 1fr) max-content 14px; }
 /* 刻みのバッジ。刻みが無い行でも空の枠を置く（置かないと右端の●が 1 列ずれる） */
 .sum .sum-every { color: var(--vscode-descriptionForeground); white-space: nowrap; }

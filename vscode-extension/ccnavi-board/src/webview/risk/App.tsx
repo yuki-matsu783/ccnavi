@@ -260,13 +260,14 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルが上がる点数 <span className="count">リスクの点がこの値に届くと、リスクレベルが 1 段上がる。HIGH 以上になると、レビューが終わるまで先へ進めない</span>
+          リスクレベルが上がる点数 <span className="count">リスクの合計点がこの値を超えた場合、リスクレベルが 1 段上がる。HIGH 以上の場合は、次フェーズに進む前に人間レビューを必須とする
+          </span>
         </h2>
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
             子チケットを閉じるとき、下の「項目」で当てはまった点を足し合わせて、その変更のリスクの点を出す。
-            その点がここの値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていく。
+            合計点が設定値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていく。
             <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めない。</strong>
             チケットで「レビュー不要」と宣言していても、人間のレビューが必要になる。
             値は MEDIUM ≤ HIGH ≤ CRITICAL となるように入れる。空欄にしたリスクレベルは、組み込みの値（
@@ -307,7 +308,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            子を閉じるとき、その子の差分（base_sha..HEAD）に当てて加点する。1 件につき当て方は 1 つ。点の合計でリスクレベルが決まり、フェーズの点は子の最大値。
+            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点する。1 件につき当て方は 1 つ。
             <code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられない。
           </p>
         </details>
@@ -355,7 +356,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#factors",
     title: "項目",
-    body: "子チケットを閉じるとき、その差分に当てて加点する項目。行を押すと欄が開き、当て方と点を直せる。「＋ 項目を追加」で足せる。点の合計でリスクレベルが決まり、フェーズの点は子の最大値。",
+    body: "子チケットを閉じるとき、その差分に当てて加点する項目。行を押すと欄が開き、当て方と点を直せる。「＋ 項目を追加」で足せる。",
   },
   {
     target: "#save",

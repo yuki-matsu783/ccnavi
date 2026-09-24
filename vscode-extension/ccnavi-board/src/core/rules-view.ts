@@ -68,7 +68,7 @@ export interface RuleForm {
   /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
   readonly additionalContextOnceFile: string;
   /**
-   * 渡す回の刻み（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
+   * 何回に 1 度渡すか（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
    * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
    *
    * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
