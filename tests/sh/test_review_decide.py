@@ -50,6 +50,50 @@ esac
 """
 
 
+WINDOWS = os.name == "nt"
+
+
+def put_tool(found: str, link: str) -> None:
+    """`found` の道具を `link` の名前で PATH に置く。
+
+    POSIX ではシンボリックリンク。Windows ではリンクを張る権限が無いことが多く、コピーや
+    ハードリンクにすると mingw64 の git / curl が隣の DLL を見つけられず起動しない。
+    だから `exec` で本物へ渡す sh を置く。名前が PATH で引ける、という役目は同じ。
+    """
+    if not WINDOWS:
+        os.symlink(found, link)
+        return
+    target = found.replace("\\", "/").replace("'", "'\\''")
+    # 改行は LF。CRLF だと sh が shebang を読み違える
+    with open(link, "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"#!/bin/sh\nexec '{target}' \"$@\"\n")
+    os.chmod(link, 0o755)
+
+
+def quote_arg(arg: str) -> str:
+    """Node（libuv）が子プロセスの引数を組むのと同じ綴りで 1 語を包む。
+
+    Windows の Python は引用符を含む語を外側の引用符なしの `{\\"u1\\":...}` にするが、MSYS の
+    sh はそれを 1 語として読めず、後ろの引数まで消える。ボードは Node から sh を起こすので、
+    テストもその形で渡す。
+    """
+    if arg and not any(c in arg for c in ' \t"'):
+        return arg
+    out = ['"']
+    backslashes = 0
+    for c in arg:
+        if c == "\\":
+            backslashes += 1
+        elif c == '"':
+            out.append("\\" * (backslashes * 2 + 1) + '"')
+            backslashes = 0
+        else:
+            out.append("\\" * backslashes + c)
+            backslashes = 0
+    out.append("\\" * (backslashes * 2) + '"')
+    return "".join(out)
+
+
 class GitLab(http.server.BaseHTTPRequestHandler):
     """sh が叩く道だけを返す代役。
 
@@ -145,7 +189,7 @@ class ReviewDecideShTest(unittest.TestCase):
         for name in ("jq", "curl", "git", "sed", "cat", "rm", "dirname", "printf", "mkdir"):
             found = shutil.which(name)
             if found and not os.path.exists(os.path.join(tools, name)):
-                os.symlink(found, os.path.join(tools, name))
+                put_tool(found, os.path.join(tools, name))
         env.update(
             CCNAVI_WORKSPACE=self.ws,
             CCNAVI_BIN_PATH=self.stub,
@@ -154,13 +198,17 @@ class ReviewDecideShTest(unittest.TestCase):
             PATH=tools + os.pathsep + os.path.dirname(SHELL),
         )
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh")
+        command = [SHELL, script, "decide", *args]
+        if WINDOWS:
+            command = " ".join(quote_arg(part) for part in command)
         return subprocess.run(
-            [SHELL, script, "decide", *args],
+            command,
             cwd=self.tree,
             env=env,
             capture_output=True,
             text=True,
-            timeout=60,
+            # Windows は MSYS の起動が遅く、1 回に 12〜24 秒かかる
+            timeout=180 if WINDOWS else 60,
         )
 
     def calls(self) -> list[str]:
