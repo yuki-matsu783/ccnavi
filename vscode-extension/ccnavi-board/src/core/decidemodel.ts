@@ -132,12 +132,12 @@ export function choicesProblem(
   const keys = preview.threads.map((t) => t.key);
   const given = Object.keys(choices);
   if (given.length !== keys.length || !keys.every((k) => k in choices)) {
-    return "行き先を選んでいない指摘がある";
+    return "対応方針を選んでいない指摘がある";
   }
   for (const key of keys) {
     const choice = choices[key];
     if (!DECIDE_CHOICES.includes(choice as DecideChoice)) {
-      return `知らない行き先: ${String(choice)}`;
+      return `知らない対応方針: ${String(choice)}`;
     }
     if (choice === "issue" && !preview.can_issue) {
       return "issue に回せるのは、フィードバック計画が承認されたあと";
