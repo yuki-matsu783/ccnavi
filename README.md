@@ -1879,7 +1879,7 @@ phases:
 
 `--explain` と `SubagentStart` はフェーズを「3: 実装とテスト」のように番号と種類で示す。
 親の局面（作業中・レビュー待ち・フィードバック計画待ち・フィードバック対応中・閉じられる）を
-名指しするのは `--explain` とボードだけ。計画を持たない親の局面は空になる。
+名指しするのは `--explain` とボードだけ。計画を持たない親と、閉じた親の局面は空になる。
 
 ### レビューの依頼と確認
 
@@ -2525,7 +2525,7 @@ ccnavi --explain --json
 
 | 鍵 | 何 |
 |---|---|
-| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 §9.7 の文） |
+| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（設計 §9.7 の文。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `accepted_threads[]` | 人が受け入れた未解決スレッド |
