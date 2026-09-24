@@ -283,14 +283,6 @@ class DenyTest(GuardHarness):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
                     self.assert_denied(result, "builtin-guard-project-home")
 
-    def test_project_home_deny_follows_the_env(self):
-        """§11.6: 綴りは `CCNAVI_PROJECT_HOME` の値で組む。"""
-        moved = os.path.join(self.lib, ".navi", "config", "rules.yml")
-        result = self.hook(
-            "Write", self.ws, guard="enable", env={"CCNAVI_PROJECT_HOME": ".navi"}, file_path=moved
-        )
-        self.assert_denied(result, "builtin-guard-project-home")
-
     def test_shell_writes_into_project_home_are_denied(self):
         """§11.6: シェルからの書き込みは `builtin-guard-setting-files` の 1 本で止まる。"""
         for command in (
@@ -334,22 +326,6 @@ class DenyTest(GuardHarness):
                 with self.subTest(tool=tool, path=os.path.basename(path)):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
                     self.assert_denied(result, "builtin-guard-common-layer")
-
-    def test_common_layer_deny_holds_when_the_project_home_is_moved(self):
-        """§11.6: ccnavi ディレクトリの名前を動かしても、既定の置き場の共通層は止まる。
-
-        共通層の置き場は ccnavi ディレクトリの名前に付いて動かないので、`*/.navi/*` からは外れる。
-        """
-        for path in (self.rules, self.phases, self.risk):
-            with self.subTest(path=os.path.basename(path)):
-                result = self.hook(
-                    "Write",
-                    self.ws,
-                    guard="enable",
-                    env={"CCNAVI_PROJECT_HOME": ".navi"},
-                    file_path=path,
-                )
-                self.assert_denied(result, "builtin-guard-common-layer")
 
     def test_common_layer_copies_in_a_worktree_are_denied(self):
         """§11.6: ワークスペースから切ったワークツリー側の共通層も止まる。
@@ -527,13 +503,6 @@ class SetupTest(unittest.TestCase):
         self.assertIn(".ccnavi/common/rules.yml", result.stdout)
         self.assertIn(".ccnavi/common/risks.yml", result.stdout)
         self.assertIn(".ccnavi/config/phases.yml", result.stdout)
-
-    def test_all_writes_project_home(self):
-        """§11.9: `--all` の env に `CCNAVI_PROJECT_HOME: ".ccnavi"` を足す。"""
-        result = self.run_setup("--all", "--no-deploy")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        env = self.settings()["env"]
-        self.assertEqual(env.get("CCNAVI_PROJECT_HOME"), ".ccnavi")
 
 
 if __name__ == "__main__":

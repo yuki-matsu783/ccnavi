@@ -114,7 +114,6 @@ class SelfGuardTest(unittest.TestCase):
         session="s1",
         tool="Bash",
         bin="",
-        home="",
         **tool_input,
     ):
         payload = json.dumps(
@@ -128,8 +127,6 @@ class SelfGuardTest(unittest.TestCase):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         if bin:
             environment["CCNAVI_BIN_PATH"] = bin
-        if home:
-            environment["CCNAVI_PROJECT_HOME"] = home
         return run_ccnavi(
             [
                 "--root",
@@ -600,21 +597,22 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
         # G2。既定の置き場では ccnavi ディレクトリの守り（`*/.ccnavi/*`）と二重に止まり、
-        # 先に名指しされるのはそちら。ccnavi ディレクトリを動かすとそちらは外れるので、
-        # 残った実行ファイル由来の守りが止めていることをそこで確かめる
-        # （REQ-SLF-07 を ccnavi ディレクトリの守りに寄りかからせない）。
+        # 先に名指しされるのはそちら。ccnavi ディレクトリの名前は動かせない（ADR-0084）ので、
+        # 残った実行ファイル由来の守りが止めていることは、`.ccnavi/` の外に置いた
+        # 振り分け（`tools/`）で確かめる（REQ-SLF-07 を ccnavi ディレクトリの守りに
+        # 寄りかからせない）。
         spelled, _, exe = self.scripts_layout()
         bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
 
-        with self.subTest(home="(既定)"):
+        with self.subTest(place="(既定)"):
             result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
 
             self.assertIn("deny", result.stdout)
 
-        with self.subTest(home=".navi"):
-            result = self.run_hook(
-                "PreToolUse", bin=spelled, home=".navi", tool="Write", file_path=bundled
-            )
+        with self.subTest(place="tools"):
+            spelled, _, exe = self.scripts_layout(("tools",))
+            bundled = os.path.join(os.path.dirname(exe), "_internal", "x")
+            result = self.run_hook("PreToolUse", bin=spelled, tool="Write", file_path=bundled)
 
             self.assertIn("deny", result.stdout)
             self.assertIn("builtin-guard-binary", result.stdout)

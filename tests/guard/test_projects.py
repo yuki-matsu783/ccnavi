@@ -104,7 +104,7 @@ def write(path, text):
     return path
 
 
-# 層の 3 本の置き場（`CCNAVI_PROJECT_HOME` の既定）。
+# 層の 3 本の置き場（既定の ccnavi ディレクトリ）。
 LAYER = os.path.join(".ccnavi", "config")
 
 
@@ -206,7 +206,7 @@ class ProjectsTest(unittest.TestCase):
 
         `--projects` は渡さない。層を探す先を動かすフラグは診断でだけ効く
         （ADR-0067）ので、置き場は `--root` の下の既定のまま。「`projects/` を
-        数えない」は `env={"CCNAVI_PROJECTS": ""}` で言う。
+        数えない」は `projects/` を作らないワークスペースで言う（ADR-0084。空文字の口は無い）。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -549,9 +549,10 @@ class ProjectsTest(unittest.TestCase):
     def test_lint_names_project_config_problems(self):
         write(layer_rules(self.app), "version: 1\ndeny: [\n")
         os.makedirs(os.path.join(self.lib, ".claude"))
+        # `projects/` を無視しない。追跡はしない: ここで `git add -A` すると、入れ子の
+        # リポジトリが `projects/app` の名前で索引に載り、「追跡されている」の側の
+        # 知らせ（ADR-0084）に切り替わって、「無視されていない」を確かめられなくなる。
         write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
-        git(self.ws, "add", "-A")
-        git(self.ws, "commit", "--quiet", "-m", "stop ignoring projects")
 
         result = self.ccnavi("--lint")
         out = result.stdout + result.stderr
@@ -586,18 +587,35 @@ class ProjectsTest(unittest.TestCase):
     # ---- 7. projects/ を数えない設定では前と同じ
 
     def test_without_a_projects_dir_everything_is_judged_by_the_workspace_rules(self):
-        no_projects = {"CCNAVI_PROJECTS": ""}
-        passed = self.hook(
-            "Write", self.ws, env=no_projects, file_path=os.path.join(self.app, "schema", "x.sql")
-        )
+        # 「数えない」を言う口は、`projects/` を作らないこと（ADR-0084）。
+        app_schema = os.path.join(self.app, "schema", "x.sql")
+        # 消さずに `projects/` の外へ動かす（Windows は .git の中の読み取り専用を消せない）。
+        os.rename(self.projects, os.path.join(self.ws, "moved-away"))
+        passed = self.hook("Write", self.ws, file_path=app_schema)
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
         record = self.last_record()
         self.assertNotIn("project", record)
 
-        passed = self.hook("Bash", self.app, env=no_projects, command="psql")
+        passed = self.hook("Bash", self.ws, command="psql")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
+
+    def test_an_empty_projects_env_still_counts_the_projects(self):
+        # A3（ADR-0084）。`CCNAVI_PROJECTS=""` は「プロジェクトを数えない」と読まれていた。
+        # 6 つの env を廃止したので、空文字を入れても `projects/` の下は数えられる。
+        # 実装前は赤。赤の理由は、まだ `CCNAVI_PROJECTS` の空文字を読んでいること。
+        env = {"CCNAVI_PROJECTS": ""}
+        denied = self.hook(
+            "Write", self.ws, env=env, file_path=os.path.join(self.app, "schema", "x.sql")
+        )
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("app:schema", self.reason(denied))
+        self.assertEqual(self.last_record()["project"], "app")
+
+        denied = self.hook("Bash", self.ws, env=env, command="psql -c 'select 1'")
+        self.assertEqual(self.decision(denied), "deny", denied.stdout + denied.stderr)
+        self.assertIn("lib:raw-psql", self.reason(denied))
 
     # ---- 8. --project-rules-file は診断でだけ 1 つのプロジェクトのルールを差し替える
 

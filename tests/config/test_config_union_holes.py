@@ -286,17 +286,6 @@ class ShellPlaceTest(GuardHarness):
             with self.subTest(command=command):
                 self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
 
-    def test_the_moved_umbrella_is_closed_the_same_way(self):
-        """§11.6: ccnavi ディレクトリの名前を動かしてあるときも、名前で終わる綴りで止まる。"""
-        result = self.hook(
-            "Bash",
-            self.ws,
-            guard="enable",
-            env={"CCNAVI_PROJECT_HOME": ".navi"},
-            command="rm -rf projects/lib/.navi",
-        )
-        self.assert_denied(result, "builtin-guard-setting-files")
-
 
 class ColonIdTest(ConfigUnionHarness):
     """A-4: 生の `id` のコロン。層の名前を添えた形（`lib:custom`）と見分けが付かない。"""
