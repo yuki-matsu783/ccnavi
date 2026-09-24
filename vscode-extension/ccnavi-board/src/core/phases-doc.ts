@@ -46,7 +46,7 @@ const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "overlap"
  * 受入テストは実装より先に書く（`overlap` で実装と並行させない）。feedback の種類は
  * `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
  */
-export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 §9.7）。人が持つ設定で、エージェントは書き換えない。
+export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。人が持つ設定で、エージェントは書き換えない。
 #
 # 親チケットの \`plan:\` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
 # \`ccnavi --approve\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に

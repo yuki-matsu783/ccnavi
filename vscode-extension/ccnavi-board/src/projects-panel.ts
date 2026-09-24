@@ -266,7 +266,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   }
   const { folder } = current;
   // clone の完了（`.git` の出現）、層のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
-  // 層の綴り（ccnavi ディレクトリの下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 §11.2）。
+  // 層の綴り（ccnavi ディレクトリの下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 11.2）。
   // 自身の層のパスが取れない（壊れた JSON）なら、層の監視は張らない。
   const rel = projectsRel === "" ? "projects" : projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);

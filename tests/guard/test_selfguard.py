@@ -450,7 +450,7 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
-    # 引用に空白を含む形（wip/design/shellread-sep.md §3）。shellread が語の中の
+    # 引用に空白を含む形（wip/design/shellread-sep.md 3）。shellread が語の中の
     # 切れ目をコマンドの区切りと別の目印で渡すようになると、`[^\x00]*` が引用の
     # 空白をまたいで行き先まで届く。止める側はそれで穴が塞がり、リダイレクトの
     # 行き先の式は語の中の目印を食わないように直す。

@@ -326,7 +326,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
   }
-  // 依頼のマーカー `{head, mr, url, host, since}`（設計 §9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。
+  // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。
   // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
   const requested = p.marks.requested ?? {};
   return {

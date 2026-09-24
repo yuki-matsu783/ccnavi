@@ -154,7 +154,7 @@ class ReadTest(unittest.TestCase):
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
 class WordSepTest(unittest.TestCase):
-    """目印を 2 つに分けたあとの読み（wip/design/shellread-sep.md §4「入力 → 返る文字列」）。
+    """目印を 2 つに分けたあとの読み（wip/design/shellread-sep.md 4「入力 → 返る文字列」）。
 
     コマンドとコマンドの間は SEP のまま。引用が 1 語につないだ空白と、語の中に
     入った演算子の文字の両側は WORD_SEP になる。ルールの `[^\\x00]*` が
@@ -211,7 +211,7 @@ class WordSepTest(unittest.TestCase):
                 self.assertEqual(show(self.readable(src)), show(want))
 
     def test_引用だけの二重の山括弧は今までどおり諦める(self):
-        # 許容した誤検知（ccnavi.md §12.2）。目印を分けても変わらない。
+        # 許容した誤検知（ccnavi.md 12.2）。目印を分けても変わらない。
         result = read('grep -n "<<" f')
         self.assertTrue(result.degraded, "引用の << を普通に読んでしまった")
         self.assertEqual(result.reason, REASON_UNTERMINATED)
@@ -406,7 +406,7 @@ class UnwrappedTest(unittest.TestCase):
 # 切り出した中身が、コマンドの先頭に立ったかどうか。
 SUBST_MARK = re.compile(r"(^|\x00)zzmark($|[ \x00])")
 
-# wip/design/shellread-subst.md §4.1。M を「呼ばれたら記録を残す関数」に置き換えて
+# wip/design/shellread-subst.md 4.1。M を「呼ばれたら記録を残す関数」に置き換えて
 # bash 3.2 と zsh で走らせた結果が元になっている。ここでは shell を走らせず、その表を期待にする。
 #   中     shell が実行し、引用の中から切り出す（bare に残らない）
 #   外     shell が実行し、引用の外から切り出す（bare にも残る）
@@ -431,7 +431,7 @@ SHELL_CASES = [
     ("14", "cat <<\\EOF\n$(M) `M`\nEOF", "-"),
     ("15", "cat <<EOF\n$(M)\nEOF", "中"),
     ("16", "cat <<EOF\nuse `M` here\nEOF", "backquote"),
-    ("17", "echo \"$(cat <<'EOF'\nfix: use `M` and $(M) (see §6)\ndon't\nEOF\n)\"", "-"),
+    ("17", "echo \"$(cat <<'EOF'\nfix: use `M` and $(M) (see 6)\ndon't\nEOF\n)\"", "-"),
     ("18", 'echo "$(cat <<EOF\nuse `M`\nEOF\n)"', "backquote"),
     ("19", 'echo "$(echo "$(M)")"', "中"),
     ("20", "echo `echo \\`M\\``", "backquote"),
@@ -482,7 +482,7 @@ SHELL_CASES = [
     ("65", "echo hi # don't\nM", "外"),
 ]
 
-# wip/design/shellread-subst.md §4.2。(入力, text, bare)。␀ は SEP、␁ は WORD_SEP。
+# wip/design/shellread-subst.md 4.2。(入力, text, bare)。␀ は SEP、␁ は WORD_SEP。
 READINGS = [
     ('echo "$(git push origin main)"', "echo $␀git push origin main", "echo $"),
     ('grep -n "$(git push)" f', "grep -n $ f␀git push", "grep -n $ f"),
@@ -779,8 +779,8 @@ class MovedTest(unittest.TestCase):
 
 class SubstTest(unittest.TestCase):
     """引用の有無によらず、shell が実行する中身を独立したコマンドとして読む
-    （wip/design/shellread-subst.md §4.1 と §4.2）。改行、プロセス置換、語の途中の `#`、
-    予約語の直後も同じ種類の穴として読む（同 §0）。
+    （wip/design/shellread-subst.md 4.1 と 4.2）。改行、プロセス置換、語の途中の `#`、
+    予約語の直後も同じ種類の穴として読む（同 0）。
     """
 
     def test_shellが実行する中身だけを切り出す(self):
@@ -897,7 +897,7 @@ class BraceTest(unittest.TestCase):
             # （敵対的レビュー）。
             "{git,\rpush,origin,main}": ["{git,\rpush,origin,main}"],
             # シェルは代入の右辺、case のパターン、[[ ]] の中を広げないが、並べる
-            # （許容した誤検知。ccnavi.md §12.2）。
+            # （許容した誤検知。ccnavi.md 12.2）。
             "x={a,b}": ["{a,b}"],
             "case $x in {a,b}) :;; esac": ["{a,b}"],
             "[[ $f == *.{jpg,png} ]]": ["{jpg,png}"],

@@ -1,6 +1,6 @@
 """承認の事実を hook がモデルへ 1 度だけ伝えることの受入テスト。
 
-設計 wip/design/approve-popup.md §2.4。人がボードで承認したあと、モデルは次の
+設計 wip/design/approve-popup.md 2.4。人がボードで承認したあと、モデルは次の
 UserPromptSubmit か PreToolUse で「承認済みチケットが置かれた。後工程を進める」を読む。
 見るのは 5 つ。
 

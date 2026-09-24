@@ -2,9 +2,9 @@
 
 tests/fixtures/ のルールではなく、運用に使っている rules.yml をそのまま `--test` に
 渡す。見るのは、shellread が目印を 2 つに分けたあとの判定（wip/design/shellread-sep.md
-§4「見本 → 判定」）。ルールの `[^\\x00]*` が「同じコマンドの中」だけを指すようになり、
+4「見本 → 判定」）。ルールの `[^\\x00]*` が「同じコマンドの中」だけを指すようになり、
 引用付きの grep / find が allow に当たる一方、引用の空白をまたいだ書き換えが deny に
-届くこと。変わってはいけないもの（§3）も同じ表で固定する。
+届くこと。変わってはいけないもの（3 章）も同じ表で固定する。
 
 後半は承認の経路と、実行役のコマンド（`env`・`sudo`・`sh -c`・`xargs` など）が
 中で実行するコマンドを止める側のルールに当てること（wip/design/launcher-scripts.md
@@ -48,7 +48,7 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     """1 件を本物のルールで判定して、試験の JSON を返す。
 
     写しと控えは外し、記録も残さない。組み込みの selfguard（設定ファイルの保護）は
-    既定のまま効かせる。§4 の表はそれを含めた判定なので。
+    既定のまま効かせる。4 の表はそれを含めた判定なので。
 
     `bin_path` を渡すと `CCNAVI_BIN_PATH` に置く。承認のルールは実行ファイルの綴りから
     当てる形を作るので、振り分けの sh を指したときの判定はこれで見る。
@@ -94,7 +94,7 @@ def blocking(body: dict) -> set[str]:
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
 class RepoRulesTest(unittest.TestCase):
-    """§4「見本 → 判定」の表。"""
+    """4「見本 → 判定」の表。"""
 
     def assert_verdict(self, subject, want, rule_id):
         body = judge("Bash", subject)
@@ -147,7 +147,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["code"], "UNDECLARED")
 
     def test_引用だけの二重の山括弧は読めないまま止まる(self):
-        # 許容した誤検知（ccnavi.md §12.2、tests/guard/test_acceptance.py）。生の文字列に
+        # 許容した誤検知（ccnavi.md 12.2、tests/guard/test_acceptance.py）。生の文字列に
         # heredoc が当たり、読めなかったことを名乗る。
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")
@@ -563,7 +563,7 @@ class MovedJudgeTest(LauncherJudgeTest):
 class SubstRepoRulesTest(unittest.TestCase):
     """コマンド置換・改行・プロセス置換を読んだあとの判定。
 
-    wip/design/shellread-subst.md の §3 と §4.3。
+    wip/design/shellread-subst.md の 3 と 4.3。
 
     見本は (subject, 判定, 当たるルールの id, 根拠コード)。id が空ならどのルールにも当たらないこと、
     コードが空なら見ない。
@@ -596,7 +596,7 @@ class SubstRepoRulesTest(unittest.TestCase):
         )
 
     def test_改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない(self):
-        # 今は allow が後ろのコマンドまで通していた（設計 §0）。
+        # 今は allow が後ろのコマンドまで通していた（設計 0）。
         self.check(
             [
                 ("grep -n x f\nsh evil.sh", "ask", "", "UNDECLARED"),
@@ -758,7 +758,7 @@ class SubstRepoRulesTest(unittest.TestCase):
             ]
         )
 
-    # 文面（§4.3）
+    # 文面（4.3）
 
     def test_引用の中から切り出したコマンドに当たったときだけ断りが出る(self):
         quoted = judge("Bash", 'gh issue create --title t --body "use $(git push) here"')

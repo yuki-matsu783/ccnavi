@@ -1,4 +1,4 @@
-"""フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 §9.7）。
+"""フェーズの種類。`.ccnavi/common/phases.yml` を読む（設計 9.7）。
 
 ## 種類は人が持つ
 
@@ -52,7 +52,7 @@ KINDS = (KIND_WORK, KIND_FEEDBACK)
 REVIEW_NONE = "none"
 # chat は、このセッションで人が差分を見る。ホストへは出ない。先へ進めるのは
 # 端末から打つ `ccnavi --reviewed <N> --chat` で、エージェントには打てない
-# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 §9.8）。
+# （DENY_TICKET_APPROVAL_CLI）。mr はホストのマージリクエストで見る（設計 9.8）。
 REVIEW_CHAT = "chat"
 REVIEW_MR = "mr"
 REVIEWS = (REVIEW_NONE, REVIEW_CHAT, REVIEW_MR)
@@ -68,7 +68,7 @@ def stricter(a: str, b: str) -> str:
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
 
 
-# 全体計画の待ち方（設計 §9.7、ADR-0078）。sequential は一直線、dag は種類の `after` を辺にする。
+# 全体計画の待ち方（設計 9.7、ADR-0078）。sequential は一直線、dag は種類の `after` を辺にする。
 ORDER_SEQUENTIAL = "sequential"
 ORDER_DAG = "dag"
 ORDERS = (ORDER_SEQUENTIAL, ORDER_DAG)
@@ -117,7 +117,7 @@ class PhaseType:
     agent: str = ""
     when: str = ""
     # source はこの種類が書いてある層の名前（`common` / `self` / プロジェクト名）。
-    # id は裸のままで、層は記録と `--explain` の欄に出す（設計 §11.4.1）。
+    # id は裸のままで、層は記録と `--explain` の欄に出す（設計 11.4.1）。
     source: str = ""
 
     @property
@@ -162,7 +162,7 @@ def load(path: str, refs: bool = True) -> tuple[PhaseTypes | None, list[Problem]
     """種類を読む。ファイルが無ければ None（種類を使わない）。壊れていれば None と苦情。
 
     `refs` を False にすると `overlap` / `requires` / `after` が指す先の確認を飛ばす。層の
-    ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 §11.4.1）、
+    ファイルを単独で読むときに使う。層は共通層の種類を指してよく（設計 11.4.1）、
     その相手はファイルの中に居ないので、1 本だけで確かめると必ず落ちる。確かめる
     のは合成したあと（`merge`）。
     """
@@ -258,7 +258,7 @@ def reference_problems(checked, pool: dict[str, PhaseType]) -> list[Problem]:
     `after` の先は `kind: work` の種類でなければならない。
 
     見るのは `checked` の側だけで、居てよい先は `pool` 全部。層の種類が共通層の
-    種類を指す形（設計 §11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
+    種類を指す形（設計 11.4.1）は、合成した集合を `pool` に渡せばそのまま通る。
     """
     problems: list[Problem] = []
     for pt in checked:
@@ -349,7 +349,7 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
 
 
 def merged_order(*layers: PhaseTypes | None) -> str:
-    """層を合わせた `order`。ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（設計 §9.7）。"""
+    """層を合わせた `order`。ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（設計 9.7）。"""
     present = [getattr(t, "order", ORDER_SEQUENTIAL) for t in layers if t is not None]
     if present and all(o == ORDER_DAG for o in present):
         return ORDER_DAG
@@ -359,7 +359,7 @@ def merged_order(*layers: PhaseTypes | None) -> str:
 def merge(
     common: PhaseTypes | None, extra: PhaseTypes | None, layer: str
 ) -> tuple[PhaseTypes, list[Problem]]:
-    """共通層の種類に、行き先の層の種類を id ごとに足す（設計 §11.4.1）。
+    """共通層の種類に、行き先の層の種類を id ごとに足す（設計 11.4.1）。
 
     足すだけで、後ろの層が前の層を上書きすることはない。同 `id` で全欄が一致する
     ものは重複とみなして後ろを捨て（info）、中身が違えば error。`title` の重なりも

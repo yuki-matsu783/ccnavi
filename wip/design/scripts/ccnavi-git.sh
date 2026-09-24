@@ -62,7 +62,7 @@ reject() {
 
 # ワークスペースルート。道具と記録の置き場。git のトップとは別物で、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
-# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 §11.8）。
+# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 11.8）。
 WS=$(ccnavi_workspace) ||
 	reject "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 
@@ -285,7 +285,7 @@ worktree)
 				wt_spell="$wt_up.claude/worktrees/$wt_name"
 				;;
 			esac
-			reject "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+			reject "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
 		;;
 	list | prune) ;;
@@ -470,7 +470,7 @@ push)
 	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
 	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
-	# プロジェクトでも置き場はワークスペース（設計 §11.2）なので、git の
+	# プロジェクトでも置き場はワークスペース（設計 11.2）なので、git の
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。

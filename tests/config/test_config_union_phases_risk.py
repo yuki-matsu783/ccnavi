@@ -1,4 +1,4 @@
-"""設定 3 本の和の受入テスト。phases と risk の合成の面（設計 §11.4.1、§11.4.2）。
+"""設定 3 本の和の受入テスト。phases と risk の合成の面（設計 11.4.1、11.4.2）。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
 共通層に `design`、自身の層に `docs`、lib の層に `build` / `release` がある。
@@ -84,7 +84,7 @@ phases:
 
 
 class PhaseUnionTest(ConfigUnionHarness):
-    """phases の合成（§11.4.1）。承認と --lint で見る。"""
+    """phases の合成（11.4.1）。承認と --lint で見る。"""
 
     def phase_problems(self, severity, layer=""):
         """phases の Problem。`layer` を渡すと、その層のものだけ。
@@ -95,7 +95,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         return [p for p in self.problems(severity, where=where) if "phases" in p["where"]]
 
     def test_plan_can_name_a_type_from_the_project_layer(self):
-        """§11.4.1: `plan:` がプロジェクトの層の種類を指せる。層から共通層の種類も指せる。"""
+        """11.4.1: `plan:` がプロジェクトの層の種類を指せる。層から共通層の種類も指せる。"""
         self.propose(
             "i0001",
             ticket_text("i0001", project="lib", plan=["design", "release"], allow=("src/*",)),
@@ -107,7 +107,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertIn("リリース", self.ccnavi("--explain").stdout)
 
     def test_the_layer_follows_the_project_of_the_parent(self):
-        """§11.4.1: 空の `project:` は自身の層。プロジェクトの層の種類は他から指せない。"""
+        """11.4.1: 空の `project:` は自身の層。プロジェクトの層の種類は他から指せない。"""
         self.propose("i0002", ticket_text("i0002", plan=["docs"], allow=("docs/*",)))
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
@@ -129,7 +129,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0004")))
 
     def test_conflicting_id_across_layers_is_an_error_and_empties_the_layer(self):
-        """§11.4.1: 同 id で中身が違えば --lint error。その層は空として扱い、承認が止まる。"""
+        """11.4.1: 同 id で中身が違えば --lint error。その層は空として扱い、承認が止まる。"""
         write_layer(self.lib, phases=LIB_PHASES_CONFLICT)
 
         errors = self.phase_problems("error", "lib")
@@ -147,14 +147,14 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0001")))
 
     def test_title_overlap_across_layers_is_an_error(self):
-        """§11.4.1: `title` の重なりも層をまたいで error。"""
+        """11.4.1: `title` の重なりも層をまたいで error。"""
         write_layer(self.lib, phases=LIB_PHASES_TITLE_OVERLAP)
 
         errors = self.phase_problems("error", "lib")
         self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
 
     def test_identical_type_in_a_later_layer_is_dropped_with_info(self):
-        """§11.4.1: 全欄一致は重複とみなして後ろを捨て、info で言う。承認は通る。"""
+        """11.4.1: 全欄一致は重複とみなして後ろを捨て、info で言う。承認は通る。"""
         write_layer(self.lib, phases=LIB_PHASES_COPIED)
 
         self.assertEqual(self.phase_problems("error"), [])
@@ -170,10 +170,10 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
     def test_scope_stays_relative_to_the_worktree(self):
-        """§11.4.1: `scope` はワークツリーのルートからの相対のまま。
+        """11.4.1: `scope` はワークツリーのルートからの相対のまま。
 
         種類の超過は承認を拒まず、承認画面の「編集対象としているが」に出る（設計 approve-carry
-        §3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
+        3.1）。相対で読めていれば、`src/a/*` は種類 build の `src/*` に入り、`docs/*` だけが出る。
         """
         self.propose(
             "i0001",
@@ -199,7 +199,7 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertTrue(os.path.exists(self.approved_copy("i0001-02")))
 
     def test_broken_project_phases_is_an_error_and_the_layer_is_empty(self):
-        """§11.2: 壊れた層の phases は空 + --lint error。共通層の種類は使える。"""
+        """11.2: 壊れた層の phases は空 + --lint error。共通層の種類は使える。"""
         write(layer_path(self.lib, "phases"), "version: 1\nphases: [\n")
 
         self.assertTrue(self.phase_problems("error", "lib"))
@@ -213,7 +213,7 @@ class PhaseUnionTest(ConfigUnionHarness):
 
 
 class RiskUnionTest(ConfigUnionHarness):
-    """risk の合成（§11.4.2）。lib の子を 1 本閉じて点と記録を見る。"""
+    """risk の合成（11.4.2）。lib の子を 1 本閉じて点と記録を見る。"""
 
     def setUp(self):
         super().setUp()
@@ -272,7 +272,7 @@ class RiskUnionTest(ConfigUnionHarness):
         return json.loads(read(path))
 
     def test_factors_concatenate_and_levels_take_the_minimum(self):
-        """§11.4.2: factors は連結、levels はキーごとに min。記録の hit に source。"""
+        """11.4.2: factors は連結、levels はキーごとに min。記録の hit に source。"""
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
 
@@ -288,7 +288,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("(CRITICAL)", closed.stdout)
 
     def test_unwritten_level_keys_do_not_take_part(self):
-        """§11.4.2: 書かれていない鍵は参加しない。lib が書かない medium / high は共通層の値。"""
+        """11.4.2: 書かれていない鍵は参加しない。lib が書かない medium / high は共通層の値。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "\n".join(str(i) for i in range(10)) + "\n")
 
@@ -299,7 +299,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("(MEDIUM)", closed.stdout)
 
     def test_same_factor_id_across_layers_counts_both_under_the_layer_name(self):
-        """§11.4.2: 同 id で中身が違えば両方を数え、後ろの層は `<層>:<id>`。--lint は warn。
+        """11.4.2: 同 id で中身が違えば両方を数え、後ろの層は `<層>:<id>`。--lint は warn。
 
         層を空にすると、プロジェクトが共通層と同じ名前の項目を 1 本書くだけで、その層の
         項目と閾値が全部消えて点が下がる。両方を数えれば、衝突は加点を増やす側にしか働かない。
@@ -329,7 +329,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("(CRITICAL)", closed.stdout)
 
     def test_colliding_judge_item_is_recorded_under_the_layer_name(self):
-        """§11.4.2: 同 id の定性項目は、後ろの層の側を `<層>:<id>` で record-risk する。"""
+        """11.4.2: 同 id の定性項目は、後ろの層の側を `<層>:<id>` で record-risk する。"""
         write(self.risk, COMMON_RISK + COMMON_JUDGE_FACTOR)
         write_layer(
             self.lib,
@@ -357,7 +357,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(self.record()["points"], 25)
 
     def test_identical_factor_in_a_later_layer_is_dropped_with_info(self):
-        """§11.4.2: 全欄一致なら重複として後ろを捨て、info で言う。"""
+        """11.4.2: 全欄一致なら重複として後ろを捨て、info で言う。"""
         copied = COMMON_RISK.replace("levels: {medium: 20, high: 40, critical: 70}\n", "")
         write_layer(self.lib, risk=copied)
 
@@ -366,14 +366,14 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertTrue(any("big-diff" in p["detail"] for p in infos), infos)
 
     def test_inverted_levels_after_merge_is_an_error(self):
-        """§11.4.2: 合成後に medium <= high <= critical でなければ error。"""
+        """11.4.2: 合成後に medium <= high <= critical でなければ error。"""
         write_layer(self.lib, risk="version: 1\nlevels: {high: 10}\n")
 
         errors = self.risk_problems("error", "lib")
         self.assertTrue(any("high" in p["detail"] for p in errors), errors)
 
     def test_script_outside_its_layer_is_an_error(self):
-        """§11.4.2: 共通層と各層は、互いの scripts/ を指せない。"""
+        """11.4.2: 共通層と各層は、互いの scripts/ を指せない。"""
         write_layer(
             self.lib,
             risk="version: 1\nfactors:\n"
@@ -392,7 +392,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertTrue(any(".ccnavi/scripts/y.sh" in p["detail"] for p in errors), errors)
 
     def test_missing_script_in_the_project_root_is_an_error(self):
-        """§11.4.2: 指す先が git プロジェクトルートに無ければ --lint error。"""
+        """11.4.2: 指す先が git プロジェクトルートに無ければ --lint error。"""
         write_layer(
             self.lib,
             risk="version: 1\nfactors:\n"
@@ -402,7 +402,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertTrue(any("gone.sh" in p["detail"] for p in errors), errors)
 
     def test_script_in_the_project_layer_runs_from_the_project_root(self):
-        """§11.4.2: 層の `script:` はそのプロジェクトの git プロジェクトルートから解く。"""
+        """11.4.2: 層の `script:` はそのプロジェクトの git プロジェクトルートから解く。"""
         write(
             os.path.join(self.lib, ".ccnavi", "scripts", "count.sh"),
             'printf \'{"points": 30, "message": "%s"}\' "$CCNAVI_TICKET"\n',
@@ -425,7 +425,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(by_id["counted"].get("source"), "lib")
 
     def test_script_in_the_common_layer_runs_through_the_merge(self):
-        """§11.4.2: 合成を通しても、共通層の `script:` はワークスペースルートから解いて走る。"""
+        """11.4.2: 合成を通しても、共通層の `script:` はワークスペースルートから解いて走る。"""
         write(
             os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"),
             'printf \'{"points": 7, "message": "%s"}\' "$CCNAVI_TICKET"\n',
@@ -442,14 +442,14 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(by_id["common-counted"].get("source"), "common")
 
     def test_missing_script_in_the_common_layer_is_an_error(self):
-        """§11.4.2: 共通層でも、指す先がワークスペースルートに無ければ --lint error。"""
+        """11.4.2: 共通層でも、指す先がワークスペースルートに無ければ --lint error。"""
         write(self.risk, COMMON_RISK + COMMON_MISSING_SCRIPT_FACTOR)
 
         errors = self.risk_problems("error")
         self.assertTrue(any("gone.sh" in p["detail"] for p in errors), errors)
 
     def test_broken_project_risk_is_empty_and_named_in_the_fallback(self):
-        """§11.2 / §11.4.2: 壊れた risk の層は空 + `fallback` に層の名前 + --lint error。"""
+        """11.2 / 11.4.2: 壊れた risk の層は空 + `fallback` に層の名前 + --lint error。"""
         write(layer_path(self.lib, "risk"), "version: 1\nfactors: [\n")
 
         errors = self.risk_problems("error", "lib")
@@ -467,7 +467,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertIn("lib", closed.stdout + closed.stderr)
 
     def test_judge_record_names_the_layer_of_each_item(self):
-        """§11.9: `<子>.judge.json` の各項目に、その項目の層の `source`。"""
+        """11.9: `<子>.judge.json` の各項目に、その項目の層の `source`。"""
         write(self.risk, COMMON_RISK + COMMON_JUDGE_FACTOR)
         write_layer(self.lib, risk=LIB_RISK + LIB_JUDGE_FACTOR)
 
@@ -489,7 +489,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(record["untested"].get("source"), "lib", record)
 
     def test_the_mark_that_rests_on_a_type_names_its_layer(self):
-        """§11.9: 種類を根拠に置くマーカー（`review: none` の skipped）には、その種類の層。"""
+        """11.9: 種類を根拠に置くマーカー（`review: none` の skipped）には、その種類の層。"""
         tree = self.one_child()
         self.commit(tree, "src/a.py", "1\n")
         closed = self.ccnavi("ticket", "finish", "i0001-01")

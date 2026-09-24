@@ -98,7 +98,7 @@ DEPLOY_RULES=".ccnavi/common/rules.yml"
 # 設定 3 本のひな形。rules と risk は汎用なので共通層（.ccnavi/common/）へ、
 # phases はワークスペースのレイアウト（scope の綴り）に付くので自身の層
 # （.ccnavi/config/）へ配る。共通層に phases を置くと、その scope が
-# projects/ の下のプロジェクトにも効いてしまう（設計 §11.2）。
+# projects/ の下のプロジェクトにも効いてしまう（設計 11.2）。
 DEPLOY_RISK=".ccnavi/common/risks.yml"
 DEPLOY_PHASES=".ccnavi/config/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"

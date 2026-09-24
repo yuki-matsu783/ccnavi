@@ -347,7 +347,7 @@ def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
     """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
     `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
-    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §11.4.2）。
+    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 11.4.2）。
     """
     if not conf.risk:
         return []
@@ -418,7 +418,7 @@ def _copy_problems(
 
 
 def _types_resolver(conf: settings.Settings, root: str):
-    """`project:` から、そのチケットに効く種類を引く（設計 §11.4.1）。
+    """`project:` から、そのチケットに効く種類を引く（設計 11.4.1）。
 
     承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 層 1 回。
@@ -622,7 +622,7 @@ def _proposal_problems(
     常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
 
     **リポジトリをまたいだら、状態が何であれ咎める。** プロジェクトは自分の git を持つので
-    （設計 §11）、そこに同じ識別子が在るのは写しではなく別物の衝突。識別子は人が選ぶ短い
+    （設計 11）、そこに同じ識別子が在るのは写しではなく別物の衝突。識別子は人が選ぶ短い
     連番で、プロジェクトが独立に振ればぶつかる。コミットの遅れでは説明が付かないから、
     ツリーごとの免除を当ててはいけない。
     """
@@ -790,7 +790,7 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """層が噛み合っているか（設計 §11.9、REQ-MLT-16）。
+    """層が噛み合っているか（設計 11.9、REQ-MLT-16）。
 
     見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
     `.ccnavi/config/` が無いことは言わない。
@@ -827,7 +827,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各層の phases / risk が、共通層と合成できるか（設計 §11.4.1、§11.4.2）。
+    """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
 
     見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
@@ -854,7 +854,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか（設計 §11.6）。
+    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか（設計 11.6）。
 
     判定が読むのは元リポジトリに checkout されている版だけ（REQ-MLT-04）。
     ワークツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
@@ -1035,7 +1035,7 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
 
     提案の置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けはその
-    プロジェクトのツリーに置く（設計 §11.5、REQ-MLT-14）。ワークスペースの
+    プロジェクトのツリーに置く（設計 11.5、REQ-MLT-14）。ワークスペースの
     `wip/<名前>/proposals/` は、名前が `projects/` に在っても在らなくても走査されない。走査
     されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
     いちばん困るので名指しし、名前が在るなら正しい置き場を案内する。error にはしない。

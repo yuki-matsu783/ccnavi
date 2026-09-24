@@ -338,7 +338,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--approved", default=None)
     parser.add_argument("--phases", default=None)
     parser.add_argument("--risk", default=None)
-    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 §11）。
+    # プロジェクトの置き場と、ccnavi ディレクトリ（設計 11）。
     parser.add_argument("--projects", default=None)
     parser.add_argument("--project-home", default="")
     # 1 つのプロジェクトのルールファイルを名前で差し替える（<名前>=<パス>）。診断だけ。
@@ -358,7 +358,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--chat", action="store_true")
     # 人が端末で打つ締め。`--approve` / `--reviewed` と同じく、人の判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
-    # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 §11.12）。
+    # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
     parser.add_argument("--config-synced", default="")
     parser.add_argument("-h", "--help", action="store_true")
     try:

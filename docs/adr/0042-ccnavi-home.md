@@ -13,7 +13,7 @@ ccnavi の置き場が `.claude/` と `.ccnavi/` の 2 か所に分かれてい�
 | 記録、控え、セッションの状態 | `.claude/ccnavi/` |
 | 自身の層・プロジェクトの層、承認済みチケット、ゲートの sh、実行ファイル | `.ccnavi/` |
 
-設計 §11.2 は「共通層は今の `.claude/ccnavi/` のまま」としていた。ccnavi ディレクトリを作ったとき、既存の置き場を
+設計 11.2 は「共通層は今の `.claude/ccnavi/` のまま」としていた。ccnavi ディレクトリを作ったとき、既存の置き場を
 動かす理由が無かったからで、層の構造から決まったものではない。`.claude/` は Claude Code 自身の置き場
 （settings.json・hooks・skills・worktrees）で、そこに ccnavi の設定と実行時の記録が混ざっていた。
 

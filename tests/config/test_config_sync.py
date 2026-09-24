@@ -1,4 +1,4 @@
-"""着手の前に共通層でプロジェクトの層を上書きする（設計 §11.12、ADR-0084）。
+"""着手の前に共通層でプロジェクトの層を上書きする（設計 11.12、ADR-0084）。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。共通層は
 rules / phases / risks の 3 本を持ち、lib はそれぞれ別の中身を持つ。app は層を持たない。

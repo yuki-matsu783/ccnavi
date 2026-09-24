@@ -8,7 +8,7 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
  *
- * 対象は 3 種（設計 §11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
+ * 対象は 3 種（設計 11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
  * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
@@ -256,7 +256,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
     // ずれたときに、この画面で保存したルールが判定に効かなくなる。答えは元リポジトリの版で、
-    // ワークツリーの中の版は指さない（設計 §11.2）。
+    // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);

@@ -308,7 +308,7 @@ class HeredocTest(unittest.TestCase):
         # 引用された << と素の << を同じトークンで返す。走査が読まなかった << が
         # トークンに出たら、閉じない本文として縮退させ、ヒアドキュメントに見えて止まる。
         # 直す対象ではなく、許容すると決めた誤検知として設計に書いてある
-        # （ccnavi.md §6.3、§12.2）。このテストは、次に来た人が
+        # （ccnavi.md 6.3、12.2）。このテストは、次に来た人が
         # 黙って直して別のところを壊さないように、決めた側を固定する。
         out = verdict(self, run(payload=pre_tool_use("Bash", "command", 'grep -n "<<" README.md')))
 
@@ -401,7 +401,7 @@ class RecordTest(unittest.TestCase):
     @unittest.skipUnless(hasattr(shellread, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち")
     def test_引用の中から切り出したコマンドに当たったことを記録する(self):
         # 書いた側が文字のつもりでいた場所に当たった判定を、あとから数えられるように
-        # （wip/design/shellread-subst.md §1.4）。
+        # （wip/design/shellread-subst.md 1.4）。
         got = self.logged(
             "enable",
             pre_tool_use("Bash", "command", 'gh issue create --body "use $(git push) here"'),

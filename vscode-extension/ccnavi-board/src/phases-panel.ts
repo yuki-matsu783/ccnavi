@@ -7,7 +7,7 @@
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存や作成が通った）。
  *
- * 対象は 3 種（設計 §11.2、§11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
+ * 対象は 3 種（設計 11.2、11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
  * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
@@ -58,7 +58,7 @@ const SCREEN = "phases";
 const OWN_WRITE_GRACE_MS = 1500;
 /** 層のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# この層のフェーズの種類。共通層の種類に足して使う（設計 §11.4.1）。",
+  "# この層のフェーズの種類。共通層の種類に足して使う（設計 11.4.1）。",
   "# 共通層と同じ id を書くなら中身も同じにする。違えば --lint が error を出し、この層は空として扱われる。",
   "",
 ].join("\n");
@@ -264,7 +264,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     phasesPath = resolveIn(root, phasesRel);
   } else {
     // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
-    // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 §11.2）。
+    // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
       throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);

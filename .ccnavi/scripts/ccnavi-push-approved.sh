@@ -5,7 +5,7 @@
 #   sh .ccnavi/scripts/ccnavi-push-approved.sh
 #
 # 承認はしない。実行ファイルも起動しない。承認済みチケットは置かれただけでは他の機械に
-# 届かない（設計 §9.2）ので、置いたあとに運ぶのがこの sh。端末の承認は ccnavi-approve.sh が、
+# 届かない（設計 9.2）ので、置いたあとに運ぶのがこの sh。端末の承認は ccnavi-approve.sh が、
 # ボードの承認は端末に送った 1 行が呼ぶ。対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
