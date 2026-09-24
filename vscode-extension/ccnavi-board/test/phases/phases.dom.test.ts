@@ -436,7 +436,7 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
     assert.equal(dom.one("#tour-title").textContent, "フェーズの種類");
     assert.ok(!dom.one("#phases").classList.contains("hidden"), "1 段目で一覧に切り替わっていない");
     const titles = [dom.one("#tour-title").textContent];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
       titles.push(dom.one("#tour-title").textContent);
@@ -445,7 +445,7 @@ test("CB-D90 拡張ホストが頼んだら吹き出しの案内を出し、最�
         assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
       }
     }
-    assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ"]);
+    assert.deepEqual(titles, ["フェーズの種類", "ほかの種類との関係", "全体計画の待ち方", "図", "保存", "ヘルプ", "案内"]);
     // 途中の一覧と図の切り替えは控えに書かない（途中でタブを閉じても、次は元の図で開く）
     assert.equal((dom.state() as { view?: string }).view, "graph");
     // 最後の段は「完了」だけ（同じ働きのボタンを 2 つ並べない）
@@ -508,10 +508,12 @@ test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDon
   }
 });
 
-test("CB-D92 細かい説明はヘルプを押したときだけ出し、そこから案内をもう一度見られる", async () => {
+test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッダ右上の ? で案内をもう一度見られ、開いていたヘルプは閉じる", async () => {
   const dom = await openPhases();
   try {
     assert.equal(dom.all("#help").length, 0, "ヘルプを押すまで説明は出さない");
+    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
     assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる/);
@@ -522,7 +524,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出し、そこ�
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
-    // ヘルプから始めた案内も、やめたら tourDone を返す
+    // ? から始めた案内も、やめたら tourDone を返す
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
   } finally {
     await dom.close();

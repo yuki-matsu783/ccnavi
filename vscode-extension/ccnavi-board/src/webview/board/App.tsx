@@ -12,7 +12,7 @@ import type { Moved } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { SAMPLE_NOTE, sampleBoard } from "../../core/tour-sample.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, useTour, type TourStep } from "../Tour.js";
+import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
@@ -183,9 +183,6 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               <label className="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
                 <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応だけ
               </label>
-              <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
-                ？ 案内
-              </button>
               <button
                 type="button"
                 className={refreshing ? "action busy" : "action"}
@@ -210,6 +207,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 承認待ち {visiblePending.length} 件を承認
               </button>
             </div>
+            <TourButton onClick={tour.start} />
           </header>
           {(board?.problems.length ?? 0) > 0 ? (
             <ul className="problems">
@@ -295,7 +293,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '[data-action="tour"]',
     title: "案内",
-    body: "この案内は、ここからもう一度見られる。",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
   },
 ];
 

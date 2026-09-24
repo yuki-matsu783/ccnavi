@@ -19,7 +19,7 @@ import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKi
 import { applyAppearance } from "../appearance.js";
 import { Graph, Legend } from "./Graph.js";
 import { Phase } from "./Phase.js";
-import { Tour, type TourStep } from "../Tour.js";
+import { Tour, TourButton, type TourStep } from "../Tour.js";
 import { post } from "./post.js";
 import { countText, duplicateNote, emptyNote, findText, graphNotices, hasRelations } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, openedFromIds, saveOpen, saveView, type Draft, type View } from "./state.js";
@@ -364,8 +364,13 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     {
       target: '[data-action="help"]',
       title: "ヘルプ",
-      body: "細かい説明はここから開く。この案内も、ここからもう一度見られる。",
+      body: "細かい説明はここから開く。",
       before: () => peekView(beforeTour.current?.view ?? view),
+    },
+    {
+      target: '[data-action="tour"]',
+      title: "案内",
+      body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
     },
   ];
 
@@ -445,6 +450,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             保存
           </button>
         </div>
+        <TourButton onClick={startTour} />
       </header>
       <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
         {lock.reason}
@@ -474,12 +480,12 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             type="button"
             className={helpOpen ? "action small on" : "action small"}
             data-action="help"
-            title="この画面の説明と案内"
+            title="この画面の説明"
             aria-expanded={helpOpen}
             aria-controls="help"
             onClick={() => setHelpOpen(!helpOpen)}
           >
-            ？ ヘルプ
+            ヘルプ
           </button>
         </h2>
         <div className="tabs" role="tablist">
@@ -525,9 +531,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               図の「人が見る」は種類の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わる。判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる（層のどれかが{" "}
               <code>sequential</code> なら <code>sequential</code>）。図はこのファイルの中だけを描くので、ほかの層の種類を指す関係は線にならない。
             </p>
-            <button type="button" className="action small" data-action="tour" onClick={startTour}>
-              案内をもう一度見る
-            </button>
           </div>
         )}
         {view === "graph" && (

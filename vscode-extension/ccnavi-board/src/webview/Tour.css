@@ -42,3 +42,32 @@
 
 /* 案内の間だけ出す見本（`core/tour-sample.ts`）の帯。見本だと分かるよう、案内の枠と同じ色にする */
 .banner.tour-sample { border-color: var(--vscode-focusBorder); }
+
+/*
+ * 案内を出し直す「?」（`TourButton`）。ツールバーの最後の子に置き、ヘッダの右上に小さく固定する。
+ * 5 画面で同じ位置に出すため、並びには混ぜない。ツールバーは sticky なので、位置はツールバーが基準になる。
+ * 右端はボタンの幅だけ空けて、ほかの操作と重ねない
+ */
+.toolbar { padding-right: 34px; }
+
+.toolbar > .tour-button {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-size: .85em;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.toolbar > .tour-button:hover { color: var(--vscode-foreground); background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+
+.toolbar > .tour-button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
