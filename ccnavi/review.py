@@ -675,7 +675,7 @@ def reviewed(
     )
     keys = "k / f / i" if d.can_issue else "k / f"
     stdout.write(
-        "未解決（Unresolved）の指摘の行き先を 1 件ずつ選びます。"
+        "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
         "それ以外を打つと、何もせずにやめます。\n"
     )
     for letter, choice in _CHOICE_KEYS.items():
@@ -910,7 +910,7 @@ def _write_decide_comment(
     followup: str,
 ) -> None:
     """MR に写す、決めた内容のコメント。issue の綴りは sh が作ったあとに書き足す。"""
-    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）の指摘の行き先:"]
+    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）の指摘の対応方針:"]
     if picked[CHOICE_KEEP]:
         lines += [
             "",
@@ -956,7 +956,7 @@ def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], fol
     )
     head = (
         f"[ccnavi] 利用者が親 {d.parent.ticket} のフェーズ {d.ph.number} で"
-        f"未解決（Unresolved）の指摘の行き先を決めた（{counts}）。"
+        f"未解決（Unresolved）の指摘の対応方針を決めた（{counts}）。"
     )
     if followup:
         items = "\n".join(f"- {_thread_line(t)}" for t in picked[CHOICE_FIX])

@@ -23,14 +23,14 @@ class DecidedPromptTest(unittest.TestCase):
         self.assertIn("フェーズ 1 をレビュー済みにした", text)
         self.assertIn("未解決（Unresolved）の指摘なし", text)
         self.assertNotIn("0 件", text)
-        self.assertNotIn("行き先を決めた", text)
+        self.assertNotIn("対応方針を決めた", text)
 
     def test_only_chosen_destinations_are_counted(self):
         t = SimpleNamespace(url="u1", path="a.py", line=1, body="x")
         picked = {c: [] for c in review.CHOICES}
         picked[review.CHOICE_KEEP] = [t]
         text = review._decided_prompt("/w", decision([t]), picked, "")
-        self.assertIn("未解決（Unresolved）の指摘の行き先を決めた（対応しない 1 件）", text)
+        self.assertIn("未解決（Unresolved）の指摘の対応方針を決めた（対応しない 1 件）", text)
         self.assertNotIn("0 件", text)
 
 

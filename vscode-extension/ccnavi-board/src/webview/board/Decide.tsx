@@ -35,7 +35,7 @@ export function DecideBody({
       <h2 id="approval-title">
         {count === 0
           ? `フェーズ ${preview.phase} で未解決（Unresolved）の指摘なし`
-          : `フェーズ ${preview.phase} で未解決（Unresolved）の指摘 ${count} 件の行き先`}
+          : `フェーズ ${preview.phase} で未解決（Unresolved）の指摘 ${count} 件の対応方針`}
       </h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       <p className="approval-note">
@@ -57,7 +57,7 @@ export function DecideBody({
               <div className="decide-body" title={t.body}>
                 {firstLine(t.body)}
               </div>
-              <div className="decide-choices" role="radiogroup" aria-label={`${t.path || t.key} の行き先`}>
+              <div className="decide-choices" role="radiogroup" aria-label={`${t.path || t.key} の対応方針`}>
                 {offered.map((c) => (
                   <label key={c}>
                     <input
@@ -85,7 +85,7 @@ export function DecideBody({
           disabled={deciding || !done}
           onClick={() => post({ type: "decideConfirm", choices })}
         >
-          {deciding ? "置いている…" : count === 0 ? "レビュー済みにする" : "この行き先で決める"}
+          {deciding ? "置いている…" : count === 0 ? "レビュー済みにする" : "この方針で決める"}
         </button>
         <button
           type="button"

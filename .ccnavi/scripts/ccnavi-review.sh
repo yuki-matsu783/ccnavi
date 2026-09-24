@@ -39,7 +39,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   request      --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
-  decide       <N> [--preview]                    未解決（Unresolved）の指摘の行き先を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
+  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ

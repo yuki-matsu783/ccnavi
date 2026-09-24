@@ -556,7 +556,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
         overlay: {
           kind: "prompt",
           title: value.followup
-            ? `フェーズ ${value.phase} の未解決（Unresolved）の指摘の行き先を決めました`
+            ? `フェーズ ${value.phase} の未解決（Unresolved）の指摘の対応方針を決めました`
             : `フェーズ ${value.phase} をレビュー済みにしました`,
           note:
             `${note}${issued} Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、` +

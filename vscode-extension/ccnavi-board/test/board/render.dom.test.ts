@@ -93,7 +93,7 @@ test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶ
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の行き先");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の対応方針");
     assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
     assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
     // issue に回せない局面では、その行き先を出さない
