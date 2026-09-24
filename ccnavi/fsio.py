@@ -254,11 +254,6 @@ def read_dict(path: str) -> dict | None:
     return data if isinstance(data, dict) else {}
 
 
-def write_json(path: str, data: Any, indent: int | None = None) -> str:
-    """JSON を書く。書けたら空文字、駄目なら理由。"""
-    return write_text(path, json.dumps(data, ensure_ascii=False, indent=indent))
-
-
 def write_json_atomic(path: str, data: Any, indent: int | None = None) -> str:
     """JSON を、読む側に途中を見せずに書く。書けたら空文字、駄目なら理由（`write_text_atomic`）。"""
     return write_text_atomic(path, json.dumps(data, ensure_ascii=False, indent=indent))

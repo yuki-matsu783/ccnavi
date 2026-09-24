@@ -248,12 +248,6 @@ def human_path_form(subject: str) -> tuple[str, str]:
     return "", ""
 
 
-def turns_off_guard(subject: str) -> str:
-    """端末要求を切る形があれば、その綴り。無ければ空。"""
-    kind, found = human_path_form(subject)
-    return found if kind == "guard-off" else ""
-
-
 def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
     return (

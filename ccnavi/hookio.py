@@ -25,7 +25,6 @@ SUBAGENT_START = "SubagentStart"
 SUBAGENT_STOP = "SubagentStop"
 
 # 1 回の呼び出しに対する判定。緩い順に並べてある。
-ALLOW = "allow"
 ASK = "ask"
 DENY = "deny"
 

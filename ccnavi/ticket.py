@@ -93,10 +93,6 @@ DONE = "done"
 CANCELLED = "cancelled"
 # 提案の置き場を走査する状態。承認済みチケットの置き場は approval.py が読む。
 STATES = (TODO, REVIEW)
-PROPOSAL_STATES = STATES
-APPROVED_STATES = (DOING, DONE)
-# 閉じた状態。
-CLOSED = (DONE, CANCELLED)
 # 終わった状態。フェーズの終わりはこれで数える（レビュー待ちも作業としては終わっている）。
 FINISHED = (REVIEW, DONE, CANCELLED)
 # 直接の作成・移動を止める置き場。todo/ への作成と編集は自由。
@@ -1021,16 +1017,6 @@ def dedupe(found: list[Ticket]) -> list[Ticket]:
     for hits in by_ticket(found).values():
         kept.extend(fold(hits))
     return kept
-
-
-def locate(root: str, tickets_rel: str, tree_root: str, ticket_id: str) -> tuple[str, str]:
-    """このワークツリーで、この識別子の提案がどの状態にあるか。無ければ空文字 2 つ。"""
-    base = os.path.join(tree_root, tickets_rel.replace("/", os.sep))
-    for state in STATES:
-        path = os.path.join(base, state, ticket_id + ".md")
-        if os.path.isfile(path):
-            return state, path
-    return "", ""
 
 
 def _place(tickets_rel: str) -> str:
