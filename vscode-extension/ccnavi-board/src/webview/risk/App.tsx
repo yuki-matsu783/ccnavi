@@ -260,13 +260,14 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルが上がる点数 <span className="count">リスクの点がこの値に届くと、リスクレベルが 1 段上がる。HIGH 以上になると、レビューが終わるまで先へ進めない</span>
+          リスクレベルが上がる点数 <span className="count">リスクの合計点がこの値を超えた場合、リスクレベルが 1 段上がる。HIGH 以上の場合は、次フェーズに進む前に人間レビューを必須とする
+          </span>
         </h2>
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
             子チケットを閉じるとき、下の「項目」で当てはまった点を足し合わせて、その変更のリスクの点を出す。
-            その点がここの値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていく。
+            合計点が設定値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていく。
             <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めない。</strong>
             チケットで「レビュー不要」と宣言していても、人間のレビューが必要になる。
             値は MEDIUM ≤ HIGH ≤ CRITICAL となるように入れる。空欄にしたリスクレベルは、組み込みの値（
