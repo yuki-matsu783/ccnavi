@@ -401,7 +401,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {page !== undefined && page.mode !== "enable" && page.mode !== "" && (
         // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。判定と記録はするが、deny や ask にヒットしてもツールの呼び出し（tool_use）を止めない
+          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まらない）
         </div>
       )}
       {(page?.notices ?? []).map((notice, index) => (
@@ -471,7 +471,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </nav>
       <section id="tab-rules" className={`pane${tab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
-          <input id="find" type="search" placeholder="id・ツール・パターン・文面で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+          <input id="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
           <span className="hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {
@@ -535,7 +535,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={tab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          判定は実行ファイルの <code>--test</code> で行う。編集中の内容で試すので保存は要らない。セッションが dry-run でも、ここは enable のときの判定を返す。
+          セッションが dry-run でも、ここは enable のときの判定を返す。
         </p>
         <div className="judge-form">
           <label>
@@ -623,7 +623,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: "#find",
       title: "絞り込み",
-      body: "id・ツール・パターン・文面で絞り込む。畳んだタイプの中も探す。",
+      body: "id・ツール・パターン・メッセージで絞り込む。畳んだタイプの中も探す。",
       before: () => peek("rules"),
     },
     {

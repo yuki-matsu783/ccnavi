@@ -48,13 +48,13 @@ export function hasContext(rule: RuleForm): boolean {
 export function contextSummary(rule: RuleForm): string {
   return hasContext(rule)
     ? "（設定あり）"
-    : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイルと、渡す回の刻み";
+    : "（未設定）。ヒットしたときにモデルへ渡すプロンプトやファイルと、何回に 1 度渡すか（every）";
 }
 
 /** ask と allow に message が残っているときに出す断り。lint が error にする */
 export function staleMessage(section: Section): string {
   const where = section === "ask" ? "人の確認ダイアログにしか出ない" : "どこにも届かない";
-  return `${section} の message は${where}ので lint が error にする。モデルに渡すプロンプトは「渡す文」（additionalContext）に移す: `;
+  return `${section} の message は${where}ので lint が error にする。モデルに渡すプロンプトはadditionalContext に移す: `;
 }
 
 /**
