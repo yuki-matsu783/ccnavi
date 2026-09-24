@@ -546,3 +546,39 @@ test("CB-D103 覚えていたプロジェクトの絞り込みが効いていて
     await dom.close();
   }
 });
+
+test("CB-D104 案内を閉じたら、焦点を案内の前の場所（「？ 案内」）へ戻す", async () => {
+  const dom = await openBoard();
+  try {
+    const button = dom.one<HTMLButtonElement>('[data-action="tour"]');
+    button.focus();
+    dom.click(button);
+    await dom.settle();
+    assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
+    dom.key("Escape");
+    await dom.settle();
+    assert.equal(dom.document.activeElement, button, "焦点が body に落ちた");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D105 案内の最中にボードが読み直せなくなったら案内を閉じて tourDone を返し、ボードが戻っても出直さない", async () => {
+  const json = fixture();
+  const dom = await openBoard(json);
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    dom.click(dom.one('[data-action="tour-next"]'));
+    await dom.settle();
+    await dom.send({ type: "data", data: { kind: "error", error: "読めない" } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
+    await dom.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "人が始めていない案内が出直した");
+  } finally {
+    await dom.close();
+  }
+});

@@ -586,3 +586,24 @@ test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、
     await dom.close();
   }
 });
+
+test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
+  const dom = await openPage({ kind: "loading", text: "ルールを読み込み中..." });
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "3 つのタブ");
+    await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中..." } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "人が始めていない案内が出直した");
+  } finally {
+    await dom.close();
+  }
+});

@@ -211,9 +211,9 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               </button>
             </div>
           </header>
-          {shown.problems.length > 0 ? (
+          {(board?.problems.length ?? 0) > 0 ? (
             <ul className="problems">
-              {shown.problems.map((problem, i) => (
+              {(board?.problems ?? []).map((problem, i) => (
                 <li key={i}>{problem}</li>
               ))}
             </ul>

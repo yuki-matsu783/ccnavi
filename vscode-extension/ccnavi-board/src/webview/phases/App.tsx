@@ -175,6 +175,21 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
   }, [tourPending, data, view, find, editing, touring]);
 
+  // 案内の最中に中身が読み込み中やエラーへ替わった。吹き出しは描かれなくなるので、ここで閉じたことにする
+  // （閉じずに残すと、中身が戻ったときに人が始めていない案内が 1 段目から出直す）。行の鍵は古いので戻さない
+  useEffect(() => {
+    if (touring && data.kind !== "page") {
+      setTouring(false);
+      const was = beforeTour.current;
+      beforeTour.current = undefined;
+      if (was !== undefined) {
+        setView(was.view);
+        setFind(was.find);
+      }
+      post({ type: "tourDone" });
+    }
+  }, [touring, data]);
+
   /**
    * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が
    * 変わったと見て内部の点を作り直す（`adoptUserNodes` の `checkEquality`）。ドラッグしている

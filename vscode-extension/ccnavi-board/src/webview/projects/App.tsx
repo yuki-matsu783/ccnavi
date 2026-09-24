@@ -117,7 +117,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       {sample !== undefined && <div className="banner tour-sample">{SAMPLE_NOTE}</div>}
       <header className="toolbar">
         <div className="summary">
-          <span>プロジェクト {page.rows.length} 件</span>
+          <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
             置き場: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
           </span>

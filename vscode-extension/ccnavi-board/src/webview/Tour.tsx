@@ -72,6 +72,17 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
     }
   }, [pending, ready, begin]);
 
+  // 案内の最中に指す先が消えた（読み直せずエラーになった、別の対象へ切り替わって読み込み中になった、
+  // 承認のオーバーレイが出た）。吹き出しは描かれなくなるので、ここで閉じたことにする。閉じずに残すと、
+  // 中身が戻ったときに人が始めていない案内が 1 段目から出直す
+  useEffect(() => {
+    if (touring && !ready) {
+      touringRef.current = false;
+      setTouring(false);
+      latest.current.onEnd();
+    }
+  }, [touring, ready]);
+
   const request = useCallback((): void => setPending(true), []);
   const start = useCallback((): void => {
     if (readyRef.current) {
@@ -149,14 +160,14 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
     setPlace(placeBubble(spot, { width: el.offsetWidth, height: el.offsetHeight }, { width: window.innerWidth, height: window.innerHeight }));
   }, [spot, index]);
 
-  // 焦点は「次へ」に置く（Enter で進める）。閉じたら、案内の前に焦点があった場所へ戻す
+  // 焦点は「次へ」に置く（Enter で進める）。閉じたら、案内の前に焦点があった場所へ戻す。
+  // **戻す先は最初に描くときに控える。** effect で控えると、先に走る「次へ」への移動のあとを読んでしまい、
+  // 閉じたときに消えた「次へ」へ戻そうとして焦点が body に落ちる
+  const [focusBefore] = useState(() => document.activeElement as HTMLElement | null);
   useEffect(() => {
     next.current?.focus();
   }, [index, measured]);
-  useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
-    return () => before?.focus?.();
-  }, []);
+  useEffect(() => () => focusBefore?.focus?.(), [focusBefore]);
 
   // Esc でやめる。Tab は吹き出しのボタンの中だけを巡る（裏の画面の「保存」などへ焦点を逃がさない）
   useEffect(() => {
