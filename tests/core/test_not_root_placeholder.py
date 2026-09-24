@@ -344,7 +344,7 @@ class NotRootLimitTest(unittest.TestCase):
     # --- 観点 10: 例外が外へ漏れない ---
 
     def test_a_very_long_root_does_not_raise(self):
-        """閾値より遥かに長いルートでも、未処理例外にならず苦情になる。
+        """しきい値より遥かに長いルートでも、未処理例外にならず苦情になる。
 
         **このテストは `except RecursionError` の側を実行しない。** `_expand_not_root` が
         256 字で先に弾くので、`re.compile` まで届かない。組み立てが落ちるのは 493 字で、
@@ -352,7 +352,7 @@ class NotRootLimitTest(unittest.TestCase):
         丸ごと消してもこのテストが落ちないことを確認済み）。
 
         ここで縛っているのは「長すぎるルートを渡しても呼び出し側へ例外が漏れない」ことだけ。
-        それでも `rules.py` が `RecursionError` を捕まえているのは、閾値や展開の形を
+        それでも `rules.py` が `RecursionError` を捕まえているのは、しきい値や展開の形を
         変えれば到達しうるため。理由はそちらのコメントにある。
         """
         path = rules_file(self.dir.name, outside_rule())

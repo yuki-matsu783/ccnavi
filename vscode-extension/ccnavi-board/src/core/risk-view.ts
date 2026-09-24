@@ -2,7 +2,7 @@
  * リスク管理画面の、拡張ホストと Webview の間の契約。
  *
  * 画面は React で組み、拡張ホストは HTML を組み立てない（ADR-0064）。拡張ホストが渡すのは
- * 「いま何を見せるか」（`RiskData`）だけで、閾値の欄も項目の行も画面が作る。画面が返すのは
+ * 「いま何を見せるか」（`RiskData`）だけで、境目の点の欄も項目の行も画面が作る。画面が返すのは
  * 人が押した操作（`RiskMessage`）だけで、点も数えず、ファイルも書かない（ADR-0035）。
  *
  * **配点の形（`KINDS`・`FactorForm` など）もここに置く。** 読み書き（`risk-doc.ts`）の側に
@@ -24,7 +24,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
-/** リスクレベルの名前は固定。閾値だけ動かす。LOW は閾値を持たない */
+/** リスクレベルの名前は固定。境目の点だけ動かす。LOW は境目の点を持たない */
 export const LEVEL_NAMES = ["medium", "high", "critical"] as const;
 export type LevelName = (typeof LEVEL_NAMES)[number];
 
@@ -38,7 +38,7 @@ export interface FactorForm {
   /** 加点。整数のはずだが欄の文字のまま持つ。整数でなければそのまま書いて lint が言う */
   readonly points: string;
   readonly kind: FactorKind;
-  /** 当て方の値。lines_over 等なら閾値、glob ならパターン、script ならパス、judge なら問い */
+  /** 当て方の値。lines_over 等なら基準、glob ならパターン、script ならパス、judge なら問い */
   readonly value: string;
   /** glob の上限。空なら青天井（欄を書かない） */
   readonly max: string;
@@ -46,7 +46,7 @@ export interface FactorForm {
 }
 
 export interface RiskForm {
-  /** 閾値。空ならそのリスクレベルは組み込みの値（欄を書かない） */
+  /** 境目の点。空ならそのリスクレベルは組み込みの値（欄を書かない） */
   readonly levels: Readonly<Record<LevelName, string>>;
   readonly factors: readonly FactorForm[];
 }
@@ -60,9 +60,9 @@ export interface RiskModel {
 
 /** 当て方の説明。select のラベルと、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; readonly placeholder: string }>> = {
-  lines_over: { label: "差分の行数が閾値を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
-  files_over: { label: "変えたファイル数が閾値を超えたら加点", placeholder: "10（変えたファイルの数がこれを超えたら加点）" },
-  deleted_over: { label: "消したファイル数が閾値を超えたら加点", placeholder: "3（消したファイルの数がこれを超えたら加点）" },
+  lines_over: { label: "変更した行数が基準を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
+  files_over: { label: "変更したファイル数が基準を超えたら加点", placeholder: "10（変更したファイルの数がこれを超えたら加点）" },
+  deleted_over: { label: "削除したファイル数が基準を超えたら加点", placeholder: "3（削除したファイルの数がこれを超えたら加点）" },
   glob: { label: "glob にヒットしたファイルが 1 つあるごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。ヒットしたファイル 1 つごとに points を加点し、max が上限）" },
   script: { label: "スクリプトが出した点を加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。スクリプトが出した点を加点し、失敗や読めない出力なら points を加点）" },
   judge: { label: "サブエージェントの答えが yes だったら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },

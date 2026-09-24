@@ -1,5 +1,5 @@
 /*
- * リスク管理画面の骨組み（`App.tsx`）。閾値の枠と、その中の欄。1 件の行は `Factor.css`。
+ * リスク管理画面の骨組み（`App.tsx`）。境目の点の枠と、その中の欄。1 件の行は `Factor.css`。
  */
 button.action.small { margin-left: auto; }
 .block { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }

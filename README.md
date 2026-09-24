@@ -824,7 +824,7 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 （承認済みチケットが `doing`）がある間は保存できない。hook はツール呼び出しのたびにルールを読み直すので、
 セッションの途中で判定が変わるのを避けるため。
 
-同じ拡張の「リスク管理画面」で、実績で測るリスクの配点（`.ccnavi/common/risks.yml`）の閾値と項目を
+同じ拡張の「リスク管理画面」で、実績で測るリスクの配点（`.ccnavi/common/risks.yml`）の境目の点と項目を
 画面で直せる。保存の前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は差分を数えない。
 ファイルが無ければ組み込みと同じ値で作れる。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない
 （配点は子チケットを閉じるときにしか読まれないので、その間は何も動かさない）。
@@ -2018,7 +2018,7 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 
 ```yaml
 version: 1
-levels: {medium: 20, high: 40, critical: 70}     # リスクレベルの名前は固定、閾値だけ動かす
+levels: {medium: 20, high: 40, critical: 70}     # リスクレベルの名前は固定、境目の点だけ動かす
 factors:
   - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
