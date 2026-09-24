@@ -123,7 +123,7 @@ export async function openRisk(): Promise<void> {
     host: riskHost(panel),
     fileWatchers: [],
     watchers: [],
-    lock: lockFromError("まだ確認していない"),
+    lock: lockFromError("確認中…"),
     changedPending: false,
     wroteAt: 0,
   };

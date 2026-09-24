@@ -196,7 +196,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           ワークスペース内のプロジェクト <span className="count">{rows.length}</span>
         </h2>
         {rows.length === 0 ? (
-          <p className="empty">プロジェクトはまだ無い。上の欄から clone するか、既存のリポジトリを置き場（無ければ作る）の直下へ移す</p>
+          <p className="empty">プロジェクト無し。上のボタンで clone するか、既存のリポジトリをprojects直下に移動してください。</p>
         ) : (
           <ul className="projects">
             {rows.map((row) => (

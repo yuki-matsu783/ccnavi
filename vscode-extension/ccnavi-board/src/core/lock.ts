@@ -42,7 +42,7 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
 export function lockFromError(error: string): Lock {
   return {
     locked: true,
-    reason: `作業中のチケットを確認中…: ${error}`,
+    reason: `作業中のチケット: ${error}`,
     doing: [],
   };
 }

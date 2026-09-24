@@ -353,7 +353,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["リスクレベルが上がる点数", "項目", "保存", "案内"]);
+    assert.deepEqual(titles, ["リスクレベルの基準点", "項目", "保存", "案内"]);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
   } finally {
     await dom.close();

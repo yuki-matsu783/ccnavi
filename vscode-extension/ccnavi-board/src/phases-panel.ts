@@ -195,7 +195,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     host: phasesHost(panel),
     fileWatchers: [],
     watchers: [],
-    lock: lockFromError("まだ確認していない"),
+    lock: lockFromError("確認中…"),
     changedPending: false,
     wroteAt: 0,
     dirty: false,
@@ -239,7 +239,7 @@ async function switchTarget(current: PanelState, target: PhasesTarget): Promise<
   current.error = undefined;
   current.dirty = false;
   current.changedPending = false;
-  current.lock = lockFromError("まだ確認していない");
+  current.lock = lockFromError("確認中…");
   // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
   // 前の対象の変化を「外で変わった」と拾い続けない
   if (current.timer !== undefined) {

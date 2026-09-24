@@ -1,5 +1,5 @@
 /**
- * リスク管理画面の本体。リスクレベルが上がる点数と、加点する項目の一覧。
+ * リスク管理画面の本体。リスクレベルの基準点と、加点する項目の一覧。
  *
  * 見せる中身は拡張ホストが渡す（`RiskData`）。画面が持つのは、人が触って決めるもの
  * （編集中の配点、開いている行、絞り込み、直前の操作の一言）だけ。点は数えず、ファイルも書かない。
@@ -260,7 +260,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルが上がる点数 <span className="count">リスクの合計点がこの値を超えた場合、リスクレベルが 1 段上がる。HIGH 以上の場合は、次フェーズに進む前に人間レビューを必須とする
+          リスクレベルの基準点 <span className="count">リスクの合計点がこの値を超えた場合、リスクレベルが 1 段上がる。HIGH 以上の場合は、次フェーズに進む前に人間レビューを必須とする
           </span>
         </h2>
         <details className="help">
@@ -350,7 +350,7 @@ const MISSING_STEP: TourStep = {
 const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#levels",
-    title: "リスクレベルが上がる点数",
+    title: "リスクレベルの基準点",
     body: "子チケットのリスクの点がこの値に届くと、リスクレベルが 1 段上がる（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めない。空欄なら組み込みの値を使う。",
   },
   {
