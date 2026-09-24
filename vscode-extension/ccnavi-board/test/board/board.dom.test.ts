@@ -513,3 +513,36 @@ test("CB-D97 承認のオーバーレイが出ている間に頼まれた案内�
     await dom.close();
   }
 });
+
+test("CB-D102 承認のオーバーレイの最中に「？ 案内」を押しても上に被せず、オーバーレイが消えてから始める", async () => {
+  const json = fixture();
+  const dom = await openBoard(json, { approval: { kind: "loading" } });
+  try {
+    dom.click(dom.one('[data-action="tour"]'));
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "承認のオーバーレイの上に案内を出した");
+    await dom.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 1);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D103 覚えていたプロジェクトの絞り込みが効いていても、案内の見本のカードは隠さない", async () => {
+  const empty = { ...fixture(), projects: ["lib"], tickets: [], parents: [], pending_approval: [] };
+  const dom = await openBoard(empty, { state: { project: "lib", parent: "*", attention: true, folded: [], widths: {} } });
+  try {
+    assert.equal(dom.one<HTMLInputElement>("#project-filter").value, "lib");
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.ok(dom.all(".card:not(.hidden)").length > 0, "見本のカードが絞り込みで隠れた");
+    dom.key("Escape");
+    await dom.settle();
+    // 絞り込みそのものは触らない
+    assert.equal(dom.one<HTMLInputElement>("#project-filter").value, "lib");
+    assert.equal(dom.all(".card").length, 0);
+  } finally {
+    await dom.close();
+  }
+});

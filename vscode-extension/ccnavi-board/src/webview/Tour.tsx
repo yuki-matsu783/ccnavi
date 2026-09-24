@@ -33,7 +33,8 @@ const BUBBLE_WIDTH = 340;
  *
  * - `request`: 拡張ホストの `tour`（初回）を受けたときに呼ぶ。**指す先が出る（`ready`）まで待って始める。**
  *   読み込み中やエラーの画面には指す先が無い
- * - `start`: 「？ 案内」を押したとき。すぐ始める
+ * - `start`: 「？ 案内」を押したとき。指す先が出ていればすぐ始め、出ていなければ（ボードの承認のオーバーレイの
+ *   最中など）`request` と同じく出るまで待つ。押した道だけ待たないと、オーバーレイの上に案内が被さる
  * - `end`: 吹き出しを閉じたとき。`onEnd` を呼ぶ（画面はそこで様子を戻し、`tourDone` を返す）
  *
  * `onStart` は始める直前に呼ぶ。案内が画面の様子（タブなど）を動かすなら、ここで控えを取る。
@@ -52,7 +53,10 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
   const touringRef = useRef(touring);
   touringRef.current = touring;
 
-  const start = useCallback((): void => {
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
+
+  const begin = useCallback((): void => {
     if (touringRef.current) {
       return;
     }
@@ -64,11 +68,18 @@ export function useTour(ready: boolean, hooks: { readonly onStart?: () => void; 
   useEffect(() => {
     if (pending && ready) {
       setPending(false);
-      start();
+      begin();
     }
-  }, [pending, ready, start]);
+  }, [pending, ready, begin]);
 
   const request = useCallback((): void => setPending(true), []);
+  const start = useCallback((): void => {
+    if (readyRef.current) {
+      begin();
+    } else {
+      setPending(true);
+    }
+  }, [begin]);
   const end = useCallback((): void => {
     touringRef.current = false;
     setTouring(false);

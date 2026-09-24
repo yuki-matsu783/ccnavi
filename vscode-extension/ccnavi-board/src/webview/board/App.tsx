@@ -121,10 +121,13 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const moved = new Map((data.kind === "board" ? (data.moved ?? []) : []).map((m) => [m.id, m]));
   const movedOf = (card: Card): Moved | undefined => moved.get(card.id);
 
+  // 見本は絞り込みに当てない。見本のカードはどのプロジェクトにも親にも属さないので、覚えていた絞り込みが
+  // 効いたままだと全部隠れ、案内が指す先を失う
   const hiddenOf = (card: Card): boolean =>
-    (project !== EMPTY.project && card.project !== project) ||
+    sample === undefined &&
+    ((project !== EMPTY.project && card.project !== project) ||
     (parent !== EMPTY.parent && card.family !== parent) ||
-    (attention && !card.attention);
+    (attention && !card.attention));
 
   // 「承認待ち N 件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
   // 「絞り込み無し」は空の並びではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認に化ける。
