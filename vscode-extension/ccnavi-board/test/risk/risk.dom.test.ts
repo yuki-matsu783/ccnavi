@@ -18,11 +18,11 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
   const dom = await openRisk();
   try {
     assert.equal(dom.all(".factor.open").length, 0);
-    assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "差分が 300 行を超えたら加点行数が多い");
-    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** にヒットしたファイルが 1 つあるごとに加点（上限 35 点）CI に触った");
-    // script は「出した点を加点」で、points は測れなかったときの保険。judge は yes で加点
-    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/common/scripts/risk.sh が出した点を加点（測れなければ 10 点）");
-    assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "問い「テストの無い変更を含むか」に yes だったら加点");
+    assert.equal(dom.one(`${rowSelector("f1")} .sum .clip`).textContent, "変更した行数（追加＋削除）が 300 行を超えると加点行数が多い");
+    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に当てはまるファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
+    // script は「返した点を加点」で、points は測れなかったときの保険。judge は yes で加点
+    assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/common/scripts/risk.sh が返した点を加点（点を取れなかったときは 10 点）");
+    assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "問い「テストの無い変更を含むか」の答えが yes なら加点");
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
     assert.ok(dom.one(rowSelector("f2")).classList.contains("open"));
@@ -43,10 +43,10 @@ test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では�
     assert.ok(dom.one(rowSelector("f2")).classList.contains("open"));
     assert.equal(dom.all(`${rowSelector("f2")} input.f-max`).length, 0);
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("f2")} input.f-value`).value, "");
-    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "（閾値 未設定）CI に触った");
+    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "（基準 未設定）CI に触った");
     dom.type(dom.one(`${rowSelector("f2")} input.f-value`), "10");
     await dom.settle();
-    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変えたファイルが 10 件を超えたら加点CI に触った");
+    assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変更したファイルが 10 件を超えると加点CI に触った");
     // 保存に渡る形にも出る。当て方を変えても id と文面は持ち越す
     dom.click(dom.one("#save"));
     await dom.settle();
@@ -61,7 +61,7 @@ test("CB-D12 絞り込みは一致した行だけを数え、開いている行�
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
     await dom.settle();
-    dom.type(dom.one("#find"), "ヒットしたファイル");
+    dom.type(dom.one("#find"), "当てはまるファイル");
     await dom.settle();
     assert.equal(dom.one("#factor-count").textContent, "1 / 4（開いたまま 1）", "画面に出ている語で当たる");
     dom.type(dom.one("#find"), "github");
@@ -164,13 +164,13 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
     const caps = dom.all(`${rowSelector("f1")} .row-body > .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "点", "当て方", "閾値", "文面"],
+      ["id", "点", "当て方", "基準", "文面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
       ["YAML のキー: id", "YAML のキー: points", "YAML のキー: lines_over / files_over / deleted_over / glob / script / judge", "YAML のキー: lines_over", "YAML のキー: message"],
     );
-    // 閾値は等級の名前を欄名にし、飾りのラベルは出さない
+    // 境目の点はリスクレベルの名前を欄名にし、飾りのラベルは出さない
     assert.deepEqual(
       dom.all("#levels > .field > .cap").map((cap) => cap.textContent),
       ["MEDIUM", "HIGH", "CRITICAL"],
@@ -287,7 +287,7 @@ test("CB-D58 当て方の選択肢は 6 つで、キーの綴りと説明を並�
       Array.from(select.options).map((option) => option.value),
       ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"],
     );
-    assert.equal(select.options[0].textContent, "lines_over（差分の行数が閾値を超えたら加点）");
+    assert.equal(select.options[0].textContent, "lines_over（変更した行数が基準を超えたら加点）");
     assert.equal(select.value, "lines_over");
   } finally {
     await dom.close();
@@ -353,7 +353,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["等級の閾値", "項目", "保存", "案内"]);
+    assert.deepEqual(titles, ["リスクレベルが上がる点数", "項目", "保存", "案内"]);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
   } finally {
     await dom.close();

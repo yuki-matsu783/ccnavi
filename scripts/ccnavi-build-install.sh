@@ -11,12 +11,14 @@
 # ccnavi は build.py が組み立てと .ccnavi/bin/<os>-<arch>/ への設置を両方する
 # （scripts/../build.py 参照）。
 #
-# 拡張機能は、いま code にインストール済みの版が vscode-extension/ccnavi-board/package.json の
-# 版以上なら、インストール済みの版を基準にパッチ版を 1 つ上げてから組み立てる。package.json の
+# 拡張機能は、いま code にインストール済みバージョンが vscode-extension/ccnavi-board/package.json の
+# 版以上なら、インストール済みバージョンを基準にパッチ版を 1 つ上げてから組み立てる。package.json の
 # 版のほうが大きければ、そのまま組み立てる。同じ版のまま vsix を作っても、VS Code は
-# インストール済みの版と同じか古い版を「入れ直せない」として弾くので、インストール済みの版を超えさせる。
-# code コマンドが無い機械（VS Code の入っていない Linux など）では版の比較を飛ばし、
-# そのままの版で組み立てるだけにする。
+# インストール済みバージョンと同じか古い版を「入れ直せない」として弾くので、インストール済みバージョンを超えさせる。
+# code コマンドは PATH を先に探し、無ければ VS Code の既定のインストール先を探す
+# （インストール時に「PATH へ追加」を外すと、端末からは code が見えない）。環境変数 CODE で
+# 場所を渡せばそれを使う。どこにも無い機械（VS Code の入っていない Linux など）では版の比較を
+# 飛ばし、そのままの版で組み立てるだけにする。
 #
 # 版を上げるときは package.json を書き換えるだけで、コミットはしない。チェックアウトした
 # ブランチ直下でこのスクリプトを打つと、その書き換えが未コミットの変更としてそこに残る。
@@ -28,6 +30,29 @@
 # 位置から読み続けて構文エラーになる。関数なら、実行の前に全体を読み終えている。
 # 書き換わったあとも、この回は読み込んだ版のまま最後まで走る。
 set -eu
+
+# code コマンドの場所を出す。見つからなければ何も出さない。
+find_code() {
+  if [ -n "${CODE:-}" ]; then
+    echo "$CODE"
+    return
+  fi
+  if command -v code >/dev/null 2>&1; then
+    command -v code
+    return
+  fi
+  for c in \
+    "$HOME/AppData/Local/Programs/Microsoft VS Code/bin/code" \
+    "/c/Program Files/Microsoft VS Code/bin/code" \
+    "/mnt/c/Program Files/Microsoft VS Code/bin/code" \
+    "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" \
+    "$HOME/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"; do
+    if [ -f "$c" ]; then
+      echo "$c"
+      return
+    fi
+  done
+}
 
 main() {
   ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -56,14 +81,15 @@ main() {
 
   pkg_version=$(node -p "require('./package.json').version")
 
-  if command -v code >/dev/null 2>&1; then
-    installed_version=$(code --list-extensions --show-versions 2>/dev/null | grep -i '^local\.ccnavi-board@' | sed 's/.*@//')
+  code_cmd=$(find_code)
+  if [ -n "${code_cmd}" ]; then
+    installed_version=$("$code_cmd" --list-extensions --show-versions 2>/dev/null | grep -i '^local\.ccnavi-board@' | sed 's/.*@//')
   else
     installed_version=""
-    echo "code コマンドが無いので、インストール済みの版との比較は飛ばします"
+    echo "code コマンドが見つからないので、インストール済みバージョンとの比較は飛ばします（場所は CODE で渡せます）"
   fi
 
-  # インストール済みの版が package.json の版以上なら、インストール済みの版のパッチを 1 つ上げた版を出す。
+  # インストール済みバージョンが package.json の版以上なら、インストール済みバージョンのパッチを 1 つ上げた版を出す。
   # 上げる必要が無ければ何も出さない。
   next_version=$(node -e '
 const parse = (v) => v.split(".").map((n) => parseInt(n, 10) || 0);
@@ -78,7 +104,7 @@ console.log(i[0] + "." + i[1] + "." + ((i[2] || 0) + 1));
 ' "$pkg_version" "$installed_version")
 
   if [ -n "${next_version}" ]; then
-    echo "インストール済みの版（${installed_version}）が package.json の版（${pkg_version}）以上なので、${next_version} に上げます"
+    echo "インストール済みバージョン（${installed_version}）が package.json の版（${pkg_version}）以上なので、${next_version} に上げます"
     pnpm version "${next_version}" --no-git-tag-version
     pkg_version="${next_version}"
   fi
@@ -92,10 +118,10 @@ console.log(i[0] + "." + i[1] + "." + ((i[2] || 0) + 1));
     exit 1
   fi
 
-  if command -v code >/dev/null 2>&1; then
+  if [ -n "${code_cmd}" ]; then
     echo ""
     echo "== 拡張機能を入れる =="
-    code --install-extension "$vsix"
+    "$code_cmd" --install-extension "$vsix"
   else
     echo ""
     echo "code コマンドが無いので、入れるのは飛ばします。入れるには:"

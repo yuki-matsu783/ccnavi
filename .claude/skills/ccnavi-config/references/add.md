@@ -183,7 +183,7 @@ phases:
 
 ```yaml
 version: 1
-levels: {medium: 20, high: 40, critical: 70}   # 等級の名前は 4 つで固定。閾値だけ動かす
+levels: {medium: 20, high: 40, critical: 70}   # リスクレベルの名前は 4 つで固定。境目の点だけ動かす
 factors:
   - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
@@ -197,15 +197,15 @@ factors:
 
 | 当て方 | 何を数えるか | 決めるときに考えること |
 |---|---|---|
-| `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が閾値を**超えた**ら加点 | 閾値はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
+| `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を**超えた**ら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
 | `glob` | 当たったファイル**ごと**に加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`**` が使える |
 | `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は**重い側**に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
-`levels` は `medium <= high <= critical`。等級の名前は増やせない（知らない名前は warn）。
+`levels` は `medium <= high <= critical`。リスクレベルの名前は増やせない（知らない名前は warn）。
 `points` と `max` は 0 以上の整数。`id` は英数と `._-`。
 
-**閾値は宣言を裏切るために在る。** 「軽い」と宣言した作業が大きくなったときにレビューへ
+**基準は宣言を裏切るために在る。** 「軽い」と宣言した作業が大きくなったときにレビューへ
 戻すのが目的なので、普通の子が毎回 HIGH に届く配点は、宣言の意味を消す。逆に届かない配点は
 入っていないのと同じ。最近の子の差分で何点になるかを、渡すときに添える。
 
