@@ -401,7 +401,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {page !== undefined && page.mode !== "enable" && page.mode !== "" && (
         // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>。判定と記録はするが、deny や ask にヒットしてもツールの呼び出し（tool_use）を止めない
+          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まらない）
         </div>
       )}
       {(page?.notices ?? []).map((notice, index) => (
@@ -535,7 +535,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={tab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          判定は実行ファイルの <code>--test</code> で行う。編集中の内容で試すので保存は要らない。セッションが dry-run でも、ここは enable のときの判定を返す。
+          セッションが dry-run でも、ここは enable のときの判定を返す。
         </p>
         <div className="judge-form">
           <label>
