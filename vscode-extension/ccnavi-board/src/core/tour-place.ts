@@ -1,5 +1,5 @@
 /**
- * 吹き出しの案内（`webview/phases/Tour.tsx`）の置き場所。DOM に触れないので単体で試せる。
+ * 吹き出しの案内（`webview/Tour.tsx`）の置き場所。DOM に触れないので単体で試せる。
  */
 
 /** 画面の上の枠（`getBoundingClientRect` の形） */

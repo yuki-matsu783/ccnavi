@@ -16,6 +16,7 @@ import type { Lock } from "../../core/lock.js";
 import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SamplesJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
+import { Tour, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
 import { JudgeResult, SamplesResult, type Judged } from "./Judge.js";
 import { post } from "./post.js";
@@ -97,6 +98,26 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   const { draft, open } = editing;
   const page = pageOf(data);
+
+  /**
+   * 案内はタブを切り替えて中を指すので、始める前のタブを控え、閉じたら戻す。**案内の間の切り替えは
+   * 控え（`saveTab`）に書かない**（途中でタブを閉じたときに、次から別のタブで開く、ということを起こさない）
+   */
+  const tabBeforeTour = useRef<TabName | undefined>(undefined);
+  const tour = useTour(data.kind === "page", {
+    onStart: () => {
+      tabBeforeTour.current = tab;
+    },
+    onEnd: () => {
+      const was = tabBeforeTour.current;
+      tabBeforeTour.current = undefined;
+      if (was !== undefined) {
+        setTab(was);
+      }
+      post({ type: "tourDone" });
+    },
+  });
+  const requestTour = tour.request;
 
   /**
    * 未保存の変更の有無が変わったら拡張ホストに伝える。同じ種類のタブは 1 枚で、別の対象を開くと
@@ -185,6 +206,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         setStatus(undefined);
       } else if (message.type === "picked") {
         pick(String(message.key), message.field as FileField, String(message.path));
+      } else if (message.type === "tour") {
+        requestTour();
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -402,6 +425,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
+          <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
+            ？ 案内
+          </button>
           <button type="button" className="action" data-action="open-rules" onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
@@ -570,11 +596,63 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-hooks" className={tab === "hooks" ? "pane active" : "pane"}>
         <Hooks hooks={page?.hooks ?? []} files={page?.hookFiles ?? { settings: false, settingsLocal: false }} />
       </section>
+      {tour.touring && <Tour steps={tourSteps(setTab, () => tabBeforeTour.current ?? tab)} onClose={tour.end} />}
       <footer className={status?.error === true ? "foot error" : "foot"}>
         <span id="status">{status?.text ?? ""}</span>
       </footer>
     </>
   );
+}
+
+/**
+ * ルール設定画面の案内。`peek` は案内の間だけのタブの切り替え（控えに書かない）、`before` は始める前のタブ。
+ * 最後の段に入る前に始める前のタブへ戻す（「？ 案内」はどのタブにも出ている）
+ */
+function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonly TourStep[] {
+  return [
+    {
+      target: ".tabs",
+      title: "3 つのタブ",
+      body: "「ルール」で deny・ask・allow のルールを直し、「判定を試す」で編集中の内容がどう判定するかを確かめ、「hook」で登録されている hook を眺める。",
+      before: () => peek("rules"),
+    },
+    {
+      target: "#tab-rules",
+      title: "ルール",
+      body: "deny（止める）・ask（確かめる）・allow（通す）のタイプごとに並ぶ。判定は強い順に deny > ask > allow。行を押すと欄が開き、「＋ ルールを追加」で足せる。見出しの ▾ でタイプを畳める。",
+      before: () => peek("rules"),
+    },
+    {
+      target: "#find",
+      title: "絞り込み",
+      body: "id・ツール・パターン・文面で絞り込む。畳んだタイプの中も探す。",
+      before: () => peek("rules"),
+    },
+    {
+      target: "#tab-judge .judge-form",
+      title: "判定を試す",
+      body: "ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返す。保存は要らない。「サンプルを一括で判定」は、サンプルのファイルに並べた例をまとめて確かめる。",
+      before: () => peek("judge"),
+    },
+    {
+      target: "#tab-hooks",
+      title: "hook",
+      body: ".claude/settings.json に登録された hook の一覧。直すときは settings.json を開いて編集する。",
+      before: () => peek("hooks"),
+    },
+    {
+      target: "#save",
+      title: "保存",
+      body: "保存すると実行ファイルが検証してから書き込む。通らなければ、下に理由が出る。ファイルが外で変わったときは上に帯が出るので、再読込する。",
+      before: () => peek(before()),
+    },
+    {
+      target: '[data-action="tour"]',
+      title: "案内",
+      body: "この案内は、ここからもう一度見られる。",
+      before: () => peek(before()),
+    },
+  ];
 }
 
 function replace(draft: Draft, section: Section, key: string, rule: RuleForm): Draft {

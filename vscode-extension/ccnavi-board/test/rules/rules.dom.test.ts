@@ -562,3 +562,48 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.close();
   }
 });
+
+test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、閉じたら始める前のタブに戻す。途中の切り替えは控えに書かない", async () => {
+  const dom = await openRules({}, { tab: "hooks" });
+  try {
+    assert.ok(dom.one("#tab-hooks").classList.contains("active"));
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    const titles: string[] = [];
+    const tabs: string[] = [];
+    while (dom.all(".tour").length > 0) {
+      titles.push(dom.one("#tour-title").textContent ?? "");
+      tabs.push(dom.one(".pane.active").id);
+      dom.click(dom.one('[data-action="tour-next"]'));
+      await dom.settle();
+    }
+    assert.deepEqual(titles, ["3 つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
+    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-hooks", "tab-hooks"]);
+    assert.ok(dom.one("#tab-hooks").classList.contains("active"), "始める前のタブに戻っていない");
+    assert.equal((dom.state() as { tab?: string }).tab, "hooks");
+    assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
+  const dom = await openPage({ kind: "loading", text: "ルールを読み込み中..." });
+  try {
+    await dom.send({ type: "tour" });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "指す先が無い読み込み中には出さない");
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.one("#tour-title").textContent, "3 つのタブ");
+    await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中..." } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0);
+    assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    await dom.settle();
+    assert.equal(dom.all(".tour").length, 0, "人が始めていない案内が出直した");
+  } finally {
+    await dom.close();
+  }
+});

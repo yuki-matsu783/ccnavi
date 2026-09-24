@@ -38,6 +38,7 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { showLoading } from "./loading.js";
 import type { RulesTarget } from "./core/screens.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 120;
@@ -609,6 +610,15 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     current.host.ready();
     redraw(current);
     postAppearance(current.host);
+    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
+    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    if (!tourSeen(SCREEN)) {
+      current.host.post({ type: "tour" } satisfies ToRules);
+    }
+    return;
+  }
+  if (message.type === "tourDone") {
+    markTourSeen(SCREEN);
     return;
   }
   // 読み直せていない画面では、ルールに当たる操作はどれも行き先が無い（「再読込」は
@@ -805,7 +815,8 @@ function asMessage(message: unknown): RulesMessage | undefined {
   const m = message as { type?: unknown; dirty?: unknown; which?: unknown; sections?: unknown; tool?: unknown; subject?: unknown; key?: unknown; field?: unknown };
   switch (m.type) {
     case "ready":
-      return { type: "ready" };
+    case "tourDone":
+      return { type: m.type };
     case "reload":
       return { type: "reload", dirty: m.dirty === true };
     case "dirty":

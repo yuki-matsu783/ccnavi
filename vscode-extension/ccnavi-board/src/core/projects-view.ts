@@ -83,6 +83,8 @@ export type ToProjects =
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "info"; readonly message: string }
   | { readonly type: "cloned"; readonly message: string }
+  /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
+  | { readonly type: "tour" }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（projects-panel の `asMessage`）が形を確かめてから使う */
@@ -100,7 +102,9 @@ export type ProjectsMessage =
   | { readonly type: "openSelfPhases" }
   | { readonly type: "openBoard"; readonly name: string }
   | { readonly type: "fetch"; readonly name: string }
-  | { readonly type: "pull"; readonly name: string };
+  | { readonly type: "pull"; readonly name: string }
+  /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
+  | { readonly type: "tourDone" };
 
 /** clone の欄の下に出す一言。`failed` は赤く出す */
 export interface CloneStatus {

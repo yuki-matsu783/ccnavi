@@ -7,7 +7,9 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
+import { SAMPLE_NOTE, sampleProjectRow } from "../../core/tour-sample.js";
 import { applyAppearance } from "../appearance.js";
+import { Tour, useTour, type TourStep } from "../Tour.js";
 import { MENU_KINDS, menuId } from "./Menu.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
@@ -26,6 +28,8 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
    */
   const [status, setStatus] = useState<CloneStatus | undefined>(undefined);
   const [openMenu, setOpenMenu] = useState<string | undefined>(undefined);
+  const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
+  const requestTour = tour.request;
 
   // 受け口（メッセージ）は描くたびに作り直さない。打ちかけの欄を消すのに今の値が要るので写しておく
   const cloneRef = useRef<CloneState>(clone);
@@ -59,6 +63,8 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         setClone(EMPTY);
         saveClone(EMPTY);
         setStatus({ kind: "info", message: String(message.message ?? "") });
+      } else if (message.type === "tour") {
+        requestTour();
       } else if (message.type === "appearance") {
         applyAppearance(message.value);
       }
@@ -68,7 +74,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
     // 作り直される。その HTML は少し古いことがあるので、いまの中身をもらい直す
     post({ type: "ready" });
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [requestTour]);
 
   // メニューは 1 つだけ開く。外を押すか Esc で閉じる（項目を押したときは Project が閉じる）
   useEffect(() => {
@@ -102,16 +108,24 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   }
 
   const page = data.page;
+  // 案内の間、プロジェクトが 1 つも無ければ見本の行を出す（`tour-sample.ts`）。指す先の行が無いと、
+  // 案内が行のメニューを説明できないため。見本は描くだけで、覆いがあるので押せない
+  const sample = tour.touring && page.rows.length === 0 ? [sampleProjectRow(page.projectsRel)] : undefined;
+  const rows = sample ?? page.rows;
   return (
     <>
+      {sample !== undefined && <div className="banner tour-sample">{SAMPLE_NOTE}</div>}
       <header className="toolbar">
         <div className="summary">
-          <span>プロジェクト {page.rows.length} 件</span>
+          <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
             置き場: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
           </span>
         </div>
         <div className="controls">
+          <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
+            ？ 案内
+          </button>
           <button
             type="button"
             className="action"
@@ -181,13 +195,13 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       <section className="list">
         <h2>
-          ワークスペース内のプロジェクト <span className="count">{page.rows.length}</span>
+          ワークスペース内のプロジェクト <span className="count">{rows.length}</span>
         </h2>
-        {page.rows.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="empty">プロジェクトはまだ無い。上の欄から clone するか、既存のリポジトリを置き場（無ければ作る）の直下へ移す</p>
         ) : (
           <ul className="projects">
-            {page.rows.map((row) => (
+            {rows.map((row) => (
               <Project key={row.name} row={row} ticketsEnabled={page.ticketsEnabled} openMenu={openMenu} onOpenMenu={setOpenMenu} />
             ))}
           </ul>
@@ -205,9 +219,39 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       <footer className="foot">
         最終更新 {page.generatedAt}（{page.root}）
       </footer>
+      {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
     </>
   );
 }
+
+/** プロジェクト管理画面の案内。画面の様子は動かさないので、閉じても戻すものは無い */
+const TOUR_STEPS: readonly TourStep[] = [
+  {
+    target: "section.clone",
+    title: "clone する",
+    body: "URL を入れて「clone」を押すと、git clone を「ccnavi」ターミナルで実行し、置き場の直下にプロジェクトとして置く。名前は URL から自動で入る。認証が要るならターミナルで入れる。",
+  },
+  {
+    target: "section.list",
+    title: "プロジェクト",
+    body: "置き場の直下にある git リポジトリが 1 行ずつ出る。「開く ▾」からルール設定（チケット制御が有効ならフェーズ管理とチケット管理も）へ、「git ▾」から fetch と pull をターミナルで実行できる。検証で見つかった問題も行に出る。",
+  },
+  {
+    target: "section.workspace",
+    title: "ワークスペース自身",
+    body: "ワークスペース自身の層のルールとフェーズの種類。自身の層のルールが無ければ、共通層からコピーして作れる。",
+  },
+  {
+    target: '.toolbar [data-action="open-rules"]',
+    title: "共通層のルール",
+    body: "どのツリーにも効く共通層のルールを開く。チケット制御が有効なら、隣の「チケット管理」でボードを開ける。",
+  },
+  {
+    target: '[data-action="tour"]',
+    title: "案内",
+    body: "この案内は、ここからもう一度見られる。",
+  },
+];
 
 /**
  * 上部の帯。置き場が無効なら他の苦情は読む意味が無いので、そこで切る。

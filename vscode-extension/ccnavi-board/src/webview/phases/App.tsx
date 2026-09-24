@@ -19,7 +19,7 @@ import { editable as canEdit, ORDER_LABELS, ORDERS, type PhaseForm, type PhaseKi
 import { applyAppearance } from "../appearance.js";
 import { Graph, Legend } from "./Graph.js";
 import { Phase } from "./Phase.js";
-import { Tour, type TourStep } from "./Tour.js";
+import { Tour, type TourStep } from "../Tour.js";
 import { post } from "./post.js";
 import { countText, duplicateNote, emptyNote, findText, graphNotices, hasRelations } from "./text.js";
 import { draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, loadView, openedFromIds, saveOpen, saveView, type Draft, type View } from "./state.js";
@@ -174,6 +174,21 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       }
     }
   }, [tourPending, data, view, find, editing, touring]);
+
+  // 案内の最中に中身が読み込み中やエラーへ替わった。吹き出しは描かれなくなるので、ここで閉じたことにする
+  // （閉じずに残すと、中身が戻ったときに人が始めていない案内が 1 段目から出直す）。行の鍵は古いので戻さない
+  useEffect(() => {
+    if (touring && data.kind !== "page") {
+      setTouring(false);
+      const was = beforeTour.current;
+      beforeTour.current = undefined;
+      if (was !== undefined) {
+        setView(was.view);
+        setFind(was.find);
+      }
+      post({ type: "tourDone" });
+    }
+  }, [touring, data]);
 
   /**
    * 図の中身。**メモ化する。** 描くたびに新しい形を作ると、React Flow は `nodes` の参照が

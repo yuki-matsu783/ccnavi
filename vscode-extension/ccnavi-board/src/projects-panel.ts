@@ -46,6 +46,7 @@ import { screens } from "./core/screens.js";
 import { readOrigin } from "./git.js";
 import { runInTerminal } from "./terminal.js";
 import { ticketControl } from "./ticket-control.js";
+import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEBOUNCE_MS = 300;
@@ -416,6 +417,15 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     // 裏にいる間に見た目が変わっていたら、入れてある HTML の body のクラスは古い。
     // `followAppearance` がそのとき送ったものは、段取りが「送れない」と見て落としている
     postAppearance(current.host);
+    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら `tourDone` を返す。
+    // 閉じずにタブを閉じたら印は残らないので、次に開いたときにもう 1 度出る
+    if (!tourSeen(SCREEN)) {
+      current.host.post({ type: "tour" } satisfies ToProjects);
+    }
+    return;
+  }
+  if (message.type === "tourDone") {
+    markTourSeen(SCREEN);
     return;
   }
   // 「更新」は一覧が無くても通す。読み直せなかったところから人が抜け出す道がこれしかない
@@ -584,6 +594,7 @@ function asMessage(message: unknown): ProjectsMessage | undefined {
   switch (m.type) {
     case "ready":
     case "refresh":
+    case "tourDone":
     case "fixIgnore":
     case "createSelfRules":
     case "openSelfRules":

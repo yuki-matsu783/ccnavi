@@ -39,3 +39,6 @@
 .tour-buttons { display: flex; gap: 6px; justify-content: flex-end; }
 
 .tour-buttons button.action.small { margin-left: 0; }
+
+/* 案内の間だけ出す見本（`core/tour-sample.ts`）の帯。見本だと分かるよう、案内の枠と同じ色にする */
+.banner.tour-sample { border-color: var(--vscode-focusBorder); }

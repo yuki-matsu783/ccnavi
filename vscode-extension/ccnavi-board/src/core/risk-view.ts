@@ -103,6 +103,8 @@ export type ToRisk =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（人が「破棄して読み直す？」をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
+  /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
+  | { readonly type: "tour" }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側（risk-panel の `asMessage`）が形を確かめてから使う */
@@ -112,7 +114,9 @@ export type RiskMessage =
   | { readonly type: "reload"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "create" }
-  | { readonly type: "save"; readonly form: RiskForm };
+  | { readonly type: "save"; readonly form: RiskForm }
+  /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
+  | { readonly type: "tourDone" };
 
 /** 最初の中身を埋める `<script type="application/json">` の id。画面はこれを読んで最初の 1 枚を描く */
 export const DATA_ID = "ccnavi-risk-data";
