@@ -107,7 +107,7 @@ export function Rule(props: RuleProps): JSX.Element {
           {rule.every === "" ? (
             <span className="sum-every" />
           ) : (
-            <span className="tag sum-every" title={`渡す回の刻み（every）: ${rule.every}`}>
+            <span className="tag sum-every" title={`every: ${rule.every}`}>
               {rule.every} 回ごと
             </span>
           )}
@@ -142,7 +142,7 @@ export function Rule(props: RuleProps): JSX.Element {
           </div>
         </Captioned>
         {section === "deny" ? (
-          <Captioned name="文面" yamlKey="message">
+          <Captioned name="メッセージ" yamlKey="message">
             {area("message", "f-message", "なぜ拒否するかと、代わりに何をすればよいか（拒否されたモデルに届く）")}
           </Captioned>
         ) : (
@@ -166,17 +166,17 @@ export function Rule(props: RuleProps): JSX.Element {
             {/* 刻みは渡す文の前。ここから下の 4 欄が「何回に 1 度届くか」を決める欄なので、先に置く。
                 type は text（number ではない）。数でない値を空にしてしまうと、読めない値を
                 見せて直させるという欄の目的が消える */}
-            <Captioned name="渡す回の刻み" yamlKey="every">
+            <Captioned name="every" yamlKey="every">
               {text("every", "f-every", "5（空なら毎回渡す）")}
             </Captioned>
-            <Captioned name="渡す文" yamlKey="additionalContext">
+            <Captioned name="additionalContext" yamlKey="additionalContext">
               {area("additionalContext", "f-context", "ヒットしたときにモデルへ渡すプロンプト")}
             </Captioned>
-            {file("additionalContextFile", "渡すファイル", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）")}
-            <Captioned name="初回だけ渡す文" yamlKey="additionalContextOnce">
+            {file("additionalContextFile", "additionalContextFile", "f-context-file", "ヒットしたときにモデルへ渡すファイル（先頭 4000 文字まで）")}
+            <Captioned name="additionalContextOnce" yamlKey="additionalContextOnce">
               {area("additionalContextOnce", "f-once", "セッションで最初にヒットしたときだけモデルへ渡すプロンプト")}
             </Captioned>
-            {file("additionalContextOnceFile", "初回だけ渡すファイル", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭 4000 文字まで）")}
+            {file("additionalContextOnceFile", "additionalContextOnceFile", "f-once-file", "セッションで最初にヒットしたときだけモデルへ渡すファイル（先頭 4000 文字まで）")}
           </div>
         </details>
         <span className="buttons">

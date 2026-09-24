@@ -317,7 +317,7 @@ test("CB-D07 足したルールは開いて焦点が id に来る。タイプを
   }
 });
 
-test("CB-D69 「渡すファイル」で選んだ綴りは、拡張ホストが名指しした行の欄にだけ入る", async () => {
+test("CB-D69 additionalContextFile で選んだ綴りは、拡張ホストが名指しした行の欄にだけ入る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -521,10 +521,10 @@ test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載
     await dom.settle();
     const caps = new Map(dom.all(`${rowSelector("git-push")} .field > .cap`).map((cap) => [cap.textContent ?? "", cap.getAttribute("title")]));
     assert.equal(caps.get("ツール"), "YAML のキー: match");
-    assert.equal(caps.get("文面"), "YAML のキー: message");
-    assert.equal(caps.get("渡す文"), "YAML のキー: additionalContext");
-    assert.equal(caps.get("初回だけ渡すファイル"), "YAML のキー: additionalContextOnceFile");
-    assert.equal(caps.get("渡す回の刻み"), "YAML のキー: every");
+    assert.equal(caps.get("メッセージ"), "YAML のキー: message");
+    assert.equal(caps.get("additionalContext"), "YAML のキー: additionalContext");
+    assert.equal(caps.get("additionalContextOnceFile"), "YAML のキー: additionalContextOnceFile");
+    assert.equal(caps.get("every"), "YAML のキー: every");
     assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), "--test の subject");
   } finally {
     await dom.close();

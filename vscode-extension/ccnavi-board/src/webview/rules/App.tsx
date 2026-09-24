@@ -471,7 +471,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </nav>
       <section id="tab-rules" className={`pane${tab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
-          <input id="find" type="search" placeholder="id・ツール・パターン・文面で絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
+          <input id="find" type="search" placeholder="id・ツール・パターン・メッセージで絞り込む" spellCheck={false} value={find} onChange={(event) => setFind(event.target.value)} />
           <span className="hint">判定は強い順に deny &gt; ask &gt; allow</span>
         </div>
         {SECTIONS.map((section) => {
@@ -623,7 +623,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: "#find",
       title: "絞り込み",
-      body: "id・ツール・パターン・文面で絞り込む。畳んだタイプの中も探す。",
+      body: "id・ツール・パターン・メッセージで絞り込む。畳んだタイプの中も探す。",
       before: () => peek("rules"),
     },
     {
