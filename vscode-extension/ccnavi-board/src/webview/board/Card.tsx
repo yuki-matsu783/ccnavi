@@ -137,21 +137,27 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 }
 
 /**
- * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人間レビューの要否、ワークツリー、
- * マーカー（依頼済はレビュー待ちの間だけバッジに出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
- * リスク（MEDIUM 以下）、base、プロジェクト。
+ * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち、人間レビューの要否（閉じたカードでは出さない）、
+ * ワークツリー、マーカー（レビュー省略とレビュー済だけ）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ *
+ * 列やバッジと同じことは重ねて書かない。クローズは完了の列で分かる。終了の印（pending）は止まっている間は
+ * バッジの「レビュー準備中」が言い、済んだ後は経過でしかない。依頼済はレビュー待ちのバッジが言う。
+ * 閉じたカードに残すのは、人のレビューを通ったか省いたかの区別と、実績のリスク。
  */
 function Facts({ card }: { readonly card: Card }): JSX.Element {
   const facts: JSX.Element[] = [];
-  if (card.copyStatus !== "none") {
+  const closed = card.copyStatus === "closed";
+  if (card.copyStatus !== "none" && !closed) {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }
-  facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  if (!closed) {
+    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  }
   if (card.worktreeExists) {
     facts.push(<Fact key="worktree" kind="worktree" text={`ワークツリー ${worktreeName(card.worktreePath)}`} title={card.worktreePath} />);
   }
   for (const mark of card.marks) {
-    if (mark !== "requested") {
+    if (mark === "skipped" || mark === "reviewed") {
       facts.push(<Fact key={`mark-${mark}`} kind={`mark mark-${mark}`} text={MARK_LABELS[mark] ?? mark} />);
     }
   }

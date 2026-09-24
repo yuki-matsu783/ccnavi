@@ -412,7 +412,9 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     assert.ok(texts(page, ".fact.copy-open").includes("承認済"));
     // レビュー待ちは列ではなく属性。カードは作業中の列にある
     assert.equal(text(page, '.column[data-state="doing"] .card[data-id="i0001-04"] .fact.copy-review'), "レビュー待ち");
-    assert.ok(texts(page, ".fact.copy-closed").includes("クローズ"));
+    // クローズは完了の列で分かるので、カードには重ねて書かない。閉じたカードにはレビューの要否も出さない
+    assert.equal(page.all(".fact.copy-closed").length, 0);
+    assert.equal(page.all('.column[data-state="done"] .card .fact.review').length, 0);
     // 取り消しは列で分かるので、カードには重ねて書かない
     assert.equal(page.all('.column[data-state="cancelled"] .card[data-id="i0001-05"]').length, 1);
     assert.equal(page.all(".fact.cancelled").length, 0);
@@ -519,6 +521,22 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
     assert.ok(texts(stillClosed, ".badge.hold").includes("レビュー待ち"));
   } finally {
     await stillClosed.close();
+  }
+  // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
+  // 省略はレビュー済と同じく、閉じた後も人のレビューを通ったかの区別として残す
+  const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
+  try {
+    assert.equal(ended.all(".fact.mark-pending").length, 0);
+    assert.ok(texts(ended, ".badge.hold").includes("レビュー準備中"));
+  } finally {
+    await ended.close();
+  }
+  const skipped = await openBoard(withMarks({ pending: { at: "t" }, skipped: { at: "t" } }, false));
+  try {
+    assert.equal(skipped.all(".fact.mark-pending").length, 0);
+    assert.ok(texts(skipped, ".fact.mark.mark-skipped").includes("レビュー省略"));
+  } finally {
+    await skipped.close();
   }
   // 依頼を出していない子のバッジは「レビュー準備中」で、依頼済とは出ない
   const notRequested = await openBoard(withMarks({}, true));
