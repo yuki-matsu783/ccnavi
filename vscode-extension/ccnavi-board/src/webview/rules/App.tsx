@@ -637,7 +637,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: "#tab-hooks",
       title: "hook",
-      body: ".claude/settings.json に登録された hook の一覧。ここでは眺めるだけで、書き換えない。",
+      body: ".claude/settings.json に登録された hook の一覧。直すときは settings.json を開いて編集する。",
       before: () => peek("hooks"),
     },
     {
