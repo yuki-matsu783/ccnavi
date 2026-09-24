@@ -443,10 +443,17 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
 
     def symlink_or_skip(self, source, link):
-        """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。"""
+        """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。
+
+        飛ばすのは権限が無いとき（Windows の 1314）と、未対応の環境だけ。ほかの失敗
+        （リンク先がすでに在るなど）は準備の崩れなので、飛ばさずに落とす。
+        """
         try:
             os.symlink(source, link)
         except (OSError, NotImplementedError) as error:
+            privilege_not_held = getattr(error, "winerror", None) == 1314
+            if not (privilege_not_held or isinstance(error, NotImplementedError)):
+                raise
             self.skipTest(f"シンボリックリンクが作れない: {error}")
 
     def test_a_symlink_is_not_exempt(self):
