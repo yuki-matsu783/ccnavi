@@ -524,13 +524,13 @@ def _explain_phases(
 def _explain_risk(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """層ごとのリスクの配点（設計 §11.9）。閾値は共通層のものを出す。"""
+    """層ごとのリスクの配点（設計 §11.9）。境目の点は共通層のものを出す。"""
     tables = [
         (v.name, *layer_risk(conf, v.name, layer_config(conf, root, v.name, settings.KIND_RISK)))
         for v in views
     ]
     common, _ = risk.load(conf.risk)
-    # 共通層の閾値。層の `levels` はキーごとに小さいほうが勝つので、実際に効く値は
+    # 共通層の境目の点。層の `levels` はキーごとに小さいほうが勝つので、実際に効く値は
     # チケットの層で決まる（設計 §11.4.2）。ここに出すのは共通層の側の既定。
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))

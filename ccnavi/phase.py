@@ -367,7 +367,7 @@ class Phase:
 
     @property
     def risk_escalates(self) -> bool:
-        """実績のリスクが、宣言に関わらずレビューが要る扱いにする等級か。"""
+        """実績のリスクが、宣言に関わらずレビューが要る扱いにするリスクレベルか。"""
         record = self.risk
         return record is not None and str(record.get("level") or "") in risk.ESCALATE_FROM
 

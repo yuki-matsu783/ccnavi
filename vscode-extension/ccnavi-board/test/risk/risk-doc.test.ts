@@ -29,7 +29,7 @@ factors:
   #   script: .ccnavi/common/risk/complexity.sh
 `;
 
-test("CB-T72 閾値と項目を読む。当て方は 1 つで、値は欄の文字として持つ", () => {
+test("CB-T72 境目の点と項目を読む。当て方は 1 つで、値は欄の文字として持つ", () => {
   const { model } = readRisk(TEXT);
   assert.equal(model.version, 1);
   assert.deepEqual(model.problems, []);
@@ -108,7 +108,7 @@ test("CB-T76 当て方を変えると前の当て方の欄は消え、新しい�
   ]);
 });
 
-test("CB-T77 新しい glob は引用符で囲み、空の閾値は書かない。整数でない文字はそのまま書く", () => {
+test("CB-T77 新しい glob は引用符で囲み、空の境目の点は書かない。整数でない文字はそのまま書く", () => {
   const doc = readRisk("version: 1\nfactors: []\n");
   const out = doc.apply({
     levels: { medium: "", high: "50", critical: "" },

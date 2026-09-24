@@ -87,7 +87,7 @@
 
 ## 補足
 
-閾値 256 は、この形の入れ子で `re.compile` が `RecursionError` になる 493 字の半分以下。
+しきい値 256 は、この形の入れ子で `re.compile` が `RecursionError` になる 493 字の半分以下。
 Windows の `MAX_PATH` が 260 なので、256 字のルートはその時点で実用にならない。
 **組み立てが落ちる長さは展開の形で変わる。** 1 文字あたりの入れ子の段数を変えたら
 `tests/core/bench_not_root.py` を回して測り直すこと。
