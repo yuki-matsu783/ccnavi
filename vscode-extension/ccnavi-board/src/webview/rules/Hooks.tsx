@@ -1,6 +1,6 @@
 /**
  * 「hook」のタブ。`.claude/settings.json`（と `settings.local.json`）に登録された hook を並べる。
- * **表示するだけで書き換えない。** 利用者ごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
+ * **** 利用者ごとの設定（`~/.claude/settings.json`）は拡張ホストが読まない。
  */
 import type { JSX } from "react";
 
@@ -15,7 +15,7 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
   return (
     <>
       <p className="hint">
-        表示するだけで書き換えない。対象は <code>.claude/settings.json</code>
+        対象は <code>.claude/settings.json</code>
         {files.settingsLocal && (
           <>
             {" と "}
