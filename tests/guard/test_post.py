@@ -557,10 +557,11 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertTrue(result.stdout, "コミットに入った変更が報告されていない")
         message = json.loads(result.stdout)["systemMessage"]
         self.assertIn("protected/keep.txt", message)
-        self.assertIn("committed", message)
+        self.assertIn("コミット済み", message)
         # 戻す手順は書かない。履歴は書き換えないので、案内できる 1 つが無い。
         self.assertNotIn("git restore", message)
-        self.assertIn("コミットに入っている", message)
+        self.assertIn("はすでにコミット済みなので", message)
+        self.assertIn("不要な変更なら取り消してください", message)
 
     def test_ターンが始まる前のコミットは言わない(self):
         # 前のターンや他のセッションが積んだコミットを、このターンの成果として

@@ -49,6 +49,14 @@ KIND_GONE = "gone"  # 追跡されていたものが消えた
 # 報告のためだけに在る種類で、自動復元（post._restorable）の対象にはしない。
 KIND_COMMITTED = "committed"
 
+# 人へ見せる綴り。記録（`record.paths`）には上の英語のまま残し、報告の文面だけ日本語にする。
+KIND_LABELS = {
+    KIND_NEW: "新規",
+    KIND_CHANGED: "変更",
+    KIND_GONE: "削除",
+    KIND_COMMITTED: "コミット済み",
+}
+
 # git に与える時間。実行前の判定に張る期限より短くしてある。
 # 大きなリポジトリでは status も待たされるが、待たせるくらいなら何も言わない。
 TIMEOUT_SECONDS = 2.0
