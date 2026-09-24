@@ -24,7 +24,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
-/** 等級の名前は固定。閾値だけ動かす。LOW は閾値を持たない */
+/** リスクレベルの名前は固定。閾値だけ動かす。LOW は閾値を持たない */
 export const LEVEL_NAMES = ["medium", "high", "critical"] as const;
 export type LevelName = (typeof LEVEL_NAMES)[number];
 
@@ -46,7 +46,7 @@ export interface FactorForm {
 }
 
 export interface RiskForm {
-  /** 閾値。空ならその等級は組み込みの値（欄を書かない） */
+  /** 閾値。空ならそのリスクレベルは組み込みの値（欄を書かない） */
   readonly levels: Readonly<Record<LevelName, string>>;
   readonly factors: readonly FactorForm[];
 }

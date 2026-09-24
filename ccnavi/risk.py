@@ -10,7 +10,7 @@
 
 ## 点が何をするか
 
-等級の名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。閾値は `levels` で動かす。
+リスクレベルの名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。閾値は `levels` で動かす。
 `HIGH` 以上なら、種類が `review: none` でも子が `required: false` でも、そのフェーズは
 人間レビューが要る扱いになり、レビューが済むまで止まる。実績で宣言を厳しい側にだけ上書きする。
 実績が小さくても、宣言のレビュー要を下げることはしない。
@@ -62,7 +62,7 @@ LEVEL_MEDIUM = "MEDIUM"
 LEVEL_HIGH = "HIGH"
 LEVEL_CRITICAL = "CRITICAL"
 LEVELS = (LEVEL_LOW, LEVEL_MEDIUM, LEVEL_HIGH, LEVEL_CRITICAL)
-# レビューが要る扱いに上書きする等級。
+# レビューが要る扱いに上書きするリスクレベル。
 ESCALATE_FROM = (LEVEL_HIGH, LEVEL_CRITICAL)
 
 DEFAULT_LEVELS = {"medium": 20, "high": 40, "critical": 70}
@@ -250,7 +250,7 @@ def parse(
         unknown = sorted(set(raw_levels) - {"medium", "high", "critical", "low"})
         for name in unknown:
             problems.append(
-                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らない等級。名前は固定")
+                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らないリスクレベル。名前は固定")
             )
     if not ordered(levels):
         problems.append(

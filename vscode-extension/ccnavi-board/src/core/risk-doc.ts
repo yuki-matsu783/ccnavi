@@ -25,7 +25,7 @@ export const RISK_VERSION = 1;
 export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を閉じるときに、その子の差分（base_sha..HEAD）で数える。
 #
 # 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューが
-# 要る扱いにするためのもの。等級の名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
+# 要る扱いにするためのもの。リスクレベルの名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
 # HIGH 以上はレビューが済むまでフェーズを止める。閾値は levels で動かす。
 #
 # 項目は 3 系統。1 件につき当て方を 1 つだけ書く。

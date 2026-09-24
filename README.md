@@ -2018,7 +2018,7 @@ GitLab の実物で分かった落とし穴は [HANDOVER.md](HANDOVER.md)、繰�
 
 ```yaml
 version: 1
-levels: {medium: 20, high: 40, critical: 70}     # 等級の名前は固定、閾値だけ動かす
+levels: {medium: 20, high: 40, critical: 70}     # リスクレベルの名前は固定、閾値だけ動かす
 factors:
   - {id: big-diff,   points: 25, lines_over: 300,   message: 行数が多い}
   - {id: many-files, points: 15, files_over: 10,    message: ファイルが多い}
