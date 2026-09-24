@@ -19,6 +19,7 @@ from typing import TextIO
 from . import (
     approval,
     audit,
+    configsync,
     diagnose,
     events,
     fsio,
@@ -175,6 +176,12 @@ A human closes a parent early ("good enough for now") with
 
 which runs `ccnavi --close-early --reason <why> --result <json>` and then
 un-drafts the merge request and files the leftovers as a new issue.
+
+When starting a project parent overwrote the project's .ccnavi/ with the common
+layer, the first review shows it. A parent that closes without any review stops
+until a human has seen it at the terminal with
+
+    ccnavi --config-synced <parent>
 """
 
 
@@ -351,6 +358,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     parser.add_argument("--chat", action="store_true")
     # 人が端末で打つ締め。`--approve` / `--reviewed` と同じく、人の判断はフラグで受ける。
     parser.add_argument("--close-early", action="store_true")
+    # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 §11.12）。
+    parser.add_argument("--config-synced", default="")
     parser.add_argument("-h", "--help", action="store_true")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
@@ -497,6 +506,16 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_OK if approved == 0 else EXIT_ERROR
 
     # チケットの状態とレビューの操作。payload を読まない。
+    # 着手で上書きした設定を、人が端末で見たと残す。レビューの代わりなので、人の判断と同じ門。
+    if args.config_synced:
+        if not conf.tickets_enabled:
+            stderr.write(f"ccnavi: チケット制御が disable（{settings.TICKET_CONTROL_ENV}）\n")
+            return EXIT_ERROR
+        if not _from_terminal(stdin, conf, stderr, "--config-synced"):
+            return EXIT_ERROR
+        code = configsync.acknowledge(stdin, stdout, stderr, conf, root, args.config_synced)
+        return EXIT_OK if code == 0 else EXIT_ERROR
+
     if args.command or args.reviewed is not None or args.close_early:
         # 残った指摘を見せるだけの `--preview` と、オーバーレイで押した `--yes` は端末を求めない。
         # `--yes` の守りは、見せた指摘の指紋の一致と、シェルから打つ形を止める組み込みの deny。

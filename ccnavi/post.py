@@ -38,6 +38,7 @@
 
 from __future__ import annotations
 
+import functools
 import os
 import time
 from collections.abc import Callable
@@ -107,7 +108,7 @@ def check(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
-    synced: Callable[[str], bool] | None = None,
+    synced: Callable[..., bool] | None = None,
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -281,7 +282,7 @@ def _committed_findings(
     mine: tuple[str, ...],
     scope: ScopeGuard | None,
     places: tuple[str, str],
-    synced: Callable[[str], bool] | None = None,
+    synced: Callable[..., bool] | None = None,
 ) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
@@ -317,12 +318,29 @@ def _committed_findings(
             )
             uncounted.append(w.tree.name or ".")
             continue
-        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, synced=synced):
+        # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
+        # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
+        # 監視・控えと復元・ここの 3 つから同時に外れる。
+        judged = functools.partial(_committed_synced, synced, top, changes) if synced else None
+        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged):
             rel = tree.relative(w.tree, finding.change.full)
             if ticket_mod.is_ticket_place(rel, tickets, approved):
                 continue
             out.append(finding)
     return out, uncounted
+
+
+def _committed_synced(
+    synced: Callable[..., bool], top: str, changes: list[gitstate.Change], full: str
+) -> bool:
+    """コミットされた中身で `synced` に答えさせる。読めなければ外さない。"""
+    path = next((c.path for c in changes if c.full == full), "")
+    if not path:
+        return False
+    text, readable = gitstate.committed_text(top, path)
+    if not readable or text is None:
+        return False
+    return synced(full, text.encode("utf-8"))
 
 
 def at_stop(
@@ -334,7 +352,7 @@ def at_stop(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
-    synced: Callable[[str], bool] | None = None,
+    synced: Callable[..., bool] | None = None,
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -596,7 +614,7 @@ def _findings(
     where: tree.Tree | None = None,
     top: str = "",
     places: tuple[str, str] = ("", ""),
-    synced: Callable[[str], bool] | None = None,
+    synced: Callable[..., bool] | None = None,
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
@@ -952,7 +970,7 @@ def at_prompt(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
-    synced: Callable[[str], bool] | None = None,
+    synced: Callable[..., bool] | None = None,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
 

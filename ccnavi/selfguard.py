@@ -918,7 +918,7 @@ def after(
     root: str,
     found: list[Target],
     written: str = "",
-    synced: Callable[[str], bool] | None = None,
+    synced: Callable[..., bool] | None = None,
 ) -> list[Outcome]:
     """実行後。控えと突き合わせて、変わっていれば戻す。
 

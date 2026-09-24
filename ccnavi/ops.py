@@ -95,26 +95,41 @@ def _sync_config(
     """
     if found.is_child or not found.project:
         return []
-    copied, why = configsync.plan(conf, worktree)
+    copied, why = configsync.plan(conf, root, worktree)
     if why:
-        stderr.write(f"ccnavi: {found.ticket} の設定を比べられない: {why}\n")
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {why}\n")
         return None
     if not copied:
         return []
+    busy, why = configsync.dirty(worktree, copied)
+    if why or busy:
+        stderr.write(
+            f"ccnavi: {found.ticket} の設定を共通層から写せない: "
+            + (
+                why
+                or f"未コミットの変更がある（{', '.join(busy)}）。人の書きかけを踏まないので止める"
+            )
+            + "\n"
+        )
+        return None
     where = approval.home_dir(conf, root, found.ticket, "")
-    failed = configsync.apply(conf, worktree, where, found.ticket, copied)
+    failed = configsync.apply(where, found.ticket, copied)
     if failed:
-        stderr.write(f"ccnavi: {found.ticket} の設定を写せない: {failed}\n")
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {failed}\n")
         return None
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
         f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
-        "最初のレビューの依頼の頭に載る:"
+        "最初のレビューで知らせる（レビューが無ければ、親を閉じる前に利用者が端末で見る）:"
     ]
     for c in copied:
         line = f"  - {c.rel}（{'上書き' if c.existed else '新しく置いた'}）"
         if c.lost:
             line += "。消えた識別子: " + ", ".join(c.lost)
+        if c.changed:
+            line += "。中身が変わった識別子: " + ", ".join(c.changed)
+        if c.unparsed:
+            line += "。上書き前を読めなかった"
         lines.append(line)
     mark = approval.parent_mark_path(where, found.ticket, configsync.MARK)
     lines.append(
@@ -122,6 +137,27 @@ def _sync_config(
         f" '{git_sh} add' してコミットすること。印 {mark} も、それを持つツリーでコミットする"
     )
     return lines
+
+
+def _config_sync_unseen(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """着手で上書きした設定を、まだ誰にも知らせていないまま親を閉じようとしているか。
+
+    知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、
+    締めた）はそこを通らないので、閉じる前に人が端末で見たことを残させる（設計 §11.12）。
+    """
+    if found.is_child or not found.project:
+        return False
+    where = approval.home_dir(conf, root, found.ticket, "")
+    if configsync.pending(where, found.ticket) is None:
+        return False
+    stderr.write(
+        f"ccnavi: {found.ticket} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
+        "（レビューを通っていない）。閉じる前に、利用者に端末で "
+        f"'ccnavi --config-synced {found.ticket}' を打って見てもらうこと\n"
+    )
+    return True
 
 
 def finish(
@@ -141,6 +177,8 @@ def finish(
         )
         return 1
     if _parent_still_busy(stderr, root, conf, found):
+        return 1
+    if _config_sync_unseen(stderr, root, conf, found):
         return 1
     if _deliverables_missing(stderr, root, conf, found):
         return 1

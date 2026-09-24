@@ -538,9 +538,8 @@ def layer_definition(
     mark_layer(extra, layer, home)
     merged, problems = merge(definition, extra, layer)
     if merged.dropped:
-        merged.fallback = (
-            f"{', '.join(merged.dropped)} の配点の境目の点が合成で逆転している。この層は空として数える"
-        )
+        dropped = ", ".join(merged.dropped)
+        merged.fallback = f"{dropped} の配点の境目の点が合成で逆転している。この層は空として数える"
     return merged, list(notes) + problems
 
 
