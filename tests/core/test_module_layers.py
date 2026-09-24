@@ -96,7 +96,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "work",
         "承認済みチケットとフェーズと、それに添える文面",
-        frozenset({"approval", "phase", "reasons"}),
+        frozenset({"approval", "configsync", "phase", "reasons"}),
     ),
     (
         "decide",

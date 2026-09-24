@@ -298,22 +298,63 @@ class RiskUnionTest(ConfigUnionHarness):
         # 25 点は medium 20 以上、high 40 未満。
         self.assertIn("(MEDIUM)", closed.stdout)
 
-    def test_same_factor_id_across_layers_is_an_error_and_empties_the_layer(self):
-        """§11.4.2: 同 id は --lint error。その層は空で、閉じるときの出力が言う。"""
+    def test_same_factor_id_across_layers_counts_both_under_the_layer_name(self):
+        """§11.4.2: 同 id で中身が違えば両方を数え、後ろの層は `<層>:<id>`。--lint は warn。
+
+        層を空にすると、プロジェクトが共通層と同じ名前の項目を 1 本書くだけで、その層の
+        項目と閾値が全部消えて点が下がる。両方を数えれば、衝突は加点を増やす側にしか働かない。
+        """
         write_layer(
             self.lib,
-            risk="version: 1\nfactors:\n  - {id: big-diff, points: 5, files_over: 1, message: x}\n",
+            risk="version: 1\nlevels: {critical: 50}\nfactors:\n"
+            "  - {id: big-diff, points: 5, files_over: 0, message: x}\n"
+            '  - {id: schema, points: 30, glob: "schema/**", message: スキーマに触った}\n',
         )
-        errors = self.risk_problems("error", "lib")
-        self.assertTrue(any("big-diff" in p["detail"] for p in errors), errors)
+        self.assertEqual(self.risk_problems("error"), [])
+        warns = self.risk_problems("warn", "lib")
+        self.assertTrue(any("lib:big-diff" in p["detail"] for p in warns), warns)
 
         tree = self.one_child()
         self.commit(tree, "schema/x.sql", "\n".join(str(i) for i in range(10)) + "\n")
         closed = self.ccnavi("ticket", "finish", "i0001-01")
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
-        self.assertEqual([h["id"] for h in self.record()["hits"]], ["big-diff"])
+        record = self.record()
+        by_id = {h["id"]: h for h in record["hits"]}
+        self.assertEqual(sorted(by_id), ["big-diff", "lib:big-diff", "schema"])
+        self.assertEqual(by_id["big-diff"].get("source"), "common")
+        self.assertEqual(by_id["lib:big-diff"].get("source"), "lib")
+        # 25 + 5 + 30。lib の critical 50 も効いたまま。
+        self.assertEqual(record["points"], 60)
+        self.assertNotIn("fallback", record)
+        self.assertIn("(CRITICAL)", closed.stdout)
+
+    def test_colliding_judge_item_is_recorded_under_the_layer_name(self):
+        """§11.4.2: 同 id の定性項目は、後ろの層の側を `<層>:<id>` で record-risk する。"""
+        write(self.risk, COMMON_RISK + COMMON_JUDGE_FACTOR)
+        write_layer(
+            self.lib,
+            risk=LIB_RISK + "  - {id: outward, points: 15, judge: 公開の API を変えるか,"
+            " message: 外向き（lib）}\n",
+        )
+
+        tree = self.one_child()
+        self.commit(tree, "src/a.py", "1\n")
+        refused = self.ccnavi("ticket", "finish", "i0001-01")
+        self.assertNotEqual(refused.returncode, 0, refused.stdout)
+        self.assertIn("lib:outward", refused.stderr)
+        for factor in ("outward", "lib:outward"):
+            judged = self.ccnavi(
+                "ticket", "record-risk", "i0001-01", factor, "yes", "--reason", "そう"
+            )
+            self.assertEqual(judged.returncode, 0, judged.stdout + judged.stderr)
+
+        closed = self.ccnavi("ticket", "finish", "i0001-01")
+        self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
+        record = self.judge_record()
+        self.assertEqual(sorted(record), ["lib:outward", "outward"])
+        self.assertEqual(record["outward"].get("source"), "common", record)
+        self.assertEqual(record["lib:outward"].get("source"), "lib", record)
         self.assertEqual(self.record()["points"], 25)
-        self.assertIn("lib", closed.stdout + closed.stderr)
 
     def test_identical_factor_in_a_later_layer_is_dropped_with_info(self):
         """§11.4.2: 全欄一致なら重複として後ろを捨て、info で言う。"""

@@ -46,7 +46,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, ops, phase, phasetypes, settings, tree
+from . import approval, configsync, fsio, gitcmd, ops, phase, phasetypes, settings, tree
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -223,6 +223,12 @@ def prepare(
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # 人が読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
+    # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
+    # （設計 §11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
+    home = approval.home_dir(conf, root, parent.ticket, "")
+    synced = configsync.pending(home, parent.ticket)
+    if synced:
+        body = configsync.notice(synced) + body
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
@@ -231,9 +237,38 @@ def prepare(
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
+    if synced:
+        # 本文に載せたことを印に残す。`requested` はこれを見て知らせ済みにする。載せていない
+        # 投稿で知らせ済みにすると、人が一度も見ないまま知らせが消える。
+        failed = configsync.mark_prepared(home, parent.ticket, phase_no)
+        if failed:
+            stderr.write(f"ccnavi: 設定の上書きを本文に載せた印を書けない ({failed})\n")
+            return 1
     # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
     stdout.write(path + "\n" + draft + "\n")
     return 0
+
+
+def _note_synced(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    parent: str,
+    where: str,
+    phase_no: int | None,
+) -> None:
+    """設定を上書きしたことを知らせた、と印に残す。書けなくても依頼は済んでいるので止めない。
+
+    `phase_no` を渡したら、その番号の依頼の本文に載せたとき（`prepare` が印に残した）だけ残す。
+    """
+    home = approval.home_dir(conf, root, parent, "")
+    if configsync.pending(home, parent) is None:
+        return
+    if phase_no is not None and not configsync.prepared_for(home, parent, phase_no):
+        return
+    failed = configsync.mark_notified(home, parent, where)
+    if failed:
+        stderr.write(f"ccnavi: 設定を上書きしたことを知らせた印を書けない: {failed}\n")
 
 
 def mr_draft(parent: ticket_mod.Ticket) -> str:
@@ -321,6 +356,7 @@ def requested(
         fsio.remove(
             os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
         )
+    _note_synced(stderr, conf, root, parent.ticket, result.url, phase_no)
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
@@ -961,6 +997,9 @@ def _reviewed_in_chat(
     if approval.MARK_REVIEWED in ph.marks:
         stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
         return 0
+    synced = configsync.pending(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket)
+    if synced:
+        stdout.write(configsync.notice(synced))
     stdout.write(f"フェーズ {ph.label}（親 {parent.ticket}）の子:\n")
     for t in ph.tickets:
         stdout.write(f"  - {t.ticket} {t.title}\n")
@@ -996,6 +1035,8 @@ def _reviewed_in_chat(
         data,
     ):
         return 1
+    if synced:
+        _note_synced(stderr, conf, root, parent.ticket, phasetypes.REVIEW_CHAT, None)
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘は人が打つ。
     stdout.write(
@@ -1137,11 +1178,22 @@ def close_early(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    left = _leftovers(approval.home_dir(conf, root, parent.ticket, ""), parent, phases, result)
+    home = approval.home_dir(conf, root, parent.ticket, "")
+    left = _leftovers(home, parent, phases, result)
+    # 着手で共通層を写したことをまだ知らせていなければ、締める前にここで見せる。y で締めたら
+    # 見たものとして残す。見せないと、締めたあとの finish でもう 1 度端末を求めることになる。
+    synced = configsync.pending(home, parent.ticket)
+    if synced:
+        stdout.write(configsync.notice(synced))
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
         return 1
+    if synced:
+        failed = configsync.mark_notified(home, parent.ticket, configsync.NOTIFIED_TERMINAL)
+        if failed:
+            stderr.write(f"ccnavi: 設定の上書きを見たと残せない: {failed}\n")
+            return 1
     stamp = approval.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason
