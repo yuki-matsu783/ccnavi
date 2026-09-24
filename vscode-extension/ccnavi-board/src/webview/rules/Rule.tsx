@@ -62,7 +62,7 @@ export function Rule(props: RuleProps): JSX.Element {
       <div className="with-button">
         {text(name, className, placeholder)}
         <button type="button" className="action small" title="ファイルを選ぶ" onClick={() => props.onPickFile(name)}>
-          選ぶ…
+          選択…
         </button>
       </div>
     </Captioned>
