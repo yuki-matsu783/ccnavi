@@ -260,14 +260,17 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          等級の閾値 <span className="count">点がこの値以上になると等級が上がる。HIGH 以上はレビューが済むまで止まる</span>
+          等級の閾値 <span className="count">リスクの点がこの値に届くと、等級が 1 段上がる。HIGH 以上になると、レビューが終わるまで先へ進めない</span>
         </h2>
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            点がその値以上になると等級が上がる（LOW → MEDIUM → HIGH → CRITICAL）。<strong>HIGH 以上はレビューが済むまでフェーズが止まり</strong>
-            、宣言に関わらず人間レビューが要る扱いになる。medium ≤ high ≤ critical の順。空ならその等級は組み込みの値（
-            {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）。
+            子チケットを閉じるとき、下の「項目」で当てはまった点を足し合わせて、その変更のリスクの点を出す。
+            その点がここの値以上になると、等級が LOW → MEDIUM → HIGH → CRITICAL の順に上がっていく。
+            <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めない。</strong>
+            チケットで「レビュー不要」と宣言していても、人間のレビューが必要になる。
+            値は MEDIUM ≤ HIGH ≤ CRITICAL となるように入れる。空欄にした等級は、組み込みの値（
+            {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）を使う。
           </p>
         </details>
         <div className="levels" id="levels">
@@ -347,7 +350,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#levels",
     title: "等級の閾値",
-    body: "子チケットの点がこの値以上になると等級が上がる（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上はレビューが済むまでフェーズが止まる。空なら組み込みの値。",
+    body: "子チケットのリスクの点がこの値に届くと、等級が 1 段上がる（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めない。空欄なら組み込みの値を使う。",
   },
   {
     target: "#factors",
