@@ -16,7 +16,7 @@ import type { Lock } from "../../core/lock.js";
 import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import type { SamplesJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, useTour, type TourStep } from "../Tour.js";
+import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
 import { JudgeResult, SamplesResult, type Judged } from "./Judge.js";
 import { post } from "./post.js";
@@ -425,9 +425,6 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
-            ？ 案内
-          </button>
           <button type="button" className="action" data-action="open-rules" onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
@@ -449,6 +446,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             保存
           </button>
         </div>
+        <TourButton onClick={tour.start} />
       </header>
       <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
         {lock.reason}
@@ -606,7 +604,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
 /**
  * ルール設定画面の案内。`peek` は案内の間だけのタブの切り替え（控えに書かない）、`before` は始める前のタブ。
- * 最後の段に入る前に始める前のタブへ戻す（「？ 案内」はどのタブにも出ている）
+ * 最後の段に入る前に始める前のタブへ戻す（ヘッダ右上の ? はどのタブにも出ている）
  */
 function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonly TourStep[] {
   return [
@@ -649,7 +647,7 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: '[data-action="tour"]',
       title: "案内",
-      body: "この案内は、ここからもう一度見られる。",
+      body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
       before: () => peek(before()),
     },
   ];

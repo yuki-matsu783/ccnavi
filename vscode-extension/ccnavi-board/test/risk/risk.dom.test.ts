@@ -343,6 +343,8 @@ test("CB-D66 読み直せなかった画面からも、再読込を頼める", a
 test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、閉じたら tourDone を返す。ファイルが無いときは作るボタンから始める", async () => {
   const dom = await openRisk();
   try {
+    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     await dom.send({ type: "tour" });
     await dom.settle();
     const titles: string[] = [];
