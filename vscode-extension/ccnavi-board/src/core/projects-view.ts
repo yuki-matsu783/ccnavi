@@ -106,7 +106,7 @@ export type ProjectsMessage =
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 
-/** clone の欄の下に出す一言。`failed` は赤く出す */
+/** clone の欄の下に出す一言。`failed` は失敗を示す */
 export interface CloneStatus {
   readonly kind: "info" | "failed";
   readonly message: string;
