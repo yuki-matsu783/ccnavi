@@ -34,14 +34,17 @@ export function DecideBody({
     <>
       <h2 id="approval-title">
         {count === 0
-          ? `フェーズ ${preview.phase} に残った指摘は無い`
-          : `フェーズ ${preview.phase} に残った指摘 ${count} 件の行き先`}
+          ? `フェーズ ${preview.phase} で未解決（Unresolved）の指摘なし`
+          : `フェーズ ${preview.phase} で未解決（Unresolved）の指摘 ${count} 件の行き先`}
       </h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       <p className="approval-note">
         親 {preview.parent} のマージリクエスト{preview.mr.url ? ` ${preview.mr.url}` : ""}。
-        「このフェーズで直す」を 1 件でも選ぶと、続きの子チケットを起こしてフェーズは開き直る。
-        {preview.can_issue ? "" : " issue に回せるのは、フィードバック計画が承認されたあと。"}
+        {/* 選ぶものが無いときは、選び方の注意を出さない。0 件なら押すとレビュー済みになるだけ */}
+        {count === 0
+          ? "押すと、このフェーズをレビュー済みにします。"
+          : "「このフェーズで直す」を 1 件でも選ぶと、続きの子チケットを起こしてフェーズを開き直します。"}
+        {count === 0 || preview.can_issue ? "" : " issue に回せるのは、フィードバック計画が承認されたあとです。"}
       </p>
       {count === 0 ? null : (
         <ol className="decide-threads">

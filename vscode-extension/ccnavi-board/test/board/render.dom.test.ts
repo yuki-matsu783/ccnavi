@@ -93,7 +93,8 @@ test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶ
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 に残った指摘 2 件の行き先");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の行き先");
+    assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
     assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
     // issue に回せない局面では、その行き先を出さない
     assert.equal(page.all('input[data-choice="issue"]').length, 0);
@@ -131,6 +132,19 @@ test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶ
     assert.ok(deciding.all("input[type=radio]").every((r) => (r as unknown as { disabled: boolean }).disabled));
   } finally {
     await deciding.close();
+  }
+  // 未解決が 0 件なら、選び方の注意（「このフェーズで直す」を選ぶと…）は出さない
+  const none = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: { ...decidePreview(false), threads: [] }, tree: "/w" },
+  });
+  try {
+    assert.equal(text(none, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘なし");
+    const notes = texts(none, ".approval-note").join(" ");
+    assert.ok(!notes.includes("このフェーズで直す"), notes);
+    assert.ok(!notes.includes("issue に回せる"), notes);
+    assert.equal(none.one<HTMLButtonElement>('button[data-action="decide-confirm"]').textContent, "レビュー済みにする");
+  } finally {
+    await none.close();
   }
 });
 

@@ -475,7 +475,7 @@ function decideOpened(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、残った指摘を読めない`,
+      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、未解決（Unresolved）の指摘を読めません`,
     });
   }
   // 残った指摘を決めるのは、依頼を出してから人が見ている間だけ。待ちでなければ依頼の記録が無い
@@ -547,15 +547,17 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       effects.unshift({ kind: "warn", text: value.warning });
     }
     const note = value.followup
-      ? `直す指摘を載せた続きの子チケット ${value.followup} を起こした。フェーズは開き直った。`
-      : "フェーズはレビュー済みになった。";
+      ? `直す指摘を載せた続きの子チケット ${value.followup} を起こしました。フェーズは開き直りました。`
+      : "フェーズはレビュー済みになりました。";
     const issued = value.issue_url ? ` issue に回した分: ${value.issue_url}` : "";
     return move(
       state,
       {
         overlay: {
           kind: "prompt",
-          title: `フェーズ ${value.phase} の残った指摘を決めた`,
+          title: value.followup
+            ? `フェーズ ${value.phase} の未解決（Unresolved）の指摘の行き先を決めました`
+            : `フェーズ ${value.phase} をレビュー済みにしました`,
           note:
             `${note}${issued} Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、` +
             "新しいセッションで開く。送るときは自分で Enter を押す。",

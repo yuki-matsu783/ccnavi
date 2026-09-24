@@ -662,17 +662,28 @@ def reviewed(
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
     if d is None:
         return 1
+    if not d.unresolved:
+        # 選ぶものが無い。選び方の案内は出さず、レビュー済みにするだけ
+        stdout.write(
+            f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘なし\n"
+        )
+        summary = apply_decision(stdout, stderr, root, conf, d, {})
+        return 0 if summary is not None else 1
     stdout.write(
-        f"フェーズ {phase_no}（親 {d.parent.ticket}）の未解決スレッド: {len(d.unresolved)} 件\n"
+        f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘: "
+        f"{len(d.unresolved)} 件\n"
     )
     keys = "k / f / i" if d.can_issue else "k / f"
-    stdout.write("残った指摘の行き先を 1 件ずつ選ぶ。それ以外を打つと、何もせずにやめる。\n")
+    stdout.write(
+        "未解決（Unresolved）の指摘の行き先を 1 件ずつ選びます。"
+        "それ以外を打つと、何もせずにやめます。\n"
+    )
     for letter, choice in _CHOICE_KEYS.items():
         if choice == CHOICE_ISSUE and not d.can_issue:
             continue
         stdout.write(f"  {letter}  {CHOICE_LABELS[choice]}\n")
     if not d.can_issue:
-        stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあと）\n")
+        stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあとです）\n")
     choices: dict[str, str] = {}
     for i, t in enumerate(d.unresolved, 1):
         stdout.write(f"[{i}/{len(d.unresolved)}] {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
@@ -846,6 +857,8 @@ def apply_decision(
     else:
         stdout.write(
             f"OK: フェーズ {ph.number} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
+            if accepted
+            else f"OK: フェーズ {ph.number} はレビュー済み（未解決（Unresolved）の指摘なし）\n"
         )
     return {
         "parent": parent.ticket,
@@ -897,7 +910,7 @@ def _write_decide_comment(
     followup: str,
 ) -> None:
     """MR に写す、決めた内容のコメント。issue の綴りは sh が作ったあとに書き足す。"""
-    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の残った指摘の行き先:"]
+    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）の指摘の行き先:"]
     if picked[CHOICE_KEEP]:
         lines += [
             "",
@@ -912,6 +925,11 @@ def _write_decide_comment(
         ]
     if picked[CHOICE_ISSUE]:
         lines += ["", "issue に回す:", *[f"- {thread_key(t)}" for t in picked[CHOICE_ISSUE]]]
+    if not any(picked.values()):
+        lines = [
+            MARKER_DECIDE,
+            f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。",
+        ]
     path = os.path.join(conf.state, DECIDE_FILE.format(parent=d.parent.ticket, phase=d.ph.number))
     failed = fsio.write_text(path, "\n".join(lines) + "\n", newline="\n")
     if failed:
@@ -920,6 +938,13 @@ def _write_decide_comment(
 
 def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], followup: str) -> str:
     """決めたことを Claude Code に渡す文。ボードがコピーか新しいセッションで渡す。"""
+    if not any(picked.values()):
+        # 選ぶものが無かった。0 件の内訳は並べず、レビュー済みになったことだけ言う
+        return (
+            f"[ccnavi] 利用者が親 {d.parent.ticket} のフェーズ {d.ph.number} をレビュー済みにした"
+            "（未解決（Unresolved）の指摘なし）。次のフェーズへ進める。"
+        )
+    # 選ばれなかった行き先（0 件）は並べない
     counts = "、".join(
         f"{label} {len(picked[c])} 件"
         for c, label in (
@@ -927,10 +952,11 @@ def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], fol
             (CHOICE_FIX, "このフェーズで直す"),
             (CHOICE_ISSUE, "issue に回す"),
         )
+        if picked[c]
     )
     head = (
         f"[ccnavi] 利用者が親 {d.parent.ticket} のフェーズ {d.ph.number} で"
-        f"残った指摘の行き先を決めた（{counts}）。"
+        f"未解決（Unresolved）の指摘の行き先を決めた（{counts}）。"
     )
     if followup:
         items = "\n".join(f"- {_thread_line(t)}" for t in picked[CHOICE_FIX])
