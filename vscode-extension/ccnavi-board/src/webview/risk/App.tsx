@@ -13,7 +13,7 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import type { Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, useTour, type TourStep } from "../Tour.js";
+import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Captioned, Factor } from "./Factor.js";
 import { post } from "./post.js";
 import { countText, findText } from "./text.js";
@@ -207,9 +207,6 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
-            ？ 案内
-          </button>
           <button type="button" className="action" data-action="open-risk" disabled={!exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
@@ -231,6 +228,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             保存
           </button>
         </div>
+        <TourButton onClick={tour.start} />
       </header>
       <p id="lock" className={lock.locked ? "lock" : "lock hidden"}>
         {lock.reason}
@@ -364,6 +362,6 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '[data-action="tour"]',
     title: "案内",
-    body: "この案内は、ここからもう一度見られる。",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
   },
 ];

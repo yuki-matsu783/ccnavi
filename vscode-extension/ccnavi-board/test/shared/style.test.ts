@@ -198,3 +198,11 @@ test("CB-T168 部品の CSS には、同じ名前の部品がある（部品を�
     .map((file) => path.relative(WEBVIEW_SRC, file).split(path.sep).join("/"));
   assert.deepEqual(missing, [], "部品が無いのに CSS だけ残っている。CSS と style.css の @import を消す");
 });
+
+test("CB-T216 案内の ? は 5 画面ともヘッダの右上に同じ形で固定し、右端はその幅だけ空ける", () => {
+  for (const name of screenNames()) {
+    const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
+    assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*width: 22px;/, `${name} の ? が右上に固定されていない`);
+    assert.match(style, /\.toolbar \{ padding-right: 34px; \}/, `${name} のツールバーが ? の幅を空けていない`);
+  }
+});

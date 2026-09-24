@@ -320,6 +320,8 @@ test("CB-D98 プロジェクトが無い画面では、案内の間だけ見本�
 test("CB-D99 プロジェクトがある画面では見本を出さず、「？ 案内」から案内を出せる", async () => {
   const dom = await openProjects();
   try {
+    // 案内の入口は ? 1 文字で、ヘッダ（ツールバー）の最後の子。位置は Tour.css が 5 画面とも右上に揃える
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "clone する");

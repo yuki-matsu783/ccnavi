@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import type { CloneStatus, ProjectsData, ProjectsPage, Stray, ToProjects } from "../../core/projects-view.js";
 import { SAMPLE_NOTE, sampleProjectRow } from "../../core/tour-sample.js";
 import { applyAppearance } from "../appearance.js";
-import { Tour, useTour, type TourStep } from "../Tour.js";
+import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { MENU_KINDS, menuId } from "./Menu.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
@@ -123,9 +123,6 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="tour" title="この画面の案内をもう一度見る" onClick={tour.start}>
-            ？ 案内
-          </button>
           <button
             type="button"
             className="action"
@@ -145,6 +142,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             更新
           </button>
         </div>
+        <TourButton onClick={tour.start} />
       </header>
       <Banners page={page} />
       <section className="clone">
@@ -249,7 +247,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: '[data-action="tour"]',
     title: "案内",
-    body: "この案内は、ここからもう一度見られる。",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
   },
 ];
 
