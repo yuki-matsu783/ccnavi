@@ -1,6 +1,6 @@
 """この呼び出しに当てるルール集合を決める。
 
-共通層に、そのツリーの層を足したものが答えになる（設計 §11.4）。足すだけで、
+共通層に、そのツリーの層を足したものが答えになる（設計 11.4）。足すだけで、
 後ろの層が前の層を上書きしたり取り消したりすることはない。共通層が読めなければ
 組み込みの既定に落ち、落ちたことを記録に残す。判定そのものはここに無い。
 
@@ -92,7 +92,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
     予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
     `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
-    接頭辞の綴りを別にするより安い（設計 §11.4）。綴り違い（`projects/Self/`）も
+    接頭辞の綴りを別にするより安い（設計 11.4）。綴り違い（`projects/Self/`）も
     同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
 
     数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
@@ -118,7 +118,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
 
 def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[Layer]:
-    """このツリーに足す層。行き先の 1 つだけ（設計 §11.4 書き込み系）。
+    """このツリーに足す層。行き先の 1 つだけ（設計 11.4 書き込み系）。
 
     ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら
     自身の層。プロジェクトのツリーならその層。ワークスペースルートの外に行き先が
@@ -147,7 +147,7 @@ def rules_for(
     payload: hookio.Input,
     record: audit.Record,
 ) -> tuple[rules.RuleSet, str, tree.Tree | None]:
-    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 §11.4）。
+    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 11.4）。
 
     パスを持つツール（PATH_TOOLS）は行き先で 1 本に決まる。共通層に、行き先のツリーの層を足す。
     行き先がプロジェクトならその層、ワークスペースのツリーなら自身の層。
@@ -292,7 +292,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
             view.missing = True
             continue
         if views[0].unreadable:
-            # 共通層が壊れているときは層を足さない（設計 §11.2）。診断もそう見せる。
+            # 共通層が壊れているときは層を足さない（設計 11.2）。診断もそう見せる。
             continue
         try:
             extra, notes = rules.load(layer.path, root)

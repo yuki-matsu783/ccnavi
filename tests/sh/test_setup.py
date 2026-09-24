@@ -94,7 +94,7 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 # 承認済みチケットを運ぶ sh（ccnavi-push-approved.sh）も配る。ボードは承認のあとこれを
-# 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry §1.5）。
+# 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry 1.5）。
 DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common.sh",
@@ -105,11 +105,11 @@ DEPLOY_SCRIPTS = (
     "ccnavi-clean.js",
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
-# --deploy が配る残りの設定 2 本（設計 §11.9）。リスクの配点は共通層、
+# --deploy が配る残りの設定 2 本（設計 11.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
-# 置き場は 2 つに分けて固定する（設計 launcher-scripts §1）。hook が起動する振り分けの sh は
+# 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は
 # 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
 LAUNCHER_NAME = "ccnavi-launcher.sh"
@@ -808,7 +808,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 §11.9）。
+            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 11.9）。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config"))

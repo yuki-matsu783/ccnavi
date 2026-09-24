@@ -88,7 +88,7 @@ def _sync_config(
     found: ticket_mod.Ticket,
     worktree: str,
 ) -> list[str] | None:
-    """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 §11.12）。
+    """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 11.12）。
 
     返すのは着手の出力に足す行。写せなければ None（着手しない）。子は親のブランチに
     乗るので比べない。ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。
@@ -175,7 +175,7 @@ def finish(
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_mod.Ticket) -> bool:
-    """この子を閉じたとき、人が見る対象になるか（設計 §9.8）。親は見ない。
+    """この子を閉じたとき、人が見る対象になるか（設計 9.8）。親は見ない。
 
     フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
     レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、人が見るまでは
@@ -199,7 +199,7 @@ def _close_parent(
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
     統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
-    締めた事実の残る先がここしか無い（設計 §9.8）。
+    締めた事実の残る先がここしか無い（設計 9.8）。
 
     案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、無いなら統合先へ戻す
     ところまで。ccnavi はどちらでもマージしない。
@@ -322,7 +322,7 @@ def record_risk(
         "reason": reason.strip(),
         "head": head,
         "at": approval.now(),
-        # その項目がどの層に書いてあるか（設計 §11.9）。
+        # その項目がどの層に書いてあるか（設計 11.9）。
         "source": factor.source,
     }
     failed = approval.write_child_record(
@@ -339,7 +339,7 @@ def record_risk(
 
 
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
-    """このチケットの層を決める `project:`（設計 §11.4.1、§11.4.2）。
+    """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
 
     権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値は人が承認していないので、判定の根拠にしない。
@@ -408,7 +408,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
-        # 空として扱った層の名前を残す（設計 §11.2）。共通層だけで測ったことが、
+        # 空として扱った層の名前を残す（設計 11.2）。共通層だけで測ったことが、
         # あとから記録を読んだ人に分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval.write_child_record(
@@ -497,7 +497,7 @@ def _find(
 def _parent_not_started(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 §9.6、REQ-TKT-48）。
+    """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
 
     親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
     ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる瞬間
@@ -571,7 +571,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
         return [
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
         ]
-    # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 §11.12）。
+    # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 11.12）。
     # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
     # そこを通らないので、人が端末で見たことを残させる。締めた親でも問うので、
     # この下の早い return より前に置く。
@@ -611,7 +611,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
 def _deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §9.8）。
+    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は塞げる。

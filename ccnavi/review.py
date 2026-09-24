@@ -224,7 +224,7 @@ def prepare(
     # 人が読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
     # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
-    # （設計 §11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
+    # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
     home = approval.home_dir(conf, root, parent.ticket, "")
     synced = configsync.pending(home, parent.ticket)
     if synced:
@@ -414,7 +414,7 @@ def confirm(
         review_sh = settings.script_command(root, "ccnavi-review.sh")
         if _is_last_feedback_review(parent, phase_no):
             # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §9.11）。
+            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
@@ -474,7 +474,7 @@ def _settle_children(
     return True
 
 
-# 残った指摘の行き先。人が指摘ごとに選ぶ（設計 §9.10）。
+# 残った指摘の行き先。人が指摘ごとに選ぶ（設計 9.10）。
 CHOICE_KEEP = "keep"
 CHOICE_FIX = "fix"
 CHOICE_ISSUE = "issue"
@@ -534,7 +534,7 @@ class Decision:
     ph: phase.Phase
     result: Result
     unresolved: list[Thread]
-    # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 §9.11）。
+    # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 9.11）。
     can_issue: bool
 
 
@@ -978,7 +978,7 @@ def _reviewed_in_chat(
     ph: phase.Phase,
     accept_unresolved: bool,
 ) -> int:
-    """このセッションで見たフェーズを、人が端末で通す（設計 §9.8）。
+    """このセッションで見たフェーズを、人が端末で通す（設計 9.8）。
 
     ホストへ出ないので写しも依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
     あること（`mr` と宣言したフェーズを安い経路で通させない）と、フェーズが終わって
@@ -1466,7 +1466,7 @@ _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 def _is_sha(value: str) -> bool:
     """マーカーの `head` が sha の形をしているか。
 
-    マーカーは親のブランチに乗って他の機械から届くファイル（設計 §9.2）なので、中身を
+    マーカーは親のブランチに乗って他の機械から届くファイル（設計 9.2）なので、中身を
     git の revision としてそのまま渡さない。`HEAD` や `@` のような「今」を指す値は
     `head..HEAD` を空差分にして判定を素通りさせ、`-` で始まる値は git のオプションに化ける。
     """
@@ -1505,7 +1505,7 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
+    写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
@@ -1840,7 +1840,7 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 §9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 9.2）。
     数えると「依頼 → マーカー → コミット」の順のせいで依頼の直後に必ず自分の足を踏み、
     承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
     待っている間の承認も依頼を壊す。未コミットの側は `_dirty` が同じ理由で外しており、

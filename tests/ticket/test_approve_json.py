@@ -1,11 +1,11 @@
 """`--approve --preview --json` と `--approve --yes <識別子,…> --json`（承認の JSON）の受入テスト。
 
-VS Code のボード拡張がオーバーレイで承認するための経路。設計 wip/design/approve-popup.md §2。
+VS Code のボード拡張がオーバーレイで承認するための経路。設計 wip/design/approve-popup.md 2。
 見るのは 6 つ。
 
 1. `--preview` は一覧の本文と識別子、対象外の提案、読めない提案を JSON で返す。
    承認済みチケットは置かない。範囲の超過だけの子は一覧に載り `overflow[]` を持つ
-   （設計 wip/design/approve-carry.md §3.3）
+   （設計 wip/design/approve-carry.md 3.3）
 2. 承認待ちが無くても `--preview` は `batch: []` で exit 0
 3. `--yes` に一覧と同じ識別子を渡すと承認済みチケットが置かれ、
    `prompt`（Claude Code に渡す文）が返る
@@ -63,7 +63,7 @@ class ApproveJsonTest(PhaseHarness):
     def test_preview_lists_the_batch_and_does_not_place_copies(self):
         self.pending_parent_and_child()
         # 種類の範囲を超える子。超過は承認を拒まないので一覧に載り、overflow[] を持つ
-        # （設計 approve-carry §3.3）。
+        # （設計 approve-carry 3.3）。
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("wip/design/*",)))
         # 計画に無い番号の子。形が壊れているので、承認の対象にしない側に載る。
         self.propose("i0001-05", child_text("i0001-05", "i0001", 5, ("wip/research/*",)))

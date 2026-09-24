@@ -86,9 +86,9 @@ TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
 # 2 つとも `CCNAVI_TICKETS_` で始めて対にする。
 TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL"
 APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
-# PROJECTS_ENV はプロジェクトの置き場（設計 §11）。ワークスペースルートからの相対。直下で `.git` を
+# PROJECTS_ENV はプロジェクトの置き場（設計 11）。ワークスペースルートからの相対。直下で `.git` を
 # 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
-# PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 §11.2）。各 git プロジェクトルートからの相対で、
+# PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 11.2）。各 git プロジェクトルートからの相対で、
 # その下の `config/{rules,phases,risks}.yml` が層の 3 本になる。自身の層
 # （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
 # 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
@@ -125,7 +125,7 @@ DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
-# B の機械で作業する流れが成り立たない（設計 §9.2）。区切りは "/" で持ち、ツリーの
+# B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
 DEFAULT_APPROVED = ".ccnavi/approved"
@@ -141,7 +141,7 @@ DEFAULT_PROJECTS = "projects"
 # 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
 # `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
 # スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
-# 済ませるため（設計 §11.2）。
+# 済ませるため（設計 11.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せる綴り。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
@@ -201,7 +201,7 @@ KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
 # 層の設定のファイル名。kind は記録と `--explain --json` の鍵の綴りなので、ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
-# 層の名前。記録の `source` と id の前置きに使う綴り（設計 §11.4）。ruleload が
+# 層の名前。記録の `source` と id の前置きに使う綴り（設計 11.4）。ruleload が
 # 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
@@ -212,7 +212,7 @@ RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
 
-# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 §11.4）。
+# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 11.4）。
 #
 # 名札の綴りでは種別を決められない。`projects/common/` は `common` を名乗るが
 # 共通層ではないし、`projects/self/` は `self` を名乗るがワークスペース自身の層
@@ -238,7 +238,7 @@ class LayerFile(NamedTuple):
 
 
 def is_reserved_layer_name(name: str) -> bool:
-    """その名前が層の名札に予約してあるか（`common` / `self`、設計 §11.4）。
+    """その名前が層の名札に予約してあるか（`common` / `self`、設計 11.4）。
 
     予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
     lint（名指しする）、approval（`project:` を承認しない）、phase / risk
@@ -258,13 +258,13 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
     """このツリーの承認済みチケットの置き場（絶対）。
 
     写しとマーカーはそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
-    （設計 §9.2）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
+    （設計 9.2）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
     """
     return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各層の `script:` に書ける唯一の綴り（設計 §11.4.2）。
+    """各層の `script:` に書ける唯一の綴り（設計 11.4.2）。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
 
@@ -458,7 +458,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
 
 
 def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> str:
-    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 §11.2）。
+    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 11.2）。
 
     `home_root` はその層の git プロジェクトルート。自身の層ならワークスペースルート、
     プロジェクトの層ならその git プロジェクトルートを渡す。3 種とも同じ形なので、

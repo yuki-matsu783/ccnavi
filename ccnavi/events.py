@@ -92,7 +92,7 @@ def watched_for(
     record: audit.Record,
     payload: hookio.Input | None = None,
 ) -> list[post.Watched]:
-    """実行後に見るツリーと、それぞれに当てるルール（設計 §11.7）。
+    """実行後に見るツリーと、それぞれに当てるルール（設計 11.7）。
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
@@ -301,7 +301,7 @@ def decide_after(
     # 書いた先を渡すのは、組み込みの既定に落ちている間の修復を戻さないため
     # （selfguard._left_as_repair）。
     # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と印で見分けて外す
-    # （設計 §11.12）。戻す側と、報告する側の両方で同じ答えを使う。
+    # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
     synced = functools.partial(configsync.is_synced_write, conf, root)
     restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
     guard = judge.guard_setting_files(stderr, mode, conf, root, payload, record, restore)

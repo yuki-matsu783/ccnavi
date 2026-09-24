@@ -123,7 +123,7 @@ class TicketTest(unittest.TestCase):
         self.rules = write(common_path(self.root, "rules"), json.dumps(RULES))
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
+        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
 
     # ---- 道具
@@ -369,7 +369,7 @@ class TicketTest(unittest.TestCase):
     def test_child_beyond_parent_is_approved_with_a_warning(self):
         """親の範囲を超える子も承認できる。超えた項は承認画面の「編集対象としているが」に出る。
 
-        判定は親の範囲で切り詰めるので、承認で止める理由が無い（設計 approve-carry §3.1）。
+        判定は親の範囲で切り詰めるので、承認で止める理由が無い（設計 approve-carry 3.1）。
         超えた項は承認しても書けないことを、承認する人がその場で読めるようにする。
         """
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -721,8 +721,8 @@ class TicketTest(unittest.TestCase):
         """実行役のコマンドを前に置いても、サブエージェントの禁止は外れない。
 
         禁止の形はコマンドの先頭の `sh` に固定していたので、`env sh` `command sh` `/bin/sh`
-        と `sh -c '…'` は素通りだった（wip/design/launcher-scripts.md §3.5.1、12 節 W5）。
-        禁止は中で実行されるコマンドにも当てる（§3.5.3）。先頭の形は対照として今のまま止まる。
+        と `sh -c '…'` は素通りだった（wip/design/launcher-scripts.md 3.5.1、12 節 W5）。
+        禁止は中で実行されるコマンドにも当てる（3.5.3）。先頭の形は対照として今のまま止まる。
         """
         self.family()
         for command in (
@@ -962,7 +962,7 @@ class TicketTest(unittest.TestCase):
 
         免除はコマンド 1 本ずつに当てる。引用の空白がコマンドの区切りと同じ目印で
         渡っていた間は、`-m "docs: a b"` が 3 本に割れて `a` と `b` が免除の形に
-        当たらず、レビューの依頼そのものが止まっていた（wip/design/shellread-sep.md §3）。
+        当たらず、レビューの依頼そのものが止まっていた（wip/design/shellread-sep.md 3）。
         """
         self.family()
         self.close_phase()
@@ -990,7 +990,7 @@ class TicketTest(unittest.TestCase):
 
         禁止の側は中で実行されるコマンドにも当てるが、通す側に当てると、レビューで止まっている間に
         `env sh …ccnavi-review.sh` の形で何でも前に置けるようになる
-        （wip/design/launcher-scripts.md §3.5.3、12 節 W4）。先頭の `sh` の形は今のまま通る。
+        （wip/design/launcher-scripts.md 3.5.3、12 節 W4）。先頭の `sh` の形は今のまま通る。
         """
         self.family()
         self.close_phase()
@@ -1525,7 +1525,7 @@ class TicketTest(unittest.TestCase):
     def test_a_closed_ticket_carried_into_worktrees_is_not_two_homes(self):
         """閉じた承認済みチケットが複数のツリーに在るのは、咎める形ではない。
 
-        承認済みチケットは git に入れて運ぶので（設計 §9.2）、コミットしたあとに
+        承認済みチケットは git に入れて運ぶので（設計 9.2）、コミットしたあとに
         ワークツリーを切れば、その数だけ写しができる。これを「複数の場所にある」で
         止めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、
         `--lint` が常に非ゼロで終わる。
@@ -1763,7 +1763,7 @@ class TicketTest(unittest.TestCase):
             "ccnavi --close-early --reason x --result r.json",
             "ccnavi ticket finish i0001-01",
             "ccnavi ticket record-risk i0001-01 untested yes --reason x",
-            # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup §2.3）。
+            # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup 2.3）。
             "uv run python -m ccnavi --approve --yes i0001,i0001-01 --json",
             "ccnavi --approve --preview --json; ccnavi --approve --yes i0001",
             # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
@@ -1772,7 +1772,7 @@ class TicketTest(unittest.TestCase):
             # 承認のスクリプトも人の経路。中身は --approve と承認済みチケットの push。
             "sh .ccnavi/scripts/ccnavi-approve.sh",
             # 承認済みチケットを運ぶ sh も人が打つ。push は外へ出す操作で、時機は人が決める
-            # （設計 approve-carry §1.6）。
+            # （設計 approve-carry 1.6）。
             "sh .ccnavi/scripts/ccnavi-push-approved.sh",
             "bash /abs/.ccnavi/scripts/ccnavi-push-approved.sh",
             "ls; sh .ccnavi/scripts/ccnavi-push-approved.sh",

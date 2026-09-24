@@ -1,6 +1,6 @@
 """ccnavi-push-approved.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から叩く。
 
-設計 wip/design/approve-carry.md §1 と §6.3。確かめるのは次のとおり。
+設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
 
 17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットは運ばない
 18. 運ぶものが無ければ 0 で `運ぶ承認済みチケットは無い。`
@@ -278,7 +278,7 @@ class PushApprovedTest(Workspace):
         self.place(tree, "i0002")
 
         result = self.push()
-        # 飛ばしたツリーがあるときの終了コードは設計（§1.3）で決まっていないので見ない。
+        # 飛ばしたツリーがあるときの終了コードは設計（1.3）で決まっていないので見ない。
         self.assertIn("loose", result.stderr)
         self.assertEqual(self.head(loose), before)
         self.assertTrue(self.dirty(loose, APPROVED))
@@ -508,7 +508,7 @@ class PushApprovedTest(Workspace):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class ApproveCarriesTest(Workspace):
-    """22. `ccnavi-approve.sh` は承認のあと `ccnavi-push-approved.sh` で運ぶ（設計 §1.4）。"""
+    """22. `ccnavi-approve.sh` は承認のあと `ccnavi-push-approved.sh` で運ぶ（設計 1.4）。"""
 
     scripts = APPROVE_SCRIPTS
 

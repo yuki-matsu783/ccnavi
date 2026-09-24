@@ -13,7 +13,7 @@
 ## 絞ることしかできない
 
 チケットが宣言できるのは「ここだけ書く」であって「ここも書ける」ではない。
-判定はルールの判定とチケットの判定の厳しい側を採る（設計 §1）。チケットが足すのは
+判定はルールの判定とチケットの判定の厳しい側を採る（設計 1）。チケットが足すのは
 「宣言した範囲の外は止める」「deny と書いた場所は止める」「ask と書いた場所は聞く」だけで、
 ルールの allow を狭めることはあっても、ルールの deny や ask を緩めることは無い。
 例外は 2 つ（`is_unscoped`）。チケットの置き場は、次の提案を書く道を残すために範囲を当てない。
@@ -23,7 +23,7 @@
 
 ## 書式
 
-`wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。設計 §9.3。
+`wip/proposals/<状態>/<識別子>.md` の先頭の frontmatter。設計 9.3。
 タイプは rules.yml と同じ `deny` / `ask` / `allow` で、今効くのは Write / Edit 系の
 パスの項だけ。`match` に Bash を書いた項は「効かない」と名指しで警告する。
 
@@ -105,7 +105,7 @@ GUARDED_STATES = (REVIEW,)
 # 範囲の項として効くツール。これ以外を match に書いた項は効かない。
 WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 範囲の件数の上限。設計 §9.3。大量に並べて人のレビューを
+# 範囲の件数の上限。設計 9.3。大量に並べて人のレビューを
 # 潰し、その中に広い範囲を紛れ込ませる手口を防ぐためのもの。
 MAX_SCOPE_ENTRIES = 20
 
@@ -264,7 +264,7 @@ WORKFLOW_DAG = "dag"
 
 @dataclass
 class Workflow:
-    """全体計画の待ち方の写し。`--approve` が計算して親の承認済みチケットに書く（設計 §9.7）。
+    """全体計画の待ち方の写し。`--approve` が計算して親の承認済みチケットに書く（設計 9.7）。
 
     `waits` は全体計画の番号 → 待つ番号、`review_at` は延期した番号 → 引き受ける番号。
     判定はこの写しだけを読み、`phases.yml` を読み直さない。
@@ -317,7 +317,7 @@ class Ticket:
     # issue は元になった課題の番号。親だけが持つ。マージリクエストを作るときに
     # `Closes #<番号>` へ写す。無くても動く。
     issue: int | None = None
-    # project は作業のプロジェクト（`projects/` の名前、設計 §11.5）。決めるのは提案を
+    # project は作業のプロジェクト（`projects/` の名前、設計 11.5）。決めるのは提案を
     # 置いた場所で、`scan` が入れる（プロジェクトの `wip/proposals/` ならその名前、ワークツリー
     # の中ならその元リポジトリ、ワークスペースの `wip/proposals/` なら空）。親も子も同じ置き場に
     # 並ぶので、継ぐ段は無い。判定は行き先のワークツリーの元リポジトリと突き合わせる。
@@ -328,7 +328,7 @@ class Ticket:
     declared_project: str = ""
     # plan は全体計画（作業フェーズの種類の並び）、feedback はフィードバック計画。
     # 親だけが持つ。feedback が None なのは「まだ計画していない」、[] は
-    # 「見たうえで対応なし」。設計 §9.7。
+    # 「見たうえで対応なし」。設計 9.7。
     plan: list[PlanItem] = field(default_factory=list)
     feedback: list[PlanItem] | None = None
     # workflow は全体計画の待ち方の写し。親の承認済みチケットだけが持ち、書くのは `--approve`。
@@ -353,7 +353,7 @@ class Ticket:
     tree_root: str = ""
     path: str = ""
     # 承認済みチケットにだけある。`ccnavi_approved` を持たない（人が置き場を動かしただけの）
-    # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 §9.2）。
+    # チケットでは空になる。承認の権威は置き場で、この欄は記録（設計 9.2）。
     approved_at: str = ""
     source_tree: str = ""
     source_path: str = ""
@@ -532,7 +532,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     """プロジェクト、先行、計画、課題の番号。読めなければ True。"""
     name = ticket.ticket
     # frontmatter の `project:` は照合用の宣言。本当のプロジェクトは提案を置いた場所で、
-    # `scan` が上書きする（設計 §11.5）。`scan` を通さない経路ではこの値が残る。
+    # `scan` が上書きする（設計 11.5）。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
 
@@ -835,7 +835,7 @@ def scan(root: str, tickets_rel: str, projects_dir: str = "") -> tuple[list[Tick
     集めるのは `todo/`（承認待ち）と `review/`（レビュー待ち）。`review/` に在るものは
     承認済みチケットが動いてきたもので、`ccnavi_approved` を持つ（approval.scan_review）。
     置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けの提案はその
-    プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 §11.5、REQ-MLT-14）。
+    プロジェクトのツリー（か、そこから切ったワークツリー）にある（設計 11.5、REQ-MLT-14）。
     ワークスペースの `wip/<名前>/proposals/` は読まない。
     同じ識別子が複数のツリーにあれば、権威のあるツリーの側だけを残す。
     """
@@ -854,9 +854,9 @@ def scan_all(
     found: list[Ticket] = []
     problems: list[Problem] = []
     ws = tree.main_tree(root)
-    # 置き場がプロジェクトを決める（設計 §11.5）。提案はどのツリーでも同じ相対の置き場に
+    # 置き場がプロジェクトを決める（設計 11.5）。提案はどのツリーでも同じ相対の置き場に
     # あり、プロジェクト向けの提案はそのプロジェクトの git が持つ。承認をプロジェクトの
-    # git で運ぶので、提案も同じブランチに乗せる（設計 §9.2、REQ-MLT-14）。
+    # git で運ぶので、提案も同じブランチに乗せる（設計 9.2、REQ-MLT-14）。
     # frontmatter の `project:` は照合に使うだけ。
     places = [
         (t, tickets_rel, t.project)
@@ -936,7 +936,7 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
     決まらない（検証が「複数の場所にある」と言う状態）。
 
     リポジトリをまたいだ衝突は畳まない。識別子は人が選ぶ短い連番なので、プロジェクトが
-    独立に振ればぶつかる（設計 §11）。それは写しではなく別物なので、どちらかを権威に
+    独立に振ればぶつかる（設計 11）。それは写しではなく別物なので、どちらかを権威に
     すると、もう片方が黙って消えて `--lint` の「複数のリポジトリにある」も出なくなる。
     """
     if len({t.project for t in hits}) > 1:
@@ -1135,7 +1135,7 @@ def _propose_place(tickets_rel: str, root: str) -> re.Pattern:
     `guard_rules` は前を問わない形（`(^|[\\/])`）で当てるが、あれは deny なので、余分に
     当たるぶんは止めすぎる側へ外れるだけ。文を渡す側を同じ形で当てると、ワークスペースの
     外に `wip/proposals/todo/` という並びを掘っただけの場所でも「提案を書いた」と読む。
-    ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下（設計 §11)
+    ツリー（ワークツリー・プロジェクト）はどれもワークスペースルートの下（設計 11)
     なので、ルートで留めれば正しい置き場は全部入り、外は入らない。
 
     大文字小文字は区別しない機械では `TODO/` も同じ場所。`guard_rules` と揃える。

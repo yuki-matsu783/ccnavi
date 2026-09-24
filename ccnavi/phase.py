@@ -329,7 +329,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
 
 
 # 止めている間の呼び名。依頼のマーカーが境目で、未依頼はエージェントの番、
-# 依頼済みは人の番（設計 §9.8）。
+# 依頼済みは人の番（設計 9.8）。
 LABEL_PREPARING = "レビュー準備中"
 LABEL_WAITING = "レビュー待ち"
 
@@ -345,7 +345,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に種類と計画の項が付く（設計 §9.7）。持たなければ
+    親が計画を持てば、番号に種類と計画の項が付く（設計 9.7）。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -429,7 +429,7 @@ class Phase:
         """終わったか。作業中（`doing/`）の子が無く、レビュー待ちか閉じた子が 1 枚以上。
 
         取り消しだけのフェーズは終わらない。レビュー待ちは作業としては終わっていて、
-        人が見るのを待っている段（設計 §9.8）。
+        人が見るのを待っている段（設計 9.8）。
         """
         states = list(self.states.values())
         if not states or any(s in (ticket_mod.TODO, ticket_mod.DOING, "") for s in states):
@@ -452,7 +452,7 @@ class Phase:
 
     @property
     def review_kind(self) -> str:
-        """このフェーズの終わりに人がどこで見るか。`none` / `chat` / `mr`（設計 §9.8）。
+        """このフェーズの終わりに人がどこで見るか。`none` / `chat` / `mr`（設計 9.8）。
 
         見る場所を言えるのは、種類と計画の項と、引き受けた延期だけ。そのうち厳しい側が
         勝つ。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
@@ -503,7 +503,7 @@ class Phase:
 
         欄の名前は JSON の綴り（`gate_closed`）に合わせてある。人に見せる名前は
         `review_label` が出す「レビュー準備中」「レビュー待ち」で、この綴りは
-        判定とボードの間の契約としてだけ残っている（設計 §9.8）。
+        判定とボードの間の契約としてだけ残っている（設計 9.8）。
         """
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
 
@@ -517,21 +517,21 @@ class Phase:
         これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは普段 `request` を
         打たないので False のまま。ボードの「受け入れ」（未解決スレッドを受け入れて進む）が
         この欄に繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
-        打ったときは（実績のリスクが高いときに勧める向き。設計 §9.10）ホストに写しがあるので、
+        打ったときは（実績のリスクが高いときに勧める向き。設計 9.10）ホストに写しがあるので、
         `mr` と同じに True でよい。このセッションで見る待ちは `review_kind` と `gate_closed`
-        で読む（設計 §9.8）。
+        で読む（設計 9.8）。
         """
         return self.gate_closed and approval.MARK_REQUESTED in self.marks
 
     @property
     def review_label(self) -> str:
-        """止めている間の呼び名。次に動く者で分かれる（設計 §9.8）。
+        """止めている間の呼び名。次に動く者で分かれる（設計 9.8）。
 
         まだ依頼していなければ動くのはエージェント（合流・push・依頼）なので
         「レビュー準備中」、依頼が出ていれば動くのは人なので「レビュー待ち」。
         `review: chat` のフェーズは普段この段を持たないので、人が端末で
         `--reviewed --chat` を打つまで「レビュー準備中」のまま。`request` を通した
-        ときだけ（設計 §9.10）`mr` と同じに「レビュー待ち」へ移る。
+        ときだけ（設計 9.10）`mr` と同じに「レビュー待ち」へ移る。
         """
         return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
@@ -540,7 +540,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
     if settings.is_reserved_layer_name(project):
@@ -565,7 +565,7 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 §11.4.1）。
+    """共通層 + その層の種類と、**その層の**苦情（設計 11.4.1）。
 
     どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
@@ -576,7 +576,7 @@ def layer_types(
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 §11.2）。
+        # 共通層が壊れている。層は足さない（設計 11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -597,7 +597,7 @@ def load_types(
 
 
 def _covered_review(phase: Phase | None) -> str:
-    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 §9.8）。"""
+    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 9.8）。"""
     if phase is None or phase.declared_review is None:
         return phasetypes.REVIEW_MR
     return phase.declared_review
@@ -625,7 +625,7 @@ def phases_of(
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
+        # 層は親の承認済みチケットの `project:` が決める（設計 11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         if owner.workflow is None and owner.state == ticket_mod.TODO:
@@ -696,7 +696,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     """止めたときに返す文。いまどの段にいて、次に何をすればよいかを言う。
 
     段の名前（レビュー準備中／レビュー待ち）を見出しに置く。止まっている事実だけを
-    言っても次の一手が出ないので、段ごとにやることを書き分ける（設計 §9.8）。
+    言っても次の一手が出ないので、段ごとにやることを書き分ける（設計 9.8）。
     """
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
@@ -741,7 +741,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置くマーカーに足す、その種類の層（設計 §11.9）。
+    """種類を根拠に置くマーカーに足す、その種類の層（設計 11.9）。
 
     `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
     層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
@@ -915,7 +915,7 @@ def order_problems(
     types: dict[str, phasetypes.PhaseType] | None,
     adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
+    """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
 
     待つ番号は親の待ち方の写し（`workflow`）が決める。一直線なら前の全部、`dag` なら
     種類の祖先に当たる前の番号。`overlap` の組は写しを作るときに待ちから外してある。
@@ -1047,7 +1047,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの局面にいるか（設計 §9.7）。計画が無ければ空文字。"""
+    """親がいまどの局面にいるか（設計 9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
