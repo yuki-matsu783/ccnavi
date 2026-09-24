@@ -1377,6 +1377,29 @@ class ChatReviewTest(PhaseHarness):
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "chat"})
 
+    def test_a_closed_parent_has_no_stage_on_the_board(self):
+        """閉じた親に「クローズ可」は出さない。閉じる前の親には局面を出す。"""
+        self.chat_phase(plan=["chores"])
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        self.start_parent()
+        self.propose("i0001", parent_text("i0001", ["chores"], feedback=[]))
+        self.assertEqual(self.approve().returncode, 0)
+
+        def parent_on_the_board():
+            board = self.ccnavi("--explain", "--json")
+            self.assertEqual(board.returncode, 0, board.stderr)
+            return {p["ticket"]: p for p in json.loads(board.stdout)["parents"]}["i0001"]
+
+        before = parent_on_the_board()
+        self.assertFalse(before["closed"])
+        self.assertIn("クローズ可", before["stage"])
+
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001").returncode, 0)
+        after = parent_on_the_board()
+        self.assertTrue(after["closed"])
+        self.assertEqual(after["stage"], "")
+
 
 class ScopeLimitTest(PhaseHarness):
     """範囲の上限（設計 wip/design/approve-carry.md §3・§4、§6.1〜§6.2）。

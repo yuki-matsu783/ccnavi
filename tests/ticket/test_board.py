@@ -193,27 +193,6 @@ class BoardTest(PhaseHarness):
         self.assertEqual(phases[2]["states"], {"i0001-02": "doing"})
         self.assertTrue(phases[2]["review_required"])
 
-    def test_a_closed_parent_has_no_stage(self):
-        """閉じた親に「クローズ可」は出さない。動いている親には局面を出す。"""
-        from unittest import mock
-
-        from ccnavi import diagnose
-
-        parent = mock.Mock(ticket="i0001")
-        with (
-            mock.patch.object(diagnose.approval, "home_dir", return_value=""),
-            mock.patch.object(diagnose.approval, "read_parent_mark", return_value=None),
-            mock.patch.object(diagnose.approval, "accepted_threads", return_value=set()),
-            mock.patch.object(diagnose.phase, "phases_of", return_value=[]),
-            mock.patch.object(diagnose.phase, "stage", return_value="クローズ可") as stage,
-        ):
-            parent.plan, parent.feedback = [], None
-            closed = diagnose._parent_record(None, "", parent, {"i0001": object()})
-            opened = diagnose._parent_record(None, "", parent, {})
-        self.assertEqual(closed["stage"], "")
-        self.assertEqual(opened["stage"], "クローズ可")
-        self.assertEqual(stage.call_count, 1)
-
     def test_with_ticket_control_disabled_the_board_is_empty_and_says_why(self):
         board = self.board("--ticket-control", "disable")
         self.assertEqual(board["tickets"], [])
