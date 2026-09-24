@@ -6,7 +6,6 @@
 .phase .row-head { grid-template-columns: 18px minmax(110px, 160px) minmax(90px, 160px) max-content max-content minmax(0, 1fr); }
 .sum .tag.work { color: var(--vscode-descriptionForeground); }
 .sum .tag.feedback { color: var(--vscode-editorInfo-foreground); }
-.field > select.f-kind, .field > select.f-review { max-width: 420px; }
 /* 関係の欄（IdPicker）。ほかの種類の id をチェックで選び、候補に無い id は右の欄に打つ */
 .field > .ids { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; min-width: 0; }
 .ids .id-select { flex: 0 1 260px; min-width: 140px; padding: 2px 0; font-family: var(--vscode-editor-font-family); }

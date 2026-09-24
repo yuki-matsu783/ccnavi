@@ -46,6 +46,8 @@
 .field > .cap { color: var(--vscode-descriptionForeground); text-align: right; font-size: .95em; }
 .field > input, .field > select, .field > textarea, .field > .inline, .field > .picker, .field > .with-button { width: 100%; box-sizing: border-box; margin: 0; min-width: 0; }
 .field > input.narrow, .field > select.narrow { max-width: 260px; }
+/* 選択欄は一番長い選択肢の幅に合わせ、欄の幅を超えない。3 画面で同じ決め方にして、説明付きの長い選択肢も切らない */
+.field > select { width: auto; max-width: 100%; justify-self: start; }
 .field > input.num { max-width: 90px; }
 .inline { display: flex; gap: 6px; align-items: center; }
 .inline > input { flex: 1; min-width: 120px; }
