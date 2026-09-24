@@ -681,7 +681,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
   }
 });
 
-test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", async () => {
+test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要対応かどうかを付ける。判定は組み立てが出した値を写すだけ", async () => {
   const page = await openBoard();
   try {
     const label = page.one("label.filter.attention");
@@ -689,7 +689,7 @@ test("CB-T132r 「要対応だけ」の絞り込みを出し、カードに要�
       label.getAttribute("title"),
       "人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
     );
-    assert.equal(label.textContent.trim(), "要対応だけ");
+    assert.equal(label.textContent.trim(), "要対応のみ");
     assert.equal(page.one('.card[data-id="i0001-03"]').getAttribute("data-attention"), "1");
     assert.equal(page.one('.card[data-id="i0001"]').getAttribute("data-attention"), "0");
     assert.equal(page.one('.card[data-id="i0001-01"]').getAttribute("data-attention"), "0");

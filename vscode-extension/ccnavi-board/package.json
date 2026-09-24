@@ -2,7 +2,7 @@
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
   "description": "ccnavi のチケットとその持ち物（提案・承認済みチケット・マーカー・ワークツリー）をカンバンで表示し、承認内容をオーバーレイで見せて人の承認を受け付け、承認の文とレビュー済みの連絡を Claude Code に渡す。ルールと hook を画面で眺め、ルールを直し、判定を試す。実績で測るリスクの配点とフェーズの種類を画面で直す。projects/ のプロジェクトを一覧し、clone をターミナルへ送る",
-  "version": "0.11.4",
+  "version": "0.11.5",
   "publisher": "local",
   "private": true,
   "license": "MIT",

@@ -328,7 +328,7 @@ test("CB-T132 要対応は承認待ち・バッジ・不備・フェーズ行の
   // 取り消した子はワークツリーが無いが、取り消しの列なので要対応ではない
   assert.equal(cards.get("i0001-05")!.attention, false);
   // 承認待ちは pending_approval で見る。親の改版は承認済みチケットが開いたまま（バッジの「未承認」は出ない）でも要対応。
-  // 落とすと「要対応だけ」の絞り込みで隠れ、承認の対象から外れる
+  // 落とすと「要対応のみ」の絞り込みで隠れ、承認の対象から外れる
   const base = fixture();
   const revision = cardsOf(buildBoard({ ...base, pending_approval: [...base.pending_approval, "i0001"] }));
   assert.equal(revision.get("i0001")!.copyStatus, "open");

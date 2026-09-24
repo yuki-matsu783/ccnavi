@@ -181,7 +181,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 </label>
               ) : null}
               <label className="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
-                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応だけ
+                <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応のみ
               </label>
               <button
                 type="button"
@@ -268,7 +268,7 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".filter.attention",
     title: "絞り込み",
-    body: "プロジェクトと親チケットで絞り込める（プロジェクトや親があるときだけ欄が出る）。「要対応だけ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が動く必要があるカードだけを出す。",
+    body: "プロジェクトと親チケットで絞り込める（プロジェクトや親があるときだけ欄が出る）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が動く必要があるカードだけを出す。",
   },
   {
     target: ".board",

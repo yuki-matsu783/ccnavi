@@ -63,7 +63,7 @@ test("CB-D41 親で絞り込むと他の家族のカードが隠れ、列の件�
   }
 });
 
-test("CB-D46 書き込みが止まっているカードは「要対応だけ」でも残る", async () => {
+test("CB-D46 書き込みが止まっているカードは「要対応のみ」でも残る", async () => {
   // 印は不備として積まれ、`attention` が立つ（board.ts）。素の版では i0001-02 は隠れる
   // （CB-D42）ので、印を付けたときだけ残ることが確かめられる。
   const base = fixture();
@@ -81,7 +81,7 @@ test("CB-D46 書き込みが止まっているカードは「要対応だけ」�
   }
 });
 
-test("CB-D42 「要対応だけ」で人が動く必要の無いカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
+test("CB-D42 「要対応のみ」で人が動く必要の無いカードが隠れ、列の件数が減り、state に残る。承認は見えている承認待ちだけ", async () => {
   const page = await openBoard();
   try {
     const box = page.one<HTMLInputElement>("#attention-filter");
