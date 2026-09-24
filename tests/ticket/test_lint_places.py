@@ -166,5 +166,157 @@ class CrossRepositoryTest(unittest.TestCase):
         self.assertNotIn("複数の場所にある", result.stdout)
 
 
+# `projects/` のぶつかりの知らせの先頭の句。VS Code 拡張（`projects-render.ts`）が
+# この句で始まる `(projects)` の苦情を見分けてバナーに出す。`lint.py` の文面と揃える
+# （設計 wip/design/i0064-fixed-places.md §4.2）。
+TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
+# 既存の「無視されていない」の文面の頭。
+NOT_IGNORED = "projects/ がワークスペースの git で無視されていない"
+
+
+class ProjectsCollisionTest(unittest.TestCase):
+    """`projects/` の置き場がワークスペース自身のソースとぶつかったときの `--lint`（A5・A6）。
+
+    ワークスペースの git が `projects/` の下のファイルを追跡していると、名前を逃がす手段が
+    無い（置き場は固定。ADR-0084）。`.gitignore` に `/projects/` を足すとソースが追跡から
+    外れるので、「無視されていない」の案内は誤りになる。代わりに `(projects)` の warn を 1 件だけ
+    出す。
+
+    | 追跡がある | プロジェクトがある | 無視されていない | 出すもの |
+    |---|---|---|---|
+    | はい | どちらでも | どちらでも | ぶつかりの warn だけ（A5） |
+    | いいえ | はい | はい | 既存の「無視されていない」（A6） |
+    | いいえ | はい | いいえ | 何も言わない |
+    | いいえ | いいえ | — | 何も言わない |
+
+    フラグ（`--projects` など）は渡さず、`--root` の下の既定の置き場を見る。
+    A5 は実装前は赤（ぶつかりの知らせがまだ無い）。A6 は今どおりで緑（回帰の見張り）。
+    """
+
+    def setUp(self):
+        self.ws = tempfile.mkdtemp(prefix="ccnavi-collision-")
+        self.addCleanup(shutil.rmtree, self.ws, ignore_errors=True)
+        os.makedirs(os.path.join(self.ws, ".claude"))
+        git(self.ws, "init", "--quiet", "-b", "main")
+        write(os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), json.dumps({"version": 1}))
+        write(os.path.join(self.ws, "src", "keep.py"), "print(1)\n")
+        self.projects = os.path.join(self.ws, "projects")
+
+    def track(self, path="projects/foo.txt", ignore=""):
+        """ワークスペースのソースとして `projects/` の下のファイルを追跡させる。"""
+        write(os.path.join(self.ws, ".gitignore"), f"/.claude/\n{ignore}")
+        write(os.path.join(self.ws, *path.split("/")), "ワークスペース自身のソース\n")
+        # `-f`: `.gitignore` に入れた後でも追跡させる（追跡は無視の設定より先に決まる）。
+        git(self.ws, "add", "-f", "--", ".gitignore", "src/keep.py", path)
+        git(self.ws, "commit", "--quiet", "-m", "init")
+
+    def no_tracking(self, ignore=""):
+        write(os.path.join(self.ws, ".gitignore"), f"/.claude/\n{ignore}")
+        git(self.ws, "add", "--", ".gitignore", "src/keep.py")
+        git(self.ws, "commit", "--quiet", "-m", "init")
+
+    def project(self, name="lib"):
+        """`projects/<名前>/` に自分の git を持つプロジェクトを 1 つ置く（追跡はさせない）。"""
+        root = os.path.join(self.projects, name)
+        write(os.path.join(root, "src", "keep.py"), "print(1)\n")
+        git(root, "init", "--quiet", "-b", "main")
+        git(root, "add", "-A")
+        git(root, "commit", "--quiet", "-m", "init")
+        return root
+
+    def lint(self):
+        environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        result = run_ccnavi(
+            ["--root", self.ws, "--lint", "--json", "--mode", "enable"],
+            input="",
+            env=environment,
+        )
+        try:
+            return json.loads(result.stdout)["problems"]
+        except (ValueError, KeyError) as exc:
+            self.fail(f"--lint --json が読めない: {exc}\n{result.stdout}\n{result.stderr}")
+
+    def about_projects(self):
+        """`(projects)` の名札の苦情。プロジェクトごとの `(projects/<名前>)` は含めない。"""
+        return [p for p in self.lint() if p["where"] == "(projects)"]
+
+    # ---- A5. 追跡があるとき
+
+    def test_a_tracked_file_under_projects_is_named_once_with_the_lead_phrase(self):
+        """追跡があれば、先頭の句つきの warn を 1 件だけ出す。例のファイルも添える。"""
+        self.track()
+        self.project()
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+        self.assertIn("projects/foo.txt", found[0]["detail"])
+
+    def test_the_collision_replaces_the_not_ignored_warning(self):
+        """「無視されていない」は出さない。この場合、その案内（`.gitignore` に入れる）は誤り。"""
+        self.track()
+        self.project()
+
+        details = [p["detail"] for p in self.lint()]
+
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
+
+    def test_the_collision_is_named_even_without_any_project(self):
+        """プロジェクトが 0 件でも出す。これからプロジェクトを置こうとした人に要る知らせ。"""
+        self.track()
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+
+    def test_the_collision_is_named_when_projects_is_ignored_too(self):
+        """追跡されているものは `.gitignore` に入っていても追跡のまま。無視の有無は問わない。"""
+        self.track(ignore="/projects/\n")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+
+    def test_the_other_project_checks_still_run_beside_the_collision(self):
+        """予約名と `.claude/` の検査（各プロジェクトごと）は、ぶつかりがあっても今どおり出す。"""
+        self.track()
+        lib = self.project("lib")
+        os.makedirs(os.path.join(lib, ".claude"))
+
+        details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
+
+        self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
+
+    # ---- A6. 追跡が無いとき（今どおり）
+
+    def test_no_tracking_and_not_ignored_still_says_not_ignored(self):
+        """追跡が無く、プロジェクトがあり、無視されていなければ、今どおり「無視されていない」。"""
+        self.no_tracking()
+        self.project()
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        self.assertIn(NOT_IGNORED, found[0]["detail"])
+        self.assertFalse(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
+
+    def test_no_tracking_and_ignored_says_nothing_about_projects(self):
+        self.no_tracking(ignore="/projects/\n")
+        self.project()
+
+        self.assertEqual(self.about_projects(), [])
+
+    def test_no_tracking_and_no_project_says_nothing_about_projects(self):
+        self.no_tracking()
+
+        self.assertEqual(self.about_projects(), [])
+
+
 if __name__ == "__main__":
     unittest.main()
