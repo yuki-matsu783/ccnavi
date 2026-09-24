@@ -139,27 +139,6 @@ def _sync_config(
     return lines
 
 
-def _config_sync_unseen(
-    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
-) -> bool:
-    """着手で上書きした設定を、まだ誰にも知らせていないまま親を閉じようとしているか。
-
-    知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、
-    締めた）はそこを通らないので、閉じる前に人が端末で見たことを残させる（設計 §11.12）。
-    """
-    if found.is_child or not found.project:
-        return False
-    where = approval.home_dir(conf, root, found.ticket, "")
-    if configsync.pending(where, found.ticket) is None:
-        return False
-    stderr.write(
-        f"ccnavi: {found.ticket} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
-        "（レビューを通っていない）。閉じる前に、利用者に端末で "
-        f"'ccnavi --config-synced {found.ticket}' を打って見てもらうこと\n"
-    )
-    return True
-
-
 def finish(
     stdout: TextIO, stderr: TextIO, root: str, conf: settings.Settings, ticket_id: str
 ) -> int:
@@ -177,8 +156,6 @@ def finish(
         )
         return 1
     if _parent_still_busy(stderr, root, conf, found):
-        return 1
-    if _config_sync_unseen(stderr, root, conf, found):
         return 1
     if _deliverables_missing(stderr, root, conf, found):
         return 1
@@ -593,6 +570,16 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     if open_children:
         return [
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
+        ]
+    # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 §11.12）。
+    # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
+    # そこを通らないので、人が端末で見たことを残させる。締めた親でも問うので、
+    # この下の早い return より前に置く。
+    if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
+        return [
+            f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
+            "（レビューを通っていない）。閉じる前に、利用者に端末で "
+            f"'ccnavi --config-synced {parent_id}' を打って見てもらうこと"
         ]
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY

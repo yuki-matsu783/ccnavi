@@ -25,6 +25,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import os
+import re
 from dataclasses import dataclass, field
 from typing import TextIO
 
@@ -36,6 +37,8 @@ from . import approval, fsio, gitcmd, phasetypes, risk, rules, settings, tree
 MARK = "config-sync"
 # 印の `files` で、配点が指すスクリプトを表す種類。
 KIND_SCRIPT = "script"
+# `is_synced_write` の `prior` を渡さなかった印。None は「その版に無い」の意味で使う。
+UNSET = object()
 # 端末で見たと残すときの `notified` の値。
 NOTIFIED_TERMINAL = "terminal"
 
@@ -65,6 +68,10 @@ class Copied:
     def digest(self) -> str:
         return _digest(self.content)
 
+    @property
+    def before_digest(self) -> str | None:
+        return _digest(self.before) if self.before is not None else None
+
 
 def common_files(conf: settings.Settings) -> dict[str, str]:
     """共通層の 3 本のうち、置いてあるもの。kind → 絶対パス。"""
@@ -82,13 +89,19 @@ def common_files(conf: settings.Settings) -> dict[str, str]:
 def projected(conf: settings.Settings, kind: str, content: bytes) -> bytes:
     """共通層の中身を、プロジェクトの層に置くときの形にする。
 
-    配点だけ、`script:` の指す先を共通層の置き場からプロジェクトの層の置き場へ直す。
-    文字列の置き換えなので、コメントの中の綴りも直る（害は無い）。
+    配点だけ、`script:` の値の頭にある共通層の置き場を、プロジェクトの層の置き場へ直す。
+    直すのは `script:` の値だけ。`glob` や `message` に同じ綴りがあっても触らない
+    （「共通層のスクリプトの変更に点を付ける」項目が、意味ごと別の項目に変わるため）。
     """
     if kind != settings.KIND_RISK:
         return content
-    common_home = risk.SCRIPT_HOMES[0]
-    return content.replace(common_home.encode(), settings.layer_script_home(conf).encode())
+    common_home = re.escape(risk.SCRIPT_HOMES[0].encode())
+    project_home = settings.layer_script_home(conf).encode()
+    return re.sub(
+        rb"(\bscript\s*:\s*[\"']?)" + common_home,
+        lambda m: m.group(1) + project_home,
+        content,
+    )
 
 
 def plan(conf: settings.Settings, root: str, tree_root: str) -> tuple[list[Copied], str]:
@@ -131,7 +144,8 @@ def dirty(tree_root: str, copied: list[Copied]) -> tuple[list[str], str]:
     if not copied:
         return [], ""
     rc, out = gitcmd.output(
-        tree_root, ["status", "--porcelain", "-z", "--", *[c.rel for c in copied]]
+        tree_root,
+        ["status", "--porcelain", "-z", "--", *[f":(literal){c.rel}" for c in copied]],
     )
     if rc != 0:
         return [], "git の状態を読めない"
@@ -157,6 +171,7 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
             "kind": c.kind,
             "path": c.rel,
             "sha256": c.digest,
+            "before_sha256": c.before_digest,
             "existed": c.existed,
             "lost": c.lost,
             "changed": c.changed,
@@ -174,34 +189,43 @@ def apply(approved_dir: str, parent: str, copied: list[Copied]) -> str:
     for c in copied:
         failed = _replace(c.target, c.content)
         if failed:
-            for w in written:
-                _undo(w)
-            _restore(path, previous)
+            stuck = [w.rel for w in written if not _undo(w)]
+            if not _restore(path, previous):
+                stuck.append(path)
+            if stuck:
+                return f"{c.rel} を書けない: {failed}（戻せなかったもの: {', '.join(stuck)}）"
             return f"{c.rel} を書けない: {failed}（書いた分と印は戻した）"
         written.append(c)
     return ""
 
 
 def is_synced_write(
-    conf: settings.Settings, root: str, path: str, content: bytes | None = None
+    conf: settings.Settings,
+    root: str,
+    path: str,
+    content: bytes | None = None,
+    prior: bytes | None | object = UNSET,
 ) -> bool:
-    """その中身が、親の着手で共通層を写したものだと読めるか。
+    """その変更が、親の着手で共通層を写したものだと読めるか。
 
-    `content` を渡せばその中身で、渡さなければディスク上の今の中身で答える。
-    コミットに入った分を見るときは、コミットされた中身を渡すこと。ディスクで答えると、
-    好きな中身でコミットしてからディスクだけ戻す形が外れる。
+    `content` は変更後の中身（渡さなければディスク上の今の中身）、`prior` は変更前として
+    比べるコミット済みの中身（渡さなければそのワークツリーの HEAD。None はその版に無い）。
+    コミットに入った分を見るときは、両方ともコミットされたもの（HEAD とターンの始まり）を
+    渡すこと。ディスクで答えると、好きな中身でコミットしてからディスクだけ戻す形が外れる。
 
     読めるのは次が全部揃ったときだけ。
 
-    1. 置き場が、プロジェクトから切った**親の**ワークツリー（名前が親の識別子）の中。
-       元リポジトリは判定が読む版なので外さない。子のワークツリーと他のプロジェクトも外さない
-    2. その中身が、共通層の対応するもの（設定はプロジェクトの層の形に直したもの、
+    1. 置き場が、プロジェクトから切った**承認済みの親チケットの**ワークツリー（名前が親の
+       識別子で、そのチケットの `project:` がワークツリーのプロジェクトと同じ）の中。
+       元リポジトリ、子のワークツリー、チケットの無いワークツリー、他のプロジェクトは外さない
+    2. その綴りの途中にシンボリックリンクが無い。リンクで差し替えると、指す先の中身で答えてしまう
+    3. その中身が、共通層の対応するもの（設定はプロジェクトの層の形に直したもの、
        スクリプトはそのまま）と同じ（改行の違いは見ない）
-    3. **その親の**印 `config-sync.json` が、その相対パスとその中身の指紋を名指ししている
+    4. **その親の**印 `config-sync.json` が、その相対パスとその中身の指紋を名指ししている
+    5. 変更前のコミット済みの中身が、印に残した上書き前の中身と同じ。外すのは写してから
+       コミットするまでの間だけで、人が直してコミットしたあとに共通層の中身へ戻す書き込みは外さない
 
-    印を探すのをその親の 1 か所に絞るのは、相対パスも指紋もプロジェクトをまたいで同じに
-    なるから。どこかの印で足りるとすると、1 度どこかで写したあとは、どのワークツリーでも
-    共通層の中身へ戻す書き込みが外れる。読めないものは外さない。
+    読めないものは外さない。
     """
     rel_home = settings.layer_script_home(conf)
     name = os.path.basename(path)
@@ -211,23 +235,46 @@ def is_synced_write(
     )
     if not is_config and f"/{rel_home}" not in path.replace(os.sep, "/"):
         return False
-    full = _key(path)
-    where = tree.tree_of(root, full, conf.projects)
+    where = tree.tree_of(root, _key(path), conf.projects)
     if where is None or not where.project or where.is_main:
         return False
-    rel = _rel(where.root, full)
+    if _linked(where.root, path):
+        return False
+    if not _approved_parent(conf, root, where):
+        return False
+    rel = _rel(where.root, path)
     expected = _expected(conf, root, rel)
     if expected is None:
         return False
-    now = content if content is not None else _read(full)
+    now = content if content is not None else _read(path)
     if now is None or not _same(now, expected):
         return False
     home = approval.home_dir(conf, root, where.name, "")
     mark = approval.read_parent_mark(home, where.name, MARK) or {}
-    return any(
-        isinstance(f, dict) and f.get("path") == rel and f.get("sha256") == _digest(now)
-        for f in mark.get("files") or []
+    entry = next(
+        (
+            f
+            for f in mark.get("files") or []
+            if isinstance(f, dict) and f.get("path") == rel and f.get("sha256") == _digest(now)
+        ),
+        None,
     )
+    if entry is None:
+        return False
+    if prior is UNSET:
+        prior, readable = gitcmd.blob(where.root, "HEAD", rel)
+        if not readable:
+            return False
+    before = _digest(prior) if isinstance(prior, bytes) else None
+    return entry.get("before_sha256") == before
+
+
+def _approved_parent(conf: settings.Settings, root: str, where: tree.Tree) -> bool:
+    """そのワークツリーが、同じプロジェクト向けの承認済みの親チケットのものか。"""
+    copies, _ = approval.scan(conf, root)
+    closed, _ = approval.scan(conf, root, closed=True)
+    ticket = approval.by_id(copies + closed).get(where.name)
+    return ticket is not None and not ticket.is_child and ticket.project == where.project
 
 
 def pending(approved_dir: str, parent: str) -> dict | None:
@@ -317,8 +364,11 @@ def acknowledge(
 
 def _compare(kind: str, tree_root: str, target: str, content: bytes) -> tuple[Copied | None, str]:
     """写す先と比べる。同じなら None。写せない理由があればそれを返す。"""
-    if not _inside(tree_root, target):
-        return None, f"{target} がワークツリーの外を指している（シンボリックリンク）"
+    if not _inside(tree_root, target) or _linked(tree_root, target):
+        return (
+            None,
+            f"{_rel_plain(tree_root, target)} がシンボリックリンクか、その下にある。写さない",
+        )
     before, why = _read_strict(target)
     if why:
         return None, f"{_rel(tree_root, target)} を読めない ({why})"
@@ -349,7 +399,9 @@ def _scripts_of(conf: settings.Settings, root: str, raw: bytes) -> list[tuple[st
         if f.kind != risk.KIND_SCRIPT or not value.startswith(common_home):
             continue
         rel = settings.layer_script_home(conf) + value[len(common_home) :]
-        found.append((os.path.join(root, value.replace("/", os.sep)), rel))
+        pair = (os.path.join(root, value.replace("/", os.sep)), rel)
+        if pair not in found:
+            found.append(pair)
     return found
 
 
@@ -422,6 +474,29 @@ def _entries(kind: str, content: bytes) -> dict[str, object] | None:
     }
 
 
+def _linked(tree_root: str, path: str) -> bool:
+    """tree_root から path までの途中（path 自身を含む）に、シンボリックリンクがあるか。
+
+    綴りのままさかのぼり、実体が tree_root に着いたところで止める。tree_root より上の
+    リンク（macOS の `/tmp` など）は数えない。着けなければ（外を指している）リンクと同じに扱う。
+    """
+    base = _key(tree_root)
+    current = os.path.abspath(path)
+    while _key(current) != base:
+        if os.path.islink(current):
+            return True
+        parent = os.path.dirname(current)
+        if parent == current:
+            return True
+        current = parent
+    return False
+
+
+def _rel_plain(base: str, path: str) -> str:
+    """リンクを解かない相対。人に見せる綴り。"""
+    return os.path.relpath(os.path.abspath(path), os.path.abspath(base)).replace(os.sep, "/")
+
+
 def _inside(tree_root: str, target: str) -> bool:
     base = _key(tree_root)
     real = _key(target)
@@ -478,17 +553,25 @@ def _replace(path: str, content: bytes) -> str:
     return ""
 
 
-def _undo(c: Copied) -> None:
+def _undo(c: Copied) -> bool:
+    """写した 1 本を元へ戻す。戻せたか。"""
     if c.before is None:
-        with contextlib.suppress(OSError):
-            os.remove(c.target)
-    else:
-        _replace(c.target, c.before)
+        with contextlib.suppress(FileNotFoundError):
+            try:
+                os.remove(c.target)
+            except OSError:
+                return False
+        return True
+    return not _replace(c.target, c.before)
 
 
-def _restore(path: str, previous: bytes | None) -> None:
+def _restore(path: str, previous: bytes | None) -> bool:
+    """印を前の中身へ戻す。戻せたか。"""
     if previous is None:
-        with contextlib.suppress(OSError):
-            os.remove(path)
-    else:
-        _replace(path, previous)
+        with contextlib.suppress(FileNotFoundError):
+            try:
+                os.remove(path)
+            except OSError:
+                return False
+        return True
+    return not _replace(path, previous)

@@ -1178,11 +1178,22 @@ def close_early(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    left = _leftovers(approval.home_dir(conf, root, parent.ticket, ""), parent, phases, result)
+    home = approval.home_dir(conf, root, parent.ticket, "")
+    left = _leftovers(home, parent, phases, result)
+    # 着手で共通層を写したことをまだ知らせていなければ、締める前にここで見せる。y で締めたら
+    # 見たものとして残す。見せないと、締めたあとの finish でもう 1 度端末を求めることになる。
+    synced = configsync.pending(home, parent.ticket)
+    if synced:
+        stdout.write(configsync.notice(synced))
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
         return 1
+    if synced:
+        failed = configsync.mark_notified(home, parent.ticket, configsync.NOTIFIED_TERMINAL)
+        if failed:
+            stderr.write(f"ccnavi: 設定の上書きを見たと残せない: {failed}\n")
+            return 1
     stamp = approval.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason

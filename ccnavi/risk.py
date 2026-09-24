@@ -44,6 +44,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -109,8 +110,19 @@ class Factor:
         return self.compiled is not None and self.compiled.match(rel) is not None
 
     def key(self) -> tuple:
-        """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。"""
-        return (self.id, self.points, self.message, self.kind, self.value, self.max)
+        """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
+
+        `script:` は綴りではなく、その層のスクリプトの置き場からの相対と、指す先の中身で比べる。
+        共通層は `.ccnavi/common/scripts/`、各層は `<ccnavi ディレクトリ>/scripts/` を指すので、
+        着手で共通層を写した配点（設計 §11.12）は綴りが違う。綴りで比べると同じ項目を
+        `<層>:<id>` として 2 重に数える。中身まで見るのは、名前だけ同じ別のスクリプトを
+        同じ項目として捨てないため。
+        """
+        value = self.value
+        if self.kind == KIND_SCRIPT:
+            rel = str(self.value)
+            value = (rel.split("/scripts/", 1)[-1], _file_digest(self.home, rel))
+        return (self.id, self.points, self.message, self.kind, value, self.max)
 
 
 @dataclass
@@ -145,6 +157,17 @@ class Definition:
             if f.id == ident:
                 return f
         return None
+
+
+def _file_digest(home: str, rel: str) -> str:
+    """スクリプトの中身の指紋。置き場が決まっていないか読めなければ空文字。"""
+    if not home:
+        return ""
+    try:
+        with open(os.path.join(home, rel.replace("/", os.sep)), "rb") as f:
+            return hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
+    except OSError:
+        return ""
 
 
 def builtin() -> Definition:

@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi import configsync, phase, settings
+from ccnavi import configsync, ops, phase, risk, settings
 from tests.config.test_config_union import (
     COMMON_PHASES,
     COMMON_RISK,
@@ -409,3 +409,161 @@ class ConfigSyncBoundaryTest(ConfigSyncTest):
 
         self.assertTrue(configsync.prepared_for(home, "i0001", 1))
         self.assertFalse(configsync.prepared_for(home, "i0001", 2))
+
+
+class ConfigSyncSecondReviewTest(ConfigSyncTest):
+    """2 回目の敵対的レビューで見つかった穴を塞いだことを見る。"""
+
+    def test_a_worktree_without_an_approved_parent_is_not_exempt(self):
+        """承認済みの親チケットの無いワークツリーは、印を自作しても外さない。"""
+        conf = self.settings()
+        tree = self.worktree(self.lib, "scratchy")
+        target = config_of(tree, "rules")
+        content = read(self.rules).encode()
+        write(target, read(self.rules))
+        mark = os.path.join(tree, ".ccnavi", "approved", "phases", "scratchy", "config-sync.json")
+        write(
+            mark,
+            json.dumps(
+                {
+                    "files": [
+                        {
+                            "path": ".ccnavi/config/rules.yml",
+                            "sha256": configsync._digest(content),
+                            "before_sha256": configsync._digest(
+                                read(config_of(self.lib, "rules")).encode()
+                            ),
+                        }
+                    ],
+                    "notified": "x",
+                }
+            ),
+        )
+
+        self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
+
+    def test_a_symlink_is_not_exempt(self):
+        """設定を別の写しへのシンボリックリンクに差し替えても外さない。"""
+        conf = self.settings()
+        tree, _ = self.start_parent()
+        target = config_of(tree, "rules")
+        os.remove(target)
+        os.symlink("risks.yml", target)
+
+        self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
+        said = self.hook("Bash", tree, event="PostToolUse", command="ls")
+        self.assertIn("rules.yml", said.stdout + said.stderr)
+
+    def test_a_symlinked_target_stops_the_start(self):
+        """写す先がシンボリックリンクなら、写さずに着手を止める。"""
+        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+        target = config_of(tree, "rules")
+        os.remove(target)
+        os.symlink("phases.yml", target)
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "link")
+
+        started = self.ccnavi("ticket", "start", "i0001")
+
+        self.assertNotEqual(started.returncode, 0, started.stdout)
+        self.assertIn("シンボリックリンク", started.stderr)
+        self.assertTrue(os.path.islink(target))
+
+    def test_writing_back_after_a_human_fix_is_not_exempt(self):
+        """写した分をコミットしたあと人が直したら、共通層の中身へ戻す書き込みは外さない。"""
+        conf = self.settings()
+        tree, _ = self.start_parent()
+        target = config_of(tree, "rules")
+        synced = read(target)
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "sync")
+        write(
+            target,
+            json.dumps({"version": 1, "deny": [{"id": "own", "match": "Bash", "glob": "*x*"}]}),
+        )
+        git(tree, "commit", "--quiet", "-am", "human fix")
+
+        write(target, synced)
+
+        self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
+        said = self.hook("Bash", tree, event="PostToolUse", command="ls")
+        self.assertIn("rules.yml", said.stdout + said.stderr)
+
+    def test_close_problems_hold_ready_until_a_human_saw_it(self):
+        """Draft を外す `ready` も同じ門を通る。知らせていない上書きがあれば止める。"""
+        conf = self.settings()
+        self.start_parent()
+
+        problems = ops.close_problems(self.ws, conf, "i0001")
+
+        self.assertTrue(any("--config-synced i0001" in p for p in problems), problems)
+
+    def test_a_synced_script_factor_is_counted_once_after_it_lands(self):
+        """写した配点が統合先に入っても、共通層の同じ項目と 2 重に数えない。"""
+        write(self.risk, COMMON_SCRIPT_RISK)
+        write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
+        tree, _ = self.start_parent()
+        # 親のブランチが統合先に入ったのと同じ形にする。
+        for rel in (".ccnavi/config/risks.yml", ".ccnavi/scripts/count.sh"):
+            write(
+                os.path.join(self.lib, *rel.split("/")), read(os.path.join(tree, *rel.split("/")))
+            )
+
+        definition, problems = risk.layer_definition(self.settings(), self.ws, "lib")
+
+        ids = [f.id for f in definition.factors]
+        self.assertEqual(ids.count("counted"), 1, ids)
+        self.assertNotIn("lib:counted", ids)
+        self.assertFalse([p for p in problems if p.severity == "warn"], problems)
+
+    def test_projected_rewrites_only_script_values(self):
+        """指す先を直すのは `script:` の値だけ。`glob` や `message` の同じ綴りは触らない。"""
+        text = (
+            b"version: 1\nfactors:\n"
+            b"  - {id: a, points: 1, script: .ccnavi/common/scripts/a.sh, message: m}\n"
+            b'  - {id: b, points: 1, glob: ".ccnavi/common/scripts/**",'
+            b" message: .ccnavi/common/scripts/ changed}\n"
+        )
+
+        out = configsync.projected(self.settings(), settings.KIND_RISK, text)
+
+        self.assertIn(b"script: .ccnavi/scripts/a.sh", out)
+        self.assertIn(b'glob: ".ccnavi/common/scripts/**"', out)
+        self.assertIn(b"message: .ccnavi/common/scripts/ changed", out)
+
+    def test_a_script_shared_by_two_factors_is_copied_once(self):
+        """2 つの項目が同じスクリプトを指しても、写すのは 1 回。"""
+        write(
+            self.risk,
+            COMMON_SCRIPT_RISK
+            + "  - {id: again, points: 2, script: .ccnavi/common/scripts/count.sh,"
+            " message: もう一度}\n",
+        )
+        write(os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh"), COUNT_SH)
+        self.propose("i0001", ticket_text("i0001", project="lib", allow=SCOPE), project="lib")
+        self.assertEqual(self.approve().returncode, 0)
+        tree = self.worktree(self.lib, "i0001")
+
+        copied, why = configsync.plan(self.settings(), self.ws, tree)
+
+        self.assertEqual(why, "")
+        rels = [c.rel for c in copied]
+        self.assertEqual(rels.count(".ccnavi/scripts/count.sh"), 1, rels)
+
+    def test_a_non_utf8_script_is_not_reported_after_it_is_committed(self):
+        """コミット分はバイト列のまま比べる。UTF-8 でないスクリプトも写した分として外れる。"""
+        write(self.risk, COMMON_SCRIPT_RISK)
+        script = os.path.join(self.ws, ".ccnavi", "common", "scripts", "count.sh")
+        os.makedirs(os.path.dirname(script), exist_ok=True)
+        with open(script, "wb") as f:
+            f.write(b"# \x82\xa0\rprintf 1\n")
+        self.assertEqual(self.hook("", self.ws, event="UserPromptSubmit").returncode, 0)
+        tree, _ = self.start_parent()
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "sync")
+
+        stopped = self.hook("", self.ws, event="Stop")
+
+        self.assertNotIn("count.sh", self.system_message(stopped))

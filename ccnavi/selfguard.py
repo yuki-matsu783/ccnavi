@@ -521,6 +521,9 @@ class Target:
     # ワークツリー側の設定は今この瞬間には誰も読まないので、「何も起きていないのに
     # 戻された」と読まれる。統合で効く道であることを言わないと、同じ手が繰り返される。
     copy: bool = False
+    # spelled は、リンクを解く前の綴り（ワークツリー側の設定だけ持つ）。着手が写した分かを
+    # 答えさせるときに渡す。解いた先で答えると、リンクに差し替えた形が指す先の中身で外れる。
+    spelled: str = ""
 
 
 @dataclass
@@ -811,6 +814,7 @@ def _worktree_copies(
                     label=_relative(root, full),
                     top=work.root,
                     copy=True,
+                    spelled=os.path.join(work.root, rel),
                 )
             )
     return copies
@@ -951,7 +955,12 @@ def after(
         if saved is not None and now == saved:
             continue
 
-        if synced is not None and target.copy and now is not None and synced(target.path):
+        if (
+            synced is not None
+            and target.copy
+            and now is not None
+            and synced(target.spelled or target.path)
+        ):
             continue
 
         if _left_as_repair(target, written, saved, now):

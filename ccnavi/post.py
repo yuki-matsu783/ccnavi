@@ -45,7 +45,19 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, fsio, gitstate, hookio, phase, phasetypes, rules, selfguard, settings, tree
+from . import (
+    audit,
+    fsio,
+    gitcmd,
+    gitstate,
+    hookio,
+    phase,
+    phasetypes,
+    rules,
+    selfguard,
+    settings,
+    tree,
+)
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -321,7 +333,9 @@ def _committed_findings(
         # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
         # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
         # 監視・控えと復元・ここの 3 つから同時に外れる。
-        judged = functools.partial(_committed_synced, synced, top, changes) if synced else None
+        judged = (
+            functools.partial(_committed_synced, synced, top, base, changes) if synced else None
+        )
         for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged):
             rel = tree.relative(w.tree, finding.change.full)
             if ticket_mod.is_ticket_place(rel, tickets, approved):
@@ -330,17 +344,35 @@ def _committed_findings(
     return out, uncounted
 
 
+def _spelled(change: gitstate.Change, top: str) -> str:
+    """変更の、リンクを解く前の絶対の綴り。ツリーのルートが分からなければ解いた先。"""
+    if not top or not change.path:
+        return change.full
+    return os.path.join(top, change.path.replace("/", os.sep))
+
+
 def _committed_synced(
-    synced: Callable[..., bool], top: str, changes: list[gitstate.Change], full: str
+    synced: Callable[..., bool],
+    top: str,
+    base: str,
+    changes: list[gitstate.Change],
+    full: str,
 ) -> bool:
-    """コミットされた中身で `synced` に答えさせる。読めなければ外さない。"""
+    """コミットされた中身で `synced` に答えさせる。読めなければ外さない。
+
+    変更後は HEAD、変更前はターンの始まりの版の中身。どちらもバイト列のまま読む。文字列で
+    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、写した分でも食い違う。
+    """
     path = next((c.path for c in changes if c.full == full), "")
     if not path:
         return False
-    text, readable = gitstate.committed_text(top, path)
-    if not readable or text is None:
+    now, readable = gitcmd.blob(top, "HEAD", path)
+    if not readable or now is None:
         return False
-    return synced(full, text.encode("utf-8"))
+    prior, readable = gitcmd.blob(top, base, path)
+    if not readable:
+        return False
+    return synced(os.path.join(top, path.replace("/", os.sep)), now, prior)
 
 
 def at_stop(
@@ -645,8 +677,9 @@ def _findings(
         if change.full in script:
             continue
         # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
-        # 内容と印で見分け、読めないものは外さない。
-        if synced is not None and synced(change.full):
+        # 内容と印で見分け、読めないものは外さない。渡すのは解く前の綴り。解いた先で答えると、
+        # 設定を別の写しへのシンボリックリンクに差し替えた形が、指す先の中身で外れる。
+        if synced is not None and synced(_spelled(change, top or tree_root)):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
