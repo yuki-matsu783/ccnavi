@@ -10,7 +10,7 @@
 
 ## 点が何をするか
 
-等級の名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。閾値は `levels` で動かす。
+リスクレベルの名前は 4 つで固定（LOW / MEDIUM / HIGH / CRITICAL）。境目の点は `levels` で動かす。
 `HIGH` 以上なら、種類が `review: none` でも子が `required: false` でも、そのフェーズは
 人間レビューが要る扱いになり、レビューが済むまで止まる。実績で宣言を厳しい側にだけ上書きする。
 実績が小さくても、宣言のレビュー要を下げることはしない。
@@ -62,7 +62,7 @@ LEVEL_MEDIUM = "MEDIUM"
 LEVEL_HIGH = "HIGH"
 LEVEL_CRITICAL = "CRITICAL"
 LEVELS = (LEVEL_LOW, LEVEL_MEDIUM, LEVEL_HIGH, LEVEL_CRITICAL)
-# レビューが要る扱いに上書きする等級。
+# レビューが要る扱いに上書きするリスクレベル。
 ESCALATE_FROM = (LEVEL_HIGH, LEVEL_CRITICAL)
 
 DEFAULT_LEVELS = {"medium": 20, "high": 40, "critical": 70}
@@ -117,7 +117,7 @@ class Factor:
 class Definition:
     # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていない層」が
-    # 共通層の緩めた閾値を黙って戻すことになる（設計 §11.4.2）。
+    # 共通層の緩めた境目の点を黙って戻すことになる（設計 §11.4.2）。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
@@ -232,7 +232,7 @@ def parse(
             )
         ]
     # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていない層」が
-    # 共通層の緩めた閾値を黙って戻す（設計 §11.4.2）。順を見るときだけ既定で補う。
+    # 共通層の緩めた境目の点を黙って戻す（設計 §11.4.2）。順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
     raw_levels = data.get("levels")
     if raw_levels is not None:
@@ -250,7 +250,7 @@ def parse(
         unknown = sorted(set(raw_levels) - {"medium", "high", "critical", "low"})
         for name in unknown:
             problems.append(
-                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らない等級。名前は固定")
+                Problem(SEVERITY_WARN, where, f"`levels.{name}` は知らないリスクレベル。名前は固定")
             )
     if not ordered(levels):
         problems.append(
@@ -269,7 +269,7 @@ def parse(
 
 
 def effective_levels(levels: dict[str, int]) -> dict[str, int]:
-    """書かれた鍵に既定を足した、実際に効く閾値。"""
+    """書かれた鍵に既定を足した、実際に効く境目の点。"""
     return {**DEFAULT_LEVELS, **levels}
 
 

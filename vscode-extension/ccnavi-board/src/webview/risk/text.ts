@@ -26,7 +26,7 @@ export function valueLabel(kind: FactorKind): string {
   if (kind === "judge") {
     return "問い";
   }
-  return "閾値";
+  return "基準";
 }
 
 /** 要約の行に出す、当て方と値をつないだ文。読んで意味が通る語順にする */
@@ -37,17 +37,17 @@ export function describe(factor: FactorForm): readonly Part[] {
   }
   switch (factor.kind) {
     case "lines_over":
-      return [dim("差分が "), code(value), dim(" 行を超えたら加点")];
+      return [dim("変更した行数（追加＋削除）が "), code(value), dim(" 行を超えると加点")];
     case "files_over":
-      return [dim("変えたファイルが "), code(value), dim(" 件を超えたら加点")];
+      return [dim("変更したファイルが "), code(value), dim(" 件を超えると加点")];
     case "deleted_over":
-      return [dim("消したファイルが "), code(value), dim(" 件を超えたら加点")];
+      return [dim("削除したファイルが "), code(value), dim(" 件を超えると加点")];
     case "glob":
-      return [code(value), dim(` にヒットしたファイルが 1 つあるごとに加点${factor.max === "" ? "" : `（上限 ${factor.max} 点）`}`)];
+      return [code(value), dim(` に当てはまるファイルを 1 つ変更するごとに加点${factor.max === "" ? "" : `（上限 ${factor.max} 点）`}`)];
     case "script":
-      return [dim("スクリプト "), code(value), dim(` が出した点を加点（測れなければ ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
+      return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
     case "judge":
-      return [dim("問い「"), code(value), dim("」に yes だったら加点")];
+      return [dim("問い「"), code(value), dim("」の答えが yes なら加点")];
   }
 }
 

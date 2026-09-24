@@ -42,7 +42,7 @@ const ENTRIES: readonly Entry[] = [
   },
   {
     label: "リスク管理",
-    description: "実績で測るリスクの配点（閾値と項目）の編集と保存",
+    description: "実績で測るリスクの配点（境目の点と項目）の編集と保存",
     command: "ccnaviBoard.openRisk",
     icon: "pulse",
     needsTickets: true,

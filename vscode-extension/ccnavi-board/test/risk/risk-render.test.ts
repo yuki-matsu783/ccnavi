@@ -40,7 +40,7 @@ test("CB-T81 埋め込む中身は JSON で、文面の < は実体にして scr
   const rendered = html();
   assert.match(rendered, /\\u003cb>CI\\u003c\/b>/);
   assert.doesNotMatch(rendered, /<b>CI<\/b>/);
-  // 当て方のラベルも組み込みの閾値も埋め込まない。画面が契約（risk-view）から持つ
+  // 当て方のラベルも組み込みの境目の点も埋め込まない。画面が契約（risk-view）から持つ
   assert.doesNotMatch(rendered, /"builtinLevels"/);
   assert.match(rendered, /"exists":true/);
 });
