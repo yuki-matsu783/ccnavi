@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -29,6 +30,8 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
             os.path.join(self.ws, ".ccnavi", "common", "rules.yml"), "w", encoding="utf-8"
         ) as f:
             f.write('{"version": 1}')
+        # 実行後の監視の控えは git のツリーに対して取る。
+        subprocess.run(["git", "init", "-q"], cwd=self.ws, check=True, capture_output=True)
 
     def hook(self, event, tool, env):
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
@@ -61,6 +64,7 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
         """`CCNAVI_STATE=""` を入れても、控えは `logs/state/` に置かれる。"""
         env = {"CCNAVI_STATE": ""}
         self.hook("UserPromptSubmit", "", env)
+        self.hook("PreToolUse", "Bash", env)
         self.hook("PostToolUse", "Bash", env)
 
         self.assertTrue(os.path.isfile(os.path.join(self.ws, "logs", "state", "s1.json")))
