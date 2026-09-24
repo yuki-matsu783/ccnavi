@@ -442,13 +442,20 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
 
         self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
 
+    def symlink_or_skip(self, source, link):
+        """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。"""
+        try:
+            os.symlink(source, link)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"シンボリックリンクが作れない: {error}")
+
     def test_a_symlink_is_not_exempt(self):
         """設定を別の写しへのシンボリックリンクに差し替えても外さない。"""
         conf = self.settings()
         tree, _ = self.start_parent()
         target = config_of(tree, "rules")
         os.remove(target)
-        os.symlink("risks.yml", target)
+        self.symlink_or_skip("risks.yml", target)
 
         self.assertFalse(configsync.is_synced_write(conf, self.ws, target))
         said = self.hook("Bash", tree, event="PostToolUse", command="ls")
@@ -461,7 +468,7 @@ class ConfigSyncSecondReviewTest(ConfigSyncTest):
         tree = self.worktree(self.lib, "i0001")
         target = config_of(tree, "rules")
         os.remove(target)
-        os.symlink("phases.yml", target)
+        self.symlink_or_skip("phases.yml", target)
         git(tree, "add", "-A")
         git(tree, "commit", "--quiet", "-m", "link")
 
