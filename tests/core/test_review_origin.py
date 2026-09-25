@@ -78,9 +78,10 @@ class OriginSubcommandTest(unittest.TestCase):
             check=True,
         )
 
-    def origin(self, url: str) -> subprocess.CompletedProcess:
+    def origin(self, url: str, extra_env=None) -> subprocess.CompletedProcess:
         subprocess.run(["git", "remote", "add", "origin", url], cwd=self.dir, check=True)
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        env.update(extra_env or {})
         # `origin` は exe を呼ばない。在ることだけ見るので、確実に在る実行ファイルを指す。
         env["CCNAVI_BIN_PATH"] = sys.executable
         env["GITLAB_TOKEN"] = "x"
@@ -105,6 +106,20 @@ class OriginSubcommandTest(unittest.TestCase):
         self.assertIn("api_base=http://127.0.0.1:9/api/v4\n", result.stdout)
         self.assertNotIn("glpat-secret", result.stdout + result.stderr)
         self.assertIn("origin=http://<伏せた>@127.0.0.1:9/root/p.git", result.stdout)
+
+    def test_the_state_variable_is_not_read(self):
+        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（ADR-0084、A9）。
+
+        sh は起動のたびに控えの置き場を作る（`mkdir -p "$state"`）。以前は `$root/` に
+        `CCNAVI_STATE` を継ぎ足すので、絶対パスを入れると存在しない置き場を見ていた。
+        実装前は赤。sh（`ccnavi-review.sh`）がまだ `CCNAVI_STATE` を読んでいる。
+        フェーズ 4 で人が写す版（`wip/design/scripts/ccnavi-review.sh`）に差し替えると通る。
+        """
+        result = self.origin("http://127.0.0.1:9/root/p.git", extra_env={"CCNAVI_STATE": "/x"})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        state = os.path.join(self.dir, "logs", "state")
+        self.assertTrue(os.path.isdir(state), "logs/state/ が無い")
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "x")), "CCNAVI_STATE を読んでいる")
 
 
 if __name__ == "__main__":

@@ -569,5 +569,41 @@ class ResetGuidanceTest(GitWrapperTest):
             self.assertEqual("書きかけ\n", f.read())
 
 
+class PlacesAreNotReadTest(GitWrapperTest):
+    """置き場を動かす環境変数は読まない（ADR-0084、A9）。
+
+    実装前は赤。sh（`ccnavi-common.sh` の `ccnavi_project`）がまだ `CCNAVI_PROJECTS` を読んでいる。
+    フェーズ 4 で人が写す版（`wip/design/scripts/ccnavi-common.sh`）に差し替えると通る。
+    """
+
+    def test_the_projects_variable_does_not_move_where_the_wrapper_logs(self):
+        """`CCNAVI_PROJECTS=/x` を入れても、`projects/foo` の中の記録は `logs/foo/` に分かれる。
+
+        `ccnavi_project` は置き場の下のディレクトリの名前（プロジェクト名）を返し、記録の
+        置き場がそこで決まる。以前は絶対パスを与えると相対の `projects/...` と照らせず、
+        プロジェクトが「無い」ことになって `logs/` の直下に書かれた。
+        """
+        project = os.path.join(self.dir, "projects", "foo")
+        os.makedirs(project)
+        git(project, "init", "-q")
+        environment = dict(os.environ)
+        environment["CCNAVI_PROJECTS"] = "/x"
+
+        result = subprocess.run(
+            [SHELL, SCRIPT, "status"],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+        )
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        made = os.path.join(self.dir, "logs", "foo")
+        self.assertTrue(os.path.isdir(made), f"logs/foo/ が無い: {result.stdout}")
+        self.assertEqual(1, len(os.listdir(made)))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -165,14 +165,12 @@ class FallbackTest(unittest.TestCase):
                 self.assertEqual(out.get("permissionDecision"), "deny", f"通した: {command!r}")
 
     def test_既定のシェルの守りは設定で動かした置き場にも当たる(self):
-        # 実行ファイル・ccnavi ディレクトリ・共通層は設定で動く。既定の側だけ空の設定で
-        # 組んでいると、動かしたワークスペースではルールファイルが壊れたときにだけ
-        # そこへの書き込みが止まらない（issue #14）。
+        # 実行ファイルは設定で動く（ccnavi ディレクトリと共通層は固定。ADR-0052・ADR-0084）。
+        # 既定の側だけ空の設定で組んでいると、動かしたワークスペースではルールファイルが
+        # 壊れたときにだけそこへの書き込みが止まらない（issue #14）。
         # 絶対パスは `/` で綴る。bash は引用されない `\` を落とすので、`\` の綴りのままでは
         # そのコマンドは設定ファイルに書かない。
         for env, command in [
-            ({"CCNAVI_PROJECT_HOME": ".navi"}, "echo x > projects/lib/.navi/config/rules.yml"),
-            ({"CCNAVI_PROJECT_HOME": ".navi"}, "rm -rf .navi"),
             ({"CCNAVI_BIN_PATH": "tools/guard/ccnavi"}, "cp /tmp/x tools/guard/ccnavi"),
             ({}, f"echo x > {self.broken.replace(os.sep, '/')}"),
         ]:

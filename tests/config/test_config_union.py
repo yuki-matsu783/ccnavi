@@ -207,7 +207,7 @@ ROOT_RULE = {
 # YAML として壊れている。閉じていない並び。
 BROKEN = "version: 1\ndeny: [\n"
 
-# ccnavi ディレクトリの既定の名前（設計 §11.2、`CCNAVI_PROJECT_HOME` の既定）。
+# ccnavi ディレクトリの名前（設計 §11.2）。固定（ADR-0084）。
 HOME = ".ccnavi"
 
 
@@ -425,8 +425,8 @@ class ConfigUnionHarness(unittest.TestCase):
         土台は `--root` の下の既定の置き場に置くので、渡す必要も無い。
 
         差し替えたいテストは `self.rules` / `self.phases` / `self.risk` に書く。
-        「`projects/` を数えない」を言いたいテストは `env={"CCNAVI_PROJECTS": ""}`
-        を渡す。人が `settings.json` に書く経路がそれで、フラグではない。
+        「`projects/` を数えない」を言いたいテストは、`projects/` を動かして無くす
+        （ADR-0084。空文字で言う口は無い）。
         """
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment.pop("CLAUDE_PROJECT_DIR", None)
@@ -1029,40 +1029,15 @@ class WiringTest(ConfigUnionHarness):
         errors = self.problems("error", where=self.project_where("self"))
         self.assertTrue(any("self" in p["detail"] for p in errors), errors)
 
-    def test_project_home_env_moves_the_umbrella(self):
-        """§11.2: `CCNAVI_PROJECT_HOME` で ccnavi ディレクトリの名前が動く。
-
-        `config/` と 3 本の名前は固定。
-        """
-        moved = {
-            "version": 1,
-            "deny": [
-                {"id": "vendor", "match": "Write|Edit", "glob": "*/vendor/*", "message": "no."}
-            ],
-        }
-        write_layer(self.lib, rules=moved, home=".navi")
-        env = {"CCNAVI_PROJECT_HOME": ".navi"}
-
-        denied = self.hook(
-            "Write", self.ws, env=env, file_path=os.path.join(self.lib, "vendor", "x.py")
-        )
-        self.assert_denied(denied, "lib:vendor")
-        # 動かしたら、既定の `.ccnavi/config/` は読まない。
-        self.assert_not_denied(
-            self.hook(
-                "Write", self.ws, env=env, file_path=os.path.join(self.lib, "schema", "x.sql")
-            )
-        )
-
     def test_workspace_without_projects_or_own_layer_is_unchanged(self):
-        """REQ-MLT-15: `projects/` を数えず自身の層も無ければ、共通層だけで判定し記録する。"""
+        """REQ-MLT-15: `projects/` が無く自身の層も無ければ、共通層だけで判定し記録する。"""
         # 自身の層だけを消す。共通層も同じ ccnavi ディレクトリの下（`.ccnavi/common/`）にある。
         shutil.rmtree(os.path.join(self.ws, HOME, "config"))
+        # `projects/` を作らないワークスペースにする（ADR-0084。数えない口は無い）。消さずに
+        # 外へ動かす。Windows は .git の中の読み取り専用のファイルを消せない。
+        os.rename(self.projects, os.path.join(self.ws, "moved-away"))
 
-        no_projects = {"CCNAVI_PROJECTS": ""}
-        allowed = self.hook(
-            "Write", self.ws, env=no_projects, file_path=os.path.join(self.ws, "src", "a.py")
-        )
+        allowed = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "src", "a.py"))
         self.assert_not_denied(allowed)
         record = self.last_record()
         self.assertEqual(record["decision"], "allow")
@@ -1070,12 +1045,10 @@ class WiringTest(ConfigUnionHarness):
         self.assertNotIn("fallback", record)
         self.assertNotIn("project", record)
 
-        denied = self.hook(
-            "Write", self.ws, env=no_projects, file_path=os.path.join(self.ws, ".env")
-        )
+        denied = self.hook("Write", self.ws, file_path=os.path.join(self.ws, ".env"))
         self.assert_denied(denied, "credentials")
         self.assertEqual(self.last_record()["rules"], ["credentials"])
-        self.assert_not_denied(self.hook("Bash", self.ws, env=no_projects, command="psql"))
+        self.assert_not_denied(self.hook("Bash", self.ws, command="psql"))
 
 
 class ExplainTest(ConfigUnionHarness):
