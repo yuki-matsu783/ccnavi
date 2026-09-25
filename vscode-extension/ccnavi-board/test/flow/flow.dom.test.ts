@@ -53,7 +53,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
     // 読んだまま（在るファイル）なら保存は押せない
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
     assert.equal(dom.all("#lock").length, 0);
-    assert.match(dom.one(".path").textContent ?? "", /references\/i0001-01\/flow\.json/);
+    assert.match(dom.one(".path").textContent ?? "", /\.ccnavi\/approved\/flows\/i0001-01\.json/);
   } finally {
     await dom.close();
   }
@@ -220,7 +220,7 @@ test("CB-D112 取り込みは拡張ホストに頼み、届いたフローで置
     await dom.settle();
     assert.deepEqual(dom.posted.filter((m) => m.type === "import").pop(), { type: "import", dirty: true });
     // 中身（data）が届くと、編集は捨てられて未保存が消える
-    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.json", flowRel: "references/i0001-01/flow.json", declared: false, exists: true, doc: sample(), lock: { locked: false, reason: "" } } } });
+    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.json", flowRel: ".ccnavi/approved/flows/i0001-01.json", exists: true, doc: sample(), lock: { locked: false, reason: "" } } } });
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
   } finally {
     await dom.close();

@@ -220,10 +220,11 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/references/i0001-01/flow.json",
-    "rel": "references/i0001-01/flow.json",
-    "declared": false,
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.json",
+    "rel": ".ccnavi/approved/flows/i0001-01.json",
+    "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
+    "linked": false,
     "locked": false
    },
    "risk": {
@@ -271,10 +272,11 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/references/i0001-02/flow.json",
-    "rel": "references/i0001-02/flow.json",
-    "declared": false,
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02.json",
+    "rel": ".ccnavi/approved/flows/i0001-02.json",
+    "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
+    "linked": false,
     "locked": true
    },
    "risk": null,
@@ -325,10 +327,11 @@
    ],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/references/i0001-03/flow.json",
-    "rel": "references/i0001-03/flow.json",
-    "declared": false,
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.json",
+    "rel": ".ccnavi/approved/flows/i0001-03.json",
+    "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
+    "linked": false,
     "locked": false
    },
    "risk": null,
@@ -383,10 +386,11 @@
    ],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/references/i0001-04/flow.json",
-    "rel": "references/i0001-04/flow.json",
-    "declared": false,
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-04.json",
+    "rel": ".ccnavi/approved/flows/i0001-04.json",
+    "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
+    "linked": false,
     "locked": false
    },
    "risk": {
@@ -433,10 +437,11 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/references/i0001-05/flow.json",
-    "rel": "references/i0001-05/flow.json",
-    "declared": false,
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-05.json",
+    "rel": ".ccnavi/approved/flows/i0001-05.json",
+    "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
+    "linked": false,
     "locked": false
    },
    "risk": null,

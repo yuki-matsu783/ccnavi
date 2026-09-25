@@ -44,7 +44,7 @@ test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に
 });
 
 test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実行ファイルの答え）で 作成 / 編集 / 閲覧（着手中）", () => {
-  const base = { path: "/ws/references/x/flow.json", rel: "references/x/flow.json", declared: false };
+  const base = { path: "/ws/.ccnavi/approved/flows/x.json", rel: ".ccnavi/approved/flows/x.json", tree: "/ws", linked: false };
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: false }), "フロー: 作成");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: false }), "フロー: 編集");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: true }), "フロー: 閲覧（着手中）");
@@ -61,7 +61,7 @@ test("CB-T228 錠は実行ファイルの flow.locked の写し。親・無い�
   assert.match(locked.target.lock.reason, /DENY_TICKET_FLOW_LOCKED/);
   assert.match(locked.target.lock.reason, /finish で終わるか cancel で取り消されると外れる/);
   assert.equal(locked.target.parent, "i0001");
-  assert.match(locked.target.flow.rel, /^references\/i0001-02\/flow\.json$/);
+  assert.match(locked.target.flow.rel, /^\.ccnavi\/approved\/flows\/i0001-02\.json$/);
   const open = flowTargetOf(board, "i0001-01");
   assert.ok(open.ok);
   assert.deepEqual(open.target.lock, { locked: false, reason: "" });
@@ -88,7 +88,8 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   const child = board.tickets.find((t) => t.ticket === "i0001-01")?.flow;
   assert.ok(child !== null && child !== undefined);
   assert.equal(child.exists, false);
-  assert.equal(child.declared, false);
+  assert.equal(child.linked, false);
+  assert.equal(child.tree, "<root>/.claude/worktrees/i0001");
   // locked の欠けた答え（古い実行ファイルか壊れた出力）は、止まっているものとして読む
   const raw = JSON.parse(fixtureText()) as { tickets: { ticket: string; flow: Record<string, unknown> | null }[] };
   for (const t of raw.tickets) {
@@ -104,4 +105,29 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.ok(flowCardOf(built, "i0001-01") !== undefined);
   assert.equal(flowCardOf(built, "i0001"), undefined);
   assert.equal(flowCardOf(built, "i9999-01"), undefined);
+});
+
+test("CB-T230 置き場かその途中がリンクなら、着手前でも読むだけ。ツリーの欄が無い古い答えも書かない側", () => {
+  const board = fixture();
+  const edit = (change: (flow: NonNullable<BoardJson["tickets"][number]["flow"]>) => object): BoardJson => ({
+    ...board,
+    tickets: board.tickets.map((t) => (t.ticket === "i0001-01" && t.flow !== null ? { ...t, flow: { ...t.flow, ...change(t.flow) } } : t)),
+  });
+  const linked = flowTargetOf(edit(() => ({ linked: true })), "i0001-01");
+  assert.ok(linked.ok);
+  assert.equal(linked.target.lock.locked, true);
+  assert.match(linked.target.lock.reason, /シンボリックリンク/);
+  const old = flowTargetOf(edit(() => ({ tree: "" })), "i0001-01");
+  assert.ok(old.ok);
+  assert.equal(old.target.lock.locked, true);
+  // linked の欠けた答えは、リンクかを確かめられないので書かない側に読む
+  const raw = JSON.parse(fixtureText()) as { tickets: { flow: Record<string, unknown> | null }[] };
+  for (const t of raw.tickets) {
+    if (t.flow !== null) {
+      delete t.flow.linked;
+    }
+  }
+  const parsed = parseBoardJson(JSON.stringify(raw));
+  assert.ok(parsed.ok);
+  assert.ok(parsed.board.tickets.filter((t) => t.flow !== null).every((t) => t.flow?.linked === true));
 });
