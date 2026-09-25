@@ -154,6 +154,9 @@ def decide_before(
         return EXIT_OK
 
     rule_set, source, target = ruleload.rules_for(stderr, conf, root, payload, record)
+    # チケットの範囲を引く行き先。下で cwd のツリーに置き換える前の、対象のパスそのものの
+    # ツリー。ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てないため。
+    dest = target
     if target is None and payload.cwd:
         # Bash には行き先が無い。記録には cwd のツリーを添える。判定には使わない。
         target = tree.tree_of(root, payload.cwd, conf.projects)
@@ -315,6 +318,8 @@ def decide_before(
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
     # 1 度だけ読んで両方に渡す（設計 9）。ワークスペースルートへの書き込みとシェルでは読まない。
+    # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
+    # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
     index = None
     if (
         conf.tickets_enabled
@@ -425,7 +430,7 @@ def decide_before(
     if verdict != rules.DENY:
         rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
         ticket_decision, text, ticket_notice, code = ticket_verdict(
-            conf, root, payload.tool_name, record.subject, index, rule_hit
+            conf, root, payload.tool_name, record.subject, dest, index, rule_hit
         )
         if ticket_notice:
             notices.append(ticket_notice)
@@ -701,6 +706,7 @@ def ticket_verdict(
     root: str,
     tool: str,
     full: str,
+    t: tree.Tree | None,
     index: dict[str, ticket_mod.Ticket] | None,
     rule_hit: tuple[str, str] | None = None,
 ) -> tuple[str, str, str, str]:
@@ -722,8 +728,13 @@ def ticket_verdict(
     注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
     切り詰めない（親の範囲では切り詰める）ので、効いていない上限があることを判定に添える。
 
+    t は full の行き先のツリー（`ruleload.rules_for` が返したもの。cwd で置き換える前）。
+    ここで引き直さない。引き直すと、索引を読むかを決めたときのツリーとファイルシステムの
+    変化で食い違う余地が残る。
+
     index は承認済みチケットの索引。1 回の判定で走査を 1 度にするため、呼び手が
-    プロジェクトの食い違いの点検と共有して渡す。ワークツリーの中への書き込みでは必ず読んである。
+    プロジェクトの食い違いの点検と共有して渡す。t がワークツリーなら、呼び手は同じ t で
+    索引を読んである。
 
     rule_hit は、ルールが当たっていたときの (ルールの id, タイプ)。チケットがそれより
     厳しい判定を返すときは文面で名指しする。ルールは通しているのに止まった理由が
@@ -734,7 +745,6 @@ def ticket_verdict(
     """
     if not conf.tickets_enabled or tool not in SCOPE_TOOLS:
         return "", "", "", ""
-    t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
         return "", "", "", ""
     assert index is not None
