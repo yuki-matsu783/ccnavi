@@ -636,7 +636,9 @@ class PostToolUseTest(Harness, unittest.TestCase):
         message = json.loads(result.stdout)["systemMessage"]
         self.assertIn("protected/keep.txt", message)
         self.assertIn("wt1", message)
-        self.assertNotIn("数えていないツリー", message, "基準が付いたツリーは数える")
+        self.assertNotIn(
+            "今回のターンでこの確認ができませんでした", message, "基準が付いたツリーは数える"
+        )
 
     def test_基準を持たないツリーは数えていないと言う(self):
         # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
@@ -648,8 +650,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         result = self.run_hook(event="Stop")
 
         message = json.loads(result.stdout)["systemMessage"]
-        self.assertIn("数えていないツリー", message)
-        self.assertIn("wt1", message)
+        self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
     def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
