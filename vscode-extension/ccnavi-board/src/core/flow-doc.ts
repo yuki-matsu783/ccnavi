@@ -513,8 +513,22 @@ export function portsOf(node: FlowNode, connections: readonly FlowConnection[]):
 }
 
 /** 線に添える言葉。`condition` があればそれ、無ければ出口の名前（実行ファイルの案内と同じ読み方） */
+/**
+ * 線の言葉に使う値の綴り。実行ファイルの `flow._text` と同じ読み方にする。真偽値は空、数は整数ならその綴り
+ * （`1.0` は `1`）、文字列はそのまま、ほかは空
+ */
+function labelText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return "";
+}
+
 export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
-  const condition = str(c.condition);
+  const condition = labelText(c.condition);
   if (condition !== "") {
     return condition;
   }
@@ -523,19 +537,23 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
     return "";
   }
   // 出口が項目の id とちょうど同じか、`branch-<番号>` の番号が項目の位置。部分一致や末尾の数字だけでは当てない
-  // （実行ファイルの案内 `flow._port_label` と同じ読み方）
-  const port = connectionFromPort(c);
+  // （実行ファイルの案内 `flow._port_label` と同じ読み方。出口・id・言葉の値も `flow._text` と同じく、
+  // 真偽値は空として読む）
+  const port = labelText(c.fromPort);
+  if (port === "") {
+    return "";
+  }
   const items = branchItems(from);
-  const byId = items.find((item) => str(item.id) !== "" && str(item.id) === port);
+  const byId = items.find((item) => labelText(item.id) !== "" && labelText(item.id) === port);
   if (byId !== undefined) {
-    return str(byId.label);
+    return labelText(byId.label);
   }
   const match = /^branch-(\d{1,6})$/.exec(port);
   if (match === null) {
     return "";
   }
   const item = items[Number(match[1])];
-  return item === undefined ? "" : str(item.label);
+  return item === undefined ? "" : labelText(item.label);
 }
 
 // ---- 入れ子の段と注意

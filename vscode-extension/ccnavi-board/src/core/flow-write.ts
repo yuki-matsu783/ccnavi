@@ -1,7 +1,7 @@
 /**
  * フローのファイルを書く（設計 9.3.1、ADR-0085）。フロー編集画面の保存の、ファイルに触る部分だけ。
  *
- * 置き場は承認済みの領域（既定 `.ccnavi/approved/flows/<子>.json`）で、エージェントは書けない。書くのは人が
+ * 置き場は承認済みの領域（既定 `.ccnavi/approved/flows/<子>.json`）で、人が持つ（エージェントの Write / Edit は判定が止める）。書くのは人が
  * ボードで保存したときだけ。ここはその 1 回を、リンクを辿らずに、途中で落ちても半端なファイルを残さずに書く。
  *
  * - **リンクは辿らない。** ツリーのルートからファイルまでの途中（ファイルそのものを含む）に 1 つでも
@@ -11,6 +11,10 @@
  * - **書き込みは入れ替え。** 同じディレクトリに一時ファイルを `wx`（在れば落ちる。リンクも辿らない）で書き、
  *   `rename` で置き換える。`rename` は行き先がリンクでもリンクそのものを置き換え、指す先には書かない
  * - **読み込んでから外で変わっていない。** 在ったファイルは更新時刻が同じ、無かったファイルはまだ無い
+ * - **ふつうのファイルで、名前が 1 つのものだけ。** 名前付きパイプは開くと待ち続け、ハードリンクは承認済みの
+ *   領域の外の名前から書き換えられる。読むときは `O_NOFOLLOW | O_NONBLOCK` で開き、開いたものを確かめ直す
+ * - **大きさは 256KB まで**（実行ファイルと同じ上限）。読むのも書くのも
+ * - **一時ファイルを残さない。** 落ちても消す。消せずに残った `.*.tmp` は `ccnavi-push-approved.sh` が運ばない
  *
  * 残る隙間（TOCTOU）: 確かめてから `rename` までの間に、誰かが途中のディレクトリをリンクに差し替えれば
  * その先に書きうる。差し替えられるのは承認済みの領域を書ける者（人）だけで、エージェントの書き込みは判定が
@@ -23,6 +27,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 export type FlowWriteResult = { readonly ok: true } | { readonly ok: false; readonly error: string };
+
+/** 読み書きするファイルの大きさの上限（バイト）。実行ファイル（`flow.FILE_LIMIT`）と同じ 256KB */
+export const FLOW_FILE_LIMIT = 256 * 1024;
+
+// Windows には無い。無ければ 0（確かめ直しだけが効く）
+const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
+const O_NONBLOCK = fs.constants.O_NONBLOCK ?? 0;
 
 /** 読み込んだときのファイルの様子。無かったなら `exists: false` */
 export interface FlowExpect {
@@ -122,26 +133,41 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
   if (changed !== undefined) {
     return { ok: false, error: changed };
   }
+  const size = Buffer.byteLength(text, "utf8");
+  if (size > FLOW_FILE_LIMIT) {
+    return { ok: false, error: `フローが大きすぎるので書かない（${size} バイト、上限 ${FLOW_FILE_LIMIT}）。実行ファイルはこれより大きいフローを読まない` };
+  }
   const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`);
+  let renamed = false;
   try {
-    fs.writeFileSync(temp, text, { encoding: "utf8", flag: "wx" });
-  } catch (error) {
-    return { ok: false, error: `フローのファイルに書けない: ${(error as Error).message}` };
+    try {
+      fs.writeFileSync(temp, text, { encoding: "utf8", flag: "wx" });
+    } catch (error) {
+      return { ok: false, error: `フローのファイルに書けない: ${(error as Error).message}` };
+    }
+    // 入れ替えの直前にもう一度確かめる（確かめてから入れ替えるまでの隙間を狭める）
+    const relinked = linkedSegment(tree, file);
+    const again = relinked !== undefined ? linkedError(relinked) : changedSince(file, expect);
+    if (again !== undefined) {
+      return { ok: false, error: again };
+    }
+    try {
+      fs.renameSync(temp, file);
+      renamed = true;
+    } catch (error) {
+      return { ok: false, error: `フローのファイルに書けない: ${(error as Error).message}` };
+    }
+    return { ok: true };
+  } finally {
+    // 途中で落ちても（例外も含めて）一時ファイルを残さない
+    if (!renamed) {
+      try {
+        fs.rmSync(temp, { force: true });
+      } catch {
+        // 消せなければ残る。push の sh は `.*.tmp` を運ばない
+      }
+    }
   }
-  // 入れ替えの直前にもう一度確かめる（確かめてから入れ替えるまでの隙間を狭める）
-  const relinked = linkedSegment(tree, file);
-  const again = relinked !== undefined ? linkedError(relinked) : changedSince(file, expect);
-  if (again !== undefined) {
-    fs.rmSync(temp, { force: true });
-    return { ok: false, error: again };
-  }
-  try {
-    fs.renameSync(temp, file);
-  } catch (error) {
-    fs.rmSync(temp, { force: true });
-    return { ok: false, error: `フローのファイルに書けない: ${(error as Error).message}` };
-  }
-  return { ok: true };
 }
 
 /** 読み込んでから外で変わったなら理由。変わっていなければ undefined */
@@ -162,6 +188,9 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
     return `${file} がシンボリックリンクかファイルでないので書かない`;
+  }
+  if (stat.nlink > 1) {
+    return hardLinkedError(file, "書かない");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
     return "フローのファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）";
@@ -188,7 +217,42 @@ export function readFlowFile(tree: string, file: string): { readonly text: strin
     throw error;
   }
   if (!stat.isFile()) {
-    throw new Error(`${file} がファイルでないので読まない`);
+    throw new Error(`${file} がふつうのファイルでない（名前付きパイプ・デバイスなど）ので読まない`);
   }
-  return { text: fs.readFileSync(file, "utf8"), mtimeMs: stat.mtimeMs };
+  if (stat.nlink > 1) {
+    throw new Error(hardLinkedError(file, "読まない（書きもしない）"));
+  }
+  if (stat.size > FLOW_FILE_LIMIT) {
+    throw new Error(`${file} が大きすぎるので読まない（${stat.size} バイト、上限 ${FLOW_FILE_LIMIT}）`);
+  }
+  // 確かめてから開くまでに差し替えられても、開いたものを確かめ直す。名前付きパイプでも待たない
+  const fd = fs.openSync(file, fs.constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+  try {
+    const opened = fs.fstatSync(fd);
+    if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) {
+      throw new Error(`${file} が開くあいだに別のファイルに差し替わったので読まない`);
+    }
+    if (opened.nlink > 1) {
+      throw new Error(hardLinkedError(file, "読まない（書きもしない）"));
+    }
+    const buffer = Buffer.alloc(FLOW_FILE_LIMIT + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const got = fs.readSync(fd, buffer, length, buffer.length - length, null);
+      if (got === 0) {
+        break;
+      }
+      length += got;
+    }
+    if (length > FLOW_FILE_LIMIT) {
+      throw new Error(`${file} が大きすぎるので読まない（上限 ${FLOW_FILE_LIMIT} バイト）`);
+    }
+    return { text: buffer.subarray(0, length).toString("utf8"), mtimeMs: opened.mtimeMs };
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function hardLinkedError(file: string, what: string): string {
+  return `${file} はハードリンク（ほかの名前からも同じ中身に届く）なので${what}。承認済みの領域の外の名前から書き換えられうる。リンクを外してから開き直す`;
 }
