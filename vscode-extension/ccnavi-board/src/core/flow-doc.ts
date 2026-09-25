@@ -522,11 +522,19 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
   if (from === undefined) {
     return "";
   }
-  const match = /(\d+)$/.exec(connectionFromPort(c));
+  // 出口が項目の id とちょうど同じか、`branch-<番号>` の番号が項目の位置。部分一致や末尾の数字だけでは当てない
+  // （実行ファイルの案内 `flow._port_label` と同じ読み方）
+  const port = connectionFromPort(c);
+  const items = branchItems(from);
+  const byId = items.find((item) => str(item.id) !== "" && str(item.id) === port);
+  if (byId !== undefined) {
+    return str(byId.label);
+  }
+  const match = /^branch-(\d{1,6})$/.exec(port);
   if (match === null) {
     return "";
   }
-  const item = branchItems(from)[Number(match[1])];
+  const item = items[Number(match[1])];
   return item === undefined ? "" : str(item.label);
 }
 

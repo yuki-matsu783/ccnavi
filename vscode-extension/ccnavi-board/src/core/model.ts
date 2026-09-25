@@ -64,11 +64,13 @@ export interface SeenInJson {
 export interface FlowJson {
   /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
   readonly path: string;
-  /** ツリーのルートからの相対（`flow:` の値、無ければ既定の `references/<子>/flow.json`） */
+  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.json`） */
   readonly rel: string;
-  /** `flow:` を書いたか */
-  readonly declared: boolean;
+  /** ファイルを持つツリーのルート。保存はここからファイルまでの途中にリンクがあれば書かない */
+  readonly tree: string;
   readonly exists: boolean;
+  /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
+  readonly linked: boolean;
   readonly locked: boolean;
 }
 
@@ -293,8 +295,10 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
   return {
     path,
     rel: str(raw.rel),
-    declared: raw.declared === true,
+    tree: str(raw.tree),
     exists: raw.exists === true,
+    // 欄が欠けていたら書かない側に倒す（リンクかを確かめられない）
+    linked: raw.linked !== false,
     // 欄が欠けていたら閉じる側に倒す（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
   };

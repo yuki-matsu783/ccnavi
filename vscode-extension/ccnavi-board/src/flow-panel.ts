@@ -14,6 +14,14 @@
  * 1. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
  * 2. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
  * 3. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
+ * 4. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
+ *
+ * 書き込みは一時ファイルの入れ替えで、リンクを辿らない（`core/flow-write.ts`）。置き場は承認済みの領域
+ * （既定 `.ccnavi/approved/flows/<子>.json`）で、エージェントは判定に止められて書けない。
+ *
+ * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
+ * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
+ * 1 回の中（実行ファイルを 1 度起こすぶん）。塞ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
  *
  * 取り込み（`.vscode/workflows/*.json`）は画面の編集中のフローを置き換えるだけで、書くのは保存を押したとき。
  */
@@ -26,6 +34,7 @@ import { followAppearance, postAppearance, readAppearance } from "./appearance.j
 import { loadBoard } from "./ccnavi.js";
 import { importFlow, parseFlow, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { renderFlowPage } from "./core/flow-render.js";
+import { readFlowFile, writeFlowFile } from "./core/flow-write.js";
 import {
   asFlowMessage,
   flowTargetOf,
@@ -169,18 +178,18 @@ async function readPage(root: string, ticket: string): Promise<Loaded> {
   const target = await lookUp(root, ticket);
   const filePath = target.flow.path;
   const shown = shownPath(root, filePath);
-  let text: string;
-  let mtimeMs: number;
+  let read: { readonly text: string; readonly mtimeMs: number } | undefined;
   try {
-    text = fs.readFileSync(filePath, "utf8");
-    mtimeMs = fs.statSync(filePath).mtimeMs;
+    // リンクは辿らない（ツリーのルートからファイルまでの途中も）。読まないし書かない
+    read = readFlowFile(target.flow.tree, filePath);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フローのファイルを読めない（${shown}）: ${(error as Error).message}`);
-    }
+    throw new Error(`フローのファイルを読めない（${shown}）: ${(error as Error).message}`);
+  }
+  if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
     return { target, exists: false, mtimeMs: 0, doc: templateFlow(ticket, target.title), shown };
   }
+  const { text, mtimeMs } = read;
   const parsed = parseFlow(text);
   if (!parsed.ok) {
     // 画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
@@ -317,7 +326,6 @@ function show(current: PanelState): void {
       parent: target.parent,
       flowPath: loaded.shown,
       flowRel: target.flow.rel,
-      declared: target.flow.declared,
       exists: loaded.exists,
       doc: loaded.doc,
       lock: current.lock,
@@ -550,36 +558,17 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直す`);
     return;
   }
-  // 3. 読み込んでから外で変わっていない。無かったファイルは、まだ無い
-  if (loaded.exists) {
-    let mtimeMs: number;
-    try {
-      mtimeMs = fs.statSync(filePath).mtimeMs;
-    } catch (error) {
-      fail(current, `フローのファイルを確かめられない: ${(error as Error).message}`);
-      return;
-    }
-    if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フローのファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
-      return;
-    }
-  } else if (fs.existsSync(filePath)) {
-    fail(current, "フローのファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）");
-    return;
-  }
-  try {
-    current.wroteAt = Date.now();
-    if (loaded.exists) {
-      fs.writeFileSync(filePath, serializeFlow(doc), "utf8");
-    } else {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      fs.writeFileSync(filePath, serializeFlow(doc), { encoding: "utf8", flag: "wx" });
-    }
-  } catch (error) {
+  // 3. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。4. リンクを辿らない。
+  // 5. 一時ファイルに書いて入れ替える（途中で落ちても半端なファイルを残さない）。3〜5 は flow-write.ts
+  current.wroteAt = Date.now();
+  const written = writeFlowFile(target.flow.tree, filePath, serializeFlow(doc), { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
+  if (!written.ok) {
     current.wroteAt = 0;
-    fail(current, `フローのファイルに書けない: ${(error as Error).message}`);
+    fail(current, written.error);
     return;
   }
   await reload(current);
-  vscode.window.showInformationMessage(`${loaded.shown} に保存した。チケットと同じツリーでコミットする`);
+  vscode.window.showInformationMessage(
+    `${loaded.shown} に保存した。承認済みチケットと同じく人がコミットする（sh .ccnavi/scripts/ccnavi-push-approved.sh）`,
+  );
 }

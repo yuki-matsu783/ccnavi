@@ -35,6 +35,11 @@ export function lockedReason(ticket: string): string {
   );
 }
 
+/** 置き場の途中かファイルがシンボリックリンク。読まないし書かない */
+export function linkedReason(rel: string): string {
+  return `フローの置き場（${rel}）かその途中がシンボリックリンクなので、読まないし書かない。リンクの先は承認済みの領域の外かもしれない。リンクを外してから開き直す`;
+}
+
 /** 確かめられなかったとき。閉じる側に倒す */
 export function lockFromFailure(error: string): FlowLock {
   return { locked: true, reason: `着手中かを確かめられないので、書かない: ${error}` };
@@ -74,7 +79,13 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
       parent: found.parent,
       project: found.project,
       flow: found.flow,
-      lock: found.flow.locked ? { locked: true, reason: lockedReason(ticket) } : OPEN_LOCK,
+      lock: found.flow.locked
+        ? { locked: true, reason: lockedReason(ticket) }
+        : found.flow.linked
+          ? { locked: true, reason: linkedReason(found.flow.rel) }
+          : found.flow.tree === ""
+            ? lockFromFailure("フローを持つツリーが実行ファイルの答えに無い（実行ファイルが古い）")
+            : OPEN_LOCK,
     },
   };
 }
@@ -96,10 +107,8 @@ export interface FlowPage {
   readonly parent: string;
   /** フローのファイル（ワークスペースルートからの相対で見せる。外なら絶対） */
   readonly flowPath: string;
-  /** ツリーのルートからの相対（`flow:` の値か既定） */
+  /** ツリーのルートからの相対（承認済みの領域の固定の置き場） */
   readonly flowRel: string;
-  /** `flow:` を書いたか */
-  readonly declared: boolean;
   /** ファイルが在るか。無ければ雛形（開始 → 終了）を見せ、保存でファイルを作る */
   readonly exists: boolean;
   readonly doc: FlowDoc;

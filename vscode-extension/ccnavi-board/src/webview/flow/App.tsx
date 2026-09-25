@@ -193,7 +193,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <span className="flow-ticket">
             <strong>{page.ticket}</strong> {page.title}
           </span>
-          <span className="path" title={`${page.flowRel}${page.declared ? "（flow: の値）" : "（flow: が無いので既定の置き場）"}`}>
+          <span className="path" title={`${page.flowRel}（承認済みの領域。書くのは人だけで、コミットも人がする）`}>
             {page.flowPath}
           </span>
           {!page.exists && <span className="dim">（まだ無い。保存すると作る）</span>}

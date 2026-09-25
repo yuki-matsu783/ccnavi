@@ -267,7 +267,7 @@ function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string
       data-action="flow"
       data-ticket={id}
       data-flow={state}
-      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見る。着手中は書き換えられない" : flow.exists ? "直す" : "作る"}（${flow.rel}）`}
+      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見る。着手中は書き換えられない" : `${flow.exists ? "直す" : "作る"}。着手すると、終わるまで書き換えられなくなる`}（${flow.rel}）`}
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow)}
