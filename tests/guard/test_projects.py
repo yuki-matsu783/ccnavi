@@ -588,16 +588,19 @@ class ProjectsTest(unittest.TestCase):
 
     def test_without_a_projects_dir_everything_is_judged_by_the_workspace_rules(self):
         # 「数えない」を言う口は、`projects/` を作らないこと（ADR-0084）。
-        app_schema = os.path.join(self.app, "schema", "x.sql")
         # 消さずに `projects/` の外へ動かす（Windows は .git の中の読み取り専用を消せない）。
-        os.rename(self.projects, os.path.join(self.ws, "moved-away"))
-        passed = self.hook("Write", self.ws, file_path=app_schema)
+        # 動かした先の app は入れ子の git のまま。`projects/` の外なら、その中でも
+        # ワークスペースのルールで判定される。
+        moved = os.path.join(self.ws, "moved-away")
+        os.rename(self.projects, moved)
+        app = os.path.join(moved, "app")
+        passed = self.hook("Write", self.ws, file_path=os.path.join(app, "schema", "x.sql"))
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
         record = self.last_record()
         self.assertNotIn("project", record)
 
-        passed = self.hook("Bash", self.ws, command="psql")
+        passed = self.hook("Bash", app, command="psql")
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertNotIn("DENY", self.reason(passed))
 

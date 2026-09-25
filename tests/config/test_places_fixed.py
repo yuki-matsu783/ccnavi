@@ -69,7 +69,17 @@ class PlacesHarness(unittest.TestCase):
     ここには何も書かれない。
     """
 
+    # 落ちたとき、どの欄が既定から外れたかを省かずに見せる。
+    maxDiff = None
+
     def setUp(self):
+        self.build()
+
+    def build(self):
+        """使い捨てのワークスペースを 1 つ作る。
+
+        subTest ごとに呼び直し、前の subTest の書き込みを持ち越さない。
+        """
         base = tempfile.mkdtemp(prefix="ccnavi-places-fixed-")
         self.addCleanup(shutil.rmtree, base, ignore_errors=True)
         self.ws = os.path.join(base, "ws")
@@ -175,6 +185,7 @@ class EnvDoesNotMoveThePlacesTest(PlacesHarness):
         """6 つを 1 つずつ入れても、どの置き場も動かない。どの変数が読まれたかが名指しで出る。"""
         for name, key in ENV_TO_KEY.items():
             with self.subTest(env=name):
+                self.build()
                 self.assertEqual(self.observe(env=self.env_of(key)), self.defaults())
 
     def test_all_six_together_are_ignored(self):
@@ -193,17 +204,18 @@ class LocalSettingsFileDoesNotMoveThePlacesTest(PlacesHarness):
     env の表と共有しているので、env を消せばここのキーも読まれなくなる。
     """
 
-    def setUp(self):
-        super().setUp()
+    def build(self):
+        super().build()
         write(os.path.join(self.ws, "pyproject.toml"), '[project]\nname = "ccnavi"\n')
 
     def local(self, **conf):
         return write(os.path.join(self.ws, "ccnavi.settings.local.json"), json.dumps(conf))
 
     def test_each_key_is_ignored(self):
-        by_key = self.moved()
         for key in ENV_TO_KEY.values():
             with self.subTest(key=key):
+                self.build()
+                by_key = self.moved()
                 self.local(**{key: by_key[key]})
                 self.assertEqual(self.observe(), self.defaults())
 

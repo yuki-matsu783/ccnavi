@@ -305,9 +305,17 @@ class PushApprovedTest(Workspace):
         """12（改）. 置き場を動かす環境変数は読まない。既定の置き場だけを運ぶ（ADR-0084、A9）。
 
         `CCNAVI_PROJECTS` / `CCNAVI_TICKETS_APPROVED` / `CCNAVI_TICKETS_PROPOSAL` を既定と違う
-        値で入れても、`projects/` の下と既定の置き場（`.ccnavi/approved`）を運ぶ。
+        値で入れても、`projects/` の下と既定の置き場（`.ccnavi/approved`）を運び、既定の
+        提案の置き場（`wip/proposals/todo`）で消えた提案の削除を同じコミットに入れる。
         env が指した置き場は運ばない。以前は 12（`CCNAVI_TICKETS_APPROVED` で置き場が動く）と
         綴りの正規化の 2 本（`CCNAVI_PROJECTS=/`・`CCNAVI_TICKETS_APPROVED=.`）が見ていた。
+
+        3 つのどれか 1 つでも読まれれば、下の確かめのどれかが落ちる。
+
+        - `CCNAVI_PROJECTS`: `projects/app` が運ばれず、env が指す `x/stray` が運ばれる
+        - `CCNAVI_TICKETS_APPROVED`: 既定の置き場の代わりに `approved/tickets` がコミットされる
+        - `CCNAVI_TICKETS_PROPOSAL`: `wip/proposals/todo` の削除が運ばれず、env が指す
+          `elsewhere/proposals/todo` の削除が運ばれる
 
         実装前は赤。sh がまだ 3 つの値を読んでいるため。フェーズ 4 で人が写す版
         （`wip/design/scripts/ccnavi-push-approved.sh`）に差し替えると通る。
@@ -316,12 +324,23 @@ class PushApprovedTest(Workspace):
         remote = self.repository(project, "work")
         self.place(project)
         tree = self.worktree("i0001")
+        # 承認で todo/ から動いた提案の形。既定の置き場と env が指す置き場に 1 枚ずつ
+        # 追跡させてから消す。運ばれてよいのは既定の側の削除だけ。
+        kept = "elsewhere/proposals/todo/x.md"
+        gone = "wip/proposals/todo/x.md"
+        for rel in (gone, kept):
+            write(os.path.join(tree, *rel.split("/")), "proposal\n")
+        git(tree, "add", "--", gone, kept)
+        git(tree, "commit", "-q", "-m", "proposals")
+        for rel in (gone, kept):
+            os.remove(os.path.join(tree, *rel.split("/")))
         self.place(tree)
-        # env が指す置き場と、ツリー全体を指す綴りが読まれたときにだけ運ばれるもの。
+        # env が指す承認済みチケットの置き場。読まれたときにだけコミットされる。
         other = "approved/tickets"
         write(os.path.join(tree, *other.split("/"), "i0009.md"), "approved\n")
-        write(os.path.join(tree, "README.md"), "書きかけ\n")
-        stray = os.path.join(self.ws, "stray")
+        # env が指すプロジェクトの置き場（`/x` は末尾の / を落とすとルートの下の `x`）。
+        # 読まれたときにだけ、その下のリポジトリが運ばれる。
+        stray = os.path.join(self.ws, "x", "stray")
         stray_remote = self.repository(stray, "work")
         self.place(stray)
         stray_before = self.head(stray)
@@ -338,12 +357,14 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.subject(project), MESSAGE, result.stderr)
         self.assertEqual(self.committed(project), [f"{APPROVED}/i0001.md"])
         self.assertEqual(self.head_of(remote, "work"), self.head(project))
+        # ワークツリーは既定の置き場と、既定の提案の置き場で消えた提案を 1 つのコミットで運ぶ。
         self.assertEqual(self.subject(tree), MESSAGE, result.stderr)
-        self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
+        self.assertEqual(self.committed(tree), sorted([f"{APPROVED}/i0001.md", gone]))
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
-        # env が指した置き場と書きかけは運ばない。`projects/` の外のリポジトリも運ばない。
+        # env が指した置き場は運ばない。承認済みチケットの置き場も、消えた提案も、
+        # その下のリポジトリも。
         self.assertTrue(self.dirty(tree, other))
-        self.assertTrue(self.dirty(tree, "README.md"))
+        self.assertTrue(self.dirty(tree, kept))
         self.assertEqual(self.head(stray), stray_before)
         self.assertEqual(self.head_of(stray_remote, "work"), "")
 
