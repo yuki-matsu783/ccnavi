@@ -488,7 +488,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       return;
     case "copy":
       await vscode.env.clipboard.writeText(effect.prompt);
-      vscode.window.setStatusBarMessage(`${effect.what}をクリップボードに入れた。Claude Code に貼って送る`, 5000);
+      vscode.window.setStatusBarMessage(`${effect.what}をコピーしました。Claude Code に貼って送ってください`, 5000);
       return;
     case "openSession":
       // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信は人が Enter）

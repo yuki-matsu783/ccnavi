@@ -170,7 +170,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="ready" kind="ready" text="Draft 解除済" />);
   }
   if (card.wrapped) {
-    facts.push(<Fact key="wrapped" kind="wrapped" text="締めた" />);
+    facts.push(<Fact key="wrapped" kind="wrapped" text="途中で完了" />);
   }
   if (card.riskLevel !== "" && !isHighRisk(card.riskLevel)) {
     facts.push(<Fact key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
@@ -279,7 +279,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           title={`未解決（Unresolved）の指摘の対応方針を 1 件ずつ決める（対応しない・このフェーズで直す・issue に回す）`}
           onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
         >
-          決める
+          対応方針を決める
         </button>
       );
     case "reviewed":
@@ -292,7 +292,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="reviewed"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を打つ）`}
+          title={`レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を実行して、レビュー済みを記録します）`}
           onClick={() => post({ type: "reviewed", parent: action.parent, phase: action.phase })}
         >
           レビュー済み連絡

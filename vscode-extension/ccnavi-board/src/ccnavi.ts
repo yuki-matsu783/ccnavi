@@ -272,7 +272,7 @@ export async function runApprovePreview(
   if (ran.killed) {
     return {
       ok: false,
-      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。承認済みチケットは置かれていない`,
+      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。まだ 1 件も承認していません`,
     };
   }
   if (ran.code !== 0) {
@@ -349,7 +349,7 @@ export async function runDecidePreview(
 ): Promise<RunResult<DecidePreview>> {
   const ran = await runScript(shell, root, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。何も置かれていない` };
+    return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。反映していません` };
   }
   if (ran.code !== 0) {
     return { ok: false, error: `ccnavi-review.sh decide --preview が失敗した:\n${ran.stderr.trim()}` };
@@ -376,7 +376,7 @@ export async function runDecideYes(
       ok: false,
       error:
         `${cutOff("ccnavi-review.sh decide", DECIDE_TIMEOUT_MS)}。` +
-        "置かれたかどうかは分からない。ボードを更新して、フェーズの状態を確かめる",
+        "反映できたか分かりません。チケット管理を更新して、フェーズの状態を確かめてください",
     };
   }
   const parsed = parseDecideResult(ran.stdout.trim().split("\n").pop() ?? "");

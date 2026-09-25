@@ -764,7 +764,7 @@ test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は
   assert.equal(done.state.overlay?.kind === "prompt" ? done.state.overlay.prompt : "", "決めた文");
   assert.deepEqual(kinds(done.effects), ["warn", "refresh"]);
   const copied = approvalStep(done.state, { kind: "handOver", how: "promptCopy" });
-  assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "残った指摘を決めた文" }]);
+  assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "対応方針の連絡文" }]);
   const again = approvalStep(deciding, { kind: "decided", outcome: { ok: false, mismatch: true } });
   assert.equal(again.state.overlay?.kind, "decideLoading");
   assert.ok(again.state.overlay?.kind === "decideLoading" && again.state.overlay.notice);

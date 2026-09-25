@@ -101,7 +101,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   if (data.kind === "error") {
     return (
       <>
-        <p className="empty">プロジェクトの一覧を読み直せなかった。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直す。</p>
+        <p className="empty">プロジェクトの一覧を読み直せなかった。原因を直してから「ccnavi ボード: プロジェクト管理画面を開く」を実行し直す。</p>
         <pre className="load-error">{data.error}</pre>
       </>
     );

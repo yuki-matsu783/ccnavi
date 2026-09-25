@@ -99,7 +99,7 @@ export function partialMessage(partial: ApprovePartial): string {
   const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
   const what =
     placed.length === 0
-      ? "承認済みチケットは 1 件も置かれていない"
+      ? "まだ 1 件も承認していません"
       : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っている。` +
         "コミットと push は送っていない（送るのは承認できたときだけ）。ボードを更新して確かめる";
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;

@@ -14,7 +14,7 @@ export const MARK_LABELS: Readonly<Record<string, string>> = {
   reviewed: "レビュー済",
 };
 
-export const PHASE_STATE_LABELS = { planned: "未計画", active: "進行中", ended: "終了" } as const;
+export const PHASE_STATE_LABELS = { planned: "未着手", active: "進行中", ended: "終了" } as const;
 
 /** 列の呼び名。列の並びと同じ 1 か所（`core/board.ts` の `COLUMNS`）から引く */
 const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));

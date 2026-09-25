@@ -676,7 +676,7 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
     assert.equal(reviewed.textContent, "レビュー済み連絡");
     assert.equal(
       reviewed.getAttribute("title"),
-      "レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase 2 を打つ）",
+      "レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します）",
     );
     page.click(reviewed);
     await page.settle();
