@@ -307,7 +307,7 @@ class FlowRenderTest(unittest.TestCase):
     def test_flow_text_cannot_pose_as_ccnavi(self):
         """フローの文に `[ccnavi]` や改行・制御文字を入れても ccnavi の行に見せられない（M3・L6）。
 
-        名乗りは全角の括弧に置き換え、改行と制御文字は落とす。
+        名乗りは亀甲括弧に置き換え、改行と制御文字は落とす。
         """
         data = {
             "nodes": [
@@ -323,7 +323,8 @@ class FlowRenderTest(unittest.TestCase):
         text = "\n".join(lines)
         self.assertEqual(len(lines), 1)
         self.assertNotIn("[ccnavi]", text.lower())
-        self.assertIn("［ccnavi］", text)
+        self.assertIn("〔ccnavi〕", text)
+        self.assertFalse(flow.impersonates(text), text)
         for ch in ("\x1b", "‮", "\x00", "\r"):
             self.assertNotIn(ch, text)
 

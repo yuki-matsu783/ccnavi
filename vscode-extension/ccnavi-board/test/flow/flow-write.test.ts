@@ -7,7 +7,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { connectionLabel, connectionsOf, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
-import { linkedSegment, readFlowFile, writeFlowFile } from "../../src/core/flow-write.js";
+import { spawnSync } from "node:child_process";
+import { FLOW_FILE_LIMIT, linkedSegment, readFlowFile, writeFlowFile } from "../../src/core/flow-write.js";
 
 function scratch(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-write-"));
@@ -105,4 +106,76 @@ test("CB-T234 線の言葉は、出口が項目の id とちょうど同じか b
   };
   const labels = connectionsOf(doc).map((c) => connectionLabel(doc, c));
   assert.deepEqual(labels, ["YES", "NO", "", ""]);
+});
+
+test("CB-T235 ハードリンクのフローは読まないし書かない。別名の中身も変わらない", () => {
+  const tree = scratch();
+  const file = place(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, '{"nodes":[]}');
+  const alias = path.join(tree, "alias.json");
+  fs.linkSync(file, alias);
+  assert.throws(() => readFlowFile(tree, file), /ハードリンク/);
+  const written = writeFlowFile(tree, file, '{"nodes":[1]}', { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
+  assert.equal(written.ok, false);
+  assert.match(written.ok ? "" : written.error, /ハードリンク/);
+  assert.equal(fs.readFileSync(alias, "utf8"), '{"nodes":[]}');
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.json"]);
+});
+
+test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない）", { skip: process.platform === "win32" }, () => {
+  const tree = scratch();
+  const file = place(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const made = spawnSync("mkfifo", [file]);
+  if (made.status !== 0) {
+    return; // mkfifo が無い機械
+  }
+  assert.throws(() => readFlowFile(tree, file), /ふつうのファイルでない/);
+  const written = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
+  assert.equal(written.ok, false);
+});
+
+test("CB-T237 256KB を超えるフローは読まないし書かない。書けなかったとき一時ファイルは残らない", () => {
+  const tree = scratch();
+  const file = place(tree);
+  const big = `{"nodes":[],"pad":"${"x".repeat(FLOW_FILE_LIMIT)}"}`;
+  const refused = writeFlowFile(tree, file, big, NEW);
+  assert.equal(refused.ok, false);
+  assert.match(refused.ok ? "" : refused.error, /大きすぎる/);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
+  fs.writeFileSync(file, big);
+  assert.throws(() => readFlowFile(tree, file), /大きすぎる/);
+  // 入れ替えの直前に外で作られた（2 度目の確かめで止まる）ときも、一時ファイルは消す
+  fs.rmSync(file);
+  const raced = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: 1 });
+  assert.equal(raced.ok, false);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
+});
+
+test("CB-T238 線の言葉は真偽値を空として読み、整数の値は綴りで比べる（実行ファイルの flow._text と同じ）", () => {
+  const base = templateFlow("i0001-01", "調査");
+  const doc: FlowDoc = {
+    ...base,
+    nodes: [
+      ...base.nodes,
+      {
+        id: "q",
+        type: "ifElse",
+        name: "q",
+        position: { x: 0, y: 0 },
+        data: { branches: [{ id: true, label: "T" }, { id: 1, label: "ONE" }, { id: "x", label: false }] },
+      },
+    ],
+    connections: [
+      { id: "c1", from: "q", to: "end", fromPort: true, toPort: "input" },
+      { id: "c2", from: "q", to: "end", fromPort: "true", toPort: "input" },
+      { id: "c3", from: "q", to: "end", fromPort: "1", toPort: "input" },
+      { id: "c4", from: "q", to: "end", fromPort: "x", toPort: "input" },
+      { id: "c5", from: "q", to: "end", fromPort: "branch-0", toPort: "input", condition: true },
+      { id: "c6", from: "q", to: "end", fromPort: "branch-0", toPort: "input", condition: 2 },
+    ],
+  };
+  const labels = connectionsOf(doc).map((c) => connectionLabel(doc, c));
+  assert.deepEqual(labels, ["", "", "ONE", "", "T", "2"]);
 });
