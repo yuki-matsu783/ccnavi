@@ -30,7 +30,7 @@ export interface RemoteInfo {
 
 export type RemoteCheck = { readonly ok: true; readonly remote: RemoteInfo } | { readonly ok: false; readonly error: string };
 
-const FORMS = "使える形式は https://host/path、ssh://host/path、git@host:path の 3 つ。ローカルのパスと file:// は使えない";
+const FORMS = "使える形式は https://host/path、ssh://host/path、git@host:path の 3 つです。ローカルのパスと file:// は使えません";
 
 /**
  * clone 元の URL を検査する。通すのは https / ssh / scp 風の 3 形だけ。
@@ -40,10 +40,10 @@ const FORMS = "使える形式は https://host/path、ssh://host/path、git@host
 export function checkRemote(raw: string): RemoteCheck {
   const url = raw.trim();
   if (url === "") {
-    return { ok: false, error: "URL が空" };
+    return { ok: false, error: "URL が空です" };
   }
   if (/\s/.test(url)) {
-    return { ok: false, error: "URL に空白が入っている" };
+    return { ok: false, error: "URL に空白が入っています" };
   }
   let userinfo = "";
   let host: string;
@@ -71,16 +71,16 @@ export function checkRemote(raw: string): RemoteCheck {
   if (userinfo.includes(":")) {
     return {
       ok: false,
-      error: "URL に資格情報（user:token@）が入っている。ターミナルの履歴と .git/config に平文で残るので使えない。credential helper か SSH 鍵を使う",
+      error: "URL に資格情報（user:token@）が入っています。ターミナルの履歴と .git/config に平文で残るので使えません。credential helper か SSH 鍵を使ってください",
     };
   }
   host = host.replace(/:\d+$/, "").toLowerCase();
   if (host === "") {
-    return { ok: false, error: "URL にホスト名が無い" };
+    return { ok: false, error: "URL にホスト名がありません" };
   }
   const cleaned = repoPath.replace(/^\/+/, "").replace(/\/+$/, "").replace(/\.git$/i, "");
   if (cleaned === "") {
-    return { ok: false, error: "URL にリポジトリのパスが無い" };
+    return { ok: false, error: "URL にリポジトリのパスがありません" };
   }
   const name = cleaned.split("/").pop() ?? "";
   return { ok: true, remote: { url, key: `${host}/${cleaned.toLowerCase()}`, name } };
@@ -105,18 +105,18 @@ export type NameCheck = { readonly ok: true; readonly name: string } | { readonl
 export function checkName(raw: string, existing: readonly string[]): NameCheck {
   const name = raw.trim();
   if (name === "") {
-    return { ok: false, error: "名前が空" };
+    return { ok: false, error: "名前が空です" };
   }
   if (!NAME_PATTERN.test(name)) {
-    return { ok: false, error: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付ける。frontmatter の project: と置き場のパスにそのまま使われる" };
+    return { ok: false, error: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付けてください。frontmatter の project: と置き場のパスにそのまま使われます" };
   }
   if (/^\.+$/.test(name)) {
-    return { ok: false, error: "名前を . だけにはできない" };
+    return { ok: false, error: "名前を . だけにはできません" };
   }
   const lower = name.toLowerCase();
   const clash = existing.find((e) => e !== "" && e.toLowerCase() === lower);
   if (clash !== undefined) {
-    return { ok: false, error: `${clash} という名前のツリーが既にある` };
+    return { ok: false, error: `${clash} という名前のツリーが既にあります` };
   }
   return { ok: true, name };
 }
@@ -151,8 +151,8 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", "
 const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 
-export const REASON_OUTSIDE = "projects/ の外にある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
-export const REASON_TOO_DEEP = "projects/ の直下ではなく、その下の階層にある。プロジェクトとして扱われるのは projects/ の直下に置いたものだけ";
+export const REASON_OUTSIDE = "projects/ の外にあります。プロジェクトとして扱われるのは projects/ の直下に置いたものだけです";
+export const REASON_TOO_DEEP = "projects/ の直下ではなく、その下の階層にあります。プロジェクトとして扱われるのは projects/ の直下に置いたものだけです";
 
 export interface StrayInput {
   /** 置き場のルートからの相対（"/" 区切り）。空なら置き場が無効 */

@@ -94,7 +94,7 @@ test("CB-T07 提案が無ければ承認済みチケットの置き場が列。�
   assert.equal(cards.get("i0001-08")!.cancelledAt, "2026-01-01T00:00:00+0000");
   assert.equal(cardsOf(buildBoard({ ...base, tickets: [{ ...closed, cancelled_at: "" }] })).get("i0001-08")!.column, "done");
   assert.equal(cards.get("i0001-07")!.column, "todo");
-  assert.match(cards.get("i0001-07")!.issues[0], /提案が見つからない/);
+  assert.match(cards.get("i0001-07")!.issues[0], /提案が見つかりません/);
   assert.equal(buildBoard(json).issueCount, 1);
 });
 
@@ -102,7 +102,7 @@ test("CB-T08 親の無い子は不備", () => {
   const base = fixture();
   const stray: TicketJson = { ...base.tickets[1], ticket: "i0002-01", parent: "i0002" };
   const cards = cardsOf(buildBoard({ ...base, tickets: [...base.tickets, stray] }));
-  assert.match(cards.get("i0002-01")!.issues[0], /親 i0002 が見つからない/);
+  assert.match(cards.get("i0002-01")!.issues[0], /親 i0002 が見つかりません/);
 });
 
 test("CB-T09 依頼済みで止まったフェーズに decide、締めた親にはバッジだけ", () => {
@@ -366,7 +366,7 @@ test("CB-T138 止まっているチケットは、不備の行に理由が出て
   const card = cardsOf(buildBoard({ ...base, tickets: [parent, stopped] })).get("i0001-02")!;
 
   assert.equal(card.blocked, stopped.blocked);
-  assert.deepEqual(card.issues, [`書き込みが止まっている: ${stopped.blocked}`]);
+  assert.deepEqual(card.issues, [`書き込みが止まっています: ${stopped.blocked}`]);
   assert.equal(card.attention, true);
   // 列は今までどおり。止まっているのは書き込みであって、置き場は動いていない。
   assert.equal(card.column, "doing");

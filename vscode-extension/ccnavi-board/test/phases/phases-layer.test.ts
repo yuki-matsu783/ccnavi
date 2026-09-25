@@ -14,14 +14,14 @@ const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, fo
 test("CB-T114 層の種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
   const layer = await openPhases({ ...MISSING, layer: true, notices: ["読めない <理由>"] });
   try {
-    assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られる/);
+    assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られます/);
     assert.equal(layer.all('button[data-action="create"]').length, 0, "層に雛形は置かない");
     // 文面はそのまま出る（React が文字として入れるので、実体参照に化けない）
     assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
     // 無い層でも種類を足して保存できる
     assert.ok(!layer.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られる/);
+    assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られます/);
     layer.click(layer.one('button[data-action="add"]'));
     await layer.settle();
     assert.ok(!layer.one<HTMLInputElement>(".phase input.f-id").disabled);
@@ -32,10 +32,10 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   // 共通層は今までどおり雛形を作るまで触れない。注意が無ければ帯を足さない
   const common = await openPhases({ ...MISSING, phasesPath: ".ccnavi/common/phases.yml" });
   try {
-    assert.match(common.one(".banner.missing").textContent, /種類を使うにはまずファイルを作る/);
+    assert.match(common.one(".banner.missing").textContent, /種類を使うにはまずファイルを作ってください/);
     assert.equal(common.one('button[data-action="create"]').textContent, "雛形でファイルを作る");
     assert.ok(common.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(common.one("#phases .empty").textContent, /上の「雛形でファイルを作る」で作ってから直す/);
+    assert.match(common.one("#phases .empty").textContent, /上の「雛形でファイルを作る」で作ってから直してください/);
     assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
     common.click(common.one('button[data-action="create"]'));
     await common.settle();

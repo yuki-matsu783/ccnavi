@@ -99,7 +99,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
             data-action="open-rules"
             data-name={row.name}
             disabled={!row.rulesExists}
-            title={`このプロジェクトの ${row.rulesRel === "" ? "層のルール" : row.rulesRel} を編集し、判定を試す`}
+            title={`このプロジェクトの ${row.rulesRel === "" ? "層のルール" : row.rulesRel} を編集し、判定を試します`}
             onClick={() => send({ type: "openRules", name: row.name })}
           >
             ルール設定
@@ -113,7 +113,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
               data-action="open-phases"
               data-name={row.name}
               disabled={row.rulesRel === ""}
-              title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集する。無ければ画面から作れる"
+              title="このプロジェクトのチケットの計画に、共通層に足して使うフェーズの種類を編集します。無ければ画面から作れます"
               onClick={() => send({ type: "openPhases", name: row.name })}
             >
               フェーズ管理
@@ -125,7 +125,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
               className="action"
               data-action="open-board"
               data-name={row.name}
-              title="このプロジェクトに絞ってチケット管理を開く"
+              title="このプロジェクトに絞ってチケット管理画面を開きます"
               onClick={() => send({ type: "openBoard", name: row.name })}
             >
               チケット管理
@@ -138,7 +138,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
             className="action"
             data-action="fetch"
             data-name={row.name}
-            title="git fetch をターミナルで実行する"
+            title="git fetch をターミナルで実行します"
             onClick={() => send({ type: "fetch", name: row.name })}
           >
             fetch
@@ -148,7 +148,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
             className="action"
             data-action="pull"
             data-name={row.name}
-            title="git pull をターミナルで実行する。衝突があれば git が止める"
+            title="git pull をターミナルで実行します。衝突があれば git が止めます"
             onClick={() => send({ type: "pull", name: row.name })}
           >
             pull
@@ -162,7 +162,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
 /** 層のルールファイル。層として数えられていない（予約名）なら、置く先も作るボタンも出さない */
 function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesRel === "") {
-    return <span className="dim">層として数えられていない（検証の error を見る）</span>;
+    return <span className="dim">層として数えられていません（検証の error を確かめてください）</span>;
   }
   if (row.rulesExists) {
     return (
@@ -179,7 +179,7 @@ function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
         className="action small"
         data-action="create-rules"
         data-name={row.name}
-        title="共通層の rules.yml をこのプロジェクトの層にコピーする。文面の sh のパスは {root} 付きに置き換える"
+        title="共通層の rules.yml をこのプロジェクトの層にコピーします。文面の sh のパスは {root} 付きに置き換えます"
         onClick={() => post({ type: "createRules", name: row.name })}
       >
         共通層からコピー

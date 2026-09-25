@@ -156,7 +156,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フェーズ管理画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フェーズ管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -172,7 +172,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`フェーズ管理画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`フェーズ管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -223,7 +223,7 @@ async function switchTarget(current: PanelState, target: PhasesTarget): Promise<
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `未保存の変更がある。破棄して「${titleOf(target)}」に切り替える？`,
+      `未保存の変更があります。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -267,20 +267,20 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);
+      throw new Error(`層の置き場を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.phasesFile.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えに自身の層が無い"
-          : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
+          ? "実行ファイルの答えに自身の層がありません"
+          : `プロジェクト ${target.name} は層として数えられていません（置き場の直下に無いか、予約名 common / self）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
     phasesRel = path.relative(root, phasesPath).split(path.sep).join("/");
     if (layer.phasesFile.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、層の種類を空として扱っている（共通層の種類だけで進む）: ${layer.phasesFile.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、層の種類を空として扱っています（共通層の種類だけで進みます）: ${layer.phasesFile.unreadable}`);
     }
   }
   let text: string;
@@ -292,7 +292,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズの種類のファイルを読めない（${phasesRel}）: ${(error as Error).message}`);
+      throw new Error(`フェーズの種類のファイルを読めません（${phasesRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（番号だけのフェーズ、無い層は空）。画面は空を見せ、「作る」だけができる。
     text = "";
@@ -301,7 +301,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "種類は自身の層とプロジェクトの層にも置ける（プロジェクト管理画面から開く）。共通層に置いた種類は全プロジェクトに効き、層に同じ id で中身の違う種類があるとその層が空として扱われる",
+      "種類は自身の層とプロジェクトの層にも置けます（プロジェクト管理画面から開きます）。共通層に置いた種類は全プロジェクトに効き、層に同じ id で中身の違う種類があるとその層が空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
@@ -572,7 +572,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "読み直したので、この保存は捨てた。いまの種類で編集し直す");
+  fail(current, "更新したので、この保存は取りやめました。いまの種類で編集し直してください");
   return true;
 }
 
@@ -618,11 +618,11 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     case "reload": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "未保存の変更がある。破棄して読み直す？",
+          "未保存の変更があります。破棄して更新しますか？",
           { modal: true },
-          "読み直す",
+          "更新",
         );
-        if (choice !== "読み直す") {
+        if (choice !== "更新") {
           // 画面は「再読込」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
           current.host.post({ type: "cancelled" } satisfies ToPhases);
           return;
@@ -638,7 +638,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       const target = current.loaded.phasesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
+        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
       );
       return;
     }
@@ -660,11 +660,11 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   if (current.target.kind !== "common") {
-    fail(current, "層には雛形を置かない。種類を足して保存すると、ファイルが作られる");
+    fail(current, "層には雛形を置きません。種類を足して保存すると、ファイルが作られます");
     return;
   }
   if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, `${loaded.phasesRel} は既に存在するため、上書きしない。再読込する`);
+    fail(current, `${loaded.phasesRel} は既に存在するため、上書きしません。更新してください`);
     return;
   }
   try {
@@ -674,7 +674,7 @@ async function create(current: PanelState): Promise<void> {
   } catch (error) {
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
-    fail(current, `${loaded.phasesRel} に書けない: ${(error as Error).message}`);
+    fail(current, `${loaded.phasesRel} に書けません: ${(error as Error).message}`);
     return;
   }
   await reload(current);
@@ -682,7 +682,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   vscode.window.showInformationMessage(
-    `${loaded.phasesRel} を雛形から作成しました。修正してコミットを行ってください。`,
+    `${loaded.phasesRel} を雛形から作成しました。修正してコミットしてください。`,
   );
 }
 
@@ -704,7 +704,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   const layer = current.target.kind !== "common";
   if (!loaded.exists && !layer) {
-    fail(current, `${loaded.phasesRel} が無い。先に「雛形でファイルを作る」を押す`);
+    fail(current, `${loaded.phasesRel} がありません。先に「雛形でファイルを作る」を押してください`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -716,7 +716,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     tmp = path.join(current.tmpDir, "phases.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
 
@@ -735,7 +735,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
+    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }
 
@@ -758,15 +758,15 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
     } catch (error) {
-      fail(current, `フェーズの種類のファイルを確かめられない: ${(error as Error).message}`);
+      fail(current, `フェーズの種類のファイルを確かめられません: ${(error as Error).message}`);
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）");
+    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られています。更新してから編集し直してください（上書きしません）");
     return;
   }
 
@@ -780,12 +780,12 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     }
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `フェーズの種類のファイルに書けない: ${(error as Error).message}`);
+    fail(current, `フェーズの種類のファイルに書けません: ${(error as Error).message}`);
     return;
   }
   await reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存した（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存しました（${tail}）`);
 }
 
 function asMessage(message: unknown): PhasesMessage | undefined {

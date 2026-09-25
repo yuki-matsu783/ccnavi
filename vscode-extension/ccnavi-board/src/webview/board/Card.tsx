@@ -76,7 +76,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
         <span className="where">{where}</span>
       </div>
       {moved !== undefined ? (
-        <div className="moved-mark" title="前の読み直しから列が変わった。次に何かが動くまで残る">
+        <div className="moved-mark" title="前回の更新から列が変わりました。次に何かが動くまで残ります">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -167,7 +167,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<MrLink key="mr" url={card.mrUrl} number={card.mrNumber} title="マージリクエストを開く" />);
   }
   if (card.ready) {
-    facts.push(<Fact key="ready" kind="ready" text="Draft 解除済" />);
+    facts.push(<Fact key="ready" kind="ready" text="Draft 解除済み" />);
   }
   if (card.wrapped) {
     facts.push(<Fact key="wrapped" kind="wrapped" text="途中で完了" />);
@@ -262,7 +262,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           className="action"
           data-action="approve-one"
           data-ticket={id}
-          title={`このチケットだけを承認する（ccnavi --approve ${id}）。まとめて承認するなら上部のボタン`}
+          title={`このチケットだけを承認します（ccnavi --approve ${id}）。まとめて承認するなら上部のボタンを使ってください`}
           onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
         >
           この 1 件を承認
@@ -276,7 +276,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="decide"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`未解決（Unresolved）の指摘の対応方針を 1 件ずつ決める（対応しない・このフェーズで直す・issue に回す）`}
+          title={`未解決（Unresolved）の指摘の対応方針を 1 件ずつ決めます（対応しない・このフェーズで直す・issue に回す）`}
           onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
         >
           対応方針を決める

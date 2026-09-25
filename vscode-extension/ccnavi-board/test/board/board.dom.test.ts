@@ -175,7 +175,7 @@ test("CB-D44 「更新」を押すと非活性になり、回り記号と「更�
     assert.equal(button.disabled, true, "押した瞬間に非活性になる");
     assert.ok(button.classList.contains("busy"), "回り記号が出る");
     assert.equal(button.getAttribute("aria-busy"), "true");
-    assert.equal(button.querySelector(".label")?.textContent, "更新中");
+    assert.equal(button.querySelector(".label")?.textContent, "更新中…");
     // 非活性の間はもう 1 度押しても送らない
     const sent = page.posted.length;
     page.click(button);

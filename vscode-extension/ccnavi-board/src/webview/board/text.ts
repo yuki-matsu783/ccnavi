@@ -5,13 +5,13 @@
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 
-export const COPY_LABELS = { none: "未承認", open: "承認済", review: "レビュー待ち", closed: "クローズ" } as const;
+export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ" } as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
-  pending: "終了を通知",
+  pending: "終了を通知済み",
   skipped: "レビュー省略",
-  requested: "レビュー依頼済",
-  reviewed: "レビュー済",
+  requested: "レビュー依頼済み",
+  reviewed: "レビュー済み",
 };
 
 export const PHASE_STATE_LABELS = { planned: "未着手", active: "進行中", ended: "終了" } as const;

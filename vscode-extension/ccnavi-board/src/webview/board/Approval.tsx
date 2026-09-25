@@ -72,10 +72,10 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
     case "done":
       return (
         <>
-          <h2 id="approval-title">{overlay.count} 件を承認した</h2>
-          {overlay.carried === true ? <p className="approval-note">承認済みチケットのコミットと push を端末に送った。</p> : null}
+          <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
+          {overlay.carried === true ? <p className="approval-note">承認済みチケットのコミットと push をターミナルに送りました。</p> : null}
           <p className="approval-note">
-            Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、新しいセッションで開く。送るときは自分で Enter を押す。
+            Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。
           </p>
           <pre className="approval-text">{overlay.prompt}</pre>
           <HandOver />

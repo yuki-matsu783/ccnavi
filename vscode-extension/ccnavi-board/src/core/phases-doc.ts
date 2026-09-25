@@ -113,16 +113,16 @@ export function readPhases(text: string): PhasesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めない: ${e.message}`);
+    problems.push(`YAML として読めません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位が対応表ではない。実行ファイルは読めない。保存すると中身を捨てて対応表から始める");
+    problems.push("最上位が対応表ではありません。実行ファイルは読めません。保存すると中身を捨てて対応表から始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version が無い。保存すると version: ${PHASES_VERSION} を先頭に足す`);
+    problems.push(`version がありません。保存すると version: ${PHASES_VERSION} を先頭に足します`);
   } else if (version !== PHASES_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めない（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になる`);
+    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${PHASES_VERSION}）。フェーズは番号だけの挙動になります`);
   }
 
   // 実行ファイルは前後の空白を落として読む（phasetypes.parse）。同じ読み方にする
@@ -133,27 +133,27 @@ export function readPhases(text: string): PhasesDocument {
     if ((ORDERS as readonly string[]).includes(orderText)) {
       order = orderText as PhaseOrder;
     } else {
-      problems.push(`order が ${ORDERS.join(" か ")} ではない。実行ファイルは読めない。画面は sequential として出し、保存すると書き直す`);
+      problems.push(`order が ${ORDERS.join(" か ")} ではありません。実行ファイルは読めません。画面は sequential として出し、保存すると書き直します`);
     }
   }
 
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phases が無い。実行ファイルは「`phases` が辞書として無い」と言う。種類を 1 つ以上足して保存する");
+    problems.push("phases がありません。実行ファイルは「`phases` が辞書として無い」と報告します。種類を 1 つ以上足して保存してください");
   } else if (!isMap(raw)) {
-    problems.push("phases が対応表ではない。種類は画面に出さない。保存すると中身を捨てて対応表から始める");
+    problems.push("phases が対応表ではありません。種類は画面に出しません。保存すると中身を捨てて対応表から始めます");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身が対応表ではない。画面に出さず、保存するとこの種類は消える（実行ファイルも読めない）`);
+        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身が対応表ではありません。画面に出さず、保存するとこの種類は消えます（実行ファイルも読めません）`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("種類が 1 つも無い。実行ファイルは「`phases` が辞書として無い」と言う");
+      problems.push("種類が 1 つもありません。実行ファイルは「`phases` が辞書として無い」と報告します");
     }
   }
 
@@ -181,12 +181,12 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   const kindText = scalarText(map, "kind") || "work";
   const kind: PhaseKind = (PHASE_KINDS as readonly string[]).includes(kindText) ? (kindText as PhaseKind) : "work";
   if (kind !== kindText) {
-    problems.push(`種類 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join(" か ")} ではない。画面は work として出し、保存すると work になる`);
+    problems.push(`種類 ${id} の kind \`${kindText}\` は ${PHASE_KINDS.join(" か ")} ではありません。画面は work として出し、保存すると work になります`);
   }
   const reviewText = scalarText(map, "review") || "mr";
   const review: Review = (REVIEWS as readonly string[]).includes(reviewText) ? (reviewText as Review) : "mr";
   if (review !== reviewText) {
-    problems.push(`種類 ${id} の review \`${reviewText}\` は ${REVIEWS.join(" か ")} ではない。画面は mr として出し、保存すると mr になる`);
+    problems.push(`種類 ${id} の review \`${reviewText}\` は ${REVIEWS.join(" か ")} ではありません。画面は mr として出し、保存すると mr になります`);
   }
 
   const rawScope = map.get("scope", true);
@@ -196,14 +196,14 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit = true;
   } else if (rawScope instanceof Scalar) {
     if (rawScope.value !== INHERIT && rawScope.value !== null) {
-      problems.push(`種類 ${id} の scope \`${String(rawScope.value)}\` は glob の並びか inherit ではない。画面は inherit として出す`);
+      problems.push(`種類 ${id} の scope \`${String(rawScope.value)}\` は glob の並びか inherit ではありません。画面は inherit として出します`);
     }
     inherit = true;
   } else if (isSeq(rawScope)) {
     inherit = false;
     scope = seqTexts(rawScope);
   } else {
-    problems.push(`種類 ${id} の scope が並びでも inherit でもない。画面は inherit として出す`);
+    problems.push(`種類 ${id} の scope が並びでも inherit でもありません。画面は inherit として出します`);
   }
 
   const lists = {} as Record<ListKey, string[]>;
@@ -214,7 +214,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     } else if (isSeq(raw)) {
       lists[key] = seqTexts(raw);
     } else {
-      problems.push(`種類 ${id} の ${key} が並びではない。画面は空として出し、保存すると欄が消える`);
+      problems.push(`種類 ${id} の ${key} が並びではありません。画面は空として出し、保存すると欄が消えます`);
       lists[key] = [];
     }
   }
@@ -263,13 +263,13 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     const id = form.id.trim();
     if (seen.has(id)) {
       // 同じキーを 2 つ書くと、実行ファイル（yaml.safe_load）は後ろで黙って上書きし、種類が 1 つ消える。
-      throw new Error(`id \`${id}\` が 2 つある。同じ id の種類は 1 つにする`);
+      throw new Error(`id \`${id}\` が 2 つあります。同じ id の種類は 1 つにしてください`);
     }
     seen.add(id);
     if (form.origin !== null) {
       if (seenOrigins.has(form.origin)) {
         // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出て、キーも重なる。
-        throw new Error(`${form.origin + 1} 件目の種類が 2 回送られた。再読込してから編集し直す`);
+        throw new Error(`${form.origin + 1} 件目の種類が 2 回送られました。更新してから編集し直してください`);
       }
       seenOrigins.add(form.origin);
     }

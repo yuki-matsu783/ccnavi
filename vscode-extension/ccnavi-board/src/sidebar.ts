@@ -56,7 +56,7 @@ const ENTRIES: readonly Entry[] = [
   },
   {
     label: "チケット管理",
-    description: "チケットをカンバンで見て、承認とレビューを進める",
+    description: "チケットをカンバンで見て、承認とレビューを進めます",
     command: "ccnaviBoard.open",
     icon: "checklist",
     needsTickets: true,

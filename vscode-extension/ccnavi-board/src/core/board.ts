@@ -199,12 +199,12 @@ function toCard(
   // 止まっていることは不備として挙げる。バッジは一目で分かる短い言葉しか出せないので、
   // 理由の全文はここに置く（`attention` もこれで立つ）。
   if (t.blocked !== "") {
-    issues.push(`書き込みが止まっている: ${t.blocked}`);
+    issues.push(`書き込みが止まっています: ${t.blocked}`);
   }
   const isParent = t.parent === "";
   const column = columnOf(t, issues);
   if (!isParent && !ids.has(t.parent)) {
-    issues.push(`親 ${t.parent} が見つからない`);
+    issues.push(`親 ${t.parent} が見つかりません`);
   }
 
   const ownParent = parents.get(isParent ? t.ticket : t.parent);
@@ -312,7 +312,7 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   if (t.copy.status === "open") {
     return "doing";
   }
-  issues.push("提案が見つからない（承認済みチケットだけがある）");
+  issues.push("提案が見つかりません（承認済みチケットだけがあります）");
   return "todo";
 }
 

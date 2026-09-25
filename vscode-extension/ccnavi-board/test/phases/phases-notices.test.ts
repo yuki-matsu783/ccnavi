@@ -21,13 +21,13 @@ test("CB-T212 注意は当てはまるときだけ。sequential の after は、
   assert.deepEqual(notices({ order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] }), []);
   // 行き先がこのファイルに無い after だけでも、sequential では効かないと言う
   const seq = notices({ order: "sequential", phases: [phase("a", { after: ["外の層の種類"] })] }, true);
-  assert.ok(seq.some((line) => /sequential なので、after は判定に効かない/.test(line)));
-  assert.ok(seq.some((line) => /ほかの層の種類を指しているならそのままでよい/.test(line)));
+  assert.ok(seq.some((line) => /sequential なので、after は判定に効きません/.test(line)));
+  assert.ok(seq.some((line) => /ほかの層の種類を指しているならそのままで構いません/.test(line)));
 });
 
 test("CB-T213 層の画面で dag を選んでいたら、ほかの層が sequential なら効かないと言う。共通層では言わない", () => {
   const f: PhasesForm = { order: "dag", phases: [phase("a"), phase("b", { after: ["a"] })] };
-  assert.ok(notices(f, true).some((line) => /ほかの層のどれかが sequential なら、判定は sequential で待つ/.test(line)));
+  assert.ok(notices(f, true).some((line) => /ほかの層のどれかが sequential なら、判定は sequential で待ちます/.test(line)));
   assert.ok(!notices(f, false).some((line) => /ほかの層/.test(line)));
 });
 

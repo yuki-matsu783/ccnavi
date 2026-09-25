@@ -128,11 +128,11 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          リスク管理画面を読み直せなかった。原因を直してから「再読込」を押す（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: リスク管理画面を開く」を実行する。開いたままでは前面に出るだけ）。
+          リスク管理画面を更新できませんでした。原因を直してから「更新」を押してください（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: リスク管理を開く」を実行してください。開いたままでは前面に出るだけです）。
         </p>
         <pre className="load-error">{data.error}</pre>
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          再読込
+          更新
         </button>
       </>
     );
@@ -192,9 +192,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   return (
     <>
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。再読込してください。
+        ファイルの変更を検知しました。更新してください。
         <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-          再読込
+          更新
         </button>
       </div>
       <header className="toolbar">
@@ -211,7 +211,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-            再読込
+            更新
           </button>
           <button
             type="button"
@@ -242,7 +242,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       {page !== undefined && !exists && (
         <div className="banner missing">
-          <span>{page.riskPath} が無い。実行ファイルは組み込みの配点で数えている（画面の値はその組み込みの配点）。直すにはまずファイルを作る。</span>
+          <span>{page.riskPath} がありません。実行ファイルは組み込みの配点で数えています（画面の値はその組み込みの配点です）。直すにはまずファイルを作ってください。</span>
           <button
             type="button"
             className="action primary"
@@ -260,18 +260,18 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       <section className="block">
         <h2>
-          リスクレベルの基準点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが 1 段上がる。HIGH 以上の場合は、次フェーズに進む前に人間レビューを必須とする
+          リスクレベルの基準点 <span className="count">リスクの合計点がこの値以上になると、リスクレベルが 1 段上がります。HIGH 以上の場合は、次フェーズに進む前に人間レビューが必須になります
           </span>
         </h2>
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            子チケットを閉じるとき、下の「項目」で当てはまった点を足し合わせて、その変更のリスクの点を出す。
-            合計点が設定値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていく。
-            <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めない。</strong>
-            チケットで「レビュー不要」と宣言していても、人間のレビューが必要になる。
-            値は MEDIUM ≤ HIGH ≤ CRITICAL となるように入れる。空欄にしたリスクレベルは、組み込みの値（
-            {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）を使う。
+            子チケットを閉じるとき、下の「項目」で当てはまった点を足し合わせて、その変更のリスクの点を出します。
+            合計点が設定値以上になると、リスクレベルが LOW → MEDIUM → HIGH → CRITICAL の順に上がっていきます。
+            <strong>HIGH 以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
+            チケットで「レビュー不要」と宣言していても、人間のレビューが必要になります。
+            値は MEDIUM ≤ HIGH ≤ CRITICAL となるように入れてください。空欄にしたリスクレベルは、組み込みの値（
+            {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）を使います。
           </p>
         </details>
         <div className="levels" id="levels">
@@ -308,8 +308,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>この欄の説明</summary>
           <p className="hint">
-            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点する。1 件につき加点条件は 1 つ。
-            <code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられない。
+            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1 件につき加点条件は 1 つです。
+            <code>script</code> が失敗したときと出力が読めないときは安全側に倒して points をそのまま加点し、<code>judge</code> は判定が揃うまで子を閉じられません。
           </p>
         </details>
         <ul className="list" id="factors">
@@ -328,7 +328,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               onRemove={() => remove(row.key)}
             />
           ))}
-          {draft.rows.length === 0 && <li className="empty">項目が無い。加点する項目が無ければ、どの子も LOW のまま閉じる</li>}
+          {draft.rows.length === 0 && <li className="empty">項目がありません。加点する項目が無ければ、どの子も LOW のまま閉じます</li>}
         </ul>
       </section>
       {tour.touring && <Tour steps={exists ? TOUR_STEPS : [MISSING_STEP, ...TOUR_STEPS]} onClose={tour.end} />}
@@ -343,7 +343,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
 const MISSING_STEP: TourStep = {
   target: '[data-action="create"]',
   title: "まずファイルを作る",
-  body: "配点のファイルがまだ無い。実行ファイルは組み込みの配点で数えている。直すには、ここで組み込みの配点からファイルを作る。",
+  body: "配点のファイルがまだありません。実行ファイルは組み込みの配点で数えています。直すには、ここで組み込みの配点からファイルを作ってください。",
 };
 
 /** リスク管理画面の案内。画面の様子は動かさないので、閉じても戻すものは無い */
@@ -351,21 +351,21 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#levels",
     title: "リスクレベルの基準点",
-    body: "子チケットのリスクの点がこの値以上になると、リスクレベルが 1 段上がる（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めない。空欄なら組み込みの値を使う。",
+    body: "子チケットのリスクの点がこの値以上になると、リスクレベルが 1 段上がります（LOW → MEDIUM → HIGH → CRITICAL）。HIGH 以上になると、レビューが終わるまでフェーズは先へ進めません。空欄なら組み込みの値を使います。",
   },
   {
     target: "#factors",
     title: "項目",
-    body: "子チケットを閉じるとき、その差分に当てて加点する項目。行を押すと欄が開き、加点条件と点を直せる。「＋ 項目を追加」で足せる。",
+    body: "子チケットを閉じるとき、その差分に当てて加点する項目です。行を押すと欄が開き、加点条件と点を直せます。「＋ 項目を追加」で足せます。",
   },
   {
     target: "#save",
     title: "保存",
-    body: "保存すると実行ファイルが検証してから書き込む。通らなければ、下に理由が出る。",
+    body: "保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。",
   },
   {
     target: '[data-action="tour"]',
     title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
   },
 ];

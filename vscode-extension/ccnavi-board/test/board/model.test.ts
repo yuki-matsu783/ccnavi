@@ -36,7 +36,7 @@ test("CB-T02 版が違えば読まない", () => {
   const parsed = parseBoardJson(text);
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
-    assert.match(parsed.error, /版が違う/);
+    assert.match(parsed.error, /版が違います/);
   }
 });
 
@@ -44,7 +44,7 @@ test("CB-T03 JSON でなければ理由を返す", () => {
   const parsed = parseBoardJson("not json");
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
-    assert.match(parsed.error, /JSON として読めない/);
+    assert.match(parsed.error, /JSON として読めません/);
   }
   const notObject = parseBoardJson("[1]");
   assert.equal(notObject.ok, false);

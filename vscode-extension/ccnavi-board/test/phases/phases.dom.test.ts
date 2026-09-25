@@ -53,7 +53,7 @@ test("CB-D21 範囲を inherit に変えると glob の欄が消え、行は開�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /id が重なっている（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /id が重なっています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -194,7 +194,7 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
 test("CB-D62 読み直せなかったら理由を出し、種類は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "種類のファイルを読めない: EACCES" });
   try {
-    assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み直せなかった/);
+    assert.match(dom.one(".empty").textContent, /フェーズ管理画面を更新できませんでした/);
     assert.equal(dom.one("pre.load-error").textContent, "種類のファイルを読めない: EACCES");
     assert.equal(dom.all("#phases").length, 0);
   } finally {
@@ -208,8 +208,8 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /種類が無い。種類が 1 つも無いファイルは実行ファイルが読めない/);
-    assert.match(dom.one(".problems").textContent, /phases が対応表ではない/);
+    assert.match(dom.one("#phases .empty").textContent, /種類がありません。種類が 1 つも無いファイルは実行ファイルが読めない/);
+    assert.match(dom.one(".problems").textContent, /phases が対応表ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
   } finally {
@@ -270,8 +270,8 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる2");
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
-    await dom.send({ type: "data", data: { kind: "loading", text: "web のフェーズを読み込み中..." } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "web のフェーズを読み込み中...");
+    await dom.send({ type: "data", data: { kind: "loading", text: "web のフェーズを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "web のフェーズを読み込み中…");
     assert.equal(dom.all(rowSelector("p1")).length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
@@ -403,7 +403,7 @@ test("CB-D88 feedback の種類は先に済ませる種類を持てないと言�
     dom.click(dom.one(`${rowSelector("p5")} .row-head`));
     await dom.settle();
     assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
-    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てない/);
+    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てません/);
   } finally {
     await dom.close();
   }
@@ -491,7 +491,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
 });
 
 test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
-  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中..." });
+  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中…" });
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
@@ -516,7 +516,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる/);
+    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まります/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");

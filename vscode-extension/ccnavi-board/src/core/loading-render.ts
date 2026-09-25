@@ -24,7 +24,7 @@ export interface LoadingOptions {
 
 /** 読み込み中の一言。`what` は読むもの（「チケット」「web のルール」）。5 画面と切り替え中の表示で綴りを揃える */
 export function loadingText(what: string): string {
-  return `${what}を読み込み中...`;
+  return `${what}を読み込み中…`;
 }
 
 /**

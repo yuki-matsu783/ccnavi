@@ -46,7 +46,7 @@ export function forgetScreens(): void {
 /** 画面を開く。`screens().rules({ kind: "self" })` のように使う */
 export function screens(): Screens {
   if (registered === undefined) {
-    throw new Error("画面の入口が登録されていない（extension.ts の registerScreens を通っていない）");
+    throw new Error("画面の入口が登録されていません（extension.ts の registerScreens を通っていません）");
   }
   return registered;
 }

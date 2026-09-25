@@ -76,7 +76,7 @@ test("CB-T105 承認の答えを読む（承認した / 一覧が違った）", 
 test("CB-T106 版が違う・JSON でない答えは読まない", () => {
   const other = parseApprovePreview(JSON.stringify({ version: APPROVE_VERSION + 1, batch: [] }));
   assert.ok(!other.ok);
-  assert.ok(!other.ok && other.error.includes("版が違う"));
+  assert.ok(!other.ok && other.error.includes("版が違います"));
   const broken = parseApproveResult("承認した。\n");
   assert.ok(!broken.ok);
   assert.ok("error" in broken);
@@ -111,9 +111,9 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "書けない (…)",
     lines: ["  i0001 のフェーズ 1 のマーカーを消した"],
   });
-  assert.ok(stopped.includes("i0001-01 で止まった"));
-  assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っている"));
-  assert.ok(stopped.includes("コミットと push は送っていない"));
+  assert.ok(stopped.includes("i0001-01 で止まりました"));
+  assert.ok(stopped.includes("i0001 の 1 件は承認済みチケットに入っています"));
+  assert.ok(stopped.includes("コミットと push は送っていません"));
   assert.ok(stopped.includes("マーカーを消した"), "端末に出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
@@ -128,6 +128,6 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "マーカーを置けない: 書けない",
     lines: [],
   });
-  assert.ok(after.includes("i0001 の後始末で止まった"));
+  assert.ok(after.includes("i0001 の後始末で止まりました"));
   assert.ok(!after.includes("i0001 で止まった"));
 });

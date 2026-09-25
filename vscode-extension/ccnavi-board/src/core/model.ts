@@ -173,16 +173,16 @@ export function parseBoardJson(text: string): ParseResult {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== BOARD_VERSION) {
     return {
       ok: false,
-      error: `ボードの版が違う（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `チケット管理の JSON の版が違います（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   const settings = isRecord(raw.settings) ? raw.settings : {};

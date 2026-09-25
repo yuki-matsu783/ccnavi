@@ -85,10 +85,10 @@ function binSetting(): string {
 export async function openBoard(project?: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ccnavi ボードを表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、チケット管理画面を表示できません");
     return;
   }
-  if (!requireTickets("ボード")) {
+  if (!requireTickets("チケット管理画面")) {
     return;
   }
   if (state !== undefined) {
@@ -104,7 +104,7 @@ export async function openBoard(project?: string): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`チケット管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -140,7 +140,7 @@ export async function openBoard(project?: string): Promise<void> {
 /** `ccnaviBoard.refresh` の本体 */
 export function refreshBoard(): void {
   if (state === undefined) {
-    vscode.window.showInformationMessage("ccnavi ボードが開かれていない");
+    vscode.window.showInformationMessage("チケット管理画面が開かれていません");
     return;
   }
   void update();
@@ -227,7 +227,7 @@ async function update(): Promise<void> {
       // 設定ファイルの読みと実行ファイルの答えが食い違えば言う。判定は実行ファイルの側で動いている。
       const mismatch = ticketControlMismatch(ticketControl(), result.board.settings.ticket_control);
       if (mismatch) {
-        vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
+        vscode.window.showWarningMessage(`チケット管理: ${mismatch}`);
       }
     }
     if (!result.ok) {
@@ -546,7 +546,7 @@ function openTicket(current: PanelState, filePath: string): void {
     return;
   }
   void showTicketPreview(filePath).catch(() => {
-    vscode.window.showInformationMessage(`チケットのファイルを開けなかった: ${filePath}`);
+    vscode.window.showInformationMessage(`チケットのファイルを開けませんでした: ${filePath}`);
     void update();
   });
 }

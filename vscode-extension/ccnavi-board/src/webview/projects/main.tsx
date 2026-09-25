@@ -10,6 +10,6 @@ import { App } from "./App.js";
 
 const root = document.getElementById("root");
 if (root !== null) {
-  const initial = readInitial<ProjectsData>(DATA_ID, "プロジェクト管理", (error) => ({ kind: "error", error }));
+  const initial = readInitial<ProjectsData>(DATA_ID, "プロジェクト管理画面", (error) => ({ kind: "error", error }));
   createRoot(root).render(<App initial={initial} />);
 }

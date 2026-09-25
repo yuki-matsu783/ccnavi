@@ -25,7 +25,7 @@ export function problemsOf(row: ProjectRow): readonly LintProblem[] {
           {
             severity: "warn" as const,
             where: "",
-            detail: `.claude/ がある。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見える。プロジェクトの設定は ${settingsDir(row)}/ に置く`,
+            detail: `.claude/ があります。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見えます。プロジェクトの設定は ${settingsDir(row)}/ に置いてください`,
           },
         ]
       : []),

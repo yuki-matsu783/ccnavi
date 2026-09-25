@@ -166,7 +166,7 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
     assert.equal(dom.all(`${cardSelector("lib")} button[data-action="create-rules"][data-name="lib"]`).length, 1);
     assert.ok(dom.one<HTMLInputElement>(`${cardSelector("lib")} button[data-action="open-rules"]`).hasAttribute("disabled"));
     // 予約名のプロジェクトは層が無いので、置く先も作るボタンも出さない
-    assert.match(rules("Self"), /層として数えられていない/);
+    assert.match(rules("Self"), /層として数えられていません/);
     assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
 
     const workspace = dom.one("section.workspace");
@@ -217,7 +217,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     const lint = dom.all(`${cardSelector("lib")} ul.lint li`).map((li) => text(li));
     assert.ok(!lint.some((l) => /\.claude\/ を持つ/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "warn: .claude/settings.json を読めない: 壊れている"), lint.join(" / "));
-    assert.ok(lint.some((l) => /\.claude\/ がある。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/ に置く/.test(l)), lint.join(" / "));
+    assert.ok(lint.some((l) => /\.claude\/ があります。Claude Code は.*プロジェクトの設定は \.ccnavi\/config\/ に置いてください/.test(l)), lint.join(" / "));
     assert.ok(lint.some((l) => l === "error: 文面が無い"), lint.join(" / "));
     // 行末は「開く ▾」と「git ▾」の 2 つ。中のボタンの data-action は前のまま
     const menus = dom.all(`${cardSelector("lib")} details.menu`);
@@ -237,7 +237,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
     row({ name: "Self", rel: "projects/Self", hasClaudeDir: true, rulesRel: "" }),
   ]);
   try {
-    const dirs = flat.all("ul.lint li").flatMap((li) => [...text(li).matchAll(/プロジェクトの設定は ([^ ]+)\/ に置く/g)].map((m) => m[1]));
+    const dirs = flat.all("ul.lint li").flatMap((li) => [...text(li).matchAll(/プロジェクトの設定は ([^ ]+)\/ に置いてください/g)].map((m) => m[1]));
     assert.deepEqual(dirs, [".ccnavi/config", "conf/ccnavi", ".ccnavi/config"]);
   } finally {
     await flat.close();

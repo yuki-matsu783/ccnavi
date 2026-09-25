@@ -144,7 +144,7 @@ function samplesSetting(): string {
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -160,7 +160,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`ルール設定画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -211,7 +211,7 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `未保存の変更がある。破棄して「${titleOf(target)}」に切り替える？`,
+      `未保存の変更があります。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -259,20 +259,20 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);
+      throw new Error(`層の置き場を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えに自身の層が無い"
-          : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
+          ? "実行ファイルの答えに自身の層がありません"
+          : `プロジェクト ${target.name} は層として数えられていません（置き場の直下に無いか、予約名 common / self）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、層を空として扱っている（ここのルールは 1 件も効いていない）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、層を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -281,8 +281,8 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
-    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通層からコピー」で作る";
-    throw new Error(`ルールファイルを読めない（${rulesRel}）: ${(error as Error).message}${hint}`);
+    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通層からコピー」で作ってください";
+    throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}${hint}`);
   }
   const hooks = [
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
@@ -562,7 +562,7 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, `読み直したので、${what}は捨てた。いまのルールでやり直す`);
+  fail(current, `更新したので、${what}は取りやめました。いまのルールでやり直してください`);
   return true;
 }
 
@@ -575,7 +575,7 @@ function fail(current: PanelState, message: string): void {
 function stage(current: PanelState, sections: Sections): RulesOverride {
   const loaded = current.loaded;
   if (loaded === undefined) {
-    throw new Error("ルールが読み込まれていない");
+    throw new Error("ルールが読み込まれていません");
   }
   const tmp = path.join(current.tmpDir, "rules.yml");
   fs.writeFileSync(tmp, loaded.doc.apply(sections), "utf8");
@@ -631,11 +631,11 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     case "reload": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "未保存の変更がある。破棄して読み直す？",
+          "未保存の変更があります。破棄して更新しますか？",
           { modal: true },
-          "読み直す",
+          "更新",
         );
-        if (choice !== "読み直す") {
+        if (choice !== "更新") {
           // 画面は「再読込」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
           // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
           if (alive(current)) {
@@ -654,7 +654,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       const target = message.which === "rules" ? current.loaded.rulesPath : current.loaded.samplesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
+        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
       );
       return;
     }
@@ -675,7 +675,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       }
       const rel = path.relative(root, chosen.fsPath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
-        void vscode.window.showWarningMessage(`ワークスペースの外のファイルは指定できない: ${chosen.fsPath}`);
+        void vscode.window.showWarningMessage(`ワークスペースの外のファイルは指定できません: ${chosen.fsPath}`);
         return;
       }
       current.host.post({
@@ -695,7 +695,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
-        fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+        fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
       const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
@@ -718,7 +718,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
-        fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+        fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
       const result = await runSamples(root, binSetting(), rules, loaded.samplesPath);
@@ -752,7 +752,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     tmp = path.join(current.tmpDir, "rules.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
 
@@ -767,7 +767,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
 
@@ -786,11 +786,11 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   try {
     mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
   } catch (error) {
-    fail(current, `ルールファイルを確かめられない: ${(error as Error).message}`);
+    fail(current, `ルールファイルを確かめられません: ${(error as Error).message}`);
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "ルールファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+    fail(current, "ルールファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
     return;
   }
 
@@ -800,12 +800,12 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   } catch (error) {
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
-    fail(current, `ルールファイルに書けない: ${(error as Error).message}`);
+    fail(current, `ルールファイルに書けません: ${(error as Error).message}`);
     return;
   }
   await reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存した（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存しました（${tail}）`);
 }
 
 function asMessage(message: unknown): RulesMessage | undefined {

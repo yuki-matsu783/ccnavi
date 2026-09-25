@@ -69,7 +69,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
     // docs の requires はこのファイルに無い種類を指すので、線にしていないと件数で言う
     const notes = dom.all(".graph-note").map((note) => note.textContent ?? "");
     assert.deepEqual(notes.length, 1);
-    assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていない/);
+    assert.match(notes[0], /このファイルに無い種類を指す関係が 1 件あり、線にしていません/);
     // 線が落ちた理由は断定しない（綴り違いかもしれない。ADR-0035）。良し悪しも言わない
     assert.doesNotMatch(notes[0], /他の層の種類を指す/);
     assert.doesNotMatch(notes[0], /循環|不正|エラー|直して/);
@@ -84,7 +84,7 @@ test("CB-D74 図の下は凡例と、当てはまるときだけの注意。線�
   // sequential なのに after がある。矢印が判定に効かないことを言う
   const seq = await openGraph({ model: model("version: 1\nphases:\n  a:\n    kind: work\n    review: mr\n  b:\n    kind: work\n    review: mr\n    after: [a]\n") });
   try {
-    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効かない/);
+    assert.match(seq.one(".graph-note").textContent ?? "", /待ち方が sequential なので、after は判定に効きません/);
   } finally {
     await seq.close();
   }
@@ -187,7 +187,7 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
     await added.settle();
     added.click(added.one('[data-action="show-graph"]'));
     await added.settle();
-    assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は図に出ない（1 件）/);
+    assert.match(added.one(".graph-note").textContent ?? "", /id が空の種類は図に出ません（1 件）/);
   } finally {
     await added.close();
   }

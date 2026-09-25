@@ -100,10 +100,10 @@ export function partialMessage(partial: ApprovePartial): string {
   const what =
     placed.length === 0
       ? "まだ 1 件も承認していません"
-      : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っている。` +
-        "コミットと push は送っていない（送るのは承認できたときだけ）。ボードを更新して確かめる";
+      : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っています。` +
+        "コミットと push は送っていません（送るのは承認できたときだけです）。チケット管理を更新して確かめてください";
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
-  return `ccnavi --approve --yes が${where}止まった: ${reason}。${what}${done}`;
+  return `ccnavi --approve --yes が${where}止まりました: ${reason}。${what}${done}`;
 }
 
 export type ResultParse =
@@ -186,16 +186,16 @@ function parseTop(text: string): Top {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== APPROVE_VERSION) {
     return {
       ok: false,
-      error: `承認の JSON の版が違う（拡張は ${APPROVE_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `承認の JSON の版が違います（拡張は ${APPROVE_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   return { ok: true, raw, version };

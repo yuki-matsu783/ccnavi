@@ -106,7 +106,7 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
 test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false });
   try {
-    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml が無い。実行ファイルは組み込みの配点で数えている/);
+    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
     assert.ok(missing.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
   } finally {
@@ -126,7 +126,7 @@ test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は�
   const dom = await openRisk({ model: readRisk("version: 1\nfactors: nope\n").model });
   try {
     assert.ok(dom.one("#lock").classList.contains("hidden"));
-    assert.match(dom.one(".problems").textContent, /factors が並びではない/);
+    assert.match(dom.one(".problems").textContent, /factors が並びではありません/);
     // 作業中のチケットが現れたら、保存は押せなくなる（編集の途中はそのまま）
     dom.type(dom.one("#find"), "");
     await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
@@ -254,7 +254,7 @@ test("CB-D55 組み上がったら ready を送り、届いた中身で編集を
 test("CB-D56 読み直せなかったら理由を出し、配点は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "配点のファイルを読めない: EACCES" });
   try {
-    assert.match(dom.one(".empty").textContent, /リスク管理画面を読み直せなかった/);
+    assert.match(dom.one(".empty").textContent, /リスク管理画面を更新できませんでした/);
     assert.equal(dom.one("pre.load-error").textContent, "配点のファイルを読めない: EACCES");
     assert.equal(dom.all("#factors").length, 0);
   } finally {

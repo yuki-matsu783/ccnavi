@@ -53,7 +53,7 @@ export function countText(total: number, query: string, shown: number, kept: num
 /** id が重なっているときに下部へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `id が重なっている（${names.join(", ")}）。1 つにするまで保存できない`;
+  return `id が重なっています（${names.join(", ")}）。1 つにするまで保存できません`;
 }
 
 /**
@@ -71,21 +71,21 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
   // after を 1 つでも書いていれば言う（線にならない、ほかの層を指す after も効かないのは同じ）
   const hasAfter = form.phases.some((phase) => phase.after.some((id) => id.trim() !== ""));
   if (form.order === "sequential" && hasAfter) {
-    out.push("待ち方が sequential なので、after は判定に効かない。全体計画は plan: に並べた順に一つずつ進む");
+    out.push("待ち方が sequential なので、after は判定に効きません。全体計画は plan: に並べた順に一つずつ進みます");
   }
   // 層の dag は、合成に入るほかの層が全部 dag のときだけ効く（`phasetypes.py` の `merged_order`）
   if (layer && form.order === "dag") {
-    out.push("層を合わせたとき、ほかの層のどれかが sequential なら、判定は sequential で待つ（このファイルの after は効かない）");
+    out.push("層を合わせたとき、ほかの層のどれかが sequential なら、判定は sequential で待ちます（このファイルの after は効きません）");
   }
   if (graph.dropped > 0) {
     out.push(
       layer
-        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（ほかの層の種類を指しているならそのままでよい。綴り違いなら保存のときの検証が言う）。ほかの層の種類を待つ種類は、図では根に見える`
-        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（綴り違いなら保存のときの検証が言う）`,
+        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（ほかの層の種類を指しているならそのままで構いません。綴り違いなら保存のときの検証が知らせます）。ほかの層の種類を待つ種類は、図では根に見えます`
+        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（綴り違いなら保存のときの検証が知らせます）`,
     );
   }
   if (graph.unnamed > 0) {
-    out.push(`id が空の種類は図に出ない（${graph.unnamed} 件）`);
+    out.push(`id が空の種類は図に出ません（${graph.unnamed} 件）`);
   }
   return out;
 }
@@ -93,9 +93,9 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
 /** 種類が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */
 export function emptyNote(exists: boolean, editable: boolean): string {
   if (exists) {
-    return "種類が無い。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足す";
+    return "種類がありません。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足してください";
   }
   return editable
-    ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる"
-    : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す";
+    ? "ファイルがありません（無い層は空で、共通層の種類だけが使われます）。種類を足して保存すると、ファイルが作られます"
+    : "ファイルがありません。上の「雛形でファイルを作る」で作ってから直してください";
 }

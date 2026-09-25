@@ -132,15 +132,15 @@ export function choicesProblem(
   const keys = preview.threads.map((t) => t.key);
   const given = Object.keys(choices);
   if (given.length !== keys.length || !keys.every((k) => k in choices)) {
-    return "対応方針を選んでいない指摘がある";
+    return "対応方針を選んでいない指摘があります";
   }
   for (const key of keys) {
     const choice = choices[key];
     if (!DECIDE_CHOICES.includes(choice as DecideChoice)) {
-      return `知らない対応方針: ${String(choice)}`;
+      return `知らない対応方針です: ${String(choice)}`;
     }
     if (choice === "issue" && !preview.can_issue) {
-      return "issue に回せるのは、フィードバック計画が承認されたあと";
+      return "issue に回せるのは、フィードバック計画が承認されたあとです";
     }
   }
   return undefined;
@@ -155,16 +155,16 @@ function parseTop(text: string): Top {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== DECIDE_VERSION) {
     return {
       ok: false,
-      error: `残った指摘の JSON の版が違う（拡張は ${DECIDE_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `未解決の指摘の JSON の版が違います（拡張は ${DECIDE_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   return { ok: true, raw, version };

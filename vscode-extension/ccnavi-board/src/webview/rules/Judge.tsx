@@ -33,7 +33,7 @@ function Pairs({ pairs }: { readonly pairs: readonly (readonly [string, string])
 
 function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Element {
   if (rules.length === 0) {
-    return <p className="empty">どのルールにもヒットしなかった</p>;
+    return <p className="empty">どのルールにもヒットしませんでした</p>;
   }
   return (
     <table>
@@ -62,7 +62,7 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
 /** そのツールで実行される hook。判定の結果と一緒に出す（拡張ホストが絞ってから渡す） */
 function RunningHooks({ hooks }: { readonly hooks: readonly HookEntry[] }): JSX.Element {
   if (hooks.length === 0) {
-    return <p className="empty">実行される hook は無い</p>;
+    return <p className="empty">実行される hook はありません</p>;
   }
   return (
     <table>
@@ -118,11 +118,11 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
           <h3>ヒットしたルール</h3>
           <Hits rules={result.rules} />
           <h3>返すメッセージ</h3>
-          {result.response === "" ? <p className="empty">メッセージは返さない</p> : <pre className="response">{result.response}</pre>}
+          {result.response === "" ? <p className="empty">メッセージは返しません</p> : <pre className="response">{result.response}</pre>}
         </>
       ) : (
         <p>
-          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツール。ルールを書いてもヒットせず、呼び出しはそのまま通る
+          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツールです。ルールを書いてもヒットせず、呼び出しはそのまま通ります
         </p>
       )}
       <h3>このツールで実行される hook</h3>

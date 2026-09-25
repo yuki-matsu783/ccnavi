@@ -85,7 +85,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         candidates={name === "after" ? others.filter((id) => props.kinds.get(id) === "work") : others}
         known={props.kinds}
         blocked={new Set(blocked.map((id) => id.trim()))}
-        blockedNote={`${blockedBy} にも挙げているので選べない（両方に挙げると保存のときの検証が止める）`}
+        blockedNote={`${blockedBy} にも挙げているので選べません（両方に挙げると保存のときの検証で止まります）`}
         typed={props.layer}
         value={phase[name]}
         disabled={disabled}
@@ -193,7 +193,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             </Captioned>
             <Captioned name="先に済ませる種類" yamlKey="after">
               {phase.kind === "feedback" && phase.after.length === 0 ? (
-                <span className="f-after dim">feedback の種類は持てない（レビュー後の対応で、全体計画の待ち方の外にある）</span>
+                <span className="f-after dim">feedback の種類は持てません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
               ) : (
                 ids("after", "先に済ませる種類", "f-after", "待ち方が dag のとき、この種類より先に閉じてレビューを終えておく work の種類")
               )}
@@ -380,7 +380,7 @@ function IdPicker({
           onKeyDown={onKeyDown}
         >
           {options.map((id, index) => {
-            const note = id === self ? "自分自身を挙げている（外す）" : !known.has(id) ? "このファイルに無い id（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類（外す）" : undefined;
+            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? "このファイルに無い id です（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
             const locked = isLocked(id);
             const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (
@@ -408,7 +408,7 @@ function IdPicker({
           })}
         </select>
       )}
-      {options.length === 0 && <span className="dim">選べる種類が無い</span>}
+      {options.length === 0 && <span className="dim">選べる種類がありません</span>}
       {typed && (
         <input
           type="text"
