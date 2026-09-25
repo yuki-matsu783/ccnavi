@@ -2813,3 +2813,34 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `shlex` は行継続を知っているか | 知らない。`\` と改行をトークンの中に残す |
 | `SubagentStart` の `additionalContext` がサブエージェントに届くか | 未実測。届かなければ、サブエージェント内の最初の `PreToolUse` で渡す形に変える |
 | `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 未実測。止めるかどうかは cwd で親を引くので、そこが割れる |
+
+### 入れ子のサブエージェント（2026-09-25、Claude Code 2.1.282）
+
+実測は上限 3 の `claude -p` でメイン → 子 → 孫を起こして見た。「文書」はその日の公式文書
+（hooks・sub-agents）の記述で、実測していない。
+
+| 前提 | 実測・文書 |
+|---|---|
+| 入れ子の上限 | 文書: 既定は 3 層まで（`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`、1 で入れ子を無効）。実測: クラウドの環境（claude.ai/code）はプロセスの env で 1 を入れている（`.claude/settings.json` には無い） |
+| 上限に達したサブエージェントに Agent ツールはあるか | 無い（実測）。遅延ツールの一覧にも出ない。起動を待ってハングすることはなく、普通に終わる |
+| 孫は Agent ツールを持てるか | 持てる（実測、上限 3） |
+| 孫の `PreToolUse` に `agent_id` が付くか | 付く（実測）。孫の Bash にも `DENY_SUBAGENT_TICKET_OP` が当たった |
+| 深さ 1 のサブエージェントに `agent_id` が届くか | 届く（実測。`logs/state/approved-<セッション>-<agent_id>.json` のファイル名で確かめた） |
+| `SubagentStart` / `SubagentStop` は孫でも来るか | 子・孫それぞれで来る（実測） |
+| `logs/log.jsonl` の `session` | メイン・子・孫で同じ値（実測）。`log.jsonl` は `agent_id` / `agent_type` / `cwd` を記録しない。誰の呼び出しかを確かめる手掛かりは `logs/state/approved-<セッション>-<agent_id>.json` |
+| サブエージェントの `cwd` | 文書: メインの `cwd`（`cd` は持ち越さない）。孫の `cwd` も親のワークツリーになる |
+| 親の `agent_id` や深さは hook の入力にあるか | 文書: 無い |
+| 起動側は子の終了を待つか | 文書: 非対話 / SDK では待たない |
+| AskUserQuestion をサブエージェントに渡せるか | 文書: `tools` に書いても全部のサブエージェントから外される |
+| 自動 compact で `SubagentStart` の文は残るか | 文書: 起動時に入れた文は compact で消えうる。同じサブエージェントの次の起動（再開）で `SubagentStart` がまた走り、文脈に写しが無ければ入れ直す |
+| `PreCompact` / `PostCompact` | 文書: サブエージェントの compact でも来て、`agent_id` / `agent_type` を持つ。どちらも `systemMessage` を捨て、`additionalContext` を受けるとは書かれていない（`PostCompact` は decision control も無い）。メインの compact は別の文脈のサブエージェントに影響しない |
+
+合成した payload で確かめた判定（同じ日）。書き込みは書き先のワークツリーで判定し `agent_id` を見ないので、
+孫も子と同じに判定される。残る弱点は 4 つ。
+
+| | 弱点 | 今の扱い |
+|---|---|---|
+| G2 | 孫の `cwd` が親のワークツリーなので、`SubagentStart` が親の子を全部並べ、`SubagentStop` が兄弟の子の変更でも差し戻す | フローの案内が、入れ子のプロンプトに担当の子・ワークツリー・範囲を書かせる（9.12、ADR-0085）。緩和で、塞いではいない |
+| G3 | 孫は、兄弟の子のワークツリーにもその範囲の中なら書ける | 同上 |
+| G4 | 差し戻しを無視した知らせが、起動した子にしか届かない | 入れ子の起動なら `systemMessage` にも載せる（9.12） |
+| G5 | Bash の実行後の監視は `cwd` のツリーだけを見る | そのまま |
