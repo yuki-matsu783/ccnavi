@@ -230,9 +230,10 @@ def lookup(index: dict, name: str):
 def _resolved(path: str) -> str:
     """行き着く先。綴りの大文字小文字は元のまま。"""
     try:
-        return os.path.realpath(path)
+        resolved = os.path.realpath(path)
     except OSError:
-        return os.path.abspath(path)
+        resolved = os.path.abspath(path)
+    return os.path.normpath(resolved)
 
 
 def _canonical(path: str) -> str:
