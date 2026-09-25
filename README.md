@@ -2519,6 +2519,7 @@ ccnavi --explain --json
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、親の提案が写っているのが普通 |
 | `scattered[]` | どれが本物か決まらない写りの全部。`{tree, state, path}`。決まっていれば空。権威のツリー（親のツリー → 元ツリーの順。ADR-0073）で畳んで 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR で言う条件と同じ（同じ関数を通る）。写りがあること自体は普通なので `seen_in` の数は食い違いを意味しない |
+| `flow` | 子のフロー（設計 9.3.1）。親は `null`。`{path, rel, declared, exists, locked}`。`path` は読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り）、`rel` はツリーのルートからの相対（`flow:` の値、無ければ既定の `references/<子>/flow.json`）、`declared` は `flow:` を書いたか、`exists` はファイルが在るか、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 
 `parents[]` の 1 件。
