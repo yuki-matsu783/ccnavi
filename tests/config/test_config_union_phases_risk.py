@@ -7,7 +7,7 @@ risk は共通層に `big-diff`、lib の層に `schema` と `levels: {critical:
 どの層を足すかは親の承認済みチケットの `project:` で決まる。lib 向けの提案は
 `wip/lib/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く。
 
-実装はまだ無い。このテストは実装フェーズが緑にする。
+実装はまだ無い。このテストは実装フェーズで通るようになる。
 """
 
 from __future__ import annotations

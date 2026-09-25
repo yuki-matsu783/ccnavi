@@ -6,7 +6,7 @@ Write / Edit の拒否、シェルからの書き込みの拒否、控えと復�
 
 ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
-実装はまだ無い。このテストは実装フェーズが緑にする。
+実装はまだ無い。このテストは実装フェーズで通るようになる。
 """
 
 from __future__ import annotations
@@ -420,7 +420,7 @@ class DenyTest(GuardHarness):
 
         末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は
         前の境界（`(?:^|[^\\w.-])`）だけを、`policy/rules.yml.bak` は後ろの境界
-        （`_TERM`）だけを落とす。片方しか置かないと、落としたほうの変異が緑のまま通る。
+        （`_TERM`）だけを落とす。片方しか置かないと、置かなかったほうの境界を消す変異がテストをすり抜ける。
         """
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         moved = ("--rules", policy)
