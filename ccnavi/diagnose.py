@@ -575,7 +575,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
-    stdout.write("    auto                          classifier が判断する\n")
+    stdout.write(
+        "    auto                          classifier（auto モードで呼び出しを通すかを決める、"
+        "Claude Code の判定役のモデル）が判断する\n"
+    )
     stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
     stdout.write("    不明なモード                  人に確認が出る\n")
     # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
