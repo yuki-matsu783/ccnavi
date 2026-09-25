@@ -436,7 +436,9 @@ def at_stop(
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
     record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
 
-    lines = [f"[ccnavi] 守ると宣言した場所が、このターンで {len(found)} 件変わりました。"]
+    lines = [
+        f"[ccnavi] 守ると宣言した場所が、この{phase.TURN_DEFINED}で {len(found)} 件変わりました。"
+    ]
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
         where = f"{finding.tree_name}: " if finding.tree_name else ""
@@ -457,22 +459,31 @@ def at_stop(
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
     if uncounted:
-        lines.append(_uncounted_line(uncounted))
+        lines.append(_uncounted_line(uncounted, define=False))
         record.detail = f"uncounted {len(uncounted)}"
     return "\n".join(lines)
 
 
-def _uncounted_line(uncounted: list[str]) -> str:
+def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
     """コミット済みを数えなかったツリーを言う 1 行。
 
     数えていないことを黙ると、そのツリーで何も起きなかったのと見分けが付かない。
+    `define` は「ターン」の定義を添えるか。同じ報告の前の行で添えていれば外す。
     """
+    names = sorted(set(uncounted))
+    shown = ", ".join(names[:REPORT_LIMIT])
+    trees = f"ワークツリー {shown} "
+    if len(names) > 1:
+        trees = f"ワークツリー {len(names)} 本（{shown}）"
+    turn = phase.TURN_DEFINED if define else "ターン"
     return (
-        f"[ccnavi] コミットに入ったぶんを数えていないツリーが {len(uncounted)} 本あります"
-        f"（{', '.join(sorted(set(uncounted))[:REPORT_LIMIT])}）。"
-        "このターンの始まりの HEAD（比べる元の位置）を控えていないか、差分を読めなかったためです。"
-        "ターンの途中で切ったワークツリーを、一度も触らずに終えたときが典型です。"
-        "そのツリーのコミットは 'git log' で自分で確かめてください。"
+        f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護対象のファイルを"
+        "変更していないかを確認します。"
+        f"{trees}では、今回のターンでこの確認ができませんでした。"
+        "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
+        "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
+        "このツリーでコミットしていなければ対応は不要です。"
+        "コミットした場合は、保護対象のファイルを変更していないか `git log` で確認してください。"
     )
 
 
@@ -1062,7 +1073,7 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     data, failed = fsio.read_json(_turn_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: ターンの基準を読めない: {failed}\n")
+            stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を読めない: {failed}\n")
         return set(), False, {}
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
@@ -1089,7 +1100,7 @@ def _save_turn(
         {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
-        stderr.write(f"ccnavi: ターンの基準を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を書けない: {failed}\n")
 
 
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
