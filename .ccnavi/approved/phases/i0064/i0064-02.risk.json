@@ -1,0 +1,23 @@
+{
+ "points": 40,
+ "level": "HIGH",
+ "hits": [
+  {
+   "id": "big-diff",
+   "points": 25,
+   "detail": "行数が多い（990 行 > 300）",
+   "source": "common"
+  },
+  {
+   "id": "many-files",
+   "points": 15,
+   "detail": "ファイルが多い（13 ファイル > 10）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "a8f9d7cda3070ac838211f8542d3f98c9b5057f9",
+ "base": "85778e68de9e2325807a77494885f751277adcc3",
+ "at": "2026-09-26T01:44:30+0900",
+ "summary": "13 ファイル、+829 -161 行、消したファイル 0"
+}
