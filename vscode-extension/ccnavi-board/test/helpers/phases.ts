@@ -47,7 +47,7 @@ export async function openPhases(overrides: Partial<PhasesPage> = {}, initialSta
 
 /**
  * 図を出した状態で開く。**大きさを測れるようにして読ませる**（`measure`）。
- * これをしないと React Flow は点を隠したまま線を 1 本も描かず、空の絵で緑になる。
+ * これをしないと React Flow は点を隠したまま線を 1 本も描かず、テストは空の絵で通る。
  */
 export async function openGraph(overrides: Partial<PhasesPage> = {}, initialState: unknown = {}): Promise<DomPage> {
   const dom = await openPage({ kind: "page", page: page(overrides) }, { ...(initialState as object), view: "graph" }, { measure: true });

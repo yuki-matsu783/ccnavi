@@ -14,7 +14,7 @@ hook は引数を渡さずに起動するので、hook からの判定の入口�
 起動は `ConfigUnionHarness.ccnavi` を使わない。あちらはフラグを渡さずに既定の置き場から
 読ませるので、フラグを足した形を見られない。ここは `flags` で足せる形にしてある。
 
-実装は入っている（ADR-0052）。ここが赤くなったら、env を読む経路が戻ったということ。
+実装は入っている（ADR-0052）。ここが落ちたら、env を読む経路が戻ったということ。
 """
 
 from __future__ import annotations
@@ -197,7 +197,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
 
     上の `FlagsStillMoveTheCommonLayerTest` と対で読む。あちらは診断では効くことを、
     ここは診断の外では効かないことを見る。片方だけだと、フラグを消しても
-    フラグを素通しにしても緑のままになる。
+    フラグを素通しにしてもテストは通り続ける。
     """
 
     def target(self):

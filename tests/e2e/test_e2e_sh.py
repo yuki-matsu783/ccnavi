@@ -52,7 +52,7 @@ def walk_up_for(relative, skip_worktrees=True):
 
     これを外すと、ワークツリーから回したときにワークツリー自身を掴む。`.ccnavi/scripts/`
     は git が運ぶのでどのワークツリーにも写しがあるが、実際に効くのはワークスペース側の
-    1 本だけ。写したあとにワークツリーから回すと、写す前の版を測って赤になる（実際に
+    1 本だけ。写したあとにワークツリーから回すと、写す前の版を測って落ちる（実際に
     起きた）。`dist/` は追跡外なのでワークツリーには無く、こちらは上へ歩くだけでよい。
 
     見つからなければ `ROOT` 直下の綴りを返す。呼ぶ側の skip 判定がそれを見る。
@@ -163,8 +163,8 @@ class WorkspaceTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # どこを測ったかを出す。緑と赤が「写したかどうか」と食い違ったとき、
-        # 最初に見る情報がこれ。出していなかったせいで、写し済みなのに赤になった
+        # どこを測ったかを出す。通るか落ちるかが「写したかどうか」と食い違ったとき、
+        # 最初に見る情報がこれ。出していなかったせいで、写し済みなのに落ちた
         # 原因（ワークツリーの古い写しを見ていた）を突き止めるのに 1 往復かかった。
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
         cls.tmp = tempfile.mkdtemp(prefix="ccnavi-e2e-")
@@ -409,7 +409,7 @@ class CredentialTest(WorkspaceTest):
 
         「消えているつもりで残っている」形は、綴りを見比べると見落とす。
         origin を読む処理まで届いたことも確かめる。届く前に落ちた実行を
-        「漏れなかった」と数えると、穴が開いたままテストが緑になる。
+        「漏れなかった」と数えると、穴が開いたままテストが通る。
         """
         assertGotPastTheRoot(self, result)
         blob = (result.stdout or "") + (result.stderr or "")

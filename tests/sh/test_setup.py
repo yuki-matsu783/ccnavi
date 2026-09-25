@@ -259,7 +259,7 @@ class WritesTheExpectedShape(SetupTest):
         """hook に書かれる 1 行そのものを見る。
 
         「ccnavi という字が入っている」だけを見ていると、綴りを取り違えても
-        テストが緑のまま通る。この 1 行は、何を起動するかと、ccnavi が何を
+        テストが通ってしまう。この 1 行は、何を起動するかと、ccnavi が何を
         守るか（CCNAVI_BIN_PATH）を同時に決めている。
         """
         self.run_setup()
@@ -518,8 +518,8 @@ class TellsWhatItDidNotChange(SetupTest):
     def test_check_is_not_settled_when_a_value_differs(self):
         """--check は、値が違うだけのときも「揃っていない」と言う。
 
-        不足の 2 つだけで終了コードを決めると、CI で --check を回す運用が、
-        disable の書かれた設定に対して緑を出し続ける。
+        不足の 2 つだけで終了コードを決めると、CI で回す --check が、
+        disable の書かれた設定でも通り続ける。
         """
         self.run_setup("--mode", "dry-run")
         result = self.run_setup("--mode", "enable", "--check")
