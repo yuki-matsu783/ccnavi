@@ -34,6 +34,7 @@
     phase: 2
     predecessors: [i0050-01]
     human_review: {required: true, reason: 設定の読み込み経路を変えるため}
+    flow: references/i0050-03/flow.json
     title: 設定画面の分割
     rationale: |
       Settings 配下のコンポーネント分割。
@@ -130,6 +131,13 @@ SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "canc
 # 承認済みチケットにだけある欄。承認の記録。
 APPROVAL_KEY = "ccnavi_approved"
 
+# 子のフロー（作業の手順のグラフ）の欄と置き場（設計 9.3、ADR-0085）。フローは承認の対象では
+# なく、担当のサブエージェントが読む手順書。置き場はチケットと同じツリーのルートからの相対で、
+# `references/` の下に限る（ロックの検査を安くするため。flow.py）。
+FLOW_KEY = "flow"
+FLOW_DIR = "references"
+FLOW_FILE = "flow.json"
+
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
 
@@ -172,6 +180,33 @@ def _plan(name: str, key: str, raw) -> tuple[list[PlanItem] | None, list[Problem
         )
         return None, problems
     return items, problems
+
+
+def default_flow(ticket_id: str) -> str:
+    """子のフローの既定の置き場。ツリーのルートからの相対。"""
+    return f"{FLOW_DIR}/{ticket_id}/{FLOW_FILE}"
+
+
+def flow_path(raw) -> tuple[str, str]:
+    """`flow:` の値を読む。(正規化した相対パス, 読めない理由)。理由が空なら読めた。
+
+    相対パスで、`references/` の下のファイルを指すこと。`..` `~` `$` と絶対パスは書けない
+    （範囲のパスと同じ理由。ツリーの外を指す、展開されるまで行き先が決まらない）。
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return "", "は相対パスの文字列で書く"
+    text = raw.strip().replace("\\", "/")
+    if text.startswith("/") or re.match(r"^[A-Za-z]:", text):
+        return "", "に絶対パスは書けない"
+    for bad, shown in (("~", "`~`"), ("$", "`$`")):
+        if bad in text:
+            return "", f"に {shown} は書けない"
+    parts = [p for p in text.split("/") if p not in ("", ".")]
+    if ".." in parts:
+        return "", "に `..` は書けない"
+    if len(parts) < 2 or parts[0] != FLOW_DIR:
+        return "", f"は `{FLOW_DIR}/` の下のファイルを指す"
+    return "/".join(parts), ""
 
 
 def _issue_number(raw) -> int | None:
@@ -333,6 +368,9 @@ class Ticket:
     feedback: list[PlanItem] | None = None
     # workflow は全体計画の待ち方の写し。親の承認済みチケットだけが持ち、書くのは `--approve`。
     workflow: Workflow | None = None
+    # flow は子のフローのファイル（ツリーのルートからの相対、区切りは "/"）。子だけが持つ。
+    # 書いていなければ空で、そのときは既定の置き場（`flow_rel`）を見る。
+    flow: str = ""
     review_required: bool = True
     review_reason: str = ""
     title: str = ""
@@ -369,6 +407,20 @@ class Ticket:
     @property
     def has_plan(self) -> bool:
         return bool(self.plan)
+
+    @property
+    def in_progress(self) -> bool:
+        """着手していて、終わってもいないし取り消されてもいない。"""
+        return bool(self.started_at) and not self.completed_at and not self.cancelled_at
+
+    def flow_rel(self) -> str:
+        """フローのファイルのツリーのルートからの相対。子でなければ空。
+
+        `flow:` を書いていればそれ、無ければ既定の `references/<子>/flow.json`。
+        """
+        if not self.is_child:
+            return ""
+        return self.flow or default_flow(self.ticket)
 
     def numbered(self) -> list[tuple[int, PlanItem]]:
         """計画の項に番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
@@ -535,6 +587,27 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     # `scan` が上書きする（設計 11.5）。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
+
+    raw_flow = front.get(FLOW_KEY)
+    if raw_flow is not None:
+        if not ticket.is_child:
+            problems.append(
+                Problem(SEVERITY_WARN, name, f"`{FLOW_KEY}` は子だけの欄。親では読まない")
+            )
+        else:
+            rel, why = flow_path(raw_flow)
+            if why:
+                # error にしない。承認済みチケットが読めなくなると範囲ごと効かなくなる（緩む）。
+                # 値を捨てて既定の置き場を見るだけなら、どこも広がらない。
+                problems.append(
+                    Problem(
+                        SEVERITY_WARN,
+                        name,
+                        f"`{FLOW_KEY}` {why}。この値は読まず、既定の `{default_flow(name)}` を見る",
+                    )
+                )
+            else:
+                ticket.flow = rel
 
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):

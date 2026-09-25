@@ -13,6 +13,7 @@ from typing import TextIO
 from . import (
     approval,
     audit,
+    flow,
     fsio,
     hookio,
     judge,
@@ -94,6 +95,8 @@ def at_start(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
+        # 子のフロー（設計 9.12、ADR-0085）。在ればファイルと `flow:` を名指しし、手順を並べる。
+        lines.extend(flow.briefing(root, t, ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))))
     hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines))
     return EXIT_OK
 

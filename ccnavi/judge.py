@@ -15,6 +15,7 @@ from . import (
     audit,
     builtin,
     ctxfile,
+    flow,
     fsio,
     hookio,
     modes,
@@ -334,6 +335,14 @@ def decide_before(
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
+
+    # 着手中の子のフローは書き換えさせない（設計 9.3、ADR-0085）。ルールより先に見る。
+    # ルールが allow と言っていても、作業中に手順書が変わることは止める（締める向きだけ）。
+    if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
+        locked, index = flow_lock(conf, root, target, record.subject, index)
+        if locked:
+            record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
+            return refuse(stdout, mode, record, rules.DENY, notices + [locked])
 
     # 書き直しを求める形は、ルールより先に止める（ADR-0046、ADR-0047）。ブレース展開と、実行する
     # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
@@ -693,6 +702,32 @@ def project_mismatch(
             "repository and approved by the user.",
         ]
     )
+
+
+def flow_lock(
+    conf: settings.Settings,
+    root: str,
+    t: tree.Tree,
+    full: str,
+    index: dict[str, ticket_mod.Ticket] | None,
+) -> tuple[str, dict[str, ticket_mod.Ticket] | None]:
+    """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ索引。
+
+    `references/` の下でなければ承認済みチケットを読まない（`flow:` はそこしか指せない）。
+    ワークツリーへの書き込みでは索引を呼び手と共有する。
+    """
+    if not full:
+        return "", index
+    rel = tree.relative(t, full)
+    if not flow.might_be_flow(rel):
+        return "", index
+    if index is None:
+        copies, _ = approval.scan(conf, root)
+        index = approval.by_id(copies)
+    child = flow.lock_hit(list(index.values()), t.project, rel)
+    if child is None:
+        return "", index
+    return flow.locked_message(child, rel), index
 
 
 # 判定の強さ。ルールの判定とチケットの判定を合わせるとき、強い側を採る（設計 1）。

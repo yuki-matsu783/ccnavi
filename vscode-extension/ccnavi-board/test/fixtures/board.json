@@ -183,6 +183,7 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": null,
    "risk": null,
    "judge": null
   },
@@ -218,6 +219,13 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/references/i0001-01/flow.json",
+    "rel": "references/i0001-01/flow.json",
+    "declared": false,
+    "exists": false,
+    "locked": false
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
@@ -262,6 +270,13 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/references/i0001-02/flow.json",
+    "rel": "references/i0001-02/flow.json",
+    "declared": false,
+    "exists": false,
+    "locked": true
+   },
    "risk": null,
    "judge": null
   },
@@ -309,6 +324,13 @@
     }
    ],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/references/i0001-03/flow.json",
+    "rel": "references/i0001-03/flow.json",
+    "declared": false,
+    "exists": false,
+    "locked": false
+   },
    "risk": null,
    "judge": null
   },
@@ -360,6 +382,13 @@
     }
    ],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/references/i0001-04/flow.json",
+    "rel": "references/i0001-04/flow.json",
+    "declared": false,
+    "exists": false,
+    "locked": false
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
@@ -403,6 +432,13 @@
    "cancel_reason": "やめた",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/references/i0001-05/flow.json",
+    "rel": "references/i0001-05/flow.json",
+    "declared": false,
+    "exists": false,
+    "locked": false
+   },
    "risk": null,
    "judge": null
   }
