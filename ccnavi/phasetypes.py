@@ -350,7 +350,7 @@ def mark_source(types: dict[str, PhaseType] | None, layer: str) -> None:
 
 def merged_order(*layers: PhaseTypes | None) -> str:
     """層を合わせた `order`。ファイルを持つ層が全部 `dag` と書いたときだけ `dag`（設計 9.7）。"""
-    present = [getattr(t, "order", ORDER_SEQUENTIAL) for t in layers if t is not None]
+    present = [t.order for t in layers if t is not None]
     if present and all(o == ORDER_DAG for o in present):
         return ORDER_DAG
     return ORDER_SEQUENTIAL

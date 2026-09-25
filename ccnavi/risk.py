@@ -639,7 +639,7 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
         changes[path] = Change(path=path, added=added, deleted=deleted)
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
     if rc == 0:
-        parts = [p for p in out.split("\0")]
+        parts = out.split("\0")
         i = 0
         while i < len(parts):
             status = parts[i]

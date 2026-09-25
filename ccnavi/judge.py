@@ -101,7 +101,6 @@ SEARCH_TOOLS = ("Grep", "Glob")
 
 
 def guard_setting_files(
-    stderr: TextIO,
     mode: str,
     conf: settings.Settings,
     root: str,
@@ -117,7 +116,6 @@ def guard_setting_files(
     """
     setting = modes.effective_setting(mode, conf.guard_core_files)
     outcomes = step(
-        stderr,
         setting,
         conf.state,
         payload.session_id,
@@ -148,7 +146,7 @@ def decide_before(
     # ときに戻る先になる。判定で弾かれた呼び出しでも先に取っておくのは、
     # 弾けなかったものだけが作業ツリーに届くので、届いた側から見れば
     # 「直前」は判定の前だから。
-    guard = guard_setting_files(stderr, mode, conf, root, payload, record, selfguard.before)
+    guard = guard_setting_files(mode, conf, root, payload, record, selfguard.before)
 
     if not record.subject:
         record.decision, record.reason = audit.SKIP, audit.REASON_NO_SUBJECT
@@ -157,6 +155,9 @@ def decide_before(
         return EXIT_OK
 
     rule_set, source, target = ruleload.rules_for(stderr, conf, root, payload, record)
+    # チケットの範囲を引く行き先。下で cwd のツリーに置き換える前の、対象のパスそのものの
+    # ツリー。ワークスペースの外へ書くときに cwd のワークツリーの範囲を当てないため。
+    dest = target
     if target is None and payload.cwd:
         # Bash には行き先が無い。記録には cwd のツリーを添える。判定には使わない。
         target = tree.tree_of(root, payload.cwd, conf.projects)
@@ -318,6 +319,8 @@ def decide_before(
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
     # 1 度だけ読んで両方に渡す（設計 9）。ワークスペースルートへの書き込みとシェルでは読まない。
+    # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
+    # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
     index = None
     scanned: list[ticket_mod.Ticket] | None = None
     if (
@@ -440,7 +443,7 @@ def decide_before(
     if verdict != rules.DENY:
         rule_hit = (group[0].id or f"({verdict})", verdict) if group else None
         ticket_decision, text, ticket_notice, code = ticket_verdict(
-            conf, root, payload.tool_name, record.subject, index, rule_hit
+            conf, root, payload.tool_name, record.subject, dest, index, rule_hit
         )
         if ticket_notice:
             notices.append(ticket_notice)
@@ -666,7 +669,7 @@ def project_mismatch(
     root: str,
     t: tree.Tree,
     full: str,
-    index: dict[str, ticket_mod.Ticket] | None = None,
+    index: dict[str, ticket_mod.Ticket] | None,
 ) -> str:
     """ワークツリーの元リポジトリと、そこに結び付く承認済みチケットの `project:` が
     違えば、その理由の文。
@@ -676,16 +679,14 @@ def project_mismatch(
     行き先のツリーが誰のものかは、そのツリーの `.git` が指す先で決まっている。
 
     index は承認済みチケットの索引。呼び手がチケットの範囲の判定と共有して渡す。
-    無ければここで読む。
+    ワークツリーの中への書き込みでは必ず読んである。
     """
     if t.is_main:
         return ""
     # 読むのは権威のある側（親のツリー）の写し。子のツリーにも checkout されているが、
     # 閉じるのも着手の欄を書くのも親のツリーの側なので、そこを読まないと閉じた
     # チケットの範囲がいつまでも効く。
-    if index is None:
-        copies, _ = approval.scan(conf, root)
-        index = approval.by_id(copies)
+    assert index is not None
     ticket = index.get(t.name)
     if ticket is None:
         return ""
@@ -762,7 +763,8 @@ def ticket_verdict(
     root: str,
     tool: str,
     full: str,
-    index: dict[str, ticket_mod.Ticket] | None = None,
+    t: tree.Tree | None,
+    index: dict[str, ticket_mod.Ticket] | None,
     rule_hit: tuple[str, str] | None = None,
 ) -> tuple[str, str, str, str]:
     """チケットが承認された範囲について何を言うかを返す。判定と、理由の文と、注記と、理由のコード。
@@ -783,8 +785,13 @@ def ticket_verdict(
     注記は、親が計画を持つのに子の番号の種類が読めないときの 1 文。そのときは種類では
     切り詰めない（親の範囲では切り詰める）ので、効いていない上限があることを判定に添える。
 
+    t は full の行き先のツリー（`ruleload.rules_for` が返したもの。cwd で置き換える前）。
+    ここで引き直さない。引き直すと、索引を読むかを決めたときのツリーとファイルシステムの
+    変化で食い違う余地が残る。
+
     index は承認済みチケットの索引。1 回の判定で走査を 1 度にするため、呼び手が
-    プロジェクトの食い違いの点検と共有して渡す。無ければここで読む。
+    プロジェクトの食い違いの点検と共有して渡す。t がワークツリーなら、呼び手は同じ t で
+    索引を読んである。
 
     rule_hit は、ルールが当たっていたときの (ルールの id, タイプ)。チケットがそれより
     厳しい判定を返すときは文面で名指しする。ルールは通しているのに止まった理由が
@@ -793,14 +800,11 @@ def ticket_verdict(
     チケットの置き場（提案と承認済みチケット）については何も言わない。承認された範囲の外に
     あるのが普通で、そこを deny にすると、いちど承認した範囲から出る道が無くなる。
     """
-    if not conf.tickets_enabled or tool not in SCOPE_TOOLS or not full:
+    if not conf.tickets_enabled or tool not in SCOPE_TOOLS:
         return "", "", "", ""
-    t = tree.tree_of(root, full, conf.projects)
     if t is None or t.is_main:
         return "", "", "", ""
-    if index is None:
-        copies, _ = approval.scan(conf, root)
-        index = approval.by_id(copies)
+    assert index is not None
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切ったワークツリーは案内では
     # 「効いている」と言われながら判定では権限モード任せに落ちる。

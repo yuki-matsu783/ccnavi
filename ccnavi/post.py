@@ -105,9 +105,6 @@ SEEN_LIMIT = 500
 # 対象の綴りを載せるときの長さの上限。
 SUBJECT_LIMIT = 200
 
-# 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
-# 区切り文字が混じった値でファイルを別の場所へ書かせない。
-
 
 def check(
     stderr: TextIO,
@@ -436,7 +433,9 @@ def at_stop(
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
     record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
 
-    lines = [f"[ccnavi] 守ると宣言した場所が、このターンで {len(found)} 件変わりました。"]
+    lines = [
+        f"[ccnavi] 守ると宣言した場所が、この{phase.TURN_DEFINED}で {len(found)} 件変わりました。"
+    ]
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
         where = f"{finding.tree_name}: " if finding.tree_name else ""
@@ -457,22 +456,31 @@ def at_stop(
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
     if uncounted:
-        lines.append(_uncounted_line(uncounted))
+        lines.append(_uncounted_line(uncounted, define=False))
         record.detail = f"uncounted {len(uncounted)}"
     return "\n".join(lines)
 
 
-def _uncounted_line(uncounted: list[str]) -> str:
+def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
     """コミット済みを数えなかったツリーを言う 1 行。
 
     数えていないことを黙ると、そのツリーで何も起きなかったのと見分けが付かない。
+    `define` は「ターン」の定義を添えるか。同じ報告の前の行で添えていれば外す。
     """
+    names = sorted(set(uncounted))
+    shown = ", ".join(names[:REPORT_LIMIT])
+    trees = f"ワークツリー {shown} "
+    if len(names) > 1:
+        trees = f"ワークツリー {len(names)} 本（{shown}）"
+    turn = phase.TURN_DEFINED if define else "ターン"
     return (
-        f"[ccnavi] コミットに入ったぶんを数えていないツリーが {len(uncounted)} 本あります"
-        f"（{', '.join(sorted(set(uncounted))[:REPORT_LIMIT])}）。"
-        "このターンの始まりの HEAD（比べる元の位置）を控えていないか、差分を読めなかったためです。"
-        "ターンの途中で切ったワークツリーを、一度も触らずに終えたときが典型です。"
-        "そのツリーのコミットは 'git log' で自分で確かめてください。"
+        f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護対象のファイルを"
+        "変更していないかを確認します。"
+        f"{trees}では、今回のターンでこの確認ができませんでした。"
+        "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
+        "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
+        "このツリーでコミットしていなければ対応は不要です。"
+        "コミットした場合は、保護対象のファイルを変更していないか `git log` で確認してください。"
     )
 
 
@@ -648,7 +656,7 @@ def _findings(
     mine: tuple[str, ...],
     source: str,
     scope: ScopeGuard | None,
-    where: tree.Tree | None = None,
+    where: tree.Tree,
     top: str = "",
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
@@ -672,8 +680,8 @@ def _findings(
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
-    name = where.name if where is not None else ""
-    tree_root = where.root if where is not None else ""
+    name = where.name
+    tree_root = where.root
     script = _script_writes(changes, places, top, where)
     found = []
     for change in changes:
@@ -703,7 +711,7 @@ def _script_writes(
     changes: list[gitstate.Change],
     places: tuple[str, str],
     top: str,
-    where: tree.Tree | None,
+    where: tree.Tree,
 ) -> set[str]:
     """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
 
@@ -732,7 +740,7 @@ def _script_writes(
     除外が通る。
     """
     tickets_rel, approved_rel = places
-    if where is None or not top or not (tickets_rel or approved_rel):
+    if not top or not (tickets_rel or approved_rel):
         return set()
     here = [
         (change, rel)
@@ -874,7 +882,7 @@ def _violation(
     change, group = finding.change, finding.group
     lines = [
         f"[ccnavi] {finding.code} ({_source(finding.source, group)})",
-        f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+        f"path: {change.path} ({change.status.strip()} / {change.kind})",
         f"tree: {finding.tree_name} ({finding.tree_root})" if finding.tree_name else "",
         f"after: {_call(payload)}",
     ]
@@ -919,7 +927,7 @@ def _preexisting(finding: Finding) -> str:
     return "\n".join(
         [
             f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
-            f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+            f"path: {change.path} ({change.status.strip()} / {change.kind})",
             "note: this was already in the working tree when ccnavi started watching this "
             "session, so the call that just ran did not cause it. Do not undo it and do not "
             "build on it: say what you found and let the user decide whose change it is.",
@@ -1062,12 +1070,12 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     data, failed = fsio.read_json(_turn_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: ターンの基準を読めない: {failed}\n")
+            stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を読めない: {failed}\n")
         return set(), False, {}
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
         return set(), False, {}
-    heads = data.get("heads") if isinstance(data, dict) else None
+    heads = data.get("heads")
     if not isinstance(heads, dict):
         # 古い控え（HEAD を持たない版）でも基準としては読める。コミットのぶんだけ
         # 言えないが、ターンの始まりを見ていないことにするより害が小さい。
@@ -1089,7 +1097,7 @@ def _save_turn(
         {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
-        stderr.write(f"ccnavi: ターンの基準を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を書けない: {failed}\n")
 
 
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:

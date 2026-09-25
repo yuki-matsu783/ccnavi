@@ -436,7 +436,6 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             args.mode,
             args.restore_if_deny,
             args.guard_core_files,
-            conf.guard_ticket_approval,
             as_json=args.json,
         )
 

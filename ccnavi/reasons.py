@@ -169,9 +169,9 @@ def reason_for(
     subject: str,
     rules_path: str,
     degraded: str,
-    runner: str = "",
-    inner: str = "",
-    quoted: bool = False,
+    runner: str,
+    inner: str,
+    quoted: bool,
 ) -> str:
     """当たったルール 1 件を、それだけで読んで成立する理由に組む。
 
@@ -291,7 +291,7 @@ def unreadable(reason: str) -> str:
     )
 
 
-def subagent_forbidden(subject: str, runner: str = "", inner: str = "") -> str:
+def subagent_forbidden(subject: str, runner: str, inner: str) -> str:
     """サブエージェントに許さない操作を止めた文。inner は reason_for と同じ。"""
     shown = " ".join(subject.split())[:SUBJECT_LIMIT]
     return "\n".join(

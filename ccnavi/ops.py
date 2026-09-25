@@ -668,9 +668,7 @@ def _deliverables_missing(
 
 
 def _tracked(worktree: str, glob: str) -> bool:
-    """この glob に当たる追跡済みのファイルが 1 つでもあるか。"""
-    if not os.path.isdir(worktree):
-        return False
+    """この glob に当たる追跡済みのファイルが 1 つでもあるか。ワークツリーが無ければ無い。"""
     rc, out = gitcmd.output(worktree, ["ls-files", "--", glob], TIMEOUT_SECONDS)
     return rc == 0 and bool(out.strip())
 

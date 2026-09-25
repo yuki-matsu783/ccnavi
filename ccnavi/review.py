@@ -359,7 +359,8 @@ def requested(
     _note_synced(stderr, conf, root, parent.ticket, result.url, phase_no)
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
-        f"OK: レビューを{done}（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
+        f"OK: レビューを{done}（{result.mr.url or result.url}）。"
+        f"{phase.TURN_DEFINED}を終えて利用者を待つこと\n"
     )
     return 0
 
@@ -491,7 +492,6 @@ CHOICE_LABELS = {
 
 
 def _followup_from_choice(
-    stdin: TextIO,
     stdout: TextIO,
     stderr: TextIO,
     root: str,
@@ -832,9 +832,7 @@ def apply_decision(
     followup = ""
     if fix:
         items = [_thread_line(t) for t in fix]
-        ident = _followup_from_choice(
-            io.StringIO(), stdout, stderr, root, conf, parent, ph, items, stamp
-        )
+        ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items, stamp)
         if ident is None:
             return None
         followup = ident
@@ -848,7 +846,7 @@ def apply_decision(
     ):
         return None
     issue_draft = ""
-    if picked[CHOICE_ISSUE] and conf.state:
+    if picked[CHOICE_ISSUE]:
         issue_draft = _write_decide_issue(stderr, conf, d, picked[CHOICE_ISSUE])
     if conf.state:
         _write_decide_comment(stderr, conf, d, picked, followup)
@@ -1078,9 +1076,7 @@ def _reviewed_in_chat(
         items.append(line.strip())
     if not items:
         return 0
-    ident = _followup_from_choice(
-        stdin, stdout, stderr, root, conf, parent, ph, items, approval.now()
-    )
+    ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items, approval.now())
     return 0 if ident is not None else 1
 
 
@@ -1227,7 +1223,7 @@ def close_early(
     if settled is None:
         return 1
     cancelled, skipped, reviewed_now = settled
-    accepted = [t.url or t.id for t in left.unresolved]
+    accepted = [thread_key(t) for t in left.unresolved]
     failed = approval.remember_accepted(
         approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
     )

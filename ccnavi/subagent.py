@@ -71,7 +71,6 @@ def at_start(
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"
     ]
-    parents = approval.by_id(copies)
     types = phase.load_types(conf, root, bound.project) or {}
     # フローの文に使える残り（文字）。子が多くても SubagentStart の文が膨らみすぎないように。
     budget = flow.TOTAL_TEXT_LIMIT
@@ -86,7 +85,7 @@ def at_start(
         waiting = [p for p in t.predecessors if p not in done]
         label = str(t.phase)
         hint = ""
-        parent = parents.get(t.parent)
+        parent = index.get(t.parent)
         item = parent.item_at(t.phase) if parent is not None and t.phase is not None else None
         pt = types.get(item.type) if item is not None else None
         if pt is not None:

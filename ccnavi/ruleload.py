@@ -54,7 +54,7 @@ class Layer:
 
 
 def load_rules(
-    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str = ""
+    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str
 ) -> tuple[rules.RuleSet, str]:
     """共通層のルール集合と、それがどこから来たかを返す。
 
@@ -181,14 +181,12 @@ def add_layers(
     chosen: list[Layer],
     root: str,
     record: audit.Record,
-) -> list[Problem]:
+) -> None:
     """共通層の上に層を順に足す。壊れた層は空として扱い、記録に残す。
 
-    返すのは層をまたいだ苦情（重複を捨てた info、同 id で中身が違う warn）。
-    判定の経路は読み捨てる。呼び出しのたびに言うと、同じ話が毎回モデルへ届く。
-    言う場所は `--lint`。
+    層をまたいだ苦情（重複を捨てた info、同 id で中身が違う warn）は読み捨てる。
+    判定の経路で呼び出しのたびに言うと、同じ話が毎回モデルへ届く。言う場所は `--lint`。
     """
-    problems: list[Problem] = []
     broken = []
     for layer in chosen:
         if not os.path.exists(layer.path):
@@ -203,12 +201,11 @@ def add_layers(
         for note in notes:
             stderr.write(f"ccnavi: {note}\n")
         prefix_ids(extra, layer.name)
-        problems.extend(merge_rules(rule_set, extra, layer.name))
+        merge_rules(rule_set, extra, layer.name)
     if broken:
         record.fallback = ",".join(broken)
         note = "unreadable layer: " + ",".join(broken)
         record.detail = f"{record.detail}; {note}" if record.detail else note
-    return problems
 
 
 def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[Problem]:

@@ -175,9 +175,6 @@ COMMON_RULES_KEY = "rules"
 # 名指しのツールで書くもの。修復として戻さない判断は、この経路で書いた先にだけ掛ける。
 REPAIR_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
-# 区切り文字が混じった値でファイルを別の場所へ書かせない。
-
 # 守る対象。root からの相対で書く。rules は設定で動くので、ここには無い。
 _SETTINGS_FILES = (
     ("settings", os.path.join(".claude", "settings.json")),
@@ -215,7 +212,6 @@ _WRITE_VERBS = (
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
-#
 # 名前がそこで終わる形。空白とコマンドの切れ目（`\x00`）を語の終わりとして数える。
 # `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
 # `mv .ccnavi .ccnavi.bak` も、ccnavi ディレクトリごと消す・退かす形なので、下のファイルを 1 本ずつ
@@ -839,7 +835,7 @@ def _inside(root: str, path: str) -> str:
     """root の下に在るなら root からの相対、外に在るなら空文字。"""
     if not path:
         return ""
-    rel = _relative(os.path.realpath(root), os.path.realpath(path))
+    rel = _relative(root, os.path.realpath(path))
     if os.path.isabs(rel) or rel == os.pardir or rel.startswith(os.pardir + os.sep):
         return ""
     return rel
@@ -851,7 +847,6 @@ def _top(root: str, target: Target) -> str:
 
 
 def before(
-    stderr: TextIO,
     setting: str,
     state_dir: str,
     session: str,
@@ -916,14 +911,13 @@ def before(
 
 
 def after(
-    stderr: TextIO,
     setting: str,
     state_dir: str,
     session: str,
     root: str,
     found: list[Target],
-    written: str = "",
-    synced: Callable[..., bool] | None = None,
+    written: str,
+    synced: Callable[..., bool],
 ) -> list[Outcome]:
     """実行後。控えと突き合わせて、変わっていれば戻す。
 
@@ -956,12 +950,7 @@ def after(
         if saved is not None and now == saved:
             continue
 
-        if (
-            synced is not None
-            and target.copy
-            and now is not None
-            and synced(target.spelled or target.path)
-        ):
+        if target.copy and now is not None and synced(target.spelled or target.path):
             continue
 
         if _left_as_repair(target, written, saved, now):
@@ -1103,7 +1092,7 @@ def at_start(
     return outcomes
 
 
-def sweep(state_dir: str, session: str, keep_days: int = KEEP_DAYS) -> None:
+def sweep(state_dir: str, session: str) -> None:
     """古い控えを落とす。
 
     セッション開始で 1 度だけ呼ぶ。控えが役に立つのはそれを取ったセッションの
@@ -1128,7 +1117,7 @@ def sweep(state_dir: str, session: str, keep_days: int = KEEP_DAYS) -> None:
     except OSError:
         return
 
-    cutoff = time.time() - keep_days * 86400
+    cutoff = time.time() - KEEP_DAYS * 86400
     mine = _safe(session)
     kept = []
     for name in names:
