@@ -47,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import fsio, modes, phasetypes, rules, settings, tree, workflow
+from . import flow, fsio, modes, phasetypes, rules, settings, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -406,6 +406,56 @@ def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: st
     return move_file(
         copy_path(approved_dir, ticket_id), review_path(tree_root, tickets_rel, ticket_id)
     )
+
+
+def carry_flow(
+    conf: settings.Settings, root: str, proposal: ticket_mod.Ticket, approved_dir: str
+) -> list[str]:
+    """承認した子のフローを、提案のツリーから承認済みチケットのツリーへ動かす。知らせる行を返す。
+
+    フローの置き場は承認済みチケットと同じツリー（設計 9.3.1）。人は承認の前に、提案が在る
+    ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
+    フローだけが元のツリーに残り、読まれなくなる（M-3）。承認は人の操作なので、ここで一緒に
+    動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
+    リンク・ふつうのファイルでないもの・ハードリンクは運ばない（`flow.load` と同じ読み方）。
+    """
+    source_root = proposal.tree_root or root
+    source = flow.flow_file(conf, source_root, proposal.ticket)
+    target = os.path.normpath(
+        os.path.join(approved_dir, flow.FLOWS_DIR, f"{proposal.ticket}{flow.SUFFIX}")
+    )
+    try:
+        if not os.path.lexists(source):
+            return []
+        if os.path.normcase(os.path.realpath(source)) == os.path.normcase(os.path.realpath(target)):
+            return []
+    except (OSError, ValueError):
+        return []
+    raw, why = flow.read_bytes(source, source_root)
+    if raw is None:
+        return [f"{proposal.ticket} のフロー {source} を運ばなかった: {why}。人が確かめて置き直す"]
+    if os.path.lexists(target):
+        held, _ = flow.read_bytes(target)
+        if held != raw:
+            return [
+                f"{proposal.ticket} のフローを {target} へ運ばなかった: 行き先に違う中身のフローが"
+                f"既に在る（上書きしない）。{source} と見比べて、人が 1 本に決める"
+            ]
+        fsio.remove(source)
+        return []
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "xb") as f:
+            f.write(raw)
+    except OSError as exc:
+        return [f"{proposal.ticket} のフローを {target} へ運べない ({exc})。{source} に残っている"]
+    try:
+        os.remove(source)
+    except OSError as exc:
+        return [
+            f"{proposal.ticket} のフローを {target} へ写した。元の {source} は消せなかった ({exc})"
+        ]
+    return [f"{proposal.ticket} のフローを {source} から {target} へ動かした"]
 
 
 def move_file(source: str, target: str) -> str:
@@ -1562,6 +1612,9 @@ def _apply(
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return Applied(1, placed, t.ticket, failed)
         placed.append(t.ticket)
+        if t.is_child:
+            for line in carry_flow(conf, root, t, where):
+                stdout.write(f"  {line}\n")
         # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
         # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
         # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）

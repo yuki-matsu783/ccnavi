@@ -13,9 +13,10 @@
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from typing import TextIO
 
-from . import approval, configsync, fsio, gitcmd, phase, risk, settings, tree
+from . import approval, configsync, flow, fsio, gitcmd, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -76,6 +77,20 @@ def start(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
+    if found.is_child:
+        # 着手のときのフローの指紋を控える。SubagentStart / SubagentStop が、着手のあとに
+        # 書き換わったら知らせる（設計 9.3.1、ADR-0085。止めない）。
+        started = replace(found, started_at=fields["started_at"])
+        where, failed = flow.record_digest(conf, root, started)
+        if failed:
+            stderr.write(
+                f"ccnavi: {ticket_id} のフローの指紋を控えられない（{failed}）。"
+                "着手のあとの書き換えは知らせられない\n"
+            )
+        else:
+            stdout.write(
+                f"フローの指紋を {where} に控えた。承認済みチケットと同じく人がコミットする\n"
+            )
     for line in synced:
         stdout.write(line + "\n")
     return 0

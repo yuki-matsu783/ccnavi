@@ -740,6 +740,15 @@ def flow_lock(
         child = flow.lock_hit(copies, found[1], found[0])
         if child is not None:
             return flow.locked_message(conf, child, path), copies
+    # ハードリンクは綴りに置き場が出ない（M-1）。書き込み先が在って名前が 2 つ以上あるときだけ、
+    # 着手中の子のフローと同じ中身（inode）かを見る。
+    target = full or spelled
+    if target and flow.hard_linked(target):
+        if copies is None:
+            copies, _ = approval.scan(conf, root)
+        child = flow.inode_hit(conf, root, copies, target)
+        if child is not None:
+            return flow.locked_message(conf, child, target), copies
     return "", copies
 
 

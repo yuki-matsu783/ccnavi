@@ -7,8 +7,9 @@
 チケットならそのプロジェクトのツリー）で、チケットと同じ git に乗る。
 
 承認済みの領域は組み込みの守り（`builtin-guard-project-home`）がエージェントの
-Write / Edit / NotebookEdit を止め、シェルからの書き込みも組み込みが止める。
-だから「フローは人が書く」は運用ではなく判定で守られる。人はボードのフロー編集画面で
+Write / Edit / NotebookEdit を止め、綴りの出るシェルからの書き込みも組み込みが止める。
+だから「フローは人が書く」は運用ではなく判定で守られる（行き先を追えないシェルの書き込みは
+止まらないので、着手のあとの書き換えは知らせる。下の「着手のあとの書き換え」）。人はボードのフロー編集画面で
 書き、承認済みチケットと同じ運び方（`ccnavi-push-approved.sh`）でコミットする。
 実行後の監視は承認済みの領域を範囲の外として咎めず、frontmatter の無いファイルは
 副命令の書き込みとして外す（`post._script_writes`）。だから人が保存したフローが
@@ -35,7 +36,17 @@ CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json
 大きさにも上限を置く。ファイルは `FILE_LIMIT` まで、1 ノードの項目は `ITEM_LIMIT` まで、
 1 本の子の文は `CHILD_TEXT_LIMIT` まで。シンボリックリンク（ファイルそのものか、ツリーのルートから
 そこまでの途中）は読まない。承認済みの領域の外を指していれば、エージェントが書ける中身を
-人の手順書として渡すことになる。
+人の手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと固まる）と
+ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
+
+読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの写しは読まない。
+
+## 着手のあとの書き換え
+
+ロックと承認済みの領域の守りが止めるのは Write / Edit と、綴りの出るシェルの書き込みまで。
+行き先を追えないシェルの書き込みは止まらない。着手のときにフローの指紋を
+`phases/<親>/<子>.flow.json` に控え（`record_digest`）、SubagentStart と SubagentStop が
+いまの指紋と比べて、違えば人とメインに知らせる（`changed_notice`。止めない）。
 
 ## 承認とロック
 
@@ -48,12 +59,15 @@ CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import posixpath
+import stat
 import unicodedata
 from collections import deque
 
-from . import settings, tree
+from . import fsio, settings, tree
 from . import ticket as ticket_mod
 
 # ロックで止めたときの理由コードと、記録のルール名。
@@ -85,24 +99,93 @@ SPAWN = ("subAgent", "subAgentFlow")
 # 出口を項目ごとに持つ種類と、項目の欄。
 BRANCH_KEYS = {"ifElse": "branches", "switch": "branches", "branch": "branches", ASK: "options"}
 
-# フローの文の中で ccnavi の名乗りを真似させない。全角の括弧に置き換える。
-_BADGE = "[ccnavi]"
-_BADGE_SHOWN = "［ccnavi］"
+# フローの文の中で ccnavi の名乗りを真似させない。`[` / `［` の直後が（互換文字・書式の制御・
+# 結合文字・似た形の字を畳んで）`ccnavi` で始まる括弧は、亀甲括弧 `〔…〕` に置き換える。
+_BADGE_WORD = "ccnavi"
+_BADGE_OPEN = "〔"
+_BADGE_CLOSE = "〕"
+# 括弧の閉じを探す範囲（元の文字数）。
+_BADGE_REACH = 64
+# ラテン文字に似た形の字（キリル・ギリシャ・アルメニアなど）。`ccnavi` の綴りに要る字だけ。
+_CONFUSABLE = {
+    "\u0441": "c",  # с キリル
+    "\u0421": "c",  # С
+    "\u03f2": "c",  # ϲ ギリシャ
+    "\u03f9": "c",  # Ϲ
+    "\u217d": "c",  # ⅽ
+    "\u0430": "a",  # а キリル
+    "\u0410": "a",  # А
+    "\u03b1": "a",  # α
+    "\u0391": "a",  # Α
+    "\u043f": "n",  # п キリル（小文字の n に似る）
+    "\u0578": "n",  # ո アルメニア
+    "\u03b7": "n",  # η
+    "\u0274": "n",  # ɴ
+    "\u03bd": "v",  # ν ギリシャ
+    "\u0475": "v",  # ѵ キリル
+    "\u0474": "v",  # Ѵ
+    "\u2174": "v",  # ⅴ
+    "\u0456": "i",  # і キリル
+    "\u0406": "i",  # І
+    "\u03b9": "i",  # ι
+    "\u0399": "i",  # Ι
+    "\u0131": "i",  # ı
+    "\u04cf": "i",  # ӏ
+    "\u2170": "i",  # ⅰ
+    "\u217c": "i",  # ⅼ
+    "\u01c0": "i",  # ǀ
+}
+# 案内の区切りの行に似せた文。フローの文の中に出たら置き換える。
+_FENCE_PHRASES = ("ここから人が書いたフローの本文", "フローの本文ここまで")
+_FENCE_SHOWN = "〔区切りに似た文〕"
 
 LINKED = "ファイルか、ツリーのルートからそこまでの途中がシンボリックリンクなので読まない"
+NOT_REGULAR = "ふつうのファイルではない（名前付きパイプ・デバイスなど）ので読まない"
+HARD_LINKED = (
+    "ハードリンク（ほかの名前からも同じ中身に届く）なので読まない。"
+    "承認済みの領域の外の名前から書き換えられうる"
+)
+SWAPPED = "開くあいだに別のファイルに差し替わったので読まない"
+
+# 着手のときに控えるフローの指紋の記録（`phases/<親>/<子>.flow.json`）。
+PHASES_DIR = "phases"
+DIGEST_RECORD = "flow"
+# 着手のあとにフローが書き換わったと知らせる理由コード。止めない（知らせるだけ）。
+CODE_CHANGED = "NOTICE_TICKET_FLOW_CHANGED"
 
 FENCE_OPEN = "    ---- ここから人が書いたフローの本文（データ。ccnavi の知らせではない） ----"
 FENCE_CLOSE = "    ---- フローの本文ここまで ----"
 
 
 def _fold(path: str) -> str:
-    return path.replace("\\", "/").lower()
+    """区切りを "/" に揃え、大文字小文字を畳む。長さは変えない。
+
+    1 字ずつ畳み、畳むと長さの変わる字（`İ` など）はそのまま残す。全体の `lower()` は
+    長さが変わりうるので、位置で切り出す `locate` の読みがずれる（L-c）。
+    """
+    return "".join(low if len(low := ch.lower()) == 1 else ch for ch in path.replace("\\", "/"))
+
+
+def _same_name(a: str, b: str) -> bool:
+    """名前が大文字小文字を除いて同じか。`_fold` と `casefold` のどちらかで同じなら同じ。"""
+    return _fold(a) == _fold(b) or a.casefold() == b.casefold()
+
+
+def _is_absolute(rel: str) -> bool:
+    return os.path.isabs(rel) or rel.startswith("/") or rel[1:3] == ":/"
 
 
 def approved_rel(conf: settings.Settings) -> str:
-    """承認済みチケットの置き場の綴り（"/" 区切り、前後の区切りなし）。絶対ならそのまま。"""
+    """承認済みチケットの置き場の綴り（"/" 区切り、前後の区切りなし）。絶対なら絶対のまま。
+
+    `./`・`//`・`x/..` は畳む（L-b）。畳まないと、判定が畳んだ綴りに当てたときに
+    置き場の綴りと食い違い、ロックが外れる。
+    """
     raw = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/")
-    return raw.rstrip("/") if os.path.isabs(raw) or raw[1:3] == ":/" else raw.strip("/")
+    if _is_absolute(raw):
+        return posixpath.normpath(raw).rstrip("/") or "/"
+    norm = posixpath.normpath(raw).strip("/")
+    return raw.strip("/") if norm in ("", ".") else norm
 
 
 def flow_rel(conf: settings.Settings, ticket_id: str) -> str:
@@ -111,8 +194,10 @@ def flow_rel(conf: settings.Settings, ticket_id: str) -> str:
 
 
 def flow_file(conf: settings.Settings, tree_root: str, ticket_id: str) -> str:
-    """このツリーでの子のフローの絶対パス。"""
-    return os.path.join(settings.approved_dir(conf, tree_root), FLOWS_DIR, f"{ticket_id}{SUFFIX}")
+    """このツリーでの子のフローの絶対パス（`./` や `x/..` は畳んだ綴り）。"""
+    return os.path.normpath(
+        os.path.join(settings.approved_dir(conf, tree_root), FLOWS_DIR, f"{ticket_id}{SUFFIX}")
+    )
 
 
 def linked(tree_root: str, path: str) -> bool:
@@ -137,24 +222,17 @@ def linked(tree_root: str, path: str) -> bool:
     return False
 
 
-def _bases(root: str, child: ticket_mod.Ticket) -> list[str]:
-    """探すツリー。承認済みチケットが在るツリー（権威のツリー）、無ければ子のワークツリー。"""
-    bases = [b for b in (child.tree_root, tree.worktree_path(root, child.ticket)) if b]
-    return bases or [root]
-
-
 def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str, bool]:
     """フローのファイルの絶対パスと、それを持つツリーのルートと、在るかどうか。
 
-    先に権威のツリーで探し、無ければ子のワークツリーで探す。どちらにも無ければ権威のツリーの側。
+    読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの版は
+    読まない。子のワークツリーはエージェントが作業する場所で、そこの写しはシェルの書き込み
+    （行き先を追えない形）で書き換えられうる（M-2）。
     リンクでも「在る」とする（読むかどうかは `load` が決める。黙って別の版へ移らない）。
     """
-    bases = _bases(root, child)
-    for base in bases:
-        path = flow_file(conf, base, child.ticket)
-        if os.path.lexists(path):
-            return path, base, True
-    return flow_file(conf, bases[0], child.ticket), bases[0], False
+    base = child.tree_root or root
+    path = flow_file(conf, base, child.ticket)
+    return path, base, os.path.lexists(path)
 
 
 def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict | None:
@@ -185,23 +263,31 @@ def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | No
     名前は `flows/` の下の残り（`<子>.json`）。プロジェクトは置き場を持つツリーのもの
     （ワークスペースなら空、ワークスペースの外なら None）。綴りは解いたものでも解く前の
     ものでもよい。大文字小文字は範囲の照合と同じく区別しない。
+
+    名前は Windows で同じファイルに届く綴りを畳む。末尾の `.` と空白、`:` から後ろ
+    （`::$DATA` などの代替データストリーム）を落とす（止める向きだけ）。8.3 形式の短い
+    名前（`I0001-~1.JSO`）は畳めない。解いた綴り（`full`）が長い名前に戻すのに任せる。
     """
     if not path:
         return None
     norm = os.path.normpath(path)
     here = _fold(norm)
-    if len(here) != len(norm):
-        here = norm.replace("\\", "/")
     rel = approved_rel(conf)
-    absolute = os.path.isabs(rel) or rel[1:3] == ":/"
-    marker = _fold(rel if absolute else f"/{rel}") + f"/{FLOWS_DIR}/"
+    absolute = _is_absolute(rel)
+    shared = absolute
+    if not absolute and (rel == ".." or rel.startswith("../")):
+        # ツリーの外（`../shared/approved`）を指す置き場。ツリーをまたいで 1 か所になりうるので、
+        # `..` を落とした残りの綴りで当て、どのプロジェクトの子でも止める（止める向き）。
+        rel = "/".join(p for p in rel.split("/") if p != "..")
+        shared = True
+    marker = _fold(rel if absolute else f"/{rel}" if rel else "") + f"/{FLOWS_DIR}/"
     at = here.rfind(marker)
     if at < 0:
         return None
-    name = here[at + len(marker) :]
+    name = here[at + len(marker) :].split(":", 1)[0].rstrip(". ")
     if not name:
         return None
-    if absolute:
+    if shared:
         # 置き場がどのツリーにも共通の 1 か所。どのプロジェクトの子でも当てる（止める向き）。
         return name, ANY_PROJECT
     owner = tree.tree_of(root, norm[:at] or os.sep, conf.projects)
@@ -225,9 +311,46 @@ def lock_hit(
             child.is_child
             and child.in_progress
             and project in (child.project, ANY_PROJECT)
-            and _fold(f"{child.ticket}{SUFFIX}") == name
+            and _same_name(f"{child.ticket}{SUFFIX}", name)
         ):
             return child
+    return None
+
+
+def hard_linked(path: str) -> bool:
+    """在るふつうのファイルで、名前が 2 つ以上あるか。無い・読めないなら偽。"""
+    try:
+        st = os.stat(path)
+    except (OSError, ValueError):
+        return False
+    return stat.S_ISREG(st.st_mode) and st.st_nlink > 1
+
+
+def inode_hit(
+    conf: settings.Settings, root: str, copies: list[ticket_mod.Ticket], path: str
+) -> ticket_mod.Ticket | None:
+    """書き込み先が、着手中の子のフローとハードリンクで同じ中身なら、その子。無ければ None。
+
+    ハードリンクは綴りに置き場が出ないので `locate` では当たらない（M-1）。書き込み先が
+    在って、名前が 2 つ以上あるときだけ、着手中の子のフロー（どのツリーの写しの置き場も）と
+    (デバイス, inode) を比べる。止める向きだけ。ふつうのファイル（名前が 1 つ）には何も読まない。
+    """
+    try:
+        st = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    if st.st_nlink < 2 or not stat.S_ISREG(st.st_mode) or not st.st_ino:
+        return None
+    for child in copies:
+        if not (child.is_child and child.in_progress):
+            continue
+        for base in dict.fromkeys(b for b in (child.tree_root, root) if b):
+            try:
+                other = os.stat(flow_file(conf, base, child.ticket))
+            except (OSError, ValueError):
+                continue
+            if (other.st_dev, other.st_ino) == (st.st_dev, st.st_ino):
+                return child
     return None
 
 
@@ -253,24 +376,65 @@ def locked_message(conf: settings.Settings, child: ticket_mod.Ticket, path: str)
 # ---- 読む
 
 
-def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
-    """フローを読む。(中身, 読めない理由)。例外は外に出さない。
+def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
+    """フローのファイルの中身（バイト）。読まないなら (None, 理由)。例外は外に出さない。
 
-    tree_root を渡せば、そこからファイルまでの途中にリンクがあるものは読まない。ファイルそのものが
-    リンクなら、tree_root が無くても読まない。
+    読むのはふつうのファイル（`S_ISREG`）で、名前が 1 つ（ハードリンクでない）ものだけ。
+    名前付きパイプを開くと書き手が来るまで戻らず、SubagentStart が固まる（H-1）。
+    ハードリンクは承認済みの領域の外の名前から書き換えられる（M-1）。
+    `lstat` で確かめてから `O_NONBLOCK | O_NOFOLLOW` で開き、開いたものを `fstat` で
+    もう一度確かめる（ふつうのファイルで、`lstat` と同じ inode）。確かめてから開くまでに
+    差し替えられても、開いたものが違えば読まない。Windows には `O_NONBLOCK` も
+    `O_NOFOLLOW` も無いので、確かめ直しだけが効く。
     """
     try:
         if tree_root and linked(tree_root, path):
             return None, LINKED
-        size = os.lstat(path).st_size
-        if size > FILE_LIMIT:
-            return None, f"大きすぎるので読まない（{size} バイト、上限 {FILE_LIMIT}）"
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+        before = os.lstat(path)
+        if stat.S_ISLNK(before.st_mode):
+            return None, LINKED
+        if not stat.S_ISREG(before.st_mode):
+            return None, NOT_REGULAR
+        if before.st_nlink > 1:
+            return None, HARD_LINKED
+        if before.st_size > FILE_LIMIT:
+            return None, f"大きすぎるので読まない（{before.st_size} バイト、上限 {FILE_LIMIT}）"
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_BINARY", 0)
+        )
         fd = os.open(path, flags)
         with os.fdopen(fd, "rb") as f:
+            after = os.fstat(f.fileno())
+            if not stat.S_ISREG(after.st_mode):
+                return None, NOT_REGULAR
+            if (after.st_dev, after.st_ino) != (before.st_dev, before.st_ino):
+                return None, SWAPPED
+            if after.st_nlink > 1:
+                return None, HARD_LINKED
             raw = f.read(FILE_LIMIT + 1)
         if len(raw) > FILE_LIMIT:
             return None, f"大きすぎるので読まない（上限 {FILE_LIMIT} バイト）"
+        return raw, ""
+    except OSError as exc:
+        return None, f"読めない ({clean(exc.strerror or type(exc).__name__)})"
+    except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
+        return None, f"読めない ({type(exc).__name__})"
+
+
+def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
+    """フローを読む。(中身, 読めない理由)。例外は外に出さない。
+
+    tree_root を渡せば、そこからファイルまでの途中にリンクがあるものは読まない。ファイルそのものが
+    リンクなら、tree_root が無くても読まない。ふつうのファイルでないもの（名前付きパイプなど）と
+    ハードリンクも読まない（`read_bytes`）。
+    """
+    raw, why = read_bytes(path, tree_root)
+    if raw is None:
+        return None, why
+    try:
         data = json.loads(raw.decode("utf-8-sig"))
     except OSError as exc:
         return None, f"読めない ({clean(exc.strerror or type(exc).__name__)})"
@@ -283,6 +447,86 @@ def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
     if not isinstance(data, dict) or not isinstance(data.get("nodes"), list):
         return None, "`nodes` の並びが無い"
     return data, ""
+
+
+# ---- 着手のあとの書き換えを知らせる
+
+
+def fingerprint(path: str, tree_root: str = "") -> str:
+    """フローのファイルの指紋。無ければ `absent`、読めれば `sha256:<16 進>`、読まないなら
+    `unreadable:<理由>`。例外は外に出さない。読み方は `load` と同じ（`read_bytes`）。"""
+    try:
+        if not os.path.lexists(path):
+            return "absent"
+    except (OSError, ValueError):
+        return "unreadable:読めない"
+    raw, why = read_bytes(path, tree_root)
+    if raw is None:
+        return f"unreadable:{why}"
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def digest_record_path(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
+    """着手のときに控えた指紋の記録の置き場。フローと同じツリーの `phases/<親>/<子>.flow.json`。"""
+    # 形は `approval.child_record_path` と同じ。flow は approval より下の段なので読まず、形を写す
+    # （`test_flow_hardening` が突き合わせる）。
+    approved = settings.approved_dir(conf, child.tree_root or root)
+    return os.path.join(approved, PHASES_DIR, child.parent, f"{child.ticket}.{DIGEST_RECORD}.json")
+
+
+def record_digest(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tuple[str, str]:
+    """着手のときのフローの指紋を控える。(書いた記録のパス, 書けなかった理由)。
+
+    置き場は子の記録（`.risk.json` など）と同じ `phases/<親>/` で、承認済みの領域にあるので
+    エージェントは書けず、親のブランチに乗って他の機械へ届く。フローが無くても控える
+    （着手のあとに現れたことも知らせるため）。
+    """
+    path, base, _ = resolve(conf, root, child)
+    data = {
+        "fingerprint": fingerprint(path, base),
+        "path": flow_rel(conf, child.ticket),
+        "at": child.started_at,
+    }
+    target = digest_record_path(conf, root, child)
+    failed = fsio.write_text(target, json.dumps(data, ensure_ascii=False, indent=1) + "\n", "\n")
+    return target, clean(failed)
+
+
+def _describe(mark: str) -> str:
+    if mark == "absent":
+        return "無い"
+    if mark.startswith("sha256:"):
+        return mark[: len("sha256:") + 12]
+    return clean(mark.partition(":")[2]) or "読めない"
+
+
+def changed_notice(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> str:
+    """着手中の子のフローが、着手のときに控えた指紋から変わっていれば、その知らせ。無ければ空。
+
+    知らせるだけで止めない（締める向き）。ロックと承認済みの領域の守りは Write / Edit と、
+    綴りの出るシェルの書き込みを止めるが、行き先を追えないシェルの書き込みは止まらない
+    （M-2）。控えが無い（この仕組みより前に着手した）子には何も言わない。例外は外に出さない。
+    """
+    try:
+        if not (child.is_child and child.in_progress):
+            return ""
+        record = fsio.read_dict(digest_record_path(conf, root, child))
+        if not record:
+            return ""
+        before = str(record.get("fingerprint") or "")
+        path, base, _ = resolve(conf, root, child)
+        now = fingerprint(path, base)
+        if not before or before == now:
+            return ""
+        return (
+            f"[ccnavi] {CODE_CHANGED}: 着手後にフローが書き換わった。子チケット "
+            f"{clean(child.ticket)} のフロー {clean(path)} が、着手のとき（{_describe(before)}）と"
+            f"違う（いま {_describe(now)}）。担当のサブエージェントが読んだ手順と、人が渡した"
+            "手順が食い違っているかもしれない。誰が書き換えたかを人が確かめる"
+            "（ロックは Write / Edit を止めるが、シェルから行き先を追えない形で書くと止まらない）"
+        )
+    except Exception:  # noqa: BLE001  知らせのために hook を落とさない
+        return ""
 
 
 # ---- 並べる
@@ -302,6 +546,9 @@ def _text(value) -> str:
     """文字列か数だけを文にする。並びや辞書は中身を辿らない（深い入れ子で落ちない）。"""
     if isinstance(value, bool):
         return ""
+    if isinstance(value, float) and value.is_integer() and abs(value) < 1e21:
+        # 整数の値の小数（`1.0`）は整数の綴りにする。ボード（JavaScript の `String`）と揃える。
+        return str(int(value))
     if isinstance(value, (str, int, float)):
         return str(value)
     return ""
@@ -319,18 +566,67 @@ def _line(value) -> str:
     return shown
 
 
+_IGNORED = ("Mn", "Mc", "Me", "Cf", "Cc", "Zs")
+
+
+def _skeleton(text: str) -> tuple[str, list[int]]:
+    """見た目で比べるための綴りと、その 1 字ずつの元の位置。
+
+    互換分解（NFKD。全角の `［` は `[`、`ⅽ` は `c`）し、結合文字・書式の制御・制御文字・
+    空白を落とし、似た形の字（`_CONFUSABLE`）をラテン文字に寄せ、大文字小文字を畳む。
+    """
+    chars: list[str] = []
+    origin: list[int] = []
+    for i, ch in enumerate(text):
+        for part in unicodedata.normalize("NFKD", ch):
+            if part.isspace() or unicodedata.category(part) in _IGNORED:
+                continue
+            for folded in _CONFUSABLE.get(part, part).casefold():
+                chars.append(_CONFUSABLE.get(folded, folded))
+                origin.append(i)
+    return "".join(chars), origin
+
+
 def _neutral(text: str) -> str:
-    lowered = text.lower()
-    if _BADGE not in lowered:
+    """フローの文が ccnavi の知らせや案内の区切りに見えないようにする（L-a）。
+
+    - `[` / `［`（互換文字も）の直後が `ccnavi` で始まる括弧は、開きと、その先の最初の閉じ
+      （`]` / `］`）を `〔` `〕` に置き換える。`[ccnavi dry-run]`・`[CCNAVI]`・幅の無い字や
+      結合文字を挟んだもの・キリル文字の `с` で綴ったものも同じ
+    - 案内の区切りの行の文（`_FENCE_PHRASES`）は `_FENCE_SHOWN` に置き換える
+    """
+    skeleton, origin = _skeleton(text)
+    replace: dict[int, str] = {}
+    word = _BADGE_WORD
+    at = skeleton.find("[")
+    while at >= 0:
+        if skeleton.startswith(word, at + 1):
+            start = origin[at]
+            replace[start] = _BADGE_OPEN
+            close = skeleton.find("]", at + 1)
+            if close >= 0 and origin[close] - start <= _BADGE_REACH:
+                replace[origin[close]] = _BADGE_CLOSE
+        at = skeleton.find("[", at + 1)
+    for phrase in _FENCE_PHRASES:
+        needle = _skeleton(phrase)[0]
+        at = skeleton.find(needle)
+        while at >= 0:
+            first, last = origin[at], origin[at + len(needle) - 1]
+            replace[first] = _FENCE_SHOWN
+            for i in range(first + 1, last + 1):
+                replace[i] = ""
+            at = skeleton.find(needle, at + len(needle))
+    if not replace:
         return text
-    out, i = [], 0
-    while True:
-        at = lowered.find(_BADGE, i)
-        if at < 0:
-            out.append(text[i:])
-            return "".join(out)
-        out.append(text[i:at] + _BADGE_SHOWN)
-        i = at + len(_BADGE)
+    return "".join(replace.get(i, ch) for i, ch in enumerate(text))
+
+
+def impersonates(text: str) -> bool:
+    """文に ccnavi の名乗りか案内の区切りに見える箇所が残っているか。テストと確かめ用。"""
+    skeleton, _ = _skeleton(text)
+    if any(_skeleton(p)[0] in skeleton for p in _FENCE_PHRASES):
+        return True
+    return f"[{_BADGE_WORD}" in skeleton
 
 
 def _dict(value) -> dict:
@@ -511,6 +807,8 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
         nexts = _capped(nexts, len(edges))
         if nexts:
             text += " → " + ", ".join(nexts)
+        # 組み立てた行でも見る。種類の名前が `ccnavi…` だと、こちらの `[<種類>]` が名乗りになる。
+        text = _neutral(text)
         if used + len(text) > text_limit and lines:
             break
         lines.append(text)
@@ -527,26 +825,35 @@ def briefing(
     child: ticket_mod.Ticket,
     scope: str,
     budget: int = TOTAL_TEXT_LIMIT,
+    full: bool = True,
 ) -> list[str]:
     """SubagentStart でこの子について渡す行。フローが無ければ空。例外は外に出さない。
 
     サブエージェントの自動 compact で消えても辿り直せるよう、ファイルの絶対パスを毎回名指しする。
     手順の文は `budget` 文字（と子 1 本の上限）まで。
+
+    `full` が偽なら、ファイルの 1 行だけを返す。起動の cwd が親のツリーで子を何本も並べるとき
+    （入れ子の孫の起動もこれ）は、どの子の担当かが hook から決められない。そこで全部の子の
+    手順を並べると、別の子の手順に従いうる（M-4）。手順を並べるのは cwd がその子の
+    ワークツリーのときだけにする。
     """
     if not child.is_child:
         return []
     path, base, exists = resolve(conf, root, child)
     if not exists:
         return []
+    if not full:
+        return [f"    フロー: {clean(path)}"]
     lock = (
-        "着手中なので、終わるまで書き換えられない（ロック）。"
+        "着手中なので、終わるまで書き換えられない（ロック）。着手のあとに書き換わったら"
+        "ccnavi が知らせる。"
         if child.in_progress
         else "着手すると、終わるまで書き換えられなくなる（ロック）。"
     )
     lines = [
         f"    フロー: {clean(path)}（人がボードで書いた {clean(child.ticket)} の手順。"
-        "承認済みの領域にあり、エージェントは書けない）。作業の前にこのファイルを読み、"
-        "その順に進める。文脈が要約されて見失ったら、このパスを読み直す。" + lock
+        "承認済みの領域にあり、人が持つもの。エージェントは編集しない）。作業の前にこのファイルを"
+        "読み、その順に進める。文脈が要約されて見失ったら、このパスを読み直す。" + lock
     ]
     data, why = load(path, base)
     if data is None:
