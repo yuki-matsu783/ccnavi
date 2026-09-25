@@ -85,7 +85,7 @@ export function DecideBody({
           disabled={deciding || !done}
           onClick={() => post({ type: "decideConfirm", choices })}
         >
-          {deciding ? "反映している…" : count === 0 ? "レビュー済みにする" : "この方針で決める"}
+          {deciding ? "反映中…" : count === 0 ? "レビュー済みにする" : "この方針で決める"}
         </button>
         <button
           type="button"
