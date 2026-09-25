@@ -1781,8 +1781,11 @@ def _result(stderr: TextIO, path: str) -> Result | None:
 
 def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
     """依頼したのと同じマージリクエストの写しか。違うもので先へ進めない。"""
-    result = _result_with_mr(stderr, path)
+    result = _result(stderr, path)
     if result is None:
+        return None
+    if result.mr is None:
+        stderr.write("ccnavi: 結果にマージリクエストが無い\n")
         return None
     if requested_mark.get("host") and result.host != requested_mark.get("host"):
         stderr.write(
