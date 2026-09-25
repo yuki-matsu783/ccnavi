@@ -359,7 +359,8 @@ def requested(
     _note_synced(stderr, conf, root, parent.ticket, result.url, phase_no)
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
-        f"OK: レビューを{done}（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
+        f"OK: レビューを{done}（{result.mr.url or result.url}）。"
+        f"{phase.TURN_DEFINED}を終えて利用者を待つこと\n"
     )
     return 0
 

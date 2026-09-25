@@ -58,6 +58,10 @@ EXEMPT_NOTE = (
     "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、その 1 本も止まります。"
 )
 
+# 利用者とモデルに見せる文で「ターン」を初めて使うところに置く綴り。LLM の用語で、
+# 利用者には定義を添えないと通じない。1 通の中では最初の 1 回だけに使う。
+TURN_DEFINED = "ターン（利用者が指示を出してから Claude が応答を終えるまで）"
+
 # サブエージェントに許さない操作。状態を動かす形・レビューの形・リモートへ送る形を、
 # コマンドの位置で。読むだけの `cat` や `--help` は止めない。
 # push を含めるのは、リモートに置く枝は親ブランチ 1 本で、それを送るのが親の仕事だから。
@@ -709,7 +713,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     elif phase.review_in_chat:
         todo = (
             "やること: 子の成果を親ブランチへ合流し、利用者に差分を見てもらって、"
-            "ターンを終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
+            f"{TURN_DEFINED}を終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
             "（review: chat）なので、マージリクエストは要りません。先へ進めるのは、"
             f"利用者が端末で打つ 'ccnavi --reviewed {n} --chat' です"
             f"（エージェントからは打てません）。{later}"
@@ -718,7 +722,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         todo = (
             "やること: 子の成果を親ブランチへ合流して push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文>' "
-            "でレビューを頼み、ターンを終えて利用者を待ってください。"
+            f"でレビューを頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
             f"利用者がレビューを終えたら '{review_sh} confirm --phase {n}' "
             f"で確かめます。{later}"
         )
@@ -810,7 +814,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                     f"{covers}が済んだら、利用者が端末で "
                     f"'ccnavi --reviewed {n} --chat' を打つと先へ進めます"
                     "（この経路はエージェントには打てません）。"
-                    f"ターンを終えて利用者を待ってください。{hold_note}"
+                    f"{TURN_DEFINED}を終えて利用者を待ってください。{hold_note}"
                 )
             else:
                 texts.append(
@@ -819,7 +823,8 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                     f"子の成果を親ブランチへ合流して push し、"
                     f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
                     "--body-file <依頼文>' "
-                    f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。{hold_note}"
+                    f"でレビュー{covers}を頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
+                    f"{hold_note}"
                 )
         else:
             failed = approval.write_mark(
