@@ -73,6 +73,8 @@ def at_start(
     ]
     parents = approval.by_id(copies)
     types = phase.load_types(conf, root, bound.project) or {}
+    # フローの文に使える残り（文字）。子が多くても SubagentStart の文が膨らみすぎないように。
+    budget = flow.TOTAL_TEXT_LIMIT
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
         state = "ワークツリーあり" if os.path.isdir(where) else "ワークツリー無し（効かない）"
@@ -95,8 +97,15 @@ def at_start(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
-        # 子のフロー（設計 9.12、ADR-0085）。在ればファイルと `flow:` を名指しし、手順を並べる。
-        lines.extend(flow.briefing(root, t, ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))))
+        # 子のフロー（設計 9.12、ADR-0085）。在ればファイルを名指しし、手順を並べる。
+        # フローは人が書くデータで、壊れていても 1 行の知らせに落とし、残りの子と範囲は渡す。
+        scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
+        try:
+            brief = flow.briefing(conf, root, t, scope, budget)
+        except Exception as exc:  # noqa: BLE001  壊れたフローで SubagentStart を落とさない
+            brief = [f"    フローを読めない（{type(exc).__name__}）。人に確かめる"]
+        budget -= sum(len(line) for line in brief)
+        lines.extend(brief)
     hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines))
     return EXIT_OK
 
