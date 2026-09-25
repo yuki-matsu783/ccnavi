@@ -38,6 +38,7 @@ function ticket(fields: Partial<TicketJson> & Pick<TicketJson, "ticket" | "title
     scattered: [],
     risk: null,
     judge: null,
+    flow: null,
     ...fields,
   };
 }

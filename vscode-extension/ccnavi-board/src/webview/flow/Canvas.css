@@ -1,0 +1,64 @@
+/*
+ * フローの図（`Canvas.tsx`）。フェーズ管理の図（`phases/Graph.css`）と同じく、React Flow の色の変数
+ * （`--xy-*`）を VS Code のテーマ変数に置き換える。`!important` は要らない。
+ */
+.flow-graph {
+  height: 70vh;
+  min-height: 360px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.flow-graph .react-flow {
+  --xy-background-color-default: var(--vscode-editor-background);
+  --xy-background-pattern-dots-color-default: var(--vscode-panel-border);
+  --xy-edge-stroke-default: var(--vscode-descriptionForeground);
+  --xy-edge-stroke-selected-default: var(--vscode-focusBorder);
+  --xy-edge-stroke-width-default: 2;
+  --xy-controls-button-background-color-default: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  --xy-controls-button-background-color-hover-default: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+  --xy-controls-button-color-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-color-hover-default: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  --xy-controls-button-border-color-default: var(--vscode-panel-border);
+  --xy-controls-box-shadow-default: none;
+  --xy-edge-label-background-color-default: var(--vscode-editor-background);
+  --xy-edge-label-color-default: var(--vscode-descriptionForeground);
+  --xy-node-background-color-default: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --xy-node-color-default: var(--vscode-foreground);
+  --xy-node-border-default: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  --xy-node-border-radius-default: 3px;
+  --xy-node-boxshadow-hover-default: 0 0 0 1px var(--vscode-focusBorder);
+  --xy-node-boxshadow-selected-default: 0 0 0 2px var(--vscode-focusBorder);
+  --xy-handle-background-color-default: var(--vscode-descriptionForeground);
+  --xy-handle-border-color-default: var(--vscode-editor-background);
+  --xy-attribution-background-color-default: transparent;
+  --xy-selection-background-color-default: var(--vscode-list-hoverBackground);
+  --xy-selection-border-default: 1px dotted var(--vscode-focusBorder);
+}
+.flow-graph .react-flow__node-step { width: 190px; font-size: var(--vscode-font-size); }
+.flow-node {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 6px 8px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  border-left: 4px solid var(--vscode-descriptionForeground);
+  border-radius: 3px;
+  color: var(--vscode-foreground);
+  text-align: left;
+}
+.react-flow__node.selected .flow-node { outline: 1px solid var(--vscode-focusBorder); }
+.flow-node:hover { outline: 1px dashed var(--vscode-contrastActiveBorder, transparent); }
+/* 種類ごとの左の縁。色は意味の色（テーマ変数）から採り、種類の名前は文字でも出す */
+.flow-node[data-type="start"], .flow-node[data-type="end"] { border-left-color: var(--vscode-charts-green, var(--vscode-focusBorder)); }
+.flow-node[data-type="prompt"], .flow-node[data-type="skill"] { border-left-color: var(--vscode-charts-blue, var(--vscode-focusBorder)); }
+.flow-node[data-type="subAgent"] { border-left-color: var(--vscode-charts-purple, var(--vscode-focusBorder)); }
+.flow-node[data-type="askUserQuestion"] { border-left-color: var(--vscode-editorWarning-foreground); }
+.flow-node[data-type="ifElse"], .flow-node[data-type="switch"] { border-left-color: var(--vscode-charts-orange, var(--vscode-editorWarning-foreground)); }
+.flow-node[data-type="other"] { border-left-style: dashed; opacity: .85; }
+.flow-node-type { font-size: .8em; color: var(--vscode-descriptionForeground); }
+.flow-node-name { font-weight: 600; overflow-wrap: anywhere; }
+.flow-node-summary { font-size: .85em; color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
+/* 分岐の出口。行ごとに右端へ点を置く（点は行を基準に置かれる） */
+.flow-ports { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.flow-port { position: relative; text-align: right; font-size: .8em; color: var(--vscode-descriptionForeground); padding-right: 6px; }
+.flow-graph .react-flow__handle { width: 8px; height: 8px; }

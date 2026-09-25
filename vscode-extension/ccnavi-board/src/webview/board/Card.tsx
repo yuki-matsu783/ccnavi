@@ -6,6 +6,8 @@ import type { JSX } from "react";
 
 import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
+import { flowButtonLabel } from "../../core/flow-view.js";
+import type { FlowJson } from "../../core/model.js";
 import { post } from "./post.js";
 import {
   COPY_LABELS,
@@ -91,11 +93,12 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
           ))}
         </ul>
       ) : null}
-      {card.actions.length > 0 ? (
+      {card.actions.length > 0 || card.flow !== null ? (
         <div className="card-actions">
           {card.actions.map((action, i) => (
             <ActionButton key={i} action={action} id={card.id} />
           ))}
+          {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} /> : null}
         </div>
       ) : null}
     </li>
@@ -248,6 +251,27 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
     <a className="fact mr mr-link" href={url} title={title}>
       {text}
     </a>
+  );
+}
+
+/**
+ * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えの写し）で変わる。
+ * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
+ */
+function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {
+  const state = flow.locked ? "locked" : flow.exists ? "edit" : "create";
+  return (
+    <button
+      type="button"
+      className="action flow"
+      data-action="flow"
+      data-ticket={id}
+      data-flow={state}
+      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見る。着手中は書き換えられない" : flow.exists ? "直す" : "作る"}（${flow.rel}）`}
+      onClick={() => post({ type: "flow", ticket: id })}
+    >
+      {flowButtonLabel(flow)}
+    </button>
   );
 }
 
