@@ -327,6 +327,12 @@ export interface CanvasProps {
   readonly onSelect: (selection: Selection | undefined) => void;
   /** 図で選んでいるノードの id が変わった（Shift で選び足したものも含む） */
   readonly onPick: (ids: readonly string[]) => void;
+  /**
+   * 図の外で選んだノード（部品箱で足したものなど）。これが替わったときだけ、そのノード 1 つを選び直す
+   * （`id` が無ければ選びを全部外す。中身を読み直したとき）。
+   * 図で押したノードは React Flow が選ぶ（Shift での選び足し・外しもそのまま）ので、ここには来ない
+   */
+  readonly focus?: { readonly id?: string } | undefined;
   /** ドラッグを放した点。位置は React Flow の決まり（グループの中のノードはグループからの位置） */
   readonly onMove: (moves: readonly { readonly id: string; readonly position: FlowPoint }[]) => void;
   readonly onConnect: (from: string, fromPort: string, to: string, toPort: string) => void;
@@ -335,29 +341,27 @@ export interface CanvasProps {
   readonly onResizeGroup: (id: string, size: FlowSize, position: FlowPoint) => void;
 }
 
-export function Canvas({ doc, readOnly, selected, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
+export function Canvas({ doc, readOnly, selected, focus, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
   const base = useMemo(() => stepsOf(doc, readOnly), [doc, readOnly]);
   const edges = useMemo(() => edgesOf(doc, selected, readOnly), [doc, selected, readOnly]);
   const [nodes, setNodes] = useState<FlowNodeView[]>(base);
 
   // 写しが替わったら手元を作り直す。測った大きさと、選んでいるか（Shift で選び足したものも）は引き継ぐ。
-  // 呼び手が図の外から選んだノード（部品箱で足したもの）がまだ選ばれていなければ、それだけを選ぶ。
-  // 図で押したノードは React Flow が先に選んでいるので、ほかの選び足しは崩さない
-  const want = selected?.kind === "node" ? selected.id : undefined;
-  const wanted = useRef(want);
+  // 呼び手が図の外から選んだノード（`focus`。部品箱で足したもの）は、それが替わったときだけ、それ 1 つを選ぶ。
+  // 図で押したノードは React Flow が選んでいる（Shift で外したものも）ので、ここでは選び直さない
+  const focused = useRef(focus);
   useEffect(() => {
-    const fresh = wanted.current !== want;
-    wanted.current = want;
+    const fresh = focused.current !== focus;
+    focused.current = focus;
     setNodes((now) => {
       const before = new Map(now.map((node) => [node.id, node]));
-      const only = fresh && want !== undefined && before.get(want)?.selected !== true;
       return base.map((node) => {
         const old = before.get(node.id);
-        const chosen = only ? node.id === want : old?.selected === true;
+        const chosen = fresh && focus !== undefined ? node.id === focus.id : old?.selected === true;
         return { ...node, selected: chosen, ...(old?.measured === undefined ? {} : { measured: old.measured }) };
       });
     });
-  }, [base, want]);
+  }, [base, focus]);
 
   const onNodesChange = useCallback((changes: NodeChange<FlowNodeView>[]) => {
     // 消す・足すは写しの側でしかしない（Delete の鍵も受けない）。ここで受けるのは大きさ・位置・選択

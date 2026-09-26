@@ -373,9 +373,17 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
   }
 }
 
-/** 使われていない id。`<種類>-<番号>` */
+/**
+ * 使われていない id。`<種類>-<番号>`。どこかのノードの `parentId` が指している id も使っているとみなす
+ * （指す先の無い `parentId` を持つノードが、新しく作ったグループに黙って入らないように）
+ */
 export function freshNodeId(doc: FlowDoc, type: string): string {
   const used = new Set(doc.nodes.map((node) => node.id));
+  for (const node of doc.nodes) {
+    if (typeof node.parentId === "string") {
+      used.add(node.parentId);
+    }
+  }
   let n = 1;
   while (used.has(`${type}-${n}`)) {
     n += 1;

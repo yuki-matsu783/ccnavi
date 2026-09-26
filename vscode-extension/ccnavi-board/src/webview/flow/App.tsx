@@ -11,7 +11,7 @@
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
  * だけ（再読込・保存が通った）。
  */
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import {
   absolutePosition,
@@ -106,6 +106,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [changed, setChanged] = useState(false);
   const [selected, setSelected] = useState<Selection | undefined>(undefined);
   const [picked, setPicked] = useState<readonly string[]>([]);
+  // 図の外で選んだノード（部品箱で足した・グループ化で作った）。図はこれが替わったときだけ、それ 1 つを選び直す
+  const [focus, setFocus] = useState<{ readonly id?: string } | undefined>(undefined);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -121,6 +123,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setStatus(undefined);
         setChanged(false);
         setSelected(undefined);
+        setPicked([]);
+        setFocus({});
         setLock(pageOf(next)?.lock ?? NO_LOCK);
       } else if (message.type === "failed") {
         setBusy(false);
@@ -150,6 +154,15 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       post({ type: "dirty", dirty });
     }
   }, [dirty]);
+
+  // 図で選んでいるノードが変わった。**毎回同じ関数を渡す**（React Flow は onSelectionChange が替わるたびに
+  // その時の選びで呼び直すので、描くたびに作り直すと、押した直後の古い選びで呼ばれる）
+  const pick = useCallback((ids: readonly string[]): void => {
+    setPicked((now) => (sameIds(now, ids) ? now : ids));
+    // Shift を押しながら選んでいたノードを押すと、React Flow はそれを選びから外す。右の欄がそのノードの
+    // ままにならないよう、残った選びの最後のノード（残っていなければ何も無い）に替える
+    setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
+  }, []);
 
   const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc)), [doc]);
 
@@ -192,6 +205,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     const added = addNode(doc, type, nextSpot(doc));
     edit(added.doc);
     setSelected({ kind: "node", id: added.id });
+    setFocus({ id: added.id });
   };
 
   /** 消したものを選んでいたら、選ぶのをやめる（線は並びの位置で指すので、線を消したら線の選びは外す） */
@@ -218,6 +232,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     edit(grouped.doc);
     setSelected({ kind: "node", id: grouped.id });
+    setFocus({ id: grouped.id });
   };
 
   return (
@@ -305,7 +320,8 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           readOnly={readOnly}
           selected={selected}
           onSelect={setSelected}
-          onPick={(ids) => setPicked((now) => (sameIds(now, ids) ? now : ids))}
+          focus={focus}
+          onPick={pick}
           onMove={(moves) => {
             // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じ写しを返す）
             const next = placeNodes(doc, moves);
@@ -316,7 +332,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           onConnect={(from, fromPort, to, toPort) => edit(connect(doc, from, fromPort, to, toPort))}
           onRemoveNode={removeNodeAt}
           onRemoveEdge={removeEdgeAt}
-          onResizeGroup={(id, size, position) => edit(resizeGroup(doc, id, size, position))}
+          onResizeGroup={(id, size, position) => {
+            // 縁を押しただけ（大きさが変わっていない）なら未保存にしない（resizeGroup が同じ写しを返す）
+            const next = resizeGroup(doc, id, size, position);
+            if (next !== doc) {
+              edit(next);
+            }
+          }}
         />
         <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSelect={setSelected} />
       </div>

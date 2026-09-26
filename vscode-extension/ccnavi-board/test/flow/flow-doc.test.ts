@@ -355,6 +355,13 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.equal(byId(again.doc, "a").parentId, "group-1");
   assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
   assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
+  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに黙って入らない）
+  const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
+  const fresh = groupNodes(stray, ["a", "b"]);
+  assert.ok(fresh !== undefined);
+  assert.equal(fresh.id, "group-2");
+  assert.equal(groupOf(fresh.doc, byId(fresh.doc, "x")), undefined);
+  assert.deepEqual(absolutePosition(fresh.doc, "x"), { x: 700, y: 500 });
 });
 
 test("CB-T255 グループを解く・消すと、中のノードは図の上の同じ位置で外へ出て残る。中のノードを消してもグループは残る", () => {
