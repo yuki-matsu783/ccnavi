@@ -150,6 +150,7 @@
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める |
 | [0086](0086-state-history-is-an-append-only-aid.md) | 状態が動いた跡を、チケットごとの追記専用のファイルに残す。正は置き場のまま |
 | [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
+| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
 
 ### 複数のリポジトリと VS Code 拡張
 
