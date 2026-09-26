@@ -244,7 +244,17 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
       ]}
     ],
     "Stop": [
-      { "hooks": [
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+      ]}
+    ],
+    "SubagentStart": [
+      { "matcher": "", "hooks": [
+        { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
+      ]}
+    ],
+    "SubagentStop": [
+      { "matcher": "", "hooks": [
         { "type": "command", "command": "\"${CLAUDE_PROJECT_DIR}/${CCNAVI_BIN_PATH}\"", "timeout": 10 }
       ]}
     ]
@@ -260,8 +270,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 }
 ```
 
-同じ実行ファイルを 7 つのイベントに登録する（上の例は 5 つ。`SubagentStart` と
-`SubagentStop` も同じ形で足す）。payload がイベント名を名乗るので、どれを走らせるかは ccnavi が選ぶ。
+同じ実行ファイルを上の 7 つのイベントに登録する。payload がイベント名を名乗るので、どれを走らせるかは ccnavi が選ぶ。
 `matcher` は絞らない。絞ると、書かなかったツールで hook 自体が起動しなくなる。
 `SessionStart` の 2 本目は取り込みの sh（`ccnavi-fetch.sh`）で、承認済みチケットと
 マーカー（親ブランチに乗って届く）と、ワークツリーの起点になるデフォルトブランチを fast-forward で
