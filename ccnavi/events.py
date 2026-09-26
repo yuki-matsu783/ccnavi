@@ -223,7 +223,7 @@ def decide_at_stop(
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
     )
-    nudge = _finish_nudge(conf, root, payload, record, mode)
+    nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
     if nudge and mode == modes.ENABLE:
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
@@ -237,6 +237,7 @@ def decide_at_stop(
 
 
 def _finish_nudge(
+    stderr: TextIO,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -245,16 +246,24 @@ def _finish_nudge(
 ) -> str:
     """`finish` の打ち忘れを促す文（ADR-0087）。促さないなら空文字。
 
-    メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは 1 回の連鎖に 1 回で、
+    メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは、同じセッションで
+    同じチケットを同じ HEAD のまま促したことが無いときだけ（控えは状態の置き場の
+    `nudged-<セッション>.json`）。コミットを足して HEAD が進めば、また促してよい。加えて
     `stop_hook_active` が真なら（Stop の hook が続けさせた結果なら。ほかの hook が止めた分も含む）
-    何もしない。チケット制御が disable なら何もしない。
+    何もしない。控えの置き場が無い（`--state ""`）か、控えを書けないときは促さない。覚えられないまま
+    止めると、ターンの終わりのたびに止まるので、黙る側を採る。チケット制御が disable なら
+    何もしない。
     """
-    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id:
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
     found = ops.unfinished_at_stop(root, conf, payload.cwd)
-    if found is None:
+    if found is None or ops.nudged_before(conf.state, payload.session_id, found):
         return ""
-    record.decision, record.code = audit.DENY, ops.CODE_FINISH_NUDGE
+    failed = ops.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: finish の促しを控えられないので、促さない: {failed}\n")
+        return ""
+    record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
     record.tree = found.ticket.ticket
     return ops.finish_nudge(root, found)

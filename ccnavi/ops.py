@@ -774,6 +774,7 @@ class Unfinished:
     ticket: ticket_mod.Ticket
     worktree: str
     ahead: int
+    head: str = ""
 
 
 def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinished | None:
@@ -787,7 +788,7 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
       フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
     - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
-    - 基準点より先にコミットが 1 件以上ある
+    - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
 
     git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり黙って通す。
     """
@@ -805,15 +806,69 @@ def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinish
     )
     if rc != 0 or out.strip():
         return None
+    ahead = _own_commits(here.root, bound)
+    head = _head(here.root)
+    if ahead <= 0 or not head:
+        return None
+    return Unfinished(bound, here.root, ahead, head)
+
+
+def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
+    """基準点より先の、このチケットが自分で作ったコミットの数。数えられなければ 0（促さない側）。
+
+    取り込んだだけのコミットは数えない。子なら親のブランチ（名前は親の識別子。子のブランチを識別子で
+    引くのと同じ慣習、`review._unmet`）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
+    （`origin/HEAD`。ADR-0060）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
+    （`--no-merges`）。子で親のブランチを引けなければ、自分のものか決まらないので 0 を返す。
+    親で `origin/HEAD` が無い（リモートの無いリポジトリ）ときは、除くものが無いので基準点の先を
+    全部数える。
+    """
+    exclude: list[str] = []
+    if t.is_child:
+        rc, sha = gitcmd.output(
+            worktree,
+            ["rev-parse", "--verify", "--quiet", f"{t.parent}^{{commit}}"],
+            TIMEOUT_SECONDS,
+        )
+        if rc != 0 or not sha.strip():
+            return 0
+        exclude.append(f"^{sha.strip()}")
+    else:
+        rc, sha = gitcmd.output(
+            worktree,
+            ["rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD^{commit}"],
+            TIMEOUT_SECONDS,
+        )
+        if rc == 0 and sha.strip():
+            exclude.append(f"^{sha.strip()}")
     rc, out = gitcmd.output(
-        here.root, ["rev-list", "--count", f"{bound.base_sha}..HEAD"], TIMEOUT_SECONDS
+        worktree,
+        ["rev-list", "--count", "--no-merges", f"{t.base_sha}..HEAD", *exclude],
+        TIMEOUT_SECONDS,
     )
     if rc != 0 or not out.strip().isdigit():
-        return None
-    ahead = int(out.strip())
-    if ahead <= 0:
-        return None
-    return Unfinished(bound, here.root, ahead)
+        return 0
+    return int(out.strip())
+
+
+def _nudge_path(state_dir: str, session: str) -> str:
+    """促した (チケット, HEAD) の控え。セッションごとに置く（差し戻しの印と同じ）。"""
+    where = fsio.safe_name(session) or "unknown"
+    return os.path.join(state_dir, f"nudged-{where}.json")
+
+
+def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
+    """このセッションで、同じチケットを同じ HEAD のまま促したことがあるか（ADR-0087）。"""
+    data = fsio.read_dict(_nudge_path(state_dir, session)) or {}
+    return data.get(found.ticket.ticket) == found.head
+
+
+def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
+    """促した (チケット, HEAD) を控える。書けなければ理由。git で運ぶ跡（history）には入れない。"""
+    path = _nudge_path(state_dir, session)
+    data = fsio.read_dict(path) or {}
+    data[found.ticket.ticket] = found.head
+    return fsio.write_json_atomic(path, dict(sorted(data.items())))
 
 
 def finish_nudge(root: str, found: Unfinished) -> str:
@@ -829,7 +884,7 @@ def finish_nudge(root: str, found: Unfinished) -> str:
             f"コミットが {found.ahead} 件あります。",
             f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
             "まだ続けるなら、続ける理由（何が残っているか）を利用者に向けて書いてから終えてください。"
-            "この案内は 1 回だけで、次に終えるときは止めません。",
+            "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
         ]
     )
 

@@ -30,11 +30,13 @@ CODE = "NUDGE_TICKET_FINISH"
 
 
 class StopNudgeTest(TicketTest):
-    def stop(self, cwd, *, active=False, mode="enable", event="Stop", agent_id="", extra=()):
+    def stop(
+        self, cwd, *, active=False, mode="enable", event="Stop", agent_id="", extra=(), session="s1"
+    ):
         payload = {
             "hook_event_name": event,
             "cwd": cwd,
-            "session_id": "s1",
+            "session_id": session,
             "stop_hook_active": active,
         }
         if agent_id:
@@ -172,6 +174,76 @@ class StopNudgeTest(TicketTest):
         tree = self.child_tree()
         self.commit_work(tree)
         self.assert_quiet(self.stop(tree, event="SubagentStop", agent_id="a1"))
+
+    # ---- 同じ HEAD では 1 回だけ（stop_hook_active に頼らない）
+
+    def test_the_same_head_is_asked_once_per_session_and_again_after_a_new_commit(self):
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        self.assertEqual(self.body(self.stop(tree)).get("decision"), "block")
+        # 次のターンの終わり（stop_hook_active は偽）でも、HEAD が同じなら止めない。
+        self.assert_quiet(self.stop(tree))
+        self.assert_quiet(self.stop(tree))
+        # コミットを足して HEAD が進めば、また 1 回だけ促す。
+        self.commit_work(tree, rel="src/a/more.py")
+        body = self.body(self.stop(tree))
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn("コミットが 2 件", body["reason"])
+        self.assert_quiet(self.stop(tree))
+        # 別のセッションは自分の控えを持つ。
+        self.assertEqual(self.body(self.stop(tree, session="s2")).get("decision"), "block")
+
+    def test_without_a_place_to_remember_it_does_not_ask(self):
+        """控えの置き場が無ければ、覚えられないので促さない（毎回止めない側）。"""
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        self.assert_quiet(self.stop(tree, extra=("--state", "")))
+
+    def test_the_nudge_is_recorded_apart_from_deny(self):
+        """監査の記録では deny と数えない。種類は nudge。"""
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        log = os.path.join(self.root, "log.jsonl")
+        self.stop(tree, extra=("--log", log))
+        with open(log, encoding="utf-8") as f:
+            line = json.loads(f.read().splitlines()[-1])
+        self.assertEqual((line["decision"], line["code"]), ("nudge", CODE))
+
+    # ---- 取り込んだだけのコミットは数えない
+
+    def test_fast_forwarding_the_parent_branch_alone_is_not_work(self):
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(self.parent_tree, rel="src/parent.py")
+        git(tree, "merge", "--quiet", "--ff-only", "i0001")
+        self.assert_quiet(self.stop(tree))
+
+    def test_merging_the_parent_branch_with_a_merge_commit_alone_is_not_work(self):
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01").returncode, 0)
+        # 別の子で、親を --no-ff で取り込む（マージのコミットが 1 つできる）。
+        other = self.child_tree("i0001-02")
+        self.commit_work(self.parent_tree, rel="src/parent.py")
+        git(other, "merge", "--quiet", "--no-ff", "--no-edit", "i0001")
+        self.assert_quiet(self.stop(other))
+        # 自分のコミットを足せば、それだけを数えて促す。
+        self.commit_work(other, rel="src/b/work.py")
+        body = self.body(self.stop(other))
+        self.assertEqual(body.get("decision"), "block")
+        self.assertIn("コミットが 1 件", body["reason"])
+
+    def test_a_child_whose_parent_branch_cannot_be_found_is_not_asked(self):
+        """親のブランチ（名前は親の識別子）を引けなければ、自分のコミットか決まらないので促さない。"""
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        git(self.parent_tree, "branch", "-m", "i0001", "renamed")
+        self.assert_quiet(self.stop(tree))
 
 
 if __name__ == "__main__":
