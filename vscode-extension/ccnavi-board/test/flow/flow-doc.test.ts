@@ -81,13 +81,16 @@ test("CB-T239 書き出しは人が読める形で、実行ファイル（YAML 1
   assert.deepEqual(read.doc, doc);
 });
 
-test("CB-T240 読みは実行ファイルと同じ YAML 1.1 の型で読み、日付は文字のまま持つ", () => {
-  const read = parseFlow("nodes:\n  - {id: a, type: askUserQuestion, position: {x: 1, y: 2}, data: {multiSelect: yes, off: n, when: 2026-01-01, mode: 0755}}\n");
+test("CB-T240 読みはルール設定の画面と同じ yaml の既定で、YAML 1.1 の読み方は真似しない（型の答えは実行ファイル）", () => {
+  const read = parseFlow("nodes:\n  - {id: a, type: askUserQuestion, position: {x: 1, y: 2}, data: {multiSelect: yes, off: n, when: 2026-01-01}}\n");
   assert.ok(read.ok, read.ok ? "" : read.error);
-  // `y` `n` は PyYAML と同じく文字（真偽値にしない）。`off` は真偽値のキー
+  // `yes` `off` は文字のまま（真偽値に差し替えない）。`y` `n` も文字。日付も文字
   assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
-  assert.deepEqual(read.doc.nodes[0].data, { multiSelect: true, false: "n", when: "2026-01-01", mode: 493 });
-  // 書き出しは y を囲まない
+  assert.deepEqual(read.doc.nodes[0].data, { multiSelect: "yes", off: "n", when: "2026-01-01" });
+  // 書き出しは実行ファイル（YAML 1.1）が文字以外に読む綴りを囲む（書式の側の制約。ADR-0035）。y は囲まない
+  const text = serializeFlow(read.doc);
+  assert.match(text, /multiSelect: "yes"/);
+  assert.match(text, /"off": n/);
   assert.match(serializeFlow(templateFlow("x", "")), /\n {6}y: 160\n/);
 });
 
@@ -135,29 +138,27 @@ test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そ�
   assert.equal(templateFlow("i0002-01", "").name, "i0002-01");
 });
 
-test("CB-T221 読めない形は理由を言って断り、例外を外に出さない。別名（アンカー）は膨らむ前に断る", () => {
+test("CB-T221 画面が断るのは描けないときだけ。正しいか（id の重なり・線の形・別名）は決めず、例外を外に出さない", () => {
   const refused: [string, RegExp][] = [
-    ["nodes: [", /YAML として読めない/],
-    ["a: 1\na: 2\n", /YAML として読めない/],
-    ["nodes: []\n---\nnodes: []\n", /YAML として読めない/],
-    ["\tnodes: []", /YAML として読めない/],
-    ["", /最上位がキーと値の並びではない/],
-    ["- 1\n", /最上位がキーと値の並びではない/],
-    ["name: x\n", /`nodes` の並びが無い/],
-    ["nodes:\n  - {type: start}\n", /nodes\[0\] に id が無い/],
-    ["nodes: [1]\n", /nodes\[0\] がオブジェクトではない/],
-    ["nodes:\n  - {id: a}\n  - {id: a}\n", /id が重なっている（a）/],
-    ["nodes: []\nconnections: {}\n", /`connections` が並びではない/],
-    ["nodes: []\nconnections: [1]\n", /connections\[0\] がオブジェクトではない/],
-    ["x: &a [1]\nnodes: [{id: a, data: *a}]\n", /別名/],
-    ["base: &b {label: x}\nnodes:\n  - id: a\n    data:\n      <<: *b\n", /別名/],
+    ["nodes: [", /画面の YAML の読み手で読めないので描けない/],
+    ["a: 1\na: 2\n", /画面の YAML の読み手で読めないので描けない/],
+    ["nodes: []\n---\nnodes: []\n", /画面の YAML の読み手で読めないので描けない/],
+    ["", /描けない/],
+    ["- 1\n", /描けない/],
+    ["name: x\n", /描けない/],
+    ["nodes:\n  - {type: start}\n", /描けない/],
+    ["nodes: [1]\n", /描けない/],
   ];
   for (const [text, reason] of refused) {
     const result = parseFlow(text);
     assert.equal(result.ok, false, text);
     assert.match(result.ok ? "" : result.error, reason, text);
   }
-  // 別名を重ねて膨らませる形（billion laughs）も、辿らずに断る
+  // 形の誤りでも描けるものは読む。正しいかは開く前と保存の前に実行ファイル（--lint --flow）が言う
+  for (const text of ["nodes:\n  - {id: a}\n  - {id: a}\n", "nodes: []\nconnections: {}\n", "nodes: []\nconnections: [1]\n", "x: &a [1]\nnodes: [{id: a, data: *a}]\n"]) {
+    assert.ok(parseFlow(text).ok, text);
+  }
+  // 別名を重ねて膨らませる形（billion laughs）は、yaml の読み手が辿る数の上限で断る（落ちない）
   const lines = ["a0: &a0 [x, x, x, x, x, x, x, x, x, x]"];
   for (let i = 1; i < 12; i += 1) {
     lines.push(`a${i}: &a${i} [${Array.from({ length: 10 }, () => `*a${i - 1}`).join(", ")}]`);
@@ -165,12 +166,7 @@ test("CB-T221 読めない形は理由を言って断り、例外を外に出さ
   lines.push("nodes: [{id: a, data: {v: *a11}}]");
   const bomb = parseFlow(lines.join("\n"));
   assert.equal(bomb.ok, false);
-  assert.match(bomb.ok ? "" : bomb.error, /別名/);
-  // アンカーだけ（別名で指していない）なら読む（実行ファイルと同じ）
-  const anchored = parseFlow("nodes:\n  - &n {id: a, type: prompt}\n");
-  assert.ok(anchored.ok, anchored.ok ? "" : anchored.error);
-  assert.deepEqual(anchored.doc.nodes, [{ id: "a", type: "prompt" }]);
-  // connections が無いフローも読める（実行ファイルと同じ）。描くときに空として扱う
+  // connections が無いフローも読める。描くときに空として扱う
   const bare = parseFlow("nodes:\n  - {id: a, type: prompt}\n");
   assert.ok(bare.ok);
   assert.deepEqual(connectionsOf(bare.doc), []);

@@ -9,12 +9,15 @@
  * 渡し方はフェーズ管理と同じ `retainedHost`（編集の途中を持つ。ADR-0062）。
  *
  * 置き場と錠は実行ファイルに聞く（`--explain --json` の `tickets[].flow`）。拡張は置き場を組まず、
- * 着手中かを `started_at` から組み直さない（ADR-0035）。保存は次を全部満たすときだけ書く。
+ * 着手中かを `started_at` から組み直さない（ADR-0035）。フローが正しいか（読めるか・形）も実行ファイルに聞く。
+ * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて `--lint --json --flow` に掛け
+ * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。保存は次を全部満たすときだけ書く。
  *
- * 1. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
- * 2. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
- * 3. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
- * 4. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
+ * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わない
+ * 2. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
+ * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
+ * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
+ * 5. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
  *
  * 書き込みは一時ファイルの入れ替えで、リンクを辿らない（`core/flow-write.ts`）。置き場は承認済みの領域
  * （既定 `.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
@@ -24,12 +27,15 @@
  * 1 回の中（実行ファイルを 1 度起こすぶん）。塞ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
  */
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard } from "./ccnavi.js";
+import { loadBoard, runFlowLint } from "./ccnavi.js";
 import { parseFlow, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
+import { lintFlowText } from "./core/flow-lint.js";
 import { renderFlowPage } from "./core/flow-render.js";
 import { readFlowFile, writeFlowFile } from "./core/flow-write.js";
 import {
@@ -71,6 +77,8 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<FlowData>;
+  /** 編集中の本文を `--lint --flow` に渡す一時ファイルの置き場。画面を閉じたら消す */
+  readonly tmpDir: string;
   fileWatchers: vscode.FileSystemWatcher[];
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
@@ -130,6 +138,7 @@ export async function openFlow(ticket: string): Promise<void> {
     panel,
     folder,
     host: flowHost(panel),
+    tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-")),
     fileWatchers: [],
     watchers: [],
     lock: lockFromFailure("確認中…"),
@@ -169,7 +178,12 @@ async function lookUp(root: string, ticket: string): Promise<FlowTarget> {
   return found.target;
 }
 
-async function readPage(root: string, ticket: string): Promise<Loaded> {
+/** 本文を実行ファイルに確かめさせる。error があれば理由を返す（`core/flow-lint.ts`） */
+function lintText(root: string, tmpDir: string, text: string, shown: string) {
+  return lintFlowText(text, tmpDir, shown, (file) => runFlowLint(root, binSetting(), file));
+}
+
+async function readPage(root: string, ticket: string, tmpDir: string): Promise<Loaded> {
   const target = await lookUp(root, ticket);
   const filePath = target.flow.path;
   const shown = shownPath(root, filePath);
@@ -185,10 +199,15 @@ async function readPage(root: string, ticket: string): Promise<Loaded> {
     return { target, exists: false, mtimeMs: 0, doc: templateFlow(ticket, target.title), shown };
   }
   const { text, mtimeMs } = read;
+  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読めないフローを画面で直すと、
+  // 読めなかった部分を落として書くことになる。エディタで直させる
+  const verdict = await lintText(root, tmpDir, text, shown);
+  if (!verdict.ok) {
+    throw new Error(`フローのファイルを開かない（${shown}）: ${verdict.error}。エディタで直してから再読込する`);
+  }
   const parsed = parseFlow(text);
   if (!parsed.ok) {
-    // 画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
-    throw new Error(`フローのファイルを読めない（${shown}）: ${parsed.error}。エディタで直してから再読込する`);
+    throw new Error(`フローのファイルを開かない（${shown}）: ${parsed.error}。エディタで直してから再読込する`);
   }
   return { target, exists: true, mtimeMs, doc: parsed.doc, shown };
 }
@@ -220,6 +239,11 @@ function registerPanelHandlers(current: PanelState): void {
     }
     current.fileWatchers = [];
     current.watchers = [];
+    try {
+      fs.rmSync(current.tmpDir, { recursive: true, force: true });
+    } catch {
+      // 消せなければ OS の一時ディレクトリに残る（承認済みの領域には書いていない）
+    }
     if (alive(current)) {
       panels.delete(current.ticket);
     }
@@ -374,7 +398,7 @@ async function reload(current: PanelState): Promise<void> {
   const seq = current.seq;
   let loaded: Loaded;
   try {
-    loaded = await readPage(current.folder.uri.fsPath, current.ticket);
+    loaded = await readPage(current.folder.uri.fsPath, current.ticket, current.tmpDir);
   } catch (error) {
     if (alive(current) && current.seq === seq) {
       current.lock = lockFromFailure((error as Error).message);
@@ -463,7 +487,17 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   if (loaded === undefined) {
     return;
   }
-  // 1. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）
+  // 1. 書き出す本文が正しいかを実行ファイルに聞く（SubagentStart と同じ読み）。error なら書かない
+  const text = serializeFlow(doc);
+  const verdict = await lintText(current.folder.uri.fsPath, current.tmpDir, text, loaded.shown);
+  if (!alive(current) || stale(current, loaded)) {
+    return;
+  }
+  if (!verdict.ok) {
+    fail(current, `保存しない: ${verdict.error}`);
+    return;
+  }
+  // 2. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）
   const { lock, target } = await refreshLock(current);
   if (!alive(current) || stale(current, loaded)) {
     return;
@@ -472,16 +506,16 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     fail(current, lock.reason);
     return;
   }
-  // 2. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
+  // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
     fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直す`);
     return;
   }
-  // 3. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。4. リンクを辿らない。
-  // 5. 一時ファイルに書いて入れ替える（途中で落ちても半端なファイルを残さない）。3〜5 は flow-write.ts
+  // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
+  // 6. 一時ファイルに書いて入れ替える（途中で落ちても半端なファイルを残さない）。4〜6 は flow-write.ts
   current.wroteAt = Date.now();
-  const written = writeFlowFile(target.flow.tree, filePath, serializeFlow(doc), { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
+  const written = writeFlowFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
   if (!written.ok) {
     current.wroteAt = 0;
     fail(current, written.error);

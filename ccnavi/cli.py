@@ -66,6 +66,12 @@ workspace's own layer; the common layer uses --phases):
 
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
 
+One child ticket's flow is checked the same way, read by the same reader and
+the same checks that SubagentStart uses (--lint only; the VS Code extension
+hands the edited flow in before it opens or saves one):
+
+    ccnavi --lint --json --flow /tmp/flow.yml
+
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
 are on the same gate: diagnosis only, dropped everywhere else.
@@ -347,6 +353,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 同じ差し替えを層のフェーズの種類に対して行う（<名前>=<パス>、名前は self かプロジェクト）。
     # VS Code 拡張のフェーズ管理画面が、編集中の層の種類を保存せずに検証するために渡す。
     parser.add_argument("--project-phases-file", default="")
+    # 子チケットのフロー 1 本を、SubagentStart と同じ読みで確かめる（`--lint` だけ）。
+    # VS Code 拡張のフロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルで渡す。
+    parser.add_argument("--flow", default="")
     # チケットの状態とレビューの操作。人か、親が保護済みスクリプトから呼ぶ。
     parser.add_argument("command", nargs="*")
     parser.add_argument("--cwd", action="append", default=None)
@@ -424,6 +433,18 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
         swaps[name] = os.path.abspath(path)
 
+    # フローの確かめは `--lint` だけが読む。判定にも採点にも効かないが、ほかの差し替えと同じく
+    # 診断の外では落として言う。診断でも `--lint` でなければ読む先が無いので、そう言って落とす。
+    if args.flow:
+        if not diagnosing:
+            stderr.write(DIAGNOSIS_ONLY.format(flag="--flow"))
+            args.flow = ""
+        elif not args.lint:
+            stderr.write("ccnavi: --flow は --lint でだけ読む\n")
+            args.flow = ""
+        else:
+            args.flow = os.path.abspath(args.flow)
+
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
     # 報告でしかないものが、検証にとっては結論そのものになる。
@@ -437,6 +458,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             args.restore_if_deny,
             args.guard_core_files,
             as_json=args.json,
+            flow_path=args.flow,
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。

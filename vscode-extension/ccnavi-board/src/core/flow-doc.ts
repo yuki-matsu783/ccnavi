@@ -15,13 +15,14 @@
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
  * 書き出しは中身から組み直す（コメントや書き方は残らない。人が保存したときだけ書く）。
  *
- * **判定はしない。** 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
+ * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`、ADR-0035）、
+ * 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
  * ここには VS Code の API も node も DOM も入れない。画面（React）が束ねて読むため。
  */
-import { Document, parseDocument, Scalar, visit, type DocumentOptions, type ParseOptions, type ScalarTag, type SchemaOptions } from "yaml";
+import { Document, parseDocument, Scalar, visit } from "yaml";
 
 import { yaml11Ambiguous } from "./yaml11.js";
 
@@ -176,116 +177,46 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 // ---- 読む・書く
 
 /**
- * 真偽値の綴り。PyYAML の resolver.py と同じで、YAML 1.1 の仕様にある `y` `n` は入れない
- * （PyYAML は文字として読む。`position` の `y` が真偽値のキーに化けないように）。
- */
-const PY_TRUE: ScalarTag = {
-  identify: (value) => value === true,
-  default: true,
-  tag: "tag:yaml.org,2002:bool",
-  test: /^(?:yes|Yes|YES|true|True|TRUE|on|On|ON)$/,
-  resolve: () => true,
-};
-const PY_FALSE: ScalarTag = {
-  identify: (value) => value === false,
-  default: true,
-  tag: "tag:yaml.org,2002:bool",
-  test: /^(?:no|No|NO|false|False|FALSE|off|Off|OFF)$/,
-  resolve: () => false,
-};
-
-/**
- * 読みの設定。実行ファイルの読み手（PyYAML の `safe_load`、YAML 1.1）に合わせ、`yes` `on` は真偽値、
- * `0755` は八進として読む（画面と実行ファイルで同じ値に見えるように）。真偽値の綴りは PyYAML のもの
- * （`PY_TRUE` / `PY_FALSE`）に差し替え、日付は文字のまま持つ（日付の値を持つと、書き出すときに形が崩れる）。
- */
-const READ_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
-  version: "1.1",
-  customTags: (tags) => [
-    PY_TRUE,
-    PY_FALSE,
-    ...tags.filter((tag) => (typeof tag === "string" ? tag !== "timestamp" && tag !== "bool" : !tag.tag.endsWith(":timestamp") && !tag.tag.endsWith(":bool"))),
-  ],
-};
-
-/** 別名（`*名前`）を持つか。実行ファイルと同じく、あれば読まない */
-function hasAlias(doc: Document): boolean {
-  let found = false;
-  visit(doc, {
-    Alias() {
-      found = true;
-      return visit.BREAK;
-    },
-  });
-  return found;
-}
-
-/**
- * YAML の本文を読む。形が読めなければ理由を返す（`nodes` の並びが無い、ノードに `id` が無い）。
- * 実行ファイル（`flow.load`）が読めないと言う形は、ここでも読めないと言う。**例外は外に出さない。**
- * 別名（`*名前`）は拒む。同じ部分木を何度も辿らせて、小さなファイルを膨らませられるため。
+ * YAML の本文を、画面が描くために読む。**正しいかは決めない。** 読めるか（大きさ・YAML として読めるか・別名）と
+ * 形（`nodes` が無い、`id` が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
+ * 画面はそれを通ったものだけを開く（ADR-0035）。読み手はルール設定の画面（`rules-doc.ts`）と同じ `yaml` の既定。
+ *
+ * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
+ * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードの並び（`id` が文字列の
+ * キーと値の並び）が取れないとき。**例外は外に出さない。**
  */
 export function parseFlow(text: string): FlowRead {
   let raw: unknown;
   try {
-    const doc = parseDocument(text.replace(/^\uFEFF/, ""), READ_OPTIONS);
+    const doc = parseDocument(text.replace(/^\uFEFF/, ""));
     const problem = doc.errors[0];
     if (problem !== undefined) {
-      return { ok: false, error: `YAML として読めない（${firstLine(problem.message)}）` };
+      return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(problem.message)}）` };
     }
-    if (hasAlias(doc)) {
-      return { ok: false, error: "YAML の別名（`*名前`）があるので読まない。同じ部分木を何度も辿らせて膨らませられる" };
-    }
-    // 別名は上で断っている。ここは念押しで、辿ろうとしたら投げさせる（下の catch が理由にする）
-    raw = doc.toJS({ maxAliasCount: 0 });
+    raw = doc.toJS();
   } catch (error) {
-    return { ok: false, error: `YAML として読めない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
+    return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
-  return checkFlow(raw);
+  const doc = asFlowDoc(raw);
+  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
 }
 
 function firstLine(text: string): string {
   return text.split("\n")[0].replace(/:$/, "").trim();
 }
 
-/** 形を確かめる。画面から届いた保存の中身も、ここを通してから書く */
-export function checkFlow(raw: unknown): FlowRead {
-  if (!isRecord(raw)) {
-    return { ok: false, error: "最上位がキーと値の並びではない" };
-  }
-  if (!Array.isArray(raw.nodes)) {
-    return { ok: false, error: "`nodes` の並びが無い" };
-  }
-  const ids = new Set<string>();
-  for (const [index, node] of raw.nodes.entries()) {
-    if (!isRecord(node)) {
-      return { ok: false, error: `nodes[${index}] がオブジェクトではない` };
-    }
-    if (typeof node.id !== "string" || node.id === "") {
-      return { ok: false, error: `nodes[${index}] に id が無い` };
-    }
-    if (ids.has(node.id)) {
-      return { ok: false, error: `ノードの id が重なっている（${node.id}）` };
-    }
-    ids.add(node.id);
-  }
-  if (raw.connections !== undefined) {
-    if (!Array.isArray(raw.connections)) {
-      return { ok: false, error: "`connections` が並びではない" };
-    }
-    for (const [index, c] of raw.connections.entries()) {
-      if (!isRecord(c)) {
-        return { ok: false, error: `connections[${index}] がオブジェクトではない` };
-      }
-    }
-  }
-  return { ok: true, doc: raw as FlowDoc };
-}
-
-/** 画面から届いたものを受ける形。形が崩れていたら undefined（書かない） */
+/**
+ * 描ける形か。最上位がキーと値の並びで、`nodes` が「文字列の `id` を持つキーと値の並び」の並び。
+ * 画面から届いた保存の中身もここで受ける（崩れていたら書かない。正しいかは保存の前に実行ファイルが言う）。
+ */
 export function asFlowDoc(raw: unknown): FlowDoc | undefined {
-  const read = checkFlow(raw);
-  return read.ok ? read.doc : undefined;
+  if (!isRecord(raw) || !Array.isArray(raw.nodes)) {
+    return undefined;
+  }
+  if (!raw.nodes.every((node) => isRecord(node) && typeof node.id === "string")) {
+    return undefined;
+  }
+  return raw as FlowDoc;
 }
 
 /**

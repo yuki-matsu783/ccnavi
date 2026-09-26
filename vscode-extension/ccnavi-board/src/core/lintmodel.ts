@@ -82,6 +82,27 @@ export function problemsOfProject(lint: LintJson, name: string): LintProblem[] {
   return lint.problems.filter((p) => p.where === prefix || p.where.startsWith(`${prefix} `));
 }
 
+/** `--lint --flow <パス>` の苦情の場所（実行ファイルの `lint.FLOW_WHERE`） */
+export const FLOW_WHERE = "(flow)";
+
+/**
+ * 渡したフローについての苦情。`where` が `(flow)` のもの。フロー編集画面はこれだけを読む
+ * （ほかの設定の苦情でフローの保存を止めない）。読めるか・形が正しいかの答えは実行ファイルが出し、
+ * 拡張は並べるだけ（ADR-0035）
+ */
+export function problemsOfFlow(lint: LintJson): LintProblem[] {
+  return lint.problems.filter((p) => p.where === FLOW_WHERE);
+}
+
+/**
+ * 標準エラーが、実行ファイルの知らないオプションの苦情（argparse の `unrecognized arguments`）で、
+ * そこに option が名指しされているか。古い実行ファイルに新しいオプション（`--flow` など）を
+ * 渡したと見分けるために使う
+ */
+export function unknownOption(stderr: string, option: string): boolean {
+  return stderr.split(/\r?\n/).some((line) => line.includes("unrecognized arguments") && line.split(/\s+/).includes(option));
+}
+
 /** 置き場そのものについての苦情。`where` が `(projects)` */
 export function problemsOfProjectsDir(lint: LintJson): LintProblem[] {
   return lint.problems.filter((p) => p.where === "(projects)");

@@ -2305,6 +2305,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ccnavi --lint                                # 実運用と同じ設定を見る
 ccnavi --lint --rules .ccnavi/common/next.yml # 入れ替える前のファイルを見る
 ccnavi --lint --json                         # 同じ苦情を JSON で（「lint の JSON」）
+ccnavi --lint --flow .ccnavi/approved/flows/i0001-01.yml # 子のフロー 1 本も確かめる
 ```
 
 ```
@@ -2432,7 +2433,8 @@ ccnavi --lint --json
 `--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にまとめて出す。終了コードも同じ
 （error があれば 1）。読み手は VS Code の拡張で、プロジェクト管理画面が
 プロジェクトごとの苦情（`projects/` が無視されていない、
-`.claude/` を持つ、予約名を使っている、層のファイルが壊れている）を拾って並べる。人向けの文面は書き換えてよいが、この JSON の形は
+`.claude/` を持つ、予約名を使っている、層のファイルが壊れている）を拾って並べ、フロー編集画面が
+`--flow` で渡したフローの苦情（`(flow)`）を拾う。人向けの文面は書き換えてよいが、この JSON の形は
 拡張との契約なので、変えるときは版を上げる。
 
 | 鍵 | 何 |
@@ -2440,8 +2442,21 @@ ccnavi --lint --json
 | `version` | 形の版。整数（いま 1）。欄を足すだけなら上げない |
 | `root` / `rules` / `mode` / `ticket_control` | 何を見て検証したか。人向けの文面が先頭に出すものと同じ |
 | `projects[]` | 検証の対象になったプロジェクトの名前 |
-| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design` など。ファイル全体への苦情なら空） |
+| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design`、`--flow` で渡したフローなら `(flow)` など。ファイル全体への苦情なら空） |
 | `errors` / `warns` / `infos` | 件数 |
+
+### 子のフローを保存せずに確かめる
+
+```sh
+ccnavi --lint --json --flow /tmp/flow.yml
+```
+
+`--flow <パス>` は、子チケットのフロー（設計 9.3.1）1 本を、`SubagentStart` が読むのと同じ読み手・同じ検査
+（大きさ、リンク・ふつうのファイルでない・ハードリンク、YAML として読めない、別名、形）で読む。読めなければ
+場所 `(flow)` の error で言い、`detail` は渡したパスで始まる。無いファイルも error。VS Code の拡張のフロー編集画面が、
+開くときと保存の前に本文を一時ファイルに書いて渡し、`(flow)` の苦情だけを読む（ほかの設定の苦情ではフローを止めない）。
+読むのは `--lint` だけで、診断の外では落とし、`--test` / `--test-samples` / `--explain` でも「`--lint` でだけ読む」と
+言って落とす。フローは判定の材料にならないので、層の置き場の門（下）とは別に数える。
 
 ### 1 つのプロジェクトのルールを保存せずに試す
 

@@ -21,11 +21,13 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
   assert.deepEqual(asFlowMessage({ type: "dirty", dirty: false }), { type: "dirty", dirty: false });
   assert.equal(asFlowMessage({ type: "dirty" }), undefined);
   assert.deepEqual(asFlowMessage({ type: "save", doc }), { type: "save", doc });
-  // 保存の中身が読めない形なら、保存そのものを捨てる（書かない）
+  // 保存の中身が描けない形なら、保存そのものを捨てる（書かない）
   assert.equal(asFlowMessage({ type: "save" }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { name: "x" } }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { nodes: [{ type: "start" }] } }), undefined);
-  assert.equal(asFlowMessage({ type: "save", doc: { nodes: [{ id: "a" }, { id: "a" }] } }), undefined);
+  // 描ける形なら受ける。id の重なりのような正しさは、保存の前に実行ファイル（--lint --flow）が言う
+  const twin = { nodes: [{ id: "a" }, { id: "a" }] };
+  assert.deepEqual(asFlowMessage({ type: "save", doc: twin }), { type: "save", doc: twin });
   // 知らない操作・オブジェクトでないもの
   assert.equal(asFlowMessage({ type: "delete" }), undefined);
   // 取り込み（外のワークフローを読む操作）は無い

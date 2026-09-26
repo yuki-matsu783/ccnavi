@@ -44,6 +44,12 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 人の手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと固まる）と
 ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
 
+形の誤り（最上位がキーと値の並びでない、`nodes` が無い、ノードに `id` が無い・重なる、
+`connections` が並びでない）も読めない理由として 1 行で言う（`shape_problem`）。
+`ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
+error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
+これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。
+
 読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの写しは読まない。
 
 ## 着手のあとの書き換え
@@ -495,9 +501,43 @@ def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
         return None, f"YAML として読めない ({_line(exc)})"
     except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
         return None, f"読めない ({type(exc).__name__})"
-    if not isinstance(data, dict) or not isinstance(data.get("nodes"), list):
-        return None, "`nodes` の並びが無い"
+    why = shape_problem(data)
+    if why:
+        return None, why
     return data, ""
+
+
+def shape_problem(data) -> str:
+    """読めた中身の形の誤り（最初の 1 つ）。無ければ空。例外は外に出さない。
+
+    SubagentStart の読み（`load`）と `--lint --flow` が同じここを通る。見るのは手順として
+    並べる土台だけ。最上位がキーと値の並び、`nodes` がキーと値の並びの並びで、どれも空でない
+    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、キーと値の並びの並び。
+    `id` が無い・重なるノードは並べるときに落ちるので、黙って手順が欠けないよう読まない側に倒す。
+    """
+    if not isinstance(data, dict):
+        return "最上位がキーと値の並びではない"
+    nodes = data.get("nodes")
+    if not isinstance(nodes, list):
+        return "`nodes` の並びが無い"
+    seen: set[str] = set()
+    for index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            return f"nodes[{index}] がキーと値の並びではない"
+        node_id = node.get("id")
+        if not isinstance(node_id, str) or not node_id:
+            return f"nodes[{index}] に文字列の id が無い"
+        if node_id in seen:
+            return f"ノードの id が重なっている（{_line(node_id)}）"
+        seen.add(node_id)
+    if "connections" in data:
+        connections = data.get("connections")
+        if not isinstance(connections, list):
+            return "`connections` が並びではない"
+        for index, connection in enumerate(connections):
+            if not isinstance(connection, dict):
+                return f"connections[{index}] がキーと値の並びではない"
+    return ""
 
 
 # ---- 着手のあとの書き換えを知らせる

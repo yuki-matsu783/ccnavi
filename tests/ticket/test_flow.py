@@ -387,9 +387,14 @@ class FlowRenderTest(unittest.TestCase):
         data, why = flow.load(self.file(text))
         self.assertIsNone(data)
         self.assertTrue(why.startswith("YAML として読めない"), why)
-        for text in ("", "- 1\n- 2\n", "nodes: 3\n", "just text\n"):
+        for text, why in (
+            ("", "最上位がキーと値の並びではない"),
+            ("- 1\n- 2\n", "最上位がキーと値の並びではない"),
+            ("nodes: 3\n", "`nodes` の並びが無い"),
+            ("just text\n", "最上位がキーと値の並びではない"),
+        ):
             with self.subTest(text=text):
-                self.assertEqual(flow.load(self.file(text)), (None, "`nodes` の並びが無い"))
+                self.assertEqual(flow.load(self.file(text)), (None, why))
         # 文書が 2 つあるものも読まない。
         data, why = flow.load(self.file("nodes: []\n---\nnodes: []\n"))
         self.assertIsNone(data)
@@ -740,7 +745,10 @@ class FlowLockTest(FlowHarness):
         self.assertIn("フローを読めない", self.reason(result))
 
     def test_a_malformed_flow_keeps_the_rest_of_subagent_start(self):
-        """型の崩れたフローでも SubagentStart は落ちず、子の一覧と範囲は渡る（H3）。"""
+        """型の崩れたフローでも SubagentStart は落ちず、子の一覧と範囲は渡る（H3）。
+
+        形の誤りは `--lint --flow` と同じ理由の 1 行で言い、手順は並べない（`flow.shape_problem`）。
+        """
         write(self.flow_path, "nodes:\n  - {id: s, type: start}\nconnections: 5\n")
         self.commit_parent("bad flow")
         child_tree = self.run_child(CHILD)
@@ -748,7 +756,8 @@ class FlowLockTest(FlowHarness):
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.reason(result)
         self.assertIn("allow: wip/research/*", text)
-        self.assertIn("1. [start]", text)
+        self.assertIn("フローを読めない: `connections` が並びではない", text)
+        self.assertNotIn("1. [start]", text)
 
     def test_a_crash_in_the_briefing_is_one_line(self):
         """フローの案内が万一例外を出しても、1 行の知らせに落として残りを渡す（H3）。"""
