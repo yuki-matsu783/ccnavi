@@ -318,5 +318,138 @@ class ProjectsCollisionTest(unittest.TestCase):
         self.assertEqual(self.about_projects(), [])
 
 
+# 載せ忘れの文面で、先頭の句の直後に来る句。ぶつかりとの見分けに使う（設計 §4.2）。
+FORGOT_NEXT = "（入れ子のリポジトリとして"
+
+
+class ProjectsAddedByMistakeTest(unittest.TestCase):
+    """索引の `projects/` の下が gitlink だけのとき（載せ忘れ）の `--lint`（A5b・A5c）。
+
+    `.gitignore` に `/projects/` を入れ忘れたまま `git add -A` した人の索引には、
+    `projects/<名前>` が gitlink（mode 160000）で載る。ワークスペース自身のソースが
+    `projects/` にあるわけではないので、改名ではなく「索引から外して無視に入れる」を案内する。
+    通常のファイルもあるときは、ぶつかりとして改名を案内し、gitlink を名指しする（A5c）。
+
+    gitlink は人が踏むのと同じ手で作る: `projects/<名前>` で `git init` して 1 回コミットし、
+    ワークスペースで `-f` を付けずに `git add -A`（設計 §6）。
+
+    ワークスペースの作りと `--lint` の読み方は A5 と同じものを借りる（継ぐと A5 のテストまで
+    ここで走り直す）。
+    """
+
+    setUp = ProjectsCollisionTest.setUp
+    project = ProjectsCollisionTest.project
+    lint = ProjectsCollisionTest.lint
+    about_projects = ProjectsCollisionTest.about_projects
+
+    def forget(self, *names, commit=True, ignore_after=False):
+        """入れ子のリポジトリを置き、`.gitignore` に入れないまま `git add -A` する。"""
+        write(os.path.join(self.ws, ".gitignore"), "/.claude/\n")
+        for name in names or ("lib",):
+            self.project(name)
+        git(self.ws, "add", "-A")
+        if commit:
+            git(self.ws, "commit", "--quiet", "-m", "init")
+        if ignore_after:
+            # 後から `.gitignore` に足しても、索引に載ったものには効かない。
+            write(os.path.join(self.ws, ".gitignore"), "/.claude/\n/projects/\n")
+
+    def indexed(self):
+        return git(self.ws, "ls-files", "-s", "--", "projects/")
+
+    # ---- A5b. gitlink だけ
+
+    def test_a_gitlink_alone_is_named_once_as_added_by_mistake(self):
+        self.forget()
+        self.assertIn("160000", self.indexed())
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(found[0]["severity"], "warn")
+        detail = found[0]["detail"]
+        self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
+        self.assertIn("`projects/lib`", detail)
+        self.assertIn("git rm -r --cached projects", detail)
+        self.assertIn("/projects/", detail)
+        self.assertNotIn("git mv", detail)
+        self.assertNotIn("ほか", detail)
+
+    def test_added_by_mistake_replaces_the_not_ignored_warning(self):
+        self.forget()
+
+        details = [p["detail"] for p in self.lint()]
+
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
+
+    def test_added_by_mistake_is_named_when_projects_is_ignored_afterwards(self):
+        """`.gitignore` に `/projects/` があっても、索引に載っている限り言う。"""
+        self.forget(ignore_after=True)
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
+
+    def test_added_by_mistake_is_named_before_the_commit(self):
+        """索引に載せただけでコミット前でも言う。直し方に `git reset -- projects` も並ぶ。"""
+        self.forget(commit=False)
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
+        self.assertIn("git reset -- projects", found[0]["detail"])
+
+    def test_two_gitlinks_name_the_first_and_count_the_rest(self):
+        self.forget("app", "lib")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("`projects/app` ほか 1 件", found[0]["detail"])
+
+    def test_added_by_mistake_is_named_even_after_the_project_is_gone(self):
+        """入れ子のリポジトリが消えて gitlink だけが索引に残っていても言う。"""
+        self.forget()
+        # 消す代わりに `projects/` の外へ動かす（Windows では `.git/objects` が読み取り専用で
+        # rmtree が断る。後始末はワークスペースごと消す setUp の側に任せる）。
+        os.replace(os.path.join(self.projects, "lib"), os.path.join(self.ws, "moved-lib"))
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
+
+    def test_the_claude_check_still_runs_beside_added_by_mistake(self):
+        """プロジェクトごとの `.claude/` の検査は今どおり出る。"""
+        self.forget()
+        os.makedirs(os.path.join(self.projects, "lib", ".claude"))
+
+        details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
+
+        self.assertTrue(any(".claude/ を持つ" in d for d in details), details)
+
+    # ---- A5c. 通常のファイルと gitlink の両方
+
+    def test_a_file_and_a_gitlink_are_named_once_as_a_collision(self):
+        write(os.path.join(self.ws, "projects", "foo.txt"), "ワークスペース自身のソース\n")
+        self.forget()
+        self.assertIn("160000", self.indexed())
+        self.assertIn("projects/foo.txt", self.indexed())
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        detail = found[0]["detail"]
+        self.assertTrue(detail.startswith(TRACKED_LEAD), detail)
+        self.assertFalse(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
+        self.assertIn("git mv projects apps", detail)
+        self.assertIn("git rm --cached projects/lib", detail)
+        self.assertNotIn("git rm -r --cached projects", detail)
+        details = [p["detail"] for p in self.lint()]
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
+
+
 if __name__ == "__main__":
     unittest.main()
