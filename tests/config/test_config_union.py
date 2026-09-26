@@ -1,4 +1,4 @@
-"""設定 3 本の和（設計 11 改版、wip/design/config-union.md）の受入テスト。rules の面。
+"""設定 3 本の和（設計 11 改版、wip/design/config-union.md）の受入テスト。rules の合成。
 
 道具を外から動かす。一時ディレクトリにワークスペース 1 つとプロジェクト 2 つ
 （lib と app）を組み、hook の payload を標準入力で渡して判定と記録を読む。
@@ -361,7 +361,7 @@ class ConfigUnionHarness(unittest.TestCase):
         self.phases = os.path.join(common, "phases.yml")
         self.risk = os.path.join(common, "risks.yml")
         # 承認済みチケットとマーカーは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる
-        # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに落ちる。
+        # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "logs", "state")
         self.log = os.path.join(self.ws, "logs", "log.jsonl")
@@ -879,7 +879,7 @@ class LayerFailureTest(ConfigUnionHarness):
         )
 
     def test_broken_layer_is_empty_and_named_in_the_record(self):
-        """11.2 / REQ-MLT-06: 壊れた層は空 + 記録の `fallback` に層の名前。組み込みへ落ちない。"""
+        """11.2 / REQ-MLT-06: 壊れた層は空 + 記録の `fallback` に層の名前。組み込みには戻らない。"""
         write(layer_path(self.lib, "rules"), BROKEN)
 
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))

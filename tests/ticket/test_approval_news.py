@@ -192,7 +192,7 @@ class ApprovalNewsTest(PhaseHarness):
         self.assertEqual(self.prompt(), "")
 
     def test_a_broken_memo_tells_instead_of_going_quiet(self):
-        """控えが壊れていたら、伝えていない承認ごと起点化せず、伝える側へ倒す。"""
+        """控えが壊れていたら、伝えていない承認ごと起点化せず、伝える側を採る。"""
         self.parent_only()
         self.prompt()
         self.next_child()

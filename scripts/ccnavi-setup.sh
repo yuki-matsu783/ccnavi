@@ -119,7 +119,7 @@ LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを分けて持つ。--force が置き換えてよいのは、人がこの実行で
 # 名指しした値だけ。既定で埋めただけの値まで置き換えると、`--all` を足しに来た
-# 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run へ落とす。
+# 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run に戻す。
 mode_given=no
 # チケット制御。プロジェクトが「全体ルールだけ」か「チケットまで」かを、導入の
 # ときに決めてもらう場所。既定は enable で、書かなくても同じに動くが、常に書く。
@@ -253,7 +253,7 @@ disable)
 	;;
 esac
 
-# チケット制御は enable か disable の 2 値。ccnavi 側は読めない値を enable に倒し、
+# チケット制御は enable か disable の 2 値。ccnavi 側は読めない値を enable として扱い、
 # --lint が error にするが、書く前に止めるほうが安い。
 case "$ticket_control" in
 enable | disable) ;;
@@ -1123,7 +1123,7 @@ if [ "$deploy_work" = yes ]; then
 		{
 			if [ -s "$root/.gitignore" ]; then
 				# 末尾に改行が無いファイルへ足すと、最後の行と繋がって別の
-				# 綴りになる。無視のつもりの行が、誰も意図しない 1 行に化ける。
+				# 綴りになる。無視のつもりの行が、誰も意図しない 1 行になってしまう。
 				if [ -n "$(tail -c 1 "$root/.gitignore")" ]; then
 					printf '\n'
 				fi

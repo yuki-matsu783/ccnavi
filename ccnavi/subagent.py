@@ -102,7 +102,7 @@ def at_start(
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
         # 子のフロー（設計 9.12、ADR-0085）。在ればファイルを名指しし、手順を並べる。
-        # フローは人が書くデータで、壊れていても 1 行の知らせに落とし、残りの子と範囲は渡す。
+        # フローは人が書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
         scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
         try:
             brief = flow.briefing(conf, root, t, scope, budget, full=full)
@@ -177,7 +177,7 @@ def at_stop(
         lines.append(f"  {child.ticket}: {rel}{_limit_note(child, found)}  範囲は {area}")
     text = "\n".join(lines + changed)
 
-    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前に落とす。
+    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前を使う。
     who = payload.agent_id or (t.name if t is not None else "")
     already = _bounced(conf.state, payload.session_id, who)
     if mode == modes.ENABLE and not already:
@@ -228,7 +228,7 @@ def _bounce_path(state_dir: str, session: str, who: str) -> str:
     「差し戻し済み」として通す。印が消えるのは、親の PostToolUse が `agentId` を
     持って通ったときだけなので、残った 1 つは次の日のセッションまで効く。
 
-    `who` は `agent_id`。持たない payload では、そのワークツリーの名前に落とす。
+    `who` は `agent_id`。持たない payload では、そのワークツリーの名前を使う。
     1 つの綴り（`unknown`）に全員を寄せると、最初の 1 体が差し戻されたあと、
     同じ置き場を見る他のサブエージェントが誰も差し戻されなくなる。しかも
     `agent_id` を持たない相手の印は `ignored_bounce` が消せないので、消えない。

@@ -87,7 +87,7 @@ class TakesTheSpellingsPeopleTypeTest(unittest.TestCase):
         self.assertEqual(["tests.core.test_run_tests"], TOOL.modules(["tests.core.test_run_tests"]))
 
     def test_an_unknown_name_plans_nothing(self):
-        """知らない名前で黙って全件に化けない。化けると、名指しが効いていないことに気づけない。"""
+        """知らない名前で黙って全件にならない。そうなると、名指しが効いていないことに気づけない。"""
         self.assertEqual([], TOOL.modules(["tests/nosuchgroup"]))
 
 

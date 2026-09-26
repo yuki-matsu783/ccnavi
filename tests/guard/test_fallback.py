@@ -74,13 +74,13 @@ class FallbackTest(unittest.TestCase):
         with open(self.broken, "w", encoding="utf-8") as f:
             f.write(BROKEN)
         # ルールファイルがそもそも無いワークスペース。読めない理由が違うだけで、
-        # 落ちる先は同じ既定。
+        # 行き着く先は同じ既定。
         empty = tempfile.TemporaryDirectory()
         self.addCleanup(empty.cleanup)
         self.without_rules = empty.name
 
     def test_壊れたルールでもセッションは死なない(self):
-        # ここが要件の核。拒否側へ倒すと、壊れたファイルを直すための呼び出しまで
+        # ここが要件の核。拒否にすると、壊れたファイルを直すための呼び出しまで
         # 止まって回復できなくなる。既定モードが block なので、ルールを置く前に
         # hook を登録しただけでセッションが死ぬ。
         #
@@ -96,8 +96,8 @@ class FallbackTest(unittest.TestCase):
                     "無害な呼び出しを拒否した",
                 )
 
-    def test_既定に落ちたことは呼び出しごとに伝える(self):
-        # 黙って落ちると、ガードが立っているように見えて実際は何も見ていない
+    def test_既定に戻ったことは呼び出しごとに伝える(self):
+        # 黙って既定に戻ると、ガードが立っているように見えて実際は何も見ていない
         # 状態が続く。止まっているより悪い。止まっていれば誰かが気づく。
         out = out_of(self, run(self.root, pre_tool_use("Bash", "command", "cat README.md")))
         said = out.get("permissionDecisionReason", "") + out.get("additionalContext", "")
@@ -113,7 +113,7 @@ class FallbackTest(unittest.TestCase):
         self.assertNotIn("permissionDecision", out_of(self, result))
 
     def test_既定でも取り返しの付かない操作は止まる(self):
-        # 落ちた先が素通しでは、壊すだけでガードを外せることになる。
+        # 戻った先が素通しでは、壊すだけでガードを外せることになる。
         for command in ["rm -rf /tmp/x", "git push origin main", "git reset --hard HEAD~1"]:
             with self.subTest(command=command):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
@@ -136,7 +136,7 @@ class FallbackTest(unittest.TestCase):
 
     def test_既定はシェルから設定を書き換えさせない(self):
         # 上と対になっている。ここを開けると、シェルでルールを壊し、壊れた結果
-        # 緩んだ既定に落ちる、という順路ができる。壊す側と直す側で経路を分ける。
+        # 緩んだ既定に戻る、という順路ができる。壊す側と直す側で経路を分ける。
         out = out_of(
             self,
             run(self.root, pre_tool_use("Bash", "command", "echo x > .ccnavi/common/rules.yml")),
@@ -186,7 +186,7 @@ class FallbackTest(unittest.TestCase):
 
     def test_既定はマージの解決を妨げない(self):
         # 衝突マーカーの入ったルールファイルは YAML として読めないので、
-        # 衝突を解いている最中は必ず既定に落ちている。そこで解決の手が止まると、
+        # 衝突を解いている最中は必ず既定を使っている。そこで解決の手が止まると、
         # ガードが落ちた状態から出られない。どれもファイルに新しい文面を書かない。
         for command in [
             "sh .ccnavi/scripts/ccnavi-git.sh restore --ours -- .ccnavi/common/rules.yml",
@@ -198,7 +198,7 @@ class FallbackTest(unittest.TestCase):
                 out = out_of(self, run(self.root, pre_tool_use("Bash", "command", command)))
                 self.assertNotEqual(out.get("permissionDecision"), "deny", f"止めた: {command!r}")
 
-    def test_既定に落ちたことは記録に残る(self):
+    def test_既定に戻ったことは記録に残る(self):
         # ガードが落ちたまま何回動いたかは、これでしか数えられない。
         log = os.path.join(self.directory.name, "log.jsonl")
         run(self.root, pre_tool_use("Bash", "command", "cat README.md"), log=log)

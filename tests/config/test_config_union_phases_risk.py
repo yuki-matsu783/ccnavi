@@ -1,4 +1,4 @@
-"""設定 3 本の和の受入テスト。phases と risk の合成の面（設計 11.4.1、11.4.2）。
+"""設定 3 本の和の受入テスト。phases と risk の合成（設計 11.4.1、11.4.2）。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
 共通層に `design`、自身の層に `docs`、lib の層に `build` / `release` がある。

@@ -162,7 +162,7 @@ JQ=$(command -v jq 2>/dev/null || :)
 [ -z "$JQ" ] && fail "jq が無い。結果の JSON を組み立てられない。" 2
 # gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
 # 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
-# 1 度だけ疎通を試して、通らなければ curl とトークンへ落ちる。
+# 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
 transport=""
 if [ "$kind" = github ]; then
 	CLI=$(command -v gh 2>/dev/null || :)

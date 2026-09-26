@@ -1,11 +1,11 @@
 """設定とルールの検証。判定を行わずに、防御を無効化しうる記述だけを報告する。
 
 判定の経路は、苦情を言うために設定を読むわけではない。判定のついでに気づいたことを
-標準エラーへ落としているだけなので、判定が走らない場面――ルールを書き換えた直後、
+標準エラーに出しているだけなので、判定が走らない場面――ルールを書き換えた直後、
 CI、入れたばかりのプロジェクト――で不備を見つける手段が無い。ここがその経路になる。
 
 急ぐ理由は事故の側にある。ルールファイルが読めないと、block モードでは
-すべてのツール呼び出しが拒否側に倒れる。そのファイルを直すための呼び出しも
+すべてのツール呼び出しが拒否になる。そのファイルを直すための呼び出しも
 止まるので、壊れてから気づいたのでは直せない。だから壊れる前に言う側が要る。
 
 深刻度の分け方は 1 つの原則で決めてある。
@@ -225,7 +225,7 @@ def report(
     if conf.tickets_enabled:
         stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
-    # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
+    # 端末から打った検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
     stdout.write(f"  モード: {mode}（この起動の環境から解決したもの）\n")
 
@@ -275,10 +275,10 @@ def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[P
 
     見るのは `CCNAVI_MODE` を掛けたあとの値（`modes.effective_setting`）。書かれた値だけを
     見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
-    なる。実行時はモードに畳まれて戻さないので、それはこの面がいちばん言うべき
+    なる。実行時はモードに畳まれて戻さないので、それはこの検査がいちばん言うべき
     「切れているのに揃って見える」そのものになる。
 
-    倒れた先が書かれた値と違うときは、そのことも言う。言わないと、直す先が
+    実際の値が書かれた値と違うときは、そのことも言う。言わないと、直す先が
     その門なのか `CCNAVI_MODE` なのかが読めない。
     """
     effective = modes.effective_setting(mode, declared)
@@ -303,7 +303,7 @@ def check(
     """
     problems: list[Problem] = []
 
-    # 上書き設定を読み飛ばしても、値は既定に落ちてガードは弱まらない。
+    # 上書き設定を読み飛ばしても、値は既定に戻ってガードは弱まらない。
     # ただし人が設定したつもりの値がどこにも効いていない状態にはなる。
     for note in notes:
         problems.append(Problem(SEVERITY_WARN, "(settings)", note))
@@ -345,8 +345,8 @@ def check(
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:
     """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
-    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
-    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 11.4.2）。
+    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
+    なるが、そこで気づくのは子を閉じる瞬間になる（設計 11.4.2）。
     """
     if not conf.risk:
         return []
@@ -563,7 +563,7 @@ def _approval_problems(
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
 
-    **「まだ承認できない」だけは warn に落とす。** 前のフェーズが閉じていない子
+    **「まだ承認できない」だけは warn にする。** 前のフェーズが閉じていない子
     （`rules.KIND_NOT_YET`）は、書いた側に直すものが無く、前が閉じれば同じ提案が通る。
     `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
     保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
@@ -587,7 +587,7 @@ def _approval_problems(
 
 
 def _said(ticket: str, problem) -> Problem:
-    """承認の苦情 1 件を、`--lint` の言い方に直す。「まだ承認できない」は warn へ落とす。"""
+    """承認の苦情 1 件を、`--lint` の言い方に直す。「まだ承認できない」は warn にする。"""
     severity = SEVERITY_WARN if problem.kind == rules.KIND_NOT_YET else problem.severity
     return Problem(severity, "(ticket)", f"{ticket}: {problem.detail}")
 
@@ -1448,7 +1448,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
     problems.extend(_every_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
-    # どちらも広さを咎めない。読めない every は 1（毎回渡る）に倒れているので、この式は
+    # どちらも広さを咎めない。読めない every は 1（毎回渡る）になっているので、この式は
     # 素通りしない（rules.readable_every）。
     if (
         (rule.additional_context or rule.additional_context_file)
@@ -1471,7 +1471,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
 def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
     """`every`（渡す回の刻み）の値と、刻んだ先に渡すものがあるか。
 
-    読めない値は error。判定は 1（毎回渡す）に倒して通すので、黙っていると書いた人は
+    読めない値は error。判定は 1（毎回渡す）として扱って通すので、黙っていると書いた人は
     刻んだつもりのまま毎回渡ることになる。`every: 1` は既定値を明示しただけなので
     何も言わない。
     """

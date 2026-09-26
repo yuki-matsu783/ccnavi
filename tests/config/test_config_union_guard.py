@@ -1,4 +1,4 @@
-"""設定 3 本の和の受入テスト。守る面（設計 11.6）と導入スクリプト（11.9 末尾）。
+"""設定 3 本の和の受入テスト。設定ファイルの守り（設計 11.6）と導入スクリプト（11.9 末尾）。
 
 selfguard のコアに、各層の `.ccnavi/config/` の 3 本と共通層の phases / risk が入る。
 Write / Edit の拒否、シェルからの書き込みの拒否、控えと復元の 3 つとも、今 rules.yml に
@@ -48,12 +48,12 @@ OPEN_RULES = {
     "allow": [{"id": "anything", "match": "Bash|Read|Write|Edit|NotebookEdit", "regex": "."}],
 }
 
-# YAML として読めない。共通層のルールがこれなら組み込みの既定に落ちる。
+# YAML として読めない。共通層のルールがこれなら組み込みの既定に戻る。
 BROKEN_RULES = "version: 1\ndeny: [\n"
 
 
 class GuardHarness(ConfigUnionHarness):
-    """守る面を enable にして動かす道具。"""
+    """設定ファイルの守りを enable にして動かす道具。"""
 
     def setUp(self):
         super().setUp()
@@ -179,7 +179,7 @@ class RestoreTest(GuardHarness):
             line["guarded"],
         )
 
-    # 組み込みの既定に落ちている間の修復（REQ-PRE-06、selfguard._left_as_repair）
+    # 組み込みの既定を使っている間の修復（REQ-PRE-06、selfguard._left_as_repair）
 
     def test_a_repair_of_an_unreadable_common_rules_file_is_left(self):
         """REQ-PRE-06: 読めない共通層のルールを名指しのツールで直した結果は、実行後に戻さない。"""
@@ -317,7 +317,7 @@ class DenyTest(GuardHarness):
         )
 
     def test_disable_does_not_add_the_deny(self):
-        """11.6: 守る面を disable にすれば組み込みの deny も足さない。"""
+        """11.6: 設定ファイルの守りを disable にすれば組み込みの deny も足さない。"""
         result = self.hook("Write", self.ws, file_path=layer_path(self.lib, "rules"))
         self.assertNotIn("builtin-guard-project-home", self.reason(result))
         result = self.hook("Write", self.ws, file_path=self.phases)

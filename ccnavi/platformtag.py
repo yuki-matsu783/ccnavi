@@ -11,7 +11,7 @@ hook が起動するのは `.ccnavi/scripts/ccnavi-launcher.sh` に置いた振�
 
 突き合わせているのは sh とここの 2 つだけ（tests/sh/test_launcher.py）。setup.sh と
 拡張の語は、どのテストも比べていない。未知の OS と CPU の扱いは既に割れていて、
-ここは読めた値をそのまま使い、sh は `unknown` に倒す。
+ここは読めた値をそのまま使い、sh は `unknown` として扱う。
 """
 
 from __future__ import annotations
