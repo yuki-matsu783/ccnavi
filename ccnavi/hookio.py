@@ -63,6 +63,9 @@ class Input:
     agent_type: str = ""
     # tool_response は PostToolUse にだけ来る。Agent の起動の後には agentId が入る。
     tool_response: dict[str, Any] = field(default_factory=dict)
+    # stop_hook_active は Stop / SubagentStop にだけ来る。真なら、この終わり方は Stop の hook が
+    # 続けさせた結果（連鎖の 2 回目以降）。促しを 1 回に留めるために読む。
+    stop_hook_active: bool = False
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -100,6 +103,7 @@ def decode(stream: TextIO) -> Input:
         tool_use_id=data.get("tool_use_id") or "",
         agent_id=str(data.get("agent_id") or ""),
         agent_type=str(data.get("agent_type") or ""),
+        stop_hook_active=data.get("stop_hook_active") is True,
     )
 
 
@@ -154,6 +158,20 @@ def write_system_message(stream: TextIO, text: str) -> None:
     このキーは hookSpecificOutput の中ではなく、応答の一番外に置く。
     """
     stream.write(json.dumps({"systemMessage": text}, ensure_ascii=False))
+    stream.write("\n")
+
+
+def write_stop_block(stream: TextIO, reason: str, system: str = "") -> None:
+    """Stop を止めて、モデルに続けさせる。`reason` はモデルが読む次の一手。
+
+    Stop の応答は `hookSpecificOutput` ではなく一番外の `decision` / `reason` で返す。exit 2 と
+    標準エラーの経路は使わない。同じ Stop で人への報告（`systemMessage`）も返したいので、1 つの
+    JSON にまとめる（exit 2 だと標準出力の JSON は読まれない）。空の `system` は鍵ごと出さない。
+    """
+    body: dict[str, Any] = {"decision": "block", "reason": reason}
+    if system:
+        body["systemMessage"] = system
+    stream.write(json.dumps(body, ensure_ascii=False))
     stream.write("\n")
 
 

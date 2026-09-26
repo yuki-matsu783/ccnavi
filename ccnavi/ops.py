@@ -13,13 +13,17 @@
 from __future__ import annotations
 
 import os
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TextIO
 
 from . import approval, configsync, flow, fsio, gitcmd, history, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
+
+# Stop で `finish` の打ち忘れを促すときの理由コード（ADR-0087）。止めるのは 1 回だけの促しで、
+# 判定の deny ではない。
+CODE_FINISH_NUDGE = "NUDGE_TICKET_FINISH"
 
 
 def start(
@@ -722,6 +726,73 @@ def _move(
             f"{conf.approved}/{ticket_mod.DONE}/ へ動く\n"
         )
     return 0
+
+
+@dataclass
+class Unfinished:
+    """Stop で `finish` を促す相手。`ahead` は基準点より先のコミットの数。"""
+
+    ticket: ticket_mod.Ticket
+    worktree: str
+    ahead: int
+
+
+def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinished | None:
+    """メインエージェントが終わろうとしたとき、`finish` を打ち忘れていそうなチケット（ADR-0087）。
+
+    促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
+
+    - 作業中（`doing/`）で着手済み。終わっても取り消されてもいない（`in_progress`）
+    - 信じられない印（`blocked`）が無い。範囲が効いていないチケットに終わりを勧めない
+    - 基準点（`base_sha`）を持つ
+    - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
+      フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
+    - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
+    - 基準点より先にコミットが 1 件以上ある
+
+    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり黙って通す。
+    """
+    here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
+    if here is None or here.is_main:
+        return None
+    copies, _ = approval.scan(conf, root)
+    bound = tree.lookup(approval.by_id(copies), here.name)
+    if bound is None or not bound.in_progress or bound.blocked or not bound.base_sha:
+        return None
+    if not bound.is_child and close_problems(root, conf, bound.ticket):
+        return None
+    rc, out = gitcmd.output(
+        here.root, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS
+    )
+    if rc != 0 or out.strip():
+        return None
+    rc, out = gitcmd.output(
+        here.root, ["rev-list", "--count", f"{bound.base_sha}..HEAD"], TIMEOUT_SECONDS
+    )
+    if rc != 0 or not out.strip().isdigit():
+        return None
+    ahead = int(out.strip())
+    if ahead <= 0:
+        return None
+    return Unfinished(bound, here.root, ahead)
+
+
+def finish_nudge(root: str, found: Unfinished) -> str:
+    """Stop を止めて渡す文。打つ sh の綴りと、続けるならどうするかを言う。"""
+    t = found.ticket
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    kind = "子チケット" if t.is_child else "親チケット"
+    return "\n".join(
+        [
+            f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})",
+            f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_mod.DOING}/）です。ワークツリー "
+            f"{found.worktree} に未コミットの変更が無く、基準点 {t.base_sha[:12]} より先に"
+            f"コミットが {found.ahead} 件あります。",
+            f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
+            "まだ続けるなら、続ける理由（何が残っているか）を利用者に向けて書いてから終えてください。"
+            "この案内は 1 回だけで、次に終えるときは止めません。",
+        ]
+    )
 
 
 def _head(worktree: str) -> str:
