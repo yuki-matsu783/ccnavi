@@ -32,7 +32,9 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 
 ノードの種類（`type`）のうち、ここが中身を読むのは `start` `end` `prompt` `subAgent`
 `askUserQuestion` `ifElse` `switch` `branch` `skill` `mcp` `subAgentFlow` `codex`
-`branchSession` `group`。知らない種類は落とさず、種類の名前と `name` だけで並べる。
+`branchSession`。知らない種類は落とさず、種類の名前と `name` だけで並べる。
+`group` は図の上の囲み（ボードの枠）で手順ではないので並べない（中のノードは `parentId` が
+あっても、ほかのノードと同じに並べる）。
 
 ## 壊れたフローで止まらない
 
@@ -111,6 +113,8 @@ TOTAL_TEXT_LIMIT = 12000
 
 # 止まってメインに返すノード。サブエージェントには利用者に聞く道具が無い。
 ASK = "askUserQuestion"
+# 図の上の囲み（ボードの枠）。手順ではないので並べない
+GROUP = "group"
 # 入れ子のサブエージェントを起こすノード。
 SPAWN = ("subAgent", "subAgentFlow")
 # 出口を項目ごとに持つ種類と、項目の欄。
@@ -858,7 +862,7 @@ def _summary(node: dict, flows: dict) -> str:
         return (_line(data.get("label")) or name) + (f"（サブフロー {name}）" if name else "")
     if kind == "codex":
         return f"Codex: {_line(data.get('prompt'))}"
-    if kind in ("group", "branchSession", "start", "end"):
+    if kind in ("branchSession", "start", "end"):
         return _line(data.get("label") or data.get("workDescription"))
     return ""
 
@@ -941,6 +945,9 @@ def _render(data, limit: int, text_limit: int) -> tuple[list[str], set[str]]:
     nodes: list[dict] = []
     seen_ids: set[str] = set()
     for n in _list(data.get("nodes")):
+        # グループは図の上の囲みで手順ではない。並べない（線が繋がっていても辿らない）
+        if isinstance(n, dict) and _text(n.get("type")) == GROUP:
+            continue
         if isinstance(n, dict) and _node_id(n) and _node_id(n) not in seen_ids:
             seen_ids.add(_node_id(n))
             nodes.append(n)

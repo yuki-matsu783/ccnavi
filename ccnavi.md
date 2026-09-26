@@ -1056,7 +1056,7 @@ subAgentFlows:             # 無くてよい
 
 | `type` | 読む `data` |
 |---|---|
-| `start` / `end` / `group` / `branchSession` | `label`（`workDescription`） |
+| `start` / `end` / `branchSession` | `label`（`workDescription`） |
 | `prompt` | `prompt` |
 | `subAgent` | `description`（無ければ `agentDefinition`）・`prompt`・`builtInType` |
 | `askUserQuestion` | `questionText`・`options[].label`・`multiSelect` |
@@ -1065,6 +1065,9 @@ subAgentFlows:             # 無くてよい
 | `mcp` | `serverId`・`toolName` |
 | `subAgentFlow` | `label`・`subAgentFlowId`（`subAgentFlows[]` の名前を引く） |
 | `codex` | `prompt` |
+
+**`group` は並べない。** ボードの図の上の囲み（枠）で手順ではない。線が繋がっていても辿らない。中のノード
+（`parentId` を持つ）はほかのノードと同じに並べる。読めるか・形（`shape_problem`）の検査はほかのノードと同じ。
 
 **知らない種類も落とさない。** 種類の名前と `name` だけで並べ、サブエージェントに中身を読ませる。
 分岐の出口は、`condition` があればそれ、無ければ出口の名前（`fromPort`）が項目の `id` とちょうど同じか、

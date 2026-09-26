@@ -165,6 +165,28 @@ class FlowRenderTest(unittest.TestCase):
         self.assertIn("[end] 終了", lines[5])
         self.assertIn("fancyNewNode", kinds)
 
+    def test_groups_are_not_listed_but_their_members_are(self):
+        data = {
+            "nodes": [
+                {"id": "g", "type": "group", "name": "下調べ", "data": {"label": "枠"}},
+                {"id": "s", "type": "start", "name": "開始", "parentId": "g"},
+                {"id": "p", "type": "prompt", "name": "読む", "parentId": "g"},
+                {"id": "e", "type": "end", "name": "終了"},
+            ],
+            "connections": [
+                {"id": "c1", "from": "s", "to": "p", "fromPort": "output"},
+                {"id": "c2", "from": "p", "to": "e", "fromPort": "output"},
+                # グループに繋がる線は辿らない（番号を振らないので行き先にも出ない）
+                {"id": "c3", "from": "e", "to": "g", "fromPort": "output"},
+            ],
+        }
+        self.assertEqual(flow.shape_problem(data), "")
+        lines, kinds = flow.render(data)
+        self.assertEqual(lines, ["1. [start] 開始 → 2", "2. [prompt] 読む → 3", "3. [end] 終了"])
+        self.assertNotIn("group", kinds)
+        # グループだけのフローは何も並べない
+        self.assertEqual(flow.render({"nodes": [data["nodes"][0]]}), ([], set()))
+
     def test_broken_shapes_do_not_raise(self):
         lines, _ = flow.render({"nodes": [{"id": "a"}, "junk", {"id": "b", "data": 3}]})
         self.assertEqual(len(lines), 2)
