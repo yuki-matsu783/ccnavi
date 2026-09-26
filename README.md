@@ -1851,7 +1851,9 @@ ccnavi --lint --json
 | `projects[]` | 検証の対象になったプロジェクトの名前 |
 | `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design`、`--flow` で渡したフローなら `(flow)` など。ファイル全体への苦情なら空） |
 | `errors` / `warns` / `infos` | 件数 |
-| `flow` | `--flow` を渡したときだけ在る。`{path, data}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
+| `flow` | `--flow` を渡したときだけ在る。`{path, data, rendered, candidates}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
+| `flow.rendered` | `SubagentStart` で担当のサブエージェントに渡る手順の行（文字列の並び。`flow.render` のまま、子のパスやロックの案内は入らない）。読めなければ `null` |
+| `flow.candidates` | フローで選べる名前。`{agents: [{name, source}], skills: [{name, source}]}`。`source` は `builtin`（`general-purpose` `Explore` `Plan`）か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`。名前は frontmatter の `name`、無ければファイル・ディレクトリの名前）。フローが読めなくても載る |
 
 ### 子のフローを保存せずに確かめる
 
@@ -1864,6 +1866,12 @@ ccnavi --lint --json --flow /tmp/flow.yml
 読めなければ場所 `(flow)` の error で言い、`detail` は渡したパスで始まる。無いファイルも error。VS Code の拡張の
 フロー編集画面が、開くときと保存の前に本文を一時ファイルに書いて渡し、`(flow)` の苦情と `flow.data` を読む
 （ほかの設定の苦情ではフローを止めない）。
+
+読めたフローには、手順として怪しいところを `(flow)` の **warn** で足す（読むのも保存も止めない）。線の `from` / `to` が
+無いノードを指す、`start` から届かないノード（`group` は外す）、`start` に入る線、`end` から出る線、分岐・問いの出口に
+線が無い、`start` / `end` が無い、`subAgent` の `builtInType` と `skill` の `name` が `flow.candidates` に無い
+（大文字小文字だけ違えば正しい綴りを添える。空の欄と `:` を含むプラグインのスキルは言わない）。巡回は言わない。
+`detail` は error と同じく渡したパスで始まる。
 
 `flow.data` は読めた中身を JSON にしたもの（`flow.as_json`）。PyYAML（YAML 1.1）の読みのままで、`0755` は 493、
 `yes` は `true`、`0o17` は文字列になる。JSON にそのまま載らない値は `{"$ccnavi": <種類>, ...}` の印にする。

@@ -169,6 +169,16 @@ test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（�
     // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
     assert.deepEqual(answer([], { path: "/p", data: { a: 1 } }).flow, { path: "/p", data: { a: 1 } });
     assert.equal(answer([], ABSENT).flow, undefined);
+    // 渡る手順（rendered）と候補（candidates）も持ち越す。形の違う項目は落とす
+    const extras = answer([], {
+      path: "/p",
+      data: {},
+      rendered: ["1. [start] 開始", 2],
+      candidates: { agents: [{ name: "Plan", source: "builtin" }, { name: "" }, 3], skills: "x" },
+    }).flow;
+    assert.deepEqual(extras?.rendered, ["1. [start] 開始"]);
+    assert.deepEqual(extras?.candidates, { agents: [{ name: "Plan", source: "builtin" }], skills: [] });
+    assert.equal(answer([], { path: "/p", data: {}, rendered: null }).flow?.rendered, null);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
