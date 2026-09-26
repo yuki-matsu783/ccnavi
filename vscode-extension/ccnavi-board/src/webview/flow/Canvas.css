@@ -62,3 +62,37 @@
 .flow-ports { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .flow-port { position: relative; text-align: right; font-size: .8em; color: var(--vscode-descriptionForeground); padding-right: 6px; }
 .flow-graph .react-flow__handle { width: 8px; height: 8px; }
+/* × のボタン。ノードは右上、線は真ん中。載せた・選んだときだけ見せる（隠している間は押せない） */
+.flow-node, .flow-group { position: relative; }
+.flow-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0;
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+  border-radius: 50%;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font: inherit; font-size: 12px; line-height: 1;
+  cursor: pointer;
+}
+.flow-remove:hover, .flow-remove:focus-visible {
+  background: var(--vscode-inputValidation-errorBackground, var(--vscode-list-hoverBackground));
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-focusBorder));
+  outline: none;
+}
+.react-flow__node .flow-remove { position: absolute; top: -9px; right: -9px; z-index: 1; visibility: hidden; }
+.react-flow__node:hover .flow-remove, .react-flow__node.selected .flow-remove, .react-flow__node .flow-remove:focus-visible { visibility: visible; }
+.flow-edge-tools { position: absolute; pointer-events: all; }
+/* グループ。点線の枠と名前だけ。ほかのノードより奥に描く（`Canvas.tsx` の zIndex） */
+.flow-graph .react-flow__node-flowGroup { font-size: var(--vscode-font-size); }
+.flow-group {
+  width: 100%; height: 100%; box-sizing: border-box;
+  border: 1px dashed var(--vscode-descriptionForeground);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--vscode-editor-background) 85%, var(--vscode-descriptionForeground));
+}
+.react-flow__node.selected .flow-group { border-color: var(--vscode-focusBorder); border-style: solid; }
+.flow-group-label {
+  position: absolute; top: 4px; left: 8px; right: 24px;
+  font-size: .85em; font-weight: 600; color: var(--vscode-descriptionForeground);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

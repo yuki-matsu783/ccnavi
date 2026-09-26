@@ -5,26 +5,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  absolutePosition,
   addBranch,
   addNode,
   connect,
   connectionLabel,
   connectionsOf,
   flowNotices,
+  groupNodes,
+  groupOf,
   moveNode,
   nesting,
   parseFlow,
   patchBranch,
   patchData,
+  placeNode,
+  placeNodes,
   portsOf,
   removeBranch,
   removeConnectionAt,
   removeNode,
   renameNode,
+  resizeGroup,
   serializeFlow,
   setConditionAt,
   templateFlow,
+  ungroup,
   type FlowDoc,
+  type FlowNode,
 } from "../../src/core/flow-doc.js";
 import { parse } from "yaml";
 
@@ -290,4 +298,163 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足
   assert.equal(connectionLabel(doc, connections[1]), "A");
   assert.equal(connectionLabel(doc, connections[0]), "");
   assert.equal(connectionLabel(setConditionAt(doc, 1, "急ぐとき"), connectionsOf(setConditionAt(doc, 1, "急ぐとき"))[1]), "急ぐとき");
+});
+
+/** 3 つのノードと線 2 本。a と b をグループにまとめる見本に使う */
+function three(): FlowDoc {
+  return {
+    id: "wf",
+    nodes: [
+      { id: "a", type: "prompt", name: "A", position: { x: 100, y: 100 }, data: { prompt: "" } },
+      { id: "b", type: "prompt", name: "B", position: { x: 400, y: 200 }, data: { prompt: "" }, extra: 1 },
+      { id: "c", type: "end", name: "C", position: { x: 800, y: 100 }, data: {} },
+    ],
+    connections: [
+      { id: "c1", from: "a", to: "b", fromPort: "output", toPort: "input" },
+      { id: "c2", from: "b", to: "c", fromPort: "output", toPort: "input" },
+    ],
+  };
+}
+
+function byId(doc: FlowDoc, id: string): FlowNode {
+  const node = doc.nodes.find((n) => n.id === id);
+  assert.ok(node !== undefined, id);
+  return node;
+}
+
+test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲み、中のノードの位置は枠からの位置になる。枠は中のノードより前に並ぶ", () => {
+  const grouped = groupNodes(three(), ["b", "a", "nothing"]);
+  assert.ok(grouped !== undefined);
+  const { doc, id } = grouped;
+  assert.equal(id, "group-1");
+  // 枠は囲んだノードのうち最も前（a）の位置に入る
+  assert.deepEqual(doc.nodes.map((n) => n.id), ["group-1", "a", "b", "c"]);
+  // 外枠は a(100,100) から b(400+190, 200+90)。余白 24、名前の帯 28
+  assert.deepEqual(byId(doc, "group-1"), { id: "group-1", type: "group", name: "グループ", position: { x: 76, y: 48 }, data: {}, style: { width: 538, height: 266 } });
+  assert.deepEqual(byId(doc, "a").position, { x: 24, y: 52 });
+  assert.equal(byId(doc, "a").parentId, "group-1");
+  assert.deepEqual(byId(doc, "b"), { id: "b", type: "prompt", name: "B", position: { x: 324, y: 152 }, data: { prompt: "" }, extra: 1, parentId: "group-1" });
+  // 図の上の位置は変わらない
+  assert.deepEqual(absolutePosition(doc, "a"), { x: 100, y: 100 });
+  assert.deepEqual(absolutePosition(doc, "b"), { x: 400, y: 200 });
+  assert.equal(byId(doc, "c").parentId, undefined);
+  // 線はそのまま。グループは注意に「欄を持たない種類」として出ない。出入口も無い
+  assert.deepEqual(doc.connections, three().connections);
+  assert.deepEqual(flowNotices(doc).filter((n) => /欄を持たない/.test(n)), []);
+  assert.deepEqual(portsOf(byId(doc, "group-1"), connectionsOf(doc)), { inputs: [], outputs: [] });
+  // グループへは線を繋がない
+  assert.equal(connect(doc, "c", "output", "group-1", "input"), doc);
+  assert.equal(connect(doc, "group-1", "output", "c", "input"), doc);
+  // グループ自身は囲まない。囲めるものが無ければ undefined
+  assert.equal(groupNodes(doc, ["group-1"]), undefined);
+  assert.equal(groupNodes(doc, []), undefined);
+  // 別のグループのノードは新しいグループへ移る（元の枠は残す）
+  const again = groupNodes(doc, ["b", "c"]);
+  assert.ok(again !== undefined);
+  assert.equal(byId(again.doc, "b").parentId, "group-2");
+  assert.equal(byId(again.doc, "a").parentId, "group-1");
+  assert.deepEqual(absolutePosition(again.doc, "b"), { x: 400, y: 200 });
+  assert.deepEqual(again.doc.nodes.map((n) => n.id), ["group-1", "a", "group-2", "b", "c"]);
+  // 指す先の無い parentId が指す id は使わない（そのノードが新しいグループに黙って入らない）
+  const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 700, y: 500 }, parentId: "group-1" }, ...three().nodes] };
+  const fresh = groupNodes(stray, ["a", "b"]);
+  assert.ok(fresh !== undefined);
+  assert.equal(fresh.id, "group-2");
+  assert.equal(groupOf(fresh.doc, byId(fresh.doc, "x")), undefined);
+  assert.deepEqual(absolutePosition(fresh.doc, "x"), { x: 700, y: 500 });
+});
+
+test("CB-T255 グループを解く・消すと、中のノードは図の上の同じ位置で外へ出て残る。中のノードを消してもグループは残る", () => {
+  const grouped = groupNodes(three(), ["a", "b"]);
+  assert.ok(grouped !== undefined);
+  for (const next of [ungroup(grouped.doc, "group-1"), removeNode(grouped.doc, "group-1")]) {
+    assert.deepEqual(next.nodes, three().nodes);
+    assert.deepEqual(next.connections, three().connections);
+  }
+  // グループでないものを解いても何も変わらない
+  assert.equal(ungroup(grouped.doc, "a"), grouped.doc);
+  // 中のノードを消すと、そのノードと線だけ消える
+  const removed = removeNode(grouped.doc, "a");
+  assert.deepEqual(removed.nodes.map((n) => n.id), ["group-1", "b", "c"]);
+  assert.equal(byId(removed, "b").parentId, "group-1");
+  assert.deepEqual(connectionsOf(removed).map((c) => c.id), ["c2"]);
+});
+
+test("CB-T256 ノードを放すと、真ん中が枠の中ならそのグループに入り、外なら出る。グループは中身ごと動く。変わらなければ同じ写し", () => {
+  const grouped = groupNodes(three(), ["a"]);
+  assert.ok(grouped !== undefined);
+  const doc = grouped.doc;
+  // 枠は (76, 48) から 238 x 166
+  assert.deepEqual(byId(doc, "group-1").style, { width: 238, height: 166 });
+  // c（後ろに並ぶ）を枠の中へ放す。枠からの位置で入り、枠が c より前にあるのでそのまま
+  const joined = placeNode(doc, "c", { x: 90, y: 110 });
+  assert.equal(byId(joined, "c").parentId, "group-1");
+  assert.deepEqual(byId(joined, "c").position, { x: 14, y: 62 });
+  assert.deepEqual(joined.nodes.map((n) => n.id), ["group-1", "a", "b", "c"]);
+  // 枠の外へ放すと出る（parentId が消え、位置は図の上の位置）
+  const left = placeNode(joined, "c", { x: 900, y: 500 });
+  assert.equal("parentId" in byId(left, "c"), false);
+  assert.deepEqual(byId(left, "c").position, { x: 900, y: 500 });
+  // 同じ枠の中で動かすだけなら入ったまま
+  const moved = placeNode(doc, "a", { x: 80, y: 60 });
+  assert.equal(byId(moved, "a").parentId, "group-1");
+  assert.deepEqual(byId(moved, "a").position, { x: 4, y: 12 });
+  // 動かしていなければ同じ写し（押しただけで未保存にしない）
+  assert.equal(placeNode(doc, "a", { x: 100, y: 100 }), doc);
+  assert.equal(placeNode(doc, "group-1", { x: 76, y: 48 }), doc);
+  assert.equal(placeNode(doc, "nothing", { x: 0, y: 0 }), doc);
+  // グループを動かすと、中のノードの位置（枠からの位置）はそのままで、図の上では一緒に動く
+  const shifted = placeNode(doc, "group-1", { x: 176, y: 148 });
+  assert.deepEqual(byId(shifted, "group-1").position, { x: 176, y: 148 });
+  assert.deepEqual(byId(shifted, "a").position, { x: 24, y: 52 });
+  assert.deepEqual(absolutePosition(shifted, "a"), { x: 200, y: 200 });
+  // 前に並ぶノードが後ろのグループに入るときは、グループを前へ移す（親を子より前に置く）
+  const late: FlowDoc = { nodes: [...three().nodes, { id: "g", type: "group", name: "G", position: { x: 700, y: 0 }, data: {}, style: { width: 400, height: 400 } }] };
+  const into = placeNode(late, "a", { x: 750, y: 50 });
+  assert.equal(byId(into, "a").parentId, "g");
+  assert.deepEqual(byId(into, "a").position, { x: 50, y: 50 });
+  assert.deepEqual(into.nodes.map((n) => n.id), ["g", "a", "b", "c"]);
+  // 指す先の無い parentId は効かせない（位置は図の上の位置として読み、書き換えない）
+  const stray: FlowDoc = { nodes: [{ id: "x", type: "prompt", name: "X", position: { x: 5, y: 5 }, parentId: "missing" }] };
+  assert.equal(groupOf(stray, byId(stray, "x")), undefined);
+  assert.deepEqual(absolutePosition(stray, "x"), { x: 5, y: 5 });
+  assert.equal(byId(placeNode(stray, "x", { x: 50, y: 5 }), "x").parentId, "missing");
+});
+
+test("CB-T257 まとめて動かしたときは React Flow の位置（枠からの位置）で読み、グループを先に置く", () => {
+  const grouped = groupNodes(three(), ["a"]);
+  assert.ok(grouped !== undefined);
+  // 枠と c を一緒に動かす。c は枠の新しい位置の中に落ちるので入る
+  const next = placeNodes(grouped.doc, [
+    { id: "c", position: { x: 300, y: 300 } },
+    { id: "group-1", position: { x: 276, y: 248 } },
+  ]);
+  assert.deepEqual(byId(next, "group-1").position, { x: 276, y: 248 });
+  assert.equal(byId(next, "c").parentId, "group-1");
+  assert.deepEqual(byId(next, "c").position, { x: 24, y: 52 });
+  // 中のノードの位置は枠からの位置として読む
+  const inner = placeNodes(grouped.doc, [{ id: "a", position: { x: 30, y: 60 } }]);
+  assert.deepEqual(byId(inner, "a").position, { x: 30, y: 60 });
+  assert.equal(byId(inner, "a").parentId, "group-1");
+  // 何も動いていなければ同じ写し
+  assert.equal(placeNodes(grouped.doc, [{ id: "a", position: { x: 24, y: 52 } }]), grouped.doc);
+});
+
+test("CB-T258 グループの大きさを変える。左や上の辺を動かしたときは中のノードを図の上で留める。下限より小さくしない", () => {
+  const grouped = groupNodes(three(), ["a"]);
+  assert.ok(grouped !== undefined);
+  const doc = grouped.doc;
+  const wider = resizeGroup(doc, "group-1", { width: 500, height: 300 });
+  assert.deepEqual(byId(wider, "group-1").style, { width: 500, height: 300 });
+  assert.deepEqual(byId(wider, "group-1").position, { x: 76, y: 48 });
+  // 左上を (56, 38) へ広げる。中の a は枠からの位置が 20, 10 だけ増え、図の上では動かない
+  const grown = resizeGroup(doc, "group-1", { width: 258, height: 176 }, { x: 56, y: 38 });
+  assert.deepEqual(byId(grown, "group-1").position, { x: 56, y: 38 });
+  assert.deepEqual(byId(grown, "a").position, { x: 44, y: 62 });
+  assert.deepEqual(absolutePosition(grown, "a"), { x: 100, y: 100 });
+  // 下限
+  assert.deepEqual(byId(resizeGroup(doc, "group-1", { width: 10, height: 10 }), "group-1").style, { width: 120, height: 80 });
+  // 変わらなければ同じ写し。グループでないものは変えない
+  assert.equal(resizeGroup(doc, "group-1", { width: 238, height: 166 }, { x: 76, y: 48 }), doc);
+  assert.equal(resizeGroup(doc, "a", { width: 500, height: 500 }), doc);
 });

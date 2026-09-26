@@ -9,12 +9,19 @@ import assert from "node:assert/strict";
 import type { HTMLButtonElement, HTMLInputElement, HTMLTextAreaElement } from "happy-dom" with { "resolution-mode": "import" };
 import { addNode, parseFlow, patchData, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { lockedReason } from "../../src/core/flow-view.js";
+import type { DomPage } from "../helpers/dom.js";
 import { openFlow, SAMPLE, sampleData, savedDoc } from "../helpers/flow.js";
 
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
   assert.ok(read.ok);
   return read.doc;
+}
+
+/** 線（SVG の要素）を押す。SVG の要素は click() を持たないので、click のイベントを流す */
+function clickSvg(dom: DomPage, element: unknown): void {
+  const Mouse = (dom.window as unknown as { MouseEvent: new (type: string, init: unknown) => unknown }).MouseEvent;
+  (element as { dispatchEvent: (event: unknown) => boolean }).dispatchEvent(new Mouse("click", { bubbles: true }));
 }
 
 /** 印のある 2 種類（問いとサブエージェント）を足した雛形 */
@@ -212,5 +219,255 @@ test("CB-D112 外のファイルを取り込むボタンは無い。中身（dat
     assert.equal(dom.all(".react-flow__node").length, 4);
   } finally {
     await dom.close();
+  }
+});
+
+test("CB-D117 ノードと線の × で消せる。押しても選ばない。消したものを選んでいたら欄はフローに戻る。読むだけなら × は出ない", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    // × はどのノードにもある（載せた・選んだときだけ見せるのは CSS）。線の × は載せる・選ぶまで出さない
+    assert.equal(dom.all('[data-action="canvas-remove-node"]').length, 4);
+    assert.equal(dom.all('[data-action="canvas-remove-edge"]').length, 0);
+    const button = dom.one('.react-flow__node[data-id="askUserQuestion-1"] [data-action="canvas-remove-node"]');
+    assert.equal(button.getAttribute("aria-label"), "このノードを消す");
+    assert.equal(button.getAttribute("title"), "このノードを消す");
+    dom.click(button);
+    await dom.settle();
+    assert.equal(dom.all(".react-flow__node").length, 3);
+    assert.equal(dom.all('.react-flow__node[data-id="askUserQuestion-1"]').length, 0);
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "flow", "押しても選ばない");
+    assert.ok(!dom.one("#dirty").classList.contains("hidden"));
+    // 選んでいるノードを × で消すと、欄はフローに戻る
+    dom.click(dom.one('.react-flow__node[data-id="subAgent-1"]'));
+    await dom.settle();
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "node");
+    dom.click(dom.one('.react-flow__node[data-id="subAgent-1"] [data-action="canvas-remove-node"]'));
+    await dom.settle();
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "flow");
+    // 線を選ぶと真ん中に × が出る。押すと線が消えて、欄はフローに戻る
+    assert.equal(dom.all(".react-flow__edge").length, 1);
+    clickSvg(dom, dom.one(".react-flow__edge"));
+    await dom.settle();
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "edge");
+    const edgeButton = dom.one('[data-action="canvas-remove-edge"]');
+    assert.equal(edgeButton.getAttribute("aria-label"), "この線を消す");
+    dom.click(edgeButton);
+    await dom.settle();
+    assert.equal(dom.all(".react-flow__edge").length, 0);
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "flow");
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    const saved = savedDoc(dom);
+    assert.deepEqual(saved.nodes.map((n) => n.id), ["start", "end"]);
+    assert.deepEqual(saved.connections, []);
+  } finally {
+    await dom.close();
+  }
+  const locked = await openFlow({ doc: marked(), lock: { locked: true, reason: lockedReason("i0001-01") } });
+  try {
+    assert.equal(locked.all('[data-action="canvas-remove-node"]').length, 0);
+    clickSvg(locked, locked.one(".react-flow__edge"));
+    await locked.settle();
+    assert.equal(locked.all('[data-action="canvas-remove-edge"]').length, 0);
+  } finally {
+    await locked.close();
+  }
+});
+
+test("CB-D118 グループは枠で描き、欄で名前を直して解ける。解くと中のノードは図の上の位置で外へ出る", async () => {
+  const doc: FlowDoc = {
+    ...templateFlow("i0001-01", "調査"),
+    nodes: [
+      { id: "g", type: "group", name: "下調べ", position: { x: 40, y: 100 }, data: {}, style: { width: 300, height: 200 } },
+      { id: "start", type: "start", name: "開始", position: { x: 40, y: 60 }, data: { label: "開始" }, parentId: "g" },
+      { id: "end", type: "end", name: "終了", position: { x: 440, y: 160 }, data: { label: "終了" } },
+    ],
+  };
+  const dom = await openFlow({ doc });
+  try {
+    assert.equal(dom.all(".react-flow__node").length, 3);
+    assert.equal(dom.all(".react-flow__edge").length, 1);
+    const group = dom.one('.react-flow__node[data-id="g"]');
+    assert.equal(group.querySelector(".flow-group-label")?.textContent, "下調べ");
+    assert.equal(group.querySelectorAll(".react-flow__handle").length, 0, "グループは出入口を持たない");
+    // 「欄を持たない種類」の注意は出さない
+    assert.equal(dom.all("#flow-notices").length, 0);
+    // 選ぶのが 1 つだけならグループ化は押せない
+    assert.ok(dom.one<HTMLButtonElement>('[data-action="group-nodes"]').disabled);
+    dom.click(group);
+    await dom.settle();
+    assert.equal(dom.one("#inspector").getAttribute("data-type"), "group");
+    assert.match(dom.one("#inspector").textContent ?? "", /中のノードは 1 個/);
+    dom.type(dom.one<HTMLInputElement>("#inspector input.f-name"), "準備");
+    await dom.settle();
+    assert.equal(dom.one('.react-flow__node[data-id="g"] .flow-group-label').textContent, "準備");
+    dom.click(dom.one('#inspector [data-action="ungroup"]'));
+    await dom.settle();
+    assert.equal(dom.all(".react-flow__node").length, 2);
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "flow");
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.deepEqual(savedDoc(dom).nodes, [
+      { id: "start", type: "start", name: "開始", position: { x: 80, y: 160 }, data: { label: "開始" } },
+      { id: "end", type: "end", name: "終了", position: { x: 440, y: 160 }, data: { label: "終了" } },
+    ]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D119 Shift を押しながらノードを 2 つ選ぶと「グループ化」が押せ、押すと枠で囲んで枠を選ぶ", async () => {
+  const dom = await openFlow({ doc: marked() });
+  try {
+    const group = (): HTMLButtonElement => dom.one<HTMLButtonElement>('[data-action="group-nodes"]');
+    assert.ok(group().disabled);
+    dom.click(dom.one('.react-flow__node[data-id="start"]'));
+    await dom.settle();
+    assert.ok(group().disabled, "1 つだけではまとめない");
+    dom.key("Shift");
+    await dom.settle();
+    dom.click(dom.one('.react-flow__node[data-id="end"]'));
+    await dom.settle();
+    assert.ok(!group().disabled);
+    dom.click(group());
+    await dom.settle();
+    assert.equal(dom.all(".react-flow__node").length, 5);
+    assert.equal(dom.one("#inspector").getAttribute("data-type"), "group");
+    assert.match(dom.one("#inspector").textContent ?? "", /中のノードは 2 個/);
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    const saved = savedDoc(dom);
+    assert.deepEqual(saved.nodes.map((n) => [n.id, n.parentId]), [
+      ["group-1", undefined],
+      ["start", "group-1"],
+      ["end", "group-1"],
+      ["askUserQuestion-1", undefined],
+      ["subAgent-1", undefined],
+    ]);
+  } finally {
+    await dom.close();
+  }
+});
+
+/** 選ばれている点の id（図の上で） */
+function pickedIds(dom: DomPage): (string | null)[] {
+  return dom.all(".react-flow__node.selected").map((node) => node.getAttribute("data-id"));
+}
+
+test("CB-D120 Shift を押しながら選んでいるノードを押すと、そのノードだけ選びから外れ、ほかは残る。右の欄は残ったノードに移る", async () => {
+  let doc = templateFlow("i0001-01", "調査");
+  doc = addNode(doc, "prompt", { x: 400, y: 80 }).doc;
+  const dom = await openFlow({ doc });
+  try {
+    const node = (id: string) => dom.one(`.react-flow__node[data-id="${id}"]`);
+    dom.click(node("start"));
+    await dom.settle();
+    dom.key("Shift");
+    await dom.settle();
+    dom.click(node("end"));
+    await dom.settle();
+    dom.click(node("prompt-1"));
+    await dom.settle();
+    assert.deepEqual(pickedIds(dom).sort(), ["end", "prompt-1", "start"]);
+    // 真ん中の 1 つを外す
+    dom.click(node("end"));
+    await dom.settle();
+    assert.deepEqual(pickedIds(dom).sort(), ["prompt-1", "start"]);
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "node");
+    assert.notEqual(dom.one("#inspector").getAttribute("data-type"), "end", "外したノードの欄のまま");
+    assert.ok(!dom.one<HTMLButtonElement>('[data-action="group-nodes"]').disabled);
+    // 残りも外すと、何も選ばず右の欄はフローに戻る。グループ化は押せない
+    dom.click(node("start"));
+    await dom.settle();
+    assert.deepEqual(pickedIds(dom), ["prompt-1"]);
+    assert.equal(dom.one("#inspector").getAttribute("data-type"), "prompt");
+    assert.ok(dom.one<HTMLButtonElement>('[data-action="group-nodes"]').disabled);
+    dom.click(node("prompt-1"));
+    await dom.settle();
+    assert.deepEqual(pickedIds(dom), []);
+    assert.equal(dom.one("#inspector").getAttribute("data-selected"), "flow");
+    // 部品箱で足したノードは、それ 1 つだけを選ぶ
+    dom.click(node("start"));
+    await dom.settle();
+    dom.click(node("end"));
+    await dom.settle();
+    dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
+    await dom.settle();
+    assert.deepEqual(pickedIds(dom), ["skill-1"]);
+    assert.equal(dom.one("#inspector").getAttribute("data-type"), "skill");
+  } finally {
+    await dom.close();
+  }
+});
+
+/** グループ 1 つ（中に開始）と終了のフロー */
+function grouped(): FlowDoc {
+  return {
+    ...templateFlow("i0001-01", "調査"),
+    nodes: [
+      { id: "g", type: "group", name: "下調べ", position: { x: 40, y: 100 }, data: {}, style: { width: 300, height: 200 } },
+      { id: "start", type: "start", name: "開始", position: { x: 40, y: 60 }, data: { label: "開始" }, parentId: "g" },
+      { id: "end", type: "end", name: "終了", position: { x: 440, y: 160 }, data: { label: "終了" } },
+    ],
+  };
+}
+
+test("CB-D121 グループの縁を押して離すだけなら未保存にしない。引けば大きさが変わる", async () => {
+  const dom = await openFlow({ doc: grouped() });
+  try {
+    dom.click(dom.one('.react-flow__node[data-id="g"]'));
+    await dom.settle();
+    const handle = dom.one('.react-flow__node[data-id="g"] .react-flow__resize-control.handle.bottom.right');
+    const Mouse = (dom.window as unknown as { MouseEvent: new (type: string, init: unknown) => unknown }).MouseEvent;
+    const fire = (target: unknown, type: string, x: number, y: number): void => {
+      (target as { dispatchEvent: (event: unknown) => boolean }).dispatchEvent(new Mouse(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, view: dom.window }));
+    };
+    fire(handle, "mousedown", 300, 200);
+    fire(dom.window, "mouseup", 300, 200);
+    await dom.settle();
+    assert.ok(dom.one("#dirty").classList.contains("hidden"), "押しただけで未保存になった");
+    fire(handle, "mousedown", 300, 200);
+    fire(dom.window, "mousemove", 340, 250);
+    fire(dom.window, "mousemove", 380, 260);
+    fire(dom.window, "mouseup", 380, 260);
+    await dom.settle();
+    assert.ok(!dom.one("#dirty").classList.contains("hidden"));
+    dom.click(dom.one("#save"));
+    await dom.settle();
+    assert.notDeepEqual(savedDoc(dom).nodes[0].style, { width: 300, height: 200 });
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D122 読むだけのときは、グループの縁を出さず、「グループを解く」「グループ化」を押せない", async () => {
+  const dom = await openFlow({ doc: grouped(), lock: { locked: true, reason: lockedReason("i0001-01") } });
+  try {
+    dom.click(dom.one('.react-flow__node[data-id="g"]'));
+    await dom.settle();
+    assert.equal(dom.one("#inspector").getAttribute("data-type"), "group");
+    assert.equal(dom.all(".react-flow__resize-control").length, 0);
+    assert.ok(dom.one<HTMLButtonElement>('#inspector [data-action="ungroup"]').disabled);
+    assert.ok(dom.one<HTMLButtonElement>('#inspector [data-action="remove-node"]').disabled);
+    // 2 つ選んでもグループ化は押せない
+    dom.click(dom.one('.react-flow__node[data-id="start"]'));
+    await dom.settle();
+    dom.key("Shift");
+    await dom.settle();
+    dom.click(dom.one('.react-flow__node[data-id="end"]'));
+    await dom.settle();
+    assert.equal(pickedIds(dom).length, 2);
+    assert.ok(dom.one<HTMLButtonElement>('[data-action="group-nodes"]').disabled);
+  } finally {
+    await dom.close();
+  }
+  // 錠が無ければ、選んだグループに縁が出る
+  const open = await openFlow({ doc: grouped() });
+  try {
+    open.click(open.one('.react-flow__node[data-id="g"]'));
+    await open.settle();
+    assert.equal(open.all(".react-flow__resize-control.handle").length, 4);
+  } finally {
+    await open.close();
   }
 });

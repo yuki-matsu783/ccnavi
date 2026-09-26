@@ -3,6 +3,7 @@
  *
  * 直すのは `core/flow-doc.ts` の関数で作った写しで、**触った欄以外は元のまま**（知らない欄を落とさない）。
  * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（ファイルと同じ YAML の形で見せる）。
+ * グループは名前だけ直せて、解く（中のノードは残して枠だけ消す）か消す（同じく中のノードは残す）。
  */
 import type { JSX } from "react";
 
@@ -16,7 +17,9 @@ import {
   connectionsOf,
   connectionTo,
   dataText,
+  groupOf,
   isEditableType,
+  isGroup,
   nodeData,
   nodeName,
   nodeType,
@@ -29,6 +32,7 @@ import {
   setConditionAt,
   setMeta,
   TYPE_LABELS,
+  ungroup,
   yamlText,
   type FlowDoc,
   type FlowNode,
@@ -109,7 +113,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSelect }: Inspe
         <span title="description">説明</span>
         <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }))} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。</p>
+      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線に載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。</p>
     </aside>
   );
 }
@@ -117,7 +121,10 @@ export function Inspector({ doc, selected, readOnly, onChange, onSelect }: Inspe
 function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc) => void; readonly onSelect: (selection: Selection | undefined) => void }): JSX.Element {
   const type = nodeType(node);
   const known = isEditableType(type);
+  const group = isGroup(node);
   const badge = badgeOf(type);
+  const members = group ? doc.nodes.filter((n) => groupOf(doc, n)?.id === node.id).length : 0;
+  const host = groupOf(doc, node);
   const text = (key: string, label: string, options: { readonly area?: boolean; readonly placeholder?: string } = {}): JSX.Element => (
     <label className="field">
       <span title={`data.${key}`}>{label}</span>
@@ -175,7 +182,28 @@ function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc:
         </>
       )}
       {known && branchKey(type) !== undefined && <Branches doc={doc} node={node} readOnly={readOnly} onChange={onChange} />}
-      {!known && (
+      {host !== undefined && <p className="dim small">グループ「{nodeName(host) || host.id}」の中。枠の外へ引くとグループから出る。</p>}
+      {group && (
+        <>
+          <p className="hint">図の上の枠。手順には入らない（線は繋がない）。中のノードは {members} 個。枠の中へ引いたノードは枠に入り、外へ引くと出る。選ぶと縁を引いて大きさを変えられる。</p>
+          <div className="buttons">
+            <button
+              type="button"
+              className="action"
+              data-action="ungroup"
+              disabled={readOnly}
+              title="枠だけ消して、中のノードはその場に残す"
+              onClick={() => {
+                onChange(ungroup(doc, node.id));
+                onSelect(undefined);
+              }}
+            >
+              グループを解く
+            </button>
+          </div>
+        </>
+      )}
+      {!known && !group && (
         <>
           <p className="hint">この画面で欄を持たない種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
@@ -192,7 +220,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc:
             onSelect(undefined);
           }}
         >
-          ノードを消す
+          {group ? "グループを消す（中のノードは残す）" : "ノードを消す"}
         </button>
       </div>
     </aside>
