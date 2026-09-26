@@ -18,17 +18,20 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
   assert.deepEqual(asFlowMessage({ type: "reload", dirty: true }), { type: "reload", dirty: true });
   // 未保存かが読めなければ「変更なし」ではなく、真のときだけ真（確認を飛ばす側にしないのは拡張ホストの問い）
   assert.deepEqual(asFlowMessage({ type: "reload", dirty: "yes" }), { type: "reload", dirty: false });
-  assert.deepEqual(asFlowMessage({ type: "import", dirty: true }), { type: "import", dirty: true });
   assert.deepEqual(asFlowMessage({ type: "dirty", dirty: false }), { type: "dirty", dirty: false });
   assert.equal(asFlowMessage({ type: "dirty" }), undefined);
   assert.deepEqual(asFlowMessage({ type: "save", doc }), { type: "save", doc });
-  // 保存の中身が読めない形なら、保存そのものを捨てる（書かない）
+  // 保存の中身が描けない形なら、保存そのものを捨てる（書かない）
   assert.equal(asFlowMessage({ type: "save" }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { name: "x" } }), undefined);
   assert.equal(asFlowMessage({ type: "save", doc: { nodes: [{ type: "start" }] } }), undefined);
-  assert.equal(asFlowMessage({ type: "save", doc: { nodes: [{ id: "a" }, { id: "a" }] } }), undefined);
+  // 描ける形なら受ける。id の重なりのような正しさは、保存の前に実行ファイル（--lint --flow）が言う
+  const twin = { nodes: [{ id: "a" }, { id: "a" }] };
+  assert.deepEqual(asFlowMessage({ type: "save", doc: twin }), { type: "save", doc: twin });
   // 知らない操作・オブジェクトでないもの
   assert.equal(asFlowMessage({ type: "delete" }), undefined);
+  // 取り込み（外のワークフローを読む操作）は無い
+  assert.equal(asFlowMessage({ type: "import", dirty: true }), undefined);
   assert.equal(asFlowMessage("save"), undefined);
   assert.equal(asFlowMessage(null), undefined);
 });
@@ -44,7 +47,7 @@ test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に
 });
 
 test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実行ファイルの答え）で 作成 / 編集 / 閲覧（着手中）", () => {
-  const base = { path: "/ws/.ccnavi/approved/flows/x.json", rel: ".ccnavi/approved/flows/x.json", tree: "/ws", linked: false };
+  const base = { path: "/ws/.ccnavi/approved/flows/x.yml", rel: ".ccnavi/approved/flows/x.yml", tree: "/ws", linked: false };
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: false }), "フロー: 作成");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: false }), "フロー: 編集");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: true }), "フロー: 閲覧（着手中）");
@@ -54,14 +57,14 @@ test("CB-T227 カードのボタンの言葉は、在るか・着手中か（実
 
 test("CB-T228 錠は実行ファイルの flow.locked の写し。親・無い子・欄の無い子は引けない", () => {
   const board = fixture();
-  // 見本の i0001-02 は着手中（DENY_TICKET_FLOW_LOCKED で止まる）、i0001-01 は閉じている
+  // 見本の i0001-02 は着手中（DENY_TICKET_FLOW_LOCKED で止まる）、i0001-01 は閉じていてファイルが在る
   const locked = flowTargetOf(board, "i0001-02");
   assert.ok(locked.ok);
   assert.equal(locked.target.lock.locked, true);
   assert.match(locked.target.lock.reason, /DENY_TICKET_FLOW_LOCKED/);
   assert.match(locked.target.lock.reason, /finish で終わるか cancel で取り消されると外れる/);
   assert.equal(locked.target.parent, "i0001");
-  assert.match(locked.target.flow.rel, /^\.ccnavi\/approved\/flows\/i0001-02\.json$/);
+  assert.match(locked.target.flow.rel, /^\.ccnavi\/approved\/flows\/i0001-02\.yml$/);
   const open = flowTargetOf(board, "i0001-01");
   assert.ok(open.ok);
   assert.deepEqual(open.target.lock, { locked: false, reason: "" });
@@ -70,6 +73,10 @@ test("CB-T228 錠は実行ファイルの flow.locked の写し。親・無い�
   assert.match(parent.ok ? "" : parent.error, /親チケット/);
   const missing = flowTargetOf(board, "i9999-01");
   assert.equal(missing.ok, false);
+  // 取り消しの子でファイルが無ければ、実行ファイルは flow を null で返す。開く先が無い
+  const cancelled = flowTargetOf(board, "i0001-05");
+  assert.equal(cancelled.ok, false);
+  assert.match(cancelled.ok ? "" : cancelled.error, /完了・取り消しの子でファイルが無い/);
   // 画面は started_at を見て組み直さない。答えが locked: false と言えば、着手済みに見えても開く
   const trusted: BoardJson = {
     ...board,
@@ -87,7 +94,8 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.equal(board.tickets.find((t) => t.ticket === "i0001")?.flow, null);
   const child = board.tickets.find((t) => t.ticket === "i0001-01")?.flow;
   assert.ok(child !== null && child !== undefined);
-  assert.equal(child.exists, false);
+  assert.equal(child.exists, true);
+  assert.equal(board.tickets.find((t) => t.ticket === "i0001-05")?.flow, null);
   assert.equal(child.linked, false);
   assert.equal(child.tree, "<root>/.claude/worktrees/i0001");
   // locked の欠けた答え（古い実行ファイルか壊れた出力）は、止まっているものとして読む
@@ -105,6 +113,35 @@ test("CB-T229 ボードの JSON の flow は子だけが持ち、locked が欠�
   assert.ok(flowCardOf(built, "i0001-01") !== undefined);
   assert.equal(flowCardOf(built, "i0001"), undefined);
   assert.equal(flowCardOf(built, "i9999-01"), undefined);
+  assert.equal(flowCardOf(built, "i0001-05"), undefined);
+});
+
+test("CB-T241 閉じた子（完了・取り消し）でファイルが無ければ、古い実行ファイルの答えでもカードにフローを載せない", () => {
+  const board = fixture();
+  // 古い実行ファイルは閉じた子にも exists: false の flow を返していた
+  const flowOf = (ticket: string, exists: boolean) => ({
+    path: `<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/${ticket}.yml`,
+    rel: `.ccnavi/approved/flows/${ticket}.yml`,
+    tree: "<root>/.claude/worktrees/i0001",
+    exists,
+    linked: false,
+    locked: false,
+  });
+  const old: BoardJson = {
+    ...board,
+    tickets: board.tickets.map((t) => (t.ticket === "i0001-01" || t.ticket === "i0001-05" ? { ...t, flow: flowOf(t.ticket, false) } : t)),
+  };
+  const built = buildBoard(old);
+  const card = (id: string) => built.columns.flatMap((column) => column.cards).find((c) => c.id === id);
+  assert.equal(card("i0001-01")?.column, "done");
+  assert.equal(card("i0001-01")?.flow, null);
+  assert.equal(card("i0001-05")?.column, "cancelled");
+  assert.equal(card("i0001-05")?.flow, null);
+  assert.equal(flowCardOf(built, "i0001-01"), undefined);
+  // 閉じた子でもファイルが在れば残す（中身を見られる）。開いている子はファイルが無くても載る（作成）
+  assert.equal(flowCardOf(buildBoard(board), "i0001-01")?.flow?.exists, true);
+  assert.equal(card("i0001-04")?.flow?.exists, false);
+  assert.equal(card("i0001-03")?.flow?.exists, false);
 });
 
 test("CB-T230 置き場かその途中がリンクなら、着手前でも読むだけ。ツリーの欄が無い古い答えも書かない側", () => {

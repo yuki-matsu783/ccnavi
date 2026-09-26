@@ -127,7 +127,7 @@ SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "canc
 APPROVAL_KEY = "ccnavi_approved"
 
 # 以前の、子のフローを指す欄（設計 9.3.1、ADR-0085）。今は読まない。フローの置き場は承認済みの
-# 領域の `flows/<子>.json` に固定（flow.py）。書いてあるチケットは warn で知らせて読み進める
+# 領域の `flows/<子>.yml` に固定（flow.py）。書いてあるチケットは warn で知らせて読み進める
 # （error にすると承認済みチケットが読めなくなり、範囲ごと効かなくなる）。
 FLOW_KEY = "flow"
 
@@ -550,7 +550,7 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
                 SEVERITY_WARN,
                 name,
                 f"`{FLOW_KEY}` はもう読まない。フローの置き場は承認済みチケットの置き場の "
-                f"`flows/{name}.json` に固定（ADR-0085）。この欄は消してよい",
+                f"`flows/{name}.yml` に固定（ADR-0085）。この欄は消してよい",
             )
         )
 

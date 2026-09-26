@@ -1,32 +1,38 @@
 /**
  * 子チケットのフロー（設計 9.3.1、ADR-0085）の読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * 形は CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json` に保存する
- * `workflow.json` と同じ。**形が合うだけで、あちらのコードは使っていない**（あちらは AGPL）。
+ * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/flow.py`）が読むもの。
  *
- *     {"id", "name", "description"?, "version", "nodes": [...], "connections": [...],
- *      "subAgentFlows"?: [{"id", "name", "nodes", "connections"}], ...}
- *     node       = {"id", "type", "name", "position": {x, y}, "data": {...}}
- *     connection = {"id", "from", "to", "fromPort", "toPort", "condition"?}
+ *     id, name, description?, version
+ *     nodes:          [node, ...]
+ *     connections:    [connection, ...]
+ *     subAgentFlows?: [{id, name, nodes, connections}, ...]
+ *     node       = {id, type, name, position: {x, y}, data: {...}}
+ *     connection = {id, from, to, fromPort, toPort, condition?}
  *
- * **知らない欄も知らない種類も落とさない。** 読んだ JSON をそのまま持ち、編集はその写しの
+ * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
+ * 書き出しは中身から組み直す（コメントや書き方は残らない。人が保存したときだけ書く）。
  *
- * **判定はしない。** 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
+ * **判定はしない。** 読めるか・形が正しいかは実行ファイルが `--lint --flow` で言い（`flow-lint.ts`、ADR-0035）、
+ * 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
  * サブエージェントに Agent ツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
  * ここには VS Code の API も node も DOM も入れない。画面（React）が束ねて読むため。
  */
+import { Document, parseDocument, Scalar, visit } from "yaml";
 
-/** ノード 1 つ。読んだ JSON のまま。欄は `nodeType` などの読み口で読む */
+import { yaml11Ambiguous } from "./yaml11.js";
+
+/** ノード 1 つ。読んだまま。欄は `nodeType` などの読み口で読む */
 export interface FlowNode {
   readonly id: string;
   readonly [key: string]: unknown;
 }
 
-/** 線 1 本。読んだ JSON のまま */
+/** 線 1 本。読んだまま */
 export interface FlowConnection {
   readonly [key: string]: unknown;
 }
@@ -84,7 +90,7 @@ export function branchKey(type: string): "branches" | "options" | undefined {
   return undefined;
 }
 
-/** 入口の綴り。cc-wf-studio の書き出しと同じ `input` / `output` / `branch-<番号>` */
+/** 出入口の綴り。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ綴りで読む） */
 export const INPUT_PORT = "input";
 export const OUTPUT_PORT = "output";
 export function branchPort(index: number): string {
@@ -171,67 +177,138 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 // ---- 読む・書く
 
 /**
- * JSON の本文を読む。形が読めなければ理由を返す（`nodes` の並びが無い、ノードに `id` が無い）。
- * 実行ファイル（`flow.load`）が読めないと言う形は、ここでも読めないと言う。
+ * YAML の本文を、画面が描くために読む。**正しいかは決めない。** 読めるか（大きさ・YAML として読めるか・別名）と
+ * 形（`nodes` が無い、`id` が無い・重なる など）の答えは実行ファイル（`--lint --flow`、`flow-lint.ts`）が出し、
+ * 画面はそれを通ったものだけを開く（ADR-0035）。読み手はルール設定の画面（`rules-doc.ts`）と同じ `yaml` の既定。
+ *
+ * ここが断るのは、画面が描けないときだけ。拡張の読み手が読めない（実行ファイルとは読み手が違うので、
+ * 実行ファイルが読めても `yaml` が断ることがある。重なったキーなど）か、ノードの並び（`id` が文字列の
+ * キーと値の並び）が取れないとき。**例外は外に出さない。**
  */
 export function parseFlow(text: string): FlowRead {
-  let raw: unknown;
+  const read = parseFlowValue(text);
+  if (!read.ok) {
+    return read;
+  }
+  const doc = asFlowDoc(read.value);
+  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
+}
+
+/**
+ * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
+ * （`flow-agree.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
+ * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。**例外は外に出さない。**
+ */
+export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
   try {
-    raw = JSON.parse(text.replace(/^﻿/, ""));
+    const doc = parseDocument(text.replace(/^\uFEFF/, ""));
+    const problem = doc.errors[0];
+    if (problem !== undefined) {
+      return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(problem.message)}）` };
+    }
+    return { ok: true, value: doc.toJS() };
   } catch (error) {
-    return { ok: false, error: `JSON として読めない（${(error as Error).message}）` };
+    return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
-  return checkFlow(raw);
 }
 
-/** 形を確かめる。画面から届いた保存の中身も、ここを通してから書く */
-export function checkFlow(raw: unknown): FlowRead {
-  if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
-  }
-  if (!Array.isArray(raw.nodes)) {
-    return { ok: false, error: "`nodes` の並びが無い" };
-  }
-  const ids = new Set<string>();
-  for (const [index, node] of raw.nodes.entries()) {
-    if (!isRecord(node)) {
-      return { ok: false, error: `nodes[${index}] がオブジェクトではない` };
-    }
-    if (typeof node.id !== "string" || node.id === "") {
-      return { ok: false, error: `nodes[${index}] に id が無い` };
-    }
-    if (ids.has(node.id)) {
-      return { ok: false, error: `ノードの id が重なっている（${node.id}）` };
-    }
-    ids.add(node.id);
-  }
-  if (raw.connections !== undefined) {
-    if (!Array.isArray(raw.connections)) {
-      return { ok: false, error: "`connections` が並びではない" };
-    }
-    for (const [index, c] of raw.connections.entries()) {
-      if (!isRecord(c)) {
-        return { ok: false, error: `connections[${index}] がオブジェクトではない` };
-      }
-    }
-  }
-  return { ok: true, doc: raw as FlowDoc };
+function firstLine(text: string): string {
+  return text.split("\n")[0].replace(/:$/, "").trim();
 }
 
-/** 画面から届いたものを受ける形。形が崩れていたら undefined（書かない） */
+/**
+ * 描ける形か。最上位がキーと値の並びで、`nodes` が「文字列の `id` を持つキーと値の並び」の並び。
+ * 画面から届いた保存の中身もここで受ける（崩れていたら書かない。正しいかは保存の前に実行ファイルが言う）。
+ */
 export function asFlowDoc(raw: unknown): FlowDoc | undefined {
-  const read = checkFlow(raw);
-  return read.ok ? read.doc : undefined;
+  if (!isRecord(raw) || !Array.isArray(raw.nodes)) {
+    return undefined;
+  }
+  if (!raw.nodes.every((node) => isRecord(node) && typeof node.id === "string")) {
+    return undefined;
+  }
+  return raw as FlowDoc;
 }
 
-/** 書き出す本文。cc-wf-studio と同じく 2 字下げ、末尾に改行 */
+/**
+ * 書き出す本文。字下げ 2 のブロック形式で、長い行を折らない。複数行の文は `|` の形で書く。
+ * 同じ中身が 2 度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
+ * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む綴り（`yes` `0755` `2026-01-01` など）と、
+ * 裸や `|` では PyYAML が読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
+ * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
+ *
+ * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
+ * （`flow-agree.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
+ */
 export function serializeFlow(doc: FlowDoc): string {
-  return `${JSON.stringify(doc, null, 2)}\n`;
+  return yamlText(doc);
+}
+
+/** 値を書き出しと同じ形の YAML にする。画面が欄を持たない種類の `data` を見せるのにも使う */
+export function yamlText(value: unknown): string {
+  const out = new Document(value, { aliasDuplicateObjects: false });
+  visit(out, {
+    Scalar(_key, node) {
+      if (typeof node.value !== "string") {
+        return;
+      }
+      if ((yaml11Ambiguous(node.value) && !/^[yYnN]$/.test(node.value)) || needsDoubleQuotes(node.value)) {
+        node.type = Scalar.QUOTE_DOUBLE;
+      }
+    },
+  });
+  // 二重引用符の中は JSON と同じ書き方にする（`yaml` の折り返しや独自のエスケープを使わない。PyYAML は JSON の
+  // エスケープを全部読む）。そのうえで JSON が裸のまま残す文字を、PyYAML が読めるエスケープに直す
+  return escapeForPyYaml(out.toString({ lineWidth: 0, doubleQuotedAsJSON: true }));
+}
+
+/**
+ * PyYAML が本文に裸では置けない文字（読み手が断る）。C0 の制御文字（タブ・改行・復帰を除く）、DEL、
+ * C1 の制御文字（U+0085 を除く）、U+FFFE・U+FFFF、対になっていないサロゲート
+ */
+const PYYAML_UNPRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に畳まれる）と、文書の頭で読み飛ばす BOM */
+const PYYAML_BREAKS = /[\u0085\u2028\u2029\uFEFF]/;
+
+/**
+ * 裸でも `|` でも正しく書けない文字列。二重引用符（とエスケープ）で書く。
+ *
+ * - タブ・復帰・U+0085・U+2028・U+2029・U+FEFF・PyYAML が裸では読めない文字を含む（`a\tb` を裸で書くと PyYAML が
+ *   読めない。U+0085 などは PyYAML が改行として読む。本文の頭の U+FEFF は BOM として読み飛ばされる）
+ * - 複数行で、1 行目の頭が空白（1 行目が空白だけの `|+` は PyYAML が中身を取り違える。字下げの指示に頼らない）か、
+ *   どこかの行の末尾が空白（空白だけの行を含む。行末の空白の扱いを読み手に任せない）。2 行目から先の頭の空白は
+ *   `|` のままで読める
+ */
+export function needsDoubleQuotes(text: string): boolean {
+  if (/[\t\r]/.test(text) || PYYAML_BREAKS.test(text) || PYYAML_UNPRINTABLE.test(text)) {
+    return true;
+  }
+  if (!text.includes("\n")) {
+    return false;
+  }
+  return /^[ \t]/.test(text) || text.split("\n").some((line) => /[ \t]$/.test(line));
+}
+
+const BREAK_ESCAPES: Readonly<Record<string, string>> = { "\u0085": "\\N", "\u2028": "\\L", "\u2029": "\\P" };
+
+/**
+ * JSON の書き方が裸のまま残す文字を、PyYAML の二重引用符のエスケープに直す。こうした文字を含む文字列は
+ * どれも二重引用符で書いてある（`needsDoubleQuotes`）ので、本文に裸で出るのは二重引用符の中だけ
+ */
+function escapeForPyYaml(text: string): string {
+  return text.replace(/[\u0085\u2028\u2029\x7F-\x84\x86-\x9F\uFEFF\uFFFE\uFFFF]/g, (ch) => {
+    const named = BREAK_ESCAPES[ch];
+    if (named !== undefined) {
+      return named;
+    }
+    const code = ch.charCodeAt(0);
+    return code <= 0xff ? `\\x${code.toString(16).padStart(2, "0")}` : `\\u${code.toString(16).padStart(4, "0")}`;
+  });
 }
 
 /**
  * ファイルが無いときに見せる最小のフロー（開始 → 終了）。保存するまでファイルは作らない。
- * 識別子と名前は子チケットから付ける（cc-wf-studio が読み込むときに要る欄）。
+ * 識別子と名前は子チケットから付ける。
  */
 export function templateFlow(ticket: string, title: string): FlowDoc {
   return {
@@ -247,17 +324,9 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
   };
 }
 
-/**
- * 取り込む（`.vscode/workflows/*.json` を、この子のフローとして読む）。形は `parseFlow` と同じで、
- * 中身は変えない（id や名前も、取り込んだファイルのまま）。書くのは人が保存を押したとき。
- */
-export function importFlow(text: string): FlowRead {
-  return parseFlow(text);
-}
-
 // ---- 編集（どれも新しい写しを返す。触ったところ以外は元のまま）
 
-/** 新しいノードの `data`。cc-wf-studio が読むのに要る欄（分岐の `outputPorts` など）も入れる */
+/** 新しいノードの `data`。画面が欄を持つものだけ */
 export function defaultData(type: PaletteType): Record<string, unknown> {
   switch (type) {
     case "start":
@@ -267,7 +336,7 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
     case "prompt":
       return { prompt: "" };
     case "subAgent":
-      return { description: "", prompt: "", outputPorts: 1 };
+      return { description: "", prompt: "" };
     case "askUserQuestion":
       return {
         questionText: "",
@@ -276,7 +345,6 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
           { label: "はい", description: "" },
           { label: "いいえ", description: "" },
         ],
-        outputPorts: 2,
       };
     case "ifElse":
       return {
@@ -285,7 +353,6 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
           { label: "真", condition: "" },
           { label: "偽", condition: "" },
         ],
-        outputPorts: 2,
       };
     case "switch":
       return {
@@ -294,7 +361,6 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
           { label: "ケース 1", condition: "" },
           { label: "既定", condition: "default" },
         ],
-        outputPorts: 2,
       };
     case "skill":
       return { name: "", description: "" };
@@ -375,7 +441,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**並びの位置で指す**（取り込んだフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は**並びの位置で指す**（人が書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -402,7 +468,7 @@ export function setMeta(doc: FlowDoc, patch: { readonly name?: string; readonly 
 }
 
 /**
- * 分岐の出口を 1 件足す。`outputPorts` を持つノードなら数を合わせる。
+ * 分岐の出口を 1 件足す。
  */
 export function addBranch(doc: FlowDoc, id: string, item: Readonly<Record<string, unknown>>): FlowDoc {
   return mapNode(doc, id, (node) => {
@@ -410,12 +476,7 @@ export function addBranch(doc: FlowDoc, id: string, item: Readonly<Record<string
     if (key === undefined) {
       return node;
     }
-    const items = [...branchItems(node), item];
-    const data: Record<string, unknown> = { ...nodeData(node), [key]: items };
-    if (typeof data.outputPorts === "number") {
-      data.outputPorts = items.length;
-    }
-    return { ...node, data };
+    return { ...node, data: { ...nodeData(node), [key]: [...branchItems(node), item] } };
   });
 }
 
@@ -441,12 +502,7 @@ export function removeBranch(doc: FlowDoc, id: string, index: number): FlowDoc {
     if (key === undefined) {
       return node;
     }
-    const items = branchItems(node).filter((_, i) => i !== index);
-    const data: Record<string, unknown> = { ...nodeData(node), [key]: items };
-    if (typeof data.outputPorts === "number") {
-      data.outputPorts = items.length;
-    }
-    return { ...node, data };
+    return { ...node, data: { ...nodeData(node), [key]: branchItems(node).filter((_, i) => i !== index) } };
   });
   if (!Array.isArray(doc.connections)) {
     return next;
@@ -485,7 +541,7 @@ export interface Ports {
 }
 
 /**
- * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（取り込んだフローが別の綴りを
+ * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（人が書いたフローが別の綴りを
  * 使っていても、線を落とさずに描くため）。
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {

@@ -1729,6 +1729,7 @@ ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ccnavi --lint                                # 実運用と同じ設定を見る
 ccnavi --lint --rules .ccnavi/common/next.yml # 入れ替える前のファイルを見る
 ccnavi --lint --json                         # 同じ苦情を JSON で（「lint の JSON」）
+ccnavi --lint --flow .ccnavi/approved/flows/i0001-01.yml # 子のフロー 1 本も確かめる
 ```
 
 ```
@@ -1841,15 +1842,47 @@ ccnavi --lint --json
 ```
 
 `--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にまとめて出す。終了コードも同じ（error があれば 1）。読み手は VS Code 拡張の
-プロジェクト管理画面。この JSON の形は拡張との契約なので、変えるときは版を上げる。
+プロジェクト管理画面と、`--flow` で渡したフローの苦情（`(flow)`）を読むフロー編集画面。この JSON の形は拡張との契約なので、変えるときは版を上げる。
 
 | 鍵 | 何 |
 |---|---|
 | `version` | 形の版。整数（いま 1）。欄を足すだけなら上げない |
 | `root` / `rules` / `mode` / `ticket_control` | 何を見て検証したか。人向けの文面が先頭に出すものと同じ |
 | `projects[]` | 検証の対象になったプロジェクトの名前 |
-| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design` など。ファイル全体への苦情なら空） |
+| `problems[]` | 苦情 1 件ずつ。`{severity, where, detail}`。`severity` は `error` / `warn` / `info`。`where` は人向けの文面で `error:` の後ろに出る場所（`(projects/lib) rule-id`、`(self) (phases) design`、`--flow` で渡したフローなら `(flow)` など。ファイル全体への苦情なら空） |
 | `errors` / `warns` / `infos` | 件数 |
+| `flow` | `--flow` を渡したときだけ在る。`{path, data}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
+
+### 子のフローを保存せずに確かめる
+
+```sh
+ccnavi --lint --json --flow /tmp/flow.yml
+```
+
+`--flow <パス>` は、子チケットのフロー（設計 9.3.1）1 本を、`SubagentStart` が読むのと同じ読み手・同じ検査
+（大きさ、リンク・ふつうのファイルでない・ハードリンク、UTF-8 として読めない、YAML として読めない、別名、形）で読む。
+読めなければ場所 `(flow)` の error で言い、`detail` は渡したパスで始まる。無いファイルも error。VS Code の拡張の
+フロー編集画面が、開くときと保存の前に本文を一時ファイルに書いて渡し、`(flow)` の苦情と `flow.data` を読む
+（ほかの設定の苦情ではフローを止めない）。
+
+`flow.data` は読めた中身を JSON にしたもの（`flow.as_json`）。PyYAML（YAML 1.1）の読みのままで、`0755` は 493、
+`yes` は `true`、`0o17` は文字列になる。JSON にそのまま載らない値は `{"$ccnavi": <種類>, ...}` の印にする。
+
+| 読めた値 | `data` での形 |
+|---|---|
+| 文字列・真偽値・null・並び | そのまま |
+| 整数（`±(2**53 - 1)` まで） | 数 |
+| それより大きい整数 | `{"$ccnavi": "int", "text": <十進>}` |
+| 浮動小数 | `{"$ccnavi": "float", "value": <数>}`。JSON では 1 と 1.0 の区別が消えるので包む。有限でなければ `"text"` に `inf` / `-inf` / `nan` |
+| キーが全部文字列の辞書 | オブジェクト。キーに `$ccnavi` があれば下の `map` |
+| キーが文字列でない辞書 | `{"$ccnavi": "map", "items": [[キー, 値], ...]}` |
+| 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs`） | `{"$ccnavi": "date" \| "datetime" \| "bytes" \| "set" \| "tuple", "text": <綴り>}`。ほかは `"other"` |
+
+フロー編集画面は、開くときに自分の読み手（`yaml`、YAML 1.2）で読んだ中身とこれを見比べ、食い違えば開かない。
+保存の前には、書き出す本文をこれに掛けて、画面が書こうとした中身と同じに読まれるときだけ書く。値の意味を
+拡張が自分で決めないため（ADR-0035）。
+読むのは `--lint` だけで、診断の外では落とし、`--test` / `--test-samples` / `--explain` でも「`--lint` でだけ読む」と
+言って落とす。フローは判定の材料にならないので、層の置き場の門（下）とは別に数える。
 
 ### 1 つのプロジェクトのルールを保存せずに試す
 
@@ -1904,7 +1937,7 @@ ccnavi --explain --json
 | `started_at` / `completed_at` / `base_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄 |
 | `seen_in[]` | 同じ識別子が写っている場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、親の提案が写っているのが普通 |
 | `scattered[]` | どれが本物か決まらない写りの全部。`{tree, state, path}`。決まっていれば空。権威のツリー（親のツリー → 元ツリーの順。ADR-0073）で畳んで 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR で言う条件と同じ。`seen_in` の数は食い違いを意味しない |
-| `flow` | 子のフロー（設計 9.3.1）。親は `null`。`{path, rel, tree, exists, linked, locked}`。`path` は読む先の絶対パス（権威のツリー＝承認済みチケットが在るツリーの版だけ。子のワークツリーの写しは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く）、`rel` はツリーのルートからの相対（承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.json`）、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
+| `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked}`。`path` は読む先の絶対パス（権威のツリー＝承認済みチケットが在るツリーの版だけ。子のワークツリーの写しは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く）、`rel` はツリーのルートからの相対（承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml`。中身は YAML）、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 
 `parents[]` の 1 件。

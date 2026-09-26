@@ -64,7 +64,7 @@ export interface SeenInJson {
 export interface FlowJson {
   /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
   readonly path: string;
-  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.json`） */
+  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
   readonly rel: string;
   /** ファイルを持つツリーのルート。保存はここからファイルまでの途中にリンクがあれば書かない */
   readonly tree: string;

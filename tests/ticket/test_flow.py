@@ -2,16 +2,17 @@
 
 見るのは 8 つ。
 
-1. 置き場は承認済みの領域の `flows/<子>.json` に固定。以前の `flow:` の欄は warn で読み飛ばす
+1. 置き場は承認済みの領域の `flows/<子>.yml` に固定。以前の `flow:` の欄は warn で読み飛ばす
 2. エージェントの書き込みは、どのツリーの置き場でも組み込みの守りが止める。人が保存したフローを
    実行後の監視が範囲外の変更として咎めない（H1）
-3. CC Workflow Studio の `workflow.json` の形を、順に並べた手順にする。知らない種類も落とさない
+3. YAML のフロー（nodes / connections）を、順に並べた手順にする。知らない種類も落とさない。
+   別名（アンカーとエイリアス）は読まない
 4. 壊れた・大きい・リンクのフローで落ちない。文の量に上限がある。ccnavi の名乗りを真似させない
 5. 着手中の子のフローへの書き込みを止める。解いた綴りと解く前の綴りの両方で。着手の前と、
    終わった後は止めない
 6. SubagentStart がフローのファイルを名指しし、手順と、askUserQuestion / subAgent の
    ノードでの動き方を渡す。フローが壊れていても残りの文は渡す
-7. `--explain --json` の子に `flow` の欄が出る（ボードが読む）
+7. `--explain --json` の子に `flow` の欄が出る（ボードが読む）。閉じた子でフローが無ければ出さない
 8. 入れ子のサブエージェントが差し戻しを無視して終わったら、`systemMessage` にも載せる
 """
 
@@ -24,64 +25,68 @@ import time
 import unittest
 from unittest import mock
 
+import yaml
+
 from ccnavi import flow, settings, ticket
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
 CHILD = "i0001-01"
 
-WORKFLOW = {
-    "id": "wf-1",
-    "name": "調査の手順",
-    "version": "1.0.0",
-    "nodes": [
-        {"id": "s", "type": "start", "name": "開始", "position": {"x": 0, "y": 0}, "data": {}},
-        {
-            "id": "p1",
-            "type": "prompt",
-            "name": "読む",
-            "position": {"x": 1, "y": 0},
-            "data": {"prompt": "既存の振る舞いを読む"},
-        },
-        {
-            "id": "q1",
-            "type": "askUserQuestion",
-            "name": "方針",
-            "position": {"x": 2, "y": 0},
-            "data": {
-                "questionText": "どちらで進めるか",
-                "options": [
-                    {"label": "小さく", "description": "a"},
-                    {"label": "大きく", "description": "b"},
-                ],
-                "outputPorts": 2,
-            },
-        },
-        {
-            "id": "a1",
-            "type": "subAgent",
-            "name": "深掘り",
-            "position": {"x": 3, "y": 0},
-            "data": {"description": "依存を洗う", "prompt": "依存を列挙する", "outputPorts": 1},
-        },
-        {
-            "id": "x1",
-            "type": "fancyNewNode",
-            "name": "未来の種類",
-            "position": {"x": 3, "y": 1},
-            "data": {"whatever": 1},
-        },
-        {"id": "e", "type": "end", "name": "終了", "position": {"x": 4, "y": 0}, "data": {}},
-    ],
-    "connections": [
-        {"id": "c1", "from": "s", "to": "p1", "fromPort": "output", "toPort": "input"},
-        {"id": "c2", "from": "p1", "to": "q1", "fromPort": "output", "toPort": "input"},
-        {"id": "c3", "from": "q1", "to": "a1", "fromPort": "branch-0", "toPort": "input"},
-        {"id": "c4", "from": "q1", "to": "x1", "fromPort": "branch-1", "toPort": "input"},
-        {"id": "c5", "from": "a1", "to": "e", "fromPort": "output", "toPort": "input"},
-        {"id": "c6", "from": "x1", "to": "e", "fromPort": "output", "toPort": "input"},
-    ],
-}
+# 見本のフロー。人がボードのフロー編集画面で書く YAML の形。
+WORKFLOW_YAML = """\
+id: wf-1
+name: 調査の手順
+version: 1.0.0
+nodes:
+  - id: s
+    type: start
+    name: 開始
+    position: {x: 0, y: 0}
+    data: {}
+  - id: p1
+    type: prompt
+    name: 読む
+    position: {x: 1, y: 0}
+    data:
+      prompt: 既存の振る舞いを読む
+  - id: q1
+    type: askUserQuestion
+    name: 方針
+    position: {x: 2, y: 0}
+    data:
+      questionText: どちらで進めるか
+      options:
+        - {label: 小さく, description: a}
+        - {label: 大きく, description: b}
+      outputPorts: 2
+  - id: a1
+    type: subAgent
+    name: 深掘り
+    position: {x: 3, y: 0}
+    data:
+      description: 依存を洗う
+      prompt: 依存を列挙する
+      outputPorts: 1
+  - id: x1
+    type: fancyNewNode
+    name: 未来の種類
+    position: {x: 3, y: 1}
+    data: {whatever: 1}
+  - id: e
+    type: end
+    name: 終了
+    position: {x: 4, y: 0}
+    data: {}
+connections:
+  - {id: c1, from: s, to: p1, fromPort: output, toPort: input}
+  - {id: c2, from: p1, to: q1, fromPort: output, toPort: input}
+  - {id: c3, from: q1, to: a1, fromPort: branch-0, toPort: input}
+  - {id: c4, from: q1, to: x1, fromPort: branch-1, toPort: input}
+  - {id: c5, from: a1, to: e, fromPort: output, toPort: input}
+  - {id: c6, from: x1, to: e, fromPort: output, toPort: input}
+"""
+WORKFLOW = yaml.safe_load(WORKFLOW_YAML)
 
 
 def conf_with(approved: str = "") -> settings.Settings:
@@ -102,11 +107,11 @@ class FlowPlaceTest(unittest.TestCase):
     """置き場は承認済みの領域に固定。以前の `flow:` の欄は読まない。"""
 
     def test_the_place_is_fixed_under_the_approved_area(self):
-        self.assertEqual(flow.flow_rel(conf_with(), CHILD), ".ccnavi/approved/flows/i0001-01.json")
-        self.assertEqual(flow.flow_rel(conf_with("x/appr/"), CHILD), "x/appr/flows/i0001-01.json")
+        self.assertEqual(flow.flow_rel(conf_with(), CHILD), ".ccnavi/approved/flows/i0001-01.yml")
+        self.assertEqual(flow.flow_rel(conf_with("x/appr/"), CHILD), "x/appr/flows/i0001-01.yml")
         self.assertEqual(
             flow.flow_file(conf_with(), "/w", CHILD),
-            os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01.json"),
+            os.path.join("/w", ".ccnavi", "approved", "flows", "i0001-01.yml"),
         )
 
     def test_the_old_flow_field_is_warned_and_ignored(self):
@@ -115,7 +120,7 @@ class FlowPlaceTest(unittest.TestCase):
             t, problems = ticket.parse(text.replace("\nphase:", f"\nflow: {value}\nphase:", 1))
             self.assertIsNotNone(t, problems)
             details = [p.detail for p in problems]
-            self.assertTrue(any("`flow`" in d and "flows/i0001-01.json" in d for d in details))
+            self.assertTrue(any("`flow`" in d and "flows/i0001-01.yml" in d for d in details))
             self.assertTrue(all(p.severity == ticket.SEVERITY_WARN for p in problems), details)
             self.assertFalse(hasattr(t, "flow"))
 
@@ -123,26 +128,26 @@ class FlowPlaceTest(unittest.TestCase):
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")
         self.addCleanup(os.rmdir, root)
         conf = conf_with()
-        place = os.path.join(root, ".ccnavi", "approved", "flows", "i0001-01.json")
-        self.assertEqual(flow.locate(conf, root, place), ("i0001-01.json", ""))
-        upper = os.path.join(root, ".CCNAVI", "Approved", "FLOWS", "I0001-01.JSON")
-        self.assertEqual(flow.locate(conf, root, upper), ("i0001-01.json", ""))
-        self.assertIsNone(flow.locate(conf, root, os.path.join(root, "flows", "i0001-01.json")))
+        place = os.path.join(root, ".ccnavi", "approved", "flows", "i0001-01.yml")
+        self.assertEqual(flow.locate(conf, root, place), ("i0001-01.yml", ""))
+        upper = os.path.join(root, ".CCNAVI", "Approved", "FLOWS", "I0001-01.YML")
+        self.assertEqual(flow.locate(conf, root, upper), ("i0001-01.yml", ""))
+        self.assertIsNone(flow.locate(conf, root, os.path.join(root, "flows", "i0001-01.yml")))
         self.assertIsNone(
             flow.locate(conf, root, os.path.join(root, ".ccnavi", "approved", "doing", "x.md"))
         )
         # ワークスペースの外は、どのプロジェクトのものでもない。
-        outside = flow.locate(conf, root, "/elsewhere/.ccnavi/approved/flows/i0001-01.json")
-        self.assertEqual(outside, ("i0001-01.json", None))
+        outside = flow.locate(conf, root, "/elsewhere/.ccnavi/approved/flows/i0001-01.yml")
+        self.assertEqual(outside, ("i0001-01.yml", None))
 
     def test_every_copy_counts_for_the_lock(self):
         """識別子で畳む前の並びを見る。1 本でも着手中なら止める（L1）。"""
         idle, running = child_ticket(), child_ticket(started=True)
-        self.assertIs(flow.lock_hit([idle, running], "", "i0001-01.json"), running)
-        self.assertIsNone(flow.lock_hit([idle], "", "i0001-01.json"))
-        self.assertIsNone(flow.lock_hit([running], None, "i0001-01.json"))
-        self.assertIsNone(flow.lock_hit([running], "", "i0001-02.json"))
-        self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, "i0001-01.json"), running)
+        self.assertIs(flow.lock_hit([idle, running], "", "i0001-01.yml"), running)
+        self.assertIsNone(flow.lock_hit([idle], "", "i0001-01.yml"))
+        self.assertIsNone(flow.lock_hit([running], None, "i0001-01.yml"))
+        self.assertIsNone(flow.lock_hit([running], "", "i0001-02.yml"))
+        self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, "i0001-01.yml"), running)
 
 
 class FlowRenderTest(unittest.TestCase):
@@ -329,33 +334,94 @@ class FlowRenderTest(unittest.TestCase):
             self.assertNotIn(ch, text)
 
     def test_large_files_are_not_read(self):
-        path = self.file(json.dumps({"nodes": [], "pad": "x" * (flow.FILE_LIMIT + 10)}))
+        path = self.file("nodes: []\npad: " + "x" * (flow.FILE_LIMIT + 10) + "\n")
         data, why = flow.load(path)
         self.assertIsNone(data)
         self.assertIn("大きすぎる", why)
+
+    def test_the_sample_is_read_from_a_yaml_file(self):
+        data, why = flow.load(self.file(WORKFLOW_YAML))
+        self.assertEqual((data, why), (WORKFLOW, ""))
+        # 先頭の BOM は外して読む。
+        data, why = flow.load(self.file("\ufeff" + WORKFLOW_YAML))
+        self.assertEqual((data, why), (WORKFLOW, ""))
+
+    def test_aliases_are_refused(self):
+        """別名（`*名前`）で同じ部分木を何度も辿らせて膨らませる形（billion laughs）を読まない。"""
+        laughs = ["a: &a [lol, lol, lol, lol, lol, lol, lol, lol, lol]"]
+        for i in range(1, 10):
+            prev, name = chr(ord("a") + i - 1), chr(ord("a") + i)
+            laughs.append(f"{name}: &{name} [{', '.join(['*' + prev] * 9)}]")
+        laughs.append("nodes: [*j]")
+        for label, text in (
+            ("billion laughs", "\n".join(laughs) + "\n"),
+            ("self reference", "nodes: &n [*n]\n"),
+            ("merge key", "base: &b {type: prompt}\nnodes:\n  - {<<: *b, id: s}\n"),
+            ("root alias", "--- *x\n"),
+        ):
+            with self.subTest(label):
+                began = time.monotonic()
+                data, why = flow.load(self.file(text))
+                self.assertIsNone(data)
+                self.assertEqual(why, flow.ALIASED)
+                self.assertLess(time.monotonic() - began, 1.0)
+        # 名前を付けただけ（使わない）なら読む。
+        data, why = flow.load(self.file("nodes: &n\n  - {id: s, type: start}\n"))
+        self.assertEqual(why, "")
+        self.assertEqual(data["nodes"], [{"id": "s", "type": "start"}])
+
+    def test_broken_yaml_is_one_line_with_the_place(self):
+        for text in ("nodes:\n  - id: s\n    type: [start\n", "nodes: [\n", "a: b: c\n", "x\x00y"):
+            with self.subTest(text=text):
+                data, why = flow.load(self.file(text))
+                self.assertIsNone(data)
+                self.assertTrue(why.startswith("YAML として読めない"), why)
+                self.assertNotIn("\n", why)
+                self.assertLessEqual(len(why), flow.TEXT_LIMIT + 40)
+        _, why = flow.load(self.file("nodes: [\n"))
+        self.assertIn("行", why)
+
+    def test_yaml_does_not_build_objects_or_non_mappings(self):
+        """読み手は SafeLoader。タグで Python の値を作らない。最上位が並びでなければ読まない。"""
+        text = "nodes: !!python/object/apply:os.system ['echo x']\n"
+        data, why = flow.load(self.file(text))
+        self.assertIsNone(data)
+        self.assertTrue(why.startswith("YAML として読めない"), why)
+        for text, why in (
+            ("", "最上位がキーと値の並びではない"),
+            ("- 1\n- 2\n", "最上位がキーと値の並びではない"),
+            ("nodes: 3\n", "`nodes` の並びが無い"),
+            ("just text\n", "最上位がキーと値の並びではない"),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(flow.load(self.file(text)), (None, why))
+        # 文書が 2 つあるものも読まない。
+        data, why = flow.load(self.file("nodes: []\n---\nnodes: []\n"))
+        self.assertIsNone(data)
+        self.assertTrue(why.startswith("YAML として読めない"), why)
 
     def test_linked_files_and_folders_are_not_read(self):
         """ファイルそのものか、ツリーのルートからの途中がリンクなら読まない（H2）。"""
         root = tempfile.mkdtemp(prefix="ccnavi-flow-")
         self.addCleanup(__import__("shutil").rmtree, root, True)
-        real = write(os.path.join(root, "wip", "real.json"), json.dumps(WORKFLOW))
+        real = write(os.path.join(root, "wip", "real.yml"), WORKFLOW_YAML)
         flows = os.path.join(root, ".ccnavi", "approved", "flows")
         os.makedirs(flows)
-        os.symlink(real, os.path.join(flows, "a.json"))
-        data, why = flow.load(os.path.join(flows, "a.json"), root)
+        os.symlink(real, os.path.join(flows, "a.yml"))
+        data, why = flow.load(os.path.join(flows, "a.yml"), root)
         self.assertIsNone(data)
         self.assertEqual(why, flow.LINKED)
         # tree_root が無くても、ファイルそのもののリンクは開かない（O_NOFOLLOW）。
         if hasattr(os, "O_NOFOLLOW"):
-            self.assertIsNone(flow.load(os.path.join(flows, "a.json"))[0])
+            self.assertIsNone(flow.load(os.path.join(flows, "a.yml"))[0])
         # 置き場のディレクトリがリンク。
         os.makedirs(os.path.join(root, "elsewhere"))
-        write(os.path.join(root, "elsewhere", "b.json"), json.dumps(WORKFLOW))
+        write(os.path.join(root, "elsewhere", "b.yml"), WORKFLOW_YAML)
         os.symlink(os.path.join(root, "elsewhere"), os.path.join(root, ".ccnavi", "approved", "x"))
-        data, why = flow.load(os.path.join(root, ".ccnavi", "approved", "x", "b.json"), root)
+        data, why = flow.load(os.path.join(root, ".ccnavi", "approved", "x", "b.yml"), root)
         self.assertEqual((data, why), (None, flow.LINKED))
         # リンクの無い本物は読む。
-        plain = write(os.path.join(flows, "c.json"), json.dumps(WORKFLOW))
+        plain = write(os.path.join(flows, "c.yml"), WORKFLOW_YAML)
         self.assertIsNotNone(flow.load(plain, root)[0])
 
     def test_briefing_says_the_lock_comes_with_the_start(self):
@@ -365,7 +431,7 @@ class FlowRenderTest(unittest.TestCase):
         conf = conf_with()
         idle = child_ticket()
         idle.tree_root = root
-        write(flow.flow_file(conf, root, CHILD), json.dumps(WORKFLOW))
+        write(flow.flow_file(conf, root, CHILD), WORKFLOW_YAML)
         text = "\n".join(flow.briefing(conf, root, idle, "wip/research/*"))
         self.assertIn("着手すると、終わるまで書き換えられなくなる", text)
         self.assertNotIn("着手中なので", text)
@@ -382,7 +448,7 @@ class FlowRenderTest(unittest.TestCase):
         self.assertIn("上限", text)
 
     def file(self, text: str) -> str:
-        handle, path = tempfile.mkstemp(suffix=".json")
+        handle, path = tempfile.mkstemp(suffix=".yml")
         os.close(handle)
         self.addCleanup(os.remove, path)
         with open(path, "w", encoding="utf-8") as f:
@@ -390,10 +456,67 @@ class FlowRenderTest(unittest.TestCase):
         return path
 
 
+class FlowInfoTest(unittest.TestCase):
+    """ボードの欄。閉じた子でフローが無ければ出さない（「フローを作る」を出させない）。"""
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp(prefix="ccnavi-flow-")
+        self.addCleanup(__import__("shutil").rmtree, self.root, True)
+        self.conf = conf_with()
+
+    def child(self, state: str, started: bool = False) -> ticket.Ticket:
+        t = child_ticket(started=started)
+        t.tree_root = self.root
+        t.state = state
+        if state == ticket.DONE:
+            t.completed_at = "2026-09-26T00:00:00Z"
+        if state == ticket.CANCELLED:
+            t.cancelled_at = "2026-09-26T00:00:00Z"
+        return t
+
+    def test_closed_children_without_a_flow_have_no_field(self):
+        for state in (ticket.DONE, ticket.CANCELLED):
+            with self.subTest(state=state):
+                self.assertIsNone(flow.info(self.conf, self.root, self.child(state, started=True)))
+
+    def test_closed_children_with_a_flow_keep_the_field(self):
+        write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
+        for state in (ticket.DONE, ticket.CANCELLED):
+            with self.subTest(state=state):
+                shown = flow.info(self.conf, self.root, self.child(state, started=True))
+                self.assertIsNotNone(shown)
+                self.assertTrue(shown["exists"])
+                self.assertFalse(shown["locked"])
+                self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
+
+    def test_open_children_keep_the_field_without_a_flow(self):
+        for state, started in ((ticket.DOING, False), (ticket.DOING, True), (ticket.TODO, False)):
+            with self.subTest(state=state, started=started):
+                shown = flow.info(self.conf, self.root, self.child(state, started=started))
+                self.assertIsNotNone(shown)
+                self.assertFalse(shown["exists"])
+                self.assertEqual(shown["locked"], started)
+
+    def test_children_waiting_for_review_keep_the_field_and_are_not_locked(self):
+        # レビュー待ちは閉じた扱いにしない（今の仕様）。フローが無くても欄を返し、
+        # 着手のあとでも錠は掛けない（錠は `doing` の間だけ）。
+        for started in (False, True):
+            with self.subTest(started=started):
+                shown = flow.info(self.conf, self.root, self.child(ticket.REVIEW, started=started))
+                self.assertIsNotNone(shown)
+                self.assertFalse(shown["exists"])
+                self.assertFalse(shown["locked"])
+                self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
+        write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
+        shown = flow.info(self.conf, self.root, self.child(ticket.REVIEW, started=True))
+        self.assertTrue(shown["exists"])
+        self.assertFalse(shown["locked"])
+
+
 class FlowHarness(PhaseHarness):
     """親 1 本（research）と、フローを持つ子 1 本。親の範囲に承認済みの領域は入らない。
 
-    フローは人が承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.json` に保存して
+    フローは人が承認のあとに親のツリーの `.ccnavi/approved/flows/<子>.yml` に保存して
     コミットする（ボードと `ccnavi-push-approved.sh` の運び方）。
     """
 
@@ -406,11 +529,11 @@ class FlowHarness(PhaseHarness):
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.flow_path = self.flow_in(self.parent_tree)
-        write(self.flow_path, json.dumps(WORKFLOW, ensure_ascii=False))
+        write(self.flow_path, WORKFLOW_YAML)
         self.commit_parent("flow")
 
     def flow_in(self, tree_root, name=CHILD):
-        return os.path.join(tree_root, ".ccnavi", "approved", "flows", f"{name}.json")
+        return os.path.join(tree_root, ".ccnavi", "approved", "flows", f"{name}.yml")
 
     def write_to(self, path, agent_id="", cwd="", tool="Write", guard="disable"):
         key = "notebook_path" if tool == "NotebookEdit" else "file_path"
@@ -468,7 +591,7 @@ class FlowGuardTest(FlowHarness):
             json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"], "deny"
         )
         # シェルから書く形は builtin-guard-setting-files が止める。
-        rel = ".ccnavi/approved/flows/i0001-01.json"
+        rel = ".ccnavi/approved/flows/i0001-01.yml"
         for command in (f"echo x > {rel}", f"cp /tmp/x {rel}", f"tee {rel} < /dev/null"):
             with self.subTest(command=command):
                 payload = {
@@ -492,8 +615,8 @@ class FlowGuardTest(FlowHarness):
         ok = write(os.path.join(self.parent_tree, "wip", "a.md"), "a\n")
         first = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok, content="a")
         self.assertNotIn("POST_TICKET_SCOPE", first.stdout + first.stderr)
-        write(self.flow_in(self.parent_tree, other), json.dumps(WORKFLOW))
-        write(self.flow_path, json.dumps({"nodes": []}))
+        write(self.flow_in(self.parent_tree, other), WORKFLOW_YAML)
+        write(self.flow_path, "nodes: []\n")
         ok2 = write(os.path.join(self.parent_tree, "wip", "b.md"), "b\n")
         second = self.hook("PostToolUse", "Write", self.parent_tree, file_path=ok2, content="b")
         said = second.stdout + second.stderr
@@ -515,7 +638,7 @@ class FlowGuardTest(FlowHarness):
         self.assertIn("POST_TICKET_SCOPE", fourth.stdout + fourth.stderr)
 
     def test_flows_are_not_read_as_tickets(self):
-        """`flows/` の JSON を承認済みチケットとして読まない（走査・索引・lint）。"""
+        """`flows/` の YAML を承認済みチケットとして読まない（走査・索引・lint）。"""
         result = self.ccnavi("--explain", "--json")
         ids = [t["ticket"] for t in json.loads(result.stdout)["tickets"]]
         self.assertEqual(sorted(ids), ["i0001", CHILD])
@@ -528,7 +651,7 @@ class FlowLockTest(FlowHarness):
     def test_the_flow_can_be_edited_before_the_child_starts(self):
         self.assert_not_locked(self.write_to(self.flow_path))
         shown = self.board_flow(CHILD)
-        self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.json")
+        self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
         self.assertTrue(shown["exists"])
         self.assertFalse(shown["locked"])
         self.assertFalse(shown["linked"])
@@ -544,13 +667,13 @@ class FlowLockTest(FlowHarness):
         self.assert_locked(self.write_to(self.flow_in(child_tree)))
         self.assert_locked(self.write_to(self.flow_in(self.root)))
         # 誰が書いても同じ（サブエージェントでも）。大文字小文字も問わない。
-        upper = os.path.join(self.parent_tree, ".ccnavi", "Approved", "FLOWS", "I0001-01.JSON")
+        upper = os.path.join(self.parent_tree, ".ccnavi", "Approved", "FLOWS", "I0001-01.YML")
         self.assert_locked(self.write_to(upper, agent_id="sub-1"))
         # 相対の綴り・`..` を挟んだ綴り・NotebookEdit。
-        rel = os.path.join(".ccnavi", "approved", "flows", f"{CHILD}.json")
+        rel = os.path.join(".ccnavi", "approved", "flows", f"{CHILD}.yml")
         self.assert_locked(self.write_to(rel, cwd=self.parent_tree))
         dotted = os.path.join(self.parent_tree, ".ccnavi", "approved", ".", "x", "..", "flows")
-        self.assert_locked(self.write_to(os.path.join(dotted, f"{CHILD}.json")))
+        self.assert_locked(self.write_to(os.path.join(dotted, f"{CHILD}.yml")))
         self.assert_locked(self.write_to(self.flow_path, tool="NotebookEdit"))
         self.assertTrue(self.board_flow(CHILD)["locked"])
         # 別の子の置き場は止めない。
@@ -558,14 +681,14 @@ class FlowLockTest(FlowHarness):
 
     def test_links_do_not_get_around_the_lock(self):
         """置き場を指すリンク越しの綴りも、リンクに差し替えたフローの綴りも止める（H2）。"""
-        real = write(os.path.join(self.parent_tree, "wip", "flow-real.json"), json.dumps(WORKFLOW))
+        real = write(os.path.join(self.parent_tree, "wip", "flow-real.yml"), WORKFLOW_YAML)
         os.remove(self.flow_path)
         os.symlink(real, self.flow_path)
         alias = os.path.join(self.parent_tree, "alias")
         os.symlink(os.path.dirname(self.flow_path), alias)
         self.commit_parent("links")
         child_tree = self.run_child(CHILD)
-        self.assert_locked(self.write_to(os.path.join(alias, f"{CHILD}.json")))
+        self.assert_locked(self.write_to(os.path.join(alias, f"{CHILD}.yml")))
         self.assert_locked(self.write_to(self.flow_path))
         # リンクのフローは読まずに、そう言う。
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
@@ -588,6 +711,17 @@ class FlowLockTest(FlowHarness):
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
         self.assert_not_locked(self.write_to(self.flow_path))
         self.assertFalse(self.board_flow(CHILD)["locked"])
+
+    def test_a_closed_child_shows_the_flow_only_when_it_exists(self):
+        """取り消して閉じた子でも、フローが在れば欄を出す（見返せる）。無ければ出さない。"""
+        self.run_child(CHILD)
+        cancelled = self.ccnavi("ticket", "cancel", CHILD, "--reason", "やめる")
+        self.assertEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
+        shown = self.board_flow(CHILD)
+        self.assertTrue(shown["exists"])
+        self.assertFalse(shown["locked"])
+        os.remove(self.flow_path)
+        self.assertIsNone(self.board_flow(CHILD))
 
     def test_subagent_start_names_the_flow_and_how_to_handle_nodes(self):
         child_tree = self.run_child(CHILD)
@@ -618,7 +752,7 @@ class FlowLockTest(FlowHarness):
         self.assertNotIn("フロー", text)
 
     def test_an_unreadable_flow_is_named_not_raised(self):
-        write(self.flow_path, "{not json")
+        write(self.flow_path, "nodes:\n  - id: s\n    type: [start\n")
         self.commit_parent("broken flow")
         child_tree = self.run_child(CHILD)
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
@@ -626,15 +760,19 @@ class FlowLockTest(FlowHarness):
         self.assertIn("フローを読めない", self.reason(result))
 
     def test_a_malformed_flow_keeps_the_rest_of_subagent_start(self):
-        """型の崩れたフローでも SubagentStart は落ちず、子の一覧と範囲は渡る（H3）。"""
-        write(self.flow_path, '{"nodes":[{"id":"s","type":"start"}],"connections":5}')
+        """型の崩れたフローでも SubagentStart は落ちず、子の一覧と範囲は渡る（H3）。
+
+        形の誤りは `--lint --flow` と同じ理由の 1 行で言い、手順は並べない（`flow.shape_problem`）。
+        """
+        write(self.flow_path, "nodes:\n  - {id: s, type: start}\nconnections: 5\n")
         self.commit_parent("bad flow")
         child_tree = self.run_child(CHILD)
         result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")
         self.assertEqual(result.returncode, 0, result.stderr)
         text = self.reason(result)
         self.assertIn("allow: wip/research/*", text)
-        self.assertIn("1. [start]", text)
+        self.assertIn("フローを読めない: `connections` が並びではない", text)
+        self.assertNotIn("1. [start]", text)
 
     def test_a_crash_in_the_briefing_is_one_line(self):
         """フローの案内が万一例外を出しても、1 行の知らせにして残りを渡す（H3）。"""

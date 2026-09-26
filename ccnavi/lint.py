@@ -47,6 +47,7 @@ from typing import TextIO
 from . import (
     approval,
     ctxfile,
+    flow,
     gitcmd,
     gitstate,
     hookio,
@@ -86,6 +87,7 @@ def report(
     restore_if_deny_flag: str = "",
     guard_core_files_flag: str = "",
     as_json: bool = False,
+    flow_path: str = "",
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
@@ -126,6 +128,10 @@ def report(
     )
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
+    flow_data = None
+    if flow_path:
+        flow_said, flow_data = flow_problems(flow_path, root)
+        problems.extend(flow_said)
     problems += [
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
         for line in said.getvalue().splitlines()
@@ -212,12 +218,18 @@ def report(
             "warns": warns,
             "infos": infos,
         }
+        if flow_path:
+            # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
+            # （README「lint の JSON」）
+            payload["flow"] = {"path": flow_path, "data": flow_data}
         stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_ERROR if errors else EXIT_OK
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
+    if flow_path:
+        stdout.write(f"  フロー: {flow_path}\n")
     stdout.write(f"  deny の場所を戻す: {_shown(restore_if_deny, mode)}\n")
     stdout.write(f"  コアファイルを守る: {_shown(guard_core_files, mode)}\n")
     stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
@@ -359,6 +371,44 @@ def _risk(conf: settings.Settings, root: str) -> list[Problem]:
             for p in risk.script_problems(definition)
         ]
     return problems
+
+
+# `--lint --flow` の苦情の場所。VS Code 拡張のフロー編集画面はこの場所の苦情だけを読む。
+FLOW_WHERE = "(flow)"
+
+
+def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
+    """子のフローのファイル 1 本が、SubagentStart が読むのと同じ読みで読めるか（`--lint --flow`）。
+
+    (苦情, 読めた中身を `flow.as_json` にしたもの。読めなければ None) を返す。
+    読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
+    UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
+    「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（ADR-0035）。
+    読めなければ error。
+    ツリーの中のファイルなら、ツリーのルートからの途中のリンクも見る（SubagentStart と同じ）。
+    無いファイルも error にする（確かめたつもりで何も確かめていない形を作らない）。
+    中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
+    """
+    shown = flow.clean(path)
+    try:
+        exists = os.path.lexists(path)
+    except (OSError, ValueError):
+        exists = False
+    if not exists:
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None
+    try:
+        rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root)) if root else os.pardir
+    except ValueError:  # Windows でドライブが違う
+        rel = os.pardir
+    inside = rel != os.pardir and not rel.startswith(os.pardir + os.sep) and not os.path.isabs(rel)
+    data, why = flow.load(path, root if inside else "")
+    if why:
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None
+    try:
+        return [], flow.as_json(data)
+    except RecursionError:
+        deep = f"{shown}: 入れ子が深すぎて中身を渡せない"
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:

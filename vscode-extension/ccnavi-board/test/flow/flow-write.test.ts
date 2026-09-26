@@ -8,7 +8,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { connectionLabel, connectionsOf, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { spawnSync } from "node:child_process";
-import { FLOW_FILE_LIMIT, linkedSegment, readFlowFile, writeFlowFile } from "../../src/core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, linkedSegment, readFlowFile, writeFlowFile } from "../../src/core/flow-write.js";
 
 function scratch(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-write-"));
@@ -16,7 +16,7 @@ function scratch(): string {
 }
 
 function place(tree: string, name = "i0001-01"): string {
-  return path.join(tree, ".ccnavi", "approved", "flows", `${name}.json`);
+  return path.join(tree, ".ccnavi", "approved", "flows", `${name}.yml`);
 }
 
 const NEW = { exists: false, mtimeMs: 0 } as const;
@@ -27,10 +27,10 @@ test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一
   const written = writeFlowFile(tree, file, '{"nodes":[]}\n', NEW);
   assert.deepEqual(written, { ok: true });
   assert.equal(fs.readFileSync(file, "utf8"), '{"nodes":[]}\n');
-  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.json"]);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.yml"]);
   const read = readFlowFile(tree, file);
   assert.ok(read !== undefined);
-  assert.equal(read.text, '{"nodes":[]}\n');
+  assert.equal(Buffer.from(read.bytes).toString("utf8"), '{"nodes":[]}\n');
   // 読んだときのままなら上書きする
   const again = writeFlowFile(tree, file, '{"nodes":[1]}\n', { exists: true, mtimeMs: read.mtimeMs });
   assert.deepEqual(again, { ok: true });
@@ -42,7 +42,7 @@ test("CB-T231 無い置き場は 1 段ずつ作って入れ替えで書く。一
 test("CB-T232 ファイルか途中のディレクトリがリンクなら、読まないし書かない。リンクの先も変わらない", () => {
   const tree = scratch();
   const outside = scratch();
-  const target = path.join(outside, "real.json");
+  const target = path.join(outside, "real.yml");
   fs.writeFileSync(target, "keep");
   // ファイルがリンク
   const file = place(tree);
@@ -62,9 +62,9 @@ test("CB-T232 ファイルか途中のディレクトリがリンクなら、読
   const second = writeFlowFile(other, place(other), "x", NEW);
   assert.equal(second.ok, false);
   assert.equal(linkedSegment(other, place(other)), flows);
-  assert.deepEqual(fs.readdirSync(outside), ["real.json"]);
+  assert.deepEqual(fs.readdirSync(outside), ["real.yml"]);
   // ツリーの外は書かない
-  const third = writeFlowFile(tree, path.join(outside, "x.json"), "x", NEW);
+  const third = writeFlowFile(tree, path.join(outside, "x.yml"), "x", NEW);
   assert.equal(third.ok, false);
   assert.match(third.ok ? "" : third.error, /ツリーの外/);
 });
@@ -113,14 +113,14 @@ test("CB-T235 ハードリンクのフローは読まないし書かない。別
   const file = place(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, '{"nodes":[]}');
-  const alias = path.join(tree, "alias.json");
+  const alias = path.join(tree, "alias.yml");
   fs.linkSync(file, alias);
   assert.throws(() => readFlowFile(tree, file), /ハードリンク/);
   const written = writeFlowFile(tree, file, '{"nodes":[1]}', { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
   assert.equal(written.ok, false);
   assert.match(written.ok ? "" : written.error, /ハードリンク/);
   assert.equal(fs.readFileSync(alias, "utf8"), '{"nodes":[]}');
-  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.json"]);
+  assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01.yml"]);
 });
 
 test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない）", { skip: process.platform === "win32" }, () => {
@@ -178,4 +178,22 @@ test("CB-T238 線の言葉は真偽値を空として読み、整数の値は綴
   };
   const labels = connectionsOf(doc).map((c) => connectionLabel(doc, c));
   assert.deepEqual(labels, ["", "", "ONE", "", "T", "2"]);
+});
+
+test("CB-T245 読んだバイトは UTF-8 として壊れていれば文字にしない（置き換え文字で埋めない）。BOM は 1 つ外す", () => {
+  const tree = scratch();
+  const file = place(tree);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const broken = Buffer.concat([Buffer.from("nodes:\n  - id: a\n    name: "), Buffer.from([0xff, 0xfe]), Buffer.from("\n")]);
+  fs.writeFileSync(file, broken);
+  const read = readFlowFile(tree, file);
+  assert.ok(read !== undefined);
+  // 読むのはバイトのまま（実行ファイルにこのバイトを確かめさせる）
+  assert.deepEqual(Buffer.from(read.bytes), broken);
+  assert.deepEqual(decodeFlowBytes(read.bytes), { ok: false, error: "UTF-8 として読めない" });
+  // 実行ファイル（utf-8-sig）と同じく、先頭の BOM は 1 つだけ外す
+  assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFFnodes: []\n", "utf8")), { ok: true, text: "nodes: []\n" });
+  assert.deepEqual(decodeFlowBytes(Buffer.from("\uFEFF\uFEFFx", "utf8")), { ok: true, text: "\uFEFFx" });
+  // 途中で切れた多バイト文字も壊れている
+  assert.equal(decodeFlowBytes(Buffer.from("あ", "utf8").subarray(0, 2)).ok, false);
 });

@@ -9,32 +9,38 @@
  * 渡し方はフェーズ管理と同じ `retainedHost`（編集の途中を持つ。ADR-0062）。
  *
  * 置き場と錠は実行ファイルに聞く（`--explain --json` の `tickets[].flow`）。拡張は置き場を組まず、
- * 着手中かを `started_at` から組み直さない（ADR-0035）。保存は次を全部満たすときだけ書く。
+ * 着手中かを `started_at` から組み直さない（ADR-0035）。フローが正しいか（読めるか・形）も実行ファイルに聞く。
+ * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて `--lint --json --flow` に掛け
+ * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。開くときは、画面の読みと実行ファイルが
+ * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-agree.ts`）。保存は次を全部満たすときだけ書く。
  *
- * 1. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
- * 2. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
- * 3. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
- * 4. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
+ * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わず、その本文を読んだ中身（`flow.data`）が
+ *    画面が書こうとした中身と同じ（`core/flow-agree.ts`。PyYAML で意味が変わる本文を書かない）
+ * 2. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
+ * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
+ * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
+ * 5. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
  *
  * 書き込みは一時ファイルの入れ替えで、リンクを辿らない（`core/flow-write.ts`）。置き場は承認済みの領域
- * （既定 `.ccnavi/approved/flows/<子>.json`）で、エージェントは判定に止められて書けない。
+ * （既定 `.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
  *
  * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
  * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
  * 1 回の中（実行ファイルを 1 度起こすぶん）。塞ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
- *
- * 取り込み（`.vscode/workflows/*.json`）は画面の編集中のフローを置き換えるだけで、書くのは保存を押したとき。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard } from "./ccnavi.js";
-import { importFlow, parseFlow, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
+import { loadBoard, runFlowLint } from "./ccnavi.js";
+import { flowDisagreement, openDisagreementText, saveDisagreementText } from "./core/flow-agree.js";
+import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
+import { lintFlowText } from "./core/flow-lint.js";
 import { renderFlowPage } from "./core/flow-render.js";
-import { readFlowFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
 import {
   asFlowMessage,
   flowTargetOf,
@@ -58,8 +64,6 @@ const DEBOUNCE_MS = 120;
 const SCREEN = "flow";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
-/** 取り込みの候補の置き場（cc-wf-studio が保存する場所） */
-const WORKFLOWS_GLOB = ".vscode/workflows/*.json";
 
 interface Loaded {
   readonly target: FlowTarget;
@@ -76,6 +80,8 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<FlowData>;
+  /** 編集中の本文を `--lint --flow` に渡す一時ファイルの置き場。画面を閉じたら消す */
+  readonly tmpDir: string;
   fileWatchers: vscode.FileSystemWatcher[];
   watchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
@@ -135,6 +141,7 @@ export async function openFlow(ticket: string): Promise<void> {
     panel,
     folder,
     host: flowHost(panel),
+    tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-")),
     fileWatchers: [],
     watchers: [],
     lock: lockFromFailure("確認中…"),
@@ -174,11 +181,16 @@ async function lookUp(root: string, ticket: string): Promise<FlowTarget> {
   return found.target;
 }
 
-async function readPage(root: string, ticket: string): Promise<Loaded> {
+/** 本文を実行ファイルに確かめさせる。error があれば理由を返す（`core/flow-lint.ts`） */
+function lintText(root: string, tmpDir: string, text: string | Uint8Array, shown: string) {
+  return lintFlowText(text, tmpDir, shown, (file) => runFlowLint(root, binSetting(), file));
+}
+
+async function readPage(root: string, ticket: string, tmpDir: string): Promise<Loaded> {
   const target = await lookUp(root, ticket);
   const filePath = target.flow.path;
   const shown = shownPath(root, filePath);
-  let read: { readonly text: string; readonly mtimeMs: number } | undefined;
+  let read: { readonly bytes: Uint8Array; readonly mtimeMs: number } | undefined;
   try {
     // リンクは辿らない（ツリーのルートからファイルまでの途中も）。読まないし書かない
     read = readFlowFile(target.flow.tree, filePath);
@@ -189,13 +201,33 @@ async function readPage(root: string, ticket: string): Promise<Loaded> {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
     return { target, exists: false, mtimeMs: 0, doc: templateFlow(ticket, target.title), shown };
   }
-  const { text, mtimeMs } = read;
-  const parsed = parseFlow(text);
-  if (!parsed.ok) {
-    // 画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
-    throw new Error(`フローのファイルを読めない（${shown}）: ${parsed.error}。エディタで直してから再読込する`);
+  const { bytes, mtimeMs } = read;
+  const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込する`);
+  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として壊れているかも
+  // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
+  const verdict = await lintText(root, tmpDir, bytes, shown);
+  if (!verdict.ok) {
+    throw refuse(verdict.error);
   }
-  return { target, exists: true, mtimeMs, doc: parsed.doc, shown };
+  const decoded = decodeFlowBytes(bytes);
+  if (!decoded.ok) {
+    throw refuse(decoded.error);
+  }
+  const value = parseFlowValue(decoded.text);
+  if (!value.ok) {
+    throw refuse(value.error);
+  }
+  // 画面の読み（YAML 1.2）が実行ファイルの読み（PyYAML）と同じときだけ開く。違えば、画面で保存しただけで
+  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-agree.ts）
+  const disagreement = flowDisagreement(value.value, verdict.data);
+  if (disagreement !== undefined) {
+    throw new Error(`フローのファイルを開かない（${shown}）: ${openDisagreementText(disagreement)}。直したら再読込する`);
+  }
+  const doc = asFlowDoc(value.value);
+  if (doc === undefined) {
+    throw refuse("ノードの並び（id が文字列のノード）が取れないので描けない");
+  }
+  return { target, exists: true, mtimeMs, doc, shown };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -225,6 +257,11 @@ function registerPanelHandlers(current: PanelState): void {
     }
     current.fileWatchers = [];
     current.watchers = [];
+    try {
+      fs.rmSync(current.tmpDir, { recursive: true, force: true });
+    } catch {
+      // 消せなければ OS の一時ディレクトリに残る（承認済みの領域には書いていない）
+    }
     if (alive(current)) {
       panels.delete(current.ticket);
     }
@@ -379,7 +416,7 @@ async function reload(current: PanelState): Promise<void> {
   const seq = current.seq;
   let loaded: Loaded;
   try {
-    loaded = await readPage(current.folder.uri.fsPath, current.ticket);
+    loaded = await readPage(current.folder.uri.fsPath, current.ticket, current.tmpDir);
   } catch (error) {
     if (alive(current) && current.seq === seq) {
       current.lock = lockFromFailure((error as Error).message);
@@ -452,9 +489,6 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       );
       return;
     }
-    case "import":
-      await importInto(current, message.dirty);
-      return;
     case "save":
       await save(current, message.doc);
       return;
@@ -466,84 +500,28 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
   }
 }
 
-interface Candidate extends vscode.QuickPickItem {
-  readonly uri?: vscode.Uri;
-}
-
-/**
- * 取り込む。候補はワークスペースの `.vscode/workflows/*.json`（cc-wf-studio の置き場）で、
- * ほかのファイルも選べる。読めたら画面の編集中のフローを置き換える（未保存になる）。**ここでは書かない。**
- */
-async function importInto(current: PanelState, dirty: boolean): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  if (current.lock.locked) {
-    fail(current, current.lock.reason);
-    return;
-  }
-  const found = await vscode.workspace.findFiles(new vscode.RelativePattern(current.folder, WORKFLOWS_GLOB), undefined, 200);
-  const items: Candidate[] = found
-    .map((uri) => ({ label: path.basename(uri.fsPath), description: shownPath(current.folder.uri.fsPath, uri.fsPath), uri }))
-    .sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
-  items.push({ label: "ほかのファイルを選ぶ…", description: "JSON のファイルを選ぶ" });
-  const picked = await vscode.window.showQuickPick(items, {
-    title: `${current.ticket} のフローに取り込む`,
-    placeHolder: found.length === 0 ? ".vscode/workflows/ に JSON が無い。ほかのファイルを選ぶ" : "取り込むワークフロー（.vscode/workflows/*.json）",
-  });
-  if (picked === undefined) {
-    current.host.post({ type: "cancelled" } satisfies ToFlow);
-    return;
-  }
-  let uri = picked.uri;
-  if (uri === undefined) {
-    const chosen = await vscode.window.showOpenDialog({
-      canSelectMany: false,
-      defaultUri: vscode.Uri.file(path.join(current.folder.uri.fsPath, ".vscode", "workflows")),
-      filters: { JSON: ["json"] },
-      openLabel: "取り込む",
-    });
-    uri = chosen?.[0];
-    if (uri === undefined) {
-      current.host.post({ type: "cancelled" } satisfies ToFlow);
-      return;
-    }
-  }
-  if (!alive(current) || current.loaded !== loaded) {
-    return;
-  }
-  if (dirty) {
-    const choice = await vscode.window.showWarningMessage("未保存の変更がある。破棄して取り込む？", { modal: true }, "取り込む");
-    if (choice !== "取り込む") {
-      current.host.post({ type: "cancelled" } satisfies ToFlow);
-      return;
-    }
-  }
-  let text: string;
-  try {
-    text = fs.readFileSync(uri.fsPath, "utf8");
-  } catch (error) {
-    fail(current, `取り込むファイルを読めない: ${(error as Error).message}`);
-    return;
-  }
-  const read = importFlow(text);
-  if (!read.ok) {
-    fail(current, `取り込めない（${shownPath(current.folder.uri.fsPath, uri.fsPath)}）: ${read.error}`);
-    return;
-  }
-  if (!alive(current) || current.loaded !== loaded) {
-    return;
-  }
-  current.host.post({ type: "imported", doc: read.doc, source: shownPath(current.folder.uri.fsPath, uri.fsPath) } satisfies ToFlow);
-}
-
 async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   const loaded = current.loaded;
   if (loaded === undefined) {
     return;
   }
-  // 1. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）
+  // 1. 書き出す本文が正しいかを実行ファイルに聞く（SubagentStart と同じ読み）。error なら書かない
+  const text = serializeFlow(doc);
+  const verdict = await lintText(current.folder.uri.fsPath, current.tmpDir, text, loaded.shown);
+  if (!alive(current) || stale(current, loaded)) {
+    return;
+  }
+  if (!verdict.ok) {
+    fail(current, `保存しない: ${verdict.error}`);
+    return;
+  }
+  // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-agree.ts）
+  const disagreement = flowDisagreement(doc, verdict.data);
+  if (disagreement !== undefined) {
+    fail(current, `保存しない: ${saveDisagreementText(disagreement)}`);
+    return;
+  }
+  // 2. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）
   const { lock, target } = await refreshLock(current);
   if (!alive(current) || stale(current, loaded)) {
     return;
@@ -552,16 +530,16 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
     fail(current, lock.reason);
     return;
   }
-  // 2. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
+  // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（権威のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
     fail(current, `フローの置き場が変わった（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。再読込してから編集し直す`);
     return;
   }
-  // 3. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。4. リンクを辿らない。
-  // 5. 一時ファイルに書いて入れ替える（途中で落ちても半端なファイルを残さない）。3〜5 は flow-write.ts
+  // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
+  // 6. 一時ファイルに書いて入れ替える（途中で落ちても半端なファイルを残さない）。4〜6 は flow-write.ts
   current.wroteAt = Date.now();
-  const written = writeFlowFile(target.flow.tree, filePath, serializeFlow(doc), { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
+  const written = writeFlowFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
   if (!written.ok) {
     current.wroteAt = 0;
     fail(current, written.error);

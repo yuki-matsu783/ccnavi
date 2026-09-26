@@ -69,7 +69,7 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
     return { ok: false, error: `${ticket} は親チケット。フローを持つのは子チケットだけ` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの答えに無い（実行ファイルが古い）` };
+    return { ok: false, error: `${ticket} のフローの置き場が実行ファイルの答えに無い（完了・取り消しの子でファイルが無いか、実行ファイルが古い）` };
   }
   return {
     ok: true,
@@ -128,8 +128,6 @@ export type ToFlow =
   | { readonly type: "changed" }
   /** 頼んだ往復が起きなかった（人が確認をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
-  /** 取り込んだ。画面は編集中のフローをこれに置き換え、未保存にする（書くのは保存を押したとき） */
-  | { readonly type: "imported"; readonly doc: FlowDoc; readonly source: string }
   | { readonly type: "tour" }
   | AppearanceMessage;
 
@@ -139,7 +137,6 @@ export type FlowMessage =
   | { readonly type: "reload"; readonly dirty: boolean }
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  | { readonly type: "import"; readonly dirty: boolean }
   | { readonly type: "save"; readonly doc: FlowDoc }
   | { readonly type: "tourDone" };
 
@@ -157,8 +154,7 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
     case "tourDone":
       return { type: m.type };
     case "reload":
-    case "import":
-      return { type: m.type, dirty: m.dirty === true };
+      return { type: "reload", dirty: m.dirty === true };
     case "dirty":
       return typeof m.dirty === "boolean" ? { type: "dirty", dirty: m.dirty } : undefined;
     case "save": {

@@ -1,8 +1,8 @@
 """子チケットのフロー（作業の手順のグラフ）。設計 9.3.1・9.12、ADR-0085。
 
 子チケット 1 本につき 1 本、担当のサブエージェントが作業中に読む手順書を置ける。
-置き場は**承認済みの領域**の `<承認済みチケットの置き場>/flows/<子>.json`
-（既定 `.ccnavi/approved/flows/<子>.json`）に固定で、チケットの欄では指さない。
+置き場は**承認済みの領域**の `<承認済みチケットの置き場>/flows/<子>.yml`
+（既定 `.ccnavi/approved/flows/<子>.yml`）に固定で、チケットの欄では指さない。
 置き場を持つツリーはチケットと同じ（承認済みチケットが在るツリー。プロジェクトの
 チケットならそのプロジェクトのツリー）で、チケットと同じ git に乗る。
 
@@ -17,13 +17,18 @@ Write / Edit / NotebookEdit を止め、綴りの出るシェルからの書き�
 
 ## 形
 
-CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json` に保存する
-`workflow.json` と同じ形を読む。形が合うだけで、そのコードは使っていない（あちらは AGPL）。
+YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー編集画面が書き、ここが読む。
 
-    {"id", "name", "description"?, "version", "nodes": [...], "connections": [...],
-     "subAgentFlows"?: [{"id", "name", "nodes", "connections"}], ...}
-    node       = {"id", "type", "name", "position": {x, y}, "data": {...}}
-    connection = {"id", "from", "to", "fromPort", "toPort", "condition"?}
+    id, name, description?, version
+    nodes:          [node, ...]
+    connections:    [connection, ...]
+    subAgentFlows?: [{id, name, nodes, connections}, ...]
+    node       = {id, type, name, position: {x, y}, data: {...}}
+    connection = {id, from, to, fromPort, toPort, condition?}
+
+読むのは `yaml.safe_load`（ルールや設定と同じ読み手）に、別名（`*名前`）を拒む守りを足したもの
+（`_Loader`）。別名は同じ部分木を何度でも指せるので、入れ子にすると小さなファイルが辿る量で
+膨らむ（billion laughs）。手順書に別名は要らないので、量で切らずに別名ごと読まない。
 
 ノードの種類（`type`）のうち、ここが中身を読むのは `start` `end` `prompt` `subAgent`
 `askUserQuestion` `ifElse` `switch` `branch` `skill` `mcp` `subAgentFlow` `codex`
@@ -38,6 +43,13 @@ CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json
 そこまでの途中）は読まない。承認済みの領域の外を指していれば、エージェントが書ける中身を
 人の手順書として渡すことになる。ふつうのファイルでないもの（名前付きパイプは開くと固まる）と
 ハードリンク（外の名前から書き換えられる）も読まない（`read_bytes`）。
+
+形の誤り（最上位がキーと値の並びでない、`nodes` が無い、ノードに `id` が無い・重なる、
+`connections` が並びでない）も読めない理由として 1 行で言う（`shape_problem`）。
+`ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
+error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
+これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。`--json` なら読めた中身も載せ（`as_json`）、
+画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば開かない・保存しない。
 
 読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの写しは読まない。
 
@@ -59,13 +71,18 @@ CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json
 
 from __future__ import annotations
 
+import base64
+import datetime
 import hashlib
 import json
+import math
 import os
 import posixpath
 import stat
 import unicodedata
 from collections import deque
+
+import yaml
 
 from . import fsio, settings, tree
 from . import ticket as ticket_mod
@@ -74,9 +91,9 @@ from . import ticket as ticket_mod
 CODE_LOCKED = "DENY_TICKET_FLOW_LOCKED"
 LOCK_RULE = "(ticket-flow-lock)"
 
-# 置き場。承認済みチケットの置き場の下の `flows/<子>.json`。
+# 置き場。承認済みチケットの置き場の下の `flows/<子>.yml`。
 FLOWS_DIR = "flows"
-SUFFIX = ".json"
+SUFFIX = ".yml"
 # 置き場が絶対パスで、どのツリーにも共通のとき。どのプロジェクトの子にも当てる。
 ANY_PROJECT = "*"
 
@@ -238,12 +255,18 @@ def resolve(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> tup
 def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict | None:
     """ボード（`--explain --json`）に出すフローの欄。子でなければ None。
 
+    閉じた子（終わった・取り消した）でフローが無ければ None。閉じた子にフローを作っても
+    読まれる場面が無い。ボードは欄が無ければ「フローを作る」を出さない。フローが在る
+    閉じた子は欄を返す（人が見返せる）。
+
     `tree` はファイルを持つツリーのルート。ボードはそこからファイルまでの途中にリンクが
     あれば書かない。`linked` はその途中にリンクがあるか（在るときだけ見る）。
     """
     if not child.is_child:
         return None
     path, base, exists = resolve(conf, root, child)
+    if not exists and child.state in (ticket_mod.DONE, ticket_mod.CANCELLED):
+        return None
     return {
         "path": path,
         "rel": flow_rel(conf, child.ticket),
@@ -260,13 +283,14 @@ def info(conf: settings.Settings, root: str, child: ticket_mod.Ticket) -> dict |
 def locate(conf: settings.Settings, root: str, path: str) -> tuple[str, str | None] | None:
     """このパスが子のフローの置き場なら（ファイルの名前, そのツリーのプロジェクト）。違えば None。
 
-    名前は `flows/` の下の残り（`<子>.json`）。プロジェクトは置き場を持つツリーのもの
+    名前は `flows/` の下の残り（`<子>.yml`）。プロジェクトは置き場を持つツリーのもの
     （ワークスペースなら空、ワークスペースの外なら None）。綴りは解いたものでも解く前の
     ものでもよい。大文字小文字は範囲の照合と同じく区別しない。
 
     名前は Windows で同じファイルに届く綴りを畳む。末尾の `.` と空白、`:` から後ろ
     （`::$DATA` などの代替データストリーム）を落とす（止める向きだけ）。8.3 形式の短い
-    名前（`I0001-~1.JSO`）は畳めない。解いた綴り（`full`）が長い名前に戻すのに任せる。
+    名前（子の名前が 8 字を超えるときの `I0001-~1.YML` など）は畳めない。解いた綴り
+    （`full`）が長い名前に戻すのに任せる。
     """
     if not path:
         return None
@@ -424,6 +448,38 @@ def read_bytes(path: str, tree_root: str = "") -> tuple[bytes | None, str]:
         return None, f"読めない ({type(exc).__name__})"
 
 
+class _AliasRefused(yaml.YAMLError):
+    """フローに別名（`*名前`）があった。"""
+
+
+class _Loader(yaml.SafeLoader):
+    """`yaml.safe_load` の読み手に、別名を拒む守りを足したもの。
+
+    別名は同じ部分木を何度でも指せる。入れ子にすると、小さなファイルでも辿る量が指数で
+    膨らむ（billion laughs）。自分を指す別名は循環する値になる。手順書に別名は要らないので、
+    出てきた時点で読むのをやめる（量で切ると、上限の手前まで辿る手間は残る）。
+    """
+
+    def compose_node(self, parent, index):
+        if self.check_event(yaml.AliasEvent):
+            raise _AliasRefused("別名")
+        return super().compose_node(parent, index)
+
+
+ALIASED = "YAML の別名（`*名前`）があるので読まない。同じ部分木を何度も辿らせて膨らませられる"
+
+
+def _yaml_problem(exc: yaml.YAMLError) -> str:
+    """YAML の読めない理由を 1 行に。問題と、あれば位置（行・桁は 1 始まり）。"""
+    problem = getattr(exc, "problem", None)
+    mark = getattr(exc, "problem_mark", None)
+    if not problem:
+        return str(exc)
+    if mark is not None:
+        return f"{problem}、{mark.line + 1} 行 {mark.column + 1} 桁"
+    return str(problem)
+
+
 def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
     """フローを読む。(中身, 読めない理由)。例外は外に出さない。
 
@@ -434,19 +490,134 @@ def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
     raw, why = read_bytes(path, tree_root)
     if raw is None:
         return None, why
+    return parse(raw)
+
+
+def parse(raw: bytes) -> tuple[dict | None, str]:
+    """フローの中身（バイト）を読む。(中身, 読めない理由)。例外は外に出さない。
+
+    文字は UTF-8（先頭の BOM は 1 つ外す。`utf-8-sig`）。UTF-8 として壊れていれば読まない
+    （置き換え文字で埋めて読むと、壊れた部分を落とした手順が渡る）。
+    """
     try:
-        data = json.loads(raw.decode("utf-8-sig"))
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        return None, f"{NOT_UTF8}（{exc.start + 1} バイト目）"
+    try:
+        # _Loader は SafeLoader に別名の守りを足したもの（任意の型は作らない）。
+        data = yaml.load(text, Loader=_Loader)
+    except _AliasRefused:
+        return None, ALIASED
     except OSError as exc:
         return None, f"読めない ({clean(exc.strerror or type(exc).__name__)})"
     except RecursionError:
-        return None, "入れ子が深すぎて JSON として読めない"
+        return None, "入れ子が深すぎて YAML として読めない"
+    except yaml.YAMLError as exc:
+        return None, f"YAML として読めない ({_line(_yaml_problem(exc))})"
     except (ValueError, TypeError) as exc:
-        return None, f"JSON として読めない ({_line(exc)})"
+        return None, f"YAML として読めない ({_line(exc)})"
     except Exception as exc:  # noqa: BLE001  壊れたデータで SubagentStart を落とさない
         return None, f"読めない ({type(exc).__name__})"
-    if not isinstance(data, dict) or not isinstance(data.get("nodes"), list):
-        return None, "`nodes` の並びが無い"
+    why = shape_problem(data)
+    if why:
+        return None, why
     return data, ""
+
+
+NOT_UTF8 = "UTF-8 として読めない"
+
+# `as_json` の印の鍵。JSON にそのまま載らない値（下）をこの鍵を持つオブジェクトで表す。
+JSON_MARK = "$ccnavi"
+# JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲
+_SAFE_INT = 2**53 - 1
+
+
+def as_json(value):
+    """読めた中身を JSON に載せる形にする（`--lint --json --flow` の `flow.data`）。
+
+    VS Code 拡張のフロー編集画面は、自分の YAML の読み手（1.2）が読んだ中身とこれを見比べ、
+    食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ。ADR-0035）。
+    文字列・真偽値・null・並び・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
+    そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の印にする。
+
+    - 浮動小数は `{"$ccnavi": "float", "value": <数>}`
+      （JSON では 1 と 1.0 の区別が消えるので包む）。
+      有限でなければ `"text"` に `inf` / `-inf` / `nan`
+    - 範囲の外の整数は `{"$ccnavi": "int", "text": <十進>}`
+    - キーが文字列でない辞書と、鍵 `$ccnavi` を持つ辞書は
+      `{"$ccnavi": "map", "items": [[キー, 値], ...]}`
+    - 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs` の 1 件）・
+      そのほかは
+      `{"$ccnavi": "date" | "datetime" | "bytes" | "set" | "tuple" | "other", "text": <綴り>}`
+    """
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if isinstance(value, int):
+        if -_SAFE_INT <= value <= _SAFE_INT:
+            return value
+        return {JSON_MARK: "int", "text": _digits(value)}
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return {JSON_MARK: "float", "value": value}
+        text = "nan" if math.isnan(value) else ("inf" if value > 0 else "-inf")
+        return {JSON_MARK: "float", "text": text}
+    if isinstance(value, list):
+        return [as_json(item) for item in value]
+    if isinstance(value, dict):
+        if JSON_MARK not in value and all(isinstance(key, str) for key in value):
+            return {key: as_json(item) for key, item in value.items()}
+        return {JSON_MARK: "map", "items": [[as_json(k), as_json(v)] for k, v in value.items()]}
+    if isinstance(value, datetime.datetime):
+        return {JSON_MARK: "datetime", "text": value.isoformat()}
+    if isinstance(value, datetime.date):
+        return {JSON_MARK: "date", "text": value.isoformat()}
+    if isinstance(value, bytes):
+        return {JSON_MARK: "bytes", "text": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, (set, frozenset)):
+        return {JSON_MARK: "set", "text": _line(repr(sorted(map(repr, value))))}
+    if isinstance(value, tuple):
+        return {JSON_MARK: "tuple", "text": _line(repr(value))}
+    return {JSON_MARK: "other", "text": type(value).__name__}
+
+
+def _digits(value: int) -> str:
+    try:
+        return str(value)
+    except ValueError:  # 桁の上限（sys.set_int_max_str_digits）を越える
+        return "(桁が多すぎる)"
+
+
+def shape_problem(data) -> str:
+    """読めた中身の形の誤り（最初の 1 つ）。無ければ空。例外は外に出さない。
+
+    SubagentStart の読み（`load`）と `--lint --flow` が同じここを通る。見るのは手順として
+    並べる土台だけ。最上位がキーと値の並び、`nodes` がキーと値の並びの並びで、どれも空でない
+    文字列の `id` を持ち、`id` が重ならない。`connections` は在れば、キーと値の並びの並び。
+    `id` が無い・重なるノードは並べるときに落ちるので、黙って手順が欠けないよう読まない側に倒す。
+    """
+    if not isinstance(data, dict):
+        return "最上位がキーと値の並びではない"
+    nodes = data.get("nodes")
+    if not isinstance(nodes, list):
+        return "`nodes` の並びが無い"
+    seen: set[str] = set()
+    for index, node in enumerate(nodes):
+        if not isinstance(node, dict):
+            return f"nodes[{index}] がキーと値の並びではない"
+        node_id = node.get("id")
+        if not isinstance(node_id, str) or not node_id:
+            return f"nodes[{index}] に文字列の id が無い"
+        if node_id in seen:
+            return f"ノードの id が重なっている（{_line(node_id)}）"
+        seen.add(node_id)
+    if "connections" in data:
+        connections = data.get("connections")
+        if not isinstance(connections, list):
+            return "`connections` が並びではない"
+        for index, connection in enumerate(connections):
+            if not isinstance(connection, dict):
+                return f"connections[{index}] がキーと値の並びではない"
+    return ""
 
 
 # ---- 着手のあとの書き換えを知らせる
@@ -755,7 +926,7 @@ def render(
 ) -> tuple[list[str], set[str]]:
     """フローを順に並べた行と、出てきたノードの種類の集合。例外は外に出さない。
 
-    JSON を読まなくても手順が追えるよう、1 ノード 1 行で `<番号>. [<種類>] <名前>: <中身>`
+    YAML を読まなくても手順が追えるよう、1 ノード 1 行で `<番号>. [<種類>] <名前>: <中身>`
     と次の番号を並べる。知らない種類は種類の名前と `name` だけ。ノードは `limit` 件まで、
     文は `text_limit` 文字まで。
     """

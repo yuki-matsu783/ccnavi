@@ -2,9 +2,10 @@
  * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
- * 走らせるのは 7 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * 走らせるのは 8 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
- * 機械可読で。プロジェクト管理画面が読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
+ * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
+ * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
  * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
@@ -41,7 +42,7 @@ import {
   type DecideOutcome,
   type DecidePreview,
 } from "./core/decidemodel.js";
-import { parseLintJson, type LintJson } from "./core/lintmodel.js";
+import { parseLintJson, unknownOption, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
 import {
@@ -490,23 +491,41 @@ function firstLine(text: string): string {
 }
 
 export async function runLintJson(root: string, setting: string): Promise<RunResult<LintJson>> {
+  return lintJson(root, setting, [], "ccnavi --lint --json");
+}
+
+/**
+ * 子チケットのフロー 1 本を実行ファイルに確かめさせる（`--lint --json --flow <パス>`）。
+ * フロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルに書いて渡す。読み手と検査は
+ * SubagentStart と同じもので、答えは `(flow)` の苦情（`problemsOfFlow`）。
+ * `--flow` を知らない古い実行ファイルは、確かめられないとして失敗にする（開かない・保存しない側）。
+ */
+export async function runFlowLint(root: string, setting: string, flowPath: string): Promise<RunResult<LintJson>> {
+  return lintJson(root, setting, ["--flow", flowPath], "ccnavi --lint --json --flow");
+}
+
+async function lintJson(root: string, setting: string, extra: readonly string[], what: string): Promise<RunResult<LintJson>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--lint", "--json"], DIAGNOSE_TIMEOUT_MS);
+  const ran = await run(launcher, root, ["--lint", "--json", ...extra], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff("ccnavi --lint --json", DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code < 0 || ran.code > 1) {
-    return { ok: false, error: `ccnavi --lint --json が失敗しました: ${firstLine(ran.stderr)}` };
+    return { ok: false, error: `${what} が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseLintJson(ran.stdout);
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
   }
+  const unknown = extra.find((option) => option.startsWith("--") && unknownOption(ran.stderr, option));
+  if (unknown !== undefined) {
+    return { ok: false, error: `実行ファイルが ${unknown} を知りません（古い版です）。${what} で確かめられないので進めません。実行ファイルを新しくしてください` };
+  }
   // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
-  return { ok: false, error: said === "" ? `ccnavi --lint --json の出力を読めません（${parsed.error}）` : `ccnavi --lint --json の出力: ${said}` };
+  return { ok: false, error: said === "" ? `${what} の出力を読めません（${parsed.error}）` : `${what} の出力: ${said}` };
 }
