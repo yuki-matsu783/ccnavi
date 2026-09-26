@@ -93,7 +93,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   config clone submodule  利用者に依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
                 読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
-                化けるので、値を見ずに一律で拒否する
+                なってしまうので、値を見ずに一律で拒否する
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS

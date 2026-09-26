@@ -1287,7 +1287,7 @@ def _project_settings(root: str) -> list[Problem]:
                     SEVERITY_WARN,
                     "(project)",
                     f"{PROJECT_SETTINGS} の env の {settings.MODE_ENV}={declared!r} は"
-                    f"モードとして読めない。{modes.ENABLE} に落ちる",
+                    f"モードとして読めない。{modes.ENABLE} として扱う",
                 )
             )
     problems.extend(_bin_path(root, env.get(settings.BIN_ENV)))

@@ -567,7 +567,7 @@ def _build(
             f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みの守りの名前で、"
             "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
             "別の名前にすること。"
-            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で面ごと切る",
+            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）でその守りごと切る",
         )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(
