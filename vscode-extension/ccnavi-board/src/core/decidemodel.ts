@@ -75,7 +75,7 @@ export function parseDecidePreview(text: string): DecidePreviewParse {
   const mr: Record<string, unknown> = isRecord(raw.mr) ? raw.mr : {};
   const digest = str(raw.digest);
   if (!/^[0-9a-f]{64}$/.test(digest)) {
-    return { ok: false, error: "digest が読めません（64 桁の 16 進ではありません）" };
+    return { ok: false, error: "ccnavi-review.sh decide --preview の digest が 64 桁の 16 進ではありません" };
   }
   return {
     ok: true,

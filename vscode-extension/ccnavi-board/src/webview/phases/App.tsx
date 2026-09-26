@@ -523,7 +523,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になります。レビューのあとは{" "}
             <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
-            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
+            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
             辺の書き漏れはそのまま並行として通るので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
             関係の欄はこのファイルのほかの種類から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の種類の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
             </p>
@@ -586,7 +586,7 @@ function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly
     return (
       <div className="banner missing">
         <span>
-          {page.phasesPath} がありません。ファイルが無ければこの設定は空で、共通の設定の種類だけが使われます。この設定に種類を足すなら、下で足して保存してください（最初の保存でファイルが作られます）。雛形は置きません。雛形の id は共通の設定の種類と重なりやすく、中身が違えばこの設定が空として扱われるためです。
+          {page.phasesPath} がありません。ファイルが無ければこの設定は空で、共通の設定の種類だけが使われます。この設定に種類を足すなら、下で足して保存してください（最初の保存でファイルが作られます）。雛形は作りません。雛形の id は共通の設定の種類と重なりやすく、中身が違えばこの設定が空として扱われるためです。
         </span>
       </div>
     );
@@ -595,7 +595,7 @@ function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly
     <div className="banner missing">
       <span>
         {page.phasesPath} がありません。実行ファイルはフェーズを番号だけで扱っていて、親チケットの <code>plan:</code> も読めません。種類を使うにはまずファイルを作ってください。雛形は README の例で、
-        <code>scope</code> の綴りは作ったあとにこのプロジェクトの置き場へ直してください。
+        <code>scope</code> のパスは作ったあとにこのプロジェクトのフォルダ構成に合わせて直してください。
       </span>
       <button type="button" className="action primary" data-action="create" disabled={busy} onClick={onCreate}>
         雛形でファイルを作る

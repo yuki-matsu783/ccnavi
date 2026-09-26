@@ -120,7 +120,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
+      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -209,7 +209,7 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
   });
   try {
     assert.match(dom.one("#phases .empty").textContent, /種類がありません。種類が 1 つも無いファイルは実行ファイルが読めない/);
-    assert.match(dom.one(".problems").textContent, /phases が対応表ではありません/);
+    assert.match(dom.one(".problems").textContent, /phases がキーと値の組（マップ）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
   } finally {

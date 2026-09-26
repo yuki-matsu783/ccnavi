@@ -158,7 +158,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   プロジェクト
                   <select id="project-filter" value={project} onChange={(event) => setView((now) => ({ ...now, project: event.target.value }))}>
                     <option value="*">すべて</option>
-                    <option value="">ワークスペース自身</option>
+                    <option value="">ワークスペース（プロジェクト外）</option>
                     {shown.projects.map((p) => (
                       <option key={p} value={p}>
                         {p}

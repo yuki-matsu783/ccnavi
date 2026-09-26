@@ -493,7 +493,7 @@ test("CB-T217 提案が残っていて未着手の列にいる閉じたカード
 
 test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビューが済んで止まらなくなった子には出さない", async () => {
   const base = fixture();
-  // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済 かつ 止まっている」を判定が言う
+  // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済み かつ 止まっている」を判定が言う
   const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
     ...base,
     parents: base.parents.map((parent) => ({
@@ -508,8 +508,8 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   const brief = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-brief")?.textContent ?? "";
   const full = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-full")?.textContent ?? "";
 
-  // クローズ・レビュー済・止まっていない子（完了列の i0001-01）。バッジは出さず、レビュー済は枠無しの行に出る。
-  // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済 · レビュー済」が残る
+  // クローズ・レビュー済み・止まっていない子（完了列の i0001-01）。バッジは出さず、レビュー済みは枠無しの行に出る。
+  // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済み · レビュー済み」が残る
   const done = await openBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false));
   try {
     assert.equal(done.all(".badge.hold").length, 0);
@@ -601,7 +601,7 @@ test("CB-T15 問題とプロジェクトの絞り込みを出す", async () => {
   const page = await openBoard({ ...fixture(), problems: ["承認済みチケット x を読めない"], projects: ["lib", "app"] });
   try {
     assert.deepEqual(texts(page, ".problems li"), ["承認済みチケット x を読めない"]);
-    assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース自身", "lib", "app"]);
+    assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース（プロジェクト外）", "lib", "app"]);
   } finally {
     await page.close();
   }

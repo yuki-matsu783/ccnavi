@@ -490,7 +490,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
 function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName: string): void {
   const root = current.folder.uri.fsPath;
   if (page.projectsDir === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、clone 先を決められません");
+    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、clone 先を決められません");
     return;
   }
   const remote = checkRemote(rawUrl);
@@ -523,7 +523,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
+    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
@@ -545,7 +545,7 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
     return;
   }
   if (row.rulesRel === "") {
-    fail(current, `プロジェクト ${name} は設定の対象になっていないので、ルールを置く先がありません`);
+    fail(current, `プロジェクト ${name} は設定の対象になっていないので、ルールのコピー先がありません`);
     return;
   }
   copyCommonRules(current, row.rulesRel, name, "プロジェクトの git");
@@ -553,7 +553,7 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
 
 function createSelfRules(current: PanelState, page: ProjectsPage): void {
   if (page.selfRulesRel === "") {
-    fail(current, "実行ファイルの答えにワークスペースの設定が無いので、置く先を決められません。更新してから押し直してください");
+    fail(current, "ccnavi の出力にワークスペースの設定が無いので、コピー先を決められません。更新してから押し直してください");
     return;
   }
   copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");

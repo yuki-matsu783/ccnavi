@@ -127,7 +127,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         <Captioned name="id" yamlKey="id">
           {text("id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）")}
         </Captioned>
-        <Captioned name="題" yamlKey="title">
+        <Captioned name="タイトル" yamlKey="title">
           {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）")}
         </Captioned>
         <Captioned name="区分" yamlKey="kind">
@@ -167,7 +167,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
               <option value="inherit">inherit（親の範囲そのまま）</option>
-              <option value="globs">上限を書く（glob の並び）</option>
+              <option value="globs">上限を書く（glob のリスト）</option>
             </select>
             {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの範囲はこの中に収める）")}
           </div>
@@ -380,7 +380,7 @@ function IdPicker({
           onKeyDown={onKeyDown}
         >
           {options.map((id, index) => {
-            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? "このファイルに無い id です（共通の設定の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
+            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? (typed ? "このファイルに無い id です（共通の設定の種類か、入力ミス）" : "このファイルに無い id です（入力ミス）") : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
             const locked = isLocked(id);
             const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (

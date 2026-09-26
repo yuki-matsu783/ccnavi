@@ -130,4 +130,11 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   });
   assert.ok(after.includes("i0001 の後始末で止まりました"));
   assert.ok(!after.includes("i0001 で止まりました"));
+
+  // 「が」と識別子の間は空白 1 つ。止まった識別子が分からない（空）ときは空白を重ねない
+  assert.ok(stopped.startsWith("ccnavi --approve --yes が i0001-01 で止まりました: 書けない (…)。"), stopped);
+  assert.ok(after.startsWith("ccnavi --approve --yes が i0001 の後始末で止まりました: "), after);
+  const unknown = partialMessage({ placed: [], ticket: "", reason: "書けない", lines: [] });
+  assert.ok(unknown.startsWith("ccnavi --approve --yes が止まりました: 書けない。"), unknown);
+  assert.ok(!unknown.includes("  "), unknown);
 });

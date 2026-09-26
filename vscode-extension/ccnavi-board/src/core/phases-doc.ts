@@ -116,7 +116,7 @@ export function readPhases(text: string): PhasesDocument {
     problems.push(`YAML として読めません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位が対応表ではありません。実行ファイルは読めません。保存すると中身を捨てて対応表から始めます");
+    problems.push("最上位がキーと値の組（マップ）ではありません。実行ファイルは読めません。保存すると中身を捨てて空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
@@ -142,12 +142,12 @@ export function readPhases(text: string): PhasesDocument {
   if (raw === undefined || raw === null) {
     problems.push("phases がありません。実行ファイルは「`phases` が辞書として無い」と報告します。種類を 1 つ以上足して保存してください");
   } else if (!isMap(raw)) {
-    problems.push("phases が対応表ではありません。種類は画面に出しません。保存すると中身を捨てて対応表から始めます");
+    problems.push("phases がキーと値の組（マップ）ではありません。種類は画面に出しません。保存すると中身を捨てて空のマップから始めます");
   } else {
     raw.items.forEach((pair, index) => {
       const id = keyText(pair);
       if (!isMap(pair.value)) {
-        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身が対応表ではありません。画面に出さず、保存するとこの種類は消えます（実行ファイルも読めません）`);
+        problems.push(`種類 ${id || `（${index + 1} 件目）`} の中身がキーと値の組（マップ）ではありません。画面に出さず、保存するとこの種類は消えます（実行ファイルも読めません）`);
         return;
       }
       phases.push(formOf(index, id, pair.value, problems));
@@ -203,7 +203,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit = false;
     scope = seqTexts(rawScope);
   } else {
-    problems.push(`種類 ${id} の scope が並びでも inherit でもありません。画面は inherit として出します`);
+    problems.push(`種類 ${id} の scope がリストでも inherit でもありません。画面は inherit として出します`);
   }
 
   const lists = {} as Record<ListKey, string[]>;
@@ -214,7 +214,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     } else if (isSeq(raw)) {
       lists[key] = seqTexts(raw);
     } else {
-      problems.push(`種類 ${id} の ${key} が並びではありません。画面は空として出し、保存すると欄が消えます`);
+      problems.push(`種類 ${id} の ${key} がリスト（配列）ではありません。画面は空として出し、保存すると欄が消えます`);
       lists[key] = [];
     }
   }

@@ -76,7 +76,7 @@ export function readRisk(text: string): RiskDocument {
     problems.push(`YAML として読めません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位が対応表ではありません。実行ファイルは組み込みの配点に落ちます。保存すると中身を捨てて対応表から始めます");
+    problems.push("最上位がキーと値の組（マップ）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を捨てて空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
@@ -89,7 +89,7 @@ export function readRisk(text: string): RiskDocument {
   const rawLevels = doc.get("levels", true);
   if (rawLevels !== undefined && rawLevels !== null) {
     if (!isMap(rawLevels)) {
-      problems.push("levels が対応表ではありません。境目の点は組み込みの値として表示します");
+      problems.push("levels がキーと値の組（マップ）ではありません。境目の点は組み込みの値として表示します");
     } else {
       for (const name of LEVEL_NAMES) {
         levels[name] = scalarText(rawLevels, name);
@@ -101,11 +101,11 @@ export function readRisk(text: string): RiskDocument {
   const rawFactors = doc.get("factors", true);
   if (rawFactors !== undefined && rawFactors !== null) {
     if (!isSeq(rawFactors)) {
-      problems.push("factors が並びではありません。項目は画面に出しません");
+      problems.push("factors がリスト（配列）ではありません。項目は画面に出しません");
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factors の ${index + 1} 件目が対応表ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読めません）`);
+          problems.push(`factors の ${index + 1} 件目がキーと値の組（マップ）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読めません）`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));

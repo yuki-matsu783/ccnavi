@@ -108,7 +108,7 @@ export function checkName(raw: string, existing: readonly string[]): NameCheck {
     return { ok: false, error: "名前が空です" };
   }
   if (!NAME_PATTERN.test(name)) {
-    return { ok: false, error: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付けてください。frontmatter の project: と置き場のパスにそのまま使われます" };
+    return { ok: false, error: "名前は英数字で始め、英数字と . _ - だけ（ASCII）で付けてください。frontmatter の project: とフォルダのパスにそのまま使われます" };
   }
   if (/^\.+$/.test(name)) {
     return { ok: false, error: "名前を . だけにはできません" };

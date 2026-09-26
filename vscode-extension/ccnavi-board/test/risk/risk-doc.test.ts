@@ -188,8 +188,8 @@ test("CB-T99 同じ元ノードを 2 回送れば書き戻さない。glob 以�
   assert.throws(() => doc.apply({ levels: f.levels, factors: [f.factors[0], { ...f.factors[0], id: "x" }] }), /2 回送られました/);
   const withMax = readRisk("version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n    max: 3\n");
   assert.equal(withMax.apply(withMax.model.form), "version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n");
-  assert.match(readRisk("hello\n").model.problems[0], /最上位が対応表ではありません/);
-  assert.match(readRisk("- a\n").model.problems[0], /最上位が対応表ではありません/);
+  assert.match(readRisk("hello\n").model.problems[0], /最上位がキーと値の組（マップ）ではありません/);
+  assert.match(readRisk("- a\n").model.problems[0], /最上位がキーと値の組（マップ）ではありません/);
 });
 
 test("CB-T100 PyYAML が別の型に読む語は引用符で囲み、それ以外は裸のまま", () => {

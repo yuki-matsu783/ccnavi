@@ -24,7 +24,7 @@ export function valueLabel(kind: FactorKind): string {
     return "スクリプト";
   }
   if (kind === "judge") {
-    return "問い";
+    return "yes/no の質問";
   }
   return "基準";
 }
@@ -47,7 +47,7 @@ export function describe(factor: FactorForm): readonly Part[] {
     case "script":
       return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
     case "judge":
-      return [dim("問い「"), code(value), dim("」の答えが yes なら加点")];
+      return [dim("質問「"), code(value), dim("」の答えが yes なら加点")];
   }
 }
 

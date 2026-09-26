@@ -119,7 +119,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         <div className="summary">
           <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
-            置き場: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
+            フォルダ: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
           </span>
         </div>
         <div className="controls">
@@ -207,7 +207,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       <Strays strays={page.strays} />
       <section className="workspace">
-        <h2>ワークスペース自身</h2>
+        <h2>ワークスペース（プロジェクト外）</h2>
         <p className="hint">
           <span className="mono">{page.root}</span>（ワークツリー {page.workspaceWorktrees.length} 件
           {page.workspaceWorktrees.length > 0 && `: ${page.workspaceWorktrees.join(", ")}`}）
@@ -227,16 +227,16 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "section.clone",
     title: "clone する",
-    body: "URL を入れて「clone」を押すと、git clone を「ccnavi」ターミナルで実行し、置き場の直下にプロジェクトとして置きます。名前は URL から自動で入ります。認証が要るならターミナルで入力してください。",
+    body: "URL を入れて「clone」を押すと、git clone を「ccnavi」ターミナルで実行し、プロジェクトのフォルダの直下に clone します。名前は URL から自動で入ります。認証が要るならターミナルで入力してください。",
   },
   {
     target: "section.list",
     title: "プロジェクト",
-    body: "置き場の直下にある git リポジトリが 1 行ずつ出ます。「開く ▾」からルール設定画面（チケット制御が有効ならフェーズ管理画面とチケット管理画面も）を開き、「git ▾」から fetch と pull をターミナルで実行できます。検証で見つかった問題も行に出ます。",
+    body: "プロジェクトのフォルダの直下にある git リポジトリが 1 行ずつ出ます。「開く ▾」からルール設定画面（チケット制御が有効ならフェーズ管理画面とチケット管理画面も）を開き、「git ▾」から fetch と pull をターミナルで実行できます。検証で見つかった問題も行に出ます。",
   },
   {
     target: "section.workspace",
-    title: "ワークスペース自身",
+    title: "ワークスペース（プロジェクト外）",
     body: "ワークスペースの設定のルールとフェーズの種類です。ワークスペースの設定のルールが無ければ、共通の設定からコピーして作れます。",
   },
   {
@@ -267,7 +267,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
   if (page.projectsRel === "") {
     banners.push(
       <div key="no-dir" className="banner warn">
-        置き場が無効です（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われません
+        プロジェクトのフォルダが無効です（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われません
       </div>,
     );
     return <>{banners}</>;

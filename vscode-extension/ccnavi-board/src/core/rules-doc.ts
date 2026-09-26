@@ -41,12 +41,12 @@ export function readRules(text: string): RulesDocument {
       continue;
     }
     if (!isSeq(seq)) {
-      problems.push(`タイプ ${section} が並びではありません。このタイプは画面に出しません`);
+      problems.push(`タイプ ${section} がリスト（配列）ではありません。このタイプは画面に出しません`);
       continue;
     }
     seq.items.forEach((item, index) => {
       if (!isMap(item)) {
-        problems.push(`タイプ ${section} の ${index + 1} 件目が対応表ではありません。画面に出しません`);
+        problems.push(`タイプ ${section} の ${index + 1} 件目がキーと値の組（マップ）ではありません。画面に出しません`);
         return;
       }
       sections[section].push(formOf(section, index, item));

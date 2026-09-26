@@ -196,7 +196,7 @@ export function screenHost<D>(surface: Surface, render: (data: D) => string): Sc
  *
  * **中身を渡すのは、画面の編集を捨ててよいときだけ。** 保持する画面は編集の途中を持つので、
  * 監視がファイルの変化に気づいても勝手に渡さない（`{type:"changed"}` の帯を出して人に決めさせる）。
- * 渡すのは、人が「再読込」を押したときと、保存・作成が通って中身が入れ替わったとき。
+ * 渡すのは、人が「更新」を押したときと、保存・作成が通って中身が入れ替わったとき。
  */
 export function retainedHost<D>(surface: RetainedSurface, render: (data: D) => string): ScreenHost<D> {
   let htmlSet = false;

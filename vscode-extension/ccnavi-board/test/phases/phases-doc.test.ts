@@ -175,7 +175,7 @@ test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す�
   assert.ok(doc.model.problems.some((p) => p.includes("kind `strange`")));
   assert.ok(doc.model.problems.some((p) => p.includes("review `maybe`")));
   assert.ok(doc.model.problems.some((p) => p.includes("scope `everything`")));
-  assert.ok(doc.model.problems.some((p) => p.includes("overlap が並びではありません")));
+  assert.ok(doc.model.problems.some((p) => p.includes("overlap がリスト（配列）ではありません")));
   const a = doc.model.form.phases[0];
   assert.equal(a.kind, "work");
   assert.equal(a.review, "mr");
@@ -247,7 +247,7 @@ test("CB-T103 同じ元ノードを 2 回送れば書き戻さない。yes / no 
     flow.apply({ order: "sequential", phases: [phase("a", { title: "A" })] }),
     "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    review: mr\n    scope: inherit\n",
   );
-  assert.match(readPhases("- a\n").model.problems[0], /最上位が対応表ではありません/);
+  assert.match(readPhases("- a\n").model.problems[0], /最上位がキーと値の組（マップ）ではありません/);
   assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの種類は消えます/);
 });
 

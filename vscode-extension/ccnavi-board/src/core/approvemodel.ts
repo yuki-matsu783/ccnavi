@@ -103,7 +103,7 @@ export function partialMessage(partial: ApprovePartial): string {
       : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っています。` +
         "コミットと push は送っていません（送るのは承認できたときだけです）。チケット管理画面を更新して確かめてください";
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
-  return `ccnavi --approve --yes が${where}止まりました: ${reason}。${what}${done}`;
+  return `ccnavi --approve --yes が${where === "" ? "" : ` ${where}`}止まりました: ${reason}。${what}${done}`;
 }
 
 export type ResultParse =

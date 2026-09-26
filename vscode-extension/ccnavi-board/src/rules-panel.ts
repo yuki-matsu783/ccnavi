@@ -5,7 +5,7 @@
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
  *
  * 対象は 3 種（設計 11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
@@ -46,7 +46,7 @@ const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
-/** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
+/** 自分の保存で監視が鳴るのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
@@ -83,7 +83,7 @@ interface PanelState {
   /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
-  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
   changedPending: boolean;
   wroteAt: number;
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
@@ -229,7 +229,7 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
   current.changedPending = false;
   current.lock = lockFromError("確認中…");
   // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
-  // 前の対象の変化を「外で変わった」と拾い続けない
+  // 前の対象の変化を「ファイルの変更を検知しました」と拾い続けない
   if (current.timer !== undefined) {
     clearTimeout(current.timer);
     current.timer = undefined;
@@ -259,14 +259,14 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`設定ファイルの置き場を実行ファイルから取得できません: ${board.error}`);
+      throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えにワークスペースの設定がありません"
-          : `プロジェクト ${target.name} は設定の対象になっていません（置き場の直下に無いか、予約名 common / self）`,
+          ? "ccnavi の出力にワークスペースの設定がありません"
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
@@ -374,7 +374,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * ルールファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * ルールファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは層の置き場で変わるので、再読込のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
@@ -444,7 +444,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
  * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
  */
 function show(current: PanelState): void {
@@ -453,7 +453,7 @@ function show(current: PanelState): void {
     return;
   }
   current.error = undefined;
-  // 読み直したので、「外で変わった」はもう今のことではない
+  // 読み直したので、「ファイルの変更を検知しました」はもう今のことではない
   current.changedPending = false;
   current.host.send({
     kind: "page",
@@ -549,7 +549,7 @@ function rulesHost(panel: vscode.WebviewPanel): ScreenHost<RulesData> {
 /**
  * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は捨てるもの。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
  * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
@@ -621,7 +621,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     markTourSeen(SCREEN);
     return;
   }
-  // 読み直せていない画面では、ルールに当たる操作はどれも行き先が無い（「再読込」は
+  // 読み直せていない画面では、ルールに当たる操作はどれも行き先が無い（「更新」は
   // 押せるが、その道は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
@@ -636,7 +636,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
           "更新",
         );
         if (choice !== "更新") {
-          // 画面は「再読込」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
+          // 画面は「更新」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
           // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
           if (alive(current)) {
             current.host.post({ type: "cancelled" } satisfies ToRules);

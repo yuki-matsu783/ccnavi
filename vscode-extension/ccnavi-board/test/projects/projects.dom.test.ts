@@ -308,7 +308,7 @@ test("CB-D98 プロジェクトが無い画面では、案内の間だけ見本�
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["clone する", "プロジェクト", "ワークスペース自身", "共通の設定のルール", "案内"]);
+    assert.deepEqual(titles, ["clone する", "プロジェクト", "ワークスペース（プロジェクト外）", "共通の設定のルール", "案内"]);
     assert.equal(dom.all("li.project").length, 0, "閉じたのに見本が残った");
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
