@@ -171,9 +171,12 @@ const PARENT_MARK_LABELS: Readonly<Record<string, string>> = {
   closed: "親を閉じた",
 };
 
-/** 動かした経路の呼び名 */
+/**
+ * 動かした経路の呼び名。`cli` は sh の副命令から来たことしか言えない（人が端末で同じ sh を打っても `cli`）ので、
+ * 誰が打ったかは断定しない
+ */
 export const VIA_LABELS: Readonly<Record<string, string>> = {
-  cli: "エージェント",
+  cli: "sh（ccnavi-ticket.sh など）",
   terminal: "端末",
   board: "ボード",
   hook: "hook",
@@ -206,4 +209,25 @@ export function historyText(e: HistoryEntryJson): string {
 export function historyAt(at: string): string {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::\d{2})?Z$/.exec(at);
   return m === null ? at : `${m[1]} ${m[2]} UTC`;
+}
+
+/**
+ * 先行を満たしていないカードのバッジ（ADR-0088）。何が止まるかはカードの今で分ける。止めるのは承認と着手（`start`）だけで、
+ * 着手済みの作業・`finish`・書き込みは止めない。先行ごとの状態は実行ファイルが付けた言葉（`label`）のまま出す
+ */
+export function predecessorsBadge(card: Card): { readonly text: string; readonly title: string } {
+  const ids = card.predecessorsUnmet.map((p) => p.ticket).join(", ");
+  const detail = card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`).join("\n");
+  const started = card.startedAt !== "" || card.copyStatus === "review";
+  if (started) {
+    return {
+      text: `先行が未完了（${ids}）`,
+      title: `着手済みです。先行が done/ に無いか取り消し済みで、満たしていません（作業と finish は止まりません）\n${detail}`,
+    };
+  }
+  const what = card.copyStatus === "none" ? "承認も着手も" : "着手が";
+  return {
+    text: `先行待ち（${ids}）`,
+    title: `先行が done/ に入る（取り消しでない）まで、${what}止まります\n${detail}`,
+  };
 }

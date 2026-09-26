@@ -864,7 +864,8 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
       "承認（承認待ち → 作業中）",
     ]);
     assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
-    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["エージェント", "エージェント", "ボード"]);
+    // cli は「sh から来た」までしか言えない（人が端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
     assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
       "フェーズ 2: マーカーを消した（子が足された）",
       "Draft を外した",
@@ -896,6 +897,41 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
     assert.match(title, /i0001-09: どの置き場にも無い/);
     // 先行を満たしているカードには出さない
     assert.equal(page.all('.card[data-id="i0001-02"] .badge.preds').length, 0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認待ちは承認と着手、未着手は着手、着手済み・レビュー待ちは止まらないと言う", async () => {
+  const base = fixture();
+  const unmet = [{ ticket: "i0001-09", state: "doing", label: "作業中（doing/）" }];
+  const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
+  const tickets = base.tickets.map((t) => {
+    if (t.ticket === "i0001-03") {
+      return { ...t, predecessors_unmet: unmet }; // 承認待ち
+    }
+    if (t.ticket === "i0001-02") {
+      return { ...t, started_at: "", predecessors_unmet: unmet }; // 承認済み・未着手
+    }
+    if (t.ticket === "i0001-04") {
+      return { ...t, predecessors_unmet: unmet }; // レビュー待ち
+    }
+    return t;
+  });
+  assert.equal(at("i0001-03").copy.status, "none");
+  assert.equal(at("i0001-02").copy.status, "open");
+  assert.equal(at("i0001-04").copy.status, "review");
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const title = (id: string) => page.one(`.card[data-id="${id}"] .badge.preds`).getAttribute("title") ?? "";
+    assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-09）");
+    assert.match(title("i0001-03"), /承認も着手も止まります/);
+    assert.equal(text(page, '.card[data-id="i0001-02"] .badge.preds'), "先行待ち（i0001-09）");
+    assert.match(title("i0001-02"), /着手が止まります/);
+    assert.doesNotMatch(title("i0001-02"), /承認/);
+    assert.equal(text(page, '.card[data-id="i0001-04"] .badge.preds'), "先行が未完了（i0001-09）");
+    assert.match(title("i0001-04"), /着手済みです/);
+    assert.match(title("i0001-04"), /作業と finish は止まりません/);
   } finally {
     await page.close();
   }

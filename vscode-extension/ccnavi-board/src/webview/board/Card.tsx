@@ -16,6 +16,7 @@ import {
   historyAt,
   historyText,
   holdLabel,
+  predecessorsBadge,
   isHighRisk,
   isHttpUrl,
   movedLabel,
@@ -155,15 +156,8 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   }
   // 先行を満たしていない（ADR-0088）。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
   if (card.predecessorsUnmet.length > 0) {
-    const detail = card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`).join("\n");
-    badges.push(
-      <Badge
-        key="preds"
-        kind="preds"
-        text={`先行待ち（${card.predecessorsUnmet.map((p) => p.ticket).join(", ")}）`}
-        title={`先行が done/ に入る（取り消しでない）まで、承認も着手も止まります\n${detail}`}
-      />,
-    );
+    const badge = predecessorsBadge(card);
+    badges.push(<Badge key="preds" kind="preds" text={badge.text} title={badge.title} />);
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(<Badge key="worktree" kind="worktree none" text="ワークツリーなし" />);
