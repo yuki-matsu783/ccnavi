@@ -42,6 +42,14 @@ OTHER_RULES = {
 OTHER_PHASES = "version: 1\nphases:\n  only-here:\n    kind: work\n    title: よそ\n"
 OTHER_RISK = "version: 1\nfactors:\n  - id: only-here\n    lines_over: 1\n    points: 99\n"
 
+# 共通層の 3 本。(種類, env, フラグ, `--explain --json` の層の欄)。
+# 種類は土台の属性の名前を兼ねる。既定の置き場は `self.<種類>`、よそは `self.other_<種類>`。
+KINDS = (
+    ("rules", "CCNAVI_RULES", "--rules", "rules"),
+    ("phases", "CCNAVI_PHASES", "--phases", "phases_file"),
+    ("risk", "CCNAVI_RISK", "--risk", "risk"),
+)
+
 
 class CommonLayerPlaceHarness(ConfigUnionHarness):
     """共通層の 3 本をフラグで渡さずに動かす道具。"""
@@ -119,32 +127,27 @@ class CommonLayerPlaceHarness(ConfigUnionHarness):
         out = json.loads(result.stdout).get("hookSpecificOutput", {})
         return out.get("permissionDecisionReason", "")
 
+    def other(self, kind):
+        """その種類のよその 1 本（`OTHER_*`）。"""
+        return getattr(self, f"other_{kind}")
+
     def all_three(self):
         """3 本ともよそを指す env。"""
-        return {
-            "CCNAVI_RULES": self.other_rules,
-            "CCNAVI_PHASES": self.other_phases,
-            "CCNAVI_RISK": self.other_risk,
-        }
+        return {env: self.other(kind) for kind, env, _flag, _field in KINDS}
 
 
 class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
     """env は共通層を動かさない。"""
 
-    def test_the_rules_env_does_not_move_the_common_layer(self):
-        """`CCNAVI_RULES` を渡しても、共通層のルールは `.ccnavi/common/rules.yml`。"""
-        layer = self.common(env={"CCNAVI_RULES": self.other_rules})
-        self.assertEqual(layer["rules"]["path"], self.rules)
+    def test_each_env_does_not_move_the_common_layer(self):
+        """env を 1 本渡しても、共通層のその 1 本は `.ccnavi/common/` のまま。
 
-    def test_the_phases_env_does_not_move_the_common_layer(self):
-        """`CCNAVI_PHASES` も同じ。"""
-        layer = self.common(env={"CCNAVI_PHASES": self.other_phases})
-        self.assertEqual(layer["phases_file"]["path"], self.phases)
-
-    def test_the_risk_env_does_not_move_the_common_layer(self):
-        """`CCNAVI_RISK` も同じ。"""
-        layer = self.common(env={"CCNAVI_RISK": self.other_risk})
-        self.assertEqual(layer["risk"]["path"], self.risk)
+        `CCNAVI_RULES` → `rules.yml`、`CCNAVI_PHASES` → `phases.yml`、`CCNAVI_RISK` → `risks.yml`。
+        """
+        for kind, env, _flag, field in KINDS:
+            with self.subTest(env=env):
+                layer = self.common(env={env: self.other(kind)})
+                self.assertEqual(layer[field]["path"], getattr(self, kind))
 
     def test_the_three_envs_together_do_not_move_anything(self):
         """3 本まとめて渡しても動かない。"""
@@ -167,17 +170,12 @@ class EnvDoesNotMoveTheCommonLayerTest(CommonLayerPlaceHarness):
 class FlagsStillMoveTheCommonLayerTest(CommonLayerPlaceHarness):
     """診断のためのフラグは残る。消しすぎの見張り。"""
 
-    def test_the_rules_flag_still_moves_the_common_layer(self):
-        layer = self.common(flags=("--rules", self.other_rules))
-        self.assertEqual(layer["rules"]["path"], self.other_rules)
-
-    def test_the_phases_flag_still_moves_the_common_layer(self):
-        layer = self.common(flags=("--phases", self.other_phases))
-        self.assertEqual(layer["phases_file"]["path"], self.other_phases)
-
-    def test_the_risk_flag_still_moves_the_common_layer(self):
-        layer = self.common(flags=("--risk", self.other_risk))
-        self.assertEqual(layer["risk"]["path"], self.other_risk)
+    def test_each_flag_still_moves_the_common_layer(self):
+        """`--rules` / `--phases` / `--risk` は、診断（`--explain`）ではそれぞれの 1 本を動かす。"""
+        for kind, _env, flag, field in KINDS:
+            with self.subTest(flag=flag):
+                layer = self.common(flags=(flag, self.other(kind)))
+                self.assertEqual(layer[field]["path"], self.other(kind))
 
     def test_the_flag_wins_over_the_env(self):
         """env を渡してもフラグが勝つ。env は読まれないので当然そうなる。"""
@@ -213,13 +211,11 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
 
     def test_each_of_the_three_flags_says_it_was_dropped(self):
         """3 本とも、落としたことを標準エラーで名指しする。"""
-        for flag, path in (
-            ("--rules", self.other_rules),
-            ("--phases", self.other_phases),
-            ("--risk", self.other_risk),
-        ):
+        for kind, _env, flag, _field in KINDS:
             with self.subTest(flag=flag):
-                result = self.decide("Read", flags=(flag, path), file_path=self.target())
+                result = self.decide(
+                    "Read", flags=(flag, self.other(kind)), file_path=self.target()
+                )
                 self.assertIn(f"{flag} は診断", result.stderr)
 
     def test_the_wording_is_the_one_the_project_file_flags_use(self):
@@ -268,8 +264,8 @@ class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):
     def test_named_tool_writes_into_the_default_place_are_denied_while_the_env_names_another(self):
         """env がよそを指していても、`.ccnavi/common/` の 3 本は組み込みで止まる。
 
-        いまは守る対象を `conf.rules` などから組み立てるので、env がよそを指すと
-        `builtin-guard-common-layer` はそちらに付く。固定になれば既定の置き場に戻る。
+        守る対象は既定の置き場から組み立てる（ADR-0052）。env を読む経路が戻ると、
+        `builtin-guard-common-layer` が env の指すよそへ付け替わり、ここが落ちる。
         """
         for path in (self.rules, self.phases, self.risk):
             with self.subTest(path=os.path.basename(path)):
