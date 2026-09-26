@@ -11,9 +11,11 @@
  * 置き場と錠は実行ファイルに聞く（`--explain --json` の `tickets[].flow`）。拡張は置き場を組まず、
  * 着手中かを `started_at` から組み直さない（ADR-0035）。フローが正しいか（読めるか・形）も実行ファイルに聞く。
  * 開くときは読んだ本文を、保存の前は書き出す本文を一時ファイルに書いて `--lint --json --flow` に掛け
- * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。保存は次を全部満たすときだけ書く。
+ * （`core/flow-lint.ts`）、error があれば理由を出して開かない・保存しない。開くときは、画面の読みと実行ファイルが
+ * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-agree.ts`）。保存は次を全部満たすときだけ書く。
  *
- * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わない
+ * 1. 実行ファイルの `--lint --flow` が書き出す本文に error を言わず、その本文を読んだ中身（`flow.data`）が
+ *    画面が書こうとした中身と同じ（`core/flow-agree.ts`。PyYAML で意味が変わる本文を書かない）
  * 2. 押した時点で実行ファイルに聞き直し、`locked` が偽（着手中でない）
  * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
  * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
@@ -34,10 +36,11 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runFlowLint } from "./ccnavi.js";
-import { parseFlow, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
+import { flowDisagreement, openDisagreementText, saveDisagreementText } from "./core/flow-agree.js";
+import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
 import { renderFlowPage } from "./core/flow-render.js";
-import { readFlowFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
 import {
   asFlowMessage,
   flowTargetOf,
@@ -179,7 +182,7 @@ async function lookUp(root: string, ticket: string): Promise<FlowTarget> {
 }
 
 /** 本文を実行ファイルに確かめさせる。error があれば理由を返す（`core/flow-lint.ts`） */
-function lintText(root: string, tmpDir: string, text: string, shown: string) {
+function lintText(root: string, tmpDir: string, text: string | Uint8Array, shown: string) {
   return lintFlowText(text, tmpDir, shown, (file) => runFlowLint(root, binSetting(), file));
 }
 
@@ -187,7 +190,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   const target = await lookUp(root, ticket);
   const filePath = target.flow.path;
   const shown = shownPath(root, filePath);
-  let read: { readonly text: string; readonly mtimeMs: number } | undefined;
+  let read: { readonly bytes: Uint8Array; readonly mtimeMs: number } | undefined;
   try {
     // リンクは辿らない（ツリーのルートからファイルまでの途中も）。読まないし書かない
     read = readFlowFile(target.flow.tree, filePath);
@@ -198,18 +201,33 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
     return { target, exists: false, mtimeMs: 0, doc: templateFlow(ticket, target.title), shown };
   }
-  const { text, mtimeMs } = read;
-  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読めないフローを画面で直すと、
-  // 読めなかった部分を落として書くことになる。エディタで直させる
-  const verdict = await lintText(root, tmpDir, text, shown);
+  const { bytes, mtimeMs } = read;
+  const refuse = (why: string): Error => new Error(`フローのファイルを開かない（${shown}）: ${why}。エディタで直してから再読込する`);
+  // 正しいかは実行ファイルに聞く（SubagentStart と同じ読み）。読んだバイトのまま渡す（UTF-8 として壊れているかも
+  // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を落として書くことになる。エディタで直させる
+  const verdict = await lintText(root, tmpDir, bytes, shown);
   if (!verdict.ok) {
-    throw new Error(`フローのファイルを開かない（${shown}）: ${verdict.error}。エディタで直してから再読込する`);
+    throw refuse(verdict.error);
   }
-  const parsed = parseFlow(text);
-  if (!parsed.ok) {
-    throw new Error(`フローのファイルを開かない（${shown}）: ${parsed.error}。エディタで直してから再読込する`);
+  const decoded = decodeFlowBytes(bytes);
+  if (!decoded.ok) {
+    throw refuse(decoded.error);
   }
-  return { target, exists: true, mtimeMs, doc: parsed.doc, shown };
+  const value = parseFlowValue(decoded.text);
+  if (!value.ok) {
+    throw refuse(value.error);
+  }
+  // 画面の読み（YAML 1.2）が実行ファイルの読み（PyYAML）と同じときだけ開く。違えば、画面で保存しただけで
+  // 値の意味が変わる（`0755` `yes` `1:30` マージキー など）。意味の答えは実行ファイルが持つ（core/flow-agree.ts）
+  const disagreement = flowDisagreement(value.value, verdict.data);
+  if (disagreement !== undefined) {
+    throw new Error(`フローのファイルを開かない（${shown}）: ${openDisagreementText(disagreement)}。直したら再読込する`);
+  }
+  const doc = asFlowDoc(value.value);
+  if (doc === undefined) {
+    throw refuse("ノードの並び（id が文字列のノード）が取れないので描けない");
+  }
+  return { target, exists: true, mtimeMs, doc, shown };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -495,6 +513,12 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   }
   if (!verdict.ok) {
     fail(current, `保存しない: ${verdict.error}`);
+    return;
+  }
+  // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-agree.ts）
+  const disagreement = flowDisagreement(doc, verdict.data);
+  if (disagreement !== undefined) {
+    fail(current, `保存しない: ${saveDisagreementText(disagreement)}`);
     return;
   }
   // 2. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）

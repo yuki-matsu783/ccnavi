@@ -186,19 +186,30 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
  * キーと値の並び）が取れないとき。**例外は外に出さない。**
  */
 export function parseFlow(text: string): FlowRead {
-  let raw: unknown;
+  const read = parseFlowValue(text);
+  if (!read.ok) {
+    return read;
+  }
+  const doc = asFlowDoc(read.value);
+  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
+}
+
+/**
+ * YAML の本文を `yaml` の既定で読んだ中身（形は確かめない）。実行ファイルが読んだ中身と見比べるのに使う
+ * （`flow-agree.ts`。描けるかより先に見比べるので、マージキーのような読みの違いも「食い違い」として言える）。
+ * 先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。**例外は外に出さない。**
+ */
+export function parseFlowValue(text: string): { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly error: string } {
   try {
     const doc = parseDocument(text.replace(/^\uFEFF/, ""));
     const problem = doc.errors[0];
     if (problem !== undefined) {
       return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(problem.message)}）` };
     }
-    raw = doc.toJS();
+    return { ok: true, value: doc.toJS() };
   } catch (error) {
     return { ok: false, error: `画面の YAML の読み手で読めないので描けない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
-  const doc = asFlowDoc(raw);
-  return doc === undefined ? { ok: false, error: "ノードの並び（id が文字列のノード）が取れないので描けない" } : { ok: true, doc };
 }
 
 function firstLine(text: string): string {
@@ -222,8 +233,12 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
 /**
  * 書き出す本文。字下げ 2 のブロック形式で、長い行を折らない。複数行の文は `|` の形で書く。
  * 同じ中身が 2 度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
- * 実行ファイル（YAML 1.1）が文字以外に読む綴り（`yes` `0755` `2026-01-01` など）は引用符で囲む。
+ * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む綴り（`yes` `0755` `2026-01-01` など）と、
+ * 裸や `|` では PyYAML が読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
  * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
+ *
+ * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
+ * （`flow-agree.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
  */
 export function serializeFlow(doc: FlowDoc): string {
   return yamlText(doc);
@@ -234,12 +249,61 @@ export function yamlText(value: unknown): string {
   const out = new Document(value, { aliasDuplicateObjects: false });
   visit(out, {
     Scalar(_key, node) {
-      if (typeof node.value === "string" && yaml11Ambiguous(node.value) && !/^[yYnN]$/.test(node.value)) {
+      if (typeof node.value !== "string") {
+        return;
+      }
+      if ((yaml11Ambiguous(node.value) && !/^[yYnN]$/.test(node.value)) || needsDoubleQuotes(node.value)) {
         node.type = Scalar.QUOTE_DOUBLE;
       }
     },
   });
-  return out.toString({ lineWidth: 0 });
+  // 二重引用符の中は JSON と同じ書き方にする（`yaml` の折り返しや独自のエスケープを使わない。PyYAML は JSON の
+  // エスケープを全部読む）。そのうえで JSON が裸のまま残す文字を、PyYAML が読めるエスケープに直す
+  return escapeForPyYaml(out.toString({ lineWidth: 0, doubleQuotedAsJSON: true }));
+}
+
+/**
+ * PyYAML が本文に裸では置けない文字（読み手が断る）。C0 の制御文字（タブ・改行・復帰を除く）、DEL、
+ * C1 の制御文字（U+0085 を除く）、U+FFFE・U+FFFF、対になっていないサロゲート
+ */
+const PYYAML_UNPRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に畳まれる）と、文書の頭で読み飛ばす BOM */
+const PYYAML_BREAKS = /[\u0085\u2028\u2029\uFEFF]/;
+
+/**
+ * 裸でも `|` でも正しく書けない文字列。二重引用符（とエスケープ）で書く。
+ *
+ * - タブ・復帰・U+0085・U+2028・U+2029・U+FEFF・PyYAML が裸では読めない文字を含む（`a\tb` を裸で書くと PyYAML が
+ *   読めない。U+0085 などは PyYAML が改行として読む。本文の頭の U+FEFF は BOM として読み飛ばされる）
+ * - 複数行で、1 行目の頭が空白（1 行目が空白だけの `|+` は PyYAML が中身を取り違える。字下げの指示に頼らない）か、
+ *   どこかの行の末尾が空白（空白だけの行を含む。行末の空白の扱いを読み手に任せない）。2 行目から先の頭の空白は
+ *   `|` のままで読める
+ */
+export function needsDoubleQuotes(text: string): boolean {
+  if (/[\t\r]/.test(text) || PYYAML_BREAKS.test(text) || PYYAML_UNPRINTABLE.test(text)) {
+    return true;
+  }
+  if (!text.includes("\n")) {
+    return false;
+  }
+  return /^[ \t]/.test(text) || text.split("\n").some((line) => /[ \t]$/.test(line));
+}
+
+const BREAK_ESCAPES: Readonly<Record<string, string>> = { "\u0085": "\\N", "\u2028": "\\L", "\u2029": "\\P" };
+
+/**
+ * JSON の書き方が裸のまま残す文字を、PyYAML の二重引用符のエスケープに直す。こうした文字を含む文字列は
+ * どれも二重引用符で書いてある（`needsDoubleQuotes`）ので、本文に裸で出るのは二重引用符の中だけ
+ */
+function escapeForPyYaml(text: string): string {
+  return text.replace(/[\u0085\u2028\u2029\x7F-\x84\x86-\x9F\uFEFF\uFFFE\uFFFF]/g, (ch) => {
+    const named = BREAK_ESCAPES[ch];
+    if (named !== undefined) {
+      return named;
+    }
+    const code = ch.charCodeAt(0);
+    return code <= 0xff ? `\\x${code.toString(16).padStart(2, "0")}` : `\\u${code.toString(16).padStart(4, "0")}`;
+  });
 }
 
 /**

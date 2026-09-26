@@ -48,7 +48,8 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 `connections` が並びでない）も読めない理由として 1 行で言う（`shape_problem`）。
 `ccnavi --lint --flow <パス>` は同じ読み手・同じ検査（`load`）でファイルを確かめ、読めなければ
 error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
-これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。
+これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。`--json` なら読めた中身も載せ（`as_json`）、
+画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば開かない・保存しない。
 
 読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの写しは読まない。
 
@@ -70,8 +71,11 @@ error で言う。ボードのフロー編集画面は、開くときと保存�
 
 from __future__ import annotations
 
+import base64
+import datetime
 import hashlib
 import json
+import math
 import os
 import posixpath
 import stat
@@ -486,9 +490,22 @@ def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
     raw, why = read_bytes(path, tree_root)
     if raw is None:
         return None, why
+    return parse(raw)
+
+
+def parse(raw: bytes) -> tuple[dict | None, str]:
+    """フローの中身（バイト）を読む。(中身, 読めない理由)。例外は外に出さない。
+
+    文字は UTF-8（先頭の BOM は 1 つ外す。`utf-8-sig`）。UTF-8 として壊れていれば読まない
+    （置き換え文字で埋めて読むと、壊れた部分を落とした手順が渡る）。
+    """
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        return None, f"{NOT_UTF8}（{exc.start + 1} バイト目）"
     try:
         # _Loader は SafeLoader に別名の守りを足したもの（任意の型は作らない）。
-        data = yaml.load(raw.decode("utf-8-sig"), Loader=_Loader)
+        data = yaml.load(text, Loader=_Loader)
     except _AliasRefused:
         return None, ALIASED
     except OSError as exc:
@@ -505,6 +522,69 @@ def load(path: str, tree_root: str = "") -> tuple[dict | None, str]:
     if why:
         return None, why
     return data, ""
+
+
+NOT_UTF8 = "UTF-8 として読めない"
+
+# `as_json` の印の鍵。JSON にそのまま載らない値（下）をこの鍵を持つオブジェクトで表す。
+JSON_MARK = "$ccnavi"
+# JSON の数として拡張（JavaScript）が崩さずに読める整数の範囲
+_SAFE_INT = 2**53 - 1
+
+
+def as_json(value):
+    """読めた中身を JSON に載せる形にする（`--lint --json --flow` の `flow.data`）。
+
+    VS Code 拡張のフロー編集画面は、自分の YAML の読み手（1.2）が読んだ中身とこれを見比べ、
+    食い違えば開かない・保存しない（読みの答えは実行ファイルが持つ。ADR-0035）。
+    文字列・真偽値・null・並び・文字列をキーとする辞書と、`±(2**53 - 1)` までの整数は
+    そのまま載せる。ほかは `{"$ccnavi": <種類>, ...}` の印にする。
+
+    - 浮動小数は `{"$ccnavi": "float", "value": <数>}`
+      （JSON では 1 と 1.0 の区別が消えるので包む）。
+      有限でなければ `"text"` に `inf` / `-inf` / `nan`
+    - 範囲の外の整数は `{"$ccnavi": "int", "text": <十進>}`
+    - キーが文字列でない辞書と、鍵 `$ccnavi` を持つ辞書は
+      `{"$ccnavi": "map", "items": [[キー, 値], ...]}`
+    - 日付・日時・バイト列（`!!binary`）・集合（`!!set`）・組（`!!omap` / `!!pairs` の 1 件）・
+      そのほかは
+      `{"$ccnavi": "date" | "datetime" | "bytes" | "set" | "tuple" | "other", "text": <綴り>}`
+    """
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if isinstance(value, int):
+        if -_SAFE_INT <= value <= _SAFE_INT:
+            return value
+        return {JSON_MARK: "int", "text": _digits(value)}
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return {JSON_MARK: "float", "value": value}
+        text = "nan" if math.isnan(value) else ("inf" if value > 0 else "-inf")
+        return {JSON_MARK: "float", "text": text}
+    if isinstance(value, list):
+        return [as_json(item) for item in value]
+    if isinstance(value, dict):
+        if JSON_MARK not in value and all(isinstance(key, str) for key in value):
+            return {key: as_json(item) for key, item in value.items()}
+        return {JSON_MARK: "map", "items": [[as_json(k), as_json(v)] for k, v in value.items()]}
+    if isinstance(value, datetime.datetime):
+        return {JSON_MARK: "datetime", "text": value.isoformat()}
+    if isinstance(value, datetime.date):
+        return {JSON_MARK: "date", "text": value.isoformat()}
+    if isinstance(value, bytes):
+        return {JSON_MARK: "bytes", "text": base64.b64encode(value).decode("ascii")}
+    if isinstance(value, (set, frozenset)):
+        return {JSON_MARK: "set", "text": _line(repr(sorted(map(repr, value))))}
+    if isinstance(value, tuple):
+        return {JSON_MARK: "tuple", "text": _line(repr(value))}
+    return {JSON_MARK: "other", "text": type(value).__name__}
+
+
+def _digits(value: int) -> str:
+    try:
+        return str(value)
+    except ValueError:  # 桁の上限（sys.set_int_max_str_digits）を越える
+        return "(桁が多すぎる)"
 
 
 def shape_problem(data) -> str:

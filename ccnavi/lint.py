@@ -128,8 +128,10 @@ def report(
     )
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
+    flow_data = None
     if flow_path:
-        problems.extend(flow_problems(flow_path, root))
+        flow_said, flow_data = flow_problems(flow_path, root)
+        problems.extend(flow_said)
     problems += [
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
         for line in said.getvalue().splitlines()
@@ -216,6 +218,10 @@ def report(
             "warns": warns,
             "infos": infos,
         }
+        if flow_path:
+            # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
+            # （README「lint の JSON」）
+            payload["flow"] = {"path": flow_path, "data": flow_data}
         stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_ERROR if errors else EXIT_OK
@@ -371,14 +377,17 @@ def _risk(conf: settings.Settings, root: str) -> list[Problem]:
 FLOW_WHERE = "(flow)"
 
 
-def flow_problems(path: str, root: str) -> list[Problem]:
+def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     """子のフローのファイル 1 本が、SubagentStart が読むのと同じ読みで読めるか（`--lint --flow`）。
 
+    (苦情, 読めた中身を `flow.as_json` にしたもの。読めなければ None) を返す。
     読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
-    YAML として読めない、別名、形）。ここで別に書くと、画面が「正しい」と言ったフローを
-    SubagentStart が読めない、という食い違いになる（ADR-0035）。読めなければ error。
+    UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
+    「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（ADR-0035）。
+    読めなければ error。
     ツリーの中のファイルなら、ツリーのルートからの途中のリンクも見る（SubagentStart と同じ）。
     無いファイルも error にする（確かめたつもりで何も確かめていない形を作らない）。
+    中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
     """
     shown = flow.clean(path)
     try:
@@ -386,16 +395,20 @@ def flow_problems(path: str, root: str) -> list[Problem]:
     except (OSError, ValueError):
         exists = False
     if not exists:
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")]
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None
     try:
         rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root)) if root else os.pardir
     except ValueError:  # Windows でドライブが違う
         rel = os.pardir
     inside = rel != os.pardir and not rel.startswith(os.pardir + os.sep) and not os.path.isabs(rel)
-    _, why = flow.load(path, root if inside else "")
+    data, why = flow.load(path, root if inside else "")
     if why:
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")]
-    return []
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None
+    try:
+        return [], flow.as_json(data)
+    except RecursionError:
+        deep = f"{shown}: 入れ子が深すぎて中身を渡せない"
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:

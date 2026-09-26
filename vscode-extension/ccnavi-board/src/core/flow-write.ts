@@ -198,8 +198,24 @@ function changedSince(file: string, expect: FlowExpect): string | undefined {
   return undefined;
 }
 
-/** 読む。リンクを辿らない。無ければ undefined（フローは任意）、読めなければ例外 */
-export function readFlowFile(tree: string, file: string): { readonly text: string; readonly mtimeMs: number } | undefined {
+/**
+ * 読んだバイトを文字にする。UTF-8 として壊れていれば読まない（置き換え文字で埋めると、壊れた部分を落として
+ * 書き直すことになる）。先頭の BOM は 1 つ外す（実行ファイルの `utf-8-sig` と同じ）。文面は実行ファイル
+ * （`flow.NOT_UTF8`）に揃える
+ */
+export function decodeFlowBytes(bytes: Uint8Array): { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string } {
+  try {
+    return { ok: true, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
+  } catch {
+    return { ok: false, error: "UTF-8 として読めない" };
+  }
+}
+
+/**
+ * 読む。リンクを辿らない。無ければ undefined（フローは任意）、読めなければ例外。中身はバイトのまま返す
+ * （開くときは、このバイトのまま実行ファイルに確かめさせ、文字にするのは `decodeFlowBytes`）
+ */
+export function readFlowFile(tree: string, file: string): { readonly bytes: Uint8Array; readonly mtimeMs: number } | undefined {
   if (segments(tree, file) === undefined) {
     throw new Error(`ツリーの外は読まない（${file}）`);
   }
@@ -247,7 +263,7 @@ export function readFlowFile(tree: string, file: string): { readonly text: strin
     if (length > FLOW_FILE_LIMIT) {
       throw new Error(`${file} が大きすぎるので読まない（上限 ${FLOW_FILE_LIMIT} バイト）`);
     }
-    return { text: buffer.subarray(0, length).toString("utf8"), mtimeMs: opened.mtimeMs };
+    return { bytes: Uint8Array.from(buffer.subarray(0, length)), mtimeMs: opened.mtimeMs };
   } finally {
     fs.closeSync(fd);
   }

@@ -29,6 +29,16 @@ export interface LintJson {
   readonly problems: readonly LintProblem[];
   readonly errors: number;
   readonly warns: number;
+  /**
+   * `--flow <パス>` を渡したときだけ在る。実行ファイルが読んだフローの中身（`data`。読めなければ null。
+   * JSON にそのまま載らない値は `{"$ccnavi": ...}` の印）。無ければ、実行ファイルがフローを見たか分からない
+   */
+  readonly flow?: LintFlow;
+}
+
+export interface LintFlow {
+  readonly path: string;
+  readonly data: unknown;
 }
 
 export type ParsedLint = { readonly ok: true; readonly value: LintJson } | { readonly ok: false; readonly error: string };
@@ -64,6 +74,7 @@ export function parseLintJson(text: string): ParsedLint {
       problems,
       errors: typeof raw.errors === "number" ? raw.errors : errors,
       warns: typeof raw.warns === "number" ? raw.warns : problems.length - errors,
+      ...(isRecord(raw.flow) && "data" in raw.flow ? { flow: { path: str(raw.flow.path), data: raw.flow.data } } : {}),
     },
   };
 }

@@ -9,6 +9,8 @@ VS Code 拡張のフロー編集画面は、開くときと保存の前に編集
 4. 形の誤り（`nodes` が無い、`id` が無い・重なる、`connections` が並びでない）は
    SubagentStart の読み（`flow.load`）とここで同じ理由になる
 5. 診断の外では落として言う。`--lint` でない診断でも読まずにそう言う
+6. `--json` には読めた中身（`flow.data`）を載せる。JSON にそのまま載らない値は印にする
+   （拡張は自分の読みとこれを見比べ、食い違えば開かない・保存しない）
 """
 
 from __future__ import annotations
@@ -140,6 +142,69 @@ class FlowLintTest(unittest.TestCase):
         self.assertIn(
             os.path.realpath(self.outside), os.path.realpath(flows[0]["detail"].split(":")[0])
         )
+
+    def flow_data(self, text: str):
+        result = self.lint(self.file(text))
+        payload = json.loads(result.stdout)
+        self.assertIn("flow", payload)
+        return payload["flow"]["data"]
+
+    def test_the_json_carries_what_was_read(self):
+        path = self.file(WORKFLOW_YAML)
+        payload = json.loads(self.lint(path).stdout)
+        self.assertEqual(payload["flow"]["path"], path)
+        self.assertEqual(payload["flow"]["data"]["nodes"][0]["id"], "s")
+        # 読めなければ中身は null（苦情は error）。
+        broken = json.loads(self.lint(self.file("nodes: [\n")).stdout)
+        self.assertIsNone(broken["flow"]["data"])
+        # --flow を渡さなければ欄ごと無い（今までの形のまま）。
+        plain = json.loads(run_ccnavi(["--root", self.root, "--lint", "--json"]).stdout)
+        self.assertNotIn("flow", plain)
+
+    def test_values_are_read_by_pyyaml_and_marked_when_json_cannot_hold_them(self):
+        mark = flow.JSON_MARK
+        head = "nodes:\n  - id: a\n    data:\n"
+        cases = (
+            ("0755", 493),
+            ("yes", True),
+            ("on", True),
+            ("1:30", 90),
+            ("0o17", "0o17"),
+            ("1e3", "1e3"),
+            ("1_000", 1000),
+            ("1.", {mark: "float", "value": 1.0}),
+            ("1.5", {mark: "float", "value": 1.5}),
+            ("!!float 1", {mark: "float", "value": 1.0}),
+            (".inf", {mark: "float", "text": "inf"}),
+            (".nan", {mark: "float", "text": "nan"}),
+            ("2026-01-01", {mark: "date", "text": "2026-01-01"}),
+            ("!!binary aGk=", {mark: "bytes", "text": "aGk="}),
+            ("123456789012345678901", {mark: "int", "text": "123456789012345678901"}),
+            ("{1: a}", {mark: "map", "items": [[1, "a"]]}),
+            ('{"$ccnavi": a}', {mark: "map", "items": [["$ccnavi", "a"]]}),
+            ("~", None),
+            ("'yes'", "yes"),
+        )
+        for value, read in cases:
+            with self.subTest(value=value):
+                data = self.flow_data(f"{head}      v: {value}\n")
+                self.assertEqual(data["nodes"][0]["data"]["v"], read)
+
+    def test_merge_keys_are_read_as_pyyaml_reads_them(self):
+        # 別名を使わないマージキーは PyYAML が畳む。拡張の読み手は畳まないので、
+        # 画面は食い違いとして断る。
+        data = self.flow_data("nodes: [{<<: {id: a}}]\n")
+        self.assertEqual(data["nodes"], [{"id": "a"}])
+
+    def test_broken_utf8_is_an_error_and_a_bom_is_dropped(self):
+        path = os.path.join(self.outside, "bad.yml")
+        with open(path, "wb") as f:
+            f.write(b"nodes:\n  - id: a\n    name: \xff\xfe\n")
+        self.assert_refused(path, flow.NOT_UTF8)
+        bom = os.path.join(self.outside, "bom.yml")
+        with open(bom, "wb") as f:
+            f.write(b"\xef\xbb\xbfnodes:\n  - id: a\n")
+        self.assertEqual(self.flow_problems(bom), [])
 
     def test_only_lint_reads_the_flag(self):
         path = self.file("nodes: [\n")

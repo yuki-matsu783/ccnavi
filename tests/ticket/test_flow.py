@@ -497,6 +497,21 @@ class FlowInfoTest(unittest.TestCase):
                 self.assertFalse(shown["exists"])
                 self.assertEqual(shown["locked"], started)
 
+    def test_children_waiting_for_review_keep_the_field_and_are_not_locked(self):
+        # レビュー待ちは閉じた扱いにしない（今の仕様）。フローが無くても欄を返し、
+        # 着手のあとでも錠は掛けない（錠は `doing` の間だけ）。
+        for started in (False, True):
+            with self.subTest(started=started):
+                shown = flow.info(self.conf, self.root, self.child(ticket.REVIEW, started=started))
+                self.assertIsNotNone(shown)
+                self.assertFalse(shown["exists"])
+                self.assertFalse(shown["locked"])
+                self.assertEqual(shown["rel"], f".ccnavi/approved/flows/{CHILD}.yml")
+        write(flow.flow_file(self.conf, self.root, CHILD), WORKFLOW_YAML)
+        shown = flow.info(self.conf, self.root, self.child(ticket.REVIEW, started=True))
+        self.assertTrue(shown["exists"])
+        self.assertFalse(shown["locked"])
+
 
 class FlowHarness(PhaseHarness):
     """親 1 本（research）と、フローを持つ子 1 本。親の範囲に承認済みの領域は入らない。
