@@ -726,10 +726,11 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 画面で直せる。保存の前に `--lint --risk` を通す。点を数えるのは実行ファイルで、拡張は差分を数えない。
 ファイルが無ければ組み込みと同じ値で作れる。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
 
-同じ拡張の「フェーズ管理画面」で、フェーズの種類（`.ccnavi/common/phases.yml`、「フェーズの種類と計画」の節）を
-画面で直せる。保存の前に `--lint --phases` を通すので、提案がワークツリーに在る親の計画が指す種類を消すとそこで止まる
+同じ拡張の「フェーズ管理画面」で、フェーズの種類（「フェーズの種類と計画」の節）を画面で直せる。対象は共通層
+（`.ccnavi/common/phases.yml`）、自身の層（`.ccnavi/config/phases.yml`）、プロジェクトの層の 3 種。
+保存の前に `--lint --phases`（層なら `--project-phases-file`）を通すので、提案がワークツリーに在る親の計画が指す種類を消すとそこで止まる
 （承認済みチケットの計画は照合しない。チケット制御が disable なら照合は走らない）。
-子の範囲が上限に収まるかを判定するのは実行ファイルで、拡張は種類を書く場所だけ。ファイルが無ければ README の例を
+子の範囲が上限に収まるかを判定するのは実行ファイルで、拡張は種類を書く場所だけ。共通層のファイルが無ければ README の例を
 雛形として作れる（組み込みの既定は無い）。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
 
 ## Bash のコマンドは実行される部分だけを見る
@@ -1394,11 +1395,13 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 
 ### フェーズの種類と計画
 
-`.ccnavi/common/phases.yml` に**フェーズの種類**を定義し、親が `plan:` にその並びを書くと、フェーズに意味が付く。
-種類は人が持つ設定で、エージェントは書き換えない。ファイルが無ければ番号だけの挙動のまま。設計は [ccnavi.md](ccnavi.md) の 9.7。
+`phases.yml` に**フェーズの種類**を定義し、親が `plan:` にその並びを書くと、フェーズに意味が付く。
+置き場は層ごと（共通層 `.ccnavi/common/`、自身の層とプロジェクトの層 `.ccnavi/config/`）で、`scope` の綴りが
+レイアウトに付くならワークスペース自身の層に置く（このリポジトリもそう）。
+種類は人が持つ設定で、エージェントは書き換えない。どの層にも無ければ番号だけの挙動のまま。設計は [ccnavi.md](ccnavi.md) の 9.7。
 
 ```yaml
-# .ccnavi/common/phases.yml
+# .ccnavi/config/phases.yml
 version: 1
 phases:
   research:
@@ -2095,7 +2098,8 @@ hook の文字列一致は外れる。そこまで塞ぐなら `permissions.deny
 | `tests/` | 受入テスト。内部の関数は呼ばず、標準入出力と終了コードだけを見る |
 | `tools/gitlab/` | 実物または代役の GitLab に sh と実行ファイルを当てて 1 周する、人が手で回す道具。自動テストは呼ばない |
 | `tests/fixtures/` | テスト用のルール（`rules.yml`、言及の無い呼び出しを見る `rules-undeclared.yml`） |
-| `.ccnavi/common/rules.yml` / `phases.yml` / `risks.yml` | このリポジトリ自身の共通層の設定 3 本 |
+| `.ccnavi/common/rules.yml` / `risks.yml` | このリポジトリ自身の共通層の設定（共通層に `phases.yml` は置かない） |
+| `.ccnavi/config/phases.yml` | このリポジトリ自身の層のフェーズの種類 |
 | `.ccnavi/common/rule-samples.yml` | ルールが何を止めて何を通すかの見本 |
 | `tools/check_rules.py` | 見本をぜんぶ判定に掛ける |
 | `vscode-extension/ccnavi-board/` | VS Code 拡張。ボード・ルール設定・リスク管理・プロジェクト管理の画面 |
