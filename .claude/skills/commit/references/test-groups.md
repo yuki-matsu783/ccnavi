@@ -1,7 +1,5 @@
 # テストのグループと、回すグループの決め方
 
-コミット前の検査（SKILL.md の手順 2）で、全件ではなくグループ単位でテストを回すための表。
-
 ## グループ
 
 `tests/<グループ>/` に置く。時間は macOS で 1 本ずつ回したときの目安。
@@ -22,9 +20,7 @@ uv run python -m unittest discover -s tests -t .         # 全件
 
 複数のグループは 1 つずつ続けて回す（`discover -s` は 1 か所しか取らない）。
 
-**全件を打つときは `tools/run_tests.py` のほうが速い。** モジュールごとに別プロセスへ分けて
-同時に回す。回る中身は discover と同じで（`tests/core/test_run_tests.py` が突き合わせる）、
-分け方と並べ方だけが違う。この機械で 177 秒が 63 秒（4 コア）。
+全件は `tools/run_tests.py` のほうが速い（モジュールごとに別プロセスで同時に回す。中身は discover と同じ）。
 
 ```sh
 uv run python tools/run_tests.py                 # 全件
@@ -32,13 +28,11 @@ uv run python tools/run_tests.py tests/ticket    # グループを名指し（�
 uv run python tools/run_tests.py --plan          # 何をどの順で回すか出すだけ
 ```
 
-落ちたら、そこで新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。
-**ターンの終わりの hook はこれを使わない。** あちらの `--failfast` は「最初に落ちた 1 件」が
-毎回同じになることに寄りかかっていて、同時に回すとそこがぶれる。
+落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
 
 ## 回すグループ
 
-**`core` はいつも回す。** そのうえで、変えたファイルを下の表に当てて、当たった行のグループを足す。
+`core` はいつも回す。そのうえで、変えたファイルを下の表に当てて、当たった行のグループを足す。
 
 | 変えたもの | 足すグループ |
 |---|---|
@@ -58,16 +52,12 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 | `docs/adr/`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
-**自動テストが無いもの。** 次は、どのグループを回しても、全件を回しても中身が確かめられない。
-表に入れていないのはそのため。変えたら手で動かして確かめる。
+自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:
 
-- `.claude/hooks/lint-py.sh`（`guard` の `test_fallback` がパスを文字列として使うだけで、実行しない）
-- `.claude/hooks/test-py.sh`（`e2e` は sh の外形だけ。差し戻しの回数と、落ちたテストを
-  差し戻すところは回らない。変えたら手で確かめる。`test-ext.sh` のほうは
-  `core` の `test_ext_tests` が控えの入口を渡して、終了コードの読み方・差し戻しの回数・
-  綴りの扱いまで見る）
+- `.claude/hooks/lint-py.sh`
+- `.claude/hooks/test-py.sh` の差し戻しの回数と、落ちたテストを差し戻すところ（`e2e` は sh の外形だけ見る）
 
-**全件を回すとき。**
+全件を回すとき:
 
 - 表のどの行にも当たらないファイルを変えた
 - `.ccnavi/scripts/ccnavi-common.sh`、`.ccnavi/common/`、`.ccnavi/config/`、`tests/__init__.py`、`tests/inproc.py`、
@@ -75,23 +65,21 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 - 統合先へ戻す前、MR に出す前
 - どの行に当たるか迷った
 
-`ccnavi/*.py` を変えたとき `e2e` は足さない。e2e が試すのはソースではなく組み立て済みの実行ファイルで、
-組み立て直さないと変更が届かないため。組み立て直したなら足す。
+`ccnavi/*.py` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
 
 ## 拡張（`vscode-extension/ccnavi-board`）のグループ
 
 拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / shared）。
-**こちらは表を引かない。** 変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
+こちらは表を引かない。変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
 
 ```sh
 cd vscode-extension/ccnavi-board
 pnpm test:plan src/core/rules-doc.ts   # 何を回すかだけ見る
 pnpm test:for src/core/rules-doc.ts    # 回す
-pnpm test                              # 全部（203 本。9.5〜11.5 秒）
+pnpm test                              # 全部
 ```
 
-グループをいくつ選んでもコンパイルは 1 回なので、変えたファイルは 1 回でまとめて渡す
-（`pnpm test:for a.ts b.ts`）。`pnpm test:rules` を 2 回打つより速い。
+コンパイルは 1 回なので、変えたファイルは 1 回でまとめて渡す（`pnpm test:for a.ts b.ts`）。
 
 ## 表を直すとき
 
