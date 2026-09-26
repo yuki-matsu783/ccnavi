@@ -409,8 +409,8 @@ function reviewed(
       kind: "prompt",
       title: `フェーズ ${chip.label} のレビュー済み連絡`,
       note:
-        "レビューを終えたことを Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、" +
-        "新しいセッションで開く。送るときは自分で Enter を押す。マーカーはエージェントが confirm を打って置く。",
+        "レビューを終えたことを プロンプトを用意しました。。コピーして進行中のセッションに貼るか、" +
+        "新しいセッションで開いてください。送るときは自分で Enter を押す。マーカーはエージェントが confirm を打って置く。",
       prompt: reviewedPrompt(input.root, parent, phase, chip.label, tree, chip.mrUrl),
     },
     only: state.only,
@@ -559,8 +559,8 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
             ? `フェーズ ${value.phase} の未解決（Unresolved）の指摘の対応方針を決めました`
             : `フェーズ ${value.phase} をレビュー済みにしました`,
           note:
-            `${note}${issued} Claude Code に伝える文を用意した。コピーして進行中のセッションに貼るか、` +
-            "新しいセッションで開く。送るときは自分で Enter を押す。",
+            `${note}${issued} プロンプトを用意しました。。コピーして進行中のセッションに貼るか、` +
+            "新しいセッションで開いてください。送るときは自分で Enter を押す。",
           prompt: value.prompt,
           what: "残った指摘を決めた文",
           keep: true,
