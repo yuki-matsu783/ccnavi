@@ -148,6 +148,7 @@
 | [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める |
+| [0086](0086-state-history-is-an-append-only-aid.md) | 状態が動いた跡を、チケットごとの追記専用のファイルに残す。正は置き場のまま |
 
 ### 複数のリポジトリと VS Code 拡張
 
