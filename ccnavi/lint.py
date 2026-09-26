@@ -1074,8 +1074,12 @@ def _projects_rel(conf: settings.Settings, root: str) -> str:
     return rel
 
 
-def _index_under(root: str, rel: str) -> tuple[list[str], list[str]] | None:
+def _index_under(root: str, rel: str) -> tuple[str, list[str]] | None:
     """索引で `<rel>/` の下に載っているものを、通常のファイルと gitlink に分けて返す。
+
+    返すのは（最初の通常のファイル、gitlink の一覧）。通常のファイルが無ければ 1 つ目は空。
+    通常のファイルは文面に 1 本目しか使わないので、残りは持たない（ワークスペースの
+    ソースが `projects/` の下に数万本あっても一覧を作らない）。
 
     `ls-files -s -z` で読む。各行は `<mode> <oid> <stage>\\t<path>` で、`-z` なので
     パスの引用（`core.quotepath`）に左右されない。mode `160000` が gitlink で、それ以外
@@ -1089,16 +1093,20 @@ def _index_under(root: str, rel: str) -> tuple[list[str], list[str]] | None:
     )
     if rc != 0:
         return None
-    files: list[str] = []
+    first_file = ""
     links: list[str] = []
+    seen_links: set[str] = set()
     for record in out.split("\0"):
         head, tab, path = record.partition("\t")
         if not tab or not path:
             continue
-        into = links if head.split(" ", 1)[0] == _GITLINK_MODE else files
-        if path not in into:
-            into.append(path)
-    return files, links
+        if head.split(" ", 1)[0] == _GITLINK_MODE:
+            if path not in seen_links:
+                seen_links.add(path)
+                links.append(path)
+        elif not first_file:
+            first_file = path
+    return first_file, links
 
 
 def _in_index(root: str, rel: str) -> str | None:
@@ -1119,11 +1127,11 @@ def _in_index(root: str, rel: str) -> str | None:
     split = _index_under(root, rel)
     if split is None:
         return None
-    files, links = split
+    first_file, links = split
     lead = _TRACKED_LEAD.format(rel=rel)
-    if files:
+    if first_file:
         text = (
-            f"{lead}（例: `{files[0]}`）。"
+            f"{lead}（例: `{first_file}`）。"
             f"ccnavi はワークスペース直下の `{rel}/` をプロジェクトの置き場として使い、"
             "名前は変えられない。"
             f"このままだと `{rel}/` の下で `.git` を持つディレクトリ（サブモジュールを含む）が"
