@@ -122,7 +122,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | `UserPromptSubmit` | 保護領域にいまある変更を控え、ターンの基準にする（7.4） | 無し |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルを控える（8 章） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルを控えと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ写し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う | 終了コード 2 と標準エラー、または `additionalContext` |
-| `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4） | `systemMessage` |
+| `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6、ADR-0087） | `systemMessage`。促すときは `decision: block` と `reason` も |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12） | `additionalContext` |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す（9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
@@ -164,7 +164,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | `enable` の deny / ask | `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny\|ask", "permissionDecisionReason": "…", "additionalContext": "…"}}`。`additionalContext` はルールが文を持つときだけ |
 | `enable` の allow、委ねた回 | 判定は出さない。通知（既定を使った、コアファイルを戻した、ルールの文）があれば `additionalContext` だけ |
 | `dry-run` の deny / ask | `additionalContext` に「enable なら止めていた / 聞いていた」と理由を並べる。終了コード 0 |
-| `Stop` | `{"systemMessage": "…"}` |
+| `Stop` | `{"systemMessage": "…"}`。`finish` を促すとき（`enable`）は `{"decision": "block", "reason": "…", "systemMessage": "…"}`。`dry-run` なら促しの文を `systemMessage` に載せて止めない |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として `enable` は
@@ -1440,6 +1440,14 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 置き場を動かした分（手での承認・再開）は跡が残らない。ボードは新しい側を `history` で受け取り、カードの
 畳める一覧に並べるだけ（10 章）。
 
+**`finish` の打ち忘れは `Stop` で 1 回だけ促す（ADR-0087）。** メインエージェントの `Stop` で、cwd のワークツリーに
+結び付いた承認済みチケットが着手済み（`doing/`、閉じても取り消してもいない）で、そのワークツリーに未コミットの変更が無く
+（追跡していないファイルも数える）、基準点より先にコミットがあれば、`decision: block` で止めて、`finish` の sh の綴りと
+「続けるなら理由を利用者に書いてから終える」を渡す（`NUDGE_TICKET_FINISH`）。payload の `stop_hook_active` が真なら
+促さない（1 回の連鎖に 1 回）。除くのは、チケット制御かモードが `disable`、ワークスペースルートかチケットの無いワークツリー、
+未着手、`blocked`、基準点が無い、親で `close_problems`（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・
+終わっていないフェーズ）が空でない、git を読めない、`SubagentStop`。`dry-run` は止めずに文を `systemMessage` に載せる。
+
 **子の着手は親の着手のあと。** 親が `doing/` で着手済みでなければ、子の `start` は止まる（親のワークツリーが
 要る）。案内は親の置き場で分かれ、`todo/` なら承認から、`doing/` で未着手なら親の `start` から。親が
 どこにも無いときと、複数の置き場にあって定まらないときも、同じ場所で止めて見えたとおりを言う。
@@ -2392,6 +2400,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに控えた指紋から変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1、ADR-0085） |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
+| `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く基準点より先にコミットがある。1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す（9.6、ADR-0087） |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10、ADR-0077） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2、ADR-0077） |

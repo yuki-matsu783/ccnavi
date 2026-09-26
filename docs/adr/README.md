@@ -149,6 +149,7 @@
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
 | [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める |
 | [0086](0086-state-history-is-an-append-only-aid.md) | 状態が動いた跡を、チケットごとの追記専用のファイルに残す。正は置き場のまま |
+| [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
 
 ### 複数のリポジトリと VS Code 拡張
 
