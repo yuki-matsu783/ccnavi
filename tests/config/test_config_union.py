@@ -1,11 +1,11 @@
-"""設定 3 本の和（設計 11 改版、wip/design/config-union.md）の受入テスト。rules の合成。
+"""設定 3 本の和（ccnavi.md の設計 11）の受入テスト。rules の合成。
 
 道具を外から動かす。一時ディレクトリにワークスペース 1 つとプロジェクト 2 つ
 （lib と app）を組み、hook の payload を標準入力で渡して判定と記録を読む。
 
 層は 3 種。
 
-- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（`--rules` / `--phases` / `--risk`）
+- 共通層: `.ccnavi/common/{rules,phases,risks}.yml`（置き場は固定。ADR-0052）
 - ワークスペース自身の層: `<ワークスペースルート>/.ccnavi/config/`
 - プロジェクトの層: `projects/<名前>/.ccnavi/config/`
 
@@ -16,9 +16,9 @@ lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い層 = 空
 ワークツリー側の設定ができ、設計 11.6 が名指しした穴（ワークツリー側の設定が書けて戻らない）を
 再現できる。
 
-実装はまだ無い。このテストは実装フェーズで通るようになる。ここでは import 時に落ちない
-ことと、振る舞いを 1 つずつ固定していることだけを守る。phases / risk の合成は
-test_config_union_phases_risk.py、selfguard と導入スクリプトは test_config_union_guard.py。
+実装は入っている。ここが落ちたら、rules の合成が設計 11 からずれたということ。
+phases / risk の合成は test_config_union_phases_risk.py、selfguard と導入スクリプトは
+test_config_union_guard.py。
 """
 
 from __future__ import annotations
@@ -528,57 +528,57 @@ class ConfigUnionHarness(unittest.TestCase):
 class WriteUnionTest(ConfigUnionHarness):
     """Write / Edit は共通層 + 行き先の層の和（11.4、REQ-MLT-03 の変更）。"""
 
-    def test_common_deny_applies_to_project_files(self):
-        """11.4: 共通層の deny がプロジェクトのファイルに効く。id は裸、source は common。"""
-        denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, ".env"))
-        self.assert_denied(denied, "credentials")
-        record = self.last_record()
-        self.assertEqual(record["project"], "lib")
-        self.assertEqual(record["rules"], ["credentials"])
-        self.assertEqual(record.get("source"), "common")
+    def test_each_layer_deny_applies_to_its_own_files(self):
+        """11.4: 3 種の層の deny は、それぞれ効く先のファイルで当たる。
 
-    def test_project_deny_applies_only_to_that_project(self):
-        """11.4: プロジェクトの層の deny はそのプロジェクトにだけ効く。id は `lib:schema`。"""
-        denied = self.hook("Write", self.ws, file_path=os.path.join(self.lib, "schema", "x.sql"))
-        self.assert_denied(denied, "lib:schema", "write a migration")
-        self.assertEqual(self.last_record()["rules"], ["lib:schema"])
-        self.assertEqual(self.last_record().get("source"), "lib")
+        id は共通層なら裸、プロジェクトの層なら `lib:`、自身の層なら `self:` が付く。
+        記録の `source` はその層、`project` は行き先のプロジェクトで、ワークスペースの
+        ファイルなら持たない。cwd は行き先と別の側に置く。層を選ぶのは行き先で、cwd ではない。
+        """
+        for source, target, cwd, rule_id, message in (
+            ("common", (self.lib, ".env"), self.ws, "credentials", "credentials are not edited"),
+            ("lib", (self.lib, "schema", "x.sql"), self.ws, "lib:schema", "write a migration"),
+            ("self", (self.ws, "generated", "x.py"), self.lib, "self:generated", "are rebuilt"),
+        ):
+            with self.subTest(source=source, rule=rule_id):
+                denied = self.hook("Write", cwd, file_path=os.path.join(*target))
+                self.assert_denied(denied, rule_id, message)
+                record = self.last_record()
+                self.assertEqual(record["rules"], [rule_id])
+                self.assertEqual(record.get("source"), source)
+                if target[0] == self.lib:
+                    self.assertEqual(record["project"], "lib")
+                else:
+                    self.assertNotIn("project", record)
 
-        self.assert_not_denied(
-            self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
-        )
-        self.assert_not_denied(
-            self.hook("Write", self.ws, file_path=os.path.join(self.ws, "schema", "x.sql"))
-        )
+    def test_a_layer_deny_does_not_reach_other_trees(self):
+        """11.4: 層の deny は効く先の外には届かない。
 
-    def test_own_layer_applies_to_workspace_trees(self):
-        """11.4: 自身の層はワークスペースルートと、そこから切ったワークツリーに効く。"""
-        denied = self.hook("Write", self.lib, file_path=os.path.join(self.ws, "generated", "x.py"))
-        self.assert_denied(denied, "self:generated")
-        record = self.last_record()
-        self.assertEqual(record["rules"], ["self:generated"])
-        self.assertEqual(record.get("source"), "self")
-        self.assertNotIn("project", record)
+        プロジェクトの層は他のプロジェクトにもワークスペースにも、自身の層はプロジェクトにも足さない。
+        """
+        for rule_id, target in (
+            ("lib:schema", (self.app, "schema", "x.sql")),
+            ("lib:schema", (self.ws, "schema", "x.sql")),
+            ("self:generated", (self.lib, "generated", "x.py")),
+        ):
+            with self.subTest(rule=rule_id, target=os.path.relpath(os.path.join(*target), self.ws)):
+                self.assert_not_denied(self.hook("Write", self.ws, file_path=os.path.join(*target)))
 
-        tree = self.worktree(self.ws, "w1")
-        denied = self.hook("Write", self.ws, file_path=os.path.join(tree, "generated", "x.py"))
-        self.assert_denied(denied, "self:generated")
-        self.assertEqual(self.last_record()["tree"], "w1")
+    def test_a_worktree_gets_the_layers_of_the_tree_it_was_cut_from(self):
+        """11.4: 切ったワークツリーには、共通層 + 切り元の層。記録の `tree` はワークツリーの名前。
 
-    def test_own_layer_does_not_reach_projects(self):
-        """11.4: 自身の層はプロジェクトのツリーには足さない。"""
-        self.assert_not_denied(
-            self.hook("Write", self.ws, file_path=os.path.join(self.lib, "generated", "x.py"))
-        )
-
-    def test_project_layer_applies_to_a_worktree_cut_from_it(self):
-        """11.4: プロジェクトから切ったワークツリーには、共通層 + そのプロジェクトの層。"""
-        tree = self.worktree(self.lib, "i0007")
-        denied = self.hook("Write", self.ws, file_path=os.path.join(tree, "schema", "x.sql"))
-        self.assert_denied(denied, "lib:schema")
-        self.assertEqual(self.last_record()["tree"], "i0007")
-        denied = self.hook("Write", self.ws, file_path=os.path.join(tree, ".env"))
-        self.assert_denied(denied, "credentials")
+        ワークスペースから切ったもの（w1）には自身の層、lib から切ったもの（i0007）には lib の層。
+        """
+        trees = {"w1": self.worktree(self.ws, "w1"), "i0007": self.worktree(self.lib, "i0007")}
+        for tree, rel, rule_id in (
+            ("w1", ("generated", "x.py"), "self:generated"),
+            ("i0007", ("schema", "x.sql"), "lib:schema"),
+            ("i0007", (".env",), "credentials"),
+        ):
+            with self.subTest(tree=tree, rule=rule_id):
+                denied = self.hook("Write", self.ws, file_path=os.path.join(trees[tree], *rel))
+                self.assert_denied(denied, rule_id)
+                self.assertEqual(self.last_record()["tree"], tree)
 
     def test_project_allow_stays_inside_the_project(self):
         """11.4 代償: 層の allow は行き先の 1 層にしか足さない。"""
