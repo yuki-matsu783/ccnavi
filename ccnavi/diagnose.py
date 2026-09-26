@@ -35,6 +35,7 @@ from . import (
     audit,
     builtin,
     flow,
+    history,
     hookio,
     judge,
     modes,
@@ -758,6 +759,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
                 worktrees,
                 seen.get(ticket_id, []),
                 scattered.get(ticket_id, []),
+                problems,
             )
         )
 
@@ -887,6 +889,7 @@ def _ticket_record(
     worktrees: dict,
     seen_in: list[dict],
     scattered: list[dict],
+    problems: list[str],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -954,9 +957,15 @@ def _ticket_record(
         "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
+        # 状態が動いた跡の新しい側（ADR-0086）。補助で、状態の正は上の置き場の欄。
+        "history": [],
     }
+    where = approval.home_dir(conf, root, ticket_id, source.parent)
+    entries, unreadable = history.read(where, ticket_id)
+    record["history"] = entries
+    if unreadable:
+        problems.append(f"{ticket_id} の履歴: {unreadable}")
     if source.parent:
-        where = approval.home_dir(conf, root, ticket_id, source.parent)
         record["risk"] = approval.read_child_record(
             where, source.parent, ticket_id, approval.CHILD_RECORD_RISK
         )

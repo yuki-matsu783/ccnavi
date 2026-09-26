@@ -16,7 +16,7 @@ import os
 from dataclasses import replace
 from typing import TextIO
 
-from . import approval, configsync, flow, fsio, gitcmd, phase, risk, settings, tree
+from . import approval, configsync, flow, fsio, gitcmd, history, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
@@ -73,6 +73,14 @@ def start(
     if failed:
         stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
         return 1
+    history.note(
+        os.path.dirname(os.path.dirname(found.path)),
+        found.ticket,
+        history.KIND_STARTED,
+        ticket_mod.DOING,
+        ticket_mod.DOING,
+        base_sha=sha,
+    )
     stdout.write(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_mod.DOING}/ のまま\n"
@@ -698,6 +706,15 @@ def _move(
     if failed:
         stderr.write(f"ccnavi: {found.ticket}: {failed}\n")
         return 1
+    cancelled = bool(fields.get("cancelled_at"))
+    history.note(
+        where,
+        found.ticket,
+        history.KIND_CANCELLED if cancelled else history.KIND_FINISHED,
+        ticket_mod.DOING,
+        state,
+        reason=fields.get("cancel_reason") if cancelled else None,
+    )
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_mod.REVIEW:
         stdout.write(

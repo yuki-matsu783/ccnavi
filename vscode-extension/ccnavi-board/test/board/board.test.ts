@@ -395,3 +395,20 @@ test("CB-T215 案内の見本のボードは、承認待ち・作業中・完了
   // 見本から開くファイルは無い（押しても何も開かない）。不備も出さない
   assert.ok(cards.every((card) => card.openPath === "" && card.issues.length === 0));
 });
+
+test("CB-T260 履歴はカードへそのまま渡り、列・注意・バッジの材料にはならない", () => {
+  // 履歴は補助の記録で、状態の正は置き場（ADR-0086）。跡が「取り消し」と言っていても、列は置き場で決まる。
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
+  const history = [
+    { at: "2026-09-26T09:00:00Z", kind: "cancelled", from: "doing", to: "done", via: "cli", phase: null, mark: "", reason: "試し" },
+  ];
+  const withHistory: TicketJson = { ...child, history };
+  const before = cardsOf(buildBoard(base)).get("i0001-02")!;
+  const after = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-02" ? withHistory : t)) })).get("i0001-02")!;
+  assert.deepEqual(after.history, history);
+  assert.equal(after.column, before.column);
+  assert.equal(after.attention, before.attention);
+  assert.deepEqual(after.issues, before.issues);
+  assert.equal(after.cancelledAt, before.cancelledAt);
+});

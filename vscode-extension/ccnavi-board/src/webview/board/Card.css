@@ -85,3 +85,12 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 }
 .issues li { overflow-wrap: anywhere; }
 .card-actions { display: flex; gap: 6px; margin-top: 8px; }
+/* 状態が動いた跡（ADR-0086）。既定で畳む。開くと新しい順に 1 行ずつ。時刻と経路は薄く */
+.history { margin-top: 6px; font-size: .82em; color: var(--vscode-descriptionForeground); }
+.history summary { cursor: pointer; width: fit-content; }
+.history summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.history-list { list-style: none; margin: 4px 0 0; padding: 0 0 0 10px; display: flex; flex-direction: column; gap: 2px; }
+.history-item { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.history-at { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.history-text { color: var(--vscode-editor-foreground); overflow-wrap: anywhere; }
+.history-via::before { content: "· "; }

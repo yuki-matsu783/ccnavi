@@ -47,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import flow, fsio, modes, phasetypes, rules, settings, tree, workflow
+from . import flow, fsio, history, modes, phasetypes, rules, settings, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -383,6 +383,14 @@ def admit(
     except OSError as exc:
         fsio.remove(target)
         return f"提案を todo/ から動かせない ({exc})"
+    history.note(
+        approved_dir,
+        ticket.ticket,
+        history.KIND_APPROVED,
+        ticket_mod.TODO,
+        ticket_mod.DOING,
+        tree=source_tree,
+    )
     return ""
 
 
@@ -511,6 +519,9 @@ def settle_review(
         if failed:
             return moved, failed
         moved.append(t.ticket)
+        history.note(
+            where, t.ticket, history.KIND_SETTLED, ticket_mod.REVIEW, ticket_mod.DONE, phase=t.phase
+        )
     return moved, ""
 
 
@@ -587,6 +598,15 @@ def followup(
     failed = _write(copy_path(where, ident), ticket_mod.render(t))
     if failed:
         return ident, failed
+    history.note(
+        where,
+        ident,
+        history.KIND_RAISED,
+        None,
+        ticket_mod.DOING,
+        phase=phase_no,
+        followup_of=[c.ticket for c in children],
+    )
     clear_marks(where, parent.ticket, phase_no)
     return ident, ""
 
@@ -610,9 +630,14 @@ def read_mark(approved_dir: str, parent: str, phase: int, kind: str) -> dict | N
 def write_mark(approved_dir: str, parent: str, phase: int, kind: str, data: dict) -> str:
     payload = dict(data)
     payload.setdefault("at", now())
-    return _write(
+    failed = _write(
         mark_path(approved_dir, parent, phase, kind), json.dumps(payload, ensure_ascii=False)
     )
+    if not failed:
+        history.note(
+            approved_dir, parent, history.KIND_PHASE_MARK, None, None, phase=phase, mark=kind
+        )
+    return failed
 
 
 def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
@@ -625,6 +650,16 @@ def clear_marks(approved_dir: str, parent: str, phase: int) -> list[str]:
             cleared.append(kind)
         except OSError:
             continue
+    if cleared:
+        history.note(
+            approved_dir,
+            parent,
+            history.KIND_PHASE_REOPENED,
+            None,
+            None,
+            phase=phase,
+            cleared=cleared,
+        )
     return cleared
 
 
@@ -648,13 +683,21 @@ def read_parent_mark(approved_dir: str, parent: str, name: str) -> dict | None:
     return fsio.read_dict(parent_mark_path(approved_dir, parent, name))
 
 
+# 親のマーカーのうち、状態の跡（history）に残すもの。締めと Draft を外した印。設定を写した印
+# （configsync）は状態ではないので残さない。
+PARENT_MARKS_IN_HISTORY = (PARENT_MARK_READY, PARENT_MARK_CLOSE_EARLY, PARENT_MARK_CLOSED)
+
+
 def write_parent_mark(approved_dir: str, parent: str, name: str, data: dict) -> str:
     payload = dict(data)
     payload.setdefault("at", now())
-    return _write(
+    failed = _write(
         parent_mark_path(approved_dir, parent, name),
         json.dumps(payload, ensure_ascii=False, indent=1),
     )
+    if not failed and name in PARENT_MARKS_IN_HISTORY:
+        history.note(approved_dir, parent, history.KIND_PARENT_MARK, None, None, mark=name)
+    return failed
 
 
 # 子ごとの記録。実績のリスク（閉じるときに数えた点）と、定性項目の判定。
@@ -2103,7 +2146,17 @@ def revise_copy(
         meta["feedback_at"] = stamp
     front[ticket_mod.APPROVAL_KEY] = meta
     current.raw = front
-    return _write(copy_path(approved_dir, current.ticket), ticket_mod.render(current))
+    failed = _write(copy_path(approved_dir, current.ticket), ticket_mod.render(current))
+    if not failed:
+        history.note(
+            approved_dir,
+            current.ticket,
+            history.KIND_REVISED,
+            ticket_mod.DOING,
+            ticket_mod.DOING,
+            feedback=True if feedback_planned else None,
+        )
+    return failed
 
 
 def revised_front(

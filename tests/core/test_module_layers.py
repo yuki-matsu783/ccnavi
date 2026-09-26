@@ -86,7 +86,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "state",
         "作業ツリーとチケットの、いまの形を読む",
-        frozenset({"builtin", "ctxfile", "flow", "risk", "selfguard", "ticket", "wrapguard"}),
+        frozenset(
+            {"builtin", "ctxfile", "flow", "history", "risk", "selfguard", "ticket", "wrapguard"}
+        ),
     ),
     (
         "compose",

@@ -74,6 +74,29 @@ export interface FlowJson {
   readonly locked: boolean;
 }
 
+/**
+ * 状態が動いた跡の 1 行（ADR-0086）。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
+ */
+export interface HistoryEntryJson {
+  /** UTC の ISO 8601（`2026-09-26T09:00:00Z`） */
+  readonly at: string;
+  /** `approved` / `started` / `finished` / `cancelled` / `settled` / `raised` / `revised` / `phase-mark` / `phase-reopened` / `parent-mark` など */
+  readonly kind: string;
+  /** 元の置き場（`todo` / `doing` / `review` / `done`）。置き場が動かないもの（マーカー）は空 */
+  readonly from: string;
+  /** 先の置き場。同上 */
+  readonly to: string;
+  /** 動かした経路（`cli` / `terminal` / `board` / `hook`） */
+  readonly via: string;
+  /** マーカーのフェーズの番号。無ければ null */
+  readonly phase: number | null;
+  /** マーカーの種類（`pending` / `requested` / `reviewed` / `skipped` / `ready` / `close-early` / `closed`）。無ければ空 */
+  readonly mark: string;
+  /** 取り消しの理由。無ければ空 */
+  readonly reason: string;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -104,6 +127,8 @@ export interface TicketJson {
   readonly judge: Record<string, unknown> | null;
   /** 子のフロー。親と、この欄を出さない古い実行ファイルでは null */
   readonly flow: FlowJson | null;
+  /** 状態が動いた跡の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
+  readonly history: readonly HistoryEntryJson[];
 }
 
 export interface PhaseJson {
@@ -284,6 +309,20 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     risk: isRecord(raw.risk) ? raw.risk : null,
     judge: isRecord(raw.judge) ? raw.judge : null,
     flow: isRecord(raw.flow) ? flow(raw.flow) : null,
+    history: list(raw.history).filter(isRecord).map(historyEntry),
+  };
+}
+
+function historyEntry(raw: Record<string, unknown>): HistoryEntryJson {
+  return {
+    at: str(raw.at),
+    kind: str(raw.kind),
+    from: str(raw.from),
+    to: str(raw.to),
+    via: str(raw.via),
+    phase: num(raw.phase),
+    mark: str(raw.mark),
+    reason: str(raw.reason),
   };
 }
 

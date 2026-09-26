@@ -11,6 +11,7 @@ import type {
   BoardJson,
   CopyStatus,
   FlowJson,
+  HistoryEntryJson,
   ParentJson,
   PhaseJson,
   ProposalState,
@@ -128,6 +129,11 @@ export interface Card {
    * カードの「フロー」ボタンの言葉だけに使う。人が動く必要（`attention`）には数えない
    */
   readonly flow: FlowJson | null;
+  /**
+   * 状態が動いた跡の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
+   * カードの畳める「履歴」に並べるだけ
+   */
+  readonly history: readonly HistoryEntryJson[];
 }
 
 export interface BoardColumn extends ColumnDef {
@@ -282,6 +288,7 @@ function toCard(
     mrNumber: mr.number,
     attention,
     flow: isParent ? null : flowOf(t.flow, column),
+    history: t.history,
   };
 }
 
