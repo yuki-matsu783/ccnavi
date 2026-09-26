@@ -19,7 +19,7 @@ def show(text):
     return text
 
 
-class ReadTest(unittest.TestCase):
+class _Readable:
     def readable(self, src):
         result = read(src)
         self.assertFalse(
@@ -28,6 +28,8 @@ class ReadTest(unittest.TestCase):
         )
         return result.text
 
+
+class ReadTest(_Readable, unittest.TestCase):
     def test_実行される語はそのまま残る(self):
         cases = {
             "git push origin main": "git push origin main",
@@ -153,21 +155,13 @@ class ReadTest(unittest.TestCase):
 
 
 @unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
-class WordSepTest(unittest.TestCase):
+class WordSepTest(_Readable, unittest.TestCase):
     """目印を 2 つに分けたあとの読み（wip/design/shellread-sep.md 4「入力 → 返る文字列」）。
 
     コマンドとコマンドの間は SEP のまま。引用が 1 語につないだ空白と、語の中に
     入った演算子の文字の両側は WORD_SEP になる。ルールの `[^\\x00]*` が
     「同じコマンドの中」だけを指せるように、2 つを別の文字にする。
     """
-
-    def readable(self, src):
-        result = read(src)
-        self.assertFalse(
-            result.degraded,
-            f"read({src!r}) が {result.reason} で諦めた。これは読めるはず",
-        )
-        return result.text
 
     def test_返る文字列は対応表のとおり(self):
         cases = {

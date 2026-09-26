@@ -321,7 +321,7 @@ class TestExtHookTest(unittest.TestCase):
         "process.exit(Number(process.env.STUB_RC || 0));\n"
     )
 
-    def workspace(self, tree="tree", touched="src/core/board.ts"):
+    def workspace(self, tree="tree"):
         """一時のワークスペースと、その中の拡張の写しを作る。
 
         `tree` に空白や記号を入れて、綴りの扱いを見る。
@@ -335,11 +335,12 @@ class TestExtHookTest(unittest.TestCase):
         with open(os.path.join(board, "scripts", "test-groups.js"), "w", encoding="utf-8") as f:
             f.write(self.STUB)
         marker = os.path.join(workspace, "logs", "session", "s1.ext-files")
+        touched = slashed(os.path.join(board, "src", "core", "board.ts"))
         # 実際の印は mark-ext.sh が `/` にそろえ、改行は LF で書く。Windows で
         # `os.path.join` のまま・既定の改行で書くと、実運用では出ない形（バックスラッシュ、
         # 行末の CR）を渡すことになり、hook が拡張を見つけられない、引数に CR が付く。
         with open(marker, "w", encoding="utf-8", newline="\n") as f:
-            f.write(f"{slashed(os.path.join(board, *touched.split('/')))}\n")
+            f.write(f"{touched}\n")
         return workspace, board, marker
 
     def stop(self, workspace, rc=0, active=False, log=None):
