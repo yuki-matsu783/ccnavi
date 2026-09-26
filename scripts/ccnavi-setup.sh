@@ -9,7 +9,7 @@
 #                            CCNAVI_TICKET_CONTROL。チケット制御を使うか。既定は enable
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
-#   --all                    既定値を持つ env も明示して書く
+#   --all                    既定値を持つ env も明示して書く（今は足すものが無い。ADR-0084）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
@@ -17,7 +17,11 @@
 #   --no-fetch               セッションの頭の取り込み（ccnavi-fetch.sh）を hook に登録しない
 #
 # 何度打っても同じ形に落ち着く。既に登録されている hook は足さないし、既にある
-# env は触らない。ccnavi と関係のない hook や設定はそのまま残す。
+# env は触らない。ccnavi と関係のない hook や設定はそのまま残す。例外は廃止した置き場の
+# env 6 つで、既にあれば外す（ADR-0084）。
+#
+# 入れ終わったところで、ワークスペースの git の索引に projects/ の下が載っていないかを見て、
+# 載っていれば --lint と同じ文面で知らせる（止めない。索引も変えない）。
 #
 # .claude/settings.json と一緒に .vscode/settings.json も見る。ccnavi は作業を
 # .claude/worktrees/ の中でさせるので、VS Code にそれを見せる 1 行が無いと、
@@ -152,7 +156,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             使うか。全体ルールだけで足りるプロジェクトは disable。既定は enable
   --deploy <ccnavi の根>    配布元。既定はこのスクリプトが入っている ccnavi の根
   --no-deploy               配布物を置かず、settings.json だけを書く
-  --all                     既定値を持つ env も明示して書く
+  --all                     既定値を持つ env も明示して書く。置き場の env は廃止したので
+                            （ADR-0084）、今は足すものが無い
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
                             配るときも、配布先に既にあるものを入れ替える
   --check                   書かずに、揃っていないところだけを並べる
@@ -165,6 +170,10 @@ CCNAVI_BIN_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）�
 .ccnavi/common/risks.yml、.ccnavi/config/phases.yml）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）は、既定で ccnavi の根から配る。配った実行ファイルの置き場は、配布先の
 .gitignore に足す。
+
+置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）は既定に
+固定で、env では動かない（ADR-0084）。既存の env に CCNAVI_PROJECTS・CCNAVI_PROJECT_HOME・
+CCNAVI_TICKETS_PROPOSAL・CCNAVI_TICKETS_APPROVED・CCNAVI_LOG・CCNAVI_STATE があれば外す。
 USAGE
 }
 
@@ -586,9 +595,8 @@ shape=$(printf '%s' "$current" | jq -r '
 ')
 [ -z "$shape" ] || die "$SETTINGS_REL の形を扱えません: ${shape}。直してから打ち直してください。"
 
-# 必ず書く env。既定を持たない CCNAVI_BIN_PATH、既定と同じでも書いておきたい
-# 2 つのパス、そして守りのつまみ。設定ファイルだけを見て、どこを読み書きするかと、
-# どこまで止まるかが分かる形にする。
+# 必ず書く env。既定を持たない CCNAVI_BIN_PATH と、守りのつまみ。設定ファイルだけを見て、
+# 何を起動するかと、どこまで止まるかが分かる形にする。
 #
 # 戻す働きの 2 つは CCNAVI_MODE に合わせる。設定が無ければ enable で動くので、
 # 書かないまま dry-run で導入すると、判定は止めないのに戻す働きだけが本気で
@@ -607,9 +615,15 @@ shape=$(printf '%s' "$current" | jq -r '
 # 値は --arg で 1 つずつ渡す。行に組んでから割ると、値に混ざった改行がそのまま
 # 行の区切りになり、ここで拒んだはずの CCNAVI_MODE=disable を別の値を経由して
 # 書き込めてしまう。
+#
+# 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
+# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（ADR-0084。
+# 共通層の 3 本は ADR-0052）。読まれない語をつまみの一覧に混ぜると、そこを直せば置き場が
+# 動くと読める。`--all` はその 4 つ（CCNAVI_STATE・CCNAVI_TICKETS_PROPOSAL・
+# CCNAVI_TICKETS_APPROVED・CCNAVI_PROJECT_HOME）を足すためのものだったので、今は足すものが無い。
+# 打ち慣れた手順が断られないように、オプションとしては受ける。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
-	CCNAVI_LOG: "logs/log.jsonl",
 	CCNAVI_BIN_PATH: $bin,
 	CCNAVI_RESTORE_IF_DENY: $mode,
 	CCNAVI_GUARD_CORE_FILES: $mode,
@@ -617,21 +631,30 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 	CCNAVI_GUARD_UNWATCHED: "enable",
 	CCNAVI_TICKET_CONTROL: $ticket_control
 }')
-# --all のときだけ足す、既定と同じ値の env。書かなくても同じように動く。
-# 書く利点は、あとで値を変えたくなった人が、つまみの一覧を README ではなく
-# 設定ファイルの中で見つけられること。
-#
-# 共通層の 3 本（rules / phases / risk）はここにも書かない。置き場は `.ccnavi/common/`
-# 固定で、env では動かないので、書いても読まれない（ADR-0052）。読まれない語を
-# つまみの一覧に混ぜると、そこを直せば置き場が動くと読める。
-if [ "$all" = yes ]; then
-	env_json=$(printf '%s' "$env_json" | jq '. + {
-		CCNAVI_STATE: "logs/state",
-		CCNAVI_TICKETS_PROPOSAL: "wip/proposals",
-		CCNAVI_TICKETS_APPROVED: ".ccnavi/approved",
-		CCNAVI_PROJECT_HOME: ".ccnavi"
-	}')
-fi
+
+# 廃止した置き場の env と、その既定（ADR-0084、設計 wip/design/i0064-fixed-places.md §1・§5）。
+# 既に入っている settings.json の env にあれば外す。env は導入スクリプトが持つ欄なので、
+# 読まれない語を残さない。外した値が既定と違っていたら、名前と値を 1 行ずつ出す。
+# 既定と同じ値は黙って外す。導入は止めず、終了コードも変えない（--check では
+# 「揃っていない」に数える。打ち直せば外れる）。
+PLACE_ENV_DEFAULTS='{
+	"CCNAVI_PROJECTS": "projects",
+	"CCNAVI_PROJECT_HOME": ".ccnavi",
+	"CCNAVI_TICKETS_PROPOSAL": "wip/proposals",
+	"CCNAVI_TICKETS_APPROVED": ".ccnavi/approved",
+	"CCNAVI_LOG": "logs/log.jsonl",
+	"CCNAVI_STATE": "logs/state"
+}'
+# 残っているもの全部（--check が並べる）と、そのうち既定と違うもの（書いたあとに名指しする）。
+leftover_places=$(printf '%s' "$current" | jq -r --argjson places "$PLACE_ENV_DEFAULTS" '
+	(.env // {}) as $cur | $places | keys_unsorted[] | . as $k | select($cur | has($k))
+	| "\($k): \($cur[$k])"
+')
+removed_places=$(printf '%s' "$current" | jq -r --argjson places "$PLACE_ENV_DEFAULTS" '
+	(.env // {}) as $cur | $places | to_entries[]
+	| .key as $k | select(($cur | has($k)) and $cur[$k] != .value)
+	| "\(.key) を .claude/settings.json から外しました（値: \($cur[.key])）。置き場は既定の \(.value) に固定されています（ADR-0084）。"
+')
 
 events_json=$(printf '%s\n' $EVENTS | jq -R -s 'split("\n") | map(select(length > 0))')
 
@@ -917,11 +940,120 @@ fi
 if [ -n "$bin_custom" ]; then
 	settled=no
 fi
+# 廃止した置き場の env が残っていれば数える。既定と同じ値でも数える（読まれない語が残っている）。
+if [ -n "$leftover_places" ]; then
+	settled=no
+fi
+
+# 廃止した置き場の env のうち、残っているもの。--check が書かずに並べる。
+report_places_plan() {
+	if [ -n "$leftover_places" ]; then
+		printf '外す env（置き場は既定に固定で、env では動かない。ADR-0084。打ち直すと外します）:\n'
+		printf '%s\n' "$leftover_places" | sed 's/^/  /'
+	fi
+}
+
+# 外したもののうち、既定と違う値だったもの。既定と同じ値は黙って外す。
+report_places_done() {
+	if [ -n "$removed_places" ]; then
+		printf '%s\n' "$removed_places"
+	fi
+}
+
+# ワークスペースの git の索引に projects/ の下が載っているときの知らせ（設計 §4.1・§4.4）。
+#
+# 条件と文面は `ccnavi --lint` の `(projects)` の warn と同じ（ccnavi/lint.py の _in_index）。
+# 変えるなら 2 か所を直す。tests/sh/test_setup.py が 1 文目の一致を見る。
+#
+# - 通常のファイルが 1 本以上: ぶつかり。ワークスペースの projects/ を改名する案内
+#   （gitlink もあれば 1 文足して名指しする）
+# - gitlink（mode 160000）だけ: 載せ忘れ。索引から外して無視に入れる案内
+#
+# 知らせるだけで、止めず、終了コードも変えない。導入の不足ではないので「揃っていない」にも
+# 数えない。索引も .gitignore も変えない（git rm --cached を打つのも /projects/ を足すのも人）。
+#
+# 標準入力に `git ls-files -s` の行（`<mode> <oid> <stage><タブ><path>`）を受ける。
+# 表示に使うだけなので -z は使わない（bash 3.2・BSD の道具で読める形）。
+projects_notice_of() {
+	tab=$(printf '\t')
+	first_file=""
+	links=""
+	links_code=""
+	links_args=""
+	first_link=""
+	link_count=0
+	last_link=""
+	while IFS= read -r line; do
+		[ -n "$line" ] || continue
+		path=${line#*"$tab"}
+		case "$line" in
+		160000\ *)
+			# 衝突中の段で同じパスが並ぶ（並びは綴り順なので隣り合う）。1 本に畳む。
+			[ "$path" = "$last_link" ] && continue
+			last_link=$path
+			link_count=$((link_count + 1))
+			if [ -z "$first_link" ]; then
+				first_link=$path
+				links_code="\`$path\`"
+				links_args=$path
+			else
+				links_code="${links_code}、\`${path}\`"
+				links_args="$links_args $path"
+			fi
+			;;
+		*)
+			if [ -z "$first_file" ]; then
+				first_file=$path
+			fi
+			;;
+		esac
+	done
+	lead='`projects/` はワークスペースの git が追跡している'
+	if [ -n "$first_file" ]; then
+		text="${lead}（例: \`${first_file}\`）。"
+		text="${text}ccnavi はワークスペース直下の \`projects/\` をプロジェクトの置き場として使い、名前は変えられない。"
+		text="${text}このままだと \`projects/\` の下で \`.git\` を持つディレクトリ（サブモジュールを含む）がプロジェクトとして数えられ、その中の設定が判定に使われる。"
+		text="${text}直すには、ワークスペースの \`projects/\` を別の名前に移す（例: \`git mv projects apps\`）。"
+		text="${text}ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは \`projects/\` の下に\`.git\` を持つものを置かない"
+		if [ "$link_count" -gt 0 ]; then
+			text="${text}。索引には入れ子のリポジトリ（${links_code}）も載っている。"
+			text="${text}ccnavi のプロジェクトとして使うなら、改名の前に \`git rm --cached ${links_args}\` で索引から外し、改名のあとで \`projects/\` の下へ戻す"
+		fi
+		printf '%s\n' "$text"
+		return 0
+	fi
+	[ "$link_count" -gt 0 ] || return 0
+	more=""
+	if [ "$link_count" -gt 1 ]; then
+		more=" ほか $((link_count - 1)) 件"
+	fi
+	text="${lead}（入れ子のリポジトリとして: \`${first_link}\`${more}）。"
+	text="${text}\`.gitignore\` に入れる前に \`git add\` したものとみられる。"
+	text="${text}プロジェクトは自分の git を持つので、ワークスペースの git には載せない。"
+	text="${text}載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、\`.gitignore\` に \`/projects/\` を足しても追跡は外れない。"
+	text="${text}直すには、ワークスペースで \`git rm -r --cached projects\` を打ち（ファイルは消えない。まだコミットしていなければ \`git reset -- projects\`）、"
+	text="${text}\`.gitignore\` に \`/projects/\` を足して（既にあればそのまま）、コミットする"
+	printf '%s\n' "$text"
+}
+
+# 索引を読めない（git が無い、git のリポジトリではない）ときは何も言わない。`--lint` と同じ。
+projects_notice=""
+if command -v git >/dev/null 2>&1; then
+	projects_notice=$(git -c core.quotepath=false -C "$root" ls-files -s -- projects/ 2>/dev/null | projects_notice_of) || projects_notice=""
+fi
+
+report_projects() {
+	if [ -n "$projects_notice" ]; then
+		printf '%s\n' "$projects_notice"
+	fi
+}
 
 if [ "$check" = yes ]; then
 	printf '%s\n' "$settings"
 	report_missing
+	report_places_plan
 	report_deploy_plan
+	report_projects
 	if [ "$settled" = yes ]; then
 		if [ "$vscode" = yes ]; then
 			printf 'env と hook と %s は揃っています。\n' "$VSCODE_REL"
@@ -937,7 +1069,7 @@ fi
 # 登録は、このスクリプトが触らないので数えない。ただし黙って終わらせない。
 settings_work=no
 if [ -n "$missing_env" ] || [ -n "$missing_hooks" ] || [ -n "$missing_fetch" ] ||
-	[ -n "$replacing_env" ]; then
+	[ -n "$replacing_env" ] || [ -n "$leftover_places" ]; then
 	settings_work=yes
 fi
 vscode_work=no
@@ -956,6 +1088,7 @@ if [ "$settings_work" = no ] && [ "$vscode_work" = no ] && [ "$deploy_work" = no
 	printf '書き足すものはありません。\n'
 	report_missing
 	report_deploy_plan
+	report_projects
 	exit 0
 fi
 
@@ -1018,10 +1151,12 @@ if [ "$settings_work" = yes ]; then
 		--argjson timeout "$HOOK_TIMEOUT" \
 		--arg fetch "$fetch" \
 		--arg fetch_cmd "$FETCH_COMMAND" \
-		--argjson fetch_timeout "$FETCH_TIMEOUT" "
+		--argjson fetch_timeout "$FETCH_TIMEOUT" \
+		--argjson places "$PLACE_ENV_DEFAULTS" "
 		$REGISTERED
 		(\$env | with_entries(select(.key as \$k | \$forced | index(\$k) != null))) as \$overrides
 		| .env = (\$env + (.env // {}) + \$overrides)
+		| .env |= with_entries(select(.key as \$k | \$places | has(\$k) | not))
 		| reduce \$events[] as \$ev (
 			.;
 			if (exact(\$ev; \$cmd)) or (looks(\$ev)) then .
@@ -1055,6 +1190,7 @@ if [ "$vscode_work" = yes ]; then
 fi
 
 report '足した' 'ccnavi を登録した' '置き換えた' '登録した'
+report_places_done
 if [ "$settings_backed_up" = yes ]; then
 	printf '書き換える前の内容は %s.bak にあります（控えは最初の 1 回だけ取ります）。\n' "$SETTINGS_REL"
 fi
@@ -1209,5 +1345,9 @@ if [ -n "$missing_parts" ]; then
 		printf '%s\n' "--no-deploy を外すと、ccnavi の根から配ります。"
 	fi
 fi
+
+# 入れ終わったところで、projects/ が索引に載っていないかを知らせる。入れる瞬間が
+# いちばん気付きやすい。止めない。
+report_projects
 
 printf 'env の値はセッションを開き直すまで効きません。\n'
