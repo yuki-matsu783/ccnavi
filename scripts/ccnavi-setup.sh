@@ -52,7 +52,7 @@
 # すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配布元の形へ戻す。
 #
 # `disable` は受け付けない。監視される側が書けるファイルから監視を止める形に
-# なるので、ccnavi 自身がそれを error として報告する（README「設定lint」）。
+# なるので、ccnavi 自身がそれを error として報告する（README「設定の検証」）。
 # 止めるならセッションを起動する側の環境から渡す。
 #
 # 終了コード: 0 成功 / 1 --check で揃っていない / 2 引数か環境の誤り
@@ -62,7 +62,7 @@ set -eu
 SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーの有無で見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
-# ビューに出す（README「worktreeをVSCODEで見えるようにする」）。
+# ビューに出す（README「ワークツリーを VS Code から見えるようにする」）。
 VSCODE_REL=".vscode/settings.json"
 VSCODE_KEYS='{"git.detectWorktrees": true}'
 # hook はこの 1 行だけを登録する。どのイベントを走らせるかは、payload が名乗る
