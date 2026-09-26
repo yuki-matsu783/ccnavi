@@ -5,16 +5,16 @@
 import { COLUMNS, type Card, type PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 
-export const COPY_LABELS = { none: "未承認", open: "承認済", review: "レビュー待ち", closed: "クローズ" } as const;
+export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ" } as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
-  pending: "終了を通知",
+  pending: "エージェントに終了を通知済み",
   skipped: "レビュー省略",
-  requested: "レビュー依頼済",
-  reviewed: "レビュー済",
+  requested: "レビュー依頼済み",
+  reviewed: "レビュー済み",
 };
 
-export const PHASE_STATE_LABELS = { planned: "未計画", active: "進行中", ended: "終了" } as const;
+export const PHASE_STATE_LABELS = { planned: "未着手", active: "進行中", ended: "終了" } as const;
 
 /** 列の呼び名。列の並びと同じ 1 か所（`core/board.ts` の `COLUMNS`）から引く */
 const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));
@@ -54,7 +54,7 @@ export function worktreeName(path: string): string {
   return name === "" ? "あり" : name;
 }
 
-/** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済 · レビュー要 · リスク: 25 (MEDIUM) — …` */
+/** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …` */
 export function phaseStatusFull(p: PhaseChip): string {
   const notes: string[] = [];
   if (p.gateClosed) {

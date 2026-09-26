@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-board",
   "displayName": "ccnavi ボード",
-  "description": "ccnavi のチケットとその持ち物（提案・承認済みチケット・マーカー・ワークツリー）をカンバンで表示し、承認内容をオーバーレイで見せて人の承認を受け付け、承認の文とレビュー済みの連絡を Claude Code に渡す。ルールと hook を画面で眺め、ルールを直し、判定を試す。実績で測るリスクの配点とフェーズの種類を画面で直す。projects/ のプロジェクトを一覧し、clone をターミナルへ送る",
+  "description": "ccnavi のチケットとその持ち物（提案・承認済みチケット・マーカー・ワークツリー）をカンバンで表示し、承認内容をオーバーレイで見せて人の承認を受け付け、承認の文とレビュー済みの連絡を Claude Code に渡します。ルールと hook を画面で眺め、ルールを直し、判定を試せます。実績で測るリスクの配点とフェーズの種類を画面で直せます。projects/ のプロジェクトを一覧し、clone をターミナルへ送ります",
   "version": "0.11.9",
   "publisher": "local",
   "private": true,
@@ -36,27 +36,27 @@
     "commands": [
       {
         "command": "ccnaviBoard.open",
-        "title": "ccnavi ボード: ボードを開く"
+        "title": "ccnavi ボード: チケット管理を開く"
       },
       {
         "command": "ccnaviBoard.refresh",
-        "title": "ccnavi ボード: ボードを更新"
+        "title": "ccnavi ボード: チケット管理を更新"
       },
       {
         "command": "ccnaviBoard.openRules",
-        "title": "ccnavi ボード: ルール設定画面を開く"
+        "title": "ccnavi ボード: ルール設定を開く"
       },
       {
         "command": "ccnaviBoard.openProjects",
-        "title": "ccnavi ボード: プロジェクト管理画面を開く"
+        "title": "ccnavi ボード: プロジェクト管理を開く"
       },
       {
         "command": "ccnaviBoard.openRisk",
-        "title": "ccnavi ボード: リスク管理画面を開く"
+        "title": "ccnavi ボード: リスク管理を開く"
       },
       {
         "command": "ccnaviBoard.openPhases",
-        "title": "ccnavi ボード: フェーズ管理画面を開く"
+        "title": "ccnavi ボード: フェーズ管理を開く"
       },
       {
         "command": "ccnaviBoard.appearance",
@@ -97,17 +97,17 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnavi の実行ファイル。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、次に .ccnavi/scripts/ccnavi-launcher.sh、それも無ければ uv run python -m ccnavi の順に探す。振り分けの sh（名前が ccnavi-launcher.sh）を指していれば、sh を通さず sh の置き場の親の bin/<os>-<arch>/ にあるこの機械向けの実行ファイルを使い、無ければ次へ進む。それ以外の綴りは、綴りそのものを実行ファイルとして使う。ワークスペースルートからの相対でも絶対でもよい。"
+          "description": "ccnavi の実行ファイルです。空なら .claude/settings.json の CCNAVI_BIN_PATH、次に dist/ccnavi/ccnavi、次に .ccnavi/scripts/ccnavi-launcher.sh、それも無ければ uv run python -m ccnavi の順に探します。振り分けの sh（名前が ccnavi-launcher.sh）を指していれば、sh を通さず sh のあるフォルダの親の bin/<os>-<arch>/ にあるこの OS と CPU 向けの実行ファイルを使い、無ければ次へ進みます。それ以外のパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対でも絶対でも構いません。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",
           "default": "",
-          "description": "承認コマンドを送るターミナルのシェル（Windows だけ使う）。空なら Git Bash（C:\\Program Files\\Git\\bin\\bash.exe）、無ければ PATH の bash。"
+          "description": "承認コマンドを送るターミナルのシェルです（Windows だけで使います）。空なら Git Bash（C:\\Program Files\\Git\\bin\\bash.exe）、無ければ PATH の bash を使います。"
         },
         "ccnaviBoard.samplesPath": {
           "type": "string",
           "default": ".ccnavi/common/rule-samples.yml",
-          "description": "ルール設定画面が一括で判定するサンプル（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でもよい。"
+          "description": "ルール設定画面が一括で判定するサンプルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でも構いません。"
         },
         "ccnaviBoard.appearance": {
           "type": "string",
@@ -122,7 +122,7 @@
             "Claude の配色（ダーク）"
           ],
           "default": "vscode",
-          "description": "ccnavi の 5 つの画面の配色。vscode なら VS Code のテーマ変数に従う。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換える（ハイコントラストのテーマでは効かない）。サイドパネルのタイトルバーの歯車からも切り替えられ（今の値は見出しの横に出る）、開いている画面にはその場で効く。"
+          "description": "ccnavi の 5 つの画面の配色です。vscode なら VS Code のテーマ変数に従います。claude-light / claude-dark は地・枠・文字と意味の色を Claude の配色に置き換えます（ハイコントラストのテーマでは効きません）。サイドパネルのタイトルバーの歯車からも切り替えられ（今の値は見出しの横に出ます）、開いている画面にはその場で効きます。"
         }
       }
     }

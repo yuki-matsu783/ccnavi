@@ -2,7 +2,7 @@
 
 道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
-作業ツリーの実物を見るのがこの面の要点なので、git を差し替えると、
+作業ツリーの実物を見るのがこの監視の要点なので、git を差し替えると、
 テストが通ることと監視が動くことが別の話になる。
 """
 
@@ -347,7 +347,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(found, ["generated.env"])
 
     def test_自動復元の予行は戻さずに戻すはずだったと言う(self):
-        # 判定は本番で、戻しだけ予行。何が戻るのかを、戻される前に見せる面。
+        # 判定は本番で、戻しだけ予行。何が戻るのかを、戻される前に見せる設定。
         self.run_hook(command="ls")
         self.dirty()
 
@@ -392,8 +392,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
             self.assertEqual(f.read(), "changed by a build\n")
         self.assertIn("would-restore:", self.context(result))
 
-    def test_読めない自動復元の値は守る側に落ちる(self):
-        # 倒れる先を off から enable に変えてある。書き損じた 1 語で守りが
+    def test_読めない自動復元の値は守る側になる(self):
+        # 読めない値の行き先を off から enable に変えてある。書き損じた 1 語で守りが
         # 消えるより、書き損じた 1 語で守りが残るほうがよい、という向き。
         # 戻す先はコミット済みの内容なので、失われるのは「宣言した保護領域を
         # 汚した未コミットの変更」だけになる。
@@ -911,7 +911,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_コミット済みの版を読めなければ言う(self):
-        # HEAD が無いリポジトリ。突き合わせる相手が読めないので、外す側には倒さない。
+        # HEAD が無いリポジトリ。突き合わせる相手が読めないので、外す側にはしない。
         # 読めていれば外れるはずのマーカーで見る。外れたら、突き合わせを飛ばしたということ。
         self.use(ticket_repo(committed=False))
         write(self.path(".ccnavi/approved/phases/i0001/1.requested"), '{"mr": 1}\n')

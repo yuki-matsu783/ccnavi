@@ -5,7 +5,7 @@
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { ProjectRow } from "../../core/projects-view.js";
 
-/** 層の設定の置き場（プロジェクトのルートからの相対）。層のルールの置き場から逆算し、無ければ既定 */
+/** プロジェクトの設定の場所（プロジェクトのルートからの相対）。その設定のルールファイルの場所から逆算し、無ければ既定 */
 export function settingsDir(row: ProjectRow): string {
   const prefix = `${row.rel}/`;
   const inside = row.rulesRel.startsWith(prefix) ? row.rulesRel.slice(prefix.length) : "";
@@ -25,7 +25,7 @@ export function problemsOf(row: ProjectRow): readonly LintProblem[] {
           {
             severity: "warn" as const,
             where: "",
-            detail: `.claude/ がある。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見える。プロジェクトの設定は ${settingsDir(row)}/ に置く`,
+            detail: `.claude/ があります。Claude Code はそこにあるスキルを読み込み、cd するとそこが別のワークスペースルートに見えます。プロジェクトの設定は ${settingsDir(row)}/ に置いてください`,
           },
         ]
       : []),

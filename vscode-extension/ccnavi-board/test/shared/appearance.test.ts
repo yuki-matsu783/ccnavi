@@ -25,7 +25,7 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test("CB-T128 見た目の設定は 3 つの値だけを受け、知らない値と型違いは既定（VS Code のテーマ）に落とす", () => {
+test("CB-T128 見た目の設定は 3 つの値だけを受け、知らない値と型違いは既定（VS Code のテーマ）にする", () => {
   assert.equal(parseAppearance("claude-light"), "claude-light");
   assert.equal(parseAppearance("claude-dark"), "claude-dark");
   assert.equal(parseAppearance("vscode"), "vscode");
@@ -125,16 +125,16 @@ test("CB-T182b 保持する画面は裏でも送る。1 枚目を読み込んで
 /**
  * 見た目の配線を、ソースを読んで見張る（CB-T157 と同じ手）。
  *
- * 退行そのもの（`followAppearance` が `webview.postMessage` を直に叩く、送り直しを落とす）は
+ * 退行そのもの（`followAppearance` が `webview.postMessage` を直に呼ぶ、送り直しを落とす）は
  * `src/appearance.ts` と 5 つのパネルで起きるが、**そこは `vscode` を import するので単体では
  * 動かせない**。上の 2 本（CB-T182 / CB-T182b）が見ているのは段取りの側で、配線を戻してもテストは通ったまま。
- * 名前で見るだけなので綴りを変えて呼ぶ道までは塞げないが、うっかり落とすのは止まる（issue #87）。
+ * 名前で見るだけなので綴りを変えて呼ぶ道までは塞げないが、うっかり落とすのは止まる。
  */
 const EXT_SRC = path.join(WEBVIEW_SRC, "..");
 
 /**
- * コードだけを返す。**コメントを落とすのが肝**で、落とさないと「`webview.postMessage` は叩かない」と
- * 書いた説明そのものが「叩いている」として当たる。
+ * コードだけを返す。**コメントを落とすのが肝**で、落とさないと「`webview.postMessage` は呼ばない」と
+ * 書いた説明そのものが「呼んでいる」として当たる。
  */
 function source(name: string): string {
   return fs
@@ -147,7 +147,7 @@ function source(name: string): string {
 const REBUILT_PANELS = ["board-panel.ts", "projects-panel.ts"];
 const RETAINED_PANELS = ["rules-panel.ts", "risk-panel.ts", "phases-panel.ts"];
 
-test("CB-T183 見た目は段取りを通る。直に postMessage を叩く道と、自前の送り直しを持たない", () => {
+test("CB-T183 見た目は段取りを通る。直に postMessage を呼ぶ道と、自前の送り直しを持たない", () => {
   const follow = source("appearance.ts");
   assert.doesNotMatch(follow, /webview\s*\.\s*postMessage/, "見た目が段取り（ScreenHost）を迂回している");
   assert.doesNotMatch(follow, /onDidChangeViewState/, "表に戻ったときの送り直しを 2 か所で持っている");

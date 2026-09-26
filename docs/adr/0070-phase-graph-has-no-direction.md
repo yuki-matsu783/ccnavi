@@ -82,7 +82,7 @@
 - `test/helpers/dom.ts` に大きさの偽物（`measure`）を足した。happy-dom の `ResizeObserver` は
   `observe()` が何もしないので、**細工をしないと React Flow は点を隠したまま線を 1 本も描かず、
   テストは空の絵のまま通る**。偽るのは大きさだけで、置き場所は偽らない（線の経路は単体では見られない。
-  README の手動確認に回す）
+  拡張の README の手動確認に回す）
 - **ドラッグのためだけに jsdom を足した**（`test/helpers/jsdom.ts`、CB-D80）。happy-dom では
   d3-drag の待ちが終わらず、DOM のテストが**固まる**（実測。90 秒で打ち切り）。jsdom なら同じ操作が
   通る。逃げ道は `dom.ts` が元から書いていた方針で、使うのはこの 1 本だけ。jsdom に無い
@@ -125,7 +125,7 @@ Chromium で実測したところ、無効になるのは属性のほうだけ�
 MIT の条件ではないので消すこともできるが、こちらから決めることではない。
 
 ただしこれは**押すと外へ出るリンク**（`https://reactflow.dev?utm_source=attribution`）で、
-VS Code は Webview のリンクを外部ブラウザへ流す。画面は自分から外を見に行かない（CLAUDE.md の
+VS Code は Webview のリンクを外部ブラウザへ流す。画面は自分から外を見に行かない（`docs/claude/exe-boundary.md` の
 実行ファイルの境界）が、**人が押せば外へ出る口が 1 つできる**。CB-T167 は CSS しか見ないので、
 これは検出されない。色は変数ではなく直書き（`#999`）なので、`Graph.css` で
 `--vscode-textLink-foreground` に寄せた（高コントラストの明るいテーマで #999 は 3:1 に届かない）。

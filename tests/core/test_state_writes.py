@@ -71,7 +71,7 @@ class UnreadableStateTest(unittest.TestCase):
     """読めなかった控えを、空で上書きしないこと。
 
     読みの打ち直しが尽きるのは、重なりが続いたときだけ。そこで書き戻すと、
-    覚えていたぶんが消える。読めなかった回は、文は渡す側へ倒しつつ、
+    覚えていたぶんが消える。読めなかった回は、文は渡す側を採りつつ、
     控えには触らない。
     """
 
@@ -92,7 +92,7 @@ class UnreadableStateTest(unittest.TestCase):
         ):
             text = ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
 
-        # 文は渡す（覚えられないなら言う側へ倒す）。
+        # 文は渡す（覚えられないなら言う側を採る）。
         self.assertIn("1 度だけの文。", text)
         # 控えは消えていない。
         self.assertEqual(fsio.read_json(self.path)[0], before)

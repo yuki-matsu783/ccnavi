@@ -33,7 +33,7 @@ from . import ticket as ticket_mod
 from .modes import EXIT_OK
 
 # 1 回の起動に張る期限。呼び手は長く走った hook を打ち切って出力を捨てるので、
-# それより先に自前の判定へ着地することが、遅い判定が黙った許可に化けるのを防ぐ。
+# それより先に自前の判定を出し終えることが、遅い判定が黙った許可になってしまうのを防ぐ。
 DEADLINE_SECONDS = 3.0
 
 # Claude Code 側の権限モード。ルールがどこも言及しなかった呼び出しの結末が、
@@ -48,12 +48,12 @@ DEADLINE_SECONDS = 3.0
 # 判断できる相手が居るモードは 4 つ。auto は classifier が読み、残りは Claude Code
 # 自身の権限の仕組み（settings.json の permissions と、モードごとの既定）が決める。
 # ccnavi がそこに確認を上乗せしても、判断する者が増えるわけではなく、同じ呼び出しで
-# 2 度聞かれるだけになる。ここに無い綴りは ask に倒す。名前が 1 つ増えたときに、
+# 2 度聞かれるだけになる。ここに無い綴りは ask として扱う。名前が 1 つ増えたときに、
 # それが素通りではなく確認になるように。
 PERMISSION_JUDGED = ("auto", "default", "acceptEdits", "plan")
 
 # 人にも classifier にも確認できないモード。ここで ask を返すと「誰も答えないまま
-# 通る」に化けるので、許可としない（REQ-PRE-08）。
+# 通る」になってしまうので、許可としない（REQ-PRE-08）。
 PERMISSION_NO_JUDGE = ("dontAsk", "bypassPermissions")
 
 # 判定を権限モードへ渡したことを表す内部の値。タイプ名（rules.ALLOW など）と
@@ -165,7 +165,7 @@ def decide_before(
         record.tree, record.project = target.name, target.project
     # 設定ファイルを守る側が有効なら、そこへシェルから書き込む形を止める
     # ルールを judgment に足す。戻せるだけでは足りないので、同じ場所を
-    # 実行前にも止める。既定に落ちているときは足さない。組み込みの既定が
+    # 実行前にも止める。既定を使っているときは足さない。組み込みの既定が
     # 同じ形を既に持っていて、二重に当たると同じ話が 2 度返る。
     if (
         record.fallback != builtin.FALLBACK
@@ -195,7 +195,7 @@ def decide_before(
             hookio.write_context(stdout, hookio.PRE_TOOL_USE, guard)
         return EXIT_OK
 
-    # 組み込みの既定に落ちたときだけ言う。層が壊れて空になったのは組み込みへの
+    # 組み込みの既定に戻ったときだけ言う。層が壊れて空になったのは組み込みへの
     # 退避ではないので、同じ文面を出すと「既定で判定している」と読み違えられる。
     # そちらは記録の `fallback` に層の名前が残り、`--lint` が error で言う。
     fallback = (
@@ -355,7 +355,7 @@ def decide_before(
     # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
     # `{git,push,origin,main}` も `c=git; $c push origin main` も、raw-git に当たらないまま push を
     # 実行する。バッククォートとシェルで読みが割れる形は、読み分けると規則が増え、読み違えると
-    # 素通りに倒れる。どれも書き直す道が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
+    # 素通りになる。どれも書き直す道が必ずあるので、読み解かずに止めて、形ごとの書き直し方を
     # 1 回で返す。
     if rewrites:
         forms = list(dict.fromkeys(form for form, _ in rewrites))
@@ -385,7 +385,7 @@ def decide_before(
             break
         # 中で実行されるコマンドは deny と ask にだけ当てる。止める側に足す当て先なので、
         # 層を読み違えても当たるはずのものが当たらないだけで、元の形の判定は消えない。
-        # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認に落ちるが、
+        # allow に当てると逆になる。`sudo -u me cat /etc/hosts` は元の形では確認になるが、
         # 中の `cat …` が読み取りの allow に当たって通るようになる。
         #
         # 引用の外の層を先に見る。同じルールが引用の中と外の両方に当たるなら、外で当たった
@@ -625,7 +625,7 @@ def screen(
     git push を引用した文書は push ではないし、そこで拒否を返すことは、
     やっていないことをやったと読み手に告げることになる。
 
-    読み切れないコマンドは生の文字列に落とす。生の文字列には実行される部分が
+    読み切れないコマンドは生の文字列のまま見る。生の文字列には実行される部分が
     すべて含まれるので、捕まえるべきものが抜けることはない。その代わり、返す拒否は
     どちらの拒否なのかを名乗る。
 
@@ -807,7 +807,7 @@ def ticket_verdict(
     assert index is not None
     # 区別しない機械では綴りの違いを許す。SubagentStart / SubagentStop / 実行後の監視と
     # 同じ引き方。ここだけ厳密に引くと、`I0001-01` と切ったワークツリーは案内では
-    # 「効いている」と言われながら判定では権限モード任せに落ちる。
+    # 「効いている」と言われながら判定では権限モード任せになる。
     ticket = tree.lookup(index, t.name)
     if ticket is None:
         return "", "", "", ""
@@ -934,13 +934,13 @@ def undeclared_verdict(permission_mode: str, degraded: str, guard_unwatched: str
     渡すのは「ルールが言及していない」ときだけ。読み切れなかったコマンド
     （degraded）は渡さない。ccnavi が読めなかったという事実は判定の結果に
     現れないので、渡すと「判断材料が足りない」ことが誰にも伝わらないまま
-    モードの既定に落ちる。読めなかったことを言えるのはここだけ（REQ-PRE-04）。
+    モードの既定になる。読めなかったことを言えるのはここだけ（REQ-PRE-04）。
 
-    知らないモードは ask に倒す。名前が 1 つ増えたときに、それが素通りではなく
+    知らないモードは ask として扱う。名前が 1 つ増えたときに、それが素通りではなく
     確認になるように。設定漏れがガードの消失にならない側へ既定を置く。
 
     確認できる者が居ないモードは、既定では通さない（REQ-PRE-08）。そこで ask を
-    返しても「誰も答えないまま通る」に化けるため。CCNAVI_GUARD_UNWATCHED を
+    返しても「誰も答えないまま通る」になってしまうため。CCNAVI_GUARD_UNWATCHED を
     disable にしたプロジェクトだけ、ここも渡す側になる。読み切れなかった
     呼び出しは、その設定でも渡さない。渡す先が「確認しない」と決まっている以上、
     読めなかったことを言える場所が他に無い。

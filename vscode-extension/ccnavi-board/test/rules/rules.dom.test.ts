@@ -262,7 +262,7 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     // ヒットしたルールの表と、返すメッセージ・hook の見出しも出る
     assert.deepEqual(dom.all("#judge-result h3").map((head) => head.textContent), ["ヒットしたルール", "返すメッセージ", "このツールで実行される hook"]);
     assert.equal(dom.all("#judge-result table tbody tr").length, 1);
-    assert.match(dom.one("#judge-result").textContent ?? "", /実行される hook は無い/);
+    assert.match(dom.one("#judge-result").textContent ?? "", /実行される hook はありません/);
   } finally {
     await dom.close();
   }
@@ -438,7 +438,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
 test("CB-T52 settings.json が無ければ hook の表にそう書く", async () => {
   const dom = await openRules({ hooks: [], hookFiles: { settings: false, settingsLocal: false } });
   try {
-    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json が無い/);
+    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json がありません/);
     assert.equal(dom.all("#tab-hooks table").length, 0);
   } finally {
     await dom.close();
@@ -545,8 +545,8 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
     // 別の対象へ切り替わった。前の対象の編集は捨てて、読み込み中を出す
-    await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中..." } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中...");
+    await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中…");
     assert.equal(dom.all(".rule").length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
@@ -590,7 +590,7 @@ test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、
 });
 
 test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
-  const dom = await openPage({ kind: "loading", text: "ルールを読み込み中..." });
+  const dom = await openPage({ kind: "loading", text: "ルールを読み込み中…" });
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
@@ -598,7 +598,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "3 つのタブ");
-    await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中..." } });
+    await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中…" } });
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);

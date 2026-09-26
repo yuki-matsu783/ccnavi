@@ -5,17 +5,17 @@
  * 画面は React（`src/webview/rules/`）で、ここが渡すのは「いま何を見せるか」（`RulesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
  *
- * 対象は 3 種（設計 11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
- * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
+ * 対象は 3 種（設計 11.2）。共通の設定のルール（`.ccnavi/common/rules.yml`）、
+ * ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの設定のルール
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
- * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
+ * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  *
- * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、ワークスペースなら `--rules`、
- * 層なら `--project-rules-file <名前>=<パス>`（自身の層は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
+ * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--rules`、
+ * ワークスペースかプロジェクトの設定なら `--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う。
  */
@@ -46,7 +46,7 @@ const DEFAULT_RULES = ".ccnavi/common/rules.yml";
 const DEFAULT_SAMPLES = ".ccnavi/common/rule-samples.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "rules";
-/** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
+/** 自分の保存で監視が鳴るのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
@@ -57,7 +57,7 @@ interface Loaded {
   readonly rulesPath: string;
   /** ワークスペースルートからの相対で見せる綴り。プロジェクトなら `projects/<名前>/.ccnavi/config/rules.yml` */
   readonly rulesRel: string;
-  /** 上部に出す注意。実行ファイルがこの層を読めていない、など */
+  /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
@@ -83,14 +83,14 @@ interface PanelState {
   /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
-  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
   changedPending: boolean;
   wroteAt: number;
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
   dirty: boolean;
   /**
    * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら捨てる。
-   * 層の置き場を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
+   * 設定ファイルの場所を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
   /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
@@ -104,7 +104,7 @@ function sameTarget(a: RulesTarget, b: RulesTarget): boolean {
   return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
-/** 保存を止めるチケットを絞るプロジェクト。共通層と自身の層は絞らない（どちらも全ツリーの Bash に効く） */
+/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どちらも全ツリーの Bash に効く） */
 function projectOf(target: RulesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
@@ -114,9 +114,9 @@ function titleOf(target: RulesTarget): string {
     case "workspace":
       return "ccnavi ルール設定";
     case "self":
-      return "ccnavi ルール設定: 自身の層";
+      return "ccnavi ルール設定: ワークスペース";
     case "project":
-      return `ccnavi ルール設定: ${target.name}`;
+      return `ccnavi ルール設定: プロジェクト ${target.name}`;
   }
 }
 
@@ -126,7 +126,7 @@ function whatOf(target: RulesTarget): string {
     case "workspace":
       return "ルール";
     case "self":
-      return "自身の層のルール";
+      return "ワークスペースの設定のルール";
     case "project":
       return `${target.name} のルール`;
   }
@@ -140,11 +140,11 @@ function samplesSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("samplesPath", DEFAULT_SAMPLES);
 }
 
-/** `ccnaviBoard.openRules` の本体。引数なしはワークスペースのルール */
+/** `ccnaviBoard.openRules` の本体。引数なしは共通の設定のルール */
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ルール設定画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -160,11 +160,11 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ルール設定画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`ルール設定画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
-  // タブは読む前に作る。層の置き場を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
   // `state` を先に立てるので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
@@ -211,7 +211,7 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `未保存の変更がある。破棄して「${titleOf(target)}」に切り替える？`,
+      `未保存の変更があります。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -229,7 +229,7 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
   current.changedPending = false;
   current.lock = lockFromError("確認中…");
   // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
-  // 前の対象の変化を「外で変わった」と拾い続けない
+  // 前の対象の変化を「ファイルの変更を検知しました」と拾い続けない
   if (current.timer !== undefined) {
     clearTimeout(current.timer);
     current.timer = undefined;
@@ -250,29 +250,29 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    // 共通層の置き場は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
-    // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
+    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
     // ずれたときに、この画面で保存したルールが判定に効かなくなる。答えは元リポジトリの版で、
     // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);
+      throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えに自身の層が無い"
-          : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
+          ? "ccnavi の出力にワークスペースの設定がありません"
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、層を空として扱っている（ここのルールは 1 件も効いていない）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -281,8 +281,8 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
-    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通層からコピー」で作る";
-    throw new Error(`ルールファイルを読めない（${rulesRel}）: ${(error as Error).message}${hint}`);
+    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通の設定からコピー」で作ってください";
+    throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}${hint}`);
   }
   const hooks = [
     ...(settingsText === undefined ? [] : parseHooks(settingsText, "settings")),
@@ -328,7 +328,7 @@ function registerPanelHandlers(current: PanelState): void {
   // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない（issue #87）。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -374,8 +374,8 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * ルールファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
- * 対象のパスは層の置き場で変わるので、再読込のたびに張り直す。
+ * ルールファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
+ * 対象のパスは設定ファイルの場所で変わるので、再読込のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
@@ -431,7 +431,7 @@ function scheduleLock(current: PanelState): void {
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * ワークスペースのルールと自身の層はどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
+ * 共通の設定とワークスペースの設定のルールはどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
@@ -444,7 +444,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
  * ときと、保存が通って中身が入れ替わったときだけ（ADR-0062）。
  */
 function show(current: PanelState): void {
@@ -453,7 +453,7 @@ function show(current: PanelState): void {
     return;
   }
   current.error = undefined;
-  // 読み直したので、「外で変わった」はもう今のことではない
+  // 読み直したので、「ファイルの変更を検知しました」はもう今のことではない
   current.changedPending = false;
   current.host.send({
     kind: "page",
@@ -549,7 +549,7 @@ function rulesHost(panel: vscode.WebviewPanel): ScreenHost<RulesData> {
 /**
  * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what` は捨てるもの。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 判定とサンプルはファイルに触らないが、捨てた編集で出した答えを
  * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
@@ -562,7 +562,7 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, `読み直したので、${what}は捨てた。いまのルールでやり直す`);
+  fail(current, `更新したので、${what}は取りやめました。いまのルールでやり直してください`);
   return true;
 }
 
@@ -575,7 +575,7 @@ function fail(current: PanelState, message: string): void {
 function stage(current: PanelState, sections: Sections): RulesOverride {
   const loaded = current.loaded;
   if (loaded === undefined) {
-    throw new Error("ルールが読み込まれていない");
+    throw new Error("ルールが読み込まれていません");
   }
   const tmp = path.join(current.tmpDir, "rules.yml");
   fs.writeFileSync(tmp, loaded.doc.apply(sections), "utf8");
@@ -621,7 +621,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     markTourSeen(SCREEN);
     return;
   }
-  // 読み直せていない画面では、ルールに当たる操作はどれも行き先が無い（「再読込」は
+  // 読み直せていない画面では、ルールに当たる操作はどれも行き先が無い（「更新」は
   // 押せるが、その道は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
@@ -631,12 +631,12 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
     case "reload": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "未保存の変更がある。破棄して読み直す？",
+          "未保存の変更があります。破棄して更新しますか？",
           { modal: true },
-          "読み直す",
+          "更新",
         );
-        if (choice !== "読み直す") {
-          // 画面は「再読込」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
+        if (choice !== "更新") {
+          // 画面は「更新」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
           // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
           if (alive(current)) {
             current.host.post({ type: "cancelled" } satisfies ToRules);
@@ -654,7 +654,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       const target = message.which === "rules" ? current.loaded.rulesPath : current.loaded.samplesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
+        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
       );
       return;
     }
@@ -675,7 +675,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       }
       const rel = path.relative(root, chosen.fsPath);
       if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
-        void vscode.window.showWarningMessage(`ワークスペースの外のファイルは指定できない: ${chosen.fsPath}`);
+        void vscode.window.showWarningMessage(`ワークスペースの外のファイルは指定できません: ${chosen.fsPath}`);
         return;
       }
       current.host.post({
@@ -695,7 +695,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
-        fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+        fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
       const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
@@ -718,7 +718,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
-        fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+        fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
       const result = await runSamples(root, binSetting(), rules, loaded.samplesPath);
@@ -752,7 +752,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     tmp = path.join(current.tmpDir, "rules.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
 
@@ -767,7 +767,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
+    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.rulesRel)}`);
     return;
   }
 
@@ -786,11 +786,11 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   try {
     mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
   } catch (error) {
-    fail(current, `ルールファイルを確かめられない: ${(error as Error).message}`);
+    fail(current, `ルールファイルを確かめられません: ${(error as Error).message}`);
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "ルールファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+    fail(current, "ルールファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
     return;
   }
 
@@ -800,12 +800,12 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   } catch (error) {
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
-    fail(current, `ルールファイルに書けない: ${(error as Error).message}`);
+    fail(current, `ルールファイルに書けません: ${(error as Error).message}`);
     return;
   }
   await reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存した（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.rulesRel} に保存しました（${tail}）`);
 }
 
 function asMessage(message: unknown): RulesMessage | undefined {

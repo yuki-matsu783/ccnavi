@@ -288,7 +288,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   /**
    * 読み直しを頼む。**押した時点でボタンを止める。** 拡張ホストは実行ファイルに聞いてから中身を
-   * 返すことがあり（層の置き場を解く）、その間に押し直せると往復が重なる。人が
+   * 返すことがあり（設定ファイルの場所を解く）、その間に押し直せると往復が重なる。人が
    * 「破棄して読み直す？」をやめたときは `cancelled` が返り、ボタンが戻る。
    */
   const reload = (): void => {
@@ -309,11 +309,11 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          ルール設定画面を読み直せなかった。原因を直してから「再読込」を押す（同じ対象を開き直しても前面に出るだけ。別の対象を開けば、このタブの中身がその対象に替わる）。
+          ルール設定画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
         </p>
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-          再読込
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          更新
         </button>
       </>
     );
@@ -386,7 +386,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
 
   const judge = (): void => {
     if (subject.trim() === "") {
-      setStatus({ text: "対象を入れる", error: true });
+      setStatus({ text: "対象を入れてください", error: true });
       return;
     }
     setBusy(true);
@@ -401,7 +401,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       {page !== undefined && page.mode !== "enable" && page.mode !== "" && (
         // 未設定は実行ファイルが enable として扱う（ccnavi/modes.py「どこにも値が無ければ enable」）ので帯は出さない
         <div className="banner warn">
-          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まらない）
+          現在の <code>CCNAVI_MODE</code>: <strong>{page.mode}</strong>（判定と記録のみ。deny や ask にヒットしても実行は止まりません）
         </div>
       )}
       {(page?.notices ?? []).map((notice, index) => (
@@ -410,9 +410,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </div>
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。再読込してください。
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-          再読込
+        ファイルの変更を検知しました。更新してください。
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          更新
         </button>
       </div>
       <header className="toolbar">
@@ -428,8 +428,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <button type="button" className="action" data-action="open-rules" onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-            再読込
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+            更新
           </button>
           <button
             type="button"
@@ -535,7 +535,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={tab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          セッションが dry-run でも、ここは enable のときの判定を返す。
+          セッションが dry-run でも、ここは enable のときの判定を返します。
         </p>
         <div className="judge-form">
           <label>
@@ -611,43 +611,43 @@ function tourSteps(peek: (tab: TabName) => void, before: () => TabName): readonl
     {
       target: ".tabs",
       title: "3 つのタブ",
-      body: "「ルール」で deny・ask・allow のルールを直し、「判定を試す」で編集中の内容がどう判定するかを確かめ、「hook」で登録されている hook を眺める。",
+      body: "「ルール」で deny・ask・allow のルールを直し、「判定を試す」で編集中の内容がどう判定するかを確かめ、「hook」で登録されている hook を眺めます。",
       before: () => peek("rules"),
     },
     {
       target: "#tab-rules",
       title: "ルール",
-      body: "deny（止める）・ask（確かめる）・allow（通す）のタイプごとに並ぶ。判定は強い順に deny > ask > allow。行を押すと欄が開き、「＋ ルールを追加」で足せる。見出しの ▾ でタイプを畳める。",
+      body: "deny（止める）・ask（確かめる）・allow（通す）のタイプごとに並びます。判定は強い順に deny > ask > allow です。行を押すと欄が開き、「＋ ルールを追加」で足せます。見出しの ▾ でタイプを畳めます。",
       before: () => peek("rules"),
     },
     {
       target: "#find",
       title: "絞り込み",
-      body: "id・ツール・パターン・メッセージで絞り込む。畳んだタイプの中も探す。",
+      body: "id・ツール・パターン・メッセージで絞り込みます。畳んだタイプの中も探します。",
       before: () => peek("rules"),
     },
     {
       target: "#tab-judge .judge-form",
       title: "判定を試す",
-      body: "ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返す。保存は要らない。「サンプルを一括で判定」は、サンプルのファイルに並べた例をまとめて確かめる。",
+      body: "ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールに当たるかを実行ファイルが返します。保存は要りません。「サンプルを一括で判定」は、サンプルのファイルに並べた例をまとめて確かめます。",
       before: () => peek("judge"),
     },
     {
       target: "#tab-hooks",
       title: "hook",
-      body: ".claude/settings.json に登録された hook の一覧。直すときは settings.json を開いて編集する。",
+      body: ".claude/settings.json に登録された hook の一覧です。直すときは settings.json を開いて編集してください。",
       before: () => peek("hooks"),
     },
     {
       target: "#save",
       title: "保存",
-      body: "保存すると実行ファイルが検証してから書き込む。通らなければ、下に理由が出る。ファイルが外で変わったときは上に帯が出るので、再読込する。",
+      body: "保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。ファイルが外で変わったときは上に帯が出るので、更新してください。",
       before: () => peek(before()),
     },
     {
       target: '[data-action="tour"]',
       title: "案内",
-      body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
+      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
       before: () => peek(before()),
     },
   ];

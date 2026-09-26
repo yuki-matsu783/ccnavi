@@ -62,7 +62,7 @@ REVIEW_RANK = {REVIEW_NONE: 0, REVIEW_CHAT: 1, REVIEW_MR: 2}
 
 
 def stricter(a: str, b: str) -> str:
-    """見る場所の厳しい側。どちらかが知らない綴りなら mr に倒す。"""
+    """見る場所の厳しい側。どちらかが知らない綴りなら mr として扱う。"""
     if a not in REVIEW_RANK or b not in REVIEW_RANK:
         return REVIEW_MR
     return a if REVIEW_RANK[a] >= REVIEW_RANK[b] else b
@@ -366,7 +366,7 @@ def merge(
     層をまたいで error（人は表示名で見るので、承認画面で見分けられない）。
 
     error があるとき、その層は空として扱い、共通層の種類だけを返す。衝突した片方を
-    黙って採ると、どちらの `review:` が効いているかを人が読めない。止まる側に倒す。
+    黙って採ると、どちらの `review:` が効いているかを人が読めない。止まる側を採る。
 
     `overlap` / `requires` / `after` が指す先は合成後の集合で確かめる。層から共通層の種類を
     指すのは正しい形なので、層 1 本の中では確かめられない。

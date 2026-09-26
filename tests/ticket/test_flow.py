@@ -775,7 +775,7 @@ class FlowLockTest(FlowHarness):
         self.assertNotIn("1. [start]", text)
 
     def test_a_crash_in_the_briefing_is_one_line(self):
-        """フローの案内が万一例外を出しても、1 行の知らせに落として残りを渡す（H3）。"""
+        """フローの案内が万一例外を出しても、1 行の知らせにして残りを渡す（H3）。"""
         child_tree = self.run_child(CHILD)
         with mock.patch("ccnavi.flow.briefing", side_effect=RecursionError("deep")):
             result = self.hook("SubagentStart", "", child_tree, agent_id="sub-1")

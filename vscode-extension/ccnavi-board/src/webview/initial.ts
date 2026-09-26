@@ -9,11 +9,11 @@ export function readInitial<D>(id: string, reopen: string, onError: (text: strin
   const element = document.getElementById(id);
   const text = element?.textContent ?? "";
   if (text === "") {
-    return onError(`画面に渡す中身が無い（拡張の不具合）。${reopen}を開き直す。`);
+    return onError(`画面に渡す中身がありません（拡張の不具合）。${reopen}を開き直してください。`);
   }
   try {
     return JSON.parse(text) as D;
   } catch (error) {
-    return onError(`画面に渡す中身を読めなかった（拡張の不具合）: ${String(error)}`);
+    return onError(`画面に渡す中身を読めませんでした（拡張の不具合）: ${String(error)}`);
   }
 }

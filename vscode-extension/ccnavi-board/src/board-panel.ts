@@ -82,15 +82,15 @@ function binSetting(): string {
 
 /**
  * `ccnaviBoard.open` の本体。`project` を渡すと、開いたボードの絞り込みをそのプロジェクトにする
- * （`""` はワークスペース自身、`"*"` は全部）。プロジェクト管理画面からの導線。
+ * （`""` はワークスペース（プロジェクト外）、`"*"` は全部）。プロジェクト管理画面からの導線。
  */
 export async function openBoard(project?: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、ccnavi ボードを表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、チケット管理画面を表示できません");
     return;
   }
-  if (!requireTickets("ボード")) {
+  if (!requireTickets("チケット管理画面")) {
     return;
   }
   if (state !== undefined) {
@@ -106,7 +106,7 @@ export async function openBoard(project?: string): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`ccnavi ボードを表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`チケット管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -142,7 +142,7 @@ export async function openBoard(project?: string): Promise<void> {
 /** `ccnaviBoard.refresh` の本体 */
 export function refreshBoard(): void {
   if (state === undefined) {
-    vscode.window.showInformationMessage("ccnavi ボードが開かれていない");
+    vscode.window.showInformationMessage("チケット管理画面が開かれていません");
     return;
   }
   void update();
@@ -229,7 +229,7 @@ async function update(): Promise<void> {
       // 設定ファイルの読みと実行ファイルの答えが食い違えば言う。判定は実行ファイルの側で動いている。
       const mismatch = ticketControlMismatch(ticketControl(), result.board.settings.ticket_control);
       if (mismatch) {
-        vscode.window.showWarningMessage(`ccnavi ボード: ${mismatch}`);
+        vscode.window.showWarningMessage(`チケット管理: ${mismatch}`);
       }
     }
     if (!result.ok) {
@@ -496,7 +496,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
       return;
     case "copy":
       await vscode.env.clipboard.writeText(effect.prompt);
-      vscode.window.setStatusBarMessage(`${effect.what}をクリップボードに入れた。Claude Code に貼って送る`, 5000);
+      vscode.window.setStatusBarMessage(`${effect.what}をコピーしました。Claude Code に貼って送ってください`, 5000);
       return;
     case "openSession":
       // 走っているセッションに送る公開の API は無いので、文を埋めて新しいセッションを開く（送信は人が Enter）
@@ -540,7 +540,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
   }
 }
 
-/** ファイルとして在るか。無いものを読もうとして投げるのは「無い」に倒す */
+/** ファイルとして在るか。無いものを読もうとして投げるのは「無い」として扱う */
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
@@ -554,7 +554,7 @@ function openTicket(current: PanelState, filePath: string): void {
     return;
   }
   void showTicketPreview(filePath).catch(() => {
-    vscode.window.showInformationMessage(`チケットのファイルを開けなかった: ${filePath}`);
+    vscode.window.showInformationMessage(`チケットのファイルを開けませんでした: ${filePath}`);
     void update();
   });
 }
@@ -624,7 +624,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "promptOpen":
       return { type: m.type };
     case "approve":
-      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きに倒れる。
+      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きになる。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"

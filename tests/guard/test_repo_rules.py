@@ -235,7 +235,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
     """承認の経路（launcher-scripts 3.4 節、12 節 A1〜A4）。"""
 
     def test_振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる(self):
-        # A1。今は `<sh>` を先頭に書いた形だけが止まり、残りは確認に落ちている。
+        # A1。今は `<sh>` を先頭に書いた形だけが止まり、残りは確認になっている。
         for subject in [
             LAUNCHER + YES,
             PLACEHOLDER + "/" + LAUNCHER + YES,
@@ -261,7 +261,7 @@ class TicketApprovalPathTest(LauncherJudgeTest):
                 self.assert_denied_by(subject, APPROVAL)
 
     def test_読み切れない形の承認も承認のルールで止まる(self):
-        # A2。今は PARSE_UNCERTAIN の確認に落ちる。止めた理由が承認のルールだと読めること。
+        # A2。今は PARSE_UNCERTAIN の確認になる。止めた理由が承認のルールだと読めること。
         for subject in [
             "sh -c '" + LAUNCHER + YES + "'",
             'bash -lc "' + LAUNCHER + YES + '"',
@@ -355,7 +355,7 @@ class RunnerTest(LauncherJudgeTest):
                 self.assert_denied_by(inner, rule_id)
 
     def test_組み込みの守りは実行役のコマンドの中でも止める(self):
-        # W1。今は実行役のコマンドを付けると、先頭に固定した式が外れて確認に落ちる。
+        # W1。今は実行役のコマンドを付けると、先頭に固定した式が外れて確認になる。
         for runner in RUNNERS:
             for inner, rule_id in GUARDED:
                 subject = runner.format(inner)
@@ -374,7 +374,7 @@ class RunnerTest(LauncherJudgeTest):
         self.assertIn("prefer-webfetch", hit(body), body["rules"])
 
     def test_中で実行されるコマンドは_allow_に当てない(self):
-        # W3。当てると、元の形では確認に落ちる `sudo` が読み取りとして通る。
+        # W3。当てると、元の形では確認になる `sudo` が読み取りとして通る。
         body = self.judge("sudo -u me cat /etc/hosts")
         self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
         self.assertNotEqual(body["verdict"], "allow", body["response"])
@@ -512,7 +512,7 @@ class MovedJudgeTest(LauncherJudgeTest):
                 self.assertEqual(blocking(self.judge(subject)), set(), subject)
 
     def test_行き先を読めない_cd_は読みを変えない(self):
-        # 縮退させない。縮退は生の文字列に落ちるので、コマンドの頭に固定して書かれた
+        # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
         # 守り（`(^|\x00)(mv|rm|tee|…)`）が当たらなくなり、**書かれた綴りで今は
         # 止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
         for subject in [
@@ -671,7 +671,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("cat a.txt\n", "allow", "prefer-read-grep", ""),
                 ("curl -s 'https://example.com/a#frag'", "ask", "prefer-webfetch", ""),
                 ('export PATH="$(go env GOPATH)/bin:$PATH"', "ask", "", "UNDECLARED"),
-                # eval の文字列の中はコマンド名を見ない。外側が縮退して確認に落ちる（ADR-0047）。
+                # eval の文字列の中はコマンド名を見ない。外側が縮退して確認になる（ADR-0047）。
                 ('eval "$(ssh-agent -s)"', "ask", "", "PARSE_UNCERTAIN"),
                 (
                     "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
@@ -845,7 +845,7 @@ class SubstRepoRulesTest(unittest.TestCase):
                 ("if $c status; then :; fi", "deny", NAME, code),
                 ("{fd}>/dev/null $c status", "deny", NAME, code),
                 ('FOO=1 eval "$c status"', "deny", NAME, code),
-                # 外側が縮退する `sh -c` と `eval` の文字列の中は、止めずに確認に落とす。
+                # 外側が縮退する `sh -c` と `eval` の文字列の中は、止めずに確認にする。
                 ('sh -c "$c status"', "ask", "", "PARSE_UNCERTAIN"),
                 ('eval "$(pyenv init -)"', "ask", "", "PARSE_UNCERTAIN"),
                 ('"$(git rev-parse --show-toplevel)/x.sh"', "deny", NAME, code),

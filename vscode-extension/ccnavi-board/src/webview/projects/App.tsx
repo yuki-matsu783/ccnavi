@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース自身。
+ * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース（プロジェクト外）。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、人が触って決めるもの
  * （clone の欄、どのメニューを開いているか、直前の操作の一言）だけ。clone も書き込みも画面はしない。
@@ -101,7 +101,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
   if (data.kind === "error") {
     return (
       <>
-        <p className="empty">プロジェクトの一覧を読み直せなかった。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直す。</p>
+        <p className="empty">プロジェクトの一覧を読み込めませんでした。原因を直してから「ccnavi ボード: プロジェクト管理を開く」を実行し直してください。</p>
         <pre className="load-error">{data.error}</pre>
       </>
     );
@@ -119,7 +119,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         <div className="summary">
           <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
-            置き場: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
+            フォルダ: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
           </span>
         </div>
         <div className="controls">
@@ -128,7 +128,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             className="action"
             data-action="open-rules"
             data-name=""
-            title="共通層のルール（どのツリーにも効く。既定 .ccnavi/common/rules.yml）を編集し、判定を試す"
+            title="共通の設定のルール（どのツリーにも効きます。既定 .ccnavi/common/rules.yml）を編集し、判定を試します"
             onClick={() => post({ type: "openRules", name: "" })}
           >
             ルール設定
@@ -181,7 +181,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             type="button"
             className="action primary"
             data-action="clone"
-            title="git clone を「ccnavi」ターミナルで実行する。認証が要るならターミナルで入れる"
+            title="git clone を「ccnavi」ターミナルで実行します。認証が要るならターミナルで入力してください"
             onClick={() => post({ type: "clone", url: clone.url, name: clone.name })}
           >
             clone
@@ -196,7 +196,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           ワークスペース内のプロジェクト <span className="count">{rows.length}</span>
         </h2>
         {rows.length === 0 ? (
-          <p className="empty">プロジェクト無し。上のボタンで clone するか、既存のリポジトリをprojects直下に移動してください。</p>
+          <p className="empty">プロジェクトがありません。上のボタンで clone するか、既存のリポジトリを projects/ の直下に移動してください。</p>
         ) : (
           <ul className="projects">
             {rows.map((row) => (
@@ -207,7 +207,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       </section>
       <Strays strays={page.strays} />
       <section className="workspace">
-        <h2>ワークスペース自身</h2>
+        <h2>ワークスペース（プロジェクト外）</h2>
         <p className="hint">
           <span className="mono">{page.root}</span>（ワークツリー {page.workspaceWorktrees.length} 件
           {page.workspaceWorktrees.length > 0 && `: ${page.workspaceWorktrees.join(", ")}`}）
@@ -227,27 +227,27 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "section.clone",
     title: "clone する",
-    body: "URL を入れて「clone」を押すと、git clone を「ccnavi」ターミナルで実行し、置き場の直下にプロジェクトとして置く。名前は URL から自動で入る。認証が要るならターミナルで入れる。",
+    body: "URL を入れて「clone」を押すと、git clone を「ccnavi」ターミナルで実行し、プロジェクトのフォルダの直下に clone します。名前は URL から自動で入ります。認証が要るならターミナルで入力してください。",
   },
   {
     target: "section.list",
     title: "プロジェクト",
-    body: "置き場の直下にある git リポジトリが 1 行ずつ出る。「開く ▾」からルール設定（チケット制御が有効ならフェーズ管理とチケット管理も）へ、「git ▾」から fetch と pull をターミナルで実行できる。検証で見つかった問題も行に出る。",
+    body: "プロジェクトのフォルダの直下にある git リポジトリが 1 行ずつ出ます。「開く ▾」からルール設定画面（チケット制御が有効ならフェーズ管理画面とチケット管理画面も）を開き、「git ▾」から fetch と pull をターミナルで実行できます。検証で見つかった問題も行に出ます。",
   },
   {
     target: "section.workspace",
-    title: "ワークスペース自身",
-    body: "ワークスペース自身の層のルールとフェーズの種類。自身の層のルールが無ければ、共通層からコピーして作れる。",
+    title: "ワークスペース（プロジェクト外）",
+    body: "ワークスペースの設定のルールとフェーズの種類です。ワークスペースの設定のルールが無ければ、共通の設定からコピーして作れます。",
   },
   {
     target: '.toolbar [data-action="open-rules"]',
-    title: "共通層のルール",
-    body: "どのツリーにも効く共通層のルールを開く。チケット制御が有効なら、隣の「チケット管理」でボードを開ける。",
+    title: "共通の設定のルール",
+    body: "どのツリーにも効く共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
   },
   {
     target: '[data-action="tour"]',
     title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
   },
 ];
 
@@ -260,14 +260,14 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
   if (page.lintError !== "") {
     banners.push(
       <div key="lint-error" className="banner warn">
-        検証結果を取得できなかったので、プロジェクトごとの結果は出せない。{page.lintError}
+        検証結果を取得できなかったので、プロジェクトごとの結果は出せません。{page.lintError}
       </div>,
     );
   }
   if (page.projectsRel === "") {
     banners.push(
       <div key="no-dir" className="banner warn">
-        置き場が無効（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われない
+        プロジェクトのフォルダが無効です（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われません
       </div>,
     );
     return <>{banners}</>;
@@ -276,7 +276,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
     banners.push(
       <div key="ignore" className="banner warn">
         <code>.gitignore</code> に <code>/{page.projectsRel}/</code>{" "}
-        が無い。各プロジェクトは自分の git リポジトリを持つので、ワークスペースの git からは除外する。
+        がありません。各プロジェクトは自分の git リポジトリを持つので、ワークスペースの git からは除外してください。
         <button type="button" className="action" data-action="fix-ignore" onClick={() => post({ type: "fixIgnore" })}>
           .gitignore に追加
         </button>
@@ -295,14 +295,14 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
 }
 
 /**
- * ワークスペース自身の層のルール。無いのは正常なので warn の色は使わない。
+ * ワークスペースの設定のルール。無いのは正常なので warn の色は使わない。
  * フェーズの種類の行は、チケット制御が disable なら出さない（種類はチケットにしか読まれない）。
  */
 function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
   return (
     <>
       <div className="self-rules">
-        <span>自身の層のルール</span>{" "}
+        <span>ワークスペースの設定のルール</span>{" "}
         {page.selfRulesExists ? (
           <>
             <span className="ok">あり</span> <span className="mono small">{page.selfRulesRel}</span>
@@ -314,10 +314,10 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
               type="button"
               className="action small"
               data-action="create-self-rules"
-              title="共通層の rules.yml を自身の層にコピーする。文面の sh のパスは {root} 付きに置き換える"
+              title="共通の設定の rules.yml をワークスペースの設定にコピーします。文面の sh のパスは {root} 付きに置き換えます"
               onClick={() => post({ type: "createSelfRules" })}
             >
-              共通層からコピー
+              共通の設定からコピー
             </button>
           </>
         )}{" "}
@@ -326,7 +326,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           className="action small"
           data-action="open-self-rules"
           disabled={!page.selfRulesExists}
-          title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試す"
+          title="ワークスペース（プロジェクト外）のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試します"
           onClick={() => post({ type: "openSelfRules" })}
         >
           ルール設定
@@ -334,12 +334,12 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
       </div>
       {page.ticketsEnabled && (
         <div className="self-rules">
-          <span>自身の層のフェーズの種類</span>{" "}
+          <span>ワークスペースの設定のフェーズの種類</span>{" "}
           <button
             type="button"
             className="action small"
             data-action="open-self-phases"
-            title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集する。無ければ画面から作れる"
+            title="プロジェクト外のチケット（project: が空）の計画に、共通の設定に足して使う種類を編集します。無ければ画面から作れます"
             onClick={() => post({ type: "openSelfPhases" })}
           >
             フェーズ管理
@@ -361,8 +361,8 @@ function Strays({ strays }: { readonly strays: readonly Stray[] }): JSX.Element 
         プロジェクトとして認識されない git リポジトリ <span className="count">{strays.length}</span>
       </h2>
       <p className="hint">
-        ワークスペース直下から 2 階層まで（`projects/` の中だけ 3 階層まで）を探して見つかったもの（node_modules、.venv、.claude の中は探さない）。プロジェクトとして扱うには <code>projects/</code>{" "}
-        の直下へ移す。この画面からは操作できない。
+        ワークスペース直下から 2 階層まで（`projects/` の中だけ 3 階層まで）を探して見つかったものです（node_modules、.venv、.claude の中は探しません）。プロジェクトとして扱うには <code>projects/</code>{" "}
+        の直下へ移してください。この画面からは操作できません。
       </p>
       <ul className="stray-list">
         {strays.map((s) => (

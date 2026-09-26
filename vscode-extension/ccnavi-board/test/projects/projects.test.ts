@@ -194,7 +194,7 @@ test("CB-T67 lint の JSON を読み、プロジェクトごとの苦情を引�
 test("CB-T68 lint の JSON の版が違えば読まない", () => {
   const parsed = parseLintJson(JSON.stringify({ version: 2, problems: [] }));
   assert.ok(!parsed.ok);
-  assert.match(parsed.error, /版が違う/);
+  assert.match(parsed.error, /版が違います/);
   assert.ok(!parseLintJson("{").ok);
 });
 

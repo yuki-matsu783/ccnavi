@@ -31,14 +31,14 @@ export function onDidChangeTicketControl(listener: (value: TicketControl) => voi
  *
  * 一覧と `when` は disable の入口を隠すが、キーバインド・他の拡張・前に開いた画面の中の
  * ボタンはそこを通らない。開く側でもう一度見て、隠れている画面が横から開かないようにする。
- * `what` は開こうとしたものの名前（「ボード」「リスク管理画面」など）。
+ * `what` は開こうとしたものの名前（「チケット管理画面」「リスク管理画面」など）。
  */
 export function requireTickets(what: string): boolean {
   if (current === "enable") {
     return true;
   }
   vscode.window.showInformationMessage(
-    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）ので、${what}は開けない。ルール設定とプロジェクト管理は使える`,
+    `このワークスペースはチケット制御を使っていない（${TICKET_CONTROL_ENV}=disable）ので、${what}は開けません。ルール設定画面とプロジェクト管理画面は使えます`,
   );
   return false;
 }

@@ -53,7 +53,7 @@ test("CB-T39 版が違う・JSON でない・オブジェクトでないとき�
   const parsed = parseTestJson(other);
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
-    assert.match(parsed.error, /版が違う/);
+    assert.match(parsed.error, /版が違います/);
   }
   const broken = parseSamplesJson("nope");
   assert.equal(broken.ok, false);

@@ -5,23 +5,23 @@
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存や作成が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
  *
- * 対象は 3 種（設計 11.2、11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
- * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
+ * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
+ * ワークスペースの設定の種類（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの設定の種類
  * （既定 `projects/<名前>/.ccnavi/config/phases.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
- * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
+ * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[].phases_file`）を使い、拡張は組まない。
  *
- * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通層なら `--lint --phases <パス>`、
- * 層なら `--lint --project-phases-file <名前>=<パス>`（自身の層は名前が `self`）で渡す。層の種類は
- * 共通層と合成して確かめられる（同じ id で中身が違う、表示名の重なり、overlap / requires の指す先）。
+ * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--lint --phases <パス>`、
+ * ワークスペースかプロジェクトの設定なら `--lint --project-phases-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。その種類は
+ * 共通の設定と合成して確かめられる（同じ id で中身が違う、表示名の重なり、overlap / requires の指す先）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
- * 作業中のチケットは、共通層と自身の層ならどのツリーでも、プロジェクトの層ならそのプロジェクトの分を見る
+ * 作業中のチケットは、共通の設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分を見る
  * （種類は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
- * ファイルが無いとき、共通層は空の画面と「雛形で作る」を見せる。層は雛形を置かない（雛形の id は共通層の種類と
- * 重なりやすく、中身が違えばその層が空として扱われる）。代わりに画面で種類を足させ、検証を通った最初の保存で
- * ファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
+ * ファイルが無いとき、共通の設定は空の画面と「種類はワークスペースかプロジェクトの設定に置く」案内（ワークスペースの設定を開くボタン）を見せ、画面からは作らせない。
+ * ワークスペースとプロジェクトの設定にも雛形は置かない（雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる）。
+ * 代わりに画面で種類を足させ、検証を通った最初の保存でファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。種類は親チケットの計画と
@@ -39,7 +39,7 @@ import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument } from "./core/phases-doc.js";
+import { asPhasesForm, readPhases, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
 import type { PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
@@ -54,9 +54,9 @@ const DEBOUNCE_MS = 120;
 const DEFAULT_PHASES = ".ccnavi/common/phases.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
-/** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
+/** 自分の保存で監視が鳴るのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
-/** 層のファイルを最初の保存で作るときに、先頭へ置く説明 */
+/** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
   "# この層のフェーズの種類。共通層の種類に足して使う（設計 11.4.1）。",
   "# 共通層と同じ id を書くなら中身も同じにする。違えば --lint が error を出し、この層は空として扱われる。",
@@ -75,7 +75,7 @@ interface Loaded {
   readonly phasesPath: string;
   /** ワークスペースルートからの相対で見せる綴り */
   readonly phasesRel: string;
-  /** 上部に出す注意。実行ファイルがこの層を読めていない、など */
+  /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
 }
 
@@ -96,14 +96,14 @@ interface PanelState {
   /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
-  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
   changedPending: boolean;
   wroteAt: number;
   /** 画面に未保存の変更があるか（画面が `dirty` で知らせる）。別の対象へ切り替えるときに聞くかを決める */
   dirty: boolean;
   /**
    * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら捨てる。
-   * 層の置き場を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
+   * 設定ファイルの場所を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
   /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
@@ -117,7 +117,7 @@ function sameTarget(a: PhasesTarget, b: PhasesTarget): boolean {
   return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
-/** 保存を止めるチケットを絞るプロジェクト。共通層と自身の層は絞らない */
+/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない */
 function projectOf(target: PhasesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
@@ -127,9 +127,9 @@ function titleOf(target: PhasesTarget): string {
     case "common":
       return "ccnavi フェーズ管理";
     case "self":
-      return "ccnavi フェーズ管理: 自身の層";
+      return "ccnavi フェーズ管理: ワークスペース";
     case "project":
-      return `ccnavi フェーズ管理: ${target.name}`;
+      return `ccnavi フェーズ管理: プロジェクト ${target.name}`;
   }
 }
 
@@ -139,7 +139,7 @@ function whatOf(target: PhasesTarget): string {
     case "common":
       return "フェーズ";
     case "self":
-      return "自身の層のフェーズ";
+      return "ワークスペースの設定のフェーズ";
     case "project":
       return `${target.name} のフェーズ`;
   }
@@ -149,14 +149,14 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openPhases` の本体。引数なしは共通層の種類 */
+/** `ccnaviBoard.openPhases` の本体。引数なしは共通の設定の種類 */
 export async function openPhases(target: PhasesTarget = { kind: "common" }): Promise<void> {
   if (!requireTickets("フェーズ管理画面")) {
     return;
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フェーズ管理画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、フェーズ管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -172,11 +172,11 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`フェーズ管理画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`フェーズ管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
-  // タブは読む前に作る。層の置き場を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
   // `state` を先に立てるので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviPhases", titleOf(target), vscode.ViewColumn.One, {
@@ -223,7 +223,7 @@ async function switchTarget(current: PanelState, target: PhasesTarget): Promise<
     }
     current.asking = true;
     const choice = await vscode.window.showWarningMessage(
-      `未保存の変更がある。破棄して「${titleOf(target)}」に切り替える？`,
+      `未保存の変更があります。破棄して「${titleOf(target)}」に切り替えますか？`,
       { modal: true },
       "切り替える",
     );
@@ -241,7 +241,7 @@ async function switchTarget(current: PanelState, target: PhasesTarget): Promise<
   current.changedPending = false;
   current.lock = lockFromError("確認中…");
   // 前の対象のファイルの監視は外す。切り替え先が読めたら `reload` が張り直す。読めずにエラーのままなら、
-  // 前の対象の変化を「外で変わった」と拾い続けない
+  // 前の対象の変化を「ファイルの変更を検知しました」と拾い続けない
   if (current.timer !== undefined) {
     clearTimeout(current.timer);
     current.timer = undefined;
@@ -259,28 +259,28 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesPath: string;
   const notices: string[] = [];
   if (target.kind === "common") {
-    // 共通層の置き場は `.ccnavi/common/` 固定（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
     phasesRel = DEFAULT_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
-    // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
+    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME から自分で組むと、組み方がずれたときに
     // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`層の置き場を実行ファイルから取得できない: ${board.error}`);
+      throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.phasesFile.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えに自身の層が無い"
-          : `プロジェクト ${target.name} は層として数えられていない（置き場の直下に無いか、予約名 common / self）`,
+          ? "ccnavi の出力にワークスペースの設定がありません"
+          : `プロジェクト ${target.name} は設定の対象になっていません（プロジェクトのフォルダの直下に無いか、予約名 common / self）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
     phasesRel = path.relative(root, phasesPath).split(path.sep).join("/");
     if (layer.phasesFile.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、層の種類を空として扱っている（共通層の種類だけで進む）: ${layer.phasesFile.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定の種類を空として扱っています（共通の設定の種類だけで進みます）: ${layer.phasesFile.unreadable}`);
     }
   }
   let text: string;
@@ -292,16 +292,16 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズの種類のファイルを読めない（${phasesRel}）: ${(error as Error).message}`);
+      throw new Error(`フェーズの種類のファイルを読めません（${phasesRel}）: ${(error as Error).message}`);
     }
-    // 無いのは不備ではない（番号だけのフェーズ、無い層は空）。画面は空を見せ、「作る」だけができる。
+    // 無いのは不備ではない（番号だけのフェーズ、無い設定は空）。画面は空を見せ、「作る」だけができる。
     text = "";
     mtimeMs = 0;
     exists = false;
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "種類は自身の層とプロジェクトの層にも置ける（プロジェクト管理画面から開く）。共通層に置いた種類は全プロジェクトに効き、層に同じ id で中身の違う種類があるとその層が空として扱われる",
+      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は全プロジェクトに効き、ワークスペースやプロジェクトの設定に同じ id で中身の違う種類があるとその設定が空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
@@ -326,7 +326,7 @@ function registerPanelHandlers(current: PanelState): void {
   // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない（issue #87）。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -372,7 +372,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * 種類のファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * 種類のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
  * ならないので、そのディレクトリを起点にする。
  */
@@ -442,9 +442,9 @@ function scheduleLock(current: PanelState): void {
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通層の種類はどのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
- * 自身の層も同じに止める（ワークスペース自身のチケットだけに効くが、絞らずに止める側に倒す）。
- * プロジェクトの層は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトの doing だけを見る。
+ * 共通の設定の種類はどのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
+ * ワークスペースの設定も同じに止める（プロジェクト外のチケットだけに効くが、絞らずに止める側にする）。
+ * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトの doing だけを見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
@@ -457,7 +457,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
  * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
  */
 function show(current: PanelState): void {
@@ -466,7 +466,7 @@ function show(current: PanelState): void {
     return;
   }
   current.error = undefined;
-  // 読み直したので、「外で変わった」はもう今のことではない
+  // 読み直したので、「ファイルの変更を検知しました」はもう今のことではない
   current.changedPending = false;
   current.host.send({
     kind: "page",
@@ -560,7 +560,7 @@ async function reload(current: PanelState): Promise<void> {
 /**
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
  */
@@ -572,7 +572,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "読み直したので、この保存は捨てた。いまの種類で編集し直す");
+  fail(current, "更新したので、この保存は取りやめました。いまの種類で編集し直してください");
   return true;
 }
 
@@ -609,7 +609,7 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     markTourSeen(SCREEN);
     return;
   }
-  // 読み直せていない画面では、種類に当たる操作はどれも行き先が無い（「再読込」は
+  // 読み直せていない画面では、種類に当たる操作はどれも行き先が無い（「更新」は
   // 押せるが、その道は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
@@ -618,12 +618,12 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     case "reload": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "未保存の変更がある。破棄して読み直す？",
+          "未保存の変更があります。破棄して更新しますか？",
           { modal: true },
-          "読み直す",
+          "更新",
         );
-        if (choice !== "読み直す") {
-          // 画面は「再読込」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
+        if (choice !== "更新") {
+          // 画面は「更新」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
           current.host.post({ type: "cancelled" } satisfies ToPhases);
           return;
         }
@@ -638,12 +638,14 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       const target = current.loaded.phasesPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
+        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
       );
       return;
     }
-    case "create": {
-      await create(current);
+    case "openSelf": {
+      // プロジェクト管理画面の「ワークスペース自身」の「フェーズ管理」と同じ入口。未保存の変更があれば
+      // 切り替えの前に聞く（共通層のファイルが無い間は欄を触れないので、ふつうは聞かずに切り替わる）
+      await openPhases({ kind: "self" });
       return;
     }
     case "save": {
@@ -651,39 +653,6 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       return;
     }
   }
-}
-
-/** 共通層に雛形を書き出す。既にあれば上書きしない。層には雛形を置かない（最初の保存で作る） */
-async function create(current: PanelState): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  if (current.target.kind !== "common") {
-    fail(current, "層には雛形を置かない。種類を足して保存すると、ファイルが作られる");
-    return;
-  }
-  if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, `${loaded.phasesRel} は既に存在するため、上書きしない。再読込する`);
-    return;
-  }
-  try {
-    fs.mkdirSync(path.dirname(loaded.phasesPath), { recursive: true });
-    current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.phasesPath, TEMPLATE_PHASES_TEXT, { encoding: "utf8", flag: "wx" });
-  } catch (error) {
-    // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
-    current.wroteAt = 0;
-    fail(current, `${loaded.phasesRel} に書けない: ${(error as Error).message}`);
-    return;
-  }
-  await reload(current);
-  if (!alive(current)) {
-    return;
-  }
-  vscode.window.showInformationMessage(
-    `${loaded.phasesRel} を雛形から作成しました。修正してコミットを行ってください。`,
-  );
 }
 
 function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
@@ -704,24 +673,24 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   const layer = current.target.kind !== "common";
   if (!loaded.exists && !layer) {
-    fail(current, `${loaded.phasesRel} が無い。先に「雛形でファイルを作る」を押す`);
+    fail(current, `${loaded.phasesRel} がありません。共通の設定は画面から作りません。種類はワークスペースかプロジェクトの設定に置いてください`);
     return;
   }
   const root = current.folder.uri.fsPath;
   let tmp: string;
   let text: string;
   try {
-    // 層のファイルを初めて作るときは、先頭に説明を置く。検証にも同じ本文を掛ける。
+    // ワークスペースかプロジェクトの設定のファイルを初めて作るときは、先頭に説明を置く。検証にも同じ本文を掛ける。
     text = (loaded.exists ? "" : LAYER_HEADER) + loaded.doc.apply(form);
     tmp = path.join(current.tmpDir, "phases.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
 
   // 1. 検証。error が 1 件でもあれば保存しない。承認済みの計画がこの種類で読めるかもここで分かる。
-  //    層なら共通層との合成もここで確かめる。
+  //    ワークスペースかプロジェクトの設定なら共通の設定との合成もここで確かめる。
   const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
   if (!alive(current)) {
     return;
@@ -735,7 +704,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
+    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.phasesRel)}`);
     return;
   }
 
@@ -758,15 +727,15 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
     } catch (error) {
-      fail(current, `フェーズの種類のファイルを確かめられない: ${(error as Error).message}`);
+      fail(current, `フェーズの種類のファイルを確かめられません: ${(error as Error).message}`);
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+      fail(current, "フェーズの種類のファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られている。再読込してから編集し直す（上書きしない）");
+    fail(current, "フェーズの種類のファイルが読み込んだあとに外で作られています。更新してから編集し直してください（上書きしません）");
     return;
   }
 
@@ -780,12 +749,12 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     }
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `フェーズの種類のファイルに書けない: ${(error as Error).message}`);
+    fail(current, `フェーズの種類のファイルに書けません: ${(error as Error).message}`);
     return;
   }
   await reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存した（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.phasesRel} に保存しました（${tail}）`);
 }
 
 function asMessage(message: unknown): PhasesMessage | undefined {
@@ -800,7 +769,7 @@ function asMessage(message: unknown): PhasesMessage | undefined {
       return typeof m.dirty === "boolean" ? { type: "dirty", dirty: m.dirty } : undefined;
     case "ready":
     case "openFile":
-    case "create":
+    case "openSelf":
     case "tourDone":
       return { type: m.type };
     case "save": {

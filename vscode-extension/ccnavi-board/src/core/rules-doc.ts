@@ -31,7 +31,7 @@ export function readRules(text: string): RulesDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めない: ${e.message}`);
+    problems.push(`YAML として読めません: ${e.message}`);
   }
   const sections = {} as Record<Section, RuleForm[]>;
   for (const section of SECTIONS) {
@@ -41,12 +41,12 @@ export function readRules(text: string): RulesDocument {
       continue;
     }
     if (!isSeq(seq)) {
-      problems.push(`タイプ ${section} が並びではない。このタイプは画面に出さない`);
+      problems.push(`タイプ ${section} がリスト（配列）ではありません。このタイプは画面に出しません`);
       continue;
     }
     seq.items.forEach((item, index) => {
       if (!isMap(item)) {
-        problems.push(`タイプ ${section} の ${index + 1} 件目が対応表ではない。画面に出さない`);
+        problems.push(`タイプ ${section} の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出しません`);
         return;
       }
       sections[section].push(formOf(section, index, item));

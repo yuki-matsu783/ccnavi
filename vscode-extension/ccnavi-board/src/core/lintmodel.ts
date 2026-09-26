@@ -48,16 +48,16 @@ export function parseLintJson(text: string): ParsedLint {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== LINT_VERSION) {
     return {
       ok: false,
-      error: `lint の JSON の版が違う（拡張は ${LINT_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `lint の JSON の版が違います（拡張は ${LINT_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   const problems = list(raw.problems).filter(isRecord).map(problem);

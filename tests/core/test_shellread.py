@@ -729,7 +729,7 @@ class MovedTest(unittest.TestCase):
                 self.assertEqual(self.moved(src), [])
 
     def test_行き先を読めない形では継ぎ足さないだけ(self):
-        # 縮退させない。縮退は生の文字列に落ちるので、`cd - && rm -f <守られた場所>` の
+        # 縮退させない。縮退すると生の文字列で見るので、`cd - && rm -f <守られた場所>` の
         # ように、書かれた綴りで**今は止まっている**形が止まらなくなる（敵対的レビュー）。
         for src in [
             "cd - && rm x",
@@ -1021,7 +1021,7 @@ class CommandNameTest(unittest.TestCase):
             "command -v $x",
             "cd $S && ls",
             "echo '$c' | cat",
-            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認に落ちる（ADR-0047）。
+            # 外側が縮退する `eval` と `sh -c` の文字列の中は見ない。確認になる（ADR-0047）。
             'sh -c "$c status"',
             'eval "$(ssh-agent -s)"',
             'eval "$x"',

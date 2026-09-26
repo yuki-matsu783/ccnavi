@@ -1,4 +1,4 @@
-"""ccnavi-push-approved.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から叩く。
+"""ccnavi-push-approved.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
 
 設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
 
@@ -568,7 +568,7 @@ class ApproveCarriesTest(Workspace):
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
 
-        `--yes` や `--root` を混ぜると、端末の y/N を経ない経路や別のワークスペースに化ける。
+        `--yes` や `--root` を混ぜると、端末の y/N を経ない経路や別のワークスペースになってしまう。
         """
         tree = self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")

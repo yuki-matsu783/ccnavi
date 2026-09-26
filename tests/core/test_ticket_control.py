@@ -74,7 +74,7 @@ class TicketControlTest(unittest.TestCase):
 
         self.assertEqual(text, "")
 
-    def test_読めない値はenableに倒れて届く(self):
+    def test_読めない値はenableとして届く(self):
         result = self.start("--mode", "enable", env={"CCNAVI_TICKET_CONTROL": "off"})
 
         self.assertIn("直接作業", self.context(result))

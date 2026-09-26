@@ -9,13 +9,13 @@
  * 組み立ての誤りなので例外で止める（利用者の操作では起こらない）。
  */
 
-/** ルール設定画面が直すルールファイル。ワークスペースのもの（共通層）、自身の層、プロジェクト 1 つの層 */
+/** ルール設定画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type RulesTarget =
   | { readonly kind: "workspace" }
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
 
-/** フェーズ管理画面が直す種類のファイル。共通層、自身の層、プロジェクト 1 つの層 */
+/** フェーズ管理画面が直す種類のファイル。共通の設定、ワークスペースの設定、プロジェクト 1 つの設定 */
 export type PhasesTarget =
   | { readonly kind: "common" }
   | { readonly kind: "self" }
@@ -23,7 +23,7 @@ export type PhasesTarget =
 
 /** 画面の入口（サイドパネルに並ぶ 5 つと、ボードから開くフロー編集）。引数は開く側が解く（空の綴りや未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
-  /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース自身、`"*"` は全部、未指定は前回のまま） */
+  /** ボード。`project` は開いたときの絞り込み（`""` はワークスペース（プロジェクト外）、`"*"` は全部、未指定は前回のまま） */
   readonly board: (project?: string) => Promise<void>;
   readonly rules: (target: RulesTarget) => Promise<void>;
   readonly risk: () => Promise<void>;
@@ -51,7 +51,7 @@ export function forgetScreens(): void {
 /** 画面を開く。`screens().rules({ kind: "self" })` のように使う */
 export function screens(): Screens {
   if (registered === undefined) {
-    throw new Error("画面の入口が登録されていない（extension.ts の registerScreens を通っていない）");
+    throw new Error("画面の入口が登録されていません（extension.ts の registerScreens を通っていません）");
   }
   return registered;
 }

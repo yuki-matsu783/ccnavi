@@ -117,7 +117,7 @@ ccnavi_fetch_or_note() {
 # そのリポジトリのデフォルトブランチの名前。分からなければ 1 を返す。
 #
 # `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
-# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側に落とす。
+# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
 # どちらも無ければ「分からない」。当てずっぽうで別のブランチを進めない。
 ccnavi_fetch_default() {
 	ccnavi_fd_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)

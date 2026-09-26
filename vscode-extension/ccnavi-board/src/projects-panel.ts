@@ -7,13 +7,13 @@
  * `retainContextWhenHidden` が偽なので、そのまま当たる（打ちかけの clone の欄は Webview の state にある）。
  *
  * 一覧は実行ファイルの答え（`--explain --json` の trees と layers、`--lint --json` の苦情）を並べる。
- * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、層のルールファイル・
+ * 拡張が自分で見るのは、origin（ローカルの git を読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
  * `.claude/` の有無、`.gitignore` の本文、プロジェクトになっていない `.git` の探索だけ。
- * 層のルールファイルの置き場は layers の答えを使い、`CCNAVI_PROJECT_HOME` から自分で組まない。
+ * そのルールファイルの場所は layers（層）の答えを使い、`CCNAVI_PROJECT_HOME` から自分で組まない。
  *
  * clone / fetch / pull は統合ターミナルへ送る。認証の対話はそこで人が行い、完了は `projects/<名前>/.git`
  * の出現を監視して拾う。書くのは、人がボタンを押したときの `.gitignore`、置き場のディレクトリ、
- * 層（プロジェクトか自身の層）のルールファイル（無いときだけ）の 3 つ。
+ * プロジェクトかワークスペースの設定のルールファイル（無いときだけ）の 3 つ。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -80,7 +80,7 @@ function binSetting(): string {
 export async function openProjects(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、プロジェクト管理を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、プロジェクト管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -97,7 +97,7 @@ export async function openProjects(): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`プロジェクト管理を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`プロジェクト管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -265,9 +265,9 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
     return;
   }
   const { folder } = current;
-  // clone の完了（`.git` の出現）、層のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
-  // 層の綴り（ccnavi ディレクトリの下の `config/`）は自身の層のパスから取る。プロジェクトの層も同じ形（設計 11.2）。
-  // 自身の層のパスが取れない（壊れた JSON）なら、層の監視は張らない。
+  // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
+  // 設定の綴り（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
+  // ワークスペースの設定のパスが取れない（壊れた JSON）なら、設定のルールファイルの監視は張らない。
   const rel = projectsRel === "" ? "projects" : projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
   const patterns = [
@@ -463,8 +463,8 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
       // 画面のボタンは disable なら描かれないが、古い画面が開いたままの間は押せる。
       // 開く側でも見るので、ここは画面の中に理由を出すためだけに見る。
       if (ticketControl() !== "enable") {
-        const what = message.type === "openBoard" ? "チケット管理" : "フェーズ管理";
-        fail(current, `${what}は開けない。このワークスペースはチケット制御が無効（CCNAVI_TICKET_CONTROL=disable）。一覧が古いので「更新」を押す`);
+        const what = message.type === "openBoard" ? "チケット管理画面" : "フェーズ管理画面";
+        fail(current, `${what}は開けません。このワークスペースはチケット制御が無効です（CCNAVI_TICKET_CONTROL=disable）。一覧が古いので「更新」を押してください`);
         return;
       }
       if (message.type === "openBoard") {
@@ -477,11 +477,11 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     case "pull": {
       const row = page.rows.find((r) => r.name === message.name);
       if (row === undefined) {
-        fail(current, `プロジェクト ${message.name} が一覧に無い。更新してから押し直す`);
+        fail(current, `プロジェクト ${message.name} が一覧にありません。更新してから押し直してください`);
         return;
       }
       runInTerminal(root, message.type === "fetch" ? fetchCommand(row.root) : pullCommand(row.root));
-      info(current, `${message.name} で git ${message.type} をターミナルに送った`);
+      info(current, `${message.name} で git ${message.type} をターミナルに送りました`);
       return;
     }
   }
@@ -490,7 +490,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
 function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName: string): void {
   const root = current.folder.uri.fsPath;
   if (page.projectsDir === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、clone 先を決められない");
+    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、clone 先を決められません");
     return;
   }
   const remote = checkRemote(rawUrl);
@@ -505,25 +505,25 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   }
   const twin = duplicateOf(page.rows, remote.remote.key);
   if (twin !== undefined) {
-    fail(current, `同じリポジトリを ${twin.name} として既に clone している（origin ${twin.origin}）`);
+    fail(current, `同じリポジトリを ${twin.name} として既に clone しています（origin ${twin.origin}）`);
     return;
   }
   const target = path.join(page.projectsDir, name.name);
   if (fs.existsSync(target) && listDir(target).length > 0) {
-    fail(current, `${page.projectsRel}/${name.name} が既にあり、空ではない`);
+    fail(current, `${page.projectsRel}/${name.name} が既にあり、空ではありません`);
     return;
   }
   runInTerminal(root, cloneCommand(root, page.projectsDir, remote.remote.url, name.name));
   info(
     current,
-    `git clone を「ccnavi」ターミナルに送った（${page.projectsRel}/${name.name}）。認証が要るならターミナルで入れる。終わると一覧が更新される`,
+    `git clone を「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が要るならターミナルで入力してください。終わると一覧が更新されます`,
     "cloned",
   );
 }
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
   if (page.projectsRel === "") {
-    fail(current, "置き場が無効（CCNAVI_PROJECTS が空）なので、足す行が無い");
+    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
     return;
   }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
@@ -531,21 +531,21 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
   try {
     fs.writeFileSync(file, gitignoreWithProjects(before, page.projectsRel), "utf8");
   } catch (error) {
-    fail(current, `.gitignore に書けない: ${(error as Error).message}`);
+    fail(current, `.gitignore に書けません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignore に /${page.projectsRel}/ を足した。コミットは人が行う`);
+  info(current, `.gitignore に /${page.projectsRel}/ を足しました。コミットは自分でしてください`);
   void update();
 }
 
 function createRules(current: PanelState, page: ProjectsPage, name: string): void {
   const row = page.rows.find((r) => r.name === name);
   if (row === undefined) {
-    fail(current, `プロジェクト ${name} が一覧に無い。更新してから押し直す`);
+    fail(current, `プロジェクト ${name} が一覧にありません。更新してから押し直してください`);
     return;
   }
   if (row.rulesRel === "") {
-    fail(current, `プロジェクト ${name} は層として数えられていないので、ルールを置く先が無い`);
+    fail(current, `プロジェクト ${name} は設定の対象になっていないので、ルールのコピー先がありません`);
     return;
   }
   copyCommonRules(current, row.rulesRel, name, "プロジェクトの git");
@@ -553,35 +553,35 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
 
 function createSelfRules(current: PanelState, page: ProjectsPage): void {
   if (page.selfRulesRel === "") {
-    fail(current, "実行ファイルの答えに自身の層が無いので、置く先を決められない。更新してから押し直す");
+    fail(current, "ccnavi の出力にワークスペースの設定が無いので、コピー先を決められません。更新してから押し直してください");
     return;
   }
   copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");
 }
 
-/** 共通層のルールを層のルールファイル（ルートからの相対）に写す。既にあれば上書きしない */
+/** 共通の設定のルールをワークスペースかプロジェクトの設定のルールファイル（ルートからの相対）に写す。既にあれば上書きしない */
 function copyCommonRules(current: PanelState, targetRel: string, label: string, repo: string): void {
   const root = current.folder.uri.fsPath;
   const target = path.join(root, ...targetRel.split("/"));
   if (fs.existsSync(target)) {
-    fail(current, `${targetRel} は既にあるので、上書きしない`);
+    fail(current, `${targetRel} は既にあるので、上書きしません`);
     return;
   }
-  // 共通層の置き場は `.ccnavi/common/` 固定。env では動かない（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かない（ADR-0052）。
   const sourceRel = DEFAULT_RULES;
   const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {
-    fail(current, `ワークスペースのルール ${sourceRel} を読めない`);
+    fail(current, `共通の設定のルール ${sourceRel} を読めません`);
     return;
   }
   try {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, rewriteRulesForProject(source, sourceRel, label, new Date().toISOString().slice(0, 10)), { encoding: "utf8", flag: "wx" });
   } catch (error) {
-    fail(current, `${targetRel} に書けない: ${(error as Error).message}`);
+    fail(current, `${targetRel} に書けません: ${(error as Error).message}`);
     return;
   }
-  info(current, `${targetRel} に共通層のルールをコピーした。中身を確かめてから${repo}にコミットする`);
+  info(current, `${targetRel} に共通の設定のルールをコピーしました。中身を確かめてから${repo}にコミットしてください`);
   void update();
 }
 

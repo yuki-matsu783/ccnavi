@@ -40,7 +40,7 @@ export function linkedReason(rel: string): string {
   return `フローの置き場（${rel}）かその途中がシンボリックリンクなので、読まないし書かない。リンクの先は承認済みの領域の外かもしれない。リンクを外してから開き直す`;
 }
 
-/** 確かめられなかったとき。閉じる側に倒す */
+/** 確かめられなかったとき。閉じる側にする */
 export function lockFromFailure(error: string): FlowLock {
   return { locked: true, reason: `着手中かを確かめられないので、書かない: ${error}` };
 }

@@ -4,7 +4,7 @@
  * 承認は取り返しがつかない（承認済みチケットが置かれ、コミットと push が端末に送られる）。
  * 連打・承認中の再入・古いボードからの承認は現実に起きるので、「この状態ではこれを受けない」を
  * 書き落とさないことが要る。**散らばっていると書き落とす**ので、見張りをこの 1 ファイルに集めた
- * （issue #92、ADR-0068）。
+ * （ADR-0068）。
  *
  * VS Code の API には触れない。外へ出る仕事（実行ファイルを呼ぶ・端末に送る・クリップボードに
  * 入れる・新しいセッションで開く・人に言う）は `ApprovalEffect` として返すだけで、**実際に行うのは
@@ -39,7 +39,7 @@
  * |---|---|
  * | `approving` の間は閉じない | 承認を打っている最中に閉じられ、結果を人が見ないまま次へ進む |
  * | 承認を打つのは `preview` のときだけ | 二重に打てる。実行ファイルの指紋の照合（ADR-0043）は 2 本目を止めるが、止まる前提で連打させない |
- * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧に化ける |
+ * | 承認の途中（`loading`・`preview`・`approving`）は二重に開かない | 見せている一覧が、読み直しの途中の別の一覧になってしまう |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
  * | 文を渡せるのは `done` と `prompt` のときだけ | 文の無い状態で「コピー」が通る |
  * | `done` の上にレビュー済みの連絡を被せない | 承認の文が、渡す前に消える |
@@ -49,7 +49,7 @@
  * | 行き先が見せた指摘の全部に 1 つずつ付いているか | 古い画面から届いた選択で、見せていない指摘の扱いが決まる |
  * | 残った指摘を読むのは、人のレビュー待ちのフェーズだけ | 依頼していないフェーズで、実行ファイルの前提の誤りを人が読むことになる |
  * | 一覧を受けるのは、それを頼んだ状態のときだけ（残った指摘も同じ） | 閉じたあとに返ってきた一覧が、勝手にオーバーレイを開く |
- * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧に化ける |
+ * | 承認と残った指摘は互いの途中に被さらない | 見せている一覧が、別の一覧になってしまう |
  * | 決めた結果の文の上に、連絡も次の「決める」も被せない | 続きの子の識別子と次の 2 手を渡す前に、文が消える |
  *
  * これらは `test/shared/approval-machine.test.ts` が見る。**同じファイルの変異テストが、
@@ -73,7 +73,7 @@ export interface ApprovalState {
   /**
    * そのオーバーレイが見せている一覧の絞り（ボードの絞り込みで見えている識別子）。空なら全部。
    * 読み直しにも承認にも同じ絞りを通す。**忘れると、絞って見せたつもりのオーバーレイが
-   * 承認待ち全部に化ける**
+   * 承認待ち全部になってしまう**
    */
   readonly only: readonly string[];
   /**
@@ -233,7 +233,7 @@ function opened(
   let only: readonly string[] = [];
   if (input.filtered) {
     if (input.tickets.length === 0) {
-      return stay(state, { kind: "warn", text: "絞り込みで見えている承認待ちが無い" });
+      return stay(state, { kind: "warn", text: "絞り込みで見えている承認待ちがありません" });
     }
     // 1 つでもいまのボードで承認待ちでなければ、ボードが古い。落として送ると「見せた 2 件の
     // つもりが 1 件」になるので、削らずに止める
@@ -241,7 +241,7 @@ function opened(
     if (!input.tickets.every((id) => pending.has(id))) {
       return stay(
         state,
-        { kind: "warn", text: "ボードが古く、承認待ちが変わっている。更新してから承認する" },
+        { kind: "warn", text: "表示が古く、承認待ちが変わっています。チケット管理画面を更新したので、もう一度承認してください" },
         { kind: "refresh" },
       );
     }
@@ -253,7 +253,7 @@ function opened(
   if (kind === "loading" || kind === "preview" || kind === "approving") {
     return stay(state);
   }
-  // 残った指摘を決める途中にも開かない。見せている指摘が、承認待ちの一覧に化ける
+  // 残った指摘を決める途中にも開かない。見せている指摘が、承認待ちの一覧になってしまう
   if (busyDeciding(state)) {
     return stay(state);
   }
@@ -334,8 +334,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
               : {
                   kind: "warn",
                   text:
-                    `承認済みチケットはまだコミットされていない。${PUSH_APPROVED_SCRIPT} が無いので、` +
-                    "導入スクリプト（scripts/ccnavi-setup.sh）で配る",
+                    `承認済みチケットはまだコミットされていません。${PUSH_APPROVED_SCRIPT} が無いので、` +
+                    "導入スクリプト（scripts/ccnavi-setup.sh）で配ってください",
                 },
             { kind: "refresh" },
           ];
@@ -350,8 +350,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     // 押し続けて全部を承認しかねない。見せているのは `approving` のままで、返ったら差し替える
     const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
     const notice = sameIds
-      ? "見せた承認画面と今の本文が違った（提案の中身が変わった）。見直してから承認する"
-      : "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する";
+      ? "表示した承認内容と今の本文が違います（提案の中身が変わりました）。見直してから承認してください"
+      : "表示した一覧と今の一覧が違います（提案が増えたか減りました）。見直してから承認してください";
     return move(
       state,
       { overlay: state.overlay, only: state.only, recheck: { notice, dropped: false } },
@@ -390,7 +390,7 @@ function reviewed(
   if (tree === undefined || chip === undefined) {
     return stay(state, {
       kind: "warn",
-      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡を組めない`,
+      text: `親 ${parent} のワークツリーかフェーズ ${phase} が無いので、レビュー済みの連絡を組めません`,
     });
   }
   // ボタンが出る条件（人のレビュー待ち）を受け側でも持つ。待ちでなければ confirm の前提（依頼のマーカー）が無い
@@ -399,7 +399,7 @@ function reviewed(
       state,
       {
         kind: "warn",
-        text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではない。ボードを更新する`,
+        text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理画面を更新しました`,
       },
       { kind: "refresh" },
     );
@@ -409,8 +409,8 @@ function reviewed(
       kind: "prompt",
       title: `フェーズ ${chip.label} のレビュー済み連絡`,
       note:
-        "レビューを終えたことを プロンプトを用意しました。。コピーして進行中のセッションに貼るか、" +
-        "新しいセッションで開いてください。送るときは自分で Enter を押す。マーカーはエージェントが confirm を打って置く。",
+        "レビューを終えたことを Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、" +
+        "新しいセッションで開いてください。送るときは自分で Enter を押してください。エージェントが confirm を実行して、レビュー済みを記録します。",
       prompt: reviewedPrompt(input.root, parent, phase, chip.label, tree, chip.mrUrl),
     },
     only: state.only,
@@ -482,7 +482,7 @@ function decideOpened(
   if (chip.reviewWaiting !== true) {
     return stay(
       state,
-      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではない。ボードを更新する` },
+      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理画面を更新しました` },
       { kind: "refresh" },
     );
   }
@@ -502,7 +502,7 @@ function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): Appr
   // 頼んだフェーズの一覧か。別のフェーズの答えで開かない
   if (result.ok && (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase)) {
     return move(state, {
-      overlay: { kind: "error", error: "頼んだフェーズと違う一覧が返った。ボードを更新してから決め直す" },
+      overlay: { kind: "error", error: "頼んだフェーズと違う一覧が返りました。チケット管理画面を更新してから決め直してください" },
       only: state.only,
     });
   }
@@ -559,10 +559,10 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
             ? `フェーズ ${value.phase} の未解決（Unresolved）の指摘の対応方針を決めました`
             : `フェーズ ${value.phase} をレビュー済みにしました`,
           note:
-            `${note}${issued} プロンプトを用意しました。。コピーして進行中のセッションに貼るか、` +
-            "新しいセッションで開いてください。送るときは自分で Enter を押す。",
+            `${note}${issued} Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、` +
+            "新しいセッションで開いてください。送るときは自分で Enter を押してください。",
           prompt: value.prompt,
-          what: "残った指摘を決めた文",
+          what: "対応方針の連絡文",
           keep: true,
         },
         only: state.only,
@@ -582,13 +582,13 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
           parent: preview.parent,
           phase: preview.phase,
           tree,
-          notice: "見せた指摘と今の指摘が違った（増えたか、書き換わった）。見直してから決める",
+          notice: "表示した指摘と今の指摘が違います（増えたか、書き換わりました）。見直してから決めてください",
         },
         only: state.only,
       },
       { kind: "loadDecide", tree, phase: preview.phase },
     );
   }
-  const error = "mismatch" in outcome ? "見せた指摘と今の指摘が違った。ボードを更新してから決め直す" : outcome.error;
+  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理画面を更新したので、もう一度「対応方針を決める」から決め直してください" : outcome.error;
   return move(state, { overlay: { kind: "error", error }, only: state.only }, { kind: "refresh" });
 }
