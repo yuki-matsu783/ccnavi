@@ -82,7 +82,7 @@
 | [0009](0009-undeclared-handover.md) | ルールが言及しない呼び出しは判定を返さず、権限モードに委ねる |
 | [0010](0010-glob.md) | 記法は `fnmatch` の glob にし、自前の記法をやめる |
 | [0011](0011-no-allow-when-degraded.md) | 読み切れないコマンドに `allow` を当てない |
-| [0012](0012-builtin-fallback.md) | ルールが読めないときは組み込みの既定に落ちる |
+| [0012](0012-builtin-fallback.md) | ルールが読めないときは組み込みの既定を使う |
 | [0013](0013-heredoc.md) | ヒアドキュメントを既定のルールで止める |
 | [0014](0014-resolved-path.md) | ファイルのパスは行き着く先で見る |
 | [0015](0015-message-and-context.md) | `message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける |
