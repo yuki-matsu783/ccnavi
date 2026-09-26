@@ -10,7 +10,11 @@
 
 書き換える・消すコードは持たない。1 行をまるごと 1 回の write で、追記で開いたハンドルに
 出す（記録の 1 行と同じ書き方。付録 B）。同じチケットの跡を 2 つのプロセスが同時に書いても
-行は混ざらない。
+行が混ざらないのは、POSIX の `O_APPEND`（書くたびに末尾へ寄せてから 1 回で書く）に頼っている。
+Windows の追記はその保証が弱く、同時に書けば行が混ざりうる（読む側は読めない行を飛ばして数える）。
+
+書く中身はどんな文字でも落とさない。不正な UTF-8 から来たサロゲート（`--reason` に混ざる）は
+`\\udcff` の形の JSON のエスケープで書き、読めば元の文字列に戻る。
 
 ## 書けなくても状態は止めない
 
@@ -35,6 +39,8 @@ import os
 import time
 from collections.abc import Iterator
 from typing import TextIO
+
+from . import ticket as ticket_mod
 
 # 承認済みの領域の下の置き場と、ファイルの拡張子。
 EVENTS_DIR = "events"
@@ -109,6 +115,12 @@ def pending_failures() -> list[str]:
 
 
 def path(approved_dir: str, ticket_id: str) -> str:
+    """跡のファイルの綴り。識別子の形でなければ空文字（置き場の外を指させない）。
+
+    呼び手は識別子を検査済みのチケットから渡すが、ここでも同じ検査を当てる（多重の守り）。
+    """
+    if not ticket_mod.is_valid_id(ticket_id):
+        return ""
     return os.path.join(approved_dir, EVENTS_DIR, ticket_id + SUFFIX)
 
 
@@ -142,10 +154,24 @@ def note(
         if value is None or value == "" or value == [] or value == {}:
             continue
         entry[key] = value
-    failed = _append(path(approved_dir, ticket_id), json.dumps(entry, ensure_ascii=False))
+    target = path(approved_dir, ticket_id)
+    if not target:
+        failed = "識別子の形ではないので、ファイルの名前に使わない"
+        _state["failures"].append(
+            f"{ticket_id!r} の履歴（{kind}）を書かない（{failed}）。状態は動いた。"
+            "正は置き場で、履歴は補助"
+        )
+        return failed
+    try:
+        # 知らない型が混ざっても落とさず、綴りにして残す。
+        line = json.dumps(entry, ensure_ascii=False, default=str)
+    except (TypeError, ValueError) as exc:
+        line, failed = "", f"JSON にできない ({exc})"
+    else:
+        failed = _append(target, line)
     if failed:
         _state["failures"].append(
-            f"{ticket_id} の履歴（{kind}）を {path(approved_dir, ticket_id)} に書けない"
+            f"{ticket_id} の履歴（{kind}）を {target} に書けない"
             f"（{failed}）。状態は動いた。正は置き場で、履歴は補助"
         )
     return failed
@@ -153,17 +179,28 @@ def note(
 
 def _append(target: str, line: str) -> str:
     """1 行を追記する。書けたら空文字、駄目なら理由。リンクは辿らない。"""
+    # サロゲート（不正な UTF-8 から来た文字）は `\udcff` の形で書く。JSON のエスケープなので、
+    # 読めば元の文字列に戻り、何も落とさない。書く前に作るので、書けない理由がここで出ることは無い。
+    data = (line + "\n").encode("utf-8", errors="backslashreplace")
     try:
         if os.path.islink(target):
             return "シンボリックリンクなので書かない"
         os.makedirs(os.path.dirname(target), exist_ok=True)
-        flags = os.O_APPEND | os.O_CREAT | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+        flags = (
+            os.O_APPEND
+            | os.O_CREAT
+            | os.O_WRONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            # Windows で改行を書き換えさせない（1 行 1 JSON の区切りは `\n` だけ）。
+            | getattr(os, "O_BINARY", 0)
+        )
         fd = os.open(target, flags, 0o644)
         try:
-            os.write(fd, (line + "\n").encode("utf-8"))
+            os.write(fd, data)
         finally:
             os.close(fd)
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
+        # ValueError は綴りに NUL が混ざったときなど。どれも「書けない」として状態は止めない。
         return str(exc)
     return ""
 
@@ -173,8 +210,12 @@ def read(approved_dir: str, ticket_id: str, limit: int = BOARD_LIMIT) -> tuple[l
 
     ファイルが無いのは跡が無いだけで、理由は空。読めない行（書きかけ、手で壊した行）は
     飛ばして数える。末尾の `READ_LIMIT_BYTES` だけを読むので、途中で切れた先頭の 1 行は捨てる。
+    切れ目がちょうど行の頭に当たったときは、その行は完全なので捨てない（1 バイト手前から読んで、
+    直前が改行かで見分ける）。識別子の形でなければ読まず、理由を返す。
     """
     target = path(approved_dir, ticket_id)
+    if not target:
+        return [], f"{ticket_id!r} は識別子の形ではないので、履歴を読まない"
     try:
         if os.path.islink(target):
             return [], f"{target} はシンボリックリンクなので読まない"
@@ -182,15 +223,17 @@ def read(approved_dir: str, ticket_id: str, limit: int = BOARD_LIMIT) -> tuple[l
             f.seek(0, os.SEEK_END)
             size = f.tell()
             start = max(0, size - READ_LIMIT_BYTES)
-            f.seek(start)
+            f.seek(max(0, start - 1))
             raw = f.read()
     except FileNotFoundError:
         return [], ""
     except OSError as exc:
         return [], f"{target} を読めない ({exc})"
-    lines = raw.decode("utf-8", errors="replace").split("\n")
     if start > 0:
-        lines = lines[1:]
+        # 先頭の 1 バイトは切れ目の直前。改行ならその次から完全な行、違えば最初の改行までが切れ端。
+        cut = 1 if raw[:1] == b"\n" else raw.find(b"\n") + 1
+        raw = raw[cut:] if cut > 0 else b""
+    lines = raw.decode("utf-8", errors="replace").split("\n")
     entries: list[dict] = []
     skipped = 0
     for line in lines:

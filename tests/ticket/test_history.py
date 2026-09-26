@@ -20,7 +20,8 @@ import re
 import unittest
 
 from ccnavi import history
-from tests.ticket.test_ticket import TicketTest, git, write
+from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
+from tests.ticket.test_ticket import TicketTest, git, read_json, write
 
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
@@ -28,7 +29,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 def load_tests(loader, tests, pattern):
     """このモジュールで書いたテストだけを走らせる（借りた TicketTest のテストは走らせない）。"""
     suite = unittest.TestSuite()
-    for case in (HistoryTest,):
+    for case in (HistoryTest, PhaseHistoryTest, ReadBoundaryTest):
         for name in sorted(vars(case)):
             if name.startswith("test_"):
                 suite.addTest(case(name))
@@ -206,6 +207,42 @@ class HistoryTest(TicketTest):
         self.assertEqual(len(after.splitlines()), len(before.splitlines()) + 1)
         self.assertEqual(read_json_lines(path)[-1]["kind"], "started")
 
+    def test_a_broken_character_in_the_reason_is_kept_and_does_not_stop_the_move(self):
+        """不正な UTF-8 由来のサロゲートが理由に混ざっても、状態は動き、跡は元の文字列で読める。"""
+        self.family()
+        cancelled = self.ccnavi("ticket", "cancel", "i0001-01", "--reason", "bad\udcff")
+        self.assertEqual(cancelled.returncode, 0, cancelled.stdout + cancelled.stderr)
+        self.assertNotIn("警告", cancelled.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.approved, "done", "i0001-01.md")))
+        last = self.lines("i0001-01")[-1]
+        self.assertEqual((last["kind"], last["reason"]), ("cancelled", "bad\udcff"))
+
+    def test_a_blocked_history_does_not_stop_a_batch_approval(self):
+        """跡が書けなくても、まとめて承認した全部が置かれ、1 件ずつ警告が出る。"""
+        self.propose("i0001", allow=("src/*",))
+        self.propose("i0001-01", parent="i0001", phase=1, allow=("src/a/*",))
+        self.propose("i0001-02", parent="i0001", phase=1, allow=("src/b/*",))
+        write(os.path.join(self.approved, "events"), "ディレクトリではない\n")
+        approved = self.ccnavi("--approve", stdin="y\n")
+        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+        for name in ("i0001", "i0001-01", "i0001-02"):
+            self.assertTrue(os.path.exists(os.path.join(self.approved, "doing", name + ".md")))
+            self.assertIn(f"ccnavi: 警告: {name} の履歴（approved）", approved.stderr)
+
+    def test_a_name_that_is_not_an_identifier_is_neither_written_nor_read(self):
+        """識別子の形でなければ（区切り文字・先頭の点）、跡のファイルに使わない。書かずに言い、読みは空。"""
+        base = os.path.join(self.root, "h")
+        with history.session(history.VIA_CLI, None):
+            for bad in ("../x", "a/b", ".hidden", ""):
+                failed = history.note(base, bad, history.KIND_STARTED, "doing", "doing")
+                self.assertIn("識別子の形ではない", failed)
+                self.assertEqual(history.path(base, bad), "")
+                entries, why = history.read(base, bad)
+                self.assertEqual(entries, [])
+                self.assertIn("識別子の形ではない", why)
+            self.assertEqual(len(history.pending_failures()), 4)
+        self.assertFalse(os.path.exists(base))
+
 
 def read_text(path):
     with open(path, encoding="utf-8") as f:
@@ -215,3 +252,147 @@ def read_text(path):
 def read_json_lines(path):
     with open(path, encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
+
+
+class PhaseHistoryTest(PhaseHarness):
+    """計画を持つ親で動く跡（改版・続きの子・親のマーカー・締め）を固定する。"""
+
+    def lines(self, ticket_id):
+        path = os.path.join(self.approved, "events", ticket_id + ".ndjson")
+        if not os.path.exists(path):
+            return []
+        with open(path, encoding="utf-8") as f:
+            return [json.loads(line) for line in f if line.strip()]
+
+    def chat_phase(self):
+        """`review: chat` のフェーズを 1 つ終わらせる（test_phases.ChatReviewTest と同じ手順）。"""
+        self.family(plan=["chores"])
+        self.propose("i0001-01", child_text("i0001-01", "i0001", 1, ["src/a*"], review=False))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("src/a1.py", "x\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+
+    def test_a_followup_child_is_raised_and_the_phase_reopens(self):
+        self.chat_phase()
+        passed = self.ccnavi(
+            "--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n直す点\n\n"
+        )
+        self.assertEqual(passed.returncode, 0, passed.stdout + passed.stderr)
+        raised = self.lines("i0001-02")
+        self.assertEqual(len(raised), 1, raised)
+        self.assertEqual(
+            (raised[0]["kind"], raised[0]["from"], raised[0]["to"], raised[0]["via"]),
+            ("raised", None, "doing", "terminal"),
+        )
+        self.assertEqual(raised[0]["followup_of"], ["i0001-01"])
+        self.assertEqual(raised[0]["phase"], 1)
+        settled = self.lines("i0001-01")[-1]
+        self.assertEqual((settled["kind"], settled["via"]), ("settled", "terminal"))
+        parent = [(e["kind"], e.get("mark"), e["via"]) for e in self.lines("i0001")]
+        self.assertIn(("phase-mark", "reviewed", "terminal"), parent)
+        reopened = [e for e in self.lines("i0001") if e["kind"] == "phase-reopened"]
+        self.assertEqual(reopened[-1]["cleared"], ["reviewed", "pending"])
+
+    def test_a_feedback_revision_and_closing_the_parent_are_left(self):
+        self.chat_phase()
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        self.start_parent()
+        self.propose("i0001", parent_text("i0001", ["chores"], feedback=[]))
+        self.assertEqual(self.approve().returncode, 0)
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001").returncode, 0)
+        kinds = [(e["kind"], e["from"], e["to"], e.get("mark")) for e in self.lines("i0001")]
+        self.assertIn(("revised", "doing", "doing", None), kinds)
+        revised = next(e for e in self.lines("i0001") if e["kind"] == "revised")
+        self.assertTrue(revised["feedback"])
+        self.assertEqual(
+            kinds[-2:], [("finished", "doing", "done", None), ("parent-mark", None, None, "closed")]
+        )
+
+    def test_close_early_is_left_on_the_parent_and_the_cancelled_child(self):
+        self.family(plan=["research", "design"])
+        self.propose(
+            "i0001-01", child_text("i0001-01", "i0001", 1, ["wip/research/*"], review=False)
+        )
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01", [("wip/research/summary.md", "s\n")])
+        self.assertEqual(self.close_child("i0001-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01")
+        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
+        self.propose("i0001-02", child_text("i0001-02", "i0001", 2, ["wip/design/*"]))
+        self.commit_parent("propose 02")
+        self.assertEqual(self.approve().returncode, 0)
+        self.start_parent()
+        fixture = self.remote()
+        done = self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--close-early",
+            "--reason",
+            "ここまで",
+            "--result",
+            fixture,
+            stdin="y\n",
+        )
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        cancelled = self.lines("i0001-02")[-1]
+        self.assertEqual(
+            (cancelled["kind"], cancelled["from"], cancelled["to"], cancelled["via"]),
+            ("cancelled", "doing", "done", "terminal"),
+        )
+        parent = [(e["kind"], e.get("phase"), e.get("mark"), e["via"]) for e in self.lines("i0001")]
+        self.assertIn(("parent-mark", None, "close-early", "terminal"), parent)
+        self.assertIn(("phase-mark", 2, "skipped", "terminal"), parent)
+        self.assertEqual(
+            read_json(os.path.join(self.approved, "phases", "i0001", "close-early.json"))["reason"],
+            "ここまで",
+        )
+
+
+class ReadBoundaryTest(unittest.TestCase):
+    """読む窓（末尾 READ_LIMIT_BYTES）の切れ目が行の頭にちょうど当たっても、完全な行を捨てない。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+
+        self.base = tempfile.mkdtemp(prefix="ccnavi-history-")
+        self.addCleanup(shutil.rmtree, self.base, ignore_errors=True)
+        os.makedirs(os.path.join(self.base, "events"))
+
+    def fill(self, width, count, tail=""):
+        line = json.dumps({"k": "a" * width})
+        with open(history.path(self.base, "x"), "w", encoding="utf-8", newline="\n") as f:
+            f.write("".join(line + "\n" for _ in range(count)) + tail)
+        return len(line) + 1
+
+    def test_the_window_starting_exactly_at_a_line_keeps_that_line(self):
+        # 1 行 128 バイト（改行込み）なら、窓の中にちょうど 512 行が入る。
+        size = self.fill(128 - 10, history.READ_LIMIT_BYTES // 128 + 1)
+        self.assertEqual(size, 128)
+        entries, why = history.read(self.base, "x", limit=0)
+        self.assertEqual(why, "")
+        self.assertEqual(len(entries), history.READ_LIMIT_BYTES // 128)
+
+    def test_the_window_starting_inside_a_line_drops_only_that_cut_line(self):
+        # 末尾に 8 バイトの行を足すと、窓の頭は 128 バイトの行の途中（8 バイト目）に当たる。
+        tail = json.dumps({"z": 1}, separators=(",", ":")) + "\n"
+        self.assertEqual(len(tail), 8)
+        size = self.fill(128 - 10, history.READ_LIMIT_BYTES // 128 + 1, tail=tail)
+        self.assertEqual(size, 128)
+        entries, why = history.read(self.base, "x", limit=0)
+        # 切れ端を捨て、残りの完全な行だけを読む（読めない行とは数えない）。
+        self.assertEqual(why, "")
+        self.assertEqual(len(entries), history.READ_LIMIT_BYTES // 128)
+        self.assertEqual(entries[-1], {"z": 1})
+
+    def test_a_short_file_is_read_whole(self):
+        self.fill(10, 3)
+        entries, why = history.read(self.base, "x", limit=0)
+        self.assertEqual((len(entries), why), (3, ""))

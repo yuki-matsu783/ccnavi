@@ -114,6 +114,14 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _CHILD = re.compile(r"^(?P<parent>[A-Za-z0-9][A-Za-z0-9._-]*)-(?P<seq>\d{2})$")
 
 
+def is_valid_id(text: str) -> bool:
+    """識別子の形（親は自由な 1 語、子もその形の中）か。区切り文字と先頭の `.` を持たない。
+
+    チケットの識別子でファイル名を組む側（history.py）が、自分でも同じ検査を当てるために使う。
+    """
+    return bool(_ID.match(text or ""))
+
+
 def child_pattern() -> re.Pattern:
     """子の識別子の形（`<親>-<2 桁連番>`）。承認の側が次の連番を数えるのに使う。"""
     return _CHILD
