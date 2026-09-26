@@ -624,6 +624,10 @@ PRED_DONE = ticket_mod.DONE
 PRED_CANCELLED = ticket_mod.CANCELLED
 PRED_MISSING = "missing"
 PRED_SCATTERED = "scattered"
+# 形の上で満たせない先行。待っても通らないので、ふつうの error にする。
+PRED_SELF = "self"  # 自分自身
+PRED_ANCESTOR = "ancestor"  # 自分の親（子は親の中の作業で、親は子より先に閉じない）
+PRED_CYCLE = "cycle"  # 先行を辿ると自分に戻る
 # 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
 PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
 PRED_LABELS = {
@@ -633,6 +637,9 @@ PRED_LABELS = {
     PRED_CANCELLED: "取り消し済み（done/ で cancelled_at を持つ）",
     PRED_MISSING: "どの置き場にも無い",
     PRED_SCATTERED: "複数の場所にある",
+    PRED_SELF: "自分自身",
+    PRED_ANCESTOR: "自分の親",
+    PRED_CYCLE: "先行を辿ると自分に戻る",
 }
 
 
@@ -694,6 +701,17 @@ def predecessor_states(
     out: list[Predecessor] = []
     for ident in dict.fromkeys(t.predecessors):
         hits = pool.get(ident, [])
+        if ident == t.ticket:
+            out.append(Predecessor(ident, PRED_SELF))
+            continue
+        if t.parent and ident == t.parent:
+            out.append(Predecessor(ident, PRED_ANCESTOR))
+            continue
+        if len(hits) == 1 and hits[0].state != PRED_DONE:
+            loop = _loop_back(t.ticket, ident, pool)
+            if loop:
+                out.append(Predecessor(ident, PRED_CYCLE, " → ".join([t.ticket, *loop])))
+                continue
         if not hits:
             out.append(Predecessor(ident, PRED_MISSING))
         elif len(hits) > 1:
@@ -702,6 +720,29 @@ def predecessor_states(
         else:
             out.append(Predecessor(ident, hits[0].state or ticket_mod.DOING))
     return out
+
+
+def _loop_back(origin: str, first: str, pool: dict[str, list[ticket_mod.Ticket]]) -> list[str]:
+    """`first` から先行を辿って `origin` に戻る道。戻らなければ空。
+
+    辿るのは池で 1 つに決まるチケットだけ（決まらないものは別の苦情になる）。閉じた（`done/`）
+    チケットの先の先行は辿らない。閉じたものは満たしているので、そこで輪が切れている。
+    """
+    seen: set[str] = set()
+    stack: list[tuple[str, list[str]]] = [(first, [first])]
+    while stack:
+        ident, route = stack.pop()
+        if ident in seen:
+            continue
+        seen.add(ident)
+        hits = pool.get(ident, [])
+        if len(hits) != 1 or hits[0].state == PRED_DONE or not hits[0].is_child:
+            continue
+        for nxt in hits[0].predecessors:
+            if nxt == origin:
+                return [*route, origin]
+            stack.append((nxt, [*route, nxt]))
+    return []
 
 
 def unmet_predecessors(
@@ -744,6 +785,22 @@ def predecessor_problems(
                     rules.SEVERITY_ERROR,
                     t.ticket,
                     f"先行 {p.ticket} は{p.label}。取り消した先行は満たせないので承認しない。"
+                    "predecessors から外して出し直す",
+                )
+            )
+        elif p.state in (PRED_SELF, PRED_ANCESTOR, PRED_CYCLE):
+            why = {
+                PRED_SELF: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
+                PRED_ANCESTOR: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、"
+                "待っても満たさない",
+                PRED_CYCLE: f"先行が輪になっている（{p.where}）。どれも他が閉じるのを待つので、"
+                "待っても満たさない",
+            }[p.state]
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} は{PRED_LABELS[p.state]}。{why}。"
                     "predecessors から外して出し直す",
                 )
             )

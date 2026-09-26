@@ -122,6 +122,43 @@ class PredecessorTest(TicketTest):
         self.assertIn("1 つに決める", refused.stderr)
         self.assertFalse(self.placed("i0001-03"))
 
+    def test_self_parent_and_loops_are_errors_that_name_the_cause(self):
+        """自分自身・自分の親・輪は待っても満たさない。error で原因を言う。"""
+        self.family(review=(False, False))
+        self.propose_after("i0001-03", "i0001-03")
+        self.propose_after("i0001-04", "i0001")
+        self.propose_after("i0001-05", "i0001-06")
+        self.propose_after("i0001-06", "i0001-05")
+        refused = self.approve()
+        self.assertIn("先行 i0001-03 は自分自身", refused.stderr)
+        self.assertIn("先行 i0001 は自分の親", refused.stderr)
+        self.assertIn("先行 i0001-06 は先行を辿ると自分に戻る", refused.stderr)
+        self.assertIn("i0001-05 → i0001-06 → i0001-05", refused.stderr)
+        self.assertIn("i0001-06 → i0001-05 → i0001-06", refused.stderr)
+        for name in ("i0001-03", "i0001-04", "i0001-05", "i0001-06"):
+            self.assertFalse(self.placed(name))
+        found = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
+        for fragment in ("自分自身", "自分の親", "自分に戻る"):
+            hits = [p["severity"] for p in found if fragment in p["detail"]]
+            self.assertTrue(hits, fragment)
+            self.assertEqual(set(hits), {"error"}, fragment)
+        # 閉じた先行の先は辿らない（満たしているので輪は切れている）。
+        board = json.loads(self.ccnavi("--explain", "--json").stdout)
+        entry = next(t for t in board["tickets"] if t["ticket"] == "i0001-05")
+        self.assertEqual([p["state"] for p in entry["predecessors_unmet"]], ["cycle"])
+
+    def test_start_names_a_self_predecessor(self):
+        self.family(review=(False, False))
+        self.propose(
+            "i0001-03", parent="i0001", phase=1, allow=("src/c/*",), predecessors=("i0001-03",)
+        )
+        self.hand_move("i0001-03")
+        self.worktree("i0001-03", "i0001")
+        refused = self.ccnavi("ticket", "start", "i0001-03")
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("- 先行 i0001-03: 自分自身", refused.stderr)
+        self.assertIn("待っても満たせない", refused.stderr)
+
     # ---- 2. プレビュー・確かめ・lint
 
     def test_the_board_preview_and_verify_show_why(self):
