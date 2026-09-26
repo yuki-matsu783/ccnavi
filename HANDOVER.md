@@ -68,10 +68,10 @@ uv run python -m unittest tests.e2e.test_e2e_sh -v
 
 ### 未了: Python 側
 
-1. **空白を含むパスへの `>` の書き込みが、シェルの守りに当たらない。** リダイレクトの行き先を拾う形
+1. **シェルの守りは、空白を含むパスへの `>` の書き込みを止めない。** リダイレクトの行き先を拾う形
    （`selfguard._WRITE_VERBS`）が引用の中の空白の目印（`\x01`）で止まる。
    `echo x > "projects/has space/.ccnavi/config/rules.yml"` は `builtin-guard-setting-files` に当たらず、
-   ルールが何も言わなければ ask に落ちる。`tee` `cp` `mv`、`cd` してからの相対の `>`、Write / Edit は止まる。
+   ルールが何も言わなければ ask になる。`tee` `cp` `mv`、`cd` してからの相対の `>`、Write / Edit は止まる。
    ワークスペースルートの絶対パスに空白があるときも同じ
 2. **`--lint` が、まだリポジトリの無い `projects/` の無視を確かめない。** `lint._projects` は
    `tree.projects()` が空なら先に返る。clone する前が一番確かめたい時点
