@@ -99,7 +99,7 @@
 | [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
 | [0063](0063-not-root-placeholder.md) | ワークスペースの外は、先読みではなく展開で書く |
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
-| [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを、診断の経路に限る |
+| [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを診断の経路に限る |
 | [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
 
@@ -161,7 +161,7 @@
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
 | [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む |
 | [0068](0068-approval-overlay-state-machine.md) | 承認のオーバーレイの遷移を 1 か所に集め、単体で試せるようにする |
-| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、外から来る部品を 1 つだけ入れる |
+| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める |
 | [0074](0074-board-shows-what-moved.md) | ボードは「動いた」を印で見せ、その印を時間では消さない |
 | [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる |
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |
