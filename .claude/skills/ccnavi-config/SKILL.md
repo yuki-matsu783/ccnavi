@@ -14,7 +14,7 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれも人�
 
 | ファイル | 決めるもの | 無いとき |
 |---|---|---|
-| `.ccnavi/common/rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定に落ち、`--lint` が言う |
+| `.ccnavi/common/rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定を使い、`--lint` が言う |
 | `.ccnavi/common/phases.yml` | フェーズの種類。親の `plan:` に並べる名前と、その範囲・レビュー・成果物 | 番号だけのフェーズ。`plan:` は読めない |
 | `.ccnavi/common/risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（定量 4 項目） |
 
