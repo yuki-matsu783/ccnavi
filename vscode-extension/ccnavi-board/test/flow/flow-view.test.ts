@@ -16,7 +16,7 @@ test("CB-T225 画面から届くメッセージは形を確かめ、崩れたも
   assert.deepEqual(asFlowMessage({ type: "openFile", extra: 1 }), { type: "openFile" });
   assert.deepEqual(asFlowMessage({ type: "tourDone" }), { type: "tourDone" });
   assert.deepEqual(asFlowMessage({ type: "reload", dirty: true }), { type: "reload", dirty: true });
-  // 未保存かが読めなければ「変更なし」ではなく、真のときだけ真（確認を飛ばす側に倒さないのは拡張ホストの問い）
+  // 未保存かが読めなければ「変更なし」ではなく、真のときだけ真（確認を飛ばす側にしないのは拡張ホストの問い）
   assert.deepEqual(asFlowMessage({ type: "reload", dirty: "yes" }), { type: "reload", dirty: false });
   assert.deepEqual(asFlowMessage({ type: "import", dirty: true }), { type: "import", dirty: true });
   assert.deepEqual(asFlowMessage({ type: "dirty", dirty: false }), { type: "dirty", dirty: false });

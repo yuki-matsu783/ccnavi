@@ -77,7 +77,7 @@ export function findRow(draft: Draft, key: string): { readonly section: Section;
   return undefined;
 }
 
-/** 控えてある「開いていた行の id」。型が違うものは空に倒す */
+/** 控えてある「開いていた行の id」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];
