@@ -75,12 +75,12 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
   }
   // 層の dag は、合成に入るほかの層が全部 dag のときだけ効く（`phasetypes.py` の `merged_order`）
   if (layer && form.order === "dag") {
-    out.push("層を合わせたとき、ほかの層のどれかが sequential なら、判定は sequential で待ちます（このファイルの after は効きません）");
+    out.push("共通の設定が sequential なら、合わせたときの判定は sequential で待ちます（このファイルの after は効きません）");
   }
   if (graph.dropped > 0) {
     out.push(
       layer
-        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（ほかの層の種類を指しているならそのままで構いません。綴り違いなら保存のときの検証が知らせます）。ほかの層の種類を待つ種類は、図では根に見えます`
+        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の種類を指しているならそのままで構いません。綴り違いなら保存のときの検証が知らせます）。共通の設定の種類を待つ種類は、図では根に見えます`
         : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（綴り違いなら保存のときの検証が知らせます）`,
     );
   }
@@ -96,6 +96,6 @@ export function emptyNote(exists: boolean, editable: boolean): string {
     return "種類がありません。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足してください";
   }
   return editable
-    ? "ファイルがありません（無い層は空で、共通層の種類だけが使われます）。種類を足して保存すると、ファイルが作られます"
+    ? "ファイルがありません（無ければこの設定は空で、共通の設定の種類だけが使われます）。種類を足して保存すると、ファイルが作られます"
     : "ファイルがありません。上の「雛形でファイルを作る」で作ってから直してください";
 }

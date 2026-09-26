@@ -516,7 +516,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まります/);
+    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");

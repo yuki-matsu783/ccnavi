@@ -114,9 +114,9 @@ function titleOf(target: RulesTarget): string {
     case "workspace":
       return "ccnavi ルール設定";
     case "self":
-      return "ccnavi ルール設定: 自身の層";
+      return "ccnavi ルール設定: ワークスペース";
     case "project":
-      return `ccnavi ルール設定: ${target.name}`;
+      return `ccnavi ルール設定: プロジェクト ${target.name}`;
   }
 }
 
@@ -126,7 +126,7 @@ function whatOf(target: RulesTarget): string {
     case "workspace":
       return "ルール";
     case "self":
-      return "自身の層のルール";
+      return "ワークスペースの設定のルール";
     case "project":
       return `${target.name} のルール`;
   }
@@ -259,20 +259,20 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`層の置き場を実行ファイルから取得できません: ${board.error}`);
+      throw new Error(`設定ファイルの置き場を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えに自身の層がありません"
-          : `プロジェクト ${target.name} は層として数えられていません（置き場の直下に無いか、予約名 common / self）`,
+          ? "実行ファイルの答えにワークスペースの設定がありません"
+          : `プロジェクト ${target.name} は設定の対象になっていません（置き場の直下に無いか、予約名 common / self）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
     rulesRel = path.relative(root, rulesPath).split(path.sep).join("/");
     if (layer.rules.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、層を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定を空として扱っています（ここのルールは 1 件も効いていません）: ${layer.rules.unreadable}`);
     }
   }
   let text: string;
@@ -281,7 +281,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
-    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通層からコピー」で作ってください";
+    const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通の設定からコピー」で作ってください";
     throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}${hint}`);
   }
   const hooks = [

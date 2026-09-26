@@ -545,7 +545,7 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
     return;
   }
   if (row.rulesRel === "") {
-    fail(current, `プロジェクト ${name} は層として数えられていないので、ルールを置く先がありません`);
+    fail(current, `プロジェクト ${name} は設定の対象になっていないので、ルールを置く先がありません`);
     return;
   }
   copyCommonRules(current, row.rulesRel, name, "プロジェクトの git");
@@ -553,7 +553,7 @@ function createRules(current: PanelState, page: ProjectsPage, name: string): voi
 
 function createSelfRules(current: PanelState, page: ProjectsPage): void {
   if (page.selfRulesRel === "") {
-    fail(current, "実行ファイルの答えに自身の層が無いので、置く先を決められません。更新してから押し直してください");
+    fail(current, "実行ファイルの答えにワークスペースの設定が無いので、置く先を決められません。更新してから押し直してください");
     return;
   }
   copyCommonRules(current, page.selfRulesRel, "自身の層（self）", "ワークスペースの git");
@@ -571,7 +571,7 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
   const sourceRel = DEFAULT_RULES;
   const source = readText(path.isAbsolute(sourceRel) ? sourceRel : path.join(root, sourceRel));
   if (source === undefined) {
-    fail(current, `ワークスペースのルール ${sourceRel} を読めません`);
+    fail(current, `共通の設定のルール ${sourceRel} を読めません`);
     return;
   }
   try {
@@ -581,7 +581,7 @@ function copyCommonRules(current: PanelState, targetRel: string, label: string, 
     fail(current, `${targetRel} に書けません: ${(error as Error).message}`);
     return;
   }
-  info(current, `${targetRel} に共通層のルールをコピーしました。中身を確かめてから${repo}にコミットしてください`);
+  info(current, `${targetRel} に共通の設定のルールをコピーしました。中身を確かめてから${repo}にコミットしてください`);
   void update();
 }
 

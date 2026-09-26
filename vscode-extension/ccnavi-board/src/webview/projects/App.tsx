@@ -128,7 +128,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             className="action"
             data-action="open-rules"
             data-name=""
-            title="共通層のルール（どのツリーにも効きます。既定 .ccnavi/common/rules.yml）を編集し、判定を試します"
+            title="共通の設定のルール（どのツリーにも効きます。既定 .ccnavi/common/rules.yml）を編集し、判定を試します"
             onClick={() => post({ type: "openRules", name: "" })}
           >
             ルール設定
@@ -237,12 +237,12 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "section.workspace",
     title: "ワークスペース自身",
-    body: "ワークスペース自身の層のルールとフェーズの種類です。自身の層のルールが無ければ、共通層からコピーして作れます。",
+    body: "ワークスペースの設定のルールとフェーズの種類です。ワークスペースの設定のルールが無ければ、共通の設定からコピーして作れます。",
   },
   {
     target: '.toolbar [data-action="open-rules"]',
-    title: "共通層のルール",
-    body: "どのツリーにも効く共通層のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
+    title: "共通の設定のルール",
+    body: "どのツリーにも効く共通の設定のルールを開きます。チケット制御が有効なら、隣の「チケット管理」でチケット管理画面を開けます。",
   },
   {
     target: '[data-action="tour"]',
@@ -302,7 +302,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
   return (
     <>
       <div className="self-rules">
-        <span>自身の層のルール</span>{" "}
+        <span>ワークスペースの設定のルール</span>{" "}
         {page.selfRulesExists ? (
           <>
             <span className="ok">あり</span> <span className="mono small">{page.selfRulesRel}</span>
@@ -314,10 +314,10 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
               type="button"
               className="action small"
               data-action="create-self-rules"
-              title="共通層の rules.yml を自身の層にコピーします。文面の sh のパスは {root} 付きに置き換えます"
+              title="共通の設定の rules.yml をワークスペースの設定にコピーします。文面の sh のパスは {root} 付きに置き換えます"
               onClick={() => post({ type: "createSelfRules" })}
             >
-              共通層からコピー
+              共通の設定からコピー
             </button>
           </>
         )}{" "}
@@ -334,12 +334,12 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
       </div>
       {page.ticketsEnabled && (
         <div className="self-rules">
-          <span>自身の層のフェーズの種類</span>{" "}
+          <span>ワークスペースの設定のフェーズの種類</span>{" "}
           <button
             type="button"
             className="action small"
             data-action="open-self-phases"
-            title="ワークスペース自身のチケット（project: が空）の計画に、共通層に足して使う種類を編集します。無ければ画面から作れます"
+            title="ワークスペース自身のチケット（project: が空）の計画に、共通の設定に足して使う種類を編集します。無ければ画面から作れます"
             onClick={() => post({ type: "openSelfPhases" })}
           >
             フェーズ管理

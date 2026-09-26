@@ -127,9 +127,9 @@ function titleOf(target: PhasesTarget): string {
     case "common":
       return "ccnavi フェーズ管理";
     case "self":
-      return "ccnavi フェーズ管理: 自身の層";
+      return "ccnavi フェーズ管理: ワークスペース";
     case "project":
-      return `ccnavi フェーズ管理: ${target.name}`;
+      return `ccnavi フェーズ管理: プロジェクト ${target.name}`;
   }
 }
 
@@ -139,7 +139,7 @@ function whatOf(target: PhasesTarget): string {
     case "common":
       return "フェーズ";
     case "self":
-      return "自身の層のフェーズ";
+      return "ワークスペースの設定のフェーズ";
     case "project":
       return `${target.name} のフェーズ`;
   }
@@ -267,20 +267,20 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     // この画面で保存した種類が承認と着手に効かなくなる。答えは元リポジトリの版（設計 11.2）。
     const board = await loadBoard(root, binSetting());
     if (!board.ok) {
-      throw new Error(`層の置き場を実行ファイルから取得できません: ${board.error}`);
+      throw new Error(`設定ファイルの置き場を実行ファイルから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.phasesFile.path === "") {
       throw new Error(
         target.kind === "self"
-          ? "実行ファイルの答えに自身の層がありません"
-          : `プロジェクト ${target.name} は層として数えられていません（置き場の直下に無いか、予約名 common / self）`,
+          ? "実行ファイルの答えにワークスペースの設定がありません"
+          : `プロジェクト ${target.name} は設定の対象になっていません（置き場の直下に無いか、予約名 common / self）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
     phasesRel = path.relative(root, phasesPath).split(path.sep).join("/");
     if (layer.phasesFile.unreadable !== "") {
-      notices.push(`実行ファイルはこのファイルを読めず、層の種類を空として扱っています（共通層の種類だけで進みます）: ${layer.phasesFile.unreadable}`);
+      notices.push(`実行ファイルはこのファイルを読めず、この設定の種類を空として扱っています（共通の設定の種類だけで進みます）: ${layer.phasesFile.unreadable}`);
     }
   }
   let text: string;
@@ -301,7 +301,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   if (target.kind === "common" && !exists) {
     notices.push(
-      "種類は自身の層とプロジェクトの層にも置けます（プロジェクト管理画面から開きます）。共通層に置いた種類は全プロジェクトに効き、層に同じ id で中身の違う種類があるとその層が空として扱われます",
+      "種類はワークスペースの設定とプロジェクトの設定にも置けます（プロジェクト管理画面から開きます）。共通の設定に置いた種類は全プロジェクトに効き、ワークスペースやプロジェクトの設定に同じ id で中身の違う種類があるとその設定が空として扱われます",
     );
   }
   // 無いときの苦情（version が無い、phases が無い）は画面に出さない。無いことは帯で言う。
@@ -660,7 +660,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   if (current.target.kind !== "common") {
-    fail(current, "層には雛形を置きません。種類を足して保存すると、ファイルが作られます");
+    fail(current, "ワークスペースとプロジェクトの設定には雛形を置きません。種類を足して保存すると、ファイルが作られます");
     return;
   }
   if (fs.existsSync(loaded.phasesPath)) {

@@ -380,7 +380,7 @@ function IdPicker({
           onKeyDown={onKeyDown}
         >
           {options.map((id, index) => {
-            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? "このファイルに無い id です（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
+            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? "このファイルに無い id です（共通の設定の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
             const locked = isLocked(id);
             const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (
@@ -414,8 +414,8 @@ function IdPicker({
           type="text"
           className="id-extra"
           spellCheck={false}
-          aria-label={`${label}にほかの層の id を足す`}
-          placeholder="ほかの層の id を入力して Enter"
+          aria-label={`${label}に共通の設定の id を足す`}
+          placeholder="共通の設定の id を入力して Enter"
           value={extra}
           disabled={disabled}
           onChange={(event) => setExtra(event.target.value)}

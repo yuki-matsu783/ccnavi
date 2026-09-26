@@ -162,15 +162,15 @@ test("CB-T113 カードは層の置き場を出す。自身の層は本体の枠
   try {
     const rules = (name: string): string => text(dom.one(`${cardSelector(name)} .field:nth-child(2) dd`));
     assert.equal(rules("app"), "あり projects/app/.ccnavi/config/rules.yml");
-    assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/rules.yml 共通層からコピー");
+    assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/rules.yml 共通の設定からコピー");
     assert.equal(dom.all(`${cardSelector("lib")} button[data-action="create-rules"][data-name="lib"]`).length, 1);
     assert.ok(dom.one<HTMLInputElement>(`${cardSelector("lib")} button[data-action="open-rules"]`).hasAttribute("disabled"));
     // 予約名のプロジェクトは層が無いので、置く先も作るボタンも出さない
-    assert.match(rules("Self"), /層として数えられていません/);
+    assert.match(rules("Self"), /設定の対象になっていません/);
     assert.equal(dom.all(`${cardSelector("Self")} button[data-action="create-rules"]`).length, 0);
 
     const workspace = dom.one("section.workspace");
-    assert.match(text(workspace), /自身の層のルール なし \.ccnavi\/config\/rules\.yml 共通層からコピー ルール設定/);
+    assert.match(text(workspace), /ワークスペースの設定のルール なし \.ccnavi\/config\/rules\.yml 共通の設定からコピー ルール設定/);
     assert.equal(dom.all('button[data-action="create-self-rules"]').length, 1);
     assert.ok(dom.one('button[data-action="open-self-rules"]').hasAttribute("disabled"));
   } finally {
@@ -274,7 +274,7 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
       assert.equal(off.all(`button[data-action="${action}"]`).length, 0, action);
     }
     const body = text(off.document.body);
-    assert.ok(!/自身の層のフェーズの種類/.test(body));
+    assert.ok(!/ワークスペースの設定のフェーズの種類/.test(body));
     assert.ok(!/フェーズ管理/.test(body));
     assert.ok(!/チケット管理/.test(body));
     // ルールとプロジェクトの操作は disable でも残る。「開く ▾」の中はルール設定だけになる
@@ -286,7 +286,7 @@ test("CB-T133 チケット制御が disable なら、チケット管理とフェ
       ["open-rules"],
     );
     assert.equal(off.all('button[data-action="open-self-rules"]').length, 1);
-    assert.match(text(off.one("section.workspace")), /自身の層のルール/);
+    assert.match(text(off.one("section.workspace")), /ワークスペースの設定のルール/);
     // チケットの件数の欄も出さない
     assert.ok(!/チケット/.test(text(off.one(cardSelector("lib")))));
   } finally {
@@ -308,7 +308,7 @@ test("CB-D98 プロジェクトが無い画面では、案内の間だけ見本�
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["clone する", "プロジェクト", "ワークスペース自身", "共通層のルール", "案内"]);
+    assert.deepEqual(titles, ["clone する", "プロジェクト", "ワークスペース自身", "共通の設定のルール", "案内"]);
     assert.equal(dom.all("li.project").length, 0, "閉じたのに見本が残った");
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
