@@ -60,7 +60,7 @@ export interface AppearanceSink {
  * - 画面が組み上がった（`ready`）ところで、呼ぶ側が送り直す
  *
  * 直に `webview.postMessage` を叩くと、この 2 つのどちらも通らない画面へ送ることになり、
- * 「送ったつもりで落ちている」が段取りの外に残る（issue #87）。
+ * 「送ったつもりで落ちている」が段取りの外に残る。
  */
 export function sendAppearance(sink: AppearanceSink, value: Appearance): boolean {
   return sink.post({ type: "appearance", value });
