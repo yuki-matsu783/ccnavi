@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース自身。
+ * プロジェクト管理画面の本体。帯・clone の欄・プロジェクトのカード・認識されない git・ワークスペース（プロジェクト外）。
  *
  * 見せる中身は拡張ホストが渡す（`ProjectsData`）。画面が自分で持つのは、人が触って決めるもの
  * （clone の欄、どのメニューを開いているか、直前の操作の一言）だけ。clone も書き込みも画面はしない。
@@ -295,7 +295,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
 }
 
 /**
- * ワークスペース自身の層のルール。無いのは正常なので warn の色は使わない。
+ * ワークスペースの設定のルール。無いのは正常なので warn の色は使わない。
  * フェーズの種類の行は、チケット制御が disable なら出さない（種類はチケットにしか読まれない）。
  */
 function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
@@ -326,7 +326,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
           className="action small"
           data-action="open-self-rules"
           disabled={!page.selfRulesExists}
-          title="ワークスペース自身のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試します"
+          title="ワークスペース（プロジェクト外）のツリーへの書き込みと、全ツリーの Bash に足してヒットするルールを編集し、判定を試します"
           onClick={() => post({ type: "openSelfRules" })}
         >
           ルール設定
@@ -339,7 +339,7 @@ function SelfRules({ page }: { readonly page: ProjectsPage }): JSX.Element {
             type="button"
             className="action small"
             data-action="open-self-phases"
-            title="ワークスペース自身のチケット（project: が空）の計画に、共通の設定に足して使う種類を編集します。無ければ画面から作れます"
+            title="プロジェクト外のチケット（project: が空）の計画に、共通の設定に足して使う種類を編集します。無ければ画面から作れます"
             onClick={() => post({ type: "openSelfPhases" })}
           >
             フェーズ管理

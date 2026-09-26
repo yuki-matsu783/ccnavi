@@ -159,7 +159,7 @@ export function Project({ row, ticketsEnabled, openMenu, onOpenMenu }: ProjectPr
   );
 }
 
-/** 層のルールファイル。層として数えられていない（予約名）なら、置く先も作るボタンも出さない */
+/** プロジェクトの設定のルールファイル。プロジェクトの設定として数えられていない（予約名）なら、置く先も作るボタンも出さない */
 function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesRel === "") {
     return <span className="dim">設定の対象になっていません（検証の error を確かめてください）</span>;

@@ -8,14 +8,14 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
  *
- * 対象は 3 種（設計 11.2）。ワークスペースのルール（共通層、`.ccnavi/common/rules.yml`）、
- * ワークスペース自身の層（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの層
+ * 対象は 3 種（設計 11.2）。共通の設定のルール（`.ccnavi/common/rules.yml`）、
+ * ワークスペースの設定のルール（既定 `.ccnavi/config/rules.yml`）、プロジェクト 1 つの設定のルール
  * （既定 `projects/<名前>/.ccnavi/config/rules.yml`）。**タブは 1 枚だけ**で、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
- * 層の置き場は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
+ * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  *
  * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、ワークスペースなら `--rules`、
- * 層なら `--project-rules-file <名前>=<パス>`（自身の層は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
+ * ワークスペースかプロジェクトの設定なら `--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う。
  */
@@ -57,7 +57,7 @@ interface Loaded {
   readonly rulesPath: string;
   /** ワークスペースルートからの相対で見せる綴り。プロジェクトなら `projects/<名前>/.ccnavi/config/rules.yml` */
   readonly rulesRel: string;
-  /** 上部に出す注意。実行ファイルがこの層を読めていない、など */
+  /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
   readonly hooks: readonly HookEntry[];
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
@@ -90,7 +90,7 @@ interface PanelState {
   dirty: boolean;
   /**
    * 読み直しの番号。読むたびに 1 つ進め、読み終えたときに変わっていたら捨てる。
-   * 層の置き場を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
+   * 設定ファイルの場所を実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
   /** 「破棄して切り替える？」を出している間は真。重ねて開かれても 2 枚目の問いを出さない */
@@ -104,7 +104,7 @@ function sameTarget(a: RulesTarget, b: RulesTarget): boolean {
   return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
 }
 
-/** 保存を止めるチケットを絞るプロジェクト。共通層と自身の層は絞らない（どちらも全ツリーの Bash に効く） */
+/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どちらも全ツリーの Bash に効く） */
 function projectOf(target: RulesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
@@ -164,7 +164,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     return;
   }
 
-  // タブは読む前に作る。層の置き場を実行ファイルに聞く間、押しても何も起きないように見えないように。
+  // タブは読む前に作る。設定ファイルの場所を実行ファイルに聞く間、押しても何も起きないように見えないように。
   // `state` を先に立てるので、読んでいる間に押し直しても上の `reveal` に入る。
   // 読めなかったときもタブは閉じず、中にエラーを出す（`reload` の `showError`）
   const panel = vscode.window.createWebviewPanel("ccnaviRules", titleOf(target), vscode.ViewColumn.One, {
@@ -250,11 +250,11 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesRel: string;
   const notices: string[] = [];
   if (target.kind === "workspace") {
-    // 共通層の置き場は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
+    // 共通の設定の場所は `.ccnavi/common/` 固定。env では動かないので設定ファイルは読まない（ADR-0052）。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
-    // 層の置き場は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
+    // 設定ファイルの場所は実行ファイルに聞く。CCNAVI_PROJECT_HOME を読んで自分で組むと、組み方が実行ファイルと
     // ずれたときに、この画面で保存したルールが判定に効かなくなる。答えは元リポジトリの版で、
     // ワークツリーの中の版は指さない（設計 11.2）。
     const board = await loadBoard(root, binSetting());
@@ -375,7 +375,7 @@ function registerPanelHandlers(current: PanelState): void {
 
 /**
  * ルールファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
- * 対象のパスは層の置き場で変わるので、再読込のたびに張り直す。
+ * 対象のパスは設定ファイルの場所で変わるので、再読込のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
@@ -431,7 +431,7 @@ function scheduleLock(current: PanelState): void {
 
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * ワークスペースのルールと自身の層はどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
+ * 共通の設定とワークスペースの設定のルールはどのツリーの doing でも止め、プロジェクトのルールはそのプロジェクトの doing だけ見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());

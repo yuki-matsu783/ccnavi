@@ -8,8 +8,8 @@
  * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
  *
- * 対象は共通層の配点（`.ccnavi/common/risks.yml`。置き場は固定）の 1 本だけ。自身の層とプロジェクトの層も
- * 配点を持ち、判定は共通層と親の `project:` の層の和で行う（設計 11.4.2）が、この画面ではそれらを開かない
+ * 対象は共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）の 1 本だけ。ワークスペースの設定とプロジェクトの設定も
+ * 配点を持ち、判定は共通の設定と親の `project:` の設定の和で行う（設計 11.4.2）が、この画面ではそれらを開かない
  * （設計 11.11）。パネルは 1 つ。
  *
  * チケット制御が disable のワークスペースでは開かない。配点は子チケットを閉じるときにしか
@@ -136,7 +136,7 @@ export async function openRisk(): Promise<void> {
 }
 
 function readPage(root: string): Loaded {
-  // 共通層の置き場は `.ccnavi/common/` 固定（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
   const riskRel = DEFAULT_RISK;
   const riskPath = resolveIn(root, riskRel);
   let text: string;

@@ -89,20 +89,20 @@ export interface PhasesPage {
   readonly root: string;
   /** 種類の定義のファイル（ワークスペースルートからの相対で見せる） */
   readonly phasesPath: string;
-  /** ファイルが在るか。無ければ空の画面を見せ、共通層なら「雛形で作る」だけができる */
+  /** ファイルが在るか。無ければ空の画面を見せ、共通の設定なら「雛形で作る」だけができる */
   readonly exists: boolean;
   readonly model: PhasesModel;
   readonly lock: Lock;
   /**
-   * 層（自身の層かプロジェクト）の種類か。層はファイルが無くても編集でき、最初の保存でファイルを作る。
-   * 雛形は置かない（雛形の id は共通層の種類と重なりやすい）
+   * ワークスペースかプロジェクトの設定の種類か。どちらもファイルが無くても編集でき、最初の保存でファイルを作る。
+   * 雛形は置かない（雛形の id は共通の設定の種類と重なりやすい）
    */
   readonly layer?: boolean;
-  /** 上部に出す注意（実行ファイルがこの層を読めていない、など） */
+  /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
 }
 
-/** 欄を触れるか。共通層はファイルが無ければ「雛形で作る」まで触れない。層は無くても足して保存できる */
+/** 欄を触れるか。共通の設定はファイルが無ければ「雛形で作る」まで触れない。ワークスペースとプロジェクトの設定は無くても足して保存できる */
 export function editable(page: PhasesPage): boolean {
   return page.exists || page.layer === true;
 }

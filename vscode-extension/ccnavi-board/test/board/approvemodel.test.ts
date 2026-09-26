@@ -136,5 +136,7 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.ok(after.startsWith("ccnavi --approve --yes が i0001 の後始末で止まりました: "), after);
   const unknown = partialMessage({ placed: [], ticket: "", reason: "書けない", lines: [] });
   assert.ok(unknown.startsWith("ccnavi --approve --yes が止まりました: 書けない。"), unknown);
-  assert.ok(!unknown.includes("  "), unknown);
+  // 継ぎ目だけを見る。識別子があれば「が」のあとに空白ちょうど 1 つ、無ければ「が」の直後に「止まりました」
+  assert.match(stopped, /--yes が [^\s]/, stopped);
+  assert.match(unknown, /--yes が止まりました/, unknown);
 });

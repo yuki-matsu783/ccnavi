@@ -28,7 +28,7 @@ export interface ProjectRow {
   readonly root: string;
   /** ルートからの相対、"/" 区切り */
   readonly rel: string;
-  /** プロジェクトの層のルールファイル。ルートからの相対、"/" 区切り。層として数えられていない（予約名）なら空 */
+  /** プロジェクトの設定のルールファイル。ルートからの相対、"/" 区切り。プロジェクトの設定として数えられていない（予約名）なら空 */
   readonly rulesRel: string;
   readonly rulesExists: boolean;
   readonly hasClaudeDir: boolean;
@@ -54,10 +54,10 @@ export interface ProjectsPage {
   readonly rows: readonly ProjectRow[];
   readonly strays: readonly Stray[];
   readonly workspaceWorktrees: readonly string[];
-  /** 自身の層のルールファイル。ルートからの相対、"/" 区切り */
+  /** ワークスペースの設定のルールファイル。ルートからの相対、"/" 区切り */
   readonly selfRulesRel: string;
   readonly selfRulesExists: boolean;
-  /** 名前の衝突を見る既存のツリー名（ワークスペース自身の空は除く） */
+  /** 名前の衝突を見る既存のツリー名（ワークスペース（プロジェクト外）を表す空は除く） */
   readonly existingNames: readonly string[];
 }
 

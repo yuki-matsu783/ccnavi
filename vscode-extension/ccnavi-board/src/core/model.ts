@@ -119,23 +119,23 @@ export interface ParentJson {
   readonly phases: readonly PhaseJson[];
 }
 
-/** 層の設定ファイル 1 本の置き場 */
+/** 設定ファイル 1 本の場所 */
 export interface LayerFileJson {
-  /** 実行ファイルが解いたパス。ファイルが無くても本来の置き場を指す */
+  /** 実行ファイルが解いたパス。ファイルが無くても本来の場所を指す */
   readonly path: string;
   /** 読めなかった理由。空なら読めた（無いファイルも空として読めた扱い） */
   readonly unreadable: string;
 }
 
 /**
- * 層 1 つ（設計 11.2）。拡張が使うのはルールとフェーズの種類のファイルの置き場だけなので、それだけを読む。
- * 宣言の中身と risk は読まない（リスク管理画面は層に追従していない、設計 11.11）。
+ * 層（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルールとフェーズの種類のファイルの場所だけなので、それだけを読む。
+ * 宣言の中身と risk は読まない（リスク管理画面はワークスペースとプロジェクトの設定に追従していない、設計 11.11）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** フェーズの種類のファイル（`phases_file`）。共通層は `.ccnavi/common/phases.yml` 固定 */
+  /** フェーズの種類のファイル（`phases_file`）。共通の設定は `.ccnavi/common/phases.yml` 固定 */
   readonly phasesFile: LayerFileJson;
 }
 
@@ -151,7 +151,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 並びは 共通層 → 自身の層 → プロジェクト（名前順） */
+  /** 並びは 共通の設定 → ワークスペースの設定 → プロジェクト（名前順） */
   readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];

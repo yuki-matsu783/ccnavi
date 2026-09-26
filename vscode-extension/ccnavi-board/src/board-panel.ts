@@ -80,7 +80,7 @@ function binSetting(): string {
 
 /**
  * `ccnaviBoard.open` の本体。`project` を渡すと、開いたボードの絞り込みをそのプロジェクトにする
- * （`""` はワークスペース自身、`"*"` は全部）。プロジェクト管理画面からの導線。
+ * （`""` はワークスペース（プロジェクト外）、`"*"` は全部）。プロジェクト管理画面からの導線。
  */
 export async function openBoard(project?: string): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];

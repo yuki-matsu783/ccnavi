@@ -209,7 +209,7 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
   });
   try {
     assert.match(dom.one("#phases .empty").textContent, /種類がありません。種類が 1 つも無いファイルは実行ファイルが読めない/);
-    assert.match(dom.one(".problems").textContent, /phases がキーと値の組（マップ）ではありません/);
+    assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
   } finally {
@@ -395,6 +395,26 @@ test("CB-D87 層の画面では、候補に無い id を打って足せる。自
   } finally {
     await dom.close();
   }
+});
+
+test("CB-D107 このファイルに無い id の説明は、共通の設定の画面では入力ミスとだけ言い、ワークスペースとプロジェクトの設定の画面では共通の設定の種類かもしれないと言う", async () => {
+  const base = readPhases(TEMPLATE_PHASES_TEXT).model;
+  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: ["外の種類"] } : p));
+  const titleOf = async (layer: boolean): Promise<string> => {
+    const dom = await openPhases({ layer, model: { ...base, form: { ...base.form, phases } } });
+    try {
+      dom.click(dom.one(`${rowSelector("p3")} .row-head`));
+      await dom.settle();
+      return dom.one(`${rowSelector("p3")} .f-overlap option[value="外の種類"]`).getAttribute("title") ?? "";
+    } finally {
+      await dom.close();
+    }
+  };
+  const common = await titleOf(false);
+  assert.match(common, /このファイルに無い id です（入力ミス）/);
+  assert.ok(!common.includes("共通の設定の種類か"), common);
+  const layered = await titleOf(true);
+  assert.match(layered, /このファイルに無い id です（共通の設定の種類か、入力ミス）/);
 });
 
 test("CB-D88 feedback の種類は先に済ませる種類を持てないと言い、欄を出さない", async () => {

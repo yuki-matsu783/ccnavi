@@ -142,7 +142,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   /**
    * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
-   * ことがあり（層の置き場を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で黙って消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   /**
@@ -521,7 +521,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <div className="help-panel" id="help">
             <p className="hint">
             親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になります。レビューのあとは{" "}
-            <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
+            <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
             は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
             <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
             辺の書き漏れはそのまま並行として通るので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
@@ -577,9 +577,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 }
 
 /**
- * ファイルが無いときの帯。共通層は「雛形で作る」まで欄を触れない。
- * 層（自身の層・プロジェクト）には雛形を置かない（雛形の id は共通層の種類と重なりやすく、
- * 中身が違えばその層が空として扱われる）。代わりに画面で足させ、最初の保存でファイルを作る。
+ * ファイルが無いときの帯。共通の設定は「雛形で作る」まで欄を触れない。
+ * ワークスペースとプロジェクトの設定には雛形を置かない（雛形の id は共通の設定の種類と重なりやすく、
+ * 中身が違えばその設定が空として扱われる）。代わりに画面で足させ、最初の保存でファイルを作る。
  */
 function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly busy: boolean; readonly onCreate: () => void }): JSX.Element {
   if (page.layer === true) {
