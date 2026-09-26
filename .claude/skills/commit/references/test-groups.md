@@ -80,7 +80,7 @@ uv run python tools/run_tests.py --plan          # 何をどの順で回すか�
 
 ## 拡張（`vscode-extension/ccnavi-board`）のグループ
 
-拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / shared）。
+拡張側にも同じ分け方がある（`test/<グループ>/`。board / rules / risk / phases / projects / flow / shared）。
 **こちらは表を引かない。** 変えたファイルを渡せば、関わるグループだけが回る（ADR-0061）。
 
 ```sh

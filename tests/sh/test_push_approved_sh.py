@@ -232,6 +232,23 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
         self.assertTrue(self.dirty(tree, "README.md"))
 
+    def test_leftover_flow_temp_files_are_not_carried(self):
+        """ボードの保存が残した `flows/.<名前>.<番号>.tmp` は運ばず、フローは運ぶ（L-e）。"""
+        tree = self.worktree("i0001")
+        flows = os.path.join(tree, ".ccnavi", "approved", "flows")
+        write(os.path.join(flows, "i0001-01.json"), '{"nodes":[]}\n')
+        temp = write(os.path.join(flows, ".i0001-01.json.123.abcdef.tmp"), "half")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01.json"])
+        self.assertTrue(os.path.exists(temp))
+        self.assertEqual(self.staged(tree), "")
+        # 一時ファイルだけが残っていても、運ぶものは無い。
+        again = self.push()
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertIn(NOTHING, again.stdout)
+
     # ---- 18. 運ぶものが無い
 
     def test_nothing_to_carry_says_so(self):

@@ -126,6 +126,11 @@ SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "canc
 # 承認済みチケットにだけある欄。承認の記録。
 APPROVAL_KEY = "ccnavi_approved"
 
+# 以前の、子のフローを指す欄（設計 9.3.1、ADR-0085）。今は読まない。フローの置き場は承認済みの
+# 領域の `flows/<子>.json` に固定（flow.py）。書いてあるチケットは warn で知らせて読み進める
+# （error にすると承認済みチケットが読めなくなり、範囲ごと効かなくなる）。
+FLOW_KEY = "flow"
+
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
 
@@ -366,6 +371,11 @@ class Ticket:
     def has_plan(self) -> bool:
         return bool(self.plan)
 
+    @property
+    def in_progress(self) -> bool:
+        """着手していて、終わってもいないし取り消されてもいない。"""
+        return bool(self.started_at) and not self.completed_at and not self.cancelled_at
+
     def numbered(self) -> list[tuple[int, PlanItem]]:
         """計画の項に番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
         items = list(self.plan) + list(self.feedback or [])
@@ -531,6 +541,18 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     # `scan` が上書きする（設計 11.5）。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
+
+    if front.get(FLOW_KEY) is not None:
+        # 以前の欄。置き場は承認済みの領域に固定したので読まない。error にすると承認済み
+        # チケットが読めなくなり、範囲ごと効かなくなる（緩む）ので warn で知らせるだけ。
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"`{FLOW_KEY}` はもう読まない。フローの置き場は承認済みチケットの置き場の "
+                f"`flows/{name}.json` に固定（ADR-0085）。この欄は消してよい",
+            )
+        )
 
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):

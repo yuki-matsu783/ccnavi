@@ -66,6 +66,13 @@ Claude Code に渡す。拡張はマーカーを置かず、実行ファイル�
 読めるかを確かめる入口だけを持つ。チケット制御が `disable` なら、対象がどれでも開かない（種類は親チケットの
 計画と子の範囲にしか読まれない）。
 
+同じ拡張に「フロー編集画面」がある。子チケットのフロー（担当のサブエージェントが作業中に読む手順書。設計 9.3.1、
+ADR-0085）を図で書く。開くのはボードの子のカードの「フロー」だけで、サイドパネルには並ばない。形は CC Workflow Studio の
+`workflow.json` と同じで、`.vscode/workflows/*.json` を取り込める。置き場と着手中かは実行ファイルの `--explain --json` の
+`tickets[].flow` を写すだけで、着手中（`locked`）の子のフローは読むだけになる。置き場は承認済みの領域
+（`.ccnavi/approved/flows/<子>.json`）で、人が持つ。エージェントの Write / Edit は判定が止め、シェルから行き先を追えない形で
+書き換わったときは、着手のあとなら実行ファイルが知らせる。書くのはこの画面を使う人だけ。
+
 同じ拡張に「プロジェクト管理画面」がある。`projects/` の直下に clone したプロジェクト（設計 11）を
 一覧し、URL を入れて `git clone` をターミナルへ送り、clone 後の設定（`.gitignore`、層のルール `.ccnavi/config/rules.yml`）を
 ボタンで整える。各行の「開く ▾」からそのプロジェクトのルール設定画面・フェーズ管理・チケット管理（ボードの絞り込み）へ飛べ、「git ▾」から fetch / pull を送れる。フェーズ管理とチケット管理は、チケット制御が `disable` なら出ない（自身の層のフェーズの種類の行も同じ）。同じ事象の注意は 1 か所にだけ出る（`.gitignore` の帯があるときは lint の同じ指摘を重ねず、`.claude/` の説明があるときは lint の同じ行を重ねない）。
@@ -124,6 +131,42 @@ Claude ライト / Claude ダーク）は、行の代わりに見出し「画面
 `contrastActiveBorder` の変数で見せる。開いている行の左の縁（他のテーマでは `focusBorder` の細い縁）、行・カード・ボタンの
 ホバーの点線、メニューの項目の枠（押せない項目は点線）、無効なボタンの点線の枠。これらの変数は HC でしか定義されないので、
 他のテーマでは効かない。
+
+### フロー編集画面
+
+子チケット 1 枚のフロー（設計 9.3.1、ADR-0085）を図で直す。ボードの子のカードの「フロー」から開き、タブは子ごとに 1 枚
+（同じ子をもう 1 度押せば前面に出す）。ボタンの言葉は、ファイルが無ければ「フロー: 作成」、在れば「フロー: 編集」、
+着手中なら「フロー: 閲覧（着手中）」。どれも `--explain --json` の `tickets[].flow`（`exists` と `locked`）の写しで、
+拡張は `started_at` などから組み直さない。親のカードには出ない。
+
+置き場は `flow.path`（承認済みの領域の `.ccnavi/approved/flows/<子>.json`。承認済みチケットと同じツリーのルートからの相対で、
+固定）。拡張は置き場を組まず、実行ファイルの答えをそのまま使う。承認済みの領域はエージェントの書き込みを判定が止めるので、
+フローを書くのは人だけ（ADR-0085）。書いたファイルは承認済みチケットと同じく人がコミットして送る。
+
+```sh
+sh .ccnavi/scripts/ccnavi-push-approved.sh   # 承認済みの領域（flows/ も）に変更のあるツリーごとにコミットし、送る
+```
+
+保護されたブランチ（`main` など）の上ならコミットだけして送らない。手で運ぶなら、親のワークツリーで
+`.ccnavi/approved/flows/<子>.json` を `git add` してコミットする。
+
+| 何 | どう出るか、何が起きるか |
+|---|---|
+| 図 | ノードが点、`connections` が矢印の線。見た目は cc-wf-studio に寄せてあるが、コードは使っていない（あちらは AGPL）。ノードの右の点から次のノードの左の点へ引くと線が繋がる。分岐（if / else・switch）と利用者に聞く（選択肢ごと）は出口が並び、線には条件か出口の名前が付く。拡大・縮小・全体表示のボタンは左下 |
+| 部品箱 | 開始・終了・プロンプト・サブエージェント・利用者に聞く・分岐（if / else）・分岐（switch）・スキル。押すといちばん下のノードの下に足され、右の欄が開く |
+| 右の欄 | 選んだノードの名前と中身（プロンプト、サブエージェントの説明・種類・プロンプト、問い・選択肢・複数選択、分岐の対象・出口の名前と条件、スキルの名前と説明）。線を選べば条件を書けて消せる。何も選ばなければフローの名前と説明。消すのはこの欄のボタンだけで、Delete の鍵では消えない |
+| 印 | 利用者に聞くノードに「メインに戻る（利用者に聞く）」、サブエージェント（とサブフロー）のノードに「入れ子（上限なら戻る）」。サブエージェントは利用者に聞けず、入れ子の上限では Agent ツールが渡らないので、どちらもそのノードで止まってメインに返す（ADR-0085）。印は種類の性質を言うだけ |
+| 注意 | 入れ子が子の下に 3 段以上重なる（既定の上限はメインの下 3 段、子は 1 段目なので子の下は 2 段まで）、サブフローが巡っている、開始が無い・2 つ以上ある、欄を持たない種類がある、サブフロー（`subAgentFlows`）がある、のときだけ上部に出る。保存は止めない |
+| 知らない欄・種類 | 落とさない。読んだ JSON をそのまま持ち、触った欄だけを差し替えて書く。欄を持たない種類（`mcp`・`subAgentFlow`・`codex` など）は名前と位置だけ直せ、`data` は JSON のまま読むだけで見せる。サブフローの中身は描かない（保存してもそのまま残る） |
+| ファイルが無い | 雛形（開始 → 終了）を見せ、そのまま「保存」できる。保存でファイル（と `.ccnavi/approved/flows/`）が作られる |
+| リンク | フローのファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（`flow.linked`）なら、読まないし書かない。理由を出す |
+| ふつうのファイルでない・ハードリンク・大きい | 名前付きパイプやデバイス、ハードリンク（名前が 2 つ以上）、256KB を超えるファイルは読まないし書かない（実行ファイルと同じ）。読むときは `O_NOFOLLOW` と `O_NONBLOCK` で開き、開いたものを確かめ直す |
+| 読めないファイル | JSON でない・`nodes` が無い・ノードに `id` が無い・`id` が重なるときは、画面を開かず理由を出す。エディタで直してから「再読込」 |
+| 取り込み | 「取り込む」でワークスペースの `.vscode/workflows/*.json` の一覧を出す（「ほかのファイルを選ぶ…」でファイルの選択）。読めたら編集中のフローを置き換えて未保存にする。**書くのは保存を押したとき**。未保存の変更があれば「破棄して取り込む？」を聞く |
+| 着手中 | `flow.locked` が真なら、上部に赤で理由（着手中は書き換えられない。`finish` か `cancel` で外れる）を出し、部品箱・欄・取り込み・保存を止める。図は動かせない。チケットの置き場が変わると錠を取り直し、開いたまま外れれば編集できるようになる |
+| 保存 | 押した時点で `--explain --json` を打ち直し、`locked` が偽で、置き場が読んだときと同じで、読み込んでから外で変わっていない（無かったファイルはまだ無い）、ツリーのルートからファイルまでの途中にリンクが無いときだけ書く。どれかが崩れれば書かずに理由を出す。書き込みは同じディレクトリの一時ファイルを `rename` で入れ替える（リンクを辿らず、途中で落ちても半端なファイルを残さない。一時ファイルは落ちても消し、消せずに残った `.*.tmp` は `ccnavi-push-approved.sh` が運ばない）。256KB を超えるフローは書かない。書く形は 2 字下げの JSON。聞き直してから書くまでの短い間に子が着手されると、着手の直後に書き込みが入りうる（残る隙間） |
+| 監視 | フローのファイル（外で変われば「外で変わった」の帯）と、チケットの置き場（錠を取り直す） |
+| 読み直しの見え方 | フェーズ管理と同じ `retainedHost`（ADR-0062）。中身が届くのは「再読込」と保存が通ったときだけで、外で変わっただけのときは帯が出る |
 
 ### プロジェクト管理画面
 
@@ -427,7 +470,7 @@ Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけ
 
 ## 手動確認の手順
 
-`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `projects-panel.ts` / `sidebar.ts` /
+`extension.ts` / `board-panel.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `flow-panel.ts` / `projects-panel.ts` / `sidebar.ts` /
 `terminal.ts` / `ccnavi.ts` / `git.ts` は VS Code の API か子プロセスに触れるので単体テストの対象外。次を拡張開発ホストで確かめる。チケットのある状態を作るには
 `tests/ticket/test_board.py` の `scene()` と同じ手順（親を承認、子を着手・閉じる、次の子を提案）を
 実際のリポジトリで踏む。
@@ -525,6 +568,15 @@ Webview の `localResourceRoots` は空のままでよく、CSP も nonce だけ
 | 44 | 作業中は保存できない | 子チケットを `start` してから「保存」 | 上部に赤で「作業中のチケットがある」。保存ボタンが押せない。`finish` にすると押せる |
 | 44b | 自身の層のフェーズ管理 | プロジェクト管理画面の「ワークスペース自身」の「フェーズ管理」。`docs` の title を共通層にある別の種類の title と同じにして「保存」 | タブの題が「ccnavi フェーズ管理: 自身の層」、上部の path が `.ccnavi/config/phases.yml`。保存は `--lint` の error（表示名が層をまたいで重なる）で止まる。戻して別の変更なら保存でき、`ccnavi --explain` の phases の表に `self` の層で出る |
 | 44c | プロジェクトの層に作る | 層の種類が無いプロジェクトの行の「フェーズ管理」→ 種類を 1 つ足して「保存」。次にそのプロジェクトの子を `start` して「保存」、別のプロジェクトの子だけを `start` にして「保存」 | 「無い」の帯が出るが作るボタンは無く、欄は触れる。保存で `projects/<名前>/.ccnavi/config/phases.yml` が先頭の説明コメント付きで出来て、足した種類が入る。前者は「プロジェクト <名前> に作業中のチケットがある」で止まり、後者は保存できる |
+| 45 | フローを作る | 未着手の子のカードの「フロー: 作成」を押す。部品箱で「利用者に聞く」と「サブエージェント」を足し、開始 → 問い → サブエージェント → 終了 と線を引き、欄を埋めて「保存」 | タブ「ccnavi フロー: <子>」が開き、雛形（開始 → 終了）が出る。問いに「メインに戻る（利用者に聞く）」、サブエージェントに「入れ子（上限なら戻る）」の印。保存で `.ccnavi/approved/flows/<子>.json` が承認済みチケットと同じツリーに出来て、ボードの言葉が「フロー: 編集」に変わる。`ccnavi --explain` の子の行と `SubagentStart` の案内にフローの手順が並ぶ |
+| 45b | 同じ子は 1 枚 | 開いたまま同じカードの「フロー」をもう 1 度押す。別の子の「フロー」を押す | 同じ子はタブが増えず前面に出る。別の子は別のタブ |
+| 45c | 着手中は読むだけ | 子を `start` してからカードの「フロー: 閲覧（着手中）」を押す。開いたまま `finish` する | 上部に赤で「着手中なので、フローは書き換えられない（DENY_TICKET_FLOW_LOCKED）… finish … cancel で外れる」。部品箱・欄・取り込み・保存が押せず、点も動かない。`finish` の後、帯が消えて編集できる |
+| 45d | 開いている間に着手された | 未着手の子のフローを開いて何か直し、保存する前に別のターミナルでその子を `start` してから「保存」 | 帯が出て保存ボタンが止まる（監視が錠を取り直す）。監視より先に押せたときも、押した時点で実行ファイルに聞き直して書かない |
+| 45e | 外で変わった | フローを開いたまま `flow.json` をエディタで変えて保存し、画面で何か直して「保存」 | 「ファイルの変更を検知しました」の帯。保存は「外で変更されている」で止まり、上書きしない |
+| 45f | 取り込み | cc-wf-studio で `.vscode/workflows/x.json` を作り、フロー編集画面の「取り込む」で選ぶ。「保存」して `git diff` を見る | 図が取り込んだフローに替わり「未保存」になる（ファイルはまだ変わらない）。保存すると、cc-wf-studio が書いた知らない欄（`schemaVersion` や `data` の欄）も種類（`mcp` など）も残ったまま `flow.json` に入る |
+| 45g | 知らない種類 | `mcp` か `subAgentFlow` を持つフローを開いてそのノードを押し、名前を変えて保存し、`git diff` を見る | 欄は名前だけで、`data` は JSON のまま読むだけ。差分は `name` の 1 行だけ |
+| 45h | 入れ子の注意 | `subAgentFlows` でサブフローを 2 重にし、奥にサブエージェントを置いたフローを開く | 上部に「入れ子のサブエージェントが子の下に 3 段重なる」の注意。保存は止まらない |
+| 45i | 裏に回しても編集が消えない | ノードを足して欄を打ちかけ、別のタブに移ってから戻る | 打ちかけの値と足したノードが残っている（`retainedHost`） |
 
 ## 構成
 
@@ -537,6 +589,7 @@ src/
   rules-panel.ts      ルール設定画面の Webview パネル（1 枚。対象（ワークスペース・自身の層・プロジェクト）を切り替える）。判定・検証・保存の受け付け（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（ワークスペースに 1 つ）。検証・作成・保存の受け付け（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通層・自身の層・プロジェクト）を切り替える）。検証・作成・保存の受け付け（vscode に依存する）
+  flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。ボードのカードから開く）。置き場と錠を実行ファイルに聞き、取り込み・保存を受け付ける（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone / fetch / pull の送信、.gitignore とルールの雛形の書き込み（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）
@@ -565,6 +618,9 @@ src/
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す）と、無いときに書く雛形の本文
     phases-graph.ts   フェーズの図の点・線・置き場所を種類の並びから組む。VS Code に触れないので単体で試せる
     phases-route.ts   図の線の経路（点を横切らない折れ線）。VS Code に触れないので単体で試せる
+    flow-doc.ts       子のフロー（workflow.json と同じ形）の読み書きと編集（知らない欄・種類を落とさない）、雛形、取り込み、入れ子の段の数え方と注意
+    flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉）
+    flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-sample.ts    案内の間だけ出す見本（ボードのカード、プロジェクトの行）。チケットやプロジェクトがまだ無いワークスペースで、案内が指す先を作る
     yaml11.ts         実行ファイル（PyYAML、YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
@@ -632,6 +688,16 @@ src/
     phases/Phase.tsx  種類 1 件の行（要約と、開いたときの欄。scope と成果物は , 区切り、関係は複数選択のセレクトボックスで選ぶ）
     phases/state.ts   編集中の種類（行ごとの鍵）・開いている行（id で控える）・id の重なり
     phases/text.ts    要約の文・絞り込みが当てる文字列・空のときの言葉
+    flow/style.css    フロー編集画面の CSS の入口（先頭で React Flow の CSS を @import する）
+    flow/App.css      App.tsx の CSS（部品箱・図・欄の並びと印）
+    flow/Canvas.css   Canvas.tsx の CSS（図・ノード・出口）
+    flow/Inspector.css Inspector.tsx の CSS（右の欄）
+    flow/post.ts      フロー編集の送り口。契約に無いものは型で止まる
+    flow/main.tsx     フロー編集画面の入口。埋め込みの JSON を読んでマウントする
+    flow/App.tsx      錠の帯・ツールバー・注意・部品箱と、拡張ホストからのメッセージの受け
+    flow/Canvas.tsx   図（ノード・出口・線）。動かす・繋ぐ・選ぶは呼び手に返す
+    flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
+    flow/text.ts      ノードの印（メインに戻る・入れ子）と 1 行の要約
     rules/style.css   ルール設定画面の CSS の入口
     rules/App.css     App.tsx の CSS（タブ・節・判定の欄・2 つの面が共有する表）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
@@ -657,14 +723,16 @@ test/
   helpers/risk.ts     リスク管理画面（React）を束ねたものごと happy-dom で開く
   helpers/phases.ts   フェーズ管理画面（React）を束ねたものごと happy-dom で開く
   helpers/rules.ts    ルール設定画面（React）を束ねたものごと happy-dom で開く
+  helpers/flow.ts     フロー編集画面（React）を束ねたものごと happy-dom で開く（図を描くので大きさの偽物を入れる）。cc-wf-studio の形の見本も持つ
   board/              ボード（board, model, approvemodel と、画面を動かす render.dom / board.dom）
   rules/              ルール設定（rules-doc, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）
   projects/           プロジェクト管理（projects と、画面を動かす projects.dom）
+  flow/               フロー編集（flow-doc, flow-view と、画面を動かす flow.dom、ボードのカードのボタンを動かす flow-card.dom）
   shared/             画面をまたぐもの（locate, commands, lock, layers, yaml11, ticket-control, screens, style, appearance, screen-host, approval-machine）
   */*.test.ts         組み立てと HTML の文字列を見る単体テスト CB-T01〜
-  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。5 画面とも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom）
+  */*.dom.test.ts     happy-dom で動かすテスト CB-D01〜。画面はどれも React なので、描くものも動かして見る（render.dom, projects.dom, risk.dom, phases.dom, rules.dom, flow.dom）
   shared/test-ids.test.ts  ID の決まり（重複しない・名前は ID から始まる）を、テストで守る
 scripts/
   bundle.js           esbuild で本体を out/extension.js に束ねる
@@ -687,8 +755,8 @@ README やチケットの記録から参照する。
 
 `webview/` は反対に、DOM だけを触って `vscode` も `node` も import しない。拡張ホストと分け合うのは
 `core/` のうち import で辿れるぶん（`board.ts`・`board-view.ts` など、判定も I/O もしないもの）だけ。
-**5 画面とも React で**、拡張ホストは中身（`BoardData` / `ProjectsData` / `RiskData` / `PhasesData` /
-`RulesData`）を渡すだけで DOM を組み立てない（ADR-0064、ADR-0062）。文字列で HTML を組む画面は
+**画面はどれも React で**（サイドパネルの 5 画面と、ボードから開くフロー編集）、拡張ホストは中身（`BoardData` / `ProjectsData` / `RiskData` / `PhasesData` /
+`RulesData` / `FlowData`）を渡すだけで DOM を組み立てない（ADR-0064、ADR-0062）。文字列で HTML を組む画面は
 1 つも残っていないので、そのための逃がし（`escapeHtml`・`APPEARANCE_SCRIPT`）も無い。
 
 **ボードに機能を足すときに触る場所。**

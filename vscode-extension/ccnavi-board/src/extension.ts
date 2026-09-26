@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { pickAppearance } from "./appearance.js";
 import { openBoard, refreshBoard } from "./board-panel.js";
 import { registerScreens, screens } from "./core/screens.js";
+import { openFlow } from "./flow-panel.js";
 import { openPhases } from "./phases-panel.js";
 import { openProjects } from "./projects-panel.js";
 import { openRisk } from "./risk-panel.js";
@@ -21,6 +22,7 @@ export function activate(context: vscode.ExtensionContext): void {
     risk: openRisk,
     phases: openPhases,
     projects: openProjects,
+    flow: openFlow,
   });
   // サイドパネルより先に読む。入口の並びがこの値で決まる。
   watchTicketControl(context);
