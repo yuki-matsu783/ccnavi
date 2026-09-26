@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import { asPhasesForm, readPhases } from "../../src/core/phases-doc.js";
+import { SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { PhaseForm } from "../../src/core/phases-view.js";
 
 /** このリポジトリの phases.yml と同じ形。コメントの置き場と flow の並びを持つ */
@@ -97,9 +98,9 @@ test("CB-T86 phases.yml を種類ごとに読む。kind と review は無けれ�
 test("CB-T87 変えていない内容で書き戻すと 1 文字も変わらない", () => {
   const doc = readPhases(SAMPLE);
   assert.equal(doc.apply(doc.model.form), SAMPLE);
-  const template = readPhases(TEMPLATE_PHASES_TEXT);
-  assert.deepEqual(template.model.problems, []);
-  assert.equal(template.apply(template.model.form), TEMPLATE_PHASES_TEXT);
+  const sample = readPhases(SAMPLE_PHASES_TEXT);
+  assert.deepEqual(sample.model.problems, []);
+  assert.equal(sample.apply(sample.model.form), SAMPLE_PHASES_TEXT);
 });
 
 test("CB-T88 変えた欄だけが差分になり、コメントと引用符は残る", () => {

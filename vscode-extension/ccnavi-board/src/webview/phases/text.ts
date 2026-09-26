@@ -97,5 +97,5 @@ export function emptyNote(exists: boolean, editable: boolean): string {
   }
   return editable
     ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる"
-    : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す";
+    : "ファイルが無い。種類は層に置く。上の案内から自身の層を開くか、プロジェクト管理画面から開く";
 }

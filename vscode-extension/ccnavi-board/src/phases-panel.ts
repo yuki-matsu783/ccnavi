@@ -5,7 +5,7 @@
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存や作成が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存が通った）。
  *
  * 対象は 3 種（設計 11.2、11.4.1）。共通層の種類（`.ccnavi/common/phases.yml`。置き場は固定）、
  * ワークスペース自身の層（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの層
@@ -19,9 +19,9 @@
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
  * 作業中のチケットは、共通層と自身の層ならどのツリーでも、プロジェクトの層ならそのプロジェクトの分を見る
  * （種類は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
- * ファイルが無いとき、共通層は空の画面と「雛形で作る」を見せる。層は雛形を置かない（雛形の id は共通層の種類と
- * 重なりやすく、中身が違えばその層が空として扱われる）。代わりに画面で種類を足させ、検証を通った最初の保存で
- * ファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
+ * ファイルが無いとき、共通層は空の画面と「種類は層に置く」案内（自身の層を開くボタン）を見せ、画面からは作らせない。
+ * 層にも雛形は置かない（雛形の id は層の種類と重なりやすく、中身が違えばその層が空として扱われる）。層は画面で
+ * 種類を足させ、検証を通った最初の保存でファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。種類は親チケットの計画と
@@ -39,7 +39,7 @@ import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument } from "./core/phases-doc.js";
+import { asPhasesForm, readPhases, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
 import type { PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
@@ -642,8 +642,10 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       );
       return;
     }
-    case "create": {
-      await create(current);
+    case "openSelf": {
+      // プロジェクト管理画面の「ワークスペース自身」の「フェーズ管理」と同じ入口。未保存の変更があれば
+      // 切り替えの前に聞く（共通層のファイルが無い間は欄を触れないので、ふつうは聞かずに切り替わる）
+      await openPhases({ kind: "self" });
       return;
     }
     case "save": {
@@ -651,39 +653,6 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       return;
     }
   }
-}
-
-/** 共通層に雛形を書き出す。既にあれば上書きしない。層には雛形を置かない（最初の保存で作る） */
-async function create(current: PanelState): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  if (current.target.kind !== "common") {
-    fail(current, "層には雛形を置かない。種類を足して保存すると、ファイルが作られる");
-    return;
-  }
-  if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, `${loaded.phasesRel} は既に存在するため、上書きしない。再読込する`);
-    return;
-  }
-  try {
-    fs.mkdirSync(path.dirname(loaded.phasesPath), { recursive: true });
-    current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.phasesPath, TEMPLATE_PHASES_TEXT, { encoding: "utf8", flag: "wx" });
-  } catch (error) {
-    // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
-    current.wroteAt = 0;
-    fail(current, `${loaded.phasesRel} に書けない: ${(error as Error).message}`);
-    return;
-  }
-  await reload(current);
-  if (!alive(current)) {
-    return;
-  }
-  vscode.window.showInformationMessage(
-    `${loaded.phasesRel} を雛形から作成しました。修正してコミットを行ってください。`,
-  );
 }
 
 function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
@@ -704,7 +673,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   const layer = current.target.kind !== "common";
   if (!loaded.exists && !layer) {
-    fail(current, `${loaded.phasesRel} が無い。先に「雛形でファイルを作る」を押す`);
+    fail(current, `${loaded.phasesRel} が無い。共通層は画面から作らない。種類は自身の層かプロジェクトの層に置く`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -800,7 +769,7 @@ function asMessage(message: unknown): PhasesMessage | undefined {
       return typeof m.dirty === "boolean" ? { type: "dirty", dirty: m.dirty } : undefined;
     case "ready":
     case "openFile":
-    case "create":
+    case "openSelf":
     case "tourDone":
       return { type: m.type };
     case "save": {

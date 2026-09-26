@@ -462,11 +462,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           ))}
         </ul>
       )}
-      {page !== undefined && !page.exists && <Missing page={page} busy={busy} onCreate={() => {
-        setBusy(true);
-        setStatus({ text: "ファイルを作成中…", error: false });
-        post({ type: "create" });
-      }} />}
+      {page !== undefined && !page.exists && <Missing page={page} busy={busy} onOpenSelf={() => post({ type: "openSelf" })} />}
       <section className="block">
         <h2>
           フェーズの種類{" "}
@@ -577,11 +573,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 }
 
 /**
- * ファイルが無いときの帯。共通層は「雛形で作る」まで欄を触れない。
- * 層（自身の層・プロジェクト）には雛形を置かない（雛形の id は共通層の種類と重なりやすく、
- * 中身が違えばその層が空として扱われる）。代わりに画面で足させ、最初の保存でファイルを作る。
+ * ファイルが無いときの帯。層（自身の層・プロジェクト）は欄を触れ、最初の保存でファイルを作る。
+ * 層にも共通層にも雛形は置かない。雛形の id は層の種類と重なりやすく、中身が違えばその層が空として扱われる。
+ * 共通層は画面から作らせず、種類を置く層（自身の層）を開く道だけを出す。
  */
-function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly busy: boolean; readonly onCreate: () => void }): JSX.Element {
+function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
   if (page.layer === true) {
     return (
       <div className="banner missing">
@@ -594,11 +590,10 @@ function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly
   return (
     <div className="banner missing">
       <span>
-        {page.phasesPath} が無い。実行ファイルはフェーズを番号だけで扱っていて、親チケットの <code>plan:</code> も読めない。種類を使うにはまずファイルを作る。雛形は README の例で、
-        <code>scope</code> の綴りは作ったあとにこのプロジェクトの置き場へ直す。
+        共通層に種類は無い（{page.phasesPath} が無い）。種類は各層（ワークスペース自身・プロジェクト）に置く。プロジェクト管理画面の「フェーズ管理」から開く。
       </span>
-      <button type="button" className="action primary" data-action="create" disabled={busy} onClick={onCreate}>
-        雛形でファイルを作る
+      <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
+        自身の層を開く
       </button>
     </div>
   );
