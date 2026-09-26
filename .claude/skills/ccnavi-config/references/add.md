@@ -42,7 +42,7 @@ allow:
 | `ask` | 人が毎回見たい確認ポイント。権限モードによらず必ず確認が出る | `message` は書かない（ダイアログにしか出ない）。伝えたいことは `additionalContext` |
 | `allow` | 「このプロジェクトで普通にやること」。権限を配る場所ではない | `message` は書かない（どこにも届かない） |
 
-どこにも当たらない呼び出しは Claude Code の権限モードに落ちる（`UNDECLARED`）。`allow` は deny の穴を開ける道具ではない。
+どこにも当たらない呼び出しは Claude Code の権限モードの判断になる（`UNDECLARED`）。`allow` は deny の穴を開ける道具ではない。
 
 当て方。`glob` か `regex` のどちらか 1 つ。必ず引用符で囲む（`*` `&` `!` `<<` は YAML が先に読む）。
 
@@ -173,7 +173,7 @@ factors:
 |---|---|---|
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る |
 | `glob` | 当たったファイルごとに加点。`max` で上限 | 触ったら人が見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対。`` が使える |
-| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重い側に倒れて `points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
+| `script` | 層の `scripts/` の下の sh（共通層は `.ccnavi/common/scripts/`、自身の層とプロジェクトの層は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。リスクレベルの名前は増やせない（知らない名前は warn）。

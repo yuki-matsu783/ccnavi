@@ -683,7 +683,7 @@ src/
     flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
     flow/text.ts      ノードの印（メインに戻る・入れ子）と 1 行の要約
     rules/style.css   ルール設定画面の CSS の入口
-    rules/App.css     App.tsx の CSS（タブ・節・判定の欄・2 つの面が共有する表）
+    rules/App.css     App.tsx の CSS（タブ・節・判定の欄・判定を試す・hook の 2 つのタブが共有する表）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
     rules/Judge.css   Judge.tsx の CSS（判定の結果）
     rules/post.ts     ルール設定の送り口。契約に無いものは型で止まる
