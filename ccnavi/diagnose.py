@@ -34,6 +34,7 @@ from . import (
     approval,
     audit,
     builtin,
+    flow,
     hookio,
     judge,
     modes,
@@ -946,6 +947,11 @@ def _ticket_record(
         "cancel_reason": source.cancel_reason,
         "seen_in": seen_in,
         "scattered": scattered,
+        # 子のフロー（設計 9.3.1、ADR-0085）。`{path, rel, tree, exists, linked, locked}`。
+        # 親は null。
+        # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
+        # チケットがあればその側、無ければ提案。
+        "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
     }

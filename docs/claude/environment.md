@@ -9,6 +9,9 @@ CLAUDE.md「実行環境」「呼び名」の詳細。sh やスクリプトを�
   （3.2 は全角の先頭バイトまで名前に読む）。`$( )` の中に `case` を書かない（3.2 は `)` を読み違える）。
   どちらも `tests/core/test_sh_portability.py` が見る
 - 使える道具は `jq` 1.6、Node 22 (pnpm 10)、Python 3.12 (uv)、go。これ以外がある前提で書かない
+- Claude Code on the web には `.ccnavi/bin` が無い。ccnavi の hook を効かせるには
+  `uv run --with pyinstaller python build.py` で組み立てる。無いとランチャーが 127 で終わり、hook は
+  何もしない（2026-09-25、Claude Code 2.1.282 で実測）
 
 ## 呼び名
 

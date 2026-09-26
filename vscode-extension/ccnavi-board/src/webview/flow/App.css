@@ -1,0 +1,28 @@
+/*
+ * フロー編集画面の骨組み（`App.tsx`）。部品箱・図・右の欄を横に並べ、狭いときは縦に積む。
+ */
+.flow-body {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 300px;
+  gap: 10px;
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .flow-body { grid-template-columns: minmax(0, 1fr); }
+}
+.flow-ticket { overflow-wrap: anywhere; }
+.flow-palette {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px;
+}
+.flow-palette button.action.small.palette-item {
+  margin-left: 0; text-align: left;
+  display: flex; gap: 6px; align-items: center; justify-content: space-between;
+}
+/* 印（種類の性質）。askUserQuestion はメインへ戻る、subAgent は入れ子。色だけに頼らず文字で言う */
+.flow-badge {
+  display: inline-block; padding: 0 6px; border-radius: 8px; font-size: .8em;
+  border: 1px solid var(--vscode-panel-border); color: var(--vscode-descriptionForeground);
+}
+.flow-badge.ask { border-color: var(--vscode-editorWarning-foreground); color: var(--vscode-editorWarning-foreground); }
+.flow-badge.nest { border-color: var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)); color: var(--vscode-editorInfo-foreground, var(--vscode-focusBorder)); }

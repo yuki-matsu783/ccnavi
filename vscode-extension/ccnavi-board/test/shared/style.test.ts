@@ -20,6 +20,7 @@ import { projectsHtml } from "../helpers/projects.js";
 import { page as riskPage, riskHtml } from "../helpers/risk.js";
 import { page as phasesPage, phasesHtml } from "../helpers/phases.js";
 import { page as rulesPage, rulesHtml } from "../helpers/rules.js";
+import { flowHtml, page as flowPage } from "../helpers/flow.js";
 
 /** 画面の名前と、その 1 枚。中身は画面（React）が組み、CSS と body だけを拡張が入れる */
 function reactPages(appearance?: "claude-dark"): [string, string][] {
@@ -31,6 +32,7 @@ function reactPages(appearance?: "claude-dark"): [string, string][] {
     ["risk", riskHtml({ kind: "page", page: riskPage() }, options)],
     ["phases", phasesHtml({ kind: "page", page: phasesPage() }, options)],
     ["rules", rulesHtml({ kind: "page", page: rulesPage() }, options)],
+    ["flow", flowHtml({ kind: "page", page: flowPage() }, options)],
   ];
 }
 

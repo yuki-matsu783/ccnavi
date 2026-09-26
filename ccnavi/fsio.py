@@ -62,6 +62,29 @@ def full_path(path: str, cwd: str) -> str:
         return os.path.normpath(os.path.abspath(joined))
 
 
+def spelled_path(path: str, cwd: str) -> str:
+    """ファイルのパスを、リンクを解かずに絶対の綴りに直す。`..` は畳む。
+
+    `full_path` は行き着く先に直すので、リンクそのものの綴りが消える。置き場の綴りに当てる
+    止める向きの検査（フローのロック）は、解いた先と解く前の両方に当てるためにこちらも使う。
+    """
+    if not path:
+        return ""
+    base = cwd or os.getcwd()
+    return os.path.normpath(os.path.abspath(os.path.join(base, os.path.expanduser(path))))
+
+
+def parent_resolved(path: str) -> str:
+    """ディレクトリだけを行き着く先に直し、最後の名前は綴りのまま残す。空なら空。"""
+    if not path:
+        return ""
+    head, name = os.path.split(path)
+    try:
+        return os.path.join(os.path.realpath(head), name)
+    except OSError:
+        return path
+
+
 def safe_name(text: str, limit: int | None = 64) -> str:
     """識別子から作る、置き場の名前。limit が None なら切り詰めない。"""
     return _UNSAFE.sub("_", text)[:limit]

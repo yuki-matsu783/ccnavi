@@ -74,6 +74,9 @@ esac
 case "$projects" in
 "" | .) projects="projects" ;;
 esac
+# ボードのフロー編集画面が保存の途中で置く一時ファイル（flows/ の下の `.<名前>.<番号>.tmp`）。
+# 落ちて残っても運ばない。書きかけの中身を人の手順書としてコミットしないため。
+skip_temp=":(exclude)$approved/flows/.*.tmp"
 
 # ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための控え。
 state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-push-approved.XXXXXX") || {
@@ -131,7 +134,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	[ -n "$tree" ] || continue
 	[ -d "$tree/$approved" ] || continue
 	git -C "$tree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-	changed=$(git -C "$tree" status --porcelain -- "$approved" 2>/dev/null || :)
+	changed=$(git -C "$tree" status --porcelain -- "$approved" "$skip_temp" 2>/dev/null || :)
 	[ -n "$changed" ] || continue
 
 	# 何か 1 つでも運ぶ対象があったことの印。detached で飛ばしても「無い」とは言わない。
@@ -145,7 +148,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		continue
 	fi
 
-	git -C "$tree" add -- "$approved" || {
+	git -C "$tree" add -- "$approved" "$skip_temp" || {
 		printf 'ccnavi-push-approved: %s で承認済みチケットをステージできない。\n' "$name" >&2
 		printf 'fail\n' >>"$state"
 		continue

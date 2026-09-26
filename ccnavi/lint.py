@@ -863,13 +863,23 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
     中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
     差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しい綴りのほう。
+
+    承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（利用者の決定）。
+    承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む
+    （設計 9.2・9.3.1）。「統合されるまで効かない」は当たらず、言えば誤った案内になる。
     """
     problems: list[Problem] = []
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
     for work in tree.worktrees(root, conf.projects):
         origin = tree.project_root(conf.projects, work.project) if work.project else root
+        approved = os.path.normcase(os.path.normpath(settings.approved_dir(conf, work.root)))
         for rel in _files_under(os.path.join(work.root, home)):
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
+                continue
+            where = os.path.normcase(
+                os.path.normpath(os.path.join(work.root, home, rel.replace("/", os.sep)))
+            )
+            if where.startswith(approved + os.sep):
                 continue
             problems.append(
                 Problem(

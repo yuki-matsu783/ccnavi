@@ -15,6 +15,7 @@ from . import (
     audit,
     builtin,
     ctxfile,
+    flow,
     fsio,
     hookio,
     modes,
@@ -321,14 +322,15 @@ def decide_before(
     # 条件は project_mismatch の早く返る条件と同じ式。ticket_verdict は dest で見るが、dest が
     # None でなければ target は dest そのものなので、先へ進むときはここも同じツリーで読んでいる。
     index = None
+    scanned: list[ticket_mod.Ticket] | None = None
     if (
         conf.tickets_enabled
         and target is not None
         and not target.is_main
         and payload.tool_name in SCOPE_TOOLS
     ):
-        copies, _ = approval.scan(conf, root)
-        index = approval.by_id(copies)
+        scanned, _ = approval.scan(conf, root)
+        index = approval.by_id(scanned)
 
     # ワークツリーの元リポジトリと承認済みチケットの `project:` の食い違いは、ルールより先に見る。
     # 範囲の宣言ではなく取り違えなので、ルールが allow と言っていても通さない。
@@ -337,6 +339,17 @@ def decide_before(
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
             return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
+
+    # 着手中の子のフローは書き換えさせない（設計 9.3.1、ADR-0085）。ルールより先に見る。
+    # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの守りでも止まる。ロックは
+    # その守りを切った設定でも効き、止めた理由（着手中）を名指しする（締める向きだけ）。
+    if conf.tickets_enabled and target is not None and payload.tool_name in SCOPE_TOOLS:
+        locked, scanned = flow_lock(conf, root, payload, record.subject, scanned)
+        if index is None and scanned is not None:
+            index = approval.by_id(scanned)
+        if locked:
+            record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
+            return refuse(stdout, mode, record, rules.DENY, notices + [locked])
 
     # 書き直しを求める形は、ルールより先に止める（ADR-0046、ADR-0047）。ブレース展開と、実行する
     # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
@@ -694,6 +707,50 @@ def project_mismatch(
             "repository and approved by the user.",
         ]
     )
+
+
+def flow_lock(
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    full: str,
+    copies: list[ticket_mod.Ticket] | None,
+) -> tuple[str, list[ticket_mod.Ticket] | None]:
+    """着手中の子のフローへの書き込みなら、その理由の文。と、読んだ承認済みチケットの並び。
+
+    当てるのは解いた綴り（`full`）と、解く前の綴り（payload のパスを cwd から繋いで `..` を
+    畳んだだけのもの）と、ディレクトリだけを解いた綴りの 3 通り。フローのファイルかその途中が
+    リンクでも、どれかの綴りが置き場に当たれば止める（止める向きだけ）。承認済みの領域の
+    `flows/` の下でなければ承認済みチケットを読まない。並びは識別子で畳む前のもので、
+    どのツリーの写しでも着手中なら止める。
+    """
+    field = SUBJECT_FIELDS.get(payload.tool_name, "")
+    value = payload.field_value(field) if field else ""
+    if payload.tool_name == "NotebookEdit":
+        value = value or payload.field_value("file_path")
+    spelled = fsio.spelled_path(value, payload.cwd)
+    # 3 通り目は、ディレクトリだけを解いてファイルの名前は残した綴り。リンク越しに置き場へ届き、
+    # 置き場のファイルがまたリンクのとき、解いた先も解く前も置き場の綴りにならない。
+    parent = fsio.parent_resolved(spelled)
+    for path in dict.fromkeys(p for p in (full, spelled, parent) if p):
+        found = flow.locate(conf, root, path)
+        if found is None:
+            continue
+        if copies is None:
+            copies, _ = approval.scan(conf, root)
+        child = flow.lock_hit(copies, found[1], found[0])
+        if child is not None:
+            return flow.locked_message(conf, child, path), copies
+    # ハードリンクは綴りに置き場が出ない（M-1）。書き込み先が在って名前が 2 つ以上あるときだけ、
+    # 着手中の子のフローと同じ中身（inode）かを見る。
+    target = full or spelled
+    if target and flow.hard_linked(target):
+        if copies is None:
+            copies, _ = approval.scan(conf, root)
+        child = flow.inode_hit(conf, root, copies, target)
+        if child is not None:
+            return flow.locked_message(conf, child, target), copies
+    return "", copies
 
 
 # 判定の強さ。ルールの判定とチケットの判定を合わせるとき、強い側を採る（設計 1）。

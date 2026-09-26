@@ -337,6 +337,7 @@ def decide_after(
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
+    bounced = ""
     if conf.tickets_enabled:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
@@ -368,5 +369,9 @@ def decide_after(
         text = (
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
-    hookio.write_context(stdout, hookio.POST_TOOL_USE, text)
+    # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
+    # 届かない。人にも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
+    system = bounced if payload.agent_id else ""
+    hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)
     return EXIT_OK

@@ -135,6 +135,7 @@
     "test:risk": "node scripts/test-groups.js risk",
     "test:phases": "node scripts/test-groups.js phases",
     "test:projects": "node scripts/test-groups.js projects",
+    "test:flow": "node scripts/test-groups.js flow",
     "test:shared": "node scripts/test-groups.js shared",
     "test:dom": "node scripts/test-groups.js --dom --all",
     "test:for": "node scripts/test-groups.js --for",
