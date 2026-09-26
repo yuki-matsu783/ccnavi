@@ -23,6 +23,7 @@ import io
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,12 @@ def git(cwd, *args):
     if done.returncode != 0:
         raise AssertionError(f"git {args}: {done.stderr}")
     return done.stdout
+
+
+def _force_remove(function, path, _error):
+    """読み取り専用のファイル（git の objects）も消す。Windows では書き込みを許さないと消せない。"""
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
 
 
 def read_json(path):
@@ -2114,137 +2121,198 @@ class TicketTest(unittest.TestCase):
         got = self.request(fixture)
         self.assertEqual(got.returncode, 0, got.stderr)
 
-    def test_request_passes_when_only_the_markers_are_unpushed(self):
-        """置き場だけが手元に残っている形で、依頼が止まらないこと。
+    # ---- 9-2. マーカーと置き場: 何が動いたか × 道 → 通る・止まる
 
-        `ccnavi-push-approved.sh` は push が落ちてもコミットを残す。そこで止めると、
-        人の承認が落ちたせいで、まだ 1 度も依頼していないフェーズの依頼まで止まる。
-        置き場の外が 1 つでも残っていれば、従来どおり push を求める。
+    def snapshot(self):
+        """self.root の今を写し、写しの置き場を返す。"""
+        dest = os.path.join(tempfile.mkdtemp(prefix="ccnavi-ticket-snap-"), "root")
+        self.addCleanup(shutil.rmtree, os.path.dirname(dest), ignore_errors=True)
+        shutil.copytree(self.root, dest, symlinks=True)
+        return dest
+
+    def restore(self, snap):
+        """self.root を写しの時点に戻す。
+
+        写しは同じパスへ戻す。ワークツリーの `.git`、origin の置き場、状態の置き場は
+        絶対パスで互いを指すので、別の場所へ置くと前の行の木を指してしまう。
+        git の objects は読み取り専用で、Windows ではそのままだと消せない。
         """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
+        shutil.rmtree(self.root, onexc=_force_remove)
+        shutil.copytree(snap, self.root, symlinks=True)
+
+    def commit_code(self, name, message, push=True):
+        """置き場の外（src/）にファイルを 1 つ足してコミットする。"""
+        write(os.path.join(self.parent_tree, "src", name), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", message)
+        if push:
+            git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def requested_mark(self):
+        return os.path.join(self.approved, "phases", "i0001", "1.requested")
+
+    def reviewed(self, fixture):
+        """人が端末で打つ道（--reviewed）。未解決の指摘は受け入れる。"""
+        return self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--reviewed",
+            "1",
+            "--accept-unresolved",
+            "--result",
+            fixture,
+            stdin="k\n",
+        )
+
+    # 動かし方。どれも「依頼の前」か「依頼の後」の写しから始まる。
+
+    def move_markers_unpushed_before_request(self, fixture):
+        # ccnavi-push-approved.sh は push が落ちてもコミットを残す。人の承認が落ちた形。
         write(os.path.join(self.approved, "doing", "unrelated.md"), "承認が落ちた形\n")
         git(self.parent_tree, "add", "--", ".ccnavi/approved")
         git(self.parent_tree, "commit", "--quiet", "-m", "ccnavi: 承認済みチケットを更新")
-        self.assertEqual(self.request(fixture).returncode, 0)
 
-    def test_request_refuses_when_the_code_is_unpushed(self):
-        """置き場の外が手元に残っていれば、依頼は止まること。"""
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "送っていない変更")
-        got = self.request(fixture)
-        self.assertNotEqual(got.returncode, 0)
-        self.assertIn("push されていない", got.stderr)
+    def move_code_unpushed(self, fixture):
+        self.commit_code("later.py", "送っていない変更", push=False)
 
-    def test_check_passes_when_only_the_markers_moved(self):
-        """マーカーだけをコミットしても check が止まらないこと。
-
-        依頼のマーカーは親のブランチにコミットして運ぶ前提のもので、「依頼 → マーカー →
-        コミット」の順のせいで依頼の直後に必ず HEAD が 1 つ進む。人がレビューで見るものは
-        変わっていないので、ここで止めると自分の足を踏む。未コミットの側は同じ理由で
-        前提から外してある。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
-        recorded = read_json(mark)["head"]
+    def move_markers_pushed(self, fixture):
+        # 「依頼 → マーカー → コミット」の順のせいで、依頼の直後に HEAD が必ず 1 つ進む。
+        recorded = read_json(self.requested_mark())["head"]
         self.commit_markers()
         self.assertNotEqual(git(self.parent_tree, "rev-parse", "HEAD").strip(), recorded)
-        check = self.confirm(fixture)
-        self.assertEqual(check.returncode, 0, check.stderr)
-        self.assertTrue(os.path.exists(os.path.join(os.path.dirname(mark), "1.reviewed")))
 
-    def test_check_passes_when_only_the_markers_are_unpushed(self):
-        """マーカーだけが手元に残っている形でも止まらないこと。
-
-        リモートにあるものと人が見るものは同じ。置き場の外が 1 つでも手元に残っていれば、
-        従来どおり push を求める。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
+    def move_markers_unpushed(self, fixture):
         self.commit_markers(push=False)
-        self.assertEqual(self.confirm(fixture).returncode, 0)
 
-    def test_request_refuses_when_only_the_markers_moved(self):
-        """マーカーだけが動いた形では、依頼を出し直させないこと。
+    def move_code_pushed(self, fixture):
+        self.commit_code("later.py", "マーカーと一緒に")
 
-        check が止まらないので、出し直しても依頼のコメントが増えるだけになる。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        self.commit_markers()
-        again = self.request(fixture)
-        self.assertNotEqual(again.returncode, 0)
-        self.assertIn("依頼済み", again.stderr)
-        self.assertEqual(len(read_json(fixture)["comments"]), 1)
-
-    def test_check_refuses_when_code_rides_with_the_markers(self):
-        """マーカーと一緒に本物の変更が乗っていれば、従来どおり止まること。"""
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        write(os.path.join(self.parent_tree, "src", "later.py"), "x\n")
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "マーカーと一緒に")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        check = self.confirm(fixture)
-        self.assertNotEqual(check.returncode, 0)
-        self.assertIn("HEAD が動いている", check.stderr)
-
-    def test_check_refuses_a_marker_head_that_is_not_a_sha(self):
-        """マーカーの `head` が sha でなければ、差分の相手にしないこと。
+    def move_code_and_forge_head(self, head):
+        """人が見ていないコミットを積み、マーカーの `head` を sha でない値に書き換える。
 
         マーカーは親のブランチに乗って他の機械から届く。`HEAD` のような「今」を指す値を
-        revision として渡すと `head..HEAD` が空差分になり、人が見ていないコミットが
-        そのまま通る。出し直しの道は残す（残さないと打つ手が無くなる）。
+        revision として渡すと `head..HEAD` が空差分になり、見ていないコミットがそのまま通る。
         """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        write(os.path.join(self.parent_tree, "src", "unseen.py"), "x\n")
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "誰も見ていない変更")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        mark = os.path.join(self.approved, "phases", "i0001", "1.requested")
-        for head in ("HEAD", "@", "-P", ""):
-            data = read_json(mark)
+
+        def move(fixture):
+            self.commit_code("unseen.py", "誰も見ていない変更")
+            data = read_json(self.requested_mark())
             data["head"] = head
-            write(mark, json.dumps(data))
-            check = self.confirm(fixture)
-            self.assertNotEqual(check.returncode, 0, f"head={head!r} で通った")
-        data = read_json(mark)
-        data["head"] = "HEAD"
-        write(mark, json.dumps(data))
-        self.assertEqual(self.request(fixture).returncode, 0)
+            write(self.requested_mark(), json.dumps(data))
 
-    def test_check_refuses_a_file_renamed_into_the_store(self):
-        """置き場の外から中へ改名したファイルを、置き場の中だけの変更と数えないこと。
+        return move
 
-        改名を 1 行にまとめられると移動元が消え、人が見た木から消えたことが映らない。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
+    def move_forged_head_then_request_again(self, fixture):
+        # 偽の head で check が止まった後にも、出し直しの道は残す（残さないと打つ手が無い）。
+        self.move_code_and_forge_head("HEAD")(fixture)
+        self.assertNotEqual(self.confirm(fixture).returncode, 0)
+
+    def move_rename_into_the_store(self, fixture):
+        # 改名を 1 行にまとめられると移動元が消え、人が見た木から消えたことが映らない。
         git(self.parent_tree, "mv", "src/keep.py", ".ccnavi/approved/keep.py")
         git(self.parent_tree, "commit", "--quiet", "-m", "置き場へ移す")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        check = self.confirm(fixture)
-        self.assertNotEqual(check.returncode, 0)
-        self.assertIn("HEAD が動いている", check.stderr)
+
+    def move_a_path_that_only_looks_like_the_store(self, fixture):
+        # `.ccnavi\\tickets\\x.py` はルート直下のファイル 1 個で、置き場の中ではない。
+        # git が `-z` で返すパスを直しにかかると、ここが除外の側に入る。
+        if os.name == "nt":
+            self.skipTest("名前に \\ を含むファイルを作れない機械")
+        write(os.path.join(self.parent_tree, ".ccnavi\\tickets\\x.py"), "x\n")
+        git(self.parent_tree, "add", "-A")
+        git(self.parent_tree, "commit", "--quiet", "-m", "置き場に見える名前")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+
+    def move_markers_with_an_open_thread(self, fixture):
+        data = read_json(fixture)
+        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "ここ"}]
+        write(fixture, json.dumps(data))
+        self.commit_markers()
+
+    def move_code_after_the_human_accepted(self, fixture):
+        # 人の道で一度受け入れた後に、見ていない変更を積んで受け入れをやり直す。
+        self.move_markers_with_an_open_thread(fixture)
+        accepted = self.reviewed(fixture)
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        self.commit_code("unseen.py", "誰も見ていない変更")
+        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
+
+    def then_the_phase_is_reviewed(self, fixture):
+        self.assertTrue(
+            os.path.exists(os.path.join(os.path.dirname(self.requested_mark()), "1.reviewed"))
+        )
+
+    def then_nothing_was_posted_again(self, fixture):
+        self.assertEqual(len(read_json(fixture)["comments"]), 1)
+
+    def test_what_moved_decides_whether_request_and_check_pass(self):
+        """置き場（.ccnavi/approved）だけが動いた形と、置き場の外が動いた形を分けること。
+
+        - request: 置き場だけが手元に残っている形では止まらない。push が落ちてもコミットが
+          残るので、そこで止めると、まだ 1 度も依頼していないフェーズまで止まる。
+          置き場の外が 1 つでも手元に残っていれば、push を求める
+        - request（依頼済み）: 置き場だけが動いた形では出し直させない。check が止まらないので、
+          出し直しても依頼のコメントが増えるだけになる
+        - check: 置き場だけが動いた形（push 済みでも手元だけでも）では止まらない。
+          人がレビューで見るものは変わっていない。置き場の外が動いていれば、
+          置き場に見せかけたもの（改名、置き場に見える名前、sha でない head）も含めて止まる
+        - 人が端末で打つ道（--reviewed）も check と同じ基準で見る
+
+        前置き（親子の承認・着手、フェーズの終わり、origin への push、依頼）は 1 度だけ作り、
+        行ごとに「依頼の前」か「依頼の後」の写しへ戻してから動かす。行の間で木は漏れない。
+        """
+        self.family()
+        self.close_phase()
+        fixture = self.remote()
+        before = self.snapshot()
+        self.assertEqual(self.request(fixture).returncode, 0)
+        after = self.snapshot()
+
+        moved = "HEAD が動いている"
+        forged = self.move_code_and_forge_head
+        # (何が動いたか, 始まり, 動かし方, 道, 通るか, stderr に出る言葉, 後で見ること)
+        rows = [
+            ("依頼の前: 置き場だけ・未 push", before, self.move_markers_unpushed_before_request,
+             "request", True, None, None),
+            ("依頼の前: 置き場の外・未 push", before, self.move_code_unpushed,
+             "request", False, "push されていない", None),
+            ("置き場だけ・push 済み", after, self.move_markers_pushed,
+             "check", True, None, self.then_the_phase_is_reviewed),
+            ("置き場だけ・未 push", after, self.move_markers_unpushed,
+             "check", True, None, None),
+            ("置き場だけ・push 済み", after, self.move_markers_pushed,
+             "request", False, "依頼済み", self.then_nothing_was_posted_again),
+            ("置き場の外・push 済み", after, self.move_code_pushed,
+             "check", False, moved, None),
+            ("置き場の外・head='HEAD'", after, forged("HEAD"), "check", False, None, None),
+            ("置き場の外・head='@'", after, forged("@"), "check", False, None, None),
+            ("置き場の外・head='-P'", after, forged("-P"), "check", False, None, None),
+            ("置き場の外・head=''", after, forged(""), "check", False, None, None),
+            ("置き場の外・head='HEAD' で check が止まった後", after,
+             self.move_forged_head_then_request_again, "request", True, None, None),
+            ("置き場の外から中へ改名", after, self.move_rename_into_the_store,
+             "check", False, moved, None),
+            ("置き場に見える名前", after, self.move_a_path_that_only_looks_like_the_store,
+             "check", False, None, None),
+            ("置き場だけ・未解決の指摘あり", after, self.move_markers_with_an_open_thread,
+             "reviewed", True, None, None),
+            ("人が受け入れた後に置き場の外", after, self.move_code_after_the_human_accepted,
+             "reviewed", False, moved, None),
+        ]  # fmt: skip
+        ways = {"request": self.request, "check": self.confirm, "reviewed": self.reviewed}
+        for what, start, move, way, passes, needle, then in rows:
+            with self.subTest(what=what, way=way):
+                self.restore(start)
+                move(fixture)
+                got = ways[way](fixture)
+                if passes:
+                    self.assertEqual(got.returncode, 0, got.stderr)
+                else:
+                    self.assertNotEqual(got.returncode, 0, got.stdout)
+                if needle:
+                    self.assertIn(needle, got.stderr)
+                if then:
+                    then(fixture)
 
     def test_check_refuses_a_submodule_that_moved(self):
         """submodule の進みを、置き場の中だけの変更と数えないこと。
@@ -2285,62 +2353,6 @@ class TicketTest(unittest.TestCase):
         check = self.confirm(fixture)
         self.assertNotEqual(check.returncode, 0)
         self.assertIn("HEAD が動いている", check.stderr)
-
-    @unittest.skipIf(os.name == "nt", "名前に \\ を含むファイルを作れない機械")
-    def test_check_refuses_a_path_that_only_looks_like_the_store(self):
-        """置き場の中に見える名前のファイルを、置き場の中と数えないこと。
-
-        `.ccnavi\\tickets\\x.py` はルート直下のファイル 1 個で、置き場の中ではない。
-        git が `-z` で返すパスを直しにかかると、ここが除外の側に入る。
-        """
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        write(os.path.join(self.parent_tree, ".ccnavi\\tickets\\x.py"), "x\n")
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "置き場に見える名前")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        self.assertNotEqual(self.confirm(fixture).returncode, 0)
-
-    def test_the_human_path_reads_the_markers_the_same_way(self):
-        """人が端末で打つ道（--reviewed）も check と同じ基準で見ること。"""
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        data = read_json(fixture)
-        data["threads"] = [{"id": "t1", "resolved": False, "url": "u1", "body": "ここ"}]
-        write(fixture, json.dumps(data))
-        self.commit_markers()
-        accepted = self.ccnavi(
-            "--cwd",
-            self.parent_tree,
-            "--reviewed",
-            "1",
-            "--accept-unresolved",
-            "--result",
-            fixture,
-            stdin="k\n",
-        )
-        self.assertEqual(accepted.returncode, 0, accepted.stderr)
-        write(os.path.join(self.parent_tree, "src", "unseen.py"), "x\n")
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "誰も見ていない変更")
-        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
-        os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
-        refused = self.ccnavi(
-            "--cwd",
-            self.parent_tree,
-            "--reviewed",
-            "1",
-            "--accept-unresolved",
-            "--result",
-            fixture,
-            stdin="k\n",
-        )
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("HEAD が動いている", refused.stderr)
 
     def test_request_again_after_head_moved(self):
         """依頼の後に HEAD が動いたら、request で依頼を出し直せること（#36）。
