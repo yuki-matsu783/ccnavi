@@ -756,6 +756,43 @@ class TellsAboutProjectsAddedByMistake(SetupTest):
         self.assertIn("git rm --cached projects/lib", details[0])
         self.assertIn(details[0], setup.stdout)
 
+    def test_gitlinks_with_a_space_or_a_quote_are_quoted_as_lint_quotes_them(self):
+        """`git rm --cached` に載せるパスは、sh で割れる文字を含むときだけ `'…'` で囲む。
+
+        `'` を含むなら `'\\''` に置く。綴りは `--lint` と 1 字違わず同じ。
+        """
+        from tests.inproc import run_ccnavi
+
+        self.git("init", "--quiet", "-b", "main")
+        for name in ("it's", "lib", "my lib"):
+            nested = os.path.join(self.dir, "projects", name)
+            os.makedirs(nested)
+            with open(os.path.join(nested, "main.py"), "w", encoding="utf-8") as f:
+                f.write("print(1)\n")
+            self.git("init", "--quiet", "-b", "main", cwd=nested)
+            self.git("add", "-A", cwd=nested)
+            self.git("commit", "--quiet", "-m", "init", cwd=nested)
+        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
+            f.write("ワークスペースのソース\n")
+        self.git("add", "-A")
+        self.git("commit", "--quiet", "-m", "init")
+        setup = self.run_setup("--mode", "enable")
+        linted = run_ccnavi(
+            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
+            input="",
+            env=clean_env(),
+        )
+
+        details = [
+            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
+        ]
+
+        self.assertEqual(len(details), 1, linted.stdout)
+        self.assertIn(
+            "`git rm --cached 'projects/it'\\''s' projects/lib 'projects/my lib'`", details[0]
+        )
+        self.assertIn(details[0], setup.stdout)
+
 
 class KeepsWhatItFinds(SetupTest):
     def test_running_twice_changes_nothing(self):

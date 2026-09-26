@@ -972,6 +972,38 @@ report_places_done() {
 # 知らせるだけで、止めず、終了コードも変えない。導入の不足ではないので「揃っていない」にも
 # 数えない。索引も .gitignore も変えない（git rm --cached を打つのも /projects/ を足すのも人）。
 #
+# 案内のコマンドに載せるパスを、sh で 1 語として読める綴りにして標準出力に出す（改行は付けない）。
+# sh が割る・展開する文字を含まなければそのまま、含めば '…' で囲み、中の ' は '\'' に置く。
+# 文字の集合と綴りは ccnavi/lint.py の _SH_SPECIAL・_sh_word と同じ。変えるなら 2 か所を直す。
+sh_word() {
+	w=$1
+	q="'"
+	case "$w" in
+	*' '* | *"$tab"* | *"$q"* | *'"'* | *\\* | *'$'* | *'`'* | *'!'* | *'*'* | *'?'* | \
+		*'['* | *']'* | *'('* | *')'* | *'{'* | *'}'* | *'<'* | *'>'* | *'|'* | *'&'* | \
+		*';'* | *'#'* | *'~'*) ;;
+	*)
+		printf '%s' "$w"
+		return 0
+		;;
+	esac
+	out=""
+	while :; do
+		case "$w" in
+		*"$q"*)
+			head=${w%%"$q"*}
+			out=$out$head$q\\$q$q
+			w=${w#*"$q"}
+			;;
+		*)
+			out=$out$w
+			break
+			;;
+		esac
+	done
+	printf "'%s'" "$out"
+}
+
 # 標準入力に `git ls-files -s` の行（`<mode> <oid> <stage><タブ><path>`）を受ける。
 # 表示に使うだけなので -z は使わない（bash 3.2・BSD の道具で読める形）。
 projects_notice_of() {
@@ -995,10 +1027,10 @@ projects_notice_of() {
 			if [ -z "$first_link" ]; then
 				first_link=$path
 				links_code="\`$path\`"
-				links_args=$path
+				links_args=$(sh_word "$path")
 			else
 				links_code="${links_code}、\`${path}\`"
-				links_args="$links_args $path"
+				links_args="$links_args $(sh_word "$path")"
 			fi
 			;;
 		*)

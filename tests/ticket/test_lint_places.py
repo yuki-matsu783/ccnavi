@@ -450,6 +450,59 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
         details = [p["detail"] for p in self.lint()]
         self.assertFalse(any(NOT_IGNORED in d for d in details), details)
 
+    # ---- 空白を含む gitlink
+
+    def test_a_gitlink_with_a_space_is_quoted_in_the_rm_cached_command(self):
+        """`git rm --cached` に載せるパスは、sh で割れる文字を含むときだけ `'…'` で囲む。
+
+        囲まないと `git rm --cached projects/my lib` になり、`projects/my` と `lib` の 2 つを
+        指すコマンドを案内してしまう。名指し（`、` 区切りのほう）は囲まない。
+        """
+        write(os.path.join(self.ws, "projects", "foo.txt"), "ワークスペース自身のソース\n")
+        self.forget("my lib", "app")
+        self.assertIn("projects/my lib", self.indexed())
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        detail = found[0]["detail"]
+        self.assertIn("`projects/app`、`projects/my lib`", detail)
+        self.assertIn("`git rm --cached projects/app 'projects/my lib'`", detail)
+
+    def test_added_by_mistake_with_a_space_still_names_the_whole_place(self):
+        """gitlink だけのときの `git rm -r --cached projects` はパスを並べないので囲まない。"""
+        self.forget("my lib")
+
+        found = self.about_projects()
+
+        self.assertEqual(len(found), 1, found)
+        detail = found[0]["detail"]
+        self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
+        self.assertIn("`projects/my lib`", detail)
+        self.assertIn("`git rm -r --cached projects`", detail)
+
+
+class ShWordTest(unittest.TestCase):
+    """案内のコマンドに載せるパスの綴り（`lint._sh_word`）。
+
+    導入スクリプトの `sh_word` と同じ綴りにする（`tests/sh/test_setup.py` が両方を比べる）。
+    """
+
+    def test_spelling(self):
+        from ccnavi.lint import _sh_word
+
+        cases = {
+            "projects/lib": "projects/lib",
+            "projects/my-lib_2.x": "projects/my-lib_2.x",
+            "projects/日本語": "projects/日本語",
+            "projects/my lib": "'projects/my lib'",
+            "projects/a$b": "'projects/a$b'",
+            "projects/it's": "'projects/it'\\''s'",
+        }
+        for path, want in cases.items():
+            with self.subTest(path=path):
+                self.assertEqual(_sh_word(path), want)
+
 
 if __name__ == "__main__":
     unittest.main()

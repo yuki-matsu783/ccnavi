@@ -1109,6 +1109,24 @@ def _index_under(root: str, rel: str) -> tuple[str, list[str]] | None:
     return first_file, links
 
 
+# sh が語を割る・展開する文字。案内に載せるパスがこれを含むときだけ `'…'` で囲む
+# （`_sh_word`）。導入スクリプト（scripts/ccnavi-setup.sh の sh_word）が同じ集合を持つ。
+_SH_SPECIAL = frozenset(" \t\n'\"\\$`!*?[](){}<>|&;#~")
+
+
+def _sh_word(path: str) -> str:
+    """案内のコマンドに載せるパスを、sh で 1 語として読める綴りにする。
+
+    割れる文字（`_SH_SPECIAL`）を含まなければそのまま（`projects/lib`）。含めば `'…'` で囲み、
+    中の `'` は `'\\''` に置く（`projects/my lib` → `'projects/my lib'`、
+    `projects/it's` → `'projects/it'\\''s'`）。英数字以外でも、日本語のように sh で割れない
+    文字は囲まない。導入スクリプトの sh_word と 1 字違わず同じ綴りにする。
+    """
+    if not any(c in _SH_SPECIAL for c in path):
+        return path
+    return "'" + path.replace("'", "'\\''") + "'"
+
+
 def _in_index(root: str, rel: str) -> str | None:
     """置き場が索引に載っているなら、その苦情の文面。載っていなければ None（設計 §4.1・§4.2）。
 
@@ -1145,7 +1163,7 @@ def _in_index(root: str, rel: str) -> str | None:
             text += (
                 f"。索引には入れ子のリポジトリ（{named}）も載っている。"
                 "ccnavi のプロジェクトとして使うなら、改名の前に"
-                f" `git rm --cached {' '.join(links)}` で索引から外し、"
+                f" `git rm --cached {' '.join(_sh_word(p) for p in links)}` で索引から外し、"
                 f"改名のあとで `{rel}/` の下へ戻す"
             )
         return text
