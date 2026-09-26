@@ -206,7 +206,7 @@ Linux なら `dist/ccnavi/ccnavi`。onefile は起動のたびにランタイム
 名指しして `--force` を付けたときだけで、名指ししていない値はそのままにする。
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と
-同じ値で書く。`CCNAVI_MODE` が `dry-run` のうちは、この 2 つも `dry-run` に落ちる（「動作モード」の節）。
+同じ値で書く。`CCNAVI_MODE` が `dry-run` のうちは、この 2 つも `dry-run` になる（「動作モード」の節）。
 `enable` へ切り替える前に、記録の `would-restore` で何が戻るはずだったかを確かめられる。
 `dry-run` で入れたままだとこの 2 つも `dry-run` のまま残るので、`--mode enable` で打ち直すか 3 行を書き換える。
 
@@ -303,7 +303,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
 | `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）はこの env でも動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。`--project-home` も同じ。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、標準エラーに出す |
-| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く。ADR-0080）。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` に倒して `--lint` が error にする |
+| `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く。ADR-0080）。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
 `${CLAUDE_PROJECT_DIR}` は hook の `command` では展開されるが `env` では展開されない。
@@ -476,12 +476,12 @@ allow:
 - 読むのは元リポジトリに checkout されている版だけ。ワークツリーで層を直しても、統合されるまで効かない。
   `--lint` が「ワークツリーにしかないファイル」を warn で言う。承認済みの領域（`.ccnavi/approved/` の承認済みチケット・
   マーカー・子の記録・フロー）は数えない。そこは親のワークツリーの版が読まれる
-- 無い層は空。壊れている層も空として扱い、記録に層の名前が残り、`--lint` が error にする。組み込みの既定へは
-  落ちない。共通層のルール自身が読めないときだけ組み込みの既定に落ち、そのとき層は足さない
+- 無い層は空。壊れている層も空として扱い、記録に層の名前が残り、`--lint` が error にする。組み込みの既定は
+  使わない。共通層のルール自身が読めないときだけ組み込みの既定を使い、そのとき層は足さない
 - id には層の名前が付く。共通層は裸の `id`、自身の層は `self:id`、プロジェクトは `<名前>:id`。記録と文面がこの形で出す
 - 同じ宣言の重複は 1 本にまとめる。裸の `id` が同じで全欄（`{root}` を置き換えた後）が一致する定義は、後ろの層のものを
   捨て、`--lint` が info で言う
-- 同じ `id` で中身が違うルールは両方効き、`--lint` が warn で言う。`deny` と `ask` は増える側に倒れる。リスクの配点も両方を数え、後ろの層の項目は
+- 同じ `id` で中身が違うルールは両方効き、`--lint` が warn で言う。`deny` と `ask` は増えるほうになる。リスクの配点も両方を数え、後ろの層の項目は
   `<層>:<id>` と名乗る。フェーズの種類は両方効かせられないので、`--lint` が error にしてその層を空として扱う
 - 共通層は配る定義で、正本は各プロジェクト。プロジェクト向けの親チケットに着手するとき、共通層にあるファイルごとに
   プロジェクトの `.ccnavi/config/` と比べ、違えば共通層で上書きする（共通層に無いファイルは消さない）。上書きで消える識別子は
@@ -555,12 +555,12 @@ allow:
 - 数えるのは「そのルールが当たった回数」。同じファイルを 5 回直せば 5。`Bash` を `match` に書かない限り
   シェルやビルドが書いたぶんは数えない
 - 刻みは `SessionStart`（起動・再開・compact の後）で 0 に戻る。`additionalContext` に添えたときは届くのが
-  遅れ（戻りが続けば一度も届かない）、`additionalContextOnce` に添えたときはセッション全体で 1 度より多く届く。
+  遅れ（N 回に届く前に 0 に戻ることが続けば一度も届かない）、`additionalContextOnce` に添えたときはセッション全体で 1 度より多く届く。
   正確に N 回ごとを守る欄ではない
 - `additionalContextOnce` に添えると、1 回目ではなく N 回目に届く。「1 回目に言いたいこと」も要るならルールを 2 件に分ける
 - 数えは文脈ごと（セッションと、サブエージェントならその起動）で、`logs/state/once-*.json` に
   「鍵 → 回数」で残る。控えの置き場が無い（`--state ""`）なら刻まず毎回届く
-- `every: 1` には `--lint` は何も言わない。`0`・負・整数でない値は error で名指しし、判定は 1 に倒して通す。
+- `every: 1` には `--lint` は何も言わない。`0`・負・整数でない値は error で名指しし、判定は 1 として扱って通す。
   渡すものが 1 つも無い `every` は warn
 
 ### ファイルの本文を渡す
@@ -638,7 +638,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq 
 ```
 
 確認できる者が居ないモードでは、ask を返しても誰も答えないまま通るので通さない（REQ-PRE-08）。
-知らないモードの名前は確認に倒す。
+知らないモードの名前は確認にする。
 
 `CCNAVI_GUARD_UNWATCHED=disable` と書いた層では、`dontAsk` と `bypassPermissions` でも判定を返さず、
 そのモードの取り決めに委ねる。`--lint` が「切れている」と warn で言う。
@@ -825,7 +825,7 @@ perl や python は縮退の対象に入れていない（`perl -pi -e 's/git pu
 
 ### 書き直しを求める形は止めて案内する
 
-書き直す道が必ずあって、読み分けると規則が増えるか、読み違えると素通りに倒れる形は、
+書き直す道が必ずあって、読み分けると規則が増えるか、読み違えると素通りになる形は、
 読み解かずにルールより先に形ごとの理由コードで止め、書き直し方を返す（[ADR-0047](docs/adr/0047-rewrite-forms.md)）。
 `sh -c`・`eval`・`xargs`・`find -exec` は止めずに、縮退と「実行役のコマンド」の読みで扱う。
 
@@ -855,7 +855,7 @@ perl や python は縮退の対象に入れていない（`perl -pi -e 's/git pu
 （`c=git; $c push origin main`）。コード `DENY_COMMAND_NAME_EXPANSION` で止める。
 前に置いた代入とリダイレクト（`FOO=1 >/dev/null $c`、`{fd}>/dev/null $c`）の後ろも、実行役のコマンドの中
 （`env $c`・`sudo $c`・`sh $SCRIPT`）も見る。`sh -c "$c"` と `eval "$(…)"` の文字列の中は見ず、
-読み切れないものとして確認に落とす。
+読み切れないものとして確認にする。
 
 | 止まる書き方 | 通る書き方 |
 |---|---|
@@ -890,7 +890,7 @@ Markdown など）、単一引用で包むか、`` \` `` と書くか、`--body-
 
 ### 実行役のコマンドが中で実行するコマンドにも当てる
 
-`env rm -f x` の `env` のように、別のコマンドを実行することが仕事のコマンドがある（実行役のコマンド）。
+`env rm -f x` の `env` のように、別のコマンドを走らせるためのコマンドがある（実行役のコマンド）。
 ルールの多くは `(^|\x00)rm` のようにコマンドの先頭に固定して書くので、ccnavi は実行役のコマンドを 1 枚ずつ外し、
 中で実行されるコマンドにも、止める側のルール（`deny` と `ask`）とサブエージェントの禁止を当てる。
 
