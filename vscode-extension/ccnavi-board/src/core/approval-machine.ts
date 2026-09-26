@@ -241,7 +241,7 @@ function opened(
     if (!input.tickets.every((id) => pending.has(id))) {
       return stay(
         state,
-        { kind: "warn", text: "チケット管理の表示が古く、承認待ちが変わっています。チケット管理画面を更新したので、もう一度承認してください" },
+        { kind: "warn", text: "表示が古く、承認待ちが変わっています。チケット管理画面を更新したので、もう一度承認してください" },
         { kind: "refresh" },
       );
     }

@@ -14,7 +14,7 @@
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json` の `layers[]`）を使い、拡張は組まない。
  *
- * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、ワークスペースなら `--rules`、
+ * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら `--rules`、
  * ワークスペースかプロジェクトの設定なら `--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が `self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う。
@@ -140,7 +140,7 @@ function samplesSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("samplesPath", DEFAULT_SAMPLES);
 }
 
-/** `ccnaviBoard.openRules` の本体。引数なしはワークスペースのルール */
+/** `ccnaviBoard.openRules` の本体。引数なしは共通の設定のルール */
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
