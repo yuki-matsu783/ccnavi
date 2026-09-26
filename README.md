@@ -3,7 +3,7 @@
 Claude Code のツール呼び出しを hook で止め、止めた理由と代わりに取る手段を返す。
 
 用語は [CONTEXT.md](CONTEXT.md)、要求は [requirements.md](requirements.md)、設計は
-[ccnavi.md](ccnavi.md)、判断の理由は [docs/adr/](docs/adr/README.md) にある。
+[ccnavi.md](ccnavi.md)、判断の理由と経緯は [docs/adr/](docs/adr/README.md) にある。
 「承認済みチケット」「マーカー」「ワークツリー」「直接作業」のような呼び名は用語集で定義している。
 
 ## 導入
@@ -302,7 +302,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `CCNAVI_TICKETS_APPROVED` | 承認済みチケットとフェーズのマーカーの置き場。各ツリーのルートからの相対。既定は `.ccnavi/approved`（ccnavi ディレクトリの下）。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く。空文字は受けず、既定の置き場に戻る（切るのは `CCNAVI_TICKET_CONTROL`。空なら `--lint` が言う） |
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。全体ルールは全プロジェクトが使い、チケットまで使うかをここで決める。`disable` なら `--approve` と `ticket` / `review` の副命令は動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_PROJECTS` | プロジェクトの置き場（設計 11）。ワークスペースルート（Claude Code を開いた場所）からの相対。既定は `projects`。直下で `.git` を持つディレクトリがプロジェクトになる。空文字にすると数えず、共通層とワークスペース自身の層だけで判定する |
-| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）はこの env でも動かない。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。`--project-home` も同じ。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、標準エラーに出す |
+| `CCNAVI_PROJECT_HOME` | ccnavi ディレクトリ（「ルールは 3 層の和で当たる」）。各 git プロジェクトルート（`.git` のある場所）からの相対。既定は `.ccnavi`。その下の `config/{rules,phases,risks}.yml` が 1 つの層の 3 本になり、`scripts/` が配点の `script:` の置き場になる。動かせるのは ccnavi ディレクトリの名前だけで、`config/` と `scripts/` と 3 本のファイル名は固定。共通層の置き場（`.ccnavi/common/`）は ccnavi ディレクトリの名前をどう変えても動かない（この env でも `--project-home` でも）。別の場所を指せるのは `--rules` / `--phases` / `--risk` のフラグだけで、それも診断（`--lint` / `--test` / `--test-samples` / `--explain`）に限る（ADR-0067）。`--project-home` も同じ。hook からの判定と `ticket` / `review` の副命令に渡すと落とし、標準エラーに出す |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、シェルから ccnavi の実行ファイルを `--approve` / `--reviewed` / `--close-early` / `ticket …` / `review …` 付きで打つ形を止め（`DENY_TICKET_APPROVAL_CLI`）、`--approve` と `--reviewed` と `--close-early` は標準入力が端末であることを求める。エージェントのコマンド行にこの変数の名前を（読むだけの形のほかで）書く形と、`--guard-ticket-approval` に `enable` 以外を渡す形も同じ理由コードで止める（表示・検索の道具だけのコマンドは除く。ADR-0080）。テストや端末の無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
 
