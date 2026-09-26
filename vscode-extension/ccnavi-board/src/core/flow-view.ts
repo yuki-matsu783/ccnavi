@@ -15,6 +15,7 @@
  */
 import type { AppearanceMessage } from "./appearance.js";
 import { asFlowDoc, type FlowDoc } from "./flow-doc.js";
+import type { LintFlowCandidates } from "./lintmodel.js";
 import type { BoardJson, FlowJson } from "./model.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
@@ -100,6 +101,20 @@ export function flowButtonLabel(flow: FlowJson): string {
 
 // ---- 画面に見せる形
 
+/**
+ * 実行ファイル（`--lint --json --flow`）がフローについて言ったこと。画面は判定し直さず、そのまま見せる。
+ */
+export interface FlowChecks {
+  /** `(flow)` の warn（線の構造・名前の綴り）。一時ファイルのパスは対象のファイルの綴りに直してある */
+  readonly warns: readonly string[];
+  /**
+   * `SubagentStart` で担当に渡る手順の行。null は並べられなかった。無ければ実行ファイルが古くて答えに欄が無い
+   */
+  readonly rendered?: readonly string[] | null;
+  /** フローで選べるサブエージェントとスキルの名前。無ければ実行ファイルが古い */
+  readonly candidates?: LintFlowCandidates;
+}
+
 export interface FlowPage {
   readonly root: string;
   readonly ticket: string;
@@ -122,6 +137,8 @@ export interface FlowPage {
    * `doc`（読み込んだ中身）と比べて未保存を立てる
    */
   readonly draft?: FlowDoc;
+  /** 開くときに実行ファイルが `doc` について言ったこと */
+  readonly checks?: FlowChecks;
 }
 
 export type FlowData =
@@ -138,6 +155,8 @@ export type ToFlow =
   /** 頼んだ往復が起きなかった（人が確認をやめた）。画面は欄を戻す */
   | { readonly type: "cancelled" }
   | { readonly type: "tour" }
+  /** 頼まれた確かめ（`check`）の答え。`seq` は頼んだときの番号。確かめられなければ `error` */
+  | { readonly type: "checked"; readonly seq: number; readonly checks?: FlowChecks; readonly error?: string }
   | AppearanceMessage;
 
 /** 画面 → 拡張ホスト。受け側は `asFlowMessage` で形を確かめてから使う */
@@ -151,6 +170,8 @@ export type FlowMessage =
   | { readonly type: "draft"; readonly doc: FlowDoc | null }
   /** 保存の前に差分を確かめるか（設定に書く） */
   | { readonly type: "reviewSave"; readonly value: boolean }
+  /** 編集中の写しを実行ファイルに確かめさせる（渡る手順・warn・候補を取り直す）。書きはしない */
+  | { readonly type: "check"; readonly seq: number; readonly doc: FlowDoc }
   | { readonly type: "tourDone" };
 
 /**
@@ -160,7 +181,7 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; dirty?: unknown; doc?: unknown; value?: unknown };
+  const m = message as { type?: unknown; dirty?: unknown; doc?: unknown; value?: unknown; seq?: unknown };
   switch (m.type) {
     case "ready":
     case "openFile":
@@ -180,6 +201,10 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
       }
       const doc = asFlowDoc(m.doc);
       return doc === undefined ? undefined : { type: "draft", doc };
+    }
+    case "check": {
+      const doc = asFlowDoc(m.doc);
+      return doc === undefined || typeof m.seq !== "number" || !Number.isFinite(m.seq) ? undefined : { type: "check", seq: m.seq, doc };
     }
     case "reviewSave":
       return typeof m.value === "boolean" ? { type: "reviewSave", value: m.value } : undefined;

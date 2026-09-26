@@ -1,5 +1,5 @@
 /*
- * 右の欄（`Inspector.tsx`）。選んだノードか線の中身。
+ * 右の欄（`Inspector.tsx`）。選んだノードか線の中身。その下の担当に渡る手順のプレビュー（`Preview.tsx`）も。
  */
 .inspector {
   border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 8px 10px;
@@ -24,3 +24,17 @@ pre.flow-raw {
   font-family: var(--vscode-editor-font-family); font-size: .85em;
   border: 1px solid var(--vscode-panel-border); border-radius: 3px;
 }
+/* 右の列（欄と、担当に渡る手順のプレビュー） */
+.flow-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.flow-preview { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 6px 10px; }
+.flow-preview summary { cursor: pointer; font-weight: 600; }
+.flow-preview p { margin: 4px 0; }
+.flow-preview .error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; overflow-wrap: anywhere; }
+pre.flow-rendered {
+  margin: 6px 0 0; padding: 6px; max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-family: var(--vscode-editor-font-family); font-size: .85em;
+  border: 1px solid var(--vscode-panel-border); border-radius: 3px;
+}
+/* 候補の名前の出どころ（組み込み・プロジェクト・候補に無い） */
+.inspector .candidate-source { font-size: .85em; color: var(--vscode-descriptionForeground); }
+.inspector .candidate-source.missing { color: var(--vscode-editorWarning-foreground); }

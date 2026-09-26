@@ -51,6 +51,7 @@ import {
   asFlowMessage,
   flowTargetOf,
   lockFromFailure,
+  type FlowChecks,
   type FlowData,
   type FlowLock,
   type FlowMessage,
@@ -79,6 +80,8 @@ interface Loaded {
   readonly doc: FlowDoc;
   /** 画面に見せる綴り（ワークスペースルートからの相対。外なら絶対） */
   readonly shown: string;
+  /** 開くときに実行ファイルが言ったこと（warn・渡る手順・候補）。ファイルが無ければ無い */
+  readonly checks?: FlowChecks;
 }
 
 /** 未保存のまま閉じた画面から戻す写し。読み込んだときのファイルの様子が今と同じときだけ戻す */
@@ -256,7 +259,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (doc === undefined) {
     throw refuse("ノードの並び（id が文字列のノード）が取れないので描けない");
   }
-  return { target, exists: true, mtimeMs, doc, shown };
+  return { target, exists: true, mtimeMs, doc, shown, checks: verdict.checks };
 }
 
 function registerPanelHandlers(current: PanelState): void {
@@ -427,6 +430,7 @@ function show(current: PanelState): void {
       doc: loaded.doc,
       lock: current.lock,
       reviewSave: reviewSetting(),
+      ...(loaded.checks === undefined ? {} : { checks: loaded.checks }),
       ...(current.shownDraft === undefined ? {} : { draft: current.shownDraft }),
     },
   });
@@ -578,12 +582,31 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
     case "save":
       await save(current, message.doc);
       return;
+    case "check":
+      await check(current, message.seq, message.doc);
+      return;
     default: {
       const unhandled: never = message;
       void unhandled;
       return;
     }
   }
+}
+
+/**
+ * 編集中の写しを実行ファイルに確かめさせ、言ったこと（warn・渡る手順・候補）を画面に返す。書きはしない。
+ * 読み直しの後に届いた答えは画面が番号（`seq`）で捨てる
+ */
+async function check(current: PanelState, seq: number, doc: FlowDoc): Promise<void> {
+  const loaded = current.loaded;
+  if (loaded === undefined) {
+    return;
+  }
+  const verdict = await lintText(current.folder.uri.fsPath, current.tmpDir, serializeFlow(doc), loaded.shown);
+  if (!alive(current)) {
+    return;
+  }
+  current.host.post((verdict.ok ? { type: "checked", seq, checks: verdict.checks } : { type: "checked", seq, error: verdict.error }) satisfies ToFlow);
 }
 
 async function save(current: PanelState, doc: FlowDoc): Promise<void> {

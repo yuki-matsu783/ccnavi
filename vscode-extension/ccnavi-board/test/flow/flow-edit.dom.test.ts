@@ -1,6 +1,6 @@
 /**
  * フロー編集画面（React）の編集の道具を happy-dom で動かす。元に戻す・やり直す、写す・貼る・複製、
- * ミニマップ、保存前の差分の一覧、未保存のまま閉じた編集を戻して開くこと、を見る。
+ * ミニマップ、保存前の差分の一覧、未保存のまま閉じた編集を戻して開くこと、実行ファイルの答え（渡る手順・warn・候補）を見る。
  *
  * 線を引く途中の断り（`isValidConnection`）はドラッグが要るので、ここでは見ない（規則は `flow-edit-ops.test.ts`
  * の `canConnect`、図の上は README の手動確認）。
@@ -8,8 +8,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { HTMLButtonElement, HTMLInputElement, HTMLTextAreaElement } from "happy-dom" with { "resolution-mode": "import" };
-import { addNode, renameNode, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
-import { lockedReason } from "../../src/core/flow-view.js";
+import { addNode, removeNode, renameNode, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
+import { lockedReason, type FlowChecks } from "../../src/core/flow-view.js";
 import type { DomPage } from "../helpers/dom.js";
 import { openFlow, savedDoc } from "../helpers/flow.js";
 
@@ -307,5 +307,133 @@ test("CB-D130 閉じる前の編集（draft）が渡れば、それを開いて�
     assert.deepEqual(dom.posted.filter((m) => m.type === "draft").pop(), { type: "draft", doc: null });
   } finally {
     await dom.close();
+  }
+});
+
+/** 確かめ直しを頼むまでの間（`App.tsx` の CHECK_MS）より少し長く待つ */
+async function waitCheck(dom: DomPage): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  await dom.settle();
+}
+
+function checksAsked(dom: DomPage): { seq: number; doc: FlowDoc }[] {
+  return dom.posted.filter((m) => m.type === "check").map((m) => ({ seq: m.seq as number, doc: m.doc as FlowDoc }));
+}
+
+const SHOWN = ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml";
+
+test("CB-D131 実行ファイルの warn は画面の注意と並べて出し、開始が無いことは実行ファイルの答えに寄せて 1 度だけ言う。渡る手順はプレビューに出す", async () => {
+  const checks: FlowChecks = {
+    warns: [`${SHOWN}: start が無い（どこから始めるかが決まらない）`],
+    rendered: ["1. [prompt] プロンプト", "2. [end] 終了"],
+  };
+  const doc = removeNode(three(), "start");
+  const dom = await openFlow({ doc, checks });
+  try {
+    const items = dom.all("#flow-notices li");
+    assert.deepEqual(items.filter((li) => li.getAttribute("data-source") === "exe").map((li) => li.textContent), checks.warns);
+    assert.ok(!items.some((li) => /開始（start）のノードが無い/.test(li.textContent ?? "")), "画面の注意と二重に出さない");
+    assert.equal(dom.one("#flow-preview pre.flow-rendered").textContent, "1. [prompt] プロンプト\n2. [end] 終了");
+    assert.equal(dom.all("#flow-preview-checking").length, 0);
+    // 開いたままでは確かめ直さない（答えが指す写しのまま）
+    await waitCheck(dom);
+    assert.deepEqual(checksAsked(dom), []);
+    // 直すと、止まってから確かめ直しを頼む。その間は前の答えを出したまま、そう言う
+    dom.click(dom.one('[data-action="add-node"][data-type="skill"]'));
+    await dom.settle();
+    assert.equal(dom.all("#flow-preview-checking").length, 1);
+    await waitCheck(dom);
+    const asked = checksAsked(dom);
+    assert.equal(asked.length, 1);
+    assert.equal(asked[0].doc.nodes.length, 3);
+    // 古い番号の答えは捨てる
+    await dom.send({ type: "checked", seq: asked[0].seq - 1, checks: { warns: ["古い"], rendered: [] } });
+    assert.equal(dom.all("#flow-preview-checking").length, 1);
+    assert.doesNotMatch(dom.one("#flow-notices").textContent ?? "", /古い/);
+    // 答えが届く。並べられなければその理由を言う
+    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [`${SHOWN}: start が無い（どこから始めるかが決まらない）`, `${SHOWN}: start から届かないノードがある: スキル`], rendered: null } });
+    assert.equal(dom.all("#flow-preview-checking").length, 0);
+    assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
+    assert.equal(dom.all("#flow-preview pre.flow-rendered").length, 0);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /並べられなかった/);
+    // 確かめられなければ理由を出し、前の答えは残す
+    dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
+    await dom.settle();
+    await waitCheck(dom);
+    const again = checksAsked(dom);
+    await dom.send({ type: "checked", seq: again[again.length - 1].seq, error: "実行ファイル（--lint --flow）が読めないと言った: …" });
+    assert.match(dom.one("#flow-preview-error").textContent ?? "", /読めないと言った/);
+    assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D132 答えの無いフロー（まだ無いファイル）は開いてすぐ確かめを頼む。古い実行ファイル（rendered が無い）ならそう言う", async () => {
+  const dom = await openFlow({ exists: false });
+  try {
+    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルに確かめていない/);
+    await waitCheck(dom);
+    const asked = checksAsked(dom);
+    assert.equal(asked.length, 1);
+    await dom.send({ type: "checked", seq: asked[0].seq, checks: { warns: [] } });
+    assert.match(dom.one("#flow-preview").textContent ?? "", /実行ファイルが古いので、渡る手順を出せない/);
+    // 答えが届いても、開始が 2 つあることは画面が言う（実行ファイルは言わない）
+    dom.click(dom.one('[data-action="add-node"][data-type="start"]'));
+    await dom.settle();
+    assert.match(dom.one("#flow-notices").textContent ?? "", /開始（start）のノードが 2 つある/);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D133 サブエージェントの種類とスキルの名前は候補から選べ、組み込み・プロジェクト・候補に無い、を添える。候補が無ければふつうの欄", async () => {
+  let doc = three();
+  doc = addNode(doc, "subAgent", { x: 500, y: 300 }).doc;
+  doc = addNode(doc, "skill", { x: 700, y: 300 }).doc;
+  const checks: FlowChecks = {
+    warns: [],
+    rendered: [],
+    candidates: { agents: [{ name: "Plan", source: "builtin" }, { name: "reviewer", source: "project" }], skills: [{ name: "commit", source: "project" }] },
+  };
+  const dom = await openFlow({ doc, checks });
+  try {
+    dom.click(dom.one('.react-flow__node[data-id="subAgent-1"]'));
+    await dom.settle();
+    const field = (): HTMLInputElement => dom.one<HTMLInputElement>("#inspector input.f-builtInType");
+    assert.equal(field().getAttribute("list"), "flow-agent-candidates");
+    assert.deepEqual(
+      dom.all("#flow-agent-candidates option").map((o) => [o.getAttribute("value"), o.getAttribute("label")]),
+      [
+        ["Plan", "組み込み"],
+        ["reviewer", "プロジェクト（.claude/ の下）"],
+      ],
+    );
+    assert.equal(dom.all("#inspector .candidate-source").length, 0, "空なら何も添えない");
+    dom.type(field(), "reviewer");
+    await dom.settle();
+    assert.equal(dom.one("#inspector .candidate-source").getAttribute("data-source"), "project");
+    // 自由入力も残す。候補に無ければそう言う（止めはしない）
+    dom.type(field(), "my-agent");
+    await dom.settle();
+    assert.match(dom.one("#inspector .candidate-source.missing").textContent ?? "", /候補に無い/);
+    assert.equal(field().value, "my-agent");
+    // スキル
+    dom.click(dom.one('.react-flow__node[data-id="skill-1"]'));
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>("#inspector input.f-name[list]").getAttribute("list"), "flow-skill-candidates");
+    dom.type(dom.one<HTMLInputElement>("#inspector input.f-name[list]"), "commit");
+    await dom.settle();
+    assert.equal(dom.one("#inspector .candidate-source").textContent, "プロジェクト（.claude/ の下）");
+  } finally {
+    await dom.close();
+  }
+  const bare = await openFlow({ doc });
+  try {
+    bare.click(bare.one('.react-flow__node[data-id="subAgent-1"]'));
+    await bare.settle();
+    assert.equal(bare.one<HTMLInputElement>("#inspector input.f-builtInType").getAttribute("list"), null);
+  } finally {
+    await bare.close();
   }
 });

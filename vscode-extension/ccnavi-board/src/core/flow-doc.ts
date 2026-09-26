@@ -1092,8 +1092,11 @@ export function nesting(doc: FlowDoc): Nesting {
 
 /**
  * 図の上に出す注意。**当てはまるときだけ出す。** 良し悪しは決めない（保存は止めない）。
+ *
+ * 実行ファイル（`--lint --flow`）の warn と並べて出す。`exe` を真にすると、実行ファイルが同じことを言うもの
+ * （開始が無い。実行ファイルは「start が無い」と言う）は出さず、実行ファイルの答えに寄せる（二重に出さない）。
  */
-export function flowNotices(doc: FlowDoc): readonly string[] {
+export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = {}): readonly string[] {
   const out: string[] = [];
   const { depth, cyclic } = nesting(doc);
   if (depth > NEST_ALLOWED) {
@@ -1107,7 +1110,9 @@ export function flowNotices(doc: FlowDoc): readonly string[] {
   }
   const starts = doc.nodes.filter((node) => nodeType(node) === "start").length;
   if (starts === 0) {
-    out.push("開始（start）のノードが無い。担当のサブエージェントは先頭のノードから読む");
+    if (options.exe !== true) {
+      out.push("開始（start）のノードが無い。担当のサブエージェントは先頭のノードから読む");
+    }
   } else if (starts > 1) {
     out.push(`開始（start）のノードが ${starts} つある。案内はどの開始からも辿って並べる`);
   }

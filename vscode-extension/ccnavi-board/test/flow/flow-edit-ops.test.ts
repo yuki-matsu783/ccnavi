@@ -13,6 +13,7 @@ import {
   connectionsOf,
   copyNodes,
   duplicateNodes,
+  flowNotices,
   groupNodes,
   groupOf,
   parseFlow,
@@ -263,4 +264,19 @@ test("CB-T265 画面から届く控えの写しと、保存前の確かめの設
   assert.equal(asFlowMessage({ type: "draft" }), undefined);
   assert.deepEqual(asFlowMessage({ type: "reviewSave", value: false }), { type: "reviewSave", value: false });
   assert.equal(asFlowMessage({ type: "reviewSave", value: "no" }), undefined);
+});
+
+test("CB-T267 確かめ直しの頼みは番号と読める写しがあるときだけ受ける。実行ファイルの答えがあれば、開始が無いという画面の注意は出さない", () => {
+  const doc = templateFlow("i0001-01", "調査");
+  assert.deepEqual(asFlowMessage({ type: "check", seq: 3, doc }), { type: "check", seq: 3, doc });
+  assert.equal(asFlowMessage({ type: "check", seq: "3", doc }), undefined);
+  assert.equal(asFlowMessage({ type: "check", seq: Number.NaN, doc }), undefined);
+  assert.equal(asFlowMessage({ type: "check", seq: 1, doc: { nodes: 1 } }), undefined);
+  // 開始が無い: 画面だけなら画面が言い、実行ファイルの答えがあれば（実行ファイルが「start が無い」と言う）言わない
+  const noStart = removeNode(doc, "start");
+  assert.ok(flowNotices(noStart).some((n) => /開始（start）のノードが無い/.test(n)));
+  assert.ok(!flowNotices(noStart, { exe: true }).some((n) => /開始（start）のノードが無い/.test(n)));
+  // 開始が 2 つは実行ファイルが言わないので、答えがあっても画面が言う
+  const twoStarts = addNode(doc, "start", { x: 0, y: 400 }).doc;
+  assert.ok(flowNotices(twoStarts, { exe: true }).some((n) => /開始（start）のノードが 2 つある/.test(n)));
 });

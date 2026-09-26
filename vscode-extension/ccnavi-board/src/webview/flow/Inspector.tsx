@@ -4,9 +4,13 @@
  * 直すのは `core/flow-doc.ts` の関数で作った写しで、**触った欄以外は元のまま**（知らない欄を落とさない）。
  * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（ファイルと同じ YAML の形で見せる）。
  * グループは名前だけ直せて、解く（中のノードは残して枠だけ消す）か消す（同じく中のノードは残す）。
+ * サブエージェントの種類とスキルの名前は、実行ファイルが挙げた候補（`candidates`）から選べる。打って決めても
+ * よく（利用者・プラグインのものは候補に無い）、候補のどれか（組み込み・プロジェクト）か、候補に無いかを添える。
  * 欄に打った字は、どの欄かを添えて返す（呼び手が同じ欄への打ち込みを元に戻す 1 件にまとめる）。フォーカスが外れたら `onSeal`。
  */
 import type { JSX } from "react";
+
+import type { LintFlowCandidate, LintFlowCandidates } from "../../core/lintmodel.js";
 
 import {
   addBranch,
@@ -53,17 +57,29 @@ export interface InspectorProps {
   /** 欄からフォーカスが外れた。打ち込みのまとまりを区切る */
   readonly onSeal?: () => void;
   readonly onSelect: (selection: Selection | undefined) => void;
+  /** 実行ファイルが挙げた、選べるサブエージェントとスキルの名前。無ければ候補を出さない */
+  readonly candidates?: LintFlowCandidates;
+}
+
+/** 候補の出どころの呼び名 */
+export function sourceLabel(source: string): string {
+  return source === "builtin" ? "組み込み" : source === "project" ? "プロジェクト（.claude/ の下）" : source;
+}
+
+/** 名前が候補のどれか。無ければ undefined */
+function candidateOf(list: readonly LintFlowCandidate[], name: string): LintFlowCandidate | undefined {
+  return list.find((c) => c.name === name);
 }
 
 function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect }: InspectorProps): JSX.Element {
+export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect, candidates }: InspectorProps): JSX.Element {
   if (selected?.kind === "node") {
     const node = doc.nodes.find((n) => n.id === selected.id);
     if (node !== undefined) {
-      return <NodeFields doc={doc} node={node} readOnly={readOnly} onChange={onChange} onSeal={onSeal} onSelect={onSelect} />;
+      return <NodeFields doc={doc} node={node} readOnly={readOnly} onChange={onChange} onSeal={onSeal} onSelect={onSelect} candidates={candidates} />;
     }
   }
   if (selected?.kind === "edge") {
@@ -125,7 +141,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect 
   );
 }
 
-function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc, typing?: string) => void; readonly onSeal?: () => void; readonly onSelect: (selection: Selection | undefined) => void }): JSX.Element {
+function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidates }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc, typing?: string) => void; readonly onSeal?: () => void; readonly onSelect: (selection: Selection | undefined) => void; readonly candidates?: LintFlowCandidates }): JSX.Element {
   const type = nodeType(node);
   const known = isEditableType(type);
   const group = isGroup(node);
@@ -142,6 +158,37 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect }: { reado
       )}
     </label>
   );
+  /** 候補から選べる欄。`list` は datalist の id。候補が無ければふつうの欄 */
+  const pickable = (key: string, label: string, list: readonly LintFlowCandidate[] | undefined, listId: string, placeholder: string): JSX.Element => {
+    const value = dataText(node, key);
+    const found = list === undefined ? undefined : candidateOf(list, value);
+    return (
+      <label className="field">
+        <span title={`data.${key}`}>{label}</span>
+        <input
+          type="text"
+          className={`f-${key}`}
+          value={value}
+          placeholder={placeholder}
+          disabled={readOnly}
+          list={list === undefined ? undefined : listId}
+          onChange={(event) => onChange(patchData(doc, node.id, { [key]: event.target.value }), `node:${node.id}:${key}`)}
+        />
+        {list !== undefined && (
+          <datalist id={listId}>
+            {list.map((c) => (
+              <option key={`${c.source}:${c.name}`} value={c.name} label={sourceLabel(c.source)} />
+            ))}
+          </datalist>
+        )}
+        {list !== undefined && value !== "" && (
+          <span className={found === undefined ? "candidate-source missing" : "candidate-source"} data-source={found?.source ?? "missing"}>
+            {found === undefined ? "候補に無い（利用者・プラグインのものなら気にしなくてよい）" : sourceLabel(found.source)}
+          </span>
+        )}
+      </label>
+    );
+  };
   return (
     <aside className="inspector" id="inspector" data-selected="node" data-type={type} onBlur={onSeal}>
       <h2>
@@ -162,7 +209,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect }: { reado
       {type === "subAgent" && (
         <>
           {text("description", "何を任せるか")}
-          {text("builtInType", "サブエージェントの種類", { placeholder: "general-purpose / Explore / Plan など" })}
+          {pickable("builtInType", "サブエージェントの種類", candidates?.agents, "flow-agent-candidates", "general-purpose / Explore / Plan など")}
           {text("prompt", "プロンプト", { area: true })}
         </>
       )}
@@ -184,7 +231,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect }: { reado
       {(type === "ifElse" || type === "switch") && text("evaluationTarget", "何で分けるか")}
       {type === "skill" && (
         <>
-          {text("name", "スキルの名前")}
+          {pickable("name", "スキルの名前", candidates?.skills, "flow-skill-candidates", "")}
           {text("description", "説明")}
         </>
       )}

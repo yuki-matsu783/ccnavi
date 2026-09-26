@@ -14,6 +14,10 @@
  * **写しを替えるのは `edit()` だけ。** 直す前の写しを履歴（`core/flow-history.ts`）に積んでから替える。
  * 「未保存」は、読み込んだ中身（`base`）と見比べて決める（`core/flow-diff.ts` の `sameFlow`）ので、
  * 元に戻して読み込んだときと同じ中身になれば消える。
+ *
+ * **実行ファイルが言ったこと（`FlowChecks`）は画面で作らない。** 開くときの答えは中身と一緒に届き、編集したら
+ * 止まってから（`CHECK_MS`）拡張ホストに確かめ直しを頼む（`check` → `checked`。書きはしない）。答えの
+ * warn は画面の注意と並べて出し、渡る手順は右の列のプレビュー、候補の名前は右の欄の選択肢に使う。
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -41,13 +45,14 @@ import {
   type PaletteType,
 } from "../../core/flow-doc.js";
 import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
-import type { FlowData, FlowLock, FlowPage, ToFlow } from "../../core/flow-view.js";
+import type { FlowChecks, FlowData, FlowLock, FlowPage, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { getState, setState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
 import { Inspector } from "./Inspector.js";
 import { post } from "./post.js";
+import { Preview } from "./Preview.js";
 import { SaveReview } from "./SaveReview.js";
 import { badgeOf } from "./text.js";
 
@@ -55,6 +60,8 @@ import { badgeOf } from "./text.js";
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
 /** 編集中の写しを拡張ホストへ控えさせるまでの間（打つたびに送らない） */
 const DRAFT_MS = 300;
+/** 編集が止まってから実行ファイルに確かめ直させるまでの間 */
+const CHECK_MS = 800;
 
 interface Status {
   readonly text: string;
@@ -161,6 +168,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   // 写したノード（画面の中の控え）と、同じ控えを何回貼ったか（貼るたびに少しずつずらす）
   const clip = useRef<{ readonly clip: FlowClip; pasted: number } | undefined>(undefined);
   const [hasClip, setHasClip] = useState(false);
+  // 実行ファイルが言ったこと。`checkedDoc` はその答えが指す写し、`checkSeq` は最後に頼んだ確かめの番号
+  const [checks, setChecks] = useState<FlowChecks | undefined>(() => pageOf(initial)?.checks);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState<string | undefined>(undefined);
+  const checkedDoc = useRef<FlowDoc | undefined>(pageOf(initial)?.checks === undefined ? undefined : pageOf(initial)?.doc);
+  const checkSeq = useRef(0);
+  // 頼んで答えを待っている
+  const checkPending = useRef(false);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -183,6 +198,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         setReview(undefined);
         setReviewSave(page?.reviewSave === true);
         setLock(page?.lock ?? NO_LOCK);
+        // 頼んでいた確かめの答えは捨てる（番号を進める）
+        checkSeq.current += 1;
+        checkedDoc.current = page?.checks === undefined ? undefined : page.doc;
+        checkPending.current = false;
+        setChecks(page?.checks);
+        setChecking(false);
+        setCheckError(undefined);
       } else if (message.type === "failed") {
         setBusy(false);
         setStatus({ text: String(message.message ?? ""), error: true });
@@ -195,6 +217,19 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       } else if (message.type === "cancelled") {
         setBusy(false);
         setStatus(undefined);
+      } else if (message.type === "checked") {
+        const answer = message as { seq?: unknown; checks?: FlowChecks; error?: string };
+        if (answer.seq !== checkSeq.current) {
+          return;
+        }
+        checkPending.current = false;
+        setChecking(false);
+        if (answer.checks !== undefined) {
+          setChecks(answer.checks);
+          setCheckError(undefined);
+        } else {
+          setCheckError(String(answer.error ?? ""));
+        }
       } else if (message.type === "tour") {
         requestTour();
       } else if (message.type === "appearance") {
@@ -245,7 +280,27 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setSelected((now) => (now?.kind !== "node" || ids.includes(now.id) ? now : ids.length === 0 ? undefined : { kind: "node", id: ids[ids.length - 1] }));
   }, []);
 
-  const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc)), [doc]);
+  // 編集が止まったら実行ファイルに確かめ直させる。答えが指す写しと同じなら頼まない
+  useEffect(() => {
+    if (doc === undefined || checkedDoc.current === doc) {
+      // 答えが指す写しに戻った（元に戻すなど）。待っている答えが無ければ確かめ直さない
+      if (!checkPending.current) {
+        setChecking(false);
+      }
+      return;
+    }
+    setChecking(true);
+    const timer = setTimeout(() => {
+      checkSeq.current += 1;
+      checkedDoc.current = doc;
+      checkPending.current = true;
+      post({ type: "check", seq: checkSeq.current, doc });
+    }, CHECK_MS);
+    return () => clearTimeout(timer);
+  }, [doc]);
+
+  // 画面の注意と、実行ファイルの warn。実行ファイルの答えがあれば、同じことを言う画面の注意は出さない
+  const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc, { exe: checks !== undefined })), [doc, checks]);
 
   // 鍵の受け口は 1 度だけ張り、中身は描くたびに最新へ差し替える
   const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
@@ -519,10 +574,17 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         </div>
         <TourButton onClick={tour.start} />
       </header>
-      {notices.length > 0 && (
+      {notices.length + (checks?.warns.length ?? 0) > 0 && (
         <ul className="problems" id="flow-notices">
           {notices.map((notice) => (
-            <li key={notice}>{notice}</li>
+            <li key={notice} data-source="screen">
+              {notice}
+            </li>
+          ))}
+          {(checks?.warns ?? []).map((warn, index) => (
+            <li key={`exe-${index}`} data-source="exe" title="ccnavi --lint --flow の warn（保存は止めない）">
+              {warn}
+            </li>
           ))}
         </ul>
       )}
@@ -565,7 +627,10 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             }
           }}
         />
-        <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} />
+        <div className="flow-side">
+          <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSeal={() => setHistory(seal)} onSelect={setSelected} candidates={checks?.candidates} />
+          <Preview checks={checks} checking={checking} error={checkError} />
+        </div>
       </div>
       {tour.touring && <Tour steps={TOUR_STEPS} onClose={tour.end} />}
       {review !== undefined && <SaveReview diff={review} onConfirm={confirmSave} onCancel={() => setReview(undefined)} />}
