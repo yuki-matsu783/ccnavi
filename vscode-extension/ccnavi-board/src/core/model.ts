@@ -56,6 +56,24 @@ export interface SeenInJson {
   readonly path: string;
 }
 
+/**
+ * 子チケットのフロー（設計 9.3.1、ADR-0085）。親は null。
+ * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
+ * 拡張は写すだけで、`started_at` などから組み直さない（ADR-0035）。
+ */
+export interface FlowJson {
+  /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
+  readonly path: string;
+  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.json`） */
+  readonly rel: string;
+  /** ファイルを持つツリーのルート。保存はここからファイルまでの途中にリンクがあれば書かない */
+  readonly tree: string;
+  readonly exists: boolean;
+  /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
+  readonly linked: boolean;
+  readonly locked: boolean;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -84,6 +102,8 @@ export interface TicketJson {
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
+  /** 子のフロー。親と、この欄を出さない古い実行ファイルでは null */
+  readonly flow: FlowJson | null;
 }
 
 export interface PhaseJson {
@@ -263,6 +283,24 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,
     judge: isRecord(raw.judge) ? raw.judge : null,
+    flow: isRecord(raw.flow) ? flow(raw.flow) : null,
+  };
+}
+
+function flow(raw: Record<string, unknown>): FlowJson | null {
+  const path = str(raw.path);
+  if (path === "") {
+    return null;
+  }
+  return {
+    path,
+    rel: str(raw.rel),
+    tree: str(raw.tree),
+    exists: raw.exists === true,
+    // 欄が欠けていたら書かない側にする（リンクかを確かめられない）
+    linked: raw.linked !== false,
+    // 欄が欠けていたら閉じる側にする（止まっているかを確かめられないので、書かせない）
+    locked: raw.locked !== false,
   };
 }
 

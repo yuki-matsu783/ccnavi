@@ -1,6 +1,6 @@
 """見本をぜんぶ判定に掛けて、期待と食い違ったものを並べる。
 
-`/ccnavi-config` スキルが呼ぶ。人が直接叩いてもよい。
+`/ccnavi-config` スキルが呼ぶ。人が直接打ってもよい。
 
     uv run python tools/check_rules.py [ルールファイル]
 

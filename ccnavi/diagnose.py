@@ -1,4 +1,4 @@
-"""判定を実行せずに試す。人が端末から叩く経路。
+"""判定を実行せずに試す。人が端末から打つ経路。
 
 ## なぜ要るか
 
@@ -34,6 +34,7 @@ from . import (
     approval,
     audit,
     builtin,
+    flow,
     hookio,
     judge,
     modes,
@@ -234,7 +235,7 @@ def _rules_hit(
 ) -> list[dict]:
     """当たったルールを、タイプと翻訳後の式まで返す。
 
-    翻訳後の式を出すのがこの試験の要。`glob` は正規表現に化けるので、
+    翻訳後の式を出すのがこの試験の要。`glob` は正規表現に変わるので、
     書いたものと当たるものの間に見えない層が 1 枚ある。その層を開けないと、
     当たらなかった理由を人が自分で辿れない。
 
@@ -475,7 +476,7 @@ def layer_phase_types(path: str) -> tuple[list, str]:
 
 
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
-    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みへは落とさない）。
+    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みには戻さない）。
 
     `script:` に書ける綴りは層ごとに違う（設計 11.4.2）ので、読み方も層ごとに分ける。
     """
@@ -575,7 +576,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
-    stdout.write("    auto                          classifier が判断する\n")
+    stdout.write(
+        "    auto                          classifier（auto モードで呼び出しを通すかを決める、"
+        "Claude Code の判定役のモデル）が判断する\n"
+    )
     stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
     stdout.write("    不明なモード                  人に確認が出る\n")
     # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
@@ -943,6 +947,11 @@ def _ticket_record(
         "cancel_reason": source.cancel_reason,
         "seen_in": seen_in,
         "scattered": scattered,
+        # 子のフロー（設計 9.3.1、ADR-0085）。`{path, rel, tree, exists, linked, locked}`。
+        # 親は null。
+        # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
+        # チケットがあればその側、無ければ提案。
+        "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
     }

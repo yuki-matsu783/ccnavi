@@ -37,7 +37,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
-# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、--lint が言う。
+# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みを使い、--lint が言う。
 version: 1
 levels:
   medium: 20
@@ -163,7 +163,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     top.items.unshift(doc.createPair("version", RISK_VERSION));
   }
 
-  // levels。空の欄は書かない（組み込みの値に落ちる）。
+  // levels。空の欄は書かない（組み込みの値を使う）。
   const rawLevels: unknown = top.get("levels", true);
   let levelsNode: YAMLMap | undefined;
   if (isMap(rawLevels)) {

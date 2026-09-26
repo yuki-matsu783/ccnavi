@@ -98,12 +98,12 @@ class HandoverTest(unittest.TestCase):
 
 class AskTest(unittest.TestCase):
     def test_an_unknown_mode_asks(self):
-        """知らないモードは確認に倒す。名前が 1 つ増えても素通りにしない。"""
+        """知らないモードは確認にする。名前が 1 つ増えても素通りにしない。"""
         result, _ = run("someFutureMode")
         self.assertEqual("ask", decision_of(self, result))
 
     def test_a_missing_mode_asks(self):
-        """モードが payload に無くても確認に倒す。"""
+        """モードが payload に無くても確認にする。"""
         result, _ = run("")
         self.assertEqual("ask", decision_of(self, result))
 

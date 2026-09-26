@@ -126,6 +126,11 @@ SCRIPT_FIELDS = ("started_at", "completed_at", "base_sha", "cancelled_at", "canc
 # 承認済みチケットにだけある欄。承認の記録。
 APPROVAL_KEY = "ccnavi_approved"
 
+# 以前の、子のフローを指す欄（設計 9.3.1、ADR-0085）。今は読まない。フローの置き場は承認済みの
+# 領域の `flows/<子>.json` に固定（flow.py）。書いてあるチケットは warn で知らせて読み進める
+# （error にすると承認済みチケットが読めなくなり、範囲ごと効かなくなる）。
+FLOW_KEY = "flow"
+
 # glob のワイルドカード。これより前が字義どおりの前置。
 _WILDCARDS = "*?["
 
@@ -206,7 +211,7 @@ class Entry:
             return False
         if self.glob and not any(c in self.glob for c in _WILDCARDS):
             # ワイルドカードの無い綴りは前置。`src` が範囲なら `src` という
-            # 名前のファイルも `src/` の下も中。そこだけ外に落ちるのは驚きでしかない。
+            # 名前のファイルも `src/` の下も中。そこだけ外になるのは驚きでしかない。
             # 大文字小文字は揃えてから比べる。機械によって区別の有無が変わると、
             # 同じチケットと同じ綴りで止まる場所が Windows と Linux で食い違う。
             # 範囲は人が宣言する意図なので、機械の都合ではなく綴りの意味で読む。
@@ -365,6 +370,11 @@ class Ticket:
     @property
     def has_plan(self) -> bool:
         return bool(self.plan)
+
+    @property
+    def in_progress(self) -> bool:
+        """着手していて、終わってもいないし取り消されてもいない。"""
+        return bool(self.started_at) and not self.completed_at and not self.cancelled_at
 
     def numbered(self) -> list[tuple[int, PlanItem]]:
         """計画の項に番号を振る。全体計画が 1 から、フィードバック計画はその続き。"""
@@ -531,6 +541,18 @@ def _read_relations(ticket: Ticket, front: dict, problems: list[Problem]) -> boo
     # `scan` が上書きする（設計 11.5）。`scan` を通さない経路ではこの値が残る。
     ticket.declared_project = _text(front.get("project")).strip()
     ticket.project = ticket.declared_project
+
+    if front.get(FLOW_KEY) is not None:
+        # 以前の欄。置き場は承認済みの領域に固定したので読まない。error にすると承認済み
+        # チケットが読めなくなり、範囲ごと効かなくなる（緩む）ので warn で知らせるだけ。
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"`{FLOW_KEY}` はもう読まない。フローの置き場は承認済みチケットの置き場の "
+                f"`flows/{name}.json` に固定（ADR-0085）。この欄は消してよい",
+            )
+        )
 
     raw_preds = front.get("predecessors")
     if isinstance(raw_preds, list):
@@ -790,7 +812,7 @@ def is_scratch_place(rel: str) -> bool:
     理由が「追跡されない」ことにあり、追跡から外しているのは `.gitignore` の `/scratchpad/` で、
     その照合は Linux では区別するため。区別せずに外すと、Linux の `SCRATCHPAD/` が「追跡される
     のに範囲を当てない場所」になり、承認した範囲の外の変更が統合先へ乗る道ができる。
-    区別する側に倒せば、どの機械でも除外は追跡から外れる範囲より狭いままで、狭いぶんは
+    区別する側を採れば、どの機械でも除外は追跡から外れる範囲より狭いままで、狭いぶんは
     範囲の判定が止めるだけで済む。
 
     ルートの直下 1 段だけを見る。`docs/scratchpad/` は普通の作業対象で、`.gitignore` も外さない
@@ -904,7 +926,7 @@ def scan_all(
                 if place_project and not ticket.declared_project:
                     # 承認済みチケットにも残す。judge は親の承認済みチケットを引けないとき
                     # （親が閉じた）子の承認済みチケットの
-                    # `project` を見る。ここで入れないとその落ち先が空になる。
+                    # `project` を見る。ここで入れないとその行き先が空になる。
                     ticket.raw["project"] = place_project
                 found.append(ticket)
     return found, problems
@@ -919,7 +941,7 @@ def fold(hits: list[Ticket]) -> list[Ticket]:
 
     親のツリーが無ければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
     そのプロジェクト）の側を採る。ワークツリーは畳めば消えるが、元ツリーは消えない。
-    親のワークツリーを作る前と、合流して畳んだ後がこの形で、ここで落ち先を決めないと、
+    親のワークツリーを作る前と、合流して畳んだ後がこの形で、ここで行き先を決めないと、
     片付けただけのチケットが「複数の場所にある」になり、状態の操作が止まる。
 
     **ただし、元ツリーより先の置き場に在る写しが 1 つでもあれば採らない。** 元ツリーを
@@ -1091,9 +1113,9 @@ def propose_notice(
     入れず、承認の知らせ（`approval.news`）と同じ口から渡す。表に allow を 1 本足す形は
     採らない。次の 3 つを一緒に引き受けることになるため。
 
-    - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの倒し方
+    - `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの扱い
       （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモードの deny も、
-      知らない綴りのモードを ask に倒す既定も、そこだけ外れる（REQ-PRE-08）
+      知らない綴りのモードを ask として扱う既定も、そこだけ外れる（REQ-PRE-08）
     - 判定は強いタイプから見て最初に当たった段で決まるので、**提案の置き場に `deny` か
       `ask` を書いているワークスペースには文が届かない。** 承認の流れをいちばん
       気にしているところにだけ届かない、という向きになる
@@ -1353,7 +1375,7 @@ def _entries(front: dict, name: str) -> tuple[list[Entry], list[Problem]]:
 def _frontmatter(text: str) -> tuple[dict | None, str, list[Problem]]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != FENCE:
-        # 通す側には倒さない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
+        # 通す側にはしない。「先頭の 1 バイト目から `---`」が frontmatter の契約で、
         # BOM を読み飛ばすと同じファイルが書き手の道具ごとに違う姿で通る。弾いたまま、
         # 目に見えない原因だけを名指しする。
         if lines and lines[0].lstrip(BOM).strip() == FENCE:

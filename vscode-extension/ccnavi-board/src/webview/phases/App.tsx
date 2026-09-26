@@ -462,11 +462,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           ))}
         </ul>
       )}
-      {page !== undefined && !page.exists && <Missing page={page} busy={busy} onCreate={() => {
-        setBusy(true);
-        setStatus({ text: "ファイルを作成中…", error: false });
-        post({ type: "create" });
-      }} />}
+      {page !== undefined && !page.exists && <Missing page={page} busy={busy} onOpenSelf={() => post({ type: "openSelf" })} />}
       <section className="block">
         <h2>
           フェーズの種類{" "}
@@ -577,11 +573,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 }
 
 /**
- * ファイルが無いときの帯。共通の設定は「雛形で作る」まで欄を触れない。
- * ワークスペースとプロジェクトの設定には雛形を置かない（雛形の id は共通の設定の種類と重なりやすく、
- * 中身が違えばその設定が空として扱われる）。代わりに画面で足させ、最初の保存でファイルを作る。
+ * ファイルが無いときの帯。ワークスペースとプロジェクトの設定は欄を触れ、最初の保存でファイルを作る。
+ * どの設定にも雛形は置かない。雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる。
+ * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く道だけを出す。
  */
-function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly busy: boolean; readonly onCreate: () => void }): JSX.Element {
+function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
   if (page.layer === true) {
     return (
       <div className="banner missing">
@@ -594,11 +590,10 @@ function Missing({ page, busy, onCreate }: { readonly page: PhasesPage; readonly
   return (
     <div className="banner missing">
       <span>
-        {page.phasesPath} がありません。実行ファイルはフェーズを番号だけで扱っていて、親チケットの <code>plan:</code> も読めません。種類を使うにはまずファイルを作ってください。雛形は README の例で、
-        <code>scope</code> のパスは作ったあとにこのプロジェクトのフォルダ構成に合わせて直してください。
+        共通の設定に種類はありません（{page.phasesPath} がありません）。種類はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
       </span>
-      <button type="button" className="action primary" data-action="create" disabled={busy} onClick={onCreate}>
-        雛形でファイルを作る
+      <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
+        自身の層を開く
       </button>
     </div>
   );

@@ -13,7 +13,7 @@
 
 名前はガードそのものの状態で言う。`enable`（判定を適用する）、`dry-run`（判定して報告するだけ）、
 `disable`（判定しない）。指定が無いときは `enable`。旧い名前は受け付けず、未知の値として
-報告したうえで `enable` に倒す。
+報告したうえで `enable` として扱う。
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）も同じ 3 値を取る。
 2 値（`enable` / `disable`）なのは `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL` の 2 本。
@@ -22,7 +22,7 @@
 
 ## 理由
 
-読み手が 2 通りある状態を残さないため、旧い名前は受けない。未知の値が `enable` に落ちるのは
+読み手が 2 通りある状態を残さないため、旧い名前は受けない。未知の値を `enable` として扱うのは
 緩む側ではない。ただし `dry-run` のつもりだった設定が止めはじめるので、名前を変えるときは
 設定の側も一緒に直す。
 

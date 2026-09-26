@@ -289,7 +289,7 @@ def decide_after(
 ) -> int:
     """実行後の監視を 1 回動かし、言うことがあれば返す。
 
-    期限を渡していない。実行前の期限は、遅い判定が黙った許可に化けるのを
+    期限を渡していない。実行前の期限は、遅い判定が黙った許可になってしまうのを
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
     何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
@@ -298,7 +298,7 @@ def decide_after(
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
     # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
-    # 書いた先を渡すのは、組み込みの既定に落ちている間の修復を戻さないため
+    # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
     # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と印で見分けて外す
     # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
@@ -309,7 +309,7 @@ def decide_after(
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:
         record.tree, record.project = watched[-1].tree.name, watched[-1].tree.project
-    # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
+    # 既定に戻ったことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
     # 範囲は実行前の判定と同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
@@ -337,6 +337,7 @@ def decide_after(
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
+    bounced = ""
     if conf.tickets_enabled:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
@@ -368,5 +369,9 @@ def decide_after(
         text = (
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
-    hookio.write_context(stdout, hookio.POST_TOOL_USE, text)
+    # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
+    # 届かない。人にも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
+    system = bounced if payload.agent_id else ""
+    hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)
     return EXIT_OK

@@ -59,8 +59,8 @@ export interface AppearanceSink {
  * - 入れ物ごと入れ直す道（`rebuilt`）では、組む側が `appearance` を HTML に埋める（`bodyTag`）
  * - 画面が組み上がった（`ready`）ところで、呼ぶ側が送り直す
  *
- * 直に `webview.postMessage` を叩くと、この 2 つのどちらも通らない画面へ送ることになり、
- * 「送ったつもりで落ちている」が段取りの外に残る（issue #87）。
+ * 直に `webview.postMessage` を呼ぶと、この 2 つのどちらも通らない画面へ送ることになり、
+ * 「送ったつもりで落ちている」が段取りの外に残る。
  */
 export function sendAppearance(sink: AppearanceSink, value: Appearance): boolean {
   return sink.post({ type: "appearance", value });

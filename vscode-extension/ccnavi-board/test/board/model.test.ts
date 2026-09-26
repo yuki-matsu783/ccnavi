@@ -93,7 +93,7 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
     assert.equal(p.state, "planned");
     assert.deepEqual(p.marks, { requested: {} });
     assert.equal(p.label, "1");
-    // 欠けたレビュー待ちは「待ちではない」に倒す。マーカーから組み直さない
+    // 欠けたレビュー待ちは「待ちではない」として扱う。マーカーから組み直さない
     assert.equal(p.review_waiting, false);
   }
 });

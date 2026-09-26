@@ -37,7 +37,7 @@ class ScriptCommandTest(unittest.TestCase):
                 settings.script_command(root, "ccnavi-review.sh"),
                 f'sh "{real}/.ccnavi/scripts/ccnavi-review.sh"',
             )
-        # 二重引用符の中でも意味を持つ文字があれば、単引用符に落とす。
+        # 二重引用符の中でも意味を持つ文字があれば、単引用符にする。
         spelled = settings.script_command("/tmp/a $b", "ccnavi-review.sh")
         self.assertTrue(spelled.startswith("sh '"), spelled)
         self.assertTrue(spelled.endswith("/.ccnavi/scripts/ccnavi-review.sh'"), spelled)

@@ -5,7 +5,7 @@
  * 画面は React（`src/webview/phases/`）で、ここが渡すのは「いま何を見せるか」（`PhasesData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存や作成が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存が通った）。
  *
  * 対象は 3 種（設計 11.2、11.4.1）。共通の設定の種類（`.ccnavi/common/phases.yml`。場所は固定）、
  * ワークスペースの設定の種類（既定 `.ccnavi/config/phases.yml`）、プロジェクト 1 つの設定の種類
@@ -19,9 +19,9 @@
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
  * 作業中のチケットは、共通の設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分を見る
  * （種類は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
- * ファイルが無いとき、共通の設定は空の画面と「雛形で作る」を見せる。ワークスペースとプロジェクトの設定には雛形を置かない（雛形の id は共通の設定の種類と
- * 重なりやすく、中身が違えばその設定が空として扱われる）。代わりに画面で種類を足させ、検証を通った最初の保存で
- * ファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
+ * ファイルが無いとき、共通の設定は空の画面と「種類はワークスペースかプロジェクトの設定に置く」案内（ワークスペースの設定を開くボタン）を見せ、画面からは作らせない。
+ * ワークスペースとプロジェクトの設定にも雛形は置かない（雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる）。
+ * 代わりに画面で種類を足させ、検証を通った最初の保存でファイルを作る。種類の無いファイル（`phases: {}`）は実行ファイルが error にするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
  *
  * チケット制御が disable のワークスペースでは、対象がどれでも開かない。種類は親チケットの計画と
@@ -39,7 +39,7 @@ import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { asPhasesForm, readPhases, TEMPLATE_PHASES_TEXT, type PhasesDocument } from "./core/phases-doc.js";
+import { asPhasesForm, readPhases, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
 import type { PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
@@ -326,7 +326,7 @@ function registerPanelHandlers(current: PanelState): void {
   // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない（issue #87）。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
@@ -443,7 +443,7 @@ function scheduleLock(current: PanelState): void {
 /**
  * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
  * 共通の設定の種類はどのツリーの承認・着手・閉じるときにも読まれるので、どのツリーの doing でも止める。
- * ワークスペースの設定も同じに止める（プロジェクト外のチケットだけに効くが、絞らずに止める側に倒す）。
+ * ワークスペースの設定も同じに止める（プロジェクト外のチケットだけに効くが、絞らずに止める側にする）。
  * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトの doing だけを見る。
  */
 async function refreshLock(current: PanelState): Promise<Lock> {
@@ -642,8 +642,10 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       );
       return;
     }
-    case "create": {
-      await create(current);
+    case "openSelf": {
+      // プロジェクト管理画面の「ワークスペース自身」の「フェーズ管理」と同じ入口。未保存の変更があれば
+      // 切り替えの前に聞く（共通層のファイルが無い間は欄を触れないので、ふつうは聞かずに切り替わる）
+      await openPhases({ kind: "self" });
       return;
     }
     case "save": {
@@ -651,39 +653,6 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
       return;
     }
   }
-}
-
-/** 共通の設定に雛形を書き出す。既にあれば上書きしない。ワークスペースとプロジェクトの設定には雛形を置かない（最初の保存で作る） */
-async function create(current: PanelState): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  if (current.target.kind !== "common") {
-    fail(current, "ワークスペースとプロジェクトの設定には雛形を作りません。種類を足して保存すると、ファイルが作られます");
-    return;
-  }
-  if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, `${loaded.phasesRel} は既に存在するため、上書きしません。更新してください`);
-    return;
-  }
-  try {
-    fs.mkdirSync(path.dirname(loaded.phasesPath), { recursive: true });
-    current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.phasesPath, TEMPLATE_PHASES_TEXT, { encoding: "utf8", flag: "wx" });
-  } catch (error) {
-    // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
-    current.wroteAt = 0;
-    fail(current, `${loaded.phasesRel} に書けません: ${(error as Error).message}`);
-    return;
-  }
-  await reload(current);
-  if (!alive(current)) {
-    return;
-  }
-  vscode.window.showInformationMessage(
-    `${loaded.phasesRel} を雛形から作成しました。修正してコミットしてください。`,
-  );
 }
 
 function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
@@ -704,7 +673,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
   }
   const layer = current.target.kind !== "common";
   if (!loaded.exists && !layer) {
-    fail(current, `${loaded.phasesRel} がありません。先に「雛形でファイルを作る」を押してください`);
+    fail(current, `${loaded.phasesRel} がありません。共通の設定は画面から作りません。種類はワークスペースかプロジェクトの設定に置いてください`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -800,7 +769,7 @@ function asMessage(message: unknown): PhasesMessage | undefined {
       return typeof m.dirty === "boolean" ? { type: "dirty", dirty: m.dirty } : undefined;
     case "ready":
     case "openFile":
-    case "create":
+    case "openSelf":
     case "tourDone":
       return { type: m.type };
     case "save": {

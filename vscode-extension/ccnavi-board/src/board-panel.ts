@@ -9,7 +9,9 @@ import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard, runApprovePreview, runApproveYes, runDecidePreview, runDecideYes } from "./ccnavi.js";
-import { buildBoard, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
+import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, type Board } from "./core/board.js";
+import { flowTicketOf } from "./core/flow-view.js";
+import { screens } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
   PUSH_APPROVED_SCRIPT,
@@ -400,6 +402,12 @@ function handleMessage(message: BoardMessage | undefined): void {
         root: realRoot(root),
       });
       return;
+    case "flow":
+      // 画面が言った識別子をそのまま信じず、いまのボードに子のカードとして在るものだけを開く
+      if (current.board !== undefined && flowCardOf(current.board, message.ticket) !== undefined) {
+        void screens().flow(message.ticket);
+      }
+      return;
     default: {
       // `BoardMessage` に操作を足したのに、ここに処理を書いていなければ型が合わなくなる。
       // 画面のボタンだけ足して受け側を忘れる、を止める
@@ -532,7 +540,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
   }
 }
 
-/** ファイルとして在るか。無いものを読もうとして投げるのは「無い」に倒す */
+/** ファイルとして在るか。無いものを読もうとして投げるのは「無い」として扱う */
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
@@ -586,6 +594,7 @@ const KNOWN: Readonly<Record<BoardMessage["type"], true>> = {
   decide: true,
   decideConfirm: true,
   reviewed: true,
+  flow: true,
   tourDone: true,
 };
 
@@ -601,6 +610,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     tickets?: unknown;
     filtered?: unknown;
     choices?: unknown;
+    ticket?: unknown;
   };
   if (typeof m.type !== "string" || !(m.type in KNOWN)) {
     return undefined;
@@ -614,7 +624,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "promptOpen":
       return { type: m.type };
     case "approve":
-      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きに倒れる。
+      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きになる。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"
@@ -639,6 +649,10 @@ function asMessage(message: unknown): BoardMessage | undefined {
       return typeof m.parent === "string" && typeof m.phase === "number" && Number.isInteger(m.phase)
         ? { type: m.type, parent: m.parent, phase: m.phase }
         : undefined;
+    case "flow": {
+      const ticket = flowTicketOf(m);
+      return ticket === undefined ? undefined : { type: "flow", ticket };
+    }
     default:
       return undefined;
   }

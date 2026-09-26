@@ -58,9 +58,9 @@ VS Code のボードが打つ `--approve --preview --json` の 2 本。前者は
 **案内を判定の表に足さなかった。** 最初は組み込みの allow ルール（`additionalContextOnce` 付き）
 として入れた。文は届いたが、代償が 3 つ付いてきた。
 
-- `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの倒し方
+- `todo/` が「ccnavi が言及する場所」になり、どのタイプも言及しないときの扱い
   （`judge.undeclared_verdict`）を通らなくなる。確認できる者が居ないモード（`dontAsk` /
-  `bypassPermissions`）の deny も、知らない綴りのモードを ask に倒す既定も、そこだけ外れる。
+  `bypassPermissions`）の deny も、知らない綴りのモードを ask として扱う既定も、そこだけ外れる。
   `CCNAVI_GUARD_UNWATCHED=enable`（既定）でも外れるので、プロジェクトが選べる範囲
   （ADR-0049、REQ-PRE-08）から 1 経路が抜ける
 - 判定は強いタイプから見て最初に当たった段で決まるので、**提案の置き場に `deny` か `ask` を
@@ -100,7 +100,7 @@ VS Code のボードが打つ `--approve --preview --json` の 2 本。前者は
   CI だけでなく、VS Code の設定画面が保存してよいかの判断にも使われる（`phases-panel.ts` /
   `risk-panel.ts` / `rules-panel.ts`）ので、**編集と関わりのない提案 1 本で設定の保存も止まる**。
   「まだ承認できない」だけ（前のフェーズが閉じていない子。`rules.KIND_NOT_YET`）はそこから外し、
-  `--lint` では warn に落とした。書いた側に直すものが無く、前が閉じれば同じ提案が通るため。
+  `--lint` では warn にした。書いた側に直すものが無く、前が閉じれば同じ提案が通るため。
   承認そのものは落とす（`approval.candidates` の側は error のまま）ので、緩むのは報告の重さだけ
 - **枝が 3 本になった。** `--approve` / `--preview` / `--preview --verify` は同じ関数を通るが、
   読む側から見ると「置く・見せる・答える」の 3 つを覚えることになる。しかも `--verify` の綴りに

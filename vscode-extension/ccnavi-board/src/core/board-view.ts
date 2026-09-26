@@ -116,6 +116,11 @@ export type BoardMessage =
   /** 残った指摘の行き先を決めた。鍵は指摘の `key`、値は `keep` / `fix` / `issue` */
   | { readonly type: "decideConfirm"; readonly choices: Readonly<Record<string, string>> }
   | { readonly type: "reviewed"; readonly parent: string; readonly phase: number }
+  /**
+   * 子のカードの「フロー」を押した。拡張ホストはいまのボードにその子が在ることを確かめてから、
+   * フロー編集画面を開く（置き場と錠はその画面が実行ファイルに聞き直す）
+   */
+  | { readonly type: "flow"; readonly ticket: string }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };
 

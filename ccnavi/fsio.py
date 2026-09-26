@@ -62,6 +62,29 @@ def full_path(path: str, cwd: str) -> str:
         return os.path.normpath(os.path.abspath(joined))
 
 
+def spelled_path(path: str, cwd: str) -> str:
+    """ファイルのパスを、リンクを解かずに絶対の綴りに直す。`..` は畳む。
+
+    `full_path` は行き着く先に直すので、リンクそのものの綴りが消える。置き場の綴りに当てる
+    止める向きの検査（フローのロック）は、解いた先と解く前の両方に当てるためにこちらも使う。
+    """
+    if not path:
+        return ""
+    base = cwd or os.getcwd()
+    return os.path.normpath(os.path.abspath(os.path.join(base, os.path.expanduser(path))))
+
+
+def parent_resolved(path: str) -> str:
+    """ディレクトリだけを行き着く先に直し、最後の名前は綴りのまま残す。空なら空。"""
+    if not path:
+        return ""
+    head, name = os.path.split(path)
+    try:
+        return os.path.join(os.path.realpath(head), name)
+    except OSError:
+        return path
+
+
 def safe_name(text: str, limit: int | None = 64) -> str:
     """識別子から作る、置き場の名前。limit が None なら切り詰めない。"""
     return _UNSAFE.sub("_", text)[:limit]
@@ -139,7 +162,7 @@ def write_text_atomic(path: str, text: str, newline: str | None = None) -> str:
     同じ場所に一時ファイルを作って書き切り、`os.replace` で差し替える。読む側が
     見るのは差し替えの前の中身か後の中身のどちらかだけになる。**差し替えが一瞬で
     終わるのは同じファイルシステムの中だけ**なので、一時ファイルは行き先と同じ
-    ディレクトリに作る。他所（`/tmp` など）に作るとコピーに化けて、この型が
+    ディレクトリに作る。他所（`/tmp` など）に作るとコピーになってしまい、この型が
     成り立たなくなる。
 
     一時ファイルの名前は、拡張子の前に一意な部分を挟んで作る（`a.json` なら

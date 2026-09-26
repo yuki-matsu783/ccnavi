@@ -189,7 +189,7 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   window.dispatchEvent(new window.Event("load"));
   // 画面が React のとき、押した直後には描き直されない。React のスケジューラは happy-dom の
-  // VM に MessageChannel が無いと setImmediate / setTimeout に落ち、どちらも
+  // VM に MessageChannel が無いと setImmediate / setTimeout を使い、どちらも
   // `waitUntilComplete` は追わない（happy-dom が数えるのは自分が張ったタイマーと取得だけ）。
   // 待ちを 1 回で切ると、機械が混んでいるときに「まだ描き直していない DOM」を見て落ちる。
   // check 相（setImmediate）と timers 相（setTimeout）の両方を何度か空にしてから見る。

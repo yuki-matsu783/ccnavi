@@ -75,7 +75,7 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
           <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
           {overlay.carried === true ? <p className="approval-note">承認済みチケットのコミットと push をターミナルに送りました。</p> : null}
           <p className="approval-note">
-            Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分で Enter を押してください。
+            Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
           </p>
           <pre className="approval-text">{overlay.prompt}</pre>
           <HandOver />

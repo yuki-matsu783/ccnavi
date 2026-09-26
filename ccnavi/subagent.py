@@ -13,6 +13,7 @@ from typing import TextIO
 from . import (
     approval,
     audit,
+    flow,
     fsio,
     hookio,
     judge,
@@ -71,6 +72,13 @@ def at_start(
         "書き込みは行き先のワークツリーのチケットで判定される。"
     ]
     types = phase.load_types(conf, root, bound.project) or {}
+    # フローの文に使える残り（文字）。子が多くても SubagentStart の文が膨らみすぎないように。
+    budget = flow.TOTAL_TEXT_LIMIT
+    # 手順を並べるのは、cwd がその子のワークツリーで子が 1 本に決まるときだけ（M-4）。
+    # 親のツリーからの起動（入れ子の孫も）では、どの子の担当かが hook から決められない。
+    full = bound.is_child
+    listed = False
+    changed: list[str] = []
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
         state = "ワークツリーあり" if os.path.isdir(where) else "ワークツリー無し（効かない）"
@@ -93,7 +101,26 @@ def at_start(
             paths = t.paths(name)
             if paths:
                 lines.append(f"    {name}: " + ", ".join(paths))
-    hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines))
+        # 子のフロー（設計 9.12、ADR-0085）。在ればファイルを名指しし、手順を並べる。
+        # フローは人が書くデータで、壊れていても 1 行の知らせにして、残りの子と範囲は渡す。
+        scope = ", ".join(t.paths(rules.ALLOW) + t.paths(rules.ASK))
+        try:
+            brief = flow.briefing(conf, root, t, scope, budget, full=full)
+        except Exception as exc:  # noqa: BLE001  壊れたフローで SubagentStart を落とさない
+            brief = [f"    フローを読めない（{type(exc).__name__}）。人に確かめる"]
+        budget -= sum(len(line) for line in brief)
+        listed = listed or bool(brief)
+        lines.extend(brief)
+        notice = flow.changed_notice(conf, root, t)
+        if notice:
+            changed.append(notice)
+    if listed and not full:
+        lines.append(
+            "  フロー: 自分の担当の子チケットのフローだけを読んで従う。他の子のフローには従わない。"
+            "担当が分からなければ、読まずにメインに聞く"
+        )
+    lines.extend(changed)
+    hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines), system="\n".join(changed))
     return EXIT_OK
 
 
@@ -131,7 +158,12 @@ def at_stop(
             continue
         for rel, found in outside:
             findings.append((child, rel, found))
+    # 着手のあとにフローが書き換わっていれば知らせる（止めない。M-2）。
+    changed = [n for n in (flow.changed_notice(conf, root, c) for c in targets) if n]
     if not findings:
+        if changed:
+            note = "\n".join(changed)
+            hookio.write_context(stdout, hookio.SUBAGENT_STOP, note, system=note)
         return EXIT_OK
 
     record.decision, record.paths = audit.DENY, [f"{c.ticket}:{rel}" for c, rel, _ in findings]
@@ -143,9 +175,9 @@ def at_stop(
     for child, rel, found in findings[: post.REPORT_LIMIT]:
         area = ", ".join(child.paths(rules.ALLOW) + child.paths(rules.ASK)) or "(空)"
         lines.append(f"  {child.ticket}: {rel}{_limit_note(child, found)}  範囲は {area}")
-    text = "\n".join(lines)
+    text = "\n".join(lines + changed)
 
-    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前に落とす。
+    # 相手を見分ける鍵。`agent_id` が無い payload では、cwd のワークツリーの名前を使う。
     who = payload.agent_id or (t.name if t is not None else "")
     already = _bounced(conf.state, payload.session_id, who)
     if mode == modes.ENABLE and not already:
@@ -154,7 +186,7 @@ def at_stop(
         stderr.write(text + "\n")
         return EXIT_BLOCK
     record.enforced = False
-    hookio.write_context(stdout, hookio.SUBAGENT_STOP, text)
+    hookio.write_context(stdout, hookio.SUBAGENT_STOP, text, system="\n".join(changed))
     return EXIT_OK
 
 
@@ -196,7 +228,7 @@ def _bounce_path(state_dir: str, session: str, who: str) -> str:
     「差し戻し済み」として通す。印が消えるのは、親の PostToolUse が `agentId` を
     持って通ったときだけなので、残った 1 つは次の日のセッションまで効く。
 
-    `who` は `agent_id`。持たない payload では、そのワークツリーの名前に落とす。
+    `who` は `agent_id`。持たない payload では、そのワークツリーの名前を使う。
     1 つの綴り（`unknown`）に全員を寄せると、最初の 1 体が差し戻されたあと、
     同じ置き場を見る他のサブエージェントが誰も差し戻されなくなる。しかも
     `agent_id` を持たない相手の印は `ignored_bounce` が消せないので、消えない。

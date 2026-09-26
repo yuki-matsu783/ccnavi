@@ -47,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import fsio, modes, phasetypes, rules, settings, tree, workflow
+from . import flow, fsio, modes, phasetypes, rules, settings, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -212,7 +212,7 @@ def scan(
 
     権威は親のツリー（親自身なら自分のツリー）。提案の `dedupe` と違い、そこに無ければ
     落とす。子のワークツリーに checkout されているのは切った時点の版なので、親のツリーで
-    閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」に倒すと、閉じたチケットが
+    閉じたあとも開いた版が残る。「権威の側に無ければ全部残す」にすると、閉じたチケットが
     開いたものとして復活する。親のツリーがその識別子をどの置き場（作業中・レビュー待ち・
     閉じた）にも持っていなければ元ツリー（ワークスペースルート。プロジェクトのチケットなら
     そのプロジェクト）の側を採り、そこにも無いときと、元ツリーより先の置き場に在る写しが
@@ -406,6 +406,56 @@ def to_review(approved_dir: str, tree_root: str, tickets_rel: str, ticket_id: st
     return move_file(
         copy_path(approved_dir, ticket_id), review_path(tree_root, tickets_rel, ticket_id)
     )
+
+
+def carry_flow(
+    conf: settings.Settings, root: str, proposal: ticket_mod.Ticket, approved_dir: str
+) -> list[str]:
+    """承認した子のフローを、提案のツリーから承認済みチケットのツリーへ動かす。知らせる行を返す。
+
+    フローの置き場は承認済みチケットと同じツリー（設計 9.3.1）。人は承認の前に、提案が在る
+    ツリーの置き場へボードで保存する。承認で子が別のツリー（親のワークツリーなど）へ動くと、
+    フローだけが元のツリーに残り、読まれなくなる（M-3）。承認は人の操作なので、ここで一緒に
+    動かす。行き先に違う中身のフローが既に在れば上書きせず、そう言う（元のほうも残す）。
+    リンク・ふつうのファイルでないもの・ハードリンクは運ばない（`flow.load` と同じ読み方）。
+    """
+    source_root = proposal.tree_root or root
+    source = flow.flow_file(conf, source_root, proposal.ticket)
+    target = os.path.normpath(
+        os.path.join(approved_dir, flow.FLOWS_DIR, f"{proposal.ticket}{flow.SUFFIX}")
+    )
+    try:
+        if not os.path.lexists(source):
+            return []
+        if os.path.normcase(os.path.realpath(source)) == os.path.normcase(os.path.realpath(target)):
+            return []
+    except (OSError, ValueError):
+        return []
+    raw, why = flow.read_bytes(source, source_root)
+    if raw is None:
+        return [f"{proposal.ticket} のフロー {source} を運ばなかった: {why}。人が確かめて置き直す"]
+    if os.path.lexists(target):
+        held, _ = flow.read_bytes(target)
+        if held != raw:
+            return [
+                f"{proposal.ticket} のフローを {target} へ運ばなかった: 行き先に違う中身のフローが"
+                f"既に在る（上書きしない）。{source} と見比べて、人が 1 本に決める"
+            ]
+        fsio.remove(source)
+        return []
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "xb") as f:
+            f.write(raw)
+    except OSError as exc:
+        return [f"{proposal.ticket} のフローを {target} へ運べない ({exc})。{source} に残っている"]
+    try:
+        os.remove(source)
+    except OSError as exc:
+        return [
+            f"{proposal.ticket} のフローを {target} へ写した。元の {source} は消せなかった ({exc})"
+        ]
+    return [f"{proposal.ticket} のフローを {source} から {target} へ動かした"]
 
 
 def move_file(source: str, target: str) -> str:
@@ -760,7 +810,7 @@ def approve(
 ) -> int:
     """未承認の提案をまとめて人に見せ、承認されたら承認済みチケットを置く。
 
-    エージェントではなく人が端末から叩く経路。提案を書き直す道は用意しない。
+    エージェントではなく人が端末から打つ経路。提案を書き直す道は用意しない。
     チケットを書くのはエージェントの仕事で、承認する場所で書き替えられると、
     承認した人が承認したものの作者になる。
 
@@ -1291,7 +1341,7 @@ def _known(path: str) -> dict[str, str] | None:
 
     読めるのに壊れているときは空の辞書を返す。「無い」と同じに扱うと、まだ伝えて
     いない承認ごと現状を起点にして黙ることになる。何も知らないことにして、
-    伝える側へ倒す。
+    伝える側を採る。
     """
     data, failed = fsio.read_json(path)
     if failed is not None:
@@ -1366,7 +1416,7 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
 
     最初の hook で控えが無ければ、いまの承認済みチケットを起点として書き、何も伝えない。
     それより後に置かれた承認済みチケットと、版の変わった承認済みチケット（親の改版）が「新しい承認」になる。
-    控えを置けない（`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側に倒す。
+    控えを置けない（`--state ""`）ときは黙る。診断の試し打ちで記録を汚さない側を採る。
     サブエージェントは自分の控えを持つので、起動より前の承認は伝えない。
 
     読み・判定・書きは直列化していない。同じセッションの hook が同時に走ると、同じ承認を
@@ -1515,7 +1565,7 @@ def _apply(
     batch: list[Candidate],
     stamp: str,
 ) -> Applied:
-    """承認された対象を承認済みチケットに落とす。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
+    """承認された対象を承認済みチケットに書く。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
     from . import phase
 
     placed: list[str] = []
@@ -1559,6 +1609,9 @@ def _apply(
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
             return Applied(1, placed, t.ticket, failed)
         placed.append(t.ticket)
+        if t.is_child:
+            for line in carry_flow(conf, root, t, where):
+                stdout.write(f"  {line}\n")
         # 終わったフェーズに子を足したら、そのフェーズのマーカーは消す。マーカーは
         # 「その時点の子が全部見られた」以上の意味を持たない（REQ-TKT-21）。
         # 消すのは置けたあと。先に消すと、書けずに終わった（置き場が塞がっている、権限が無い）
@@ -2216,7 +2269,7 @@ def child_problems(
     """
     if parent is None:
         # 文面だけは呼び手が差し替える。承認のときは「まだ承認されていない」しか起きないが、
-        # 判定のときは「承認されたが閉じた」も同じ穴に落ちる。検査は同じで、読む人の
+        # 判定のときは「承認されたが閉じた」も同じ検査に当たる。検査は同じで、読む人の
         # 次の一手が違うだけなので、分けるのは言葉だけにする。
         detail = missing or f"親 {t.parent} が承認されていない"
         return [rules.Problem(rules.SEVERITY_ERROR, t.ticket, detail)]
@@ -2274,7 +2327,7 @@ def mark_blocked(conf: settings.Settings, kept: list[ticket_mod.Ticket]) -> None
     別の池で引くと、ここでは親が見つかって印が付かないのに、判定の側では見つからず
     `parent=None` のまま子の宣言だけで範囲が決まる（閉じた親やレビュー待ちの親まで
     引ける池にすると、この形になる）。親の範囲で切り詰められないのに通る形は、
-    承認していない範囲に書ける道そのものなので、引けないなら止める側へ倒す。
+    承認していない範囲に書ける道そのものなので、引けないなら止める側を採る。
 
     親が閉じたのに子が開いている形は、道具を通る限り起きない（`ops.close_problems` が
     開いた子のある親を閉じさせない）。置き場を手で動かして起きたなら、親を閉じたのは

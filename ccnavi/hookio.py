@@ -30,7 +30,7 @@ DENY = "deny"
 
 
 class NoPayload(Exception):
-    """標準入力が空だった。hook ではなく人が直接叩いている。
+    """標準入力が空だった。hook ではなく人が直接打っている。
 
     独立した型にしてある。ここで 0 を返すと、設置を誤った hook が
     正常に動いている hook と見分けられなくなる。
@@ -123,14 +123,23 @@ def write_verdict(stream: TextIO, decision: str, reason: str, context: str = "")
     _write(stream, payload)
 
 
-def write_context(stream: TextIO, event: str, text: str) -> None:
+def write_context(stream: TextIO, event: str, text: str, system: str = "") -> None:
     """判定を返さないとき、モデルに届く文を書き出す。
 
     PostToolUse と SessionStart は判定自体ができないのでこの経路しかない。
     PreToolUse でも、ccnavi がこの呼び出しの判定を持たない（handover）ときや
     dry-run で知らせるだけのときはこちらを使う。素の標準出力は捨てられる。
+
+    system は人に見せる文（`systemMessage`）。同じ 1 つの JSON の一番外に並べる。
+    空なら鍵ごと出さない。
     """
-    _write(stream, {"hookEventName": event, "additionalContext": text})
+    body: dict[str, Any] = {
+        "hookSpecificOutput": {"hookEventName": event, "additionalContext": text}
+    }
+    if system:
+        body["systemMessage"] = system
+    stream.write(json.dumps(body, ensure_ascii=False))
+    stream.write("\n")
 
 
 def write_system_message(stream: TextIO, text: str) -> None:

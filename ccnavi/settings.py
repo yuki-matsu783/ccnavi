@@ -159,7 +159,7 @@ def script_command(root: str, name: str) -> str:
     空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、止めている間の例外と
     サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
     区切りと別の目印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
-    まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符に落とす。
+    まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符にする。
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
     return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
@@ -313,13 +313,13 @@ class Settings:
     # guard_ticket_approval_declared は、解決する前に人が書いた綴り。判定はこれを
     # 読まない。読むのは --lint で、dry-run のように「書けるつもりで書かれたが
     # この門には無い値」を名指しするために要る。解決した値だけを持っていると、
-    # 書いた人の思い違いが enable に倒れた時点で消える。
+    # 書いた人の思い違いが enable として扱われた時点で消える。
     guard_ticket_approval: str = ""
     guard_ticket_approval_declared: str = ""
 
     # guard_unwatched は、確認できる者が居ないモードで未宣言の呼び出しを止めるか。
     # enable / disable の 2 つだけを取る。解決は cli が selfguard.resolve で行い、
-    # 読めない値は enable に倒れる。空は enable と同じに読む。
+    # 読めない値は enable になる。空は enable と同じに読む。
     guard_unwatched: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
@@ -328,7 +328,7 @@ class Settings:
     bin: str = ""
 
     # ticket_control はチケット制御を使うか。enable / disable の 2 つだけを取る。
-    # 解決は cli が selfguard.resolve で行い、読めない値は enable に倒す。
+    # 解決は cli が selfguard.resolve で行い、読めない値は enable として扱う。
     # ticket_control_declared は解決する前に人が書いた綴りで、--lint がそれを名指しする。
     ticket_control: str = ""
     ticket_control_declared: str = ""
@@ -365,7 +365,7 @@ class Settings:
         """チケット制御が効いているか。
 
         判定・監視・診断はこれで分岐する。approved の真偽で分岐しない。
-        解決前（空）は enable と同じに読む。読めない値は解決で enable に倒れるので、
+        解決前（空）は enable と同じに読む。読めない値は解決で enable になるので、
         ここで disable と読めるのは disable と書かれたときだけになる。
         """
         return self.ticket_control != TICKET_CONTROL_DISABLE
@@ -564,7 +564,7 @@ def _resolve_bin(root: str, path: str) -> str:
     そこでも守れるほうがよい。継ぎ足した綴りは在るものだけを採るので、
     推測で別のファイルを実体として扱うことにはならない。
 
-    どちらも無ければ書かれたまま返す。ここで空に落とすと、綴りを間違えた設定が
+    どちらも無ければ書かれたまま返す。ここで空にすると、綴りを間違えた設定が
     「実行ファイルを守らない設定」と見分けられなくなる。無いことは selfguard が
     missing と言い、綴りを確かめるよう促す。
     """

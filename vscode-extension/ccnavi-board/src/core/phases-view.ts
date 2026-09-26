@@ -89,20 +89,22 @@ export interface PhasesPage {
   readonly root: string;
   /** 種類の定義のファイル（ワークスペースルートからの相対で見せる） */
   readonly phasesPath: string;
-  /** ファイルが在るか。無ければ空の画面を見せ、共通の設定なら「雛形で作る」だけができる */
+  /**
+   * ファイルが在るか。無ければ空の画面を見せる。共通の設定は画面から作らせず、種類はワークスペースかプロジェクトの設定に置くよう案内する
+   * （共通の設定に雛形を置くと、ワークスペースやプロジェクトの設定の同じ id と中身が食い違い、その設定が空として扱われるため）
+   */
   readonly exists: boolean;
   readonly model: PhasesModel;
   readonly lock: Lock;
   /**
-   * ワークスペースかプロジェクトの設定の種類か。どちらもファイルが無くても編集でき、最初の保存でファイルを作る。
-   * 雛形は置かない（雛形の id は共通の設定の種類と重なりやすい）
+   * ワークスペースかプロジェクトの設定の種類か。どちらもファイルが無くても編集でき、最初の保存でファイルを作る
    */
   readonly layer?: boolean;
   /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
 }
 
-/** 欄を触れるか。共通の設定はファイルが無ければ「雛形で作る」まで触れない。ワークスペースとプロジェクトの設定は無くても足して保存できる */
+/** 欄を触れるか。共通の設定はファイルが無ければ触れない（画面からは作らせない）。ワークスペースとプロジェクトの設定は無くても足して保存できる */
 export function editable(page: PhasesPage): boolean {
   return page.exists || page.layer === true;
 }
@@ -138,7 +140,8 @@ export type PhasesMessage =
   /** 未保存の変更の有無が変わった。別の対象へ切り替えるときに聞くかを拡張ホストが決める */
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
-  | { readonly type: "create" }
+  /** 共通層のファイルが無いときの案内から、自身の層を開く（プロジェクト管理画面の入口と同じ道） */
+  | { readonly type: "openSelf" }
   | { readonly type: "save"; readonly form: PhasesForm }
   /** 案内を閉じた。拡張ホストは見たことを残し、次からは初回の案内を送らない */
   | { readonly type: "tourDone" };

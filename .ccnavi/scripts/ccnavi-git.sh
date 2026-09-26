@@ -31,7 +31,7 @@ FAIL_LINES="${CCNAVI_GIT_FAIL_LINES:-30}"
 # 残す記録の本数。放っておくと増え続けるので世代で切る。
 KEEP_LOGS="${CCNAVI_GIT_KEEP_LOGS:-50}"
 
-# 対話に落ちる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
+# 対話になる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
 # 資格情報プロンプトは /dev/tty を直接開くので stdin だけでは止まらない。
 GIT_TERMINAL_PROMPT=0
 GIT_PAGER=cat
@@ -93,7 +93,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   config clone submodule  利用者に依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
                 読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
-                化けるので、値を見ずに一律で拒否する
+                なってしまうので、値を見ずに一律で拒否する
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
@@ -349,7 +349,7 @@ restore)
 	# --ours / --theirs もここを通る。衝突したパスにしか効かない（普段は
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
 	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
-	# 入っていると YAML として読めず、判定は組み込みの既定に落ちているが、
+	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
 	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	for arg in ${1+"$@"}; do
@@ -440,7 +440,7 @@ checkout | switch)
 	;;
 
 fetch | pull)
-	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗に倒れる。
+	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-f | --force | --prune | --unshallow)

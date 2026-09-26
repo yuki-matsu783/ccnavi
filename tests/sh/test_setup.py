@@ -531,7 +531,7 @@ class TellsWhatItDidNotChange(SetupTest):
         """置き換えるのは、この実行で名指しした値だけ。
 
         `--force` が既定値まで押し込むと、`--all` を足しに来た打ち直しが、
-        その場で指定していない CCNAVI_MODE を既定の dry-run へ落とす。
+        その場で指定していない CCNAVI_MODE を既定の dry-run に戻す。
         """
         self.run_setup("--mode", "enable")
 

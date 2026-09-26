@@ -10,6 +10,7 @@
 import type {
   BoardJson,
   CopyStatus,
+  FlowJson,
   ParentJson,
   PhaseJson,
   ProposalState,
@@ -122,6 +123,11 @@ export interface Card {
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
+  /**
+   * 子のフロー（ADR-0085）。親は null。在るか・着手中で書けないかは実行ファイルの答えの写しで、
+   * カードの「フロー」ボタンの言葉だけに使う。人が動く必要（`attention`）には数えない
+   */
+  readonly flow: FlowJson | null;
 }
 
 export interface BoardColumn extends ColumnDef {
@@ -275,6 +281,7 @@ function toCard(
     mrUrl: mr.url,
     mrNumber: mr.number,
     attention,
+    flow: isParent ? null : t.flow,
   };
 }
 
@@ -370,6 +377,18 @@ export function parentCardOf(board: Board, parent: string): Card | undefined {
   for (const column of board.columns) {
     for (const card of column.cards) {
       if (card.id === parent && card.isParent) {
+        return card;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** 子の識別子から、フローを持つ子のカード。親・無い識別子・フローの欄が無い子は undefined */
+export function flowCardOf(board: Board, ticket: string): Card | undefined {
+  for (const column of board.columns) {
+    for (const card of column.cards) {
+      if (card.id === ticket && !card.isParent && card.flow !== null) {
         return card;
       }
     }

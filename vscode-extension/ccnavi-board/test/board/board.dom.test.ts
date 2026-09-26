@@ -559,7 +559,7 @@ test("CB-D104 案内を閉じたら、焦点を案内の前の場所（「？ �
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Escape");
     await dom.settle();
-    assert.equal(dom.document.activeElement, button, "焦点が body に落ちた");
+    assert.equal(dom.document.activeElement, button, "焦点が body に移った");
   } finally {
     await dom.close();
   }

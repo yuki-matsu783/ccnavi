@@ -183,6 +183,7 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": null,
    "risk": null,
    "judge": null
   },
@@ -218,6 +219,14 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.json",
+    "rel": ".ccnavi/approved/flows/i0001-01.json",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
@@ -262,6 +271,14 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02.json",
+    "rel": ".ccnavi/approved/flows/i0001-02.json",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": true
+   },
    "risk": null,
    "judge": null
   },
@@ -309,6 +326,14 @@
     }
    ],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.json",
+    "rel": ".ccnavi/approved/flows/i0001-03.json",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false
+   },
    "risk": null,
    "judge": null
   },
@@ -360,6 +385,14 @@
     }
    ],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-04.json",
+    "rel": ".ccnavi/approved/flows/i0001-04.json",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
@@ -403,6 +436,14 @@
    "cancel_reason": "やめた",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-05.json",
+    "rel": ".ccnavi/approved/flows/i0001-05.json",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false
+   },
    "risk": null,
    "judge": null
   }
