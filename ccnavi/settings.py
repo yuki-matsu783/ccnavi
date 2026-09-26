@@ -32,9 +32,11 @@ from typing import NamedTuple
 # `--phases` / `--risk` のフラグが持つ。hook は引数を渡さずに起動するので、
 # 判定の入口は固定される。
 MODE_ENV = "CCNAVI_MODE"
-LOG_ENV = "CCNAVI_LOG"
-# STATE_ENV はセッションごとの控えの置き場。
-STATE_ENV = "CCNAVI_STATE"
+# 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）も env では
+# 動かない。既定に固定で、下の DEFAULT_* がそれ（ADR-0084）。診断のために動かす道は `--log` /
+# `--state` / `--tickets` / `--approved` / `--projects` / `--project-home` のフラグだけで、
+# cli._override が重ねる。
+#
 # 戻す働きは 2 つあり、守る対象の決まり方が違うので環境変数も分けてある。
 #
 # RESTORE_IF_DENY_ENV は、ルールが `deny` と宣言した場所を戻す。対象は
@@ -77,23 +79,8 @@ BIN_SUFFIXES = (".exe",)
 # チケット制御は、提案を承認して承認済みチケットを作り、その範囲・フェーズの HITL ポイント・
 # サブエージェントの制限を判定に掛ける働き全体。全体ルールは全プロジェクトが使うが、
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
-# 置き場のパス（APPROVED_ENV）とは分けてある。パスが空であることと機能を切ることは別の話。
+# 置き場のパス（承認済みチケットの置き場）とは分けてある。パスが在ることと機能を切ることは別の話。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
-# チケット制御が使う置き場 2 つ。どちらも各ツリーのルートからの相対で、そのツリーの
-# git が追跡する。TICKETS_ENV は提案の置き場、APPROVED_ENV は承認済みチケットの置き場。
-# 判定が読むのは承認済みチケット（`doing/`）だけ。提案の置き場には承認待ち（`todo/`）と
-# レビュー待ち（`review/`）が並び、承認の画面とフェーズの終わりの判定が読む。
-# 2 つとも `CCNAVI_TICKETS_` で始めて対にする。
-TICKETS_ENV = "CCNAVI_TICKETS_PROPOSAL"
-APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
-# PROJECTS_ENV はプロジェクトの置き場（設計 §11）。ワークスペースルートからの相対。直下で `.git` を
-# 持つディレクトリがプロジェクトになる。空文字にするとプロジェクトを数えない。
-# PROJECT_HOME_ENV は ccnavi ディレクトリ（設計 §11.2）。各 git プロジェクトルートからの相対で、
-# その下の `config/{rules,phases,risks}.yml` が層の 3 本になる。自身の層
-# （ワークスペースルートの下）とプロジェクトの層の両方に同じ値が効く。
-# 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
-PROJECTS_ENV = "CCNAVI_PROJECTS"
-PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
 
 # own_project は ccnavi 自身のソースツリーを見分ける目印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -109,10 +96,9 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 記録と控えは `logs/` に置く（ADR-0042）。`.claude/` には Claude Code 自身のもの
 # （settings.json・hooks・skills・worktrees）だけを残す。
 #
-# 共通層の置き場は ccnavi ディレクトリの名前（CCNAVI_PROJECT_HOME）に付いて動かない。
-# ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
-# 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
-# hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
+# 置き場はどれもここに固定で、env でも上書き設定ファイルでも動かない（共通層は ADR-0052、
+# 残りは ADR-0084）。診断のために別の場所を指すのはフラグ（`--rules` / `--log` など）だけで、
+# hook は引数を渡さずに起動するから、判定の入口はここから動かない。
 DEFAULT_LOG = os.path.join("logs", "log.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
@@ -344,7 +330,8 @@ class Settings:
     phases: str = ""
     # risk は実績で測るリスクの配点（絶対）。無ければ組み込みの配点。
     risk: str = ""
-    # projects はプロジェクトの置き場（絶対）。空ならプロジェクトを数えず、ワークスペース
+    # projects はプロジェクトの置き場（絶対）。既定に固定で、空になるのは診断のフラグ
+    # （`--projects ""`）で渡したときだけ。そのときはプロジェクトを数えず、ワークスペース
     # 自身だけで動く。project_home は ccnavi ディレクトリ（git プロジェクトルートからの相対、
     # "/" 区切り）。自身の層とプロジェクトの層の両方に効く。
     projects: str = ""
@@ -405,25 +392,15 @@ def load(root: str) -> tuple[Settings, list[str]]:
         projects=os.path.join(root, DEFAULT_PROJECTS),
         project_home=DEFAULT_PROJECT_HOME,
     )
-    # 環境変数と上書き設定ファイルで重ねる欄。読み方と、空文字を「指定した」と読むか。
-    # 空文字を受ける欄は、「記録しない」「控えを持たない」「プロジェクトを数えない」を
-    # 言えるようにしてある。承認済みチケットの置き場は空文字を受けない。チケット制御を切るのは
-    # TICKET_CONTROL_ENV の仕事で、置き場を空にしても既定の置き場のまま動く。
+    # 環境変数と上書き設定ファイルで重ねる欄と、その読み方。空文字は「指定しなかった」と読む。
     #
-    # 共通層の 3 本（rules / phases / risk）はこの表に無い。env でも上書き設定ファイルでも
-    # 動かず、既定の `.ccnavi/common/` のまま。動かせるのはフラグだけで、そちらは
-    # cli._override が重ねる（ADR-0052）。
-    overrides = (
-        ("projects", PROJECTS_ENV, _log_or_none, True),
-        ("project_home", PROJECT_HOME_ENV, _relative, False),
-        ("bin", BIN_ENV, _resolve_bin, False),
-        ("log", LOG_ENV, _log_or_none, True),
-        ("state", STATE_ENV, _log_or_none, True),
-        ("tickets", TICKETS_ENV, _relative, False),
-        ("approved", APPROVED_ENV, _relative, False),
-    )
-    for name, env, read, accepts_empty in overrides:
-        if env in os.environ and (accepts_empty or os.environ[env]):
+    # 置き場（共通層の 3 本、記録・控え・提案・承認済みチケット・プロジェクト・ccnavi
+    # ディレクトリ）はこの表に無い。env でも上書き設定ファイルでも動かず、既定のまま。
+    # 動かせるのはフラグだけで、そちらは cli._override が重ねる（ADR-0052・ADR-0084）。
+    # 残る `bin` は置き場ではなく、hook が起動する実行ファイルの指定で、既定を持たない。
+    overrides = (("bin", BIN_ENV, _resolve_bin),)
+    for name, env, read in overrides:
+        if os.environ.get(env):
             setattr(settings, name, read(root, os.environ[env]))
 
     if not own_source_tree(root):
@@ -449,9 +426,9 @@ def load(root: str) -> tuple[Settings, list[str]]:
     for name in ("guard_ticket_approval", "ticket_control"):
         if isinstance(conf.get(name), str):
             setattr(settings, f"{name}_declared", conf[name])
-    for name, _, read, accepts_empty in overrides:
+    for name, _, read in overrides:
         value = conf.get(name)
-        if isinstance(value, str) and (accepts_empty or value):
+        if isinstance(value, str) and value:
             setattr(settings, name, read(root, value))
 
     return settings, problems
@@ -485,17 +462,6 @@ def layer_real_path(conf: Settings, home_root: str, kind: str) -> str:
 def _layer_name(home_root: str) -> str:
     """差し替えを引くときの名前。プロジェクトの層は置き場の下のディレクトリ名。"""
     return os.path.basename(os.path.normpath(home_root)) if home_root else ""
-
-
-def _relative(root: str, path: str) -> str:
-    """提案の置き場の綴りを、作業ツリーのルートからの相対に揃える。
-
-    絶対パスは受けない。作業ツリーごとに違うルートに継ぎ足すものなので、
-    絶対で書かれた 1 か所を全ツリーが指すと、どのツリーの提案なのかが
-    分からなくなる。絶対で来たら先頭の区切りだけ落として相対として読む。
-    root は使わない。他の読み方と並べて表に置けるように、引数の形だけ揃えてある。
-    """
-    return path.replace("\\", "/").strip("/")
 
 
 def own_source_tree(root: str) -> bool:
@@ -539,11 +505,6 @@ def _read_local(root: str) -> tuple[dict | None, list[str]]:
     if not isinstance(conf, dict):
         return None, [f"{LOCAL_FILE} がオブジェクトではないので無視した"]
     return conf, []
-
-
-def _log_or_none(root: str, path: str) -> str:
-    """明示的な空文字を「記録しない」として扱う。"""
-    return _resolve(root, path) if path else ""
 
 
 def _resolve(root: str, path: str) -> str:

@@ -31,8 +31,8 @@ CODE_CHILD_PUSH = "DENY_CHILD_PUSH"
 ENV_RULE_ID = "builtin-script-env"
 CHILD_PUSH_RULE_ID = "builtin-child-push"
 
-# 保護済みの sh の名前。置き場（`.ccnavi/scripts/`）は `CCNAVI_PROJECT_HOME` で変わりうるので、
-# 名前で見る。
+# 保護済みの sh の名前。置き場は `.ccnavi/scripts/` に固定だが（ADR-0084）、呼び出しの綴りは
+# 絶対パス・相対パス・ワークツリーの中の写しとまちまちなので、パスではなく名前で見る。
 _SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh")
 _GIT_SCRIPT = "ccnavi-git.sh"
 

@@ -257,6 +257,46 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を 1 か所にだ
   }
 });
 
+// `projects/` がワークスペースの git の索引に載っているときの苦情（ccnavi/lint.py の `_in_index`）。
+// 先頭の句は 2 つで共通で、載せ忘れは直後に「（入れ子のリポジトリとして」が続く（設計 §4.2）
+const COLLISION =
+  "`projects/` はワークスペースの git が追跡している（例: `projects/foo/main.py`）。ccnavi はワークスペース直下の `projects/` をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの `projects/` を別の名前に移す（例: `git mv projects apps`）";
+const ADDED_BY_MISTAKE =
+  "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで `git rm -r --cached projects` を打ち、`.gitignore` に `/projects/` を足して、コミットする";
+
+/** 置き場の苦情の帯・`.gitignore` の帯とボタンを見る */
+async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[]; fixButtons: number }> {
+  const dom = await openProjects([row()], { ignored, dirProblems: [problem("warn", detail, "(projects)"), problem("warn", "別の指摘", "(projects)")] });
+  try {
+    return {
+      banners: dom.all(".banner").map((b) => text(b)),
+      fixButtons: dom.all('button[data-action="fix-ignore"]').length,
+    };
+  } finally {
+    await dom.close();
+  }
+}
+
+test("CB-D107 A10 置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignore のボタンと「無視されていない」の帯を出さない", async () => {
+  const { banners, fixButtons } = await trackedBanners(COLLISION, false);
+  assert.equal(fixButtons, 0);
+  assert.ok(banners.includes(`warn: ${COLLISION}`), banners.join(" / "));
+  assert.ok(!banners.some((b) => /\.gitignore.*が無い/.test(b)), banners.join(" / "));
+  assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
+  // 別の指摘は今どおり出る
+  assert.ok(banners.includes("warn: 別の指摘"), banners.join(" / "));
+});
+
+test("CB-D108 A10b 載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignore に /projects/ が既にあっても苦情の帯は出たまま", async () => {
+  for (const ignored of [false, true]) {
+    const { banners, fixButtons } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
+    assert.equal(fixButtons, 0, `ignored=${ignored}`);
+    assert.ok(banners.includes(`warn: ${ADDED_BY_MISTAKE}`), `ignored=${ignored}: ${banners.join(" / ")}`);
+    assert.ok(!banners.some((b) => /\.gitignore.*が無い/.test(b)), banners.join(" / "));
+    assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
+  }
+});
+
 test("CB-T133 チケット制御が disable なら、チケット管理とフェーズ管理の入口を出さない", async () => {
   const enabled = await openProjects([row()]);
   try {

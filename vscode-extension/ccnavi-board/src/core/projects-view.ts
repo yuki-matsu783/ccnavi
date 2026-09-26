@@ -45,7 +45,10 @@ export interface ProjectsPage {
   readonly root: string;
   readonly generatedAt: string;
   readonly ticketsEnabled: boolean;
-  /** 置き場（絶対）。空なら置き場が無効（CCNAVI_PROJECTS が空） */
+  /**
+   * 置き場（絶対）。実行ファイルの答え（`board.settings.projects`）で、既定の `<root>/projects` に固定
+   * （ADR-0084）。空になるのは診断のフラグ `--projects ""` を渡したときだけで、拡張はフラグを渡さない
+   */
   readonly projectsDir: string;
   readonly projectsRel: string;
   readonly ignored: boolean;

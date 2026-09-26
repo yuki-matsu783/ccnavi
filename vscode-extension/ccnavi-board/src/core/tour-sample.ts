@@ -117,7 +117,7 @@ export function sampleBoard(root: string, generatedAt: string): Board {
 
 /** プロジェクト管理画面の見本の行。`projectsRel` は今の置き場（`projects` など） */
 export function sampleProjectRow(projectsRel: string): ProjectRow {
-  const rel = `${projectsRel === "" ? "projects" : projectsRel}/sample-app`;
+  const rel = `${projectsRel}/sample-app`;
   return {
     name: "sample-app",
     root: "",

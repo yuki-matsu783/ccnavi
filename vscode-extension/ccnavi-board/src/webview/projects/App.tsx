@@ -14,6 +14,7 @@ import { MENU_KINDS, menuId } from "./Menu.js";
 import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
+import { isTrackedProjectsDir } from "./text.js";
 
 export function App({ initial }: { readonly initial: ProjectsData }): JSX.Element {
   const [data, setData] = useState<ProjectsData>(initial);
@@ -119,7 +120,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
         <div className="summary">
           <span>プロジェクト {rows.length} 件</span>
           <span className="path" title={page.projectsDir}>
-            置き場: {page.projectsRel === "" ? "（無効）" : `${page.projectsRel}/`}
+            置き場: {`${page.projectsRel}/`}
           </span>
         </div>
         <div className="controls">
@@ -252,8 +253,11 @@ const TOUR_STEPS: readonly TourStep[] = [
 ];
 
 /**
- * 上部の帯。置き場が無効なら他の苦情は読む意味が無いので、そこで切る。
- * `.gitignore` の帯（直すボタン付き）と同じ事象は 2 度出さない。
+ * 上部の帯。`.gitignore` の帯（直すボタン付き）と同じ事象は 2 度出さない。
+ *
+ * 置き場がワークスペースの git の索引に載っている（ぶつかりか載せ忘れ。`isTrackedProjectsDir`）ときは、
+ * `.gitignore` の帯も「無視されていない」も出さず、実行ファイルの苦情の帯だけを出す。
+ * `.gitignore` に `/projects/` があっても（`page.ignored` が真でも）、索引に載っている限り苦情は出たまま。
  */
 function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
   const banners: JSX.Element[] = [];
@@ -264,15 +268,8 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
       </div>,
     );
   }
-  if (page.projectsRel === "") {
-    banners.push(
-      <div key="no-dir" className="banner warn">
-        置き場が無効（CCNAVI_PROJECTS が空）。clone してもプロジェクトとして扱われない
-      </div>,
-    );
-    return <>{banners}</>;
-  }
-  if (!page.ignored) {
+  const tracked = page.dirProblems.some((p) => isTrackedProjectsDir(p, page.projectsRel));
+  if (!page.ignored && !tracked) {
     banners.push(
       <div key="ignore" className="banner warn">
         <code>.gitignore</code> に <code>/{page.projectsRel}/</code>{" "}
@@ -283,7 +280,7 @@ function Banners({ page }: { readonly page: ProjectsPage }): JSX.Element {
       </div>,
     );
   }
-  const dirProblems = page.dirProblems.filter((p) => page.ignored || !/無視されていない/.test(p.detail));
+  const dirProblems = page.dirProblems.filter((p) => (page.ignored && !tracked) || !/無視されていない/.test(p.detail));
   for (const [index, p] of dirProblems.entries()) {
     banners.push(
       <div key={`dir:${index}`} className={`banner ${p.severity}`}>

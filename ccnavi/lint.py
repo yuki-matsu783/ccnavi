@@ -533,6 +533,9 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
     （`builtin-guard-project-home`）。ルールファイルには書かせない（書かせると消せる）。
     ここで見るのは、置き場が本当に ccnavi ディレクトリの下にあるか。外に向けると、
     その 1 本が当たらず、エージェントが承認済みチケットを書けて承認の意味が無くなる。
+
+    置き場は既定に固定（ADR-0084）なので、外に向くのは診断のフラグ（`--approved` /
+    `--project-home`）で動かしたときだけ。フラグが残る間は見ておく。
     """
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("\\", "/").strip("/")
     approved = (conf.approved or settings.DEFAULT_APPROVED).replace("\\", "/").strip("/")
@@ -542,8 +545,8 @@ def _approved_guarded(conf: settings.Settings, root: str) -> list[Problem]:
         Problem(
             SEVERITY_ERROR,
             "(ticket)",
-            f"承認済みチケットの置き場（{settings.APPROVED_ENV}={conf.approved}）が"
-            f"ccnavi ディレクトリ（{settings.PROJECT_HOME_ENV}={conf.project_home}）の外にある。"
+            f"承認済みチケットの置き場（{conf.approved}）が"
+            f"ccnavi ディレクトリ（{conf.project_home}）の外にある。"
             "組み込みが守らないので、エージェントが承認済みチケットを書けて承認の意味が無い",
         )
     ]
@@ -978,6 +981,19 @@ def _tracked(root: str, rel: str) -> str:
     return first[0] if first else ""
 
 
+# `projects/` がワークスペースの git の索引に載っているときの `(projects)` の warn の先頭の句。
+# ぶつかり（通常のファイル）と載せ忘れ（gitlink だけ）で共通にする。VS Code 拡張
+# （vscode-extension/ccnavi-board の src/webview/projects/text.ts の isTrackedProjectsDir）が
+# この句で始まる苦情を見て `.gitignore` のボタンと「無視されていない」の帯を出さない。
+# `tests/`（test_lint_places.py・test_setup.py）と導入スクリプト（scripts/ccnavi-setup.sh）も
+# 同じ句を持つ。
+# 載せ忘れは先頭の句の直後が `（入れ子のリポジトリとして` で、`tests/` がそれで見分ける。
+# 変えるならそちらも直す（設計 wip/design/i0064-fixed-places.md §4.2）。
+_TRACKED_LEAD = "`{rel}/` はワークスペースの git が追跡している"
+# 索引の mode のうち gitlink（入れ子のリポジトリを 1 つの版として載せたもの）。
+_GITLINK_MODE = "160000"
+
+
 def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     """プロジェクトの置き場が噛み合っているか（REQ-MLT-16）。
 
@@ -985,13 +1001,22 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
     予約名（`common` / `self`、綴り違いも含む）を使っていないこと、プロジェクトが
     `.claude/` を持たないことを見る。層の中身は
     `_layers` が見る。
+
+    その前に、置き場がワークスペースの git の索引に載っていないかを見る（`_in_index`）。
+    載っていれば「無視されていない」の代わりにそれを言う。プロジェクトが 1 つも無くても
+    見る。これからプロジェクトを置こうとする人に要る知らせで、入れ子のリポジトリが
+    消えて gitlink だけが索引に残っている場合もある。
     """
     problems: list[Problem] = []
+    rel = _projects_rel(conf, root)
+    indexed = _in_index(root, rel) if rel else None
+    if indexed is not None:
+        problems.append(Problem(SEVERITY_WARN, "(projects)", indexed))
     found = tree.projects(conf.projects)
     if not found:
         return problems
-    rel = os.path.relpath(conf.projects, root).replace(os.sep, "/")
-    if _ignored(root, rel) is False:
+    rel = rel or os.path.relpath(conf.projects, root).replace(os.sep, "/")
+    if indexed is None and _ignored(root, rel) is False:
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -1029,6 +1054,132 @@ def _projects(conf: settings.Settings, root: str) -> list[Problem]:
                 )
             )
     return problems
+
+
+def _projects_rel(conf: settings.Settings, root: str) -> str:
+    """プロジェクトの置き場の、ワークスペースルートからの相対（"/" 区切り）。
+
+    置き場は既定の `projects` に固定（ADR-0084）。診断のフラグで空やワークスペースの外を
+    指されたときは空を返し、索引は見ない（ワークスペースの git の話ではなくなる）。
+    """
+    if not conf.projects:
+        return ""
+    try:
+        rel = os.path.relpath(conf.projects, root).replace(os.sep, "/")
+    except ValueError:
+        # Windows で別のドライブを指している。
+        return ""
+    if rel in (".", "") or rel == ".." or rel.startswith("../"):
+        return ""
+    return rel
+
+
+def _index_under(root: str, rel: str) -> tuple[str, list[str]] | None:
+    """索引で `<rel>/` の下に載っているものを、通常のファイルと gitlink に分けて返す。
+
+    返すのは（最初の通常のファイル、gitlink の一覧）。通常のファイルが無ければ 1 つ目は空。
+    通常のファイルは文面に 1 本目しか使わないので、残りは持たない（ワークスペースの
+    ソースが `projects/` の下に数万本あっても一覧を作らない）。
+
+    `ls-files -s -z` で読む。各行は `<mode> <oid> <stage>\\t<path>` で、`-z` なので
+    パスの引用（`core.quotepath`）に左右されない。mode `160000` が gitlink で、それ以外
+    （`100644`・`100755`・`120000`）は通常のファイル。衝突中の段で同じパスが並ぶのは 1 本に畳む。
+    git が無い・失敗したときは None（`_tracked` と同じく何も言わない）。
+
+    `_tracked`（`_scratch` も使う）とは別に置く。あちらは 1 本目の名前だけを返し、mode を見ない。
+    """
+    rc, out = gitcmd.output(
+        root, ["ls-files", "-s", "-z", "--", rel + "/"], gitstate.TIMEOUT_SECONDS
+    )
+    if rc != 0:
+        return None
+    first_file = ""
+    links: list[str] = []
+    seen_links: set[str] = set()
+    for record in out.split("\0"):
+        head, tab, path = record.partition("\t")
+        if not tab or not path:
+            continue
+        if head.split(" ", 1)[0] == _GITLINK_MODE:
+            if path not in seen_links:
+                seen_links.add(path)
+                links.append(path)
+        elif not first_file:
+            first_file = path
+    return first_file, links
+
+
+# sh が語を割る・展開する文字。案内に載せるパスがこれを含むときだけ `'…'` で囲む
+# （`_sh_word`）。導入スクリプト（scripts/ccnavi-setup.sh の sh_word）が同じ集合を持つ。
+_SH_SPECIAL = frozenset(" \t\n'\"\\$`!*?[](){}<>|&;#~")
+
+
+def _sh_word(path: str) -> str:
+    """案内のコマンドに載せるパスを、sh で 1 語として読める綴りにする。
+
+    割れる文字（`_SH_SPECIAL`）を含まなければそのまま（`projects/lib`）。含めば `'…'` で囲み、
+    中の `'` は `'\\''` に置く（`projects/my lib` → `'projects/my lib'`、
+    `projects/it's` → `'projects/it'\\''s'`）。英数字以外でも、日本語のように sh で割れない
+    文字は囲まない。導入スクリプトの sh_word と 1 字違わず同じ綴りにする。
+    """
+    if not any(c in _SH_SPECIAL for c in path):
+        return path
+    return "'" + path.replace("'", "'\\''") + "'"
+
+
+def _in_index(root: str, rel: str) -> str | None:
+    """置き場が索引に載っているなら、その苦情の文面。載っていなければ None（設計 §4.1・§4.2）。
+
+    - 通常のファイルが 1 本以上ある: **ぶつかり**。ワークスペース自身のソースに `projects/` が
+      あるので、`.gitignore` に足せという案内は誤り（ソースが追跡から外れる）。改名を案内する。
+      gitlink も載っていれば 1 文足して名指しする
+    - gitlink だけ: **載せ忘れ**。`.gitignore` に入れる前に `git add -A` した人の索引の形で、
+      改名は要らない。索引から外して無視に入れる 2 手を案内する。`.gitignore` に既に
+      `/projects/` があっても、索引に載っている限り追跡は外れないので言う
+    - `.gitmodules` で意図して置いたサブモジュールも mode だけで見るので載せ忘れになる
+      （設計 §4.5 の分岐 2）
+
+    導入スクリプト（scripts/ccnavi-setup.sh）が同じ条件と同じ文面を持つ。変えるならそちらも直す
+    （tests/sh/test_setup.py が 1 文目の一致を見る）。
+    """
+    split = _index_under(root, rel)
+    if split is None:
+        return None
+    first_file, links = split
+    lead = _TRACKED_LEAD.format(rel=rel)
+    if first_file:
+        text = (
+            f"{lead}（例: `{first_file}`）。"
+            f"ccnavi はワークスペース直下の `{rel}/` をプロジェクトの置き場として使い、"
+            "名前は変えられない。"
+            f"このままだと `{rel}/` の下で `.git` を持つディレクトリ（サブモジュールを含む）が"
+            "プロジェクトとして数えられ、その中の設定が判定に使われる。"
+            f"直すには、ワークスペースの `{rel}/` を別の名前に移す（例: `git mv {rel} apps`）。"
+            f"ccnavi でプロジェクトを置かないなら、このままでも動く。そのときは `{rel}/` の下に"
+            "`.git` を持つものを置かない"
+        )
+        if links:
+            named = "、".join(f"`{p}`" for p in links)
+            text += (
+                f"。索引には入れ子のリポジトリ（{named}）も載っている。"
+                "ccnavi のプロジェクトとして使うなら、改名の前に"
+                f" `git rm --cached {' '.join(_sh_word(p) for p in links)}` で索引から外し、"
+                f"改名のあとで `{rel}/` の下へ戻す"
+            )
+        return text
+    if not links:
+        return None
+    more = f" ほか {len(links) - 1} 件" if len(links) > 1 else ""
+    return (
+        f"{lead}（入れ子のリポジトリとして: `{links[0]}`{more}）。"
+        "`.gitignore` に入れる前に `git add` したものとみられる。"
+        "プロジェクトは自分の git を持つので、ワークスペースの git には載せない。"
+        "載せたままだと、ワークスペースのコミットがプロジェクトの版を記録し続け、"
+        f"`.gitignore` に `/{rel}/` を足しても追跡は外れない。"
+        f"直すには、ワークスペースで `git rm -r --cached {rel}` を打ち"
+        f"（ファイルは消えない。まだコミットしていなければ `git reset -- {rel}`）、"
+        f"`.gitignore` に `/{rel}/` を足して（既にあればそのまま）、コミットする"
+    )
 
 
 def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
