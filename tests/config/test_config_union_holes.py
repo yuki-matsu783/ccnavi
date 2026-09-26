@@ -110,7 +110,7 @@ SELF_PROJECT_RULES = {
             "id": "kube",
             "match": "Bash",
             "glob": "*kubectl*",
-            "message": "kubectl は人が叩く。",
+            "message": "kubectl は人が打つ。",
         }
     ],
 }
@@ -314,7 +314,7 @@ class ColonIdTest(ConfigUnionHarness):
         self.assertTrue(any("lib:custom" in p["where"] for p in errors), errors)
 
     def test_a_rule_with_a_colon_in_its_id_does_not_judge(self):
-        """11.4: 落として名指しする側に倒す。黙って効かせると、どのファイルを直すのか決まらない。
+        """11.4: 落として名指しする側を採る。黙って効かせると、どのファイルを直すのか決まらない。
 
         1 件の不備でガード全体は落とさない（rules.load）ので、他のルールは効いたまま。
         代償は、その 1 本が効かなくなること。`--lint` が error で言うのがその受け皿。

@@ -7,9 +7,9 @@
 実装（`_rule_problems` の条件に `rule.every <= 1` を足す）は i0060 フェーズ 2 の範囲。
 ここに書くテストは、その実装が無い間は一部が落ちて正しい
 （`test_every_over_1_suppresses_*` の 2 本）。残りは今の時点で既に通り、
-「読めない `every` は毎回渡る側へ倒す」という既定の挙動を実装後も落とさないための杭になる。
+「読めない `every` は毎回渡る側にする」という既定の挙動を実装後も落とさないための杭になる。
 
-道具は外から叩く（`tests/inproc.py` の `run_ccnavi`）。書き方は
+道具は外から呼ぶ（`tests/inproc.py` の `run_ccnavi`）。書き方は
 `tests/core/test_additional_context.py` の `test_lint_warns_on_broad_allow_only` に揃えた。
 """
 
@@ -103,7 +103,7 @@ class LintBroadEveryTest(unittest.TestCase):
         self.assertTrue(any("everything" in line for line in lines), done.stdout)
 
     def test_unreadable_every_still_warns(self):
-        # 読めない every は既定の 1 に倒すので、rule.every を見る実装なら自動的に warn が残る。
+        # 読めない every は既定の 1 として扱うので、rule.every を見る実装なら自動的に warn が残る。
         # every_written（書いたかどうか）だけを見る実装に書き換えたときに、この杭が落ちる。
         for bad in (0, -1, "x"):
             with self.subTest(every=bad):

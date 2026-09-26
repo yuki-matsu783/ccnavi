@@ -238,7 +238,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース自身（空）も候補。覚え直しても「すべて」に落ちない
+    // ワークスペース自身（空）も候補。覚え直しても「すべて」にならない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");
@@ -559,7 +559,7 @@ test("CB-D104 案内を閉じたら、焦点を案内の前の場所（「？ �
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Escape");
     await dom.settle();
-    assert.equal(dom.document.activeElement, button, "焦点が body に落ちた");
+    assert.equal(dom.document.activeElement, button, "焦点が body に移った");
   } finally {
     await dom.close();
   }

@@ -37,7 +37,7 @@ _SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh")
 _GIT_SCRIPT = "ccnavi-git.sh"
 
 # 同じコマンド行で置いてよい変数。出力の量と待ち時間だけを変え、検査の材料には触れない。
-# 通すものを並べる形にして、あとから sh が読むようになった変数は止まる側に倒す。
+# 通すものを並べる形にして、あとから sh が読むようになった変数は止まる側にする。
 PASS_THROUGH = frozenset(
     {
         "CCNAVI_GIT_MAX_LINES",
@@ -72,7 +72,7 @@ def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
     コマンド行のどこで置いても数える。前置きの代入（`X=… sh …`）、`env X=…`、`export X=…`、
     すでに書き出してある変数への素の代入（`X=…; sh …`。settings.json の env が書き出した変数は
     代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は、allow が当たらずに
-    確認へ落ちるので、ここでは見ない。
+    確認になるので、ここでは見ない。
     """
     if degraded:
         return "", []
@@ -132,7 +132,7 @@ def child_parent(conf: settings.Settings, root: str, name: str) -> tuple[str, st
 
     探すのは、ワークスペースルート・プロジェクトの置き場の下・`.claude/worktrees/` の下の
     ディレクトリ全部の `doing/`・`done/` と `review/`。git のリポジトリかどうかは問わない。
-    読めないファイルは「子かもしれない」として止める側に倒す（親は `?`）。
+    読めないファイルは「子かもしれない」として止める側にする（親は `?`）。
     """
     for top in _trees(conf, root):
         approved = settings.approved_dir(conf, top)

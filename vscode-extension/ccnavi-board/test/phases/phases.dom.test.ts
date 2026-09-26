@@ -1,9 +1,9 @@
 /** フェーズ管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。 */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import { readPhases } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
-import { openPage, openPhases, page, rowSelector } from "../helpers/phases.js";
+import { openPage, openPhases, page, rowSelector, SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLOptionElement } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -31,7 +31,7 @@ test("CB-D20 既定は畳み、行を押すと開いて state に id が入る�
     await dom.settle();
     assert.ok(dom.one(rowSelector("p2")).classList.contains("open"));
     assert.deepEqual((dom.state() as { open: string[] }).open, ["design"]);
-    // 雛形の design は when を持つので開く。implement-feedback は関係も案内も無いので閉じる
+    // 見本の design は when を持つので開く。implement-feedback は関係も案内も無いので閉じる
     assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
     assert.ok(!dom.one(`${rowSelector("p5")} details.more`).hasAttribute("open"));
   } finally {
@@ -222,7 +222,7 @@ test("CB-D67 ほかの種類との関係・補足は、最後の値を消して�
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
-    // 雛形の research は when だけを持つので開いている
+    // 見本の research は when だけを持つので開いている
     assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
     dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
@@ -297,7 +297,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
         .all<HTMLOptionElement>(`${rowSelector("p4")} ${field} select.id-select option`)
         .filter((option) => only === undefined || option.selected)
         .map((option) => option.value);
-    // 雛形の implement。自分（implement）は候補に出ない
+    // 見本の implement。自分（implement）は候補に出ない
     assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
     assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
     // after の候補は work の種類だけ。feedback の種類は待つ先にできない
@@ -369,7 +369,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
 });
 
 test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
-  const base = readPhases(TEMPLATE_PHASES_TEXT).model;
+  const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
   const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
   try {

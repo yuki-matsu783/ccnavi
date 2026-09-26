@@ -1,5 +1,5 @@
 /**
- * 層（自身の層・プロジェクト）の種類。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
+ * 層（自身の層・プロジェクト）と共通層の種類。ファイルが無いときの見せ方と、無いファイルへの書き戻し。
  * 画面の側は React なので happy-dom で動かして見る。
  */
 import { test } from "node:test";
@@ -16,7 +16,7 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   try {
     assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られる/);
     assert.equal(layer.all('button[data-action="create"]').length, 0, "層に雛形は置かない");
-    // 文面はそのまま出る（React が文字として入れるので、実体参照に化けない）
+    // 文面はそのまま出る（React が文字として入れるので、実体参照に変わらない）
     assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
     // 無い層でも種類を足して保存できる
@@ -28,20 +28,28 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   } finally {
     await layer.close();
   }
+});
 
-  // 共通層は今までどおり雛形を作るまで触れない。注意が無ければ帯を足さない
+test("CB-T239 共通層のファイルが無いときは雛形を作らせず、種類は層に置くと案内して自身の層を開く道だけを出す", async () => {
   const common = await openPhases({ ...MISSING, phasesPath: ".ccnavi/common/phases.yml" });
   try {
-    assert.match(common.one(".banner.missing").textContent, /種類を使うにはまずファイルを作る/);
-    assert.equal(common.one('button[data-action="create"]').textContent, "雛形でファイルを作る");
+    const banner = common.one(".banner.missing").textContent;
+    assert.match(banner, /共通層に種類は無い/);
+    assert.match(banner, /種類は各層（ワークスペース自身・プロジェクト）に置く/);
+    assert.match(banner, /プロジェクト管理画面の「フェーズ管理」から開く/);
+    assert.equal(common.all('button[data-action="create"]').length, 0, "共通層に雛形を作るボタンは出さない");
+    assert.ok(!/雛形/.test(common.one("body").textContent), "雛形で作る道を案内しない");
+    // 欄は触れない（画面から共通層のファイルを作らせない）。注意が無ければ帯を足さない
     assert.ok(common.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(common.one("#phases .empty").textContent, /上の「雛形でファイルを作る」で作ってから直す/);
+    assert.match(common.one("#phases .empty").textContent, /種類は層に置く/);
     assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
-    common.click(common.one('button[data-action="create"]'));
+    // 自身の層を開くボタンは、拡張ホストへ openSelf だけを送る（ファイルは作らない）
+    assert.equal(common.one('button[data-action="open-self"]').textContent, "自身の層を開く");
+    common.click(common.one('button[data-action="open-self"]'));
     await common.settle();
     assert.deepEqual(
       common.posted.filter((message) => message.type !== "ready"),
-      [{ type: "create" }],
+      [{ type: "openSelf" }],
     );
   } finally {
     await common.close();

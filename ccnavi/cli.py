@@ -388,7 +388,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.guard_ticket_approval:
         conf.guard_ticket_approval_declared = args.guard_ticket_approval
     # この門は dry-run を取らない（selfguard.GATE_SETTINGS）。取れない語で書かれて
-    # いたら、読めない値と同じ扱いで enable へ倒す。--lint はそれを error にする。
+    # いたら、読めない値と同じく enable として扱う。--lint はそれを error にする。
     conf.guard_ticket_approval = selfguard.resolve(
         stderr,
         args.guard_ticket_approval,
@@ -396,7 +396,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         settings.GUARD_TICKET_APPROVAL_ENV,
         selfguard.GATE_SETTINGS,
     )
-    # チケット制御も 2 値。読めない値は enable（使う側）に倒す。切ったつもりで
+    # チケット制御も 2 値。読めない値は enable（使う側）として扱う。切ったつもりで
     # 綴りを誤った設定は、判定では効いたままになり、--lint が error で名指しする。
     if args.ticket_control:
         conf.ticket_control_declared = args.ticket_control
@@ -440,7 +440,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         )
 
     # 診断の経路。どちらも payload を読まず、判定を実行にも記録にも繋げない。
-    # 人が端末から叩いて「このルールは何に当たるのか」を確かめるための場所で、
+    # 人が端末から打って「このルールは何に当たるのか」を確かめるための場所で、
     # 判定そのものは実運用と同じ関数を通る（REQ-DIA-03）。
     if args.test is not None:
         if args.json:
@@ -453,7 +453,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.explain:
         return diagnose.explain(stdout, stderr, conf, root)
 
-    # 承認の経路。人が端末から叩くもので、payload を読まないのでここで分かれる。
+    # 承認の経路。人が端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
     # 判断ではなく、これから効く範囲についての合意になる。
     if args.approve:
@@ -541,7 +541,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         settings.GUARD_CORE_FILES_ENV,
     )
     # この門は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
-    # 持つので、ここに dry-run は無い。読めない値は enable に倒れる。
+    # 持つので、ここに dry-run は無い。読めない値は enable になる。
     conf.guard_unwatched = selfguard.resolve(
         stderr,
         "",

@@ -1,4 +1,4 @@
-"""複数のリポジトリ（REQ-MLT）の受入テスト。道具を外から叩いて応答だけを見る。
+"""複数のリポジトリ（REQ-MLT）の受入テスト。道具を外から呼んで応答だけを見る。
 
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
@@ -170,13 +170,13 @@ class ProjectsTest(unittest.TestCase):
         self.app = self.project("app", APP_RULES)
         self.lib = self.project("lib", LIB_RULES)
         # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる
-        # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに落ちる。
+        # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "log.jsonl")
 
     def approved_path(self, *parts):
-        """承認済みチケットの置き場の下のパス。どのツリーに落ちたかを探す。"""
+        """承認済みチケットの置き場の下のパス。どのツリーに置かれたかを探す。"""
         for where in (self.ws, self.lib, self.app):
             path = os.path.join(where, ".ccnavi", "approved", *parts)
             if os.path.exists(path):
@@ -324,8 +324,8 @@ class ProjectsTest(unittest.TestCase):
     def test_unreadable_project_rules_are_empty_and_drop_out_of_the_union(self):
         """壊れた層は空として扱い、記録が層の名前を残す（設計 11.2、REQ-MLT-06）。
 
-        組み込みの既定へは落ちない。共通層が有るのに落とすと、共通層の deny が
-        消える側に倒れる。
+        組み込みの既定には戻らない。共通層が有るのに戻すと、共通層の deny が
+        消える側になる。
         """
         write(layer_rules(self.app), "version: 1\ndeny: [\n")
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))

@@ -263,7 +263,7 @@ class FlagsAreDiagnosisOnlyTest(CommonLayerPlaceHarness):
 
 
 class TheDefaultPlaceStaysGuardedTest(CommonLayerPlaceHarness):
-    """守る面は既定の置き場に付く。"""
+    """設定ファイルの守りは既定の置き場に付く。"""
 
     def test_named_tool_writes_into_the_default_place_are_denied_while_the_env_names_another(self):
         """env がよそを指していても、`.ccnavi/common/` の 3 本は組み込みで止まる。

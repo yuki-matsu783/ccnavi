@@ -11,8 +11,8 @@
  * 文字の配列で持つ。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
- * 要否が決まる）。ファイルが無いときに「作る」で書く雛形は README の例で、置き場の
- * 綴りはそのプロジェクトに合わせて画面で直す前提。
+ * 要否が決まる）。雛形も持たない（共通層に雛形を置くと、層の同じ id と中身が食い違い、その層が
+ * 空として扱われる）。
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
 
@@ -36,72 +36,6 @@ export type ListKey = (typeof LIST_KEYS)[number];
 
 /** 種類の中の欄を書く順。無い欄はこの順の直前の欄の後ろに入る */
 const KEY_ORDER = ["kind", "title", "review", "scope", "deliverables", "overlap", "requires", "after", "agent", "when"] as const;
-
-/**
- * ファイルが無いときに「作る」で書き出す雛形。`scope` の綴りは例なので、作ったあとに画面で
- * そのプロジェクトの置き場に直す。
- *
- * **待ち方は dag で、流れを `after` で書く**（調査 → 設計と受入テスト作成 → 実装とテスト）。
- * 一直線（sequential）だと種類どうしの順序がファイルのどこにも無く、図に流れが出ない。
- * 受入テストは実装より先に書く（`overlap` で実装と並行させない）。feedback の種類は
- * `after` を持てない（`phasetypes.py`）ので、レビュー後の対応として別に置く。
- */
-export const TEMPLATE_PHASES_TEXT = `# フェーズの種類（設計 9.7）。人が持つ設定で、エージェントは書き換えない。
-#
-# 親チケットの \`plan:\` に、ここで定義した種類の名前を順に並べる。それが全体計画で、
-# \`ccnavi --approve\` が通ることが合意になる。レビューを受けたあとは \`feedback:\` に
-# \`kind: feedback\` の種類を並べて改版を出す（対応が無くても \`[]\` で出す）。
-#
-# \`id\`（キー）と \`title\` はどちらも一意。重なれば --lint が error で止める。
-# このファイルが無ければ、フェーズは番号だけの挙動に戻る。
-#
-# \`order: dag\` なので、各項は \`after\` に挙げた種類（の祖先）だけを待ち、辺で繋がっていない
-# 種類は並行して進む。辺の書き漏れは並行として通るので、画面の図で確かめる。
-#
-# 下は雛形。scope の綴りはこのプロジェクトの置き場に合わせて直す。
-version: 1
-order: dag
-
-phases:
-  research:
-    kind: work
-    title: 調査
-    review: none
-    scope: ["wip/research/*"]
-    deliverables: ["wip/research/summary.md"]
-    when: 既存の振る舞いや依存が分からないとき。分かっているなら飛ばす
-
-  design:
-    kind: work
-    title: 設計
-    review: mr
-    scope: ["wip/design/*", "docs/*"]
-    deliverables: ["wip/design/*.md"]
-    after: [research]
-    when: 触る場所が 3 か所を超えるか、外から見える振る舞いが変わるとき
-
-  acceptance:
-    kind: work
-    title: 受入テスト作成
-    review: mr
-    scope: ["tests/*"]
-    after: [design]
-    when: 振る舞いが変わるとき。設計のあと、実装より先に書く
-
-  implement:
-    kind: work
-    title: 実装とテスト
-    review: mr
-    scope: ["src/*", "tests/*"]
-    requires: [acceptance]
-    after: [acceptance]
-
-  implement-feedback:
-    kind: feedback
-    title: 実装フィードバック対応
-    review: mr
-    scope: inherit
-`;
 
 export interface PhasesDocument {
   readonly model: PhasesModel;

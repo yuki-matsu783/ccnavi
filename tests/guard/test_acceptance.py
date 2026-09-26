@@ -313,7 +313,7 @@ class HeredocTest(unittest.TestCase):
         out = verdict(self, run(payload=pre_tool_use("Bash", "command", 'grep -n "<<" README.md')))
 
         self.assertEqual(out.get("permissionDecision"), "deny")
-        # 止まる側に倒れるだけでなく、本来の禁止と混ざらない文面であること。
+        # 止まる側になるだけでなく、本来の禁止と混ざらない文面であること。
         # 誤検知を許容できるのは、返る文面が読み手に次の一手を残すからで、
         # そこが崩れると許容の前提が消える。
         self.assertIn("raw text", out["permissionDecisionReason"])

@@ -194,7 +194,7 @@ test("CB-D78 id が空の種類は図に出ず、その数を一言が言う", a
 });
 
 test("CB-D79 同じ組が requires と overlap の両方を持つとき、2 本が重ならない", async () => {
-  // このリポジトリの設定（acceptance と implement）と雛形が、まさにこの形。
+  // このリポジトリの設定（acceptance と implement）と見本が、まさにこの形。
   // 同じ端どうしを結ぶと破線が実線の下に隠れ、overlap が 1 本も見えなくなる
   const dom = await openGraph({ model: model(LINKED) });
   try {
@@ -211,8 +211,8 @@ test("CB-D79 同じ組が requires と overlap の両方を持つとき、2 本�
   }
 });
 
-test("CB-D89 雛形の図は after の矢印で流れを描き、work と feedback を枠で分けて「レビュー後」の矢印で結ぶ", async () => {
-  // 雛形は dag で、調査 → 設計 → 受入テスト作成 → 実装とテスト。implement-feedback は feedback の枠
+test("CB-D89 見本の図は after の矢印で流れを描き、work と feedback を枠で分けて「レビュー後」の矢印で結ぶ", async () => {
+  // 見本は dag で、調査 → 設計 → 受入テスト作成 → 実装とテスト。implement-feedback は feedback の枠
   const dom = await openGraph();
   try {
     const after = dom.all(".react-flow__edge.rel-after path.react-flow__edge-path");
@@ -224,7 +224,7 @@ test("CB-D89 雛形の図は after の矢印で流れを描き、work と feedba
     assert.match(dom.one('.phase-group[data-kind="work"]').textContent ?? "", /作業（plan:）/);
     assert.match(dom.one('.phase-group[data-kind="feedback"]').textContent ?? "", /フィードバック対応（feedback:）/);
     assert.match(dom.one(".phase-group-arrow").textContent ?? "", /レビュー後/);
-    // 雛形は dag で、落ちた線も id の空の種類も無いので、注意は 1 つも出ない
+    // 見本は dag で、落ちた線も id の空の種類も無いので、注意は 1 つも出ない
     assert.equal(dom.all(".graph-note").length, 0);
   } finally {
     await dom.close();

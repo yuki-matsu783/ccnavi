@@ -162,7 +162,7 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("error:", result.stdout)
         self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=dry-run", result.stdout)
-        # 倒れた先も言う。言わないと、止まっているのか通っているのかが分からない。
+        # 実際の値も言う。言わないと、止まっているのか通っているのかが分からない。
         self.assertIn("enable として動いている", result.stdout)
 
     def test_確認できない側の門を切ったらwarnで言う(self):
@@ -553,7 +553,7 @@ class LintTest(unittest.TestCase):
     def test_モードとして読めない値はwarnとして報告される(self):
         result = lint(self.root, rules_file(self.root, SOUND), mode="blocking")
 
-        self.assertEqual(result.returncode, 0, "block に落ちるのでガードは弱まらない")
+        self.assertEqual(result.returncode, 0, "block になるのでガードは弱まらない")
         self.assertEqual(counts(result.stdout), (0, 1))
         self.assertIn("blocking", result.stdout)
 

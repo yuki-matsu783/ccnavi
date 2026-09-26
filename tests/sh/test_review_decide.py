@@ -1,6 +1,6 @@
 """ccnavi-review.sh decide の受入テスト。
 
-sh を外から叩き、GitLab の代役と実行ファイルの代役で 1 周させる。
+sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周させる。
 
 見るのは sh の仕事だけ（設計 9.10）。
 
@@ -12,7 +12,7 @@ sh を外から叩き、GitLab の代役と実行ファイルの代役で 1 周�
 5. 引数の組み合わせの誤りは、実行ファイルを起こす前に断る
 
 実行ファイルは代役（引数を記録し、決まった答えと下書きを書く sh）。判定そのものは
-`tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が叩く道だけを返す。
+`tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ道だけを返す。
 """
 
 from __future__ import annotations
@@ -98,7 +98,7 @@ def quote_arg(arg: str) -> str:
 
 
 class GitLab(http.server.BaseHTTPRequestHandler):
-    """sh が叩く道だけを返す代役。
+    """sh が呼ぶ道だけを返す代役。
 
     投稿は `posted` に積む。`fail_notes` なら投稿のコメントを 500 にする。
     """

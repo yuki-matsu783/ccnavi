@@ -297,9 +297,9 @@ function flow(raw: Record<string, unknown>): FlowJson | null {
     rel: str(raw.rel),
     tree: str(raw.tree),
     exists: raw.exists === true,
-    // 欄が欠けていたら書かない側に倒す（リンクかを確かめられない）
+    // 欄が欠けていたら書かない側にする（リンクかを確かめられない）
     linked: raw.linked !== false,
-    // 欄が欠けていたら閉じる側に倒す（止まっているかを確かめられないので、書かせない）
+    // 欄が欠けていたら閉じる側にする（止まっているかを確かめられないので、書かせない）
     locked: raw.locked !== false,
   };
 }

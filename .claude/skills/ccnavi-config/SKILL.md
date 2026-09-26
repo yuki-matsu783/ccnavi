@@ -10,16 +10,13 @@ description: >-
 
 # ccnavi-config
 
-ccnavi の判定と進め方は、3 本のファイルで決まる。どれも**人が持つ設定**で、
-エージェントが書き換えると、自分のリスクや守りを自分で決められることになる。
+ccnavi の判定と進め方は 3 本のファイルで決まる。どれも人が持つ設定。
 
 | ファイル | 決めるもの | 無いとき |
 |---|---|---|
-| `.ccnavi/common/rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定に落ち、`--lint` が言う |
+| `.ccnavi/common/rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定を使い、`--lint` が言う |
 | `.ccnavi/common/phases.yml` | フェーズの種類。親の `plan:` に並べる名前と、その範囲・レビュー・成果物 | 番号だけのフェーズ。`plan:` は読めない |
 | `.ccnavi/common/risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（定量 4 項目） |
-
-このスキルの仕事は 2 つで、入口で分かれる。
 
 | 言われたこと | 読むもの |
 |---|---|
@@ -30,24 +27,18 @@ ccnavi の判定と進め方は、3 本のファイルで決まる。どれも**
 
 ## 絶対ルール
 
-- **3 本のファイルを書き換えない。** 下書きはワークツリーの `scratchpad/` に置き（ワークツリーが
-  無ければセッションの scratchpad。docs/claude/scratchpad.md）、検証を通してから
-  「何をなぜ変えるか」と一緒に利用者に渡す。置くのは利用者。`dry-run` で警告だけで
-  通っても同じ。判定が緩んだときに手順が変わる形にしない
-- **判定を目で真似しない。** 当たるかどうかは必ず `ccnavi --test-samples` か `--lint` に
-  聞く。glob は正規表現に翻訳され、Bash はシェルとして読まれてから当たるので、
-  読んだだけの「当たるはず」は判定と別のことを言う
-- **見本を期待に合わせて書き換えない。** 食い違いが出たら、直すのはルールか見本の
-  どちらかで、決めるのは利用者
-- **TodoWrite と Agent ツールを使わない**
+- 3 本のファイルを書き換えない。下書きはワークツリーの `scratchpad/`（無ければセッションのスクラッチパッド。docs/claude/scratchpad.md）に置き、検証を通してから
+  「何をなぜ変えるか」と一緒に利用者に渡す。置くのは利用者。`dry-run` で警告だけで通っても同じ
+- 判定を目で真似しない。当たるかどうかは必ず `ccnavi --test-samples` か `--lint` に聞く
+- 見本を期待に合わせて書き換えない。食い違いが出たら、ルールと見本のどちらを直すかは利用者が決める
+- TodoWrite と Agent ツールを使わない
 
 ## ccnavi の打ち方
 
 以下で `ccnavi` と書いたら、このリポジトリでは `uv run python -m ccnavi`。配布先の
-プロジェクトでは settings.json の `CCNAVI_BIN_PATH` が指す振り分けの sh
-（`.ccnavi/scripts/ccnavi-launcher.sh`。この機械に合う `.ccnavi/bin/<os>-<arch>/ccnavi` を選んで起動する）。
+プロジェクトでは settings.json の `CCNAVI_BIN_PATH` が指す `.ccnavi/scripts/ccnavi-launcher.sh`。
 
-診断のときは記録と控えを外す。外さないと、走っているセッションの記録に診断の行が混ざる。
+診断のときは記録と控えを外す（`--log "" --state ""`）。
 
 ```sh
 ccnavi --lint --log "" --state ""
@@ -59,10 +50,9 @@ ccnavi --explain --log "" --state ""
 - `--lint` は判定をせず、防御を消す・全部止める記述を error、意図した防御が効いていない
   記述を warn で名指しする。3 本まとめて見る。error があれば終了コード 1
 - `--test-samples` は見本をぜんぶ判定に掛け、置いたタイプ（`deny` / `ask` / `allow`）と
-  違う判定になったものを並べる。判定は hook と同じ関数を通る
+  違う判定になったものを並べる
 - `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる。判定はしない
-- `--rules` / `--phases` / `--risk` で下書きを差し替えられる。本物を置く前に確かめる道
+- `--rules` / `--phases` / `--risk` で下書きを差し替えられる
 
-**`--test` に禁止語を書かない。** `ccnavi --test Bash "git push"` は、その Bash 自体が
-`raw-git` に当たる。単発で試したいものも見本ファイルを `scratchpad/` に書いて
-`--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。
+`--test` に禁止語を書かない（`ccnavi --test Bash "git push"` はその Bash 自体が `raw-git` に当たる）。
+単発で試したいものも見本ファイルを `scratchpad/` に書いて `--test-samples` で回す。見本の形は `.ccnavi/common/rule-samples.yml` の先頭のコメントにある。

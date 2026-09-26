@@ -23,7 +23,7 @@
 - 定性（サブエージェント）: `judge:` に書いた問いを、親がサブエージェントに判断させ、
   `ccnavi-ticket.sh record-risk` で yes / no を記録する。判定が揃うまで子は閉じられない
 
-測れなかった項目（スクリプトの失敗、読めない出力）は重い側に倒し、その項目の点を加える。
+測れなかった項目（スクリプトの失敗、読めない出力）は重いほうとして扱い、その項目の点を加える。
 「測れないから 0」にすると、壊れたスクリプトがリスクを消す。
 
 ## 書式
@@ -38,7 +38,7 @@
       - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 
-ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、
+ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
 そのことは --lint と子を閉じるときの出力が言う。
 """
 
@@ -134,7 +134,7 @@ class Definition:
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
     source: str = BUILTIN
-    # 読めなかった理由（組み込みに落ちたとき、か、層を空として扱ったとき）。
+    # 読めなかった理由（組み込みに戻ったとき、か、層を空として扱ったとき）。
     fallback: str = ""
     # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 11.2）。
     dropped: list[str] = field(default_factory=list)
@@ -190,7 +190,7 @@ def builtin() -> Definition:
 
 
 def load(path: str) -> tuple[Definition, list[Problem]]:
-    """共通層の定義を読む。無ければ組み込み。壊れていれば組み込みに落ち、苦情を返す。"""
+    """共通層の定義を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す。"""
     if not path:
         return builtin(), []
     try:
@@ -213,9 +213,9 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
 
 
 def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
-    """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みへは落とさない。
+    """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みには戻さない。
 
-    共通層が在るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 11.2）。
+    共通層が在るのに組み込みに戻すと、共通層の配点が消える側になる（設計 11.2）。
     壊れた層は空として扱い、苦情だけを返す。
     """
     if not path:
@@ -426,7 +426,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
     `levels` は書かれた鍵だけが参加し、キーごとに小さいほうを採る。どの層も書いて
     いない鍵は既定（`DEFAULT_LEVELS`）。
 
-    同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる方向に倒れるから。
+    同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる側になるから。
     両方を数えれば、衝突は加点を増やす側にしか働かない（ルールの同 `id` と同じ扱い）。
     裸の `id` にコロンは書けないので、名乗り直した `id` が他の項目と重なることは無い。
 
@@ -541,7 +541,7 @@ def layer_definition(
     """共通層 + その層の配点と、**その層の**苦情（設計 11.4.2）。
 
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
-    言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに落ち、
+    言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに戻り、
     そのときは層を足さない（設計 11.2）。
     """
     definition, _ = load(conf.risk)
@@ -679,7 +679,7 @@ class Score:
     points: int = 0
     level: str = LEVEL_LOW
     hits: list[Hit] = field(default_factory=list)
-    # 測れなかった項目（重い側に倒して加点済み）。
+    # 測れなかった項目（重いほうとして扱い、加点済み）。
     unmeasured: list[str] = field(default_factory=list)
     # 判定の無い定性項目。揃うまで子は閉じられない。
     pending: list[Factor] = field(default_factory=list)

@@ -37,7 +37,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
-# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、--lint が言う。
+# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みを使い、--lint が言う。
 version: 1
 levels:
   medium: 20
@@ -76,13 +76,13 @@ export function readRisk(text: string): RiskDocument {
     problems.push(`YAML として読めない: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位が対応表ではない。実行ファイルは組み込みの配点に落ちる。保存すると中身を捨てて対応表から始める");
+    problems.push("最上位が対応表ではない。実行ファイルは組み込みの配点を使う。保存すると中身を捨てて対応表から始める");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
     problems.push(`version が無い。保存すると version: ${RISK_VERSION} を先頭に足す`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めない（読むのは ${RISK_VERSION}）。組み込みの配点に落ちる`);
+    problems.push(`version ${String(version)} は実行ファイルが読めない（読むのは ${RISK_VERSION}）。組み込みの配点を使う`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
@@ -163,7 +163,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     top.items.unshift(doc.createPair("version", RISK_VERSION));
   }
 
-  // levels。空の欄は書かない（組み込みの値に落ちる）。
+  // levels。空の欄は書かない（組み込みの値を使う）。
   const rawLevels: unknown = top.get("levels", true);
   let levelsNode: YAMLMap | undefined;
   if (isMap(rawLevels)) {

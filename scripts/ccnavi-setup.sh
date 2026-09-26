@@ -52,7 +52,7 @@
 # すると、そのプロジェクトが何を止めるかを、打ち直し 1 回で配布元の形へ戻す。
 #
 # `disable` は受け付けない。監視される側が書けるファイルから監視を止める形に
-# なるので、ccnavi 自身がそれを error として報告する（README「設定lint」）。
+# なるので、ccnavi 自身がそれを error として報告する（README「設定の検証」）。
 # 止めるならセッションを起動する側の環境から渡す。
 #
 # 終了コード: 0 成功 / 1 --check で揃っていない / 2 引数か環境の誤り
@@ -62,7 +62,7 @@ set -eu
 SETTINGS_REL=".claude/settings.json"
 # VS Code へ渡す設定。値ではなくキーの有無で見て、足りないものだけを足す。
 # `git.detectWorktrees` は、.claude/worktrees/ の中のワークツリーをソース管理の
-# ビューに出す（README「worktreeをVSCODEで見えるようにする」）。
+# ビューに出す（README「ワークツリーを VS Code から見えるようにする」）。
 VSCODE_REL=".vscode/settings.json"
 VSCODE_KEYS='{"git.detectWorktrees": true}'
 # hook はこの 1 行だけを登録する。どのイベントを走らせるかは、payload が名乗る
@@ -119,7 +119,7 @@ LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを分けて持つ。--force が置き換えてよいのは、人がこの実行で
 # 名指しした値だけ。既定で埋めただけの値まで置き換えると、`--all` を足しに来た
-# 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run へ落とす。
+# 打ち直しが、その場で指定していない CCNAVI_MODE を既定の dry-run に戻す。
 mode_given=no
 # チケット制御。プロジェクトが「全体ルールだけ」か「チケットまで」かを、導入の
 # ときに決めてもらう場所。既定は enable で、書かなくても同じに動くが、常に書く。
@@ -253,7 +253,7 @@ disable)
 	;;
 esac
 
-# チケット制御は enable か disable の 2 値。ccnavi 側は読めない値を enable に倒し、
+# チケット制御は enable か disable の 2 値。ccnavi 側は読めない値を enable として扱い、
 # --lint が error にするが、書く前に止めるほうが安い。
 case "$ticket_control" in
 enable | disable) ;;
@@ -1123,7 +1123,7 @@ if [ "$deploy_work" = yes ]; then
 		{
 			if [ -s "$root/.gitignore" ]; then
 				# 末尾に改行が無いファイルへ足すと、最後の行と繋がって別の
-				# 綴りになる。無視のつもりの行が、誰も意図しない 1 行に化ける。
+				# 綴りになる。無視のつもりの行が、誰も意図しない 1 行になってしまう。
 				if [ -n "$(tail -c 1 "$root/.gitignore")" ]; then
 					printf '\n'
 				fi

@@ -11,7 +11,7 @@
 
   - `rules.load` が返すルール集合と苦情（Problem）
   - 組み立てた式が当たるか当たらないか
-  - hook として叩いたときの判定
+  - hook として呼んだときの判定
   - `--lint` の言い分
 
 `_build` の戻り値の形をどう変えるか（設計 4.4 の案 1 か案 2）は実装フェーズの
@@ -45,7 +45,7 @@ def absolute(path: str) -> str:
     展開はルートを 1 文字ずつ写すだけなので、区切りが `\` でも中身は変わらない。
     変わるのは**絶対かどうか**で、`rules.real_root` が呼ぶ `os.path.realpath` は、
     相対のパスなら頭に cwd を足す。POSIX で `C:\Users\...` をそのまま渡すと、ルートが
-    `<cwd>/C:\Users\...` に化けて、「中」のはずのパスが全部「外」になり、長さの境界も
+    `<cwd>/C:\Users\...` になってしまい、「中」のはずのパスが全部「外」になり、長さの境界も
     cwd のぶんだけずれる。設計 2.3 の表は Windows の綴りのまま残して、頭だけを機械に
     合わせる（docs/claude/environment.md「実行環境」: 4 つのどれでも動くように書く）。
 
@@ -77,7 +77,7 @@ def write(path: str, text: str) -> str:
 def rules_file(directory: str, *rule: dict, section: str = "deny") -> str:
     """ルールファイルを 1 枚書いて綴りを返す。
 
-    置くのは共通層の既定の場所。hook として叩く側は `--rules` を渡せない
+    置くのは共通層の既定の場所。hook として呼ぶ側は `--rules` を渡せない
     （診断でだけ効く。ADR-0067）ので、ワークスペースルートの下の既定の綴りに要る。
     直に `rules.load` に渡すだけのテストは、どこに在っても同じ。
     """
@@ -192,7 +192,7 @@ class NotRootExpansionTest(unittest.TestCase):
 
         最内に `\\Z` を混ぜると、ルートを最後までなぞり切った位置で「外」に落ちる。
         `Glob` を `path` 省略で呼ぶと対象が cwd（＝ルート）になるので、
-        いちばん普通の呼び出しが「外」に化ける。
+        いちばん普通の呼び出しが「外」になってしまう。
 
         各段の `\\Z` は「ルートより上」を拾うためのもので、最内とは意味が違う。
         """
@@ -364,7 +364,7 @@ class NotRootLimitTest(unittest.TestCase):
                     self.fail("RecursionError が外へ漏れた")
                 self.assertTrue(problems)
 
-    # --- 観点 9: 生成できないときの倒れ方 ---
+    # --- 観点 9: 生成できないときの扱い ---
 
     def test_deny_falls_closed(self):
         """組み立てられない `deny` は、`match` の全部を止める。設計 4.3。
@@ -412,7 +412,7 @@ class NotRootLimitTest(unittest.TestCase):
     def test_allow_falls_the_other_way(self):
         """組み立てられない `allow` は、どれにも当たらない。設計 4.3。
 
-        当たる扱いにすると ccnavi が黙る範囲が広がる。deny とは逆に倒す。
+        当たる扱いにすると ccnavi が黙る範囲が広がる。deny とは逆の側を採る。
         """
         path = rules_file(
             self.dir.name,
@@ -424,7 +424,7 @@ class NotRootLimitTest(unittest.TestCase):
         matched = [
             r for r in rule_set.allow if r.compiled and r.compiled.search(absolute(r"C:\x\y.md"))
         ]
-        self.assertEqual(matched, [], "allow は当たらない側に倒すべき")
+        self.assertEqual(matched, [], "allow は当たらない側にすべき")
 
 
 class NotRootWritingTest(unittest.TestCase):
@@ -481,7 +481,7 @@ class NotRootWritingTest(unittest.TestCase):
 
 
 class NotRootJudgeTest(unittest.TestCase):
-    """hook として叩いたときの判定。設計 4.7。"""
+    """hook として呼んだときの判定。設計 4.7。"""
 
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
