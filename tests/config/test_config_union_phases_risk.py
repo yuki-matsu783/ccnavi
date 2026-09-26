@@ -5,9 +5,9 @@ fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ�
 risk は共通層に `big-diff`、lib の層に `schema` と `levels: {critical: 50}` がある。
 
 どの層を足すかは親の承認済みチケットの `project:` で決まる。lib 向けの提案は
-`wip/lib/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く。
+`projects/lib/wip/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く（設計 11.5）。
 
-実装はまだ無い。このテストは実装フェーズで通るようになる。
+実装は入っている。ここが落ちたら、phases / risk の合成が設計 11.4.1 / 11.4.2 からずれたということ。
 """
 
 from __future__ import annotations
