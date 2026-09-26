@@ -443,15 +443,31 @@ export function removeNode(doc: FlowDoc, id: string): FlowDoc {
 }
 
 /**
- * 線を足す。同じ出口から同じ入口への線が既にあれば足さない。自分へ戻る線も足さない。
+ * `from` から `to` へ線を引けるか。図で引いている最中（React Flow の `isValidConnection`）と `connect` が同じ規則で読む。
+ *
+ * - 自分へ戻る線は引かない
+ * - グループは囲みで手順ではない。線は繋がない
+ * - 開始（start）へ入る線と、終了（end）から出る線は引かない（開始は入口を、終了は出口を持たない）
+ * - 無いノードには引かない
+ */
+export function canConnect(doc: FlowDoc, from: string, to: string): boolean {
+  if (from === to) {
+    return false;
+  }
+  const source = doc.nodes.find((node) => node.id === from);
+  const target = doc.nodes.find((node) => node.id === to);
+  if (source === undefined || target === undefined || isGroup(source) || isGroup(target)) {
+    return false;
+  }
+  return nodeType(target) !== "start" && nodeType(source) !== "end";
+}
+
+/**
+ * 線を足す。引けない線（`canConnect`）と、同じ出口から同じ入口への線が既にあるときは足さない。
  * `connections` が無かったフローには、ここで初めて欄ができる。
  */
 export function connect(doc: FlowDoc, from: string, fromPort: string, to: string, toPort: string): FlowDoc {
-  if (from === to) {
-    return doc;
-  }
-  // グループは囲みで手順ではない。線は繋がない
-  if (doc.nodes.some((node) => (node.id === from || node.id === to) && isGroup(node))) {
+  if (!canConnect(doc, from, to)) {
     return doc;
   }
   const now = connectionsOf(doc);
@@ -813,6 +829,123 @@ export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; 
     next = placeNode(next, move.id, { x: base.x + move.position.x, y: base.y + move.position.y });
   }
   return next;
+}
+
+// ---- 写す・貼る・複製する
+
+/**
+ * 写したノードと線（画面の中の控え）。元のフローから切り離した深い写しで、貼るたびに id を振り直す。
+ *
+ * - `nodes` は元の並びの順（グループは中のノードより前）。`parentId` は元の id のまま持つ
+ * - `absolute` は写した時点の図の上の位置。貼る先に元のグループが無いとき（消した・別のグループの中身だけ
+ *   写した）は、この位置で外に置く
+ * - `connections` は写したノード同士の線だけ（片方しか写していない線は写さない）
+ */
+export interface FlowClip {
+  readonly nodes: readonly FlowNode[];
+  readonly absolute: Readonly<Record<string, FlowPoint>>;
+  readonly connections: readonly FlowConnection[];
+}
+
+/** 貼るたびにずらす量。元のノードにちょうど重ならないように */
+export const PASTE_OFFSET: FlowPoint = { x: 40, y: 40 };
+
+/** 写さない種類。開始は 1 つだけにしておく（2 つあると案内は両方から辿る。`flowNotices` の注意） */
+export function isCopyable(node: FlowNode): boolean {
+  return nodeType(node) !== "start";
+}
+
+function deepCopy<T>(value: T): T {
+  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+}
+
+/**
+ * 選んだノードを写す。写せないノード（開始）は外す。グループを選んだら中のノードも一緒に写す
+ * （枠だけ写すと空の枠になる）。写すものが無ければ undefined。
+ */
+export function copyNodes(doc: FlowDoc, ids: readonly string[]): FlowClip | undefined {
+  const wanted = new Set(ids);
+  for (const node of doc.nodes) {
+    const group = groupOf(doc, node);
+    if (group !== undefined && wanted.has(group.id)) {
+      wanted.add(node.id);
+    }
+  }
+  const nodes = doc.nodes.filter((node) => wanted.has(node.id) && isCopyable(node));
+  if (nodes.length === 0) {
+    return undefined;
+  }
+  const kept = new Set(nodes.map((node) => node.id));
+  const absolute: Record<string, FlowPoint> = {};
+  for (const node of nodes) {
+    absolute[node.id] = absolutePosition(doc, node.id);
+  }
+  return {
+    nodes: nodes.map(deepCopy),
+    absolute,
+    connections: connectionsOf(doc)
+      .filter((c) => kept.has(connectionFrom(c)) && kept.has(connectionTo(c)))
+      .map(deepCopy),
+  };
+}
+
+/**
+ * 写したものを貼る。ノードの id は `freshNodeId`、線の id は `freshConnectionId` で振り直し、線の両端と
+ * `parentId` を新しい id に付け替える。出口の綴り（`branch-<番号>`）と `data` はそのまま（分岐の出口の並びも
+ * 一緒に写しているので、同じ出口に付く）。
+ *
+ * 置き場所は、グループの外のノードは `offset` だけずらす。グループの中のノードは、
+ * - グループも一緒に貼るなら、新しいグループの中で元と同じ相対位置
+ * - グループは貼らず、元のグループが貼る先にまだあるなら、同じグループの中で `offset` だけずらす
+ * - 元のグループが貼る先に無ければ、写した時点の図の上の位置から `offset` だけずらして外に置く
+ *
+ * 貼ったノードは後ろに足す。グループは中のノードより前に並ぶ（写しの並びのまま）。
+ */
+export function pasteNodes(doc: FlowDoc, clip: FlowClip, offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } {
+  const renamed = new Map<string, string>();
+  let next: FlowDoc = doc;
+  const added: FlowNode[] = [];
+  for (const node of clip.nodes) {
+    const id = freshNodeId({ ...next, nodes: [...next.nodes, ...added] }, nodeType(node) || "node");
+    renamed.set(node.id, id);
+    added.push({ ...node, id });
+  }
+  const placed = added.map((node, index): FlowNode => {
+    const original = clip.nodes[index];
+    const parent = typeof original.parentId === "string" ? original.parentId : undefined;
+    const own = nodePosition(original, index);
+    if (parent !== undefined && renamed.has(parent)) {
+      return { ...node, parentId: renamed.get(parent) as string };
+    }
+    const hostNow = parent === undefined ? undefined : doc.nodes.find((n) => n.id === parent && isGroup(n));
+    if (parent !== undefined && hostNow !== undefined && !isGroup(original)) {
+      return withPosition(node, { x: own.x + offset.x, y: own.y + offset.y });
+    }
+    const at = clip.absolute[original.id] ?? own;
+    const outside = parent === undefined ? node : withoutParent(node);
+    return withPosition(outside, { x: at.x + offset.x, y: at.y + offset.y });
+  });
+  next = { ...next, nodes: [...next.nodes, ...placed] };
+  if (clip.connections.length > 0) {
+    const connections = [...connectionsOf(next)];
+    for (const c of clip.connections) {
+      const from = renamed.get(connectionFrom(c));
+      const to = renamed.get(connectionTo(c));
+      if (from === undefined || to === undefined) {
+        continue;
+      }
+      const id = freshConnectionId({ ...next, connections }, from, to);
+      connections.push({ ...c, id, from, to });
+    }
+    next = { ...next, connections };
+  }
+  return { doc: next, ids: placed.map((node) => node.id) };
+}
+
+/** 選んだノードをその場で複製する（写して `offset` だけずらして貼る）。写せるものが無ければ undefined */
+export function duplicateNodes(doc: FlowDoc, ids: readonly string[], offset: FlowPoint = PASTE_OFFSET): { readonly doc: FlowDoc; readonly ids: readonly string[] } | undefined {
+  const clip = copyNodes(doc, ids);
+  return clip === undefined ? undefined : pasteNodes(doc, clip, offset);
 }
 
 // ---- 出入口

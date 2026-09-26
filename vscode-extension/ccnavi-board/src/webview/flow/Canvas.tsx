@@ -15,7 +15,10 @@
  *
  * ノードと線には × のボタンを付ける（ノードは右上、線は真ん中。載せた・選んだときだけ見える）。
  * 押すと呼び手に返すだけで、消すのは写しの側。読むだけのときは出さない。
- * Shift を押しながら押す・囲むと、いくつも選べる。選んだノードの id は `onPick` で返す（グループ化に使う）。
+ * Shift を押しながら押す・囲むと、いくつも選べる。選んだノードの id は `onPick` で返す（グループ化・写す・複製に使う）。
+ *
+ * 線を引いている最中に、引けない先（開始へ入る・終了から出る・グループ・自分）は `canConnect` で断る
+ * （放しても線はできない）。右下のミニマップは `minimap` が真のときだけ出す。
  *
  * 見た目は `Canvas.css`。
  */
@@ -29,6 +32,7 @@ import {
   getBezierPath,
   Handle,
   MarkerType,
+  MiniMap,
   NodeResizer,
   Position,
   ReactFlow,
@@ -44,6 +48,7 @@ import {
 } from "@xyflow/react";
 
 import {
+  canConnect,
   connectionFrom,
   connectionFromPort,
   connectionLabel,
@@ -328,11 +333,13 @@ export interface CanvasProps {
   /** 図で選んでいるノードの id が変わった（Shift で選び足したものも含む） */
   readonly onPick: (ids: readonly string[]) => void;
   /**
-   * 図の外で選んだノード（部品箱で足したものなど）。これが替わったときだけ、そのノード 1 つを選び直す
-   * （`id` が無ければ選びを全部外す。中身を読み直したとき）。
+   * 図の外で選んだノード（部品箱で足したもの・貼ったものなど）。これが替わったときだけ、そのノードを選び直す
+   * （空なら選びを全部外す。中身を読み直したとき）。
    * 図で押したノードは React Flow が選ぶ（Shift での選び足し・外しもそのまま）ので、ここには来ない
    */
-  readonly focus?: { readonly id?: string } | undefined;
+  readonly focus?: { readonly ids: readonly string[] } | undefined;
+  /** 右下にミニマップを出すか */
+  readonly minimap?: boolean;
   /** ドラッグを放した点。位置は React Flow の決まり（グループの中のノードはグループからの位置） */
   readonly onMove: (moves: readonly { readonly id: string; readonly position: FlowPoint }[]) => void;
   readonly onConnect: (from: string, fromPort: string, to: string, toPort: string) => void;
@@ -341,7 +348,31 @@ export interface CanvasProps {
   readonly onResizeGroup: (id: string, size: FlowSize, position: FlowPoint) => void;
 }
 
-export function Canvas({ doc, readOnly, selected, focus, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
+/** ミニマップの点の色。種類ごとの左の縁（`Canvas.css`）と同じ色の変数 */
+function minimapColor(node: FlowNodeView): string {
+  if (node.type === "flowGroup") {
+    return "transparent";
+  }
+  switch (node.data.type) {
+    case "start":
+    case "end":
+      return "var(--vscode-charts-green, var(--vscode-focusBorder))";
+    case "prompt":
+    case "skill":
+      return "var(--vscode-charts-blue, var(--vscode-focusBorder))";
+    case "subAgent":
+      return "var(--vscode-charts-purple, var(--vscode-focusBorder))";
+    case "askUserQuestion":
+      return "var(--vscode-editorWarning-foreground)";
+    case "ifElse":
+    case "switch":
+      return "var(--vscode-charts-orange, var(--vscode-editorWarning-foreground))";
+    default:
+      return "var(--vscode-descriptionForeground)";
+  }
+}
+
+export function Canvas({ doc, readOnly, selected, focus, minimap = false, onSelect, onPick, onMove, onConnect, onRemoveNode, onRemoveEdge, onResizeGroup }: CanvasProps): JSX.Element {
   const base = useMemo(() => stepsOf(doc, readOnly), [doc, readOnly]);
   const edges = useMemo(() => edgesOf(doc, selected, readOnly), [doc, selected, readOnly]);
   const [nodes, setNodes] = useState<FlowNodeView[]>(base);
@@ -357,7 +388,7 @@ export function Canvas({ doc, readOnly, selected, focus, onSelect, onPick, onMov
       const before = new Map(now.map((node) => [node.id, node]));
       return base.map((node) => {
         const old = before.get(node.id);
-        const chosen = fresh && focus !== undefined ? node.id === focus.id : old?.selected === true;
+        const chosen = fresh && focus !== undefined ? focus.ids.includes(node.id) : old?.selected === true;
         return { ...node, selected: chosen, ...(old?.measured === undefined ? {} : { measured: old.measured }) };
       });
     });
@@ -377,6 +408,9 @@ export function Canvas({ doc, readOnly, selected, focus, onSelect, onPick, onMov
     },
     [readOnly, onConnect],
   );
+
+  // 引いている最中に断る（開始へ入る・終了から出る線など）。写しの側の `connect` も同じ規則で断る
+  const isValidConnection = useCallback((connection: Connection | FlowEdge) => !readOnly && canConnect(doc, connection.source, connection.target), [doc, readOnly]);
 
   const handleSelection = useCallback(({ nodes: chosenNodes }: OnSelectionChangeParams) => onPick(chosenNodes.map((node) => node.id)), [onPick]);
 
@@ -409,6 +443,7 @@ export function Canvas({ doc, readOnly, selected, focus, onSelect, onPick, onMov
           onPaneClick={() => onSelect(undefined)}
           onSelectionChange={handleSelection}
           onConnect={handleConnect}
+          isValidConnection={isValidConnection}
           nodesDraggable={!readOnly}
           nodesConnectable={!readOnly}
           fitView
@@ -423,6 +458,7 @@ export function Canvas({ doc, readOnly, selected, focus, onSelect, onPick, onMov
         >
           <Background />
           <Controls showInteractive={false} />
+          {minimap && <MiniMap<FlowNodeView> id="flow-minimap" pannable zoomable ariaLabel="ミニマップ" nodeColor={minimapColor} nodeStrokeWidth={2} />}
         </ReactFlow>
       </Actions.Provider>
     </div>

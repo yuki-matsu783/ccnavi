@@ -4,6 +4,7 @@
  * 直すのは `core/flow-doc.ts` の関数で作った写しで、**触った欄以外は元のまま**（知らない欄を落とさない）。
  * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（ファイルと同じ YAML の形で見せる）。
  * グループは名前だけ直せて、解く（中のノードは残して枠だけ消す）か消す（同じく中のノードは残す）。
+ * 欄に打った字は、どの欄かを添えて返す（呼び手が同じ欄への打ち込みを元に戻す 1 件にまとめる）。フォーカスが外れたら `onSeal`。
  */
 import type { JSX } from "react";
 
@@ -44,7 +45,13 @@ export interface InspectorProps {
   readonly doc: FlowDoc;
   readonly selected: Selection | undefined;
   readonly readOnly: boolean;
-  readonly onChange: (doc: FlowDoc) => void;
+  /**
+   * 直した写しを返す。欄に打った文字は `typing`（どの欄か）を添える。呼び手はそれを手がかりに、
+   * 同じ欄に続けて打ったものを元に戻す 1 件にまとめる
+   */
+  readonly onChange: (doc: FlowDoc, typing?: string) => void;
+  /** 欄からフォーカスが外れた。打ち込みのまとまりを区切る */
+  readonly onSeal?: () => void;
   readonly onSelect: (selection: Selection | undefined) => void;
 }
 
@@ -52,11 +59,11 @@ function str(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-export function Inspector({ doc, selected, readOnly, onChange, onSelect }: InspectorProps): JSX.Element {
+export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect }: InspectorProps): JSX.Element {
   if (selected?.kind === "node") {
     const node = doc.nodes.find((n) => n.id === selected.id);
     if (node !== undefined) {
-      return <NodeFields doc={doc} node={node} readOnly={readOnly} onChange={onChange} onSelect={onSelect} />;
+      return <NodeFields doc={doc} node={node} readOnly={readOnly} onChange={onChange} onSeal={onSeal} onSelect={onSelect} />;
     }
   }
   if (selected?.kind === "edge") {
@@ -67,7 +74,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSelect }: Inspe
         return node === undefined ? `${id}（無い）` : nodeName(node) || id;
       };
       return (
-        <aside className="inspector" id="inspector" data-selected="edge">
+        <aside className="inspector" id="inspector" data-selected="edge" onBlur={onSeal}>
           <h2>線</h2>
           <p className="mono small">
             {name(connectionFrom(connection))} → {name(connectionTo(connection))}
@@ -81,7 +88,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSelect }: Inspe
               value={str(connection.condition)}
               placeholder="空なら出口の名前で読む"
               disabled={readOnly}
-              onChange={(event) => onChange(setConditionAt(doc, selected.index, event.target.value))}
+              onChange={(event) => onChange(setConditionAt(doc, selected.index, event.target.value), `edge:${selected.index}:condition`)}
             />
           </label>
           <div className="buttons">
@@ -103,22 +110,22 @@ export function Inspector({ doc, selected, readOnly, onChange, onSelect }: Inspe
     }
   }
   return (
-    <aside className="inspector" id="inspector" data-selected="flow">
+    <aside className="inspector" id="inspector" data-selected="flow" onBlur={onSeal}>
       <h2>フロー</h2>
       <label className="field">
         <span title="name">名前</span>
-        <input type="text" className="f-flow-name" value={str(doc.name)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { name: event.target.value }))} />
+        <input type="text" className="f-flow-name" value={str(doc.name)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { name: event.target.value }), "flow:name")} />
       </label>
       <label className="field">
         <span title="description">説明</span>
-        <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }))} />
+        <textarea className="f-flow-description" rows={3} value={str(doc.description)} disabled={readOnly} onChange={(event) => onChange(setMeta(doc, { description: event.target.value }), "flow:description")} />
       </label>
-      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線に載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。</p>
+      <p className="hint">ノードを押すと、ここに欄が出る。ノードの右の点から左の点へ引くと線が繋がる。線を押すと条件を書ける。ノードや線に載せると出る × で消せる。Shift を押しながらノードを選ぶと、「グループ化」で枠にまとめられる。Ctrl+Z で元に戻し、Ctrl+C・Ctrl+V・Ctrl+D で選んだノードを写す・貼る・複製する。</p>
     </aside>
   );
 }
 
-function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc) => void; readonly onSelect: (selection: Selection | undefined) => void }): JSX.Element {
+function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc, typing?: string) => void; readonly onSeal?: () => void; readonly onSelect: (selection: Selection | undefined) => void }): JSX.Element {
   const type = nodeType(node);
   const known = isEditableType(type);
   const group = isGroup(node);
@@ -129,14 +136,14 @@ function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc:
     <label className="field">
       <span title={`data.${key}`}>{label}</span>
       {options.area === true ? (
-        <textarea className={`f-${key}`} rows={5} value={dataText(node, key)} placeholder={options.placeholder} disabled={readOnly} onChange={(event) => onChange(patchData(doc, node.id, { [key]: event.target.value }))} />
+        <textarea className={`f-${key}`} rows={5} value={dataText(node, key)} placeholder={options.placeholder} disabled={readOnly} onChange={(event) => onChange(patchData(doc, node.id, { [key]: event.target.value }), `node:${node.id}:${key}`)} />
       ) : (
-        <input type="text" className={`f-${key}`} value={dataText(node, key)} placeholder={options.placeholder} disabled={readOnly} onChange={(event) => onChange(patchData(doc, node.id, { [key]: event.target.value }))} />
+        <input type="text" className={`f-${key}`} value={dataText(node, key)} placeholder={options.placeholder} disabled={readOnly} onChange={(event) => onChange(patchData(doc, node.id, { [key]: event.target.value }), `node:${node.id}:${key}`)} />
       )}
     </label>
   );
   return (
-    <aside className="inspector" id="inspector" data-selected="node" data-type={type}>
+    <aside className="inspector" id="inspector" data-selected="node" data-type={type} onBlur={onSeal}>
       <h2>
         {TYPE_LABELS[type] ?? (type || "種類なし")} <span className="mono small dim">{node.id}</span>
       </h2>
@@ -148,7 +155,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc:
       {badge !== undefined && <p className="hint">{badge.title}</p>}
       <label className="field">
         <span title="name">名前</span>
-        <input type="text" className="f-name" value={nodeName(node)} disabled={readOnly} onChange={(event) => onChange(renameNode(doc, node.id, event.target.value))} />
+        <input type="text" className="f-name" value={nodeName(node)} disabled={readOnly} onChange={(event) => onChange(renameNode(doc, node.id, event.target.value), `node:${node.id}:name`)} />
       </label>
       {(type === "start" || type === "end") && text("label", "説明")}
       {type === "prompt" && text("prompt", "プロンプト", { area: true })}
@@ -228,7 +235,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc:
 }
 
 /** 分岐の出口（`branches`）か選択肢（`options`）。1 件ずつが出口になる */
-function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc) => void }): JSX.Element {
+function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; readonly node: FlowNode; readonly readOnly: boolean; readonly onChange: (doc: FlowDoc, typing?: string) => void }): JSX.Element {
   const key = branchKey(nodeType(node));
   const options = key === "options";
   const items = branchItems(node);
@@ -246,7 +253,7 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
             value={str(item.label)}
             placeholder="名前"
             disabled={readOnly}
-            onChange={(event) => onChange(patchBranch(doc, node.id, index, { label: event.target.value }))}
+            onChange={(event) => onChange(patchBranch(doc, node.id, index, { label: event.target.value }), `node:${node.id}:branch:${index}:label`)}
           />
           <input
             type="text"
@@ -254,7 +261,7 @@ function Branches({ doc, node, readOnly, onChange }: { readonly doc: FlowDoc; re
             value={str(item[second])}
             placeholder={options ? "説明" : "条件"}
             disabled={readOnly}
-            onChange={(event) => onChange(patchBranch(doc, node.id, index, { [second]: event.target.value }))}
+            onChange={(event) => onChange(patchBranch(doc, node.id, index, { [second]: event.target.value }), `node:${node.id}:branch:${index}:${second}`)}
           />
           {!fixed && (
             <button type="button" className="action small" data-action="remove-branch" disabled={readOnly || items.length <= 1} title="この出口と、そこから出る線を消す" onClick={() => onChange(removeBranch(doc, node.id, index))}>

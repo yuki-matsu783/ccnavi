@@ -113,6 +113,15 @@ export interface FlowPage {
   readonly exists: boolean;
   readonly doc: FlowDoc;
   readonly lock: FlowLock;
+  /**
+   * 保存の前に差分の一覧を見せて確かめるか（設定 `ccnaviBoard.flowSaveReview`）。無ければ見せる
+   */
+  readonly reviewSave?: boolean;
+  /**
+   * 未保存のまま閉じた画面から戻す編集中の写し。あれば画面は `doc` の代わりにこれを開き、
+   * `doc`（読み込んだ中身）と比べて未保存を立てる
+   */
+  readonly draft?: FlowDoc;
 }
 
 export type FlowData =
@@ -138,6 +147,10 @@ export type FlowMessage =
   | { readonly type: "dirty"; readonly dirty: boolean }
   | { readonly type: "openFile" }
   | { readonly type: "save"; readonly doc: FlowDoc }
+  /** 編集中の写し。未保存のまま閉じられたときに戻すため、拡張ホストが控える。未保存でなくなったら null */
+  | { readonly type: "draft"; readonly doc: FlowDoc | null }
+  /** 保存の前に差分を確かめるか（設定に書く） */
+  | { readonly type: "reviewSave"; readonly value: boolean }
   | { readonly type: "tourDone" };
 
 /**
@@ -147,7 +160,7 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
   }
-  const m = message as { type?: unknown; dirty?: unknown; doc?: unknown };
+  const m = message as { type?: unknown; dirty?: unknown; doc?: unknown; value?: unknown };
   switch (m.type) {
     case "ready":
     case "openFile":
@@ -161,6 +174,15 @@ export function asFlowMessage(message: unknown): FlowMessage | undefined {
       const doc = asFlowDoc(m.doc);
       return doc === undefined ? undefined : { type: "save", doc };
     }
+    case "draft": {
+      if (m.doc === null) {
+        return { type: "draft", doc: null };
+      }
+      const doc = asFlowDoc(m.doc);
+      return doc === undefined ? undefined : { type: "draft", doc };
+    }
+    case "reviewSave":
+      return typeof m.value === "boolean" ? { type: "reviewSave", value: m.value } : undefined;
     default:
       return undefined;
   }
