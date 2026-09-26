@@ -1051,7 +1051,7 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 
 `disable` は `.claude/settings.json` に書いても効かない（名指しで無視して理由を出す）。エージェントが書き換えられるファイルなので、
 監視される側が監視を止められないようにしている。`disable` にするときはセッションを起動する側の環境から渡す。
-読めない値は報告して `enable` に落ちる（ADR-0007）。詳細は [ccnavi.md](ccnavi.md) の 4.4。
+読めない値は報告して `enable` として扱う（ADR-0007）。詳細は [ccnavi.md](ccnavi.md) の 4.4。
 
 ## ツール実行後の監視
 
@@ -1059,8 +1059,8 @@ ripgrep の既定の挙動で、ccnavi の側では変えられない。
 素通りする。実行後の監視は、走ったあとの作業ツリーを `git status` で読んでそれを拾う。設計は [ccnavi.md](ccnavi.md) の 7。
 
 保護領域は別に宣言しない。`match` に `Write` `Edit` `NotebookEdit` のどれかを含むルールが、そのまま保護領域の宣言になる。
-例外は ccnavi 自身の書き込み。記録と控えの置き場は最初から外れ、チケットの置き場は `ticket start` / `finish` や
-`review request` / `ready` が書いたと内容から読めるぶんだけ外れる（ADR-0075）。作業範囲・親・フェーズが変わっていれば報告する。
+例外は ccnavi 自身の書き込み。記録と控えの置き場は最初から外れる。チケットの置き場では、ccnavi の副命令（`ticket start` / `finish` や
+`review request` / `ready` など）が書いたと内容から見分けられる変更だけが外れる（ADR-0075）。作業範囲・親・フェーズが変わっていれば報告する。
 
 ```
 [ccnavi] POST_VIOLATION (rule: guard-config)
@@ -1125,8 +1125,8 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 - 実行ファイルの実体は `logs/state/selfguard/store/` にハッシュ名で 1 本だけ置く。3 日より長く触られていないセッションの控えは、
   次のセッション開始で落とす
 
-戻す前に止める側も組み込みで持つ。この面が有効な間、次の場所へシェルから書き込む形は、ルールに書いていなくても拒否される。
-ルールファイルが壊れて組み込みの既定に落ちている間も同じ。
+戻す前に止める側も組み込みで持つ。この機能が有効な間、次の場所へシェルから書き込む形は、ルールに書いていなくても拒否される。
+ルールファイルが壊れて組み込みの既定を使っている間も同じ。
 
 - `.claude/` の `hooks/` と `settings*.json`、ccnavi ディレクトリ（`.ccnavi`）、`ccnavi-git.sh`、実行ファイル、
   共通層の 3 本（`.ccnavi/common/`）、記録と控え（`logs/log.jsonl` と `logs/state`）
@@ -1142,8 +1142,8 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
   ルールの下書きと一緒に利用者に渡す
 
 止めるのは書き込む綴りと場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/common/rules.yml` や `git add <パス>` は通る）。
-`builtin-guard-` で始まる id はどの層のルールファイルにも書けない（書けば error。`--lint` も言う）。外したいなら env で面ごと切る。
-ルールファイルが既定に落ちている間は、共通層のルールファイルを Write / Edit で直した結果を戻さない（実行前に読めなかったときに限る）。
+`builtin-guard-` で始まる id はどの層のルールファイルにも書けない（書けば error。`--lint` も言う）。外したいなら env でこの機能ごと切る。
+ルールファイルが既定を使っている間は、共通層のルールファイルを Write / Edit で直した結果を戻さない（実行前に読めなかったときに限る）。
 
 `PreToolUse` の登録ごと消された場合は ccnavi が一切動かない。hook の登録を hook 自身で守ることはできない。
 
@@ -1342,7 +1342,7 @@ Write / Edit の対象を解いた先が `.claude/worktrees/<名前>/` の中な
 | 何も言わない | 範囲の外、または `deny` の項 | 止まる（`DENY_TICKET_SCOPE`） |
 | 何も言わない | ワークツリーにチケットが無い | 権限モードに従う（`UNDECLARED`） |
 
-チケットがルールより強かった回は、文面の頭に `rule: <id> (allow) lets this through, but the ticket for this worktree narrows it` が載り、
+チケットの判定がルールに勝った回は、文面の頭に `rule: <id> (allow) lets this through, but the ticket for this worktree narrows it` が載り、
 チケットの `deny` の項に当たったなら `ticket entry: deny <綴り>` も載る。記録では `rules` が `(ticket-scope)` とルールの id の並びになり、`source` は空になる。
 
 ```sh
@@ -1377,7 +1377,7 @@ jq -r 'select(.rules[0]? == "(ticket-scope)" and (.rules | length) > 1) | .subje
 - 親の計画の項の `mr`（種類が `none` でも `mr` にする）
 - 延期した番号の分を引き受けているなら、その分の宣言
 
-閉じた子の `human_review.required: true` と、実績のリスクが HIGH 以上は、`none` を `chat` に上げるだけで場所は指さない。
+閉じた子の `human_review.required` が `true` か、実績のリスクが HIGH 以上のときは、`none` を `chat` に上げるだけで場所は指さない。
 
 | | `mr` | `chat` | `none` |
 |---|---|---|---|
@@ -1565,11 +1565,11 @@ factors:
 | 系統 | 書き方 | 誰が測るか |
 |---|---|---|
 | 定量（組み込み） | `lines_over` / `files_over` / `deleted_over` / `glob`（当たるごとに加点。`max` で上限） | ccnavi が差分から数える |
-| 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通層。自身の層とプロジェクトの層はその層の `.ccnavi/scripts/` の下） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は**重い側に倒し**、その項目の点を加える |
+| 定量（スクリプト） | `script: <.ccnavi/common/scripts/ の下>`（共通層。自身の層とプロジェクトの層はその層の `.ccnavi/scripts/` の下） | ccnavi が `sh` で走らせる。cwd は子のワークツリー、`CCNAVI_BASE_SHA` / `CCNAVI_HEAD` / `CCNAVI_TICKET` / `CCNAVI_PARENT` を渡し、標準出力の整数か `{"points": N, "message": "…"}` を受け取る。失敗や読めない出力は**重いほうとして扱い**、その項目の点を加える |
 | 定性（サブエージェント） | `judge: <問い>` | 判定が揃うまで子は閉じられない。`finish` が問いと差分の要約を `state/risk-judge-<子>.md` に書くので、親がそれをサブエージェントに渡し、報告を `sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason <根拠>` で記録する。判定は子の HEAD に結ぶので、HEAD が動けば取り直し |
 
 点と加点した理由は、閉じたときの出力、フェーズの終わりの文面、`--explain`、レビューの依頼文の先頭
-（「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に出る。壊れた `risks.yml` は組み込みに落ち、`--lint` と閉じたときの出力がそう言う。
+（「このレビューのリスク: 58 (HIGH) — 行数が多い（…）」）に出る。壊れた `risks.yml` は組み込みに戻り、`--lint` と閉じたときの出力がそう言う。
 
 ### サブエージェントに渡すもの
 
@@ -1582,16 +1582,16 @@ factors:
 
 ## ルールファイルが読めないとき
 
-組み込みの既定に落ちて判定を続ける。止まらない（止めると壊れた設定を直す操作まで止まる）。設計は [ccnavi.md](ccnavi.md) の 5.6。
+組み込みの既定に戻って判定を続ける。止まらない（止めると壊れた設定を直す操作まで止まる）。設計は [ccnavi.md](ccnavi.md) の 5.6。
 既定に入っているのは取り返しの付かない操作だけ。`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、シェルからガード自身の設定への書き込み。
 
 | 操作 | 既定での扱い | なぜ |
 |---|---|---|
 | `Write` / `Edit` でルールファイルを直す | 通す | ここを止めると直す道が 1 本も残らない |
-| シェルからルールファイルへ書き込む | 止める | 壊してから緩んだ既定に落ちる順路を作らない |
+| シェルからルールファイルへ書き込む | 止める | 壊してから緩んだ既定に戻る順路を作らない |
 | `git add` / `git restore --ours` でマージの衝突を解く | 通す | 戻すのは既にコミットされている内容で、新しい文面は書かない |
 
-止めるのは書き込む綴りだけで、場所の名前が出ただけでは止めない。既定に落ちたことは、止めた回だけでなく通した回にも伝える。
+止めるのは書き込む綴りだけで、場所の名前が出ただけでは止めない。既定に戻ったことは、止めた回だけでなく通した回にも伝える。
 
 ## 記録
 
@@ -1691,7 +1691,7 @@ ccnavi --test Bash "cd /repo && git push" --json
 ccnavi --test-samples .ccnavi/common/rule-samples.yml --json
 ```
 
-`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code の拡張のルール設定画面。判定は文字で出すときと同じ関数を通る
+`--test` と `--test-samples` の結果を JSON で出す。読み手は VS Code 拡張のルール設定画面。判定は文字で出すときと同じ関数を通る
 （REQ-DIA-03）。`--json` のときは終了コードが常に 0 で、食い違いの数は `mismatches` で読む。
 実例は `vscode-extension/ccnavi-board/test/fixtures/test.json` と `samples.json`。`tests/core/test_test_json.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
@@ -1772,7 +1772,7 @@ error 2 件、warn 2 件、info 0 件
 | 深刻度 | 拾うもの |
 |---|---|
 | error | `.claude/settings.json` の `env` が `CCNAVI_MODE=disable` を宣言している |
-| error | `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL` が 2 値として読めない値（`enable` に倒して動く） |
+| error | `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_TICKET_CONTROL` が 2 値として読めない値（`enable` として扱って動く） |
 | error | `.claude/settings.json` の `env` の `CCNAVI_BIN_PATH` が指す先が在るのに実行できない（hook が 126 で起動せず、何も判定していない。POSIX だけで見る。Windows は実行ビットを持たない。書いた綴りをそのまま見て、`.exe` は補わない） |
 | warn | モードが `disable` / `dry-run`、あるいはモードとして読めない値 |
 | warn | 読めない `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` の値 |
@@ -1840,7 +1840,7 @@ error 2 件、warn 2 件、info 0 件
 ccnavi --lint --json
 ```
 
-`--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にまとめて出す。終了コードも同じ（error があれば 1）。読み手は VS Code の拡張の
+`--lint` と同じ苦情を、同じ深刻度で 1 つの JSON にまとめて出す。終了コードも同じ（error があれば 1）。読み手は VS Code 拡張の
 プロジェクト管理画面。この JSON の形は拡張との契約なので、変えるときは版を上げる。
 
 | 鍵 | 何 |
@@ -1874,7 +1874,7 @@ ccnavi --lint --json --project-phases-file lib=/tmp/phases.yml
 ccnavi --explain --json
 ```
 
-`--explain` のうちチケットに関わる部分を JSON で出す。読み手は VS Code の拡張「ccnavi ボード」で、拡張はこれを並べるだけで提案やマーカーを
+`--explain` のうちチケットに関わる部分を JSON で出す。読み手は VS Code の拡張「ccnavi ボード」。拡張はこれを並べるだけで、提案やマーカーを
 自分では読まない。ネットワークには出ない。`version` が拡張の知っている版（いま 1）と違えば、拡張は読まずに版の違いを伝える。
 実例は `vscode-extension/ccnavi-board/test/fixtures/board.json`。`tests/ticket/test_board.py` が同じ例で形を確かめる
 （形を変えたら `CCNAVI_BOARD_FIXTURE=1` を付けてそのテストを走らせ、例を書き直す）。
