@@ -170,7 +170,7 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<Fact key="ready" kind="ready" text="Draft 解除済み" />);
   }
   if (card.wrapped) {
-    facts.push(<Fact key="wrapped" kind="wrapped" text="途中で完了" />);
+    facts.push(<Fact key="wrapped" kind="wrapped" text="早期に締めた" />);
   }
   if (card.riskLevel !== "" && !isHighRisk(card.riskLevel)) {
     facts.push(<Fact key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);

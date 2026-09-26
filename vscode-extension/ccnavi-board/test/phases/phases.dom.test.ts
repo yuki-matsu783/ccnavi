@@ -194,7 +194,7 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
 test("CB-D62 読み直せなかったら理由を出し、種類は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "種類のファイルを読めない: EACCES" });
   try {
-    assert.match(dom.one(".empty").textContent, /フェーズ管理画面を更新できませんでした/);
+    assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み込めませんでした/);
     assert.equal(dom.one("pre.load-error").textContent, "種類のファイルを読めない: EACCES");
     assert.equal(dom.all("#phases").length, 0);
   } finally {

@@ -182,7 +182,7 @@ export function parseBoardJson(text: string): ParseResult {
   if (version !== BOARD_VERSION) {
     return {
       ok: false,
-      error: `チケット管理の JSON の版が違います（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `ccnavi --explain --json の版が違います（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   const settings = isRecord(raw.settings) ? raw.settings : {};

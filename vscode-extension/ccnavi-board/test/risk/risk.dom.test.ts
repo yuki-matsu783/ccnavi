@@ -254,7 +254,7 @@ test("CB-D55 組み上がったら ready を送り、届いた中身で編集を
 test("CB-D56 読み直せなかったら理由を出し、配点は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "配点のファイルを読めない: EACCES" });
   try {
-    assert.match(dom.one(".empty").textContent, /リスク管理画面を更新できませんでした/);
+    assert.match(dom.one(".empty").textContent, /リスク管理画面を読み込めませんでした/);
     assert.equal(dom.one("pre.load-error").textContent, "配点のファイルを読めない: EACCES");
     assert.equal(dom.all("#factors").length, 0);
   } finally {

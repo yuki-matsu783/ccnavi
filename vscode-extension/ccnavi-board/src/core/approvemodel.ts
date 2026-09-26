@@ -99,9 +99,9 @@ export function partialMessage(partial: ApprovePartial): string {
   const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket} の後始末で` : `${ticket} で`;
   const what =
     placed.length === 0
-      ? "まだ 1 件も承認していません"
+      ? "承認済みになったチケットはありません"
       : `${placed.join(", ")} の ${placed.length} 件は承認済みチケットに入っています。` +
-        "コミットと push は送っていません（送るのは承認できたときだけです）。チケット管理を更新して確かめてください";
+        "コミットと push は送っていません（送るのは承認できたときだけです）。チケット管理画面を更新して確かめてください";
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
   return `ccnavi --approve --yes が${where}止まりました: ${reason}。${what}${done}`;
 }

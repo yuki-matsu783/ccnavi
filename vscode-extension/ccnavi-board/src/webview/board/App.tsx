@@ -138,7 +138,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     <>
       {shown === undefined ? (
         <>
-          <p className="board-empty">チケット管理画面を更新できませんでした。原因を直してから「ccnavi ボード: チケット管理を更新」を実行してください。</p>
+          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnavi ボード: チケット管理を更新」を実行してください。</p>
           <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         </>
       ) : (

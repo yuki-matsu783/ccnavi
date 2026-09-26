@@ -668,7 +668,7 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   const notWaiting = approvalStep(CLOSED, { ...input, chip: chipOf({ reviewWaiting: false }) });
   assert.equal(notWaiting.state.overlay, undefined);
   assert.deepEqual(notWaiting.effects, [
-    { kind: "warn", text: "親 i0001 のフェーズ 1 設計 は人のレビュー待ちではありません。チケット管理を更新してください" },
+    { kind: "warn", text: "親 i0001 のフェーズ 1 設計 は人のレビュー待ちではありません。チケット管理画面を更新してください" },
     { kind: "refresh" },
   ]);
 });

@@ -272,7 +272,7 @@ export async function runApprovePreview(
   if (ran.killed) {
     return {
       ok: false,
-      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。まだ 1 件も承認していません`,
+      error: `${cutOff("ccnavi --approve --preview --json", APPROVE_TIMEOUT_MS)}。何も承認していません`,
     };
   }
   if (ran.code !== 0) {
@@ -309,7 +309,7 @@ export async function runApproveYes(
       error:
         `${cutOff("ccnavi --approve --yes", APPROVE_TIMEOUT_MS)}。` +
         "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットと push は送っていません" +
-        "（送るのは承認できたときだけです）。チケット管理を更新して、何が承認されたかを確かめてください",
+        "（送るのは承認できたときだけです）。チケット管理画面を更新して、何が承認されたかを確かめてください",
     };
   }
   const parsed = parseApproveResult(ran.stdout);
@@ -376,7 +376,7 @@ export async function runDecideYes(
       ok: false,
       error:
         `${cutOff("ccnavi-review.sh decide", DECIDE_TIMEOUT_MS)}。` +
-        "反映できたか分かりません。チケット管理を更新して、フェーズの状態を確かめてください",
+        "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確かめてください",
     };
   }
   const parsed = parseDecideResult(ran.stdout.trim().split("\n").pop() ?? "");

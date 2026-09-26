@@ -399,7 +399,7 @@ function reviewed(
       state,
       {
         kind: "warn",
-        text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理を更新してください`,
+        text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理画面を更新してください`,
       },
       { kind: "refresh" },
     );
@@ -482,7 +482,7 @@ function decideOpened(
   if (chip.reviewWaiting !== true) {
     return stay(
       state,
-      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理を更新してください` },
+      { kind: "warn", text: `親 ${parent} のフェーズ ${chip.label} は人のレビュー待ちではありません。チケット管理画面を更新してください` },
       { kind: "refresh" },
     );
   }
@@ -502,7 +502,7 @@ function decidePreviewed(state: ApprovalState, result: DecidePreviewParse): Appr
   // 頼んだフェーズの一覧か。別のフェーズの答えで開かない
   if (result.ok && (result.value.parent !== overlay.parent || result.value.phase !== overlay.phase)) {
     return move(state, {
-      overlay: { kind: "error", error: "頼んだフェーズと違う一覧が返りました。チケット管理を更新してから決め直してください" },
+      overlay: { kind: "error", error: "頼んだフェーズと違う一覧が返りました。チケット管理画面を更新してから決め直してください" },
       only: state.only,
     });
   }
@@ -589,6 +589,6 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       { kind: "loadDecide", tree, phase: preview.phase },
     );
   }
-  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理を更新してから決め直してください" : outcome.error;
+  const error = "mismatch" in outcome ? "表示した指摘と今の指摘が違います。チケット管理画面を更新してから決め直してください" : outcome.error;
   return move(state, { overlay: { kind: "error", error }, only: state.only }, { kind: "refresh" });
 }

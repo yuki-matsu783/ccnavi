@@ -75,7 +75,7 @@ export function parseDecidePreview(text: string): DecidePreviewParse {
   const mr: Record<string, unknown> = isRecord(raw.mr) ? raw.mr : {};
   const digest = str(raw.digest);
   if (!/^[0-9a-f]{64}$/.test(digest)) {
-    return { ok: false, error: "ccnavi の出力が壊れています（digest がありません）" };
+    return { ok: false, error: "digest が読めません（64 桁の 16 進ではありません）" };
   }
   return {
     ok: true,
@@ -105,7 +105,7 @@ export function parseDecideResult(text: string): DecideOutcome {
     return { ok: false, mismatch: true };
   }
   if (raw.ok !== true) {
-    return { ok: false, error: "反映できたか分かりません（ccnavi の出力を読めません）" };
+    return { ok: false, error: "反映できたか分かりません（出力の ok が true ではありません）" };
   }
   return {
     ok: true,

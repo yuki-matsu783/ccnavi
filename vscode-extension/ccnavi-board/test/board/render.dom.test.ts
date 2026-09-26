@@ -176,7 +176,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
     approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
   });
   try {
-    assert.equal(text(empty, "#approval-title"), "承認待ちのチケットは無い");
+    assert.equal(text(empty, "#approval-title"), "承認待ちのチケットなし");
     // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
     assert.equal(text(empty, "pre.approval-text"), "承認待ちのチケットは無い。");
     assert.equal(empty.all('button[data-action="approve-confirm"]').length, 0);
@@ -224,7 +224,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     // 運ぶ sh を端末に送ったときだけ、そう言う。
-    assert.ok(!texts(page, ".approval-note").some((note) => note.includes("端末に送った")));
+    assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
   }
@@ -727,7 +727,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
     assert.equal(page.all('button[data-action="prompt-open"]').length, 1);
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    assert.ok(!text(page, ".approval").includes("を承認した"));
+    assert.ok(!text(page, ".approval").includes("を承認しました"));
   } finally {
     await page.close();
   }
@@ -757,7 +757,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
 test("CB-T162 読み直せなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
   const plain = await openPage({ kind: "error", error: "ccnavi --explain --json が失敗した: 60 秒で返らないので打ち切った" });
   try {
-    assert.ok(text(plain, ".board-empty").includes("チケット管理画面を更新できませんでした"));
+    assert.ok(text(plain, ".board-empty").includes("チケット管理画面を読み込めませんでした"));
     assert.ok(text(plain, "pre.load-error").includes("60 秒で返らないので打ち切った"));
     assert.equal(plain.all(".approval-backdrop").length, 0, "オーバーレイが無ければ被せない");
     // ボードの部品は出さない

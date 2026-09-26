@@ -212,10 +212,10 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     return (
       <>
         <p className="empty">
-          フェーズ管理画面を更新できませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
+          フェーズ管理画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
         </p>
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -415,7 +415,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -432,7 +432,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" disabled={page?.exists !== true} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
             更新
           </button>
           <button

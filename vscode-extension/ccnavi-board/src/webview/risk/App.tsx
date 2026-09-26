@@ -128,10 +128,10 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     return (
       <>
         <p className="empty">
-          リスク管理画面を更新できませんでした。原因を直してから「更新」を押してください（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: リスク管理を開く」を実行してください。開いたままでは前面に出るだけです）。
+          リスク管理画面を読み込めませんでした。原因を直してから「更新」を押してください（画面を開き直すなら、このタブを閉じてから「ccnavi ボード: リスク管理を開く」を実行してください。開いたままでは前面に出るだけです）。
         </p>
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
           更新
         </button>
       </>
@@ -193,7 +193,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     <>
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
         ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -210,7 +210,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <button type="button" className="action" data-action="open-risk" disabled={!exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
             更新
           </button>
           <button

@@ -119,7 +119,7 @@ function Body({
   const tickets = preview.batch.map((b) => b.ticket);
   return (
     <>
-      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットは無い" : `承認待ちのチケット ${count} 件`}</h2>
+      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット ${count} 件`}</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       {count === 0 ? null : (
         <table className="approval-batch">

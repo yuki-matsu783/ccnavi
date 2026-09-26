@@ -8,7 +8,7 @@ import type { Moved } from "../../core/board-moved.js";
 export const COPY_LABELS = { none: "未承認", open: "承認済み", review: "レビュー待ち", closed: "クローズ" } as const;
 
 export const MARK_LABELS: Readonly<Record<string, string>> = {
-  pending: "終了を通知済み",
+  pending: "エージェントに終了を通知済み",
   skipped: "レビュー省略",
   requested: "レビュー依頼済み",
   reviewed: "レビュー済み",
@@ -54,7 +54,7 @@ export function worktreeName(path: string): string {
   return name === "" ? "あり" : name;
 }
 
-/** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済 · レビュー要 · リスク: 25 (MEDIUM) — …` */
+/** フェーズ行の状態の全文。`終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 25 (MEDIUM) — …` */
 export function phaseStatusFull(p: PhaseChip): string {
   const notes: string[] = [];
   if (p.gateClosed) {

@@ -118,8 +118,8 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
   const none = partialMessage({ placed: [], ticket: "i0001", reason: "書けない", lines: [] });
-  assert.ok(none.includes("まだ 1 件も承認していません"));
-  assert.ok(!none.includes("入っている"));
+  assert.ok(none.includes("承認済みになったチケットはありません"));
+  assert.ok(!none.includes("入っています"));
 
   // 書けたあとの後始末（マーカーを置く）で落ちたときは、言い方を変える
   const after = partialMessage({
@@ -129,5 +129,5 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     lines: [],
   });
   assert.ok(after.includes("i0001 の後始末で止まりました"));
-  assert.ok(!after.includes("i0001 で止まった"));
+  assert.ok(!after.includes("i0001 で止まりました"));
 });

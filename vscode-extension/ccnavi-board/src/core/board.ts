@@ -320,7 +320,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
   const actions: Action[] = [];
   // 残った指摘を決められるのは、人のレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
-  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済」・「決める」の操作はみな
+  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「対応方針を決める」の操作はみな
   // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
     actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
