@@ -13,7 +13,23 @@
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
-import { addNode, connect, flowNotices, moveNode, nodePosition, PALETTE, TYPE_LABELS, type FlowDoc, type PaletteType } from "../../core/flow-doc.js";
+import {
+  absolutePosition,
+  addNode,
+  connect,
+  flowNotices,
+  groupNodes,
+  isGroup,
+  nodeSize,
+  PALETTE,
+  placeNodes,
+  removeConnectionAt,
+  removeNode,
+  resizeGroup,
+  TYPE_LABELS,
+  type FlowDoc,
+  type PaletteType,
+} from "../../core/flow-doc.js";
 import type { FlowData, FlowLock, FlowPage, ToFlow } from "../../core/flow-view.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
@@ -34,14 +50,25 @@ function pageOf(data: FlowData): FlowPage | undefined {
   return data.kind === "page" ? data.page : undefined;
 }
 
-/** 足したノードを置く場所。いちばん下のノードのさらに下 */
+/**
+ * 足したノードを置く場所。いちばん下の縁（図の上の位置で読む。グループはその枠の下の縁）のさらに下。
+ * グループの枠の中に落ちないよう、グループの下に置く（足したノードはどのグループにも入らない）
+ */
 function nextSpot(doc: FlowDoc): { x: number; y: number } {
   if (doc.nodes.length === 0) {
     return { x: 80, y: 80 };
   }
-  const spots = doc.nodes.map((node, index) => nodePosition(node, index));
-  const bottom = spots.reduce((low, spot) => (spot.y > low.y ? spot : low), spots[0]);
-  return { x: bottom.x, y: bottom.y + 140 };
+  const spots = doc.nodes.map((node) => {
+    const at = absolutePosition(doc, node.id);
+    return { x: at.x, bottom: at.y + nodeSize(node).height };
+  });
+  const low = spots.reduce((max, spot) => (spot.bottom > max.bottom ? spot : max), spots[0]);
+  return { x: low.x, y: low.bottom + 50 };
+}
+
+/** 並びが同じか（選んだノードの id を毎回作り直さないため） */
+function sameIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
 const TOUR_STEPS: readonly TourStep[] = [
@@ -53,7 +80,9 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: "#flow-graph",
     title: "図",
-    body: "ノードの右の点から次のノードの左の点へ引くと線が繋がる。ノードや線を押すと、右の欄で中身を直せる。",
+    body:
+      "ノードの右の点から次のノードの左の点へ引くと線が繋がる。ノードや線を押すと、右の欄で中身を直せる。ノードや線に載せると出る × で消せる。" +
+      "Shift を押しながらノードを押す（何も無いところを引いて囲む）といくつも選べ、「グループ化」で枠にまとめられる。枠の中へ引いたノードは枠に入り、外へ引くと出る。",
   },
   {
     target: "#inspector",
@@ -76,6 +105,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const [lock, setLock] = useState<FlowLock>(() => pageOf(initial)?.lock ?? NO_LOCK);
   const [changed, setChanged] = useState(false);
   const [selected, setSelected] = useState<Selection | undefined>(undefined);
+  const [picked, setPicked] = useState<readonly string[]>([]);
   const tour = useTour(data.kind === "page", { onEnd: () => post({ type: "tourDone" }) });
   const requestTour = tour.request;
 
@@ -164,6 +194,32 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     setSelected({ kind: "node", id: added.id });
   };
 
+  /** 消したものを選んでいたら、選ぶのをやめる（線は並びの位置で指すので、線を消したら線の選びは外す） */
+  const removeNodeAt = (id: string): void => {
+    edit(removeNode(doc, id));
+    // ノードと一緒に線も消えて並びの位置がずれるので、線の選びも外す
+    if ((selected?.kind === "node" && selected.id === id) || selected?.kind === "edge") {
+      setSelected(undefined);
+    }
+  };
+  const removeEdgeAt = (index: number): void => {
+    edit(removeConnectionAt(doc, index));
+    if (selected?.kind === "edge") {
+      setSelected(undefined);
+    }
+  };
+
+  // グループ化できるのは、グループでないノードを 2 つ以上選んでいるとき
+  const groupable = picked.filter((id) => doc.nodes.some((node) => node.id === id && !isGroup(node)));
+  const group = (): void => {
+    const grouped = groupNodes(doc, groupable);
+    if (grouped === undefined) {
+      return;
+    }
+    edit(grouped.doc);
+    setSelected({ kind: "node", id: grouped.id });
+  };
+
   return (
     <>
       {lock.locked && (
@@ -191,6 +247,16 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           </span>
         </div>
         <div className="controls">
+          <button
+            type="button"
+            className="action"
+            data-action="group-nodes"
+            disabled={readOnly || groupable.length < 2}
+            title="Shift を押しながらノードを 2 つ以上選ぶと、枠（グループ）にまとめられる。枠は図の上の囲みで、手順は変わらない"
+            onClick={group}
+          >
+            グループ化
+          </button>
           <button type="button" className="action" data-action="open-flow" disabled={!page.exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
@@ -239,16 +305,18 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           readOnly={readOnly}
           selected={selected}
           onSelect={setSelected}
-          onMove={(id, position) => {
-            // 押しただけ（動かしていない）なら未保存にしない
-            const index = doc.nodes.findIndex((node) => node.id === id);
-            const now = index < 0 ? undefined : nodePosition(doc.nodes[index], index);
-            if (now === undefined || (Math.round(position.x) === Math.round(now.x) && Math.round(position.y) === Math.round(now.y))) {
-              return;
+          onPick={(ids) => setPicked((now) => (sameIds(now, ids) ? now : ids))}
+          onMove={(moves) => {
+            // 押しただけ（動かしていない）なら未保存にしない（placeNodes が同じ写しを返す）
+            const next = placeNodes(doc, moves);
+            if (next !== doc) {
+              edit(next);
             }
-            edit(moveNode(doc, id, position));
           }}
           onConnect={(from, fromPort, to, toPort) => edit(connect(doc, from, fromPort, to, toPort))}
+          onRemoveNode={removeNodeAt}
+          onRemoveEdge={removeEdgeAt}
+          onResizeGroup={(id, size, position) => edit(resizeGroup(doc, id, size, position))}
         />
         <Inspector doc={doc} selected={selected} readOnly={readOnly} onChange={edit} onSelect={setSelected} />
       </div>

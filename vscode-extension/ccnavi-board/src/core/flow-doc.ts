@@ -7,8 +7,14 @@
  *     nodes:          [node, ...]
  *     connections:    [connection, ...]
  *     subAgentFlows?: [{id, name, nodes, connections}, ...]
- *     node       = {id, type, name, position: {x, y}, data: {...}}
+ *     node       = {id, type, name, position: {x, y}, data: {...}, parentId?}
+ *     group      = {id, type: "group", name, position: {x, y}, data: {label?}, style: {width, height}}
  *     connection = {id, from, to, fromPort, toPort, condition?}
+ *
+ * グループ（`type: "group"`）は図の上の囲みで、手順ではない。出入口を持たず、線は繋がない。
+ * 中のノードは `parentId` にグループの id を持ち、`position` は**グループの左上からの位置**
+ * （React Flow の決まり）。グループは中のノードより前に並べる（React Flow は親を先に読む）。
+ * グループの中にグループは置かない。
  *
  * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
@@ -415,9 +421,13 @@ export function moveNode(doc: FlowDoc, id: string, position: FlowPoint): FlowDoc
   });
 }
 
-/** ノードを消す。そのノードに出入りする線も消す */
+/**
+ * ノードを消す。そのノードに出入りする線も消す。
+ * グループを消すときは、中のノードは消さずに外へ出す（`ungroup` と同じ。位置は図の上で動かない）。
+ */
 export function removeNode(doc: FlowDoc, id: string): FlowDoc {
-  const next: Record<string, unknown> = { ...doc, nodes: doc.nodes.filter((node) => node.id !== id) };
+  const released = releaseMembers(doc, id);
+  const next: Record<string, unknown> = { ...released, nodes: released.nodes.filter((node) => node.id !== id) };
   if (Array.isArray(doc.connections)) {
     next.connections = connectionsOf(doc).filter((c) => connectionFrom(c) !== id && connectionTo(c) !== id);
   }
@@ -430,6 +440,10 @@ export function removeNode(doc: FlowDoc, id: string): FlowDoc {
  */
 export function connect(doc: FlowDoc, from: string, fromPort: string, to: string, toPort: string): FlowDoc {
   if (from === to) {
+    return doc;
+  }
+  // グループは囲みで手順ではない。線は繋がない
+  if (doc.nodes.some((node) => (node.id === from || node.id === to) && isGroup(node))) {
     return doc;
   }
   const now = connectionsOf(doc);
@@ -527,6 +541,272 @@ export function removeBranch(doc: FlowDoc, id: string, index: number): FlowDoc {
   return { ...next, connections };
 }
 
+// ---- グループ（図の上の囲み。手順ではない）
+
+export const GROUP_TYPE = "group";
+/** 大きさの分からないノードの見積もり。図のノードの幅（`Canvas.css` の `.react-flow__node-step`）とふつうの高さ */
+export const NODE_SIZE: FlowSize = { width: 190, height: 90 };
+/** 大きさを書いていないグループの大きさ */
+export const GROUP_SIZE: FlowSize = { width: 320, height: 200 };
+/** グループの最小の大きさ（図で縮めるときの下限） */
+export const GROUP_MIN: FlowSize = { width: 120, height: 80 };
+/** 囲むときの余白と、上に名前を書く帯の高さ */
+const GROUP_PAD = 24;
+const GROUP_HEAD = 28;
+
+export interface FlowSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+export function isGroup(node: FlowNode): boolean {
+  return nodeType(node) === GROUP_TYPE;
+}
+
+function positiveNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/** ノードの大きさ。`style` の `width` / `height` があればそれ、無ければ見積もり */
+export function nodeSize(node: FlowNode): FlowSize {
+  const style = isRecord(node.style) ? node.style : {};
+  const fallback = isGroup(node) ? GROUP_SIZE : NODE_SIZE;
+  return { width: positiveNumber(style.width) ?? fallback.width, height: positiveNumber(style.height) ?? fallback.height };
+}
+
+/**
+ * ノードが入っているグループ。`parentId` が在るグループを指しているときだけ。グループ自身は
+ * どこにも入らない（グループの中にグループは置かない）。指す先が無い・グループでない `parentId` は
+ * 読むだけで効かせない（図でも親にしない。書き換えもしない）
+ */
+export function groupOf(doc: FlowDoc, node: FlowNode): FlowNode | undefined {
+  if (isGroup(node) || typeof node.parentId !== "string" || node.parentId === node.id) {
+    return undefined;
+  }
+  const parent = doc.nodes.find((n) => n.id === node.parentId);
+  return parent !== undefined && isGroup(parent) ? parent : undefined;
+}
+
+function positionIn(doc: FlowDoc, node: FlowNode): FlowPoint {
+  return nodePosition(node, doc.nodes.indexOf(node));
+}
+
+/** 図の上の位置（グループの中のノードは、グループの位置を足す）。無いノードは原点 */
+export function absolutePosition(doc: FlowDoc, id: string): FlowPoint {
+  const node = doc.nodes.find((n) => n.id === id);
+  if (node === undefined) {
+    return { x: 0, y: 0 };
+  }
+  const own = positionIn(doc, node);
+  const group = groupOf(doc, node);
+  if (group === undefined) {
+    return own;
+  }
+  const base = positionIn(doc, group);
+  return { x: base.x + own.x, y: base.y + own.y };
+}
+
+function withPosition(node: FlowNode, at: FlowPoint): FlowNode {
+  const now = isRecord(node.position) ? node.position : {};
+  return { ...node, position: { ...now, x: Math.round(at.x), y: Math.round(at.y) } };
+}
+
+function withoutParent(node: FlowNode): FlowNode {
+  const { parentId: _dropped, ...rest } = node;
+  void _dropped;
+  return rest as FlowNode;
+}
+
+/** グループの中のノードを外へ出す（図の上の位置は変えない）。グループでなければそのまま */
+function releaseMembers(doc: FlowDoc, groupId: string): FlowDoc {
+  const group = doc.nodes.find((n) => n.id === groupId);
+  if (group === undefined || !isGroup(group)) {
+    return doc;
+  }
+  return {
+    ...doc,
+    nodes: doc.nodes.map((node) => (groupOf(doc, node)?.id === groupId ? withoutParent(withPosition(node, absolutePosition(doc, node.id))) : node)),
+  };
+}
+
+/** `id` のノードを `before` のノードの直前へ移す（親は子より前に並べる） */
+function moveBefore(nodes: readonly FlowNode[], id: string, before: string): FlowNode[] {
+  const moving = nodes.find((n) => n.id === id);
+  const rest = nodes.filter((n) => n.id !== id);
+  const at = rest.findIndex((n) => n.id === before);
+  if (moving === undefined || at < 0) {
+    return [...nodes];
+  }
+  return [...rest.slice(0, at), moving, ...rest.slice(at)];
+}
+
+/**
+ * 選んだノードを新しいグループで囲む。グループの大きさは、囲むノードの外枠に余白を足したもの
+ * （大きさの分からないノードは `NODE_SIZE` で見積もる）。
+ *
+ * グループ自身は囲まない（入れ子にしない）。別のグループに入っているノードは、そのグループから
+ * 抜けて新しいグループに移る（元のグループは空でも残す）。囲めるノードが 1 つも無ければ undefined。
+ * 新しいグループは、囲んだノードのうち最も前のものの位置に並べる（親を子より前に置くため）。
+ */
+export function groupNodes(doc: FlowDoc, ids: readonly string[]): { readonly doc: FlowDoc; readonly id: string } | undefined {
+  const wanted = new Set(ids);
+  const picked = doc.nodes.filter((node) => wanted.has(node.id) && !isGroup(node));
+  if (picked.length === 0) {
+    return undefined;
+  }
+  const spots = new Map(picked.map((node) => [node.id, absolutePosition(doc, node.id)]));
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  for (const node of picked) {
+    const at = spots.get(node.id) as FlowPoint;
+    const size = nodeSize(node);
+    left = Math.min(left, at.x);
+    top = Math.min(top, at.y);
+    right = Math.max(right, at.x + size.width);
+    bottom = Math.max(bottom, at.y + size.height);
+  }
+  const origin = { x: Math.round(left - GROUP_PAD), y: Math.round(top - GROUP_PAD - GROUP_HEAD) };
+  const id = freshNodeId(doc, GROUP_TYPE);
+  const group: FlowNode = {
+    id,
+    type: GROUP_TYPE,
+    name: TYPE_LABELS[GROUP_TYPE] ?? GROUP_TYPE,
+    position: origin,
+    data: {},
+    style: { width: Math.round(right - left + GROUP_PAD * 2), height: Math.round(bottom - top + GROUP_PAD * 2 + GROUP_HEAD) },
+  };
+  const nodes: FlowNode[] = [];
+  let placed = false;
+  for (const node of doc.nodes) {
+    const at = spots.get(node.id);
+    if (at === undefined) {
+      nodes.push(node);
+      continue;
+    }
+    if (!placed) {
+      nodes.push(group);
+      placed = true;
+    }
+    nodes.push({ ...withPosition(node, { x: at.x - origin.x, y: at.y - origin.y }), parentId: id });
+  }
+  return { doc: { ...doc, nodes }, id };
+}
+
+/** グループを解く。中のノードは図の上の同じ位置のまま外へ出し、グループは消す。グループでなければそのまま */
+export function ungroup(doc: FlowDoc, groupId: string): FlowDoc {
+  const group = doc.nodes.find((n) => n.id === groupId);
+  return group === undefined || !isGroup(group) ? doc : removeNode(doc, groupId);
+}
+
+/**
+ * グループの大きさを変える。左や上の辺を動かしたときは位置（`position`、図の上の位置）も渡す。
+ * そのときは中のノードの位置（グループからの位置）をずれた分だけ戻し、図の上では動かさない
+ * （React Flow も縮めている間、中のノードをその場に留める）。
+ */
+export function resizeGroup(doc: FlowDoc, id: string, size: FlowSize, position?: FlowPoint): FlowDoc {
+  const group = doc.nodes.find((n) => n.id === id);
+  if (group === undefined || !isGroup(group)) {
+    return doc;
+  }
+  const now = positionIn(doc, group);
+  const dx = position === undefined ? 0 : Math.round(position.x) - Math.round(now.x);
+  const dy = position === undefined ? 0 : Math.round(position.y) - Math.round(now.y);
+  const style = isRecord(group.style) ? group.style : {};
+  const width = Math.round(Math.max(GROUP_MIN.width, size.width));
+  const height = Math.round(Math.max(GROUP_MIN.height, size.height));
+  if (dx === 0 && dy === 0 && style.width === width && style.height === height) {
+    // 縁を押しただけ。未保存にしない
+    return doc;
+  }
+  return {
+    ...doc,
+    nodes: doc.nodes.map((node) => {
+      if (node.id === id) {
+        const resized = { ...node, style: { ...style, width, height } };
+        return dx === 0 && dy === 0 ? resized : withPosition(resized, { x: now.x + dx, y: now.y + dy });
+      }
+      if ((dx !== 0 || dy !== 0) && groupOf(doc, node)?.id === id) {
+        const at = positionIn(doc, node);
+        return withPosition(node, { x: at.x - dx, y: at.y - dy });
+      }
+      return node;
+    }),
+  };
+}
+
+/**
+ * ノードを図の上の位置 `absolute` に置く（ドラッグを放したとき）。
+ *
+ * - グループはそのまま動く（中のノードは位置がグループからなので、一緒に動く）
+ * - ほかのノードは、真ん中がグループの枠の中に落ちればそのグループに入り、どの枠にも落ちなければ
+ *   グループから出る。枠が重なっていれば、後ろに並ぶ（図で上に描かれる）グループに入る
+ *
+ * 位置もグループも変わらなければ、同じ写しをそのまま返す（押しただけで未保存にしない）。
+ */
+export function placeNode(doc: FlowDoc, id: string, absolute: FlowPoint): FlowDoc {
+  const index = doc.nodes.findIndex((n) => n.id === id);
+  if (index < 0) {
+    return doc;
+  }
+  const node = doc.nodes[index];
+  const at = { x: Math.round(absolute.x), y: Math.round(absolute.y) };
+  const now = nodePosition(node, index);
+  if (isGroup(node)) {
+    return Math.round(now.x) === at.x && Math.round(now.y) === at.y ? doc : moveNode(doc, id, at);
+  }
+  const size = nodeSize(node);
+  const cx = at.x + size.width / 2;
+  const cy = at.y + size.height / 2;
+  const host = [...doc.nodes].reverse().find((g) => {
+    if (!isGroup(g) || g.id === id) {
+      return false;
+    }
+    const base = positionIn(doc, g);
+    const box = nodeSize(g);
+    return cx >= base.x && cx <= base.x + box.width && cy >= base.y && cy <= base.y + box.height;
+  });
+  const current = groupOf(doc, node);
+  const base = host === undefined ? { x: 0, y: 0 } : positionIn(doc, host);
+  const rel = { x: at.x - base.x, y: at.y - base.y };
+  if (host?.id === current?.id && Math.round(now.x) === rel.x && Math.round(now.y) === rel.y) {
+    return doc;
+  }
+  let changed = withPosition(node, rel);
+  if (host !== undefined) {
+    changed = { ...changed, parentId: host.id };
+  } else if (current !== undefined) {
+    changed = withoutParent(changed);
+  }
+  const nodes = doc.nodes.map((n) => (n.id === id ? changed : n));
+  if (host !== undefined && doc.nodes.indexOf(host) > index) {
+    return { ...doc, nodes: moveBefore(nodes, host.id, id) };
+  }
+  return { ...doc, nodes };
+}
+
+/**
+ * ドラッグで動いた点をまとめて置く。位置は React Flow の決まり（グループの中のノードはグループからの位置）で、
+ * 写しの今のグループに対して読む。グループを先に置き、そのあとほかのノードを置く（一緒に動いた
+ * グループの新しい位置から読むため）。何も変わらなければ同じ写しを返す。
+ */
+export function placeNodes(doc: FlowDoc, moves: readonly { readonly id: string; readonly position: FlowPoint }[]): FlowDoc {
+  const typeOf = new Map(doc.nodes.map((node) => [node.id, isGroup(node)]));
+  const ordered = [...moves.filter((m) => typeOf.get(m.id) === true), ...moves.filter((m) => typeOf.get(m.id) === false)];
+  let next = doc;
+  for (const move of ordered) {
+    const node = next.nodes.find((n) => n.id === move.id);
+    if (node === undefined) {
+      continue;
+    }
+    const group = groupOf(next, node);
+    const base = group === undefined ? { x: 0, y: 0 } : positionIn(next, group);
+    next = placeNode(next, move.id, { x: base.x + move.position.x, y: base.y + move.position.y });
+  }
+  return next;
+}
+
 // ---- 出入口
 
 export interface PortInfo {
@@ -546,6 +826,10 @@ export interface Ports {
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {
   const type = nodeType(node);
+  if (type === GROUP_TYPE) {
+    // グループは出入口を持たない（線を繋がない）
+    return { inputs: [], outputs: [] };
+  }
   const inputs: PortInfo[] = type === "start" ? [] : [{ id: INPUT_PORT, label: "" }];
   const outputs: PortInfo[] = [];
   const key = branchKey(type);
@@ -686,7 +970,7 @@ export function flowNotices(doc: FlowDoc): readonly string[] {
   } else if (starts > 1) {
     out.push(`開始（start）のノードが ${starts} つある。案内はどの開始からも辿って並べる`);
   }
-  const unknown = [...new Set(doc.nodes.map(nodeType).filter((type) => !isEditableType(type)))];
+  const unknown = [...new Set(doc.nodes.map(nodeType).filter((type) => !isEditableType(type) && type !== GROUP_TYPE))];
   if (unknown.length > 0) {
     out.push(`この画面で欄を持たない種類がある（${unknown.map((t) => t || "(種類なし)").join(", ")}）。名前と位置だけ変えられ、中身は保存してもそのまま残る`);
   }
