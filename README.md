@@ -730,8 +730,8 @@ hook の一覧は `.claude/settings.json` と `settings.local.json` を読むだ
 （`.ccnavi/common/phases.yml`）、自身の層（`.ccnavi/config/phases.yml`）、プロジェクトの層の 3 種。
 保存の前に `--lint --phases`（層なら `--project-phases-file`）を通すので、提案がワークツリーに在る親の計画が指す種類を消すとそこで止まる
 （承認済みチケットの計画は照合しない。チケット制御が disable なら照合は走らない）。
-子の範囲が上限に収まるかを判定するのは実行ファイルで、拡張は種類を書く場所だけ。共通層のファイルが無ければ README の例を
-雛形として作れる（組み込みの既定は無い）。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
+子の範囲が上限に収まるかを判定するのは実行ファイルで、拡張は種類を書く場所だけ。共通層のファイルは画面から作らない
+（組み込みの既定も雛形も無い）。種類は自身の層かプロジェクトの層に置き、プロジェクト管理画面から開く。`CCNAVI_TICKET_CONTROL` が `disable` なら入口ごと出ない。
 
 ## Bash のコマンドは実行される部分だけを見る
 
