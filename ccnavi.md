@@ -245,7 +245,7 @@ ccnavi のリポジトリでの組み立て: `build.py` は PyInstaller の出�
 
 | 欄 | 数えるもの |
 |---|---|
-| `decision` = `allow` / `ask` / `deny` / `handover` / `skip` | 下した判定。`handover` は権限モードに委ねた回 |
+| `decision` = `allow` / `ask` / `deny` / `handover` / `nudge` / `skip` | 下した判定。`handover` は権限モードに委ねた回。`nudge` は `Stop` で `finish` を促した回（ツール呼び出しの判定ではないので `deny` と数えない。ADR-0087） |
 | `enforced` | 実際に適用したか。`dry-run` は常に偽 |
 | `code` | 判定の根拠の種別（付録 A） |
 | `reason` | `skip` の理由 |
@@ -1452,10 +1452,12 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 
 **`finish` の打ち忘れは `Stop` で 1 回だけ促す（ADR-0087）。** メインエージェントの `Stop` で、cwd のワークツリーに
 結び付いた承認済みチケットが着手済み（`doing/`、閉じても取り消してもいない）で、そのワークツリーに未コミットの変更が無く
-（追跡していないファイルも数える）、基準点より先にコミットがあれば、`decision: block` で止めて、`finish` の sh の綴りと
-「続けるなら理由を利用者に書いてから終える」を渡す（`NUDGE_TICKET_FINISH`）。payload の `stop_hook_active` が真なら
-促さない（1 回の連鎖に 1 回）。除くのは、チケット制御かモードが `disable`、ワークスペースルートかチケットの無いワークツリー、
-未着手、`blocked`、基準点が無い、親で `close_problems`（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・
+（追跡していないファイルも数える）、基準点より先に自分で作ったコミットがあれば（取り込んだだけのコミットは数えない。
+子なら親のブランチ、親なら `origin/HEAD` にあるものとマージのコミットを除く）、`decision: block` で止めて、`finish` の sh の綴りと
+「続けるなら理由を利用者に書いてから終える」を渡す（`NUDGE_TICKET_FINISH`）。同じセッションで同じチケットを同じ HEAD のまま
+促すのは 1 回だけ（控えは状態の置き場の `nudged-<セッション>.json`。git では運ばない）。HEAD が進めばまた促す。payload の
+`stop_hook_active` が真なら促さない。控えの置き場が無いか書けないときも促さない。除くのは、チケット制御かモードが `disable`、ワークスペースルートかチケットの無いワークツリー、
+未着手、`blocked`、基準点が無い、子で親のブランチを引けない、親で `close_problems`（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・
 終わっていないフェーズ）が空でない、git を読めない、`SubagentStop`。`dry-run` は止めずに文を `systemMessage` に載せる。
 
 **子の着手は親の着手のあと。** 親が `doing/` で着手済みでなければ、子の `start` は止まる（親のワークツリーが
@@ -2410,7 +2412,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに控えた指紋から変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1、ADR-0085） |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
-| `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く基準点より先にコミットがある。1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す（9.6、ADR-0087） |
+| `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6、ADR-0087）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10、ADR-0077） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2、ADR-0077） |

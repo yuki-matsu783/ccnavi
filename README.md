@@ -1092,10 +1092,12 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 ここでは戻さず、`CCNAVI_MODE` も見ない（見えたことを言うだけなので、`dry-run` でも報告する）。
 
 同じ `Stop` で、`finish` の打ち忘れを 1 回だけ促す（ADR-0087）。メインエージェントの cwd のワークツリーに結び付いたチケットが
-着手済みで、そのワークツリーに未コミットの変更が無く（追跡していないファイルも数える）、基準点より先にコミットがあれば、
+着手済みで、そのワークツリーに未コミットの変更が無く（追跡していないファイルも数える）、基準点より先に自分で作ったコミットがあれば
+（子なら親のブランチ、親なら `origin/HEAD` を取り込んだだけのコミットとマージのコミットは数えない）、
 `{"decision": "block", "reason": …}` で止め、`ccnavi-ticket.sh finish <識別子>` の綴りと「まだ続けるなら理由を書いてから終える」を
-渡す（理由コード `NUDGE_TICKET_FINISH`。報告があれば同じ JSON の `systemMessage` に載る）。payload の `stop_hook_active` が真なら
-促さない。チケット制御かモードが `disable`、未着手、書き込み停止中（`blocked`）、親で `finish` が通らない形（開いている子・
+渡す（理由コード `NUDGE_TICKET_FINISH`。報告があれば同じ JSON の `systemMessage` に載る。記録の `decision` は `nudge`）。同じセッションで
+同じチケットを同じ HEAD のまま促すのは 1 回だけで（控えは `logs/state/nudged-<セッション>.json`）、コミットを足せばまた促す。
+payload の `stop_hook_active` が真なとき、控えを置けないとき、子で親のブランチを引けないときも促さない。チケット制御かモードが `disable`、未着手、書き込み停止中（`blocked`）、親で `finish` が通らない形（開いている子・
 レビュー準備中／レビュー待ち・フィードバック計画待ち・終わっていないフェーズ）、git を読めないとき、`SubagentStop` では促さない。
 `dry-run` では止めず、止めたはずの文を `systemMessage` に載せる。
 
