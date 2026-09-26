@@ -46,5 +46,5 @@ export function ticketControlMismatch(fromFiles: TicketControl, fromBoard: strin
   if (board === fromFiles) {
     return "";
   }
-  return `${TICKET_CONTROL_ENV} の読みが食い違う（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめる`;
+  return `${TICKET_CONTROL_ENV} の読みが食い違っています（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめてください`;
 }

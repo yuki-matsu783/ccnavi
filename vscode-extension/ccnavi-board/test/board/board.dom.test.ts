@@ -175,7 +175,7 @@ test("CB-D44 「更新」を押すと非活性になり、回り記号と「更�
     assert.equal(button.disabled, true, "押した瞬間に非活性になる");
     assert.ok(button.classList.contains("busy"), "回り記号が出る");
     assert.equal(button.getAttribute("aria-busy"), "true");
-    assert.equal(button.querySelector(".label")?.textContent, "更新中");
+    assert.equal(button.querySelector(".label")?.textContent, "更新中…");
     // 非活性の間はもう 1 度押しても送らない
     const sent = page.posted.length;
     page.click(button);
@@ -238,7 +238,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース自身（空）も候補。覚え直しても「すべて」にならない
+    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に落ちない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");
@@ -250,7 +250,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
   } finally {
     await page.close();
   }
-  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース自身」も効かせない
+  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース（プロジェクト外）」も効かせない
   // （解除する手立てが画面に無いまま「絞り込み中」になってしまう）
   const without = await openBoard(fixture(), { state: { project: "" } });
   try {

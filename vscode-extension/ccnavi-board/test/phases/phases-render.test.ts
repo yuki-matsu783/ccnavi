@@ -31,7 +31,7 @@ test("CB-T95 フェーズ管理画面は外部資源を持たず、種類を JSO
 test("CB-T121 束ねた画面を nonce 付きの script に流し込み、資源としては読ませない", () => {
   const rendered = phasesHtml({ kind: "page", page: page() });
   assert.ok(rendered.includes(`<script nonce="${NONCE}">\n${screenScript("phases")}\n</script>`));
-  assert.match(rendered, /<div id="root"><p class="empty" id="ccnavi-loading">フェーズを読み込み中\.\.\.<\/p><\/div>/);
+  assert.match(rendered, /<div id="root"><p class="empty" id="ccnavi-loading">フェーズを読み込み中…<\/p><\/div>/);
   assert.doesNotMatch(shell(rendered), /<script[^>]*\ssrc=/);
 });
 

@@ -166,17 +166,17 @@ test("CB-T90 足す・消す・空の並びは欄ごと消す・scope の inheri
 test("CB-T91 id が重なれば書き戻さない（実行ファイルは後ろで黙って上書きするため）", () => {
   const doc = readPhases(SAMPLE);
   const phases = doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, id: "research" } : p));
-  assert.throws(() => doc.apply({ order: "sequential", phases }), /id `research` が 2 つある/);
+  assert.throws(() => doc.apply({ order: "sequential", phases }), /id `research` が 2 つあります/);
 });
 
 test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す。読めない値は苦情にして既定で出す", () => {
   const doc = readPhases(`phases:\n  a:\n    kind: strange\n    review: maybe\n    scope: everything\n    overlap: b\n`);
   assert.equal(doc.model.version, null);
-  assert.ok(doc.model.problems.some((p) => p.startsWith("version が無い")));
+  assert.ok(doc.model.problems.some((p) => p.startsWith("version がありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("kind `strange`")));
   assert.ok(doc.model.problems.some((p) => p.includes("review `maybe`")));
   assert.ok(doc.model.problems.some((p) => p.includes("scope `everything`")));
-  assert.ok(doc.model.problems.some((p) => p.includes("overlap が並びではない")));
+  assert.ok(doc.model.problems.some((p) => p.includes("overlap がリスト（配列）ではありません")));
   const a = doc.model.form.phases[0];
   assert.equal(a.kind, "work");
   assert.equal(a.review, "mr");
@@ -187,8 +187,8 @@ test("CB-T92 version が無ければ苦情を出し、保存で先頭に足す�
 });
 
 test("CB-T93 phases が無い、種類が無い、空のファイルは苦情になり、保存で対応表から始める", () => {
-  assert.ok(readPhases("version: 1\n").model.problems.some((p) => p.startsWith("phases が無い")));
-  assert.ok(readPhases("version: 1\nphases: {}\n").model.problems.some((p) => p.startsWith("種類が 1 つも無い")));
+  assert.ok(readPhases("version: 1\n").model.problems.some((p) => p.startsWith("phases がありません")));
+  assert.ok(readPhases("version: 1\nphases: {}\n").model.problems.some((p) => p.startsWith("種類が 1 つもありません")));
   const empty = readPhases("");
   assert.deepEqual(empty.model.form.phases, []);
   const out = empty.apply({ order: "sequential", phases: [phase("implement", { title: "実装", inherit: false, scope: ["src/*"] })] });
@@ -237,7 +237,7 @@ test("CB-T102 先頭を動かしても空白だけの行は出ず、先頭を消
 test("CB-T103 同じ元ノードを 2 回送れば書き戻さない。yes / no の id は引用符で囲む。phases: {} はブロックに直す", () => {
   const doc = readPhases(SAMPLE);
   const [research] = doc.model.form.phases;
-  assert.throws(() => doc.apply({ order: "sequential", phases: [research, { ...research, id: "x" }] }), /2 回送られた/);
+  assert.throws(() => doc.apply({ order: "sequential", phases: [research, { ...research, id: "x" }] }), /2 回送られました/);
 
   const renamed = doc.apply({ order: "sequential", phases: doc.model.form.phases.map((p) => (p.id === "design" ? { ...p, id: "yes", overlap: ["no", "research"], when: "on" } : p)) });
   assert.match(renamed, /\n  "yes":\n    kind: work\n    title: 設計\n    review: mr\n    scope: \["wip\/design\/\*", "docs\/\*"\]\n    overlap: \["no", research\]\n    when: "on"\n/);
@@ -248,8 +248,8 @@ test("CB-T103 同じ元ノードを 2 回送れば書き戻さない。yes / no 
     flow.apply({ order: "sequential", phases: [phase("a", { title: "A" })] }),
     "version: 1\nphases:\n  a:\n    kind: work\n    title: A\n    review: mr\n    scope: inherit\n",
   );
-  assert.match(readPhases("- a\n").model.problems[0], /最上位が対応表ではない/);
-  assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの種類は消える/);
+  assert.match(readPhases("- a\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
+  assert.match(readPhases("version: 1\nphases:\n  broken:\n  ok:\n    kind: work\n").model.problems[0], /保存するとこの種類は消えます/);
 });
 
 test("CB-T198 order と after を読み、書き戻す。sequential は元から欄が無ければ書かない", () => {

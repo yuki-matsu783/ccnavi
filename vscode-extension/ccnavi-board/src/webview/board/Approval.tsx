@@ -72,10 +72,10 @@ function Inner({ overlay }: { readonly overlay: ApprovalOverlay }): JSX.Element 
     case "done":
       return (
         <>
-          <h2 id="approval-title">{overlay.count} 件を承認した</h2>
-          {overlay.carried === true ? <p className="approval-note">承認済みチケットのコミットと push を端末に送った。</p> : null}
+          <h2 id="approval-title">{overlay.count} 件を承認しました</h2>
+          {overlay.carried === true ? <p className="approval-note">承認済みチケットのコミットと push をターミナルに送りました。</p> : null}
           <p className="approval-note">
-            プロンプトを用意しました。。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
+            Claude Code に伝える文を用意しました。コピーして進行中のセッションに貼るか、新しいセッションで開いてください。
           </p>
           <pre className="approval-text">{overlay.prompt}</pre>
           <HandOver />
@@ -119,14 +119,14 @@ function Body({
   const tickets = preview.batch.map((b) => b.ticket);
   return (
     <>
-      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットは無い" : `承認待ちのチケット ${count} 件`}</h2>
+      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット ${count} 件`}</h2>
       {notice ? <p className="approval-note warn">{notice}</p> : null}
       {count === 0 ? null : (
         <table className="approval-batch">
           <thead>
             <tr>
-              <th>識別子</th>
-              <th>題</th>
+              <th>ID</th>
+              <th>タイトル</th>
               <th>場所</th>
             </tr>
           </thead>
@@ -135,7 +135,7 @@ function Body({
               <tr key={b.ticket}>
                 <td className="approval-id">{b.ticket}</td>
                 <td>{b.title}</td>
-                <td>{b.revision ? "親の改版" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
+                <td>{b.revision ? "親（計画の改訂）" : b.parent === null ? "親" : `親 ${b.parent} / フェーズ ${b.phase ?? "?"}`}</td>
               </tr>
             ))}
           </tbody>

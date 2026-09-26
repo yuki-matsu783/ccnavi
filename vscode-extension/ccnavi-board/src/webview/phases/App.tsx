@@ -142,7 +142,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   /**
    * 読み直しを頼む。**押した時点で欄を止める。** 拡張ホストは実行ファイルに聞いてから中身を返す
-   * ことがあり（層の置き場を解く）、その間に打った内容は、届いた中身で黙って消えるため。
+   * ことがあり（設定ファイルの場所を解く）、その間に打った内容は、届いた中身で黙って消えるため。
    * 人が「破棄して読み直す？」をやめたときは `cancelled` が返り、欄が戻る。
    */
   /**
@@ -212,11 +212,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     return (
       <>
         <p className="empty">
-          フェーズ管理画面を読み直せなかった。原因を直してから「再読込」を押す（同じ対象を開き直しても前面に出るだけ。別の対象を開けば、このタブの中身がその対象に替わる）。
+          フェーズ管理画面を読み込めませんでした。原因を直してから「更新」を押してください（同じ対象を開き直しても前面に出るだけです。別の対象を開けば、このタブの中身がその対象に替わります）。
         </p>
         <pre className="load-error">{data.error}</pre>
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
-          再読込
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={() => post({ type: "reload", dirty: false })}>
+          更新
         </button>
       </>
     );
@@ -330,7 +330,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     {
       target: "#phases",
       title: "フェーズの種類",
-      body: "工程の型。作業（work）の種類は親チケットの計画 plan: に、フィードバック対応（feedback）の種類はレビューのあとの feedback: に並べる。行を押すと欄が開き、「＋ 種類を追加」で増やせる。",
+      body: "工程の型です。作業（work）の種類は親チケットの計画 plan: に、フィードバック対応（feedback）の種類はレビューのあとの feedback: に並べます。行を押すと欄が開き、「＋ 種類を追加」で増やせます。",
       before: () => peekView("list"),
     },
     {
@@ -338,8 +338,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       title: "ほかの種類との関係",
       body:
         sample === undefined
-          ? "種類を足して行を開くと「ほかの種類との関係」の欄があり、並行できる種類・一緒に必要な種類・先に済ませる種類を複数選択のリストで選べる（押すたびに付け外し）。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になる。"
-          : "並行できる種類・一緒に必要な種類・先に済ませる種類を、複数選択のリストで選ぶ（押すたびに付け外し）。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になる。",
+          ? "種類を足して行を開くと「ほかの種類との関係」の欄があり、並行できる種類・一緒に必要な種類・先に済ませる種類を複数選択のリストで選べます（押すたびに付け外し）。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になります。"
+          : "並行できる種類・一緒に必要な種類・先に済ませる種類を、複数選択のリストで選びます（押すたびに付け外し）。先に済ませる種類（after）は、待ち方が dag のときに判定が待つ相手になります。",
       before: () => {
         peekView("list");
         openSample();
@@ -348,29 +348,29 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     {
       target: "#f-order",
       title: "全体計画の待ち方",
-      body: "sequential は plan: に並べた順に一つずつ進む。dag は after でつないだ種類だけを待ち、つながっていない種類は並行して進む。層のどれかが sequential なら、判定は sequential で待つ。",
+      body: "sequential は plan: に並べた順に一つずつ進みます。dag は after でつないだ種類だけを待ち、つながっていない種類は並行して進みます。合わせて使う設定のどれかが sequential なら、判定は sequential で待ちます。",
     },
     {
       target: "#phase-graph",
       title: "図",
-      body: "矢印が after の流れ、実線が一緒に必要、破線が並行できる関係。作業（work）とフィードバック対応（feedback）は枠で分かれ、枠の間の矢印はレビュー後の順を表す。点を押すと一覧のその行へ移る。",
+      body: "矢印が after の流れ、実線が一緒に必要、破線が並行できる関係です。作業（work）とフィードバック対応（feedback）は枠で分かれ、枠の間の矢印はレビュー後の順を表します。点を押すと一覧のその行へ移ります。",
       before: () => peekView("graph"),
     },
     {
       target: "#save",
       title: "保存",
-      body: "保存すると実行ファイルが検証してから書き込む。通らなければ、下に理由が出る。",
+      body: "保存すると実行ファイルが検証してから書き込みます。通らなければ、下に理由が出ます。",
     },
     {
       target: '[data-action="help"]',
       title: "ヘルプ",
-      body: "細かい説明はここから開く。",
+      body: "細かい説明はここから開けます。",
       before: () => peekView(beforeTour.current?.view ?? view),
     },
     {
       target: '[data-action="tour"]',
       title: "案内",
-      body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
+      body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
     },
   ];
 
@@ -414,9 +414,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </div>
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。再読込してください。
-        <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-          再読込
+        ファイルの変更を検知しました。更新してください。
+        <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+          更新
         </button>
       </div>
       <header className="toolbar">
@@ -432,8 +432,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" disabled={page?.exists !== true} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
-            再読込
+          <button type="button" className="action" data-action="reload" title="ファイルを読み直します" disabled={busy} onClick={reload}>
+            更新
           </button>
           <button
             type="button"
@@ -516,16 +516,16 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {helpOpen && (
           <div className="help-panel" id="help">
             <p className="hint">
-            親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になる。レビューのあとは{" "}
-            <code>feedback:</code> に <code>feedback</code> の種類を並べて改版を出す。<code>id</code> と <code>title</code> はどちらも一意。<code>scope</code>{" "}
-            は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきもの。
-            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に置くなら一緒に必要な種類。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待たない。
-            辺の書き漏れはそのまま並行として通るので、図で確かめる。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効かない。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効かない。
-            関係の欄はこのファイルのほかの種類から選ぶ（層の画面では、ほかの層の種類の id を打って足せる）。範囲と成果物は <code>,</code> で区切る。
+            親チケットの <code>plan:</code> に <code>work</code> の種類を順に並べたものが全体計画で、<code>--approve</code> が通ることが合意になります。レビューのあとは{" "}
+            <code>feedback:</code> に <code>feedback</code> の種類を並べて計画を改訂します。<code>id</code> と <code>title</code> はどちらも一意です。<code>scope</code>{" "}
+            は子チケットの範囲の上限（ワークツリーのルートからの glob。<code>inherit</code> なら親の範囲そのまま）、<code>deliverables</code> は閉じる前に存在し、git に追跡されているべきものです。
+            <code>overlap</code> は並行してよい種類（対称）、<code>requires</code> は計画に入れるなら一緒に必要な種類です。<code>after</code> は待ち方が <code>dag</code> のときの依存（先に閉じてレビューが済んでいるべき種類）で、書かない種類は何も待ちません。
+            辺の書き漏れはそのまま並行として通るので、図で確かめてください。待ち方は親チケットの承認のときに親へ写り、あとで直しても進行中の親には効きません。<code>agent</code> と <code>when</code> はエージェントへの案内にだけ使い、判定には効きません。
+            関係の欄はこのファイルのほかの種類から選びます（ワークスペースとプロジェクトの設定の画面では、共通の設定の種類の id を入力して足せます）。範囲と成果物は <code>,</code> で区切ります。
             </p>
             <p className="hint">
-              図の「人が見る」は種類の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わる。判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる（層のどれかが{" "}
-              <code>sequential</code> なら <code>sequential</code>）。図はこのファイルの中だけを描くので、ほかの層の種類を指す関係は線にならない。
+              図の「人が見る」は種類の宣言（<code>review</code>）で、計画の延期や実績のリスクで実際に見る場所は変わります。判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります（合わせる設定のどれかが{" "}
+              <code>sequential</code> なら <code>sequential</code>）。図はこのファイルの中だけを描くので、ほかの設定の種類を指す関係は線になりません。
             </p>
           </div>
         )}
@@ -573,16 +573,16 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 }
 
 /**
- * ファイルが無いときの帯。層（自身の層・プロジェクト）は欄を触れ、最初の保存でファイルを作る。
- * 層にも共通層にも雛形は置かない。雛形の id は層の種類と重なりやすく、中身が違えばその層が空として扱われる。
- * 共通層は画面から作らせず、種類を置く層（自身の層）を開く道だけを出す。
+ * ファイルが無いときの帯。ワークスペースとプロジェクトの設定は欄を触れ、最初の保存でファイルを作る。
+ * どの設定にも雛形は置かない。雛形の id は共通の設定の種類と重なりやすく、中身が違えばその設定が空として扱われる。
+ * 共通の設定は画面から作らせず、種類を置くワークスペースの設定を開く道だけを出す。
  */
 function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readonly busy: boolean; readonly onOpenSelf: () => void }): JSX.Element {
   if (page.layer === true) {
     return (
       <div className="banner missing">
         <span>
-          {page.phasesPath} が無い。無い層は空で、共通層の種類だけが使われる。この層に種類を足すなら、下で足して保存する（最初の保存でファイルが作られる）。雛形は置かない。雛形の id は共通層の種類と重なりやすく、中身が違えばこの層が空として扱われるため。
+          {page.phasesPath} がありません。ファイルが無ければこの設定は空で、共通の設定の種類だけが使われます。この設定に種類を足すなら、下で足して保存してください（最初の保存でファイルが作られます）。雛形は作りません。雛形の id は共通の設定の種類と重なりやすく、中身が違えばこの設定が空として扱われるためです。
         </span>
       </div>
     );
@@ -590,7 +590,7 @@ function Missing({ page, busy, onOpenSelf }: { readonly page: PhasesPage; readon
   return (
     <div className="banner missing">
       <span>
-        共通層に種類は無い（{page.phasesPath} が無い）。種類は各層（ワークスペース自身・プロジェクト）に置く。プロジェクト管理画面の「フェーズ管理」から開く。
+        共通の設定に種類はありません（{page.phasesPath} がありません）。種類はワークスペースかプロジェクトの設定に置いてください。プロジェクト管理画面の「フェーズ管理」から開けます。
       </span>
       <button type="button" className="action primary" data-action="open-self" disabled={busy} onClick={onOpenSelf}>
         自身の層を開く

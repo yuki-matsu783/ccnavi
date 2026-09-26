@@ -73,23 +73,23 @@ export function readRisk(text: string): RiskDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めない: ${e.message}`);
+    problems.push(`YAML として読めません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位が対応表ではない。実行ファイルは組み込みの配点を使う。保存すると中身を捨てて対応表から始める");
+    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を捨てて空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version が無い。保存すると version: ${RISK_VERSION} を先頭に足す`);
+    problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に足します`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めない（読むのは ${RISK_VERSION}）。組み込みの配点を使う`);
+    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点に落ちます`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
   const rawLevels = doc.get("levels", true);
   if (rawLevels !== undefined && rawLevels !== null) {
     if (!isMap(rawLevels)) {
-      problems.push("levels が対応表ではない。境目の点は組み込みの値として出す");
+      problems.push("levels がマップ（キーと値の組の集まり）ではありません。境目の点は組み込みの値として表示します");
     } else {
       for (const name of LEVEL_NAMES) {
         levels[name] = scalarText(rawLevels, name);
@@ -101,17 +101,17 @@ export function readRisk(text: string): RiskDocument {
   const rawFactors = doc.get("factors", true);
   if (rawFactors !== undefined && rawFactors !== null) {
     if (!isSeq(rawFactors)) {
-      problems.push("factors が並びではない。項目は画面に出さない");
+      problems.push("factors がリスト（配列）ではありません。項目は画面に出しません");
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factors の ${index + 1} 件目が対応表ではない。画面に出さず、保存するとこの項目は消える（実行ファイルも読めない）`);
+          problems.push(`factors の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読めません）`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));
         if (present.length > 1) {
           problems.push(
-            `factors の ${index + 1} 件目に加点条件が ${present.length} 個ある（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消える`,
+            `factors の ${index + 1} 件目に加点条件が ${present.length} 個あります（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消えます`,
           );
         }
         factors.push(formOf(index, item, present[0] ?? "lines_over"));
@@ -194,7 +194,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
   for (const form of edited.factors) {
     if (form.origin !== null && seen.has(form.origin)) {
       // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出る。
-      throw new Error(`${form.origin + 1} 件目の項目が 2 回送られた。再読込してから編集し直す`);
+      throw new Error(`${form.origin + 1} 件目の項目が 2 回送られました。更新してから編集し直してください`);
     }
     if (form.origin !== null) {
       seen.add(form.origin);

@@ -14,14 +14,14 @@ const MISSING: Partial<PhasesPage> = { exists: false, model: { version: null, fo
 test("CB-T114 層の種類のファイルが無いときは雛形を置かず、欄を触れるようにして最初の保存で作らせる", async () => {
   const layer = await openPhases({ ...MISSING, layer: true, notices: ["読めない <理由>"] });
   try {
-    assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られる/);
+    assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られます/);
     assert.equal(layer.all('button[data-action="create"]').length, 0, "層に雛形は置かない");
     // 文面はそのまま出る（React が文字として入れるので、実体参照に変わらない）
     assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
     // 無い層でも種類を足して保存できる
     assert.ok(!layer.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られる/);
+    assert.match(layer.one("#phases .empty").textContent, /種類を足して保存すると、ファイルが作られます/);
     layer.click(layer.one('button[data-action="add"]'));
     await layer.settle();
     assert.ok(!layer.one<HTMLInputElement>(".phase input.f-id").disabled);
@@ -34,14 +34,14 @@ test("CB-T239 共通層のファイルが無いときは雛形を作らせず、
   const common = await openPhases({ ...MISSING, phasesPath: ".ccnavi/common/phases.yml" });
   try {
     const banner = common.one(".banner.missing").textContent;
-    assert.match(banner, /共通層に種類は無い/);
-    assert.match(banner, /種類は各層（ワークスペース自身・プロジェクト）に置く/);
-    assert.match(banner, /プロジェクト管理画面の「フェーズ管理」から開く/);
-    assert.equal(common.all('button[data-action="create"]').length, 0, "共通層に雛形を作るボタンは出さない");
+    assert.match(banner, /共通の設定に種類はありません/);
+    assert.match(banner, /種類はワークスペースかプロジェクトの設定に置いてください/);
+    assert.match(banner, /プロジェクト管理画面の「フェーズ管理」から開けます/);
+    assert.equal(common.all('button[data-action="create"]').length, 0, "共通の設定に雛形を作るボタンは出さない");
     assert.ok(!/雛形/.test(common.one("body").textContent), "雛形で作る道を案内しない");
-    // 欄は触れない（画面から共通層のファイルを作らせない）。注意が無ければ帯を足さない
+    // 欄は触れない（画面から共通の設定のファイルを作らせない）。注意が無ければ帯を足さない
     assert.ok(common.one<HTMLButtonElement>('button[data-action="add"]').disabled);
-    assert.match(common.one("#phases .empty").textContent, /種類は層に置く/);
+    assert.match(common.one("#phases .empty").textContent, /種類はワークスペースかプロジェクトの設定に置いてください/);
     assert.equal(common.all(".banner.warn:not(#changed)").length, 0);
     // 自身の層を開くボタンは、拡張ホストへ openSelf だけを送る（ファイルは作らない）
     assert.equal(common.one('button[data-action="open-self"]').textContent, "自身の層を開く");

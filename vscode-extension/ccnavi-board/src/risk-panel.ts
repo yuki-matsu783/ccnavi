@@ -5,11 +5,11 @@
  * 画面は React（`src/webview/risk/`）で、ここが渡すのは「いま何を見せるか」（`RiskData`）だけ。
  * 渡し方は `core/screen-host.ts` の `retainedHost` が決める。この画面は編集の途中を持つので
  * `retainContextWhenHidden` が真で、**入れ物（HTML）は 1 度しか入らない**（ADR-0062）。
- * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「再読込」を押した、保存や作成が通った）。
+ * 中身を渡すのは、画面の編集を捨ててよいときだけ（人が「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは `changed` を送り、捨てるかどうかは人が決める。
  *
- * 対象は共通層の配点（`.ccnavi/common/risks.yml`。置き場は固定）の 1 本だけ。自身の層とプロジェクトの層も
- * 配点を持ち、判定は共通層と親の `project:` の層の和で行う（設計 11.4.2）が、この画面ではそれらを開かない
+ * 対象は共通の設定の配点（`.ccnavi/common/risks.yml`。場所は固定）の 1 本だけ。ワークスペースの設定とプロジェクトの設定も
+ * 配点を持ち、判定は共通の設定と親の `project:` の設定の和で行う（設計 11.4.2）が、この画面ではそれらを開かない
  * （設計 11.11）。パネルは 1 つ。
  *
  * チケット制御が disable のワークスペースでは開かない。配点は子チケットを閉じるときにしか
@@ -43,7 +43,7 @@ const DEBOUNCE_MS = 120;
 const DEFAULT_RISK = ".ccnavi/common/risks.yml";
 /** 画面の名前。束ねの綴りは `src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
-/** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
+/** 自分の保存で監視が鳴るのを、この間だけ「ファイルの変更を検知しました」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
 
 interface Loaded {
@@ -73,7 +73,7 @@ interface PanelState {
   /** 読み直せなかった理由。`loaded` と排他で、どちらかは必ず入っている */
   error?: string;
   lock: Lock;
-  /** 「外で変わった」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
+  /** 「ファイルの変更を検知しました」を出したまま、まだ読み直していない。表に戻ったときに送り直す */
   changedPending: boolean;
   wroteAt: number;
 }
@@ -91,7 +91,7 @@ export async function openRisk(): Promise<void> {
   }
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (folder === undefined) {
-    vscode.window.showInformationMessage("ワークスペースが開かれていないため、リスク管理画面を表示できない");
+    vscode.window.showInformationMessage("ワークスペースが開かれていないため、リスク管理画面を表示できません");
     return;
   }
   if (state !== undefined) {
@@ -104,7 +104,7 @@ export async function openRisk(): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
-    vscode.window.showErrorMessage(`リスク管理画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
+    vscode.window.showErrorMessage(`リスク管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
 
@@ -136,7 +136,7 @@ export async function openRisk(): Promise<void> {
 }
 
 function readPage(root: string): Loaded {
-  // 共通層の置き場は `.ccnavi/common/` 固定（ADR-0052）。
+  // 共通の設定の場所は `.ccnavi/common/` 固定（ADR-0052）。
   const riskRel = DEFAULT_RISK;
   const riskPath = resolveIn(root, riskRel);
   let text: string;
@@ -148,7 +148,7 @@ function readPage(root: string): Loaded {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`配点のファイルを読めない（${riskRel}）: ${(error as Error).message}`);
+      throw new Error(`配点のファイルを読めません（${riskRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（組み込みの配点）。画面は組み込みを見せ、「作る」だけができる。
     text = BUILTIN_RISK_TEXT;
@@ -220,7 +220,7 @@ function registerPanelHandlers(current: PanelState): void {
 }
 
 /**
- * 配点のファイルと設定ファイルが変わったら「外で変わった」と伝える。自分の保存は除く。
+ * 配点のファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは設定で変わるので、再読込のたびに張り直す。絶対パスはワークスペース相対の glob に
  * ならないので、そのディレクトリを起点にする。
  */
@@ -303,7 +303,7 @@ async function refreshLock(current: PanelState): Promise<Lock> {
 }
 
 /**
- * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「再読込」を押した
+ * いま見せるものを渡す。**画面の編集はここで捨てられる**ので、呼ぶのは人が「更新」を押した
  * ときと、保存・作成が通って中身が入れ替わったときだけ（ADR-0062）。
  */
 function show(current: PanelState): void {
@@ -312,7 +312,7 @@ function show(current: PanelState): void {
     return;
   }
   current.error = undefined;
-  // 読み直したので、「外で変わった」はもう今のことではない
+  // 読み直したので、「ファイルの変更を検知しました」はもう今のことではない
   current.changedPending = false;
   current.host.send({
     kind: "page",
@@ -391,7 +391,7 @@ function riskHost(panel: vscode.WebviewPanel): ScreenHost<RiskData> {
 /**
  * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
  *
- * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「再読込」を押せば、
+ * 保存は実行ファイルへ 2 度出る（`--lint` と錠の取り直し）。その間に人が「更新」を押せば、
  * 画面の編集は捨てられ、新しい中身が出ている。**そこへ古い編集を書くと、捨てたはずのものが
  * ファイルに入る。** 読み直されていたら、この保存はもう無かったことにする。
  */
@@ -399,7 +399,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "読み直したので、この保存は捨てた。いまの配点で編集し直す");
+  fail(current, "更新したので、この保存は取りやめました。いまの配点で編集し直してください");
   return true;
 }
 
@@ -430,7 +430,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     markTourSeen(SCREEN);
     return;
   }
-  // 読み直せていない画面では、配点に当たる操作はどれも行き先が無い（「再読込」は
+  // 読み直せていない画面では、配点に当たる操作はどれも行き先が無い（「更新」は
   // 押せるが、その道は `reload` が読み直しからやり直す）
   if (current.loaded === undefined && message.type !== "reload") {
     return;
@@ -439,12 +439,12 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     case "reload": {
       if (message.dirty) {
         const choice = await vscode.window.showWarningMessage(
-          "未保存の変更がある。破棄して読み直す？",
+          "未保存の変更があります。破棄して更新しますか？",
           { modal: true },
-          "読み直す",
+          "更新",
         );
-        if (choice !== "読み直す") {
-          // 画面は「再読込」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
+        if (choice !== "更新") {
+          // 画面は「更新」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
           current.host.post({ type: "cancelled" } satisfies ToRisk);
           return;
         }
@@ -459,7 +459,7 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
       const target = current.loaded.riskPath;
       void vscode.workspace.openTextDocument(target).then(
         (document) => vscode.window.showTextDocument(document),
-        () => vscode.window.showInformationMessage(`ファイルを開けなかった: ${target}`),
+        () => vscode.window.showInformationMessage(`ファイルを開けませんでした: ${target}`),
       );
       return;
     }
@@ -481,7 +481,7 @@ function create(current: PanelState): void {
     return;
   }
   if (fs.existsSync(loaded.riskPath)) {
-    fail(current, `${loaded.riskRel} は既に存在するため、上書きしない。再読込する`);
+    fail(current, `${loaded.riskRel} は既に存在するため、上書きしません。更新してください`);
     return;
   }
   try {
@@ -491,11 +491,11 @@ function create(current: PanelState): void {
   } catch (error) {
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
-    fail(current, `${loaded.riskRel} に書けない: ${(error as Error).message}`);
+    fail(current, `${loaded.riskRel} に書けません: ${(error as Error).message}`);
     return;
   }
   reload(current);
-  vscode.window.showInformationMessage(`${loaded.riskRel} を組み込みの配点で作った。コミットは人が行う`);
+  vscode.window.showInformationMessage(`${loaded.riskRel} を組み込みの配点で作りました。コミットは自分でしてください`);
 }
 
 async function save(current: PanelState, form: RiskForm): Promise<void> {
@@ -504,7 +504,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (!loaded.exists) {
-    fail(current, `${loaded.riskRel} が無い。先に「組み込みの配点でファイルを作る」を押す`);
+    fail(current, `${loaded.riskRel} がありません。先に「組み込みの配点でファイルを作る」を押してください`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -515,7 +515,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     tmp = path.join(current.tmpDir, "risks.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
-    fail(current, `編集中の内容を書き出せない: ${(error as Error).message}`);
+    fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
 
@@ -533,7 +533,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスを名乗るので、画面では対象のファイルの綴りに直す。
-    fail(current, `--lint が error を報告した。直してから保存する:\n${lint.value.report.split(tmp).join(loaded.riskRel)}`);
+    fail(current, `--lint が error を報告しました。直してから保存してください:\n${lint.value.report.split(tmp).join(loaded.riskRel)}`);
     return;
   }
 
@@ -555,11 +555,11 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   try {
     mtimeMs = fs.statSync(loaded.riskPath).mtimeMs;
   } catch (error) {
-    fail(current, `配点のファイルを確かめられない: ${(error as Error).message}`);
+    fail(current, `配点のファイルを確かめられません: ${(error as Error).message}`);
     return;
   }
   if (mtimeMs !== loaded.mtimeMs) {
-    fail(current, "配点のファイルが読み込んだあとに外で変更されている。再読込してから編集し直す（この変更は上書きしない）");
+    fail(current, "配点のファイルが読み込んだあとに外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
     return;
   }
 
@@ -568,12 +568,12 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     fs.writeFileSync(loaded.riskPath, text, "utf8");
   } catch (error) {
     current.wroteAt = 0;
-    fail(current, `配点のファイルに書けない: ${(error as Error).message}`);
+    fail(current, `配点のファイルに書けません: ${(error as Error).message}`);
     return;
   }
   reload(current);
   const tail = lint.value.report.split("\n").filter((l) => l.trim() !== "").pop() ?? "";
-  vscode.window.showInformationMessage(`${loaded.riskRel} に保存した（${tail}）`);
+  vscode.window.showInformationMessage(`${loaded.riskRel} に保存しました（${tail}）`);
 }
 
 function asMessage(message: unknown): RiskMessage | undefined {

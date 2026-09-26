@@ -126,7 +126,7 @@ test("CB-T77 新しい glob は引用符で囲み、空の境目の点は書か�
 test("CB-T78 version が無ければ苦情にして、保存で先頭に足す。壊れた形は苦情にして他は出す", () => {
   const missing = readRisk("levels:\n  high: 40\n");
   assert.equal(missing.model.version, null);
-  assert.match(missing.model.problems[0], /version が無い/);
+  assert.match(missing.model.problems[0], /version がありません/);
   assert.match(missing.apply(missing.model.form), /^version: 1\nlevels:\n  high: 40\n$/);
 
   const broken = readRisk("version: 1\nlevels: nope\nfactors:\n  - id: a\n    points: 1\n    lines_over: 1\n    glob: '*'\n  - not-a-map\n");
@@ -167,7 +167,7 @@ test("CB-T97 対応表でない項目が前にあっても、後ろの項目は�
   const text = "version: 1\nfactors:\n  - ごみ\n  # a の理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n";
   const doc = readRisk(text);
   assert.deepEqual(doc.model.form.factors.map((f) => [f.origin, f.id]), [[1, "a"], [2, "b"]]);
-  assert.match(doc.model.problems[0], /保存するとこの項目は消える/);
+  assert.match(doc.model.problems[0], /保存するとこの項目は消えます/);
   // 何も変えずに保存: 読めない項目だけが消え、a と b はそれぞれのコメントごと残る
   const out = doc.apply(doc.model.form);
   assert.equal(out, "version: 1\nfactors:\n  # a の理由\n  - id: a\n    points: 1\n    lines_over: 1\n  # b の理由\n  - id: b\n    points: 2\n    files_over: 2\n");
@@ -185,11 +185,11 @@ test("CB-T98 先頭の項目を消しても並びの見出しのコメントは�
 test("CB-T99 同じ元ノードを 2 回送れば書き戻さない。glob 以外の max は消す。最上位が対応表でなければ苦情", () => {
   const doc = readRisk(TEXT);
   const f = doc.model.form;
-  assert.throws(() => doc.apply({ levels: f.levels, factors: [f.factors[0], { ...f.factors[0], id: "x" }] }), /2 回送られた/);
+  assert.throws(() => doc.apply({ levels: f.levels, factors: [f.factors[0], { ...f.factors[0], id: "x" }] }), /2 回送られました/);
   const withMax = readRisk("version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n    max: 3\n");
   assert.equal(withMax.apply(withMax.model.form), "version: 1\nfactors:\n  - id: a\n    points: 1\n    lines_over: 5\n");
-  assert.match(readRisk("hello\n").model.problems[0], /最上位が対応表ではない/);
-  assert.match(readRisk("- a\n").model.problems[0], /最上位が対応表ではない/);
+  assert.match(readRisk("hello\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
+  assert.match(readRisk("- a\n").model.problems[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
 });
 
 test("CB-T100 PyYAML が別の型に読む語は引用符で囲み、それ以外は裸のまま", () => {

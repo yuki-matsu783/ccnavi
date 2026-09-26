@@ -106,7 +106,7 @@ export interface RulesPage {
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly samplesPath: string;
   readonly lock: Lock;
-  /** 上部に出す注意（実行ファイルがこの層を読めていない、など） */
+  /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
 }
 
@@ -117,7 +117,7 @@ export interface RulesPage {
  * 他の 4 画面と同じ形で、画面はどちらでも 1 枚を描く。
  *
  * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは種類ごとに 1 枚）。
- * `text` は画面に出す一言（「web のルールを読み込み中...」）。読み終えたら `page` か `error` が続けて届く
+ * `text` は画面に出す一言（「web のルールを読み込み中…」）。読み終えたら `page` か `error` が続けて届く
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
