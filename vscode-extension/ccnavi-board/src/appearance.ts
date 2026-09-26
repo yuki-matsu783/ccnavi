@@ -36,7 +36,7 @@ export function postAppearance(host: AppearanceSink): boolean {
 /**
  * 設定が変わったら、開いている画面に送る。パネルを作ったときに購読し、閉じたら外す。
  *
- * **送り先は段取り（`ScreenHost`）で、`panel.webview.postMessage` は叩かない**。
+ * **送り先は段取り（`ScreenHost`）で、`panel.webview.postMessage` は呼ばない**。
  * 表に戻ったときの送り直しもここでは持たない。保持しない画面（ボード・プロジェクト管理）は
  * 表に戻ると入れ物から作り直され、`ready` で呼ぶ側が送り直す。保持する画面（ルール設定・
  * リスク管理・フェーズ管理）は、裏にいる間の `lock` と `changed` を送り直すのと同じところで

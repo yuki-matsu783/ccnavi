@@ -540,7 +540,7 @@ async function runEffect(current: PanelState, effect: ApprovalEffect): Promise<v
   }
 }
 
-/** ファイルとして在るか。無いものを読もうとして投げるのは「無い」に倒す */
+/** ファイルとして在るか。無いものを読もうとして投げるのは「無い」として扱う */
 function isFile(filePath: string): boolean {
   try {
     return fs.statSync(filePath).isFile();
@@ -624,7 +624,7 @@ function asMessage(message: unknown): BoardMessage | undefined {
     case "promptOpen":
       return { type: m.type };
     case "approve":
-      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きに倒れる。
+      // 形が崩れていたら捨てる。「全部承認」に丸めると、検証の失敗が広がる向きになる。
       return Array.isArray(m.tickets) &&
         m.tickets.every((t) => typeof t === "string") &&
         typeof m.filtered === "boolean"

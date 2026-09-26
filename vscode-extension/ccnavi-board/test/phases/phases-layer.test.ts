@@ -16,7 +16,7 @@ test("CB-T114 層の種類のファイルが無いときは雛形を置かず、
   try {
     assert.match(layer.one(".banner.missing").textContent, /最初の保存でファイルが作られる/);
     assert.equal(layer.all('button[data-action="create"]').length, 0, "層に雛形は置かない");
-    // 文面はそのまま出る（React が文字として入れるので、実体参照に化けない）
+    // 文面はそのまま出る（React が文字として入れるので、実体参照に変わらない）
     assert.equal(layer.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(layer.one(".banner.warn:not(#changed)").textContent, "読めない <理由>");
     // 無い層でも種類を足して保存できる
