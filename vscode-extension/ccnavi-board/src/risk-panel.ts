@@ -174,7 +174,7 @@ function registerPanelHandlers(current: PanelState): void {
   // どちらが正しくても壊れないよう、表に戻ったところで、いま出すべき知らせを送り直す。
   // 中身（`data`）は送らない。送ると、裏で打っていた編集がここで消える。
   // 見た目（`appearance`）も同じ扱い。保持しない画面は入れ物から作り直されるので `ready` で渡るが、
-  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない（issue #87）。
+  // 保持する画面は作り直されないので、裏にいる間の切り替えが落ちていたらここでしか拾えない。
   panel.onDidChangeViewState(() => {
     if (!panel.visible || !alive(current)) {
       return;
