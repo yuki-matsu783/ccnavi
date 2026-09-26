@@ -97,6 +97,18 @@ export interface HistoryEntryJson {
   readonly reason: string;
 }
 
+/**
+ * 満たしていない先行 1 本（ADR-0088）。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
+ * 求める。その答えを実行ファイルが出し、拡張は写すだけ（先行の置き場から組み直さない）。
+ */
+export interface PredecessorUnmetJson {
+  readonly ticket: string;
+  /** `todo` / `doing` / `review`（閉じれば満たす）、`cancelled` / `missing` / `scattered`（待っても満たさない） */
+  readonly state: string;
+  /** 人向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
+  readonly label: string;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -105,6 +117,8 @@ export interface TicketJson {
   readonly project: string;
   readonly issue: number | null;
   readonly predecessors: readonly string[];
+  /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケット・この欄を出さない古い実行ファイルも空） */
+  readonly predecessors_unmet: readonly PredecessorUnmetJson[];
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /**
@@ -285,6 +299,9 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     project: str(raw.project),
     issue: num(raw.issue),
     predecessors: list(raw.predecessors).map(str),
+    predecessors_unmet: list(raw.predecessors_unmet)
+      .filter(isRecord)
+      .map((p) => ({ ticket: str(p.ticket), state: str(p.state), label: str(p.label) })),
     human_review: { required: raw !== undefined && review.required === true, reason: str(review.reason) },
     proposal: isRecord(raw.proposal) ? proposal(raw.proposal) : null,
     blocked: str(raw.blocked),

@@ -24,6 +24,7 @@ function ticket(fields: Partial<TicketJson> & Pick<TicketJson, "ticket" | "title
     project: "",
     issue: null,
     predecessors: [],
+    predecessors_unmet: [],
     human_review: { required: false, reason: "" },
     proposal: null,
     blocked: "",

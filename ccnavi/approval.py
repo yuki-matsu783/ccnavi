@@ -562,7 +562,9 @@ def followup(
     }
     if parent.project:
         front["project"] = parent.project
-    front["predecessors"] = [c.ticket for c in children]
+    # 先行は、見た子のうち取り消しでないもの。取り消した子は満たせないので、先行に入れると
+    # 続きの子が着手できなくなる（ADR-0088）。範囲の和には入れる（見たのは同じフェーズの全部）。
+    front["predecessors"] = [c.ticket for c in children if not c.cancelled_at]
     front["human_review"] = {"required": True, "reason": "レビューで残った指摘への対応"}
     front["title"] = f"フェーズ {phase_no} のレビューの指摘に応える"
     front["rationale"] = (
@@ -613,6 +615,157 @@ def followup(
 
 def by_id(tickets: list[ticket_mod.Ticket]) -> dict[str, ticket_mod.Ticket]:
     return {t.ticket: t for t in tickets}
+
+
+# ---- 先行（`predecessors`）を満たしているか（ADR-0088）
+
+# 先行の状態。満たしたとみなすのは `done` だけ（`.ccnavi/approved/done/` に在り、取り消しでない）。
+PRED_DONE = ticket_mod.DONE
+PRED_CANCELLED = ticket_mod.CANCELLED
+PRED_MISSING = "missing"
+PRED_SCATTERED = "scattered"
+# 先行が閉じれば同じ提案のまま通る状態。承認では `rules.KIND_NOT_YET` の苦情にする。
+PRED_WAITING = (ticket_mod.TODO, ticket_mod.DOING, ticket_mod.REVIEW)
+PRED_LABELS = {
+    ticket_mod.TODO: "承認待ち（todo/）",
+    ticket_mod.DOING: "作業中（doing/）",
+    ticket_mod.REVIEW: "レビュー待ち（review/）",
+    PRED_CANCELLED: "取り消し済み（done/ で cancelled_at を持つ）",
+    PRED_MISSING: "どの置き場にも無い",
+    PRED_SCATTERED: "複数の場所にある",
+}
+
+
+@dataclass
+class Predecessor:
+    """先行 1 本の今。`where` は複数の場所にあるときの在り処（`ツリー:置き場` の並び）。"""
+
+    ticket: str
+    state: str
+    where: str = ""
+
+    @property
+    def met(self) -> bool:
+        return self.state == PRED_DONE
+
+    @property
+    def waiting(self) -> bool:
+        """先行が閉じれば満たす状態か。取り消し・無い・複数の場所は、待っても満たさない。"""
+        return self.state in PRED_WAITING
+
+    @property
+    def label(self) -> str:
+        text = PRED_LABELS.get(self.state, self.state)
+        return f"{text}: {self.where}" if self.where else text
+
+
+def predecessor_pool_of(
+    open_copies: list[ticket_mod.Ticket],
+    review: list[ticket_mod.Ticket],
+    closed: list[ticket_mod.Ticket],
+    proposals: list[ticket_mod.Ticket],
+) -> dict[str, list[ticket_mod.Ticket]]:
+    """先行を引く池。識別子 → 権威のある写りの全部（`ops._places` と同じ集め方）。
+
+    承認済みチケット（作業中・レビュー待ち・閉じた）はどれも数える。`todo/` の提案は、同じ識別子の
+    承認済みチケットがどこにも無いときだけ数える（在れば改版の候補か書き損じ）。写りが 2 つ以上
+    残れば、どれが本物か決まらない。
+    """
+    pool = _by_id(open_copies + review + closed)
+    for t in proposals:
+        if t.state == ticket_mod.TODO and t.ticket not in pool:
+            pool.setdefault(t.ticket, []).append(t)
+    return pool
+
+
+def predecessor_pool(conf: settings.Settings, root: str) -> dict[str, list[ticket_mod.Ticket]]:
+    """いまの置き場から先行を引く池を組む。"""
+    open_copies, _ = scan(conf, root)
+    review, _ = scan_review(conf, root)
+    closed, _ = scan(conf, root, closed=True)
+    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    return predecessor_pool_of(open_copies, review, closed, proposals)
+
+
+def predecessor_states(
+    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
+) -> list[Predecessor]:
+    """このチケットの先行のそれぞれの今。並びは `predecessors` の順（重ねて書いたものは 1 つ）。"""
+    out: list[Predecessor] = []
+    for ident in dict.fromkeys(t.predecessors):
+        hits = pool.get(ident, [])
+        if not hits:
+            out.append(Predecessor(ident, PRED_MISSING))
+        elif len(hits) > 1:
+            where = ", ".join(f"{h.tree or '(ワークスペースルート)'}:{h.state}" for h in hits)
+            out.append(Predecessor(ident, PRED_SCATTERED, where))
+        else:
+            out.append(Predecessor(ident, hits[0].state or ticket_mod.DOING))
+    return out
+
+
+def unmet_predecessors(
+    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]]
+) -> list[Predecessor]:
+    """満たしていない先行。子だけが先行を持つ（親の `predecessors` は読まない）。"""
+    if not t.is_child:
+        return []
+    return [p for p in predecessor_states(t, pool) if not p.met]
+
+
+def predecessor_problems(
+    t: ticket_mod.Ticket, pool: dict[str, list[ticket_mod.Ticket]], approved_rel: str
+) -> list[rules.Problem]:
+    """承認で落とす先行の苦情（ADR-0088）。
+
+    満たしたとみなすのは `done/` に在って取り消しでないものだけ。
+
+    先行が閉じれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は `rules.KIND_NOT_YET`。
+    書いた側に直すものは無く、`--lint` は warn で言う（フェーズの順序と同じ扱い）。取り消し・
+    どこにも無い・複数の場所は、待っても満たさないので、ふつうの error にする。
+    """
+    problems: list[rules.Problem] = []
+    for p in unmet_predecessors(t, pool):
+        if p.waiting:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} が閉じていない（いまは {p.label}）。{p.ticket} が "
+                    f"{approved_rel}/{ticket_mod.DONE}/ に入る（作業を終え、レビューが要るなら"
+                    "人のレビューが済む）まで承認しない。先行が要らないなら predecessors から外して"
+                    "出し直す",
+                    rules.KIND_NOT_YET,
+                )
+            )
+        elif p.state == PRED_CANCELLED:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} は{p.label}。取り消した先行は満たせないので承認しない。"
+                    "predecessors から外して出し直す",
+                )
+            )
+        elif p.state == PRED_MISSING:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} がどの置き場（todo/・doing/・review/・done/）にも無い。"
+                    "綴りを直すか、predecessors から外して出し直す",
+                )
+            )
+        else:
+            problems.append(
+                rules.Problem(
+                    rules.SEVERITY_ERROR,
+                    t.ticket,
+                    f"先行 {p.ticket} が{p.label}。どれが本物か決まらないので満たしたとみなさない。"
+                    "先に 1 つに決める（先へ進んだ側を合流させるか、残ったワークツリーを畳む）",
+                )
+            )
+    return problems
 
 
 def children_of(tickets: list[ticket_mod.Ticket], parent_id: str) -> list[ticket_mod.Ticket]:
@@ -1510,6 +1663,8 @@ def candidates(
     # 層ごとの読み込みは 1 プロジェクト 1 回。承認の対象に同じ層のチケットが
     # 何件あっても、ファイルを読むのはその層につき 1 度で足りる。
     cache: dict[str, dict | None] = {}
+    # 先行を引く池。先行を書いた子が居るときだけ、最初の 1 回で組む。
+    preds: dict[str, list[ticket_mod.Ticket]] | None = None
 
     def types_for(t: ticket_mod.Ticket) -> dict | None:
         name = project_of(t, pool)
@@ -1550,6 +1705,12 @@ def candidates(
                 complaints += phase.order_problems(
                     root, conf, t, parent, types, added.get(t.parent)
                 )
+        if t.is_child and t.predecessors:
+            # 先行は `done/` に在って取り消しでないことを求める（ADR-0088）。同じ承認で通る
+            # 先行も、まだ `todo/` に在るので満たさない。
+            if preds is None:
+                preds = predecessor_pool(conf, root)
+            complaints += predecessor_problems(t, preds, conf.approved)
         if any(p.severity == rules.SEVERITY_ERROR for p in complaints):
             rejected.append((t, complaints))
             continue
@@ -1778,7 +1939,8 @@ def screen(
             if t.predecessors:
                 lines.append(f"■ 依存している他チケット: {', '.join(t.predecessors)}")
                 lines.append(
-                    "    先に閉じておく。閉じないまま着手しても止まらないが、--lint が warn を出す"
+                    "    どれも done/ に在って取り消しでないこと。"
+                    "満たしていなければ、承認も着手も止まる"
                 )
         elif t.has_plan:
             lines.append("■ 全体計画")

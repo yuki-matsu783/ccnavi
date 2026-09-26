@@ -608,18 +608,21 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         return 0
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
-    done = {t.ticket for t in closed + review}
+    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
         head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{place}、{bound}）"
         if t.is_child:
-            waiting = [p for p in t.predecessors if p not in done]
-            review = "要" if t.review_required else "不要"
-            head += f" 親 {t.parent} フェーズ {t.phase} レビュー{review}"
-            if waiting:
-                head += f" 先行が閉じていない: {', '.join(waiting)}"
+            unmet = approval.unmet_predecessors(t, preds)
+            need = "要" if t.review_required else "不要"
+            head += f" 親 {t.parent} フェーズ {t.phase} レビュー{need}"
+            if unmet:
+                head += " 先行を満たしていない: " + ", ".join(
+                    f"{p.ticket}（{p.label}）" for p in unmet
+                )
         stdout.write(f"  {head}\n")
         for name in rules.SECTIONS:
             for path in t.paths(name):
@@ -727,6 +730,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         review_copies,
         approval.types_resolver(conf, root, open_copies),
     )
+    # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
+    preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )
@@ -760,6 +765,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
                 seen.get(ticket_id, []),
                 scattered.get(ticket_id, []),
                 problems,
+                preds,
             )
         )
 
@@ -890,6 +896,7 @@ def _ticket_record(
     seen_in: list[dict],
     scattered: list[dict],
     problems: list[str],
+    preds: dict[str, list[ticket_mod.Ticket]],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -910,6 +917,16 @@ def _ticket_record(
         "project": source.project,
         "issue": source.issue,
         "predecessors": list(source.predecessors),
+        # 満たしていない先行（ADR-0088）。承認と着手はこれが空でなければ止まる。閉じたチケットは空。
+        # `label` は人向けの言葉で、ボードは写すだけ。
+        "predecessors_unmet": (
+            []
+            if status == "closed"
+            else [
+                {"ticket": p.ticket, "state": p.state, "label": p.label}
+                for p in approval.unmet_predecessors(source, preds)
+            ]
+        ),
         "human_review": {
             "required": source.review_required,
             "reason": source.review_reason,

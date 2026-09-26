@@ -412,3 +412,16 @@ test("CB-T260 履歴はカードへそのまま渡り、列・注意・バッジ
   assert.deepEqual(after.issues, before.issues);
   assert.equal(after.cancelledAt, before.cancelledAt);
 });
+
+test("CB-T263 先行待ちはカードへそのまま渡り、列と要対応は変えない", () => {
+  // 判定（先行が done/ に在って取り消しでないか）は実行ファイルが出す。ボードは先行の置き場から組み直さない。
+  const base = fixture();
+  const unmet = [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }];
+  const before = cardsOf(buildBoard(base)).get("i0001-03")!;
+  const after = cardsOf(buildBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-03" ? { ...t, predecessors_unmet: unmet } : t)) })).get("i0001-03")!;
+  assert.deepEqual(after.predecessorsUnmet, unmet);
+  assert.equal(after.column, before.column);
+  assert.equal(after.attention, before.attention);
+  // 欄が空なら何も持たない
+  assert.deepEqual(before.predecessorsUnmet, []);
+});

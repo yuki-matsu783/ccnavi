@@ -140,3 +140,17 @@ test("CB-T259 history は実行ファイルの跡を写す。欄が無ければ�
   assert.equal(mark.mark, "pending");
   assert.deepEqual(parsed.board.tickets[1].history, []);
 });
+
+test("CB-T262 predecessors_unmet は実行ファイルの答えを写す。欄が無ければ空（満たしている扱い）", () => {
+  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
+  const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
+  tickets[3].predecessors_unmet = [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
+  delete tickets[1].predecessors_unmet;
+  const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }]);
+  assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
+});

@@ -49,6 +49,8 @@ a.mr-link:hover, a.mr-link:focus-visible { text-decoration: underline; color: va
 .badge.copy-none { color: var(--vscode-charts-blue); }
 .badge.hold, .badge.seen, .badge.risk-high, .badge.risk-critical { color: var(--vscode-editorError-foreground); }
 .badge.blocked { color: var(--vscode-editorError-foreground); font-weight: 600; }
+/* 先行待ち（ADR-0088）。止まっているのは承認と着手で、書き込みではないので警告の色 */
+.badge.preds { color: var(--vscode-editorWarning-foreground); }
 .badge.mark-requested { color: var(--vscode-charts-yellow); }
 .badge.worktree.none { color: var(--vscode-editorWarning-foreground); }
 .facts { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 5px; font-size: .85em; color: var(--vscode-descriptionForeground); }

@@ -545,7 +545,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of))
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -649,6 +650,7 @@ def _proposal_problems(
     closed: list,
     done: set[str],
     repo_of: dict[str, str],
+    preds: dict | None = None,
 ) -> list[Problem]:
     """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
 
@@ -734,13 +736,16 @@ def _proposal_problems(
         )
     for t in index.values():
         if t.started_at:
-            waiting = [p for p in t.predecessors if p not in done]
-            if waiting:
+            # 先行の数え方は承認と着手と同じ（ADR-0088）。着手はこれで止まるので、ここに出るのは
+            # 着手のあとに先行が動いたか、止める前の版で着手したもの。
+            unmet = approval.unmet_predecessors(t, preds or {})
+            if unmet:
+                names = ", ".join(f"{p.ticket}（{p.label}）" for p in unmet)
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
                         "(ticket)",
-                        f"{t.ticket} は先行 {', '.join(waiting)} が閉じていないのに着手している",
+                        f"{t.ticket} は先行 {names} を満たしていないのに着手している",
                     )
                 )
     for ticket_id, places in seen.items():

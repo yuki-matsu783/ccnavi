@@ -49,6 +49,8 @@ def start(
         return 1
     if _parent_not_started(stderr, root, conf, found):
         return 1
+    if _predecessors_unmet(stderr, root, conf, found):
+        return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
     # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
@@ -567,6 +569,43 @@ def _parent_not_started(
         )
         return True
     return False
+
+
+def _predecessors_unmet(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """子の先行が全部 `done/` に在って取り消しでないか（ADR-0088）。欠けていれば止めて言う。
+
+    承認でも同じ検査を当てるが、承認のあとに先行が動くこと（人が `done/` から戻す）と、置き場を
+    手で動かして承認する運び（ADR-0058）があるので、着手の手前でもう一度見る。どの先行が何の
+    状態か、どうすればよいかを 1 本ずつ言う。
+    """
+    unmet = approval.unmet_predecessors(found, approval.predecessor_pool(conf, root))
+    if not unmet:
+        return False
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    stderr.write(
+        f"ccnavi: {found.ticket} の先行が満たされていないので着手しない"
+        f"（先行は {conf.approved}/{ticket_mod.DONE}/ に在って取り消しでないこと）:\n"
+    )
+    for p in unmet:
+        stderr.write(f"  - 先行 {p.ticket}: {p.label}\n")
+    if any(p.waiting for p in unmet):
+        stderr.write(
+            f"  先行を先に閉じる（作業中なら '{ticket_sh} finish <先行>'。"
+            "レビューが要るなら人のレビューが済んで done/ に入るまで待つ）\n"
+        )
+    if any(not p.waiting for p in unmet):
+        stderr.write(
+            "  取り消した・どこにも無い先行は満たせない。"
+            "複数の場所にある先行は、先に 1 つに決める\n"
+        )
+    stderr.write(
+        "  先行が要らないなら、利用者に承認済みチケットの predecessors から外してもらうか、"
+        f"'{ticket_sh} cancel {found.ticket} --reason <理由>' で取り消し、"
+        "先行を外した提案を出し直して承認を受ける\n"
+    )
+    return True
 
 
 def _parent_still_busy(

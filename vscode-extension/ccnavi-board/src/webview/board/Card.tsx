@@ -135,7 +135,7 @@ function History({ entries }: { readonly entries: readonly HistoryEntryJson[] })
 
 /**
  * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
- * 書き込み停止中、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
+ * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
  * 本物が決まらない写り。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
@@ -152,6 +152,18 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   // ここは一目で分かる短い言葉に留める。
   if (card.blocked !== "") {
     badges.push(<Badge key="blocked" kind="blocked" text="書き込み停止中" title={card.blocked} />);
+  }
+  // 先行を満たしていない（ADR-0088）。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
+  if (card.predecessorsUnmet.length > 0) {
+    const detail = card.predecessorsUnmet.map((p) => `${p.ticket}: ${p.label}`).join("\n");
+    badges.push(
+      <Badge
+        key="preds"
+        kind="preds"
+        text={`先行待ち（${card.predecessorsUnmet.map((p) => p.ticket).join(", ")}）`}
+        title={`先行が done/ に入る（取り消しでない）まで、承認も着手も止まります\n${detail}`}
+      />,
+    );
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(<Badge key="worktree" kind="worktree none" text="ワークツリーなし" />);

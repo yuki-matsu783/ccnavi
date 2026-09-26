@@ -880,3 +880,23 @@ test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新�
     await empty.close();
   }
 });
+
+test("CB-T264 先行を満たしていないカードに「先行待ち（先行の識別子）」のバッジ。どの先行が何の状態かは tooltip に実行ファイルの言葉で出す", async () => {
+  const base = fixture();
+  const unmet = [
+    { ticket: "i0001-02", state: "doing", label: "作業中（doing/）" },
+    { ticket: "i0001-09", state: "missing", label: "どの置き場にも無い" },
+  ];
+  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-03" ? { ...t, predecessors_unmet: unmet } : t)) });
+  try {
+    assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-02, i0001-09）");
+    const title = page.one('.card[data-id="i0001-03"] .badge.preds').getAttribute("title") ?? "";
+    assert.match(title, /承認も着手も止まります/);
+    assert.match(title, /i0001-02: 作業中（doing\/）/);
+    assert.match(title, /i0001-09: どの置き場にも無い/);
+    // 先行を満たしているカードには出さない
+    assert.equal(page.all('.card[data-id="i0001-02"] .badge.preds').length, 0);
+  } finally {
+    await page.close();
+  }
+});
