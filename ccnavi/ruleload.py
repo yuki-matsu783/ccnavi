@@ -7,8 +7,10 @@
 ## 層は 3 種
 
 - 共通層: `.ccnavi/common/rules.yml`。どのツリーにも効く。置き場は固定で、env では動かない
-- 自身の層: ワークスペースルートの `<CCNAVI_PROJECT_HOME>/config/rules.yml`
-- プロジェクトの層: `projects/<名前>/<CCNAVI_PROJECT_HOME>/config/rules.yml`
+- 自身の層: ワークスペースルートの `.ccnavi/config/rules.yml`
+- プロジェクトの層: `projects/<名前>/.ccnavi/config/rules.yml`
+
+自身の層とプロジェクトの層の置き場も固定で、env では動かない（ADR-0084）。
 
 パスを持つツール（Read / Grep / Glob / Write / Edit / NotebookEdit）は共通層 + 行き先の層の 1 つ。
 パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）は共通層 + 自身の層 +
