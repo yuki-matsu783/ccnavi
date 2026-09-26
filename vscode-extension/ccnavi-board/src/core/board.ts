@@ -281,8 +281,20 @@ function toCard(
     mrUrl: mr.url,
     mrNumber: mr.number,
     attention,
-    flow: isParent ? null : t.flow,
+    flow: isParent ? null : flowOf(t.flow, column),
   };
+}
+
+/**
+ * カードに載せる子のフロー。閉じた子（完了・取り消し）でファイルが無ければ null（作る先が無いので「作成」を出さない）。
+ * 実行ファイルもこの子には `flow` を null で返すが、古い実行ファイルの答えでもボタンを出さないための念押し。
+ * ファイルが在れば閉じた子でも残す（中身を見られる）
+ */
+function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
+  if (flow === null) {
+    return null;
+  }
+  return (column === "done" || column === "cancelled") && !flow.exists ? null : flow;
 }
 
 function isHighRisk(level: string): boolean {

@@ -26,8 +26,8 @@ export function page(overrides: Partial<FlowPage> = {}): FlowPage {
     ticket: "i0001-01",
     title: "調査",
     parent: "i0001",
-    flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.json",
-    flowRel: ".ccnavi/approved/flows/i0001-01.json",
+    flowPath: ".claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml",
+    flowRel: ".ccnavi/approved/flows/i0001-01.yml",
     exists: true,
     doc: templateFlow("i0001-01", "調査"),
     lock: OPEN_LOCK,
@@ -55,31 +55,75 @@ export function savedDoc(dom: DomPage): FlowDoc {
   return saves[saves.length - 1].doc as FlowDoc;
 }
 
-/** cc-wf-studio が書き出す形に寄せた見本の本文。画面が知らない欄・知らない種類（mcp）・サブフローを持つ */
-export const SAMPLE = JSON.stringify({
-  id: "wf-1",
-  name: "調べて聞く",
-  version: "1.0.0",
-  schemaVersion: "1.2.0",
-  metadata: { tags: ["x"], createdAt: "2026-09-01T00:00:00Z" },
-  nodes: [
-    { id: "start-1", type: "start", name: "Start", position: { x: 0, y: 0 }, data: { label: "Start" } },
-    {
-      id: "ask-1",
-      type: "askUserQuestion",
-      name: "方針を聞く",
-      position: { x: 200, y: 0, z: 3 },
-      style: { width: 220 },
-      data: { questionText: "どちら？", options: [{ label: "A", description: "" }, { label: "B", description: "" }], multiSelect: false, outputPorts: 2, extra: 1 },
-    },
-    { id: "mcp-1", type: "mcp", name: "MCP", position: { x: 400, y: 0 }, data: { serverId: "srv", toolName: "t", parameters: [{ name: "p" }] } },
-    { id: "end-1", type: "end", name: "End", position: { x: 600, y: 0 }, data: { label: "End" } },
-  ],
-  connections: [
-    { id: "c1", from: "start-1", to: "ask-1", fromPort: "output", toPort: "input" },
-    { id: "c2", from: "ask-1", to: "mcp-1", fromPort: "branch-0", toPort: "input" },
-    { id: "c3", from: "ask-1", to: "end-1", fromPort: "branch-1", toPort: "input", extra: true },
-    { id: "c4", from: "mcp-1", to: "end-1", fromPort: "output", toPort: "input" },
-  ],
-  subAgentFlows: [{ id: "sf-1", name: "深掘り", nodes: [{ id: "sa", type: "subAgent", name: "x", position: { x: 0, y: 0 }, data: {} }], connections: [] }],
-});
+/** 見本の中身。画面が知らない欄・知らない種類（mcp）・サブフローを持つ。`SAMPLE` を読むとこれになる */
+export function sampleData(): Record<string, unknown> {
+  return {
+    id: "wf-1",
+    name: "調べて聞く",
+    version: "1.0.0",
+    schemaVersion: "1.2.0",
+    metadata: { tags: ["x"], createdAt: "2026-09-01T00:00:00Z" },
+    nodes: [
+      { id: "start-1", type: "start", name: "Start", position: { x: 0, y: 0 }, data: { label: "Start" } },
+      {
+        id: "ask-1",
+        type: "askUserQuestion",
+        name: "方針を聞く",
+        position: { x: 200, y: 0, z: 3 },
+        style: { width: 220 },
+        data: { questionText: "どちら？", options: [{ label: "A", description: "" }, { label: "B", description: "" }], multiSelect: false, extra: 1 },
+      },
+      { id: "mcp-1", type: "mcp", name: "MCP", position: { x: 400, y: 0 }, data: { serverId: "srv", toolName: "t", parameters: [{ name: "p" }] } },
+      { id: "end-1", type: "end", name: "End", position: { x: 600, y: 0 }, data: { label: "End" } },
+    ],
+    connections: [
+      { id: "c1", from: "start-1", to: "ask-1", fromPort: "output", toPort: "input" },
+      { id: "c2", from: "ask-1", to: "mcp-1", fromPort: "branch-0", toPort: "input" },
+      { id: "c3", from: "ask-1", to: "end-1", fromPort: "branch-1", toPort: "input", extra: true },
+      { id: "c4", from: "mcp-1", to: "end-1", fromPort: "output", toPort: "input" },
+    ],
+    subAgentFlows: [{ id: "sf-1", name: "深掘り", nodes: [{ id: "sa", type: "subAgent", name: "x", position: { x: 0, y: 0 }, data: {} }], connections: [] }],
+  };
+}
+
+/** 人が手で書いた形の見本の本文（YAML。コメント・流れ形式・引用符が混じる）。読むと `sampleData()` になる */
+export const SAMPLE = `# 調べてから利用者に聞くフロー
+id: wf-1
+name: 調べて聞く
+version: 1.0.0
+schemaVersion: "1.2.0"
+metadata:
+  tags: [x]
+  createdAt: "2026-09-01T00:00:00Z"
+nodes:
+  - {id: start-1, type: start, name: Start, position: {x: 0, y: 0}, data: {label: Start}}
+  - id: ask-1
+    type: askUserQuestion
+    name: 方針を聞く
+    position: {x: 200, y: 0, z: 3}
+    style: {width: 220}
+    data:
+      questionText: どちら？
+      options:
+        - {label: A, description: ""}
+        - {label: B, description: ""}
+      multiSelect: false
+      extra: 1
+  - id: mcp-1
+    type: mcp
+    name: MCP
+    position: {x: 400, y: 0}
+    data: {serverId: srv, toolName: t, parameters: [{name: p}]}
+  - {id: end-1, type: end, name: End, position: {x: 600, y: 0}, data: {label: End}}
+connections:
+  - {id: c1, from: start-1, to: ask-1, fromPort: output, toPort: input}
+  - {id: c2, from: ask-1, to: mcp-1, fromPort: branch-0, toPort: input}
+  - {id: c3, from: ask-1, to: end-1, fromPort: branch-1, toPort: input, extra: true}
+  - {id: c4, from: mcp-1, to: end-1, fromPort: output, toPort: input}
+subAgentFlows:
+  - id: sf-1
+    name: 深掘り
+    nodes:
+      - {id: sa, type: subAgent, name: x, position: {x: 0, y: 0}, data: {}}
+    connections: []
+`;

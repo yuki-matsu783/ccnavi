@@ -1,17 +1,19 @@
 /**
  * 子チケットのフロー（設計 9.3.1、ADR-0085）の読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * 形は CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json` に保存する
- * `workflow.json` と同じ。**形が合うだけで、あちらのコードは使っていない**（あちらは AGPL）。
+ * ファイルは YAML の 1 文書（既定 `.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`ccnavi/flow.py`）が読むもの。
  *
- *     {"id", "name", "description"?, "version", "nodes": [...], "connections": [...],
- *      "subAgentFlows"?: [{"id", "name", "nodes", "connections"}], ...}
- *     node       = {"id", "type", "name", "position": {x, y}, "data": {...}}
- *     connection = {"id", "from", "to", "fromPort", "toPort", "condition"?}
+ *     id, name, description?, version
+ *     nodes:          [node, ...]
+ *     connections:    [connection, ...]
+ *     subAgentFlows?: [{id, name, nodes, connections}, ...]
+ *     node       = {id, type, name, position: {x, y}, data: {...}}
+ *     connection = {id, from, to, fromPort, toPort, condition?}
  *
- * **知らない欄も知らない種類も落とさない。** 読んだ JSON をそのまま持ち、編集はその写しの
+ * **知らない欄も知らない種類も落とさない。** 読んだ中身をそのまま持ち、編集はその写しの
  * 触ったところだけを差し替える（`phases-doc.ts` が YAML の知らない欄を残すのと同じ考え）。
  * 欠けた欄（`position` や `data`）も、読むときに既定で補うだけで、触るまで書き足さない。
+ * 書き出しは中身から組み直す（コメントや書き方は残らない。人が保存したときだけ書く）。
  *
  * **判定はしない。** 着手中に書けるかは実行ファイルが `flow.locked` で言う（ADR-0085）。
  * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限に当たった
@@ -19,14 +21,17 @@
  *
  * ここには VS Code の API も node も DOM も入れない。画面（React）が束ねて読むため。
  */
+import { Document, parseDocument, Scalar, visit, type DocumentOptions, type ParseOptions, type ScalarTag, type SchemaOptions } from "yaml";
 
-/** ノード 1 つ。読んだ JSON のまま。欄は `nodeType` などの読み口で読む */
+import { yaml11Ambiguous } from "./yaml11.js";
+
+/** ノード 1 つ。読んだまま。欄は `nodeType` などの読み口で読む */
 export interface FlowNode {
   readonly id: string;
   readonly [key: string]: unknown;
 }
 
-/** 線 1 本。読んだ JSON のまま */
+/** 線 1 本。読んだまま */
 export interface FlowConnection {
   readonly [key: string]: unknown;
 }
@@ -84,7 +89,7 @@ export function branchKey(type: string): "branches" | "options" | undefined {
   return undefined;
 }
 
-/** 入口の綴り。cc-wf-studio の書き出しと同じ `input` / `output` / `branch-<番号>` */
+/** 出入口の綴り。`input` / `output` / `branch-<番号>`（実行ファイルの案内 `flow._port_label` も同じ綴りで読む） */
 export const INPUT_PORT = "input";
 export const OUTPUT_PORT = "output";
 export function branchPort(index: number): string {
@@ -171,23 +176,82 @@ export function branchItems(node: FlowNode): readonly Readonly<Record<string, un
 // ---- 読む・書く
 
 /**
- * JSON の本文を読む。形が読めなければ理由を返す（`nodes` の並びが無い、ノードに `id` が無い）。
- * 実行ファイル（`flow.load`）が読めないと言う形は、ここでも読めないと言う。
+ * 真偽値の綴り。PyYAML の resolver.py と同じで、YAML 1.1 の仕様にある `y` `n` は入れない
+ * （PyYAML は文字として読む。`position` の `y` が真偽値のキーに化けないように）。
+ */
+const PY_TRUE: ScalarTag = {
+  identify: (value) => value === true,
+  default: true,
+  tag: "tag:yaml.org,2002:bool",
+  test: /^(?:yes|Yes|YES|true|True|TRUE|on|On|ON)$/,
+  resolve: () => true,
+};
+const PY_FALSE: ScalarTag = {
+  identify: (value) => value === false,
+  default: true,
+  tag: "tag:yaml.org,2002:bool",
+  test: /^(?:no|No|NO|false|False|FALSE|off|Off|OFF)$/,
+  resolve: () => false,
+};
+
+/**
+ * 読みの設定。実行ファイルの読み手（PyYAML の `safe_load`、YAML 1.1）に合わせ、`yes` `on` は真偽値、
+ * `0755` は八進として読む（画面と実行ファイルで同じ値に見えるように）。真偽値の綴りは PyYAML のもの
+ * （`PY_TRUE` / `PY_FALSE`）に差し替え、日付は文字のまま持つ（日付の値を持つと、書き出すときに形が崩れる）。
+ */
+const READ_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
+  version: "1.1",
+  customTags: (tags) => [
+    PY_TRUE,
+    PY_FALSE,
+    ...tags.filter((tag) => (typeof tag === "string" ? tag !== "timestamp" && tag !== "bool" : !tag.tag.endsWith(":timestamp") && !tag.tag.endsWith(":bool"))),
+  ],
+};
+
+/** 別名（`*名前`）を持つか。実行ファイルと同じく、あれば読まない */
+function hasAlias(doc: Document): boolean {
+  let found = false;
+  visit(doc, {
+    Alias() {
+      found = true;
+      return visit.BREAK;
+    },
+  });
+  return found;
+}
+
+/**
+ * YAML の本文を読む。形が読めなければ理由を返す（`nodes` の並びが無い、ノードに `id` が無い）。
+ * 実行ファイル（`flow.load`）が読めないと言う形は、ここでも読めないと言う。**例外は外に出さない。**
+ * 別名（`*名前`）は拒む。同じ部分木を何度も辿らせて、小さなファイルを膨らませられるため。
  */
 export function parseFlow(text: string): FlowRead {
   let raw: unknown;
   try {
-    raw = JSON.parse(text.replace(/^﻿/, ""));
+    const doc = parseDocument(text.replace(/^\uFEFF/, ""), READ_OPTIONS);
+    const problem = doc.errors[0];
+    if (problem !== undefined) {
+      return { ok: false, error: `YAML として読めない（${firstLine(problem.message)}）` };
+    }
+    if (hasAlias(doc)) {
+      return { ok: false, error: "YAML の別名（`*名前`）があるので読まない。同じ部分木を何度も辿らせて膨らませられる" };
+    }
+    // 別名は上で断っている。ここは念押しで、辿ろうとしたら投げさせる（下の catch が理由にする）
+    raw = doc.toJS({ maxAliasCount: 0 });
   } catch (error) {
-    return { ok: false, error: `JSON として読めない（${(error as Error).message}）` };
+    return { ok: false, error: `YAML として読めない（${firstLine(error instanceof Error ? error.message : String(error))}）` };
   }
   return checkFlow(raw);
+}
+
+function firstLine(text: string): string {
+  return text.split("\n")[0].replace(/:$/, "").trim();
 }
 
 /** 形を確かめる。画面から届いた保存の中身も、ここを通してから書く */
 export function checkFlow(raw: unknown): FlowRead {
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "最上位がキーと値の並びではない" };
   }
   if (!Array.isArray(raw.nodes)) {
     return { ok: false, error: "`nodes` の並びが無い" };
@@ -224,14 +288,32 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
   return read.ok ? read.doc : undefined;
 }
 
-/** 書き出す本文。cc-wf-studio と同じく 2 字下げ、末尾に改行 */
+/**
+ * 書き出す本文。字下げ 2 のブロック形式で、長い行を折らない。複数行の文は `|` の形で書く。
+ * 同じ中身が 2 度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
+ * 実行ファイル（YAML 1.1）が文字以外に読む綴り（`yes` `0755` `2026-01-01` など）は引用符で囲む。
+ * `y` `n` は PyYAML が文字として読むので囲まない（`position` の `y` をそのまま書く）。
+ */
 export function serializeFlow(doc: FlowDoc): string {
-  return `${JSON.stringify(doc, null, 2)}\n`;
+  return yamlText(doc);
+}
+
+/** 値を書き出しと同じ形の YAML にする。画面が欄を持たない種類の `data` を見せるのにも使う */
+export function yamlText(value: unknown): string {
+  const out = new Document(value, { aliasDuplicateObjects: false });
+  visit(out, {
+    Scalar(_key, node) {
+      if (typeof node.value === "string" && yaml11Ambiguous(node.value) && !/^[yYnN]$/.test(node.value)) {
+        node.type = Scalar.QUOTE_DOUBLE;
+      }
+    },
+  });
+  return out.toString({ lineWidth: 0 });
 }
 
 /**
  * ファイルが無いときに見せる最小のフロー（開始 → 終了）。保存するまでファイルは作らない。
- * 識別子と名前は子チケットから付ける（cc-wf-studio が読み込むときに要る欄）。
+ * 識別子と名前は子チケットから付ける。
  */
 export function templateFlow(ticket: string, title: string): FlowDoc {
   return {
@@ -247,17 +329,9 @@ export function templateFlow(ticket: string, title: string): FlowDoc {
   };
 }
 
-/**
- * 取り込む（`.vscode/workflows/*.json` を、この子のフローとして読む）。形は `parseFlow` と同じで、
- * 中身は変えない（id や名前も、取り込んだファイルのまま）。書くのは人が保存を押したとき。
- */
-export function importFlow(text: string): FlowRead {
-  return parseFlow(text);
-}
-
 // ---- 編集（どれも新しい写しを返す。触ったところ以外は元のまま）
 
-/** 新しいノードの `data`。cc-wf-studio が読むのに要る欄（分岐の `outputPorts` など）も入れる */
+/** 新しいノードの `data`。画面が欄を持つものだけ */
 export function defaultData(type: PaletteType): Record<string, unknown> {
   switch (type) {
     case "start":
@@ -267,7 +341,7 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
     case "prompt":
       return { prompt: "" };
     case "subAgent":
-      return { description: "", prompt: "", outputPorts: 1 };
+      return { description: "", prompt: "" };
     case "askUserQuestion":
       return {
         questionText: "",
@@ -276,7 +350,6 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
           { label: "はい", description: "" },
           { label: "いいえ", description: "" },
         ],
-        outputPorts: 2,
       };
     case "ifElse":
       return {
@@ -285,7 +358,6 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
           { label: "真", condition: "" },
           { label: "偽", condition: "" },
         ],
-        outputPorts: 2,
       };
     case "switch":
       return {
@@ -294,7 +366,6 @@ export function defaultData(type: PaletteType): Record<string, unknown> {
           { label: "ケース 1", condition: "" },
           { label: "既定", condition: "default" },
         ],
-        outputPorts: 2,
       };
     case "skill":
       return { name: "", description: "" };
@@ -375,7 +446,7 @@ export function connect(doc: FlowDoc, from: string, fromPort: string, to: string
 }
 
 /**
- * 線を消す。線は**並びの位置で指す**（取り込んだフローの線は id が無いことも重なることもある）。
+ * 線を消す。線は**並びの位置で指す**（人が書いたフローの線は id が無いことも重なることもある）。
  */
 export function removeConnectionAt(doc: FlowDoc, index: number): FlowDoc {
   return { ...doc, connections: connectionsOf(doc).filter((_, i) => i !== index) };
@@ -402,7 +473,7 @@ export function setMeta(doc: FlowDoc, patch: { readonly name?: string; readonly 
 }
 
 /**
- * 分岐の出口を 1 件足す。`outputPorts` を持つノードなら数を合わせる。
+ * 分岐の出口を 1 件足す。
  */
 export function addBranch(doc: FlowDoc, id: string, item: Readonly<Record<string, unknown>>): FlowDoc {
   return mapNode(doc, id, (node) => {
@@ -410,12 +481,7 @@ export function addBranch(doc: FlowDoc, id: string, item: Readonly<Record<string
     if (key === undefined) {
       return node;
     }
-    const items = [...branchItems(node), item];
-    const data: Record<string, unknown> = { ...nodeData(node), [key]: items };
-    if (typeof data.outputPorts === "number") {
-      data.outputPorts = items.length;
-    }
-    return { ...node, data };
+    return { ...node, data: { ...nodeData(node), [key]: [...branchItems(node), item] } };
   });
 }
 
@@ -441,12 +507,7 @@ export function removeBranch(doc: FlowDoc, id: string, index: number): FlowDoc {
     if (key === undefined) {
       return node;
     }
-    const items = branchItems(node).filter((_, i) => i !== index);
-    const data: Record<string, unknown> = { ...nodeData(node), [key]: items };
-    if (typeof data.outputPorts === "number") {
-      data.outputPorts = items.length;
-    }
-    return { ...node, data };
+    return { ...node, data: { ...nodeData(node), [key]: branchItems(node).filter((_, i) => i !== index) } };
   });
   if (!Array.isArray(doc.connections)) {
     return next;
@@ -485,7 +546,7 @@ export interface Ports {
 }
 
 /**
- * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（取り込んだフローが別の綴りを
+ * ノードの出入口。種類ごとの既定に、読んだ線が使っている綴りを足す（人が書いたフローが別の綴りを
  * 使っていても、線を落とさずに描くため）。
  */
 export function portsOf(node: FlowNode, connections: readonly FlowConnection[]): Ports {

@@ -17,22 +17,19 @@
  * 4. ツリーのルートからファイルまでの途中にシンボリックリンクが無い
  *
  * 書き込みは一時ファイルの入れ替えで、リンクを辿らない（`core/flow-write.ts`）。置き場は承認済みの領域
- * （既定 `.ccnavi/approved/flows/<子>.json`）で、エージェントは判定に止められて書けない。
+ * （既定 `.ccnavi/approved/flows/<子>.yml`）で、エージェントは判定に止められて書けない。
  *
  * 残る隙間（TOCTOU）: 1 で聞き直してから書くまでの間に子が着手されると、着手の直後に書き込みが入りうる。
  * 着手は人か親のエージェントが `ccnavi-ticket.sh start` を打つ操作で、聞き直しから書き込みまでは同じ保存の
  * 1 回の中（実行ファイルを 1 度起こすぶん）。塞ぐには実行ファイルの側に錠の置き場が要るので、ここでは狭めるだけにする。
- *
- * 取り込み（`.vscode/workflows/*.json`）は画面の編集中のフローを置き換えるだけで、書くのは保存を押したとき。
  */
 import * as crypto from "node:crypto";
-import * as fs from "node:fs";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
 import { loadBoard } from "./ccnavi.js";
-import { importFlow, parseFlow, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
+import { parseFlow, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { renderFlowPage } from "./core/flow-render.js";
 import { readFlowFile, writeFlowFile } from "./core/flow-write.js";
 import {
@@ -58,8 +55,6 @@ const DEBOUNCE_MS = 120;
 const SCREEN = "flow";
 /** 自分の保存で監視が鳴るのを、この間だけ「外で変わった」と言わない */
 const OWN_WRITE_GRACE_MS = 1500;
-/** 取り込みの候補の置き場（cc-wf-studio が保存する場所） */
-const WORKFLOWS_GLOB = ".vscode/workflows/*.json";
 
 interface Loaded {
   readonly target: FlowTarget;
@@ -452,9 +447,6 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       );
       return;
     }
-    case "import":
-      await importInto(current, message.dirty);
-      return;
     case "save":
       await save(current, message.doc);
       return;
@@ -464,78 +456,6 @@ async function handleMessage(current: PanelState, message: FlowMessage | undefin
       return;
     }
   }
-}
-
-interface Candidate extends vscode.QuickPickItem {
-  readonly uri?: vscode.Uri;
-}
-
-/**
- * 取り込む。候補はワークスペースの `.vscode/workflows/*.json`（cc-wf-studio の置き場）で、
- * ほかのファイルも選べる。読めたら画面の編集中のフローを置き換える（未保存になる）。**ここでは書かない。**
- */
-async function importInto(current: PanelState, dirty: boolean): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  if (current.lock.locked) {
-    fail(current, current.lock.reason);
-    return;
-  }
-  const found = await vscode.workspace.findFiles(new vscode.RelativePattern(current.folder, WORKFLOWS_GLOB), undefined, 200);
-  const items: Candidate[] = found
-    .map((uri) => ({ label: path.basename(uri.fsPath), description: shownPath(current.folder.uri.fsPath, uri.fsPath), uri }))
-    .sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
-  items.push({ label: "ほかのファイルを選ぶ…", description: "JSON のファイルを選ぶ" });
-  const picked = await vscode.window.showQuickPick(items, {
-    title: `${current.ticket} のフローに取り込む`,
-    placeHolder: found.length === 0 ? ".vscode/workflows/ に JSON が無い。ほかのファイルを選ぶ" : "取り込むワークフロー（.vscode/workflows/*.json）",
-  });
-  if (picked === undefined) {
-    current.host.post({ type: "cancelled" } satisfies ToFlow);
-    return;
-  }
-  let uri = picked.uri;
-  if (uri === undefined) {
-    const chosen = await vscode.window.showOpenDialog({
-      canSelectMany: false,
-      defaultUri: vscode.Uri.file(path.join(current.folder.uri.fsPath, ".vscode", "workflows")),
-      filters: { JSON: ["json"] },
-      openLabel: "取り込む",
-    });
-    uri = chosen?.[0];
-    if (uri === undefined) {
-      current.host.post({ type: "cancelled" } satisfies ToFlow);
-      return;
-    }
-  }
-  if (!alive(current) || current.loaded !== loaded) {
-    return;
-  }
-  if (dirty) {
-    const choice = await vscode.window.showWarningMessage("未保存の変更がある。破棄して取り込む？", { modal: true }, "取り込む");
-    if (choice !== "取り込む") {
-      current.host.post({ type: "cancelled" } satisfies ToFlow);
-      return;
-    }
-  }
-  let text: string;
-  try {
-    text = fs.readFileSync(uri.fsPath, "utf8");
-  } catch (error) {
-    fail(current, `取り込むファイルを読めない: ${(error as Error).message}`);
-    return;
-  }
-  const read = importFlow(text);
-  if (!read.ok) {
-    fail(current, `取り込めない（${shownPath(current.folder.uri.fsPath, uri.fsPath)}）: ${read.error}`);
-    return;
-  }
-  if (!alive(current) || current.loaded !== loaded) {
-    return;
-  }
-  current.host.post({ type: "imported", doc: read.doc, source: shownPath(current.folder.uri.fsPath, uri.fsPath) } satisfies ToFlow);
 }
 
 async function save(current: PanelState, doc: FlowDoc): Promise<void> {

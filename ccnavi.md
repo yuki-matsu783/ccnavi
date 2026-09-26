@@ -1111,7 +1111,7 @@ dry-run のときは末尾に 1 行足す。足す文は「止まらない」で
 | フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json`、受け入れた指摘の `accepted.json` | レビューのスクリプト、`ticket finish <親>`、人 | 親のブランチにコミット |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローの指紋。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
-| 子のフロー | 同 `flows/<子>.json`（9.3.1） | 人（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごと運ぶ） |
+| 子のフロー | 同 `flows/<子>.yml`（9.3.1） | 人（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごと運ぶ） |
 | ワークツリー | `.claude/worktrees/<識別子>/` | 親が git のラッパースクリプトで切る | 管理外 |
 
 状態は置き場で表す。`ls` で見え、コミットに残り、「閉じたつもり」が起きない。**チケットは 1 本の
@@ -1220,7 +1220,7 @@ base_sha: ""
 - `predecessors` は案内にだけ使う。判定も HITL ポイントも見ない
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文と人の書いた行は保つ）
-- フロー（次の節）はチケットの欄では指さない。置き場は承認済みの領域の `flows/<子>.json` に固定。
+- フロー（次の節）はチケットの欄では指さない。置き場は承認済みの領域の `flows/<子>.yml` に固定。
   以前の欄 `flow` が書いてあれば warn で名指しして読み飛ばす（error にすると承認済みチケットが読めなくなり、
   範囲ごと効かなくなる。読み飛ばすだけなら何も広がらない）
 
@@ -1229,8 +1229,8 @@ base_sha: ""
 子チケットは、担当のサブエージェントが作業中に読む手順書（フロー）を持てる（ADR-0085）。HITL の
 流れ（承認・フェーズ・レビュー）は変えない。フローは子の中の作業の段取りで、人の判断の点を増やさない。
 
-**置き場。** 承認済みの領域の `<承認済みチケットの置き場>/flows/<子>.json`（既定
-`.ccnavi/approved/flows/<子>.json`）に固定で、チケットの欄では指さない（9.2）。置き場を持つツリーは
+**置き場。** 承認済みの領域の `<承認済みチケットの置き場>/flows/<子>.yml`（既定
+`.ccnavi/approved/flows/<子>.yml`）に固定で、チケットの欄では指さない（9.2）。置き場を持つツリーは
 承認済みチケットが在るツリー（親のワークツリー、畳んだ後は元ツリー）で、プロジェクトのチケットなら
 そのプロジェクトの側。チケットと同じ git に乗り、親のブランチで他の機械へ届く。子のワークツリーは
 親のブランチから切るので、切る前にコミットしてあればそこにも同じ版が写る。読むのは権威のツリーの版だけで、
@@ -1255,21 +1255,40 @@ base_sha: ""
 着手中か）だけで、範囲・フェーズ・承認のどれも読まない。承認済みチケットの走査（`doing/` と `done/` の
 `*.md`）にも入らない。
 
+ボードの欄（`--explain --json` の `tickets[].flow`）は子にだけ出す。閉じた子（終わった・取り消した）で
+フローが無ければ欄を出さない（`null`）。閉じた子にフローを作っても読まれる場面が無く、ボードが
+「フローを作る」を出していた。追記（2026-09-26）で改めた。フローが在る閉じた子は欄を出し、人が見返せる。
+
 最初は `references/<子>/flow.json`（`flow:` で指せる）に置き、親の範囲に `references/` を入れない運用で
 エージェントの書き込みを止めていた。レビューで 2 つの問題が出て、置き場を移した（ADR-0085）。人がボードで
 保存したフローが、次のエージェントの呼び出しの実行後の監視で範囲外の変更（`POST_TICKET_SCOPE`、戻し方に
 `git clean -f`）として咎められた。運用で守っていたので、範囲に `references/` を入れた親ではエージェントが
 フローを書けた。
 
-**形。** CC Workflow Studio（breaking-brake/cc-wf-studio）が `.vscode/workflows/*.json` に保存する
-`workflow.json` と同じ形を読む。形が合うだけで、あちらのコードは使わない（AGPL）。
+**形。** YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー編集画面が書き、実行ファイルが読む。
 
+```yaml
+id: wf-1
+name: 調査の手順
+description: …            # 無くてよい
+version: 1.0.0
+nodes:
+  - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, parentId: …, data: {…}}   # parentId は無くてよい
+connections:
+  - {id: c1, from: s, to: p1, fromPort: output, toPort: input, condition: …}            # condition は無くてよい
+subAgentFlows:             # 無くてよい
+  - {id: …, name: …, description: …, nodes: […], connections: […]}
 ```
-{ "id", "name", "description"?, "version", "schemaVersion"?,
-  "nodes": [ { "id", "type", "name", "position": {x, y}, "parentId"?, "data": { … } } ],
-  "connections": [ { "id", "from", "to", "fromPort", "toPort", "condition"? } ],
-  "subAgentFlows"?: [ { "id", "name", "description"?, "nodes", "connections" } ], … }
-```
+
+読み手は `yaml.safe_load`（ルール・フェーズ・リスクの設定と同じ）に、別名を拒む守りを足したもの（`flow._Loader`）。
+別名（`*名前`）があれば読まずにそう言う。別名は同じ部分木を何度でも指せるので、入れ子にすると小さなファイルでも
+辿る量が指数で膨らむ（billion laughs）。自分を指す別名は循環する値になる。手順書に別名は要らないので、量で
+切らずに別名ごと拒む。
+
+最初は CC Workflow Studio（breaking-brake/cc-wf-studio）の `workflow.json` と同じ形の JSON
+（`flows/<子>.json`）を読み、ボードはあちらの保存（`.vscode/workflows/*.json`）を取り込めた。追記（2026-09-26）:
+定義を YAML（`flows/<子>.yml`）に変え、CC Workflow Studio との互換と拡張の取り込みをやめた（利用者の決定、
+ADR-0085）。形（`nodes`・`connections`・`subAgentFlows`、ノードの種類）は変えていない。古い `.json` は読まない。
 
 | `type` | 読む `data` |
 |---|---|
@@ -1290,7 +1309,7 @@ base_sha: ""
 ボードの線の言葉も同じ読み方。
 
 **壊れたフローで止まらない。** フローは人が書くデータで、形は保証されない。読む・並べるのどこでも例外を
-外へ出さない。JSON でない・入れ子が深すぎる・`nodes` が無い・欄の型が違う（`connections` が数、など）は、
+外へ出さない。YAML として読めない・別名がある・入れ子が深すぎる・`nodes` が無い・欄の型が違う（`connections` が数、など）は、
 読めないと 1 行で言うか、並べられるところまで並べる。`SubagentStart` はフローの案内が万一例外を出しても
 1 行の知らせに落とし、子の一覧と範囲は渡す。大きさにも上限を置く。ファイルは 256KB まで（超えたら読まずに
 そう言う）、1 ノードの選択肢・分岐・次は 10 件まで（残りは「…ほか N 件」）、子 1 本の手順の文は 4000 文字、
@@ -1319,7 +1338,7 @@ base_sha: ""
 終わった後（`finish` / `cancel` の後）なら人が書き換えられる。
 **着手中**（`started_at` があり、`completed_at` も `cancelled_at` も無く、`doing/` に在る）は、実行前の
 判定が `Write` / `Edit` / `NotebookEdit` を `DENY_TICKET_FLOW_LOCKED` で止める。覆うのは
-その子の `flows/<子>.json` で、チケットと同じリポジトリのどのツリー（ワークスペースルート・プロジェクト・
+その子の `flows/<子>.yml` で、チケットと同じリポジトリのどのツリー（ワークスペースルート・プロジェクト・
 どのワークツリー）でも、誰が書いても（`agent_id` を見ない）同じ。大文字小文字は範囲の照合と同じく区別しない。
 綴りは 3 通りに当てる。解いた先（ルールと同じ）、解く前（cwd から繋いで `..` を畳んだだけ）、
 ディレクトリだけを解いた綴り。置き場を指すリンク越しの綴りも、リンクに差し替えたフローの綴りも止まる。
@@ -2853,7 +2872,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `DENY_TICKET_SCOPE` / `TICKET_ASK` | チケットの範囲の外 / 範囲の `ask` |
 | `DENY_TICKET_BLOCKED` | 承認済みチケット自体が信じられない。範囲を当てる前に止める（親が引けない、番号が親の計画に無い、`project:` が置き場と違う、など。9.4、ADR-0058） |
 | `DENY_TICKET_PROJECT_MISMATCH` | 行き先のプロジェクトと承認済みチケットの `project:` が違う |
-| `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.json`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1、ADR-0085） |
+| `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.yml`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1、ADR-0085） |
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに控えた指紋から変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1、ADR-0085） |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |

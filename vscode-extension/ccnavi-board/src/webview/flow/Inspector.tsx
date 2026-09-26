@@ -2,7 +2,7 @@
  * 右の欄。選んだノードか線の中身を直す。何も選んでいなければフロー自体の名前と説明。
  *
  * 直すのは `core/flow-doc.ts` の関数で作った写しで、**触った欄以外は元のまま**（知らない欄を落とさない）。
- * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（JSON のまま見せる）。
+ * 画面が欄を持たない種類は、名前だけ直せて、`data` は読むだけ（ファイルと同じ YAML の形で見せる）。
  */
 import type { JSX } from "react";
 
@@ -29,6 +29,7 @@ import {
   setConditionAt,
   setMeta,
   TYPE_LABELS,
+  yamlText,
   type FlowDoc,
   type FlowNode,
 } from "../../core/flow-doc.js";
@@ -177,7 +178,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSelect }: { readonly doc:
       {!known && (
         <>
           <p className="hint">この画面で欄を持たない種類。名前と位置だけ変えられ、中身（data）は保存してもそのまま残る。</p>
-          <pre className="flow-raw">{JSON.stringify(nodeData(node), null, 2)}</pre>
+          <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}
       <div className="buttons">

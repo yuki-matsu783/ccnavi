@@ -1,5 +1,5 @@
 /**
- * フロー編集画面（React）を happy-dom で動かす。図・印・錠・保存・取り込み・注意を見る。
+ * フロー編集画面（React）を happy-dom で動かす。図・印・錠・保存・注意を見る。
  *
  * 図は大きさの偽物（`openPage` が渡す `measure`）で描かせる。見るのは「点と線がその数あるか」
  * 「押すと何が起きるか」まで。線の経路とドラッグは README の手動確認に回す。
@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import type { HTMLButtonElement, HTMLInputElement, HTMLTextAreaElement } from "happy-dom" with { "resolution-mode": "import" };
 import { addNode, parseFlow, patchData, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { lockedReason } from "../../src/core/flow-view.js";
-import { openFlow, SAMPLE, savedDoc } from "../helpers/flow.js";
+import { openFlow, SAMPLE, sampleData, savedDoc } from "../helpers/flow.js";
 
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
@@ -53,7 +53,7 @@ test("CB-D107 図はノードと線を描き、問いには「メインに戻る
     // 読んだまま（在るファイル）なら保存は押せない
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
     assert.equal(dom.all("#lock").length, 0);
-    assert.match(dom.one(".path").textContent ?? "", /\.ccnavi\/approved\/flows\/i0001-01\.json/);
+    assert.match(dom.one(".path").textContent ?? "", /\.ccnavi\/approved\/flows\/i0001-01\.yml/);
   } finally {
     await dom.close();
   }
@@ -81,7 +81,7 @@ test("CB-D108 ファイルが無ければ雛形を見せ、そのまま保存で
   }
 });
 
-test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、部品箱・欄・取り込み・保存を止める。外れれば戻る", async () => {
+test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、部品箱・欄・保存を止める。外れれば戻る", async () => {
   const lock = { locked: true, reason: lockedReason("i0001-02") };
   const dom = await openFlow({ ticket: "i0001-02", doc: marked(), lock, exists: false });
   try {
@@ -92,7 +92,6 @@ test("CB-D109 錠が掛かっていれば読むだけ。理由の帯を出し、
       assert.ok(button.disabled);
     }
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "無いファイルでも、錠が掛かっていれば保存できない");
-    assert.ok(dom.one<HTMLButtonElement>('[data-action="import"]').disabled);
     assert.equal(dom.one("#flow-graph").getAttribute("data-readonly"), "1");
     // ノードを押して欄を見ても、欄は止まっている
     dom.click(dom.one('.react-flow__node[data-id="subAgent-1"]'));
@@ -126,7 +125,7 @@ test("CB-D110 部品箱で足して欄で直して保存すると、知らない
     dom.click(dom.one('.react-flow__node[data-id="mcp-1"]'));
     await dom.settle();
     assert.match(dom.one("#inspector").textContent ?? "", /この画面で欄を持たない種類/);
-    assert.match(dom.one("#inspector pre.flow-raw").textContent ?? "", /"serverId": "srv"/);
+    assert.match(dom.one("#inspector pre.flow-raw").textContent ?? "", /serverId: srv\ntoolName: t\n/);
     // 足して、欄で直す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
@@ -143,7 +142,7 @@ test("CB-D110 部品箱で足して欄で直して保存すると、知らない
     dom.click(dom.one("#save"));
     await dom.settle();
     const saved = savedDoc(dom) as unknown as Record<string, unknown>;
-    const original = JSON.parse(SAMPLE) as Record<string, unknown>;
+    const original = sampleData();
     for (const key of ["id", "name", "version", "schemaVersion", "metadata", "subAgentFlows"]) {
       assert.deepEqual(saved[key], original[key], key);
     }
@@ -200,28 +199,17 @@ test("CB-D111 入れ子が子の下 2 段を超えるときだけ注意を出す
   }
 });
 
-test("CB-D112 取り込みは拡張ホストに頼み、届いたフローで置き換えて未保存にする（書くのは保存のとき）", async () => {
+test("CB-D112 外のファイルを取り込むボタンは無い。中身（data）が届くと編集は捨てられて未保存が消える", async () => {
   const dom = await openFlow();
   try {
-    dom.click(dom.one('[data-action="import"]'));
+    assert.equal(dom.all('[data-action="import"]').length, 0);
+    assert.doesNotMatch(dom.one(".toolbar").textContent ?? "", /取り込/);
+    dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
-    assert.deepEqual(dom.posted.filter((m) => m.type === "import"), [{ type: "import", dirty: false }]);
-    assert.ok(dom.one<HTMLButtonElement>('[data-action="import"]').disabled, "選んでいる間は止める");
-    // やめたら戻る
-    await dom.send({ type: "cancelled" });
-    assert.ok(!dom.one<HTMLButtonElement>('[data-action="import"]').disabled);
-    await dom.send({ type: "imported", doc: sample(), source: ".vscode/workflows/research.json" });
-    assert.equal(dom.all(".react-flow__node").length, 4);
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
-    assert.match(dom.one("#status").textContent ?? "", /\.vscode\/workflows\/research\.json を取り込んだ。保存するまでファイルには書かない/);
-    assert.equal(dom.posted.filter((m) => m.type === "save").length, 0, "取り込んだだけでは書かない");
-    // 未保存のまま、もう 1 度取り込もうとすると、拡張ホストに未保存を伝える（確認は拡張ホストが出す）
-    dom.click(dom.one('[data-action="import"]'));
-    await dom.settle();
-    assert.deepEqual(dom.posted.filter((m) => m.type === "import").pop(), { type: "import", dirty: true });
-    // 中身（data）が届くと、編集は捨てられて未保存が消える
-    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.json", flowRel: ".ccnavi/approved/flows/i0001-01.json", exists: true, doc: sample(), lock: { locked: false, reason: "" } } } });
+    await dom.send({ type: "data", data: { kind: "page", page: { root: "/ws", ticket: "i0001-01", title: "調査", parent: "i0001", flowPath: "x.yml", flowRel: ".ccnavi/approved/flows/i0001-01.yml", exists: true, doc: sample(), lock: { locked: false, reason: "" } } } });
     assert.ok(dom.one("#dirty").classList.contains("hidden"));
+    assert.equal(dom.all(".react-flow__node").length, 4);
   } finally {
     await dom.close();
   }

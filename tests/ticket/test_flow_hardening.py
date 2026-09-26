@@ -21,8 +21,17 @@ import threading
 import time
 import unittest
 
+import yaml
+
 from ccnavi import approval, flow, settings
-from tests.ticket.test_flow import CHILD, WORKFLOW, FlowHarness, child_ticket, conf_with
+from tests.ticket.test_flow import (
+    CHILD,
+    WORKFLOW,
+    WORKFLOW_YAML,
+    FlowHarness,
+    child_ticket,
+    conf_with,
+)
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import write
 
@@ -74,7 +83,7 @@ class FlowFileKindTest(unittest.TestCase):
     @unittest.skipUnless(HAS_FIFO, "mkfifo が無い")
     def test_a_fifo_is_not_read_and_does_not_hang(self):
         root = scratch(self)
-        fifo = os.path.join(root, "flow.json")
+        fifo = os.path.join(root, "flow.yml")
         os.mkfifo(fifo)
         began = time.monotonic()
         with Watchdog(fifo) as dog:
@@ -88,18 +97,18 @@ class FlowFileKindTest(unittest.TestCase):
 
     def test_a_hard_linked_flow_is_not_read(self):
         root = scratch(self)
-        path = write(os.path.join(root, "flows", "a.json"), json.dumps(WORKFLOW))
+        path = write(os.path.join(root, "flows", "a.yml"), WORKFLOW_YAML)
         self.assertIsNotNone(flow.load(path, root)[0])
-        os.link(path, os.path.join(root, "alias.json"))
+        os.link(path, os.path.join(root, "alias.yml"))
         data, why = flow.load(path, root)
         self.assertIsNone(data)
         self.assertEqual(why, flow.HARD_LINKED)
         self.assertTrue(flow.hard_linked(path))
-        self.assertFalse(flow.hard_linked(os.path.join(root, "missing.json")))
+        self.assertFalse(flow.hard_linked(os.path.join(root, "missing.yml")))
 
     def test_a_directory_is_not_read(self):
         root = scratch(self)
-        folder = os.path.join(root, "flows", "a.json")
+        folder = os.path.join(root, "flows", "a.yml")
         os.makedirs(folder)
         self.assertEqual(flow.load(folder, root), (None, flow.NOT_REGULAR))
 
@@ -123,14 +132,14 @@ class FlowSpellingTest(unittest.TestCase):
                 self.assertEqual(flow.approved_rel(conf), ".ccnavi/approved")
                 place = flow.flow_file(conf, root, CHILD)
                 self.assertEqual(
-                    place, os.path.join(root, ".ccnavi", "approved", "flows", f"{CHILD}.json")
+                    place, os.path.join(root, ".ccnavi", "approved", "flows", f"{CHILD}.yml")
                 )
-                self.assertEqual(flow.locate(conf, root, place), (f"{CHILD}.json", ""))
+                self.assertEqual(flow.locate(conf, root, place), (f"{CHILD}.yml", ""))
 
     def test_a_place_outside_the_tree_is_locked_for_every_project(self):
         conf = conf_with("../shared/approved")
-        found = flow.locate(conf, "/w", "/elsewhere/shared/approved/flows/i0001-01.json")
-        self.assertEqual(found, ("i0001-01.json", flow.ANY_PROJECT))
+        found = flow.locate(conf, "/w", "/elsewhere/shared/approved/flows/i0001-01.yml")
+        self.assertEqual(found, ("i0001-01.yml", flow.ANY_PROJECT))
 
     def test_windows_aliases_of_the_name_are_folded(self):
         """末尾の `.` と空白、代替データストリームは同じファイルに届く（止める向きに畳む）。"""
@@ -138,15 +147,15 @@ class FlowSpellingTest(unittest.TestCase):
         conf = conf_with()
         base = os.path.join(root, ".ccnavi", "approved", "flows")
         for name in (
-            "i0001-01.json.",
-            "i0001-01.json ",
-            "i0001-01.json::$DATA",
-            "I0001-01.JSON",
-            "i0001-01.json:x",
+            "i0001-01.yml.",
+            "i0001-01.yml ",
+            "i0001-01.yml::$DATA",
+            "I0001-01.YML",
+            "i0001-01.yml:x",
         ):
             with self.subTest(name=name):
                 found = flow.locate(conf, root, os.path.join(base, name))
-                self.assertEqual(found, ("i0001-01.json", ""))
+                self.assertEqual(found, ("i0001-01.yml", ""))
                 self.assertIsNotNone(flow.lock_hit([child_ticket(True)], "", found[0]))
 
     def test_case_folding_keeps_offsets_with_dotted_capital_i(self):
@@ -154,14 +163,14 @@ class FlowSpellingTest(unittest.TestCase):
         conf = conf_with()
         running = child_ticket(started=True)
         for path in (
-            "/home/İsmail/ws/.ccnavi/approved/flows/I0001-01.JSON",
-            "/home/İsmail/ws/.ccnavi/Approved/flows/i0001-01.json",
-            "/home/ismail/ws/.CCNAVI/APPROVED/FLOWS/I0001-01.JSON",
+            "/home/İsmail/ws/.ccnavi/approved/flows/I0001-01.YML",
+            "/home/İsmail/ws/.ccnavi/Approved/flows/i0001-01.yml",
+            "/home/ismail/ws/.CCNAVI/APPROVED/FLOWS/I0001-01.YML",
         ):
             with self.subTest(path=path):
                 found = flow.locate(conf, "/home/ismail/ws", path)
                 self.assertIsNotNone(found)
-                self.assertEqual(found[0], "i0001-01.json")
+                self.assertEqual(found[0], "i0001-01.yml")
                 self.assertIs(flow.lock_hit([running], flow.ANY_PROJECT, found[0]), running)
         self.assertEqual(len(flow._fold("İx")), 2)
 
@@ -232,7 +241,7 @@ class FlowReadPlaceTest(FlowHarness):
         self.commit_parent("no flow in the parent tree")
         child_tree = self.run_child(CHILD)
         # 子のワークツリーの写しに、エージェントがシェルから書いた版。
-        write(self.flow_in(child_tree), json.dumps(WORKFLOW, ensure_ascii=False))
+        write(self.flow_in(child_tree), WORKFLOW_YAML)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn(CHILD, text)
         self.assertNotIn("フロー:", text)
@@ -275,7 +284,7 @@ class FlowDigestTest(FlowHarness):
         record = self.record()
         self.assertTrue(record["fingerprint"].startswith("sha256:"), record)
         self.assertEqual(record["fingerprint"], flow.fingerprint(self.flow_path))
-        self.assertEqual(record["path"], f".ccnavi/approved/flows/{CHILD}.json")
+        self.assertEqual(record["path"], f".ccnavi/approved/flows/{CHILD}.yml")
         self.assertTrue(record["at"])
 
     def test_an_unchanged_flow_says_nothing(self):
@@ -288,7 +297,7 @@ class FlowDigestTest(FlowHarness):
     def test_a_flow_rewritten_after_the_start_is_reported(self):
         """シェルから行き先を追えない形で書き換えた、を直に書いて真似る。止めずに知らせる。"""
         child_tree = self.run_child(CHILD)
-        write(self.flow_path, json.dumps({"nodes": [{"id": "s", "type": "prompt", "name": "x"}]}))
+        write(self.flow_path, "nodes:\n  - {id: s, type: prompt, name: x}\n")
         start, stop = self.start_and_stop(child_tree)
         for result in (start, stop):
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -310,7 +319,7 @@ class FlowDigestTest(FlowHarness):
         self.commit_parent("no flow")
         child_tree = self.run_child(CHILD)
         self.assertEqual(self.record()["fingerprint"], "absent")
-        write(self.flow_path, json.dumps(WORKFLOW))
+        write(self.flow_path, WORKFLOW_YAML)
         start, _ = self.start_and_stop(child_tree)
         self.assertIn(CHANGED, json.loads(start.stdout)["systemMessage"])
 
@@ -342,7 +351,7 @@ class FlowHardLinkLockTest(FlowHarness):
     """ハードリンクの別名への書き込みもロックが止める（M-1）。"""
 
     def test_a_hard_link_alias_is_locked_while_in_progress(self):
-        alias = os.path.join(self.parent_tree, "wip", "notes.json")
+        alias = os.path.join(self.parent_tree, "wip", "notes.yml")
         os.makedirs(os.path.dirname(alias), exist_ok=True)
         os.link(self.flow_path, alias)
         # 着手の前は止めない（ロックは着手中だけ）。
@@ -355,7 +364,7 @@ class FlowHardLinkLockTest(FlowHarness):
         self.assertIn("ハードリンク", text)
         self.assertNotIn(flow.FENCE_OPEN, text)
         # 名前が 1 つのふつうのファイルは、ロックの走査もしない。
-        plain = write(os.path.join(self.parent_tree, "wip", "plain.json"), "{}")
+        plain = write(os.path.join(self.parent_tree, "wip", "plain.yml"), "{}")
         self.assert_not_locked(self.write_to(plain))
 
 
@@ -369,9 +378,9 @@ class FlowParentBriefingTest(PhaseHarness):
             self.propose(kid, child_text(kid, "i0001", 1, (f"wip/research/r{i}/*",)))
         self.commit_parent()
         self.assertEqual(self.approve().returncode, 0)
-        paths = [os.path.join(self.approved, "flows", f"{k}.json") for k in kids]
+        paths = [os.path.join(self.approved, "flows", f"{k}.yml") for k in kids]
         for path in paths:
-            write(path, json.dumps(WORKFLOW, ensure_ascii=False))
+            write(path, WORKFLOW_YAML)
         self.commit_parent("flows")
         self.start_parent()
         text = self.reason(self.hook("SubagentStart", "", self.parent_tree, agent_id="sub-1"))
@@ -411,7 +420,7 @@ class FlowCarriedOnApprovalTest(PhaseHarness):
     def test_the_flow_moves_with_the_ticket(self):
         before = self.board()
         self.assertEqual(os.path.realpath(before["tree"]), os.path.realpath(self.root))
-        write(before["path"], json.dumps(WORKFLOW, ensure_ascii=False))
+        write(before["path"], WORKFLOW_YAML)
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("フローを", result.stdout)
@@ -421,21 +430,21 @@ class FlowCarriedOnApprovalTest(PhaseHarness):
         self.assertTrue(after["exists"])
         self.assertFalse(os.path.exists(before["path"]))
         with open(after["path"], encoding="utf-8") as f:
-            self.assertEqual(json.load(f)["name"], WORKFLOW["name"])
+            self.assertEqual(yaml.safe_load(f)["name"], WORKFLOW["name"])
         child_tree = self.run_child(CHILD)
         text = self.reason(self.hook("SubagentStart", "", child_tree, agent_id="sub-1"))
         self.assertIn("3. [askUserQuestion] 方針", text)
 
     def test_a_different_flow_at_the_destination_is_not_overwritten(self):
         before = self.board()
-        write(before["path"], json.dumps(WORKFLOW, ensure_ascii=False))
-        held = write(os.path.join(self.approved, "flows", f"{CHILD}.json"), '{"nodes": []}')
+        write(before["path"], WORKFLOW_YAML)
+        held = write(os.path.join(self.approved, "flows", f"{CHILD}.yml"), "nodes: []\n")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("運ばなかった", result.stdout)
         self.assertIn("上書きしない", result.stdout)
         with open(held, encoding="utf-8") as f:
-            self.assertEqual(f.read(), '{"nodes": []}')
+            self.assertEqual(f.read(), "nodes: []\n")
         self.assertTrue(os.path.exists(before["path"]))
 
     def test_no_flow_means_nothing_is_said(self):

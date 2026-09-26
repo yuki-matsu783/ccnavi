@@ -1,5 +1,5 @@
 /**
- * 子のフローの読み書き（`core/flow-doc.ts`）。知らない欄と知らない種類を落とさないこと、雛形、取り込み、
+ * 子のフローの読み書き（`core/flow-doc.ts`）。YAML の読み書き、知らない欄と知らない種類を落とさないこと、雛形、
  * 編集の関数、入れ子の段の数え方を見る。
  */
 import { test } from "node:test";
@@ -11,7 +11,6 @@ import {
   connectionLabel,
   connectionsOf,
   flowNotices,
-  importFlow,
   moveNode,
   nesting,
   parseFlow,
@@ -27,23 +26,69 @@ import {
   templateFlow,
   type FlowDoc,
 } from "../../src/core/flow-doc.js";
-import { SAMPLE } from "../helpers/flow.js";
+import { parse } from "yaml";
+
+import { SAMPLE, sampleData } from "../helpers/flow.js";
+
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
   assert.ok(read.ok, read.ok ? "" : read.error);
   return read.doc;
 }
 
-/** JSON として同じか（書き出した本文をもう 1 度読んで比べる） */
+/** 書き出した本文をもう 1 度読んだ中身（読み手は拡張の外の YAML の読み方で） */
 function roundTrip(doc: FlowDoc): unknown {
-  return JSON.parse(serializeFlow(doc));
+  return parse(serializeFlow(doc));
 }
 
-test("CB-T218 読んで書くだけなら、知らない欄も知らない種類も元のまま出る", () => {
-  assert.deepEqual(roundTrip(sample()), JSON.parse(SAMPLE));
-  // 2 字下げで、末尾に改行
-  assert.ok(serializeFlow(sample()).endsWith("}\n"));
-  assert.match(serializeFlow(sample()), /^\{\n  "id": "wf-1",/);
+test("CB-T218 YAML を読んで書くだけなら、知らない欄も知らない種類も元のまま出る", () => {
+  // 手で書いた形（コメント・流れ形式・BOM）も読める
+  assert.deepEqual(sample(), sampleData());
+  const bom = parseFlow(`\uFEFF${SAMPLE}`);
+  assert.ok(bom.ok);
+  assert.deepEqual(bom.doc, sampleData());
+  assert.deepEqual(roundTrip(sample()), sampleData());
+  // 書き出しはブロック形式の 2 字下げで、末尾に改行。別名（& / *）は使わない
+  const text = serializeFlow(sample());
+  assert.ok(text.endsWith("\n"));
+  assert.match(text, /^id: wf-1\nname: 調べて聞く\n/);
+  assert.match(text, /\nnodes:\n {2}- id: start-1\n {4}type: start\n/);
+  assert.doesNotMatch(text, /[&*]\w/);
+  assert.doesNotMatch(text, /^\s*\{/m);
+});
+
+test("CB-T239 書き出しは人が読める形で、実行ファイル（YAML 1.1）が別の型に読む綴りは引用符で囲む", () => {
+  // 同じ中身を 2 か所で持っても別名にしない（実行ファイルは別名を読まない）
+  const shared = { x: 1, y: 2 };
+  const doc: FlowDoc = {
+    nodes: [
+      { id: "a", type: "prompt", name: "yes", position: shared, data: { prompt: "1 行目\n2 行目\n", mode: "0755", on: "2026-01-01", empty: "" } },
+      { id: "b", type: "prompt", name: "no", position: shared, data: { prompt: "続き" } },
+    ],
+  };
+  const text = serializeFlow(doc);
+  assert.doesNotMatch(text, /[&*]\w/);
+  // 複数行の文は | の形
+  assert.match(text, /prompt: \|\n {8}1 行目\n {8}2 行目\n/);
+  // YAML 1.1 で真偽値・八進・日付に読まれる綴りは引用符で囲む（キーも）
+  assert.match(text, /name: "yes"/);
+  assert.match(text, /name: "no"/);
+  assert.match(text, /mode: "0755"/);
+  assert.match(text, /"on": "2026-01-01"/);
+  assert.match(text, /empty: ""/);
+  const read = parseFlow(text);
+  assert.ok(read.ok);
+  assert.deepEqual(read.doc, doc);
+});
+
+test("CB-T240 読みは実行ファイルと同じ YAML 1.1 の型で読み、日付は文字のまま持つ", () => {
+  const read = parseFlow("nodes:\n  - {id: a, type: askUserQuestion, position: {x: 1, y: 2}, data: {multiSelect: yes, off: n, when: 2026-01-01, mode: 0755}}\n");
+  assert.ok(read.ok, read.ok ? "" : read.error);
+  // `y` `n` は PyYAML と同じく文字（真偽値にしない）。`off` は真偽値のキー
+  assert.deepEqual(read.doc.nodes[0].position, { x: 1, y: 2 });
+  assert.deepEqual(read.doc.nodes[0].data, { multiSelect: true, false: "n", when: "2026-01-01", mode: 493 });
+  // 書き出しは y を囲まない
+  assert.match(serializeFlow(templateFlow("x", "")), /\n {6}y: 160\n/);
 });
 
 test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（data・position・最上位・線）は残す", () => {
@@ -53,13 +98,13 @@ test("CB-T219 編集は触ったところだけを差し替え、ほかの欄（
   doc = moveNode(doc, "ask-1", { x: 250.4, y: 10.6 });
   doc = setConditionAt(doc, 0, "いつも");
   const out = roundTrip(doc) as Record<string, unknown>;
-  const original = JSON.parse(SAMPLE) as Record<string, unknown>;
+  const original = sampleData();
   for (const key of ["id", "name", "version", "schemaVersion", "metadata", "subAgentFlows"]) {
     assert.deepEqual(out[key], original[key], key);
   }
   const nodes = out.nodes as Record<string, unknown>[];
   const ask = nodes[1];
-  assert.deepEqual(ask.data, { questionText: "どれにする？", options: [{ label: "A", description: "" }, { label: "B", description: "" }], multiSelect: false, outputPorts: 2, extra: 1 });
+  assert.deepEqual(ask.data, { questionText: "どれにする？", options: [{ label: "A", description: "" }, { label: "B", description: "" }], multiSelect: false, extra: 1 });
   // 位置は丸め、知らない欄（z）は残す。ノードの知らない欄（style）も残す
   assert.deepEqual(ask.position, { x: 250, y: 11, z: 3 });
   assert.deepEqual(ask.style, { width: 220 });
@@ -90,27 +135,43 @@ test("CB-T220 雛形は 開始 → 終了 の 2 ノードと線 1 本で、そ�
   assert.equal(templateFlow("i0002-01", "").name, "i0002-01");
 });
 
-test("CB-T221 取り込みは形を確かめて中身を変えない。読めない形は理由を言って断る", () => {
-  const read = importFlow(`﻿${SAMPLE}`);
-  assert.ok(read.ok);
-  assert.deepEqual(roundTrip(read.doc), JSON.parse(SAMPLE));
+test("CB-T221 読めない形は理由を言って断り、例外を外に出さない。別名（アンカー）は膨らむ前に断る", () => {
   const refused: [string, RegExp][] = [
-    ["{", /JSON として読めない/],
-    ["[]", /最上位がオブジェクトではない/],
-    ['{"name":"x"}', /`nodes` の並びが無い/],
-    ['{"nodes":[{"type":"start"}]}', /nodes\[0\] に id が無い/],
-    ['{"nodes":[1]}', /nodes\[0\] がオブジェクトではない/],
-    ['{"nodes":[{"id":"a"},{"id":"a"}]}', /id が重なっている（a）/],
-    ['{"nodes":[],"connections":{}}', /`connections` が並びではない/],
-    ['{"nodes":[],"connections":[1]}', /connections\[0\] がオブジェクトではない/],
+    ["nodes: [", /YAML として読めない/],
+    ["a: 1\na: 2\n", /YAML として読めない/],
+    ["nodes: []\n---\nnodes: []\n", /YAML として読めない/],
+    ["\tnodes: []", /YAML として読めない/],
+    ["", /最上位がキーと値の並びではない/],
+    ["- 1\n", /最上位がキーと値の並びではない/],
+    ["name: x\n", /`nodes` の並びが無い/],
+    ["nodes:\n  - {type: start}\n", /nodes\[0\] に id が無い/],
+    ["nodes: [1]\n", /nodes\[0\] がオブジェクトではない/],
+    ["nodes:\n  - {id: a}\n  - {id: a}\n", /id が重なっている（a）/],
+    ["nodes: []\nconnections: {}\n", /`connections` が並びではない/],
+    ["nodes: []\nconnections: [1]\n", /connections\[0\] がオブジェクトではない/],
+    ["x: &a [1]\nnodes: [{id: a, data: *a}]\n", /別名/],
+    ["base: &b {label: x}\nnodes:\n  - id: a\n    data:\n      <<: *b\n", /別名/],
   ];
   for (const [text, reason] of refused) {
-    const result = importFlow(text);
+    const result = parseFlow(text);
     assert.equal(result.ok, false, text);
     assert.match(result.ok ? "" : result.error, reason, text);
   }
+  // 別名を重ねて膨らませる形（billion laughs）も、辿らずに断る
+  const lines = ["a0: &a0 [x, x, x, x, x, x, x, x, x, x]"];
+  for (let i = 1; i < 12; i += 1) {
+    lines.push(`a${i}: &a${i} [${Array.from({ length: 10 }, () => `*a${i - 1}`).join(", ")}]`);
+  }
+  lines.push("nodes: [{id: a, data: {v: *a11}}]");
+  const bomb = parseFlow(lines.join("\n"));
+  assert.equal(bomb.ok, false);
+  assert.match(bomb.ok ? "" : bomb.error, /別名/);
+  // アンカーだけ（別名で指していない）なら読む（実行ファイルと同じ）
+  const anchored = parseFlow("nodes:\n  - &n {id: a, type: prompt}\n");
+  assert.ok(anchored.ok, anchored.ok ? "" : anchored.error);
+  assert.deepEqual(anchored.doc.nodes, [{ id: "a", type: "prompt" }]);
   // connections が無いフローも読める（実行ファイルと同じ）。描くときに空として扱う
-  const bare = importFlow('{"nodes":[{"id":"a","type":"prompt"}]}');
+  const bare = parseFlow("nodes:\n  - {id: a, type: prompt}\n");
   assert.ok(bare.ok);
   assert.deepEqual(connectionsOf(bare.doc), []);
 });
@@ -134,14 +195,12 @@ test("CB-T222 ノードを消すと線も消え、出口を消すと後ろの出
   );
   const ask = trimmed.nodes[1].data as Record<string, unknown>;
   assert.deepEqual(ask.options, [{ label: "B", description: "" }]);
-  assert.equal(ask.outputPorts, 1);
-  // 足すと outputPorts も合わせる。1 件だけ直すと他は元のまま
+  // 足すと後ろに付く。1 件だけ直すと他は元のまま
   const grown = patchBranch(addBranch(trimmed, "ask-1", { label: "C", description: "" }), "ask-1", 0, { description: "いまのまま" });
   assert.deepEqual((grown.nodes[1].data as Record<string, unknown>).options, [
     { label: "B", description: "いまのまま" },
     { label: "C", description: "" },
   ]);
-  assert.equal((grown.nodes[1].data as Record<string, unknown>).outputPorts, 2);
   // 線
   const same = connect(sample(), "start-1", "output", "ask-1", "input");
   assert.equal(connectionsOf(same).length, 4, "同じ線は足さない");
@@ -150,14 +209,14 @@ test("CB-T222 ノードを消すと線も消え、出口を消すと後ろの出
   assert.deepEqual(connectionsOf(linked)[4], { id: "c-start-1-end-1", from: "start-1", to: "end-1", fromPort: "output", toPort: "input" });
   assert.equal(connectionsOf(removeConnectionAt(linked, 4)).length, 4);
   // connections が無かったフローには欄ができる
-  const bare = importFlow('{"nodes":[{"id":"a","type":"start"},{"id":"b","type":"end"}]}');
+  const bare = parseFlow("nodes:\n  - {id: a, type: start}\n  - {id: b, type: end}\n");
   assert.ok(bare.ok);
   assert.equal(connectionsOf(connect(bare.doc, "a", "output", "b", "input")).length, 1);
   // 足したノードは使われていない id と既定の中身を持つ
   const added = addNode(templateFlow("x", ""), "askUserQuestion", { x: 1, y: 2 });
   assert.equal(added.id, "askUserQuestion-1");
   assert.deepEqual(added.doc.nodes[2].position, { x: 1, y: 2 });
-  assert.equal((added.doc.nodes[2].data as Record<string, unknown>).outputPorts, 2);
+  assert.deepEqual(added.doc.nodes[2].data, { questionText: "", multiSelect: false, options: [{ label: "はい", description: "" }, { label: "いいえ", description: "" }] });
 });
 
 /** サブフローを重ねたフロー。`depth` はメインの流れから数えた subAgentFlow の重なり */
@@ -219,7 +278,7 @@ test("CB-T224 出入口は種類の既定に、読んだ線が使う綴りを足
   // 開始に入口は無く、終了に出口は無い
   assert.deepEqual(portsOf(doc.nodes[0], []).inputs, []);
   assert.deepEqual(portsOf(doc.nodes[3], []).outputs, []);
-  // 取り込んだ線が別の綴りの出口を使っていれば、その出口も描く
+  // 人が書いた線が別の綴りの出口を使っていれば、その出口も描く
   const odd = connect(doc, "mcp-1", "success", "end-1", "in-2");
   const mcpPorts = portsOf(odd.nodes[2], connectionsOf(odd));
   assert.deepEqual(

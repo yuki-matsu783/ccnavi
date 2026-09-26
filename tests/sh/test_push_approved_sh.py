@@ -236,12 +236,12 @@ class PushApprovedTest(Workspace):
         """ボードの保存が残した `flows/.<名前>.<番号>.tmp` は運ばず、フローは運ぶ（L-e）。"""
         tree = self.worktree("i0001")
         flows = os.path.join(tree, ".ccnavi", "approved", "flows")
-        write(os.path.join(flows, "i0001-01.json"), '{"nodes":[]}\n')
-        temp = write(os.path.join(flows, ".i0001-01.json.123.abcdef.tmp"), "half")
+        write(os.path.join(flows, "i0001-01.yml"), "nodes: []\n")
+        temp = write(os.path.join(flows, ".i0001-01.yml.123.abcdef.tmp"), "half")
 
         result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01.json"])
+        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01.yml"])
         self.assertTrue(os.path.exists(temp))
         self.assertEqual(self.staged(tree), "")
         # 一時ファイルだけが残っていても、運ぶものは無い。

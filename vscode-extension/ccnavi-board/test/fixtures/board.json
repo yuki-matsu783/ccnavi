@@ -220,10 +220,10 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.json",
-    "rel": ".ccnavi/approved/flows/i0001-01.json",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml",
+    "rel": ".ccnavi/approved/flows/i0001-01.yml",
     "tree": "<root>/.claude/worktrees/i0001",
-    "exists": false,
+    "exists": true,
     "linked": false,
     "locked": false
    },
@@ -272,8 +272,8 @@
    "seen_in": [],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02.json",
-    "rel": ".ccnavi/approved/flows/i0001-02.json",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02.yml",
+    "rel": ".ccnavi/approved/flows/i0001-02.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
@@ -327,8 +327,8 @@
    ],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.json",
-    "rel": ".ccnavi/approved/flows/i0001-03.json",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.yml",
+    "rel": ".ccnavi/approved/flows/i0001-03.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
@@ -386,8 +386,8 @@
    ],
    "scattered": [],
    "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-04.json",
-    "rel": ".ccnavi/approved/flows/i0001-04.json",
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-04.yml",
+    "rel": ".ccnavi/approved/flows/i0001-04.yml",
     "tree": "<root>/.claude/worktrees/i0001",
     "exists": false,
     "linked": false,
@@ -436,14 +436,7 @@
    "cancel_reason": "やめた",
    "seen_in": [],
    "scattered": [],
-   "flow": {
-    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-05.json",
-    "rel": ".ccnavi/approved/flows/i0001-05.json",
-    "tree": "<root>/.claude/worktrees/i0001",
-    "exists": false,
-    "linked": false,
-    "locked": false
-   },
+   "flow": null,
    "risk": null,
    "judge": null
   }

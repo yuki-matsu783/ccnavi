@@ -5,11 +5,11 @@
  * 選んでいるもの、直前の操作の一言）だけ。
  *
  * **着手中かは画面が決めない。** 錠（`FlowLock`）は実行ファイルの答え（`flow.locked`）の写しで、
- * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存・取り込みが止まる）。
+ * 拡張ホストが渡す。錠が掛かっている間は読むだけ（欄・部品箱・保存が止まる）。
  * 保存を押したときも、拡張ホストが実行ファイルに聞き直してから書く（ADR-0085）。
  *
  * **中身（`data`）が届いたら、編集中のフローはその中身で置き換える。** 届くのは編集を捨ててよいとき
- * だけ（再読込・保存が通った）。取り込み（`imported`）は置き換えたうえで未保存にする。
+ * だけ（再読込・保存が通った）。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
@@ -61,11 +61,6 @@ const TOUR_STEPS: readonly TourStep[] = [
     body: "選んだノードの中身（プロンプト・問いと選択肢・分岐の条件など）を直す。画面が知らない種類は、名前だけ直せて中身はそのまま残る。",
   },
   {
-    target: '[data-action="import"]',
-    title: "取り込み",
-    body: "CC Workflow Studio で書いた .vscode/workflows/*.json を、この子のフローとして取り込む。書くのは保存を押したとき。",
-  },
-  {
     target: "#save",
     title: "保存",
     body: "保存の直前に、子チケットが着手中でないかを ccnavi に聞き直す。着手中なら書かない（担当のサブエージェントが読んでいる手順が途中で変わるのを防ぐ）。",
@@ -86,7 +81,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent): void => {
-      const message = (event.data ?? {}) as Partial<ToFlow> & { data?: FlowData; lock?: FlowLock; message?: string; value?: unknown; doc?: FlowDoc; source?: string };
+      const message = (event.data ?? {}) as Partial<ToFlow> & { data?: FlowData; lock?: FlowLock; message?: string; value?: unknown };
       if (message.type === "data" && message.data !== undefined) {
         const next = message.data;
         setData(next);
@@ -107,12 +102,6 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       } else if (message.type === "cancelled") {
         setBusy(false);
         setStatus(undefined);
-      } else if (message.type === "imported" && message.doc !== undefined) {
-        setDoc(message.doc);
-        setDirty(true);
-        setBusy(false);
-        setSelected(undefined);
-        setStatus({ text: `${String(message.source ?? "")} を取り込んだ。保存するまでファイルには書かない`, error: false });
       } else if (message.type === "tour") {
         requestTour();
       } else if (message.type === "appearance") {
@@ -204,20 +193,6 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         <div className="controls">
           <button type="button" className="action" data-action="open-flow" disabled={!page.exists} onClick={() => post({ type: "openFile" })}>
             エディタで開く
-          </button>
-          <button
-            type="button"
-            className="action"
-            data-action="import"
-            disabled={readOnly}
-            title=".vscode/workflows/*.json（CC Workflow Studio の保存先）から取り込む"
-            onClick={() => {
-              setBusy(true);
-              setStatus({ text: "取り込むファイルを選んでいる…", error: false });
-              post({ type: "import", dirty });
-            }}
-          >
-            取り込む
           </button>
           <button type="button" className="action" data-action="reload" disabled={busy} onClick={reload}>
             再読込
