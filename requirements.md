@@ -2,7 +2,7 @@
 type: requirements
 title: ccnavi 要件書
 description: ccnavi が外から観測できる約束。背景、外部要求、各面ごとの要件定義
-tags: [spec, cli]
+tags: [design-doc, judging, hook]
 keywords: [要件, 外部要求, 仕様, REQ, ツール実行, 判定, ルール, hook, JSON]
 ---
 
