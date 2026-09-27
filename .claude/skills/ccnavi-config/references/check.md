@@ -92,7 +92,7 @@ sh .ccnavi/scripts/ccnavi-git.sh log --shortstat -20
 食い違っていなくても、次に当たるものは黙って通さずに聞く。まとめて 1 回で、
 AskUserQuestion。聞くのは「この設定をどうするか」で、「この呼び出しを通してよいか」ではない。
 
-- 権限モードへの委譲（`UNDECLARED`）が多い。`logs/log.jsonl` の `decision == "handover"` を数える。
+- 権限モードへの委譲（`UNDECLARED`）が多い。`logs/decisions.jsonl` の `decision == "handover"` を数える。
   同じ場所が繰り返すなら allow に足す先、毎回違うなら allow の粒度が細かすぎる。どちらかを添えて聞く
 - 広すぎる allow・deny（`*` 単独、語の切れ目の無い glob、コマンド名を挟まない regex）
 - regex を使っているルール。glob で書けない理由を確かめる
