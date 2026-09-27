@@ -2,7 +2,7 @@
 type: guide
 title: プロジェクトを置いて作業する
 description: ワークスペースに複数のリポジトリを置いて管理する方法。置き場、チケット、設定の関連
-tags: [guide, projects]
+tags: [projects, ticket]
 keywords: [プロジェクト, projects, リポジトリ, clone, チケット, ワークツリー, 層]
 ---
 

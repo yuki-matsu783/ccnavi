@@ -2,7 +2,7 @@
 type: handover
 title: 引き継ぎ
 description: ccnavi の現状と次に入る人が知るべきこと。実装状況、未実装機能、次の作業
-tags: [handover, status]
+tags: [status, state]
 keywords: [引き継ぎ, 実装状況, 未実装, 次の作業, ADR, テスト, hook]
 ---
 

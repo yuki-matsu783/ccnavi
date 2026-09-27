@@ -2,7 +2,7 @@
 type: guide
 title: 提案と判断・セッションの役割分担
 description: 提案時に含めるべき内容と、セッション中のメインとサブエージェントの役割分担
-tags: [guide, decision-making]
+tags: [judging, approval]
 keywords: [提案, 判断, サブエージェント, ワークツリー, セッション, 役割分担]
 ---
 
