@@ -1,9 +1,9 @@
 ---
 type: adr
 title: ファイルのパスは行き着く先で見る
-description: "`Read` `Write` `Edit` `NotebookEdit` のルールは、payload の `file_path` そのものではなく、"
-tags: [adr, rules, sh-scripts, judging]
-keywords: [ファイルのパスは行き着く先で見る, ADR-0014, 状態, 採用, 状況, file_path, を来たまま当てていたので, docs, env, のような綴りでルールを外せた, ルール, rule]
+description: "ファイルパスを絶対パスに解決し、.. を畳み、シンボリックリンク先を確認したうえでルールを適用する"
+tags: [rules, judging]
+keywords: [パス解決, 絶対パス, シンボリックリンク, ファイルパス, 正規化, ルール]
 ---
 # ADR-0014: ファイルのパスは行き着く先で見る
 

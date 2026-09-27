@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 配布は PyInstaller の onedir にする
-description: onedir で組み立て、`dist/ccnavi/` のフォルダごと配る。要件の「単一の実行ファイル」は
-tags: [adr, launcher, hook, state]
-keywords: [配布は, PyInstaller, の, ADR-0002, onedir, にする, 状態, 採用, 状況, hook]
+description: "PyInstaller の onedir 形式でフォルダごと配布し、起動速度と単一配布物のバランスを取る"
+tags: [build, launcher]
+keywords: [配布, PyInstaller, onedir, 起動速度, パフォーマンス, フォルダ]
 ---
 # ADR-0002: 配布は PyInstaller の onedir にする
 

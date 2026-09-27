@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 戻す働きは 3 値にし、新しく現れたファイルは消さず退避する
-description: "`CCNAVI_RESTORE_IF_DENY` と `CCNAVI_GUARD_CORE_FILES` は `enable` / `dry-run` / `disable` の 3 値。"
-tags: [adr, rules, settings, judging]
-keywords: [戻す働きは, 3, 値にし、新しく現れたファイルは消さず退避する, ADR-0019, 値にし, 新しく現れたファイルは消さず退避する, 状態, 採用, 状況, 当初の設計では, 自動復元の設定は, ルール, rule, 設定, settings]
+description: "戻す機能を enable/dry-run/disable の3値にし、新規ファイルは削除せず退避する"
+tags: [records, config]
+keywords: [復元, 戻す, 3値, ファイル退避, enable, dry-run]
 ---
 # ADR-0019: 戻す働きは 3 値にし、新しく現れたファイルは消さず退避する
 

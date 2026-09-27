@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 常駐にしない
-description: 常駐させない。呼び出しごとに起動し、設定を読み、判定して終わる。
-tags: [adr, rules, settings, launcher]
-keywords: [常駐にしない, ADR-0003, 状態, 採用, 状況, hook, はツール呼び出しのたびにプロセスを起こす, セッション開始時に常駐させ, 以降の呼び出しを, そこへ取り次げば, ルール, rule, 設定, settings]
+description: 呼び出しごとにプロセスを起動して設定と判定を処理し、常駐による複雑性を避ける
+tags: [hook, rules, settings]
+keywords: [プロセス起動, 常駐, daemon, 呼び出し, 判定, 設定読み込み]
 ---
 # ADR-0003: 常駐にしない
 

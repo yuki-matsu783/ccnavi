@@ -1,9 +1,9 @@
 ---
 type: adr
 title: ヒアドキュメントを既定のルールで止める
-description: このリポジトリの既定のルールは、`<<` を含む Bash 呼び出しを止める。代わりは `Write` / `Edit`
-tags: [adr, rules, sh-scripts, state]
-keywords: [ヒアドキュメントを既定のルールで止める, ADR-0013, 状態, 採用, 状況, ヒアドキュメントの本文は実行位置として数えない, 本文に禁止語を書いただけでは止まらない, ヒアドキュメントを使わせるかどうかは, それとは別の話, ヒアドキュメントで書いたファイルは, ルール, rule]
+description: "ヒアドキュメントを含む Bash 呼び出しを既定ルールで止め、Write/Edit で代替させる"
+tags: [rules, sh-scripts]
+keywords: [ヒアドキュメント, "<<", Bash, セキュリティ, Write, Edit]
 ---
 # ADR-0013: ヒアドキュメントを既定のルールで止める
 

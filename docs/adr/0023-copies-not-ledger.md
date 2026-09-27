@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 承認済みの姿はチケットごとのファイルにし、台帳をやめる
-description: 承認したチケット 1 本につき 1 つ、`.claude/ccnavi/tickets/<識別子>.md` に承認済みチケットを置く。
-tags: [adr, rules, ticket, approval]
-keywords: [承認済みの姿はチケットごとのファイルにし、台帳をやめる, ADR-0023, 承認済みの姿はチケットごとのファイルにし, 台帳をやめる, 状態, 採用, 状況, 当初の設計はチケットが, current-ticket, md, 1, チケット, ticket, ルール, rule, 設定, settings, 許可, approval]
+description: "チケットごとのファイルで承認済み状態を管理し、台帳形式をやめる"
+tags: [ticket, approval]
+keywords: [チケット, 承認, ファイル管理, 台帳, 承認済みチケット]
 ---
 # ADR-0023: 承認済みの姿はチケットごとのファイルにし、台帳をやめる
 

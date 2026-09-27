@@ -1,9 +1,9 @@
 ---
 type: adr
 title: "読み切れないコマンドに `allow` を当てない"
-description: "縮退した呼び出しに `allow` は当てない。`deny` と `ask` は当てたままにする。どこにも当たらなければ"
-tags: [adr, git, rules, approval]
-keywords: "[読み切れないコマンドに, `allow`, を当てない, ADR-0011, allow, 状態, 採用, 状況, Bash, のルールは, コマンド文字列そのものではなく, ルール, rule, 許可, approval, git]"
+description: "読み切れないコマンドの縮退時には allow を当てず、deny と ask に限定して安全性を確保する"
+tags: [rules, approval]
+keywords: [コマンド解析, 縮退, allow, deny, ask, 安全性]
 ---
 # ADR-0011: 読み切れないコマンドに `allow` を当てない
 
