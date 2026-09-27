@@ -161,6 +161,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の束ねを読めない", { screen: "rules" });
     vscode.window.showErrorMessage(`ルール設定画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
@@ -244,8 +245,8 @@ async function switchTarget(current: PanelState, target: RulesTarget): Promise<v
 }
 
 async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
-  const settingsText = readText(path.join(root, ".claude", "settings.json"));
-  const localText = readText(path.join(root, ".claude", "settings.local.json"));
+  const settingsText = readText(root, path.join(".claude", "settings.json"));
+  const localText = readText(root, path.join(".claude", "settings.local.json"));
   const env = (name: string) => (settingsText !== undefined && envFromSettingsJson(settingsText, name)) || "";
   let rulesPath: string;
   let rulesRel: string;
@@ -282,6 +283,11 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     text = fs.readFileSync(rulesPath, "utf8");
     mtimeMs = fs.statSync(rulesPath).mtimeMs;
   } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      // 無いのは画面が文面で言う（プロジェクトの設定はまだ作っていないことがある）
+      diaglog.get("ccnavi-board", root).error("ルールファイルを読めない", { path: rulesRel, code });
+    }
     const hint = target.kind === "workspace" ? "" : "。無いならプロジェクト管理画面の「共通の設定からコピー」で作ってください";
     throw new Error(`ルールファイルを読めません（${rulesRel}）: ${(error as Error).message}${hint}`);
   }
@@ -305,10 +311,15 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   };
 }
 
-function readText(filePath: string): string | undefined {
+/** ワークスペースの設定を読む。無いのはふつう。読めないときは無いとして進む（hook の一覧が空になる） */
+function readText(root: string, rel: string): string | undefined {
   try {
-    return fs.readFileSync(filePath, "utf8");
-  } catch {
+    return fs.readFileSync(path.join(root, rel), "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      diaglog.get("ccnavi-board", root).warn("設定を読めないので無いとして進めた", { path: rel.split(path.sep).join("/"), code });
+    }
     return undefined;
   }
 }
@@ -354,8 +365,13 @@ function registerPanelHandlers(current: PanelState): void {
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
-    } catch {
+    } catch (error) {
       // 一時ファイルの片付けに失敗しても画面の仕事には関係ない
+      diaglog.get("ccnavi-board", current.folder.uri.fsPath).warn("一時ディレクトリを消せない", {
+        screen: "rules",
+        path: current.tmpDir,
+        code: (error as NodeJS.ErrnoException).code,
+      });
     }
     if (state === current) {
       state = undefined;
@@ -698,6 +714,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
+        diaglog.get("ccnavi-board", root).error("編集中の内容を一時ファイルに書けない", { screen: "rules", code: (error as NodeJS.ErrnoException).code });
         fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
@@ -721,6 +738,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       try {
         rules = stage(current, message.sections);
       } catch (error) {
+        diaglog.get("ccnavi-board", root).error("編集中の内容を一時ファイルに書けない", { screen: "rules", code: (error as NodeJS.ErrnoException).code });
         fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
         return;
       }
@@ -771,6 +789,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     tmp = path.join(current.tmpDir, "rules.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("編集中の内容を一時ファイルに書けない", { screen: "rules", code: (error as NodeJS.ErrnoException).code });
     fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
@@ -805,6 +824,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
   try {
     mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("ルールファイルを確かめられない", { path: loaded.rulesRel, code: (error as NodeJS.ErrnoException).code });
     fail(current, `ルールファイルを確かめられません: ${(error as Error).message}`);
     return;
   }
@@ -817,6 +837,7 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
     current.wroteAt = Date.now();
     fs.writeFileSync(loaded.rulesPath, text, "utf8");
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("ルールファイルに書けない", { path: loaded.rulesRel, code: (error as NodeJS.ErrnoException).code });
     // 書けなかったのに猶予を立てたままだと、その間の本物の外部変更を握りつぶす。
     current.wroteAt = 0;
     fail(current, `ルールファイルに書けません: ${(error as Error).message}`);

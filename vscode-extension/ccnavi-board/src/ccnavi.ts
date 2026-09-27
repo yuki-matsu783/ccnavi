@@ -55,6 +55,7 @@ import {
   type TestJson,
 } from "./core/testmodel.js";
 import { missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
+import * as diaglog from "./log.js";
 
 export type LoadResult =
   | { readonly ok: true; readonly board: BoardJson; readonly launcher: Launcher }
@@ -173,7 +174,12 @@ function readSettingsEnvBin(root: string): string | undefined {
     let text: string;
     try {
       text = fs.readFileSync(path.join(root, ".claude", name), "utf8");
-    } catch {
+    } catch (error) {
+      // 無いのはふつう。読めないときは次のファイルと既定の置き場で探し続ける
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT") {
+        diaglog.get(LOG_NAME, root).warn("設定を読めないので飛ばした", { path: `.claude/${name}`, code });
+      }
       continue;
     }
     const found = binFromSettingsJson(text);
@@ -190,24 +196,86 @@ interface Ran {
   readonly stderr: string;
   /** 期限で打ち切った（execFile が殺した）。標準エラーには何も残らないので、呼び手が文面を作る */
   readonly killed: boolean;
+  /** 起動できなかったときの Node の理由（`ENOENT` など）。起動できたなら空 */
+  readonly errno: string;
+  /** 起動から返るまでのミリ秒 */
+  readonly ms: number;
 }
 
-function run(
+/** 診断ログの出どころ（docs/claude/logging.md）。画面の 4 つと同じ名前 */
+const LOG_NAME = "ccnavi-board";
+
+/** 実行ファイルか sh を呼ぶ 1 本。診断ログに書く名前（`--explain` など）と、失敗に数えない終了コード */
+interface Call {
+  readonly sub: string;
+  readonly okCodes?: readonly number[];
+}
+
+/**
+ * 走らせた結果を診断ログに 1 行書く。標準エラーは中身を書かず長さだけ（資格情報やパスが混ざりうる）。
+ * 起動できない・打ち切った・失敗の終了コードは ERROR、それ以外は DEBUG で所要時間を
+ */
+function noteRan(root: string, call: Call, ran: Ran): void {
+  const log = diaglog.get(LOG_NAME, root);
+  if (ran.errno === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+    log.error("実行ファイルの出力が上限を超えた", { sub: call.sub, limit: MAX_OUTPUT, ms: ran.ms });
+    return;
+  }
+  if (ran.errno !== "" && !ran.killed) {
+    log.error("実行ファイルを起動できない", { sub: call.sub, errno: ran.errno });
+    return;
+  }
+  if (ran.killed) {
+    log.error("実行ファイルを打ち切った", { sub: call.sub, killed: true, ms: ran.ms, stderr_len: ran.stderr.length });
+    return;
+  }
+  if (!(call.okCodes ?? [0]).includes(ran.code)) {
+    log.error("実行ファイルが失敗した", { sub: call.sub, code: ran.code, ms: ran.ms, stderr_len: ran.stderr.length });
+    return;
+  }
+  log.debug("実行ファイルが返った", { sub: call.sub, code: ran.code, ms: ran.ms, stdout_len: ran.stdout.length });
+}
+
+/** 実行ファイルの出力を読めなかった。中身は書かず、長さと失敗の種類（JSON でない / 形が違う）だけ */
+function noteUnreadable(root: string, sub: string, stdout: string): void {
+  let kind = "shape";
+  try {
+    JSON.parse(stdout);
+  } catch {
+    kind = "json";
+  }
+  diaglog.get(LOG_NAME, root).error("実行ファイルの出力を読めない", { sub, kind, stdout_len: stdout.length });
+}
+
+/** 実行ファイルを探す。見つからなければ診断ログに書く（文面は呼び手が NOT_FOUND を返す） */
+function launcherFor(root: string, setting: string, sub: string): Launcher | undefined {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    diaglog.get(LOG_NAME, root).error("実行ファイルが見つからない", { sub, setting: setting === "" ? "unset" : "set" });
+  }
+  return launcher;
+}
+
+async function run(
   launcher: Launcher,
   root: string,
   args: readonly string[],
-  timeout?: number,
+  timeout: number | undefined,
+  call: Call,
 ): Promise<Ran> {
   const common = ["--root", root, ...args];
   const [file, argv] =
     launcher.kind === "exe"
       ? [launcher.path, common]
       : ["uv", ["run", "python", "-m", "ccnavi", ...common]];
-  return spawn(file, argv, root, timeout);
+  const ran = await spawn(file, argv, root, timeout);
+  noteRan(root, call, ran);
+  return ran;
 }
 
 /** 子プロセスを 1 本走らせ、終了コード・出力・打ち切られたかを返す */
 function spawn(file: string, argv: readonly string[], cwd: string, timeout?: number): Promise<Ran> {
+  const started = Date.now();
   return new Promise((resolve) => {
     execFile(
       file,
@@ -232,6 +300,11 @@ function spawn(file: string, argv: readonly string[], cwd: string, timeout?: num
           stdout,
           stderr: stderr.trim() || (error ? error.message : ""),
           killed: (error as { killed?: unknown } | null)?.killed === true,
+          errno:
+            error !== null && typeof (error as { code?: unknown }).code === "string"
+              ? ((error as { code: string }).code as string)
+              : "",
+          ms: Date.now() - started,
         });
       },
     );
@@ -239,11 +312,12 @@ function spawn(file: string, argv: readonly string[], cwd: string, timeout?: num
 }
 
 export async function loadBoard(root: string, setting: string): Promise<LoadResult> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--explain --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, launcher, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
+  const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS, { sub });
   if (ran.code !== 0) {
     const why = ran.killed
       ? `${EXPLAIN_TIMEOUT_MS / 1000} 秒で返らないので打ち切りました`
@@ -252,6 +326,7 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   }
   const parsed = parseBoardJson(ran.stdout);
   if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
     return { ok: false, launcher, error: parsed.error };
   }
   return { ok: true, launcher, board: parsed.board };
@@ -269,11 +344,12 @@ export async function runApprovePreview(
   setting: string,
   only: readonly string[] = [],
 ): Promise<RunResult<ApprovePreview>> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--approve --preview --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS);
+  const ran = await run(launcher, root, previewArgs(only), APPROVE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return {
       ok: false,
@@ -286,6 +362,9 @@ export async function runApprovePreview(
     return { ok: false, error: `ccnavi --approve --preview --json が失敗しました:\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
+  if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
+  }
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
@@ -300,11 +379,12 @@ export async function runApproveYes(
   digest: string,
   only: readonly string[] = [],
 ): Promise<ApproveOutcome> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--approve --yes --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
+  const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS, { sub });
   // 打ち切りは読む前に見る。承認済みチケットは 1 件ずつ置かれる（approval.py の for cand in batch）ので、
   // 途中で殺されると一部だけ置かれた状態が残る。stdout も途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
@@ -329,8 +409,10 @@ export async function runApproveYes(
   // 途中で止まった。置かれたぶんは残っているので、そう言う。ここで黙ると人は
   // 「何も起きていない」と読み、置かれた承認済みチケットに気づかないまま次へ進む。
   if ("partial" in parsed) {
+    diaglog.get(LOG_NAME, root).error("承認が途中で止まった", { sub, code: ran.code });
     return { ok: false, error: partialMessage(parsed.partial) };
   }
+  noteUnreadable(root, sub, ran.stdout);
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi --approve --yes の出力を読み取れません（${parsed.error}）` : said };
 }
@@ -352,7 +434,8 @@ export async function runDecidePreview(
   tree: string,
   phase: number,
 ): Promise<RunResult<DecidePreview>> {
-  const ran = await runScript(shell, root, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
+  const sub = "decide --preview";
+  const ran = await runScript(shell, root, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。反映していません` };
   }
@@ -360,6 +443,9 @@ export async function runDecidePreview(
     return { ok: false, error: `ccnavi-review.sh decide --preview が失敗しました:\n${ran.stderr.trim()}` };
   }
   const parsed = parseDecidePreview(ran.stdout);
+  if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
+  }
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
@@ -375,7 +461,8 @@ export async function runDecideYes(
   choices: Readonly<Record<string, string>>,
   digest: string,
 ): Promise<DecideOutcome> {
-  const ran = await runScript(shell, root, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS);
+  const sub = "decide";
+  const ran = await runScript(shell, root, tree, decideArgs(phase, choices, digest), DECIDE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return {
       ok: false,
@@ -388,6 +475,7 @@ export async function runDecideYes(
   if (parsed.ok || "mismatch" in parsed) {
     return parsed;
   }
+  noteUnreadable(root, sub, ran.stdout);
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
   return { ok: false, error: said === "" ? `ccnavi-review.sh decide の出力を読み取れません（${parsed.error}）` : said };
 }
@@ -396,14 +484,17 @@ export async function runDecideYes(
  * sh のスクリプト（`.ccnavi/scripts/` の下）を子プロセスで走らせる。綴りは `/` 区切りにする
  * （Windows の Git Bash は `C:/…` を読める）
  */
-function runScript(
+async function runScript(
   shell: string,
   root: string,
   cwd: string,
   args: readonly string[],
   timeout: number,
+  call: Call,
 ): Promise<Ran> {
-  return spawn(shell, [toPosixPath(path.join(root, REVIEW_SCRIPT)), ...args], cwd, timeout);
+  const ran = await spawn(shell, [toPosixPath(path.join(root, REVIEW_SCRIPT)), ...args], cwd, timeout);
+  noteRan(root, call, ran);
+  return ran;
 }
 
 /** 1 件を判定する。`rules` は当てるルールファイルの差し替え（編集中の内容を置いた一時ファイルでもよい） */
@@ -414,7 +505,8 @@ export async function runTest(
   tool: string,
   subject: string,
 ): Promise<RunResult<TestJson>> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--test --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
@@ -425,7 +517,7 @@ export async function runTest(
     tool,
     subject,
     "--json",
-  ], DIAGNOSE_TIMEOUT_MS);
+  ], DIAGNOSE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return { ok: false, error: cutOff("ccnavi --test --json", DIAGNOSE_TIMEOUT_MS) };
   }
@@ -433,6 +525,9 @@ export async function runTest(
     return { ok: false, error: `ccnavi --test --json が失敗しました: ${ran.stderr}` };
   }
   const parsed = parseTestJson(ran.stdout);
+  if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
+  }
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
@@ -443,7 +538,8 @@ export async function runSamples(
   rules: RulesOverride,
   samplesPath: string,
 ): Promise<RunResult<SamplesJson>> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--test-samples --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
@@ -453,7 +549,7 @@ export async function runSamples(
     "--test-samples",
     samplesPath,
     "--json",
-  ], DIAGNOSE_TIMEOUT_MS);
+  ], DIAGNOSE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return { ok: false, error: cutOff("ccnavi --test-samples --json", DIAGNOSE_TIMEOUT_MS) };
   }
@@ -461,6 +557,9 @@ export async function runSamples(
     return { ok: false, error: `ccnavi --test-samples --json が失敗しました: ${ran.stderr}` };
   }
   const parsed = parseSamplesJson(ran.stdout);
+  if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
+  }
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
@@ -470,11 +569,12 @@ export async function runSamples(
  * 記録を読むので `--log ""` は付けない（控えは実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
  */
 export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--suggest --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--suggest", "--json"], DIAGNOSE_TIMEOUT_MS);
+  const ran = await run(launcher, root, ["--suggest", "--json"], DIAGNOSE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return { ok: false, error: cutOff("ccnavi --suggest --json", DIAGNOSE_TIMEOUT_MS) };
   }
@@ -485,6 +585,9 @@ export async function runSuggest(root: string, setting: string): Promise<RunResu
     return { ok: false, error: `ccnavi --suggest --json が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseSuggestJson(ran.stdout);
+  if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
+  }
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 
@@ -494,11 +597,13 @@ export async function runLint(
   setting: string,
   override: LintOverride,
 ): Promise<RunResult<LintResult>> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--lint";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"], DIAGNOSE_TIMEOUT_MS);
+  // 終了コード 1 は「error を報告した」で、呼び出しの失敗ではない
+  const ran = await run(launcher, root, [...overrideArgs(override), "--lint"], DIAGNOSE_TIMEOUT_MS, { sub, okCodes: [0, 1] });
   if (ran.killed) {
     return { ok: false, error: cutOff("ccnavi --lint", DIAGNOSE_TIMEOUT_MS) };
   }
@@ -537,6 +642,7 @@ export async function runFlowLint(root: string, setting: string, flowPath: strin
   }
   const refused = missingFlags(probe, ["--flow"], what, hasSource(root));
   if (refused !== undefined) {
+    diaglog.get(LOG_NAME, root).error("実行ファイルが要るフラグを知らない", { sub: "--lint --json --flow", flag: "--flow", probe: probe.kind });
     return { ok: false, error: refused };
   }
   return lintJson(root, setting, ["--flow", flowPath], what);
@@ -548,11 +654,12 @@ export async function runFlowLint(root: string, setting: string, flowPath: strin
  * （見分けにこの苦情を使うのは、ここの 1 か所だけ）。
  */
 export async function probeVersion(root: string, setting: string): Promise<VersionProbe | undefined> {
-  const launcher = findLauncher(root, setting);
+  const sub = "--version --json";
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return undefined;
   }
-  const ran = await run(launcher, root, ["--version", "--json"], DIAGNOSE_TIMEOUT_MS);
+  const ran = await run(launcher, root, ["--version", "--json"], DIAGNOSE_TIMEOUT_MS, { sub });
   if (ran.killed) {
     return { kind: "failed", error: cutOff("ccnavi --version --json", DIAGNOSE_TIMEOUT_MS) };
   }
@@ -563,6 +670,9 @@ export async function probeVersion(root: string, setting: string): Promise<Versi
     return { kind: "failed", error: `ccnavi --version --json が失敗しました: ${firstLine(ran.stderr)}` };
   }
   const parsed = parseVersionJson(ran.stdout);
+  if (!parsed.ok) {
+    noteUnreadable(root, sub, ran.stdout);
+  }
   return parsed.ok ? { kind: "ok", info: parsed.value } : { kind: "failed", error: parsed.error };
 }
 
@@ -575,11 +685,13 @@ export function hasSource(root: string): boolean {
 }
 
 async function lintJson(root: string, setting: string, extra: readonly string[], what: string): Promise<RunResult<LintJson>> {
-  const launcher = findLauncher(root, setting);
+  const sub = what.replace(/^ccnavi /, "");
+  const launcher = launcherFor(root, setting, sub);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
-  const ran = await run(launcher, root, ["--lint", "--json", ...extra], DIAGNOSE_TIMEOUT_MS);
+  // 終了コード 1 は「error を報告した」で、呼び出しの失敗ではない
+  const ran = await run(launcher, root, ["--lint", "--json", ...extra], DIAGNOSE_TIMEOUT_MS, { sub, okCodes: [0, 1] });
   if (ran.killed) {
     return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
   }
@@ -590,6 +702,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
   }
+  noteUnreadable(root, sub, ran.stdout);
   // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);

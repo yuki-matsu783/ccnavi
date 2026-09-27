@@ -9,6 +9,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { TICKET_CONTROL_ENV, ticketControlFrom, type TicketControl } from "./core/ticket-control.js";
+import * as diaglog from "./log.js";
 
 /** package.json の `when` と揃える */
 export const CONTEXT_KEY = "ccnaviBoard.ticketControl";
@@ -46,8 +47,8 @@ export function requireTickets(what: string): boolean {
 /** ワークスペースの設定ファイルから読み直す。ファイルが無ければ enable */
 export function readTicketControl(root: string): TicketControl {
   return ticketControlFrom({
-    settings: readText(path.join(root, ".claude", "settings.json")),
-    local: readText(path.join(root, ".claude", "settings.local.json")),
+    settings: readText(root, ".claude/settings.json"),
+    local: readText(root, ".claude/settings.local.json"),
   });
 }
 
@@ -80,10 +81,15 @@ export function watchTicketControl(context: vscode.ExtensionContext): void {
   }
 }
 
-function readText(filePath: string): string | undefined {
+/** 無いのはふつう（enable）。読めないときも無いとして進み、無い（ENOENT）以外は診断ログに残す */
+function readText(root: string, rel: string): string | undefined {
   try {
-    return fs.readFileSync(filePath, "utf8");
-  } catch {
+    return fs.readFileSync(path.join(root, ...rel.split("/")), "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      diaglog.get("ccnavi-board", root).warn("設定を読めないので無いとして進めた", { path: rel, code });
+    }
     return undefined;
   }
 }

@@ -31,6 +31,7 @@ import { showLoading } from "./loading.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { ticketControlMismatch } from "./core/ticket-control.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
+import * as diaglog from "./log.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -106,6 +107,7 @@ export async function openBoard(project?: string): Promise<void> {
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の束ねを読めない", { screen: "board" });
     vscode.window.showErrorMessage(`チケット管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
@@ -124,7 +126,7 @@ export async function openBoard(project?: string): Promise<void> {
     panel,
     folder,
     watchers: [],
-    host: boardHost(panel),
+    host: boardHost(panel, folder.uri.fsPath),
     loading: false,
     again: false,
     wasVisible: panel.visible,
@@ -301,7 +303,13 @@ function withFilter(data: BoardData, filter: string | undefined): BoardData {
  * ボードの画面に渡す口。VS Code のパネルを `screenHost` の形に合わせる。
  * nonce は呼ぶたびに変える（同じ文字列を `webview.html` に入れても VS Code は何もしない）。
  */
-function boardHost(panel: vscode.WebviewPanel): ScreenHost<BoardData> {
+function boardHost(panel: vscode.WebviewPanel, root: string): ScreenHost<BoardData> {
+  if (panel.options.retainContextWhenHidden === true) {
+    // screenHost は retainContextWhenHidden が偽であることを前提にしている（core/screen-host.ts の表）。真のままだと、
+    // 裏に回った画面にも入れ物を入れ直し、編集の途中を持たない画面なのに持つ画面の段取りと食い違う。
+    // 診断ログにだけ残す（console には出さない。docs/claude/logging.md）
+    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "board", retainContextWhenHidden: true });
+  }
   return screenHost<BoardData>(
     {
       get visible(): boolean {
@@ -553,7 +561,11 @@ function openTicket(current: PanelState, filePath: string): void {
   if (current.board === undefined || !isKnownPath(current.board, filePath)) {
     return;
   }
-  void showTicketPreview(filePath).catch(() => {
+  void showTicketPreview(filePath).catch((error: unknown) => {
+    diaglog.get("ccnavi-board", current.folder.uri.fsPath).warn("チケットのファイルを開けない", {
+      path: filePath,
+      code: (error as NodeJS.ErrnoException | undefined)?.code,
+    });
     vscode.window.showInformationMessage(`チケットのファイルを開けませんでした: ${filePath}`);
     void update();
   });

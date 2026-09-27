@@ -173,6 +173,7 @@ export async function openPhases(target: PhasesTarget = { kind: "common" }): Pro
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の束ねを読めない", { screen: "phases" });
     vscode.window.showErrorMessage(`フェーズ管理画面を表示できません: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
@@ -293,6 +294,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      diaglog.get("ccnavi-board", root).error("フェーズの種類のファイルを読めない", { path: phasesRel, code: (error as NodeJS.ErrnoException).code });
       throw new Error(`フェーズの種類のファイルを読めません（${phasesRel}）: ${(error as Error).message}`);
     }
     // 無いのは不備ではない（番号だけのフェーズ、無い設定は空）。画面は空を見せ、「作る」だけができる。
@@ -352,8 +354,13 @@ function registerPanelHandlers(current: PanelState): void {
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
-    } catch {
+    } catch (error) {
       // 一時ファイルの片付けに失敗しても画面の仕事には関係ない
+      diaglog.get("ccnavi-board", current.folder.uri.fsPath).warn("一時ディレクトリを消せない", {
+        screen: "phases",
+        path: current.tmpDir,
+        code: (error as NodeJS.ErrnoException).code,
+      });
     }
     if (state === current) {
       state = undefined;
@@ -688,6 +695,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     tmp = path.join(current.tmpDir, "phases.yml");
     fs.writeFileSync(tmp, text, "utf8");
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("編集中の内容を一時ファイルに書けない", { screen: "phases", code: (error as NodeJS.ErrnoException).code });
     fail(current, `編集中の内容を書き出せません: ${(error as Error).message}`);
     return;
   }
@@ -730,6 +738,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
     try {
       mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
     } catch (error) {
+      diaglog.get("ccnavi-board", root).error("フェーズの種類のファイルを確かめられない", { path: loaded.phasesRel, code: (error as NodeJS.ErrnoException).code });
       fail(current, `フェーズの種類のファイルを確かめられません: ${(error as Error).message}`);
       return;
     }
@@ -751,6 +760,7 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
       fs.writeFileSync(loaded.phasesPath, text, { encoding: "utf8", flag: "wx" });
     }
   } catch (error) {
+    diaglog.get("ccnavi-board", root).error("フェーズの種類のファイルに書けない", { path: loaded.phasesRel, code: (error as NodeJS.ErrnoException).code });
     current.wroteAt = 0;
     fail(current, `フェーズの種類のファイルに書けません: ${(error as Error).message}`);
     return;

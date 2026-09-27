@@ -190,6 +190,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     webviewScript(SCREEN);
     webviewStyle(SCREEN);
   } catch (error) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("画面の束ねを読めない", { screen: "flow" });
     vscode.window.showErrorMessage(`フロー編集画面を表示できない: ${error instanceof Error ? error.message : String(error)}`);
     return;
   }
@@ -261,6 +262,8 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     // リンクは辿らない（ツリーのルートからファイルまでの途中も）。読まないし書かない
     read = readFlowFile(target.flow.tree, filePath);
   } catch (error) {
+    // 無いときは undefined が返るので、ここに来るのは読めない・読まないと決めたとき（リンク・大きすぎる など）
+    diaglog.get("ccnavi-board", root).error("フローのファイルを読めない", { path: shown, code: (error as NodeJS.ErrnoException).code });
     throw new Error(`フローのファイルを読めない（${shown}）: ${(error as Error).message}`);
   }
   if (read === undefined) {
@@ -326,8 +329,13 @@ function registerPanelHandlers(current: PanelState): void {
     current.watchers = [];
     try {
       fs.rmSync(current.tmpDir, { recursive: true, force: true });
-    } catch {
+    } catch (error) {
       // 消せなければ OS の一時ディレクトリに残る（承認済みの領域には書いていない）
+      diaglog.get("ccnavi-board", current.folder.uri.fsPath).warn("一時ディレクトリを消せない", {
+        screen: "flow",
+        path: current.tmpDir,
+        code: (error as NodeJS.ErrnoException).code,
+      });
     }
     if (alive(current)) {
       panels.delete(current.ticket);
@@ -688,6 +696,8 @@ async function save(current: PanelState, doc: FlowDoc): Promise<void> {
   current.wroteAt = Date.now();
   const written = writeFlowFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
   if (!written.ok) {
+    // 外で変わった・リンク・書けない のどれか。理由の文面は画面に出すので、ここには置き場だけ
+    diaglog.get("ccnavi-board", current.folder.uri.fsPath).warn("フローを保存しなかった", { path: loaded.shown });
     current.wroteAt = 0;
     fail(current, written.error);
     return;
