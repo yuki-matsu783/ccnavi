@@ -82,7 +82,7 @@ class SelfGuardTest(unittest.TestCase):
         git(self.repo, "commit", "--quiet", "-m", "init")
 
         self.state = os.path.join(self.repo, "state")
-        self.log = os.path.join(self.repo, "log.jsonl")
+        self.log = os.path.join(self.repo, "decisions.jsonl")
 
     def binary(self, text="MZ fake executable\n"):
         """実行ファイルの代わりを置く。`.gitignore` の中に在る想定なので、
@@ -411,7 +411,7 @@ class SelfGuardTest(unittest.TestCase):
             "cd .ccnavi && echo x > common/rules.yml",
             "cd .claude && echo x > settings.json",
             "cd .claude/hooks && echo x > lint-py.sh",
-            "cd logs && rm log.jsonl",
+            "cd logs && rm decisions.jsonl",
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -439,7 +439,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_記録と控えの置き場もシェルからの書き込みで止まる(self):
         # 記録と控えは判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
-        for command in ("rm logs/log.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
+        for command in ("rm logs/decisions.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x"):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
@@ -447,10 +447,10 @@ class SelfGuardTest(unittest.TestCase):
     def test_ローテートした記録もシェルからの書き込みで止まる(self):
         # 消すのはセッションの開始と端末から打つ `ccnavi --prune` だけ（prune）。
         for command in (
-            "rm logs/log.20260927-120000.jsonl",
-            "rm logs/log.*.jsonl",
-            "echo x > logs/log.20260927-120000-2.jsonl",
-            "cd logs && rm log.20260927-120000.jsonl",
+            "rm logs/decisions.20260927-120000.jsonl",
+            "rm logs/decisions.*.jsonl",
+            "echo x > logs/decisions.20260927-120000-2.jsonl",
+            "cd logs && rm decisions.20260927-120000.jsonl",
         ):
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -463,13 +463,13 @@ class SelfGuardTest(unittest.TestCase):
             for path in (
                 os.path.join(self.repo, "logs", "state", "denied-x.json"),
                 os.path.join(self.repo, "logs", "state", "selfguard", "s1", "settings"),
-                os.path.join(self.repo, "logs", "log.jsonl"),
-                os.path.join(self.repo, "logs", "log.20260927-120000.jsonl"),
+                os.path.join(self.repo, "logs", "decisions.jsonl"),
+                os.path.join(self.repo, "logs", "decisions.20260927-120000.jsonl"),
                 os.path.join(self.repo, "Logs", "State", "x.json"),
                 # 置き場を動かしてある（--state / --log）。
                 os.path.join(self.state, "denied-x.json"),
                 self.log,
-                os.path.join(self.repo, "log.20260927-120000-2.jsonl"),
+                os.path.join(self.repo, "decisions.20260927-120000-2.jsonl"),
             ):
                 with self.subTest(tool=tool, path=path):
                     key = "notebook_path" if tool == "NotebookEdit" else "file_path"

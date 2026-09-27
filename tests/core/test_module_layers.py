@@ -81,7 +81,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "read",
         "最下段だけを読む。git の状態・ルール・動作モード・記録の 1 行と後始末・拒否の数え",
-        frozenset({"audit", "gitstate", "modes", "prune", "repeat", "rules"}),
+        frozenset({"audit", "diaglog", "gitstate", "modes", "prune", "repeat", "rules"}),
     ),
     (
         "state",

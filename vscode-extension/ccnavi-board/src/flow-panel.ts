@@ -63,6 +63,7 @@ import { loadingText } from "./core/loading-render.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
+import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -204,7 +205,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     ticket,
     panel,
     folder,
-    host: flowHost(panel),
+    host: flowHost(panel, folder.uri.fsPath),
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-")),
     fileWatchers: [],
     watchers: [],
@@ -487,9 +488,11 @@ function redraw(current: PanelState): void {
   current.host.send({ kind: "loading", text: loadingText(`${current.ticket} のフロー`) });
 }
 
-function flowHost(panel: vscode.WebviewPanel): ScreenHost<FlowData> {
+function flowHost(panel: vscode.WebviewPanel, root: string): ScreenHost<FlowData> {
   if (panel.options.retainContextWhenHidden !== true) {
-    console.error("フロー編集の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）");
+    // retainedHost は retainContextWhenHidden が真であることを前提にしている。偽のままだと、裏に回った画面へ
+    // 送り続けて中身が古いまま止まる。診断ログにだけ残す（console には出さない。docs/claude/logging.md）
+    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "flow", retainContextWhenHidden: false });
   }
   return retainedHost<FlowData>(
     {

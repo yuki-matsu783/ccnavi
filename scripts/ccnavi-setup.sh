@@ -609,7 +609,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
-	CCNAVI_LOG: "logs/log.jsonl",
+	CCNAVI_LOG: "logs/decisions.jsonl",
 	CCNAVI_BIN_PATH: $bin,
 	CCNAVI_RESTORE_IF_DENY: $mode,
 	CCNAVI_GUARD_CORE_FILES: $mode,
