@@ -22,13 +22,15 @@
 消さない。チケットやレビューの寿命で使われるか、利用者のファイルそのものなので、セッションの
 日付では決められない。
 
-しきい値は環境変数で動かせる（LIMITS）。0 はその段を止める。読めない値は既定で動き、
-報告に出す。
+しきい値は環境変数で動かせる（LIMITS）。0 はその段を止める。読めない値・有限でない値
+（`inf`・`nan`）・0 より大きく下限（FLOORS、1 MB と 1 日）より小さい値は既定で動き、報告に
+出す。下限を置くのは、しきい値を 0 に近づけるだけで保持日数のうちの記録が消えるため。
 """
 
 from __future__ import annotations
 
 import contextlib
+import math
 import os
 import re
 import shutil
@@ -49,6 +51,12 @@ LIMITS = (
     (LOG_KEEP_DAYS_ENV, DEFAULT_LOG_KEEP_DAYS),
     (STATE_KEEP_DAYS_ENV, DEFAULT_STATE_KEEP_DAYS),
 )
+# 0 のほかに受ける値の下限。これより小さい値は既定で動く。
+FLOORS = {
+    LOG_ROTATE_MB_ENV: 1.0,
+    LOG_KEEP_DAYS_ENV: 1.0,
+    STATE_KEEP_DAYS_ENV: 1.0,
+}
 
 # ローテートした記録の日時の書き方。名前の順と時刻の順が合う形。
 STAMP = "%Y%m%d-%H%M%S"
@@ -100,8 +108,15 @@ def limits() -> tuple[float, float, float, list[str]]:
             value = float(raw)
         except ValueError:
             value = -1.0
-        if value < 0 or value != value:
+        floor = FLOORS[env]
+        if value < 0 or not math.isfinite(value):
             problems.append(f"{env}={raw!r} は 0 以上の数ではないので既定の {default:g} で動く")
+            value = default
+        elif 0 < value < floor:
+            problems.append(
+                f"{env}={raw!r} は下限の {floor:g} より小さいので既定の {default:g} で動く"
+                "（0 はその段を止める）"
+            )
             value = default
         values.append(value)
     return values[0], values[1], values[2], problems
