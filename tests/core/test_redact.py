@@ -137,6 +137,94 @@ class RedactTest(unittest.TestCase):
             self.assertNotIn(secret, out)
         self.assertIn(" run ", out)
 
+    def test_url_userinfo_password_with_at_sign(self):
+        # パスワードに `@` が入っても、ホストの手前の最後の `@` までを伏せる
+        # （ccnavi_mask_url と同じ）。
+        out = self.assertHidden(
+            "psql postgres://user:P@ssw0rd!@db.example.com/app",
+            "ssw0rd",
+            ("postgres://user:", "@db.example.com/app"),
+        )
+        self.assertNotIn("P@", out)
+        # 空白はまたがない。後ろの語の `@` まで伸ばさない。
+        out = redact.redact("git clone https://u:pw@host/r.git && ssh me@other")
+        self.assertIn("ssh me@other", out)
+        self.assertNotIn(":pw@", out)
+
+    def test_more_names(self):
+        for text, secret, name in (
+            ("SECRET_KEY=abc123 python app.py", "abc123", "SECRET_KEY="),
+            ("export aws_secret_key=abc123", "abc123", "aws_secret_key="),
+            ("MYSQL_PWD=hunter2 mysql db", "hunter2", "MYSQL_PWD="),
+            ("echo //registry.npmjs.org/:_authToken=npmsecret1 >> x", "npmsecret1", "_authToken="),
+            ("SESSION_COOKIE=abc123 run", "abc123", "SESSION_COOKIE="),
+        ):
+            with self.subTest(text=text):
+                self.assertHidden(text, secret, (name,))
+        # 素の PWD（いまの場所）は秘密ではない。
+        self.assertEqual(redact.redact("PWD=/home/me make"), "PWD=/home/me make")
+
+    def test_cookie_header(self):
+        # `;` で並ぶ値は 1 つの値として伏せる（長ければ頭と尻が残る）。
+        out = self.assertHidden(
+            "curl -H 'Cookie: session=abc123; id=zz99' https://x",
+            "abc123",
+            ("Cookie:", "https://x"),
+        )
+        self.assertIn(redact.mask("session=abc123; id=zz99"), out)
+        self.assertHidden("curl -H 'Cookie: a=1; token=abc123' x", "abc123", ("Cookie:",))
+        self.assertHidden("curl -b 'sid=abc123' https://x", "abc123", ("curl -b",))
+        self.assertHidden("curl --cookie sid=abc123 https://x", "abc123", ("--cookie",))
+
+    def test_aws_configure_set(self):
+        self.assertHidden(
+            "aws configure set aws_secret_access_key wJalrXUtnFEMI --profile p",
+            "wJalrXUtnFEMI",
+            ("aws_secret_access_key", "--profile p"),
+        )
+
+    def test_more_token_shapes(self):
+        for token in (
+            "sk-ant-api03-" + "A1b2C3d4E5" * 3,
+            "sk-proj-" + "A1b2C3d4E5" * 3,
+            "sk-" + "A1b2C3d4E5" * 4,
+            "sk_live_" + "A1b2C3d4E5" * 2,
+            "rk_live_" + "A1b2C3d4E5" * 2,
+            "AIza" + "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6",
+            "npm_" + "A1b2C3d4E5" * 3 + "abcdef",
+            "eyJhbGciOiJIUzI1NiJ9" + ".eyJzdWIiOiIxMjM0NTY3ODkwIn0" + ".dozjgNryP4J3jVmNHl0w5N",
+        ):
+            with self.subTest(token=token[:8]):
+                out = self.assertHidden(f"echo {token} > /dev/null", token, ("echo",))
+                self.assertIn(token[:6], out)
+        # 語の途中の `sk-` は読まない。
+        for text in ("git checkout task-1234567890abcdefghijkl", "ls disk-0123456789abcdefghij"):
+            self.assertEqual(redact.redact(text), text)
+
+    def test_command_scoped_password_flags(self):
+        self.assertHidden("sshpass -p hunter2 ssh -p 22 me@host", "hunter2", ("ssh -p 22",))
+        self.assertHidden("sshpass -phunter2 scp a b", "hunter2", ("sshpass",))
+        self.assertHidden("docker login -u me -p hunter2 reg.io", "hunter2", ("reg.io",))
+        self.assertHidden(
+            "redis-cli -h h -a hunter2 ping", "hunter2", ("redis-cli -h h -a", "ping")
+        )
+        # コマンドの外の -p / -a は読まない。
+        for text in (
+            "sshpass -f pw.txt ssh -p 2222 host",
+            "docker run -p 8080:80 img",
+            "ls -a; mkdir -p x",
+            "redis-cli ping; ls -a src",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(redact.redact(text), text)
+
+    def test_nul_is_a_boundary(self):
+        # unwrapped はコマンドを \x00 でつなぐ。値はそこで終わる。
+        out = redact.redact("GITHUB_TOKEN=abc123\x00gh pr list")
+        self.assertEqual(out, "GITHUB_TOKEN=***\x00gh pr list")
+        out = redact.redact("mysql -phunter2\x00ls -a")
+        self.assertEqual(out, "mysql -p***\x00ls -a")
+
 
 class SpeedTest(unittest.TestCase):
     """長い入力でも伏せる手間が長さにほぼ比例すること。
