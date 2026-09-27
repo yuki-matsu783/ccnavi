@@ -334,8 +334,8 @@ class PushApprovedTest(Workspace):
         - `CCNAVI_TICKETS_PROPOSAL`: `wip/proposals/todo` の削除が運ばれず、env が指す
           `elsewhere/proposals/todo` の削除が運ばれる
 
-        実装前は赤。sh がまだ 3 つの値を読んでいるため。フェーズ 4 で人が写す版
-        （`wip/design/scripts/ccnavi-push-approved.sh`）に差し替えると通る。
+        `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+        写す前の sh は 3 つの値を読むため。
         """
         project = os.path.join(self.ws, "projects", "app")
         remote = self.repository(project, "work")
