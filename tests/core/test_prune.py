@@ -2,7 +2,7 @@
 
 見るのは 4 つ。
 
-1. 記録は上限を超えたときだけ `log.<日時>.jsonl` へ名前を変え、中身を捨てない
+1. 記録は上限を超えたときだけ `decisions.<日時>.jsonl` へ名前を変え、中身を捨てない
 2. ローテートした記録は保持日数を過ぎたものだけを消し、いま書いている記録は消さない
 3. 控えはセッションごとにまとめて判断する。どれか 1 つでも新しければ全部を残し、
    いま始まったセッションと、セッションを名前に持たないものは消さない
@@ -48,7 +48,7 @@ class _Base(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ccnavi-prune-")
         self.logs = os.path.join(self.root, "logs")
-        self.log = os.path.join(self.logs, "log.jsonl")
+        self.log = os.path.join(self.logs, "decisions.jsonl")
         self.state = os.path.join(self.logs, "state")
         os.makedirs(self.state)
         env = mock.patch.dict(os.environ, {}, clear=False)
@@ -78,8 +78,8 @@ class RotateTest(_Base):
         report = self.run_prune()
         self.assertEqual(len(report.rotated), 1)
         src, dst = report.rotated[0]
-        self.assertEqual(src, "logs/log.jsonl")
-        self.assertRegex(dst, r"^logs/log\.\d{8}-\d{6}\.jsonl$")
+        self.assertEqual(src, "logs/decisions.jsonl")
+        self.assertRegex(dst, r"^logs/decisions\.\d{8}-\d{6}\.jsonl$")
         self.assertFalse(os.path.exists(self.log))
         with open(os.path.join(self.root, dst), encoding="utf-8") as f:
             self.assertEqual(f.read(), body)
@@ -91,7 +91,7 @@ class RotateTest(_Base):
         first()
         _write(self.log, "b" * len(BIG))
         report = first()
-        names = sorted(n for n in os.listdir(self.logs) if n.startswith("log."))
+        names = sorted(n for n in os.listdir(self.logs) if n.startswith("decisions."))
         self.assertEqual(len(names), 2, names)
         self.assertRegex(report.rotated[0][1], r"-2\.jsonl$")
 
@@ -104,7 +104,7 @@ class RotateTest(_Base):
         _write(self.log, "b" * len(BIG))
         with mock.patch.object(prune.os.path, "exists", return_value=False):
             report = self.run_prune()
-        names = sorted(n for n in os.listdir(self.logs) if n.startswith("log."))
+        names = sorted(n for n in os.listdir(self.logs) if n.startswith("decisions."))
         self.assertEqual(len(names), 2, names)
         self.assertRegex(report.rotated[0][1], r"-2\.jsonl$")
         (first,) = [n for n in names if not n.endswith("-2.jsonl")]
@@ -163,15 +163,15 @@ class RotateTest(_Base):
 class LogPruneTest(_Base):
     def test_only_old_rotated_logs_are_removed(self):
         _write(self.log, "{}\n", age_days=100)
-        old = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=15)
-        old2 = _write(os.path.join(self.logs, "log.20260101-000000-2.jsonl"), age_days=15)
-        fresh = _write(os.path.join(self.logs, "log.20260920-000000.jsonl"), age_days=13)
+        old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=15)
+        old2 = _write(os.path.join(self.logs, "decisions.20260101-000000-2.jsonl"), age_days=15)
+        fresh = _write(os.path.join(self.logs, "decisions.20260920-000000.jsonl"), age_days=13)
         other = _write(os.path.join(self.logs, "git-20260101-000000-1.log"), age_days=100)
-        stray = _write(os.path.join(self.logs, "log.backup.jsonl"), age_days=100)
+        stray = _write(os.path.join(self.logs, "decisions.backup.jsonl"), age_days=100)
         report = self.run_prune()
         self.assertEqual(
             report.logs,
-            ["logs/log.20260101-000000-2.jsonl", "logs/log.20260101-000000.jsonl"],
+            ["logs/decisions.20260101-000000-2.jsonl", "logs/decisions.20260101-000000.jsonl"],
         )
         for path in (old, old2):
             self.assertFalse(os.path.exists(path))
@@ -179,13 +179,13 @@ class LogPruneTest(_Base):
             self.assertTrue(os.path.exists(path), path)
 
     def test_keep_days_can_be_moved(self):
-        path = _write(os.path.join(self.logs, "log.20260920-000000.jsonl"), age_days=3)
+        path = _write(os.path.join(self.logs, "decisions.20260920-000000.jsonl"), age_days=3)
         os.environ[prune.LOG_KEEP_DAYS_ENV] = "2"
         self.run_prune()
         self.assertFalse(os.path.exists(path))
 
     def test_empty_log_setting_touches_nothing(self):
-        path = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=30)
+        path = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         prune.run(self.root, "", self.state, now=NOW)
         self.assertTrue(os.path.exists(path))
 
@@ -337,25 +337,25 @@ class EntryTest(_Base):
         }
 
     def test_prune_preview_lists_without_a_terminal(self):
-        old = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=30)
+        old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         proc = run_ccnavi(["--prune", "--preview"], env=self.env(), cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("消す  logs/log.20260101-000000.jsonl", proc.stdout)
+        self.assertIn("消す  logs/decisions.20260101-000000.jsonl", proc.stdout)
         self.assertTrue(os.path.exists(old))
 
     def test_prune_needs_a_terminal(self):
-        old = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=30)
+        old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         proc = run_ccnavi(["--prune"], env=self.env(), cwd=self.root)
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("--prune は端末から打つもの", proc.stderr)
         self.assertTrue(os.path.exists(old))
 
     def test_prune_removes_and_says_so(self):
-        old = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=30)
+        old = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable")
         proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
-        self.assertIn("消した  logs/log.20260101-000000.jsonl", proc.stdout)
+        self.assertIn("消した  logs/decisions.20260101-000000.jsonl", proc.stdout)
         self.assertFalse(os.path.exists(old))
 
     def test_prune_with_nothing_to_do(self):
@@ -366,7 +366,7 @@ class EntryTest(_Base):
 
     def test_tiny_keep_days_from_the_command_line_fall_back(self):
         # 1 日より短い保持は受けない。いま書いたばかりの記録が消える形になる。
-        fresh = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=0.5)
+        fresh = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=0.5)
         env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable", CCNAVI_LOG_KEEP_DAYS="0.0001")
         proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
         self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -383,7 +383,7 @@ class EntryTest(_Base):
         )
 
     def test_session_start_prunes_and_records_what_moved(self):
-        old_log = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=30)
+        old_log = _write(os.path.join(self.logs, "decisions.20260101-000000.jsonl"), age_days=30)
         old_state = _write(os.path.join(self.state, f"{S_OLD}.turn.json"), age_days=30)
         mine = _write(os.path.join(self.state, f"{S_ME}.turn.json"), age_days=30)
         proc = self.session_start()

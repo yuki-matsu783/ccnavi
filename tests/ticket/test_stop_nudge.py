@@ -206,7 +206,7 @@ class StopNudgeTest(TicketTest):
         self.family()
         tree = self.child_tree()
         self.commit_work(tree)
-        log = os.path.join(self.root, "log.jsonl")
+        log = os.path.join(self.root, "decisions.jsonl")
         self.stop(tree, extra=("--log", log))
         with open(log, encoding="utf-8") as f:
             line = json.loads(f.read().splitlines()[-1])

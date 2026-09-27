@@ -118,8 +118,8 @@ To rotate the decision log and remove old logs and finished sessions' state
 
 --preview only lists what would move. Without it, --prune needs a terminal.
 
-To draft rules from the decision log (logs/log.jsonl and its rotated
-log.*.jsonl), run
+To draft rules from the decision log (logs/decisions.jsonl and its rotated
+decisions.*.jsonl), run
 
     ccnavi --suggest [--json]
 

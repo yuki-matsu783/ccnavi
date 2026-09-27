@@ -4,11 +4,11 @@
 だけ。実行前の判定（PreToolUse）では走らせない。ツール呼び出しのたびに置き場を数えると、
 判定を待たせる（ADR-0003 と同じ理由で、重い仕事はセッションに 1 度の場所へ置く）。
 
-**記録（`logs/log.jsonl`）。** 大きさが上限を超えていたら、同じディレクトリの
-`log.<日時>.jsonl` へ名前を変える。中身は 1 行も捨てない。「記録が無い呼び出し = ccnavi が
+**記録（`logs/decisions.jsonl`）。** 大きさが上限を超えていたら、同じディレクトリの
+`decisions.<日時>.jsonl` へ名前を変える。中身は 1 行も捨てない。「記録が無い呼び出し = ccnavi が
 動かなかった」という読み方（audit）は、ローテートした分も合わせて読めば変わらない。
 消すのは、ローテートした記録のうち最後に書かれてから保持日数を過ぎたものだけで、
-いま書いている `log.jsonl` は消さない。
+いま書いている `decisions.jsonl` は消さない。
 
 **控え（`logs/state/`）。** 消すのはセッションを名前に持つものだけで、セッションごとにまとめて
 判断する。そのセッションの控えのどれかが保持日数のうちに書かれていれば、全部を残す。
@@ -185,7 +185,10 @@ def _shown(root: str, path: str) -> str:
 
 
 def _rotated_name(log_path: str, now: float) -> str:
-    """ローテート先。`log.jsonl` → `log.<日時>.jsonl`。同じ名前があれば `-2` から足す。"""
+    """ローテート先。`decisions.jsonl` → `decisions.<日時>.jsonl`。
+
+    同じ名前があれば `-2` から足す。
+    """
     directory, base = os.path.split(log_path)
     stem, ext = os.path.splitext(base)
     stamp = time.strftime(STAMP, time.localtime(now))
@@ -231,7 +234,7 @@ def _rotate(
     """大きさが上限を超えていたら名前を変える。
 
     名前を変えるだけで、書き写さない。同じ時に追記している hook は、開いたハンドルのまま
-    ローテート先へ書き、次の起動からは新しい `log.jsonl` を作って書く（audit は開くたびに
+    ローテート先へ書き、次の起動からは新しい `decisions.jsonl` を作って書く（audit は開くたびに
     O_CREAT で作る）。どちらの 1 行も失われない。Windows で開かれていて変えられなければ、
     次の開始でまた試す。
     """
