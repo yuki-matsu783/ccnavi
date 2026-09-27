@@ -74,6 +74,8 @@ log_debug 判定の材料 -- "sub=$sub" "top=$root" "cwd=$PWD"
   - `WARN` 続行できる異常（読めない入力を捨てて進んだ、など）
   - `ERROR` 処理を止める失敗
 - 既定の `INFO` で、1 回の起動につき数行に収める。ループの中で `INFO` を書かない
+- ツール呼び出しのたびに走る hook（ccnavi の実行ファイルの判定など）は、判定の結果も `DEBUG` に置く。
+  既定の `INFO` で hook の呼び出しの数だけ行を増やさない
 - 出さないレベルでは logger が時刻も行も作らない。**`DEBUG` の引数を組み立てるために外部コマンドを
   起こさない**（`$(git …)` や `$(date)` を `log_debug` の引数に書かない。`$PWD` のように手元にある値を使う）。
   重い材料が要るときは Python なら `log.enabled(diaglog.DEBUG)`、TS なら `log.enabled("DEBUG")` で囲む
