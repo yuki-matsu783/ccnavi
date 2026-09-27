@@ -18,6 +18,7 @@ from . import (
     builtin,
     configsync,
     ctxfile,
+    docsearch,
     fsio,
     hookio,
     judge,
@@ -397,6 +398,12 @@ def decide_at_start(
     skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
+    # md の frontmatter の索引を差分で新しくし、引き方を案内する（`ccnavi --docs`）。
+    # サブエージェントには出さない。壊れても黙る（docsearch.at_start が例外を外に出さない）。
+    if not payload.agent_id:
+        docs = docsearch.at_start(conf, root)
+        if docs:
+            texts.append(docs)
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK
