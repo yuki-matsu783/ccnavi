@@ -55,6 +55,9 @@ def judge(tool: str, subject: str, bin_path: str = "") -> dict:
     """
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
     environment.pop("CLAUDE_PROJECT_DIR", None)
+    # 診断ログも残さない。`--root` はこのリポジトリそのものなので、INFO の副命令の行が
+    # 見本の数だけ利用者の `logs/diag/` に積もる。
+    environment["CCNAVI_LOG_LEVEL"] = "ERROR"
     if bin_path:
         environment["CCNAVI_BIN_PATH"] = bin_path
     done = run_ccnavi(

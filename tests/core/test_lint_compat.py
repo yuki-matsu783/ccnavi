@@ -21,6 +21,8 @@ from tests.inproc import run_ccnavi
 
 def ccnavi(*args: str, root: str) -> subprocess.CompletedProcess:
     environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+    # `--root` にこのリポジトリを渡す回がある。利用者の `logs/diag/` に副命令の行を積まない。
+    environment["CCNAVI_LOG_LEVEL"] = "ERROR"
     return run_ccnavi(["--root", root, *args], input="", cwd=ROOT, env=environment)
 
 
