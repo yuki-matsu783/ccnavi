@@ -1,3 +1,10 @@
+---
+type: adr
+title: "ルールを `deny` / `ask` / `allow` の 3 タイプに分け、既定を許可にしない"
+description: "ルールを deny/ask/allow の3タイプに分け、既定を許可にせず、言及されない呼び出しはClaudeCodeへ返す"
+tags: [rules, approval]
+keywords: [ルール, deny, ask, allow, 判定, 権限モード, 3タイプ]
+---
 # ADR-0008: ルールを `deny` / `ask` / `allow` の 3 タイプに分け、既定を許可にしない
 
 状態: 採用

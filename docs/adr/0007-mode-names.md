@@ -1,3 +1,10 @@
+---
+type: adr
+title: "モードの名前を `enable` / `dry-run` / `disable` にする"
+description: "モード名をガード状態そのもので言い、enable/dry-run/disable の3値に統一する"
+tags: [config, rules]
+keywords: [モード, enable, dry-run, disable, ガード状態, 設定]
+---
 # ADR-0007: モードの名前を `enable` / `dry-run` / `disable` にする
 
 状態: 採用

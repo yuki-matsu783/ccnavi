@@ -1,3 +1,10 @@
+---
+type: adr
+title: 言語を Go から Python に移す
+description: "Python 3.12 とシェルの字句規則に従う shlex を使い、コマンド分割の不具合を根本的に解決する"
+tags: [python, build]
+keywords: [Python, 字句解析, shlex, コマンド分割, Go, 実装言語]
+---
 # ADR-0001: 言語を Go から Python に移す
 
 状態: 採用
