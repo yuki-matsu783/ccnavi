@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TextIO
 
-from . import settings
+from . import diaglog, settings
 
 # 終了コード。
 EXIT_OK = 0  # 判定を書いた、あるいは言うことが無かった
@@ -41,7 +41,9 @@ DRY_RUN = "dry-run"  # 判定して報告するが、呼び出しには手を出
 ENABLE = "enable"  # 判定を呼び出しに適用する
 
 
-def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> str:
+def resolve_mode(
+    stderr: TextIO, flag_value: str, conf: settings.Settings, *, root: str = ""
+) -> str:
     """設定された値をモードにする。
 
     設定ファイルが決められるのは enable と dry-run だけで、その編集は次のツール
@@ -53,6 +55,10 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
     固定できるように。
 
     どこにも値が無ければ enable。設定の欠落が、ガードの欠落にならないように。
+
+    `root` を渡すと、enable に戻したことを診断ログにも WARN で残す。値は環境変数から
+    来ることがあるので書かず、どこから来たか（`source`）と理由だけを書く。`--lint` は
+    同じ苦情を自分で報告するので渡さない。
     """
     source, value = settings.MODE_ENV, conf.mode
     if flag_value:
@@ -78,6 +84,9 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
             f"the project; start the session with {settings.MODE_ENV}={DISABLE} "
             "in the environment instead\n"
         )
+        diaglog.get("ccnavi", root).warn(
+            "動作モードを enable に戻した", source=source, reason="disable-from-project"
+        )
         return ENABLE
 
     if normalized in ("", ENABLE):
@@ -89,6 +98,9 @@ def resolve_mode(stderr: TextIO, flag_value: str, conf: settings.Settings) -> st
     stderr.write(
         f"ccnavi: {source}={value!r} is not a mode; using {ENABLE}. "
         f"Valid modes are {DISABLE}, {DRY_RUN} and {ENABLE}\n"
+    )
+    diaglog.get("ccnavi", root).warn(
+        "動作モードを enable に戻した", source=source, reason="unknown-value"
     )
     return ENABLE
 

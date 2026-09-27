@@ -15,6 +15,7 @@ from . import (
     audit,
     builtin,
     ctxfile,
+    diaglog,
     flow,
     fsio,
     hookio,
@@ -430,6 +431,9 @@ def decide_before(
         for rule in rule_set.section(name):
             if time.monotonic() > deadline:
                 stderr.write("ccnavi: 判定を終える前に期限に達した\n")
+                diaglog.get("ccnavi", root).warn(
+                    "判定を終える前に期限に達した", tool=payload.tool_name, mode=mode
+                )
                 record.decision, record.reason = audit.SKIP, audit.REASON_DEADLINE_EXCEEDED
                 return modes.fail_closed(mode)
             if rule.matches(payload.tool_name, subject):
@@ -494,7 +498,7 @@ def decide_before(
     # 当たったルールがモデルへ渡す文。通す・聞く・止めるのどれでも、判定とは
     # 別の経路（additionalContext）で届く。
     context = ctxfile.for_rules(
-        stderr, conf.state, payload, group, ctxfile.bases(conf, root, target)
+        stderr, conf.state, payload, group, ctxfile.bases(conf, root, target), root=root
     )
     # このセッションがまだ知らない承認（人がボードで承認して置かれた承認済みチケット）は、
     # 判定がどれでも 1 度だけ添える。応答は 1 つの JSON なので、ルールの文と

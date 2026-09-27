@@ -40,6 +40,7 @@ import time
 from collections.abc import Iterator
 from typing import TextIO
 
+from . import diaglog
 from . import ticket as ticket_mod
 
 # 承認済みの領域の下の置き場と、ファイルの拡張子。
@@ -77,7 +78,9 @@ KIND_PHASE_MARK = "phase-mark"
 KIND_PHASE_REOPENED = "phase-reopened"  # フェーズのマーカーを消した（同じ番号に子が足された）
 KIND_PARENT_MARK = "parent-mark"  # 親のマーカーを置いた（ready / close-early / closed）
 
-_state: dict = {"via": VIA_CLI, "failures": []}
+# root はワークスペースルート。書けなかったことを診断ログ（diaglog）にも残す置き場で、
+# 入口（`cli`）がルートを解いた直後に `set_root` で入れる。空なら診断ログには書かない。
+_state: dict = {"via": VIA_CLI, "failures": [], "root": ""}
 
 
 @contextlib.contextmanager
@@ -90,6 +93,7 @@ def session(via: str, stderr: TextIO | None) -> Iterator[None]:
     before = dict(_state)
     _state["via"] = via
     _state["failures"] = []
+    _state["root"] = ""
     try:
         yield
     finally:
@@ -98,6 +102,18 @@ def session(via: str, stderr: TextIO | None) -> Iterator[None]:
         if stderr is not None:
             for line in failures:
                 stderr.write(f"ccnavi: 警告: {line}\n")
+
+
+def set_root(root: str) -> None:
+    """書けなかったことを診断ログに残す先（ワークスペースルート）。`session` の中で使う。"""
+    _state["root"] = root
+
+
+def _warn(ticket_id: str, kind: str, **fields: object) -> None:
+    """書けなかった 1 件を診断ログに WARN で残す。標準エラーへの警告は `session` が出す。"""
+    diaglog.get("ccnavi", str(_state.get("root") or "")).warn(
+        "チケットの跡を書けず飛ばした", ticket=ticket_id, kind=kind, **fields
+    )
 
 
 def set_via(via: str) -> None:
@@ -161,6 +177,7 @@ def note(
             f"{ticket_id!r} の履歴（{kind}）を書かない（{failed}）。状態は動いた。"
             "正は置き場で、履歴は補助"
         )
+        _warn("", kind, reason="bad-id")  # 識別子の形でない綴りは写さない
         return failed
     try:
         # 知らない型が混ざっても落とさず、綴りにして残す。
@@ -174,6 +191,7 @@ def note(
             f"{ticket_id} の履歴（{kind}）を {target} に書けない"
             f"（{failed}）。状態は動いた。正は置き場で、履歴は補助"
         )
+        _warn(ticket_id, kind, path=target, **diaglog.cause(failed))
     return failed
 
 

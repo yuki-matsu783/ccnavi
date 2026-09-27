@@ -16,10 +16,28 @@ import os
 from dataclasses import dataclass, replace
 from typing import TextIO
 
-from . import approval, configsync, flow, fsio, gitcmd, history, phase, risk, settings, tree
+from . import (
+    approval,
+    configsync,
+    diaglog,
+    flow,
+    fsio,
+    gitcmd,
+    history,
+    phase,
+    risk,
+    settings,
+    tree,
+)
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
+
+
+def _log(root: str) -> diaglog.Logger:
+    """チケット操作の診断ログ。受け付けと終了コードは入口（cli）が書き、ここは結果と失敗を書く。"""
+    return diaglog.get("ccnavi", root)
+
 
 # Stop で `finish` の打ち忘れを促すときの理由コード（ADR-0087）。止めるのは 1 回だけの促しで、
 # 判定の deny ではない。
@@ -70,6 +88,7 @@ def start(
     sha = _head(worktree)
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
+        _log(root).error("着手で HEAD を読めない", ticket=ticket_id, worktree=worktree)
         return 1
     synced = _sync_config(stderr, root, conf, found, worktree)
     if synced is None:
@@ -78,6 +97,9 @@ def start(
     failed = approval.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
+        _log(root).error(
+            "着手の欄を書けない", ticket=ticket_id, path=found.path, **diaglog.cause(failed)
+        )
         return 1
     history.note(
         os.path.dirname(os.path.dirname(found.path)),
@@ -87,6 +109,7 @@ def start(
         ticket_mod.DOING,
         base_sha=sha,
     )
+    _log(root).info("チケットに着手した", ticket=found.ticket, base=sha[:12])
     stdout.write(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_mod.DOING}/ のまま\n"
@@ -101,6 +124,7 @@ def start(
                 f"ccnavi: {ticket_id} のフローの指紋を控えられない（{failed}）。"
                 "着手のあとの書き換えは知らせられない\n"
             )
+            _log(root).warn("フローの指紋を控えられない", ticket=ticket_id, **diaglog.cause(failed))
         else:
             stdout.write(
                 f"フローの指紋を {where} に控えた。承認済みチケットと同じく人がコミットする\n"
@@ -127,6 +151,7 @@ def _sync_config(
     copied, why = configsync.plan(conf, root, worktree)
     if why:
         stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {why}\n")
+        _log(root).error("着手で設定を共通層から写せない", ticket=found.ticket, stage="plan")
         return None
     if not copied:
         return []
@@ -140,12 +165,25 @@ def _sync_config(
             )
             + "\n"
         )
+        _log(root).error(
+            "着手で設定を共通層から写せない",
+            ticket=found.ticket,
+            stage="dirty",
+            busy=len(busy or []),
+        )
         return None
     where = approval.home_dir(conf, root, found.ticket, "")
     failed = configsync.apply(where, found.ticket, copied)
     if failed:
         stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {failed}\n")
+        _log(root).error(
+            "着手で設定を共通層から写せない",
+            ticket=found.ticket,
+            stage="apply",
+            **diaglog.cause(failed),
+        )
         return None
+    _log(root).info("着手で設定を共通層から写した", ticket=found.ticket, files=len(copied))
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     lines = [
         f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
@@ -245,6 +283,7 @@ def _close_parent(
     )
     if failed:
         stderr.write(f"ccnavi: 締めた記録を書けない: {failed}\n")
+        _log(root).warn("親を締めた記録を書けない", ticket=found.ticket, **diaglog.cause(failed))
     git_sh = settings.script_command(root, "ccnavi-git.sh")
     if phase.chat_only(root, conf, found.ticket, venues):
         stdout.write(
@@ -340,6 +379,7 @@ def record_risk(
     head = _head(worktree)
     if not head:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
+        _log(root).error("リスクの判定で HEAD を読めない", ticket=ticket_id, worktree=worktree)
         return 1
     where = approval.home_dir(conf, root, ticket_id, found.parent)
     record = (
@@ -359,7 +399,14 @@ def record_risk(
     )
     if failed:
         stderr.write(f"ccnavi: 判定を記録できない: {failed}\n")
+        _log(root).error(
+            "リスクの判定を記録できない",
+            ticket=ticket_id,
+            factor=factor_id,
+            **diaglog.cause(failed),
+        )
         return 1
+    _log(root).info("リスクの判定を記録した", ticket=ticket_id, factor=factor_id, answer=answer)
     stdout.write(
         f"OK: {ticket_id} の {factor_id} を {answer} と記録した"
         f"（{'+' + str(factor.points) if answer == 'yes' else '加点なし'}、HEAD {head[:12]}）\n"
@@ -396,9 +443,11 @@ def _score_child(
     definition = risk.load_definition(conf, root, _project_of(conf, root, found))
     if definition.fallback:
         stderr.write(f"ccnavi: {definition.fallback}\n")
+        _log(root).warn("リスクの配点を読めず既定で測った", ticket=found.ticket)
     diff, why = risk.measure(worktree, found.base_sha)
     if diff is None:
         stderr.write(f"ccnavi: {found.ticket} のリスクを測れない: {why}\n")
+        _log(root).error("リスクを測れない", ticket=found.ticket, worktree=worktree)
         return None
     where = approval.home_dir(conf, root, found.ticket, found.parent)
     judgements = (
@@ -420,6 +469,12 @@ def _score_child(
             failed = fsio.write_text(path, prompt, newline="\n")
             if failed:
                 stderr.write(f"ccnavi: 問いを書き出せない ({failed})\n")
+                _log(root).warn(
+                    "リスクの問いを書き出せない",
+                    ticket=found.ticket,
+                    path=path,
+                    **diaglog.cause(failed),
+                )
             else:
                 where = path
         names = ", ".join(f.id for f in score.pending)
@@ -432,6 +487,7 @@ def _score_child(
         )
         if where:
             stderr.write(f"  問い: {where}\n")
+        _log(root).info("閉じるのを断った", ticket=found.ticket, reason="risk-judge-pending")
         return None
     record = score.as_dict()
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
@@ -445,6 +501,7 @@ def _score_child(
     )
     if failed:
         stderr.write(f"ccnavi: リスクを記録できない: {failed}\n")
+        _log(root).error("リスクを記録できない", ticket=found.ticket, **diaglog.cause(failed))
         return None
     lines = score.lines()
     lines[0] += f"（{diff.summary()}、配点 {definition.source}）"
@@ -738,6 +795,9 @@ def _move(
     failed = approval.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {found.ticket} に欄を書けない: {failed}\n")
+        _log(root).error(
+            "チケットに欄を書けない", ticket=found.ticket, path=found.path, **diaglog.cause(failed)
+        )
         return 1
     where = os.path.dirname(os.path.dirname(found.path))
     if state == ticket_mod.REVIEW:
@@ -748,6 +808,9 @@ def _move(
         place = f"{conf.approved}/{ticket_mod.DONE}/"
     if failed:
         stderr.write(f"ccnavi: {found.ticket}: {failed}\n")
+        _log(root).error(
+            "チケットを動かせない", ticket=found.ticket, to=state, **diaglog.cause(failed)
+        )
         return 1
     cancelled = bool(fields.get("cancelled_at"))
     history.note(
@@ -757,6 +820,9 @@ def _move(
         ticket_mod.DOING,
         state,
         reason=fields.get("cancel_reason") if cancelled else None,
+    )
+    _log(root).info(
+        "チケットを取り消した" if cancelled else "チケットを閉じた", ticket=found.ticket, to=state
     )
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_mod.REVIEW:

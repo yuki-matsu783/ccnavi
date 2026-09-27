@@ -47,6 +47,7 @@ from typing import TextIO
 
 from . import (
     audit,
+    diaglog,
     fsio,
     gitcmd,
     gitstate,
@@ -118,6 +119,8 @@ def check(
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    *,
+    root: str,
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -134,12 +137,15 @@ def check(
 
     places はチケットの置き場（提案と承認済みチケット）。そこに現れた変更のうち、
     ccnavi の副命令が書いたと内容から読めるものを外す（`_script_writes`）。
+
+    root はワークスペースルート。診断ログ（diaglog）の置き場にだけ使う。書くのは失敗の
+    経路だけで、呼び出しのたびに走る成功の経路には何も足さない。
     """
     if payload.tool_name in READ_ONLY_TOOLS:
         record.decision, record.reason = audit.SKIP, REASON_TOOL_CANNOT_WRITE
         return ""
 
-    read = _read_all(stderr, watched, record)
+    read = _read_all(stderr, watched, record, root=root)
     if not read:
         return ""
 
@@ -151,9 +157,9 @@ def check(
     #
     # 触られないまま終わったツリーには、ここでも基準が付かない。そちらは
     # ターンの終わりが「数えていない」と言う（`_uncounted_line`）。
-    _note_new_trees(stderr, state_dir, payload.session_id, read)
+    _note_new_trees(stderr, state_dir, payload.session_id, read, root=root)
 
-    seen, first_time = _load_seen(stderr, state_dir, payload.session_id)
+    seen, first_time = _load_seen(stderr, state_dir, payload.session_id, root=root)
 
     found = [
         f
@@ -165,7 +171,7 @@ def check(
         # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
         # 汚れが全部「前から在ったもの」になってしまい、誰も差し戻されなくなる。
         if first_time:
-            _save_seen(stderr, state_dir, payload.session_id, set())
+            _save_seen(stderr, state_dir, payload.session_id, set(), root=root)
         record.decision, record.enforced = audit.ALLOW, True
         return ""
 
@@ -187,7 +193,7 @@ def check(
             here = [f for f in fresh if f.tree_name == w.tree.name and _restorable(f)]
             if not here:
                 continue
-            done = _restore(stderr, top, state_dir, [f.change for f in here])
+            done = _restore(stderr, top, state_dir, [f.change for f in here], root=root)
             restored.update({f.key(): done[f.change.path] for f in here if f.change.path in done})
     # dry-run では戻さない代わりに、戻していたはずだと言う。selfguard の
     # would-restore と同じ扱いにしてある。黙って何もしないと、報告を読んだ側には
@@ -207,6 +213,7 @@ def check(
         # すでに知っている変更ではなく新しい出来事なので、もう一度言う。
         | {f.key() for f in fresh if f.key() not in restored}
         | {f.key() for f in carried},
+        root=root,
     )
 
     record.paths = [f"{f.change.kind} {f.change.path}" for f in fresh]
@@ -260,6 +267,8 @@ def _note_new_trees(
     state_dir: str,
     session: str,
     read: list[tuple[Watched, str, list[gitstate.Change]]],
+    *,
+    root: str,
 ) -> None:
     """ターンの基準にまだ居ないツリーの HEAD を控える。居るツリーには触らない。
 
@@ -268,7 +277,7 @@ def _note_new_trees(
     （`baseline`）は動かさない。あれは「ターンの始まりに何が汚れていたか」で、
     あとから足すと、このターンで現れた汚れを前から在ったことにしてしまう。
     """
-    baseline, known, heads = _load_turn(stderr, state_dir, session)
+    baseline, known, heads = _load_turn(stderr, state_dir, session, root=root)
     if not known:
         # ターンの始まりを見ていない。基準そのものが無いので、ここで HEAD だけを
         # 置くと「基準はあるが baseline が空」になってしまう。何もしない。
@@ -281,7 +290,7 @@ def _note_new_trees(
         if sha:
             fresh_heads[top] = sha
     if fresh_heads:
-        _save_turn(stderr, state_dir, session, baseline, {**heads, **fresh_heads})
+        _save_turn(stderr, state_dir, session, baseline, {**heads, **fresh_heads}, root=root)
 
 
 def _committed_findings(
@@ -292,6 +301,8 @@ def _committed_findings(
     scope: ScopeGuard | None,
     places: tuple[str, str],
     synced: Callable[..., bool] | None = None,
+    *,
+    root: str,
 ) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
@@ -324,6 +335,9 @@ def _committed_findings(
         if unreadable:
             stderr.write(
                 f"ccnavi: コミット済みの差分を読めない（{w.tree.name or '.'}）: {unreadable}\n"
+            )
+            diaglog.get("ccnavi", root).warn(
+                "コミット済みの差分を読めず数えなかった", tree=w.tree.name or "."
             )
             uncounted.append(w.tree.name or ".")
             continue
@@ -382,6 +396,8 @@ def at_stop(
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    *,
+    root: str,
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -396,7 +412,7 @@ def at_stop(
     戻しもしない。ここで報告するのは、実行後の監視が戻さなかった、あるいは
     戻す設定になっていなかった変更で、どうするかは人が決める。
     """
-    baseline, known_baseline, heads = _load_turn(stderr, state_dir, payload.session_id)
+    baseline, known_baseline, heads = _load_turn(stderr, state_dir, payload.session_id, root=root)
     if not known_baseline:
         # ターンの始まりを見ていない。ここで今そこに在るものを全部並べると、
         # 利用者の書きかけも他のセッションが置いたものも、このターンの成果として
@@ -404,7 +420,7 @@ def at_stop(
         record.decision, record.reason = audit.SKIP, REASON_NO_TURN_BASELINE
         return ""
 
-    read = _read_all(stderr, watched, record)
+    read = _read_all(stderr, watched, record, root=root)
     if not read:
         return ""
 
@@ -418,7 +434,9 @@ def at_stop(
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
     # 同じ見た目になる（呼び出しごとの監視も同じ穴を持つが、そちらは戻しに関わるので
     # 断面を変えない。人が 1 度で見るのはこの報告）。
-    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
+    committed, uncounted = _committed_findings(
+        stderr, read, heads, mine, scope, places, synced, root=root
+    )
     found += committed
     if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
@@ -625,7 +643,7 @@ class Watched:
 
 
 def _read_all(
-    stderr: TextIO, watched: list[Watched], record: audit.Record
+    stderr: TextIO, watched: list[Watched], record: audit.Record, *, root: str
 ) -> list[tuple[Watched, str, list[gitstate.Change]]]:
     """見るツリーを順に git に聞く。読めないツリーは記録して飛ばす。
 
@@ -633,17 +651,24 @@ def _read_all(
     記録に残せば、監視が動いていなかった期間を後から数えられる。数えられないと、
     違反が無かったのか見ていなかったのかが同じ見た目になる。
     """
-    out, failed = [], []
+    out, failed, names = [], [], []
     for w in watched:
         top = gitstate.top_level(w.tree.root)
         changes, unreadable = gitstate.read(top)
         if unreadable:
             failed.append(f"{w.tree.name}: {unreadable}" if w.tree.name else unreadable)
+            names.append(w.tree.name or ".")
             continue
         out.append((w, top, changes))
     if failed:
         note = "; ".join(failed)
         stderr.write(f"ccnavi: 作業ツリーを読めないので実行後の監視は動かない: {note}\n")
+        # git の出力（note）は写さない。どのツリーかと、残りを見られたかだけ。
+        diaglog.get("ccnavi", root).warn(
+            "作業ツリーを読めず実行後の監視から外した",
+            trees=",".join(names),
+            read=len(out),
+        )
         record.detail = f"{record.detail}; {note}" if record.detail else note
     if not out:
         record.decision, record.reason = audit.SKIP, REASON_WORKTREE_UNREADABLE
@@ -973,7 +998,7 @@ def _call(payload: hookio.Input) -> str:
 
 
 def _restore(
-    stderr: TextIO, top: str, state_dir: str, changes: list[gitstate.Change]
+    stderr: TextIO, top: str, state_dir: str, changes: list[gitstate.Change], *, root: str
 ) -> dict[str, str]:
     """戻せたものを {パス: 退避先（戻しただけなら空文字）} で返す。
 
@@ -986,6 +1011,12 @@ def _restore(
         failed = gitstate.restore(top, change, aside)
         if failed:
             stderr.write(f"ccnavi: {change.path} を戻せない: {failed}\n")
+            diaglog.get("ccnavi", root).warn(
+                "保護領域の変更を戻せない",
+                path=change.path,
+                kind=change.kind,
+                **diaglog.cause(failed),
+            )
             continue
         done[change.path] = aside if change.kind == gitstate.KIND_NEW else ""
     return done
@@ -1017,6 +1048,8 @@ def at_prompt(
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
     synced: Callable[..., bool] | None = None,
+    *,
+    root: str,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
 
@@ -1028,7 +1061,7 @@ def at_prompt(
     基準を取るのはターンが始まる瞬間で、そこが「エージェントがまだ何もして
     いない時点」になる。以降に現れたものだけが、このターンで起きたこと。
     """
-    read = _read_all(stderr, watched, record)
+    read = _read_all(stderr, watched, record, root=root)
     if not read:
         # 基準を取れなかった。前のターンの控えが残っていると、そこに入っている
         # HEAD を「このターンの始まり」として読むことになり、前のターンの
@@ -1051,13 +1084,16 @@ def at_prompt(
         payload.session_id,
         {f.key() for f in found},
         {top: sha for top, sha in heads.items() if sha},
+        root=root,
     )
     record.decision, record.enforced = audit.ALLOW, True
     if found:
         record.detail = f"turn baseline {len(found)}"
 
 
-def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool, dict]:
+def _load_turn(
+    stderr: TextIO, state_dir: str, session: str, *, root: str
+) -> tuple[set[str], bool, dict]:
     """このターンの基準を返す。2 つめの値は、基準を持っているかどうか。3 つめは各ツリーの HEAD。
 
     持っていないなら、ターンの始まりを見ていない。登録されていないか、
@@ -1067,10 +1103,14 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     """
     if not state_dir:
         return set(), False, {}
-    data, failed = fsio.read_json(_turn_path(state_dir, session))
+    path = _turn_path(state_dir, session)
+    data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を読めない: {failed}\n")
+            diaglog.get("ccnavi", root).warn(
+                "ターンの基準を読めず基準無しとして進んだ", path=path, **diaglog.cause(failed)
+            )
         return set(), False, {}
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
@@ -1088,19 +1128,29 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
 
 
 def _save_turn(
-    stderr: TextIO, state_dir: str, session: str, baseline: set[str], heads: dict[str, str]
+    stderr: TextIO,
+    state_dir: str,
+    session: str,
+    baseline: set[str],
+    heads: dict[str, str],
+    *,
+    root: str,
 ) -> None:
     if not state_dir:
         return
+    path = _turn_path(state_dir, session)
     failed = fsio.write_json_atomic(
-        _turn_path(state_dir, session),
+        path,
         {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
         stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を書けない: {failed}\n")
+        diaglog.get("ccnavi", root).warn(
+            "ターンの基準を書けない", path=path, **diaglog.cause(failed)
+        )
 
 
-def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:
+def _load_seen(stderr: TextIO, state_dir: str, session: str, *, root: str) -> tuple[set[str], bool]:
     """すでに報告した変更と、このセッションで初めて見るかどうかを返す。
 
     読めなければ「初めて」として扱う。控えを失ったときに、前から在った変更を
@@ -1108,10 +1158,14 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     """
     if not state_dir:
         return set(), True
-    data, failed = fsio.read_json(_seen_path(state_dir, session))
+    path = _seen_path(state_dir, session)
+    data, failed = fsio.read_json(path)
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: 実行後の監視の控えを読めない: {failed}\n")
+            diaglog.get("ccnavi", root).warn(
+                "実行後の監視の控えを読めず初回として進んだ", path=path, **diaglog.cause(failed)
+            )
         return set(), True
     seen = data.get("seen") if isinstance(data, dict) else None
     if not isinstance(seen, list):
@@ -1119,7 +1173,7 @@ def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     return {s for s in seen if isinstance(s, str)}, False
 
 
-def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> None:
+def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str], *, root: str) -> None:
     """控えを書く。書けなかったことは報告して捨てる。
 
     ここでの失敗は監視を止めない。控えが無ければ同じ変更をもう一度報告する
@@ -1127,8 +1181,10 @@ def _save_seen(stderr: TextIO, state_dir: str, session: str, seen: set[str]) -> 
     """
     if not state_dir:
         return
-    failed = fsio.write_json_atomic(
-        _seen_path(state_dir, session), {"seen": sorted(seen)[:SEEN_LIMIT]}
-    )
+    path = _seen_path(state_dir, session)
+    failed = fsio.write_json_atomic(path, {"seen": sorted(seen)[:SEEN_LIMIT]})
     if failed:
         stderr.write(f"ccnavi: 実行後の監視の控えを書けない: {failed}\n")
+        diaglog.get("ccnavi", root).warn(
+            "実行後の監視の控えを書けない", path=path, **diaglog.cause(failed)
+        )

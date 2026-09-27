@@ -433,6 +433,80 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
 
     root = args.root if args.root is not None else default_root()
+    history.set_root(root)
+    cmd = _subcommand(args)
+    if not cmd:
+        # hook。呼び出しのたびに走るので、受け付けは書かない（判定の結果を DEBUG で書く）。
+        return _dispatch(stdin, stdout, stderr, args, root)
+    # 副命令は人か sh が打つもので、低頻度。受け付けと終了コードを INFO で 1 行ずつ残す。
+    # 引数の値（識別子の後ろの語・パス・理由の文）は書かず、どの副命令かだけを書く。
+    log = diaglog.get("ccnavi", root)
+    log.info("副命令を受け付けた", cmd=cmd, json=args.json)
+    try:
+        code = _dispatch(stdin, stdout, stderr, args, root)
+    except Exception as exc:
+        log.error("副命令が例外で止まった", cmd=cmd, **diaglog.cause(exc))
+        raise
+    log.info("副命令を終えた", cmd=cmd, exit=code)
+    return code
+
+
+# 診断ログに書く副命令の名前。`ticket` と `review` の後ろの語は、ここにあるものだけを書く。
+_TICKET_VERBS = ("start", "finish", "cancel", "record-risk")
+_REVIEW_VERBS = ("prepare", "requested", "confirm", "ready")
+
+
+def _subcommand(args: argparse.Namespace) -> str:
+    """hook ではない起動の、副命令の名前（固定の語）。hook なら空文字。
+
+    振り分け（`_dispatch`）と同じ順で見る。利用者の引数はそのまま返さない。
+    """
+    if args.lint:
+        return "lint"
+    if args.test is not None:
+        return "test"
+    if args.test_samples:
+        return "test-samples"
+    if args.suggest:
+        return "suggest"
+    if args.explain:
+        return "explain"
+    if args.prune:
+        return "prune-preview" if args.preview else "prune"
+    if args.approve:
+        if args.verify:
+            return "approve-verify"
+        if args.preview:
+            return "approve-preview"
+        if args.yes:
+            return "approve-yes"
+        return "approve"
+    if args.config_synced:
+        return "config-synced"
+    if args.close_early:
+        return "close-early"
+    if args.reviewed is not None:
+        if args.accept_unresolved and args.preview:
+            return "reviewed-preview"
+        if args.accept_unresolved and args.yes:
+            return "reviewed-yes"
+        return "reviewed"
+    if args.command:
+        words = list(args.command)
+        kind = words[0]
+        verb = words[1] if len(words) > 1 else ""
+        if kind == "ticket" and verb in _TICKET_VERBS:
+            return f"ticket-{verb}"
+        if kind == "review" and verb in _REVIEW_VERBS:
+            return f"review-{verb}"
+        return "unknown"
+    return ""
+
+
+def _dispatch(
+    stdin: TextIO, stdout: TextIO, stderr: TextIO, args: argparse.Namespace, root: str
+) -> int:
+    """ルートを解いたあとの振り分け。診断・後始末・承認・チケットとレビューの操作、残りが hook。"""
     conf, problems = settings.load(root)
 
     # 層の置き場（中身の 3 本と、層を探す先の 2 本）の差し替えは診断の経路でだけ効く。
@@ -462,6 +536,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.guard_ticket_approval,
         settings.GUARD_TICKET_APPROVAL_ENV,
         selfguard.GATE_SETTINGS,
+        root=root,
     )
     # チケット制御も 2 値。読めない値は enable（使う側）として扱う。切ったつもりで
     # 綴りを誤った設定は、判定では効いたままになり、--lint が error で名指しする。
@@ -473,6 +548,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.ticket_control,
         settings.TICKET_CONTROL_ENV,
         selfguard.GATE_SETTINGS,
+        root=root,
     )
 
     # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
@@ -618,16 +694,23 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
+    if problems:
+        diaglog.get("ccnavi", root).warn("設定の不備を読み飛ばした", count=len(problems))
 
-    mode = modes.resolve_mode(stderr, args.mode, conf)
+    mode = modes.resolve_mode(stderr, args.mode, conf, root=root)
     conf.restore_if_deny = selfguard.resolve(
-        stderr, args.restore_if_deny, conf.restore_if_deny, settings.RESTORE_IF_DENY_ENV
+        stderr,
+        args.restore_if_deny,
+        conf.restore_if_deny,
+        settings.RESTORE_IF_DENY_ENV,
+        root=root,
     )
     conf.guard_core_files = selfguard.resolve(
         stderr,
         args.guard_core_files,
         conf.guard_core_files,
         settings.GUARD_CORE_FILES_ENV,
+        root=root,
     )
     # この門は enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が
     # 持つので、ここに dry-run は無い。読めない値は enable になる。
@@ -637,6 +720,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         conf.guard_unwatched,
         settings.GUARD_UNWATCHED_ENV,
         selfguard.GATE_SETTINGS,
+        root=root,
     )
     log = audit.Log(conf.log)
     deadline = time.monotonic() + judge.DEADLINE_SECONDS
@@ -652,6 +736,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         diaglog.get("ccnavi", root).warn("hook の payload を読めない", mode=mode)
         _record(
             stderr,
+            root,
             log,
             audit.Record(
                 mode=mode,
@@ -672,7 +757,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     )
 
     code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
-    _record(stderr, log, record)
+    _record(stderr, root, log, record)
     # 診断ログ。受け付けたイベントと最終判定だけ。subject（コマンドの全文）は書かない。
     # 呼び出しごとに走るので DEBUG に置き、既定の INFO では行を増やさない。
     diaglog.get("ccnavi", root).debug(
@@ -708,6 +793,10 @@ def _prune(
         stdout.write(line + "\n")
     for problem in report.problems:
         stderr.write(f"ccnavi: {problem}\n")
+    if report.problems:
+        diaglog.get("ccnavi", root).warn(
+            "後始末できないものを残した", count=len(report.problems), preview=preview
+        )
     return EXIT_OK
 
 
@@ -847,13 +936,16 @@ def operate(
     return EXIT_OK if code == 0 else EXIT_ERROR
 
 
-def _record(stderr: TextIO, log: audit.Log, record: audit.Record) -> None:
+def _record(stderr: TextIO, root: str, log: audit.Log, record: audit.Record) -> None:
     """1 行を書く。書けなかったことは報告して捨てる。
     それがツールの実行可否を変えられてはいけない。"""
     try:
         log.write(record)
     except OSError as exc:
         stderr.write(f"ccnavi: 記録を書けない: {exc}\n")
+        diaglog.get("ccnavi", root).warn(
+            "判定の記録を書けず捨てた", event=record.event, **diaglog.cause(exc)
+        )
 
 
 def default_root() -> str:

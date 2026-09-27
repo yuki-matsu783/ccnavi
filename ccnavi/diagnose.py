@@ -34,6 +34,7 @@ from . import (
     approval,
     audit,
     builtin,
+    diaglog,
     flow,
     history,
     hookio,
@@ -424,6 +425,7 @@ def test_samples(
         body = run_samples(stderr, conf, root, path)
     except (OSError, ValueError) as exc:
         stderr.write(f"ccnavi: 見本を読めない: {exc}\n")
+        diaglog.get("ccnavi", root).error("見本を読めない", path=path, **diaglog.cause(exc))
         return 1
 
     if as_json:

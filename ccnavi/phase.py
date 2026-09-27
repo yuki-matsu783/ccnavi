@@ -34,6 +34,7 @@ from typing import TextIO
 
 from . import (
     approval,
+    diaglog,
     gitcmd,
     phasetypes,
     risk,
@@ -847,6 +848,12 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
+                diaglog.get("ccnavi", root).warn(
+                    "フェーズのマーカーを書けない",
+                    parent=parent.ticket,
+                    phase=n,
+                    **diaglog.cause(failed),
+                )
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。"
                 f"レビューは {at} 番目と一緒に見る計画なので、ここでは止めません。"
@@ -862,6 +869,12 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
+                diaglog.get("ccnavi", root).warn(
+                    "フェーズのマーカーを書けない",
+                    parent=parent.ticket,
+                    phase=n,
+                    **diaglog.cause(failed),
+                )
             required = [t.ticket for t in phase.tickets if t.review_required]
             covers = (
                 f"（{', '.join(str(c) for c in phase.covers)} 番目の分も含めて）"
@@ -920,6 +933,12 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
             )
             if failed:
                 stderr.write(f"ccnavi: フェーズのマーカーを書けない: {failed}\n")
+                diaglog.get("ccnavi", root).warn(
+                    "フェーズのマーカーを書けない",
+                    parent=parent.ticket,
+                    phase=n,
+                    **diaglog.cause(failed),
+                )
             risk_note = f"{phase.risk_line}。" if phase.risk_line else ""
             texts.append(
                 f"[ccnavi] {parent.ticket} のフェーズ {phase.label} が終わりました。{risk_note}"

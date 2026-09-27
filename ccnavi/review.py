@@ -46,8 +46,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, configsync, fsio, gitcmd, ops, phase, phasetypes, settings, tree
+from . import approval, configsync, diaglog, fsio, gitcmd, ops, phase, phasetypes, settings, tree
 from . import ticket as ticket_mod
+
+
+def _log(root: str) -> diaglog.Logger:
+    """レビュー操作の診断ログ。受け付けと終了コードは入口（cli）が書き、ここは結果・断った理由・
+    失敗を書く。指摘の本文・依頼文・理由の文・リモートの失敗の文は写さない。"""
+    return diaglog.get("ccnavi", root)
+
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
 MARKER_REQUEST = "<!-- ccnavi:request "
@@ -197,6 +204,7 @@ def prepare(
     parent, ph = found
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。投稿する本文を置く場所が無い\n")
+        _log(root).error("控えの置き場が無くレビューの本文を置けない", parent=parent.ticket)
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
     unmet = _unmet(tree_root, conf, ph)
@@ -218,6 +226,13 @@ def prepare(
         stderr.write(f"ccnavi: 依頼の前提が {len(unmet)} 件満たされていない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
+        _log(root).info(
+            "レビューの依頼を断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="unmet",
+            count=len(unmet),
+        )
         return 1
     marker = f"{MARKER_REQUEST}{parent.ticket}:{phase_no} -->\n"
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
@@ -236,6 +251,12 @@ def prepare(
     )
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
+        _log(root).error(
+            "レビューの本文を書き出せない",
+            parent=parent.ticket,
+            phase=phase_no,
+            **diaglog.cause(failed),
+        )
         return 1
     if synced:
         # 本文に載せたことを印に残す。`requested` はこれを見て知らせ済みにする。載せていない
@@ -243,7 +264,13 @@ def prepare(
         failed = configsync.mark_prepared(home, parent.ticket, phase_no)
         if failed:
             stderr.write(f"ccnavi: 設定の上書きを本文に載せた印を書けない ({failed})\n")
+            _log(root).error(
+                "設定の上書きを本文に載せた印を書けない",
+                parent=parent.ticket,
+                **diaglog.cause(failed),
+            )
             return 1
+    _log(root).info("レビューの本文を書き出した", parent=parent.ticket, phase=phase_no)
     # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
     stdout.write(path + "\n" + draft + "\n")
     return 0
@@ -269,6 +296,9 @@ def _note_synced(
     failed = configsync.mark_notified(home, parent, where)
     if failed:
         stderr.write(f"ccnavi: 設定を上書きしたことを知らせた印を書けない: {failed}\n")
+        _log(root).warn(
+            "設定を上書きしたことを知らせた印を書けない", parent=parent, **diaglog.cause(failed)
+        )
 
 
 def mr_draft(parent: ticket_mod.Ticket) -> str:
@@ -319,13 +349,17 @@ def requested(
     already = _already_requested(tree_root, conf, ph, phase_no)
     if already:
         stderr.write(f"ccnavi: {already}\n")
+        _log(root).info(
+            "依頼の控えを断った", parent=parent.ticket, phase=phase_no, reason="already-requested"
+        )
         return 1
     again = approval.MARK_REQUESTED in ph.marks
-    result = _result_with_mr(stderr, result_path)
+    result = _result_with_mr(stderr, root, result_path)
     if result is None:
         return 1
     if not result.url:
         stderr.write("ccnavi: 結果に投稿の url が無い。投稿されていないならマーカーは置かない\n")
+        _log(root).info("依頼の控えを断った", parent=parent.ticket, phase=phase_no, reason="no-url")
         return 1
     # 投稿とマーカーの間に HEAD が動いていないか。動いていれば、人が見るものとマーカーが食い違う。
     unmet = _unmet(tree_root, conf, ph)
@@ -333,12 +367,20 @@ def requested(
         stderr.write("ccnavi: 投稿の後に前提が崩れた。マーカーは置かない\n")
         for line in unmet:
             stderr.write(f"  - {line}\n")
+        _log(root).info(
+            "依頼の控えを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="unmet-after-post",
+            count=len(unmet),
+        )
         return 1
     rc, head = _git(tree_root, ["rev-parse", "HEAD"])
     # since はホストの時計。手元の時計と比べると、依頼直後の指摘が「依頼より前」に
     # 落ちて黙って除かれる。
     if not _mark(
         stderr,
+        root,
         approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         phase_no,
@@ -358,6 +400,7 @@ def requested(
         )
     _note_synced(stderr, conf, root, parent.ticket, result.url, phase_no)
     done = "依頼し直した" if again else "依頼した"
+    _log(root).info("レビューの依頼を控えた", parent=parent.ticket, phase=phase_no, again=again)
     stdout.write(
         f"OK: レビューを{done}（{result.mr.url or result.url}）。"
         f"{phase.TURN_DEFINED}を終えて利用者を待つこと\n"
@@ -382,6 +425,12 @@ def confirm(
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
+        _log(root).info(
+            "レビュー済みにするのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="not-requested",
+        )
         return 1
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = _moved_since_request(tree_root, conf, requested_mark)
@@ -389,8 +438,14 @@ def confirm(
         stderr.write(
             f"ccnavi: {moved}。人が見たものと今の HEAD が違う。{_redo_request(root, phase_no)}\n"
         )
+        _log(root).info(
+            "レビュー済みにするのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="moved-since-request",
+        )
         return 1
-    result = _matching(stderr, result_path, requested_mark)
+    result = _matching(stderr, root, result_path, requested_mark)
     if result is None:
         return 1
     changes = [r for r in effective(result.reviews) if r.state.upper() == CHANGES_REQUESTED]
@@ -401,6 +456,13 @@ def confirm(
         )
         for r in changes:
             stderr.write(f"  - {r.url}\n")
+        _log(root).info(
+            "レビュー済みにするのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="changes-requested",
+            count=len(changes),
+        )
         return 1
     unresolved = _unresolved(
         result.threads,
@@ -410,6 +472,13 @@ def confirm(
     )
     if unresolved:
         stderr.write(f"ccnavi: 未解決のスレッドが {len(unresolved)} 件残っている\n")
+        _log(root).info(
+            "レビュー済みにするのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="unresolved",
+            count=len(unresolved),
+        )
         for t in unresolved:
             stderr.write(f"  - {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
         review_sh = settings.script_command(root, "ccnavi-review.sh")
@@ -435,6 +504,7 @@ def confirm(
         return 1
     if not _mark(
         stderr,
+        root,
         approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         phase_no,
@@ -442,6 +512,9 @@ def confirm(
         {"mr": result.mr.number, "accepted": []},
     ):
         return 1
+    _log(root).info(
+        "フェーズをレビュー済みにした", parent=parent.ticket, phase=phase_no, via="confirm"
+    )
     stdout.write(f"OK: フェーズ {phase_no} はレビュー済み。先へ進める\n")
     return 0
 
@@ -466,6 +539,12 @@ def _settle_children(
     moved, failed = approval.settle_review(conf, root, parent.ticket, [*ph.covers, ph.number])
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
+        _log(root).error(
+            "レビュー待ちの子を動かせない",
+            parent=parent.ticket,
+            phase=ph.number,
+            **diaglog.cause(failed),
+        )
         return False
     if moved:
         stdout.write(
@@ -506,7 +585,20 @@ def _followup_from_choice(
     ident, failed = approval.followup(conf, root, parent, ph.number, children, items, stamp)
     if failed:
         stderr.write(f"ccnavi: 続きの子チケットを起こせない: {failed}\n")
+        _log(root).error(
+            "続きの子チケットを起こせない",
+            parent=parent.ticket,
+            phase=ph.number,
+            **diaglog.cause(failed),
+        )
         return None
+    _log(root).info(
+        "続きの子チケットを起こした",
+        parent=parent.ticket,
+        phase=ph.number,
+        ticket=ident,
+        items=len(items),
+    )
     stdout.write(
         f"続きの子チケット {ident} を {conf.approved}/{ticket_mod.DOING}/ に起こした"
         f"（フェーズ {ph.number}、範囲は見た子の和、本文に指摘 {len(items)} 件）。"
@@ -579,19 +671,37 @@ def _decision(
     requested_mark = ph.marks.get(approval.MARK_REQUESTED)
     if requested_mark is None:
         stderr.write("ccnavi: 依頼の記録が無い。先に request すること\n")
+        _log(root).info(
+            "残った指摘を決めるのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="not-requested",
+        )
         return None
     tree_root = tree.worktree_path(root, parent.ticket)
     moved = _moved_since_request(tree_root, conf, requested_mark)
     if moved:
         stderr.write(f"ccnavi: {moved}。{_redo_request(root, phase_no)}\n")
+        _log(root).info(
+            "残った指摘を決めるのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="moved-since-request",
+        )
         return None
-    result = _matching(stderr, result_path, requested_mark)
+    result = _matching(stderr, root, result_path, requested_mark)
     if result is None:
         return None
     if any(r.state.upper() == CHANGES_REQUESTED for r in effective(result.reviews)):
         stderr.write(
             "ccnavi: 変更要求のレビューが立っている。decide でも通せない。"
             "レビュアーの approve / dismiss を待つこと\n"
+        )
+        _log(root).info(
+            "残った指摘を決めるのを断った",
+            parent=parent.ticket,
+            phase=phase_no,
+            reason="changes-requested",
         )
         return None
     unresolved = _unresolved(
@@ -692,6 +802,7 @@ def reviewed(
         picked = _CHOICE_KEYS.get(fsio.read_line(stdin).strip().lower(), "")
         if not picked or (picked == CHOICE_ISSUE and not d.can_issue):
             stderr.write("ccnavi: 決めなかった。何も置いていない\n")
+            _log(root).info("残った指摘を決めなかった", phase=phase_no, reason="declined")
             return 1
         choices[thread_key(t)] = picked
     summary = apply_decision(stdout, stderr, root, conf, d, choices)
@@ -766,10 +877,12 @@ def decide_yes(
             + "\n"
         )
         stderr.write("ccnavi: 見せた指摘と今の指摘が違う。何も置いていない\n")
+        _log(root).info("残った指摘を決めるのを断った", phase=phase_no, reason="digest-mismatch")
         return 1
     shown = {thread_key(t) for t in d.unresolved}
     if set(raw) != shown:
         stderr.write("ccnavi: 選択が見せた指摘と揃っていない（足りないか、余分がある）\n")
+        _log(root).info("残った指摘を決めるのを断った", phase=phase_no, reason="choice-mismatch")
         return 1
     if not d.can_issue and CHOICE_ISSUE in raw.values():
         stderr.write("ccnavi: issue に回せるのは、フィードバック計画が承認されたあと\n")
@@ -812,6 +925,7 @@ def apply_decision(
     # 何も置く前に断る（受け入れだけが残り、issue は作られない、にしない）
     if picked[CHOICE_ISSUE] and not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。issue に回す下書きを置けない\n")
+        _log(root).error("控えの置き場が無く issue の下書きを置けない", parent=parent.ticket)
         return None
     # 前の回の下書き（投稿に失敗して残ったもの）は捨てる。残すと、この回に選んでいない
     # issue やコメントを sh が投稿する
@@ -826,6 +940,9 @@ def apply_decision(
         failed = approval.remember_accepted(home, parent.ticket, accepted, ph.number)
         if failed:
             stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
+            _log(root).error(
+                "受け入れを控えられない", parent=parent.ticket, **diaglog.cause(failed)
+            )
             return None
     if not _settle_children(stdout, stderr, root, conf, parent, ph):
         return None
@@ -838,6 +955,7 @@ def apply_decision(
         followup = ident
     elif not _mark(
         stderr,
+        root,
         home,
         parent.ticket,
         ph.number,
@@ -847,9 +965,18 @@ def apply_decision(
         return None
     issue_draft = ""
     if picked[CHOICE_ISSUE]:
-        issue_draft = _write_decide_issue(stderr, conf, d, picked[CHOICE_ISSUE])
+        issue_draft = _write_decide_issue(stderr, root, conf, d, picked[CHOICE_ISSUE])
     if conf.state:
-        _write_decide_comment(stderr, conf, d, picked, followup)
+        _write_decide_comment(stderr, root, conf, d, picked, followup)
+    _log(root).info(
+        "残った指摘の行き先を置いた",
+        parent=parent.ticket,
+        phase=ph.number,
+        keep=len(picked[CHOICE_KEEP]),
+        fix=len(fix),
+        issue=len(picked[CHOICE_ISSUE]),
+        followup=followup,
+    )
     if followup:
         stdout.write(f"OK: フェーズ {ph.number} は続きの子 {followup} で応える\n")
     else:
@@ -876,7 +1003,7 @@ def _thread_line(t: Thread) -> str:
 
 
 def _write_decide_issue(
-    stderr: TextIO, conf: settings.Settings, d: Decision, threads: list[Thread]
+    stderr: TextIO, root: str, conf: settings.Settings, d: Decision, threads: list[Thread]
 ) -> str:
     """issue に回す指摘の下書き。1 行目が題、空行のあとが本文。書けなければ空。"""
     assert d.result.mr is not None
@@ -896,12 +1023,19 @@ def _write_decide_issue(
     failed = fsio.write_text(path, "\n".join(text), newline="\n")
     if failed:
         stderr.write(f"ccnavi: issue の下書きを書き出せない ({failed})\n")
+        _log(root).warn(
+            "issue の下書きを書き出せない",
+            parent=d.parent.ticket,
+            path=path,
+            **diaglog.cause(failed),
+        )
         return ""
     return path
 
 
 def _write_decide_comment(
     stderr: TextIO,
+    root: str,
     conf: settings.Settings,
     d: Decision,
     picked: dict[str, list[Thread]],
@@ -932,6 +1066,12 @@ def _write_decide_comment(
     failed = fsio.write_text(path, "\n".join(lines) + "\n", newline="\n")
     if failed:
         stderr.write(f"ccnavi: 記録を書き出せない ({failed})\n")
+        _log(root).warn(
+            "決めた内容のコメントを書き出せない",
+            parent=d.parent.ticket,
+            path=path,
+            **diaglog.cause(failed),
+        )
 
 
 def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], followup: str) -> str:
@@ -1038,6 +1178,12 @@ def _reviewed_in_chat(
     stdout.flush()
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: レビュー済みにしなかった\n")
+        _log(root).info(
+            "レビュー済みにするのを断った",
+            parent=parent.ticket,
+            phase=ph.number,
+            reason="declined",
+        )
         return 1
     data = {
         "by": phasetypes.REVIEW_CHAT,
@@ -1052,6 +1198,7 @@ def _reviewed_in_chat(
         return 1
     if not _mark(
         stderr,
+        root,
         approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         ph.number,
@@ -1061,6 +1208,9 @@ def _reviewed_in_chat(
         return 1
     if synced:
         _note_synced(stderr, conf, root, parent.ticket, phasetypes.REVIEW_CHAT, None)
+    _log(root).info(
+        "フェーズをレビュー済みにした", parent=parent.ticket, phase=ph.number, via="chat"
+    )
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘は人が打つ。
     stdout.write(
@@ -1102,6 +1252,9 @@ def ready(
     problems += _merge_problems(tree.worktree_path(root, parent.ticket), conf, root)
     if problems:
         stderr.write("ccnavi: まだ Draft を外せない:\n")
+        _log(root).info(
+            "Draft を外すのを断った", parent=parent.ticket, reason="not-ready", count=len(problems)
+        )
         for p in problems:
             stderr.write(f"  - {p}\n")
         stderr.write(
@@ -1110,11 +1263,12 @@ def ready(
             "を打つ\n"
         )
         return 1
-    result = _result_with_mr(stderr, result_path)
+    result = _result_with_mr(stderr, root, result_path)
     if result is None:
         return 1
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。コメントの下書きを置く場所が無い\n")
+        _log(root).error("控えの置き場が無くコメントの下書きを置けない", parent=parent.ticket)
         return 1
     wrapped = approval.read_parent_mark(
         approval.home_dir(conf, root, parent.ticket, ""),
@@ -1132,15 +1286,23 @@ def ready(
     failed = _write_text(path, "\n".join(text) + "\n")
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
+        _log(root).error(
+            "Draft を外すコメントの下書きを書けない",
+            parent=parent.ticket,
+            path=path,
+            **diaglog.cause(failed),
+        )
         return 1
     if not _parent_mark(
         stderr,
+        root,
         approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         approval.PARENT_MARK_READY,
         {"mr": result.mr.number, "url": result.mr.url},
     ):
         return 1
+    _log(root).info("Draft を外す用意をした", parent=parent.ticket)
     stdout.write(path + "\n")
     return 0
 
@@ -1177,8 +1339,9 @@ def close_early(
         return 1
     if not conf.state:
         stderr.write("ccnavi: 控えの置き場が空。下書きを置く場所が無い\n")
+        _log(root).error("控えの置き場が無く締めの下書きを置けない", parent=parent.ticket)
         return 1
-    result = _result_with_mr(stderr, result_path)
+    result = _result_with_mr(stderr, root, result_path)
     if result is None:
         return 1
     assert result.mr is not None
@@ -1210,11 +1373,15 @@ def close_early(
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
+        _log(root).info("締めるのを断った", parent=parent.ticket, reason="declined")
         return 1
     if synced:
         failed = configsync.mark_notified(home, parent.ticket, configsync.NOTIFIED_TERMINAL)
         if failed:
             stderr.write(f"ccnavi: 設定の上書きを見たと残せない: {failed}\n")
+            _log(root).error(
+                "設定の上書きを見たと残せない", parent=parent.ticket, **diaglog.cause(failed)
+            )
             return 1
     stamp = approval.now()
     settled = _settle(
@@ -1229,9 +1396,11 @@ def close_early(
     )
     if failed:
         stderr.write(f"ccnavi: 受け入れを控えられない: {failed}\n")
+        _log(root).error("受け入れを控えられない", parent=parent.ticket, **diaglog.cause(failed))
         return 1
     if not _parent_mark(
         stderr,
+        root,
         approval.home_dir(conf, root, parent.ticket, ""),
         parent.ticket,
         approval.PARENT_MARK_CLOSE_EARLY,
@@ -1251,7 +1420,16 @@ def close_early(
     )
     if failed:
         stderr.write(f"ccnavi: {failed}\n")
+        _log(root).error("締めの下書きを書けない", parent=parent.ticket, **diaglog.cause(failed))
         return 1
+    _log(root).info(
+        "親を途中で締めた",
+        parent=parent.ticket,
+        cancelled=len(cancelled),
+        skipped=len(skipped),
+        settled=len(reviewed_now),
+        accepted=len(accepted),
+    )
     # 下書きの綴りは標準出力に出さない。ここは人の端末に向いていて、sh は
     # 控えの置き場の決まった名前（親の識別子 = ブランチ名）で拾う。
     stdout.write(
@@ -1359,6 +1537,7 @@ def _settle(
                 continue
             if not _mark(
                 stderr,
+                root,
                 approval.home_dir(conf, root, parent.ticket, ""),
                 parent.ticket,
                 ph.number,
@@ -1372,6 +1551,7 @@ def _settle(
                 return None
             if not _mark(
                 stderr,
+                root,
                 approval.home_dir(conf, root, parent.ticket, ""),
                 parent.ticket,
                 ph.number,
@@ -1691,31 +1871,50 @@ def _parent_phase(
     return parent, ph
 
 
-def _result_with_mr(stderr: TextIO, path: str) -> Result | None:
+def _result_with_mr(stderr: TextIO, root: str, path: str) -> Result | None:
     """写しを読み、マージリクエストが入っていることまで確かめる。無ければ言って None。"""
-    result = _result(stderr, path)
+    result = _result(stderr, root, path)
     if result is None or result.mr is None:
         stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+        _log(root).info("リモートの写しを断った", reason="no-mr")
         return None
     return result
 
 
 def _mark(
-    stderr: TextIO, approved_dir: str, parent: str, number: int, kind: str, data: dict
+    stderr: TextIO,
+    root: str,
+    approved_dir: str,
+    parent: str,
+    number: int,
+    kind: str,
+    data: dict,
 ) -> bool:
     """フェーズのマーカーを置く。置けなければ言って False。"""
     failed = approval.write_mark(approved_dir, parent, number, kind, data)
     if failed:
         stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
+        _log(root).error(
+            "フェーズのマーカーを置けない",
+            parent=parent,
+            phase=number,
+            mark=kind,
+            **diaglog.cause(failed),
+        )
         return False
     return True
 
 
-def _parent_mark(stderr: TextIO, approved_dir: str, parent: str, name: str, data: dict) -> bool:
+def _parent_mark(
+    stderr: TextIO, root: str, approved_dir: str, parent: str, name: str, data: dict
+) -> bool:
     """親のマーカーを置く。置けなければ言って False。"""
     failed = approval.write_parent_mark(approved_dir, parent, name, data)
     if failed:
         stderr.write(f"ccnavi: マーカーを置けない: {failed}\n")
+        _log(root).error(
+            "親のマーカーを置けない", parent=parent, mark=name, **diaglog.cause(failed)
+        )
         return False
     return True
 
@@ -1769,36 +1968,41 @@ def _unpushed(tree_root: str, conf: settings.Settings, branch: str) -> bool:
     return bool(failed or changed)
 
 
-def _result(stderr: TextIO, path: str) -> Result | None:
+def _result(stderr: TextIO, root: str, path: str) -> Result | None:
     if not path:
         stderr.write("ccnavi: --result <json> が要る。リモートの写しは sh が渡す\n")
         return None
     result = Result.load(path)
     if result.error:
         stderr.write(f"ccnavi: リモートを読めていない: {result.error}\n")
+        # 失敗の文は sh とホストの出力で、URL や資格情報が混ざりうるので写さない。
+        _log(root).error("リモートの写しが読めていない", path=path)
         return None
     return result
 
 
-def _matching(stderr: TextIO, path: str, requested_mark: dict) -> Result | None:
+def _matching(stderr: TextIO, root: str, path: str, requested_mark: dict) -> Result | None:
     """依頼したのと同じマージリクエストの写しか。違うもので先へ進めない。"""
-    result = _result(stderr, path)
+    result = _result(stderr, root, path)
     if result is None:
         return None
     if result.mr is None:
         stderr.write("ccnavi: 結果にマージリクエストが無い\n")
+        _log(root).info("リモートの写しを断った", reason="no-mr")
         return None
     if requested_mark.get("host") and result.host != requested_mark.get("host"):
         stderr.write(
             f"ccnavi: 依頼したホスト（{requested_mark.get('host')}）と"
             f"結果のホスト（{result.host}）が違う\n"
         )
+        _log(root).info("リモートの写しを断った", reason="host-mismatch")
         return None
     if requested_mark.get("mr") and int(requested_mark["mr"]) != result.mr.number:
         stderr.write(
             f"ccnavi: 依頼したマージリクエスト（{requested_mark['mr']}）と"
             f"結果のもの（{result.mr.number}）が違う\n"
         )
+        _log(root).info("リモートの写しを断った", reason="mr-mismatch")
         return None
     return result
 

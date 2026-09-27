@@ -123,7 +123,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
-from . import fsio, gitstate, platformtag, rules, settings, shellread, tree
+from . import diaglog, fsio, gitstate, platformtag, rules, settings, shellread, tree
 from .modes import DISABLE, DRY_RUN, ENABLE
 
 # 設定の値。mode と同じ 3 語。定義は modes にあり、ここは借りているだけ。
@@ -577,7 +577,13 @@ class Outcome:
 
 
 def resolve(
-    stderr: TextIO, flag: str, declared: str, name: str, allowed: tuple[str, ...] = SETTINGS
+    stderr: TextIO,
+    flag: str,
+    declared: str,
+    name: str,
+    allowed: tuple[str, ...] = SETTINGS,
+    *,
+    root: str = "",
 ) -> str:
     """設定の値を解決する。読めない値は enable として扱う。
 
@@ -589,6 +595,9 @@ def resolve(
     `allowed` を絞ると、そこに無い語も「読めない値」として扱う。dry-run を
     持たない門（GATE_SETTINGS）に dry-run と書かれた設定が、止めているのに
     止めていないように読める形で残らないようにする。
+
+    `root` を渡すと、enable に戻したことを診断ログにも WARN で残す。値は環境変数から
+    来ることがあるので書かず、設定の名前だけを書く。`--lint` は自分で報告するので渡さない。
     """
     value = (flag or declared or "").strip().lower()
     if not value:
@@ -599,6 +608,7 @@ def resolve(
         f"ccnavi: {name}={value!r} is not a setting; using {ENABLE}. "
         f"Valid values are {', '.join(allowed)}\n"
     )
+    diaglog.get("ccnavi", root).warn("設定の値を読めず enable に戻した", name=name)
     return ENABLE
 
 

@@ -31,7 +31,7 @@ from typing import TextIO
 
 import yaml
 
-from . import approval, fsio, gitcmd, phasetypes, risk, rules, settings, tree
+from . import approval, diaglog, fsio, gitcmd, phasetypes, risk, rules, settings, tree
 
 # 親ごとの印の名前。`phases/<親>/config-sync.json`。
 MARK = "config-sync"
@@ -353,11 +353,18 @@ def acknowledge(
     stdout.flush()
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 残さなかった\n")
+        diaglog.get("ccnavi", root).info(
+            "設定の上書きを見たと残すのを断った", parent=parent, reason="declined"
+        )
         return 1
     failed = mark_notified(home, parent, NOTIFIED_TERMINAL)
     if failed:
         stderr.write(f"ccnavi: 印を書けない: {failed}\n")
+        diaglog.get("ccnavi", root).error(
+            "設定の上書きを見た印を書けない", parent=parent, **diaglog.cause(failed)
+        )
         return 1
+    diaglog.get("ccnavi", root).info("設定の上書きを見たと残した", parent=parent)
     stdout.write(f"OK: {parent} の設定の上書きを見たものとして残した\n")
     return 0
 
