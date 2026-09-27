@@ -293,6 +293,41 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
   }
 });
 
+test("CB-D124 「記録から候補を出す」は suggest を送り、届いた候補を下書きのまま判定タブに並べる", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one('button[data-action="suggest"]'));
+    await dom.settle();
+    assert.equal(dom.posted.filter((message) => message.type === "suggest").length, 1);
+    assert.ok((dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
+    const candidate = {
+      kind: "rule",
+      section: "ask",
+      id: "suggest-npm-install",
+      tool: "Bash",
+      count: 6,
+      summary: "ルールを足す候補",
+      layer: "common",
+      rules_path: "/ws/.ccnavi/common/rules.yml",
+      samples: [],
+      yaml: "# ルールを足す候補\nrules:\n  ask: []\n",
+    };
+    await dom.send({
+      type: "suggested",
+      result: { version: 1, root: "/ws", rules_path: "", logs: ["/ws/logs/log.jsonl"], records: 9, candidates: [candidate], dropped: 2 },
+    });
+    assert.ok(dom.one("#tab-judge").classList.contains("active"));
+    assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
+    assert.equal(dom.all("#suggest-result .candidate").length, 1);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /落としたもの 2 件/);
+    assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを足す候補/);
+    // 候補はルールに足さない（下書きを見せるだけ）
+    assert.equal(dom.all('.rule[data-id="suggest-npm-install"]').length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D07 足したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の並びを送る", async () => {
   const dom = await openRules();
   try {

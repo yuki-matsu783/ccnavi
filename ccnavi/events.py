@@ -27,6 +27,7 @@ from . import (
     post,
     prune,
     reasons,
+    repeat,
     ruleload,
     rules,
     selfguard,
@@ -224,6 +225,11 @@ def decide_at_stop(
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
     )
+    # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
+    # 言い換えで回っているかもしれないことを人にも 1 度言う。止めはしない。
+    repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
+    if repeated:
+        report = f"{report}\n\n{repeated}" if report else repeated
     nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
     if nudge and mode == modes.ENABLE:
         hookio.write_stop_block(stdout, nudge, system=report)
