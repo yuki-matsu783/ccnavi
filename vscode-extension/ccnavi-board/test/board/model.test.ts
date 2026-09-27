@@ -36,7 +36,7 @@ test("CB-T02 版が違えば読まない", () => {
   const parsed = parseBoardJson(text);
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
-    assert.match(parsed.error, /版が違う/);
+    assert.match(parsed.error, /版が違います/);
   }
 });
 
@@ -44,7 +44,7 @@ test("CB-T03 JSON でなければ理由を返す", () => {
   const parsed = parseBoardJson("not json");
   assert.equal(parsed.ok, false);
   if (!parsed.ok) {
-    assert.match(parsed.error, /JSON として読めない/);
+    assert.match(parsed.error, /JSON として読めません/);
   }
   const notObject = parseBoardJson("[1]");
   assert.equal(notObject.ok, false);
@@ -93,7 +93,7 @@ test("CB-T04 欠けた項目は既定値で埋め、全体を捨てない", () =
     assert.equal(p.state, "planned");
     assert.deepEqual(p.marks, { requested: {} });
     assert.equal(p.label, "1");
-    // 欠けたレビュー待ちは「待ちではない」に倒す。マーカーから組み直さない
+    // 欠けたレビュー待ちは「待ちではない」として扱う。マーカーから組み直さない
     assert.equal(p.review_waiting, false);
   }
 });
@@ -112,4 +112,45 @@ test("CB-T140 blocked は欄が無ければ空。古い実行ファイルの出�
   }
   assert.match(parsed.board.tickets[0].blocked, /作業中に無い/);
   assert.equal(parsed.board.tickets[1].blocked, "");
+});
+
+test("CB-T259 history は実行ファイルの跡を写す。欄が無ければ空、オブジェクトでない行は落とし、欠けた欄は既定値で埋める", () => {
+  // 欄が無いのは、この欄より前の実行ファイルの出力。空なら履歴を出さない。
+  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
+  const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
+  tickets[0].history = [
+    { at: "2026-09-26T09:00:00Z", ticket: "i0001", kind: "approved", from: "todo", to: "doing", via: "board" },
+    { at: "2026-09-26T09:05:00Z", ticket: "i0001", kind: "phase-mark", from: null, to: null, via: "hook", phase: 1, mark: "pending" },
+    "壊れた行",
+  ];
+  delete tickets[1].history;
+
+  const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  const [approved, mark] = parsed.board.tickets[0].history;
+  assert.equal(parsed.board.tickets[0].history.length, 2);
+  assert.deepEqual(approved, { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" });
+  // 置き場が動かないもの（マーカー）は from / to が null。空の綴りにして、フェーズとマーカーの種類を持つ
+  assert.equal(mark.from, "");
+  assert.equal(mark.to, "");
+  assert.equal(mark.phase, 1);
+  assert.equal(mark.mark, "pending");
+  assert.deepEqual(parsed.board.tickets[1].history, []);
+});
+
+test("CB-T262 predecessors_unmet は実行ファイルの答えを写す。欄が無ければ空（満たしている扱い）", () => {
+  const base = JSON.parse(fixtureText()) as Record<string, unknown>;
+  const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
+  tickets[3].predecessors_unmet = [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }, "壊れた行"];
+  delete tickets[1].predecessors_unmet;
+  const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  assert.deepEqual(parsed.board.tickets[3].predecessors_unmet, [{ ticket: "i0001-02", state: "doing", label: "作業中（doing/）" }]);
+  assert.deepEqual(parsed.board.tickets[1].predecessors_unmet, []);
 });

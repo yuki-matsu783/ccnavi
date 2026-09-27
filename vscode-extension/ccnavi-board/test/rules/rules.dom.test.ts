@@ -262,7 +262,7 @@ test("CB-D06 判定で当たった行はその場で開くが state には入ら
     // ヒットしたルールの表と、返すメッセージ・hook の見出しも出る
     assert.deepEqual(dom.all("#judge-result h3").map((head) => head.textContent), ["ヒットしたルール", "返すメッセージ", "このツールで実行される hook"]);
     assert.equal(dom.all("#judge-result table tbody tr").length, 1);
-    assert.match(dom.one("#judge-result").textContent ?? "", /実行される hook は無い/);
+    assert.match(dom.one("#judge-result").textContent ?? "", /実行される hook はありません/);
   } finally {
     await dom.close();
   }
@@ -293,6 +293,41 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
   }
 });
 
+test("CB-D124 「記録から候補を出す」は suggest を送り、届いた候補を下書きのまま判定タブに並べる", async () => {
+  const dom = await openRules();
+  try {
+    dom.click(dom.one('button[data-action="suggest"]'));
+    await dom.settle();
+    assert.equal(dom.posted.filter((message) => message.type === "suggest").length, 1);
+    assert.ok((dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
+    const candidate = {
+      kind: "rule",
+      section: "ask",
+      id: "suggest-npm-install",
+      tool: "Bash",
+      count: 6,
+      summary: "ルールを足す候補",
+      layer: "common",
+      rules_path: "/ws/.ccnavi/common/rules.yml",
+      samples: [],
+      yaml: "# ルールを足す候補\nrules:\n  ask: []\n",
+    };
+    await dom.send({
+      type: "suggested",
+      result: { version: 1, root: "/ws", rules_path: "", logs: ["/ws/logs/log.jsonl"], records: 9, candidates: [candidate], dropped: 2 },
+    });
+    assert.ok(dom.one("#tab-judge").classList.contains("active"));
+    assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
+    assert.equal(dom.all("#suggest-result .candidate").length, 1);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /落としたもの 2 件/);
+    assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを足す候補/);
+    // 候補はルールに足さない（下書きを見せるだけ）
+    assert.equal(dom.all('.rule[data-id="suggest-npm-install"]').length, 0);
+  } finally {
+    await dom.close();
+  }
+});
+
 test("CB-D07 足したルールは開いて焦点が id に来る。タイプを移すと移った先でも開いたまま。保存は今の並びを送る", async () => {
   const dom = await openRules();
   try {
@@ -317,7 +352,7 @@ test("CB-D07 足したルールは開いて焦点が id に来る。タイプを
   }
 });
 
-test("CB-D69 「渡すファイル」で選んだ綴りは、拡張ホストが名指しした行の欄にだけ入る", async () => {
+test("CB-D69 additionalContextFile で選んだ綴りは、拡張ホストが名指しした行の欄にだけ入る", async () => {
   const dom = await openRules();
   try {
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -438,7 +473,7 @@ test("CB-T51 保存できない理由と読み込みの苦情を出す", async (
 test("CB-T52 settings.json が無ければ hook の表にそう書く", async () => {
   const dom = await openRules({ hooks: [], hookFiles: { settings: false, settingsLocal: false } });
   try {
-    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json が無い/);
+    assert.match(dom.one("#tab-hooks").textContent ?? "", /settings\.json がありません/);
     assert.equal(dom.all("#tab-hooks table").length, 0);
   } finally {
     await dom.close();
@@ -521,10 +556,10 @@ test("CB-T124 欄名は日本語で、YAML のキー名は欄名の title に載
     await dom.settle();
     const caps = new Map(dom.all(`${rowSelector("git-push")} .field > .cap`).map((cap) => [cap.textContent ?? "", cap.getAttribute("title")]));
     assert.equal(caps.get("ツール"), "YAML のキー: match");
-    assert.equal(caps.get("文面"), "YAML のキー: message");
-    assert.equal(caps.get("渡す文"), "YAML のキー: additionalContext");
-    assert.equal(caps.get("初回だけ渡すファイル"), "YAML のキー: additionalContextOnceFile");
-    assert.equal(caps.get("渡す回の刻み"), "YAML のキー: every");
+    assert.equal(caps.get("メッセージ"), "YAML のキー: message");
+    assert.equal(caps.get("additionalContext"), "YAML のキー: additionalContext");
+    assert.equal(caps.get("additionalContextOnceFile"), "YAML のキー: additionalContextOnceFile");
+    assert.equal(caps.get("every"), "YAML のキー: every");
     assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), "--test の subject");
   } finally {
     await dom.close();
@@ -545,8 +580,8 @@ test("CB-D83 未保存の変更の有無は変わったときだけ拡張ホス�
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
     // 別の対象へ切り替わった。前の対象の編集は捨てて、読み込み中を出す
-    await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中..." } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中...");
+    await dom.send({ type: "data", data: { kind: "loading", text: "web のルールを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "web のルールを読み込み中…");
     assert.equal(dom.all(".rule").length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
@@ -590,7 +625,7 @@ test("CB-D101 ルール設定の案内はタブを切り替えて中を指し、
 });
 
 test("CB-D106 読み込み中に頼まれた案内はルールが出てから始め、別の対象へ切り替わって読み込み中になったら閉じて tourDone を返す", async () => {
-  const dom = await openPage({ kind: "loading", text: "ルールを読み込み中..." });
+  const dom = await openPage({ kind: "loading", text: "ルールを読み込み中…" });
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
@@ -598,7 +633,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, "3 つのタブ");
-    await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中..." } });
+    await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中…" } });
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.posted.filter((message) => message.type === "tourDone").length, 1);

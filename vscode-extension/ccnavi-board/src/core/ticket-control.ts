@@ -4,7 +4,7 @@
  *
  * 拡張は hook が受け取るプロセスの環境を見られないので、設定ファイルの本文から読む。
  * シェルから渡された値は拾えない（README に「設定ファイルに書く」と決めてある）。
- * 読めない値は enable に倒す。ccnavi の解決（selfguard.resolve）と同じ向きで、
+ * 読めない値は enable として扱う。ccnavi の解決（selfguard.resolve）と同じ向きで、
  * 綴りを誤った設定でボードが消えると、切れたと思い込む。
  */
 import { envFromSettingsJson } from "./hooks.js";
@@ -46,5 +46,5 @@ export function ticketControlMismatch(fromFiles: TicketControl, fromBoard: strin
   if (board === fromFiles) {
     return "";
   }
-  return `${TICKET_CONTROL_ENV} の読みが食い違う（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめる`;
+  return `${TICKET_CONTROL_ENV} の読みが食い違っています（設定ファイル: ${fromFiles}、実行ファイル: ${board}）。セッションを開き直したか、シェルの環境から渡していないかを確かめてください`;
 }

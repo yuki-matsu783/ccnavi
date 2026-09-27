@@ -138,15 +138,15 @@ function readObject(text: string): Parsed<Record<string, unknown>> {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `試験の JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `試験の JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "試験の JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "試験の JSON の最上位がオブジェクトではありません" };
   }
   if (raw.version !== TEST_VERSION) {
     return {
       ok: false,
-      error: `試験の JSON の版が違う（拡張は ${TEST_VERSION}、実行ファイルは ${String(raw.version)}）。拡張か実行ファイルを揃える`,
+      error: `試験の JSON の版が違います（拡張は ${TEST_VERSION}、実行ファイルは ${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
     };
   }
   return { ok: true, value: raw };

@@ -28,6 +28,9 @@ test("CB-T206 残った指摘の一覧を読む。版・指紋が合わなけれ
   assert.equal(parsed.ok && parsed.value.phase, 2);
   assert.equal(parseDecidePreview(previewJson({ version: 2 })).ok, false);
   assert.equal(parseDecidePreview(previewJson({ digest: "" })).ok, false);
+  // どこから来た値かを文に入れる
+  const badDigest = parseDecidePreview(previewJson({ digest: "xyz" }));
+  assert.ok(!badDigest.ok && "error" in badDigest && badDigest.error.startsWith("ccnavi-review.sh decide --preview の digest が"));
   assert.equal(parseDecidePreview("not json").ok, false);
 });
 

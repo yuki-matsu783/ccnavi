@@ -38,12 +38,26 @@
 
 from __future__ import annotations
 
+import functools
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, fsio, gitstate, hookio, phase, phasetypes, rules, selfguard, settings, tree
+from . import (
+    audit,
+    fsio,
+    gitcmd,
+    gitstate,
+    hookio,
+    phase,
+    phasetypes,
+    rules,
+    selfguard,
+    settings,
+    tree,
+)
 from . import ticket as ticket_mod
 
 # 保護領域の宣言とみなすツール名。ルールの match にこのどれかが入っていれば、
@@ -59,7 +73,7 @@ WRITE_TOOLS = ("Write", "Edit", "NotebookEdit")
 READ_ONLY_TOOLS = ("Read", "Grep", "Glob", "WebFetch", "WebSearch")
 
 # 返す文に載せる理由コード。cli.py の表と同じ体系から借りている。
-# 設計 §7.2 が監査に残す事象名がそのまま POST_VIOLATION。
+# 設計 7.2 が監査に残す事象名がそのまま POST_VIOLATION。
 CODE_VIOLATION = "POST_VIOLATION"
 # 前から在った変更には別のコードを立てる。同じコードで送ると、受け取った側に
 # 「直前の実行が壊したもの」と「元から汚れていたもの」を見分ける手が無くなる。
@@ -74,7 +88,7 @@ CODE_TICKET_SCOPE = "POST_TICKET_SCOPE"
 # 出所にこの名前を添えて、ルールファイルを探しても見つからないことを示す。
 TICKET_SCOPE_RULE = "(ticket-scope)"
 
-# 判定に至らなかった理由のうち、この面だけが出すもの。
+# 判定に至らなかった理由のうち、この監視だけが出すもの。
 REASON_TOOL_CANNOT_WRITE = "tool-cannot-write"
 REASON_WORKTREE_UNREADABLE = "worktree-unreadable"
 # ターンの始まりを見ていないので、このターンで起きたことを切り出せない。
@@ -91,9 +105,6 @@ SEEN_LIMIT = 500
 # 対象の綴りを載せるときの長さの上限。
 SUBJECT_LIMIT = 200
 
-# 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
-# 区切り文字が混じった値でファイルを別の場所へ書かせない。
-
 
 def check(
     stderr: TextIO,
@@ -106,6 +117,7 @@ def check(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
+    synced: Callable[..., bool] | None = None,
 ) -> str:
     """実行後の 1 回ぶんを処理し、モデルに返す文を返す。返す文が無ければ空文字。
 
@@ -118,7 +130,7 @@ def check(
     報告しはじめると、監視は 1 回目から嘘しか言わなくなる。
 
     watched は見るツリー。ワークスペースルートと、この呼び出しが触ったツリー
-    （設計 §11.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
+    （設計 11.7）。ツリーごとに git を起こし、そのツリーのルールで見る。
 
     places はチケットの置き場（提案と承認済みチケット）。そこに現れた変更のうち、
     ccnavi の副命令が書いたと内容から読めるものを外す（`_script_writes`）。
@@ -146,12 +158,12 @@ def check(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
     if not found:
         # 違反が無くても、初回なら控えを作る。ここを飛ばすと、綺麗な作業ツリーで
         # 始まったセッションはいつまでも「初回」のままになり、その後に現れた
-        # 汚れが全部「前から在ったもの」に化けて、誰も差し戻されなくなる。
+        # 汚れが全部「前から在ったもの」になってしまい、誰も差し戻されなくなる。
         if first_time:
             _save_seen(stderr, state_dir, payload.session_id, set())
         record.decision, record.enforced = audit.ALLOW, True
@@ -180,7 +192,7 @@ def check(
     # dry-run では戻さない代わりに、戻していたはずだと言う。selfguard の
     # would-restore と同じ扱いにしてある。黙って何もしないと、報告を読んだ側には
     # 戻しを切った形と見分けが付かない。予行として置いた設定が「戻しは要らない」
-    # という結論に読み替えられるし、対象がルールファイル次第で動くこの面では、
+    # という結論に読み替えられるし、対象がルールファイル次第で動くこの監視では、
     # 何が戻るのかを本番の前に見せることがそのまま安全の余裕になる。
     # 予行で言うのも、本番で戻すのと同じ集合に限る。戻さない 1 件に「本番なら
     # 戻していた」と書くと、設定を enable にしたときに起きることを読み違えさせる。
@@ -259,7 +271,7 @@ def _note_new_trees(
     baseline, known, heads = _load_turn(stderr, state_dir, session)
     if not known:
         # ターンの始まりを見ていない。基準そのものが無いので、ここで HEAD だけを
-        # 置くと「基準はあるが baseline が空」に化ける。何もしない。
+        # 置くと「基準はあるが baseline が空」になってしまう。何もしない。
         return
     fresh_heads = {}
     for _, top, _ in read:
@@ -279,6 +291,7 @@ def _committed_findings(
     mine: tuple[str, ...],
     scope: ScopeGuard | None,
     places: tuple[str, str],
+    synced: Callable[..., bool] | None = None,
 ) -> tuple[list[Finding], list[str]]:
     """このターンでコミットに入った、保護領域の変更。
 
@@ -296,7 +309,7 @@ def _committed_findings(
     無いのは、ターンの途中で切られたツリー（プロンプトのときに無かった）か、
     そのとき HEAD を読めなかったツリーで、どちらも「変わっていない」ではない。
     ワークツリーを切ってから手を付けるのがこのリポジトリの手順なので、切った
-    ターンのコミットはここに落ちる。落ちたことを言わないと、見ていない期間が
+    ターンのコミットはここに当たる。そのことを言わないと、見ていない期間が
     「何も起きなかった」と同じ見た目になる。
     """
     out: list[Finding] = []
@@ -314,12 +327,49 @@ def _committed_findings(
             )
             uncounted.append(w.tree.name or ".")
             continue
-        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree):
+        # 着手が写した分かどうかは、コミットされた中身で答える。ディスクで答えると、
+        # 好きな中身でコミットしてからディスクだけ共通層の中身へ戻す形が、呼び出しごとの
+        # 監視・控えと復元・ここの 3 つから同時に外れる。
+        judged = (
+            functools.partial(_committed_synced, synced, top, base, changes) if synced else None
+        )
+        for finding in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, synced=judged):
             rel = tree.relative(w.tree, finding.change.full)
             if ticket_mod.is_ticket_place(rel, tickets, approved):
                 continue
             out.append(finding)
     return out, uncounted
+
+
+def _spelled(change: gitstate.Change, top: str) -> str:
+    """変更の、リンクを解く前の絶対の綴り。ツリーのルートが分からなければ解いた先。"""
+    if not top or not change.path:
+        return change.full
+    return os.path.join(top, change.path.replace("/", os.sep))
+
+
+def _committed_synced(
+    synced: Callable[..., bool],
+    top: str,
+    base: str,
+    changes: list[gitstate.Change],
+    full: str,
+) -> bool:
+    """コミットされた中身で `synced` に答えさせる。読めなければ外さない。
+
+    変更後は HEAD、変更前はターンの始まりの版の中身。どちらもバイト列のまま読む。文字列で
+    読むと、UTF-8 でないスクリプトや単独の CR が読み替えられ、写した分でも食い違う。
+    """
+    path = next((c.path for c in changes if c.full == full), "")
+    if not path:
+        return False
+    now, readable = gitcmd.blob(top, "HEAD", path)
+    if not readable or now is None:
+        return False
+    prior, readable = gitcmd.blob(top, base, path)
+    if not readable:
+        return False
+    return synced(os.path.join(top, path.replace("/", os.sep)), now, prior)
 
 
 def at_stop(
@@ -331,6 +381,7 @@ def at_stop(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
+    synced: Callable[..., bool] | None = None,
 ) -> str:
     """ターンの終わりに、このターンで変わった保護領域を人へ報告する。
 
@@ -360,14 +411,14 @@ def at_stop(
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
         if f.key() not in baseline
     ]
     # このターンでコミットに入ったぶんも足す。`git status` はコミットを見せないので、
     # ここを足さないと、保護領域を汚してからコミットした回が「何も起きなかった」と
     # 同じ見た目になる（呼び出しごとの監視も同じ穴を持つが、そちらは戻しに関わるので
     # 断面を変えない。人が 1 度で見るのはこの報告）。
-    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places)
+    committed, uncounted = _committed_findings(stderr, read, heads, mine, scope, places, synced)
     found += committed
     if not found and not uncounted:
         record.decision, record.enforced = audit.ALLOW, True
@@ -382,7 +433,9 @@ def at_stop(
     record.paths = [f"{f.change.kind} {f.change.path}" for f in found]
     record.rules = sorted({rule.id or "(id 無し)" for f in found for rule in f.group})
 
-    lines = [f"[ccnavi] 守ると宣言した場所が、このターンで {len(found)} 件変わりました。"]
+    lines = [
+        f"[ccnavi] 守ると宣言した場所が、この{phase.TURN_DEFINED}で {len(found)} 件変わりました。"
+    ]
     for finding in found[:REPORT_LIMIT]:
         rule = finding.group[0]
         where = f"{finding.tree_name}: " if finding.tree_name else ""
@@ -390,30 +443,44 @@ def at_stop(
         how = (
             f"戻すなら {undo}"
             if undo
-            else "コミットに入っている（履歴は書き換えない。取り込む前に確かめる）"
+            else (
+                f"{finding.change.path} はすでにコミット済みなので、"
+                "取り込む前に中身を確かめ、不要な変更なら取り消してください"
+            )
         )
+        kind = gitstate.KIND_LABELS.get(finding.change.kind, finding.change.kind)
         lines.append(
-            f"  {where}{finding.change.path}（{finding.change.kind}）"
-            f" ルール {rule.id or '(id 無し)'} / {how}"
+            f"  {where}{finding.change.path}（{kind}）"
+            f" 対象のルール: {rule.id or '(id 無し)'} / {how}"
         )
     if len(found) > REPORT_LIMIT:
         lines.append(f"  ほか {len(found) - REPORT_LIMIT} 件。全部は git status に出ます。")
     if uncounted:
-        lines.append(_uncounted_line(uncounted))
+        lines.append(_uncounted_line(uncounted, define=False))
         record.detail = f"uncounted {len(uncounted)}"
     return "\n".join(lines)
 
 
-def _uncounted_line(uncounted: list[str]) -> str:
+def _uncounted_line(uncounted: list[str], *, define: bool = True) -> str:
     """コミット済みを数えなかったツリーを言う 1 行。
 
     数えていないことを黙ると、そのツリーで何も起きなかったのと見分けが付かない。
+    `define` は「ターン」の定義を添えるか。同じ報告の前の行で添えていれば外す。
     """
+    names = sorted(set(uncounted))
+    shown = ", ".join(names[:REPORT_LIMIT])
+    trees = f"ワークツリー {shown} "
+    if len(names) > 1:
+        trees = f"ワークツリー {len(names)} 本（{shown}）"
+    turn = phase.TURN_DEFINED if define else "ターン"
     return (
-        f"[ccnavi] コミットに入ったぶんを数えていないツリーが {len(uncounted)} 本あります"
-        f"（{', '.join(sorted(set(uncounted))[:REPORT_LIMIT])}）。"
-        "ターンの始まりに基準（HEAD）を取れていません。ターンの途中で切ったワークツリーが"
-        "これにあたります。そのツリーのコミットは 'git log' で確かめてください。"
+        f"[ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護対象のファイルを"
+        "変更していないかを確認します。"
+        f"{trees}では、今回のターンでこの確認ができませんでした。"
+        "ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。"
+        "ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。"
+        "このツリーでコミットしていなければ対応は不要です。"
+        "コミットした場合は、保護対象のファイルを変更していないか `git log` で確認してください。"
     )
 
 
@@ -429,7 +496,7 @@ class ScopeGuard:
 
     root: str
     copies: dict[str, ticket_mod.Ticket] = field(default_factory=dict)
-    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる（設計 §11.3）。
+    # プロジェクトの置き場。ワークツリーの元リポジトリをプロジェクトまで広げる（設計 11.3）。
     projects: str = ""
     # チケットの置き場（ツリーのルートからの相対）。提案と承認済みチケット。
     tickets: str = ""
@@ -545,7 +612,7 @@ class Finding:
 
 @dataclass
 class Watched:
-    """実行後に見るツリー 1 つと、そこに当てるルール（設計 §11.7）。
+    """実行後に見るツリー 1 つと、そこに当てるルール（設計 11.7）。
 
     ワークスペースのツリーにはワークスペースのルール、プロジェクトとそのワークツリーには
     そのプロジェクトのルール。実行前の判定と同じ引き方でなければ、実行前に通った
@@ -589,9 +656,10 @@ def _findings(
     mine: tuple[str, ...],
     source: str,
     scope: ScopeGuard | None,
-    where: tree.Tree | None = None,
+    where: tree.Tree,
     top: str = "",
     places: tuple[str, str] = ("", ""),
+    synced: Callable[..., bool] | None = None,
 ) -> list[Finding]:
     """変更のうち、報告すべきものを返す。
 
@@ -608,18 +676,23 @@ def _findings(
     「範囲を広げれば済む」と読ませて、済まないことを 1 往復あとに知らせる。
 
     ルールの allow に当たる変更も、チケットの範囲は当てる。実行前の判定がルールと
-    チケットの厳しい側を採るのと同じ（設計 §5）。allow を理由に飛ばすと、実行前に
+    チケットの厳しい側を採るのと同じ（設計 5）。allow を理由に飛ばすと、実行前に
     止まる書き込みがシェルから入ったときに誰も言わない。
     """
     own = tuple(os.path.realpath(p) for p in mine if p)
-    name = where.name if where is not None else ""
-    tree_root = where.root if where is not None else ""
+    name = where.name
+    tree_root = where.root
     script = _script_writes(changes, places, top, where)
     found = []
     for change in changes:
         if any(change.full == p or change.full.startswith(p + os.sep) for p in own):
             continue
         if change.full in script:
+            continue
+        # 着手のときに共通層でプロジェクトの層を上書きした分（`configsync.is_synced_write`）。
+        # 内容と印で見分け、読めないものは外さない。渡すのは解く前の綴り。解いた先で答えると、
+        # 設定を別の写しへのシンボリックリンクに差し替えた形が、指す先の中身で外れる。
+        if synced is not None and synced(_spelled(change, top or tree_root)):
             continue
         group = [rule for rule in _guarding(rule_set) if _guards_writes(rule, change.full)]
         if group:
@@ -638,7 +711,7 @@ def _script_writes(
     changes: list[gitstate.Change],
     places: tuple[str, str],
     top: str,
-    where: tree.Tree | None,
+    where: tree.Tree,
 ) -> set[str]:
     """チケットの置き場の変更のうち、ccnavi の副命令が書いたと読めるものの実パス。
 
@@ -663,11 +736,11 @@ def _script_writes(
     書き込み（シェル、ビルド、スクリプトが内部で開くファイル）で自分の範囲を広げる道ができる。
 
     読めなかったものは外さない。git を起こせない、期限に達した、ファイルを読めない——
-    どれも「変わっていない」ではない。倒す向きを間違えると、git を数秒止めるだけで
+    どれも「変わっていない」ではない。どちらとして扱うかを間違えると、git を数秒止めるだけで
     除外が通る。
     """
     tickets_rel, approved_rel = places
-    if where is None or not top or not (tickets_rel or approved_rel):
+    if not top or not (tickets_rel or approved_rel):
         return set()
     here = [
         (change, rel)
@@ -713,7 +786,7 @@ def _script_writes(
         # どれがどれの行き先なのかを内容からは決められない。正規の移動 1 件に、
         # 同じ姿のチケットのただの削除や、行き先に直接置いた偽物が相乗りする。
         # 同じ姿ということは識別子まで同じということなので、揃うのは普通の手順では
-        # 起きない。曖昧なら全部報告する側に倒す。
+        # 起きない。曖昧なら全部報告する側を採る。
         if len(landed) == 1 and len(leaving) == 1:
             out.add(change.full)
             out.add(landed[0].full)
@@ -809,7 +882,7 @@ def _violation(
     change, group = finding.change, finding.group
     lines = [
         f"[ccnavi] {finding.code} ({_source(finding.source, group)})",
-        f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+        f"path: {change.path} ({change.status.strip()} / {change.kind})",
         f"tree: {finding.tree_name} ({finding.tree_root})" if finding.tree_name else "",
         f"after: {_call(payload)}",
     ]
@@ -854,7 +927,7 @@ def _preexisting(finding: Finding) -> str:
     return "\n".join(
         [
             f"[ccnavi] {CODE_PREEXISTING} ({_source(finding.source, group)})",
-            f"path: {change.path} ({change.status.strip() or change.status} / {change.kind})",
+            f"path: {change.path} ({change.status.strip()} / {change.kind})",
             "note: this was already in the working tree when ccnavi started watching this "
             "session, so the call that just ran did not cause it. Do not undo it and do not "
             "build on it: say what you found and let the user decide whose change it is.",
@@ -943,6 +1016,7 @@ def at_prompt(
     payload: hookio.Input,
     record: audit.Record,
     places: tuple[str, str] = ("", ""),
+    synced: Callable[..., bool] | None = None,
 ) -> None:
     """ターンの始まり。いま保護領域に在る変更を控えて、このターンの基準にする。
 
@@ -958,15 +1032,15 @@ def at_prompt(
     if not read:
         # 基準を取れなかった。前のターンの控えが残っていると、そこに入っている
         # HEAD を「このターンの始まり」として読むことになり、前のターンの
-        # コミットをこのターンの成果として並べる。基準の側は「言い落とす」に
-        # 倒れるのに、HEAD の側だけ「言い過ぎる」に倒れるので、消しておく。
+        # コミットをこのターンの成果として並べる。基準の側は「言い落とす」ほうに
+        # なるのに、HEAD の側だけ「言い過ぎる」ほうになるので、消しておく。
         fsio.remove(_turn_path(state_dir, payload.session_id))
         return
 
     found = [
         f
         for w, top, changes in read
-        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places)
+        for f in _findings(changes, w.rule_set, mine, w.source, scope, w.tree, top, places, synced)
     ]
     # ツリーごとの HEAD も控える。ターンの終わりに「このターンでコミットに
     # 入ったもの」を数える基準になる（`git status` はコミットを見せない）。
@@ -996,12 +1070,12 @@ def _load_turn(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], 
     data, failed = fsio.read_json(_turn_path(state_dir, session))
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
-            stderr.write(f"ccnavi: ターンの基準を読めない: {failed}\n")
+            stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を読めない: {failed}\n")
         return set(), False, {}
     base = data.get("baseline") if isinstance(data, dict) else None
     if not isinstance(base, list):
         return set(), False, {}
-    heads = data.get("heads") if isinstance(data, dict) else None
+    heads = data.get("heads")
     if not isinstance(heads, dict):
         # 古い控え（HEAD を持たない版）でも基準としては読める。コミットのぶんだけ
         # 言えないが、ターンの始まりを見ていないことにするより害が小さい。
@@ -1023,7 +1097,7 @@ def _save_turn(
         {"baseline": sorted(baseline)[:SEEN_LIMIT], "heads": dict(sorted(heads.items()))},
     )
     if failed:
-        stderr.write(f"ccnavi: ターンの基準を書けない: {failed}\n")
+        stderr.write(f"ccnavi: {phase.TURN_DEFINED}の基準を書けない: {failed}\n")
 
 
 def _load_seen(stderr: TextIO, state_dir: str, session: str) -> tuple[set[str], bool]:

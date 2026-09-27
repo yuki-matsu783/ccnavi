@@ -107,7 +107,7 @@ GATE_SCRIPTS = ("ccnavi-ticket.sh", "ccnavi-review.sh", "ccnavi-git.sh")
 # 実際に配る sh。3 本が起動して最初に読む共通部（ccnavi-common.sh）も要る。
 # 配らないと、配った先で 3 本とも「共通部が読めない」で落ちる。
 # 承認済みチケットを運ぶ sh（ccnavi-push-approved.sh）も配る。ボードは承認のあとこれを
-# 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry §1.5）。
+# 端末に送るので、配らないと配布先のボードは運べない（設計 approve-carry 1.5）。
 DEPLOY_SCRIPTS = (
     *GATE_SCRIPTS,
     "ccnavi-common.sh",
@@ -118,11 +118,11 @@ DEPLOY_SCRIPTS = (
     "ccnavi-clean.js",
 )
 RULES_PARTS = (".ccnavi", "common", "rules.yml")
-# --deploy が配る残りの設定 2 本（設計 §11.9）。リスクの配点は共通層、
+# --deploy が配る残りの設定 2 本（設計 11.9）。リスクの配点は共通層、
 # フェーズの種類は自身の層（scope がワークスペースのレイアウトに付くため）。
 RISK_PARTS = (".ccnavi", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "phases.yml")
-# 置き場は 2 つに分けて固定する（設計 launcher-scripts §1）。hook が起動する振り分けの sh は
+# 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は
 # 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
 LAUNCHER_NAME = "ccnavi-launcher.sh"
@@ -272,7 +272,7 @@ class WritesTheExpectedShape(SetupTest):
         """hook に書かれる 1 行そのものを見る。
 
         「ccnavi という字が入っている」だけを見ていると、綴りを取り違えても
-        テストが緑のまま通る。この 1 行は、何を起動するかと、ccnavi が何を
+        テストが通ってしまう。この 1 行は、何を起動するかと、ccnavi が何を
         守るか（CCNAVI_BIN_PATH）を同時に決めている。
         """
         self.run_setup()
@@ -882,8 +882,8 @@ class TellsWhatItDidNotChange(SetupTest):
     def test_check_is_not_settled_when_a_value_differs(self):
         """--check は、値が違うだけのときも「揃っていない」と言う。
 
-        不足の 2 つだけで終了コードを決めると、CI で --check を回す運用が、
-        disable の書かれた設定に対して緑を出し続ける。
+        不足の 2 つだけで終了コードを決めると、CI で回す --check が、
+        disable の書かれた設定でも通り続ける。
         """
         self.run_setup("--mode", "dry-run")
         result = self.run_setup("--mode", "enable", "--check")
@@ -895,7 +895,7 @@ class TellsWhatItDidNotChange(SetupTest):
         """置き換えるのは、この実行で名指しした値だけ。
 
         `--force` が既定値まで押し込むと、`--all` を足しに来た打ち直しが、
-        その場で指定していない CCNAVI_MODE を既定の dry-run へ落とす。
+        その場で指定していない CCNAVI_MODE を既定の dry-run に戻す。
         """
         self.run_setup("--mode", "enable")
 
@@ -1172,7 +1172,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 §11.9）。
+            # 設定 3 本のひな形。risk は共通層、phases は自身の層（設計 11.9）。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config"))

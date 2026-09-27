@@ -93,7 +93,8 @@ test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶ
   });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "decidePreview");
-    assert.equal(text(page, "#approval-title"), "フェーズ 2 に残った指摘 2 件の行き先");
+    assert.equal(text(page, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘 2 件の対応方針");
+    assert.ok(texts(page, ".approval-note").join(" ").includes("「このフェーズで直す」を 1 件でも選ぶと"));
     assert.deepEqual(texts(page, ".decide-body"), ["命名を直す", "<b>テスト</b>"]);
     // issue に回せない局面では、その行き先を出さない
     assert.equal(page.all('input[data-choice="issue"]').length, 0);
@@ -132,6 +133,19 @@ test("CB-T205 残った指摘は 1 件ずつ行き先を選び、全部に選ぶ
   } finally {
     await deciding.close();
   }
+  // 未解決が 0 件なら、選び方の注意（「このフェーズで直す」を選ぶと…）は出さない
+  const none = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: { ...decidePreview(false), threads: [] }, tree: "/w" },
+  });
+  try {
+    assert.equal(text(none, "#approval-title"), "フェーズ 2 で未解決（Unresolved）の指摘なし");
+    const notes = texts(none, ".approval-note").join(" ");
+    assert.ok(!notes.includes("このフェーズで直す"), notes);
+    assert.ok(!notes.includes("issue に回せる"), notes);
+    assert.equal(none.one<HTMLButtonElement>('button[data-action="decide-confirm"]').textContent, "レビュー済みにする");
+  } finally {
+    await none.close();
+  }
 });
 
 test("CB-D73 説明の付く見出しは次の行をツールチップに畳み、知らない見出しは畳まない", async () => {
@@ -162,7 +176,7 @@ test("CB-T108 承認の対象が空なら承認ボタンを出さず、承認中
     approval: { kind: "preview", preview: { ...preview, batch: [], text: "承認待ちのチケットは無い。" } },
   });
   try {
-    assert.equal(text(empty, "#approval-title"), "承認待ちのチケットは無い");
+    assert.equal(text(empty, "#approval-title"), "承認待ちのチケットなし");
     // 実行ファイルの本文（文末に句点が付く文）はそのまま出す。画面のラベルとは別物。
     assert.equal(text(empty, "pre.approval-text"), "承認待ちのチケットは無い。");
     assert.equal(empty.all('button[data-action="approve-confirm"]').length, 0);
@@ -197,7 +211,7 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
   const page = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-03 を承認した <b>" } });
   try {
     assert.equal(page.one(".approval-backdrop").getAttribute("data-approval"), "done");
-    assert.equal(text(page, "#approval-title"), "1 件を承認した");
+    assert.equal(text(page, "#approval-title"), "1 件を承認しました");
     // 文は文字として出す。<b> がタグにならない
     assert.equal(text(page, "pre.approval-text"), "i0001-03 を承認した <b>");
     assert.equal(page.all("pre.approval-text b").length, 0);
@@ -210,13 +224,13 @@ test("CB-T108b 承認したら同じオーバーレイに文とコピー・新�
     assert.deepEqual(page.posted.at(-1), { type: "promptOpen" });
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
     // 運ぶ sh を端末に送ったときだけ、そう言う。
-    assert.ok(!texts(page, ".approval-note").some((note) => note.includes("端末に送った")));
+    assert.ok(!texts(page, ".approval-note").some((note) => note.includes("ターミナルに送りました")));
   } finally {
     await page.close();
   }
   const carried = await openBoard(fixture(), { approval: { kind: "done", count: 1, prompt: "i0001-03 を承認した", carried: true } });
   try {
-    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットのコミットと push を端末に送った。"));
+    assert.ok(texts(carried, ".approval-note").includes("承認済みチケットのコミットと push をターミナルに送りました。"));
   } finally {
     await carried.close();
   }
@@ -349,9 +363,9 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   try {
     const rows = page.all(".card.parent .phase");
     assert.equal(rows[0].querySelector(".phase-brief")?.textContent, "リスク HIGH");
-    assert.equal(rows[0].querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
+    assert.equal(rows[0].querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 40 (HIGH) — 行数が多い（6509 行 > 300）");
     assert.equal(rows[1].querySelector(".phase-brief")?.textContent, "レビュー待ち");
-    assert.equal(rows[1].querySelector(".phase-full")?.textContent, "終了 · レビュー待ち · レビュー依頼済 · レビュー要");
+    assert.equal(rows[1].querySelector(".phase-full")?.textContent, "終了 · レビュー待ち · レビュー依頼済み · レビュー要");
     assert.equal(rows[1].querySelectorAll('button[data-action="decide"]').length, 1);
   } finally {
     await page.close();
@@ -365,7 +379,7 @@ test("CB-T13c フェーズ行の要約はバッジと同じ条件（レビュー
   try {
     const row = page2.all(".card.parent .phase")[0];
     assert.equal(row.querySelector(".phase-brief")?.textContent, "");
-    assert.equal(row.querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 25 (MEDIUM)");
+    assert.equal(row.querySelector(".phase-full")?.textContent, "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 25 (MEDIUM)");
   } finally {
     await page2.close();
   }
@@ -395,10 +409,15 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
     assert.equal(text(page, ".badge.copy.copy-none"), "未承認");
     assert.equal(text(page, ".badge.worktree.none"), "ワークツリーなし");
     // 属性は枠無しの fact。承認済・レビューの要否・ワークツリーの名前・base
-    assert.ok(texts(page, ".fact.copy-open").includes("承認済"));
+    assert.ok(texts(page, ".fact.copy-open").includes("承認済み"));
     // レビュー待ちは列ではなく属性。カードは作業中の列にある
     assert.equal(text(page, '.column[data-state="doing"] .card[data-id="i0001-04"] .fact.copy-review'), "レビュー待ち");
-    assert.ok(texts(page, ".fact.copy-closed").includes("クローズ"));
+    // クローズは完了・取り消しの列で分かるので、カードには重ねて書かない。そこにいるカードにはレビューの要否も出さない
+    assert.equal(page.all(".fact.copy-closed").length, 0);
+    assert.equal(page.all('.column[data-state="done"] .card .fact.review').length, 0);
+    assert.equal(page.all('.column[data-state="cancelled"] .card .fact.review').length, 0);
+    // 実績のリスクは閉じたカードにも残る
+    assert.ok(texts(page, '.column[data-state="done"] .card[data-id="i0001-01"] .fact.risk').length > 0);
     // 取り消しは列で分かるので、カードには重ねて書かない
     assert.equal(page.all('.column[data-state="cancelled"] .card[data-id="i0001-05"]').length, 1);
     assert.equal(page.all(".fact.cancelled").length, 0);
@@ -455,9 +474,26 @@ test("CB-T13 カードにバッジ・フェーズ・操作を出す。バッジ�
   assert.ok(css().indexOf(".card.pending { border-left") < css().indexOf(".card.review-hold { border-left"));
 });
 
+test("CB-T217 提案が残っていて未着手の列にいる閉じたカードには、列との食い違いの手がかりとしてクローズとレビューの要否を出す", async () => {
+  const base = fixture();
+  const proposal = { state: "todo", tree: "i0001", tree_root: "<root>/.claude/worktrees/i0001", path: "<root>/.claude/worktrees/i0001/wip/proposals/todo/i0001-01.md" };
+  const page = await openBoard({
+    ...base,
+    tickets: base.tickets.map((t) => (t.ticket === "i0001-01" ? { ...t, proposal } : t)),
+  } as typeof base);
+  try {
+    const card = '.column[data-state="todo"] .card[data-id="i0001-01"]';
+    assert.equal(page.all(card).length, 1);
+    assert.equal(text(page, `${card} .fact.copy-closed`), "クローズ");
+    assert.equal(page.all(`${card} .fact.review`).length, 1);
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビューが済んで止まらなくなった子には出さない", async () => {
   const base = fixture();
-  // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済 かつ 止まっている」を判定が言う
+  // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは「依頼済み かつ 止まっている」を判定が言う
   const withMarks = (marks: Record<string, Record<string, unknown>>, gateClosed: boolean) => ({
     ...base,
     parents: base.parents.map((parent) => ({
@@ -472,14 +508,14 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   const brief = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-brief")?.textContent ?? "";
   const full = (page: DomPage): string => page.all(".card.parent .phase")[0].querySelector(".phase-full")?.textContent ?? "";
 
-  // クローズ・レビュー済・止まっていない子（完了列の i0001-01）。バッジは出さず、レビュー済は枠無しの行に出る。
-  // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済 · レビュー済」が残る
+  // クローズ・レビュー済み・止まっていない子（完了列の i0001-01）。バッジは出さず、レビュー済みは枠無しの行に出る。
+  // 親カードのフェーズ行の要約にも出ない。全文には経過として「レビュー依頼済み · レビュー済み」が残る
   const done = await openBoard(withMarks({ requested: { at: "t" }, reviewed: { at: "t" } }, false));
   try {
     assert.equal(done.all(".badge.hold").length, 0);
-    assert.ok(texts(done, ".fact.mark.mark-reviewed").includes("レビュー済"));
+    assert.ok(texts(done, ".fact.mark.mark-reviewed").includes("レビュー済み"));
     assert.equal(brief(done), "");
-    assert.equal(full(done), "終了 · レビュー依頼済 · レビュー済 · レビュー要 · リスク: 0 (LOW)");
+    assert.equal(full(done), "終了 · レビュー依頼済み · レビュー済み · レビュー要 · リスク: 0 (LOW)");
   } finally {
     await done.close();
   }
@@ -496,7 +532,7 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   try {
     assert.ok(texts(waiting, ".badge.hold").includes("レビュー待ち"));
     assert.equal(brief(waiting), "レビュー待ち");
-    assert.equal(full(waiting), "終了 · レビュー待ち · レビュー依頼済 · レビュー要 · リスク: 0 (LOW)");
+    assert.equal(full(waiting), "終了 · レビュー待ち · レビュー依頼済み · レビュー要 · リスク: 0 (LOW)");
   } finally {
     await waiting.close();
   }
@@ -506,12 +542,28 @@ test("CB-T13a 止めている間だけ段の名前をバッジに出す。レビ
   } finally {
     await stillClosed.close();
   }
+  // 終了の印（pending）はカードの属性に出さない。止まっている間はバッジの「レビュー準備中」が言う。
+  // 省略はレビュー済と同じく、閉じた後も人のレビューを通ったかの区別として残す
+  const ended = await openBoard(withMarks({ pending: { at: "t" } }, true));
+  try {
+    assert.equal(ended.all(".fact.mark-pending").length, 0);
+    assert.ok(texts(ended, ".badge.hold").includes("レビュー準備中"));
+  } finally {
+    await ended.close();
+  }
+  const skipped = await openBoard(withMarks({ pending: { at: "t" }, skipped: { at: "t" } }, false));
+  try {
+    assert.equal(skipped.all(".fact.mark-pending").length, 0);
+    assert.ok(texts(skipped, ".fact.mark.mark-skipped").includes("レビュー省略"));
+  } finally {
+    await skipped.close();
+  }
   // 依頼を出していない子のバッジは「レビュー準備中」で、依頼済とは出ない
   const notRequested = await openBoard(withMarks({}, true));
   try {
     assert.ok(texts(notRequested, ".badge.hold").includes("レビュー準備中"));
     assert.equal(brief(notRequested), "レビュー準備中");
-    assert.ok(!notRequested.document.body.textContent.includes("レビュー依頼済"));
+    assert.ok(!notRequested.document.body.textContent.includes("レビュー依頼済み"));
   } finally {
     await notRequested.close();
   }
@@ -549,7 +601,7 @@ test("CB-T15 問題とプロジェクトの絞り込みを出す", async () => {
   const page = await openBoard({ ...fixture(), problems: ["承認済みチケット x を読めない"], projects: ["lib", "app"] });
   try {
     assert.deepEqual(texts(page, ".problems li"), ["承認済みチケット x を読めない"]);
-    assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース自身", "lib", "app"]);
+    assert.deepEqual(texts(page, "#project-filter option"), ["すべて", "ワークスペース（プロジェクト外）", "lib", "app"]);
   } finally {
     await page.close();
   }
@@ -624,7 +676,7 @@ test("CB-T131r レビュー待ちのフェーズ行に「レビュー済み連�
     assert.equal(reviewed.textContent, "レビュー済み連絡");
     assert.equal(
       reviewed.getAttribute("title"),
-      "レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase 2 を打つ）",
+      "レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase 2 を実行して、レビュー済みを記録します）",
     );
     page.click(reviewed);
     await page.settle();
@@ -675,7 +727,7 @@ test("CB-T131o レビュー済みの連絡のオーバーレイは、題・注�
     assert.equal(page.all('button[data-action="prompt-copy"]').length, 1);
     assert.equal(page.all('button[data-action="prompt-open"]').length, 1);
     assert.equal(page.all('button[data-action="approve-cancel"]').length, 1);
-    assert.ok(!text(page, ".approval").includes("を承認した"));
+    assert.ok(!text(page, ".approval").includes("を承認しました"));
   } finally {
     await page.close();
   }
@@ -687,7 +739,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
     const label = page.one("label.filter.attention");
     assert.equal(
       label.getAttribute("title"),
-      "人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
+      "人が動く必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）",
     );
     assert.equal(label.textContent.trim(), "要対応のみ");
     assert.equal(page.one('.card[data-id="i0001-03"]').getAttribute("data-attention"), "1");
@@ -705,7 +757,7 @@ test("CB-T132r 「要対応のみ」の絞り込みを出し、カードに要�
 test("CB-T162 読み直せなかった画面にも承認のオーバーレイが載り、閉じる手立てが付いてくる", async () => {
   const plain = await openPage({ kind: "error", error: "ccnavi --explain --json が失敗した: 60 秒で返らないので打ち切った" });
   try {
-    assert.ok(text(plain, ".board-empty").includes("ボードを読み直せなかった"));
+    assert.ok(text(plain, ".board-empty").includes("チケット管理画面を読み込めませんでした"));
     assert.ok(text(plain, "pre.load-error").includes("60 秒で返らないので打ち切った"));
     assert.equal(plain.all(".approval-backdrop").length, 0, "オーバーレイが無ければ被せない");
     // ボードの部品は出さない
@@ -719,7 +771,7 @@ test("CB-T162 読み直せなかった画面にも承認のオーバーレイが
     approval: { kind: "done", count: 2, prompt: "i0001-03 を承認した" },
   });
   try {
-    assert.equal(text(withApproval, "#approval-title"), "2 件を承認した");
+    assert.equal(text(withApproval, "#approval-title"), "2 件を承認しました");
     assert.equal(text(withApproval, "pre.approval-text"), "i0001-03 を承認した");
     // ボタンが効く（画面の骨組みが載っている）
     withApproval.click(withApproval.one('button[data-action="prompt-copy"]'));
@@ -750,7 +802,7 @@ test("CB-T141 止まっているカードに「書き込み停止中」のバッ
   try {
     assert.equal(text(page, ".badge.blocked"), "書き込み停止中");
     assert.equal(page.one(".badge.blocked").getAttribute("title"), reason);
-    assert.deepEqual(texts(page, ".card .issues li"), [`書き込みが止まっている: ${reason}`]);
+    assert.deepEqual(texts(page, ".card .issues li"), [`書き込みが止まっています: ${reason}`]);
   } finally {
     await page.close();
   }
@@ -776,6 +828,110 @@ test("CB-T142 見た目の切り替えは body のクラスだけを付け替え
     assert.equal(page.document.body.className, "");
     // 画面は作り直されていない（列はそのまま）
     assert.equal(page.all(".column").length, 4);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。跡が無いカードには出さない", async () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
+  const parent = base.tickets.find((t) => t.ticket === "i0001")!;
+  const entries = [
+    { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" },
+    { at: "2026-09-26T09:10:00Z", kind: "started", from: "doing", to: "doing", via: "cli", phase: null, mark: "", reason: "" },
+    { at: "2026-09-26T10:00:00Z", kind: "cancelled", from: "doing", to: "done", via: "cli", phase: null, mark: "", reason: "要らなくなった" },
+  ];
+  const marks = [
+    { at: "2026-09-26T11:00:00Z", kind: "phase-mark", from: "", to: "", via: "hook", phase: 1, mark: "pending" },
+    { at: "2026-09-26T11:05:00Z", kind: "parent-mark", from: "", to: "", via: "cli", phase: null, mark: "ready" },
+    { at: "2026-09-26T11:06:00Z", kind: "phase-reopened", from: "", to: "", via: "terminal", phase: 2, mark: "" },
+  ].map((e) => ({ reason: "", ...e }));
+  const page = await openBoard({
+    ...base,
+    tickets: [
+      { ...parent, history: marks },
+      { ...child, history: entries },
+    ],
+  });
+  try {
+    const details = page.one('.card[data-id="i0001-02"] details.history');
+    assert.equal(details.hasAttribute("open"), false);
+    assert.equal(text(page, '.card[data-id="i0001-02"] details.history summary'), "履歴（3 件）");
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-text'), [
+      "取り消し（作業中 → 完了）: 要らなくなった",
+      "着手",
+      "承認（承認待ち → 作業中）",
+    ]);
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
+    // cli は「sh から来た」までしか言えない（人が端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
+    assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
+      "フェーズ 2: マーカーを消した（子が足された）",
+      "Draft を外した",
+      "フェーズ 1: エージェントに終了を通知済み",
+    ]);
+  } finally {
+    await page.close();
+  }
+  const empty = await openBoard({ ...base, tickets: base.tickets.map((t) => ({ ...t, history: [] })) });
+  try {
+    assert.equal(empty.all("details.history").length, 0);
+  } finally {
+    await empty.close();
+  }
+});
+
+test("CB-T264 先行を満たしていないカードに「先行待ち（先行の識別子）」のバッジ。どの先行が何の状態かは tooltip に実行ファイルの言葉で出す", async () => {
+  const base = fixture();
+  const unmet = [
+    { ticket: "i0001-02", state: "doing", label: "作業中（doing/）" },
+    { ticket: "i0001-09", state: "missing", label: "どの置き場にも無い" },
+  ];
+  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-03" ? { ...t, predecessors_unmet: unmet } : t)) });
+  try {
+    assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-02, i0001-09）");
+    const title = page.one('.card[data-id="i0001-03"] .badge.preds').getAttribute("title") ?? "";
+    assert.match(title, /承認も着手も止まります/);
+    assert.match(title, /i0001-02: 作業中（doing\/）/);
+    assert.match(title, /i0001-09: どの置き場にも無い/);
+    // 先行を満たしているカードには出さない
+    assert.equal(page.all('.card[data-id="i0001-02"] .badge.preds').length, 0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認待ちは承認と着手、未着手は着手、着手済み・レビュー待ちは止まらないと言う", async () => {
+  const base = fixture();
+  const unmet = [{ ticket: "i0001-09", state: "doing", label: "作業中（doing/）" }];
+  const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
+  const tickets = base.tickets.map((t) => {
+    if (t.ticket === "i0001-03") {
+      return { ...t, predecessors_unmet: unmet }; // 承認待ち
+    }
+    if (t.ticket === "i0001-02") {
+      return { ...t, started_at: "", predecessors_unmet: unmet }; // 承認済み・未着手
+    }
+    if (t.ticket === "i0001-04") {
+      return { ...t, predecessors_unmet: unmet }; // レビュー待ち
+    }
+    return t;
+  });
+  assert.equal(at("i0001-03").copy.status, "none");
+  assert.equal(at("i0001-02").copy.status, "open");
+  assert.equal(at("i0001-04").copy.status, "review");
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const title = (id: string) => page.one(`.card[data-id="${id}"] .badge.preds`).getAttribute("title") ?? "";
+    assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-09）");
+    assert.match(title("i0001-03"), /承認も着手も止まります/);
+    assert.equal(text(page, '.card[data-id="i0001-02"] .badge.preds'), "先行待ち（i0001-09）");
+    assert.match(title("i0001-02"), /着手が止まります/);
+    assert.doesNotMatch(title("i0001-02"), /承認/);
+    assert.equal(text(page, '.card[data-id="i0001-04"] .badge.preds'), "先行が未完了（i0001-09）");
+    assert.match(title("i0001-04"), /着手済みです/);
+    assert.match(title("i0001-04"), /作業と finish は止まりません/);
   } finally {
     await page.close();
   }

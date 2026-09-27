@@ -1,4 +1,4 @@
-"""フェーズの種類と計画（REQ-TKT-26〜35、設計 §9.7）の受入テスト。
+"""フェーズの種類と計画（REQ-TKT-26〜35、設計 9.7）の受入テスト。
 
 見るのは 9 つ。
 
@@ -12,7 +12,7 @@
 8. 残った指摘の切り出しの下書き
 9. このセッションで見るフェーズ（`review: chat`）の止め方と締め
 
-範囲の上限（設計 wip/design/approve-carry.md §3・§4）は ScopeLimitTest が見る。
+範囲の上限（設計 wip/design/approve-carry.md 3・4）は ScopeLimitTest が見る。
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ class PhaseHarness(unittest.TestCase):
         self.phases = write(common_path(self.root, "phases"), PHASES)
         self.state = os.path.join(self.root, "state")
         self.parent_tree = self.worktree("i0001", "main")
-        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 §9.2）。
+        # 写しとマーカーは親のツリーに置かれ、親のブランチに乗る（設計 9.2）。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
 
     # ---- 道具
@@ -332,7 +332,7 @@ class ApproveOnlyTest(PhaseHarness):
         self.propose("i0001-02", child_text("i0001-02", "i0001", 1, ("tests/x*",)))
         self.commit_parent()
         # 絞らないときは、改版後の計画で検証される。種類の超過は承認を拒まず、承認画面に
-        # 「編集対象としているが」として出る（設計 approve-carry §3.2）。n で何も適用しない
+        # 「編集対象としているが」として出る（設計 approve-carry 3.2）。n で何も適用しない
         whole = self.ccnavi("--approve", stdin="n\n")
         self.assertIn("編集対象としているが", whole.stdout)
         self.assertIn("超えている", whole.stdout)
@@ -444,7 +444,7 @@ class PhaseTest(PhaseHarness):
     def test_child_must_fit_the_phase_type(self):
         """種類の範囲の超過は承認を拒まず、承認画面で見せる。計画に無い番号は今までどおり拒む。
 
-        超過は判定が切り詰めるので、承認で止める理由が無い（設計 approve-carry §3.1）。
+        超過は判定が切り詰めるので、承認で止める理由が無い（設計 approve-carry 3.1）。
         チケットの形の誤り（計画に無い番号）は判定で補えないので、承認で止める。
         """
         self.family(plan=["research", "design"])
@@ -1088,7 +1088,7 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
         self.assertIn("--cwd は 1 度しか渡せない", refused.stderr)
 
     def test_one_of_each_still_goes_through(self):
-        """1 本ずつなら通る。断る側だけを見ると、全部断る実装でも緑になる。"""
+        """1 本ずつなら通る。断る側だけを見ると、全部断る実装でもテストが通ってしまう。"""
         passed = self.ccnavi("--cwd", self.parent_tree, "--explain", "--json")
 
         self.assertEqual(passed.returncode, 0, passed.stderr)
@@ -1134,7 +1134,7 @@ class PhasesFlagIsDiagnosisOnlyTest(PhaseHarness):
 
 
 class ChatReviewTest(PhaseHarness):
-    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 §9.8、ADR-0065）。"""
+    """このセッションで見るフェーズ（REQ-TKT-45〜47、設計 9.8、ADR-0065）。"""
 
     def chat_phase(self, plan=("chores", "design")):
         """`review: chat` のフェーズを 1 つ終わらせて、告知の文を返す。"""
@@ -1377,9 +1377,32 @@ class ChatReviewTest(PhaseHarness):
         record = read_json(os.path.join(self.approved, "phases", "i0001", "closed.json"))
         self.assertEqual(record["reviews"], {"1": "chat"})
 
+    def test_a_closed_parent_has_no_stage_on_the_board(self):
+        """閉じた親に「クローズ可」は出さない。閉じる前の親には局面を出す。"""
+        self.chat_phase(plan=["chores"])
+        passed = self.ccnavi("--cwd", self.parent_tree, "--reviewed", "1", "--chat", stdin="y\n")
+        self.assertEqual(passed.returncode, 0, passed.stderr)
+        self.start_parent()
+        self.propose("i0001", parent_text("i0001", ["chores"], feedback=[]))
+        self.assertEqual(self.approve().returncode, 0)
+
+        def parent_on_the_board():
+            board = self.ccnavi("--explain", "--json")
+            self.assertEqual(board.returncode, 0, board.stderr)
+            return {p["ticket"]: p for p in json.loads(board.stdout)["parents"]}["i0001"]
+
+        before = parent_on_the_board()
+        self.assertFalse(before["closed"])
+        self.assertIn("クローズ可", before["stage"])
+
+        self.assertEqual(self.ccnavi("ticket", "finish", "i0001").returncode, 0)
+        after = parent_on_the_board()
+        self.assertTrue(after["closed"])
+        self.assertEqual(after["stage"], "")
+
 
 class ScopeLimitTest(PhaseHarness):
-    """範囲の上限（設計 wip/design/approve-carry.md §3・§4、§6.1〜§6.2）。
+    """範囲の上限（設計 wip/design/approve-carry.md 3・4、6.1〜6.2）。
 
     承認は範囲の超過を拒まず「編集対象としているが」として見せる。判定は子 → 親 → 種類の
     厳しい側で切り詰め、外へ出した上限を `limit:` 行で名指しする。
@@ -1451,7 +1474,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_dry_run_lets_the_write_through_and_says_which_limit(self):
         """8. dry-run: 同じ Write は通り、enable なら止めたことと `limit: phase type` が出る。
 
-        dry-run の文面は今の judge.decide_before のもの（設計 §4.4「新しい処理は足さない」）。
+        dry-run の文面は今の judge.decide_before のもの（設計 4.4「新しい処理は足さない」）。
         """
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
@@ -1579,7 +1602,7 @@ class ScopeLimitTest(PhaseHarness):
         """8. 親が計画を持ち番号が計画にあっても、phases.yml がどの層にも無ければ注記しない。
 
         「種類が読めない」は phases.yml が在って読めないときだけ。無いのは番号だけの挙動
-        （設計 §4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。
+        （設計 4.2 の表の 1 行目）で、注記を出すと毎回の Write に余計な 1 行が載る。
         """
         tree = self.approved_child(
             child_text("i0001-01", "i0001", 1, ["wip/research/*", "src/a/*"])
@@ -1615,7 +1638,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_regex_child_ignores_case_like_the_glob_child(self):
         """14. regex の子: 範囲の綴りは glob の子と同じく大文字小文字を区別しない。
 
-        範囲は人が宣言する意図なので、`regex` で書いても同じ場所を指す（設計 §9.3）。
+        範囲は人が宣言する意図なので、`regex` で書いても同じ場所を指す（設計 9.3）。
         区別が要るなら `(?-i:...)` で囲む。
         """
         tree = self.approved_child(

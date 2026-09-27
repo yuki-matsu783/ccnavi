@@ -22,10 +22,10 @@ sh の HTTP 経路（curl / gh / glab、jq での組み立て、ページング�
 
 対象のプロジェクトは、origin を `http://127.0.0.1:<port>/demo/greeter.git` にして、
 push だけ手元の bare リポジトリへ向ける（`git remote set-url --push`）。
-`GITLAB_TOKEN` に下の TOKEN を置くと、sh は curl 経路でここを叩く。
+`GITLAB_TOKEN` に下の TOKEN を置くと、sh は curl 経路でここを呼ぶ。
 
 人間役（issue を立てる、スレッドを立てる、解決する、変更要求を出す、マージする）は
-curl で直に叩く。sh と同じ道具を使わないほうが、片方の壊れがもう片方に隠れない。
+curl で直に呼ぶ。sh と同じ道具を使わないほうが、片方の壊れがもう片方に隠れない。
 
 ## 時計をずらしてある
 

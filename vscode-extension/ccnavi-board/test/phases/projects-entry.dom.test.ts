@@ -16,7 +16,7 @@ test("CB-T115 プロジェクト管理画面はカードと本体の枠からフ
 
     const selfPhases = dom.one('section.workspace button[data-action="open-self-phases"]');
     assert.equal(selfPhases.className, "action small");
-    assert.match((dom.one("section.workspace").textContent ?? "").trim(), /自身の層のフェーズの種類 フェーズ管理/);
+    assert.match((dom.one("section.workspace").textContent ?? "").trim(), /ワークスペースの設定のフェーズの種類 フェーズ管理/);
 
     // 押すと契約どおりの型で送る（拡張ホストは名前を持たない自身の層として受ける）
     dom.click(selfPhases);

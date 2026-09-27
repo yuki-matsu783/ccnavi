@@ -50,10 +50,11 @@ def groups() -> list[str]:
     found = []
     for name in sorted(os.listdir(TESTS)):
         directory = os.path.join(TESTS, name)
-        if not os.path.isdir(directory) or name == "__pycache__":
+        if not os.path.isdir(directory):
             continue
         # `__init__.py` が無いディレクトリは discover が飛ばすので、グループではない
         # （`tests/fixtures/` がこれ。固定データの置き場で、テストは入っていない）。
+        # `__pycache__` もここで落ちる。
         if not os.path.isfile(os.path.join(directory, "__init__.py")):
             continue
         if any(n.startswith("test_") and n.endswith(".py") for n in os.listdir(directory)):
@@ -142,7 +143,7 @@ def main() -> int:
             if result is None:
                 continue
             results.append(result)
-            dotted, spent, code, output = result
+            dotted, spent, code, _ = result
             if code != 0 and failed is None:
                 failed = result
                 stop = True
@@ -153,7 +154,7 @@ def main() -> int:
 
     if failed is None:
         return 0
-    dotted, spent, _, output = failed
+    dotted, _, _, output = failed
     print(f"\n--- 落ちたのは {dotted} ---", file=sys.stderr)
     print(output.strip(), file=sys.stderr)
     skipped = len(planned) - len(results)

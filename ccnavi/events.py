@@ -16,14 +16,18 @@ from . import (
     approval,
     audit,
     builtin,
+    configsync,
     ctxfile,
     fsio,
     hookio,
     judge,
     modes,
+    ops,
     phase,
     post,
+    prune,
     reasons,
+    repeat,
     ruleload,
     rules,
     selfguard,
@@ -61,7 +65,7 @@ def decide(
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         return decide_at_prompt(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
-        return decide_at_stop(stdout, stderr, conf, root, payload, record)
+        return decide_at_stop(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
         return subagent.at_start(stdout, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
@@ -91,7 +95,7 @@ def watched_for(
     record: audit.Record,
     payload: hookio.Input | None = None,
 ) -> list[post.Watched]:
-    """実行後に見るツリーと、それぞれに当てるルール（設計 §11.7）。
+    """実行後に見るツリーと、それぞれに当てるルール（設計 11.7）。
 
     payload が無ければ全部のツリー（ターンの区切り）。あればワークスペースルートと、
     この呼び出しが触ったツリー（パスを持つツールは行き先、Bash は cwd）。
@@ -104,7 +108,7 @@ def watched_for(
     else:
         trees = [ws]
         where = record.subject if payload.tool_name in ruleload.PATH_TOOLS else payload.cwd
-        t = tree.tree_of(root, where, conf.projects) if where else None
+        t = tree.tree_of(root, where, conf.projects)
         if t is not None and t.root != ws.root:
             trees.append(t)
     loaded: dict[str, tuple[rules.RuleSet, str]] = {}
@@ -173,6 +177,7 @@ def decide_at_prompt(
         payload,
         record,
         (conf.tickets, conf.approved),
+        functools.partial(configsync.is_synced_write, conf, root),
     )
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
@@ -183,6 +188,7 @@ def decide_at_prompt(
 def decide_at_stop(
     stdout: TextIO,
     stderr: TextIO,
+    mode: str,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -194,16 +200,21 @@ def decide_at_stop(
     経路に載せてあり、そこは既に足りている。足りていないのは、ターンが終わった
     あとに人が「結局どこが変わったのか」を 1 度で見る場所のほう。
 
-    exit 2 は使わない。このイベントでの exit 2 はターンを続けさせる意味になり、
-    報告のために作業を終わらせない形になる。何も止めずに、言うだけにする。
+    報告のためには止めない。このイベントで止めることはターンを続けさせる意味になり、
+    報告のために作業を終わらせない形になる。報告は言うだけにする。
 
-    モードを見ない。dry-run でも disable でも報告する。ここは呼び出しにも
-    作業ツリーにも手を出さず、見えたことを言うだけなので、モードが約束している
-    ものを何ひとつ破らない。むしろ dry-run は「まだ何も適用していないが何が
-    起きているか」を見るためのモードなので、ここが黙ると見る手立てが減る。
+    報告はモードを見ない。dry-run でも報告する。ここは呼び出しにも作業ツリーにも手を
+    出さず、見えたことを言うだけなので、モードが約束しているものを何ひとつ破らない。
+    むしろ dry-run は「まだ何も適用していないが何が起きているか」を見るためのモードなので、
+    ここが黙ると見る手立てが減る。
+
+    止めるのは 1 つだけ。cwd のワークツリーのチケットが、作業を終えたように見えるのに
+    `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
+    （ADR-0087、`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
+    止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
     """
     watched, scope = watch_context(stderr, conf, root, record)
-    text = post.at_stop(
+    report = post.at_stop(
         stderr,
         conf.state,
         (conf.state, conf.log),
@@ -212,10 +223,57 @@ def decide_at_stop(
         payload,
         record,
         (conf.tickets, conf.approved),
+        functools.partial(configsync.is_synced_write, conf, root),
     )
-    if text:
-        hookio.write_system_message(stdout, text)
+    # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
+    # 言い換えで回っているかもしれないことを人にも 1 度言う。止めはしない。
+    repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
+    if repeated:
+        report = f"{report}\n\n{repeated}" if report else repeated
+    nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
+    if nudge and mode == modes.ENABLE:
+        hookio.write_stop_block(stdout, nudge, system=report)
+        return EXIT_OK
+    if nudge:
+        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後の監視と同じ言い方）。
+        told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
+        report = f"{report}\n\n{told}" if report else told
+    if report:
+        hookio.write_system_message(stdout, report)
     return EXIT_OK
+
+
+def _finish_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    mode: str,
+) -> str:
+    """`finish` の打ち忘れを促す文（ADR-0087）。促さないなら空文字。
+
+    メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは、同じセッションで
+    同じチケットを同じ HEAD のまま促したことが無いときだけ（控えは状態の置き場の
+    `nudged-<セッション>.json`）。コミットを足して HEAD が進めば、また促してよい。加えて
+    `stop_hook_active` が真なら（Stop の hook が続けさせた結果なら。ほかの hook が止めた分も含む）
+    何もしない。控えの置き場が無い（`--state ""`）か、控えを書けないときは促さない。覚えられないまま
+    止めると、ターンの終わりのたびに止まるので、黙る側を採る。チケット制御が disable なら
+    何もしない。
+    """
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    found = ops.unfinished_at_stop(root, conf, payload.cwd)
+    if found is None or ops.nudged_before(conf.state, payload.session_id, found):
+        return ""
+    failed = ops.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: finish の促しを控えられないので、促さない: {failed}\n")
+        return ""
+    record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
+    record.enforced = mode == modes.ENABLE
+    record.tree = found.ticket.ticket
+    return ops.finish_nudge(root, found)
 
 
 def decide_at_start(
@@ -256,6 +314,7 @@ def decide_at_start(
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
+    record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:
@@ -268,9 +327,26 @@ def decide_at_start(
     return EXIT_OK
 
 
+def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
+    """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
+
+    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前の判定に置くと、呼び出しの
+    たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
+    動かしたものの数は記録の `detail` に残す（消したことも記録に残る）。
+    """
+    try:
+        report = prune.run(root, conf.log, conf.state, session)
+    except Exception as exc:  # noqa: BLE001 - 後始末の失敗でセッションの開始を止めない
+        stderr.write(f"ccnavi: 記録と控えの後始末に失敗した: {exc}\n")
+        return ""
+    for problem in report.problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    return prune.summary(report)
+
+
 def _written(payload: hookio.Input, record: audit.Record) -> str:
     """この呼び出しが名指しのツールで書いた先の、解決済みのパス。書かないツールなら空。"""
-    if payload.tool_name not in selfguard.REPAIR_TOOLS or not record.subject:
+    if payload.tool_name not in selfguard.REPAIR_TOOLS:
         return ""
     return fsio.full_path(record.subject, payload.cwd)
 
@@ -286,7 +362,7 @@ def decide_after(
 ) -> int:
     """実行後の監視を 1 回動かし、言うことがあれば返す。
 
-    期限を渡していない。実行前の期限は、遅い判定が黙った許可に化けるのを
+    期限を渡していない。実行前の期限は、遅い判定が黙った許可になってしまうのを
     防ぐためのもので、止められるイベントでしか意味を持たない。ここは
     何も止めていないので、遅れは待ち時間にしかならない。作業ツリーを読む側は
     自前の短い時間を持っていて、そこに達したら何も言わずに終わる。
@@ -295,15 +371,18 @@ def decide_after(
     # 戻すと、この呼び出しが書き換えたルールファイルをそのまま読んで保護領域を
     # 決めることになり、`deny` を空にされた版で「守るものは無い」と判断する。
     # 守りの根拠を、この呼び出しが触れる前の状態に返してから読む。
-    # 書いた先を渡すのは、組み込みの既定に落ちている間の修復を戻さないため
+    # 書いた先を渡すのは、組み込みの既定を使っている間の修復を戻さないため
     # （selfguard._left_as_repair）。
-    restore = functools.partial(selfguard.after, written=_written(payload, record))
-    guard = judge.guard_setting_files(stderr, mode, conf, root, payload, record, restore)
+    # 着手のときに共通層でプロジェクトの層を上書きした分は、内容と印で見分けて外す
+    # （設計 11.12）。戻す側と、報告する側の両方で同じ答えを使う。
+    synced = functools.partial(configsync.is_synced_write, conf, root)
+    restore = functools.partial(selfguard.after, written=_written(payload, record), synced=synced)
+    guard = judge.guard_setting_files(mode, conf, root, payload, record, restore)
 
     watched = watched_for(stderr, conf, root, record, payload)
     if len(watched) > 1:
         record.tree, record.project = watched[-1].tree.name, watched[-1].tree.project
-    # 既定に落ちたことをこのイベントでは言わない。実行前の判定が呼び出しごとに
+    # 既定に戻ったことをこのイベントでは言わない。実行前の判定が呼び出しごとに
     # 言っているので、同じターンで 2 度届く。届く数が増えると、どちらも
     # 読まれなくなる。記録には fallback が残る。
     # 範囲は実行前の判定と同じ経路で解く。状態は置き場そのもので、写す段は無い（ADR-0055）。
@@ -324,12 +403,14 @@ def decide_after(
         # `_committed_findings` が置き場を外すのと同じ理由。判定の有無で、外れたり
         # 外れなかったりさせない。
         places=(conf.tickets, conf.approved),
+        synced=synced,
     )
     # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。
     if guard:
         text = f"{guard}\n\n{text}" if text else guard
     # フェーズが終わったばかりなら、ここで 1 度だけ言う。止まるのは次の呼び出しから。
+    bounced = ""
     if conf.tickets_enabled:
         parent = phase.parent_for_cwd(root, conf, payload.cwd)
         said = phase.announce(stderr, root, conf, parent) if parent is not None else ""
@@ -361,5 +442,9 @@ def decide_after(
         text = (
             f"[ccnavi dry-run] {modes.ENABLE} would have sent this back as a correction:\n" + text
         )
-    hookio.write_context(stdout, hookio.POST_TOOL_USE, text)
+    # 起動したのがサブエージェント（入れ子）なら、差し戻しを無視した知らせはその子にしか
+    # 届かない。人にも見えるよう `systemMessage` に同じ文を載せる（ADR-0085、G4）。
+    # 上の exit 2 の経路では標準出力の JSON が読まれないので、載せられない。
+    system = bounced if payload.agent_id else ""
+    hookio.write_context(stdout, hookio.POST_TOOL_USE, text, system=system)
     return EXIT_OK

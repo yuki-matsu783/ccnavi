@@ -29,6 +29,16 @@ export interface LintJson {
   readonly problems: readonly LintProblem[];
   readonly errors: number;
   readonly warns: number;
+  /**
+   * `--flow <パス>` を渡したときだけ在る。実行ファイルが読んだフローの中身（`data`。読めなければ null。
+   * JSON にそのまま載らない値は `{"$ccnavi": ...}` の印）。無ければ、実行ファイルがフローを見たか分からない
+   */
+  readonly flow?: LintFlow;
+}
+
+export interface LintFlow {
+  readonly path: string;
+  readonly data: unknown;
 }
 
 export type ParsedLint = { readonly ok: true; readonly value: LintJson } | { readonly ok: false; readonly error: string };
@@ -38,16 +48,16 @@ export function parseLintJson(text: string): ParsedLint {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== LINT_VERSION) {
     return {
       ok: false,
-      error: `lint の JSON の版が違う（拡張は ${LINT_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `lint の JSON の版が違います（拡張は ${LINT_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   const problems = list(raw.problems).filter(isRecord).map(problem);
@@ -64,6 +74,7 @@ export function parseLintJson(text: string): ParsedLint {
       problems,
       errors: typeof raw.errors === "number" ? raw.errors : errors,
       warns: typeof raw.warns === "number" ? raw.warns : problems.length - errors,
+      ...(isRecord(raw.flow) && "data" in raw.flow ? { flow: { path: str(raw.flow.path), data: raw.flow.data } } : {}),
     },
   };
 }
@@ -80,6 +91,27 @@ function problem(raw: Record<string, unknown>): LintProblem {
 export function problemsOfProject(lint: LintJson, name: string): LintProblem[] {
   const prefix = `(projects/${name})`;
   return lint.problems.filter((p) => p.where === prefix || p.where.startsWith(`${prefix} `));
+}
+
+/** `--lint --flow <パス>` の苦情の場所（実行ファイルの `lint.FLOW_WHERE`） */
+export const FLOW_WHERE = "(flow)";
+
+/**
+ * 渡したフローについての苦情。`where` が `(flow)` のもの。フロー編集画面はこれだけを読む
+ * （ほかの設定の苦情でフローの保存を止めない）。読めるか・形が正しいかの答えは実行ファイルが出し、
+ * 拡張は並べるだけ（ADR-0035）
+ */
+export function problemsOfFlow(lint: LintJson): LintProblem[] {
+  return lint.problems.filter((p) => p.where === FLOW_WHERE);
+}
+
+/**
+ * 標準エラーが、実行ファイルの知らないオプションの苦情（argparse の `unrecognized arguments`）で、
+ * そこに option が名指しされているか。`--version` を知らない古い実行ファイルを見分けるために使う
+ * （`ccnavi.ts` の probeVersion）。ほかの新しいフラグを知っているかは、版の JSON の `flags` で見る
+ */
+export function unknownOption(stderr: string, option: string): boolean {
+  return stderr.split(/\r?\n/).some((line) => line.includes("unrecognized arguments") && line.split(/\s+/).includes(option));
 }
 
 /** 置き場そのものについての苦情。`where` が `(projects)` */

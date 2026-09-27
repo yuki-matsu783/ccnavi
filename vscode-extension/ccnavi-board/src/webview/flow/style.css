@@ -1,0 +1,12 @@
+/*
+ * フロー編集画面の CSS。部品 1 つに CSS 1 本（`Canvas.tsx` なら `Canvas.css`）で、ここは束ねの入口。
+ *
+ * **先頭の 1 行だけが外の綴り**（`@xyflow/react`。図が要る CSS）。色は `--xy-*` の変数で出来ていて、
+ * `Canvas.css` が `--vscode-*` に置き換える（フェーズ管理の `Graph.css` と同じやり方。ADR-0070）。
+ */
+@import "@xyflow/react/dist/style.css";
+@import "../styles/page.css";
+@import "./App.css";
+@import "./Canvas.css";
+@import "./Inspector.css";
+@import "../Tour.css";

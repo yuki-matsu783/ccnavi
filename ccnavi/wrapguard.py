@@ -3,10 +3,10 @@
 1. **sh の検査の材料を変える環境変数を、同じコマンド行で置く形。** sh はワークスペースルート・
    承認済みチケットの置き場・実行ファイルを環境変数から読む（`ccnavi-common.sh`）。
    `CCNAVI_TICKETS_APPROVED=/x sh …ccnavi-git.sh push` は、存在しない置き場を見て子の push を
-   通す。拒否されたエージェントが言い換えて再試行する形そのもので、§2.1 の「逸れていく LLM」の
+   通す。拒否されたエージェントが言い換えて再試行する形そのもので、2.1 の「逸れていく LLM」の
    範囲に入る。hook は `settings.json` の env で起動するので、ここで見る代入の影響を受けない。
 2. **子チケットのワークツリーからの `ccnavi-git.sh push`。** 子の成果は親が合流してから親の
-   ツリーで送る（設計 §9.10）。sh も同じ検査を持つが、sh の検査は上の環境変数で外れ、承認済み
+   ツリーで送る（設計 9.10）。sh も同じ検査を持つが、sh の検査は上の環境変数で外れ、承認済み
    チケットの探し方を sh の中に写して持つので、写しがずれると黙って外れる（#120）。止める場所を
    hook に置き、sh の検査は 2 重目として残す（ADR-0077）。
 
@@ -37,7 +37,7 @@ _SCRIPT = re.compile(r"ccnavi-[A-Za-z0-9-]+\.sh")
 _GIT_SCRIPT = "ccnavi-git.sh"
 
 # 同じコマンド行で置いてよい変数。出力の量と待ち時間だけを変え、検査の材料には触れない。
-# 通すものを並べる形にして、あとから sh が読むようになった変数は止まる側に倒す。
+# 通すものを並べる形にして、あとから sh が読むようになった変数は止まる側にする。
 PASS_THROUGH = frozenset(
     {
         "CCNAVI_GIT_MAX_LINES",
@@ -72,7 +72,7 @@ def check_env(subject: str, degraded: str) -> tuple[str, list[str]]:
     コマンド行のどこで置いても数える。前置きの代入（`X=… sh …`）、`env X=…`、`export X=…`、
     すでに書き出してある変数への素の代入（`X=…; sh …`。settings.json の env が書き出した変数は
     代入だけで sh に届く）、`unset X`・`env -u X`。読み切れない形は、allow が当たらずに
-    確認へ落ちるので、ここでは見ない。
+    確認になるので、ここでは見ない。
     """
     if degraded:
         return "", []
@@ -91,7 +91,7 @@ def check_child_push(
 ) -> tuple[str, str, str]:
     """子チケットのワークツリーからの `ccnavi-git.sh push` なら（ツリーの名前, 親, 見つけた綴り）。
 
-    居場所は payload の cwd から `cd` を追った先（§6.3.2）。追えなくなった先で push を
+    居場所は payload の cwd から `cd` を追った先（6.3.2）。追えなくなった先で push を
     打つ形は、どのツリーから送るのかが決まらないので止める（親は `?`）。
     """
     if degraded or not cwd:
@@ -132,7 +132,7 @@ def child_parent(conf: settings.Settings, root: str, name: str) -> tuple[str, st
 
     探すのは、ワークスペースルート・プロジェクトの置き場の下・`.claude/worktrees/` の下の
     ディレクトリ全部の `doing/`・`done/` と `review/`。git のリポジトリかどうかは問わない。
-    読めないファイルは「子かもしれない」として止める側に倒す（親は `?`）。
+    読めないファイルは「子かもしれない」として止める側にする（親は `?`）。
     """
     for top in _trees(conf, root):
         approved = settings.approved_dir(conf, top)

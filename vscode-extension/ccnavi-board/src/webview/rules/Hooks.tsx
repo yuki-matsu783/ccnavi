@@ -22,7 +22,7 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
             <code>.claude/settings.local.json</code>
           </>
         )}{" "}
-        の hooks。利用者ごとの設定（<code>~/.claude/settings.json</code>）は対象外。
+        の hooks です。利用者ごとの設定（<code>~/.claude/settings.json</code>）は対象外です。
       </p>
       <Table hooks={hooks} files={files} />
     </>
@@ -31,10 +31,10 @@ export function Hooks({ hooks, files }: HooksProps): JSX.Element {
 
 function Table({ hooks, files }: HooksProps): JSX.Element {
   if (!files.settings) {
-    return <p className="empty">.claude/settings.json が無い</p>;
+    return <p className="empty">.claude/settings.json がありません</p>;
   }
   if (hooks.length === 0) {
-    return <p className="empty">hooks が 1 つも登録されていない</p>;
+    return <p className="empty">hooks が 1 つも登録されていません</p>;
   }
   return (
     <>
@@ -65,7 +65,7 @@ function Table({ hooks, files }: HooksProps): JSX.Element {
         </tbody>
       </table>
       <p className="hint">
-        「判定を試す」でツールを選ぶと、そのツールで実行される hook だけをここから絞り込んで出す。matcher の意味は Claude Code のもの（空か <code>*</code> で全部、それ以外はツール名への正規表現）。
+        「判定を試す」でツールを選ぶと、そのツールで実行される hook だけをここから絞り込んで出します。matcher の意味は Claude Code のものです（空か <code>*</code> で全部、それ以外はツール名への正規表現）。
       </p>
     </>
   );

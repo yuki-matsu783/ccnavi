@@ -1,4 +1,4 @@
-"""3 つのタイプと権限モードへの委譲の受入テスト。道具を外から叩いて応答だけを見る。
+"""3 つのタイプと権限モードへの委譲の受入テスト。道具を外から呼んで応答だけを見る。
 
 見るのは 4 つ。
 
@@ -90,7 +90,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_どのルールも言及しなければ確認になる(self):
         # 既定が許可ではなく確認であること。allow を書き切るまで、
-        # 言及されていない呼び出しは人が見る側に落ちる。
+        # 言及されていない呼び出しは人が見る側になる。
         self.rules(deny=[rule("push", "Bash", "*git push*")])
 
         out = self.judge("Bash", "ls -la")
@@ -181,7 +181,7 @@ class SectionsTest(unittest.TestCase):
 
     def test_読み切れないコマンドは拒否ではなく確認になる(self):
         # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
-        # 設計 §6.3 の PARSE_UNCERTAIN は人に確認を出す。
+        # 設計 6.3 の PARSE_UNCERTAIN は人に確認を出す。
         self.rules(
             deny=[rule("push", "Bash", "*git push*")],
             allow=[rule("anything", "Bash", "*", message="")],

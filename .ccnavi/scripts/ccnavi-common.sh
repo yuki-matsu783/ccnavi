@@ -7,14 +7,20 @@
 # 同じディレクトリを指す。**この読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない**（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 5 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 6 つ。標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で綴りが違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
 #   ccnavi_workspace           ワークスペースルートの絶対パス
 #   ccnavi_bin <ワークスペースルート>  起動する実行ファイルのパス
+#   ccnavi_compat_skew <ワークスペースルート> <実行ファイル>  実行ファイルと互換の版が食い違えば直し方を出す
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
+
+# この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの ccnavi/version.py の COMPAT、
+# VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
+# sh を直さないと動かない形に変えたときだけ。`ccnavi --lint` もこの行を読んで比べる。
+CCNAVI_COMPAT=1
 
 # 相対パスを絶対に直す。
 #
@@ -81,7 +87,7 @@ ccnavi_abs() {
 #
 # **git に聞かない。** git のトップは git の用途にだけ使う。モード B では
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
-# 正しい答えで、ここで欲しいものとは違う（設計 §11.8）。
+# 正しい答えで、ここで欲しいものとは違う（設計 11.8）。
 #
 # 目印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
@@ -147,6 +153,29 @@ ccnavi_bin() {
 	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_BIN_PATH" ;;
 	*) ccnavi_bin_try "$1/$CCNAVI_BIN_PATH" ;;
 	esac
+}
+
+# 実行ファイルの `--version` が言う互換の版と CCNAVI_COMPAT を比べる。揃っていれば何も出さずに 0、
+# 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側は標準エラーへ書いて先へ進む
+# （止めない。止める・通すの判定は実行ファイルと hook が持つ。docs/claude/exe-boundary.md）。
+#
+# `--version` を知らない古い実行ファイルは、互換の版を答えないので古いとして言う。
+# 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら配り直し。
+ccnavi_compat_skew() {
+	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
+	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
+	if [ -f "$1/build.py" ] && [ -f "$1/ccnavi/__main__.py" ]; then
+		ccnavi_cs_fix="build.py を回して組み立て直してください（uv run --with pyinstaller python build.py）"
+	else
+		ccnavi_cs_fix="ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
+	fi
+	if [ -z "$ccnavi_cs_have" ]; then
+		printf '実行ファイル %s は --version に互換の版を答えません（古い版）。%s。\n' "$2" "$ccnavi_cs_fix"
+		return 1
+	fi
+	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
+	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "$ccnavi_cs_have" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
+	return 1
 }
 
 ccnavi_bin_try() {

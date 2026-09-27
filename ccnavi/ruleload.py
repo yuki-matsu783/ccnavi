@@ -1,8 +1,8 @@
 """この呼び出しに当てるルール集合を決める。
 
-共通層に、そのツリーの層を足したものが答えになる（設計 §11.4）。足すだけで、
+共通層に、そのツリーの層を足したものが答えになる（設計 11.4）。足すだけで、
 後ろの層が前の層を上書きしたり取り消したりすることはない。共通層が読めなければ
-組み込みの既定に落ち、落ちたことを記録に残す。判定そのものはここに無い。
+組み込みの既定に戻り、戻ったことを記録に残す。判定そのものはここに無い。
 
 ## 層は 3 種
 
@@ -21,8 +21,8 @@
 
 ファイルが無い層は空。不備ではないので、記録にも `--lint` にも出さない。壊れている
 層も空として扱うが、そちらは記録の `fallback` に層の名前を残し、`--lint` が error で
-言う。組み込みの既定へは落とさない。共通層が在るのに組み込みへ落とすと、共通層の
-deny が消える側に倒れる。共通層自身が読めないときだけ、今までどおり組み込みへ落ち、
+言う。組み込みの既定には戻さない。共通層が在るのに組み込みへ戻すと、共通層の
+deny が消える側になる。共通層自身が読めないときだけ、今までどおり組み込みに戻り、
 そのとき層は足さない（REQ-PRE-06）。
 """
 
@@ -56,17 +56,17 @@ class Layer:
 
 
 def load_rules(
-    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str = ""
+    stderr: TextIO, conf: settings.Settings, record: audit.Record, root: str
 ) -> tuple[rules.RuleSet, str]:
     """共通層のルール集合と、それがどこから来たかを返す。
 
-    読めなければ組み込みの既定に落ちる。「設定が読めない」は「判断できない」
-    ではなく「設定が壊れている」。拒否側へ倒すと、壊れたファイルを直すための
+    読めなければ組み込みの既定に戻る。「設定が読めない」は「判断できない」
+    ではなく「設定が壊れている」。拒否にすると、壊れたファイルを直すための
     呼び出しまで止まって回復できなくなる。既定モードが block なので、
     ファイルを置く前に hook を登録しただけでセッションが死ぬ（REQ-PRE-06）。
     既定は設定を丸ごと受け取る。守る場所の綴りは設定で動くので（builtin.rule_data）。
 
-    出所は、いま当てているルールがどこから来たか。既定に落ちているなら
+    出所は、いま当てているルールがどこから来たか。既定を使っているなら
     読めなかったファイルではない。そのファイルを名乗ると、見に行った人が
     当たったルールを見つけられない。
     """
@@ -94,7 +94,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
     予約名のプロジェクト（`projects/common/` と `projects/self/`）は数えない。
     `common:id` / `self:id` と区別が付かないので、名前を 2 つ予約するほうが、
-    接頭辞の綴りを別にするより安い（設計 §11.4）。綴り違い（`projects/Self/`）も
+    接頭辞の綴りを別にするより安い（設計 11.4）。綴り違い（`projects/Self/`）も
     同じに扱う（`settings.is_reserved_layer_name`）。`--lint` が error で言う。
 
     数えないことは、そのプロジェクトが緩く扱われるという意味ではない。行き先の
@@ -120,7 +120,7 @@ def layers(conf: settings.Settings, root: str) -> list[Layer]:
 
 
 def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> list[Layer]:
-    """このツリーに足す層。行き先の 1 つだけ（設計 §11.4 書き込み系）。
+    """このツリーに足す層。行き先の 1 つだけ（設計 11.4 書き込み系）。
 
     ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら
     自身の層。プロジェクトのツリーならその層。ワークスペースルートの外に行き先が
@@ -131,7 +131,7 @@ def layer_for(conf: settings.Settings, root: str, target: tree.Tree | None) -> l
     ワークスペース自身の層の名札と一致するので、**そのプロジェクトへの Write / Edit が
     プロジェクト自身の deny を一度も読まずに、ワークスペースの層のルールで判定される**。
     ワークスペースの層に広い `allow` があればそれで通る。層無しなら共通層だけで
-    判定するので、緩む側には倒れない。`--lint` が error で名指しし、人が名前を変える
+    判定するので、緩む側にはならない。`--lint` が error で名指しし、人が名前を変える
     までのあいだも、この 1 行が判定のすり替えを止める。
     """
     if target is None:
@@ -149,7 +149,7 @@ def rules_for(
     payload: hookio.Input,
     record: audit.Record,
 ) -> tuple[rules.RuleSet, str, tree.Tree | None]:
-    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 §11.4）。
+    """この呼び出しに当てるルール集合と、その出所と、行き先のツリー（設計 11.4）。
 
     パスを持つツール（PATH_TOOLS）は行き先で 1 本に決まる。共通層に、行き先のツリーの層を足す。
     行き先がプロジェクトならその層、ワークスペースのツリーなら自身の層。
@@ -157,7 +157,7 @@ def rules_for(
     パスを持たないツール（Bash / PowerShell / WebFetch / Skill / Agent）は全部の和。呼び出しが
     どのプロジェクトのものかは当てない。Bash で当てる仕掛け（cwd、cd の追跡、引数の語の走査）は
     「どのルールファイルを引くか」にしか効かず、副作用は結局実行後の監視が拾う。WebFetch・Skill・
-    Agent は当てる材料を持たない。和なら deny と ask は増える側に倒れ、緩むのは allow の共有だけに
+    Agent は当てる材料を持たない。和なら deny と ask は増える側になり、緩むのは allow の共有だけに
     なる（REQ-MLT-05）。読めない層は和から外し、外したことを記録に残す（REQ-MLT-06）。
     """
     target = None
@@ -183,14 +183,12 @@ def add_layers(
     chosen: list[Layer],
     root: str,
     record: audit.Record,
-) -> list[Problem]:
+) -> None:
     """共通層の上に層を順に足す。壊れた層は空として扱い、記録に残す。
 
-    返すのは層をまたいだ苦情（重複を捨てた info、同 id で中身が違う warn）。
-    判定の経路は読み捨てる。呼び出しのたびに言うと、同じ話が毎回モデルへ届く。
-    言う場所は `--lint`。
+    層をまたいだ苦情（重複を捨てた info、同 id で中身が違う warn）は読み捨てる。
+    判定の経路で呼び出しのたびに言うと、同じ話が毎回モデルへ届く。言う場所は `--lint`。
     """
-    problems: list[Problem] = []
     broken = []
     for layer in chosen:
         if not os.path.exists(layer.path):
@@ -205,12 +203,11 @@ def add_layers(
         for note in notes:
             stderr.write(f"ccnavi: {note}\n")
         prefix_ids(extra, layer.name)
-        problems.extend(merge_rules(rule_set, extra, layer.name))
+        merge_rules(rule_set, extra, layer.name)
     if broken:
         record.fallback = ",".join(broken)
         note = "unreadable layer: " + ",".join(broken)
         record.detail = f"{record.detail}; {note}" if record.detail else note
-    return problems
 
 
 def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[Problem]:
@@ -220,8 +217,8 @@ def merge_rules(base: rules.RuleSet, extra: rules.RuleSet, layer: str) -> list[P
     みなして後ろを捨てる（info）。見本を写して始めたプロジェクトが共通層と同じ行を
     持つのは普通の形で、それを衝突と呼ぶと本当の衝突が埋もれる。
 
-    中身が違えば両方効かせる（warn）。rules は足すだけの面なので、`deny` と `ask` は
-    増える側に倒れる。`allow` は広がる側だが、書き込み系では行き先の 1 層にしか
+    中身が違えば両方効かせる（warn）。rules は足すだけの設定なので、`deny` と `ask` は
+    増えるほうになる。`allow` は広がる側だが、書き込み系では行き先の 1 層にしか
     足さないので、広がる範囲はそのツリーの中に閉じる。
     """
     problems: list[Problem] = []
@@ -294,7 +291,7 @@ def survey(stderr: TextIO, conf: settings.Settings, root: str) -> list[LayerView
             view.missing = True
             continue
         if views[0].unreadable:
-            # 共通層が壊れているときは層を足さない（設計 §11.2）。診断もそう見せる。
+            # 共通層が壊れているときは層を足さない（設計 11.2）。診断もそう見せる。
             continue
         try:
             extra, notes = rules.load(layer.path, root)
@@ -327,7 +324,7 @@ def layer_files(conf: settings.Settings, root: str) -> list[settings.LayerFile]:
     予約名のプロジェクトも並べる。判定の層としては数えない（layers）が、ファイルは
     守る。`--lint` が名前を変えるよう言っているあいだも、そこに置いてある 3 本は
     ccnavi の設定ファイルで、書き換えられたら戻すほうが筋が通る。判定に効かない
-    ものを守るだけなので、緩む側には倒れない。
+    ものを守るだけなので、緩む側にはならない。
 
     在るかどうかは見ない。無いファイルは selfguard が対象から外す（REQ-SLF-03）ので、
     ここで存在を確かめると、同じ判断が 2 か所に分かれる。

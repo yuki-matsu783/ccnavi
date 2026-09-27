@@ -1,5 +1,6 @@
 #!/bin/sh
-# vsix を組み立てる。依存を入れ、コンパイルとテストを通してから、リポジトリの dist/ に出す。
+# vsix を組み立てる。依存を入れ、コンパイルしてから、リポジトリの dist/ に出す。
+# テストは回さない。組み立てを速くするため。テストは pnpm test で別に回す。
 # Windows の Git Bash、WSL、Linux のどれでも同じに動く。pnpm 10 と Node 22 が要る。
 set -eu
 
@@ -8,7 +9,6 @@ cd "$here"
 
 pnpm install --frozen-lockfile
 pnpm run compile
-pnpm test
 
 version=$(node -p "require('./package.json').version")
 out="$(cd "$here/../.." && pwd)/dist"

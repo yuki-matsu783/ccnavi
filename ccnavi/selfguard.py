@@ -5,10 +5,10 @@
 ルールに書いた守りは、ルールを消せば一緒に消える。実行後の監視は保護領域を
 ルールファイルの `deny` と `ask` から導くので、ルールファイル自身をそこで守ると、
 書き換えられた瞬間に「何を守るか」の一覧ごと失われる。`deny` を空にされた形も、
-壊れて組み込みの既定に落ちた形も、どちらも保護領域は 0 件になり、監視は何も
+壊れて組み込みの既定に戻った形も、どちらも保護領域は 0 件になり、監視は何も
 検知しない。守りの根拠が、守られる対象の中に置いてあることが原因になる。
 
-だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 §11.6）。
+だからこの一式は、ルールファイルの外に、組み込みで持つ（設計 11.6）。
 
     <root>/.claude/settings.json        hook の登録そのもの
     <root>/.claude/settings.local.json  同上。個人の上書き
@@ -78,9 +78,9 @@ git の変更一覧にも出てこない。止める側も気づく側も無い�
   1. 実行前に、対象そのものが無かった。控える中身が無いので、まず git から
      戻して、戻ったものを控える。控えられなければ、次の実行後に戻す先が無い。
   2. 実行後に、控えが読めなかった。控えの置き場ごと消されたときがこれ。
-     戻す先を失っているので、git のコミット済みの内容へ落とす。
+     戻す先を失っているので、git のコミット済みの内容を使う。
 
-どちらも「本筋が使えないので、劣るほうへ落ちた」と報告に書く。落ちたことを
+どちらも「本筋が使えないので、劣るほうを使った」と報告に書く。それを
 黙ると、戻した先が直前の断面なのかコミット済みの内容なのかを、受け取った側が
 見分けられない。人の書きかけが消えているかもしれない、という違いになる。
 
@@ -119,6 +119,7 @@ import os
 import re
 import shutil
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TextIO
 
@@ -174,9 +175,6 @@ COMMON_RULES_KEY = "rules"
 # 名指しのツールで書くもの。修復として戻さない判断は、この経路で書いた先にだけ掛ける。
 REPAIR_TOOLS = ("Write", "Edit", "NotebookEdit")
 
-# 控えのファイル名に使える文字。セッション識別子はそのまま名前になるので、
-# 区切り文字が混じった値でファイルを別の場所へ書かせない。
-
 # 守る対象。root からの相対で書く。rules は設定で動くので、ここには無い。
 _SETTINGS_FILES = (
     ("settings", os.path.join(".claude", "settings.json")),
@@ -214,7 +212,6 @@ _WRITE_VERBS = (
 )
 _COPY_VERBS = r"(^|\x00)(cp|ln|install)\b[^\x00]*"
 
-#
 # 名前がそこで終わる形。空白とコマンドの切れ目（`\x00`）を語の終わりとして数える。
 # `[\\/]` だけで閉じていると、区切りが続かない綴りが素通りする。`rm -rf .ccnavi` も
 # `mv .ccnavi .ccnavi.bak` も、ccnavi ディレクトリごと消す・退かす形なので、下のファイルを 1 本ずつ
@@ -232,7 +229,7 @@ _END = rf"(?:[\\/ {_NOT_A_WORD}]|$)"
 _COPY_TERM = r"$"
 _COPY_END = r"(?:[\\/]|$)"
 
-# `.ccnavi/` は ccnavi ディレクトリの既定の綴り（設計 §11.2）。その下には各層の設定 3 本と、
+# `.ccnavi/` は ccnavi ディレクトリの既定の綴り（設計 11.2）。その下には各層の設定 3 本と、
 # 配点が呼ぶスクリプトが入る。どちらも判定の中身そのものなので、ccnavi ディレクトリごと止める。
 # 既定の綴りをここに書いておくのは、ccnavi ディレクトリの名前を動かしていないワークスペースが、
 # 設定の受け渡しに依らずに守られるようにするため。動かしてある場合は project_home_clause が足す。
@@ -243,19 +240,21 @@ _COPY_END = r"(?:[\\/]|$)"
 # チケットの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
 # `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。どちらも判定が読むので
-# 名前を絞って守る。`logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので
-# 守らない。
+# 名前を絞って守る。ローテートした記録（`logs/log.<日時>.jsonl`、prune）も同じ綴りで守る。
+# 判定は読まないが、「記録が無い = 動かなかった」を読む元で、シェルから消せると自分の呼び出しの
+# 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi --prune` だけ。
+# `logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
 _PLACES = (
     r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
-    r"logs[\\/](log\.jsonl|state)" + _END,
+    r"logs[\\/](log(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
     r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
-    r"logs[\\/](log\.jsonl|state)" + _COPY_END,
+    r"logs[\\/](log(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _COPY_END,
     r"ccnavi-git\.sh",
 )
 
@@ -303,7 +302,7 @@ def _folded(clause: str) -> str:
 
 
 def project_home_clause(project_home: str) -> str:
-    """ccnavi ディレクトリの綴りを、シェルの書き込みに当てる形に直す（設計 §11.6）。
+    """ccnavi ディレクトリの綴りを、シェルの書き込みに当てる形に直す（設計 11.6）。
 
     ccnavi ディレクトリの下は丸ごと守る。層の設定 3 本も、配点が呼ぶスクリプトも、そこに入る。
     既定の名前（`.ccnavi`）は _PLACES が持っているので、ここが返すのは動かして
@@ -312,7 +311,7 @@ def project_home_clause(project_home: str) -> str:
 
     返す 1 本は書き込む側と写す側の両方に足される。写す側だけは既定の名前が
     `_COPY_END`（空白を数えない）で閉じているので、動かしてある ccnavi ディレクトリのほうが
-    `cp <ccnavi ディレクトリ> <外>` まで止める、というぶんだけ広い。広い側が deny なので倒れる向きは
+    `cp <ccnavi ディレクトリ> <外>` まで止める、というぶんだけ広い。広い側が deny なのでずれる向きは
     安全だが、綴りを揃えるなら足し方を 2 つに分けることになる。
     """
     parts = [re.escape(p) for p in _home_name(project_home).split("/") if p]
@@ -422,7 +421,7 @@ def common_shell_clause(root: str, path: str) -> str:
 
 
 def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
-    """共通層の 3 本を、名指しのツールに当てる形に直す（設計 §11.6）。
+    """共通層の 3 本を、名指しのツールに当てる形に直す（設計 11.6）。
 
     当てる先は解決済みの絶対パス。ワークスペースルートの下に在るなら、ワークスペースと、
     そこから切ったワークツリー（`.claude/worktrees/<名前>/`）の同じ相対に当てる。ワークツリー側の
@@ -445,6 +444,39 @@ def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
     if not alternatives:
         return ""
     return _folded("^(?:" + "|".join(alternatives) + ")$")
+
+
+# 記録と控えの置き場の既定の綴り（`_PLACES` の `logs/` の節と同じ場所）を、名指しのツールに
+# 当てる形。当てる先は解決済みの絶対パスなので、末尾で閉じる。
+_RECORDS_PLACES = r"[\\/]logs[\\/](?:log(?:\.[^\\/]*)?\.jsonl$|state(?:[\\/]|$))"
+
+
+def records_regex(log_path: str = "", state_dir: str = "") -> str:
+    """記録と控えの置き場を、名指しのツールに当てる形（設計 11.6、ADR-0089）。
+
+    シェルの書き込みの側（`_PLACES`）と同じ `logs/log*.jsonl` と `logs/state/` の綴りに加えて、
+    診断のフラグで動かした置き場（`--log` / `--state`。env では動かない。ADR-0084）にも当てる。
+    記録はいま書いている 1 本と、同じディレクトリのローテートした分（`<名前>.<日時><拡張子>`）。
+    書かれた綴りと行き着く先の両方で当てる。
+    """
+    alternatives = [_RECORDS_PLACES]
+    if log_path:
+        directory, base = os.path.split(log_path)
+        stem, ext = os.path.splitext(base)
+        for where in sorted({os.path.abspath(directory), os.path.realpath(directory)}):
+            alternatives.append(
+                "^"
+                + _spelled(where)
+                + r"[\\/]"
+                + re.escape(stem)
+                + r"(?:\.[^\\/]*)?"
+                + re.escape(ext)
+                + "$"
+            )
+    if state_dir:
+        for where in sorted({os.path.abspath(state_dir), os.path.realpath(state_dir)}):
+            alternatives.append("^" + _spelled(where) + r"(?:[\\/]|$)")
+    return _folded("(?:" + "|".join(alternatives) + ")")
 
 
 def _spelled(path: str) -> str:
@@ -483,13 +515,22 @@ COMMON_LAYER_MESSAGE = (
     "読むだけなら止まりません。"
 )
 
+RECORDS_RULE_ID = "builtin-guard-records"
+
+RECORDS_MESSAGE = (
+    "ccnavi の記録と控えの置き場（logs/log*.jsonl と logs/state/）です。判定が読み、"
+    "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントは書き換えません。"
+    "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
+)
+
 PROJECT_HOME_RULE_ID = "builtin-guard-project-home"
 
 PROJECT_HOME_MESSAGE = (
     "層の設定の置き場です。ここに入っているルール・フェーズの種類・リスクの配点が"
     "このツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩め"
-    "られます。変更が要るなら、何をなぜ変えたいのかを伝えて利用者に依頼してください。"
-    "読むだけなら止まりません。"
+    "られます。承認済みチケット・フェーズのマーカー・子のフロー（approved/ の下）も"
+    "ここにあり、書くのは人です。変更が要るなら、何をなぜ変えたいのかを伝えて利用者に"
+    "依頼してください。読むだけなら止まりません。"
 )
 
 
@@ -520,6 +561,9 @@ class Target:
     # ワークツリー側の設定は今この瞬間には誰も読まないので、「何も起きていないのに
     # 戻された」と読まれる。統合で効く道であることを言わないと、同じ手が繰り返される。
     copy: bool = False
+    # spelled は、リンクを解く前の綴り（ワークツリー側の設定だけ持つ）。着手が写した分かを
+    # 答えさせるときに渡す。解いた先で答えると、リンクに差し替えた形が指す先の中身で外れる。
+    spelled: str = ""
 
 
 @dataclass
@@ -534,9 +578,9 @@ class Outcome:
 def resolve(
     stderr: TextIO, flag: str, declared: str, name: str, allowed: tuple[str, ...] = SETTINGS
 ) -> str:
-    """設定の値を解決する。読めない値は enable に倒す。
+    """設定の値を解決する。読めない値は enable として扱う。
 
-    mode の解決が読めない値を enable へ倒すのと同じ向き。倒れた先が
+    mode の解決が読めない値を enable として扱うのと同じ向き。行き着く先が
     「守る」側になる。書き損じた 1 語で守りが消えるより、書き損じた 1 語で
     守りが残るほうがよい。戻す動きはファイルに触るが、触る先は組み込みで
     固定された 3 つだけで、しかも戻す先はこちらが取った直前の断面になる。
@@ -563,10 +607,11 @@ def add_rules(
     project_home: str = "",
     root: str = "",
     common_files: tuple[str, ...] = (),
+    records: tuple[str, str] = ("", ""),
 ) -> None:
     """ガード自身を守るルールを、判定に足す。
 
-    ルールファイルの外から足す。この面が守る対象をルールから導かないのと同じ
+    ルールファイルの外から足す。ここで守る対象をルールから導かないのと同じ
     理由で、止める側もルールに書かせない。書かせると、消せることになる。
 
     4 本ある。シェルから書き込む形、名指しのツールで実行ファイルを書く形、
@@ -622,6 +667,15 @@ def add_rules(
                 "message": PROJECT_HOME_MESSAGE,
             },
         )
+    _insert(
+        rule_set,
+        {
+            "id": RECORDS_RULE_ID,
+            "match": "Write|Edit|NotebookEdit",
+            "regex": records_regex(*records),
+            "message": RECORDS_MESSAGE,
+        },
+    )
     common = common_layer_regex(root, common_files)
     if common:
         # 先頭に挿すので、後に足したこちらが ccnavi ディレクトリの 1 本より先に当たる。
@@ -652,7 +706,7 @@ def targets(
     layers: list[settings.LayerFile] = (),
     projects_dir: str = "",
 ) -> list[Target]:
-    """守る対象を組み立てる（設計 §11.6）。
+    """守る対象を組み立てる（設計 11.6）。
 
     ルールファイルと実行ファイルは設定で動くので、解決済みの綴りを受け取る。
     空なら、その設定を持たないということなので、対象からも外れる。
@@ -810,6 +864,7 @@ def _worktree_copies(
                     label=_relative(root, full),
                     top=work.root,
                     copy=True,
+                    spelled=os.path.join(work.root, rel),
                 )
             )
     return copies
@@ -820,7 +875,7 @@ def _copy_key(key: str, name: str) -> str:
 
     key はそのままファイル名になるので、ワークツリーの名前を素で混ぜると、
     区切り文字の入った名前で控えが別の場所へ書かれる。潰した綴りだけにすると、
-    今度は `a/b` と `a_b` が同じ名前に落ちて、別のワークツリーの控えを互いに
+    今度は `a/b` と `a_b` が同じ名前になって、別のワークツリーの控えを互いに
     書き戻すことになる。中身が入れ替わるので、取り違えは実害になる。
     潰した綴りに元の名前の digest を添えて、読めることと衝突しないことの
     両方を取る。
@@ -833,7 +888,7 @@ def _inside(root: str, path: str) -> str:
     """root の下に在るなら root からの相対、外に在るなら空文字。"""
     if not path:
         return ""
-    rel = _relative(os.path.realpath(root), os.path.realpath(path))
+    rel = _relative(root, os.path.realpath(path))
     if os.path.isabs(rel) or rel == os.pardir or rel.startswith(os.pardir + os.sep):
         return ""
     return rel
@@ -845,7 +900,6 @@ def _top(root: str, target: Target) -> str:
 
 
 def before(
-    stderr: TextIO,
     setting: str,
     state_dir: str,
     session: str,
@@ -863,7 +917,7 @@ def before(
 
       * 前は在ったのに今は無い。消された。控えから戻す。
       * 最初から無い。`settings.local.json` を置いていないプロジェクトが
-        これで、普通の状態になる。ここで毎回 git を叩くと、何も起きていない
+        これで、普通の状態になる。ここで毎回 git を呼ぶと、何も起きていない
         呼び出しが毎回外部プロセスを起こす。無いことを 1 度控えて、以後は黙る。
 
     2 つを分けるのが控えの有無。控えが在るのに対象が無いなら、控えを取った
@@ -910,22 +964,27 @@ def before(
 
 
 def after(
-    stderr: TextIO,
     setting: str,
     state_dir: str,
     session: str,
     root: str,
     found: list[Target],
-    written: str = "",
+    written: str,
+    synced: Callable[..., bool],
 ) -> list[Outcome]:
     """実行後。控えと突き合わせて、変わっていれば戻す。
 
-    控えが読めなければ git のコミット済みの内容へ落ちる。落ちたことは
+    控えが読めなければ git のコミット済みの内容を使う。使ったことは
     報告に書く。戻した先が直前の断面なのかコミット済みの内容なのかで、
     人の書きかけが残っているかどうかが変わるので。
 
     written は、この呼び出しが名指しのツール（REPAIR_TOOLS）で書いた先の解決済みの
-    パス。組み込みの既定に落ちている間の修復だけは戻さない（_left_as_repair）。
+    パス。組み込みの既定を使っている間の修復だけは戻さない（_left_as_repair）。
+
+    synced は、ワークツリー側の設定の変更が、着手のときに共通層でプロジェクトの層を
+    上書きしたものかを答える（`configsync.is_synced_write`）。そう読めるものは戻さない。
+    戻すと着手が写した中身が同じ呼び出しの中で消え、最初のレビューで知らせる印だけが残る。
+    ワークツリー側の設定に限るのは、上書きするのが親のワークツリーだけだから。
     """
     if setting == DISABLE or not state_dir:
         return []
@@ -942,6 +1001,9 @@ def after(
         now = _read(target.path)
 
         if saved is not None and now == saved:
+            continue
+
+        if target.copy and now is not None and synced(target.spelled or target.path):
             continue
 
         if _left_as_repair(target, written, saved, now):
@@ -995,15 +1057,15 @@ def after(
 
 
 def _left_as_repair(target: Target, written: str, saved: bytes | None, now: bytes | None) -> bool:
-    """組み込みの既定に落ちている間の修復か。そうなら戻さない（REQ-PRE-06）。
+    """組み込みの既定を使っている間の修復か。そうなら戻さない（REQ-PRE-06）。
 
     共通層のルールファイルが読めないと、組み込みの既定は Write / Edit による修復を通す。
     ところが実行前に取る控えは壊れた中身なので、そのまま戻すと、直した結果が同じ呼び出しの
     中で消える。「Write / Edit で直せ」という案内と実際が食い違う。
 
     戻さないのは次の 4 つが揃ったときだけ。
-      1. 対象が共通層のルールファイルそのもの。組み込みの既定に落ちる原因になるのはこの
-         1 本だけで、ワークツリー側の設定や他の層の設定は読めなくても既定に落ちない
+      1. 対象が共通層のルールファイルそのもの。組み込みの既定に戻る原因になるのはこの
+         1 本だけで、ワークツリー側の設定や他の層の設定は読めなくても既定に戻らない
       2. この呼び出しが名指しのツールでそこを書いた。シェルからの書き込みは既定でも止める
          経路なので、ここでも戻す
       3. 控え（この呼び出しの直前の中身）がルールファイルとして読めない。実行後の中身で
@@ -1083,7 +1145,7 @@ def at_start(
     return outcomes
 
 
-def sweep(state_dir: str, session: str, keep_days: int = KEEP_DAYS) -> None:
+def sweep(state_dir: str, session: str) -> None:
     """古い控えを落とす。
 
     セッション開始で 1 度だけ呼ぶ。控えが役に立つのはそれを取ったセッションの
@@ -1108,7 +1170,7 @@ def sweep(state_dir: str, session: str, keep_days: int = KEEP_DAYS) -> None:
     except OSError:
         return
 
-    cutoff = time.time() - keep_days * 86400
+    cutoff = time.time() - KEEP_DAYS * 86400
     mine = _safe(session)
     kept = []
     for name in names:
@@ -1459,7 +1521,7 @@ def _backup_path(state_dir: str, session: str, target: Target) -> str:
     控えが在るのに読めない形になる。名前に使える字へ均してから置く。
 
     切り詰めない。ワークツリー側の設定の key は末尾にワークツリーの名前の digest を持っていて、
-    そこを落とすと別のワークツリーの控えと同じ名前に落ちる。長さで落ちるなら、
+    そこを落とすと別のワークツリーの控えと同じ名前になる。長さで落ちるなら、
     書けなかったことが報告に出るほうがよい。
     """
     name = fsio.safe_name(target.key, limit=None)

@@ -61,7 +61,7 @@ function PhaseNodeView({ id, data }: NodeProps<PhaseNode>): JSX.Element {
           {data.review}
         </span>
         {data.review !== "none" && (
-          <span className="tag hitl" title="種類の宣言（review）。計画の延期や実績のリスクで、実際に見る場所は変わる">
+          <span className="tag hitl" title="種類の宣言（review）です。計画の延期や実績のリスクで、実際に見る場所は変わります">
             人が見る
           </span>
         )}
@@ -314,7 +314,7 @@ export function Graph({ graph, onPick }: { readonly graph: PhasesGraph; readonly
   }, []);
 
   if (graph.nodes.length === 0) {
-    return <p className="empty">図に出せる種類が無い（id を入れると出る）。</p>;
+    return <p className="empty">図に出せる種類がありません（id を入れると出ます）。</p>;
   }
   return (
     <div className="graph" id="phase-graph" data-nodes={graph.nodes.length} data-edges={graph.edges.length}>

@@ -10,7 +10,7 @@
 `tests/fixtures/` を拾わないことを名指しで見るのは、ここが実際に踏みやすい穴だから。
 `tests/` の下のディレクトリを名前だけで数えるとグループに見えるが、`__init__.py` が
 無いので discover は飛ばす。道具の側だけが拾うと `unittest tests.fixtures` が
-「importable でない」で落ち、全件が赤くなる。
+「importable でない」で落ち、実行全体が失敗になる。
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ class TakesTheSpellingsPeopleTypeTest(unittest.TestCase):
         self.assertEqual(["tests.core.test_run_tests"], TOOL.modules(["tests.core.test_run_tests"]))
 
     def test_an_unknown_name_plans_nothing(self):
-        """知らない名前で黙って全件に化けない。化けると、名指しが効いていないことに気づけない。"""
+        """知らない名前で黙って全件にならない。そうなると、名指しが効いていないことに気づけない。"""
         self.assertEqual([], TOOL.modules(["tests/nosuchgroup"]))
 
 

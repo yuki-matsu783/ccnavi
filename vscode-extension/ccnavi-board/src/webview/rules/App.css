@@ -1,5 +1,5 @@
 /*
- * ルール設定画面の骨組み（`App.tsx`）。タブと面、タイプごとの節、判定を試す欄、そして 2 つの面が
+ * ルール設定画面の骨組み（`App.tsx`）。タブとその中身、タイプごとの節、判定を試す欄、そして 2 つのタブが
  * 共有する表（サンプルの一括判定と hook の一覧）。1 件の行は `Rule.css`、判定の結果は `Judge.css`。
  */
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 10px; }

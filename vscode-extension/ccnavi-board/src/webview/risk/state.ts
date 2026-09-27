@@ -41,12 +41,12 @@ export function formOf(draft: Draft): RiskForm {
   return { levels: draft.levels, factors: draft.rows.map((row) => row.factor) };
 }
 
-/** 新しい項目。当て方の既定は `lines_over` */
+/** 新しい項目。加点条件の既定は `lines_over` */
 export function emptyFactor(): FactorForm {
   return { origin: null, id: "", points: "", kind: "lines_over", value: "", max: "", message: "" };
 }
 
-/** 控えてある「開いていた項目の id」。型が違うものは空に倒す */
+/** 控えてある「開いていた項目の id」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];

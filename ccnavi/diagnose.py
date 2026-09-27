@@ -1,4 +1,4 @@
-"""判定を実行せずに試す。人が端末から叩く経路。
+"""判定を実行せずに試す。人が端末から打つ経路。
 
 ## なぜ要るか
 
@@ -34,6 +34,8 @@ from . import (
     approval,
     audit,
     builtin,
+    flow,
+    history,
     hookio,
     judge,
     modes,
@@ -234,7 +236,7 @@ def _rules_hit(
 ) -> list[dict]:
     """当たったルールを、タイプと翻訳後の式まで返す。
 
-    翻訳後の式を出すのがこの試験の要。`glob` は正規表現に化けるので、
+    翻訳後の式を出すのがこの試験の要。`glob` は正規表現に変わるので、
     書いたものと当たるものの間に見えない層が 1 枚ある。その層を開けないと、
     当たらなかった理由を人が自分で辿れない。
 
@@ -266,16 +268,7 @@ def _rules_hit(
                 }
             )
             continue
-        hits.append(
-            {
-                "id": name,
-                "source": "file",
-                "section": rule.decision,
-                "kind": "glob" if rule.glob else "regex",
-                "written": rule.glob or rule.regex,
-                "pattern": rule.compiled.pattern if rule.compiled else "",
-            }
-        )
+        hits.append({"id": name, "source": "file", "section": rule.decision, **_rule_form(rule)})
     return hits
 
 
@@ -473,7 +466,7 @@ def layer_phase_types(path: str) -> tuple[list, str]:
     合成はしない。ここで出すのは「どの層に何が書いてあるか」で、id ごとに
     合わせた結果は判定の側（phase）が持つ。`overlap` / `requires` の参照は
     確かめない。層は共通層の種類を指してよいので、1 本だけで確かめると
-    正しい定義まで「読めない」になる（設計 §11.4.1）。
+    正しい定義まで「読めない」になる（設計 11.4.1）。
     """
     if not path or not os.path.isfile(path):
         return [], ""
@@ -484,16 +477,16 @@ def layer_phase_types(path: str) -> tuple[list, str]:
 
 
 def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str]:
-    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みへは落とさない）。
+    """その層のリスクの項目と、読めなかった理由。無い層は空（組み込みには戻さない）。
 
-    `script:` に書ける綴りは層ごとに違う（設計 §11.4.2）ので、読み方も層ごとに分ける。
+    `script:` に書ける綴りは層ごとに違う（設計 11.4.2）ので、読み方も層ごとに分ける。
     """
     if not path or not os.path.isfile(path):
         return [], ""
     if name == ruleload.LAYER_COMMON:
-        definition, notes = risk.load(path)
+        definition, _ = risk.load(path)
         if definition.fallback:
-            return [], definition.fallback or "; ".join(str(n) for n in notes)
+            return [], definition.fallback
         return list(definition.factors), ""
     definition, notes = risk.load_layer(path, (settings.layer_script_home(conf),))
     if definition is None:
@@ -504,7 +497,7 @@ def layer_risk(conf: settings.Settings, name: str, path: str) -> tuple[list, str
 def _explain_phases(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """層ごとのフェーズの種類（設計 §11.9）。id は裸のまま、層は欄で出す。"""
+    """層ごとのフェーズの種類（設計 11.9）。id は裸のまま、層は欄で出す。"""
     tables = [
         (v.name, *layer_phase_types(layer_config(conf, root, v.name, settings.KIND_PHASES)))
         for v in views
@@ -524,18 +517,18 @@ def _explain_phases(
 def _explain_risk(
     stdout: TextIO, conf: settings.Settings, root: str, views: list[ruleload.LayerView]
 ) -> None:
-    """層ごとのリスクの配点（設計 §11.9）。境目の点は共通層のものを出す。"""
+    """層ごとのリスクの配点（設計 11.9）。境目の点は共通層のものを出す。"""
     tables = [
         (v.name, *layer_risk(conf, v.name, layer_config(conf, root, v.name, settings.KIND_RISK)))
         for v in views
     ]
     common, _ = risk.load(conf.risk)
     # 共通層の境目の点。層の `levels` はキーごとに小さいほうが勝つので、実際に効く値は
-    # チケットの層で決まる（設計 §11.4.2）。ここに出すのは共通層の側の既定。
+    # チケットの層で決まる（設計 11.4.2）。ここに出すのは共通層の側の既定。
     effective = risk.effective_levels(common.levels)
     levels = " / ".join(f"{k} {effective[k]}" for k in ("medium", "high", "critical"))
     stdout.write(f"\n■ risk（levels: {levels}）\n")
-    stdout.write(f"  {'id':<16}{'層':<10}{'当て方':<20}{'points':<8}message\n")
+    stdout.write(f"  {'id':<16}{'層':<10}{'加点条件':<20}{'points':<8}message\n")
     for name, items, unreadable in tables:
         if unreadable:
             stdout.write(f"  {layer_label(name)}: 読めない: {unreadable}。この層は空として扱う\n")
@@ -560,7 +553,7 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
     stdout.write(f"ccnavi: いま効いている宣言（出所 {source}）\n")
     stdout.write(
         "  パスを持つツールは 共通層 + 行き先の層、持たないツールは全部の層の和で判定する"
-        "（設計 §11.4）\n"
+        "（設計 11.4）\n"
     )
 
     for view in views:
@@ -584,7 +577,10 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
 
     stdout.write("\n■ どのルールも言及しない呼び出し\n")
     stdout.write("  ccnavi は判定を持たず、Claude Code の権限モードに従う\n")
-    stdout.write("    auto                          classifier が判断する\n")
+    stdout.write(
+        "    auto                          classifier（auto モードで呼び出しを通すかを決める、"
+        "Claude Code の判定役のモデル）が判断する\n"
+    )
     stdout.write("    default / acceptEdits / plan  Claude Code 自身の権限の仕組みが決める\n")
     stdout.write("    不明なモード                  人に確認が出る\n")
     # ここだけは層の設定で変わるので、書いてあるとおりの結末を出す。
@@ -612,18 +608,21 @@ def explain(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: str) 
         return 0
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
-    done = {t.ticket for t in closed + review}
+    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     for t in sorted(copies + review, key=lambda x: (x.parent or x.ticket, x.ticket)):
         where = tree.worktree_path(root, t.ticket)
         bound = "ワークツリーあり" if tree.is_worktree_of(root, where) else "ワークツリー無し"
         place = "レビュー待ち" if t.state == ticket_mod.REVIEW else "作業中"
         head = f"{t.ticket}（{t.title}、承認 {t.approved_at}、{place}、{bound}）"
         if t.is_child:
-            waiting = [p for p in t.predecessors if p not in done]
-            review = "要" if t.review_required else "不要"
-            head += f" 親 {t.parent} フェーズ {t.phase} レビュー{review}"
-            if waiting:
-                head += f" 先行が閉じていない: {', '.join(waiting)}"
+            unmet = approval.unmet_predecessors(t, preds)
+            need = "要" if t.review_required else "不要"
+            head += f" 親 {t.parent} フェーズ {t.phase} レビュー{need}"
+            if unmet:
+                head += " 先行を満たしていない: " + ", ".join(
+                    f"{p.ticket}（{p.label}）" for p in unmet
+                )
         stdout.write(f"  {head}\n")
         for name in rules.SECTIONS:
             for path in t.paths(name):
@@ -674,7 +673,7 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
     読み手は VS Code のボード拡張。拡張は提案・承認済みチケット・マーカーを自分で解釈せず、ここが
     出した形をそのまま並べる。「レビューで止まっているか」「承認待ちは何か」の答えを
     2 か所で出さないための口で、判定と同じ関数（phase / approval）で組む。
-    ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 §3 P11）。
+    ネットワークには出ない。見るのはワークスペースの中のファイルだけ（設計 3 P11）。
     """
     stdout.write(json.dumps(board(conf, root, stderr), ensure_ascii=True, indent=1))
     stdout.write("\n")
@@ -682,7 +681,7 @@ def explain_json(stdout: TextIO, stderr: TextIO, conf: settings.Settings, root: 
 
 
 def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> dict:
-    """ボードの中身。形は設計 §10 と README「ボードの JSON」に書いてある。"""
+    """ボードの中身。形は設計 10 と README「ボードの JSON」に書いてある。"""
     problems: list[str] = []
     trees = tree.all_trees(root, conf.projects)
     payload: dict = {
@@ -731,6 +730,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
         review_copies,
         approval.types_resolver(conf, root, open_copies),
     )
+    # 先行を引く池。承認と着手が使うのと同じ集め方（ADR-0088）。
+    preds = approval.predecessor_pool_of(open_copies, review_copies, closed_copies, proposals)
     payload["pending_approval"] = sorted(
         {t.ticket for t in pending} | {t.ticket for t in revisions}
     )
@@ -763,6 +764,8 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
                 worktrees,
                 seen.get(ticket_id, []),
                 scattered.get(ticket_id, []),
+                problems,
+                preds,
             )
         )
 
@@ -775,7 +778,7 @@ def board(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> d
 
 
 def _layers(conf: settings.Settings, root: str, stderr: TextIO | None = None) -> list[dict]:
-    """層ごとの宣言（設計 §11.9）。並びは 共通層 → 自身の層 → プロジェクト（名前順）。
+    """層ごとの宣言（設計 11.9）。並びは 共通層 → 自身の層 → プロジェクト（名前順）。
 
     rules は重複を捨てたあとの、その層から実際に判定へ入ったぶん。phases と risk は
     その層のファイルに書いてあるぶんで、合成はしない（合成の結果は親のフェーズの
@@ -818,15 +821,22 @@ def _rule_record(rule: rules.Rule) -> dict:
         "section": rule.decision,
         "source": rule.source,
         "match": rule.match,
-        "kind": "glob" if rule.glob else "regex",
-        "written": rule.glob or rule.regex,
-        "pattern": rule.compiled.pattern if rule.compiled else "",
+        **_rule_form(rule),
         "message": rule.message,
     }
 
 
+def _rule_form(rule: rules.Rule) -> dict:
+    """ルールの書き方。書いた綴りと、翻訳後の式。"""
+    return {
+        "kind": "glob" if rule.glob else "regex",
+        "written": rule.glob or rule.regex,
+        "pattern": rule.compiled.pattern if rule.compiled else "",
+    }
+
+
 def _phase_type_record(layer: str, pt) -> dict:
-    """フェーズの種類 1 つ。id は裸のまま、層は欄で出す（設計 §11.4.1）。"""
+    """フェーズの種類 1 つ。id は裸のまま、層は欄で出す（設計 11.4.1）。"""
     return {
         "id": pt.id,
         "source": layer,
@@ -885,6 +895,8 @@ def _ticket_record(
     worktrees: dict,
     seen_in: list[dict],
     scattered: list[dict],
+    problems: list[str],
+    preds: dict[str, list[ticket_mod.Ticket]],
 ) -> dict:
     """チケット 1 件。提案と承認済みチケットとワークツリーの今を 1 つにまとめる。"""
     copy = open_index.get(ticket_id) or closed_index.get(ticket_id)
@@ -896,7 +908,7 @@ def _ticket_record(
         status = "closed"
     else:
         status = "none"
-    found = worktrees.get(ticket_id) or tree.lookup(worktrees, ticket_id)
+    found = tree.lookup(worktrees, ticket_id)
     record: dict = {
         "ticket": ticket_id,
         "parent": source.parent,
@@ -905,6 +917,16 @@ def _ticket_record(
         "project": source.project,
         "issue": source.issue,
         "predecessors": list(source.predecessors),
+        # 満たしていない先行（ADR-0088）。承認と着手はこれが空でなければ止まる。閉じたチケットは空。
+        # `label` は人向けの言葉で、ボードは写すだけ。
+        "predecessors_unmet": (
+            []
+            if status == "closed"
+            else [
+                {"ticket": p.ticket, "state": p.state, "label": p.label}
+                for p in approval.unmet_predecessors(source, preds)
+            ]
+        ),
         "human_review": {
             "required": source.review_required,
             "reason": source.review_reason,
@@ -945,11 +967,22 @@ def _ticket_record(
         "cancel_reason": source.cancel_reason,
         "seen_in": seen_in,
         "scattered": scattered,
+        # 子のフロー（設計 9.3.1、ADR-0085）。`{path, rel, tree, exists, linked, locked}`。
+        # 親は null。
+        # locked は判定がそのフローへの書き込みを止めているか（着手中）。読むのは承認済み
+        # チケットがあればその側、無ければ提案。
+        "flow": flow.info(conf, root, copy if copy is not None else source),
         "risk": None,
         "judge": None,
+        # 状態が動いた跡の新しい側（ADR-0086）。補助で、状態の正は上の置き場の欄。
+        "history": [],
     }
+    where = approval.home_dir(conf, root, ticket_id, source.parent)
+    entries, unreadable = history.read(where, ticket_id)
+    record["history"] = entries
+    if unreadable:
+        problems.append(f"{ticket_id} の履歴: {unreadable}")
     if source.parent:
-        where = approval.home_dir(conf, root, ticket_id, source.parent)
         record["risk"] = approval.read_child_record(
             where, source.parent, ticket_id, approval.CHILD_RECORD_RISK
         )
@@ -994,10 +1027,12 @@ def _parent_record(
 ) -> dict:
     """親 1 件。局面、計画、親のマーカー、フェーズの並び。"""
     where = approval.home_dir(conf, root, parent.ticket, "")
+    closed = parent.ticket in closed_index
     return {
         "ticket": parent.ticket,
-        "closed": parent.ticket in closed_index,
-        "stage": phase.stage(root, conf, parent),
+        "closed": closed,
+        # 閉じた親に「クローズ可」と言っても意味が無い。局面は動いている親だけが持つ。
+        "stage": "" if closed else phase.stage(root, conf, parent),
         "plan": [item.as_raw() for item in parent.plan],
         "feedback": (
             [item.as_raw() for item in parent.feedback] if parent.feedback is not None else None

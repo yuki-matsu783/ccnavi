@@ -222,7 +222,7 @@ allow:
   assert.equal(readRules(cleared).model.sections.deny[0].additionalContextFile, "");
 });
 
-test("CB-T134 every（渡す回の刻み）は書かれたまま読む。触らなければ書き戻しでも変わらない", () => {
+test("CB-T134 every（何回に 1 度渡すか）は書かれたまま読む。触らなければ書き戻しでも変わらない", () => {
   const text = `version: 1
 deny: []
 ask: []

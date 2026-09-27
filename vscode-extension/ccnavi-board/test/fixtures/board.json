@@ -159,6 +159,7 @@
    "project": "",
    "issue": null,
    "predecessors": [],
+   "predecessors_unmet": [],
    "human_review": {
     "required": true,
     "reason": "t"
@@ -183,8 +184,40 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": null,
    "risk": null,
-   "judge": null
+   "judge": null,
+   "history": [
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001",
+     "kind": "approved",
+     "from": "todo",
+     "to": "doing",
+     "via": "terminal",
+     "tree": "i0001"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001",
+     "kind": "phase-mark",
+     "from": null,
+     "to": null,
+     "via": "hook",
+     "phase": 1,
+     "mark": "pending"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001",
+     "kind": "phase-mark",
+     "from": null,
+     "to": null,
+     "via": "cli",
+     "phase": 1,
+     "mark": "reviewed"
+    }
+   ]
   },
   {
    "ticket": "i0001-01",
@@ -194,6 +227,7 @@
    "project": "",
    "issue": null,
    "predecessors": [],
+   "predecessors_unmet": [],
    "human_review": {
     "required": false,
     "reason": "t"
@@ -218,6 +252,14 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-01.yml",
+    "rel": ".ccnavi/approved/flows/i0001-01.yml",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": true,
+    "linked": false,
+    "locked": false
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
@@ -228,7 +270,44 @@
     "at": "2026-09-13T13:50:22+0000",
     "summary": "1 ファイル、+1 -0 行、消したファイル 0"
    },
-   "judge": null
+   "judge": null,
+   "history": [
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-01",
+     "kind": "approved",
+     "from": "todo",
+     "to": "doing",
+     "via": "terminal",
+     "tree": "i0001"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-01",
+     "kind": "started",
+     "from": "doing",
+     "to": "doing",
+     "via": "cli",
+     "base_sha": "0000000000000000000000000000000000000000"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-01",
+     "kind": "finished",
+     "from": "doing",
+     "to": "review",
+     "via": "cli"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-01",
+     "kind": "settled",
+     "from": "review",
+     "to": "done",
+     "via": "cli",
+     "phase": 1
+    }
+   ]
   },
   {
    "ticket": "i0001-02",
@@ -238,6 +317,7 @@
    "project": "",
    "issue": null,
    "predecessors": [],
+   "predecessors_unmet": [],
    "human_review": {
     "required": true,
     "reason": "t"
@@ -262,8 +342,36 @@
    "cancel_reason": "",
    "seen_in": [],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-02.yml",
+    "rel": ".ccnavi/approved/flows/i0001-02.yml",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": true
+   },
    "risk": null,
-   "judge": null
+   "judge": null,
+   "history": [
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-02",
+     "kind": "approved",
+     "from": "todo",
+     "to": "doing",
+     "via": "board",
+     "tree": "i0001"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-02",
+     "kind": "started",
+     "from": "doing",
+     "to": "doing",
+     "via": "cli",
+     "base_sha": "0000000000000000000000000000000000000000"
+    }
+   ]
   },
   {
    "ticket": "i0001-03",
@@ -273,6 +381,7 @@
    "project": "",
    "issue": null,
    "predecessors": [],
+   "predecessors_unmet": [],
    "human_review": {
     "required": true,
     "reason": "t"
@@ -309,8 +418,17 @@
     }
    ],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-03.yml",
+    "rel": ".ccnavi/approved/flows/i0001-03.yml",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false
+   },
    "risk": null,
-   "judge": null
+   "judge": null,
+   "history": []
   },
   {
    "ticket": "i0001-04",
@@ -320,6 +438,7 @@
    "project": "",
    "issue": null,
    "predecessors": [],
+   "predecessors_unmet": [],
    "human_review": {
     "required": true,
     "reason": "t"
@@ -360,6 +479,14 @@
     }
    ],
    "scattered": [],
+   "flow": {
+    "path": "<root>/.claude/worktrees/i0001/.ccnavi/approved/flows/i0001-04.yml",
+    "rel": ".ccnavi/approved/flows/i0001-04.yml",
+    "tree": "<root>/.claude/worktrees/i0001",
+    "exists": false,
+    "linked": false,
+    "locked": false
+   },
    "risk": {
     "points": 0,
     "level": "LOW",
@@ -370,7 +497,35 @@
     "at": "2026-09-13T13:50:23+0000",
     "summary": "1 ファイル、+2 -0 行、消したファイル 0"
    },
-   "judge": null
+   "judge": null,
+   "history": [
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-04",
+     "kind": "approved",
+     "from": "todo",
+     "to": "doing",
+     "via": "board",
+     "tree": "i0001"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-04",
+     "kind": "started",
+     "from": "doing",
+     "to": "doing",
+     "via": "cli",
+     "base_sha": "0000000000000000000000000000000000000000"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-04",
+     "kind": "finished",
+     "from": "doing",
+     "to": "review",
+     "via": "cli"
+    }
+   ]
   },
   {
    "ticket": "i0001-05",
@@ -380,6 +535,7 @@
    "project": "",
    "issue": null,
    "predecessors": [],
+   "predecessors_unmet": [],
    "human_review": {
     "required": true,
     "reason": "t"
@@ -403,8 +559,29 @@
    "cancel_reason": "やめた",
    "seen_in": [],
    "scattered": [],
+   "flow": null,
    "risk": null,
-   "judge": null
+   "judge": null,
+   "history": [
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-05",
+     "kind": "approved",
+     "from": "todo",
+     "to": "doing",
+     "via": "terminal",
+     "tree": "i0001"
+    },
+    {
+     "at": "2026-09-13T13:50:22Z",
+     "ticket": "i0001-05",
+     "kind": "cancelled",
+     "from": "doing",
+     "to": "done",
+     "via": "cli",
+     "reason": "要らなくなった"
+    }
+   ]
   }
  ],
  "parents": [

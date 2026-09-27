@@ -17,11 +17,11 @@
 だから読みは 2 段にしてある。先に原文を 1 回走査して（_Scanner）、引用の状態を
 自分で持ったまま、シェルが実行するのに shlex が見ないもの（コマンド置換、
 プロセス置換、ヒアドキュメントの本文、コメント、改行）を片付ける。書き直す道が必ずあって、
-読み分けると規則が増えるか、読み違えると素通りに倒れる形（バッククォート、ブレース展開、
+読み分けると規則が増えるか、読み違えると素通りになる形（バッククォート、ブレース展開、
 実行するときに決まるコマンド名、シェルで読みが割れる形）は、読み解かずに並べて判定が止める。
 語の分割はそのあと shlex に任せる。引用の規則を 2 か所で持つことになるが、shlex の
 状態機械は公開されておらず、中身を写すと Python の版で壊れる
-（wip/design/shellread-subst.md §1.1）。
+（wip/design/shellread-subst.md 1.1）。
 
 仕事を文字列として受け取って実行するコマンドは、読み切れないものとして扱う。
 その代わり、`env` `sudo` `sh -c` のような実行役のコマンドが中で実行するコマンドを、
@@ -33,7 +33,7 @@
 使った形は止める）。
 やるのは、普通の作業で書かれるコマンドについて、その語が実行されるのか
 書かれただけなのかを判定すること。判定できないときはそう言って、
-呼び出し側が生の文字列との一致に落とせるようにする。そちらが厳しい側の読み。
+呼び出し側が生の文字列との一致に切り替えられるようにする。そちらが厳しい側の読み。
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ WORD_SEP = "\x01"
 # 引用符だけで書かれた 1 語（`echo ">"`）は演算子と区別が付かない。shlex は
 # 引用されていたかどうかを返さないので、ここでは演算子として扱う。走査は引用の
 # 範囲を知っているので直せるが、それは止まっていたものが通る向きの変更になるので
-# 別に決める（設計 §6）。
+# 別に決める（設計 6）。
 _PUNCTUATION = "();<>|&"
 
 # 読み切れなかった理由。何が読みを止めたかまで名指しする。
@@ -93,7 +93,7 @@ REASON_BACKQUOTE = "backquote"
 
 # ---- 書き直しを求める形
 #
-# 書き直す道が必ずあり、読み分けると規則が増えるか、読み違えると素通りに倒れる形。読みはこれを
+# 書き直す道が必ずあり、読み分けると規則が増えるか、読み違えると素通りになる形。読みはこれを
 # 読み解かずに Reading.rewrites に（形, 綴り）で並べ、判定がルールより先に止めて、形ごとの
 # 書き直し方を案内する（ADR-0046、ADR-0047）。
 #
@@ -198,7 +198,7 @@ _TAKES_CODE_FLAG = {
 # いるものが止まらなくなる。同じ理由で、コマンドの位置の語には継ぎ足さない。
 #
 # 行き先が読めなくなったら、そこから先は継ぎ足さない。読みそのものは変えない。
-# 縮退させると生の文字列に落ちて、`cd - && rm -f <守られた場所>` のように
+# 縮退させると生の文字列で見ることになり、`cd - && rm -f <守られた場所>` のように
 # **今は止まっている形**が止まらなくなる（敵対的レビュー 2026-09-20）。
 
 # 行き先を綴りに持たないもの。読めない行き先として扱う。
@@ -212,15 +212,16 @@ _RUNS_BUILTIN = frozenset({"builtin", "command"})
 _CD_OPTIONS = frozenset({"-L", "-P", "-e", "-@"})
 
 # 中で実行されるコマンドの居場所だけを移す実行役のコマンドのオプション。
-# 値は次の語か `=` の後ろ。まとめ書き（`-iC /tmp`）は読まない（継ぎ足さない側に倒れる）。
+# 値は次の語か `=` の後ろ。まとめ書き（`-iC /tmp`）は読まない（継ぎ足さない側になる）。
 _MOVES_TO = {"env": ("-C", "--chdir"), "sudo": ("-D", "--chdir")}
 
 # 左がサブシェルになる区切り。`cd a | b` と `cd a & b` の `cd` は、右にも後ろにも効かない。
 _FORKED = frozenset({"|", "|&", "&"})
 
-# 綴りの中にあると、行き先が実行するときまで決まらない文字。変数と置換（走査が `$` 1 文字に
-# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。先頭の `~` は別に見る。
-_PATH_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
+# 綴りの中にあると、実行するときまでシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
+# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。行き先の綴りとコマンド名の両方に使う。
+# 行き先では先頭の `~` を別に見る。コマンド名では `[` だけの test コマンドと `[[` は当たらない。
+_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
 
 # 絶対パス。継ぎ足さずにそのまま使う。Windows のドライブ文字も絶対。
 _ABSOLUTE = re.compile(r"[\\/]|[A-Za-z]:[\\/]")
@@ -332,10 +333,6 @@ _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
 # `env` と `sudo` が代入として読む引数。どちらも `=` を含む引数を名前の綴りを問わず代入に
 # 数える（`env a+=1 rm x` は `a+` という変数を置いて rm を実行する）。シェルの代入より広い。
 _RUNNER_ASSIGNMENT = re.compile(r"[^=-][^=]*=")
-
-# コマンド名の中で、実行するときにシェルが中身を決める文字。変数と置換（走査が `$` 1 文字に
-# 置き換えたもの）、グロブの `*` `?` と閉じた `[…]`。`[` だけの test コマンドと `[[` は当たらない。
-_NAME_EXPANDS = re.compile(r"[$*?]|\[[^\]]*\]")
 
 # bash 4.1 以降の名前付き fd。`{fd}>/dev/null cmd` のリダイレクトの前に付く。
 _NAMED_FD = re.compile(r"\{[A-Za-z_][A-Za-z0-9_]*\}")
@@ -891,8 +888,8 @@ def read(src: str) -> Reading:
     # コマンド名は、読んだコマンドと、実行役のコマンドを外した層の両方で見る。
     # `env $c push` の `$c` と `sh $SCRIPT` の `$SCRIPT` は、層の先頭にしか立たない。
     # `eval` と `sh -c` の文字列を読み直した層は、外側が縮退していれば見ない。そのときは確認に
-    # 落ちるので、止めて書き直させると、書き直し先がファイルになって中身が見えなくなる（ADR-0047）。
-    # 縮退していない（`FOO=1 eval "$c"`）なら確認に落ちる保証が無いので、見る。
+    # なるので、止めて書き直させると、書き直し先がファイルになって中身が見えなくなる（ADR-0047）。
+    # 縮退していない（`FOO=1 eval "$c"`）なら確認になる保証が無いので、見る。
     looked = [
         layer
         for (_, layer, _), reread_layer in zip(layers, marks, strict=True)
@@ -908,12 +905,11 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     """外側のコマンド 1 本ずつの（語の並び, そのコマンドが居る場所）。
 
     居る場所は `cd` を追った先で、読みの起点（打たれた場所）から見た綴り。起点そのものは
-    空文字、読めなくなったら None（§6.3.2 と同じ追い方）。置換の中身は並べない。
+    空文字、読めなくなったら None（6.3.2 と同じ追い方）。置換の中身は並べない。
     読み切れない形（走査か shlex が止まる）なら空のリストを返す。呼び手は read() の
     degraded を先に見て、そちらで扱う。
     """
-    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
-    src = src.replace("\\\r\n", "").replace("\\\n", "")
+    src = _prepare(src)
     try:
         outer, _, _, _ = _scan(src)
         tokens = _tokenize(outer)
@@ -924,6 +920,19 @@ def placed(src: str) -> list[tuple[list[str], str | None]]:
     return places
 
 
+def _prepare(src: str) -> str:
+    """走査の前の下ごしらえ。目印の文字を空白に戻し、行継続を消す。
+
+    改行の前のバックスラッシュはシェルの行継続で、2 文字とも消える。
+    2 行に割ったコマンドは 1 行で書いたのと同じ語の並びになる。
+    走査より先に消すのは、改行をコマンドの区切りに読ませないため。
+    シングルクォートの中では 2 文字とも文字通りなのでそこでは取りこぼすが、
+    誰も書かない綴りだし、変わるのは引数の文字列であってどのコマンドが走るかではない。
+    """
+    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
+    return src.replace("\\\r\n", "").replace("\\\n", "")
+
+
 def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     """読みと、層を作る先のコマンドの並びを返す。
 
@@ -932,13 +941,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     """
     if depth > _MAX_DEPTH:
         return _stopped(_Unreadable(REASON_AMBIGUOUS_SUBST, _TOO_DEEP)), []
-    src = src.replace(SEP, " ").replace(WORD_SEP, " ")
-    # 改行の前のバックスラッシュはシェルの行継続で、2 文字とも消える。
-    # 2 行に割ったコマンドは 1 行で書いたのと同じ語の並びになる。
-    # 走査より先に消すのは、改行をコマンドの区切りに読ませないため。
-    # シングルクォートの中では 2 文字とも文字通りなのでそこでは取りこぼすが、
-    # 誰も書かない綴りだし、変わるのは引数の文字列であってどのコマンドが走るかではない。
-    src = src.replace("\\\r\n", "").replace("\\\n", "")
+    src = _prepare(src)
 
     try:
         outer, found, heads, braces = _scan(src)
@@ -979,7 +982,7 @@ def _read(src: str, depth: int) -> tuple[Reading, list[tuple[list[str], bool]]]:
     if sum(t in ("<<", "<<-") for t in tokens) > heads:
         # 走査がヒアドキュメントと読まなかった `<<` が、トークンに出た。引用が `<<` だけの
         # 1 語（`grep -n "<<" f`）で、shlex からは演算子と区別が付かない。今までどおり
-        # 閉じない本文として縮退する（ccnavi.md §12.2 の許容した誤検知）。
+        # 閉じない本文として縮退する（ccnavi.md 12.2 の許容した誤検知）。
         return Reading(degraded=True, reason=REASON_UNTERMINATED, rewrites=rewrites), runnable
 
     why = _classify(commands)
@@ -1350,14 +1353,14 @@ def _destination(rest: list[str], k: int) -> int:
     if len(where) != 1:
         return -1
     target = rest[where[0]]
-    if not target or target.startswith(("-", "~")) or _PATH_EXPANDS.search(target):
+    if not target or target.startswith(("-", "~")) or _EXPANDS.search(target):
         return -1
     return where[0]
 
 
 def _target(here: str | None, word: str) -> str | None:
     """移る先を、読みの起点から見た綴りにする。決まらなければ None。"""
-    if _PATH_EXPANDS.search(word) or word.startswith("~"):
+    if _EXPANDS.search(word) or word.startswith("~"):
         return None
     if _ABSOLUTE.match(word):
         return _capped(_normal(word))
@@ -1465,7 +1468,7 @@ def _with_time(commands: list[list[str]]) -> list[list[str]]:
     _split_commands は予約語を 1 本にするので、`time -f %e rm x` は `time` と
     `-f %e rm x` の 2 本になり、`rm x` がどちらのコマンドの先頭にも立たない。`time` を
     実行役のコマンドとして外すために、層を作るときだけつなぐ。後ろのコマンドもそのまま
-    残すので、つなぎ違えても層が増えるだけで、止める側に倒れる。
+    残すので、つなぎ違えても層が増えるだけで、止める側になる。
     """
     out: list[list[str]] = []
     for k, command in enumerate(commands):
@@ -1487,7 +1490,7 @@ def _expanded_names(commands: list[list[str]]) -> list[str]:
         name = _command_name(command)
         if len(previous) == 1 and previous[0] in _TAKES_A_WORD:
             name = ""
-        if name and _NAME_EXPANDS.search(name) and name not in seen:
+        if name and _EXPANDS.search(name) and name not in seen:
             found.append(name)
             seen.update((name, _base(name)))
         previous = command
@@ -1757,7 +1760,7 @@ def _render(commands: list[list[str]]) -> str:
     リダイレクトではない。ここで両側に目印を置かないと、`grep -n "x>" f` が
     `x > f` と同じ形になり、書き込み先を見るルールが読み手に当たる。
     """
-    return SEP.join(" ".join(_join(token) for token in command) for command in commands if command)
+    return SEP.join(_render_command(command) for command in commands if command)
 
 
 def _join(token: str) -> str:

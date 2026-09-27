@@ -53,7 +53,7 @@ export function countText(total: number, query: string, shown: number, kept: num
 /** id が重なっているときに下部へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `id が重なっている（${names.join(", ")}）。1 つにするまで保存できない`;
+  return `id が重なっています（${names.join(", ")}）。1 つにするまで保存できません`;
 }
 
 /**
@@ -61,31 +61,31 @@ export function duplicateNote(ids: ReadonlySet<string>): string {
  * 細かい説明（「人が見る」の意味、待ち方が決まる時点）は札のツールチップとヘルプに置く。
  * 毎回 6 文を並べていたときは、要る注意がほかの文に埋もれていた。
  *
- * **線が落ちた理由は言わない。** 綴り違いかもしれないし、他の層の種類かもしれない。
+ * **線が落ちた理由は言わない。** 綴り違いかもしれないし、ほかの設定の種類かもしれない。
  * 決めるのは実行ファイルで、`phasetypes.py` の `reference_problems` が合成した集合で
- * 確かめ、無ければ error を出す。画面がその手前で「他の層だ」と言うと、保存したときに
+ * 確かめ、無ければ error を出す。画面がその手前で「ほかの設定の種類だ」と言うと、保存したときに
  * 実行ファイルが逆のことを言う（ADR-0035）。ここは「線にしていない」までしか言わない。
  */
 export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolean): readonly string[] {
   const out: string[] = [];
-  // after を 1 つでも書いていれば言う（線にならない、ほかの層を指す after も効かないのは同じ）
+  // after を 1 つでも書いていれば言う（線にならない、ほかの設定を指す after も効かないのは同じ）
   const hasAfter = form.phases.some((phase) => phase.after.some((id) => id.trim() !== ""));
   if (form.order === "sequential" && hasAfter) {
-    out.push("待ち方が sequential なので、after は判定に効かない。全体計画は plan: に並べた順に一つずつ進む");
+    out.push("待ち方が sequential なので、after は判定に効きません。全体計画は plan: に並べた順に一つずつ進みます");
   }
-  // 層の dag は、合成に入るほかの層が全部 dag のときだけ効く（`phasetypes.py` の `merged_order`）
+  // ワークスペースとプロジェクトの設定の dag は、合成に入るほかの設定が全部 dag のときだけ効く（`phasetypes.py` の `merged_order`）
   if (layer && form.order === "dag") {
-    out.push("層を合わせたとき、ほかの層のどれかが sequential なら、判定は sequential で待つ（このファイルの after は効かない）");
+    out.push("共通の設定が sequential なら、合わせたときの判定は sequential で待ちます（このファイルの after は効きません）");
   }
   if (graph.dropped > 0) {
     out.push(
       layer
-        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（ほかの層の種類を指しているならそのままでよい。綴り違いなら保存のときの検証が言う）。ほかの層の種類を待つ種類は、図では根に見える`
-        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていない（綴り違いなら保存のときの検証が言う）`,
+        ? `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（共通の設定の種類を指しているならそのままで構いません。入力ミスなら保存のときの検証が知らせます）。共通の設定の種類を待つ種類は、図では根に見えます`
+        : `このファイルに無い種類を指す関係が ${graph.dropped} 件あり、線にしていません（入力ミスなら保存のときの検証が知らせます）`,
     );
   }
   if (graph.unnamed > 0) {
-    out.push(`id が空の種類は図に出ない（${graph.unnamed} 件）`);
+    out.push(`id が空の種類は図に出ません（${graph.unnamed} 件）`);
   }
   return out;
 }
@@ -93,9 +93,9 @@ export function graphNotices(graph: PhasesGraph, form: PhasesForm, layer: boolea
 /** 種類が 1 つも無いときに一覧へ出す文。ファイルの有無と、触れるかで変わる */
 export function emptyNote(exists: boolean, editable: boolean): string {
   if (exists) {
-    return "種類が無い。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足す";
+    return "種類がありません。種類が 1 つも無いファイルは実行ファイルが読めないので、保存する前に足してください";
   }
   return editable
-    ? "ファイルが無い（無い層は空で、共通層の種類だけが使われる）。種類を足して保存すると、ファイルが作られる"
-    : "ファイルが無い。上の「雛形でファイルを作る」で作ってから直す";
+    ? "ファイルがありません（無ければこの設定は空で、共通の設定の種類だけが使われます）。種類を足して保存すると、ファイルが作られます"
+    : "ファイルがありません。種類はワークスペースかプロジェクトの設定に置いてください。上の案内からワークスペースの設定を開くか、プロジェクト管理画面から開けます";
 }

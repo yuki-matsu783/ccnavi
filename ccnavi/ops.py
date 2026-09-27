@@ -13,12 +13,17 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass, replace
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, phase, risk, settings, tree
+from . import approval, configsync, flow, fsio, gitcmd, history, phase, risk, settings, tree
 from . import ticket as ticket_mod
 
 TIMEOUT_SECONDS = 5.0
+
+# Stop で `finish` の打ち忘れを促すときの理由コード（ADR-0087）。止めるのは 1 回だけの促しで、
+# 判定の deny ではない。
+CODE_FINISH_NUDGE = "NUDGE_TICKET_FINISH"
 
 
 def start(
@@ -44,6 +49,8 @@ def start(
         return 1
     if _parent_not_started(stderr, root, conf, found):
         return 1
+    if _predecessors_unmet(stderr, root, conf, found):
+        return 1
     # ワークツリーは承認済みチケットの `project` が指すリポジトリから
     # 切られていること（REQ-MLT-13）。
     # 元リポジトリが違えば、判定はそのツリーの元リポジトリで行われ、チケットと噛み合わない。
@@ -64,16 +71,101 @@ def start(
     if not sha:
         stderr.write(f"ccnavi: {worktree} の HEAD を読めない\n")
         return 1
+    synced = _sync_config(stderr, root, conf, found, worktree)
+    if synced is None:
+        return 1
     fields = {"started_at": approval.now(), "base_sha": sha}
     failed = approval.update_fields(found.path, fields)
     if failed:
         stderr.write(f"ccnavi: {ticket_id} に着手の欄を書けない: {failed}\n")
         return 1
+    history.note(
+        os.path.dirname(os.path.dirname(found.path)),
+        found.ticket,
+        history.KIND_STARTED,
+        ticket_mod.DOING,
+        ticket_mod.DOING,
+        base_sha=sha,
+    )
     stdout.write(
         f"OK: {found.ticket} に着手した（{fields['started_at']} / 基準点 {sha[:12]}）。"
         f"置き場は {ticket_mod.DOING}/ のまま\n"
     )
+    if found.is_child:
+        # 着手のときのフローの指紋を控える。SubagentStart / SubagentStop が、着手のあとに
+        # 書き換わったら知らせる（設計 9.3.1、ADR-0085。止めない）。
+        started = replace(found, started_at=fields["started_at"])
+        where, failed = flow.record_digest(conf, root, started)
+        if failed:
+            stderr.write(
+                f"ccnavi: {ticket_id} のフローの指紋を控えられない（{failed}）。"
+                "着手のあとの書き換えは知らせられない\n"
+            )
+        else:
+            stdout.write(
+                f"フローの指紋を {where} に控えた。承認済みチケットと同じく人がコミットする\n"
+            )
+    for line in synced:
+        stdout.write(line + "\n")
     return 0
+
+
+def _sync_config(
+    stderr: TextIO,
+    root: str,
+    conf: settings.Settings,
+    found: ticket_mod.Ticket,
+    worktree: str,
+) -> list[str] | None:
+    """親の着手の前に、共通層でプロジェクトの層を上書きする（設計 11.12）。
+
+    返すのは着手の出力に足す行。写せなければ None（着手しない）。子は親のブランチに
+    乗るので比べない。ワークスペース自身の作業は、共通層と同じリポジトリにあるので比べない。
+    """
+    if found.is_child or not found.project:
+        return []
+    copied, why = configsync.plan(conf, root, worktree)
+    if why:
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {why}\n")
+        return None
+    if not copied:
+        return []
+    busy, why = configsync.dirty(worktree, copied)
+    if why or busy:
+        stderr.write(
+            f"ccnavi: {found.ticket} の設定を共通層から写せない: "
+            + (
+                why
+                or f"未コミットの変更がある（{', '.join(busy)}）。人の書きかけを踏まないので止める"
+            )
+            + "\n"
+        )
+        return None
+    where = approval.home_dir(conf, root, found.ticket, "")
+    failed = configsync.apply(where, found.ticket, copied)
+    if failed:
+        stderr.write(f"ccnavi: {found.ticket} の設定を共通層から写せない: {failed}\n")
+        return None
+    git_sh = settings.script_command(root, "ccnavi-git.sh")
+    lines = [
+        f"共通層とプロジェクト {found.project} の設定が違っていたので、共通層で上書きした。"
+        "最初のレビューで知らせる（レビューが無ければ、親を閉じる前に利用者が端末で見る）:"
+    ]
+    for c in copied:
+        line = f"  - {c.rel}（{'上書き' if c.existed else '新しく置いた'}）"
+        if c.lost:
+            line += "。消えた識別子: " + ", ".join(c.lost)
+        if c.changed:
+            line += "。中身が変わった識別子: " + ", ".join(c.changed)
+        if c.unparsed:
+            line += "。上書き前を読めなかった"
+        lines.append(line)
+    mark = approval.parent_mark_path(where, found.ticket, configsync.MARK)
+    lines.append(
+        f"  作業を始める前に、{worktree} で {', '.join(c.rel for c in copied)} を"
+        f" '{git_sh} add' してコミットすること。印 {mark} も、それを持つツリーでコミットする"
+    )
+    return lines
 
 
 def finish(
@@ -112,7 +204,7 @@ def finish(
 
 
 def _needs_review(root: str, conf: settings.Settings, found: ticket_mod.Ticket) -> bool:
-    """この子を閉じたとき、人が見る対象になるか（設計 §9.8）。親は見ない。
+    """この子を閉じたとき、人が見る対象になるか（設計 9.8）。親は見ない。
 
     フェーズの「見る場所」を、この子を閉じたものとして数え直す。延期したフェーズの子も
     レビュー待ちに置く。見るのは次にレビューがあるフェーズの番だが、人が見るまでは
@@ -136,7 +228,7 @@ def _close_parent(
 
     記録（`closed.json`）は、どのフェーズをどこで見たかを親のブランチに残す。提案は
     統合先へ戻す前に `wip/` ごと消えるので、マージリクエストを作らない運び方では
-    締めた事実の残る先がここしか無い（設計 §9.8）。
+    締めた事実の残る先がここしか無い（設計 9.8）。
 
     案内は運び方で分かれる。マージリクエストがあるなら Draft を外す合図まで、無いなら統合先へ戻す
     ところまで。ccnavi はどちらでもマージしない。
@@ -259,7 +351,7 @@ def record_risk(
         "reason": reason.strip(),
         "head": head,
         "at": approval.now(),
-        # その項目がどの層に書いてあるか（設計 §11.9）。
+        # その項目がどの層に書いてあるか（設計 11.9）。
         "source": factor.source,
     }
     failed = approval.write_child_record(
@@ -276,7 +368,7 @@ def record_risk(
 
 
 def _project_of(conf: settings.Settings, root: str, found: ticket_mod.Ticket) -> str:
-    """このチケットの層を決める `project:`（設計 §11.4.1、§11.4.2）。
+    """このチケットの層を決める `project:`（設計 11.4.1、11.4.2）。
 
     権威は承認済みチケットの側。子は親から継ぐので、親の承認済みチケットを引く。提案の側に
     書いてある値は人が承認していないので、判定の根拠にしない。
@@ -345,7 +437,7 @@ def _score_child(
     record.update({"head": diff.head, "base": diff.base, "at": approval.now()})
     record["summary"] = diff.summary()
     if definition.dropped:
-        # 空として扱った層の名前を残す（設計 §11.2）。共通層だけで測ったことが、
+        # 空として扱った層の名前を残す（設計 11.2）。共通層だけで測ったことが、
         # あとから記録を読んだ人に分かる。
         record["fallback"] = ",".join(definition.dropped)
     failed = approval.write_child_record(
@@ -434,7 +526,7 @@ def _find(
 def _parent_not_started(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 §9.6、REQ-TKT-48）。
+    """子に着手してよいか。親が作業中で着手済みでなければ止める（設計 9.6、REQ-TKT-48）。
 
     親の `start` を飛ばしても途中では何も壊れず、親を閉じるときだけが通らない。壊れない
     ので気付けず、気付くのがいちばん遅い場所になる。親の作業が実際に始まる瞬間
@@ -479,6 +571,43 @@ def _parent_not_started(
     return False
 
 
+def _predecessors_unmet(
+    stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
+) -> bool:
+    """子の先行が全部 `done/` に在って取り消しでないか（ADR-0088）。欠けていれば止めて言う。
+
+    承認でも同じ検査を当てるが、承認のあとに先行が動くこと（人が `done/` から戻す）と、置き場を
+    手で動かして承認する運び（ADR-0058）があるので、着手の手前でもう一度見る。どの先行が何の
+    状態か、どうすればよいかを 1 本ずつ言う。
+    """
+    unmet = approval.unmet_predecessors(found, approval.predecessor_pool(conf, root))
+    if not unmet:
+        return False
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    stderr.write(
+        f"ccnavi: {found.ticket} の先行が満たされていないので着手しない"
+        f"（先行は {conf.approved}/{ticket_mod.DONE}/ に在って取り消しでないこと）:\n"
+    )
+    for p in unmet:
+        stderr.write(f"  - 先行 {p.ticket}: {p.label}\n")
+    if any(p.waiting for p in unmet):
+        stderr.write(
+            f"  先行を先に閉じる（作業中なら '{ticket_sh} finish <先行>'。"
+            "レビューが要るなら人のレビューが済んで done/ に入るまで待つ）\n"
+        )
+    if any(not p.waiting for p in unmet):
+        stderr.write(
+            "  取り消した・どこにも無い・自分自身や自分の親・輪になった先行は、待っても満たせない。"
+            "複数の場所にある先行は、先に 1 つに決める\n"
+        )
+    stderr.write(
+        "  先行が要らないなら、利用者に承認済みチケットの predecessors から外してもらうか、"
+        f"'{ticket_sh} cancel {found.ticket} --reason <理由>' で取り消し、"
+        "先行を外した提案を出し直して承認を受ける\n"
+    )
+    return True
+
+
 def _parent_still_busy(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
@@ -507,6 +636,16 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
     if open_children:
         return [
             f"{parent_id} には開いている子がある（{', '.join(open_children)}）。子を先に閉じること"
+        ]
+    # 着手で共通層を写した親は、それを人に知らせるまで閉じず、Draft も外させない（設計 11.12）。
+    # 知らせるのは最初のレビュー。レビューの無い親（計画が無い、全部 `review: none`、締めた）は
+    # そこを通らないので、人が端末で見たことを残させる。締めた親でも問うので、
+    # この下の早い return より前に置く。
+    if configsync.pending(approval.home_dir(conf, root, parent_id, ""), parent_id):
+        return [
+            f"{parent_id} は着手のときに共通層で設定を上書きしたが、まだ人に知らせていない"
+            "（レビューを通っていない）。閉じる前に、利用者に端末で "
+            f"'ccnavi --config-synced {parent_id}' を打って見てもらうこと"
         ]
     if approval.read_parent_mark(
         approval.home_dir(conf, root, parent_id, ""), parent_id, approval.PARENT_MARK_CLOSE_EARLY
@@ -538,7 +677,7 @@ def close_problems(root: str, conf: settings.Settings, parent_id: str) -> list[s
 def _deliverables_missing(
     stderr: TextIO, root: str, conf: settings.Settings, found: ticket_mod.Ticket
 ) -> bool:
-    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 §9.8）。
+    """フェーズの最後の子を閉じる前に、種類の成果物が揃っているか（設計 9.8）。
 
     在って追跡されていることだけを見る。中身は見ない。空でも在ることは分かるので、
     「調査したことにする」は塞げる。
@@ -580,9 +719,7 @@ def _deliverables_missing(
 
 
 def _tracked(worktree: str, glob: str) -> bool:
-    """この glob に当たる追跡済みのファイルが 1 つでもあるか。"""
-    if not os.path.isdir(worktree):
-        return False
+    """この glob に当たる追跡済みのファイルが 1 つでもあるか。ワークツリーが無ければ無い。"""
     rc, out = gitcmd.output(worktree, ["ls-files", "--", glob], TIMEOUT_SECONDS)
     return rc == 0 and bool(out.strip())
 
@@ -612,6 +749,15 @@ def _move(
     if failed:
         stderr.write(f"ccnavi: {found.ticket}: {failed}\n")
         return 1
+    cancelled = bool(fields.get("cancelled_at"))
+    history.note(
+        where,
+        found.ticket,
+        history.KIND_CANCELLED if cancelled else history.KIND_FINISHED,
+        ticket_mod.DOING,
+        state,
+        reason=fields.get("cancel_reason") if cancelled else None,
+    )
     stdout.write(f"OK: {found.ticket} を {place} へ動かした（{said}）\n")
     if state == ticket_mod.REVIEW:
         stdout.write(
@@ -619,6 +765,128 @@ def _move(
             f"{conf.approved}/{ticket_mod.DONE}/ へ動く\n"
         )
     return 0
+
+
+@dataclass
+class Unfinished:
+    """Stop で `finish` を促す相手。`ahead` は基準点より先のコミットの数。"""
+
+    ticket: ticket_mod.Ticket
+    worktree: str
+    ahead: int
+    head: str = ""
+
+
+def unfinished_at_stop(root: str, conf: settings.Settings, cwd: str) -> Unfinished | None:
+    """メインエージェントが終わろうとしたとき、`finish` を打ち忘れていそうなチケット（ADR-0087）。
+
+    促すのは、cwd のワークツリーに結び付いた承認済みチケットが次を全部満たすときだけ。
+
+    - 作業中（`doing/`）で着手済み。終わっても取り消されてもいない（`in_progress`）
+    - 信じられない印（`blocked`）が無い。範囲が効いていないチケットに終わりを勧めない
+    - 基準点（`base_sha`）を持つ
+    - 親なら `close_problems` が空。開いている子・レビュー準備中／レビュー待ちのフェーズ・
+      フィードバック計画待ち・終わっていないフェーズがあれば `finish` は通らないので促さない
+    - ワークツリーに未コミットの変更が無い（追跡していないファイルも数える）
+    - 基準点より先に、自分で作ったコミットが 1 件以上ある（`_own_commits`）
+
+    git を読めなければ促さない。促しは守りではないので、読めないときは今までどおり黙って通す。
+    """
+    here = tree.tree_of(root, cwd or os.getcwd(), conf.projects)
+    if here is None or here.is_main:
+        return None
+    copies, _ = approval.scan(conf, root)
+    bound = tree.lookup(approval.by_id(copies), here.name)
+    if bound is None or not bound.in_progress or bound.blocked or not bound.base_sha:
+        return None
+    if not bound.is_child and close_problems(root, conf, bound.ticket):
+        return None
+    rc, out = gitcmd.output(
+        here.root, ["status", "--porcelain", "--untracked-files=all"], TIMEOUT_SECONDS
+    )
+    if rc != 0 or out.strip():
+        return None
+    ahead = _own_commits(here.root, bound)
+    head = _head(here.root)
+    if ahead <= 0 or not head:
+        return None
+    return Unfinished(bound, here.root, ahead, head)
+
+
+def _own_commits(worktree: str, t: ticket_mod.Ticket) -> int:
+    """基準点より先の、このチケットが自分で作ったコミットの数。数えられなければ 0（促さない側）。
+
+    取り込んだだけのコミットは数えない。子なら親のブランチ（名前は親の識別子。子のブランチを識別子で
+    引くのと同じ慣習、`review._unmet`）の先にあるもの、親ならワークツリーの起点のデフォルトブランチ
+    （`origin/HEAD`。ADR-0060）の先にあるものを除く。取り込みで生まれたマージのコミットも除く
+    （`--no-merges`）。子で親のブランチを引けなければ、自分のものか決まらないので 0 を返す。
+    親で `origin/HEAD` が無い（リモートの無いリポジトリ）ときは、除くものが無いので基準点の先を
+    全部数える。
+    """
+    exclude: list[str] = []
+    if t.is_child:
+        rc, sha = gitcmd.output(
+            worktree,
+            ["rev-parse", "--verify", "--quiet", f"{t.parent}^{{commit}}"],
+            TIMEOUT_SECONDS,
+        )
+        if rc != 0 or not sha.strip():
+            return 0
+        exclude.append(f"^{sha.strip()}")
+    else:
+        rc, sha = gitcmd.output(
+            worktree,
+            ["rev-parse", "--verify", "--quiet", "refs/remotes/origin/HEAD^{commit}"],
+            TIMEOUT_SECONDS,
+        )
+        if rc == 0 and sha.strip():
+            exclude.append(f"^{sha.strip()}")
+    rc, out = gitcmd.output(
+        worktree,
+        ["rev-list", "--count", "--no-merges", f"{t.base_sha}..HEAD", *exclude],
+        TIMEOUT_SECONDS,
+    )
+    if rc != 0 or not out.strip().isdigit():
+        return 0
+    return int(out.strip())
+
+
+def _nudge_path(state_dir: str, session: str) -> str:
+    """促した (チケット, HEAD) の控え。セッションごとに置く（差し戻しの印と同じ）。"""
+    where = fsio.safe_name(session) or "unknown"
+    return os.path.join(state_dir, f"nudged-{where}.json")
+
+
+def nudged_before(state_dir: str, session: str, found: Unfinished) -> bool:
+    """このセッションで、同じチケットを同じ HEAD のまま促したことがあるか（ADR-0087）。"""
+    data = fsio.read_dict(_nudge_path(state_dir, session)) or {}
+    return data.get(found.ticket.ticket) == found.head
+
+
+def remember_nudge(state_dir: str, session: str, found: Unfinished) -> str:
+    """促した (チケット, HEAD) を控える。書けなければ理由。git で運ぶ跡（history）には入れない。"""
+    path = _nudge_path(state_dir, session)
+    data = fsio.read_dict(path) or {}
+    data[found.ticket.ticket] = found.head
+    return fsio.write_json_atomic(path, dict(sorted(data.items())))
+
+
+def finish_nudge(root: str, found: Unfinished) -> str:
+    """Stop を止めて渡す文。打つ sh の綴りと、続けるならどうするかを言う。"""
+    t = found.ticket
+    ticket_sh = settings.script_command(root, "ccnavi-ticket.sh")
+    kind = "子チケット" if t.is_child else "親チケット"
+    return "\n".join(
+        [
+            f"[ccnavi] {CODE_FINISH_NUDGE} (ticket: {t.ticket})",
+            f"{kind} {t.ticket} は着手済みのまま作業中（{ticket_mod.DOING}/）です。ワークツリー "
+            f"{found.worktree} に未コミットの変更が無く、基準点 {t.base_sha[:12]} より先に"
+            f"コミットが {found.ahead} 件あります。",
+            f"作業が終わったなら '{ticket_sh} finish {t.ticket}' を実行してから終えてください。"
+            "まだ続けるなら、続ける理由（何が残っているか）を利用者に向けて書いてから終えてください。"
+            "この案内は同じ HEAD では 1 回だけで、コミットを足すまで次に終えるときは止めません。",
+        ]
+    )
 
 
 def _head(worktree: str) -> str:

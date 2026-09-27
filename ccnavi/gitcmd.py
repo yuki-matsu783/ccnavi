@@ -75,3 +75,31 @@ def output(
     if done.failure:
         return 1, ""
     return done.code, done.out
+
+
+def blob(
+    cwd: str, rev: str, path: str, timeout: float = TIMEOUT_SECONDS
+) -> tuple[bytes | None, bool]:
+    """その版に入っている 1 本の中身を、バイト列のまま返す。`(中身, 読めた)`。
+
+    文字列で読むと、UTF-8 でない中身（Shift_JIS のコメントを持つスクリプトなど）と単独の CR が
+    読み替えられ、中身の突き合わせが食い違う。その版にその綴りが無ければ `(None, True)`、
+    git を起こせない・期限に達した・版が無いときは `(None, False)`。
+    """
+    listed = run(cwd, ["ls-tree", "-z", rev, "--", path], timeout)
+    if not listed.ok:
+        return None, False
+    if not listed.out.strip("\0").strip():
+        return None, True
+    try:
+        done = subprocess.run(
+            ["git", "cat-file", "blob", f"{rev}:{path}"],
+            cwd=cwd,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, False
+    if done.returncode != 0:
+        return None, False
+    return done.stdout, True

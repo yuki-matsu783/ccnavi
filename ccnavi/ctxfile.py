@@ -114,7 +114,7 @@ def for_rules(
     数える。
 
     控えを置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
-    なら黙るのではなく言うほうに倒す。届かない文は書いていないのと同じになるから。
+    なら黙るのではなく言うほうを採る。届かない文は書いていないのと同じになるから。
     """
     parts: list[str] = []
     counted: dict[str, int] | None = None
@@ -226,7 +226,7 @@ def _save_once(
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
     # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
     # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
-    # 倒れる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
+    # なる。途中で落ちたときも空のまま残り、次の起動が同じ読み違いをする。
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
         stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")

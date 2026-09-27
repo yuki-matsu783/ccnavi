@@ -8,7 +8,7 @@
 （`--result <path>`）。その JSON の形が sh と exe の契約で、テストも同じ経路を通る。
 
 API のパス、トークンの権限、ページング、セルフホストの差は実物に当てないと決まらない。
-exe が API を直接叩くと、それが配布物の中に閉じて、壊れたときに exe を作り直すしかない。
+exe が API を直接呼ぶと、それが配布物の中に閉じて、壊れたときに exe を作り直すしかない。
 sh ならプロジェクトごとに直せる。
 
 ## 依頼は prepare と requested の 2 段
@@ -46,7 +46,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TextIO
 
-from . import approval, fsio, gitcmd, ops, phase, phasetypes, settings, tree
+from . import approval, configsync, fsio, gitcmd, ops, phase, phasetypes, settings, tree
 from . import ticket as ticket_mod
 
 # 投稿に付けるマーカー。機構自身の投稿を、確認のときに除くため。
@@ -223,6 +223,12 @@ def prepare(
     # 計画があれば、このレビューが含むフェーズを機械が先頭に書く。延期した分を
     # 人が読み落とさないように。
     body = _covered_header(root, conf, parent, ph) + body
+    # 着手のときに共通層でプロジェクトの設定を上書きしていれば、最初の依頼の頭に載せる
+    # （設計 11.12）。知らせたことは、投稿が済んでから `requested` が印に残す。
+    home = approval.home_dir(conf, root, parent.ticket, "")
+    synced = configsync.pending(home, parent.ticket)
+    if synced:
+        body = configsync.notice(synced) + body
     path = os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
     draft = os.path.join(conf.state, MR_FILE.format(parent=parent.ticket))
     failed = fsio.write_text(path, marker + body, newline="\n") or fsio.write_text(
@@ -231,9 +237,38 @@ def prepare(
     if failed:
         stderr.write(f"ccnavi: 本文を書き出せない ({failed})\n")
         return 1
+    if synced:
+        # 本文に載せたことを印に残す。`requested` はこれを見て知らせ済みにする。載せていない
+        # 投稿で知らせ済みにすると、人が一度も見ないまま知らせが消える。
+        failed = configsync.mark_prepared(home, parent.ticket, phase_no)
+        if failed:
+            stderr.write(f"ccnavi: 設定の上書きを本文に載せた印を書けない ({failed})\n")
+            return 1
     # 1 行目が依頼の本文、2 行目がマージリクエストの下書き。sh はこの順で読む。
     stdout.write(path + "\n" + draft + "\n")
     return 0
+
+
+def _note_synced(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    parent: str,
+    where: str,
+    phase_no: int | None,
+) -> None:
+    """設定を上書きしたことを知らせた、と印に残す。書けなくても依頼は済んでいるので止めない。
+
+    `phase_no` を渡したら、その番号の依頼の本文に載せたとき（`prepare` が印に残した）だけ残す。
+    """
+    home = approval.home_dir(conf, root, parent, "")
+    if configsync.pending(home, parent) is None:
+        return
+    if phase_no is not None and not configsync.prepared_for(home, parent, phase_no):
+        return
+    failed = configsync.mark_notified(home, parent, where)
+    if failed:
+        stderr.write(f"ccnavi: 設定を上書きしたことを知らせた印を書けない: {failed}\n")
 
 
 def mr_draft(parent: ticket_mod.Ticket) -> str:
@@ -321,9 +356,11 @@ def requested(
         fsio.remove(
             os.path.join(conf.state, REQUEST_FILE.format(parent=parent.ticket, phase=phase_no))
         )
+    _note_synced(stderr, conf, root, parent.ticket, result.url, phase_no)
     done = "依頼し直した" if again else "依頼した"
     stdout.write(
-        f"OK: レビューを{done}（{result.mr.url or result.url}）。ターンを終えて利用者を待つこと\n"
+        f"OK: レビューを{done}（{result.mr.url or result.url}）。"
+        f"{phase.TURN_DEFINED}を終えて利用者を待つこと\n"
     )
     return 0
 
@@ -378,7 +415,7 @@ def confirm(
         review_sh = settings.script_command(root, "ccnavi-review.sh")
         if _is_last_feedback_review(parent, phase_no):
             # フィードバック対応の最後のレビュー。新しいフィードバック作業フェーズは
-            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 §9.11）。
+            # 足せない。同じフェーズでやり直すか、別の issue に切り出すか（設計 9.11）。
             stderr.write(
                 "フィードバック対応の最後のレビューです。道は 2 つ。\n"
                 f"  - 同じフェーズ {phase_no} に子を足して承認を受け、やり直す（差し戻し）\n"
@@ -438,7 +475,7 @@ def _settle_children(
     return True
 
 
-# 残った指摘の行き先。人が指摘ごとに選ぶ（設計 §9.10）。
+# 残った指摘の行き先。人が指摘ごとに選ぶ（設計 9.10）。
 CHOICE_KEEP = "keep"
 CHOICE_FIX = "fix"
 CHOICE_ISSUE = "issue"
@@ -455,7 +492,6 @@ CHOICE_LABELS = {
 
 
 def _followup_from_choice(
-    stdin: TextIO,
     stdout: TextIO,
     stderr: TextIO,
     root: str,
@@ -498,7 +534,7 @@ class Decision:
     ph: phase.Phase
     result: Result
     unresolved: list[Thread]
-    # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 §9.11）。
+    # issue に回せるか。回せるのはフィードバック計画が承認されたあと（設計 9.11）。
     can_issue: bool
 
 
@@ -626,17 +662,28 @@ def reviewed(
     d = _decision(stderr, root, conf, cwd, phase_no, result_path)
     if d is None:
         return 1
+    if not d.unresolved:
+        # 選ぶものが無い。選び方の案内は出さず、レビュー済みにするだけ
+        stdout.write(
+            f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘なし\n"
+        )
+        summary = apply_decision(stdout, stderr, root, conf, d, {})
+        return 0 if summary is not None else 1
     stdout.write(
-        f"フェーズ {phase_no}（親 {d.parent.ticket}）の未解決スレッド: {len(d.unresolved)} 件\n"
+        f"フェーズ {phase_no}（親 {d.parent.ticket}）で未解決（Unresolved）の指摘: "
+        f"{len(d.unresolved)} 件\n"
     )
     keys = "k / f / i" if d.can_issue else "k / f"
-    stdout.write("残った指摘の行き先を 1 件ずつ選ぶ。それ以外を打つと、何もせずにやめる。\n")
+    stdout.write(
+        "未解決（Unresolved）の指摘の対応方針を 1 件ずつ選びます。"
+        "それ以外を打つと、何もせずにやめます。\n"
+    )
     for letter, choice in _CHOICE_KEYS.items():
         if choice == CHOICE_ISSUE and not d.can_issue:
             continue
         stdout.write(f"  {letter}  {CHOICE_LABELS[choice]}\n")
     if not d.can_issue:
-        stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあと）\n")
+        stdout.write("  （issue に回せるのは、フィードバック計画が承認されたあとです）\n")
     choices: dict[str, str] = {}
     for i, t in enumerate(d.unresolved, 1):
         stdout.write(f"[{i}/{len(d.unresolved)}] {t.url} {t.path}:{t.line} {_first_line(t.body)}\n")
@@ -785,9 +832,7 @@ def apply_decision(
     followup = ""
     if fix:
         items = [_thread_line(t) for t in fix]
-        ident = _followup_from_choice(
-            io.StringIO(), stdout, stderr, root, conf, parent, ph, items, stamp
-        )
+        ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items, stamp)
         if ident is None:
             return None
         followup = ident
@@ -801,7 +846,7 @@ def apply_decision(
     ):
         return None
     issue_draft = ""
-    if picked[CHOICE_ISSUE] and conf.state:
+    if picked[CHOICE_ISSUE]:
         issue_draft = _write_decide_issue(stderr, conf, d, picked[CHOICE_ISSUE])
     if conf.state:
         _write_decide_comment(stderr, conf, d, picked, followup)
@@ -810,6 +855,8 @@ def apply_decision(
     else:
         stdout.write(
             f"OK: フェーズ {ph.number} はレビュー済み（未解決 {len(accepted)} 件を受け入れた）\n"
+            if accepted
+            else f"OK: フェーズ {ph.number} はレビュー済み（未解決（Unresolved）の指摘なし）\n"
         )
     return {
         "parent": parent.ticket,
@@ -861,7 +908,7 @@ def _write_decide_comment(
     followup: str,
 ) -> None:
     """MR に写す、決めた内容のコメント。issue の綴りは sh が作ったあとに書き足す。"""
-    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の残った指摘の行き先:"]
+    lines = [MARKER_DECIDE, f"フェーズ {d.ph.number} の未解決（Unresolved）の指摘の対応方針:"]
     if picked[CHOICE_KEEP]:
         lines += [
             "",
@@ -876,6 +923,11 @@ def _write_decide_comment(
         ]
     if picked[CHOICE_ISSUE]:
         lines += ["", "issue に回す:", *[f"- {thread_key(t)}" for t in picked[CHOICE_ISSUE]]]
+    if not any(picked.values()):
+        lines = [
+            MARKER_DECIDE,
+            f"フェーズ {d.ph.number} で未解決（Unresolved）の指摘なし。レビュー済みにした。",
+        ]
     path = os.path.join(conf.state, DECIDE_FILE.format(parent=d.parent.ticket, phase=d.ph.number))
     failed = fsio.write_text(path, "\n".join(lines) + "\n", newline="\n")
     if failed:
@@ -884,6 +936,13 @@ def _write_decide_comment(
 
 def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], followup: str) -> str:
     """決めたことを Claude Code に渡す文。ボードがコピーか新しいセッションで渡す。"""
+    if not any(picked.values()):
+        # 選ぶものが無かった。0 件の内訳は並べず、レビュー済みになったことだけ言う
+        return (
+            f"[ccnavi] 利用者が親 {d.parent.ticket} のフェーズ {d.ph.number} をレビュー済みにした"
+            "（未解決（Unresolved）の指摘なし）。次のフェーズへ進める。"
+        )
+    # 選ばれなかった行き先（0 件）は並べない
     counts = "、".join(
         f"{label} {len(picked[c])} 件"
         for c, label in (
@@ -891,10 +950,11 @@ def _decided_prompt(root: str, d: Decision, picked: dict[str, list[Thread]], fol
             (CHOICE_FIX, "このフェーズで直す"),
             (CHOICE_ISSUE, "issue に回す"),
         )
+        if picked[c]
     )
     head = (
         f"[ccnavi] 利用者が親 {d.parent.ticket} のフェーズ {d.ph.number} で"
-        f"残った指摘の行き先を決めた（{counts}）。"
+        f"未解決（Unresolved）の指摘の対応方針を決めた（{counts}）。"
     )
     if followup:
         items = "\n".join(f"- {_thread_line(t)}" for t in picked[CHOICE_FIX])
@@ -916,7 +976,7 @@ def _reviewed_in_chat(
     ph: phase.Phase,
     accept_unresolved: bool,
 ) -> int:
-    """このセッションで見たフェーズを、人が端末で通す（設計 §9.8）。
+    """このセッションで見たフェーズを、人が端末で通す（設計 9.8）。
 
     ホストへ出ないので写しも依頼の記録も無い。代わりに見るのは 3 つ。宣言が `chat` で
     あること（`mr` と宣言したフェーズを安い経路で通させない）と、フェーズが終わって
@@ -961,6 +1021,9 @@ def _reviewed_in_chat(
     if approval.MARK_REVIEWED in ph.marks:
         stdout.write(f"OK: フェーズ {ph.number} はすでにレビュー済み\n")
         return 0
+    synced = configsync.pending(approval.home_dir(conf, root, parent.ticket, ""), parent.ticket)
+    if synced:
+        stdout.write(configsync.notice(synced))
     stdout.write(f"フェーズ {ph.label}（親 {parent.ticket}）の子:\n")
     for t in ph.tickets:
         stdout.write(f"  - {t.ticket} {t.title}\n")
@@ -996,6 +1059,8 @@ def _reviewed_in_chat(
         data,
     ):
         return 1
+    if synced:
+        _note_synced(stderr, conf, root, parent.ticket, phasetypes.REVIEW_CHAT, None)
     stdout.write(f"OK: フェーズ {ph.number} はレビュー済み（このセッションで見た）\n")
     # 残した指摘があれば、続きの子を起こす。ホストに写しが無いので、指摘は人が打つ。
     stdout.write(
@@ -1011,9 +1076,7 @@ def _reviewed_in_chat(
         items.append(line.strip())
     if not items:
         return 0
-    ident = _followup_from_choice(
-        stdin, stdout, stderr, root, conf, parent, ph, items, approval.now()
-    )
+    ident = _followup_from_choice(stdout, stderr, root, conf, parent, ph, items, approval.now())
     return 0 if ident is not None else 1
 
 
@@ -1137,11 +1200,22 @@ def close_early(
             f"ccnavi: 作業中の子がいる（{', '.join(doing)}）。閉じるか取り消してから締めること\n"
         )
         return 1
-    left = _leftovers(approval.home_dir(conf, root, parent.ticket, ""), parent, phases, result)
+    home = approval.home_dir(conf, root, parent.ticket, "")
+    left = _leftovers(home, parent, phases, result)
+    # 着手で共通層を写したことをまだ知らせていなければ、締める前にここで見せる。y で締めたら
+    # 見たものとして残す。見せないと、締めたあとの finish でもう 1 度端末を求めることになる。
+    synced = configsync.pending(home, parent.ticket)
+    if synced:
+        stdout.write(configsync.notice(synced))
     _show_leftovers(stdout, parent, left)
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 締めなかった\n")
         return 1
+    if synced:
+        failed = configsync.mark_notified(home, parent.ticket, configsync.NOTIFIED_TERMINAL)
+        if failed:
+            stderr.write(f"ccnavi: 設定の上書きを見たと残せない: {failed}\n")
+            return 1
     stamp = approval.now()
     settled = _settle(
         stdout, stderr, root, conf, parent, phases, left, result.mr.number, stamp, reason
@@ -1149,7 +1223,7 @@ def close_early(
     if settled is None:
         return 1
     cancelled, skipped, reviewed_now = settled
-    accepted = [t.url or t.id for t in left.unresolved]
+    accepted = [thread_key(t) for t in left.unresolved]
     failed = approval.remember_accepted(
         approval.home_dir(conf, root, parent.ticket, ""), parent.ticket, accepted
     )
@@ -1388,9 +1462,9 @@ _SHA = re.compile(r"^[0-9a-f]{7,64}$")
 def _is_sha(value: str) -> bool:
     """マーカーの `head` が sha の形をしているか。
 
-    マーカーは親のブランチに乗って他の機械から届くファイル（設計 §9.2）なので、中身を
+    マーカーは親のブランチに乗って他の機械から届くファイル（設計 9.2）なので、中身を
     git の revision としてそのまま渡さない。`HEAD` や `@` のような「今」を指す値は
-    `head..HEAD` を空差分にして判定を素通りさせ、`-` で始まる値は git のオプションに化ける。
+    `head..HEAD` を空差分にして判定を素通りさせ、`-` で始まる値は git のオプションになってしまう。
     """
     return bool(_SHA.match(value))
 
@@ -1407,7 +1481,7 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
 
     `-z` が返すパスはもう正規化されているので、こちらでは何も直さない。空白を落としたり
     `\\` を `/` に直したりすると、`.ccnavi\\tickets\\x.py` という名前のファイル 1 個が
-    置き場の中のパスに化けて、除外の側に落ちる。
+    置き場の中のパスになってしまい、除外の側に入る。
     """
     if not ref:
         return [], "比べる相手が無い"
@@ -1427,7 +1501,7 @@ def _outside_approved(tree_root: str, conf: settings.Settings, ref: str) -> tupl
 def _dirty(tree_root: str, conf: settings.Settings) -> bool:
     """ワークツリーに未コミットの変更があるか。ccnavi 自身の置き場は数えない。
 
-    写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 §9.2）。
+    写しとマーカーはこのワークツリーの `.ccnavi/` に置かれ、git が追跡する（設計 9.2）。
     マーカーはフェーズの終わりに hook が書くので、ここを数えると「レビューを頼む前に
     マーカーをコミットしろ」と言い続けることになる。マーカーと写しをコミットして push するのは
     `ccnavi-review.sh` と `ccnavi-approve.sh` の仕事で、人の作業の汚れとは別に扱う。
@@ -1762,7 +1836,7 @@ def _moved_since_request(tree_root: str, conf: settings.Settings, requested_mark
 
     ただし ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えた
     コミットは、動いたと数えない。
-    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 §9.2）。
+    依頼のマーカーはそこに置かれ、親のブランチにコミットして他の機械へ運ぶ前提のもの（設計 9.2）。
     数えると「依頼 → マーカー → コミット」の順のせいで依頼の直後に必ず自分の足を踏み、
     承認を運ぶ `ccnavi-push-approved.sh` が置き場をまとめてコミットするので、レビューを
     待っている間の承認も依頼を壊す。未コミットの側は `_dirty` が同じ理由で外しており、

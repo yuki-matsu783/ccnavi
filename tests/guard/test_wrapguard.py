@@ -79,7 +79,7 @@ class EnvTest(unittest.TestCase):
             # 保護済みの sh を呼ばないなら、ここの話ではない。
             "CCNAVI_BIN_PATH=x uv run python -m ccnavi --lint",
             "echo CCNAVI_BIN_PATH=x && sh .ccnavi/scripts/ccnavi-git.sh status",
-            # 読み切れない形はここでは見ない。allow が当たらずに確認へ落ちる。
+            # 読み切れない形はここでは見ない。allow が当たらずに確認になる。
             "sh -c 'CCNAVI_X=1 sh .ccnavi/scripts/ccnavi-git.sh push'",
         ):
             with self.subTest(command=command):

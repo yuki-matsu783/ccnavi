@@ -4,7 +4,7 @@
 #   sh .ccnavi/scripts/ccnavi-fetch.sh
 #
 # 1 つめは**承認済みチケットとマーカー**。これらは親チケットのブランチに乗り、A の機械から
-# push されて届く（設計 §9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに
+# push されて届く（設計 9.2）。取ってこないと、B の機械は古い版で判定する。承認したのに
 # 範囲が効かない、レビュー済みなのに止まったまま、という形になる。
 #
 # 2 つめは**ワークツリーの起点になるデフォルトブランチ**（`origin/HEAD` が指すもの。多くは
@@ -19,7 +19,7 @@
 #
 # 進めるのは fast-forward だけ。マージも rebase もしない。作業ツリーに未コミットの
 # 変更があるツリーは触らない。そこに居るのは人か別のセッションの書きかけで、
-# セッションの頭に走る hook が動かしてよいものではない（CLAUDE.md の「他セッションの
+# セッションの頭に走る hook が動かしてよいものではない（docs/claude/worktree.md の「他セッションの
 # 作業を踏まないために」）。進められなかったツリーは理由を 1 行で言う。
 #
 # 出力はモデルに届く。何も動かなかったときは黙る。毎回同じ行を返すと、
@@ -39,7 +39,7 @@
 
 set -u
 
-# 共通部分。ワークスペースルートの探し方はここにある（設計 §11.8）。
+# 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
 approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
@@ -117,7 +117,7 @@ ccnavi_fetch_or_note() {
 # そのリポジトリのデフォルトブランチの名前。分からなければ 1 を返す。
 #
 # `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
-# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側に落とす。
+# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
 # どちらも無ければ「分からない」。当てずっぽうで別のブランチを進めない。
 ccnavi_fetch_default() {
 	ccnavi_fd_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)

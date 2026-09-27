@@ -15,7 +15,7 @@ export interface ViewState {
 
 export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, folded: [], widths: {} };
 
-/** 覚えていた値を読む。型が違うもの・知らないものは既定に倒す */
+/** 覚えていた値を読む。型が違うもの・知らないものは既定を使う */
 export function loadState(): ViewState {
   const saved = (getState() ?? {}) as Partial<Record<keyof ViewState, unknown>>;
   const widths = typeof saved.widths === "object" && saved.widths !== null ? (saved.widths as Record<string, unknown>) : {};

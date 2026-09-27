@@ -174,7 +174,7 @@ export function Tour({ steps, onClose }: { readonly steps: readonly TourStep[]; 
 
   // 焦点は「次へ」に置く（Enter で進める）。閉じたら、案内の前に焦点があった場所へ戻す。
   // **戻す先は最初に描くときに控える。** effect で控えると、先に走る「次へ」への移動のあとを読んでしまい、
-  // 閉じたときに消えた「次へ」へ戻そうとして焦点が body に落ちる
+  // 閉じたときに消えた「次へ」へ戻そうとして焦点が body に移ってしまう
   const [focusBefore] = useState(() => document.activeElement as HTMLElement | null);
   useEffect(() => {
     next.current?.focus();

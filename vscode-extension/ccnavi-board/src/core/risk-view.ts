@@ -11,7 +11,7 @@
  *
  * この画面は `retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は `retainedHost` で、
  * 入れ物は 1 度しか入らない（ADR-0062）。**中身（`data`）が届くのは、画面の編集を捨ててよいとき
- * だけ**（人が「再読込」を押した、保存や作成が通って中身が入れ替わった）。ファイルが外で
+ * だけ**（人が「更新」を押した、保存や作成が通って中身が入れ替わった）。ファイルが外で
  * 変わっただけのときは `changed` の帯を出し、捨てるかどうかは人が決める。
  */
 import type { AppearanceMessage } from "./appearance.js";
@@ -20,7 +20,7 @@ import { embedJson, type DataMessage } from "./screen-host.js";
 
 // ---- 配点の形（画面と読み書きで分け合う）
 
-/** 当て方。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
+/** 加点条件。1 件につき 1 つ。ccnavi の risk.KINDS と同じ並び */
 export const KINDS = ["lines_over", "files_over", "deleted_over", "glob", "script", "judge"] as const;
 export type FactorKind = (typeof KINDS)[number];
 
@@ -38,7 +38,7 @@ export interface FactorForm {
   /** 加点。整数のはずだが欄の文字のまま持つ。整数でなければそのまま書いて lint が言う */
   readonly points: string;
   readonly kind: FactorKind;
-  /** 当て方の値。lines_over 等なら基準、glob ならパターン、script ならパス、judge なら問い */
+  /** 加点条件の値。lines_over 等なら基準、glob ならパターン、script ならパス、judge なら問い */
   readonly value: string;
   /** glob の上限。空なら青天井（欄を書かない） */
   readonly max: string;
@@ -58,14 +58,14 @@ export interface RiskModel {
   readonly problems: readonly string[];
 }
 
-/** 当て方の説明。select のラベルと、値の欄の placeholder */
+/** 加点条件の説明。select のラベルと、値の欄の placeholder */
 export const KIND_LABELS: Readonly<Record<FactorKind, { readonly label: string; readonly placeholder: string }>> = {
   lines_over: { label: "変更した行数が基準を超えたら加点", placeholder: "300（追加と削除の合計がこれを超えたら加点）" },
   files_over: { label: "変更したファイル数が基準を超えたら加点", placeholder: "10（変更したファイルの数がこれを超えたら加点）" },
   deleted_over: { label: "削除したファイル数が基準を超えたら加点", placeholder: "3（削除したファイルの数がこれを超えたら加点）" },
   glob: { label: "glob に当てはまるファイルを 1 つ変更するごとに加点", placeholder: ".github/**（ワークツリーのルートからの相対。当てはまるファイル 1 つごとに points を加点し、max が上限）" },
   script: { label: "スクリプトが返した点を加点", placeholder: ".ccnavi/common/scripts/xxx.sh（.ccnavi/common/scripts/ の下だけ。スクリプトが返した点を加点し、失敗や読めない出力なら points を加点）" },
-  judge: { label: "サブエージェントの答えが yes なら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes / no で答えられる問い。yes で加点）" },
+  judge: { label: "サブエージェントの答えが yes なら加点", placeholder: "テストの無い振る舞いの変更を含むか（差分を読んで yes/no で答えられる質問。yes で加点）" },
 };
 
 // ---- 画面に見せる形

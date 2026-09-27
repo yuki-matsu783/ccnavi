@@ -2,7 +2,7 @@
 
 道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、そこを
 汚してから payload を渡し、返ってきた文と終了コードと記録だけを読む。
-作業ツリーの実物を見るのがこの面の要点なので、git を差し替えると、
+作業ツリーの実物を見るのがこの監視の要点なので、git を差し替えると、
 テストが通ることと監視が動くことが別の話になる。
 """
 
@@ -347,7 +347,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertEqual(found, ["generated.env"])
 
     def test_自動復元の予行は戻さずに戻すはずだったと言う(self):
-        # 判定は本番で、戻しだけ予行。何が戻るのかを、戻される前に見せる面。
+        # 判定は本番で、戻しだけ予行。何が戻るのかを、戻される前に見せる設定。
         self.run_hook(command="ls")
         self.dirty()
 
@@ -392,8 +392,8 @@ class PostToolUseTest(Harness, unittest.TestCase):
             self.assertEqual(f.read(), "changed by a build\n")
         self.assertIn("would-restore:", self.context(result))
 
-    def test_読めない自動復元の値は守る側に落ちる(self):
-        # 倒れる先を off から enable に変えてある。書き損じた 1 語で守りが
+    def test_読めない自動復元の値は守る側になる(self):
+        # 読めない値の行き先を off から enable に変えてある。書き損じた 1 語で守りが
         # 消えるより、書き損じた 1 語で守りが残るほうがよい、という向き。
         # 戻す先はコミット済みの内容なので、失われるのは「宣言した保護領域を
         # 汚した未コミットの変更」だけになる。
@@ -557,10 +557,11 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertTrue(result.stdout, "コミットに入った変更が報告されていない")
         message = json.loads(result.stdout)["systemMessage"]
         self.assertIn("protected/keep.txt", message)
-        self.assertIn("committed", message)
+        self.assertIn("コミット済み", message)
         # 戻す手順は書かない。履歴は書き換えないので、案内できる 1 つが無い。
         self.assertNotIn("git restore", message)
-        self.assertIn("コミットに入っている", message)
+        self.assertIn("はすでにコミット済みなので", message)
+        self.assertIn("不要な変更なら取り消してください", message)
 
     def test_ターンが始まる前のコミットは言わない(self):
         # 前のターンや他のセッションが積んだコミットを、このターンの成果として
@@ -635,7 +636,9 @@ class PostToolUseTest(Harness, unittest.TestCase):
         message = json.loads(result.stdout)["systemMessage"]
         self.assertIn("protected/keep.txt", message)
         self.assertIn("wt1", message)
-        self.assertNotIn("数えていないツリー", message, "基準が付いたツリーは数える")
+        self.assertNotIn(
+            "今回のターンでこの確認ができませんでした", message, "基準が付いたツリーは数える"
+        )
 
     def test_基準を持たないツリーは数えていないと言う(self):
         # ターンの途中で切ったワークツリーは、プロンプトのときに無いので基準を
@@ -647,8 +650,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         result = self.run_hook(event="Stop")
 
         message = json.loads(result.stdout)["systemMessage"]
-        self.assertIn("数えていないツリー", message)
-        self.assertIn("wt1", message)
+        self.assertIn("ワークツリー wt1 では、今回のターンでこの確認ができませんでした", message)
         self.assertIn("uncounted", self.records()[-1].get("detail", ""))
 
     def test_戻さなかった1件は控えに入りターンの終わりに人へ出る(self):
@@ -909,7 +911,7 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("POST_VIOLATION", result.stderr)
 
     def test_コミット済みの版を読めなければ言う(self):
-        # HEAD が無いリポジトリ。突き合わせる相手が読めないので、外す側には倒さない。
+        # HEAD が無いリポジトリ。突き合わせる相手が読めないので、外す側にはしない。
         # 読めていれば外れるはずのマーカーで見る。外れたら、突き合わせを飛ばしたということ。
         self.use(ticket_repo(committed=False))
         write(self.path(".ccnavi/approved/phases/i0001/1.requested"), '{"mr": 1}\n')

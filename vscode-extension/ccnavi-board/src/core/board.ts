@@ -10,7 +10,10 @@
 import type {
   BoardJson,
   CopyStatus,
+  FlowJson,
+  HistoryEntryJson,
   ParentJson,
+  PredecessorUnmetJson,
   PhaseJson,
   ProposalState,
   ProposalJson,
@@ -122,6 +125,21 @@ export interface Card {
    * 親ならフェーズ行の要約に出るもの（レビュー準備中／レビュー待ち・HIGH 以上）
    */
   readonly attention: boolean;
+  /**
+   * 子のフロー（ADR-0085）。親は null。在るか・着手中で書けないかは実行ファイルの答えの写しで、
+   * カードの「フロー」ボタンの言葉だけに使う。人が動く必要（`attention`）には数えない
+   */
+  readonly flow: FlowJson | null;
+  /**
+   * 状態が動いた跡の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
+   * カードの畳める「履歴」に並べるだけ
+   */
+  readonly history: readonly HistoryEntryJson[];
+  /**
+   * 満たしていない先行（ADR-0088）。空でなければ、承認も着手も止まる。実行ファイルの答えの写しで、
+   * カードの「先行待ち」のバッジに使う
+   */
+  readonly predecessorsUnmet: readonly PredecessorUnmetJson[];
 }
 
 export interface BoardColumn extends ColumnDef {
@@ -199,12 +217,12 @@ function toCard(
   // 止まっていることは不備として挙げる。バッジは一目で分かる短い言葉しか出せないので、
   // 理由の全文はここに置く（`attention` もこれで立つ）。
   if (t.blocked !== "") {
-    issues.push(`書き込みが止まっている: ${t.blocked}`);
+    issues.push(`書き込みが止まっています: ${t.blocked}`);
   }
   const isParent = t.parent === "";
   const column = columnOf(t, issues);
   if (!isParent && !ids.has(t.parent)) {
-    issues.push(`親 ${t.parent} が見つからない`);
+    issues.push(`親 ${t.parent} が見つかりません`);
   }
 
   const ownParent = parents.get(isParent ? t.ticket : t.parent);
@@ -275,7 +293,22 @@ function toCard(
     mrUrl: mr.url,
     mrNumber: mr.number,
     attention,
+    flow: isParent ? null : flowOf(t.flow, column),
+    history: t.history,
+    predecessorsUnmet: t.predecessors_unmet,
   };
+}
+
+/**
+ * カードに載せる子のフロー。閉じた子（完了・取り消し）でファイルが無ければ null（作る先が無いので「作成」を出さない）。
+ * 実行ファイルもこの子には `flow` を null で返すが、古い実行ファイルの答えでもボタンを出さないための念押し。
+ * ファイルが在れば閉じた子でも残す（中身を見られる）
+ */
+function flowOf(flow: FlowJson | null, column: ProposalState): FlowJson | null {
+  if (flow === null) {
+    return null;
+  }
+  return (column === "done" || column === "cancelled") && !flow.exists ? null : flow;
 }
 
 function isHighRisk(level: string): boolean {
@@ -312,7 +345,7 @@ function columnOf(t: TicketJson, issues: string[]): ProposalState {
   if (t.copy.status === "open") {
     return "doing";
   }
-  issues.push("提案が見つからない（承認済みチケットだけがある）");
+  issues.push("提案が見つかりません（承認済みチケットだけがあります）");
   return "todo";
 }
 
@@ -320,13 +353,13 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
   const marks = Object.keys(p.marks).sort();
   const actions: Action[] = [];
   // 残った指摘を決められるのは、人のレビュー待ち（依頼を出したのに止まったまま）のとき。待ちかどうかは
-  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済」・「決める」の操作はみな
+  // 判定が `review_waiting` で言う。子カードのバッジ・フェーズ行の「レビュー依頼済み」・「対応方針を決める」の操作はみな
   // それを読み、止まっているかとマーカーからここで組み直さない。
   if (p.review_waiting) {
     actions.push({ kind: "decide", parent: parent.ticket, phase: p.number });
     actions.push({ kind: "reviewed", parent: parent.ticket, phase: p.number });
   }
-  // 依頼のマーカー `{head, mr, url, host, since}`（設計 §9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。
+  // 依頼のマーカー `{head, mr, url, host, since}`（設計 9.10）。URL は依頼の投稿を指す。中身を解釈せず写すだけ。
   // 依頼のマーカーは mr と url を必ず一緒に持ち、リンクは url があるときだけ出すので、他のマーカーの mr は読まない
   const requested = p.marks.requested ?? {};
   return {
@@ -370,6 +403,18 @@ export function parentCardOf(board: Board, parent: string): Card | undefined {
   for (const column of board.columns) {
     for (const card of column.cards) {
       if (card.id === parent && card.isParent) {
+        return card;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** 子の識別子から、フローを持つ子のカード。親・無い識別子・フローの欄が無い子は undefined */
+export function flowCardOf(board: Board, ticket: string): Card | undefined {
+  for (const column of board.columns) {
+    for (const card of column.cards) {
+      if (card.id === ticket && !card.isParent && card.flow !== null) {
         return card;
       }
     }

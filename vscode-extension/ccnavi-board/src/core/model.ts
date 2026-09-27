@@ -56,6 +56,59 @@ export interface SeenInJson {
   readonly path: string;
 }
 
+/**
+ * 子チケットのフロー（設計 9.3.1、ADR-0085）。親は null。
+ * `locked` は判定がいまそのファイルへの書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。
+ * 拡張は写すだけで、`started_at` などから組み直さない（ADR-0035）。
+ */
+export interface FlowJson {
+  /** 読む先の絶対パス（権威のツリーの版、無ければ子のワークツリーの版。どちらにも無ければ権威のツリーの側の綴り） */
+  readonly path: string;
+  /** ツリーのルートからの相対。承認済みの領域の固定の置き場（既定 `.ccnavi/approved/flows/<子>.yml`） */
+  readonly rel: string;
+  /** ファイルを持つツリーのルート。保存はここからファイルまでの途中にリンクがあれば書かない */
+  readonly tree: string;
+  readonly exists: boolean;
+  /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
+  readonly linked: boolean;
+  readonly locked: boolean;
+}
+
+/**
+ * 状態が動いた跡の 1 行（ADR-0086）。`.ccnavi/approved/events/<識別子>.ndjson` の新しい側を実行ファイルが読んで渡す。
+ * 補助の記録で、状態の正は置き場（`copy` / `proposal`）。拡張は並べるだけで、ここから状態を組み直さない。
+ */
+export interface HistoryEntryJson {
+  /** UTC の ISO 8601（`2026-09-26T09:00:00Z`） */
+  readonly at: string;
+  /** `approved` / `started` / `finished` / `cancelled` / `settled` / `raised` / `revised` / `phase-mark` / `phase-reopened` / `parent-mark` など */
+  readonly kind: string;
+  /** 元の置き場（`todo` / `doing` / `review` / `done`）。置き場が動かないもの（マーカー）は空 */
+  readonly from: string;
+  /** 先の置き場。同上 */
+  readonly to: string;
+  /** 動かした経路（`cli` / `terminal` / `board` / `hook`） */
+  readonly via: string;
+  /** マーカーのフェーズの番号。無ければ null */
+  readonly phase: number | null;
+  /** マーカーの種類（`pending` / `requested` / `reviewed` / `skipped` / `ready` / `close-early` / `closed`）。無ければ空 */
+  readonly mark: string;
+  /** 取り消しの理由。無ければ空 */
+  readonly reason: string;
+}
+
+/**
+ * 満たしていない先行 1 本（ADR-0088）。承認と着手は、先行が全部 `.ccnavi/approved/done/` に在って取り消しでないことを
+ * 求める。その答えを実行ファイルが出し、拡張は写すだけ（先行の置き場から組み直さない）。
+ */
+export interface PredecessorUnmetJson {
+  readonly ticket: string;
+  /** `todo` / `doing` / `review`（閉じれば満たす）、`cancelled` / `missing` / `scattered`（待っても満たさない） */
+  readonly state: string;
+  /** 人向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
+  readonly label: string;
+}
+
 export interface TicketJson {
   readonly ticket: string;
   readonly parent: string;
@@ -64,6 +117,8 @@ export interface TicketJson {
   readonly project: string;
   readonly issue: number | null;
   readonly predecessors: readonly string[];
+  /** 満たしていない先行。空なら満たしている（先行が無い・閉じたチケット・この欄を出さない古い実行ファイルも空） */
+  readonly predecessors_unmet: readonly PredecessorUnmetJson[];
   readonly human_review: { readonly required: boolean; readonly reason: string };
   readonly proposal: ProposalJson | null;
   /**
@@ -84,6 +139,10 @@ export interface TicketJson {
   readonly scattered: readonly SeenInJson[];
   readonly risk: Record<string, unknown> | null;
   readonly judge: Record<string, unknown> | null;
+  /** 子のフロー。親と、この欄を出さない古い実行ファイルでは null */
+  readonly flow: FlowJson | null;
+  /** 状態が動いた跡の新しい側（古い順）。この欄を出さない古い実行ファイルでは空 */
+  readonly history: readonly HistoryEntryJson[];
 }
 
 export interface PhaseJson {
@@ -119,23 +178,23 @@ export interface ParentJson {
   readonly phases: readonly PhaseJson[];
 }
 
-/** 層の設定ファイル 1 本の置き場 */
+/** 設定ファイル 1 本の場所 */
 export interface LayerFileJson {
-  /** 実行ファイルが解いたパス。ファイルが無くても本来の置き場を指す */
+  /** 実行ファイルが解いたパス。ファイルが無くても本来の場所を指す */
   readonly path: string;
   /** 読めなかった理由。空なら読めた（無いファイルも空として読めた扱い） */
   readonly unreadable: string;
 }
 
 /**
- * 層 1 つ（設計 §11.2）。拡張が使うのはルールとフェーズの種類のファイルの置き場だけなので、それだけを読む。
- * 宣言の中身と risk は読まない（リスク管理画面は層に追従していない、設計 §11.11）。
+ * 層（layer）1 つ（設計 11.2。共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルールとフェーズの種類のファイルの場所だけなので、それだけを読む。
+ * 宣言の中身と risk は読まない（リスク管理画面はワークスペースとプロジェクトの設定に追従していない、設計 11.11）。
  */
 export interface LayerJson {
   /** `common` / `self` / プロジェクトの名前 */
   readonly name: string;
   readonly rules: LayerFileJson;
-  /** フェーズの種類のファイル（`phases_file`）。共通層は `.ccnavi/common/phases.yml` 固定 */
+  /** フェーズの種類のファイル（`phases_file`）。共通の設定は `.ccnavi/common/phases.yml` 固定 */
   readonly phasesFile: LayerFileJson;
 }
 
@@ -151,7 +210,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 並びは 共通層 → 自身の層 → プロジェクト（名前順） */
+  /** 並びは 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
   readonly projects: readonly string[];
   readonly problems: readonly string[];
@@ -173,16 +232,16 @@ export function parseBoardJson(text: string): ParseResult {
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `JSON として読めない: ${(error as Error).message}` };
+    return { ok: false, error: `JSON として読めません: ${(error as Error).message}` };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: "JSON の最上位がオブジェクトではない" };
+    return { ok: false, error: "JSON の最上位がオブジェクトではありません" };
   }
   const version = typeof raw.version === "number" ? raw.version : NaN;
   if (version !== BOARD_VERSION) {
     return {
       ok: false,
-      error: `ボードの版が違う（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
+      error: `ccnavi --explain --json の版が違います（拡張は ${BOARD_VERSION}、実行ファイルは ${String(raw.version)}）`,
     };
   }
   const settings = isRecord(raw.settings) ? raw.settings : {};
@@ -240,6 +299,9 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     project: str(raw.project),
     issue: num(raw.issue),
     predecessors: list(raw.predecessors).map(str),
+    predecessors_unmet: list(raw.predecessors_unmet)
+      .filter(isRecord)
+      .map((p) => ({ ticket: str(p.ticket), state: str(p.state), label: str(p.label) })),
     human_review: { required: raw !== undefined && review.required === true, reason: str(review.reason) },
     proposal: isRecord(raw.proposal) ? proposal(raw.proposal) : null,
     blocked: str(raw.blocked),
@@ -263,6 +325,38 @@ function ticket(raw: Record<string, unknown>): TicketJson {
     scattered: seenIn(raw.scattered),
     risk: isRecord(raw.risk) ? raw.risk : null,
     judge: isRecord(raw.judge) ? raw.judge : null,
+    flow: isRecord(raw.flow) ? flow(raw.flow) : null,
+    history: list(raw.history).filter(isRecord).map(historyEntry),
+  };
+}
+
+function historyEntry(raw: Record<string, unknown>): HistoryEntryJson {
+  return {
+    at: str(raw.at),
+    kind: str(raw.kind),
+    from: str(raw.from),
+    to: str(raw.to),
+    via: str(raw.via),
+    phase: num(raw.phase),
+    mark: str(raw.mark),
+    reason: str(raw.reason),
+  };
+}
+
+function flow(raw: Record<string, unknown>): FlowJson | null {
+  const path = str(raw.path);
+  if (path === "") {
+    return null;
+  }
+  return {
+    path,
+    rel: str(raw.rel),
+    tree: str(raw.tree),
+    exists: raw.exists === true,
+    // 欄が欠けていたら書かない側にする（リンクかを確かめられない）
+    linked: raw.linked !== false,
+    // 欄が欠けていたら閉じる側にする（止まっているかを確かめられないので、書かせない）
+    locked: raw.locked !== false,
   };
 }
 

@@ -17,7 +17,7 @@ export interface Lock {
 }
 
 /**
- * ワークスペースのルールは、どのツリーの doing でも保存を止める（Bash の和に効くため）。
+ * 共通の設定とワークスペースの設定のルール（`project` を渡さない）は、どのツリーの doing でも保存を止める（Bash の和に効くため）。
  * プロジェクトのルール（`project` を渡す）は、そのプロジェクトの doing だけを見る。
  * 作業中は「承認済みチケットが開いていて（`copy.status` が `open`）、着手済み（`started_at` がある）」。
  * 承認しただけで着手していないものは、まだセッションが動いていないので数えない（ADR-0055 の前と同じ線）。
@@ -33,16 +33,16 @@ export function lockFromBoard(board: BoardJson, project?: string): Lock {
   const where = project === undefined ? "" : `プロジェクト ${project} に`;
   return {
     locked: true,
-    reason: `${where}作業中のチケットがある（${doing.join(", ")}）。終わるか取り消すまで保存できない`,
+    reason: `${where}作業中のチケットがあります（${doing.join(", ")}）。変更すると整合性が崩れるので、保存はできません。`,
     doing,
   };
 }
 
-/** ボードが読めなかったとき。確かめられないなら閉じる側に倒す */
+/** ボードが読めなかったとき。確かめられないなら閉じる側にする */
 export function lockFromError(error: string): Lock {
   return {
     locked: true,
-    reason: `作業中のチケットが無いことを確かめられないので保存できない: ${error}`,
+    reason: `作業中のチケット: ${error}`,
     doing: [],
   };
 }

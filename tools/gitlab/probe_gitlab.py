@@ -2,7 +2,7 @@
 
 tests/ticket/test_ticket.py と同じ形で一時リポジトリを作り、使い捨てのプロジェクトを
 GitLab に作って、`ccnavi-ticket.sh` / `ccnavi-git.sh` / `ccnavi-review.sh` を本物に通す。
-人間役（レビュアー）は別ユーザのトークンで API を直に叩く。
+人間役（レビュアー）は別ユーザのトークンで API を直に呼ぶ。
 sh と同じ道具を使わないほうが、片方の壊れがもう片方に隠れない。
 
 ## 用意するもの

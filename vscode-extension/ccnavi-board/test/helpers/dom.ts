@@ -57,7 +57,7 @@ export interface LoadOptions {
    *
    * happy-dom は `ResizeObserver` の殻を持つが `observe()` が何もせず、`offsetWidth` は 0 を返す。
    * React Flow は点の大きさを `ResizeObserver` の報せで知り、測れていない点を `visibility: hidden` の
-   * まま置き、**線を 1 本も描かない**。落ちないので、細工をしないと「空の絵」を見て緑になる。
+   * まま置き、**線を 1 本も描かない**。落ちないので、細工をしないとテストは「空の絵」を見て通る。
    *
    * ここで偽るのは大きさだけで、**置き場所は偽らない**（線の経路の正しさはここでは見られない。
    * 見るのは「点と線がその本数あるか」「押すと何が起きるか」まで）。数字は下の `SIZES`。
@@ -189,7 +189,7 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
   document.dispatchEvent(new window.Event("DOMContentLoaded", { bubbles: true }));
   window.dispatchEvent(new window.Event("load"));
   // 画面が React のとき、押した直後には描き直されない。React のスケジューラは happy-dom の
-  // VM に MessageChannel が無いと setImmediate / setTimeout に落ち、どちらも
+  // VM に MessageChannel が無いと setImmediate / setTimeout を使い、どちらも
   // `waitUntilComplete` は追わない（happy-dom が数えるのは自分が張ったタイマーと取得だけ）。
   // 待ちを 1 回で切ると、機械が混んでいるときに「まだ描き直していない DOM」を見て落ちる。
   // check 相（setImmediate）と timers 相（setTimeout）の両方を何度か空にしてから見る。

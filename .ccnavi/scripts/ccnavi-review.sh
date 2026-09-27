@@ -39,7 +39,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
   request      --phase <N> --body-file <依頼文>   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く
   confirm      --phase <N>                        依頼より後の未解決スレッドが無ければマーカーを置く
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに写す
-  decide       <N> [--preview]                    残った指摘の行き先を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
+  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（人が端末で打つ。--preview は一覧を JSON で見るだけ）
   ready                                           閉じられて wip を片付け push 済みなら Draft を外す（「マージに進んでよい」の合図。マージは人が squash で）
   close-early  --reason <理由> [--no-issue]       まだ残っているが締める判断（人が端末で打つ）。残りを issue に写す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた写し（JSON）を標準出力へ
@@ -78,7 +78,7 @@ esac
 #
 # 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
 # プロジェクトを答え、写し・マーカー・状態の置き場がプロジェクト側にずれる。
-# 道具の置き場は上へ歩いて探す（設計 §11.8）。
+# 道具の置き場は上へ歩いて探す（設計 11.8）。
 root=$(ccnavi_workspace) ||
 	fail "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 here="$(pwd -W 2>/dev/null || pwd)"
@@ -86,8 +86,23 @@ state="$root/${CCNAVI_STATE:-logs/state}"
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
+# 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
+# 引数の誤りで断る道と、実行ファイルを使わない副命令（origin / fetch / comment）では起こさない。
+# `$( )` の中から呼ぶと印が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
+told_skew=""
+tell_skew() {
+	[ -z "$told_skew" ] || return 0
+	told_skew=1
+	# ソースで動かすとき（bin が無い）は、sh と同じツリーのものを動かすので比べない。
+	[ -n "${bin:-}" ] || return 0
+	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-review: %s\n' "$skew" >&2
+}
+
 if bin=$(ccnavi_bin "$root"); then
-	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
+	ccnavi() {
+		tell_skew
+		"$bin" --root "$root" --cwd "$here" "$@"
+	}
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
@@ -162,7 +177,7 @@ JQ=$(command -v jq 2>/dev/null || :)
 [ -z "$JQ" ] && fail "jq が無い。結果の JSON を組み立てられない。" 2
 # gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
 # 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
-# 1 度だけ疎通を試して、通らなければ curl とトークンへ落ちる。
+# 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
 transport=""
 if [ "$kind" = github ]; then
 	CLI=$(command -v gh 2>/dev/null || :)
@@ -495,6 +510,7 @@ confirm)
 	;;
 request)
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
+	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
 	file=$(printf '%s\n' "$prepared" | sed -n 1p)
 	draft=$(printf '%s\n' "$prepared" | sed -n 2p)
@@ -585,6 +601,7 @@ decide)
 	fi
 	if [ -n "$choices" ]; then
 		# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
+		tell_skew
 		out=$(ccnavi --reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result") || {
 			printf '%s\n' "$out"
 			exit 1
@@ -603,6 +620,7 @@ ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
 	# ここが外してコメントを投稿する。マージは人。
 	fetch_all >"$result"
+	tell_skew
 	noted=$(ccnavi review ready --result "$result") || exit $?
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')

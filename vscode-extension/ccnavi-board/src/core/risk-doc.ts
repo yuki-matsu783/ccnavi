@@ -28,7 +28,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 # 要る扱いにするためのもの。リスクレベルの名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
 # HIGH 以上はレビューが済むまでフェーズを止める。境目の点は levels で動かす。
 #
-# 項目は 3 系統。1 件につき当て方を 1 つだけ書く。
+# 項目は 3 系統。1 件につき加点条件を 1 つだけ書く。
 #   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
 #   定量（スクリプト）: script: <.ccnavi/common/scripts/ の下>。cwd は子のワークツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
@@ -37,7 +37,7 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
 #                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
 #
-# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、--lint が言う。
+# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。壊れていれば組み込みを使い、--lint が言う。
 version: 1
 levels:
   medium: 20
@@ -73,23 +73,23 @@ export function readRisk(text: string): RiskDocument {
   const doc = parseDocument(text, { keepSourceTokens: false });
   const problems: string[] = [];
   for (const e of doc.errors) {
-    problems.push(`YAML として読めない: ${e.message}`);
+    problems.push(`YAML として読めません: ${e.message}`);
   }
   if (doc.contents !== null && !isMap(doc.contents)) {
-    problems.push("最上位が対応表ではない。実行ファイルは組み込みの配点に落ちる。保存すると中身を捨てて対応表から始める");
+    problems.push("最上位がマップ（キーと値の組の集まり）ではありません。実行ファイルは組み込みの配点を使います。保存すると中身を捨てて空のマップから始めます");
   }
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`version が無い。保存すると version: ${RISK_VERSION} を先頭に足す`);
+    problems.push(`version がありません。保存すると version: ${RISK_VERSION} を先頭に足します`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)} は実行ファイルが読めない（読むのは ${RISK_VERSION}）。組み込みの配点に落ちる`);
+    problems.push(`version ${String(version)} は実行ファイルが読めません（読むのは ${RISK_VERSION}）。組み込みの配点に落ちます`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
   const rawLevels = doc.get("levels", true);
   if (rawLevels !== undefined && rawLevels !== null) {
     if (!isMap(rawLevels)) {
-      problems.push("levels が対応表ではない。境目の点は組み込みの値として出す");
+      problems.push("levels がマップ（キーと値の組の集まり）ではありません。境目の点は組み込みの値として表示します");
     } else {
       for (const name of LEVEL_NAMES) {
         levels[name] = scalarText(rawLevels, name);
@@ -101,17 +101,17 @@ export function readRisk(text: string): RiskDocument {
   const rawFactors = doc.get("factors", true);
   if (rawFactors !== undefined && rawFactors !== null) {
     if (!isSeq(rawFactors)) {
-      problems.push("factors が並びではない。項目は画面に出さない");
+      problems.push("factors がリスト（配列）ではありません。項目は画面に出しません");
     } else {
       rawFactors.items.forEach((item, index) => {
         if (!isMap(item)) {
-          problems.push(`factors の ${index + 1} 件目が対応表ではない。画面に出さず、保存するとこの項目は消える（実行ファイルも読めない）`);
+          problems.push(`factors の ${index + 1} 件目がマップ（キーと値の組の集まり）ではありません。画面に出さず、保存するとこの項目は消えます（実行ファイルも読めません）`);
           return;
         }
         const present = KINDS.filter((k) => item.has(k));
         if (present.length > 1) {
           problems.push(
-            `factors の ${index + 1} 件目に当て方が ${present.length} 個ある（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消える`,
+            `factors の ${index + 1} 件目に加点条件が ${present.length} 個あります（${present.join(", ")}）。画面は ${present[0]} だけを出し、保存すると他は消えます`,
           );
         }
         factors.push(formOf(index, item, present[0] ?? "lines_over"));
@@ -163,7 +163,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
     top.items.unshift(doc.createPair("version", RISK_VERSION));
   }
 
-  // levels。空の欄は書かない（組み込みの値に落ちる）。
+  // levels。空の欄は書かない（組み込みの値を使う）。
   const rawLevels: unknown = top.get("levels", true);
   let levelsNode: YAMLMap | undefined;
   if (isMap(rawLevels)) {
@@ -194,7 +194,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
   for (const form of edited.factors) {
     if (form.origin !== null && seen.has(form.origin)) {
       // 同じ元ノードを 2 か所に置くと、後から書いた欄が両方に出る。
-      throw new Error(`${form.origin + 1} 件目の項目が 2 回送られた。再読込してから編集し直す`);
+      throw new Error(`${form.origin + 1} 件目の項目が 2 回送られました。更新してから編集し直してください`);
     }
     if (form.origin !== null) {
       seen.add(form.origin);
@@ -257,7 +257,7 @@ function keepSpacing(before: readonly unknown[], after: readonly YAMLMap[]): voi
 function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   setValue(doc, node, "id", form.id, Scalar.PLAIN);
   setValue(doc, node, "points", numberish(form.points), Scalar.PLAIN, "id");
-  // 当て方は 1 つ。他の当て方の欄が残っていれば消す（残すと lint が「1 つを書く」と止める）。
+  // 加点条件は 1 つ。他の加点条件の欄が残っていれば消す（残すと lint が「1 つを書く」と止める）。
   for (const other of KINDS) {
     if (other !== form.kind && node.has(other)) {
       node.delete(other);
@@ -271,7 +271,7 @@ function writeFactor(doc: Document, node: YAMLMap, form: FactorForm): void {
   } else {
     setValue(doc, node, form.kind, form.value, Scalar.PLAIN, "points");
   }
-  // max は glob の上限。glob 以外の当て方では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
+  // max は glob の上限。glob 以外の加点条件では意味が無く、画面にも出ないので消す。空なら欄ごと消す（青天井）。
   if (form.max === "" || form.kind !== "glob") {
     if (node.has("max")) {
       node.delete("max");

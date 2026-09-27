@@ -73,6 +73,7 @@
 | [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0044）） |
 | [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
 | [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
+| [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの控えをセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 
 ### ルールと判定
 
@@ -82,7 +83,7 @@
 | [0009](0009-undeclared-handover.md) | ルールが言及しない呼び出しは判定を返さず、権限モードに委ねる |
 | [0010](0010-glob.md) | 記法は `fnmatch` の glob にし、自前の記法をやめる |
 | [0011](0011-no-allow-when-degraded.md) | 読み切れないコマンドに `allow` を当てない |
-| [0012](0012-builtin-fallback.md) | ルールが読めないときは組み込みの既定に落ちる |
+| [0012](0012-builtin-fallback.md) | ルールが読めないときは組み込みの既定を使う |
 | [0013](0013-heredoc.md) | ヒアドキュメントを既定のルールで止める |
 | [0014](0014-resolved-path.md) | ファイルのパスは行き着く先で見る |
 | [0015](0015-message-and-context.md) | `message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける |
@@ -99,7 +100,7 @@
 | [0051](0051-regex-ignores-case.md) | `regex` も大文字小文字を区別せずに当て、区別が要るときは `(?-i:...)` で囲む |
 | [0063](0063-not-root-placeholder.md) | ワークスペースの外は、先読みではなく展開で書く |
 | [0052](0052-common-layer-fixed.md) | 共通層の置き場を `.ccnavi/common/` に固定し、env で動かせなくする |
-| [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを、診断の経路に限る |
+| [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを診断の経路に限る |
 | [0084](0084-places-are-fixed-to-defaults.md) | 置き場を既定に固定し、置き場を動かす環境変数を廃止する |
 | [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
@@ -148,6 +149,10 @@
 | [0079](0079-subcommand-names-say-what-they-do.md) | 副命令の名前は動きを言い、人の判断はフラグで受ける |
 | [0080](0080-deny-turning-off-the-terminal-requirement.md) | 端末要求を切る形は、実行ファイルの呼び方によらず止める |
 | [0081](0081-decide-each-thread-on-the-board.md) | 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする |
+| [0085](0085-child-flow-locked-while-in-progress.md) | 子チケットにフローを持たせ、着手中は書き換えを止める |
+| [0086](0086-state-history-is-an-append-only-aid.md) | 状態が動いた跡を、チケットごとの追記専用のファイルに残す。正は置き場のまま |
+| [0087](0087-nudge-finish-at-stop.md) | 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す |
+| [0088](0088-predecessors-gate-approval-and-start.md) | 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ |
 
 ### 複数のリポジトリと VS Code 拡張
 
@@ -155,12 +160,13 @@
 |---|---|
 | [0033](0033-projects.md) | 複数のリポジトリ：道具はワークスペース、設定はプロジェクト、Bash は和 |
 | [0035](0035-extension-no-judging.md) | VS Code 拡張は判定を自分で出さない |
+| [0084](0084-common-layer-is-distributed-to-projects.md) | 共通層は配る定義にし、親の着手でプロジェクトの層を上書きして最初のレビューで知らせる |
 | [0038](0038-project-from-location.md) | チケットのプロジェクトは提案を置いた場所で決める |
 | [0064](0064-extension-board-in-react.md) | ボードの画面を React にし、拡張ホストは中身だけを渡す |
 | [0062](0062-retained-screen-host.md) | 保持する画面は、入れ物を入れ直さない段取りで React にする |
 | [0066](0066-webview-css-beside-components.md) | 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む |
 | [0068](0068-approval-overlay-state-machine.md) | 承認のオーバーレイの遷移を 1 か所に集め、単体で試せるようにする |
-| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、外から来る部品を 1 つだけ入れる |
+| [0070](0070-phase-graph-has-no-direction.md) | フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める |
 | [0074](0074-board-shows-what-moved.md) | ボードは「動いた」を印で見せ、その印を時間では消さない |
 | [0082](0082-phase-graph-groups-tour.md) | フェーズの図を区分の枠で分け、図の下は凡例と当てはまるときだけの注意にし、細かい案内は初回の吹き出しとヘルプに寄せる |
 | [0083](0083-tour-on-every-screen-with-samples.md) | 初回の吹き出しの案内を拡張の 5 画面すべてに出し、中身が空の画面では案内の間だけ見本を出す |

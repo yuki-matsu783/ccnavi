@@ -8,8 +8,8 @@
  * （`IdPicker`）。自分の id は候補に出さない。`after` の候補は work の種類だけ（feedback の種類は
  * 待つ先にできず、feedback の種類は `after` を持てない。`phasetypes.py`）。同じ id を `after` と
  * `overlap` の両方には挙げられない（同じく error）ので、片方で選んだ id はもう片方で選べなくする。
- * 層（自身の層・プロジェクト）はほかの層の種類を指せるので、候補に無い id を打つ欄も出す。
- * 共通層はほかの層を指せない（照合は自分のファイルの中だけ）ので、その欄は出さない。
+ * ワークスペースとプロジェクトの設定はほかの設定の種類を指せるので、候補に無い id を打つ欄も出す。
+ * 共通の設定はほかの設定を指せない（照合は自分のファイルの中だけ）ので、その欄は出さない。
  */
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from "react";
 
@@ -30,11 +30,11 @@ export interface PhaseProps {
   readonly moreOpen: boolean;
   /** このファイルの種類の id と区分（並び順）。関係の欄の候補にする */
   readonly kinds: ReadonlyMap<string, PhaseKind>;
-  /** 層（自身の層・プロジェクト）の画面か。層だけがほかの層の種類を指せる */
+  /** ワークスペースかプロジェクトの設定の画面か。この 2 つだけがほかの設定の種類を指せる */
   readonly layer: boolean;
   /** id が他の種類と重なっている。保存は止まる */
   readonly duplicate: boolean;
-  /** 欄を触れるか。保存の往復の間と、共通層でファイルが無い間は触れない */
+  /** 欄を触れるか。保存の往復の間と、共通の設定でファイルが無い間は触れない */
   readonly disabled: boolean;
   readonly onToggle: () => void;
   readonly onToggleMore: (open: boolean) => void;
@@ -85,7 +85,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         candidates={name === "after" ? others.filter((id) => props.kinds.get(id) === "work") : others}
         known={props.kinds}
         blocked={new Set(blocked.map((id) => id.trim()))}
-        blockedNote={`${blockedBy} にも挙げているので選べない（両方に挙げると保存のときの検証が止める）`}
+        blockedNote={`${blockedBy} にも挙げているので選べません（両方に挙げると保存のときの検証で止まります）`}
         typed={props.layer}
         value={phase[name]}
         disabled={disabled}
@@ -127,7 +127,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         <Captioned name="id" yamlKey="id">
           {text("id", "f-id narrow", "implement（英数字で始まり、使えるのは英数字と . _ -）")}
         </Captioned>
-        <Captioned name="題" yamlKey="title">
+        <Captioned name="タイトル" yamlKey="title">
           {text("title", "f-title narrow", "実装とテスト（空なら id をそのまま使う）")}
         </Captioned>
         <Captioned name="区分" yamlKey="kind">
@@ -167,7 +167,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
               <option value="inherit">inherit（親の範囲そのまま）</option>
-              <option value="globs">上限を書く（glob の並び）</option>
+              <option value="globs">上限を書く（glob のリスト）</option>
             </select>
             {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（ワークツリーのルートからの相対。子チケットの範囲はこの中に収める）")}
           </div>
@@ -193,7 +193,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             </Captioned>
             <Captioned name="先に済ませる種類" yamlKey="after">
               {phase.kind === "feedback" && phase.after.length === 0 ? (
-                <span className="f-after dim">feedback の種類は持てない（レビュー後の対応で、全体計画の待ち方の外にある）</span>
+                <span className="f-after dim">feedback の種類は持てません（レビュー後の対応で、全体計画の待ち方の外にあります）</span>
               ) : (
                 ids("after", "先に済ませる種類", "f-after", "待ち方が dag のとき、この種類より先に閉じてレビューを終えておく work の種類")
               )}
@@ -281,13 +281,13 @@ function ListInput({
  * `change` はそれでも届いたとき（止めきれない操作）のために、届いた選択をそのまま受ける。
  *
  * 候補は呼ぶ側が決める（自分と空を除いた、このファイルの種類）。**候補に無い値も消さずに出す**
- * （ほかの層の種類・綴り違い・自分自身）。外せば並びから消える。値は前後の空白を落として読む
+ * （ほかの設定の種類・綴り違い・自分自身）。外せば並びから消える。値は前後の空白を落として読む
  * （実行ファイルも落として解く）。空の値は出さない。
  *
  * 並びは候補の順（ファイルの並び）に揃え、候補に無い値はその後ろに元の順で置く。選択を
  * 付け外しするたびに並びが入れ替わって差分が出る、ということをしない。
  *
- * 候補に無い id を打つ欄は `typed` のときだけ出す（層の画面）。打った文字は Enter か、欄を離れたときに
+ * 候補に無い id を打つ欄は `typed` のときだけ出す（ワークスペースとプロジェクトの設定の画面）。打った文字は Enter か、欄を離れたときに
  * 足す（`,` 区切りで複数も可）。自分の id は打っても足さない。
  */
 function IdPicker({
@@ -380,7 +380,7 @@ function IdPicker({
           onKeyDown={onKeyDown}
         >
           {options.map((id, index) => {
-            const note = id === self ? "自分自身を挙げている（外す）" : !known.has(id) ? "このファイルに無い id（ほかの層の種類か、綴り違い）" : !candidates.includes(id) ? "ここには挙げられない種類（外す）" : undefined;
+            const note = id === self ? "自分自身を挙げています（外してください）" : !known.has(id) ? (typed ? "このファイルに無い id です（共通の設定の種類か、入力ミス）" : "このファイルに無い id です（入力ミス）") : !candidates.includes(id) ? "ここには挙げられない種類です（外してください）" : undefined;
             const locked = isLocked(id);
             const tip = [locked ? blockedNote : undefined, note].filter((part) => part !== undefined).join("／");
             return (
@@ -408,14 +408,14 @@ function IdPicker({
           })}
         </select>
       )}
-      {options.length === 0 && <span className="dim">選べる種類が無い</span>}
+      {options.length === 0 && <span className="dim">選べる種類がありません</span>}
       {typed && (
         <input
           type="text"
           className="id-extra"
           spellCheck={false}
-          aria-label={`${label}にほかの層の id を足す`}
-          placeholder="ほかの層の id を入力して Enter"
+          aria-label={`${label}に共通の設定の id を足す`}
+          placeholder="共通の設定の id を入力して Enter"
           value={extra}
           disabled={disabled}
           onChange={(event) => setExtra(event.target.value)}

@@ -83,7 +83,7 @@ VERSION = 1
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 # info は「そう書いてあるとおりに効いているが、書いた人が知りたいはずのこと」。
-# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 §11.4）。
+# 層をまたいで同じ定義が重複していて後ろを捨てた、がこれにあたる（設計 11.4）。
 # warn と分けるのは、重複は普通の形（見本から始めたプロジェクト）で、これを warn に
 # 混ぜると本当に緩んでいる warn が埋もれるため。
 SEVERITY_INFO = "info"
@@ -116,7 +116,7 @@ _BACKREFERENCE = re.compile(r"\\[1-9]")
 ROOT_PLACEHOLDER = "{root}"
 
 # 「ワークスペースルートの外」を指す合言葉。`regex` にだけ書け、`^` の直後に 1 回だけ。
-# 読み込み時に、先読みを使わない入れ子の式へ展開する（not_root_pattern、設計 i0061 §2）。
+# 読み込み時に、先読みを使わない入れ子の式へ展開する（not_root_pattern、設計 i0061 2）。
 NOT_ROOT_PLACEHOLDER = "{!root}"
 
 # 展開の最内と、各段の「ここで文字列が終わる」に置く綴り。`$` ではなく `\Z` なのは、
@@ -129,16 +129,16 @@ _NOT_ROOT_END = r"\Z"
 # Windows の MAX_PATH は 260 なので、256 字のルートはその時点で実用にならない。
 #
 # **組み立てが落ちる長さは、展開の形で変わる。** 1 文字あたりの入れ子の段数を変えたら、
-# bench_not_root.py を回して測り直すこと（設計 i0061 §4.1）。
+# bench_not_root.py を回して測り直すこと（設計 i0061 4.1）。
 MAX_ROOT_LEN = 256
 
 # 生成できなかった `deny` / `ask` に持たせる式。どの文字列にも当たるので、そのルールが
-# 見るツールの呼び出しは全部止まる。守りが消えるより止まるほうがよい、という向きへ
-# 倒すために使う（設計 i0061 §4.3）。
+# 見るツールの呼び出しは全部止まる。守りが消えるより止まるほうがよい、という向きを
+# 採るために使う（設計 i0061 4.3）。
 _MATCH_EVERYTHING = "^"
 
 # 生成した式に現れてはいけない書き方。`_unsupported` は繰り返しを見ないので、そこへ
-# 掛け直すだけでは「繰り返しを含まない」ことを確かめられない（設計 i0061 §2.5）。
+# 掛け直すだけでは「繰り返しを含まない」ことを確かめられない（設計 i0061 2.5）。
 #
 # `?` は入れていない。生成した式は捕獲しないグループ `(?:` を使うので、`?` を量化子と
 # 数えると式自身の構造に当たってしまう。ルートの文字は `re.escape` を通るため、
@@ -147,23 +147,23 @@ _GENERATED_QUANTIFIER = re.compile(r"(?<!\\)[*+]|(?<!\\)\{\d")
 
 # `{!root}` の直後に続けてよい書き始め。生成した式が読み終える位置はパスの区切りとは
 # 限らないので、任意の位置まで進む書き方で受けていないものは warn で伝える
-# （設計 i0061 §3.3）。
+# （設計 i0061 3.3）。
 _SKIPS_ANYWHERE = re.compile(r"(?:\.[*+]|\[\\s\\S\][*+])")
 
 # 層の名前と id の間に入る文字（`self:docs` / `lib:source`、ruleload.prefix_ids）。
 # 書かれたままの id にこれが入っていると、層を添えた形と見分けが付かない。
-# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 §11.4）。
+# 名前の綴りを 1 文字予約するほうが、前置きの綴りを別にするより安い（設計 11.4）。
 ID_SEPARATOR = ":"
 
 # 苦情の出どころ（`Problem.kind`）。「いまは通らないが、書いた側に直すものは無い」もの。
 # 前のフェーズが閉じていない子がこれで、閉じれば同じ提案がそのまま通る。承認は落とすが、
-# 全体を見る `--lint` は warn に落とす（提案 1 本で設定画面の保存と CI が止まらないように）。
+# 全体を見る `--lint` は warn にする（提案 1 本で設定画面の保存と CI が止まらないように）。
 KIND_NOT_YET = "not-yet"
 
 # 組み込みの守りの名前の頭。ルールファイルからは書けない（読み込まずに error）。
 # 同じ id で書いたルールがあると組み込みを足さない形にすると、何にも当たらない 1 本を
 # その名前で書くだけで守りを黙って消せてしまう。ルールファイルの記述に依らず足すのが
-# 組み込みの役目なので、置き換えの道ごと閉じる。外したいなら env で面ごと切る。
+# 組み込みの役目なので、置き換えの道ごと閉じる。外したいなら env でその守りごと切る。
 RESERVED_ID_PREFIX = "builtin-guard-"
 
 
@@ -175,8 +175,7 @@ def root_pattern(root: str) -> str:
     `/` で考える。大文字小文字は式ごと区別せずに当てるので（_build）、ここでは機械を
     見ない。見ると `c:` と `C:` の扱いが機械で割れる。
     """
-    real = os.path.realpath(root).rstrip("\\/")
-    return "".join("[\\\\/]" if ch in "\\/" else re.escape(ch) for ch in real)
+    return "".join(_same(ch) for ch in real_root(root))
 
 
 def root_glob(root: str) -> str:
@@ -191,9 +190,9 @@ def real_root(root: str) -> str:
     """ルートを、展開に使える形に正規化する。
 
     `os.path.realpath` で解き、**末尾の区切りを落とす**。落とさないと、最後の区切りを
-    「同じ」の側で消費した直後に最内へ落ち、ルート直下の普通のファイル名が「外」に
-    化ける。Windows では `os.path.realpath('/')` が `C:\\` を返すので、ドライブ直下を
-    ワークスペースにした環境は必ずここを踏む（設計 i0061 §2.0）。
+    「同じ」の側で消費した直後に最内の段へ進み、ルート直下の普通のファイル名が「外」に
+    なってしまう。Windows では `os.path.realpath('/')` が `C:\\` を返すので、ドライブ直下を
+    ワークスペースにした環境は必ずここを踏む（設計 i0061 2.0）。
 
     `root_pattern` / `root_glob` も同じ 2 手を踏んでいる。`{!root}` だけ違う扱いにしない。
     """
@@ -220,12 +219,12 @@ def not_root_pattern(root: str) -> str:
         ^(?:\\Z|[^c]|c(?:\\Z|[^:]|:(?:\\Z|[^\\\\/]|[\\\\/](?:…))))
 
     **繰り返しを 1 つも含まない。** 各段の選択肢は最初の 1 文字でほぼ排他なので、
-    戻る余地がほとんど無い（設計 i0061 §2.5）。判定は 1 回 3.5 マイクロ秒で、
+    戻る余地がほとんど無い（設計 i0061 2.5）。判定は 1 回 3.5 マイクロ秒で、
     ルートの長さに比例して伸びるだけ。
 
     列挙型（前置きを 1 文字ずつ伸ばして並べる形）を採らないのは、式の長さが
     ルートの長さの 2 乗で伸びるため。436 字のルートで 141,365 字・組み立て 481 ms に
-    なり、判定の期限（3 秒）に達してしまう（設計 i0061 §2.7）。
+    なり、判定の期限（3 秒）に達してしまう（設計 i0061 2.7）。
 
     引数には `real_root` で正規化したパスを渡す。`^` は呼ぶ側が書く。
     """
@@ -264,8 +263,8 @@ def readable_every(written: object) -> int:
     YAML が数として読まなかった値（引用符を書いた）なので、こちらも読まない。
     真偽値は `True == 1` で整数として通ってしまうので、先に外す。
 
-    読めなかったときに何をするかは呼ぶ側が決める。判定（_build）は 1 に倒して
-    毎回渡す側へ、--lint は error にして名指しする。同じ「読めるか」を 2 か所で
+    読めなかったときに何をするかは呼ぶ側が決める。判定（_build）は 1 として扱って
+    毎回渡し、--lint は error にして名指しする。同じ「読めるか」を 2 か所で
     別々に書くと、黙って無視される値と咎められる値がずれる。
     """
     if written is None:
@@ -299,12 +298,12 @@ class Rule:
     # 層の和では `lib:schema` のように層の名前が前に付く（ruleload.prefix_ids）。
     id: str = ""
     # bare_id は書かれたままの id。層の名前を添える前の綴りで、層をまたいで
-    # 同じルールかどうかを見るときの鍵になる（設計 §11.4「重複は後ろを捨てる」）。
+    # 同じルールかどうかを見るときの鍵になる（設計 11.4「重複は後ろを捨てる」）。
     # id から前置きを剥がして求める形にすると、`:` を含む id を書いた人の定義が
-    # 剥がされる側に倒れるので、書いたときの綴りをそのまま持つ。
+    # 剥がされる側になるので、書いたときの綴りをそのまま持つ。
     bare_id: str = ""
     # source はこのルールが来た層（common / self / プロジェクトの名前）。記録の
-    # `source` 欄と `--explain` がこれを読む（設計 §11.9）。
+    # `source` 欄と `--explain` がこれを読む（設計 11.9）。
     source: str = ""
     # match は対象のツール名を "|" で並べたもの。"Write|Edit" など。
     match: str = ""
@@ -339,7 +338,7 @@ class Rule:
     # 書かないときと同じ。書いていないときの場合分けをどこにも持たないための既定値。
     every: int = 1
     # every_written は書かれたままの値。読めない値（0・負・整数でない）でもルールは
-    # 組み上げ、every は 1（毎回渡す）に倒す。ここで弾いてルールごと捨てると、--lint の
+    # 組み上げ、every は 1（毎回渡す）として扱う。ここで弾いてルールごと捨てると、--lint の
     # 名指しが `allow[3]` の形になり、どの id を直せばよいかを言えなくなる。咎めるのは
     # --lint の仕事で、そのために書かれた値をそのまま持つ。書いていなければ None。
     every_written: object = None
@@ -368,7 +367,7 @@ class Rule:
         return fill_root(self.degraded_message or self.message, self.root)
 
     def key(self) -> tuple:
-        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 §11.4、§11.8）。
+        """層をまたいで「同じ定義」と言えるかどうかの鍵（設計 11.4、11.8）。
 
         比べるのは書いた綴りではなく、`{root}` を置き換えたあとの式。共通層と
         プロジェクトの層に同じ `{root}/...` を書いた定義は、置き換え先が同じ
@@ -387,7 +386,7 @@ class Rule:
             # 刻みだけが違う 2 件は別の定義。同じ文を違う頻度で渡すルールを、
             # 層をまたいで片方に潰さない。比べるのは読み取ったあとの刻みで、
             # 書かれたままの値ではない（`5` と `"5"` は同じ刻みではない。後者は
-            # 読めない値として 1 に倒れるので、そこで分かれる）。
+            # 読めない値として 1 になるので、そこで分かれる）。
             self.every,
             self.decision,
         )
@@ -437,7 +436,7 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
 
     YAML の解析の失敗は ValueError に変換して投げ直す。呼び手はここが投げるものを
     OSError と ValueError の 2 つで受けていて、素通りする例外が 1 つでもあると、
-    ルールファイルの書き損じがそのまま hook の異常終了になる。既定に落ちる
+    ルールファイルの書き損じがそのまま hook の異常終了になる。既定に戻る
     経路（REQ-PRE-06）を通らずに落ちるので、壊れたファイルを直す呼び出しも
     止まる。読み手を替えるたびに、変換の側も一緒に見ること。
     """
@@ -449,9 +448,9 @@ def load(path: str, root: str = "") -> tuple[RuleSet, list[Problem]]:
 def readable(content: bytes) -> bool:
     """その中身を、load がルールファイルとして読めるか。
 
-    読めなければ呼び手（ruleload.load_rules）は組み込みの既定に落ちる。控えの中身を見て
-    「この呼び出しの直前に既定に落ちていたか」を決めるのに使う（selfguard）。線を load と
-    別に引くと、既定に落ちていたのに落ちていないと読む、あるいはその逆が起きる。
+    読めなければ呼び手（ruleload.load_rules）は組み込みの既定を使う。控えの中身を見て
+    「この呼び出しの直前に既定を使っていたか」を決めるのに使う（selfguard）。線を load と
+    別に引くと、既定を使っていたのに使っていないと読む、あるいはその逆が起きる。
     """
     try:
         _decode(content.decode("utf-8"), "(content)")
@@ -474,7 +473,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
     """読み込み済みのルールを組み立てる。
 
     ファイルを開く部分と分けてあるのは、組み込みの既定ルールが同じ経路を通るため。
-    別の道で組み立てると、ファイルから読んだときと既定に落ちたときで
+    別の道で組み立てると、ファイルから読んだときと既定に戻ったときで
     ルールの意味が食い違いうる。食い違えば、ガードが落ちている最中に
     さらに読み違えることになる。
 
@@ -506,7 +505,7 @@ def parse(data: dict, root: str = "", builtin: bool = False) -> tuple[RuleSet, l
         for i, raw in enumerate(raw_section):
             rule, problem = _build(raw, name, i, root, builtin)
             # 苦情とルールは同時に返りうる。`{!root}` を組み立てられなかった deny / ask が
-            # これで、「報告する」と「守りを消さない」を両立させる唯一の道（設計 i0061 §4.4）。
+            # これで、「報告する」と「守りを消さない」を両立させる唯一の道（設計 i0061 4.4）。
             # 捨てるだけにすると、生成に失敗した deny が黙って消えて素通りになる。
             if problem is not None:
                 problems.append(problem)
@@ -526,9 +525,9 @@ def _build(
     - `(rule, None)`   組み立てられた
     - `(None, problem)` 受け付けられない。判定に使わない（REQ-RUL-08）
     - `(rule, problem)` 苦情はあるが判定には使う。`{!root}` を組み立てられなかった
-      `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側に倒れる。
+      `deny` / `ask` がこれで、`match` の全部に当たる式を持って止める側になる。
       捨てると「ワークスペースの外の全部」が素通りになるので、報告だけでは足りない
-      （REQ-RUL-10、設計 i0061 §4.3）
+      （REQ-RUL-10、設計 i0061 4.3）
     """
     where = f"{section}[{index}]"
     if not isinstance(raw, dict):
@@ -568,7 +567,7 @@ def _build(
             f"`{RESERVED_ID_PREFIX}` で始まる id は組み込みの守りの名前で、"
             "ルールファイルには書けない。同じ名前で書いても組み込みは置き換わらない。"
             "別の名前にすること。"
-            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）で面ごと切る",
+            "組み込みを外したいなら env（CCNAVI_GUARD_CORE_FILES など）でその守りごと切る",
         )
     if not rule.message and section in _NEEDS_MESSAGE:
         return None, Problem(
@@ -592,7 +591,7 @@ def _build(
         )
 
     # `{!root}` は `regex` 専用。`glob` は fnmatch に翻訳されるので、入れ子の選択肢を持つ
-    # 展開結果を埋める場所が無い（設計 i0061 §3.1）。
+    # 展開結果を埋める場所が無い（設計 i0061 3.1）。
     if NOT_ROOT_PLACEHOLDER in rule.glob:
         return None, Problem(
             SEVERITY_ERROR,
@@ -647,8 +646,8 @@ def _build(
         return None, Problem(SEVERITY_ERROR, name, f"正規表現として組み立てられない: {exc}")
     except RecursionError:
         # `re` の組み立ては入れ子を再帰で読む。捕まえないとプロセスごと落ち、
-        # hook の異常終了は呼び出しを素通りさせる入口になる（設計 i0061 §4.2）。
-        # shellread が同じ形で `RecursionError` を安全側に倒しているのに倣う。
+        # hook の異常終了は呼び出しを素通りさせる入口になる（設計 i0061 4.2）。
+        # shellread が同じ形で `RecursionError` を安全側にしているのに倣う。
         if uses_not_root:
             return _ungeneratable(rule, section, name, "入れ子が深すぎて組み立てられない")
         return None, Problem(SEVERITY_ERROR, name, "入れ子が深すぎて組み立てられない")
@@ -661,7 +660,7 @@ def _not_root_placement(expression: str) -> str:
 
     置けるのは `^` の直後だけで、1 つの式に 1 回。展開されるのは
     「先頭から、外だと確定するところまで」を読み進める式なので、前に何かを置いても
-    意味を持たない（設計 i0061 §3.2）。
+    意味を持たない（設計 i0061 3.2）。
     """
     if expression.count(NOT_ROOT_PLACEHOLDER) > 1:
         return f"`{NOT_ROOT_PLACEHOLDER}` は 1 つの式に 1 回だけ書ける"
@@ -672,7 +671,7 @@ def _not_root_placement(expression: str) -> str:
             "前に何かを置くと意味を持たない"
         )
     # 直後の量化子は error。`?` や `{0}` を付けると展開結果ごと省略できるようになり、
-    # 「外だけを止める」はずのルールが**どの対象にも当たる**式に化ける。
+    # 「外だけを止める」はずのルールが**どの対象にも当たる**式になってしまう。
     # ワークスペースの中への書き込みまで止まるので、warn では済ませない。
     rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
     if rest[:1] in ("?", "*", "+", "{"):
@@ -690,7 +689,7 @@ def _not_root_suffix(expression: str) -> str:
     続けてよいかどうかは意味の問題で、機械には判定できない。展開結果が食い終わる
     位置がパスの区切りである保証は無いので、区切りを前提にした綴り
     （`^{!root}[\\\\/]foo`）は壊れてはいないが、まず書いた人の勘違い。
-    止めるほどではないので warn（設計 i0061 §3.3）。
+    止めるほどではないので warn（設計 i0061 3.3）。
     """
     rest = expression[len("^" + NOT_ROOT_PLACEHOLDER) :]
     if not rest or _SKIPS_ANYWHERE.match(rest):
@@ -715,21 +714,21 @@ def _expand_not_root(expression: str, root: str) -> tuple[str, str]:
     generated = not_root_pattern(real)
     # 生成した部分が契約（繰り返しも先読みも含まない）を守っているかを自分で見る。
     # 見るのは `not_root_pattern` が作った部分だけで、書いた人が後ろに続けた式は含めない。
-    # `.*` のような繰り返しをそこに書くのは許している（設計 §3.3）ので、
+    # `.*` のような繰り返しをそこに書くのは許している（設計 3.3）ので、
     # 全体に掛けると正しい書き方まで弾く。
     #
     # いまの `not_root_pattern` は `re.escape` で組み立てるので、この検査は通常は発火しない。
     # 将来ここを書き換えたときに黙って契約が破れるのを防ぐための置き石で、
-    # 外から叩いて発火させることはできない。
+    # 外から呼んで発火させることはできない。
     if _GENERATED_QUANTIFIER.search(generated) or _unsupported(generated):
         return expression, "展開した式が契約を守っていない（組み立ての不具合）"
     return expression.replace(NOT_ROOT_PLACEHOLDER, generated), ""
 
 
 def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Rule | None, Problem]:
-    """`{!root}` を組み立てられなかったときの倒れ方（設計 i0061 §4.3）。
+    """`{!root}` を組み立てられなかったときの扱い（設計 i0061 4.3）。
 
-    強い側に倒す。`deny` と `ask` は `match` の全部に当てて止め、`allow` は
+    強い側を採る。`deny` と `ask` は `match` の全部に当てて止め、`allow` は
     どれにも当てない。`allow` を当たる扱いにすると ccnavi が黙る範囲が広がるので、
     そこだけ逆になる。
 
@@ -739,11 +738,11 @@ def _ungeneratable(rule: Rule, section: str, name: str, detail: str) -> tuple[Ru
 
     ## 設計から変えた 2 点（実装フェーズの判断。文書に反映すること）
 
-    - **記録に `root-too-long` の欄は足さない**（設計 §4.6 を取り消す）。`audit` の
+    - **記録に `root-too-long` の欄は足さない**（設計 4.6 を取り消す）。`audit` の
       `REASON_*` は「判定に至らなかった理由」で、ここは判定に至っている（deny する）。
       記録には `deny` と当たったルールの id が既に残り、なぜ止めたかはこの文面が言う。
       新しい名前を足すと、判定に至らなかったものと同じ欄に別の意味が混ざる
-    - **SessionStart では何も言わない**（設計 §6.1 を「何もしない」に決めた）。
+    - **SessionStart では何も言わない**（設計 6.1 を「何もしない」に決めた）。
       256 字のルートは Windows の MAX_PATH の外で実用にならず、踏む人はまずいない。
       踏んだときはこの文面が理由と直し方を言う。めったに起きないことのために
       SessionStart を毎回重くしない

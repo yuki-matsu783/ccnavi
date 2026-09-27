@@ -1,11 +1,11 @@
 """設定とルールの検証。判定を行わずに、防御を無効化しうる記述だけを報告する。
 
 判定の経路は、苦情を言うために設定を読むわけではない。判定のついでに気づいたことを
-標準エラーへ落としているだけなので、判定が走らない場面――ルールを書き換えた直後、
+標準エラーに出しているだけなので、判定が走らない場面――ルールを書き換えた直後、
 CI、入れたばかりのプロジェクト――で不備を見つける手段が無い。ここがその経路になる。
 
 急ぐ理由は事故の側にある。ルールファイルが読めないと、block モードでは
-すべてのツール呼び出しが拒否側に倒れる。そのファイルを直すための呼び出しも
+すべてのツール呼び出しが拒否になる。そのファイルを直すための呼び出しも
 止まるので、壊れてから気づいたのでは直せない。だから壊れる前に言う側が要る。
 
 深刻度の分け方は 1 つの原則で決めてある。
@@ -42,11 +42,13 @@ import contextlib
 import io
 import json
 import os
+import re
 from typing import TextIO
 
 from . import (
     approval,
     ctxfile,
+    flow,
     gitcmd,
     gitstate,
     hookio,
@@ -61,6 +63,7 @@ from . import (
     selfguard,
     settings,
     tree,
+    version,
 )
 from . import ticket as ticket_mod
 from .modes import EXIT_ERROR, EXIT_OK
@@ -85,8 +88,8 @@ def report(
     flag: str,
     restore_if_deny_flag: str = "",
     guard_core_files_flag: str = "",
-    guard_ticket_approval: str = "",
     as_json: bool = False,
+    flow_path: str = "",
 ) -> int:
     """検証の結果を書き、error が 1 件でもあれば非ゼロを返す。
 
@@ -127,6 +130,10 @@ def report(
     )
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
+    flow_data = None
+    if flow_path:
+        flow_said, flow_data = flow_problems(flow_path, root)
+        problems.extend(flow_said)
     problems += [
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
         for line in said.getvalue().splitlines()
@@ -176,7 +183,7 @@ def report(
                 "ルールがどこも言及しない呼び出しを止めない",
             )
         )
-    if conf.tickets_enabled and guard_ticket_approval == selfguard.DISABLE:
+    if conf.tickets_enabled and conf.guard_ticket_approval == selfguard.DISABLE:
         problems.append(
             Problem(
                 SEVERITY_WARN,
@@ -204,7 +211,7 @@ def report(
             "root": root,
             "rules": conf.rules,
             "mode": mode,
-            "ticket_control": conf.ticket_control or selfguard.ENABLE,
+            "ticket_control": conf.ticket_control,
             "projects": [t.name for t in tree.projects(conf.projects)],
             "problems": [
                 {"severity": p.severity, "where": p.rule, "detail": p.detail} for p in problems
@@ -213,20 +220,26 @@ def report(
             "warns": warns,
             "infos": infos,
         }
+        if flow_path:
+            # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
+            # （README「lint の JSON」）
+            payload["flow"] = {"path": flow_path, "data": flow_data}
         stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_ERROR if errors else EXIT_OK
 
     stdout.write("ccnavi: 設定を検証する\n")
     stdout.write(f"  ルール: {conf.rules}\n")
+    if flow_path:
+        stdout.write(f"  フロー: {flow_path}\n")
     stdout.write(f"  deny の場所を戻す: {_shown(restore_if_deny, mode)}\n")
     stdout.write(f"  コアファイルを守る: {_shown(guard_core_files, mode)}\n")
     stdout.write(f"  確認できる者が居ないモードで守る: {guard_unwatched}\n")
-    stdout.write(f"  チケット制御: {conf.ticket_control or selfguard.ENABLE}\n")
+    stdout.write(f"  チケット制御: {conf.ticket_control}\n")
     if conf.tickets_enabled:
-        stdout.write(f"  チケットの承認の経路を守る: {guard_ticket_approval or selfguard.ENABLE}\n")
+        stdout.write(f"  チケットの承認の経路を守る: {conf.guard_ticket_approval}\n")
     # 環境変数はこの起動が受け取ったものであって、セッションが受け取るものではない。
-    # 端末から叩いた検証と hook から届く環境は別物なので、どちらを見た結果なのかを
+    # 端末から打った検証と hook から届く環境は別物なので、どちらを見た結果なのかを
     # 名乗らせる。名乗らないと、通った検証が別の設定についての報告になる。
     stdout.write(f"  モード: {mode}（この起動の環境から解決したもの）\n")
 
@@ -276,10 +289,10 @@ def _gate(name: str, declared: str, mode: str, voices: dict[str, str]) -> list[P
 
     見るのは `CCNAVI_MODE` を掛けたあとの値（`modes.effective_setting`）。書かれた値だけを
     見ると、`CCNAVI_MODE=dry-run` のもとで `enable` と書かれた門を「守っている」と読むことに
-    なる。実行時はモードに畳まれて戻さないので、それはこの面がいちばん言うべき
+    なる。実行時はモードに畳まれて戻さないので、それはこの検査がいちばん言うべき
     「切れているのに揃って見える」そのものになる。
 
-    倒れた先が書かれた値と違うときは、そのことも言う。言わないと、直す先が
+    実際の値が書かれた値と違うときは、そのことも言う。言わないと、直す先が
     その門なのか `CCNAVI_MODE` なのかが読めない。
     """
     effective = modes.effective_setting(mode, declared)
@@ -304,7 +317,7 @@ def check(
     """
     problems: list[Problem] = []
 
-    # 上書き設定を読み飛ばしても、値は既定に落ちてガードは弱まらない。
+    # 上書き設定を読み飛ばしても、値は既定に戻ってガードは弱まらない。
     # ただし人が設定したつもりの値がどこにも効いていない状態にはなる。
     for note in notes:
         problems.append(Problem(SEVERITY_WARN, "(settings)", note))
@@ -327,6 +340,7 @@ def check(
         )
 
     problems.extend(_project_settings(root))
+    problems.extend(_sh_compat(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
     problems.extend(_phases(conf))
@@ -343,11 +357,68 @@ def check(
     return problems
 
 
-def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
+# sh が互換の版を名乗る場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
+# 1 か所で足りる。
+SH_COMPAT_FILE = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh")
+_SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
+
+
+def compat_fix(root: str) -> str:
+    """実行ファイルと sh が食い違ったときの直し方。ccnavi のリポジトリなら組み立て直し、
+    配布先なら配り直し。配布先には組み立てる元（build.py とソース）が無い。"""
+    if os.path.isfile(os.path.join(root, "build.py")) and os.path.isfile(
+        os.path.join(root, "ccnavi", "__main__.py")
+    ):
+        return "build.py を回して組み立て直す（uv run --with pyinstaller python build.py）"
+    return (
+        "ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> "
+        "--force で実行ファイルと sh を配り直す"
+    )
+
+
+def _sh_compat(root: str) -> list[Problem]:
+    """`.ccnavi/scripts/` の sh と、この実行ファイルの互換の版（version.COMPAT）が揃っているか。
+
+    食い違っても判定は動くので warn。sh が頼るフラグや出力の形が変わっていれば、sh の側で
+    チケットやレビューの操作が落ちる。sh が無いワークスペース（試しの置き場）は言わない。
+    層のファイルの書式の版（`version:`）は、読む側が既に error で言う。
+    """
+    path = os.path.join(root, SH_COMPAT_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return []
+    except (OSError, UnicodeDecodeError) as exc:
+        return [Problem(SEVERITY_WARN, "(version)", f"{path} を読めない ({exc})")]
+    found = _SH_COMPAT.search(text)
+    if found is None:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                "(version)",
+                f"{path} が互換の版（CCNAVI_COMPAT）を名乗らない。実行ファイル（互換 "
+                f"{version.COMPAT}）より古い sh。{compat_fix(root)}",
+            )
+        ]
+    declared = int(found.group(1))
+    if declared == version.COMPAT:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            "(version)",
+            f"sh（{path}）は互換 {declared}、実行ファイルは互換 {version.COMPAT} で食い違っている。"
+            f"{compat_fix(root)}",
+        )
+    ]
+
+
+def _risk(conf: settings.Settings, root: str) -> list[Problem]:
     """共通層のリスクの配点が読めるか。無いのは不備ではない（組み込みの配点）。
 
-    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重い側に
-    倒れるが、そこで気づくのは子を閉じる瞬間になる（設計 §11.4.2）。
+    `script:` が指す先が在ることも見る。走らせるときは「測れなかった」で重いほうに
+    なるが、そこで気づくのは子を閉じる瞬間になる（設計 11.4.2）。
     """
     if not conf.risk:
         return []
@@ -360,6 +431,44 @@ def _risk(conf: settings.Settings, root: str = "") -> list[Problem]:
             for p in risk.script_problems(definition)
         ]
     return problems
+
+
+# `--lint --flow` の苦情の場所。VS Code 拡張のフロー編集画面はこの場所の苦情だけを読む。
+FLOW_WHERE = "(flow)"
+
+
+def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
+    """子のフローのファイル 1 本が、SubagentStart が読むのと同じ読みで読めるか（`--lint --flow`）。
+
+    (苦情, 読めた中身を `flow.as_json` にしたもの。読めなければ None) を返す。
+    読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
+    UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
+    「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（ADR-0035）。
+    読めなければ error。
+    ツリーの中のファイルなら、ツリーのルートからの途中のリンクも見る（SubagentStart と同じ）。
+    無いファイルも error にする（確かめたつもりで何も確かめていない形を作らない）。
+    中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
+    """
+    shown = flow.clean(path)
+    try:
+        exists = os.path.lexists(path)
+    except (OSError, ValueError):
+        exists = False
+    if not exists:
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None
+    try:
+        rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root)) if root else os.pardir
+    except ValueError:  # Windows でドライブが違う
+        rel = os.pardir
+    inside = rel != os.pardir and not rel.startswith(os.pardir + os.sep) and not os.path.isabs(rel)
+    data, why = flow.load(path, root if inside else "")
+    if why:
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None
+    try:
+        return [], flow.as_json(data)
+    except RecursionError:
+        deep = f"{shown}: 入れ子が深すぎて中身を渡せない"
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:
@@ -393,8 +502,6 @@ def _copy_problems(
       判定は止めないが、承認の画面を通っていれば起きない形なので、置き場を動かして
       承認した分の壊れを CI で止める。範囲の超過だけは `validate` も warn
     """
-    from . import phase as phase_mod
-
     problems: list[Problem] = []
     pool = dict(index)
     for t in closed:
@@ -410,7 +517,7 @@ def _copy_problems(
             problems.append(Problem(p.severity, "(ticket)", f"{t.ticket}: {p.detail}"))
         parent = pool.get(t.parent) if t.is_child else None
         if parent is not None:
-            for p in phase_mod.order_problems(root, conf, t, parent, types):
+            for p in phase.order_problems(root, conf, t, parent, types):
                 # 承認のときは error。承認済みのものに当てるのは「その順で始めた」という
                 # 記録で、いま止める根拠にはならない。
                 problems.append(Problem(SEVERITY_WARN, "(ticket)", f"{t.ticket}: {p.detail}"))
@@ -418,7 +525,7 @@ def _copy_problems(
 
 
 def _types_resolver(conf: settings.Settings, root: str):
-    """`project:` から、そのチケットに効く種類を引く（設計 §11.4.1）。
+    """`project:` から、そのチケットに効く種類を引く（設計 11.4.1）。
 
     承認の対象の中でもチケットごとに層が違いうるので、1 つに決めずに引く形で渡す。
     読み込みは 1 層 1 回。
@@ -433,7 +540,7 @@ def _types_resolver(conf: settings.Settings, root: str):
     return resolve
 
 
-def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
+def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     """チケットと承認済みチケットとワークツリーが噛み合っているかを見る（REQ-TKT-25）。
 
     判定に効くのは承認済みチケットの側だけなので、ここで問うのは「効いている範囲は何か」と
@@ -498,7 +605,8 @@ def _ticket(conf: settings.Settings, root: str = "") -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of))
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -569,7 +677,7 @@ def _approval_problems(
 
     範囲の超過は承認では落ちないが、判定で止まるので同じく名指しする（warn）。
 
-    **「まだ承認できない」だけは warn に落とす。** 前のフェーズが閉じていない子
+    **「まだ承認できない」だけは warn にする。** 前のフェーズが閉じていない子
     （`rules.KIND_NOT_YET`）は、書いた側に直すものが無く、前が閉じれば同じ提案が通る。
     `--lint` はワークスペース全体を見る道具で、その終了コードは VS Code の設定画面が
     保存してよいかの判断にも使われる（`phases-panel.ts`）。ここを error にすると、
@@ -593,7 +701,7 @@ def _approval_problems(
 
 
 def _said(ticket: str, problem) -> Problem:
-    """承認の苦情 1 件を、`--lint` の言い方に直す。「まだ承認できない」は warn へ落とす。"""
+    """承認の苦情 1 件を、`--lint` の言い方に直す。「まだ承認できない」は warn にする。"""
     severity = SEVERITY_WARN if problem.kind == rules.KIND_NOT_YET else problem.severity
     return Problem(severity, "(ticket)", f"{ticket}: {problem.detail}")
 
@@ -605,6 +713,7 @@ def _proposal_problems(
     closed: list,
     done: set[str],
     repo_of: dict[str, str],
+    preds: dict | None = None,
 ) -> list[Problem]:
     """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
 
@@ -625,7 +734,7 @@ def _proposal_problems(
     常に非ゼロで終わる。捕まえたいのは 1 つのツリーの中で 2 つの状態に在る形だけ。
 
     **リポジトリをまたいだら、状態が何であれ咎める。** プロジェクトは自分の git を持つので
-    （設計 §11）、そこに同じ識別子が在るのは写しではなく別物の衝突。識別子は人が選ぶ短い
+    （設計 11）、そこに同じ識別子が在るのは写しではなく別物の衝突。識別子は人が選ぶ短い
     連番で、プロジェクトが独立に振ればぶつかる。コミットの遅れでは説明が付かないから、
     ツリーごとの免除を当ててはいけない。
     """
@@ -690,13 +799,16 @@ def _proposal_problems(
         )
     for t in index.values():
         if t.started_at:
-            waiting = [p for p in t.predecessors if p not in done]
-            if waiting:
+            # 先行の数え方は承認と着手と同じ（ADR-0088）。着手はこれで止まるので、ここに出るのは
+            # 着手のあとに先行が動いたか、止める前の版で着手したもの。
+            unmet = approval.unmet_predecessors(t, preds or {})
+            if unmet:
+                names = ", ".join(f"{p.ticket}（{p.label}）" for p in unmet)
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
                         "(ticket)",
-                        f"{t.ticket} は先行 {', '.join(waiting)} が閉じていないのに着手している",
+                        f"{t.ticket} は先行 {names} を満たしていないのに着手している",
                     )
                 )
     for ticket_id, places in seen.items():
@@ -793,7 +905,7 @@ def layer_where(name: str) -> str:
 
 
 def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]:
-    """層が噛み合っているか（設計 §11.9、REQ-MLT-16）。
+    """層が噛み合っているか（設計 11.9、REQ-MLT-16）。
 
     見るのは 2 つ。層のファイルが読めることと、層をまたいだ重複と同名の衝突。
     `.ccnavi/config/` が無いことは言わない。
@@ -830,7 +942,7 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
 
 
 def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
-    """各層の phases / risk が、共通層と合成できるか（設計 §11.4.1、§11.4.2）。
+    """各層の phases / risk が、共通層と合成できるか（設計 11.4.1、11.4.2）。
 
     見るのは合成したあとの姿。同 `id` で中身が違う、`title` が層をまたいで重なる、
     `levels` が逆転する、`script:` が層の外を指すか指す先が無い、を error で言い、
@@ -857,7 +969,7 @@ def _layer_configs(conf: settings.Settings, root: str) -> list[Problem]:
 
 
 def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
-    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか（設計 §11.6）。
+    """ワークツリーの ccnavi ディレクトリに、元リポジトリに無いファイルがあるか（設計 11.6）。
 
     判定が読むのは元リポジトリに checkout されている版だけ（REQ-MLT-04）。
     ワークツリーの `.ccnavi/` に足したファイルは、そのブランチが統合されるまで効かない。
@@ -869,13 +981,23 @@ def _worktree_layers(conf: settings.Settings, root: str) -> list[Problem]:
 
     中身の違いは見ない。同じ綴りのファイルが両方に在れば、それは編集で、git の
     差分が拾う。ここが拾うのは、元リポジトリに無くて差分にも出ない新しい綴りのほう。
+
+    承認済みの領域（承認済みチケット・マーカー・子の記録・フロー）は数えない（利用者の決定）。
+    承認済みチケットは親のワークツリーに置かれ、判定もフローの案内もそのツリーの版を読む
+    （設計 9.2・9.3.1）。「統合されるまで効かない」は当たらず、言えば誤った案内になる。
     """
     problems: list[Problem] = []
     home = (conf.project_home or settings.DEFAULT_PROJECT_HOME).replace("/", os.sep)
     for work in tree.worktrees(root, conf.projects):
         origin = tree.project_root(conf.projects, work.project) if work.project else root
+        approved = os.path.normcase(os.path.normpath(settings.approved_dir(conf, work.root)))
         for rel in _files_under(os.path.join(work.root, home)):
             if os.path.exists(os.path.join(origin, home, rel.replace("/", os.sep))):
+                continue
+            where = os.path.normcase(
+                os.path.normpath(os.path.join(work.root, home, rel.replace("/", os.sep)))
+            )
+            if where.startswith(approved + os.sep):
                 continue
             problems.append(
                 Problem(
@@ -1186,7 +1308,7 @@ def _ticket_places(conf: settings.Settings, root: str) -> list[Problem]:
     """走査されないチケットの置き場が残っていないか（REQ-MLT-16）。
 
     提案の置き場はどのツリーでも同じ相対（`wip/proposals/`）で、プロジェクト向けはその
-    プロジェクトのツリーに置く（設計 §11.5、REQ-MLT-14）。ワークスペースの
+    プロジェクトのツリーに置く（設計 11.5、REQ-MLT-14）。ワークスペースの
     `wip/<名前>/proposals/` は、名前が `projects/` に在っても在らなくても走査されない。走査
     されない置き場は、提案があっても画面にもボードにも出ない。黙って消えるのが
     いちばん困るので名指しし、名前が在るなら正しい置き場を案内する。error にはしない。
@@ -1431,7 +1553,7 @@ def _project_settings(root: str) -> list[Problem]:
                     SEVERITY_WARN,
                     "(project)",
                     f"{PROJECT_SETTINGS} の env の {settings.MODE_ENV}={declared!r} は"
-                    f"モードとして読めない。{modes.ENABLE} に落ちる",
+                    f"モードとして読めない。{modes.ENABLE} として扱う",
                 )
             )
     problems.extend(_bin_path(root, env.get(settings.BIN_ENV)))
@@ -1466,7 +1588,7 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
     return problems
 
 
-def _rules(path: str, root: str = "", home: str = "", layer: bool = False) -> list[Problem]:
+def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
@@ -1592,7 +1714,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
     problems.extend(_every_problems(rule, name))
 
     # once の文は文脈ごとに 1 度しか積まれず、every > 1 は刻んだ回にしか積まれないので、
-    # どちらも広さを咎めない。読めない every は 1（毎回渡る）に倒れているので、この式は
+    # どちらも広さを咎めない。読めない every は 1（毎回渡る）になっているので、この式は
     # 素通りしない（rules.readable_every）。
     if (
         (rule.additional_context or rule.additional_context_file)
@@ -1615,7 +1737,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
 def _every_problems(rule: rules.Rule, name: str) -> list[Problem]:
     """`every`（渡す回の刻み）の値と、刻んだ先に渡すものがあるか。
 
-    読めない値は error。判定は 1（毎回渡す）に倒して通すので、黙っていると書いた人は
+    読めない値は error。判定は 1（毎回渡す）として扱って通すので、黙っていると書いた人は
     刻んだつもりのまま毎回渡ることになる。`every: 1` は既定値を明示しただけなので
     何も言わない。
     """

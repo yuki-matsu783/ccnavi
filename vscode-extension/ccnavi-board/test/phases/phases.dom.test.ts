@@ -1,9 +1,9 @@
 /** フェーズ管理画面（React）を happy-dom で動かす。描くものも、押したときの動きもここで見る。 */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readPhases, TEMPLATE_PHASES_TEXT } from "../../src/core/phases-doc.js";
+import { readPhases } from "../../src/core/phases-doc.js";
 import type { PhasesForm } from "../../src/core/phases-view.js";
-import { openPage, openPhases, page, rowSelector } from "../helpers/phases.js";
+import { openPage, openPhases, page, rowSelector, SAMPLE_PHASES_TEXT } from "../helpers/phases.js";
 import type { DomPage } from "../helpers/dom.js";
 import type { HTMLButtonElement, HTMLInputElement, HTMLOptionElement } from "happy-dom" with { "resolution-mode": "import" };
 
@@ -31,7 +31,7 @@ test("CB-D20 既定は畳み、行を押すと開いて state に id が入る�
     await dom.settle();
     assert.ok(dom.one(rowSelector("p2")).classList.contains("open"));
     assert.deepEqual((dom.state() as { open: string[] }).open, ["design"]);
-    // 雛形の design は when を持つので開く。implement-feedback は関係も案内も無いので閉じる
+    // 見本の design は when を持つので開く。implement-feedback は関係も案内も無いので閉じる
     assert.ok(dom.one(`${rowSelector("p2")} details.more`).hasAttribute("open"));
     assert.ok(!dom.one(`${rowSelector("p5")} details.more`).hasAttribute("open"));
   } finally {
@@ -53,7 +53,7 @@ test("CB-D21 範囲を inherit に変えると glob の欄が消え、行は開�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /id が重なっている（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /id が重なっています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -120,7 +120,7 @@ test("CB-T125 種類の欄名は日本語で、YAML のキー名は欄名の tit
     const caps = dom.all(`${rowSelector("p1")} .row-body .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "題", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
+      ["id", "タイトル", "区分", "レビュー", "範囲", "成果物", "並行できる種類", "一緒に必要な種類", "先に済ませる種類", "案内するエージェント", "使う場面"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -194,7 +194,7 @@ test("CB-D61 ファイルが外で変わったら帯を出し、届いた中身�
 test("CB-D62 読み直せなかったら理由を出し、種類は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "種類のファイルを読めない: EACCES" });
   try {
-    assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み直せなかった/);
+    assert.match(dom.one(".empty").textContent, /フェーズ管理画面を読み込めませんでした/);
     assert.equal(dom.one("pre.load-error").textContent, "種類のファイルを読めない: EACCES");
     assert.equal(dom.all("#phases").length, 0);
   } finally {
@@ -208,8 +208,8 @@ test("CB-D63 種類が無いファイルは、保存する前に足すと言う�
     lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] },
   });
   try {
-    assert.match(dom.one("#phases .empty").textContent, /種類が無い。種類が 1 つも無いファイルは実行ファイルが読めない/);
-    assert.match(dom.one(".problems").textContent, /phases が対応表ではない/);
+    assert.match(dom.one("#phases .empty").textContent, /種類がありません。種類が 1 つも無いファイルは実行ファイルが読めない/);
+    assert.match(dom.one(".problems").textContent, /phases がマップ（キーと値の組の集まり）ではありません/);
     assert.equal(dom.one("#lock").textContent, "作業中のチケットがある（i0001-02）");
     assert.ok(!dom.one("#lock").classList.contains("hidden"));
   } finally {
@@ -222,7 +222,7 @@ test("CB-D67 ほかの種類との関係・補足は、最後の値を消して�
   try {
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
-    // 雛形の research は when だけを持つので開いている
+    // 見本の research は when だけを持つので開いている
     assert.ok(dom.one(`${rowSelector("p1")} details.more`).hasAttribute("open"));
     dom.type(dom.one(`${rowSelector("p1")} input.f-when`), "");
     await dom.settle();
@@ -270,8 +270,8 @@ test("CB-D84 未保存の変更の有無は変わったときだけ拡張ホス�
     dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる2");
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "dirty"), [{ type: "dirty", dirty: true }], "打ち続けても 1 度だけ");
-    await dom.send({ type: "data", data: { kind: "loading", text: "web のフェーズを読み込み中..." } });
-    assert.equal(dom.one("#ccnavi-loading").textContent, "web のフェーズを読み込み中...");
+    await dom.send({ type: "data", data: { kind: "loading", text: "web のフェーズを読み込み中…" } });
+    assert.equal(dom.one("#ccnavi-loading").textContent, "web のフェーズを読み込み中…");
     assert.equal(dom.all(rowSelector("p1")).length, 0);
     assert.deepEqual(
       dom.posted.filter((message) => message.type === "dirty").map((message) => message.dirty),
@@ -297,7 +297,7 @@ test("CB-D85 関係の欄はほかの種類の id を複数選択で選べ、自
         .all<HTMLOptionElement>(`${rowSelector("p4")} ${field} select.id-select option`)
         .filter((option) => only === undefined || option.selected)
         .map((option) => option.value);
-    // 雛形の implement。自分（implement）は候補に出ない
+    // 見本の implement。自分（implement）は候補に出ない
     assert.deepEqual(values(".f-requires"), ["research", "design", "acceptance", "implement-feedback"]);
     assert.deepEqual(values(".f-requires", "checked"), ["acceptance"]);
     // after の候補は work の種類だけ。feedback の種類は待つ先にできない
@@ -369,7 +369,7 @@ test("CB-D94 関係の欄は矢印で印だけを動かし、Space で付け外�
 });
 
 test("CB-D87 層の画面では、候補に無い id を打って足せる。自分の id と空は足さず、無い id と自分自身は印を付けて出す", async () => {
-  const base = readPhases(TEMPLATE_PHASES_TEXT).model;
+  const base = readPhases(SAMPLE_PHASES_TEXT).model;
   const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: [" design ", "", "acceptance"] } : p));
   const dom = await openPhases({ layer: true, model: { ...base, form: { ...base.form, phases } } });
   try {
@@ -397,13 +397,33 @@ test("CB-D87 層の画面では、候補に無い id を打って足せる。自
   }
 });
 
+test("CB-D115 このファイルに無い id の説明は、共通の設定の画面では入力ミスとだけ言い、ワークスペースとプロジェクトの設定の画面では共通の設定の種類かもしれないと言う", async () => {
+  const base = readPhases(SAMPLE_PHASES_TEXT).model;
+  const phases = base.form.phases.map((p) => (p.id === "acceptance" ? { ...p, overlap: ["外の種類"] } : p));
+  const titleOf = async (layer: boolean): Promise<string> => {
+    const dom = await openPhases({ layer, model: { ...base, form: { ...base.form, phases } } });
+    try {
+      dom.click(dom.one(`${rowSelector("p3")} .row-head`));
+      await dom.settle();
+      return dom.one(`${rowSelector("p3")} .f-overlap option[value="外の種類"]`).getAttribute("title") ?? "";
+    } finally {
+      await dom.close();
+    }
+  };
+  const common = await titleOf(false);
+  assert.match(common, /このファイルに無い id です（入力ミス）/);
+  assert.ok(!common.includes("共通の設定の種類か"), common);
+  const layered = await titleOf(true);
+  assert.match(layered, /このファイルに無い id です（共通の設定の種類か、入力ミス）/);
+});
+
 test("CB-D88 feedback の種類は先に済ませる種類を持てないと言い、欄を出さない", async () => {
   const dom = await openPhases();
   try {
     dom.click(dom.one(`${rowSelector("p5")} .row-head`));
     await dom.settle();
     assert.equal(dom.all(`${rowSelector("p5")} .f-after .id-option`).length, 0);
-    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てない/);
+    assert.match(dom.one(`${rowSelector("p5")} .f-after`).textContent ?? "", /feedback の種類は持てません/);
   } finally {
     await dom.close();
   }
@@ -491,7 +511,7 @@ test("CB-D93 案内の間は Tab が吹き出しのボタンの中だけを巡�
 });
 
 test("CB-D91 案内は Esc かスキップでやめられ、やめても tourDone を返す。読み込み中に頼まれたら中身が出てから始める", async () => {
-  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中..." });
+  const dom = await openPage({ kind: "loading", text: "フェーズの種類を読み込み中…" });
   try {
     await dom.send({ type: "tour" });
     await dom.settle();
@@ -516,7 +536,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
     assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
-    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、層を合わせたうえで親チケットの承認のときに決まる/);
+    assert.match(dom.one("#help").textContent ?? "", /判定が使う待ち方は、設定を合わせたうえで親チケットの承認のときに決まります/);
     dom.click(dom.one('[data-action="tour"]'));
     await dom.settle();
     assert.equal(dom.all("#help").length, 0, "案内を始めたらヘルプは閉じる");

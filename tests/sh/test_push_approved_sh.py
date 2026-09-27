@@ -1,6 +1,6 @@
-"""ccnavi-push-approved.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から叩く。
+"""ccnavi-push-approved.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
 
-設計 wip/design/approve-carry.md §1 と §6.3。確かめるのは次のとおり。
+設計 wip/design/approve-carry.md 1 と 6.3。確かめるのは次のとおり。
 
 17. 置き場（`.ccnavi/approved`）の変更だけをコミットし、同じツリーの他の未コミットは運ばない
 18. 運ぶものが無ければ 0 で `運ぶ承認済みチケットは無い。`
@@ -232,6 +232,23 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.committed(tree), [f"{APPROVED}/i0001.md"])
         self.assertTrue(self.dirty(tree, "README.md"))
 
+    def test_leftover_flow_temp_files_are_not_carried(self):
+        """ボードの保存が残した `flows/.<名前>.<番号>.tmp` は運ばず、フローは運ぶ（L-e）。"""
+        tree = self.worktree("i0001")
+        flows = os.path.join(tree, ".ccnavi", "approved", "flows")
+        write(os.path.join(flows, "i0001-01.yml"), "nodes: []\n")
+        temp = write(os.path.join(flows, ".i0001-01.yml.123.abcdef.tmp"), "half")
+
+        result = self.push()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.committed(tree), [".ccnavi/approved/flows/i0001-01.yml"])
+        self.assertTrue(os.path.exists(temp))
+        self.assertEqual(self.staged(tree), "")
+        # 一時ファイルだけが残っていても、運ぶものは無い。
+        again = self.push()
+        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
+        self.assertIn(NOTHING, again.stdout)
+
     # ---- 18. 運ぶものが無い
 
     def test_nothing_to_carry_says_so(self):
@@ -278,7 +295,7 @@ class PushApprovedTest(Workspace):
         self.place(tree, "i0002")
 
         result = self.push()
-        # 飛ばしたツリーがあるときの終了コードは設計（§1.3）で決まっていないので見ない。
+        # 飛ばしたツリーがあるときの終了コードは設計（1.3）で決まっていないので見ない。
         self.assertIn("loose", result.stderr)
         self.assertEqual(self.head(loose), before)
         self.assertTrue(self.dirty(loose, APPROVED))
@@ -525,7 +542,7 @@ class PushApprovedTest(Workspace):
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")
 class ApproveCarriesTest(Workspace):
-    """22. `ccnavi-approve.sh` は承認のあと `ccnavi-push-approved.sh` で運ぶ（設計 §1.4）。"""
+    """22. `ccnavi-approve.sh` は承認のあと `ccnavi-push-approved.sh` で運ぶ（設計 1.4）。"""
 
     scripts = APPROVE_SCRIPTS
 
@@ -568,7 +585,7 @@ class ApproveCarriesTest(Workspace):
     def test_approve_refuses_words_that_are_not_ids(self):
         """識別子でない語は断り、実行ファイルを呼ばない。
 
-        `--yes` や `--root` を混ぜると、端末の y/N を経ない経路や別のワークスペースに化ける。
+        `--yes` や `--root` を混ぜると、端末の y/N を経ない経路や別のワークスペースになってしまう。
         """
         tree = self.worktree("i0001")
         args = os.path.join(self._tmp.name, "args")

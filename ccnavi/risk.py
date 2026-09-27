@@ -23,7 +23,7 @@
 - 定性（サブエージェント）: `judge:` に書いた問いを、親がサブエージェントに判断させ、
   `ccnavi-ticket.sh record-risk` で yes / no を記録する。判定が揃うまで子は閉じられない
 
-測れなかった項目（スクリプトの失敗、読めない出力）は重い側に倒し、その項目の点を加える。
+測れなかった項目（スクリプトの失敗、読めない出力）は重いほうとして扱い、その項目の点を加える。
 「測れないから 0」にすると、壊れたスクリプトがリスクを消す。
 
 ## 書式
@@ -38,17 +38,18 @@
       - {id: complexity, points: 30, script: .ccnavi/common/scripts/complexity.sh, message: 複雑度}
       - {id: untested,   points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}
 
-ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに落ち、
+ファイルが無ければ組み込みの既定（上の定量 4 項目と同じ値）。壊れていれば組み込みに戻り、
 そのことは --lint と子を閉じるときの出力が言う。
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import yaml
 
@@ -98,33 +99,44 @@ class Factor:
     max: int | None = None
     compiled: re.Pattern | None = None
     # source はこの項目が書いてある層の名前（`common` / `self` / プロジェクト名）。
-    # 記録の hit と judge の項目に残す（設計 §11.9）。
+    # 記録の hit と judge の項目に残す（設計 11.9）。
     source: str = ""
     # home は `script:` を解く基準ディレクトリ。共通層と自身の層はワークスペース
     # ルート、プロジェクトの層はそのプロジェクトの git プロジェクトルート
-    # （設計 §11.4.2）。定義を読んだ側が埋める。
+    # （設計 11.4.2）。定義を読んだ側が埋める。
     home: str = ""
 
     def matches(self, rel: str) -> bool:
         return self.compiled is not None and self.compiled.match(rel) is not None
 
     def key(self) -> tuple:
-        """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。"""
-        return (self.id, self.points, self.message, self.kind, self.value, self.max)
+        """層をまたいで「同じ項目か」を比べるための全欄。`source` と `home` は含めない。
+
+        `script:` は綴りではなく、その層のスクリプトの置き場からの相対と、指す先の中身で比べる。
+        共通層は `.ccnavi/common/scripts/`、各層は `<ccnavi ディレクトリ>/scripts/` を指すので、
+        着手で共通層を写した配点（設計 11.12）は綴りが違う。綴りで比べると同じ項目を
+        `<層>:<id>` として 2 重に数える。中身まで見るのは、名前だけ同じ別のスクリプトを
+        同じ項目として捨てないため。
+        """
+        value = self.value
+        if self.kind == KIND_SCRIPT:
+            rel = str(self.value)
+            value = (rel.split("/scripts/", 1)[-1], _file_digest(self.home, rel))
+        return (self.id, self.points, self.message, self.kind, value, self.max)
 
 
 @dataclass
 class Definition:
     # levels は**書かれた鍵だけ**。書かれていない鍵は DEFAULT_LEVELS で読む
     # （`level_of`）。既定で埋めて持つと、合成のときに「書いていない層」が
-    # 共通層の緩めた境目の点を黙って戻すことになる（設計 §11.4.2）。
+    # 共通層の緩めた境目の点を黙って戻すことになる（設計 11.4.2）。
     levels: dict[str, int] = field(default_factory=dict)
     factors: list[Factor] = field(default_factory=list)
     # どこから読んだか。組み込みなら BUILTIN。
     source: str = BUILTIN
-    # 読めなかった理由（組み込みに落ちたとき、か、層を空として扱ったとき）。
+    # 読めなかった理由（組み込みに戻ったとき、か、層を空として扱ったとき）。
     fallback: str = ""
-    # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 §11.2）。
+    # 空として扱った層の名前。記録の `fallback` にそのまま入る（設計 11.2）。
     dropped: list[str] = field(default_factory=list)
 
     @property
@@ -147,6 +159,17 @@ class Definition:
         return None
 
 
+def _file_digest(home: str, rel: str) -> str:
+    """スクリプトの中身の指紋。置き場が決まっていないか読めなければ空文字。"""
+    if not home:
+        return ""
+    try:
+        with open(os.path.join(home, rel.replace("/", os.sep)), "rb") as f:
+            return hashlib.sha256(f.read().replace(b"\r\n", b"\n")).hexdigest()
+    except OSError:
+        return ""
+
+
 def builtin() -> Definition:
     factors, _ = _factors(
         [
@@ -167,7 +190,7 @@ def builtin() -> Definition:
 
 
 def load(path: str) -> tuple[Definition, list[Problem]]:
-    """共通層の定義を読む。無ければ組み込み。壊れていれば組み込みに落ち、苦情を返す。"""
+    """共通層の定義を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す。"""
     if not path:
         return builtin(), []
     try:
@@ -190,9 +213,9 @@ def load(path: str) -> tuple[Definition, list[Problem]]:
 
 
 def load_layer(path: str, script_homes: tuple[str, ...]) -> tuple[Definition | None, list[Problem]]:
-    """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みへは落とさない。
+    """層の定義を読む。無ければ None（無い層 = 空）。壊れていても組み込みには戻さない。
 
-    共通層が在るのに組み込みへ落とすと、共通層の配点が消える側に倒れる（設計 §11.2）。
+    共通層が在るのに組み込みに戻すと、共通層の配点が消える側になる（設計 11.2）。
     壊れた層は空として扱い、苦情だけを返す。
     """
     if not path:
@@ -213,7 +236,7 @@ def parse(
     """定義 1 本を読む。`script_homes` はこの層で `script:` に書ける綴りの先頭。
 
     共通層は `.ccnavi/common/scripts/`、各層はその `<ccnavi ディレクトリ>/scripts/` だけ。
-    たがいの側を指す定義はここで error にする（設計 §11.4.2）。プロジェクトの
+    たがいの側を指す定義はここで error にする（設計 11.4.2）。プロジェクトの
     リポジトリに入る定義が、ワークスペースの道具に依存する形を作らないため。
     """
     problems: list[Problem] = []
@@ -232,7 +255,7 @@ def parse(
             )
         ]
     # 書かれた鍵だけを持つ。既定で埋めると、合成のときに「書いていない層」が
-    # 共通層の緩めた境目の点を黙って戻す（設計 §11.4.2）。順を見るときだけ既定で補う。
+    # 共通層の緩めた境目の点を黙って戻す（設計 11.4.2）。順を見るときだけ既定で補う。
     levels: dict[str, int] = {}
     raw_levels = data.get("levels")
     if raw_levels is not None:
@@ -320,7 +343,7 @@ def _factors(
                 Problem(
                     SEVERITY_ERROR,
                     ident,
-                    "当て方は 1 つ（" + " / ".join(KINDS) + "）を書く",
+                    "加点条件は 1 つ（" + " / ".join(KINDS) + "）を書く",
                 )
             )
             continue
@@ -396,14 +419,18 @@ def mark_layer(definition: Definition, layer: str, home: str) -> None:
 
 
 def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition, list[Problem]]:
-    """共通層の配点に、行き先の層の配点を足す（設計 §11.4.2）。
+    """共通層の配点に、行き先の層の配点を足す（設計 11.4.2）。
 
     `factors` は連結。同 `id` で全欄が一致すれば重複として後ろを捨て（info）、
-    中身が違えば error。`levels` は書かれた鍵だけが参加し、キーごとに小さいほうを
-    採る。どの層も書いていない鍵は既定（`DEFAULT_LEVELS`）。
+    中身が違えば両方を数え、後ろの層の項目を `<層>:<id>` と名乗らせる（warn）。
+    `levels` は書かれた鍵だけが参加し、キーごとに小さいほうを採る。どの層も書いて
+    いない鍵は既定（`DEFAULT_LEVELS`）。
 
-    error があるとき、その層は空として扱い、共通層だけを返す。点は小さくなる方向に
-    倒れうるので、`--lint` を error にして直すまで目に付く形にする。
+    同 `id` の衝突で層を空にしないのは、空にすると点が小さくなる側になるから。
+    両方を数えれば、衝突は加点を増やす側にしか働かない（ルールの同 `id` と同じ扱い）。
+    裸の `id` にコロンは書けないので、名乗り直した `id` が他の項目と重なることは無い。
+
+    合成後の `levels` の順が崩れる error のときは、その層を空として扱い、共通層だけを返す。
     """
     problems: list[Problem] = []
     ids = {f.id for f in common.factors}
@@ -421,15 +448,17 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
             )
             continue
         if f.id in ids:
+            qualified = f"{layer}{ID_SEPARATOR}{f.id}"
             problems.append(
                 Problem(
-                    SEVERITY_ERROR,
+                    SEVERITY_WARN,
                     f.id,
-                    f"`{f.id}` が前の層と重複している。{layer} の層は空として扱う。"
-                    "同じ名前で違う配点があると、記録を読んだ人がどちらの話か決められない",
+                    f"`{f.id}` が前の層と同じ id で中身が違う。両方を数え、{layer} の側は"
+                    f" `{qualified}` と名乗る（記録と record-risk もこの名前）。"
+                    "同じ項目のつもりなら全欄を揃え、別の項目なら id を変える",
                 )
             )
-            continue
+            f = replace(f, id=qualified)
         ids.add(f.id)
         keys.add(f.key())
         added.append(f)
@@ -466,7 +495,7 @@ def merge(common: Definition, extra: Definition, layer: str) -> tuple[Definition
 
 
 def script_problems(definition: Definition, layer: str = "") -> list[Problem]:
-    """`script:` が指す先が、その層の git プロジェクトルートに在るか（設計 §11.4.2）。
+    """`script:` が指す先が、その層の git プロジェクトルートに在るか（設計 11.4.2）。
 
     `layer` を渡すと、その層から来た項目だけを見る。走らせるときは今までどおり
     「測れなかった」でその項目の点を加えるが、`--lint` は在ることを先に言う。
@@ -494,7 +523,7 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の risks.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの配点がワークスペースの層として合成される。
     配点を書ける側が層を選べると、自分のリスクを自分で下げる道になる。
     """
@@ -509,11 +538,11 @@ def definition_path(conf: settings.Settings, root: str, project: str) -> str:
 def layer_definition(
     conf: settings.Settings, root: str = "", project: str = ""
 ) -> tuple[Definition, list[Problem]]:
-    """共通層 + その層の配点と、**その層の**苦情（設計 §11.4.2）。
+    """共通層 + その層の配点と、**その層の**苦情（設計 11.4.2）。
 
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
-    言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに落ち、
-    そのときは層を足さない（設計 §11.2）。
+    言うと同じ文を 2 度読むことになる。共通層が壊れていれば組み込みに戻り、
+    そのときは層を足さない（設計 11.2）。
     """
     definition, _ = load(conf.risk)
     mark_layer(definition, settings.LAYER_COMMON, root)
@@ -532,9 +561,8 @@ def layer_definition(
     mark_layer(extra, layer, home)
     merged, problems = merge(definition, extra, layer)
     if merged.dropped:
-        merged.fallback = (
-            f"{', '.join(merged.dropped)} の配点が衝突している。この層は空として数える"
-        )
+        dropped = ", ".join(merged.dropped)
+        merged.fallback = f"{dropped} の配点の境目の点が合成で逆転している。この層は空として数える"
     return merged, list(notes) + problems
 
 
@@ -611,7 +639,7 @@ def measure(worktree: str, base: str, head: str = "HEAD") -> tuple[Diff | None, 
         changes[path] = Change(path=path, added=added, deleted=deleted)
     rc, out = _git(worktree, ["diff", "--name-status", "-z", f"{base}..{head}"])
     if rc == 0:
-        parts = [p for p in out.split("\0")]
+        parts = out.split("\0")
         i = 0
         while i < len(parts):
             status = parts[i]
@@ -642,7 +670,7 @@ class Hit:
     id: str
     points: int
     detail: str
-    # この項目が書いてある層（設計 §11.9）。記録に残す。
+    # この項目が書いてある層（設計 11.9）。記録に残す。
     source: str = ""
 
 
@@ -651,7 +679,7 @@ class Score:
     points: int = 0
     level: str = LEVEL_LOW
     hits: list[Hit] = field(default_factory=list)
-    # 測れなかった項目（重い側に倒して加点済み）。
+    # 測れなかった項目（重いほうとして扱い、加点済み）。
     unmeasured: list[str] = field(default_factory=list)
     # 判定の無い定性項目。揃うまで子は閉じられない。
     pending: list[Factor] = field(default_factory=list)
@@ -685,7 +713,7 @@ def evaluate(
     """差分と判定から点を出す。定性項目に判定が無ければ pending に積む。"""
     score = Score()
     for f in definition.factors:
-        # 加点した項目には、その定義が書いてある層を残す（設計 §11.9）。
+        # 加点した項目には、その定義が書いてある層を残す（設計 11.9）。
         where = f.source
         if f.kind == KIND_LINES:
             if diff.lines > int(f.value):
@@ -716,7 +744,7 @@ def evaluate(
                 score.hits.append(Hit(f.id, points, f"{f.message}（{shown}）", where))
         elif f.kind == KIND_SCRIPT:
             # 解く基準はその層の git プロジェクトルート。共通層と自身の層は
-            # ワークスペースルート、プロジェクトの層はそのプロジェクト（設計 §11.4.2）。
+            # ワークスペースルート、プロジェクトの層はそのプロジェクト（設計 11.4.2）。
             points, note = run_script(f.home or root, str(f.value), worktree, env)
             if points is None:
                 score.hits.append(

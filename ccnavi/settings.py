@@ -81,6 +81,9 @@ BIN_SUFFIXES = (".exe",)
 # チケットまで使うかはプロジェクトが決めるので、その宣言をここに置く。
 # 置き場のパス（承認済みチケットの置き場）とは分けてある。パスが在ることと機能を切ることは別の話。
 TICKET_CONTROL_ENV = "CCNAVI_TICKET_CONTROL"
+# DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
+# 添えるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
+DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 
 # own_project は ccnavi 自身のソースツリーを見分ける目印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -111,7 +114,7 @@ DEFAULT_TICKETS = "wip/proposals"
 # 承認済みチケットは ccnavi ディレクトリ（`.ccnavi/`）の下。そこは組み込みが丸ごと止めているので、
 # 別の保護を足さずに済む。ワークスペースの 1 か所ではなくツリーごとに置くのは、
 # 承認をプロジェクトの git で運ぶため。承認した人の機械にだけ在る形だと、A が承認して
-# B の機械で作業する流れが成り立たない（設計 §9.2）。区切りは "/" で持ち、ツリーの
+# B の機械で作業する流れが成り立たない（設計 9.2）。区切りは "/" で持ち、ツリーの
 # ルートに継ぎ足すときに os の区切りへ直す。
 # 下に `doing/`（作業中）と `done/`（閉じた）と `phases/`（マーカー）が並ぶ（ADR-0055）。
 DEFAULT_APPROVED = ".ccnavi/approved"
@@ -127,7 +130,7 @@ DEFAULT_PROJECTS = "projects"
 # 置かない（プロジェクトに `.claude/` があると Claude Code がそこのスキルを読み、
 # `--lint` が迷い子として拾う）。`config/` でもなく `.ccnavi/` にするのは、3 本と
 # スクリプトを 1 つのディレクトリにまとめて、組み込みの deny を `*/.ccnavi/*` の 1 行で
-# 済ませるため（設計 §11.2）。
+# 済ませるため（設計 11.2）。
 DEFAULT_PROJECT_HOME = ".ccnavi"
 # 引用せずにシェルへ渡せる綴り。空白とシェルの記号を含まない。
 _BARE_PATH = re.compile(r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+")
@@ -145,7 +148,7 @@ def script_command(root: str, name: str) -> str:
     空白やシェルの記号を含むときだけ引用する。引用しないと sh が単語に割り、止めている間の例外と
     サブエージェントの禁止（`\\S*ccnavi-...`）にも当たらない。引用すれば shellread が中の空白を
     区切りと別の目印にするので、どちらにも当たる。文面は案内を `'...'` で囲むので、引用は
-    まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符に落とす。
+    まず `"..."` にし、`"` の中でも意味を持つ文字があるときだけ単引用符にする。
     """
     base = os.path.realpath(root).replace("\\", "/").rstrip("/")
     return f"sh {_quoted(f'{base}/{DEFAULT_PROJECT_HOME}/scripts/{name}')}"
@@ -187,7 +190,7 @@ KIND_RISK = "risk"
 LAYER_KINDS = (KIND_RULES, KIND_PHASES, KIND_RISK)
 # 層の設定のファイル名。kind は記録と `--explain --json` の鍵の綴りなので、ファイル名とは別に持つ。
 LAYER_FILE_NAMES = {KIND_RULES: "rules.yml", KIND_PHASES: "phases.yml", KIND_RISK: "risks.yml"}
-# 層の名前。記録の `source` と id の前置きに使う綴り（設計 §11.4）。ruleload が
+# 層の名前。記録の `source` と id の前置きに使う綴り（設計 11.4）。ruleload が
 # 別名で持っているが、実体はここに置く。phases と risk の合成は phase / risk が
 # 行い、そこは ruleload を import できない（ruleload が phase を import する）。
 LAYER_COMMON = "common"
@@ -198,7 +201,7 @@ RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF)
 # プロジェクトの側を分ける（_layer_key）。
 PROJECT_KEY_HOME = "projects/"
 
-# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 §11.4）。
+# 層の種別。その層がどこから来たかを、名札の綴りとは別に持つ（設計 11.4）。
 #
 # 名札の綴りでは種別を決められない。`projects/common/` は `common` を名乗るが
 # 共通層ではないし、`projects/self/` は `self` を名乗るがワークスペース自身の層
@@ -224,7 +227,7 @@ class LayerFile(NamedTuple):
 
 
 def is_reserved_layer_name(name: str) -> bool:
-    """その名前が層の名札に予約してあるか（`common` / `self`、設計 §11.4）。
+    """その名前が層の名札に予約してあるか（`common` / `self`、設計 11.4）。
 
     予約の判断はここ 1 か所だけで持つ。ruleload（層を数える・行き先の層を引く）、
     lint（名指しする）、approval（`project:` を承認しない）、phase / risk
@@ -244,13 +247,13 @@ def approved_dir(conf: Settings, tree_root: str) -> str:
     """このツリーの承認済みチケットの置き場（絶対）。
 
     写しとマーカーはそのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く
-    （設計 §9.2）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
+    （設計 9.2）。だから置き場はワークスペースの 1 か所ではなく、ツリーごとに解く。
     """
     return os.path.join(tree_root, (conf.approved or DEFAULT_APPROVED).replace("/", os.sep))
 
 
 def layer_script_home(conf: Settings) -> str:
-    """各層の `script:` に書ける唯一の綴り（設計 §11.4.2）。
+    """各層の `script:` に書ける唯一の綴り（設計 11.4.2）。
 
     形は `<ccnavi ディレクトリ>/scripts/` で、"/" 区切り。
 
@@ -281,6 +284,8 @@ class Settings:
     log: str = ""
     rules: str = ""
     state: str = ""
+    # 同じ理由の拒否を何回目から名指しするか。書かれたままの綴りで、読むのは repeat.threshold。
+    deny_repeat: str = ""
     # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
     #
     # restore_if_deny は、ルールが `deny` と宣言した場所が副作用で変わったときに
@@ -299,13 +304,13 @@ class Settings:
     # guard_ticket_approval_declared は、解決する前に人が書いた綴り。判定はこれを
     # 読まない。読むのは --lint で、dry-run のように「書けるつもりで書かれたが
     # この門には無い値」を名指しするために要る。解決した値だけを持っていると、
-    # 書いた人の思い違いが enable に倒れた時点で消える。
+    # 書いた人の思い違いが enable として扱われた時点で消える。
     guard_ticket_approval: str = ""
     guard_ticket_approval_declared: str = ""
 
     # guard_unwatched は、確認できる者が居ないモードで未宣言の呼び出しを止めるか。
     # enable / disable の 2 つだけを取る。解決は cli が selfguard.resolve で行い、
-    # 読めない値は enable に倒れる。空は enable と同じに読む。
+    # 読めない値は enable になる。空は enable と同じに読む。
     guard_unwatched: str = ""
 
     # bin は ccnavi 自身の実行ファイル。空なら守らない。指定されたときだけ
@@ -314,7 +319,7 @@ class Settings:
     bin: str = ""
 
     # ticket_control はチケット制御を使うか。enable / disable の 2 つだけを取る。
-    # 解決は cli が selfguard.resolve で行い、読めない値は enable に倒す。
+    # 解決は cli が selfguard.resolve で行い、読めない値は enable として扱う。
     # ticket_control_declared は解決する前に人が書いた綴りで、--lint がそれを名指しする。
     ticket_control: str = ""
     ticket_control_declared: str = ""
@@ -352,7 +357,7 @@ class Settings:
         """チケット制御が効いているか。
 
         判定・監視・診断はこれで分岐する。approved の真偽で分岐しない。
-        解決前（空）は enable と同じに読む。読めない値は解決で enable に倒れるので、
+        解決前（空）は enable と同じに読む。読めない値は解決で enable になるので、
         ここで disable と読めるのは disable と書かれたときだけになる。
         """
         return self.ticket_control != TICKET_CONTROL_DISABLE
@@ -383,6 +388,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),
+        deny_repeat=os.environ.get(DENY_REPEAT_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
@@ -435,7 +441,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
 
 
 def layer_path(conf: Settings, home_root: str, kind: str, layer: str = "") -> str:
-    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 §11.2）。
+    """層の設定ファイルの絶対パス。判定と診断が読む先（設計 11.2）。
 
     `home_root` はその層の git プロジェクトルート。自身の層ならワークスペースルート、
     プロジェクトの層ならその git プロジェクトルートを渡す。3 種とも同じ形なので、
@@ -525,7 +531,7 @@ def _resolve_bin(root: str, path: str) -> str:
     そこでも守れるほうがよい。継ぎ足した綴りは在るものだけを採るので、
     推測で別のファイルを実体として扱うことにはならない。
 
-    どちらも無ければ書かれたまま返す。ここで空に落とすと、綴りを間違えた設定が
+    どちらも無ければ書かれたまま返す。ここで空にすると、綴りを間違えた設定が
     「実行ファイルを守らない設定」と見分けられなくなる。無いことは selfguard が
     missing と言い、綴りを確かめるよう促す。
     """

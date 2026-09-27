@@ -50,6 +50,17 @@ from . import ticket as ticket_mod
 # コマンドの位置で `sh` から呼ぶ形だけ。綴りがどこかに含まれるだけでは通さない。
 # 連結されたコマンドの全部がこの形でなければ、1 つでも違えば止める。
 _EXEMPT_COMMAND = re.compile(r"^(sh|bash)\s+\S*ccnavi-(ticket|review|git)\.sh(\s|$)")
+# 止めたときの文に添える、通る形の案内。案内どおりの 1 本に `cd … &&` や `| tail` を
+# 付けると、連結の全部が上の形でないので止まる。文が「何を打つか」だけを言うと、
+# 付け足した形で打って止まり、案内と拒否が食い違って見える。
+EXEMPT_NOTE = (
+    "止めている間に通るのは、ccnavi-ticket.sh・ccnavi-review.sh・ccnavi-git.sh を"
+    "sh で単独で打つ形だけです。cd や | tail などを前後に付けると、その 1 本も止まります。"
+)
+
+# 利用者とモデルに見せる文で「ターン」を初めて使うところに置く綴り。LLM の用語で、
+# 利用者には定義を添えないと通じない。1 通の中では最初の 1 回だけに使う。
+TURN_DEFINED = "ターン（利用者が指示を出してから Claude が応答を終えるまで）"
 
 # サブエージェントに許さない操作。状態を動かす形・レビューの形・リモートへ送る形を、
 # コマンドの位置で。読むだけの `cat` や `--help` は止めない。
@@ -95,7 +106,7 @@ _PREVIEW_END = rf"[ \t;&|\r\n{re.escape(shellread.SEP)}]"
 _PREVIEW_WORD = rf"[ \t]--preview(?={_PREVIEW_END}|$)"
 _NOT_PREVIEW = rf"(?![^{selfguard._NOT_A_WORD};&|\r\n]*{_PREVIEW_WORD})"
 _CLI_FORMS = (
-    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b"
+    rf"(--yes\b|--approve\b{_NOT_PREVIEW}|--reviewed\b|--close-early\b|--config-synced\b"
     r"|\b(ticket|review)\s+"
     r"(start|finish|cancel|record-risk|prepare|requested|confirm|ready)\b)"
 )
@@ -139,7 +150,7 @@ def forbidden(subject: str, unwrapped: str = "") -> bool:
 # `python -c` に引数のリストで渡す形）。だからコマンドの位置は見ず、**コマンド行の生の文字列の
 # 全体**から、引用符と `\` を落としてから綴りを探す（`--y""es`・`"--yes"`・`--x\=y` を同じに読む）。
 # 外すのは、並んだコマンドが全部、表示・検索・閲覧の道具（名前の完全一致）のときだけ。
-# 外す道具を並べ損ねても、倒れるのは止める側。
+# 外す道具を並べ損ねても、止める側になるだけ。
 _GUARD_NAME = "CCNAVI_GUARD_TICKET_APPROVAL"
 # 変数を読むだけの形（`$X`・`${X}`・`$env:X`・`${env:X}`）。後ろに代入が続けば読むだけではない。
 _GUARD_READ = re.compile(
@@ -196,7 +207,7 @@ def _commit_messages(subject: str) -> list[str]:
     """コミットの文面（`git commit` / `ccnavi-git.sh commit` の `-m` / `--message` の値）。
 
     文面は実行されないので、綴りを探す対象から外す。値の中にコマンド置換があれば実行されるので
-    外さない。読み切れないコマンド行なら空（外さない側に倒す）。
+    外さない。読み切れないコマンド行なら空（外さない側にする）。
     """
     found: list[str] = []
     for words, _ in shellread.placed(subject):
@@ -241,18 +252,12 @@ def human_path_form(subject: str) -> tuple[str, str]:
     return "", ""
 
 
-def turns_off_guard(subject: str) -> str:
-    """端末要求を切る形があれば、その綴り。無ければ空。"""
-    kind, found = human_path_form(subject)
-    return found if kind == "guard-off" else ""
-
-
 def board_form_message(found: str) -> str:
     """ボードの経路の形で止めた文。"""
     return (
         f"ボードの経路の形（{found}）を、コマンド行に書いています。この形は人がボードの"
         "オーバーレイで押したものを拡張が打つためのもので、端末の確かめが無いぶん、エージェントが"
-        "打つ道はここで止めます。承認と残った指摘の行き先は、利用者がボードか端末で決めます。"
+        "打つ道はここで止めます。承認と残った指摘の対応方針は、利用者がボードか端末で決めます。"
         "綴りを探したいだけなら、シェルの grep ではなく Grep ツールを使ってください。"
     )
 
@@ -265,6 +270,90 @@ def guard_off_message(found: str) -> str:
         "回すためのもので、エージェントが置くものではありません。承認・レビュー済み・締めは利用者が"
         "端末かボードで行います。この綴りを探したいだけなら、シェルの grep ではなく Grep ツールを"
         "使ってください。"
+    )
+
+
+# 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）。チケット制御と端末要求を切る設定に
+# 依らず、組み込みの deny（`DENY_RECORDS_PRUNE`）で止める（ADR-0089）。実行ファイルの側の
+# 端末要求は、擬似端末（`script -qc '…' /dev/null`）でも、チケット制御を切ったワークスペースで
+# 端末要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
+# 自分の呼び出しの記録を消せる。
+#
+# 見るのは human_path_form と同じく、引用符と `\` を落としたコマンド行の生の文字列。実行役の
+# コマンド越し（`script -qc`・`bash -c`・`env`）でも同じ綴りが残る。コマンドの切れ目
+# （`;` `&` `|` 改行）の中に ccnavi の名前と、単独の語の `--prune` が並べば止める。
+# `git fetch --prune` や `ccnavi-git.sh fetch --prune` は ccnavi の名前（`ccnavi` と
+# `ccnavi.exe` と実行ファイルの名前が、語の終わりで閉じた形）を持たないので当たらない。
+#
+# 免除は `--preview` が `--prune` の隣に単独の語として並んだ形だけ。間に引用符があれば
+# 免除しない。免除をコマンドの中のどこかの `--preview` にすると、
+# `bash -c "ccnavi --prune" x --preview` のように、実行役の引数に置いた `--preview` で免除が
+# 立つ。
+_PRUNE_WORD = re.compile(r"(?<!\S)--prune(?!\S)")
+_PREVIEW_AFTER = re.compile(r"[ \t]+--preview(?![^\s;&|])")
+_PREVIEW_BEFORE = re.compile(r"(?<!\S)--preview[ \t]+$")
+_PRUNE_SEGMENT = re.compile(r"[^;&|\n]+")
+CODE_RECORDS_PRUNE = "DENY_RECORDS_PRUNE"
+RECORDS_PRUNE_RULE_ID = "builtin-guard-records-prune"
+
+
+def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
+    """引用符とバックスラッシュを落とした綴りと、落とした場所（落とした後の位置）の組。"""
+    text = subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
+    out: list[str] = []
+    cuts: set[int] = set()
+    for ch in text:
+        if ch in "'\"`\\":
+            cuts.add(len(out))
+            continue
+        out.append(ch)
+    return "".join(out), cuts
+
+
+def _prune_names(bin_path: str) -> re.Pattern[str]:
+    """ccnavi の名前。語の終わりで閉じた形だけ。"""
+    names = [r"ccnavi(?:\.exe)?"]
+    base = os.path.basename((bin_path or "").replace("\\", "/"))
+    if base:
+        names.append(re.escape(base))
+    return re.compile(r"(?:" + "|".join(names) + r")(?=\s)", re.IGNORECASE)
+
+
+def prune_form(subject: str, bin_path: str = "") -> str:
+    """記録を消す `ccnavi --prune`（`--preview` の無い形）があれば、見つけた綴り。無ければ空。"""
+    text, cuts = _unquoted_marks(subject)
+    if "--prune" not in text or _only_readers(text):
+        return ""
+    names = _prune_names(bin_path)
+    for segment in _PRUNE_SEGMENT.finditer(text):
+        name = names.search(segment.group(0))
+        if not name:
+            continue
+        for word in _PRUNE_WORD.finditer(text, segment.start() + name.end(), segment.end()):
+            if not _previewed(text, cuts, word.start(), word.end()):
+                return "--prune"
+    return ""
+
+
+def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
+    """`--prune`（start から end）の隣に、単独の語の `--preview` が引用をまたがずに並ぶか。"""
+    after = _PREVIEW_AFTER.match(text, end)
+    if after and not any(end <= i < after.end() for i in cuts):
+        return True
+    before = _PREVIEW_BEFORE.search(text, 0, start)
+    if not before:
+        return False
+    gap = before.start() + len("--preview")
+    return not any(gap <= i <= start for i in cuts)
+
+
+def prune_message() -> str:
+    """`--prune` で止めた文。"""
+    return (
+        "記録と控えを消す 'ccnavi --prune' は、人が端末から打つものです。記録は"
+        "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントからは消しません。"
+        "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
+        "消す必要があれば、理由を添えて利用者に依頼してください。"
     )
 
 
@@ -308,7 +397,8 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
             f"'{settings.script_command(root, 'ccnavi-review.sh')}' を"
             "使い、承認は利用者が VS Code のボードか "
             f"'{settings.script_command(root, 'ccnavi-approve.sh')}' で、"
-            "残った指摘の行き先は利用者がボードか端末で決めます。承認済みチケットのコミットと push"
+            "残った指摘の対応方針は利用者がボードか端末で決めます。"
+            "承認済みチケットのコミットと push"
             f"（'{settings.script_command(root, 'ccnavi-push-approved.sh')}'）も人が打ちます。"
             "ボードで承認すると、承認済みチケットのコミットと push が端末で実行されます。"
             "エージェントは打ちません。"
@@ -321,7 +411,7 @@ def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
 
 
 # 止めている間の呼び名。依頼のマーカーが境目で、未依頼はエージェントの番、
-# 依頼済みは人の番（設計 §9.8）。
+# 依頼済みは人の番（設計 9.8）。
 LABEL_PREPARING = "レビュー準備中"
 LABEL_WAITING = "レビュー待ち"
 
@@ -337,7 +427,7 @@ TIMEOUT_SECONDS = 2.0
 class Phase:
     """1 つの親の 1 つのフェーズ。
 
-    親が計画を持てば、番号に種類と計画の項が付く（設計 §9.7）。持たなければ
+    親が計画を持てば、番号に種類と計画の項が付く（設計 9.7）。持たなければ
     番号だけで、今までどおり子の `human_review` からレビューの要否を決める。
     """
 
@@ -421,7 +511,7 @@ class Phase:
         """終わったか。作業中（`doing/`）の子が無く、レビュー待ちか閉じた子が 1 枚以上。
 
         取り消しだけのフェーズは終わらない。レビュー待ちは作業としては終わっていて、
-        人が見るのを待っている段（設計 §9.8）。
+        人が見るのを待っている段（設計 9.8）。
         """
         states = list(self.states.values())
         if not states or any(s in (ticket_mod.TODO, ticket_mod.DOING, "") for s in states):
@@ -444,15 +534,15 @@ class Phase:
 
     @property
     def review_kind(self) -> str:
-        """このフェーズの終わりに人がどこで見るか。`none` / `chat` / `mr`（設計 §9.8）。
+        """このフェーズの終わりに人がどこで見るか。`none` / `chat` / `mr`（設計 9.8）。
 
         見る場所を言えるのは、種類と計画の項と、引き受けた延期だけ。そのうち厳しい側が
         勝つ。子の宣言（`human_review.required`）と実績のリスクは「要る」とだけ言い、
         場所は言わないので、宣言が「見ない」だったフェーズを `chat` へ上げるにとどまる。
-        どちらも止める向きにしか働かず、宣言された `mr` を `chat` に落とすことはない。
+        どちらも止める向きにしか働かず、宣言された `mr` を `chat` に下げることはない。
 
         場所を言う者が 1 人も居なければ（計画が無い、種類が読めない）今までどおりで、
-        子が「人が見る」と言うか実績が高ければ `mr`。緩い側に倒すと、種類のファイルが
+        子が「人が見る」と言うか実績が高ければ `mr`。緩い側を採ると、種類のファイルが
         読めないときにレビューの行き先が消える。延期を引き受けている番号は、覆っている分の
         宣言が読めなくても `mr` を受け取る（`_covered_review`）ので、ここには落ちない。
 
@@ -495,7 +585,7 @@ class Phase:
 
         欄の名前は JSON の綴り（`gate_closed`）に合わせてある。人に見せる名前は
         `review_label` が出す「レビュー準備中」「レビュー待ち」で、この綴りは
-        判定とボードの間の契約としてだけ残っている（設計 §9.8）。
+        判定とボードの間の契約としてだけ残っている（設計 9.8）。
         """
         return self.ended and self.review_required and approval.MARK_REVIEWED not in self.marks
 
@@ -509,21 +599,21 @@ class Phase:
         これはマージリクエストの待ちだけを言う。`review: chat` のフェーズは普段 `request` を
         打たないので False のまま。ボードの「受け入れ」（未解決スレッドを受け入れて進む）が
         この欄に繋がっており、写しの無い chat のフェーズに出すと打てない操作を見せることになる。
-        打ったときは（実績のリスクが高いときに勧める向き。設計 §9.10）ホストに写しがあるので、
+        打ったときは（実績のリスクが高いときに勧める向き。設計 9.10）ホストに写しがあるので、
         `mr` と同じに True でよい。このセッションで見る待ちは `review_kind` と `gate_closed`
-        で読む（設計 §9.8）。
+        で読む（設計 9.8）。
         """
         return self.gate_closed and approval.MARK_REQUESTED in self.marks
 
     @property
     def review_label(self) -> str:
-        """止めている間の呼び名。次に動く者で分かれる（設計 §9.8）。
+        """止めている間の呼び名。次に動く者で分かれる（設計 9.8）。
 
         まだ依頼していなければ動くのはエージェント（合流・push・依頼）なので
         「レビュー準備中」、依頼が出ていれば動くのは人なので「レビュー待ち」。
         `review: chat` のフェーズは普段この段を持たないので、人が端末で
         `--reviewed --chat` を打つまで「レビュー準備中」のまま。`request` を通した
-        ときだけ（設計 §9.10）`mr` と同じに「レビュー待ち」へ移る。
+        ときだけ（設計 9.10）`mr` と同じに「レビュー待ち」へ移る。
         """
         return LABEL_WAITING if self.review_waiting else LABEL_PREPARING
 
@@ -532,7 +622,7 @@ def types_path(conf: settings.Settings, root: str, project: str) -> str:
     """そのプロジェクトの層の phases.yml。空の `project` はワークスペース自身の層。
 
     予約名（`common` / `self`）のプロジェクトは層として数えないので、綴りを持たない
-    （設計 §11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
+    （設計 11.4）。名前で引くと `project or LAYER_SELF` がワークスペース自身の層の
     名札と一致し、そのプロジェクトの phases がワークスペースの層として合成される。
     """
     if settings.is_reserved_layer_name(project):
@@ -557,18 +647,18 @@ def common_types(
 def layer_types(
     conf: settings.Settings, root: str, project: str = ""
 ) -> tuple[dict[str, phasetypes.PhaseType] | None, list[rules.Problem]]:
-    """共通層 + その層の種類と、**その層の**苦情（設計 §11.4.1）。
+    """共通層 + その層の種類と、**その層の**苦情（設計 11.4.1）。
 
     どの層を足すかは親の承認済みチケットの `project:` が決める。空ならワークスペース自身の層。
     共通層自身の苦情は返さない。言う場所は `--lint` の共通層の項で、そこと二重に
     言うと、層の話を読みに来た人が同じ文を 2 度読むことになる。
 
     無い層は空（苦情なし）。壊れた層も空として扱うが、そちらは error を返す。
-    組み込みへは落とさない。共通層が在るのに落とすと、共通層の種類が消える。
+    組み込みには戻さない。共通層が在るのに戻すと、共通層の種類が消える。
     """
     common, notes = common_types(conf)
     if common is None and notes:
-        # 共通層が壊れている。層は足さない（設計 §11.2）。
+        # 共通層が壊れている。層は足さない（設計 11.2）。
         return None, []
     path = types_path(conf, root, project)
     if not path or not os.path.exists(path):
@@ -589,7 +679,7 @@ def load_types(
 
 
 def _covered_review(phase: Phase | None) -> str:
-    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 §9.8）。"""
+    """延期を引き受けた側に渡す「覆っている分の見る場所」。読めなければ `mr`（設計 9.8）。"""
     if phase is None or phase.declared_review is None:
         return phasetypes.REVIEW_MR
     return phase.declared_review
@@ -617,7 +707,7 @@ def phases_of(
     if owner is None and proposed is not None and proposed.ticket == parent_id:
         owner = proposed
     if owner is not None and owner.has_plan:
-        # 層は親の承認済みチケットの `project:` が決める（設計 §11.4.1）。人が承認した値で、
+        # 層は親の承認済みチケットの `project:` が決める（設計 11.4.1）。人が承認した値で、
         # 子は親から継ぐので、判定が申告に依存する形にはならない。
         types = load_types(conf, root, owner.project) or {}
         if owner.workflow is None and owner.state == ticket_mod.TODO:
@@ -629,7 +719,7 @@ def phases_of(
         # `review_kind`。ここで渡さないと、chat の計画に mr の延期が混ざったときに
         # 引き受けた側が chat のままになり、宣言した mr が消える。
         #
-        # 覆っている分の宣言が読めない番号は `mr` に倒す。延期できるのはレビューのある
+        # 覆っている分の宣言が読めない番号は `mr` として扱う。延期できるのはレビューのある
         # 種類だけ（承認が確かめる）なので、そこには必ず見る場所を言った者が居た。
         # 読めなくなったことを理由に、その番号のレビューが消えてはいけない。
         for phase in by_number.values():
@@ -688,7 +778,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     """止めたときに返す文。いまどの段にいて、次に何をすればよいかを言う。
 
     段の名前（レビュー準備中／レビュー待ち）を見出しに置く。止まっている事実だけを
-    言っても次の一手が出ないので、段ごとにやることを書き分ける（設計 §9.8）。
+    言っても次の一手が出ないので、段ごとにやることを書き分ける（設計 9.8）。
     """
     review_sh = settings.script_command(root, "ccnavi-review.sh")
     what = "サブエージェントの起動" if tool == "Agent" else "このシェル実行"
@@ -707,7 +797,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
     elif phase.review_in_chat:
         todo = (
             "やること: 子の成果を親ブランチへ合流し、利用者に差分を見てもらって、"
-            "ターンを終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
+            f"{TURN_DEFINED}を終えて利用者を待ってください。このフェーズはこのセッションで見る計画"
             "（review: chat）なので、マージリクエストは要りません。先へ進めるのは、"
             f"利用者が端末で打つ 'ccnavi --reviewed {n} --chat' です"
             f"（エージェントからは打てません）。{later}"
@@ -716,7 +806,7 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
         todo = (
             "やること: 子の成果を親ブランチへ合流して push し、"
             f"'{review_sh} request --phase {n} --body-file <依頼文>' "
-            "でレビューを頼み、ターンを終えて利用者を待ってください。"
+            f"でレビューを頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
             f"利用者がレビューを終えたら '{review_sh} confirm --phase {n}' "
             f"で確かめます。{later}"
         )
@@ -727,12 +817,13 @@ def hold_reason(phase: Phase, tool: str, root: str) -> str:
             f"フェーズは終わっていて、{why}。"
             f"レビュー済みのマーカーが置かれるまで、{what}を止めます。",
             todo,
+            *([] if tool == "Agent" else [EXEMPT_NOTE]),
         ]
     )
 
 
 def _type_source(phase: Phase) -> dict:
-    """種類を根拠に置くマーカーに足す、その種類の層（設計 §11.9）。
+    """種類を根拠に置くマーカーに足す、その種類の層（設計 11.9）。
 
     `review:` が絡むマーカー（省略と保留）にだけ足す。他のマーカーは種類を見ずに置くので、
     層を書いても根拠にならない。種類の無いフェーズでは欄そのものを置かない。
@@ -785,7 +876,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                 who += f"{phase.risk_line}。"
             hold_note = (
                 "指摘があれば同じフェーズに子を足せます。レビュー済みになるまで、"
-                "サブエージェントの起動とシェル実行は止まります。"
+                f"サブエージェントの起動とシェル実行は止まります。{EXEMPT_NOTE}"
             )
             if phase.review_in_chat:
                 # このセッションで人が見る。ホストへは出ないので push もしない。
@@ -807,7 +898,7 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                     f"{covers}が済んだら、利用者が端末で "
                     f"'ccnavi --reviewed {n} --chat' を打つと先へ進めます"
                     "（この経路はエージェントには打てません）。"
-                    f"ターンを終えて利用者を待ってください。{hold_note}"
+                    f"{TURN_DEFINED}を終えて利用者を待ってください。{hold_note}"
                 )
             else:
                 texts.append(
@@ -816,7 +907,8 @@ def announce(stderr: TextIO, root: str, conf: settings.Settings, parent: ticket_
                     f"子の成果を親ブランチへ合流して push し、"
                     f"'{settings.script_command(root, 'ccnavi-review.sh')} request --phase {n} "
                     "--body-file <依頼文>' "
-                    f"でレビュー{covers}を頼み、ターンを終えて利用者を待ってください。{hold_note}"
+                    f"でレビュー{covers}を頼み、{TURN_DEFINED}を終えて利用者を待ってください。"
+                    f"{hold_note}"
                 )
         else:
             failed = approval.write_mark(
@@ -906,14 +998,14 @@ def order_problems(
     types: dict[str, phasetypes.PhaseType] | None,
     adding: list[ticket_mod.Ticket] | None = None,
 ) -> list[rules.Problem]:
-    """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 §9.7）。
+    """N 番目の子を承認してよいか。待つフェーズが閉じてレビューが済んでいるか（設計 9.7）。
 
     待つ番号は親の待ち方の写し（`workflow`）が決める。一直線なら前の全部、`dag` なら
     種類の祖先に当たる前の番号。`overlap` の組は写しを作るときに待ちから外してある。
 
     ここで出す苦情は `rules.KIND_NOT_YET`。承認は落とすが、書いた側に直すものは無く、
     前のフェーズが閉じれば同じ提案がそのまま通る。全体を見る `--lint` はこの印を見て
-    warn に落とす（`lint._approval_problems`）。
+    warn にする（`lint._approval_problems`）。
 
     `adding` は同じ承認で先に通った、同じ親の子。承認されればそのフェーズには開いた子が
     増え、マーカーも消える（`_apply` の `clear_marks`）。ディスクの上では閉じていても、開いた
@@ -1038,7 +1130,7 @@ def settle_last_review(approved_dir: str, parent: ticket_mod.Ticket, stamp: str)
 
 
 def stage(root: str, conf: settings.Settings, parent: ticket_mod.Ticket) -> str:
-    """親がいまどの局面にいるか（設計 §9.7）。計画が無ければ空文字。"""
+    """親がいまどの局面にいるか（設計 9.7）。計画が無ければ空文字。"""
     if not parent.has_plan:
         return ""
     phases = phases_of(root, conf, parent.ticket)
@@ -1185,7 +1277,7 @@ def unread_type(
     `types` は `load_types` が返したもの（None を含む）。phases.yml がどの層にも無いのは
     番号だけの挙動で、読めないのではないので何も言わない。ファイルは在るのに種類が
     引けない（壊れた・種類を消した）ときだけ返す。そのとき判定は種類では切り詰めない。
-    deny に倒すと、人が phases.yml を直している間、全部の子のワークツリーで書き込みが止まる。
+    deny にすると、人が phases.yml を直している間、全部の子のワークツリーで書き込みが止まる。
     """
     item = plan_item(child, parent)
     if item is None or parent is None:

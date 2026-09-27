@@ -109,7 +109,7 @@ class BoardTest(PhaseHarness):
     def test_scattered_is_empty_when_the_home_tree_is_gone_but_the_origin_holds_one(self):
         """親のツリーが無ければ元ツリーが権威。畳んだだけの形を散在に数えない。
 
-        親のワークツリーは合流したら畳む。そこを落ち先の無いまま数えると、片付けた
+        親のワークツリーは合流したら畳む。そこを行き先の無いまま数えると、片付けた
         家族のカードが全部「複数の場所にある」になり、状態の操作も止まる。
         """
         self.scene()

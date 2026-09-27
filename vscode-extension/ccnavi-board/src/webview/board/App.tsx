@@ -22,7 +22,7 @@ import { EMPTY, loadState, saveState, type ViewState } from "./state.js";
 const MIN_WIDTH = 220;
 
 /**
- * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース自身ス本体」（空）と各プロジェクト。
+ * プロジェクトの絞り込みの候補。「すべて」と、プロジェクトがあれば「ワークスペース（プロジェクト外）」（空）と各プロジェクト。
  * プロジェクトが無いボードでは欄を出さないので、候補も「すべて」だけ。覚えていた値がここに無ければ効かせない
  * （欄が無いまま「絞り込み中」になると、人には解除する手立てが無い）
  */
@@ -130,7 +130,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     (attention && !card.attention));
 
   // 「承認待ち N 件を承認」は、押したときに承認の対象になるもの（絞り込みで見えている承認待ち）の数にする。
-  // 「絞り込み無し」は空の並びではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認に化ける。
+  // 「絞り込み無し」は空の並びではなく filtered で言う。空を「全部」に読ませると、0 件のつもりが全部承認になってしまう。
   const visiblePending =
     shown?.columns.flatMap((column) => column.cards.filter((card) => card.pendingApproval && !hiddenOf(card)).map((card) => card.id)) ?? [];
 
@@ -138,7 +138,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     <>
       {shown === undefined ? (
         <>
-          <p className="board-empty">ボードを読み直せなかった。原因を直してから「ccnavi ボード: ボードを更新」を実行する。</p>
+          <p className="board-empty">チケット管理画面を読み込めませんでした。原因を直してから「ccnavi ボード: チケット管理を更新」を実行してください。</p>
           <pre className="load-error">{data.kind === "error" ? data.error : ""}</pre>
         </>
       ) : (
@@ -158,7 +158,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   プロジェクト
                   <select id="project-filter" value={project} onChange={(event) => setView((now) => ({ ...now, project: event.target.value }))}>
                     <option value="*">すべて</option>
-                    <option value="">ワークスペース自身</option>
+                    <option value="">ワークスペース（プロジェクト外）</option>
                     {shown.projects.map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -180,7 +180,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   </select>
                 </label>
               ) : null}
-              <label className="filter attention" title="人が動く必要があるカードだけを出す（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
+              <label className="filter attention" title="人が動く必要があるカードだけを表示します（承認待ち・レビュー準備中／レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備）">
                 <input type="checkbox" id="attention-filter" checked={attention} onChange={(event) => setView((now) => ({ ...now, attention: event.target.checked }))} /> 要対応のみ
               </label>
               <button
@@ -195,7 +195,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 }}
               >
                 <span className="spin" aria-hidden="true" />
-                <span className="label">{refreshing ? "更新中" : "更新"}</span>
+                <span className="label">{refreshing ? "更新中…" : "更新"}</span>
               </button>
               <button
                 type="button"
@@ -263,44 +263,44 @@ const TOUR_STEPS: readonly TourStep[] = [
   {
     target: ".toolbar .summary",
     title: "集計",
-    body: "承認待ちと不備の件数、残りのチケット数。絞り込みに関係なく、ボード全体の数を出す。",
+    body: "承認待ちと不備の件数、残りのチケット数です。絞り込みに関係なく、チケット管理画面全体の数を表示します。",
   },
   {
     target: ".filter.attention",
     title: "絞り込み",
-    body: "プロジェクトと親チケットで絞り込める（プロジェクトや親があるときだけ欄が出る）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が動く必要があるカードだけを出す。",
+    body: "プロジェクトと親チケットで絞り込めます（プロジェクトや親があるときだけ欄が出ます）。「要対応のみ」は、承認待ち・レビュー待ち・ワークツリーなし・HIGH 以上のリスク・不備など、人が動く必要があるカードだけを表示します。",
   },
   {
     target: ".board",
     title: "列",
-    body: "チケットは 未着手 → 作業中 → 完了（または取り消し）と動く。見出しを押すと列を畳み、右端をドラッグすると幅を変えられる（ダブルクリックで元に戻る）。",
+    body: "チケットは 未着手 → 作業中 → 完了（または取り消し）と動きます。見出しを押すと列を畳み、右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。",
   },
   {
     target: ".column:not(.folded) .card:not(.hidden)",
     title: "カード",
-    body: "1 枚が 1 チケット。親か子か、フェーズの進み、人が動く必要がある状態のバッジが出る。押すとチケットのファイルを開く。承認やレビュー済みの連絡のボタンは、要るときだけカードに出る。",
+    body: "1 枚が 1 チケットです。親か子か、フェーズの進み、人が動く必要がある状態のバッジが出ます。押すとチケットのファイルを開きます。承認やレビュー済みの連絡のボタンは、要るときだけカードに出ます。",
   },
   {
     target: '[data-action="approve"]',
     title: "承認",
-    body: "絞り込みで見えている承認待ちをまとめて承認する。押すと承認する内容がオーバーレイに出るので、確かめてから承認する。承認した文は Claude Code に渡す。",
+    body: "絞り込みで見えている承認待ちをまとめて承認します。押すと承認する内容がオーバーレイに出るので、確かめてから承認してください。承認した文は Claude Code に渡します。",
   },
   {
     target: '[data-action="refresh"]',
     title: "更新",
-    body: "チケットとワークツリーを読み直す。前の読み直しから列が変わったカードには印が付く。",
+    body: "チケットとワークツリーの状態を更新します。前回の更新から列が変わったカードには印が付きます。",
   },
   {
     target: '[data-action="tour"]',
     title: "案内",
-    body: "この案内は、ヘッダ右上の ? からもう一度見られる。",
+    body: "この案内は、ヘッダ右上の ? からもう一度見られます。",
   },
 ];
 
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (
     <footer className="foot">
-      取得 {board.generatedAt} / {board.root}
+      最終更新 {board.generatedAt} / {board.root}
     </footer>
   );
 }

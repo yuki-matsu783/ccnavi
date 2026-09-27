@@ -1,6 +1,6 @@
 /*
  * プロジェクト管理画面の骨組み（`App.tsx`）。節、要約、clone の欄と結果、一覧の入れ物、
- * ワークスペース自身のルールと、置き場の外に居るリポジトリ。1 件のカードは `Project.css`。
+ * ワークスペースの設定のルールと、置き場の外に居るリポジトリ。1 件のカードは `Project.css`。
  */
 section { margin-bottom: 18px; }
 .summary { font-weight: 600; }

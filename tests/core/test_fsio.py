@@ -179,7 +179,7 @@ class WriteAtomicTest(unittest.TestCase):
         """一時ファイルは行き先と同じディレクトリに作る。
 
         os.replace が一瞬で終わるのは同じファイルシステムの中だけなので、
-        他所に作るとコピーに化けて、途中を見せない型が成り立たなくなる。
+        他所に作るとコピーになってしまい、途中を見せない型が成り立たなくなる。
         """
         seen: list[str] = []
         real = tempfile.mkstemp

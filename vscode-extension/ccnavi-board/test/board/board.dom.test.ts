@@ -175,7 +175,7 @@ test("CB-D44 「更新」を押すと非活性になり、回り記号と「更�
     assert.equal(button.disabled, true, "押した瞬間に非活性になる");
     assert.ok(button.classList.contains("busy"), "回り記号が出る");
     assert.equal(button.getAttribute("aria-busy"), "true");
-    assert.equal(button.querySelector(".label")?.textContent, "更新中");
+    assert.equal(button.querySelector(".label")?.textContent, "更新中…");
     // 非活性の間はもう 1 度押しても送らない
     const sent = page.posted.length;
     page.click(button);
@@ -238,7 +238,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
     await page.send({ type: "filter", project: "無い名前" });
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "app");
     assert.equal((page.state() as { project: string }).project, "app");
-    // ワークスペース自身（空）も候補。覚え直しても「すべて」に落ちない
+    // ワークスペース（プロジェクト外。空）も候補。覚え直しても「すべて」に落ちない
     page.change(page.one("#project-filter"), "");
     await page.settle();
     assert.equal(page.one<HTMLInputElement>("#project-filter").value, "");
@@ -250,7 +250,7 @@ test("CB-D48 プロジェクトの絞り込みは拡張ホストからの指定�
   } finally {
     await page.close();
   }
-  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース自身」も効かせない
+  // プロジェクトが無いボードでは欄も出ないので、覚えていた「ワークスペース（プロジェクト外）」も効かせない
   // （解除する手立てが画面に無いまま「絞り込み中」になってしまう）
   const without = await openBoard(fixture(), { state: { project: "" } });
   try {
@@ -425,14 +425,14 @@ test("CB-D82 渡された分にだけ印を出す。渡されなければ出さ�
   }
 });
 
-test("CB-D82b 新しく出たカードは「新しく出た」と言う", async () => {
+test("CB-D82b 新規起票のカードは「新規起票」と言う", async () => {
   const page = await openBoard();
   try {
     await page.send({ type: "data", data: data([{ id: "i0001-03", to: "todo" }]) });
     const card = page.one('.card[data-id="i0001-03"]');
     assert.ok(card.classList.contains("moved"));
     assert.equal(card.getAttribute("data-moved"), "none-todo");
-    assert.equal(card.querySelector(".moved-mark")?.textContent, "新しく出た（未着手）");
+    assert.equal(card.querySelector(".moved-mark")?.textContent, "新規起票");
   } finally {
     await page.close();
   }
@@ -559,7 +559,7 @@ test("CB-D104 案内を閉じたら、焦点を案内の前の場所（「？ �
     assert.equal(dom.document.activeElement, dom.one('[data-action="tour-next"]'));
     dom.key("Escape");
     await dom.settle();
-    assert.equal(dom.document.activeElement, button, "焦点が body に落ちた");
+    assert.equal(dom.document.activeElement, button, "焦点が body に移った");
   } finally {
     await dom.close();
   }
@@ -582,5 +582,25 @@ test("CB-D105 案内の最中にボードが読み直せなくなったら案内
     assert.equal(dom.all(".tour").length, 0, "人が始めていない案内が出直した");
   } finally {
     await dom.close();
+  }
+});
+
+test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。カードの他の場所を押せば開く", async () => {
+  const base = fixture();
+  const history = [{ at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" }];
+  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-01" ? { ...t, history } : t)) });
+  try {
+    const before = page.posted.length;
+    page.click(page.one('.card[data-id="i0001-01"] details.history summary'));
+    await page.settle();
+    assert.equal(page.posted.length, before);
+    page.click(page.one('.card[data-id="i0001-01"] .history-text'));
+    await page.settle();
+    assert.equal(page.posted.length, before);
+    page.click(page.one('.card[data-id="i0001-01"] .title'));
+    await page.settle();
+    assert.equal(page.posted.at(-1)?.type, "open");
+  } finally {
+    await page.close();
   }
 });

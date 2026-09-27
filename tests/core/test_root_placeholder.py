@@ -1,5 +1,5 @@
 """ルールの `{root}` がワークスペースルートに置き換わることの受入テスト。
-道具を外から叩いて応答だけを見る。
+道具を外から呼んで応答だけを見る。
 
 「ワークスペースルートの下で、かつ .claude/worktrees/ の外」を止めるルールが、main の側では止め、
 ワークツリーの中では止めず、ワークスペースの外には何も言わないこと。
@@ -133,7 +133,7 @@ class RootPlaceholderTest(unittest.TestCase):
         detour = os.path.join(self.root, "docs", "..", "README.md")
         self.assertEqual(self.judge("Write", detour).get("permissionDecision"), "deny")
         # ワークスペースルートの綴りも、どの機械でも区別せずに当てる。区別する機械では
-        # 別の場所を指す綴りだが、それでも止める側に倒す（`{root}` を機械で変えない）。
+        # 別の場所を指す綴りだが、それでも止める側を採る（`{root}` を機械で変えない）。
         swapped = os.path.join(self.root.swapcase(), "README.md")
         self.assertEqual(self.judge("Write", swapped).get("permissionDecision"), "deny")
 

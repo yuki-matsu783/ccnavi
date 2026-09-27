@@ -18,6 +18,7 @@ import type { AppearanceMessage } from "./appearance.js";
 import type { HookEntry } from "./hooks.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
+import type { SuggestJson } from "./suggestmodel.js";
 import type { SamplesJson, TestJson } from "./testmodel.js";
 
 // ---- ルールの形（画面と読み書きで分け合う）
@@ -68,7 +69,7 @@ export interface RuleForm {
   /** 最初に当たったときだけ本文を渡すファイル（`additionalContextOnceFile`）。無ければ空 */
   readonly additionalContextOnceFile: string;
   /**
-   * 渡す回の刻み（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
+   * 何回に 1 度渡すか（`every`）。当たった回数がこの倍数になった回だけ文が渡り、
    * `additionalContextOnce` はその最初の 1 回（＝ N 回目）に渡る。書いていなければ空。
    *
    * 他の欄と同じく**書かれたままの文字**で持つ。数（`number | null`）で持つと、空欄が
@@ -106,7 +107,7 @@ export interface RulesPage {
   readonly hookFiles: { readonly settings: boolean; readonly settingsLocal: boolean };
   readonly samplesPath: string;
   readonly lock: Lock;
-  /** 上部に出す注意（実行ファイルがこの層を読めていない、など） */
+  /** 上部に出す注意（実行ファイルがこの設定を読めていない、など） */
   readonly notices?: readonly string[];
 }
 
@@ -117,7 +118,7 @@ export interface RulesPage {
  * 他の 4 画面と同じ形で、画面はどちらでも 1 枚を描く。
  *
  * `loading` は開いているタブの対象を切り替えて、新しい対象を読んでいる間（タブは種類ごとに 1 枚）。
- * `text` は画面に出す一言（「web のルールを読み込み中...」）。読み終えたら `page` か `error` が続けて届く
+ * `text` は画面に出す一言（「web のルールを読み込み中…」）。読み終えたら `page` か `error` が続けて届く
  */
 export type RulesData =
   | { readonly kind: "page"; readonly page: RulesPage }
@@ -127,7 +128,7 @@ export type RulesData =
 /**
  * 拡張ホスト → 画面。中身を包む形は `screen-host.ts` が決める（渡すのはそこ）。
  *
- * `judged` と `sampled` は実行ファイルに聞いた判定の結果、`failed` は操作の結果をその場で言う
+ * `judged` と `sampled` は実行ファイルに聞いた判定の結果、`suggested` は記録から起こした候補、`failed` は操作の結果をその場で言う
  * 一言、`lock` は保存してよいかの取り直し、`changed` はファイルが外で変わったという帯、
  * `picked` はダイアログで選んだファイルの綴り。どれも画面の編集には触らない
  * （`picked` は名指しした 1 欄だけを埋める）。
@@ -136,6 +137,7 @@ export type ToRules =
   | DataMessage<RulesData>
   | { readonly type: "judged"; readonly result: TestJson; readonly hooks: readonly HookEntry[] }
   | { readonly type: "sampled"; readonly result: SamplesJson }
+  | { readonly type: "suggested"; readonly result: SuggestJson }
   | { readonly type: "failed"; readonly message: string }
   | { readonly type: "lock"; readonly lock: Lock }
   | { readonly type: "changed" }
@@ -163,6 +165,8 @@ export type RulesMessage =
   | { readonly type: "judge"; readonly sections: Sections; readonly tool: string; readonly subject: string }
   /** 編集中の内容でサンプルを一括で判定する */
   | { readonly type: "samples"; readonly sections: Sections }
+  /** 記録からルールの候補を起こす（`--suggest --json`）。読むのは保存済みのルールで、編集中の内容は渡さない */
+  | { readonly type: "suggest" }
   | { readonly type: "pickFile"; readonly key: string; readonly field: FileField }
   /** 吹き出しの案内を閉じた（最後まで見ても、途中でやめても）。拡張ホストは次から初回の案内を頼まない */
   | { readonly type: "tourDone" };

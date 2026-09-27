@@ -65,7 +65,7 @@ export function duplicates(draft: Draft): ReadonlySet<string> {
   return dup;
 }
 
-/** 控えてある「開いていた種類の id」。型が違うものは空に倒す */
+/** 控えてある「開いていた種類の id」。型が違うものは空として扱う */
 export function loadOpen(): ReadonlySet<string> {
   const saved = (getState() ?? {}) as { open?: unknown };
   const ids = Array.isArray(saved.open) ? saved.open.filter((id): id is string => typeof id === "string") : [];

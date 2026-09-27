@@ -19,13 +19,13 @@ test("CB-T200 読み込み中の 1 枚はスクリプトを持たず、名前を
   assert.match(html, /<style nonce="N1">\n\.empty \{ color: red; \}\n<\/style>/);
   assert.match(html, /<body class="ccnavi-claude-dark">/);
   assert.match(html, /<title>ccnavi ルール設定: &lt;a&amp;b&gt;<\/title>/);
-  assert.match(html, /<p class="empty" id="ccnavi-loading">&lt;a&amp;b&gt; のルールを読み込み中...<\/p>/);
+  assert.match(html, /<p class="empty" id="ccnavi-loading">&lt;a&amp;b&gt; のルールを読み込み中…<\/p>/);
   // 見た目を渡さなければ VS Code のテーマに従う
   assert.match(renderLoadingPage("x", "x", { nonce: "N2", style: "" }), /<body>/);
 });
 
 test("CB-T200b 読み込み中の一言は「<何>を読み込み中...」で、5 画面の入れ物も束ねた画面が組み上がるまで同じ一言を持つ", () => {
-  assert.equal(loadingText("チケット"), "チケットを読み込み中...");
+  assert.equal(loadingText("チケット"), "チケットを読み込み中…");
   const options = { nonce: "N", script: "", style: "" };
   const error = { kind: "error", error: "x" } as const;
   const pages: ReadonlyArray<readonly [string, string]> = [
@@ -36,6 +36,6 @@ test("CB-T200b 読み込み中の一言は「<何>を読み込み中...」で、
     ["リスク", renderRiskPage(error, options)],
   ];
   for (const [what, html] of pages) {
-    assert.match(html, new RegExp(`<div id="root"><p class="empty" id="ccnavi-loading">${what}を読み込み中\\.\\.\\.</p></div>`), what);
+    assert.match(html, new RegExp(`<div id="root"><p class="empty" id="ccnavi-loading">${what}を読み込み中…</p></div>`), what);
   }
 });

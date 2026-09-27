@@ -509,7 +509,7 @@ test("CB-T170 絞り込みは見えている識別子だけを絞りに通す。
 
   const none = approvalStep(CLOSED, { kind: "approve", tickets: [], filtered: true, pending: ["i0001"] });
   assert.equal(none.state.overlay, undefined);
-  assert.deepEqual(none.effects, [{ kind: "warn", text: "絞り込みで見えている承認待ちが無い" }]);
+  assert.deepEqual(none.effects, [{ kind: "warn", text: "絞り込みで見えている承認待ちがありません" }]);
 });
 
 test("CB-T171 一覧が返ったら見せる。読めなければ、そう見せる", () => {
@@ -581,7 +581,7 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返
   assert.equal(shown.state.overlay?.kind, "preview");
   assert.equal(
     shown.state.overlay?.kind === "preview" ? shown.state.overlay.notice : "",
-    "見せた承認画面と今の本文が違った（提案の中身が変わった）。見直してから承認する",
+    "表示した承認内容と今の本文が違います（提案の中身が変わりました）。見直してから承認してください",
     "識別子が同じなら、変わったのは本文",
   );
   assert.equal(shown.state.recheck, undefined);
@@ -598,7 +598,7 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで読み直し、返
   });
   assert.equal(
     otherShown.state.overlay?.kind === "preview" ? otherShown.state.overlay.notice : "",
-    "見せた一覧と今の一覧が違った（提案が増えたか減った）。見直してから承認する",
+    "表示した一覧と今の一覧が違います（提案が増えたか減りました）。見直してから承認してください",
   );
 });
 
@@ -661,14 +661,14 @@ test("CB-T177 レビュー済みの連絡は、閉じているときと、error 
   const noTree = approvalStep(CLOSED, { ...input, tree: undefined });
   assert.equal(noTree.state.overlay, undefined);
   assert.deepEqual(noTree.effects, [
-    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡を組めない" },
+    { kind: "warn", text: "親 i0001 のワークツリーかフェーズ 1 が無いので、レビュー済みの連絡を組めません" },
   ]);
 
   // 人のレビュー待ちでなければ、ボタンの前提が無い。言って読み直す
   const notWaiting = approvalStep(CLOSED, { ...input, chip: chipOf({ reviewWaiting: false }) });
   assert.equal(notWaiting.state.overlay, undefined);
   assert.deepEqual(notWaiting.effects, [
-    { kind: "warn", text: "親 i0001 のフェーズ 1 設計 は人のレビュー待ちではない。ボードを更新する" },
+    { kind: "warn", text: "親 i0001 のフェーズ 1 設計 は人のレビュー待ちではありません。チケット管理画面を更新しました" },
     { kind: "refresh" },
   ]);
 });
@@ -764,7 +764,7 @@ test("CB-T204 置けたら渡す文を見せて読み直す。投稿の警告は
   assert.equal(done.state.overlay?.kind === "prompt" ? done.state.overlay.prompt : "", "決めた文");
   assert.deepEqual(kinds(done.effects), ["warn", "refresh"]);
   const copied = approvalStep(done.state, { kind: "handOver", how: "promptCopy" });
-  assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "残った指摘を決めた文" }]);
+  assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "対応方針の連絡文" }]);
   const again = approvalStep(deciding, { kind: "decided", outcome: { ok: false, mismatch: true } });
   assert.equal(again.state.overlay?.kind, "decideLoading");
   assert.ok(again.state.overlay?.kind === "decideLoading" && again.state.overlay.notice);

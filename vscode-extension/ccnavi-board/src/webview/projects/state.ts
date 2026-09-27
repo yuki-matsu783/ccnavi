@@ -14,7 +14,7 @@ export interface CloneState {
 
 export const EMPTY: CloneState = { url: "", name: "", nameTouched: false };
 
-/** 覚えていた値を読む。型が違うもの・知らないものは既定に倒す */
+/** 覚えていた値を読む。型が違うもの・知らないものは既定を使う */
 export function loadClone(): CloneState {
   const saved = (getState() ?? {}) as Partial<Record<keyof CloneState, unknown>>;
   return {

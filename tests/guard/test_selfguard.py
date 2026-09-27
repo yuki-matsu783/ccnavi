@@ -1,4 +1,4 @@
-"""ccnavi 自身の設定ファイルを守る面の受入テスト。
+"""ccnavi 自身の設定ファイルを守る仕組みの受入テスト。
 
 道具を外から動かす。本物の git リポジトリを一時ディレクトリに作り、実行前の
 payload で控えを取らせ、設定ファイルを壊してから実行後の payload を渡し、
@@ -6,7 +6,7 @@ payload で控えを取らせ、設定ファイルを壊してから実行後の
 
 ここで確かめたいのは 1 つに尽きる。ルールファイルを壊す道と、壊れたことに
 気づく道が、同じファイルに乗っていないこと。ルール由来の保護は、ルールを
-空にされると保護領域ごと消える。この面はそこを埋めるために在る。
+空にされると保護領域ごと消える。この仕組みはそこを埋めるために在る。
 """
 
 from __future__ import annotations
@@ -190,7 +190,7 @@ class SelfGuardTest(unittest.TestCase):
     def test_ルールを空にされても保護は消えない(self):
         # ルール由来の保護は、保護領域をルールファイルから導く。deny を空に
         # されるとその一覧ごと消えるので、実行後の監視は何も検知しない。
-        # この面はルールを読まずに対象を決めるので、そこで止まらない。
+        # この仕組みはルールを読まずに対象を決めるので、そこで止まらない。
         self.run_hook("PreToolUse")
         write(self.rules, json.dumps({"version": 1, "deny": [], "ask": [], "allow": []}))
         write(self.settings, "{}\n")
@@ -441,13 +441,63 @@ class SelfGuardTest(unittest.TestCase):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_ローテートした記録もシェルからの書き込みで止まる(self):
+        # 消すのはセッションの開始と端末から打つ `ccnavi --prune` だけ（prune）。
+        for command in (
+            "rm logs/log.20260927-120000.jsonl",
+            "rm logs/log.*.jsonl",
+            "echo x > logs/log.20260927-120000-2.jsonl",
+            "cd logs && rm log.20260927-120000.jsonl",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
+                self.assertIn("builtin-guard-setting-files", result.stdout)
+
+    def test_記録と控えの置き場は名指しのツールでも止まる(self):
+        # シェルの側の文面は「Write / Edit でも拒否される場所」と言う。名指しのツールで書けると、
+        # 拒否の数え（denied-<セッション>.json）や記録を書き換えて自分の足跡を消せる。
+        for tool in ("Write", "Edit", "NotebookEdit"):
+            for path in (
+                os.path.join(self.repo, "logs", "state", "denied-x.json"),
+                os.path.join(self.repo, "logs", "state", "selfguard", "s1", "settings"),
+                os.path.join(self.repo, "logs", "log.jsonl"),
+                os.path.join(self.repo, "logs", "log.20260927-120000.jsonl"),
+                os.path.join(self.repo, "Logs", "State", "x.json"),
+                # 置き場を動かしてある（--state / --log）。
+                os.path.join(self.state, "denied-x.json"),
+                self.log,
+                os.path.join(self.repo, "log.20260927-120000-2.jsonl"),
+            ):
+                with self.subTest(tool=tool, path=path):
+                    key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+                    result = self.run_hook("PreToolUse", tool=tool, **{key: path})
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-records", result.stdout)
+
+    def test_記録の隣の別のファイルは名指しのツールで書ける(self):
+        for path in (
+            os.path.join(self.repo, "logs", "git-20260913-000000-1.log"),
+            os.path.join(self.repo, "logs", "notes.md"),
+            os.path.join(self.repo, "logstate", "x.json"),
+            os.path.join(self.repo, "src", "logs", "catalog.jsonl"),
+            os.path.join(self.repo, "state-notes", "x.md"),
+        ):
+            with self.subTest(path=path):
+                result = self.run_hook("PreToolUse", tool="Write", file_path=path)
+                self.assertNotIn("builtin-guard-records", result.stdout)
+
+    def test_disable_なら記録の置き場の名指しも止めない(self):
+        path = os.path.join(self.repo, "logs", "state", "denied-x.json")
+        result = self.run_hook("PreToolUse", setting="disable", tool="Write", file_path=path)
+        self.assertNotIn("builtin-guard-records", result.stdout)
+
     def test_git_ラッパースクリプトの記録は止めない(self):
         # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
         result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
 
         self.assertNotIn("builtin-guard-setting-files", result.stdout)
 
-    # 引用に空白を含む形（wip/design/shellread-sep.md §3）。shellread が語の中の
+    # 引用に空白を含む形（wip/design/shellread-sep.md 3）。shellread が語の中の
     # 切れ目をコマンドの区切りと別の目印で渡すようになると、`[^\x00]*` が引用の
     # 空白をまたいで行き先まで届く。止める側はそれで穴が塞がり、リダイレクトの
     # 行き先の式は語の中の目印を食わないように直す。

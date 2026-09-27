@@ -1,13 +1,16 @@
 /**
- * 「判定を試す」の結果。1 件の判定（`judged`）と、サンプルの一括判定（`sampled`）。
+ * 「判定を試す」の結果。1 件の判定（`judged`）と、サンプルの一括判定（`sampled`）、記録から起こした
+ * ルールの候補（`suggested`）。
  *
- * **ここは判定しない。** 出すのは実行ファイル（`--test --json` / `--test-samples --json`）が
- * 返した形をそのまま読んだものだけで、当たる・当たらないの理屈は持たない。
+ * **ここは判定しない。** 出すのは実行ファイル（`--test --json` / `--test-samples --json` /
+ * `--suggest --json`）が返した形をそのまま読んだものだけで、当たる・当たらないの理屈は持たない。
+ * 候補もルールに足さない。下書きを見せるだけで、置くのは人。
  */
 import { Fragment, type JSX } from "react";
 
 import type { HookEntry } from "../../core/hooks.js";
 import { SECTIONS } from "../../core/rules-view.js";
+import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { RuleHitJson, SamplesJson, TestJson } from "../../core/testmodel.js";
 
 /** 判定のバッジ。空（判定の対象外）は薄い地の色で出す */
@@ -33,7 +36,7 @@ function Pairs({ pairs }: { readonly pairs: readonly (readonly [string, string])
 
 function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Element {
   if (rules.length === 0) {
-    return <p className="empty">どのルールにもヒットしなかった</p>;
+    return <p className="empty">どのルールにもヒットしませんでした</p>;
   }
   return (
     <table>
@@ -62,7 +65,7 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
 /** そのツールで実行される hook。判定の結果と一緒に出す（拡張ホストが絞ってから渡す） */
 function RunningHooks({ hooks }: { readonly hooks: readonly HookEntry[] }): JSX.Element {
   if (hooks.length === 0) {
-    return <p className="empty">実行される hook は無い</p>;
+    return <p className="empty">実行される hook はありません</p>;
   }
   return (
     <table>
@@ -118,11 +121,11 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
           <h3>ヒットしたルール</h3>
           <Hits rules={result.rules} />
           <h3>返すメッセージ</h3>
-          {result.response === "" ? <p className="empty">メッセージは返さない</p> : <pre className="response">{result.response}</pre>}
+          {result.response === "" ? <p className="empty">メッセージは返しません</p> : <pre className="response">{result.response}</pre>}
         </>
       ) : (
         <p>
-          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツール。ルールを書いてもヒットせず、呼び出しはそのまま通る
+          <Verdict verdict="" /> {result.tool} は判定の対象を取り出せないツールです。ルールを書いてもヒットせず、呼び出しはそのまま通ります
         </p>
       )}
       <h3>このツールで実行される hook</h3>
@@ -181,6 +184,37 @@ export function SamplesResult({ result }: { readonly result: SamplesJson }): JSX
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** 候補の種類の言い換え */
+const SUGGEST_KINDS: Readonly<Record<string, string>> = {
+  rule: "ルールを足す",
+  message: "message を見直す",
+};
+
+export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX.Element {
+  return (
+    <div id="suggest-result" className="result">
+      <p>
+        記録 {result.logs.length} 本・{result.records} 行から、候補 {result.candidates.length} 件
+        （検証を通らず落としたもの {result.dropped} 件）。どれも下書きで、置くのは人です。
+      </p>
+      {result.candidates.length === 0 ? (
+        <p className="empty">候補はありません</p>
+      ) : (
+        result.candidates.map((candidate, index) => (
+          <div key={index} className="candidate" data-id={candidate.id}>
+            <p>
+              <span className={`verdict ${candidate.section}`}>{candidate.section}</span>{" "}
+              {SUGGEST_KINDS[candidate.kind] ?? candidate.kind}: <code>{candidate.id}</code>
+            </p>
+            <p>{candidate.summary}</p>
+            <pre className="response">{candidate.yaml}</pre>
+          </div>
+        ))
+      )}
     </div>
   );
 }

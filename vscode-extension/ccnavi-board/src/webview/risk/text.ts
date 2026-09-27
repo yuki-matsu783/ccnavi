@@ -15,7 +15,7 @@ export interface Part {
 const dim = (text: string): Part => ({ tone: "dim", text });
 const code = (text: string): Part => ({ tone: "code", text });
 
-/** 値の欄の名前。当て方で意味が変わる */
+/** 値の欄の名前。加点条件で意味が変わる */
 export function valueLabel(kind: FactorKind): string {
   if (kind === "glob") {
     return "glob";
@@ -24,12 +24,12 @@ export function valueLabel(kind: FactorKind): string {
     return "スクリプト";
   }
   if (kind === "judge") {
-    return "問い";
+    return "yes/no の質問";
   }
   return "基準";
 }
 
-/** 要約の行に出す、当て方と値をつないだ文。読んで意味が通る語順にする */
+/** 要約の行に出す、加点条件と値をつないだ文。読んで意味が通る語順にする */
 export function describe(factor: FactorForm): readonly Part[] {
   const value = factor.value;
   if (value === "") {
@@ -47,7 +47,7 @@ export function describe(factor: FactorForm): readonly Part[] {
     case "script":
       return [dim("スクリプト "), code(value), dim(` が返した点を加点（点を取れなかったときは ${factor.points === "" ? "points" : `${factor.points} 点`}）`)];
     case "judge":
-      return [dim("問い「"), code(value), dim("」の答えが yes なら加点")];
+      return [dim("質問「"), code(value), dim("」の答えが yes なら加点")];
   }
 }
 
@@ -61,14 +61,14 @@ export function summaryPoints(factor: FactorForm): string {
   return factor.points === "" ? "—" : `${factor.points} 点`;
 }
 
-/** 当て方と値をツールチップに出す文 */
+/** 加点条件と値をツールチップに出す文 */
 export function kindTitle(factor: FactorForm): string {
   return KIND_LABELS[factor.kind].label + (factor.value === "" ? "" : `: ${factor.value}`);
 }
 
 /**
- * 絞り込みが当てる文字列。**画面に出ている語（当て方のラベルと要約の文）でも、キーの綴り
- * （`lines_over` など）でも当たる。** 要約に出る文をそのまま含めるので、当て方を変えれば
+ * 絞り込みが当てる文字列。**画面に出ている語（加点条件のラベルと要約の文）でも、キーの綴り
+ * （`lines_over` など）でも当たる。** 要約に出る文をそのまま含めるので、加点条件を変えれば
  * 当たる語も変わる。
  */
 export function findText(factor: FactorForm): string {

@@ -23,7 +23,7 @@
 
 set -eu
 
-# 共通部分。ワークスペースルートの探し方はここにある（設計 §11.8）。
+# 共通部分。ワークスペースルートの探し方はここにある（設計 11.8）。
 . "$(dirname "$0")/ccnavi-common.sh"
 
 usage() {
@@ -73,7 +73,7 @@ esac
 #
 # git には聞かない。モード B（projects/ の下に別リポジトリを clone する形）では、
 # cwd がプロジェクトの中にあると git はプロジェクトを答える。それは git として
-# 正しい答えで、ここで欲しいもの（道具の置き場）とは違う（設計 §11.8）。
+# 正しい答えで、ここで欲しいもの（道具の置き場）とは違う（設計 11.8）。
 root=$(ccnavi_workspace) || {
 	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
@@ -81,6 +81,7 @@ root=$(ccnavi_workspace) || {
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
+	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
 	exec "$bin" --root "$root" ticket "$@"
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	cd "$root"

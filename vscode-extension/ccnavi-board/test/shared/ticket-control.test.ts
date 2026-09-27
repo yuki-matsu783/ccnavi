@@ -19,7 +19,7 @@ test("CB-T56 settings.json の disable で切れる。大文字と前後の空�
   assert.equal(ticketControlFrom({ settings: env("enable"), local: undefined }), "enable");
 });
 
-test("CB-T57 読めない値は enable に倒す（ccnavi の解決と同じ向き）", () => {
+test("CB-T57 読めない値は enable として扱う（ccnavi の解決と同じ向き）", () => {
   assert.equal(ticketControlFrom({ settings: env("off"), local: undefined }), "enable");
   assert.equal(ticketControlFrom({ settings: env(""), local: undefined }), "enable");
 });

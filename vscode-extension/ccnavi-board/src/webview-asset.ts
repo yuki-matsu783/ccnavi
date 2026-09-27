@@ -34,7 +34,7 @@ function asset(name: string): string {
       // 次の候補へ
     }
   }
-  throw new Error(`画面の束ねが見つからない: ${name}（拡張のビルドが揃っていない。pnpm run compile を通す）`);
+  throw new Error(`画面の束ねが見つかりません: ${name}（拡張のビルドが揃っていません。pnpm run compile を実行してください）`);
 }
 
 /**

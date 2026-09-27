@@ -1,9 +1,9 @@
-"""複数のリポジトリ（REQ-MLT）の受入テスト。道具を外から叩いて応答だけを見る。
+"""複数のリポジトリ（REQ-MLT）の受入テスト。道具を外から呼んで応答だけを見る。
 
 ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。
 ワークスペースは Claude Code を起動した場所で、自分の git を持つ。プロジェクトは
 `projects/` の直下に clone した別のリポジトリで、それぞれ層の 3 本の置き場
-（`.ccnavi/config/`、設計 §11.2）に rules.yml を持つ。
+（`.ccnavi/config/`、設計 11.2）に rules.yml を持つ。
 
 見るのは 5 つ。
 
@@ -113,35 +113,17 @@ def layer_rules(root):
     return os.path.join(root, LAYER, "rules.yml")
 
 
-def ticket_text(name, *, project="", allow=()):
+def ticket_text(name, *, parent="", project="", allow=()):
     lines = ["---", "version: 1", f"ticket: {name}"]
+    if parent:
+        lines += [f"parent: {parent}", "phase: 1"]
     if project:
         lines.append(f"project: {project}")
     lines += [
         "human_review:",
         "  required: false",
         "  reason: テスト",
-        "title: 作業",
-        "rationale: |",
-        "  理由",
-    ]
-    if allow:
-        lines.append("allow:")
-        for g in allow:
-            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
-    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
-
-
-def child_text(name, parent, *, project="", allow=()):
-    lines = ["---", "version: 1", f"ticket: {name}", f"parent: {parent}", "phase: 1"]
-    if project:
-        lines.append(f"project: {project}")
-    lines += [
-        "human_review:",
-        "  required: false",
-        "  reason: テスト",
-        f"title: 子 {name}",
+        f"title: 子 {name}" if parent else "title: 作業",
         "rationale: |",
         "  理由",
     ]
@@ -170,13 +152,13 @@ class ProjectsTest(unittest.TestCase):
         self.app = self.project("app", APP_RULES)
         self.lib = self.project("lib", LIB_RULES)
         # 承認済みチケットは、そのチケットの親のツリーの `.ccnavi/approved/` に置かれる
-        # （設計 §9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに落ちる。
+        # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "state")
         self.log = os.path.join(self.ws, "log.jsonl")
 
     def approved_path(self, *parts):
-        """承認済みチケットの置き場の下のパス。どのツリーに落ちたかを探す。"""
+        """承認済みチケットの置き場の下のパス。どのツリーに置かれたかを探す。"""
         for where in (self.ws, self.lib, self.app):
             path = os.path.join(where, ".ccnavi", "approved", *parts)
             if os.path.exists(path):
@@ -322,10 +304,10 @@ class ProjectsTest(unittest.TestCase):
     # ---- 3. 読めないプロジェクトのルール
 
     def test_unreadable_project_rules_are_empty_and_drop_out_of_the_union(self):
-        """壊れた層は空として扱い、記録が層の名前を残す（設計 §11.2、REQ-MLT-06）。
+        """壊れた層は空として扱い、記録が層の名前を残す（設計 11.2、REQ-MLT-06）。
 
-        組み込みの既定へは落ちない。共通層が有るのに落とすと、共通層の deny が
-        消える側に倒れる。
+        組み込みの既定には戻らない。共通層が有るのに戻すと、共通層の deny が
+        消える側になる。
         """
         write(layer_rules(self.app), "version: 1\ndeny: [\n")
         passed = self.hook("Write", self.ws, file_path=os.path.join(self.app, "schema", "x.sql"))
@@ -360,7 +342,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertEqual(record["project"], "app")
 
     def test_worktree_cut_from_the_wrong_project_is_refused_by_the_ticket(self):
-        # プロジェクトの提案はそのプロジェクトの wip/proposals/ に置く（設計 §11.5）。
+        # プロジェクトの提案はそのプロジェクトの wip/proposals/ に置く（設計 11.5）。
         # 置き場がプロジェクトを決めるので、frontmatter の project は書かなくてよい。
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"),
@@ -388,7 +370,7 @@ class ProjectsTest(unittest.TestCase):
         outside = self.hook("Write", self.ws, file_path=os.path.join(right, "docs", "a.md"))
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
 
-    # ---- 4b. プロジェクトを決めるのは提案を置いた場所（設計 §11.5）
+    # ---- 4b. プロジェクトを決めるのは提案を置いた場所（設計 11.5）
 
     def test_the_place_decides_the_project_for_parent_and_child_alike(self):
         write(
@@ -397,7 +379,7 @@ class ProjectsTest(unittest.TestCase):
         )
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01.md"),
-            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
         )
         # 承認の前から、親も子も同じプロジェクトとしてボードに出る
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
@@ -433,7 +415,7 @@ class ProjectsTest(unittest.TestCase):
         )
         write(
             os.path.join(self.app, "wip", "proposals", "todo", "i0007-01.md"),
-            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
         )
         result = self.ccnavi("--approve", stdin="y\n")
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから
@@ -445,7 +427,7 @@ class ProjectsTest(unittest.TestCase):
 
     def test_a_proposal_inside_a_project_worktree_is_read_without_complaint(self):
         # 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、
-        # 承認をプロジェクトの git で運ぶために、そこに置く（設計 §9.4、REQ-MLT-14）。
+        # 承認をプロジェクトの git で運ぶために、そこに置く（設計 9.4、REQ-MLT-14）。
         # 置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録した道から
         # 引くので閉じられる。
         tree = self.worktree(self.lib, "i0010")
@@ -462,6 +444,9 @@ class ProjectsTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "todo", "i0010.md")))
         started = self.ccnavi("ticket", "start", "i0010")
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+        # 着手で共通層を写したので、レビューの無いこの親は人が端末で見てから閉じる（設計 11.12）。
+        seen = self.ccnavi("--config-synced", "i0010", stdin="y\n")
+        self.assertEqual(seen.returncode, 0, seen.stdout + seen.stderr)
         done = self.ccnavi("ticket", "finish", "i0010")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         closed = os.path.join(tree, ".ccnavi", "approved", "done", "i0010.md")
@@ -483,7 +468,7 @@ class ProjectsTest(unittest.TestCase):
     def test_lint_names_a_workspace_side_place_even_for_a_known_project(self):
         # 名前が projects/ に在っても、ワークスペースの wip/<名前>/proposals/ は走査されない。
         # 提案はそのプロジェクトの側 projects/<名前>/wip/proposals/ に置く
-        # （設計 §11.5、REQ-MLT-14）。
+        # （設計 11.5、REQ-MLT-14）。
         # 黙ると提案が消えたように見えるので、正しい置き場を添えて名指しする
         write(
             os.path.join(self.ws, "wip", "lib", "proposals", "todo", "i0011.md"),
@@ -504,7 +489,7 @@ class ProjectsTest(unittest.TestCase):
         )
         self.assertEqual(self.ccnavi("--approve", stdin="y\n").returncode, 0)
         # 承認はプロジェクトの todo/ からプロジェクトの doing/ へ動かす。取り消すと done/ へ。
-        # 置き場はプロジェクトの git が持つ（設計 §11.5）。
+        # 置き場はプロジェクトの git が持つ（設計 11.5）。
         lib_approved = os.path.join(self.lib, ".ccnavi", "approved")
         self.assertFalse(
             os.path.exists(os.path.join(self.lib, "wip", "proposals", "todo", "i0007.md"))
@@ -561,7 +546,7 @@ class ProjectsTest(unittest.TestCase):
         self.assertIn("(projects/lib)", out)
         self.assertIn(".claude/ を持つ", out)
 
-        # `--explain` は層ごとに並べる（設計 §11.9）。読めない層はその位置で言う。
+        # `--explain` は層ごとに並べる（設計 11.9）。読めない層はその位置で言う。
         explained = self.ccnavi("--explain")
         self.assertIn("■ rules app", explained.stdout)
         self.assertIn("■ rules lib", explained.stdout)

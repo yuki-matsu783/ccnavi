@@ -6,11 +6,17 @@ import type { JSX } from "react";
 
 import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
+import { flowButtonLabel } from "../../core/flow-view.js";
+import type { FlowJson, HistoryEntryJson } from "../../core/model.js";
 import { post } from "./post.js";
 import {
   COPY_LABELS,
   MARK_LABELS,
+  VIA_LABELS,
+  historyAt,
+  historyText,
   holdLabel,
+  predecessorsBadge,
   isHighRisk,
   isHttpUrl,
   movedLabel,
@@ -42,9 +48,9 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
   if (hidden) {
     classes.push("hidden");
   }
-  // ボタンとリンク（マージリクエスト）の上では提案を開かない
+  // ボタンとリンク（マージリクエスト）と畳める履歴の上では提案を開かない
   const open = (target: EventTarget | null): void => {
-    if (target instanceof Element && target.closest("button, a") !== null) {
+    if (target instanceof Element && target.closest(NOT_OPENING) !== null) {
       return;
     }
     if (card.openPath !== "") {
@@ -64,7 +70,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       tabIndex={0}
       onClick={(event) => open(event.target)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" && !(event.target instanceof Element && event.target.closest("button, a") !== null)) {
+        if (event.key === "Enter" && !(event.target instanceof Element && event.target.closest(NOT_OPENING) !== null)) {
           event.preventDefault();
           open(event.target);
         }
@@ -76,7 +82,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
         <span className="where">{where}</span>
       </div>
       {moved !== undefined ? (
-        <div className="moved-mark" title="前の読み直しから列が変わった。次に何かが動くまで残る">
+        <div className="moved-mark" title="前回の更新から列が変わりました。次に何かが動くまで残ります">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -84,6 +90,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       <Badges card={card} />
       <Facts card={card} />
       {card.phases.length > 0 ? <Phases phases={card.phases} /> : null}
+      {card.history.length > 0 ? <History entries={card.history} /> : null}
       {card.issues.length > 0 ? (
         <ul className="issues">
           {card.issues.map((issue, i) => (
@@ -91,20 +98,45 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
           ))}
         </ul>
       ) : null}
-      {card.actions.length > 0 ? (
+      {card.actions.length > 0 || card.flow !== null ? (
         <div className="card-actions">
           {card.actions.map((action, i) => (
             <ActionButton key={i} action={action} id={card.id} />
           ))}
+          {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} /> : null}
         </div>
       ) : null}
     </li>
   );
 }
 
+/** カードの上で押しても提案を開かない場所。ボタン・リンク・畳める履歴 */
+const NOT_OPENING = "button, a, details";
+
+/**
+ * 状態が動いた跡（ADR-0086）。既定で畳み、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
+ * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
+ */
+function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
+  return (
+    <details className="history">
+      <summary>履歴（{entries.length} 件）</summary>
+      <ol className="history-list">
+        {[...entries].reverse().map((e, i) => (
+          <li key={i} className={`history-item history-${e.kind}`} title={e.at}>
+            <span className="history-at">{historyAt(e.at)}</span>
+            <span className="history-text">{historyText(e)}</span>
+            {e.via !== "" ? <span className="history-via">{VIA_LABELS[e.via] ?? e.via}</span> : null}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 /**
  * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
- * 書き込み停止中、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
+ * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
  * 本物が決まらない写り。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
@@ -122,6 +154,11 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   if (card.blocked !== "") {
     badges.push(<Badge key="blocked" kind="blocked" text="書き込み停止中" title={card.blocked} />);
   }
+  // 先行を満たしていない（ADR-0088）。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
+  if (card.predecessorsUnmet.length > 0) {
+    const badge = predecessorsBadge(card);
+    badges.push(<Badge key="preds" kind="preds" text={badge.text} title={badge.title} />);
+  }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(<Badge key="worktree" kind="worktree none" text="ワークツリーなし" />);
   }
@@ -138,20 +175,28 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
 
 /**
  * 枠の無い薄い文字で 1 行に並べる属性。承認済／レビュー待ち／クローズ、人間レビューの要否、ワークツリー、
- * マーカー（依頼済はレビュー待ちの間だけバッジに出し、それ以外はどこにも出さない）、Draft 解除済、締めた、
- * リスク（MEDIUM 以下）、base、プロジェクト。
+ * マーカー（終了と依頼済は出さない）、Draft 解除済、締めた、リスク（MEDIUM 以下）、base、プロジェクト。
+ *
+ * 列やバッジと同じことは重ねて書かない。完了・取り消しの列にいる閉じたカードには、クローズと人間レビューの要否を
+ * 出さない（閉じたことは列で分かり、レビューが済むかは省略／レビュー済で分かる）。提案が残っていて未着手・作業中の
+ * 列にいる閉じたカードには、列と食い違うことの手がかりとしてクローズを出す。
+ * 終了の印（pending）は、止まっている間はバッジの「レビュー準備中」が言い、済んだ後は経過でしかない。
+ * 依頼済はレビュー待ちのバッジが言う。どちらもフェーズ行の全文には残る。
  */
 function Facts({ card }: { readonly card: Card }): JSX.Element {
   const facts: JSX.Element[] = [];
-  if (card.copyStatus !== "none") {
+  const closedInColumn = card.copyStatus === "closed" && (card.column === "done" || card.column === "cancelled");
+  if (card.copyStatus !== "none" && !closedInColumn) {
     facts.push(<Fact key="copy" kind={`copy-${card.copyStatus}`} text={COPY_LABELS[card.copyStatus]} />);
   }
-  facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  if (!closedInColumn) {
+    facts.push(<Fact key="review" kind="review" text={`人間レビュー${card.reviewRequired ? "要" : "不要"}`} title={card.reviewReason} />);
+  }
   if (card.worktreeExists) {
     facts.push(<Fact key="worktree" kind="worktree" text={`ワークツリー ${worktreeName(card.worktreePath)}`} title={card.worktreePath} />);
   }
   for (const mark of card.marks) {
-    if (mark !== "requested") {
+    if (mark !== "requested" && mark !== "pending") {
       facts.push(<Fact key={`mark-${mark}`} kind={`mark mark-${mark}`} text={MARK_LABELS[mark] ?? mark} />);
     }
   }
@@ -159,10 +204,10 @@ function Facts({ card }: { readonly card: Card }): JSX.Element {
     facts.push(<MrLink key="mr" url={card.mrUrl} number={card.mrNumber} title="マージリクエストを開く" />);
   }
   if (card.ready) {
-    facts.push(<Fact key="ready" kind="ready" text="Draft 解除済" />);
+    facts.push(<Fact key="ready" kind="ready" text="Draft 解除済み" />);
   }
   if (card.wrapped) {
-    facts.push(<Fact key="wrapped" kind="wrapped" text="締めた" />);
+    facts.push(<Fact key="wrapped" kind="wrapped" text="早期に締めた" />);
   }
   if (card.riskLevel !== "" && !isHighRisk(card.riskLevel)) {
     facts.push(<Fact key="risk" kind={`risk risk-${card.riskLevel.toLowerCase()}`} text={riskText(card)} />);
@@ -243,6 +288,27 @@ function MrLink({ url, number, title }: { readonly url: string; readonly number:
   );
 }
 
+/**
+ * 子のフロー（ADR-0085）を開くボタン。言葉は在るか・着手中か（実行ファイルの答えの写し）で変わる。
+ * 着手中でも押せる（読むだけの画面が開く）。押したら拡張ホストへ返すだけ
+ */
+function FlowButton({ flow, id }: { readonly flow: FlowJson; readonly id: string }): JSX.Element {
+  const state = flow.locked ? "locked" : flow.exists ? "edit" : "create";
+  return (
+    <button
+      type="button"
+      className="action flow"
+      data-action="flow"
+      data-ticket={id}
+      data-flow={state}
+      title={`子チケットの作業の手順（フロー）を図で${flow.locked ? "見る。着手中は書き換えられない" : `${flow.exists ? "直す" : "作る"}。着手すると、終わるまで書き換えられなくなる`}（${flow.rel}）`}
+      onClick={() => post({ type: "flow", ticket: id })}
+    >
+      {flowButtonLabel(flow)}
+    </button>
+  );
+}
+
 /** 人が押せる操作。押したら拡張ホストへ返すだけで、画面は何も置かない */
 function ActionButton({ action, id }: { readonly action: Action; readonly id: string }): JSX.Element {
   switch (action.kind) {
@@ -254,7 +320,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           className="action"
           data-action="approve-one"
           data-ticket={id}
-          title={`このチケットだけを承認する（ccnavi --approve ${id}）。まとめて承認するなら上部のボタン`}
+          title={`このチケットだけを承認します（ccnavi --approve ${id}）。まとめて承認するなら上部のボタンを使ってください`}
           onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
         >
           この 1 件を承認
@@ -268,10 +334,10 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="decide"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`残った指摘の行き先を 1 件ずつ決める（対応しない・このフェーズで直す・issue に回す）`}
+          title={`未解決（Unresolved）の指摘の対応方針を 1 件ずつ決めます（対応しない・このフェーズで直す・issue に回す）`}
           onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
         >
-          決める
+          対応方針を決める
         </button>
       );
     case "reviewed":
@@ -284,7 +350,7 @@ function ActionButton({ action, id }: { readonly action: Action; readonly id: st
           data-action="reviewed"
           data-parent={action.parent}
           data-phase={action.phase}
-          title={`レビューを終えたことを Claude Code に伝える文を作る（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を打つ）`}
+          title={`レビューを終えたことを Claude Code に伝える文を作ります（エージェントが ccnavi-review.sh confirm --phase ${action.phase} を実行して、レビュー済みを記録します）`}
           onClick={() => post({ type: "reviewed", parent: action.parent, phase: action.phase })}
         >
           レビュー済み連絡

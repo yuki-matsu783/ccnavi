@@ -31,7 +31,7 @@ FAIL_LINES="${CCNAVI_GIT_FAIL_LINES:-30}"
 # 残す記録の本数。放っておくと増え続けるので世代で切る。
 KEEP_LOGS="${CCNAVI_GIT_KEEP_LOGS:-50}"
 
-# 対話に落ちる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
+# 対話になる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
 # 資格情報プロンプトは /dev/tty を直接開くので stdin だけでは止まらない。
 GIT_TERMINAL_PROMPT=0
 GIT_PAGER=cat
@@ -62,7 +62,7 @@ reject() {
 
 # ワークスペースルート。道具と記録の置き場。git のトップとは別物で、
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
-# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 §11.8）。
+# 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 11.8）。
 WS=$(ccnavi_workspace) ||
 	reject "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 
@@ -93,7 +93,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   config clone submodule  利用者に依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
                 読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
-                化けるので、値を見ずに一律で拒否する
+                なってしまうので、値を見ずに一律で拒否する
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
@@ -285,7 +285,7 @@ worktree)
 				wt_spell="$wt_up.claude/worktrees/$wt_name"
 				;;
 			esac
-			reject "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 §11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+			reject "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
 		;;
 	list | prune) ;;
@@ -349,7 +349,7 @@ restore)
 	# --ours / --theirs もここを通る。衝突したパスにしか効かない（普段は
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
 	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
-	# 入っていると YAML として読めず、判定は組み込みの既定に落ちているが、
+	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
 	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	for arg in ${1+"$@"}; do
@@ -362,7 +362,7 @@ restore)
 	;;
 
 merge)
-	# 早送り以外も通す。CLAUDE.md のワークツリー手順は、main が先に進んだ状態から
+	# 早送り以外も通す。docs/claude/worktree.md の手順は、main が先に進んだ状態から
 	# ブランチへ main を取り込む形を必ず通る。そこを --ff-only に絞ると、
 	# 枝分かれした時点でブランチが永久に統合されない。衝突の解消はメインの仕事で、
 	# 解こうとする手をラッパースクリプトが止めてしまっては、止めた先に進む道が無くなる。
@@ -440,7 +440,7 @@ checkout | switch)
 	;;
 
 fetch | pull)
-	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗に倒れる。
+	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-f | --force | --prune | --unshallow)
@@ -470,7 +470,7 @@ push)
 	# レビュー待ちの `wip/proposals/review/<名前>.md`）に `parent:` があるかだけ。
 	# 承認済みチケットの無いツリー（チケットを使わないブランチ）は通す。
 	# ワークツリーはワークスペースの .claude/worktrees/ の下にある。元リポジトリが
-	# プロジェクトでも置き場はワークスペース（設計 §11.2）なので、git の
+	# プロジェクトでも置き場はワークスペース（設計 11.2）なので、git の
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。

@@ -12,7 +12,7 @@ open する、想定していないシェル構文で書く。どれも「何が
 配布物の条件は「判定の間に外部プロセスを起こさない」。それは実行前の判定に
 掛かる条件で、あそこはツール呼び出しを止めている最中であり、遅れがそのまま
 エージェントの待ち時間になる。加えて期限に達した hook は素通りするので、
-遅さがガードの穴に化ける。
+遅さがガードの穴になってしまう。
 
 実行後は止めていない。すでに走ったものについて後から言うだけなので、遅れは
 待ち時間にしかならず、読めなければ何も言わないだけで、穴も開かない。そのうえ
@@ -48,6 +48,14 @@ KIND_GONE = "gone"  # 追跡されていたものが消えた
 # 拒む（人の判断で行う操作なので、ここから手順として案内もしない）。
 # 報告のためだけに在る種類で、自動復元（post._restorable）の対象にはしない。
 KIND_COMMITTED = "committed"
+
+# 人へ見せる綴り。記録（`record.paths`）には上の英語のまま残し、報告の文面だけ日本語にする。
+KIND_LABELS = {
+    KIND_NEW: "新規",
+    KIND_CHANGED: "変更",
+    KIND_GONE: "削除",
+    KIND_COMMITTED: "コミット済み",
+}
 
 # git に与える時間。実行前の判定に張る期限より短くしてある。
 # 大きなリポジトリでは status も待たされるが、待たせるくらいなら何も言わない。
@@ -137,7 +145,7 @@ def read(top: str, timeout: float = TIMEOUT_SECONDS) -> tuple[list[Change], str]
         return [], REASON_NO_GIT
     if done.timed_out:
         return [], REASON_TIMEOUT
-    if done.failure or done.code != 0:
+    if not done.ok:
         return [], REASON_FAILED
 
     return [c for c in (_parse(top, entry) for entry in done.out.split("\0")) if c], ""
@@ -313,7 +321,7 @@ def committed_text(
     読めた答えなので、読めなかったことにしない。git を起こせない・期限に達した・
     HEAD そのものが無いときは `(None, False)`。
 
-    **呼ぶ側は「読めなかった」を「変わっていない」に倒してはいけない。** ここを倒すと、
+    **呼ぶ側は「読めなかった」を「変わっていない」として扱ってはいけない。** そう扱うと、
     git を 2 秒止めるだけで、突き合わせの上に建てた除外が全部通る。
 
     無いことの確かめに `ls-tree` をもう 1 回起こすのは、`show` の失敗が「HEAD に無い」

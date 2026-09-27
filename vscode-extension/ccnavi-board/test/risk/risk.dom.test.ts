@@ -14,7 +14,7 @@ function savedForm(dom: DomPage): RiskForm {
   return saves[saves.length - 1].form as RiskForm;
 }
 
-test("CB-D10 既定は畳み、行を押すと開いて state に id が入る。要約は当て方に応じた文になる", async () => {
+test("CB-D10 既定は畳み、行を押すと開いて state に id が入る。要約は加点条件に応じた文になる", async () => {
   const dom = await openRisk();
   try {
     assert.equal(dom.all(".factor.open").length, 0);
@@ -22,7 +22,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, ".github/** に当てはまるファイルを 1 つ変更するごとに加点（上限 35 点）CI に触った");
     // script は「返した点を加点」で、points は測れなかったときの保険。judge は yes で加点
     assert.equal(dom.one(`${rowSelector("f3")} .sum .clip`).textContent, "スクリプト .ccnavi/common/scripts/risk.sh が返した点を加点（点を取れなかったときは 10 点）");
-    assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "問い「テストの無い変更を含むか」の答えが yes なら加点");
+    assert.equal(dom.one(`${rowSelector("f4")} .sum .clip`).textContent, "質問「テストの無い変更を含むか」の答えが yes なら加点");
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
     await dom.settle();
     assert.ok(dom.one(rowSelector("f2")).classList.contains("open"));
@@ -33,7 +33,7 @@ test("CB-D10 既定は畳み、行を押すと開いて state に id が入る�
   }
 });
 
-test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では上限の欄が消え、行は開いたまま", async () => {
+test("CB-D11 加点条件を変えると値は持ち越さず、glob 以外では上限の欄が消え、行は開いたまま", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f2")} .row-head`));
@@ -47,7 +47,7 @@ test("CB-D11 当て方を変えると値は持ち越さず、glob 以外では�
     dom.type(dom.one(`${rowSelector("f2")} input.f-value`), "10");
     await dom.settle();
     assert.equal(dom.one(`${rowSelector("f2")} .sum .clip`).textContent, "変更したファイルが 10 件を超えると加点CI に触った");
-    // 保存に渡る形にも出る。当て方を変えても id と文面は持ち越す
+    // 保存に渡る形にも出る。加点条件を変えても id と理由は持ち越す
     dom.click(dom.one("#save"));
     await dom.settle();
     assert.deepEqual(savedForm(dom).factors[1], { origin: 1, id: "ci", points: "35", kind: "files_over", value: "10", max: "", message: "CI に触った" });
@@ -106,7 +106,7 @@ test("CB-D13 ファイルが無ければ欄も追加も押せず、「作る」�
 test("CB-T82 ファイルが無ければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false });
   try {
-    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml が無い。実行ファイルは組み込みの配点で数えている/);
+    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/common\/risks\.yml がありません。実行ファイルは組み込みの配点で数えています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
     assert.ok(missing.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
   } finally {
@@ -126,7 +126,7 @@ test("CB-T84 保存できない理由と読み込みの苦情を出し、錠は�
   const dom = await openRisk({ model: readRisk("version: 1\nfactors: nope\n").model });
   try {
     assert.ok(dom.one("#lock").classList.contains("hidden"));
-    assert.match(dom.one(".problems").textContent, /factors が並びではない/);
+    assert.match(dom.one(".problems").textContent, /factors がリスト（配列）ではありません/);
     // 作業中のチケットが現れたら、保存は押せなくなる（編集の途中はそのまま）
     dom.type(dom.one("#find"), "");
     await dom.send({ type: "lock", lock: { locked: true, reason: "作業中のチケットがある（i0001-02）", doing: ["i0001-02"] } });
@@ -156,7 +156,7 @@ test("CB-T122 項目の一覧は 1 件 1 行で、控えてある id の行は�
   }
 });
 
-test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が変わり、YAML のキー名は title に載せる", async () => {
+test("CB-T126 項目の欄名は日本語で、値の欄は加点条件で名前が変わり、YAML のキー名は title に載せる", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
@@ -164,7 +164,7 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
     const caps = dom.all(`${rowSelector("f1")} .row-body > .field > .cap`);
     assert.deepEqual(
       caps.map((cap) => cap.textContent),
-      ["id", "点", "当て方", "基準", "文面"],
+      ["id", "点", "加点条件", "基準", "理由"],
     );
     assert.deepEqual(
       caps.map((cap) => cap.getAttribute("title")),
@@ -181,7 +181,7 @@ test("CB-T126 項目の欄名は日本語で、値の欄は当て方で名前が
     await dom.settle();
     assert.deepEqual(
       dom.all(`${rowSelector("f2")} .row-body > .field > .cap`).map((cap) => cap.textContent),
-      ["id", "点", "当て方", "glob", "文面"],
+      ["id", "点", "加点条件", "glob", "理由"],
     );
     assert.equal(dom.one(`${rowSelector("f2")} .inline > .cap`).textContent, "上限");
   } finally {
@@ -254,7 +254,7 @@ test("CB-D55 組み上がったら ready を送り、届いた中身で編集を
 test("CB-D56 読み直せなかったら理由を出し、配点は出さない", async () => {
   const dom = await openPage({ kind: "error", error: "配点のファイルを読めない: EACCES" });
   try {
-    assert.match(dom.one(".empty").textContent, /リスク管理画面を読み直せなかった/);
+    assert.match(dom.one(".empty").textContent, /リスク管理画面を読み込めませんでした/);
     assert.equal(dom.one("pre.load-error").textContent, "配点のファイルを読めない: EACCES");
     assert.equal(dom.all("#factors").length, 0);
   } finally {
@@ -277,7 +277,7 @@ test("CB-D57 見た目の切り替えは body のクラスだけを付け替え�
   }
 });
 
-test("CB-D58 当て方の選択肢は 6 つで、キーの綴りと説明を並べて出す", async () => {
+test("CB-D58 加点条件の選択肢は 6 つで、キーの綴りと説明を並べて出す", async () => {
   const dom = await openRisk();
   try {
     dom.click(dom.one(`${rowSelector("f1")} .row-head`));
@@ -353,7 +353,7 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の案内を出し、
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["リスクレベルが上がる点数", "項目", "保存", "案内"]);
+    assert.deepEqual(titles, ["リスクレベルの基準点", "項目", "保存", "案内"]);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
   } finally {
     await dom.close();

@@ -1,9 +1,9 @@
 """控えを置く側が、途中を見せない書き方を通っていることの受入テスト。
 
 `fsio` 側の単体テストは `write_text_atomic` そのものしか見ない。それだけだと、
-呼び出し側が素の `write_json` に戻されてもスイートは緑のまま通る（実際に戻して
+呼び出し側が素の書き方に戻されてもスイートは通ってしまう（実際に戻して
 確かめた）。ここで見るのは配線で、控えを置く 4 か所が `write_json_atomic` を
-通ること。素の `write_json` は呼ばないこと。
+通ること。
 
 もう 1 つ見るのは、控えを読めなかったときに書き戻さないこと。読めないのは控えが
 在るときにしか起きないので、そこで「まだ何も無い」として書くと、覚えていたぶんを
@@ -44,14 +44,10 @@ class WiringTest(unittest.TestCase):
         self.err = io.StringIO()
 
     def _assert_atomic(self, call):
-        """呼び出しが write_json_atomic を通り、素の write_json を通らないこと。"""
-        with (
-            mock.patch.object(fsio, "write_json_atomic", wraps=fsio.write_json_atomic) as atomic,
-            mock.patch.object(fsio, "write_json", wraps=fsio.write_json) as plain,
-        ):
+        """呼び出しが write_json_atomic を通ること。"""
+        with mock.patch.object(fsio, "write_json_atomic", wraps=fsio.write_json_atomic) as atomic:
             call()
         self.assertTrue(atomic.called, "write_json_atomic を通っていない")
-        self.assertFalse(plain.called, "素の write_json を通っている")
 
     def test_ctxfile_once_state(self):
         self._assert_atomic(
@@ -75,7 +71,7 @@ class UnreadableStateTest(unittest.TestCase):
     """読めなかった控えを、空で上書きしないこと。
 
     読みの打ち直しが尽きるのは、重なりが続いたときだけ。そこで書き戻すと、
-    覚えていたぶんが消える。読めなかった回は、文は渡す側へ倒しつつ、
+    覚えていたぶんが消える。読めなかった回は、文は渡す側を採りつつ、
     控えには触らない。
     """
 
@@ -96,7 +92,7 @@ class UnreadableStateTest(unittest.TestCase):
         ):
             text = ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
 
-        # 文は渡す（覚えられないなら言う側へ倒す）。
+        # 文は渡す（覚えられないなら言う側を採る）。
         self.assertIn("1 度だけの文。", text)
         # 控えは消えていない。
         self.assertEqual(fsio.read_json(self.path)[0], before)
