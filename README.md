@@ -2223,6 +2223,67 @@ ccnavi --version --json
 配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
 拡張のほうが古ければ拡張を入れ直す。`--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
 
+## ドキュメントの索引
+
+```sh
+ccnavi --docs --text コンフリクト --format detail     # 話題で当たりを付ける
+ccnavi --docs --type adr --sort mtime -r --limit 10     # 新しい ADR から 10 本
+ccnavi --docs --tag worktree --tag git --format path    # どちらかのタグを持つもの（OR）のパスだけ
+ccnavi --docs --path docs/claude --format count         # 件数だけ
+```
+
+md を本文ではなく頭の frontmatter で引く。grep は当たった行を返すので、そのファイルが何の文書かは開くまで分からず、
+よそからの言及も同じ重みで混ざる。frontmatter の書き方は [docs/claude/frontmatter.md](docs/claude/frontmatter.md)。
+
+引くのはワークスペースと、プロジェクトの置き場の直下の各プロジェクト（それぞれ別の git）を合わせたもの。どこから打っても同じで、
+パス（`concept_id`）はワークスペースルートから書く（`projects/lib/docs/x`）。`--path projects/lib` で 1 つのプロジェクトに絞れる。
+それぞれの `git ls-files --cached --others --exclude-standard` のうち `*.md` を載せ、実体の無いもの（消してまだステージしていないもの）、
+シンボリックリンク、ccnavi ディレクトリ（`.ccnavi/`）の下は載せない。ワークスペースの一覧からはプロジェクトの置き場を外す。
+
+引く前に、md が直下にあるディレクトリごとの `index.jsonl` を新しくする（`--no-refresh` で省く）。`concept_id` と `mtime` が
+同じ行は読み直さずに使い回し、中身が変わらなければ書かない。**書くのは git がそこの `index.jsonl` を無視しているときだけ。**
+md を持つディレクトリのどれでも無視されていないツリー（ワークスペースかプロジェクト）は索引の対象外にし、引かずに標準エラーで
+名指しする。使うには、そのリポジトリの `.gitignore` に `**/index.jsonl` を足す（ccnavi は `.gitignore` を書き換えない）。
+一部のディレクトリだけが無視されていない（追跡されている `index.jsonl` がある）なら、そこは書かずに行だけを組む。
+
+`SessionStart` はサブエージェントでなければ、ワークスペースとプロジェクトの索引を同じ手順で新しくし、引き方と frontmatter の
+決まりの要点を `additionalContext` に添える。対象外にしたツリーがあれば 1 行で名指しする（全部が対象なら何も足さない）。
+md が 1 本も無い・git の外なら何も言わない。新しくするのに使うのは 3 秒まで（`docsearch.START_SECONDS`）で、過ぎたら残りは
+次の回に回す（書けたディレクトリの分は次に使い回す。`--docs` は引く前に期限なしで新しくする）。何が起きてもセッションの開始は止めない。
+
+| オプション | 対象 | 一致 |
+|---|---|---|
+| `--type <値>` | `frontmatter.type` | 完全一致 |
+| `--tag <値>` | `frontmatter.tags` の要素（スカラーでも 1 要素の並びとして扱う） | 完全一致 |
+| `--keyword <値>` | `frontmatter.keywords` の要素 | 完全一致 |
+| `--path <部分>` | `concept_id` | 部分一致 |
+| `--text <部分>` | `concept_id`・`mtime`・frontmatter のすべてのスカラーの値（キー名は含まない） | 部分一致 |
+| `--since <日時>` / `--until <日時>` | `mtime`（`YYYY-MM-DD` か `YYYY-MM-DDTHH:MM:SS`）。`--until` は書いた桁の終わりまで（日付だけならその日の `23:59:59`） | 以上 / 以下 |
+
+同じオプションの繰り返しは OR、違うオプションどうしは AND。大文字小文字は区別しない。並べ方は `--sort path|mtime|type|title`
+（既定 `path`。第 2 キーは `concept_id`）、`-r` / `--reverse` で逆、`--limit <N>` で並べた後の先頭 N 件（0 以下は全部）。
+`--format` は `table`（既定。`type` / `concept_id` / `title` を全角を幅 2 として桁揃え）・`path`・`detail`・`json`・`jsonl`・`count`
+（`matched=<絞った数> [shown=<出した数>] total=<全部>`。`shown` は `--limit` で切ったときだけ）。`--json` は `--format json` と同じ。
+`table` と `detail` は同じ件数の 1 行を標準エラーにも出す。0 件でも終了コードは 0 で、使い方の誤りと git の外だけが 1。
+値が `-` で始まるときは `--text=-A` のように `=` で繋ぐ。
+
+`index.jsonl` と `--format jsonl` の 1 行、`--format json` の配列の要素は同じ形。
+
+```json
+{"concept_id":"docs/claude/worktree","directory":"docs/claude","frontmatter":{"type":"guide","tags":["worktree","git"]},"mtime":"2026-09-27T19:56:23"}
+```
+
+| 鍵 | 何 |
+|---|---|
+| `concept_id` | 引いた結果ではワークスペースルートからの相対パス（`/` 区切り）から `.md` を落としたもの。`index.jsonl` に書く行は、そのリポジトリのルートから（プロジェクトの頭の `projects/<名前>/` が無い） |
+| `directory` | そのファイルがあるディレクトリ（`concept_id` と同じ基準。ルート直下は空） |
+| `frontmatter` | 頭の `---` から `---`（か `...`）までを YAML（SafeLoader、別名は拒む）で読んだもの。無い・読めない・キーと値の並びでなければ `null`。日付などの JSON に無い値は文字列 |
+| `mtime` | ファイルの更新日時。ローカル時刻の `YYYY-MM-DDTHH:MM:SS` |
+
+md が全部消えたディレクトリ（追跡されているが実体が無い）の `index.jsonl` は消す。それ以外の経路で残った古い `index.jsonl` は
+読まない（引くのは、いま md を持つディレクトリの分だけ）。`mtime` は秒で比べるので、同じ秒の中で 2 度書き換えた md は
+次に `mtime` が変わるまで古い行のままになる。
+
 ## 生の git は止めてラッパースクリプトへ寄せる
 
 `.ccnavi/scripts/ccnavi-git.sh` は安全な git だけを通し、出力を抑えて結果だけを返す。生の `git` はルールで拒否し、拒否の文面からここへ誘導する。
@@ -2291,6 +2352,7 @@ hook の文字列一致は外れる。そこまで塞ぐなら `permissions.deny
 | `ccnavi/ruleload.py` | この呼び出しに当てるルール集合を決める（ワークスペース・プロジェクト・その和） |
 | `ccnavi/subagent.py` | SubagentStart / SubagentStop。開いている子の案内と、範囲外の変更の差し戻し |
 | `ccnavi/ctxfile.py` | 当たったルールがモデルへ渡す文（additionalContext）。ファイルの本文と once の控え |
+| `ccnavi/docsearch.py` | md の frontmatter の索引（`index.jsonl`）を組み、`--docs` で引く。`SessionStart` の案内 |
 | `ccnavi/selfguard.py` | ccnavi 自身の設定ファイルと実行ファイルの控えと復元 |
 | `ccnavi/modes.py` | enable / dry-run / disable の 3 値と終了コード。モードの解決 |
 | `ccnavi/gitcmd.py` | git を 1 回起こす |
