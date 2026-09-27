@@ -10,6 +10,9 @@
 消すのは、ローテートした記録のうち最後に書かれてから保持日数を過ぎたものだけで、
 いま書いている `log.jsonl` は消さない。
 
+**診断ログ（`logs/diag/*.log`）。** 記録と同じしきい値で、大きさでローテートし、
+保持日数（CCNAVI_LOG_KEEP_DAYS）のあいだ書かれていないものを消す（_prune_diag）。
+
 **控え（`logs/state/`）。** 消すのはセッションを名前に持つものだけで、セッションごとにまとめて
 判断する。そのセッションの控えのどれかが保持日数のうちに書かれていれば、全部を残す。
 動いているセッションは、ターンの始まりの基準（`<セッション>.turn.json`）をプロンプトの
@@ -37,7 +40,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from . import fsio
+from . import diaglog, fsio
 
 # しきい値の環境変数と既定値。
 LOG_ROTATE_MB_ENV = "CCNAVI_LOG_ROTATE_MB"
@@ -86,6 +89,10 @@ _SESSION_AND_KEY = (
 _SEEN = re.compile(
     r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.json$"
 )
+
+
+# ローテートした診断ログ（`<出どころ>.<日時>.log`）。_rotated_name と同じ形。
+_DIAG_ROTATED = re.compile(r"\.\d{8}-\d{6}(?:-\d+)?\.log$")
 
 
 @dataclass
@@ -149,6 +156,7 @@ def run(
             _rotate(report, root, log_path, int(rotate_mb * 1024 * 1024), dry_run, now)
         if log_days > 0:
             _prune_logs(report, root, log_path, now - log_days * 86400, dry_run)
+    _prune_diag(report, root, rotate_mb, log_days, dry_run, now)
     if state_dir and state_days > 0:
         _prune_state(report, root, state_dir, session, now - state_days * 86400, dry_run)
     return report
@@ -283,6 +291,48 @@ def _prune_logs(report: Report, root: str, log_path: str, cutoff: float, dry_run
         path = os.path.join(directory, name)
         try:
             if not os.path.isfile(path) or os.path.getmtime(path) >= cutoff:
+                continue
+        except OSError:
+            continue
+        if _remove(report, root, path, dry_run):
+            report.logs.append(_shown(root, path))
+
+
+def _prune_diag(
+    report: Report, root: str, rotate_mb: float, log_days: float, dry_run: bool, now: float
+) -> None:
+    """診断ログ（`logs/diag/*.log`、diaglog）の後始末。しきい値は記録と同じものを使う。
+
+    出どころごとの 1 本が上限を超えていたら、記録と同じく `<出どころ>.<日時>.log` へ名前を
+    変える（_rotate）。そのうえで、ローテートした分も含めて最後に書かれてから保持日数を過ぎた
+    `*.log` を消す。置き場がリンクなら辿らない（控えの置き場と同じ理由）。
+    """
+    directory = os.path.join(root, diaglog.DIAG_DIR)
+    if os.path.islink(directory):
+        report.problems.append(
+            f"{_shown(root, directory)} はリンクなので辿らない（診断ログを消さない）"
+        )
+        return
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        return
+    cutoff = now - log_days * 86400
+    for name in names:
+        if not name.endswith(".log"):
+            continue
+        path = os.path.join(directory, name)
+        try:
+            if os.path.islink(path) or not os.path.isfile(path):
+                continue
+        except OSError:
+            continue
+        if rotate_mb > 0 and not _DIAG_ROTATED.search(name):
+            _rotate(report, root, path, int(rotate_mb * 1024 * 1024), dry_run, now)
+        if log_days <= 0:
+            continue
+        try:
+            if os.path.getmtime(path) >= cutoff:
                 continue
         except OSError:
             continue
