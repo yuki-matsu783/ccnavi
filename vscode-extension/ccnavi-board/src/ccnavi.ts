@@ -8,6 +8,7 @@
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
  * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）、
  * `--suggest --json`（記録からルールの候補を起こす。ルール設定画面が読む。記録を読むので `--log ""` は付けない）。
+ * ほかに `--version --json`（版・互換の版・受け付けるフラグ）を、起動のときと新しいフラグを使う前に聞く。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（ワークスペースかプロジェクトの設定の種類なら `--project-phases-file <名前>=<パス>`）で
@@ -53,6 +54,7 @@ import {
   type SamplesJson,
   type TestJson,
 } from "./core/testmodel.js";
+import { missingFlags, parseVersionJson, type VersionProbe } from "./core/version.js";
 
 export type LoadResult =
   | { readonly ok: true; readonly board: BoardJson; readonly launcher: Launcher }
@@ -524,10 +526,52 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
  * 子チケットのフロー 1 本を実行ファイルに確かめさせる（`--lint --json --flow <パス>`）。
  * フロー編集画面が、開くときと保存の前に編集中の本文を一時ファイルに書いて渡す。読み手と検査は
  * SubagentStart と同じもので、答えは `(flow)` の苦情（`problemsOfFlow`）。
- * `--flow` を知らない古い実行ファイルは、確かめられないとして失敗にする（開かない・保存しない側）。
+ * 先に `--version --json` で `--flow` を知っているかを見る。知らない古い実行ファイル（`--version` も
+ * 知らないものを含む）は、確かめられないとして失敗にする（開かない・保存しない側）。
  */
 export async function runFlowLint(root: string, setting: string, flowPath: string): Promise<RunResult<LintJson>> {
-  return lintJson(root, setting, ["--flow", flowPath], "ccnavi --lint --json --flow");
+  const what = "ccnavi --lint --json --flow";
+  const probe = await probeVersion(root, setting);
+  if (probe === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const refused = missingFlags(probe, ["--flow"], what, hasSource(root));
+  if (refused !== undefined) {
+    return { ok: false, error: refused };
+  }
+  return lintJson(root, setting, ["--flow", flowPath], what);
+}
+
+/**
+ * 実行ファイルに版を聞く（`--version --json`）。実行ファイルが見つからなければ undefined。
+ * `--version` を知らない古い実行ファイルは argparse の「知らないオプション」で見分けて `old` にする
+ * （見分けにこの苦情を使うのは、ここの 1 か所だけ）。
+ */
+export async function probeVersion(root: string, setting: string): Promise<VersionProbe | undefined> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return undefined;
+  }
+  const ran = await run(launcher, root, ["--version", "--json"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { kind: "failed", error: cutOff("ccnavi --version --json", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    if (unknownOption(ran.stderr, "--version")) {
+      return { kind: "old" };
+    }
+    return { kind: "failed", error: `ccnavi --version --json が失敗しました: ${firstLine(ran.stderr)}` };
+  }
+  const parsed = parseVersionJson(ran.stdout);
+  return parsed.ok ? { kind: "ok", info: parsed.value } : { kind: "failed", error: parsed.error };
+}
+
+/**
+ * ワークスペースが ccnavi のリポジトリ（組み立てる元の build.py とソースがある）か。
+ * 実行ファイルが古いときの直し方が、組み立て直しか配り直しかで分かれる
+ */
+export function hasSource(root: string): boolean {
+  return fs.existsSync(path.join(root, "build.py")) && fs.existsSync(path.join(root, "ccnavi", "__main__.py"));
 }
 
 async function lintJson(root: string, setting: string, extra: readonly string[], what: string): Promise<RunResult<LintJson>> {
@@ -545,10 +589,6 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   const parsed = parseLintJson(ran.stdout);
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
-  }
-  const unknown = extra.find((option) => option.startsWith("--") && unknownOption(ran.stderr, option));
-  if (unknown !== undefined) {
-    return { ok: false, error: `実行ファイルが ${unknown} を知りません（古い版です）。${what} で確かめられないので進めません。実行ファイルを新しくしてください` };
   }
   // 設定の不備などで実行ファイルが JSON ではなく人向けの文面を出したときは、JSON.parse の苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる

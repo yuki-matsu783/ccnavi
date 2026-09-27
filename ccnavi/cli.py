@@ -35,6 +35,7 @@ from . import (
     selfguard,
     settings,
     suggest,
+    version,
 )
 from .modes import EXIT_ERROR, EXIT_OK
 
@@ -48,6 +49,16 @@ watch the working tree for protected files that changed anyway. Exercise it with
 
     echo '{"hook_event_name":"PreToolUse","tool_name":"Bash",
            "tool_input":{"command":"git push"}}' | ccnavi
+
+To say which build this is, run
+
+    ccnavi --version [--json]
+
+It prints the version, the commit it was built from ("unknown" when run from
+source), the compat version the scripts in .ccnavi/scripts/ and the VS Code
+extension compare with their own, and every flag it accepts. It reads no
+payload and no settings. The --json shape is documented in README.md
+("版の JSON").
 
 To check the rules file and the settings without making a decision, run
 
@@ -405,6 +416,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
     parser.add_argument("--config-synced", default="")
     parser.add_argument("-h", "--help", action="store_true")
+    # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
+    parser.add_argument("--version", action="store_true")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -412,6 +425,9 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         stderr.write(USAGE)
         return EXIT_ERROR
+    # 設定もワークスペースも読まない。フラグは上の定義から引くので、足したものはそのまま並ぶ。
+    if args.version:
+        return version.report(stdout, parser, args.json)
     if not _one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
 

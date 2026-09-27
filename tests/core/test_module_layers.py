@@ -108,7 +108,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "entry",
         "入口と診断。下の段からは読まれない",
-        frozenset({"cli", "diagnose", "events", "lint", "subagent", "suggest", "__main__"}),
+        frozenset(
+            {"cli", "diagnose", "events", "lint", "subagent", "suggest", "version", "__main__"}
+        ),
     ),
 )
 

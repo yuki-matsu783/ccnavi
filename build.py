@@ -7,6 +7,10 @@ onedir で作る。onefile は起動のたびにランタイムを一時ディ�
 
     uv run --with pyinstaller python build.py
 
+組み立ての元のコミットを実行ファイルに埋める（`ccnavi --version` が言う）。`build/stamp/` に
+`ccnavi_buildinfo.py` を書き、PyInstaller に一緒に入れさせる。git に聞くのはここだけで、
+実行ファイルは聞かない。作業ツリーに未コミットの変更があれば `-dirty` を付ける。
+
 組み立てた `dist/ccnavi/` は `.ccnavi/bin/<os>-<arch>/` へ写す。hook が起動する振り分けの sh
 （`.ccnavi/scripts/ccnavi-launcher.sh`）は `../bin/` のこちらを探すので、写すまで hook は
 新しい実行ファイルを起動しない。
@@ -23,7 +27,7 @@ import time
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 
-from ccnavi import platformtag  # noqa: E402
+from ccnavi import platformtag, version  # noqa: E402
 
 # 組み立ての出力。導入スクリプトはここから配り、代わりに通る sh は env が無いときここを探す。
 DIST = os.path.join(ROOT, "dist")
@@ -51,9 +55,54 @@ def build_target() -> str:
     return platformtag.host_target()
 
 
+def source_commit(root: str) -> str:
+    """`root` の HEAD のコミット。未コミットの変更があれば `-dirty` を付ける。
+
+    git が無い・リポジトリでないときは `unknown`。組み立ては止めない（版が分からないだけで、
+    実行ファイルとしては動く）。
+    """
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        changed = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return version.UNKNOWN
+    if not head:
+        return version.UNKNOWN
+    return head + ("-dirty" if changed else "")
+
+
+def write_buildinfo(stamp: str, commit: str) -> str:
+    """組み立ての元のコミットを書いた部品を `stamp` に置き、そのパスを返す。
+
+    パッケージ（`ccnavi/`）の外に置く。中に置くと、ソースで動かしたときに前の組み立ての
+    コミットを名乗る。
+    """
+    os.makedirs(stamp, exist_ok=True)
+    path = os.path.join(stamp, version.BUILDINFO_MODULE + ".py")
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write('"""build.py が組み立てのときに書く。手で直さない。"""\n\n')
+        f.write(f"COMMIT = {commit!r}\n")
+    return path
+
+
 def build() -> int:
     work = os.path.join(ROOT, "build")
     staging = os.path.join(work, "dist")
+    stamp = os.path.join(work, "stamp")
+    commit = source_commit(ROOT)
+    write_buildinfo(stamp, commit)
 
     command = [
         sys.executable,
@@ -71,6 +120,10 @@ def build() -> int:
         work,
         "--paths",
         ROOT,
+        "--paths",
+        stamp,
+        "--hidden-import",
+        version.BUILDINFO_MODULE,
         os.path.join(ROOT, "main.py"),
     ]
     result = subprocess.run(command, cwd=ROOT)
@@ -81,7 +134,7 @@ def build() -> int:
     target = build_target()
     with open(TARGET, "w", encoding="utf-8", newline="\n") as f:
         f.write(target + "\n")
-    print(f"built {executable()} ({target})")
+    print(f"built {executable()} ({target}, {commit})")
 
     try:
         live = install(os.path.join(DIST, NAME), ROOT, target)

@@ -107,8 +107,8 @@ export function problemsOfFlow(lint: LintJson): LintProblem[] {
 
 /**
  * 標準エラーが、実行ファイルの知らないオプションの苦情（argparse の `unrecognized arguments`）で、
- * そこに option が名指しされているか。古い実行ファイルに新しいオプション（`--flow` など）を
- * 渡したと見分けるために使う
+ * そこに option が名指しされているか。`--version` を知らない古い実行ファイルを見分けるために使う
+ * （`ccnavi.ts` の probeVersion）。ほかの新しいフラグを知っているかは、版の JSON の `flags` で見る
  */
 export function unknownOption(stderr: string, option: string): boolean {
   return stderr.split(/\r?\n/).some((line) => line.includes("unrecognized arguments") && line.split(/\s+/).includes(option));

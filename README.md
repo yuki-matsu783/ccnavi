@@ -1888,6 +1888,7 @@ error 2 件、warn 2 件、info 0 件
 | warn | `PostToolUse` / `SubagentStart` / `SubagentStop` に ccnavi が登録されていない |
 | warn | 登録はされているが git の作業ツリーではない（監視が何も検知しない） |
 | warn | `.ccnavi/scripts/ccnavi-{ticket,review,git}.sh` が無い |
+| warn | `.ccnavi/scripts/ccnavi-common.sh` の互換の版（`CCNAVI_COMPAT`）が実行ファイルと違うか、名乗っていない（場所は `(version)`。直し方は「版の JSON」） |
 
 登録の検査は `.claude/settings.json` しか見ない。そのファイルが無いときは何も言わない（利用者ごとの設定は見えないため）。
 
@@ -2126,6 +2127,49 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 - `issue_url` と `warning` は sh が足す。置いたあとの投稿（issue とコメント）で起きたことで、置いたことは戻さない
 - 見せた指摘と今の指摘が違えば、何も置かずに `{"version": 1, "ok": false, "mismatch": true, "digest": {"expected", "current"}}` を
   返して 1 で終わる
+
+## 版の JSON
+
+```sh
+ccnavi --version          # 1 行 1 項目（`compat: 1` など。sh が読む）
+ccnavi --version --json
+```
+
+実行ファイルが自分について言う。設定もワークスペースも読まず、常に 0 で終わる。読み手は VS Code 拡張と
+`.ccnavi/scripts/` の sh で、どちらも起動のときに互換の版を自分のものと比べる。
+
+```json
+{"schema": 1, "version": "0.1.0", "commit": "88182c2…", "built": true, "compat": 1,
+ "flags": ["--accept-unresolved", "--approve", "…", "--version", "--yes"],
+ "formats": {"phases": 1, "risks": 1, "rules": 1, "ticket": 1}}
+```
+
+| 鍵 | 何 |
+|---|---|
+| `schema` | この JSON の形の版（いま 1）。欄を足すだけなら上げない |
+| `version` | ccnavi の版（`pyproject.toml` の `version`） |
+| `commit` | 組み立ての元のコミット。`build.py` が組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
+| `built` | 組み立てた実行ファイルなら真、ソースで動いていれば偽 |
+| `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
+| `flags` | 受け付けるフラグ。引数の定義から引くので、フラグを足せばここにも並ぶ |
+| `formats` | 読む書式の版。層のファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
+
+**互換の版**は 3 か所に同じ値で書く。実行ファイル（`ccnavi/version.py` の `COMPAT`）、sh（`ccnavi-common.sh` の
+`CCNAVI_COMPAT`）、拡張（`src/core/version.ts` の `EXTENSION_COMPAT`）。sh や拡張が頼るフラグや出力の形を、
+呼ぶ側を直さないと動かない形に変えたときだけ上げる。フラグや欄を足すだけなら上げない（拡張は使う前に `flags` を見る）。
+層のファイルは頭の `version:` が書式の版を名乗り、読めない版は `--lint` が既に error で言うので、層に別の版は足さない。
+
+食い違ったとき、どこでも直し方を名指しする。止めはしない（止める・通すは実行ファイルと hook が持つ）。
+
+| 見つける場所 | 言うこと |
+|---|---|
+| sh（`ccnavi-ticket.sh` / `ccnavi-approve.sh` / `ccnavi-review.sh`） | 実行ファイルを起こす前に `--version` を読み、食い違えば標準エラーに 1 行出して先へ進む |
+| VS Code 拡張 | 起動のときに 1 度聞き、食い違えば通知を出す。`--flow` を使う前には `flags` を見て、無ければフロー編集画面を開かない・保存しない |
+| `ccnavi --lint` | sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn で言う |
+
+直し方は、ccnavi のリポジトリ（`build.py` とソースがある）なら `uv run --with pyinstaller python build.py` で組み立て直し、
+配布先なら ccnavi のリポジトリで組み立てて `sh scripts/ccnavi-setup.sh <ワークスペース> --force` で実行ファイルと sh を配り直す。
+拡張のほうが古ければ拡張を入れ直す。`--version` を知らない実行ファイルは、この仕組みより前の古い版として扱う。
 
 ## 生の git は止めてラッパースクリプトへ寄せる
 
