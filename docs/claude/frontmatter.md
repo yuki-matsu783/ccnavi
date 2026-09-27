@@ -60,7 +60,8 @@ keywords: [ワークツリー, 統合先, ccnavi-git.sh, worktree add, fast-forw
 `projects/<名前>/` の md も同じ決まりで書く（`ccnavi --docs` はワークスペースとプロジェクトを横断し、パスは
 `projects/<名前>/…` で出る）。プロジェクトの置き場ごとの文書（`docs/spec/` など）は、上の表の近い値を使うか、表に行を足す。
 索引に載るのは、そのリポジトリの `.gitignore` に `**/index.jsonl` があるプロジェクトだけ。無いプロジェクトは SessionStart の
-案内で名指しされる。足すのはそのプロジェクトのチケットの範囲で行う（ccnavi は書き換えない）。
+案内で名指しされる。足すのはそのプロジェクトのチケットの範囲で行う（ccnavi は書き換えない。導入スクリプト
+`scripts/ccnavi-setup.sh` が足すのはワークスペースの `.gitignore` だけ）。
 
 ## 索引のファイル
 
