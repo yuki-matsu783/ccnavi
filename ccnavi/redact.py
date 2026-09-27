@@ -41,8 +41,13 @@ _KEY_WORDS = (
     r"token|password|passwd|secret|api[_-]?key|apikey|access[_-]?key|private[_-]?key|"
     r"client[_-]?secret|auth[_-]?token|credentials?"
 )
+# 名前の頭は長さを限り、名前の途中から始めない（前の字が名前の字なら当てない）。どちらかが
+# 無いと、`-` や `_` が続くだけの文字列で、始まりの位置ごとに末尾まで食っては戻す形になり、
+# 手間が長さの 2 乗で増える（1.5 万字で 10 秒）。記録は実行前の判定の期限の中で書くので、
+# 期限を過ぎると hook の拒否ごと捨てられる。これより長い名前は取りこぼす。
+_NAME_HEAD = r"[A-Za-z0-9_.-]{0,64}"
 _ASSIGN = re.compile(
-    r"(?<![A-Za-z0-9])[A-Za-z0-9_.-]*(?:" + _KEY_WORDS + r")[\"']?\s*[=:]\s*" + _VALUE,
+    r"(?<![A-Za-z0-9_.-])" + _NAME_HEAD + r"(?:" + _KEY_WORDS + r")[\"']?\s*[=:]\s*" + _VALUE,
     re.IGNORECASE,
 )
 # 空白で値を渡すフラグ（`--password xxx`、`--token xxx`）。`=` の形は _ASSIGN が読む。

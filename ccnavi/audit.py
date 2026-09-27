@@ -52,6 +52,8 @@ REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
 # 記録に残すコマンドやパスの上限。ヒアドキュメントはファイル 1 本を運べるので、
 # 1 回の呼び出しが記録を膨らませられないようにする。
 SUBJECT_LIMIT = 1000
+# 伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値を伏せられるだけの余りを持たせる。
+REDACT_LIMIT = SUBJECT_LIMIT * 4
 
 
 @dataclass
@@ -163,9 +165,12 @@ class Log:
     def _as_dict(self, record: Record) -> dict:
         # コマンドの全文が入る欄は、秘密の形を伏せてから書く（redact）。伏せるのは記録だけで、
         # record そのものは書き換えない。判定は伏せる前の文字列で済んでいる。切る前に伏せるのは、
-        # 上限で値の途中が切れると、形が崩れて伏せられなくなるため。
-        subject = _limited(redact.redact(record.subject))
-        unwrapped = _limited(redact.redact(record.unwrapped))
+        # 上限で値の途中が切れると、形が崩れて伏せられなくなるため。ただし伏せる前にも
+        # 上限の数倍（REDACT_LIMIT）で切る。どれだけ長くても、伏せる手間が実行前の判定の
+        # 期限に届かないように。そこで切れた値は、残った字数の側で上限に切られて見えない。
+        # detail は ccnavi が組む文で、上限を持たないので切らない。
+        subject = _limited(redact.redact(record.subject[:REDACT_LIMIT]), len(record.subject))
+        unwrapped = _limited(redact.redact(record.unwrapped[:REDACT_LIMIT]), len(record.unwrapped))
         detail = redact.redact(record.detail)
 
         elapsed_ms = (time.perf_counter() - self._start) * 1000
@@ -214,8 +219,12 @@ class Log:
         return out
 
 
-def _limited(text: str) -> str:
-    """記録に残す文字列を上限で切る。切ったら残りの長さを添える。"""
-    if len(text) <= SUBJECT_LIMIT:
+def _limited(text: str, whole: int = 0) -> str:
+    """記録に残す文字列を上限で切る。切ったら残りの長さを添える。
+
+    whole は伏せる前に切る前の長さ。伏せる前に REDACT_LIMIT で切った分も、残りの長さに数える。
+    """
+    rest = max(len(text), whole) - SUBJECT_LIMIT
+    if rest <= 0:
         return text
-    return text[:SUBJECT_LIMIT] + f"…(+{len(text) - SUBJECT_LIMIT})"
+    return text[:SUBJECT_LIMIT] + f"…(+{rest})"
