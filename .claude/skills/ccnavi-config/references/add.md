@@ -60,7 +60,8 @@ allow:
 - `match` に書けるのは、判定が対象を取り出せるツールだけ。`Bash` `PowerShell`（コマンド）、
   `Read` `Edit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
-  及ぼすなら `Bash|PowerShell`
+  及ぼすなら `Bash|PowerShell`。ツールでない名前は `UserPromptSubmit`（利用者の発言の本文に当たる）だけで、
+  `allow` に置いて文を渡すためだけに使う（止めない。`every: N` で「発言 N 回に 1 度」。ADR-0090）
 
 Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 本ずつ当たり、ヒアドキュメントの中身は当たらない
 （既定の `heredoc` ルールが入口ごと止める）。
