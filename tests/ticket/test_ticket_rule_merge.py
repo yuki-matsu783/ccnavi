@@ -153,7 +153,7 @@ class Workspace(unittest.TestCase):
         # 共通層は既定の置き場に置く。`--rules` は診断でだけ効くので渡せない（ADR-0067）。
         self.rules = write(common_path(self.root, "rules"), json.dumps(SILENT))
         self.state = os.path.join(self.root, "state")
-        self.log = os.path.join(self.root, "log.jsonl")
+        self.log = os.path.join(self.root, "decisions.jsonl")
         self.parent_tree = self.worktree("i0001", "main")
         self.child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
 

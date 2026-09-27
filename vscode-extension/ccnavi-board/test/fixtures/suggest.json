@@ -3,7 +3,7 @@
  "root": "/repo",
  "rules_path": "/repo/.ccnavi/common/rules.yml",
  "logs": [
-  "/repo/logs/log.jsonl"
+  "/repo/logs/decisions.jsonl"
  ],
  "records": 14,
  "candidates": [

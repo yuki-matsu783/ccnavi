@@ -257,7 +257,7 @@ class SpeedTest(unittest.TestCase):
     def test_record_cuts_before_redacting(self):
         # 記録は上限の数倍で切ってから伏せる。100 万字でも期限の中で書ける。
         directory = tempfile.mkdtemp(prefix="ccnavi-redact-")
-        log = os.path.join(directory, "log.jsonl")
+        log = os.path.join(directory, "decisions.jsonl")
         subject = "-" * 1_000_000
         start = time.perf_counter()
         audit.Log(log).write(audit.Record(decision=audit.ALLOW, subject=subject))
@@ -272,7 +272,7 @@ class RecordTest(unittest.TestCase):
 
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="ccnavi-redact-")
-        self.log = os.path.join(self.dir, "log.jsonl")
+        self.log = os.path.join(self.dir, "decisions.jsonl")
 
     def _lines(self) -> list[dict]:
         with open(self.log, encoding="utf-8") as f:

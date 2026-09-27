@@ -314,7 +314,7 @@ test("CB-D124 「記録から候補を出す」は suggest を送り、届いた
     };
     await dom.send({
       type: "suggested",
-      result: { version: 1, root: "/ws", rules_path: "", logs: ["/ws/logs/log.jsonl"], records: 9, candidates: [candidate], dropped: 2 },
+      result: { version: 1, root: "/ws", rules_path: "", logs: ["/ws/logs/decisions.jsonl"], records: 9, candidates: [candidate], dropped: 2 },
     });
     assert.ok(dom.one("#tab-judge").classList.contains("active"));
     assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);

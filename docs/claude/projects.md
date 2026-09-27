@@ -14,7 +14,7 @@
 | 提案（承認待ち `todo/`、レビュー待ち `review/`） | そのツリーの `wip/proposals/<状態>/`。プロジェクト向けは `projects/<名前>/wip/proposals/<状態>/` |
 | 承認済みチケット（作業中 `doing/`、閉じた `done/`）、フェーズのマーカー、子の記録（`.risk.json` など） | 親チケットのツリーの `.ccnavi/approved/`。プロジェクト向けは `projects/<名前>/.ccnavi/approved/` |
 | git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` |
-| 判定の記録と控え | ワークスペースの `logs/log.jsonl` と `logs/state/` |
+| 判定の記録と控え | ワークスペースの `logs/decisions.jsonl` と `logs/state/` |
 | ワークツリー | ワークスペースの `.claude/worktrees/<名前>` |
 | 状態の跡（いつ・どの経路で置き場が動いたか。追記だけの補助で、正は置き場） | 承認済みチケットと同じツリーの `.ccnavi/approved/events/<識別子>.ndjson`（1 行 1 JSON。マーカーの跡は親のファイル） |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの `.ccnavi/approved/flows/<子>.yml`（固定。中身は YAML。チケットの欄では指さない） |

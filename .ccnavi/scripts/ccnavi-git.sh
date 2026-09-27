@@ -52,8 +52,12 @@ unset GIT_EXTERNAL_DIFF GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_ALTERNATE_OBJ
 # $0 は呼ばれたときの綴りそのままなので、ワークツリーの中から相対で呼ばれても合う。
 SELF="sh $0"
 
+# reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
+# 診断ログにだけ残す。文面には利用者の引数（URL など）が入るので、ログには写さない。
 reject() {
-	printf 'ccnavi-git: %s\n' "$1" >&2
+	printf 'ccnavi-git: %s\n' "$2" >&2
+	# 診断ログ（docs/claude/logging.md）。上の文面が契約で、こちらは別に残すだけ。
+	log_info 拒否した -- "sub=${sub:-}" "reason=$1"
 	exit 2
 }
 
@@ -64,7 +68,9 @@ reject() {
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
 # 上へ歩いて `.ccnavi/scripts/ccnavi-common.sh` を探す（設計 11.8）。
 WS=$(ccnavi_workspace) ||
-	reject "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
+	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
+# 解いたルートを logger に渡し、書くたびに探し直させない。
+ccnavi_log_root="$WS"
 
 usage() {
 	cat <<'USAGE'
@@ -122,7 +128,7 @@ esac
 # 列挙して弾く手は、漏れた名前が読み取り専用のまま通るので採らない。値を見ずに
 # 形で落とす。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
 case "$1" in
--*) reject "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
+-*) reject global-option "サブコマンドより前のオプション ($1) は受け取りません。素の形 ($SELF <サブコマンド> ...) で書き直してください。設定の一時上書きが要るなら、その理由を利用者に伝えてください。" ;;
 esac
 
 sub="$1"
@@ -133,13 +139,13 @@ shift
 for arg in ${1+"$@"}; do
 	case "$arg" in
 	-c | --config-env | --config-env=*)
-		reject "設定の一時上書き ($arg) は受け取りません。素の形で書き直してください。"
+		reject config-override "設定の一時上書き ($arg) は受け取りません。素の形で書き直してください。"
 		;;
 	--output | --output=* | --upload-pack* | --receive-pack* | --exec-path* | --exec=* | --ext-diff | --textconv)
-		reject "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+		reject output-or-exec "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
 		;;
 	--git-dir | --git-dir=* | --work-tree | --work-tree=* | --namespace | --namespace=* | -C)
-		reject "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
 		;;
 	esac
 done
@@ -170,16 +176,16 @@ branch)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		--force | --delete=* | --move | --move=* | --set-upstream-to | --set-upstream-to=* | --edit-description)
-			reject "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
+			reject branch-force "$arg はブランチを強制的に消すか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも要るなら利用者に依頼してください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*D*)
-				reject "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
+				reject branch-delete-unmerged "$arg は未マージのブランチを消します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも消したいなら利用者に依頼してください。"
 				;;
 			*f* | *m* | *u*)
-				reject "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
+				reject branch-move "$arg はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由を利用者に伝えてください。"
 				;;
 			esac
 			;;
@@ -191,7 +197,7 @@ tag)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-l | --list | --contains | --contains=* | --points-at | --points-at=* | --merged | --no-merged | --sort=* | --format=* | -n | -n[0-9]*) ;;
-		-*) reject "tag は一覧だけ通します ($arg は不可)。タグを作る・消すのは利用者に依頼してください。" ;;
+		-*) reject tag-write "tag は一覧だけ通します ($arg は不可)。タグを作る・消すのは利用者に依頼してください。" ;;
 		esac
 	done
 	;;
@@ -200,9 +206,9 @@ remote)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-v | --verbose | show | get-url) ;;
-		-*) reject "remote は一覧だけ通します ($arg は不可)。" ;;
+		-*) reject remote-option "remote は一覧だけ通します ($arg は不可)。" ;;
 		add | set-url | set-head | set-branches | remove | rm | rename | prune | update)
-			reject "remote $arg は取得先・送信先を書き換えます。利用者に依頼してください。"
+			reject remote-write "remote $arg は取得先・送信先を書き換えます。利用者に依頼してください。"
 			;;
 		esac
 	done
@@ -241,7 +247,7 @@ worktree)
 			--detach | -d | --force | -f | --checkout | --no-checkout | --lock | \
 				--guess-remote | --no-guess-remote | --track | --no-track | --quiet | -q) ;;
 			-*)
-				reject "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中にワークツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
+				reject worktree-option "worktree add の $wt_word は通しません。行き先を取り違えると、プロジェクトの中にワークツリーを作ってしまいます。使いたい形があれば、利用者に伝えて一覧に足してもらってください。"
 				;;
 			*)
 				if [ -z "$wt_dest" ]; then
@@ -250,9 +256,9 @@ worktree)
 				;;
 			esac
 		done
-		[ -n "$wt_dest" ] || reject "worktree add に行き先がありません。"
+		[ -n "$wt_dest" ] || reject worktree-no-dest "worktree add に行き先がありません。"
 		wt_abs=$(ccnavi_abs "$wt_dest") ||
-			reject "worktree add の行き先 ($wt_dest) を絶対パスに直せません。親のディレクトリが在るか確かめてください。"
+			reject worktree-dest-unresolved "worktree add の行き先 ($wt_dest) を絶対パスに直せません。親のディレクトリが在るか確かめてください。"
 		wt_ok=no
 		case "$wt_abs" in
 		"$WS"/.claude/worktrees/*)
@@ -288,16 +294,16 @@ worktree)
 				wt_spell="$wt_up.claude/worktrees/$wt_name"
 				;;
 			esac
-			reject "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+			reject worktree-outside "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（設計 11.2）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
 		;;
 	list | prune) ;;
 	remove)
 		if has --force ${1+"$@"} || has -f ${1+"$@"}; then
-			reject "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してからオプション無しの $SELF worktree remove を使ってください。"
+			reject worktree-remove-force "worktree remove --force は、未コミットの変更ごとツリーを消します。中の変更を確かめ、要るものを退避してからオプション無しの $SELF worktree remove を使ってください。"
 		fi
 		;;
-	*) reject "worktree $action は通しません。使えるのは list / add / prune / remove です。" ;;
+	*) reject worktree-action "worktree $action は通しません。使えるのは list / add / prune / remove です。" ;;
 	esac
 	;;
 
@@ -306,9 +312,9 @@ stash)
 	case "$action" in
 	list | show | push | save | pop | apply | -*) ;;
 	drop | clear)
-		reject "stash $action は退避した変更を捨てます。中身を $SELF stash show -p で確かめ、要らないと判断した理由を利用者に伝えてください。"
+		reject stash-drop "stash $action は退避した変更を捨てます。中身を $SELF stash show -p で確かめ、要らないと判断した理由を利用者に伝えてください。"
 		;;
-	*) reject "stash $action は通しません。使えるのは list / show / push / pop / apply です。" ;;
+	*) reject stash-action "stash $action は通しません。使えるのは list / show / push / pop / apply です。" ;;
 	esac
 	;;
 
@@ -324,20 +330,20 @@ rm)
 	# 通さないのは -f。それを付けると、コミットしていない変更ごと消える。
 	# git が守っている線がそこなので、こちらで引く線も同じ場所にする。
 	# -r は通す。付けても、中の 1 つでも書きかけがあれば git が止める。
-	[ "$#" -eq 0 ] && reject "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
+	[ "$#" -eq 0 ] && reject rm-no-path "rm は消すファイルを名指ししてください ($SELF rm <パス>)。"
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		. | :/ | "*" | ":/*" | "./")
-			reject "rm にツリー全体 ($arg) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
+			reject rm-whole-tree "rm にツリー全体 ($arg) を渡すと、追跡されているファイルがまとめて消えます。消すものを 1 つずつ名指ししてください。"
 			;;
 		--force)
-			reject "$arg はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてから利用者に伝えてください。"
+			reject rm-force "$arg はコミットしていない変更ごと消します。付けずに実行し、git が止めたなら、その中身を確かめてから利用者に伝えてください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*f*)
-				reject "$arg には -f (--force) が含まれます。コミットしていない変更ごと消すので通しません。付けずに実行してください。"
+				reject rm-force "$arg には -f (--force) が含まれます。コミットしていない変更ごと消すので通しません。付けずに実行してください。"
 				;;
 			esac
 			;;
@@ -354,11 +360,11 @@ restore)
 	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
-	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
+	[ "$#" -eq 0 ] && reject restore-no-path "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		. | :/ | "*" | ":/*" | "./")
-			reject "restore にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。戻したいファイルを 1 つずつ名指ししてください。"
+			reject restore-whole-tree "restore にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。戻したいファイルを 1 つずつ名指ししてください。"
 			;;
 		esac
 	done
@@ -379,17 +385,17 @@ merge)
 		-X | -s | --strategy | --strategy-option)
 			case "$arg" in
 			ours | theirs)
-				reject "$prev $arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+				reject merge-discard-side "$prev $arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
 				;;
 			esac
 			;;
 		esac
 		case "$arg" in
 		-Xours | -Xtheirs | --strategy-option=ours | --strategy-option=theirs | -sours | --strategy=ours)
-			reject "$arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
+			reject merge-discard-side "$arg は衝突した側を黙って捨てます。他セッションの書きかけが入っていても差分に残りません。衝突は 1 つずつ中身を見て解いてください。"
 			;;
 		--no-verify)
-			reject "$arg はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+			reject merge-no-verify "$arg はマージ前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
 			;;
 		esac
 		prev="$arg"
@@ -427,12 +433,12 @@ merge-file)
 		--union | --ours | --theirs | --diff3 | --zdiff3 | --object-id | -q | --quiet | \
 			--marker-size=* | --diff-algorithm=* | -L?*) ;;
 		-*)
-			reject "merge-file の $arg は通しません。通すのは -p (--stdout) と --union / --ours / --theirs / --diff3 / --zdiff3 / --object-id / -L <ラベル> / --marker-size=<数> / -q だけで、短いオプションは 1 つずつ分けて書きます。"
+			reject merge-file-option "merge-file の $arg は通しません。通すのは -p (--stdout) と --union / --ours / --theirs / --diff3 / --zdiff3 / --object-id / -L <ラベル> / --marker-size=<数> / -q だけで、短いオプションは 1 つずつ分けて書きます。"
 			;;
 		esac
 	done
 	if [ "$mf_stdout" = no ]; then
-		reject "merge-file は -p (--stdout) を付けた形だけ通します。付けないと 1 つめのファイルを直に書き換えます。衝突の最中なら $SELF merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス> で出力し、その結果を Edit で書いてください。"
+		reject merge-file-no-stdout "merge-file は -p (--stdout) を付けた形だけ通します。付けないと 1 つめのファイルを直に書き換えます。衝突の最中なら $SELF merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス> で出力し、その結果を Edit で書いてください。"
 	fi
 	;;
 
@@ -442,13 +448,13 @@ commit)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		--no-verify)
-			reject "$arg はコミット前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
+			reject commit-no-verify "$arg はコミット前の検査を飛ばします。検査が落ちるなら、落ちた理由を直してください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*n*)
-				reject "$arg には -n (--no-verify) が含まれます。コミット前の検査は飛ばさず、落ちた理由を直してください。"
+				reject commit-no-verify "$arg には -n (--no-verify) が含まれます。コミット前の検査は飛ばさず、落ちた理由を直してください。"
 				;;
 			esac
 			;;
@@ -462,19 +468,19 @@ checkout | switch)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		--force | --discard-changes | --ours | --theirs)
-			reject "$arg は作業中の変更を捨てます。退避は $SELF stash push -u です。"
+			reject checkout-discard "$arg は作業中の変更を捨てます。退避は $SELF stash push -u です。"
 			;;
 		--)
-			reject "$sub にパスを渡す形は、そのファイルの書きかけを消します。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
+			reject checkout-path "$sub にパスを渡す形は、そのファイルの書きかけを消します。戻したいファイルがあるなら $SELF restore <パス> を名指しで使ってください。"
 			;;
 		. | :/)
-			reject "$sub にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。$SELF restore <パス> を名指しで使ってください。"
+			reject checkout-whole-tree "$sub にツリー全体 ($arg) を渡すと、作業中の変更が黙って消えます。$SELF restore <パス> を名指しで使ってください。"
 			;;
 		--*) ;;
 		-*)
 			case "$arg" in
 			*f*)
-				reject "$arg には -f (--force) が含まれます。作業中の変更を捨てるので通しません。退避は $SELF stash push -u です。"
+				reject checkout-force "$arg には -f (--force) が含まれます。作業中の変更を捨てるので通しません。退避は $SELF stash push -u です。"
 				;;
 			esac
 			;;
@@ -487,7 +493,7 @@ fetch | pull)
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-f | --force | --prune | --unshallow)
-			reject "$arg は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
+			reject fetch-force "$arg は手元の参照を書き換えます。オプション無しの $SELF $sub で足ります。"
 			;;
 		esac
 	done
@@ -503,7 +509,7 @@ push)
 	# 統合は人がマージリクエストで行う。
 	push_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ -z "$push_branch" ] || [ "$push_branch" = "HEAD" ]; then
-		reject "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので通しません。"
+		reject detached-head "いまブランチの上に居ません（detached HEAD）。送る先が決まらないので通しません。"
 	fi
 	# 子チケットのワークツリーからは送らない。レビューはマージリクエストの実物に結び、
 	# その実物は親ブランチに 1 本だけある。子の成果は親が手元で合流してから、親の
@@ -519,6 +525,7 @@ push)
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	push_root="$WS"
+	log_debug push の判定の材料 -- "branch=$push_branch" "top=$push_top" "workspace=$WS"
 	if [ -n "$push_root" ]; then
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
@@ -552,7 +559,7 @@ push)
 					"$push_proposals/review/$push_name.md"; do
 					if [ -f "$push_copy" ] && grep -q '^parent:' "$push_copy"; then
 						push_parent=$(sed -n 's/^parent:[[:space:]]*//p' "$push_copy" | head -n 1)
-						reject "$push_name は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を取り込んでから、親のワークツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
+						reject push-child-worktree "$push_name は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（${push_parent}）が子の成果を取り込んでから、親のワークツリー (.claude/worktrees/$push_parent) で送ります。子は作業を終えたら結果を報告して終わってください。"
 					fi
 				done
 			done
@@ -561,7 +568,7 @@ push)
 	fi
 	case "$push_branch" in
 	main | master | develop | release | release/*)
-		reject "$push_branch は統合先です。統合は利用者がマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
+		reject push-integration-branch "$push_branch は統合先です。統合は利用者がマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"
 		;;
 	esac
 	push_seen_remote=""
@@ -569,50 +576,50 @@ push)
 		case "$arg" in
 		-u | --set-upstream | --porcelain | --quiet | -q | --verbose | -v) ;;
 		--no-verify)
-			reject "$arg は送る前の検査を飛ばします。検査が落ちるなら原因を直してください。"
+			reject push-no-verify "$arg は送る前の検査を飛ばします。検査が落ちるなら原因を直してください。"
 			;;
 		--force-with-lease | --force-with-lease=* | --force-if-includes | -f | --force)
-			reject "$arg はリモートの履歴を書き換えます。送り直したい理由を利用者に伝えてください。"
+			reject push-force "$arg はリモートの履歴を書き換えます。送り直したい理由を利用者に伝えてください。"
 			;;
 		-d | --delete)
-			reject "$arg はリモートのブランチを消します。利用者に依頼してください。"
+			reject push-delete "$arg はリモートのブランチを消します。利用者に依頼してください。"
 			;;
 		--all | --mirror | --tags | --follow-tags | --prune | --atomic)
-			reject "$arg は今のブランチ以外も動かします。通すのは、居るブランチをそのまま送る形だけです。"
+			reject push-all "$arg は今のブランチ以外も動かします。通すのは、居るブランチをそのまま送る形だけです。"
 			;;
 		-*)
-			reject "push で $arg は通しません。通すのは 'push [-u] [<リモート>] [$push_branch]' の形だけです。"
+			reject push-option "push で $arg は通しません。通すのは 'push [-u] [<リモート>] [$push_branch]' の形だけです。"
 			;;
 		*:*)
-			reject "$arg は送り先を直に書く形（refspec や URL）です。設定済みのリモート名だけを使い、居るブランチをそのままの名前で送ってください。"
+			reject push-refspec "$arg は送り先を直に書く形（refspec や URL）です。設定済みのリモート名だけを使い、居るブランチをそのままの名前で送ってください。"
 			;;
 		*)
 			if [ -z "$push_seen_remote" ]; then
 				push_seen_remote="$arg"
 			elif [ "$arg" != "$push_branch" ] && [ "$arg" != "HEAD" ]; then
-				reject "$arg は今居るブランチ（${push_branch}）ではありません。他のブランチは、そこへ移ってから送ってください。"
+				reject push-other-branch "$arg は今居るブランチ（${push_branch}）ではありません。他のブランチは、そこへ移ってから送ってください。"
 			fi
 			;;
 		esac
 	done
 	;;
 reset)
-	reject "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。ブランチをリモートに合わせたい（squash マージの後で fast-forward できない、など）なら、$SELF fetch <リモート> <ブランチ> のあと $SELF checkout -B <ブランチ> <リモート>/<ブランチ> を使ってください。書きかけとぶつかるなら git が拒みます。ただし、そのブランチにしか無いコミットは黙って外れます。先に $SELF log --oneline <リモート>/<ブランチ>..HEAD で外れるコミットを見て、それが触ったファイルについて $SELF diff HEAD <リモート>/<ブランチ> -- <ファイル> が空（変更が行き先に入っている）ことを確かめてから打ってください。空でなければ打たずに利用者に伝えてください。"
+	reject reset "reset は作業中の変更やコミットを消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。ブランチをリモートに合わせたい（squash マージの後で fast-forward できない、など）なら、$SELF fetch <リモート> <ブランチ> のあと $SELF checkout -B <ブランチ> <リモート>/<ブランチ> を使ってください。書きかけとぶつかるなら git が拒みます。ただし、そのブランチにしか無いコミットは黙って外れます。先に $SELF log --oneline <リモート>/<ブランチ>..HEAD で外れるコミットを見て、それが触ったファイルについて $SELF diff HEAD <リモート>/<ブランチ> -- <ファイル> が空（変更が行き先に入っている）ことを確かめてから打ってください。空でなければ打たずに利用者に伝えてください。"
 	;;
 clean)
-	reject "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
+	reject clean "$sub は作業中の変更を消します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
 	;;
 rebase | cherry-pick | revert | am | apply | bisect | filter-branch | replace | update-ref | symbolic-ref | reflog | gc | notes)
-	reject "$sub は履歴か参照を書き換えます。通しません。必要な理由を利用者に伝えてください。"
+	reject history-rewrite "$sub は履歴か参照を書き換えます。通しません。必要な理由を利用者に伝えてください。"
 	;;
 config)
-	reject "config は設定を読み書きします。値には資格情報が混ざるので通しません。必要な値は利用者に尋ねてください。"
+	reject config "config は設定を読み書きします。値には資格情報が混ざるので通しません。必要な値は利用者に尋ねてください。"
 	;;
 clone | submodule | lfs)
-	reject "$sub は外から中身を持ち込みます。通しません。利用者に依頼してください。"
+	reject import "$sub は外から中身を持ち込みます。通しません。利用者に依頼してください。"
 	;;
 *)
-	reject "$sub はホワイトリストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
+	reject not-allowed "$sub はホワイトリストにありません。使える形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
 	;;
 esac
 
@@ -622,7 +629,9 @@ diff | show | log | whatchanged) set -- --no-ext-diff ${1+"$@"} ;;
 esac
 
 root=$(git rev-parse --show-toplevel 2>/dev/null || :)
-[ -z "$root" ] && reject "git リポジトリの中で実行してください。"
+[ -z "$root" ] && reject not-a-repo "git リポジトリの中で実行してください。"
+log_info 受け付けた -- "sub=$sub" "args=$#"
+log_debug 判定の材料 -- "sub=$sub" "action=${action:-}" "top=$root" "cwd=$PWD" "workspace=$WS"
 
 # 記録はワークスペースの下に寄せる（REQ-MLT-14、設計 4.1）。git のトップに書くと、
 # モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
@@ -712,6 +721,8 @@ fi
 # 世代で切る。新しい順に並べ、上限より後ろを消す。
 ls -1t "$logdir"/git-*.log 2>/dev/null | awk -v keep="$KEEP_LOGS" 'NR > keep' |
 	while IFS= read -r old; do rm -f "$old"; done
+
+log_info 終わった -- "sub=$sub" "exit=$status" "lines=$lines" "log=$logrel"
 
 [ "$status" -eq 0 ] || exit 1
 exit 0
