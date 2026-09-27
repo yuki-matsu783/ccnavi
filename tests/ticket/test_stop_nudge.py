@@ -264,7 +264,8 @@ class StopNudgeTest(TicketTest):
         self.assert_quiet(self.stop(tree))
         third = self.body(self.stop(tree))
         self.assertEqual(third.get("decision"), "block")
-        self.assertIn("NUDGE_STOP_RULE: 振り返る", third["reason"])
+        self.assertTrue(third["reason"].startswith("NUDGE_STOP_RULE: "), third["reason"])
+        self.assertIn("振り返る", third["reason"])
         self.assertNotIn(CODE, third["reason"])
 
 

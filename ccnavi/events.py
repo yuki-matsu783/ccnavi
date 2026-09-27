@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 import functools
 import io
 from typing import TextIO
@@ -41,6 +40,13 @@ from .modes import EXIT_BLOCK, EXIT_OK
 
 # `match: Stop` のルールで止めた回の理由コード（ADR-0090）。記録の `code` と、止めた文の頭に出る。
 CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
+# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文（ADR-0090）。ルールの文や
+# 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
+STOP_PREFACE = (
+    "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めない。"
+    "このターンが利用者への問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書く。"
+    "振り返って何も無ければ「振り返り: 無し」とだけ答える。"
+)
 
 
 def decide(
@@ -72,7 +78,7 @@ def decide(
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
-        return subagent.at_start(stdout, conf, root, payload, record)
+        return subagent.at_start(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
         return subagent.at_stop(stdout, stderr, mode, conf, root, payload, record)
     # 判定を持たないイベントは誤りではない。想定していない登録が
@@ -269,9 +275,10 @@ def stop_rules_nudge(
     設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
     「ターンの終わり 10 回に 1 度」止める。
 
-    ルールはパスを持たないツールと同じく全部の層の和から引く。cwd には依らない。見るのは
-    `allow` だけ（`deny` / `ask` に書いたものは `--lint` が言う）。当てる先は固定の `(stop)` で、
-    `glob: "*"` と書く。
+    ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
+    外のリポジトリで、そこに書かれた 1 行が cwd に依らずメインのターンの終わりを止められて
+    しまうため。本文のファイルもワークスペースルートの版だけを読む（ワークツリーやプロジェクトの
+    写しはエージェントが書き換えられる）。
 
     止めない回:
 
@@ -279,31 +286,32 @@ def stop_rules_nudge(
     - サブエージェント（`agent_id` がある）。候補は報告に添えてメインに返す決まり
     - 数えを覚えられない（`--state ""`、控えを読めない・書けない）。覚えられないまま止めると
       ターンの終わりのたびに止まるので、黙る側を採る（ADR-0087 と同じ）
+
+    数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
+    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、利用者への問いで終わった
+    ターンの問いが消えないように。記録の `rules` には、実際に渡したルールだけを残す。
     """
     if payload.stop_hook_active or payload.agent_id or not conf.state:
         return ""
-    probe = dataclasses.replace(payload, tool_name=rules.STOP_MATCH)
-    # 苦情と読めなかった層の記録は、同じ起動の watch_context が全部のツリーについて
-    # 書いたあと。ここでもう一度書くと同じ話が 2 度並ぶので、使い捨てに受ける。
-    rule_set, _, _ = ruleload.rules_for(io.StringIO(), conf, root, probe, audit.Record())
-    group = [r for r in rule_set.allow if r.matches(rules.STOP_MATCH, rules.STOP_SUBJECT)]
+    group = ruleload.stop_rules(conf, root)
     if not group:
         return ""
-    target = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
-    text = ctxfile.for_rules(
-        stderr,
-        conf.state,
-        payload,
-        group,
-        ctxfile.bases(conf, root, target),
-        unsure_speaks=False,
-    )
-    if not text:
+    counts = ctxfile.stop_path(conf.state, payload.session_id)
+    parts: list[str] = []
+    delivered: list[str] = []
+    for rule in group:
+        text = ctxfile.for_rules(
+            stderr, conf.state, payload, [rule], [root], unsure_speaks=False, counts_path=counts
+        )
+        if text:
+            parts.append(text)
+            delivered.append(rule.id or f"({rules.ALLOW})")
+    if not parts:
         return ""
     record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
     record.enforced = mode == modes.ENABLE
-    record.rules = [*record.rules, *(r.id or f"({rules.ALLOW})" for r in group)]
-    return f"{CODE_RULE_NUDGE}: {text}"
+    record.rules = [*record.rules, *delivered]
+    return f"{CODE_RULE_NUDGE}: {STOP_PREFACE}\n\n" + "\n\n".join(parts)
 
 
 def _finish_nudge(
@@ -373,7 +381,7 @@ def decide_at_start(
     # 渡した回の数えはここで捨てる。このイベントは起動だけでなく再開と compact の後にも
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
-    ctxfile.forget(conf.state, payload.session_id)
+    ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
@@ -386,7 +394,7 @@ def decide_at_start(
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録（ADR-0091）。
-    skills = projskills.index(conf, root, payload.cwd)
+    skills = projskills.notice(stderr, conf, root, payload, at_start=True)
     if skills:
         texts.append(skills)
     if texts:

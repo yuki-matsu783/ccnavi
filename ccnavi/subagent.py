@@ -29,9 +29,17 @@ from . import (
 from . import ticket as ticket_mod
 from .modes import EXIT_BLOCK, EXIT_OK
 
+# サブエージェントには Stop の振り返り（ADR-0090）が届かないので、始まりに 1 行だけ渡す。
+# メインはこの節を集めて振り返りに使う（docs/claude/skill-review.md）。
+CANDIDATE_NOTE = (
+    "[ccnavi] 作業中に手順の落とし穴やスキルの誤りに気づいたら、最後の報告に「スキル候補」の節を"
+    "足して書く（対象のスキル・何を直すか・根拠）。スキルのファイルは自分では書かない。"
+)
+
 
 def at_start(
     stdout: TextIO,
+    stderr: TextIO,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -51,7 +59,9 @@ def at_start(
     record.decision, record.enforced = audit.ALLOW, True
     # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（ADR-0091）。
     # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
-    skills = projskills.index(conf, root, payload.cwd)
+    skills = projskills.notice(stderr, conf, root, payload, at_start=True)
+    # 振り返りの候補は、止められないサブエージェントには報告で返してもらう（ADR-0090）。
+    skills = f"{skills}\n\n{CANDIDATE_NOTE}" if skills else CANDIDATE_NOTE
     if not conf.tickets_enabled:
         return _say(stdout, skills)
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
@@ -133,7 +143,7 @@ def at_start(
 
 
 def _say(stdout: TextIO, text: str) -> int:
-    """子チケットの一覧が無い起動で、渡す文（スキルの目録）があればそれだけを渡す。"""
+    """子チケットの一覧が無い起動で、渡す文（スキルの目録と候補の 1 行）だけを渡す。"""
     if text:
         hookio.write_context(stdout, hookio.SUBAGENT_START, text)
     return EXIT_OK

@@ -70,6 +70,7 @@ SELFGUARD_STORE = "store"
 _SESSION_ONLY = (
     re.compile(r"^nudged-(?P<s>.+)\.json$"),  # ops._nudge_path
     re.compile(r"^denied-(?P<s>.+)\.json$"),  # repeat._path
+    re.compile(r"^stop-(?P<s>.+)\.json$"),  # ctxfile.stop_path
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
 )
 # 名前の後ろにセッション以外の鍵が `-` で続く控え。セッションにも `-` が入るので、

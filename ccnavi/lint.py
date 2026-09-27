@@ -946,7 +946,13 @@ def _layers(stderr: TextIO, conf: settings.Settings, root: str) -> list[Problem]
             continue
         if view.missing:
             continue
-        from_file = _rules(view.path, root, home=_layer_home(conf, root, view.name), layer=True)
+        from_file = _rules(
+            view.path,
+            root,
+            home=_layer_home(conf, root, view.name),
+            layer=True,
+            project=view.name != ruleload.LAYER_SELF,
+        )
         for c in from_file:
             problems.append(Problem(c.severity, f"{where} {c.rule}".rstrip(), c.detail))
         # `survey` は層のファイルの苦情も `problems` に入れている。`_rules` が同じファイルを
@@ -1458,7 +1464,9 @@ def _bin_path(root: str, declared: object) -> list[Problem]:
     return problems
 
 
-def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Problem]:
+def _rules(
+    path: str, root: str, home: str = "", layer: bool = False, project: bool = False
+) -> list[Problem]:
     """ルールファイルを、判定が読むのと同じ読み方で読んで検証する。
 
     rules.load をそのまま呼ぶ。別の読み方をすると、検証は通ったのに実運用で
@@ -1472,6 +1480,9 @@ def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Pr
     `allow` が空でも穴にはならない（空の層 = 何も足さない）。共通層に掛けている
     「空のガードは入っていないのと同じ」の問いを、層にまで広げると、allow を
     1 件だけ足した層が毎回 error を出し続けることになる。
+
+    `project` はプロジェクトの層かどうか。ターンの終わりのルール（`match: Stop`）は
+    プロジェクトの層から読まないので、そこに書いたものを言う（ADR-0090）。
     """
     home = home or root or os.path.dirname(os.path.abspath(path))
     try:
@@ -1521,19 +1532,19 @@ def _rules(path: str, root: str, home: str = "", layer: bool = False) -> list[Pr
                 )
             )
         seen.add(rule.id)
-        problems.extend(_rule_problems(rule, name, home))
+        problems.extend(_rule_problems(rule, name, home, project))
 
     return problems
 
 
-def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
+def _rule_problems(rule: rules.Rule, name: str, home: str, project: bool = False) -> list[Problem]:
     """ルール 1 件の中身。当たらない match、届かない message、指すファイル、広い allow。"""
     problems: list[Problem] = []
     for tool in _inert(rule.match):
         problems.append(
             Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
         )
-    problems.extend(_stop_problems(rule, name))
+    problems.extend(_stop_problems(rule, name, project))
 
     if rule.message and rule.decision != rules.DENY:
         # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
@@ -1605,25 +1616,40 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
     return problems
 
 
-def _stop_problems(rule: rules.Rule, name: str) -> list[Problem]:
+def _stop_problems(rule: rules.Rule, name: str, project: bool = False) -> list[Problem]:
     """`match: Stop` のルール（ターンの終わりに止めて文を渡す。ADR-0090）の書き方。
 
-    見るのは 3 つ。どれも判定は変えないので warn。
+    見るのは 4 つ。どれも判定は変えないので warn。
 
-    1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので何も起きない
-    2. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
-    3. `every` が 1。渡す回ごとに Stop を止めるので、ターンの終わりのたびに止まる
-       （`additionalContextOnce` だけなら各セッションの最初のターンで止まる）
+    1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので、`Stop` の部分は何も起きない
+       （`Bash|Stop` なら `Bash` の部分はふつうに効く）
+    2. プロジェクトの層に置いた。ターンの終わりには共通層と自身の層しか読まない
+    3. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
+    4. `every` が 2 より小さい。実行時にも使わない（ターンの終わりのたびに止まらないように）
     """
-    if rules.STOP_MATCH not in (want.strip() for want in rule.match.split("|")):
+    wants = [want.strip() for want in rule.match.split("|") if want.strip()]
+    if rules.STOP_MATCH not in wants:
         return []
+    others = [w for w in wants if w != rules.STOP_MATCH]
     if rule.decision != rules.ALLOW:
+        rest = f"（{'|'.join(others)} の部分はふつうに効く）" if others else ""
         return [
             Problem(
                 SEVERITY_WARN,
                 name,
                 f"{rule.decision} の match に {rules.STOP_MATCH} がある。ターンの終わりに見るのは "
-                "allow のルールだけなので、ここでは何も起きない。allow に置く",
+                f"allow のルールだけなので、{rules.STOP_MATCH} の部分は何も起きない{rest}。"
+                f"{rules.STOP_MATCH} は allow の別のルールに分けて置く",
+            )
+        ]
+    if project:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"プロジェクトの層の {rules.STOP_MATCH} のルールは使われない。ターンの終わりには"
+                "共通層と自身の層しか読まない"
+                "（外のリポジトリの 1 行でメインのターンを止めさせない）",
             )
         ]
     problems: list[Problem] = []
@@ -1637,13 +1663,13 @@ def _stop_problems(rule: rules.Rule, name: str) -> list[Problem]:
                 'この glob / regex では当たらないので何も起きない。glob: "*" と書く',
             )
         )
-    if rule.every <= 1:
+    if rule.every < 2:
         problems.append(
             Problem(
                 SEVERITY_WARN,
                 name,
-                f"{rules.STOP_MATCH} のルールに every が無い（1）。"
-                "渡す回ごとにターンの終わりを止めるので、"
+                f"{rules.STOP_MATCH} のルールに every が無い（1）ので使われない。"
+                "使うと渡す回ごとにターンの終わりを止めるので、"
                 "every: 10 のように刻む",
             )
         )
