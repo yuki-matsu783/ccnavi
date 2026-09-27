@@ -27,6 +27,8 @@ NOW = time.time()
 S_OLD = "11111111-aaaa-bbbb-cccc-000000000001"
 S_LIVE = "22222222-aaaa-bbbb-cccc-000000000002"
 S_ME = "33333333-aaaa-bbbb-cccc-000000000003"
+# ローテートの下限（1 MB）を超える記録。
+BIG = "a" * (1024 * 1024 + 100)
 
 
 def _write(path: str, text: str = "x", age_days: float = 0.0) -> str:
@@ -70,8 +72,8 @@ class RotateTest(_Base):
         self.assertTrue(os.path.exists(self.log))
 
     def test_log_over_the_limit_is_renamed_with_its_content(self):
-        os.environ[prune.LOG_ROTATE_MB_ENV] = "0.001"  # 約 1 KB
-        body = '{"decision":"allow"}\n' * 100
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "1"  # 下限
+        body = '{"decision":"allow"}\n' * 60000
         _write(self.log, body)
         report = self.run_prune()
         self.assertEqual(len(report.rotated), 1)
@@ -83,11 +85,11 @@ class RotateTest(_Base):
             self.assertEqual(f.read(), body)
 
     def test_same_second_does_not_overwrite(self):
-        os.environ[prune.LOG_ROTATE_MB_ENV] = "0.001"
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "1"
         first = self.run_prune  # 同じ now で 2 回
-        _write(self.log, "a" * 2000)
+        _write(self.log, BIG)
         first()
-        _write(self.log, "b" * 2000)
+        _write(self.log, "b" * len(BIG))
         report = first()
         names = sorted(n for n in os.listdir(self.logs) if n.startswith("log."))
         self.assertEqual(len(names), 2, names)
@@ -98,16 +100,45 @@ class RotateTest(_Base):
 
     def test_zero_turns_the_step_off_and_bad_values_fall_back(self):
         os.environ[prune.LOG_ROTATE_MB_ENV] = "0"
-        _write(self.log, "a" * 2000)
+        _write(self.log, BIG)
         self.assertEqual(self.run_prune().rotated, [])
         os.environ[prune.LOG_KEEP_DAYS_ENV] = "many"
         _, days, _, problems = prune.limits()
         self.assertEqual(days, 14.0)
         self.assertIn(prune.LOG_KEEP_DAYS_ENV, problems[0])
 
+    def test_tiny_and_non_finite_values_fall_back(self):
+        # 0 に近づけるだけで保持日数のうちの記録を消せないよう、0 のほかは下限を置く。
+        # 有限でない値は、ローテートの大きさを整数にするところで落ちる。
+        for env, default in prune.LIMITS:
+            for raw in ("0.001", "0.5", "inf", "-inf", "nan", "1e400"):
+                with self.subTest(env=env, raw=raw):
+                    os.environ[env] = raw
+                    values = prune.limits()
+                    self.assertEqual(values[[e for e, _ in prune.LIMITS].index(env)], default)
+                    self.assertTrue(any(env in p for p in values[3]), values[3])
+            os.environ.pop(env)
+
+    def test_zero_and_floor_are_taken(self):
+        for env, _ in prune.LIMITS:
+            for raw in ("0", "1", "2.5"):
+                with self.subTest(env=env, raw=raw):
+                    os.environ[env] = raw
+                    values = prune.limits()
+                    self.assertEqual(values[[e for e, _ in prune.LIMITS].index(env)], float(raw))
+                    self.assertEqual(values[3], [])
+            os.environ.pop(env)
+
+    def test_infinite_rotate_does_not_crash(self):
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "inf"
+        _write(self.log, "{}\n")
+        report = self.run_prune()
+        self.assertEqual(report.rotated, [])
+        self.assertIn(prune.LOG_ROTATE_MB_ENV, report.problems[0])
+
     def test_dry_run_moves_nothing(self):
-        os.environ[prune.LOG_ROTATE_MB_ENV] = "0.001"
-        _write(self.log, "a" * 2000)
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "1"
+        _write(self.log, BIG)
         report = self.run_prune(dry_run=True)
         self.assertEqual(len(report.rotated), 1)
         self.assertTrue(os.path.exists(self.log))
@@ -264,6 +295,15 @@ class EntryTest(_Base):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertIn("動かすものは無い", proc.stdout)
 
+    def test_tiny_keep_days_from_the_command_line_fall_back(self):
+        # 1 日より短い保持は受けない。いま書いたばかりの記録が消える形になる。
+        fresh = _write(os.path.join(self.logs, "log.20260101-000000.jsonl"), age_days=0.5)
+        env = self.env(CCNAVI_GUARD_TICKET_APPROVAL="disable", CCNAVI_LOG_KEEP_DAYS="0.0001")
+        proc = run_ccnavi(["--prune"], env=env, cwd=self.root)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("下限", proc.stderr)
+        self.assertTrue(os.path.exists(fresh))
+
     def session_start(self, session: str = S_ME):
         payload = {"hook_event_name": "SessionStart", "session_id": session, "source": "startup"}
         return run_ccnavi(
@@ -296,6 +336,74 @@ class EntryTest(_Base):
             (line,) = [json.loads(x) for x in f]
         self.assertEqual(line["decision"], "allow")
         self.assertNotIn("detail", line)
+
+
+class HookTest(_Base):
+    """エージェントが Bash から `ccnavi --prune` を打つ形は、実行前の判定で止まること。
+
+    実行ファイルの端末要求は、擬似端末（`script -qc`）でも、チケット制御を切った
+    ワークスペースで端末要求を切る変数を並べても抜けられる。チケット制御に依らず止める。
+    """
+
+    def pre_tool_use(self, command: str, tool: str = "Bash", **env: str):
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "session_id": "s1",
+            "tool_name": tool,
+            "tool_input": {"command": command},
+        }
+        return run_ccnavi(
+            ["--log", self.log, "--state", self.state],
+            input=json.dumps(payload),
+            env={
+                "CLAUDE_PROJECT_DIR": self.root,
+                "CCNAVI_MODE": "enable",
+                "CCNAVI_TICKET_CONTROL": "disable",
+                **env,
+            },
+            cwd=self.root,
+        )
+
+    def test_prune_is_denied_however_it_is_called(self):
+        for command in (
+            "ccnavi --prune",
+            "script -qc 'ccnavi --prune' /dev/null",
+            "CCNAVI_GUARD_TICKET_APPROVAL=disable CCNAVI_LOG_KEEP_DAYS=0 ccnavi --prune",
+            "uv run python -m ccnavi --prune",
+            ".ccnavi/bin/linux-x64/ccnavi --json --prune",
+            'bash -c "ccnavi --prune" x --preview',
+            'bash -c "ccnavi --prune" --preview',
+            "ccnavi --prune --preview; ccnavi --prune",
+            'ccnavi --pr""une',
+            "ccnavi --prune --reason=--preview",
+            "ccnavi --prune | tail -3",
+        ):
+            with self.subTest(command=command):
+                proc = self.pre_tool_use(command)
+                self.assertIn("DENY_RECORDS_PRUNE", proc.stdout)
+                self.assertIn('"deny"', proc.stdout)
+
+    def test_powershell_form_is_denied(self):
+        proc = self.pre_tool_use("& C:\\tools\\ccnavi.exe --prune", tool="PowerShell")
+        self.assertIn("DENY_RECORDS_PRUNE", proc.stdout)
+
+    def test_preview_and_other_prunes_pass(self):
+        for command in (
+            "ccnavi --prune --preview",
+            "ccnavi --preview --prune",
+            'bash -c "ccnavi --prune --preview"',
+            "git fetch --prune",
+            "sh .ccnavi/scripts/ccnavi-git.sh fetch origin --prune",
+            "echo ccnavi --prune",
+            "git remote prune origin",
+        ):
+            with self.subTest(command=command):
+                proc = self.pre_tool_use(command)
+                self.assertNotIn("DENY_RECORDS_PRUNE", proc.stdout)
+
+    def test_guard_core_files_disable_turns_it_off(self):
+        proc = self.pre_tool_use("ccnavi --prune", CCNAVI_GUARD_CORE_FILES="disable")
+        self.assertNotIn("DENY_RECORDS_PRUNE", proc.stdout)
 
 
 if __name__ == "__main__":
