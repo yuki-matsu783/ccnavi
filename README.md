@@ -296,8 +296,10 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
 | `CCNAVI_LOG` | 記録先。既定は `logs/decisions.jsonl`。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
-| `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない。`1` より小さい値は既定で動く（「記録の後始末」） |
-| `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
+| `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない。`1` より小さい値は既定で動く（「記録の後始末」）。診断ログ（`logs/diag/*.log`）にも同じ値が効く |
+| `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く。診断ログ（`logs/diag/*.log`）は、ローテートしたものに限らずこの日数のあいだ書かれていなければ消す |
+| `CCNAVI_LOG_LEVEL` | 診断ログ（`logs/diag/<出どころ>.log`）に書く下限のレベル。`DEBUG` / `INFO`（既定）/ `WARN` / `ERROR`。大文字小文字は問わず、空と読めない値は `INFO`。判定の記録（`CCNAVI_LOG`）とは別物で、判定は変わらない |
+| `CCNAVI_LOG_NAME` | sh の診断ログの出どころの名前を上書きする（既定はスクリプトの名前から拡張子を落としたもの。`ccnavi-git` など）。`[A-Za-z0-9_-]` 以外の字を含む名前では書かない |
 | `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの控えを残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
@@ -1709,6 +1711,9 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 
 - `decisions.jsonl` が `CCNAVI_LOG_ROTATE_MB`（既定 10 MB）を超えていたら、`logs/decisions.<日時>.jsonl` へ名前を変える。中身は捨てない
 - ローテートした記録のうち、最後に書かれてから `CCNAVI_LOG_KEEP_DAYS`（既定 14 日）を過ぎたものを消す
+- 診断ログ（`logs/diag/<出どころ>.log`）も同じしきい値で片付ける。上限を超えた 1 本を `<出どころ>.<日時>.log` へ
+  名前を変え（同じ秒に同じ名前があれば `-2` から足す）、`CCNAVI_LOG_KEEP_DAYS` のあいだ書かれていない `*.log` を消す。
+  その回にローテートした 1 本はその回には消さない。`logs` か `logs/diag` がリンクなら辿らない
 - `logs/state/` の、セッションを名前に持つ控えを、そのセッションのどれもが `CCNAVI_STATE_KEEP_DAYS`（既定 14 日）
   書かれていなければまとめて消す。いま始まったセッションと、レビューの下書き・退避したファイルなどセッションを
   名前に持たないもの、知らない名前のファイル、リンクになった置き場は消さない
