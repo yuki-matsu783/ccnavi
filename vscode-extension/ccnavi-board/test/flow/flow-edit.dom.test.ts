@@ -44,7 +44,7 @@ function three(): FlowDoc {
   ] };
 }
 
-test("CB-D123 元に戻す・やり直すはボタンと Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y で効く。戻して読み込んだ中身に戻れば未保存が消える", async () => {
+test("CB-D137 元に戻す・やり直すはボタンと Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y で効く。戻して読み込んだ中身に戻れば未保存が消える", async () => {
   const dom = await openFlow();
   try {
     assert.ok(button(dom, "undo").disabled);
@@ -89,7 +89,7 @@ test("CB-D123 元に戻す・やり直すはボタンと Ctrl+Z / Ctrl+Shift+Z /
   }
 });
 
-test("CB-D124 欄に続けて打った字は元に戻す 1 件にまとまる。フォーカスが外れたら区切る", async () => {
+test("CB-D138 欄に続けて打った字は元に戻す 1 件にまとまる。フォーカスが外れたら区切る", async () => {
   const dom = await openFlow({ doc: three() });
   try {
     // 時計を止める（実時間に頼ると、遅い機械で打ち込みの間が 1 秒を超えてまとまりが切れる）

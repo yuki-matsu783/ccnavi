@@ -184,7 +184,7 @@ test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（�
   }
 });
 
-test("CB-T266 通ったときは (flow) の warn を対象のファイルの綴りに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
+test("CB-T278 通ったときは (flow) の warn を対象のファイルの綴りに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
   const dir = tmpDir();
   try {
     let tmp = "";
