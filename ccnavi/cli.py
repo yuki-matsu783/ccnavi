@@ -674,7 +674,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
     _record(stderr, log, record)
     # 診断ログ。受け付けたイベントと最終判定だけ。subject（コマンドの全文）は書かない。
-    diaglog.get("ccnavi", root).info(
+    # 呼び出しごとに走るので DEBUG に置き、既定の INFO では行を増やさない。
+    diaglog.get("ccnavi", root).debug(
         "hook を判定した",
         event=record.event,
         tool=record.tool,

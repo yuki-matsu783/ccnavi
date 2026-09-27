@@ -2,7 +2,7 @@
 
 sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と拡張（`src/log.ts`）と同じ形の行を出す。
 
-    2026-09-27T10:15:03+09:00 INFO  ccnavi[4242] hook を判定した event=PreToolUse decision=deny
+    2026-09-27T10:15:03+09:00 DEBUG ccnavi[4242] hook を判定した event=PreToolUse decision=deny
 
 標準の logging は使わない。ハンドラの組み立てと import の重さを hook のホットパスに
 持ち込まないためと、3 つの言語で行の形を 1 字まで揃えるため。
