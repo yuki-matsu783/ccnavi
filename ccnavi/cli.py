@@ -99,13 +99,17 @@ from the workspace root, e.g. projects/lib/docs/x):
 The same filter given twice is OR, different filters are AND, and case is
 ignored. --type, --tag and --keyword match whole values; --path matches part
 of the path without .md; --text matches part of the path, the mtime or any
-frontmatter value. A date-only --until runs to the end of that day. No match
-is still exit 0. Before searching it brings the per-directory index.jsonl up
-to date (it writes only where git ignores index.jsonl; a tree that ignores
-none is left out and named on stderr);
+frontmatter value; strings are compared in NFC. --since and --until take
+YYYY-MM-DD[THH[:MM[:SS]]] and --until runs to the end of what it names (a date
+to 23:59:59, THH to :59:59, THH:MM to :59). No match is still exit 0. Before
+searching it brings the per-directory index.jsonl up to date (it writes only
+where git ignores index.jsonl and the file is ccnavi's own; a tree that
+ignores none is left out and named on stderr). The first run reads the head
+of every markdown file; later runs read only those whose mtime moved.
 --no-refresh reuses what is there. --json is --format json. The rows are
 documented in README.md ("ドキュメントの索引"). These filters are for --docs
-only; anywhere else they are dropped and said so on stderr.
+only; anywhere else they stop the run with exit 1, and flags that belong to
+other runs stop --docs the same way.
 
 The common layer's own three files are moved by --rules, --phases and --risk,
 and where the layers are looked for by --projects and --project-home. All five
@@ -510,6 +514,20 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         selfguard.GATE_SETTINGS,
     )
 
+    # ドキュメントの索引を引く経路。payload を読まず、判定も記録もしない。
+    # 絞り込みのフラグは `--docs` でだけ読む。ほかの経路で渡されたら止める。このフラグが
+    # 無かったころは argparse が知らないフラグとして止めていたので、落として先へ進めると
+    # `ticket start X --limit 3` のような打ち間違いが通るようになる（`--flow` は診断の中の
+    # 差し替えで、落としても何も動かないので落とすだけにしている）。
+    if not args.docs:
+        stray = _docs_flags_given(args)
+        if stray:
+            for flag in stray:
+                stderr.write(DOCS_ONLY.format(flag=flag))
+            return EXIT_ERROR
+    else:
+        return _docs(stdout, stderr, conf, root, args)
+
     # 1 つの層だけを差し替える形。効く経路は共通層の 3 本と同じ。
     for flag, value, swaps in (
         ("--project-rules-file", args.project_rules_file, conf.project_rules_files),
@@ -537,14 +555,6 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             args.flow = ""
         else:
             args.flow = os.path.abspath(args.flow)
-
-    # ドキュメントの索引を引く経路。payload を読まず、判定も記録もしない。
-    # 絞り込みのフラグは `--docs` でだけ読む。ほかの経路で渡されたら言って落とす
-    # （`--flow` と同じ）。
-    if not args.docs:
-        _drop_docs_flags(stderr, args)
-    else:
-        return _docs(stdout, stderr, conf, root, args)
 
     # 検証だけを行う経路。payload を読まないので、判定に入る前にここで分かれる。
     # 苦情の扱いが逆になるのが分ける理由で、判定にとっては読み飛ばした設定の
@@ -733,29 +743,40 @@ DOCS_FLAGS = (
     ("--format", "format", None),
     ("--no-refresh", "no_refresh", False),
 )
-DOCS_ONLY = "ccnavi: {flag} は --docs でだけ効く\n"
-# `--docs` と一緒に使えない経路。どれも別のことをする。
-_OTHER_MODES = (
-    ("--lint", "lint"),
-    ("--test", "test"),
-    ("--test-samples", "test_samples"),
-    ("--explain", "explain"),
-    ("--suggest", "suggest"),
-    ("--prune", "prune"),
-    ("--approve", "approve"),
-    ("--reviewed", "reviewed"),
-    ("--close-early", "close_early"),
-    ("--config-synced", "config_synced"),
+DOCS_ONLY = "ccnavi: {flag} は --docs でだけ使える\n"
+# `--docs` と一緒に使えないフラグ。ほかの経路と、その経路でだけ読むもの。黙って無視すると、
+# 打った人は効いたと思う。
+_NOT_WITH_DOCS = (
+    "--lint",
+    "--test",
+    "--test-samples",
+    "--explain",
+    "--suggest",
+    "--prune",
+    "--approve",
+    "--reviewed",
+    "--close-early",
+    "--config-synced",
+    "--yes",
+    "--preview",
+    "--verify",
+    "--digest",
+    "--result",
+    "--tickets",
+    "--phase",
+    "--body-file",
+    "--reason",
+    "--accept-unresolved",
+    "--chat",
+    "--flow",
+    "--project-rules-file",
+    "--project-phases-file",
 )
 
 
-def _drop_docs_flags(stderr: TextIO, args: argparse.Namespace) -> None:
-    """`--docs` の外で渡された絞り込みのフラグを、標準エラーに出して落とす。"""
-    for flag, name, absent in DOCS_FLAGS:
-        if getattr(args, name) == absent:
-            continue
-        stderr.write(DOCS_ONLY.format(flag=flag))
-        setattr(args, name, absent)
+def _docs_flags_given(args: argparse.Namespace) -> list[str]:
+    """渡された `--docs` 用のフラグ。"""
+    return [flag for flag, name, absent in DOCS_FLAGS if getattr(args, name) != absent]
 
 
 def _docs(
@@ -766,8 +787,8 @@ def _docs(
     args: argparse.Namespace,
 ) -> int:
     """`--docs`。ワークスペースと、索引の対象になるプロジェクトの md を引く。"""
-    for flag, name in _OTHER_MODES:
-        value = getattr(args, name)
+    for flag in _NOT_WITH_DOCS:
+        value = getattr(args, flag[2:].replace("-", "_"))
         # `is` で比べる。`--reviewed 0` の 0 は False と等しいので、`in` だと見落とす。
         if value is None or value is False or value == "":
             continue
