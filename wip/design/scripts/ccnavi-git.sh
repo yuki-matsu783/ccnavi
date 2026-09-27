@@ -31,7 +31,7 @@ FAIL_LINES="${CCNAVI_GIT_FAIL_LINES:-30}"
 # 残す記録の本数。放っておくと増え続けるので世代で切る。
 KEEP_LOGS="${CCNAVI_GIT_KEEP_LOGS:-50}"
 
-# 対話に落ちる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
+# 対話になる道を全部塞ぐ。Bash ツールの stdin は /dev/null だが、git の
 # 資格情報プロンプトは /dev/tty を直接開くので stdin だけでは止まらない。
 GIT_TERMINAL_PROMPT=0
 GIT_PAGER=cat
@@ -80,6 +80,9 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
+            merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
+                  両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
+                  (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
   通信      fetch  pull  (--force / --prune は不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
@@ -93,7 +96,7 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
   config clone submodule  利用者に依頼する
   -c / --config-env / --git-dir / -C / --output / --upload-pack / --exec-path
                 読み取り専用のサブコマンドでも任意コマンドの実行や書き込みに
-                化けるので、値を見ずに一律で拒否する
+                なってしまうので、値を見ずに一律で拒否する
 
 出力: 成功なら要約と先頭 40 行、失敗なら末尾 30 行。全量は logs/ に残る。
 環境変数: CCNAVI_GIT_MAX_LINES / CCNAVI_GIT_FAIL_LINES / CCNAVI_GIT_KEEP_LOGS
@@ -349,7 +352,7 @@ restore)
 	# --ours / --theirs もここを通る。衝突したパスにしか効かない（普段は
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
 	# 衝突したときに解く道はここしかない。ルールファイルに衝突マーカーが
-	# 入っていると YAML として読めず、判定は組み込みの既定に落ちているが、
+	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
 	# 既定もこの形は止めない（ccnavi/builtin.py）。
 	[ "$#" -eq 0 ] && reject "restore は戻すファイルを名指ししてください ($SELF restore <パス>)。"
 	for arg in ${1+"$@"}; do
@@ -391,6 +394,46 @@ merge)
 		esac
 		prev="$arg"
 	done
+	;;
+
+merge-file)
+	# 衝突を両方取り込む形 (--union) を作るための道。通すのは結果を標準出力に出す形
+	# (-p / --stdout) だけ。付けないと git は 1 つめのファイルを直に書き換える。
+	# ファイルを書くのは Edit / Write に寄せる。そちらなら hook が行き先を見られる。
+	#
+	# オプションは知っているものだけ通す。git は長いオプションの略記 (--std) も
+	# 打ち消し (--no-stdout) も受け取るので、知らない綴りを通すと -p を付けたつもりで
+	# 書き込みに戻る。-L と --marker-size は値を次の語で取る。`-L -p` の -p は
+	# ラベルで、-p を付けたことにならない (git はファイルを書く)。だから値ごと飛ばす。
+	# `--` の後ろはファイル名。そこに -p があっても数えない。
+	# 束ねた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
+	#
+	# --object-id は通す。衝突の最中なら :2:<パス> :1:<パス> :3:<パス> を直に渡せて、
+	# 一時ファイルが要らない。-p が無いと結果をオブジェクトとしてリポジトリに書くが、
+	# -p は必須なのでその形はここに来ない。
+	mf_stdout=no
+	mf_skip=no
+	mf_end=no
+	for arg in ${1+"$@"}; do
+		if [ "$mf_skip" = yes ]; then
+			mf_skip=no # 直前のオプションの値
+			continue
+		fi
+		[ "$mf_end" = yes ] && continue
+		case "$arg" in
+		--) mf_end=yes ;;
+		-p | --stdout) mf_stdout=yes ;;
+		-L | --marker-size | --diff-algorithm) mf_skip=yes ;;
+		--union | --ours | --theirs | --diff3 | --zdiff3 | --object-id | -q | --quiet | \
+			--marker-size=* | --diff-algorithm=* | -L?*) ;;
+		-*)
+			reject "merge-file の $arg は通しません。通すのは -p (--stdout) と --union / --ours / --theirs / --diff3 / --zdiff3 / --object-id / -L <ラベル> / --marker-size=<数> / -q だけで、短いオプションは 1 つずつ分けて書きます。"
+			;;
+		esac
+	done
+	if [ "$mf_stdout" = no ]; then
+		reject "merge-file は -p (--stdout) を付けた形だけ通します。付けないと 1 つめのファイルを直に書き換えます。衝突の最中なら $SELF merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス> で出力し、その結果を Edit で書いてください。"
+	fi
 	;;
 
 commit)
@@ -440,7 +483,7 @@ checkout | switch)
 	;;
 
 fetch | pull)
-	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗に倒れる。
+	# 外と通信する。資格情報の入力待ちは GIT_TERMINAL_PROMPT=0 で即失敗になる。
 	for arg in ${1+"$@"}; do
 		case "$arg" in
 		-f | --force | --prune | --unshallow)
@@ -474,14 +517,8 @@ push)
 	# --git-common-dir から導くと、モード B ではプロジェクトである元リポジトリを指して
 	# 条件が一致せず、承認済みチケットの検査が丸ごと飛ぶ。ガードが「効いている
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
-	#
-	# 2 つとも実際のパス（symlink を畳んだもの）にそろえてから比べる。WS は論理の pwd から、
-	# push_top は git の実際のパスから作られるので、ワークスペースを symlink 越しに開くと
-	# （macOS の /tmp → /private/tmp など）case に当たらず、検査が丸ごと飛ぶ。
-	# 同じ検査を hook も持つ（ADR-0077）。こちらは 2 重目。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	[ -z "$push_top" ] || push_top=$(cd "$push_top" 2>/dev/null && { pwd -P -W 2>/dev/null || pwd -P; }) || :
-	push_root=$(cd "$WS" 2>/dev/null && { pwd -P -W 2>/dev/null || pwd -P; }) || push_root="$WS"
+	push_root="$WS"
 	if [ -n "$push_root" ]; then
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
@@ -492,23 +529,14 @@ push)
 			# ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・
 			# .claude/worktrees/ の下。approval.trees）を全部見る。識別子は重ならないので、
 			# どこで見つかってもこのツリーの子のもの。
-			push_projects="${CCNAVI_PROJECTS:-projects}"
-			case "$push_projects" in
-			/* | [A-Za-z]:*) ;;
-			*) push_projects="$push_root/$push_projects" ;;
-			esac
+			# 置き場は固定（ADR-0084）。綴りは ccnavi の既定（settings.py の DEFAULT_PROJECTS・
+			# DEFAULT_TICKETS・DEFAULT_APPROVED）と揃える。ずれると、この検査が黙って飛ぶ。
+			# hook の同じ検査（wrapguard.py の子の push）と同じ場所を見る（ADR-0077 の 2 重目）。
+			push_projects="$push_root/projects"
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				case "${CCNAVI_TICKETS_APPROVED:-}" in
-				/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
-				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
-				# env を書いていないワークスペースで、この検査が黙って飛ぶ。
-				*) push_copies="$push_tree/${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" ;;
-				esac
-				case "${CCNAVI_TICKETS_PROPOSAL:-}" in
-				/* | [A-Za-z]:*) push_proposals="$CCNAVI_TICKETS_PROPOSAL" ;;
-				*) push_proposals="$push_tree/${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}" ;;
-				esac
+				push_copies="$push_tree/.ccnavi/approved"
+				push_proposals="$push_tree/wip/proposals"
 				# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
 				# 取り込んで片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
 				for push_copy in "$push_copies/doing/$push_name.md" "$push_copies/done/$push_name.md" \
