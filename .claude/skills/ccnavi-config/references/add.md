@@ -62,7 +62,8 @@ allow:
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
   及ぼすなら `Bash|PowerShell`。ツールでない名前は `Stop`（メインエージェントのターンの終わり）だけで、
   `allow` に `glob: "*"` と `every: N` を添えて置く。渡す回にターンの終わりを止めて文を渡す（ADR-0090）。
-  `every` を書かないとターンの終わりのたびに止まる（`--lint` が warn）
+  `every` が 2 より小さいもの、プロジェクトの層に置いたものは使われない（`--lint` が warn）。
+  当たるかは `ccnavi --test Stop "(stop)"` か見本の `tool: Stop` で確かめる
 
 Bash は実行される部分に当たる。`$( )` の中や `&&` の先も 1 本ずつ当たり、ヒアドキュメントの中身は当たらない
 （既定の `heredoc` ルールが入口ごと止める）。
