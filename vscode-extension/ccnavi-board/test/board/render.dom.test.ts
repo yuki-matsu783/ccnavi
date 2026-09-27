@@ -832,3 +832,107 @@ test("CB-T142 見た目の切り替えは body のクラスだけを付け替え
     await page.close();
   }
 });
+
+test("CB-T261 履歴は畳んだ「履歴（N 件）」で出し、開くと新しい順に時刻・何が動いたか・経路が並ぶ。跡が無いカードには出さない", async () => {
+  const base = fixture();
+  const child = base.tickets.find((t) => t.ticket === "i0001-02")!;
+  const parent = base.tickets.find((t) => t.ticket === "i0001")!;
+  const entries = [
+    { at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" },
+    { at: "2026-09-26T09:10:00Z", kind: "started", from: "doing", to: "doing", via: "cli", phase: null, mark: "", reason: "" },
+    { at: "2026-09-26T10:00:00Z", kind: "cancelled", from: "doing", to: "done", via: "cli", phase: null, mark: "", reason: "要らなくなった" },
+  ];
+  const marks = [
+    { at: "2026-09-26T11:00:00Z", kind: "phase-mark", from: "", to: "", via: "hook", phase: 1, mark: "pending" },
+    { at: "2026-09-26T11:05:00Z", kind: "parent-mark", from: "", to: "", via: "cli", phase: null, mark: "ready" },
+    { at: "2026-09-26T11:06:00Z", kind: "phase-reopened", from: "", to: "", via: "terminal", phase: 2, mark: "" },
+  ].map((e) => ({ reason: "", ...e }));
+  const page = await openBoard({
+    ...base,
+    tickets: [
+      { ...parent, history: marks },
+      { ...child, history: entries },
+    ],
+  });
+  try {
+    const details = page.one('.card[data-id="i0001-02"] details.history');
+    assert.equal(details.hasAttribute("open"), false);
+    assert.equal(text(page, '.card[data-id="i0001-02"] details.history summary'), "履歴（3 件）");
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-text'), [
+      "取り消し（作業中 → 完了）: 要らなくなった",
+      "着手",
+      "承認（承認待ち → 作業中）",
+    ]);
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-at'), ["2026-09-26 10:00 UTC", "2026-09-26 09:10 UTC", "2026-09-26 09:00 UTC"]);
+    // cli は「sh から来た」までしか言えない（人が端末で同じ sh を打っても cli）ので、誰が打ったかは言わない
+    assert.deepEqual(texts(page, '.card[data-id="i0001-02"] .history-via'), ["sh（ccnavi-ticket.sh など）", "sh（ccnavi-ticket.sh など）", "ボード"]);
+    assert.deepEqual(texts(page, '.card[data-id="i0001"] .history-text'), [
+      "フェーズ 2: マーカーを消した（子が足された）",
+      "Draft を外した",
+      "フェーズ 1: エージェントに終了を通知済み",
+    ]);
+  } finally {
+    await page.close();
+  }
+  const empty = await openBoard({ ...base, tickets: base.tickets.map((t) => ({ ...t, history: [] })) });
+  try {
+    assert.equal(empty.all("details.history").length, 0);
+  } finally {
+    await empty.close();
+  }
+});
+
+test("CB-T264 先行を満たしていないカードに「先行待ち（先行の識別子）」のバッジ。どの先行が何の状態かは tooltip に実行ファイルの言葉で出す", async () => {
+  const base = fixture();
+  const unmet = [
+    { ticket: "i0001-02", state: "doing", label: "作業中（doing/）" },
+    { ticket: "i0001-09", state: "missing", label: "どの置き場にも無い" },
+  ];
+  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-03" ? { ...t, predecessors_unmet: unmet } : t)) });
+  try {
+    assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-02, i0001-09）");
+    const title = page.one('.card[data-id="i0001-03"] .badge.preds').getAttribute("title") ?? "";
+    assert.match(title, /承認も着手も止まります/);
+    assert.match(title, /i0001-02: 作業中（doing\/）/);
+    assert.match(title, /i0001-09: どの置き場にも無い/);
+    // 先行を満たしているカードには出さない
+    assert.equal(page.all('.card[data-id="i0001-02"] .badge.preds').length, 0);
+  } finally {
+    await page.close();
+  }
+});
+
+test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認待ちは承認と着手、未着手は着手、着手済み・レビュー待ちは止まらないと言う", async () => {
+  const base = fixture();
+  const unmet = [{ ticket: "i0001-09", state: "doing", label: "作業中（doing/）" }];
+  const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
+  const tickets = base.tickets.map((t) => {
+    if (t.ticket === "i0001-03") {
+      return { ...t, predecessors_unmet: unmet }; // 承認待ち
+    }
+    if (t.ticket === "i0001-02") {
+      return { ...t, started_at: "", predecessors_unmet: unmet }; // 承認済み・未着手
+    }
+    if (t.ticket === "i0001-04") {
+      return { ...t, predecessors_unmet: unmet }; // レビュー待ち
+    }
+    return t;
+  });
+  assert.equal(at("i0001-03").copy.status, "none");
+  assert.equal(at("i0001-02").copy.status, "open");
+  assert.equal(at("i0001-04").copy.status, "review");
+  const page = await openBoard({ ...base, tickets });
+  try {
+    const title = (id: string) => page.one(`.card[data-id="${id}"] .badge.preds`).getAttribute("title") ?? "";
+    assert.equal(text(page, '.card[data-id="i0001-03"] .badge.preds'), "先行待ち（i0001-09）");
+    assert.match(title("i0001-03"), /承認も着手も止まります/);
+    assert.equal(text(page, '.card[data-id="i0001-02"] .badge.preds'), "先行待ち（i0001-09）");
+    assert.match(title("i0001-02"), /着手が止まります/);
+    assert.doesNotMatch(title("i0001-02"), /承認/);
+    assert.equal(text(page, '.card[data-id="i0001-04"] .badge.preds'), "先行が未完了（i0001-09）");
+    assert.match(title("i0001-04"), /着手済みです/);
+    assert.match(title("i0001-04"), /作業と finish は止まりません/);
+  } finally {
+    await page.close();
+  }
+});
