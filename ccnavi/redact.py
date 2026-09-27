@@ -29,17 +29,18 @@ KEEP_HEAD = 6
 KEEP_TAIL = 4
 MASK = "***"
 
-# 引用の外で、値の終わりとして読む字。
-_BARE_VALUE = r"[^\s'\"&;|,)}<>`]+"
+# 引用の外で、値の終わりとして読む字。`\x00` は unwrapped がコマンドをつなぐ目印。
+_BARE_VALUE = r"[^\s'\"&;|,)}<>`\x00]+"
 # 値。引用されていれば閉じ引用まで、されていなければ区切りの字の手前まで。
 _VALUE = r"(?:'(?P<sq>[^'\n]*)'|\"(?P<dq>[^\"\n]*)\"|(?P<bare>" + _BARE_VALUE + r"))"
 
 # 名前が秘密を指す `名前=値` / `名前: 値`。名前はこれで終わるもの（`GITHUB_TOKEN`、
-# `db_password`、`x-api-key`、`aws_secret_access_key`）。途中に含むだけの名前
-# （`tokenizer`、`secretName`）は読まない。
+# `db_password`、`x-api-key`、`aws_secret_access_key`、`SECRET_KEY`、`MYSQL_PWD`、`_authToken`、
+# `SESSION_COOKIE`）。途中に含むだけの名前（`tokenizer`、`secretName`）は読まない。
+# `pwd` は前に `_` か `-` が付いた形だけ。素の `PWD` はいまの場所で、秘密ではない。
 _KEY_WORDS = (
-    r"token|password|passwd|secret|api[_-]?key|apikey|access[_-]?key|private[_-]?key|"
-    r"client[_-]?secret|auth[_-]?token|credentials?"
+    r"token|password|passwd|[_-]pwd|secret|secret[_-]?key|api[_-]?key|apikey|access[_-]?key|"
+    r"private[_-]?key|client[_-]?secret|auth[_-]?token|credentials?|cookie"
 )
 # 名前の頭は長さを限り、名前の途中から始めない（前の字が名前の字なら当てない）。どちらかが
 # 無いと、`-` や `_` が続くだけの文字列で、始まりの位置ごとに末尾まで食っては戻す形になり、
@@ -62,8 +63,15 @@ _AUTH_HEADER = re.compile(
     re.IGNORECASE,
 )
 _BEARER = re.compile(r"\bbearer\s+(?P<bare>[A-Za-z0-9._~+/=-]+)", re.IGNORECASE)
-# URL に埋めた資格情報（`https://user:<値>@host`）。
-_URL_USERINFO = re.compile(r"://[^/\s:@'\"]+:(?P<bare>[^@\s/'\"]+)@")
+# URL に埋めた資格情報（`https://user:<値>@host`）。値に `@` が入ることがあるので、ホストの
+# 手前の最後の `@` までを伏せる（ccnavi-common.sh の ccnavi_mask_url と同じ読み）。空白と
+# `/` はまたがない。
+_URL_USERINFO = re.compile(r"://[^/\s:@'\"\x00]+:(?P<bare>[^\s/'\"\x00]+)@")
+# HTTP の Cookie ヘッダの値。`;` で並ぶ値を全部、引用か行の終わりまで伏せる。
+_COOKIE_HEADER = re.compile(
+    r"\b(?:set-)?cookie\s*:\s*(?P<bare>[^'\"\n\x00]+)",
+    re.IGNORECASE,
+)
 # 形そのものがトークンだと言えるもの。
 _TOKENS = re.compile(
     r"(?<![A-Za-z0-9])(?P<bare>"
@@ -72,6 +80,11 @@ _TOKENS = re.compile(
     r"|github_pat_[A-Za-z0-9_]{20,}"  # GitHub の fine-grained トークン
     r"|glpat-[A-Za-z0-9_-]{20,}"  # GitLab の個人アクセストークン
     r"|xox[abprs]-[A-Za-z0-9-]{10,}"  # Slack のトークン
+    r"|sk-[A-Za-z0-9_-]{20,}"  # OpenAI / Anthropic の API キー（`sk-ant-…`、`sk-proj-…` を含む）
+    r"|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}"  # Stripe の秘密鍵と制限付き鍵
+    r"|AIza[0-9A-Za-z_-]{30,}"  # Google の API キー
+    r"|npm_[A-Za-z0-9]{30,}"  # npm のアクセストークン
+    r"|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"  # JWT
     r")(?![A-Za-z0-9])"
 )
 # 秘密鍵の本文。見出しと結びの行は残し、あいだを伏せる。
@@ -81,18 +94,45 @@ _PRIVATE_KEY = re.compile(
 )
 
 # コマンドを限って読むフラグ。`-p` や `-u` はほかのコマンドでは別の意味なので
-# （`mkdir -p`、`ssh -p 22`、`sort -u`）、そのコマンドの中でだけ読む。
-# コマンドの範囲は、名前から次のコマンドの切れ目（`;` `|` `&` 改行）の手前まで。
+# （`mkdir -p`、`ssh -p 22`、`sort -u`、`ls -a`）、そのコマンドの中でだけ読む。
+# コマンドの範囲は、名前から次のコマンドの切れ目（`;` `|` `&` 改行 `\x00`）の手前まで。
+_SEGMENT_REST = r"[^\n;|&\x00]*"
 _SEGMENTS = (
     # mysql 系の `-p<パスワード>`（空白を挟まない形だけがパスワードになる）。
     (
-        re.compile(r"\b(?:mysql\w*|mariadb\w*)\b[^\n;|&]*"),
+        re.compile(r"\b(?:mysql\w*|mariadb\w*)\b" + _SEGMENT_REST),
         re.compile(r"(?<=\s)-p" + _VALUE),
     ),
     # curl の `-u user:<パスワード>` / `--user user:<パスワード>`。
     (
-        re.compile(r"\bcurl\b[^\n;|&]*"),
-        re.compile(r"(?<=\s)(?:-u|--user)[\s=]*['\"]?[^\s:'\"]+:(?P<bare>[^\s'\"]+)"),
+        re.compile(r"\bcurl\b" + _SEGMENT_REST),
+        re.compile(r"(?<=\s)(?:-u|--user)[\s=]*['\"]?[^\s:'\"\x00]+:(?P<bare>[^\s'\"\x00]+)"),
+    ),
+    # curl の `-b <クッキー>` / `--cookie <クッキー>`。
+    (
+        re.compile(r"\bcurl\b" + _SEGMENT_REST),
+        re.compile(r"(?<=\s)(?:-b|--cookie)[\s=]+" + _VALUE),
+    ),
+    # sshpass の `-p <パスワード>` / `-p<パスワード>`。見るのは sshpass 自身のオプションだけで、
+    # 後ろに続くコマンド（`ssh -p 22`）の `-p` は読まない。
+    (
+        re.compile(r"\bsshpass\b" + _SEGMENT_REST),
+        re.compile(r"^sshpass(?:\s+-[^p\s]\S*)*\s+-p\s*" + _VALUE),
+    ),
+    # docker login の `-p <パスワード>`（`--password` は _FLAG が読む）。
+    (
+        re.compile(r"\bdocker\s+login\b" + _SEGMENT_REST),
+        re.compile(r"(?<=\s)-p\s*" + _VALUE),
+    ),
+    # redis-cli の `-a <パスワード>` / `--pass <パスワード>`。
+    (
+        re.compile(r"\bredis-cli\b" + _SEGMENT_REST),
+        re.compile(r"(?<=\s)(?:-a|--pass)\s+" + _VALUE),
+    ),
+    # `aws configure set aws_secret_access_key <値>`（名前と値を空白で分ける形）。
+    (
+        re.compile(r"\baws\s+configure\b" + _SEGMENT_REST),
+        re.compile(r"(?<=\s)(?:aws_secret_access_key|aws_session_token)\s+" + _VALUE),
     ),
 )
 
@@ -129,7 +169,16 @@ def _spans(text: str) -> list[tuple[int, int]]:
     次の形がもう 1 度伏せ、残した頭と尻まで消える。
     """
     found: list[tuple[int, int]] = []
-    for pattern in (_PRIVATE_KEY, _TOKENS, _AUTH_HEADER, _BEARER, _URL_USERINFO, _ASSIGN, _FLAG):
+    for pattern in (
+        _PRIVATE_KEY,
+        _TOKENS,
+        _AUTH_HEADER,
+        _BEARER,
+        _URL_USERINFO,
+        _COOKIE_HEADER,
+        _ASSIGN,
+        _FLAG,
+    ):
         found.extend(_value_spans(pattern, text, 0))
     for segment, option in _SEGMENTS:
         for part in segment.finditer(text):
