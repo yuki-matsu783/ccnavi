@@ -1095,7 +1095,9 @@ subAgentFlows:             # 無くてよい
 error があれば理由を出して開かない・保存しない（ADR-0035）。
 
 **手順として怪しいところは warn。** 読めたフローには、線の構造（`flow.structure_problems`。無いノードを指す線、
-`start` から届かないノード、`start` に入る線・`end` から出る線、分岐・問いの出口に線が無い、`start` / `end` が無い）と、
+`start` から届かないノード、`start` に入る線・`end` から出る線、分岐・問いの出口に線が無い、`start` / `end` が無い。
+出口は画面の `portsOf` と同じに読み、複数選択の問いは `output` の 1 本、グループへ出る線も出口を使ったと数える。
+無いノードを指す線は `ITEM_LIMIT` 件まで言い、残りは数だけ）と、
 `subAgent` の種類・`skill` の名前の綴り（`flow.name_problems`。候補は `flow.catalog`）を `(flow)` の warn で足す。
 読むのも保存も止めない（既に在るフローを読めなくしない）。巡回は意図して書くことがあるので言わない。`SubagentStart` は
 これを見ない。`--json` には、渡る手順の行（`flow.rendered`。`flow.render` のまま）と選べる名前（`flow.candidates`。

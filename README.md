@@ -1853,7 +1853,7 @@ ccnavi --lint --json
 | `errors` / `warns` / `infos` | 件数 |
 | `flow` | `--flow` を渡したときだけ在る。`{path, data, rendered, candidates}`。`path` は確かめたファイルの絶対パス、`data` は実行ファイルが読んだ中身（下）。読めなければ `null` |
 | `flow.rendered` | `SubagentStart` で担当のサブエージェントに渡る手順の行（文字列の並び。`flow.render` のまま、子のパスやロックの案内は入らない）。読めなければ `null` |
-| `flow.candidates` | フローで選べる名前。`{agents: [{name, source}], skills: [{name, source}]}`。`source` は `builtin`（`general-purpose` `Explore` `Plan`）か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`。名前は frontmatter の `name`、無ければファイル・ディレクトリの名前）。フローが読めなくても載る |
+| `flow.candidates` | フローで選べる名前。`{agents: [{name, source}], skills: [{name, source}]}`。`source` は `builtin`（`general-purpose` `Explore` `Plan`）か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`。名前は frontmatter（頭の `---` の区間だけを YAML として読む）の `name`、無ければファイル・ディレクトリの名前。エージェントはふつうのファイルだけで、`.md` の大文字小文字は区別しない。`.claude` を含む途中にリンクがあれば読まない）。フローが読めなくても載る |
 
 ### 子のフローを保存せずに確かめる
 

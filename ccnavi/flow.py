@@ -676,6 +676,11 @@ def structure_problems(data) -> list[str]:
     見るのは、線の `from` / `to` が無いノードを指す、`start` から届かないノード、`start` に入る線、
     `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い。グループは外す
     （手順ではない）。巡回は言わない。サブフロー（`subAgentFlows`）の中は見ない。
+
+    出口は画面（`flow-doc.ts` の `portsOf`）と同じに読む。複数選択（`multiSelect: true`）の問いは
+    選択肢ごとに出口を分けず、`output` の 1 本だけ。グループへ出る線も、出る側の出口は使っている
+    （線は手順に数えないが、「出口に線が無い」とは言わない）。無いノードを指す線は
+    `ITEM_LIMIT` 件まで言い、残りは数だけ添える。
     """
     try:
         return _structure_problems(data)
@@ -694,6 +699,7 @@ def _structure_problems(data) -> list[str]:
     }
     kinds = {nid: _text(n.get("type")) for nid, n in by_id.items()}
     out: list[str] = []
+    missing: list[str] = []
     edges: dict[str, list[str]] = {}
     ports: dict[str, set[str]] = {}
     for index, c in enumerate(_list(data.get("connections"))):
@@ -707,16 +713,21 @@ def _structure_problems(data) -> list[str]:
                 continue
             if ref not in by_id:
                 shown = _line(ref) or "(空)"
-                out.append(f"線 {cid} の {end_name} が無いノード（{shown}）を指している")
+                missing.append(f"線 {cid} の {end_name} が無いノード（{shown}）を指している")
                 bad = True
+        if not bad and src in by_id:
+            # グループへ出る線でも、出る側の出口は使っている
+            ports.setdefault(src, set()).add(_text(c.get("fromPort")) or "output")
         if bad or src in groups or dst in groups:
             continue
         edges.setdefault(src, []).append(dst)
-        ports.setdefault(src, set()).add(_text(c.get("fromPort")) or "output")
         if kinds.get(dst) == "start":
             out.append(f"線 {cid} が start（{_named(by_id[dst])}）に入っている")
         if kinds.get(src) == "end":
             out.append(f"線 {cid} が end（{_named(by_id[src])}）から出ている")
+    out.extend(missing[:ITEM_LIMIT])
+    if len(missing) > ITEM_LIMIT:
+        out.append(f"無いノードを指す線は…ほか {len(missing) - ITEM_LIMIT} 件")
     starts = [nid for nid in by_id if kinds[nid] == "start"]
     if not starts:
         out.append("start が無い（どこから始めるかが決まらない）")
@@ -738,8 +749,13 @@ def _structure_problems(data) -> list[str]:
         key = BRANCH_KEYS.get(kinds[nid])
         if key is None:
             continue
-        items = [i for i in _list(_dict(node.get("data")).get(key)) if isinstance(i, dict)]
         taken = ports.get(nid, set())
+        if kinds[nid] == ASK and _dict(node.get("data")).get("multiSelect") is True:
+            # 複数選択の問いは出口を分けない（`output` の 1 本。画面の `portsOf` と同じ）
+            if "output" not in taken:
+                out.append(f"問い {_named(node)} の出口に線が無い: output（複数選択）")
+            continue
+        items = [i for i in _list(_dict(node.get("data")).get(key)) if isinstance(i, dict)]
         empty = [
             _line(item.get("label")) or f"{index + 1} 番目"
             for index, item in enumerate(items)
@@ -767,11 +783,23 @@ SOURCE_BUILTIN = "builtin"
 SOURCE_PROJECT = "project"
 
 
-def _front_name(path: str) -> str:
-    """Markdown の frontmatter の `name:` の値。無い・読めないなら空。リンクは辿らない。"""
+def _regular_file(path: str) -> bool:
+    """リンクでない、ふつうのファイルか（辿らずに見る）。"""
     try:
-        if os.path.islink(path) or not os.path.isfile(path):
-            return ""
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except (OSError, ValueError):
+        return False
+
+
+def _front_name(path: str) -> str:
+    """Markdown の frontmatter の `name:` の値。無い・読めないなら空。リンクは辿らない。
+
+    frontmatter（頭の `---` から次の `---` まで）だけを `yaml.safe_load` で読む（`>-` の折り返しや
+    行末の注釈で名前が化けないように）。別名は拒む（`_Loader`）。`name` が文字列でなければ空。
+    """
+    if not _regular_file(path):
+        return ""
+    try:
         with open(path, "rb") as f:
             head = f.read(HEAD_LIMIT).decode("utf-8-sig", errors="replace")
     except (OSError, ValueError):
@@ -779,22 +807,29 @@ def _front_name(path: str) -> str:
     lines = head.splitlines()
     if not lines or lines[0].strip() != "---":
         return ""
+    body: list[str] = []
     for line in lines[1:]:
         if line.strip() == "---":
             break
-        key, sep, value = line.partition(":")
-        if sep and key.strip() == "name" and not line[:1].isspace():
-            value = value.strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-                value = value[1:-1]
-            return clean(value).strip()
-    return ""
-
-
-def _entries(path: str) -> list[os.DirEntry]:
-    """ディレクトリの中身（名前の順、`CATALOG_LIMIT` 件まで）。リンクのディレクトリは読まない。"""
+        body.append(line)
+    else:
+        return ""
     try:
-        if os.path.islink(path) or not os.path.isdir(path):
+        meta = yaml.load("\n".join(body), Loader=_Loader)  # noqa: S506  _Loader は SafeLoader
+    except (yaml.YAMLError, ValueError, RecursionError):
+        return ""
+    value = meta.get("name") if isinstance(meta, dict) else None
+    return clean(value).strip() if isinstance(value, str) else ""
+
+
+def _entries(path: str, root: str) -> list[os.DirEntry]:
+    """ディレクトリの中身（名前の順、`CATALOG_LIMIT` 件まで）。
+
+    `root` からそのディレクトリまでの途中（`.claude` 自体を含む）にリンクがあれば読まない
+    （`linked` と同じ考え方）。
+    """
+    try:
+        if linked(root, path) or not os.path.isdir(path):
             return []
         with os.scandir(path) as it:
             found = sorted(it, key=lambda e: e.name)
@@ -815,19 +850,21 @@ def catalog(root: str) -> dict[str, list[dict]]:
     agents = [{"name": name, "source": SOURCE_BUILTIN} for name in BUILTIN_AGENTS]
     skills: list[dict] = []
     if root:
-        for entry in _entries(os.path.join(root, AGENTS_DIR)):
-            if not entry.name.endswith(".md"):
+        for entry in _entries(os.path.join(root, AGENTS_DIR), root):
+            # ふつうのファイルだけ（ディレクトリ・リンクは数えない）。
+            # `.md` は大文字小文字を区別しない
+            if not entry.name.lower().endswith(".md") or not _regular_file(entry.path):
                 continue
             name = _front_name(entry.path) or entry.name[: -len(".md")]
             agents.append({"name": name, "source": SOURCE_PROJECT})
-        for entry in _entries(os.path.join(root, SKILLS_DIR)):
+        for entry in _entries(os.path.join(root, SKILLS_DIR), root):
             try:
                 if entry.is_symlink() or not entry.is_dir():
                     continue
             except OSError:
                 continue
             path = os.path.join(entry.path, SKILL_FILE)
-            if not os.path.isfile(path) or os.path.islink(path):
+            if not _regular_file(path):
                 continue
             skills.append({"name": _front_name(path) or entry.name, "source": SOURCE_PROJECT})
     return {"agents": _unique(agents), "skills": _unique(skills)}

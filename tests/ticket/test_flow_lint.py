@@ -316,6 +316,45 @@ connections:
         text = STRUCTURE_BASE + "  - {id: c5, from: p1, to: g}\n"
         self.assertEqual(self.problems(text), [])
 
+    def test_multi_select_questions_have_one_output(self):
+        # 複数選択の問いは出口を分けない（`output` の 1 本。画面の portsOf と同じ）
+        multi = """\
+nodes:
+  - {id: s, type: start}
+  - id: q
+    type: askUserQuestion
+    name: 方針
+    data: {multiSelect: true, options: [{label: 小さく}, {label: 大きく}]}
+  - {id: e, type: end}
+connections:
+  - {id: c1, from: s, to: q}
+"""
+        said = self.problems(multi)
+        self.assertIn("問い q（方針） の出口に線が無い: output（複数選択）", said)
+        # 選択肢ごとの出口（小さく・大きく）は探さない
+        self.assertFalse([line for line in said if "小さく" in line], said)
+        linked_out = multi + "  - {id: c2, from: q, to: e, fromPort: output}\n"
+        self.assertEqual(self.problems(linked_out), [])
+        # fromPort を書かない線も output として読む
+        self.assertEqual(self.problems(multi + "  - {id: c2, from: q, to: e}\n"), [])
+
+    def test_a_branch_exit_into_a_group_is_a_used_exit(self):
+        # グループへ出る線は手順に数えないが、出口は使っている（「出口に線が無い」とは言わない）
+        text = STRUCTURE_BASE.replace(
+            "  - {id: c3, from: q, to: p1, fromPort: branch-1}\n",
+            "  - {id: c3, from: q, to: g, fromPort: branch-1}\n",
+        )
+        self.assertEqual(self.problems(text), [])
+
+    def test_lines_to_missing_nodes_are_capped(self):
+        extra = "".join(
+            f"  - {{id: x{i}, from: p1, to: ghost{i}}}\n" for i in range(flow.ITEM_LIMIT + 3)
+        )
+        said = self.problems(STRUCTURE_BASE + extra)
+        missing = [line for line in said if "無いノード" in line]
+        self.assertEqual(len(missing), flow.ITEM_LIMIT + 1, said)
+        self.assertEqual(missing[-1], "無いノードを指す線は…ほか 3 件")
+
     def test_broken_shapes_do_not_raise(self):
         for data in ({"nodes": [{"id": "a", "data": [1]}], "connections": [{"from": [1]}]}, 5):
             with self.subTest(data=data):
@@ -380,6 +419,35 @@ subAgentFlows:
         self.assertIn("genral-purpose", said[1])
         self.assertIn("comit", said[2])
         self.assertIn("nested", said[3])
+
+    def test_frontmatter_is_read_as_yaml(self):
+        agents = os.path.join(self.root, ".claude", "agents")
+        # 折り返し（>-）と行末の注釈で名前が化けない。閉じていない frontmatter は読まない
+        write(
+            os.path.join(agents, "folded.md"), "---\nname: >-\n  folded-name\ndescription: x\n---\n"
+        )
+        write(os.path.join(agents, "noted.md"), "---\nname: noted  # 注釈\n---\n")
+        write(os.path.join(agents, "open.md"), "---\nname: never-closed\n")
+        write(os.path.join(agents, "number.md"), "---\nname: 5\n---\n")
+        # 拡張子の大文字小文字は区別しない。ディレクトリは数えない
+        write(os.path.join(agents, "UPPER.MD"), "---\nname: upper\n---\n")
+        os.makedirs(os.path.join(agents, "dir.md"))
+        cat = flow.catalog(self.root)
+        project = sorted(a["name"] for a in cat["agents"] if a["source"] == "project")
+        self.assertEqual(project, ["folded-name", "noted", "number", "open", "upper"])
+
+    def test_links_on_the_way_are_not_followed(self):
+        outside = tempfile.mkdtemp(prefix="ccnavi-flow-cand-out-")
+        self.addCleanup(shutil.rmtree, outside, True)
+        write(os.path.join(outside, "agents", "far.md"), "---\nname: far\n---\n")
+        write(os.path.join(outside, "skills", "far", "SKILL.md"), "---\nname: far\n---\n")
+        try:
+            os.symlink(outside, os.path.join(self.root, ".claude"), target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"シンボリックリンクを作れない: {exc}")
+        cat = flow.catalog(self.root)
+        self.assertEqual([a["source"] for a in cat["agents"]], ["builtin"] * 3)
+        self.assertEqual(cat["skills"], [])
 
 
 class FlowLintExtrasTest(unittest.TestCase):
