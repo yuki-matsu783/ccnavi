@@ -1,3 +1,11 @@
+---
+type: adr
+title: cd で移った先から見た綴りを、当てる先として足す
+description: cd で移動後のコマンド綴りを読んで、ファイルの守りを cd 経由の書き込みにも当てる
+tags: [selfguard, rules]
+keywords: [cd, 移動, 綴り, 当てる先, 守り, ルール, shellread]
+---
+
 # ADR-0069: `cd` で移った先から見た綴りを、当てる先として足す
 
 状態: 採用

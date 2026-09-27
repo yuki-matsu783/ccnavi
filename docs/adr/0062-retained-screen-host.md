@@ -1,3 +1,11 @@
+---
+type: adr
+title: 保持する画面は、入れ物を入れ直さない段取りで React にする
+description: retainContextWhenHidden が真の画面を React で実装するとき、入れ物を再作成せずに中身を更新する段取りを定める
+tags: [extension, design-doc]
+keywords: [画面, React, 保持, retainContextWhenHidden, webview, VS Code]
+---
+
 # ADR-0062: 保持する画面は、入れ物を入れ直さない段取りで React にする
 
 状態: 採用

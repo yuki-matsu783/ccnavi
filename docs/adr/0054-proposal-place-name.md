@@ -1,3 +1,11 @@
+---
+type: adr
+title: 提案の置き場の既定を wip/proposals にする
+description: 提案の置き場を wip/tickets から wip/proposals に変え、承認済みチケット（.ccnavi/tickets）との役割の違いを名前で示す
+tags: [ticket, config]
+keywords: [提案, wip/proposals, チケット, 置き場, 既定, env, 移行]
+---
+
 # ADR-0054: 提案の置き場の既定を `wip/proposals` にする
 
 状態: 採用

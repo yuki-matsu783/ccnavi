@@ -1,3 +1,11 @@
+---
+type: adr
+title: 承認は端末ではなくボードのオーバーレイで受ける
+description: 承認をシェル端末ではなく GUI ボードのオーバーレイで受け、hook で通知する設計
+tags: [approval, board, extension]
+keywords: [承認, ボード, オーバーレイ, GUI, hook, 端末]
+---
+
 # ADR-0040: 承認は端末ではなくボードのオーバーレイで受け、承認したことは hook が伝える
 
 状態: 採用

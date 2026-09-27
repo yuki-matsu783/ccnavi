@@ -1,3 +1,10 @@
+---
+type: adr
+title: "読み切れないコマンドに `allow` を当てない"
+description: "読み切れないコマンドの縮退時には allow を当てず、deny と ask に限定して安全性を確保する"
+tags: [rules, approval]
+keywords: [コマンド解析, 縮退, allow, deny, ask, 安全性]
+---
 # ADR-0011: 読み切れないコマンドに `allow` を当てない
 
 状態: 採用

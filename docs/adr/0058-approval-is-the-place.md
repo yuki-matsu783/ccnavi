@@ -1,3 +1,11 @@
+---
+type: adr
+title: 承認の権威は置き場。記録の欄は必須にしない
+description: チケットの置き場がエージェントの書き込み権限で権威を持ち、メタデータの欄は必須化しない
+tags: [approval, config]
+keywords: [承認, 権威, 置き場, .ccnavi/approved, ccnavi_approved, 必須]
+---
+
 # ADR-0058: 承認の権威は置き場。記録の欄は必須にしない
 
 状態: 採用

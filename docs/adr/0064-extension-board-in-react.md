@@ -1,3 +1,11 @@
+---
+type: adr
+title: ボードの画面を React にし、拡張ホストは中身だけを渡す
+description: ボード画面を React で実装し、型検査を効かせて差分更新できるようにする
+tags: [extension, design-doc]
+keywords: [ボード, React, 拡張ホスト, webview, 画面, TypeScript]
+---
+
 # ADR-0064: ボードの画面を React にし、拡張ホストは中身だけを渡す
 
 状態: 採用
