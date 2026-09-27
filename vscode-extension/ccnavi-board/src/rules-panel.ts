@@ -26,7 +26,7 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runLint, runSamples, runTest, type RulesOverride } from "./ccnavi.js";
+import { loadBoard, runLint, runSamples, runSuggest, runTest, type RulesOverride } from "./ccnavi.js";
 import { envFromSettingsJson, hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
@@ -732,6 +732,22 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       current.host.post({ type: "sampled", result: result.value } satisfies ToRules);
       return;
     }
+    case "suggest": {
+      const loaded = current.loaded;
+      if (loaded === undefined) {
+        return;
+      }
+      const result = await runSuggest(root, binSetting());
+      if (!alive(current) || stale(current, loaded, "この候補")) {
+        return;
+      }
+      if (!result.ok) {
+        fail(current, result.error);
+        return;
+      }
+      current.host.post({ type: "suggested", result: result.value } satisfies ToRules);
+      return;
+    }
     case "save": {
       await save(current, message.sections);
       return;
@@ -816,6 +832,7 @@ function asMessage(message: unknown): RulesMessage | undefined {
   switch (m.type) {
     case "ready":
     case "tourDone":
+    case "suggest":
       return { type: m.type };
     case "reload":
       return { type: "reload", dirty: m.dirty === true };

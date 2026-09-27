@@ -13,6 +13,8 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from . import redact
+
 # 呼び出しに何が起きたか。
 ALLOW = "allow"
 ASK = "ask"
@@ -26,6 +28,10 @@ SKIP = "skip"
 # 判断した回がどれだけかを言えなくなる。ルールを足すべきかどうかは前者で決まり、
 # ガードが効いていたかどうかは後者で決まるので、同じ欄には置けない。
 HANDOVER = "handover"
+# NUDGE は、ツール呼び出しの判定ではなく、ターンの終わりに作業を促したことを示す（Stop の
+# `finish` の促し。ADR-0087）。DENY と分けるのは、deny の集計（止めた呼び出しの数）に
+# 促しを混ぜないため。促しは 1 回だけで、理由を書けば通る。
+NUDGE = "nudge"
 
 # 判定に至らなかった理由。
 REASON_MODE_DISABLED = "mode-disabled"
@@ -46,6 +52,10 @@ REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
 # 記録に残すコマンドやパスの上限。ヒアドキュメントはファイル 1 本を運べるので、
 # 1 回の呼び出しが記録を膨らませられないようにする。
 SUBJECT_LIMIT = 1000
+# 伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値を伏せられるだけの余りを持たせる。
+REDACT_LIMIT = SUBJECT_LIMIT * 4
+# 伏せる処理が落ちたときに、その欄へ代わりに書く文。平文は書かない。
+REDACT_FAILED = "[ccnavi: 機密情報を伏せる処理が失敗したため、この欄の中身は記録していません]"
 
 
 @dataclass
@@ -155,8 +165,15 @@ class Log:
             os.close(fd)
 
     def _as_dict(self, record: Record) -> dict:
-        subject = _limited(record.subject)
-        unwrapped = _limited(record.unwrapped)
+        # コマンドの全文が入る欄は、秘密の形を伏せてから書く（redact）。伏せるのは記録だけで、
+        # record そのものは書き換えない。判定は伏せる前の文字列で済んでいる。切る前に伏せるのは、
+        # 上限で値の途中が切れると、形が崩れて伏せられなくなるため。ただし伏せる前にも
+        # 上限の数倍（REDACT_LIMIT）で切る。どれだけ長くても、伏せる手間が実行前の判定の
+        # 期限に届かないように。そこで切れた値は、残った字数の側で上限に切られて見えない。
+        # detail は ccnavi が組む文で、上限を持たないので切らない。
+        subject = _limited(_redacted(record.subject[:REDACT_LIMIT]), len(record.subject))
+        unwrapped = _limited(_redacted(record.unwrapped[:REDACT_LIMIT]), len(record.unwrapped))
+        detail = _redacted(record.detail)
 
         elapsed_ms = (time.perf_counter() - self._start) * 1000
         out: dict = {
@@ -182,7 +199,7 @@ class Log:
             ("degraded", record.degraded),
             ("unwrapped", unwrapped),
             ("fallback", record.fallback),
-            ("detail", record.detail),
+            ("detail", detail),
             ("tree", record.tree),
             ("project", record.project),
             ("source", record.source),
@@ -204,8 +221,25 @@ class Log:
         return out
 
 
-def _limited(text: str) -> str:
-    """記録に残す文字列を上限で切る。切ったら残りの長さを添える。"""
-    if len(text) <= SUBJECT_LIMIT:
+def _redacted(text: str) -> str:
+    """秘密の形を伏せた文字列。伏せる処理が何で落ちても、平文の代わりに REDACT_FAILED を返す。
+
+    記録を書くのは判定を stdout に出した後で、ここで例外が抜けると hook が 0 以外で終わる。
+    Claude Code は 0 以外で終わった hook の出力を読まないので、出したはずの deny が消えて通る。
+    伏せ字の不具合が判定を緩めないように、例外はここで止める。
+    """
+    try:
+        return redact.redact(text)
+    except Exception:
+        return REDACT_FAILED if text else text
+
+
+def _limited(text: str, whole: int = 0) -> str:
+    """記録に残す文字列を上限で切る。切ったら残りの長さを添える。
+
+    whole は伏せる前に切る前の長さ。伏せる前に REDACT_LIMIT で切った分も、残りの長さに数える。
+    """
+    rest = max(len(text), whole) - SUBJECT_LIMIT
+    if rest <= 0:
         return text
-    return text[:SUBJECT_LIMIT] + f"…(+{len(text) - SUBJECT_LIMIT})"
+    return text[:SUBJECT_LIMIT] + f"…(+{rest})"

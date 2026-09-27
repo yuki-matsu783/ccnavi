@@ -109,14 +109,12 @@ test("CB-T88 変えた欄だけが差分になり、コメントと引用符は�
     p.id === "design" ? { ...p, review: "none" as const, scope: ["wip/design/*"], when: "設計が要るとき" } : p,
   );
   const out = doc.apply({ order: "sequential", phases });
-  // 新しく現れる行は変えた欄だけ（review: none の行は research に元からある）
-  const changed = out.split("\n").filter((line) => !SAMPLE.includes(line));
-  assert.deepEqual(changed, ['    scope: ["wip/design/*"]', "    when: 設計が要るとき"]);
-  assert.match(out, /\n  design:\n    kind: work\n    title: 設計\n    review: none\n    scope: \["wip\/design\/\*"\]\n    when: 設計が要るとき\n/);
-  // 先頭の説明と種類の前のコメントはそのまま
-  assert.match(out, /^# フェーズの種類。/);
-  assert.match(out, /\n  # 分からないときだけ\n  research:\n/);
-  assert.match(out, /\n  # 触る場所が多いとき\n  design:\n/);
+  const expected = SAMPLE.replace(
+    '    review: mr\n    scope: ["wip/design/*", "docs/*"]\n',
+    '    review: none\n    scope: ["wip/design/*"]\n    when: 設計が要るとき\n',
+  );
+  assert.notEqual(expected, SAMPLE);
+  assert.equal(out, expected);
 });
 
 test("CB-T89 並べ替えと改名で、種類の前のコメントが一緒に動く", () => {

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -101,13 +102,16 @@ def lint(root: str, rules_path: str, mode: str = "enable") -> subprocess.Complet
     return ccnavi(root, "--lint", "--rules", rules_path, "--mode", mode)
 
 
+COUNTS = re.compile(r"^error (\d+) 件、warn (\d+) 件", re.M)
+
+
 def counts(text: str) -> tuple[int, int]:
-    """報告の最後の行から error と warn の件数を読む。"""
-    for line in reversed(text.splitlines()):
-        if line.startswith("error "):
-            fields = line.replace("件", "").replace("、", " ").split()
-            return int(fields[1]), int(fields[3])
-    raise AssertionError(f"件数の行が無い: {text!r}")
+    """報告の最後の件数の行から error と warn の件数を読む。"""
+    found = COUNTS.findall(text)
+    if not found:
+        raise AssertionError(f"件数の行が無い: {text!r}")
+    errors, warns = found[-1]
+    return int(errors), int(warns)
 
 
 class LintTest(unittest.TestCase):

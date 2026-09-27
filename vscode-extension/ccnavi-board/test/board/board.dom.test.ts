@@ -584,3 +584,23 @@ test("CB-D105 案内の最中にボードが読み直せなくなったら案内
     await dom.close();
   }
 });
+
+test("CB-D123 履歴を開け閉めしてもカードの提案は開かない。カードの他の場所を押せば開く", async () => {
+  const base = fixture();
+  const history = [{ at: "2026-09-26T09:00:00Z", kind: "approved", from: "todo", to: "doing", via: "board", phase: null, mark: "", reason: "" }];
+  const page = await openBoard({ ...base, tickets: base.tickets.map((t) => (t.ticket === "i0001-01" ? { ...t, history } : t)) });
+  try {
+    const before = page.posted.length;
+    page.click(page.one('.card[data-id="i0001-01"] details.history summary'));
+    await page.settle();
+    assert.equal(page.posted.length, before);
+    page.click(page.one('.card[data-id="i0001-01"] .history-text'));
+    await page.settle();
+    assert.equal(page.posted.length, before);
+    page.click(page.one('.card[data-id="i0001-01"] .title'));
+    await page.settle();
+    assert.equal(page.posted.at(-1)?.type, "open");
+  } finally {
+    await page.close();
+  }
+});

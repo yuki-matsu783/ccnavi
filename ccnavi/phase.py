@@ -273,6 +273,90 @@ def guard_off_message(found: str) -> str:
     )
 
 
+# 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）。チケット制御と端末要求を切る設定に
+# 依らず、組み込みの deny（`DENY_RECORDS_PRUNE`）で止める（ADR-0089）。実行ファイルの側の
+# 端末要求は、擬似端末（`script -qc '…' /dev/null`）でも、チケット制御を切ったワークスペースで
+# 端末要求を切る変数を前に並べても抜けられる。しきい値の環境変数を 0 に近づけて並べれば、
+# 自分の呼び出しの記録を消せる。
+#
+# 見るのは human_path_form と同じく、引用符と `\` を落としたコマンド行の生の文字列。実行役の
+# コマンド越し（`script -qc`・`bash -c`・`env`）でも同じ綴りが残る。コマンドの切れ目
+# （`;` `&` `|` 改行）の中に ccnavi の名前と、単独の語の `--prune` が並べば止める。
+# `git fetch --prune` や `ccnavi-git.sh fetch --prune` は ccnavi の名前（`ccnavi` と
+# `ccnavi.exe` と実行ファイルの名前が、語の終わりで閉じた形）を持たないので当たらない。
+#
+# 免除は `--preview` が `--prune` の隣に単独の語として並んだ形だけ。間に引用符があれば
+# 免除しない。免除をコマンドの中のどこかの `--preview` にすると、
+# `bash -c "ccnavi --prune" x --preview` のように、実行役の引数に置いた `--preview` で免除が
+# 立つ。
+_PRUNE_WORD = re.compile(r"(?<!\S)--prune(?!\S)")
+_PREVIEW_AFTER = re.compile(r"[ \t]+--preview(?![^\s;&|])")
+_PREVIEW_BEFORE = re.compile(r"(?<!\S)--preview[ \t]+$")
+_PRUNE_SEGMENT = re.compile(r"[^;&|\n]+")
+CODE_RECORDS_PRUNE = "DENY_RECORDS_PRUNE"
+RECORDS_PRUNE_RULE_ID = "builtin-guard-records-prune"
+
+
+def _unquoted_marks(subject: str) -> tuple[str, set[int]]:
+    """引用符とバックスラッシュを落とした綴りと、落とした場所（落とした後の位置）の組。"""
+    text = subject.replace(shellread.SEP, "\n").replace(shellread.WORD_SEP, " ")
+    out: list[str] = []
+    cuts: set[int] = set()
+    for ch in text:
+        if ch in "'\"`\\":
+            cuts.add(len(out))
+            continue
+        out.append(ch)
+    return "".join(out), cuts
+
+
+def _prune_names(bin_path: str) -> re.Pattern[str]:
+    """ccnavi の名前。語の終わりで閉じた形だけ。"""
+    names = [r"ccnavi(?:\.exe)?"]
+    base = os.path.basename((bin_path or "").replace("\\", "/"))
+    if base:
+        names.append(re.escape(base))
+    return re.compile(r"(?:" + "|".join(names) + r")(?=\s)", re.IGNORECASE)
+
+
+def prune_form(subject: str, bin_path: str = "") -> str:
+    """記録を消す `ccnavi --prune`（`--preview` の無い形）があれば、見つけた綴り。無ければ空。"""
+    text, cuts = _unquoted_marks(subject)
+    if "--prune" not in text or _only_readers(text):
+        return ""
+    names = _prune_names(bin_path)
+    for segment in _PRUNE_SEGMENT.finditer(text):
+        name = names.search(segment.group(0))
+        if not name:
+            continue
+        for word in _PRUNE_WORD.finditer(text, segment.start() + name.end(), segment.end()):
+            if not _previewed(text, cuts, word.start(), word.end()):
+                return "--prune"
+    return ""
+
+
+def _previewed(text: str, cuts: set[int], start: int, end: int) -> bool:
+    """`--prune`（start から end）の隣に、単独の語の `--preview` が引用をまたがずに並ぶか。"""
+    after = _PREVIEW_AFTER.match(text, end)
+    if after and not any(end <= i < after.end() for i in cuts):
+        return True
+    before = _PREVIEW_BEFORE.search(text, 0, start)
+    if not before:
+        return False
+    gap = before.start() + len("--preview")
+    return not any(gap <= i <= start for i in cuts)
+
+
+def prune_message() -> str:
+    """`--prune` で止めた文。"""
+    return (
+        "記録と控えを消す 'ccnavi --prune' は、人が端末から打つものです。記録は"
+        "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントからは消しません。"
+        "何が消える対象かを見るだけなら 'ccnavi --prune --preview' は通ります。"
+        "消す必要があれば、理由を添えて利用者に依頼してください。"
+    )
+
+
 def ticket_approval_rule(bin_path: str, root: str) -> rules.Rule:
     """ccnavi の実行ファイルを人の判断の経路に使う形を止めるルール。
 

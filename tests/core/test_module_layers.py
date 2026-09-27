@@ -66,12 +66,12 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
         frozenset(
             {
                 "__init__",
-                "audit",
                 "fsio",
                 "gitcmd",
                 "globmatch",
                 "hookio",
                 "platformtag",
+                "redact",
                 "settings",
                 "shellread",
                 "tree",
@@ -80,13 +80,15 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     ),
     (
         "read",
-        "最下段だけを読む。git の状態・ルール・動作モード",
-        frozenset({"gitstate", "modes", "rules"}),
+        "最下段だけを読む。git の状態・ルール・動作モード・記録の 1 行と後始末・拒否の数え",
+        frozenset({"audit", "gitstate", "modes", "prune", "repeat", "rules"}),
     ),
     (
         "state",
         "作業ツリーとチケットの、いまの形を読む",
-        frozenset({"builtin", "ctxfile", "flow", "risk", "selfguard", "ticket", "wrapguard"}),
+        frozenset(
+            {"builtin", "ctxfile", "flow", "history", "risk", "selfguard", "ticket", "wrapguard"}
+        ),
     ),
     (
         "compose",
@@ -106,7 +108,9 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "entry",
         "入口と診断。下の段からは読まれない",
-        frozenset({"cli", "diagnose", "events", "lint", "subagent", "__main__"}),
+        frozenset(
+            {"cli", "diagnose", "events", "lint", "subagent", "suggest", "version", "__main__"}
+        ),
     ),
 )
 

@@ -22,9 +22,12 @@ from . import (
     hookio,
     judge,
     modes,
+    ops,
     phase,
     post,
+    prune,
     reasons,
+    repeat,
     ruleload,
     rules,
     selfguard,
@@ -62,7 +65,7 @@ def decide(
     if payload.event == hookio.USER_PROMPT_SUBMIT:
         return decide_at_prompt(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.STOP:
-        return decide_at_stop(stdout, stderr, conf, root, payload, record)
+        return decide_at_stop(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
         return subagent.at_start(stdout, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
@@ -185,6 +188,7 @@ def decide_at_prompt(
 def decide_at_stop(
     stdout: TextIO,
     stderr: TextIO,
+    mode: str,
     conf: settings.Settings,
     root: str,
     payload: hookio.Input,
@@ -196,16 +200,21 @@ def decide_at_stop(
     経路に載せてあり、そこは既に足りている。足りていないのは、ターンが終わった
     あとに人が「結局どこが変わったのか」を 1 度で見る場所のほう。
 
-    exit 2 は使わない。このイベントでの exit 2 はターンを続けさせる意味になり、
-    報告のために作業を終わらせない形になる。何も止めずに、言うだけにする。
+    報告のためには止めない。このイベントで止めることはターンを続けさせる意味になり、
+    報告のために作業を終わらせない形になる。報告は言うだけにする。
 
-    モードを見ない。dry-run でも disable でも報告する。ここは呼び出しにも
-    作業ツリーにも手を出さず、見えたことを言うだけなので、モードが約束している
-    ものを何ひとつ破らない。むしろ dry-run は「まだ何も適用していないが何が
-    起きているか」を見るためのモードなので、ここが黙ると見る手立てが減る。
+    報告はモードを見ない。dry-run でも報告する。ここは呼び出しにも作業ツリーにも手を
+    出さず、見えたことを言うだけなので、モードが約束しているものを何ひとつ破らない。
+    むしろ dry-run は「まだ何も適用していないが何が起きているか」を見るためのモードなので、
+    ここが黙ると見る手立てが減る。
+
+    止めるのは 1 つだけ。cwd のワークツリーのチケットが、作業を終えたように見えるのに
+    `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
+    （ADR-0087、`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
+    止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
     """
     watched, scope = watch_context(stderr, conf, root, record)
-    text = post.at_stop(
+    report = post.at_stop(
         stderr,
         conf.state,
         (conf.state, conf.log),
@@ -216,9 +225,55 @@ def decide_at_stop(
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
     )
-    if text:
-        hookio.write_system_message(stdout, text)
+    # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
+    # 言い換えで回っているかもしれないことを人にも 1 度言う。止めはしない。
+    repeated = repeat.at_stop(conf.state, payload.session_id, repeat.threshold(conf.deny_repeat))
+    if repeated:
+        report = f"{report}\n\n{repeated}" if report else repeated
+    nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
+    if nudge and mode == modes.ENABLE:
+        hookio.write_stop_block(stdout, nudge, system=report)
+        return EXIT_OK
+    if nudge:
+        # dry-run は止めない。止めたはずのことを人への報告に載せる（実行後の監視と同じ言い方）。
+        told = f"[ccnavi dry-run] {modes.ENABLE} would have blocked this stop:\n{nudge}"
+        report = f"{report}\n\n{told}" if report else told
+    if report:
+        hookio.write_system_message(stdout, report)
     return EXIT_OK
+
+
+def _finish_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    mode: str,
+) -> str:
+    """`finish` の打ち忘れを促す文（ADR-0087）。促さないなら空文字。
+
+    メインエージェントの Stop でだけ呼ぶ（SubagentStop は別の手順）。促すのは、同じセッションで
+    同じチケットを同じ HEAD のまま促したことが無いときだけ（控えは状態の置き場の
+    `nudged-<セッション>.json`）。コミットを足して HEAD が進めば、また促してよい。加えて
+    `stop_hook_active` が真なら（Stop の hook が続けさせた結果なら。ほかの hook が止めた分も含む）
+    何もしない。控えの置き場が無い（`--state ""`）か、控えを書けないときは促さない。覚えられないまま
+    止めると、ターンの終わりのたびに止まるので、黙る側を採る。チケット制御が disable なら
+    何もしない。
+    """
+    if not conf.tickets_enabled or payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    found = ops.unfinished_at_stop(root, conf, payload.cwd)
+    if found is None or ops.nudged_before(conf.state, payload.session_id, found):
+        return ""
+    failed = ops.remember_nudge(conf.state, payload.session_id, found)
+    if failed:
+        stderr.write(f"ccnavi: finish の促しを控えられないので、促さない: {failed}\n")
+        return ""
+    record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
+    record.enforced = mode == modes.ENABLE
+    record.tree = found.ticket.ticket
+    return ops.finish_nudge(root, found)
 
 
 def decide_at_start(
@@ -259,6 +314,7 @@ def decide_at_start(
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
+    record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:
@@ -269,6 +325,23 @@ def decide_at_start(
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK
+
+
+def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
+    """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
+
+    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前の判定に置くと、呼び出しの
+    たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
+    動かしたものの数は記録の `detail` に残す（消したことも記録に残る）。
+    """
+    try:
+        report = prune.run(root, conf.log, conf.state, session)
+    except Exception as exc:  # noqa: BLE001 - 後始末の失敗でセッションの開始を止めない
+        stderr.write(f"ccnavi: 記録と控えの後始末に失敗した: {exc}\n")
+        return ""
+    for problem in report.problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    return prune.summary(report)
 
 
 def _written(payload: hookio.Input, record: audit.Record) -> str:

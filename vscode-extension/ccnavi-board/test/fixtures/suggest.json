@@ -1,0 +1,64 @@
+{
+ "version": 1,
+ "root": "/repo",
+ "rules_path": "/repo/.ccnavi/common/rules.yml",
+ "logs": [
+  "/repo/logs/log.jsonl"
+ ],
+ "records": 14,
+ "candidates": [
+  {
+   "kind": "rule",
+   "section": "ask",
+   "id": "suggest-npm-install",
+   "tool": "Bash",
+   "count": 6,
+   "summary": "\u30eb\u30fc\u30eb\u3092\u8db3\u3059\u5019\u88dc: Bash \u306e npm install \u304c 6 \u56de\u3001\u3069\u306e\u30eb\u30fc\u30eb\u306b\u3082\u5f53\u305f\u3089\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u3002\u6b62\u3081\u308b\u3079\u304d\u306a\u3089 deny \u306b\u79fb\u3057\u3066 message \u3092\u66f8\u304f",
+   "layer": "common",
+   "rules_path": "/repo/.ccnavi/common/rules.yml",
+   "rule": {
+    "id": "suggest-npm-install",
+    "match": "Bash",
+    "regex": "(^|[\\s;&|(])(\\S*[\\\\/])?npm\\s+install(\\s|$)"
+   },
+   "samples": [
+    {
+     "tool": "Bash",
+     "subject": "npm install p0",
+     "why": "\u8a18\u9332\u3067\u3001\u3069\u306e\u30eb\u30fc\u30eb\u3082\u8a00\u53ca\u305b\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u5f62\uff08npm install\uff09"
+    },
+    {
+     "tool": "Bash",
+     "subject": "npm install p1",
+     "why": "\u8a18\u9332\u3067\u3001\u3069\u306e\u30eb\u30fc\u30eb\u3082\u8a00\u53ca\u305b\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u5f62\uff08npm install\uff09"
+    }
+   ],
+   "yaml": "# \u30eb\u30fc\u30eb\u3092\u8db3\u3059\u5019\u88dc: Bash \u306e npm install \u304c 6 \u56de\u3001\u3069\u306e\u30eb\u30fc\u30eb\u306b\u3082\u5f53\u305f\u3089\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u3002\u6b62\u3081\u308b\u3079\u304d\u306a\u3089 deny \u306b\u79fb\u3057\u3066 message \u3092\u66f8\u304f\nrules:\n  ask:\n  - id: suggest-npm-install\n    match: Bash\n    regex: (^|[\\s;&|(])(\\S*[\\\\/])?npm\\s+install(\\s|$)\nsamples:\n  ask:\n  - tool: Bash\n    subject: npm install p0\n    why: \u8a18\u9332\u3067\u3001\u3069\u306e\u30eb\u30fc\u30eb\u3082\u8a00\u53ca\u305b\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u5f62\uff08npm install\uff09\n  - tool: Bash\n    subject: npm install p1\n    why: \u8a18\u9332\u3067\u3001\u3069\u306e\u30eb\u30fc\u30eb\u3082\u8a00\u53ca\u305b\u305a\u6a29\u9650\u30e2\u30fc\u30c9\u3078\u6e21\u3063\u305f\u5f62\uff08npm install\uff09\n"
+  },
+  {
+   "kind": "message",
+   "section": "deny",
+   "id": "git-push",
+   "tool": "Bash",
+   "count": 3,
+   "summary": "message \u3092\u898b\u76f4\u3059\u5019\u88dc: git-push \u304c\u540c\u3058\u547c\u3073\u51fa\u3057\u3092\u7e70\u308a\u8fd4\u3057\u6b62\u3081\u305f\uff083 \u56de\uff09\u3002\u6587\u9762\u304b\u3089\u6b21\u306e\u4e00\u624b\u304c\u8aad\u3081\u3066\u3044\u306a\u3044\u7591\u3044",
+   "layer": "common",
+   "rules_path": "/repo/.ccnavi/common/rules.yml",
+   "rule": {
+    "id": "git-push",
+    "match": "Bash",
+    "glob": "*git push*",
+    "message": "push \u3057\u307e\u305b\u3093\u3002\u5229\u7528\u8005\u306b\u983c\u3093\u3067\u304f\u3060\u3055\u3044\u3002"
+   },
+   "samples": [
+    {
+     "tool": "Bash",
+     "subject": "git push origin main",
+     "why": "\u8a18\u9332\u3067\u3001git-push \u304c\u540c\u3058\u547c\u3073\u51fa\u3057\u3092 3 \u56de\u4ee5\u4e0a\u6b62\u3081\u305f\u5f62"
+    }
+   ],
+   "yaml": "# message \u3092\u898b\u76f4\u3059\u5019\u88dc: git-push \u304c\u540c\u3058\u547c\u3073\u51fa\u3057\u3092\u7e70\u308a\u8fd4\u3057\u6b62\u3081\u305f\uff083 \u56de\uff09\u3002\u6587\u9762\u304b\u3089\u6b21\u306e\u4e00\u624b\u304c\u8aad\u3081\u3066\u3044\u306a\u3044\u7591\u3044\nrules:\n  deny:\n  - id: git-push\n    match: Bash\n    glob: '*git push*'\n    message: push \u3057\u307e\u305b\u3093\u3002\u5229\u7528\u8005\u306b\u983c\u3093\u3067\u304f\u3060\u3055\u3044\u3002\nsamples:\n  deny:\n  - tool: Bash\n    subject: git push origin main\n    why: \u8a18\u9332\u3067\u3001git-push \u304c\u540c\u3058\u547c\u3073\u51fa\u3057\u3092 3 \u56de\u4ee5\u4e0a\u6b62\u3081\u305f\u5f62\n"
+  }
+ ],
+ "dropped": 1
+}

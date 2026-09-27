@@ -11,6 +11,7 @@ import { openRules } from "./rules-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
 import { initTours } from "./tour.js";
+import { warnVersionSkew } from "./version-check.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
@@ -27,6 +28,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // サイドパネルより先に読む。入口の並びがこの値で決まる。
   watchTicketControl(context);
   registerSidebar(context);
+  // 実行ファイルと拡張の互換の版が食い違っていれば知らせる。待たない（起動を遅らせない）
+  void warnVersionSkew();
   context.subscriptions.push(
     // 引数はプロジェクト管理画面からの導線でだけ渡る。パレットとサイドパネルからは無い。
     vscode.commands.registerCommand("ccnaviBoard.open", (project?: unknown) =>

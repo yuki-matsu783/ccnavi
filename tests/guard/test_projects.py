@@ -113,35 +113,17 @@ def layer_rules(root):
     return os.path.join(root, LAYER, "rules.yml")
 
 
-def ticket_text(name, *, project="", allow=()):
+def ticket_text(name, *, parent="", project="", allow=()):
     lines = ["---", "version: 1", f"ticket: {name}"]
+    if parent:
+        lines += [f"parent: {parent}", "phase: 1"]
     if project:
         lines.append(f"project: {project}")
     lines += [
         "human_review:",
         "  required: false",
         "  reason: テスト",
-        "title: 作業",
-        "rationale: |",
-        "  理由",
-    ]
-    if allow:
-        lines.append("allow:")
-        for g in allow:
-            lines += ["  - match: Write|Edit", f'    glob: "{g}"']
-    lines += ['started_at: ""', 'completed_at: ""', 'base_sha: ""', "---", "", "本文"]
-    return "\n".join(lines) + "\n"
-
-
-def child_text(name, parent, *, project="", allow=()):
-    lines = ["---", "version: 1", f"ticket: {name}", f"parent: {parent}", "phase: 1"]
-    if project:
-        lines.append(f"project: {project}")
-    lines += [
-        "human_review:",
-        "  required: false",
-        "  reason: テスト",
-        f"title: 子 {name}",
+        f"title: 子 {name}" if parent else "title: 作業",
         "rationale: |",
         "  理由",
     ]
@@ -397,7 +379,7 @@ class ProjectsTest(unittest.TestCase):
         )
         write(
             os.path.join(self.lib, "wip", "proposals", "todo", "i0007-01.md"),
-            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
         )
         # 承認の前から、親も子も同じプロジェクトとしてボードに出る
         board = json.loads(self.ccnavi("--explain", "--json").stdout)
@@ -433,7 +415,7 @@ class ProjectsTest(unittest.TestCase):
         )
         write(
             os.path.join(self.app, "wip", "proposals", "todo", "i0007-01.md"),
-            child_text("i0007-01", "i0007", allow=("src/a/*",)),
+            ticket_text("i0007-01", parent="i0007", allow=("src/a/*",)),
         )
         result = self.ccnavi("--approve", stdin="y\n")
         # 承認の対象の一部（子）が落ちたので、通ったぶん（親）を置いてから

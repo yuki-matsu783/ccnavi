@@ -23,15 +23,19 @@ from . import (
     diagnose,
     events,
     fsio,
+    history,
     hookio,
     judge,
     lint,
     modes,
     ops,
+    prune,
     review,
     ruleload,
     selfguard,
     settings,
+    suggest,
+    version,
 )
 from .modes import EXIT_ERROR, EXIT_OK
 
@@ -45,6 +49,16 @@ watch the working tree for protected files that changed anyway. Exercise it with
 
     echo '{"hook_event_name":"PreToolUse","tool_name":"Bash",
            "tool_input":{"command":"git push"}}' | ccnavi
+
+To say which build this is, run
+
+    ccnavi --version [--json]
+
+It prints the version, the commit it was built from ("unknown" when run from
+source), the compat version the scripts in .ccnavi/scripts/ and the VS Code
+extension compare with their own, and every flag it accepts. It reads no
+payload and no settings. The --json shape is documented in README.md
+("版の JSON").
 
 To check the rules file and the settings without making a decision, run
 
@@ -96,6 +110,24 @@ in a file against them, run
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
+
+To rotate the decision log and remove old logs and finished sessions' state
+(SessionStart does the same on its own), run
+
+    ccnavi --prune [--preview]
+
+--preview only lists what would move. Without it, --prune needs a terminal.
+
+To draft rules from the decision log (logs/log.jsonl and its rotated
+log.*.jsonl), run
+
+    ccnavi --suggest [--json]
+
+It lists deny/ask drafts only: calls no rule mentioned that kept being handed
+over, and denies that kept stopping the same call (review their message).
+Each draft passed the same checks as --lint and --test-samples; the rest are
+counted and dropped. Nothing is written. --json prints the shape documented in
+README.md ("候補の JSON"); the VS Code extension reads it.
 
 To review the pending tickets and approve the work areas they declare, run
 
@@ -305,7 +337,17 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
-    """1 回の起動を処理する。"""
+    """1 回の起動を処理する。
+
+    状態の跡（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
+    人の判断の経路（端末・ボード）と hook は枝の中で差し替える。跡を書けなかった知らせは、
+    起動を抜けるときに標準エラーへ出す（状態の操作は止めない。ADR-0086）。
+    """
+    with history.session(history.VIA_CLI, stderr):
+        return _run(stdin, stdout, stderr, argv)
+
+
+def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
     # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）を抜ける。
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
@@ -339,6 +381,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
+    # 記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。人が端末から打つ。
+    parser.add_argument("--prune", action="store_true")
+    # 記録からルールの候補を起こす（suggest）。読むだけで、何も書かない。
+    parser.add_argument("--suggest", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tickets", default="")
     parser.add_argument("--approved", default=None)
@@ -370,6 +416,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 人が端末で見たと残す、着手で上書きした設定（レビューの無いまま閉じる親、設計 11.12）。
     parser.add_argument("--config-synced", default="")
     parser.add_argument("-h", "--help", action="store_true")
+    # 版・組み立ての元のコミット・受け付けるフラグ・互換の版を言う。拡張と sh が起動のときに読む。
+    parser.add_argument("--version", action="store_true")
     try:
         args = parser.parse_args(_json_out_of_test(argv))
     except SystemExit:
@@ -377,6 +425,9 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if args.help:
         stderr.write(USAGE)
         return EXIT_ERROR
+    # 設定もワークスペースも読まない。フラグは上の定義から引くので、足したものはそのまま並ぶ。
+    if args.version:
+        return version.report(stdout, parser, args.json)
     if not _one_wrapper_flag_each(stderr, args):
         return EXIT_ERROR
 
@@ -388,7 +439,13 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
-    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    diagnosing = (
+        args.lint
+        or args.test is not None
+        or bool(args.test_samples)
+        or args.explain
+        or args.suggest
+    )
     if not diagnosing:
         _drop_outside_diagnosis(stderr, args)
 
@@ -470,10 +527,16 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
     if args.test_samples:
         return diagnose.test_samples(stdout, stderr, conf, root, args.test_samples, args.json)
+    if args.suggest:
+        return suggest.report(stdout, conf, root, args.json)
     if args.explain and args.json:
         return diagnose.explain_json(stdout, stderr, conf, root)
     if args.explain:
         return diagnose.explain(stdout, stderr, conf, root)
+
+    # 後始末の経路。payload を読まない。セッションの開始でも同じものが走る（events）。
+    if args.prune:
+        return _prune(stdin, stdout, stderr, conf, root, args.preview)
 
     # 承認の経路。人が端末から打つもので、payload を読まないのでここで分かれる。
     # 判定を 1 度も通らないのも分ける理由で、承認はツール呼び出しについての
@@ -505,6 +568,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
+            history.set_via(history.VIA_BOARD)
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
             code = approval.approve_yes(
                 stdout,
@@ -519,6 +583,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
+        history.set_via(history.VIA_TERMINAL)
         rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
         # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = approval.approve(
@@ -534,6 +599,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--config-synced"):
             return EXIT_ERROR
+        history.set_via(history.VIA_TERMINAL)
         code = configsync.acknowledge(stdin, stdout, stderr, conf, root, args.config_synced)
         return EXIT_OK if code == 0 else EXIT_ERROR
 
@@ -593,6 +659,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         )
         return modes.fail_closed(mode)
 
+    history.set_via(history.VIA_HOOK)
     record = audit.Record(
         mode=mode,
         permission_mode=payload.permission_mode,
@@ -605,6 +672,30 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
     _record(stderr, log, record)
     return code
+
+
+def _prune(
+    stdin: TextIO,
+    stdout: TextIO,
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    preview: bool,
+) -> int:
+    """記録と控えの後始末を 1 度走らせ、動かしたものを出す。
+
+    消すのは記録なので、`--preview`（見るだけ）でなければ端末を求める。エージェントが
+    Bash から打てると、しきい値の環境変数を 0 に近づけて前に並べるだけで、自分の呼び出しの
+    記録を消せる。
+    """
+    if not preview and not _from_terminal(stdin, conf, stderr, "--prune"):
+        return EXIT_ERROR
+    report = prune.run(root, conf.log, conf.state, dry_run=preview)
+    for line in prune.lines(report, preview):
+        stdout.write(line + "\n")
+    for problem in report.problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    return EXIT_OK
 
 
 def _from_terminal(stdin: TextIO, conf: settings.Settings, stderr: TextIO, flag: str) -> bool:
@@ -655,6 +746,7 @@ def operate(
         # 人の判断。`--approve` / `--reviewed` と同じく端末を求める。
         if not _from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
+        history.set_via(history.VIA_TERMINAL)
         code = review.close_early(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
@@ -664,6 +756,7 @@ def operate(
         if not args.json or not args.result:
             stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
             return EXIT_ERROR
+        history.set_via(history.VIA_BOARD)
         if args.preview:
             code = review.decide_preview(
                 stdout, stderr, root, conf, cwd, args.reviewed, args.result
@@ -682,6 +775,7 @@ def operate(
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
+        history.set_via(history.VIA_TERMINAL)
         code = review.reviewed(
             stdin,
             stdout,

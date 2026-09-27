@@ -86,8 +86,23 @@ state="$root/${CCNAVI_STATE:-logs/state}"
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
+# 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
+# 引数の誤りで断る道と、実行ファイルを使わない副命令（origin / fetch / comment）では起こさない。
+# `$( )` の中から呼ぶと印が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
+told_skew=""
+tell_skew() {
+	[ -z "$told_skew" ] || return 0
+	told_skew=1
+	# ソースで動かすとき（bin が無い）は、sh と同じツリーのものを動かすので比べない。
+	[ -n "${bin:-}" ] || return 0
+	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-review: %s\n' "$skew" >&2
+}
+
 if bin=$(ccnavi_bin "$root"); then
-	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
+	ccnavi() {
+		tell_skew
+		"$bin" --root "$root" --cwd "$here" "$@"
+	}
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
@@ -495,6 +510,7 @@ confirm)
 	;;
 request)
 	# 段 1: 前提。exe が依頼の本文と、マージリクエストの下書きを書き出す。
+	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
 	file=$(printf '%s\n' "$prepared" | sed -n 1p)
 	draft=$(printf '%s\n' "$prepared" | sed -n 2p)
@@ -585,6 +601,7 @@ decide)
 	fi
 	if [ -n "$choices" ]; then
 		# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
+		tell_skew
 		out=$(ccnavi --reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result") || {
 			printf '%s\n' "$out"
 			exit 1
@@ -603,6 +620,7 @@ ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
 	# ここが外してコメントを投稿する。マージは人。
 	fetch_all >"$result"
+	tell_skew
 	noted=$(ccnavi review ready --result "$result") || exit $?
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')

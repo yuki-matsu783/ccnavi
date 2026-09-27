@@ -7,12 +7,16 @@ import type { JSX } from "react";
 import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import { flowButtonLabel } from "../../core/flow-view.js";
-import type { FlowJson } from "../../core/model.js";
+import type { FlowJson, HistoryEntryJson } from "../../core/model.js";
 import { post } from "./post.js";
 import {
   COPY_LABELS,
   MARK_LABELS,
+  VIA_LABELS,
+  historyAt,
+  historyText,
   holdLabel,
+  predecessorsBadge,
   isHighRisk,
   isHttpUrl,
   movedLabel,
@@ -44,9 +48,9 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
   if (hidden) {
     classes.push("hidden");
   }
-  // ボタンとリンク（マージリクエスト）の上では提案を開かない
+  // ボタンとリンク（マージリクエスト）と畳める履歴の上では提案を開かない
   const open = (target: EventTarget | null): void => {
-    if (target instanceof Element && target.closest("button, a") !== null) {
+    if (target instanceof Element && target.closest(NOT_OPENING) !== null) {
       return;
     }
     if (card.openPath !== "") {
@@ -66,7 +70,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       tabIndex={0}
       onClick={(event) => open(event.target)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" && !(event.target instanceof Element && event.target.closest("button, a") !== null)) {
+        if (event.key === "Enter" && !(event.target instanceof Element && event.target.closest(NOT_OPENING) !== null)) {
           event.preventDefault();
           open(event.target);
         }
@@ -86,6 +90,7 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
       <Badges card={card} />
       <Facts card={card} />
       {card.phases.length > 0 ? <Phases phases={card.phases} /> : null}
+      {card.history.length > 0 ? <History entries={card.history} /> : null}
       {card.issues.length > 0 ? (
         <ul className="issues">
           {card.issues.map((issue, i) => (
@@ -105,9 +110,33 @@ export function CardItem({ card, hidden, moved }: { readonly card: Card; readonl
   );
 }
 
+/** カードの上で押しても提案を開かない場所。ボタン・リンク・畳める履歴 */
+const NOT_OPENING = "button, a, details";
+
+/**
+ * 状態が動いた跡（ADR-0086）。既定で畳み、開くと新しい順に並ぶ。補助の記録で、列やバッジはここから決めない
+ * （状態の正は置き場。実行ファイルが渡した新しい側だけを並べる）
+ */
+function History({ entries }: { readonly entries: readonly HistoryEntryJson[] }): JSX.Element {
+  return (
+    <details className="history">
+      <summary>履歴（{entries.length} 件）</summary>
+      <ol className="history-list">
+        {[...entries].reverse().map((e, i) => (
+          <li key={i} className={`history-item history-${e.kind}`} title={e.at}>
+            <span className="history-at">{historyAt(e.at)}</span>
+            <span className="history-text">{historyText(e)}</span>
+            {e.via !== "" ? <span className="history-via">{VIA_LABELS[e.via] ?? e.via}</span> : null}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 /**
  * 枠付きのバッジは、人が動く必要がある状態だけ。未承認、レビュー準備中／レビュー待ち、
- * 書き込み停止中、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
+ * 書き込み停止中、先行待ち、ワークツリーなし（閉じたチケットは除く）、実績のリスクが HIGH 以上、
  * 本物が決まらない写り。出すバッジが無ければ行ごと出さない。
  */
 function Badges({ card }: { readonly card: Card }): JSX.Element | null {
@@ -124,6 +153,11 @@ function Badges({ card }: { readonly card: Card }): JSX.Element | null {
   // ここは一目で分かる短い言葉に留める。
   if (card.blocked !== "") {
     badges.push(<Badge key="blocked" kind="blocked" text="書き込み停止中" title={card.blocked} />);
+  }
+  // 先行を満たしていない（ADR-0088）。承認も着手も止まる。どの先行が何の状態かは tooltip に（実行ファイルの言葉のまま）
+  if (card.predecessorsUnmet.length > 0) {
+    const badge = predecessorsBadge(card);
+    badges.push(<Badge key="preds" kind="preds" text={badge.text} title={badge.title} />);
   }
   if (!card.worktreeExists && card.copyStatus !== "closed") {
     badges.push(<Badge key="worktree" kind="worktree none" text="ワークツリーなし" />);

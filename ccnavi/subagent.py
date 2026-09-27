@@ -65,8 +65,9 @@ def at_start(
         return EXIT_OK
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
-    # 先行が「済んだ」は、閉じたかレビュー待ちか。レビュー待ちは作業としては終わっている。
-    done = {t.ticket for t in closed + review}
+    proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
+    # 先行を満たしたとみなすのは、承認と着手と同じく `done/` の取り消しでないものだけ（ADR-0088）。
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
     lines = [
         "[ccnavi] 承認済みで開いている子チケット。"
         "書き込みは行き先のワークツリーのチケットで判定される。"
@@ -82,7 +83,7 @@ def at_start(
     for t in sorted(children, key=lambda x: x.ticket):
         where = tree.worktree_path(root, t.ticket)
         state = "ワークツリーあり" if os.path.isdir(where) else "ワークツリー無し（効かない）"
-        waiting = [p for p in t.predecessors if p not in done]
+        waiting = [f"{p.ticket}（{p.label}）" for p in approval.unmet_predecessors(t, preds)]
         label = str(t.phase)
         hint = ""
         parent = index.get(t.parent)

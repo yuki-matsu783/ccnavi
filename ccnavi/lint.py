@@ -42,6 +42,7 @@ import contextlib
 import io
 import json
 import os
+import re
 from typing import TextIO
 
 from . import (
@@ -62,6 +63,7 @@ from . import (
     selfguard,
     settings,
     tree,
+    version,
 )
 from . import ticket as ticket_mod
 from .modes import EXIT_ERROR, EXIT_OK
@@ -346,6 +348,7 @@ def check(
         )
 
     problems.extend(_project_settings(root))
+    problems.extend(_sh_compat(root))
     problems.extend(_after(root))
     problems.extend(_rules(conf.rules, root))
     problems.extend(_phases(conf))
@@ -360,6 +363,63 @@ def check(
     problems.extend(_worktree_layers(conf, root))
     problems.extend(_ticket_places(conf, root))
     return problems
+
+
+# sh が互換の版を名乗る場所。`.ccnavi/scripts/` の sh はどれもこれを `.` で読むので、
+# 1 か所で足りる。
+SH_COMPAT_FILE = os.path.join(".ccnavi", "scripts", "ccnavi-common.sh")
+_SH_COMPAT = re.compile(r"^CCNAVI_COMPAT=([0-9]+)[ \t]*$", re.MULTILINE)
+
+
+def compat_fix(root: str) -> str:
+    """実行ファイルと sh が食い違ったときの直し方。ccnavi のリポジトリなら組み立て直し、
+    配布先なら配り直し。配布先には組み立てる元（build.py とソース）が無い。"""
+    if os.path.isfile(os.path.join(root, "build.py")) and os.path.isfile(
+        os.path.join(root, "ccnavi", "__main__.py")
+    ):
+        return "build.py を回して組み立て直す（uv run --with pyinstaller python build.py）"
+    return (
+        "ccnavi のリポジトリで build.py を回し、scripts/ccnavi-setup.sh <このワークスペース> "
+        "--force で実行ファイルと sh を配り直す"
+    )
+
+
+def _sh_compat(root: str) -> list[Problem]:
+    """`.ccnavi/scripts/` の sh と、この実行ファイルの互換の版（version.COMPAT）が揃っているか。
+
+    食い違っても判定は動くので warn。sh が頼るフラグや出力の形が変わっていれば、sh の側で
+    チケットやレビューの操作が落ちる。sh が無いワークスペース（試しの置き場）は言わない。
+    層のファイルの書式の版（`version:`）は、読む側が既に error で言う。
+    """
+    path = os.path.join(root, SH_COMPAT_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+    except FileNotFoundError:
+        return []
+    except (OSError, UnicodeDecodeError) as exc:
+        return [Problem(SEVERITY_WARN, "(version)", f"{path} を読めない ({exc})")]
+    found = _SH_COMPAT.search(text)
+    if found is None:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                "(version)",
+                f"{path} が互換の版（CCNAVI_COMPAT）を名乗らない。実行ファイル（互換 "
+                f"{version.COMPAT}）より古い sh。{compat_fix(root)}",
+            )
+        ]
+    declared = int(found.group(1))
+    if declared == version.COMPAT:
+        return []
+    return [
+        Problem(
+            SEVERITY_WARN,
+            "(version)",
+            f"sh（{path}）は互換 {declared}、実行ファイルは互換 {version.COMPAT} で食い違っている。"
+            f"{compat_fix(root)}",
+        )
+    ]
 
 
 def _risk(conf: settings.Settings, root: str) -> list[Problem]:
@@ -566,7 +626,8 @@ def _ticket(conf: settings.Settings, root: str) -> list[Problem]:
     repo_of = {
         t.name or "(ワークスペースルート)": t.project for t in tree.all_trees(root, conf.projects)
     }
-    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of))
+    preds = approval.predecessor_pool_of(copies, review, closed, proposals)
+    problems.extend(_proposal_problems(proposals, copies, index, closed, done, repo_of, preds))
     problems.extend(_approval_problems(root, conf, proposals, copies, closed, review))
 
     worktrees = tree.worktrees(root, conf.projects)
@@ -670,6 +731,7 @@ def _proposal_problems(
     closed: list,
     done: set[str],
     repo_of: dict[str, str],
+    preds: dict | None = None,
 ) -> list[Problem]:
     """提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。
 
@@ -755,13 +817,16 @@ def _proposal_problems(
         )
     for t in index.values():
         if t.started_at:
-            waiting = [p for p in t.predecessors if p not in done]
-            if waiting:
+            # 先行の数え方は承認と着手と同じ（ADR-0088）。着手はこれで止まるので、ここに出るのは
+            # 着手のあとに先行が動いたか、止める前の版で着手したもの。
+            unmet = approval.unmet_predecessors(t, preds or {})
+            if unmet:
+                names = ", ".join(f"{p.ticket}（{p.label}）" for p in unmet)
                 problems.append(
                     Problem(
                         SEVERITY_WARN,
                         "(ticket)",
-                        f"{t.ticket} は先行 {', '.join(waiting)} が閉じていないのに着手している",
+                        f"{t.ticket} は先行 {names} を満たしていないのに着手している",
                     )
                 )
     for ticket_id, places in seen.items():
