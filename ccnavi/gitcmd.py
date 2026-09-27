@@ -11,11 +11,23 @@ git を起こす場所は 1 つにする。呼ぶ側はそれぞれ「読めな�
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 
 # 渡されなかったときの期限。
 TIMEOUT_SECONDS = 5.0
+
+
+def _env() -> dict[str, str]:
+    """git に渡す環境。親の環境に `GIT_OPTIONAL_LOCKS=0` を足す。
+
+    `status` は index のついでの更新のために `index.lock` を取る。期限で殺すとそれが
+    残り、以後の add や commit が止まる。この設定が止めるのは `status` のついでの lock
+    だけで、作業ツリーと比べる `diff` の更新や、restore のように index を書き換える
+    操作の lock は取られる。
+    """
+    return {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
 
 
 @dataclass
@@ -56,6 +68,7 @@ def run(
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=_env(),
             timeout=timeout,
         )
     except FileNotFoundError as exc:
@@ -96,6 +109,7 @@ def blob(
             ["git", "cat-file", "blob", f"{rev}:{path}"],
             cwd=cwd,
             capture_output=True,
+            env=_env(),
             timeout=timeout,
         )
     except (OSError, subprocess.TimeoutExpired):

@@ -31,6 +31,9 @@ deny:
     subject: "/repo/.claude/skills/commit/SKILL.md"
     why: .claude/ の下も worktrees/ 以外は main では触らない
   - tool: Write
+    subject: "/repo/projects/lib/docs/skills/deploy/SKILL.md"
+    why: プロジェクトのスキル（ADR-0091）も元ツリーでは触らない。プロジェクトから切ったワークツリーで直す
+  - tool: Write
     subject: "/repo/.claude/worktrees/x/.claude/settings.json"
     why: ワークツリーの中でも hook の登録は触らない（guard-settings）。統合で main の登録になる
   - tool: Edit
@@ -335,3 +338,18 @@ allow:
     why: >-
       1 本だけの検索。prefer-read-grep が当てて通し、Grep ツールのほうを
       セッションに一度だけ勧める。読む手を取り上げるのが目的ではない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/x/wip/proposals/todo/skill-commit-retry.md"
+    why: >-
+      ワークツリーの中で提案を書く。worktrees と skill-review-at-proposal の両方が当たり、
+      振り返りの候補を思い出させる一言が添えられる
+  - tool: Stop
+    subject: "(stop)"
+    why: >-
+      ターンの終わり。skill-review-every-10 が使われ、10 回に 1 度止めて振り返りの手順を渡す
+      （ADR-0090）。every が無い・プロジェクトの層にしか無いルールでは判定に入らない
+  - tool: Write
+    subject: "/repo/.claude/worktrees/lib1/docs/skills/deploy/SKILL.md"
+    why: >-
+      プロジェクトから切ったワークツリーの docs/skills/（ADR-0091）。守りの外のふつうの場所で、
+      worktrees の allow に当たる。チケットがあればその範囲でさらに絞られる

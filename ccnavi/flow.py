@@ -52,6 +52,8 @@ YAML の 1 文書で、最上位はキーと値の並び。ボードのフロー
 error で言う。ボードのフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いて
 これに掛ける（ADR-0035。正しいかの答えはここ 1 か所）。`--json` なら読めた中身も載せ（`as_json`）、
 画面は自分の読み（YAML 1.2）と見比べて、値の意味が食い違えば開かない・保存しない。
+読めたフローの線の構造（`structure_problems`）と名前の綴り（`name_problems`）は warn で足し、
+読むのは止めない。
 
 読むのは権威のツリー（承認済みチケットが在るツリー）の版だけ。子のワークツリーの写しは読まない。
 
@@ -157,7 +159,13 @@ _CONFUSABLE = {
     "\u01c0": "i",  # ǀ
 }
 # 案内の区切りの行に似せた文。フローの文の中に出たら置き換える。
-_FENCE_PHRASES = ("ここから人が書いたフローの本文", "フローの本文ここまで")
+# プロジェクトのスキルの目録（projskills.FENCE_OPEN / FENCE_CLOSE）の区切りも同じく崩す。
+_FENCE_PHRASES = (
+    "ここから人が書いたフローの本文",
+    "フローの本文ここまで",
+    "ここからプロジェクトのスキルの目録",
+    "目録ここまで",
+)
 _FENCE_SHOWN = "〔区切りに似た文〕"
 
 LINKED = "ファイルか、ツリーのルートからそこまでの途中がシンボリックリンクなので読まない"
@@ -622,6 +630,310 @@ def shape_problem(data) -> str:
             if not isinstance(connection, dict):
                 return f"connections[{index}] がキーと値の並びではない"
     return ""
+
+
+# ---- 線の構造と名前（`--lint --flow` の warn）
+#
+# 読めるか・形（`shape_problem`）の外にある、手順として怪しいところ。読むのは止めない（warn）。
+# `SubagentStart` は見ない（並べ方は `render` のまま）。巡回は意図して書くことがあるので言わない。
+
+# 並べない（手順でない）種類。構造の検査からも外す。
+_NOT_STEP = (GROUP,)
+
+
+def _step_nodes(data) -> list[dict]:
+    """構造を見るノード。辞書で `id` を持ち、グループでないもの（重なった `id` は最初の 1 つ）。"""
+    nodes: list[dict] = []
+    seen: set[str] = set()
+    for n in _list(_dict(data).get("nodes")):
+        if not isinstance(n, dict) or _text(n.get("type")) in _NOT_STEP:
+            continue
+        nid = _node_id(n)
+        if nid and nid not in seen:
+            seen.add(nid)
+            nodes.append(n)
+    return nodes
+
+
+def _named(node: dict) -> str:
+    """苦情で名指しするノード。`<id>（<名前>）`。"""
+    nid, name = _line(_node_id(node)), _line(node.get("name"))
+    return f"{nid}（{name}）" if name and name != nid else nid
+
+
+def _names(nodes: list[dict]) -> str:
+    return ", ".join(_capped([_named(n) for n in nodes[:ITEM_LIMIT]], len(nodes)))
+
+
+def _port_taken(node: dict, index: int, item: dict, ports: set[str]) -> bool:
+    """項目（分岐・選択肢）の出口に線があるか。
+
+    読み方は `_port_label` と同じ（項目の `id` か `branch-<番号>`）。
+    """
+    item_id = _text(item.get("id"))
+    if item_id and item_id in ports:
+        return True
+    return any(_branch_index(port) == index for port in ports)
+
+
+def structure_problems(data) -> list[str]:
+    """線の構造の怪しいところ（1 件 1 行）。無ければ空。例外は外に出さない。
+
+    見るのは、線の `from` / `to` が無いノードを指す、`start` から届かないノード、`start` に入る線、
+    `end` から出る線、分岐・問いの出口に線が無い、`end` が無い、`start` が無い。グループは外す
+    （手順ではない）。巡回は言わない。サブフロー（`subAgentFlows`）の中は見ない。
+
+    出口は画面（`flow-doc.ts` の `portsOf`）と同じに読む。複数選択（`multiSelect: true`）の問いは
+    選択肢ごとに出口を分けず、`output` の 1 本だけ。グループへ出る線も、出る側の出口は使っている
+    （線は手順に数えないが、「出口に線が無い」とは言わない）。無いノードを指す線は
+    `ITEM_LIMIT` 件まで言い、残りは数だけ添える。
+    """
+    try:
+        return _structure_problems(data)
+    except Exception:  # noqa: BLE001  壊れたデータで lint を落とさない
+        return ["線の構造を確かめられない（中身の型が崩れている）"]
+
+
+def _structure_problems(data) -> list[str]:
+    data = _dict(data)
+    nodes = _step_nodes(data)
+    by_id = {_node_id(n): n for n in nodes}
+    groups = {
+        _node_id(n)
+        for n in _list(data.get("nodes"))
+        if isinstance(n, dict) and _text(n.get("type")) in _NOT_STEP
+    }
+    kinds = {nid: _text(n.get("type")) for nid, n in by_id.items()}
+    out: list[str] = []
+    missing: list[str] = []
+    edges: dict[str, list[str]] = {}
+    ports: dict[str, set[str]] = {}
+    for index, c in enumerate(_list(data.get("connections"))):
+        if not isinstance(c, dict):
+            continue
+        cid = _line(c.get("id")) or f"connections[{index}]"
+        src, dst = _text(c.get("from")), _text(c.get("to"))
+        bad = False
+        for end_name, ref in (("from", src), ("to", dst)):
+            if ref in groups:
+                continue
+            if ref not in by_id:
+                shown = _line(ref) or "(空)"
+                missing.append(f"線 {cid} の {end_name} が無いノード（{shown}）を指している")
+                bad = True
+        if not bad and src in by_id:
+            # グループへ出る線でも、出る側の出口は使っている
+            ports.setdefault(src, set()).add(_text(c.get("fromPort")) or "output")
+        if bad or src in groups or dst in groups:
+            continue
+        edges.setdefault(src, []).append(dst)
+        if kinds.get(dst) == "start":
+            out.append(f"線 {cid} が start（{_named(by_id[dst])}）に入っている")
+        if kinds.get(src) == "end":
+            out.append(f"線 {cid} が end（{_named(by_id[src])}）から出ている")
+    out.extend(missing[:ITEM_LIMIT])
+    if len(missing) > ITEM_LIMIT:
+        out.append(f"無いノードを指す線は…ほか {len(missing) - ITEM_LIMIT} 件")
+    starts = [nid for nid in by_id if kinds[nid] == "start"]
+    if not starts:
+        out.append("start が無い（どこから始めるかが決まらない）")
+    if not any(kind == "end" for kind in kinds.values()):
+        out.append("end が無い（どこで終わるかが決まらない）")
+    if starts:
+        reached: set[str] = set()
+        queue = deque(starts)
+        while queue:
+            current = queue.popleft()
+            if current in reached:
+                continue
+            reached.add(current)
+            queue.extend(edges.get(current, []))
+        lost = [n for nid, n in by_id.items() if nid not in reached]
+        if lost:
+            out.append(f"start から届かないノードがある: {_names(lost)}")
+    for nid, node in by_id.items():
+        key = BRANCH_KEYS.get(kinds[nid])
+        if key is None:
+            continue
+        taken = ports.get(nid, set())
+        if kinds[nid] == ASK and _dict(node.get("data")).get("multiSelect") is True:
+            # 複数選択の問いは出口を分けない（`output` の 1 本。画面の `portsOf` と同じ）
+            if "output" not in taken:
+                out.append(f"問い {_named(node)} の出口に線が無い: output（複数選択）")
+            continue
+        items = [i for i in _list(_dict(node.get("data")).get(key)) if isinstance(i, dict)]
+        empty = [
+            _line(item.get("label")) or f"{index + 1} 番目"
+            for index, item in enumerate(items)
+            if not _port_taken(node, index, item, taken)
+        ]
+        if empty:
+            what = "問い" if kinds[nid] == ASK else "分岐"
+            shown = ", ".join(_capped(empty[:ITEM_LIMIT], len(empty)))
+            out.append(f"{what} {_named(node)} の出口に線が無い: {shown}")
+    return out
+
+
+# ---- 選べるエージェントとスキルの名前（`--lint --json --flow` の `flow.candidates`）
+
+# Claude Code の組み込みのサブエージェント。
+BUILTIN_AGENTS = ("general-purpose", "Explore", "Plan")
+# プロジェクトのサブエージェントとスキルの置き場（ワークスペースルートからの相対）。
+AGENTS_DIR = os.path.join(".claude", "agents")
+SKILLS_DIR = os.path.join(".claude", "skills")
+SKILL_FILE = "SKILL.md"
+# 読むファイルの数と、1 本から読む頭の大きさ（バイト）の上限。
+CATALOG_LIMIT = 200
+HEAD_LIMIT = 8 * 1024
+SOURCE_BUILTIN = "builtin"
+SOURCE_PROJECT = "project"
+
+
+def _regular_file(path: str) -> bool:
+    """リンクでない、ふつうのファイルか（辿らずに見る）。"""
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except (OSError, ValueError):
+        return False
+
+
+def _front_name(path: str) -> str:
+    """Markdown の frontmatter の `name:` の値。無い・読めないなら空。リンクは辿らない。
+
+    frontmatter（頭の `---` から次の `---` まで）だけを `yaml.safe_load` で読む（`>-` の折り返しや
+    行末の注釈で名前が化けないように）。別名は拒む（`_Loader`）。`name` が文字列でなければ空。
+    """
+    if not _regular_file(path):
+        return ""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(HEAD_LIMIT).decode("utf-8-sig", errors="replace")
+    except (OSError, ValueError):
+        return ""
+    lines = head.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return ""
+    body: list[str] = []
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        body.append(line)
+    else:
+        return ""
+    try:
+        meta = yaml.load("\n".join(body), Loader=_Loader)  # noqa: S506  _Loader は SafeLoader
+    except (yaml.YAMLError, ValueError, RecursionError):
+        return ""
+    value = meta.get("name") if isinstance(meta, dict) else None
+    return clean(value).strip() if isinstance(value, str) else ""
+
+
+def _entries(path: str, root: str) -> list[os.DirEntry]:
+    """ディレクトリの中身（名前の順、`CATALOG_LIMIT` 件まで）。
+
+    `root` からそのディレクトリまでの途中（`.claude` 自体を含む）にリンクがあれば読まない
+    （`linked` と同じ考え方）。
+    """
+    try:
+        if linked(root, path) or not os.path.isdir(path):
+            return []
+        with os.scandir(path) as it:
+            found = sorted(it, key=lambda e: e.name)
+    except (OSError, ValueError):
+        return []
+    return found[:CATALOG_LIMIT]
+
+
+def catalog(root: str) -> dict[str, list[dict]]:
+    """フローで選べるサブエージェントとスキルの名前。例外は外に出さない。
+
+    `{"agents": [{name, source}], "skills": [{name, source}]}`。`source` は `builtin`（組み込み）
+    か `project`（ワークスペースの `.claude/agents/*.md` と `.claude/skills/*/SKILL.md`）。
+    名前は frontmatter の `name`、無ければファイル（スキルはディレクトリ）の名前。
+    見るのはディレクトリの中だけで、利用者のホーム（`~/.claude`）とプラグインのものは入らない。
+    リンクは辿らない。
+    """
+    agents = [{"name": name, "source": SOURCE_BUILTIN} for name in BUILTIN_AGENTS]
+    skills: list[dict] = []
+    if root:
+        for entry in _entries(os.path.join(root, AGENTS_DIR), root):
+            # ふつうのファイルだけ（ディレクトリ・リンクは数えない）。
+            # `.md` は大文字小文字を区別しない
+            if not entry.name.lower().endswith(".md") or not _regular_file(entry.path):
+                continue
+            name = _front_name(entry.path) or entry.name[: -len(".md")]
+            agents.append({"name": name, "source": SOURCE_PROJECT})
+        for entry in _entries(os.path.join(root, SKILLS_DIR), root):
+            try:
+                if entry.is_symlink() or not entry.is_dir():
+                    continue
+            except OSError:
+                continue
+            path = os.path.join(entry.path, SKILL_FILE)
+            if not _regular_file(path):
+                continue
+            skills.append({"name": _front_name(path) or entry.name, "source": SOURCE_PROJECT})
+    return {"agents": _unique(agents), "skills": _unique(skills)}
+
+
+def _unique(items: list[dict]) -> list[dict]:
+    seen: set[str] = set()
+    kept = []
+    for item in items:
+        if item["name"] and item["name"] not in seen:
+            seen.add(item["name"])
+            kept.append(item)
+    return kept
+
+
+def _flow_nodes(data) -> list[dict]:
+    """名前を確かめるノード。最上位とサブフローの中の両方。"""
+    data = _dict(data)
+    nodes = [n for n in _list(data.get("nodes")) if isinstance(n, dict)]
+    for sub in _list(data.get("subAgentFlows")):
+        nodes.extend(n for n in _list(_dict(sub).get("nodes")) if isinstance(n, dict))
+    return nodes
+
+
+def name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
+    """`subAgent` の種類（`builtInType`）と `skill` の名前（`name`）が候補に無いもの（1 件 1 行）。
+
+    綴りの誤りを見つけるため。空の欄は言わない（書きかけ）。スキルの `:` を含む名前
+    （プラグインのスキル）は、ディレクトリの中から確かめられないので言わない。大文字小文字だけが
+    違えば、正しい綴りを添える。例外は外に出さない。
+    """
+    try:
+        return _name_problems(data, cat)
+    except Exception:  # noqa: BLE001  壊れたデータで lint を落とさない
+        return []
+
+
+def _name_problems(data, cat: dict[str, list[dict]]) -> list[str]:
+    agents = [i["name"] for i in cat.get("agents", [])]
+    skills = [i["name"] for i in cat.get("skills", [])]
+    out: list[str] = []
+    for node in _flow_nodes(data):
+        kind = _text(node.get("type"))
+        info = _dict(node.get("data"))
+        if kind == "subAgent":
+            what, value, known = "サブエージェントの種類", _text(info.get("builtInType")), agents
+        elif kind == "skill":
+            what, value, known = "スキル", _text(info.get("name")), skills
+            if ":" in value:
+                continue
+        else:
+            continue
+        value = value.strip()
+        if not value or value in known:
+            continue
+        near = [k for k in known if k.casefold() == value.casefold()]
+        hint = f"。大文字小文字が違う（{_line(near[0])}）" if near else ""
+        out.append(
+            f"ノード {_named(node)} の{what} {_line(value)} が候補に無い"
+            "（組み込みと .claude/ の下に無い。綴りの誤りか、"
+            f"利用者・プラグインのものなら気にしなくてよい）{hint}"
+        )
+    return out
 
 
 # ---- 着手のあとの書き換えを知らせる

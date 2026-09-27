@@ -93,7 +93,7 @@ TIERS: tuple[tuple[str, str, frozenset[str]], ...] = (
     (
         "compose",
         "層ごとの設定を読んで、判定の材料に組む",
-        frozenset({"phasetypes", "ruleload", "workflow"}),
+        frozenset({"phasetypes", "projskills", "ruleload", "workflow"}),
     ),
     (
         "work",

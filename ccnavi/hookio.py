@@ -66,6 +66,9 @@ class Input:
     # stop_hook_active は Stop / SubagentStop にだけ来る。真なら、この終わり方は Stop の hook が
     # 続けさせた結果（連鎖の 2 回目以降）。促しを 1 回に留めるために読む。
     stop_hook_active: bool = False
+    # source は SessionStart にだけ来る。`startup` / `resume` / `clear` / `compact`。Stop の促しの
+    # 数えを捨てるのは `startup` だけ（ADR-0090、ctxfile.forget）。
+    source: str = ""
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -104,6 +107,7 @@ def decode(stream: TextIO) -> Input:
         agent_id=str(data.get("agent_id") or ""),
         agent_type=str(data.get("agent_type") or ""),
         stop_hook_active=data.get("stop_hook_active") is True,
+        source=str(data.get("source") or ""),
     )
 
 
