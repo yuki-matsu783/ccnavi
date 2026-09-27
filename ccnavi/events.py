@@ -26,6 +26,7 @@ from . import (
     ops,
     phase,
     post,
+    projskills,
     prune,
     reasons,
     repeat,
@@ -384,6 +385,10 @@ def decide_at_start(
         texts.append(selfguard.report(outcomes))
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録（ADR-0091）。
+    skills = projskills.index(conf, root, payload.cwd)
+    if skills:
+        texts.append(skills)
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK

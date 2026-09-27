@@ -20,6 +20,7 @@ from . import (
     modes,
     phase,
     post,
+    projskills,
     reasons,
     rules,
     settings,
@@ -48,21 +49,24 @@ def at_start(
     子の範囲を案内し、調査役が自分の居場所を迷う（SubagentStop と同じ絞り方）。
     """
     record.decision, record.enforced = audit.ALLOW, True
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（ADR-0091）。
+    # 子チケットの一覧が無い起動（チケット制御が無い、チケットの無いツリー）でも渡す。
+    skills = projskills.index(conf, root, payload.cwd)
     if not conf.tickets_enabled:
-        return EXIT_OK
+        return _say(stdout, skills)
     t = tree.tree_of(root, payload.cwd or os.getcwd(), conf.projects)
     if t is None or t.is_main:
-        return EXIT_OK
+        return _say(stdout, skills)
     # 権威のある側（親のツリー）の写しを読む。着手で書かれる基準点は親のツリーの
     # 写しにだけ入るので、子のツリーに checkout されている版では足りない。
     copies, _ = approval.scan(conf, root)
     index = approval.by_id(copies)
     bound = tree.lookup(index, t.name)
     if bound is None:
-        return EXIT_OK
+        return _say(stdout, skills)
     children = [bound] if bound.is_child else [c for c in copies if c.parent == bound.ticket]
     if not children:
-        return EXIT_OK
+        return _say(stdout, skills)
     closed, _ = approval.scan(conf, root, closed=True)
     review, _ = approval.scan_review(conf, root)
     proposals, _ = ticket_mod.scan(root, conf.tickets, conf.projects)
@@ -121,7 +125,17 @@ def at_start(
             "担当が分からなければ、読まずにメインに聞く"
         )
     lines.extend(changed)
-    hookio.write_context(stdout, hookio.SUBAGENT_START, "\n".join(lines), system="\n".join(changed))
+    text = "\n".join(lines)
+    if skills:
+        text = f"{skills}\n\n{text}"
+    hookio.write_context(stdout, hookio.SUBAGENT_START, text, system="\n".join(changed))
+    return EXIT_OK
+
+
+def _say(stdout: TextIO, text: str) -> int:
+    """子チケットの一覧が無い起動で、渡す文（スキルの目録）があればそれだけを渡す。"""
+    if text:
+        hookio.write_context(stdout, hookio.SUBAGENT_START, text)
     return EXIT_OK
 
 
