@@ -95,6 +95,22 @@ class RotateTest(_Base):
         self.assertEqual(len(names), 2, names)
         self.assertRegex(report.rotated[0][1], r"-2\.jsonl$")
 
+    def test_same_second_race_does_not_overwrite(self):
+        # 同じ秒に始まった 2 つのセッションが、どちらも行き先がまだ無いと見てから名前を変える形。
+        # 行き先を先に押さえないと、後の 1 本が先にローテートした記録を上書きする。
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "1"
+        _write(self.log, BIG)
+        self.run_prune()
+        _write(self.log, "b" * len(BIG))
+        with mock.patch.object(prune.os.path, "exists", return_value=False):
+            report = self.run_prune()
+        names = sorted(n for n in os.listdir(self.logs) if n.startswith("log."))
+        self.assertEqual(len(names), 2, names)
+        self.assertRegex(report.rotated[0][1], r"-2\.jsonl$")
+        (first,) = [n for n in names if not n.endswith("-2.jsonl")]
+        with open(os.path.join(self.logs, first), encoding="utf-8") as f:
+            self.assertEqual(f.read(1), "a")
+
     def test_default_limit_is_10mb(self):
         self.assertEqual(prune.limits()[:3], (10.0, 14.0, 14.0))
 
