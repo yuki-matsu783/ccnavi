@@ -81,6 +81,7 @@ root=$(ccnavi_workspace) || {
 
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
+	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-ticket: %s\n' "$skew" >&2
 	exec "$bin" --root "$root" ticket "$@"
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	cd "$root"

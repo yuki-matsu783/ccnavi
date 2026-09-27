@@ -21,6 +21,7 @@ from . import (
     modes,
     phase,
     reasons,
+    repeat,
     ruleload,
     rules,
     selfguard,
@@ -172,7 +173,12 @@ def decide_before(
         and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
     ):
         selfguard.add_rules(
-            rule_set, conf.bin, conf.project_home, root, selfguard.common_layer_files(conf)
+            rule_set,
+            conf.bin,
+            conf.project_home,
+            root,
+            selfguard.common_layer_files(conf),
+            (conf.log, conf.state),
         )
     # チケットの状態の置き場を守る。動かすのはスクリプトだけで、直接の作成・移動は
     # 誰がやっても止める。チケット制御が効いているときだけ足す。
@@ -226,6 +232,32 @@ def decide_before(
                         wrapguard.CODE_ENV, subject, wrapguard.env_message(script, names)
                     )
                 ],
+                conf=conf,
+            )
+
+    # 記録と控えを消す `ccnavi --prune`（`--preview` の無い形）は、チケット制御に依らず止める
+    # （phase.prune_form）。実行ファイルの端末要求は擬似端末で抜けられる。記録と控えの置き場を
+    # シェルの書き込みから守る組み込み（selfguard）と同じく、ガード自身を守る設定で切れる。
+    if (
+        payload.tool_name in phase.SHELL_TOOLS
+        and modes.effective_setting(mode, conf.guard_core_files) != selfguard.DISABLE
+    ):
+        found = phase.prune_form(record.subject, conf.bin)
+        if found:
+            record.code = phase.CODE_RECORDS_PRUNE
+            record.rules = [phase.RECORDS_PRUNE_RULE_ID]
+            return refuse(
+                stdout,
+                mode,
+                record,
+                rules.DENY,
+                notices
+                + [
+                    reasons.builtin_refusal(
+                        phase.CODE_RECORDS_PRUNE, subject, phase.prune_message()
+                    )
+                ],
+                conf=conf,
             )
 
     # 人の判断の経路のうち、hook のほかに守りが無い形（端末要求を切る形、ボードの経路の形）は
@@ -255,6 +287,7 @@ def decide_before(
                         else phase.board_form_message(found),
                     )
                 ],
+                conf=conf,
             )
 
     # 子チケットのワークツリーからの `ccnavi-git.sh push` は、誰が打っても止める。sh も同じ検査を
@@ -278,6 +311,7 @@ def decide_before(
                         wrapguard.child_push_message(name, parent),
                     )
                 ],
+                conf=conf,
             )
 
     # サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない。
@@ -302,6 +336,7 @@ def decide_before(
             record,
             rules.DENY,
             notices + [reasons.subagent_forbidden(subject, runner, layer)],
+            conf=conf,
         )
 
     # HITL ポイント。人間レビュー要のフェーズが終わっていてマーカーが無い間、
@@ -314,7 +349,7 @@ def decide_before(
         if held is not None and not exempt:
             record.code, record.rules = phase.CODE_REVIEW, [reasons.TICKET_RULE]
             reason = phase.hold_reason(held, payload.tool_name, root)
-            return refuse(stdout, mode, record, rules.DENY, notices + [reason])
+            return refuse(stdout, mode, record, rules.DENY, notices + [reason], conf=conf)
 
     # 承認済みチケットの索引。ワークツリーへの書き込みでは、プロジェクトの食い違いの点検と
     # チケットの範囲の判定の両方が引く。走査は 1 回で数百ミリ秒かかるので、1 回の判定で
@@ -338,7 +373,7 @@ def decide_before(
         mismatch = project_mismatch(conf, root, target, record.subject, index)
         if mismatch:
             record.code, record.rules = reasons.CODE_TICKET_PROJECT, [reasons.TICKET_RULE]
-            return refuse(stdout, mode, record, rules.DENY, notices + [mismatch])
+            return refuse(stdout, mode, record, rules.DENY, notices + [mismatch], conf=conf)
 
     # 着手中の子のフローは書き換えさせない（設計 9.3.1、ADR-0085）。ルールより先に見る。
     # 置き場は承認済みの領域で、エージェントの書き込みは組み込みの守りでも止まる。ロックは
@@ -349,7 +384,7 @@ def decide_before(
             index = approval.by_id(scanned)
         if locked:
             record.code, record.rules = flow.CODE_LOCKED, [flow.LOCK_RULE]
-            return refuse(stdout, mode, record, rules.DENY, notices + [locked])
+            return refuse(stdout, mode, record, rules.DENY, notices + [locked], conf=conf)
 
     # 書き直しを求める形は、ルールより先に止める（ADR-0046、ADR-0047）。ブレース展開と、実行する
     # ときに決まるコマンド名は、ルールを当てる読みと実行されるものが食い違う。
@@ -365,7 +400,7 @@ def decide_before(
             reasons.rewrite(record.subject, form, [text for f, text in rewrites if f == form])
             for form in forms
         ]
-        return refuse(stdout, mode, record, rules.DENY, notices + parts)
+        return refuse(stdout, mode, record, rules.DENY, notices + parts, conf=conf)
 
     # 強いタイプから順に見て、最初に当たったところで止める。deny に当たった
     # 呼び出しについて ask のタイプを調べる意味は無いし、調べれば「拒否だが
@@ -554,7 +589,7 @@ def decide_before(
             )
         return EXIT_OK
 
-    return refuse(stdout, mode, record, verdict, notices + texts, context)
+    return refuse(stdout, mode, record, verdict, notices + texts, context, conf=conf)
 
 
 def refuse(
@@ -564,12 +599,17 @@ def refuse(
     verdict: str,
     parts: list[str],
     context: str = "",
+    conf: settings.Settings | None = None,
 ) -> int:
     """拒否か確認を返す。dry-run なら返す代わりに、返していたはずだと言う。
 
     context はルールの `additionalContext`。判定と一緒にモデルへ渡す文で、
     dry-run では判定の代わりの文に続けて出す。止めない回でも文だけは届く形にして、
     enable に切り替えたときに初めて読まれる文を残さない。
+
+    conf があれば、止めた回を数える（repeat）。同じ理由で同じ呼び出しを N 回止めたら、
+    文面の末尾に「言い換えずに相談する」一文を足す。判定は変えない。数えるのは実際に
+    止めた回（enable の deny）だけで、dry-run と確認は数えない。
     """
     # 空行で割るのは、1 件ずつが閉じた文であることを見た目でも保つため。
     reason = "\n\n".join(parts)
@@ -585,6 +625,10 @@ def refuse(
         return EXIT_OK
 
     record.decision, record.enforced = decision, True
+    if conf is not None and verdict == rules.DENY:
+        n = repeat.count(conf.state, record)
+        if n >= repeat.threshold(conf.deny_repeat):
+            reason += "\n\n" + repeat.note(repeat.rule_of(record), n)
     hookio.write_verdict(
         stdout, hookio.DENY if verdict == rules.DENY else hookio.ASK, reason, context
     )

@@ -14,11 +14,12 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } f
 
 import type { Lock } from "../../core/lock.js";
 import { KNOWN_TOOLS, SECTIONS, SECTION_LABELS, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { SamplesJson } from "../../core/testmodel.js";
 import { applyAppearance } from "../appearance.js";
 import { Tour, TourButton, useTour, type TourStep } from "../Tour.js";
 import { Hooks } from "./Hooks.js";
-import { JudgeResult, SamplesResult, type Judged } from "./Judge.js";
+import { JudgeResult, SamplesResult, SuggestResult, type Judged } from "./Judge.js";
 import { post } from "./post.js";
 import { Rule } from "./Rule.js";
 import {
@@ -89,6 +90,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [tab, setTab] = useState<TabName>(() => loadTab());
   const [judged, setJudged] = useState<Judged | undefined>(undefined);
   const [sampled, setSampled] = useState<SamplesJson | undefined>(undefined);
+  const [suggested, setSuggested] = useState<SuggestJson | undefined>(undefined);
   const [tool, setTool] = useState<string>(KNOWN_TOOLS[0]);
   const [subject, setSubject] = useState("");
   /** 選択肢が開いている行。開くのは画面ぜんたいで 1 つだけ */
@@ -180,6 +182,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           // 別の対象へ切り替わった。前の対象のルールで出した判定を、いまのルールの結果として残さない
           setJudged(undefined);
           setSampled(undefined);
+          setSuggested(undefined);
         }
       } else if (message.type === "judged") {
         const result = message.result as Judged["result"];
@@ -192,6 +195,11 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         setBusy(false);
         setStatus(undefined);
         setSampled(message.result as SamplesJson);
+        showTab("judge");
+      } else if (message.type === "suggested") {
+        setBusy(false);
+        setStatus(undefined);
+        setSuggested(message.result as SuggestJson);
         showTab("judge");
       } else if (message.type === "failed") {
         setBusy(false);
@@ -590,6 +598,24 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
         </div>
         {sampled !== undefined && <SamplesResult result={sampled} />}
+        <div className="samples-head">
+          <button
+            type="button"
+            className="action"
+            data-action="suggest"
+            disabled={busy}
+            title="ccnavi --suggest --json。保存済みのルールと判定の記録から、deny / ask の下書きを起こす"
+            onClick={() => {
+              setBusy(true);
+              setStatus({ text: "記録から候補を起こしています…", error: false });
+              post({ type: "suggest" });
+            }}
+          >
+            記録から候補を出す
+          </button>
+          <span className="hint">保存済みのルールで確かめた候補です。編集中の内容は使いません</span>
+        </div>
+        {suggested !== undefined && <SuggestResult result={suggested} />}
       </section>
       <section id="tab-hooks" className={tab === "hooks" ? "pane active" : "pane"}>
         <Hooks hooks={page?.hooks ?? []} files={page?.hookFiles ?? { settings: false, settingsLocal: false }} />

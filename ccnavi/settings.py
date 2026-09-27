@@ -94,6 +94,9 @@ APPROVED_ENV = "CCNAVI_TICKETS_APPROVED"
 # 動かせるのは ccnavi ディレクトリの名前だけで、`config/` と 3 本のファイル名は固定。
 PROJECTS_ENV = "CCNAVI_PROJECTS"
 PROJECT_HOME_ENV = "CCNAVI_PROJECT_HOME"
+# DENY_REPEAT_ENV は、同じ理由で同じ呼び出しを何回止めたら「言い換えずに相談せよ」と
+# 添えるか（repeat）。既定は 3。判定は変わらず、文面と人への報告が変わるだけ。
+DENY_REPEAT_ENV = "CCNAVI_DENY_REPEAT"
 
 # own_project は ccnavi 自身のソースツリーを見分ける目印。own_source_tree を参照。
 OWN_PROJECT = "ccnavi"
@@ -295,6 +298,8 @@ class Settings:
     log: str = ""
     rules: str = ""
     state: str = ""
+    # 同じ理由の拒否を何回目から名指しするか。書かれたままの綴りで、読むのは repeat.threshold。
+    deny_repeat: str = ""
     # 戻す働きの 2 つ。どちらも mode と同じ enable / dry-run / disable を取る。
     #
     # restore_if_deny は、ルールが `deny` と宣言した場所が副作用で変わったときに
@@ -396,6 +401,7 @@ def load(root: str) -> tuple[Settings, list[str]]:
         guard_ticket_approval=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_ticket_approval_declared=os.environ.get(GUARD_TICKET_APPROVAL_ENV, ""),
         guard_unwatched=os.environ.get(GUARD_UNWATCHED_ENV, ""),
+        deny_repeat=os.environ.get(DENY_REPEAT_ENV, ""),
         ticket_control=os.environ.get(TICKET_CONTROL_ENV, ""),
         ticket_control_declared=os.environ.get(TICKET_CONTROL_ENV, ""),
         tickets=DEFAULT_TICKETS,
