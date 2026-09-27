@@ -55,7 +55,7 @@ SUBJECT_LIMIT = 1000
 # 伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値を伏せられるだけの余りを持たせる。
 REDACT_LIMIT = SUBJECT_LIMIT * 4
 # 伏せる処理が落ちたときに、その欄へ代わりに書く文。平文は書かない。
-REDACT_FAILED = "[ccnavi: 伏せ字に失敗したので書かない]"
+REDACT_FAILED = "[ccnavi: 秘密を伏せる処理が失敗したため、この欄の中身は記録していません]"
 
 
 @dataclass
