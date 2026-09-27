@@ -1,3 +1,10 @@
+---
+type: adr
+title: "`message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける"
+description: "`message` は `deny` だけの欄（必須）。`ask` と `allow` に書くと `--lint` が error にする。"
+tags: [adr, rules, launcher, state]
+keywords: "[`message`, は, `deny`, ADR-0015, message, deny, だけの欄にし, モデルへの一言は, additionalContext, に分ける, 状態, 採用, ルール, rule]"
+---
 # ADR-0015: `message` は `deny` だけの欄にし、モデルへの一言は `additionalContext` に分ける
 
 状態: 採用

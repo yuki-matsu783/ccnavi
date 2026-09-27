@@ -1,3 +1,10 @@
+---
+type: adr
+title: "設定は `.claude/settings.json` の `env` に置く"
+description: "設定は環境変数 `CCNAVI_*` で渡し、プロジェクトは `.claude/settings.json` の `env` ブロックに書く。"
+tags: [adr, settings, launcher, design-doc]
+keywords: "[設定は, `.claude/settings.json`, の, ADR-0005, claude, settings, json, env, に置く, 状態, 採用, 設定]"
+---
 # ADR-0005: 設定は `.claude/settings.json` の `env` に置く
 
 状態: 採用

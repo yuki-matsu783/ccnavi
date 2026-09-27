@@ -1,3 +1,10 @@
+---
+type: adr
+title: 言語を Go から Python に移す
+description: Python 3.12 で書き、コマンドの分割は標準ライブラリの `shlex` に任せる。
+tags: [adr, git, rules, settings]
+keywords: [言語を, Go, から, ADR-0001, Python, に移す, 状態, 採用, 状況, 最初は, ルール, rule, 設定, settings, git]
+---
 # ADR-0001: 言語を Go から Python に移す
 
 状態: 採用

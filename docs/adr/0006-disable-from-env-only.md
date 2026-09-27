@@ -1,3 +1,10 @@
+---
+type: adr
+title: "`disable` は起動側の環境からしか効かせない"
+description: 停止の指定は、ccnavi を起動した側の環境からしか効かせない。守り方は 2 段にする。
+tags: [adr, rules, ticket, settings]
+keywords: "[`disable`, は起動側の環境からしか効かせない, ADR-0006, disable, 状態, 採用, 状況, 設定は, claude, settings, json, チケット, ticket, ルール, rule, 設定]"
+---
 # ADR-0006: `disable` は起動側の環境からしか効かせない
 
 状態: 採用

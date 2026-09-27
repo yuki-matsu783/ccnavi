@@ -1,3 +1,10 @@
+---
+type: adr
+title: 実行後の監視の保護領域はルールから導き、別の宣言を持たない
+description: "`match` に `Write` `Edit` `NotebookEdit` のどれかを含む `deny` / `ask` のルールが、そのまま"
+tags: [adr, git, rules, ticket]
+keywords: [実行後の監視の保護領域はルールから導き、別の宣言を持たない, ADR-0017, 実行後の監視の保護領域はルールから導き, 別の宣言を持たない, 状態, 採用, 状況, 当初の設計では, 実行後の監視が見る保護領域はプロジェクト設定の, target_directories, が, チケット, ticket, ルール, rule, 設定, settings, git]
+---
 # ADR-0017: 実行後の監視の保護領域はルールから導き、別の宣言を持たない
 
 状態: 採用

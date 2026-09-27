@@ -1,3 +1,10 @@
+---
+type: adr
+title: "モードの名前を `enable` / `dry-run` / `disable` にする"
+description: "名前はガードそのものの状態で言う。`enable`（判定を適用する）、`dry-run`（判定して報告するだけ）、"
+tags: [adr, ticket, approval, settings]
+keywords: "[モードの名前を, `enable`, /, ADR-0007, enable, dry-run, disable, にする, 状態, 採用, 状況, 以前のモード名は, チケット, ticket, 設定, settings, 許可, approval]"
+---
 # ADR-0007: モードの名前を `enable` / `dry-run` / `disable` にする
 
 状態: 採用

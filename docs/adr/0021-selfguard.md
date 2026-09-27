@@ -1,3 +1,10 @@
+---
+type: adr
+title: コアファイルはルールの外で守る
+description: 次のものだけは、ルールファイルの外に組み込みで持つ（`CCNAVI_GUARD_CORE_FILES`）。
+tags: [adr, git, rules, phase]
+keywords: [コアファイルはルールの外で守る, ADR-0021, 状態, 採用, 状況, 実行後の監視の保護領域はルールファイルの, deny, と, ask, から導く, フェーズ, phase, ルール, rule, 設定, settings, git]
+---
 # ADR-0021: コアファイルはルールの外で守る
 
 状態: 採用

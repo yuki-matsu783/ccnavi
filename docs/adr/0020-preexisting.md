@@ -1,3 +1,10 @@
+---
+type: adr
+title: 前から在った変更は差し戻さない
+description: 初めて見たときにその場で控え（`state/<セッション>.json`）を取り、以降に新しく現れたものだけを
+tags: [adr, git, launcher, testing]
+keywords: [前から在った変更は差し戻さない, ADR-0020, 状態, 採用, 状況, 最初は, git, status, に出たものを全部, 直前の実行が汚した]
+---
 # ADR-0020: 前から在った変更は差し戻さない
 
 状態: 採用

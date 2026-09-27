@@ -1,3 +1,10 @@
+---
+type: adr
+title: 実行時の依存に PyYAML を 1 本だけ許す
+description: 実行時の依存は PyYAML 1 本。読むのは `safe_load` に限る。PyInstaller と ruff は開発時にしか
+tags: [adr, rules, ticket, settings]
+keywords: [実行時の依存に, PyYAML, を, ADR-0004, 1, 本だけ許す, 状態, 採用, 状況, 以前の方針は依存ゼロだった, チケット, ticket, ルール, rule, 設定, settings]
+---
 # ADR-0004: 実行時の依存に PyYAML を 1 本だけ許す
 
 状態: 採用

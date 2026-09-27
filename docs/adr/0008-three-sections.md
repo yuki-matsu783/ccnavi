@@ -1,3 +1,10 @@
+---
+type: adr
+title: "ルールを `deny` / `ask` / `allow` の 3 タイプに分け、既定を許可にしない"
+description: "ルールファイルは `.claude/ccnavi/rules.yml`（YAML）で、`deny` `ask` `allow` の 3 つのタイプに"
+tags: [adr, rules, ticket, approval]
+keywords: "[ルールを, `deny`, /, ADR-0008, deny, ask, allow, の, 3, タイプに分け, 既定を許可にしない, 状態, チケット, ticket, ルール, rule, 許可, approval]"
+---
 # ADR-0008: ルールを `deny` / `ask` / `allow` の 3 タイプに分け、既定を許可にしない
 
 状態: 採用
