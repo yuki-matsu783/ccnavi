@@ -14,6 +14,7 @@ import os
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 from ccnavi import audit, redact
 from tests.inproc import run_ccnavi
@@ -329,6 +330,57 @@ class RecordTest(unittest.TestCase):
         self.assertEqual(line["decision"], "deny")
         self.assertEqual(line["rules"], ["no-this-token"])
         self.assertNotIn(LONG, line["subject"])
+
+    def test_redact_failure_writes_no_plain_text(self):
+        # 伏せる処理が落ちても記録は書け、その欄には平文の代わりに決まった文が入る。
+        record = audit.Record(
+            decision=audit.ALLOW,
+            subject=f"curl -H 'Authorization: Bearer {LONG}' x",
+            unwrapped=f"GITHUB_TOKEN={GHP} gh api",
+            detail="password=hunter2",
+        )
+        with mock.patch.object(redact, "redact", side_effect=RuntimeError("boom")):
+            audit.Log(self.log).write(record)
+        (line,) = self._lines()
+        for secret in (LONG, GHP, "hunter2"):
+            self.assertNotIn(secret, json.dumps(line))
+        self.assertEqual(line["subject"], audit.REDACT_FAILED)
+        self.assertEqual(line["unwrapped"], audit.REDACT_FAILED)
+        self.assertEqual(line["detail"], audit.REDACT_FAILED)
+
+    def test_redact_failure_keeps_the_deny(self):
+        # 伏せる処理が落ちても hook は 0 で終わり、出した deny が残る。
+        rules = os.path.join(self.dir, ".ccnavi", "common", "rules.yml")
+        os.makedirs(os.path.dirname(rules))
+        with open(rules, "w", encoding="utf-8") as f:
+            f.write(
+                "version: 1\n"
+                "deny:\n"
+                "  - id: no-curl\n"
+                "    match: Bash\n"
+                "    glob: 'curl *'\n"
+                "    message: 止める\n"
+            )
+        payload = {
+            "hook_event_name": "PreToolUse",
+            "session_id": "s1",
+            "tool_name": "Bash",
+            "tool_input": {"command": f"curl -H 'Authorization: Bearer {LONG}' x"},
+        }
+        with mock.patch.object(redact, "redact", side_effect=RuntimeError("boom")):
+            proc = run_ccnavi(
+                ["--log", self.log, "--state", "", "--ticket-control", "disable"],
+                input=json.dumps(payload),
+                env={"CLAUDE_PROJECT_DIR": self.dir, "CCNAVI_MODE": "enable"},
+                cwd=self.dir,
+            )
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(
+            json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecision"], "deny"
+        )
+        (line,) = self._lines()
+        self.assertEqual(line["decision"], "deny")
+        self.assertEqual(line["subject"], audit.REDACT_FAILED)
 
 
 if __name__ == "__main__":

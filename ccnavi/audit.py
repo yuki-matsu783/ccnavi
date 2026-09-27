@@ -54,6 +54,8 @@ REASON_DEADLINE_EXCEEDED = "deadline-exceeded"
 SUBJECT_LIMIT = 1000
 # 伏せる前に切る長さ。上限の手前で始まって上限をまたぐ値を伏せられるだけの余りを持たせる。
 REDACT_LIMIT = SUBJECT_LIMIT * 4
+# 伏せる処理が落ちたときに、その欄へ代わりに書く文。平文は書かない。
+REDACT_FAILED = "[ccnavi: 伏せ字に失敗したので書かない]"
 
 
 @dataclass
@@ -169,9 +171,9 @@ class Log:
         # 上限の数倍（REDACT_LIMIT）で切る。どれだけ長くても、伏せる手間が実行前の判定の
         # 期限に届かないように。そこで切れた値は、残った字数の側で上限に切られて見えない。
         # detail は ccnavi が組む文で、上限を持たないので切らない。
-        subject = _limited(redact.redact(record.subject[:REDACT_LIMIT]), len(record.subject))
-        unwrapped = _limited(redact.redact(record.unwrapped[:REDACT_LIMIT]), len(record.unwrapped))
-        detail = redact.redact(record.detail)
+        subject = _limited(_redacted(record.subject[:REDACT_LIMIT]), len(record.subject))
+        unwrapped = _limited(_redacted(record.unwrapped[:REDACT_LIMIT]), len(record.unwrapped))
+        detail = _redacted(record.detail)
 
         elapsed_ms = (time.perf_counter() - self._start) * 1000
         out: dict = {
@@ -217,6 +219,19 @@ class Log:
 
         out["ms"] = round(elapsed_ms, 3)
         return out
+
+
+def _redacted(text: str) -> str:
+    """秘密の形を伏せた文字列。伏せる処理が何で落ちても、平文の代わりに REDACT_FAILED を返す。
+
+    記録を書くのは判定を stdout に出した後で、ここで例外が抜けると hook が 0 以外で終わる。
+    Claude Code は 0 以外で終わった hook の出力を読まないので、出したはずの deny が消えて通る。
+    伏せ字の不具合が判定を緩めないように、例外はここで止める。
+    """
+    try:
+        return redact.redact(text)
+    except Exception:
+        return REDACT_FAILED if text else text
 
 
 def _limited(text: str, whole: int = 0) -> str:
