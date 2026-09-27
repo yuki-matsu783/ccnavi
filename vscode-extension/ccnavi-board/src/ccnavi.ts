@@ -2,11 +2,12 @@
  * 実行ファイルを探して走らせる。Node の子プロセスを使うが VS Code には依存しない。
  * 実行ファイルはネットワークに出ないので、ここで待つのはワークスペースの走査だけ。
  *
- * 走らせるのは 8 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
+ * 走らせるのは 9 つ。`--explain --json`（ボード）、`--test --json`（1 件の判定）、
  * `--test-samples --json`（見本の一括）、`--lint`（設定の検証）、`--lint --json`（同じ苦情を
  * 機械可読で。プロジェクト管理画面が読む）、`--lint --json --flow <パス>`（子のフロー 1 本を
  * SubagentStart と同じ読みで確かめる。フロー編集画面が開くときと保存の前に読む）、`--approve --preview --json`（承認待ちの一覧を見る）、
- * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）。
+ * `--approve --yes … --json`（見せた一覧を承認する。人がオーバーレイで押したときだけ）、
+ * `--suggest --json`（記録からルールの候補を起こす。ルール設定画面が読む。記録を読むので `--log ""` は付けない）。
  * 判定と検証はルールファイルを差し替えられる。
  * 共通の設定のルールは `--rules`、プロジェクトのルールは `--project-rules-file <名前>=<パス>`。
  * 検証はリスクの配点も `--risk` で、フェーズの種類も `--phases`（ワークスペースかプロジェクトの設定の種類なら `--project-phases-file <名前>=<パス>`）で
@@ -45,6 +46,7 @@ import {
 import { parseLintJson, unknownOption, type LintJson } from "./core/lintmodel.js";
 import { binFromSettingsJson, hostTarget, locate } from "./core/locate.js";
 import { parseBoardJson, type BoardJson } from "./core/model.js";
+import { parseSuggestJson, type SuggestJson } from "./core/suggestmodel.js";
 import {
   parseSamplesJson,
   parseTestJson,
@@ -457,6 +459,30 @@ export async function runSamples(
     return { ok: false, error: `ccnavi --test-samples --json が失敗しました: ${ran.stderr}` };
   }
   const parsed = parseSamplesJson(ran.stdout);
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
+}
+
+/**
+ * 記録からルールの候補を起こす（`--suggest --json`、README「候補の JSON」）。読むのは保存済みの
+ * ルールと記録で、編集中の内容は渡さない。候補は実行ファイルが `--lint` と見本の判定で確かめたものだけ。
+ * 記録を読むので `--log ""` は付けない（控えは実行ファイルが外す）。`--suggest` を知らない古い実行ファイルは失敗にする。
+ */
+export async function runSuggest(root: string, setting: string): Promise<RunResult<SuggestJson>> {
+  const launcher = findLauncher(root, setting);
+  if (launcher === undefined) {
+    return { ok: false, error: NOT_FOUND };
+  }
+  const ran = await run(launcher, root, ["--suggest", "--json"], DIAGNOSE_TIMEOUT_MS);
+  if (ran.killed) {
+    return { ok: false, error: cutOff("ccnavi --suggest --json", DIAGNOSE_TIMEOUT_MS) };
+  }
+  if (ran.code !== 0) {
+    if (unknownOption(ran.stderr, "--suggest")) {
+      return { ok: false, error: "実行ファイルが --suggest を知りません（古い版です）。実行ファイルを新しくしてください" };
+    }
+    return { ok: false, error: `ccnavi --suggest --json が失敗しました: ${firstLine(ran.stderr)}` };
+  }
+  const parsed = parseSuggestJson(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
 }
 

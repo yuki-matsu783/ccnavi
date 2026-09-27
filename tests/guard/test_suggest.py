@@ -14,8 +14,11 @@ import unittest
 
 import yaml
 
-from tests import common_path
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
+
+# VS Code 拡張が読む `--suggest --json` の例。形を変えたらここも書き直す。
+FIXTURE = os.path.join(ROOT, "vscode-extension", "ccnavi-board", "test", "fixtures", "suggest.json")
 
 RULES = """\
 version: 1
@@ -157,6 +160,21 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         docs = [d for d in yaml.safe_load_all(result.stdout) if d]
         self.assertEqual("suggest-npm-ci", docs[0]["rules"]["ask"][0]["id"])
+
+    def test_extension_fixture_has_the_same_keys(self):
+        """VS Code 拡張が読む例（test/fixtures/suggest.json）は、いまの出力と同じ鍵を持つ。"""
+        self._write(
+            "log.jsonl",
+            [_handover("Bash", "npm ci") for _ in range(5)] + [_deny("git push") for _ in range(3)],
+        )
+        body = self._json()
+        with open(FIXTURE, encoding="utf-8") as f:
+            example = json.load(f)
+        self.assertEqual(sorted(body), sorted(example))
+        self.assertEqual(example["version"], body["version"])
+        for got, want in zip(body["candidates"], example["candidates"], strict=True):
+            self.assertEqual(sorted(got), sorted(want))
+            self.assertEqual(sorted(got["samples"][0]), sorted(want["samples"][0]))
 
     def test_no_log(self):
         """記録が無ければそう言って 0 で終わる。"""
