@@ -281,7 +281,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | イベント | ここで何をするか | 登録しないと |
 |---|---|---|
 | `SessionStart` | 実行ファイルの控えを取る。チケット制御が効いていれば、直接作業とチケット作業の使い分けをモデルに渡す | 実行ファイルが差し替えられても戻せない。モデルがチケットをいつ起こすかを知らないまま進む |
-| `UserPromptSubmit` | 保護領域の状態とツリーごとの HEAD を控え、ターンの基準にする | ターンの終わりの報告が出ない（コミットに入った変更も見えない） |
+| `UserPromptSubmit` | 保護領域の状態とツリーごとの HEAD を控え、ターンの基準にする。`match: UserPromptSubmit` のルールの文を渡す | ターンの終わりの報告が出ない（コミットに入った変更も見えない）。発言の回の文が届かない |
 | `PreToolUse` | 呼び出しを判定し、設定ファイルを控える | 判定そのものが働かない |
 | `PostToolUse` | 作業ツリーを見て、変わっていれば戻す。チケットの状態を承認済みチケットへ写す | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
 | `Stop` | このターンで変わった保護領域を利用者へ報告する。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す | 変更が人の目に触れない。閉じ忘れたチケットが作業中に残る |
@@ -569,6 +569,25 @@ allow:
 - `every: 1` には `--lint` は何も言わない。`0`・負・整数でない値は error で名指しし、判定は 1 として扱って通す。
   渡すものが 1 つも無い `every` は warn
 
+### 発言の回に渡す
+
+`match: UserPromptSubmit` の `allow` のルールは、利用者が発言したときに当たる（ADR-0090）。当てる先は発言の本文。
+`every: N` と組むと「発言 N 回に 1 度」になる。
+
+```yaml
+allow:
+  - id: skill-review-every-10
+    match: UserPromptSubmit
+    glob: "*"
+    every: 10
+    additionalContextFile: docs/claude/skill-review.md
+```
+
+- 発言は止めない。`deny` / `ask` に書いても何も起きず、`--lint` が warn で言う
+- ルールは全部の層の和から引く。cwd がどのプロジェクトでも同じルールが当たる
+- 記録には当たったルールの id だけが残り、発言の本文は残らない
+- `every` の数えと、`SessionStart` で 0 に戻ることは上と同じ。サブエージェントには届かない
+
 ### ファイルの本文を渡す
 
 `additionalContextFile` と `additionalContextOnceFile` は、文の代わりに（または文に続けて）
@@ -666,6 +685,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/log.jsonl | sort | uniq 
 | `Skill` | スキル名 |
 | `Agent` | 起動の見出し（`description`、無ければ `prompt`） |
 | `WebFetch` | URL |
+| `UserPromptSubmit` | 利用者の発言の本文（ツールではない。`allow` に書いて文を渡すためだけのもの。下の「発言の回に渡す」） |
 
 `WebSearch` のように対象を取り出せないツールは判定に届かないまま通るので、
 `allow` に書いても死んだ行になる（`--lint` が咎める）。`match` は

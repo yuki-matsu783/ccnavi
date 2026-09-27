@@ -103,6 +103,7 @@
 | [0067](0067-common-layer-flags-are-diagnosis-only.md) | 層の置き場を動かすフラグを診断の経路に限る |
 | [0056](0056-state-written-without-showing-the-middle.md) | 控えは途中を見せない書き方で置き、取りこぼしはロックで塞がない |
 | [0057](0057-nudge-lives-in-config.md) | 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ |
+| [0090](0090-rules-can-speak-at-the-prompt.md) | `match: UserPromptSubmit` のルールで、利用者の発言の回にも文を渡せるようにする |
 
 ### 実行後の監視と自己防衛
 

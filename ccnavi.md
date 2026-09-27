@@ -119,7 +119,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | イベント | すること | 応答 |
 |---|---|---|
 | `SessionStart` | コアファイルの控えを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1） | `additionalContext` |
-| `UserPromptSubmit` | 保護領域にいまある変更を控え、ターンの基準にする（7.4） | 無し |
+| `UserPromptSubmit` | 保護領域にいまある変更を控え、ターンの基準にする（7.4）。まだ伝えていない承認を 1 度だけ伝える（9.4）。`match: UserPromptSubmit` の `allow` のルールが当たれば、その文を渡す（6.6、ADR-0090） | 渡す文があるときだけ `additionalContext` |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルを控える（8 章） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルを控えと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ写し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う | 終了コード 2 と標準エラー、または `additionalContext` |
 | `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6、ADR-0087） | `systemMessage`。促すときは `decision: block` と `reason` も |
@@ -276,7 +276,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 | 欄 | 意味 |
 |---|---|
 | `id` | 識別子。文面と記録で名乗る。無ければルールファイルを名乗る |
-| `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch` |
+| `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `UserPromptSubmit`（利用者の発言。`allow` だけ。6.6） |
 | `glob` | `fnmatch` の記法。文字列全体に当たる |
 | `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
@@ -692,6 +692,19 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 プロジェクト → ワークスペースルートの順に探し、最初に在ったものを読む。絶対パスと `..` で上に
 出るパスは読まない。先頭 4000 文字で切り、切ったことと続きの在りかを末尾に添える。
 無ければ何も足さない（REQ-PRE-12）。同じタイプに複数当たれば全部の文を空行で割って並べる。
+
+#### 発言の回に渡す文
+
+`match` に `UserPromptSubmit` を書いた `allow` のルールは、利用者が発言したとき（`UserPromptSubmit`）に当たる（ADR-0090、REQ-PRE-17）。
+当てる先は発言の本文（payload の `prompt`。空なら `(prompt)`）。ルールは全部の層の和から引くので、cwd がどのプロジェクトでも同じルールが当たる。
+本文のファイルは cwd のツリー → そのプロジェクト → ワークスペースルートの順に探す。文・ファイル・`every`・控えは上と同じで、
+`every: 10` なら「発言 10 回に 1 度」になる。応答は `UserPromptSubmit` の `additionalContext` で、承認の知らせ（9.4）があれば
+その後ろに並べる。
+
+- 発言は止めない。`deny` / `ask` に書いたものは当てず、`--lint` が warn で言う
+- 記録には当たったルールの id（`rules`）だけを残し、発言の本文は残さない
+- サブエージェントには来ないイベントなので、数えはメインの文脈だけ
+- 書いたルールが無ければ、今までどおり何も返さない
 
 ---
 
