@@ -364,7 +364,7 @@ class ConfigUnionHarness(unittest.TestCase):
         # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "logs", "state")
-        self.log = os.path.join(self.ws, "logs", "log.jsonl")
+        self.log = os.path.join(self.ws, "logs", "decisions.jsonl")
 
         self.projects = os.path.join(self.ws, "projects")
         self.lib = os.path.join(self.projects, "lib")

@@ -116,7 +116,7 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # ccnavi ディレクトリの名前は各層の綴りで、共通層はこの既定に固定されている。
 # 診断のために別の場所を指すのは `--rules` / `--phases` / `--risk` のフラグだけで、
 # hook は引数を渡さずに起動するから、判定の入口はここから動かない（ADR-0052）。
-DEFAULT_LOG = os.path.join("logs", "log.jsonl")
+DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。

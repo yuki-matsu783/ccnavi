@@ -212,7 +212,7 @@ class StopRulesTest(unittest.TestCase):
                 stop_rule("three", additionalContext="三", every=3),
             )
         )
-        log = os.path.join(self.root, "log.jsonl")
+        log = os.path.join(self.root, "decisions.jsonl")
         for _ in range(2):
             self.stop(log=log)
         with open(log, encoding="utf-8") as f:
