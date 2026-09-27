@@ -296,9 +296,9 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
 | `CCNAVI_LOG` | 記録先。既定は `logs/log.jsonl`。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
-| `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない（「記録の後始末」） |
-| `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない |
-| `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの控えを残す日数。既定は `14`。`0` で消さない |
+| `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない。`1` より小さい値は既定で動く（「記録の後始末」） |
+| `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
+| `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの控えを残す日数。既定は `14`。`0` で消さない。`1` より小さい値は既定で動く |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_DENY_REPEAT` | 同じ理由で同じ呼び出しを何回止めたら、拒否の文面に「言い換えずに利用者に相談する」一文を足し、ターンの終わりに人へ報告するか。既定は `3`。2 未満と読めない値は既定に戻る。判定は変わらない（「同じ呼び出しを繰り返し止めたとき」） |
@@ -1658,8 +1658,9 @@ jq -r 'select(.decision == "deny") | .source' logs/log.jsonl | sort | uniq -c
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
 種類を根拠に置くフェーズのマーカーには、その種類の層が入る。
 
-`subject`・`unwrapped`・`detail` は、書く直前に秘密の形（`Authorization:` の値、`token=` / `password=` などの値、
-`ghp_…` / `glpat-…` / `AKIA…` などのトークン、URL の `user:<値>@`、mysql の `-p<値>` など）を伏せる。
+`subject`・`unwrapped`・`detail` は、書く直前に秘密の形（`Authorization:` / `Cookie:` の値、`token=` / `password=` /
+`SECRET_KEY=` / `MYSQL_PWD=` などの値、`ghp_…` / `glpat-…` / `AKIA…` / `sk-…` / `AIza…` / `npm_…` / JWT などのトークン、
+URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、redis-cli の `-a` など）を伏せる。
 18 字未満の値は `***`、それより長い値は頭 6 字と尻 4 字を残す（`ghp_Ab***Q7r8`）。判定は伏せる前の文字列で下す（ADR-0089）。
 
 ### 記録の後始末
@@ -1670,9 +1671,11 @@ jq -r 'select(.decision == "deny") | .source' logs/log.jsonl | sort | uniq -c
 - ローテートした記録のうち、最後に書かれてから `CCNAVI_LOG_KEEP_DAYS`（既定 14 日）を過ぎたものを消す
 - `logs/state/` の、セッションを名前に持つ控えを、そのセッションのどれもが `CCNAVI_STATE_KEEP_DAYS`（既定 14 日）
   書かれていなければまとめて消す。いま始まったセッションと、レビューの下書き・退避したファイルなどセッションを
-  名前に持たないものは消さない
+  名前に持たないもの、知らない名前のファイル、リンクになった置き場は消さない
 
 動かした数はセッション開始の行の `detail` に `pruned rotated=1 logs=2 state=5` の形で残る。手で走らせるなら端末から打つ。
+エージェントが Bash から `--preview` の無い形を打つと、チケット制御に依らず `DENY_RECORDS_PRUNE` で止まる。
+記録と控えの置き場は、シェルからの書き込みと同じく `Write` / `Edit` からも止まる（`builtin-guard-records`）。
 
 ```sh
 ccnavi --prune --preview   # 動かすものを並べるだけ

@@ -249,7 +249,10 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 記録だけで、判定は伏せる前の文字列で下す。記録が 10 MB を超えたら `log.<日時>.jsonl` へローテートし、ローテートした
 記録と終わったセッションの控え（`logs/state/`）は 14 日で消す。走るのはセッション開始と `ccnavi --prune` だけで、
 実行前の判定では走らない。控えはセッションごとにまとめて、どれかが保持日数のうちに書かれていれば全部残す
-（`ccnavi/prune.py`、ADR-0089）。「記録が無ければ動かなかった」は、ローテートした分と合わせて読む。
+（`ccnavi/prune.py`、ADR-0089）。`<セッション>.json` と読むのは UUID の形の名前だけで、知らない名前のファイルと、
+リンクになった置き場（`logs/state` そのものと `selfguard/`）には触らない。しきい値は 0 のほか 1 MB・1 日より
+小さい値と有限でない値を受けず、既定で動く。ローテート先は `O_EXCL` で先に押さえてから名前を変える。
+伏せる前にも 4000 字（上限の 4 倍）で切り、伏せる手間が実行前の判定の期限に届かないようにする。「記録が無ければ動かなかった」は、ローテートした分と合わせて読む。
 
 | 欄 | 数えるもの |
 |---|---|
@@ -806,7 +809,7 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 
 ### 8.2 止める側
 
-`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 4 本を挿す。
+`CCNAVI_GUARD_CORE_FILES` が有効な間、`deny` の先頭に最大 5 本を挿す。
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
@@ -814,6 +817,13 @@ hook スクリプトと保護済みスクリプトはここに無く、ルール
 | `builtin-guard-binary` | `CCNAVI_BIN_PATH` が設定されているとき | `Write` `Edit` `NotebookEdit` |
 | `builtin-guard-project-home` | ccnavi ディレクトリの綴り（`CCNAVI_PROJECT_HOME`）が決まっているとき | 同上 |
 | `builtin-guard-common-layer` | 共通層の 3 本の置き場が決まっているとき（11.6） | 同上 |
+| `builtin-guard-records` | 常に | `Write` `Edit` `NotebookEdit` で、記録と控えの置き場（`logs/log*.jsonl`、`logs/state/`、動かしてあれば `CCNAVI_LOG` とその隣のローテートした分、`CCNAVI_STATE` の下）。シェルの側の `builtin-guard-setting-files` と同じ場所 |
+
+同じ設定が有効な間、`ccnavi --prune`（`--preview` の無い形）をシェルから打つ形も、チケット制御に依らず
+`DENY_RECORDS_PRUNE`（`builtin-guard-records-prune`）で止める（`phase.prune_form`、ADR-0089）。実行ファイルの端末要求は
+擬似端末（`script -qc`）でも抜けられ、チケット制御を切ったワークスペースでは端末要求を切る変数も止まらないため。
+見るのは引用符を落としたコマンド行で、コマンドの切れ目の中に ccnavi の名前と単独の語の `--prune` が並べば止める。
+免除は `--preview` が `--prune` の隣に引用をまたがずに並んだ形だけ。
 
 `logs/` の下の git のラッパースクリプトの記録は守らない。
 
@@ -2440,6 +2450,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `DENY_TICKET_PROJECT_MISMATCH` | 行き先のプロジェクトと承認済みチケットの `project:` が違う |
 | `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.yml`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1、ADR-0085） |
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに控えた指紋から変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1、ADR-0085） |
+| `DENY_RECORDS_PRUNE` | 記録と控えを消す `ccnavi --prune`（`--preview` なし）をシェルから打った。チケット制御に依らない（ADR-0089） |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6、ADR-0087）。記録の `decision` は `nudge` |
