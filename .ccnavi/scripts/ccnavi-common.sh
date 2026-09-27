@@ -210,7 +210,7 @@ ccnavi_project() {
 	else
 		ccnavi_pj_ws=$(ccnavi_workspace) || return 0
 	fi
-	ccnavi_pj_places="${CCNAVI_PROJECTS:-projects}"
+	ccnavi_pj_places=projects # 固定（ADR-0092）
 
 	# ワークスペースの下に無ければ、名乗るプロジェクトは無い。
 	case "$ccnavi_pj_dir" in

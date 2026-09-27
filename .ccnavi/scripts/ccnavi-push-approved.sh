@@ -8,9 +8,9 @@
 # 届かない（設計 9.2）ので、置いたあとに運ぶのがこの sh。端末の承認は ccnavi-approve.sh が、
 # ボードの承認は端末に送った 1 行が呼ぶ。対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
-# 数えるツリーは、ワークスペース、$CCNAVI_PROJECTS（既定 projects）の下、.claude/worktrees の下。
-# 置き場は $CCNAVI_TICKETS_APPROVED（既定 .ccnavi/approved）。承認は提案を
-# $CCNAVI_TICKETS_PROPOSAL（既定 wip/proposals）の todo/ から動かすので（ADR-0055）、
+# 数えるツリーは、ワークスペース、projects/ の下、.claude/worktrees/ の下。
+# 置き場は .ccnavi/approved/（置き場はどれも固定、ADR-0092）。承認は提案を
+# wip/proposals/todo/ から動かすので（ADR-0055）、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）は運ばない。
 #
 # - コミットはパスを限る。`-a` も `add -A` も使わない。他人の書きかけを運ばない
@@ -55,25 +55,9 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved="${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}"
-proposals="${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}"
-projects="${CCNAVI_PROJECTS:-projects}"
-# 末尾の / を落とす。`[ -L "projects/" ]` はリンクを辿って偽になる。
-approved="${approved%/}"
-proposals="${proposals%/}"
-projects="${projects%/}"
-# 落として空になる綴り（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
-# ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
-# どちらも頼まれた置き場ではないので、既定に戻す。
-case "$approved" in
-"" | .) approved=".ccnavi/approved" ;;
-esac
-case "$proposals" in
-"" | .) proposals="wip/proposals" ;;
-esac
-case "$projects" in
-"" | .) projects="projects" ;;
-esac
+approved=.ccnavi/approved # 固定（ADR-0092）
+proposals=wip/proposals   # 固定（ADR-0092）
+projects=projects         # 固定（ADR-0092）
 # ボードのフロー編集画面が保存の途中で置く一時ファイル（flows/ の下の `.<名前>.<番号>.tmp`）。
 # 落ちて残っても運ばない。書きかけの中身を人の手順書としてコミットしないため。
 skip_temp=":(exclude)$approved/flows/.*.tmp"

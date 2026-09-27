@@ -529,23 +529,14 @@ push)
 			# ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・
 			# .claude/worktrees/ の下。approval.trees）を全部見る。識別子は重ならないので、
 			# どこで見つかってもこのツリーの子のもの。
-			push_projects="${CCNAVI_PROJECTS:-projects}"
-			case "$push_projects" in
-			/* | [A-Za-z]:*) ;;
-			*) push_projects="$push_root/$push_projects" ;;
-			esac
+			# 置き場は固定（ADR-0092）。綴りは ccnavi の既定（settings.py の DEFAULT_PROJECTS・
+			# DEFAULT_TICKETS・DEFAULT_APPROVED）と揃える。ずれると、この検査が黙って飛ぶ。
+			# hook の同じ検査（wrapguard.py の子の push）と同じ場所を見る（ADR-0077 の 2 重目）。
+			push_projects="$push_root/projects"
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				case "${CCNAVI_TICKETS_APPROVED:-}" in
-				/* | [A-Za-z]:*) push_copies="$CCNAVI_TICKETS_APPROVED" ;;
-				# 既定は ccnavi の既定（settings.py の DEFAULT_APPROVED）と揃える。ずれると、
-				# env を書いていないワークスペースで、この検査が黙って飛ぶ。
-				*) push_copies="$push_tree/${CCNAVI_TICKETS_APPROVED:-.ccnavi/approved}" ;;
-				esac
-				case "${CCNAVI_TICKETS_PROPOSAL:-}" in
-				/* | [A-Za-z]:*) push_proposals="$CCNAVI_TICKETS_PROPOSAL" ;;
-				*) push_proposals="$push_tree/${CCNAVI_TICKETS_PROPOSAL:-wip/proposals}" ;;
-				esac
+				push_copies="$push_tree/.ccnavi/approved"
+				push_proposals="$push_tree/wip/proposals"
 				# レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る。子を閉じたあと、親が
 				# 取り込んで片付けるまでの間もそのツリーは子のもので、送ってよくなるわけではない。
 				for push_copy in "$push_copies/doing/$push_name.md" "$push_copies/done/$push_name.md" \
