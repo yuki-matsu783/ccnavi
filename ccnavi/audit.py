@@ -13,6 +13,8 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from . import redact
+
 # 呼び出しに何が起きたか。
 ALLOW = "allow"
 ASK = "ask"
@@ -159,8 +161,12 @@ class Log:
             os.close(fd)
 
     def _as_dict(self, record: Record) -> dict:
-        subject = _limited(record.subject)
-        unwrapped = _limited(record.unwrapped)
+        # コマンドの全文が入る欄は、秘密の形を伏せてから書く（redact）。伏せるのは記録だけで、
+        # record そのものは書き換えない。判定は伏せる前の文字列で済んでいる。切る前に伏せるのは、
+        # 上限で値の途中が切れると、形が崩れて伏せられなくなるため。
+        subject = _limited(redact.redact(record.subject))
+        unwrapped = _limited(redact.redact(record.unwrapped))
+        detail = redact.redact(record.detail)
 
         elapsed_ms = (time.perf_counter() - self._start) * 1000
         out: dict = {
@@ -186,7 +192,7 @@ class Log:
             ("degraded", record.degraded),
             ("unwrapped", unwrapped),
             ("fallback", record.fallback),
-            ("detail", record.detail),
+            ("detail", detail),
             ("tree", record.tree),
             ("project", record.project),
             ("source", record.source),
