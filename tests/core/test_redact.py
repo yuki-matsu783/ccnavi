@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 import unittest
 
 from ccnavi import audit, redact
@@ -135,6 +136,46 @@ class RedactTest(unittest.TestCase):
         for secret in ("aaa111", "bbb222", AKIA):
             self.assertNotIn(secret, out)
         self.assertIn(" run ", out)
+
+
+class SpeedTest(unittest.TestCase):
+    """長い入力でも伏せる手間が長さにほぼ比例すること。
+
+    記録は実行前の判定の期限の中で書く。名前の形（`_ASSIGN`）の頭が長さを限らずに
+    食うと、`-` や `_` が続くだけの 1.5 万字で 10 秒を超え、期限を過ぎた hook の拒否が
+    捨てられる（素通り）。
+    """
+
+    LIMIT_SECONDS = 0.5
+
+    def test_long_runs_of_name_characters(self):
+        for ch in ("-", "_", ".", "a", "A", "a-", "x_"):
+            text = ch * (100_000 // len(ch))
+            with self.subTest(ch=ch):
+                start = time.perf_counter()
+                redact.redact(text)
+                self.assertLess(time.perf_counter() - start, self.LIMIT_SECONDS)
+
+    def test_long_runs_of_other_shapes(self):
+        for piece in ("://a:", "token=", "-p", "\x00", "eyJ", "sk-", "Cookie: ", "@", " -a"):
+            text = piece * (100_000 // len(piece))
+            for command in ("", "mysql ", "curl -u a:", "redis-cli ", "sshpass ", "docker login "):
+                with self.subTest(piece=piece, command=command):
+                    start = time.perf_counter()
+                    redact.redact(command + text)
+                    self.assertLess(time.perf_counter() - start, self.LIMIT_SECONDS)
+
+    def test_record_cuts_before_redacting(self):
+        # 記録は上限の数倍で切ってから伏せる。100 万字でも期限の中で書ける。
+        directory = tempfile.mkdtemp(prefix="ccnavi-redact-")
+        log = os.path.join(directory, "log.jsonl")
+        subject = "-" * 1_000_000
+        start = time.perf_counter()
+        audit.Log(log).write(audit.Record(decision=audit.ALLOW, subject=subject))
+        self.assertLess(time.perf_counter() - start, self.LIMIT_SECONDS)
+        with open(log, encoding="utf-8") as f:
+            line = json.loads(f.read())
+        self.assertTrue(line["subject"].endswith(f"…(+{len(subject) - audit.SUBJECT_LIMIT})"))
 
 
 class RecordTest(unittest.TestCase):
