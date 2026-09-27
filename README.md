@@ -67,6 +67,7 @@ jq -r 'select(.event=="PreToolUse" and .decision=="allow")|[((.rules//[])|join("
 ```
 
 `subject` は 1 行に均してから数える（複数行のコマンドを `uniq -c` が行数ぶんに割らないように）。
+ローテートした分（`logs/log.<日時>.jsonl`）も合わせて数えるなら、`logs/log.jsonl` の代わりに `logs/log*.jsonl` を渡す。
 
 `decision` が `skip` の行は判定が届かなかった回で、`reason` に理由が入る。
 `paths` が付いた行は実行後の監視が拾った変更で、引数に現れない書き込みがそこにある。
@@ -294,6 +295,9 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `CCNAVI_MODE` | `enable`（既定）、`dry-run`、`disable` |
 | `CCNAVI_LOG` | 記録先。既定は `logs/log.jsonl`。空文字にすると記録しない |
 | `CCNAVI_STATE` | 実行後の監視の控えの置き場。既定は `logs/state`。空文字にすると控えを持たない |
+| `CCNAVI_LOG_ROTATE_MB` | 記録をローテートする大きさ（MB）。既定は `10`。`0` でローテートしない（「記録の後始末」） |
+| `CCNAVI_LOG_KEEP_DAYS` | ローテートした記録を残す日数。既定は `14`。`0` で消さない |
+| `CCNAVI_STATE_KEEP_DAYS` | 終わったセッションの控えを残す日数。既定は `14`。`0` で消さない |
 | `CCNAVI_RESTORE_IF_DENY` | `enable`（既定）、`dry-run`、`disable`。`deny` と宣言した場所が副作用で変わったとき、git から戻すか。`dry-run` は戻さずに「戻すはずだった」と言う |
 | `CCNAVI_GUARD_CORE_FILES` | `enable`（既定）、`dry-run`、`disable`。ccnavi が動くために要るファイルを守るか。書き込みを止める側と、控えて戻す側の両方が切り替わる |
 | `CCNAVI_GUARD_UNWATCHED` | `enable`（既定）、`disable`。人にも classifier にも確認できないモード（`dontAsk` / `bypassPermissions`）で、ルールがどこも言及しない呼び出しを止めるか。`disable` なら判定を返さず、そのモードの取り決めに委ねる（読み切れなかった呼び出しは委ねない。「ルールが言及していない呼び出し」）。`dry-run` は無く、それ以外の値は `enable` として動いて `--lint` が言う |
@@ -1636,6 +1640,27 @@ jq -r 'select(.decision == "deny") | .source' logs/log.jsonl | sort | uniq -c
 
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
 種類を根拠に置くフェーズのマーカーには、その種類の層が入る。
+
+`subject`・`unwrapped`・`detail` は、書く直前に秘密の形（`Authorization:` の値、`token=` / `password=` などの値、
+`ghp_…` / `glpat-…` / `AKIA…` などのトークン、URL の `user:<値>@`、mysql の `-p<値>` など）を伏せる。
+18 字未満の値は `***`、それより長い値は頭 6 字と尻 4 字を残す（`ghp_Ab***Q7r8`）。判定は伏せる前の文字列で下す（ADR-0089）。
+
+### 記録の後始末
+
+セッションが始まるたびに、記録と控えを片付ける。実行前の判定では走らない。
+
+- `log.jsonl` が `CCNAVI_LOG_ROTATE_MB`（既定 10 MB）を超えていたら、`logs/log.<日時>.jsonl` へ名前を変える。中身は捨てない
+- ローテートした記録のうち、最後に書かれてから `CCNAVI_LOG_KEEP_DAYS`（既定 14 日）を過ぎたものを消す
+- `logs/state/` の、セッションを名前に持つ控えを、そのセッションのどれもが `CCNAVI_STATE_KEEP_DAYS`（既定 14 日）
+  書かれていなければまとめて消す。いま始まったセッションと、レビューの下書き・退避したファイルなどセッションを
+  名前に持たないものは消さない
+
+動かした数はセッション開始の行の `detail` に `pruned rotated=1 logs=2 state=5` の形で残る。手で走らせるなら端末から打つ。
+
+```sh
+ccnavi --prune --preview   # 動かすものを並べるだけ
+ccnavi --prune             # 動かして、動かしたものを出す（端末から）
+```
 
 ## ルールが何に当たるかを確かめる
 

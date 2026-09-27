@@ -73,6 +73,7 @@
 | [0041](0041-launcher-per-machine.md) | 実行ファイルは機械ごとの置き場に並べ、hook は振り分けの sh を起動する（置き換え（ADR-0044）） |
 | [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
 | [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
+| [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの控えをセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
 
 ### ルールと判定
 
