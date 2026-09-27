@@ -446,6 +446,39 @@ def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
     return _folded("^(?:" + "|".join(alternatives) + ")$")
 
 
+# 記録と控えの置き場の既定の綴り（`_PLACES` の `logs/` の節と同じ場所）を、名指しのツールに
+# 当てる形。当てる先は解決済みの絶対パスなので、末尾で閉じる。
+_RECORDS_PLACES = r"[\\/]logs[\\/](?:log(?:\.[^\\/]*)?\.jsonl$|state(?:[\\/]|$))"
+
+
+def records_regex(log_path: str = "", state_dir: str = "") -> str:
+    """記録と控えの置き場を、名指しのツールに当てる形（設計 11.6、ADR-0089）。
+
+    シェルの書き込みの側（`_PLACES`）と同じ `logs/log*.jsonl` と `logs/state/` の綴りに加えて、
+    設定で動かした置き場（`--log` / `--state`、`CCNAVI_LOG` / `CCNAVI_STATE`）にも当てる。
+    記録はいま書いている 1 本と、同じディレクトリのローテートした分（`<名前>.<日時><拡張子>`）。
+    書かれた綴りと行き着く先の両方で当てる。
+    """
+    alternatives = [_RECORDS_PLACES]
+    if log_path:
+        directory, base = os.path.split(log_path)
+        stem, ext = os.path.splitext(base)
+        for where in sorted({os.path.abspath(directory), os.path.realpath(directory)}):
+            alternatives.append(
+                "^"
+                + _spelled(where)
+                + r"[\\/]"
+                + re.escape(stem)
+                + r"(?:\.[^\\/]*)?"
+                + re.escape(ext)
+                + "$"
+            )
+    if state_dir:
+        for where in sorted({os.path.abspath(state_dir), os.path.realpath(state_dir)}):
+            alternatives.append("^" + _spelled(where) + r"(?:[\\/]|$)")
+    return _folded("(?:" + "|".join(alternatives) + ")")
+
+
 def _spelled(path: str) -> str:
     """パスを、区切りをどちらの綴りでも当てる形にする。"""
     return r"[\\/]".join(re.escape(part) for part in re.split(r"[\\/]", path))
@@ -480,6 +513,14 @@ COMMON_LAYER_MESSAGE = (
     "効くので、エージェントが書き換えると自分の判定を緩められます。変更が要るなら、下書きを"
     "検証したうえで何をなぜ変えたいのかを伝えて利用者に依頼してください（/ccnavi-config）。"
     "読むだけなら止まりません。"
+)
+
+RECORDS_RULE_ID = "builtin-guard-records"
+
+RECORDS_MESSAGE = (
+    "ccnavi の記録と控えの置き場（logs/log*.jsonl と logs/state/）です。判定が読み、"
+    "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントは書き換えません。"
+    "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
 )
 
 PROJECT_HOME_RULE_ID = "builtin-guard-project-home"
@@ -566,6 +607,7 @@ def add_rules(
     project_home: str = "",
     root: str = "",
     common_files: tuple[str, ...] = (),
+    records: tuple[str, str] = ("", ""),
 ) -> None:
     """ガード自身を守るルールを、判定に足す。
 
@@ -625,6 +667,15 @@ def add_rules(
                 "message": PROJECT_HOME_MESSAGE,
             },
         )
+    _insert(
+        rule_set,
+        {
+            "id": RECORDS_RULE_ID,
+            "match": "Write|Edit|NotebookEdit",
+            "regex": records_regex(*records),
+            "message": RECORDS_MESSAGE,
+        },
+    )
     common = common_layer_regex(root, common_files)
     if common:
         # 先頭に挿すので、後に足したこちらが ccnavi ディレクトリの 1 本より先に当たる。
