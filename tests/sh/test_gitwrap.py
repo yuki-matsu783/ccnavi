@@ -5,6 +5,9 @@
 
 使い捨ての git リポジトリを毎回作る。このリポジトリ自身で走らせると、
 テストが「コードのこと」ではなく「走った機械の作業ツリーのこと」を報告する。
+
+`CCNAVI_SH_DIR` で、写す sh の出どころを差し替えられる。既定はこのツリーの
+`.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
 from __future__ import annotations
@@ -18,7 +21,8 @@ import unittest
 
 from tests import ROOT
 
-SCRIPT = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-git.sh")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SCRIPT = os.path.join(SH_DIR, "ccnavi-git.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 
 
@@ -671,6 +675,42 @@ class ResetGuidanceTest(GitWrapperTest):
         self.assertEqual(before, git_out(self.dir, "rev-parse", "HEAD"))
         with open(os.path.join(self.dir, "tracked.txt"), encoding="utf-8") as f:
             self.assertEqual("書きかけ\n", f.read())
+
+
+class PlacesAreNotReadTest(GitWrapperTest):
+    """置き場を動かす環境変数は読まない（ADR-0092、A9）。
+
+    `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
+    写す前の sh（`ccnavi-common.sh` の `ccnavi_project`）は `CCNAVI_PROJECTS` を読むため。
+    """
+
+    def test_the_projects_variable_does_not_move_where_the_wrapper_logs(self):
+        """`CCNAVI_PROJECTS=/x` を入れても、`projects/foo` の中の記録は `logs/foo/` に分かれる。
+
+        `ccnavi_project` は置き場の下のディレクトリの名前（プロジェクト名）を返し、記録の
+        置き場がそこで決まる。以前は絶対パスを与えると相対の `projects/...` と照らせず、
+        プロジェクトが「無い」ことになって `logs/` の直下に書かれた。
+        """
+        project = os.path.join(self.dir, "projects", "foo")
+        os.makedirs(project)
+        git(project, "init", "-q")
+        environment = dict(os.environ)
+        environment["CCNAVI_PROJECTS"] = "/x"
+
+        result = subprocess.run(
+            [SHELL, SCRIPT, "status"],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=environment,
+        )
+
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        made = os.path.join(self.dir, "logs", "foo")
+        self.assertTrue(os.path.isdir(made), f"logs/foo/ が無い: {result.stdout}")
+        self.assertEqual(1, len(os.listdir(made)))
 
 
 if __name__ == "__main__":

@@ -268,7 +268,7 @@ function watchProjects(current: PanelState, projectsRel: string, selfRulesRel: s
   // clone の完了（`.git` の出現）、ワークスペースとプロジェクトの設定のルールファイルの出入り、origin の変化、ワークツリーの登録、`.gitignore`。
   // 設定の綴り（ccnavi ディレクトリの下の `config/`）はワークスペースの設定のパスから取る。プロジェクトの設定も同じ形（設計 11.2）。
   // ワークスペースの設定のパスが取れない（壊れた JSON）なら、設定のルールファイルの監視は張らない。
-  const rel = projectsRel === "" ? "projects" : projectsRel;
+  const rel = projectsRel;
   const layerDir = selfRulesRel === "" ? "" : path.posix.dirname(selfRulesRel);
   const patterns = [
     `${rel}/*/.git`,
@@ -489,10 +489,6 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
 
 function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName: string): void {
   const root = current.folder.uri.fsPath;
-  if (page.projectsDir === "") {
-    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、clone 先を決められません");
-    return;
-  }
   const remote = checkRemote(rawUrl);
   if (!remote.ok) {
     fail(current, remote.error);
@@ -522,10 +518,6 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
 }
 
 function fixIgnore(current: PanelState, page: ProjectsPage): void {
-  if (page.projectsRel === "") {
-    fail(current, "プロジェクトのフォルダが無効（CCNAVI_PROJECTS が空）なので、足す行がありません");
-    return;
-  }
   const file = path.join(current.folder.uri.fsPath, ".gitignore");
   const before = readText(file);
   try {

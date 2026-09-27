@@ -1,0 +1,4 @@
+{"at": "2026-09-27T06:51:43Z", "ticket": "i0064-04", "kind": "approved", "from": "todo", "to": "doing", "via": "board", "tree": "i0064"}
+{"at": "2026-09-27T10:39:33Z", "ticket": "i0064-04", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "20f621293b2a5e4cd638dd1286c02700cff0305a"}
+{"at": "2026-09-27T12:16:09Z", "ticket": "i0064-04", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
+{"at": "2026-09-27T13:05:27Z", "ticket": "i0064-04", "kind": "settled", "from": "review", "to": "done", "via": "board", "phase": 4}

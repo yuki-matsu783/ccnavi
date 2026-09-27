@@ -318,9 +318,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     const carried = count > 0 && carrier;
     // 承認できたら読み直す。**監視（`core/watch.ts`）だけに頼らない。** 承認は承認済みチケットを
     // `.ccnavi/approved/doing/` に書いてから提案を消すので、ふつうはその置き場の監視が拾って
-    // 読み直る。拾えないのは、その置き場が監視の綴りと違うとき（`CCNAVI_TICKETS_APPROVED` が
-    // 既定と違う。監視の綴りは `core/watch.ts` に固定してあり、この env を読まない）、
-    // `files.watcherExclude` でそこを外したとき、監視の効かないファイルシステムのとき。
+    // 読み直る。拾えないのは、`files.watcherExclude` でそこを外したとき、監視の効かない
+    // ファイルシステムのとき（置き場は既定に固定で、監視の綴り `core/watch.ts` とずれない。ADR-0084）。
     // 読み直しの途中でもう 1 回頼まれた分は呼ぶ側が 1 回に畳む（`board-panel.ts` の `again`）ので、
     // 監視と重なっても画面はちらつかない。**1 件も置かれていないなら読み直さない**（何も動いていない）。
     //

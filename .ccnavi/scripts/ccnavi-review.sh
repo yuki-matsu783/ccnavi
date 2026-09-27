@@ -88,7 +88,7 @@ root=$(ccnavi_workspace) ||
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
-state="$root/${CCNAVI_STATE:-logs/state}"
+state="$root/logs/state" # 固定（ADR-0092）
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 
