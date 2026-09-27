@@ -38,6 +38,9 @@ from . import (
 )
 from .modes import EXIT_BLOCK, EXIT_OK
 
+# `match: Stop` のルールで止めた回の理由コード（ADR-0090）。記録の `code` と、止めた文の頭に出る。
+CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
+
 
 def decide(
     stdout: TextIO,
@@ -181,44 +184,9 @@ def decide_at_prompt(
         functools.partial(configsync.is_synced_write, conf, root),
     )
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
-    told = "\n\n".join(p for p in (told, prompt_context(stderr, conf, root, payload, record)) if p)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
-
-
-def prompt_context(
-    stderr: TextIO,
-    conf: settings.Settings,
-    root: str,
-    payload: hookio.Input,
-    record: audit.Record,
-) -> str:
-    """`match: UserPromptSubmit` の `allow` のルールが、この発言で渡す文（ADR-0090）。
-
-    書いたルールが無ければ空で、これまでどおり何も返さない。渡すかどうか・何を渡すかは
-    設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
-    「10 回の発言に 1 度」になる。
-
-    ルールはパスを持たないツールと同じく全部の層の和から引く。どのプロジェクトで話して
-    いても同じルールが当たり、cwd には依らない。見るのは `allow` だけ。発言を止める
-    経路は持たない（止めたいものは無く、止めると利用者の言葉が消える）。`deny` / `ask` に
-    書いたものは `--lint` が言う。
-
-    当てる先は発言の本文。空（画像だけなど）なら `(prompt)` に当てる。本文は記録に残さず、
-    当たったルールの id だけを残す。
-    """
-    probe = dataclasses.replace(payload, tool_name=rules.PROMPT_MATCH)
-    # 苦情と読めなかった層の記録は、同じ起動の watch_context が全部のツリーについて
-    # 書いたあと。ここでもう一度書くと同じ話が 2 度並ぶので、使い捨ての控えに受ける。
-    rule_set, _, _ = ruleload.rules_for(io.StringIO(), conf, root, probe, audit.Record())
-    subject = payload.prompt or "(prompt)"
-    group = [r for r in rule_set.allow if r.matches(rules.PROMPT_MATCH, subject)]
-    if not group:
-        return ""
-    record.rules = [*record.rules, *(r.id or f"({rules.ALLOW})" for r in group)]
-    target = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
-    return ctxfile.for_rules(stderr, conf.state, payload, group, ctxfile.bases(conf, root, target))
 
 
 def decide_at_stop(
@@ -248,6 +216,9 @@ def decide_at_stop(
     `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
     （ADR-0087、`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
     止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
+
+    `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
+    （ADR-0090、`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     report = post.at_stop(
@@ -267,6 +238,10 @@ def decide_at_stop(
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
     nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
+    if not nudge:
+        # finish の促しで止める回は、ルールの促しを数えもしない（ADR-0090）。1 回の Stop で
+        # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
+        nudge = stop_rules_nudge(stderr, conf, root, payload, record, mode)
     if nudge and mode == modes.ENABLE:
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
@@ -277,6 +252,57 @@ def decide_at_stop(
     if report:
         hookio.write_system_message(stdout, report)
     return EXIT_OK
+
+
+def stop_rules_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    mode: str,
+) -> str:
+    """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文（ADR-0090）。
+
+    書いたルールが無ければ空で、これまでどおり止めない。何を言うか・何回に 1 度かは
+    設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
+    「ターンの終わり 10 回に 1 度」止める。
+
+    ルールはパスを持たないツールと同じく全部の層の和から引く。cwd には依らない。見るのは
+    `allow` だけ（`deny` / `ask` に書いたものは `--lint` が言う）。当てる先は固定の `(stop)` で、
+    `glob: "*"` と書く。
+
+    止めない回:
+
+    - `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降）。数えもしない
+    - サブエージェント（`agent_id` がある）。候補は報告に添えてメインに返す決まり
+    - 数えを覚えられない（`--state ""`、控えを読めない・書けない）。覚えられないまま止めると
+      ターンの終わりのたびに止まるので、黙る側を採る（ADR-0087 と同じ）
+    """
+    if payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    probe = dataclasses.replace(payload, tool_name=rules.STOP_MATCH)
+    # 苦情と読めなかった層の記録は、同じ起動の watch_context が全部のツリーについて
+    # 書いたあと。ここでもう一度書くと同じ話が 2 度並ぶので、使い捨てに受ける。
+    rule_set, _, _ = ruleload.rules_for(io.StringIO(), conf, root, probe, audit.Record())
+    group = [r for r in rule_set.allow if r.matches(rules.STOP_MATCH, rules.STOP_SUBJECT)]
+    if not group:
+        return ""
+    target = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
+    text = ctxfile.for_rules(
+        stderr,
+        conf.state,
+        payload,
+        group,
+        ctxfile.bases(conf, root, target),
+        unsure_speaks=False,
+    )
+    if not text:
+        return ""
+    record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
+    record.enforced = mode == modes.ENABLE
+    record.rules = [*record.rules, *(r.id or f"({rules.ALLOW})" for r in group)]
+    return f"{CODE_RULE_NUDGE}: {text}"
 
 
 def _finish_nudge(

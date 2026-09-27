@@ -245,6 +245,28 @@ class StopNudgeTest(TicketTest):
         git(self.parent_tree, "branch", "-m", "i0001", "renamed")
         self.assert_quiet(self.stop(tree))
 
+    # ---- `match: Stop` のルール（ADR-0090）と重なったとき
+
+    def test_the_finish_nudge_goes_first_and_the_stop_rule_is_not_counted(self):
+        """同じ Stop で両方が止めたいとき、`finish` の促しだけを出し、ルールの数えは進めない。"""
+        with open(self.rules, encoding="utf-8") as f:
+            body = json.load(f)
+        rule = {"id": "review", "match": "Stop", "glob": "*", "every": 2}
+        body["allow"] = [*body.get("allow", []), {**rule, "additionalContext": "振り返る"}]
+        write(self.rules, json.dumps(body))
+        self.family()
+        tree = self.child_tree()
+        self.commit_work(tree)
+        first = self.body(self.stop(tree))
+        self.assertIn(CODE, first.get("reason", ""))
+        self.assertNotIn("NUDGE_STOP_RULE", first.get("reason", ""))
+        # finish の促しは同じ HEAD では 1 回だけ。ここからルールを数える（1 回目は止めない）。
+        self.assert_quiet(self.stop(tree))
+        third = self.body(self.stop(tree))
+        self.assertEqual(third.get("decision"), "block")
+        self.assertIn("NUDGE_STOP_RULE: 振り返る", third["reason"])
+        self.assertNotIn(CODE, third["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

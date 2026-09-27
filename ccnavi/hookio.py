@@ -66,9 +66,6 @@ class Input:
     # stop_hook_active は Stop / SubagentStop にだけ来る。真なら、この終わり方は Stop の hook が
     # 続けさせた結果（連鎖の 2 回目以降）。促しを 1 回に留めるために読む。
     stop_hook_active: bool = False
-    # prompt は UserPromptSubmit にだけ来る、利用者の発言の本文。`match: UserPromptSubmit` の
-    # ルールを当てる先にだけ使い、記録には残さない。
-    prompt: str = ""
 
     def field_value(self, name: str) -> str:
         """tool_input から文字列を 1 つ取り出す。"command" や "file_path" など。"""
@@ -107,7 +104,6 @@ def decode(stream: TextIO) -> Input:
         agent_id=str(data.get("agent_id") or ""),
         agent_type=str(data.get("agent_type") or ""),
         stop_hook_active=data.get("stop_hook_active") is True,
-        prompt=data.get("prompt") if isinstance(data.get("prompt"), str) else "",
     )
 
 

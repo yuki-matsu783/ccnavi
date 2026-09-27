@@ -92,6 +92,7 @@ def for_rules(
     payload: hookio.Input,
     group: list[rules.Rule],
     bases: list[str] | None = None,
+    unsure_speaks: bool = True,
 ) -> str:
     """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
 
@@ -115,7 +116,14 @@ def for_rules(
 
     控えを置く場所が無いとき（`--state ""`）は刻まず、once の文も毎回渡す。覚えられない
     なら黙るのではなく言うほうを採る。届かない文は書いていないのと同じになるから。
+
+    `unsure_speaks=False` はその逆で、覚えられない回（控えの置き場が無い・読めない）には
+    刻みを持つルールも once を持つルールも渡さない。渡すことが Stop を止めることになる呼び手
+    （`events.stop_rules_nudge`）のためのもの。そこで言うほうを採ると、ターンの終わりの
+    たびに止まる。
     """
+    if not unsure_speaks and not state_dir:
+        return ""
     parts: list[str] = []
     counted: dict[str, int] | None = None
     consulted = False
@@ -127,6 +135,8 @@ def for_rules(
             if not consulted:
                 counted = _load_once(stderr, state_dir, payload)
                 consulted = True
+            if counted is None and not unsure_speaks:
+                continue
             if counted is None:
                 # 読めなかったときは、覚えていないものとして渡し、書き戻さない。
                 # `--state ""` と同じ「覚えられないなら言う」側だが、上書きだけは
@@ -165,7 +175,10 @@ def for_rules(
             if once:
                 parts.append(once)
     if counted is not None:
-        _save_once(stderr, state_dir, payload, counted)
+        saved = _save_once(stderr, state_dir, payload, counted)
+        if not saved and not unsure_speaks:
+            # 数えを書けなかった。次の回も同じ数えから始まり、同じ回に止め続けうる。
+            return ""
     return "\n\n".join(parts)
 
 
@@ -222,7 +235,8 @@ def _load_once(stderr: TextIO, state_dir: str, payload: hookio.Input) -> dict[st
 
 def _save_once(
     stderr: TextIO, state_dir: str, payload: hookio.Input, given: dict[str, int]
-) -> None:
+) -> bool:
+    """控えを書く。書けたか。"""
     path = _once_path(state_dir, payload.session_id, payload.agent_id)
     # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
     # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
@@ -230,6 +244,7 @@ def _save_once(
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
         stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
+    return not failed
 
 
 def forget(state_dir: str, session: str) -> None:

@@ -1533,18 +1533,7 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
         problems.append(
             Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
         )
-    if rule.decision != rules.ALLOW and rules.PROMPT_MATCH in (
-        want.strip() for want in rule.match.split("|")
-    ):
-        # 発言には止める経路が無く、見るのは allow だけ（events.prompt_context）。
-        problems.append(
-            Problem(
-                SEVERITY_WARN,
-                name,
-                f"{rule.decision} の match に {rules.PROMPT_MATCH} がある。発言は止めず、"
-                "文を渡すのも allow のルールだけなので、ここでは何も起きない。allow に置く",
-            )
-        )
+    problems.extend(_stop_problems(rule, name))
 
     if rule.message and rule.decision != rules.DENY:
         # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
@@ -1613,6 +1602,51 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
                     "ヒットするたびに同じ文がコンテキストに積まれる。狭いルールに分けて書く",
                 )
             )
+    return problems
+
+
+def _stop_problems(rule: rules.Rule, name: str) -> list[Problem]:
+    """`match: Stop` のルール（ターンの終わりに止めて文を渡す。ADR-0090）の書き方。
+
+    見るのは 3 つ。どれも判定は変えないので warn。
+
+    1. `deny` / `ask` に置いた。Stop で見るのは allow だけなので何も起きない
+    2. 当てる先の `(stop)` に当たらない glob / regex。何も起きない
+    3. `every` が 1。渡す回ごとに Stop を止めるので、ターンの終わりのたびに止まる
+       （`additionalContextOnce` だけなら各セッションの最初のターンで止まる）
+    """
+    if rules.STOP_MATCH not in (want.strip() for want in rule.match.split("|")):
+        return []
+    if rule.decision != rules.ALLOW:
+        return [
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rule.decision} の match に {rules.STOP_MATCH} がある。ターンの終わりに見るのは "
+                "allow のルールだけなので、ここでは何も起きない。allow に置く",
+            )
+        ]
+    problems: list[Problem] = []
+    if rule.compiled is not None and not rule.compiled.search(rules.STOP_SUBJECT):
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rules.STOP_MATCH} には当てる文字列が無い"
+                f"（固定の {rules.STOP_SUBJECT} に当てる）。"
+                'この glob / regex では当たらないので何も起きない。glob: "*" と書く',
+            )
+        )
+    if rule.every <= 1:
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rules.STOP_MATCH} のルールに every が無い（1）。"
+                "渡す回ごとにターンの終わりを止めるので、"
+                "every: 10 のように刻む",
+            )
+        )
     return problems
 
 
@@ -1708,8 +1742,8 @@ def _inert(match: str) -> list[str]:
     inert: list[str] = []
     for want in match.split("|"):
         tool = want.strip()
-        if not tool or tool == rules.PROMPT_MATCH:
-            # 発言に当てる名前。当てる先は judge ではなく events.prompt_context が持つ。
+        if not tool or tool == rules.STOP_MATCH:
+            # ターンの終わりに当てる名前。当てる先は judge ではなく events.stop_rules_nudge が持つ。
             continue
         probe = hookio.Input(tool_name=tool, tool_input=probe_input)
         if not judge.subject_of(probe):
