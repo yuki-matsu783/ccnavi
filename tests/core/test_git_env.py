@@ -22,6 +22,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from ccnavi import gitcmd
 from tests import GIT_ENV
 from tests.inproc import run_ccnavi
 
@@ -110,6 +111,41 @@ class SurvivesTheClearedEnvironmentTest(unittest.TestCase):
         with mock.patch("ccnavi.cli.run", record):
             run_ccnavi(["--help"], env={"GIT_CONFIG_GLOBAL": "/nowhere"})
         self.assertEqual("/nowhere", seen.get("GIT_CONFIG_GLOBAL"))
+
+
+class OptionalLocksAreOffTest(unittest.TestCase):
+    """`gitcmd` が起こす git には `GIT_OPTIONAL_LOCKS=0` が渡り、親の環境も残る。
+
+    `git status` は index のついでの更新に `index.lock` を取る。期限切れで
+    殺されるとそれが残り、以後の add や commit が止まる。
+    """
+
+    def seen_env(self, call):
+        seen = []
+
+        def record(*args, **kwargs):
+            seen.append(kwargs.get("env"))
+            return subprocess.CompletedProcess(args, 0, "x\n", "")
+
+        with mock.patch("ccnavi.gitcmd.subprocess.run", record):
+            call()
+        self.assertTrue(seen, "git が起こされていない")
+        return seen
+
+    def assert_env(self, env):
+        self.assertIsNotNone(env, "env が渡っていない（親の環境のまま）")
+        self.assertEqual("0", env.get("GIT_OPTIONAL_LOCKS"))
+        self.assertEqual(os.environ.get("PATH"), env.get("PATH"), "親の環境が引き継がれていない")
+
+    def test_run_turns_optional_locks_off(self):
+        for env in self.seen_env(lambda: gitcmd.run(".", ["status"])):
+            self.assert_env(env)
+
+    def test_blob_turns_optional_locks_off(self):
+        envs = self.seen_env(lambda: gitcmd.blob(".", "HEAD", "a.txt"))
+        self.assertEqual(2, len(envs), "ls-tree と cat-file の 2 回を起こすはず")
+        for env in envs:
+            self.assert_env(env)
 
 
 if __name__ == "__main__":
