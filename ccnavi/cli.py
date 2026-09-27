@@ -438,22 +438,39 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     if not cmd:
         # hook。呼び出しのたびに走るので、受け付けは書かない（判定の結果を DEBUG で書く）。
         return _dispatch(stdin, stdout, stderr, args, root)
-    # 副命令は人か sh が打つもので、低頻度。受け付けと終了コードを INFO で 1 行ずつ残す。
+    # 副命令は人か sh が打つもので、低頻度。受け付けと終了コードを 1 行ずつ残す。
+    # 読むだけの副命令は拡張がファイルの変化のたびに打つので DEBUG に置き、既定の INFO では
+    # 行を増やさない（hook の判定と同じ扱い）。状態を変える副命令は INFO。
     # 引数の値（識別子の後ろの語・パス・理由の文）は書かず、どの副命令かだけを書く。
     log = diaglog.get("ccnavi", root)
-    log.info("副命令を受け付けた", cmd=cmd, json=args.json)
+    note = log.debug if cmd in _READ_ONLY else log.info
+    note("副命令を受け付けた", cmd=cmd, json=args.json)
     try:
         code = _dispatch(stdin, stdout, stderr, args, root)
     except Exception as exc:
         log.error("副命令が例外で止まった", cmd=cmd, **diaglog.cause(exc))
         raise
-    log.info("副命令を終えた", cmd=cmd, exit=code)
+    note("副命令を終えた", cmd=cmd, exit=code)
     return code
 
 
 # 診断ログに書く副命令の名前。`ticket` と `review` の後ろの語は、ここにあるものだけを書く。
 _TICKET_VERBS = ("start", "finish", "cancel", "record-risk")
 _REVIEW_VERBS = ("prepare", "requested", "confirm", "ready")
+# 状態を変えない副命令。拡張や sh が繰り返し打つので、受け付けと終了は DEBUG で書く。
+_READ_ONLY = frozenset(
+    (
+        "lint",
+        "test",
+        "test-samples",
+        "suggest",
+        "explain",
+        "prune-preview",
+        "approve-preview",
+        "approve-verify",
+        "reviewed-preview",
+    )
+)
 
 
 def _subcommand(args: argparse.Namespace) -> str:

@@ -477,14 +477,34 @@ class RolloutTest(_Base):
 
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         done = run_ccnavi(
+            ["--root", self.root, "--prune", "--preview"], input="", cwd=self.root, env=env
+        )
+        # 読むだけの副命令は、既定の INFO では何も足さない（拡張が繰り返し打つため）。
+        self.assertEqual([], self.find("副命令を"), self.lines("ccnavi"))
+        env["CCNAVI_LOG_LEVEL"] = "DEBUG"
+        done = run_ccnavi(
             ["--root", self.root, "--lint", "--json"], input="", cwd=self.root, env=env
         )
         took = self.find("副命令を受け付けた")
         ended = self.find("副命令を終えた")
         self.assertEqual(1, len(took), self.lines("ccnavi"))
+        self.assertIn("DEBUG", took[0])
         self.assertIn("cmd=lint", took[0])
         self.assertEqual(1, len(ended))
         self.assertIn(f"cmd=lint exit={done.returncode}", ended[0])
+
+    def test_a_subcommand_that_changes_state_logs_at_info(self):
+        from tests.inproc import run_ccnavi
+
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        done = run_ccnavi(["--root", self.root, "--prune"], input="", cwd=self.root, env=env)
+        took = self.find("副命令を受け付けた")
+        ended = self.find("副命令を終えた")
+        self.assertEqual(1, len(took), self.lines("ccnavi"))
+        self.assertIn("INFO ", took[0])
+        self.assertIn("cmd=prune ", took[0])
+        self.assertEqual(1, len(ended))
+        self.assertIn(f"cmd=prune exit={done.returncode}", ended[0])
 
     def test_a_hook_call_adds_nothing_at_the_default_level(self):
         from tests.inproc import run_ccnavi
