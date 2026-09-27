@@ -39,6 +39,37 @@ export interface LintJson {
 export interface LintFlow {
   readonly path: string;
   readonly data: unknown;
+  /** `SubagentStart` で担当に渡る手順の行（`flow.render`）。読めなければ null。古い実行ファイルなら無い */
+  readonly rendered?: readonly string[] | null;
+  /** フローで選べるサブエージェントとスキルの名前（`flow.catalog`）。古い実行ファイルなら無い */
+  readonly candidates?: LintFlowCandidates;
+}
+
+/** 候補 1 件。`source` は `builtin`（組み込み）か `project`（ワークスペースの `.claude/` の下） */
+export interface LintFlowCandidate {
+  readonly name: string;
+  readonly source: string;
+}
+
+export interface LintFlowCandidates {
+  readonly agents: readonly LintFlowCandidate[];
+  readonly skills: readonly LintFlowCandidate[];
+}
+
+function flowOf(raw: Record<string, unknown>): LintFlow {
+  const rendered = Array.isArray(raw.rendered) ? raw.rendered.filter((l): l is string => typeof l === "string") : raw.rendered === null ? null : undefined;
+  const cands = isRecord(raw.candidates) ? raw.candidates : undefined;
+  const pick = (value: unknown): LintFlowCandidate[] =>
+    list(value)
+      .filter(isRecord)
+      .map((c) => ({ name: str(c.name), source: str(c.source) }))
+      .filter((c) => c.name !== "");
+  return {
+    path: str(raw.path),
+    data: raw.data,
+    ...(rendered === undefined ? {} : { rendered }),
+    ...(cands === undefined ? {} : { candidates: { agents: pick(cands.agents), skills: pick(cands.skills) } }),
+  };
 }
 
 export type ParsedLint = { readonly ok: true; readonly value: LintJson } | { readonly ok: false; readonly error: string };
@@ -74,7 +105,7 @@ export function parseLintJson(text: string): ParsedLint {
       problems,
       errors: typeof raw.errors === "number" ? raw.errors : errors,
       warns: typeof raw.warns === "number" ? raw.warns : problems.length - errors,
-      ...(isRecord(raw.flow) && "data" in raw.flow ? { flow: { path: str(raw.flow.path), data: raw.flow.data } } : {}),
+      ...(isRecord(raw.flow) && "data" in raw.flow ? { flow: flowOf(raw.flow) } : {}),
     },
   };
 }

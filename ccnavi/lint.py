@@ -131,8 +131,10 @@ def report(
 
     problems = check(root, conf, notes, mode, complaints.getvalue())
     flow_data = None
+    flow_rendered = None
+    flow_candidates = flow.catalog(root) if flow_path else {}
     if flow_path:
-        flow_said, flow_data = flow_problems(flow_path, root)
+        flow_said, flow_data, flow_rendered = flow_problems(flow_path, root, flow_candidates)
         problems.extend(flow_said)
     problems += [
         Problem(SEVERITY_WARN, "(restore)", line.removeprefix("ccnavi: "))
@@ -222,8 +224,14 @@ def report(
         }
         if flow_path:
             # 実行ファイルが読んだ中身。拡張のフロー編集画面は自分の読みとこれを見比べる
-            # （README「lint の JSON」）
-            payload["flow"] = {"path": flow_path, "data": flow_data}
+            # （README「lint の JSON」）。`rendered` は SubagentStart で渡る手順の行（読めなければ
+            # null）、`candidates` はフローで選べるサブエージェントとスキルの名前
+            payload["flow"] = {
+                "path": flow_path,
+                "data": flow_data,
+                "rendered": flow_rendered,
+                "candidates": flow_candidates,
+            }
         stdout.write(json.dumps(payload, ensure_ascii=True, indent=1))
         stdout.write("\n")
         return EXIT_ERROR if errors else EXIT_OK
@@ -437,10 +445,13 @@ def _risk(conf: settings.Settings, root: str) -> list[Problem]:
 FLOW_WHERE = "(flow)"
 
 
-def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
+def flow_problems(
+    path: str, root: str, candidates: dict | None = None
+) -> tuple[list[Problem], object, list[str] | None]:
     """子のフローのファイル 1 本が、SubagentStart が読むのと同じ読みで読めるか（`--lint --flow`）。
 
-    (苦情, 読めた中身を `flow.as_json` にしたもの。読めなければ None) を返す。
+    (苦情, 読めた中身を `flow.as_json` にしたもの, `SubagentStart` で渡る手順の行（`flow.render`）)
+    を返す。読めなければ中身と行は None。
     読み手も検査も `flow.load` そのもの（大きさ、リンク・ふつうのファイルでない・ハードリンク、
     UTF-8 として読めない、YAML として読めない、別名、形）。ここで別に書くと、画面が
     「正しい」と言ったフローを SubagentStart が読めない、という食い違いになる（ADR-0035）。
@@ -448,6 +459,10 @@ def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     ツリーの中のファイルなら、ツリーのルートからの途中のリンクも見る（SubagentStart と同じ）。
     無いファイルも error にする（確かめたつもりで何も確かめていない形を作らない）。
     中身を返すのは、拡張が値の意味（`0755` や `yes` を何と読むか）を自分で決めずに済ませるため。
+
+    読めたフローには、手順として怪しいところを warn で足す（読むのは止めない）。線の構造
+    （`flow.structure_problems`）と、`candidates`（`flow.catalog`）を渡せばサブエージェントの種類と
+    スキルの名前の綴り（`flow.name_problems`）。どれも `detail` は渡したパスで始まる。
     """
     shown = flow.clean(path)
     try:
@@ -455,7 +470,7 @@ def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     except (OSError, ValueError):
         exists = False
     if not exists:
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: 無い")], None, None
     try:
         rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root)) if root else os.pardir
     except ValueError:  # Windows でドライブが違う
@@ -463,12 +478,18 @@ def flow_problems(path: str, root: str) -> tuple[list[Problem], object]:
     inside = rel != os.pardir and not rel.startswith(os.pardir + os.sep) and not os.path.isabs(rel)
     data, why = flow.load(path, root if inside else "")
     if why:
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, f"{shown}: {why}")], None, None
     try:
-        return [], flow.as_json(data)
+        shaped = flow.as_json(data)
     except RecursionError:
         deep = f"{shown}: 入れ子が深すぎて中身を渡せない"
-        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None
+        return [Problem(SEVERITY_ERROR, FLOW_WHERE, deep)], None, None
+    said = flow.structure_problems(data)
+    if candidates is not None:
+        said += flow.name_problems(data, candidates)
+    warns = [Problem(SEVERITY_WARN, FLOW_WHERE, f"{shown}: {line}") for line in said]
+    rendered, _ = flow.render(data)
+    return warns, shaped, rendered
 
 
 def _phases(conf: settings.Settings) -> list[Problem]:

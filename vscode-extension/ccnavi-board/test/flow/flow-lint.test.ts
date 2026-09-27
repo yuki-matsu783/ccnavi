@@ -57,8 +57,8 @@ test("CB-T242 本文を一時ファイルに書いて実行ファイルに渡し
         ]),
       };
     });
-    // 通れば、実行ファイルが読んだ中身を返す
-    assert.deepEqual(verdict, { ok: true, data: { nodes: [] } });
+    // 通れば、実行ファイルが読んだ中身と、(flow) の warn を返す（ほかの設定の苦情は載せない）
+    assert.deepEqual(verdict, { ok: true, data: { nodes: [] }, checks: { warns: ["言うだけの苦情"] } });
     assert.equal(asked.length, 1);
     assert.equal(path.dirname(asked[0]), dir);
     assert.ok(path.basename(asked[0]).startsWith(FLOW_TEMP_PREFIX));
@@ -137,8 +137,8 @@ test("CB-T246 一時ファイルは呼ぶたびに別の名前で書き、終わ
     await new Promise((resolve) => setImmediate(resolve));
     release();
     assert.deepEqual(await Promise.all([first, second]), [
-      { ok: true, data: { nodes: [] } },
-      { ok: true, data: { nodes: [] } },
+      { ok: true, data: { nodes: [] }, checks: { warns: [] } },
+      { ok: true, data: { nodes: [] }, checks: { warns: [] } },
     ]);
     assert.notEqual(seen.get("nodes: [{id: a}]\n"), seen.get("nodes: [{id: b}]\n"));
     assert.deepEqual(fs.readdirSync(dir), []);
@@ -169,6 +169,48 @@ test("CB-T247 答えに読んだ中身（flow）が無ければ通さない（�
     // lint の JSON の読み手は flow を持ち越す。無ければ欄ごと無い
     assert.deepEqual(answer([], { path: "/p", data: { a: 1 } }).flow, { path: "/p", data: { a: 1 } });
     assert.equal(answer([], ABSENT).flow, undefined);
+    // 渡る手順（rendered）と候補（candidates）も持ち越す。形の違う項目は落とす
+    const extras = answer([], {
+      path: "/p",
+      data: {},
+      rendered: ["1. [start] 開始", 2],
+      candidates: { agents: [{ name: "Plan", source: "builtin" }, { name: "" }, 3], skills: "x" },
+    }).flow;
+    assert.deepEqual(extras?.rendered, ["1. [start] 開始"]);
+    assert.deepEqual(extras?.candidates, { agents: [{ name: "Plan", source: "builtin" }], skills: [] });
+    assert.equal(answer([], { path: "/p", data: {}, rendered: null }).flow?.rendered, null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("CB-T278 通ったときは (flow) の warn を対象のファイルの綴りに直し、渡る手順（rendered）と候補（candidates）を添えて返す", async () => {
+  const dir = tmpDir();
+  try {
+    let tmp = "";
+    const candidates = { agents: [{ name: "Plan", source: "builtin" }], skills: [{ name: "commit", source: "project" }] };
+    const verdict = await lintFlowText("nodes: []\n", dir, SHOWN, async (file): Promise<FlowLintRun> => {
+      tmp = file;
+      return {
+        ok: true,
+        value: answer([{ severity: "warn", where: FLOW_WHERE, detail: `${file}: start が無い（どこから始めるかが決まらない）` }], {
+          path: file,
+          data: { nodes: [] },
+          rendered: ["1. [prompt] 書く"],
+          candidates,
+        }),
+      };
+    });
+    assert.ok(verdict.ok);
+    assert.deepEqual(verdict.checks, { warns: [`${SHOWN}: start が無い（どこから始めるかが決まらない）`], rendered: ["1. [prompt] 書く"], candidates });
+    assert.ok(!verdict.checks.warns[0].includes(tmp));
+    // 並べられなければ null のまま。古い実行ファイル（欄が無い）なら欄ごと無い
+    const unreadable = await lintFlowText("nodes: []\n", dir, SHOWN, async (file) => ({ ok: true, value: answer([], { path: file, data: { nodes: [] }, rendered: null }) }));
+    assert.ok(unreadable.ok);
+    assert.equal(unreadable.checks.rendered, null);
+    const old = await lintFlowText("nodes: []\n", dir, SHOWN, async (file) => ({ ok: true, value: answer([], { path: file, data: { nodes: [] } }) }));
+    assert.ok(old.ok);
+    assert.deepEqual(old.checks, { warns: [] });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

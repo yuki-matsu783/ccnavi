@@ -35,8 +35,8 @@ export interface DomPage {
   change(element: Element, value?: string): void;
   /** 要素を押す（click イベント） */
   click(element: Element): void;
-  /** キーを押す（keydown を流す）。要素を渡さなければ document に流す（画面ぜんたいで受けるもの） */
-  key(name: string, element?: Element): void;
+  /** キーを押す（keydown を流す）。要素を渡さなければ document に流す（画面ぜんたいで受けるもの）。Ctrl などは `modifiers` */
+  key(name: string, element?: Element, modifiers?: { readonly ctrlKey?: boolean; readonly shiftKey?: boolean; readonly metaKey?: boolean }): void;
   /** セレクタで 1 つ取る。無ければ落とす */
   one<T extends Element = HTMLElement>(selector: string): T;
   /** セレクタで全部取る */
@@ -229,9 +229,9 @@ export async function loadPage(html: string, initialState?: unknown, options: Lo
       (element as HTMLElement).click();
       raise();
     },
-    key(name, element) {
+    key(name, element, modifiers) {
       const target = element ?? (document as unknown as Element);
-      target.dispatchEvent(new window.KeyboardEvent("keydown", { key: name, bubbles: true }));
+      target.dispatchEvent(new window.KeyboardEvent("keydown", { key: name, bubbles: true, ...modifiers }));
       raise();
     },
     one<T extends Element = HTMLElement>(selector: string): T {

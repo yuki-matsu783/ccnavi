@@ -109,6 +109,11 @@
           "default": ".ccnavi/common/rule-samples.yml",
           "description": "ルール設定画面が一括で判定するサンプルです（deny / ask / allow のタイプに tool と subject を並べた YAML）。ワークスペースルートからの相対でも絶対でも構いません。"
         },
+        "ccnaviBoard.flowSaveReview": {
+          "type": "boolean",
+          "default": true,
+          "description": "フロー編集画面で「保存」を押したとき、読み込んだ時点からの変更（足した・消した・変えたノードと線）を一覧で見せ、確かめてから保存します。外すと確かめずに保存します。一覧の「次から確かめずに保存する」でも外れます。"
+        },
         "ccnaviBoard.appearance": {
           "type": "string",
           "enum": [

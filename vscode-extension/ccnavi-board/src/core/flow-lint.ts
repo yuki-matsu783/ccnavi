@@ -11,7 +11,8 @@
  * 互いの本文を読み違えない。苦情は一時ファイルのパスを名乗るので、画面に出すときは対象のファイルの綴りに直す。
  *
  * 通ったときは、実行ファイルが読んだ中身（`flow.data`）を返す。画面はそれを自分の中身と見比べる
- * （`flow-agree.ts`）。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
+ * （`flow-agree.ts`）。あわせて、実行ファイルがそのフローについて言ったこと（`(flow)` の warn、担当に渡る手順
+ * `rendered`、選べる名前 `candidates`）を `FlowChecks` にまとめて返す。warn も一時ファイルのパスを名乗るので綴りを直す。答えに `flow` が無ければ、実行ファイルが本当にフローを見たか分からないので通さない
  * （`--flow` を知らない古い実行ファイルと同じ扱い）。
  *
  * VS Code の API は使わない（単体テストで確かめる。実行ファイルの答えは偽物を渡す）。
@@ -20,13 +21,17 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import type { FlowChecks } from "./flow-view.js";
 import { problemsOfFlow, type LintJson } from "./lintmodel.js";
 
 /** 実行ファイルを走らせた結果（`ccnavi.ts` の `RunResult<LintJson>` と同じ形） */
 export type FlowLintRun = { readonly ok: true; readonly value: LintJson } | { readonly ok: false; readonly error: string };
 
-/** 通ったときは、実行ファイルが読んだ中身（`flow.as_json` の形） */
-export type FlowLintVerdict = { readonly ok: true; readonly data: unknown } | { readonly ok: false; readonly error: string };
+/**
+ * 通ったときは、実行ファイルが読んだ中身（`flow.as_json` の形）と、実行ファイルがそのフローについて言ったこと
+ * （`(flow)` の warn・渡る手順・候補の名前）
+ */
+export type FlowLintVerdict = { readonly ok: true; readonly data: unknown; readonly checks: FlowChecks } | { readonly ok: false; readonly error: string };
 
 /** 一時ファイルの名前の頭 */
 export const FLOW_TEMP_PREFIX = "flow-";
@@ -61,10 +66,12 @@ export async function lintFlowText(
     if (!ran.ok) {
       return { ok: false, error: ran.error };
     }
-    const errors = problemsOfFlow(ran.value).filter((p) => p.severity === "error");
+    // 苦情は渡した一時ファイルのパスを名乗るので、対象のファイルの綴りに直す
+    const rename = (detail: string): string => detail.split(tmp).join(shown);
+    const problems = problemsOfFlow(ran.value);
+    const errors = problems.filter((p) => p.severity === "error");
     if (errors.length > 0) {
-      // 苦情は渡した一時ファイルのパスを名乗るので、対象のファイルの綴りに直す
-      const said = errors.map((p) => p.detail.split(tmp).join(shown)).join("\n");
+      const said = errors.map((p) => rename(p.detail)).join("\n");
       return { ok: false, error: `実行ファイル（--lint --flow）が読めないと言った: ${said}` };
     }
     const flow = ran.value.flow;
@@ -74,7 +81,12 @@ export async function lintFlowText(
         error: "実行ファイル（--lint --flow）が読んだ中身（flow）を返さない（古い）。確かめられないので進めない。実行ファイルを新しくする",
       };
     }
-    return { ok: true, data: flow.data };
+    const checks: FlowChecks = {
+      warns: problems.filter((p) => p.severity === "warn").map((p) => rename(p.detail)),
+      ...(flow.rendered === undefined ? {} : { rendered: flow.rendered }),
+      ...(flow.candidates === undefined ? {} : { candidates: flow.candidates }),
+    };
+    return { ok: true, data: flow.data, checks };
   } finally {
     try {
       fs.rmSync(tmp, { force: true });
