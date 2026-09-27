@@ -392,5 +392,129 @@ class PruneDiagTest(_Base):
         self.assertTrue(any("リンク" in p for p in report.problems))
 
 
+class RolloutTest(_Base):
+    """ccnavi/ の失敗の経路と副命令が診断ログに残り、標準エラーの文面は変わらないこと。
+
+    行の形は上のクラスが見る。ここは「書かれたか」と「書いてはいけない値が入っていないか」だけ。
+    """
+
+    def find(self, text: str, name: str = "ccnavi") -> list[str]:
+        return [line for line in self.lines(name) if text in line]
+
+    def test_cause_keeps_only_the_kind_and_errno(self):
+        self.assertEqual(
+            {"error": "PermissionError", "errno": 13},
+            diaglog.cause(PermissionError(13, "Permission denied", "/secret/x")),
+        )
+        self.assertEqual({"error": "ValueError"}, diaglog.cause(ValueError("中身")))
+        self.assertEqual({"errno": 28}, diaglog.cause("[Errno 28] No space left: '/x'"))
+        self.assertEqual({}, diaglog.cause("読めない"))
+        self.assertEqual({}, diaglog.cause(None))
+
+    def test_a_subcommand_logs_what_it_took_and_how_it_ended(self):
+        from tests.inproc import run_ccnavi
+
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        done = run_ccnavi(
+            ["--root", self.root, "--lint", "--json"], input="", cwd=self.root, env=env
+        )
+        took = self.find("副命令を受け付けた")
+        ended = self.find("副命令を終えた")
+        self.assertEqual(1, len(took), self.lines("ccnavi"))
+        self.assertIn("cmd=lint", took[0])
+        self.assertEqual(1, len(ended))
+        self.assertIn(f"cmd=lint exit={done.returncode}", ended[0])
+
+    def test_a_hook_call_adds_nothing_at_the_default_level(self):
+        from tests.inproc import run_ccnavi
+
+        env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
+        # ルールが無いと組み込みの既定に戻り、その縮退は WARN で残る。ここは読める設定で見る。
+        common = os.path.join(self.root, ".ccnavi", "common")
+        os.makedirs(common)
+        with open(os.path.join(common, "rules.yml"), "w", encoding="utf-8") as f:
+            f.write("version: 1\n")
+        payload = (
+            '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls"},'
+            '"session_id":"s1","cwd":"' + self.root.replace("\\", "/") + '"}'
+        )
+        done = run_ccnavi(["--root", self.root, "--state", "", "--log", ""], input=payload, env=env)
+        self.assertEqual("", done.stderr)
+        self.assertEqual([], self.lines("ccnavi"))
+
+    def test_unreadable_rules_fall_back_and_say_so_once(self):
+        from ccnavi import audit, ruleload, settings
+
+        conf, _ = settings.load(self.root)
+        conf.rules = os.path.join(self.root, "rules.yml")
+        with open(conf.rules, "w", encoding="utf-8") as f:
+            f.write("deny: [\n")
+        err = io.StringIO()
+        ruleload.load_rules(err, conf, audit.Record(), self.root)
+        ruleload.load_rules(io.StringIO(), conf, audit.Record(), self.root)
+        self.assertTrue(err.getvalue().startswith("ccnavi: ルールを読めない: "))
+        warned = self.find("ルールを読めず組み込みの既定に戻した")
+        self.assertEqual(1, len(warned), self.lines("ccnavi"))
+        self.assertIn(" WARN  ", warned[0])
+        self.assertIn("layer=common", warned[0])
+        # 中身の断片（壊れた YAML）は写さない。
+        self.assertNotIn("deny", warned[0])
+
+    def test_post_state_that_cannot_be_written_is_warned_without_the_message(self):
+        from ccnavi import fsio, post
+
+        err = io.StringIO()
+        failed = "[Errno 13] Permission denied: '/home/someone/secret.json'"
+        with mock.patch.object(fsio, "write_json_atomic", return_value=failed):
+            post._save_seen(err, self.root, "s1", {"a"}, root=self.root)
+        self.assertEqual(f"ccnavi: 実行後の監視の控えを書けない: {failed}\n", err.getvalue())
+        warned = self.find("実行後の監視の控えを書けない")
+        self.assertEqual(1, len(warned))
+        self.assertIn("errno=13", warned[0])
+        self.assertNotIn("Permission denied", warned[0])
+
+    def test_a_marker_that_cannot_be_placed_is_an_error(self):
+        from ccnavi import approval, review
+
+        err = io.StringIO()
+        with mock.patch.object(approval, "write_mark", return_value="[Errno 30] ro"):
+            placed = review._mark(err, self.root, self.root, "p0001", 2, "reviewed", {})
+        self.assertFalse(placed)
+        self.assertEqual("ccnavi: マーカーを置けない: [Errno 30] ro\n", err.getvalue())
+        failed = self.find("フェーズのマーカーを置けない")
+        self.assertEqual(1, len(failed))
+        self.assertIn(" ERROR ", failed[0])
+        self.assertIn("parent=p0001 phase=2 mark=reviewed errno=30", failed[0])
+
+    def test_a_history_line_that_cannot_be_written_is_warned(self):
+        from ccnavi import history
+
+        blocker = os.path.join(self.root, "approved")
+        with open(blocker, "w", encoding="utf-8") as f:
+            f.write("ファイルなのでディレクトリを作れない")
+        err = io.StringIO()
+        with history.session(history.VIA_CLI, err):
+            history.set_root(self.root)
+            failed = history.note(blocker, "i0001", history.KIND_STARTED, "doing", "doing")
+        self.assertTrue(failed)
+        self.assertTrue(err.getvalue().startswith("ccnavi: 警告: i0001 の履歴（started）を"))
+        warned = self.find("チケットの跡を書けず飛ばした")
+        self.assertEqual(1, len(warned))
+        self.assertIn("ticket=i0001 kind=started", warned[0])
+
+    def test_an_unknown_mode_does_not_write_the_value(self):
+        from ccnavi import modes, settings
+
+        conf, _ = settings.load(self.root)
+        err = io.StringIO()
+        got = modes.resolve_mode(err, "tok-abc", conf, root=self.root)
+        self.assertEqual(modes.ENABLE, got)
+        self.assertIn("'tok-abc' is not a mode", err.getvalue())
+        warned = self.find("動作モードを enable に戻した")
+        self.assertEqual(1, len(warned))
+        self.assertIn("source=--mode reason=unknown-value", warned[0])
+        self.assertNotIn("tok-abc", warned[0])
+
+
 if __name__ == "__main__":
     unittest.main()
