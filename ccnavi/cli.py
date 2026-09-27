@@ -20,6 +20,7 @@ from . import (
     approval,
     audit,
     configsync,
+    diaglog,
     diagnose,
     events,
     fsio,
@@ -648,6 +649,7 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return EXIT_ERROR
     except hookio.Unusable as exc:
         stderr.write(f"ccnavi: {exc}\n")
+        diaglog.get("ccnavi", root).warn("hook の payload を読めない", mode=mode)
         _record(
             stderr,
             log,
@@ -671,6 +673,16 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
 
     code = events.decide(stdout, stderr, mode, conf, root, payload, record, deadline)
     _record(stderr, log, record)
+    # 診断ログ。受け付けたイベントと最終判定だけ。subject（コマンドの全文）は書かない。
+    diaglog.get("ccnavi", root).info(
+        "hook を判定した",
+        event=record.event,
+        tool=record.tool,
+        mode=mode,
+        decision=record.decision,
+        code=record.code,
+        exit=code,
+    )
     return code
 
 

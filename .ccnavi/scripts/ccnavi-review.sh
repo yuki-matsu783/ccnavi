@@ -51,6 +51,8 @@ USAGE
 
 fail() {
 	printf 'ccnavi-review: %s\n' "$1" >&2
+	# 診断ログ（docs/claude/logging.md）。上の文面が契約で、こちらは別に残すだけ。
+	log_info 止めた -- "sub=${sub:-}" "exit=${2:-1}" "reason=$1"
 	exit "${2:-1}"
 }
 
@@ -488,9 +490,13 @@ fetch_all() {
 		'{host: $host, mr: $mr, threads: $threads, reviews: $reviews, fetched_at: (now | todate)}'
 }
 
+log_info 受け付けた -- "sub=$sub" "args=$#"
+log_debug 判定の材料 -- "sub=$sub" "kind=$kind" "host=$host" "branch=$branch" "transport=$transport" "bin=${bin:-}"
+
 mkdir -p "$state"
 result="$state/review-result-$$.json"
-trap 'rm -f "$result"' EXIT
+# 抜けるときに写しを消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
+trap 'review_exit=$?; rm -f "$result"; log_info 終わった -- "sub=$sub" "exit=$review_exit"' EXIT
 
 case "$sub" in
 origin)

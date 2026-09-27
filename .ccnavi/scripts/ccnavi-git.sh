@@ -54,6 +54,8 @@ SELF="sh $0"
 
 reject() {
 	printf 'ccnavi-git: %s\n' "$1" >&2
+	# 診断ログ（docs/claude/logging.md）。上の文面が契約で、こちらは別に残すだけ。
+	log_info 拒否した -- "sub=${sub:-}" "reason=$1"
 	exit 2
 }
 
@@ -519,6 +521,7 @@ push)
 	# つもりで効いていない」形になるので、ワークスペースルートを基準にする。
 	push_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	push_root="$WS"
+	log_debug push の判定の材料 -- "branch=$push_branch" "top=$push_top" "workspace=$WS"
 	if [ -n "$push_root" ]; then
 		case "$push_top" in
 		"$push_root"/.claude/worktrees/*)
@@ -623,6 +626,8 @@ esac
 
 root=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -z "$root" ] && reject "git リポジトリの中で実行してください。"
+log_info 受け付けた -- "sub=$sub" "args=$#"
+log_debug 判定の材料 -- "sub=$sub" "action=${action:-}" "top=$root" "cwd=$PWD" "workspace=$WS"
 
 # 記録はワークスペースの下に寄せる（REQ-MLT-14、設計 4.1）。git のトップに書くと、
 # モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
@@ -712,6 +717,8 @@ fi
 # 世代で切る。新しい順に並べ、上限より後ろを消す。
 ls -1t "$logdir"/git-*.log 2>/dev/null | awk -v keep="$KEEP_LOGS" 'NR > keep' |
 	while IFS= read -r old; do rm -f "$old"; done
+
+log_info 終わった -- "sub=$sub" "exit=$status" "lines=$lines" "log=$logrel"
 
 [ "$status" -eq 0 ] || exit 1
 exit 0

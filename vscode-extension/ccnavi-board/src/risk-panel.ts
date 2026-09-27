@@ -35,6 +35,7 @@ import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.j
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { WATCH_PATTERNS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
+import * as diaglog from "./log.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -120,7 +121,7 @@ export async function openRisk(): Promise<void> {
     panel,
     folder,
     tmpDir: fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-risk-")),
-    host: riskHost(panel),
+    host: riskHost(panel, folder.uri.fsPath),
     fileWatchers: [],
     watchers: [],
     lock: lockFromError("確認中…"),
@@ -365,8 +366,9 @@ function redraw(current: PanelState): void {
  * パネルの `retainContextWhenHidden` を偽に変えると、送った先が捨てられていても気づけなくなる。
  * 型では止まらないので、ここで見て言う。
  */
-function riskHost(panel: vscode.WebviewPanel): ScreenHost<RiskData> {
+function riskHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RiskData> {
   if (panel.options.retainContextWhenHidden !== true) {
+    diaglog.get("ccnavi-board", root).error("画面の前提が崩れている", { screen: "risk", retainContextWhenHidden: false });
     console.error(`リスク管理の画面は retainContextWhenHidden が真であることを前提にしている（retainedHost）。偽のままだと、裏に回った画面へ送り続けて中身が古いまま止まる`);
   }
   return retainedHost<RiskData>(
