@@ -196,6 +196,29 @@ def _rotated_name(log_path: str, now: float) -> str:
     return candidate
 
 
+def _reserve(log_path: str, now: float) -> str:
+    """ローテート先を空のファイルで押さえて、その名前を返す。
+
+    名前を決めてから変えるまでのあいだに、同じ秒に始まった別のセッションが同じ名前を
+    選ぶと、後から変えた側が先の記録を上書きする。O_EXCL で作れた名前だけを自分のものに
+    する。作ったファイルは名前を変えるときに置き換わる（os.replace。Windows でも上書きする）。
+    """
+    directory, base = os.path.split(log_path)
+    stem, ext = os.path.splitext(base)
+    stamp = time.strftime(STAMP, time.localtime(now))
+    n = 1
+    while True:
+        suffix = "" if n == 1 else f"-{n}"
+        candidate = os.path.join(directory, f"{stem}.{stamp}{suffix}{ext}")
+        try:
+            fd = os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            n += 1
+            continue
+        os.close(fd)
+        return candidate
+
+
 def _rotated_pattern(log_path: str) -> re.Pattern[str]:
     stem, ext = os.path.splitext(os.path.basename(log_path))
     return re.compile("^" + re.escape(stem) + r"\.\d{8}-\d{6}(?:-\d+)?" + re.escape(ext) + "$")
@@ -217,21 +240,32 @@ def _rotate(
         return
     if size <= limit:
         return
-    target = _rotated_name(log_path, now)
     if dry_run:
-        report.rotated.append((_shown(root, log_path), _shown(root, target)))
+        report.rotated.append((_shown(root, log_path), _shown(root, _rotated_name(log_path, now))))
         return
+    target = ""
     try:
+        target = _reserve(log_path, now)
         # 同じ時に始まった別のセッションが先に変えていれば、ここには小さい新しい記録がある。
         if os.path.getsize(log_path) <= limit:
+            _drop(target)
             return
-        os.rename(log_path, target)
+        os.replace(log_path, target)
     except FileNotFoundError:
+        _drop(target)
         return
     except OSError as exc:
+        _drop(target)
         report.problems.append(f"{_shown(root, log_path)} をローテートできない: {exc}")
         return
     report.rotated.append((_shown(root, log_path), _shown(root, target)))
+
+
+def _drop(reserved: str) -> None:
+    """押さえたまま使わなかったローテート先を消す。"""
+    if reserved:
+        with contextlib.suppress(OSError):
+            os.remove(reserved)
 
 
 def _prune_logs(report: Report, root: str, log_path: str, cutoff: float, dry_run: bool) -> None:
