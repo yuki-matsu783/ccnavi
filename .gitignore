@@ -26,6 +26,10 @@ __pycache__/
 /logs/
 *.jsonl
 
+# md の frontmatter の索引（`ccnavi --docs`、SessionStart が書く）。上の `*.jsonl` にも当たるが、
+# ccnavi は git がここを無視しているときだけ書くので、`*.jsonl` を外しても索引は無視されたままにする。
+**/index.jsonl
+
 # 並行セッションのワークツリー。ワークスペースルートの中に置かれるので、
 # セッションの道具と権限が届く代わりに git の邪魔になる。
 /.claude/worktrees/
