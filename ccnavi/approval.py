@@ -47,7 +47,7 @@ import shutil
 from dataclasses import dataclass, field, replace
 from typing import TextIO
 
-from . import flow, fsio, history, modes, phasetypes, rules, settings, tree, workflow
+from . import diaglog, flow, fsio, history, modes, phasetypes, rules, settings, tree, workflow
 from . import ticket as ticket_mod
 
 # 承認済みチケットの下の置き場。作業中（判定が読む）、閉じた、マーカーと記録。
@@ -1098,6 +1098,7 @@ def approve(
     stdout.flush()
     if fsio.read_line(stdin).strip().lower() not in ("y", "yes"):
         stderr.write("ccnavi: 承認しなかった\n")
+        diaglog.get("ccnavi", root).info("承認を見送った", reason="declined")
         return 1
     code = _apply(stdout, stderr, root, conf, gathered.batch, now()).code
     if code == 0 and gathered.rejected:
@@ -1167,6 +1168,7 @@ def gather(
     `project:` が決める（設計 11.4.1）ので、候補を組むところで 1 件ずつ引き、
     引いたものを `Candidate` が持ち歩く。画面は候補が持つ種類を使う。
     """
+    log = diaglog.get("ccnavi", root)
     proposals, problems = ticket_mod.scan(root, conf.tickets, conf.projects)
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
@@ -1174,6 +1176,10 @@ def gather(
     approved, notes = scan(conf, root)
     for note in notes:
         stderr.write(f"ccnavi: {note}\n")
+    if problems or notes:
+        log.warn(
+            "読めない提案か承認済みチケットを飛ばした", proposals=len(problems), copies=len(notes)
+        )
     closed, _ = scan(conf, root, closed=True)
     review, _ = scan_review(conf, root)
 
@@ -1197,6 +1203,7 @@ def gather(
             ]
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
+            log.info("承認の絞りを断った", reason="unknown-id", count=len(unknown))
             return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
         # 親の改版を外して子だけ通すと、子は承認済みチケット（旧計画）で検証される。絞らなければ
         # 改版後の計画で落ちるものが通ることになるので、親も並べるまで何も承認しない。
@@ -1209,6 +1216,7 @@ def gather(
             lines.append("何も承認しない。親も並べる")
             for line in lines:
                 stderr.write(f"ccnavi: {line}\n")
+            log.info("承認の絞りを断った", reason="parent-revision-left-out", count=len(blocked))
             return Gathered([], [], texts, {}, False, broken, "\n".join(lines))
         waiting_count = len(pending) + len(revisions)
         pending = [t for t in pending if t.ticket in wanted]
@@ -1223,6 +1231,12 @@ def gather(
         stderr.write(f"ccnavi: {t.ticket} は承認の対象にしない\n")
         for p in complaints:
             stderr.write(f"  {p}\n")
+    if rejected:
+        log.info(
+            "承認の対象から外した",
+            count=len(rejected),
+            tickets=",".join(t.ticket for t, _ in rejected),
+        )
     return Gathered(batch, rejected, texts, pool, False, broken, "", note)
 
 
@@ -1326,6 +1340,7 @@ def verify(
     """
     gathered = gather(stderr, conf, root, only)
     verdict = _verdict(gathered, conf.tickets)
+    diaglog.get("ccnavi", root).info("承認できるかを確かめた", ok=verdict.ok, reason=verdict.reason)
     if as_json:
         body = _preview_body(root, gathered)
         body["verify"] = {"ok": verdict.ok, "reason": verdict.reason}
@@ -1515,6 +1530,10 @@ def approve_yes(
                 },
             }
             stdout.write(json.dumps(body, ensure_ascii=False) + "\n")
+        diaglog.get("ccnavi", root).info(
+            "承認を断った",
+            reason="list-mismatch" if wanted != current else "digest-mismatch",
+        )
         if wanted != current:
             stderr.write(
                 "ccnavi: 見せた一覧と今の一覧が違う（見せた: "
@@ -1529,6 +1548,7 @@ def approve_yes(
         return 1
     if not gathered.batch:
         stderr.write("ccnavi: 承認するものが無い\n")
+        diaglog.get("ccnavi", root).info("承認を断った", reason="nothing-pending")
         return 1
 
     lines = io.StringIO()
@@ -1605,10 +1625,13 @@ def _known(path: str) -> dict[str, str] | None:
     return {}
 
 
-def _write_known(stderr: TextIO, path: str, known: dict[str, str]) -> None:
+def _write_known(stderr: TextIO, path: str, known: dict[str, str], *, root: str) -> None:
     failed = fsio.write_json_atomic(path, {"known": dict(sorted(known.items()))})
     if failed:
         stderr.write(f"ccnavi: 承認を伝えた控えを書けない: {failed}\n")
+        diaglog.get("ccnavi", root).warn(
+            "承認を伝えた控えを書けない", path=path, **diaglog.cause(failed)
+        )
 
 
 def _mark(t: ticket_mod.Ticket) -> str:
@@ -1661,7 +1684,9 @@ def baseline(
         return
     path = _news_path(conf.state, session, agent_id)
     if _known(path) is None:
-        _write_known(stderr, path, {i: _mark(t) for i, t in _copy_marks(conf, root).items()})
+        _write_known(
+            stderr, path, {i: _mark(t) for i, t in _copy_marks(conf, root).items()}, root=root
+        )
 
 
 def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent_id: str) -> str:
@@ -1683,14 +1708,14 @@ def news(stderr: TextIO, conf: settings.Settings, root: str, session: str, agent
     current = _copy_marks(conf, root)
     marks = {i: _mark(t) for i, t in current.items()}
     if known is None:
-        _write_known(stderr, path, marks)
+        _write_known(stderr, path, marks, root=root)
         return ""
     fresh = _fresh(known, current)
     if not fresh:
         return ""
     # 消えた承認済みチケットの分も残す。1 回読めなかっただけで「知らない」に戻すと、
     # 次の回に同じ承認をもう一度伝えることになる。
-    _write_known(stderr, path, {**known, **marks})
+    _write_known(stderr, path, {**known, **marks}, root=root)
     return _approved_text(fresh, {t.ticket for t in fresh if t.ticket in known}, root)
 
 
@@ -1829,7 +1854,20 @@ def _apply(
     """承認された対象を承認済みチケットに書く。改版は承認済みチケットを書き換え、新規は承認済みチケットを置く。"""
     from . import phase
 
+    log = diaglog.get("ccnavi", root)
     placed: list[str] = []
+
+    def stop(ticket: str, stage: str, failed: str) -> Applied:
+        # 失敗の文（failed）はパスを含むので写さない。どこで止まったかと errno だけ。
+        log.error(
+            "承認済みチケットを置けず止めた",
+            ticket=ticket,
+            stage=stage,
+            placed=len(placed),
+            **diaglog.cause(failed),
+        )
+        return Applied(1, placed, ticket, failed)
+
     for cand in batch:
         t = cand.ticket
         if cand.is_revision and cand.current is not None:
@@ -1837,12 +1875,18 @@ def _apply(
             failed = revise_copy(where, cand.current, t, stamp, cand.plans_feedback, cand.types)
             if failed:
                 stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-                return Applied(1, placed, t.ticket, failed)
+                return stop(t.ticket, "revise", failed)
             placed.append(t.ticket)
             try:
                 os.remove(t.path)
             except OSError as exc:
                 stderr.write(f"ccnavi: {t.ticket}: 改版の提案を todo/ から消せない ({exc})\n")
+                log.warn(
+                    "改版の提案を todo/ から消せない",
+                    ticket=t.ticket,
+                    path=t.path,
+                    **diaglog.cause(exc),
+                )
             what = "フィードバック計画" if cand.plans_feedback else "全体計画"
             stdout.write(f"  {t.ticket} の{what}を改版した\n")
             if cand.plans_feedback:
@@ -1850,12 +1894,13 @@ def _apply(
                 failed = phase.settle_last_review(where, t, stamp)
                 if failed:
                     stderr.write(f"ccnavi: {t.ticket}: マーカーを置けない: {failed}\n")
+                    stop(t.ticket, "last-review-mark", failed)
                     return Applied(1, placed, t.ticket, f"マーカーを置けない: {failed}")
                 # 全体計画の子でレビュー待ちに残っているものは、見たうえでの計画なので閉じる。
                 moved, failed = settle_review(conf, root, t.ticket, list(range(1, len(t.plan) + 1)))
                 if failed:
                     stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-                    return Applied(1, placed, t.ticket, failed)
+                    return stop(t.ticket, "settle-review", failed)
                 if moved:
                     stdout.write(f"  レビュー待ちの子を閉じた: {', '.join(moved)}\n")
                 stdout.write(
@@ -1868,7 +1913,7 @@ def _apply(
         failed = admit(where, t, t.tree, stamp, wf)
         if failed:
             stderr.write(f"ccnavi: {t.ticket}: {failed}\n")
-            return Applied(1, placed, t.ticket, failed)
+            return stop(t.ticket, "admit", failed)
         placed.append(t.ticket)
         if t.is_child:
             for line in carry_flow(conf, root, t, where):
@@ -1892,6 +1937,7 @@ def _apply(
                 )
 
     stdout.write(f"\n承認した。{conf.approved}/{DOING_DIR}/ へ動かした。\n")
+    log.info("承認済みチケットを置いた", count=len(placed), tickets=",".join(placed))
     return Applied(0, placed)
 
 

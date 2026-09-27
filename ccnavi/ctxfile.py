@@ -24,7 +24,7 @@ import os
 import time
 from typing import TextIO
 
-from . import fsio, hookio, rules, settings, tree
+from . import diaglog, fsio, hookio, rules, settings, tree
 
 # 1 回の応答に載せる本文の上限（文字数）。固定。超えた分は載せず、切ったことを言う。
 MAX_CHARS = 4000
@@ -53,7 +53,7 @@ def locate(bases: list[str], rel: str) -> str:
     return ""
 
 
-def load(stderr: TextIO, bases: list[str], rel: str) -> str:
+def load(stderr: TextIO, bases: list[str], rel: str, *, root: str) -> str:
     """ファイルの本文。無ければ空。上限を超えたら先頭だけを返し、切ったことを末尾に添える。"""
     full = locate(bases, rel)
     if not full:
@@ -63,6 +63,9 @@ def load(stderr: TextIO, bases: list[str], rel: str) -> str:
             head = f.read(MAX_CHARS + 1)
     except OSError as exc:
         stderr.write(f"ccnavi: {rel} を読めない: {exc}\n")
+        diaglog.get("ccnavi", root).warn(
+            "文脈に渡すファイルを読めず文だけ渡した", path=full, **diaglog.cause(exc)
+        )
         return ""
     if len(head) <= MAX_CHARS:
         return head.strip()
@@ -95,6 +98,8 @@ def for_rules(
     bases: list[str] | None = None,
     unsure_speaks: bool = True,
     counts_path: str = "",
+    *,
+    root: str,
 ) -> str:
     """当たったルールがモデルへ渡す文。1 件ずつ閉じた文なので空行で割る。
 
@@ -126,6 +131,8 @@ def for_rules(
 
     `counts_path` は数えの控えの置き場を差し替える。空なら文脈ごとの `once-*.json`。
     Stop の促しは compact・再開をまたいで数えたいので、別の控え（`stop_path`）を渡す。
+
+    `root` はワークスペースルート。控えやファイルを読み書きできなかったときの診断ログの置き場。
     """
     if not unsure_speaks and not state_dir:
         return ""
@@ -138,7 +145,7 @@ def for_rules(
         # どのみち毎回渡すので、数えても判定 1 回ぶんの書き込みが増えるだけになる。
         if state_dir and (rule.every > 1 or has_once):
             if not consulted:
-                counted = _load_once(stderr, counts_path or _path_of(state_dir, payload))
+                counted = _load_once(stderr, counts_path or _path_of(state_dir, payload), root=root)
                 consulted = True
             if counted is None and not unsure_speaks:
                 continue
@@ -167,6 +174,7 @@ def for_rules(
                 bases or [],
                 rules.fill_root(rule.additional_context, rule.root),
                 rule.additional_context_file,
+                root=root,
             )
             if text:
                 parts.append(text)
@@ -176,20 +184,21 @@ def for_rules(
                 bases or [],
                 rules.fill_root(rule.additional_context_once, rule.root),
                 rule.additional_context_once_file,
+                root=root,
             )
             if once:
                 parts.append(once)
     if counted is not None:
-        saved = _save_once(stderr, counts_path or _path_of(state_dir, payload), counted)
+        saved = _save_once(stderr, counts_path or _path_of(state_dir, payload), counted, root=root)
         if not saved and not unsure_speaks:
             # 数えを書けなかった。次の回も同じ数えから始まり、同じ回に止め続けうる。
             return ""
     return "\n\n".join(parts)
 
 
-def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str) -> str:
+def _with_file(stderr: TextIO, bases: list[str], text: str, rel: str, *, root: str) -> str:
     """文とファイルの本文を空行で並べる。どちらか無ければ在るほうだけ。"""
-    body = load(stderr, bases, rel) if rel else ""
+    body = load(stderr, bases, rel, root=root) if rel else ""
     return "\n\n".join(p for p in (text, body) if p)
 
 
@@ -228,7 +237,7 @@ def stop_path(state_dir: str, session: str) -> str:
     return os.path.join(state_dir, f"stop-{fsio.safe_name(session) or 'unknown'}.json")
 
 
-def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
+def _load_once(stderr: TextIO, path: str, *, root: str) -> dict[str, int] | None:
     """この文脈で、どのルールが何回当たったか。まだ無ければ空、**読めなければ None**。
 
     `given` は「鍵 → 回数」。
@@ -242,6 +251,9 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
     if failed is not None:
         if not isinstance(failed, FileNotFoundError):
             stderr.write(f"ccnavi: 渡した回の控えを読めない: {failed}\n")
+            diaglog.get("ccnavi", root).warn(
+                "渡した回の控えを読めず数えずに進んだ", path=path, **diaglog.cause(failed)
+            )
             return None
         return {}
     given = data.get("given") if isinstance(data, dict) else None
@@ -250,7 +262,7 @@ def _load_once(stderr: TextIO, path: str) -> dict[str, int] | None:
     return {k: n for k, n in given.items() if isinstance(k, str) and isinstance(n, int)}
 
 
-def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
+def _save_once(stderr: TextIO, path: str, given: dict[str, int], *, root: str) -> bool:
     """控えを書く。書けたか。"""
     # 取り合いになる控えなので、途中を見せない書き方で置く。素の open(path, "w") だと
     # 書いている最中は空で、そこを別の呼び出しに読まれると「まだ 1 回も当たっていない」に
@@ -258,6 +270,9 @@ def _save_once(stderr: TextIO, path: str, given: dict[str, int]) -> bool:
     failed = fsio.write_json_atomic(path, {"given": dict(sorted(given.items()))})
     if failed:
         stderr.write(f"ccnavi: 渡した回の控えを書けない: {failed}\n")
+        diaglog.get("ccnavi", root).warn(
+            "渡した回の控えを書けない", path=path, **diaglog.cause(failed)
+        )
     return not failed
 
 

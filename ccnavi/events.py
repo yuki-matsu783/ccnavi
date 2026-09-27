@@ -18,6 +18,7 @@ from . import (
     builtin,
     configsync,
     ctxfile,
+    diaglog,
     fsio,
     hookio,
     judge,
@@ -189,6 +190,7 @@ def decide_at_prompt(
         record,
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
+        root=root,
     )
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
     if told:
@@ -238,6 +240,7 @@ def decide_at_stop(
         record,
         (conf.tickets, conf.approved),
         functools.partial(configsync.is_synced_write, conf, root),
+        root=root,
     )
     # 同じ理由で繰り返し止めた呼び出し（repeat）。拒否の文面はモデルにしか届かないので、
     # 言い換えで回っているかもしれないことを人にも 1 度言う。止めはしない。
@@ -301,7 +304,14 @@ def stop_rules_nudge(
     delivered: list[str] = []
     for rule in group:
         text = ctxfile.for_rules(
-            stderr, conf.state, payload, [rule], [root], unsure_speaks=False, counts_path=counts
+            stderr,
+            conf.state,
+            payload,
+            [rule],
+            [root],
+            unsure_speaks=False,
+            counts_path=counts,
+            root=root,
         )
         if text:
             parts.append(text)
@@ -340,6 +350,11 @@ def _finish_nudge(
     failed = ops.remember_nudge(conf.state, payload.session_id, found)
     if failed:
         stderr.write(f"ccnavi: finish の促しを控えられないので、促さない: {failed}\n")
+        diaglog.get("ccnavi", root).warn(
+            "finish の促しを控えられず促さなかった",
+            ticket=found.ticket.ticket,
+            **diaglog.cause(failed),
+        )
         return ""
     record.decision, record.code = audit.NUDGE, ops.CODE_FINISH_NUDGE
     record.enforced = mode == modes.ENABLE
@@ -413,9 +428,14 @@ def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session:
         report = prune.run(root, conf.log, conf.state, session)
     except Exception as exc:  # noqa: BLE001 - 後始末の失敗でセッションの開始を止めない
         stderr.write(f"ccnavi: 記録と控えの後始末に失敗した: {exc}\n")
+        diaglog.get("ccnavi", root).warn("セッションの開始で後始末に失敗した", **diaglog.cause(exc))
         return ""
     for problem in report.problems:
         stderr.write(f"ccnavi: {problem}\n")
+    if report.problems:
+        diaglog.get("ccnavi", root).warn(
+            "セッションの開始で後始末できないものを残した", count=len(report.problems)
+        )
     return prune.summary(report)
 
 
@@ -479,6 +499,7 @@ def decide_after(
         # 外れなかったりさせない。
         places=(conf.tickets, conf.approved),
         synced=synced,
+        root=root,
     )
     # 設定ファイルについて言うことは、実行後の監視の報告より前に置く。
     # ガード自身が触られた回は、他の何よりそれが先に読まれてほしい。

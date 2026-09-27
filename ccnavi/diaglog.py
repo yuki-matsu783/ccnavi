@@ -48,6 +48,9 @@ MASK = "***"
 # 値を `"` で囲む字。
 _NEEDS_QUOTE = (" ", "\t", '"', "=", "\n", "\r")
 
+# 失敗の文に埋まった errno（`[Errno 13] Permission denied: '…'`）。
+_ERRNO = re.compile(r"\[Errno (\d+)\]")
+
 
 def threshold() -> int:
     """CCNAVI_LOG_LEVEL から閾値を読む。空と読めない値は INFO。"""
@@ -99,6 +102,26 @@ def get(name: str, root: str | None = None) -> Logger:
     どちらも無ければ何も書かない（置き場を当て推量で決めない）。
     """
     return Logger(name, root)
+
+
+def cause(failed: object) -> dict[str, object]:
+    """失敗を行に載せる値。例外なら種類（`error=`）と errno、文字列なら中の `[Errno N]` だけ。
+
+    例外の文面や失敗の文そのものは載せない。パス・利用者の入力・ファイルの中身・コマンドの
+    出力が混ざるため（docs/claude/logging.md「書かないこと」）。読めないものは空の辞書。
+    呼び方は `log.warn("…を書けない", path=p, **diaglog.cause(failed))`。
+    """
+    out: dict[str, object] = {}
+    if isinstance(failed, BaseException):
+        out["error"] = type(failed).__name__
+        number = getattr(failed, "errno", None)
+        if isinstance(number, int):
+            out["errno"] = number
+    elif isinstance(failed, str):
+        found = _ERRNO.search(failed)
+        if found:
+            out["errno"] = int(found.group(1))
+    return out
 
 
 def stamp(now: datetime.datetime | None = None) -> str:

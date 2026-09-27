@@ -13,6 +13,7 @@ from typing import TextIO
 from . import (
     approval,
     audit,
+    diaglog,
     flow,
     fsio,
     hookio,
@@ -180,6 +181,9 @@ def at_stop(
         outside, unreadable = phase.scope_findings(root, conf, child, index.get(child.parent))
         if unreadable:
             stderr.write(f"ccnavi: {child.ticket} のワークツリーを読めない: {unreadable}\n")
+            diaglog.get("ccnavi", root).warn(
+                "子のワークツリーを読めず範囲の検査から外した", ticket=child.ticket
+            )
             continue
         for rel, found in outside:
             findings.append((child, rel, found))
@@ -206,7 +210,7 @@ def at_stop(
     who = payload.agent_id or (t.name if t is not None else "")
     already = _bounced(conf.state, payload.session_id, who)
     if mode == modes.ENABLE and not already:
-        _remember_bounce(stderr, conf.state, payload.session_id, who)
+        _remember_bounce(stderr, conf.state, payload.session_id, who, root=root)
         record.enforced = True
         stderr.write(text + "\n")
         return EXIT_BLOCK
@@ -268,9 +272,13 @@ def _bounced(state_dir: str, session: str, who: str) -> bool:
     return bool(state_dir) and os.path.exists(_bounce_path(state_dir, session, who))
 
 
-def _remember_bounce(stderr: TextIO, state_dir: str, session: str, who: str) -> None:
+def _remember_bounce(stderr: TextIO, state_dir: str, session: str, who: str, *, root: str) -> None:
     if not state_dir:
         return
-    failed = fsio.write_text(_bounce_path(state_dir, session, who), fsio.stamp())
+    path = _bounce_path(state_dir, session, who)
+    failed = fsio.write_text(path, fsio.stamp())
     if failed:
         stderr.write(f"ccnavi: 差し戻しの回数を書けない: {failed}\n")
+        diaglog.get("ccnavi", root).warn(
+            "差し戻しの回数を書けない", path=path, **diaglog.cause(failed)
+        )

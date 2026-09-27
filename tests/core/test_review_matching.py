@@ -32,7 +32,7 @@ class MatchingTest(unittest.TestCase):
 
     def _run(self, path: str, mark: dict | None = None) -> tuple[object, str]:
         err = io.StringIO()
-        got = review._matching(err, path, mark or {})
+        got = review._matching(err, "", path, mark or {})
         return got, err.getvalue()
 
     def test_empty_path_says_only_that_result_is_needed(self):

@@ -1142,7 +1142,9 @@ def propose_notice(
         return ""
     if not _propose_place(conf.tickets, root).search(subject):
         return ""
-    return ctxfile.for_rules(stderr, conf.state, payload, [_propose_rule(conf.tickets, conf.bin)])
+    return ctxfile.for_rules(
+        stderr, conf.state, payload, [_propose_rule(conf.tickets, conf.bin)], root=root
+    )
 
 
 def _propose_place(tickets_rel: str, root: str) -> re.Pattern:

@@ -31,7 +31,7 @@ import os
 from dataclasses import dataclass, field
 from typing import TextIO
 
-from . import audit, builtin, hookio, rules, settings, tree
+from . import audit, builtin, diaglog, hookio, rules, settings, tree
 from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 
 # 層の名前。共通層と自身の層は固定で、プロジェクトの層はその名前を名乗る。
@@ -40,6 +40,19 @@ from .rules import SEVERITY_INFO, SEVERITY_WARN, Problem
 # （`settings.is_reserved_layer_name`）。
 LAYER_COMMON = settings.LAYER_COMMON
 LAYER_SELF = settings.LAYER_SELF
+
+# この起動で診断ログに書いた縮退（ルート, 事象, 層, パス）。`--test-samples` は見本の数だけ
+# ルールを読み直すので、同じ縮退を見本の数だけ書かないように 1 度に絞る。hook は 1 起動 1 回。
+_logged: set[tuple[str, str, str, str]] = set()
+
+
+def _warn_once(root: str, msg: str, layer: str, path: str, **fields: object) -> None:
+    """設定の縮退を診断ログに WARN で 1 度だけ書く（docs/claude/logging.md）。"""
+    key = (root, msg, layer, path)
+    if key in _logged:
+        return
+    _logged.add(key)
+    diaglog.get("ccnavi", root).warn(msg, layer=layer, path=path, **fields)
 
 
 @dataclass
@@ -74,11 +87,22 @@ def load_rules(
         rule_set, problems = rules.load(rules_path, root)
     except (OSError, ValueError) as exc:
         stderr.write(f"ccnavi: ルールを読めない: {exc}\n")
+        _warn_once(
+            root,
+            "ルールを読めず組み込みの既定に戻した",
+            LAYER_COMMON,
+            rules_path,
+            **diaglog.cause(exc),
+        )
         rule_set, problems = builtin.load(root, conf)
         record.fallback = builtin.FALLBACK
         record.detail = rules_path
     for problem in problems:
         stderr.write(f"ccnavi: {problem}\n")
+    if problems:
+        _warn_once(
+            root, "ルールの不備を読み飛ばした", LAYER_COMMON, rules_path, count=len(problems)
+        )
     mark_source(rule_set, LAYER_COMMON)
     return rule_set, builtin.SOURCE if record.fallback else rules_path
 
@@ -197,10 +221,19 @@ def add_layers(
             extra, notes = rules.load(layer.path, root)
         except (OSError, ValueError) as exc:
             stderr.write(f"ccnavi: 層 {layer.name} のルールを読めない: {exc}\n")
+            _warn_once(
+                root,
+                "層のルールを読めず空として扱った",
+                layer.name,
+                layer.path,
+                **diaglog.cause(exc),
+            )
             broken.append(layer.name)
             continue
         for note in notes:
             stderr.write(f"ccnavi: {note}\n")
+        if notes:
+            _warn_once(root, "ルールの不備を読み飛ばした", layer.name, layer.path, count=len(notes))
         prefix_ids(extra, layer.name)
         merge_rules(rule_set, extra, layer.name)
     if broken:

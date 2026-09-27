@@ -124,7 +124,7 @@ def notice(
     if not conf.state:
         return text if at_start else ""
     carrier = rules.Rule(id=f"{ONCE_ID}:{project}", additional_context_once=text)
-    return ctxfile.for_rules(stderr, conf.state, payload, [carrier])
+    return ctxfile.for_rules(stderr, conf.state, payload, [carrier], root=root)
 
 
 def index(conf: settings.Settings, root: str, cwd: str) -> str:

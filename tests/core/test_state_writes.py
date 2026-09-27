@@ -51,20 +51,22 @@ class WiringTest(unittest.TestCase):
 
     def test_ctxfile_once_state(self):
         self._assert_atomic(
-            lambda: ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
+            lambda: ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [], root="")
         )
 
     def test_post_seen_state(self):
-        self._assert_atomic(lambda: post._save_seen(self.err, self.state, "s1", {"a"}))
+        self._assert_atomic(lambda: post._save_seen(self.err, self.state, "s1", {"a"}, root=""))
 
     def test_post_turn_state(self):
         self._assert_atomic(
-            lambda: post._save_turn(self.err, self.state, "s1", {"a"}, {"/tmp/tree": "abc123"})
+            lambda: post._save_turn(
+                self.err, self.state, "s1", {"a"}, {"/tmp/tree": "abc123"}, root=""
+            )
         )
 
     def test_approval_known_state(self):
         path = os.path.join(self.state, "approved-s1.json")
-        self._assert_atomic(lambda: approval._write_known(self.err, path, {"i0001": "1"}))
+        self._assert_atomic(lambda: approval._write_known(self.err, path, {"i0001": "1"}, root=""))
 
 
 class UnreadableStateTest(unittest.TestCase):
@@ -82,7 +84,7 @@ class UnreadableStateTest(unittest.TestCase):
 
     def test_keeps_the_state_when_it_cannot_be_read(self):
         # 覚えている控えを用意する。
-        ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
+        ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [], root="")
         before = fsio.read_json(self.path)[0]
         self.assertEqual(before, {"given": {"note": 1}})
 
@@ -90,7 +92,7 @@ class UnreadableStateTest(unittest.TestCase):
         with mock.patch.object(
             fsio, "read_json", return_value=(None, PermissionError(errno.EACCES, "busy"))
         ):
-            text = ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
+            text = ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [], root="")
 
         # 文は渡す（覚えられないなら言う側を採る）。
         self.assertIn("1 度だけの文。", text)
@@ -101,7 +103,7 @@ class UnreadableStateTest(unittest.TestCase):
     def test_missing_state_is_written_as_usual(self):
         """無いのは普通の状態。ここは今までどおり書く。"""
         self.assertFalse(os.path.exists(self.path))
-        ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [])
+        ctxfile.for_rules(self.err, self.state, _payload(), [_once_rule()], [], root="")
         self.assertEqual(fsio.read_json(self.path)[0], {"given": {"note": 1}})
 
 
