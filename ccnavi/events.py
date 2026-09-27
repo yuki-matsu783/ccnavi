@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import io
 from typing import TextIO
@@ -180,9 +181,44 @@ def decide_at_prompt(
         functools.partial(configsync.is_synced_write, conf, root),
     )
     told = approval.news(stderr, conf, root, payload.session_id, payload.agent_id)
+    told = "\n\n".join(p for p in (told, prompt_context(stderr, conf, root, payload, record)) if p)
     if told:
         hookio.write_context(stdout, hookio.USER_PROMPT_SUBMIT, told)
     return EXIT_OK
+
+
+def prompt_context(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+) -> str:
+    """`match: UserPromptSubmit` の `allow` のルールが、この発言で渡す文（ADR-0090）。
+
+    書いたルールが無ければ空で、これまでどおり何も返さない。渡すかどうか・何を渡すかは
+    設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
+    「10 回の発言に 1 度」になる。
+
+    ルールはパスを持たないツールと同じく全部の層の和から引く。どのプロジェクトで話して
+    いても同じルールが当たり、cwd には依らない。見るのは `allow` だけ。発言を止める
+    経路は持たない（止めたいものは無く、止めると利用者の言葉が消える）。`deny` / `ask` に
+    書いたものは `--lint` が言う。
+
+    当てる先は発言の本文。空（画像だけなど）なら `(prompt)` に当てる。本文は記録に残さず、
+    当たったルールの id だけを残す。
+    """
+    probe = dataclasses.replace(payload, tool_name=rules.PROMPT_MATCH)
+    # 苦情と読めなかった層の記録は、同じ起動の watch_context が全部のツリーについて
+    # 書いたあと。ここでもう一度書くと同じ話が 2 度並ぶので、使い捨ての控えに受ける。
+    rule_set, _, _ = ruleload.rules_for(io.StringIO(), conf, root, probe, audit.Record())
+    subject = payload.prompt or "(prompt)"
+    group = [r for r in rule_set.allow if r.matches(rules.PROMPT_MATCH, subject)]
+    if not group:
+        return ""
+    record.rules = [*record.rules, *(r.id or f"({rules.ALLOW})" for r in group)]
+    target = tree.tree_of(root, payload.cwd, conf.projects) if payload.cwd else None
+    return ctxfile.for_rules(stderr, conf.state, payload, group, ctxfile.bases(conf, root, target))
 
 
 def decide_at_stop(

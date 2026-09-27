@@ -94,6 +94,11 @@ ASK = "ask"
 ALLOW = "allow"
 SECTIONS = (DENY, ASK, ALLOW)
 
+# `match` に書ける、ツールではない名前。利用者が何か言った回（UserPromptSubmit）に当たり、
+# 当てる先はその発言の本文。止める経路は無く、`allow` のルールの文を渡すだけ（ADR-0090）。
+# 名前をイベント名と同じにしたのは、ツール名と取り違えないため。
+PROMPT_MATCH = "UserPromptSubmit"
+
 # 文面が要るタイプ。deny だけ。ask の文面は人の確認ダイアログにしか出ず、allow は
 # 通すだけで届く先が無い（どちらも実測済み、設計 付録 C）。モデルに渡す文は
 # additionalContext に書く。ask と allow に書いた文面は lint が error にするが、

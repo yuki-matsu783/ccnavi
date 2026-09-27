@@ -1533,6 +1533,18 @@ def _rule_problems(rule: rules.Rule, name: str, home: str) -> list[Problem]:
         problems.append(
             Problem(SEVERITY_WARN, name, f"match の {tool} には当てる対象が無い。何も止まらない")
         )
+    if rule.decision != rules.ALLOW and rules.PROMPT_MATCH in (
+        want.strip() for want in rule.match.split("|")
+    ):
+        # 発言には止める経路が無く、見るのは allow だけ（events.prompt_context）。
+        problems.append(
+            Problem(
+                SEVERITY_WARN,
+                name,
+                f"{rule.decision} の match に {rules.PROMPT_MATCH} がある。発言は止めず、"
+                "文を渡すのも allow のルールだけなので、ここでは何も起きない。allow に置く",
+            )
+        )
 
     if rule.message and rule.decision != rules.DENY:
         # ask の文面は人の確認ダイアログにしか出ず、allow の文面はどこにも出ない。
@@ -1696,7 +1708,8 @@ def _inert(match: str) -> list[str]:
     inert: list[str] = []
     for want in match.split("|"):
         tool = want.strip()
-        if not tool:
+        if not tool or tool == rules.PROMPT_MATCH:
+            # 発言に当てる名前。当てる先は judge ではなく events.prompt_context が持つ。
             continue
         probe = hookio.Input(tool_name=tool, tool_input=probe_input)
         if not judge.subject_of(probe):
