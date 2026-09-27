@@ -1,3 +1,10 @@
+---
+type: adr
+title: 権威のツリーが無ければ元ツリーを採る
+description: 同じ識別子のチケットが複数のツリーに写るのは普通の形で（承認済みチケットは親のブランチに乗り、
+tags: [adr, approval, docs, review]
+keywords: [ADR-0024, ADR-0073, approval, review, state, ticket, worktree, ある, つにしてから, 失ったもの, 権威のツリーが無ければ元ツリーを採る, 複数の場所に, 親の]
+---
 # ADR-0073: 権威のツリーが無ければ元ツリーを採る
 
 状態: 採用

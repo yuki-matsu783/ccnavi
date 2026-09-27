@@ -1,3 +1,18 @@
+---
+type: adr
+title: 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする
+description: 2026-09-23、レビューで残った指摘の扱いを見直した。前の形は端末の `decide` だけで、選べるのは
+tags: [adr, approval, cli, hook]
+keywords: [ADR-0028, ADR-0040, ADR-0081, approval, deny, hook, review, ticket, だけで, とになる, に回す, ボードで選べるようにする, 何も置かない, 実行, 残った指摘は 1 件ずつ行き先を決め]
+---
+---
+type: adr
+title: 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする
+description: レビュー指摘ごとに行き先を選択する仕組みをボード内に統合。
+tags: [adr, review, approval]
+keywords: [指摘, 行き先, ボード, 指摘ごと, keep, fix, issue, decide]
+---
+
 # ADR-0081: 残った指摘は 1 件ずつ行き先を決め、ボードで選べるようにする
 
 状態: 採用

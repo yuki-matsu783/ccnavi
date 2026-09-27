@@ -1,3 +1,18 @@
+---
+type: adr
+title: 副命令の名前は動きを言い、人の判断はフラグで受ける
+description: 2026-09-23、`ccnavi-ticket.sh` と `ccnavi-review.sh` の副命令の名前を見直した。名前から動きが
+tags: [adr, approval, git, hook]
+keywords: [ADR-0079, approval, deny, git, hook, record, review, ticket, が読めない, った, で受ける, にする, 人の判断はフラグで受ける, 副命令の名前は動きを言い, 名前から動き]
+---
+---
+type: adr
+title: 副命令の名前は動きを言い、人の判断はフラグで受ける
+description: 副命令の名前を動作から明確にし、人の判断の入力方法を統一。
+tags: [adr, cli, approval]
+keywords: [副命令, 名前, フラグ, done, judge, check, review, ticket]
+---
+
 # ADR-0079: 副命令の名前は動きを言い、人の判断はフラグで受ける
 
 状態: 採用

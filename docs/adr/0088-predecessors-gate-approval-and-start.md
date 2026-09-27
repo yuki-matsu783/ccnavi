@@ -1,3 +1,10 @@
+---
+type: adr
+title: 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ
+description: 子チケットの先行依存を承認と着手で検証し、順序を強制。
+tags: [adr, ticket, phase]
+keywords: [predecessors, 先行, 依存, チケット, 承認, 着手, done, cancel]
+---
 # ADR-0088: 先行（`predecessors`）は承認と着手で求める。満たすのは `done/` に在って取り消しでないものだけ
 
 状態: 採用

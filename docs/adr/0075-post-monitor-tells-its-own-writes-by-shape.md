@@ -1,3 +1,10 @@
+---
+type: adr
+title: 実行後の監視は、自分の副命令の書き込みを姿で見分ける
+description: 実行後の監視は、保護領域をルールファイルの `deny` と `ask` から導く（ADR-0017）。そこから
+tags: [adr, docs, git, phase]
+keywords: [ADR-0017, ADR-0072, ADR-0075, ask, commit, deny, git, phase, restore, review, rules, script, state, ticket, ーは, 同じ姿の, 実行後の監視, 実行後の監視は, 承認済み, 新しく現れた]
+---
 # ADR-0075: 実行後の監視は、自分の副命令の書き込みを姿で見分ける
 
 状態: 採用

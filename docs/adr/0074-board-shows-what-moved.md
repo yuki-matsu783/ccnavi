@@ -1,3 +1,10 @@
+---
+type: adr
+title: ボードは「動いた」を印で見せ、その印を時間では消さない
+description: チケットの置き場が変わると（人が承認する、エージェントが `ticket done` を打つ）、ボードは監視で
+tags: [adr, approval, board, state]
+keywords: [ADR-0068, ADR-0074, approval, board, state, ticket, が動かしたと, せる, その印を時間では消さない, ボードは「動いた」を印で見せ, 承認の直後は, 採らなかった, 閉じたときに]
+---
 # ADR-0074: ボードは「動いた」を印で見せ、その印を時間では消さない
 
 状態: 採用

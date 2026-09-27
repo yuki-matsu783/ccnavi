@@ -1,3 +1,18 @@
+---
+type: adr
+title: フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く
+description: 2026-09-23。全体計画は種類の一直線の並びで、N 番目の子は 1〜N-1 番目の全部が閉じてレビューが
+tags: [adr, phase, review]
+keywords: [ADR-0026, ADR-0030, ADR-0035, dag, deny, overlap, phase, plan, requires, review, workflow, だけ, で書く, ない, ワークフローを DAG で書く, 失ったもの, 延期の引き受]
+---
+---
+type: adr
+title: フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く
+description: フェーズ間の依存を DAG として表現し、並行処理を柔軟に設定。
+tags: [adr, phase, review]
+keywords: [DAG, フェーズ, 依存, after, requires, overlap, ワークフロー, 並行]
+---
+
 # ADR-0078: フェーズの種類に依存（`after`）を持たせ、ワークフローを DAG で書く
 
 状態: 採用（ADR-0026 の「順序は承認で止める」と、ADR-0070 の「線に向きは付けない」の一部を改める。図の下に常に出す注記は ADR-0082 が改める）
