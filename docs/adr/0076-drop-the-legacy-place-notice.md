@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 旧の置き場への移行案内を畳む
-description: 置き場の移行案内を削除し、置き場の綴りを 1 つに統一。
-tags: [adr, approval, settings]
-keywords: [移行, 旧置き場, 案内, 定数, チケット, 承認済み, legacy]
+description: 旧の置き場への移行案内を削除し、置き場の定数を統一する
+tags: [approval, settings, config]
+keywords: [置き場, 移行案内, 定数, 承認済みチケット, lint, 綴り]
 ---
 
 # ADR-0076: 旧の置き場への移行案内を畳む

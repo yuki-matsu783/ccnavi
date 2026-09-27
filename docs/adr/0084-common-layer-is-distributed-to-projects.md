@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 共通層は配る定義にし、親の着手でプロジェクトの層を上書きして最初のレビューで知らせる
-description: 共通層を配布メカニズムに変え、プロジェクトごとの設定を統一。
-tags: [adr, config, distribution]
-keywords: [共通層, 配布, プロジェクト, 設定, 層の合成, 配点, risks.yml]
+description: 共通層を配布の定義にし、各プロジェクトの層として上書きする
+tags: [config, distribution]
+keywords: [共通層, 配布, プロジェクト, 層, risks.yml, 設定, 合成]
 ---
 # ADR-0084: 共通層は配る定義にし、親の着手でプロジェクトの層を上書きして最初のレビューで知らせる
 

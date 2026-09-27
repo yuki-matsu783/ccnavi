@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す
-description: チケット着手終了の忘れを検知し、ユーザーに通知する仕組み。
-tags: [adr, ticket, approval]
-keywords: [finish, nudge, Stop, チケット, 着手, 完了, コミット, prompt]
+description: 作業が終わったのに finish されていないとき、Stop で 1 回だけ止めて促す
+tags: [ticket, approval, phase]
+keywords: [finish, nudge, Stop, チケット, 着手, コミット, 促し]
 ---
 # ADR-0087: 作業を終えたように見えるのに `finish` されていないチケットは、Stop で 1 回だけ止めて促す
 

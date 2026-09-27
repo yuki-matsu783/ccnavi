@@ -1,16 +1,9 @@
 ---
 type: adr
 title: 端末要求を切る形は、実行ファイルの呼び方によらず止める
-description: 2026-09-23、敵対的レビューで次の抜け道が見つかった。人の判断の経路（`--approve` / `--reviewed` /
-tags: [adr, approval, cli, hook]
-keywords: [ADR-0080, approval, deny, hook, review, script, shell, ticket, なる, る形は, 実行, 実行ファイルの呼び方によらず止める, 敵対的, 端末要求を切, 端末要求を切る形は]
----
----
-type: adr
-title: 端末要求を切る形は、実行ファイルの呼び方によらず止める
-description: エージェントが端末要求を迂回する形式を block し、セキュリティを強化。
-tags: [adr, rules, approval]
-keywords: [端末, 要求, 環境変数, セキュリティ, エージェント, CLI, フラグ]
+description: "エージェントが端末要求を切るコマンド行の形式を block する"
+tags: [rules, approval, selfguard]
+keywords: [端末, 要求, コマンド行, 変数, エージェント, block, deny]
 ---
 
 # ADR-0080: 端末要求を切る形は、実行ファイルの呼び方によらず止める

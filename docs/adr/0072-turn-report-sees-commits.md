@@ -1,9 +1,9 @@
 ---
 type: adr
 title: コミットに入った変更を見るのは、ターンの終わりの報告だけ
-description: 実行後の監視が見ていたのは `git status`、つまり**未コミットの変更だけ**だった。保護領域を
-tags: [adr, docs, git, phase]
-keywords: [ADR-0072, ask, commit, deny, git, phase, state, turn, すると, の終わりの報, コミットに入った変更を見るのは, ターンの終わりの報告だけ, 呼び出しごと, 数えていない, 許可された]
+description: ターン終了時の報告でコミット済みの変更も監視対象に含め、呼び出しごとの監視は未コミット変更のみにとどめる
+tags: [git, phase, state]
+keywords: [コミット, 変更, ターン終了, 監視, 報告, HEAD, 差分, git]
 ---
 # ADR-0072: コミットに入った変更を見るのは、ターンの終わりの報告だけ
 

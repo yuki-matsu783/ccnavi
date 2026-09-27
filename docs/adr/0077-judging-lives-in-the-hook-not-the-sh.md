@@ -1,9 +1,9 @@
 ---
 type: adr
 title: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする
-description: 実行ファイルと sh の判定分担を明確化し、セキュリティを強化。
-tags: [adr, rules, git]
-keywords: [判定, hook, sh, 検査, セキュリティ, ccnavi-git.sh, push, ワークツリー]
+description: "止める・通すの判定を hook に集中させ、sh の検査は 2 重目の守りにする"
+tags: [rules, git, selfguard]
+keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
 ---
 
 # ADR-0077: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする

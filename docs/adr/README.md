@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 設計判断の記録（ADR）
-description: 設計判断を記録する形式と管理方法。なぜその決定をしたか、何を採らなかったかを留める。
-tags: [adr, docs, guide]
-keywords: [ADR, 設計判断, 記録, なぜ, 決定, 比較, 番号重複, テスト, 置き換え, 管理]
+description: 設計判断を記録する形式と管理方法。判断ごとに状態、状況、決定、理由、得失を書く。
+tags: [docs, docs-search]
+keywords: [ADR, 設計判断, 記録, 番号重複, テスト, 置き換え, 管理]
 ---
 # 設計判断の記録（ADR）
 

@@ -1,9 +1,9 @@
 ---
 type: adr
 title: プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す
-description: プロジェクト内スキル定義をドキュメント配下に統合。
-tags: [adr, skills, projects]
-keywords: [スキル, プロジェクト, docs/skills, 目録, Claude Code, SKILL.md]
+description: プロジェクトのスキルを docs/skills に置き、ccnavi は目録だけを渡す
+tags: [skills, projects, docs]
+keywords: [スキル, プロジェクト, docs/skills, 目録, SKILL.md, 振り返り]
 ---
 # ADR-0091: プロジェクトのスキルは `docs/skills/` に置き、ccnavi は目録だけを渡す
 

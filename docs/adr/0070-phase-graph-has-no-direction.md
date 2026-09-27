@@ -1,9 +1,9 @@
 ---
 type: adr
 title: フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める
-description: フェーズ管理画面は種類を一覧で見せる（ADR-0064）。`requires` と `overlap` は並びの欄に
-tags: [adr, approval, board, config]
-keywords: [ADR-0035, ADR-0062, ADR-0064, approval, board, config, dag, overlap, phase, plan, requires, state, から, この, だけで, ない, フェーズの関係を図にする, 実行]
+description: フェーズの関係を向きの無い図で見せ、置き場所は id だけで決める
+tags: [phase, board]
+keywords: [フェーズ, グラフ, DAG, requires, overlap, 置き場所, id]
 ---
 # ADR-0070: フェーズの関係を図にする。線に向きは付けず、置き場所は id だけで決める
 
