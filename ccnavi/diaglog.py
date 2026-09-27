@@ -12,14 +12,20 @@ sh（`.ccnavi/scripts/ccnavi-common.sh` の log_*）と拡張（`src/log.ts`）�
 利用者やモデルに見せる文面（`ccnavi: …` の標準エラー、hook の JSON）とは別物で、そちらは
 このモジュールと関係なく今のまま書く。
 
-本文と値は書く前に redact を通す。秘密の形を伏せる最後の網で、秘密の値をそもそも
+本文と値は書く前に、まず mask_userinfo（URL と scp 形の資格情報を `***` に。sh と拡張と
+同じ読み）を、次に redact を通す。秘密の形を伏せる最後の網で、秘密の値をそもそも
 渡さないのが先（規約）。
+
+**リンクは辿らない。** `logs`・`logs/diag`・書き先のファイルのどれかがシンボリックリンクなら
+書かずに捨てる（書き先は O_NOFOLLOW で開く。無い OS では lstat で見る）。ファイルは 0600 で作る。
+出どころの名前が `[A-Za-z0-9_-]` 以外を含むときも書かない。
 """
 
 from __future__ import annotations
 
 import datetime
 import os
+import re
 
 from . import redact
 
@@ -32,6 +38,12 @@ WARN = 30
 ERROR = 40
 _NAMES = {DEBUG: "DEBUG", INFO: "INFO ", WARN: "WARN ", ERROR: "ERROR"}
 _BY_WORD = {"DEBUG": DEBUG, "INFO": INFO, "WARN": WARN, "ERROR": ERROR}
+
+# 出どころに使える名前。これ以外の字（区切り・`.`・空白）を含む名前では書かない。
+_NAME = re.compile(r"[A-Za-z0-9_-]+")
+# 伏せ字で語を切る字（sh の ccnavi_log_space と同じ）。
+_SPACE = re.compile(r"([ \t\n\r]+)")
+MASK = "***"
 
 # 値を `"` で囲む字。
 _NEEDS_QUOTE = (" ", "\t", '"', "=", "\n", "\r")
@@ -72,10 +84,10 @@ class Logger:
     def _emit(self, level: int, msg: str, fields: dict[str, object]) -> None:
         try:
             root = self.root if self.root is not None else os.environ.get("CLAUDE_PROJECT_DIR", "")
-            if not root:
+            if not root or not _NAME.fullmatch(self.name):
                 return
-            safe = {key: redact.redact(text(value)) for key, value in fields.items()}
-            line = format_line(stamp(), level, self.name, os.getpid(), redact.redact(msg), safe)
+            safe = {key: scrub(text(value)) for key, value in fields.items()}
+            line = format_line(stamp(), level, self.name, os.getpid(), scrub(msg), safe)
             append(os.path.join(root, DIAG_DIR, f"{self.name}.log"), line)
         except Exception:  # noqa: BLE001 ログの失敗で本体を止めない
             return
@@ -106,6 +118,48 @@ def text(value: object) -> str:
     return str(value)
 
 
+def scrub(value: str) -> str:
+    """書く前に伏せる。mask_userinfo（3 つの言語で共通）のあと redact（Python だけ）。"""
+    return redact.redact(mask_userinfo(value))
+
+
+def mask_userinfo(value: str) -> str:
+    """URL と scp 形に埋まった資格情報を `***` にする（sh の ccnavi_log_mask と同じ読み）。
+
+    空白・タブ・LF・CR で切った語ごとに見る。`://` を含む語は、`://` の後ろから次の `/` までを
+    authority とし、`@` があれば最後の `@` より前を伏せる。含まない語は、最初の `/` より前に `@` が
+    あり、最後の `@` より前に `:` があれば、そこを伏せる（`user:tok@host:path`）。
+    """
+    if "@" not in value:
+        return value
+    parts = _SPACE.split(value)
+    return "".join(part if i % 2 else _mask_word(part) for i, part in enumerate(parts))
+
+
+def _mask_word(word: str) -> str:
+    if "@" not in word:
+        return word
+    if "://" not in word:
+        head = word.split("/", 1)[0]
+        if "@" not in head:
+            return word
+        user = head.rsplit("@", 1)[0]
+        if ":" not in user:
+            return word
+        return MASK + "@" + word[len(user) + 1 :]
+    out = []
+    rest = word
+    while "://" in rest:
+        before, rest = rest.split("://", 1)
+        out.append(before + "://")
+        authority = rest.split("/", 1)[0]
+        if "@" in authority:
+            out.append(MASK + "@" + authority.rsplit("@", 1)[1])
+            rest = rest[len(authority) :]
+    out.append(rest)
+    return "".join(out)
+
+
 def fold(value: str) -> str:
     """改行（CR LF・CR・LF）を `\\n` の 2 字に畳む。"""
     return value.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n")
@@ -127,14 +181,25 @@ def format_line(
 
 
 def append(path: str, line: str) -> None:
-    """1 行を O_APPEND で 1 度に書く。並行するプロセスの行と混ざらない。"""
+    """1 行を O_APPEND で 1 度に書く。並行するプロセスの行と混ざらない。
+
+    `logs`・`logs/diag`・書き先のどれかがリンクなら書かない。書き先は O_NOFOLLOW で開き
+    （リンクなら開けずに OSError）、それが無い OS では lstat で先に見る。新しいファイルは 0600。
+    """
+    directory = os.path.dirname(path)
+    for place in (os.path.dirname(directory), directory):
+        if os.path.islink(place):
+            return
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if not nofollow and os.path.islink(path):
+        return
     data = (line + "\n").encode("utf-8")
-    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0)
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | nofollow | getattr(os, "O_BINARY", 0)
     try:
-        fd = os.open(path, flags, 0o644)
+        fd = os.open(path, flags, 0o600)
     except FileNotFoundError:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fd = os.open(path, flags, 0o644)
+        os.makedirs(directory, exist_ok=True)
+        fd = os.open(path, flags, 0o600)
     try:
         os.write(fd, data)
     finally:

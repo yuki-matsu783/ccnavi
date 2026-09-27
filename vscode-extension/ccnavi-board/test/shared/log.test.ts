@@ -1,5 +1,6 @@
 /**
- * 診断ログ（`src/log.ts`）。行の形・logfmt の逃がし方・レベルの絞り込み・置き場・書けないときの黙殺。
+ * 診断ログ（`src/log.ts`）。行の形・logfmt の逃がし方・レベルの絞り込み・置き場・書けないときの黙殺・
+ * リンクを辿らないこと・出どころの名前・0600・URL と scp 形の伏せ字。
  * sh と Python が同じ行を出すことは Python のテスト（tests/sh/test_diaglog_sh.py）が見る。
  */
 import { test } from "node:test";
@@ -7,7 +8,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { formatLine, get, LEVEL_ENV, quote, stamp, threshold } from "../../src/log.js";
+import { formatLine, get, LEVEL_ENV, maskUserinfo, quote, stamp, threshold } from "../../src/log.js";
 
 const HEAD = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} (DEBUG|INFO |WARN |ERROR) ([^[\s]+)\[(\d+)\] /;
 
@@ -109,4 +110,92 @@ test("CB-T283 書けないときは黙って捨て、console にも何も出さ�
     fs.rmSync(root, { recursive: true, force: true });
   }
   assert.deepEqual(spoken, []);
+});
+
+function tryLink(target: string, link: string): boolean {
+  try {
+    fs.symlinkSync(target, link);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test("CB-T284 logs・logs/diag・書き先のどれかがリンクなら、辿らずに捨てる", (t) => {
+  const root = workspace();
+  const outside = workspace();
+  try {
+    const diag = path.join(root, "logs", "diag");
+    fs.mkdirSync(diag, { recursive: true });
+    const victim = path.join(root, "logs", "decisions.jsonl");
+    fs.writeFileSync(victim, "{}\n");
+    if (!tryLink("../decisions.jsonl", path.join(diag, "probe.log"))) {
+      t.skip("リンクを作れない");
+      return;
+    }
+    withLevel(undefined, () => get("probe", root).error("x"));
+    assert.equal(fs.readFileSync(victim, "utf8"), "{}\n");
+    // logs/diag がリンク
+    fs.rmSync(path.join(root, "logs"), { recursive: true, force: true });
+    fs.mkdirSync(path.join(root, "logs"));
+    tryLink(outside, diag);
+    withLevel(undefined, () => get("probe", root).error("x"));
+    assert.deepEqual(fs.readdirSync(outside), []);
+    // logs そのものがリンク
+    fs.rmSync(path.join(root, "logs"), { recursive: true, force: true });
+    fs.mkdirSync(path.join(outside, "diag"));
+    tryLink(outside, path.join(root, "logs"));
+    withLevel(undefined, () => get("probe", root).error("x"));
+    assert.deepEqual(fs.readdirSync(path.join(outside, "diag")), []);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("CB-T285 出どころの名前が [A-Za-z0-9_-] 以外を含めば書かない。新しいファイルは 0600", () => {
+  const root = workspace();
+  try {
+    for (const name of ["../escape", "a.b", "a b", "a/b", ""]) {
+      withLevel(undefined, () => get(name, root).error("x"));
+      assert.equal(fs.existsSync(path.join(root, "logs")), false, name);
+      assert.equal(fs.existsSync(path.join(root, "escape.log")), false, name);
+    }
+    if (process.platform !== "win32") {
+      const saved = process.umask(0o022);
+      try {
+        withLevel(undefined, () => get("probe", root).info("x"));
+      } finally {
+        process.umask(saved);
+      }
+      assert.equal(fs.statSync(path.join(root, "logs", "diag", "probe.log")).mode & 0o777, 0o600);
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("CB-T286 URL と scp 形に埋まった資格情報を *** に伏せる（本文と値の両方。sh と Python と同じ読み）", () => {
+  const cases: Array<[string, string]> = [
+    ["https://user:tok@host/x y", "https://***@host/x y"],
+    ["oauth2:tok@gitlab.example:org/r.git", "***@gitlab.example:org/r.git"],
+    ["git@github.com:org/r.git", "git@github.com:org/r.git"],
+    ["  a://b://c@d/e\tu:p@h:x\nz", "  a://b://***@d/e\t***@h:x\nz"],
+    ["no at", "no at"],
+    ["x@y", "x@y"],
+    ["@a:b", "@a:b"],
+    ["https://@h", "https://***@h"],
+    ["ssh://git@h:22/p https://a:b@c@d/p", "ssh://***@h:22/p https://***@d/p"],
+  ];
+  for (const [given, expected] of cases) {
+    assert.equal(maskUserinfo(given), expected, given);
+  }
+  const root = workspace();
+  try {
+    withLevel(undefined, () => get("probe", root).info("clone https://u:SECRET@h/x", { url: "oauth2:SECRET@h:o/r.git" }));
+    const [line] = lines(root);
+    assert.equal(line.replace(HEAD, ""), "clone https://***@h/x url=***@h:o/r.git");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

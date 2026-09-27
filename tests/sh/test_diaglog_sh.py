@@ -3,10 +3,14 @@
 見るのは 2 組。
 
 1. sh の logger そのもの。行の形・置き場・出どころの決め方・レベルの絞り込み・logfmt の
-   逃がし方・URL の資格情報の伏せ字。`set -eu` の下でも書けないときに黙って 0 で戻り、
-   標準出力にも標準エラーにも何も出さないこと。出さないレベルでは date を起こさないこと
+   逃がし方・URL と scp 形の資格情報の伏せ字。`set -eu` の下でも書けないときに黙って 0 で戻り、
+   標準出力にも標準エラーにも何も出さないこと。出さないレベルでは date を起こさないこと。
+   リンク（logs・logs/diag・書き先）を辿らないこと、使えない字の出どころでは書かないこと、
+   新しいファイルが 0600 になること
 2. 同じ入力から、sh・Python（ccnavi/diaglog.py）・拡張（src/log.ts を node が型を剥がして読む）が
    同じ行を出すこと。時刻と pid は除いて比べ、時刻は 3 つとも同じ形であることだけを見る
+3. ccnavi-git.sh の reject と ccnavi-review.sh の fail が、拒否の文面ではなく識別子だけを
+   診断ログに残すこと（文面は標準エラーの契約で、そちらは変わらない）
 
 使い捨てのワークスペースに ccnavi-common.sh を置き、それを読む sh を書いて走らせる。
 """
@@ -42,6 +46,16 @@ CASES: list[tuple[str, str, list[tuple[str, str]]]] = [
     ("ERROR", "改行を\n含む本文", [("n", "l1\nl2\r\nl3\rl4"), ("empty", ""), ("bs", "a\\b")]),
     ("INFO", "値の無い行", []),
     ("DEBUG", "判定の材料", [("sub", "push"), ("path", "/tmp/x y/z")]),
+    (
+        "INFO",
+        "clone https://u:p@h/x を読んだ",
+        [
+            ("url", "https://user:glpat-SECRET@gitlab.example/x.git"),
+            ("scp", "oauth2:tok@gitlab.example:org/r.git"),
+            ("plain", "git@github.com:org/r.git"),
+            ("said", "push to ssh://git@h:22/p failed"),
+        ],
+    ),
 ]
 
 
@@ -201,7 +215,167 @@ class ShLoggerTest(_Workspace):
         )
         line = self.lines()[0]
         self.assertNotIn("SECRET", line)
-        self.assertIn("https://<伏せた>@gitlab.example/x.git", line)
+        self.assertIn("https://***@gitlab.example/x.git", line)
+
+    def test_the_message_is_masked_too(self):
+        self.run_sh("log_info 'clone https://u:SECRET@h/x と' 'oauth2:SECRET@h:org/r.git'")
+        self.assertEqual("clone https://***@h/x と ***@h:org/r.git", body(self.lines()[0])[2])
+
+    def test_a_linked_log_file_is_not_followed(self):
+        diag = os.path.join(self.ws, "logs", "diag")
+        os.makedirs(diag)
+        victim = os.path.join(self.ws, "logs", "decisions.jsonl")
+        with open(victim, "w", encoding="utf-8") as f:
+            f.write("{}\n")
+        if not symlink("../decisions.jsonl", os.path.join(diag, "probe.log")):
+            self.skipTest("リンクを作れない")
+        result = self.run_sh("log_error x -- a=1")
+        self.assertEqual((0, "done\n", ""), (result.returncode, result.stdout, result.stderr))
+        with open(victim, encoding="utf-8") as f:
+            self.assertEqual("{}\n", f.read())
+
+    def test_a_linked_place_is_not_followed(self):
+        outside = tempfile.mkdtemp(prefix="ccnavi-diaglog-out-")
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        # logs/diag がリンク
+        os.makedirs(os.path.join(self.ws, "logs"))
+        if not symlink(outside, os.path.join(self.ws, "logs", "diag")):
+            self.skipTest("リンクを作れない")
+        self.run_sh("log_error x")
+        self.assertEqual([], os.listdir(outside))
+        # logs そのものがリンク
+        shutil.rmtree(os.path.join(self.ws, "logs"))
+        os.makedirs(os.path.join(outside, "diag"))
+        symlink(outside, os.path.join(self.ws, "logs"))
+        result = self.run_sh("log_error x")
+        self.assertEqual((0, "done\n", ""), (result.returncode, result.stdout, result.stderr))
+        self.assertEqual([], os.listdir(os.path.join(outside, "diag")))
+
+    def test_a_name_with_other_characters_is_not_written(self):
+        for name in ("../escape", "a.b", "a b", "a/b"):
+            with self.subTest(name=name):
+                result = self.run_sh("log_error x", CCNAVI_LOG_NAME=name)
+                self.assertEqual(
+                    (0, "done\n", ""), (result.returncode, result.stdout, result.stderr)
+                )
+                self.assertFalse(os.path.exists(os.path.join(self.ws, "logs")))
+                self.assertFalse(os.path.exists(os.path.join(self.ws, "escape.log")))
+
+    @unittest.skipIf(os.name == "nt", "権限のビットは POSIX だけ")
+    def test_a_new_file_is_owner_only(self):
+        self.run_sh("umask 022\nlog_info x")
+        mode = os.stat(os.path.join(self.ws, "logs", "diag", "probe.log")).st_mode & 0o777
+        self.assertEqual(0o600, mode)
+
+    def test_replace_with_an_empty_needle_returns(self):
+        result = subprocess.run(
+            [
+                SHELL,
+                "-c",
+                f". {shlex.quote(COMMON)}; ccnavi_log_replace abc '' x;"
+                " printf '%s' \"$ccnavi_log_out\"",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual((0, "abc"), (result.returncode, result.stdout))
+
+    def test_a_given_root_is_used_without_searching(self):
+        # ccnavi-common.sh を持たない場所でも、渡されたルートに書く（探し直さない）。
+        other = tempfile.mkdtemp(prefix="ccnavi-diaglog-root-")
+        self.addCleanup(shutil.rmtree, other, ignore_errors=True)
+        self.run_sh(f"ccnavi_log_root={shlex.quote(other)}\nlog_info x")
+        self.assertTrue(os.path.isfile(os.path.join(other, "logs", "diag", "probe.log")))
+        self.assertEqual([], self.lines())
+
+
+def symlink(target: str, link: str) -> bool:
+    """リンクを張る。張れない環境（Windows の権限）なら偽。"""
+    try:
+        os.symlink(target, link)
+    except (OSError, NotImplementedError):
+        return False
+    return True
+
+
+class GuardScriptTest(_Workspace):
+    """reject / fail は識別子だけを診断ログに残す。文面と終了コードは契約のまま。"""
+
+    def setUp(self):
+        super().setUp()
+        for name in ("ccnavi-git.sh", "ccnavi-review.sh"):
+            shutil.copy(
+                os.path.join(ROOT, ".ccnavi", "scripts", name),
+                os.path.join(self.ws, ".ccnavi", "scripts"),
+            )
+
+    def run_script(self, name: str, *args: str):
+        return subprocess.run(
+            [SHELL, os.path.join(self.ws, ".ccnavi", "scripts", name), *args],
+            cwd=self.ws,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=base_env(CCNAVI_WORKSPACE=self.ws),
+            check=False,
+        )
+
+    def test_every_reject_and_fail_names_an_identifier(self):
+        for name, word in (("ccnavi-git.sh", "reject"), ("ccnavi-review.sh", "fail")):
+            with open(os.path.join(ROOT, ".ccnavi", "scripts", name), encoding="utf-8") as f:
+                calls = [
+                    x
+                    for x in f
+                    if re.search(rf"(^|[\s;|&(]){word} ", x) and not x.lstrip().startswith("#")
+                ]
+            self.assertTrue(calls, name)
+            for line in calls:
+                with self.subTest(script=name, line=line.strip()[:60]):
+                    self.assertRegex(line, rf"(^|[\s;|&(]){word} [a-z][a-z-]* \"")
+
+    def test_reject_logs_the_identifier_not_the_text(self):
+        result = self.run_script("ccnavi-git.sh", "log", "--upload-pack=https://u:SECRET@h/x")
+        self.assertEqual(2, result.returncode)
+        self.assertEqual(
+            "ccnavi-git: --upload-pack=https://u:SECRET@h/x は、"
+            "読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。"
+            "出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すので"
+            "そちらを読んでください。\n",
+            result.stderr,
+        )
+        (line,) = self.lines("ccnavi-git")
+        self.assertEqual("拒否した sub=log reason=output-or-exec", body(line)[2])
+
+    def test_reject_does_not_follow_a_linked_log(self):
+        """再現: logs/diag/ccnavi-git.log を判定の記録へのリンクにしても、リンク先に書かない。"""
+        diag = os.path.join(self.ws, "logs", "diag")
+        os.makedirs(diag)
+        victim = os.path.join(self.ws, "logs", "decisions.jsonl")
+        with open(victim, "w", encoding="utf-8") as f:
+            f.write("{}\n")
+        if not symlink("../decisions.jsonl", os.path.join(diag, "ccnavi-git.log")):
+            self.skipTest("リンクを作れない")
+        result = self.run_script("ccnavi-git.sh", "reset")
+        self.assertEqual(2, result.returncode)
+        self.assertTrue(
+            result.stderr.startswith("ccnavi-git: reset は作業中の変更やコミットを消します。")
+        )
+        with open(victim, encoding="utf-8") as f:
+            self.assertEqual("{}\n", f.read())
+
+    def test_fail_logs_the_identifier_not_the_text(self):
+        result = self.run_script("ccnavi-review.sh", "https://u:SECRET@h")
+        self.assertEqual(2, result.returncode)
+        self.assertEqual(
+            "ccnavi-review: https://u:SECRET@h は通しません。"
+            "使えるのは request / confirm / comment / decide / ready / close-early / fetch / "
+            "origin です。\n",
+            result.stderr,
+        )
+        (line,) = self.lines("ccnavi-review")
+        self.assertEqual("止めた sub=https://***@h exit=2 reason=unknown-sub", body(line)[2])
 
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
@@ -288,6 +462,13 @@ class SameLineTest(_Workspace):
                 ),
                 ("INFO ", "probe", "値の無い行"),
                 ("DEBUG", "probe", '判定の材料 sub=push path="/tmp/x y/z"'),
+                (
+                    "INFO ",
+                    "probe",
+                    "clone https://***@h/x を読んだ url=https://***@gitlab.example/x.git"
+                    " scp=***@gitlab.example:org/r.git plain=git@github.com:org/r.git"
+                    ' said="push to ssh://***@h:22/p failed"',
+                ),
             ],
             [body(x) for x in self.sh_lines()],
         )

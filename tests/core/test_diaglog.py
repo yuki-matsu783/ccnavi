@@ -7,8 +7,11 @@
    改行は `\\n` に畳む
 3. レベルの絞り込み。CCNAVI_LOG_LEVEL（大文字小文字を問わない）、空と読めない値は INFO
 4. 置き場は `<root>/logs/diag/<出どころ>.log`。無ければ作る。root が無ければ書かない
-5. 書けないときは黙って捨てる。標準出力にも標準エラーにも何も出さない。書く前に redact を通す
-6. prune は保持日数を過ぎた診断ログを消し、上限を超えたものをローテートする
+5. 書けないときは黙って捨てる。標準出力にも標準エラーにも何も出さない。書く前に
+   mask_userinfo（3 つの言語で共通の伏せ字）と redact を通す
+6. prune は保持日数を過ぎた診断ログを消し、上限を超えたものをローテートする。dry_run は本番と
+   同じ結果を示す
+7. リンク（logs・logs/diag・書き先）を辿らない。使えない字の出どころでは書かない。ファイルは 0600
 
 sh と拡張が同じ行を出すことは tests/sh/test_diaglog_sh.py が見る。
 """
@@ -208,6 +211,87 @@ class FailOpenTest(_Base):
         self.assertNotIn(token, line)
 
 
+class MaskTest(unittest.TestCase):
+    def test_url_and_scp_credentials_become_stars(self):
+        cases = {
+            "https://user:tok@host/x y": "https://***@host/x y",
+            "oauth2:tok@gitlab.example:org/r.git": "***@gitlab.example:org/r.git",
+            "git@github.com:org/r.git": "git@github.com:org/r.git",
+            "  a://b://c@d/e\tu:p@h:x\nz": "  a://b://***@d/e\t***@h:x\nz",
+            "no at": "no at",
+            "x@y": "x@y",
+            "@a:b": "@a:b",
+            "https://@h": "https://***@h",
+            "ssh://git@h:22/p https://a:b@c@d/p": "ssh://***@h:22/p https://***@d/p",
+        }
+        for given, expected in cases.items():
+            with self.subTest(given=given):
+                self.assertEqual(expected, diaglog.mask_userinfo(given))
+
+
+class LinkTest(_Base):
+    def link(self, target: str, path: str) -> None:
+        try:
+            os.symlink(target, path)
+        except (OSError, NotImplementedError):
+            self.skipTest("リンクを作れない")
+
+    def victim(self) -> str:
+        path = os.path.join(self.root, "logs", "decisions.jsonl")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{}\n")
+        return path
+
+    def assert_untouched(self, path: str) -> None:
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual("{}\n", f.read())
+
+    def test_a_linked_log_file_is_not_followed(self):
+        victim = self.victim()
+        os.makedirs(os.path.join(self.root, "logs", "diag"))
+        self.link("../decisions.jsonl", self.path())
+        diaglog.get("probe", self.root).error("x")
+        self.assert_untouched(victim)
+
+    def test_a_linked_log_file_is_not_followed_without_o_nofollow(self):
+        victim = self.victim()
+        os.makedirs(os.path.join(self.root, "logs", "diag"))
+        self.link("../decisions.jsonl", self.path())
+        with mock.patch.object(diaglog.os, "O_NOFOLLOW", 0, create=True):
+            diaglog.get("probe", self.root).error("x")
+        self.assert_untouched(victim)
+
+    def test_a_linked_place_is_not_followed(self):
+        outside = tempfile.mkdtemp(prefix="ccnavi-diaglog-out-")
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        os.makedirs(os.path.join(self.root, "logs"))
+        self.link(outside, os.path.join(self.root, "logs", "diag"))
+        diaglog.get("probe", self.root).error("x")
+        self.assertEqual([], os.listdir(outside))
+        shutil.rmtree(os.path.join(self.root, "logs"))
+        os.makedirs(os.path.join(outside, "diag"))
+        self.link(outside, os.path.join(self.root, "logs"))
+        diaglog.get("probe", self.root).error("x")
+        self.assertEqual([], os.listdir(os.path.join(outside, "diag")))
+
+    def test_a_name_with_other_characters_is_not_written(self):
+        for name in ("../escape", "a.b", "a b", "a/b", ""):
+            with self.subTest(name=name):
+                diaglog.get(name, self.root).error("x")
+                self.assertFalse(os.path.exists(os.path.join(self.root, "logs")))
+                self.assertFalse(os.path.exists(os.path.join(self.root, "escape.log")))
+
+    @unittest.skipIf(os.name == "nt", "権限のビットは POSIX だけ")
+    def test_a_new_file_is_owner_only(self):
+        saved = os.umask(0o022)
+        try:
+            diaglog.get("probe", self.root).info("x")
+        finally:
+            os.umask(saved)
+        self.assertEqual(0o600, os.stat(self.path()).st_mode & 0o777)
+
+
 class PruneDiagTest(_Base):
     def setUp(self):
         super().setUp()
@@ -254,6 +338,34 @@ class PruneDiagTest(_Base):
         self.assertEqual(1, len(report.rotated))
         (rotated,) = [n for n in os.listdir(self.diag) if n != "ccnavi.log"]
         self.assertRegex(rotated, r"^ccnavi\.\d{8}-\d{6}\.log$")
+
+    def test_dry_run_shows_what_the_real_run_does(self):
+        # 上限を超え、かつ保持日数も過ぎた 1 本。本番はローテートだけで消さないので、
+        # dry_run も「ローテート」にだけ並べる。
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "1"
+        self.put("ccnavi.log", 30, size=1024 * 1024 + 10)
+        preview = prune.run(self.root, "", "", dry_run=True)
+        self.assertEqual(1, len(preview.rotated))
+        self.assertEqual([], preview.logs)
+        real = prune.run(self.root, "", "")
+        self.assertEqual((len(preview.rotated), preview.logs), (len(real.rotated), real.logs))
+
+    def test_a_linked_logs_directory_is_not_followed(self):
+        outside = tempfile.mkdtemp(prefix="ccnavi-diaglog-out-")
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        os.makedirs(os.path.join(outside, "diag"))
+        victim = os.path.join(outside, "diag", "x.log")
+        with open(victim, "w", encoding="utf-8") as f:
+            f.write("x")
+        os.utime(victim, (0, 0))
+        shutil.rmtree(os.path.join(self.root, "logs"))
+        try:
+            os.symlink(outside, os.path.join(self.root, "logs"))
+        except OSError:
+            self.skipTest("リンクを作れない")
+        report = prune.run(self.root, "", "")
+        self.assertTrue(os.path.exists(victim))
+        self.assertTrue(any("リンク" in p for p in report.problems))
 
     def test_a_rotated_diag_log_is_not_rotated_again(self):
         os.environ[prune.LOG_ROTATE_MB_ENV] = "1"

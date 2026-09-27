@@ -238,8 +238,8 @@ def _rotated_pattern(log_path: str) -> re.Pattern[str]:
 
 def _rotate(
     report: Report, root: str, log_path: str, limit: int, dry_run: bool, now: float
-) -> None:
-    """大きさが上限を超えていたら名前を変える。
+) -> bool:
+    """大きさが上限を超えていたら名前を変える。変えた（dry_run なら変える）とき真。
 
     名前を変えるだけで、書き写さない。同じ時に追記している hook は、開いたハンドルのまま
     ローテート先へ書き、次の起動からは新しい `decisions.jsonl` を作って書く（audit は開くたびに
@@ -249,28 +249,29 @@ def _rotate(
     try:
         size = os.path.getsize(log_path)
     except OSError:
-        return
+        return False
     if size <= limit:
-        return
+        return False
     if dry_run:
         report.rotated.append((_shown(root, log_path), _shown(root, _rotated_name(log_path, now))))
-        return
+        return True
     target = ""
     try:
         target = _reserve(log_path, now)
         # 同じ時に始まった別のセッションが先に変えていれば、ここには小さい新しい記録がある。
         if os.path.getsize(log_path) <= limit:
             _drop(target)
-            return
+            return False
         os.replace(log_path, target)
     except FileNotFoundError:
         _drop(target)
-        return
+        return False
     except OSError as exc:
         _drop(target)
         report.problems.append(f"{_shown(root, log_path)} をローテートできない: {exc}")
-        return
+        return False
     report.rotated.append((_shown(root, log_path), _shown(root, target)))
+    return True
 
 
 def _drop(reserved: str) -> None:
@@ -308,14 +309,18 @@ def _prune_diag(
 
     出どころごとの 1 本が上限を超えていたら、記録と同じく `<出どころ>.<日時>.log` へ名前を
     変える（_rotate）。そのうえで、ローテートした分も含めて最後に書かれてから保持日数を過ぎた
-    `*.log` を消す。置き場がリンクなら辿らない（控えの置き場と同じ理由）。
+    `*.log` を消す。この回にローテートした 1 本はこの回には消さない（名前が変わって元の
+    場所から無くなるため）。dry_run でも同じ扱いにして、本番と同じ結果を示す。
+    置き場（`logs` か `logs/diag`）がリンクなら辿らない（控えの置き場と同じ理由。logger も
+    リンクの先には書かない）。
     """
     directory = os.path.join(root, diaglog.DIAG_DIR)
-    if os.path.islink(directory):
-        report.problems.append(
-            f"{_shown(root, directory)} はリンクなので辿らない（診断ログを消さない）"
-        )
-        return
+    for place in (os.path.dirname(directory), directory):
+        if os.path.islink(place):
+            report.problems.append(
+                f"{_shown(root, place)} はリンクなので辿らない（診断ログを消さない）"
+            )
+            return
     try:
         names = sorted(os.listdir(directory))
     except OSError:
@@ -330,8 +335,12 @@ def _prune_diag(
                 continue
         except OSError:
             continue
-        if rotate_mb > 0 and not _DIAG_ROTATED.search(name):
-            _rotate(report, root, path, int(rotate_mb * 1024 * 1024), dry_run, now)
+        if (
+            rotate_mb > 0
+            and not _DIAG_ROTATED.search(name)
+            and _rotate(report, root, path, int(rotate_mb * 1024 * 1024), dry_run, now)
+        ):
+            continue
         if log_days <= 0:
             continue
         try:

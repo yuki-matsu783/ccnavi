@@ -9,7 +9,12 @@
  * **画面にも console にも何も出さない。** 書けないときは黙って捨て、例外を外へ出さない。
  * 利用者に見せる通知（showErrorMessage など）とは別物で、そちらはこのモジュールと関係なく書く。
  *
- * 秘密を伏せる仕掛けは持たない。秘密の値・ファイルの中身・環境変数の値を渡さないのが決まり。
+ * 伏せるのは URL と scp 形に埋まった資格情報だけ（maskUserinfo。sh と Python と同じ読みで `***`）。
+ * ほかの秘密の形は伏せない。秘密の値・ファイルの中身・環境変数の値を渡さないのが決まり。
+ *
+ * **リンクは辿らない。** `logs`・`logs/diag`・書き先のどれかがシンボリックリンクなら書かずに捨てる
+ * （lstat で見て、書き先は O_NOFOLLOW のある OS ではそれでも開く）。ファイルは 0600 で作る。
+ * 出どころの名前が `[A-Za-z0-9_-]` 以外を含むときも書かない。
  *
  * node の型を剥がすだけで動く書き方にしてある（enum も引数のプロパティも使わない）。
  * Python のテスト（tests/core/test_diaglog.py）が `node` で直に読み、3 つの言語の行を比べる。
@@ -47,12 +52,13 @@ export function threshold(env: NodeJS.ProcessEnv = process.env): Level {
 export function get(name: string, root: string): Logger {
   const min = RANK[threshold()];
   const file = path.join(root, "logs", "diag", `${name}.log`);
+  const usable = root !== "" && NAME.test(name);
   const emit = (level: Level, msg: string, fields: Fields | undefined): void => {
-    if (RANK[level] < min || root === "") {
+    if (RANK[level] < min || !usable) {
       return;
     }
     try {
-      append(file, formatLine(stamp(new Date()), level, name, process.pid, msg, fields ?? {}));
+      append(file, formatLine(stamp(new Date()), level, name, process.pid, maskUserinfo(msg), masked(fields ?? {})));
     } catch {
       // ログの失敗で本体を止めない
     }
@@ -64,6 +70,64 @@ export function get(name: string, root: string): Logger {
     warn: (msg, fields) => emit("WARN", msg, fields),
     error: (msg, fields) => emit("ERROR", msg, fields),
   };
+}
+
+/** 出どころに使える名前。これ以外の字を含む名前では書かない */
+const NAME = /^[A-Za-z0-9_-]+$/;
+
+const MASK = "***";
+
+/** 値を文字にしてから伏せる。null と undefined は空のまま */
+function masked(fields: Fields): Fields {
+  const out: Record<string, Value> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    out[key] = maskUserinfo(text(value));
+  }
+  return out;
+}
+
+/**
+ * URL と scp 形に埋まった資格情報を `***` にする（sh の ccnavi_log_mask、Python の mask_userinfo と同じ読み）。
+ * 空白・タブ・LF・CR で切った語ごとに見る。`://` を含む語は authority（次の `/` まで）の最後の `@` より前を、
+ * 含まない語は最初の `/` より前の最後の `@` より前に `:` があればそこを伏せる。
+ */
+export function maskUserinfo(value: string): string {
+  if (!value.includes("@")) {
+    return value;
+  }
+  return value
+    .split(/([ \t\n\r]+)/)
+    .map((part, i) => (i % 2 === 1 ? part : maskWord(part)))
+    .join("");
+}
+
+function maskWord(word: string): string {
+  if (!word.includes("@")) {
+    return word;
+  }
+  if (!word.includes("://")) {
+    const head = word.split("/", 1)[0];
+    const at = head.lastIndexOf("@");
+    if (at < 0) {
+      return word;
+    }
+    const user = head.slice(0, at);
+    return user.includes(":") ? `${MASK}@${word.slice(at + 1)}` : word;
+  }
+  let out = "";
+  let rest = word;
+  for (let sep = rest.indexOf("://"); sep >= 0; sep = rest.indexOf("://")) {
+    out += `${rest.slice(0, sep)}://`;
+    rest = rest.slice(sep + 3);
+    const slash = rest.indexOf("/");
+    const authority = slash < 0 ? rest : rest.slice(0, slash);
+    const at = authority.lastIndexOf("@");
+    if (at >= 0) {
+      out += `${MASK}@${authority.slice(at + 1)}`;
+      rest = rest.slice(authority.length);
+    }
+  }
+  return out + rest;
 }
 
 function two(n: number): string {
@@ -113,16 +177,38 @@ export function formatLine(when: string, level: Level, name: string, pid: number
   return `${when} ${LABEL[level]} ${name}[${pid}] ${fold(msg)}${tail}`;
 }
 
-/** 1 行を O_APPEND で 1 度に書く。置き場が無ければ作る */
-function append(file: string, line: string): void {
-  const data = `${line}\n`;
+function isLink(target: string): boolean {
   try {
-    fs.appendFileSync(file, data, "utf8");
+    return fs.lstatSync(target).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 1 行を O_APPEND で 1 度に書く。置き場が無ければ作る。
+ * `logs`・`logs/diag`・書き先のどれかがリンクなら書かない。新しいファイルは 0600
+ */
+function append(file: string, line: string): void {
+  const dir = path.dirname(file);
+  if (isLink(path.dirname(dir)) || isLink(dir) || isLink(file)) {
+    return;
+  }
+  const c = fs.constants;
+  const flags = c.O_WRONLY | c.O_APPEND | c.O_CREAT | (c.O_NOFOLLOW ?? 0);
+  let fd: number;
+  try {
+    fd = fs.openSync(file, flags, 0o600);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       throw error;
     }
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.appendFileSync(file, data, "utf8");
+    fs.mkdirSync(dir, { recursive: true });
+    fd = fs.openSync(file, flags, 0o600);
+  }
+  try {
+    fs.writeSync(fd, `${line}\n`);
+  } finally {
+    fs.closeSync(fd);
   }
 }
