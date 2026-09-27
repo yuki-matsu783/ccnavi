@@ -1,3 +1,10 @@
+---
+type: adr
+title: 実行後の監視は git を起こし、外部プロセスを起こさない条件は実行前に限る
+description: "実行後の監視は git status で変更を確認し、外部プロセス条件は実行前に限定する"
+tags: [records, git]
+keywords: [実行後監視, git status, プロセス起動, 変更確認, worktree]
+---
 # ADR-0018: 実行後の監視は git を起こし、外部プロセスを起こさない条件は実行前に限る
 
 状態: 採用

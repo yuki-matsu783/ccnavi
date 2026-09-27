@@ -1,3 +1,11 @@
+---
+type: adr
+title: 共通層の置き場を .ccnavi/common/ に固定する
+description: 共通層（ルール、フェーズの種類、リスクの配点）の置き場を環境変数から固定に変え、3 層の決まり方を統一する
+tags: [config, rules]
+keywords: [共通層, 置き場, .ccnavi/common, 環境変数, 固定, ルール, フェーズ, リスク]
+---
+
 # ADR-0052: 共通層の置き場を `.ccnavi/common/` に固定する
 
 状態: 採用

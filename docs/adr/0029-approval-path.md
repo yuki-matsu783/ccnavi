@@ -1,3 +1,11 @@
+---
+type: adr
+title: チケットの承認の経路を守る
+description: 承認フローのパスを定義し、経路外の承認を防ぐ仕組み
+tags: [approval, ticket, rules]
+keywords: [承認, チケット, 経路, フロー, ルール, 制御]
+---
+
 # ADR-0029: チケットの承認の経路を守る
 
 状態: 採用

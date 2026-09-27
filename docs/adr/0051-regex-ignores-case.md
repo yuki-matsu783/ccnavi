@@ -1,3 +1,11 @@
+---
+type: adr
+title: regex も大文字小文字を区別せずに当てる
+description: ルールと範囲の regex を glob と同じように case-insensitive で当て、同じ宣言が機械で割れる形を無くす
+tags: [rules, config]
+keywords: [regex, 大文字小文字, 区別しない, glob, IGNORECASE, "(?-i:)"]
+---
+
 # ADR-0051: `regex` も大文字小文字を区別せずに当てる
 
 状態: 採用

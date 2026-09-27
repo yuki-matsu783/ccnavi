@@ -1,3 +1,11 @@
+---
+type: skill-reference
+title: 足す・直す
+description: ccnavi の設定（rules.yml、phases.yml、risks.yml）に新しいルールや設定を追加する方法と検証手順
+tags: [rules, config, skills]
+keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ルール, lint, 検証]
+---
+
 # 足す・直す
 
 書式の細部で迷ったら `ccnavi/rules.py` `ccnavi/phasetypes.py` `ccnavi/risk.py` の冒頭の docstring を読む。

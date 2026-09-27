@@ -1,3 +1,11 @@
+---
+type: design
+title: ccnavi 設計書
+description: ccnavi の実装がどう構成されているか。概要から詳細まで、設計原則と実装の全体像
+tags: [design-doc, state]
+keywords: [設計書, 実装, 脅威モデル, 判定, ルール, hook, チケット, ガード, 拒否]
+---
+
 # ccnavi 設計書
 
 いまの実装がどう作られているかを書く。

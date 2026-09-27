@@ -1,3 +1,10 @@
+---
+type: adr
+title: 配布は PyInstaller の onedir にする
+description: "PyInstaller の onedir 形式でフォルダごと配布し、起動速度と単一配布物のバランスを取る"
+tags: [build, launcher]
+keywords: [配布, PyInstaller, onedir, 起動速度, パフォーマンス, フォルダ]
+---
 # ADR-0002: 配布は PyInstaller の onedir にする
 
 状態: 採用

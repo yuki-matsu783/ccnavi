@@ -1,3 +1,10 @@
+---
+type: adr
+title: "match: Stop のルールで、ターンの終わり N 回に 1 度止めて文を渡せるようにする"
+description: "match: Stop のルールで、ターン終了時に N 回に 1 度止めて文を渡す"
+tags: [rules, review, hook]
+keywords: ["match: Stop", nudge, every, ターン終了, ルール, 促し, スキル]
+---
 # ADR-0090: `match: Stop` のルールで、ターンの終わり N 回に 1 度止めて文を渡せるようにする
 
 状態: 採用

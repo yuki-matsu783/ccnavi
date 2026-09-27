@@ -1,3 +1,11 @@
+---
+type: adr
+title: 探すツールが読むファイルの守りは、ルールに足さず 3 層に分ける
+description: Grep と Glob が読むファイルの守りを ccnavi ルール、.gitignore、Read() の deny で 3 層に分担する
+tags: [selfguard, rules]
+keywords: [Grep, Glob, credentials, .gitignore, 3層, ファイル, 守り]
+---
+
 # ADR-0050: 探すツールが読むファイルの守りは、ルールに足さず 3 層に分ける
 
 状態: 採用

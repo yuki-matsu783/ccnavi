@@ -1,3 +1,10 @@
+---
+type: adr
+title: "設定は `.claude/settings.json` の `env` に置く"
+description: ".claude/settings.json の env ブロックに ccnavi の設定を置き、hook と設定を統一管理する"
+tags: [config, settings]
+keywords: [設定, env, .claude/settings.json, 環境変数, hook, 統一管理]
+---
 # ADR-0005: 設定は `.claude/settings.json` の `env` に置く
 
 状態: 採用
