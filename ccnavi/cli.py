@@ -33,6 +33,7 @@ from . import (
     ruleload,
     selfguard,
     settings,
+    suggest,
 )
 from .modes import EXIT_ERROR, EXIT_OK
 
@@ -97,6 +98,17 @@ in a file against them, run
 
 Both go through the same decision as the hook. --json prints the shape
 documented in README.md ("試験の JSON"); the VS Code extension reads it.
+
+To draft rules from the decision log (logs/log.jsonl and its rotated
+log.*.jsonl), run
+
+    ccnavi --suggest [--json]
+
+It lists deny/ask drafts only: calls no rule mentioned that kept being handed
+over, and denies that kept stopping the same call (review their message).
+Each draft passed the same checks as --lint and --test-samples; the rest are
+counted and dropped. Nothing is written. --json prints the shape documented in
+README.md ("候補の JSON"); the VS Code extension reads it.
 
 To review the pending tickets and approve the work areas they declare, run
 
@@ -350,6 +362,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 見本をぜんぶ判定に掛ける。tools/check_rules.py と VS Code 拡張が呼ぶ。
     parser.add_argument("--test-samples", metavar="FILE", default="")
     parser.add_argument("--explain", action="store_true")
+    # 記録からルールの候補を起こす（suggest）。読むだけで、何も書かない。
+    parser.add_argument("--suggest", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tickets", default="")
     parser.add_argument("--approved", default=None)
@@ -399,7 +413,13 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 設定を保存せずに緩める道になるので、そこでは無視する（ADR-0067）。
     # 診断は payload を読まず、判定を実行にも記録にも繋げないので、保存していない設定を
     # 指しても実運用に漏れない。
-    diagnosing = args.lint or args.test is not None or bool(args.test_samples) or args.explain
+    diagnosing = (
+        args.lint
+        or args.test is not None
+        or bool(args.test_samples)
+        or args.explain
+        or args.suggest
+    )
     if not diagnosing:
         _drop_outside_diagnosis(stderr, args)
 
@@ -481,6 +501,8 @@ def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         return diagnose.test(stdout, stderr, conf, root, args.test[0], args.test[1])
     if args.test_samples:
         return diagnose.test_samples(stdout, stderr, conf, root, args.test_samples, args.json)
+    if args.suggest:
+        return suggest.report(stdout, conf, root, args.json)
     if args.explain and args.json:
         return diagnose.explain_json(stdout, stderr, conf, root)
     if args.explain:
