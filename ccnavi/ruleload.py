@@ -26,6 +26,7 @@ deny が消える側になる。共通層自身が読めないときだけ、今
 
 from __future__ import annotations
 
+import io
 import os
 from dataclasses import dataclass, field
 from typing import TextIO
@@ -360,3 +361,28 @@ def prefix_ids(rule_set: rules.RuleSet, layer: str) -> None:
     for rule in rule_set.all():
         if rule.id:
             rule.id = f"{layer}{rules.ID_SEPARATOR}{rule.id}"
+
+
+def stop_rules(conf: settings.Settings, root: str) -> list[rules.Rule]:
+    """ターンの終わりに当てるルール。共通層とワークスペース自身の層の `allow` だけ。
+
+    - プロジェクトの層は見ない。共通層を配った写し（ADR-0084）が古くなっても二重に数えない
+    - 同じ id（層の前置きを除いた綴り）は最初の 1 本だけ
+    - `every` が 2 より小さいものは使わない。ターンの終わりのたびに止まる（`--lint` も言う）
+    """
+    said = io.StringIO()
+    rule_set, source = load_rules(said, conf, audit.Record(), root)
+    if source != builtin.SOURCE:
+        own = [layer for layer in layers(conf, root) if layer.name == LAYER_SELF]
+        add_layers(said, rule_set, own, root, audit.Record())
+    picked: list[rules.Rule] = []
+    seen: set[str] = set()
+    for rule in rule_set.allow:
+        if rule.every < 2 or not rule.matches(rules.STOP_MATCH, rules.STOP_SUBJECT):
+            continue
+        key = rule.bare_id or rule.id
+        if key and key in seen:
+            continue
+        seen.add(key)
+        picked.append(rule)
+    return picked

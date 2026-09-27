@@ -31,6 +31,7 @@ import unittest
 
 from ccnavi import phase as phase_mod
 from ccnavi import settings, shellread, ticket
+from ccnavi.subagent import CANDIDATE_NOTE
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -1732,7 +1733,8 @@ class TicketTest(unittest.TestCase):
         for cwd in (self.root, self.worktree("research-abc", "main")):
             result = self.hook("SubagentStart", "", cwd, agent_id="sub-r")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(self.reason(result), "", cwd)
+            # 子の一覧は渡らない。どの起動にも付く「スキル候補」の 1 行（ADR-0090）だけ。
+            self.assertEqual(self.reason(result), CANDIDATE_NOTE, cwd)
         # 子のワークツリーからは、その子だけ。
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01")
         text = self.reason(self.hook("SubagentStart", "", child, agent_id="sub-1"))

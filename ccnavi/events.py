@@ -25,6 +25,7 @@ from . import (
     ops,
     phase,
     post,
+    projskills,
     prune,
     reasons,
     repeat,
@@ -36,6 +37,16 @@ from . import (
     tree,
 )
 from .modes import EXIT_BLOCK, EXIT_OK
+
+# `match: Stop` のルールで止めた回の理由コード（ADR-0090）。記録の `code` と、止めた文の頭に出る。
+CODE_RULE_NUDGE = "NUDGE_STOP_RULE"
+# `match: Stop` のルールで止めたとき、ルールの文の前に必ず置く文（ADR-0090）。ルールの文や
+# 指したファイルが差し替わっても、止めた回の扱いがここで決まるように、実行ファイルに持つ。
+STOP_PREFACE = (
+    "これはタスクの続きではない。ここまでの作業の振り返りだけをし、ほかの作業は始めない。"
+    "このターンが利用者への問い・確認で終わっていたなら、振り返りの後にその問いを最後にもう一度書く。"
+    "振り返って何も無ければ「振り返り: 無し」とだけ答える。"
+)
 
 
 def decide(
@@ -67,7 +78,7 @@ def decide(
     if payload.event == hookio.STOP:
         return decide_at_stop(stdout, stderr, mode, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_START:
-        return subagent.at_start(stdout, conf, root, payload, record)
+        return subagent.at_start(stdout, stderr, conf, root, payload, record)
     if payload.event == hookio.SUBAGENT_STOP:
         return subagent.at_stop(stdout, stderr, mode, conf, root, payload, record)
     # 判定を持たないイベントは誤りではない。想定していない登録が
@@ -212,6 +223,9 @@ def decide_at_stop(
     `finish` されていないとき、1 回の連鎖に 1 回だけ止めて `finish` か続ける理由を促す
     （ADR-0087、`_finish_nudge`）。こちらはモードを見る。enable でだけ止め、dry-run では
     止めたはずの文を報告に載せる。止めるときも報告は同じ応答の `systemMessage` で返す。
+
+    `finish` を促さなかった回に限り、`match: Stop` のルールが渡す回ならそこで止める
+    （ADR-0090、`stop_rules_nudge`）。止め方とモードの扱いは `finish` の促しと同じ。
     """
     watched, scope = watch_context(stderr, conf, root, record)
     report = post.at_stop(
@@ -231,6 +245,10 @@ def decide_at_stop(
     if repeated:
         report = f"{report}\n\n{repeated}" if report else repeated
     nudge = _finish_nudge(stderr, conf, root, payload, record, mode)
+    if not nudge:
+        # finish の促しで止める回は、ルールの促しを数えもしない（ADR-0090）。1 回の Stop で
+        # 止める理由は 1 つだけにし、数えを進めて届かない回を作らない。
+        nudge = stop_rules_nudge(stderr, conf, root, payload, record, mode)
     if nudge and mode == modes.ENABLE:
         hookio.write_stop_block(stdout, nudge, system=report)
         return EXIT_OK
@@ -241,6 +259,59 @@ def decide_at_stop(
     if report:
         hookio.write_system_message(stdout, report)
     return EXIT_OK
+
+
+def stop_rules_nudge(
+    stderr: TextIO,
+    conf: settings.Settings,
+    root: str,
+    payload: hookio.Input,
+    record: audit.Record,
+    mode: str,
+) -> str:
+    """`match: Stop` の `allow` のルールが、このターンの終わりで止めて渡す文（ADR-0090）。
+
+    書いたルールが無ければ空で、これまでどおり止めない。何を言うか・何回に 1 度かは
+    設定が持ち、ここは当てて数えるだけ（ADR-0057 と同じ分け方）。`every: 10` と書けば
+    「ターンの終わり 10 回に 1 度」止める。
+
+    ルールは共通層とワークスペース自身の層からだけ引く（`ruleload.stop_rules`）。プロジェクトの層は
+    外のリポジトリで、そこに書かれた 1 行が cwd に依らずメインのターンの終わりを止められて
+    しまうため。本文のファイルもワークスペースルートの版だけを読む（ワークツリーやプロジェクトの
+    写しはエージェントが書き換えられる）。
+
+    止めない回:
+
+    - `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降）。数えもしない
+    - サブエージェント（`agent_id` がある）。候補は報告に添えてメインに返す決まり
+    - 数えを覚えられない（`--state ""`、控えを読めない・書けない）。覚えられないまま止めると
+      ターンの終わりのたびに止まるので、黙る側を採る（ADR-0087 と同じ）
+
+    数えは `ctxfile.stop_path` に置き、compact・再開・clear では捨てない。渡す文の頭には
+    `STOP_PREFACE` を必ず付ける。止めた回がタスクの続きと読まれず、利用者への問いで終わった
+    ターンの問いが消えないように。記録の `rules` には、実際に渡したルールだけを残す。
+    """
+    if payload.stop_hook_active or payload.agent_id or not conf.state:
+        return ""
+    group = ruleload.stop_rules(conf, root)
+    if not group:
+        return ""
+    counts = ctxfile.stop_path(conf.state, payload.session_id)
+    parts: list[str] = []
+    delivered: list[str] = []
+    for rule in group:
+        text = ctxfile.for_rules(
+            stderr, conf.state, payload, [rule], [root], unsure_speaks=False, counts_path=counts
+        )
+        if text:
+            parts.append(text)
+            delivered.append(rule.id or f"({rules.ALLOW})")
+    if not parts:
+        return ""
+    record.decision, record.code = audit.NUDGE, CODE_RULE_NUDGE
+    record.enforced = mode == modes.ENABLE
+    record.rules = [*record.rules, *delivered]
+    return f"{CODE_RULE_NUDGE}: {STOP_PREFACE}\n\n" + "\n\n".join(parts)
 
 
 def _finish_nudge(
@@ -310,7 +381,7 @@ def decide_at_start(
     # 渡した回の数えはここで捨てる。このイベントは起動だけでなく再開と compact の後にも
     # 来るので、モデルの文脈が新しくなるたびに「1 度だけ渡す文」は改めて届き、`every` の
     # 刻みも 0 から数え直しになる。
-    ctxfile.forget(conf.state, payload.session_id)
+    ctxfile.forget(conf.state, payload.session_id, startup=payload.source == "startup")
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
@@ -322,6 +393,10 @@ def decide_at_start(
         texts.append(selfguard.report(outcomes))
     if conf.tickets_enabled:
         texts.append(reasons.ways_of_working(conf, root, mode))
+    # cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録（ADR-0091）。
+    skills = projskills.notice(stderr, conf, root, payload, at_start=True)
+    if skills:
+        texts.append(skills)
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK

@@ -20,6 +20,7 @@ from . import (
     hookio,
     modes,
     phase,
+    projskills,
     reasons,
     repeat,
     ruleload,
@@ -510,6 +511,11 @@ def decide_before(
             )
             if p
         )
+    # cwd がプロジェクトの中に入った最初の呼び出しで、そのプロジェクトのスキルの目録を 1 度だけ
+    # 添える（ADR-0091）。セッションはワークスペースルートで始まり、あとから cd で入るのがふつう。
+    skills = projskills.notice(stderr, conf, root, payload)
+    if skills:
+        told = "\n\n".join(p for p in (told, skills) if p)
     if told:
         context = "\n\n".join(p for p in (told, context) if p)
 
