@@ -71,6 +71,7 @@ root=$(ccnavi_workspace) || {
 # 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 # `set --` の右の "$@" は置き換える前の引数（並べた識別子）に展開される。
 if bin=$(ccnavi_bin "$root"); then
+	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-approve: %s\n' "$skew" >&2
 	set -- "$bin" --root "$root" --approve "$@"
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	set -- uv run python -m ccnavi --root "$root" --approve "$@"
