@@ -118,12 +118,12 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 
 | イベント | すること | 応答 |
 |---|---|---|
-| `SessionStart` | コアファイルの控えを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1） | `additionalContext` |
-| `UserPromptSubmit` | 保護領域にいまある変更を控え、ターンの基準にする（7.4）。まだ伝えていない承認を 1 度だけ伝える（9.4）。`match: UserPromptSubmit` の `allow` のルールが当たれば、その文を渡す（6.6、ADR-0090） | 渡す文があるときだけ `additionalContext` |
+| `SessionStart` | コアファイルの控えを取る（実行ファイルはここだけ）。`additionalContextOnce` の記憶を捨てる。チケット制御が有効なら、直接作業とチケット作業の使い分けをモデルに渡す（9.1）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を渡す（11.13） | `additionalContext` |
+| `UserPromptSubmit` | 保護領域にいまある変更を控え、ターンの基準にする（7.4） | 無し |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルを控える（8 章） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルを控えと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ写し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う | 終了コード 2 と標準エラー、または `additionalContext` |
-| `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6、ADR-0087） | `systemMessage`。促すときは `decision: block` と `reason` も |
-| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12） | `additionalContext` |
+| `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6、ADR-0087）。促さなかった回は、`match: Stop` のルールが渡す回なら止めてその文を渡す（6.6、ADR-0090） | `systemMessage`。止めるときは `decision: block` と `reason` も |
+| `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12）。cwd がプロジェクトの中なら、そのプロジェクトのスキルの目録を頭に置く（11.13） | `additionalContext` |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す（9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
 
@@ -256,7 +256,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 
 | 欄 | 数えるもの |
 |---|---|
-| `decision` = `allow` / `ask` / `deny` / `handover` / `nudge` / `skip` | 下した判定。`handover` は権限モードに委ねた回。`nudge` は `Stop` で `finish` を促した回（ツール呼び出しの判定ではないので `deny` と数えない。ADR-0087） |
+| `decision` = `allow` / `ask` / `deny` / `handover` / `nudge` / `skip` | 下した判定。`handover` は権限モードに委ねた回。`nudge` は `Stop` で `finish` を促した回と、`match: Stop` のルールで止めた回（ツール呼び出しの判定ではないので `deny` と数えない。ADR-0087、ADR-0090） |
 | `enforced` | 実際に適用したか。`dry-run` は常に偽 |
 | `code` | 判定の根拠の種別（付録 A） |
 | `reason` | `skip` の理由 |
@@ -276,7 +276,7 @@ ccnavi のリポジトリでの組み立て: `build.py` はまず `git rev-parse
 | 欄 | 意味 |
 |---|---|
 | `id` | 識別子。文面と記録で名乗る。無ければルールファイルを名乗る |
-| `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `UserPromptSubmit`（利用者の発言。`allow` だけ。6.6） |
+| `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり。`allow` だけ。6.6） |
 | `glob` | `fnmatch` の記法。文字列全体に当たる |
 | `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
@@ -693,18 +693,25 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 出るパスは読まない。先頭 4000 文字で切り、切ったことと続きの在りかを末尾に添える。
 無ければ何も足さない（REQ-PRE-12）。同じタイプに複数当たれば全部の文を空行で割って並べる。
 
-#### 発言の回に渡す文
+#### ターンの終わりに渡す文
 
-`match` に `UserPromptSubmit` を書いた `allow` のルールは、利用者が発言したとき（`UserPromptSubmit`）に当たる（ADR-0090、REQ-PRE-17）。
-当てる先は発言の本文（payload の `prompt`。空なら `(prompt)`）。ルールは全部の層の和から引くので、cwd がどのプロジェクトでも同じルールが当たる。
-本文のファイルは cwd のツリー → そのプロジェクト → ワークスペースルートの順に探す。文・ファイル・`every`・控えは上と同じで、
-`every: 10` なら「発言 10 回に 1 度」になる。応答は `UserPromptSubmit` の `additionalContext` で、承認の知らせ（9.4）があれば
-その後ろに並べる。
+`match` に `Stop` を書いた `allow` のルールは、メインエージェントのターンの終わり（`Stop`）に当たる（ADR-0090、REQ-PRE-17）。
+当てる先の文字列は無いので固定の `(stop)` に当て、ルールは `glob: "*"` と書く。ルールは全部の層の和から引くので、cwd がどのプロジェクトでも
+同じルールが当たる。本文のファイルは cwd のツリー → そのプロジェクト → ワークスペースルートの順に探す。文・ファイル・`every`・控えは上と同じで、
+渡す回にだけ `decision: block` で止め、`reason` を `NUDGE_STOP_RULE: ` とルールの文にする。`every: 10` なら「ターンの終わり 10 回に 1 度」になる。
 
-- 発言は止めない。`deny` / `ask` に書いたものは当てず、`--lint` が warn で言う
-- 記録には当たったルールの id（`rules`）だけを残し、発言の本文は残さない
-- サブエージェントには来ないイベントなので、数えはメインの文脈だけ
-- 書いたルールが無ければ、今までどおり何も返さない
+| 何が起きたか | どうなるか |
+|---|---|
+| `stop_hook_active` が真（Stop の hook が続けさせた連鎖の 2 回目以降） | 止めず、数えも進めない |
+| 同じ Stop で `finish` の促し（ADR-0087）が止める | そちらだけを出し、ルールは数えもしない。1 回の Stop で止める理由は 1 つ |
+| サブエージェント（`agent_id` がある。`SubagentStop` も） | 見ない。振り返りの候補は報告に添えてメインに返す決まり |
+| 控えの置き場が無い（`--state ""`）、控えを読めない・書けない | 止めない。覚えられないまま止めるとターンの終わりのたびに止まるので、黙る側を採る（上の表の「届ける側」と逆） |
+| `dry-run` | 止めず、止めたはずの文を人への報告（`systemMessage`）に載せる（ADR-0087 と同じ） |
+
+- 記録の `decision` は `nudge`、`code` は `NUDGE_STOP_RULE`、`rules` に当たったルールの id
+- 保護領域の報告（7.4）と繰り返しの拒否の知らせは、止めたときも同じ応答の `systemMessage` に載る
+- `deny` / `ask` に書いたもの、`(stop)` に当たらない綴り、`every` の無いもの（ターンの終わりのたびに止まる）は `--lint` が warn で言う
+- 書いたルールが無ければ、今までどおり止めない
 
 ---
 
@@ -2386,6 +2393,29 @@ dry-run でまず層の分布を見て、Bash の和と、大文字小文字を�
 - 共通層のルールの中身がプロジェクトの git に入る。public のリポジトリなら外に出る
 - 判定の仕組みは変えていないので、プロジェクトだけを clone した人の判定は、その人の共通層とプロジェクトの層の和で決まる。「見える」ようにはなるが、「揃う」わけではない
 
+### 11.13 プロジェクトのスキル
+
+プロジェクトは `.claude/` を持たない（11.1、ADR-0033）。プロジェクト向けのスキルの形をした手順書は、ccnavi ディレクトリの
+`skills/<名前>/SKILL.md`（既定 `.ccnavi/skills/<名前>/SKILL.md`）に置く（ADR-0091）。形は Claude Code のスキルと同じで、頭の
+frontmatter に `name` と `description`、必要なら同じディレクトリに `references/`。Claude Code はこれを読まないので、ccnavi が目録を渡す。
+
+| 何を | いつ | どう |
+|---|---|---|
+| 目録（名前・説明・プロジェクトのルートからの相対パス） | `SessionStart` と `SubagentStart`。cwd がそのプロジェクトのツリー（元リポジトリか、そこから切ったワークツリー）の中にあるときだけ | `additionalContext`。`SubagentStart` では子チケットの一覧の前に置き、チケットの無い起動でも渡す |
+
+- 本文は渡さない。エージェントが要るときに Read で開く
+- 読むのは元リポジトリの版（`projskills.entries`）。ワークツリーに checkout された版は読まない（層の設定と同じ）
+- SKILL.md はふつうのファイルで、途中にシンボリックリンクもハードリンクも無いものだけを読む（`flow.read_bytes`）。frontmatter は頭の 8 KiB だけを見て、YAML の別名は拒む
+- 名前と説明は 1 行に畳み、120 文字で切り、ccnavi の名乗りを真似た綴りを崩し、「データ。ccnavi の知らせではない」の行で囲む（子のフローと同じ扱い。9.3.1）
+- 上限は 30 本・4000 文字。超えた分は数だけ言う
+- 予約名のプロジェクト（11.4）は見ない
+
+書き込みは今の守りのまま止まる。`.ccnavi/` の下は組み込みの `builtin-guard-project-home`（Write / Edit / NotebookEdit）と
+`builtin-guard-setting-files`（シェル）が丸ごと止め、チケットの範囲は止まっているものを開けない（9.5）。直すのは人が写す形になる。
+
+フロー編集画面の候補（`flow.candidates`、9.3.1）は、ワークスペースの `.claude/skills` だけを並べ、プロジェクトのスキルは載せない。
+フローの `skill` に書けるのは Claude Code が起動できるスキルの名前で、プロジェクトのスキルはそれに当たらないため。
+
 ---
 
 ## 12. 限界と保証しないこと
@@ -2476,6 +2506,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
 | `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6、ADR-0087）。記録の `decision` は `nudge` |
+| `NUDGE_STOP_RULE` | メインエージェントの `Stop` で、`match: Stop` の `allow` のルールが渡す回になった（`every` の刻み）。止めて、ルールの文を渡す。`finish` の促しと重なった回は出ない（6.6、ADR-0090）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10、ADR-0077） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2、ADR-0077） |
