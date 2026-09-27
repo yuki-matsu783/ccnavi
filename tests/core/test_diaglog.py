@@ -392,5 +392,66 @@ class PruneDiagTest(_Base):
         self.assertTrue(any("リンク" in p for p in report.problems))
 
 
+class PruneDiagRotateNameTest(_Base):
+    """ローテート先の名前がぶつかったときと、ローテートの後に作られるファイルの権限。"""
+
+    def setUp(self):
+        super().setUp()
+        for name, _ in prune.LIMITS:
+            os.environ.pop(name, None)
+        self.diag = os.path.join(self.root, "logs", "diag")
+        os.makedirs(self.diag)
+
+    put = PruneDiagTest.put
+
+    def big(self) -> str:
+        os.environ[prune.LOG_ROTATE_MB_ENV] = "1"
+        return self.put("ccnavi.log", 0, size=1024 * 1024 + 10)
+
+    def taken(self, now: float) -> str:
+        """同じ秒に別のセッションが先にローテートした 1 本。"""
+        stamp = time.strftime(prune.STAMP, time.localtime(now))
+        return self.put(f"ccnavi.{stamp}.log", 0, size=5)
+
+    def test_the_same_second_gets_dash_2(self):
+        now = time.time()
+        self.big()
+        first = self.taken(now)
+        report = prune.run(self.root, "", "", now=now)
+        stamp = time.strftime(prune.STAMP, time.localtime(now))
+        self.assertEqual(
+            [("logs/diag/ccnavi.log", f"logs/diag/ccnavi.{stamp}-2.log")], report.rotated
+        )
+        # 先の 1 本は上書きされず、そのまま残る。
+        with open(first, encoding="utf-8") as f:
+            self.assertEqual("aaaaa", f.read())
+        self.assertTrue(os.path.exists(os.path.join(self.diag, f"ccnavi.{stamp}-2.log")))
+        self.assertFalse(os.path.exists(os.path.join(self.diag, "ccnavi.log")))
+
+    def test_dry_run_names_dash_2_too(self):
+        now = time.time()
+        self.big()
+        self.taken(now)
+        preview = prune.run(self.root, "", "", dry_run=True, now=now)
+        stamp = time.strftime(prune.STAMP, time.localtime(now))
+        self.assertEqual(
+            [("logs/diag/ccnavi.log", f"logs/diag/ccnavi.{stamp}-2.log")], preview.rotated
+        )
+        self.assertFalse(os.path.exists(os.path.join(self.diag, f"ccnavi.{stamp}-2.log")))
+
+    @unittest.skipIf(os.name == "nt", "権限のビットは POSIX だけ")
+    def test_the_file_made_after_rotation_is_owner_only(self):
+        self.big()
+        report = prune.run(self.root, "", "")
+        self.assertEqual(1, len(report.rotated))
+        saved = os.umask(0o022)
+        try:
+            diaglog.get("ccnavi", self.root).info("ローテートの後の 1 行")
+        finally:
+            os.umask(saved)
+        self.assertEqual(0o600, os.stat(self.path("ccnavi")).st_mode & 0o777)
+        self.assertEqual(1, len(self.lines("ccnavi")))
+
+
 if __name__ == "__main__":
     unittest.main()
