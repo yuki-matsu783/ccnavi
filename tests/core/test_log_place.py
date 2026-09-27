@@ -1,4 +1,4 @@
-"""記録は `<root>/logs/log.jsonl`、控えは `<root>/logs/state`。空文字の口は無い（ADR-0084 の A4）。
+"""記録は `<root>/logs/log.jsonl`、控えは `<root>/logs/state`。空文字の口は無い（ADR-0092 の A4）。
 
 `CCNAVI_LOG=""` は「記録しない」、`CCNAVI_STATE=""` は「控えを持たない」と読まれていた。
 6 つの env を廃止したので、空文字を入れても既定の置き場に書かれる。

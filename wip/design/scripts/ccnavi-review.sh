@@ -82,7 +82,7 @@ esac
 root=$(ccnavi_workspace) ||
 	fail "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
 here="$(pwd -W 2>/dev/null || pwd)"
-state="$root/logs/state" # 固定（ADR-0084）
+state="$root/logs/state" # 固定（ADR-0092）
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 

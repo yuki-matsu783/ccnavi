@@ -9,7 +9,7 @@
 # ボードの承認は端末に送った 1 行が呼ぶ。対になるのはセッションの頭に取ってくる ccnavi-fetch.sh。
 #
 # 数えるツリーは、ワークスペース、projects/ の下、.claude/worktrees/ の下。
-# 置き場は .ccnavi/approved/（置き場はどれも固定、ADR-0084）。承認は提案を
+# 置き場は .ccnavi/approved/（置き場はどれも固定、ADR-0092）。承認は提案を
 # wip/proposals/todo/ から動かすので（ADR-0055）、
 # そこで追跡されていたファイルの削除も同じコミットに入れる。todo/ の書きかけ（未追跡・編集中）は運ばない。
 #
@@ -55,9 +55,9 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved=.ccnavi/approved # 固定（ADR-0084）
-proposals=wip/proposals   # 固定（ADR-0084）
-projects=projects         # 固定（ADR-0084）
+approved=.ccnavi/approved # 固定（ADR-0092）
+proposals=wip/proposals   # 固定（ADR-0092）
+projects=projects         # 固定（ADR-0092）
 # ボードのフロー編集画面が保存の途中で置く一時ファイル（flows/ の下の `.<名前>.<番号>.tmp`）。
 # 落ちて残っても運ばない。書きかけの中身を人の手順書としてコミットしないため。
 skip_temp=":(exclude)$approved/flows/.*.tmp"

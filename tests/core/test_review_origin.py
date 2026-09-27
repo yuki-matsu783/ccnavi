@@ -112,7 +112,7 @@ class OriginSubcommandTest(unittest.TestCase):
         self.assertIn("origin=http://<伏せた>@127.0.0.1:9/root/p.git", result.stdout)
 
     def test_the_state_variable_is_not_read(self):
-        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（ADR-0084、A9）。
+        """`CCNAVI_STATE=/x` を入れても、sh は控えを `logs/state/` に置く（ADR-0092、A9）。
 
         sh は起動のたびに控えの置き場を作る（`mkdir -p "$state"`）。以前は `$root/` に
         `CCNAVI_STATE` を継ぎ足すので、絶対パスを入れると存在しない置き場を見ていた。

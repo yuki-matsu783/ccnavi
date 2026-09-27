@@ -674,7 +674,7 @@ class ResetGuidanceTest(GitWrapperTest):
 
 
 class PlacesAreNotReadTest(GitWrapperTest):
-    """置き場を動かす環境変数は読まない（ADR-0084、A9）。
+    """置き場を動かす環境変数は読まない（ADR-0092、A9）。
 
     `.ccnavi/scripts/` が写す版（i0064-04 の `wip/design/scripts/`）になる前は落ちる。
     写す前の sh（`ccnavi-common.sh` の `ccnavi_project`）は `CCNAVI_PROJECTS` を読むため。

@@ -529,7 +529,7 @@ push)
 			# ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・
 			# .claude/worktrees/ の下。approval.trees）を全部見る。識別子は重ならないので、
 			# どこで見つかってもこのツリーの子のもの。
-			# 置き場は固定（ADR-0084）。綴りは ccnavi の既定（settings.py の DEFAULT_PROJECTS・
+			# 置き場は固定（ADR-0092）。綴りは ccnavi の既定（settings.py の DEFAULT_PROJECTS・
 			# DEFAULT_TICKETS・DEFAULT_APPROVED）と揃える。ずれると、この検査が黙って飛ぶ。
 			# hook の同じ検査（wrapguard.py の子の push）と同じ場所を見る（ADR-0077 の 2 重目）。
 			push_projects="$push_root/projects"

@@ -647,7 +647,7 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_scripts_に置いた振り分けの実体は名指しのツールから止まる(self):
         # G2。既定の置き場では ccnavi ディレクトリの守り（`*/.ccnavi/*`）と二重に止まり、
-        # 先に名指しされるのはそちら。ccnavi ディレクトリの名前は動かせない（ADR-0084）ので、
+        # 先に名指しされるのはそちら。ccnavi ディレクトリの名前は動かせない（ADR-0092）ので、
         # 残った実行ファイル由来の守りが止めていることは、`.ccnavi/` の外に置いた
         # 振り分け（`tools/`）で確かめる（REQ-SLF-07 を ccnavi ディレクトリの守りに
         # 寄りかからせない）。
