@@ -116,6 +116,10 @@ LAUNCHER_NAME = "ccnavi-launcher.sh"
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_BIN_PATH に書く綴り。固定。
 BIN_PATH = "/".join(LAUNCHER_PARTS)
+# 配布先の .gitignore に足す `--docs` の索引の 1 行と見出し。docsearch は git がそこの
+# index.jsonl を無視しているときだけ書く（README「ドキュメントの索引」）。
+INDEX_LINE = "**/index.jsonl"
+INDEX_HEADER = "# ccnavi --docs が書く索引（scripts/ccnavi-setup.sh）"
 
 
 def section(stdout, heading):
@@ -1282,7 +1286,8 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
 
         written = self.gitignore()
         lines = [line for line in written.splitlines() if line.strip() and not line.startswith("#")]
-        self.assertEqual(lines, [f"/.ccnavi/bin/{THIS_MACHINE}/"])
+        # 実行ファイルの置き場のほかは、`--docs` の索引の 1 行だけ（KeepsTheIndexOutOfGit）。
+        self.assertEqual(lines, [f"/.ccnavi/bin/{THIS_MACHINE}/", INDEX_LINE])
         for wide in (
             "/.ccnavi/",
             "/.ccnavi/bin/",
@@ -1365,6 +1370,91 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1)
         self.assertIn(".gitignore に足す", result.stdout)
+
+
+class KeepsTheIndexOutOfGit(DeploysWhatTheProjectNeeds):
+    """`--docs` の索引（`**/index.jsonl`）を .gitignore に足す。
+
+    docsearch は git がそこの index.jsonl を無視しているときだけ書く。無視の 1 行が無い
+    配布先では、配った実行ファイルの `--docs` が索引を作らない。
+    """
+
+    def write_gitignore(self, text):
+        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+
+    def test_adds_the_line_under_its_own_header(self):
+        self.make_git()
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        written = self.gitignore()
+        self.assertIn(f"{INDEX_HEADER}\n{INDEX_LINE}\n", written)
+        self.assertEqual(written.count(INDEX_LINE + "\n"), 1)
+        self.assertIn(INDEX_LINE, section(result.stdout, ".gitignore に足した"))
+
+    def test_running_twice_does_not_write_it_again(self):
+        src = self.make_source()
+        self.make_git()
+        self.run_setup("--deploy", src)
+        first = self.gitignore()
+
+        result = self.run_setup("--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.gitignore(), first)
+        self.assertEqual(first.count(INDEX_HEADER), 1)
+
+    def test_does_not_add_it_when_the_line_is_already_there(self):
+        for existing in (INDEX_LINE, "index.jsonl"):
+            with self.subTest(existing=existing):
+                self.write_gitignore(f"node_modules/\n{existing}\n")
+                self.make_git()
+                self.run_setup("--deploy", self.make_source())
+                written = self.gitignore()
+                self.assertTrue(written.startswith(f"node_modules/\n{existing}\n"), written)
+                self.assertEqual(written.count("index.jsonl"), 1, written)
+                self.assertNotIn(INDEX_HEADER, written)
+
+    def test_adds_only_the_index_when_the_build_is_already_ignored(self):
+        """実行ファイルの塊だけがある配布先（前の版で入れたもの）には、索引の塊だけを足す。"""
+        self.make_git()
+        before = (
+            "node_modules/\n\n"
+            "# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）\n"
+            f"/.ccnavi/bin/{THIS_MACHINE}/\n"
+        )
+        self.write_gitignore(before)
+
+        result = self.run_setup("--deploy", self.make_source())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.gitignore(), f"{before}\n{INDEX_HEADER}\n{INDEX_LINE}\n")
+
+    def test_does_not_join_the_last_line_without_a_newline(self):
+        self.make_git()
+        self.write_gitignore(f"*.log\n/.ccnavi/bin/{THIS_MACHINE}/")
+
+        self.run_setup("--deploy", self.make_source())
+        written = self.gitignore()
+        self.assertTrue(written.startswith(f"*.log\n/.ccnavi/bin/{THIS_MACHINE}/\n"), written)
+        self.assertIn(f"\n{INDEX_LINE}\n", written)
+        self.assertEqual(written.count(f"/.ccnavi/bin/{THIS_MACHINE}/"), 1)
+
+    def test_check_names_it_without_writing(self):
+        """配布が済み、実行ファイルの行もあっても、索引の行が欠けていれば揃っていない。"""
+        self.make_git()
+        src = self.make_source()
+        self.run_setup("--deploy", src)
+        self.write_gitignore(f"/.ccnavi/bin/{THIS_MACHINE}/\n")
+
+        result = self.run_setup("--deploy", src, "--check")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(INDEX_LINE, section(result.stdout, ".gitignore に足す"))
+        self.assertEqual(self.gitignore(), f"/.ccnavi/bin/{THIS_MACHINE}/\n")
+
+    def test_writes_nothing_without_deploying(self):
+        """`--no-deploy` は settings.json だけを書く。"""
+        self.make_git()
+        self.run_setup("--no-deploy")
+        self.assertIsNone(self.gitignore())
 
 
 class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
