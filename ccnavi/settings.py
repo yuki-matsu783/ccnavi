@@ -102,7 +102,8 @@ LOCAL_FILE = "ccnavi.settings.local.json"
 # 置き場はどれもここに固定で、env でも上書き設定ファイルでも動かない（共通層は ADR-0052、
 # 残りは ADR-0084）。診断のために別の場所を指すのはフラグ（`--rules` / `--log` など）だけで、
 # hook は引数を渡さずに起動するから、判定の入口はここから動かない。
-DEFAULT_LOG = os.path.join("logs", "log.jsonl")
+# 判定の記録のファイル名は `decisions.jsonl`（ADR-0092）。
+DEFAULT_LOG = os.path.join("logs", "decisions.jsonl")
 DEFAULT_RULES = os.path.join(".ccnavi", "common", "rules.yml")
 # 控えはセッションごとの一時的な状態なので、記録とは分けて畳んでおく。
 # 配る対象ではないし、消えても次の起動で取り直せる。

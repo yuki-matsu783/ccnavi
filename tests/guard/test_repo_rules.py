@@ -396,7 +396,7 @@ class RunnerTest(LauncherJudgeTest):
             "find . -name '*.py' -exec grep -l foo {} \\;": set(),
             "echo x | xargs grep -n foo": set(),
             "nohup python -m http.server &": set(),
-            "stdbuf -o0 tail -n 3 logs/log.jsonl": set(),
+            "stdbuf -o0 tail -n 3 logs/decisions.jsonl": set(),
             "source .venv/bin/activate": set(),
             ". .venv/bin/activate && uv run pytest": set(),
             "bash -lc 'uv run ruff check .'": set(),
@@ -410,7 +410,7 @@ class RunnerTest(LauncherJudgeTest):
             "xargs -n1 -I{} echo {}": set(),
             "sudo -E env PATH=/x make install": set(),
             "env -u CCNAVI_MODE uv run python -m ccnavi --lint": set(),
-            "timeout 5 sh -c 'cat logs/log.jsonl | tail -n 3'": set(),
+            "timeout 5 sh -c 'cat logs/decisions.jsonl | tail -n 3'": set(),
         }
         self.assertEqual(len(cases), 27)
         for subject, want in cases.items():

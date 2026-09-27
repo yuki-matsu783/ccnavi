@@ -49,9 +49,13 @@ gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GIT
 USAGE
 }
 
+# fail <識別子> <文面> [終了コード]。文面は標準エラーへ出す契約。識別子は止めた理由の種類を
+# 表す短い語で、診断ログにだけ残す。文面には origin やパスが入るので、ログには写さない。
 fail() {
-	printf 'ccnavi-review: %s\n' "$1" >&2
-	exit "${2:-1}"
+	printf 'ccnavi-review: %s\n' "$2" >&2
+	# 診断ログ（docs/claude/logging.md）。上の文面が契約で、こちらは別に残すだけ。
+	log_info 止めた -- "sub=${sub:-}" "exit=${3:-1}" "reason=$1"
+	exit "${3:-1}"
 }
 
 # 共通部分。ワークスペースルートの探し方と、URL の伏せ字はここにある。
@@ -70,7 +74,7 @@ request | confirm | comment | decide | ready | close-early | fetch | origin) ;;
 	exit 0
 	;;
 *)
-	fail "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin です。" 2
+	fail unknown-sub "$sub は通しません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin です。" 2
 	;;
 esac
 
@@ -80,7 +84,9 @@ esac
 # プロジェクトを答え、写し・マーカー・状態の置き場がプロジェクト側にずれる。
 # 道具の置き場は上へ歩いて探す（設計 11.8）。
 root=$(ccnavi_workspace) ||
-	fail "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+# 解いたルートを logger に渡し、書くたびに探し直させない。
+ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 state="$root/logs/state" # 固定（ADR-0092）
 
@@ -106,13 +112,13 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
+	fail no-bin "ccnavi の実行ファイルが無い（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにも無い）。build.py で組み立てるか、scripts/ccnavi-setup.sh で配ってください。" 2
 fi
 
 # ---- リモート。origin の URL でホストを見分ける。
 
 origin=$(git remote get-url origin 2>/dev/null || :)
-[ -z "$origin" ] && fail "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
+[ -z "$origin" ] && fail no-origin "origin が無い。レビューはマージリクエストの実物に結ぶので、リモートが要る。"
 # 伏せた綴りを、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
 # 生の $origin を文面に入れる綴りを 1 つも残さないことで、次に fail を足す人が
 # 素通りできないようにする。URL に資格情報を埋める使い方は普通にあり、
@@ -128,7 +134,7 @@ http://*) scheme=http ;;
 *) scheme=https ;;
 esac
 rest=$(printf '%s' "$origin" | sed -E 's#^(https?://|git@|ssh://git@)##')
-[ "$rest" = "$origin" ] && fail "origin の綴りを読めない ($origin_shown)。"
+[ "$rest" = "$origin" ] && fail origin-unreadable "origin の綴りを読めない ($origin_shown)。"
 # `user:token@host` の形はユーザ情報を落とす。URL にトークンを埋める使い方は普通にあり、
 # 落とさないと host にトークンが混ざり、API の綴りにも `origin` の出力にも漏れる（実測）。
 # 認証は gh / glab か GITLAB_TOKEN / GITHUB_TOKEN で行い、URL 側の資格情報は使わない。
@@ -146,7 +152,7 @@ case "$host" in
 	esac
 	;;
 esac
-[ -n "$host" ] || fail "origin からホストを読めない ($origin_shown)。"
+[ -n "$host" ] || fail origin-no-host "origin からホストを読めない ($origin_shown)。"
 tail="${rest#"$host"}"
 while :; do
 	case "$tail" in
@@ -156,7 +162,7 @@ while :; do
 done
 path="${tail%.git}"
 path="${path%/}"
-[ -n "$path" ] || fail "origin からプロジェクトのパスを読めない ($origin_shown)。"
+[ -n "$path" ] || fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。"
 case "$host" in
 github.com | github.com:*)
 	kind=github
@@ -174,7 +180,7 @@ branch=$(git rev-parse --abbrev-ref HEAD)
 # ---- 道具。絶対パスに解いて固定する。
 
 JQ=$(command -v jq 2>/dev/null || :)
-[ -z "$JQ" ] && fail "jq が無い。結果の JSON を組み立てられない。" 2
+[ -z "$JQ" ] && fail no-jq "jq が無い。結果の JSON を組み立てられない。" 2
 # gh / glab は「入っている」だけでは足りない。そのホストで認証されていなければ
 # 通らない（手元に立てた GitLab に glab を繋いでいない、が普通にある）。
 # 1 度だけ疎通を試して、通らなければ curl とトークンに切り替える。
@@ -197,9 +203,9 @@ if [ -z "$transport" ]; then
 	if [ -n "$CURL" ] && [ -n "$token" ]; then
 		transport=curl
 	elif [ -n "$CURL" ]; then
-		fail "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
+		fail no-transport-token "$cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name も無い。$token_name を置くか、$cli_name を $host に認証してください。" 2
 	else
-		fail "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' を人が打つ形にしてください。" 2
+		fail no-transport "$cli_name が $host で使えず、curl も無い。どちらかを用意するか、MCP などでリモートを読める道具でスレッドとレビューを JSON にして、'ccnavi review confirm --result <json>' を人が打つ形にしてください。" 2
 	fi
 fi
 
@@ -278,7 +284,7 @@ pages() {
 		n=$(printf '%s' "$chunk" | "$JQ" 'length')
 		[ "$n" -lt 100 ] && break
 		page=$((page + 1))
-		[ "$page" -gt 20 ] && fail "$rel が多すぎて読み切れない。"
+		[ "$page" -gt 20 ] && fail too-many-pages "$rel が多すぎて読み切れない。"
 	done
 	printf '%s' "$all"
 }
@@ -351,7 +357,7 @@ threads() {
 			[ "$more" = true ] || break
 			cursor=$(printf '%s' "$res" | "$JQ" '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
 			page=$((page + 1))
-			[ "$page" -gt 20 ] && fail "reviewThreads が多すぎて読み切れない。"
+			[ "$page" -gt 20 ] && fail too-many-threads "reviewThreads が多すぎて読み切れない。"
 		done
 		printf '%s' "$all"
 	else
@@ -400,7 +406,7 @@ undraft() {
 	if [ "$kind" = github ]; then
 		pr=$(api GET "repos/$path/pulls/$mr_number")
 		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
-		[ -n "$node" ] || fail "マージリクエスト #$mr_number の node_id を読めない。"
+		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
 		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも落とす。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
@@ -413,7 +419,7 @@ undraft() {
 		api POST graphql "$query" | "$JQ" -r '.data.markPullRequestReadyForReview.pullRequest.isDraft'
 	else
 		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
-		[ -n "$title" ] || fail "マージリクエスト !$mr_number の題を読めない。"
+		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number の題を読めない。"
 		stripped=$(printf '%s' "$title" | sed -E 's/^[[:space:]]*(\[?(Draft|WIP)\]?:?[[:space:]]*)+//I')
 		if [ "$stripped" = "$title" ]; then
 			printf 'false\n'
@@ -479,7 +485,7 @@ post_decision() {
 
 fetch_all() {
 	mr=$(find_mr)
-	[ -z "$mr" ] && fail "親ブランチ $branch に対応するマージリクエストが $host に無い。"
+	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host に無い。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	t=$(threads "$number" "$url")
@@ -488,9 +494,15 @@ fetch_all() {
 		'{host: $host, mr: $mr, threads: $threads, reviews: $reviews, fetched_at: (now | todate)}'
 }
 
+log_info 受け付けた -- "sub=$sub" "args=$#"
+log_debug 判定の材料 -- "sub=$sub" "kind=$kind" "host=$host" "branch=$branch" "transport=$transport" "bin=${bin:-}"
+
 mkdir -p "$state"
 result="$state/review-result-$$.json"
-trap 'rm -f "$result"' EXIT
+# 抜けるときに写しを消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
+# rm が失敗しても（写しの名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
+# 元の終了コードを上書きしないよう、失敗を飲んでから元の値で抜け直す。
+trap 'review_exit=$?; rm -f "$result" 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 
 case "$sub" in
 origin)
@@ -518,9 +530,9 @@ request)
 	# 「見る場所が無い」で止めない。統合するのは人なので下書きで作る。
 	mr=$(find_mr)
 	if [ -z "$mr" ]; then
-		[ -n "$draft" ] && [ -f "$draft" ] || fail "マージリクエストの下書きを読めない ($draft)。"
-		mr=$(create_mr "$draft") || fail "マージリクエストを作れなかった。ホストの返事は上に出ている。"
-		[ -z "$mr" ] && fail "マージリクエストを作れなかった。"
+		[ -n "$draft" ] && [ -f "$draft" ] || fail no-draft "マージリクエストの下書きを読めない ($draft)。"
+		mr=$(create_mr "$draft") || fail mr-create-failed "マージリクエストを作れなかった。ホストの返事は上に出ている。"
+		[ -z "$mr" ] && fail mr-create-empty "マージリクエストを作れなかった。"
 		printf 'マージリクエストを作った: %s\n' "$(printf '%s' "$mr" | "$JQ" -r '.url')"
 	fi
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
@@ -543,9 +555,9 @@ comment)
 		*) shift ;;
 		esac
 	done
-	[ -n "$body" ] && [ -f "$body" ] || fail "comment には --body-file <本文> が要る。" 2
+	[ -n "$body" ] && [ -f "$body" ] || fail no-body-file "comment には --body-file <本文> が要る。" 2
 	mr=$(find_mr)
-	[ -z "$mr" ] && fail "親ブランチ $branch に対応するマージリクエストが $host に無い。"
+	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host に無い。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	noted="$state/review-comment-$$.md"
@@ -565,7 +577,7 @@ decide)
 	# 最後の形は、エージェントが打つと組み込みの deny（builtin-guard-ticket-approval）が止める。
 	n="${1:-}"
 	case "$n" in
-	'' | *[!0-9]*) fail "decide には <N>（フェーズ番号）が要る。" 2 ;;
+	'' | *[!0-9]*) fail decide-no-phase "decide には <N>（フェーズ番号）が要る。" 2 ;;
 	esac
 	# 下書きの名前は実行ファイルが整数で組む（`01` でも `1`）。揃えないと、書いた下書きを拾えない
 	n=$(printf '%s' "$n" | sed 's/^0*\([0-9]\)/\1/')
@@ -581,18 +593,18 @@ decide)
 			;;
 		--json) shift ;;
 		--choices | --digest)
-			[ "$#" -ge 2 ] || fail "decide の $1 には値が要る。" 2
+			[ "$#" -ge 2 ] || fail decide-no-value "decide の $1 には値が要る。" 2
 			if [ "$1" = --choices ]; then choices="$2"; else digest="$2"; fi
 			shift 2
 			;;
-		*) fail "decide は $1 を受けない。" 2 ;;
+		*) fail decide-bad-option "decide は $1 を受けない。" 2 ;;
 		esac
 	done
 	if [ "$preview" -eq 1 ] && [ -n "$choices$digest" ]; then
-		fail "decide の --preview と --choices / --digest は一緒に使えない。" 2
+		fail decide-preview-conflict "decide の --preview と --choices / --digest は一緒に使えない。" 2
 	fi
 	if [ -n "$choices" ] || [ -n "$digest" ]; then
-		[ -n "$choices" ] && [ -n "$digest" ] || fail "decide の --choices と --digest は組で渡す。" 2
+		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡す。" 2
 	fi
 	fetch_all >"$result"
 	if [ "$preview" -eq 1 ]; then
@@ -625,7 +637,7 @@ ready)
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	still=$(undraft "$number")
-	[ "$still" = "false" ] || fail "Draft を外せなかった（${url}）。ホストの返事は上に出ている。"
+	[ "$still" = "false" ] || fail undraft-failed "Draft を外せなかった（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
 		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
 	fi
@@ -650,7 +662,7 @@ close-early)
 		*) shift ;;
 		esac
 	done
-	[ -n "$reason" ] || fail "close-early には --reason <理由> が要る。" 2
+	[ -n "$reason" ] || fail close-early-no-reason "close-early には --reason <理由> が要る。" 2
 	fetch_all >"$result"
 	# exe は人に残りを見せて y/N を取るので、標準出力は端末のまま。下書きは控えの
 	# 置き場の決まった名前で拾う（親の識別子 = ブランチ名）。
@@ -661,7 +673,7 @@ close-early)
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
 	if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
 		issue=$(create_issue "$issue_draft")
-		[ -z "$issue" ] && fail "残りを写す issue を作れなかった。下書きは $issue_draft にある。"
+		[ -z "$issue" ] && fail issue-create-failed "残りを写す issue を作れなかった。下書きは $issue_draft にある。"
 		issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
 		issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
 		printf '残りを #%s に写した（%s）\n' "$issue_no" "$issue_url"

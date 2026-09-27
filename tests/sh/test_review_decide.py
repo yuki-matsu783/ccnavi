@@ -10,6 +10,7 @@ sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周�
 3. 投稿に失敗したら下書きを残し、警告を答えに載せる（置いたことは戻さない）
 4. フェーズ番号の綴りを揃える（`01` でも、実行ファイルが `1` で書いた下書きを拾う）
 5. 引数の組み合わせの誤りは、実行ファイルを起こす前に断る
+6. 抜けるときの片付け（EXIT の trap）で rm が失敗しても、元の終了コードで抜ける（dash と bash）
 
 実行ファイルは代役（引数を記録し、決まった答えと下書きを書く sh）。判定そのものは
 `tests/ticket` が見る。GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ道だけを返す。
@@ -187,7 +188,9 @@ class ReviewDecideShTest(unittest.TestCase):
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR)
         self.log = os.path.join(self.work, "stub.log")
 
-    def decide(self, *args: str) -> subprocess.CompletedProcess:
+    def decide(self, *args: str, shell: str | None = None) -> subprocess.CompletedProcess:
+        shell = shell or SHELL
+        assert shell is not None
         env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         # gh / glab を PATH から外し、curl とトークンの道を通す
         tools = os.path.join(self.work, "bin")
@@ -201,10 +204,10 @@ class ReviewDecideShTest(unittest.TestCase):
             CCNAVI_BIN_PATH=self.stub,
             GITLAB_TOKEN=TOKEN,
             STUB_LOG=self.log,
-            PATH=tools + os.pathsep + os.path.dirname(SHELL),
+            PATH=tools + os.pathsep + os.path.dirname(shell),
         )
         script = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-review.sh")
-        command = [SHELL, script, "decide", *args]
+        command = [shell, script, "decide", *args]
         if WINDOWS:
             command = " ".join(quote_arg(part) for part in command)
         return subprocess.run(
@@ -275,6 +278,28 @@ class ReviewDecideShTest(unittest.TestCase):
             self.assertEqual(refused.returncode, 2, (args, refused.stderr))
         self.assertEqual(self.calls(), [])
         self.assertEqual(GitLab.posted, [])
+
+    @unittest.skipIf(WINDOWS, "rm の代役を PATH の頭に置く形は POSIX で見る")
+    def test_a_failing_rm_in_the_exit_trap_keeps_the_exit_code(self):
+        shells = [found for found in (shutil.which("dash"), shutil.which("bash")) if found]
+        if not shells:
+            self.skipTest("dash も bash も無い")
+        tools = os.path.join(self.work, "bin")
+        os.makedirs(tools, exist_ok=True)
+        fake_rm = os.path.join(tools, "rm")
+        with open(fake_rm, "w", encoding="utf-8", newline="\n") as f:
+            f.write("#!/bin/sh\necho 'rm: cannot remove' >&2\nexit 1\n")
+        os.chmod(fake_rm, 0o755)
+        for shell in shells:
+            with self.subTest(shell=os.path.basename(shell)):
+                refused = self.decide("x", shell=shell)
+                self.assertEqual(2, refused.returncode, refused.stderr)
+                self.assertEqual(
+                    "ccnavi-review: decide には <N>（フェーズ番号）が要る。\n", refused.stderr
+                )
+                shown = self.decide("1", "--preview", shell=shell)
+                self.assertEqual(0, shown.returncode, shown.stderr)
+                self.assertEqual("d0", json.loads(shown.stdout)["digest"])
 
 
 if __name__ == "__main__":

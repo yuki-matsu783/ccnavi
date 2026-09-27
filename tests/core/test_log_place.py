@@ -1,4 +1,5 @@
-"""記録は `<root>/logs/log.jsonl`、控えは `<root>/logs/state`。空文字の口は無い（ADR-0092 の A4）。
+"""記録は `<root>/logs/decisions.jsonl`、控えは `<root>/logs/state`。空文字の口は無い
+（ADR-0092 の A4）。
 
 `CCNAVI_LOG=""` は「記録しない」、`CCNAVI_STATE=""` は「控えを持たない」と読まれていた。
 6 つの env を廃止したので、空文字を入れても既定の置き場に書かれる。
@@ -50,11 +51,11 @@ class EmptyEnvStillWritesTheRecordTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_an_empty_log_env_still_writes_to_the_default_place(self):
-        """`CCNAVI_LOG=""` を入れても、判定の記録は `logs/log.jsonl` に 1 件書かれる。"""
+        """`CCNAVI_LOG=""` を入れても、判定の記録は `logs/decisions.jsonl` に 1 件書かれる。"""
         self.hook("PreToolUse", "Bash", {"CCNAVI_LOG": ""})
 
-        path = os.path.join(self.ws, "logs", "log.jsonl")
-        self.assertTrue(os.path.isfile(path), "logs/log.jsonl が書かれていない")
+        path = os.path.join(self.ws, "logs", "decisions.jsonl")
+        self.assertTrue(os.path.isfile(path), "logs/decisions.jsonl が書かれていない")
         with open(path, encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]
         self.assertEqual(len(records), 1, records)

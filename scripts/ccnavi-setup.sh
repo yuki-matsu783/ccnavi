@@ -637,12 +637,14 @@ env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "
 # 読まれない語を残さない。外した値が既定と違っていたら、名前と値を 1 行ずつ出す。
 # 既定と同じ値は黙って外す。導入は止めず、終了コードも変えない（--check では
 # 「揃っていない」に数える。打ち直せば外れる）。
+# CCNAVI_LOG の既定は改名後の logs/decisions.jsonl（ADR-0092 の改名）。以前の導入スクリプトが
+# 書いた logs/log.jsonl は既定と違うものとして名指しする。記録の書き先が変わるので、黙らない。
 PLACE_ENV_DEFAULTS='{
 	"CCNAVI_PROJECTS": "projects",
 	"CCNAVI_PROJECT_HOME": ".ccnavi",
 	"CCNAVI_TICKETS_PROPOSAL": "wip/proposals",
 	"CCNAVI_TICKETS_APPROVED": ".ccnavi/approved",
-	"CCNAVI_LOG": "logs/log.jsonl",
+	"CCNAVI_LOG": "logs/decisions.jsonl",
 	"CCNAVI_STATE": "logs/state"
 }'
 # 残っているもの全部（--check が並べる）と、そのうち既定と違うもの（書いたあとに名指しする）。

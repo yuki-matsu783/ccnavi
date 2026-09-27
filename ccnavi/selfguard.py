@@ -239,22 +239,22 @@ _COPY_END = r"(?:[\\/]|$)"
 # `.claude/` に続く綴り全部が入り、ワークツリーの片付けまで止まる。
 # チケットの sh は `.ccnavi/scripts/` にあるので、`.claude` の側で守るのは hook と設定ファイルだけ。
 #
-# `logs/` は記録と控えの置き場（`logs/log.jsonl` と `logs/state/`）。どちらも判定が読むので
-# 名前を絞って守る。ローテートした記録（`logs/log.<日時>.jsonl`、prune）も同じ綴りで守る。
+# `logs/` は記録と控えの置き場（`logs/decisions.jsonl` と `logs/state/`）。どちらも判定が読むので
+# 名前を絞って守る。ローテートした記録（`logs/decisions.<日時>.jsonl`、prune）も同じ綴りで守る。
 # 判定は読まないが、「記録が無い = 動かなかった」を読む元で、シェルから消せると自分の呼び出しの
 # 記録を消せる。消すのはセッションの開始と、端末から打つ `ccnavi --prune` だけ。
 # `logs/` の下の git のラッパースクリプトの記録は、消しても判定に効かないので守らない。
 _PLACES = (
     r"\.claude(?:[\\/](hooks" + _END + r"|settings[\w.-]*\.json)|" + _TERM + r")",
     r"\.ccnavi" + _END,
-    r"logs[\\/](log(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _END,
+    r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _END,
     r"ccnavi-git\.sh",
 )
 _COPY_PLACES = (
     r"\.claude(?:[\\/](hooks|settings)|" + _COPY_TERM + r")",
     # 行き先が ccnavi ディレクトリそのもの（`cp /tmp/x .ccnavi`）でも止める。
     r"\.ccnavi" + _COPY_END,
-    r"logs[\\/](log(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _COPY_END,
+    r"logs[\\/](decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state)" + _COPY_END,
     r"ccnavi-git\.sh",
 )
 
@@ -448,14 +448,15 @@ def common_layer_regex(root: str, common_files: tuple[str, ...]) -> str:
 
 # 記録と控えの置き場の既定の綴り（`_PLACES` の `logs/` の節と同じ場所）を、名指しのツールに
 # 当てる形。当てる先は解決済みの絶対パスなので、末尾で閉じる。
-_RECORDS_PLACES = r"[\\/]logs[\\/](?:log(?:\.[^\\/]*)?\.jsonl$|state(?:[\\/]|$))"
+_RECORDS_PLACES = r"[\\/]logs[\\/](?:decisions(?:\.[^\\/]*)?\.jsonl$|state(?:[\\/]|$))"
 
 
 def records_regex(log_path: str = "", state_dir: str = "") -> str:
     """記録と控えの置き場を、名指しのツールに当てる形（設計 11.6、ADR-0089）。
 
-    シェルの書き込みの側（`_PLACES`）と同じ `logs/log*.jsonl` と `logs/state/` の綴りに加えて、
-    診断のフラグで動かした置き場（`--log` / `--state`。env では動かない。ADR-0084）にも当てる。
+    シェルの書き込みの側（`_PLACES`）と同じ `logs/decisions*.jsonl` と `logs/state/` の綴りに
+    加えて、診断のフラグで動かした置き場（`--log` / `--state`。env では動かない。ADR-0084）にも
+    当てる。
     記録はいま書いている 1 本と、同じディレクトリのローテートした分（`<名前>.<日時><拡張子>`）。
     書かれた綴りと行き着く先の両方で当てる。
     """
@@ -518,7 +519,7 @@ COMMON_LAYER_MESSAGE = (
 RECORDS_RULE_ID = "builtin-guard-records"
 
 RECORDS_MESSAGE = (
-    "ccnavi の記録と控えの置き場（logs/log*.jsonl と logs/state/）です。判定が読み、"
+    "ccnavi の記録と控えの置き場（logs/decisions*.jsonl と logs/state/）です。判定が読み、"
     "「ccnavi が何を判定したか」を後から確かめる元なので、エージェントは書き換えません。"
     "シェルからの書き込みでも拒否される場所です。読むだけなら止まりません。"
 )

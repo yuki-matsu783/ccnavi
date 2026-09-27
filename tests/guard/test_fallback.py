@@ -198,7 +198,7 @@ class FallbackTest(unittest.TestCase):
 
     def test_既定に戻ったことは記録に残る(self):
         # ガードが落ちたまま何回動いたかは、これでしか数えられない。
-        log = os.path.join(self.directory.name, "log.jsonl")
+        log = os.path.join(self.directory.name, "decisions.jsonl")
         run(self.root, pre_tool_use("Bash", "command", "cat README.md"), log=log)
         with open(log, encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]

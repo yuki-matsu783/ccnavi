@@ -57,7 +57,11 @@ def logs_of(cwd):
     directory = os.path.join(cwd, "logs")
     if not os.path.isdir(directory):
         return []
-    names = sorted(os.listdir(directory), reverse=True)
+    # 診断ログの置き場（logs/diag/）はディレクトリなので数えない。
+    names = sorted(
+        (n for n in os.listdir(directory) if os.path.isfile(os.path.join(directory, n))),
+        reverse=True,
+    )
     out = []
     for name in names:
         with open(os.path.join(directory, name), encoding="utf-8", errors="replace") as f:

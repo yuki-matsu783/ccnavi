@@ -133,7 +133,7 @@ deny:
     subject: "mv /repo/.ccnavi/common/rules.yml /tmp/old.yml"
     why: 移した元が消える。ルールが読めなくなる
   - tool: Bash
-    subject: "rm /repo/logs/log.jsonl"
+    subject: "rm /repo/logs/decisions.jsonl"
     why: 記録を消すのも書き換えのうち
   - tool: Bash
     subject: "echo x | tee /repo/.ccnavi/common/rules.yml"

@@ -126,7 +126,7 @@ class PlacesHarness(unittest.TestCase):
             self.hook(event, tool, env=env)
         # 記録と控えは hook が書いたものだけを見る。`--explain` を先に走らせると、そちらが
         # 書いた分と区別が付かない。
-        wrote_log = os.path.isfile(os.path.join(self.ws, "logs", "log.jsonl"))
+        wrote_log = os.path.isfile(os.path.join(self.ws, "logs", "decisions.jsonl"))
         wrote_state = os.path.isfile(os.path.join(self.ws, "logs", "state", "s1.json"))
         done = self.run_ccnavi(["--explain", "--json"], env=env)
         try:

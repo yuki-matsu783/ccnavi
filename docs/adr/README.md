@@ -74,6 +74,7 @@
 | [0042](0042-ccnavi-home.md) | 共通層の設定は `.ccnavi/common/` に、記録と控えは `logs/` に置く |
 | [0044](0044-launcher-in-scripts.md) | 振り分けの sh は `.ccnavi/scripts/` に、実行ファイルは `.ccnavi/bin/<os>-<arch>/` に固定する |
 | [0089](0089-rotate-prune-and-redact-records.md) | 記録は大きさでローテートし、古い記録と終わったセッションの控えをセッション開始で消す。記録に書くコマンドは秘密の形を伏せる |
+| [0092](0092-rename-decision-records.md) | 判定の記録のファイル名を `logs/decisions.jsonl` にする |
 
 ### ルールと判定
 

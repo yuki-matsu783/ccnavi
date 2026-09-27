@@ -81,7 +81,7 @@ PLACE_ENV_DEFAULTS = {
     "CCNAVI_PROJECT_HOME": ".ccnavi",
     "CCNAVI_TICKETS_PROPOSAL": "wip/proposals",
     "CCNAVI_TICKETS_APPROVED": ".ccnavi/approved",
-    "CCNAVI_LOG": "logs/log.jsonl",
+    "CCNAVI_LOG": "logs/decisions.jsonl",
     "CCNAVI_STATE": "logs/state",
 }
 # `projects/` がワークスペースの git に追跡されているときの知らせの先頭の句。`--lint` の
@@ -510,6 +510,22 @@ class RemovesThePlaceVariables(SetupTest):
         ):
             with self.subTest(name=name):
                 self.assertNotIn(name, result.stdout)
+
+    def test_names_the_old_record_name_written_by_an_earlier_setup(self):
+        """以前の導入スクリプトが書いた `CCNAVI_LOG=logs/log.jsonl` は、既定と違うとして名指しする。
+
+        記録のファイル名は `logs/decisions.jsonl` に改名された。env は読まれないので、
+        外すと記録の書き先が変わる。黙って外すと気付けない。
+        """
+        self.write_settings({"env": self.existing(CCNAVI_LOG="logs/log.jsonl")})
+
+        result = self.run_setup("--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        lines = [line for line in result.stdout.splitlines() if "CCNAVI_LOG" in line]
+        self.assertEqual(len(lines), 1, result.stdout)
+        self.assertIn("値: logs/log.jsonl）", lines[0])
+        self.assertIn("logs/decisions.jsonl", lines[0])
 
     def test_says_nothing_when_every_value_was_the_default(self):
         self.write_settings({"env": self.existing()})

@@ -155,7 +155,7 @@ class ProjectsTest(unittest.TestCase):
         # （設計 9.2）。ここの土台は親のワークツリーを作らないので、提案があったツリーに置かれる。
         self.approved = os.path.join(self.ws, ".ccnavi", "approved")
         self.state = os.path.join(self.ws, "state")
-        self.log = os.path.join(self.ws, "log.jsonl")
+        self.log = os.path.join(self.ws, "decisions.jsonl")
 
     def approved_path(self, *parts):
         """承認済みチケットの置き場の下のパス。どのツリーに置かれたかを探す。"""
