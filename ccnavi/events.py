@@ -25,6 +25,7 @@ from . import (
     ops,
     phase,
     post,
+    prune,
     reasons,
     ruleload,
     rules,
@@ -307,6 +308,7 @@ def decide_at_start(
     # 承認の控えは捨てない。控えが無ければ、いまの承認済みチケットを「知っているもの」として
     # 書く。それより後に置かれた承認済みチケットだけが、次の hook で「新しい承認」になる。
     approval.baseline(stderr, conf, root, payload.session_id, payload.agent_id)
+    record.detail = _prune_at_start(stderr, conf, root, payload.session_id)
     record.decision, record.enforced = audit.ALLOW, True
     texts = []
     if outcomes:
@@ -317,6 +319,23 @@ def decide_at_start(
     if texts:
         hookio.write_context(stdout, hookio.SESSION_START, "\n\n".join(texts))
     return EXIT_OK
+
+
+def _prune_at_start(stderr: TextIO, conf: settings.Settings, root: str, session: str) -> str:
+    """記録のローテートと、古い記録・終わったセッションの控えの削除（prune）。
+
+    ここに置くのは、セッションに 1 度しか来ない場所だから。実行前の判定に置くと、呼び出しの
+    たびに置き場を数えることになる。何が起きても開始は止めない。失敗は標準エラーに出し、
+    動かしたものの数は記録の `detail` に残す（消したことも記録に残る）。
+    """
+    try:
+        report = prune.run(root, conf.log, conf.state, session)
+    except Exception as exc:  # noqa: BLE001 - 後始末の失敗でセッションの開始を止めない
+        stderr.write(f"ccnavi: 記録と控えの後始末に失敗した: {exc}\n")
+        return ""
+    for problem in report.problems:
+        stderr.write(f"ccnavi: {problem}\n")
+    return prune.summary(report)
 
 
 def _written(payload: hookio.Input, record: audit.Record) -> str:
