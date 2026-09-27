@@ -69,6 +69,7 @@ SELFGUARD_STORE = "store"
 # 名前からセッションがそのまま読める控え。
 _SESSION_ONLY = (
     re.compile(r"^nudged-(?P<s>.+)\.json$"),  # ops._nudge_path
+    re.compile(r"^denied-(?P<s>.+)\.json$"),  # repeat._path
     re.compile(r"^(?P<s>.+)\.turn\.json$"),  # post._turn_path
 )
 # 名前の後ろにセッション以外の鍵が `-` で続く控え。セッションにも `-` が入るので、
@@ -78,8 +79,12 @@ _SESSION_AND_KEY = (
     ("approved-", ".json"),  # approval._news_path
     ("subagent-", ".bounced"),  # subagent._bounce_path
 )
-# `<セッション>.json`（post._seen_path）。上の 2 組のどれでもない `.json`。
-_SEEN = re.compile(r"^(?P<s>.+)\.json$")
+# `<セッション>.json`（post._seen_path）。Claude Code のセッションは UUID なので、その形に
+# 限る。`.+` で読むと、置き場に置かれた別のファイル（`package.json`、レビューの結果の
+# 写しなど）をセッションの控えと読み違えて消す。形の違う名前は知らないファイルとして残す。
+_SEEN = re.compile(
+    r"^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.json$"
+)
 
 
 @dataclass
@@ -253,8 +258,17 @@ def _prune_logs(report: Report, root: str, log_path: str, cutoff: float, dry_run
 def _prune_state(
     report: Report, root: str, state_dir: str, session: str, cutoff: float, dry_run: bool
 ) -> None:
-    """終わったセッションの控えを、セッションごとにまとめて消す。"""
-    groups, loose = _session_entries(state_dir)
+    """終わったセッションの控えを、セッションごとにまとめて消す。
+
+    置き場そのものがリンクなら、何も消さずに報告に出す。リンクの先は ccnavi の置き場とは
+    限らず、辿って消すと置き場の外のファイルを消す。
+    """
+    if os.path.islink(state_dir):
+        report.problems.append(
+            f"{_shown(root, state_dir)} はリンクなので辿らない（控えを消さない）"
+        )
+        return
+    groups, loose = _session_entries(report, root, state_dir)
     mine = {fsio.safe_name(session), fsio.safe_name(session, limit=None)} if session else set()
     doomed: list[str] = []
     for token, paths in sorted(groups.items()):
@@ -271,7 +285,9 @@ def _prune_state(
             report.state.append(_shown(root, path))
 
 
-def _session_entries(state_dir: str) -> tuple[dict[str, list[str]], list[str]]:
+def _session_entries(
+    report: Report, root: str, state_dir: str
+) -> tuple[dict[str, list[str]], list[str]]:
     """控えの置き場を、セッションの綴りごとにまとめる。2 つめはまとめられなかったもの。"""
     groups: dict[str, list[str]] = {}
     try:
@@ -280,10 +296,15 @@ def _session_entries(state_dir: str) -> tuple[dict[str, list[str]], list[str]]:
         return groups, []
 
     guard = os.path.join(state_dir, SELFGUARD_DIR)
-    try:
-        guarded = os.listdir(guard) if os.path.isdir(guard) else []
-    except OSError:
-        guarded = []
+    guarded: list[str] = []
+    if os.path.islink(guard):
+        # 置き場そのものと同じ理由で辿らない。
+        report.problems.append(f"{_shown(root, guard)} はリンクなので辿らない（控えを消さない）")
+    else:
+        try:
+            guarded = os.listdir(guard) if os.path.isdir(guard) else []
+        except OSError:
+            guarded = []
     for name in guarded:
         path = os.path.join(guard, name)
         if name != SELFGUARD_STORE and os.path.isdir(path):
