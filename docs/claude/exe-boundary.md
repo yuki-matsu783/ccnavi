@@ -1,3 +1,11 @@
+---
+type: guide
+title: 実行ファイルの境界
+description: ccnavi 実行ファイルの責務範囲。ネットワークに出ない、git との連携、シェルスクリプトとの役割分担
+tags: [guide, architecture]
+keywords: [実行ファイル, ネットワーク, 境界, sh, Python, 判定, hook, payload]
+---
+
 # 実行ファイルの境界
 
 - ccnavi の実行ファイルはネットワークに出ない。自分で見て判断するのは、プロジェクトの

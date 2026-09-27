@@ -1,3 +1,11 @@
+---
+type: guide
+title: 下書きと使い捨ての置き場
+description: 本番に入れない下書きや使い捨てファイルの置き場とその扱い
+tags: [guide, workflow]
+keywords: [scratchpad, 下書き, 使い捨て, gitignore, ワークツリー, セッション]
+---
+
 # 下書きと使い捨ての置き場
 
 本番に入れないもの（設定の写し、再現用のスクリプト、調べた出力、渡す前の下書き）は、

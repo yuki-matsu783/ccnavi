@@ -1,3 +1,11 @@
+---
+type: glossary
+title: ccnavi 用語集
+description: ccnavi の判定層、チケット制御、作業形態など、プロジェクトで使う術語の定義
+tags: [glossary, terminology]
+keywords: [用語集, 全体ルール, 層, 共通層, 自身の層, プロジェクトの層, チケット制御, 保護領域]
+---
+
 # ccnavi
 
 Claude Code の hook から呼ばれ、危ないツール呼び出しを止めて代わりの道を返すガード。

@@ -1,3 +1,11 @@
+---
+type: guide
+title: 診断ログを書く
+description: sh、Python、TypeScript で診断ログを書くときの決まり。形式、置き場、レベル
+tags: [guide, logging]
+keywords: [診断ログ, logger, sh, Python, TypeScript, logfmt, ccnavi-common.sh, diaglog]
+---
+
 # 診断ログを書く
 
 sh・Python・TypeScript で「あとから何が起きたかを追う」ための行を書くときの決まり。
