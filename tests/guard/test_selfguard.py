@@ -456,6 +456,44 @@ class SelfGuardTest(unittest.TestCase):
                 result = self.run_hook("PreToolUse", command=command)
                 self.assertIn("builtin-guard-setting-files", result.stdout)
 
+    def test_記録と控えの置き場は名指しのツールでも止まる(self):
+        # シェルの側の文面は「Write / Edit でも拒否される場所」と言う。名指しのツールで書けると、
+        # 拒否の数え（denied-<セッション>.json）や記録を書き換えて自分の足跡を消せる。
+        for tool in ("Write", "Edit", "NotebookEdit"):
+            for path in (
+                os.path.join(self.repo, "logs", "state", "denied-x.json"),
+                os.path.join(self.repo, "logs", "state", "selfguard", "s1", "settings"),
+                os.path.join(self.repo, "logs", "log.jsonl"),
+                os.path.join(self.repo, "logs", "log.20260927-120000.jsonl"),
+                os.path.join(self.repo, "Logs", "State", "x.json"),
+                # 置き場を動かしてある（--state / --log）。
+                os.path.join(self.state, "denied-x.json"),
+                self.log,
+                os.path.join(self.repo, "log.20260927-120000-2.jsonl"),
+            ):
+                with self.subTest(tool=tool, path=path):
+                    key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+                    result = self.run_hook("PreToolUse", tool=tool, **{key: path})
+                    self.assertIn("deny", result.stdout)
+                    self.assertIn("builtin-guard-records", result.stdout)
+
+    def test_記録の隣の別のファイルは名指しのツールで書ける(self):
+        for path in (
+            os.path.join(self.repo, "logs", "git-20260913-000000-1.log"),
+            os.path.join(self.repo, "logs", "notes.md"),
+            os.path.join(self.repo, "logstate", "x.json"),
+            os.path.join(self.repo, "src", "logs", "catalog.jsonl"),
+            os.path.join(self.repo, "state-notes", "x.md"),
+        ):
+            with self.subTest(path=path):
+                result = self.run_hook("PreToolUse", tool="Write", file_path=path)
+                self.assertNotIn("builtin-guard-records", result.stdout)
+
+    def test_disable_なら記録の置き場の名指しも止めない(self):
+        path = os.path.join(self.repo, "logs", "state", "denied-x.json")
+        result = self.run_hook("PreToolUse", setting="disable", tool="Write", file_path=path)
+        self.assertNotIn("builtin-guard-records", result.stdout)
+
     def test_git_ラッパースクリプトの記録は止めない(self):
         # 消しても判定に効かない。logs/ を丸ごと守ると片付けまで止まる。
         result = self.run_hook("PreToolUse", command="rm logs/git-20260913-000000-1.log")
