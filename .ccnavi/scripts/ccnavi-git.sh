@@ -80,6 +80,9 @@ sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> [引数...]
             checkout / switch (ブランチを移る形だけ。-f と -- <パス> は不可)
             stash (list show push pop apply)
             merge (-X ours / -s ours / --no-verify は不可)
+            merge-file -p (標準出力に出す形だけ。ファイルへは書かない)
+                  両方取り込むときは merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス>
+                  (現在・祖先・相手の順) で出力し、それを読んで Edit で書く
   通信      fetch  pull  (--force / --prune は不可)
             push  (居るブランチを同じ名前で送る形だけ。force / delete / all は不可。
                    main master develop release へ直接は送れない。
@@ -391,6 +394,46 @@ merge)
 		esac
 		prev="$arg"
 	done
+	;;
+
+merge-file)
+	# 衝突を両方取り込む形 (--union) を作るための道。通すのは結果を標準出力に出す形
+	# (-p / --stdout) だけ。付けないと git は 1 つめのファイルを直に書き換える。
+	# ファイルを書くのは Edit / Write に寄せる。そちらなら hook が行き先を見られる。
+	#
+	# オプションは知っているものだけ通す。git は長いオプションの略記 (--std) も
+	# 打ち消し (--no-stdout) も受け取るので、知らない綴りを通すと -p を付けたつもりで
+	# 書き込みに戻る。-L と --marker-size は値を次の語で取る。`-L -p` の -p は
+	# ラベルで、-p を付けたことにならない (git はファイルを書く)。だから値ごと飛ばす。
+	# `--` の後ろはファイル名。そこに -p があっても数えない。
+	# 束ねた短いオプション (-pq) は分けて書かせる。1 文字ずつ読むと -L の値を取り違える。
+	#
+	# --object-id は通す。衝突の最中なら :2:<パス> :1:<パス> :3:<パス> を直に渡せて、
+	# 一時ファイルが要らない。-p が無いと結果をオブジェクトとしてリポジトリに書くが、
+	# -p は必須なのでその形はここに来ない。
+	mf_stdout=no
+	mf_skip=no
+	mf_end=no
+	for arg in ${1+"$@"}; do
+		if [ "$mf_skip" = yes ]; then
+			mf_skip=no # 直前のオプションの値
+			continue
+		fi
+		[ "$mf_end" = yes ] && continue
+		case "$arg" in
+		--) mf_end=yes ;;
+		-p | --stdout) mf_stdout=yes ;;
+		-L | --marker-size | --diff-algorithm) mf_skip=yes ;;
+		--union | --ours | --theirs | --diff3 | --zdiff3 | --object-id | -q | --quiet | \
+			--marker-size=* | --diff-algorithm=* | -L?*) ;;
+		-*)
+			reject "merge-file の $arg は通しません。通すのは -p (--stdout) と --union / --ours / --theirs / --diff3 / --zdiff3 / --object-id / -L <ラベル> / --marker-size=<数> / -q だけで、短いオプションは 1 つずつ分けて書きます。"
+			;;
+		esac
+	done
+	if [ "$mf_stdout" = no ]; then
+		reject "merge-file は -p (--stdout) を付けた形だけ通します。付けないと 1 つめのファイルを直に書き換えます。衝突の最中なら $SELF merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス> で出力し、その結果を Edit で書いてください。"
+	fi
 	;;
 
 commit)
