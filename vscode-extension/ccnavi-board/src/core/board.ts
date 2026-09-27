@@ -11,7 +11,9 @@ import type {
   BoardJson,
   CopyStatus,
   FlowJson,
+  HistoryEntryJson,
   ParentJson,
+  PredecessorUnmetJson,
   PhaseJson,
   ProposalState,
   ProposalJson,
@@ -128,6 +130,16 @@ export interface Card {
    * カードの「フロー」ボタンの言葉だけに使う。人が動く必要（`attention`）には数えない
    */
   readonly flow: FlowJson | null;
+  /**
+   * 状態が動いた跡の新しい側（古い順。ADR-0086）。補助の記録で、列やバッジはここから組まない。
+   * カードの畳める「履歴」に並べるだけ
+   */
+  readonly history: readonly HistoryEntryJson[];
+  /**
+   * 満たしていない先行（ADR-0088）。空でなければ、承認も着手も止まる。実行ファイルの答えの写しで、
+   * カードの「先行待ち」のバッジに使う
+   */
+  readonly predecessorsUnmet: readonly PredecessorUnmetJson[];
 }
 
 export interface BoardColumn extends ColumnDef {
@@ -282,6 +294,8 @@ function toCard(
     mrNumber: mr.number,
     attention,
     flow: isParent ? null : flowOf(t.flow, column),
+    history: t.history,
+    predecessorsUnmet: t.predecessors_unmet,
   };
 }
 

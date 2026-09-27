@@ -122,7 +122,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | `UserPromptSubmit` | 保護領域にいまある変更を控え、ターンの基準にする（7.4） | 無し |
 | `PreToolUse` | 呼び出しを判定する（6 章）。コアファイルを控える（8 章） | `permissionDecision` と `additionalContext` |
 | `PostToolUse` | コアファイルを控えと突き合わせて戻す。作業ツリーを git で読み、保護領域の変更を報告し、設定に従って戻す（7 章）。チケットの状態を承認済みチケットへ写し、フェーズの終わりを告げる（9.8）。サブエージェントが差し戻しを無視して終わったことを親に言う | 終了コード 2 と標準エラー、または `additionalContext` |
-| `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4） | `systemMessage` |
+| `Stop` | このターンで変わった保護領域を利用者へ報告する（7.4）。メインエージェントの cwd のワークツリーのチケットが、作業を終えたように見えるのに `finish` されていなければ、1 回だけ止めて促す（9.6、ADR-0087） | `systemMessage`。促すときは `decision: block` と `reason` も |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す（9.12） | `additionalContext` |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す（9.12） | 終了コード 2 と標準エラー |
 | その他 | 何もせず通す。記録に `event-not-checked` | 無し |
@@ -164,7 +164,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | `enable` の deny / ask | `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny\|ask", "permissionDecisionReason": "…", "additionalContext": "…"}}`。`additionalContext` はルールが文を持つときだけ |
 | `enable` の allow、委ねた回 | 判定は出さない。通知（既定を使った、コアファイルを戻した、ルールの文）があれば `additionalContext` だけ |
 | `dry-run` の deny / ask | `additionalContext` に「enable なら止めていた / 聞いていた」と理由を並べる。終了コード 0 |
-| `Stop` | `{"systemMessage": "…"}` |
+| `Stop` | `{"systemMessage": "…"}`。`finish` を促すとき（`enable`）は `{"decision": "block", "reason": "…", "systemMessage": "…"}`。`dry-run` なら促しの文を `systemMessage` に載せて止めない |
 | `PostToolUse` / `SubagentStop` の差し戻し | 標準エラーに文、終了コード 2。`dry-run` なら `additionalContext` で 0 |
 
 期限は `PreToolUse` で 3 秒。ルール照合の途中で超えたら `deadline-exceeded` として `enable` は
@@ -245,7 +245,7 @@ ccnavi のリポジトリでの組み立て: `build.py` は PyInstaller の出�
 
 | 欄 | 数えるもの |
 |---|---|
-| `decision` = `allow` / `ask` / `deny` / `handover` / `skip` | 下した判定。`handover` は権限モードに委ねた回 |
+| `decision` = `allow` / `ask` / `deny` / `handover` / `nudge` / `skip` | 下した判定。`handover` は権限モードに委ねた回。`nudge` は `Stop` で `finish` を促した回（ツール呼び出しの判定ではないので `deny` と数えない。ADR-0087） |
 | `enforced` | 実際に適用したか。`dry-run` は常に偽 |
 | `code` | 判定の根拠の種別（付録 A） |
 | `reason` | `skip` の理由 |
@@ -900,6 +900,7 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | フェーズのマーカー | 同 `phases/<親>/<N>.pending` / `.requested` / `.reviewed` / `.skipped` | hook、レビューのスクリプト、`ccnavi --reviewed` | 親のブランチにコミット |
 | 親のマーカー | 同 `phases/<親>/ready.json` / `close-early.json` / `closed.json`、受け入れた指摘の `accepted.json` | レビューのスクリプト、`ticket finish <親>`、人 | 親のブランチにコミット |
 | 子の記録 | 同 `phases/<親>/<子>.risk.json` / `.judge.json` / `.flow.json`（着手のときのフローの指紋。9.3.1） | `ticket finish` / `ticket record-risk` / `ticket start` | 親のブランチにコミット |
+| 状態の跡 | 同 `events/<識別子>.ndjson`（9.6。1 行 1 JSON の追記だけ） | 状態を動かす実行ファイル（承認・`ticket` と `review` の副命令・`--reviewed`・`close-early`・hook の告知）。書き換え・消すコードは無い | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごと運ぶ） |
 | 子のフロー | 同 `flows/<子>.yml`（9.3.1） | 人（ボードのフロー編集画面）。エージェントの Write / Edit は判定が止める。承認で提案のツリーから一緒に動く | 親のブランチにコミット（`ccnavi-push-approved.sh` が置き場ごと運ぶ） |
 | ワークツリー | `.claude/worktrees/<識別子>/` | 親が git のラッパースクリプトで切る | 管理外 |
 
@@ -961,7 +962,7 @@ issue: 50                # 親だけ。マージリクエストの Closes に写
 project: lib             # 置き場と同じ名前。省ける（決めるのは置き場。11）
 parent: i0050            # 子だけ
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり。0 以上の整数。計画があれば 1 から
-predecessors: [i0050-01] # 先に閉じているべき子。案内にだけ使う
+predecessors: [i0050-01] # 子だけ。先に閉じているべき子。承認と着手で求める（ADR-0088）
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
@@ -997,7 +998,10 @@ base_sha: ""
   `allow` か `ask` が 1 件は要る。綴りは書いたまま持ち、大文字小文字を無視するのは当てるときだけ
 - `human_review` は子ごと。フェーズの子に 1 枚でも `required: true` があれば、そのフェーズの終わりで
   レビューが済むまで止まる。省くのに理由が無ければ warn
-- `predecessors` は案内にだけ使う。判定も HITL ポイントも見ない
+- `predecessors` は子だけ。承認と `ticket start` が、各チケットが `done/` に在って取り消しでないことを求める
+  （9.4、9.6、ADR-0088）。レビュー待ち（`review/`）・取り消し済み・どこにも無い・複数の場所にある先行と、
+  自分自身・自分の親・辿ると自分に戻る先行は満たさない。止めるのは承認と `start` だけで、判定（書き込みの範囲）と
+  `finish` と HITL ポイントは見ない。書き込みの範囲は承認済みチケットの置き場が決める
 - `started_at` `completed_at` `base_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文と人の書いた行は保つ）
 - フロー（次の節）はチケットの欄では指さない。欄 `flow` は廃止。書いてあれば warn で名指しして読み飛ばす
@@ -1168,7 +1172,9 @@ warn、チケットで編集対象としているが書き込めない場所（�
 
 承認時に確かめること。親の計画が `phases.yml` と噛み合うか（種類の存在、`kind`、`requires`、延期の
 先にレビューがあるか。`order: dag` なら循環・並びと終端も。9.7）。全体計画の承認と改版では、待ち方の写し `workflow:` を書く。子の親が承認の対象の中か承認済みチケットにあるか、深さ 2 段。
-`project` が置き場に在るか、子は親と同じか。前のフェーズが閉じてレビュー済みか（9.7）。error が
+`project` が置き場に在るか、子は親と同じか。前のフェーズが閉じてレビュー済みか（9.7）。子の先行（`predecessors`）が
+全部 `done/` に在って取り消しでないか（ADR-0088。先行が閉じれば通るものはフェーズの順序と同じく「まだ承認できない」、
+取り消し・どこにも無い・複数の場所はふつうの error）。error が
 あればその提案は落として標準エラーに出し、読めない提案があって承認するものが無ければ 1 を返す。
 
 **範囲の広さは承認で止めない。** 子の項が親の範囲を超える、種類の `scope` を超える、regex で
@@ -1413,7 +1419,7 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 | `todo` → `doing` | `ccnavi --approve`（人）、ボード | 9.4。同じ識別子がどの置き場にも無い | `ccnavi_approved`、置き場から決まった `project` |
 | `todo` → `doing`（手で） | 人が hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が当てる（ADR-0058） | ― |
 | `todo`（改版）→ 消える | `ccnavi --approve`（人） | 同じ識別子が `doing/` にあり、計画だけが違う。`doing/` の側の計画を差し替える | `revised_at` / `feedback_at` |
-| `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い、綴りが大文字小文字まで同じ。子なら親が `doing/` に在って着手済み | `started_at`、`base_sha`（そのワークツリーの HEAD） |
+| `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い、綴りが大文字小文字まで同じ。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない（ADR-0088） | `started_at`、`base_sha`（そのワークツリーの HEAD） |
 | `doing` → `review` | `ccnavi-ticket.sh finish` | 着手済み。子で、閉じた時点のフェーズがレビュー要（延期を含む。9.8）。種類の成果物が在り、定性のリスク判定が揃っている（9.9） | `completed_at` |
 | `doing` → `done` | `ccnavi-ticket.sh finish` | 着手済み。子ならフェーズがレビュー不要。親なら開いている子が無く、レビューで止まっておらず、計画があればフィードバック計画が承認済みで全フェーズが終わっている（締めていれば子だけ） | `completed_at` |
 | `doing` → `done`（取り消し） | `ccnavi-ticket.sh cancel --reason`、`close-early`（未着手の子） | 理由が空でない。親なら開いている子が無い | `cancelled_at`、`cancel_reason` |
@@ -1429,6 +1435,32 @@ deny にはしない（phases.yml はコアファイルでエージェントが�
 
 閉じる向き（`doing` → `review` / `done`）は範囲が消える向きなので承認は要らない。再開は範囲が戻る
 向きなので人の手に置く。親を閉じても子の承認済みチケットは閉じない。
+
+**状態の跡（ADR-0086）。** 実行ファイルが上の表の遷移とマーカーの遷移を動かすたびに、承認済みの領域の
+`events/<識別子>.ndjson` へ 1 行 1 JSON を追記する（`at` は UTC の ISO 8601、`kind`、元と先の置き場 `from` / `to`、
+経路 `via` = `cli` / `terminal` / `board` / `hook`）。マーカーの跡は親のファイルに `phase-mark` / `phase-reopened` /
+`parent-mark` で残り、`from` / `to` は `null`。書くのは動かす操作の最下段（`approval.admit` など）で、書けなくても
+状態の操作は止めず、`ccnavi: 警告: …` を標準エラーに出す（入口の `cli.run` が起動を抜けるときにまとめて出す）。
+**正は置き場で、跡は補助。** 判定も状態の操作も跡を読まず、食い違ったら置き場を信じる。人が hook の外で
+置き場を動かした分（手での承認・再開）は跡が残らない。ボードは新しい側を `history` で受け取り、カードの
+畳める一覧に並べるだけ（10 章）。
+
+**先行は着手でも見る（ADR-0088）。** 子の `start` は、`predecessors` の各チケットが `done/` に在って取り消しでないことを
+求める。承認でも同じ検査を当てるが、承認のあとに先行が戻された子と、置き場を手で動かして承認した子（ADR-0058）が
+あるので、着手の手前でもう一度見る。止めたときは、どの先行が何の状態か（承認待ち・作業中・レビュー待ち・取り消し済み・
+どこにも無い・複数の場所）と、先行を閉じる（`finish`）か、先行が要らないなら人に承認済みチケットの欄から外してもらうか
+取り消して出し直す（`cancel`）ことを sh の綴りで言う。続きの子（9.10）は、見た子のうち取り消したものを先行に入れない。
+止めるのは `start` までで、書き込みは止めない（判定は `started_at` も先行も見ない）。
+
+**`finish` の打ち忘れは `Stop` で 1 回だけ促す（ADR-0087）。** メインエージェントの `Stop` で、cwd のワークツリーに
+結び付いた承認済みチケットが着手済み（`doing/`、閉じても取り消してもいない）で、そのワークツリーに未コミットの変更が無く
+（追跡していないファイルも数える）、基準点より先に自分で作ったコミットがあれば（取り込んだだけのコミットは数えない。
+子なら親のブランチ、親なら `origin/HEAD` にあるものとマージのコミットを除く）、`decision: block` で止めて、`finish` の sh の綴りと
+「続けるなら理由を利用者に書いてから終える」を渡す（`NUDGE_TICKET_FINISH`）。同じセッションで同じチケットを同じ HEAD のまま
+促すのは 1 回だけ（控えは状態の置き場の `nudged-<セッション>.json`。git では運ばない）。HEAD が進めばまた促す。payload の
+`stop_hook_active` が真なら促さない。控えの置き場が無いか書けないときも促さない。除くのは、チケット制御かモードが `disable`、ワークスペースルートかチケットの無いワークツリー、
+未着手、`blocked`、基準点が無い、子で親のブランチを引けない、親で `close_problems`（開いている子・レビュー準備中／レビュー待ち・フィードバック計画待ち・
+終わっていないフェーズ）が空でない、git を読めない、`SubagentStop`。`dry-run` は止めずに文を `systemMessage` に載せる。
 
 **子の着手は親の着手のあと。** 親が `doing/` で着手済みでなければ、子の `start` は止まる（親のワークツリーが
 要る）。案内は親の置き場で分かれ、`todo/` なら承認から、`doing/` で未着手なら親の `start` から。親が
@@ -1835,7 +1867,8 @@ compact の前後の hook でフローを入れ直すことはしない（理由
 
 JSON の形は README の「試験の JSON」「lint の JSON」「ボードの JSON」に定める。拡張はこれを並べるだけで、
 提案もマーカーも自分で解釈せず、glob も regex も自分で当てず、点も数えない（ADR-0035）。止まっているか・
-承認待ち・ワークツリーの有無は、判定と承認が使う関数をそのまま呼んで載せる。
+承認待ち・ワークツリーの有無は、判定と承認が使う関数をそのまま呼んで載せる。チケットには状態の跡（9.6、ADR-0086）の
+新しい側も `history` で載せる。カードはそれを畳める「履歴」に並べるだけで、列やバッジは跡から決めない。
 
 承認は拡張の中で完結する（9.4）。オーバーレイが `--approve --preview --json` で一覧を見せ、人が押したら
 `--approve --yes` を子プロセスで打つ。承認できたら渡す文を見せ、ボードを読み直して列が変わったカードに印を
@@ -2381,6 +2414,7 @@ ccnavi はアプリケーション層の柵で、それ自体を最終防衛線�
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに控えた指紋から変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1、ADR-0085） |
 | `DENY_TICKET_APPROVAL_CLI` | 実行ファイルを承認用のオプション付きで直接打った。実行役のコマンド越しに打った形を含む。端末要求を切る変数とフラグをコマンド行に書いた形も（9.5） |
 | `DENY_PHASE_REVIEW` | フェーズのレビューで止まっている（レビュー準備中・レビュー待ち） |
+| `NUDGE_TICKET_FINISH` | メインエージェントの `Stop` で、cwd のワークツリーのチケットが着手済みのまま、未コミットの変更が無く基準点より先に自分のコミットがある。同じ HEAD では 1 回だけ止めて `finish` か続ける理由を促す（9.6、ADR-0087）。記録の `decision` は `nudge` |
 | `DENY_SUBAGENT_TICKET_OP` | サブエージェントがチケットの状態・レビュー・push を動かそうとした |
 | `DENY_CHILD_PUSH` | 子チケットのワークツリーから `ccnavi-git.sh push` を打った。`cd` の行き先が読めない push を含む（9.10、ADR-0077） |
 | `DENY_SCRIPT_ENV_OVERRIDE` | 保護済みの sh を、sh の検査の材料を変える環境変数と同じコマンド行で呼んだ（8.2、ADR-0077） |

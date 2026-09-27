@@ -282,7 +282,7 @@ hook は、そのイベントに ccnavi が登録されていなければ足す�
 | `UserPromptSubmit` | 保護領域の状態とツリーごとの HEAD を控え、ターンの基準にする | ターンの終わりの報告が出ない（コミットに入った変更も見えない） |
 | `PreToolUse` | 呼び出しを判定し、設定ファイルを控える | 判定そのものが働かない |
 | `PostToolUse` | 作業ツリーを見て、変わっていれば戻す。チケットの状態を承認済みチケットへ写す | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない |
-| `Stop` | このターンで変わった保護領域を利用者へ報告する | 変更が人の目に触れない |
+| `Stop` | このターンで変わった保護領域を利用者へ報告する。cwd のワークツリーのチケットを `finish` し忘れていそうなら 1 回だけ止めて促す | 変更が人の目に触れない。閉じ忘れたチケットが作業中に残る |
 | `SubagentStart` | 承認済みで開いている子チケットの一覧を渡す | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 子のワークツリーに範囲外の変更が残っていれば 1 回だけ差し戻す | コミット済みの範囲外が親に届く |
 
@@ -1091,6 +1091,16 @@ undo: git clean -f -- ".ccnavi/common/probe.json"
 控えた状態なので、`UserPromptSubmit` を登録していないと `Stop` は何も言わない（記録には `no-turn-baseline`）。
 ここでは戻さず、`CCNAVI_MODE` も見ない（見えたことを言うだけなので、`dry-run` でも報告する）。
 
+同じ `Stop` で、`finish` の打ち忘れを 1 回だけ促す（ADR-0087）。メインエージェントの cwd のワークツリーに結び付いたチケットが
+着手済みで、そのワークツリーに未コミットの変更が無く（追跡していないファイルも数える）、基準点より先に自分で作ったコミットがあれば
+（子なら親のブランチ、親なら `origin/HEAD` を取り込んだだけのコミットとマージのコミットは数えない）、
+`{"decision": "block", "reason": …}` で止め、`ccnavi-ticket.sh finish <識別子>` の綴りと「まだ続けるなら理由を書いてから終える」を
+渡す（理由コード `NUDGE_TICKET_FINISH`。報告があれば同じ JSON の `systemMessage` に載る。記録の `decision` は `nudge`）。同じセッションで
+同じチケットを同じ HEAD のまま促すのは 1 回だけで（控えは `logs/state/nudged-<セッション>.json`）、コミットを足せばまた促す。
+payload の `stop_hook_active` が真なとき、控えを置けないとき、子で親のブランチを引けないときも促さない。チケット制御かモードが `disable`、未着手、書き込み停止中（`blocked`）、親で `finish` が通らない形（開いている子・
+レビュー準備中／レビュー待ち・フィードバック計画待ち・終わっていないフェーズ）、git を読めないとき、`SubagentStop` では促さない。
+`dry-run` では止めず、止めたはずの文を `systemMessage` に載せる。
+
 ### 自動復元
 
 `CCNAVI_RESTORE_IF_DENY=enable`（既定）のとき、ccnavi 自身が戻す。`dry-run` では戻さず、報告に `would-restore` の行を足す。
@@ -1234,7 +1244,7 @@ issue: 50                # 親だけ。マージリクエストの Closes に写
 project: lib             # 置き場と同じ名前。省ける（提案を置いた場所が決める）
 parent: i0050            # 子だけ。親は書かない
 phase: 2                 # 子だけ。同じ親の同じ番号が 1 つのまとまり
-predecessors: [i0050-01] # 先に閉じているべき子。案内にだけ使う
+predecessors: [i0050-01] # 子だけ。先に閉じているべき子。承認と着手（start）で求める。書き込みは止めない（ADR-0088）
 human_review:
   required: true         # 既定。省くなら理由を書く
   reason: 設定の読み込み経路を変えるため
@@ -1573,7 +1583,7 @@ factors:
 
 ### サブエージェントに渡すもの
 
-`SubagentStart` で、cwd のワークツリーに関わる承認済みで開いている子の一覧（識別子・ワークツリー・範囲・先行の状態）を渡す。
+`SubagentStart` で、cwd のワークツリーに関わる承認済みで開いている子の一覧（識別子・ワークツリー・範囲・満たしていない先行とその状態）を渡す。
 親のワークツリーからならその親の子、子のワークツリーからならその子自身。それ以外には何も渡さない。判定は行き先で決まるので、これは案内でしかない。
 
 ### 参考にした運用
@@ -1819,7 +1829,7 @@ error 2 件、warn 2 件、info 0 件
 | error | 親が計画を持つのに `phases.yml` が読めない、`phases.yml` / `risks.yml` 自身の誤り |
 | error | 承認済みチケットが読めない |
 | warn | 未承認の提案がある |
-| warn | `predecessors` が閉じていないのに着手している子 |
+| warn | `predecessors` を満たしていない（`done/` に無いか取り消し済み）のに着手している子 |
 | warn | チケットの無いワークツリー、識別子と名前の一致しないワークツリー |
 | warn | ワークツリー側に置かれた承認済みチケット（読まれない） |
 | warn | 承認済みチケットはあるがワークツリーが無い（範囲が効かない） |
@@ -1930,6 +1940,7 @@ ccnavi --explain --json
 | 鍵 | 何 |
 |---|---|
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から |
+| `predecessors_unmet[]` | 満たしていない先行（ADR-0088）。`{ticket, state, label}`。`state` は `todo` / `doing` / `review`（先行が閉じれば満たす）と `cancelled` / `missing` / `scattered` / `self` / `ancestor` / `cycle`（待っても満たさない）、`label` は人向けの言葉（「作業中（doing/）」など）。空でなければ承認と着手（`start`）が止まる（書き込みと `finish` は止まらない）。先行が無い子・親・閉じたチケットは空。ボードはこれで「先行待ち」のバッジを出し、自分では数えない |
 | `proposal` | `{state, tree, tree_root, path}`。権威のあるツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`doing/` `done/` に在るときは `null` |
 | `copy` | `{status, approved_at, source_tree, path}`。`status` は `none`（未承認）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`） |
 | `blocked` | 空でなければ「読めるが信じられない」理由（ADR-0058）。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
@@ -1939,6 +1950,7 @@ ccnavi --explain --json
 | `scattered[]` | どれが本物か決まらない写りの全部。`{tree, state, path}`。決まっていれば空。権威のツリー（親のツリー → 元ツリーの順。ADR-0073）で畳んで 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR で言う条件と同じ。`seen_in` の数は食い違いを意味しない |
 | `flow` | 子のフロー（設計 9.3.1）。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked}`。`path` は読む先の絶対パス（権威のツリー＝承認済みチケットが在るツリーの版だけ。子のワークツリーの写しは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く）、`rel` はツリーのルートからの相対（承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml`。中身は YAML）、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中）。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのまま写し、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
+| `history[]` | 状態が動いた跡（ADR-0086）の新しい側 20 件を古い順に。`.ccnavi/approved/events/<識別子>.ndjson`（権威のツリー＝承認済みチケットが在るツリーの版）の 1 行ずつで、`{at, ticket, kind, from, to, via, ...}`。`at` は UTC の ISO 8601、`kind` は `approved` / `revised` / `raised` / `started` / `finished` / `cancelled` / `settled`（置き場が動いたもの）と `phase-mark` / `phase-reopened` / `parent-mark`（マーカー。親の跡に残り、`from` / `to` は `null` で `phase` / `mark` を持つ）、`from` / `to` は置き場の名前（`todo` / `doing` / `review` / `done`）、`via` は `cli`（sh の副命令）/ `terminal`（人が端末で）/ `board`（ボード）/ `hook`。種類ごとに `phase`・`mark`・`reason`・`base_sha`・`tree`・`followup_of`・`cleared` が付く。**補助で、状態の正は置き場の欄**。跡が無ければ空。読めない行があれば飛ばして `problems[]` で言う |
 
 `parents[]` の 1 件。
 
@@ -1973,7 +1985,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `batch[].overflow[]` | 範囲の超過（親の範囲・フェーズの種類の `scope` を超える項、regex の項）の説明。文字列の並びで、無ければ `[]`。承認は通るが、判定で止まる |
 | `text` | 承認画面の本文そのまま。拡張はこれを等幅で並べ、項目には分けない |
 | `digest` | 見せた中身の指紋。`--yes` の `--digest` にそのまま渡す |
-| `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}`。載るのは形の壊れた提案（親が承認されていない、計画に無い番号、順序など）だけで、範囲の超過だけの子は `batch[]` に載る |
+| `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}`。載るのは形の壊れた提案（親が承認されていない、計画に無い番号、順序、先行（`predecessors`）が `done/` に無いか取り消し済み（ADR-0088）など）だけで、範囲の超過だけの子は `batch[]` に載る |
 | `problems[]` | 読めない提案や承認済みチケットの説明 |
 
 `--preview` 自身は、対象にしない提案があっても 0 で返る。答えが要るときだけ `--verify` を足す。
@@ -1985,7 +1997,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `verify.reason` | 答えの理由の名前。全部入るなら `ok`、入らないなら `refused`（絞りが通らない）/ `nothing-pending`（承認待ちが 1 件も無い）/ `rejected`（承認の対象にしない提案がある）。読めない提案（`problems[]`）はここに出ない |
 
 `--verify` は、`--approve` が落とさない範囲の超過（`batch[].overflow`）と読めない提案（`problems[]`）では「いいえ」にしない。どちらも本文には出す。
-承認で落ちるものは `ccnavi --lint` も同じ関数で名指しする（ただし「まだ承認できない」子は `--lint` では warn）。
+承認で落ちるものは `ccnavi --lint` も同じ関数で名指しする（ただし「まだ承認できない」子は `--lint` では warn。先行が閉じれば通る子もここに入る。取り消し済み・どこにも無い・複数の場所にある・自分自身・自分の親・輪になった先行は error）。
 
 `--yes` の答え。値は `--preview` の `batch[].ticket` をカンマで並べたもの。
 

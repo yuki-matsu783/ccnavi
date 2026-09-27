@@ -23,6 +23,7 @@ from . import (
     diagnose,
     events,
     fsio,
+    history,
     hookio,
     judge,
     lint,
@@ -305,7 +306,17 @@ def _json_out_of_test(argv: list[str]) -> list[str]:
 
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
-    """1 回の起動を処理する。"""
+    """1 回の起動を処理する。
+
+    状態の跡（history）の経路はここで決まる。既定はエージェントが sh から打つ副命令（`cli`）で、
+    人の判断の経路（端末・ボード）と hook は枝の中で差し替える。跡を書けなかった知らせは、
+    起動を抜けるときに標準エラーへ出す（状態の操作は止めない。ADR-0086）。
+    """
+    with history.session(history.VIA_CLI, stderr):
+        return _run(stdin, stdout, stderr, argv)
+
+
+def _run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
     # 前方一致を受けない。受けると `--close` や `--review` が `--close-early` / `--reviewed` として
     # 走り、全部綴った形しか見ない組み込みの deny（`phase._CLI_FORMS`）を抜ける。
     parser = argparse.ArgumentParser(prog="ccnavi", add_help=False, allow_abbrev=False)
@@ -505,6 +516,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         # 同じであることを求める。エージェントがこれを Bash で打つ形は組み込みの
         # deny（phase.ticket_approval_rule）が止める。
         if args.yes:
+            history.set_via(history.VIA_BOARD)
             # 後ろに並べた語は preview に渡したのと同じ絞り。`--yes` は見せた識別子。
             code = approval.approve_yes(
                 stdout,
@@ -519,6 +531,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_OK if code == 0 else EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--approve"):
             return EXIT_ERROR
+        history.set_via(history.VIA_TERMINAL)
         rule_set, _ = ruleload.load_rules(stderr, conf, audit.Record(), root)
         # `--approve` の後ろに並べた語は、承認の対象に入れる識別子。無ければ承認待ち全部。
         approved = approval.approve(
@@ -534,6 +547,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
             return EXIT_ERROR
         if not _from_terminal(stdin, conf, stderr, "--config-synced"):
             return EXIT_ERROR
+        history.set_via(history.VIA_TERMINAL)
         code = configsync.acknowledge(stdin, stdout, stderr, conf, root, args.config_synced)
         return EXIT_OK if code == 0 else EXIT_ERROR
 
@@ -593,6 +607,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO, argv: list[str]) -> int:
         )
         return modes.fail_closed(mode)
 
+    history.set_via(history.VIA_HOOK)
     record = audit.Record(
         mode=mode,
         permission_mode=payload.permission_mode,
@@ -655,6 +670,7 @@ def operate(
         # 人の判断。`--approve` / `--reviewed` と同じく端末を求める。
         if not _from_terminal(stdin, conf, stderr, "--close-early"):
             return EXIT_ERROR
+        history.set_via(history.VIA_TERMINAL)
         code = review.close_early(stdin, stdout, stderr, root, conf, cwd, args.reason, args.result)
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None and args.accept_unresolved and (args.preview or args.yes):
@@ -664,6 +680,7 @@ def operate(
         if not args.json or not args.result:
             stderr.write("ccnavi: ボードの経路は --json と --result <json> を付けて打つ\n")
             return EXIT_ERROR
+        history.set_via(history.VIA_BOARD)
         if args.preview:
             code = review.decide_preview(
                 stdout, stderr, root, conf, cwd, args.reviewed, args.result
@@ -682,6 +699,7 @@ def operate(
             )
         return EXIT_OK if code == 0 else EXIT_ERROR
     if args.reviewed is not None:
+        history.set_via(history.VIA_TERMINAL)
         code = review.reviewed(
             stdin,
             stdout,
