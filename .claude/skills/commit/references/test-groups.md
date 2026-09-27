@@ -1,3 +1,11 @@
+---
+type: skill-reference
+title: テストのグループと回すグループの決め方
+description: ccnavi のテストを複数のグループに分けて管理する方法と、変更時にどのグループを実行すべきか決める基準
+tags: [testing, skills]
+keywords: [テストグループ, tests, core, guard, config, ticket, sh, e2e, discover, run_tests.py]
+---
+
 # テストのグループと、回すグループの決め方
 
 ## グループ

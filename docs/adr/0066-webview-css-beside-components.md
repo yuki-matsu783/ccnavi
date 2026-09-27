@@ -1,3 +1,11 @@
+---
+type: adr
+title: 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む
+description: CSS ファイルを React 部品と同じディレクトリに配置し、esbuild で束ねて拡張ホストが流し込む
+tags: [extension, design-doc]
+keywords: [CSS, webview, esbuild, 部品, React, スタイル, 束ね]
+---
+
 # ADR-0066: 画面の CSS を部品と同じ置き場に移し、束ねたものを拡張ホストが流し込む
 
 状態: 採用

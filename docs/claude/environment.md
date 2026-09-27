@@ -1,3 +1,11 @@
+---
+type: guide
+title: 実行環境と呼び名
+description: 対応する実行環境（Windows、macOS、Linux）と、プロジェクトで使う用語の定義
+tags: [settings, sh-scripts]
+keywords: [実行環境, Windows, macOS, Linux, Git Bash, WSL, ワークスペースルート, sh, bash]
+---
+
 # 実行環境と呼び名
 
 ## 実行環境

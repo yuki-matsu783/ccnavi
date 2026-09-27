@@ -1,3 +1,11 @@
+---
+type: adr
+title: 実行ファイルの境界は自分のディレクトリの中
+description: ccnavi 実行ファイルのスコープをその置き場ディレクトリに限定する設計
+tags: [exe-boundary, design-doc]
+keywords: [実行ファイル, 境界, ディレクトリ, スコープ, ccnavi]
+---
+
 # ADR-0028: 実行ファイルの境界は自分のディレクトリの中
 
 状態: 採用

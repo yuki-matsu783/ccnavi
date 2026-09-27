@@ -1,3 +1,11 @@
+---
+type: adr
+title: 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ
+description: レビューを促す勧告の文面と頻度を rules.yml で管理し、実装から分離する
+tags: [config, review]
+keywords: [勧告, しきい値, 設定, ルール, every, additionalContext, 頻度]
+---
+
 # ADR-0057: 勧告の文面としきい値は設定が持ち、実行ファイルは数えるところだけを持つ
 
 状態: 採用
